@@ -525,7 +525,8 @@ export function createIntakeBudget(throttle: IntakeThrottle, startedAt: number, 
   let revisitsLeft = Math.floor(throttle.max_ingests / 4);
   const sources = new Map<string, { attempted: number; estimate_ms: number; hold: string | null }>();
   const state = (source: string) => {
-    if (!sources.has(source)) sources.set(source, { attempted: 0, estimate_ms: 15_000, hold: null });
+    // Craigslist ingests and search pages are short (1-3 s): a 15 s starting estimate reserved 32 s of every run for nothing.
+    if (!sources.has(source)) sources.set(source, { attempted: 0, estimate_ms: source === "craigslist" ? 5_000 : 15_000, hold: null });
     return sources.get(source)!;
   };
   const remainingMs = () => Math.max(0, startedAt + 110_000 - clock());
