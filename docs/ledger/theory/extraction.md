@@ -70,10 +70,11 @@ The owner: "best is a metric we have yet to fully develop." So the ranking is a 
 revised, not a one-off table. `best_v1` scores each landed lot from 0 to 1 and is stored with its components in
 `firecrawl_lot_score` (metric_version `best_v1`):
 
-    best_v1 = ( 2 x tier + complete + outcome + unique + group ) / 6, an unknown component counts 0
+    best_v1 = ( 2 x tier + complete + 2 x outcome + unique + group ) / 7, an unknown component counts 0
     tier      model year 1964-1973 = 1, 1974-1991 = 0.6, other = 0.2
     complete  (description + VIN + a photo + a location) / 4
-    outcome   a realized price = 1; the outcome known without a price (reserve not met, no sale, ended) = 0.5; an ask = 0
+    outcome   (weight 2 since 2026-10-15: the owner's core product is what sold, for how much and how fast, so an ask with no
+              observable outcome is half a data point) a realized price = 1; the outcome known without a price (reserve not met, no sale, ended) = 0.5; an ask = 0
     unique    1 when no other platform holds an event for the same vehicle, else 0
     group     the lot's model family x year band score over the best group score (`firecrawl_group_score`); an illiquid
               or unmatched family = 0
@@ -105,7 +106,7 @@ relists). Those are properties of a lot and apply to every source, so they are l
     quality    = checks passed / checks known, over: no dealer wording, no parts or project wording, VIN not noisy
                  (a 1981-or-later VIN that is not 17 characters, a masked VIN, or a typed-VIN conflict), not a relist,
                  and, when recorded, seller_type = private. No check known = unknown, which counts 0.
-    best_v1_1  = ( 2 x tier + complete + outcome + unique + group + quality ) / 7
+    best_v1_1  = ( 2 x tier + complete + 2 x outcome + unique + group + quality ) / 8
 
 Method `lexicon_v1` derives the four checks from the stored description, year, VIN and events for every scored lot (the
 lexicons are `firecrawl_params` rows `lexicon_dealer` and `lexicon_parts_project`, from the terms lane-ebay used). A lane that
