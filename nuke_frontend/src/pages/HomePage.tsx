@@ -163,7 +163,7 @@ export function familyCoverage(nodes: readonly TreemapNode[] | null): string {
  *  and its sold amount (vehicle_price_facts); the median is withheld under 5 sales. */
 export function mapLegend(level: MapLevel, measured = level === 'brands' || level === 'families' || level === 'models'): string {
   if (level === 'vehicles') return 'area = confirmed sale price · click to open the record';
-  if (measured) return `area = dollars from confirmed sales · of offered sold = share of cars offered at auction that sold · 12 mo = sales and dollars in the last 12 months against the 12 before; color follows sales (gray: too few dated sales) · nominal${level === 'families' ? ' · other models = names not yet keyed to a family, and families with under 3 sales' : ''} · click to go down`;
+  if (measured) return `area = dollars from confirmed sales · of offered sold = share of cars offered at auction that sold · BaT 12 mo = sales and dollars on Bring a Trailer in the last 12 months against the 12 before, the venue held in full both years; color follows those sales (gray: BaT holds under half the sales, or too few a year earlier) · nominal${level === 'families' ? ' · other models = names not yet keyed to a family, and families with under 3 sales' : ''} · click to go down`;
   return 'area = vehicles with a confirmed sale · color = their median sale price (gray: under 5 sales) · nominal, all years · asks, bids and unknown outcomes are not counted · click to go down';
 }
 
@@ -375,8 +375,10 @@ function priceToColor(medianPrice: number | undefined): string {
   return 'var(--heat-6)';
 }
 
-/** Sales in the last 12 months against the 12 before, when the brand has enough dated sales to say so: at least 10 a
- *  year earlier and a sale date on at least half its sales. Null otherwise; the tile is then gray, not a guess. */
+/** Sales on Bring a Trailer in the last 12 months against the 12 before (treemap_brand_market and the family readers count
+ *  BaT only since 20261015131500: the all-venue move mixed in venues whose intake is uneven between the two years), when
+ *  there are enough to say so: at least 10 a year earlier, and BaT's dated sales at least half of the tile's sales.
+ *  Null otherwise; the tile is then gray, not a guess. */
 export function brandMomentum(n: Pick<TreemapNode, 'count' | 'dated' | 'sold_12m' | 'sold_prior_12m'>): number | null {
   if (n.sold_12m == null || !n.sold_prior_12m || n.sold_prior_12m < 10) return null;
   if (!n.dated || n.dated < 0.5 * n.count) return null;
@@ -411,7 +413,7 @@ export function brandLines(n: TreemapNode): string[] {
   if (n.offered && n.offered >= 20 && n.sold_any != null) lines.push(`${Math.round((100 * n.sold_any) / n.offered)}% of offered sold`);
   const m = brandMomentum(n);
   const d = brandDollarMomentum(n);
-  if (m !== null) lines.push(`12 mo: sales ${signedPct(m)}${d !== null ? `, $ ${signedPct(d)}` : ''}`);
+  if (m !== null) lines.push(`BaT 12 mo: sales ${signedPct(m)}${d !== null ? `, $ ${signedPct(d)}` : ''}`);
   return lines;
 }
 
@@ -700,11 +702,11 @@ function TreemapTooltip({ node, x, y, totalCount, level }: TooltipData) {
         <div><Text role="measure">{fmtMoney(node.usd)}</Text> <Text role="caption">from {fmtNum(node.count)} confirmed sales</Text></div>
         <div style={{ borderTop: '1px solid var(--border)', paddingTop: 6, display: 'flex', flexDirection: 'column', gap: 3 }}>
           {node.offered && node.sold_any != null ? <Row label={`of ${fmtNum(node.offered)} offered sold`} value={`${Math.round((100 * node.sold_any) / node.offered)}%`} /> : null}
-          {node.sold_12m != null ? <Row label="sold, last 12 months" value={`${fmtNum(node.sold_12m)}${node.usd_12m ? ` · ${fmtMoney(node.usd_12m)}` : ''}`} /> : null}
-          {node.sold_prior_12m != null ? <Row label="sold, the 12 before" value={`${fmtNum(node.sold_prior_12m)}${node.usd_prior_12m ? ` · ${fmtMoney(node.usd_prior_12m)}` : ''}`} /> : null}
-          {m !== null ? <Row label="change, sales" value={signedPct(m)} /> : null}
-          {d !== null ? <Row label="change, dollars" value={signedPct(d)} /> : null}
-          {m === null && node.sold_12m != null ? <Row label="12-month change" value="too few dated sales" /> : null}
+          {node.sold_12m != null ? <Row label="sold on BaT, last 12 months" value={`${fmtNum(node.sold_12m)}${node.usd_12m ? ` · ${fmtMoney(node.usd_12m)}` : ''}`} /> : null}
+          {node.sold_prior_12m != null ? <Row label="sold on BaT, the 12 before" value={`${fmtNum(node.sold_prior_12m)}${node.usd_prior_12m ? ` · ${fmtMoney(node.usd_prior_12m)}` : ''}`} /> : null}
+          {m !== null ? <Row label="change, BaT sales" value={signedPct(m)} /> : null}
+          {d !== null ? <Row label="change, BaT dollars" value={signedPct(d)} /> : null}
+          {m === null && node.sold_12m != null ? <Row label="BaT 12-month change" value="too few BaT sales" /> : null}
           {node.avg_bids ? <Row label="average bids" value={String(node.avg_bids)} /> : null}
           {node.models ? <Row label="model names sold" value={fmtNum(node.models)} /> : null}
           {node.familyKey === 'other' ? <Text role="caption" as="div">names not yet keyed to a model family, and families with under 3 sales</Text> : null}

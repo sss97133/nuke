@@ -22,8 +22,8 @@ describe('the ledger map legend measure', () => {
     const legend = mapLegend('brands');
     expect(legend).toContain('area = dollars from confirmed sales');
     expect(legend).toContain('of offered sold = share of cars offered at auction that sold');
-    expect(legend).toContain('12 mo = sales and dollars in the last 12 months against the 12 before');
-    expect(legend).toContain('gray: too few dated sales');
+    expect(legend).toContain('BaT 12 mo = sales and dollars on Bring a Trailer in the last 12 months against the 12 before, the venue held in full both years');
+    expect(legend).toContain('gray: BaT holds under half the sales, or too few a year earlier');
     expect(legend).not.toMatch(/low–|’yy/);
     expect(legend).not.toMatch(/median/);
   });
