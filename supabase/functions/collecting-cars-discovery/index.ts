@@ -252,9 +252,10 @@ Deno.serve(async (req) => {
       }
       const { data: src } = await supabase.from("observation_sources").select("id").eq("slug", "collecting-cars").maybeSingle();
       if (!src) return okJson({ error: "observation source collecting-cars not found" }, 404);
-      const { error } = await supabase.from("source_census").insert(out.map((o) => ({
+      const censusAt = Date.now(); // source_census is unique on (source, census_at): one millisecond apart per day
+      const { error } = await supabase.from("source_census").insert(out.map((o, i) => ({
         source_id: src.id, census_day: o.day, universe_total: o.listed, census_method: "enumerated", census_confidence: 0.9,
-        census_url: TYPESENSE_ENDPOINT, census_at: new Date().toISOString(),
+        census_url: TYPESENSE_ENDPOINT, census_at: new Date(censusAt + i).toISOString(),
         census_notes: `Cars published that UTC day (tsPublishedUTC), any stage, counted in the Collecting Cars search index (collection ${TYPESENSE_COLLECTION}).`,
       })));
       if (error) throw new Error(`source_census insert failed: ${error.message}`);
