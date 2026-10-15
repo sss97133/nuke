@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 vi.mock('../lib/supabase', () => ({ supabase: {} }));
-import { familyCoverage, ledgerViewsClock, ledgerViewsStamp, mapCaption, mapLegend } from './HomePage';
+import { familyCoverage, familyNamesShown, ledgerViewsClock, ledgerViewsStamp, mapCaption, mapLegend } from './HomePage';
 
 describe('the ledger map legend clock', () => {
   it('says how long ago the views were refreshed, and keeps the exact time for the title', () => {
@@ -72,5 +72,14 @@ describe('how much of a brand the family level names', () => {
     const refresh = { refreshedAt: '2026-10-14T09:10:00Z', populations: null };
     expect(mapCaption('families', 1000, refresh, Date.parse('2026-10-15T01:10:00Z'), familyCoverage(nodes)))
       .toBe('1,000 vehicles with a confirmed sale · 90% in 2 model families · updated 16 h ago');
+  });
+});
+
+describe('what a family level shows', () => {
+  it('says when it shows the largest names of a family', () => {
+    expect(familyNamesShown(200, 1355)).toBe(' · largest 200 of 1,355 names');
+    expect(familyNamesShown(49, 49)).toBe('');
+    expect(familyNamesShown(0, 10)).toBe('');
+    expect(familyNamesShown(200, undefined)).toBe('');
   });
 });

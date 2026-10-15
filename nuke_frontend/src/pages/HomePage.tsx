@@ -64,6 +64,8 @@ interface DrillLevel {
   label: string;
   make?: string;
   family?: string;
+  /** how many model names in the family sold (the family level's models), so the next level can say what it shows */
+  names?: number;
   model?: string;
   year?: number;
 }
@@ -157,6 +159,11 @@ export function familyCoverage(nodes: readonly TreemapNode[] | null): string {
   const named = nodes.filter((n) => n.familyKey && n.familyKey !== 'other');
   const share = total > 0 ? named.reduce((sum, n) => sum + n.count, 0) / total : 0;
   return ` · ${Math.round(share * 100)}% in ${named.length.toLocaleString('en-US')} model famil${named.length === 1 ? 'y' : 'ies'}`;
+}
+
+/** At a family's model names: when the reader's 200 are fewer than the family's names, say so. */
+export function familyNamesShown(shown: number, names?: number): string {
+  return names && shown > 0 && names > shown ? ` · largest ${shown.toLocaleString('en-US')} of ${names.toLocaleString('en-US')} names` : '';
 }
 
 /** What area and color mean at each level. The readers count public records with a confirmed sale (vehicle_sale_basis)
@@ -992,7 +999,7 @@ export function TreemapHomePage({ onBrowse, embedded = false }: { onBrowse: () =
       recordInterest('make', node.name);
       setDrillStack(prev => [...prev, { label: node.name, make: node.name }]);
     } else if (levelType === 'families' && node.familyKey) {
-      setDrillStack(prev => [...prev, { label: node.name, make: currentLevel.make, family: node.familyKey }]);
+      setDrillStack(prev => [...prev, { label: node.name, make: currentLevel.make, family: node.familyKey, names: node.models ?? undefined }]);
     } else if (levelType === 'families' || levelType === 'models') {
       // A family's model name, or the brand's own when families could not be read; a sale without a name stops here.
       if (node.noModel) return;
@@ -1267,7 +1274,8 @@ export function TreemapHomePage({ onBrowse, embedded = false }: { onBrowse: () =
         <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 12, flexShrink: 0 }}>
           {activeData && (
             <Text role="caption" title={ledgerViewsStamp(refresh.refreshedAt)}>
-              {mapCaption(levelType, totalCount, refresh, Date.now(), levelType === 'families' ? familyCoverage(activeData) : '')}
+              {mapCaption(levelType, totalCount, refresh, Date.now(), levelType === 'families' ? familyCoverage(activeData)
+                : levelType === 'models' ? familyNamesShown(activeData?.length ?? 0, currentLevel.names) : '')}
             </Text>
           )}
           {currentLevel.year && currentLevel.make && currentLevel.model && (
