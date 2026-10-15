@@ -67,6 +67,7 @@ Deno.test({
     let tamperWork: Row | null = null;
     let tamperWorkSource = false;
     let revokeWorkAtResult = false;
+    let hideReportSiblings = false;
     const reportParents = new Set<string>();
     const host = Deno.env.get("PGHOST") ?? "";
     const port = Deno.env.get("PGPORT") ?? "";
@@ -176,6 +177,9 @@ Deno.test({
           else throw new Error(`Unhandled filter: ${key}=${value}`);
         }
         let statement: string;
+        // Hide intake's same-sentence lookup so the PostgreSQL gate alone decides.
+        if (request.method === "GET" && hideReportSiblings && table === "vehicle_observations" &&
+          url.searchParams.get("extraction_method") === `eq.${RETAINED_REPORTED_WORK_MODE}`) return respond([]);
         if (request.method === "GET") {
           assert(filters.length > 0, "Unfiltered SDK table scans are forbidden");
           statement = `SELECT COALESCE(jsonb_agg(to_jsonb(r)),'[]'::jsonb)::text FROM (SELECT ${selected.join(",")} FROM public.${table} WHERE ${filters.join(" AND ")} LIMIT ${limit}) r`;
@@ -595,16 +599,16 @@ Deno.test({
         equal(bridgeErrors, [], "Reported work must use only sanctioned fixture routes");
         return { status: response.status, data: await response.json() };
       };
-      const seedReport = async (text: string, key: string) => {
+      const seedReport = async (text: string, key: string, page = key, capturedAt = "2026-10-10T02:40:06.123456Z") => {
         pendingReportText = text;
         const response = await handler!(new Request(`${ORIGIN}/functions/v1/ingest-observation`, {
           method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${SERVICE_KEY}` },
           body: JSON.stringify({ source_slug: "bat", kind: "listing", vehicle_id: VEHICLE,
-            source_url: `https://bringatrailer.com/listing/${key}/`, source_identifier: key,
-            observed_at: "2026-10-10T02:40:06.123456Z", extraction_method: "html_description_capture", content_text: text,
+            source_url: `https://bringatrailer.com/listing/${page}/`, source_identifier: key,
+            observed_at: capturedAt, extraction_method: "html_description_capture", content_text: text,
             defer_analysis: true, agent_cost_cents: 0, structured_data: { extractor: "extract-bat-core", source_text_field: "extract-bat-core.extractDescription",
               description_capture: true, extractor_input_truncated: false, source_capture_basis: "direct_fetch", source_capture_sha256: "b".repeat(64),
-              source_captured_at: "2026-10-10T02:40:06.123456Z", observation_time_basis: "source_capture", source_event_time_status: "unknown" } }),
+              source_captured_at: capturedAt, observation_time_basis: "source_capture", source_event_time_status: "unknown" } }),
         }));
         const result = await response.json(); equal(response.status, 200, `Native work parent failed: ${JSON.stringify(result)}`);
         assert(result.success && !result.duplicate, "Source must enter through real native intake");
@@ -754,6 +758,38 @@ Deno.test({
         } finally { await sql(witnessDefinition); }
         equal(bridgeErrors, [], "No external call or unsupported route");
       }), "Reported legacy/reapplication contract failed");
+      assert(await t.step("a repeated capture of one listing sentence adds no second public report", async () => {
+        // Live 2026-10-15: each first-admission vehicle held 15-16 identical captures of one listing page.
+        const sameSentence = () => json(`SELECT to_jsonb(count(*))::text FROM public.vehicle_observations WHERE vehicle_id=${quote(VEHICLE)}::uuid
+          AND kind='activity' AND extraction_method=${quote(RETAINED_REPORTED_WORK_MODE)} AND structured_data->>'source_value'=${quote(workQuote)}`);
+        const honda = async () => (await workRead()).reported_work.filter((r: Row) => r.source_value === workQuote);
+        const recapture = await seedReport(textFor(workQuote), "reported-work-fixture-recapture", "reported-work-fixture", "2026-10-12T03:00:00.654321Z");
+        const repeated = await workInvoke(recapture); equal(repeated.status, 200, JSON.stringify(repeated.data));
+        equal([repeated.data.duplicate, repeated.data.writes, repeated.data.observation_id, repeated.data.admitted_source_observation_id],
+          [true, 0, workChild, workParent], "A later capture replays the existing report");
+        equal(await sameSentence(), 1, "No second child for one listing sentence");
+        hideReportSiblings = true;
+        const errorsBefore = databaseErrors.length;
+        try { equal((await workInvoke(recapture)).status, 500, "PostgreSQL refuses a repeated report the intake lookup missed"); }
+        finally { hideReportSiblings = false; }
+        assert(databaseErrors.slice(errorsBefore).some(e => e.code === "23514" && e.message.includes("already admitted for this listing sentence")), "Specific same-sentence refusal");
+        equal(await sameSentence(), 1, "Refused repeat leaves one child");
+        equal((await workRead()).reported_work.length, 3, "Public report count unchanged by repeated captures");
+        await sql(`UPDATE public.vehicle_observations SET is_superseded=true WHERE id=${quote(workParent)}::uuid`);
+        let surviving = "";
+        try {
+          const readmitted = await workInvoke(recapture); equal(readmitted.status, 200, JSON.stringify(readmitted.data));
+          equal([readmitted.data.duplicate, readmitted.data.writes], [false, 1], "A surviving capture may carry a report whose capture was withdrawn");
+          surviving = readmitted.data.observation_id; equal((await honda()).map((r: Row) => r.observation_id), [surviving], "One report, from the surviving capture");
+        } finally { await sql(`UPDATE public.vehicle_observations SET is_superseded=false WHERE id=${quote(workParent)}::uuid`); }
+        assert(surviving && surviving !== workChild, "The surviving capture's report is its own child");
+        equal((await honda()).map((r: Row) => r.observation_id), [workChild], "Both captures current: the reader shows the earliest report once");
+        equal((await workRead()).reported_work.length, 3, "Collapsed reader keeps one report per listing sentence");
+        const relisting = await seedReport(textFor(workQuote), "reported-work-relisting", "reported-work-relisting", "2026-10-13T04:00:00.111111Z");
+        const another = await workInvoke(relisting); equal([another.status, another.data.writes], [200, 1], "A different listing page is a separate publication");
+        equal((await honda()).length, 2, "One report per listing page, each with its own source URL");
+        equal(bridgeErrors, [], "No external call or unsupported route");
+      }), "Reported repeated-capture contract failed");
     } finally {
       Deno.serve = originalServe;
       globalThis.fetch = originalFetch;

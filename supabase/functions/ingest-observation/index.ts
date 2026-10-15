@@ -392,6 +392,23 @@ Deno.serve(async function handleObservation(req, internal?: unknown) {
       const derived = row && await deriveRetainedReportedWork(row, vehicle?.data ?? null, source?.data ?? null, selector.reportIndex);
       if (!derived) return new Response(JSON.stringify({ error: "Retained reported work ineligible", writes: 0, model_calls: 0 }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      // One report per listing sentence: another capture of the same page repeats
+      // the publisher's assertion; it is neither a new report nor corroboration.
+      // The PostgreSQL custody trigger enforces this; here it is a clean replay.
+      const siblings = await supabase.from("vehicle_observations").select("id,source_observation_id,structured_data")
+        .eq("vehicle_id", derived.vehicle_id).eq("kind", "activity").eq("extraction_method", RETAINED_REPORTED_WORK_MODE)
+        .eq("source_url", derived.source_url).eq("is_superseded", false).limit(20).abortSignal(AbortSignal.timeout(5000));
+      if (siblings.error) throw new Error("Retained work assertion lookup unavailable");
+      for (const sibling of siblings.data ?? []) {
+        if (sibling.source_observation_id === selector.sourceId || sibling.structured_data?.source_value !== derived.structured_data.source_value) continue;
+        const current = await supabase.rpc("retained_reported_work_result_matches", {
+          p_source: sibling.source_observation_id, p_result: sibling.id,
+        }).abortSignal(AbortSignal.timeout(5000));
+        if (current.error) throw new Error("Retained work assertion lookup unavailable");
+        if (current.data === true) return new Response(JSON.stringify({ success: true, duplicate: true, observation_id: sibling.id,
+          admitted_source_observation_id: sibling.source_observation_id, vehicle_id: derived.vehicle_id, writes: 0, model_calls: 0 }),
+          { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      }
       input = derived;
       retainedSourceId = selector.sourceId;
     } else if (input.extraction_method === RETAINED_REPORTED_WORK_MODE || input.structured_data?.analysis_kind === "retained_reported_work") {

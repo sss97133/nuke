@@ -11,7 +11,7 @@ DO $guard$
 DECLARE h text; owned record; target regprocedure; expected_trigger text; source_row public.observation_sources%ROWTYPE; expected_kinds public.observation_kind[];
 BEGIN
  h:=encode(sha256(convert_to(pg_get_functiondef('public.validate_retained_listing_property_source()'::regprocedure),'UTF8')),'base64');
- IF h NOT IN ('6lHy6FjcSj9f6EtcCMzy/a+jsNGlcciluTeMZcXNDns=','lHH92aGMaoTlbLndFE6wlHxbMb7lnMAZQKT5UVv0fJE=') THEN
+ IF h NOT IN ('6lHy6FjcSj9f6EtcCMzy/a+jsNGlcciluTeMZcXNDns=','4sy0OTUHRs38lbIdSM7QsFamhCkK4jaOaicJ6XEWzLs=') THEN
   RAISE EXCEPTION 'Retained source owner drift; integrate reviewed migrations first'; END IF;
  IF encode(sha256(convert_to(pg_get_functiondef('public.observation_is_public(public.observation_kind,jsonb)'::regprocedure),'UTF8')),'base64') <> 'pmSqNJ65TgNxUjs2UiR8Iv91I3YUPOD+OIAGjaUgYXY=' THEN
   RAISE EXCEPTION 'Observation privacy owner drift'; END IF;
@@ -32,7 +32,7 @@ BEGIN
   ('public.retained_reported_work_source_qualified(vehicle_observations)','71PonY8kIjdqlPK41O5f+hL7IqoUOz42X/svGb3nX+0='),
   ('public.retained_reported_work_matches(vehicle_observations,vehicle_observations)','v9GQSuuOOxP9TRiHarZZbZ/AZREFONSxXYK1Noe2E3s='),
   ('public.retained_reported_work_result_matches(uuid,uuid)','AEFYeKws5sPz+pmpj8l33ok0DK4iMjNO4msoRSKIsiw='),
-  ('public.vehicle_build_log_public(uuid,boolean)','g/p5i1GqH8vtOV8MEjwWDAvQ31vVDkrVcFROPnlI7Mg=')
+  ('public.vehicle_build_log_public(uuid,boolean)','5aXkwA9E9XijkcQwJLJAg3zQtgzXZZoMsanz0IU/bSE=')
  ) AS expected(signature,hash) LOOP
   target:=to_regprocedure(owned.signature);
   IF h='6lHy6FjcSj9f6EtcCMzy/a+jsNGlcciluTeMZcXNDns=' THEN
@@ -169,6 +169,14 @@ BEGIN
     SELECT * INTO p FROM public.vehicle_observations WHERE id=NEW.source_observation_id FOR SHARE;
     IF NOT FOUND OR NOT public.retained_reported_work_matches(p,NEW) THEN
       RAISE EXCEPTION 'Retained reported work must match exact public source assertion' USING ERRCODE='23514'; END IF;
+    -- One current report per listing sentence; repeated captures of the page
+    -- repeat the assertion. A report whose capture was withdrawn no longer counts.
+    PERFORM pg_advisory_xact_lock(hashtextextended('retained_reported_work:'||NEW.vehicle_id::text||':'||NEW.source_url||':'||md5(NEW.structured_data->>'source_value'),0));
+    IF EXISTS(SELECT 1 FROM public.vehicle_observations o JOIN public.vehicle_observations op ON op.id=o.source_observation_id
+      WHERE o.vehicle_id=NEW.vehicle_id AND o.kind='activity' AND o.extraction_method='retained_listing_reported_work_v1'
+        AND o.source_id=NEW.source_id AND o.source_url=NEW.source_url AND o.is_superseded IS FALSE AND o.id IS DISTINCT FROM NEW.id
+        AND o.structured_data->>'source_value'=NEW.structured_data->>'source_value' AND public.retained_reported_work_matches(op,o)) THEN
+      RAISE EXCEPTION 'Retained reported work already admitted for this listing sentence' USING ERRCODE='23514'; END IF;
     RETURN NEW;
   END IF;
   v_property_key := NEW.structured_data->>'property_key';$new$);
@@ -208,15 +216,18 @@ LANGUAGE sql STABLE SECURITY DEFINER SET search_path='' AS $fn$
     'reported_date',c.structured_data->>'reported_date','reported_date_label',c.structured_data->>'reported_date_label','date_precision',c.structured_data->>'date_precision',
     'performed_clause',c.structured_data->>'performed_clause','source_value',c.structured_data->>'source_value',
     'source_observation_id',c.source_observation_id,'source_id',c.source_id,'source_url',c.source_url,
-    'source_captured_at',c.structured_data->>'source_captured_at','source_recorded_at',p.ingested_at,
+    'source_captured_at',c.structured_data->>'source_captured_at','source_recorded_at',c.parent_ingested_at,
     'source_capture_sha256',c.structured_data->>'source_capture_sha256','source_capture_basis',c.structured_data->>'source_capture_basis',
     'source_witness_version',c.structured_data->>'source_witness_version','observed_at',c.observed_at,'ingested_at',c.ingested_at,
     'confidence_score',c.confidence_score) ORDER BY c.structured_data->>'reported_date' DESC,c.id),'[]'::jsonb)
-   FROM public.vehicle_observations c JOIN public.vehicle_observations p ON p.id=c.source_observation_id
-   WHERE c.vehicle_id=p_vehicle_id AND c.kind='activity' AND c.extraction_method='retained_listing_reported_work_v1'
-    AND c.is_superseded IS FALSE AND public.retained_reported_work_matches(p,c)
-    AND public.public_text(c.structured_data->>'source_value')=c.structured_data->>'source_value'
-    AND public.public_text(c.structured_data->>'performed_clause')=c.structured_data->>'performed_clause'
+   FROM (SELECT DISTINCT ON (c.source_id,c.source_url,c.structured_data->>'source_value') c.*,p.ingested_at AS parent_ingested_at
+    FROM public.vehicle_observations c JOIN public.vehicle_observations p ON p.id=c.source_observation_id
+    WHERE c.vehicle_id=p_vehicle_id AND c.kind='activity' AND c.extraction_method='retained_listing_reported_work_v1'
+     AND c.is_superseded IS FALSE AND public.retained_reported_work_matches(p,c)
+     AND public.public_text(c.structured_data->>'source_value')=c.structured_data->>'source_value'
+     AND public.public_text(c.structured_data->>'performed_clause')=c.structured_data->>'performed_clause'
+    -- Repeated captures of one listing sentence are one report: the earliest admitted.
+    ORDER BY c.source_id,c.source_url,c.structured_data->>'source_value',c.ingested_at,c.id) c
   ) ELSE '[]'::jsonb END);
 $fn$;
 COMMENT ON FUNCTION public.vehicle_build_log_public(uuid,boolean) IS

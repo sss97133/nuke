@@ -71,6 +71,7 @@ const sources = new Map([
   ['retainedDescriptionIdentity',compile('../supabase/functions/ingest-observation/retainedDescriptionIdentity.ts')],
   ['retainedPowertrain',compile('../supabase/functions/ingest-observation/retainedPowertrain.ts')],
   ['retainedDescriptionPowertrain',compile('../supabase/functions/ingest-observation/retainedDescriptionPowertrain.ts')],
+  ['retainedReportedWork',compile('../supabase/functions/ingest-observation/retainedReportedWork.ts')],
   ['retainedOdometer',compile('../supabase/functions/ingest-observation/retainedOdometer.ts')],
   ['retainedListingIdentity',compile('../supabase/functions/ingest-observation/retainedListingIdentity.ts')],
   ['retainedDescriptionPresentation',compile('../supabase/functions/ingest-observation/retainedDescriptionPresentation.ts')],
@@ -268,6 +269,7 @@ function fixture(options = {}) {
         if(specifier==='./retainedDescriptionIdentity.ts')return load('retainedDescriptionIdentity');
         if(specifier==='./retainedPowertrain.ts')return load('retainedPowertrain');
         if(specifier==='./retainedDescriptionPowertrain.ts')return load('retainedDescriptionPowertrain');
+        if(specifier==='./retainedReportedWork.ts')return load('retainedReportedWork');
         if(specifier==='./retainedOdometer.ts')return load('retainedOdometer');
         if(specifier==='./retainedListingIdentity.ts')return load('retainedListingIdentity');
         if(specifier==='./retainedDescriptionPresentation.ts')return load('retainedDescriptionPresentation');

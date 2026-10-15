@@ -602,7 +602,17 @@ A source month never becomes a fabricated day, and a recommendation never become
 a reported completed repair. The bounded v1 grammar recognizes explicit action
 and literal object phrases from inspected testimony; unknown phrases, qualification
 tails and “and more” remain withheld. These source words establish no parts catalog
-identity. Repeated captures can describe the same repair.
+identity.
+
+A report's grain is one sentence on one listing page (source, listing URL, exact
+sentence), not one capture. On 2026-10-15 each of the two first-admission
+vehicles held 15–16 non-superseded captures of a single listing page, all with
+identical text. A later capture of the same sentence replays the existing report
+(`duplicate`, zero writes); the custody trigger refuses a second current child
+under an advisory lock, and the reader returns the earliest admitted report once.
+When the admitted capture is withdrawn, a surviving capture may carry the report.
+A different listing page is a separate publication of the sentence, not
+corroboration.
 
 The proposed required two-argument `vehicle_build_log_public(uuid,boolean)`
 overload returns separate `work_records` and `reported_work` arrays. Its report
@@ -627,8 +637,9 @@ the proposed capability to prove the actual handler and reader. Final checked
 head, test receipts and release order belong in the private review packet before
 any release decision: `/Users/skylar/nuke-logs/data-model-expand-20261015/REPORTED_WORK_PACKET.json`.
 
-Local proof for this proposal passed 17 actual handler/PostgreSQL steps, 414
-cached intake tests and 27 focused table tests. SQL and JavaScript agreed on all
+Local proof for this proposal passed 18 actual handler/PostgreSQL steps
+(including the repeated-capture step, which fails against the earlier
+capture-grain identity), 414 cached intake tests and 27 focused table tests. SQL and JavaScript agreed on all
 20 retained diagnostic texts: five candidate assertions across four sources,
 including withholding the vague “and more” assertion. Candidate detection is not
 admission or independent corroboration. The fixture anonymous reader returned
