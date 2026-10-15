@@ -855,6 +855,7 @@ async function matchOrCreateVehicle(
       ai_processing_status: "skipped", // not requested: see the matched path below
       source_url: parsed.url || null,
     }));
+    // (Deployed 2026-10-15 with #1531: #1528's deploy died on its migration before the functions step.)
     const imgWrite = await insertMissingVehicleImages(supabaseAdmin, newVehicle.id, imageRows);
     if (imgWrite.error) console.error(`[ingest] vehicle_images insert ${newVehicle.id}: ${imgWrite.error.message}`);
   }
