@@ -10,6 +10,9 @@
 --     sale whose own page names its model year but not its family is another car: not pooled, counted in conflicts;
 --   * asks: Facebook listings and classified events in the 365 days before today, one per vehicle (its latest), never a
 --     duplicate or blocked listing, never a private or deleted vehicle, never pooled with sales;
+--   * (20261015160000) the odometer: sorted readings, n_miles and the median over the same window and rows, zero and
+--     out-of-range readings unknown, an ask carrying its own or its vehicle's reading; replacing the unbuilt view and
+--     keeping a built one;
 --   * it is created empty and the first refresh builds it; no vehicle or listing id is stored; anon reads it; later
 --     refreshes run CONCURRENTLY; the migration applies twice and schedules its refresh once.
 \set ON_ERROR_STOP on
@@ -41,7 +44,7 @@ CREATE FUNCTION cron.schedule(job_name text, schedule text, command text) RETURN
 $$ INSERT INTO cron.job (jobname, schedule, command) VALUES (job_name, schedule, command) RETURNING jobid $$;
 
 CREATE TABLE public.vehicles (id uuid PRIMARY KEY, make text, model text, year integer, sale_date date, bat_sale_date date,
-  listing_url text, discovery_url text,
+  listing_url text, discovery_url text, mileage integer,
   deleted_at timestamptz, is_public boolean DEFAULT true, listing_kind text);
 CREATE TABLE public.mv_treemap_outcomes (id uuid PRIMARY KEY, brand_name text, model text, year integer, source_name text,
   outcome text, sale_basis text, sold_amount numeric, bat_bids integer, bat_watchers integer);
@@ -49,7 +52,7 @@ CREATE TABLE public.mv_model_family_names (make_l text, model_l text, vehicles b
   family text, matched text, year_start integer, year_end integer, PRIMARY KEY (make_l, model_l));
 CREATE TABLE public.canonical_models (id uuid PRIMARY KEY, make text, canonical_model text, aliases text[]);
 CREATE TABLE public.marketplace_listings (id uuid PRIMARY KEY, vehicle_id uuid, price integer, status text,
-  first_seen_at timestamptz);
+  first_seen_at timestamptz, mileage integer);
 CREATE TABLE public.vehicle_events (id uuid PRIMARY KEY, vehicle_id uuid, source_platform text, current_price numeric,
   created_at timestamptz);
 
@@ -68,11 +71,13 @@ INSERT INTO public.canonical_models (id, make, canonical_model, aliases) VALUES
   ('00000000-0000-4000-c000-00000000000b', 'Buick', 'Electra', '{electra,"electra 225"}');
 
 -- A 1967: 12 sales at 10,000 .. 120,000 (8 BaT, 4 Mecum; g 1..6 dated last year, g 7..9 dated 2015 by bat_sale_date,
--- g 10..12 undated) and 3 unsold. Half the names are "corvette stingray".
-INSERT INTO public.vehicles (id, make, model, year, sale_date, bat_sale_date)
+-- g 10..12 undated) and 3 unsold. Half the names are "corvette stingray". Odometers (20261015160000): g 1..10 read
+-- g x 1,000 miles; g 11 reads 2,500,000 and g 12 reads 0, both unknown.
+INSERT INTO public.vehicles (id, make, model, year, sale_date, bat_sale_date, mileage)
 SELECT ('00000000-0000-4000-a067-' || lpad(g::text, 12, '0'))::uuid, 'Chevrolet',
        CASE WHEN g % 2 = 0 THEN 'Corvette Stingray' ELSE 'Corvette' END, 1967,
-       CASE WHEN g <= 6 THEN current_date - 300 END, CASE WHEN g BETWEEN 7 AND 9 THEN date '2015-06-01' END
+       CASE WHEN g <= 6 THEN current_date - 300 END, CASE WHEN g BETWEEN 7 AND 9 THEN date '2015-06-01' END,
+       CASE WHEN g <= 10 THEN g * 1000 WHEN g = 11 THEN 2500000 WHEN g = 12 THEN 0 END
 FROM generate_series(1, 15) g;
 INSERT INTO public.mv_treemap_outcomes (id, year, source_name, outcome, sold_amount)
 SELECT ('00000000-0000-4000-a067-' || lpad(g::text, 12, '0'))::uuid, 1967,
@@ -122,17 +127,19 @@ SELECT v.id, v.year, 'Bring a Trailer', 'sold', 5000 FROM public.vehicles v WHER
 
 -- Asks on A 1967: 10 Facebook listings at 5,000 .. 50,000 first seen yesterday at 06:00 (vehicles a1..a10); a duplicate and a
 -- blocked listing; one first seen today and one 400 days ago; vehicle a1 also has a newer Craigslist event at 6,000 (yesterday 12:00)
--- (its latest ask) and an older KSL one; a private vehicle's and a deleted vehicle's asks.
-INSERT INTO public.vehicles (id, make, model, year, is_public, deleted_at)
+-- (its latest ask) and an older KSL one; a private vehicle's and a deleted vehicle's asks. Odometers: the Facebook
+-- listings a1..a5 state g x 2,000 miles; vehicle a1 reads 77,000 (its Craigslist ask carries the vehicle's reading).
+INSERT INTO public.vehicles (id, make, model, year, is_public, deleted_at, mileage)
 SELECT ('00000000-0000-4000-e067-' || lpad(g::text, 12, '0'))::uuid, 'Chevrolet', 'Corvette', 1967,
-       g <> 15, CASE WHEN g = 16 THEN now() END
+       g <> 15, CASE WHEN g = 16 THEN now() END, CASE WHEN g = 1 THEN 77000 END
 FROM generate_series(1, 16) g;
-INSERT INTO public.marketplace_listings (id, vehicle_id, price, status, first_seen_at)
+INSERT INTO public.marketplace_listings (id, vehicle_id, price, status, first_seen_at, mileage)
 SELECT gen_random_uuid(), ('00000000-0000-4000-e067-' || lpad(g::text, 12, '0'))::uuid,
        CASE WHEN g <= 10 THEN g * 5000 ELSE 99000 END,
        CASE g WHEN 11 THEN 'duplicate' WHEN 12 THEN 'blocked' ELSE 'active' END,
        CASE g WHEN 13 THEN current_date + interval '1 minute' WHEN 14 THEN current_date - 400
-            ELSE current_date - 1 + interval '6 hours' END
+            ELSE current_date - 1 + interval '6 hours' END,
+       CASE WHEN g <= 5 THEN g * 2000 END
 FROM generate_series(1, 16) g;
 INSERT INTO public.vehicle_events (id, vehicle_id, source_platform, current_price, created_at) VALUES
   (gen_random_uuid(), '00000000-0000-4000-e067-000000000001', 'craigslist', 6000, current_date - 1 + interval '12 hours'),
@@ -142,6 +149,9 @@ INSERT INTO public.vehicle_events (id, vehicle_id, source_platform, current_pric
 \ir ../migrations/20261015130000_family_year_prices.sql
 -- A second application changes nothing and passes its own guard and checks.
 \ir ../migrations/20261015130000_family_year_prices.sql
+-- 20261015160000 replaces the unbuilt view with the odometer columns; applied twice, the second changes nothing.
+\ir ../migrations/20261015160000_family_year_prices_miles.sql
+\ir ../migrations/20261015160000_family_year_prices_miles.sql
 SELECT pg_temp.ok('created empty: the deploy reads nothing; the first build is the refresh',
   NOT (SELECT relispopulated FROM pg_class WHERE oid = 'public.mv_family_year_prices'::regclass));
 SELECT public.refresh_family_year_prices();
@@ -174,6 +184,15 @@ SELECT pg_temp.ok('B 1971: 9 sales even at 1966..1976, thin, no percentiles; the
 SELECT pg_temp.ok('A 1967 asked: 10 asks, one per vehicle, a1 at its latest (Craigslist 6,000); never pooled with sales',
   (SELECT n = 10 AND offered IS NULL AND prices = ARRAY[6000,10000,15000,20000,25000,30000,35000,40000,45000,50000]
       AND by_source = '{"Craigslist": 1, "Facebook Marketplace": 9}'::jsonb FROM pg_temp.r('a', 1967, 'asked')));
+SELECT pg_temp.ok('A 1967 sold miles: 10 readings 1,000 .. 10,000, median 5,000 (a zero and a 2,500,000 reading are unknown)',
+  (SELECT n_miles = 10 AND miles = ARRAY[1000,2000,3000,4000,5000,6000,7000,8000,9000,10000] AND miles_p50 = 5000
+   AND width_bucket(7500, miles) = 7 FROM pg_temp.r('a', 1967, 'sold')));
+SELECT pg_temp.ok('A 1966 pools the window''s readings (1965..1967): the 1967 sales'' 10',
+  (SELECT n_miles = 10 FROM pg_temp.r('a', 1966, 'sold')));
+SELECT pg_temp.ok('A 1967 asked miles: 5 readings; the Craigslist ask carries its vehicle''s 77,000; under 10, no median',
+  (SELECT n_miles = 5 AND miles = ARRAY[4000,6000,8000,10000,77000] AND miles_p50 IS NULL FROM pg_temp.r('a', 1967, 'asked')));
+SELECT pg_temp.ok('B 1971 (no readings): no miles, n_miles 0',
+  (SELECT n_miles = 0 AND miles = '{}'::integer[] FROM pg_temp.r('b', 1971, 'sold')));
 SELECT pg_temp.ok('no duplicate, blocked, same-day, year-old, private or deleted ask; no auction event counts as an ask',
   (SELECT NOT (prices && ARRAY[99000, 80000]) FROM pg_temp.r('a', 1967, 'asked')));
 SELECT pg_temp.ok('no vehicle or listing id column',
@@ -198,3 +217,9 @@ SELECT pg_temp.ok('refreshes concurrently through refresh_family_year_prices(), 
   AND (SELECT command FROM cron.job WHERE jobname = 'refresh-family-year-prices') LIKE '%refresh_family_year_prices()%'
   AND (SELECT n FROM public.mv_family_year_prices WHERE year = 1967 AND basis = 'sold'
          AND family_id = '00000000-0000-4000-c000-00000000000a') = 12);
+-- After the first build, 20261015160000 applies again without dropping or emptying the built view.
+\ir ../migrations/20261015160000_family_year_prices_miles.sql
+SELECT pg_temp.ok('re-applying the odometer migration after the build keeps the built view',
+  (SELECT relispopulated FROM pg_class WHERE oid = 'public.mv_family_year_prices'::regclass)
+  AND (SELECT n_miles FROM public.mv_family_year_prices WHERE year = 1967 AND basis = 'sold'
+         AND family_id = '00000000-0000-4000-c000-00000000000a') = 10);
