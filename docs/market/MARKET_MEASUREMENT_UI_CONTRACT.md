@@ -396,3 +396,33 @@ Delivered October 15, first pass (subtraction and the figure; the finish estimat
   once (no table); the latest question and the seller's latest words; then only the facts the row does not show
   (miles, colors, VIN, location).
 - **The views.** Live now, Sold, Calendar and Just listed, then Make.
+
+### Where a live lot should finish (model 32), October 15
+
+The owner's product for the board: an estimate of where each live lot finishes, from what equivalent lots did before,
+and how confident it is. Built from a backtest run offline against the local BaT archive (264,746 lots, 7.10M timed bids,
+2014-07-30 → 2026-09-27) and production rows; the receipt is kept with the session logs.
+- **Method (analog, v1 price-only).** For each live lot, the finished BaT lots that looked most like it at the same
+  hours to close: same no-reserve flag, a near bid, a near position of the bid against where its model page usually
+  finishes; same page, make and model year preferred. Estimate = the bid × their weighted median rise to the close;
+  80% range from their 10th–90th percentile rise, calibrated per hours to close × no-reserve × grade. Never below the
+  bid. Grade A: the page has comparables within 3 model years and ≥ 5 of the 50 analogs are on it; B: fewer same-page
+  analogs; C: priced from the make.
+- **Measured.** On 25,673 car lots closed 2026-04..09 (never used for tuning): median miss 19.4 / 16.7 / 15.0 / 13.3 /
+  11.7% at 72 h / 24 h / 6 h / 1 h / 10 min, 80% ranges held 79-80%; naive (bid × typical rise) 33.4 / 25.2 / 20.7 /
+  17.1 / 14.7%. Replayed on 1,106 production lots closed 09-28..10-14: 16.2% and 80.8%. By price tier at 24 h:
+  19.1% under $25K to 11.2% over $100K, ranges holding 78-81% in every tier and for reserve-not-met lots.
+- **Not shown, measured as worse:** the model 31 band alone once bidding starts (27% at every hour; 2.9× wide); the
+  bid path alone before the last hours (no better than naive); live_lot_temperature_at's hours band as an estimate
+  (22% at 24 h, 2.4× wide); the v24 engine (graded as made on 935 lots: 24-28% miss, its p25-p75 held 24-38%, its
+  confidence_score does not track error, worse than naive at every horizon); hot/cold.
+- **Confidence wording** is generated from the calibration, capped at the latest production measurement: grade A
+  "8 in 10 cars like this finished inside this range. Half finished within 15%."; grade C "About 3 in 4 … treat it as
+  rough" while its production coverage is under 78%.
+- **Freshness.** Written hourly by a Mac job (scripts/market/live-finish.mjs, model 32 rows in hammer_predictions;
+  first sight, bid changes and horizon crossings only). live_finish_estimates() withholds every estimate when the
+  writer has been silent for two hours, so a sleeping laptop shows as missing, never stale; each estimate says
+  "comparable sales through <date>".
+- **Gaps.** The archive stops at 2026-09-27 (a daily append of settled lots is next); production has no BaT model-page
+  key (titles map at 92.7-96.4%); bidder and comment counts improve the 24 h miss from 17.4% to 16.7% and come with a
+  bounded engagement read later; grade C and reserve-not-met are the weakest cells.
