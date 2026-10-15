@@ -27,6 +27,7 @@ import { parseLocation } from "../_shared/parseLocation.ts";
 import { writeObservation } from "../_shared/observationWriter.ts";
 import { requireWriteAuth } from "../_shared/writeGuard.ts";
 import { projectSecretKey } from "../_shared/supabaseKeys.ts";
+import { batchFromTargets, discoverTargets } from "./targets.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -501,6 +502,12 @@ Deno.serve(async (req) => {
     });
 
     const body = await req.json().catch(() => ({}));
+    if (body?.action === "batch_from_targets") {
+      return new Response(JSON.stringify(await batchFromTargets(supabase, supabaseUrl, serviceRoleKey, firecrawlApiKey, body)), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
+    if (body?.action === "discover_targets") {
+      return new Response(JSON.stringify(await discoverTargets(supabase, firecrawlApiKey)), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
     const inputUrl = String(body?.url || body?.listing_url || body?.auction_url || "").trim();
     const providedVehicleId = body?.vehicle_id ? String(body.vehicle_id) : null;
 
@@ -541,6 +548,13 @@ Deno.serve(async (req) => {
       responseTimeMs = 0;
       fromCache = true;
       console.log(`✅ C&B: Cache hit — using snapshot from ${cachedSnapshot.fetched_at} (${html.length} chars, markdown: ${markdown.length} chars)`);
+    } else if (typeof body?.html === "string" && body.html.length > 1000) {
+      // Page already fetched by this function's batch_from_targets (one Firecrawl credit, no actions): archive and parse it.
+      html = body.html;
+      markdown = typeof body.markdown === "string" ? body.markdown : "";
+      httpStatus = 200;
+      responseTimeMs = 0;
+      await trySaveHtmlSnapshot({ supabase, listingUrl: listingUrlNorm, httpStatus, success: true, errorMessage: null, html, metadata: { markdown } });
     } else {
       // Cache miss — fetch via Firecrawl (C&B is a React SPA, blocks direct fetch)
       const scrapeStart = Date.now();
