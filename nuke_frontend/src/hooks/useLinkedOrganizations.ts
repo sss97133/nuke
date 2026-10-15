@@ -25,7 +25,9 @@ export function useLinkedOrganizations(vehicleId: string, initialOrganizations?:
           )
         `)
         .eq('vehicle_id', vehicleId)
-        .in('status', ['active', 'sold', 'pending', 'past', 'archived']);
+        .in('status', ['active', 'sold', 'pending', 'past', 'archived'])
+        // A link the owner rejected is not a link; pending ones stay, labeled unconfirmed by the card.
+        .not('user_rejected', 'is', true);
 
       if (error) throw error;
 

@@ -424,7 +424,8 @@ export const VehicleProfileProvider: React.FC<{ children: React.ReactNode }> = (
         .from('organization_vehicles')
         .select('id, organization_id, relationship_type, auto_tagged, gps_match_confidence, status, businesses!inner (id, business_name, business_type, city, state, logo_url)')
         .eq('vehicle_id', vehicle.id)
-        .in('status', ['active', 'sold', 'pending', 'past', 'archived']);
+        .in('status', ['active', 'sold', 'pending', 'past', 'archived'])
+        .not('user_rejected', 'is', true);
       if (error) { setLinkedOrganizations([]); return; }
       const enriched = (data || []).map((ov: any) => ({
         id: ov.id, organization_id: ov.organization_id, relationship_type: ov.relationship_type,
