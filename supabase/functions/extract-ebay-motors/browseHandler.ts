@@ -20,7 +20,7 @@ export async function handleBrowse(supabase: any, body: any): Promise<Response> 
     });
     return json(rep, rep.ok ? 200 : 500);
   }
-  if (body.action === "reland") { const rep = await reland(supabase, { limit: body.limit }); return json(rep, rep.ok ? 200 : 500); }
+  if (body.action === "reland") { const rep = await reland(supabase, { limit: body.limit, offset: body.offset }); return json(rep, rep.ok ? 200 : 500); }
   if (body.action === "deep") {         // one item page: read, parse, and (unless dry_run) land
     const url = String(body.url ?? "");
     if (!/^https:\/\/(www\.)?ebay\.com\/itm\/\d{6,}/.test(url)) return json({ ok: false, error: "url must be an ebay.com/itm/<id> link" }, 400);
