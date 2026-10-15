@@ -772,6 +772,8 @@ async function fetchAndParse(url: string, opts?: { skipFirecrawl?: boolean }): P
 
     const fromJson = parseNextData(directResult.html, url, postFromFlight(directResult.html));
     if (!fromJson && directResult.html.includes("404 - PAGE NOT FOUND")) throw new Error("PAGE_NOT_FOUND");
+    // A lot with no year and make in its title or taxonomy (neon signs, traffic lights, other automobilia) is not a vehicle.
+    if (fromJson && !(fromJson.year && fromJson.make) && opts?.skipFirecrawl) throw new Error("NOT_A_VEHICLE");
     if (fromJson && fromJson.year && fromJson.make) {
       console.log(`[MECUM] Parsed via __NEXT_DATA__ (free): ${fromJson.year} ${fromJson.make} ${fromJson.model}`);
       return fromJson;
@@ -1082,25 +1084,15 @@ async function saveVehicle(
   // Save images (batch insert, skip existing)
   if (vehicle.image_urls.length > 0) {
     const imageLimit = Math.min(vehicle.image_urls.length, 80);
-    for (let idx = 0; idx < imageLimit; idx++) {
-      const imgUrl = vehicle.image_urls[idx];
-      const { data: existingImg } = await supabase
-        .from("vehicle_images")
-        .select("id")
-        .eq("vehicle_id", vehicleId)
-        .eq("image_url", imgUrl)
-        .limit(1)
-        .maybeSingle();
-      if (!existingImg) {
-        await supabase.from("vehicle_images").insert({
-          vehicle_id: vehicleId,
-          image_url: imgUrl,
-          source: "external_import",
-          source_url: imgUrl,
-          is_external: true,
-          position: idx,
-        });
-      }
+    // One read and one insert for the lot (this was a select and an insert per image: about 150 requests a lot).
+    const { data: have } = await supabase.from("vehicle_images").select("image_url").eq("vehicle_id", vehicleId).limit(500);
+    const haveUrls = new Set((have ?? []).map((r: { image_url: string }) => r.image_url));
+    const fresh = vehicle.image_urls.slice(0, imageLimit)
+      .map((imgUrl, idx) => ({ vehicle_id: vehicleId, image_url: imgUrl, source: "external_import", source_url: imgUrl, is_external: true, position: idx }))
+      .filter((row) => !haveUrls.has(row.image_url));
+    if (fresh.length) {
+      const { error: imgErr } = await supabase.from("vehicle_images").insert(fresh);
+      if (imgErr) console.warn(`[MECUM] image insert failed for ${vehicleId}: ${imgErr.message}`);
     }
   }
 
@@ -1514,7 +1506,7 @@ Deno.serve(async (req) => {
           consecutiveFailures = 0;
         } catch (err: any) {
           const msg = String(err?.message || err);
-          const gone = msg === "PAGE_NOT_FOUND";
+          const gone = msg === "PAGE_NOT_FOUND" || msg === "NOT_A_VEHICLE";
           await supabase.from("import_queue").update({ status: gone ? "skipped" : "failed", error_message: msg.slice(0, 500), processed_at: new Date().toISOString() }).eq("id", rowId);
           if (gone) { results.gone++; consecutiveFailures = 0; }
           else {
