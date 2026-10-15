@@ -110,6 +110,11 @@ export default function FamilySalesChart({ brand, familyKey, family, width, heig
 }) {
   const { sales, n: windowCount, truncated, failed } = useFamilySales(brand, familyKey);
   const [hover, setHover] = useState<number | null>(null);
+  // Venues the reader hid from the legend: their dots and their share of the median line go, the axis stays, so one
+  // venue's prices read against the same scale as the rest (Mecum against BaT, say). A new family shows every venue.
+  const [hidden, setHidden] = useState<ReadonlySet<string>>(new Set());
+  useEffect(() => { setHidden(new Set()); }, [brand, familyKey]);
+  const toggle = (key: string) => setHidden((h) => { const next = new Set(h); if (!next.delete(key)) next.add(key); return next; });
   const svgRef = useRef<SVGSVGElement>(null);
   const plot = useMemo(() => {
     if (!sales?.length || width < 200 || height < 160) return null;
@@ -123,15 +128,16 @@ export default function FamilySalesChart({ brand, familyKey, family, width, heig
     const lo = Math.max(PRICE_FLOOR, Math.min(...usd) * 0.85), hi = Math.max(...usd) * 1.15;
     const x = (t: number) => M.left + ((t - t0) / (t1 - t0)) * w;
     const y = (v: number) => head + M.top + h - ((Math.log10(v) - Math.log10(lo)) / (Math.log10(hi) - Math.log10(lo))) * h;
-    const dots = pts.map((p) => ({ ...p, cx: x(p.t), cy: y(p.usd), color: venueOf(p.source).color }));
-    const line = rollingMedian(pts).map((p) => `${x(p.t).toFixed(1)},${y(p.usd).toFixed(1)}`);
+    const shown = hidden.size ? pts.filter((p) => !hidden.has(venueOf(p.source).key)) : pts;
+    const dots = shown.map((p) => ({ ...p, cx: x(p.t), cy: y(p.usd), color: venueOf(p.source).color }));
+    const line = rollingMedian(shown).map((p) => `${x(p.t).toFixed(1)},${y(p.usd).toFixed(1)}`);
     const years: { x: number; label: string }[] = [];
     for (let yr = new Date(t0).getUTCFullYear() + 1; yr <= new Date(t1).getUTCFullYear(); yr++) years.push({ x: x(Date.UTC(yr, 0, 1)), label: String(yr) });
     const ticks = logTicks(lo, hi).map((v) => ({ y: y(v), label: money(v) }));
     const counts = VENUES.map((v) => ({ ...v, n: pts.filter((p) => venueOf(p.source).key === v.key).length })).filter((v) => v.n > 0);
     return { dots, line: line.length > 1 ? 'M' + line.join('L') : '', years, ticks, counts, head, w, h, n: dated.length,
-      under: dated.length - pts.length, since: new Date(dated[0].t) };
-  }, [sales, width, height]);
+      under: dated.length - pts.length, shown: shown.length, since: new Date(dated[0].t) };
+  }, [sales, width, height, hidden]);
   const move = useMemo(() => (sales ? batMove(sales) : null), [sales]);
 
   const onMove = (e: React.MouseEvent<SVGSVGElement>) => {
@@ -157,7 +163,8 @@ export default function FamilySalesChart({ brand, familyKey, family, width, heig
         <Text role="entity" dense>{family}</Text>
         <Text role="caption">{(narrow ? `${count} sales since ${since} · line = rolling median`
           : `${count} sales with a date since ${since} · one dot each · line = rolling median, 60 days either side`)
-          + (plot.under ? ` · ${plot.under.toLocaleString('en-US')} under ${money(PRICE_FLOOR)} not drawn` : '')}</Text>
+          + (plot.under ? ` · ${plot.under.toLocaleString('en-US')} under ${money(PRICE_FLOOR)} not drawn` : '')
+          + (hidden.size ? ` · ${plot.shown.toLocaleString('en-US')} shown` : '')}</Text>
       </div>
       {move && <div className="family-sales__move">
         <Text role="measure">{money(move.last)}</Text>
@@ -166,7 +173,10 @@ export default function FamilySalesChart({ brand, familyKey, family, width, heig
       </div>}
     </div>
     <div className="family-sales__legend">
-      {plot.counts.map((v) => <span key={v.key} className="family-sales__venue"><svg width="8" height="8" aria-hidden="true"><circle cx="4" cy="4" r="4" fill={v.color} /></svg><Text role="caption">{narrow ? v.short : v.label} {v.n.toLocaleString('en-US')}</Text></span>)}
+      {plot.counts.map((v) => <button key={v.key} type="button" className="family-sales__venue" aria-pressed={!hidden.has(v.key)}
+        title={hidden.has(v.key) ? `Show ${v.label}` : `Hide ${v.label}`} onClick={() => toggle(v.key)}>
+        <svg width="8" height="8" aria-hidden="true"><circle cx="4" cy="4" r="4" fill={v.color} /></svg>
+        <Text role="caption">{narrow ? v.short : v.label} {v.n.toLocaleString('en-US')}</Text></button>)}
     </div>
     <svg ref={svgRef} className="family-sales__plot" width={width} height={height - plot.head} viewBox={`0 ${plot.head} ${width} ${height - plot.head}`}
       role="img" aria-label={`${family}: ${plot.n} sales over five years, price against date`}

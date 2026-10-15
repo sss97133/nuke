@@ -4,7 +4,10 @@
   justify-content: space-between; align-items: baseline; gap: 16px; }
 .family-sales__title, .family-sales__move { display: flex; align-items: baseline; gap: 10px; min-width: 0; }
 .family-sales__legend { position: absolute; left: 60px; top: 34px; display: flex; flex-wrap: wrap; gap: 12px; }
-.family-sales__venue { display: inline-flex; align-items: center; gap: 4px; }
+.family-sales__venue { display: inline-flex; align-items: center; gap: 4px; padding: 0; border: 0; background: none;
+  color: inherit; font: inherit; cursor: pointer; }
+.family-sales__venue[aria-pressed="false"] { opacity: 0.35; }
+.family-sales__venue:focus-visible { outline: 2px solid var(--text); outline-offset: 2px; }
 .family-sales__plot { position: absolute; left: 0; top: 54px; cursor: crosshair; }
 .family-sales__grid { stroke: var(--border); stroke-width: 1; opacity: 0.6; }
 .family-sales__axis { font: 400 10px 'Courier New', monospace; fill: var(--text-secondary); }
