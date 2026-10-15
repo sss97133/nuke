@@ -297,7 +297,7 @@
       }
     },
     {
-      "name": "a rejection is not ledgered by this function",
+      "name": "an identity-insufficient rejection is ledgered failed on the daily schedule",
       "url": "https://classiccars.com/listings/view/0000012/1981-example-model-for-sale-in-anytown-xx-00000",
       "ingest": {
         "status": "rejected",
@@ -306,7 +306,8 @@
       },
       "vehicle": null,
       "expect": {
-        "status": null
+        "status": "failed",
+        "failure_category": "identity_insufficient"
       }
     },
     {
