@@ -36,7 +36,7 @@ async function publicKeyPem(kid: string): Promise<string | null> {
   if (hit && Date.now() - hit.at < 3_600_000) return hit.pem;
   const token = await appToken("https://api.ebay.com/oauth/api_scope");
   if (!token) return null;
-  const r = await fetch(`${ebayApiBase()}/commerce/notification/v1/public_key/${encodeURIComponent(kid)}`, {
+  const r = await fetch(`${ebayApiBase()}/commerce/notification/v1/public_key/${encodeURIComponent(kid)}`, { // guardrail-allow: raw-fetch (eBay JSON API, bearer token)
     headers: { Authorization: `Bearer ${token}` },
   });
   if (!r.ok) return null;
