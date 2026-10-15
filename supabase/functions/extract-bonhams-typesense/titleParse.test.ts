@@ -104,3 +104,9 @@ Deno.test('a headline, a year range and a make: the year stays null and the rang
   const c = parseTitle('Property of a deceased estate,Jaguar D-Type 4.5-Litre Replica Chassis no. 12700');
   equal([c.year, c.make, c.blurb], [null, 'Jaguar', 'Property of a deceased estate']);
 });
+
+Deno.test('MGA and MGB are the MG make with the letter as the model', () => {
+  const a = parseTitle('1958 MGA 1500 Fixed Head Coupe Chassis no. HMD13 55757');
+  equal([a.year, a.make, a.model], [1958, 'MG', 'A 1500 Fixed Head Coupe']);
+  equal(parseTitle('1977 MGB GT V8 Coupé').make, 'MG');
+});

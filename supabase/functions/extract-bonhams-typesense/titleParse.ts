@@ -26,7 +26,7 @@ export const KNOWN_MAKES = [
   "Maxwell", "Winton", "Thornycroft", "Dennis", "Argyll", "Arrol-Johnston", "Star", "Clement-Talbot", "Spyker", "Rambler", "Hispano Suiza",
   "Stanley", "Locomobile", "White", "Kissel", "Amilcar", "Simplex", "Fitch", "DRA", "CGV", "De Dion-Bouton", "De Dion Bouton", "Tyrrell", "Benetton",
   "Ensign", "March", "Toj", "Lynx", "Walker", "Lister", "Elva", "Chevron", "Alpine", "Bitter", "Mors", "De Dietrich", "Georges Richard", "Grinnall", "Merryweather", "Gardner-Serpollet", "Cunningham", "Diva", "Kincraft", "Greenwood", "AMG", "Group 44", "SS", "Gulf Mirage",
-  "MGA", "MGB", "MGC", "MGF", "Delaunay-Belleville", "Berliet", "Darracq", "Sizaire", "Lorraine-Dietrich",
+  "Delaunay-Belleville", "Berliet", "Darracq", "Sizaire", "Lorraine-Dietrich",
 ];
 
 /** Catalogue spellings that name a make on KNOWN_MAKES under its full name. */
@@ -205,6 +205,12 @@ export function parseTitle(title: string): ParsedTitle {
     const canon = MAKE_CANON.get(makeKey(atStart[1])) ?? atStart[1];
     foundMake = MAKE_ALIASES[canon.toLowerCase()] ?? canon;
     clean = clean.slice(atStart[1].length).replace(/^[\s-]+/, "");
+  }
+  // "MGB GT V8": the make is MG, the letter is the model's.
+  const mg = foundMake ? null : clean.match(/^MG([ABCFT])\b\s*/i);
+  if (mg) {
+    foundMake = "MG";
+    clean = `${mg[1].toUpperCase()} ${clean.slice(mg[0].length)}`.trim();
   }
   if (!foundMake && clean.length > 0) {
     // Hyphenated makes: "Harley-Davidson", unknown compound
