@@ -748,8 +748,8 @@ async function fetchAndParse(url: string, opts?: { skipFirecrawl?: boolean }): P
       } catch (_) {}
     }
     if (archiveHtml) {
-      if (archiveHtml.includes("404 - PAGE NOT FOUND")) throw new Error("PAGE_NOT_FOUND");
       const fromArchive = parseNextData(archiveHtml, url, postFromFlight(archiveHtml));
+      if (!fromArchive && archiveHtml.includes("404 - PAGE NOT FOUND")) throw new Error("PAGE_NOT_FOUND");
       if (fromArchive && fromArchive.year && fromArchive.make) {
         console.log(`[MECUM] Parsed via archived __NEXT_DATA__ (snapshot ${bestSnapshot.id}): ${fromArchive.year} ${fromArchive.make} ${fromArchive.model}`);
         return fromArchive;
@@ -765,12 +765,12 @@ async function fetchAndParse(url: string, opts?: { skipFirecrawl?: boolean }): P
   });
 
   if (directResult.html) {
-    // Check for 404
-    if (directResult.html.includes("404 - PAGE NOT FOUND") || directResult.statusCode === 404) {
-      throw new Error("PAGE_NOT_FOUND");
-    }
+    // A 404 is the status code, or a page with no lot in it that shows the 404 template. Live lot pages (measured
+    // 2026-10-15, /lots/1181445/) embed that template's text in their payload, so the text alone is not a 404.
+    if (directResult.statusCode === 404) throw new Error("PAGE_NOT_FOUND");
 
     const fromJson = parseNextData(directResult.html, url, postFromFlight(directResult.html));
+    if (!fromJson && directResult.html.includes("404 - PAGE NOT FOUND")) throw new Error("PAGE_NOT_FOUND");
     if (fromJson && fromJson.year && fromJson.make) {
       console.log(`[MECUM] Parsed via __NEXT_DATA__ (free): ${fromJson.year} ${fromJson.make} ${fromJson.model}`);
       return fromJson;
@@ -1351,7 +1351,7 @@ Deno.serve(async (req) => {
       const { data: up } = await supabase
         .from("import_queue")
         .select("id, listing_url, raw_data")
-        .eq("extractor_version", UPCOMING_TAG)
+        .in("extractor_version", [UPCOMING_TAG, TARGETS_TAG]) // pending TARGETS_TAG rows are re-reads of lots wrongly marked 404
         .eq("status", "pending")
         .order("priority", { ascending: false })
         .order("created_at", { ascending: true })
