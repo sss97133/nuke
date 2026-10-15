@@ -29,6 +29,7 @@ import { applyCraigslistImagePlan, planCraigslistImages } from "../_shared/craig
 import { landCraigslistBlip, modelFromText, type ModelCitation } from "./craigslistBlip.ts";
 import { type CraigslistCapture, pickCapture } from "../_shared/craigslistAttributes.ts";
 import { type CaptureLanding, landCraigslistCapture, ledgerFields } from "./craigslistCapture.ts";
+import { classifiedListingId, classifiedPlatform, landClassifiedListing } from "./classifiedEvent.ts";
 import { slugStubRejection } from "./slugStub.ts";
 import { extractFromHtml } from "../extract-craigslist/extract.ts";
 import { projectSecretKey } from "../_shared/supabaseKeys.ts";
@@ -1003,6 +1004,8 @@ interface EnrichedData {
   seller_name?: string | null;
   /** Canonicalized listing URL the extractor actually wrote to `vehicles.listing_url`, if it differs from the input URL. */
   listing_url?: string | null;
+  /** When the listing went up, if the extractor read it (ClassicCars and KSL events; ISO). */
+  posted_at?: string | null;
   /** Craigslist only: the post's attribute block, id and clocks, as extract-craigslist read them (see ./craigslistCapture.ts). */
   capture?: CraigslistCapture | null;
 }
@@ -1213,6 +1216,7 @@ async function tryAutoEnrich(url: string, platform: string): Promise<EnrichResul
         seller_name: vehicle.seller || vehicle.seller_username || vehicle.seller_name || null,
         listing_url: vehicle.listing_url || (typeof vehicle.url === "string" ? vehicle.url : null),
         vehicle_id: writtenId || undefined,
+        posted_at: typeof vehicle.posted_at === "string" ? vehicle.posted_at : null,
         capture: platform === "craigslist" ? pickCapture(vehicle) : null,
       },
     };
@@ -1433,6 +1437,7 @@ async function ingestOne(input: IngestInput, userId: string | null): Promise<Ing
     let enrichmentSkipped = false;
     let enrichmentError: string | null = null;
     let extractorVehicleId: string | undefined;
+    let enrichedPostedAt: string | null = null;
 
     if (input.enrich !== false && listingUrl && !input.description) {
       const enrichResult = await tryAutoEnrich(listingUrl, platform);
@@ -1444,6 +1449,7 @@ async function ingestOne(input: IngestInput, userId: string | null): Promise<Ing
             enrichment_error: "Craigslist share detail post identity mismatch", source: platform, external_id: externalId };
         }
         extractorVehicleId = enriched.vehicle_id;
+        enrichedPostedAt = enriched.posted_at ?? null;
         // The extractor (e.g. extract-bat-core) may have written the vehicle
         // under its own canonicalized URL, which can differ from the URL we
         // were given (trailing slash, www, query params). Adopt it so the
@@ -1757,6 +1763,24 @@ async function ingestOne(input: IngestInput, userId: string | null): Promise<Ing
           },
         },
       );
+    }
+
+    // ClassicCars and KSL: the same listing projection Craigslist lands, so the classified board can read them.
+    const classified = classifiedPlatform(listingUrl);
+    if (classified && match.vehicleId && !isPreview) {
+      const listingId = classifiedListingId(listingUrl);
+      if (listingId) {
+        try {
+          const landed = await landClassifiedListing(supabaseAdmin, {
+            vehicleId: match.vehicleId, platform: classified, listingUrl: listingUrl ?? "", listingId,
+            price: typeof input.price === "number" ? input.price : null, postedAt: enrichedPostedAt,
+            observedAt: new Date().toISOString(),
+          });
+          if (landed.event.action === "error") console.error(`[ingest] ${classified} listing event ${match.vehicleId}: ${landed.event.error}`);
+        } catch (e) {
+          console.error(`[ingest] ${classified} listing event ${match.vehicleId}: ${e instanceof Error ? e.message : String(e)}`);
+        }
+      }
     }
 
     // Facebook Saved: set status based on sold flag
