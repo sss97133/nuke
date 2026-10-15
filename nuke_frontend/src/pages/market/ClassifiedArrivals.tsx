@@ -36,14 +36,12 @@ export function tidyName(value: string | null | undefined): string {
 const SOURCE_MARKS: Record<string, string> = {
   craigslist: '/vendor/craigslist/favicon.ico', facebook_marketplace: '/vendor/facebook/favicon.ico', ksl: '/vendor/ksl/favicon.ico',
 };
-// Live means the newest arrival is within one intake cycle: poll-listing-feeds runs every 15 minutes (96 of 96 runs in
-// the 24 h to 2026-10-15 01:30Z), so 20 minutes allows a cycle and its processing. Past that the board says how far
-// behind it is, whether the intake stalled or the page has sat unread.
-const LIVE_MS = 20 * 60_000;
-export function freshness(newestAt: string | null | undefined, now = Date.now()): string {
-  const t = newestAt ? Date.parse(newestAt) : NaN;
-  if (!Number.isFinite(t)) return 'refresh';
-  return now - t < LIVE_MS ? 'live' : `${ageOf(newestAt, now)} behind`;
+// The reader's as_of is when it read this snapshot. Posting age does not establish successful source capture.
+export function freshness(readAt: string | null | undefined, now = Date.now()): string {
+  const t = readAt ? Date.parse(readAt) : NaN;
+  if (!Number.isFinite(t) || t > now) return 'refresh';
+  const age = ageOf(readAt, now);
+  return age === 'now' ? 'read just now' : `read ${age} ago`;
 }
 // When a listing went up: the reader's listed_at (20261015070000), else the post time when it precedes the first
 // sighting, else the first sighting. Capture trails posting (median 6.5 h on 2026-10-15), so first seen is not age.
@@ -128,36 +126,41 @@ export default function ClassifiedArrivals({ collection, sourcePicker }: { colle
   useEffect(() => { const id = window.setInterval(() => setNow(Date.now()), 30_000); return () => window.clearInterval(id); }, []);
   const shownNewest = newestOf(first);
   const [polled, setPolled] = useState<{ newest: string | null; waiting: number } | null>(null);
+  const [pollFailed, setPollFailed] = useState(false);
   useEffect(() => {
     setPolled(null);
+    setPollFailed(false);
     if (!shownNewest) return;
+    let active = true;
     const id = window.setInterval(() => {
       if (document.hidden) return;
       readAskBoard({ ...askQuery, sort: 'newest' }, 0)
-        .then(board => setPolled({ newest: newestOf(board), waiting: arrivalsAfter(board.rows, shownNewest) }))
-        .catch(() => { /* the next tick reads again */ });
+        .then(board => { if (active) { setPolled({ newest: newestOf(board), waiting: arrivalsAfter(board.rows, shownNewest) }); setPollFailed(false); } })
+        .catch(() => { if (active) setPollFailed(true); });
     }, 120_000);
-    return () => window.clearInterval(id);
+    return () => { active = false; window.clearInterval(id); };
   }, [askQuery, shownNewest]);
   const [arrived, setArrived] = useState<number | null>(null);
   const shownAt = useRef<string | null>(null);
   const refresh = async () => {
+    setArrived(null);
     shownAt.current = shownNewest;
     const result = await query.refetch();
+    if (result.isError) return;
+    setPollFailed(false); setPolled(null);
     setArrived(arrivalsAfter(result.data?.pages[0]?.rows ?? [], shownAt.current)); setNow(Date.now());
     window.setTimeout(() => setArrived(null), 6_000);
   };
-  const polledNewest = polled?.newest ?? null;
-  const latest = shownNewest && polledNewest && Date.parse(polledNewest) > Date.parse(shownNewest) ? polledNewest : shownNewest ?? polledNewest;
   const control = query.isFetching ? '↻ reading…'
+    : query.isError || pollFailed ? '↻ retry'
     : !first ? '↻ reading…'
     : polled?.waiting ? `↻ ${count(polled.waiting)}${polled.waiting >= 60 ? '+' : ''} new`
-    : `↻ ${freshness(latest, now)}`;
+    : `↻ ${freshness(first.as_of, Math.max(now, Date.now()))}`;
 
   return <section aria-label="Classified arrivals" className="market-explorer">
     <Masthead result={<>
       <button type="button" className="market-control" aria-busy={query.isFetching} onClick={() => void refresh()}
-        title="Read the newest listings">
+        title={pollFailed ? 'Latest check failed. Showing the last fetched listings; select to retry.' : 'Read the newest listings; the read clock does not establish source capture freshness.'}>
         <Text role="label">{control}</Text>
       </button>
       {arrived !== null && <Text role="caption" as="div">{arrived > 0 ? `${count(arrived)} new` : 'nothing new yet'}</Text>}
@@ -171,7 +174,7 @@ export default function ClassifiedArrivals({ collection, sourcePicker }: { colle
       <summary><Text role="label">Filters</Text></summary>
     <div className="k-section k-strip market-scope" role="group" aria-label="Arrivals scope">
       {sourcePicker}
-      <label className="market-scope__cohort"><Text role="label">Window</Text><select className="market-control k-body" value={hours}
+      <label className="market-scope__cohort"><Text role="label">First captured</Text><select className="market-control k-body" value={hours}
         onChange={event => set('window', event.target.value === '24' ? null : event.target.value)}>
         {ASK_WINDOWS.map(h => <option key={h} value={h}>{WINDOW_NAMES[h]}</option>)}
       </select></label>

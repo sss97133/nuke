@@ -70,13 +70,19 @@ interface DrillLevel {
 // one once the tab resolves), so one load fetched it twice (measured 2026-10-13, every logged-out capture). One
 // promise per page lifetime; a failed read is forgotten so the next mount retries.
 let brandsRead: Promise<TreemapNode[] | null> | null = null;
-function readTreemapBrands(): Promise<TreemapNode[] | null> {
+export function readTreemapBrands(): Promise<TreemapNode[] | null> {
   if (!brandsRead) {
     const market = Promise.resolve(supabase.rpc('treemap_brand_market'))
       .then(({ data, error }) => (error || !data ? [] : data as Partial<TreemapNode>[]), () => []);
     brandsRead = Promise.all([Promise.resolve(supabase.rpc('treemap_by_brand')), market]).then(([{ data: result, error }, rows]) => {
       if (error || !result) { brandsRead = null; return null; }
       const byName = new Map(rows.map((m) => [m.name, m]));
+      // One map must use one area/color basis. Missing supplemental rows cannot mix dollars with record counts.
+      const complete = (result as TreemapNode[]).every(n => {
+        const usd = byName.get(n.name)?.usd;
+        return typeof usd === 'number' && Number.isFinite(usd) && usd > 0;
+      });
+      if (!complete) { brandsRead = null; return result as TreemapNode[]; }
       return (result as TreemapNode[]).map((n) => {
         const m = byName.get(n.name);
         return m ? { ...n, usd: m.usd, sold_any: m.sold_any, offered: m.offered, p10: m.p10, p90: m.p90,
@@ -136,9 +142,9 @@ export function mapCaption(level: 'brands' | 'models' | 'years' | 'vehicles', le
 
 /** What area and color mean at each level. The readers count public records with a confirmed sale (vehicle_sale_basis)
  *  and its sold amount (vehicle_price_facts); the median is withheld under 5 sales. */
-export function mapLegend(level: 'brands' | 'models' | 'years' | 'vehicles'): string {
+export function mapLegend(level: 'brands' | 'models' | 'years' | 'vehicles', brandMarketAvailable = true): string {
   if (level === 'vehicles') return 'area = confirmed sale price · click to open the record';
-  if (level === 'brands') return 'area = dollars from confirmed sales · of offered sold = share of cars offered at auction that sold · 12 mo = sales and dollars in the last 12 months against the 12 before; color follows sales (gray: too few dated sales) · nominal · click to go down';
+  if (level === 'brands' && brandMarketAvailable) return 'area = dollars from confirmed sales · of offered sold = share of cars offered at auction that sold · 12 mo = sales and dollars in the last 12 months against the 12 before; color follows sales (gray: too few dated sales) · nominal · click to go down';
   return 'area = vehicles with a confirmed sale · color = their median sale price (gray: under 5 sales) · nominal, all years · asks, bids and unknown outcomes are not counted · click to go down';
 }
 
@@ -1352,7 +1358,7 @@ export function TreemapHomePage({ onBrowse, embedded = false }: { onBrowse: () =
         }}
       >
         <Text role="caption">
-          {mapLegend(levelType)}
+          {mapLegend(levelType, !!activeData?.length && activeData.every(n => n.usd != null && n.usd > 0))}
         </Text>
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
           <button

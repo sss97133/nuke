@@ -217,8 +217,8 @@ export default function AuctionEvidence({ vehicleId, onClose, compact = false, s
       {!query.isPending && !query.isError && !evidence && <p role="status">This listing has changed or is no longer publicly available.</p>}
       {evidence && <>
         <FinishBlock vehicleId={vehicleId} />
-        {bids.length > 0 ? <BidPath rows={pathRows} selected={selected ?? latestBid?.id ?? null} onSelect={setSelected} />
-          : <p className="auction-evidence-note">No bids yet.</p>}
+        <BidPath rows={pathRows} selected={selected ?? latestBid?.id ?? null} onSelect={setSelected} />
+        {!book.data?.bids?.length && evidence.truncated && <p className="auction-evidence-note">Earlier interactions omitted by the limit.</p>}
         {(question || seller) && <div className="market-inspection-talk">
           {[question, seller].filter((r): r is EpisodeInteraction => !!r).map(r => <div key={r.id}>
             <Text role="label">{r.comment_type === 'question' ? 'Latest question' : 'Seller'}</Text>{' '}

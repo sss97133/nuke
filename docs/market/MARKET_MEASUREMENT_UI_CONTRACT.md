@@ -334,11 +334,14 @@ cannot defend); the honest interim is the ask placed against the same car's meas
 
 **Typography and logos.** Careful use of logos (makes, sources) and type is more fun, and the site under-uses it.
 
-Delivered October 15 on the classifieds board: "Just listed"; a top-right refresh that reads live or how far behind,
+Delivered October 15 on the classifieds board: "Just listed"; a top-right refresh with the last successful read age,
 checks quietly every two minutes and offers "N new" without moving the list; filters folded into one closed control;
 rows with mileage, the source and the listing's age; the tier label and the raw taste score removed. The reader
 (20261015070000) orders newest first by when a listing went up (listed_at = the post time, never later than the first
-sighting) and returns the newest listing time, so the control and the top row agree.
+sighting) and returns the newest listing time. The top row's posting age stays distinct from the snapshot read time.
+The refresh control uses the reader's `as_of`; a failed check offers retry, retaining prior rows. A new posting does
+not establish source freshness. The window filter says "First captured" because eligibility uses first landing,
+even when the posting is older.
 
 Measured that day, and the reason "live" cannot yet be claimed of the market: the intake (poll-listing-feeds, every
 15 minutes) captured 614 Craigslist listings in 24 h, a median 6.5 h after they were posted (p10 82 min, p90 3 days;
@@ -386,7 +389,8 @@ what I'm looking at." What he named:
   are the right idea; the board must turn them into that answer.
 
 Delivered October 15, first pass (subtraction and the figure; the finish estimate is the next pass):
-- **The masthead.** Bring a Trailer's mark and name, and a clock that reads live or how far behind the last board read is.
+- **The masthead.** Bring a Trailer's mark and name, and the last successful browser-read age. Vehicle-row updates by
+  arbitrary writers cannot establish source freshness. A failed refresh offers retry while retaining prior rows.
 - **Two figures.** The dollars bid now and the open lots, each set as a figure (a new kit role) with its comparison
   stated once: change on a week ago and rank among the same hour in earlier weeks. Each opens the map of what it is
   made of: by dollars or by lots. The second treemap no longer shows unless asked.
