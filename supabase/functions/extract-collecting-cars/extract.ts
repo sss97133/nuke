@@ -67,10 +67,16 @@ function resolveRef(flight: string, ref: string): string | null {
 }
 
 const ENTITIES: Record<string, string> = { amp: "&", lt: "<", gt: ">", quot: '"', apos: "'", nbsp: " " };
+const stripTags = (html: string): string => {
+  // Repeat until stable so nested fragments such as "<<b>script>" cannot survive one pass.
+  let prev = html, next = html.replace(/<[^>]*>/g, "");
+  while (next !== prev) { prev = next; next = next.replace(/<[^>]*>/g, ""); }
+  return next;
+};
 const plain = (html: string) =>
-  html.replace(/<\/(p|li|h\d)>/gi, "\n").replace(/<br\s*\/?>/gi, "\n").replace(/<[^>]+>/g, "")
+  stripTags(html.replace(/<\/(p|li|h\d)>/gi, "\n").replace(/<br\s*\/?>/gi, "\n"))
     .replace(/&(#\d+|[a-z]+);/gi, (m, e: string) => e[0] === "#" ? String.fromCodePoint(parseInt(e.slice(1), 10)) : ENTITIES[e.toLowerCase()] ?? m)
-    .replace(/[ \t ]+/g, " ").replace(/\n\s*\n+/g, "\n").trim();
+    .replace(/[ \t\u00a0]+/g, " ").replace(/\n\s*\n+/g, "\n").trim();
 
 const clean = (v: unknown): string | null => (typeof v === "string" && v.trim() ? v.trim() : null);
 const int = (v: unknown): number | null => { const n = Number.parseInt(String(v ?? ""), 10); return Number.isFinite(n) ? n : null; };
