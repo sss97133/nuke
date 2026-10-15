@@ -271,6 +271,8 @@ Contract, as delivered in `auction_calendar_read` and the Market tab's `?collect
   `ended_at` = run day; `metadata.auction_name`, `auction_session_days`, `sale_key`, `sale_starts_on`, `sale_ends_on`,
   `sale_location`, `lot_number`, `has_reserve`, `currency`, `roster_first_seen_at` (kept from the first read) and
   `withdrawn_at`. After the sale the writer flips the status to the house's result and keeps the metadata.
+- **The clock is the data's.** The page says how long ago each sale's lots were last written ("updated 12 min ago"),
+  per sale and overall, never the time of the read (owner, 2026-10-15: a full read timestamp is noise).
 - **Timers are days.** The house publishes a run day, not a minute: a sale counts days to its first run day, runs "day
   n of m" during its days, and a lot "runs in n days". No hours, minutes or seconds appear for a day-precision clock.
 - **One axis.** Each sale row draws its run days (height = lots that day) on one axis from today to the last sale landed;

@@ -11,7 +11,7 @@ export type RunDay = { day: string; lots: number };
 export type CalendarSale = {
   house: string; sale_key: string; sale_name: string; location: string | null;
   starts_on: string; ends_on: string; lots: number; seen_before: number; no_reserve: number;
-  first_seen_at: string | null; first_seen_7d: number; run_days: RunDay[];
+  first_seen_at: string | null; first_seen_7d: number; updated_at: string | null; run_days: RunDay[];
 };
 export type PriorResult = {
   house: string; on: string | null; outcome: string; amount: number | null; currency: string | null;
@@ -25,6 +25,7 @@ export type RosterLot = {
 };
 export type CalendarPopulation = {
   lots: number; sales: number; houses: number; seen_before: number; no_reserve: number; first_seen_7d: number;
+  updated_at: string | null;
 };
 export type AuctionCalendar = {
   as_of: string; horizon_days: number; population: CalendarPopulation; sales: CalendarSale[];
@@ -68,6 +69,17 @@ export function saleTimer(startsOn: string, endsOn: string, now: number): string
     return total > 1 ? `running · day ${today} of ${total}` : 'running today';
   }
   return toStart === 1 ? 'tomorrow' : `in ${toStart} days`;
+}
+
+/** How long ago the data was last written: minutes, then hours, then days. Never a full timestamp. */
+export function updatedAgo(at: string | null | undefined, now: number): string {
+  const t = at ? Date.parse(at) : NaN;
+  if (!Number.isFinite(t)) return 'update time unrecorded';
+  const min = Math.max(Math.floor((now - t) / 60_000), 0);
+  if (min < 1) return 'updated just now';
+  if (min < 60) return `updated ${min} min ago`;
+  const h = Math.floor(min / 60);
+  return h < 48 ? `updated ${h} h ago` : `updated ${Math.floor(h / 24)} days ago`;
 }
 
 /** A lot's timer: its run day, at day precision. */
