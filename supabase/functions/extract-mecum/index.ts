@@ -17,6 +17,7 @@
  * Actions:
  *   POST { "url": "..." }                            — Extract single URL
  *   POST { "action": "batch_from_queue", "limit": 10 }  — Process queue items
+ *   POST { "action": "batch_from_targets", "limit": 20 } — Land unlanded sitemap targets, direct fetch only, throttled
  *   POST { "action": "re_enrich", "limit": 50 }     — Re-enrich existing vehicles
  *   POST { "action": "source_result_preview", "snapshot_id": "UUID" }
  *      — Service-only, hash-verified retained-source preview; never writes
@@ -30,8 +31,10 @@ import { cleanVehicleFields } from "../_shared/pollutionDetector.ts";
 import { writeObservation } from "../_shared/observationWriter.ts";
 import { authenticateWriter, requireWriteAuth } from "../_shared/writeGuard.ts";
 import { projectSecretKey } from "../_shared/supabaseKeys.ts";
+import { postFromFlight } from "./rscPost.ts";
 
 const EXTRACTOR_VERSION = "2.0.0";
+const TARGETS_TAG = "mecum-targets:1";
 export const MECUM_SOURCE_RESULT_PARSER_VERSION = "extract-mecum:2.0.0:source_result_candidate_v2";
 
 type MecumTaxonomyClaim = { index: number; name: string | null; slug: string | null; incomplete: boolean };
@@ -402,18 +405,20 @@ function getEdgeName(obj: any, taxonomyKey: string): string | null {
 
 // ─── Parse __NEXT_DATA__ JSON (preferred, zero-cost) ────────────────────
 
-function parseNextData(html: string, url: string): MecumVehicle | null {
+function parseNextData(html: string, url: string, flightPost: any = null): MecumVehicle | null {
   const nextDataMatch = html.match(/<script[^>]*id="__NEXT_DATA__"[^>]*>([\s\S]*?)<\/script>/);
-  if (!nextDataMatch?.[1]) return null;
-
-  let parsed: any;
-  try {
-    parsed = JSON.parse(nextDataMatch[1]);
-  } catch {
-    return null;
+  let post: any = null;
+  if (nextDataMatch?.[1]) {
+    try {
+      post = JSON.parse(nextDataMatch[1])?.props?.pageProps?.post;
+    } catch {
+      return null;
+    }
+  } else {
+    // App-router pages (measured 2026-10-15) carry the same lot object in flight chunks; callers read it with
+    // postFromFlight (rscPost.ts) and pass it in, which keeps this function free of imports.
+    post = flightPost;
   }
-
-  const post = parsed?.props?.pageProps?.post;
   if (!post) return null;
 
   const vehicle: MecumVehicle = {
@@ -712,7 +717,7 @@ async function fetchAndParse(url: string, opts?: { skipFirecrawl?: boolean }): P
     }
     if (archiveHtml) {
       if (archiveHtml.includes("404 - PAGE NOT FOUND")) throw new Error("PAGE_NOT_FOUND");
-      const fromArchive = parseNextData(archiveHtml, url);
+      const fromArchive = parseNextData(archiveHtml, url, postFromFlight(archiveHtml));
       if (fromArchive && fromArchive.year && fromArchive.make) {
         console.log(`[MECUM] Parsed via archived __NEXT_DATA__ (snapshot ${bestSnapshot.id}): ${fromArchive.year} ${fromArchive.make} ${fromArchive.model}`);
         return fromArchive;
@@ -733,7 +738,7 @@ async function fetchAndParse(url: string, opts?: { skipFirecrawl?: boolean }): P
       throw new Error("PAGE_NOT_FOUND");
     }
 
-    const fromJson = parseNextData(directResult.html, url);
+    const fromJson = parseNextData(directResult.html, url, postFromFlight(directResult.html));
     if (fromJson && fromJson.year && fromJson.make) {
       console.log(`[MECUM] Parsed via __NEXT_DATA__ (free): ${fromJson.year} ${fromJson.make} ${fromJson.model}`);
       return fromJson;
@@ -1096,6 +1101,94 @@ Deno.serve(async (req) => {
           status: vehicle.status,
         },
       });
+    }
+
+    // ── Batch from sitemap targets (free path: direct fetch only, throttled) ──────────────────
+    // Walks source_targets for mecum in id order. A target is skipped if it already has a vehicle_event or an
+    // import_queue row; each one tried gets an import_queue row (extractor_version TARGETS_TAG, raw_data.target_id), which
+    // is also the cursor. Never calls Firecrawl. Stops at `limit` lots, at the time budget, or after 3 failures in a
+    // row, and at once on a 403/429. Mecum's robots.txt asks for Crawl-delay: 1, so delay_ms floors at 1000.
+    if (action === "batch_from_targets") {
+      const limit = Math.min(Math.max(Math.floor(Number(body.limit)) || 20, 1), 40);
+      const delayMs = Math.max(Math.floor(Number(body.delay_ms)) || 1500, 1000);
+      const budgetMs = 110_000;
+      const started = Date.now();
+
+      const { data: last } = await supabase
+        .from("import_queue")
+        .select("raw_data")
+        .eq("extractor_version", TARGETS_TAG)
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      let cursor = Number(body.after_id) || Number(last?.raw_data?.target_id) || 0;
+
+      const picked: { id: number; listing_url: string }[] = [];
+      for (let page = 0; page < 20 && picked.length < limit; page++) {
+        const { data: targets, error: tErr } = await supabase
+          .from("source_targets")
+          .select("id, listing_url")
+          .eq("source_slug", "mecum")
+          .gt("id", cursor)
+          .order("id", { ascending: true })
+          .limit(200);
+        if (tErr) throw tErr;
+        if (!targets?.length) break;
+        cursor = targets[targets.length - 1].id;
+        const urls = targets.map((t: { listing_url: string }) => t.listing_url);
+        const [{ data: queued }, { data: landed }] = await Promise.all([
+          supabase.from("import_queue").select("listing_url").in("listing_url", urls),
+          supabase.from("vehicle_events").select("source_url").eq("source_platform", "mecum").in("source_url", urls),
+        ]);
+        const done = new Set([
+          ...(queued ?? []).map((r: { listing_url: string }) => r.listing_url),
+          ...(landed ?? []).map((r: { source_url: string }) => r.source_url),
+        ]);
+        for (const t of targets) {
+          if (!done.has(t.listing_url) && picked.length < limit) picked.push(t);
+        }
+      }
+
+      const results = { picked: picked.length, landed: 0, created: 0, updated: 0, gone: 0, failed: 0, stopped: null as string | null, errors: [] as string[] };
+      let consecutiveFailures = 0;
+      for (const t of picked) {
+        if (Date.now() - started > budgetMs) { results.stopped = "time_budget"; break; }
+        const { data: row, error: claimErr } = await supabase
+          .from("import_queue")
+          .insert({
+            listing_url: t.listing_url,
+            status: "processing",
+            extractor_version: TARGETS_TAG,
+            raw_data: { target_id: t.id },
+            locked_at: new Date().toISOString(),
+          })
+          .select("id")
+          .single();
+        if (claimErr || !row) continue; // another run holds this target
+        try {
+          const vehicle = await fetchAndParse(t.listing_url, { skipFirecrawl: true });
+          if (!vehicle.year && !vehicle.make) throw new Error("Could not parse vehicle data");
+          const { vehicleId, isNew } = await saveVehicle(supabase, vehicle);
+          await supabase.from("import_queue").update({ status: "complete", vehicle_id: vehicleId, processed_at: new Date().toISOString() }).eq("id", row.id);
+          results.landed++;
+          if (isNew) results.created++; else results.updated++;
+          consecutiveFailures = 0;
+        } catch (err: any) {
+          const msg = String(err?.message || err);
+          const gone = msg === "PAGE_NOT_FOUND";
+          await supabase.from("import_queue").update({ status: gone ? "skipped" : "failed", error_message: msg.slice(0, 500), processed_at: new Date().toISOString() }).eq("id", row.id);
+          if (gone) { results.gone++; consecutiveFailures = 0; }
+          else {
+            results.failed++;
+            consecutiveFailures++;
+            if (results.errors.length < 5) results.errors.push(`${t.listing_url}: ${msg.slice(0, 200)}`);
+            if (/\b(403|429)\b/.test(msg)) { results.stopped = "blocked_by_source"; break; }
+            if (consecutiveFailures >= 3) { results.stopped = "3_failures_in_a_row"; break; }
+          }
+        }
+        await new Promise((r) => setTimeout(r, delayMs));
+      }
+      return okJson({ success: true, cursor, ...results });
     }
 
     // ── Batch from queue ──────────────────────────────────────────────
