@@ -47,3 +47,12 @@ Deno.test("price kinds: asking, bid, msrp, unknown", () => {
   assertEquals(m.map((x) => [x.amount, x.kind]), [[107000, "asking"], [3995, "original_msrp"], [52000, "bid"], [16504, "unknown"], [12000, "asking"]]);
   assertEquals(priceFromText("Original MSRP was $4,200 and the high bid is $9,000.").price, null);
 });
+
+Deno.test("a non-USD ask is the seller's own number, never current_price", () => {
+  const conv = priceFromText("About that asking price, I\u2019m assuming that\u2019s in Canadian funds, in which case it would be $10,234 U.S.");
+  assertEquals(conv.price, null);
+  assertEquals(conv.foreign, { currency: "CAD", originalAmount: null, usdDerived: 10234, sentence: conv.foreign!.sentence });
+  const cad = priceFromText("The seller is asking C$12,000 for it.");
+  assertEquals([cad.price, cad.foreign?.currency, cad.foreign?.originalAmount, cad.foreign?.usdDerived], [null, "CAD", 12000, null]);
+  assertEquals(priceFromText("The seller is asking $7,500 for the car.").price, 7500);
+});
