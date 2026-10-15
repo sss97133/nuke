@@ -75,3 +75,15 @@ Deno.test("a notice at status 200 ends the listing, and the notice is recorded; 
   const r: any = endedRow({ vehicle_id: "v", source_listing_id: "1", source_url: "u" }, { status: 200, observed_at: "2026-10-15T04:00:00.000Z", snapshot_id: null, notice: "flagged" });
   assertEquals(r.metadata.removal, { http_status: 200, observed_at: "2026-10-15T04:00:00.000Z", basis: "revisit", notice: "flagged" });
 });
+
+Deno.test("the sweep stops at its own time cap, not only at the worker deadline", async () => {
+  const rows = [1, 2, 3, 4].map((n) => ({ id: `e${n}`, vehicle_id: "v", source_listing_id: String(n), source_url: `u${n}`, metadata: {} }));
+  const f = fakeSupabase(rows);
+  let probes = 0;
+  const out = await sweepCraigslistRemovals({
+    supabase: f.client, remainingMs: () => 100_000, sleep: async () => { await new Promise((r) => setTimeout(r, 30)); },
+    probe: async () => { probes++; return { status: 200, observed_at: "2026-10-15T11:00:00.000Z", snapshot_id: null }; },
+  }, 4, 24 * 3600_000, 0, 50);
+  assertEquals(out.stopped, "sweep_time");
+  assertEquals(probes < 4, true);
+});

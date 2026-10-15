@@ -67,7 +67,8 @@ export interface SweepDeps {
 }
 
 /** Check up to `max` landed Craigslist listings that are still `unknown`, oldest check first. Never throws. */
-export async function sweepCraigslistRemovals(deps: SweepDeps, max = 5, minAgeMs = 24 * 3600_000, spacingMs = 2000) {
+export async function sweepCraigslistRemovals(deps: SweepDeps, max = 5, minAgeMs = 24 * 3600_000, spacingMs = 2000, maxMs = Infinity) {
+  const startedAt = Date.now();
   const out = { checked: 0, ended: 0, live: 0, unknown: 0, stopped: null as string | null, errors: [] as string[] };
   let consecutive403 = 0;
   try {
@@ -80,6 +81,7 @@ export async function sweepCraigslistRemovals(deps: SweepDeps, max = 5, minAgeMs
     if (error) { out.errors.push(error.message); return out; }
     for (const row of data ?? []) {
       if (deps.remainingMs() < 20_000) { out.stopped = "worker_deadline"; break; }
+      if (Date.now() - startedAt > maxMs) { out.stopped = "sweep_time"; break; }
       const probe = await deps.probe(row.source_url);
       out.checked++;
       const verdict = classifyProbe(probe.status, probe.notice ?? null);

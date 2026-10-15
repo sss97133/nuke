@@ -1076,7 +1076,9 @@ Deno.serve(async (req) => {
           } as any);
           return { status: r.statusCode, observed_at: new Date().toISOString(), snapshot_id: r.snapshotId, notice: noticeFrom(r.html) };
         },
-      }, 12);
+      // 12 checks, but at most 30 s of the run: measured 2026-10-15, an uncapped sweep took the whole 110 s and 94-99 of 100
+      // feeds were deferred at the worker deadline.
+      }, 12, 24 * 3600_000, 2000, 30_000);
     }
 
 
