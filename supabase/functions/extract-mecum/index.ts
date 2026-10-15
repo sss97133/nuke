@@ -405,7 +405,7 @@ function getEdgeName(obj: any, taxonomyKey: string): string | null {
 
 // ─── Parse __NEXT_DATA__ JSON (preferred, zero-cost) ────────────────────
 
-function parseNextData(html: string, url: string): MecumVehicle | null {
+function parseNextData(html: string, url: string, flightPost: any = null): MecumVehicle | null {
   const nextDataMatch = html.match(/<script[^>]*id="__NEXT_DATA__"[^>]*>([\s\S]*?)<\/script>/);
   let post: any = null;
   if (nextDataMatch?.[1]) {
@@ -415,8 +415,9 @@ function parseNextData(html: string, url: string): MecumVehicle | null {
       return null;
     }
   } else {
-    // App-router pages (measured 2026-10-15) carry the same lot object in flight chunks; see rscPost.ts.
-    post = postFromFlight(html);
+    // App-router pages (measured 2026-10-15) carry the same lot object in flight chunks; callers read it with
+    // postFromFlight (rscPost.ts) and pass it in, which keeps this function free of imports.
+    post = flightPost;
   }
   if (!post) return null;
 
@@ -716,7 +717,7 @@ async function fetchAndParse(url: string, opts?: { skipFirecrawl?: boolean }): P
     }
     if (archiveHtml) {
       if (archiveHtml.includes("404 - PAGE NOT FOUND")) throw new Error("PAGE_NOT_FOUND");
-      const fromArchive = parseNextData(archiveHtml, url);
+      const fromArchive = parseNextData(archiveHtml, url, postFromFlight(archiveHtml));
       if (fromArchive && fromArchive.year && fromArchive.make) {
         console.log(`[MECUM] Parsed via archived __NEXT_DATA__ (snapshot ${bestSnapshot.id}): ${fromArchive.year} ${fromArchive.make} ${fromArchive.model}`);
         return fromArchive;
@@ -737,7 +738,7 @@ async function fetchAndParse(url: string, opts?: { skipFirecrawl?: boolean }): P
       throw new Error("PAGE_NOT_FOUND");
     }
 
-    const fromJson = parseNextData(directResult.html, url);
+    const fromJson = parseNextData(directResult.html, url, postFromFlight(directResult.html));
     if (fromJson && fromJson.year && fromJson.make) {
       console.log(`[MECUM] Parsed via __NEXT_DATA__ (free): ${fromJson.year} ${fromJson.make} ${fromJson.model}`);
       return fromJson;
