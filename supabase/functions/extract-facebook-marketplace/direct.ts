@@ -1,6 +1,6 @@
 // The existing direct writer, separated from Deno.serve for executable custody/error assays.
 import { corsHeaders } from "../_shared/cors.ts";
-import { captureReference, captureSightingId, type BrowserCapture } from "./capture.ts";
+import { captureReference, captureSightingId, isSavedCapture, type BrowserCapture } from "./capture.ts";
 
 export interface DirectDeps {
   supabase: any;
@@ -62,6 +62,7 @@ export async function handleDirect(body: DirectInput, deps: DirectDeps) {
   if (body.capture && !deps.capturePrepared) return jsonResponse({ error: "use browser_capture mode for retained capture input" }, 400);
   body = { ...body, facebook_id: facebookId };
   const observedAt = body.capture?.observed_at || new Date().toISOString();
+  const saved = isSavedCapture(body.capture);
 
   // Check existing
   const { data: existing, error: readError } = await supabase
@@ -79,7 +80,7 @@ export async function handleDirect(body: DirectInput, deps: DirectDeps) {
     const isLatest = Date.parse(observedAt) >= Date.parse(existing.last_seen_at ?? "1970-01-01");
     // A local retry never becomes a new source visit; an older capture cannot regress current state.
     const updates: Record<string, unknown> = {
-      last_seen_at: isLatest ? observedAt : existing.last_seen_at,
+      last_seen_at: isLatest && !saved ? observedAt : existing.last_seen_at,
       first_seen_at: Date.parse(observedAt) < Date.parse(existing.first_seen_at ?? observedAt) ? observedAt : (existing.first_seen_at ?? observedAt),
       submission_count: (existing.submission_count || 1) + (duplicateCapture ? 0 : 1),
     };
@@ -108,7 +109,7 @@ export async function handleDirect(body: DirectInput, deps: DirectDeps) {
     ];
 
     for (const [col, val] of mergeFields) {
-      if (isLatest && val != null && val !== undefined) {
+      if (isLatest && !saved && val != null && val !== undefined) {
         updates[col] = val;
       }
     }
@@ -125,7 +126,7 @@ export async function handleDirect(body: DirectInput, deps: DirectDeps) {
 
     // Attempt vehicle linking if not already linked
     let vehicleId = existing.vehicle_id;
-    if (!vehicleId) {
+    if (!vehicleId && !saved) {
       const link = await linkToVehicle({
         vin: null,
         parsed_year: body.parsed_year,
@@ -154,7 +155,7 @@ export async function handleDirect(body: DirectInput, deps: DirectDeps) {
   }
 
   // New listing — attempt vehicle linking before insert
-  const link = await linkToVehicle({
+  const link = saved ? { vehicle_id: null, suggested_vehicle_id: null } : await linkToVehicle({
     vin: null,
     parsed_year: body.parsed_year,
     parsed_make: body.parsed_make,
@@ -185,7 +186,7 @@ export async function handleDirect(body: DirectInput, deps: DirectDeps) {
     all_images: body.all_images || null,
     seller_name: body.seller_name || null,
     contact_info: body.contact_info || null,
-    status: body.status || "active",
+    status: saved ? "unknown" : body.status || "active",
     first_seen_at: observedAt,
     last_seen_at: observedAt,
     raw_scrape_data: {
@@ -221,8 +222,11 @@ async function finishLanding(body: DirectInput, deps: DirectDeps, listing: any) 
   const { supabase, writeObservation } = deps;
   const observedAt = body.capture?.observed_at || new Date().toISOString();
   const errors: string[] = [];
-  let observation: any = { status: "unlinked", observation_id: null, errors: [] };
-  if (listing.vehicle_id) {
+  // A private Saved page is testimony about the owner's collection, not a
+  // public listing visit. Keep it in the private capture/sighting owners only.
+  const saved = isSavedCapture(body.capture);
+  let observation: any = { status: saved ? "private_source" : "unlinked", observation_id: null, errors: [] };
+  if (listing.vehicle_id && !saved) {
     const fields: Record<string, unknown> = {};
     for (const [key, value] of Object.entries({ year: body.parsed_year, make: body.parsed_make,
       model: body.parsed_model, asking_price: body.current_price ?? body.price, mileage: body.mileage,
@@ -254,7 +258,7 @@ async function finishLanding(body: DirectInput, deps: DirectDeps, listing: any) 
     const sighting = await supabase.from("fb_listing_sightings").upsert({
       id: sightingId, listing_id: listing.listing_id, sweep_job_id: body.capture.capture_id,
       price_at_sighting: body.current_price ?? body.price ?? null, seen_at: observedAt,
-      source: "browser_capture", submitted_by: body.agent_context?.agent_id ?? "fb-browser-capture",
+      source: saved ? "saved_browser_capture" : "browser_capture", submitted_by: body.agent_context?.agent_id ?? "fb-browser-capture",
     }, { onConflict: "id", ignoreDuplicates: true });
     if (sighting.error) errors.push(sighting.error.message);
     else {

@@ -715,6 +715,11 @@ jobs:
         working-directory: ./nuke_frontend
         run: npm ci
 
+      - name: Verify rendered Facebook collection, private acknowledgements and scheduled recovery
+        run: |
+          ln -s nuke_frontend/node_modules node_modules
+          node --import tsx --test scripts/fb-browser-capture/collector.test.mjs
+
       - name: Verify actual identity reader with installed dependencies
         run: node --test scripts/test-search-identity-profile-link.mjs
         env:

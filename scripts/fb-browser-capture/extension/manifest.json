@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Nuke Marketplace Capture",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "Permitted rendered Marketplace captures through Nuke’s existing intake.",
   "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAwbta7ShTHN3MOLQBjt23Xvotv1Rl8GudT0uR0tVqKTwAO5aF1auFPe85cuOMkeAcf06Tjj/d3RqeeZXcfEAwIcjZ9mdbFDf0Oo/IUXT1Y/b7RQ7Et+Adz4MVv26RbXc/ATXTKkxw5CAET7BcmfQc08XIN3BZoVtd1q+R7H5dHidQIGv5lJ1ClheB+b5AScShjAjMXfnLDRTwzUfQ0Ia5f7UB87KIm6v8eD6OGxZWrZYsMIcRmSs0wOF5/dg+AmdxoOiG1YrDQMpxG48BHM9+pe9KEluPb7aRlO+zfTZX47h1sDCnVKNztpQPlPagcF/hHt1VPXS31Sl16x3FDbessQIDAQAB",
   "permissions": [
@@ -12,7 +12,9 @@
   ],
   "host_permissions": [
     "https://www.facebook.com/marketplace/*",
-    "https://facebook.com/marketplace/*"
+    "https://facebook.com/marketplace/*",
+    "https://www.facebook.com/saved/*",
+    "https://facebook.com/saved/*"
   ],
   "background": {
     "service_worker": "worker.mjs",

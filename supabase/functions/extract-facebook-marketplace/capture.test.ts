@@ -156,3 +156,40 @@ Deno.test("existing-listing read/update failures preserve prior raw material and
   }
   assert.equal((await run(repeat)).success,true); assert.equal(db.tables.fb_listing_sightings.length,2);
 });
+
+Deno.test("Saved Marketplace captures retain private history without changing public listing state or linking vehicles", async () => {
+  const saved = { ...first, target_url: "https://www.facebook.com/saved/?cref=28", actual_url: "https://www.facebook.com/saved/",
+    retrieval_surface: "chrome_mv3_rendered_saved_cards" };
+  const card = { ...item, url: `https://www.facebook.com/marketplace/item/${item.facebook_id}/`, status: "unknown" };
+  const db = new MemoryDb();
+  const existing = { id: "listing",facebook_id: item.facebook_id,vehicle_id: "vehicle",status: "sold",
+    price: 1000,current_price: 1000,title: "retained source title",last_seen_at: "2026-10-01T00:00:00Z",submission_count: 1 };
+  db.tables.marketplace_listings.push(existing);
+  let links=0,observations=0;
+  const run = (capture: BrowserCapture,batch: any[]) => handleBrowserCapture(db,{capture,batch},body=>handleDirect(body,{
+    supabase: db,capturePrepared:true,
+    linkToVehicle:async()=>{links++;return {vehicle_id:"unwanted",suggested_vehicle_id:null};},
+    writeObservation:async()=>{observations++;return {observationId:"unwanted"};},
+  }));
+  const landed=await run(saved,[card]);
+  assert.equal(landed.success,true);assert.equal(landed.counts.private_source,1);
+  assert.equal(existing.status,"sold");assert.equal(existing.current_price,1000);
+  assert.equal(existing.title,"retained source title");assert.equal(existing.last_seen_at,"2026-10-01T00:00:00Z");
+  assert.equal(db.tables.fb_listing_sightings[0].price_at_sighting,3500);
+  assert.equal(db.tables.fb_listing_sightings[0].source,"saved_browser_capture");
+  assert.equal(db.tables.fb_sweep_jobs[0].metadata.capture.actual_url,saved.actual_url);
+  const another={...card,facebook_id:"999",url:"https://www.facebook.com/marketplace/item/999/"};
+  const repeat={...saved,capture_id:"00000000-0000-4000-a000-000000000005"};
+  assert.equal((await run(repeat,[another])).success,true);
+  const added=db.tables.marketplace_listings.find(row=>row.facebook_id==="999");
+  assert.equal(added.status,"unknown");assert.equal(added.vehicle_id,undefined);
+  assert.equal(links,0);assert.equal(observations,0);
+  assert.equal((await run(saved,[card])).counts.duplicate_sightings,1);
+  assert.equal(db.tables.fb_listing_sightings.length,2);
+  for (const actual_url of ["https://www.facebook.com/saved/settings/","https://www.facebook.com/messages/","https://www.facebook.com/marketplace/category/vehicles/"]) {
+    assert.throws(()=>validateCapture({...saved,actual_url},[card]),/browser surface/);
+  }
+  assert.throws(()=>validateCapture(saved,[{...card,status:"active"}]),/unknown availability/);
+  assert.throws(()=>validateCapture(saved,[{...card,url:"https://www.facebook.com/marketplace/item/other/"}]),/exact Marketplace/);
+  assert.throws(()=>validateCapture({...saved,retrieval_surface:"search"},[card]),/browser surface/);
+});

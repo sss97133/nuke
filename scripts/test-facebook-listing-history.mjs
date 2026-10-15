@@ -78,20 +78,22 @@ test('actual PostgreSQL history preserves source grain, admission boundaries, re
       CREATE TABLE fb_sweep_jobs(id uuid PRIMARY KEY,started_at timestamptz,completed_at timestamptz,created_at timestamptz,status text,metadata jsonb);
       CREATE INDEX ON fb_sweep_jobs(started_at DESC);
       CREATE TABLE marketplace_listings(id uuid PRIMARY KEY,facebook_id text UNIQUE,vehicle_id uuid,title text,price integer,seller_name text);
-      CREATE TABLE fb_listing_sightings(id uuid PRIMARY KEY,listing_id uuid,sweep_job_id uuid,seen_at timestamptz,price_at_sighting numeric);
+      CREATE TABLE fb_listing_sightings(id uuid PRIMARY KEY,listing_id uuid,sweep_job_id uuid,seen_at timestamptz,price_at_sighting numeric,source text);
       INSERT INTO marketplace_listings VALUES(md5('listing-a')::uuid,'1001',NULL,'MUTABLE_TITLE',999999,'PRIVATE_SELLER'),(md5('listing-b')::uuid,'1002',NULL,'OTHER_MUTABLE_TITLE',999999,'PRIVATE_CONTACT');`);
-    const seed=(n,observed,ack,price,detail=false,ids=['1001']) => {
+    const seed=(n,observed,ack,price,detail=false,ids=['1001'],saved=false) => {
       const run=JSON.parse(sql(`SELECT to_json(md5('run-${n}')::uuid)`));
       const capture={ capture_id: run,observed_at: observed,access_state: 'available',complete: false,
         actual_url: detail ? 'https://www.facebook.com/marketplace/item/1001/' : 'https://www.facebook.com/marketplace/category/vehicles/?sortBy=creation_time_descend&next=/marketplace/item/1002/',
         target_url: 'https://www.facebook.com/marketplace/las-vegas/vehicles/',actual_region: 'Nevada',retrieval_surface: detail ? 'detail' : 'search',
         source_listed_at: null,source_listed_label: detail ? '2 hours ago' : null };
-      const batch=ids.map(id=>({ facebook_id: id,title: `Retained listing ${id}`,price: id==='1001' ? price : 200,content_text: 'PRIVATE_RAW_BODY' }));
+      if(saved)Object.assign(capture,{actual_url:'https://www.facebook.com/saved/?cref=28',target_url:'https://www.facebook.com/saved/',retrieval_surface:'chrome_mv3_rendered_saved_cards'});
+      const batch=ids.map(id=>({ facebook_id: id,title: `Retained listing ${id}`,price: id==='1001' ? price : 200,content_text: 'PRIVATE_RAW_BODY',
+        ...(saved?{url:`https://www.facebook.com/marketplace/item/${id}/`,status:'unknown'}:{}) }));
       const results=ids.map(id=>({ facebook_id: id,listing_id: JSON.parse(sql(`SELECT to_json(md5('listing-${id==='1001' ? 'a' : 'b'}')::uuid)`)),
         sighting_id: JSON.parse(sql(`SELECT to_json(md5('sighting-${n}-${id}')::uuid)`)),listing_landed: true,sighting_landed: true }));
       const metadata=JSON.stringify({ writer: 'extract-facebook-marketplace',capture_version: 1,capture,batch,results }).replaceAll("'","''");
       sql(`INSERT INTO fb_sweep_jobs VALUES('${run}','${ack}','${ack}','${ack}','completed','${metadata}'::jsonb) ON CONFLICT(id) DO NOTHING;`);
-      for (const [i,id] of ids.entries()) sql(`INSERT INTO fb_listing_sightings VALUES('${results[i].sighting_id}','${results[i].listing_id}','${run}','${observed}',${batch[i].price}) ON CONFLICT(id) DO NOTHING;`);
+      for (const [i,id] of ids.entries()) sql(`INSERT INTO fb_listing_sightings VALUES('${results[i].sighting_id}','${results[i].listing_id}','${run}','${observed}',${batch[i].price},'${saved?'saved_browser_capture':'browser_capture'}') ON CONFLICT(id) DO NOTHING;`);
       return run;
     };
     const read=(eventBefore='2025-01-03T12:00:00Z',known='2025-01-03T12:00:00Z') => {
@@ -134,5 +136,34 @@ test('actual PostgreSQL history preserves source grain, admission boundaries, re
     assert.equal(read().rows[0].observation_count,3);
     sql(`UPDATE fb_sweep_jobs SET status='completed',metadata=jsonb_set(metadata,'{batch}','{}') WHERE id='${later}'`);
     assert.equal(read().rows[0].observation_count,3);
+    const savedRun=seed(5,'2025-01-03T09:30:00Z','2025-01-03T09:31:00Z',100,false,['1001'],true);
+    const savedHistory=read().rows.find(r=>r.facebook_id==='1001');
+    assert.equal(savedHistory.observation_count,4);assert.equal(savedHistory.saved_observations,1);
+    assert.equal(savedHistory.search_sightings,2);assert.equal(savedHistory.same_query_revisits,1);
+    assert.equal(savedHistory.detail_observations,1);assert.equal(savedHistory.observations.at(-1).saved_observation,true);
+    assert.equal(savedHistory.observations.at(-1).source_reported_listed_at,null);
+    assert(!JSON.stringify(savedHistory).includes('PRIVATE_'));
+    sql(`UPDATE fb_sweep_jobs SET metadata=jsonb_set(metadata,'{capture,actual_url}','"https://www.facebook.com/saved/settings/"') WHERE id='${savedRun}'`);
+    assert.equal(read().rows.find(r=>r.facebook_id==='1001').observation_count,3);
+    // Real role reads prove Saved raw bytes/keys are withheld while ordinary
+    // search captures and the existing privileged history remain available.
+    sql(`DO $$ BEGIN
+      IF NOT EXISTS(SELECT FROM pg_roles WHERE rolname='anon') THEN CREATE ROLE anon NOLOGIN; END IF;
+      IF NOT EXISTS(SELECT FROM pg_roles WHERE rolname='authenticated') THEN CREATE ROLE authenticated NOLOGIN; END IF;
+      IF NOT EXISTS(SELECT FROM pg_roles WHERE rolname='service_role') THEN CREATE ROLE service_role NOLOGIN BYPASSRLS; END IF;
+      END $$;
+      GRANT SELECT ON fb_sweep_jobs,fb_listing_sightings TO anon,authenticated,service_role;
+      ALTER TABLE fb_sweep_jobs ENABLE ROW LEVEL SECURITY; ALTER TABLE fb_listing_sightings ENABLE ROW LEVEL SECURITY;
+      CREATE POLICY "Sweep jobs are readable" ON fb_sweep_jobs FOR SELECT USING(true);
+      CREATE POLICY "Sightings are readable" ON fb_listing_sightings FOR SELECT USING(true);`);
+    const beforePrivacy=Number(sql('SELECT count(*) FROM fb_sweep_jobs'));
+    sql(readFileSync(new URL('../supabase/migrations/20261015054617_protect_saved_facebook_captures.sql',import.meta.url),'utf8'));
+    for (const role of ['anon','authenticated']) {
+      assert.equal(Number(sql(`SET ROLE ${role}; SELECT count(*) FROM fb_sweep_jobs; RESET ROLE;`)),beforePrivacy-1);
+      assert.equal(sql(`SET ROLE ${role}; SELECT count(*) FROM fb_sweep_jobs WHERE id='${savedRun}'; RESET ROLE;`),'0');
+      assert.equal(sql(`SET ROLE ${role}; SELECT count(*) FROM fb_listing_sightings WHERE sweep_job_id='${savedRun}'; RESET ROLE;`),'0');
+    }
+    assert.equal(sql(`SET ROLE service_role; SELECT count(*) FROM fb_sweep_jobs WHERE id='${savedRun}'; RESET ROLE;`),'1');
+    assert.equal(sql(`SET ROLE service_role; SELECT count(*) FROM fb_listing_sightings WHERE sweep_job_id='${savedRun}'; RESET ROLE;`),'1');
     assert.equal(sql("SELECT count(*) FROM pg_stat_activity WHERE wait_event_type='Lock'"),'0');
   });
