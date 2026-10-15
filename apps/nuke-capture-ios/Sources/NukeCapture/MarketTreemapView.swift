@@ -455,7 +455,7 @@ struct MarketTreemapView: View {
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                 } else if failed && nodes.isEmpty {
                     ContentUnavailableView {
-                        Label("Couldn't load", systemImage: "wifi.exclamationmark")
+                        Label("Couldn't load", systemImage: "exclamationmark.triangle")
                     } actions: {
                         Button("Retry") { Task { await load() } }.buttonStyle(.borderedProminent)
                     }
@@ -918,7 +918,7 @@ struct FilteredVehicleGrid: View {
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else if failed && rows.isEmpty {
                 ContentUnavailableView {
-                    Label("Couldn't load", systemImage: "wifi.exclamationmark")
+                    Label("Couldn't load", systemImage: "exclamationmark.triangle")
                 } actions: {
                     Button("Retry") { Task { await load() } }.buttonStyle(.borderedProminent)
                 }

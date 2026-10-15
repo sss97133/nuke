@@ -92,7 +92,7 @@ struct LiveAnalysisStream: View {
                     }
                 } else if loadError {
                     HStack(spacing: 8) {
-                        Label("Couldn't reach the pipeline", systemImage: "wifi.exclamationmark")
+                        Label("Couldn't reach the pipeline", systemImage: "exclamationmark.triangle")
                             .font(.caption2).foregroundStyle(.secondary)
                         Spacer()
                         Button("Retry") { Task { await poll(reset: true) } }

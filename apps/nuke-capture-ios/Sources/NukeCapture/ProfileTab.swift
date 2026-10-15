@@ -152,6 +152,7 @@ struct ProfileTab: View {
     @State private var query = ""
     @State private var results: [ProfileRow] = []
     @State private var searchError = false   // a failed handle search ≠ "no such user"
+    @State private var searchFailureText: String?
     @State private var showAccount = false
 
     private var rootUserId: String {
@@ -166,9 +167,9 @@ struct ProfileTab: View {
                 } else if searchError && results.isEmpty {
                     // The search request failed — never read as "no such handle".
                     ContentUnavailableView {
-                        Label("Couldn't search", systemImage: "wifi.exclamationmark")
+                        Label("Couldn't search", systemImage: "exclamationmark.triangle")
                     } description: {
-                        Text("Check your connection.")
+                        Text(searchFailureText ?? "The search failed.")
                     } actions: {
                         Button("Retry") {
                             Task { await search(query.trimmingCharacters(in: .whitespaces)) }
@@ -238,6 +239,7 @@ struct ProfileTab: View {
                 .value
         } catch {
             searchError = true
+            searchFailureText = ReadFailure.text(error)
             NSLog("NukeCapture profile search failed: %@", String(describing: error))
         }
     }
@@ -395,7 +397,7 @@ struct ProfileView: View {
             } else if latestError {
                 Section("Latest work") {
                     HStack {
-                        Label("Couldn't load", systemImage: "wifi.exclamationmark")
+                        Label("Couldn't load", systemImage: "exclamationmark.triangle")
                             .font(.footnote).foregroundStyle(.secondary)
                         Spacer()
                         Button("Retry") { Task { await loadLatest() } }
@@ -916,7 +918,7 @@ struct ProfileView: View {
     private var garageErrorSection: some View {
         Section {
             VStack(alignment: .leading, spacing: 8) {
-                Label("Couldn't load the garage", systemImage: "wifi.exclamationmark")
+                Label("Couldn't load the garage", systemImage: "exclamationmark.triangle")
                     .font(.subheadline)
                     .foregroundStyle(Color.primary)
                 Text("Your vehicles are on the record — the connection dropped.")
@@ -1232,9 +1234,9 @@ struct DayReceiptView: View {
                 } else if loadError != nil {
                     // Failed ≠ empty — offer a way back, never a dead red string.
                     ContentUnavailableView {
-                        Label("Couldn't load the day", systemImage: "wifi.exclamationmark")
+                        Label("Couldn't load the day", systemImage: "exclamationmark.triangle")
                     } description: {
-                        Text("Check your connection.")
+                        Text("The read failed. Retry.")
                     } actions: {
                         Button("Retry") { Task { loaded = false; loadError = nil; await load() } }
                             .buttonStyle(.borderedProminent)

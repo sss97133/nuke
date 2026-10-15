@@ -822,7 +822,7 @@ struct VehicleDetailView: View {
                 if let loadError {
                     // The page spine failed — one Retry recovers header+gallery+ASSET.
                     VStack(alignment: .leading, spacing: 10) {
-                        Label(loadError, systemImage: "wifi.exclamationmark")
+                        Label(loadError, systemImage: "exclamationmark.triangle")
                             .font(.footnote).foregroundStyle(.secondary)
                         Button("Retry") { Task { await load() } }
                             .font(.footnote)
@@ -1050,7 +1050,7 @@ struct VehicleDetailView: View {
     /// as a silently-absent one (Worklight).
     @ViewBuilder private func sectionError(_ what: String, retry: @escaping () -> Void) -> some View {
         HStack(spacing: 8) {
-            Label("Couldn't load \(what)", systemImage: "wifi.exclamationmark")
+            Label("Couldn't load \(what)", systemImage: "exclamationmark.triangle")
                 .font(.system(.caption2, design: .monospaced))
                 .foregroundStyle(.secondary)
             Spacer()
@@ -3234,7 +3234,7 @@ struct FieldProvenanceSheet: View {
                     } else if loadFailed {
                         // The trace failed — don't claim "no source exists yet".
                         VStack(alignment: .leading, spacing: 10) {
-                            Label("Couldn't trace the source", systemImage: "wifi.exclamationmark")
+                            Label("Couldn't trace the source", systemImage: "exclamationmark.triangle")
                                 .font(.footnote).foregroundStyle(.secondary)
                             Button("Retry") { Task { await load() } }
                                 .font(.footnote)

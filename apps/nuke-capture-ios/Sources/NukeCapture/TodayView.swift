@@ -250,7 +250,7 @@ private struct UnderstandingPanel: View {
                 } else if loadError {
                     // The fetch failed — don't sit on "Reading the record…" forever.
                     HStack(spacing: 8) {
-                        Label("Couldn't load", systemImage: "wifi.exclamationmark")
+                        Label("Couldn't load", systemImage: "exclamationmark.triangle")
                             .font(.caption2).foregroundStyle(.secondary)
                         Spacer()
                         Button("Retry") { Task { await fetch() } }
@@ -421,7 +421,7 @@ private struct LiveMetricsStrip: View {
             if engine.statsError && !engine.statsLoaded {
                 metricsFunnel
                 HStack {
-                    Label("Couldn't load your record", systemImage: "wifi.exclamationmark")
+                    Label("Couldn't load your record", systemImage: "exclamationmark.triangle")
                         .font(.caption).foregroundStyle(.secondary)
                     Spacer()
                     Button("Retry") { Task { await engine.refreshAnalyzedCount() } }
@@ -537,7 +537,7 @@ private struct GarageStrip: View {
                 // Failed to load — never the same dead-empty render as "no vehicles".
                 Section("Your garage") {
                     HStack {
-                        Label("Couldn't load", systemImage: "wifi.exclamationmark")
+                        Label("Couldn't load", systemImage: "exclamationmark.triangle")
                             .font(.footnote).foregroundStyle(.secondary)
                         Spacer()
                         Button("Retry") { Task { await load() } }

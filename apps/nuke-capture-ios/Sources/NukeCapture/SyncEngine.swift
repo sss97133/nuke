@@ -47,6 +47,11 @@ final class SyncEngine: ObservableObject {
     @Published private(set) var totalSkippedOffShop: Int
     @Published private(set) var isSyncing = false
     @Published private(set) var lastError: String?
+    /// Set when the server refused the session or the app's key (HTTP 401) during a pass. Every
+    /// upload stops until a pass succeeds again; the screens say so instead of looking stuck.
+    @Published private(set) var authProblem: String?
+    /// Photos that failed Config.maxAttemptsPerAsset times and no longer hold the pass back.
+    @Published private(set) var gaveUpCount = 0
     @Published private(set) var authorizationDenied = false
     @Published private(set) var lastSyncDate: Date?
     @Published private(set) var uploadsToday: Int
@@ -144,11 +149,17 @@ final class SyncEngine: ObservableObject {
         static let relevantTotal = "relevantPhotoTotal" // Int — confirmed at-site set handed to backfill
         static let contributorMode = "contributorMode"  // Bool — this device contributes to an org pool
         static let totalHeldPrivate = "totalHeldPrivate" // Int — frames the contributor gate held back
+        static let seenAssets = "seenAssetIDs"          // [String] PHAsset ids settled, capped (Config.seenAssetCap)
+        static let failedAttempts = "assetFailedAttempts" // [String: Int] attempts per asset that failed
     }
 
     /// Dedupe set: "filename|size" of everything already uploaded. Ordered
     /// oldest→newest so capping drops the oldest entries.
     private var seenSet: [String]
+    /// PHAsset ids already settled, oldest first; the Set mirrors it for lookups.
+    private var seenAssetOrder: [String]
+    private var seenAssetIDs: Set<String>
+    private var failedAttempts: [String: Int]
 
     private var changeObserver: PhotoLibraryObserver?
 
@@ -197,6 +208,10 @@ final class SyncEngine: ObservableObject {
         totalSynced = defaults.integer(forKey: Key.totalSynced)
         totalSkippedOffShop = defaults.integer(forKey: Key.totalSkipped)
         seenSet = defaults.stringArray(forKey: Key.seenSet) ?? []
+        seenAssetOrder = defaults.stringArray(forKey: Key.seenAssets) ?? []
+        seenAssetIDs = Set(seenAssetOrder)
+        failedAttempts = (defaults.dictionary(forKey: Key.failedAttempts) as? [String: Int]) ?? [:]
+        gaveUpCount = failedAttempts.values.filter { $0 >= Config.maxAttemptsPerAsset }.count
         lastSyncDate = defaults.object(forKey: Key.lastSyncDate) as? Date
         recentUploadIDs = defaults.stringArray(forKey: Key.recentUploads) ?? []
         isPaused = defaults.bool(forKey: Key.paused)
@@ -423,87 +438,11 @@ final class SyncEngine: ObservableObject {
             // this pass (failures > 0), so the remainder is re-found when it cools.
             if Self.deviceTooHotOrLow { refreshThermalHold(); failed += 1; break }
 
-            // ── Gate 1 (privacy, on-device): GPS site-gate + ownership check ──
-            // Confirmed ignition sites; falls back to the hardcoded
-            // Config.shopLocations when none are confirmed (migration).
-            // sourceType + mediaSubtypes filter: only user-originated, non-screenshot images.
-            guard let loc = asset.location,
-                  SiteStore.shared.isAtSite(latitude: loc.coordinate.latitude,
-                                            longitude: loc.coordinate.longitude),
-                  asset.sourceType == .typeUserLibrary,
-                  !asset.mediaSubtypes.contains(.photoScreenshot) else {
-                skipped += 1
-                continue
-            }
-
-            // ── Gate 1b (contributor firewall): default-exclude before upload ──
-            // Contributor mode only. A private photo shot AT the shop (selfie,
-            // paycheck, a person) clears the GPS gate but must NEVER reach the
-            // shared pool — hold anything without an affirmative vehicle label
-            // or with a prominent face. Owner mode skips this entirely.
-            if contributorMode, await contributorGateHolds(assetID: asset.localIdentifier) {
-                heldPrivate += 1
-                continue
-            }
-
-            let filename = Self.originalFilename(for: asset)
-
-            do {
-                // Export the ORIGINAL bytes (downloads from iCloud if the
-                // local copy is optimized away). Same PHImageManager path as
-                // the Mac relay — bytes stay in memory, no temp file needed
-                // at shop-photo sizes (3–10 MB).
-                let data = try await Self.requestOriginalData(for: asset)
-
-                // ── Gate 2 (ownership): require Apple camera EXIF ──
-                // iMessage-received photos have EXIF stripped → make == nil.
-                // Screenshots are pre-filtered above but double-gated here.
-                let (cameraMake, cameraModel) = CameraEXIF.cameraInfo(from: data)
-                guard cameraMake == "Apple" else { skipped += 1; continue }
-
-                // ── Dedupe: (filename, size) seen-set ──
-                let key = "\(filename)|\(data.count)"
-                if seenSet.contains(key) { deduped += 1; continue }
-
-                // ── Owner triage (on-device): pixels vs metadata-only ──
-                // Classify the already-fetched bytes (no second PhotoKit fetch).
-                // Pixels upload ONLY when it's vehicle work, no prominent face,
-                // and not flagged sensitive; everything else uploads metadata
-                // only (EXIF alibi) with the pixels left on the phone. Fail-safe:
-                // undecodable/unclassifiable ⇒ metadata-only (mirrors the
-                // contributor firewall's "hold if unclassifiable").
-                var pixelsEligible = false
-                var mlLabels: [String] = []
-                if let cg = Self.downsampledCGImage(from: data) {
-                    let t = VisionEngine.triage(cg)
-                    mlLabels = t.labels
-                    pixelsEligible = t.pixelsEligible
-                }
-                if !pixelsEligible { metadataOnly += 1 }
-
-                let sourceTypeLabel = Self.sourceTypeLabel(for: asset)
-                let meta = PhotoMeta(
-                    assetIdentifier: asset.localIdentifier,
-                    filename: filename,
-                    creationDate: asset.creationDate,
-                    exifCaptureDate: CameraEXIF.captureDate(from: data),
-                    latitude: asset.location?.coordinate.latitude,
-                    longitude: asset.location?.coordinate.longitude,
-                    cameraMake: cameraMake,
-                    cameraModel: cameraModel,
-                    sourceType: sourceTypeLabel
-                )
-                try await SupabaseService.uploadPhoto(
-                    data: data, meta: meta, userId: userId,
-                    uploadPixels: pixelsEligible, appleMLLabels: mlLabels
-                )
-
-                markSeen(key)
-                recordUpload(assetIdentifier: asset.localIdentifier)
+            var stop = false
+            switch await processAsset(asset, userId: userId) {
+            case .uploaded(let pixels):
                 uploaded += 1
-                totalSynced += 1
-                defaults.set(totalSynced, forKey: Key.totalSynced)
-
+                if !pixels { metadataOnly += 1 }
                 // LIVE T0: read the just-captured frame on-device (Apple Vision)
                 // the instant it uploads, so the user watches the analysis land in
                 // seconds. LIVE sync ONLY (this loop) — NEVER the backfill drain,
@@ -516,12 +455,27 @@ final class SyncEngine: ObservableObject {
                         self.addLiveT0(atom)
                     }
                 }
-            } catch {
+            case .offSite, .notOwnCamera:
+                skipped += 1
+            case .heldPrivate:
+                heldPrivate += 1
+            case .deduped:
+                deduped += 1
+            case .gaveUp:
+                break   // failed Config.maxAttemptsPerAsset times; counted in gaveUpCount, holds nothing back
+            case .deferred:
+                // In iCloud only and not on Wi-Fi: retried on Wi-Fi, not an attempt against the photo.
                 failed += 1
-                lastError = "\(filename): \(error.localizedDescription)"
+            case .authFailed:
+                failed += 1
+                stop = true
+            case .failed(let retry):
+                if retry { failed += 1 }
             }
+            if stop { break }
         }
 
+        persistSeenAssets()
         totalSkippedOffShop += skipped
         defaults.set(totalSkippedOffShop, forKey: Key.totalSkipped)
         recordHeldPrivate(heldPrivate)
@@ -650,6 +604,7 @@ final class SyncEngine: ObservableObject {
                 // or cancellation; preserve failures and newly queued assets.
                 let pending = defaults.stringArray(forKey: Key.backfillQueue) ?? []
                 let remaining = pending.filter { !settled.contains($0) }
+                persistSeenAssets()
                 defaults.set(remaining, forKey: Key.backfillQueue)
                 backfillRemaining = remaining.count
             }
@@ -675,84 +630,38 @@ final class SyncEngine: ObservableObject {
                     if attemptedInPass > 1 { try? await Task.sleep(for: .milliseconds(Config.foregroundBackfillPaceMs)) }
                 }
 
-                // Same gate as sync() — backfill candidates came from
+                // Same per-photo path and gates as sync(): backfill candidates came from
                 // confirmed clusters, but the gate is the gate.
-                // sourceType + mediaSubtypes mirror the sync pass filter.
-                guard let loc = asset.location,
-                      SiteStore.shared.isAtSite(latitude: loc.coordinate.latitude,
-                                                longitude: loc.coordinate.longitude),
-                      asset.sourceType == .typeUserLibrary,
-                      !asset.mediaSubtypes.contains(.photoScreenshot) else {
+                let outcome = await processAsset(asset, userId: userId)
+                if Task.isCancelled || isPaused { return }
+                switch outcome {
+                case .uploaded(let pixels):
+                    uploaded += 1
+                    if !pixels { metadataOnly += 1 }
+                    settled.insert(asset.localIdentifier)
+                case .offSite, .notOwnCamera:
                     skipped += 1
                     settled.insert(asset.localIdentifier)
-                    continue
-                }
-
-                // Contributor firewall (default-exclude) before any historical
-                // photo joins the pool — same gate as the live sync pass.
-                if contributorMode, await contributorGateHolds(assetID: asset.localIdentifier) {
+                case .heldPrivate:
                     heldPrivate += 1
                     settled.insert(asset.localIdentifier)
-                    continue
-                }
-
-                let filename = Self.originalFilename(for: asset)
-                do {
-                    let data = try await Self.requestOriginalData(for: asset)
-                    if Task.isCancelled || isPaused { return }
-
-                    // Gate 2: require Apple camera EXIF (same as sync pass).
-                    let (cameraMake, cameraModel) = CameraEXIF.cameraInfo(from: data)
-                    guard cameraMake == "Apple" else {
-                        skipped += 1
-                        settled.insert(asset.localIdentifier)
-                        continue
-                    }
-
-                    let key = "\(filename)|\(data.count)"
-                    if seenSet.contains(key) {
-                        deduped += 1
-                        settled.insert(asset.localIdentifier)
-                        continue
-                    }
-
-                    // Owner triage — same on-device pixels-vs-metadata-only
-                    // decision as the live sync pass (fail-safe to metadata-only).
-                    var pixelsEligible = false
-                    var mlLabels: [String] = []
-                    if let cg = Self.downsampledCGImage(from: data) {
-                        let t = VisionEngine.triage(cg)
-                        mlLabels = t.labels
-                        pixelsEligible = t.pixelsEligible
-                    }
-
-                    let sourceTypeLabel = Self.sourceTypeLabel(for: asset)
-                    let meta = PhotoMeta(
-                        assetIdentifier: asset.localIdentifier,
-                        filename: filename,
-                        creationDate: asset.creationDate,
-                        exifCaptureDate: CameraEXIF.captureDate(from: data),
-                        latitude: asset.location?.coordinate.latitude,
-                        longitude: asset.location?.coordinate.longitude,
-                        cameraMake: cameraMake,
-                        cameraModel: cameraModel,
-                        sourceType: sourceTypeLabel
-                    )
-                    try await SupabaseService.uploadPhoto(
-                        data: data, meta: meta, userId: userId,
-                        uploadPixels: pixelsEligible, appleMLLabels: mlLabels
-                    )
-                    markSeen(key)
-                    recordUpload(assetIdentifier: asset.localIdentifier)
+                case .deduped:
+                    deduped += 1
                     settled.insert(asset.localIdentifier)
-                    uploaded += 1
-                    if !pixelsEligible { metadataOnly += 1 }
-                    totalSynced += 1
-                    defaults.set(totalSynced, forKey: Key.totalSynced)
-                } catch {
+                case .gaveUp:
+                    settled.insert(asset.localIdentifier)
+                case .deferred:
+                    failed += 1                      // stays queued for a Wi-Fi pass
+                case .authFailed:
                     failed += 1
-                    lastError = "\(filename): \(error.localizedDescription)"
-                    backfillError = recoveryMessage
+                    return                           // queue persists; nothing more can land until sign-in
+                case .failed(let retry):
+                    if retry {
+                        failed += 1
+                        backfillError = recoveryMessage
+                    } else {
+                        settled.insert(asset.localIdentifier)
+                    }
                 }
             }
 
@@ -837,6 +746,164 @@ final class SyncEngine: ObservableObject {
 
         // Hit the iteration cap with work still owed — caller reschedules.
         return false
+    }
+
+    // ─── One photo, the same path for the live pass and the backfill ─────────
+
+    enum AssetOutcome {
+        case uploaded(pixels: Bool)
+        case offSite          // no GPS, off every site, not user-originated, or a screenshot
+        case notOwnCamera     // no Apple camera EXIF (received, edited elsewhere)
+        case heldPrivate      // contributor firewall
+        case deduped
+        case gaveUp           // failed Config.maxAttemptsPerAsset times already
+        case deferred         // original only in iCloud and the link is metered
+        case authFailed       // the server refused the session or key: stop the pass
+        case failed(retry: Bool)  // retry == false: this failure used the last attempt
+    }
+
+    /// What the on-device read of one original found. Computed off the main actor: EXIF parse,
+    /// a 512 px decode and the Vision triage used to run on the main thread for every photo.
+    struct PreparedOriginal: Sendable {
+        let cameraMake: String?
+        let cameraModel: String?
+        let exifCaptureDate: Date?
+        let pixelsEligible: Bool
+        let labels: [String]
+    }
+
+    nonisolated static func prepare(_ data: Data) async -> PreparedOriginal {
+        let (make, model) = CameraEXIF.cameraInfo(from: data)
+        var eligible = false
+        var labels: [String] = []
+        // Owner triage only matters for our own camera's frames; skip the decode otherwise.
+        if make == "Apple", let cg = downsampledCGImage(from: data) {
+            let t = VisionEngine.triage(cg)
+            labels = t.labels
+            eligible = t.pixelsEligible
+        }
+        return PreparedOriginal(cameraMake: make, cameraModel: model,
+                                exifCaptureDate: CameraEXIF.captureDate(from: data),
+                                pixelsEligible: eligible, labels: labels)
+    }
+
+    /// Gates first on metadata alone (no bytes read), then the original, then the upload.
+    private func processAsset(_ asset: PHAsset, userId: String) async -> AssetOutcome {
+        let id = asset.localIdentifier
+        // ── Gate 1 (privacy, on-device): GPS site-gate + ownership check ──
+        // Confirmed ignition sites; falls back to the hardcoded
+        // Config.shopLocations when none are confirmed (migration).
+        // sourceType + mediaSubtypes filter: only user-originated, non-screenshot images.
+        guard let loc = asset.location,
+              SiteStore.shared.isAtSite(latitude: loc.coordinate.latitude,
+                                        longitude: loc.coordinate.longitude),
+              asset.sourceType == .typeUserLibrary,
+              !asset.mediaSubtypes.contains(.photoScreenshot) else {
+            return .offSite
+        }
+        // Settled before: skip without reading the original again. The 3-day overlap re-finds
+        // every recent photo on each pass, and re-reading those originals was most of a pass.
+        if seenAssetIDs.contains(id) { return .deduped }
+        if (failedAttempts[id] ?? 0) >= Config.maxAttemptsPerAsset { return .gaveUp }
+
+        // ── Gate 1b (contributor firewall): default-exclude before upload ──
+        // Contributor mode only. A private photo shot AT the shop (selfie,
+        // paycheck, a person) clears the GPS gate but must NEVER reach the
+        // shared pool — hold anything without an affirmative vehicle label
+        // or with a prominent face. Owner mode skips this entirely.
+        if contributorMode, await contributorGateHolds(assetID: id) { return .heldPrivate }
+
+        let filename = Self.originalFilename(for: asset)
+        let data: Data
+        do {
+            // The ORIGINAL bytes. iCloud downloads only on an unmetered link: on cellular an
+            // optimized-away original waits for Wi-Fi instead of downloading in the foreground.
+            data = try await Self.requestOriginalData(for: asset, allowNetwork: NetworkMonitor.shared.isUnmetered)
+        } catch is OriginalInCloud {
+            return .deferred
+        } catch {
+            return noteFailure(id, message: "\(filename): \(error.localizedDescription)")
+        }
+
+        let prep = await Self.prepare(data)
+        // ── Gate 2 (ownership): require Apple camera EXIF ──
+        // iMessage-received photos have EXIF stripped → make == nil.
+        guard prep.cameraMake == "Apple" else { markAssetSeen(id); return .notOwnCamera }
+
+        // ── Dedupe: (filename, size) seen-set, for rows written before asset-level dedupe ──
+        let key = "\(filename)|\(data.count)"
+        if seenSet.contains(key) { markAssetSeen(id); return .deduped }
+
+        // ── Owner triage (on-device): pixels vs metadata-only ──
+        // Pixels upload ONLY when it's vehicle work, no prominent face,
+        // and not flagged sensitive; everything else uploads metadata
+        // only (EXIF alibi) with the pixels left on the phone. Fail-safe:
+        // undecodable/unclassifiable ⇒ metadata-only.
+        let meta = PhotoMeta(
+            assetIdentifier: id,
+            filename: filename,
+            creationDate: asset.creationDate,
+            exifCaptureDate: prep.exifCaptureDate,
+            latitude: asset.location?.coordinate.latitude,
+            longitude: asset.location?.coordinate.longitude,
+            cameraMake: prep.cameraMake,
+            cameraModel: prep.cameraModel,
+            sourceType: Self.sourceTypeLabel(for: asset)
+        )
+        do {
+            try await SupabaseService.uploadPhoto(
+                data: data, meta: meta, userId: userId,
+                uploadPixels: prep.pixelsEligible, appleMLLabels: prep.labels
+            )
+        } catch {
+            if SupabaseService.isAuthFailure(error) {
+                authProblem = "The server refused this sign-in, so nothing is uploading. Sign out and sign in again."
+                lastError = authProblem
+                return .authFailed
+            }
+            return noteFailure(id, message: "\(filename): \(error.localizedDescription)")
+        }
+
+        authProblem = nil
+        markSeen(key)
+        markAssetSeen(id)
+        if failedAttempts.removeValue(forKey: id) != nil {
+            defaults.set(failedAttempts, forKey: Key.failedAttempts)
+        }
+        recordUpload(assetIdentifier: id)
+        totalSynced += 1
+        defaults.set(totalSynced, forKey: Key.totalSynced)
+        return .uploaded(pixels: prep.pixelsEligible)
+    }
+
+    /// Counts one failed attempt. The last allowed attempt returns retry == false, so the caller
+    /// stops holding the watermark or the queue for this photo.
+    private func noteFailure(_ id: String, message: String) -> AssetOutcome {
+        lastError = message
+        let n = (failedAttempts[id] ?? 0) + 1
+        failedAttempts[id] = n
+        defaults.set(failedAttempts, forKey: Key.failedAttempts)
+        if n >= Config.maxAttemptsPerAsset {
+            gaveUpCount += 1
+            return .failed(retry: false)
+        }
+        return .failed(retry: true)
+    }
+
+    private func markAssetSeen(_ id: String) {
+        guard seenAssetIDs.insert(id).inserted else { return }
+        seenAssetOrder.append(id)
+        if seenAssetOrder.count > Config.seenAssetCap {
+            let drop = seenAssetOrder.count - Config.seenAssetCap
+            seenAssetOrder.prefix(drop).forEach { seenAssetIDs.remove($0) }
+            seenAssetOrder.removeFirst(drop)
+        }
+        // Written every 25 and at the end of each pass, not per photo (a 5,000-id array).
+        if seenAssetOrder.count % 25 == 0 { persistSeenAssets() }
+    }
+
+    private func persistSeenAssets() {
+        defaults.set(seenAssetOrder, forKey: Key.seenAssets)
     }
 
     private func markSeen(_ key: String) {
@@ -998,6 +1065,8 @@ final class SyncEngine: ObservableObject {
             ) { data, _, _, info in
                 if let data {
                     continuation.resume(returning: data)
+                } else if !allowNetwork, (info?[PHImageResultIsInCloudKey] as? Bool) == true {
+                    continuation.resume(throwing: OriginalInCloud())
                 } else {
                     let underlying = info?[PHImageErrorKey] as? NSError
                     continuation.resume(throwing: underlying ?? NSError(
@@ -1009,6 +1078,9 @@ final class SyncEngine: ObservableObject {
         }
     }
 }
+
+/// The original is only in iCloud and this request may not download it.
+struct OriginalInCloud: Error {}
 
 /// Tiny NSObject shim — PHPhotoLibraryChangeObserver calls arrive on a
 /// background queue; we just forward a poke and let SyncEngine hop to the

@@ -224,7 +224,7 @@ final class AttributionEngine: ObservableObject {
             ownerVehicles = vehicles
             confirmLoaded = true
         } catch {
-            confirmLoadError = "Couldn't load your sessions. Check your connection and try again."
+            confirmLoadError = "Couldn't load your sessions. Retry."
             NSLog("NukeCapture confirmation load failed: %@", String(describing: error))
         }
     }
