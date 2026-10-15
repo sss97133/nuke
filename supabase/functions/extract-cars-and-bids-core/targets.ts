@@ -19,24 +19,30 @@ export async function discoverTargets(supabase: any, firecrawlApiKey: string) {
     { apiKey: firecrawlApiKey, timeoutMs: 60_000, maxAttempts: 1 },
   );
   const xml: string = res.raw?.data?.rawHtml ?? "";
-  const urls = [...xml.matchAll(/<loc>([^<]+\/auctions\/[^<]+)<\/loc>/g)].map((m) => m[1]);
+  // The sitemap covers the last 12 months, unordered; take it newest lastmod first so recent auctions get the low target ids.
+  const entries = [...xml.matchAll(/<url>([\s\S]*?)<\/url>/g)].flatMap((m) => {
+    const url = m[1].match(/<loc>([^<]+\/auctions\/[^<]+)<\/loc>/)?.[1];
+    return url ? [{ url, lastmod: m[1].match(/<lastmod>([^<]+)<\/lastmod>/)?.[1] ?? "" }] : [];
+  });
+  entries.sort((a, b) => b.lastmod.localeCompare(a.lastmod));
+  const urls = entries.map((e) => e.url);
   if (!urls.length) return { success: false, error: res.error ?? "empty sitemap", status: res.httpStatus };
 
   const held = new Set<string>();
   for (let from = 0; ; from += 1000) {
     const { data, error } = await supabase.from("vehicle_events").select("source_url").eq("source_platform", "cars_and_bids").range(from, from + 999);
     if (error) throw error;
-    for (const r of data ?? []) { const id = auctionId(r.source_url); if (id) held.add(id); }
+    for (const r of data ?? []) { const id = auctionId(r.source_url); if (id) held.add(id.toLowerCase()); } // older writers lowercased ids
     if ((data?.length ?? 0) < 1000) break;
   }
   const known = new Set<string>();
   for (let from = 0; ; from += 1000) {
     const { data, error } = await supabase.from("source_targets").select("listing_url").eq("source_slug", "cars-and-bids").order("id").range(from, from + 999);
     if (error) throw error;
-    for (const r of data ?? []) { const id = auctionId(r.listing_url); if (id) known.add(id); }
+    for (const r of data ?? []) { const id = auctionId(r.listing_url); if (id) known.add(id.toLowerCase()); }
     if ((data?.length ?? 0) < 1000) break;
   }
-  const fresh = urls.filter((u) => { const id = auctionId(u)!; return !held.has(id) && !known.has(id); }).reverse(); // sitemap lists oldest first
+  const fresh = urls.filter((u) => { const id = auctionId(u)!.toLowerCase(); return !held.has(id) && !known.has(id); });
   const now = new Date().toISOString();
   let added = 0;
   for (let i = 0; i < fresh.length; i += 100) {
