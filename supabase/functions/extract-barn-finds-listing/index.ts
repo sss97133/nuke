@@ -149,7 +149,7 @@ async function extractOne(supabase: Supabase, url: string): Promise<Outcome> {
     // The post is an article about a listing elsewhere; whether that listing is still open is not stated.
     event_status: "unknown",
     started_at: post.publishedAt ?? undefined,
-    current_price: post.askingPrice ?? undefined,
+    current_price: post.askingPrice ?? null, // null on purpose: a reland must clear a price an older parse got wrong
     comment_count: post.comments.length,
     extracted_at: observedAt,
     extraction_method: "html_parse",
