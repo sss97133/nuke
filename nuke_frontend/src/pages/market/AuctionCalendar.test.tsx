@@ -3,7 +3,7 @@ import React, { act } from 'react';
 import { createRoot } from 'react-dom/client';
 import { BrowserRouter } from 'react-router-dom';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { daysUntil, houseLink, runTimer, saleTimer } from './useAuctionCalendar';
+import { daysUntil, houseLink, runTimer, saleTimer, updatedAgo } from './useAuctionCalendar';
 
 const fixture = vi.hoisted(() => ({ calendar: {} as any, roster: {} as any, rosterFor: vi.fn(), more: vi.fn() }));
 vi.mock('./useAuctionCalendar', async original => ({
@@ -18,10 +18,10 @@ import AuctionCalendar from './AuctionCalendar';
 const NOW = new Date(2026, 9, 15, 12, 0, 0);
 const SALES = [
   { house: 'mecum', sale_key: 'fixture-fall-2026', sale_name: 'Fixture Fall 2026', location: 'Fixture City, TX', starts_on: '2026-10-21', ends_on: '2026-10-24',
-    lots: 1037, seen_before: 212, no_reserve: 300, first_seen_at: '2026-08-01T00:00:00Z', first_seen_7d: 40,
+    lots: 1037, seen_before: 212, no_reserve: 300, first_seen_at: '2026-08-01T00:00:00Z', first_seen_7d: 40, updated_at: new Date(2026, 9, 15, 11, 48).toISOString(),
     run_days: [{ day: '2026-10-21', lots: 200 }, { day: '2026-10-22', lots: 280 }, { day: '2026-10-23', lots: 300 }, { day: '2026-10-24', lots: 257 }] },
   { house: 'gooding', sale_key: 'fixture-winter-2027', sale_name: 'Fixture Winter Auction', location: null, starts_on: '2027-01-08', ends_on: '2027-01-08',
-    lots: 2, seen_before: 1, no_reserve: 1, first_seen_at: '2026-10-07T00:00:00Z', first_seen_7d: 2, run_days: [{ day: '2027-01-08', lots: 2 }] },
+    lots: 2, seen_before: 1, no_reserve: 1, first_seen_at: '2026-10-07T00:00:00Z', first_seen_7d: 2, updated_at: new Date(2026, 9, 14, 9, 0).toISOString(), run_days: [{ day: '2027-01-08', lots: 2 }] },
 ];
 const ROWS = [
   { event_id: 'e1', vehicle_id: 'v1', source_url: 'https://www.goodingco.com/lot/fixture-one', lot_number: '12', run_on: '2027-01-08',
@@ -44,7 +44,7 @@ beforeEach(() => {
   container = document.createElement('div'); document.body.appendChild(container); root = createRoot(container);
   fixture.rosterFor.mockClear(); fixture.more.mockClear();
   fixture.calendar = { isPending: false, isError: false, data: { as_of: '2026-10-15T01:00:00Z', horizon_days: 200,
-    population: { lots: 1039, sales: 2, houses: 2, seen_before: 213, no_reserve: 301, first_seen_7d: 42 }, sales: SALES, roster: null } };
+    population: { lots: 1039, sales: 2, houses: 2, seen_before: 213, no_reserve: 301, first_seen_7d: 42, updated_at: new Date(2026, 9, 15, 11, 48).toISOString() }, sales: SALES, roster: null } };
   fixture.roster = { isPending: false, isError: false, hasNextPage: true, isFetchingNextPage: false, fetchNextPage: fixture.more,
     data: { pages: [{ as_of: '2026-10-15T01:00:00Z', roster: { house: 'gooding', sale_key: 'fixture-winter-2027', lots: 2, offset: 0, rows: ROWS } }] } };
 });
@@ -66,6 +66,14 @@ describe('day-precision timers', () => {
     expect(runTimer('2026-10-15', now)).toBe('runs today');
     expect(runTimer('2027-01-08', now)).toBe('runs in 85 days');
   });
+  it('says how long ago the data was written, never a full timestamp', () => {
+    const now = NOW.getTime();
+    expect(updatedAgo(new Date(now - 20_000).toISOString(), now)).toBe('updated just now');
+    expect(updatedAgo(new Date(now - 12 * 60_000).toISOString(), now)).toBe('updated 12 min ago');
+    expect(updatedAgo(new Date(now - 27 * 3_600_000).toISOString(), now)).toBe('updated 27 h ago');
+    expect(updatedAgo(new Date(now - 5 * 86_400_000).toISOString(), now)).toBe('updated 5 days ago');
+    expect(updatedAgo(null, now)).toBe('update time unrecorded');
+  });
   it('links a house page only on that house host over https', () => {
     expect(houseLink('mecum', 'https://www.mecum.com/lots/1/x/')).toBe('https://www.mecum.com/lots/1/x/');
     expect(houseLink('mecum', 'https://evil.example/lots/1/x/')).toBeNull();
@@ -78,14 +86,17 @@ it('states the lots with their population and lists each sale with its timer and
   await render();
   expect(container.querySelector('h1')?.textContent).toBe('Auction calendar');
   expect(container.textContent).toContain('1,039 lots');
-  expect(container.textContent).toContain('on 2 scheduled sales from 2 houses, today to 200 days out · 213 with an earlier record on Nuke');
+  expect(container.textContent).toContain('on 2 scheduled sales from 2 houses in the next 200 days · 213 with an earlier record on Nuke · updated 12 min ago');
+  expect(container.textContent).not.toMatch(/as of|\d{1,2}:\d{2}:\d{2}/);
   const rows = [...container.querySelectorAll('tr.auction-sale')];
   expect(rows).toHaveLength(2);
   expect(rows[0].textContent).toContain('in 6 days');
   expect(rows[0].textContent).toContain('Mecum');
   expect(rows[0].textContent).toContain('1,037 lots');
   expect(rows[0].textContent).toContain('212 with an earlier record · 300 no reserve');
+  expect(rows[0].textContent).toContain('40 first seen in the last 7 days · updated 12 min ago');
   expect(rows[1].textContent).toContain('in 85 days');
+  expect(rows[1].textContent).toContain('updated 27 h ago');
   expect(rows[1].textContent).toContain('Gooding & Co');
   expect(rows[0].querySelectorAll('rect.auction-track__day')).toHaveLength(4);
   expect(fixture.rosterFor).not.toHaveBeenCalled();
