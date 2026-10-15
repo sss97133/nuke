@@ -36,3 +36,24 @@ Deno.test("a sale facet names its key and dates", () => {
   const s = parseSaleFacet("Kissimmee 2027|1799107200|1800144000", "kissimmee-2027");
   if (s?.sale_starts_on !== "2027-01-05" || s?.sale_ends_on !== "2027-01-17") throw new Error(JSON.stringify(s));
 });
+
+import { priorSaleFacet, seriesKey, summarizePriorSale } from "./indexLot.ts";
+
+Deno.test("a renamed series is one series", () => {
+  if (seriesKey("Dallas 2024") !== seriesKey("Dallas/Fort Worth 2026")) throw new Error("dallas");
+  if (seriesKey("Las Vegas Motorcycles 2026") !== seriesKey("LV Motorcycles 2027")) throw new Error("motorcycles");
+  if (seriesKey("Las Vegas 2025") === seriesKey("Las Vegas Motorcycles 2026")) throw new Error("las vegas must not match its motorcycle sale");
+});
+
+Deno.test("the prior sale is the latest earlier sale of the series", () => {
+  const all = ["Dallas 2024|1725408000|1725667200", "Dallas/Fort Worth 2025|1761696000|1761955200", "Dallas/Fort Worth 2026|1792540800|1792800000", "Kissimmee 2025|1736208000|1737244800"];
+  const p = priorSaleFacet("Dallas/Fort Worth 2026|1792540800|1792800000", all);
+  if (p !== "Dallas/Fort Worth 2025|1761696000|1761955200") throw new Error(String(p));
+  if (priorSaleFacet("Tulsa 2026|1780617600|1780704000", all) !== null) throw new Error("no prior expected");
+});
+
+Deno.test("a prior sale summary counts vehicle lots, sold, bid-goes-on and the median of priced sold lots", () => {
+  const lot = (type: string, sold: number, bgo: number, price: number) => ({ taxonomies: { lot_type: [{ name: type }] }, sold, bid_goes_on: bgo, highest_bid_or_price: price });
+  const s = summarizePriorSale([lot("Auto", 1, 0, 10000), lot("Auto", 1, 0, 30000), lot("Auto", 1, 0, 20000), lot("Motorcycle", 0, 1, 5000), lot("Road Art", 1, 0, 400)], "dallas-fort-worth-2025", "2025-10-29");
+  if (s.lots !== 5 || s.vehicle_lots !== 4 || s.sold !== 3 || s.bid_goes_on !== 1 || s.median_price !== 20000 || s.priced !== 3) throw new Error(JSON.stringify(s));
+});

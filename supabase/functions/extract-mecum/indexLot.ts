@@ -90,3 +90,63 @@ export function indexLot(hit: any): { lot: IndexLot } | { skip: string; url?: st
   };
 }
 
+
+// ─── Prior sale of a series ─────────────────────────────────────────────
+
+/**
+ * A sale's series, so a renamed series still matches its past sales: "Dallas 2024" and "Dallas/Fort Worth 2026" are one series,
+ * and so are "Las Vegas Motorcycles 2026" and "LV Motorcycles 2027". The year is dropped and the name is reduced to letters.
+ */
+export function seriesKey(saleName: string): string {
+  return saleName.toLowerCase()
+    .replace(/\s+\d{4}$/, "")
+    .replace(/\/?\s*fort worth/, "")
+    .replace(/^lv\b/, "las vegas")
+    .replace(/[^a-z0-9]/g, "");
+}
+
+/** The sale facet values ("Name|startEpoch|endEpoch") of the same series that ended before this one started: the latest first. */
+export function priorSaleFacet(upcoming: string, all: string[]): string | null {
+  const [name, start] = upcoming.split("|");
+  const startEpoch = Number(start);
+  if (!name || !Number.isFinite(startEpoch)) return null;
+  const key = seriesKey(name);
+  let best: { value: string; end: number } | null = null;
+  for (const value of all) {
+    const [n, , e] = value.split("|");
+    const end = Number(e);
+    if (!n || !Number.isFinite(end) || end >= startEpoch || seriesKey(n) !== key) continue;
+    if (!best || end > best.end) best = { value, end };
+  }
+  return best?.value ?? null;
+}
+
+export interface PriorSale {
+  sale_key: string | null;
+  lots: number;
+  vehicle_lots: number;
+  sold: number;
+  bid_goes_on: number;
+  median_price: number | null;
+  priced: number;
+  ends_on: string;
+}
+
+/** Vehicle lots are every lot that is not Road Art. Sold and bid-goes-on count vehicle lots; the median is of sold lots with a stated price. */
+export function summarizePriorSale(hits: any[], saleKey: string | null, endsOn: string): PriorSale {
+  const vehicle = hits.filter((h) => termName(h?.taxonomies, "lot_type") !== "Road Art");
+  const sold = vehicle.filter((h) => h?.sold === 1);
+  const prices = sold.map((h) => Number(h?.highest_bid_or_price)).filter((p) => Number.isFinite(p) && p > 0).sort((a, b) => a - b);
+  const mid = prices.length >> 1;
+  const median = prices.length === 0 ? null : (prices.length % 2 ? prices[mid] : (prices[mid - 1] + prices[mid]) / 2);
+  return {
+    sale_key: saleKey,
+    lots: hits.length,
+    vehicle_lots: vehicle.length,
+    sold: sold.length,
+    bid_goes_on: vehicle.filter((h) => h?.bid_goes_on === 1).length,
+    median_price: median,
+    priced: prices.length,
+    ends_on: endsOn,
+  };
+}
