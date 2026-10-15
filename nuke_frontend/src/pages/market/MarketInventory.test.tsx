@@ -33,7 +33,7 @@ it('opens the existing explorer at Market and keeps unresolved source presentati
   await render('tab=market');
   expect(container.textContent).toContain('Existing BaT bid board');
   expect(fixture.source).not.toHaveBeenCalled();
-  await act(async () => [...container.querySelectorAll('button')].find(b => b.textContent === 'Captured listings')!.click());
+  await act(async () => [...container.querySelectorAll('button')].find(b => b.textContent === 'Just listed')!.click());
   expect(new URLSearchParams(window.location.search).get('tab')).toBe('market');
   expect(new URLSearchParams(window.location.search).get('collection')).toBe('listings');
   expect(container.querySelector('h1')?.textContent).toBe('Just listed');
@@ -58,10 +58,10 @@ it('keeps source filtering and Market navigation in the URL and retains existing
 });
 it('opens the auction calendar as a third collection and clears a chosen sale when leaving it', async () => {
   await render('tab=market');
-  await act(async () => [...container.querySelectorAll('button')].find(b => b.textContent === 'Auction calendar')!.click());
+  await act(async () => [...container.querySelectorAll('button')].find(b => b.textContent === 'Calendar')!.click());
   expect(new URLSearchParams(window.location.search).get('collection')).toBe('calendar');
   expect(container.textContent).toContain('Calendar fixture');
-  expect([...container.querySelectorAll('button')].map(b => b.textContent)).toEqual(expect.arrayContaining(['BaT live auctions', 'Captured listings']));
+  expect([...container.querySelectorAll('button')].map(b => b.textContent)).toEqual(expect.arrayContaining(['BaT live auctions', 'Just listed']));
   await act(async () => root.unmount()); root = createRoot(container);
   await render('tab=market&collection=calendar&sale=mecum:fixture-2027');
   await act(async () => [...container.querySelectorAll('button')].find(b => b.textContent === 'BaT live auctions')!.click());

@@ -344,3 +344,44 @@ intake that captures within minutes; that is intake work, not page work.
 
 Next: the interest order (underpriced against same-car sales first, then sale composition and the viewer's band), and
 the ask placed against measured sales.
+## The live auction board — owner direction, October 15
+
+Read on nuke.ag/?tab=market&collection=auctions as a visitor: "a lot of work goes into it ... but I don't even know
+what I'm looking at." What he named:
+
+- **Each datum once.** The rule for every group on the page: present a fact one time, in its most efficient place. The
+  board showed its live-bid total twice and its lot count five times. AI is supposed to reduce what a viewer reads,
+  not multiply it; rehashed data presented as important is the failure.
+- **The headline number.** "$42.6M on Bring a Trailer live auctions" was a line of text that did not look real. It
+  should look like a figure, in the world of its venue (the BaT mark, typography), relative to something the viewer
+  can judge (the same hour in earlier weeks), and clickable, because people want to study what makes it up. The open
+  lot count is equally meaningful and was neither relative nor clickable.
+- **Ease the viewer in.** Two treemaps of different designs, a row of unexplained buttons (open inventory, recorded
+  sales, auction calendar, captured listings, cohort, all makes) and map controls (group by brand, inside each box
+  decades) made the page "scary": a viewer will not click what they cannot predict.
+- **What a lot row says.** Running hot / running cold is not believed: its basis is invisible. Retained high, bidder
+  counts, "within 10% of the high", "8/8 reported bids held" and "Source: BaT" are noise. The last bid's age and the
+  last raise are mildly interesting. No reserve matters to buyers and should stand out (yellow). The image is small for
+  the space it has, and the type is not used.
+- **The lot drawer.** It repeated the name and the location, wrapped thin measures (leader's margin, bid coverage,
+  "how much bidding sits near the high") in disclaimers, put the original-listing link in the wrong place, showed a
+  "published headline" under Sources, and drew the bids as a chart and again as a table.
+- **The product is the finish.** What the board should do is gauge where a lot will finish, from what equivalent
+  lots did before: "back in 2019 the same equivalent vehicle had raised like this at this point and sold for this
+  much", then an estimate and how confident it is, like a call sheet. The stacks and data analysis behind the board
+  are the right idea; the board must turn them into that answer.
+
+Delivered October 15, first pass (subtraction and the figure; the finish estimate is the next pass):
+- **The masthead.** Bring a Trailer's mark and name, and a clock that reads live or how far behind the last board read is.
+- **Two figures.** The dollars bid now and the open lots, each set as a figure (a new kit role) with its comparison
+  stated once: change on a week ago and rank among the same hour in earlier weeks. Each opens the map of what it is
+  made of: by dollars or by lots. The second treemap no longer shows unless asked.
+- **Removed.** The Thursday strip and the edge strips (they repeated the totals), the coverage line, the hot/cold
+  tags, filters and sorts (heatOf stays exported for the phone's shared fixture), and from each row "Source: BaT",
+  the location, retained high, bidder counts, "within 10%" and reported-bids-held.
+- **A lot.** A larger photo (a full-width card on a phone), the name at entity size, the row facts as text, time left,
+  the bid with its pace ("bid 3 h ago · +0.6%"), and No reserve in yellow, also first among the filters.
+- **The drawer.** One panel: bids and watchers, then the Bring a Trailer link, the record and Stack A; the bid chart
+  once (no table); the latest question and the seller's latest words; then only the facts the row does not show
+  (miles, colors, VIN, location).
+- **The views.** Live now, Sold, Calendar and Just listed, then Make.

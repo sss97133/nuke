@@ -3,8 +3,11 @@
    counts and ratchets every font or inline-style declaration outside src/kit.
    Colors and the border token come from unified-design-system.css. */
 
-/* Roles. The entity name is always the largest text on a page; a measure never outranks it. */
+/* Roles. The entity name is the largest name on a page; a measure never outranks it. A page may set its headline
+   numbers (one, or two side by side) as figures, which may: the board's live total is its news, and set as a sentence
+   it did not read as a number (owner, 2026-10-15). */
 .k-entity  { font: 700 20px/1.1 Arial, sans-serif; letter-spacing: -0.02em; color: var(--text); }
+.k-figure  { font: 700 34px/1 'Courier New', monospace; font-variant-numeric: tabular-nums; letter-spacing: -0.03em; color: var(--text); }
 .k-measure { font: 700 14px/1.2 'Courier New', monospace; font-variant-numeric: tabular-nums; color: var(--text); }
 .k-body    { font: 400 10px/1.5 Arial, sans-serif; color: var(--text); }
 .k-caption { font: 400 9px/1.4 'Courier New', monospace; color: var(--text-secondary); }
@@ -18,7 +21,8 @@
 /* src/styles/tailwind-design-system-overrides.css sets `* { font-family: Arial !important }` for the whole app, so the
    two Courier roles state their family with the same force; a class outranks the universal selector among !important rules.
    Measured 2026-10-13: without this, every measure and caption on nuke.ag computed to Arial. */
-.k-measure, .k-caption { font-family: 'Courier New', monospace !important; }
+.k-figure, .k-measure, .k-caption { font-family: 'Courier New', monospace !important; }
+@media (max-width: 480px) { .k-figure { font-size: 28px; } }
 
 /* Containers. 2 px frames a section; 1 px rules the rows inside it. */
 .k-section { border-bottom: 2px solid var(--border); padding: 8px 12px; background: var(--surface); }
