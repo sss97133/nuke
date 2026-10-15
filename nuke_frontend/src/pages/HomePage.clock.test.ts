@@ -21,9 +21,10 @@ describe('the ledger map legend measure', () => {
   it('says what a brand tile measures: dollars, the band, sell-through, the year that trades, the 12-month move', () => {
     const legend = mapLegend('brands');
     expect(legend).toContain('area = dollars from confirmed sales');
-    expect(legend).toContain('$low–$high = the cheapest tenth to the top tenth of sales');
-    expect(legend).toContain('sell = share of cars offered that sold');
-    expect(legend).toContain('color = sales in the last 12 months against the 12 before (gray: too few dated sales)');
+    expect(legend).toContain('of offered sold = share of cars offered at auction that sold');
+    expect(legend).toContain('12 mo = sales and dollars in the last 12 months against the 12 before');
+    expect(legend).toContain('gray: too few dated sales');
+    expect(legend).not.toMatch(/low–|’yy/);
     expect(legend).not.toMatch(/median/);
   });
   it('says the area counts confirmed sales and the color is their median below the brand level', () => {
