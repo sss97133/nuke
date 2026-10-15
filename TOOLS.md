@@ -469,6 +469,7 @@ Lets a Nuke user run analysis on **their own Claude plan**: subscription token a
 | Classify make from image | `api-v1-vision/classify` or `yono-classify` | Hierarchical: tier1 family, tier2 make. $0/image |
 | Analyze condition/zone/damage | `yono-analyze` | Florence-2 vision analysis. Writes to vehicle_images if image_id provided |
 | Batch classify images | `api-v1-vision/batch` or `yono-batch-process` | Bulk version, max 100 images |
+| Condition read of a listing's photos, on request | `api-v1-vision/listing` | POST `{vehicle_id, max_photos?}` (admins or the service key). Reads up to 16 photos with YONO, then the caller's own connected provider (BYOK), and writes one `kind=condition` observation (source `nuke-vision`, `analysis_kind=listing_photo_condition_v1`) through `ingest-observation`. At most `LISTING_ANALYSES_PER_DAY` (default 40) a day |
 | Background vision processing | `yono-vision-worker` | Cron worker, claims batches, writes to vehicle_images |
 | Keep sidecar warm | `yono-keepalive` | Pings Modal every 5 min (cron job 249) |
 | Export training data | `export-training-batch` | Prepares training dataset |
