@@ -1,5 +1,6 @@
 import { RETAINED_PROPERTY_KEYS } from "./retainedInterior.ts";
 import { RETAINED_IDENTITY_KEYS, retainedListingIdentityValue } from "./retainedListingIdentity.ts";
+import { DESCRIPTION_ENGINE_FAMILY_LABEL_VERSION, ENGINE_FAMILY_LABEL_VERSION } from "./retainedDescriptionPowertrain.ts";
 /** Property admission only. Source lineage, clocks and replay belong to the writer. */
 export const IMAGE_PROPERTY_VALUES = {
   image_visible_rust_severity: ["none", "surface", "pitting", "perforation"],
@@ -82,6 +83,18 @@ export function validateObservationProperty(
   }
   if (value === undefined || value === null) {
     return invalid("Unknown property values must be omitted, not defaulted");
+  }
+  if (input.property_key === "engine_family_label" && (input.kind !== "specification" ||
+      input.agent_inferred !== true || typeof value !== "string" ||
+      value.length > 20 || !/^[A-Z0-9]+(?:-[A-Z0-9]+)?$/.test(value) || !/[A-Z]/.test(value) || !/[0-9]/.test(value) ||
+      typeof fields.source_value !== "string" || !fields.source_value.trim() || new TextEncoder().encode(fields.source_value).length > 500 ||
+      fields.normalization_version !== ENGINE_FAMILY_LABEL_VERSION ||
+      fields.source_witness_version !== DESCRIPTION_ENGINE_FAMILY_LABEL_VERSION ||
+      fields.source_field !== "content_text" || fields.label_role !== "publisher_powering_engine_label" ||
+      fields.engine_identity_status !== "unverified" || fields.source_event_time_status !== "unknown" ||
+      fields.factory_configuration_status !== "unknown" || fields.current_configuration_status !== "unknown" ||
+      fields.independent_source !== false)) {
+    return invalid("Retained engine family labels require a qualified publisher quote; engine identity remains unverified");
   }
   if (["interior_color", "exterior_color"].includes(input.property_key) &&
       (input.kind !== "specification" || typeof value !== "string" || !value.trim())) {

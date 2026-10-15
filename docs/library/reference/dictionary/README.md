@@ -377,6 +377,14 @@ The vocabulary is Nuke-specific, but every underlying concept descends from a we
 - **Half-Life / trust decay** → the accuracy/currency dimension of provenance: a datum's value depends on how and when it was derived. [buneman-2001-why-where-provenance]
 - **Dimensional Shadow / Digital Twin (five fixed perspectives)** → separation of facts (measures) from dimensions, i.e. Kimball star-schema dimensional modeling. [kimball-2013-dw-toolkit]
 
+### Publisher engine-family label (implementation prepared 2026-10-11)
+
+`engine_family_label` is the literal label in a publisher's direct statement about the engine powering
+the subject. It is distinct from the existing casting/serial-derived `engine_code`. A derived label
+retains its exact quote, source observation, capture fingerprint, capture/recording clocks and
+`engine_identity_status=unverified`; factory/current configuration and event time remain unknown.
+The existing property proposal governs ratification. An intake implementation does not itself approve it.
+
 ### Bibliography
 
 1. **[rdf11-concepts]** Cyganiak, Wood, Lanthaler (eds.) (2014). *RDF 1.1 Concepts and Abstract Syntax (W3C Recommendation)*. W3C. https://www.w3.org/TR/rdf11-concepts/
