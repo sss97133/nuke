@@ -1,5 +1,5 @@
--- Isolated PostgreSQL 17 contract for 20261016200000_sync_local_vision_tags_noop.sql and
--- 20261016201000_user_image_counts.sql. Synthetic rows only.
+-- Isolated PostgreSQL 17 contract for 20261016200000_sync_local_vision_tags_noop.sql,
+-- 20261016201000_user_image_counts.sql and 20261016202000_user_image_counts_triggers_retry.sql. Synthetic rows only.
 --   createdb dm_refinement_user_image_counts
 --   psql -X -v ON_ERROR_STOP=1 -d dm_refinement_user_image_counts -f supabase/sql/test_user_image_counts.sql
 -- Fixtures: the vehicle_images columns these functions read, its updated_at trigger and user indexes, the API roles,
@@ -11,7 +11,9 @@
 -- back transaction, compaction, a re-run band), each new reader returns exactly what the live reader returns for the
 -- owner, a stranger and a user with no images; the owner gate (is_owner_view, the stream's auth.uid() scope, anon
 -- grants) is unchanged; the new tables are not readable through the API roles; rows with no user_id write no counts;
--- the tag push leaves unchanged rows untouched and reports what it reported before.
+-- the tag push leaves unchanged rows untouched and reports what it reported before; from the state the 2026-10-15
+-- deploy left (tables and functions, no triggers, live readers), the retry migration waits out a writer holding
+-- vehicle_images (dblink), creates the triggers, counts the rows written in between and switches the readers.
 \set ON_ERROR_STOP on
 DO $$ BEGIN
   IF current_database() NOT LIKE 'dm_refinement_%' OR to_regclass('public.vehicle_images') IS NOT NULL THEN
@@ -564,5 +566,69 @@ SELECT pg_temp.check_all('after tag pushes');
 SET statement_timeout = '60s';
 SELECT pg_temp.check_all('after re-applying the counts migration');
 SELECT pg_temp.ok('re-apply keeps three triggers and one job',
+  (SELECT count(*) FROM pg_trigger WHERE tgrelid = 'public.vehicle_images'::regclass AND tgname LIKE 'trg_user_image_counts_%') = 3
+  AND (SELECT count(*) FROM cron.job WHERE jobname = 'compact-user-image-counts') = 1);
+
+-- The 2026-10-15 deploy stopped at 20261016201000's trigger block (lock timeout): its tables and functions exist and
+-- are empty, no trigger, no job, the live readers in place. Put this database in that state, write rows the counters
+-- do not see, hold vehicle_images the way a writer does, and apply 20261016202000.
+DROP TRIGGER trg_user_image_counts_ins ON public.vehicle_images;
+DROP TRIGGER trg_user_image_counts_upd ON public.vehicle_images;
+DROP TRIGGER trg_user_image_counts_del ON public.vehicle_images;
+TRUNCATE public.user_image_counts, public.user_image_deep_reads;
+SELECT cron.unschedule('compact-user-image-counts');
+DO $$
+DECLARE f text;
+BEGIN
+  FOREACH f IN ARRAY ARRAY['get_user_sync_status(uuid)', 'get_user_capture_stats(uuid)', 'get_user_analyzed_count(uuid)',
+                           'get_analysis_stream(timestamptz,integer)'] LOOP
+    EXECUTE replace(pg_get_functiondef(('legacy.' || f)::regprocedure), 'FUNCTION legacy.', 'FUNCTION public.');
+  END LOOP;
+END $$;
+SELECT pg_temp.ok('failed-deploy state: no trigger, no job, empty tables, live readers',
+  NOT EXISTS (SELECT 1 FROM pg_trigger WHERE tgrelid = 'public.vehicle_images'::regclass AND tgname LIKE 'trg_user_image_counts_%')
+  AND NOT EXISTS (SELECT 1 FROM cron.job WHERE jobname = 'compact-user-image-counts')
+  AND NOT EXISTS (SELECT 1 FROM public.user_image_counts) AND NOT EXISTS (SELECT 1 FROM public.user_image_deep_reads)
+  AND position('user_image_counts' IN pg_get_functiondef('public.get_user_sync_status(uuid)'::regprocedure)) = 0);
+INSERT INTO public.vehicle_images (user_id, source, ai_processing_status, created_at, taken_at, ai_scan_metadata)
+VALUES ('aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', 'capture_relay_ios', 'pending', now(), now() - interval '1 day',
+        '{"byok_deep_analysis":{"scene_type":"engine_bay"}}');
+UPDATE public.vehicle_images SET ai_processing_status = 'analyzed'
+WHERE id IN (SELECT id FROM public.vehicle_images WHERE user_id = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa'
+               AND source = 'capture_relay_ios' AND ai_processing_status = 'processing' ORDER BY id LIMIT 2);
+DELETE FROM public.vehicle_images WHERE exif_data->>'uuid' = 'L75' AND user_id = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa';
+
+CREATE EXTENSION IF NOT EXISTS dblink;
+SELECT dblink_connect('holder', format('dbname=%s host=%s port=%s user=%s', current_database(),
+  split_part(current_setting('unix_socket_directories'), ',', 1), current_setting('port'), current_user));
+SELECT dblink_send_query('holder',
+  'BEGIN; LOCK TABLE public.vehicle_images IN ROW EXCLUSIVE MODE; SELECT pg_sleep(5); COMMIT;');
+SELECT pg_sleep(0.5);
+SELECT pg_temp.ok('another session holds vehicle_images in ROW EXCLUSIVE mode, as a writer does',
+  EXISTS (SELECT 1 FROM pg_locks WHERE relation = 'public.vehicle_images'::regclass AND mode = 'RowExclusiveLock'
+            AND granted AND pid <> pg_backend_pid()));
+CREATE TABLE pg_temp.retry_clock AS SELECT clock_timestamp() AS started;
+\ir ../migrations/20261016202000_user_image_counts_triggers_retry.sql
+SET statement_timeout = '60s';
+SELECT pg_temp.ok('the retry waited out the writer (a single 2 s attempt would have failed) and created the triggers',
+  clock_timestamp() - (SELECT started FROM pg_temp.retry_clock) > interval '4 seconds'
+  AND (SELECT count(*) FROM pg_trigger WHERE tgrelid = 'public.vehicle_images'::regclass
+         AND tgname LIKE 'trg_user_image_counts_%' AND NOT tgisinternal) = 3);
+SELECT dblink_disconnect('holder');
+SELECT pg_temp.ok('after the retry: job scheduled and readers switched',
+  EXISTS (SELECT 1 FROM cron.job WHERE jobname = 'compact-user-image-counts' AND schedule = '*/15 * * * *')
+  AND position('user_image_counts' IN pg_get_functiondef('public.get_user_sync_status(uuid)'::regprocedure)) > 0
+  AND position('user_image_deep_reads' IN pg_get_functiondef('public.get_analysis_stream(timestamptz,integer)'::regprocedure)) > 0);
+SELECT pg_temp.ok('grants on the readers and the tag push are still unchanged',
+  NOT EXISTS (SELECT 1 FROM pg_temp.acl_before b JOIN pg_proc p ON p.oid::regprocedure::text = b.f
+              WHERE p.proacl::text IS DISTINCT FROM b.acl));
+SELECT pg_temp.check_all('after the retry migration (rows written before it are counted by its backfill)');
+INSERT INTO public.vehicle_images (user_id, source, ai_processing_status, created_at, taken_at)
+VALUES ('bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb', 'capture_relay_ios', 'queued', now(), now());
+SELECT pg_temp.check_all('after a write once the retry has run');
+\ir ../migrations/20261016202000_user_image_counts_triggers_retry.sql
+SET statement_timeout = '60s';
+SELECT pg_temp.check_all('after re-applying the retry migration');
+SELECT pg_temp.ok('re-applying the retry keeps three triggers and one job',
   (SELECT count(*) FROM pg_trigger WHERE tgrelid = 'public.vehicle_images'::regclass AND tgname LIKE 'trg_user_image_counts_%') = 3
   AND (SELECT count(*) FROM cron.job WHERE jobname = 'compact-user-image-counts') = 1);
