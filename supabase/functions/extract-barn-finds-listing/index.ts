@@ -162,7 +162,13 @@ async function extractOne(supabase: Supabase, url: string): Promise<Outcome> {
       modified_at: post.modifiedAt,
       price_text: post.priceText,
       // current_price is set only from a mention the sentence calls asking; every mention is kept with its kind and sentence
-      price_kind: post.askingPrice != null ? "asking" : post.priceMentions.length ? "unknown" : null,
+      price_kind: post.askingPrice != null || post.foreignPrice ? "asking" : post.priceMentions.length ? "unknown" : null,
+      // price_currency: the currency the seller's ask is stated in. current_price is only ever a USD ask; a non-USD ask keeps
+      // the seller's own amount (null when the prose gives only the writer's USD conversion) and the derived USD figure here.
+      price_currency: post.foreignPrice ? post.foreignPrice.currency : post.askingPrice != null ? "USD" : null,
+      price_original_amount: post.foreignPrice ? post.foreignPrice.originalAmount : null,
+      price_usd_derived: post.foreignPrice ? post.foreignPrice.usdDerived : null,
+      price_usd_derived_basis: post.foreignPrice?.usdDerived != null ? "writer's own conversion quoted in the post; rate and date not stated" : null,
       price_source_sentence: post.priceSentence,
       price_mentions: post.priceMentions,
       obo: post.obo,
