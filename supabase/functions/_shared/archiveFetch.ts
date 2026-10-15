@@ -19,7 +19,6 @@ import { fetchPage, type FetchOptions as DirectFetchOptions } from "./hybridFetc
 import { firecrawlScrape, type FirecrawlScrapeResult } from "./firecrawl.ts";
 import { parseQualifiedBaTSale } from "./batParser.ts";
 import { projectSecretKey } from "./supabaseKeys.ts";
-import { softWrite } from "./writeResult.ts";
 
 /** Remove NUL characters, which Postgres text columns cannot store. */
 export function stripNul(s: string | null | undefined): string | null {
@@ -37,7 +36,7 @@ export interface ArchiveFetchResult {
   statusCode: number | null;
   error: string | null;
   costCents: number;
-  /** Set when the capture could not be retained (the snapshot insert failed); callers can count it. A duplicate is not an error. */
+  /** Set when the capture could not be retained (the snapshot insert failed); callers can count it. A duplicate is not an error. Same contract as softWrite (writeResult.ts), inlined because this module's imports are pinned by the archive-custody test. */
   archiveError?: string | null;
 }
 
@@ -409,7 +408,8 @@ export async function archiveFetch(
       } else {
         // A retention that fails must be visible: the fetch itself is still returned, the failure is logged by softWrite and
         // carried on the result (archiveError) so callers and counters see it instead of it vanishing.
-        result.archiveError = softWrite("listing_page_snapshots insert", { error: insertErr as { message?: string; code?: string } });
+        result.archiveError = `listing_page_snapshots insert failed: ${insertErr.message}${(insertErr as { code?: string }).code ? ` (${(insertErr as { code?: string }).code})` : ""}`;
+        console.error(`[archiveFetch] ${result.archiveError}`);
       }
     } else if (inserted) {
       result.snapshotId = inserted.id;
