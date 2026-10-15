@@ -1,3 +1,4 @@
+// Redeployed 2026-10-15 so the bundle carries the archiveFetch rawHtml block fallback (PR 1428).
 // KSL Cars listing extractor - no LLM. The page is server-rendered; the parsing lives in ./extract.ts (pure, tested
 // against a stored page). Every fetch is archived to listing_page_snapshots by archiveFetch before it is parsed.
 // Returns { success, extracted }; `ingest` reads that shape and does the vehicle write.
