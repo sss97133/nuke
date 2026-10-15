@@ -199,11 +199,13 @@ async function extractOne(supabase: Supabase, url: string): Promise<Outcome> {
   if (post.comments.length > 0) {
     const rows = [];
     for (const c of post.comments) {
+      if (!c.author || !c.postedAtAssumedUtc) continue; // author_username and posted_at are NOT NULL
       const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(`barnfinds:${c.id}:${c.text}`));
       rows.push({
         vehicle_id: finalVehicleId,
         platform,
-        comment_type: c.depth > 1 ? "reply" : "comment",
+        comment_type: "observation", // the table allows bid, sold, question, answer, observation...; a reader's remark is an observation
+        posted_at: c.postedAtAssumedUtc,
         sequence_number: rows.length,
         author_username: c.author,
         comment_text: c.text,

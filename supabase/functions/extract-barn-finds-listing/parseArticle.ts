@@ -11,7 +11,8 @@ export interface BarnFindsComment {
   id: string;
   author: string | null;
   member: boolean;
-  postedText: string | null; // as shown, e.g. "Feb 1, 2026 9:49pm": the site's time zone is not stated, so not parsed
+  postedText: string | null; // as shown, e.g. "Feb 1, 2026 9:49pm"
+  postedAtAssumedUtc: string | null; // the shown time read as UTC: the site does not state its zone, so this can be hours off
   likes: number | null;
   depth: number;
   text: string;
@@ -69,6 +70,11 @@ function stripScripts(input: string): string {
   return out;
 }
 
+/** Site widgets that sit among the paragraphs, e.g. "1971 Chevrolet Corvette Convertible Bid Now 6 days $100" (an auction teaser). */
+export function isWidgetText(t: string): boolean {
+  return /\bBid Now\b|Auctions Ending Soon|View All Auctions|\bAdvertisement\b/i.test(t);
+}
+
 const clean = (s: string) => decodeEntities(stripTags(s)).replace(/\s+/g, " ").trim();
 
 /** Year, make and model from a headline such as "Mild Build 350 V8: 1989 Chevrolet C1500". */
@@ -87,7 +93,7 @@ export function identityFromTitle(title: string | null): { year: number | null; 
 
 /** The seller's price quoted in the prose: "set their price at $107,000 OBO", "asking $12,500". */
 export function priceFromText(text: string): { price: number | null; priceText: string | null; obo: boolean } {
-  const m = text.match(/\b(?:price|asking|asks?|listed (?:for|at)|bid)\b[^$.]{0,50}\$\s?(\d{1,3}(?:,\d{3})+|\d{3,7})(?!\d)([^.]{0,12})/i);
+  const m = text.match(/\b(?:price|asking|asks?|listed (?:for|at))\b[^$.]{0,50}\$\s?(\d{1,3}(?:,\d{3})+|\d{3,7})(?!\d)([^.]{0,12})/i);
   if (!m) return { price: null, priceText: null, obo: false };
   const price = Number(m[1].replace(/,/g, ""));
   if (!Number.isFinite(price) || price < 100) return { price: null, priceText: null, obo: false };
@@ -133,6 +139,16 @@ export function imageUrls(content: string): string[] {
   return out;
 }
 
+export function shownTimeAsUtc(text: string | null): string | null {
+  const m = text?.match(/([A-Z][a-z]{2}) (\d{1,2}), (\d{4}) (\d{1,2}):(\d{2})\s*([ap]m)/i);
+  if (!m) return null;
+  const mon = ["jan", "feb", "mar", "apr", "may", "jun", "jul", "aug", "sep", "oct", "nov", "dec"].indexOf(m[1].toLowerCase());
+  if (mon < 0) return null;
+  let h = Number(m[4]) % 12;
+  if (m[6].toLowerCase() === "pm") h += 12;
+  return new Date(Date.UTC(Number(m[3]), mon, Number(m[2]), h, Number(m[5]))).toISOString();
+}
+
 export function parseComments(html: string): BarnFindsComment[] {
   const area = html.slice(Math.max(html.indexOf('<div id="comments"'), 0));
   const out: BarnFindsComment[] = [];
@@ -143,12 +159,14 @@ export function parseComments(html: string): BarnFindsComment[] {
     const text = clean(body);
     if (!text) continue;
     const tail = area.slice((m.index ?? 0) + m[0].length, (m.index ?? 0) + m[0].length + 600);
+    const postedText = clean(head.match(/class="comment-meta[^"]*"[^>]*>([\s\S]*?)<\/div>/i)?.[1] ?? "") || null;
     const likes = tail.match(/cld-count-wrap">\s*(\d+)/)?.[1];
     out.push({
       id: m[1],
       author: clean(head.match(/<cite[^>]*>([\s\S]*?)<\/cite>/i)?.[1] ?? "") || null,
       member: /member-tag/.test(head),
-      postedText: clean(head.match(/class="comment-meta[^"]*"[^>]*>([\s\S]*?)<\/div>/i)?.[1] ?? "") || null,
+      postedText,
+      postedAtAssumedUtc: shownTimeAsUtc(postedText),
       likes: likes != null ? Number(likes) : null,
       depth: Number(m[2]),
       text,
@@ -165,7 +183,7 @@ export function parseBarnFindsPost(htmlRaw: string): BarnFindsPost {
   const h1 = html.match(/<h1[^>]*>([\s\S]*?)<\/h1>/i)?.[1];
   const title = clean(String(article.headline ?? h1 ?? "")) || null;
   const content = entryContent(stripScripts(html));
-  const paragraphs = [...content.matchAll(/<p\b[^>]*>([\s\S]*?)<\/p>/gi)].map((p) => clean(p[1])).filter((t) => t && !/^Disclosure:/i.test(t));
+  const paragraphs = [...content.matchAll(/<p\b[^>]*>([\s\S]*?)<\/p>/gi)].map((p) => clean(p[1])).filter((t) => t && !/^Disclosure:/i.test(t) && !isWidgetText(t));
   const articleText = paragraphs.join("\n\n");
   const id = identityFromTitle(title);
   const { price, priceText, obo } = priceFromText(articleText);
