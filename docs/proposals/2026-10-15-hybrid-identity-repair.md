@@ -40,10 +40,19 @@ car ... but year/make/model belong to something else"), now arriving from a seco
 
 ## Population
 
+Selector run (read-only, `scripts/bat-corrections/select_hybrid_candidates.sh`, 2026-10-15 06:34Z):
+- 1967 Corvette: 34 candidates, and all 34 are hybrids. Each has a Barrett-Jackson docket `discovery_url` over
+  another platform's lot. These are the same 34 measured above.
+- Electra, all years: 3 candidates. 2 are hybrids (B-J dockets over a BaT station wagon and a BaT Special). The third
+  is an alias gap, not another car: an '89 Electra Estate Wagon whose page reads "buick estate".
+
+So the conflicts are mostly this one writer's overlays, and a candidate is not a verdict.
+
 1. The fleet count: `sum(conflicts)` over the fold's `sold` rows, by family. This is available after the first build.
    It counts sales whose own page names their model year but no phrase of their family. That's a lower bound,
    because pages without a descriptive slug are not tested.
-2. Row selection for the batch: per family, read `mv_treemap_outcomes` through its cell index (brand, model, year).
+2. Row selection for the batch: `scripts/bat-corrections/select_hybrid_candidates.sh <out> <family_id>[:<y0>:<y1>]`.
+   Per family, it reads `mv_treemap_outcomes` through its cell index (brand, model, year).
    Join the family names, fetch only the matched rows' pages, and apply the same conflict rule.
    - Pages of 20 to 50 families per read, spaced, under the 10 s cap.
    - The output is a private list (vehicle id, current identity, the lot page, the conflicting phrase). It goes to
