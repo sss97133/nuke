@@ -7,6 +7,7 @@
  * Version: 1.0.0
  */
 import { chassisFromListItemText } from "./batChassis.ts";
+import { countdownEndDate } from "./batAuctionRecord.ts";
 
 export const BAT_PARSER_VERSION = "batParser:1.0.0";
 
@@ -503,8 +504,8 @@ export function extractEssentials(html: string): BatEssentials {
     }
   }
   if (!auction_end_date) {
-    const m = h.match(/data-auction-ends="(\d{4}-\d{2}-\d{2})-\d{2}-\d{2}-\d{2}"/i);
-    if (m?.[1]) auction_end_date = String(m[1]);
+    const cd = countdownEndDate(h); // null on a closed page: its sidebar countdowns belong to other lots
+    if (cd) auction_end_date = cd;
   }
 
   // Counts

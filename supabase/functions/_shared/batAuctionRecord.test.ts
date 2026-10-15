@@ -1,6 +1,6 @@
 // deno test supabase/functions/_shared/batAuctionRecord.test.ts
 import { assertEquals, assertRejects } from "https://deno.land/std@0.224.0/assert/mod.ts";
-import { readCommentsJson, summarizeAuction, vinCheckDigitOk, buildAuctionCommentRows, linkAuctionCommentIdentities, type BatCommentIdentityStore } from "./batAuctionRecord.ts";
+import { countdownEndDate, readCommentsJson, summarizeAuction, vinCheckDigitOk, buildAuctionCommentRows, linkAuctionCommentIdentities, type BatCommentIdentityStore } from "./batAuctionRecord.ts";
 
 // Shapes copied from real lot pages (2026-09-27): each comment carries nested channels/likers/images
 // arrays, which is what defeats a lazy "comments":[...] regex.
@@ -190,4 +190,18 @@ Deno.test("replay with no fresh rows never touches the identity store", async ()
     insertMissing: async () => { throw new Error("No writes expected"); },
   });
   assertEquals(linked, []);
+});
+
+// 2026-10-15: a closed "-2" repeat lot (1970-porsche-914-6-110-2, sold 10/14/26) was stamped with 2026-10-15, the
+// end of a LIVE lot in its sidebar (data-auction-ends="2026-10-15-17-00-00"), because the closed page has no countdown.
+const sidebar = `<div data-auction-ends="2026-10-15-17-00-00" data-layout="{hn}"></div>`;
+Deno.test("countdownEndDate: a closed '-2' relist page ignores a sidebar lot's countdown", () => {
+  const closed = page([bid("m1959", 61000, 1792009000), record("bat-bid-reserve", "m1959", "Sold on 10/14/26 for $67,000 to m1959", 1792009681)]) + sidebar;
+  assertEquals(summarizeAuction(closed).recordAt, "2026-10-14T20:28:01.000Z");
+  assertEquals(countdownEndDate(closed), null);
+});
+
+Deno.test("countdownEndDate: a live page reads its own countdown", () => {
+  const live = page([bid("a", 100, 1792000000)]) + `<div data-auction-ends="2026-10-17-19-08-57"></div>` + sidebar;
+  assertEquals(countdownEndDate(live), "2026-10-17");
 });

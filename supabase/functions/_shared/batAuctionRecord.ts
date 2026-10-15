@@ -150,6 +150,18 @@ export function summarizeAuction(input: string | any[] | null): BatAuctionRecord
 }
 
 /** ISO 3779 check digit for a 17-character VIN (pre-1981 VINs have none and are not judged here). */
+/**
+ * The countdown end date ("2025-12-16-19-08-57" -> "2025-12-16") of a LIVE lot page, or null.
+ * A closed page has no countdown of its own, but its sidebar lists other live lots with data-auction-ends: the first
+ * match there is another lot's end (2026-10-15: repeat "-2" lots sold on 10/14 were stamped with a sidebar lot's date).
+ * A page that carries a closing record is closed, so it never reads a countdown.
+ */
+export function countdownEndDate(html: string): string | null {
+  if (summarizeAuction(html).recordAt) return null;
+  const m = html.match(/data-auction-ends="(\d{4}-\d{2}-\d{2})-\d{2}-\d{2}-\d{2}"/i);
+  return m?.[1] ?? null;
+}
+
 export function vinCheckDigitOk(vin: string | null | undefined): boolean | null {
   const v = String(vin ?? "").trim().toUpperCase();
   if (v.length !== 17) return null;
