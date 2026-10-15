@@ -41,6 +41,7 @@ interface ObservationRow {
   observed_at: string | null;
   content_text: string | null;
   source_url: string | null;
+  image_id?: string | null;
 }
 
 interface Stats {
@@ -75,6 +76,7 @@ export default function VehicleShowcase() {
   const [vehicle, setVehicle] = useState<VehicleRow | null>(null);
   const [images, setImages] = useState<ImageRow[]>([]);
   const [observations, setObservations] = useState<ObservationRow[]>([]);
+  const [visibleImageIds, setVisibleImageIds] = useState<ReadonlySet<string>>(new Set());
   const [stats, setStats] = useState<Stats | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -94,7 +96,7 @@ export default function VehicleShowcase() {
             .order('taken_at', { ascending: false, nullsFirst: false })
             .order('created_at', { ascending: false })
             .limit(48),
-          supabase.from('vehicle_observations').select('id, kind, observed_at, content_text, source_url')
+          supabase.from('vehicle_observations').select('id, kind, observed_at, content_text, source_url, image_id:structured_data->>image_id')
             .eq('vehicle_id', vehicleId)
             .eq('is_superseded', false)
             .order('observed_at', { ascending: false, nullsFirst: false })
@@ -111,7 +113,15 @@ export default function VehicleShowcase() {
 
         setVehicle(vehicleRes.data as VehicleRow);
         setImages((imagesRes.data || []) as ImageRow[]);
-        setObservations((obsRes.data || []) as ObservationRow[]);
+        const obsRows = (obsRes.data || []) as ObservationRow[];
+        setObservations(obsRows);
+        // Which of the media observations' frames this viewer may see: their own read of vehicle_images, gate applied.
+        const imageIds = [...new Set(obsRows.filter(o => o.kind === 'media' && o.image_id).map(o => o.image_id as string))];
+        const { data: readable } = imageIds.length
+          ? await supabase.from('vehicle_images').select('id').in('id', imageIds)
+          : { data: [] as { id: string }[] };
+        if (cancelled) return;
+        setVisibleImageIds(new Set(((readable || []) as { id: string }[]).map(r => r.id)));
 
         const allObs = (allObsRes.data || []) as { kind: string; observed_at: string | null }[];
         const byKind: Record<string, number> = {};
@@ -164,7 +174,7 @@ export default function VehicleShowcase() {
 
   const heroUrl = images[0]?.image_url || vehicle?.primary_image_url || null;
 
-  const testimony = useMemo(() => splitTestimony(observations), [observations]);
+  const testimony = useMemo(() => splitTestimony(observations, visibleImageIds), [observations, visibleImageIds]);
 
   const monthGroups = useMemo(() => {
     const groups: Record<string, ObservationRow[]> = {};
@@ -277,7 +287,10 @@ export default function VehicleShowcase() {
               </div>
               <div className="showcase-photo-row__kind">media</div>
               <div>
-                <div className="showcase-photo-row__line">{testimony.photos.count.toLocaleString()} photos</div>
+                <div className="showcase-photo-row__line">
+                  {testimony.photos.count.toLocaleString()} photos
+                  {testimony.photos.shown < testimony.photos.count && ` · ${(testimony.photos.count - testimony.photos.shown).toLocaleString()} not public`}
+                </div>
                 <div className="showcase-photo-row__thumbs">
                   {testimony.photos.photos.map(p => (
                     <a key={p.id} className="showcase-photo-row__thumb" href={p.url} target="_blank" rel="noopener noreferrer">
