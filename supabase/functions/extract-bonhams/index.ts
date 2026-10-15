@@ -943,6 +943,12 @@ async function extractCatalog(catalogUrl: string): Promise<{
   return { auctionId, auctionName, auctionDate, auctionLocation, lots };
 }
 
+/** The same lot under any host or slug: .../auction/{sale}/lot/{lot}/ (the trigram index on discovery_url serves it). */
+function lotIlikePattern(url: string): string | null {
+  const m = url.match(/\/auction\/(\d+)\/lot\/([^/?#]+)/i);
+  return m ? `%bonhams.com/auction/${m[1]}/lot/${m[2]}/%` : null;
+}
+
 // ─── Save to database ───────────────────────────────────────────────────────
 
 async function saveVehicle(
@@ -988,7 +994,7 @@ async function saveVehicle(
       const { vehicleId: resolvedId } = await resolveExistingVehicleId(supabase, {
         url: extracted.url,
         platform: "bonhams",
-        discoveryUrlIlikePattern: opts.fast ? null : discoveryUrlIlikePattern(extracted.url),
+        discoveryUrlIlikePattern: opts.fast ? lotIlikePattern(extracted.url) : discoveryUrlIlikePattern(extracted.url),
       });
       if (resolvedId) targetId = resolvedId;
     } catch (e: any) {
