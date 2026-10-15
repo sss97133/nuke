@@ -150,7 +150,7 @@ export function FeedStatsStrip({
   const asOfLabel = asOf && Number.isFinite(asOf.getTime()) ? `${String(asOf.getUTCHours()).padStart(2, '0')}:${String(asOf.getUTCMinutes()).padStart(2, '0')}Z` : null;
   const totalLabel = stats.total_is_estimate
     ? `about ${formatCompact(stats.total_vehicles)} (estimate)`
-    : `${stats.total_vehicles.toLocaleString('en-US')}${asOfLabel ? ` as of ${asOfLabel}` : ''}`;
+    : `${stats.total_vehicles.toLocaleString('en-US')} public records${asOfLabel ? `, as of ${asOfLabel}` : ''}`;
 
   return (
     <div
@@ -181,7 +181,7 @@ export function FeedStatsStrip({
         <Stat
           label="ALL RECORDS"
           value={totalLabel}
-          hoverHint={stats.total_is_estimate ? `Planner estimate of public records, updated ${stats.counts_updated_at ?? 'time unknown'}.` : `Public records, the same count the map shows, as of ${stats.total_as_of ?? 'time unknown'}. Updates when the map refreshes.`}
+          hoverHint={stats.total_is_estimate ? `Planner estimate of public records, updated ${stats.counts_updated_at ?? 'time unknown'}.` : `Public records: is_public, not deleted, not a non-vehicle item. The same exact count the map shows, as of ${stats.total_as_of ?? 'time unknown'}; it updates when the map refreshes (daily, 09:10Z).`}
         />
       )}
 
