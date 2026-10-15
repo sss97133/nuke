@@ -15,10 +15,10 @@ export const decode = (s: string) =>
 const stripTags = (s: string) => { let prev; do { prev = s; s = s.replace(/<[^>]*>/g, " "); } while (s !== prev); return s; };
 
 export const textOf = (html: string) => {
-  const spaced = html.replace(/<svg[\s\S]*?<\/svg>/gi, "").replace(/<(?:\/p|\/li|\/h\d|br\s*\/?)>/gi, "\n")
-    .replace(/<\/?(?:b|i|u|em|strong|a|span|small|sup|sub)\b[^>]*>/gi, "");
+  const spaced = html.replace(/<svg[\s\S]*?<\/svg>/gi, "\u0001").replace(/<(?:\/p|\/li|\/h\d|br\s*\/?)>/gi, "\n")
+    .replace(/<\/?(?:b|i|u|em|strong|a|span|small|sup|sub)\b[^>]*>/gi, "\u0001"); // sentinel, so removed tags cannot join into a new one
   // Strip, decode, strip again: an encoded "&lt;iframe" must not come out as a tag.
-  return stripTags(decode(stripTags(spaced)))
+  return stripTags(decode(stripTags(spaced))).replace(/\u0001/g, "")
     .replace(/[ \t\u00a0]+/g, " ").replace(/ *\n */g, "\n").replace(/\n{2,}/g, "\n").trim();
 };
 
