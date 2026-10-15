@@ -134,6 +134,11 @@ interface CabExtractedData {
  * NOTE: ld+json is NOT present in Firecrawl-rendered HTML (C&B is a React SPA;
  * ld+json is only in pre-hydration server response). All data comes from rendered DOM.
  */
+/** A live or ended C&B auction page carries .bid-stats or the .cnb-details blocks; the not-found shell carries neither. */
+export function isGonePage(html: string): boolean {
+  return html.length > 0 && !html.includes("bid-stats") && !html.includes("cnb-details");
+}
+
 function parseCabHtml(html: string, sourceUrl?: string): CabExtractedData {
   const result: CabExtractedData = {
     vin: null, mileage: null, title: null, year: null, make: null, model: null,
@@ -567,7 +572,8 @@ Deno.serve(async (req) => {
       markdown = typeof body.markdown === "string" ? body.markdown : "";
       httpStatus = 200;
       responseTimeMs = 0;
-      await trySaveHtmlSnapshot({ supabase, listingUrl: listingUrlNorm, httpStatus, success: true, errorMessage: null, html, metadata: { markdown } });
+      const goneOnArrival = isGonePage(html);
+      await trySaveHtmlSnapshot({ supabase, listingUrl: listingUrlNorm, httpStatus, success: !goneOnArrival, errorMessage: goneOnArrival ? "page gone: no auction DOM (C&B serves its not-found shell with HTTP 200)" : null, html, metadata: { markdown } });
       const { data: snapRow } = await supabase.from("listing_page_snapshots").select("id").eq("listing_url", listingUrlNorm).eq("success", true).order("fetched_at", { ascending: false }).limit(1).maybeSingle();
       newSnapshotId = snapRow?.id ?? null;
     } else {
@@ -636,6 +642,15 @@ Deno.serve(async (req) => {
       });
     }
 
+    // C&B answers a removed auction with its not-found shell and HTTP 200: no bid stats, no detail blocks. That is not a result
+    // (reading it as an active auction stamped 'active'/'live' on 70 ended lots, 2026-10-15). Record it and write nothing.
+    if (isGonePage(html)) {
+      await supabase.rpc("record_revision_item", {
+        p_url: listingUrlCanonical, p_missing: ["result"], p_reason: "not_found", p_next_action: "none", p_raised_by: "extract-cars-and-bids-core",
+        p_snapshot_id: newSnapshotId, p_detail: { page: "gone", html_length: html.length }, p_vehicle_id: providedVehicleId,
+      });
+      return new Response(JSON.stringify({ success: false, error: "page_gone", snapshot_id: newSnapshotId }), { status: 410, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
     // Parse HTML directly — no LLM, no markdown, no API cost
     const extracted = parseCabHtml(html, listingUrlCanonical);
     // Depth pass over the same retained capture: full description, comment/bid stream, seller/buyer, end moment, outcome, gallery.
