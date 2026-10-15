@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 vi.mock('../lib/supabase', () => ({ supabase: {} }));
-import { familyCoverage, familyNamesShown, ledgerViewsClock, ledgerViewsStamp, mapCaption, mapLegend } from './HomePage';
+import { familyCoverage, familyNamesShown, mapCaptionShort, ledgerViewsClock, ledgerViewsStamp, mapCaption, mapLegend } from './HomePage';
 
 describe('the ledger map legend clock', () => {
   it('says how long ago the views were refreshed, and keeps the exact time for the title', () => {
@@ -81,5 +81,14 @@ describe('what a family level shows', () => {
     expect(familyNamesShown(49, 49)).toBe('');
     expect(familyNamesShown(0, 10)).toBe('');
     expect(familyNamesShown(200, undefined)).toBe('');
+  });
+});
+
+describe('the caption on a phone', () => {
+  it('keeps the count and drops the sentence', () => {
+    const refresh = { refreshedAt: '2026-10-14T09:10:00Z', populations: { measure: 'confirmed_sale_v1', mapped_sales: 241959, public_records: 633678 } };
+    expect(mapCaptionShort('brands', 5, refresh)).toBe('241,959 sold');
+    expect(mapCaptionShort('families', 27510, refresh)).toBe('27,510 sold');
+    expect(mapCaptionShort('vehicles', 200, refresh)).toBe('200 shown');
   });
 });
