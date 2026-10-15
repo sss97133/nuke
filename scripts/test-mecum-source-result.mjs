@@ -267,6 +267,7 @@ function previewFixture(options = {}) {
         if (specifier === '../_shared/archiveFetch.ts') return load('archive');
         if (specifier === '../_shared/writeGuard.ts') return load('guard');
         if (specifier === './supabaseKeys.ts' || specifier === '../_shared/supabaseKeys.ts') return load('keys');
+        if (specifier === './rscPost.ts') return { postFromFlight: () => assert.fail('No app-router lot read in the preview') };
         if (specifier === './apiKeyAuth.ts') return { hashApiKey: () => assert.fail('No API-key path') };
         if (specifier === './batFetcher.ts') return { fetchBatPage: () => assert.fail('No source fetch'), logFetchCost: () => assert.fail('No paid fetch'), isLoginPage: () => false };
         if (specifier === './hybridFetcher.ts') return { fetchPage: () => assert.fail('No source fetch') };
