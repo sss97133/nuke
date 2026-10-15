@@ -2062,25 +2062,28 @@ def main():
     # RSI pass 39: a wire's route over the twin graph (inputs/route_lengths.json, export_route_lengths.py from the live
     # model). No length: the complete route. A zone estimate or an older twin path (taken before the route graph and the
     # cab placement of the PDM30): the longer of the two, because a twin route carries no modelled slack or service loop
-    # and so never shortens a cut. Tape and design lengths stand. Only a wire with one segment: the segment fold chains
-    # a wire's ends in an order that can double back (26a runs AMP -> door -> AMP -> speaker in the model, 2026-10-15),
-    # so a multi-hop sum is not the wire's length until the chain is fixed.
+    # and so never shortens a cut. Tape and design lengths stand. A wire with one segment, or a through run (RSI pass
+    # 40): one path whose only interior plugs are crossings (the 61-pin, a body bulkhead, a door pass-through), so its
+    # segments sum to the wire. A bus (CAN, the door-lock buses) is a tree, not a run, and waits.
     _rl = json.load((INPUTS / "route_lengths.json").open()) if (INPUTS / "route_lengths.json").exists() else {}
+    _crossing = re.compile(r"^(FIREWALL-CABIN|FIREWALL-BODY-[A-Z]|DOOR-[LR]-PASS(-P)?)$")
     for w in list(wires) + list(implied):
         r = (_rl.get("wires") or {}).get(str(w["id"]))
-        if (not r or not r.get("complete") or r.get("segments") != 1 or w.get("retired")
+        run = r and (r.get("segments") == 1 or (r.get("chain") and all(_crossing.match(p) for p in r["chain"][1:-1])))
+        if (not r or not r.get("complete") or not run or w.get("retired")
                 or length_kind(w) not in (None, "estimate", "twin")):
             continue
         route_ft = math.ceil(r["route_in"] / 12 * 10) / 10
         old = w.get("length_ft")
         if isinstance(old, (int, float)) and old >= route_ft:
             continue
+        via = f" through {', '.join(r['chain'][1:-1])}" if r.get("segments", 1) > 1 and r.get("chain") else ""
         w.setdefault("conflicts", []).append(
             f"decision: length_ft {old} -> {route_ft} — its route over the twin graph is {r['route_in']} in over {r['branches']} "
-            f"branches ({_rl.get('exported_at')}, inputs/route_lengths.json)"
+            f"branches{via} ({_rl.get('exported_at')}, inputs/route_lengths.json)"
             + (f", longer than the {'twin path' if length_kind(w) == 'twin' else 'zone estimate'}" if old else ""))
         w["length_ft"] = route_ft
-        w["length_basis"] = (f"route over the twin graph: {r['route_in']} in over {r['branches']} branches "
+        w["length_basis"] = (f"route over the twin graph: {r['route_in']} in over {r['branches']} branches{via} "
                              f"(inputs/route_lengths.json, {_rl.get('exported_at')}); the cut adds the pad")
     for w in list(wires) + list(implied):
         w["length_kind"] = length_kind(w)
