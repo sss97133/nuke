@@ -1,12 +1,16 @@
 -- Empty disposable PG17 only: psql -X -v ON_ERROR_STOP=1 -d dm_refinement_live_finish_estimates -f this-file.sql
--- Contract for 20261015100000_live_finish_estimates.sql. Synthetic rows only; never production.
+-- Contract for 20261015100000_live_finish_estimates.sql and 20261018010000_live_finish_estimates_model_33.sql (the
+-- definition in force). Synthetic rows only; never production.
 -- vehicles and hammer_predictions keep the columns the reader uses, with their live types (2026-10-15):
 --   * one row per public live BaT lot, from its latest model 32 prediction; models 31 and 24 are never read;
 --   * private, deleted, non-vehicle, ended, other-venue and not-live lots are left out;
 --   * every estimate is withheld when the writer has not run for two hours;
 --   * notes that are not a JSON object leave grade and sentence null instead of failing the read;
 --   * analogs come only for up to five named lots, and only the four notes keys the reader names leave the function;
---   * anon executes it while reading no prediction column it could not read before; it is a definer with a pinned path.
+--   * anon executes it while reading no prediction column it could not read before; it is a definer with a pinned path;
+--   * model 33: a lot's latest model 33 row while that writer ran within two hours, unless its model 32 row is more than an
+--     hour newer; model 32 for the rest; a 'model' and a 'factors' column after the ten that were there; no sentence
+--     and no other notes key from model 33; model 32 alone again when the model 33 writer stops.
 \set ON_ERROR_STOP on
 DO $$ BEGIN
   IF current_database() NOT LIKE 'dm_refinement_%'
@@ -67,7 +71,8 @@ INSERT INTO public.hammer_predictions (vehicle_id, current_bid, model_version, p
   ('00000000-0000-4000-8000-000000000008', 1, 32, 2, 1, 3, 0.5, now() - interval '5 minutes', '{"grade":"C"}');
 
 \ir ../migrations/20261015100000_live_finish_estimates.sql
-\ir ../migrations/20261015100000_live_finish_estimates.sql
+\ir ../migrations/20261018010000_live_finish_estimates_model_33.sql
+\ir ../migrations/20261018010000_live_finish_estimates_model_33.sql
 
 DO $$
 DECLARE b jsonb := public.live_finish_estimates();
@@ -86,7 +91,10 @@ BEGIN
   PERFORM pg_temp.ok('notes that are not JSON leave grade and sentence null, and the estimate stands',
     r->4 = 'null'::jsonb AND r->6 = 'null'::jsonb AND (r->>1)::numeric = 83100);
   PERFORM pg_temp.ok('no analogs on the board read', b->'analogs' = 'null'::jsonb OR b->'analogs' IS NULL);
-  PERFORM pg_temp.ok('the payload names its columns', jsonb_array_length(b->'columns') = 10);
+  PERFORM pg_temp.ok('the payload names its columns: the ten before, then model and factors',
+    b->'columns' = '["vehicle_id","estimate","low","high","grade","coverage","sentence","estimated_at","bid_at_estimate","comps_through","model","factors"]'::jsonb);
+  PERFORM pg_temp.ok('with no model 33 rows: model 32 served, every row says so',
+    (b->>'model')::int = 32 AND (SELECT bool_and((x->>10)::int = 32 AND x->11 = 'null'::jsonb) FROM jsonb_array_elements(b->'rows') x));
 END $$;
 
 DO $$
@@ -110,6 +118,82 @@ BEGIN
 END $$;
 UPDATE public.hammer_predictions SET predicted_at = predicted_at + interval '3 hours' WHERE model_version = 32;
 
+-- Model 33. Lot 1: a model 33 row newer than its model 32 row. Lot 2: model 32 only. Lot 7: model 33 only. Lot 3 (private):
+-- model 33, never shown. Lot 9: a model 33 row 100 minutes older than its model 32 row (model 33 skipped it since).
+-- Lot 10: model 33 factors that are not an object.
+INSERT INTO public.vehicles (id, is_public, deleted_at, listing_kind, sale_status, platform_source, auction_end_date) VALUES
+  ('00000000-0000-4000-8000-000000000009', true, NULL, NULL, 'auction_live', 'bringatrailer', (now() + interval '7 hours')::text),
+  ('00000000-0000-4000-8000-000000000010', true, NULL, NULL, 'auction_live', 'bringatrailer', (now() + interval '7 hours')::text);
+INSERT INTO public.hammer_predictions (vehicle_id, current_bid, model_version, predicted_hammer, predicted_low, predicted_high,
+  confidence_score, predicted_at, notes) VALUES
+  ('00000000-0000-4000-8000-000000000001', 25000, 33, 33900, 27000, 43000, 0.7949, now() - interval '5 minutes',
+   '{"grade":"A","sentence":"not for model 33","comps_through":"2026-10-14","private_note":"never leaves either",'
+   '"coverage":{"value":0.7949,"source":"archive hold-out 2026-04..09","n":25620},'
+   '"factors":{"core":{"est32":33000},"trim":1200,"room":-300,"cultural":50,"markets":0,"history":0,"other":-50},'
+   '"analogs":[{"title":"1966 Ford Mustang Fastback","closed":"2026-03-01","bid":24000,"final":36100}]}'),
+  ('00000000-0000-4000-8000-000000000007', 41000, 33, 52000, 44000, 66000, 0.7911, now() - interval '5 minutes',
+   '{"grade":"B","comps_through":"2026-10-14","factors":{"core":{"est32":50000},"trim":900,"room":1500,"cultural":0,"markets":-100,"history":0,"other":-300}}'),
+  ('00000000-0000-4000-8000-000000000003', 1, 33, 2, 1, 3, 0.5, now() - interval '5 minutes', '{"grade":"C"}'),
+  ('00000000-0000-4000-8000-000000000009', 30000, 33, 36000, 31000, 47000, 0.79, now() - interval '110 minutes', '{"grade":"A"}'),
+  ('00000000-0000-4000-8000-000000000009', 31000, 32, 37000, 32000, 49000, 0.78, now() - interval '10 minutes', '{"grade":"A","sentence":"model 32 for lot 9"}'),
+  ('00000000-0000-4000-8000-000000000010', 9000, 33, 12000, 9500, 16000, 0.79, now() - interval '5 minutes', '{"grade":"C","factors":[1,2,3]}');
+
+DO $$
+DECLARE b jsonb := public.live_finish_estimates();
+  r jsonb;
+BEGIN
+  PERFORM pg_temp.ok('model 33 fresh: model 33 served, both writers named',
+    (b->>'fresh')::boolean AND (b->>'model')::int = 33 AND b->'writers'->>'33' IS NOT NULL AND b->'writers'->>'32' IS NOT NULL
+    AND (b->>'writer_at')::timestamptz = (b->'writers'->>'33')::timestamptz);
+  PERFORM pg_temp.ok('lots: 1, 7 and 10 on model 33; 2 and 9 on model 32; 3 never',
+    (SELECT jsonb_object_agg(x->>0, x->10) FROM jsonb_array_elements(b->'rows') x) = jsonb_build_object(
+      '00000000-0000-4000-8000-000000000001', 33, '00000000-0000-4000-8000-000000000002', 32,
+      '00000000-0000-4000-8000-000000000007', 33, '00000000-0000-4000-8000-000000000009', 32,
+      '00000000-0000-4000-8000-000000000010', 33));
+  SELECT x INTO r FROM jsonb_array_elements(b->'rows') x WHERE x->>0 = '00000000-0000-4000-8000-000000000001';
+  PERFORM pg_temp.ok('lot 1: the model 33 estimate, range, grade, coverage, bid and comps date',
+    (r->>1)::numeric = 33900 AND (r->>2)::numeric = 27000 AND (r->>3)::numeric = 43000 AND r->>4 = 'A'
+    AND (r->>5)::numeric = 0.7949 AND (r->>8)::numeric = 25000 AND r->>9 = '2026-10-14');
+  PERFORM pg_temp.ok('lot 1: no sentence from model 33', r->6 = 'null'::jsonb);
+  PERFORM pg_temp.ok('lot 1: the factor steps, numeric, as written',
+    r->11 = '{"core":{"est32":33000},"trim":1200,"room":-300,"cultural":50,"markets":0,"history":0,"other":-50}'::jsonb);
+  SELECT x INTO r FROM jsonb_array_elements(b->'rows') x WHERE x->>0 = '00000000-0000-4000-8000-000000000009';
+  PERFORM pg_temp.ok('lot 9: model 32, newer by more than an hour, with its sentence',
+    (r->>1)::numeric = 37000 AND r->>6 = 'model 32 for lot 9' AND r->11 = 'null'::jsonb);
+  SELECT x INTO r FROM jsonb_array_elements(b->'rows') x WHERE x->>0 = '00000000-0000-4000-8000-000000000010';
+  PERFORM pg_temp.ok('lot 10: factors that are not an object leave null', r->11 = 'null'::jsonb AND (r->>1)::numeric = 12000);
+  PERFORM pg_temp.ok('no other model 33 notes key leaves',
+    position('never leaves either' IN b::text) = 0 AND position('not for model 33' IN b::text) = 0
+    AND position('hold-out' IN b::text) = 0);
+END $$;
+DO $$
+DECLARE b jsonb := public.live_finish_estimates(ARRAY['00000000-0000-4000-8000-000000000001']::uuid[]);
+BEGIN
+  PERFORM pg_temp.ok('a named lot carries its model 33 analogs',
+    b->'analogs'->'00000000-0000-4000-8000-000000000001'->0->>'final' = '36100' AND position('never leaves' IN b::text) = 0);
+END $$;
+
+-- The model 33 writer stops: model 32 alone again (lot 7 has no model 32 row, so it shows nothing).
+UPDATE public.hammer_predictions SET predicted_at = predicted_at - interval '3 hours' WHERE model_version = 33;
+DO $$
+DECLARE b jsonb := public.live_finish_estimates();
+BEGIN
+  PERFORM pg_temp.ok('a stopped model 33 writer: model 32 served',
+    (b->>'fresh')::boolean AND (b->>'model')::int = 32 AND b->'writers'->'33' = 'null'::jsonb
+    AND (SELECT bool_and((x->>10)::int = 32) FROM jsonb_array_elements(b->'rows') x)
+    AND (SELECT array_agg(x->>0 ORDER BY x->>0) FROM jsonb_array_elements(b->'rows') x)
+      = ARRAY['00000000-0000-4000-8000-000000000001', '00000000-0000-4000-8000-000000000002', '00000000-0000-4000-8000-000000000009']);
+END $$;
+-- Both writers stopped: nothing.
+UPDATE public.hammer_predictions SET predicted_at = predicted_at - interval '3 hours' WHERE model_version = 32;
+DO $$
+DECLARE b jsonb := public.live_finish_estimates();
+BEGIN
+  PERFORM pg_temp.ok('both writers stopped: nothing shown', NOT (b->>'fresh')::boolean AND b->'rows' = '[]'::jsonb AND b->'model' = 'null'::jsonb);
+END $$;
+UPDATE public.hammer_predictions SET predicted_at = predicted_at + interval '3 hours' WHERE model_version IN (32, 33);
+SELECT pg_temp.ok('no prediction left in the future', (SELECT max(predicted_at) FROM public.hammer_predictions) <= now());
+
 SELECT pg_temp.ok('PUBLIC cannot execute; anon, authenticated and service_role can',
   NOT has_function_privilege('public', 'public.live_finish_estimates(uuid[])', 'execute')
   AND has_function_privilege('anon', 'public.live_finish_estimates(uuid[])', 'execute')
@@ -126,6 +210,6 @@ SET ROLE anon;
 DO $$
 DECLARE b jsonb := public.live_finish_estimates();
 BEGIN
-  PERFORM pg_temp.ok('anon: the same two estimates', jsonb_array_length(b->'rows') = 2);
+  PERFORM pg_temp.ok('anon: the same five estimates', jsonb_array_length(b->'rows') = 5);
 END $$;
 RESET ROLE;
