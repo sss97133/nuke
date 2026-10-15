@@ -97,3 +97,38 @@ Deno.test("the queue row is plain JSON", () => {
   const row = buildQueueRow(extractFromHtml(page("modern-vin-17-full-block.html"), URL1));
   equal(JSON.parse(JSON.stringify(row)), row);
 });
+
+Deno.test("a post with no asking price still has its title and place (no Product JSON-LD on the page)", () => {
+  const html = `<meta name="geo.placename" content="Mission"><span class="postingtitletext"><span id="titletextonly">Jeep 1994</span><span> (Mission)</span></span>
+<section id="postingbody">Jeep 4x4 title limpio</section>`;
+  const d = extractFromHtml(html, "https://www.craigslist.org/view/d/mission-jeep/1W8xkJukDjkMrHYxucmGEH");
+  if (d.title !== "Jeep 1994") throw new Error(`title ${d.title}`);
+  if (d.location !== "Mission") throw new Error(`location ${d.location}`);
+  if (d.price !== null) throw new Error("no price was offered");
+});
+
+import { extractGallery, fullSizeImageUrl, imageKey } from "./extract.ts";
+
+Deno.test("the gallery is the page's whole image list, in order, at full size, one entry per photo", () => {
+  const html = `<script> var imgList = [{"imgid":"3:a1","shortid":"a1","thumb":"https://images.craigslist.org/00a_a1_0CI0t2_50x50c.jpg","url":"https://images.craigslist.org/00a_a1_0CI0t2_600x450.jpg"},` +
+    `{"url":"https://images.craigslist.org/00b_b2_0CI0t2_600x450.jpg"},{"url":"https://images.craigslist.org/00c_c3_0CI0t2_600x450.jpg"}];</script>`;
+  const g = extractGallery(html, ["https://images.craigslist.org/00a_a1_0CI0t2_600x450.jpg"]);
+  equal(g, [
+    "https://images.craigslist.org/00a_a1_0CI0t2_1200x900.jpg",
+    "https://images.craigslist.org/00b_b2_0CI0t2_1200x900.jpg",
+    "https://images.craigslist.org/00c_c3_0CI0t2_1200x900.jpg",
+  ]);
+});
+
+Deno.test("with no image list the JSON-LD images are used, also at full size; two sizes of one photo share a key", () => {
+  equal(extractGallery("<html></html>", ["https://images.craigslist.org/00a_a1_0CI0t2_600x450.jpg"]), ["https://images.craigslist.org/00a_a1_0CI0t2_1200x900.jpg"]);
+  equal(imageKey("https://images.craigslist.org/00a_a1_0CI0t2_600x450.jpg"), imageKey("https://images.craigslist.org/00a_a1_0CI0t2_1200x900.jpg"));
+  equal(fullSizeImageUrl("https://images.craigslist.org/00a_a1_0CI0t2_50x50c.jpg"), "https://images.craigslist.org/00a_a1_0CI0t2_1200x900.jpg");
+});
+
+Deno.test("a body keeps its line breaks and is not cut at 5000 characters", () => {
+  const body = "Line one.<br>Line two.<br><br><br><br>Line three " + "x".repeat(6000);
+  const x = extractFromHtml(`<section id="postingbody">${body}</section>`, URL1);
+  assert((x.description ?? "").startsWith("Line one.\nLine two.\n\nLine three"), "breaks kept, runs of blank lines folded");
+  assert((x.description ?? "").length > 6000, "not cut at 5000");
+});

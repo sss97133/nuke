@@ -154,9 +154,30 @@ Deno.test("another platform keeps its existing completeness contract even with s
   equal(write({ status: "created", vehicle_id: "v1" }, WITH_DATA)!.status, "complete");
 });
 
-Deno.test("the poller ledgers nothing for an ingest error or a non-structural rejection", () => {
-  equal(write({ status: "error", error: "ingest HTTP 502" }, null), null);
-  equal(write({ status: "rejected", reason: "insufficient identity: year=? make=? model=?" }, null), null);
+Deno.test("attempted errors back off with unknown landing, preserving an earlier vehicle pointer and attempt ceiling", () => {
+  const first = write({ status: "error", error: "ingest HTTP 502" }, WITH_DATA,
+    { status: "complete", vehicle_id: "earlier-vehicle", attempts: 0 })!;
+  equal(first.status, "failed");
+  equal(first.landed, null);
+  equal([first.row.attempts, first.row.next_attempt_at, first.row.vehicle_id], [1, iso(24 * HOUR), "earlier-vehicle"]);
+  equal((first.row.raw_data as Record<string, unknown>).ingest_result_unknown, true);
+  equal((first.row.raw_data as Record<string, unknown>).landed, undefined);
+  const timeout = write({ status: "error", error: "AbortError: timed out" }, null)!;
+  equal([timeout.status, timeout.row.failure_category, timeout.row.next_attempt_at], ["failed", "timeout", iso(HOUR)]);
+  const final = write({ status: "error", error: "HTTP 500" }, null, { status: "failed", attempts: 2, max_attempts: 3 })!;
+  equal([final.row.attempts, final.row.next_attempt_at], [3, null]);
+  equal(write({ status: "rejected", reason: "unspecified" }, null), null);
+});
+
+Deno.test("a post with a blank model is ledgered failed, retried a day later, and final at max attempts", () => {
+  const ingest = { status: "rejected", reason: "insufficient identity: year=1975 make=Datsun model=? — need all three" };
+  const first = write(ingest, null)!;
+  equal(first.status, "failed");
+  equal(first.row.failure_category, "identity_insufficient");
+  equal(first.row.attempts, 1);
+  equal(Date.parse(first.row.next_attempt_at as string) - NOW.getTime(), 24 * HOUR);
+  const last = ledgerWriteFor({ url: "u", feedId: "f", ingest, batch: { rows: new Map(), error: null }, prev: { status: "failed", attempts: 2 }, now: NOW })!;
+  equal(last.row.next_attempt_at, null);
 });
 
 Deno.test("landedFields reports which of price, images and description the row holds", () => {
@@ -431,7 +452,7 @@ Deno.test("a rejection is never skipped, even when the extractor's text holds a 
 
 Deno.test("a rejection that is not enrichment_failed still follows the old rule: structural is skipped, the rest is not ledgered", () => {
   equal(ledgerWriteFor({ url: "u", feedId: "f", ingest: { status: "rejected", reason: "implausible year: 1801" }, batch: { rows: new Map(), error: null }, now: NOW })?.status, "skipped");
-  equal(ledgerWriteFor({ url: "u", feedId: "f", ingest: { status: "rejected", reason: "insufficient identity: year=? make=? model=?" }, batch: { rows: new Map(), error: null }, now: NOW }), null);
+  equal(ledgerWriteFor({ url: "u", feedId: "f", ingest: { status: "rejected", reason: "some other rejection" }, batch: { rows: new Map(), error: null }, now: NOW }), null);
 });
 
 Deno.test("the rejection is recorded once: later polls skip the URL until it is due, and a final one never returns", () => {
@@ -499,6 +520,21 @@ Deno.test('measured slow calls defer the next call; fast calls use available wor
   equal(budget.reserve('fast'), null);
 });
 
+Deno.test('feed allocations share remaining slots and redistribute empty or refused targets without raising caps', () => {
+  const budget = createIntakeBudget(intakeThrottle({ max_ingests: 40,
+    sources: { paused: { enabled: false }, small: { max_ingests: 1 } } }), 0, () => 0);
+  equal(budget.feedAllowance(40, 20), 1);
+  equal(budget.feedAllowance(4, 20), 10); // Thirty-six empty targets spent no slots.
+  equal(budget.reserve('paused'), null);
+  equal(budget.feedAllowance(3, 20), 14);
+  assert(!!budget.reserve('small'), 'one configured source slot');
+  equal(budget.reserve('small'), null);
+  equal(budget.feedAllowance(2, 20), 20);
+  equal(budget.snapshot().attempted, 1);
+  equal(budget.feedAllowance(1, 8), 8); // Article-hop ceiling survives redistribution.
+  equal(createIntakeBudget(intakeThrottle({ max_ingests: 0 }), 0, () => 0).feedAllowance(1, 20), 0);
+});
+
 Deno.test('latest source visit outranks its old metro feeds; billing errors persist a six-hour backoff', () => {
   const now = NOW.getTime();
   const feeds = [{ source_slug: 'craigslist', last_polled_at: new Date(now - 86400000).toISOString() },
@@ -514,4 +550,31 @@ Deno.test('latest source visit outranks its old metro feeds; billing errors pers
   assert(!!budget.reserve('mecum'), 'source receives one slot');
   equal(budget.reserve('mecum'), null);
   assert(!!budget.reserve('other'), 'another source retains a slot');
+});
+
+Deno.test("planIngests: a complete row past the revisit age is asked again after new URLs and retries, bounded by max", () => {
+  const old = { status: "complete", processed_at: iso(-25 * HOUR) };
+  const recent = { status: "complete", processed_at: iso(-HOUR) };
+  const ledger = new Map<string, LedgerKnown>([["old1", old], ["old2", old], ["recent", recent]]);
+  const rule = { afterMs: 24 * HOUR, max: 1 };
+  const plan = planIngests(["old1", "old2", "recent", "n1"], new Set(), ledger, NOW, 20, rule);
+  equal(plan.toIngest, ["n1", "old1"]);
+  equal(plan.revisits, 1);
+  equal(plan.settled, 2);
+  equal(planIngests(["old1"], new Set(), ledger, NOW, 20).toIngest, []);
+});
+
+Deno.test("an unresolved Craigslist blip is ledgered skipped with its observation id, and is not retried", () => {
+  const w = ledgerWriteFor({ url: "u", feedId: "f", ingest: { status: "unresolved", reason: "insufficient identity", blip: { observation: "written", observation_id: "obs-1" } }, batch: { rows: new Map(), error: null }, now: NOW })!;
+  equal(w.status, "skipped");
+  equal((w.row.raw_data as any).blip_observation_id, "obs-1");
+});
+
+Deno.test("revisits take at most a quarter of an invocation's ingests, spent across feed pages", () => {
+  const b = createIntakeBudget(intakeThrottle({ max_ingests: 40 }), Date.now());
+  equal(b.revisitAllowance(), 10);
+  b.spendRevisits(4);
+  equal(b.revisitAllowance(), 6);
+  b.spendRevisits(50);
+  equal(b.revisitAllowance(), 0);
 });

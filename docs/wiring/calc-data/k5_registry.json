@@ -15,7 +15,7 @@
   "counts": {
    "active": 174,
    "candidate": 243,
-   "implied": 243,
+   "implied": 245,
    "devices": 141
   }
  },
@@ -3783,8 +3783,8 @@
    "color": "gray",
    "color_basis": "PROPOSED",
    "printed_label": "",
-   "length_ft": 3.5,
-   "length_basis": "cut list v4.2 zone estimate",
+   "length_ft": 3.7,
+   "length_basis": "twin: landmark L18, PDM30 -> DASH_CLUSTER (headlight-switch dash region, the Dakota VHX box's anchor), 43.4 in = 3.62 ft along the routed polyline (output/K5_landmarks_blender_derived.yaml; k5LandmarkPaths.ts L18), rounded up to 0.1 ft; the 15 % body pad (state row 33) is applied downstream; the PDM30 position is the twin's assertion A2 (state section 4); replaces the cut list v4.2 zone estimate, which was shorter than the 3.59 ft straight line; not taped on the truck",
    "engine_running": false,
    "notes": "",
    "april": {
@@ -3800,6 +3800,7 @@
    "conflicts": [
     "gauge: v4.2 22 AWG vs April 20 AWG",
     "April superseded — insulation TXL/GXL — superseded by the Tefzel-only lock (state §1, 2026-05-11)",
+    "decision: length_ft 3.5 -> 3.7 — twin: landmark L18, PDM30 -> DASH_CLUSTER (headlight-switch dash region, the Dakota VHX box's anchor), 43.4 in = 3.62 ft along the routed polyline (output/K5_landmarks_blender_derived.yaml; k5LandmarkPaths.ts L18), rounded up to 0.1 ft; the 15 % body pad (state row 33) is applied downstream; the PDM30 position is the twin's assertion A2 (state section 4); replaces the cut list v4.2 zone estimate, which was shorter than the 3.59 ft straight line; not taped on the truck",
     "decision: frm ECU -> PDM30:OUT13 — Dakota VHX manual p.5-6: DIM (+) night dimming input — 'connect to tail light circuit'; it started at 'ECU'",
     "decision: label Headlight Switch -> Park/tail feed -> Dakota VHX DIM (+) night dimming — Dakota VHX manual p.5-6: DIM (+) night dimming input — 'connect to tail light circuit'; it started at 'ECU'",
     "decision: to {'device': 'Dakota_VHX_Control_Box', 'pin': 'DIMMER_IN', 'terminal': 'DT04_socket'} -> {'device': 'DAKOTA-VHX', 'pin': 'DIM (+)', 'terminal': 'screw terminal'} — Dakota VHX manual p.5-6: DIM (+) night dimming input — 'connect to tail light circuit'; it started at 'ECU'",
@@ -3811,7 +3812,7 @@
     "build-plan/MASTER_CUT_LIST.csv:134"
    ],
    "control": "headlight switch PARK on PDM30 DIG2",
-   "length_kind": "estimate",
+   "length_kind": "twin",
    "gauge": "22 AWG",
    "route": {
     "sides": [
@@ -4041,7 +4042,7 @@
     ],
     "crossing": "firewall: FIREWALL-BODY-A 11"
    },
-   "pdm_limit": "PDM30 OUT26: OPEN: needs the Hella 8TW 004 223-031 pump current: Hella's product information (web_snapshots/www.hella.com__BI_Washer-pumps-and-water-tanks_2026.md) gives 12 V, 2 bar, 1 l/min and the plug, not the current: bench it",
+   "pdm_limit": "PDM30 OUT26: OPEN: needs the factory washer ratchet solenoid's coil current: the Hella pump and tank were retired on 2026-09-29 and #50 now feeds the solenoid on the wiper gearbox (endpoint WASHER-PUMP); the 1977 LTSM (p.803, p.814) gives no current: bench it (RSI pass 23)",
    "option": "BASE",
    "option_status": "base"
   },
@@ -4139,7 +4140,7 @@
     ],
     "crossing": "cab exit: through the body to the outside (path not recorded)"
    },
-   "pdm_limit": "PDM30 OUT7: OPEN: needs the E-Stopp ESK001 engage current (estopp.com FAQ gives no figure)",
+   "pdm_limit": "PDM30 OUT7: 10 A per output (>= 1.25 x 8 A; E-Stopp standard kit page (web_snapshots/www.estopp.com__e-stopp-standard-kit.md:264-267, 2026-10-15): 'Power Requirement: 12V/10A constant power', 'Draws 3-8A when operating'; it runs about 8-10 s to full stroke (E-Stopp_ESK001_Installation.pdf p.1), a pulse the PDM's 20-50 s filter rides (PDM manual p.23) (RSI pass 23))",
    "option": "BASE",
    "option_status": "base"
   },
@@ -5848,13 +5849,14 @@
    "color": "red",
    "color_basis": "DAVE",
    "printed_label": "",
-   "length_ft": 3.5,
-   "length_basis": "cut list v4.2 zone estimate",
+   "length_ft": 3.7,
+   "length_basis": "twin: landmark L18, PDM30 -> DASH_CLUSTER (headlight-switch dash region, the Dakota VHX box's anchor), 43.4 in = 3.62 ft along the routed polyline (output/K5_landmarks_blender_derived.yaml; k5LandmarkPaths.ts L18), rounded up to 0.1 ft; the 15 % body pad (state row 33) is applied downstream; the PDM30 position is the twin's assertion A2 (state section 4); replaces the cut list v4.2 zone estimate, which was shorter than the 3.59 ft straight line; not taped on the truck",
    "engine_running": true,
    "notes": "",
    "april": null,
    "conflicts": [
     "decision: awg 22 -> 18 — Dakota 650314:P p.6: ACC. POWER 18 AWG",
+    "decision: length_ft 3.5 -> 3.7 — twin: landmark L18, PDM30 -> DASH_CLUSTER (headlight-switch dash region, the Dakota VHX box's anchor), 43.4 in = 3.62 ft along the routed polyline (output/K5_landmarks_blender_derived.yaml; k5LandmarkPaths.ts L18), rounded up to 0.1 ft; the 15 % body pad (state row 33) is applied downstream; the PDM30 position is the twin's assertion A2 (state section 4); replaces the cut list v4.2 zone estimate, which was shorter than the 3.59 ft straight line; not taped on the truck",
     "decision: frm PDM30 -> PDM30:OUT29 — Dakota 650314:P p.6: ACC. POWER 18 AWG",
     "decision: to None -> {'device': 'Dakota VHX control box', 'pin': 'ACC. POWER', 'terminal': 'screw terminal'} — Dakota 650314:P p.6: ACC. POWER 18 AWG",
     "pin text from the termination rows (one home for pins, review A3): frm 'PDM30:OUT29' -> 'PDM30:OUT29 (B16)'"
@@ -5863,7 +5865,7 @@
     "output/K5_cut_list_v4_2.txt:98"
    ],
    "control": "PDM30 DIG1 ignition RUN",
-   "length_kind": "estimate",
+   "length_kind": "twin",
    "gauge": "18 AWG",
    "route": {
     "sides": [
@@ -5871,7 +5873,7 @@
     ],
     "crossing": "none: both ends on one side"
    },
-   "pdm_limit": "PDM30 OUT29: OPEN: needs the Dakota VHX and GSS-3000 currents (manuals give none)",
+   "pdm_limit": "PDM30 OUT29: 2 A per output (>= 1.25 x 1.02 A; Dakota VHX manual 650314:P p.7: 'the system draws less than 1 amp'; GSS-3000 manual p.10 (web_snapshots/www.dakotadigital.com__GSS-3000.md:533-535): 'W/O Safety Relay ~ 20 mA' (the registry wires no safety relay) (RSI pass 23))",
    "option": "BASE",
    "option_status": "base"
   },
@@ -7116,13 +7118,13 @@
    "status": "active",
    "section": "MISC (16 wires, 115.2 ft)",
    "subsystem": "HVAC_AC",
-   "frm": "PDM15:OUT11 (A6)",
+   "frm": "SPL-PDM15-OUT8 (PDM15:OUT8 pigtails B7 + B13)",
    "to": {
     "device": "AC-CLUTCH",
     "pin": "T1 single lead, male bullet (clutch coil +)",
     "terminal": "open"
    },
-   "awg": 20,
+   "awg": 18,
    "spec": "M22759/32",
    "color": "red",
    "color_basis": "DAVE",
@@ -7133,24 +7135,26 @@
    "notes": "",
    "april": null,
    "conflicts": [
-    "decision: frm PDM30:OUT16 -> PDM15:OUT11 — compressor ordered 2026-09-24 (state §1 A/C hard parts); clutch is an engine-bay load; agent choice under owner delegation 2026-09-27 ('you can choose the parts ... get it done ... i can tell u to replace later') — replaceable",
+    "decision: awg 20 -> 18 — compressor ordered 2026-09-24 (state §1 A/C hard parts); clutch is an engine-bay load; agent choice under owner delegation 2026-09-27 ('you can choose the parts ... get it done ... i can tell u to replace later') — replaceable",
+    "decision: frm PDM30:OUT16 -> PDM15:OUT8 — compressor ordered 2026-09-24 (state §1 A/C hard parts); clutch is an engine-bay load; agent choice under owner delegation 2026-09-27 ('you can choose the parts ... get it done ... i can tell u to replace later') — replaceable",
     "decision: to None -> {'device': 'AC-CLUTCH', 'pin': 'clutch lead', 'terminal': 'open'} — compressor ordered 2026-09-24 (state §1 A/C hard parts); clutch is an engine-bay load; agent choice under owner delegation 2026-09-27 ('you can choose the parts ... get it done ... i can tell u to replace later') — replaceable",
-    "pin text from the termination rows (one home for pins, review A3): to.pin 'clutch lead' -> 'T1 single lead, male bullet (clutch coil +)' at AC-CLUTCH",
-    "pin text from the termination rows (one home for pins, review A3): frm 'PDM15:OUT11' -> 'PDM15:OUT11 (A6)'"
+    "decision: frm PDM15:OUT11 -> PDM15:OUT8, awg 20 -> 18 (RSI pass 24) — the Sanden SD7 clutch draws up to 4.2 A (SD7 service manual p.14), so the limit is ceil(1.25 x 4.2) = 6 A; 20 AWG at 100 C is 6 A (PDM manual p.48), 0.85 x 6 = 5.1 A < 6. 18 AWG (9 A, 0.85 x 9 = 7.6 A) carries it, but MoTeC wants 24#-20# on an 8 A output (p.6, p.48), so the clutch moves to PDM15's free 20 A output OUT8 (B7 + B13, p.43): two 20 AWG pigtails into an M81824/1-2 and the 18 AWG run, the treatment #64 got in round 4. OUT11 is free again",
+    "decision: frm PDM15:OUT8 -> SPL-PDM15-OUT8 (PDM15:OUT8 pigtails B7 + B13) — the 18 AWG load wire starts at the in-line M81824/1-2; the two 20 AWG pigtails 23_PT1/_PT2 land on PDM15 B7 and B13 (review A1 (receipt 2026-09-28_reviews-and-shape-rules.md; state 0h(1)): MoTeC PDM user manual p.48 — 20# to 16# on 20 A outputs, 16# = 15 A at 80 C, each pin carries about half the output; Superseal SSC-N contact 24-16 AWG (ProWire M800-KIT-N); in-line MiniSeal M81824/1-3 (ProWire Raychem MiniSeal page: 'Butt: M81824/1 series'); one conductor can't fill both cavities of a paired 20 A output (MoTeC PDM manual p.43/p.44 '20 A Output n (with Axx)'), so every load on OUT1-8 takes two equal pigtails and an in-line MiniSeal. Pigtail gauge makes both splice sides fit one colour (3137CT cavities 26-20 / 20-16 / 16-12): a 12-16 AWG load takes 2 x 16 AWG into M81824/1-3 (yellow); an 18-20 AWG load takes 2 x 20 AWG into M81824/1-2 (blue); a 22-24 AWG load is raised to 20 AWG first (red can't take 2 x 20). 20 AWG pigtails are inside MoTeC's 20#-16# for 20 A outputs (p.48) and carry 2 x 8 A at 80 C, so that output's limit is set to 16 A or less (review 2026-09-28, second book review))",
+    "pin text from the termination rows (one home for pins, review A3): to.pin 'clutch lead' -> 'T1 single lead, male bullet (clutch coil +)' at AC-CLUTCH"
    ],
    "sources": [
     "output/K5_cut_list_v4_2.txt:145"
    ],
    "control": "CAN: M130 A/C request, interlocked by the PDM15 low/high pressure switch inputs",
    "length_kind": "estimate",
-   "gauge": "20 AWG",
+   "gauge": "18 AWG",
    "route": {
     "sides": [
      "engine bay"
     ],
     "crossing": "none: both ends on one side"
    },
-   "pdm_limit": "PDM15 OUT11: OPEN: needs the Sanden SD7B10 clutch coil current (Sanden spec)",
+   "pdm_limit": "PDM15 OUT8: 6 A per output (>= 1.25 x 4.2 A; Sanden SD7 service manual p.14 §10.4 (component_drawings/Sanden_SD7_Service_Manual.pdf; SD7B10 listed p.3): 'Normal current should be 3.6 - 4.2A at 12VDC', the top of the range (RSI pass 23))",
    "option": "BASE",
    "option_status": "base"
   },
@@ -9095,12 +9099,13 @@
    "color": "red",
    "color_basis": "TAP",
    "printed_label": "",
-   "length_ft": 1.5,
-   "length_basis": "cut list v4.2 zone estimate",
+   "length_ft": 3.7,
+   "length_basis": "twin: landmark L18, PDM30 -> DASH_CLUSTER (headlight-switch dash region, the Dakota VHX box's anchor), 43.4 in = 3.62 ft along the routed polyline (output/K5_landmarks_blender_derived.yaml; k5LandmarkPaths.ts L18), rounded up to 0.1 ft; the 15 % body pad (state row 33) is applied downstream; the PDM30 position is the twin's assertion A2 (state section 4); replaces the cut list v4.2 zone estimate, which was shorter than the 3.59 ft straight line; not taped on the truck",
    "engine_running": false,
    "notes": "Dash-side splice on #80; color follows parent circuit (see v4 receipt)",
    "april": null,
    "conflicts": [
+    "decision: length_ft 1.5 -> 3.7 — twin: landmark L18, PDM30 -> DASH_CLUSTER (headlight-switch dash region, the Dakota VHX box's anchor), 43.4 in = 3.62 ft along the routed polyline (output/K5_landmarks_blender_derived.yaml; k5LandmarkPaths.ts L18), rounded up to 0.1 ft; the 15 % body pad (state row 33) is applied downstream; the PDM30 position is the twin's assertion A2 (state section 4); replaces the cut list v4.2 zone estimate, which was shorter than the 3.59 ft straight line; not taped on the truck",
     "decision: frm TAP #80 DASH -> PDM30:OUT27 — None",
     "decision: to None -> {'device': 'Dakota VHX control box', 'pin': 'L TURN', 'terminal': 'screw terminal'} — None",
     "decision: spec M22759/32 -> M22759/16 at 22 AWG — MoTeC C125 manual p.20 + PDM manual p.48 specify M22759/16-22; /32-22 OD 1.09 mm is under the 1.20 mm seal minimum (GT150 12191818), /16-22 is 1.27–1.37 mm",
@@ -9112,7 +9117,7 @@
    ],
    "control": "tap of the left turn output: the PDM flashes OUT27 from the turn switch input DIG4 (channel plan)",
    "subsystem_basis": "Dakota VHX dual-sender wires (receipt 2026-05-14 acceptance)",
-   "length_kind": "estimate",
+   "length_kind": "twin",
    "gauge": "22 AWG",
    "route": {
     "sides": [
@@ -9141,12 +9146,13 @@
    "color": "red",
    "color_basis": "TAP",
    "printed_label": "",
-   "length_ft": 1.5,
-   "length_basis": "cut list v4.2 zone estimate",
+   "length_ft": 3.7,
+   "length_basis": "twin: landmark L18, PDM30 -> DASH_CLUSTER (headlight-switch dash region, the Dakota VHX box's anchor), 43.4 in = 3.62 ft along the routed polyline (output/K5_landmarks_blender_derived.yaml; k5LandmarkPaths.ts L18), rounded up to 0.1 ft; the 15 % body pad (state row 33) is applied downstream; the PDM30 position is the twin's assertion A2 (state section 4); replaces the cut list v4.2 zone estimate, which was shorter than the 3.59 ft straight line; not taped on the truck",
    "engine_running": false,
    "notes": "Dash-side splice on #82; color follows parent circuit (see v4 receipt)",
    "april": null,
    "conflicts": [
+    "decision: length_ft 1.5 -> 3.7 — twin: landmark L18, PDM30 -> DASH_CLUSTER (headlight-switch dash region, the Dakota VHX box's anchor), 43.4 in = 3.62 ft along the routed polyline (output/K5_landmarks_blender_derived.yaml; k5LandmarkPaths.ts L18), rounded up to 0.1 ft; the 15 % body pad (state row 33) is applied downstream; the PDM30 position is the twin's assertion A2 (state section 4); replaces the cut list v4.2 zone estimate, which was shorter than the 3.59 ft straight line; not taped on the truck",
     "decision: frm TAP #82 DASH -> PDM30:OUT28 — None",
     "decision: to None -> {'device': 'Dakota VHX control box', 'pin': 'R TURN', 'terminal': 'screw terminal'} — None",
     "decision: spec M22759/32 -> M22759/16 at 22 AWG — MoTeC C125 manual p.20 + PDM manual p.48 specify M22759/16-22; /32-22 OD 1.09 mm is under the 1.20 mm seal minimum (GT150 12191818), /16-22 is 1.27–1.37 mm",
@@ -9158,7 +9164,7 @@
    ],
    "control": "tap of the right turn output: the PDM flashes OUT28 from the turn switch input DIG5 (channel plan)",
    "subsystem_basis": "Dakota VHX dual-sender wires (receipt 2026-05-14 acceptance)",
-   "length_kind": "estimate",
+   "length_kind": "twin",
    "gauge": "22 AWG",
    "route": {
     "sides": [
@@ -9631,7 +9637,7 @@
     ],
     "crossing": "none: both ends on one side"
    },
-   "pdm_limit": "PDM30 OUT24: OPEN: needs the M130 supply current (no consumption figure in the M1 techspec on file)",
+   "pdm_limit": "PDM30 OUT24: 1 A per output (>= 1.25 x 0.34 A; MoTeC M130 product page (web_snapshots/www.motec.com.au__M130.md:88, 2026-10-15): 'Typical no-load supply current: 0.34 A at 13.8 V supply'; the throttle servo's current also enters at A26 through the half bridges (RMS 4 A at most): log it before calling the limit final (RSI pass 23))",
    "option": "BASE",
    "option_status": "base"
   },
@@ -19852,7 +19858,7 @@
     "crossing": "none: both ends on one side"
    },
    "color": "red",
-   "pdm_limit": "PDM30 OUT23: OPEN: needs the RVS mirror display current (rearviewsafety.com gives none)",
+   "pdm_limit": "PDM30 OUT23: 1 A per output (>= 1.25 x 0.67 A; RVS-7180355-IR mirror monitor specs (web_snapshots/www.rearviewsafety.com__license-plate-backup-camera-system-rvs-7180355-ir.md:490-491): 'Power Consumption 8W', 0.67 A at 12 V (RSI pass 23))",
    "option": "RC",
    "option_status": "decided"
   },
@@ -21838,7 +21844,7 @@
     "crossing": "none: both ends on one side"
    },
    "color": "red",
-   "pdm_limit": "PDM30 OUT11: OPEN: needs the RetroSound memory (constant) current",
+   "pdm_limit": "PDM30 OUT11: CONFLICT: needs 19 A per output, the thinnest conductor allows 6 A (0.85 x 8 A, PDM manual p.48 80 C column / ProWire tables) — a heavier wire or pigtail closes it",
    "option": "AUD",
    "option_status": "decided"
   },
@@ -22712,7 +22718,7 @@
     "crossing": "none: both ends on one side"
    },
    "color": "red",
-   "pdm_limit": "PDM30 OUT29: OPEN: needs the Dakota VHX and GSS-3000 currents (manuals give none)",
+   "pdm_limit": "PDM30 OUT29: 2 A per output (>= 1.25 x 1.02 A; Dakota VHX manual 650314:P p.7: 'the system draws less than 1 amp'; GSS-3000 manual p.10 (web_snapshots/www.dakotadigital.com__GSS-3000.md:533-535): 'W/O Safety Relay ~ 20 mA' (the registry wires no safety relay) (RSI pass 23))",
    "option": "BASE",
    "option_status": "base"
   },
@@ -23472,6 +23478,68 @@
    "option_status": "base"
   },
   {
+   "id": "23_PT1",
+   "label": "PDM15 OUT8 pigtail 1 of 2 (pin B7) to the #23 splice",
+   "status": "implied",
+   "frm": "PDM15:B7",
+   "to": "SPL-PDM15-OUT8 (pigtail side)",
+   "awg": 20,
+   "spec": "M22759/32",
+   "splice": "M81824/1-2",
+   "color": "red",
+   "length_ft": null,
+   "length_basis": "pigtail: both legs the same length, cut at the formboard",
+   "control": "CAN: M130 A/C request, interlocked by the PDM15 low/high pressure switch inputs",
+   "subsystem": "HVAC_AC",
+   "subsystem_basis": "pigtail of #23",
+   "pigtail_of": "23",
+   "conflicts": [],
+   "sources": [
+    "review A1 (receipt 2026-09-28_reviews-and-shape-rules.md; state 0h(1)): MoTeC PDM user manual p.48 — 20# to 16# on 20 A outputs, 16# = 15 A at 80 C, each pin carries about half the output; Superseal SSC-N contact 24-16 AWG (ProWire M800-KIT-N); in-line MiniSeal M81824/1-3 (ProWire Raychem MiniSeal page: 'Butt: M81824/1 series')"
+   ],
+   "length_kind": null,
+   "gauge": "20 AWG",
+   "route": {
+    "sides": [
+     "engine bay"
+    ],
+    "crossing": "none: both ends on one side"
+   },
+   "option": "BASE",
+   "option_status": "base"
+  },
+  {
+   "id": "23_PT2",
+   "label": "PDM15 OUT8 pigtail 2 of 2 (pin B13) to the #23 splice",
+   "status": "implied",
+   "frm": "PDM15:B13",
+   "to": "SPL-PDM15-OUT8 (pigtail side)",
+   "awg": 20,
+   "spec": "M22759/32",
+   "splice": "M81824/1-2",
+   "color": "red",
+   "length_ft": null,
+   "length_basis": "pigtail: both legs the same length, cut at the formboard",
+   "control": "CAN: M130 A/C request, interlocked by the PDM15 low/high pressure switch inputs",
+   "subsystem": "HVAC_AC",
+   "subsystem_basis": "pigtail of #23",
+   "pigtail_of": "23",
+   "conflicts": [],
+   "sources": [
+    "review A1 (receipt 2026-09-28_reviews-and-shape-rules.md; state 0h(1)): MoTeC PDM user manual p.48 — 20# to 16# on 20 A outputs, 16# = 15 A at 80 C, each pin carries about half the output; Superseal SSC-N contact 24-16 AWG (ProWire M800-KIT-N); in-line MiniSeal M81824/1-3 (ProWire Raychem MiniSeal page: 'Butt: M81824/1 series')"
+   ],
+   "length_kind": null,
+   "gauge": "20 AWG",
+   "route": {
+    "sides": [
+     "engine bay"
+    ],
+    "crossing": "none: both ends on one side"
+   },
+   "option": "BASE",
+   "option_status": "base"
+  },
+  {
    "id": "INJ_PWR_PT1",
    "label": "PDM15 OUT2 pigtail 1 of 2 (pin A3) to the #INJ_PWR splice",
    "status": "implied",
@@ -23993,8 +24061,8 @@
    "source": "K5_WIRING_STATE.md row 33"
   },
   "device_end_coverage": {
-   "mapped": 525,
-   "wire_ends": 555,
+   "mapped": 529,
+   "wire_ends": 559,
    "endpoints_without_pin_map": [
     "AC-HP-SW",
     "AC-LP-SW",
@@ -24245,12 +24313,14 @@
    ],
    "M22759/32 20 AWG red": [
     "93_PT1",
-    "93_PT2"
+    "93_PT2",
+    "23_PT1",
+    "23_PT2"
    ]
   },
   "pins_from_terminations": {
    "to.pin": 70,
-   "frm": 59,
+   "frm": 58,
    "to": 8
   }
  },
@@ -24749,7 +24819,6 @@
     "SSB-34BS-PA66": 1
    },
    "wires": [
-    "23",
     "105",
     "111",
     "PCS_IGN_PT",
@@ -24771,7 +24840,6 @@
     "START_TRIG_PT2"
    ],
    "cavities": {
-    "23": "A6",
     "105": "A21",
     "111": "A30",
     "PCS_IGN_PT": "A11",
@@ -24835,6 +24903,8 @@
     "BFL_0V",
     "64_PT1",
     "64_PT2",
+    "23_PT1",
+    "23_PT2",
     "FAN_LEG2_PT1",
     "FAN_LEG2_PT2"
    ],
@@ -24847,6 +24917,8 @@
     "BFL_0V": "B22",
     "64_PT1": "B5",
     "64_PT2": "B11",
+    "23_PT1": "B7",
+    "23_PT2": "B13",
     "FAN_LEG2_PT1": "B3",
     "FAN_LEG2_PT2": "B9"
    },
@@ -31623,6 +31695,39 @@
    "range_by_wire": null,
    "side": "engine bay"
   },
+  "SPL-PDM15-OUT8": {
+   "device": "PDM15 OUT8 pigtail splice — pins B7 + B13 (2 × 20 AWG) joined to the A/C clutch feed #23 (18 AWG)",
+   "where": "engine",
+   "family": "miniseal",
+   "kit": {
+    "M81824/1-2": 1
+   },
+   "wires": [
+    "23_PT1",
+    "23_PT2",
+    "23"
+   ],
+   "cavities": null,
+   "empty": null,
+   "doubled": null,
+   "range": [
+    26,
+    12
+   ],
+   "out_of_range": [],
+   "pigtailed": [],
+   "note": "in-line MiniSeal M81824/1-2: 2 x 20 AWG in, 18 AWG out (RSI pass 24: the clutch moved off the 8 A OUT11 so its feed can be 18 AWG)",
+   "branch_wires_missing": 0,
+   "unknown_wire_ids": [],
+   "open": [],
+   "sources": [
+    "MoTeC PDM user manual p.43 (20 A Output 8 on B7 with B13)",
+    "MoTeC PDM user manual p.6, p.48 (20#-16# on 20 A outputs)"
+   ],
+   "splice_point": null,
+   "range_by_wire": null,
+   "side": "engine bay"
+  },
   "IBST-DIAG": {
    "device": "sealed Deutsch DTM 4-way diagnostic port near the booster for a USB CAN logger: harness half DTM 4-pin (F) MoTeC #68054 (size 20 sockets); capped with the mating DTM 4-pin (M) #68055 when no logger is on (CANDIDATE, option IBST-CAN)",
    "where": "engine",
@@ -33517,16 +33622,6 @@
    "doubled": null
   },
   {
-   "wire": "23",
-   "endpoint": "PDM15-A",
-   "where": "engine",
-   "cavity": "A6",
-   "factory_circuit": null,
-   "part": "SSC-N",
-   "family": "ssc",
-   "doubled": null
-  },
-  {
    "wire": "START_TRIG_PT1",
    "endpoint": "PDM15-A",
    "where": "engine",
@@ -33551,6 +33646,16 @@
    "endpoint": "PDM15-B",
    "where": "engine",
    "cavity": "B11",
+   "factory_circuit": null,
+   "part": "SSC-N",
+   "family": "ssc",
+   "doubled": null
+  },
+  {
+   "wire": "23_PT2",
+   "endpoint": "PDM15-B",
+   "where": "engine",
+   "cavity": "B13",
    "factory_circuit": null,
    "part": "SSC-N",
    "family": "ssc",
@@ -33631,6 +33736,16 @@
    "endpoint": "PDM15-B",
    "where": "engine",
    "cavity": "B5",
+   "factory_circuit": null,
+   "part": "SSC-N",
+   "family": "ssc",
+   "doubled": null
+  },
+  {
+   "wire": "23_PT1",
+   "endpoint": "PDM15-B",
+   "where": "engine",
+   "cavity": "B7",
    "factory_circuit": null,
    "part": "SSC-N",
    "family": "ssc",
@@ -41097,6 +41212,36 @@
    "doubled": null
   },
   {
+   "wire": "23_PT1",
+   "endpoint": "SPL-PDM15-OUT8",
+   "where": "engine",
+   "cavity": "splice 1",
+   "factory_circuit": null,
+   "part": "M81824/1-2",
+   "family": "miniseal",
+   "doubled": null
+  },
+  {
+   "wire": "23_PT2",
+   "endpoint": "SPL-PDM15-OUT8",
+   "where": "engine",
+   "cavity": "splice 2",
+   "factory_circuit": null,
+   "part": "M81824/1-2",
+   "family": "miniseal",
+   "doubled": null
+  },
+  {
+   "wire": "23",
+   "endpoint": "SPL-PDM15-OUT8",
+   "where": "engine",
+   "cavity": "splice 3",
+   "factory_circuit": null,
+   "part": "M81824/1-2",
+   "family": "miniseal",
+   "doubled": null
+  },
+  {
    "wire": "BFL_SIG",
    "endpoint": "BRAKE-FLUID-LVL",
    "where": "engine",
@@ -41135,10 +41280,11 @@
     "102r",
     "108r",
     "112r",
-    "APS_T1_5V"
+    "APS_T1_5V",
+    "20 AWG pin lead"
    ],
    "splice": "D-609-05",
-   "equiv_awg": 14
+   "equiv_awg": 12
   },
   {
    "at": "M130-B B15",
@@ -41147,10 +41293,11 @@
     "99s",
     "101g",
     "101s",
-    "APS_T2_GND"
+    "APS_T2_GND",
+    "20 AWG pin lead"
    ],
    "splice": "D-609-05",
-   "equiv_awg": 14
+   "equiv_awg": 12
   },
   {
    "at": "M130-B B16",
@@ -41162,8 +41309,7 @@
     "102g",
     "108g",
     "112g",
-    "103g",
-    "20 AWG lead"
+    "20 AWG group lead"
    ],
    "splice": "D-609-05",
    "equiv_awg": 12
@@ -41171,20 +41317,22 @@
   {
    "at": "M130-B B16",
    "wires": [
+    "103g",
     "103s",
     "104g",
     "104s",
     "APS_T1_GND",
-    "20 AWG lead"
+    "20 AWG group lead"
    ],
    "splice": "D-609-05",
-   "equiv_awg": 14
+   "equiv_awg": 12
   },
   {
    "at": "M130-B B16",
    "wires": [
-    "2 group leads",
-    "pin lead"
+    "20 AWG group lead",
+    "20 AWG group lead",
+    "20 AWG pin lead"
    ],
    "splice": "D-609-05",
    "equiv_awg": 14
@@ -41193,19 +41341,21 @@
    "at": "M130-B B19",
    "wires": [
     "99r",
-    "101r"
+    "101r",
+    "20 AWG pin lead"
    ],
-   "splice": "D-609-04",
-   "equiv_awg": 18
+   "splice": "D-609-05",
+   "equiv_awg": 14
   },
   {
    "at": "M130-B B21",
    "wires": [
     "APS_T1_SIG",
-    "PCS_TPS"
+    "PCS_TPS",
+    "20 AWG pin lead"
    ],
-   "splice": "D-609-04",
-   "equiv_awg": 18
+   "splice": "D-609-05",
+   "equiv_awg": 14
   },
   {
    "at": "PDM30-A A11",
@@ -41214,10 +41364,11 @@
     "75",
     "81",
     "83",
-    "84"
+    "84",
+    "20 AWG pin lead"
    ],
    "splice": "D-609-05",
-   "equiv_awg": 14
+   "equiv_awg": 12
   },
   {
    "at": "PDM30-A A15",
@@ -41225,10 +41376,11 @@
     "97",
     "76",
     "89",
-    "MIRROR_TRIG"
+    "MIRROR_TRIG",
+    "20 AWG pin lead"
    ],
    "splice": "D-609-05",
-   "equiv_awg": 14
+   "equiv_awg": 12
   },
   {
    "at": "PDM30-A A24",
@@ -41239,11 +41391,30 @@
     "87",
     "88",
     "90",
-    "91",
-    "92"
+    "20 AWG group lead"
    ],
    "splice": "D-609-05",
-   "equiv_awg": 12
+   "equiv_awg": 10
+  },
+  {
+   "at": "PDM30-A A24",
+   "wires": [
+    "91",
+    "92",
+    "20 AWG group lead"
+   ],
+   "splice": "D-609-05",
+   "equiv_awg": 14
+  },
+  {
+   "at": "PDM30-A A24",
+   "wires": [
+    "20 AWG group lead",
+    "20 AWG group lead",
+    "20 AWG pin lead"
+   ],
+   "splice": "D-609-05",
+   "equiv_awg": 14
   },
   {
    "at": "PDM30-A A28",
@@ -41251,16 +41422,18 @@
     "IGN_SW_0V",
     "BRK_SW_0V",
     "HL_SW_0V",
-    "TURN_SW_0V"
+    "TURN_SW_0V",
+    "20 AWG pin lead"
    ],
    "splice": "D-609-05",
-   "equiv_awg": 14
+   "equiv_awg": 12
   },
   {
    "at": "PDM30-B B1",
    "wires": [
     "38",
-    "LOCK_FEED_R"
+    "LOCK_FEED_R",
+    "20 AWG pin lead"
    ],
    "splice": "D-609-05",
    "equiv_awg": 12
@@ -41269,46 +41442,51 @@
    "at": "PDM30-B B12",
    "wires": [
     "80",
-    "119"
-   ],
-   "splice": "D-609-04",
-   "equiv_awg": 16
-  },
-  {
-   "at": "PDM30-B B14",
-   "wires": [
-    "82",
-    "120"
-   ],
-   "splice": "D-609-04",
-   "equiv_awg": 16
-  },
-  {
-   "at": "PDM30-B B16",
-   "wires": [
-    "71",
-    "GSS_PWR"
+    "119",
+    "20 AWG pin lead"
    ],
    "splice": "D-609-05",
    "equiv_awg": 14
   },
   {
+   "at": "PDM30-B B14",
+   "wires": [
+    "82",
+    "120",
+    "20 AWG pin lead"
+   ],
+   "splice": "D-609-05",
+   "equiv_awg": 14
+  },
+  {
+   "at": "PDM30-B B16",
+   "wires": [
+    "71",
+    "GSS_PWR",
+    "20 AWG pin lead"
+   ],
+   "splice": "D-609-05",
+   "equiv_awg": 12
+  },
+  {
    "at": "PDM30-B B25",
    "wires": [
     "CAN_LO",
-    "CAN_FW_L"
+    "CAN_FW_L",
+    "20 AWG pin lead"
    ],
-   "splice": "D-609-04",
-   "equiv_awg": 18
+   "splice": "D-609-05",
+   "equiv_awg": 14
   },
   {
    "at": "PDM30-B B26",
    "wires": [
     "CAN_HI",
-    "CAN_FW_H"
+    "CAN_FW_H",
+    "20 AWG pin lead"
    ],
-   "splice": "D-609-04",
-   "equiv_awg": 18
+   "splice": "D-609-05",
+   "equiv_awg": 14
   },
   {
    "at": "PDM30-B B8",
@@ -41317,37 +41495,168 @@
     "68",
     "69",
     "73",
-    "74"
+    "20 AWG group lead"
    ],
    "splice": "D-609-05",
    "equiv_awg": 12
   },
   {
+   "at": "PDM30-B B8",
+   "wires": [
+    "74",
+    "20 AWG group lead"
+   ],
+   "splice": "D-609-04",
+   "equiv_awg": 14
+  },
+  {
+   "at": "PDM30-B B8",
+   "wires": [
+    "20 AWG group lead",
+    "20 AWG group lead",
+    "20 AWG pin lead"
+   ],
+   "splice": "D-609-05",
+   "equiv_awg": 14
+  },
+  {
    "at": "PDM15-A A28",
    "wires": [
     "AC_LP_0V",
-    "AC_HP_0V"
+    "AC_HP_0V",
+    "20 AWG pin lead"
    ],
-   "splice": "D-609-04",
-   "equiv_awg": 18
+   "splice": "D-609-05",
+   "equiv_awg": 14
   },
   {
    "at": "PDM15-B B25",
    "wires": [
     "CAN_FW_L",
-    "CAN_LTCD_L"
+    "CAN_LTCD_L",
+    "20 AWG pin lead"
    ],
-   "splice": "D-609-04",
-   "equiv_awg": 16
+   "splice": "D-609-05",
+   "equiv_awg": 14
   },
   {
    "at": "PDM15-B B26",
    "wires": [
     "CAN_FW_H",
-    "CAN_LTCD_H"
+    "CAN_LTCD_H",
+    "20 AWG pin lead"
+   ],
+   "splice": "D-609-05",
+   "equiv_awg": 14
+  },
+  {
+   "at": "TG-SW-DASH 4 FEED",
+   "wires": [
+    "TG_KEY_FEED",
+    "TG_FEED"
+   ],
+   "splice": null,
+   "equiv_awg": 10
+  },
+  {
+   "at": "TG-SW-KEY CLOSE terminal",
+   "wires": [
+    "TG_CUT_IN",
+    "TG_BUS_UP"
+   ],
+   "splice": null,
+   "equiv_awg": 10
+  },
+  {
+   "at": "TG-SW-KEY OPEN terminal",
+   "wires": [
+    "TG_BUS_DN",
+    "TG_MOT_B"
+   ],
+   "splice": null,
+   "equiv_awg": 10
+  },
+  {
+   "at": "VSS-SENDER white lead (signal)",
+   "wires": [
+    "VSS_DAK",
+    "100"
    ],
    "splice": "D-609-04",
-   "equiv_awg": 16
+   "equiv_awg": 14
+  },
+  {
+   "at": "BLOWER-MOTOR + blade terminal",
+   "wires": [
+    "BLOWER_MOT",
+    "BLOWER_HI"
+   ],
+   "splice": null,
+   "equiv_awg": 10
+  },
+  {
+   "at": "FLOOR-DIMMER 10 feed cavity",
+   "wires": [
+    "85",
+    "86"
+   ],
+   "splice": "D-609-04",
+   "equiv_awg": 14
+  },
+  {
+   "at": "FLOOR-DIMMER 12 LOW cavity",
+   "wires": [
+    "85a",
+    "86a"
+   ],
+   "splice": "D-609-05",
+   "equiv_awg": 12
+  },
+  {
+   "at": "FLOOR-DIMMER 11 HIGH cavity",
+   "wires": [
+    "85b",
+    "86b",
+    "121"
+   ],
+   "splice": "D-609-05",
+   "equiv_awg": 12
+  },
+  {
+   "at": "DOOR-JAMB-L switch terminal",
+   "wires": [
+    "42",
+    "STEP_DOOR_L"
+   ],
+   "splice": "D-609-04",
+   "equiv_awg": 14
+  },
+  {
+   "at": "DOOR-JAMB-R switch terminal",
+   "wires": [
+    "43",
+    "STEP_DOOR_R"
+   ],
+   "splice": "D-609-04",
+   "equiv_awg": 14
+  },
+  {
+   "at": "SUB + push terminal",
+   "wires": [
+    "30a",
+    "SUB_JMP_P"
+   ],
+   "splice": null,
+   "equiv_awg": 10
+  },
+  {
+   "at": "SUB - push terminal",
+   "wires": [
+    "30b",
+    "SUB_JMP_N"
+   ],
+   "splice": null,
+   "equiv_awg": 10
   },
   {
    "at": "SPL-FUEL-SND",
@@ -41405,8 +41714,8 @@
    ],
    "splice": "D-609-05",
    "type": "stub",
-   "equiv_awg": 14,
-   "cm": 3702
+   "equiv_awg": 12,
+   "cm": 4402
   },
   {
    "at": "SPL-PDM30-OUT3",
@@ -41544,6 +41853,29 @@
    "equiv_awg": [
     12,
     14
+   ]
+  },
+  {
+   "at": "SPL-PDM15-OUT8",
+   "wires": [
+    "23_PT1",
+    "23_PT2",
+    "23"
+   ],
+   "splice": "M81824/1-2",
+   "type": "in-line",
+   "sides": [
+    [
+     "23_PT1",
+     "23_PT2"
+    ],
+    [
+     "23"
+    ]
+   ],
+   "equiv_awg": [
+    14,
+    18
    ]
   },
   {
@@ -41730,7 +42062,7 @@
    "327583": 1,
    "327638": 3,
    "327639": 2,
-   "4-1437284-3": 43,
+   "4-1437284-3": 42,
    "610TP": 2,
    "638TP": 2,
    "68054": 1,
@@ -41755,8 +42087,8 @@
    "CPA-100-3/4-BK": 1,
    "CPA-100-3/8-RED": 1,
    "D-609-03": 53,
-   "D-609-04": 20,
-   "D-609-05": 32,
+   "D-609-04": 15,
+   "D-609-05": 46,
    "D38999/24WJ61SN": 1,
    "D38999/26WJ61PN": 1,
    "DL214": 2,
@@ -41787,7 +42119,7 @@
    "M39029/56-351": 58,
    "M39029/58-363": 58,
    "M800-KIT-N": 3,
-   "M81824/1-2": 1,
+   "M81824/1-2": 2,
    "M81824/1-3": 14,
    "M85049/69-25N": 2,
    "MS27488-20-2": 6,
@@ -41797,7 +42129,7 @@
    "S02-03-R": 4,
    "SSB-26BS-PA66": 3,
    "SSB-34BS-PA66": 3,
-   "SSC-N": 137,
+   "SSC-N": 138,
    "W12P": 2,
    "W12S": 2,
    "W6P": 1,
@@ -41823,7 +42155,7 @@
    "M22759/16 10 AWG red": 21.2,
    "M22759/16 22 AWG brown": 30.7,
    "M22759/16 22 AWG brown/black": 21.2,
-   "M22759/16 22 AWG red": 193.8,
+   "M22759/16 22 AWG red": 198.8,
    "M22759/16 22 AWG orange": 25.4,
    "M22759/16 22 AWG orange/black": 4.0,
    "M22759/16 22 AWG yellow/brown": 5.5,
@@ -41837,7 +42169,7 @@
    "M22759/16 22 AWG green/violet": 4.0,
    "M22759/16 22 AWG green/gray": 4.0,
    "M22759/16 22 AWG green/white": 9.2,
-   "M22759/16 22 AWG gray": 39.3,
+   "M22759/16 22 AWG gray": 39.6,
    "M22759/16 22 AWG white": 68.2,
    "M22759/16 22 AWG white/orange": 19.8,
    "M22759/16 22 AWG white/blue": 14.6,
@@ -41850,11 +42182,11 @@
    "M22759/32 16 AWG white/violet": 42.3,
    "M22759/32 18 AWG black": 21.9,
    "M22759/32 18 AWG brown/black": 18.4,
-   "M22759/32 18 AWG red": 27.7,
+   "M22759/32 18 AWG red": 33.2,
    "M22759/32 18 AWG violet": 15.9,
    "M22759/32 18 AWG white/violet": 15.9,
    "M22759/32 20 AWG black": 8.0,
-   "M22759/32 20 AWG red": 128.7,
+   "M22759/32 20 AWG red": 123.4,
    "M22759/32 20 AWG green/blue": 42.3,
    "M22759/32 20 AWG gray": 45.2,
    "M22759/32 20 AWG white/brown": 5.5,
@@ -41901,9 +42233,9 @@
    "kind": "wire",
    "item": "M22759/16 22 AWG red",
    "codes": [],
-   "need_ft": 193.8,
+   "need_ft": 198.8,
    "cart_ft": 0,
-   "status": "short by 193.8 ft"
+   "status": "short by 198.8 ft"
   },
   {
    "kind": "wire",
@@ -42021,9 +42353,9 @@
    "kind": "wire",
    "item": "M22759/16 22 AWG gray",
    "codes": [],
-   "need_ft": 39.3,
+   "need_ft": 39.6,
    "cart_ft": 0,
-   "status": "short by 39.3 ft"
+   "status": "short by 39.6 ft"
   },
   {
    "kind": "wire",
@@ -42403,9 +42735,9 @@
    "codes": [
     "M22759/32-20-2"
    ],
-   "need_ft": 128.7,
+   "need_ft": 123.4,
    "cart_ft": 40.0,
-   "status": "short by 88.7 ft; also 93_PT1, 93_PT2 (length not measured yet)"
+   "status": "short by 83.4 ft; also 93_PT1, 93_PT2, 23_PT1, 23_PT2 (length not measured yet)"
   },
   {
    "kind": "wire",
@@ -42491,7 +42823,7 @@
    "codes": [
     "M22759/32-18-2"
    ],
-   "need_ft": 27.7,
+   "need_ft": 33.2,
    "cart_ft": 40.0,
    "status": "covered"
   },
@@ -42897,11 +43229,11 @@
    "kind": "plug",
    "item": "4-1437284-3",
    "name": "Superseal 1.0 cavity sealing plug",
-   "need": 43,
+   "need": 42,
    "cart": 40,
    "inside": [],
    "vendor": "prowire",
-   "status": "short by 3"
+   "status": "short by 2"
   },
   {
    "kind": "lug",
@@ -43217,21 +43549,21 @@
    "kind": "splice",
    "item": "D-609-04",
    "name": "MiniSeal stub splice, blue (20–16)",
-   "need": 20,
+   "need": 15,
    "cart": 25,
    "inside": [],
    "vendor": "prowire",
-   "status": "covered (+5 spare)"
+   "status": "covered (+10 spare)"
   },
   {
    "kind": "splice",
    "item": "D-609-05",
    "name": "MiniSeal stub splice, yellow (16–12) — rails and ECU pin splices",
-   "need": 32,
+   "need": 46,
    "cart": 20,
    "inside": [],
    "vendor": "prowire",
-   "status": "short by 12"
+   "status": "short by 26"
   },
   {
    "kind": "housing",
@@ -43617,7 +43949,7 @@
    "kind": "splice",
    "item": "M81824/1-2",
    "name": "MiniSeal in-line (butt) splice, blue, with its sealing sleeve — 2 x 20 AWG pigtails to an 18-20 AWG load",
-   "need": 1,
+   "need": 2,
    "cart": 0,
    "inside": [],
    "vendor": "prowire",
@@ -43797,13 +44129,13 @@
    "kind": "contact",
    "item": "SSC-N",
    "name": "Superseal 1.0 solid contact, nickel, 16–24 AWG",
-   "need": 137,
+   "need": 138,
    "cart": 150,
    "inside": [
     "2 × M800-KIT-N × 65"
    ],
    "vendor": "prowire",
-   "status": "covered (+13 spare)"
+   "status": "covered (+12 spare)"
   },
   {
    "kind": "wedge",
@@ -44060,8 +44392,8 @@
    {
     "code": "M22759/16-22-2",
     "qty": 400,
-    "need_ft": 193.8,
-    "why": "need 193.8 ft"
+    "need_ft": 198.8,
+    "why": "need 198.8 ft"
    },
    {
     "code": "M22759/16-22-3",
@@ -44150,8 +44482,8 @@
    {
     "code": "M22759/16-22-8",
     "qty": 165,
-    "need_ft": 39.3,
-    "why": "need 39.3 ft"
+    "need_ft": 39.6,
+    "why": "need 39.6 ft"
    },
    {
     "code": "M22759/16-22-9",
@@ -44224,8 +44556,8 @@
    {
     "code": "M22759/32-20-2",
     "qty_from": 40.0,
-    "qty": 130,
-    "need_ft": 128.7
+    "qty": 125,
+    "need_ft": 123.4
    },
    {
     "code": "M22759/32-14-2",
@@ -44381,10 +44713,10 @@
    {
     "code": "4-1437284-3",
     "name": "Superseal 1.0 cavity sealing plug",
-    "need": 43,
+    "need": 42,
     "cart": 40,
     "vendor": "prowire",
-    "status": "short by 3"
+    "status": "short by 2"
    },
    {
     "code": "610TP",
@@ -44517,10 +44849,10 @@
    {
     "code": "D-609-05",
     "name": "MiniSeal stub splice, yellow (16–12) — rails and ECU pin splices",
-    "need": 32,
+    "need": 46,
     "cart": 20,
     "vendor": "prowire",
-    "status": "short by 12"
+    "status": "short by 26"
    },
    {
     "code": "DL438",
@@ -44685,7 +45017,7 @@
    {
     "code": "M81824/1-2",
     "name": "MiniSeal in-line (butt) splice, blue, with its sealing sleeve — 2 x 20 AWG pigtails to an 18-20 AWG load",
-    "need": 1,
+    "need": 2,
     "cart": 0,
     "vendor": "prowire",
     "status": "missing — in no cart"
@@ -45608,7 +45940,7 @@
     },
     {
      "field": "#99r ECU end",
-     "value": "M130:B19: SSC-N, AFM8 + K1S selector 6; splice D-609-04",
+     "value": "M130:B19: SSC-N, AFM8 + K1S selector 6; splice D-609-05",
      "source": "ProWire SSC-N tooling chart; motec_m130_datasheet.pdf p.4–5; ProWire 3137CT (MiniSeal cavities)",
      "state": "cited"
     },
@@ -45716,7 +46048,7 @@
     },
     {
      "field": "#101r ECU end",
-     "value": "M130:B19: SSC-N, AFM8 + K1S selector 6; splice D-609-04",
+     "value": "M130:B19: SSC-N, AFM8 + K1S selector 6; splice D-609-05",
      "source": "ProWire SSC-N tooling chart; motec_m130_datasheet.pdf p.4–5; ProWire 3137CT (MiniSeal cavities)",
      "state": "cited"
     },
@@ -47822,7 +48154,7 @@
     },
     {
      "field": "#99r ECU end",
-     "value": "M130:B19: SSC-N, AFM8 + K1S selector 6; splice D-609-04",
+     "value": "M130:B19: SSC-N, AFM8 + K1S selector 6; splice D-609-05",
      "source": "ProWire SSC-N tooling chart; motec_m130_datasheet.pdf p.4–5; ProWire 3137CT (MiniSeal cavities)",
      "state": "cited"
     },
@@ -47864,7 +48196,7 @@
     },
     {
      "field": "#101r ECU end",
-     "value": "M130:B19: SSC-N, AFM8 + K1S selector 6; splice D-609-04",
+     "value": "M130:B19: SSC-N, AFM8 + K1S selector 6; splice D-609-05",
      "source": "ProWire SSC-N tooling chart; motec_m130_datasheet.pdf p.4–5; ProWire 3137CT (MiniSeal cavities)",
      "state": "cited"
     },
@@ -49418,7 +49750,7 @@
     },
     {
      "field": "#APS_T1_SIG ECU end",
-     "value": "M130:B21: SSC-N, AFM8 + K1S selector 6; splice D-609-04",
+     "value": "M130:B21: SSC-N, AFM8 + K1S selector 6; splice D-609-05",
      "source": "ProWire SSC-N tooling chart; motec_m130_datasheet.pdf p.4–5; ProWire 3137CT (MiniSeal cavities)",
      "state": "cited"
     },
@@ -50612,6 +50944,19 @@
    "status": "set"
   },
   {
+   "output": "PDM15 OUT8",
+   "loads": [
+    "23"
+   ],
+   "load_a": 4.2,
+   "source": "Sanden SD7 service manual p.14 §10.4 (component_drawings/Sanden_SD7_Service_Manual.pdf; SD7B10 listed p.3): 'Normal current should be 3.6 - 4.2A at 12VDC', the top of the range (RSI pass 23)",
+   "wire_cap_a": 9,
+   "limit_a": 6,
+   "need_a": 6,
+   "max_a": 7,
+   "status": "set"
+  },
+  {
    "output": "PDM15 OUT9",
    "loads": [
     "ALT_L"
@@ -50623,17 +50968,6 @@
    "need_a": 1,
    "max_a": 5,
    "status": "set"
-  },
-  {
-   "output": "PDM15 OUT11",
-   "loads": [
-    "23"
-   ],
-   "load_a": null,
-   "source": "needs the Sanden SD7B10 clutch coil current (Sanden spec)",
-   "wire_cap_a": 6,
-   "limit_a": null,
-   "status": "OPEN: needs the Sanden SD7B10 clutch coil current (Sanden spec)"
   },
   {
    "output": "PDM15 OUT13",
@@ -50727,11 +51061,13 @@
    "loads": [
     "54"
    ],
-   "load_a": null,
-   "source": "needs the E-Stopp ESK001 engage current (estopp.com FAQ gives no figure)",
+   "load_a": 8,
+   "source": "E-Stopp standard kit page (web_snapshots/www.estopp.com__e-stopp-standard-kit.md:264-267, 2026-10-15): 'Power Requirement: 12V/10A constant power', 'Draws 3-8A when operating'; it runs about 8-10 s to full stroke (E-Stopp_ESK001_Installation.pdf p.1), a pulse the PDM's 20-50 s filter rides (PDM manual p.23) (RSI pass 23)",
    "wire_cap_a": 15,
-   "limit_a": null,
-   "status": "OPEN: needs the E-Stopp ESK001 engage current (estopp.com FAQ gives no figure)"
+   "limit_a": 10,
+   "need_a": 10,
+   "max_a": 12,
+   "status": "set"
   },
   {
    "output": "PDM30 OUT8",
@@ -50773,11 +51109,13 @@
    "loads": [
     "RADIO_CONST"
    ],
-   "load_a": null,
-   "source": "needs the RetroSound memory (constant) current",
+   "load_a": 15,
+   "source": "RetroSound Motor 2B user manual printed p.21 (component_drawings/RetroSound_Motor-2B_User_Manual.pdf): 'Current Consumption (during operation) Max. 15A', the whole radio with its internal amp at full output, fused on this yellow lead (p.19). This build runs the speakers off the external amp, so its draw is lower: bench the yellow lead at 13.5 V with the speaker outputs open and USB loaded (RSI pass 23)",
    "wire_cap_a": 8,
    "limit_a": null,
-   "status": "OPEN: needs the RetroSound memory (constant) current"
+   "need_a": 19,
+   "max_a": 6,
+   "status": "CONFLICT: needs 19 A per output, the thinnest conductor allows 6 A (0.85 x 8 A, PDM manual p.48 80 C column / ProWire tables) — a heavier wire or pigtail closes it"
   },
   {
    "output": "PDM30 OUT12",
@@ -50936,22 +51274,26 @@
    "loads": [
     "MIRROR_PWR"
    ],
-   "load_a": null,
-   "source": "needs the RVS mirror display current (rearviewsafety.com gives none)",
+   "load_a": 0.67,
+   "source": "RVS-7180355-IR mirror monitor specs (web_snapshots/www.rearviewsafety.com__license-plate-backup-camera-system-rvs-7180355-ir.md:490-491): 'Power Consumption 8W', 0.67 A at 12 V (RSI pass 23)",
    "wire_cap_a": 8,
-   "limit_a": null,
-   "status": "OPEN: needs the RVS mirror display current (rearviewsafety.com gives none)"
+   "limit_a": 1,
+   "need_a": 1,
+   "max_a": 6,
+   "status": "set"
   },
   {
    "output": "PDM30 OUT24",
    "loads": [
     "ECU_PWR"
    ],
-   "load_a": null,
-   "source": "needs the M130 supply current (no consumption figure in the M1 techspec on file)",
+   "load_a": 0.34,
+   "source": "MoTeC M130 product page (web_snapshots/www.motec.com.au__M130.md:88, 2026-10-15): 'Typical no-load supply current: 0.34 A at 13.8 V supply'; the throttle servo's current also enters at A26 through the half bridges (RMS 4 A at most): log it before calling the limit final (RSI pass 23)",
    "wire_cap_a": 15,
-   "limit_a": null,
-   "status": "OPEN: needs the M130 supply current (no consumption figure in the M1 techspec on file)"
+   "limit_a": 1,
+   "need_a": 1,
+   "max_a": 10,
+   "status": "set"
   },
   {
    "output": "PDM30 OUT25",
@@ -50976,10 +51318,10 @@
     "50"
    ],
    "load_a": null,
-   "source": "needs the Hella 8TW 004 223-031 pump current: Hella's product information (web_snapshots/www.hella.com__BI_Washer-pumps-and-water-tanks_2026.md) gives 12 V, 2 bar, 1 l/min and the plug, not the current: bench it",
+   "source": "needs the factory washer ratchet solenoid's coil current: the Hella pump and tank were retired on 2026-09-29 and #50 now feeds the solenoid on the wiper gearbox (endpoint WASHER-PUMP); the 1977 LTSM (p.803, p.814) gives no current: bench it (RSI pass 23)",
    "wire_cap_a": 8,
    "limit_a": null,
-   "status": "OPEN: needs the Hella 8TW 004 223-031 pump current: Hella's product information (web_snapshots/www.hella.com__BI_Washer-pumps-and-water-tanks_2026.md) gives 12 V, 2 bar, 1 l/min and the plug, not the current: bench it"
+   "status": "OPEN: needs the factory washer ratchet solenoid's coil current: the Hella pump and tank were retired on 2026-09-29 and #50 now feeds the solenoid on the wiper gearbox (endpoint WASHER-PUMP); the 1977 LTSM (p.803, p.814) gives no current: bench it (RSI pass 23)"
   },
   {
    "output": "PDM30 OUT27",
@@ -51015,11 +51357,13 @@
     "71",
     "GSS_PWR"
    ],
-   "load_a": null,
-   "source": "needs the Dakota VHX and GSS-3000 currents (manuals give none)",
+   "load_a": 1.02,
+   "source": "Dakota VHX manual 650314:P p.7: 'the system draws less than 1 amp'; GSS-3000 manual p.10 (web_snapshots/www.dakotadigital.com__GSS-3000.md:533-535): 'W/O Safety Relay ~ 20 mA' (the registry wires no safety relay) (RSI pass 23)",
    "wire_cap_a": 8,
-   "limit_a": null,
-   "status": "OPEN: needs the Dakota VHX and GSS-3000 currents (manuals give none)"
+   "limit_a": 2,
+   "need_a": 2,
+   "max_a": 6,
+   "status": "set"
   },
   {
    "output": "PDM30 OUT30",
@@ -51345,7 +51689,7 @@
     "L3 crossing": true,
     "L4 ends": true,
     "L5 material": false,
-    "length": "estimated",
+    "length": "twin",
     "crosses": false
    },
    "46": {
@@ -51678,7 +52022,7 @@
     "L3 crossing": true,
     "L4 ends": true,
     "L5 material": true,
-    "length": "estimated",
+    "length": "twin",
     "crosses": false
    },
    "72": {
@@ -52182,7 +52526,7 @@
     "L3 crossing": true,
     "L4 ends": true,
     "L5 material": false,
-    "length": "estimated",
+    "length": "twin",
     "crosses": false
    },
    "120": {
@@ -52191,7 +52535,7 @@
     "L3 crossing": true,
     "L4 ends": true,
     "L5 material": false,
-    "length": "estimated",
+    "length": "twin",
     "crosses": false
    },
    "121": {
@@ -54426,6 +54770,24 @@
     "length": "unknown",
     "crosses": false
    },
+   "23_PT1": {
+    "L1 plugs": true,
+    "L2 wire": true,
+    "L3 crossing": true,
+    "L4 ends": true,
+    "L5 material": false,
+    "length": "unknown",
+    "crosses": false
+   },
+   "23_PT2": {
+    "L1 plugs": true,
+    "L2 wire": true,
+    "L3 crossing": true,
+    "L4 ends": true,
+    "L5 material": false,
+    "length": "unknown",
+    "crosses": false
+   },
    "INJ_PWR_PT1": {
     "L1 plugs": true,
     "L2 wire": true,
@@ -54568,17 +54930,17 @@
     }
    },
    "BASE": {
-    "wires": 327,
-    "L1 plugs": 247,
-    "L2 wire": 324,
-    "L3 crossing": 327,
-    "L4 ends": 313,
+    "wires": 329,
+    "L1 plugs": 249,
+    "L2 wire": 326,
+    "L3 crossing": 329,
+    "L4 ends": 315,
     "L5 material": 2,
     "crossings": 90,
     "length": {
-     "estimated": 159,
-     "twin": 7,
-     "unknown": 161
+     "estimated": 155,
+     "twin": 11,
+     "unknown": 163
     }
    },
    "BFL": {
@@ -54685,16 +55047,17 @@
     }
    },
    "dash_cabin": {
-    "wires": 54,
-    "L1 plugs": 36,
-    "L2 wire": 54,
-    "L3 crossing": 54,
-    "L4 ends": 52,
+    "wires": 56,
+    "L1 plugs": 38,
+    "L2 wire": 56,
+    "L3 crossing": 56,
+    "L4 ends": 54,
     "L5 material": 1,
     "crossings": 13,
     "length": {
-     "estimated": 16,
-     "unknown": 38
+     "estimated": 13,
+     "twin": 3,
+     "unknown": 40
     }
    },
    "engine": {
@@ -54733,7 +55096,8 @@
     "L5 material": 0,
     "crossings": 0,
     "length": {
-     "estimated": 9,
+     "twin": 1,
+     "estimated": 8,
      "unknown": 14
     }
    },
@@ -54779,33 +55143,33 @@
   },
   "configuration": {
    "buildable (base + decided)": {
-    "wires": 358,
-    "L1 plugs": 266,
-    "L2 wire": 355,
-    "L3 crossing": 358,
-    "L4 ends": 344,
+    "wires": 360,
+    "L1 plugs": 268,
+    "L2 wire": 357,
+    "L3 crossing": 360,
+    "L4 ends": 346,
     "L5 material": 2,
     "crossings": 90,
     "length": {
-     "estimated": 173,
-     "twin": 7,
-     "unknown": 178
+     "estimated": 169,
+     "twin": 11,
+     "unknown": 180
     }
    }
   },
   "composite": {
    "composite (every option)": {
-    "wires": 390,
-    "L1 plugs": 270,
-    "L2 wire": 382,
-    "L3 crossing": 390,
-    "L4 ends": 374,
+    "wires": 392,
+    "L1 plugs": 272,
+    "L2 wire": 384,
+    "L3 crossing": 392,
+    "L4 ends": 376,
     "L5 material": 2,
     "crossings": 90,
     "length": {
-     "estimated": 176,
-     "twin": 7,
-     "unknown": 207
+     "estimated": 172,
+     "twin": 11,
+     "unknown": 209
     }
    }
   }
@@ -55147,6 +55511,8 @@
     "64_PT2",
     "66_PT1",
     "66_PT2",
+    "23_PT1",
+    "23_PT2",
     "INJ_PWR_PT1",
     "INJ_PWR_PT2",
     "COIL_PWR_PT1",
@@ -58695,14 +59061,14 @@
    },
    "PDM15 20 A outputs": {
     "capacity": 8,
-    "used": 7,
-    "spare": 1,
+    "used": 8,
+    "spare": 0,
     "source": "PDM30 datasheet p.1; PDM user manual comparison table"
    },
    "PDM15 8 A outputs": {
     "capacity": 7,
-    "used": 3,
-    "spare": 4,
+    "used": 2,
+    "spare": 5,
     "source": "PDM30 datasheet p.1; PDM user manual comparison table"
    },
    "PDM15 inputs": {
@@ -58814,10 +59180,10 @@
      },
      {
       "item": "M22759/16 22 AWG red",
-      "need_ft": 193.8,
+      "need_ft": 198.8,
       "cart_ft": 0,
       "on_hand_ft": null,
-      "status": "short by 193.8 ft"
+      "status": "short by 198.8 ft"
      },
      {
       "item": "M22759/16 22 AWG orange",
@@ -58912,10 +59278,10 @@
      },
      {
       "item": "M22759/16 22 AWG gray",
-      "need_ft": 39.3,
+      "need_ft": 39.6,
       "cart_ft": 0,
       "on_hand_ft": null,
-      "status": "short by 39.3 ft"
+      "status": "short by 39.6 ft"
      },
      {
       "item": "M22759/16 22 AWG white",
@@ -59185,10 +59551,10 @@
      },
      {
       "item": "M22759/32 20 AWG red",
-      "need_ft": 128.7,
+      "need_ft": 123.4,
       "cart_ft": 40.0,
       "on_hand_ft": null,
-      "status": "short by 88.7 ft; also 93_PT1, 93_PT2 (length not measured yet)"
+      "status": "short by 83.4 ft; also 93_PT1, 93_PT2, 23_PT1, 23_PT2 (length not measured yet)"
      },
      {
       "item": "M22759/32 20 AWG green/blue",
@@ -59241,7 +59607,7 @@
      },
      {
       "item": "M22759/32 18 AWG red",
-      "need_ft": 27.7,
+      "need_ft": 33.2,
       "cart_ft": 40.0,
       "on_hand_ft": null,
       "status": "covered"

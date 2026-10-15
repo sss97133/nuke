@@ -3,7 +3,8 @@
  * Route: /builds/:vehicleId
  *
  * First product surface for the build-coordinator. Dogfood: Skylar's K20.
- * No auth required — public reads via RLS on work_orders / work_order_line_items / work_order_payments.
+ * Reads go through RLS on work_orders / work_order_line_items / work_order_payments: the books reach the work
+ * order's customer and the shop's owners. A visitor who can read none of them is sent to /vehicle/:vehicleId.
  *
  * Sections:
  *   1. Header (vehicle + budget)
@@ -14,7 +15,7 @@
  */
 
 import React, { useEffect, useMemo, useState } from 'react';
-import { useParams } from 'react-router-dom';
+import { Navigate, useParams } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import './BuildDashboard.css';
 
@@ -26,7 +27,6 @@ interface Vehicle {
   make: string | null;
   model: string | null;
   vin: string | null;
-  current_value: number | null;
 }
 
 interface WorkOrder {
@@ -124,7 +124,7 @@ const BuildDashboard: React.FC = () => {
         const [vehicleRes, woRes] = await Promise.all([
           supabase
             .from('vehicles')
-            .select('id, year, make, model, vin, current_value')
+            .select('id, year, make, model, vin')
             .eq('id', vehicleId)
             .maybeSingle(),
           supabase
@@ -245,6 +245,13 @@ const BuildDashboard: React.FC = () => {
         </div>
       </div>
     );
+  }
+
+  // The books are the owner's: work orders are readable only by their customer and the shop's owners, so a visitor
+  // reads none and the meter could only show unknowns and a paid $0. With nothing readable, send the visitor to the
+  // vehicle's public page instead of drawing empty money widgets.
+  if (!error && workOrders.length === 0 && payments.length === 0) {
+    return <Navigate to={`/vehicle/${vehicleId}`} replace />;
   }
 
   return (

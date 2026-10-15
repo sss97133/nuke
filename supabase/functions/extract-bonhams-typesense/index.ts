@@ -24,6 +24,12 @@ import "jsr:@supabase/functions-js/edge-runtime.d.ts";
  *     → Typesense discovers URLs → archiveFetch (Firecrawl) archives raw HTML/markdown
  *     → Stored in listing_page_snapshots. "Fetch once, extract forever."
  *
+ *   POST { "mode": "land", "batch_size": 100 }
+ *     → One Typesense request (sorted oldest auction first), mapped and landed through extract-bonhams
+ *       (vehicles + vehicle_events + vehicle_observations with the source document retained). The page cursor is
+ *       the last landed page, read back from vehicle_events.metadata.ts_page; it wraps to page 1 after the last page
+ *       (a revisit). Run by pg_cron job bonhams-typesense-land. At most 1 request to Bonhams per run.
+ *
  *   POST { "mode": "stats" }
  *     → Return count of available cars and import_queue overlap
  *
@@ -96,14 +102,14 @@ function parseTitle(title: string): ParsedTitle {
   // Extract chassis/VIN from title
   // Patterns: "Chassis no. XXXXX", "Chassis no XXXXX", "VIN XXXXX"
   const chassisPatterns = [
-    /Chassis\s+no\.?\s+([A-Z0-9*-]+(?:\s+[A-Z0-9*-]+)?)/i,
+    /Chassis\s+no\.?\s+([A-Z0-9*][A-Z0-9*./-]*)/i,
     /VIN[:\s]+([A-HJ-NPR-Z0-9]{17})/i,
-    /Frame\s+no\.?\s+([A-Z0-9*-]+)/i,
+    /Frame\s+no\.?\s+([A-Z0-9*][A-Z0-9*./-]*)/i,
   ];
   for (const pat of chassisPatterns) {
     const m = title.match(pat);
     if (m) {
-      result.chassis = m[1].trim().toUpperCase();
+      result.chassis = m[1].trim().replace(/[./-]+$/, "").toUpperCase();
       break;
     }
   }
@@ -423,6 +429,148 @@ Deno.serve(async (req) => {
       });
     }
 
+    // ─── MODE: land ─────────────────────────────────────────────────────
+    if (mode === "land") {
+      const supabase = createClient(
+        Deno.env.get("SUPABASE_URL") ?? "",
+        projectSecretKey() ?? "",
+      );
+      const size = Math.min(Number(batch_size) || 100, 100);
+      // Newest sale first (2026-10-15): the first walk went oldest-first and landed 2003-2014; the calendar and the deep pass want the newest.
+      const SORT = "auctionEndDate.timestamp:desc";
+
+      let pageNo = Number(page) > 1 ? Number(page) : 0;
+      let pass = 0;
+      if (!pageNo) {
+        // The cursor is the furthest page of the newest pass (metadata.ts_pass, absent = pass 0), not the latest row written:
+        // a stray page-1 landing, or a failed read read as "nothing landed", used to send the walk back to page 1 (10:42Z
+        // 2026-10-15: 150 lots per 20 minutes became re-landing pages 1-4). A failed read now stops the run.
+        const { data: last, error: curErr } = await supabase
+          .from("vehicle_events")
+          .select("metadata")
+          .eq("source_platform", "bonhams")
+          .eq("extraction_source", "bonhams-typesense")
+          .eq("metadata->>ts_sort", "desc")
+          .not("metadata->>ts_page", "is", null)
+          .order("metadata->ts_pass", { ascending: false, nullsFirst: false })
+          .order("metadata->ts_page", { ascending: false })
+          .limit(1);
+        if (curErr) return okJson({ success: false, error: `cursor read failed: ${curErr.message}` }, 503);
+        const m = (last?.[0]?.metadata ?? {}) as Record<string, unknown>;
+        const lastPage = Number(m.ts_page);
+        pass = Number.isFinite(Number(m.ts_pass)) ? Number(m.ts_pass) : 0;
+        pageNo = Number.isFinite(lastPage) && lastPage > 0 ? lastPage + 1 : 1;
+      }
+
+      const fetchPage = (n: number) => {
+        const params = new URLSearchParams({
+          q: "*", query_by: "title", per_page: String(size), page: String(n),
+          filter_by: DEPARTMENT_FILTER, sort_by: SORT,
+        });
+        return fetch(`${TYPESENSE_HOST}/search-proxy/collections/${TYPESENSE_COLLECTION}/documents/search?${params}`, {
+          headers: { "X-TYPESENSE-API-KEY": TYPESENSE_API_KEY, "Accept": "application/json" },
+        });
+      };
+      let res = await fetchPage(pageNo);
+      if (res.status === 403 || res.status === 429) {
+        // Back off: nothing more is asked of Bonhams this run; the next scheduled run tries again.
+        return okJson({ success: false, backoff: true, upstream_status: res.status, page: pageNo });
+      }
+      if (!res.ok) return okJson({ success: false, error: `Typesense HTTP ${res.status}`, page: pageNo }, 502);
+      let data = await res.json() as TypesenseResponse;
+      if (!data.hits?.length && pageNo > 1) {
+        // Past the last page: wrap to page 1 (a revisit), 2 s after the previous request.
+        await new Promise((r) => setTimeout(r, 2000));
+        pageNo = 1;
+        pass += 1; // a new pass over the index: its cursor outranks every page of the last pass
+        res = await fetchPage(pageNo);
+        if (res.status === 403 || res.status === 429) return okJson({ success: false, backoff: true, upstream_status: res.status, page: pageNo });
+        if (!res.ok) return okJson({ success: false, error: `Typesense HTTP ${res.status}`, page: pageNo }, 502);
+        data = await res.json() as TypesenseResponse;
+      }
+
+      const totalPages = Math.max(1, Math.ceil(data.found / size));
+      if (!data.hits?.length) {
+        return okJson({ success: true, mode: "land", page: pageNo, landed: 0, found: data.found });
+      }
+
+      const observedAt = new Date().toISOString();
+      const lots = data.hits.filter((h) => h.document?.title && h.document.title.length >= 3).map((h) => {
+        const doc = h.document;
+        const m = mapDocument(doc);
+        const raw = m.raw_data as Record<string, unknown>;
+        const hammer = doc.price?.hammerPrice > 0 ? Math.round(doc.price.hammerPrice) : null;
+        const ended = !!doc.flags?.isAuctionEnded;
+        return {
+          url: m.listing_url,
+          title: m.listing_title,
+          year: m.listing_year,
+          make: m.listing_make,
+          model: m.listing_model,
+          vin: null,
+          chassis_number: (raw.chassis as string | null) ?? null,
+          mileage: null, engine: null, transmission: null, exterior_color: null, interior_color: null, body_style: null,
+          description: (raw.description as string | null) ?? null,
+          sale_price: hammer,
+          price_currency: doc.currency?.iso_code ?? null,
+          auction_status: hammer ? "sold" : (ended ? "unsold" : "upcoming"),
+          lot_number: doc.lotNo?.full || doc.lotId || null,
+          sale_id: doc.auctionId || null,
+          sale_name: null,
+          sale_date: doc.hammerTime?.datetime || doc.auctionEndDate?.datetime || null,
+          sale_location: doc.region?.name || doc.country?.name || null,
+          estimate_low: doc.price?.estimateLow > 0 ? doc.price.estimateLow : null,
+          estimate_high: doc.price?.estimateHigh > 0 ? doc.price.estimateHigh : null,
+          estimate_currency: doc.currency?.iso_code ?? null,
+          image_urls: doc.image?.url ? [doc.image.url] : [],
+          fetch_source: "bonhams-typesense",
+          cost_cents: 0,
+          event_key: doc.id,
+          ts_page: pageNo,
+          extra_metadata: {
+            ts_landed_at: observedAt,
+            ts_sort: "desc",
+            ts_pass: pass,
+            sale_key: `bonhams-${doc.auctionId}`,
+            auction_session_days: (doc.hammerTime?.datetime || doc.auctionEndDate?.datetime)
+              ? [String(doc.hammerTime?.datetime || doc.auctionEndDate?.datetime).slice(0, 10)] : [],
+            sale_starts_on: (doc as unknown as { biddableFrom?: { datetime?: string } }).biddableFrom?.datetime?.slice(0, 10) ?? null,
+            sale_ends_on: doc.auctionEndDate?.datetime?.slice(0, 10) ?? null,
+            sale_location: doc.region?.name || doc.country?.name || null,
+            country_code: doc.country?.code ?? null,
+            lot_unique_id: doc.lotUniqueId ?? null,
+            engine_number: (doc.catalogDesc || "").match(/Engine\s+no\.?\s*:?\s*([A-Z0-9*][A-Z0-9*./-]*)/i)?.[1]?.toUpperCase() ?? null,
+            registration: (doc.catalogDesc || "").match(/Registration\s+no\.?\s*:?\s*([^<\n]{2,20})/i)?.[1]?.trim() ?? null,
+            without_reserve: !!doc.flags?.isWithoutReserve,
+            bonhams_status: doc.status ?? null,
+          },
+          hammer_price: hammer,
+          hammer_premium: doc.price?.hammerPremium > 0 ? Math.round(doc.price.hammerPremium) : null,
+          // The source document is retained on the observation (raw_data); the page is stamped for the cursor.
+          raw_document: { ...doc, styledDescription: undefined, _capture: { source: "bonhams-typesense", observed_at: observedAt, ts_page: pageNo, sort: SORT } },
+        };
+      });
+
+      // Two calls of 50: one 100-lot call hit WORKER_RESOURCE_LIMIT (2026-10-15 01:41Z).
+      const landed: Record<string, unknown>[] = [];
+      let landOk = true;
+      for (let i = 0; i < lots.length; i += 50) {
+        const landRes = await fetch(`${Deno.env.get("SUPABASE_URL")}/functions/v1/extract-bonhams`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json", Authorization: req.headers.get("authorization") ?? "" },
+          body: JSON.stringify({ action: "land_lots", lots: lots.slice(i, i + 50), observed_at: observedAt }),
+        });
+        landOk = landOk && landRes.ok;
+        landed.push(await landRes.json().catch(() => ({ error: `HTTP ${landRes.status}` })));
+      }
+
+      // The cursor is metadata.ts_page on each landed vehicle_events row (set by the lander).
+      return okJson({
+        success: landOk, mode: "land", page: pageNo, total_pages: totalPages, found: data.found,
+        next_page: pageNo >= totalPages ? 1 : pageNo + 1, lander: landed,
+      });
+    }
+
     // ─── MODE: search ───────────────────────────────────────────────────
     if (mode === "search") {
       const data = await searchTypesense(query, startPage, perPage, filter || undefined);
@@ -692,7 +840,7 @@ Deno.serve(async (req) => {
       });
     }
 
-    return okJson({ success: false, error: `Unknown mode: ${mode}. Use "search", "ingest", "archive", or "stats".` }, 400);
+    return okJson({ success: false, error: `Unknown mode: ${mode}. Use "search", "ingest", "archive", "land" or "stats".` }, 400);
 
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : "Unknown error";

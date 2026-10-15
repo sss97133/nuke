@@ -16,8 +16,11 @@ const PAGE_SIZE = 60;
 export type AskRow = {
   event_id: string; vehicle_id: string; source: string; url: string | null;
   asking_price: number | null; tier: AskTier | null; first_seen_at: string; posted_at: string | null;
+  listed_at?: string | null; // least(posted_at, first_seen_at): when the listing went up (20261015070000)
   year: number | null; make: string | null; model: string | null; drivetrain: string | null; body_style: string | null;
   mileage: number | null; image: string | null;
+  // What the listing itself says (20261015080000): its stated miles, a disclosed odometer state, its title status.
+  listing_mileage?: number | null; odometer?: 'broken' | 'rolled_over' | null; title_status?: string | null; observation_id?: string | null;
   city: string | null; region: string | null; lat: number | null; lng: number | null; distance_mi: number | null;
   taste: number | null; in_band: boolean | null;
 };
@@ -27,6 +30,7 @@ export type AskPopulation = {
 };
 export type AskBoard = {
   as_of: string; since: string; window_hours: number; band_min_taste: number;
+  newest_at?: string | null; // the newest listed_at the caller can see in the window (20261015070000)
   population: AskPopulation; matching: number; rows: AskRow[];
 };
 export type AskBoardQuery = {

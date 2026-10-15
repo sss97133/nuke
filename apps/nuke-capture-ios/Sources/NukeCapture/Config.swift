@@ -33,14 +33,15 @@ enum Config {
     // here stopped working when the legacy API keys were disabled (key switch, 2026-10-14 05:28Z).
     static let supabaseAnonKey = "sb_publishable_jJ4IIdHqsgd7Gd5c55t-5g_SceqkkXU"
 
-    // Same bucket + path convention as the Mac relay. The path is shared on
-    // purpose: if the SAME photo reaches both devices (iCloud), the second
-    // upload hits the storage "already exists" tolerance and the row insert's
-    // duplicate tolerance — cross-device dedupe falls out of the path scheme.
+    // Content-addressed under the relay's folder: users/<userId>/capture-relay/<sha256>/<filename>.
+    // The path used to be the filename alone, but iPhone names wrap at IMG_9999 and repeat across
+    // years, so a new photo met an older photo's object, the upload's "already exists" tolerance
+    // passed, and its row pointed at the older bytes: 586 paths held rows of different photos
+    // (2026-10-15, 1,266 rows). Keyed by the bytes, "already exists" means the same photo, so the
+    // tolerance is true again, and the same photo from two devices still lands on one object.
     static let storageBucket = "vehicle-photos"
-    /// Storage prefix inside the bucket: users/<userId>/capture-relay/<filename>
-    static func storagePath(userId: String, filename: String) -> String {
-        "users/\(userId)/capture-relay/\(filename)"
+    static func storagePath(userId: String, sha256: String, filename: String) -> String {
+        "users/\(userId)/capture-relay/\(sha256)/\(filename)"
     }
 
     /// iOS: `source` column value — 'capture_relay_ios' (Mac uses
@@ -86,6 +87,12 @@ enum Config {
     static let maxPerRun = 200
     /// Dedupe seen-set cap in UserDefaults.
     static let seenSetCap = 1000
+    /// Assets already settled (uploaded, or definitively not this camera's), by PHAsset
+    /// localIdentifier, checked before any byte is read. Cap in UserDefaults (~45 B each).
+    static let seenAssetCap = 5000
+    /// Attempts an asset gets before a pass stops waiting on it. Without a limit one photo that
+    /// always fails held the watermark forever, and every open re-read the same originals.
+    static let maxAttemptsPerAsset = 3
     /// Steady-state fallback: how far sync() looks back when no watermark
     /// exists. First run proper is the IGNITION full-library scan
     /// (IgnitionEngine) — it sets the watermark to the scan moment and the

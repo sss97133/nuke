@@ -1920,6 +1920,35 @@ we have to collect and analyze the data to understand the odds."
    organizations it scores. The registry change is the data-model lane's; the needs above are its list.
 5. **The pitch is secondary.** It stays in `docs/POSITIONING.md` as one application of the function, not the goal.
 
+### 13.9.3 Attributed demand and contextual opportunities (owner, 2026-10-14 local)
+
+The owner broadened the classified-feed question beyond personal interest: model local, state, national and cultural
+value contexts and the ability to act; precompute useful supply/demand connections before a user joins. A public
+wanted post can express attributed demand without becoming a Nuke account or proof of current buying intent. Interest,
+request, available supply, contextual fit and financial opportunity have different evidence and outcomes. The owner
+asked agents to proceed independently, test the model through skeptical review, and repair useful missing relationships.
+
+The existing [opportunity matching specification](../../features/opportunity-matching/SPEC.md) now carries this general
+contract and preserves the funding case as dated history. Inspection found three differently grained owners:
+`demand_signal` measures aggregate search/interest; `taste_intent_signals` records user saves; `demand_briefs` carries
+concierge partner asks. None becomes a new external-request store. Attributed testimony and property vocabulary retain
+their existing observation/identity/curator owners; request episode, criteria, lifecycle, visibility and evaluation
+relationships remain named work.
+
+Independent review corrected two model errors: no known unmet criterion does not establish eligibility when required
+facts are unknown; and a registry of eligible businesses cannot supply the application denominator for funding odds.
+The first implementation extends `scripts/discovery/buying-evidence.mjs` with an explicit structured-request mode,
+using existing anonymous typed-specification and provenance readers. Required/preferred predicates return met, unmet,
+unknown or conflict with source IDs and clocks. Primitive record labels cannot satisfy a requirement. This is a bounded
+private operator consumer over 1–10 declared candidates, not a maintained public market feed or automatic request
+extraction. Availability, geographic/cultural ranking, economic outcomes and whole-market coverage remain unassessed.
+
+The correction assay preserves captured inputs and reevaluates the same request after discriminating evidence, with an
+unaffected candidate and earlier captured receipt retained. Such replay proves the evaluator, not historical canonical
+state reconstruction or fleet improvement. No production schema, request admission, source activation, contact or paid
+model calls are part of this implementation. Implementation/test/publication/runtime stages are recorded in the lane's
+private receipt; neither this contract nor a passing fixture establishes net newly ready public answers.
+
 ### 13.10 Used-vehicle buying evidence: resale reassurance and personal use (owner, 2026-10-08)
 
 **Owner direction, in substance.** A buyer comparing a truck at 94k miles and a higher price with one at
@@ -2211,3 +2240,245 @@ for housings (molded numbers) with the ECU's A/B labels mapped at the instance. 
 parts, each with its supplier page as source and no price. (d) #110 itself: signal, net, two segments mated at cavity
 w, every resolvable key filled, every unresolved one held with its text and reason. (e) Parity: the legacy query and
 the new rows return the same four wire ends; the diff is published with the change.
+
+#### 13.12.3 RSI passes 1 to 24: the model measures itself and fills its gaps (lead, 2026-10-14 and 15)
+
+Owner, on the reshape: "a bit light ... data model goes rsi". The loop each pass ran:
+1. Read the stack SH scoreboard (`v_harness_coverage`, per public vehicle and layer).
+2. Take the largest gap that existing evidence can close.
+3. Close it with a migration and a PG17 contract test.
+4. Re-measure live as a logged-out reader.
+
+Every pass has a receipt in `docs/wiring/receipts/` dated 2026-10-14.
+
+| Pass | Migration | Gap (before) | Evidence used | After (live) |
+|---|---|---|---|---|
+| 1 | 20261014113000 | no field-level evidence, no design state, options at plug grain only, no protection, no self-measurement | 783 k5-wiring observations; device_pin_maps; endpoint couplings | 450 decided / 138 candidate / 50 contradicted segments; 1,066 option links; 57 protected nets; 798 evidence links; stack SH + scoreboard |
+| 2 | 20261014123000 | cavity keys 0 / 884 | MILNEC 25-61 transcription (rings checked 1/6/12/19/23); MoTeC 65044 / 65045 | 295 / 884; 121 cited cavity rows |
+| 3 | 20261014133000 | baseline and residual missing | 65 factory-circuit facts landed through ingest-observation | factory rows keyed 27 / 62; carried 5, unassessed 13, baseline gap 23 |
+| 4 | 20261014143000 | 4 of 28 build-cited GM numbers unnamed; cavity and PDM keys unreadable to the public | ST 352 78 Circuit Tabulation pp. 8-11 (generated rows) | 129 circuits added (348 in all); 139 agree, 6 conflict; build-cited GM circuits named 28 / 28; cavity library and PDM tables readable to a logged-out reader |
+| 5 | 20261014153000 | one net joined battery + and a PDM output to ground | the fold's own node rule, stated as data | net GND-BANK-CAB superseded, 16 nets added (400 live); supply joined to ground 0 / 400; design loads on 12 nets (battery + 180 A, peak 200 A); protection unchanged at 57. The cab ground bank's return to the engine star now waits with the DC primary (its engine end is a PS-STUDS row) |
+| 6 | 20261014163000 | terminal keys 27, tool keys 211 / 884 | the build catalog (parts.yaml, tools.yaml) | 102 catalog rows added (27 already present); terminal keys 494 / 884, tool keys 403 / 884; key_harness_wire_ends() |
+| 7 | 20261014173000 | planned lengths never checked against geometry | twin positions on 98 plugs | 132 / 638 segments with both plugs positioned; 4 of the 15 with a plan are planned shorter than the straight line (PDM30 to Dakota VHX); harness views revoked of public write grants |
+| 8 | 20261014233000 | no record of any build step; the public key could write build_state (closed first, 20261014193000) | the build_state column's own transitions, logged by trigger | append-only harness_build_events; 0 / 390 decided wires with a recorded step (nothing cut yet) |
+| 9 | 20261014234500 | Deutsch DT/DTP plugs had no cavity layout | stored customconnectorkits pages for DT 2/6/8/12-way and DTP 2/4-way | 49 / 49 Deutsch ends keyed; cavity keys 344 / 884 |
+| 10 | 20261014235500 | measures carried no unit; the owner could not see the scoreboard | the measures themselves | a grain on every measure; owner MODEL tab on the wiring page |
+| (re-plan) | 20261015001000 | four PDM30 to Dakota VHX wires planned shorter than the straight line | the twin's L18 route, 43.4 in unpadded | 0 / 15 planned shorter; the cut pad stays downstream in the BOM |
+| 11 | 20261015003000 | a loader run that supersedes a wire would strand its segments silently | the loader's own supersession links | resync fold, called by the loader after every run; 0 / 638 live segments on superseded rows |
+| 12 | 20261015013000 | the route graph lived only in repo files; 132 plug positions were copied anchor coordinates, ten of them overtaken by the record | k5LandmarkPaths.ts and the landmark YAML; state rows 0ag, 0ah and section 4 | 51 live points, 12 fallen to successors; 7 of 32 branches standing; 435 / 884 wire ends at a node, 199 of them at a node not yet placed; 46 / 638 segments at standing positions; geometry check 0 / 3 |
+| 13 | 20261015023000 | the PDM15 pin map was not MoTeC's (21 of 37 rows wrong, 24 pins missing); 13 / 63 PDM-fed wires sat on an output their design does not name | MoTeC PDM manual, printed p.43 (PDF p.46) | pin map per the manual; protection fold (pin, else the output the design names); PDM-fed wires off their output 0 / 63; protected nets 57 to 62 |
+| 14 | 20261015033000 | wires landed in one pin were separate nets: 89 nets were pieces of 27 electrical nodes | the plugs' own cavity labels (case-sensitive: the 61-pin has F and f) | refold_harness_nets(); 338 live nets; 29 / 602 pin cavities shared |
+| 15 | 20261015043000 | no programmed limit or cited load on any PDM-fed net | the registry's pdm_settings (39 outputs) | 40 channels; PDM-fed nets with a limit 20 / 39 and with a load 20 / 39; 18 / 40 outputs waiting on a cited current; 1 / 40 in conflict; nets with a load 12 to 32 |
+| 16 | 20261015090000, writer re-issued 20261015093000 | the design's splices were not in the model, so 29 shared pins could not be told from crowded contacts | the registry's splices | harness_splices and members, loaded by the loader; shared pins with no splice the design names 29 / 29 to 0 / 29 (0 / 30 after pass 19); 144 / 148 conductors keyed |
+| 17 | (generator) | the registry could not be rebuilt from main (four inputs off main), so design changes were hand-patched | the generator's own inputs, copied in | a fresh main checkout rebuilds k5_registry.json byte-identical; #1238's hand-patched wires now agree with their BOM and readiness |
+| 18 | (generator) | 11 device terminals held several wires with no splice in the registry, though each device is marked a splice point | the endpoints' splice_point marks and open notes | 12 device-terminal splices listed (37 to 49): 7 with a MiniSeal part, 5 past the largest cavity with none; a 10 AWG zero-area bug in the sizing fixed |
+| 19 | 20261015100000 | 47 live wire ends of 21 decided wires sat on no segment (empty segments made before their ends existed), and no measure saw them | the wires' own live ends, by the reshape's rule | fill_harness_segment_ends(); wire ends on no segment 0 / 931; segments with both ends known 458 / 638 to 484 / 643; terminal keys 494 to 523, tool keys 403 to 418 |
+| 20 | 20261015104500 (re-issue of 20261015103000) | the fill check used the AWG formula and the crimp tool's colour bands | TE/Raychem SCD D-609-03/-04/-05 (CMA ranges) and D-436-60/-61 (CMA per gauge) | TE's figures put 2 / 34 checkable sides over (M130-B B16 group 1 7,248 and PDM30-A A24 6,956 against D-609-05's 6,755 CMA), both closed by pass 21; 0 / 56 after |
+| 21 | (generator) | 1 of 31 spliced pins named the lead into its contact, and splices were sized on the formula | TE's CMA figures; MoTeC PDM manual p.6 and p.48 (24-20 AWG on 8 A outputs); ProWire SSC-N (16-24 AWG) | every ECU/PDM pin splice names a 20 AWG pin lead; spliced pins with a named lead 1 / 31 to 19 / 31; B16, A24 and B8 split into groups; splices 49 to 53; sides the check cannot settle 31 / 64 to 12 / 68 |
+| 22 | 20261015110000 | passes 2 and 9 keyed cavities inline, so ends added later were never keyed (344 to 340) | the rules of passes 2 and 9 | key_harness_wire_end_cavities(), called by the loader; 18 ends and 13 housings keyed on its first run; cavity keys 340 to 358 / 931 |
+| 23 | (generator) | 18 of 40 PDM outputs had no cited running current | maker pages and manuals (Sanden SD7 p.14, E-Stopp kit page, RetroSound Motor 2B p.21, RVS mirror specs, MoTeC M130 page, Dakota VHX p.7 and GSS-3000 p.10) | outputs waiting on a cited current 18 / 40 to 12 / 40; PDM-fed nets with a load 20 / 39 to 26 / 39, with a limit 20 / 39 to 24 / 39; outputs in conflict 1 / 40 to 3 / 40 (the A/C clutch on 20 AWG; the radio on its 15 A maximum, which a bench figure closes) |
+| 24 | (generator) | the A/C clutch's cited 4.2 A needs a 6 A limit that its 20 AWG feed cannot carry, and MoTeC wants 24-20 AWG on an 8 A output | MoTeC PDM manual p.6, p.43, p.48; the treatment #64 got in round 4 | #23 moves to PDM15 OUT8 with two 20 AWG pigtails into an M81824/1-2 and an 18 AWG run; outputs in conflict 3 / 40 to 2 / 40. The load also showed that wires the loader adds get no segment (wire ends on no segment 0 to 1; segments on superseded rows 0 to 1): pass 25 |
+
+**What the loop found that no one asked about:**
+- **A short in the model.** It was found while folding loads. The reshape treated PS-STUDS (nine distinct studs) and
+  MARKER-LF (a lamp typed ground) as single nodes. The scoreboard now carries the physics check "nets that join a
+  supply to ground (must be 0)".
+- **Factory baseline gaps.** The build cites 23 GM circuits that the factory baseline has no keyed row for. The
+  baseline itself is thin.
+- **Six colour conflicts** between the 1973 manual and the 1978 chart: circuits 22, 67, 225, 231, 232 and 234. They are
+  recorded and not resolved.
+- **Unreadable keys.** Row security was on with no policy on the cavity library and the PDM tables.
+- **Impossible lengths.** Four wires from the PDM30 to the Dakota VHX were planned shorter than the straight line
+  between their plugs. They were re-planned from the twin's L18 route (20261015001000). Pass 12 then showed L18's own
+  PDM30 spot (twin assumption A2) was overtaken on 2026-09-29, so that plan's basis is stale. A driver-side PDM30 sits
+  nearer the Dakota box, so the plan errs long.
+- **The twin was overtaken.** Ten of its anchors were replaced by later rows of the record. The one 61-pin moved the
+  firewall crossing to the driver fuse-box hole; the M130 and PDM30 follow it; the coils are on the central
+  DEL-Stributor; the CKP is above the starter; the battery, alternator and O2 sensors moved. 24 of its 30 branches fell
+  with those points. Pass 12 keeps them all, superseded, and counts a plug's position only where its point stands.
+- **The PDM15 pin map was not MoTeC's.** It numbered outputs A1 to A15 in order. MoTeC's manual pairs the 20 A outputs
+  across pins (OUT1 = A1 + A10) and puts the 8 A outputs between them.
+- **Wires in one pin were separate circuits.** The fold joined wires only through bus plugs; 89 nets were pieces of 27
+  electrical nodes. The 8 marker and clearance feeds on PDM30 OUT19 were 8 nets.
+- **Paralleled outputs, on purpose.** PDM30 OUT17 and OUT18 meet at the floor dimmer's feed (receipt 2026-05-14). MoTeC
+  allows outputs in parallel when they are one type and share one condition (PDM manual printed p.6, pp.22-23); both
+  are 8 A outputs. MoTeC does not say how a trip on one behaves for the other.
+- **An output that cannot carry its load.** PDM30 OUT21 (door locks) needs 12 A; an 8 A output's setting caps at 10 A.
+- **The design record could not be rebuilt.** The registry's generator read four files that were not on main, so every
+  design change since late September was a hand patch, and the BOM drifted from the wires.
+- **The scoreboard was blind to ends off segments.** Every wire-end measure counted ends on live segments only, so 47
+  ends the loader added sat unseen until pass 19 counted them.
+- **Production refuses what the contracts allowed.** The production API refuses an UPDATE without a WHERE, even inside a
+  function (pg-safeupdate), and stack_needs objects must be table.column. Both broke a first deploy; each now has a
+  contract or a fixture constraint.
+- **New wires get no segment.** The reshape segmented the wires that existed on 2026-10-14; a wire the loader adds
+  later (the clutch's pigtails, pass 24) has no segment, and no measure counts decided wires without one.
+- **The crimp tool's colour bands are not the splice maker's ranges.** On TE's own figures two pin splices the formula
+  passed are over D-609-05 (M130-B B16's first group, 7,248 against 6,755 CMA).
+
+**Owed, as the scoreboard names it:**
+- Routing (0 segments routed). The graph is in the model (pass 12). Routing waits on placing the points the record
+  leaves open: the M130, PDM30, DEL-Stributor, CKP, battery, alternator and O2 sensors (199 wire ends). The M130 and
+  PDM30 spots are an engineering call (state row 0aj), and they need a free-space check in the driver kick panel first.
+- The DC primary's stud-to-stud topology. It waits on the power-spine re-draw.
+- PDM limits still waiting on a cited load current: 12 of 40 outputs, most with no published figure; each status names
+  the bench measurement that closes it (coil packs, starter solenoid, PCS ignition, blower, E-Stopp sense, iBooster
+  wake, radio ACC, horn, camera, washer solenoid, USB charger input).
+- Two outputs in conflict: PDM30 OUT11 (the radio's published 15 A maximum assumes its own speakers; a bench figure
+  closes it) and OUT21 (door locks, 9 A needing 12 A on an 8 A output; the actuators stall while a rocker is held, so
+  the pulse load wants a measured stall current before the 125 % rule is applied to it).
+- The 31 pin and group leads the design now names (RSI pass 21) as wire rows with cut lengths, so they reach the cut
+  list and the BOM.
+- The factory baseline's own completeness: 35 rows unkeyed and 23 cited circuits absent. The 1978 diagram pages are
+  images.
+- Cavity layouts for the families with none cited: GM 56-series blade, Metri-Pack, rings and kit terminals.
+- The leads into device terminals the design splices (the dimmer, door jambs, blower, tailgate switches, subwoofer):
+  the factory terminals' ranges are open. Five of those joins have no MiniSeal that fits (2 x 12, 2 x 14, 2 x 10 AWG).
+- Answers only the makers can give: the Superseal seal range against MoTeC's own 22 AWG Tefzel; two wires in one
+  Superseal contact; how paralleled PDM outputs trip.
+- The public map search still opens a device card (DeviceDetailPanel) with the April design's 61-pin pin map, 8 AWG
+  power and ground through the bulkhead, which the engine-only firewall rule retired.
+- Measured lengths (the outcome).
+
+### Recursive refinement: the original request must cross admission and readers (2026-10-11)
+
+**Owner direction, in substance.** Discussion must in parallel shape PostgreSQL, documentation and the
+Markdown methodology guiding the next agent. Artist, buyer and researcher are descriptions arising
+from behavior, not fixed audience categories. A progress function or proposal is not the completed model.
+
+**Bounded implemented case.** The existing engine-family proposal had a deterministic witness but no
+supported admission path. The prepared migration `20261011230939_retained_engine_family_intake.sql`
+extends existing PostgreSQL witness, tuple-validation and insertion functions, plus provenance output.
+The Edge selector accepts only the retained source ID and derives its claim from that source. The
+property must belong to the existing approved proposal and be ratified core vocabulary. A publisher's
+label stays separate from `engine_code`, with literal quote, source fingerprint, microsecond clocks
+and unknown engine identity/configuration/event time. No new table, stack entry, worker or replay is created.
+
+**Local evidence.** `scripts/test-engine-family-intake.sh` uses PostgreSQL 17 and the actual Edge handler
+with a narrow test transport. Both source and child enter through that handler. The unchanged selector
+fails before registration, still fails after synthetic curator review against old SQL, then succeeds
+after migration. Ten integrated steps verify actual anonymous provenance/canonical readers, same-ID
+retry, withdrawal/supersession/visibility refusal, error refusal, twenty SQL/TypeScript witness cases,
+preserved function attributes and idempotent reapplication. The existing intake suite reports 330
+passing tests; the enforced local repository gate passes. This is not deployed HTTP/PostgREST proof.
+
+**What the iteration corrected.** One reader called the inner value predicate, so the new registration
+gate moved to the shared predicate. Duplicate lookup bypassed insertion checks, so success now calls
+the existing result validator. Provenance output omitted identity/capture qualifiers, so those now
+survive that reader too. Questions, general-model assertions and engine labels in another part of a
+sentence were excluded from the family grammar. These observed failures refined code and methodology together.
+
+**Delivery and population boundary.** Implemented and locally tested; production approval, merge,
+deployment and runtime verification remain outstanding. The live proposal was still open on the
+dated read. This pass changes production coverage by zero; total eligibility and fleet gain were not
+measured. Automatic schema repair and the cross-domain behavior-to-role model remain unfinished.
+
+**Integration refresh, 2026-10-15 UTC.** PR #976 was resumed against current main. Live definitions
+showed newer native make/model admission and provenance qualifiers; the migration and disposable
+baseline now preserve them. The real-handler contract tests make admission before the migration,
+then make replay and model admission afterwards. Its service-call tests use the current secret-key
+contract and refuse publishable keys, legacy HS256 tokens and authenticated users. A local attack
+also showed that changing the family property's unit left one canonical claim readable; the shared
+predicate now refuses unit, parent and discriminator changes, and duplicate intake rechecks that
+same predicate. Existing testimony remains intact.
+
+The PostgreSQL 17 integration passes twelve steps, and the intake suite passes 351 tests with its
+opt-in integration test separately exercised. The enforced local gate passes. Read-only rechecking
+the proposal's four original source IDs at 00:35 UTC retains one M50 candidate and three refusals;
+these are original controls, not independent held-out accuracy or admitted production claims.
+
+Population boundary: the live atlas at 00:28 UTC estimates 1,014,519 stored vehicle records; public
+and engine-family-eligible totals remain unmeasured. Four source controls do not establish fleet
+coverage. Net newly usable production answers from this refresh: zero. The production proposal is
+still open; merge/deployment authorization and curator ratification remain separate held steps.
+
+### Live-market classifieds: what "ended" means (lane-live-market, 2026-10-15)
+
+A classified listing (Craigslist) has no close and no reserve. While the page reads, `vehicle_events.event_status` is
+`unknown`. When a revisit gets HTTP 404 for the post (measured 2026-10-15: posts from 2025 return 404 "Page Not Found"),
+the listing is `ended`, `ended_at` is the fetch time, and `metadata.removal` holds the evidence. That says the listing
+is gone, withdrawn, expired or sold off-site; the outcome is unknown, never a sale. A listing that scrolls off the first
+page of a search is not removed (only the first page is read), so absence from a search page is not evidence. The
+revisit rule (a landed post still on a search page is read again after 24 h) is the clock for this. A blank-model post is
+kept as an unresolved listing observation (`vehicle_id` NULL) and is not retried as a failure.
+
+### 13.13 A listing rises by what it is: the classified merit stack (owner, 2026-10-15)
+
+**Owner direction, in substance.** The arrivals feed is led by Craigslist "not cuz its good but cuz its easy. its
+boring to look at. that needs to be expressed in the very thread of the dna." Saying the listings are bad gets nowhere;
+the goal is to define in Postgres (keys, foreign keys, folds, larger group cross-analysis) the difference between a 1967
+Corvette for $22K and a 1971 Buick for $5,500, so leads surface "preference / hard code agnostic. they rise by way of
+what they are." The human explanation: a sick listing sells fast, "but not for us": the why has to be factual, with
+citation. Same night (to skylar-83): the benchmark is Barn Finds' "good deal, snatch this up", and the visualizer should
+teach the market by saying where each listing sits in our price analysis.
+
+**What was there.** The feed (`classified_ask_board`, Market tab "Just listed") ordered newest first, with a "band" sort
+on `compute_taste_score`: hand-typed weights (Chevrolet 40, Blazer 25, a Las Vegas bonus of 5). That is the hard code the
+owner names. Every row on 2026-10-15 was Craigslist (1,158 events since 10-13), because Craigslist is the one classified
+source landing listing events; 136 Facebook listings landed on 10-12/13 with no vehicle bound and none since.
+
+**The stack, layer by layer.**
+
+| Layer | Object | Grain, key, clock | State 2026-10-15 |
+|---|---|---|---|
+| Log | `vehicle_events` (classified listings), `marketplace_listings` (Facebook sweeps), `mv_treemap_outcomes` (recorded sales) | one listing / one recorded outcome; created_at / first_seen_at, sale_date | existing |
+| Key | `mv_model_family_names.family_id` (#1317, skylar-83) | make and model name -> canonical_models family, year range +/-1 | 494,210 of 681,551 public vehicles keyed |
+| Dimension | factory model family x model year | canonical_models | existing |
+| Fold / baseline | `mv_family_year_prices` (#1375) | family x model year x basis (sold, asked); narrowest 0/1/2/3/5-year window holding 10 prices, cited; conflicts counted | created empty; first build by the 09:40 UTC cron (load, see below) |
+| Residual / feature | `classified_ask_board.position` (#1382) | per listing: at_or_below among sales and among other asks, p25/p50/p75, n, venues, share; `position` sort | merges after the first build |
+| Prediction | `classified_ask_board.merit` from the active `listing_exit_models` row (#1380) | P(gone within 7 days of first sight) | no active model: the exit test failed (below) |
+| Outcome | `v_classified_exit_outcomes` (#1380) | per listing: first seen, last seen, exited_at, region, fate_7d | Facebook 3,777 exits Feb-Jun; Craigslist revisits from 10-15 (5 per 15 min) |
+
+**The identity guard (a raw-vs-model test inside the fold).** Of 469 recorded 1967 Corvette sales (model strings
+beginning "corvette"), 34 have their own source page naming a different car: Camaros, Chevelles, Impalas, a C10, a Nova,
+El Caminos. Of the six recorded at $22K or less, three are other cars (a C10 at $10,999, a custom sport truck at $3,450, a
+Mecum Chevelle at $16,000) and two are real project coupes ($16,500, $20,250). The fold refuses a sale whose page names its
+model year but not its family and counts it in `conflicts`, so the defect is measured fleet-wide and a cheap ask is not
+flattered by mislabeled sales. A page counts as naming the family if it carries any of the family's canonical_models
+phrases (name and aliases, 3+ characters): the first rule, the alias the name matched, refused 535 of 548 Wrangler sales
+whose pages read "2000-jeep-wrangler-82". Across 1962-72 the refused "Corvette" pages read Impala 38, Camaro 32, Chevelle
+16, Corvair 12, El Camino 10, Bel Air 9, Nova 7, Biscayne 7, C10 8. The record repair is the vehicle-identity owner's
+(supersession of `vehicles.model`). This stack realizes registered stacks SC (liquidity as an option) and S10 (liquidity
+surface) for classifieds; registering its needs in `stack_needs` is the next registry step.
+
+**The two cars, read with the fold's rules** (bounded reads 2026-10-15 ~04:50Z; the fold's first build is the
+authority). A 1967 Corvette asking $22,000: 435 recorded 1967 Corvette sales (Bring a Trailer 243, Mecum 37, Gooding 16,
+other 138), median $93,000 (p25 $70,641, p75 $132,000); 4 of 435 sold for $22,000 or less, so the ask sits under 431 of
+them, $71,000 below the median, in a single model year. The 1971 Electra 225 asking $5,500 (Sacramento, Craigslist): 17
+recorded Electra sales across 1969-73 (the window had to widen two years either side), median $17,500 (p25 $12,750); none
+at or below $5,500. Both asks sit at the bottom of their family's sales; what separates them is depth (435 sales in one
+model year against 17 across five), the dollars between ask and the middle ($71,000 against $12,000) and the multiple
+(4.2x against 3.2x). Among Facebook asks first seen in the last year the Corvette sits 5 of 16 (1965-69, median $31,250)
+and the Electra 4 of 10 (1968-74, median $8,000): a classified ask against auction sales mostly measures venue.
+
+**The owner's acceptance case** (skylar-83, his read of the top three in the feed, 04:15Z). 1965 Barracuda $29,500, "top
+dollar": 11 of 14 recorded 1965 Barracuda sales at or below, above the p75 ($28,375). 1999 Wrangler $14,000 at 178,000 mi,
+"right in the middle": 24 of 51 recorded 1999 Wrangler sales at or below (median $14,500), and 45 of 46 Facebook asks
+(median $5,500), so expensive for a classified. 1995 GMC K1500 $3,500 at 300,000 mi, "busted up": 6 recorded K1500 sales
+across 1990-2000 and 2 asks, so no position; GMC and Chevrolet K1500s are separate families today (a badge-twin gap in
+the key layer), and mileage is not a feature yet.
+
+**The exit test (the "sells fast" claim, measured).** Facebook listings keyed to a family with a known 7-day fate,
+restricted to the five weeks the removal sweep ran (2026-02-23, 03-02, 03-23, 03-30, 06-08; in other weeks only survivors
+have a known fate): 1,743 listings, 339 gone within 7 days (19.4%). Of those, 952 sit among 10+ earlier asks of their
+family (point-in-time, another vehicle, the fold's window rule). Train before 03-30, test after: position among asks gave
+a held-out AUC of 0.501 +/- 0.031 (price alone 0.541 +/- 0.028); the exit rate by ask position ran 23.1%, 21.7%, 17.6%,
+25.1%, 16.1% from the bottom fifth to the top. On this label, where an ask sits among its family's asks does not predict
+that it is gone in a week, so no `listing_exit_models` row is active and `merit` stays null. The label is weak (missing
+from a later sweep is not a sale) and small; the next tests are the sale position once the fold is built and Craigslist
+404 exits as they accrue. Scripts and the result: `scripts/stacks/classified-exit/`. Until a model beats chance on held-out
+exits, the feed's factual order is `position` (the share of the family's prices at or below the ask, lowest first): one
+measured quantity, labeled as what it is, never as "best deal".
+
+**Load, measured.** Production estimates the family join at 1 row (it is ~400,000), and with nested loops the planner
+paired every year row with every target year: a 0.5% sample ran past 10 s. Built without nested loops it reads `vehicles`
+once (parallel seq scan) and merge-joins on the family; the same query over 170,252 sales and 111,553 asks took 0.84 s on
+PostgreSQL 17 locally. Intake lanes were writing at deploy time (skylar-f7), so the view is created empty and the first
+build is the 09:40 UTC cron.
+
+**What is still missing.** Condition: the price follows condition, and condition comes from photos; 0 of 690 photos on 60
+recent Craigslist cars carry a condition read, so seller-declared condition (an attributed claim, `condition` on the
+board) is the only input until the on-demand Analyze path exists. Venue: a classified ask against auction sales mostly
+measures venue and condition, which is why the ask-vs-asks position leads and the sale position follows. Facebook
+classified listings do not reach the board (no vehicle binding since 10-13). Craigslist exits accrue at the revisit
+sweep's rate (5 posts per 15-minute run). Mileage is not yet a feature.

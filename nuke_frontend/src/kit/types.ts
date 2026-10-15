@@ -7,7 +7,7 @@ import type { VehicleIdentityToken } from '../utils/vehicleIdentity';
 export type Viewer = 'anon' | 'contributor' | 'owner';
 
 /** The five text roles. Their sizes live in kit.css and nowhere else. */
-export type Role = 'entity' | 'measure' | 'body' | 'caption' | 'label';
+export type Role = 'entity' | 'figure' | 'measure' | 'body' | 'caption' | 'label';
 
 /** Where a claim came from: the evidence class, and a pointer at the evidence. */
 export type Source = {

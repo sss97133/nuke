@@ -87,6 +87,9 @@ export interface BrowseStats {
   by_source: { source: string; count: number }[];
   by_era: { era: string; count: number }[];
   by_model: { model: string; count: number; avg_price: number }[];
+  /** When the counts were folded (mv_market_position), and over which vehicles; absent on the live aggregate. */
+  as_of?: string | null;
+  population?: string | null;
 }
 
 const DEFAULT_FILTERS: VehicleFilters = {

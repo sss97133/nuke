@@ -46,17 +46,6 @@ interface PinMapRow {
   device_model: string;
 }
 
-interface PartsReceptionRow {
-  part_number: string;
-  quantity_ordered: number;
-  quantity_received: number;
-  status: string;
-  unit_cost: number;
-  total_cost: number;
-  order_date: string;
-  actual_delivery_date: string;
-}
-
 interface WorkOrderPartRow {
   part_name: string;
   part_number: string;
@@ -75,7 +64,6 @@ interface Props {
   result: OverlayResult;
   devices: ManifestDevice[];
   pinMaps: Record<string, unknown[]>;
-  partsReception: unknown[];
   workOrderParts: unknown[];
   zoneColors: Record<string, string>;
   onClose: () => void;
@@ -83,7 +71,7 @@ interface Props {
 }
 
 export function DeviceDetailPanel({
-  device, wire, result, devices, pinMaps, partsReception, workOrderParts,
+  device, wire, result, devices, pinMaps, workOrderParts,
   zoneColors, onClose, onShowOnFormboard,
 }: Props) {
   // ── Device wires from overlay ──
@@ -103,14 +91,6 @@ export function DeviceDetailPanel({
     if (!device?.model_number) return [];
     return (pinMaps[device.model_number] ?? []) as PinMapRow[];
   }, [device, pinMaps]);
-
-  // ── Procurement data ──
-  const procurementData = useMemo((): PartsReceptionRow | null => {
-    if (!device?.part_number) return null;
-    return (partsReception as PartsReceptionRow[]).find(
-      p => p.part_number === device.part_number
-    ) ?? null;
-  }, [device, partsReception]);
 
   const workOrderData = useMemo((): WorkOrderPartRow[] => {
     if (!device?.part_number) return [];
@@ -230,20 +210,12 @@ export function DeviceDetailPanel({
 
             {/* ── Procurement Status ── */}
             <Section title="PROCUREMENT">
-              <Row label="PRICE" value={device.price ? `$${device.price.toFixed(2)}` : '—'} color={device.price ? C.text : C.muted} />
+              {device.price != null && <Row label="PRICE" value={`$${device.price.toFixed(2)}`} />}
               <Row
                 label="STATUS"
                 value={device.purchased ? 'PURCHASED' : 'NOT PURCHASED'}
                 color={device.purchased ? C.pass : C.fail}
               />
-              {procurementData && (
-                <>
-                  <Row label="ORDERED" value={String(procurementData.quantity_ordered)} />
-                  <Row label="RECEIVED" value={String(procurementData.quantity_received)}
-                    color={procurementData.quantity_received >= procurementData.quantity_ordered ? C.pass : C.warn} />
-                  <Row label="PROCUREMENT" value={procurementData.status?.toUpperCase() || '—'} />
-                </>
-              )}
               {workOrderData.length > 0 && workOrderData.map((wo, i) => (
                 <Row key={i} label={`WO PART ${i + 1}`} value={`${wo.quantity}× $${wo.unit_price}`} />
               ))}

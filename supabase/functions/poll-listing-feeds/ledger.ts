@@ -51,8 +51,10 @@
  * `failed` the same way, with no vehicle_id and the category read from the extractor's error, so it follows the same
  * schedule. It is never `skipped`, even when the error text contains a word the structural check looks for.
  *
- * Errors from `ingest` itself (HTTP failure, timeout on the poller's side) are not ledgered, as before: the next poll
- * asks again. Structural rejections (editorial, not a vehicle, implausible year, quality-gate) are `skipped`, as before.
+ * Errors from `ingest` itself (HTTP failure, timeout on the poller's side) enter the same failed/backoff schedule.
+ * Their landing outcome remains unknown, never complete or skipped. Otherwise a failed first URL can repeatedly
+ * consume a target's fair allocation and prevent its healthy siblings from being attempted.
+ * Structural rejections (editorial, not a vehicle, implausible year, quality-gate) remain `skipped`.
  */
 
 /** Columns of the vehicle row that show whether the extraction landed anything. `id` keys the batched read-back. */
@@ -86,6 +88,7 @@ export interface IngestOutcome {
   enrichment_error?: string | null;
   reason?: string | null;
   error?: string | null;
+  blip?: { observation?: string; observation_id?: string } | null;
   listing_capture?: {
     post_id?: string | null;
     capture_landing?: {
@@ -113,10 +116,12 @@ export interface LandedBatch {
 /** A ledger row as the known-URL lookup returns it. */
 export interface LedgerKnown {
   status: string;
+  vehicle_id?: string | null;
   attempts?: number | null;
   max_attempts?: number | null;
   next_attempt_at?: string | null;
   failure_category?: string | null;
+  processed_at?: string | null;
 }
 
 export type LedgerOutcome =
@@ -203,7 +208,26 @@ export function ledgerDecision(
   return "retry";
 }
 
+/**
+ * Revisit rule for a venue whose listings change after they land (a price drop, an edit): a `complete` ledger row whose
+ * last pass is older than `afterMs` and whose URL is still on a feed page is asked again, after every new URL and every
+ * due retry. `max` bounds the revisits one feed page may add. `ingest` finds the vehicle by its listing_url, keeps the
+ * snapshot, and an unchanged page adds no observation.
+ */
+export interface Revisit {
+  afterMs: number;
+  max: number;
+}
+
+export function revisitDue(row: LedgerKnown | null | undefined, now: Date, afterMs: number): boolean {
+  if (!row || row.status !== "complete") return false;
+  const at = row.processed_at ? Date.parse(row.processed_at) : NaN;
+  return Number.isFinite(at) && now.getTime() - at >= afterMs;
+}
+
 export interface IngestPlan {
+  /** Settled `complete` URLs due for a revisit. */
+  revisits?: number;
   /** New URLs first, then due retries, cut at the cap. */
   toIngest: string[];
   fresh: number;
@@ -221,23 +245,28 @@ export function planIngests(
   ledger: Map<string, LedgerKnown>,
   now: Date,
   cap: number,
+  revisit: Revisit | null = null,
 ): IngestPlan {
   const fresh: string[] = [];
   const retries: string[] = [];
+  const revisits: string[] = [];
   let settled = 0;
   let backoff = 0;
   for (const url of urls) {
     const d = ledgerDecision(ledger.get(url), now);
-    if (d === "settled") settled++;
-    else if (d === "backoff") backoff++;
+    if (d === "settled") {
+      if (revisit && revisitDue(ledger.get(url), now, revisit.afterMs) && revisits.length < revisit.max) revisits.push(url);
+      else settled++;
+    } else if (d === "backoff") backoff++;
     else if (d === "retry") retries.push(url);
     else if (onVehicles.has(url)) settled++;
     else fresh.push(url);
   }
   return {
-    toIngest: [...fresh, ...retries].slice(0, cap),
+    toIngest: [...fresh, ...retries, ...revisits].slice(0, cap),
     fresh: fresh.length,
     retries: retries.length,
+    revisits: revisits.length,
     settled,
     backoff,
   };
@@ -312,7 +341,22 @@ export function isEnrichmentFailedReject(ingest: IngestOutcome): boolean {
   return ingest.status === "rejected" && /^enrichment_failed\b/.test(String(ingest.reason ?? ""));
 }
 
+/**
+ * A post whose year, make or model could not be read (a seller who left the model blank: "75 datsun"). Measured
+ * 2026-10-15 on Craigslist, 10 h of post pages: 73 of 332 fetched pages (22%) ended here with no ledger row, so every
+ * poll fetched them again for as long as they stayed on a search page. They now take the failed schedule: a retry a day,
+ * final at max_attempts, so a transient extractor miss still gets its retries and a blank model stops costing requests.
+ */
+export function isIdentityInsufficientReject(ingest: IngestOutcome): boolean {
+  return ingest.status === "rejected" && /^insufficient identity\b/.test(String(ingest.reason ?? ""));
+}
+
 /** Rejections that will not change on a retry; the poller ledgers them `skipped`. */
+/** A Craigslist post kept as an unresolved listing observation (no model stated). Nothing to retry: the post is retained. */
+export function isUnresolvedBlip(ingest: IngestOutcome): boolean {
+  return ingest.status === "unresolved";
+}
+
 export function isStructuralReject(ingest: IngestOutcome): boolean {
   return (
     ingest.status === "rejected" &&
@@ -321,12 +365,14 @@ export function isStructuralReject(ingest: IngestOutcome): boolean {
   );
 }
 
-/** Whether this ingest result gets a ledger row at all. Errors do not: the next poll retries them. */
+/** Actual attempted errors receive a failed retry receipt, not a claim that ingestion landed or wrote nothing. */
 export function shouldLedger(ingest: IngestOutcome): boolean {
   return (
-    ["created", "matched", "duplicate"].includes(ingest.status ?? "") ||
+    ["created", "matched", "duplicate", "error"].includes(ingest.status ?? "") ||
     isStructuralReject(ingest) ||
-    isEnrichmentFailedReject(ingest)
+    isUnresolvedBlip(ingest) ||
+    isEnrichmentFailedReject(ingest) ||
+    isIdentityInsufficientReject(ingest)
   );
 }
 
@@ -353,13 +399,18 @@ export function ledgerWriteFor(input: {
   const { url, feedId, ingest, batch, prev, now } = input;
   if (!shouldLedger(ingest)) return null;
 
-  // A rejection has no vehicle to read back. Every other ledgered result has one, and must be read.
+  // A rejected/failed request need not return a vehicle. Its landing remains unknown even if an earlier row exists.
   let outcome: LedgerOutcome | null;
-  if (isEnrichmentFailedReject(ingest)) {
+  if (ingest.status === "error") {
+    const message = String(ingest.error || ingest.reason || "ingest request outcome unavailable");
+    outcome = { status: "failed", message, failure_category: failureCategoryFor(message), landed: null };
+  } else if (isEnrichmentFailedReject(ingest)) {
     const extractorError = String(ingest.enrichment_error ?? "").trim();
     const message = String(ingest.reason);
     outcome = { status: "failed", message, failure_category: failureCategoryFor(extractorError || message), landed: null };
-  } else if (isStructuralReject(ingest)) {
+  } else if (isIdentityInsufficientReject(ingest)) {
+    outcome = { status: "failed", message: String(ingest.reason), failure_category: "identity_insufficient", landed: null };
+  } else if (isUnresolvedBlip(ingest) || isStructuralReject(ingest)) {
     outcome = null;
   } else {
     outcome = ledgerOutcomeForIngest(ingest, readbackFor(ingest.vehicle_id, batch));
@@ -370,15 +421,17 @@ export function ledgerWriteFor(input: {
   const row: Record<string, unknown> = {
     listing_url: url,
     status,
-    vehicle_id: ingest.vehicle_id ?? null,
+    vehicle_id: ingest.vehicle_id ?? (ingest.status === "error" ? prev?.vehicle_id : null) ?? null,
     processed_at: now.toISOString(),
     raw_data: {
       feed_id: feedId,
       ingested_via: "poll_firecrawl_html",
       ingest_status: ingest.status,
+      ...(ingest.status === "error" ? { ingest_result_unknown: true } : {}),
       ...(landed ? { landed } : {}),
       ...(ingest.enrichment_error ? { enrichment_error: String(ingest.enrichment_error).slice(0, 200) } : {}),
       ...(ingest.reason ? { reject_reason: String(ingest.reason).slice(0, 200) } : {}),
+      ...(ingest.blip?.observation_id ? { blip_observation_id: ingest.blip.observation_id } : {}),
     },
   };
 
@@ -429,7 +482,7 @@ export function intakeThrottle(raw: unknown = {}): IntakeThrottle {
     max_ingests: limit(value.max_ingests, 20, 100), sources: normalized };
 }
 
-export function selectIntakeFeeds<T extends { source_slug: string; last_polled_at?: string | null; poll_interval_minutes?: number | null; last_error?: string | null; error_count?: number | null }>(
+export function selectIntakeFeeds<T extends { source_slug: string; last_polled_at?: string | null; poll_interval_minutes?: number | null; last_error?: string | null; error_count?: number | null; search_criteria?: { tier?: unknown } | null }>(
   feeds: T[], limit: number, throttle: IntakeThrottle, now: number, force = false,
 ): T[] {
   const groups = new Map<string, T[]>();
@@ -448,6 +501,9 @@ export function selectIntakeFeeds<T extends { source_slug: string; last_polled_a
     const group = groups.get(feed.source_slug) ?? [];
     group.push(feed); groups.set(feed.source_slug, group);
   }
+  // Within a source, a lower tier (search_criteria.tier) is selected first; the order inside a tier stays oldest-poll-first.
+  const tierRank = (f: T) => { const t = Number(f.search_criteria?.tier); return Number.isInteger(t) && t >= 1 && t <= 9 ? t : 9; };
+  for (const group of groups.values()) group.sort((a, b) => tierRank(a) - tierRank(b));
   // Oldest due source first, then round-robin. Hundreds of metro feeds must
   // not take every slot ahead of a single auction-house feed.
   const selected: T[] = [];
@@ -465,9 +521,12 @@ export function selectIntakeFeeds<T extends { source_slug: string; last_polled_a
 export function createIntakeBudget(throttle: IntakeThrottle, startedAt: number, clock = Date.now) {
   let attempted = 0;
   let sourceShare = 20;
+  // Revisits (a landed post asked again) may take at most a quarter of an invocation's ingests: new posts come first.
+  let revisitsLeft = Math.floor(throttle.max_ingests / 4);
   const sources = new Map<string, { attempted: number; estimate_ms: number; hold: string | null }>();
   const state = (source: string) => {
-    if (!sources.has(source)) sources.set(source, { attempted: 0, estimate_ms: 15_000, hold: null });
+    // Craigslist ingests and search pages are short (1-3 s): a 15 s starting estimate reserved 32 s of every run for nothing.
+    if (!sources.has(source)) sources.set(source, { attempted: 0, estimate_ms: source === "craigslist" ? 5_000 : 15_000, hold: null });
     return sources.get(source)!;
   };
   const remainingMs = () => Math.max(0, startedAt + 110_000 - clock());
@@ -481,7 +540,18 @@ export function createIntakeBudget(throttle: IntakeThrottle, startedAt: number, 
     return null;
   };
   return {
+    /** How many revisits this feed page may still plan; spendRevisits() takes them off after planning. */
+    revisitAllowance() { return revisitsLeft; },
+    spendRevisits(n: number) { revisitsLeft = Math.max(0, revisitsLeft - n); },
     shareAcrossSources(count: number) { sourceShare = Math.max(1, Math.ceil(throttle.max_ingests / Math.max(1, count))); },
+    // A source's fair share is still too large for one busy target to spend
+    // before the other selected feeds get a turn. Recompute from unspent
+    // slots so empty or held feeds leave their allocation to later targets.
+    feedAllowance(remainingTargets: number, maximum: number): number {
+      if (!Number.isInteger(remainingTargets) || remainingTargets < 1
+        || !Number.isInteger(maximum) || maximum < 0) throw new Error("invalid feed allocation");
+      return Math.min(maximum, Math.ceil(Math.max(0, throttle.max_ingests - attempted) / remainingTargets));
+    },
     reserve(source: string): { timeout_ms: number } | null {
       if (refusal(source)) return null;
       attempted++; state(source).attempted++;

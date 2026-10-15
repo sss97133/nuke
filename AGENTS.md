@@ -90,6 +90,13 @@ recognize relationships from retained evidence, find the existing owner, impleme
 repair and prove its consumer. Configuration is one application; a diagnostic report alone does
 not close the work. The bounded discovery assays are operator tools, not autonomous write authority.
 
+Recursive work must return to its original failed question after each repair. Test the actual intake,
+PostgreSQL admission and consumer together; a registered property or a successful duplicate lookup is
+insufficient. Recheck withdrawal, supersession and source visibility through every affected reader.
+Carry the next observed gap into code and the methodology together, preserving deployment holds.
+Roles such as artist, buyer and researcher describe evidenced behavior in context; do not turn them
+into permanent identity types or mandatory arrival choices without a separate model decision.
+
 ## Invariants
 1. **Facts are never invented.** Every datum carries its source, method, observed_at and trust.
    "Unknown" is an answer; a guess is not.
@@ -109,6 +116,10 @@ not close the work. The bounded discovery assays are operator tools, not autonom
   - One migration per commit per push: CI applies only the last commit's new files.
   - Set `statement_timeout` and `lock_timeout` in any migration that can wait on a lock (the pooler
     default is 10 s).
+  - Create a simple view in `public` (one table, no aggregate) `WITH (security_invoker = true)`. The
+    `view_write_guard` event trigger fails a statement that leaves a view there running as its owner
+    while anon or authenticated can write through it; its migration,
+    `supabase/migrations/20261014214500_view_write_guard.sql`, lists the cases.
   - Verify it live after the run.
 - **Edge functions.** Same path; CI deploys the function folders the commit changed. A function that
   writes calls `requireWriteAuth` (`supabase/functions/_shared/writeGuard.ts`), and
@@ -167,4 +178,4 @@ open them by path:
 - `wiring-receipt.md` and `wiring-wire-closure-protocol.md` for `docs/wiring/`.
 - `apps/nuke-capture-ios/README.md`, section "The room", for the iOS app (sub-folder `CLAUDE.md` files are
   gitignored, so the README is the tracked home).
-- `production-engineering.md`, which applies everywhere.
+- `production-engineering.md` and `liveness-and-intent.md`, which apply everywhere.

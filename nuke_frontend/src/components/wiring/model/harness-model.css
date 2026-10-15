@@ -1,0 +1,7 @@
+/* The MODEL tab pane: fills the workspace and scrolls; type, borders and spacing inside come from the kit. */
+.harness-model {
+  position: absolute;
+  inset: 0;
+  overflow: auto;
+  padding: 0 12px 24px;
+}

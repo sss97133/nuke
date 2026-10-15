@@ -19,6 +19,7 @@
 import { createClient } from "jsr:@supabase/supabase-js@2";
 import { requireOwnerOrService, requireWriteAuth } from "../_shared/writeGuard.ts";
 import { projectSecretKey } from "../_shared/supabaseKeys.ts";
+import { geminiFetch } from '../_shared/geminiGuard.ts';
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -330,11 +331,16 @@ async function getImageAsBase64(storagePath: string): Promise<{ base64: string; 
   return { base64: await bufferToBase64(buffer), mediaType: resp.headers.get("content-type") || "image/jpeg" };
 }
 
-function getImageUrl(storagePath: string): string {
-  if (storagePath.startsWith("http://") || storagePath.startsWith("https://")) {
-    return storagePath;
-  }
-  return `${Deno.env.get("SUPABASE_URL")}/storage/v1/object/public/deal-documents/${storagePath}`;
+// A URL a vision API can fetch: a deal-documents file (a relative path, or a stored storage URL to any bucket) is
+// signed for 10 minutes, since the document buckets are private (2026-10-15); another host's URL passes through.
+async function getImageUrl(storagePath: string): Promise<string> {
+  const match = storagePath.match(SUPABASE_STORAGE_RE);
+  const isUrl = storagePath.startsWith("http://") || storagePath.startsWith("https://");
+  if (isUrl && !match) return storagePath;
+  const [bucket, path] = match ? [match[1], decodeURIComponent(match[2])] : ["deal-documents", storagePath];
+  const { data } = await supabase.storage.from(bucket).createSignedUrl(path, 600);
+  if (data?.signedUrl) return data.signedUrl;
+  return isUrl ? storagePath : `${Deno.env.get("SUPABASE_URL")}/storage/v1/object/public/deal-documents/${storagePath}`;
 }
 
 // ─── CLASSIFICATION (Gemini Flash — free tier) ─────────────────────────────
@@ -343,8 +349,8 @@ async function classifyWithGemini(base64Image: string): Promise<any> {
   const apiKey = Deno.env.get("GOOGLE_AI_API_KEY");
   if (!apiKey) throw new Error("GOOGLE_AI_API_KEY not configured");
 
-  const response = await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`,
+  const response = await geminiFetch(
+    `https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent?key=${apiKey}`,
     {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -358,7 +364,7 @@ async function classifyWithGemini(base64Image: string): Promise<any> {
         generationConfig: { temperature: 0.1, maxOutputTokens: 1000 },
       }),
     }
-  );
+  , 'document-ocr-worker');
 
   if (!response.ok) {
     const err = await response.text();
@@ -468,7 +474,7 @@ async function classifyDocument(storagePath: string): Promise<{ document_type: s
 
   // Last resort: GPT-4o
   try {
-    const imageUrl = getImageUrl(storagePath);
+    const imageUrl = await getImageUrl(storagePath);
     const result = await classifyWithGPT4o(imageUrl);
     return { ...result, provider: "openai" };
   } catch (e) {
@@ -612,7 +618,7 @@ async function extractWithXAI(imageUrl: string, docType: string): Promise<any> {
 
 async function extractDocument(storagePath: string, docType: string): Promise<any> {
   const { base64, mediaType } = await getImageAsBase64(storagePath);
-  const imageUrl = getImageUrl(storagePath);
+  const imageUrl = await getImageUrl(storagePath);
   const errors: string[] = [];
 
   // Try Claude Sonnet first (best at dense document OCR)

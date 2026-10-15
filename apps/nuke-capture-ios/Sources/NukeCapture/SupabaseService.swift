@@ -486,6 +486,24 @@ enum SupabaseService {
     /// the contributor firewall both decide this before calling.
     /// `appleMLLabels` is sent on BOTH paths so the server L2 vision gate stops
     /// being starved of the cheap on-device classification it needs.
+    /// True when the server refused who we are, not this photo: a rejected or expired session, or
+    /// a key the gateway no longer accepts ("Legacy API keys are disabled", 2026-10-14). A pass
+    /// that hits one stops, instead of reading and failing every remaining original.
+    nonisolated static func isAuthFailure(_ error: Error) -> Bool {
+        if error is AuthError { return true }
+        if let e = error as? HTTPError { return e.response.statusCode == 401 }
+        if let e = error as? PostgrestError {
+            if e.code == "PGRST301" || e.code == "PGRST302" { return true }
+            return e.message.lowercased().contains("jwt")
+        }
+        if let e = error as? StorageError {
+            if e.statusCode == "401" { return true }
+            let m = e.message.lowercased()
+            return m.contains("jwt") || m.contains("api key")
+        }
+        return false
+    }
+
     static func uploadPhoto(data: Data, meta: PhotoMeta, userId: String,
                             uploadPixels: Bool, appleMLLabels: [String]) async throws {
         let mime = mimeType(forFilename: meta.filename)
@@ -500,14 +518,16 @@ enum SupabaseService {
         var status = "skipped"
 
         if uploadPixels {
-            let path = Config.storagePath(userId: userId, filename: meta.filename)
+            // SHA-256 of the bytes, lowercase hex: it names the object, so it comes first.
+            let hash = SHA256.hash(data: data).map { String(format: "%02x", $0) }.joined()
+            let path = Config.storagePath(userId: userId, sha256: hash, filename: meta.filename)
             do {
                 try await client.storage
                     .from(Config.storageBucket)
                     .upload(path, data: data, options: FileOptions(contentType: mime, upsert: false))
             } catch {
-                // Same tolerance as the daemon: object already in the bucket is
-                // fine — we still want the DB row (it may have failed last run).
+                // The path is the bytes' hash, so an object already there is this same photo
+                // (an earlier run, or another device); we still want the row.
                 let msg = String(describing: error).lowercased()
                 guard msg.contains("already exists") || msg.contains("duplicate") else { throw error }
             }
@@ -516,8 +536,7 @@ enum SupabaseService {
                 .from(Config.storageBucket)
                 .getPublicURL(path: path).absoluteString
             storagePath = path
-            // SHA-256 of the uploaded bytes — lowercase hex string.
-            fileHash = SHA256.hash(data: data).map { String(format: "%02x", $0) }.joined()
+            fileHash = hash
             status = "pending"
         }
 
@@ -558,3 +577,33 @@ enum SupabaseService {
         }
     }
 }
+
+/// Why a read failed, in plain words, from the error itself. Every failed read used to say "Check
+/// your connection", including the board's server timeouts (2026-10-15: HTTP 500 after 17 s on a
+/// working network), which sent the reader to the wrong cause.
+enum ReadFailure {
+    nonisolated static func text(_ error: Error) -> String {
+        if let u = error as? URLError {
+            switch u.code {
+            case .notConnectedToInternet, .networkConnectionLost, .dataNotAllowed, .internationalRoamingOff:
+                return "No network connection."
+            case .timedOut:
+                return "The server did not answer in time."
+            default:
+                return "The request failed (\(u.code.rawValue))."
+            }
+        }
+        if SupabaseService.isAuthFailure(error) { return "The server refused this sign-in. Sign in again." }
+        if let e = error as? HTTPError {
+            return e.response.statusCode >= 500
+                ? "The server failed to answer (HTTP \(e.response.statusCode)). Retry usually works."
+                : "The server refused the read (HTTP \(e.response.statusCode))."
+        }
+        if let e = error as? PostgrestError, e.code == "57014" {
+            return "The database ran out of time on this read."
+        }
+        if error is DecodingError { return "The answer arrived in a shape this build cannot read." }
+        return "The read failed: \(error.localizedDescription)"
+    }
+}
+

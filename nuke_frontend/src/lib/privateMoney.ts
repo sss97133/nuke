@@ -10,6 +10,20 @@ import { supabase } from './supabase';
 export const ORGANIZATION_VEHICLE_PRIVATE_COLUMNS = ['cost_basis', 'sale_price', 'asking_price', 'internal_notes'] as const;
 export const VEHICLE_PRIVATE_COLUMNS = ['purchase_price', 'purchase_date', 'purchase_location'] as const;
 
+// A third party's name and contact on a vehicle are personal details, never public. They are not granted to
+// anon or authenticated (migration 20261014160500_owner_contact_columns_owner_only), the same column grant as the
+// money above; the whole-row readers vehicle_row_read and get_vehicle_profile_data null them for every non-owner.
+// Kept apart from the money so each list reads true, and scanned by privateMoney.test.ts the same way.
+export const VEHICLE_OWNER_PII_COLUMNS = ['owner_name', 'owner_contact'] as const;
+
+// A transfer's party access tokens are the party credential, and inbox_email and the parties' emails and phones are
+// personal contact. None are granted to anon or authenticated (migration
+// 20261014190000_transfer_party_credentials_owner_only): a read that names one, or selects '*' on the table, fails
+// for every visitor. The /t/ page learns its role through transfer_party_role, and the admin dashboard reads the
+// link fields through transfer_admin_links. Scanned by privateMoney.test.ts the same way.
+export const OWNERSHIP_TRANSFER_PRIVATE_COLUMNS = ['buyer_access_token', 'seller_access_token', 'inbox_email',
+  'buyer_email', 'seller_email', 'buyer_phone', 'seller_phone'] as const;
+
 export interface OrganizationVehicleBook {
   id: string;
   vehicle_id: string;

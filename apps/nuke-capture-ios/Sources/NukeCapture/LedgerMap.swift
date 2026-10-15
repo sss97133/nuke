@@ -183,7 +183,7 @@ struct LedgerMapView: View {
             }
             GeometryReader { geo in
                 if failed {
-                    ContentUnavailableView { Label("Couldn't read the ledger's views", systemImage: "wifi.exclamationmark") } actions: {
+                    ContentUnavailableView { Label("Couldn't read the ledger's views", systemImage: "exclamationmark.triangle") } actions: {
                         Button("Retry") { Task { await load() } }
                     }
                 } else if isLeaf {

@@ -39,6 +39,9 @@ CREATE TABLE public.vehicle_contributors (vehicle_id uuid, user_id uuid, role te
 CREATE TABLE public.timeline_events (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(), vehicle_id uuid, event_type text, event_date date,
   created_at timestamptz DEFAULT now());
+CREATE TABLE public.vehicle_observations (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(), vehicle_id uuid, kind text, content_text text, source_url text,
+  extraction_method text, observed_at timestamptz, is_superseded boolean, structured_data jsonb);
 CREATE TABLE public.test_price_facts (
   vehicle_id uuid PRIMARY KEY, price_kind text, price_amount numeric, price_as_of timestamptz,
   price_live boolean, platform text, source_url text);
@@ -67,6 +70,9 @@ CREATE POLICY "Anyone can view evidence" ON public.field_evidence FOR SELECT
   USING (auth.role() = 'authenticated'
     OR (coalesce(source_type, '') <> ALL (ARRAY['quickbooks', 'invoice', 'email_receipt', 'receipt', 'bank_statement', 'card_statement'])
         AND coalesce(field_name, '') <> ALL (ARRAY['seller_name', 'seller_profile_url', 'seller_phone', 'seller_email', 'buyer_name'])));
+ALTER TABLE public.vehicle_observations ENABLE ROW LEVEL SECURITY;
+CREATE POLICY public_listing_obs ON public.vehicle_observations FOR SELECT
+  USING (kind = 'listing' AND EXISTS (SELECT 1 FROM public.vehicles v WHERE v.id = vehicle_observations.vehicle_id AND v.is_public = true));
 ALTER TABLE public.timeline_events ENABLE ROW LEVEL SECURITY;
 CREATE POLICY public_vehicle_events ON public.timeline_events FOR SELECT
   USING (EXISTS (SELECT 1 FROM public.vehicles v WHERE v.id = timeline_events.vehicle_id AND v.is_public = true));
@@ -80,6 +86,7 @@ GRANT SELECT ON ALL TABLES IN SCHEMA public TO anon, authenticated, service_role
 \ir ../migrations/20261013143000_vehicle_profile_read.sql
 \ir ../migrations/20261013144500_vehicle_profile_read_acronyms.sql
 \ir ../migrations/20261013161500_vehicle_profile_read_timeline.sql
+\ir ../migrations/20261015070000_vehicle_profile_read_description.sql
 
 -- Seeds. v1: the documented case; v2: nothing recorded; v3: a sourceless odometer; v4: private;
 -- v5: a classified asking price; v6: competing evidence; v7: a live auction bid.
@@ -240,6 +247,24 @@ SET test.auth_uid = '20000000-0000-0000-0000-000000000004';
 SELECT public.t_assert(public.vehicle_profile_read('10000000-0000-0000-0000-000000000004')->>'viewer' = 'owner', 'a private vehicle reads for its user');
 SET test.auth_uid = '20000000-0000-0000-0000-000000000009';
 SELECT public.t_assert(public.vehicle_profile_read('10000000-0000-0000-0000-000000000004') IS NULL, 'a private vehicle reads as NULL for another user');
+RESET ROLE;
+
+-- 2b. The full description: the newest readable description capture, with its source; null when none; a private vehicle's
+-- capture is not shown; superseded and non-capture listing rows are skipped.
+-- ALLOW_RAW_TESTIMONY_WRITE: synthetic fixture rows in a disposable contract database, never production.
+INSERT INTO public.vehicle_observations (vehicle_id, kind, content_text, source_url, extraction_method, observed_at, is_superseded, structured_data) VALUES
+ ('10000000-0000-0000-0000-000000000001', 'listing', 'old prose', 'https://example.test/lot', 'html_description_capture', '2026-01-01', false, '{"description_capture": true}'),
+ ('10000000-0000-0000-0000-000000000001', 'listing', 'The newest full prose of the listing.', 'https://example.test/lot', 'html_description_capture', '2026-02-01', false, '{"description_capture": true}'),
+ ('10000000-0000-0000-0000-000000000001', 'listing', 'superseded prose that is newest', 'https://example.test/lot', 'html_description_capture', '2026-03-01', true, '{"description_capture": true}'),
+ ('10000000-0000-0000-0000-000000000001', 'listing', 'a listing row that is not a description', 'https://example.test/lot', 'x', '2026-04-01', false, '{}'),
+ ('10000000-0000-0000-0000-000000000004', 'listing', 'private prose', 'https://example.test/p', 'x', '2026-01-01', false, '{"description_capture": true}');
+SET ROLE anon;
+SELECT public.t_assert(public.vehicle_profile_read('10000000-0000-0000-0000-000000000001')->'description'->>'text' = 'The newest full prose of the listing.', 'description: newest live capture');
+SELECT public.t_assert((public.vehicle_profile_read('10000000-0000-0000-0000-000000000001')->'description'->>'length')::int = 37
+  AND public.vehicle_profile_read('10000000-0000-0000-0000-000000000001')->'description'->'source'->>'url' = 'https://example.test/lot'
+  AND public.vehicle_profile_read('10000000-0000-0000-0000-000000000001')->'description'->>'observed_at' IS NOT NULL, 'description: length, source and clock');
+SELECT public.t_assert(public.vehicle_profile_read('10000000-0000-0000-0000-000000000002')->'description' = 'null'::jsonb, 'description: null when no capture');
+SELECT public.t_assert(jsonb_array_length(public.vehicle_profile_read('10000000-0000-0000-0000-000000000001')->'sections') >= 1, 'description: sections untouched');
 RESET ROLE;
 
 -- 3. Grants: anon and authenticated may execute; nothing else may.

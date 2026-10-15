@@ -15,6 +15,7 @@ import { useOverlayCompute } from '../components/wiring/useOverlayCompute';
 import { DeviceDetailPanel } from '../components/wiring/DeviceDetailPanel';
 import { CommandPalette } from '../components/wiring/CommandPalette';
 import { useDRC } from '../components/wiring/useDRC';
+import HarnessModelView from '../components/wiring/model/HarnessModelView';
 
 // Tab views are lazy-loaded so initial paint only pays for the active tab.
 // The 3D tab pulls Three.js (~2.7MB), schematics/data/topology each have their
@@ -67,7 +68,7 @@ const ZONE_COLORS: Record<string, string> = {
   underbody: '#666666',
 };
 
-type ViewTab = 'formboard' | 'schematics' | '3d' | 'data' | 'topology' | 'workbench' | 'connectors' | 'map';
+type ViewTab = 'formboard' | 'schematics' | '3d' | 'data' | 'topology' | 'workbench' | 'connectors' | 'map' | 'model';
 const TABS: { id: ViewTab; label: string; key: string }[] = [
   { id: 'formboard', label: 'FORMBOARD', key: '1' },
   { id: 'schematics', label: 'SCHEMATICS', key: '2' },
@@ -77,6 +78,7 @@ const TABS: { id: ViewTab; label: string; key: string }[] = [
   { id: 'workbench', label: 'WORKBENCH', key: '6' },
   { id: 'connectors', label: 'CONNECTORS', key: '7' },
   { id: 'map', label: 'MAP', key: '8' },
+  { id: 'model', label: 'MODEL', key: '9' },
 ];
 
 // ── Camera state per view ─────────────────────────────────────────────
@@ -142,7 +144,6 @@ export default function WiringPlan() {
 
   // ── Supabase queries for detail panel ──
   const [pinMaps, setPinMaps] = useState<Record<string, unknown[]>>({});
-  const [partsReception, setPartsReception] = useState<unknown[]>([]);
   const [workOrderParts, setWorkOrderParts] = useState<unknown[]>([]);
 
   // ── DRC (must be after pinMaps declaration) ──
@@ -199,18 +200,12 @@ export default function WiringPlan() {
     loadPinMaps();
   }, []);
 
-  // ── Load procurement data once ──
+  // ── Procurement is the owner's: work-order parts carry prices, so only the row owner reads them. parts_reception
+  // is not read at all: no browser role holds a grant on it (every read was a 401, the owner's too). ──
   useEffect(() => {
-    async function loadProcurement() {
-      const [prRes, woRes] = await Promise.all([
-        supabase.from('parts_reception').select('*'),
-        supabase.from('work_order_parts').select('*'),
-      ]);
-      if (prRes.data) setPartsReception(prRes.data);
-      if (woRes.data) setWorkOrderParts(woRes.data);
-    }
-    loadProcurement();
-  }, []);
+    if (!isRowOwner) return;
+    supabase.from('work_order_parts').select('*').then(({ data }) => { if (data) setWorkOrderParts(data); });
+  }, [isRowOwner]);
 
   // ── Click handlers ──
   const handleDeviceClick = useCallback((deviceId: string, shiftKey?: boolean) => {
@@ -365,9 +360,9 @@ export default function WiringPlan() {
         {/* The chips below come from the older compute-wiring-overlay engine (it recommends an M150 and counts
             the April device list). The MAP tab reads the typed rows and carries its own counts, so on the map
             these would contradict it (owner saw "ECU M150" on 2026-09-29; the locked ECU is the M130). */}
-        {shownTab === 'map' ? (
+        {shownTab === 'map' || shownTab === 'model' ? (
           <span style={{ color: C.label, fontFamily: 'Arial', fontSize: 8, textTransform: 'uppercase', letterSpacing: 1 }}>
-            COUNTS ARE ON THE MAP BELOW (TYPED ROWS)
+            {shownTab === 'model' ? 'THE MODEL MEASURING ITSELF BELOW (TYPED ROWS)' : 'COUNTS ARE ON THE MAP BELOW (TYPED ROWS)'}
           </span>
         ) : (<>
         <StatusChip label="DEVICES" value={overlay.result.deviceCount} />
@@ -499,6 +494,7 @@ export default function WiringPlan() {
               <WiringMap vehicleId={vehicleId} />
             </div>
           )}
+          {shownTab === 'model' && <HarnessModelView vehicleId={vehicleId} />}
           {shownTab === 'topology' && (
             <div style={{ position: 'absolute', inset: 0 }}>
               <TopologyView
@@ -523,7 +519,6 @@ export default function WiringPlan() {
           result={overlay.result}
           devices={overlay.devices}
           pinMaps={pinMaps}
-          partsReception={partsReception}
           workOrderParts={workOrderParts}
           zoneColors={ZONE_COLORS}
           onClose={handleClosePanel}

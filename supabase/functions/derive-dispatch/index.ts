@@ -25,6 +25,7 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { corsHeaders } from "../_shared/cors.ts";
 import { isServiceCaller, requireWriteAuth } from "../_shared/writeGuard.ts";
 import { projectSecretKey } from "../_shared/supabaseKeys.ts";
+import { mustWrite } from '../_shared/writeResult.ts';
 
 const WORKER = `derive-dispatch-${crypto.randomUUID().slice(0, 8)}`;
 
@@ -201,9 +202,9 @@ Deno.serve(async (req) => {
     // since the table was created, because nothing ever drove it.
     const slugs = [...new Set(claimed.map((c: any) => c.extractor_slug))];
     for (const s of slugs) {
-      await admin.from("observation_extractors")
+      mustWrite('observation_extractors update', await admin.from("observation_extractors")
         .update({ last_run_at: new Date().toISOString(), ...(failed === 0 && done > 0 ? { last_success_at: new Date().toISOString(), consecutive_failures: 0 } : {}) })
-        .eq("slug", s);
+        .eq("slug", s));
     }
 
     return json({ claimed: claimed.length, done, failed, results });

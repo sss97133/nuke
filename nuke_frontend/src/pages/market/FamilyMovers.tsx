@@ -1,0 +1,111 @@
+import { useEffect, useState } from 'react';
+import { supabase } from '../../lib/supabase';
+import { Text } from '../../kit';
+import './FamilyMovers.css';
+
+// The families whose Bring a Trailer market moved most in the last 12 months against the 12 before, both ways, with
+// BaT's own move beside them (treemap_family_movers, 20261015173000). Owner, 2026-10-15, on the brand map: "increase
+// over 12 months is interesting, but needs expansion and clarity". A tile's color says one brand's move; this says
+// which families moved most across every brand, and a pick drills the map to that family.
+export type Mover = {
+  direction: 'up' | 'down'; brand: string; family_key: string; family: string;
+  sold_12m: number; sold_prior_12m: number; usd_12m: number; usd_prior_12m: number;
+  bat_sold_12m: number; bat_sold_prior_12m: number; bat_usd_12m: number; bat_usd_prior_12m: number;
+  eligible: number; families: number;
+};
+
+// One read per page lifetime; a failed read is forgotten so the next mount retries, and the strip stays away.
+let moversRead: Promise<Mover[] | null> | null = null;
+export function readFamilyMovers(): Promise<Mover[] | null> {
+  if (typeof (supabase as { rpc?: unknown })?.rpc !== 'function') return Promise.resolve(null);
+  if (!moversRead) {
+    moversRead = Promise.resolve(supabase.rpc('treemap_family_movers', { p_limit: 8 })).then(
+      ({ data, error }) => { if (error || !Array.isArray(data)) { moversRead = null; return null; } return data as Mover[]; },
+      () => { moversRead = null; return null; },
+    );
+  }
+  return moversRead;
+}
+
+// The two years behind each mover: its BaT sales in 24 bins of about a month, oldest first (treemap_family_monthly,
+// 20261016050000). Bins 12..23 add up to the chip's last-12-months count and 0..11 to the year before, so the bars show
+// the shape behind "46→92 sold". One read per page lifetime; a failed or malformed read draws no bars.
+let monthlyRead: Promise<Map<string, number[]>> | null = null;
+export function readFamilyMonthly(rows: Mover[]): Promise<Map<string, number[]>> {
+  if (typeof (supabase as { rpc?: unknown })?.rpc !== 'function') return Promise.resolve(new Map());
+  if (!monthlyRead) {
+    monthlyRead = Promise.resolve(supabase.rpc('treemap_family_monthly',
+      { p_families: rows.map((m) => ({ brand: m.brand, family_key: m.family_key })) })).then(
+      ({ data, error }) => {
+        const out = new Map<string, number[]>();
+        const families = (data as { families?: unknown } | null)?.families;
+        if (error || !Array.isArray(families)) { monthlyRead = null; return out; }
+        for (const f of families as { brand?: unknown; family_key?: unknown; bins?: unknown }[]) {
+          if (typeof f?.brand === 'string' && typeof f.family_key === 'string' && Array.isArray(f.bins) && f.bins.length === 24
+            && f.bins.every((n) => typeof n === 'number' && n >= 0)) out.set(`${f.brand}|${f.family_key}`, f.bins as number[]);
+        }
+        return out;
+      },
+      () => { monthlyRead = null; return new Map(); },
+    );
+  }
+  return monthlyRead;
+}
+
+// 24 bars, the prior year faint and the last year in the chip's direction, each scaled to the family's busiest bin.
+export function Spark({ bins, direction }: { bins: number[]; direction: 'up' | 'down' }) {
+  const max = Math.max(1, ...bins);
+  return <svg className={`map-movers__spark map-movers__spark--${direction}`} width="48" height="14" viewBox="0 0 48 14" aria-hidden="true">
+    {bins.map((n, i) => {
+      const h = n > 0 ? Math.max(1, Math.round((n / max) * 13)) : 0;
+      return <rect key={i} x={i * 2} y={14 - h} width="1.5" height={h} className={i < 12 ? 'map-movers__bar--prior' : 'map-movers__bar--recent'} />;
+    })}
+  </svg>;
+}
+
+export function move(now: number, before: number): string {
+  if (!before) return '';
+  const m = now / before - 1;
+  return `${m >= 0 ? '▲' : '▼'}${Math.abs(Math.round(m * 100))}%`;
+}
+
+export default function FamilyMovers({ onPick }: { onPick: (m: Mover) => void }) {
+  const [rows, setRows] = useState<Mover[] | null>(null);
+  const [bins, setBins] = useState<Map<string, number[]>>(new Map());
+  useEffect(() => {
+    let live = true;
+    readFamilyMovers().then((r) => { if (live) setRows(r); });
+    return () => { live = false; };
+  }, []);
+  useEffect(() => {
+    if (!rows?.length) return;
+    let live = true;
+    readFamilyMonthly(rows).then((b) => { if (live) setBins(b); });
+    return () => { live = false; };
+  }, [rows]);
+  if (!rows?.length) return null;
+  const bat = rows[0];
+  const chip = (m: Mover) => <button key={`${m.direction}-${m.brand}-${m.family_key}`} type="button"
+    className={`map-movers__item map-movers__item--${m.direction}`} onClick={() => onPick(m)}
+    title={`${m.brand} ${m.family} on Bring a Trailer: ${m.sold_prior_12m} sold in the 12 months before, ${m.sold_12m} in the last 12; dollars ${move(m.usd_12m, m.usd_prior_12m)}${bins.has(`${m.brand}|${m.family_key}`) ? '; bars: sales by month over two years, the last 12 in color' : ''}`}>
+    <Text role="label">{m.brand} {m.family}</Text>
+    {bins.has(`${m.brand}|${m.family_key}`) && <Spark bins={bins.get(`${m.brand}|${m.family_key}`)!} direction={m.direction} />}
+    <Text role="measure" dense>{move(m.usd_12m, m.usd_prior_12m)}</Text>
+    <Text role="caption">{m.sold_prior_12m}→{m.sold_12m} sold</Text>
+  </button>;
+  // Risers and fallers each get a row, so both show without scrolling past the other.
+  const row = (direction: 'up' | 'down', title: string) => {
+    const list = rows.filter((m) => m.direction === direction);
+    return list.length ? <div className="map-movers__row">
+      <Text role="label" className="map-movers__title">{title}</Text>
+      <div className="map-movers__list">{list.map(chip)}</div>
+    </div> : null;
+  };
+  return <div className="map-movers" role="group" aria-label="Moving on Bring a Trailer, last 12 months">
+    {row('up', 'Rising on BaT · 12 mo')}
+    {row('down', 'Falling')}
+    <Text role="caption" className="map-movers__base">
+      dollars on BaT, last 12 months against the 12 before · BaT overall: sales {move(bat.bat_sold_12m, bat.bat_sold_prior_12m)}, $ {move(bat.bat_usd_12m, bat.bat_usd_prior_12m)} · {bat.eligible.toLocaleString('en-US')} of {bat.families.toLocaleString('en-US')} families with 30+ BaT sales each year
+    </Text>
+  </div>;
+}

@@ -50,11 +50,11 @@ export function MarketScopeControls({ make, scopeKey, view, onMakeChange, onView
     <div role="group" aria-label="Market view" className="market-scope__views">
       {(['inventory', 'sales'] as const).map(mode => <button key={mode} type="button" className="market-control"
         aria-pressed={view === mode} onClick={() => onViewChange(mode)}>
-        <Text role="label">{mode === 'inventory' ? 'Open inventory' : 'Recorded sales'}</Text>
+        <Text role="label">{mode === 'inventory' ? 'Live now' : 'Sold'}</Text>
       </button>)}
       {children}
     </div>
-    <label className="market-scope__cohort"><Text role="label">Cohort</Text>
+    <label className="market-scope__cohort"><Text role="label">Make</Text>
       <select aria-label="Recorded sales scope" className="market-control k-body" value={option?.key ?? (unmatchedMake ? `stored:${unmatchedMake}` : '')}
         onChange={e => onMakeChange(options.find(o => o.key === e.target.value)?.make ?? null, e.target.value || null)}>
         <option value="">{view === 'inventory' ? 'All makes' : 'Choose a make or grouping'}</option>

@@ -3,6 +3,7 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { supabase, getCurrentUserId } from '../../lib/supabase';
 import { aiDataIngestion, type ExtractionResult, ingestVehicle } from '../../services/aiDataIngestion';
 import { dataRouter, type DatabaseOperationPlan } from '../../services/dataRouter';
+import { findPublicVehicleByVin } from '../../lib/vehicleByVin';
 import { universalSearchService, type UniversalSearchResult } from '../../services/universalSearchService';
 import { classifyIntent, type SearchIntent } from '../../lib/search/intentRouter';
 import { KNOWN_MAKES, MAKE_ALIASES } from '../../lib/search/dictionaries';
@@ -52,21 +53,24 @@ async function fetchMakeStats(make: string): Promise<MakeStats | null> {
     const resolved = MAKE_ALIASES[make.toLowerCase()] || make;
     const normalizedMake = KNOWN_MAKES.find(m => m.toLowerCase() === resolved.toLowerCase()) || resolved;
 
+    // normalizedMake is the canonical spelling from KNOWN_MAKES, so an equality match finds the make through
+    // idx_vehicles_make_year. `make ilike` is not leakproof, cannot be an index qual under the row policies, and
+    // scans the whole heap (measured 2026-10-14: Lotus count 1.5 s with eq, over 10 s with ilike).
     const [countRes, modelsRes, priceRes] = await Promise.all([
       supabase
         .from('vehicles')
         .select('id', { count: 'exact', head: true })
-        .ilike('make', normalizedMake),
+        .eq('make', normalizedMake),
       supabase
         .from('vehicles')
         .select('model')
-        .ilike('make', normalizedMake)
+        .eq('make', normalizedMake)
         .not('model', 'is', null)
         .limit(500),
       supabase
         .from('vehicles')
         .select('sale_price, year')
-        .ilike('make', normalizedMake)
+        .eq('make', normalizedMake)
         .not('sale_price', 'is', null)
         .gt('sale_price', 0)
         .limit(200),
@@ -404,15 +408,10 @@ export default function AIDataIngestionSearch() {
       setMakeStats(null);
       setVinCheckLoading(true);
       const cleanedVin = trimmed.replace(/[^A-Z0-9]/gi, '').toUpperCase();
-      Promise.resolve(
-        supabase
-          .from('vehicles')
-          .select('id, year, make, model')
-          .ilike('vin', cleanedVin)
-          .limit(1)
-      ).then(({ data }) => {
-          if (data && data.length > 0) {
-            const v = data[0];
+      // One indexed read of the public vehicle a VIN names; `vin ilike` is a sequential scan under the row policies.
+      findPublicVehicleByVin(cleanedVin)
+        .then((v) => {
+          if (v) {
             setVinCheckResult({
               exists: true,
               vehicleId: v.id,

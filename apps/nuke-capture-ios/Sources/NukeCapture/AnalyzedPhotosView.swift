@@ -89,6 +89,7 @@ struct AnalyzedPhotosView: View {
     @State private var photos: [AnalyzedPhoto] = []
     @State private var loaded = false
     @State private var loadError: String?
+    @State private var failureText: String?
     @State private var selected: AnalyzedPhoto?
 
     // 3 columns, hairline gutter — reads as a film contact sheet, not cards.
@@ -124,9 +125,9 @@ struct AnalyzedPhotosView: View {
             } else if let loadError {
                 // Failed ≠ empty — say it, with a way back.
                 ContentUnavailableView {
-                    Label(loadError, systemImage: "wifi.exclamationmark")
+                    Label(loadError, systemImage: "exclamationmark.triangle")
                 } description: {
-                    Text("Check your connection.")
+                    Text(failureText ?? "The read failed.")
                 } actions: {
                     Button("Retry") { Task { await load() } }
                         .buttonStyle(.borderedProminent)
@@ -175,7 +176,8 @@ struct AnalyzedPhotosView: View {
                 .value
             photos = rows
         } catch {
-            loadError = "Load failed"
+            loadError = "Couldn't load analyzed photos"
+            failureText = ReadFailure.text(error)
             NSLog("NukeCapture analyzed photos failed: %@", String(describing: error))
         }
         loaded = true   // flip regardless — stops the infinite spinner

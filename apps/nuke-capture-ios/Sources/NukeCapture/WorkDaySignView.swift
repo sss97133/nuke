@@ -81,7 +81,7 @@ final class WorkDaySignEngine: ObservableObject {
             }
             loaded = true
         } catch {
-            loadError = "Couldn't load your work days. Check your connection and try again."
+            loadError = "Couldn't load your work days. Retry."
             NSLog("NukeCapture work days load failed: %@", String(describing: error))
         }
     }

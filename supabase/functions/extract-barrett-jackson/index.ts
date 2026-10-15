@@ -31,6 +31,15 @@ import { normalizeVehicleFields } from "../_shared/normalizeVehicle.ts";
 import { writeObservation } from "../_shared/observationWriter.ts";
 import { requireWriteAuth } from "../_shared/writeGuard.ts";
 import { projectSecretKey } from "../_shared/supabaseKeys.ts";
+import { mustWrite, softWrite } from '../_shared/writeResult.ts';
+import { fillOnlyIdentity, identityConflict, REVISION_DIFFERENT_CAR } from '../_shared/identityMatch.ts';
+
+/** The resolved vehicle is a different car than the lot: nothing is written, a revision item is returned (missing: identity_match,
+ *  reason: different_car, next action: relink). Photos and episodes for a different car never attach to that vehicle. */
+class IdentityRefused extends Error {
+  constructor(public vehicleId: string, public url: string, public detail: string) { super(`identity refused: different_car (${detail})`); }
+  get revision() { return { ...REVISION_DIFFERENT_CAR, vehicle_id: this.vehicleId, incoming_url: this.url, detail: this.detail }; }
+}
 
 const EXTRACTOR_VERSION = "2.0.0";
 
@@ -922,6 +931,16 @@ async function saveVehicle(
     if (byVin?.id) existingId = byVin.id;
   }
 
+  // Identity guard: the lot must be the same car as the vehicle it resolved to (a VIN or URL match is not enough: the
+  // docket car overwrote a BaT sport truck's year, make, model, VIN, URL and photos, 2026-10-15). Fill-only below.
+  let existingIdentity: { year: number | null; make: string | null; model: string | null; vin: string | null; sale_price?: number | null } | null = null;
+  if (existingId) {
+    const { data: idRow } = await supabase.from("vehicles").select("year,make,model,vin,sale_price").eq("id", existingId).maybeSingle();
+    existingIdentity = (idRow as typeof existingIdentity) ?? null;
+    const conflict = existingIdentity ? identityConflict(existingIdentity, { year: vehicle.year, make: vehicle.make, model: vehicle.model, vin: vehicle.vin }) : null;
+    if (conflict) throw new IdentityRefused(existingId, vehicle.url, conflict);
+  }
+
   // Build raw data payload
   // Sale rule (lock 1, 2026-09-27): a Barrett-Jackson figure is the sale only when the page says
   // sold ("is_sold" in the RSC payload, SOLD in the markdown); on "Not Sold" / "Withdrawn" / unknown
@@ -1000,7 +1019,11 @@ async function saveVehicle(
     }
 
     // Strip identity/source fields that should only be set on insert
-    const { discovery_url: _du, discovery_source: _ds, source: _src, listing_source: _ls, ...updateData } = cleanData;
+    const { discovery_url: _du, discovery_source: _ds, source: _src, listing_source: _ls, ...updateAll } = cleanData;
+    // Identity fields are fill-only on a vehicle that already has them.
+    // sale_price is fill-only too: a docket price must not replace the price a vehicle already carries.
+    const updateData = existingIdentity ? fillOnlyIdentity(updateAll, existingIdentity) : updateAll;
+    if (existingIdentity?.sale_price != null) delete (updateData as Record<string, unknown>).sale_price;
 
     const { error: updateErr } = await supabase.from("vehicles").update(updateData).eq("id", existingId);
     if (updateErr) {
@@ -1057,14 +1080,14 @@ async function saveVehicle(
           .limit(1)
           .maybeSingle();
         if (!existingImg) {
-          await supabase.from("vehicle_images").insert({
+          mustWrite('vehicle_images insert', await supabase.from("vehicle_images").insert({
             vehicle_id: vehicleId,
             image_url: imgUrl,
             source: "external_import",
             source_url: imgUrl,
             is_external: true,
             position: idx,
-          });
+          }));
         }
       } catch (e) {
         console.warn(`[BJ] Image insert failed (non-fatal): ${e instanceof Error ? e.message : String(e)}`);
@@ -1084,7 +1107,7 @@ async function saveVehicle(
       .maybeSingle();
 
     if (!existingListing) {
-      await supabase.from("vehicle_events").insert({
+      mustWrite('vehicle_events insert', await supabase.from("vehicle_events").insert({
         vehicle_id: vehicleId,
         source_platform: "barrettjackson",
         event_type: "auction",
@@ -1104,7 +1127,7 @@ async function saveVehicle(
           extraction_method: vehicle.extraction_method,
           extractor_version: EXTRACTOR_VERSION,
         },
-      });
+      }));
     }
   } catch (e) {
     console.warn(`[BJ] External listing insert failed (non-fatal): ${e instanceof Error ? e.message : String(e)}`);
@@ -1122,14 +1145,14 @@ async function saveVehicle(
       .maybeSingle();
 
     if (!existingEvent) {
-      await supabase.from("auction_events").insert({
+      mustWrite('auction_events insert', await supabase.from("auction_events").insert({
         vehicle_id: vehicleId,
         source: "barrett-jackson",
         source_url: vehicle.url,
         outcome: vehicle.status?.toLowerCase() === "sold" ? "sold" : "listed",
         winning_bid: vehicle.sale_price || null,
         lot_number: vehicle.lot_number || null,
-      });
+      }));
     }
   } catch (e) {
     console.warn(`[BJ] Auction event insert failed (non-fatal): ${e instanceof Error ? e.message : String(e)}`);
@@ -1186,14 +1209,21 @@ Deno.serve(async (req) => {
           `${vehicle.image_urls.length} images, method=${vehicle.extraction_method}`,
       );
 
-      const { vehicleId, isNew, fieldsUpdated, qualityScore } = await saveVehicle(supabase, vehicle);
+      let saved: Awaited<ReturnType<typeof saveVehicle>>;
+      try {
+        saved = await saveVehicle(supabase, vehicle);
+      } catch (e) {
+        if (e instanceof IdentityRefused) return okJson({ success: false, refused: "different_car", revision: e.revision }, 409);
+        throw e;
+      }
+      const { vehicleId, isNew, fieldsUpdated, qualityScore } = saved;
 
       // Update queue entry if exists
       try {
-        await supabase
+        mustWrite('import_queue update', await supabase
           .from("import_queue")
           .update({ status: "complete", vehicle_id: vehicleId, error_message: null })
-          .eq("listing_url", url);
+          .eq("listing_url", url));
       } catch (e) {
         console.warn(`[BJ] Queue update failed (non-fatal): ${e instanceof Error ? e.message : String(e)}`);
       }
@@ -1242,10 +1272,10 @@ Deno.serve(async (req) => {
       }
 
       const ids = items.map((i: { id: string }) => i.id);
-      await supabase
+      mustWrite('import_queue update', await supabase
         .from("import_queue")
         .update({ status: "processing", locked_at: new Date().toISOString() })
-        .in("id", ids);
+        .in("id", ids));
 
       const results = {
         total: items.length,
@@ -1262,20 +1292,20 @@ Deno.serve(async (req) => {
           const vehicle = await fetchAndParse(item.listing_url);
 
           if (!vehicle.year && !vehicle.make) {
-            await supabase
+            mustWrite('import_queue update', await supabase
               .from("import_queue")
               .update({ status: "failed", error_message: "Could not parse vehicle data", attempts: 1 })
-              .eq("id", item.id);
+              .eq("id", item.id));
             results.failed++;
             continue;
           }
 
           const { vehicleId, isNew } = await saveVehicle(supabase, vehicle);
 
-          await supabase
+          mustWrite('import_queue update', await supabase
             .from("import_queue")
             .update({ status: "complete", vehicle_id: vehicleId, error_message: null })
-            .eq("id", item.id);
+            .eq("id", item.id));
 
           results.success++;
           if (isNew) results.created++;
@@ -1285,6 +1315,7 @@ Deno.serve(async (req) => {
           await new Promise((r) => setTimeout(r, 1000));
         } catch (err: unknown) {
           const msg = err instanceof Error ? err.message : String(err);
+          const isRefused = err instanceof IdentityRefused;
           const isRejected = msg.includes("Quality gate rejected");
           const isRemoved = msg === "PAGE_NOT_FOUND";
 
@@ -1295,13 +1326,14 @@ Deno.serve(async (req) => {
             results.errors.push(`${item.listing_url}: ${msg.slice(0, 120)}`);
           }
 
-          await supabase
+          softWrite('import_queue update', await supabase
             .from("import_queue")
             .update({
-              status: isRemoved ? "skipped" : "failed",
-              error_message: (isRemoved ? "Page removed/404" : msg).slice(0, 500),
+              // A different-car refusal is a revision item (identity_match / different_car / relink), not a failure to retry.
+              status: isRemoved ? "skipped" : isRefused ? "pending_review" : "failed",
+              error_message: (isRemoved ? "Page removed/404" : isRefused ? `identity_match: ${msg}; next action: relink vehicle ${(err as IdentityRefused).vehicleId}` : msg).slice(0, 500),
             })
-            .eq("id", item.id);
+            .eq("id", item.id));
         }
       }
 

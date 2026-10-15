@@ -41,6 +41,7 @@ const ALLOWLIST = {
   "mcp-connector": "own tiered auth: write tools need nk_live_/OAuth/service; read tools open",
   "oauth-server": "OAuth authorization/token flows carry their own proofs (client secret, PKCE, user session)",
   "stripe-webhook": "Stripe signature is the auth",
+  "auto-merge-duplicate-orgs": "authenticateWriter refuses anonymous callers (writeAuthResponse on !ok); scanAll is service-role only, organizationId requires an owner/discoverer of that org",
   "universal-search": "public read; its one write (register_make_model_subject) is idempotent and bounded to canonical make/model/year",
 };
 

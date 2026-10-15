@@ -4,6 +4,7 @@ import { corsHeaders } from "../_shared/cors.ts";
 import { cloudVisionJSON, cloudVisionMultiJSON } from "../_shared/visionFallback.ts";
 import { requireWriteAuth } from "../_shared/writeGuard.ts";
 import { projectSecretKey } from "../_shared/supabaseKeys.ts";
+import { mustWrite, softWrite } from '../_shared/writeResult.ts';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -339,7 +340,7 @@ Deno.serve(async (req: Request) => {
           const signature = await buildVehicleSignature(supabase, userId, imageUrls, desc);
 
           if (!dryRun && signature) {
-            await supabase
+            mustWrite('vehicles update', await supabase
               .from("vehicles")
               .update({
                 visual_signature: {
@@ -348,7 +349,7 @@ Deno.serve(async (req: Request) => {
                   built_at: new Date().toISOString(),
                 },
               })
-              .eq("id", v.id);
+              .eq("id", v.id));
           }
 
           results.push({ vehicle_id: v.id, desc, signature });
@@ -539,7 +540,7 @@ Deno.serve(async (req: Request) => {
               update.auto_suggestion_confidence = ai.confidence;
               update.auto_suggestion_reasons = ai.distinguishing_features || [];
             }
-            await supabase.from("vehicle_images").update(update).eq("id", img.id);
+            mustWrite('vehicle_images update', await supabase.from("vehicle_images").update(update).eq("id", img.id));
 
             // Session propagation: if this was a session representative, propagate to all images in that session
             if (img.session_num != null && status === "confirmed" && ai.confidence >= 0.7) {
@@ -551,9 +552,9 @@ Deno.serve(async (req: Request) => {
                 const sessionPeers = sessionImages
                   .filter((s: any) => s.session_num === img.session_num && s.image_id !== img.id && !s.image_vehicle_match_status);
                 for (const peer of sessionPeers) {
-                  await supabase.from("vehicle_images")
+                  mustWrite('vehicle_images update', await supabase.from("vehicle_images")
                     .update({ image_vehicle_match_status: "confirmed" })
-                    .eq("id", peer.image_id);
+                    .eq("id", peer.image_id));
                   results.push({
                     image_id: peer.image_id,
                     image_url: peer.image_url,
@@ -571,9 +572,9 @@ Deno.serve(async (req: Request) => {
         } catch (err) {
           errors.push({ image_id: img.id, error: `Disambiguate error: ${(err as Error).message}` });
           if (!dryRun) {
-            await supabase.from("vehicle_images")
+            softWrite('vehicle_images update', await supabase.from("vehicle_images")
               .update({ image_vehicle_match_status: "ambiguous" })
-              .eq("id", img.id);
+              .eq("id", img.id));
           }
         }
       }
@@ -686,9 +687,9 @@ Deno.serve(async (req: Request) => {
           continue;
         }
         if (!dryRun) {
-          await supabase.from("vehicle_images")
+          mustWrite('vehicle_images update', await supabase.from("vehicle_images")
             .update({ image_vehicle_match_status: "unrelated" })
-            .eq("id", img.id);
+            .eq("id", img.id));
         }
         results.push({
           image_id: img.id, image_url: img.image_url, status: "unrelated",
@@ -707,9 +708,9 @@ Deno.serve(async (req: Request) => {
           confidence: 0, reason: "Facebook CDN URL — cannot verify via API",
         });
         if (!dryRun) {
-          await supabase.from("vehicle_images")
+          mustWrite('vehicle_images update', await supabase.from("vehicle_images")
             .update({ image_vehicle_match_status: "ambiguous" })
-            .eq("id", img.id);
+            .eq("id", img.id));
         }
         continue;
       }
@@ -721,9 +722,9 @@ Deno.serve(async (req: Request) => {
           confidence: 1.0, reason: "Noise/placeholder/local URL",
         });
         if (!dryRun) {
-          await supabase.from("vehicle_images")
+          mustWrite('vehicle_images update', await supabase.from("vehicle_images")
             .update({ image_vehicle_match_status: "unrelated" })
-            .eq("id", img.id);
+            .eq("id", img.id));
         }
         continue;
       }
@@ -754,7 +755,7 @@ Deno.serve(async (req: Request) => {
         if (!dryRun) {
           const update: Record<string, any> = { image_vehicle_match_status: status };
           if (ai.detected_vehicle) update.ai_detected_vehicle = ai.detected_vehicle;
-          await supabase.from("vehicle_images").update(update).eq("id", img.id);
+          mustWrite('vehicle_images update', await supabase.from("vehicle_images").update(update).eq("id", img.id));
         }
       } catch (err) {
         // A failed vision call is no verdict: the image stays unchecked (status NULL) for a later

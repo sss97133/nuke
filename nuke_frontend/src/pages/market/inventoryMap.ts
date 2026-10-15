@@ -52,22 +52,33 @@ export function mapValue(a: LiveAuction, dimension: MapDimension | 'lot', taxono
 export interface InventoryMapGroup { key: string; name: string; lots: LiveAuction[] }
 export interface ReadableMapGroup extends InventoryMapGroup { remainder?: InventoryMapGroup[] }
 
+// What a box's area stands for: its open lots, or the dollars currently bid on them (the board's headline figure,
+// opened into what it is made of). A lot without a recorded bid adds no dollars.
+export type MapMeasure = 'lots' | 'bids';
+export function groupArea(group: InventoryMapGroup, measure: MapMeasure = 'lots'): number {
+  return measure === 'bids' ? group.lots.reduce((n, a) => n + (a.currentBid != null && a.currentBid > 0 ? a.currentBid : 0), 0)
+    : group.lots.length;
+}
+
 /** Keep the area of every lot, but combine boxes too small to identify into a named list entry. */
-export function readableInventoryLayout(groups: InventoryMapGroup[], width: number, height: number) {
-  if (width <= 0 || height <= 0 || !groups.length) return [];
-  const sorted = [...groups].sort((a, b) => b.lots.length - a.lots.length || a.key.localeCompare(b.key));
-  const total = sorted.reduce((n, g) => n + g.lots.length, 0);
+export function readableInventoryLayout(groups: InventoryMapGroup[], width: number, height: number, measure: MapMeasure = 'lots') {
+  const area = (g: InventoryMapGroup) => groupArea(g, measure);
+  // A box with no area cannot be drawn; in dollars that is a group whose lots have no recorded bid.
+  const drawable = groups.filter(g => area(g) > 0);
+  if (width <= 0 || height <= 0 || !drawable.length) return [];
+  const sorted = [...drawable].sort((a, b) => area(b) - area(a) || a.key.localeCompare(b.key));
+  const total = sorted.reduce((n, g) => n + area(g), 0);
   // Keep the largest legible prefix. Reserve the combined entry at the edge so it
   // cannot displace the largest named brand or trigger repeated layout collapse.
   const max = Math.min(sorted.length, Math.floor(width * height / (88 * 60)));
   for (let shown = max; shown >= 0; shown--) {
     const remainder = sorted.slice(shown);
     const remainderLots = remainder.flatMap(g => g.lots);
-    const share = remainderLots.length / total;
+    const share = remainder.reduce((n, g) => n + area(g), 0) / total;
     const landscape = width >= height;
     const mainWidth = landscape ? width * (1 - share) : width;
     const mainHeight = landscape ? height : height * (1 - share);
-    const rects = squarify<ReadableMapGroup>(sorted.slice(0, shown).map(node => ({ node, area: node.lots.length })), 0, 0, mainWidth, mainHeight);
+    const rects = squarify<ReadableMapGroup>(sorted.slice(0, shown).map(node => ({ node, area: area(node) })), 0, 0, mainWidth, mainHeight);
     if (rects.some(r => r.w < 88 || r.h < 60)) continue;
     if (remainder.length) {
       const restWidth = landscape ? width - mainWidth : width;

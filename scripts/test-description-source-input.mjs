@@ -181,6 +181,7 @@ function fixture(options = {}) {
         if (specifier === '../_shared/observationContentHash.ts') return load('hash');
         if (specifier === '../_shared/writeGuard.ts') return load('guard');
         if (specifier === './supabaseKeys.ts' || specifier === '../_shared/supabaseKeys.ts') return load('keys');
+        if (specifier === '../_shared/geminiGuard.ts') return { geminiFetch: (url, init) => fixtureFetch(url, init) };
         if (specifier === './apiKeyAuth.ts') return { hashApiKey: () => assert.fail('No API-key path is used') };
         assert.fail(`Unexpected import ${specifier}`);
       },

@@ -19,6 +19,18 @@ vi.mock('../../lib/supabase', () => ({ supabase: { functions: {
 import IntakeReadiness from './IntakeReadiness';
 let root: Root, container: HTMLDivElement;
 const clock = '2026-10-10T12:00:00Z';
+const reportingInventory = (owner: string, unit: string, activity_basis: string, rows: any[] = []) => ({
+  owner, unit, status: 'measured', measured_at: clock, complete: true, row_limit: 1000,
+  rows: rows.map(row => ({ id: row.label, enabled: true, cadence_minutes: 60, last_activity_at: clock,
+    has_error: null, state: 'recent_activity', activity_basis, ...row })),
+});
+const sourceOwner = (owner: string) => container.querySelector(`[data-owner="${owner}"]`)!;
+async function changeInput(input: HTMLInputElement, value: string) {
+  await act(async () => {
+    Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!.call(input, value);
+    input.dispatchEvent(new Event('input', { bubbles: true }));
+  });
+}
 async function render() { await act(async () => root.render(<MemoryRouter><IntakeReadiness /></MemoryRouter>)); }
 async function tick(ms: number) { await act(async () => vi.advanceTimersByTimeAsync(ms)); }
 
@@ -26,6 +38,12 @@ beforeEach(() => {
   vi.useFakeTimers(); vi.setSystemTime(new Date(clock)); (globalThis as any).IS_REACT_ACT_ENVIRONMENT = true;
   fixture.requests = []; fixture.held = null; fixture.bookCalls = 0; fixture.book = { isPending: true };
   fixture.responses = {
+    reporting: { data: { contract: 'intake_status_v1', section: 'reporting', inventories: [
+      reportingInventory('source_registry', 'platforms', 'last_successful_at', [{ label: 'Synthetic platform' }]),
+      reportingInventory('scrape_sources', 'scrape targets', 'last_scraped_at', [{ label: 'Synthetic scraper', last_activity_at: null, state: 'never_reported' }]),
+      reportingInventory('listing_feeds', 'feed targets', 'last_polled_at', [{ label: 'Synthetic feed', has_error: true }]),
+      reportingInventory('forum_sources', 'forums', 'last_crawled_at', [{ label: 'Synthetic forum', enabled: null, cadence_minutes: null, state: 'configuration_unknown', has_error: false }]),
+    ] } },
     consumers: { data: { contract: 'intake_status_v1', section: 'consumers', status: 'measured', measured_at: clock, complete: true,
       rows: [{ stack_id: 'SA', version: 1, name: 'Synthetic question', question: 'Which retained observations support the answer?', status: 'building',
         coverage: 0.5, n_needs: 2, n_present: 1, n_partial: 0, n_missing: 1, needs_complete: true,
@@ -51,7 +69,7 @@ it('keeps URL denominators, queue completion and model delivery distinct', async
   expect(container.textContent).toContain('10 completed queue matches / 100 known target URLs');
   expect(container.textContent).toContain('Zero matches can coexist with retained source data');
   expect(container.textContent).toContain('does not prove a vehicle, sale or downstream answer');
-  expect(fixture.requests).toHaveLength(4);
+  expect(fixture.requests).toHaveLength(5);
   expect(fixture.requests.every(r => r.options.method === 'GET' && r.options.signal instanceof AbortSignal)).toBe(true);
 });
 it('links resolved public sources to their canonical profile inventory and leaves unresolved sources explicit', async () => {
@@ -103,11 +121,11 @@ it('finishes the metadata read before issuing aggregate reads and gives each a s
   let release!: (value: any) => void;
   fixture.held = new Promise(resolve => { release = resolve; });
   await render();
-  expect(fixture.requests.map(r => r.name)).toEqual(['db-stats?intake=model']);
+  expect(fixture.requests.map(r => r.name)).toEqual(['db-stats?intake=reporting']);
   fixture.held = null;
-  await act(async () => release(fixture.responses.model));
-  expect(fixture.requests.map(r => r.name)).toEqual(['db-stats?intake=model', 'db-stats?intake=consumers', 'db-stats?intake=coverage', 'db-stats?intake=jobs']);
-  expect(new Set(fixture.requests.map(r => r.options.signal)).size).toBe(4);
+  await act(async () => release(fixture.responses.reporting));
+  expect(fixture.requests.map(r => r.name)).toEqual(['db-stats?intake=reporting', 'db-stats?intake=model', 'db-stats?intake=consumers', 'db-stats?intake=coverage', 'db-stats?intake=jobs']);
+  expect(new Set(fixture.requests.map(r => r.options.signal)).size).toBe(5);
   expect(container.textContent).toContain('10 completed queue matches / 100 known target URLs');
 });
 it('does not turn unavailable job declarations into undeclared writers or absent owner matches', async () => {
@@ -126,7 +144,7 @@ it('stops queued aggregate requests when the component unmounts', async () => {
   await render();
   await act(async () => root.unmount());
   fixture.held = null;
-  await act(async () => release(fixture.responses.model));
+  await act(async () => release(fixture.responses.reporting));
   expect(fixture.requests).toHaveLength(1);
   expect(fixture.requests[0].options.signal.aborted).toBe(true);
 });
@@ -198,7 +216,7 @@ it('opens source details from the summary and navigates declared table relations
   expect((container.querySelector('#status-sources') as HTMLDetailsElement).open).toBe(true);
   const relationship = [...container.querySelectorAll('button')].find(b => b.textContent === 'vehicle_events →')!;
   await act(async () => relationship.click());
-  expect((container.querySelector('select') as HTMLSelectElement).value).toBe('vehicle_events');
+  expect((container.querySelector('select[aria-label="Inspect table"]') as HTMLSelectElement).value).toBe('vehicle_events');
   expect(container.textContent).toContain('Referenced by');
   expect(container.textContent).toContain('vehicle_observations →');
 });
@@ -212,7 +230,7 @@ it('exposes declared consumer gaps and drills a dependency into its table owners
   await act(async () => link.click());
   expect((container.querySelector('#status-model') as HTMLDetailsElement).open).toBe(true);
   expect((container.querySelector('select[aria-label="Inspect table"]') as HTMLSelectElement).value).toBe('vehicle_observations');
-  const search = container.querySelector('input[type="search"]') as HTMLInputElement;
+  const search = container.querySelector('#status-consumers input[type="search"]') as HTMLInputElement;
   await act(async () => {
     Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!.call(search, 'no matching question');
     search.dispatchEvent(new Event('input', { bubbles: true }));
@@ -341,4 +359,124 @@ it('offers a retry after an incomplete retained read without rendering invented 
   expect(container.textContent).toContain('could not be read completely');
   await act(async () => [...container.querySelectorAll('button')].find(b => b.textContent === 'Retry retained lot')!.click());
   expect(fixture.book.refetch).toHaveBeenCalledOnce();
+});
+
+it('keeps operating inventory grains separate and counts every known enabled row in the activity denominator', async () => {
+  fixture.responses.reporting.data.inventories[0] = reportingInventory('source_registry', 'platforms', 'last_successful_at', [
+    { label: 'Recent platform' },
+    { label: 'Overdue platform', last_activity_at: '2026-10-10T11:00:00Z', state: 'overdue' },
+    { label: 'Never platform', last_activity_at: null, state: 'never_reported' },
+    { label: 'No cadence platform', cadence_minutes: null, state: 'cadence_missing' },
+    { label: 'Inactive platform', enabled: false, state: 'inactive' },
+    { label: 'Unknown platform', enabled: null, state: 'configuration_unknown' },
+    { label: 'Future platform', last_activity_at: '2026-10-10T12:01:00Z', state: 'invalid_clock' },
+  ]);
+  fixture.responses.reporting.data.inventories[0].counts = { total: 900000, enabled: 900000 };
+  await render();
+  const registry = sourceOwner('source_registry');
+  expect([...registry.querySelectorAll('dd')].map(value => value.textContent)).toEqual([
+    '7 platforms', '5 known · 1 unknown', '1 / 5', '1', '1', 'Unmeasured',
+  ]);
+  expect(registry.textContent).toContain('1 enabled with cadence missing · 1 invalid clocks · 1 configuration unknown');
+  expect(registry.textContent).toContain('including rows without cadence');
+  expect(sourceOwner('forum_sources').textContent).toContain('0 known · 1 unknown');
+  expect(sourceOwner('forum_sources').textContent).toContain('reporting configuration is unknown');
+  expect(container.querySelector('#status-reporting')?.textContent).not.toContain('900,000');
+  expect(container.querySelector('#status-reporting')?.textContent).toContain('not one total of sources or vehicles');
+  expect(container.querySelector('.status-flow')?.textContent).toContain('source families with known target URLs');
+});
+
+it('never treats a fresh feed attempt with a recorded error as capture or delivery proof', async () => {
+  await render();
+  const feed = sourceOwner('listing_feeds');
+  expect(feed.textContent).toContain('1 / 1');
+  expect(feed.textContent).toContain('1 / 1 measured');
+  expect(feed.querySelector('tbody tr')?.textContent).toContain('Recent activityError reported');
+  expect(feed.textContent).toContain('recorded before work starts');
+  expect(feed.textContent).toContain('not completed capture or landed output');
+  expect(feed.textContent).not.toMatch(/healthy|100%|capture succeeded/i);
+  expect(container.querySelector('#status-reporting')?.textContent).toContain('A completed check can find zero new items');
+});
+
+it.each(['partition', 'cadence', 'boolean', 'duplicate', 'unit', 'basis'])('isolates malformed operating inventory %s without showing its counts', async kind => {
+  const inventory = fixture.responses.reporting.data.inventories[2];
+  if (kind === 'partition') inventory.rows[0].state = 'overdue';
+  if (kind === 'cadence') inventory.rows[0].cadence_minutes = '60';
+  if (kind === 'boolean') inventory.rows[0].has_error = 'false';
+  if (kind === 'duplicate') inventory.rows.push({ ...inventory.rows[0] });
+  if (kind === 'unit') inventory.unit = 'vehicles';
+  if (kind === 'basis') inventory.rows[0].activity_basis = 'last_successful_at';
+  await render();
+  expect(sourceOwner('listing_feeds').textContent).toContain('Inventory unavailable. Counts unmeasured');
+  expect(sourceOwner('listing_feeds').querySelector('dl')).toBeNull();
+  expect(sourceOwner('source_registry').textContent).toContain('1 platforms');
+  expect(container.textContent).toContain('10 completed queue matches / 100 known target URLs');
+});
+
+it('retains each unavailable owner with its original date while accepting independent newer inventory', async () => {
+  await render();
+  fixture.responses.reporting = structuredClone(fixture.responses.reporting);
+  fixture.responses.reporting.data.inventories[2] = { owner: 'listing_feeds', unit: 'feed targets', status: 'unavailable',
+    measured_at: null, complete: false, row_limit: 1000, rows: [] };
+  fixture.responses.reporting.data.inventories[0].measured_at = '2026-10-10T12:05:00Z';
+  await tick(300_000);
+  expect(sourceOwner('listing_feeds').textContent).toContain('Refresh unavailable. Stale reading retained below');
+  expect(sourceOwner('listing_feeds').textContent).toContain(timeForTest(clock));
+  expect(sourceOwner('listing_feeds').textContent).toContain('Synthetic feed');
+  expect(sourceOwner('source_registry').textContent).toContain(timeForTest('2026-10-10T12:05:00Z'));
+  expect(sourceOwner('source_registry').textContent).not.toContain('Stale reading');
+  fixture.responses.reporting = { error: { message: 'PRIVATE_REPORTING_ERROR' } };
+  await tick(300_000);
+  expect(sourceOwner('source_registry').textContent).toContain('Stale reading retained');
+  expect(container.textContent).not.toContain('PRIVATE_REPORTING_ERROR');
+});
+
+it('withholds full totals for a partial inventory and searches rows beyond the display cap', async () => {
+  fixture.responses.reporting.data.inventories[2] = reportingInventory('listing_feeds', 'feed targets', 'last_polled_at',
+    Array.from({ length: 1000 }, (_, index) => ({ label: `Feed ${index}`, has_error: index === 999 })));
+  fixture.responses.reporting.data.inventories[2].complete = false;
+  await render();
+  const feed = sourceOwner('listing_feeds');
+  expect(feed.textContent).toContain('Returned slice · full inventory totals withheld');
+  expect(feed.querySelector('.status-source-counts')).toBeNull();
+  expect(feed.querySelectorAll('tbody tr')).toHaveLength(50);
+  expect(feed.textContent).toContain('Search and filters use all 1,000 retained rows');
+  await changeInput(feed.querySelector<HTMLInputElement>('input[type=search]')!, 'Feed 999');
+  expect(feed.querySelectorAll('tbody tr')).toHaveLength(1);
+  expect(feed.querySelector('tbody')?.textContent).toContain('Feed 999');
+  await changeInput(feed.querySelector<HTMLInputElement>('input[type=search]')!, '');
+  await act(async () => (feed.querySelector('input[type=checkbox]') as HTMLInputElement).click());
+  expect(feed.querySelectorAll('tbody tr')).toHaveLength(1);
+  const select = feed.querySelector('select')!;
+  await act(async () => { select.value = 'overdue'; select.dispatchEvent(new Event('change', { bubbles: true })); });
+  expect(feed.textContent).toContain('No rows match these filters');
+});
+
+it.each(['missing owner', 'duplicate owner', 'truncated slice'])('refuses an invalid operating inventory boundary: %s', async kind => {
+  const inventories = fixture.responses.reporting.data.inventories;
+  if (kind === 'missing owner') inventories.pop();
+  if (kind === 'duplicate owner') inventories[3] = structuredClone(inventories[2]);
+  if (kind === 'truncated slice') inventories[2].complete = false;
+  await render();
+  expect(sourceOwner('listing_feeds').textContent).toContain('Inventory unavailable. Counts unmeasured');
+  expect(sourceOwner('listing_feeds').querySelector('dl')).toBeNull();
+  expect(container.textContent).toContain('10 completed queue matches / 100 known target URLs');
+});
+
+it('shows partial error measurement without turning unknown errors into a clean reading', async () => {
+  const inventory = fixture.responses.reporting.data.inventories[2];
+  inventory.rows.push({ ...inventory.rows[0], id: 'unknown-error-feed', label: 'Unknown error feed', has_error: null });
+  await render();
+  expect(sourceOwner('listing_feeds').querySelector('.status-source-counts')?.textContent).toContain('1 / 1 measured · 1 unmeasured');
+  expect(sourceOwner('source_registry').querySelector('.status-source-counts')?.textContent).toContain('Reported errorsUnmeasured');
+});
+
+it('distinguishes a complete empty inventory from an unavailable inventory', async () => {
+  fixture.responses.reporting.data.inventories[0].rows = [];
+  fixture.responses.reporting.data.inventories[2] = { owner: 'listing_feeds', unit: 'feed targets', status: 'unavailable',
+    measured_at: null, complete: false, row_limit: 1000, rows: [] };
+  await render();
+  expect(sourceOwner('source_registry').querySelector('.status-source-counts')?.textContent).toContain('0 platforms');
+  expect(sourceOwner('listing_feeds').textContent).toContain('Counts unmeasured');
+  expect(sourceOwner('listing_feeds').querySelector('.status-source-counts')).toBeNull();
 });

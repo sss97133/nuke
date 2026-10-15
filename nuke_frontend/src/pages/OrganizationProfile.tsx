@@ -12,8 +12,9 @@ import { extractImageMetadata } from '../utils/imageMetadata';
 import { DynamicTabBar } from '../components/organization/DynamicTabBar';
 import { OrganizationIntelligenceService, type OrganizationIntelligence, type TabConfig } from '../services/organizationIntelligenceService';
 import VehicleThumbnail from '../components/VehicleThumbnail';
-import { getOrganizationProfileData, getOrganizationCompetitiveContext, type SellerTrackRecord, type CompetitiveContext } from '../services/profileStatsService';
+import { getOrganizationProfileData, type SellerTrackRecord } from '../services/profileStatsService';
 import { AdminNotificationService } from '../services/adminNotificationService';
+import { fetchVehicleCardImages } from '../services/vehicleCardImages';
 import BroadArrowMetricsDisplay from '../components/organization/BroadArrowMetricsDisplay';
 import VehicleCardDense from '../components/vehicles/VehicleCardDense';
 import { fetchOrganizationVehicleBooks, withOrganizationVehicleBook } from '../lib/privateMoney';
@@ -364,7 +365,6 @@ export default function OrganizationProfile() {
   const ownershipUploadId = `org-ownership-${organizationId}`;
   const [comprehensiveData, setComprehensiveData] = useState<any>(null);
   const [sellerTrackRecord, setSellerTrackRecord] = useState<SellerTrackRecord | null>(null);
-  const [competitiveContext, setCompetitiveContext] = useState<CompetitiveContext | null>(null);
   const [auctionHeatmapEvents, setAuctionHeatmapEvents] = useState<Array<{ event_date: string; event_type: string; cost_amount?: number }>>([]);
 
   // Grid and sorting controls (similar to CursorHomepage)
@@ -1169,13 +1169,6 @@ export default function OrganizationProfile() {
                 cost_amount: v.sale_price ? Number(v.sale_price) : undefined,
               }));
             setAuctionHeatmapEvents(heatEvents);
-            // Load competitive context using the org state
-            const orgState = org?.state || null;
-            if (orgState) {
-              getOrganizationCompetitiveContext(organizationId, orgState)
-                .then(ctx => { if (ctx) setCompetitiveContext(ctx); })
-                .catch(() => {});
-            }
           }
         } catch (err) {
           // Failed to load comprehensive profile data - silent
@@ -1190,11 +1183,9 @@ export default function OrganizationProfile() {
           if (intelligence) {
             setIntelligence(intelligence);
             
-            // Get data signals for tab priority calculation
-            let dataSignals = intelligence.dataSignals;
-            if (!dataSignals || Object.keys(dataSignals).length === 0) {
-              dataSignals = await OrganizationIntelligenceService.analyzeDataSignals(organizationId);
-            }
+            // Tab priority reads the stored signals. A page view never runs analyze_organization_data_signals: it
+            // writes the organization row and timed out (57014) for visitors on 2026-10-14.
+            const dataSignals = intelligence.dataSignals ?? org.data_signals ?? null;
             
             // Determine tab priority based on intelligence
             const priorityTabs = OrganizationIntelligenceService.determineTabPriority(intelligence, dataSignals);
@@ -1339,8 +1330,7 @@ export default function OrganizationProfile() {
 
           const [allVehiclesData, allImagesData, allNativeAuctionsData, allExternalAuctionsData, allBatAuctionsData, soldExternalListingsData, soldBatListingsData, endedVehicleListingsData, allExternalListingsData] = await Promise.all([
             runChunked(ids => supabase.from('vehicles').select('id, year, make, model, vin, current_value, asking_price, sale_status, sale_price, sale_date, listing_location, listing_location_raw, analysis_tier, signal_score, auction_outcome').in('id', ids)),
-
-            runChunked(ids => supabase.from('vehicle_images').select('vehicle_id, thumbnail_url, medium_url, image_url, variants, is_primary, created_at').in('vehicle_id', ids).order('is_primary', { ascending: false }).order('created_at', { ascending: true })),
+            runChunked(ids => fetchVehicleCardImages(ids)),
             runChunked(ids => supabase.from('vehicle_listings').select('vehicle_id, id, status, sale_type, auction_end_time, current_high_bid_cents, bid_count, reserve_price_cents').in('vehicle_id', ids).eq('status', 'active').in('sale_type', ['auction', 'live_auction']).gt('auction_end_time', now)),
             // external_listings -> vehicle_events. external_listings is granted to
             // service_role ONLY and carries ZERO RLS policies, so from a browser
@@ -2443,33 +2433,6 @@ export default function OrganizationProfile() {
                     </div>
                   )}
                 </div>
-              </div>
-            )}
-
-            {/* Competitive Context */}
-            {competitiveContext && (
-              <div style={{
-                padding: '8px 16px',
-                background: 'var(--surface)',
-                border: '1px solid var(--border)',
-                marginBottom: '16px',
-                fontSize: '11px',
-                color: 'var(--text-muted)',
-              }}>
-                <span style={{ fontSize: '9px', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.5px', marginRight: '8px' }}>
-                  MARKET CONTEXT
-                </span>
-                {competitiveContext.state}: #{competitiveContext.state_rank} of {competitiveContext.state_total} sellers with 3+ vehicles
-                {competitiveContext.volume_peers.length > 0 && (
-                  <span style={{ marginLeft: '12px' }}>
-                    Similar volume: {competitiveContext.volume_peers.map(p => (
-                      <Link key={p.org_id} to={`/org/${p.org_id}`}
-                        style={{ color: 'var(--text)', textDecoration: 'underline', marginRight: '8px' }}>
-                        {p.business_name} ({p.vehicle_count})
-                      </Link>
-                    ))}
-                  </span>
-                )}
               </div>
             )}
 

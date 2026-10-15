@@ -17,11 +17,20 @@ export interface KnownAuction {
   code: string;
   name: string;
   date: string;
+  /** The last day the auction page states, where it states a range; absent for a one-day sale. */
+  lastDate?: string;
 }
 
 export function getKnownAuctions(): KnownAuction[] {
   return [
     // 2026 auctions
+    // LF26, MO26 and MC26 are the auctions rmsothebys-discovery (job 450) is to read next. Without a line here a sold lot
+    // gets sold_at = null and its timeline event is dated the day of extraction. The three lines below cite the live
+    // auction page as read on 2026-10-14 (the header line under the auction name); no listing_page_snapshots row holds
+    // those pages yet. LF26 is not yet held on 2026-10-14: its lots are upcoming and carry no sale day until the auction.
+    { code: 'LF26', name: 'London 2026', date: '2026-10-31' }, // page: "31 October 2026" · live page read 2026-10-14, not archived
+    { code: 'MO26', name: 'Monterey 2026', date: '2026-08-13', lastDate: '2026-08-15' }, // page: "13 - 15 August 2026" · live page read 2026-10-14, not archived
+    { code: 'MC26', name: 'Monaco 2026', date: '2026-04-25', lastDate: '2026-04-25' }, // page: "25 April 2026" (the text says hosted 24–25 April) · live page read 2026-10-14, not archived
     { code: 'PA26', name: 'Paris 2026', date: '2026-01-28' }, // page: "28 January 2026" · listing_page_snapshots 0e9e873b-a054-45e0-ac23-481a9908d201
     { code: 'AZ26', name: 'Arizona 2026', date: '2026-01-23' }, // page: "23 January 2026" · listing_page_snapshots ea2fb9b9-ab08-4ffd-b74c-b5df50f673b1
     { code: 'CC26', name: 'Cavallino Palm Beach 2026', date: '2026-02-14' }, // not checked

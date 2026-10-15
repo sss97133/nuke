@@ -4,7 +4,7 @@ import { createRoot, type Root } from 'react-dom/client';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-const fixture = vi.hoisted(() => ({ vehicles: [] as any[], result: null as any }));
+const fixture = vi.hoisted(() => ({ vehicles: [] as any[], result: null as any, pending: false }));
 vi.mock('../../lib/supabase', () => ({
   supabase: {
     from: () => ({
@@ -14,7 +14,7 @@ vi.mock('../../lib/supabase', () => ({
     }),
   },
 }));
-vi.mock('../../lib/mcp', () => ({ callTool: async () => fixture.result }));
+vi.mock('../../lib/mcp', () => ({ callTool: () => (fixture.pending ? new Promise(() => {}) : Promise.resolve(fixture.result)) }));
 import JournalPage from './JournalPage';
 
 const PUBLIC_ID = 'a90c008a-0000-0000-0000-000000000001';
@@ -39,7 +39,7 @@ describe('JournalPage', () => {
     };
     container = document.createElement('div'); document.body.appendChild(container); root = createRoot(container);
   });
-  afterEach(async () => { await act(async () => root.unmount()); container.remove(); });
+  afterEach(async () => { await act(async () => root.unmount()); container.remove(); fixture.pending = false; vi.unstubAllGlobals(); });
 
   async function render() {
     await act(async () => {
@@ -60,5 +60,14 @@ describe('JournalPage', () => {
     expect(container.querySelector(`a[href="/vehicle/${PRIVATE_ID}"]`)).toBeNull();
     expect(container.textContent).not.toMatch(/a90c008a|bbbbbbbb|3fb4d983/i);
     expect(container.textContent).toContain('UNATTRIBUTED');
+  });
+
+  it('renders the public record from the fast read while the projection is still pending', async () => {
+    fixture.pending = true;
+    const fast = { date: '2026-09-24', audience: 'public', work_log: fixture.result.work_log };
+    vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify(fast), { status: 200 })));
+    await render();
+    expect(container.querySelector(`a[href="/vehicle/${PUBLIC_ID}"]`)?.textContent).toBe('1977 Chevrolet Blazer');
+    expect(container.textContent).not.toContain('LOADING');
   });
 });

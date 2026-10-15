@@ -27,6 +27,10 @@ import { parseLocation } from "../_shared/parseLocation.ts";
 import { writeObservation } from "../_shared/observationWriter.ts";
 import { requireWriteAuth } from "../_shared/writeGuard.ts";
 import { projectSecretKey } from "../_shared/supabaseKeys.ts";
+import { batchFromTargets, discoverTargets, reviseCab, recaptureCab } from "./targets.ts";
+import { parseCabDepth } from "./cabPage.ts";
+import { insertMissingVehicleImages } from "../_shared/vehicleImageWrite.ts";
+import { fillOnlyIdentity, identityConflict, REVISION_DIFFERENT_CAR } from "../_shared/identityMatch.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -501,6 +505,18 @@ Deno.serve(async (req) => {
     });
 
     const body = await req.json().catch(() => ({}));
+    if (body?.action === "batch_from_targets") {
+      return new Response(JSON.stringify(await batchFromTargets(supabase, supabaseUrl, serviceRoleKey, firecrawlApiKey, body)), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
+    if (body?.action === "revise") {
+      return new Response(JSON.stringify(await reviseCab(supabase, supabaseUrl, serviceRoleKey, body)), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
+    if (body?.action === "recapture") {
+      return new Response(JSON.stringify(await recaptureCab(supabase, supabaseUrl, serviceRoleKey, firecrawlApiKey, body)), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
+    if (body?.action === "discover_targets") {
+      return new Response(JSON.stringify(await discoverTargets(supabase, firecrawlApiKey)), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
     const inputUrl = String(body?.url || body?.listing_url || body?.auction_url || "").trim();
     const providedVehicleId = body?.vehicle_id ? String(body.vehicle_id) : null;
 
@@ -534,13 +550,26 @@ Deno.serve(async (req) => {
     let responseTimeMs: number;
     let fromCache = false;
 
-    if (cachedSnapshot?.html) {
+    let newSnapshotId: string | null = null;
+    if (cachedSnapshot?.html && body?.recapture !== true) {
       html = cachedSnapshot.html;
       markdown = cachedSnapshot.markdown || '';
       httpStatus = 200;
       responseTimeMs = 0;
       fromCache = true;
       console.log(`✅ C&B: Cache hit — using snapshot from ${cachedSnapshot.fetched_at} (${html.length} chars, markdown: ${markdown.length} chars)`);
+    } else if (body?.retained_only === true) {
+      // reparse_retained: never fetch (a fetch here costs a Firecrawl credit).
+      return new Response(JSON.stringify({ success: false, error: "no_retained_capture" }), { status: 409, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    } else if (typeof body?.html === "string" && body.html.length > 1000) {
+      // Page already fetched by this function's batch_from_targets (one Firecrawl credit, no actions): archive and parse it.
+      html = body.html;
+      markdown = typeof body.markdown === "string" ? body.markdown : "";
+      httpStatus = 200;
+      responseTimeMs = 0;
+      await trySaveHtmlSnapshot({ supabase, listingUrl: listingUrlNorm, httpStatus, success: true, errorMessage: null, html, metadata: { markdown } });
+      const { data: snapRow } = await supabase.from("listing_page_snapshots").select("id").eq("listing_url", listingUrlNorm).eq("success", true).order("fetched_at", { ascending: false }).limit(1).maybeSingle();
+      newSnapshotId = snapRow?.id ?? null;
     } else {
       // Cache miss — fetch via Firecrawl (C&B is a React SPA, blocks direct fetch)
       const scrapeStart = Date.now();
@@ -609,6 +638,29 @@ Deno.serve(async (req) => {
 
     // Parse HTML directly — no LLM, no markdown, no API cost
     const extracted = parseCabHtml(html, listingUrlCanonical);
+    // Depth pass over the same retained capture: full description, comment/bid stream, seller/buyer, end moment, outcome, gallery.
+    const depth = parseCabDepth(html, cachedSnapshot?.fetched_at ? new Date(cachedSnapshot.fetched_at) : new Date());
+    if (depth.seller) { extracted.sellerName = depth.seller.name; extracted.sellerProfileUrl = depth.seller.profileUrl; }
+    if (depth.endedAt) extracted.endDate = depth.endedAt;
+    extracted.auctionStatus = depth.outcome;
+    if (depth.amount) extracted.currentBid = depth.amount;
+    if (depth.bidCount != null) extracted.bidCount = depth.bidCount;
+    if (depth.commentCount != null) extracted.commentCount = depth.commentCount;
+    if (depth.viewCount != null) extracted.viewCount = depth.viewCount;
+    if (depth.watchingCount != null) extracted.watchingCount = depth.watchingCount;
+    const sec = (k: string) => depth.sections.find((x) => x.key === k)?.text ?? null;
+    extracted.dougsTake = sec("dougs-take") ?? extracted.dougsTake;
+    extracted.highlights = sec("highlights") ?? extracted.highlights;
+    extracted.equipment = sec("equipment") ?? extracted.equipment;
+    extracted.modifications = sec("modifications") ?? extracted.modifications;
+    extracted.knownFlaws = sec("known_flaws") ?? extracted.knownFlaws;
+    extracted.recentServiceHistory = sec("recent_service_history") ?? extracted.recentServiceHistory;
+    extracted.otherItemsIncluded = sec("other_items") ?? extracted.otherItemsIncluded;
+    extracted.ownershipHistory = sec("ownership_history") ?? extracted.ownershipHistory;
+    extracted.sellerNotes = sec("seller_notes") ?? extracted.sellerNotes;
+    extracted.bidHistory = depth.comments.filter((c) => c.bidAmount).map((c) => ({ id: c.id, bidder: c.author, amount: c.bidAmount!, timeAgo: c.postedAt }));
+    if (depth.photos.length) extracted.images = depth.photos;
+    else extracted.images = extracted.images.filter((u) => /og-image|\/photos\//.test(u)).slice(0, 1);
     console.log(`✅ C&B: Parsed from ${fromCache ? 'cache' : 'live fetch'}`);
 
     // Check if we got minimum required data (year/make/model)
@@ -679,18 +731,7 @@ Deno.serve(async (req) => {
       // Set primary image from extracted gallery
       primary_image_url: extracted.images.length > 0 ? extracted.images[0] : null,
       // Rich description: all content sections combined
-      description: [
-        extracted.dougsTake ? `**Doug's Take:**\n${extracted.dougsTake}` : null,
-        extracted.highlights ? `**Highlights:**\n${extracted.highlights}` : null,
-        extracted.equipment ? `**Equipment:**\n${extracted.equipment}` : null,
-        extracted.modifications ? `**Modifications:**\n${extracted.modifications}` : null,
-        extracted.knownFlaws ? `**Known Flaws:**\n${extracted.knownFlaws}` : null,
-        extracted.recentServiceHistory ? `**Recent Service History:**\n${extracted.recentServiceHistory}` : null,
-        extracted.otherItemsIncluded ? `**Other Items Included:**\n${extracted.otherItemsIncluded}` : null,
-        extracted.ownershipHistory ? `**Ownership History:**\n${extracted.ownershipHistory}` : null,
-        extracted.sellerNotes ? `**Seller Notes:**\n${extracted.sellerNotes}` : null,
-        extracted.description,
-      ].filter(Boolean).join('\n\n') || null,
+      description: [extracted.description, depth.fullDescription].filter(Boolean).join('\n\n') || null,
       listing_location: parsedLoc.clean,
       listing_location_raw: parsedLoc.raw,
       listing_location_source: 'carsandbids',
@@ -756,7 +797,7 @@ Deno.serve(async (req) => {
         error: 'Quality gate rejected extraction',
         quality_score: gateResult.score,
         quality_issues: gateResult.issues,
-        url: listingUrl,
+        url: listingUrlCanonical,
       }), {
         status: 422,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -801,16 +842,36 @@ Deno.serve(async (req) => {
       }
     }
 
+    // Identity guard: a URL/VIN match is not proof it is the same car. A different car is refused and raised as a revision
+    // item (identity_match / different_car / relink); for the same car, year/make/model/vin are fill-only.
+    let existingIdentity: { year: number | null; make: string | null; model: string | null; vin: string | null } | null = null;
+    if (vehicleId) {
+      const { data: idRow } = await supabase.from("vehicles").select("year,make,model,vin").eq("id", vehicleId).maybeSingle();
+      existingIdentity = (idRow as typeof existingIdentity) ?? null;
+      const conflict = existingIdentity ? identityConflict(existingIdentity, { year: extracted.year, make: extracted.make, model: extracted.model, vin: extracted.vin }) : null;
+      if (conflict) {
+        await supabase.rpc("record_revision_item", {
+          p_url: listingUrlCanonical, p_missing: [REVISION_DIFFERENT_CAR.missing], p_reason: REVISION_DIFFERENT_CAR.reason,
+          p_next_action: REVISION_DIFFERENT_CAR.next_action, p_raised_by: "extract-cars-and-bids-core", p_snapshot_id: null,
+          p_detail: { vehicle_id: vehicleId, detail: conflict }, p_vehicle_id: vehicleId,
+        });
+        return new Response(JSON.stringify({ success: false, refused: "different_car", vehicle_id: vehicleId, detail: conflict }), {
+          status: 409, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+    }
+    const fillOnly = <T extends Record<string, unknown>>(row: T, id: string | null, known: typeof existingIdentity) => (id && known ? fillOnlyIdentity(row, known) : row);
+
     // Upsert vehicle
     let created = false;
     if (vehicleId) {
       // Update existing
       const { error: updateError } = await supabase
         .from("vehicles")
-        .update({
+        .update(fillOnly({
           ...vehicleData,
           updated_at: new Date().toISOString(),
-        })
+        }, vehicleId, existingIdentity))
         .eq("id", vehicleId);
 
       if (updateError) {
@@ -844,7 +905,7 @@ Deno.serve(async (req) => {
             vehicleId = dupVehicle.id;
             await supabase
               .from("vehicles")
-              .update({ ...vehicleData, updated_at: new Date().toISOString() })
+              .update(fillOnly({ ...vehicleData, updated_at: new Date().toISOString() }, vehicleId, await supabase.from("vehicles").select("year,make,model,vin").eq("id", vehicleId).maybeSingle().then((r: any) => r.data ?? null)))
               .eq("id", vehicleId);
             console.log(`✅ C&B: Updated existing vehicle via fallback: ${vehicleId}`);
           } else {
@@ -905,7 +966,21 @@ Deno.serve(async (req) => {
       const nowIso = new Date().toISOString();
       // NOTE: Do NOT include user_id field - omitting it allows the constraint to pass
       // The attribution check requires either user_id OR (source='*_import' with specific fields)
-      const imageRows = extracted.images.slice(0, 50).map((url, idx) => ({
+      const photoKey = (u: string) => u.replace(/^.*\/cdn-cgi\/image\/[^/]*\//, "").split("?")[0];
+      const { data: heldImgs } = await supabase.from("vehicle_images").select("id, image_url, exif_data").eq("vehicle_id", vehicleId).eq("source", "external_import").or("is_superseded.is.null,is_superseded.eq.false").limit(1000);
+      const fullRes = (u: string) => /width=2080[,/]/.test(u);
+      const current = new Set(extracted.images.map(photoKey));
+      const mine = (heldImgs ?? []).filter((r: { exif_data: any }) => r.exif_data?.imported_from === "cars_and_bids");
+      // Earlier runs stored every media URL on the page (similar-auction thumbnails, avatars) and gallery copies at 542 px.
+      // Supersede those (the original stays, flagged) when this page's gallery is known; keep a full-resolution copy of each.
+      const stale = mine.filter((r: { image_url: string }) => !current.has(photoKey(r.image_url)) || !fullRes(r.image_url)).map((r: { id: string }) => r.id);
+      if (stale.length) {
+        const { error: supErr } = await supabase.from("vehicle_images").update({ is_superseded: true, superseded_at: nowIso }).in("id", stale);
+        if (supErr) console.warn(`⚠️ C&B: supersede images failed: ${supErr.message}`);
+      }
+      const staleSet = new Set(stale);
+      const held = new Set((heldImgs ?? []).filter((r: { id: string }) => !staleSet.has(r.id)).map((r: { image_url: string }) => photoKey(r.image_url)));
+      const imageRows = extracted.images.filter((u) => !held.has(photoKey(u))).slice(0, 200).map((url, idx) => ({
         vehicle_id: vehicleId,
         image_url: url,
         source: "external_import", // Use external_import source to satisfy attribution check (cab_import not whitelisted)
@@ -914,31 +989,27 @@ Deno.serve(async (req) => {
         approval_status: "auto_approved",
         is_approved: true,
         redaction_level: "none",
-        position: idx,
-        display_order: idx,
-        is_primary: idx === 0,
+        position: held.size + idx,
+        display_order: held.size + idx,
+        is_primary: held.size + idx === 0,
         exif_data: {
           source_url: listingUrlCanonical,
           discovery_url: listingUrlCanonical,
           imported_from: "cars_and_bids",
+          photos_on_page: extracted.images.length,
+          photos_claimed: depth.photoCountClaimed,
         },
       }));
 
-      // Delete existing cab_import images first to avoid duplicates
-      const { error: deleteError } = await supabase
-        .from("vehicle_images")
-        .delete()
-        .eq("vehicle_id", vehicleId)
-        .eq("source", "external_import");
-      if (deleteError) console.error('Failed to delete from vehicle_images:', deleteError.message);
-
+      // Testimony is never deleted: images already held stay, only new ones are added.
       console.log(`✅ C&B: Attempting to insert ${imageRows.length} images for vehicle ${vehicleId}`);
       console.log(`✅ C&B: First image row: ${JSON.stringify(imageRows[0])}`);
 
-      const { data: insertedImages, error: imgError } = await supabase
-        .from("vehicle_images")
-        .insert(imageRows)
-        .select("id");
+      // Exact-URL guard on top of the photo-key filter above: one row per URL per vehicle.
+      const { data: insertedImages, error: imgErrorRaw } = imageRows.length
+        ? await insertMissingVehicleImages(supabase, vehicleId, imageRows, { select: "id" })
+        : { data: [] as { id: string }[], error: null };
+      const imgError = imgErrorRaw as any;
 
       if (imgError) {
         console.error(`⚠️ C&B: Image insert failed: ${imgError.message}`);
@@ -959,15 +1030,49 @@ Deno.serve(async (req) => {
       }
     }
 
+    // External identities: seller, buyer and every commenter, linked by platform + handle.
+    const identityIds = new Map<string, string>();
+    {
+      const handles = new Map<string, string | null>();
+      if (depth.seller) handles.set(depth.seller.name, depth.seller.profileUrl);
+      if (depth.buyer) handles.set(depth.buyer.name, depth.buyer.profileUrl);
+      for (const c of depth.comments) if (!handles.has(c.author)) handles.set(c.author, c.profileUrl);
+      if (handles.size > 0) {
+        const nowIso = new Date().toISOString();
+        const rows = [...handles].map(([handle, profile]) => ({
+          platform: "cars_and_bids", handle, profile_url: profile || `https://carsandbids.com/user/${encodeURIComponent(handle)}`,
+          last_seen_at: nowIso, updated_at: nowIso,
+        }));
+        const { data: idRows, error: idErr } = await supabase.from("external_identities").upsert(rows, { onConflict: "platform,handle" }).select("id, handle");
+        if (idErr) console.warn(`⚠️ C&B: external identities failed: ${idErr.message}`);
+        for (const r of idRows ?? []) identityIds.set(r.handle, r.id);
+      }
+    }
+    const reserveStatus = extracted.noReserve ? "no_reserve" : depth.outcome === "sold" ? "reserve_met" : depth.outcome === "reserve_not_met" ? "reserve_not_met" : "unknown";
+
     // Upsert vehicle_event
     const vehicleEventData: Record<string, any> = {
-      source_platform: "carsandbids",
+      source_platform: "cars_and_bids", // the 18,7k events already held use this spelling
+      source_listing_id: extracted.lotNumber,
       event_type: "auction",
       source_url: listingUrlCanonical,
       vehicle_id: vehicleId,
       current_price: extracted.currentBid,
       event_status: extracted.auctionStatus || "active",
       ended_at: extracted.endDate,
+      final_price: extracted.auctionStatus === 'sold' ? extracted.currentBid : null,
+      bid_count: extracted.bidCount,
+      comment_count: extracted.commentCount,
+      view_count: extracted.viewCount,
+      watcher_count: extracted.watchingCount,
+      seller_identifier: depth.seller?.name ?? null,
+      seller_external_identity_id: depth.seller ? identityIds.get(depth.seller.name) ?? null : null,
+      buyer_identifier: depth.buyer?.name ?? null,
+      buyer_external_identity_id: depth.buyer ? identityIds.get(depth.buyer.name) ?? null : null,
+      extraction_method: "dom_parse",
+      extraction_source: "carsandbids_snapshot",
+      extractor_version: "extract-cars-and-bids-core:3",
+      extracted_at: new Date().toISOString(),
       // sold_at = the auction end moment when the auction actually sold (C&B "Ended" = sold unless reserve not met)
       sold_at: extracted.auctionStatus === 'sold' ? extracted.endDate : null,
       metadata: {
@@ -975,6 +1080,11 @@ Deno.serve(async (req) => {
         seller_id: extracted.sellerId,
         seller_name: extracted.sellerName,
         location: extracted.location,
+        reserve_status: reserveStatus,
+        no_reserve: extracted.noReserve,
+        photos_on_page: extracted.images.length,
+        photos_claimed: depth.photoCountClaimed,
+        comments_on_page: depth.comments.length,
       },
     };
 
@@ -984,12 +1094,16 @@ Deno.serve(async (req) => {
       }
     });
 
-    const { error: listingError } = await supabase
-      .from("vehicle_events")
-      .upsert(vehicleEventData, { onConflict: "source_platform,source_url" });
+    // No unique index on (source_platform, source_url), so ON CONFLICT cannot be used (that upsert never wrote):
+    // find this vehicle's event, then update or insert.
+    const { data: heldEvent } = await supabase.from("vehicle_events").select("id").eq("vehicle_id", vehicleId)
+      .in("source_platform", ["cars_and_bids", "carsandbids"]).order("created_at", { ascending: true }).limit(1).maybeSingle();
+    const { error: listingError } = heldEvent?.id
+      ? await supabase.from("vehicle_events").update({ ...vehicleEventData, updated_at: new Date().toISOString() }).eq("id", heldEvent.id)
+      : await supabase.from("vehicle_events").insert(vehicleEventData);
 
     if (listingError) {
-      console.warn(`⚠️ C&B: Vehicle event upsert failed: ${listingError.message}`);
+      console.warn(`⚠️ C&B: Vehicle event write failed: ${listingError.message}`);
     }
 
     // Link to Cars & Bids organization
@@ -1015,31 +1129,71 @@ Deno.serve(async (req) => {
       }
     }
 
-    // Upsert auction_event
-    if (vehicleId && extracted.lotNumber) {
+    // Upsert auction_event (columns as in the live table) and land the comment/bid stream under it
+    if (vehicleId) {
       const auctionEventData: Record<string, any> = {
         vehicle_id: vehicleId,
-        platform: "carsandbids",
+        source: "cars_and_bids",
+        source_url: listingUrlCanonical,
+        source_listing_id: extracted.lotNumber,
         lot_number: extracted.lotNumber,
-        auction_url: listingUrlCanonical,
+        auction_end_date: extracted.endDate,
+        outcome: depth.outcome === "sold" ? "sold" : depth.outcome === "reserve_not_met" ? "reserve_not_met" : depth.outcome === "ended" ? "pending" : "live",
+        reserve_disclosed: extracted.noReserve ? true : null,
         high_bid: extracted.currentBid,
-        end_date: extracted.endDate,
-        status: extracted.auctionStatus || "active",
-        location: extracted.location,
+        winning_bid: depth.outcome === "sold" ? extracted.currentBid : null,
+        total_bids: extracted.bidCount,
+        bid_history: extracted.bidHistory.length ? extracted.bidHistory : null,
+        high_bidder: depth.currentBidder,
+        winning_bidder: depth.buyer?.name ?? null,
+        seller_name: depth.seller?.name ?? null,
+        seller_type: extracted.sellerId,
+        seller_location: extracted.location,
+        page_views: extracted.viewCount,
+        watchers: extracted.watchingCount,
+        comments_count: extracted.commentCount,
+        scraped_at: new Date().toISOString(),
+        raw_data: { comments_claimed: depth.commentCount, bids_claimed: depth.bidCount, photos_claimed: depth.photoCountClaimed, photos_on_page: depth.photos.length, reserve_status: reserveStatus, snapshot_fetched_at: cachedSnapshot?.fetched_at ?? null, comments_on_page: depth.comments.length },
       };
-
-      Object.keys(auctionEventData).forEach(key => {
-        if (auctionEventData[key] === null || auctionEventData[key] === undefined) {
-          delete auctionEventData[key];
-        }
+      Object.keys(auctionEventData).forEach((key) => {
+        if (auctionEventData[key] === null || auctionEventData[key] === undefined) delete auctionEventData[key];
       });
-
-      const { error: auctionError } = await supabase
+      const { data: auctionRow, error: auctionError } = await supabase
         .from("auction_events")
-        .upsert(auctionEventData, { onConflict: "vehicle_id,platform,lot_number" });
+        .upsert(auctionEventData, { onConflict: "vehicle_id,source_url" })
+        .select("id")
+        .maybeSingle();
+      if (auctionError) console.warn(`⚠️ C&B: Auction event upsert failed: ${auctionError.message}`);
 
-      if (auctionError) {
-        console.warn(`⚠️ C&B: Auction event upsert failed: ${auctionError.message}`);
+      if (auctionRow?.id && depth.comments.length) {
+        const endMs = extracted.endDate ? new Date(extracted.endDate).getTime() : null;
+        const rows = depth.comments.map((c, i) => {
+          const posted = c.postedAt ?? new Date().toISOString();
+          return {
+            auction_event_id: auctionRow.id,
+            vehicle_id: vehicleId,
+            platform: "cars_and_bids",
+            source_url: listingUrlCanonical,
+            content_hash: `cab_${vehicleId}_${c.id}`,
+            sequence_number: i + 1,
+            posted_at: posted,
+            hours_until_close: endMs ? Math.max(0, (endMs - new Date(posted).getTime()) / 3_600_000) : null,
+            author_username: c.author,
+            author_external_identity_id: identityIds.get(c.author) ?? null,
+            external_identity_id: identityIds.get(c.author) ?? null,
+            is_seller: c.isSeller,
+            comment_type: c.bidAmount ? "bid" : c.isSeller ? "seller_response" : c.text.includes("?") ? "question" : "observation",
+            comment_text: c.text,
+            word_count: c.text.split(/\s+/).length,
+            has_question: c.text.includes("?"),
+            comment_likes: c.likes,
+            bid_amount: c.bidAmount,
+          };
+        });
+        for (let k = 0; k < rows.length; k += 100) {
+          const { error: cErr } = await supabase.from("auction_comments").upsert(rows.slice(k, k + 100), { onConflict: "vehicle_id,content_hash" });
+          if (cErr) { console.warn(`⚠️ C&B: comments upsert failed: ${cErr.message}`); break; }
+        }
       }
     }
 
@@ -1085,6 +1239,13 @@ Deno.serve(async (req) => {
       },
       images_inserted: imagesInserted,
       image_insert_error: imageInsertError,
+      snapshot_id: newSnapshotId,
+      result: { outcome: depth.outcome, amount: depth.amount, ended_at: depth.endedAt, buyer: depth.buyer?.name ?? null },
+      completeness: {
+        comments_landed: depth.comments.filter((c) => !c.bidAmount).length, comments_claimed: depth.commentCount,
+        bids_landed: depth.comments.filter((c) => c.bidAmount).length, bids_claimed: depth.bidCount,
+        photos_landed: depth.photos.length, photos_claimed: depth.photoCountClaimed,
+      },
       timestamp: new Date().toISOString(),
     }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },

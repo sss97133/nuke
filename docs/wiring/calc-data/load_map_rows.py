@@ -785,6 +785,26 @@ def main():
         api.insert("wiring_decision_links", lrows)
         n_link += len(lrows)
     print(f"options: {len(reg.get('options') or {})} · rows inserted {n_new} · superseded {n_sup} · plug links {n_link}")
+    # the harness model (harness_segments) follows the wires and wire ends this run superseded (RSI pass 11), and every
+    # plug this run wrote is keyed to its live point on the route graph, by the anchor named in pos_source (RSI pass 12)
+    if not PLAN:
+        print(f"harness model: {api._req('POST', 'rpc/resync_harness_segments', {'p_vehicle_id': K5})}")
+        # every decided wire's segments follow its live ends by the reshape's rule: new wires get segments, a segment whose
+        # end changed plug takes the new end (RSI pass 25, which covers pass 19's fill); the new ends are keyed to their
+        # terminal and tool parts (key_harness_wire_ends, RSI pass 6)
+        print(f"segments: {api._req('POST', 'rpc/conform_harness_segments', {'p_vehicle_id': K5})}")
+        print(f"wire end keys: {api._req('POST', 'rpc/key_harness_wire_ends', {'p_vehicle_id': K5})}")
+        # and to their cavity in the cited library (RSI pass 22: the rules of passes 2 and 9, re-runnable)
+        print(f"cavity keys: {api._req('POST', 'rpc/key_harness_wire_end_cavities', {'p_vehicle_id': K5})}")
+        print(f"route graph: {api._req('POST', 'rpc/key_harness_endpoints_to_topology', {'p_vehicle_id': K5})}")
+        # nets re-folded through bus plugs and shared pins (RSI pass 14); it re-folds protection too: each net's PDM output
+        # from its wire ends' pins, else the output its wires' design names (RSI pass 13)
+        print(f"nets: {api._req('POST', 'rpc/refold_harness_nets', {'p_vehicle_id': K5})}")
+        # the design's splices and their conductors; the nets re-fold through them, and a splice that would join a
+        # supply to ground refuses the whole load (RSI pass 16)
+        print(f"splices: {api._req('POST', 'rpc/load_harness_splices', {'p_vehicle_id': K5, 'p_rows': reg.get('splices') or [], 'p_source': f'k5_registry.json splices @ {SHA}'})}")
+        # each PDM output's programmed limit and cited load onto its channel, then onto the nets it protects (RSI pass 15)
+        print(f"pdm settings: {api._req('POST', 'rpc/load_pdm_settings', {'p_vehicle_id': K5, 'p_rows': reg.get('pdm_settings') or [], 'p_source': f'k5_registry.json pdm_settings @ {SHA}'})}")
 
 
 if __name__ == "__main__":
