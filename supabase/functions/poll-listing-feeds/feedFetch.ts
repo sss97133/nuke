@@ -22,7 +22,10 @@ function isConfirmedEmptySearch(url: string, result: CraigslistArchiveResult): b
     if (source.protocol !== "https:" || source.username || source.password || source.port ||
       !/(^|\.)craigslist\.org$/.test(source.hostname) || !/^\/search(?:\/|$)/.test(source.pathname)) return false;
   } catch { return false; }
-  const html = result.html.replace(/<!--[\s\S]*?-->/g, "");
+  const html = result.html;
+  // Retained source searches have no comments. Refuse ambiguous markup rather
+  // than rewriting it: an unterminated comment can hide otherwise valid data.
+  if (html.includes("<!--") || html.includes("-->")) return false;
   if (/cf_chl_opt|cf-browser-verification|\/cdn-cgi\/challenge-platform\/|access denied|403 forbidden|captcha|verify (?:that )?you are human/i.test(html) ||
     (/cloudflare/i.test(html) && /attention required|just a moment/i.test(html))) return false;
   const attr = (attributes: string, name: string): string | undefined => {
@@ -30,7 +33,12 @@ function isConfirmedEmptySearch(url: string, result: CraigslistArchiveResult): b
       .filter(attribute => attribute[1].toLowerCase() === name);
     return matching.length === 1 ? matching[0][2] ?? matching[0][3] ?? matching[0][4] : undefined;
   };
-  const scripts = [...html.matchAll(/<script\b([^>]*)>([\s\S]*?)<\/script\s*>/gi)];
+  const scripts = [...html.matchAll(/<script\b([^>]*)>([\s\S]*?)(<\/script\b[^>]*>)/gi)];
+  // A malformed or unclosed duplicate must not disappear from the uniqueness
+  // check. Accept only complete blocks with ordinary HTML end-tag whitespace.
+  if (scripts.length !== (html.match(/<script\b/gi) ?? []).length ||
+    scripts.length !== (html.match(/<\/script\b/gi) ?? []).length ||
+    scripts.some(script => !/^[\t\n\f\r ]*$/.test(script[3].slice(8, -1)))) return false;
   const json = (id: string): Record<string, unknown> | null => {
     const matching = scripts.filter(script => attr(script[1], "id") === id);
     if (matching.length !== 1 || attr(matching[0][1], "type")?.toLowerCase() !== "application/ld+json") return null;

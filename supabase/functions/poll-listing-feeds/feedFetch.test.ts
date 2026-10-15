@@ -20,8 +20,10 @@ function archived(value: Partial<CraigslistArchiveResult>): CraigslistArchiveRes
   return { html: null, statusCode: 200, error: null, ...value };
 }
 Deno.test("a successful Craigslist search explicitly corroborates its empty result", async () => {
-  equal(await fetchCraigslistFeed(url, async () => archived({ html: emptySearch })),
-    { html: emptySearch, error: null, confirmedEmpty: true });
+  for (const html of [emptySearch, emptySearch.replaceAll('</script>', '</script\t\n >')]) {
+    equal(await fetchCraigslistFeed(url, async () => archived({ html })),
+      { html, error: null, confirmedEmpty: true });
+  }
 });
 
 Deno.test("empty recognition rejects ambiguous, conflicting or blocked source evidence", async () => {
@@ -35,6 +37,10 @@ Deno.test("empty recognition rejects ambiguous, conflicting or blocked source ev
     emptySearch + '<script type="application/ld+json" id="ld_searchpage_results">{"@type":"ItemList","itemListElement":[]}</script>',
     emptySearch + '<script type="application/ld+json" id="ld_searchpage_results">{"@type":"ItemList","itemListElement":[{}]}</script>',
     emptySearch.replace('<script', '<!-- <script').replace('</script>', '</script> -->'),
+    '<!--' + emptySearch,
+    '<!-- outer <!-- inner -->' + emptySearch + '-->',
+    emptySearch + '<script type="application/ld+json" id="ld_searchpage_results">{"@type":"ItemList","itemListElement":[{}]}</script\t\n bar>',
+    emptySearch + '<script type="application/ld+json" id="ld_searchpage_results">{"@type":"ItemList","itemListElement":[{}]}',
     emptySearch.replace('class="cl-static-search-results"', 'class="other"'),
     emptySearch.replace('</ol>', ''),
     emptySearch.replace('</ol>', '<li class="cl-static-search-result">unreadable item</li></ol>'),
