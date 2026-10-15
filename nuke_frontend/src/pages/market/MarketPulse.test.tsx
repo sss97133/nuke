@@ -374,9 +374,22 @@ describe('where a lot should finish', () => {
       bidAtEstimate: 25000, compsThrough: '2026-09-27' });
     await render();
     const line = container.querySelector('[data-vehicle-id="later"] .market-lot-finish')!;
-    expect(line.textContent).toBe('likely $33K · $26K–$45K');
+    // how far the bid has to run ($25,000 now), then the range bar: the range, the likely tick, the bid
+    expect(line.textContent).toBe('likely $33K · +32% to go · $26K–$45K');
     expect(line.getAttribute('title')).toContain('8 in 10 cars like this');
+    expect(line.querySelector('svg')?.getAttribute('aria-label')).toBe('likely $33K, range $26K to $45K, bid $25K');
+    expect(line.querySelectorAll('svg line')).toHaveLength(2);
     expect(container.querySelector('[data-vehicle-id="first"] .market-lot-finish')).toBeNull();
+  });
+});
+
+describe('how far a lot has to run', () => {
+  it('says the gap from the bid to the likely finish', async () => {
+    const { finishGap } = await import('./MarketPulse');
+    expect(finishGap(500000, { estimate: 575000 })).toBe('+15% to go');
+    expect(finishGap(600000, { estimate: 575000 })).toBe('4% past likely');
+    expect(finishGap(575000, { estimate: 576000 })).toBe('at likely');
+    expect(finishGap(null, { estimate: 575000 })).toBeNull();
   });
 });
 

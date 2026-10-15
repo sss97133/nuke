@@ -225,3 +225,10 @@
 .market-finish__analogs { margin: 0; padding-left: 18px; display: grid; gap: 4px; }
 .market-finish__analogs li > * + * { margin-left: 8px; }
 .market-lot-finish strong { color: var(--text); }
+/* The finish range under a row's bid: the range shaded, the likely finish a tick, the bid now a bar. */
+.market-lot-finish { display: grid; gap: 3px; justify-items: end; }
+.market-lot-finish__bar { display: block; width: 160px; height: 8px; }
+.market-lot-finish__band { fill: var(--border); }
+.market-lot-finish__likely { stroke: var(--text-secondary); stroke-width: 1.5; vector-effect: non-scaling-stroke; }
+.market-lot-finish__bid { stroke: var(--text); stroke-width: 2.5; vector-effect: non-scaling-stroke; }
+@media (max-width: 760px) { .market-lot-finish { justify-items: start; } }
