@@ -87,6 +87,17 @@ export function parseTitle(title: string): ParsedTitle {
       clean = clean.slice(yearMatch[0].length).trim();
     }
   }
+  // Older catalogue titles end with the year ("Mercedes-Benz 280 SL cabriolet avec hardtop 1969", "Minerva modele CC 38 HP tourer 1912").
+  if (!result.year) {
+    const tail = clean.match(/\s+(?:c\.?\s*)?(\d{4})\s*$/i);
+    if (tail) {
+      const y = parseInt(tail[1], 10);
+      if (y >= 1886 && y <= 2030) {
+        result.year = y;
+        clean = clean.slice(0, clean.length - tail[0].length).trim();
+      }
+    }
+  }
   // Fallback: "c.1960" or "Circa 1960"
   if (!result.year) {
     const circaMatch = clean.match(/(?:c\.?\s*|circa\s+)(\d{4})/i);

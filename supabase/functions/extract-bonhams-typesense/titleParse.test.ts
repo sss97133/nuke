@@ -51,3 +51,16 @@ Deno.test('a title with no year anywhere stays without one', () => {
   equal(parseTitle('1840s Tilley Horsedrawn Manual Fire Pump').year, null);
   equal(parseTitle('The Ferrari factory team, Mille Miglia, Le Mans').year, null);
 });
+
+Deno.test('a year at the end of an older catalogue title is the car\'s year', () => {
+  const a = parseTitle('Mercedes-Benz 280 SL cabriolet avec hardtop 1969');
+  equal([a.year, a.make, a.model], [1969, 'Mercedes-Benz', '280 SL cabriolet avec hardtop']);
+  const b = parseTitle("Ford Escort RS Cosworth 'Motorsport' 1994");
+  equal([b.year, b.make], [1994, 'Ford']);
+  const c = parseTitle('Minerva mod\u00e8le CC 38 HP tourer 1912');
+  equal([c.year, c.make], [1912, 'Minerva']);
+});
+
+Deno.test('a trailing number that is not a year is left alone', () => {
+  equal(parseTitle('A set of 12 spark plugs 7777').year, null);
+});
