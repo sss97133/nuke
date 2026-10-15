@@ -13,6 +13,11 @@ import { classifyFailure, recordRevision, reviseRetained } from "../_shared/revi
 export const TARGETS_TAG = "carsandbids-targets:1";
 const CAB_SOURCE_ID = "960d1c7f-f711-4f95-9eb5-8e57833f7e0a"; // scrape_sources "Cars and Bids"; claim_revision_items matches on its name
 const SITEMAP = "https://carsandbids.com/cab-sitemap/auctions.xml";
+const DEEP_ACTIONS = [
+  { type: "click", selector: ".cnb-details-comments .dropdown-toggle" }, { type: "wait", milliseconds: 500 },
+  { type: "click", selector: "button[data-ga=newest]" }, { type: "wait", milliseconds: 2500 },
+  { type: "click", selector: ".gallery-preview .all" }, { type: "wait", milliseconds: 2500 },
+];
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 export const auctionId = (url: string) => url.match(/\/auctions\/([^/?#]+)/)?.[1] ?? null;
 
@@ -117,11 +122,7 @@ export async function batchFromTargets(supabase: any, supabaseUrl: string, key: 
           url: t.listing_url, formats: ["html", "markdown"], onlyMainContent: false, waitFor: 2500,
           // Same 1 credit as a bare scrape (measured 2026-10-15): comments filtered to Newest show the whole thread, and
           // "All Photos" opens the full gallery. Without these a sold page shows 19 of 51 comments and 9 of 75 photos.
-          actions: [
-            { type: "click", selector: ".cnb-details-comments .dropdown-toggle" }, { type: "wait", milliseconds: 500 },
-            { type: "click", selector: "button[data-ga=newest]" }, { type: "wait", milliseconds: 2500 },
-            { type: "click", selector: ".gallery-preview .all" }, { type: "wait", milliseconds: 2500 },
-          ],
+          actions: DEEP_ACTIONS,
         },
         { apiKey: firecrawlApiKey, timeoutMs: 45_000, maxAttempts: 1 },
       );
@@ -179,4 +180,48 @@ export async function reviseCab(supabase: any, supabaseUrl: string, key: string,
       return { ok: true, whole, detail: c };
     },
   });
+}
+
+/**
+ * Re-capture lots whose only snapshot was taken mid-auction. Same 1-credit deep scrape as the batch; the new capture is
+ * archived as a fresh listing_page_snapshots row (recapture:true makes the extractor prefer it over the cached one), then
+ * parsed. A 404 is a not_found revision item, never a result. Reports per URL: snapshot id and the outcome read from it.
+ */
+export async function recaptureCab(supabase: any, supabaseUrl: string, key: string, firecrawlApiKey: string, body: Record<string, any>) {
+  const urls: string[] = (Array.isArray(body.urls) ? body.urls : []).filter((u: unknown) => typeof u === "string" && /^https:\/\/carsandbids\.com\/auctions\//.test(u)).slice(0, 8);
+  const minBalance = Math.floor(Number(body.min_balance)) || 0;
+  if (minBalance > 0) {
+    const cu = await fetch("https://api.firecrawl.dev/v1/team/credit-usage", { headers: { Authorization: `Bearer ${firecrawlApiKey}` }, signal: AbortSignal.timeout(15_000) }).then((r) => r.json()).catch(() => null); // guardrail-allow: raw-fetch
+    const remaining = Number(cu?.data?.remaining_credits);
+    if (!Number.isFinite(remaining)) return { success: false, stopped: "credit_balance_unreadable" };
+    if (remaining <= minBalance) return { success: true, stopped: "credit_floor_reached", remaining, min_balance: minBalance, results: [] };
+  }
+  const results: Record<string, unknown>[] = [];
+  for (const url of urls) {
+    const fc = await firecrawlScrape(
+      { url, formats: ["html", "markdown"], onlyMainContent: false, waitFor: 2500, actions: DEEP_ACTIONS },
+      { apiKey: firecrawlApiKey, timeoutMs: 45_000, maxAttempts: 1 },
+    );
+    if (fc.httpStatus === 404) {
+      await recordRevision(supabase, { url, missing: ["result"], reason: "not_found", next: "none", raisedBy: "extract-cars-and-bids-core:recapture", detail: { http: 404 } });
+      results.push({ url, fetched: true, status: 404 });
+    } else {
+      const html = fc.data?.html ?? "";
+      if (!html || html.length < 1000) {
+        const k = classifyFailure(fc.error || "insufficient html");
+        await recordRevision(supabase, { url, missing: ["result"], reason: k.reason, next: k.next, raisedBy: "extract-cars-and-bids-core:recapture", detail: { error: String(fc.error ?? "").slice(0, 200) } });
+        results.push({ url, fetched: false, error: String(fc.error ?? "insufficient html").slice(0, 160) });
+        if (/\b(402|403|429)\b/.test(String(fc.error))) break;
+      } else {
+        const res = await fetch(`${supabaseUrl}/functions/v1/extract-cars-and-bids-core`, {
+          method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${key}`, apikey: key },
+          body: JSON.stringify({ url, html, markdown: fc.data?.markdown ?? "", recapture: true }), signal: AbortSignal.timeout(90_000),
+        });
+        const out = await res.json().catch(() => ({}));
+        results.push({ url, fetched: true, status: 200, extract_status: res.status, snapshot_id: out.snapshot_id ?? null, result: out.result ?? null, vehicle_id: out.vehicle_id ?? null, refused: out.refused ?? null });
+      }
+    }
+    await sleep(2000);
+  }
+  return { success: true, results };
 }
