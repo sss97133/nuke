@@ -96,6 +96,7 @@ export function fixture(options = {}) {
       if (name.endsWith('/schedule.ts')) return { nextYield: () => ({ rate: 0, interval_minutes: 60 }) };
       if (name.endsWith('/removal.ts')) return { sweepCraigslistRemovals: async () => null, noticeFrom: () => null };
       if (name.endsWith('/kslCards.ts')) return { parseKslSearchCards: () => [] };
+      if (name.endsWith('/yearFilter.ts')) return { splitByYear: (u) => ({ keep: u, rest: [] }) };
       if (name.endsWith('/firecrawlGate.ts')) return { firecrawlGate: () => ({ allow: async () => true, record: async () => {} }), ALLOWANCE_EXHAUSTED: 'allowance_deferred: test' };
       if (name.endsWith('/extractionMetrics.ts')) return metrics.exports;
       if (name.endsWith('/writeGuard.ts')) return { requireWriteAuth: async () => null };
