@@ -359,7 +359,7 @@ const MAX_ARTICLE_HOPS_PER_POLL = 8;
  * curated posts age out of the RSS within a day, and a login-walled target
  * (FB) would otherwise burn a hop slot retrying forever. One shot per article.
  */
-async function pollArticleHopFeed(supabase: any, feed: any, budget: IntakeBudget): Promise<FeedResult> {
+async function pollArticleHopFeed(supabase: any, feed: any, budget: IntakeBudget, allocation = MAX_ARTICLE_HOPS_PER_POLL): Promise<FeedResult> {
   const result: FeedResult = {
     feed: feed.display_name,
     source: feed.source_slug,
@@ -425,7 +425,7 @@ async function pollArticleHopFeed(supabase: any, feed: any, budget: IntakeBudget
     for (const q of ledgered || []) known.add(q.listing_url);
   }
   result.matched_existing = known.size;
-  const fresh = articleUrls.filter((u) => !known.has(u)).slice(0, MAX_ARTICLE_HOPS_PER_POLL);
+  const fresh = articleUrls.filter((u) => !known.has(u)).slice(0, Math.min(MAX_ARTICLE_HOPS_PER_POLL, allocation));
 
   const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
   const serviceKey = projectSecretKey()!;
@@ -532,6 +532,7 @@ async function pollFirecrawlHtmlFeed(
   supabase: any,
   feed: any,
   budget: IntakeBudget,
+  allocation = MAX_NEW_INGESTS_PER_POLL,
 ): Promise<FeedResult> {
   const result: FeedResult = {
     feed: feed.display_name,
@@ -737,7 +738,7 @@ async function pollFirecrawlHtmlFeed(
       supabase.from("vehicles").select("listing_url").in("listing_url", chunk),
       supabase
         .from("import_queue")
-        .select("listing_url, status, attempts, max_attempts, next_attempt_at, failure_category, processed_at")
+        .select("listing_url, status, vehicle_id, attempts, max_attempts, next_attempt_at, failure_category, processed_at")
         .in("listing_url", chunk)
         .in("status", ["complete", "skipped", "failed"]),
     ]);
@@ -757,7 +758,7 @@ async function pollFirecrawlHtmlFeed(
     for (const q of ledgered || []) ledgerRows.set(q.listing_url, q);
   }
   // New URLs first, then failed ones whose retry is due; the cap applies to both.
-  const plan = planIngests(urls, onVehicles, ledgerRows, new Date(), MAX_NEW_INGESTS_PER_POLL,
+  const plan = planIngests(urls, onVehicles, ledgerRows, new Date(), Math.min(MAX_NEW_INGESTS_PER_POLL, allocation),
     feed.source_slug === "craigslist" ? CRAIGSLIST_REVISIT : null);
   result.matched_existing = plan.settled + plan.backoff;
   result.retries_due = plan.retries;
@@ -769,10 +770,9 @@ async function pollFirecrawlHtmlFeed(
 
   // Ledger the settled outcome so future polls skip this share URL (vehicles
   // stores the canonical form, which never matches the share form — see the
-  // lookup above). Errors are NOT ledgered: they retry next poll. Rejections
-  // only ledger when STRUCTURAL (editorial / not-a-vehicle / implausible-year /
-  // quality-gate reject); identity-insufficient rejects are often a transient
-  // enrichment failure and deserve a retry (the 2026-07-02 VW Thing miss).
+  // lookup above). Attempted errors retain an unknown-outcome failed receipt and backoff.
+  // Structural rejects (editorial / not-a-vehicle / implausible-year / quality-gate)
+  // are skipped; identity-insufficient and enrichment-failed rejects use the failed retry schedule.
   // "quality_gate_reject" covers deterministic gate rejects (e.g.
   // vin_make_mismatch) added 2026-07-07 — the same URL fails the same way
   // every time, so without this it burns a MAX_NEW_INGESTS_PER_POLL slot on
@@ -813,7 +813,7 @@ async function pollFirecrawlHtmlFeed(
       if (Object.keys(captureFields).length > 0) {
         write.row.raw_data = { ...((write.row.raw_data as Record<string, unknown> | undefined) ?? {}), ...captureFields };
       }
-      if (write.status === "failed") result.landed_no_data!++;
+      if (write.status === "failed" && w.ingest.status !== "error") result.landed_no_data!++;
       const { error: ledgerWriteError, data: ledgerReceipt } = await supabase
         .from("import_queue")
         .upsert(write.row, { onConflict: "listing_url" }).select('id,status,listing_url');
@@ -837,15 +837,15 @@ async function pollFirecrawlHtmlFeed(
     const grant = budget.reserve(feed.source_slug);
     if (!grant) { result.deferred_reason = budget.refusal(feed.source_slug); break; }
     const attemptStarted = Date.now();
+    let timeout: ReturnType<typeof setTimeout> | undefined;
     try {
       const controller = new AbortController();
       // ingest's own enrichment call (tryAutoEnrich) uses a 75s internal
       // timeout (ingest/index.ts), so a shorter caller-side timeout here
       // aborts mid-enrichment on any listing taking 30-75s to extract,
-      // reports it back as a client "error" — which is NOT ledgered (errors
-      // retry next poll, by design) — and re-burns a MAX_NEW_INGESTS_PER_POLL
-      // slot on the exact same slow URL every future poll. Must exceed 75s.
-      const timeout = setTimeout(() => controller.abort(), grant.timeout_ms);
+      // reports an unknown request outcome and spends a retry. Retain the
+      // existing allowance when enough time remains, instead of cutting it short.
+      timeout = setTimeout(() => controller.abort(), grant.timeout_ms);
 
       const resp = await fetch(`${supabaseUrl}/functions/v1/ingest`, {
         method: "POST",
@@ -864,6 +864,7 @@ async function pollFirecrawlHtmlFeed(
         error: `ingest HTTP ${resp.status} (non-JSON body)`,
       }))) as IngestOutcome;
       const status = ingest.status || "error";
+      ingest.status = status;
 
       const outcomeEntry: NonNullable<FeedResult["ingest_outcomes"]>[number] = {
         url,
@@ -886,13 +887,18 @@ async function pollFirecrawlHtmlFeed(
 
       if (shouldLedger(ingest)) waiting.push({ url, ingest, entry: outcomeEntry });
     } catch (err: any) {
-      budget.record(feed.source_slug, Date.now() - attemptStarted, { error: err?.message || String(err) });
-      result.ingest_outcomes!.push({
+      const ingest: IngestOutcome = { status: "error", error: err?.message || String(err) };
+      budget.record(feed.source_slug, Date.now() - attemptStarted, ingest);
+      const entry = {
         url,
         status: "error",
         ingest_attempted: true,
         error: (err?.message || String(err)).slice(0, 200),
-      });
+      };
+      result.ingest_outcomes!.push(entry);
+      waiting.push({ url, ingest, entry });
+    } finally {
+      clearTimeout(timeout);
     }
 
     if (Date.now() - lastFlushAt >= FLUSH_AFTER_MS) await flushLedger();
@@ -1066,7 +1072,7 @@ Deno.serve(async (req) => {
     // the invocation first.
     const FEED_LOOP_TIME_BUDGET_MS = 110_000;
 
-    for (const feed of dueFeeds) {
+    for (const [feedIndex, feed] of dueFeeds.entries()) {
       if (Date.now() - startTime > FEED_LOOP_TIME_BUDGET_MS) {
         console.log(`[poll-feeds] Time budget exceeded (${Date.now() - startTime}ms) — stopping early, ${dueFeeds.length - results.length} feed(s) deferred to next cron tick`);
         break;
@@ -1080,6 +1086,7 @@ Deno.serve(async (req) => {
       }
       await runReceipt.begin(feed.id);
       const resultIndex = results.length;
+      const allocation = budget.feedAllowance(dueFeeds.length - feedIndex, MAX_NEW_INGESTS_PER_POLL);
       try {
 
       // CLAIM BEFORE WORK. Stamp last_polled_at up front so a mid-feed kill
@@ -1100,7 +1107,7 @@ Deno.serve(async (req) => {
       // RSS). Both bypass the legacy import_queue path entirely and route
       // through `ingest` with the share-URL ledger.
       if (feed.search_criteria?.fetch_strategy === "rss_article_hop") {
-        const hopResult = await pollArticleHopFeed(supabase, feed, budget);
+        const hopResult = await pollArticleHopFeed(supabase, feed, budget, allocation);
         results.push(hopResult);
         totalFound += hopResult.items_found;
         totalIngested += hopResult.new_ingested || 0;
@@ -1113,7 +1120,7 @@ Deno.serve(async (req) => {
           feed.search_criteria?.fetch_strategy
         )
       ) {
-        const fcResult = await pollFirecrawlHtmlFeed(supabase, feed, budget);
+        const fcResult = await pollFirecrawlHtmlFeed(supabase, feed, budget, allocation);
         results.push(fcResult);
         totalFound += fcResult.items_found;
         totalIngested += fcResult.new_ingested || 0;

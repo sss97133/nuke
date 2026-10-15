@@ -311,7 +311,7 @@
       }
     },
     {
-      "name": "an ingest error is not ledgered, so the next poll retries it",
+      "name": "an ingest error keeps an unknown-outcome failed retry receipt",
       "url": "https://classiccars.com/listings/view/0000013/1982-example-model-for-sale-in-anytown-xx-00000",
       "ingest": {
         "status": "error",
@@ -319,7 +319,8 @@
       },
       "vehicle": null,
       "expect": {
-        "status": null
+        "status": "failed",
+        "failure_category": "extraction_failed"
       }
     }
   ]
