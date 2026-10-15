@@ -6,7 +6,7 @@
  *
  * POST { url: "https://barnfinds.com/bf-exclusive-1990-ford-f-150-lariat-4x4/" }
  * POST { url, use_firecrawl: true }  – force Firecrawl
- * POST { action: "batch", limit?: number }  – drain the barnfinds rows of import_queue under a polite throttle
+ * POST { action: "batch", limit?: number }  – land unlanded barnfinds source_targets under a polite throttle
  *   (>= 2 s between fetches, stops on 403/429, time-boxed); run by the barnfinds-intake-batch pg_cron job.
  */
 
@@ -268,56 +268,103 @@ async function extractOne(supabase: Supabase, url: string, useFirecrawl: boolean
 const json = (body: unknown, status = 200) =>
   new Response(JSON.stringify(body), { status, headers: { ...corsHeaders, "Content-Type": "application/json" } });
 
-/** Drain pending barnfinds rows of import_queue, one fetch per MIN_GAP_MS, stopping on a 403/429 or when the time box ends. */
+const TARGETS_TAG = "barnfinds-targets";
+const spellings = (u: string) => [u, u.replace(/\/+$/, "")];
+
+/**
+ * Land unlanded barnfinds source_targets, one fetch per MIN_GAP_MS. Walks source_targets in id order. A target is skipped
+ * if it has a vehicle_event or an import_queue row; each one tried gets an import_queue row (extractor_version
+ * TARGETS_TAG, raw_data.target_id), which is also the cursor. The row is inserted as 'processing': a 'pending' insert fires
+ * trigger_process_import_queue_url, one HTTP call per row, and the auto-source trigger costs 14 ms a row.
+ * Stops at `limit`, at the time box, after 3 failures in a row, and at once on a 403/429.
+ */
 async function runBatch(supabase: Supabase, limit: number) {
   const started = Date.now();
-  const { data: rows, error } = await supabase
+  const { data: last } = await supabase
     .from("import_queue")
-    .select("id, listing_url, attempts, max_attempts")
-    .like("listing_url", "https://barnfinds.com/%")
-    .eq("status", "pending")
-    .or(`next_attempt_at.is.null,next_attempt_at.lte.${new Date().toISOString()}`)
-    .order("created_at", { ascending: true })
-    .limit(limit);
-  if (error) return { success: false, error: error.message };
+    .select("raw_data")
+    .eq("extractor_version", TARGETS_TAG)
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  let cursor = Number(last?.raw_data?.target_id) || 0;
 
-  const tally = { processed: 0, complete: 0, skipped: 0, failed: 0, event_inserted: 0, event_updated: 0, blocked: false };
-  let last = 0;
-  for (const row of rows ?? []) {
-    if (Date.now() - started > BATCH_BUDGET_MS) break;
-    const wait = MIN_GAP_MS - (Date.now() - last);
+  const picked: { id: number; listing_url: string }[] = [];
+  for (let page = 0; page < 20 && picked.length < limit; page++) {
+    const { data: targets, error: tErr } = await supabase
+      .from("source_targets")
+      .select("id, listing_url")
+      .eq("source_slug", "barnfinds")
+      .gt("id", cursor)
+      .order("id", { ascending: true })
+      .limit(200);
+    if (tErr) return { success: false, error: tErr.message };
+    if (!targets?.length) break;
+    cursor = targets[targets.length - 1].id;
+    const queued = new Set<string>();
+    const landed = new Set<string>();
+    // 25 targets x 2 spellings keeps each request line short; an unread answer must never count as "nothing landed".
+    for (let i = 0; i < targets.length; i += 25) {
+      const chunk = targets.slice(i, i + 25).flatMap((t: { listing_url: string }) => spellings(t.listing_url));
+      const [q, e] = await Promise.all([
+        supabase.from("import_queue").select("listing_url").in("listing_url", chunk),
+        supabase.from("vehicle_events").select("source_url").eq("source_platform", "barnfinds").in("source_url", chunk),
+      ]);
+      if (q.error || e.error) return { success: false, error: `landed lookup failed: ${(q.error || e.error)?.message}` };
+      for (const r of q.data ?? []) queued.add(String(r.listing_url).replace(/\/+$/, ""));
+      for (const r of e.data ?? []) landed.add(String(r.source_url).replace(/\/+$/, ""));
+    }
+    for (const t of targets) {
+      const k = t.listing_url.replace(/\/+$/, "");
+      if (!queued.has(k) && !landed.has(k) && picked.length < limit) picked.push(t);
+    }
+  }
+
+  const tally = { picked: picked.length, complete: 0, skipped: 0, failed: 0, event_inserted: 0, event_updated: 0, stopped: null as string | null };
+  let lastFetch = 0;
+  let consecutiveFailures = 0;
+  for (const t of picked) {
+    if (Date.now() - started > BATCH_BUDGET_MS) { tally.stopped = "time_budget"; break; }
+    const { data: row, error: claimErr } = await supabase
+      .from("import_queue")
+      .insert({ listing_url: t.listing_url, status: "processing", extractor_version: TARGETS_TAG, raw_data: { target_id: t.id }, locked_at: new Date().toISOString() })
+      .select("id")
+      .single();
+    if (claimErr || !row) continue; // another run holds this target
+    const wait = MIN_GAP_MS - (Date.now() - lastFetch);
     if (wait > 0) await new Promise((r) => setTimeout(r, wait));
-    last = Date.now();
+    lastFetch = Date.now();
     const now = new Date().toISOString();
     let out: Outcome;
     try {
-      out = await extractOne(supabase, String(row.listing_url).replace(/\/$/, ""), false);
+      out = await extractOne(supabase, t.listing_url.replace(/\/+$/, ""), false);
     } catch (e: any) {
       out = { status: 500, body: { success: false, error: e?.message ?? String(e) } };
     }
     if (out.blocked) {
-      // Back off: leave the row pending, try again in an hour.
-      await supabase.from("import_queue").update({ next_attempt_at: new Date(Date.now() + 3600_000).toISOString(), error_message: String(out.body.error), updated_at: now }).eq("id", row.id);
-      tally.blocked = true;
+      // Back off: free the target for a later run and stop.
+      await supabase.from("import_queue").delete().eq("id", row.id);
+      tally.stopped = "blocked_by_source";
       break;
     }
-    tally.processed++;
-    const attempts = (row.attempts ?? 0) + 1;
     if (out.body.success) {
       tally.complete++;
+      consecutiveFailures = 0;
       if (out.body.event === "inserted") tally.event_inserted++; else tally.event_updated++;
-      await supabase.from("import_queue").update({ status: "complete", attempts, processed_at: now, last_attempt_at: now, updated_at: now, vehicle_id: out.body.vehicle_id, error_message: null, extractor_version: "extract-barn-finds-listing" }).eq("id", row.id);
+      await supabase.from("import_queue").update({ status: "complete", processed_at: now, vehicle_id: out.body.vehicle_id }).eq("id", row.id);
     } else if (out.status === 422) {
-      // The page is not a parseable listing (wanted ad, collection post, quality gate): terminal.
+      // Not a parseable listing (wanted ad, collection post, quality gate): terminal.
       tally.skipped++;
-      await supabase.from("import_queue").update({ status: "skipped", attempts, last_attempt_at: now, updated_at: now, error_message: String(out.body.error), failure_category: "extraction_failed" }).eq("id", row.id);
+      consecutiveFailures = 0;
+      await supabase.from("import_queue").update({ status: "skipped", processed_at: now, error_message: String(out.body.error).slice(0, 500), failure_category: "extraction_failed" }).eq("id", row.id);
     } else {
       tally.failed++;
-      const dead = attempts >= (row.max_attempts ?? 3);
-      await supabase.from("import_queue").update({ status: dead ? "failed" : "pending", attempts, last_attempt_at: now, updated_at: now, next_attempt_at: new Date(Date.now() + 900_000).toISOString(), error_message: String(out.body.error), failure_category: "extraction_failed" }).eq("id", row.id);
+      consecutiveFailures++;
+      await supabase.from("import_queue").update({ status: "failed", processed_at: now, error_message: String(out.body.error).slice(0, 500), failure_category: "extraction_failed" }).eq("id", row.id);
+      if (consecutiveFailures >= 3) { tally.stopped = "3_failures_in_a_row"; break; }
     }
   }
-  return { success: true, claimed: rows?.length ?? 0, ...tally, elapsed_ms: Date.now() - started };
+  return { success: true, cursor, ...tally, elapsed_ms: Date.now() - started };
 }
 
 Deno.serve(async (req) => {
