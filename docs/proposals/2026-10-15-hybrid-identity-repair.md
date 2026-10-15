@@ -1,11 +1,18 @@
 # Hybrid vehicle rows: a lot's own sale under another car's identity (proposal, 2026-10-15)
 
-Status (2026-10-15 14:25Z): prevention landed, so the first rows have been repaired.
+Status (2026-10-15 23:50Z): executed, a record of what was done.
 - **Prevention:** extract-barrett-jackson refuses a different car and fills identity only (#1438); the Mecum page path
   was fixed in #1468.
-- **Repaired:** the five acceptance rows. See "Executed" below.
-- **Next:** the 30 Conceptcarz rows and the fleet count. The count comes from `mv_family_year_prices.conflicts` after
-  the fold's first build (cron `refresh-family-year-prices`, 18:40 UTC).
+- **Repaired:** the five acceptance rows, 437 BaT-lot hybrids and 241 Mecum-lot hybrids. About 10,500 B-J auctions
+  moved to the cars whose lots they are, almost all as duplicates of a copy that car already held. See "Executed" and
+  "Fleet pass" below.
+- **Writers added:** `correct_auction_event_link` (#1546, #1561) and `reattribute_observation` onto an existing image
+  copy (#1553).
+- **Fleet count:** taken from the fold's first build (Population item 1).
+- **Still open:**
+  - B-J lots that have no vehicle: lane-online-auctions re-lands them and the relink follows its map.
+  - 5,737 same-car pairs for merge review.
+  - The 30 Conceptcarz rows in the 1967 Corvette cell, which are Conceptcarz-origin duplicates.
 
 Owner: lane skylar-08. Readers affected: skylar-83's mv_treemap_outcomes, mv_family_market and the brand map.
 
