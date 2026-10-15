@@ -2,10 +2,11 @@
 import React, { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
-const fixture = vi.hoisted(() => ({ query: {} as any, activity: {} as any, book: null as any }));
+const fixture = vi.hoisted(() => ({ query: {} as any, activity: {} as any, book: null as any, finish: undefined as any }));
 vi.mock('../../hooks/useAuctionComments', () => ({ EPISODE_READ_LIMIT: 100, useAuctionEpisode: () => fixture.query }));
 vi.mock('../stacks/orderBookReader', async importOriginal => ({ ...await importOriginal<any>(), useBidBook: () => ({ data: fixture.book }) }));
 vi.mock('./useLotMovement', () => ({ useLotMovement: () => fixture.activity }));
+vi.mock('./useFinishEstimates', () => ({ useFinishAnalogs: () => ({ data: fixture.finish }) }));
 vi.mock('../../components/PrefetchLink', () => ({ PrefetchLink: ({ to, ...p }: any) => <a href={to} {...p} /> }));
 import AuctionEvidence, { AuctionCompetition } from './AuctionEvidence';
 let root: Root, container: HTMLDivElement;
@@ -29,6 +30,7 @@ beforeEach(() => {
     ] } };
   fixture.book = null;
   fixture.activity = { coverage: { lots: [] } };
+  fixture.finish = undefined;
   container = document.createElement('div'); document.body.appendChild(container); root = createRoot(container);
 });
 afterEach(async () => { await act(async () => root.unmount()); container.remove(); });
@@ -153,6 +155,29 @@ it('draws every bid the bid book holds, not only the newest interactions', async
   expect(container.querySelector('.auction-evidence-chart-heading')?.textContent).toContain('4');
   // The latest bid is the highlighted point by default.
   expect(container.querySelector('svg [aria-pressed="true"]')?.getAttribute('aria-label')).toContain('$2,000');
+});
+
+it('opens with where the lot should finish: estimate, range, measured confidence and the past lots it rests on', async () => {
+  fixture.finish = { board: { fresh: true, writerAt: null, byId: new Map([[id, { vehicleId: id, estimate: 33000, low: 25500, high: 45100,
+    grade: 'A', coverage: 0.775, sentence: '8 in 10 cars like this finished inside this range. Half finished within 15%.',
+    estimatedAt: Date.now() - 10 * 60_000, bidAtEstimate: 25000, compsThrough: '2026-09-27' }]]) },
+    analogs: [{ url: 'https://bringatrailer.com/listing/1965-ford-mustang-convertible-55/', title: '1965 Ford Mustang Convertible A-Code',
+      closed: '2026-02-22', bid: 25000, final: 38250, outcome: 'sold' },
+      { url: null, title: '1966 Ford Mustang GT Coupe', closed: '2026-09-26', bid: 21000, final: 21500, outcome: 'reserve_not_met' }] };
+  await act(async () => root.render(<AuctionEvidence vehicleId={id} sourceUrl={source} compact onClose={() => {}} />));
+  const block = container.querySelector('[aria-label="Where it should finish"]')!;
+  expect(block.textContent).toContain('$33,000');
+  expect(block.textContent).toContain('80% range $25,500–$45,100');
+  expect(block.textContent).toContain('8 in 10 cars like this finished inside this range');
+  expect(block.querySelector('a[href^="https://bringatrailer.com/listing/"]')?.textContent).toBe('1965 Ford Mustang Convertible A-Code');
+  expect(block.textContent).toContain('bid $25,000 at this point · finished $38,250');
+  expect(block.textContent).toContain('high bid $21,500');
+  expect(block.textContent).toContain('Comparable sales through Sep 27, 2026');
+  expect(block.textContent).toContain('estimated 10 min ago at a $25,000 bid');
+});
+it('says nothing about the finish when there is no estimate', async () => {
+  await act(async () => root.render(<AuctionEvidence vehicleId={id} sourceUrl={source} compact onClose={() => {}} />));
+  expect(container.querySelector('[aria-label="Where it should finish"]')).toBeNull();
 });
 
 it('preserves the row owner focus when compact inspection effects replay', async () => {

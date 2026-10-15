@@ -218,3 +218,10 @@
   .market-figure { gap: 8px 16px; }
   .market-board__head { align-items: flex-start; }
 }
+/* Where it should finish: the estimate first in the drawer, then the past lots it rests on. */
+.market-finish { display: grid; gap: 6px; margin: 4px 0 14px; padding: 10px 12px; border: 2px solid var(--border); background: var(--bg); max-width: 72ch; }
+.market-finish__value { display: flex; align-items: baseline; flex-wrap: wrap; gap: 4px 12px; }
+.market-finish p { margin: 0; }
+.market-finish__analogs { margin: 0; padding-left: 18px; display: grid; gap: 4px; }
+.market-finish__analogs li > * + * { margin-left: 8px; }
+.market-lot-finish strong { color: var(--text); }

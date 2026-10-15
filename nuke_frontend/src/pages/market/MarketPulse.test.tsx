@@ -4,7 +4,8 @@ import { createRoot, type Root } from 'react-dom/client';
 import { BrowserRouter } from 'react-router-dom';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-const fixture = vi.hoisted(() => ({ pulse: {} as any, movement: {} as any, taxonomy: {} as any, details: new Map() as Map<string, any>, specs: [] as any[], retry: vi.fn(), sameHour: [] as any[] }));
+const fixture = vi.hoisted(() => ({ pulse: {} as any, movement: {} as any, taxonomy: {} as any, details: new Map() as Map<string, any>, specs: [] as any[], retry: vi.fn(), sameHour: [] as any[], finish: new Map() as Map<string, any> }));
+vi.mock('./useFinishEstimates', () => ({ useFinishEstimates: () => ({ data: { fresh: true, writerAt: null, byId: fixture.finish } }) }));
 vi.mock('./useMarketPulse', async importOriginal => ({
   ...await importOriginal<typeof import('./useMarketPulse')>(),
   useMarketPulse: () => fixture.pulse, useSameHourReadings: () => ({ data: fixture.sameHour }), useInventoryTaxonomy: () => fixture.taxonomy,
@@ -69,7 +70,7 @@ beforeEach(() => {
     observe() { this.callback([{ contentRect: { width: window.innerWidth } }]); }
     disconnect() {}
   });
-  fixture.retry.mockReset(); fixture.details = new Map(); fixture.specs = [];
+  fixture.retry.mockReset(); fixture.details = new Map(); fixture.specs = []; fixture.finish = new Map();
   fixture.taxonomy = { data: [], isLoading: false, isError: false, isSuccess: true, refetch: fixture.retry };
   vi.stubGlobal('requestAnimationFrame', (fn: () => void) => { fn(); return 0; });
   HTMLElement.prototype.scrollIntoView = vi.fn();
@@ -365,6 +366,19 @@ describe('market answer -> supporting lots', () => {
   });
 });
 
+
+describe('where a lot should finish', () => {
+  it('puts the estimate and its range under the bid, with the measured confidence on hover, and nothing without one', async () => {
+    fixture.finish.set('later', { vehicleId: 'later', estimate: 33000, low: 25500, high: 45100, grade: 'A', coverage: 0.775,
+      sentence: '8 in 10 cars like this finished inside this range. Half finished within 15%.', estimatedAt: Date.now(),
+      bidAtEstimate: 25000, compsThrough: '2026-09-27' });
+    await render();
+    const line = container.querySelector('[data-vehicle-id="later"] .market-lot-finish')!;
+    expect(line.textContent).toBe('likely $33K · $26K–$45K');
+    expect(line.getAttribute('title')).toContain('8 in 10 cars like this');
+    expect(container.querySelector('[data-vehicle-id="first"] .market-lot-finish')).toBeNull();
+  });
+});
 
 describe('the board in its own history', () => {
   it('places each figure against the same hour on earlier weeks, once, and keeps no second copy of the totals', async () => {
