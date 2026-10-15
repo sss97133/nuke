@@ -61,7 +61,7 @@ BEGIN
   SELECT conductors_named || ' = ' || circular_mils INTO got FROM public.v_harness_splice_check WHERE splice_code = 'PDM30-A A2 #1';
   IF got IS DISTINCT FROM 'TP1 (22 AWG), TP2 (22 AWG), 20 AWG pin lead = 2306' THEN RAISE EXCEPTION 'A2 fill: %', got; END IF;
 
-  SELECT string_agg(measure || '=' || numerator || '/' || denominator, '; ' ORDER BY measure) INTO got FROM public.v_harness_coverage
+  SELECT string_agg(measure || '=' || numerator || '/' || denominator, '; ' ORDER BY measure COLLATE "C") INTO got FROM public.v_harness_coverage
   WHERE measure IN ('splice members keyed to a live wire', 'pin cavities shared by several wires with no splice the design names (must be 0)',
                     'spliced pins whose lead into the pin the design names', 'splice sides outside the part''s crimp range (must be 0)');
   IF got IS DISTINCT FROM 'pin cavities shared by several wires with no splice the design names (must be 0)=1/2; splice members keyed to a live wire=8/10; splice sides outside the part''s crimp range (must be 0)=1/3; spliced pins whose lead into the pin the design names=1/3' THEN
