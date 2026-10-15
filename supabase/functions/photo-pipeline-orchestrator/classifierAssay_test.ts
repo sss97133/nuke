@@ -1,3 +1,5 @@
+import { __setGuardDb, allowAllGuardDb } from '../_shared/geminiGuard.ts';
+__setGuardDb(allowAllGuardDb()); // these suites assert exact fetch counts; the guard's own tests are _shared/geminiGuard.test.ts
 import { runClassifierAssay } from "./classifierAssay.ts";
 
 const imageId = "eada407d-2206-46e4-89db-490743c723d1";

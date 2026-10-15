@@ -1,3 +1,5 @@
+import { __setGuardDb, allowAllGuardDb } from '../_shared/geminiGuard.ts';
+__setGuardDb(allowAllGuardDb()); // these suites assert exact fetch counts; the guard's own tests are _shared/geminiGuard.test.ts
 // Handler integration uses only a synthetic project/key and in-memory HTTP.
 // No net permission is requested; unexpected image/model calls fail the test.
 let handler: (req: Request) => Promise<Response>;

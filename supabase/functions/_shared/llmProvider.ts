@@ -1,3 +1,4 @@
+import { geminiFetch } from './geminiGuard.ts';
 /**
  * Unified LLM Provider System
  * Supports OpenAI, Anthropic, and Google Gemini
@@ -292,14 +293,14 @@ async function callGoogle(config: LLMConfig, messages: any[], options?: any): Pr
     requestBody.systemInstruction = { parts: [{ text: systemMessage }] };
   }
 
-  const response = await fetch(
+  const response = await geminiFetch(
     `https://generativelanguage.googleapis.com/v1beta/models/${config.model}:generateContent?key=${config.apiKey}`,
     {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(requestBody),
     }
-  );
+  , 'llmProvider');
   
   if (!response.ok) {
     const error = await response.text();
