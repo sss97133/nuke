@@ -68,7 +68,8 @@ export async function batchFromTargets(supabase: any, supabaseUrl: string, key: 
   let cursor = Number(body.after_id) || Number(last?.raw_data?.target_id) || 0;
 
   const picked: { id: number; listing_url: string }[] = [];
-  for (let page = 0; page < 10 && picked.length < limit; page++) {
+  // Candidates beyond `limit`: a lot another run already claimed (unique import_queue.listing_url) is skipped for free.
+  for (let page = 0; page < 10 && picked.length < limit * 3; page++) {
     const { data: targets, error } = await supabase.from("source_targets").select("id, listing_url").eq("source_slug", "cars-and-bids").gt("id", cursor).order("id", { ascending: true }).limit(200);
     if (error) throw error;
     if (!targets?.length) break;
@@ -76,18 +77,21 @@ export async function batchFromTargets(supabase: any, supabaseUrl: string, key: 
     const urls = targets.map((t: any) => t.listing_url);
     const { data: queued } = await supabase.from("import_queue").select("listing_url").in("listing_url", urls);
     const done = new Set((queued ?? []).map((r: any) => r.listing_url));
-    for (const t of targets) if (picked.length < limit && !done.has(t.listing_url)) picked.push(t);
+    for (const t of targets) if (picked.length < limit * 3 && !done.has(t.listing_url)) picked.push(t);
   }
 
-  const results = { picked: picked.length, landed: 0, failed: 0, credits: 0, stopped: null as string | null, errors: [] as string[] };
+  const results = { candidates: picked.length, landed: 0, failed: 0, credits: 0, stopped: null as string | null, errors: [] as string[] };
   let streak = 0;
+  let claimed = 0;
   for (const t of picked) {
+    if (claimed >= limit) break;
     if (Date.now() - started > budgetMs) { results.stopped = "time_budget"; break; }
     const { data: row, error: claimErr } = await supabase.from("import_queue").insert({
       listing_url: t.listing_url, status: "processing", extractor_version: TARGETS_TAG,
       raw_data: { target_id: t.id }, locked_at: new Date().toISOString(),
     }).select("id").single();
-    if (claimErr || !row) continue;
+    if (claimErr || !row) continue; // claimed by the other cron job before any credit was spent
+    claimed++;
     const finish = (status: string, error?: string, vehicleId?: string) =>
       supabase.from("import_queue").update({ status, error_message: error?.slice(0, 500) ?? null, vehicle_id: vehicleId ?? null, processed_at: new Date().toISOString() }).eq("id", row.id);
     try {
