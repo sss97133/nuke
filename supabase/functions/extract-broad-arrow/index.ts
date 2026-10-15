@@ -1198,17 +1198,19 @@ Deno.serve(async (req) => {
     }
 
     // --- Roster: upcoming sales for the auction calendar (0 credits: plain fetches of the site's own public pages) ---
-    // /vehicles (all pages, 2 s apart) gives the lot cards; /events/event/<sale> the run day and place. Up to 40 lots not yet landed as
+    // /vehicles (all pages, 10 s apart, the site's Crawl-delay) gives the lot cards; /events/event/<sale> the run day and place. Up to 20 lots not yet landed as
     // upcoming are landed per run through saveToDatabase (event_status upcoming, ended_at the run day, calendar metadata), and a
     // source_census row (house_roster_facet) states the lots listed per sale. A 403/429 or a page without cards ends the run.
     if (action === 'roster') {
+      // robots.txt (read 2026-10-16) sets Crawl-delay: 10 for every agent and disallows no path used here (/vehicles?page=N, /events/event/...).
+      const CRAWL_DELAY_MS = 10_000;
       const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
       const observedAt = new Date().toISOString();
       const cards: RosterCard[] = [];
       const seenUrls = new Set<string>();
       let stoppedBy: string | null = null;
       for (let pg = 1; pg <= 8; pg++) {
-        if (pg > 1) await sleep(2000);
+        if (pg > 1) await sleep(CRAWL_DELAY_MS);
         const r = await archiveFetch(`https://www.broadarrowauctions.com/vehicles${pg > 1 ? `?page=${pg}` : ''}`, {
           platform: 'broad_arrow', callerName: 'extract-broad-arrow-roster', useFirecrawl: false, skipCache: true, metadata: { source: 'broad-arrow-roster', page: pg },
         });
@@ -1224,7 +1226,7 @@ Deno.serve(async (req) => {
       const events = new Map<string, ReturnType<typeof parseEventPage>>();
       for (const [code, lots] of bySale) {
         const name = lots[0].sale_name ?? code;
-        await sleep(2000);
+        await sleep(CRAWL_DELAY_MS);
         const ev = await archiveFetch(`https://www.broadarrowauctions.com/events/event/${encodeURIComponent(name.normalize('NFD').replace(/[\u0300-\u036f]/g, ''))}`, {
           platform: 'broad_arrow', callerName: 'extract-broad-arrow-roster', useFirecrawl: false, skipCache: true, metadata: { source: 'broad-arrow-roster', sale: code },
         });
@@ -1239,7 +1241,7 @@ Deno.serve(async (req) => {
         const { data: have } = await supabase.from('vehicle_events').select('source_listing_id').eq('source_platform', 'broad_arrow').eq('event_status', 'upcoming').in('source_listing_id', keys);
         for (const h of have ?? []) landedUrls.add(String(h.source_listing_id));
       }
-      const todo = cards.filter((c) => !landedUrls.has(keyOf(c.url)) && events.get(c.code)?.starts_on).slice(0, 40);
+      const todo = cards.filter((c) => !landedUrls.has(keyOf(c.url)) && events.get(c.code)?.starts_on).slice(0, 20);
       const out = { landed: 0, created: 0, failed: 0, errors: [] as string[] };
       for (const c of todo) {
         const e = events.get(c.code)!;
