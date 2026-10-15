@@ -337,6 +337,16 @@ export function isEnrichmentFailedReject(ingest: IngestOutcome): boolean {
   return ingest.status === "rejected" && /^enrichment_failed\b/.test(String(ingest.reason ?? ""));
 }
 
+/**
+ * A post whose year, make or model could not be read (a seller who left the model blank: "75 datsun"). Measured
+ * 2026-10-15 on Craigslist, 10 h of post pages: 73 of 332 fetched pages (22%) ended here with no ledger row, so every
+ * poll fetched them again for as long as they stayed on a search page. They now take the failed schedule: a retry a day,
+ * final at max_attempts, so a transient extractor miss still gets its retries and a blank model stops costing requests.
+ */
+export function isIdentityInsufficientReject(ingest: IngestOutcome): boolean {
+  return ingest.status === "rejected" && /^insufficient identity\b/.test(String(ingest.reason ?? ""));
+}
+
 /** Rejections that will not change on a retry; the poller ledgers them `skipped`. */
 export function isStructuralReject(ingest: IngestOutcome): boolean {
   return (
@@ -351,7 +361,8 @@ export function shouldLedger(ingest: IngestOutcome): boolean {
   return (
     ["created", "matched", "duplicate"].includes(ingest.status ?? "") ||
     isStructuralReject(ingest) ||
-    isEnrichmentFailedReject(ingest)
+    isEnrichmentFailedReject(ingest) ||
+    isIdentityInsufficientReject(ingest)
   );
 }
 
@@ -384,6 +395,8 @@ export function ledgerWriteFor(input: {
     const extractorError = String(ingest.enrichment_error ?? "").trim();
     const message = String(ingest.reason);
     outcome = { status: "failed", message, failure_category: failureCategoryFor(extractorError || message), landed: null };
+  } else if (isIdentityInsufficientReject(ingest)) {
+    outcome = { status: "failed", message: String(ingest.reason), failure_category: "identity_insufficient", landed: null };
   } else if (isStructuralReject(ingest)) {
     outcome = null;
   } else {

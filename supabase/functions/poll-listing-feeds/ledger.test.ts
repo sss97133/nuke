@@ -156,7 +156,17 @@ Deno.test("another platform keeps its existing completeness contract even with s
 
 Deno.test("the poller ledgers nothing for an ingest error or a non-structural rejection", () => {
   equal(write({ status: "error", error: "ingest HTTP 502" }, null), null);
-  equal(write({ status: "rejected", reason: "insufficient identity: year=? make=? model=?" }, null), null);
+});
+
+Deno.test("a post with a blank model is ledgered failed, retried a day later, and final at max attempts", () => {
+  const ingest = { status: "rejected", reason: "insufficient identity: year=1975 make=Datsun model=? — need all three" };
+  const first = write(ingest, null)!;
+  equal(first.status, "failed");
+  equal(first.row.failure_category, "identity_insufficient");
+  equal(first.row.attempts, 1);
+  equal(Date.parse(first.row.next_attempt_at as string) - NOW.getTime(), 24 * HOUR);
+  const last = ledgerWriteFor({ url: "u", feedId: "f", ingest, batch: { rows: new Map(), error: null }, prev: { status: "failed", attempts: 2 }, now: NOW })!;
+  equal(last.row.next_attempt_at, null);
 });
 
 Deno.test("landedFields reports which of price, images and description the row holds", () => {
@@ -431,7 +441,7 @@ Deno.test("a rejection is never skipped, even when the extractor's text holds a 
 
 Deno.test("a rejection that is not enrichment_failed still follows the old rule: structural is skipped, the rest is not ledgered", () => {
   equal(ledgerWriteFor({ url: "u", feedId: "f", ingest: { status: "rejected", reason: "implausible year: 1801" }, batch: { rows: new Map(), error: null }, now: NOW })?.status, "skipped");
-  equal(ledgerWriteFor({ url: "u", feedId: "f", ingest: { status: "rejected", reason: "insufficient identity: year=? make=? model=?" }, batch: { rows: new Map(), error: null }, now: NOW }), null);
+  equal(ledgerWriteFor({ url: "u", feedId: "f", ingest: { status: "rejected", reason: "some other rejection" }, batch: { rows: new Map(), error: null }, now: NOW }), null);
 });
 
 Deno.test("the rejection is recorded once: later polls skip the URL until it is due, and a final one never returns", () => {
