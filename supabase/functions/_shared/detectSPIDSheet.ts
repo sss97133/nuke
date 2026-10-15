@@ -1,3 +1,4 @@
+import { geminiFetch } from './geminiGuard.ts';
 /**
  * BULLETPROOF SPID Sheet Detection Utility
  * Detects GM SPID (Service Parts Identification) sheets with cascading API fallback
@@ -264,7 +265,7 @@ async function extractWithGoogleGemini(
   const imageBuffer = await imageResponse.arrayBuffer();
   const base64Image = btoa(String.fromCharCode(...new Uint8Array(imageBuffer)));
 
-  const response = await fetch(
+  const response = await geminiFetch(
     `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`,
     {
       method: 'POST',
@@ -283,7 +284,7 @@ async function extractWithGoogleGemini(
         }
       })
     }
-  );
+  , 'detectSPIDSheet');
 
   if (!response.ok) {
     const errorText = await response.text();

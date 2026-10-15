@@ -1,3 +1,4 @@
+import { geminiFetch } from '../_shared/geminiGuard.ts';
 /**
  * LLM-based HTML extraction using database schema as checklist
  * Intelligently locates and extracts all required fields from HTML
@@ -311,7 +312,7 @@ Be specific - give exact selectors or paths.`;
     if (googleKey) {
       // Use Google Gemini API (free tier)
       console.log('🔍 Using Google Gemini API for structure analysis...');
-      const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${googleKey}`, {
+      const response = await geminiFetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${googleKey}`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -328,7 +329,7 @@ Be specific - give exact selectors or paths.`;
           }
         }),
         signal: AbortSignal.timeout(45000),
-      });
+      }, 'extract-premium-auction');
 
       if (!response.ok) {
         const errorText = await response.text();
@@ -491,7 +492,7 @@ Extract only fields that are clearly present. Use null for missing fields.`;
     if (googleKey) {
       // Use Google Gemini API (free tier)
       console.log('📥 Using Google Gemini API for extraction...');
-      const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${googleKey}`, {
+      const response = await geminiFetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${googleKey}`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -508,7 +509,7 @@ Extract only fields that are clearly present. Use null for missing fields.`;
           }
         }),
         signal: AbortSignal.timeout(45000),
-      });
+      }, 'extract-premium-auction');
 
       if (!response.ok) {
         const errorText = await response.text();

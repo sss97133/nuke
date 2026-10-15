@@ -1,3 +1,4 @@
+import { geminiFetch } from '../_shared/geminiGuard.ts';
 /** Existing classifier, isolated for failure/receipt assays without hosted calls. */
 export interface ClassifierReceipt {
   model: string | null;
@@ -211,9 +212,9 @@ export async function classifyImage(
     timing.token_count = performance.now() - phaseStarted; phaseStarted = performance.now();
     phase = "classification";
     receipt.attempts = 1;
-    const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`, {
+    const response = await geminiFetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`, {
       method: "POST", headers, body, redirect: "error", signal: AbortSignal.timeout(CLASSIFIER_BUDGET.request_ms),
-    });
+    }, 'photo-pipeline-orchestrator', fetch);
     if (!response.ok) return UNCLASSIFIED_FALLBACK({ ...receipt, failure_phase: phase,
       error_class: response.status === 429 ? "classifier_rate_limited" : "classifier_http_error", http_status: response.status, quota: await quotaDiagnostics(response) });
     phase = "response";
