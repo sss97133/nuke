@@ -55,7 +55,7 @@ export async function discoverTargets(supabase: any, firecrawlApiKey: string) {
 }
 
 export async function batchFromTargets(supabase: any, supabaseUrl: string, key: string, firecrawlApiKey: string, body: Record<string, any>) {
-  const limit = Math.min(Math.max(Math.floor(Number(body.limit)) || 10, 1), 20);
+  const limit = Math.min(Math.max(Math.floor(Number(body.limit)) || 7, 1), 12);
   const delayMs = Math.max(Math.floor(Number(body.delay_ms)) || 2000, 2000);
   const maxTotal = Math.max(Math.floor(Number(body.max_total)) || 5000, 1);
   const budgetMs = 110_000;
@@ -92,7 +92,16 @@ export async function batchFromTargets(supabase: any, supabaseUrl: string, key: 
       supabase.from("import_queue").update({ status, error_message: error?.slice(0, 500) ?? null, vehicle_id: vehicleId ?? null, processed_at: new Date().toISOString() }).eq("id", row.id);
     try {
       const fc = await firecrawlScrape(
-        { url: t.listing_url, formats: ["html", "markdown"], onlyMainContent: false, waitFor: 3000 },
+        {
+          url: t.listing_url, formats: ["html", "markdown"], onlyMainContent: false, waitFor: 2500,
+          // Same 1 credit as a bare scrape (measured 2026-10-15): comments filtered to Newest show the whole thread, and
+          // "All Photos" opens the full gallery. Without these a sold page shows 19 of 51 comments and 9 of 75 photos.
+          actions: [
+            { type: "click", selector: ".cnb-details-comments .dropdown-toggle" }, { type: "wait", milliseconds: 500 },
+            { type: "click", selector: "button[data-ga=newest]" }, { type: "wait", milliseconds: 2500 },
+            { type: "click", selector: ".gallery-preview .all" }, { type: "wait", milliseconds: 2500 },
+          ],
+        },
         { apiKey: firecrawlApiKey, timeoutMs: 45_000, maxAttempts: 1 },
       );
       results.credits += Number(fc.raw?.data?.metadata?.creditsUsed ?? 1);
@@ -108,6 +117,7 @@ export async function batchFromTargets(supabase: any, supabaseUrl: string, key: 
       const out = await res.json().catch(() => ({}));
       if (!res.ok || out.success === false) throw new Error(`extract ${res.status}: ${out.error ?? "failed"}`);
       await finish("complete", undefined, out.vehicle_id);
+      if (out.completeness) await supabase.from("import_queue").update({ raw_data: { target_id: t.id, ...out.completeness } }).eq("id", row.id);
       results.landed++; streak = 0;
     } catch (err: any) {
       const msg = String(err?.message || err);

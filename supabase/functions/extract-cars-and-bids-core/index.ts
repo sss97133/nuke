@@ -1101,7 +1101,7 @@ Deno.serve(async (req) => {
         watchers: extracted.watchingCount,
         comments_count: extracted.commentCount,
         scraped_at: new Date().toISOString(),
-        raw_data: { reserve_status: reserveStatus, snapshot_fetched_at: cachedSnapshot?.fetched_at ?? null, comments_on_page: depth.comments.length },
+        raw_data: { comments_claimed: depth.commentCount, bids_claimed: depth.bidCount, photos_claimed: depth.photoCountClaimed, photos_on_page: depth.photos.length, reserve_status: reserveStatus, snapshot_fetched_at: cachedSnapshot?.fetched_at ?? null, comments_on_page: depth.comments.length },
       };
       Object.keys(auctionEventData).forEach((key) => {
         if (auctionEventData[key] === null || auctionEventData[key] === undefined) delete auctionEventData[key];
@@ -1187,6 +1187,11 @@ Deno.serve(async (req) => {
       },
       images_inserted: imagesInserted,
       image_insert_error: imageInsertError,
+      completeness: {
+        comments_landed: depth.comments.filter((c) => !c.bidAmount).length, comments_claimed: depth.commentCount,
+        bids_landed: depth.comments.filter((c) => c.bidAmount).length, bids_claimed: depth.bidCount,
+        photos_landed: depth.photos.length, photos_claimed: depth.photoCountClaimed,
+      },
       timestamp: new Date().toISOString(),
     }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },

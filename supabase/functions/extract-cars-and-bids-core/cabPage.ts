@@ -117,7 +117,7 @@ export function parseCabDepth(html: string, fetchedAt: Date): CabDepth {
   const comments: CabComment[] = [];
   const cAt = html.indexOf("cnb-details-comments");
   const stream = cAt >= 0 ? html.slice(cAt) : html;
-  const starts = [...stream.matchAll(/<li data-id="([^"]+)" id="comment-[^"]+" class="comment[^"]*">/g)];
+  const starts = [...stream.matchAll(/<li data-id="([^"]+)" id="comment-[^"]+" class="(?:comment|bid)\b[^"]*">/g)];
   starts.forEach((m, i) => {
     const chunk = stream.slice(m.index!, i + 1 < starts.length ? starts[i + 1].index! : m.index! + 20000);
     const author = chunk.match(/class="user" href="([^"]*)">([^<]*)</);
