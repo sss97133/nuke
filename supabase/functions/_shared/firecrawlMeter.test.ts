@@ -1,5 +1,5 @@
 import { assertEquals } from "https://deno.land/std@0.224.0/assert/mod.ts";
-import { firecrawlScrape } from "./firecrawl.ts";
+import { firecrawlMap, firecrawlScrape } from "./firecrawl.ts";
 import { meterAllowance } from "./firecrawlMeter.ts";
 
 type Call = [string, Record<string, unknown>];
@@ -46,4 +46,22 @@ Deno.test("firecrawlScrape asks first and records one credit after, for a succes
       assertEquals(calls[1][1].p_url, "https://carsandbids.com/auctions/abc/x");
     } finally { globalThis.fetch = realFetch; }
   }
+});
+
+Deno.test("firecrawlMap is gated and metered like a scrape", async () => {
+  const realFetch = globalThis.fetch;
+  let fetched = 0;
+  globalThis.fetch = (() => { fetched++; return Promise.resolve(new Response(JSON.stringify({ success: true, links: ["https://carsandbids.com/a"] }), { status: 200 })); }) as typeof fetch;
+  try {
+    const denied: Call[] = [];
+    const r0 = await firecrawlMap("https://example.org/", { apiKey: "test", meterClient: stub({ firecrawl_allowance_for_url: { data: 0 } }, denied) });
+    assertEquals(r0.error, "firecrawl_allowance_exhausted");
+    assertEquals(fetched, 0);
+    const calls: Call[] = [];
+    const r1 = await firecrawlMap("https://carsandbids.com/", { apiKey: "test", maxAttempts: 1, caller: "onboard-source",
+      meterClient: stub({ firecrawl_allowance_for_url: { data: 2 }, firecrawl_record_url_spend: { data: 1 } }, calls) });
+    assertEquals(r1.success, true);
+    assertEquals(calls.map((c) => c[0]), ["firecrawl_allowance_for_url", "firecrawl_record_url_spend"]);
+    assertEquals(calls[1][1].p_lane, "onboard-source");
+  } finally { globalThis.fetch = realFetch; }
 });
