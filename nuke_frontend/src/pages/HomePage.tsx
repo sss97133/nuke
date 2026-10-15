@@ -27,6 +27,17 @@ interface TreemapNode {
   auction_count?: number;
   avg_bids?: number;
   avg_watchers?: number;
+  // A brand's market (mv_brand_market via treemap_brand_market, 2026-10-15): dollars, sell-through, the p10-p90 band,
+  // the model year that trades, and the last 12 months against the 12 before.
+  usd?: number | null;
+  sold_any?: number | null;
+  offered?: number | null;
+  p10?: number | null;
+  p90?: number | null;
+  year_p50?: number | null;
+  dated?: number | null;
+  sold_12m?: number | null;
+  sold_prior_12m?: number | null;
   imageUrl?: string;
   id?: string;
   isVehicle?: boolean;
@@ -59,9 +70,16 @@ interface DrillLevel {
 let brandsRead: Promise<TreemapNode[] | null> | null = null;
 function readTreemapBrands(): Promise<TreemapNode[] | null> {
   if (!brandsRead) {
-    brandsRead = supabase.rpc('treemap_by_brand').then(({ data: result, error }) => {
+    const market = Promise.resolve(supabase.rpc('treemap_brand_market'))
+      .then(({ data, error }) => (error || !data ? [] : data as Partial<TreemapNode>[]), () => []);
+    brandsRead = Promise.all([Promise.resolve(supabase.rpc('treemap_by_brand')), market]).then(([{ data: result, error }, rows]) => {
       if (error || !result) { brandsRead = null; return null; }
-      return result as TreemapNode[];
+      const byName = new Map(rows.map((m) => [m.name, m]));
+      return (result as TreemapNode[]).map((n) => {
+        const m = byName.get(n.name);
+        return m ? { ...n, usd: m.usd, sold_any: m.sold_any, offered: m.offered, p10: m.p10, p90: m.p90,
+          year_p50: m.year_p50, dated: m.dated, sold_12m: m.sold_12m, sold_prior_12m: m.sold_prior_12m } : n;
+      });
     }, () => { brandsRead = null; return null; });
   }
   return brandsRead;
@@ -111,6 +129,7 @@ export function mapCaption(level: 'brands' | 'models' | 'years' | 'vehicles', le
  *  and its sold amount (vehicle_price_facts); the median is withheld under 5 sales. */
 export function mapLegend(level: 'brands' | 'models' | 'years' | 'vehicles'): string {
   if (level === 'vehicles') return 'area = confirmed sale price · click to open the record';
+  if (level === 'brands') return 'area = dollars from confirmed sales · $low–$high = the cheapest tenth to the top tenth of sales · sell = share of cars offered that sold · ’yy = the model year that trades · color = sales in the last 12 months against the 12 before (gray: too few dated sales) · nominal · click to go down';
   return 'area = vehicles with a confirmed sale · color = their median sale price (gray: under 5 sales) · nominal, all years · asks, bids and unknown outcomes are not counted · click to go down';
 }
 
@@ -270,6 +289,37 @@ function priceToColor(medianPrice: number | undefined): string {
   return 'var(--heat-6)';
 }
 
+/** Sales in the last 12 months against the 12 before, when the brand has enough dated sales to say so: at least 10 a
+ *  year earlier and a sale date on at least half its sales. Null otherwise; the tile is then gray, not a guess. */
+export function brandMomentum(n: Pick<TreemapNode, 'count' | 'dated' | 'sold_12m' | 'sold_prior_12m'>): number | null {
+  if (n.sold_12m == null || !n.sold_prior_12m || n.sold_prior_12m < 10) return null;
+  if (!n.dated || n.dated < 0.5 * n.count) return null;
+  return n.sold_12m / n.sold_prior_12m - 1;
+}
+
+function momentumToColor(m: number | null): string {
+  if (m === null) return 'var(--heat-0)';
+  if (m >= 0.2) return 'color-mix(in srgb, var(--success) 42%, var(--surface))';
+  if (m >= 0.05) return 'color-mix(in srgb, var(--success) 20%, var(--surface))';
+  if (m > -0.05) return 'var(--surface)';
+  if (m > -0.2) return 'color-mix(in srgb, var(--error) 20%, var(--surface))';
+  return 'color-mix(in srgb, var(--error) 42%, var(--surface))';
+}
+
+/** The brand tile's lines, most important first; the cell shows as many as fit. Each is a measured fact of the brand's
+ *  confirmed sales, or absent. */
+export function brandLines(n: TreemapNode): string[] {
+  const lines: string[] = [];
+  if (n.usd) lines.push(`${fmtMoney(n.usd)} · ${fmtNum(n.count)} sold`);
+  if (n.p10 && n.p90) lines.push(`${fmtMoney(n.p10)}–${fmtMoney(n.p90)}`);
+  if (n.offered && n.offered >= 20 && n.sold_any != null) lines.push(`${Math.round((100 * n.sold_any) / n.offered)}% sell`);
+  const m = brandMomentum(n);
+  const era = n.year_p50 ? `’${String(n.year_p50).slice(-2)}` : '';
+  const move = m === null ? '' : `${m >= 0 ? '▲' : '▼'}${Math.abs(Math.round(m * 100))}% 12 mo`;
+  if (era || move) lines.push([era, move].filter(Boolean).join(' · '));
+  return lines;
+}
+
 // ────────────────────────────────────────────────────────────
 // TREEMAP CELL COMPONENT
 // ────────────────────────────────────────────────────────────
@@ -288,7 +338,8 @@ function TreemapCell({ rect, onClick, totalCount, showValue, repImage }: CellPro
   const [imgLoaded, setImgLoaded] = useState(false);
 
   const pct = totalCount > 0 ? ((node.count / totalCount) * 100) : 0;
-  const bg = priceToColor(node.median_price);
+  const isBrandMarket = node.usd != null && !node.isVehicle;
+  const bg = isBrandMarket ? momentumToColor(brandMomentum(node)) : priceToColor(node.median_price);
   const isVehicle = !!node.isVehicle;
   const hasImage = isVehicle ? !!node.imageUrl : !!repImage;
   const imageUrl = isVehicle ? node.imageUrl : repImage;
@@ -310,8 +361,14 @@ function TreemapCell({ rect, onClick, totalCount, showValue, repImage }: CellPro
   const nameFontSize = area > 40000 ? 13 : area > 15000 ? 11 : area > 5000 ? 10 : 9;
   const dataFontSize = area > 40000 ? 11 : area > 15000 ? 10 : 9;
 
-  const textColor = 'var(--text)';
-  const textSecondary = 'var(--text-secondary)';
+  // The darkest price tints carry light text; everything else the theme's text (dark tiles were unreadable, 2026-10-15).
+  const onDark = ['var(--heat-4)', 'var(--heat-5)', 'var(--heat-6)'].includes(bg) && !(isVehicle && showImage);
+  const textColor = onDark ? '#ffffff' : 'var(--text)';
+  const textSecondary = onDark ? 'rgba(255, 255, 255, 0.82)' : 'var(--text-secondary)';
+  const lineHeightPx = dataFontSize * 1.3;
+  const marketLines = isBrandMarket && canShowCount
+    ? brandLines(node).slice(0, Math.max(1, Math.floor((h - nameFontSize * 1.4 - 10) / lineHeightPx)))
+    : [];
 
   return (
     <div
@@ -413,7 +470,24 @@ function TreemapCell({ rect, onClick, totalCount, showValue, repImage }: CellPro
               {node.listingTitle || node.name}
             </div>
           )}
-          {canShowCount && (
+          {marketLines.map((line, i) => (
+            <div
+              key={i}
+              style={{
+                fontSize: dataFontSize,
+                fontFamily: "'Courier New', monospace",
+                fontWeight: i === 0 ? 700 : 400,
+                color: i === 0 ? textColor : textSecondary,
+                lineHeight: 1.3,
+                whiteSpace: 'nowrap',
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+              }}
+            >
+              {line}
+            </div>
+          ))}
+          {canShowCount && !isBrandMarket && (
             <div
               style={{
                 fontSize: dataFontSize,
@@ -425,7 +499,7 @@ function TreemapCell({ rect, onClick, totalCount, showValue, repImage }: CellPro
               {fmtNum(node.count)} sold
             </div>
           )}
-          {canShowPrice && node.median_price && (
+          {canShowPrice && node.median_price && !isBrandMarket && (
             <div
               style={{
                 fontSize: isVehicle ? nameFontSize : dataFontSize,
@@ -450,7 +524,7 @@ function TreemapCell({ rect, onClick, totalCount, showValue, repImage }: CellPro
               {fmtNum(node.mileage!)} mi
             </div>
           )}
-          {canShowPct && pct >= 0.1 && (
+          {canShowPct && pct >= 0.1 && !isBrandMarket && (
             <div
               style={{
                 fontSize: 8,
@@ -762,7 +836,7 @@ export function TreemapHomePage({ onBrowse, embedded = false }: { onBrowse: () =
     const PAD = 2; // border space
     const items = activeData
       .filter(n => n.count > 0)
-      .map(node => ({ node, area: node.count }));
+      .map(node => ({ node, area: node.usd && node.usd > 0 ? node.usd : node.count }));
     return squarify(items, PAD, PAD, dims.w - PAD * 2, dims.h - PAD * 2);
   }, [activeData, dims]);
 
@@ -1259,7 +1333,7 @@ export function TreemapHomePage({ onBrowse, embedded = false }: { onBrowse: () =
               cursor: 'pointer',
             }}
           >
-            {embedded ? 'THE LIVE BOARD ↓' : 'BROWSE ALL'}
+            {embedded ? 'BAT LIVE BOARD ↓' : 'BROWSE ALL'}
           </button>
           {!embedded && <a
             href="https://nuke.ag"
