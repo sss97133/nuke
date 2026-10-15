@@ -305,7 +305,10 @@ def main():
 
     # ------------------------------------------------ nodes: v5 endpoints + April candidate devices
     nodes = {}
+    STUD_SET = {e_ for e_, x in eps.items() if x.get("stud_set")}    # RSI pass 37: a stud set's ends live on its stud nodes
     for eid, e in eps.items():
+        if eid in STUD_SET:
+            continue
         fam = e.get("family") if e.get("family") in FAMILIES else "unknown"
         wl = [wires.get(str(w)) for w in (e.get("wires") or []) if isinstance(e.get("wires"), list) and str(w) in wires]
         secs = Counter(SUB2SECTION.get(w.get("subsystem")) for w in wl if w and SUB2SECTION.get(w.get("subsystem")))
@@ -355,6 +358,7 @@ def main():
             return ALIAS_N.get(re.sub(r"[^a-z0-9]", "", b.lower())) or (b if b in eps else None)
         fc = _code(w.get("frm"))
         tc = _code(w["to"].get("device") if isinstance(w.get("to"), dict) else w.get("to"))
+        fc, tc = (None if fc in STUD_SET else fc), (None if tc in STUD_SET else tc)   # the stud nodes carry those ends
         # the start is the plug the record names, else the ECU/PDM pin; a wire whose start plug has no write-up still
         # starts there (2026-09-27: dual-pin PDM outputs had both pins taken as the two ends)
         src_end = (next((t for t in tl if fc and t["endpoint"] == fc), None)
@@ -539,11 +543,14 @@ def main():
     gone = dict(REPLACED_NODES)
     for code in (reg.get("retired_endpoints") or {}):
         gone.setdefault(code, None)
+    for code in STUD_SET:          # RSI pass 37: a stud set's cable ends live on its stud nodes
+        gone.setdefault(code, None)
     n_gone = 0
     for code, succ in sorted(gone.items()):
         if code not in have or code in nodes:
             continue
-        why = f"replaced by {succ}" if succ else (reg.get("retired_endpoints") or {}).get(code)
+        why = (f"replaced by {succ}" if succ else "its cable ends live on its stud nodes (RSI pass 37)" if code in STUD_SET
+               else (reg.get("retired_endpoints") or {}).get(code))
         if PLAN:
             print(f"   - {code} leaves the map ({why})")
         else:

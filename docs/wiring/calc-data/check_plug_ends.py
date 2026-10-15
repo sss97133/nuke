@@ -483,7 +483,8 @@ def run_wires():
         if kind == "v5" and isinstance(to, dict):
             far = [t for t in ends.get(wid, []) if not str(t["endpoint"]).startswith(("M130", "PDM30", "PDM15", "FIREWALL"))]
             rec = code_of(to.get("device"))
-            if far and rec and rec not in {t["endpoint"] for t in far}:
+            # a stud set's ends live on its stud nodes (RSI pass 37): the record naming the set agrees with them
+            if far and rec and rec not in {t["endpoint"] for t in far} | {t.get("stud_of") for t in far if t.get("stud_of")}:
                 res["R14 agree"] = ("FAIL", f"record says {to.get('device')} ({rec}); write-up ends at {', '.join(t['endpoint'] for t in far)}")
             elif far and TODO.search(str(to.get("pin") or "")) and far[0].get("cavity") and not TODO.search(str(far[0].get("cavity"))):
                 # (a record and a plug that both say the pin is unknown agree; R8 already stamps it OPEN — 2026-09-28)

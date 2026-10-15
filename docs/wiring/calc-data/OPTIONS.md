@@ -74,15 +74,15 @@ Each cell = wires passing that layer / wires in the group. length = measured · 
 
 | group | wires | L1 plugs | L2 wire | L3 crossing | L4 ends | L5 material | crossings | length |
 |---|---|---|---|---|---|---|---|---|
-| buildable (base + decided) | 384 | 292 | 381 | 384 | 370 | 1 | 90 | m 0 · e 195 · u 178 |
-| composite (every option) | 417 | 297 | 409 | 417 | 401 | 1 | 90 | m 0 · e 199 · u 207 |
+| buildable (base + decided) | 384 | 298 | 381 | 384 | 376 | 2 | 90 | m 0 · e 195 · u 178 |
+| composite (every option) | 417 | 303 | 409 | 417 | 407 | 2 | 90 | m 0 · e 199 · u 207 |
 
 ### By option
 
 | group | wires | L1 plugs | L2 wire | L3 crossing | L4 ends | L5 material | crossings | length |
 |---|---|---|---|---|---|---|---|---|
 | AUD | 21 | 16 | 21 | 21 | 21 | 0 | 0 | m 0 · e 14 · u 7 |
-| BASE | 352 | 272 | 349 | 352 | 338 | 1 | 90 | m 0 · e 178 · u 163 |
+| BASE | 352 | 278 | 349 | 352 | 344 | 2 | 90 | m 0 · e 178 · u 163 |
 | BFL | 2 | 0 | 2 | 2 | 2 | 0 | 0 | m 0 · e 0 · u 2 |
 | IBST-CAN | 2 | 0 | 2 | 2 | 0 | 0 | 0 | m 0 · e 0 · u 2 |
 | PL | 7 | 1 | 7 | 7 | 7 | 0 | 0 | m 0 · e 2 · u 5 |
@@ -100,7 +100,7 @@ Each cell = wires passing that layer / wires in the group. length = measured · 
 | engine | 133 | 128 | 130 | 133 | 128 | 1 | 52 | m 0 · e 108 · u 23 |
 | lighting_front | 35 | 19 | 35 | 35 | 35 | 0 | 10 | m 0 · e 22 · u 13 |
 | lighting_rear | 23 | 5 | 23 | 23 | 23 | 0 | 0 | m 0 · e 8 · u 14 |
-| power_spine | 40 | 26 | 40 | 40 | 32 | 0 | 8 | m 0 · e 3 · u 32 |
+| power_spine | 40 | 32 | 40 | 40 | 38 | 1 | 8 | m 0 · e 3 · u 32 |
 | powertrain_chassis | 22 | 17 | 22 | 22 | 21 | 0 | 1 | m 0 · e 6 · u 16 |
 | unsectioned | 4 | 3 | 4 | 4 | 4 | 0 | 0 | m 0 · e 0 · u 4 |
 

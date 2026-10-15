@@ -3363,3 +3363,137 @@ ends:
       method: follows PDM15 (pigtail / stub splice within reach of its connector)
       confidence: low
       source: docs/wiring/research/2026-10-15_device-positions.md
+  - id: ISO-STUD-A
+    what: "Isolator stud A (Blue Sea 7700, battery side)"
+    where: "On the isolator"
+    zone: engine
+    status: proposed
+    follows: PS-STUDS
+    why:
+      - text: The DC primary's stud set names this stud from its cables' own words (RSI pass 37).
+        source: docs/wiring/calc-data/catalog/endpoints.yaml PS-STUDS (studs, stud_nodes)
+    position:
+      point: ISOLATOR
+      frame: twin
+      x: -0.52
+      y: -1.9
+      z: 1.1
+      method: "on the isolator (its 3/8-16 stud A)"
+      confidence: low
+      source: docs/wiring/receipts/2026-10-15_k5-power-spine-studs.md
+  - id: ISO-STUD-B
+    what: "Isolator stud B (Blue Sea 7700, load side)"
+    where: "On the isolator"
+    zone: engine
+    status: proposed
+    follows: PS-STUDS
+    why:
+      - text: The DC primary's stud set names this stud from its cables' own words (RSI pass 37).
+        source: docs/wiring/calc-data/catalog/endpoints.yaml PS-STUDS (studs, stud_nodes)
+    position:
+      point: ISOLATOR
+      frame: twin
+      x: -0.52
+      y: -1.9
+      z: 1.1
+      method: "on the isolator (its 3/8-16 stud B)"
+      confidence: low
+      source: docs/wiring/receipts/2026-10-15_k5-power-spine-studs.md
+  - id: DIST-STUD
+    what: "Distribution stud and its MEGA/MIDI fuse holders"
+    where: "Beside the isolator, on its load side"
+    zone: engine
+    status: proposed
+    follows: PS-STUDS
+    why:
+      - text: The DC primary's stud set names this stud from its cables' own words (RSI pass 37).
+        source: docs/wiring/calc-data/catalog/endpoints.yaml PS-STUDS (studs, stud_nodes)
+    position:
+      point: ISOLATOR
+      frame: twin
+      x: -0.52
+      y: -1.9
+      z: 1.1
+      method: "beside the isolator: ISO_OUT runs stud B to it (point shared with the isolator until a bracket is drawn)"
+      confidence: low
+      source: docs/wiring/receipts/2026-10-15_k5-power-spine-studs.md
+  - id: STARTER-BPLUS
+    what: "Starter B+ stud"
+    where: "On the starter, passenger side of the block"
+    zone: engine
+    status: proposed
+    follows: PS-STUDS
+    why:
+      - text: The DC primary's stud set names this stud from its cables' own words (RSI pass 37).
+        source: docs/wiring/calc-data/catalog/endpoints.yaml PS-STUDS (studs, stud_nodes)
+    position:
+      point: STARTER
+      frame: twin
+      x: -0.3
+      y: -1.45
+      z: 0.57
+      method: "on the starter (twin anchor STARTER; the twin engine insert sits about 0.15 m too far back)"
+      confidence: low
+      source: docs/wiring/receipts/2026-10-15_k5-power-spine-studs.md
+  - id: GND-BLOCK
+    what: "Engine block ground stud near the starter (G1)"
+    where: "On the block beside the starter"
+    zone: engine
+    status: proposed
+    follows: PS-STUDS
+    why:
+      - text: The DC primary's stud set names this stud from its cables' own words (RSI pass 37).
+        source: docs/wiring/calc-data/catalog/endpoints.yaml PS-STUDS (studs, stud_nodes)
+    position:
+      point: STARTER
+      frame: twin
+      x: -0.3
+      y: -1.45
+      z: 0.57
+      method: "G1 lands 'near the starter': the starter point (twin engine insert about 0.15 m too far back)"
+      confidence: low
+      source: docs/wiring/receipts/2026-10-15_k5-power-spine-studs.md
+  - id: ALT-BPLUS
+    what: "Alternator B+ stud (Holley 197-302)"
+    where: "On the alternator, Holley mid-mount bracket"
+    zone: engine
+    status: open
+    follows: PS-STUDS
+    why:
+      - text: The DC primary's stud set names this stud from its cables' own words (RSI pass 37).
+        source: docs/wiring/calc-data/catalog/endpoints.yaml PS-STUDS (studs, stud_nodes)
+    open:
+      - "the alternator point stands open: the twin puts K5H_Alternator on the passenger side, mounts.yaml on the driver side"
+  - id: GND-FRAME
+    what: "Frame rail ground boss (G2)"
+    where: "On the frame rail below the battery corner"
+    zone: engine
+    status: open
+    follows: PS-STUDS
+    why:
+      - text: The DC primary's stud set names this stud from its cables' own words (RSI pass 37).
+        source: docs/wiring/calc-data/catalog/endpoints.yaml PS-STUDS (studs, stud_nodes)
+    open:
+      - "no frame boss is drawn yet; the frame rail is not an object in the twin engine bay"
+  - id: GND-HEAD
+    what: "Engine head/block ground strap stud (G3)"
+    where: "At the rear of the engine"
+    zone: engine
+    status: open
+    follows: PS-STUDS
+    why:
+      - text: The DC primary's stud set names this stud from its cables' own words (RSI pass 37).
+        source: docs/wiring/calc-data/catalog/endpoints.yaml PS-STUDS (studs, stud_nodes)
+    open:
+      - "the rear of the engine is the twin insert face that sits about 0.15 m too far back"
+  - id: FW-BOND
+    what: "Firewall bond stud, engine side (G3)"
+    where: "On the firewall, engine side"
+    zone: engine
+    status: open
+    follows: PS-STUDS
+    why:
+      - text: The DC primary's stud set names this stud from its cables' own words (RSI pass 37).
+        source: docs/wiring/calc-data/catalog/endpoints.yaml PS-STUDS (studs, stud_nodes)
+    open:
+      - "no bond stud spot is recorded on the firewall"
