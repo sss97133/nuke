@@ -4042,7 +4042,7 @@
     ],
     "crossing": "firewall: FIREWALL-BODY-A 11"
    },
-   "pdm_limit": "PDM30 OUT26: OPEN: needs the Hella 8TW 004 223-031 pump current: Hella's product information (web_snapshots/www.hella.com__BI_Washer-pumps-and-water-tanks_2026.md) gives 12 V, 2 bar, 1 l/min and the plug, not the current: bench it",
+   "pdm_limit": "PDM30 OUT26: OPEN: needs the factory washer ratchet solenoid's coil current: the Hella pump and tank were retired on 2026-09-29 and #50 now feeds the solenoid on the wiper gearbox (endpoint WASHER-PUMP); the 1977 LTSM (p.803, p.814) gives no current: bench it (RSI pass 23)",
    "option": "BASE",
    "option_status": "base"
   },
@@ -4140,7 +4140,7 @@
     ],
     "crossing": "cab exit: through the body to the outside (path not recorded)"
    },
-   "pdm_limit": "PDM30 OUT7: OPEN: needs the E-Stopp ESK001 engage current (estopp.com FAQ gives no figure)",
+   "pdm_limit": "PDM30 OUT7: 10 A per output (>= 1.25 x 8 A; E-Stopp standard kit page (web_snapshots/www.estopp.com__e-stopp-standard-kit.md:264-267, 2026-10-15): 'Power Requirement: 12V/10A constant power', 'Draws 3-8A when operating'; it runs about 8-10 s to full stroke (E-Stopp_ESK001_Installation.pdf p.1), a pulse the PDM's 20-50 s filter rides (PDM manual p.23) (RSI pass 23))",
    "option": "BASE",
    "option_status": "base"
   },
@@ -5873,7 +5873,7 @@
     ],
     "crossing": "none: both ends on one side"
    },
-   "pdm_limit": "PDM30 OUT29: OPEN: needs the Dakota VHX and GSS-3000 currents (manuals give none)",
+   "pdm_limit": "PDM30 OUT29: 2 A per output (>= 1.25 x 1.02 A; Dakota VHX manual 650314:P p.7: 'the system draws less than 1 amp'; GSS-3000 manual p.10 (web_snapshots/www.dakotadigital.com__GSS-3000.md:533-535): 'W/O Safety Relay ~ 20 mA' (the registry wires no safety relay) (RSI pass 23))",
    "option": "BASE",
    "option_status": "base"
   },
@@ -7152,7 +7152,7 @@
     ],
     "crossing": "none: both ends on one side"
    },
-   "pdm_limit": "PDM15 OUT11: OPEN: needs the Sanden SD7B10 clutch coil current (Sanden spec)",
+   "pdm_limit": "PDM15 OUT11: CONFLICT: needs 6 A per output, the thinnest conductor allows 5 A (0.85 x 6 A, PDM manual p.48 100 C column / ProWire tables) — a heavier wire or pigtail closes it",
    "option": "BASE",
    "option_status": "base"
   },
@@ -9635,7 +9635,7 @@
     ],
     "crossing": "none: both ends on one side"
    },
-   "pdm_limit": "PDM30 OUT24: OPEN: needs the M130 supply current (no consumption figure in the M1 techspec on file)",
+   "pdm_limit": "PDM30 OUT24: 1 A per output (>= 1.25 x 0.34 A; MoTeC M130 product page (web_snapshots/www.motec.com.au__M130.md:88, 2026-10-15): 'Typical no-load supply current: 0.34 A at 13.8 V supply'; the throttle servo's current also enters at A26 through the half bridges (RMS 4 A at most): log it before calling the limit final (RSI pass 23))",
    "option": "BASE",
    "option_status": "base"
   },
@@ -19856,7 +19856,7 @@
     "crossing": "none: both ends on one side"
    },
    "color": "red",
-   "pdm_limit": "PDM30 OUT23: OPEN: needs the RVS mirror display current (rearviewsafety.com gives none)",
+   "pdm_limit": "PDM30 OUT23: 1 A per output (>= 1.25 x 0.67 A; RVS-7180355-IR mirror monitor specs (web_snapshots/www.rearviewsafety.com__license-plate-backup-camera-system-rvs-7180355-ir.md:490-491): 'Power Consumption 8W', 0.67 A at 12 V (RSI pass 23))",
    "option": "RC",
    "option_status": "decided"
   },
@@ -21842,7 +21842,7 @@
     "crossing": "none: both ends on one side"
    },
    "color": "red",
-   "pdm_limit": "PDM30 OUT11: OPEN: needs the RetroSound memory (constant) current",
+   "pdm_limit": "PDM30 OUT11: CONFLICT: needs 19 A per output, the thinnest conductor allows 6 A (0.85 x 8 A, PDM manual p.48 80 C column / ProWire tables) — a heavier wire or pigtail closes it",
    "option": "AUD",
    "option_status": "decided"
   },
@@ -22716,7 +22716,7 @@
     "crossing": "none: both ends on one side"
    },
    "color": "red",
-   "pdm_limit": "PDM30 OUT29: OPEN: needs the Dakota VHX and GSS-3000 currents (manuals give none)",
+   "pdm_limit": "PDM30 OUT29: 2 A per output (>= 1.25 x 1.02 A; Dakota VHX manual 650314:P p.7: 'the system draws less than 1 amp'; GSS-3000 manual p.10 (web_snapshots/www.dakotadigital.com__GSS-3000.md:533-535): 'W/O Safety Relay ~ 20 mA' (the registry wires no safety relay) (RSI pass 23))",
    "option": "BASE",
    "option_status": "base"
   },
@@ -50797,11 +50797,13 @@
    "loads": [
     "23"
    ],
-   "load_a": null,
-   "source": "needs the Sanden SD7B10 clutch coil current (Sanden spec)",
+   "load_a": 4.2,
+   "source": "Sanden SD7 service manual p.14 §10.4 (component_drawings/Sanden_SD7_Service_Manual.pdf; SD7B10 listed p.3): 'Normal current should be 3.6 - 4.2A at 12VDC', the top of the range (RSI pass 23)",
    "wire_cap_a": 6,
    "limit_a": null,
-   "status": "OPEN: needs the Sanden SD7B10 clutch coil current (Sanden spec)"
+   "need_a": 6,
+   "max_a": 5,
+   "status": "CONFLICT: needs 6 A per output, the thinnest conductor allows 5 A (0.85 x 6 A, PDM manual p.48 100 C column / ProWire tables) — a heavier wire or pigtail closes it"
   },
   {
    "output": "PDM15 OUT13",
@@ -50895,11 +50897,13 @@
    "loads": [
     "54"
    ],
-   "load_a": null,
-   "source": "needs the E-Stopp ESK001 engage current (estopp.com FAQ gives no figure)",
+   "load_a": 8,
+   "source": "E-Stopp standard kit page (web_snapshots/www.estopp.com__e-stopp-standard-kit.md:264-267, 2026-10-15): 'Power Requirement: 12V/10A constant power', 'Draws 3-8A when operating'; it runs about 8-10 s to full stroke (E-Stopp_ESK001_Installation.pdf p.1), a pulse the PDM's 20-50 s filter rides (PDM manual p.23) (RSI pass 23)",
    "wire_cap_a": 15,
-   "limit_a": null,
-   "status": "OPEN: needs the E-Stopp ESK001 engage current (estopp.com FAQ gives no figure)"
+   "limit_a": 10,
+   "need_a": 10,
+   "max_a": 12,
+   "status": "set"
   },
   {
    "output": "PDM30 OUT8",
@@ -50941,11 +50945,13 @@
    "loads": [
     "RADIO_CONST"
    ],
-   "load_a": null,
-   "source": "needs the RetroSound memory (constant) current",
+   "load_a": 15,
+   "source": "RetroSound Motor 2B user manual printed p.21 (component_drawings/RetroSound_Motor-2B_User_Manual.pdf): 'Current Consumption (during operation) Max. 15A', the whole radio with its internal amp at full output, fused on this yellow lead (p.19). This build runs the speakers off the external amp, so its draw is lower: bench the yellow lead at 13.5 V with the speaker outputs open and USB loaded (RSI pass 23)",
    "wire_cap_a": 8,
    "limit_a": null,
-   "status": "OPEN: needs the RetroSound memory (constant) current"
+   "need_a": 19,
+   "max_a": 6,
+   "status": "CONFLICT: needs 19 A per output, the thinnest conductor allows 6 A (0.85 x 8 A, PDM manual p.48 80 C column / ProWire tables) — a heavier wire or pigtail closes it"
   },
   {
    "output": "PDM30 OUT12",
@@ -51104,22 +51110,26 @@
    "loads": [
     "MIRROR_PWR"
    ],
-   "load_a": null,
-   "source": "needs the RVS mirror display current (rearviewsafety.com gives none)",
+   "load_a": 0.67,
+   "source": "RVS-7180355-IR mirror monitor specs (web_snapshots/www.rearviewsafety.com__license-plate-backup-camera-system-rvs-7180355-ir.md:490-491): 'Power Consumption 8W', 0.67 A at 12 V (RSI pass 23)",
    "wire_cap_a": 8,
-   "limit_a": null,
-   "status": "OPEN: needs the RVS mirror display current (rearviewsafety.com gives none)"
+   "limit_a": 1,
+   "need_a": 1,
+   "max_a": 6,
+   "status": "set"
   },
   {
    "output": "PDM30 OUT24",
    "loads": [
     "ECU_PWR"
    ],
-   "load_a": null,
-   "source": "needs the M130 supply current (no consumption figure in the M1 techspec on file)",
+   "load_a": 0.34,
+   "source": "MoTeC M130 product page (web_snapshots/www.motec.com.au__M130.md:88, 2026-10-15): 'Typical no-load supply current: 0.34 A at 13.8 V supply'; the throttle servo's current also enters at A26 through the half bridges (RMS 4 A at most): log it before calling the limit final (RSI pass 23)",
    "wire_cap_a": 15,
-   "limit_a": null,
-   "status": "OPEN: needs the M130 supply current (no consumption figure in the M1 techspec on file)"
+   "limit_a": 1,
+   "need_a": 1,
+   "max_a": 10,
+   "status": "set"
   },
   {
    "output": "PDM30 OUT25",
@@ -51144,10 +51154,10 @@
     "50"
    ],
    "load_a": null,
-   "source": "needs the Hella 8TW 004 223-031 pump current: Hella's product information (web_snapshots/www.hella.com__BI_Washer-pumps-and-water-tanks_2026.md) gives 12 V, 2 bar, 1 l/min and the plug, not the current: bench it",
+   "source": "needs the factory washer ratchet solenoid's coil current: the Hella pump and tank were retired on 2026-09-29 and #50 now feeds the solenoid on the wiper gearbox (endpoint WASHER-PUMP); the 1977 LTSM (p.803, p.814) gives no current: bench it (RSI pass 23)",
    "wire_cap_a": 8,
    "limit_a": null,
-   "status": "OPEN: needs the Hella 8TW 004 223-031 pump current: Hella's product information (web_snapshots/www.hella.com__BI_Washer-pumps-and-water-tanks_2026.md) gives 12 V, 2 bar, 1 l/min and the plug, not the current: bench it"
+   "status": "OPEN: needs the factory washer ratchet solenoid's coil current: the Hella pump and tank were retired on 2026-09-29 and #50 now feeds the solenoid on the wiper gearbox (endpoint WASHER-PUMP); the 1977 LTSM (p.803, p.814) gives no current: bench it (RSI pass 23)"
   },
   {
    "output": "PDM30 OUT27",
@@ -51183,11 +51193,13 @@
     "71",
     "GSS_PWR"
    ],
-   "load_a": null,
-   "source": "needs the Dakota VHX and GSS-3000 currents (manuals give none)",
+   "load_a": 1.02,
+   "source": "Dakota VHX manual 650314:P p.7: 'the system draws less than 1 amp'; GSS-3000 manual p.10 (web_snapshots/www.dakotadigital.com__GSS-3000.md:533-535): 'W/O Safety Relay ~ 20 mA' (the registry wires no safety relay) (RSI pass 23)",
    "wire_cap_a": 8,
-   "limit_a": null,
-   "status": "OPEN: needs the Dakota VHX and GSS-3000 currents (manuals give none)"
+   "limit_a": 2,
+   "need_a": 2,
+   "max_a": 6,
+   "status": "set"
   },
   {
    "output": "PDM30 OUT30",
