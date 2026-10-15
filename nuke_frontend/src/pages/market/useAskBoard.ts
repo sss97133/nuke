@@ -28,6 +28,7 @@ export type AskRow = {
   // family's recorded sales and other classified asks (mv_family_year_prices). merit: the active exit model's chance
   // that a listing like this is gone within the model's horizon; null until a model is active.
   position?: AskPosition | null;
+  read_miles?: number | null; // the odometer reading the miles position used: the listing's stated miles, else the vehicle's
   merit?: { exit7: number; model_version: string } | null;
 };
 // One price population around a model year: n prices in year_from..year_to; at_or_below = how many are <= this ask.
@@ -36,6 +37,9 @@ export type AskPricePopulation = {
   n: number; year_from: number; year_to: number; thin: boolean;
   p25: number | null; p50: number | null; p75: number | null; at_or_below: number | null;
   by_source: Record<string, number>; as_of: string;
+  // The odometer (20261015160000): n readings among the same rows, their median, and how many read at or below this
+  // listing's miles (null under 10 readings, or when the seller disclosed a broken or rolled-over odometer).
+  miles?: { n: number; p50: number | null; at_or_below: number | null };
 };
 export type AskPosition = {
   family: string; family_id: string;

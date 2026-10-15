@@ -95,7 +95,8 @@ CREATE TABLE public.mv_model_family_names (make_l text, model_l text, vehicles b
 CREATE TABLE public.mv_family_year_prices (family_id uuid, year integer, basis text, year_from integer, year_to integer,
   n integer, offered integer, conflicts integer, thin boolean, p10 integer, p25 integer, p50 integer, p75 integer,
   p90 integer, prices integer[], dated integer, first_on date, last_on date, n_24m integer, by_source jsonb,
-  as_of timestamptz, PRIMARY KEY (family_id, year, basis));
+  as_of timestamptz, n_miles integer NOT NULL DEFAULT 0, miles integer[] NOT NULL DEFAULT '{}', miles_p50 integer,
+  PRIMARY KEY (family_id, year, basis));
 CREATE TABLE public.listing_exit_models (version text PRIMARY KEY, active boolean NOT NULL DEFAULT false,
   horizon_days integer NOT NULL, label text NOT NULL, intercept double precision NOT NULL, features jsonb NOT NULL,
   base_rate double precision NOT NULL, trained_on jsonb NOT NULL, evaluated_on jsonb NOT NULL, receipt text NOT NULL,
@@ -280,6 +281,17 @@ INSERT INTO public.mv_family_year_prices (family_id, year, basis, year_from, yea
    '{"Bring a Trailer": 10}', now()),
   ('00000000-0000-4000-c000-000000000004', 1979, 'sold', 1979, 1979, 10, 10, 0, false, 1, 1, 1,
    ARRAY[1,1,1,1,1,1,1,1,1,1], 10, NULL, NULL, 0, '{}', now());
+-- Odometers (20261015160000): the Blazer's 20 sales read 10,000 .. 200,000 (median 100,000) and its asks 3 readings;
+-- the H3T's sales 12 readings, but the H3T discloses a rolled-over odometer.
+-- (fixture table, not testimony)
+UPDATE public.mv_family_year_prices SET n_miles = 20, miles_p50 = 100000,
+  miles = (SELECT array_agg(g * 10000 ORDER BY g) FROM generate_series(1, 20) g)
+  WHERE family_id = '00000000-0000-4000-c000-000000000001' AND basis = 'sold';
+UPDATE public.mv_family_year_prices SET n_miles = 3, miles = ARRAY[50000, 90000, 150000]
+  WHERE family_id = '00000000-0000-4000-c000-000000000001' AND basis = 'asked';
+UPDATE public.mv_family_year_prices SET n_miles = 12, miles_p50 = 60000,
+  miles = (SELECT array_agg(g * 10000 ORDER BY g) FROM generate_series(1, 12) g)
+  WHERE family_id = '00000000-0000-4000-c000-000000000002' AND basis = 'sold';
 
 DO $$
 DECLARE b jsonb := public.classified_ask_board();
@@ -299,7 +311,13 @@ BEGIN
     (r->'position'->'asked'->>'n')::int = 11 AND (r->'position'->'asked'->>'at_or_below')::int = 5
     AND (r->'position'->'asked'->>'thin')::boolean IS FALSE);
   PERFORM pg_temp.ok('Blazer: no merit without an active model', r->'merit' = 'null'::jsonb);
+  PERFORM pg_temp.ok('Blazer miles: its stated 88,000 sits above 8 of 20 recorded sales'' readings (median 100,000); 3 ask readings place nothing',
+    (r->>'read_miles')::int = 88000 AND r->'position'->'sold'->'miles' = '{"n": 20, "p50": 100000, "at_or_below": 8}'::jsonb
+    AND r->'position'->'asked'->'miles' = '{"n": 3, "p50": null, "at_or_below": null}'::jsonb);
   SELECT x INTO r FROM jsonb_array_elements(b->'rows') x WHERE x->>'model' = 'h3t';
+  PERFORM pg_temp.ok('H3T miles: a disclosed rolled-over odometer places nothing, though 12 readings exist',
+    r->'read_miles' = 'null'::jsonb AND r->'position'->'sold'->'miles'->'at_or_below' = 'null'::jsonb
+    AND (r->'position'->'sold'->'miles'->>'n')::int = 12);
   PERFORM pg_temp.ok('H3T: 6 recorded sales are thin: no band, no at_or_below; no asks',
     (r->'position'->'sold'->>'thin')::boolean AND r->'position'->'sold'->'at_or_below' = 'null'::jsonb
     AND (r->'position'->'sold'->>'n')::int = 6 AND r->'position'->'asked' = 'null'::jsonb);

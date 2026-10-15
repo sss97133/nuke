@@ -8,6 +8,9 @@
 --              offered, conflicts (sales refused because their own page is another car), first/last sale, by_source;
 --       asked  other classified asks in the 365 days before the fold's refresh: the same, without this listing.
 --     thin (fewer than 10) carries no percentiles and no at_or_below.
+--     miles (each of sold and asked): n, p50 and at_or_below for the listing's own odometer reading (its stated miles,
+--     else the vehicle's) among the same rows' readings (20261015160000), when 10 or more exist; read_miles names the
+--     reading used. None when the seller disclosed a broken or rolled-over odometer.
 --     share: the share of the family's prices at or below this ask (other asks when there are 10, else sales; basis
 --     says which). One measured quantity, no weights: p_sort => 'position' puts the lowest against its own family first.
 --   merit: the active listing_exit_models row's chance that a listing like this is gone within its horizon, computed
@@ -29,11 +32,12 @@ DECLARE v text;
 BEGIN
   SELECT encode(sha256(convert_to(prosrc, 'UTF8')), 'base64') INTO v
   FROM pg_proc WHERE oid = 'public.classified_ask_board(integer,double precision,double precision,integer,integer,text,text,integer,integer)'::regprocedure;
-  IF v IS DISTINCT FROM '2wRKul4/2BnP7TJze1jUL3TZ5QrIfTDWMtWQKyMTdV8=' AND v IS DISTINCT FROM 'n6jfuWA/lRnelNZLUTa0ihtGRmfk440kizRpfjXFe2A=' THEN
+  IF v IS DISTINCT FROM '2wRKul4/2BnP7TJze1jUL3TZ5QrIfTDWMtWQKyMTdV8=' AND v IS DISTINCT FROM 't+dIHZoW+SilSh6EzPWzJD6w++ftz+GqbL8teNP2hXE=' THEN
     RAISE EXCEPTION 'classified_ask_board is not the 20261015080000 body (sha256 %); not replacing it', v;
   END IF;
-  IF to_regclass('public.mv_family_year_prices') IS NULL OR to_regclass('public.listing_exit_models') IS NULL THEN
-    RAISE EXCEPTION 'apply 20261015130000_family_year_prices.sql and 20261015140000_listing_exit_models.sql first';
+  IF to_regclass('public.mv_family_year_prices') IS NULL OR to_regclass('public.listing_exit_models') IS NULL
+     OR NOT EXISTS (SELECT 1 FROM pg_attribute WHERE attrelid = 'public.mv_family_year_prices'::regclass AND attname = 'miles') THEN
+    RAISE EXCEPTION 'apply 20261015130000_family_year_prices.sql, 20261015140000_listing_exit_models.sql and 20261015160000_family_year_prices_miles.sql first';
   END IF;
   -- The fold is created empty and first built by its 09:40 UTC refresh; reading it before then would fail every call.
   IF NOT (SELECT relispopulated FROM pg_class WHERE oid = 'public.mv_family_year_prices'::regclass) THEN
@@ -131,9 +135,11 @@ BEGIN
       fs.n AS sold_n, fs.thin AS sold_thin, fs.year_from AS sold_from, fs.year_to AS sold_to,
       fs.p25 AS sold_p25, fs.p50 AS sold_p50, fs.p75 AS sold_p75, fs.offered AS sold_offered, fs.conflicts AS sold_conflicts,
       fs.first_on AS sold_first, fs.last_on AS sold_last, fs.by_source AS sold_sources, fs.as_of AS sold_as_of,
+      fs.n_miles AS sold_n_miles, fs.miles_p50 AS sold_miles_p50, fs.miles AS sold_miles,
       CASE WHEN fs.thin IS FALSE AND s.current_price > 0 THEN width_bucket(s.current_price, fs.prices) END AS sold_below,
       fa.n - ai.self AS asked_n, fa.year_from AS asked_from, fa.year_to AS asked_to,
       fa.p25 AS asked_p25, fa.p50 AS asked_p50, fa.p75 AS asked_p75, fa.by_source AS asked_sources, fa.as_of AS asked_as_of,
+      fa.n_miles AS asked_n_miles, fa.miles_p50 AS asked_miles_p50, fa.miles AS asked_miles,
       CASE WHEN fa.n - ai.self >= 10 AND s.current_price > 0
            THEN greatest(width_bucket(s.current_price, fa.prices) - ai.self, 0) END AS asked_below
     FROM shaped s
@@ -208,6 +214,18 @@ BEGIN
       FROM public.vehicle_observations vo
       WHERE vo.id = page.observation_id AND vo.vehicle_id = page.vehicle_id
     ) o ON true
+  ), milage AS (
+    -- Where the listing's miles sit among the same rows' odometer readings (mv_family_year_prices.miles, 10 or more):
+    -- its stated miles, else the vehicle's; none when the seller disclosed a broken or rolled-over odometer.
+    SELECT told.*, mi.miles AS read_miles,
+      CASE WHEN mi.miles IS NOT NULL AND told.sold_n_miles >= 10 THEN width_bucket(mi.miles, told.sold_miles) END AS sold_miles_below,
+      CASE WHEN mi.miles IS NOT NULL AND told.asked_n_miles >= 10 THEN width_bucket(mi.miles, told.asked_miles) END AS asked_miles_below
+    FROM told
+    CROSS JOIN LATERAL (
+      SELECT CASE WHEN told.odometer IS NULL AND coalesce(told.listing_mileage, told.mileage) > 0
+                       AND coalesce(told.listing_mileage, told.mileage) < 2000000
+                  THEN coalesce(told.listing_mileage, told.mileage) END AS miles
+    ) mi
   )
   SELECT jsonb_build_object(
     'as_of', now(),
@@ -248,12 +266,15 @@ BEGIN
             'n', sold_n, 'year_from', sold_from, 'year_to', sold_to, 'thin', sold_thin,
             'p25', sold_p25, 'p50', sold_p50, 'p75', sold_p75, 'at_or_below', sold_below,
             'offered', sold_offered, 'conflicts', sold_conflicts, 'first_on', sold_first, 'last_on', sold_last,
-            'by_source', sold_sources, 'as_of', sold_as_of) END,
+            'by_source', sold_sources, 'as_of', sold_as_of,
+            'miles', jsonb_build_object('n', sold_n_miles, 'p50', sold_miles_p50, 'at_or_below', sold_miles_below)) END,
           'asked', CASE WHEN asked_n > 0 THEN jsonb_build_object(
             'n', asked_n, 'year_from', asked_from, 'year_to', asked_to, 'thin', asked_n < 10,
             'p25', CASE WHEN asked_n >= 10 THEN asked_p25 END, 'p50', CASE WHEN asked_n >= 10 THEN asked_p50 END,
             'p75', CASE WHEN asked_n >= 10 THEN asked_p75 END, 'at_or_below', asked_below,
-            'by_source', asked_sources, 'as_of', asked_as_of) END) END,
+            'by_source', asked_sources, 'as_of', asked_as_of,
+            'miles', jsonb_build_object('n', asked_n_miles, 'p50', asked_miles_p50, 'at_or_below', asked_miles_below)) END) END,
+        'read_miles', read_miles,
         'merit', CASE WHEN exit7 IS NOT NULL THEN jsonb_build_object(
           'exit7', round(exit7::numeric, 3), 'model_version', (SELECT version FROM model)) END)
       ORDER BY
@@ -262,7 +283,7 @@ BEGIN
         CASE WHEN p_sort = 'nearest' THEN distance_mi END ASC NULLS LAST,
         CASE WHEN p_sort = 'band' THEN taste END DESC NULLS LAST,
         CASE WHEN p_sort = 'price' THEN current_price END ASC NULLS LAST,
-        listed_at DESC, id DESC) FROM told), '[]'::jsonb)
+        listed_at DESC, id DESC) FROM milage), '[]'::jsonb)
   ) INTO v_out;
   RETURN v_out;
 END
