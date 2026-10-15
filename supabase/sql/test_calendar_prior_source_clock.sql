@@ -182,3 +182,60 @@ BEGIN
   END IF;
   RAISE NOTICE 'PASS: unknown/known clocks, prior retention/order, future/privacy exclusions, exact output boundary and permissions';
 END $$;
+
+-- 20261016160000: the reader takes its lots from a read model (mv_auction_calendar_lots). For anon, every call's output
+-- is unchanged (sales, population, unplaced, roster rows with their live prior records, paging) except the added
+-- population.lots_built_at; the reader keeps its owner, grants and execution properties; the read model holds public
+-- vehicle lots only and anon may read but not write it; its refresh job is scheduled once.
+CREATE SCHEMA IF NOT EXISTS cron;
+CREATE TABLE cron.job (jobid bigserial PRIMARY KEY, jobname text UNIQUE, schedule text, command text);
+CREATE FUNCTION cron.schedule(name text, schedule text, command text) RETURNS bigint LANGUAGE sql AS
+  $$ INSERT INTO cron.job (jobname, schedule, command) VALUES ($1, $2, $3) RETURNING jobid $$;
+SET ROLE anon;
+CREATE TEMP TABLE model_before AS
+  SELECT public.auction_calendar_read(200) AS base, public.auction_calendar_read(200, 'gooding', 'synthetic-sale') AS roster,
+         public.auction_calendar_read(400, 'gooding', 'synthetic-sale', 1, 1) AS page2;
+RESET ROLE;
+\ir ../migrations/20261016160000_auction_calendar_lots_read_model.sql
+\ir ../migrations/20261016160000_auction_calendar_lots_read_model.sql
+SET ROLE anon;
+CREATE TEMP TABLE model_after AS
+  SELECT public.auction_calendar_read(200) AS base, public.auction_calendar_read(200, 'gooding', 'synthetic-sale') AS roster,
+         public.auction_calendar_read(400, 'gooding', 'synthetic-sale', 1, 1) AS page2;
+RESET ROLE;
+DO $$
+DECLARE vb record; va record;
+  strip CONSTANT text := 'lots_built_at';
+BEGIN
+  SELECT * INTO vb FROM model_before; SELECT * INTO va FROM model_after;
+  IF (vb.base - 'as_of') IS DISTINCT FROM jsonb_set(va.base - 'as_of', '{population}', (va.base->'population') - strip)
+     OR (vb.roster - 'as_of') IS DISTINCT FROM jsonb_set(va.roster - 'as_of', '{population}', (va.roster->'population') - strip)
+     OR (vb.page2 - 'as_of') IS DISTINCT FROM jsonb_set(va.page2 - 'as_of', '{population}', (va.page2->'population') - strip) THEN
+    RAISE EXCEPTION 'Read model changed the reader''s output: before % after %', vb.roster, va.roster;
+  END IF;
+  IF jsonb_array_length(va.roster#>'{roster,rows}') <> 2 OR jsonb_array_length(va.roster#>'{roster,rows,0,prior}') = 0
+     OR va.base#>>'{population,lots_built_at}' IS NULL THEN
+    RAISE EXCEPTION 'Roster rows, their prior records and the build time must be present: %', va.roster;
+  END IF;
+  IF EXISTS (SELECT 1 FROM reader_permissions b CROSS JOIN pg_proc a
+    WHERE a.oid = b.oid
+      AND (a.proowner, a.proacl, a.prosecdef, a.proconfig, a.provolatile)
+          IS DISTINCT FROM (b.proowner, b.proacl, b.prosecdef, b.proconfig, b.provolatile)) THEN
+    RAISE EXCEPTION 'Reader permissions, owner or execution properties changed';
+  END IF;
+  IF (SELECT count(*) FROM public.mv_auction_calendar_lots) <> 2
+     OR EXISTS (SELECT 1 FROM public.mv_auction_calendar_lots
+                WHERE vehicle_id IN (md5('private')::uuid, md5('deleted')::uuid, md5('road-art')::uuid)) THEN
+    RAISE EXCEPTION 'The read model must hold public vehicle lots only';
+  END IF;
+  IF NOT has_table_privilege('anon', 'public.mv_auction_calendar_lots', 'SELECT')
+     OR has_table_privilege('anon', 'public.mv_auction_calendar_lots', 'INSERT') THEN
+    RAISE EXCEPTION 'anon reads the read model and cannot write it';
+  END IF;
+  IF (SELECT count(*) FROM cron.job WHERE jobname = 'refresh-auction-calendar' AND schedule = '7,37 * * * *'
+        AND command LIKE '%statement_timeout = ''5min''%' AND command LIKE '%REFRESH MATERIALIZED VIEW CONCURRENTLY public.mv_auction_calendar_lots') <> 1 THEN
+    RAISE EXCEPTION 'The read model''s refresh job must be scheduled once';
+  END IF;
+  RAISE NOTICE 'PASS: read model keeps anon output (base, roster, paging), live priors, permissions, public-only lots, one refresh job';
+END $$;
+REFRESH MATERIALIZED VIEW CONCURRENTLY public.mv_auction_calendar_lots;
