@@ -482,7 +482,7 @@ export function intakeThrottle(raw: unknown = {}): IntakeThrottle {
     max_ingests: limit(value.max_ingests, 20, 100), sources: normalized };
 }
 
-export function selectIntakeFeeds<T extends { source_slug: string; last_polled_at?: string | null; poll_interval_minutes?: number | null; last_error?: string | null; error_count?: number | null }>(
+export function selectIntakeFeeds<T extends { source_slug: string; last_polled_at?: string | null; poll_interval_minutes?: number | null; last_error?: string | null; error_count?: number | null; search_criteria?: { tier?: unknown } | null }>(
   feeds: T[], limit: number, throttle: IntakeThrottle, now: number, force = false,
 ): T[] {
   const groups = new Map<string, T[]>();
@@ -501,6 +501,9 @@ export function selectIntakeFeeds<T extends { source_slug: string; last_polled_a
     const group = groups.get(feed.source_slug) ?? [];
     group.push(feed); groups.set(feed.source_slug, group);
   }
+  // Within a source, a lower tier (search_criteria.tier) is selected first; the order inside a tier stays oldest-poll-first.
+  const tierRank = (f: T) => { const t = Number(f.search_criteria?.tier); return Number.isInteger(t) && t >= 1 && t <= 9 ? t : 9; };
+  for (const group of groups.values()) group.sort((a, b) => tierRank(a) - tierRank(b));
   // Oldest due source first, then round-robin. Hundreds of metro feeds must
   // not take every slot ahead of a single auction-house feed.
   const selected: T[] = [];
