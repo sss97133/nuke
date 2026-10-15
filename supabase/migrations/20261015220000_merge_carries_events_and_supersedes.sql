@@ -34,8 +34,12 @@
 SET statement_timeout = '60s';
 SET lock_timeout = '5s';
 
+-- ACCESS EXCLUSIVE on two hot tables: while the lock waits, every write to them queues behind it. Wait at most 2 s, then fail
+-- (re-ship these two statements in a quieter window rather than raising the timeout).
+SET lock_timeout = '2s';
 ALTER TABLE public.vehicle_events  ADD COLUMN IF NOT EXISTS merged_from_vehicle_id uuid;
 ALTER TABLE public.timeline_events ADD COLUMN IF NOT EXISTS merged_from_vehicle_id uuid;
+SET lock_timeout = '5s';
 COMMENT ON COLUMN public.vehicle_events.merged_from_vehicle_id  IS 'Set by merge_into_primary: the duplicate vehicle this row came from. unmerge_vehicle moves rows with this stamp back.';
 COMMENT ON COLUMN public.timeline_events.merged_from_vehicle_id IS 'Set by merge_into_primary: the duplicate vehicle this row came from. unmerge_vehicle moves rows with this stamp back.';
 
