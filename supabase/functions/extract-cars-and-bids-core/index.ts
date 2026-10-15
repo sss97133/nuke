@@ -29,6 +29,7 @@ import { requireWriteAuth } from "../_shared/writeGuard.ts";
 import { projectSecretKey } from "../_shared/supabaseKeys.ts";
 import { batchFromTargets, discoverTargets, reviseCab, recaptureCab } from "./targets.ts";
 import { parseCabDepth } from "./cabPage.ts";
+import { recordSellerTypes, sellerTypeRow } from "../_shared/sellerType.ts";
 import { insertMissingVehicleImages } from "../_shared/vehicleImageWrite.ts";
 import { fillOnlyIdentity, identityConflict, REVISION_DIFFERENT_CAR } from "../_shared/identityMatch.ts";
 
@@ -1128,6 +1129,18 @@ Deno.serve(async (req) => {
 
     if (listingError) {
       console.warn(`⚠️ C&B: Vehicle event write failed: ${listingError.message}`);
+    }
+
+    // Seller type of the lot (the source's own "Seller Type" label, declared 0.9; absent = unknown), through record_lot_quality_signals.
+    try {
+      const evId = heldEvent?.id ?? (await supabase.from("vehicle_events").select("id").eq("vehicle_id", vehicleId)
+        .in("source_platform", ["cars_and_bids", "carsandbids"]).order("created_at", { ascending: true }).limit(1).maybeSingle()).data?.id;
+      if (evId) {
+        const value = extracted.sellerId === "dealer" || extracted.sellerId === "private" ? extracted.sellerId : "unknown";
+        await recordSellerTypes(supabase, [sellerTypeRow({ eventId: evId, value, basis: "declared", field: "Seller Type", text: value === "unknown" ? null : `Seller Type: ${value}`, method: "cab_seller_type_label" })], "extract-cars-and-bids-core");
+      }
+    } catch (e) {
+      console.warn(`⚠️ C&B: seller type not written: ${e instanceof Error ? e.message : String(e)}`);
     }
 
     // Link to Cars & Bids organization
