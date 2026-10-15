@@ -5,6 +5,7 @@ import { writeObservation } from '../_shared/observationWriter.ts';
 import { requireWriteAuth } from '../_shared/writeGuard.ts';
 import { projectSecretKey } from "../_shared/supabaseKeys.ts";
 import { parseSsrPage } from "./ssrPage.ts";
+import { fillOnlyIdentity, identityConflict, REVISION_DIFFERENT_CAR } from '../_shared/identityMatch.ts';
 import { parseLocation } from "../_shared/parseLocation.ts";
 import { batchFromTargets, discoverTargets } from "./targets.ts";
 
@@ -955,10 +956,28 @@ Deno.serve(async (req: Request) => {
       status: 'active'
     };
 
+    // Identity guard: a VIN/URL/slug match is not proof it is the same car. A different car is refused and raised as a
+    // revision item (identity_match / different_car / relink); for the same car, year/make/model/vin are fill-only.
+    let existingIdentity: { year: number | null; make: string | null; model: string | null; vin: string | null } | null = null;
+    if (vehicleId) {
+      const { data: idRow } = await supabase.from('vehicles').select('year,make,model,vin').eq('id', vehicleId).maybeSingle();
+      existingIdentity = (idRow as typeof existingIdentity) ?? null;
+      const conflict = existingIdentity ? identityConflict(existingIdentity, { year: vehicleData.year, make: vehicleData.make, model: vehicleData.model, vin: vehicleData.vin }) : null;
+      if (conflict) {
+        await supabase.rpc('record_revision_item', {
+          p_url: listing.url, p_missing: [REVISION_DIFFERENT_CAR.missing], p_reason: REVISION_DIFFERENT_CAR.reason,
+          p_next_action: REVISION_DIFFERENT_CAR.next_action, p_raised_by: 'import-pcarmarket-listing', p_snapshot_id: null,
+          p_detail: { vehicle_id: vehicleId, detail: conflict }, p_vehicle_id: vehicleId,
+        });
+        return new Response(JSON.stringify({ success: false, refused: 'different_car', vehicle_id: vehicleId, detail: conflict }),
+          { status: 409, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+      }
+    }
+
     if (vehicleId) {
       await supabase
         .from('vehicles')
-        .update(vehicleData)
+        .update(existingIdentity ? fillOnlyIdentity(vehicleData, existingIdentity) : vehicleData)
         .eq('id', vehicleId);
       console.log(`Updated existing vehicle: ${vehicleId}`);
     } else {
@@ -986,7 +1005,7 @@ Deno.serve(async (req: Request) => {
             .maybeSingle()).data?.id : null);
           if (dupId) {
             vehicleId = dupId;
-            await supabase.from('vehicles').update(vehicleData).eq('id', vehicleId);
+            await supabase.from('vehicles').update(fillOnlyIdentity(vehicleData, (await supabase.from('vehicles').select('year,make,model,vin').eq('id', vehicleId).maybeSingle()).data ?? {})).eq('id', vehicleId);
             console.log(`[pcarmarket] Updated existing vehicle after dedup: ${vehicleId}`);
           } else {
             throw vehicleError;
