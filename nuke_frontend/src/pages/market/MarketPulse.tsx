@@ -1,47 +1,43 @@
 import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { PrefetchLink as Link } from '../../components/PrefetchLink';
 import { usePageTitle } from '../../hooks/usePageTitle';
-import { CoverageView, Masthead, Row, Rows, Text } from '../../kit';
+import { Masthead, Text } from '../../kit';
 import { timeLeft, useSecondClock } from '../../hooks/useSecondClock';
 import MarketInventoryMap from './MarketInventoryMap';
 import { mapLens, mapValue, matchesMapLens, recordedModel, taxonomyByListing, type InventoryMapLens, type InventoryMapGroup, type MapDimension } from './inventoryMap';
 import AuctionEvidence, { AuctionCompetition } from './AuctionEvidence';
-import { BID_BUCKETS, bidBucket, currentBidDistribution, NO_MAKE, useMarketPulse, useInventoryTaxonomy, useSameHourReadings, type BidBucket, type BidCurve, type HourReading, type LiveAuction } from './useMarketPulse';
-import { HeaderPopover } from '../../components/vehicle/HeaderPopover';
+import { BID_BUCKETS, bidBucket, currentBidDistribution, NO_MAKE, useMarketPulse, useInventoryTaxonomy, useSameHourReadings, type BidBucket, type BidCurve, type LiveAuction } from './useMarketPulse';
 import RecordedSalesComparison, { MarketScopeControls, type MarketSalesLens } from './RecordedSalesComparison';
 import { MakeLogo } from '../../components/common/MakeIdentity';
 import { selectRowFacts, useMarketRowDetails, useMarketRowSpecs, vehicleIdentity, type LotInspection, type MarketRowDetails } from './useMarketRowDetails';
 
 // The homepage: the live collector-car market as Nuke sees it right now.
-// Activity figures count the rows market_pulse_live() returns; rows open their
-// canonical records. Monetary heat (hot/cold against comparable sales) and the
-// same-hour history strips are withheld until the board's bid units are bound;
-// their last implementation is in git history before this commit.
+// Activity figures count the rows market_pulse_live() returns; rows open their canonical records.
+// Owner review, 2026-10-15 (docs/market/MARKET_MEASUREMENT_UI_CONTRACT.md, "The live auction board"): each datum once,
+// in its most efficient place. The live total is the page's one figure, placed against the same hour in earlier
+// weeks and opened into what it is made of; hot/cold tags, bidder depth and the edge strips left the page (their
+// last implementation is in git history before this commit; heatOf stays exported for the phone's shared fixture).
 
 const HOUR = 3_600_000;
 const DAY = 24 * HOUR;
 
-type Window = 'all' | '1h' | '24h' | 'new' | 'nr' | 'hot' | 'cold';
-type Sort = 'ending' | 'bid' | 'newest' | 'hottest' | 'coldest';
+type Window = 'all' | '1h' | '24h' | 'new' | 'nr';
+type Sort = 'ending' | 'bid' | 'newest';
 
+// Filters over the open lots, each with its count; one that would show nothing is not offered.
 const WINDOWS: { id: Window; label: string }[] = [
   { id: 'all', label: 'Live lots' },
-  { id: '1h', label: 'Ending < 1 h' },
-  { id: '24h', label: 'Ending < 24 h' },
-  { id: 'new', label: 'First seen < 24 h' },
   { id: 'nr', label: 'No reserve' },
-  { id: 'hot', label: 'Running hot' },
-  { id: 'cold', label: 'Running cold' },
+  { id: '1h', label: 'Ending in 1 h' },
+  { id: '24h', label: 'Ending in 24 h' },
+  { id: 'new', label: 'New in 24 h' },
 ];
 
 // Current auctions appear in close order unless the viewer chooses another sort.
 const SORTS: { id: Sort; label: string }[] = [
-  { id: 'bid', label: 'Highest bid' },
   { id: 'ending', label: 'Ending first' },
-  { id: 'newest', label: 'First seen' },
-  { id: 'hottest', label: 'Hottest' },
-  { id: 'coldest', label: 'Coldest' },
+  { id: 'bid', label: 'Highest bid' },
+  { id: 'newest', label: 'Newest' },
 ];
 
 // Bids are US dollars: Bring a Trailer runs every auction in USD and reports the bid as a dollar amount.
@@ -57,6 +53,14 @@ const left = timeLeft;
 // In the viewer's own time zone.
 function clock(ms: number): string {
   return new Date(ms).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit', timeZoneName: 'short' });
+}
+
+// Live while the last board read is within one read cycle (BaT's board is read every 15 minutes; 20 allows a cycle and
+// its write); past that, how far behind it is. Unknown stays unknown.
+export function boardFreshness(syncedAt: number | null | undefined, now: number): string {
+  if (syncedAt == null || !Number.isFinite(syncedAt)) return 'refresh';
+  const m = Math.max(0, Math.floor((now - syncedAt) / 60_000));
+  return m < 20 ? 'live' : m < 60 ? `${m} min behind` : m < 1440 ? `${Math.floor(m / 60)} h behind` : `${Math.floor(m / 1440)} d behind`;
 }
 
 function title(a: LiveAuction): string {
@@ -91,13 +95,14 @@ function rankOf(value: number, readings: { v: number }[]): { below: number; abov
   const below = readings.filter((r) => value > r.v).length;
   const above = readings.filter((r) => value < r.v).length;
   const text = n === 0 ? null
+    : below === 0 && above === 0 ? `level with all ${n}`
     : below === n ? `higher than all ${n}`
     : above === n ? `lower than all ${n}`
     : below >= above ? `higher than ${below} of ${n}` : `lower than ${above} of ${n}`;
   return { below, above, n, text };
 }
 
-function RangeBar({ value, readings, fmt, weekdayUtc, weeks }: { value: number; readings: { day: string; v: number }[]; fmt: (n: number, compact?: boolean) => string; weekdayUtc: string; weeks: number }) {
+function RangeBar({ value, readings, fmt, weekdayUtc, weeks, bare = false }: { value: number; readings: { day: string; v: number }[]; fmt: (n: number, compact?: boolean) => string; weekdayUtc: string; weeks: number; bare?: boolean }) {
   const lo = Math.min(value, ...readings.map((r) => r.v));
   const hi = Math.max(value, ...readings.map((r) => r.v));
   const span = hi - lo;
@@ -105,7 +110,7 @@ function RangeBar({ value, readings, fmt, weekdayUtc, weeks }: { value: number; 
   const { n, text: rank } = rankOf(value, readings);
   return (
     <span className="market-range">
-      <Text role="label">Same time on {weekdayUtc}s · {n === weeks ? `last ${weeks} weeks` : `${n} of the last ${weeks} weeks`}</Text>
+      {!bare && <Text role="label">Same time on {weekdayUtc}s · {n === weeks ? `last ${weeks} weeks` : `${n} of the last ${weeks} weeks`}</Text>}
       <Text role="measure" dense>{fmt(lo, true)}</Text>
       <svg className="market-range__bar" viewBox="0 0 160 12" width="160" height="12" aria-hidden="true">
         <rect className="market-range__track" x="0" y="5" width="160" height="2" />
@@ -113,114 +118,29 @@ function RangeBar({ value, readings, fmt, weekdayUtc, weeks }: { value: number; 
         <rect className="market-range__now" x={x(value) - 3} y="0" width="6" height="12"><title>{`Now: ${fmt(value)}`}</title></rect>
       </svg>
       <Text role="measure" dense>{fmt(hi, true)}</Text>
-      {rank && <Text role="label" className="market-range__verdict">{rank} {weekdayUtc}s at this hour</Text>}
+      {rank && !bare && <Text role="label" className="market-range__verdict">{rank} {weekdayUtc}s at this hour</Text>}
     </span>
   );
 }
-
-interface Series {
-  key: string;
-  what: string; // what is measured
-  set: string; // the comparison set
-  value: number; // now
-  readings: { day: string; v: number }[]; // the same weekday and hour in earlier weeks
-  fmt: (n: number, compact?: boolean) => string;
-}
-
-interface Edge extends Series { depth: number; beyond: number }
-
-const EDGE_MIN_READINGS = 6;
-const EDGE_MAX = 6;
-const MAKE_MIN_AUCTIONS = 5;
 
 function count(n: number): string {
   return Math.round(n).toLocaleString('en-US');
 }
 
-function edgeOf(s: Series): Edge | null {
-  const { below, above, n } = rankOf(s.value, s.readings);
-  if (n < EDGE_MIN_READINGS) return null;
-  const top = below >= n - 1;
-  const bottom = above >= n - 1;
-  if (!top && !bottom) return null;
-  const vs = s.readings.map((r) => r.v);
-  const lo = Math.min(...vs);
-  const hi = Math.max(...vs);
-  const span = hi - lo || Math.abs(hi) || 1;
-  // depth 0 = beyond every reading, 1 = beyond all but one; beyond = how far past the far end, in spans.
-  return { ...s, depth: n - Math.max(below, above), beyond: top ? (s.value - hi) / span : (lo - s.value) / span };
-}
-
-// Series: the whole board's current bids, auctions with a bid, and bid per auction; and, once 6 weeks of live
-// readings carry them, the same per make.
-export function edgeSeries(live: LiveAuction[], readings: HourReading[]): Series[] {
-  const bidded = live.filter((a) => a.currentBid != null);
-  const bids = bidded.reduce((s, a) => s + (a.currentBid ?? 0), 0);
-  const withN = readings.filter((r) => r.n != null && (r.n as number) > 0);
-  const out: Series[] = [
-    { key: 'bids', what: 'Current bids', set: 'all live BaT auctions', value: bids, readings: readings.map((r) => ({ day: r.day, v: r.bids })), fmt: bidNumber },
-    { key: 'n', what: 'Auctions with a bid', set: 'all live BaT auctions', value: bidded.length, readings: withN.map((r) => ({ day: r.day, v: r.n as number })), fmt: count },
-  ];
-  if (bidded.length > 0) {
-    out.push({ key: 'per', what: 'Current bid per auction', set: 'all live BaT auctions with a bid', value: bids / bidded.length, readings: withN.map((r) => ({ day: r.day, v: r.bids / (r.n as number) })), fmt: (v) => bidNumber(v) });
-  }
-  const byMake = readings.filter((r) => r.byMake != null);
-  if (byMake.length >= EDGE_MIN_READINGS) {
-    const now = new Map<string, [number, number]>();
-    for (const a of bidded) {
-      const m = now.get(a.make) ?? [0, 0];
-      now.set(a.make, [m[0] + (a.currentBid ?? 0), m[1] + 1]);
-    }
-    const makes = new Set([...now.keys(), ...byMake.flatMap((r) => Object.keys(r.byMake as object))]);
-    for (const make of makes) {
-      if (make === NO_MAKE) continue;
-      const past = byMake.map((r) => ({ day: r.day, bm: (r.byMake as Record<string, [number, number]>)[make] ?? [0, 0] }));
-      const cur = now.get(make) ?? [0, 0];
-      if (Math.max(cur[1], ...past.map((p) => p.bm[1])) < MAKE_MIN_AUCTIONS) continue;
-      out.push({ key: `bids:${make}`, what: `${make} · current bids`, set: `live BaT auctions of ${make}`, value: cur[0], readings: past.map((p) => ({ day: p.day, v: Number(p.bm[0]) })), fmt: bidNumber });
-      out.push({ key: `n:${make}`, what: `${make} · auctions with a bid`, set: `live BaT auctions of ${make}`, value: cur[1], readings: past.map((p) => ({ day: p.day, v: Number(p.bm[1]) })), fmt: count });
-    }
-  }
-  return out;
-}
-
-function shortDay(day: string): string {
-  return new Date(`${day}T00:00:00Z`).toLocaleDateString('en-US', { day: 'numeric', month: 'short', timeZone: 'UTC' });
-}
-
-// Only what is at an edge of its own history earns a strip here; the board's own reading always sits in the masthead.
-function EdgeStrips({ series, hourUtc, weekdayUtc, archiveDays }: { series: Series[]; hourUtc: string; weekdayUtc: string; archiveDays: Set<string> }) {
-  const edges = useMemo(
-    () => series.map(edgeOf).filter((e): e is Edge => e != null).sort((a, b) => a.depth - b.depth || b.beyond - a.beyond).slice(0, EDGE_MAX),
-    [series]
-  );
-  if (edges.length === 0) return null;
-  return (
-    <section className="market-edges" aria-label="Edges of the board's own history">
-      <div className="market-edges__head">
-        <Text role="label">Top or bottom 2 of its own history now · {edges.length} of {series.length} series, each against its own readings at {hourUtc}:00 UTC on earlier {weekdayUtc}s</Text>
-      </div>
-      {edges.map((e) => {
-        const weeks = Math.round((Date.now() - Date.parse(`${e.readings[0].day}T00:00:00Z`)) / (7 * DAY));
-        const rebuilt = e.readings.filter((r) => archiveDays.has(r.day)).length;
-        return (
-          <div key={e.key} className="market-edge">
-            <div className="market-edge__head">
-              <Text role="entity" dense>{e.what}</Text>
-              <Text role="measure" dense>{e.fmt(e.value)}</Text>
-              <Text role="label">now</Text>
-            </div>
-            <RangeBar value={e.value} readings={e.readings} fmt={e.fmt} weekdayUtc={weekdayUtc} weeks={weeks} />
-            <Text role="caption" as="div">
-              Window: {hourUtc}:00 UTC on {weekdayUtc}s, {shortDay(e.readings[0].day)} to {shortDay(e.readings[e.readings.length - 1].day)}, and now.
-              {' '}Count: {e.readings.length} readings.
-              {' '}Set: {e.set} (BAT-LIVE-BIDS index, read hourly from the live board{rebuilt ? `; ${rebuilt} of the readings rebuilt from BaT bid history, 96% of auctions` : ''}).
-            </Text>
-          </div>
-        );
-      })}
-    </section>
-  );
+// A headline number: the figure, what it counts, where it sits against the same hour in earlier weeks, and the map of
+// what it is made of, one press away.
+function Figure({ value, label, open, onToggle, relative, bar, title }: {
+  value: string; label: string; open: boolean; onToggle: () => void; relative: (string | null)[]; bar?: React.ReactNode; title?: string;
+}) {
+  const said = relative.filter((r): r is string => !!r);
+  return <div className="market-figure__item">
+    <button type="button" className="market-figure__value" aria-expanded={open} aria-controls="market-composition" onClick={onToggle} title={title}>
+      <Text role="figure">{value}</Text>
+      <Text role="label">{label} · by brand {open ? '▴' : '▾'}</Text>
+    </button>
+    {said.length > 0 && <Text role="body" as="div">{said.join(' · ')}</Text>}
+    {bar}
+  </div>;
 }
 
 // ---- Hot / cold: the bid against where comparable sales usually sit at this point in the auction --------------
@@ -259,85 +179,9 @@ export function heatOf(a: LiveAuction, curve: BidCurve | null, now: number): Hea
   return { ratio, state: ratio >= HOT ? 'hot' : ratio <= COLD ? 'cold' : 'in line', typicalNow, share, hoursLeft };
 }
 
-// Backtest, 10,065 cars sold 2026-06-27..09-26, each priced only from sales before it: of the cars tagged hot at
-// this much time left, the share that finished above the middle of their comparable sales; of those tagged cold,
-// the share that finished below it. (In line: 46-49% above, i.e. no signal.)
-// The read sends this as 'backtest' from heat_tag_backtest (market_pulse_live v3); until it does, the page carries the
-// 2026-09-28 run here. Same rows either way; the table is the source once it is live.
-type Backtest = [number, string, number, number][];
-const BACKTEST: Backtest = [
-  [120, '5 days', 0.784, 0.781], [96, '4 days', 0.808, 0.797], [72, '3 days', 0.833, 0.809],
-  [48, '2 days', 0.855, 0.829], [24, 'a day', 0.884, 0.85], [12, '12 hours', 0.915, 0.876],
-];
-
-// Three significant figures: "about $166,000", not "$166,323".
-function about(n: number): number {
-  const step = 10 ** Math.max(0, Math.floor(Math.log10(Math.max(n, 1))) - 2);
-  return Math.round(n / step) * step;
-}
-
-// Past 3x the multiple mostly says the comps don't describe the car (backtest: 77% of those sold above 90% of their
-// comps), so it is shown as 3x+ rather than as a precise number.
-function multiple(ratio: number): string {
-  return ratio >= 3 ? '3×+' : ratio < 0.1 ? '<0.1×' : `${ratio.toFixed(1)}×`;
-}
-
-function heatParts(a: LiveAuction, heat: Heat, backtest: Backtest) {
-  const band = a.band as NonNullable<LiveAuction['band']>;
-  // Quote the checkpoint at or before this point in the auction (17 h left reads the 24 h record, not the 12 h one).
-  const [, when, hotAbove, coldBelow] = [...backtest].reverse().find((row) => row[0] >= heat.hoursLeft) ?? backtest[backtest.length - 1];
-  return {
-    bid: bidNumber(a.currentBid),
-    left: left(heat.hoursLeft * HOUR),
-    comps: band.comps,
-    middle: bidNumber(band.p50),
-    range: `${bidNumber(band.p10)}–${bidNumber(band.p90)}`,
-    share: Math.round(heat.share * 100),
-    typical: bidNumber(about(heat.typicalNow)),
-    multiple: multiple(heat.ratio),
-    beyond: (a.currentBid ?? 0) > band.p90
-      ? 'The bid already tops 90% of those sales: this car is bringing more than its model page usually does (a rarer version, very low miles, or prices that have risen since), so the multiple says "beyond its comps", not how far.'
-      : null,
-    outcome: heat.state === 'hot'
-      ? `Of sold cars running this hot ${when} out, ${Math.round(hotAbove * 100)}% finished above the middle of their comparable sales.`
-      : heat.state === 'cold'
-        ? `Of sold cars running this cold ${when} out, ${Math.round(coldBelow * 100)}% finished below the middle of their comparable sales.`
-        : null,
-  };
-}
-
-// The tag on a row, and the reasoning behind it one tap away: the bid, the comps, their middle, the typical bid
-// at this point in the auction, the multiple, and how lots tagged this way finished before.
-function HeatTag({ a, heat, backtest }: { a: LiveAuction; heat: Heat; backtest: Backtest }) {
-  const [open, setOpen] = useState(false);
-  const boundary = useRef<HTMLSpanElement>(null);
-  if (heat.state === 'in line') return null;
-  const x = heatParts(a, heat, backtest);
-  const hot = heat.state === 'hot';
-  return (
-    <span ref={boundary} className="market-heat">
-      <button type="button" className={`market-heat__tag market-heat__tag--${heat.state}`} aria-haspopup="dialog" aria-expanded={open}
-        aria-label={`Why ${title(a)} is running ${heat.state}`} onClick={() => setOpen((v) => !v)}>
-        <Text role="label">{hot ? 'Running hot' : 'Running cold'} · {x.multiple}</Text>
-      </button>
-      <HeaderPopover open={open} title={`${hot ? 'Running hot' : 'Running cold'} · ${title(a)}`} width={360} align="left" dismissBoundaryRef={boundary} onClose={() => setOpen(false)}>
-        <Rows title="The reading">
-          <Row label="Current bid">{x.bid} · {x.left} left</Row>
-          <Row label="Comparable sales">{x.comps} on its BaT model page, weighted toward the same version, year, mileage and gearbox</Row>
-          <Row label="Their middle">{x.middle} (80% range {x.range})</Row>
-          <Row label="Typical bid now">about {x.typical}: with this much time left, cars at this price are usually bid to about {x.share}% of their final</Row>
-          <Row label="This bid" role="measure">{x.multiple} typical</Row>
-        </Rows>
-        {x.beyond && <Text role="body" as="p">{x.beyond}</Text>}
-        {x.outcome && <Text role="body" as="p"><Text role="label">Track record</Text> {x.outcome}</Text>}
-      </HeaderPopover>
-    </span>
-  );
-}
-
 function Thumb({ src }: { src: string | null }) {
   if (!src) return <div className="market-thumb" />;
-  return <img className="market-thumb" src={src} alt="" width={72} height={48} loading="lazy" decoding="async" />;
+  return <img className="market-thumb" src={src} alt="" width={168} height={112} loading="lazy" decoding="async" />;
 }
 
 // This is a row-write-age warning only. vehicles.updated_at can change for any
@@ -346,7 +190,7 @@ const STALE_MS = 45 * 60_000;
 
 function BidCell({ auction, risen, stale }: { auction: LiveAuction; risen: boolean; stale: boolean }) {
   return (
-    <Text role="measure" dense
+    <Text role="measure"
       title={`Recorded current bid. Record updated ${clock(auction.updatedAt)} by a writer; source read time is unavailable.${stale ? ' Recent record writes are behind.' : ''}`}
       className={`market-bid${risen ? ' market-bid--risen' : stale ? ' market-bid--stale' : ''}`}
     >
@@ -372,8 +216,8 @@ function useSeen<T extends HTMLElement>(): [React.RefObject<T | null>, boolean] 
   return [ref, seen];
 }
 
-function BoardRow({ a, risen, stale, detail, expanded, heat, backtest, onInspect }: {
-  a: LiveAuction; risen: boolean; stale: boolean; detail?: MarketRowDetails; expanded: boolean; heat: Heat | null; backtest: Backtest;
+function BoardRow({ a, risen, stale, detail, expanded, onInspect }: {
+  a: LiveAuction; risen: boolean; stale: boolean; detail?: MarketRowDetails; expanded: boolean;
   onInspect: (a: LiveAuction, view: LotInspection) => void;
 }) {
   const [rowRef, seen] = useSeen<HTMLDivElement>();
@@ -382,12 +226,13 @@ function BoardRow({ a, risen, stale, detail, expanded, heat, backtest, onInspect
   const facts = selectRowFacts(specs.data ?? [], title(a));
   const bidReading = detail?.currentBid != null ? { ...a, currentBid: detail.currentBid,
     updatedAt: detail.recordedAt ? Date.parse(detail.recordedAt) : a.updatedAt } : a;
+  // A row says what the photo cannot: the time left, the bid and its pace, and no reserve. The venue is the page's.
   return (
     <div ref={rowRef} className="market-lot-row" data-vehicle-id={a.id} data-expanded={expanded}>
       <div className="market-lot-close">
         <Text role="label">Closes in</Text>
         <Countdown endsAt={a.endsAt} />
-        {heat && <HeatTag a={a} heat={heat} backtest={backtest} />}
+        {a.noReserve && <Text role="label" className="market-no-reserve">No reserve</Text>}
       </div>
       <button type="button" className="market-lot-image" onClick={() => onInspect(a, 'auction')}
         aria-label={`Inspect ${title(a)}`} aria-expanded={expanded} aria-controls={expanded ? `lot-inspection-${a.id}` : undefined}>
@@ -395,25 +240,15 @@ function BoardRow({ a, risen, stale, detail, expanded, heat, backtest, onInspect
       </button>
       <div className="market-lot-identity">
         <button type="button" className="market-lot-name" onClick={() => onInspect(a, 'auction')}
-          aria-expanded={expanded} aria-controls={expanded ? `lot-inspection-${a.id}` : undefined}><Text role="entity" dense>{title(a)}</Text></button>
+          aria-expanded={expanded} aria-controls={expanded ? `lot-inspection-${a.id}` : undefined}><Text role="entity">{title(a)}</Text></button>
         <div className="market-lot-facts">
-          {facts.map(f => <button type="button" key={f.field} onClick={() => onInspect(a, 'vehicle')}
-            title={`${f.label}: ${f.value}${f.conflict ? ' · differing reports' : ''}`}
-            aria-label={`Inspect ${f.label.toLowerCase()} for ${title(a)}: ${f.value}${f.conflict ? ', differing reports' : ''}`}>
-            <Text role="body">{f.value}{f.conflict && <span aria-hidden="true"> †</span>}</Text>
-          </button>)}
-          {!facts.length && specs.isError && <Text role="caption">Specifications unavailable</Text>}
-        </div>
-        <div className="market-lot-context">
-          {detail?.location && <Text role="caption">{detail.location}</Text>}
-          {a.noReserve && <Text role="caption">No reserve</Text>}
-          <button type="button" onClick={() => onInspect(a, 'sources')} aria-label={`Sources for ${title(a)}`}><Text role="caption">Source: BaT</Text></button>
+          {facts.map(f => <Text role="body" key={f.field} title={`${f.label}: ${f.value}${f.conflict ? ' · reports differ' : ''}`}>{f.value}</Text>)}
         </div>
       </div>
       <button type="button" className="market-lot-metrics" onClick={() => onInspect(a, 'auction')}
         aria-label={`Inspect auction for ${title(a)}`} aria-expanded={expanded}>
         <AuctionCompetition vehicleId={a.id} sourceUrl={a.listingUrl} row enabled={reached}
-          fallback={<span><Text role="label">Recorded bid</Text><BidCell auction={bidReading} risen={risen} stale={stale} /></span>} />
+          fallback={<BidCell auction={bidReading} risen={risen} stale={stale} />} />
       </button>
     </div>
   );
@@ -423,8 +258,8 @@ function BoardRow({ a, risen, stale, detail, expanded, heat, backtest, onInspect
 // document never grows past one page. A shared link to a lot opens the page that holds it.
 export const PAGE = 24;
 
-function Board({ rows, risenIds, stale, activityId, heats, backtest, inspection, onInspect, onInspectionChange, onClose }: {
-  rows: LiveAuction[]; risenIds: Set<string>; stale: boolean; activityId: string | null; heats: Map<string, Heat | null>; backtest: Backtest;
+function Board({ rows, risenIds, stale, activityId, inspection, onInspect, onInspectionChange, onClose }: {
+  rows: LiveAuction[]; risenIds: Set<string>; stale: boolean; activityId: string | null;
   inspection: LotInspection; onInspect: (a: LiveAuction, view: LotInspection) => void;
   onInspectionChange: (view: LotInspection) => void; onClose: () => void;
 }) {
@@ -443,7 +278,7 @@ function Board({ rows, risenIds, stale, activityId, heats, backtest, inspection,
         const expanded = a.id === activityId;
         return (
           <div key={a.id}>
-            <BoardRow a={a} risen={risenIds.has(a.id)} stale={stale} detail={detail} expanded={expanded} heat={heats.get(a.id) ?? null} backtest={backtest} onInspect={onInspect} />
+            <BoardRow a={a} risen={risenIds.has(a.id)} stale={stale} detail={detail} expanded={expanded} onInspect={onInspect} />
             {expanded && <AuctionEvidence key={a.id} vehicleId={a.id} compact inspection={inspection} summary={detail}
               sourceUrl={a.listingUrl} onInspectionChange={onInspectionChange} onClose={onClose} />}
           </div>
@@ -453,10 +288,8 @@ function Board({ rows, risenIds, stale, activityId, heats, backtest, inspection,
   );
 }
 
-function inWindow(a: LiveAuction, w: Window, now: number, heat?: Heat | null): boolean {
+function inWindow(a: LiveAuction, w: Window, now: number): boolean {
   switch (w) {
-    case 'hot': return heat?.state === 'hot';
-    case 'cold': return heat?.state === 'cold';
     case '1h': return a.endsAt - now < HOUR;
     case '24h': return a.endsAt - now < DAY;
     case 'new': return now - a.listedAt < DAY;
@@ -597,8 +430,6 @@ export default function MarketPulse({ onUnavailable, collection }: { onUnavailab
   const cohort = useMemo(() => live.filter(a => make == null || a.make === make), [live, make]);
   const todayUtc = new Date(now).toISOString().slice(0, 10);
   const sameHour = useSameHourReadings(data?.sameHour?.hourUtc ?? '', todayUtc);
-  const edgeInput = useMemo(() => data?.sameHour && sameHour.data ? edgeSeries(live, sameHour.data) : [], [data?.sameHour, sameHour.data, live]);
-  const archiveDays = useMemo(() => new Set((sameHour.data ?? []).filter((r) => r.source === 'archive').map((r) => r.day)), [sameHour.data]);
   const liveBids = useMemo(() => live.reduce((s, a) => s + (a.currentBid ?? 0), 0), [live]);
   const cohortBids = useMemo(() => cohort.reduce((s, a) => s + (a.currentBid ?? 0), 0), [cohort]);
   const boardReadings = useMemo(() => (sameHour.data ?? []).flatMap((r) => {
@@ -612,26 +443,19 @@ export default function MarketPulse({ onUnavailable, collection }: { onUnavailab
     for (const a of live) if (a.make !== NO_MAKE) counts.set(a.make, (counts.get(a.make) ?? 0) + 1);
     return [...counts.entries()].sort((x, y) => y[1] - x[1] || x[0].localeCompare(y[0]))[0]?.[0] ?? null;
   }, [live]);
-  // The read's own verdict when it sent one (v3: heat_of with the server's clock, the same the phone shows); the page
-  // computes it only for older payloads. Both are graded against one fixture (heat-fixture.contract.test.ts).
-  const heats = useMemo(() => new Map<string, Heat | null>(live.map((a) => [a.id, a.serverHeat ?? heatOf(a, data?.curve ?? null, now)])), [live, data?.curve, now]);
-  const backtest = useMemo<Backtest>(() => data?.backtest && data.backtest.length
-    ? data.backtest.map((b) => [b.horizonHours, b.label, b.hotAbove, b.coldBelow] as Backtest[number]).sort((x, y) => y[0] - x[0])
-    : BACKTEST, [data?.backtest]);
-
   const figures = useMemo(() => {
-    const f: Record<Window, number> = { all: 0, '1h': 0, '24h': 0, new: 0, nr: 0, hot: 0, cold: 0 };
-    for (const a of cohort) for (const w of WINDOWS) if (inWindow(a, w.id, now, heats.get(a.id))) f[w.id] += 1;
+    const f: Record<Window, number> = { all: 0, '1h': 0, '24h': 0, new: 0, nr: 0 };
+    for (const a of cohort) for (const w of WINDOWS) if (inWindow(a, w.id, now)) f[w.id] += 1;
     return f;
-  }, [cohort, now, heats]);
+  }, [cohort, now]);
   const syncBehind = data?.syncedAt != null && now - data.syncedAt > STALE_MS;
 
-  const scoped = useMemo(() => cohort.filter(a => inWindow(a, win, now, heats.get(a.id))), [cohort, win, now, heats]);
+  const scoped = useMemo(() => cohort.filter(a => inWindow(a, win, now)), [cohort, win, now]);
   const distribution = useMemo(() => currentBidDistribution(scoped), [scoped]);
   // The make map is the wider inventory context. Window/range changes reshape its actual population;
   // the selected make is highlighted within it rather than erasing all other brands.
-  const mappedInventory = useMemo(() => live.filter(a => inWindow(a, win, now, heats.get(a.id))
-    && (selectedBid == null || bidBucket(a.currentBid) === selectedBid)), [live, win, now, heats, selectedBid]);
+  const mappedInventory = useMemo(() => live.filter(a => inWindow(a, win, now)
+    && (selectedBid == null || bidBucket(a.currentBid) === selectedBid)), [live, win, now, selectedBid]);
 
   const mapAuctions = useMemo(() => mappedInventory.filter(a => (make == null || a.make === make)
     && (inventoryLens.group === 'model' || model == null || recordedModel(a) === model)), [mappedInventory, make, model, inventoryLens.group]);
@@ -646,14 +470,11 @@ export default function MarketPulse({ onUnavailable, collection }: { onUnavailab
       && matchesMapLens(a, inventoryLens, taxonomy));
     // Keep an inspected lot reachable while the board rolls past its deadline.
     if (pinnedAuction?.id === activityId && !rows.some(a => a.id === activityId)) rows.push(pinnedAuction);
-    const ratio = (a: LiveAuction) => heats.get(a.id)?.ratio ?? null;
     if (sort === 'bid') rows.sort((a, b) => (b.currentBid ?? 0) - (a.currentBid ?? 0));
     else if (sort === 'newest') rows.sort((a, b) => b.listedAt - a.listedAt);
-    else if (sort === 'hottest') rows.sort((a, b) => (ratio(b) ?? -1) - (ratio(a) ?? -1));
-    else if (sort === 'coldest') rows.sort((a, b) => (ratio(a) ?? Infinity) - (ratio(b) ?? Infinity));
     else rows.sort((a, b) => a.endsAt - b.endsAt);
     return rows;
-  }, [scoped, selectedBid, sort, heats, model, inventoryLens.group, inventoryLens.inside, inventoryLens.focus, inventoryLens.child, taxonomy, pinnedAuction, activityId]);
+  }, [scoped, selectedBid, sort, model, inventoryLens.group, inventoryLens.inside, inventoryLens.focus, inventoryLens.child, taxonomy, pinnedAuction, activityId]);
 
   // One page of the board. A link to a lot opens its page; a filter change returns to the first page.
   const pages = Math.max(1, Math.ceil(board.length / PAGE));
@@ -668,32 +489,54 @@ export default function MarketPulse({ onUnavailable, collection }: { onUnavailab
   };
 
 
-  // The page as a document: the population is the entity, its count the headline result, and the scope strip
-  // carries the view, the cohort and the coverage of the cohort within the captured population.
+  // The page as a document. The venue is the entity. Its live total is the page's one figure, stated once against the
+  // same hour in earlier weeks, and it opens into what it is made of (the map, by dollars). The lot count takes the
+  // viewer to the lots. The clock says live, or how far behind the last board read is, and reads again on a press.
   const weekAgoPct = data?.weekAgo && make == null ? pctChange(liveBids, data.weekAgo.bids) : null;
+  const rank = boardReadings.length ? rankOf(cohortBids, boardReadings) : null;
+  // The lot count is compared as lots with a bid, the unit the hourly readings keep.
+  const bidded = cohort.filter(a => a.currentBid != null).length;
+  const lotReadings = (sameHour.data ?? []).flatMap((r) => make == null
+    ? (r.n != null ? [{ day: r.day, v: r.n as number }] : [])
+    : (r.byMake?.[make] ? [{ day: r.day, v: Number(r.byMake[make][1]) }] : []));
+  const lotRank = lotReadings.length ? rankOf(bidded, lotReadings) : null;
+  const lotWeekPct = data?.weekAgo && make == null && data.weekAgo.n > 0 ? pctChange(bidded, data.weekAgo.n) : null;
+  const mapMeasure: 'bids' | 'lots' | null = params.get('map') === 'lots' ? 'lots' : params.get('map') ? 'bids' : null;
+  const [reading, setReading] = useState(false);
+  const readAgain = async () => { setReading(true); try { await refetch(); } finally { setReading(false); } };
+  const toggleMap = (measure: 'bids' | 'lots') => {
+    const next = new URLSearchParams(params);
+    if (mapMeasure === measure) next.delete('map'); else next.set('map', measure);
+    setParams(next, { replace: true, preventScrollReset: true });
+  };
   const masthead = (
-    <Masthead result={view === 'inventory' ? <>
-      <div className="market-masthead__count"><Text role="measure">{isLoading ? '…' : cohort.length.toLocaleString('en-US')}</Text> <Text role="label">open lots</Text></div>
-      {data?.syncedAt != null && <Text role="caption" as="div" title={data.source}>recorded {clock(data.syncedAt)}{syncBehind ? ' · over 45 min ago' : ''}</Text>}
-      {data?.weekAgo && weekAgoPct != null && <Text role="caption" as="div" title={`${bidNumber(data.weekAgo.bids)} across ${data.weekAgo.n.toLocaleString('en-US')} auctions at ${clock(data.weekAgo.at)} a week ago${data.weekAgo.source === 'archive' ? ' (rebuilt from BaT bid history, 96% of auctions)' : ''}`}>
-        vs same time last week {data.weekAgo.source === 'archive' ? '≈' : ''}{signed(weekAgoPct)} from {bidNumber(data.weekAgo.bids, true)}</Text>}
-    </> : undefined}>
-      <Text role="entity" as="h1">{view !== 'inventory' ? 'Recorded sales' : isLoading || cohortBids <= 0 ? 'Open BaT lots' : `${bidNumber(cohortBids, true)} on BaT live auctions${make ? ` · ${make}` : ''}`}</Text>
+    <Masthead result={view === 'inventory' ? <button type="button" className="market-control market-clock" aria-busy={reading}
+      onClick={() => void readAgain()} title={data?.syncedAt != null ? `Board read ${clock(data.syncedAt)}. Select to read again.` : 'Read the board'}>
+      <Text role="label">{reading ? '↻ reading…' : `↻ ${boardFreshness(data?.syncedAt, now)}`}</Text>
+    </button> : undefined}>
+      {view === 'inventory' ? <span className="market-venue">
+        <img className="market-venue__mark" src="/vendor/bat/favicon.ico" alt="" width={32} height={32} />
+        <Text role="entity" as="h1">Bring a Trailer{make ? ` · ${make}` : ''}</Text>
+        <Text role="label">Live auctions</Text>
+      </span> : <Text role="entity" as="h1">Recorded sales</Text>}
     </Masthead>
   );
-  // The board's own reading in its own history, always: the owner's building block (docs/schematics/homepage.md).
-  const boardStrip = view === 'inventory' && data?.sameHour && boardReadings.length > 0 ? (
-    <div className="k-section market-pulse-strip" role="group" aria-label="The board in its own history">
-      <RangeBar value={cohortBids} readings={boardReadings} fmt={bidNumber} weekdayUtc={data.sameHour.weekdayUtc}
-        weeks={Math.max(boardReadings.length, Math.round((Date.now() - Date.parse(`${boardReadings[0].day}T00:00:00Z`)) / (7 * DAY)))} />
-      <Text role="caption" as="div">Current bids{make ? ` on ${make} lots` : ''} at {data.sameHour.hourUtc}:00 UTC on earlier {data.sameHour.weekdayUtc}s · {boardReadings.length} readings · BAT-LIVE-BIDS index, read hourly from the live board.</Text>
-    </div>
+  const at = (r: ReturnType<typeof rankOf> | null) => r?.text ? `${r.text} weeks at this hour` : null;
+  const figure = view === 'inventory' ? (
+    <section className="k-section market-figure" aria-label="The live board in numbers">
+      <Figure value={isLoading ? '…' : bidNumber(cohortBids, true)} label="Bid now" open={mapMeasure === 'bids'} onToggle={() => toggleMap('bids')}
+        title={`Current bids in US dollars as Bring a Trailer records them${data?.source ? ` (${data.source})` : ''}.${data?.weekAgo ? ` A week ago: ${bidNumber(data.weekAgo.bids)} across ${data.weekAgo.n.toLocaleString('en-US')} auctions at ${clock(data.weekAgo.at)}${data.weekAgo.source === 'archive' ? ', rebuilt from BaT bid history (96% of auctions)' : ''}.` : ''}`}
+        relative={[weekAgoPct != null ? `${data?.weekAgo?.source === 'archive' ? '≈' : ''}${signed(weekAgoPct)} on a week ago` : null, at(rank)]}
+        bar={data?.sameHour && boardReadings.length > 0 ? <RangeBar bare value={cohortBids} readings={boardReadings} fmt={bidNumber}
+          weekdayUtc={data.sameHour.weekdayUtc} weeks={boardReadings.length} /> : undefined} />
+      <Figure value={isLoading ? '…' : count(cohort.length)} label="Open lots" open={mapMeasure === 'lots'} onToggle={() => toggleMap('lots')}
+        title={`Open lots on the board. Compared with earlier weeks as lots with a bid (${count(bidded)} now).`}
+        relative={[lotWeekPct != null ? `${signed(lotWeekPct)} on a week ago` : null, at(lotRank)]} />
+    </section>
   ) : null;
   const scope = (
     <div className="k-section k-strip market-scope" role="group" aria-label="Market scope">
       <MarketScopeControls make={make} scopeKey={salesLens.scopeKey} view={view} onMakeChange={setCohort} onViewChange={v => setParam('view', v)}>{collection}</MarketScopeControls>
-      {view === 'inventory' && !isLoading && data && <CoverageView className="k-strip__coverage"
-        c={{ n: cohort.length, of: live.length, grain: 'captured BaT vehicle lots', as_of: data.syncedAt != null ? new Date(data.syncedAt).toISOString() : null }} />}
     </div>
   );
 
@@ -704,10 +547,18 @@ export default function MarketPulse({ onUnavailable, collection }: { onUnavailab
     {onUnavailable}
   </>;
 
+  // Filters and sorts sit on the lots they change. A count is said only when it narrows the open lots.
+  const filtered = make != null || model != null || win !== 'all' || selectedBid != null || inventoryLens.focus != null;
   return (
     <div className="market-explorer">
       {masthead}
-      {boardStrip}
+      {figure}
+
+      {view === 'inventory' && mapMeasure && <section id="market-composition" className="market-map" aria-label={mapMeasure === 'bids' ? 'What the bids are made of' : 'What the open lots are'}>
+        {mapAuctions.length > 0 && <MarketInventoryMap auctions={mapAuctions} lens={inventoryLens} taxonomy={taxonomy} measure={mapMeasure}
+          taxonomyLoading={taxonomyQuery.isLoading} taxonomyError={taxonomyQuery.isError} onRetryTaxonomy={() => { void taxonomyQuery.refetch(); }}
+          risenIds={risenIds} selectedModel={model} onLensChange={setInventoryLens} onSelect={selectMapGroup} />}
+      </section>}
 
       {view === 'inventory' && isError && data && <div role="status" className="market-status">Refresh failed. Showing the last fetched board. <button className="market-control" onClick={() => refetch()}><Text role="label">Retry</Text></button></div>}
 
@@ -716,59 +567,28 @@ export default function MarketPulse({ onUnavailable, collection }: { onUnavailab
 
       {scope}
 
-      {view === 'inventory' && data?.sameHour && edgeInput.length > 0 &&
-        <EdgeStrips series={edgeInput} hourUtc={data.sameHour.hourUtc} weekdayUtc={data.sameHour.weekdayUtc} archiveDays={archiveDays} />}
-
       {view === 'sales' && <RecordedSalesComparison make={make} onMakeChange={setCohort} view={view} onViewChange={v => setParam('view', v)} lens={salesLens} onLensChange={setSalesLens} controls={false} />}
 
       {view === 'inventory' && <>
       {make && <nav aria-label="Inventory drill path" className="market-drill">
-        <button type="button" className="market-control" onClick={() => setParam('make', null)}><Text role="label">All captured makes</Text></button>
+        <button type="button" className="market-control" onClick={() => setParam('make', null)}><Text role="label">All makes</Text></button>
         <span aria-hidden="true">→</span>
         <button type="button" className="market-control market-control--make" onClick={() => setParam('model', null)}><MakeLogo make={make} /><Text role="label">{make}</Text></button>
-        {model && <><span aria-hidden="true">→</span><Text role="body">Recorded model: {model}</Text></>}
+        {model && <><span aria-hidden="true">→</span><Text role="body">{model}</Text></>}
       </nav>}
 
-      {/* Windows. Each is a count that filters the board below. The whole cohort is counted in the masthead,
-          and a window with nothing in it is not offered. */}
-      <div role="group" aria-label="Open inventory filters" className="market-windows">
-        {WINDOWS.filter((w) => w.id !== 'all' && (isLoading || win === w.id || figures[w.id] > 0)).map((w) => (
-          <button key={w.id} type="button" className="market-window" aria-pressed={win === w.id}
-            title={w.id === 'new' ? 'First seen by Nuke in the last 24 h; the live page is read every 15 min'
-              : w.id === 'hot' ? `Bid at least ${HOT}x where comparable sales usually sit at this point in the auction (within 5 days of the close)`
-              : w.id === 'cold' ? `Bid at most ${COLD}x where comparable sales usually sit at this point in the auction (within 5 days of the close)`
-              : undefined}
-            onClick={() => setParam('live', win === w.id ? null : w.id)}>
-            <Text role="label">{w.label}</Text>
-            <Text role="measure">{isLoading ? '…' : figures[w.id].toLocaleString('en-US')}</Text>
-          </button>
-        ))}
-      </div>
-
-      {!isLoading && <details open={selectedBid != null} className="market-distribution">
-        <summary><Text role="label">Filter live lots by current bid</Text></summary>
-        <BidDistribution distribution={distribution} lots={scoped.length} scope={`${make ?? 'All makes'} · ${WINDOWS.find(w => w.id === win)?.label}`} selected={selectedBid} onSelect={b => setParam('bidRange', selectedBid === b ? null : b)} fetchedAt={dataUpdatedAt} />
-      </details>}
-
-
-      <section className="market-map">
-          {mapAuctions.length > 0 && <MarketInventoryMap auctions={mapAuctions} lens={inventoryLens} taxonomy={taxonomy}
-            taxonomyLoading={taxonomyQuery.isLoading} taxonomyError={taxonomyQuery.isError} onRetryTaxonomy={() => { void taxonomyQuery.refetch(); }}
-            risenIds={risenIds} selectedModel={model} onLensChange={setInventoryLens} onSelect={selectMapGroup} />}
-      </section>
-
-
-      <div ref={boardRef} tabIndex={-1} className="market-board" aria-label="Supporting live lots">
+      <div ref={boardRef} tabIndex={-1} className="market-board" aria-label="Live lots">
       <section className="market-board__frame">
         <div className="market-board__head">
-          <Text role="caption">
-            {mapFilterPending ? 'Reading classifications…' : `${board.filter(a => a.endsAt > now).length.toLocaleString('en-US')} lots`}
-            {make ? ` · ${make}` : ''}
-            {model ? ` · recorded model ${model}` : ''}
-            {win !== 'all' ? ` · ${WINDOWS.find((w) => w.id === win)?.label}` : ''}
-            {selectedBid ? ` · ${BID_BUCKETS.find(b => b.id === selectedBid)?.label}` : ''}
-            {' · † differing specification reports'}
-          </Text>
+          <div role="group" aria-label="Filter the lots" className="market-chips">
+            {WINDOWS.filter((w) => w.id !== 'all' && (isLoading || win === w.id || figures[w.id] > 0)).map((w) => (
+              <button key={w.id} type="button" className={`market-chip${w.id === 'nr' ? ' market-chip--nr' : ''}`} aria-pressed={win === w.id}
+                title={w.id === 'new' ? 'First seen by Nuke in the last 24 h; the live page is read every 15 min' : undefined}
+                onClick={() => setParam('live', win === w.id ? null : w.id)}>
+                <Text role="label">{w.label}</Text> <Text role="measure" dense>{isLoading ? '…' : figures[w.id].toLocaleString('en-US')}</Text>
+              </button>
+            ))}
+          </div>
           <div className="market-sorts" role="group" aria-label="Sort">
             {SORTS.map((s) => (
               <button key={s.id} type="button" className="market-control" aria-pressed={sort === s.id}
@@ -778,6 +598,17 @@ export default function MarketPulse({ onUnavailable, collection }: { onUnavailab
             ))}
           </div>
         </div>
+        {!isLoading && <details open={selectedBid != null} className="market-distribution">
+          <summary><Text role="label">Filter by bid</Text></summary>
+          <BidDistribution distribution={distribution} lots={scoped.length} scope={`${make ?? 'All makes'} · ${WINDOWS.find(w => w.id === win)?.label}`} selected={selectedBid} onSelect={b => setParam('bidRange', selectedBid === b ? null : b)} fetchedAt={dataUpdatedAt} />
+        </details>}
+        {filtered && !mapFilterPending && <Text role="caption" as="div" className="market-board__scope">
+          {`${board.filter(a => a.endsAt > now).length.toLocaleString('en-US')} of ${live.length.toLocaleString('en-US')} lots`}
+          {make ? ` · ${make}` : ''}{model ? ` · ${model}` : ''}
+          {win !== 'all' ? ` · ${WINDOWS.find((w) => w.id === win)?.label}` : ''}
+          {selectedBid ? ` · ${BID_BUCKETS.find(b => b.id === selectedBid)?.label}` : ''}
+        </Text>}
+        {mapFilterPending && <Text role="caption" as="div" className="market-board__scope">Reading classifications…</Text>}
         {!isLoading && !mapFilterPending && board.length === 0 && <div role="status" className="market-board__empty">No open lots match these filters. <button type="button" className="market-control" onClick={() => {
           const next = new URLSearchParams(params);
           ['make', 'live', 'bidRange', 'mapFocus', 'mapChild'].forEach(k => next.delete(k));
@@ -785,7 +616,7 @@ export default function MarketPulse({ onUnavailable, collection }: { onUnavailab
           next.set('make', 'all');
           setParams(next, { replace: true });
         }}><Text role="label">Clear market filters</Text></button></div>}
-        {isLoading || mapFilterPending ? null : <Board rows={pageRows} risenIds={risenIds} stale={syncBehind} heats={heats} backtest={backtest}
+        {isLoading || mapFilterPending ? null : <Board rows={pageRows} risenIds={risenIds} stale={syncBehind}
           activityId={activityId} inspection={inspection} onInspect={openActivity} onInspectionChange={setInspection} onClose={closeActivity} />}
         {!isLoading && !mapFilterPending && board.length > 0 && (
           <nav className="market-board-pager" aria-label="Board pages">
@@ -797,12 +628,6 @@ export default function MarketPulse({ onUnavailable, collection }: { onUnavailab
       </section>
       </div>
       </>}
-
-      {view === 'inventory' && data?.source && (
-        <Text role="caption" as="p" className="market-source">
-          Source: {data.source}. Bids are US dollars as Bring a Trailer records them; a bid's freshness is the record's last write, shown beside it.
-        </Text>
-      )}
     </div>
   );
 }

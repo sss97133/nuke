@@ -7,8 +7,8 @@ const AuctionCalendar = lazy(() => import('./AuctionCalendar'));
 const AUCTION_LENS_PARAMS = ['view', 'lot', 'make', 'model', 'live', 'sort', 'bidRange', 'inspect', 'day', 'salesScope', 'days', 'benchmark', 'series', 'board'];
 const COLLECTIONS = [
   { key: 'auctions', label: 'BaT live auctions' },
-  { key: 'calendar', label: 'Auction calendar' },
-  { key: 'listings', label: 'Captured listings' },
+  { key: 'calendar', label: 'Calendar' },
+  { key: 'listings', label: 'Just listed' },
 ] as const;
 type Collection = typeof COLLECTIONS[number]['key'];
 

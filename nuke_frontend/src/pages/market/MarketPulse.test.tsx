@@ -58,7 +58,8 @@ function button(prefix: string) {
 }
 async function click(prefix: string) { await act(async () => button(prefix).click()); }
 function boardTitles() { return [...container.querySelectorAll<HTMLElement>('.market-lot-row')].map(a => a.dataset.vehicleId); }
-function cohortCount() { return container.querySelector('.k-masthead__result .k-measure')?.textContent; }
+// The open-lot count is the second figure; the first is the dollars bid now.
+function cohortCount() { return container.querySelectorAll('.market-figure .k-figure')[1]?.textContent; }
 beforeEach(() => {
   vi.useFakeTimers(); vi.setSystemTime(new Date('2026-10-03T12:00:00Z'));
   (globalThis as any).IS_REACT_ACT_ENVIRONMENT = true;
@@ -110,7 +111,7 @@ describe('market answer -> supporting lots', () => {
   }
   it('nests years inside their own brand, shares the selection, and restores it from the URL', async () => {
     fixture.pulse.data.auctions[0].year = 1995;
-    await render(); await choose('Inventory sub-boxes', 'year');
+    await render('map=lots'); await choose('Inventory sub-boxes', 'year');
     const region = container.querySelector('[data-map-group="PORSCHE"]')!;
     await act(async () => region.querySelector<HTMLButtonElement>('button[aria-label^="2000:"]')!.click());
     expect(window.location.search).toContain('mapFocus=PORSCHE');
@@ -127,7 +128,7 @@ describe('market answer -> supporting lots', () => {
   });
   it('shows the decades inside a brand box before the drill is taken, and keeps the chosen sub-box option', async () => {
     fixture.pulse.data.auctions[0].year = 1995;
-    await render();
+    await render('map=lots');
     expect((container.querySelector('select[aria-label="Inventory sub-boxes"]') as HTMLSelectElement).value).toBe('era');
     const porsche = container.querySelector('[data-map-group="PORSCHE"]')!;
     expect(porsche.querySelector('button[aria-label^="1990–1999: 1 captured lots"]')).toBeTruthy();
@@ -140,7 +141,7 @@ describe('market answer -> supporting lots', () => {
     fixture.pulse.data.auctions = [...fixture.pulse.data.auctions,
       ...Array.from({ length: 60 }, (_, i) => ({ ...lot(`p-${i}`, 'PORSCHE', null, 1), model: `Model ${i}` })),
       ...Array.from({ length: 12 }, (_, i) => lot(`f-${i}`, 'FORD', null, 1))];
-    await render('mapInside=model');
+    await render('map=lots&mapInside=model');
     const porsche = container.querySelector('[data-map-group="PORSCHE"]')!;
     expect(porsche.querySelectorAll('.inventory-map-child')).toHaveLength(61);
     expect(porsche.textContent).not.toContain('more models');
@@ -149,7 +150,7 @@ describe('market answer -> supporting lots', () => {
   it('opens an individual lot in the existing evidence route without a nested button', async () => {
     const id = '46dd9cc6-20ec-47cb-a563-159a8005115c';
     fixture.pulse.data.auctions[0].id = id;
-    await render(); await choose('Inventory sub-boxes', 'lot');
+    await render('map=lots'); await choose('Inventory sub-boxes', 'lot');
     expect(container.querySelector('.inventory-map button button')).toBeNull();
     await act(async () => container.querySelector<HTMLButtonElement>(`[data-map-lot="${id}"]`)!.click());
     expect(window.location.search).toContain(`lot=${id}`);
@@ -162,7 +163,7 @@ describe('market answer -> supporting lots', () => {
   it('keeps smaller brands reachable and drills from an explicit brand view into models', async () => {
     fixture.pulse.data.auctions = [...fixture.pulse.data.auctions,
       ...Array.from({ length: 80 }, (_, i) => lot(`small-${i}`, `SMALL ${i}`, null, 1))];
-    await render('mapBy=make');
+    await render('map=lots&mapBy=make');
     const more = container.querySelector<HTMLButtonElement>('[data-map-more]')!;
     expect(more.textContent).toContain('more brands');
     // The tail keeps its area: every small brand is a cell of its own inside the box, sized by its lots.
@@ -175,7 +176,7 @@ describe('market answer -> supporting lots', () => {
     await act(async () => tail.querySelector<HTMLButtonElement>('button[aria-label^="SMALL 78:"]')!.click());
     expect(window.location.search).toContain('make=SMALL+78');
     expect(boardTitles()).toEqual(["small-78"]);
-    await click('All captured makes');
+    await click('All makes');
     await act(async () => container.querySelector<HTMLButtonElement>('[data-map-more]')!.click());
     const list = container.querySelector('.inventory-map-list-grid')!;
     expect(list.textContent).toContain('SMALL 79');
@@ -183,7 +184,7 @@ describe('market answer -> supporting lots', () => {
     expect(window.location.search).toContain('make=SMALL+79');
     expect((container.querySelector('select[aria-label="Group inventory by"]') as HTMLSelectElement).value).toBe('era');
     expect(boardTitles()).toEqual(['small-79']);
-    await click('All captured makes');
+    await click('All makes');
     expect(boardTitles()).toHaveLength(24);
     expect(container.textContent).toContain('1–24 of 84 lots');
     expect(container.querySelector('.inventory-map-remainder')).toBeNull();
@@ -191,11 +192,11 @@ describe('market answer -> supporting lots', () => {
     expect(window.location.search).toContain('board=2');
     expect(boardTitles()).toHaveLength(24);
     expect(boardTitles()[0]).toBe('small-23');
-    await render('mapBy=make&make=all&board=4');
+    await render('map=lots&mapBy=make&make=all&board=4');
     expect(boardTitles()).toHaveLength(12);
     expect(container.textContent).toContain('73–84 of 84 lots');
     expect(container.querySelector('[aria-label="Next 24 lots"]')).toBeNull();
-    await click('Ending < 24 h');
+    await click('Ending in 24 h');
     expect(window.location.search).toContain('board=1');
   });
   it('opens a shared lot on the page that holds it and returns to the first page by link', async () => {
@@ -215,33 +216,33 @@ describe('market answer -> supporting lots', () => {
     expect(container.querySelector('[aria-label="Previous 24 lots"]')).toBeNull();
   });
   it('returns from a model sub-box to the whole model and recovers a group that disappeared', async () => {
-    await render('make=PORSCHE&mapBy=model&mapInside=year&mapFocus=' + encodeURIComponent(JSON.stringify(['PORSCHE', 'Local fixture'])) + '&mapChild=2000');
+    await render('map=lots&make=PORSCHE&mapBy=model&mapInside=year&mapFocus=' + encodeURIComponent(JSON.stringify(['PORSCHE', 'Local fixture'])) + '&mapChild=2000');
     await click('Local fixture: 3 captured lots');
     expect(window.location.search).not.toContain('mapChild');
     expect(window.location.search).not.toContain('mapFocus');
     expect(boardTitles()).toEqual(['first', 'unknown', 'later']);
-    await render('mapBy=year&mapFocus=1901');
+    await render('map=lots&mapBy=year&mapFocus=1901');
     expect(container.textContent).toContain('No captured lots remain in this map group');
     await click('Show all map groups');
     expect(boardTitles()).toEqual(['other-make', 'first', 'unknown', 'later']);
   });
   it('keeps unrecorded taxonomy visible and distinguishes a failed metadata read', async () => {
     fixture.taxonomy.data = [{ id: 'later', listing_url: fixture.pulse.data.auctions[0].listingUrl, canonical_vehicle_type: 'CAR', canonical_body_style: 'COUPE' }];
-    await render(); await choose('Group inventory by', 'type');
+    await render('map=lots'); await choose('Group inventory by', 'type');
     await click('Unrecorded: 3'); expect(boardTitles()).toEqual(['other-make', 'first', 'unknown']);
     fixture.taxonomy.isError = true; fixture.taxonomy.isSuccess = false;
-    await render('mapBy=type');
+    await render('map=lots&mapBy=type');
     expect(container.textContent).toContain('classifications could not be loaded');
     expect(container.querySelector('.inventory-map-canvas button')).toBeNull();
     await click('Retry classifications'); expect(fixture.retry).toHaveBeenCalledOnce();
   });
   it('pulses changed lots without moving them and allows motion to be disabled', async () => {
-    await render('mapInside=lot');
+    await render('map=lots&mapInside=lot');
     const positions = () => [...container.querySelectorAll('[data-map-lot]')].map(el => [el.getAttribute('data-map-lot'), el.getAttribute('style')]);
     const before = positions();
     fixture.pulse.data = { ...fixture.pulse.data, auctions: [...fixture.pulse.data.auctions].reverse() };
     fixture.pulse.risenIds = new Set(['later']);
-    await render('mapInside=lot');
+    await render('map=lots&mapInside=lot');
     expect(positions()).toEqual(before);
     expect(container.querySelector('[data-map-lot="later"]')?.classList.contains('inventory-map-pulse')).toBe(true);
     await act(async () => container.querySelector<HTMLInputElement>('.inventory-map-pulse-control input')!.click());
@@ -251,23 +252,23 @@ describe('market answer -> supporting lots', () => {
     fixture.pulse.data.auctions[0].model = 'Recorded model A';
     fixture.pulse.data.auctions[1].model = 'Recorded model B';
     fixture.pulse.data.auctions[2].model = 'Recorded model B';
-    await render('make=PORSCHE&mapBy=model');
+    await render('map=lots&make=PORSCHE&mapBy=model');
     await click('Recorded model B: 2 captured lots');
     expect(window.location.search).toContain('model=Recorded+model+B');
     expect(boardTitles()).toEqual(['first', 'unknown']);
-    expect(container.querySelector('[aria-label="Inventory drill path"]')?.textContent).toContain('Recorded model: Recorded model B');
+    expect(container.querySelector('[aria-label="Inventory drill path"]')?.textContent).toContain('Recorded model B');
     await click('Use recorded sales view');
     expect(window.location.search).toContain('view=sales');
     expect(window.location.search).not.toContain('model=');
-    expect(container.querySelector('[aria-label="Supporting live lots"]')).toBeNull();
+    expect(container.querySelector('[aria-label="Live lots"]')).toBeNull();
     await click('Use inventory view');
     expect(boardTitles()).toEqual(['first', 'unknown', 'later']);
   });
   it('attaches its map observer when an initially loading population becomes available', async () => {
     const data = fixture.pulse.data; fixture.pulse.data = undefined; fixture.pulse.isLoading = true;
-    await render('make=all');
+    await render('map=lots&make=all');
     expect(container.querySelector('button[aria-label="PORSCHE: 3 captured live lots"]')).toBeNull();
-    fixture.pulse.data = data; fixture.pulse.isLoading = false; await render();
+    fixture.pulse.data = data; fixture.pulse.isLoading = false; await render('map=lots');
     expect(container.querySelector('button[aria-label="PORSCHE: 3 captured live lots"]')).toBeTruthy();
   });
   it('uses one comparison make for the live board and keeps the optional bid ranges collapsed', async () => {
@@ -282,7 +283,7 @@ describe('market answer -> supporting lots', () => {
     expect(window.location.search).toContain('make=all');
     expect(cohortCount()).toBe('4');
     expect([...container.querySelectorAll('button')].some(b => b.textContent === 'Live lots')).toBe(false);
-    expect(container.querySelector('[aria-label="Open inventory filters"]')?.textContent).not.toContain('Ending < 1 h');
+    expect(container.querySelector('[aria-label="Filter the lots"]')?.textContent).not.toContain('Ending in 1 h');
   });
   it('keeps unknown separate from zero and assigns each boundary exactly once', () => {
     const bids = [null, 0, 9_999, 10_000, 24_999, 25_000, 49_999, 50_000, 99_999, 100_000, NaN, -1];
@@ -298,11 +299,11 @@ describe('market answer -> supporting lots', () => {
     expect(container.textContent).toContain('Current bids in US dollars as recorded');
     expect(container.querySelector('.market-bid')?.textContent).toMatch(/^\$[\d,]+$/);
     expect(cohortCount()).toBe('3');
-    expect(container.textContent).toContain('3 of 4 captured BaT vehicle lots');
+    expect(container.querySelector('.market-board__scope')?.textContent).toBe('3 of 4 lots · PORSCHE');
     expect(container.querySelector('[aria-label="Current bid distribution"]')?.textContent).toContain('2 of 3 lots');
-    await click('Ending < 24 h');
-    expect(button('Ending < 24 h').getAttribute('aria-pressed')).toBe('true');
-    await click('Ending < 24 h');
+    await click('Ending in 24 h');
+    expect(button('Ending in 24 h').getAttribute('aria-pressed')).toBe('true');
+    await click('Ending in 24 h');
     expect(boardTitles().slice(-3)).toEqual(['first', 'unknown', 'later']);
     expect(window.location.search).toContain('board=1');
   });
@@ -314,9 +315,9 @@ describe('market answer -> supporting lots', () => {
     await click('$25,000–49,999:'); expect(boardTitles().slice(-3)).toEqual(['first', 'unknown', 'later']);
   });
   it('drills unknown bids without treating them as zero and scopes the graph to the window', async () => {
-    await render('make=PORSCHE&mapBy=model'); await click('Unrecorded:');
+    await render('map=lots&make=PORSCHE&mapBy=model'); await click('Unrecorded:');
     expect(boardTitles()).toEqual(['unknown']);
-    await click('Ending < 24 h');
+    await click('Ending in 24 h');
     expect(window.location.search).not.toContain('bidRange');
     expect(container.querySelector('[aria-label="Current bid distribution"]')?.textContent).toContain('1 of 2 lots');
     expect(container.querySelector('button[aria-label="Local fixture: 2 captured lots. Filter this recorded model"]')).toBeTruthy();
@@ -342,72 +343,76 @@ describe('market answer -> supporting lots', () => {
     await render('make=PORSCHE'); expect(container.textContent).toContain('Refresh failed');
     expect(container.textContent).toContain('1 of 1 lots have a recorded bid number');
   });
-  it('tags a priced lot hot or cold against its comps and explains the reading with its track record', async () => {
+  it('shows no hot or cold verdict, and marks no reserve in the row and in the filters', async () => {
     fixture.pulse.data.curve = { fixture: [[120, 0.2], [0, 1]] };
-    fixture.pulse.data.auctions[0].band = { p10: 100, p50: 500, p90: 1000, comps: 100, tier: 'fixture' };
+    fixture.pulse.data.auctions[0].band = { p10: 100, p50: 500, p90: 1000, comps: 100, tier: 'fixture' }; // once tagged hot
+    fixture.pulse.data.auctions[0].noReserve = true;
     await render('make=PORSCHE');
-    expect(button('Running hot').textContent).toContain('1');
-    expect([...container.querySelectorAll('button')].some(b => b.textContent?.startsWith('Running cold'))).toBe(false);
-    const tag = container.querySelector('[data-vehicle-id="later"] .market-heat__tag')!;
-    expect(tag.textContent).toBe('Running hot · 3×+');
-    expect(tag.getAttribute('aria-label')).toBe('Why 2000 PORSCHE Local fixture is running hot');
-    await act(async () => (tag as HTMLButtonElement).click());
-    expect(document.body.textContent).toContain('Of sold cars running this hot 2 days out, 86% finished above the middle of their comparable sales.');
-    expect(document.body.textContent).toContain('100 on its BaT model page');
-    expect(document.body.textContent).toContain('$100–$1,000');
-    await click('Running hot');
+    expect(container.textContent).not.toMatch(/Running (hot|cold)|Hottest|Coldest/);
+    expect(container.querySelector('.market-heat')).toBeNull();
+    expect(container.querySelector('[data-vehicle-id="later"] .market-no-reserve')?.textContent).toBe('No reserve');
+    expect(container.querySelector('[data-vehicle-id="first"] .market-no-reserve')).toBeNull();
+    expect(button('No reserve').className).toContain('market-chip--nr');
+    await click('No reserve');
     expect(boardTitles()).toEqual(['later']);
-    await click('Hottest');
-    expect(window.location.search).toContain('sort=hottest');
-    await click('Running hot');
-    expect(container.querySelector('[data-vehicle-id="first"] .market-heat')).toBeNull();
   });
-  it('takes the verdict and track record the read sends when the payload carries them', async () => {
-    fixture.pulse.data.curve = { fixture: [[120, 0.2], [0, 1]] };
-    const a = fixture.pulse.data.auctions[0];
-    a.band = { p10: 100, p50: 500, p90: 1000, comps: 100, tier: 'fixture' }; // the page alone would read this bid as hot
-    a.serverHeat = { ratio: 0.5, state: 'cold', typicalNow: 2 * (a.currentBid as number), share: 0.5, hoursLeft: 40 };
-    fixture.pulse.data.backtest = [{ horizonHours: 48, label: '2 days', hotAbove: 0.5, coldBelow: 0.99, nHot: 10, nCold: 10, runAt: '2026-10-14T00:00:00Z', population: 'fixture', lotsSold: 20, source: 'fixture' }];
-    await render('make=PORSCHE');
-    const tag = container.querySelector('[data-vehicle-id="later"] .market-heat__tag')!;
-    expect(tag.textContent).toBe('Running cold · 0.5×');
-    await act(async () => (tag as HTMLButtonElement).click());
-    expect(document.body.textContent).toContain('Of sold cars running this cold 2 days out, 99% finished below the middle of their comparable sales.');
-    delete a.serverHeat; fixture.pulse.data.backtest = null;
+  it('says the source once, as the venue, and not on each row', async () => {
+    await render();
+    expect(container.querySelector('h1')?.textContent).toBe('Bring a Trailer');
+    expect(container.querySelector('.market-venue__mark')?.getAttribute('src')).toBe('/vendor/bat/favicon.ico');
+    expect(container.textContent).not.toContain('Source: BaT');
+    expect(container.textContent).not.toContain('differing specification reports');
   });
 });
 
 
 describe('the board in its own history', () => {
-  it('places the current bids among the same hour on earlier weeks and says where they sit, counted', async () => {
+  it('places each figure against the same hour on earlier weeks, once, and keeps no second copy of the totals', async () => {
     fixture.pulse.data.sameHour = { hourUtc: '12', weekdayUtc: 'Saturday', low: 1, high: 2, weeks: 7, firstDay: '2026-08-15', readings: [] };
     fixture.pulse.data.weekAgo = { at: Date.now() - 7 * 86_400_000, bids: 100_000, n: 3, byMake: null, source: 'live' };
-    fixture.sameHour = Array.from({ length: 7 }, (_, i) => ({ day: `2026-08-${15 + i}`, bids: 50_000 + i * 1_000, n: 3, byMake: null, source: i === 0 ? 'archive' : 'live' }));
+    fixture.sameHour = Array.from({ length: 7 }, (_, i) => ({ day: `2026-08-${15 + i}`, bids: 50_000 + i * 1_000, n: 2, byMake: null, source: i === 0 ? 'archive' : 'live' }));
     await render('make=all');
-    expect(container.querySelector('h1')?.textContent).toBe('$125K on BaT live auctions');
-    expect(container.querySelector('.k-masthead')?.textContent).toContain('vs same time last week +25.0% from $100K');
-    const strip = container.querySelector('[aria-label="The board in its own history"]')!;
-    expect(strip.textContent).toContain('Same time on Saturdays · last 7 weeks');
-    expect(strip.textContent).toContain('higher than all 7 Saturdays at this hour');
-    expect(strip.querySelectorAll('.market-range__tick')).toHaveLength(7);
-    const edges = container.querySelector('[aria-label="Edges of the board\'s own history"]')!;
-    expect(edges.textContent).toContain('Current bids');
-    expect(edges.textContent).toContain('$125,000');
-    expect(edges.textContent).toContain('1 of the readings rebuilt from BaT bid history');
-  });
-  it('renders nothing of the kind when the board has no hour, and no edge section when nothing is at an edge', async () => {
-    await render();
-    expect(container.querySelector('[aria-label="The board in its own history"]')).toBeNull();
+    const [bids, lots] = [...container.querySelectorAll('.market-figure__item')];
+    expect(bids.querySelector('.k-figure')?.textContent).toBe('$125K');
+    expect(bids.textContent).toContain('+25.0% on a week ago · higher than all 7 weeks at this hour');
+    expect(bids.querySelectorAll('.market-range__tick')).toHaveLength(7);
+    expect(lots.querySelector('.k-figure')?.textContent).toBe('4');
+    expect(lots.textContent).toContain('+0.0% on a week ago · higher than all 7 weeks at this hour');
+    // Said once: no second, longer copy of the total on the page (hover titles aside).
+    const visible = container.cloneNode(true) as HTMLElement;
+    visible.querySelectorAll('title').forEach(t => t.remove());
+    expect(visible.textContent).not.toContain('$125,000');
     expect(container.querySelector('[aria-label="Edges of the board\'s own history"]')).toBeNull();
+    expect(container.querySelector('[aria-label="The board in its own history"]')).toBeNull();
+  });
+  it('says nothing comparative without readings, and says ties as level', async () => {
+    await render();
+    expect(container.querySelector('.market-range')).toBeNull();
+    expect(container.querySelector('.market-figure')?.textContent).not.toContain('weeks at this hour');
     fixture.pulse.data.sameHour = { hourUtc: '12', weekdayUtc: 'Saturday', low: 1, high: 2, weeks: 7, firstDay: '2026-08-15', readings: [] };
     fixture.sameHour = Array.from({ length: 7 }, (_, i) => ({ day: `2026-08-${15 + i}`, bids: 100_000 + i * 10_000, n: 3, byMake: null, source: 'live' }));
     await render('make=all');
-    expect(container.querySelector('[aria-label="The board in its own history"]')?.textContent).toContain('lower than 4 of 7 Saturdays');
-    expect(container.querySelector('[aria-label="Edges of the board\'s own history"]')).toBeNull();
+    const [bids, lots] = [...container.querySelectorAll('.market-figure__item')];
+    expect(bids.textContent).toContain('lower than 4 of 7 weeks at this hour');
+    expect(lots.textContent).toContain('level with all 7 weeks at this hour');
+  });
+  it('opens the map of what each figure is made of, by dollars or by lots, and closes it again', async () => {
+    await render();
+    expect(container.querySelector('#market-composition')).toBeNull();
+    await click('$125K');
+    expect(window.location.search).toContain('map=bids');
+    expect(container.querySelector('#market-composition')?.getAttribute('aria-label')).toBe('What the bids are made of');
+    expect(container.textContent).toContain('Box size = dollars bid now');
+    await click('4');
+    expect(window.location.search).toContain('map=lots');
+    expect(container.textContent).toContain('Box size = number of open lots');
+    await click('4');
+    expect(window.location.search).not.toContain('map=');
+    expect(container.querySelector('#market-composition')).toBeNull();
   });
   it('opens a chosen brand on its decades, and a decade box on its cars', async () => {
     fixture.pulse.data.auctions[0].year = 1995;
-    await render('make=PORSCHE');
+    await render('map=lots&make=PORSCHE');
     expect((container.querySelector('select[aria-label="Group inventory by"]') as HTMLSelectElement).value).toBe('era');
     expect((container.querySelector('select[aria-label="Inventory sub-boxes"]') as HTMLSelectElement).value).toBe('lot');
     const nineties = container.querySelector('[data-map-group="1990–1999"]')!;
@@ -428,11 +433,12 @@ describe('the market document', () => {
   it('names the population once, counts the cohort in the masthead and states its coverage in the strip', async () => {
     await render('make=PORSCHE');
     const h1 = container.querySelector('h1')!;
-    expect(h1.textContent).toBe('$25K on BaT live auctions · PORSCHE');
+    expect(h1.textContent).toBe('Bring a Trailer · PORSCHE');
     expect(h1.className).toContain('k-entity');
-    expect(container.querySelector('.k-masthead__result .k-measure')?.textContent).toBe('3');
-    expect(container.querySelector('.k-masthead__result .k-caption')?.textContent).toMatch(/^recorded /);
-    expect(container.querySelector('[aria-label="Market scope"] .k-coverage')?.textContent).toContain('3 of 4 captured BaT vehicle lots');
+    expect(container.querySelector('.market-figure .k-figure')?.textContent).toBe('$25K');
+    expect(cohortCount()).toBe('3');
+    expect(container.querySelector('.k-masthead__result')?.textContent).toBe('↻ live');
+    expect(container.querySelector('[aria-label="Market scope"] .k-coverage')).toBeNull();
     expect(container.textContent?.match(/Market explorer|Market cohort|captured vehicle auctions/)).toBeNull();
     expect(container.querySelectorAll('h1')).toHaveLength(1);
     await click('Use recorded sales view');
@@ -443,7 +449,7 @@ describe('the market document', () => {
   it('keeps the scope strip and the masthead when the live board cannot be read', async () => {
     fixture.pulse.data = undefined; fixture.pulse.isLoading = false; fixture.pulse.isError = true;
     await render();
-    expect(container.querySelector('h1')?.textContent).toBe('Open BaT lots');
+    expect(container.querySelector('h1')?.textContent).toBe('Bring a Trailer');
     expect(container.querySelector('[aria-label="Market scope"]')).toBeTruthy();
     expect(container.querySelector('[aria-label="Market scope"] .k-coverage')).toBeNull();
   });
@@ -473,17 +479,14 @@ describe('inline market row inspection', () => {
     expect(container.textContent).toContain('2004 BMW M3');
     expect(container.textContent).not.toContain('Arbitrary promotional headline');
     expect(container.textContent).toContain('6-speed manual');
-    expect(container.textContent).toContain('CA · 90210');
+    expect(container.querySelector(`[data-vehicle-id="${id}"]`)?.textContent).not.toContain('CA · 90210');
     expect(container.querySelector(`[data-vehicle-id="${id}"] .market-lot-metrics`)?.textContent).toContain('Stack A bidding depth');
     expect(container.querySelector('a[href*="bringatrailer.com/listing"]')).toBeNull();
     await click('Inspect auction for 2004 BMW M3');
     const row = container.querySelector(`[data-vehicle-id="${id}"]`)!;
     expect(row.nextElementSibling?.getAttribute('id')).toBe(`lot-inspection-${id}`);
     expect(window.location.search).toContain('inspect=auction');
-    await click('Inspect transmission for 2004 BMW M3');
-    expect(window.location.search).toContain('inspect=vehicle');
-    await click('Sources for 2004 BMW M3');
-    expect(window.location.search).toContain('inspect=sources');
+    expect([...container.querySelectorAll(`[data-vehicle-id="${id}"] .market-lot-facts button`)]).toHaveLength(0);
     await click('Close listing evidence');
     expect(window.location.search).not.toContain('lot=');
     expect(document.activeElement).toBe(row.querySelector('.market-lot-name'));

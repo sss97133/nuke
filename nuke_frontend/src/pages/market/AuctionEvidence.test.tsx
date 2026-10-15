@@ -103,27 +103,37 @@ it('connects recorded identity to sale context with subject exclusion, without l
   expect(params.has('currency')).toBe(false);
 });
 
-it('keeps the first inspection concise and puts the outbound listing behind Sources', async () => {
+it('opens one panel that adds only what the row cannot say, with the venue link where a reader looks', async () => {
   const scroll = vi.fn(); const previous = HTMLElement.prototype.scrollIntoView;
   HTMLElement.prototype.scrollIntoView = scroll;
   fixture.query.data.vehicle = { id, year: 1937, make: 'Packard', model: '115-C', title: 'Promotional source headline' };
-  fixture.query.data.specs[0].rooted = true;
+  fixture.query.data.specs = [
+    { field: 'transmission', label: 'Transmission', value: '3-speed manual', reported_value: null, rooted: true },
+    { field: 'mileage', label: 'Mileage', value: 64000, reported_value: null },
+    { field: 'vin', label: 'VIN', value: 'C123456', reported_value: null },
+  ];
   try {
-    await act(async () => root.render(<AuctionEvidence vehicleId={id} compact onClose={() => {}} />));
-    expect(container.querySelector('section')?.id).toBe(`lot-inspection-${id}`);
-    expect(container.textContent).toContain('Latest recorded bid $2,000');
-    expect(container.textContent).toContain('+$1,000 from the previous retained bid');
-    expect(container.querySelector('a[href^="https://bringatrailer.com"]')).toBeNull();
-    expect(container.querySelector('.auction-evidence-layout')).toBeNull();
-    expect(container.querySelector('svg')?.closest('details')?.open).toBe(false);
+    await act(async () => root.render(<AuctionEvidence vehicleId={id} compact onClose={() => {}}
+      summary={{ id, location: 'CA · 90210', bidCount: 2, watchers: 432 } as any} />));
+    const panel = container.querySelector('section')!;
+    expect(panel.id).toBe(`lot-inspection-${id}`);
+    expect(panel.querySelectorAll('nav button')).toHaveLength(0);
+    expect(panel.querySelector('a[href^="https://bringatrailer.com"]')?.getAttribute('href')).toBe(source);
+    expect(panel.querySelector('.market-inspection-counts')?.textContent).toBe('2 bids432 watching');
+    // The bids are drawn once, and not again as a table.
+    expect(panel.querySelectorAll('svg [role="button"]')).toHaveLength(2);
+    expect(panel.querySelector('table')).toBeNull();
+    expect(panel.textContent).toContain('Which component is leaking?');
+    expect(panel.textContent).toContain('Posted photos or video.');
+    expect(panel.textContent).toContain('64,000');
+    expect(panel.textContent).toContain('C123456');
+    expect(panel.textContent).toContain('CA · 90210');
+    // The row already says the name and its facts; the source headline and the read's disclaimers are not news.
+    expect(panel.textContent).not.toContain('3-speed manual');
+    expect(panel.textContent).not.toContain('1937 Packard 115-C');
+    expect(panel.textContent).not.toContain('Promotional source headline');
+    expect(panel.textContent).not.toMatch(/Retained high|within 10%|Leader’s margin|Bid coverage|Capture completeness|Source read/);
     expect(scroll).not.toHaveBeenCalled();
-    await act(async () => [...container.querySelectorAll('nav button')].find(b => b.textContent === 'Vehicle')!.dispatchEvent(new MouseEvent('click', { bubbles: true })));
-    expect(container.textContent).toContain('1937 Packard 115-C');
-    expect(container.textContent).toContain('Reports differ');
-    expect(container.textContent).not.toContain('Promotional source headline');
-    await act(async () => [...container.querySelectorAll('nav button')].find(b => b.textContent === 'Sources')!.dispatchEvent(new MouseEvent('click', { bubbles: true })));
-    expect(container.querySelector('a[href^="https://bringatrailer.com"]')?.getAttribute('href')).toBe(source);
-    expect(container.textContent).toContain('Promotional source headline');
   } finally { HTMLElement.prototype.scrollIntoView = previous; }
 });
 
@@ -148,30 +158,23 @@ it('preserves the row owner focus when compact inspection effects replay', async
 });
 
 
-it('projects Stack A into the row and uses the same high for price and depth', async () => {
-  fixture.book = {
-    vehicle: { id }, lot: { id: 'lot', source_url: source, auction_end_date: '2026-10-04T12:00:00Z', total_bids: 3, updated_at: '2026-10-04T11:30:00Z' },
-    readAt: '2026-10-04T11:30:00Z', bids: [
-      row('one', 'bid', '2026-10-04T10:00:00Z', { bid_amount: 500, external_identity_id: id, bat_comment_id: 1 }),
-      row('two', 'bid', '2026-10-04T10:30:00Z', { bid_amount: 900, external_identity_id: '00000000-0000-4000-8000-000000000002', bat_comment_id: 2 }),
-      row('three', 'bid', '2026-10-04T11:00:00Z', { bid_amount: 1000, external_identity_id: id, bat_comment_id: 3 }),
-    ],
-  };
-  await act(async () => root.render(<AuctionCompetition vehicleId={id} sourceUrl={source} row fallback={<span>Recorded bid 800</span>} />));
-  expect(container.textContent).toContain('Retained high$1,000');
-  expect(container.textContent).toContain('2 within 10%');
-  expect(container.textContent).toContain('2 bidders · 2 within 10% of the high'); expect(container.textContent).toContain('3/3 reported bids held');
-  expect(container.textContent).not.toContain('800');
-  expect(container.querySelector('a')).toBeNull();
-  await act(async () => root.render(<AuctionCompetition vehicleId={id} sourceUrl={source} />));
-  expect(container.querySelector('.market-competition-answer')?.textContent).toContain('2 of 2');
-  expect(container.querySelector('input[type=range]')?.getAttribute('max')).toBe('2');
-  expect(container.querySelector('details')?.open).toBe(false);
-  expect(container.querySelector('a')?.getAttribute('href')).toContain('/stacks/order-book/');
-  fixture.book.lot.total_bids = 6;
-  fixture.book = { ...fixture.book };
-  await act(async () => root.render(<AuctionCompetition vehicleId={id} sourceUrl={source} />));
-  expect(container.textContent).toContain('At least 2');
-  expect(container.textContent).not.toContain('Leader’s margin');
-  expect(container.textContent).not.toContain('Last raise');
+it('adds the pace of bidding to the board bid in the row, from Stack A, and nothing else', async () => {
+  vi.useFakeTimers(); vi.setSystemTime(new Date('2026-10-04T12:00:00Z'));
+  try {
+    fixture.book = {
+      vehicle: { id }, lot: { id: 'lot', source_url: source, auction_end_date: '2026-10-04T12:00:00Z', total_bids: 3, updated_at: '2026-10-04T11:30:00Z' },
+      readAt: '2026-10-04T11:30:00Z', bids: [
+        row('one', 'bid', '2026-10-04T10:00:00Z', { bid_amount: 500, external_identity_id: id, bat_comment_id: 1 }),
+        row('two', 'bid', '2026-10-04T10:30:00Z', { bid_amount: 900, external_identity_id: '00000000-0000-4000-8000-000000000002', bat_comment_id: 2 }),
+        row('three', 'bid', '2026-10-04T11:00:00Z', { bid_amount: 1000, external_identity_id: id, bat_comment_id: 3 }),
+      ],
+    };
+    await act(async () => root.render(<AuctionCompetition vehicleId={id} sourceUrl={source} row fallback={<span>Recorded bid 800</span>} />));
+    expect(container.textContent).toBe('Recorded bid 800bid 1 h ago · +11.1%');
+    expect(container.textContent).not.toMatch(/Retained high|bidders|within 10%|reported bids held|Bid depth/);
+    expect(container.querySelector('a')).toBeNull();
+    fixture.book = null;
+    await act(async () => root.render(<AuctionCompetition vehicleId={id} sourceUrl={source} row fallback={<span>Recorded bid 800</span>} />));
+    expect(container.textContent).toBe('Recorded bid 800');
+  } finally { vi.useRealTimers(); }
 });

@@ -104,17 +104,23 @@ function readTreemapRefresh(): Promise<MapRefresh> {
   return refreshRead;
 }
 
-/** The legend's clock clause: the refresh time when the ledger recorded one, else the old wording. */
-export function ledgerViewsClock(refreshedAt: string | null): string {
+/** The legend's clock clause: how long ago the ledger's views were refreshed, the way a feed says it (owner,
+ *  2026-10-15: no full date-and-time stamps). The exact time stays on the caption's title. */
+export function ledgerViewsClock(refreshedAt: string | null, now = Date.now()): string {
   const t = refreshedAt ? Date.parse(refreshedAt) : NaN;
   if (!Number.isFinite(t)) return ' · as of the last refresh of the ledger\u2019s views';
-  return ` · as of ${new Date(t).toISOString().slice(0, 16).replace('T', ' ')} UTC`;
+  const m = Math.max(0, Math.floor((now - t) / 60_000));
+  return ` · updated ${m < 1 ? 'just now' : m < 60 ? `${m} min ago` : m < 2880 ? `${Math.floor(m / 60)} h ago` : `${Math.floor(m / 1440)} d ago`}`;
+}
+export function ledgerViewsStamp(refreshedAt: string | null): string | undefined {
+  const t = refreshedAt ? Date.parse(refreshedAt) : NaN;
+  return Number.isFinite(t) ? `Views refreshed ${new Date(t).toISOString().slice(0, 16).replace('T', ' ')} UTC` : undefined;
 }
 
 /** The count beside the map, with its population and date. At the top level both numbers come from the refresh
  *  receipt (treemap_refreshes.populations), so they share one snapshot: the mapped sales of all public records. Below
  *  it the count is the level's own; the leaf shows at most 200 sales, the largest. */
-export function mapCaption(level: 'brands' | 'models' | 'years' | 'vehicles', levelCount: number, refresh: MapRefresh): string {
+export function mapCaption(level: 'brands' | 'models' | 'years' | 'vehicles', levelCount: number, refresh: MapRefresh, now = Date.now()): string {
   const fmt = (n: number) => n.toLocaleString('en-US');
   const p = refresh.populations;
   const receipt = level === 'brands' && p?.measure === 'confirmed_sale_v1'
@@ -122,7 +128,7 @@ export function mapCaption(level: 'brands' | 'models' | 'years' | 'vehicles', le
   const count = level === 'vehicles'
     ? `${levelCount >= 200 ? 'largest 200' : fmt(levelCount)} confirmed sales`
     : `${fmt(receipt ? p!.mapped_sales! : levelCount)} vehicles with a confirmed sale`;
-  return `${count}${receipt ? ` of ${fmt(p!.public_records!)} public records` : ''}${ledgerViewsClock(refresh.refreshedAt)}`;
+  return `${count}${receipt ? ` of ${fmt(p!.public_records!)} public records` : ''}${ledgerViewsClock(refresh.refreshedAt, now)}`;
 }
 
 /** What area and color mean at each level. The readers count public records with a confirmed sale (vehicle_sale_basis)
@@ -1132,7 +1138,7 @@ export function TreemapHomePage({ onBrowse, embedded = false }: { onBrowse: () =
         {/* Level indicator + feed shortcut */}
         <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 12, flexShrink: 0 }}>
           {activeData && (
-            <Text role="caption">
+            <Text role="caption" title={ledgerViewsStamp(refresh.refreshedAt)}>
               {mapCaption(levelType, totalCount, refresh)}
             </Text>
           )}
