@@ -42,19 +42,26 @@ export default function FamilyMovers({ onPick }: { onPick: (m: Mover) => void })
   }, []);
   if (!rows?.length) return null;
   const bat = rows[0];
+  const chip = (m: Mover) => <button key={`${m.direction}-${m.brand}-${m.family_key}`} type="button"
+    className={`map-movers__item map-movers__item--${m.direction}`} onClick={() => onPick(m)}
+    title={`${m.brand} ${m.family} on Bring a Trailer: ${m.sold_prior_12m} sold in the 12 months before, ${m.sold_12m} in the last 12; dollars ${move(m.usd_12m, m.usd_prior_12m)}`}>
+    <Text role="label">{m.brand} {m.family}</Text>
+    <Text role="measure" dense>{move(m.usd_12m, m.usd_prior_12m)}</Text>
+    <Text role="caption">{m.sold_prior_12m}→{m.sold_12m} sold</Text>
+  </button>;
+  // Risers and fallers each get a row, so both show without scrolling past the other.
+  const row = (direction: 'up' | 'down', title: string) => {
+    const list = rows.filter((m) => m.direction === direction);
+    return list.length ? <div className="map-movers__row">
+      <Text role="label" className="map-movers__title">{title}</Text>
+      <div className="map-movers__list">{list.map(chip)}</div>
+    </div> : null;
+  };
   return <div className="map-movers" role="group" aria-label="Moving on Bring a Trailer, last 12 months">
-    <Text role="label" className="map-movers__title">Moving on BaT · 12 mo</Text>
-    <div className="map-movers__list">
-      {rows.map((m) => <button key={`${m.direction}-${m.brand}-${m.family_key}`} type="button"
-        className={`map-movers__item map-movers__item--${m.direction}`} onClick={() => onPick(m)}
-        title={`${m.brand} ${m.family} on Bring a Trailer: ${m.sold_prior_12m} sold in the 12 months before, ${m.sold_12m} in the last 12; dollars ${move(m.usd_12m, m.usd_prior_12m)}`}>
-        <Text role="label">{m.brand} {m.family}</Text>
-        <Text role="measure" dense>{move(m.usd_12m, m.usd_prior_12m)}</Text>
-        <Text role="caption">{m.sold_prior_12m}→{m.sold_12m} sold</Text>
-      </button>)}
-    </div>
+    {row('up', 'Rising on BaT · 12 mo')}
+    {row('down', 'Falling')}
     <Text role="caption" className="map-movers__base">
-      dollars on BaT; BaT overall: sales {move(bat.bat_sold_12m, bat.bat_sold_prior_12m)}, $ {move(bat.bat_usd_12m, bat.bat_usd_prior_12m)} · {bat.eligible.toLocaleString('en-US')} of {bat.families.toLocaleString('en-US')} families with 30+ BaT sales each year
+      dollars on BaT, last 12 months against the 12 before · BaT overall: sales {move(bat.bat_sold_12m, bat.bat_sold_prior_12m)}, $ {move(bat.bat_usd_12m, bat.bat_usd_prior_12m)} · {bat.eligible.toLocaleString('en-US')} of {bat.families.toLocaleString('en-US')} families with 30+ BaT sales each year
     </Text>
   </div>;
 }
