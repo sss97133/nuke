@@ -70,3 +70,12 @@
 .map-callouts__item--loss .map-callouts__move { color: var(--error); }
 .map-callouts__n { font-size: 11px; color: var(--text-secondary); font-family: 'Courier New', monospace; }
 @media (max-width: 640px) { .map-callouts { gap: 2px 14px; padding: 4px 12px; } .map-callouts__n { display: none; } }
+
+/* Sales by house above the map: one 100% bar in the venue colors and the larger houses' shares. */
+.venue-mix { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 12px; padding: 6px 16px; border-bottom: 2px solid var(--border); background: var(--bg); flex-shrink: 0; font-family: Arial, sans-serif; }
+.venue-mix__label { font-size: 10px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: var(--text-secondary); }
+.venue-mix__bar { display: flex; width: 240px; height: 10px; border: 1px solid var(--border); }
+.venue-mix__seg { display: block; min-width: 1px; height: 100%; }
+.venue-mix__names { display: inline-flex; flex-wrap: wrap; gap: 2px 10px; font-size: 12px; color: var(--text); font-variant-numeric: tabular-nums; }
+.venue-mix__n { color: var(--text-secondary); font-size: 11px; font-family: 'Courier New', monospace; }
+@media (max-width: 640px) { .venue-mix { padding: 4px 12px; } .venue-mix__bar { width: 100%; } .venue-mix__n { display: none; } }

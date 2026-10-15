@@ -9,7 +9,7 @@ import { OnboardingSlideshow } from '../components/onboarding/OnboardingSlidesho
 import { useInterests } from '../hooks/useInterests';
 import { optimizeImageUrl } from '../lib/imageOptimizer';
 import { squarify } from '../lib/squarify';
-import { MapCallouts, MapLegend, MarketCard, MarketSheet, MarketTile, money as fmtMoneyMap, type MapBasis } from './market/MarketTile';
+import { MapCallouts, MapLegend, MarketCard, MarketSheet, MarketTile, VenueMix, money as fmtMoneyMap, type MapBasis } from './market/MarketTile';
 import { batBaseline, callouts, relativeMove } from './market/mapScale';
 import { readShareMovers } from './market/FamilyMovers';
 import IntakePage from './intake/IntakePage';
@@ -114,7 +114,8 @@ export function readTreemapBrands(): Promise<TreemapNode[] | null> {
 // The clock of the ledger's views: the latest treemap_refreshes row, written by treemap_refresh_all() since 2026-10-14
 // (job 175, daily 09:10 UTC), with the map's population receipt (treemap_populations()) since 20261014063000.
 // Absent or unreadable, the legend says what it always said, without a time or a population.
-export interface MapPopulations { measure?: string; public_records?: number; mapped_sales?: number }
+export interface MapPopulations { measure?: string; public_records?: number; mapped_sales?: number;
+  by_house?: { house: string | null; sales: number; amount: number }[] }
 export interface MapRefresh { refreshedAt: string | null; populations: MapPopulations | null }
 const NO_REFRESH: MapRefresh = { refreshedAt: null, populations: null };
 let refreshRead: Promise<MapRefresh> | null = null;
@@ -1426,6 +1427,9 @@ export function TreemapHomePage({ onBrowse, embedded = false }: { onBrowse: () =
           </span>
         </div>
       </div>
+
+      {/* ─── SALES BY HOUSE: what the all-venue map holds, house by house (the refresh's receipt) ─── */}
+      {levelType === 'brands' && basis === 'ledger' && <VenueMix rows={refresh.populations?.by_house} clock={ledgerViewsClock(refresh.refreshedAt)} />}
 
       {/* ─── CALLOUTS: the clearest gain and loss against BaT and the largest tile, each a way into its tile ─── */}
       {marketLevel && !(levelType === 'brands' && brandView === 'nested') && activeData && (
