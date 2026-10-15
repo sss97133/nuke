@@ -9,6 +9,7 @@ import { test } from 'node:test';
 import * as ledger from '../supabase/functions/poll-listing-feeds/ledger.ts';
 import { captureLedgerFields } from '../supabase/functions/poll-listing-feeds/captureLedger.ts';
 import { fetchCraigslistFeed } from '../supabase/functions/poll-listing-feeds/feedFetch.ts';
+import { emptySearchHtml } from '../supabase/functions/poll-listing-feeds/fixtures/empty-search.ts';
 const require = createRequire(new URL('../nuke_frontend/package.json', import.meta.url));
 const ts = require('typescript');
 const { createClient } = require('@supabase/supabase-js');
@@ -205,6 +206,75 @@ for (const status of [403, 429]) {
     assert.equal(target.counts.landed_ledger_acknowledged, 0);
     assert.deepEqual(ledger.selectIntakeFeeds([{ ...f.feed, ...failure.body }], 1,
       ledger.intakeThrottle(), Date.parse(failure.body.last_polled_at) + 15 * 60_000), []);
+  });
+}
+
+const emptySearchFeed = { source_slug: 'craigslist', feed_url: 'https://example.craigslist.org/search/cta',
+  search_criteria: { fetch_strategy: 'firecrawl_html' }, error_count: 59, last_error: 'parsed_zero' };
+
+test('explicit empty Craigslist search completes zero and resets errors without spending admission slots', async () => {
+  const f = fixture({ feed: emptySearchFeed, archive: async () => ({ html: emptySearchHtml, statusCode: 200, error: null }) });
+  const result = await f.request(), target = f.stored.get(result.body.receipt_id).metadata.targets[0];
+  assert.equal(target.state, 'completed');
+  assert.equal(target.counts.discovered_items, 0);
+  assert.equal(target.counts.ingestion_requests, 0);
+  assert.equal(target.counts.landed_ledger_acknowledged, 0);
+  assert.equal(result.body.throttle.attempted, 0);
+  const success = f.calls.find(c => c.path === '/rest/v1/listing_feeds' && c.body?.error_count === 0);
+  assert.equal(success.body.last_error, null);
+  assert.equal(success.body.last_poll_count, 0);
+  assert(!f.calls.some(c => c.path === '/functions/v1/ingest' || c.path === '/rest/v1/import_queue'));
+});
+
+test('one Craigslist result still needs the normal ingestion and matching ledger acknowledgement', async () => {
+  const url = 'https://www.craigslist.org/view/d/example-car/abc123XYZ';
+  const html = emptySearchHtml.replace('"itemListElement":[]', `"itemListElement":[{"url":"${url}"}]`)
+    .replace('</ol>', `<li class="cl-static-search-result"><a href="${url}">1980 Ford</a></li></ol>`);
+  const f = fixture({ feed: emptySearchFeed, archive: async () => ({ html, statusCode: 200, error: null }),
+    ingestResult: () => ({ status: 'created', source: 'craigslist', vehicle_id: '00000000-0000-4000-8000-000000000002',
+      listing_capture: { post_id: '1234567890', capture_landing: { observation: 'written',
+        observation_id: '00000000-0000-4000-8000-000000000031', listing_event: {
+          action: 'inserted', id: '00000000-0000-4000-8000-000000000032' } } } }) });
+  const result = await f.request(), target = f.stored.get(result.body.receipt_id).metadata.targets[0];
+  assert.equal(target.state, 'completed');
+  assert.equal(target.counts.discovered_items, 1);
+  assert.equal(target.counts.ingestion_requests, 1);
+  assert.equal(target.counts.landed_ledger_acknowledged, 1);
+  assert.equal(result.body.throttle.attempted, 1);
+  assert(f.calls.some(c => c.path === '/rest/v1/import_queue' && c.method === 'POST' && c.body.status === 'complete'));
+});
+
+test('the empty search bypass does not apply to another source strategy', async () => {
+  const f = fixture({ feed: { ...emptySearchFeed, source_slug: 'other', search_criteria: {
+    fetch_strategy: 'firecrawl_html', prefer_direct_fetch: true } },
+    archive: async () => ({ html: emptySearchHtml, statusCode: 200, error: null }) });
+  const result = await f.request();
+  assert.equal(result.body.results[0].error, 'parsed_zero');
+  assert.equal(f.stored.get(result.body.receipt_id).metadata.targets[0].state, 'failed');
+  assert.equal(result.body.throttle.attempted, 0);
+});
+
+for (const [name, html, criteria] of [
+  ['challenge', emptySearchHtml + '<h1>Access Denied</h1>'],
+  ['captcha challenge', emptySearchHtml + '<div class="g-recaptcha">Verify you are human</div>'],
+  ['unquoted nonempty row', emptySearchHtml.replace('</ol>', '<li class=cl-static-search-result>unreadable item</li></ol>')],
+  ['malformed JSON', emptySearchHtml.replace('"itemListElement":[]', '"itemListElement":[')],
+  ['absent result data', '<html><body>Loading search</body></html>'],
+  ['null result data', emptySearchHtml.replace('"itemListElement":[]', '"itemListElement":null')],
+  ['nonempty data without extractable links', emptySearchHtml.replace('"itemListElement":[]', '"itemListElement":[{"name":"unreadable item"}]')],
+  ['invalid configured regex', emptySearchHtml, { listing_url_regex: '[' }],
+  ['nonmatching configured regex', emptySearchHtml, { listing_url_regex: 'https://example.invalid/listing/[^" ]+' }],
+]) {
+  test(`zero Craigslist links still fail with ${name}`, async () => {
+    const f = fixture({ feed: { ...emptySearchFeed, search_criteria: { ...emptySearchFeed.search_criteria, ...criteria } },
+      archive: async () => ({ html, statusCode: 200, error: null }) });
+    const result = await f.request(), target = f.stored.get(result.body.receipt_id).metadata.targets[0];
+    assert.equal(target.state, 'failed');
+    assert.equal(result.body.results[0].error, 'parsed_zero');
+    assert.equal(result.body.throttle.attempted, 0);
+    const failure = f.calls.find(c => c.path === '/rest/v1/listing_feeds' && c.body?.last_error === 'parsed_zero');
+    assert.equal(failure.body.error_count, 60);
+    assert(!f.calls.some(c => c.path === '/functions/v1/ingest' || c.path === '/rest/v1/import_queue'));
   });
 }
 

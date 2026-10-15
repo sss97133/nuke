@@ -1,6 +1,7 @@
 import { fetchCraigslistFeed, type CraigslistArchiveOptions, type CraigslistArchiveResult } from "./feedFetch.ts";
 import { fetchPage } from "../_shared/hybridFetcher.ts";
 import { failureCategoryFor, intakeThrottle, selectIntakeFeeds } from "./ledger.ts";
+import { emptySearchHtml as emptySearch } from "./fixtures/empty-search.ts";
 
 const url = "https://lasvegas.craigslist.org/search/cta?min_auto_year=1960";
 const html = `<html><title>Cars</title>${"public listing ".repeat(100)}</html>`;
@@ -18,6 +19,41 @@ async function withFetch(
 function archived(value: Partial<CraigslistArchiveResult>): CraigslistArchiveResult {
   return { html: null, statusCode: 200, error: null, ...value };
 }
+Deno.test("a successful Craigslist search explicitly corroborates its empty result", async () => {
+  equal(await fetchCraigslistFeed(url, async () => archived({ html: emptySearch })),
+    { html: emptySearch, error: null, confirmedEmpty: true });
+});
+
+Deno.test("empty recognition rejects ambiguous, conflicting or blocked source evidence", async () => {
+  const invalid = [
+    emptySearch.replace('"itemListElement":[]', '"itemListElement":null'),
+    emptySearch.replace('"itemListElement":[]', '"itemListElement":['),
+    emptySearch.replace('"itemListElement":[]', '"itemListElement":[{"name":"unreadable item"}]'),
+    emptySearch.replace('"SearchResultsPage"', '"WebPage"'),
+    emptySearch.replace('id="ld_searchpage_results"', 'id="other"'),
+    emptySearch.replace('type="application/ld+json"', 'type="text/plain"'),
+    emptySearch + '<script type="application/ld+json" id="ld_searchpage_results">{"@type":"ItemList","itemListElement":[]}</script>',
+    emptySearch + '<script type="application/ld+json" id="ld_searchpage_results">{"@type":"ItemList","itemListElement":[{}]}</script>',
+    emptySearch.replace('<script', '<!-- <script').replace('</script>', '</script> -->'),
+    emptySearch.replace('class="cl-static-search-results"', 'class="other"'),
+    emptySearch.replace('</ol>', ''),
+    emptySearch.replace('</ol>', '<li class="cl-static-search-result">unreadable item</li></ol>'),
+    emptySearch.replace('</ol>', '<li class=cl-static-search-result>unreadable item</li></ol>'),
+    emptySearch + '<script>window._cf_chl_opt = {};</script>',
+    emptySearch + '<h1>Access Denied</h1>',
+    emptySearch + '<div class="g-recaptcha">Verify you are human</div>',
+  ];
+  for (const html of invalid) {
+    equal((await fetchCraigslistFeed(url, async () => archived({ html }))).confirmedEmpty, undefined);
+  }
+  for (const override of [{ statusCode: 403 }, { statusCode: null }, { error: "Blocked by site" }]) {
+    equal((await fetchCraigslistFeed(url, async () => archived({ html: emptySearch, ...override }))).confirmedEmpty, undefined);
+  }
+  for (const wrongUrl of ["http://lasvegas.craigslist.org/search/cta", "https://notcraigslist.org/search/cta",
+    "https://craigslist.org.evil.example/search/cta", "https://www.craigslist.org/view/d/car/token"]) {
+    equal((await fetchCraigslistFeed(wrongUrl, async () => archived({ html: emptySearch }))).confirmedEmpty, undefined);
+  }
+});
 
 Deno.test("Craigslist requests fresh archived public HTML without a renderer", async () => {
   const calls: CraigslistArchiveOptions[] = [];
