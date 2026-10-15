@@ -1407,6 +1407,8 @@ async function ingestOne(input: IngestInput, userId: string | null): Promise<Ing
 
     // Auto-enrich: call the platform's extractor to get full listing data
     let capture: CraigslistCapture | null = null;
+    // Keep source prose beside its capture, separately from caller notes or retained vehicle text.
+    let captureDescription: string | null = null;
     const captureAnswer = (): { listing_capture?: Record<string, unknown> } =>
       capture ? { listing_capture: ledgerFields(capture) } : {};
     let enrichmentSucceeded = false;
@@ -1454,7 +1456,11 @@ async function ingestOne(input: IngestInput, userId: string | null): Promise<Ing
           input.location = normalizeLocation(enriched.location) ?? undefined;
         }
         if (!input.seller_name && enriched.seller_name) input.seller_name = enriched.seller_name;
-        if (enriched.capture) capture = enriched.capture;
+        if (enriched.capture) {
+          capture = enriched.capture;
+          captureDescription = typeof enriched.description === "string" && enriched.description.trim()
+            ? enriched.description : null;
+        }
         // Extracted identity beats slug-derived guesses (caller-explicit fields
         // were already merged into input above, so they still win)
         if (enriched.year && enriched.make) {
@@ -1721,6 +1727,7 @@ async function ingestOne(input: IngestInput, userId: string | null): Promise<Ing
           vehicleId: match.vehicleId,
           listingUrl: listingUrl ?? input.url ?? "",
           capture,
+          sourceDescription: captureDescription,
           isNewVehicle: match.isNew,
           modelCitation,
           written: {
