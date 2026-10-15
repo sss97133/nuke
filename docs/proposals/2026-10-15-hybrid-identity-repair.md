@@ -2,7 +2,8 @@
 
 Status: plan. Nothing has been written. The population count comes from `mv_family_year_prices.conflicts` after its
 first build (cron `refresh-family-year-prices`, 09:40 UTC). Owner of the plan: lane skylar-08. Readers affected:
-skylar-83 (mv_treemap_outcomes, mv_family_market, the brand map). Writer bug: routed to the intake lane by skylar-83.
+skylar-83 (mv_treemap_outcomes, mv_family_market, the brand map). Writer bugs: the Barrett-Jackson resolver (routed to the intake lane by skylar-83) and the extract-mecum page path
+(fixed in #1468).
 
 ## What is wrong
 
@@ -80,6 +81,28 @@ This makes the Conceptcarz rows the larger and harder half of the batch.
    - **hybrid:** a B-J `discovery_url` or VIN on a lot row of another platform;
    - **mislabel:** the model is wrong and no foreign identity is present (the 09-28 class);
    - **page ambiguity:** the page names neither car clearly. These are left alone.
+
+### A second writer: extract-mecum's page path (intake-flow, 2026-10-15 07:30Z)
+
+The Mecum page path also overwrote year/make/model on every vehicle it updated. Fixed in #1468: identity becomes
+fill-only, and a disagreeing lot goes to the revision queue as a relink.
+
+A bounded read covers vehicles linked to a page-path event since 2026-10-14:
+- 879 vehicles in all;
+- 71 that also carry another platform's events;
+- 7 of those 71 disagree with the other platform's slug or title on year or make.
+
+Three of the 7 look real:
+- b68e146c, a "1956 Nimbus 750" whose BaT event is a 1969 Ferrari 365 GT;
+- 503d8097, a "1955 Chevrolet 3100" whose BaT event is a 1959 Apache pickup;
+- ec13809c, a 1967 Lancia Flavia against a 1966 BaT slug, which may be a model-year difference.
+
+The other four are naming differences (Hi-Boy/highboy, Shelby/Ford, Hummer H1/AM General).
+
+The lists are private: `~/nuke-logs/mecum-hybrid-candidates-20261015.json` and
+`~/nuke-logs/mecum-hybrid-disagreeing-ids-20261015.json`. This count is a bound, not the population, because an
+overwrite on a vehicle with no second platform cannot be told apart from the vehicle's own values. The repair steps
+below apply unchanged. For these rows, "its own lot" is the platform whose event predates the Mecum page write.
 
 ## Repair, per hybrid row, in order (sanctioned writers only)
 
