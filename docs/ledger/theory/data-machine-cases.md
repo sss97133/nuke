@@ -2359,3 +2359,84 @@ is gone, withdrawn, expired or sold off-site; the outcome is unknown, never a sa
 page of a search is not removed (only the first page is read), so absence from a search page is not evidence. The
 revisit rule (a landed post still on a search page is read again after 24 h) is the clock for this. A blank-model post is
 kept as an unresolved listing observation (`vehicle_id` NULL) and is not retried as a failure.
+
+### 13.13 A listing rises by what it is: the classified merit stack (owner, 2026-10-15)
+
+**Owner direction, in substance.** The arrivals feed is led by Craigslist "not cuz its good but cuz its easy. its
+boring to look at. that needs to be expressed in the very thread of the dna." Saying the listings are bad gets nowhere;
+the goal is to define in Postgres (keys, foreign keys, folds, larger group cross-analysis) the difference between a 1967
+Corvette for $22K and a 1971 Buick for $5,500, so leads surface "preference / hard code agnostic. they rise by way of
+what they are." The human explanation: a sick listing sells fast, "but not for us": the why has to be factual, with
+citation. Same night (to skylar-83): the benchmark is Barn Finds' "good deal, snatch this up", and the visualizer should
+teach the market by saying where each listing sits in our price analysis.
+
+**What was there.** The feed (`classified_ask_board`, Market tab "Just listed") ordered newest first, with a "band" sort
+on `compute_taste_score`: hand-typed weights (Chevrolet 40, Blazer 25, a Las Vegas bonus of 5). That is the hard code the
+owner names. Every row on 2026-10-15 was Craigslist (1,158 events since 10-13), because Craigslist is the one classified
+source landing listing events; 136 Facebook listings landed on 10-12/13 with no vehicle bound and none since.
+
+**The stack, layer by layer.**
+
+| Layer | Object | Grain, key, clock | State 2026-10-15 |
+|---|---|---|---|
+| Log | `vehicle_events` (classified listings), `marketplace_listings` (Facebook sweeps), `mv_treemap_outcomes` (recorded sales) | one listing / one recorded outcome; created_at / first_seen_at, sale_date | existing |
+| Key | `mv_model_family_names.family_id` (#1317, skylar-83) | make and model name -> canonical_models family, year range +/-1 | 494,210 of 681,551 public vehicles keyed |
+| Dimension | factory model family x model year | canonical_models | existing |
+| Fold / baseline | `mv_family_year_prices` (#1375) | family x model year x basis (sold, asked); narrowest 0/1/2/3/5-year window holding 10 prices, cited; conflicts counted | created empty; first build by the 09:40 UTC cron (load, see below) |
+| Residual / feature | `classified_ask_board.position` (#1382) | per listing: at_or_below among sales and among other asks, p25/p50/p75, n, venues, share; `position` sort | merges after the first build |
+| Prediction | `classified_ask_board.merit` from the active `listing_exit_models` row (#1380) | P(gone within 7 days of first sight) | no active model: the exit test failed (below) |
+| Outcome | `v_classified_exit_outcomes` (#1380) | per listing: first seen, last seen, exited_at, region, fate_7d | Facebook 3,777 exits Feb-Jun; Craigslist revisits from 10-15 (5 per 15 min) |
+
+**The identity guard (a raw-vs-model test inside the fold).** Of 469 recorded 1967 Corvette sales (model strings
+beginning "corvette"), 34 have their own source page naming a different car: Camaros, Chevelles, Impalas, a C10, a Nova,
+El Caminos. Of the six recorded at $22K or less, three are other cars (a C10 at $10,999, a custom sport truck at $3,450, a
+Mecum Chevelle at $16,000) and two are real project coupes ($16,500, $20,250). The fold refuses a sale whose page names its
+model year but not its family and counts it in `conflicts`, so the defect is measured fleet-wide and a cheap ask is not
+flattered by mislabeled sales. A page counts as naming the family if it carries any of the family's canonical_models
+phrases (name and aliases, 3+ characters): the first rule, the alias the name matched, refused 535 of 548 Wrangler sales
+whose pages read "2000-jeep-wrangler-82". Across 1962-72 the refused "Corvette" pages read Impala 38, Camaro 32, Chevelle
+16, Corvair 12, El Camino 10, Bel Air 9, Nova 7, Biscayne 7, C10 8. The record repair is the vehicle-identity owner's
+(supersession of `vehicles.model`). This stack realizes registered stacks SC (liquidity as an option) and S10 (liquidity
+surface) for classifieds; registering its needs in `stack_needs` is the next registry step.
+
+**The two cars, read with the fold's rules** (bounded reads 2026-10-15 ~04:50Z; the fold's first build is the
+authority). A 1967 Corvette asking $22,000: 435 recorded 1967 Corvette sales (Bring a Trailer 243, Mecum 37, Gooding 16,
+other 138), median $93,000 (p25 $70,641, p75 $132,000); 4 of 435 sold for $22,000 or less, so the ask sits under 431 of
+them, $71,000 below the median, in a single model year. The 1971 Electra 225 asking $5,500 (Sacramento, Craigslist): 17
+recorded Electra sales across 1969-73 (the window had to widen two years either side), median $17,500 (p25 $12,750); none
+at or below $5,500. Both asks sit at the bottom of their family's sales; what separates them is depth (435 sales in one
+model year against 17 across five), the dollars between ask and the middle ($71,000 against $12,000) and the multiple
+(4.2x against 3.2x). Among Facebook asks first seen in the last year the Corvette sits 5 of 16 (1965-69, median $31,250)
+and the Electra 4 of 10 (1968-74, median $8,000): a classified ask against auction sales mostly measures venue.
+
+**The owner's acceptance case** (skylar-83, his read of the top three in the feed, 04:15Z). 1965 Barracuda $29,500, "top
+dollar": 11 of 14 recorded 1965 Barracuda sales at or below, above the p75 ($28,375). 1999 Wrangler $14,000 at 178,000 mi,
+"right in the middle": 24 of 51 recorded 1999 Wrangler sales at or below (median $14,500), and 45 of 46 Facebook asks
+(median $5,500), so expensive for a classified. 1995 GMC K1500 $3,500 at 300,000 mi, "busted up": 6 recorded K1500 sales
+across 1990-2000 and 2 asks, so no position; GMC and Chevrolet K1500s are separate families today (a badge-twin gap in
+the key layer), and mileage is not a feature yet.
+
+**The exit test (the "sells fast" claim, measured).** Facebook listings keyed to a family with a known 7-day fate,
+restricted to the five weeks the removal sweep ran (2026-02-23, 03-02, 03-23, 03-30, 06-08; in other weeks only survivors
+have a known fate): 1,743 listings, 339 gone within 7 days (19.4%). Of those, 952 sit among 10+ earlier asks of their
+family (point-in-time, another vehicle, the fold's window rule). Train before 03-30, test after: position among asks gave
+a held-out AUC of 0.501 +/- 0.031 (price alone 0.541 +/- 0.028); the exit rate by ask position ran 23.1%, 21.7%, 17.6%,
+25.1%, 16.1% from the bottom fifth to the top. On this label, where an ask sits among its family's asks does not predict
+that it is gone in a week, so no `listing_exit_models` row is active and `merit` stays null. The label is weak (missing
+from a later sweep is not a sale) and small; the next tests are the sale position once the fold is built and Craigslist
+404 exits as they accrue. Scripts and the result: `scripts/stacks/classified-exit/`. Until a model beats chance on held-out
+exits, the feed's factual order is `position` (the share of the family's prices at or below the ask, lowest first): one
+measured quantity, labeled as what it is, never as "best deal".
+
+**Load, measured.** Production estimates the family join at 1 row (it is ~400,000), and with nested loops the planner
+paired every year row with every target year: a 0.5% sample ran past 10 s. Built without nested loops it reads `vehicles`
+once (parallel seq scan) and merge-joins on the family; the same query over 170,252 sales and 111,553 asks took 0.84 s on
+PostgreSQL 17 locally. Intake lanes were writing at deploy time (skylar-f7), so the view is created empty and the first
+build is the 09:40 UTC cron.
+
+**What is still missing.** Condition: the price follows condition, and condition comes from photos; 0 of 690 photos on 60
+recent Craigslist cars carry a condition read, so seller-declared condition (an attributed claim, `condition` on the
+board) is the only input until the on-demand Analyze path exists. Venue: a classified ask against auction sales mostly
+measures venue and condition, which is why the ask-vs-asks position leads and the sale position follows. Facebook
+classified listings do not reach the board (no vehicle binding since 10-13). Craigslist exits accrue at the revisit
+sweep's rate (5 posts per 15-minute run). Mileage is not yet a feature.
