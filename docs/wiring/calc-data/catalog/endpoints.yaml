@@ -1370,7 +1370,7 @@ AMP:
   note: "75 W x 4 at 4 ohm + 300 W x 1 at 2 ohm; 4 AWG power and ground leads, 60 A fuse; 9-13/16 x 2-1/8 x 6-3/4 in; tuned with JL's TuN app over USB"
   family: open
   kit: {}
-  wires: ["AMP_PWR_TAIL", "AMP_GND_TAIL", "RADIO_REM", "RCA_FRONT", "RCA_REAR", "RCA_SUB", "26a", "26b", "27a", "27b", "28a", "28b", "29a", "29b", "30a", "30b"]
+  wires: ["AMP_PWR_TAIL", "AMP_GND_TAIL", "RADIO_REM", "RCA_FRONT", "RCA_REAR", "RCA_SUB", "26a", "26b", "27a", "27b", "28a", "28b", "29a", "29b", "30a", "30b", "30c", "30d"]
   open: ["mount spot (cargo area, near the woofers)", "input count for the radio's sub RCA (see RCA_SUB)"]
   sources: ["web_snapshots/www.crutchfield.com__JL-Audio-VX700-5i.md ('4-gauge power and ground leads and a 60-amp fuse recommended'; DSP input routing and mixing)",
             "owner 2026-09-27: 'kicker is not cool... what a brand for a 100k truck'"]
@@ -1391,16 +1391,16 @@ SUB:
   device: "woofer 1 of 2 — JBL Club 102SL 10 in shallow-mount (3.25 in deep), impedance switch set to 4 ohm; the two in parallel = 2 ohm on the amp's 300 W sub channel; lined up at Crutchfield, $274.95 each"
   family: open
   kit: {}
-  wires: ["30a", "30b", SUB_JMP_P, SUB_JMP_N]
+  wires: ["30a", "30b"]
   open: ["enclosure: sealed box sized for two shallow 10s, built or bought once the cargo-area spot is set"]
   sources: ["owner 2026-09-25: 'we are gonna do jbl 10\" compact woofers, an amp not sure which and then the appropriate other speakers'",
             "web_snapshots/www.crutchfield.com__JBL-Club-102SL.md (in stock, $274.95 each; the Club WS1000 page lists it as the in-stock replacement)"]
 SUB-2:
   where: rear
-  device: "woofer 2 of 2 — JBL Club 102SL, switch at 4 ohm, jumpered in parallel with woofer 1"
+  device: "woofer 2 of 2 — JBL Club 102SL, switch at 4 ohm, on the amp sub harness's second lead pair (paralleled inside the harness, JL guide)"
   family: open
   kit: {}
-  wires: [SUB_JMP_P, SUB_JMP_N]
+  wires: ["30c", "30d"]
   sources: ["web_snapshots/www.crutchfield.com__JBL-Club-102SL.md"]
 GND-SPLICE-REAR:
   where: rear

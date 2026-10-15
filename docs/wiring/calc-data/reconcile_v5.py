@@ -753,6 +753,11 @@ IMPLIED += [
      "RCA pair", HERMOSA + "; RetroSound Motor 2B user manual p.3: 'Multi-channel pre-amp outputs (front, rear, subwoofer)'"),
     ("SUB_JMP_P", "Woofer jumper (+): woofer 1 to woofer 2, in parallel", "SUB (+)", "SUB-2 (+)", 10, "M22759/16", "owner 2026-09-25: 'we are gonna do jbl 10\" compact woofers, an amp not sure which and then the appropriate other speakers'; JBL Club 102SL: impedance selector 2 or 4 ohm, 350 W RMS (Crutchfield page, snapshot web_snapshots/www.crutchfield.com__JBL-Club-102SL.md) — both set to 4 ohm and wired in parallel = 2 ohm for the amp's 300 W sub channel; build book 'Audio, decided Sep 25': 10 AWG pair with a jumper between the two woofers"),
     ("SUB_JMP_N", "Woofer jumper (-): woofer 1 to woofer 2, in parallel", "SUB (-)", "SUB-2 (-)", 10, "M22759/16", "owner 2026-09-25: 'we are gonna do jbl 10\" compact woofers, an amp not sure which and then the appropriate other speakers'; JBL Club 102SL: impedance selector 2 or 4 ohm, 350 W RMS (Crutchfield page, snapshot web_snapshots/www.crutchfield.com__JBL-Club-102SL.md) — both set to 4 ohm and wired in parallel = 2 ohm for the amp's 300 W sub channel; build book 'Audio, decided Sep 25': 10 AWG pair with a jumper between the two woofers"),
+    # RSI pass 29: each woofer takes its own pair of the amp's sub harness, so no push terminal holds two 10 AWG wires
+    ("30c", "Subwoofer 2 (+): amp sub harness pair 2 -> woofer 2", "AMP (sub output +, pair 2)", "SUB-2 (+)", 10, "M22759/16",
+     "JL VX700/5i connection guide (reference_documents/web_snapshots/www.retailspecs.com__VXi_700_5_MAN.md, Subwoofer Output Harness): 'Two pairs of wire leads are included to facilitate multiple subwoofer wiring. Both positive and both negative wire leads are connected in parallel inside the harness' (brown +, brown/white -)"),
+    ("30d", "Subwoofer 2 (-): amp sub harness pair 2 -> woofer 2", "AMP (sub output -, pair 2)", "SUB-2 (-)", 10, "M22759/16",
+     "JL VX700/5i connection guide (reference_documents/web_snapshots/www.retailspecs.com__VXi_700_5_MAN.md, Subwoofer Output Harness): 'Two pairs of wire leads are included to facilitate multiple subwoofer wiring. Both positive and both negative wire leads are connected in parallel inside the harness' (brown +, brown/white -)"),
     ("RCA_SUB", "Radio sub RCA out -> amplifier sub input", "RADIO (sub RCA out)", "AMP (sub input)", None, "RCA pair",
      "RetroSound Motor 2B user manual p.3 (reference_documents/component_drawings/RetroSound_Motor-2B_User_Manual.pdf): "
      "'Multi-channel pre-amp outputs (front, rear, subwoofer)'; the JL VX700/5i DSP does 'input routing and mixing' "
@@ -865,6 +870,15 @@ IMPLIED_EXTRA_0927.update({
     "REAR_ST_R": {"control": "PDM30 logic: brake DIG14, right turn DIG5 (flash); hazard = DIG4 + DIG5 together"},
 })
 IMPLIED_EXTRA.update(IMPLIED_EXTRA_0927)
+# RSI pass 29: woofer 2 takes the amp sub harness's second lead pair; the jumpers retire (a push terminal holds one 10 AWG wire)
+IMPLIED_EXTRA.update({
+    "30c": {"color": "red", "length_ft": 18.4, "length_basis": "the run of #30a: both woofers sit in one sealed box (endpoints SUB, SUB-2)"},
+    "30d": {"color": "black", "length_ft": 18.4, "length_basis": "the run of #30b: both woofers sit in one sealed box (endpoints SUB, SUB-2)"},
+})
+IMPLIED_RETIRED.update({
+    "SUB_JMP_P": "JBL Club shallow subwoofer owner's manual (web_snapshots/www.sonicelectronix.com__club10_12.md): push terminals take bare or tinned wire 14 to 8 AWG, one hole each; two 10 AWG wires are 20,760 CM against 8 AWG's 16,510, and no MiniSeal stub splice takes 10 AWG (TE/Raychem D-609-05 tops out at 6,755 CMA). JL VX700/5i connection guide (reference_documents/web_snapshots/www.retailspecs.com__VXi_700_5_MAN.md, Subwoofer Output Harness): 'Two pairs of wire leads are included to facilitate multiple subwoofer wiring. Both positive and both negative wire leads are connected in parallel inside the harness' (brown +, brown/white -); woofer 2 takes pair 2 (#30c/#30d) instead (RSI pass 29)",
+    "SUB_JMP_N": "JBL Club shallow subwoofer owner's manual (web_snapshots/www.sonicelectronix.com__club10_12.md): push terminals take bare or tinned wire 14 to 8 AWG, one hole each; two 10 AWG wires are 20,760 CM against 8 AWG's 16,510, and no MiniSeal stub splice takes 10 AWG (TE/Raychem D-609-05 tops out at 6,755 CMA). JL VX700/5i connection guide (reference_documents/web_snapshots/www.retailspecs.com__VXi_700_5_MAN.md, Subwoofer Output Harness): 'Two pairs of wire leads are included to facilitate multiple subwoofer wiring. Both positive and both negative wire leads are connected in parallel inside the harness' (brown +, brown/white -); woofer 2 takes pair 2 (#30c/#30d) instead (RSI pass 29)",
+})
 
 # Decisions made after v4.2 that change an existing v4.2 row (cited). Applied over the v4.2 value;
 # the old value is kept in `conflicts`, so each row reads its own history. Nothing is deleted:
@@ -1399,7 +1413,7 @@ SUBSYSTEM_RULES = [
     (r"^(DOME_GND|UD_GND|FW_GND|UH_GND|CARGO_GND)$", "LIGHTING_INTERIOR", "interior lamp grounds (2026-09-27)"),
     (r"^(WASH_.*|WIPER_.*)$", "WIPERS_WASHER", "factory wiper circuit and washer ground (2026-09-27)"),
     (r"^(BLOWER_.*)$", "HVAC_AC", "factory Four-Season blower circuit (2026-09-27)"),
-    (r"^(RADIO_.*|RCA_.*|AMP_GND|SUB_JMP_.*)$", "AUDIO", "head unit, amplifier, woofer jumpers (2026-09-27)"),
+    (r"^(RADIO_.*|RCA_.*|AMP_GND|SUB_JMP_.*|30[cd])$", "AUDIO", "head unit, amplifier, woofer jumpers (2026-09-27), woofer 2's own pair (RSI pass 29)"),
     (r"^(USB_GND|OUT12V_GND)$", "ACCESSORY_12V", "accessory grounds (2026-09-27)"),
     (r"^(STEP_.*)$", "AMP_STEPS", "AMP Research harness (2026-09-27)"),
     (r"^(ESTOPP_.*)$", "EPARKING_BRAKE", "E-Stopp (2026-09-27)"),
