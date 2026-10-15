@@ -32,6 +32,14 @@ import { writeObservation } from "../_shared/observationWriter.ts";
 import { requireWriteAuth } from "../_shared/writeGuard.ts";
 import { projectSecretKey } from "../_shared/supabaseKeys.ts";
 import { mustWrite, softWrite } from '../_shared/writeResult.ts';
+import { fillOnlyIdentity, identityConflict, REVISION_DIFFERENT_CAR } from '../_shared/identityMatch.ts';
+
+/** The resolved vehicle is a different car than the lot: nothing is written, a revision item is returned (missing: identity_match,
+ *  reason: different_car, next action: relink). Photos and episodes for a different car never attach to that vehicle. */
+class IdentityRefused extends Error {
+  constructor(public vehicleId: string, public url: string, public detail: string) { super(`identity refused: different_car (${detail})`); }
+  get revision() { return { ...REVISION_DIFFERENT_CAR, vehicle_id: this.vehicleId, incoming_url: this.url, detail: this.detail }; }
+}
 
 const EXTRACTOR_VERSION = "2.0.0";
 
@@ -923,6 +931,16 @@ async function saveVehicle(
     if (byVin?.id) existingId = byVin.id;
   }
 
+  // Identity guard: the lot must be the same car as the vehicle it resolved to (a VIN or URL match is not enough: the
+  // docket car overwrote a BaT sport truck's year, make, model, VIN, URL and photos, 2026-10-15). Fill-only below.
+  let existingIdentity: { year: number | null; make: string | null; model: string | null; vin: string | null } | null = null;
+  if (existingId) {
+    const { data: idRow } = await supabase.from("vehicles").select("year,make,model,vin").eq("id", existingId).maybeSingle();
+    existingIdentity = (idRow as typeof existingIdentity) ?? null;
+    const conflict = existingIdentity ? identityConflict(existingIdentity, { year: vehicle.year, make: vehicle.make, model: vehicle.model, vin: vehicle.vin }) : null;
+    if (conflict) throw new IdentityRefused(existingId, vehicle.url, conflict);
+  }
+
   // Build raw data payload
   // Sale rule (lock 1, 2026-09-27): a Barrett-Jackson figure is the sale only when the page says
   // sold ("is_sold" in the RSC payload, SOLD in the markdown); on "Not Sold" / "Withdrawn" / unknown
@@ -1001,7 +1019,9 @@ async function saveVehicle(
     }
 
     // Strip identity/source fields that should only be set on insert
-    const { discovery_url: _du, discovery_source: _ds, source: _src, listing_source: _ls, ...updateData } = cleanData;
+    const { discovery_url: _du, discovery_source: _ds, source: _src, listing_source: _ls, ...updateAll } = cleanData;
+    // Identity fields are fill-only on a vehicle that already has them.
+    const updateData = existingIdentity ? fillOnlyIdentity(updateAll, existingIdentity) : updateAll;
 
     const { error: updateErr } = await supabase.from("vehicles").update(updateData).eq("id", existingId);
     if (updateErr) {
@@ -1187,7 +1207,14 @@ Deno.serve(async (req) => {
           `${vehicle.image_urls.length} images, method=${vehicle.extraction_method}`,
       );
 
-      const { vehicleId, isNew, fieldsUpdated, qualityScore } = await saveVehicle(supabase, vehicle);
+      let saved: Awaited<ReturnType<typeof saveVehicle>>;
+      try {
+        saved = await saveVehicle(supabase, vehicle);
+      } catch (e) {
+        if (e instanceof IdentityRefused) return okJson({ success: false, refused: "different_car", revision: e.revision }, 409);
+        throw e;
+      }
+      const { vehicleId, isNew, fieldsUpdated, qualityScore } = saved;
 
       // Update queue entry if exists
       try {
@@ -1286,6 +1313,7 @@ Deno.serve(async (req) => {
           await new Promise((r) => setTimeout(r, 1000));
         } catch (err: unknown) {
           const msg = err instanceof Error ? err.message : String(err);
+          const isRefused = err instanceof IdentityRefused;
           const isRejected = msg.includes("Quality gate rejected");
           const isRemoved = msg === "PAGE_NOT_FOUND";
 
@@ -1299,8 +1327,9 @@ Deno.serve(async (req) => {
           softWrite('import_queue update', await supabase
             .from("import_queue")
             .update({
-              status: isRemoved ? "skipped" : "failed",
-              error_message: (isRemoved ? "Page removed/404" : msg).slice(0, 500),
+              // A different-car refusal is a revision item (identity_match / different_car / relink), not a failure to retry.
+              status: isRemoved ? "skipped" : isRefused ? "pending_review" : "failed",
+              error_message: (isRemoved ? "Page removed/404" : isRefused ? `identity_match: ${msg}; next action: relink vehicle ${(err as IdentityRefused).vehicleId}` : msg).slice(0, 500),
             })
             .eq("id", item.id));
         }
