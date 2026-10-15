@@ -678,7 +678,7 @@ export default function MarketPulse({ onUnavailable, collection }: { onUnavailab
       {data?.weekAgo && weekAgoPct != null && <Text role="caption" as="div" title={`${bidNumber(data.weekAgo.bids)} across ${data.weekAgo.n.toLocaleString('en-US')} auctions at ${clock(data.weekAgo.at)} a week ago${data.weekAgo.source === 'archive' ? ' (rebuilt from BaT bid history, 96% of auctions)' : ''}`}>
         vs same time last week {data.weekAgo.source === 'archive' ? '≈' : ''}{signed(weekAgoPct)} from {bidNumber(data.weekAgo.bids, true)}</Text>}
     </> : undefined}>
-      <Text role="entity" as="h1">{view !== 'inventory' ? 'Recorded sales' : isLoading || cohortBids <= 0 ? 'Open lots' : `${bidNumber(cohortBids, true)} on the board${make ? ` · ${make}` : ''}`}</Text>
+      <Text role="entity" as="h1">{view !== 'inventory' ? 'Recorded sales' : isLoading || cohortBids <= 0 ? 'Open BaT lots' : `${bidNumber(cohortBids, true)} on BaT live auctions${make ? ` · ${make}` : ''}`}</Text>
     </Masthead>
   );
   // The board's own reading in its own history, always: the owner's building block (docs/schematics/homepage.md).

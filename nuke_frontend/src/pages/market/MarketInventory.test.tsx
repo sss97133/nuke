@@ -7,6 +7,7 @@ const fixture = vi.hoisted(() => ({ query: {} as any, source: vi.fn(), more: vi.
 vi.mock('./useCapturedListings', async original => ({ ...await original<typeof import('./useCapturedListings')>(), useCapturedListings: (source: string, enabled = true) => { if (enabled) fixture.source(source); return fixture.query; } }));
 vi.mock('./useAskBoard', async original => ({ ...await original<typeof import('./useAskBoard')>(), useAskBoard: (q: any, enabled = true) => { fixture.board(q, enabled); return fixture.boardQuery; } }));
 vi.mock('./MarketPulse', () => ({ default: ({ collection }: any) => <section>Existing BaT bid board{collection}</section> }));
+vi.mock('./AuctionCalendar', () => ({ default: ({ collection }: any) => <section>Calendar fixture{collection}</section> }));
 vi.mock('./PrivateCaptureHistory', () => ({ default: () => null }));
 vi.mock('../../components/PrefetchLink', () => ({ PrefetchLink: ({ to, children, ...props }: any) => <a href={to} {...props}>{children}</a> }));
 import MarketInventory from './MarketInventory';
@@ -52,7 +53,19 @@ it('keeps source filtering and Market navigation in the URL and retains existing
   await act(async () => { const select = container.querySelector('select')!; select.value = 'ksl'; select.dispatchEvent(new Event('change', { bubbles: true })); });
   expect(new URLSearchParams(window.location.search).get('source')).toBe('ksl');
   expect(new URLSearchParams(window.location.search).get('tab')).toBe('market');
-  await act(async () => [...container.querySelectorAll('button')].find(b => b.textContent === 'BaT auctions')!.click());
+  await act(async () => [...container.querySelectorAll('button')].find(b => b.textContent === 'BaT live auctions')!.click());
+  expect(container.textContent).toContain('Existing BaT bid board');
+});
+it('opens the auction calendar as a third collection and clears a chosen sale when leaving it', async () => {
+  await render('tab=market');
+  await act(async () => [...container.querySelectorAll('button')].find(b => b.textContent === 'Auction calendar')!.click());
+  expect(new URLSearchParams(window.location.search).get('collection')).toBe('calendar');
+  expect(container.textContent).toContain('Calendar fixture');
+  expect([...container.querySelectorAll('button')].map(b => b.textContent)).toEqual(expect.arrayContaining(['BaT live auctions', 'Captured listings']));
+  await act(async () => root.unmount()); root = createRoot(container);
+  await render('tab=market&collection=calendar&sale=mecum:fixture-2027');
+  await act(async () => [...container.querySelectorAll('button')].find(b => b.textContent === 'BaT live auctions')!.click());
+  expect(new URLSearchParams(window.location.search).get('sale')).toBeNull();
   expect(container.textContent).toContain('Existing BaT bid board');
 });
 it('shows the retained source observation separately from admission and update clocks', async () => {

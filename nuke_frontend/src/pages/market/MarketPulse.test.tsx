@@ -384,7 +384,7 @@ describe('the board in its own history', () => {
     fixture.pulse.data.weekAgo = { at: Date.now() - 7 * 86_400_000, bids: 100_000, n: 3, byMake: null, source: 'live' };
     fixture.sameHour = Array.from({ length: 7 }, (_, i) => ({ day: `2026-08-${15 + i}`, bids: 50_000 + i * 1_000, n: 3, byMake: null, source: i === 0 ? 'archive' : 'live' }));
     await render('make=all');
-    expect(container.querySelector('h1')?.textContent).toBe('$125K on the board');
+    expect(container.querySelector('h1')?.textContent).toBe('$125K on BaT live auctions');
     expect(container.querySelector('.k-masthead')?.textContent).toContain('vs same time last week +25.0% from $100K');
     const strip = container.querySelector('[aria-label="The board in its own history"]')!;
     expect(strip.textContent).toContain('Same time on Saturdays · last 7 weeks');
@@ -428,7 +428,7 @@ describe('the market document', () => {
   it('names the population once, counts the cohort in the masthead and states its coverage in the strip', async () => {
     await render('make=PORSCHE');
     const h1 = container.querySelector('h1')!;
-    expect(h1.textContent).toBe('$25K on the board · PORSCHE');
+    expect(h1.textContent).toBe('$25K on BaT live auctions · PORSCHE');
     expect(h1.className).toContain('k-entity');
     expect(container.querySelector('.k-masthead__result .k-measure')?.textContent).toBe('3');
     expect(container.querySelector('.k-masthead__result .k-caption')?.textContent).toMatch(/^recorded /);
@@ -443,7 +443,7 @@ describe('the market document', () => {
   it('keeps the scope strip and the masthead when the live board cannot be read', async () => {
     fixture.pulse.data = undefined; fixture.pulse.isLoading = false; fixture.pulse.isError = true;
     await render();
-    expect(container.querySelector('h1')?.textContent).toBe('Open lots');
+    expect(container.querySelector('h1')?.textContent).toBe('Open BaT lots');
     expect(container.querySelector('[aria-label="Market scope"]')).toBeTruthy();
     expect(container.querySelector('[aria-label="Market scope"] .k-coverage')).toBeNull();
   });
