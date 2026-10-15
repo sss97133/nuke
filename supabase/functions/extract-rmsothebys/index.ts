@@ -583,6 +583,9 @@ Deno.serve(async (req) => {
 
       if (save_to_db) {
         const saved = await saveVehicle(supabase, vehicle);
+        if ('skipped' in saved && saved.skipped === 'different_car') {
+          return okJson({ success: false, refused: 'different_car', vehicle_id: saved.vehicleId, detail: saved.detail, vehicle }, 409);
+        }
         if ('skipped' in saved) {
           return okJson({ success: false, skipped: true, skip_reason: saved.skipped, error: `No vehicle data found: ${saved.skipped}`, vehicle });
         }

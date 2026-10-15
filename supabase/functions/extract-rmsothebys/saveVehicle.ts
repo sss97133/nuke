@@ -17,6 +17,8 @@ import { classifyLot, type LotSkipReason } from './lotKind.ts';
 import { lotStatus } from './lotStatus.ts';
 import { parseEstimate, saleCalendar } from './calendarKeys.ts';
 import { rmListingUrlVariants } from './lotUrl.ts';
+import { mustWrite } from '../_shared/writeResult.ts';
+import { identityConflict, REVISION_DIFFERENT_CAR } from '../_shared/identityMatch.ts';
 
 // RM Sotheby's - we'll store metadata in origin_metadata instead of linking to org table
 const RM_SOTHEBYS_NAME = "RM Sotheby's";
@@ -68,7 +70,10 @@ export interface SaveDeps {
   writeEvent: (supabase: any, row: any) => Promise<{ action: string; error?: string; reason?: string }>;
 }
 
-export type SaveResult = { vehicleId: string; isNew: boolean } | { skipped: LotSkipReason };
+export type SaveResult =
+  | { vehicleId: string; isNew: boolean }
+  | { skipped: LotSkipReason }
+  | { skipped: 'different_car'; vehicleId: string; detail: string };
 
 // Save extracted vehicle to database.
 // The one place a lot becomes a row, so the vehicles-only rule lives here: every action that writes (process,
@@ -109,7 +114,25 @@ export async function saveVehicle(
   let isNew: boolean;
 
   if (resolvedId) {
-    await supabase
+    // Identity guard: a URL or listing-key match is not proof it is the same car. A lot whose VIN or make differs, whose
+    // year is more than 1 apart, or whose model shares no word with the resolved vehicle is refused and raised as a
+    // revision item (identity_match / different_car / relink); nothing is written to that vehicle.
+    const { data: idRow } = await supabase.from('vehicles').select('year,make,model,vin').eq('id', resolvedId).maybeSingle();
+    const conflict = idRow ? identityConflict(idRow, { year: vehicle.year, make: vehicle.make, model: vehicle.model }) : null;
+    if (conflict) {
+      try {
+        await supabase.rpc('record_revision_item', {
+          p_url: vehicle.url, p_missing: [REVISION_DIFFERENT_CAR.missing], p_reason: REVISION_DIFFERENT_CAR.reason,
+          p_next_action: REVISION_DIFFERENT_CAR.next_action, p_raised_by: 'extract-rmsothebys', p_snapshot_id: null,
+          p_detail: { vehicle_id: resolvedId, detail: conflict }, p_vehicle_id: resolvedId,
+        });
+      } catch (e) {
+        console.warn(`[RMS] revision item not recorded for ${vehicle.url}: ${e instanceof Error ? e.message : String(e)}`);
+      }
+      return { skipped: 'different_car', vehicleId: resolvedId, detail: conflict };
+    }
+
+    mustWrite('vehicles update', await supabase
       .from('vehicles')
       .update({
         sale_price: vehicle.sold_price,
@@ -117,7 +140,7 @@ export async function saveVehicle(
         status: 'active',
         updated_at: new Date().toISOString(),
       })
-      .eq('id', resolvedId);
+      .eq('id', resolvedId));
 
     // Fire-and-forget observation write
     const obsFields: Record<string, any> = {};
