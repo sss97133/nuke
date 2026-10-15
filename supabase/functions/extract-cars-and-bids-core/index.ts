@@ -27,7 +27,7 @@ import { parseLocation } from "../_shared/parseLocation.ts";
 import { writeObservation } from "../_shared/observationWriter.ts";
 import { requireWriteAuth } from "../_shared/writeGuard.ts";
 import { projectSecretKey } from "../_shared/supabaseKeys.ts";
-import { batchFromTargets, discoverTargets, reviseCab } from "./targets.ts";
+import { batchFromTargets, discoverTargets, reviseCab, recaptureCab } from "./targets.ts";
 import { parseCabDepth } from "./cabPage.ts";
 import { insertMissingVehicleImages } from "../_shared/vehicleImageWrite.ts";
 import { fillOnlyIdentity, identityConflict, REVISION_DIFFERENT_CAR } from "../_shared/identityMatch.ts";
@@ -511,6 +511,9 @@ Deno.serve(async (req) => {
     if (body?.action === "revise") {
       return new Response(JSON.stringify(await reviseCab(supabase, supabaseUrl, serviceRoleKey, body)), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
+    if (body?.action === "recapture") {
+      return new Response(JSON.stringify(await recaptureCab(supabase, supabaseUrl, serviceRoleKey, firecrawlApiKey, body)), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
     if (body?.action === "discover_targets") {
       return new Response(JSON.stringify(await discoverTargets(supabase, firecrawlApiKey)), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
@@ -547,7 +550,8 @@ Deno.serve(async (req) => {
     let responseTimeMs: number;
     let fromCache = false;
 
-    if (cachedSnapshot?.html) {
+    let newSnapshotId: string | null = null;
+    if (cachedSnapshot?.html && body?.recapture !== true) {
       html = cachedSnapshot.html;
       markdown = cachedSnapshot.markdown || '';
       httpStatus = 200;
@@ -564,6 +568,8 @@ Deno.serve(async (req) => {
       httpStatus = 200;
       responseTimeMs = 0;
       await trySaveHtmlSnapshot({ supabase, listingUrl: listingUrlNorm, httpStatus, success: true, errorMessage: null, html, metadata: { markdown } });
+      const { data: snapRow } = await supabase.from("listing_page_snapshots").select("id").eq("listing_url", listingUrlNorm).eq("success", true).order("fetched_at", { ascending: false }).limit(1).maybeSingle();
+      newSnapshotId = snapRow?.id ?? null;
     } else {
       // Cache miss — fetch via Firecrawl (C&B is a React SPA, blocks direct fetch)
       const scrapeStart = Date.now();
@@ -1233,6 +1239,8 @@ Deno.serve(async (req) => {
       },
       images_inserted: imagesInserted,
       image_insert_error: imageInsertError,
+      snapshot_id: newSnapshotId,
+      result: { outcome: depth.outcome, amount: depth.amount, ended_at: depth.endedAt, buyer: depth.buyer?.name ?? null },
       completeness: {
         comments_landed: depth.comments.filter((c) => !c.bidAmount).length, comments_claimed: depth.commentCount,
         bids_landed: depth.comments.filter((c) => c.bidAmount).length, bids_claimed: depth.bidCount,
