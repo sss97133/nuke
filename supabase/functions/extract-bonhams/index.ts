@@ -1210,13 +1210,20 @@ async function saveVehicle(
   // Create vehicle_events record (non-fatal)
   try {
     const listingUrlKey = normalizeListingUrlKey(extracted.url);
+    // roster_first_seen_at is the first read of the lot on the house's roster: keep the earlier one.
+    if (extracted.extra_metadata?.roster_first_seen_at && extracted.event_key) {
+      const { data: prior } = await supabase.from("vehicle_events").select("metadata").eq("source_platform", "bonhams")
+        .eq("source_listing_id", extracted.event_key).limit(1);
+      const first = prior?.[0]?.metadata?.roster_first_seen_at;
+      if (first) extracted.extra_metadata = { ...extracted.extra_metadata, roster_first_seen_at: first };
+    }
     const res = await writeVehicleEventByKey(supabase, {
       vehicle_id: targetId,
       source_platform: "bonhams",
       event_type: "auction",
       source_url: extracted.url,
       source_listing_id: extracted.event_key || listingUrlKey || extracted.lot_number || extracted.sale_id,
-      event_status: extracted.auction_status === "sold" ? "sold" : (extracted.auction_status === "upcoming" ? "active" : "ended"),
+      event_status: extracted.auction_status === "sold" ? "sold" : (extracted.auction_status === "upcoming" ? (opts.fast ? "upcoming" : "active") : "ended"),
       ended_at: extracted.sale_date,
       final_price: extracted.sale_price,
       starting_price: extracted.estimate_low,
