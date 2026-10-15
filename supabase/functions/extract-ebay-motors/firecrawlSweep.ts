@@ -75,6 +75,11 @@ export async function discover(supabase: any, o: DiscoverOptions = {}): Promise<
   const rep: DiscoverReport = { ...base, search_pages: 0, cards: 0, blips_new: 0, blips_duplicate: 0, deep_read: 0, deep_cap_left: null, facet_totals: {} };
   const groups = (o.jobs ?? [{ tiers: o.tiers ?? [1, 2], facets: o.facets ?? ["private"] }])
     .flatMap((j) => TIERS.filter((t) => j.tiers.includes(t.id)).flatMap((tier) => j.facets.map((facet) => ({ tier, facet }))));
+  if (groups.some((g) => g.facet === "unspecified")) {
+    // Measured 2026-10-15: the Not%2520Specified value is not honoured by eBay (4,100+ results, the unfiltered stream), so it would read dealers.
+    rep.ok = false; rep.errors.push("facet 'unspecified' is not a working eBay filter (returns the unfiltered stream); not read");
+    return rep;
+  }
   const now = new Date().toISOString();
   type Cand = { card: Card; tier: number; facet: Facet };
   const cands: Cand[] = [];
