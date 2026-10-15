@@ -10,6 +10,7 @@
 --     sale whose own page names its model year but not its family is another car: not pooled, counted in conflicts;
 --   * asks: Facebook listings and classified events in the 365 days before today, one per vehicle (its latest), never a
 --     duplicate or blocked listing, never a private or deleted vehicle, never pooled with sales;
+--   * (20261015215000) venues: each source's count and its median from 5 prices, within the row's window;
 --   * (20261015160000) the odometer: sorted readings, n_miles and the median over the same window and rows, zero and
 --     out-of-range readings unknown, an ask carrying its own or its vehicle's reading; replacing the unbuilt view and
 --     keeping a built one;
@@ -152,6 +153,9 @@ INSERT INTO public.vehicle_events (id, vehicle_id, source_platform, current_pric
 -- 20261015160000 replaces the unbuilt view with the odometer columns; applied twice, the second changes nothing.
 \ir ../migrations/20261015160000_family_year_prices_miles.sql
 \ir ../migrations/20261015160000_family_year_prices_miles.sql
+-- 20261015215000 replaces it again with venues (each source's count and median); applied twice.
+\ir ../migrations/20261015215000_family_year_prices_venues.sql
+\ir ../migrations/20261015215000_family_year_prices_venues.sql
 SELECT pg_temp.ok('created empty: the deploy reads nothing; the first build is the refresh',
   NOT (SELECT relispopulated FROM pg_class WHERE oid = 'public.mv_family_year_prices'::regclass));
 SELECT public.refresh_family_year_prices();
@@ -184,6 +188,12 @@ SELECT pg_temp.ok('B 1971: 9 sales even at 1966..1976, thin, no percentiles; the
 SELECT pg_temp.ok('A 1967 asked: 10 asks, one per vehicle, a1 at its latest (Craigslist 6,000); never pooled with sales',
   (SELECT n = 10 AND offered IS NULL AND prices = ARRAY[6000,10000,15000,20000,25000,30000,35000,40000,45000,50000]
       AND by_source = '{"Craigslist": 1, "Facebook Marketplace": 9}'::jsonb FROM pg_temp.r('a', 1967, 'asked')));
+SELECT pg_temp.ok('A 1967 sold venues: Bring a Trailer 8 (median 45,000), Mecum 4 (under 5 prices, no median)',
+  (SELECT venues = '{"Bring a Trailer": {"n": 8, "p50": 45000}, "Mecum": {"n": 4, "p50": null}}'::jsonb
+   FROM pg_temp.r('a', 1967, 'sold')));
+SELECT pg_temp.ok('A 1967 asked venues: Facebook 9 (median 30,000), Craigslist 1',
+  (SELECT venues = '{"Craigslist": {"n": 1, "p50": null}, "Facebook Marketplace": {"n": 9, "p50": 30000}}'::jsonb
+   FROM pg_temp.r('a', 1967, 'asked')));
 SELECT pg_temp.ok('A 1967 sold miles: 10 readings 1,000 .. 10,000, median 5,000 (a zero and a 2,500,000 reading are unknown)',
   (SELECT n_miles = 10 AND miles = ARRAY[1000,2000,3000,4000,5000,6000,7000,8000,9000,10000] AND miles_p50 = 5000
    AND width_bucket(7500, miles) = 7 FROM pg_temp.r('a', 1967, 'sold')));
@@ -217,8 +227,9 @@ SELECT pg_temp.ok('refreshes concurrently through refresh_family_year_prices(), 
   AND (SELECT command FROM cron.job WHERE jobname = 'refresh-family-year-prices') LIKE '%refresh_family_year_prices()%'
   AND (SELECT n FROM public.mv_family_year_prices WHERE year = 1967 AND basis = 'sold'
          AND family_id = '00000000-0000-4000-c000-00000000000a') = 12);
--- After the first build, 20261015160000 applies again without dropping or emptying the built view.
+-- After the first build, 20261015160000 and 20261015215000 apply again without dropping or emptying the built view.
 \ir ../migrations/20261015160000_family_year_prices_miles.sql
+\ir ../migrations/20261015215000_family_year_prices_venues.sql
 SELECT pg_temp.ok('re-applying the odometer migration after the build keeps the built view',
   (SELECT relispopulated FROM pg_class WHERE oid = 'public.mv_family_year_prices'::regclass)
   AND (SELECT n_miles FROM public.mv_family_year_prices WHERE year = 1967 AND basis = 'sold'
