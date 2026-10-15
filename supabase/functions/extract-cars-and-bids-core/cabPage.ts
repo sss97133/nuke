@@ -12,9 +12,15 @@ export const decode = (s: string) =>
     return Number.isFinite(n) && n > 0 && n < 0x110000 ? String.fromCodePoint(n) : m;
   });
 
-export const textOf = (html: string) =>
-  decode(html.replace(/<svg[\s\S]*?<\/svg>/gi, "").replace(/<(?:\/p|\/li|\/h\d|br\s*\/?)>/gi, "\n").replace(/<\/?(?:b|i|u|em|strong|a|span|small|sup|sub)\b[^>]*>/gi, "").replace(/<[^>]+>/g, " "))
-    .replace(/[ \t ]+/g, " ").replace(/ *\n */g, "\n").replace(/\n{2,}/g, "\n").trim();
+const stripTags = (s: string) => { let prev; do { prev = s; s = s.replace(/<[^>]*>/g, " "); } while (s !== prev); return s; };
+
+export const textOf = (html: string) => {
+  const spaced = html.replace(/<svg[\s\S]*?<\/svg>/gi, "").replace(/<(?:\/p|\/li|\/h\d|br\s*\/?)>/gi, "\n")
+    .replace(/<\/?(?:b|i|u|em|strong|a|span|small|sup|sub)\b[^>]*>/gi, "");
+  // Strip, decode, strip again: an encoded "&lt;iframe" must not come out as a tag.
+  return stripTags(decode(stripTags(spaced)))
+    .replace(/[ \t\u00a0]+/g, " ").replace(/ *\n */g, "\n").replace(/\n{2,}/g, "\n").trim();
+};
 
 /** Inner html of the element whose opening tag starts at `start` (tag name taken from the tag), balanced on nested same-name tags. */
 export function balanced(html: string, start: number): string | null {
