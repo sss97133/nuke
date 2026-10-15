@@ -6,6 +6,7 @@ import { sourceLink, sourceName } from './useCapturedListings';
 import './ClassifiedArrivals.css';
 import { ASK_SORTS, ASK_TIERS, ASK_WINDOWS, type AskRow, type AskSort, type AskTier, TIER_NAMES, readAskBoard, useAskBoard } from './useAskBoard';
 import { photoList, useListingPhotos } from './useListingPhotos';
+import { type PositionRead, headline, spreadLine } from './askPosition';
 
 // The classified asks that came online, nationwide, with three lenses: near the viewer, the owner's band, and the
 // asking-price tier. The point stays in memory (never in the URL); logged out there is none until the viewer shares it.
@@ -101,6 +102,39 @@ function ListingPhotos({ urls, to, label }: { urls: string[]; to: string; label:
   </div>;
 }
 const count = (n: number | undefined) => (n ?? 0).toLocaleString('en-US');
+const dollars = (v: number) => `$${Math.round(v).toLocaleString('en-US')}`;
+
+// The ask on a price line: the middle half of the population it is placed by (p25 to p75), its median, and the ask.
+function PriceStrip({ ask, p25, p50, p75 }: { ask: number; p25: number; p50: number | null; p75: number }) {
+  const lo = Math.min(p25, ask), hi = Math.max(p75, ask);
+  const pad = (hi - lo) * 0.08 || hi * 0.05 || 1;
+  const x = (v: number) => ((v - lo + pad) / (hi - lo + 2 * pad)) * 100;
+  return <svg className="market-ask__price" viewBox="0 0 100 10" preserveAspectRatio="none" role="img"
+    aria-label={`ask ${dollars(ask)}; middle half ${dollars(p25)} to ${dollars(p75)}${p50 != null ? `, median ${dollars(p50)}` : ''}`}>
+    <line x1="0" x2="100" y1="5" y2="5" className="market-ask__axis" />
+    <rect x={x(p25)} y="2" width={Math.max(0.5, x(p75) - x(p25))} height="6" className="market-ask__band" />
+    {p50 != null && <line x1={x(p50)} x2={x(p50)} y1="1" y2="9" className="market-ask__median" />}
+    <line x1={x(ask)} x2={x(ask)} y1="0" y2="10" className="market-ask__at" />
+  </svg>;
+}
+
+// Where the ask lands, under its price: a word, the price line, then a line per population, the one it is placed by
+// first. Nothing when the reader has no position for the row.
+// The board's position and the seller's stated condition (classified_ask_board 20261015150000).
+type PlacedRow = AskRow & { position?: PositionRead | null; condition?: string | null };
+
+function AskPlacement({ ask, position }: { ask: number | null; position?: PositionRead | null }) {
+  const head = headline(position);
+  const lines = [spreadLine(position?.sold, 'sales'), spreadLine(position?.asked, 'asks')];
+  if (head?.basis === 'asks') lines.reverse();
+  if (!head && !lines.some(Boolean)) return null;
+  const basis = head ? (head.basis === 'sales' ? position?.sold : position?.asked) : null;
+  return <div className="market-ask__position">
+    {head && <Text role="label" as="div">{head.word}{head.span ? ` · ${head.span}` : ''}</Text>}
+    {ask != null && basis?.p25 != null && basis.p75 != null && <PriceStrip ask={ask} p25={basis.p25} p50={basis.p50} p75={basis.p75} />}
+    {lines.filter(Boolean).map(line => <Text key={line} role="caption" as="div">{line}</Text>)}
+  </div>;
+}
 
 export default function ClassifiedArrivals({ collection, sourcePicker }: { collection?: ReactNode; sourcePicker?: ReactNode }) {
   const [params, setParams] = useSearchParams();
@@ -265,6 +299,7 @@ export default function ClassifiedArrivals({ collection, sourcePicker }: { colle
           {row.asking_price == null ? <Text role="caption">Unpriced</Text>
             : <Text role="measure">${Number(row.asking_price).toLocaleString('en-US')}</Text>}
           <Text role="body" as="div">{place || 'Place unrecorded'}{row.distance_mi != null ? ` · ${row.distance_mi.toLocaleString('en-US')} mi away` : ''}</Text>
+          <AskPlacement ask={row.asking_price == null ? null : Number(row.asking_price)} position={(row as PlacedRow).position} />
         </div>
       </article>;
     })}</div>}

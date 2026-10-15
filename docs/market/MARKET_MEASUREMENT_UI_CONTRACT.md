@@ -407,6 +407,21 @@ position is 0 on every row), so the board's image leads.
 Owners: the position and merit fold (each ask against its family's sales at its year, asks against similar asks, exit
 outcomes) is the listing-merit lane; the card renders what it returns.
 
+**What exists for condition, measured 2026-10-15 04:30Z.** No classified photo has a condition read (0 of 690 photos on
+60 recent Craigslist cars; 0 of 100 recent classified cars carry a condition observation). The seller's declared
+condition is already captured (569 of 701 priced listing observations in the last 24 h: good 275, excellent 179, fair
+73, like new 32, salvage 10) and rides on the board as an attributed claim ("seller: like new"). A development read of
+the owner's three cars from their photos agreed with his order: the Barracuda a very nice driver (glossy paint,
+straight panels, redone interior, sound deadener over the floors), the Wrangler a lifted, tidy 4.0 driver showing its
+178,374 miles, the K1500 a weathered truck photographed in weeds, three exterior photos only.
+
+**The Analyze path.** One owner/admin control per listing card: api-v1-vision gains a listing route (requireWriteAuth
+then requireAdminOrService; a daily cap) that reads the listing's photos, tries YONO first (no model fee) and otherwise
+the caller's own connected provider (Nuke does not fund cloud inference; about $0.015 a photo on the owner's key, about
+$0.18 for 12 photos), and writes one condition observation through ingest-observation (source nuke-vision, agent
+inferred, so its confidence is capped at 0.6). The card shows the read beside the seller's claim; the position can then
+be read against cars in like condition. Pixels alone never set a value.
+
 ## The live auction board — owner direction, October 15
 
 Read on nuke.ag/?tab=market&collection=auctions as a visitor: "a lot of work goes into it ... but I don't even know

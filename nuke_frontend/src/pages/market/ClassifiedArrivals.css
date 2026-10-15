@@ -33,8 +33,17 @@
   .market-ask__image img, .market-ask__blank { width: 100%; height: auto; aspect-ratio: 3 / 2; }
   .market-ask__photos, .market-ask__strip { width: 100%; }
   .market-ask__identity { grid-area: identity; }
-  .market-ask__deal { grid-area: deal; grid-auto-flow: column; justify-content: space-between; justify-items: start; align-items: baseline; text-align: left; }
+  .market-ask__deal { grid-area: deal; grid-template-columns: auto auto; justify-content: space-between; justify-items: start; align-items: baseline; text-align: left; }
 }
 /* The source as a quiet mark beside the listing's age. */
 .market-ask__seen { display: inline-flex; align-items: center; gap: 6px; }
 .market-ask__mark { width: 14px; height: 14px; opacity: 0.7; flex-shrink: 0; }
+/* Where the ask lands: a word, the price line (the middle half of its population shaded, the median a tick, the ask a
+   bar), and the counts it rests on. */
+.market-ask__position { display: grid; gap: 2px; justify-items: end; width: 100%; max-width: 220px; }
+.market-ask__price { width: 100%; height: 10px; display: block; }
+.market-ask__axis { stroke: var(--border); stroke-width: 1; vector-effect: non-scaling-stroke; }
+.market-ask__band { fill: var(--surface-strong, var(--border)); }
+.market-ask__median { stroke: var(--text-secondary); stroke-width: 1; vector-effect: non-scaling-stroke; }
+.market-ask__at { stroke: var(--text); stroke-width: 2; vector-effect: non-scaling-stroke; }
+@media (max-width: 760px) { .market-ask__position { justify-items: start; max-width: none; grid-column: 1 / -1; } }

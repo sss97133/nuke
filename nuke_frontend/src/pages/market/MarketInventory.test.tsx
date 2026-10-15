@@ -197,6 +197,23 @@ it('a photo list keeps web addresses only, once each, the lead first', async () 
   expect(photoList(null, undefined)).toEqual([]);
 });
 
+it('says where an ask lands: the word, the price line, then the counts it rests on; nothing without a position', async () => {
+  fixture.boardQuery.data.pages[0].rows[0].position = {
+    family: 'Blazer', family_id: 'f-blazer', share: 40 / 43, basis: 'asked',
+    sold: { n: 16, year_from: 1983, year_to: 1985, thin: false, p25: 9000, p50: 12500, p75: 16000, at_or_below: 15, by_source: { bat: 12, mecum: 4 } },
+    asked: { n: 43, year_from: 1983, year_to: 1985, thin: false, p25: 8000, p50: 11000, p75: 15000, at_or_below: 40 },
+  };
+  await render('collection=listings');
+  const [first, second] = [...container.querySelectorAll('.market-ask')];
+  const placed = first.querySelector('.market-ask__position')!;
+  expect(placed.querySelector('.k-label')?.textContent).toBe('top of the market · 1983–85 Blazer');
+  // Placed by the other asks (ten or more exist), so they come first; the sales follow.
+  expect([...placed.querySelectorAll('.k-caption')].map(n => n.textContent)).toEqual([
+    'at or above 40 of 43 asks, median $11K', 'at or above 15 of 16 sales, median $12.5K']);
+  expect(placed.querySelector('svg[role="img"]')?.getAttribute('aria-label')).toBe('ask $18,800; middle half $8,000 to $15,000, median $11,000');
+  expect(second.querySelector('.market-ask__position')).toBeNull();
+});
+
 it('tier, band and window are lenses in the URL', async () => {
   await render('collection=listings');
   await act(async () => button('$5K–15K').click());
@@ -315,5 +332,29 @@ describe('how a feed says time', () => {
     expect(arrivalsAfter(rows, '2026-10-15T01:40:00Z')).toBe(1);
     expect(arrivalsAfter(rows, '2026-10-15T01:45:00Z')).toBe(0);
     expect(arrivalsAfter(rows, null)).toBe(0);
+  });
+});
+
+describe('where an ask lands', () => {
+  it('places by the reader\'s share, else by asks when they are enough, else by sales, and counts a thin population without placing it', async () => {
+    const { headline, placement, spreadLine } = await import('./askPosition');
+    expect(placement(0.95)).toBe('top of the market');
+    expect(placement(0.75)).toBe('upper end');
+    expect(placement(0.5)).toBe('middle of the market');
+    expect(placement(0.2)).toBe('lower end');
+    expect(placement(0.05)).toBe('bottom of the market');
+    // The reader's share and basis lead when present.
+    expect(headline({ family: 'Wrangler', share: 0.52, basis: 'sold',
+      sold: { n: 214, year_from: 1997, year_to: 2001, thin: false, p25: 9000, p50: 13500, p75: 19000, at_or_below: 111 } }))
+      .toEqual({ word: 'middle of the market', basis: 'sales', span: '1997–01 Wrangler' });
+    const thinSold = { n: 6, year_from: 1965, year_to: 1965, thin: true, p25: null, p50: null, p75: null, at_or_below: null };
+    const asked = { n: 40, year_from: 1964, year_to: 1966, thin: false, p25: 12000, p50: 18000, p75: 24000, at_or_below: 3 };
+    expect(headline({ family: 'Barracuda', sold: thinSold, asked })).toEqual({ word: 'bottom of the market', basis: 'asks', span: '1964–66 Barracuda' });
+    expect(spreadLine(thinSold, 'sales')).toBe('only 6 recorded sales');
+    expect(spreadLine({ ...thinSold, n: 1 }, 'sales')).toBe('only 1 recorded sale');
+    expect(spreadLine(asked, 'asks')).toBe('under 37 of 40 asks, median $18K');
+    expect(spreadLine(null, 'asks')).toBeNull();
+    expect(headline({ family: 'Barracuda', sold: thinSold, asked: null })).toBeNull();
+    expect(headline(null)).toBeNull();
   });
 });
