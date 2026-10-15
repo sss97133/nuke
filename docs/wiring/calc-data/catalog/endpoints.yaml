@@ -940,6 +940,37 @@ PS-STUDS:
     IBOOST_PERM_FH: ["9918"]         # the Blue Sea 5065 holder's 12 AWG pigtail on the 3/8 in distribution stud (the #6 lug there is 238LTP, 3/8): ProWire 9918 12-10 AWG 3/8
     GND_RET_CAB: [238LTP, 238LTP]
   wires: ["63", "6", "59", G1, G2, G3, ISO_OUT, ODY_NEG, ACC_NEG, DCDC_IN, GND_RET_CAB, PDM_BPOS, PDM15_BPOS, "52", "3", IBOOST_PERM_FH]
+  # RSI pass 37: the studs each cable end lands on, in the order of its lugs above. PS-STUDS is the DC primary's stud set;
+  # its ends live on these stud nodes (GND-BANK-ENG is the ground star's own endpoint). Read from each wire's own words
+  # (registry frm/to: "distribution stud", "starter B+ stud", "isolator stud A" ...).
+  stud_set: true
+  studs:
+    "63": [ISO-STUD-A]                    # Odyssey + to isolator stud A (Blue Sea 7700, 3/8-16)
+    "6": [DIST-STUD, STARTER-BPLUS]       # distribution stud to the starter B+ stud
+    "59": [ALT-BPLUS, DIST-STUD]          # alternator B+ stud to the distribution stud via the MEGA
+    G1: [GND-BANK-ENG, GND-BLOCK]         # ground star to the engine block near the starter
+    G2: [GND-BANK-ENG, GND-FRAME]         # ground star to the frame rail boss
+    G3: [GND-HEAD, FW-BOND]               # engine head/block strap to the firewall bond stud
+    ISO_OUT: [ISO-STUD-B, DIST-STUD]      # isolator stud B to the distribution stud
+    ODY_NEG: [GND-BANK-ENG]               # Odyssey - to the ground star
+    ACC_NEG: [GND-BANK-ENG]               # YellowTop - to the ground star
+    DCDC_IN: [DIST-STUD]                  # MIDI 60 A holder on the distribution bus
+    GND_RET_CAB: [GND-BANK-ENG]           # the cab return to the ground star
+    PDM_BPOS: [DIST-STUD]                 # MEGA 125 A holder on the distribution bus
+    PDM15_BPOS: [DIST-STUD]               # MEGA 100 A holder on the distribution bus
+    "52": [DIST-STUD]                     # MIDI 40 A holder on the distribution bus
+    "3": [DIST-STUD]                      # the step kit's own fuse on the distribution bus
+    IBOOST_PERM_FH: [DIST-STUD]           # the Blue Sea 5065 holder's pigtail on the 3/8 in distribution stud
+  stud_nodes:
+    DIST-STUD: "distribution stud and its fuse holders (MEGA 125 A, MEGA 100 A, MIDI 60 A, MIDI 40 A), downstream of isolator stud B"
+    ISO-STUD-A: "Blue Sea 7700 isolator stud A (3/8-16), battery side"
+    ISO-STUD-B: "Blue Sea 7700 isolator stud B (3/8-16), load side"
+    STARTER-BPLUS: "starter B+ stud (5/16 in, build-book assumption)"
+    ALT-BPLUS: "alternator B+ stud (Holley 197-302; 5/16 in, build-book assumption)"
+    GND-BLOCK: "engine block ground stud near the starter (G1)"
+    GND-FRAME: "frame rail ground boss (G2)"
+    GND-HEAD: "engine head/block ground strap stud (G3)"
+    FW-BOND: "firewall bond stud, engine side (G3)"
   open:
     - "topology is Dave's DC primary (battery → isolator → stud → branches) but the registry still carries the v4 runs #63/#6/#59 — the power-spine chapter re-draws them"
     - "stud sizes: starter + alternator 5/16 in is the build book's assumption; isolator studs are 3/8 in-16 (Blue Sea 7700), so 238LTP fits them"

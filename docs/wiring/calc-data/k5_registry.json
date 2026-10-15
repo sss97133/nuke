@@ -24781,8 +24781,8 @@
    "source": "K5_WIRING_STATE.md row 33"
   },
   "device_end_coverage": {
-   "mapped": 627,
-   "wire_ends": 657,
+   "mapped": 649,
+   "wire_ends": 679,
    "endpoints_without_pin_map": [
     "AC-HP-SW",
     "AC-LP-SW",
@@ -28901,6 +28901,7 @@
    ],
    "splice_point": null,
    "range_by_wire": null,
+   "stud_set": true,
    "side": "engine bay"
   },
   "APS": {
@@ -29984,7 +29985,12 @@
     "FAN_GND",
     "DCDC_GND",
     "AMP_GND",
-    "IBOOST_GND"
+    "IBOOST_GND",
+    "G1",
+    "G2",
+    "ODY_NEG",
+    "ACC_NEG",
+    "GND_RET_CAB"
    ],
    "cavities": null,
    "empty": null,
@@ -33356,6 +33362,266 @@
     "cavity": "B26",
     "joins": null
    },
+   "side": "engine bay"
+  },
+  "ISO-STUD-A": {
+   "device": "Blue Sea 7700 isolator stud A (3/8-16), battery side",
+   "where": "engine",
+   "family": "lug",
+   "kit": {},
+   "wires": [
+    "63"
+   ],
+   "cavities": null,
+   "empty": null,
+   "doubled": null,
+   "range": null,
+   "out_of_range": [],
+   "pigtailed": [],
+   "note": "RSI pass 37: a stud of the DC primary (PS-STUDS)",
+   "branch_wires_missing": 0,
+   "unknown_wire_ids": [],
+   "open": [],
+   "sources": [
+    "build book 'DC primary' table",
+    "state 0i",
+    "chapters/17"
+   ],
+   "splice_point": null,
+   "range_by_wire": null,
+   "stud_of": "PS-STUDS",
+   "side": "engine bay"
+  },
+  "DIST-STUD": {
+   "device": "distribution stud and its fuse holders (MEGA 125 A, MEGA 100 A, MIDI 60 A, MIDI 40 A), downstream of isolator stud B",
+   "where": "engine",
+   "family": "lug",
+   "kit": {},
+   "wires": [
+    "6",
+    "59",
+    "ISO_OUT",
+    "DCDC_IN",
+    "PDM_BPOS",
+    "PDM15_BPOS",
+    "52",
+    "3",
+    "IBOOST_PERM_FH"
+   ],
+   "cavities": null,
+   "empty": null,
+   "doubled": null,
+   "range": null,
+   "out_of_range": [],
+   "pigtailed": [],
+   "note": "RSI pass 37: a stud of the DC primary (PS-STUDS)",
+   "branch_wires_missing": 0,
+   "unknown_wire_ids": [],
+   "open": [],
+   "sources": [
+    "build book 'DC primary' table",
+    "state 0i",
+    "chapters/17"
+   ],
+   "splice_point": null,
+   "range_by_wire": null,
+   "stud_of": "PS-STUDS",
+   "side": "engine bay"
+  },
+  "STARTER-BPLUS": {
+   "device": "starter B+ stud (5/16 in, build-book assumption)",
+   "where": "engine",
+   "family": "lug",
+   "kit": {},
+   "wires": [
+    "6"
+   ],
+   "cavities": null,
+   "empty": null,
+   "doubled": null,
+   "range": null,
+   "out_of_range": [],
+   "pigtailed": [],
+   "note": "RSI pass 37: a stud of the DC primary (PS-STUDS)",
+   "branch_wires_missing": 0,
+   "unknown_wire_ids": [],
+   "open": [],
+   "sources": [
+    "build book 'DC primary' table",
+    "state 0i",
+    "chapters/17"
+   ],
+   "splice_point": null,
+   "range_by_wire": null,
+   "stud_of": "PS-STUDS",
+   "side": "engine bay"
+  },
+  "ALT-BPLUS": {
+   "device": "alternator B+ stud (Holley 197-302; 5/16 in, build-book assumption)",
+   "where": "engine",
+   "family": "lug",
+   "kit": {},
+   "wires": [
+    "59"
+   ],
+   "cavities": null,
+   "empty": null,
+   "doubled": null,
+   "range": null,
+   "out_of_range": [],
+   "pigtailed": [],
+   "note": "RSI pass 37: a stud of the DC primary (PS-STUDS)",
+   "branch_wires_missing": 0,
+   "unknown_wire_ids": [],
+   "open": [],
+   "sources": [
+    "build book 'DC primary' table",
+    "state 0i",
+    "chapters/17"
+   ],
+   "splice_point": null,
+   "range_by_wire": null,
+   "stud_of": "PS-STUDS",
+   "side": "engine bay"
+  },
+  "GND-BLOCK": {
+   "device": "engine block ground stud near the starter (G1)",
+   "where": "engine",
+   "family": "lug",
+   "kit": {},
+   "wires": [
+    "G1"
+   ],
+   "cavities": null,
+   "empty": null,
+   "doubled": null,
+   "range": null,
+   "out_of_range": [],
+   "pigtailed": [],
+   "note": "RSI pass 37: a stud of the DC primary (PS-STUDS)",
+   "branch_wires_missing": 0,
+   "unknown_wire_ids": [],
+   "open": [],
+   "sources": [
+    "build book 'DC primary' table",
+    "state 0i",
+    "chapters/17"
+   ],
+   "splice_point": null,
+   "range_by_wire": null,
+   "stud_of": "PS-STUDS",
+   "side": "engine bay"
+  },
+  "GND-FRAME": {
+   "device": "frame rail ground boss (G2)",
+   "where": "engine",
+   "family": "lug",
+   "kit": {},
+   "wires": [
+    "G2"
+   ],
+   "cavities": null,
+   "empty": null,
+   "doubled": null,
+   "range": null,
+   "out_of_range": [],
+   "pigtailed": [],
+   "note": "RSI pass 37: a stud of the DC primary (PS-STUDS)",
+   "branch_wires_missing": 0,
+   "unknown_wire_ids": [],
+   "open": [],
+   "sources": [
+    "build book 'DC primary' table",
+    "state 0i",
+    "chapters/17"
+   ],
+   "splice_point": null,
+   "range_by_wire": null,
+   "stud_of": "PS-STUDS",
+   "side": "engine bay"
+  },
+  "GND-HEAD": {
+   "device": "engine head/block ground strap stud (G3)",
+   "where": "engine",
+   "family": "lug",
+   "kit": {},
+   "wires": [
+    "G3"
+   ],
+   "cavities": null,
+   "empty": null,
+   "doubled": null,
+   "range": null,
+   "out_of_range": [],
+   "pigtailed": [],
+   "note": "RSI pass 37: a stud of the DC primary (PS-STUDS)",
+   "branch_wires_missing": 0,
+   "unknown_wire_ids": [],
+   "open": [],
+   "sources": [
+    "build book 'DC primary' table",
+    "state 0i",
+    "chapters/17"
+   ],
+   "splice_point": null,
+   "range_by_wire": null,
+   "stud_of": "PS-STUDS",
+   "side": "engine bay"
+  },
+  "FW-BOND": {
+   "device": "firewall bond stud, engine side (G3)",
+   "where": "engine",
+   "family": "lug",
+   "kit": {},
+   "wires": [
+    "G3"
+   ],
+   "cavities": null,
+   "empty": null,
+   "doubled": null,
+   "range": null,
+   "out_of_range": [],
+   "pigtailed": [],
+   "note": "RSI pass 37: a stud of the DC primary (PS-STUDS)",
+   "branch_wires_missing": 0,
+   "unknown_wire_ids": [],
+   "open": [],
+   "sources": [
+    "build book 'DC primary' table",
+    "state 0i",
+    "chapters/17"
+   ],
+   "splice_point": null,
+   "range_by_wire": null,
+   "stud_of": "PS-STUDS",
+   "side": "engine bay"
+  },
+  "ISO-STUD-B": {
+   "device": "Blue Sea 7700 isolator stud B (3/8-16), load side",
+   "where": "engine",
+   "family": "lug",
+   "kit": {},
+   "wires": [
+    "ISO_OUT"
+   ],
+   "cavities": null,
+   "empty": null,
+   "doubled": null,
+   "range": null,
+   "out_of_range": [],
+   "pigtailed": [],
+   "note": "RSI pass 37: a stud of the DC primary (PS-STUDS)",
+   "branch_wires_missing": 0,
+   "unknown_wire_ids": [],
+   "open": [],
+   "sources": [
+    "build book 'DC primary' table",
+    "state 0i",
+    "chapters/17"
+   ],
+   "splice_point": null,
+   "range_by_wire": null,
+   "stud_of": "PS-STUDS",
    "side": "engine bay"
   }
  },
@@ -38301,166 +38567,6 @@
    "doubled": null
   },
   {
-   "wire": "63",
-   "endpoint": "PS-STUDS",
-   "where": "engine",
-   "cavity": "stud, lug 238LTP + 238LTP",
-   "factory_circuit": null,
-   "part": "238LTP + 238LTP",
-   "family": "lug",
-   "doubled": null
-  },
-  {
-   "wire": "6",
-   "endpoint": "PS-STUDS",
-   "where": "engine",
-   "cavity": "stud, lug 238LTP + 2516LTP",
-   "factory_circuit": null,
-   "part": "238LTP + 2516LTP",
-   "family": "lug",
-   "doubled": null
-  },
-  {
-   "wire": "59",
-   "endpoint": "PS-STUDS",
-   "where": "engine",
-   "cavity": "stud, lug 2516LTP + 2516LTP",
-   "factory_circuit": null,
-   "part": "2516LTP + 2516LTP",
-   "family": "lug",
-   "doubled": null
-  },
-  {
-   "wire": "G1",
-   "endpoint": "PS-STUDS",
-   "where": "engine",
-   "cavity": "stud, lug 238LTP + 238LTP",
-   "factory_circuit": null,
-   "part": "238LTP + 238LTP",
-   "family": "lug",
-   "doubled": null
-  },
-  {
-   "wire": "G2",
-   "endpoint": "PS-STUDS",
-   "where": "engine",
-   "cavity": "stud, lug DL438 + DL438",
-   "factory_circuit": null,
-   "part": "DL438 + DL438",
-   "family": "lug",
-   "doubled": null
-  },
-  {
-   "wire": "G3",
-   "endpoint": "PS-STUDS",
-   "where": "engine",
-   "cavity": "stud, lug 838TP + 838TP",
-   "factory_circuit": null,
-   "part": "838TP + 838TP",
-   "family": "lug",
-   "doubled": null
-  },
-  {
-   "wire": "ISO_OUT",
-   "endpoint": "PS-STUDS",
-   "where": "engine",
-   "cavity": "stud, lug 238LTP + 238LTP",
-   "factory_circuit": null,
-   "part": "238LTP + 238LTP",
-   "family": "lug",
-   "doubled": null
-  },
-  {
-   "wire": "ODY_NEG",
-   "endpoint": "PS-STUDS",
-   "where": "engine",
-   "cavity": "stud, lug 238LTP + 238LTP",
-   "factory_circuit": null,
-   "part": "238LTP + 238LTP",
-   "family": "lug",
-   "doubled": null
-  },
-  {
-   "wire": "ACC_NEG",
-   "endpoint": "PS-STUDS",
-   "where": "engine",
-   "cavity": "stud, lug DL438 + DL438",
-   "factory_circuit": null,
-   "part": "DL438 + DL438",
-   "family": "lug",
-   "doubled": null
-  },
-  {
-   "wire": "DCDC_IN",
-   "endpoint": "PS-STUDS",
-   "where": "engine",
-   "cavity": "stud, lug 610TP",
-   "factory_circuit": null,
-   "part": "610TP",
-   "family": "lug",
-   "doubled": null
-  },
-  {
-   "wire": "GND_RET_CAB",
-   "endpoint": "PS-STUDS",
-   "where": "engine",
-   "cavity": "stud, lug 238LTP + 238LTP",
-   "factory_circuit": null,
-   "part": "238LTP + 238LTP",
-   "family": "lug",
-   "doubled": null
-  },
-  {
-   "wire": "PDM_BPOS",
-   "endpoint": "PS-STUDS",
-   "where": "engine",
-   "cavity": "stud, lug 2516LTP",
-   "factory_circuit": null,
-   "part": "2516LTP",
-   "family": "lug",
-   "doubled": null
-  },
-  {
-   "wire": "PDM15_BPOS",
-   "endpoint": "PS-STUDS",
-   "where": "engine",
-   "cavity": "stud, lug 2516LTP",
-   "factory_circuit": null,
-   "part": "2516LTP",
-   "family": "lug",
-   "doubled": null
-  },
-  {
-   "wire": "52",
-   "endpoint": "PS-STUDS",
-   "where": "engine",
-   "cavity": "stud, lug 610TP",
-   "factory_circuit": null,
-   "part": "610TP",
-   "family": "lug",
-   "doubled": null
-  },
-  {
-   "wire": "3",
-   "endpoint": "PS-STUDS",
-   "where": "engine",
-   "cavity": "stud, lug AMP-KIT-RING",
-   "factory_circuit": null,
-   "part": "AMP-KIT-RING",
-   "family": "lug",
-   "doubled": null
-  },
-  {
-   "wire": "IBOOST_PERM_FH",
-   "endpoint": "PS-STUDS",
-   "where": "engine",
-   "cavity": "stud, lug 9918",
-   "factory_circuit": null,
-   "part": "9918",
-   "family": "lug",
-   "doubled": null
-  },
-  {
    "wire": "APS_T1_5V",
    "endpoint": "APS",
    "where": "cabin",
@@ -43289,6 +43395,248 @@
    "part": "D-609-05",
    "family": "miniseal",
    "doubled": null
+  },
+  {
+   "wire": "63",
+   "endpoint": "ISO-STUD-A",
+   "where": "engine",
+   "cavity": "stud, lug 238LTP",
+   "factory_circuit": null,
+   "part": "238LTP",
+   "family": "lug",
+   "doubled": null,
+   "stud_of": "PS-STUDS"
+  },
+  {
+   "wire": "6",
+   "endpoint": "DIST-STUD",
+   "where": "engine",
+   "cavity": "stud, lug 238LTP",
+   "factory_circuit": null,
+   "part": "238LTP",
+   "family": "lug",
+   "doubled": null,
+   "stud_of": "PS-STUDS"
+  },
+  {
+   "wire": "6",
+   "endpoint": "STARTER-BPLUS",
+   "where": "engine",
+   "cavity": "stud, lug 2516LTP",
+   "factory_circuit": null,
+   "part": "2516LTP",
+   "family": "lug",
+   "doubled": null,
+   "stud_of": "PS-STUDS"
+  },
+  {
+   "wire": "59",
+   "endpoint": "ALT-BPLUS",
+   "where": "engine",
+   "cavity": "stud, lug 2516LTP",
+   "factory_circuit": null,
+   "part": "2516LTP",
+   "family": "lug",
+   "doubled": null,
+   "stud_of": "PS-STUDS"
+  },
+  {
+   "wire": "59",
+   "endpoint": "DIST-STUD",
+   "where": "engine",
+   "cavity": "stud, lug 2516LTP",
+   "factory_circuit": null,
+   "part": "2516LTP",
+   "family": "lug",
+   "doubled": null,
+   "stud_of": "PS-STUDS"
+  },
+  {
+   "wire": "G1",
+   "endpoint": "GND-BANK-ENG",
+   "where": "engine",
+   "cavity": "stud, lug 238LTP",
+   "factory_circuit": null,
+   "part": "238LTP",
+   "family": "lug",
+   "doubled": null,
+   "stud_of": "PS-STUDS"
+  },
+  {
+   "wire": "G1",
+   "endpoint": "GND-BLOCK",
+   "where": "engine",
+   "cavity": "stud, lug 238LTP",
+   "factory_circuit": null,
+   "part": "238LTP",
+   "family": "lug",
+   "doubled": null,
+   "stud_of": "PS-STUDS"
+  },
+  {
+   "wire": "G2",
+   "endpoint": "GND-BANK-ENG",
+   "where": "engine",
+   "cavity": "stud, lug DL438",
+   "factory_circuit": null,
+   "part": "DL438",
+   "family": "lug",
+   "doubled": null,
+   "stud_of": "PS-STUDS"
+  },
+  {
+   "wire": "G2",
+   "endpoint": "GND-FRAME",
+   "where": "engine",
+   "cavity": "stud, lug DL438",
+   "factory_circuit": null,
+   "part": "DL438",
+   "family": "lug",
+   "doubled": null,
+   "stud_of": "PS-STUDS"
+  },
+  {
+   "wire": "G3",
+   "endpoint": "GND-HEAD",
+   "where": "engine",
+   "cavity": "stud, lug 838TP",
+   "factory_circuit": null,
+   "part": "838TP",
+   "family": "lug",
+   "doubled": null,
+   "stud_of": "PS-STUDS"
+  },
+  {
+   "wire": "G3",
+   "endpoint": "FW-BOND",
+   "where": "engine",
+   "cavity": "stud, lug 838TP",
+   "factory_circuit": null,
+   "part": "838TP",
+   "family": "lug",
+   "doubled": null,
+   "stud_of": "PS-STUDS"
+  },
+  {
+   "wire": "ISO_OUT",
+   "endpoint": "ISO-STUD-B",
+   "where": "engine",
+   "cavity": "stud, lug 238LTP",
+   "factory_circuit": null,
+   "part": "238LTP",
+   "family": "lug",
+   "doubled": null,
+   "stud_of": "PS-STUDS"
+  },
+  {
+   "wire": "ISO_OUT",
+   "endpoint": "DIST-STUD",
+   "where": "engine",
+   "cavity": "stud, lug 238LTP",
+   "factory_circuit": null,
+   "part": "238LTP",
+   "family": "lug",
+   "doubled": null,
+   "stud_of": "PS-STUDS"
+  },
+  {
+   "wire": "ODY_NEG",
+   "endpoint": "GND-BANK-ENG",
+   "where": "engine",
+   "cavity": "stud, lug 238LTP",
+   "factory_circuit": null,
+   "part": "238LTP",
+   "family": "lug",
+   "doubled": null,
+   "stud_of": "PS-STUDS"
+  },
+  {
+   "wire": "ACC_NEG",
+   "endpoint": "GND-BANK-ENG",
+   "where": "engine",
+   "cavity": "stud, lug DL438",
+   "factory_circuit": null,
+   "part": "DL438",
+   "family": "lug",
+   "doubled": null,
+   "stud_of": "PS-STUDS"
+  },
+  {
+   "wire": "DCDC_IN",
+   "endpoint": "DIST-STUD",
+   "where": "engine",
+   "cavity": "stud, lug 610TP",
+   "factory_circuit": null,
+   "part": "610TP",
+   "family": "lug",
+   "doubled": null,
+   "stud_of": "PS-STUDS"
+  },
+  {
+   "wire": "GND_RET_CAB",
+   "endpoint": "GND-BANK-ENG",
+   "where": "engine",
+   "cavity": "stud, lug 238LTP",
+   "factory_circuit": null,
+   "part": "238LTP",
+   "family": "lug",
+   "doubled": null,
+   "stud_of": "PS-STUDS"
+  },
+  {
+   "wire": "PDM_BPOS",
+   "endpoint": "DIST-STUD",
+   "where": "engine",
+   "cavity": "stud, lug 2516LTP",
+   "factory_circuit": null,
+   "part": "2516LTP",
+   "family": "lug",
+   "doubled": null,
+   "stud_of": "PS-STUDS"
+  },
+  {
+   "wire": "PDM15_BPOS",
+   "endpoint": "DIST-STUD",
+   "where": "engine",
+   "cavity": "stud, lug 2516LTP",
+   "factory_circuit": null,
+   "part": "2516LTP",
+   "family": "lug",
+   "doubled": null,
+   "stud_of": "PS-STUDS"
+  },
+  {
+   "wire": "52",
+   "endpoint": "DIST-STUD",
+   "where": "engine",
+   "cavity": "stud, lug 610TP",
+   "factory_circuit": null,
+   "part": "610TP",
+   "family": "lug",
+   "doubled": null,
+   "stud_of": "PS-STUDS"
+  },
+  {
+   "wire": "3",
+   "endpoint": "DIST-STUD",
+   "where": "engine",
+   "cavity": "stud, lug AMP-KIT-RING",
+   "factory_circuit": null,
+   "part": "AMP-KIT-RING",
+   "family": "lug",
+   "doubled": null,
+   "stud_of": "PS-STUDS"
+  },
+  {
+   "wire": "IBOOST_PERM_FH",
+   "endpoint": "DIST-STUD",
+   "where": "engine",
+   "cavity": "stud, lug 9918",
+   "factory_circuit": null,
+   "part": "9918",
+   "family": "lug",
+   "doubled": null,
+   "stud_of": "PS-STUDS"
   }
  ],
  "splices": [
@@ -54245,19 +54593,19 @@
     "crosses": false
    },
    "6": {
-    "L1 plugs": false,
+    "L1 plugs": true,
     "L2 wire": true,
     "L3 crossing": true,
-    "L4 ends": false,
+    "L4 ends": true,
     "L5 material": false,
     "length": "twin",
     "crosses": false
    },
    "59": {
-    "L1 plugs": false,
+    "L1 plugs": true,
     "L2 wire": true,
     "L3 crossing": true,
-    "L4 ends": false,
+    "L4 ends": true,
     "L5 material": false,
     "length": "twin",
     "crosses": false
@@ -54767,29 +55115,29 @@
     "crosses": false
    },
    "G1": {
-    "L1 plugs": false,
+    "L1 plugs": true,
     "L2 wire": true,
     "L3 crossing": true,
-    "L4 ends": false,
+    "L4 ends": true,
     "L5 material": false,
     "length": "twin",
     "crosses": false
    },
    "G2": {
-    "L1 plugs": false,
+    "L1 plugs": true,
     "L2 wire": true,
     "L3 crossing": true,
-    "L4 ends": false,
+    "L4 ends": true,
     "L5 material": false,
     "length": "unknown",
     "crosses": false
    },
    "G3": {
-    "L1 plugs": false,
+    "L1 plugs": true,
     "L2 wire": true,
     "L3 crossing": true,
-    "L4 ends": false,
-    "L5 material": false,
+    "L4 ends": true,
+    "L5 material": true,
     "length": "unknown",
     "crosses": false
    },
@@ -56459,10 +56807,10 @@
     "crosses": false
    },
    "ISO_OUT": {
-    "L1 plugs": false,
+    "L1 plugs": true,
     "L2 wire": true,
     "L3 crossing": true,
-    "L4 ends": false,
+    "L4 ends": true,
     "L5 material": false,
     "length": "unknown",
     "crosses": false
@@ -57213,11 +57561,11 @@
    },
    "BASE": {
     "wires": 352,
-    "L1 plugs": 272,
+    "L1 plugs": 278,
     "L2 wire": 349,
     "L3 crossing": 352,
-    "L4 ends": 338,
-    "L5 material": 1,
+    "L4 ends": 344,
+    "L5 material": 2,
     "crossings": 90,
     "length": {
      "estimated": 178,
@@ -57385,11 +57733,11 @@
    },
    "power_spine": {
     "wires": 40,
-    "L1 plugs": 26,
+    "L1 plugs": 32,
     "L2 wire": 40,
     "L3 crossing": 40,
-    "L4 ends": 32,
-    "L5 material": 0,
+    "L4 ends": 38,
+    "L5 material": 1,
     "crossings": 8,
     "length": {
      "twin": 5,
@@ -57426,11 +57774,11 @@
   "configuration": {
    "buildable (base + decided)": {
     "wires": 384,
-    "L1 plugs": 292,
+    "L1 plugs": 298,
     "L2 wire": 381,
     "L3 crossing": 384,
-    "L4 ends": 370,
-    "L5 material": 1,
+    "L4 ends": 376,
+    "L5 material": 2,
     "crossings": 90,
     "length": {
      "estimated": 195,
@@ -57442,11 +57790,11 @@
   "composite": {
    "composite (every option)": {
     "wires": 417,
-    "L1 plugs": 297,
+    "L1 plugs": 303,
     "L2 wire": 409,
     "L3 crossing": 417,
-    "L4 ends": 401,
-    "L5 material": 1,
+    "L4 ends": 407,
+    "L5 material": 2,
     "crossings": 90,
     "length": {
      "estimated": 199,
