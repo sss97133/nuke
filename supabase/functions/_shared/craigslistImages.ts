@@ -14,10 +14,10 @@ export function imageKey(url: string): string {
 
 const FULL = /_1200x900\.jpg(\?.*)?$/i;
 
-export interface ExistingImage { id: string; image_url: string; is_primary?: boolean | null; is_duplicate?: boolean | null }
+export interface ExistingImage { id: string; image_url: string; is_primary?: boolean | null; is_duplicate?: boolean | null; vision_gate_status?: string | null }
 export interface ImagePlan {
   /** Gallery photos to insert, with their gallery index. */
-  insert: { url: string; position: number; replaces: string[]; primary: boolean }[];
+  insert: { url: string; position: number; replaces: string[]; primary: boolean; gate?: string }[];
   /** Existing rows to mark as duplicates once the row that replaces them exists. */
   supersede: { id: string; key: string }[];
 }
@@ -33,7 +33,10 @@ export function planCraigslistImages(existing: ExistingImage[], gallery: string[
   gallery.forEach((url, position) => {
     const rows = byKey.get(imageKey(url)) ?? [];
     if (rows.some((r) => FULL.test(r.image_url))) return; // already holds this photo at full size
-    plan.insert.push({ url, position, replaces: rows.map((r) => r.id), primary: rows.some((r) => !!r.is_primary) });
+    // The same photo at a larger size keeps the gate verdict of the row it replaces: a gallery that was cleared must not
+    // go blank while the larger copies wait for the classifier. A photo with no earlier row starts at the column default.
+    const gate = rows.length > 0 && rows.every((r) => r.vision_gate_status === "approved") ? "approved" : undefined;
+    plan.insert.push({ url, position, replaces: rows.map((r) => r.id), primary: rows.some((r) => !!r.is_primary), ...(gate ? { gate } : {}) });
     for (const r of rows) plan.supersede.push({ id: r.id, key: imageKey(url) });
   });
   return plan;
@@ -52,7 +55,7 @@ export async function applyCraigslistImagePlan(
       if (item.primary && item.replaces.length) await supabase.from("vehicle_images").update({ is_primary: false }).in("id", item.replaces);
       const { data, error } = await supabase.from("vehicle_images").insert({
         vehicle_id: args.vehicleId, image_url: item.url, is_primary: item.primary, position: item.position, display_order: item.position,
-        source: args.source, is_external: true, source_url: args.sourceUrl,
+        source: args.source, is_external: true, source_url: args.sourceUrl, ...(item.gate ? { vision_gate_status: item.gate } : {}),
       }).select("id").maybeSingle();
       if (error || !data?.id) { out.errors.push(error?.message ?? "no id"); continue; }
       out.inserted++;

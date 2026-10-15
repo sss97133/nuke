@@ -940,7 +940,7 @@ async function enrichVehicle(vehicleId: string, data: VehicleEnrichment, platfor
     // Check which images already exist
     const { data: existingImages } = await supabaseAdmin
       .from("vehicle_images")
-      .select("id, image_url, is_primary, is_duplicate")
+      .select("id, image_url, is_primary, is_duplicate, vision_gate_status")
       .eq("vehicle_id", vehicleId);
 
     if (platform === "craigslist") {
