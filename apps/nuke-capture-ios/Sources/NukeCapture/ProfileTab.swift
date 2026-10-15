@@ -356,9 +356,10 @@ struct ProfileView: View {
                 }
             }
 
-            // ORGANIZATIONS — the web profile's affiliations table (OrganizationAffiliations.tsx),
-            // same read, same columns: the businesses this person works with and as what.
-            OrgAffiliationsSection(rows: affiliations, failureText: affiliationsFailure)
+            // ORGANIZATIONS — the person's memberships with each relation's weight (user_org_relations), on their
+            // own profile only: the owner took organizations off the profile face on 2026-06-13 ("I don't want those
+            // showing up"; UserWorkspaceContent.tsx), and the web shows them only on the signed-in capsule.
+            if isOwn { OrgAffiliationsSection(rows: affiliations, failureText: affiliationsFailure) }
 
             // GARAGE — the user's vehicles, the way into the whole drill chain.
             // Empty + own profile → a LIVING state that says what's coming, not a
@@ -425,6 +426,7 @@ struct ProfileView: View {
         .task(id: userId) { await loadLatest() }
         .task(id: userId) { await loadProducer() }
         .task(id: userId) {
+            guard isOwn else { return }
             do { affiliations = try await OrgAffiliationsSection.load(userId: userId); affiliationsFailure = nil }
             catch { if affiliations.isEmpty { affiliationsFailure = ReadFailure.text(error) } }
         }
