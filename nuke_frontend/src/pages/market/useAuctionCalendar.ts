@@ -14,6 +14,13 @@ export type CalendarSale = {
   first_seen_at: string | null; first_seen_7d: number; updated_at: string | null; run_days: RunDay[];
   /** Lots the house lists for the sale (newest house roster census), when a census covers the house. */
   lots_listed: number | null; listed_at: string | null;
+  /** The same series' previous sale, from the house's own index (census meta prior_sale), when the census carries it. */
+  prior_sale?: PriorSale | null;
+};
+/** A sale series' previous sale as the house's index recorded it: its final roster and how much of it sold. */
+export type PriorSale = {
+  sale_key: string; lots: number; vehicle_lots: number | null; sold: number | null; bid_goes_on?: number | null;
+  median_price: number | null; ends_on?: string | null;
 };
 /** A sale the house lists whose days are not recorded yet and of which no lot has landed. */
 export type UnplacedSale = { house: string; sale_key: string; sale_name: string; lots_listed: number; listed_at: string | null };
@@ -78,6 +85,16 @@ export function saleTimer(startsOn: string, endsOn: string, now: number): string
 }
 
 /** How long ago the data was last written: minutes, then hours, then days. Never a full timestamp. */
+/** "Mecum ran 1,459 lots at Dallas 2025 · 71% of its vehicles sold": the series' previous sale, in the house's numbers. */
+export function priorSaleLine(house: string, prior: PriorSale | null | undefined): string | null {
+  if (!prior || !(prior.lots > 0)) return null;
+  const name = prior.sale_key.split('-').map(w => (/^\d+$/.test(w) ? w : w.charAt(0).toUpperCase() + w.slice(1))).join(' ');
+  const base = `${houseName(house)} ran ${prior.lots.toLocaleString('en-US')} lots at ${name}`;
+  const vehicles = prior.vehicle_lots ?? null;
+  return vehicles && vehicles > 0 && prior.sold != null
+    ? `${base} · ${Math.round((100 * prior.sold) / vehicles)}% of its vehicles sold` : base;
+}
+
 export function updatedAgo(at: string | null | undefined, now: number): string {
   const t = at ? Date.parse(at) : NaN;
   if (!Number.isFinite(t)) return 'update time unrecorded';

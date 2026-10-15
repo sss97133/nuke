@@ -283,7 +283,9 @@ Contract, as delivered in `auction_calendar_read` and the Market tab's `?collect
   `source_census` row per house with `census_method` 'house_roster_facet' (the Mecum lane writes one per index read,
   keyed by sale_key; read through `house_roster_census()`, since `observation_sources` is not readable logged out).
   A listed sale with no lot landed and no recorded days is shown under the table, not on the axis. Last year's final
-  roster as a baseline is still owed.
+  roster is the baseline: the census meta's `prior_sale` (the same series' previous sale from the house's index, matched by
+  series and location because houses rename sales) reads "Mecum ran 1,459 lots at Dallas 2025 · 71% of its vehicles
+  sold" beside the roster count.
 - **Non-vehicle lots** (`listing_kind` 'non_vehicle_item', e.g. Mecum road art) are not lots on the calendar, as on the map.
 - **A backfilled sale stops reading unconfirmed** once a sale correction on the vehicle cites that lot among its
   `source.lots` (the house's own result was read and applied).
