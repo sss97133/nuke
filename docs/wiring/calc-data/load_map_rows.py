@@ -785,9 +785,11 @@ def main():
         api.insert("wiring_decision_links", lrows)
         n_link += len(lrows)
     print(f"options: {len(reg.get('options') or {})} · rows inserted {n_new} · superseded {n_sup} · plug links {n_link}")
-    # the harness model (harness_segments) follows the wires and wire ends this run superseded (RSI pass 11)
+    # the harness model (harness_segments) follows the wires and wire ends this run superseded (RSI pass 11), and every
+    # plug this run wrote is keyed to its live point on the route graph, by the anchor named in pos_source (RSI pass 12)
     if not PLAN:
         print(f"harness model: {api._req('POST', 'rpc/resync_harness_segments', {'p_vehicle_id': K5})}")
+        print(f"route graph: {api._req('POST', 'rpc/key_harness_endpoints_to_topology', {'p_vehicle_id': K5})}")
 
 
 if __name__ == "__main__":
