@@ -278,9 +278,15 @@ Contract, as delivered in `auction_calendar_read` and the Market tab's `?collect
 - **One axis.** Each sale row draws its run days (height = lots that day) on one axis from today to the last sale landed;
   the first seven days are shaded as the window a 7-day online auction runs in, so the live board and the calendar read
   as one timer at two lead times.
-- **Roster fill is a measure.** Lots landed per sale, and those first seen in the last 7 days (the consignment
-  observation is `roster_first_seen_at`). The house's own stated roster count and last year's final roster are the
-  denominator and baseline still owed: Mecum's index states them per sale; no table holds them yet.
+- **Roster fill is a measure.** Lots landed per sale against the lots the house lists ("111 of 1,037"), and those
+  first seen in the last 7 days (the consignment observation is `roster_first_seen_at`). The listed count is the newest
+  `source_census` row per house with `census_method` 'house_roster_facet' (the Mecum lane writes one per index read,
+  keyed by sale_key; read through `house_roster_census()`, since `observation_sources` is not readable logged out).
+  A listed sale with no lot landed and no recorded days is shown under the table, not on the axis. Last year's final
+  roster as a baseline is still owed.
+- **Non-vehicle lots** (`listing_kind` 'non_vehicle_item', e.g. Mecum road art) are not lots on the calendar, as on the map.
+- **A backfilled sale stops reading unconfirmed** once a sale correction on the vehicle cites that lot among its
+  `source.lots` (the house's own result was read and applied).
 - **Resale history.** Every consigned car shows up to five earlier records of the same vehicle on any venue (VINs are
   unique on `vehicles`, so a resold car lands on its existing record). Outcomes are the source's own; a `sold` written by
   `orphan-backfill-v1` reads "recorded, result unconfirmed" (that backfill labeled any priced row sold, classified asks
