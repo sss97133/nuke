@@ -97,6 +97,10 @@ export function useFamilySales(brand: string | null, familyKey: string | null) {
 }
 
 const M = { left: 60, right: 18, top: 16, bottom: 26 };
+// The price axis starts at $500. A sale recorded under it (27 of 169,682 dated sales in five years on 2026-10-15, the
+// lowest $1; for the 911 a 1989 Carrera 4 at $320) is counted in the caption and not drawn: it fell below the axis,
+// and stretching the axis to it would flatten every real price.
+export const PRICE_FLOOR = 500;
 // Under this width the head stacks (title over the BaT move) and the legend takes short venue names (a 390 px phone
 // wrapped the one-line head over the legend and the dots, 2026-10-15).
 const NARROW = 640;
@@ -109,13 +113,14 @@ export default function FamilySalesChart({ brand, familyKey, family, width, heig
   const svgRef = useRef<SVGSVGElement>(null);
   const plot = useMemo(() => {
     if (!sales?.length || width < 200 || height < 160) return null;
-    const pts = sales.map((s) => ({ ...s, t: Date.parse(s.sale_date) })).filter((s) => Number.isFinite(s.t) && s.usd > 0).sort((a, b) => a.t - b.t);
+    const dated = sales.map((s) => ({ ...s, t: Date.parse(s.sale_date) })).filter((s) => Number.isFinite(s.t) && s.usd > 0).sort((a, b) => a.t - b.t);
+    const pts = dated.filter((s) => s.usd >= PRICE_FLOOR);
     if (!pts.length) return null;
     const head = width < NARROW ? 96 : 54;
     const w = width - M.left - M.right, h = height - head - M.top - M.bottom;
     const t0 = Math.min(pts[0].t, Date.now() - 1826 * DAY), t1 = Date.now();
     const usd = pts.map((p) => p.usd);
-    const lo = Math.max(500, Math.min(...usd) * 0.85), hi = Math.max(...usd) * 1.15;
+    const lo = Math.max(PRICE_FLOOR, Math.min(...usd) * 0.85), hi = Math.max(...usd) * 1.15;
     const x = (t: number) => M.left + ((t - t0) / (t1 - t0)) * w;
     const y = (v: number) => head + M.top + h - ((Math.log10(v) - Math.log10(lo)) / (Math.log10(hi) - Math.log10(lo))) * h;
     const dots = pts.map((p) => ({ ...p, cx: x(p.t), cy: y(p.usd), color: venueOf(p.source).color }));
@@ -124,7 +129,8 @@ export default function FamilySalesChart({ brand, familyKey, family, width, heig
     for (let yr = new Date(t0).getUTCFullYear() + 1; yr <= new Date(t1).getUTCFullYear(); yr++) years.push({ x: x(Date.UTC(yr, 0, 1)), label: String(yr) });
     const ticks = logTicks(lo, hi).map((v) => ({ y: y(v), label: money(v) }));
     const counts = VENUES.map((v) => ({ ...v, n: pts.filter((p) => venueOf(p.source).key === v.key).length })).filter((v) => v.n > 0);
-    return { dots, line: line.length > 1 ? 'M' + line.join('L') : '', years, ticks, counts, head, w, h, n: pts.length, since: new Date(pts[0].t) };
+    return { dots, line: line.length > 1 ? 'M' + line.join('L') : '', years, ticks, counts, head, w, h, n: dated.length,
+      under: dated.length - pts.length, since: new Date(dated[0].t) };
   }, [sales, width, height]);
   const move = useMemo(() => (sales ? batMove(sales) : null), [sales]);
 
@@ -149,8 +155,9 @@ export default function FamilySalesChart({ brand, familyKey, family, width, heig
     <div className="family-sales__head">
       <div className="family-sales__title">
         <Text role="entity" dense>{family}</Text>
-        <Text role="caption">{narrow ? `${count} sales since ${since} · line = rolling median`
-          : `${count} sales with a date since ${since} · one dot each · line = rolling median, 60 days either side`}</Text>
+        <Text role="caption">{(narrow ? `${count} sales since ${since} · line = rolling median`
+          : `${count} sales with a date since ${since} · one dot each · line = rolling median, 60 days either side`)
+          + (plot.under ? ` · ${plot.under.toLocaleString('en-US')} under ${money(PRICE_FLOOR)} not drawn` : '')}</Text>
       </div>
       {move && <div className="family-sales__move">
         <Text role="measure">{money(move.last)}</Text>
