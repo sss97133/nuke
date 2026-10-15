@@ -80,8 +80,9 @@ Standing rules the code carries:
   `relation_weight` (2^(-age/6 h) of the last contribution): live, stalling, or dormant a day after the last one.
   Contributions are passive (photos at the organization's locations, its images, timeline events, contractor work),
   because nobody at work spends a minute in the app. Reads: `user_org_relations` (the profile's list) and
-  `get_org_page` (`OrganizationView`). An organization opens inside the app, never on nuke.ag. Membership still decides
-  permissions and the contributor gate (`fetchActiveOrgMemberships`).
+  `get_org_page` (`OrganizationView`). An organization opens inside the app, never on nuke.ag. The list shows on the
+  person's own profile only (the owner took organizations off the profile face on 2026-06-13). Membership still
+  decides permissions and the contributor gate (`fetchActiveOrgMemberships`).
 - **Newest first.** Each sync pass leads with the last three days, newest first, ahead of the watermark window, and an
   original that lives only in iCloud goes to the backfill queue (the background job downloads it on Wi-Fi) instead of
   holding the watermark. On 2026-10-15 the owner's window sat in June; every open re-read the same 200 iCloud-only June
