@@ -4,7 +4,7 @@ import { PrefetchLink } from '../../components/PrefetchLink';
 import { MakeIdentity, VehicleIdentity } from '../../components/common/MakeIdentity';
 import { Masthead, Text } from '../../kit';
 import { sourceLink, sourceName } from './useCapturedListings';
-import { ASK_SORTS, ASK_TIERS, ASK_WINDOWS, type AskSort, type AskTier, TIER_NAMES, readAskBoard, useAskBoard } from './useAskBoard';
+import { ASK_SORTS, ASK_TIERS, ASK_WINDOWS, type AskRow, type AskSort, type AskTier, TIER_NAMES, readAskBoard, useAskBoard } from './useAskBoard';
 
 // The classified asks that came online, nationwide, with three lenses: near the viewer, the owner's band, and the
 // asking-price tier. The point stays in memory (never in the URL); logged out there is none until the viewer shares it.
@@ -52,6 +52,15 @@ export function newestOf(board: { newest_at?: string | null; rows: Timed[] } | u
 export function arrivalsAfter(rows: Timed[], since: string | null): number {
   const t = since ? Date.parse(since) : NaN;
   return Number.isFinite(t) ? rows.filter(row => Date.parse(listedAt(row)) > t).length : 0;
+}
+// The miles and title as the listing states them. A seller-disclosed broken odometer is not a mileage, so no number is
+// shown for it; a rolled-over one says so beside the number. A title other than clean is said; clean goes unsaid.
+export function listingFacts(row: Pick<AskRow, 'mileage' | 'listing_mileage' | 'odometer' | 'title_status'>): { miles: string | null; title: string | null } {
+  const n = row.listing_mileage ?? row.mileage;
+  const miles = row.odometer === 'broken' ? 'odometer broken'
+    : n != null ? `${n.toLocaleString('en-US')} mi${row.odometer === 'rolled_over' ? ', rolled over' : ''}` : null;
+  const title = row.title_status && row.title_status !== 'clean' ? `${row.title_status} title` : null;
+  return { miles, title };
 }
 function vehicleImage(value?: string | null) {
   try { const url = new URL(value ?? ''); return ['http:', 'https:'].includes(url.protocol) && !url.username && !url.password ? url.href : null; }
@@ -197,7 +206,7 @@ export default function ClassifiedArrivals({ collection, sourcePicker }: { colle
         const identity = [row.year, row.make, row.model].filter(Boolean).join(' ');
         const image = vehicleImage(row.image);
         // The photo says the body and drive; the row carries what it cannot: miles, and how old the listing is.
-        const specs = row.mileage ? `${row.mileage.toLocaleString('en-US')} mi` : '';
+        const said = listingFacts(row);
         const age = ageOf(listedAt(row), now);
         const seen = [sourceName(row.source), age && (age === 'now' ? 'just now' : `${age} ago`)].filter(Boolean).join(' · ');
         return <tr key={row.event_id}>
@@ -206,7 +215,7 @@ export default function ClassifiedArrivals({ collection, sourcePicker }: { colle
               {row.make && row.model ? <VehicleIdentity year={row.year} make={row.make} model={row.model} />
                 : row.make ? <>{row.year ?? ''} <MakeIdentity make={row.make} /></> : identity || 'Vehicle identity unrecorded'}
             </PrefetchLink></Text>
-            {specs && <Text role="caption" as="div">{specs}</Text>}
+            {(said.miles || said.title) && <Text role="caption" as="div">{said.miles}{said.miles && said.title ? ' · ' : ''}{said.title && <strong>{said.title}</strong>}</Text>}
             <Text role="caption" as="div">{href ? <a href={href} target="_blank" rel="noopener noreferrer">{seen}</a> : seen}</Text></td>
           <td>{row.asking_price == null ? <Text role="caption">Unpriced</Text>
             : <><Text role="measure" dense>${Number(row.asking_price).toLocaleString('en-US')}</Text> <Text role="caption">· asking</Text></>}

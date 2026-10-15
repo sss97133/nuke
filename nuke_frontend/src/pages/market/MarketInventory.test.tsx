@@ -160,6 +160,16 @@ it('near me refused: the whole country, said so', async () => {
   expect(lastQuery().point).toBeNull();
 });
 
+describe('what a listing says about its miles and title', () => {
+  it('never shows a disclosed broken odometer as a mileage, says rolled over and an unclean title, and leaves clean unsaid', async () => {
+    const { listingFacts } = await import('./ClassifiedArrivals');
+    expect(listingFacts({ mileage: 10, listing_mileage: 10, odometer: 'broken', title_status: null })).toEqual({ miles: 'odometer broken', title: null });
+    expect(listingFacts({ mileage: 5, listing_mileage: 62000, odometer: 'rolled_over', title_status: 'salvage' })).toEqual({ miles: '62,000 mi, rolled over', title: 'salvage title' });
+    expect(listingFacts({ mileage: 88000, listing_mileage: null, odometer: null, title_status: 'clean' })).toEqual({ miles: '88,000 mi', title: null });
+    expect(listingFacts({ mileage: null, odometer: null, title_status: undefined } as never)).toEqual({ miles: null, title: null });
+  });
+});
+
 describe('how a feed says time', () => {
   it('says how old a listing is in feed terms, and unknown as unknown', async () => {
     const { ageOf, freshness } = await import('./ClassifiedArrivals');
