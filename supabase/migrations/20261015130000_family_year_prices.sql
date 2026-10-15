@@ -12,8 +12,8 @@
 -- Grain: one row per (family_id, model year, basis).
 --   basis 'sold'   recorded sales: mv_treemap_outcomes rows with sold_amount > 0 (its sale_basis rules), all dates.
 --                  offered = every recorded outcome, sold or not, so sold / offered is the family's sell-through.
---                  A sale whose own page (listing_url, else discovery_url) names the model year but not the family's
---                  matched phrase is another car recorded under the name: it is left out and counted in conflicts.
+--                  A sale whose own page (listing_url, else discovery_url) names the model year but no phrase of its
+--                  family (canonical_models name and aliases) is another car under the name: left out, in conflicts.
 --   basis 'asked'  classified asking prices first seen in the 365 days before the refresh day: Facebook Marketplace
 --                  (marketplace_listings, one per listing) and Craigslist, KSL and Facebook listing events
 --                  (vehicle_events), one ask per vehicle, its latest. An ask is not a sale and is never pooled with one.
@@ -75,22 +75,39 @@ WITH sold AS (
   JOIN public.vehicles v ON v.id = a.vehicle_id AND v.deleted_at IS NULL AND v.is_public IS TRUE
     AND (v.listing_kind IS NULL OR v.listing_kind <> 'non_vehicle_item') AND v.year IS NOT NULL
   ORDER BY a.vehicle_id, a.seen_at DESC
+), words AS (
+  -- Every phrase that names a family: its canonical_models rows (the family_id row and its duplicates of the same make
+  -- and model name, as mv_model_family_names merges them), their model name and aliases ("cuda", "vette", "sting ray"),
+  -- three characters or more, lower case with punctuation as spaces.
+  SELECT f.family_id, array_agg(DISTINCT w) AS words
+  FROM (SELECT DISTINCT family_id FROM public.mv_model_family_names WHERE family_id IS NOT NULL) f
+  JOIN public.canonical_models m0 ON m0.id = f.family_id
+  JOIN public.canonical_models m ON lower(m.canonical_model) = lower(m0.canonical_model)
+    AND regexp_replace(lower(m.make), '[^a-z0-9]', '', 'g') = regexp_replace(lower(m0.make), '[^a-z0-9]', '', 'g')
+  CROSS JOIN LATERAL unnest(array_append(coalesce(m.aliases, '{}'::text[]), m.canonical_model)) a(x)
+  CROSS JOIN LATERAL (SELECT btrim(regexp_replace(lower(a.x), '[^a-z0-9]+', ' ', 'g')) AS w) n
+  WHERE length(n.w) >= 3
+  GROUP BY f.family_id
 ), named AS (
-  SELECT x.basis, n.family_id, x.year, x.price, x.outcome, x.source, x.priced_on, n.matched,
+  SELECT x.basis, n.family_id, x.year, x.price, x.outcome, x.source, x.priced_on,
+         array_append(coalesce(wd.words, '{}'::text[]), n.matched) AS words,
          ' ' || btrim(regexp_replace(lower(regexp_replace(x.page, '^.*/([^/]+)/?$', '\1')), '[^a-z0-9]+', ' ', 'g')) || ' ' AS slug
   FROM (SELECT * FROM sold UNION ALL SELECT * FROM asked) x
   JOIN public.mv_model_family_names n ON n.make_l = x.make_l AND n.model_l = x.model_l
+  LEFT JOIN words wd ON wd.family_id = n.family_id
   WHERE n.family_id IS NOT NULL
     AND (n.year_start IS NULL OR x.year >= n.year_start - 1)
     AND (n.year_end IS NULL OR x.year <= n.year_end + 1)
 ), p AS (
-  -- A sale whose own page names its model year but not the family's phrase is another car recorded under this name
+  -- A sale whose own page names its model year but no phrase of its family is another car recorded under this name
   -- (2026-10-15: 34 of 469 recorded 1967 Corvette sales were Camaros, Chevelles, Impalas, C10s, a Nova and El Caminos by
-  -- their pages). Its price is not pooled; it is counted in conflicts.
+  -- their pages). Its price is not pooled; it is counted in conflicts. Phrases are compared with and without spaces
+  -- ("sting ray" / "stingray", "f 150" / "f150").
   SELECT basis, family_id, year, price, outcome, source, priced_on,
     coalesce(basis = 'sold' AND slug LIKE '% ' || year || ' %'
-             AND position(' ' || matched || ' ' IN slug) = 0
-             AND position(replace(matched, ' ', '') IN replace(slug, ' ', '')) = 0, false) AS conflict
+             AND NOT EXISTS (SELECT 1 FROM unnest(words) w
+                             WHERE position(' ' || w || ' ' IN slug) > 0
+                                OR position(replace(w, ' ', '') IN replace(slug, ' ', '')) > 0), false) AS conflict
   FROM named
 ), yr AS (
   -- Per family, model year and basis first, so a window pools at most 11 small rows, never every price of a family.

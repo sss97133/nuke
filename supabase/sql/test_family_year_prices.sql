@@ -47,6 +47,7 @@ CREATE TABLE public.mv_treemap_outcomes (id uuid PRIMARY KEY, brand_name text, m
   outcome text, sale_basis text, sold_amount numeric, bat_bids integer, bat_watchers integer);
 CREATE TABLE public.mv_model_family_names (make_l text, model_l text, vehicles bigint, make text, family_id uuid,
   family text, matched text, year_start integer, year_end integer, PRIMARY KEY (make_l, model_l));
+CREATE TABLE public.canonical_models (id uuid PRIMARY KEY, make text, canonical_model text, aliases text[]);
 CREATE TABLE public.marketplace_listings (id uuid PRIMARY KEY, vehicle_id uuid, price integer, status text,
   first_seen_at timestamptz);
 CREATE TABLE public.vehicle_events (id uuid PRIMARY KEY, vehicle_id uuid, source_platform text, current_price numeric,
@@ -56,9 +57,15 @@ CREATE TABLE public.vehicle_events (id uuid PRIMARY KEY, vehicle_id uuid, source
 -- of family A; "electra 225" is family B; "mystery" has no family.
 INSERT INTO public.mv_model_family_names (make_l, model_l, vehicles, make, family_id, family, matched, year_start, year_end) VALUES
   ('chevrolet', 'corvette', 1, 'Chevrolet', '00000000-0000-4000-c000-00000000000a', 'Corvette', 'corvette', 1953, NULL),
-  ('chevrolet', 'corvette stingray', 1, 'Chevrolet', '00000000-0000-4000-c000-00000000000a', 'Corvette', 'corvette', 1953, NULL),
+  ('chevrolet', 'corvette stingray', 1, 'Chevrolet', '00000000-0000-4000-c000-00000000000a', 'Corvette', 'corvette stingray', 1953, NULL),
   ('buick', 'electra 225', 1, 'Buick', '00000000-0000-4000-c000-00000000000b', 'Electra', 'electra 225', 1959, 1976),
   ('buick', 'mystery', 1, 'Buick', NULL, NULL, NULL, NULL, NULL);
+-- The families' canonical rows: family A's own row (its id is the family_id) and a duplicate spelled "CHEVROLET" whose
+-- alias "stingray" belongs to the same family; family B's row. A two-letter alias is too short to name anything.
+INSERT INTO public.canonical_models (id, make, canonical_model, aliases) VALUES
+  ('00000000-0000-4000-c000-00000000000a', 'Chevrolet', 'Corvette', '{corvette,vette,"sting ray",cv}'),
+  ('00000000-0000-4000-c000-0000000000aa', 'CHEVROLET', 'Corvette', '{stingray}'),
+  ('00000000-0000-4000-c000-00000000000b', 'Buick', 'Electra', '{electra,"electra 225"}');
 
 -- A 1967: 12 sales at 10,000 .. 120,000 (8 BaT, 4 Mecum; g 1..6 dated last year, g 7..9 dated 2015 by bat_sale_date,
 -- g 10..12 undated) and 3 unsold. Half the names are "corvette stingray".
@@ -79,12 +86,25 @@ UPDATE public.vehicles SET listing_url = 'https://bringatrailer.com/listing/1967
   WHERE id = '00000000-0000-4000-a067-000000000001';
 UPDATE public.vehicles SET discovery_url = 'Corvette roadster, 4-speed' WHERE id = '00000000-0000-4000-a067-000000000002';
 UPDATE public.vehicles SET listing_url = 'https://www.example.com/' WHERE id = '00000000-0000-4000-a067-000000000003';
+-- g 4 is a "Corvette Stingray" (its name matched the longer phrase "corvette stingray") whose page says only
+-- "corvette": the family is named, so it is the same car and stays (2026-10-15: the matched-phrase-only rule refused 535
+-- of 548 Wrangler sales whose pages read "2000-jeep-wrangler-82").
+UPDATE public.vehicles SET listing_url = 'https://bringatrailer.com/listing/1967-chevrolet-corvette-convertible-88/'
+  WHERE id = '00000000-0000-4000-a067-000000000004';
+-- g 6 and g 8 name the car only by an alias: "sting ray" (the family row) and "stingray" (its duplicate row). They stay.
+UPDATE public.vehicles SET listing_url = 'https://bringatrailer.com/listing/1967-chevrolet-sting-ray-coupe/'
+  WHERE id = '00000000-0000-4000-a067-000000000006';
+UPDATE public.vehicles SET listing_url = 'https://www.mecum.com/lots/123/1967-chevrolet-stingray-427/'
+  WHERE id = '00000000-0000-4000-a067-000000000008';
 INSERT INTO public.vehicles (id, make, model, year, listing_url, discovery_url) VALUES
   ('00000000-0000-4000-a067-000000000101', 'Chevrolet', 'Corvette', 1967, 'https://bringatrailer.com/listing/1967-chevrolet-camaro-ss-12/', NULL),
-  ('00000000-0000-4000-a067-000000000102', 'Chevrolet', 'Corvette Stingray', 1967, NULL, '1967 Chevrolet Chevelle SS 396');
+  ('00000000-0000-4000-a067-000000000102', 'Chevrolet', 'Corvette Stingray', 1967, NULL, '1967 Chevrolet Chevelle SS 396'),
+  -- a C10 whose only overlap with the family is the two-letter alias "cv" (in "cv joints"): too short to name it.
+  ('00000000-0000-4000-a067-000000000103', 'Chevrolet', 'Corvette', 1967, 'https://bringatrailer.com/listing/1967-chevrolet-c10-cv-joints/', NULL);
 INSERT INTO public.mv_treemap_outcomes (id, year, source_name, outcome, sold_amount) VALUES
   ('00000000-0000-4000-a067-000000000101', 1967, 'Bring a Trailer', 'sold', 1000),
-  ('00000000-0000-4000-a067-000000000102', 1967, 'Mecum', 'sold', 500000);
+  ('00000000-0000-4000-a067-000000000102', 1967, 'Mecum', 'sold', 500000),
+  ('00000000-0000-4000-a067-000000000103', 1967, 'Bring a Trailer', 'sold', 2000);
 -- A 1966: 4 sales at 1,000 .. 4,000 (Mecum).
 INSERT INTO public.vehicles (id, make, model, year)
 SELECT ('00000000-0000-4000-a066-' || lpad(g::text, 12, '0'))::uuid, 'Chevrolet', 'Corvette', 1966 FROM generate_series(1, 4) g;
@@ -131,8 +151,8 @@ SELECT pg_temp.ok('the first refresh builds it (plain, not concurrently)',
 CREATE FUNCTION pg_temp.r(f text, y integer, b text) RETURNS public.mv_family_year_prices LANGUAGE sql AS
 $$ SELECT * FROM public.mv_family_year_prices WHERE family_id = ('00000000-0000-4000-c000-00000000000' || f)::uuid AND year = y AND basis = b $$;
 
-SELECT pg_temp.ok('A 1967 sold: its own 12 sales, offered 15, not thin; the Camaro and the Chevelle are 2 conflicts',
-  (SELECT year_from = 1967 AND year_to = 1967 AND n = 12 AND offered = 15 AND conflicts = 2 AND NOT thin
+SELECT pg_temp.ok('A 1967 sold: its own 12 sales, offered 15, not thin; the Camaro, the Chevelle and the C10 are 3 conflicts; pages naming an alias (sting ray, stingray) stay',
+  (SELECT year_from = 1967 AND year_to = 1967 AND n = 12 AND offered = 15 AND conflicts = 3 AND NOT thin
    FROM pg_temp.r('a', 1967, 'sold')));
 SELECT pg_temp.ok('A 1967 sold: p10 21,000, p25 37,500, p50 65,000, p75 92,500, p90 109,000 (percentile_cont)',
   (SELECT p10 = 21000 AND p25 = 37500 AND p50 = 65000 AND p75 = 92500 AND p90 = 109000 FROM pg_temp.r('a', 1967, 'sold')));
