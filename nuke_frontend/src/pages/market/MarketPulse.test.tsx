@@ -249,6 +249,27 @@ describe('market answer -> supporting lots', () => {
     await act(async () => container.querySelector<HTMLInputElement>('.inventory-map-pulse-control input')!.click());
     expect(container.querySelector('.inventory-map-pulse')).toBeNull();
   });
+  it('rings a bell for each new bid only after the viewer turns bid sounds on', async () => {
+    const tones: number[] = [];
+    class FakeAudio {
+      state = 'running'; currentTime = 0; destination = {};
+      resume() { return Promise.resolve(); }
+      createGain() { return { gain: { setValueAtTime() {}, exponentialRampToValueAtTime() {} }, connect: (d: any) => d }; }
+      createOscillator() { return { type: '', frequency: { set value(v: number) { tones.push(v); } }, connect: (g: any) => g, start() {}, stop() {} }; }
+    }
+    vi.stubGlobal('AudioContext', FakeAudio);
+    fixture.pulse.newBids = [{ id: 'b1', vehicleId: 'later', amount: 26_000, bidAt: Date.now(), endAt: null }];
+    await render();
+    expect(button('Bid sounds off').getAttribute('aria-pressed')).toBe('false');
+    await act(async () => { await vi.advanceTimersByTimeAsync(20_000); });
+    expect(tones).toEqual([]);
+    await click('Bid sounds off');
+    expect(button('Bid sounds on').getAttribute('aria-pressed')).toBe('true');
+    await act(async () => { await vi.advanceTimersByTimeAsync(20_000); });
+    expect(tones.length).toBeGreaterThan(0);
+    await click('Bid sounds on');
+    expect(button('Bid sounds off').getAttribute('aria-pressed')).toBe('false');
+  });
   it('drills recorded model labels into exactly their records and replaces inventory when switching views', async () => {
     fixture.pulse.data.auctions[0].model = 'Recorded model A';
     fixture.pulse.data.auctions[1].model = 'Recorded model B';

@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '../../lib/supabase';
 
@@ -296,6 +296,42 @@ export function increasedBids(previous: LiveAuction[], current: LiveAuction[]): 
 // This polls recorded state, not the source or a complete stream of bid events.
 const REFETCH_MS = 60_000;
 
+// Bids from Bring a Trailer's live feed as the live stream records them (live_bid_tape: each bid once, about a minute
+// behind the source), read every 15 s. A tape bid lifts its lot's recorded bid while the board's 15-minute sync is
+// behind it, so every reader of the board keeps one bid per lot, the newest Nuke holds.
+const TAPE_MS = 15_000;
+export interface TapeBid { id: string; vehicleId: string; amount: number; bidAt: number; endAt: number | null }
+
+export function parseTape(data: unknown): TapeBid[] {
+  const bids = (data as { bids?: unknown } | null)?.bids;
+  if (!Array.isArray(bids)) return [];
+  return bids.flatMap((b) => {
+    const r = (b ?? {}) as Record<string, unknown>;
+    const amount = Number(r.amount);
+    const bidAt = Date.parse(String(r.bid_at ?? ''));
+    const endAt = r.end_at ? Date.parse(String(r.end_at)) : NaN;
+    if (typeof r.id !== 'string' || typeof r.vehicle_id !== 'string' || !(amount > 0) || !Number.isFinite(bidAt)) return [];
+    return [{ id: r.id, vehicleId: r.vehicle_id, amount, bidAt, endAt: Number.isFinite(endAt) ? endAt : null }];
+  });
+}
+
+async function fetchTape(): Promise<TapeBid[]> {
+  const { data, error } = await supabase.rpc('live_bid_tape', { p_minutes: 5 });
+  if (error) throw error;
+  return parseTape(data);
+}
+
+/** Each lot at the newest bid Nuke holds: the board's recorded bid, or a newer tape bid (and the end it moved to). */
+export function withTapeBids(auctions: LiveAuction[], best: ReadonlyMap<string, TapeBid>): LiveAuction[] {
+  if (!best.size) return auctions;
+  return auctions.map((a) => {
+    const b = best.get(a.id);
+    if (!b || !(b.amount > (a.currentBid ?? 0))) return a;
+    return { ...a, currentBid: b.amount, updatedAt: Math.max(a.updatedAt, b.bidAt),
+      endsAt: b.endAt != null && b.endAt > a.endsAt ? b.endAt : a.endsAt };
+  });
+}
+
 export function useMarketPulse() {
   const query = useQuery({
     queryKey: ['market-pulse-live'],
@@ -304,6 +340,51 @@ export function useMarketPulse() {
     staleTime: REFETCH_MS / 2,
     retry: 1,
   });
+  const tape = useQuery({
+    queryKey: ['live-bid-tape'],
+    queryFn: fetchTape,
+    refetchInterval: TAPE_MS,
+    staleTime: TAPE_MS / 2,
+    retry: 0,
+  });
+
+  // The newest tape bid per lot; bids already read are not replayed. The first read sets the baseline quietly.
+  const best = useRef(new Map<string, TapeBid>());
+  const seen = useRef<Set<string> | null>(null);
+  const [tapeTick, setTapeTick] = useState(0);
+  const [tapeRisen, setTapeRisen] = useState<Set<string>>(new Set());
+  const [newBids, setNewBids] = useState<TapeBid[]>([]);
+  useEffect(() => {
+    const bids = tape.data;
+    if (!bids) return;
+    const first = seen.current == null;
+    const known = seen.current ?? new Set<string>();
+    const fresh = bids.filter((b) => !known.has(b.id));
+    seen.current = known.size > 5000 ? new Set(bids.map((b) => b.id)) : known;
+    for (const b of fresh) {
+      seen.current.add(b.id);
+      const cur = best.current.get(b.vehicleId);
+      if (!cur || b.amount > cur.amount) best.current.set(b.vehicleId, b);
+    }
+    if (!fresh.length) return;
+    setTapeTick((t) => t + 1);
+    if (first) return;
+    setNewBids(fresh);
+    setTapeRisen(new Set(fresh.map((b) => b.vehicleId)));
+    const timer = window.setTimeout(() => setTapeRisen(new Set()), 1800);
+    return () => window.clearTimeout(timer);
+  }, [tape.data]);
+  const data = useMemo(() => {
+    const d = query.data;
+    if (!d) return d;
+    // A tape bid stops lifting its lot once the board's own read has caught up with it.
+    for (const a of d.auctions) {
+      const b = best.current.get(a.id);
+      if (b && (a.currentBid ?? 0) >= b.amount) best.current.delete(a.id);
+    }
+    return { ...d, auctions: withTapeBids(d.auctions, best.current) };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [query.data, tapeTick]);
 
   // Bids that rose since the previous fetch. Motion on the page is driven by this set only.
   const prevBids = useRef<LiveAuction[] | null>(null);
@@ -318,5 +399,6 @@ export function useMarketPulse() {
     return () => window.clearTimeout(timer);
   }, [query.data]);
 
-  return { ...query, risenIds };
+  const risen = useMemo(() => (tapeRisen.size ? new Set([...risenIds, ...tapeRisen]) : risenIds), [risenIds, tapeRisen]);
+  return { ...query, data, risenIds: risen, newBids };
 }
