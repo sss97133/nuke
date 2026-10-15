@@ -315,7 +315,17 @@ export async function firecrawlScrape(
   }
 }
 
-export async function firecrawlMap(
+type FirecrawlMapOptions = FirecrawlClientOptions & {
+    limit?: number;
+    search?: string;
+    ignoreSitemap?: boolean;
+    sitemapOnly?: boolean;
+    includeSubdomains?: boolean;
+    timeout?: number;
+    location?: any;
+  };
+
+async function firecrawlMapRaw(
   url: string,
   options: FirecrawlClientOptions & {
     limit?: number;
@@ -421,3 +431,23 @@ export async function firecrawlMap(
   };
 }
 
+/**
+ * The /map endpoint costs credits too, so it goes through the same door as firecrawlScrape: ask the allowance of the URL's source
+ * first (none, an unmapped host or an unreadable allowance means no call: error firecrawl_allowance_exhausted), record one credit
+ * after every call that was sent.
+ */
+export async function firecrawlMap(url: string, options: FirecrawlMapOptions = {}): Promise<FirecrawlMapResult> {
+  const gate = await meterAllowance(url, options.meterClient);
+  if (!gate.allowed) {
+    return { httpStatus: 0, ok: false, success: false, links: [], error: 'firecrawl_allowance_exhausted', raw: null, attempts: 0 };
+  }
+  let result: FirecrawlMapResult | null = null;
+  try {
+    result = await firecrawlMapRaw(url, options);
+    return result;
+  } finally {
+    await meterRecord(url, 1, options.caller ?? 'firecrawlMap',
+      result ? `map;http=${result.httpStatus};attempts=${result.attempts};${result.success ? 'ok' : (result.error ?? 'failed').slice(0, 80)}` : 'map;threw',
+      options.meterClient);
+  }
+}
