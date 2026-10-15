@@ -12,7 +12,11 @@ export type CalendarSale = {
   house: string; sale_key: string; sale_name: string; location: string | null;
   starts_on: string; ends_on: string; lots: number; seen_before: number; no_reserve: number;
   first_seen_at: string | null; first_seen_7d: number; updated_at: string | null; run_days: RunDay[];
+  /** Lots the house lists for the sale (newest house roster census), when a census covers the house. */
+  lots_listed: number | null; listed_at: string | null;
 };
+/** A sale the house lists whose days are not recorded yet and of which no lot has landed. */
+export type UnplacedSale = { house: string; sale_key: string; sale_name: string; lots_listed: number; listed_at: string | null };
 export type PriorResult = {
   house: string; on: string | null; outcome: string; amount: number | null; currency: string | null;
   basis: 'source' | 'unconfirmed'; url: string | null;
@@ -26,9 +30,11 @@ export type RosterLot = {
 export type CalendarPopulation = {
   lots: number; sales: number; houses: number; seen_before: number; no_reserve: number; first_seen_7d: number;
   updated_at: string | null;
+  /** Lots listed across the sales: the house's count where a census covers it, else the lots landed. */
+  listed: number;
 };
 export type AuctionCalendar = {
-  as_of: string; horizon_days: number; population: CalendarPopulation; sales: CalendarSale[];
+  as_of: string; horizon_days: number; population: CalendarPopulation; sales: CalendarSale[]; unplaced?: UnplacedSale[];
   roster: { house: string; sale_key: string; lots: number; offset: number; rows: RosterLot[] } | null;
 };
 

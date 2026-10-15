@@ -18,10 +18,12 @@ import AuctionCalendar from './AuctionCalendar';
 const NOW = new Date(2026, 9, 15, 12, 0, 0);
 const SALES = [
   { house: 'mecum', sale_key: 'fixture-fall-2026', sale_name: 'Fixture Fall 2026', location: 'Fixture City, TX', starts_on: '2026-10-21', ends_on: '2026-10-24',
-    lots: 1037, seen_before: 212, no_reserve: 300, first_seen_at: '2026-08-01T00:00:00Z', first_seen_7d: 40, updated_at: new Date(2026, 9, 15, 11, 48).toISOString(),
+    lots: 612, seen_before: 212, no_reserve: 300, first_seen_at: '2026-08-01T00:00:00Z', first_seen_7d: 40, updated_at: new Date(2026, 9, 15, 11, 48).toISOString(),
+    lots_listed: 1037, listed_at: new Date(2026, 9, 15, 10, 0).toISOString(),
     run_days: [{ day: '2026-10-21', lots: 200 }, { day: '2026-10-22', lots: 280 }, { day: '2026-10-23', lots: 300 }, { day: '2026-10-24', lots: 257 }] },
   { house: 'gooding', sale_key: 'fixture-winter-2027', sale_name: 'Fixture Winter Auction', location: null, starts_on: '2027-01-08', ends_on: '2027-01-08',
-    lots: 2, seen_before: 1, no_reserve: 1, first_seen_at: '2026-10-07T00:00:00Z', first_seen_7d: 2, updated_at: new Date(2026, 9, 14, 9, 0).toISOString(), run_days: [{ day: '2027-01-08', lots: 2 }] },
+    lots: 2, seen_before: 1, no_reserve: 1, first_seen_at: '2026-10-07T00:00:00Z', first_seen_7d: 2, updated_at: new Date(2026, 9, 14, 9, 0).toISOString(),
+    lots_listed: null, listed_at: null, run_days: [{ day: '2027-01-08', lots: 2 }] },
 ];
 const ROWS = [
   { event_id: 'e1', vehicle_id: 'v1', source_url: 'https://www.goodingco.com/lot/fixture-one', lot_number: '12', run_on: '2027-01-08',
@@ -44,7 +46,8 @@ beforeEach(() => {
   container = document.createElement('div'); document.body.appendChild(container); root = createRoot(container);
   fixture.rosterFor.mockClear(); fixture.more.mockClear();
   fixture.calendar = { isPending: false, isError: false, data: { as_of: '2026-10-15T01:00:00Z', horizon_days: 200,
-    population: { lots: 1039, sales: 2, houses: 2, seen_before: 213, no_reserve: 301, first_seen_7d: 42, updated_at: new Date(2026, 9, 15, 11, 48).toISOString() }, sales: SALES, roster: null } };
+    population: { lots: 614, listed: 1039, sales: 2, houses: 2, seen_before: 213, no_reserve: 301, first_seen_7d: 42, updated_at: new Date(2026, 9, 15, 11, 48).toISOString() }, sales: SALES,
+    unplaced: [{ house: 'mecum', sale_key: 'fixture-winter-2027', sale_name: 'Fixture Winter 2027', lots_listed: 855, listed_at: '2026-10-15T10:00:00Z' }], roster: null } };
   fixture.roster = { isPending: false, isError: false, hasNextPage: true, isFetchingNextPage: false, fetchNextPage: fixture.more,
     data: { pages: [{ as_of: '2026-10-15T01:00:00Z', roster: { house: 'gooding', sale_key: 'fixture-winter-2027', lots: 2, offset: 0, rows: ROWS } }] } };
 });
@@ -85,18 +88,22 @@ describe('day-precision timers', () => {
 it('states the lots with their population and lists each sale with its timer and roster counts', async () => {
   await render();
   expect(container.querySelector('h1')?.textContent).toBe('Auction calendar');
-  expect(container.textContent).toContain('1,039 lots');
-  expect(container.textContent).toContain('on 2 scheduled sales from 2 houses in the next 200 days · 213 with an earlier record on Nuke · updated 12 min ago');
+  expect(container.textContent).toContain('614 of 1,039 lots');
+  expect(container.textContent).toContain('landed of the lots the houses list, on 2 scheduled sales from 2 houses in the next 200 days · 213 with an earlier record on Nuke · updated 12 min ago');
+  expect(container.querySelector('.auction-unplaced')?.textContent).toBe('Also listed, days and lots not landed yet: Mecum Fixture Winter 2027, 855 lots');
   expect(container.textContent).not.toMatch(/as of|\d{1,2}:\d{2}:\d{2}/);
   const rows = [...container.querySelectorAll('tr.auction-sale')];
   expect(rows).toHaveLength(2);
   expect(rows[0].textContent).toContain('in 6 days');
   expect(rows[0].textContent).toContain('Mecum');
-  expect(rows[0].textContent).toContain('1,037 lots');
+  expect(rows[0].textContent).toContain('612 of 1,037 lots');
+  expect(rows[0].textContent).toContain('Mecum lists 1,037, read 2 h ago');
   expect(rows[0].textContent).toContain('212 with an earlier record · 300 no reserve');
   expect(rows[0].textContent).toContain('40 first seen in the last 7 days · updated 12 min ago');
   expect(rows[1].textContent).toContain('in 85 days');
   expect(rows[1].textContent).toContain('updated 27 h ago');
+  expect(rows[1].textContent).toContain('2 lots');
+  expect(rows[1].textContent).not.toContain(' of ');
   expect(rows[1].textContent).toContain('Gooding & Co');
   expect(rows[0].querySelectorAll('rect.auction-track__day')).toHaveLength(4);
   expect(fixture.rosterFor).not.toHaveBeenCalled();
@@ -124,8 +131,15 @@ it('opens a roster in place by run day, with earlier records in the source terms
   expect(container.querySelector('.auction-roster')).toBeNull();
 });
 
+it('says when a listed sale has no lot landed yet', async () => {
+  fixture.roster = { ...fixture.roster, hasNextPage: false, data: { pages: [{ as_of: '2026-10-15T01:00:00Z', roster: { house: 'gooding', sale_key: 'fixture-winter-2027', lots: 0, offset: 0, rows: [] } }] } };
+  await render();
+  const open = [...container.querySelectorAll('button.auction-sale__open')].find(b => b.textContent?.includes('Fixture Winter Auction'))!;
+  await act(async () => (open as HTMLButtonElement).click());
+  expect(container.textContent).toContain('No lot of this sale has landed yet.');
+});
 it('says so when no scheduled sale has a lot landed', async () => {
-  fixture.calendar.data = { ...fixture.calendar.data, population: { lots: 0, sales: 0, houses: 0, seen_before: 0, no_reserve: 0, first_seen_7d: 0 }, sales: [] };
+  fixture.calendar.data = { ...fixture.calendar.data, population: { lots: 0, listed: 0, sales: 0, houses: 0, seen_before: 0, no_reserve: 0, first_seen_7d: 0 }, sales: [], unplaced: [] };
   await render();
   expect(container.textContent).toContain('No scheduled sale has a lot landed for the next 200 days.');
   expect(container.querySelector('table')).toBeNull();

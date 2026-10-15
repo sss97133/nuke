@@ -135,6 +135,7 @@ function Roster({ sale, now }: { sale: CalendarSale; now: number }) {
   const days = rows.reduce<Map<string, RosterLot[]>>((m, lot) => m.set(lot.run_on, [...(m.get(lot.run_on) ?? []), lot]), new Map());
   const byDay = new Map(sale.run_days.map(r => [r.day, r.lots]));
   if (query.isPending) return <p role="status" className="k-body">Reading the roster…</p>;
+  if (!query.isError && rows.length === 0) return <p role="status" className="k-body">No lot of this sale has landed yet{sale.lots_listed != null ? `; ${houseName(sale.house)} lists ${count(sale.lots_listed)}` : ''}.</p>;
   if (query.isError) return <p role="status" className="k-body">The roster could not be read. <button type="button" className="market-control"
     onClick={() => void query.refetch()}><Text role="label">Retry</Text></button></p>;
   return <div className="auction-roster" aria-label={`${sale.sale_name} roster`}>
@@ -169,9 +170,10 @@ export default function AuctionCalendar({ collection }: { collection?: ReactNode
 
   return <section aria-label="Auction calendar" className="market-explorer">
     <Masthead result={<>
-      <Text role="measure" as="div">{population ? `${count(population.lots)} ${population.lots === 1 ? 'lot' : 'lots'}` : '…'}</Text>
+      <Text role="measure" as="div">{population ? (population.listed > population.lots
+        ? `${count(population.lots)} of ${count(population.listed)} lots` : `${count(population.lots)} ${population.lots === 1 ? 'lot' : 'lots'}`) : '…'}</Text>
       <Text role="caption" as="div">{data && population
-        ? `on ${count(population.sales)} scheduled ${population.sales === 1 ? 'sale' : 'sales'} from ${count(population.houses)} ${population.houses === 1 ? 'house' : 'houses'} in the next ${data.horizon_days} days · ${count(population.seen_before)} with an earlier record on Nuke · ${updatedAgo(population.updated_at, now)}`
+        ? `${population.listed > population.lots ? 'landed of the lots the houses list, ' : ''}on ${count(population.sales)} scheduled ${population.sales === 1 ? 'sale' : 'sales'} from ${count(population.houses)} ${population.houses === 1 ? 'house' : 'houses'} in the next ${data.horizon_days} days · ${count(population.seen_before)} with an earlier record on Nuke · ${updatedAgo(population.updated_at, now)}`
         : 'reading the calendar…'}</Text>
     </>}>
       <Text role="entity" as="h1">Auction calendar</Text>
@@ -208,7 +210,9 @@ export default function AuctionCalendar({ collection }: { collection?: ReactNode
               <Text role="label" as="div">{houseName(sale.house)}</Text>
               <Text role="entity" dense as="div">{sale.sale_name}</Text>
               {sale.location && <Text role="caption" as="div">{sale.location}</Text>}</button></td>
-            <td><Text role="measure" dense as="div">{count(sale.lots)} {sale.lots === 1 ? 'lot' : 'lots'}</Text>
+            <td><Text role="measure" dense as="div">{sale.lots_listed != null && sale.lots_listed !== sale.lots
+                ? `${count(sale.lots)} of ${count(sale.lots_listed)} lots` : `${count(sale.lots)} ${sale.lots === 1 ? 'lot' : 'lots'}`}</Text>
+              {sale.lots_listed != null && <Text role="caption" as="div">{houseName(sale.house)} lists {count(sale.lots_listed)}, {updatedAgo(sale.listed_at, now).replace('updated', 'read')}</Text>}
               <Text role="caption" as="div">{count(sale.first_seen_7d)} first seen in the last 7 days · {updatedAgo(sale.updated_at, now)}</Text>
               <Text role="caption" as="div">{count(sale.seen_before)} with an earlier record · {count(sale.no_reserve)} no reserve</Text></td>
             <td className="auction-calendar__axis"><SaleTrack sale={sale} now={now} horizon={horizon} /></td>
@@ -217,5 +221,8 @@ export default function AuctionCalendar({ collection }: { collection?: ReactNode
         </Fragment>;
       })}</tbody>
     </table></div>}
+    {data?.unplaced && data.unplaced.length > 0 && <Text role="caption" as="p" className="auction-unplaced">
+      Also listed, days and lots not landed yet: {data.unplaced.map(u => `${houseName(u.house)} ${u.sale_name}, ${count(u.lots_listed)} lots`).join(' · ')}
+    </Text>}
   </section>;
 }
