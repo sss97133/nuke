@@ -13,6 +13,9 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
+import { optimizeImageUrl } from '../../lib/imageOptimizer';
+import { evidenceSpan, splitTestimony } from './showcaseTestimony';
+import './VehicleShowcase.css';
 
 const FEATURED_VEHICLE_ID = 'e04bf9c5-b488-433b-be9a-3d307861d90b';
 
@@ -122,21 +125,27 @@ export default function VehicleShowcase() {
           }
         }
 
-        const [{ count: imageCount }, { count: eventCount }] = await Promise.all([
+        const [{ count: imageCount }, { count: eventCount }, { data: earliestPhoto }] = await Promise.all([
           supabase.from('vehicle_images').select('id', { count: 'exact', head: true })
             .eq('vehicle_id', vehicleId).eq('is_duplicate', false).eq('is_document', false)
             .not('is_superseded', 'is', true),
           supabase.from('vehicle_events').select('id', { count: 'exact', head: true })
             .eq('vehicle_id', vehicleId),
+          supabase.from('vehicle_images').select('taken_at')
+            .eq('vehicle_id', vehicleId).eq('is_duplicate', false).eq('is_document', false)
+            .not('taken_at', 'is', null).order('taken_at', { ascending: true }).limit(1),
         ]);
+        // The record spans its photos' capture times as well as its observation clocks.
+        const latestPhoto = ((imagesRes.data || []) as ImageRow[]).find(i => i.taken_at)?.taken_at ?? null;
+        const span = evidenceSpan(first, last, (earliestPhoto as { taken_at: string | null }[] | null)?.[0]?.taken_at, latestPhoto);
 
         setStats({
           total_observations: allObsRes.count ?? allObs.length,
           total_images: imageCount ?? 0,
           total_events: eventCount ?? 0,
           by_kind: byKind,
-          first_observed: first,
-          last_observed: last,
+          first_observed: span.first,
+          last_observed: span.last,
         });
       } catch (e) {
         if (!cancelled) setError(e instanceof Error ? e.message : String(e));
@@ -155,15 +164,17 @@ export default function VehicleShowcase() {
 
   const heroUrl = images[0]?.image_url || vehicle?.primary_image_url || null;
 
+  const testimony = useMemo(() => splitTestimony(observations), [observations]);
+
   const monthGroups = useMemo(() => {
     const groups: Record<string, ObservationRow[]> = {};
-    for (const o of observations) {
+    for (const o of testimony.listed) {
       const key = o.observed_at ? o.observed_at.slice(0, 7) : '----';
       if (!groups[key]) groups[key] = [];
       groups[key].push(o);
     }
     return Object.entries(groups).sort((a, b) => b[0].localeCompare(a[0]));
-  }, [observations]);
+  }, [testimony]);
 
   if (loading) {
     return (
@@ -253,11 +264,31 @@ export default function VehicleShowcase() {
       )}
 
       {/* Observation timeline */}
-      {monthGroups.length > 0 && (
+      {observations.length > 0 && (
         <div style={{ padding: '32px', borderBottom: '2px solid #222' }}>
           <div style={{ fontSize: 9, letterSpacing: '0.15em', color: '#888', textTransform: 'uppercase', marginBottom: 16 }}>
             Recent Testimony · last {observations.length} observations
           </div>
+          {testimony.photos && (
+            <div className="showcase-photo-row">
+              <div className="showcase-photo-row__date">
+                {fmtDate(testimony.photos.first) === fmtDate(testimony.photos.last)
+                  ? fmtDate(testimony.photos.last) : `${fmtDate(testimony.photos.first)} – ${fmtDate(testimony.photos.last)}`}
+              </div>
+              <div className="showcase-photo-row__kind">media</div>
+              <div>
+                <div className="showcase-photo-row__line">{testimony.photos.count.toLocaleString()} photos</div>
+                <div className="showcase-photo-row__thumbs">
+                  {testimony.photos.photos.map(p => (
+                    <a key={p.id} className="showcase-photo-row__thumb" href={p.url} target="_blank" rel="noopener noreferrer">
+                      <img src={optimizeImageUrl(p.url, 'small') ?? p.url} alt="" width={96} height={72} loading="lazy"
+                        onError={e => { (e.currentTarget.parentElement as HTMLElement).hidden = true; }} />
+                    </a>
+                  ))}
+                </div>
+              </div>
+            </div>
+          )}
           {monthGroups.map(([month, rows]) => (
             <div key={month} style={{ marginBottom: 24 }}>
               <div style={{ fontSize: 10, fontFamily: MONO_FONT, color: '#666', marginBottom: 8, borderBottom: '1px solid #1a1a1a', paddingBottom: 4 }}>
