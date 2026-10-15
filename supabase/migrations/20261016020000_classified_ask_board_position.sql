@@ -41,9 +41,9 @@ BEGIN
      OR NOT EXISTS (SELECT 1 FROM pg_attribute WHERE attrelid = 'public.mv_family_year_prices'::regclass AND attname = 'venues') THEN
     RAISE EXCEPTION 'apply 20261015130000_family_year_prices.sql, 20261015140000_listing_exit_models.sql, 20261015160000_family_year_prices_miles.sql and 20261015215000_family_year_prices_venues.sql first';
   END IF;
-  -- The fold is created empty and first built by its 09:40 UTC refresh; reading it before then would fail every call.
+  -- The fold is created empty and first built by its daily 10:40 UTC refresh (20261016015000); reading it before then would fail every call.
   IF NOT (SELECT relispopulated FROM pg_class WHERE oid = 'public.mv_family_year_prices'::regclass) THEN
-    RAISE EXCEPTION 'mv_family_year_prices has not been built yet (refresh-family-year-prices, 09:40 UTC); not replacing the board';
+    RAISE EXCEPTION 'mv_family_year_prices has not been built yet (refresh-family-year-prices, 10:40 UTC); not replacing the board';
   END IF;
 END $guard$;
 
