@@ -175,7 +175,8 @@ final class AttributionEngine: ObservableObject {
             ids.forEach { filedIDs.insert($0) }
         }
         for (albumId, group) in albumGroups where group.ids.count >= Config.albumProfileMinPhotos {
-            guard let label = AlbumLabel.parse(group.name) else { continue }
+            // The server needs year, make and model, each present in the album name.
+            guard let label = AlbumLabel.parse(group.name), label.model != nil else { continue }
             let ids = group.ids.filter { !filedIDs.contains($0) }
             guard ids.count >= Config.albumProfileMinPhotos else { continue }
             if let r = await createProfile(DeviceProfileRequest(basis: "album", vin: nil, serial: nil, year: label.year,
@@ -237,36 +238,52 @@ final class AttributionEngine: ObservableObject {
         let evidence: [String: String]
     }
 
-    /// Files through `device_file_images` in chunks; returns the ids the server filed.
+    /// Files through `device_file_images` in chunks of 40; returns the ids the server filed.
+    /// Each filing fires the vehicle's recount triggers (~250 ms), so the server stops starting
+    /// items before the 15 s statement limit and returns the rest as "deferred"; those are sent
+    /// again, up to three rounds.
     private func deviceFile(_ items: [DeviceFileItem]) async -> (filed: Set<String>, byMethod: [String: Int], refused: Int) {
         var filed = Set<String>(), byMethod: [String: Int] = [:], refused = 0
-        var i = 0
-        while i < items.count {
-            let chunk = Array(items[i..<min(i + 200, items.count)])
-            i += chunk.count
-            struct P: Encodable { let p_items: [DeviceFileItem] }
-            do {
-                let res: AnyJSON = try await SupabaseService.client.rpc("device_file_images", params: P(p_items: chunk)).execute().value
-                let ok = Self.filedIDs(from: res)
-                filed.formUnion(ok)
-                for it in chunk where ok.contains(it.image_id) { byMethod[it.method, default: 0] += 1 }
-                refused += chunk.count - ok.count
-            } catch {
-                NSLog("NukeCapture device_file_images failed: %@", String(describing: error))
-                refused += chunk.count
+        var pending = items
+        for _ in 0..<3 where !pending.isEmpty {
+            var deferred: [DeviceFileItem] = []
+            var i = 0
+            while i < pending.count {
+                let chunk = Array(pending[i..<min(i + 40, pending.count)])
+                i += chunk.count
+                struct P: Encodable { let p_items: [DeviceFileItem] }
+                do {
+                    let res: AnyJSON = try await SupabaseService.client.rpc("device_file_images", params: P(p_items: chunk)).execute().value
+                    let statuses = Self.statuses(from: res)
+                    for it in chunk {
+                        switch statuses[it.image_id] {
+                        case "filed", "already":
+                            filed.insert(it.image_id); byMethod[it.method, default: 0] += 1
+                        case "deferred", "busy":
+                            deferred.append(it)
+                        default:
+                            refused += 1
+                        }
+                    }
+                } catch {
+                    NSLog("NukeCapture device_file_images failed: %@", String(describing: error))
+                    refused += chunk.count
+                }
             }
+            pending = deferred
         }
+        refused += pending.count
         return (filed, byMethod, refused)
     }
 
-    /// Reads the image ids the server reports as filed (status "filed" or "already").
-    private static func filedIDs(from res: AnyJSON) -> Set<String> {
-        guard case .object(let o) = res, case .array(let results)? = o["results"] else { return [] }
-        var out = Set<String>()
+    /// image_id → status, from device_file_images' results.
+    private static func statuses(from res: AnyJSON) -> [String: String] {
+        guard case .object(let o) = res, case .array(let results)? = o["results"] else { return [:] }
+        var out: [String: String] = [:]
         for r in results {
             guard case .object(let row) = r, case .string(let id)? = row["image_id"],
                   case .string(let status)? = row["status"] else { continue }
-            if status == "filed" || status == "already" { out.insert(id) }
+            out[id] = status
         }
         return out
     }
