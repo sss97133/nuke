@@ -4863,7 +4863,7 @@
    ],
    "to": [
     "PS-STUDS (engine block near the starter)",
-    "stud, lug 238LTP + 238LTP"
+    "engine block near the starter"
    ],
    "sides": [
     "engine bay",
@@ -4876,7 +4876,7 @@
    "rules": {
     "R8 ends": [
      "PASS",
-     "GND-BANK-ENG (ground star: stud bank beside the batteries - both battery negatives, block, frame and engine-bay returns): -> PS-STUDS (engine block near the starter):stud, lug 238LTP + 238LTP"
+     "GND-BANK-ENG (ground star: stud bank beside the batteries - both battery negatives, block, frame and engine-bay returns): -> PS-STUDS (engine block near the starter):engine block near the starter"
     ]
    }
   },
@@ -4890,7 +4890,7 @@
    ],
    "to": [
     "PS-STUDS (frame rail boss)",
-    "stud, lug DL438 + DL438"
+    "frame rail boss"
    ],
    "sides": [
     "engine bay",
@@ -4903,7 +4903,7 @@
    "rules": {
     "R8 ends": [
      "PASS",
-     "GND-BANK-ENG (ground star: stud bank beside the batteries - both battery negatives, block, frame and engine-bay returns): -> PS-STUDS (frame rail boss):stud, lug DL438 + DL438"
+     "GND-BANK-ENG (ground star: stud bank beside the batteries - both battery negatives, block, frame and engine-bay returns): -> PS-STUDS (frame rail boss):frame rail boss"
     ]
    }
   },
@@ -10069,7 +10069,7 @@
    ],
    "to": [
     "GND-BANK-ENG (ground star: stud bank beside the batteries - both battery negatives, block, frame and engine-bay returns)",
-    "ground star: stud bank beside the batteries - both battery negatives, block, frame and engine-bay returns"
+    "stud, lug 238LTP"
    ],
    "sides": [
     "cab",
@@ -10082,7 +10082,7 @@
    "rules": {
     "R8 ends": [
      "PASS",
-     "GND-BANK-CAB (cab ground bank beside the PDM30): -> GND-BANK-ENG (ground star: stud bank beside the batteries - both battery negatives, block, frame and engine-bay returns):ground star: stud bank beside the batteries - both battery negatives, block, frame and engine-bay returns"
+     "GND-BANK-CAB (cab ground bank beside the PDM30): -> GND-BANK-ENG (ground star: stud bank beside the batteries - both battery negatives, block, frame and engine-bay returns):stud, lug 238LTP"
     ],
     "R12 firewall": [
      "PASS",
@@ -10336,7 +10336,7 @@
    ],
    "to": [
     "GND-BANK-ENG (ground star: stud bank beside the batteries - both battery negatives, block, frame and engine-bay returns)",
-    "ground star: stud bank beside the batteries - both battery negatives, block, frame and engine-bay returns"
+    "stud, lug 238LTP"
    ],
    "sides": [
     "engine bay",
@@ -10349,7 +10349,7 @@
    "rules": {
     "R8 ends": [
      "PASS",
-     "ODYSSEY (-): -> GND-BANK-ENG (ground star: stud bank beside the batteries - both battery negatives, block, frame and engine-bay returns):ground star: stud bank beside the batteries - both battery negatives, block, frame and engine-bay returns"
+     "ODYSSEY (-): -> GND-BANK-ENG (ground star: stud bank beside the batteries - both battery negatives, block, frame and engine-bay returns):stud, lug 238LTP"
     ]
    }
   },
@@ -10363,7 +10363,7 @@
    ],
    "to": [
     "GND-BANK-ENG (ground star: stud bank beside the batteries - both battery negatives, block, frame and engine-bay returns)",
-    "ground star: stud bank beside the batteries - both battery negatives, block, frame and engine-bay returns"
+    "stud, lug DL438"
    ],
    "sides": [
     "engine bay",
@@ -10376,7 +10376,7 @@
    "rules": {
     "R8 ends": [
      "PASS",
-     "ACC-BATT (-): -> GND-BANK-ENG (ground star: stud bank beside the batteries - both battery negatives, block, frame and engine-bay returns):ground star: stud bank beside the batteries - both battery negatives, block, frame and engine-bay returns"
+     "ACC-BATT (-): -> GND-BANK-ENG (ground star: stud bank beside the batteries - both battery negatives, block, frame and engine-bay returns):stud, lug DL438"
     ]
    }
   },

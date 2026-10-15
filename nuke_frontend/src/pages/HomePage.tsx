@@ -183,18 +183,18 @@ export function familyNamesShown(shown: number, names?: number): string {
 /** What area and color mean at each level. The readers count public records with a confirmed sale (vehicle_sale_basis)
  *  and its sold amount (vehicle_price_facts); the median is withheld under 5 sales. */
 export function mapLegend(level: MapLevel, measured = level === 'brands' || level === 'families' || level === 'models'): string {
-  if (level === 'vehicles') return 'area = confirmed sale price · click to open the record';
-  if (measured) return `area = dollars from confirmed sales · of offered sold = share of cars offered at auction that sold · BaT 12 mo = sales and dollars on Bring a Trailer in the last 12 months against the 12 before, the venue held in full both years; color follows those sales (gray: BaT holds under half the sales, or too few a year earlier) · nominal${level === 'families' ? ' · other models = names not yet keyed to a family, and families with under 3 sales' : ''} · click to go down`;
-  return 'area = vehicles with a confirmed sale · color = their median sale price (gray: under 5 sales) · nominal, all years · asks, bids and unknown outcomes are not counted · click to go down';
+  if (level === 'vehicles') return 'box size = confirmed sale price · click a box to open the car';
+  if (measured) return `box size = dollars from confirmed sales · of offered sold = share of cars offered at auction that sold · BaT 12 mo = sales and dollars on Bring a Trailer in the last 12 months against the 12 before, the one house we hold in full both years; color follows those sales (gray: BaT holds under half the sales, or too few a year earlier) · prices not adjusted for inflation${level === 'families' ? ' · other models = names not yet keyed to a family, and families with under 3 sales' : ''} · click a box to go deeper`;
+  return 'box size = vehicles with a confirmed sale · color = their median sale price (gray: under 5 sales) · prices not adjusted for inflation, all years · asks, bids and unknown outcomes are not counted · click a box to go deeper';
 }
 
 /** The legend under the map: the sales chart's when a family shows its chart (the tiles' legend described tiles that
  *  were not on screen, 2026-10-15), the level's otherwise. */
-export const SALES_CHART_LEGEND = 'one dot = one confirmed sale with a date, the last five years · one panel per model-year '
-  + 'decade, all on one log price axis from the family\'s 1st to 99th percentile (sales past it sit on the edge, counted) · '
-  + 'color = venue · line = the median of the sales within 60 days either side, every 14 days; band = their middle half · '
-  + 'headline = Bring a Trailer\'s price move, each decade\'s median weighted by its sales a year earlier · nominal · '
-  + 'click a dot to open its record';
+export const SALES_CHART_LEGEND = 'one dot = one confirmed sale with a date, the last five years · one panel per decade the cars '
+  + 'were built, all on one price scale that leaves out the cheapest and dearest 1% (those sit on the edge, counted) · '
+  + 'color = auction house · line = the typical (median) price of sales within 60 days either side; band = their middle half · '
+  + 'headline = Bring a Trailer\'s price change, each decade weighted by how much it sold a year earlier · prices not adjusted '
+  + 'for inflation · click a dot to open the car';
 export function legendFor(level: MapLevel, chartShown: boolean, measured?: boolean): string {
   return chartShown ? SALES_CHART_LEGEND : measured === undefined ? mapLegend(level) : mapLegend(level, measured);
 }

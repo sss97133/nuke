@@ -1,0 +1,2134 @@
+{
+ "exported_at": "2026-10-15T20:19Z",
+ "source": "live route graph (v_harness_route_length_check over harness_segments), vehicle e08bf694-970f-4cbe-8a74-8715158a0f2e",
+ "wires": {
+  "10": {
+   "route_in": 10.9,
+   "branches": 2,
+   "segments": 2,
+   "routed": 1,
+   "complete": false
+  },
+  "100": {
+   "route_in": 74.2,
+   "branches": 5,
+   "segments": 2,
+   "routed": 2,
+   "complete": true
+  },
+  "101": {
+   "route_in": 67.5,
+   "branches": 6,
+   "segments": 2,
+   "routed": 2,
+   "complete": true
+  },
+  "101g": {
+   "route_in": 67.5,
+   "branches": 6,
+   "segments": 2,
+   "routed": 2,
+   "complete": true
+  },
+  "101r": {
+   "route_in": 67.5,
+   "branches": 6,
+   "segments": 2,
+   "routed": 2,
+   "complete": true
+  },
+  "101s": {
+   "route_in": 10.9,
+   "branches": 2,
+   "segments": 2,
+   "routed": 1,
+   "complete": false
+  },
+  "102": {
+   "route_in": 92.9,
+   "branches": 8,
+   "segments": 2,
+   "routed": 2,
+   "complete": true
+  },
+  "102g": {
+   "route_in": 92.9,
+   "branches": 8,
+   "segments": 2,
+   "routed": 2,
+   "complete": true
+  },
+  "102r": {
+   "route_in": 92.9,
+   "branches": 8,
+   "segments": 2,
+   "routed": 2,
+   "complete": true
+  },
+  "103": {
+   "route_in": 64.7,
+   "branches": 6,
+   "segments": 2,
+   "routed": 2,
+   "complete": true
+  },
+  "103g": {
+   "route_in": 64.7,
+   "branches": 6,
+   "segments": 2,
+   "routed": 2,
+   "complete": true
+  },
+  "103s": {
+   "route_in": 10.9,
+   "branches": 2,
+   "segments": 2,
+   "routed": 1,
+   "complete": false
+  },
+  "104": {
+   "route_in": 104.1,
+   "branches": 10,
+   "segments": 2,
+   "routed": 2,
+   "complete": true
+  },
+  "104g": {
+   "route_in": 104.1,
+   "branches": 10,
+   "segments": 2,
+   "routed": 2,
+   "complete": true
+  },
+  "104s": {
+   "route_in": 10.9,
+   "branches": 2,
+   "segments": 2,
+   "routed": 1,
+   "complete": false
+  },
+  "105": {
+   "route_in": 11.0,
+   "branches": 1,
+   "segments": 1,
+   "routed": 1,
+   "complete": true
+  },
+  "108": {
+   "route_in": 80.5,
+   "branches": 7,
+   "segments": 2,
+   "routed": 2,
+   "complete": true
+  },
+  "108g": {
+   "route_in": 80.5,
+   "branches": 7,
+   "segments": 2,
+   "routed": 2,
+   "complete": true
+  },
+  "108r": {
+   "route_in": 80.5,
+   "branches": 7,
+   "segments": 2,
+   "routed": 2,
+   "complete": true
+  },
+  "109": {
+   "route_in": 58.7,
+   "branches": 6,
+   "segments": 2,
+   "routed": 2,
+   "complete": true
+  },
+  "109g": {
+   "route_in": 58.7,
+   "branches": 6,
+   "segments": 2,
+   "routed": 2,
+   "complete": true
+  },
+  "11": {
+   "route_in": 10.9,
+   "branches": 2,
+   "segments": 2,
+   "routed": 1,
+   "complete": false
+  },
+  "110": {
+   "route_in": 59.9,
+   "branches": 6,
+   "segments": 2,
+   "routed": 2,
+   "complete": true
+  },
+  "110g": {
+   "route_in": 59.9,
+   "branches": 6,
+   "segments": 2,
+   "routed": 2,
+   "complete": true
+  },
+  "111": {
+   "route_in": 43.6,
+   "branches": 9,
+   "segments": 1,
+   "routed": 1,
+   "complete": true
+  },
+  "112": {
+   "route_in": 45.0,
+   "branches": 5,
+   "segments": 2,
+   "routed": 2,
+   "complete": true
+  },
+  "112g": {
+   "route_in": 45.0,
+   "branches": 5,
+   "segments": 2,
+   "routed": 2,
+   "complete": true
+  },
+  "112r": {
+   "route_in": 45.0,
+   "branches": 5,
+   "segments": 2,
+   "routed": 2,
+   "complete": true
+  },
+  "113": {
+   "route_in": 89.2,
+   "branches": 6,
+   "segments": 2,
+   "routed": 2,
+   "complete": true
+  },
+  "113g": {
+   "route_in": 89.2,
+   "branches": 6,
+   "segments": 2,
+   "routed": 2,
+   "complete": true
+  },
+  "114": {
+   "route_in": 14.7,
+   "branches": 3,
+   "segments": 2,
+   "routed": 1,
+   "complete": false
+  },
+  "115": {
+   "route_in": 14.7,
+   "branches": 3,
+   "segments": 2,
+   "routed": 1,
+   "complete": false
+  },
+  "116": {
+   "route_in": 3.8,
+   "branches": 1,
+   "segments": 1,
+   "routed": 1,
+   "complete": true
+  },
+  "117": {
+   "route_in": 150.2,
+   "branches": 7,
+   "segments": 1,
+   "routed": 1,
+   "complete": true
+  },
+  "119": {
+   "route_in": 22.3,
+   "branches": 3,
+   "segments": 1,
+   "routed": 1,
+   "complete": true
+  },
+  "12": {
+   "route_in": 10.9,
+   "branches": 2,
+   "segments": 2,
+   "routed": 1,
+   "complete": false
+  },
+  "120": {
+   "route_in": 22.3,
+   "branches": 3,
+   "segments": 1,
+   "routed": 1,
+   "complete": true
+  },
+  "121": {
+   "route_in": 24.1,
+   "branches": 3,
+   "segments": 1,
+   "routed": 1,
+   "complete": true
+  },
+  "123": {
+   "route_in": 28.2,
+   "branches": 4,
+   "segments": 1,
+   "routed": 1,
+   "complete": true
+  },
+  "13": {
+   "route_in": 55.9,
+   "branches": 6,
+   "segments": 2,
+   "routed": 2,
+   "complete": true
+  },
+  "14": {
+   "route_in": 68.9,
+   "branches": 8,
+   "segments": 2,
+   "routed": 2,
+   "complete": true
+  },
+  "15": {
+   "route_in": 49.1,
+   "branches": 5,
+   "segments": 2,
+   "routed": 2,
+   "complete": true
+  },
+  "16": {
+   "route_in": 62.1,
+   "branches": 7,
+   "segments": 2,
+   "routed": 2,
+   "complete": true
+  },
+  "17": {
+   "route_in": 55.9,
+   "branches": 6,
+   "segments": 2,
+   "routed": 2,
+   "complete": true
+  },
+  "18": {
+   "route_in": 68.9,
+   "branches": 8,
+   "segments": 2,
+   "routed": 2,
+   "complete": true
+  },
+  "19": {
+   "route_in": 62.6,
+   "branches": 7,
+   "segments": 2,
+   "routed": 2,
+   "complete": true
+  },
+  "20": {
+   "route_in": 75.6,
+   "branches": 9,
+   "segments": 2,
+   "routed": 2,
+   "complete": true
+  },
+  "21": {
+   "route_in": 52.1,
+   "branches": 3,
+   "segments": 1,
+   "routed": 1,
+   "complete": true
+  },
+  "23": {
+   "route_in": 54.7,
+   "branches": 4,
+   "segments": 1,
+   "routed": 1,
+   "complete": true
+  },
+  "24": {
+   "route_in": 10.9,
+   "branches": 2,
+   "segments": 2,
+   "routed": 1,
+   "complete": false
+  },
+  "26a": {
+   "route_in": 338.2,
+   "branches": 13,
+   "segments": 2,
+   "routed": 2,
+   "complete": true
+  },
+  "26b": {
+   "route_in": 338.2,
+   "branches": 13,
+   "segments": 2,
+   "routed": 2,
+   "complete": true
+  },
+  "27a": {
+   "route_in": 315.6,
+   "branches": 13,
+   "segments": 2,
+   "routed": 2,
+   "complete": true
+  },
+  "27b": {
+   "route_in": 315.6,
+   "branches": 13,
+   "segments": 2,
+   "routed": 2,
+   "complete": true
+  },
+  "28a": {
+   "route_in": 68.5,
+   "branches": 3,
+   "segments": 1,
+   "routed": 1,
+   "complete": true
+  },
+  "28b": {
+   "route_in": 68.5,
+   "branches": 3,
+   "segments": 1,
+   "routed": 1,
+   "complete": true
+  },
+  "29a": {
+   "route_in": 16.6,
+   "branches": 1,
+   "segments": 1,
+   "routed": 1,
+   "complete": true
+  },
+  "29b": {
+   "route_in": 16.6,
+   "branches": 1,
+   "segments": 1,
+   "routed": 1,
+   "complete": true
+  },
+  "3": {
+   "route_in": 111.6,
+   "branches": 10,
+   "segments": 1,
+   "routed": 1,
+   "complete": true
+  },
+  "30a": {
+   "route_in": 54.5,
+   "branches": 2,
+   "segments": 1,
+   "routed": 1,
+   "complete": true
+  },
+  "30b": {
+   "route_in": 54.5,
+   "branches": 2,
+   "segments": 1,
+   "routed": 1,
+   "complete": true
+  },
+  "30c": {
+   "route_in": 54.6,
+   "branches": 3,
+   "segments": 1,
+   "routed": 1,
+   "complete": true
+  },
+  "30d": {
+   "route_in": 54.6,
+   "branches": 3,
+   "segments": 1,
+   "routed": 1,
+   "complete": true
+  },
+  "31": {
+   "route_in": 33.1,
+   "branches": 5,
+   "segments": 1,
+   "routed": 1,
+   "complete": true
+  },
+  "32": {
+   "route_in": 175.2,
+   "branches": 9,
+   "segments": 1,
+   "routed": 1,
+   "complete": true
+  },
+  "33": {
+   "route_in": 19.0,
+   "branches": 3,
+   "segments": 1,
+   "routed": 1,
+   "complete": true
+  },
+  "34": {
+   "route_in": 64.8,
+   "branches": 6,
+   "segments": 2,
+   "routed": 2,
+   "complete": true
+  },
+  "35": {
+   "route_in": 92.4,
+   "branches": 10,
+   "segments": 2,
+   "routed": 2,
+   "complete": true
+  },
+  "38": {
+   "route_in": 64.8,
+   "branches": 6,
+   "segments": 2,
+   "routed": 2,
+   "complete": true
+  },
+  "39": {
+   "route_in": 22.3,
+   "branches": 3,
+   "segments": 1,
+   "routed": 1,
+   "complete": true
+  },
+  "42": {
+   "route_in": 36.3,
+   "branches": 3,
+   "segments": 1,
+   "routed": 1,
+   "complete": true
+  },
+  "43": {
+   "route_in": 64.3,
+   "branches": 7,
+   "segments": 1,
+   "routed": 1,
+   "complete": true
+  },
+  "45": {
+   "route_in": 30.1,
+   "branches": 5,
+   "segments": 1,
+   "routed": 1,
+   "complete": true
+  },
+  "46": {
+   "route_in": 22.4,
+   "branches": 4,
+   "segments": 1,
+   "routed": 1,
+   "complete": true
+  },
+  "48": {
+   "route_in": 67.9,
+   "branches": 6,
+   "segments": 2,
+   "routed": 2,
+   "complete": true
+  },
+  "49": {
+   "route_in": 50.1,
+   "branches": 5,
+   "segments": 2,
+   "routed": 2,
+   "complete": true
+  },
+  "4a": {
+   "route_in": 64.6,
+   "branches": 6,
+   "segments": 2,
+   "routed": 2,
+   "complete": true
+  },
+  "4b": {
+   "route_in": 64.6,
+   "branches": 6,
+   "segments": 2,
+   "routed": 2,
+   "complete": true
+  },
+  "4c": {
+   "route_in": 64.6,
+   "branches": 6,
+   "segments": 2,
+   "routed": 2,
+   "complete": true
+  },
+  "4e": {
+   "route_in": 64.6,
+   "branches": 6,
+   "segments": 2,
+   "routed": 2,
+   "complete": true
+  },
+  "4f": {
+   "route_in": 64.6,
+   "branches": 6,
+   "segments": 2,
+   "routed": 2,
+   "complete": true
+  },
+  "5": {
+   "route_in": 10.9,
+   "branches": 2,
+   "segments": 2,
+   "routed": 1,
+   "complete": false
+  },
+  "50": {
+   "route_in": 49.7,
+   "branches": 5,
+   "segments": 2,
+   "routed": 2,
+   "complete": true
+  },
+  "51": {
+   "route_in": 30.1,
+   "branches": 5,
+   "segments": 1,
+   "routed": 1,
+   "complete": true
+  },
+  "52": {
+   "route_in": 65.4,
+   "branches": 7,
+   "segments": 1,
+   "routed": 1,
+   "complete": true
+  },
+  "53": {
+   "route_in": 22.1,
+   "branches": 2,
+   "segments": 1,
+   "routed": 1,
+   "complete": true
+  },
+  "54": {
+   "route_in": 118.1,
+   "branches": 5,
+   "segments": 1,
+   "routed": 1,
+   "complete": true
+  },
+  "55": {
+   "route_in": 67.2,
+   "branches": 5,
+   "segments": 1,
+   "routed": 1,
+   "complete": true
+  },
+  "66": {
+   "route_in": 191.1,
+   "branches": 11,
+   "segments": 1,
+   "routed": 1,
+   "complete": true
+  },
+  "67": {
+   "route_in": 135.5,
+   "branches": 5,
+   "segments": 1,
+   "routed": 1,
+   "complete": true
+  },
+  "68": {
+   "route_in": 12.9,
+   "branches": 3,
+   "segments": 1,
+   "routed": 1,
+   "complete": true
+  },
+  "69": {
+   "route_in": 16.6,
+   "branches": 3,
+   "segments": 1,
+   "routed": 1,
+   "complete": true
+  },
+  "7": {
+   "route_in": 10.9,
+   "branches": 2,
+   "segments": 2,
+   "routed": 1,
+   "complete": false
+  },
+  "70": {
+   "route_in": 16.9,
+   "branches": 3,
+   "segments": 1,
+   "routed": 1,
+   "complete": true
+  },
+  "71": {
+   "route_in": 22.3,
+   "branches": 3,
+   "segments": 1,
+   "routed": 1,
+   "complete": true
+  },
+  "72": {
+   "route_in": 20.9,
+   "branches": 4,
+   "segments": 1,
+   "routed": 1,
+   "complete": true
+  },
+  "73": {
+   "route_in": 17.3,
+   "branches": 2,
+   "segments": 2,
+   "routed": 1,
+   "complete": false
+  },
+  "74": {
+   "route_in": 175.0,
+   "branches": 6,
+   "segments": 1,
+   "routed": 1,
+   "complete": true
+  },
+  "75": {
+   "route_in": 198.0,
+   "branches": 6,
+   "segments": 1,
+   "routed": 1,
+   "complete": true
+  },
+  "76": {
+   "route_in": 200.4,
+   "branches": 7,
+   "segments": 1,
+   "routed": 1,
+   "complete": true
+  },
+  "77": {
+   "route_in": 198.0,
+   "branches": 8,
+   "segments": 1,
+   "routed": 1,
+   "complete": true
+  },
+  "78": {
+   "route_in": 200.3,
+   "branches": 7,
+   "segments": 1,
+   "routed": 1,
+   "complete": true
+  },
+  "79": {
+   "route_in": 83.9,
+   "branches": 4,
+   "segments": 1,
+   "routed": 1,
+   "complete": true
+  },
+  "8": {
+   "route_in": 10.9,
+   "branches": 2,
+   "segments": 2,
+   "routed": 1,
+   "complete": false
+  },
+  "80": {
+   "route_in": 72.0,
+   "branches": 6,
+   "segments": 2,
+   "routed": 2,
+   "complete": true
+  },
+  "81": {
+   "route_in": 195.7,
+   "branches": 7,
+   "segments": 1,
+   "routed": 1,
+   "complete": true
+  },
+  "82": {
+   "route_in": 126.0,
+   "branches": 7,
+   "segments": 2,
+   "routed": 2,
+   "complete": true
+  },
+  "83": {
+   "route_in": 72.0,
+   "branches": 6,
+   "segments": 2,
+   "routed": 2,
+   "complete": true
+  },
+  "84": {
+   "route_in": 126.0,
+   "branches": 7,
+   "segments": 2,
+   "routed": 2,
+   "complete": true
+  },
+  "85": {
+   "route_in": 24.4,
+   "branches": 2,
+   "segments": 1,
+   "routed": 1,
+   "complete": true
+  },
+  "85a": {
+   "route_in": 70.1,
+   "branches": 6,
+   "segments": 2,
+   "routed": 2,
+   "complete": true
+  },
+  "85b": {
+   "route_in": 70.1,
+   "branches": 6,
+   "segments": 2,
+   "routed": 2,
+   "complete": true
+  },
+  "86": {
+   "route_in": 24.4,
+   "branches": 2,
+   "segments": 1,
+   "routed": 1,
+   "complete": true
+  },
+  "86a": {
+   "route_in": 124.1,
+   "branches": 7,
+   "segments": 2,
+   "routed": 2,
+   "complete": true
+  },
+  "86b": {
+   "route_in": 124.1,
+   "branches": 7,
+   "segments": 2,
+   "routed": 2,
+   "complete": true
+  },
+  "87": {
+   "route_in": 75.7,
+   "branches": 6,
+   "segments": 2,
+   "routed": 2,
+   "complete": true
+  },
+  "88": {
+   "route_in": 129.7,
+   "branches": 7,
+   "segments": 2,
+   "routed": 2,
+   "complete": true
+  },
+  "89": {
+   "route_in": 198.1,
+   "branches": 8,
+   "segments": 1,
+   "routed": 1,
+   "complete": true
+  },
+  "9": {
+   "route_in": 10.9,
+   "branches": 2,
+   "segments": 2,
+   "routed": 1,
+   "complete": false
+  },
+  "90": {
+   "route_in": 92.8,
+   "branches": 5,
+   "segments": 1,
+   "routed": 1,
+   "complete": true
+  },
+  "91": {
+   "route_in": 101.7,
+   "branches": 6,
+   "segments": 1,
+   "routed": 1,
+   "complete": true
+  },
+  "92": {
+   "route_in": 173.4,
+   "branches": 6,
+   "segments": 1,
+   "routed": 1,
+   "complete": true
+  },
+  "93": {
+   "route_in": 195.6,
+   "branches": 7,
+   "segments": 1,
+   "routed": 1,
+   "complete": true
+  },
+  "97": {
+   "route_in": 173.9,
+   "branches": 6,
+   "segments": 1,
+   "routed": 1,
+   "complete": true
+  },
+  "98": {
+   "route_in": 146.4,
+   "branches": 6,
+   "segments": 1,
+   "routed": 1,
+   "complete": true
+  },
+  "99": {
+   "route_in": 10.9,
+   "branches": 2,
+   "segments": 2,
+   "routed": 1,
+   "complete": false
+  },
+  "99g": {
+   "route_in": 10.9,
+   "branches": 2,
+   "segments": 2,
+   "routed": 1,
+   "complete": false
+  },
+  "99r": {
+   "route_in": 10.9,
+   "branches": 2,
+   "segments": 2,
+   "routed": 1,
+   "complete": false
+  },
+  "99s": {
+   "route_in": 10.9,
+   "branches": 2,
+   "segments": 2,
+   "routed": 1,
+   "complete": false
+  },
+  "ACC_NEG": {
+   "route_in": 7.5,
+   "branches": 1,
+   "segments": 1,
+   "routed": 1,
+   "complete": true
+  },
+  "AC_HP_0V": {
+   "route_in": 43.6,
+   "branches": 9,
+   "segments": 1,
+   "routed": 1,
+   "complete": true
+  },
+  "AC_LP_0V": {
+   "route_in": 11.0,
+   "branches": 1,
+   "segments": 1,
+   "routed": 1,
+   "complete": true
+  },
+  "AMP_GND": {
+   "route_in": 167.7,
+   "branches": 8,
+   "segments": 1,
+   "routed": 1,
+   "complete": true
+  },
+  "AMP_GND_TAIL": {
+   "route_in": 10.6,
+   "branches": 1,
+   "segments": 1,
+   "routed": 1,
+   "complete": true
+  },
+  "AMP_PWR_TAIL": {
+   "route_in": 10.6,
+   "branches": 1,
+   "segments": 1,
+   "routed": 1,
+   "complete": true
+  },
+  "APS_T1_5V": {
+   "route_in": 18.0,
+   "branches": 2,
+   "segments": 1,
+   "routed": 1,
+   "complete": true
+  },
+  "APS_T1_GND": {
+   "route_in": 18.0,
+   "branches": 2,
+   "segments": 1,
+   "routed": 1,
+   "complete": true
+  },
+  "APS_T1_SIG": {
+   "route_in": 18.0,
+   "branches": 2,
+   "segments": 1,
+   "routed": 1,
+   "complete": true
+  },
+  "APS_T2_5V": {
+   "route_in": 18.0,
+   "branches": 2,
+   "segments": 1,
+   "routed": 1,
+   "complete": true
+  },
+  "APS_T2_GND": {
+   "route_in": 18.0,
+   "branches": 2,
+   "segments": 1,
+   "routed": 1,
+   "complete": true
+  },
+  "APS_T2_SIG": {
+   "route_in": 18.0,
+   "branches": 2,
+   "segments": 1,
+   "routed": 1,
+   "complete": true
+  },
+  "BFL_0V": {
+   "route_in": 51.1,
+   "branches": 3,
+   "segments": 1,
+   "routed": 1,
+   "complete": true
+  },
+  "BFL_SIG": {
+   "route_in": 51.1,
+   "branches": 3,
+   "segments": 1,
+   "routed": 1,
+   "complete": true
+  },
+  "BLOWER_BAT": {
+   "route_in": 116.7,
+   "branches": 11,
+   "segments": 2,
+   "routed": 2,
+   "complete": true
+  },
+  "BLOWER_GND": {
+   "route_in": 35.7,
+   "branches": 7,
+   "segments": 1,
+   "routed": 1,
+   "complete": true
+  },
+  "BLOWER_HI": {
+   "route_in": 95.2,
+   "branches": 6,
+   "segments": 2,
+   "routed": 2,
+   "complete": true
+  },
+  "BLOWER_M2": {
+   "route_in": 116.7,
+   "branches": 11,
+   "segments": 2,
+   "routed": 2,
+   "complete": true
+  },
+  "BLOWER_MED": {
+   "route_in": 116.7,
+   "branches": 11,
+   "segments": 2,
+   "routed": 2,
+   "complete": true
+  },
+  "BLOWER_MOT": {
+   "route_in": 17.4,
+   "branches": 2,
+   "segments": 1,
+   "routed": 1,
+   "complete": true
+  },
+  "BRK_SW_0V": {
+   "route_in": 22.1,
+   "branches": 2,
+   "segments": 1,
+   "routed": 1,
+   "complete": true
+  },
+  "BU_L_GND": {
+   "route_in": 89.4,
+   "branches": 4,
+   "segments": 1,
+   "routed": 1,
+   "complete": true
+  },
+  "BU_R_GND": {
+   "route_in": 89.4,
+   "branches": 4,
+   "segments": 1,
+   "routed": 1,
+   "complete": true
+  },
+  "BWS_SIG": {
+   "route_in": 82.1,
+   "branches": 4,
+   "segments": 1,
+   "routed": 1,
+   "complete": true
+  },
+  "CAM_GND": {
+   "route_in": 62.9,
+   "branches": 3,
+   "segments": 1,
+   "routed": 1,
+   "complete": true
+  },
+  "CAM_VIDEO": {
+   "route_in": 220.1,
+   "branches": 9,
+   "segments": 1,
+   "routed": 1,
+   "complete": true
+  },
+  "CAN_FW_H": {
+   "route_in": 88.2,
+   "branches": 10,
+   "segments": 2,
+   "routed": 2,
+   "complete": true
+  },
+  "CAN_FW_L": {
+   "route_in": 88.2,
+   "branches": 10,
+   "segments": 2,
+   "routed": 2,
+   "complete": true
+  },
+  "CAN_HI": {
+   "route_in": 37.0,
+   "branches": 4,
+   "segments": 2,
+   "routed": 2,
+   "complete": true
+  },
+  "CAN_LO": {
+   "route_in": 37.0,
+   "branches": 4,
+   "segments": 2,
+   "routed": 2,
+   "complete": true
+  },
+  "CARGO_GND": {
+   "route_in": 163.9,
+   "branches": 6,
+   "segments": 1,
+   "routed": 1,
+   "complete": true
+  },
+  "CHMSL_GND": {
+   "route_in": 145.5,
+   "branches": 5,
+   "segments": 1,
+   "routed": 1,
+   "complete": true
+  },
+  "CL_C_GND": {
+   "route_in": 98.7,
+   "branches": 6,
+   "segments": 1,
+   "routed": 1,
+   "complete": true
+  },
+  "CL_L_GND": {
+   "route_in": 89.8,
+   "branches": 5,
+   "segments": 1,
+   "routed": 1,
+   "complete": true
+  },
+  "CL_R_GND": {
+   "route_in": 107.6,
+   "branches": 7,
+   "segments": 1,
+   "routed": 1,
+   "complete": true
+  },
+  "COIL_PWR": {
+   "route_in": 61.6,
+   "branches": 5,
+   "segments": 1,
+   "routed": 1,
+   "complete": true
+  },
+  "DAK_BRAKE": {
+   "route_in": 117.8,
+   "branches": 6,
+   "segments": 1,
+   "routed": 1,
+   "complete": true
+  },
+  "DAK_CEL": {
+   "route_in": 3.8,
+   "branches": 1,
+   "segments": 1,
+   "routed": 1,
+   "complete": true
+  },
+  "DAK_CONST": {
+   "route_in": 22.3,
+   "branches": 3,
+   "segments": 1,
+   "routed": 1,
+   "complete": true
+  },
+  "DAK_CTS_RET": {
+   "route_in": 14.7,
+   "branches": 3,
+   "segments": 2,
+   "routed": 1,
+   "complete": false
+  },
+  "DAK_GEAR": {
+   "route_in": 32.9,
+   "branches": 5,
+   "segments": 1,
+   "routed": 1,
+   "complete": true
+  },
+  "DAK_OILP_5V": {
+   "route_in": 14.7,
+   "branches": 3,
+   "segments": 2,
+   "routed": 1,
+   "complete": false
+  },
+  "DAK_OILP_GND": {
+   "route_in": 14.7,
+   "branches": 3,
+   "segments": 2,
+   "routed": 1,
+   "complete": false
+  },
+  "DCDC_GND": {
+   "route_in": 13.8,
+   "branches": 2,
+   "segments": 1,
+   "routed": 1,
+   "complete": true
+  },
+  "DCDC_IN": {
+   "route_in": 19.9,
+   "branches": 3,
+   "segments": 1,
+   "routed": 1,
+   "complete": true
+  },
+  "DCDC_OUT": {
+   "route_in": 6.3,
+   "branches": 1,
+   "segments": 1,
+   "routed": 1,
+   "complete": true
+  },
+  "DOME_GND": {
+   "route_in": 141.4,
+   "branches": 6,
+   "segments": 1,
+   "routed": 1,
+   "complete": true
+  },
+  "ECU_PWR": {
+   "route_in": 18.5,
+   "branches": 2,
+   "segments": 1,
+   "routed": 1,
+   "complete": true
+  },
+  "ESTOPP_GND": {
+   "route_in": 7.1,
+   "branches": 2,
+   "segments": 1,
+   "routed": 1,
+   "complete": true
+  },
+  "ESTOPP_IGN": {
+   "route_in": 118.1,
+   "branches": 5,
+   "segments": 1,
+   "routed": 1,
+   "complete": true
+  },
+  "FAN_GND": {
+   "route_in": 70.2,
+   "branches": 9,
+   "segments": 1,
+   "routed": 1,
+   "complete": true
+  },
+  "FAN_LEG1": {
+   "route_in": 3.1,
+   "branches": 1,
+   "segments": 1,
+   "routed": 1,
+   "complete": true
+  },
+  "FAN_LEG2": {
+   "route_in": 3.1,
+   "branches": 1,
+   "segments": 1,
+   "routed": 1,
+   "complete": true
+  },
+  "FAN_PWM": {
+   "route_in": 66.2,
+   "branches": 6,
+   "segments": 2,
+   "routed": 2,
+   "complete": true
+  },
+  "FUEL_SND_GND": {
+   "route_in": 138.3,
+   "branches": 6,
+   "segments": 1,
+   "routed": 1,
+   "complete": true
+  },
+  "FUEL_SND_LEAD": {
+   "route_in": 11.9,
+   "branches": 1,
+   "segments": 1,
+   "routed": 1,
+   "complete": true
+  },
+  "FW_GND": {
+   "route_in": 10.7,
+   "branches": 2,
+   "segments": 1,
+   "routed": 1,
+   "complete": true
+  },
+  "GND_RET_REAR": {
+   "route_in": 117.1,
+   "branches": 6,
+   "segments": 1,
+   "routed": 1,
+   "complete": true
+  },
+  "GSS_GND": {
+   "route_in": 4.7,
+   "branches": 1,
+   "segments": 1,
+   "routed": 1,
+   "complete": true
+  },
+  "GSS_PWR": {
+   "route_in": 10.6,
+   "branches": 2,
+   "segments": 1,
+   "routed": 1,
+   "complete": true
+  },
+  "GSS_SENS_B": {
+   "route_in": 65.5,
+   "branches": 6,
+   "segments": 1,
+   "routed": 1,
+   "complete": true
+  },
+  "GSS_SENS_G": {
+   "route_in": 65.5,
+   "branches": 6,
+   "segments": 1,
+   "routed": 1,
+   "complete": true
+  },
+  "GSS_SENS_R": {
+   "route_in": 65.5,
+   "branches": 6,
+   "segments": 1,
+   "routed": 1,
+   "complete": true
+  },
+  "HL_L_GND": {
+   "route_in": 80.3,
+   "branches": 5,
+   "segments": 1,
+   "routed": 1,
+   "complete": true
+  },
+  "HL_R_GND": {
+   "route_in": 26.3,
+   "branches": 4,
+   "segments": 1,
+   "routed": 1,
+   "complete": true
+  },
+  "HL_SW_0V": {
+   "route_in": 22.4,
+   "branches": 4,
+   "segments": 1,
+   "routed": 1,
+   "complete": true
+  },
+  "HL_SW_HEAD": {
+   "route_in": 22.4,
+   "branches": 4,
+   "segments": 1,
+   "routed": 1,
+   "complete": true
+  },
+  "HL_SW_PARK": {
+   "route_in": 22.4,
+   "branches": 4,
+   "segments": 1,
+   "routed": 1,
+   "complete": true
+  },
+  "HORN_GND": {
+   "route_in": 79.5,
+   "branches": 5,
+   "segments": 1,
+   "routed": 1,
+   "complete": true
+  },
+  "HORN_SW": {
+   "route_in": 19.0,
+   "branches": 3,
+   "segments": 1,
+   "routed": 1,
+   "complete": true
+  },
+  "IBOOST_GND": {
+   "route_in": 71.5,
+   "branches": 8,
+   "segments": 1,
+   "routed": 1,
+   "complete": true
+  },
+  "IBOOST_PERM": {
+   "route_in": 60.4,
+   "branches": 4,
+   "segments": 1,
+   "routed": 1,
+   "complete": true
+  },
+  "IBOOST_PERM_FH": {
+   "route_in": 5.0,
+   "branches": 3,
+   "segments": 1,
+   "routed": 1,
+   "complete": true
+  },
+  "IBOOST_WAKE": {
+   "route_in": 52.0,
+   "branches": 5,
+   "segments": 2,
+   "routed": 2,
+   "complete": true
+  },
+  "IGN_RUN_B": {
+   "route_in": 18.9,
+   "branches": 2,
+   "segments": 1,
+   "routed": 1,
+   "complete": true
+  },
+  "IGN_START": {
+   "route_in": 18.9,
+   "branches": 2,
+   "segments": 1,
+   "routed": 1,
+   "complete": true
+  },
+  "IGN_SW_0V": {
+   "route_in": 18.9,
+   "branches": 2,
+   "segments": 1,
+   "routed": 1,
+   "complete": true
+  },
+  "INJ1_PWR": {
+   "route_in": 13.3,
+   "branches": 2,
+   "segments": 1,
+   "routed": 1,
+   "complete": true
+  },
+  "INJ2_PWR": {
+   "route_in": 13.3,
+   "branches": 2,
+   "segments": 1,
+   "routed": 1,
+   "complete": true
+  },
+  "INJ3_PWR": {
+   "route_in": 6.5,
+   "branches": 1,
+   "segments": 1,
+   "routed": 1,
+   "complete": true
+  },
+  "INJ4_PWR": {
+   "route_in": 6.5,
+   "branches": 1,
+   "segments": 1,
+   "routed": 1,
+   "complete": true
+  },
+  "INJ5_PWR": {
+   "route_in": 13.3,
+   "branches": 2,
+   "segments": 1,
+   "routed": 1,
+   "complete": true
+  },
+  "INJ6_PWR": {
+   "route_in": 13.3,
+   "branches": 2,
+   "segments": 1,
+   "routed": 1,
+   "complete": true
+  },
+  "INJ7_PWR": {
+   "route_in": 20.0,
+   "branches": 3,
+   "segments": 1,
+   "routed": 1,
+   "complete": true
+  },
+  "INJ8_PWR": {
+   "route_in": 20.0,
+   "branches": 3,
+   "segments": 1,
+   "routed": 1,
+   "complete": true
+  },
+  "INJ_PWR": {
+   "route_in": 28.5,
+   "branches": 4,
+   "segments": 1,
+   "routed": 1,
+   "complete": true
+  },
+  "ISO_CLOSE": {
+   "route_in": 104.5,
+   "branches": 13,
+   "segments": 2,
+   "routed": 2,
+   "complete": true
+  },
+  "ISO_GND": {
+   "route_in": 6.1,
+   "branches": 1,
+   "segments": 1,
+   "routed": 1,
+   "complete": true
+  },
+  "ISO_KILL": {
+   "route_in": 22.6,
+   "branches": 3,
+   "segments": 1,
+   "routed": 1,
+   "complete": true
+  },
+  "ISO_LED": {
+   "route_in": 104.5,
+   "branches": 13,
+   "segments": 2,
+   "routed": 2,
+   "complete": true
+  },
+  "ISO_OPEN": {
+   "route_in": 104.5,
+   "branches": 13,
+   "segments": 2,
+   "routed": 2,
+   "complete": true
+  },
+  "ISO_PWR": {
+   "route_in": 3.8,
+   "branches": 2,
+   "segments": 1,
+   "routed": 1,
+   "complete": true
+  },
+  "ISO_SW_PWR": {
+   "route_in": 102.3,
+   "branches": 11,
+   "segments": 2,
+   "routed": 2,
+   "complete": true
+  },
+  "LIC_GND": {
+   "route_in": 62.4,
+   "branches": 3,
+   "segments": 1,
+   "routed": 1,
+   "complete": true
+  },
+  "LOCK_BUS_A": {
+   "route_in": 345.3,
+   "branches": 30,
+   "segments": 5,
+   "routed": 5,
+   "complete": true
+  },
+  "LOCK_BUS_B": {
+   "route_in": 345.3,
+   "branches": 30,
+   "segments": 5,
+   "routed": 5,
+   "complete": true
+  },
+  "LOCK_FEED_R": {
+   "route_in": 92.4,
+   "branches": 10,
+   "segments": 2,
+   "routed": 2,
+   "complete": true
+  },
+  "LOCK_GND_L": {
+   "route_in": 70.7,
+   "branches": 7,
+   "segments": 2,
+   "routed": 2,
+   "complete": true
+  },
+  "LOCK_GND_R": {
+   "route_in": 86.5,
+   "branches": 9,
+   "segments": 2,
+   "routed": 2,
+   "complete": true
+  },
+  "MIRROR_GND": {
+   "route_in": 107.4,
+   "branches": 7,
+   "segments": 1,
+   "routed": 1,
+   "complete": true
+  },
+  "MIRROR_PWR": {
+   "route_in": 101.5,
+   "branches": 6,
+   "segments": 1,
+   "routed": 1,
+   "complete": true
+  },
+  "MIRROR_TRIG": {
+   "route_in": 101.5,
+   "branches": 6,
+   "segments": 1,
+   "routed": 1,
+   "complete": true
+  },
+  "MK_LF_GND": {
+   "route_in": 87.7,
+   "branches": 5,
+   "segments": 1,
+   "routed": 1,
+   "complete": true
+  },
+  "MK_LR_GND": {
+   "route_in": 89.3,
+   "branches": 4,
+   "segments": 1,
+   "routed": 1,
+   "complete": true
+  },
+  "MK_RF_GND": {
+   "route_in": 33.7,
+   "branches": 4,
+   "segments": 1,
+   "routed": 1,
+   "complete": true
+  },
+  "MK_RR_GND": {
+   "route_in": 89.3,
+   "branches": 4,
+   "segments": 1,
+   "routed": 1,
+   "complete": true
+  },
+  "OUT12V_GND": {
+   "route_in": 15.0,
+   "branches": 3,
+   "segments": 1,
+   "routed": 1,
+   "complete": true
+  },
+  "PCS_BATT": {
+   "route_in": 15.7,
+   "branches": 3,
+   "segments": 1,
+   "routed": 1,
+   "complete": true
+  },
+  "PCS_BRK": {
+   "route_in": 15.7,
+   "branches": 3,
+   "segments": 1,
+   "routed": 1,
+   "complete": true
+  },
+  "PCS_GND": {
+   "route_in": 9.8,
+   "branches": 2,
+   "segments": 1,
+   "routed": 1,
+   "complete": true
+  },
+  "PCS_IGN": {
+   "route_in": 109.2,
+   "branches": 9,
+   "segments": 2,
+   "routed": 2,
+   "complete": true
+  },
+  "PCS_NS": {
+   "route_in": 15.7,
+   "branches": 3,
+   "segments": 1,
+   "routed": 1,
+   "complete": true
+  },
+  "PCS_REV": {
+   "route_in": 15.7,
+   "branches": 3,
+   "segments": 1,
+   "routed": 1,
+   "complete": true
+  },
+  "PCS_RPM": {
+   "route_in": 34.2,
+   "branches": 5,
+   "segments": 1,
+   "routed": 1,
+   "complete": true
+  },
+  "PCS_TPS": {
+   "route_in": 34.2,
+   "branches": 5,
+   "segments": 1,
+   "routed": 1,
+   "complete": true
+  },
+  "PDM15_BPOS": {
+   "route_in": 8.9,
+   "branches": 4,
+   "segments": 1,
+   "routed": 1,
+   "complete": true
+  },
+  "PDM15_GND1": {
+   "route_in": 15.0,
+   "branches": 5,
+   "segments": 1,
+   "routed": 1,
+   "complete": true
+  },
+  "PDM15_GND2": {
+   "route_in": 15.0,
+   "branches": 5,
+   "segments": 1,
+   "routed": 1,
+   "complete": true
+  },
+  "PDM_BPOS": {
+   "route_in": 64.8,
+   "branches": 7,
+   "segments": 1,
+   "routed": 1,
+   "complete": true
+  },
+  "PDM_GND1": {
+   "route_in": 70.9,
+   "branches": 8,
+   "segments": 1,
+   "routed": 1,
+   "complete": true
+  },
+  "PDM_GND2": {
+   "route_in": 70.9,
+   "branches": 8,
+   "segments": 1,
+   "routed": 1,
+   "complete": true
+  },
+  "PT_LF_GND": {
+   "route_in": 84.0,
+   "branches": 5,
+   "segments": 1,
+   "routed": 1,
+   "complete": true
+  },
+  "PT_RF_GND": {
+   "route_in": 30.0,
+   "branches": 4,
+   "segments": 1,
+   "routed": 1,
+   "complete": true
+  },
+  "PUMP_GND": {
+   "route_in": 188.3,
+   "branches": 8,
+   "segments": 1,
+   "routed": 1,
+   "complete": true
+  },
+  "RADIO_CONST": {
+   "route_in": 33.1,
+   "branches": 5,
+   "segments": 1,
+   "routed": 1,
+   "complete": true
+  },
+  "RADIO_GND": {
+   "route_in": 27.2,
+   "branches": 4,
+   "segments": 1,
+   "routed": 1,
+   "complete": true
+  },
+  "RADIO_REM": {
+   "route_in": 147.1,
+   "branches": 6,
+   "segments": 1,
+   "routed": 1,
+   "complete": true
+  },
+  "RCA_FRONT": {
+   "route_in": 147.1,
+   "branches": 6,
+   "segments": 1,
+   "routed": 1,
+   "complete": true
+  },
+  "RCA_REAR": {
+   "route_in": 147.1,
+   "branches": 6,
+   "segments": 1,
+   "routed": 1,
+   "complete": true
+  },
+  "RCA_SUB": {
+   "route_in": 147.1,
+   "branches": 6,
+   "segments": 1,
+   "routed": 1,
+   "complete": true
+  },
+  "REAR_ST_L": {
+   "route_in": 195.7,
+   "branches": 7,
+   "segments": 1,
+   "routed": 1,
+   "complete": true
+  },
+  "REAR_ST_R": {
+   "route_in": 198.0,
+   "branches": 6,
+   "segments": 1,
+   "routed": 1,
+   "complete": true
+  },
+  "START_TRIG": {
+   "route_in": 32.4,
+   "branches": 1,
+   "segments": 1,
+   "routed": 1,
+   "complete": true
+  },
+  "STEP_DOOR_L": {
+   "route_in": 37.4,
+   "branches": 3,
+   "segments": 1,
+   "routed": 1,
+   "complete": true
+  },
+  "STEP_DOOR_R": {
+   "route_in": 111.1,
+   "branches": 10,
+   "segments": 1,
+   "routed": 1,
+   "complete": true
+  },
+  "STEP_GND": {
+   "route_in": 117.7,
+   "branches": 11,
+   "segments": 1,
+   "routed": 1,
+   "complete": true
+  },
+  "TCASE_SW_GND": {
+   "route_in": 73.4,
+   "branches": 5,
+   "segments": 1,
+   "routed": 1,
+   "complete": true
+  },
+  "TGR_CUT_IN": {
+   "route_in": 34.3,
+   "branches": 2,
+   "segments": 1,
+   "routed": 1,
+   "complete": true
+  },
+  "TGR_DN": {
+   "route_in": 177.0,
+   "branches": 8,
+   "segments": 1,
+   "routed": 1,
+   "complete": true
+  },
+  "TGR_KEY_FEED": {
+   "route_in": 177.0,
+   "branches": 8,
+   "segments": 1,
+   "routed": 1,
+   "complete": true
+  },
+  "TGR_KEY_GND": {
+   "route_in": 52.1,
+   "branches": 3,
+   "segments": 1,
+   "routed": 1,
+   "complete": true
+  },
+  "TGR_MOT_A": {
+   "route_in": 48.0,
+   "branches": 2,
+   "segments": 1,
+   "routed": 1,
+   "complete": true
+  },
+  "TGR_MOT_B": {
+   "route_in": 17.1,
+   "branches": 2,
+   "segments": 1,
+   "routed": 1,
+   "complete": true
+  },
+  "TGR_M_GND": {
+   "route_in": 8.0,
+   "branches": 1,
+   "segments": 1,
+   "routed": 1,
+   "complete": true
+  },
+  "TGR_UP": {
+   "route_in": 177.0,
+   "branches": 8,
+   "segments": 1,
+   "routed": 1,
+   "complete": true
+  },
+  "TG_BUS_DN": {
+   "route_in": 177.0,
+   "branches": 8,
+   "segments": 1,
+   "routed": 1,
+   "complete": true
+  },
+  "TG_BUS_UP": {
+   "route_in": 177.0,
+   "branches": 8,
+   "segments": 1,
+   "routed": 1,
+   "complete": true
+  },
+  "TG_CUT_IN": {
+   "route_in": 34.3,
+   "branches": 2,
+   "segments": 1,
+   "routed": 1,
+   "complete": true
+  },
+  "TG_FEED": {
+   "route_in": 13.9,
+   "branches": 2,
+   "segments": 2,
+   "routed": 1,
+   "complete": false
+  },
+  "TG_KEY_FEED": {
+   "route_in": 177.0,
+   "branches": 8,
+   "segments": 1,
+   "routed": 1,
+   "complete": true
+  },
+  "TG_MOT_A": {
+   "route_in": 48.0,
+   "branches": 2,
+   "segments": 1,
+   "routed": 1,
+   "complete": true
+  },
+  "TG_MOT_B": {
+   "route_in": 17.1,
+   "branches": 2,
+   "segments": 1,
+   "routed": 1,
+   "complete": true
+  },
+  "TL_L_GND": {
+   "route_in": 87.0,
+   "branches": 3,
+   "segments": 1,
+   "routed": 1,
+   "complete": true
+  },
+  "TL_R_GND": {
+   "route_in": 87.0,
+   "branches": 3,
+   "segments": 1,
+   "routed": 1,
+   "complete": true
+  },
+  "TURN_SW_0V": {
+   "route_in": 19.0,
+   "branches": 3,
+   "segments": 1,
+   "routed": 1,
+   "complete": true
+  },
+  "TURN_SW_R": {
+   "route_in": 19.0,
+   "branches": 3,
+   "segments": 1,
+   "routed": 1,
+   "complete": true
+  },
+  "UD_GND": {
+   "route_in": 7.0,
+   "branches": 2,
+   "segments": 1,
+   "routed": 1,
+   "complete": true
+  },
+  "USB_GND": {
+   "route_in": 11.0,
+   "branches": 2,
+   "segments": 1,
+   "routed": 1,
+   "complete": true
+  },
+  "UTC_0V": {
+   "route_in": 18.5,
+   "branches": 2,
+   "segments": 1,
+   "routed": 1,
+   "complete": true
+  },
+  "VSS_DAK": {
+   "route_in": 78.0,
+   "branches": 6,
+   "segments": 2,
+   "routed": 2,
+   "complete": true
+  },
+  "VSS_GND": {
+   "route_in": 78.0,
+   "branches": 6,
+   "segments": 2,
+   "routed": 2,
+   "complete": true
+  },
+  "VSS_PWR": {
+   "route_in": 78.0,
+   "branches": 6,
+   "segments": 2,
+   "routed": 2,
+   "complete": true
+  },
+  "WASH_GND": {
+   "route_in": 69.6,
+   "branches": 8,
+   "segments": 1,
+   "routed": 1,
+   "complete": true
+  },
+  "WIN_GND_L": {
+   "route_in": 70.7,
+   "branches": 7,
+   "segments": 2,
+   "routed": 2,
+   "complete": true
+  },
+  "WIN_GND_R": {
+   "route_in": 86.5,
+   "branches": 9,
+   "segments": 2,
+   "routed": 2,
+   "complete": true
+  },
+  "WIN_MOT_L_A": {
+   "route_in": 19.7,
+   "branches": 2,
+   "segments": 1,
+   "routed": 1,
+   "complete": true
+  },
+  "WIN_MOT_L_B": {
+   "route_in": 19.7,
+   "branches": 2,
+   "segments": 1,
+   "routed": 1,
+   "complete": true
+  },
+  "WIN_MOT_R_A": {
+   "route_in": 18.6,
+   "branches": 2,
+   "segments": 1,
+   "routed": 1,
+   "complete": true
+  },
+  "WIN_MOT_R_B": {
+   "route_in": 18.6,
+   "branches": 2,
+   "segments": 1,
+   "routed": 1,
+   "complete": true
+  },
+  "WIN_R_DN": {
+   "route_in": 157.2,
+   "branches": 16,
+   "segments": 3,
+   "routed": 3,
+   "complete": true
+  },
+  "WIN_R_UP": {
+   "route_in": 157.2,
+   "branches": 16,
+   "segments": 3,
+   "routed": 3,
+   "complete": true
+  },
+  "WIPER_GND": {
+   "route_in": 69.6,
+   "branches": 8,
+   "segments": 1,
+   "routed": 1,
+   "complete": true
+  },
+  "WIPER_SW_GND": {
+   "route_in": 28.3,
+   "branches": 5,
+   "segments": 1,
+   "routed": 1,
+   "complete": true
+  },
+  "WIPER_T1": {
+   "route_in": 49.9,
+   "branches": 7,
+   "segments": 2,
+   "routed": 2,
+   "complete": true
+  },
+  "WIPER_T3": {
+   "route_in": 49.9,
+   "branches": 7,
+   "segments": 2,
+   "routed": 2,
+   "complete": true
+  }
+ }
+}

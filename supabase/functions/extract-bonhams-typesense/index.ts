@@ -189,6 +189,7 @@ function mapDocument(doc: BonhamsDoc): MappedVehicle {
       lot_number: doc.lotNo?.full || doc.lotId,
       chassis: parsed.chassis,
       title_year_range: parsed.year_range ?? null,
+      title_blurb: parsed.blurb ?? null,
       description,
       image_url: imageUrl,
       currency,
@@ -282,7 +283,13 @@ function lotToExtraction(doc: BonhamsDoc, ctx: LandContext): Record<string, unkn
   const hammer = doc.price?.hammerPrice > 0 ? Math.round(doc.price.hammerPrice) : null;
   const ended = !!doc.flags?.isAuctionEnded;
   const runDay = String(doc.hammerTime?.datetime || doc.auctionEndDate?.datetime || "").slice(0, 10);
+  // Lot-level evidence that a lot is a vehicle (department is the sale's, so MOT-CAR also holds mascots, handbooks and helmets): a chassis,
+  // frame or VIN line in the title or catalog text, or a year the title parser found. Neither: an item, not a car (2026-10-16: 1,249 of the
+  // 2,422 Bonhams episodes with no year had neither, and every one sampled was memorabilia).
+  const hasMarker = /(chassis|frame)\s+no\.?|\bVIN[: .]/i.test(`${doc.title ?? ""} ${doc.catalogDesc ?? ""}`);
+  const nonVehicle = !hasMarker && m.listing_year == null;
   return {
+    non_vehicle_item: nonVehicle,
     url: m.listing_url,
     title: m.listing_title,
     year: m.listing_year,
@@ -320,6 +327,7 @@ function lotToExtraction(doc: BonhamsDoc, ctx: LandContext): Record<string, unkn
       lot_unique_id: doc.lotUniqueId ?? null,
       has_reserve: !doc.flags?.isWithoutReserve,
       ...(raw.title_year_range ? { title_year_range: raw.title_year_range } : {}),
+      ...(raw.title_blurb ? { title_blurb: raw.title_blurb } : {}),
       currency: doc.currency?.iso_code ?? null,
       roster_first_seen_at: observedAt, // kept from the first read by extract-bonhams
       engine_number: (doc.catalogDesc || "").match(/Engine\s+no\.?\s*:?\s*([A-Z0-9*][A-Z0-9*./-]*)/i)?.[1]?.toUpperCase() ?? null,
@@ -358,6 +366,27 @@ Deno.serve(async (req) => {
 
     const perPage = Math.min(Number(batch_size) || 50, MAX_PER_PAGE);
     const startPage = Math.max(Number(page) || 1, 1);
+
+    // ─── MODE: departments ──────────────────────────────────────────────
+    // Which departments the search index holds, with lot counts (one request, read only), and, for named lots, each lot's own department.
+    //   POST { "mode": "departments" }                       -> facet counts of department.code (+ name) over the whole lots collection
+    //   POST { "mode": "departments", "ids": ["31858-214"] } -> [{ id, department: {code, name} | null }] for up to 250 lot ids
+    if (mode === "departments") {
+      const headers = { "X-TYPESENSE-API-KEY": TYPESENSE_API_KEY, "Accept": "application/json" };
+      const ids: string[] = (Array.isArray(body.ids) ? body.ids : []).map(String).filter((x: string) => /^[0-9]+-[0-9]+[A-Za-z]{0,2}$/.test(x)).slice(0, 250); // lot numbers can carry a letter ("908A")
+      const params: Record<string, string> = ids.length
+        ? { q: "*", query_by: "title", per_page: "250", filter_by: `id:=[${ids.map((x) => (/^[0-9]+-[0-9]+$/.test(x) ? x : "`" + x + "`")).join(",")}]`, include_fields: "id,department" }
+        : { q: "*", query_by: "title", per_page: "0", facet_by: "department.code,department.name", max_facet_values: "60" };
+      const res = await fetch(`${TYPESENSE_HOST}/search-proxy/collections/${TYPESENSE_COLLECTION}/documents/search?${new URLSearchParams(params)}`, { headers });
+      if (res.status === 403 || res.status === 429) return okJson({ success: false, backoff: true, upstream_status: res.status });
+      if (!res.ok) return okJson({ success: false, error: `Typesense HTTP ${res.status}` }, 502);
+      const j = await res.json() as { found: number; hits?: Array<{ document: { id: string; department?: { code: string; name: string } } }>; facet_counts?: Array<{ field_name: string; counts: Array<{ value: string; count: number }> }> };
+      if (ids.length) {
+        const byId = new Map((j.hits ?? []).map((h) => [h.document.id, h.document.department ?? null]));
+        return okJson({ success: true, mode: "departments", asked: ids.length, found: j.hits?.length ?? 0, lots: ids.map((id) => ({ id, department: byId.get(id) ?? null })) });
+      }
+      return okJson({ success: true, mode: "departments", total: j.found, facets: Object.fromEntries((j.facet_counts ?? []).map((f) => [f.field_name, f.counts])) });
+    }
 
     // ─── MODE: stats ────────────────────────────────────────────────────
     if (mode === "stats") {

@@ -25,6 +25,8 @@ export interface ParsedTitle {
   chassis: string | null;
   /** "1965-2016" when the title leads with a year range. */
   year_range?: string;
+  /** A claim that stood ahead of the car in the title ("58,000 kms from new"). */
+  blurb?: string;
 }
 
 export function parseTitle(title: string): ParsedTitle {
@@ -54,12 +56,23 @@ export function parseTitle(title: string): ParsedTitle {
     .replace(/\s*VIN[:\s]+.*/i, "")
     .trim();
 
+  // A claim ahead of the car ("58,000 kms from new,1976 Ferrari 308GTB", "1 of only 70 built,1963 Aston Martin DB4"): the car starts at the
+  // first ", YYYY " within the first 60 characters; the claim is kept as blurb, not read as the make or the year.
+  if (!/^\d{4}\s*[\/\u2013\u2014-]?\s*\d{0,4}\s/.test(clean)) {
+    const lead = clean.slice(0, 60).match(/^(.{3,58}?),\s*(\d{4})\s+(?=[A-Za-z])/);
+    if (lead && parseInt(lead[2], 10) >= 1886 && parseInt(lead[2], 10) <= 2030) {
+      result.blurb = lead[1].trim();
+      clean = clean.slice(lead[0].length - lead[2].length - 1).trim();
+    }
+  }
+
   // Year: leading 4-digit year (1886-2030), or a leading range ("1965/2016 Shelby Cobra", "1960-2000 Aston Martin"): the first year of
   // a range names the car, and the range is kept as year_range because the second year is a later build or conversion.
-  const rangeMatch = clean.match(/^(\d{4})\s*[\/\u2013\u2014-]\s*(\d{4})\s+/);
+  const rangeMatch = clean.match(/^(\d{4})\s*[\/\u2013\u2014-]\s*(\d{2}|\d{4})\s+/);
   if (rangeMatch) {
     const a = parseInt(rangeMatch[1], 10);
-    const b = parseInt(rangeMatch[2], 10);
+    // "1954-55": two digits read in the first year's century
+    const b = rangeMatch[2].length === 2 ? parseInt(rangeMatch[1].slice(0, 2) + rangeMatch[2], 10) : parseInt(rangeMatch[2], 10);
     if (a >= 1886 && b >= a && b <= 2030) {
       result.year = a;
       result.year_range = `${a}-${b}`;
@@ -72,6 +85,17 @@ export function parseTitle(title: string): ParsedTitle {
     if (y >= 1886 && y <= 2030) {
       result.year = y;
       clean = clean.slice(yearMatch[0].length).trim();
+    }
+  }
+  // Older catalogue titles end with the year ("Mercedes-Benz 280 SL cabriolet avec hardtop 1969", "Minerva modele CC 38 HP tourer 1912").
+  if (!result.year) {
+    const tail = clean.match(/\s+(?:c\.?\s*)?(\d{4})\s*$/i);
+    if (tail) {
+      const y = parseInt(tail[1], 10);
+      if (y >= 1886 && y <= 2030) {
+        result.year = y;
+        clean = clean.slice(0, clean.length - tail[0].length).trim();
+      }
     }
   }
   // Fallback: "c.1960" or "Circa 1960"

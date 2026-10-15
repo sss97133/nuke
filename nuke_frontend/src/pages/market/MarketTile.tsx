@@ -1,5 +1,5 @@
 import React from 'react';
-import { moveFill, moveText, pct, textWidth, tileClass, tileName, GATE_MIN, type Baseline, type Callout, type Move } from './mapScale';
+import { moveFill, moveText, moveTextShort, pct, textWidth, tileClass, tileName, GATE_MIN, type Baseline, type Callout, type Move } from './mapScale';
 import { venueOf } from './FamilySalesChart';
 import './MarketMap.css';
 
@@ -40,7 +40,7 @@ export function tileLines(node: MarketNode, move: Move, w: number, h: number, ba
   const room = w - 12;
   const moveSize = Math.max(10, Math.round(nameSize * 0.75));
   const full = moveText(move);
-  const short = move.kind === 'move' ? pct(move.rel) : full;
+  const short = moveTextShort(move);
   const moveLine = [full, short].find((t) => t && textWidth(t) * moveSize <= room) ?? '';
   // The figures the tile's area is drawn from: BaT's last 12 months, or every venue and year.
   const usd = basis === 'bat12' ? node.usd_12m : node.usd;
@@ -161,19 +161,19 @@ export function MapLegend({ base, clock, basis }: { base: Baseline | null; clock
             <span className="map-legend__value">{label}</span>
           </span>
         ))}
-        <span className="map-legend__stop"><span className="map-legend__swatch map-legend__swatch--few" /><span className="map-legend__value">{basis === 'ledger' ? 'too few BaT sales, or mostly other venues' : 'too few BaT sales'}</span></span>
+        <span className="map-legend__stop"><span className="map-legend__swatch map-legend__swatch--few" /><span className="map-legend__value">{basis === 'ledger' ? 'too few BaT sales to tell, or mostly sold elsewhere' : 'too few BaT sales to tell'}</span></span>
         <span className="map-legend__stop"><span className="map-legend__swatch map-legend__swatch--none" /><span className="map-legend__value">no BaT sales</span></span>
       </div>
       <div className="map-legend__receipt">
-        Color: each tile’s Bring a Trailer sales, last 12 months against the 12 before, relative to BaT overall
-        {base ? ` (${pct(base.move)}, ${num(base.prior)} → ${num(base.sold)})` : ''}; ends of the scale hold everything past ±50%, and the label
-        prints the real value. Area: {basis === 'bat12' ? 'Bring a Trailer dollars, last 12 months' : 'dollars of confirmed sales, all venues and years; hatched where BaT holds under half the sales'}. Nominal{clock}.
+        Color: is each tile selling more or less on Bring a Trailer than a year ago, after taking out BaT’s own growth
+        {base ? ` (${pct(base.move)}, ${num(base.prior)} → ${num(base.sold)})` : ''}; the strongest colors mean 50% or more either way, and
+        the label gives the exact figure. Size: {basis === 'bat12' ? 'Bring a Trailer dollars, last 12 months' : 'dollars of confirmed sales at every auction house, all years; striped where BaT holds under half the sales'}. Prices not adjusted for inflation{clock}.
       </div>
     </div>
   );
 }
 
-const CALLOUT_LABEL: Record<Callout['kind'], string> = { gain: 'Gained most on BaT', loss: 'Lost most', largest: 'Largest' };
+const CALLOUT_LABEL: Record<Callout['kind'], string> = { gain: 'Biggest gain on BaT', loss: 'Biggest drop', largest: 'Biggest' };
 /** The map's counted callouts, one line above it: the clearest gain and loss against BaT and the largest tile's move. */
 export function MapCallouts({ items, onPick }: { items: Callout[]; onPick: (name: string) => void }) {
   if (!items.length) return null;

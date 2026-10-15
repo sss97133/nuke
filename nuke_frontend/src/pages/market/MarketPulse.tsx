@@ -11,6 +11,7 @@ import RecordedSalesComparison, { MarketScopeControls, type MarketSalesLens } fr
 import { MakeLogo } from '../../components/common/MakeIdentity';
 import { selectRowFacts, useMarketRowDetails, useMarketRowSpecs, vehicleIdentity, type LotInspection, type MarketRowDetails } from './useMarketRowDetails';
 import { useFinishEstimates, type FinishEstimate } from './useFinishEstimates';
+import { ringBids, startBidChime } from './bidChime';
 
 // The homepage: the live collector-car market as Nuke sees it right now.
 // Activity figures count the rows market_pulse_live() returns; rows open their canonical records.
@@ -333,7 +334,10 @@ function inWindow(a: LiveAuction, w: Window, now: number): boolean {
 
 export default function MarketPulse({ onUnavailable, collection }: { onUnavailable?: React.ReactNode; collection?: React.ReactNode }) {
   usePageTitle('Market');
-  const { data, isLoading, isError, risenIds, refetch, dataUpdatedAt } = useMarketPulse();
+  const { data, isLoading, isError, risenIds, refetch, dataUpdatedAt, newBids } = useMarketPulse();
+  // A bell for each bid as it lands, off until the viewer turns it on.
+  const [sound, setSound] = useState(false);
+  useEffect(() => (sound && newBids?.length ? ringBids(newBids) : undefined), [newBids, sound]);
   const finish = useFinishEstimates();
   const [params, setParams] = useSearchParams();
   const boardRef = useRef<HTMLDivElement>(null);
@@ -629,6 +633,11 @@ export default function MarketPulse({ onUnavailable, collection }: { onUnavailab
                 <Text role="label">{s.label}</Text>
               </button>
             ))}
+            <button type="button" className="market-control" aria-pressed={sound}
+              title="A short bell for each bid as it lands, about a minute after Bring a Trailer records it"
+              onClick={() => setSound(sound ? false : startBidChime())}>
+              <Text role="label">{sound ? 'Bid sounds on' : 'Bid sounds off'}</Text>
+            </button>
           </div>
         </div>
         {!isLoading && <details open={selectedBid != null} className="market-distribution">

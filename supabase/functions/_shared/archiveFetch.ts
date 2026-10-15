@@ -20,6 +20,11 @@ import { firecrawlScrape, type FirecrawlScrapeResult } from "./firecrawl.ts";
 import { parseQualifiedBaTSale } from "./batParser.ts";
 import { projectSecretKey } from "./supabaseKeys.ts";
 
+/** Remove NUL characters, which Postgres text columns cannot store. */
+export function stripNul(s: string | null | undefined): string | null {
+  return s == null ? null : s.includes("\u0000") ? s.replace(/\u0000/g, "") : s;
+}
+
 export interface ArchiveFetchResult {
   html: string | null;
   markdown: string | null;
@@ -31,6 +36,8 @@ export interface ArchiveFetchResult {
   statusCode: number | null;
   error: string | null;
   costCents: number;
+  /** Set when the capture could not be retained (the snapshot insert failed); callers can count it. A duplicate is not an error. Same contract as softWrite (writeResult.ts), inlined because this module's imports are pinned by the archive-custody test. */
+  archiveError?: string | null;
 }
 
 export interface ArchiveFetchOptions {
@@ -46,6 +53,8 @@ export interface ArchiveFetchOptions {
   useFirecrawl?: boolean;
   /** Direct fetch first; when the site blocks it (403/429/challenge, "Blocked by site"), fetch the page with Firecrawl. */
   firecrawlOnBlock?: boolean;
+  /** Asked before every paid Firecrawl scrape; when it resolves false the scrape is skipped (error firecrawl_allowance_exhausted). */
+  firecrawlAllowed?: () => Promise<boolean>;
   /** Firecrawl waitFor in ms */
   waitForJs?: number;
   /** Request markdown from Firecrawl in addition to HTML */
@@ -301,6 +310,8 @@ export async function archiveFetch(
     if (batResult.costCents > 0) {
       await logFetchCost(supabase, options?.callerName ?? "archiveFetch", url, batResult).catch(() => {});
     }
+  } else if (useFirecrawl && options?.firecrawlAllowed && !(await options.firecrawlAllowed())) {
+    result.error = "firecrawl_allowance_exhausted";
   } else if (useFirecrawl) {
     // Firecrawl for JS-rendered sites
     const formats = ["html"];
@@ -338,7 +349,9 @@ export async function archiveFetch(
 
     // The site refused our server's address: one Firecrawl scrape, only for callers that opted in.
     const refused = !result.html && (/blocked|forbidden|captcha|challenge|auth_required|login page/i.test(result.error ?? "") || [401, 403, 429].includes(result.statusCode ?? 0));
-    if (options?.firecrawlOnBlock && refused) {
+    if (options?.firecrawlOnBlock && refused && options.firecrawlAllowed && !(await options.firecrawlAllowed())) {
+      result.error = "firecrawl_allowance_exhausted";
+    } else if (options?.firecrawlOnBlock && refused) {
       const fcResult: FirecrawlScrapeResult = await firecrawlScrape({
         url,
         formats: ["rawHtml"], // the extractors that opt in read script payloads, which "html" strips
@@ -363,7 +376,10 @@ export async function archiveFetch(
 
   // Step 3: Archive to listing_page_snapshots (non-blocking, never fail the main operation)
   try {
-    const html = result.html;
+    // Postgres text (and the JSON body PostgREST reads) cannot hold a NUL: "unsupported Unicode escape sequence" failed every
+    // PCarMarket snapshot insert (non-fatal, so the capture was silently lost). Drop the NULs; the hash is of what is stored.
+    const html = stripNul(result.html);
+    const markdownStored = stripNul(result.markdown);
     const htmlHash = html ? await sha256(html) : null;
 
     const payload: Record<string, unknown> = {
@@ -375,7 +391,7 @@ export async function archiveFetch(
       success: html !== null && html.length > 0 && !isGarbageHtml(html, platform),
       error_message: result.error,
       html: html,
-      markdown: result.markdown,
+      markdown: markdownStored,
       html_sha256: htmlHash,
       content_length: html?.length ?? 0,
       metadata: {
@@ -396,7 +412,10 @@ export async function archiveFetch(
       if (String((insertErr as any).code || "") === "23505") {
         console.log(`[archiveFetch] Duplicate snapshot for ${url} (content unchanged)`);
       } else {
-        console.warn(`[archiveFetch] Snapshot insert failed (non-fatal): ${insertErr.message}`);
+        // A retention that fails must be visible: the fetch itself is still returned, the failure is logged by softWrite and
+        // carried on the result (archiveError) so callers and counters see it instead of it vanishing.
+        result.archiveError = `listing_page_snapshots insert failed: ${insertErr.message}${(insertErr as { code?: string }).code ? ` (${(insertErr as { code?: string }).code})` : ""}`;
+        console.error(`[archiveFetch] ${result.archiveError}`);
       }
     } else if (inserted) {
       result.snapshotId = inserted.id;

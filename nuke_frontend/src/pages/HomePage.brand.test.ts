@@ -70,7 +70,7 @@ describe('a partially unavailable brand market', () => {
     const rows = await readTreemapBrands();
     expect(rows).toEqual(base);
     const legend = mapLegend('brands', !!rows?.length && rows.every(n => n.usd != null && n.usd > 0));
-    expect(legend).toContain('area = vehicles with a confirmed sale');
+    expect(legend).toContain('box size = vehicles with a confirmed sale');
     expect(legend).toContain('color = their median sale price');
     expect(legend).not.toContain('last 12 months');
   });
@@ -81,6 +81,6 @@ describe('a partially unavailable brand market', () => {
     const { readTreemapBrands, mapLegend } = await import('./HomePage');
     const rows = await readTreemapBrands();
     expect(rows?.[0].usd).toBe(200_000);
-    expect(mapLegend('brands', true)).toContain('area = dollars from confirmed sales');
+    expect(mapLegend('brands', true)).toContain('box size = dollars from confirmed sales');
   });
 });

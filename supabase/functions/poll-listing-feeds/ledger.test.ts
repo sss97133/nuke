@@ -578,3 +578,17 @@ Deno.test("revisits take at most a quarter of an invocation's ingests, spent acr
   b.spendRevisits(50);
   equal(b.revisitAllowance(), 0);
 });
+
+Deno.test("a Firecrawl allowance deferral is not a failure: no ledger row, no attempt, and the source stops for this run", () => {
+  equal(failureCategoryFor("extract-ksl HTTP 500: allowance_deferred: firecrawl allowance exhausted for today"), "deferred");
+  // KSL's extractor failing falls through to ingest's identity check; the extractor's error rides on enrichment_error.
+  const ingest: IngestOutcome = { status: "rejected", reason: "insufficient identity: year=? make=? model=? — need all three",
+    enrichment_error: "extract-ksl HTTP 500: allowance_deferred: firecrawl allowance exhausted for today" };
+  equal(ledgerWriteFor({ url: "u", feedId: "f", ingest, batch: { rows: new Map(), error: null }, prev: { status: "failed", attempts: 1 }, now: NOW }), null);
+  const budget = createIntakeBudget(intakeThrottle({ max_ingests: 20 }), 0, () => 0);
+  budget.record("ksl", 1000, ingest);
+  equal(budget.refusal("ksl"), "deferred");
+  // an ordinary identity failure is still ledgered as before
+  const plain: IngestOutcome = { status: "rejected", reason: "insufficient identity: year=? make=? model=? — need all three" };
+  equal(ledgerWriteFor({ url: "u", feedId: "f", ingest: plain, batch: { rows: new Map(), error: null }, now: NOW })?.row.failure_category, "identity_insufficient");
+});

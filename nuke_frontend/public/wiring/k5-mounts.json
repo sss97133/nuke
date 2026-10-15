@@ -1,6 +1,6 @@
 {
  "vehicle_id": "e08bf694-970f-4cbe-8a74-8715158a0f2e",
- "generated_at": "2026-10-15T18:21Z",
+ "generated_at": "2026-10-15T20:21Z",
  "source": "docs/wiring/calc-data/catalog/mounts.yaml",
  "boxes": [
   {
@@ -956,7 +956,17 @@
      "text": "It is daisy-chained to the 8 coil power pins.",
      "source": "docs/wiring/calc-data/catalog/endpoints.yaml RAIL-COIL_PWR"
     }
-   ]
+   ],
+   "position": {
+    "point": "RAIL_COIL_PWR",
+    "frame": "twin",
+    "x": 0.0,
+    "y": -1.655,
+    "z": 1.31,
+    "method": "centroid of the eight coil centres (K5H_Coil_1..8) = node VALLEY (0, -1.655, 1.31)",
+    "confidence": "low",
+    "source": "docs/wiring/research/2026-10-15_device-positions.md"
+   }
   },
   "RAIL-INJ_PWR": {
    "id": "RAIL-INJ_PWR",
@@ -970,7 +980,17 @@
      "text": "It is daisy-chained at the fuel rail to the 8 injector pin 1s.",
      "source": "docs/wiring/calc-data/catalog/endpoints.yaml RAIL-INJ_PWR"
     }
-   ]
+   ],
+   "position": {
+    "point": "RAIL_INJ_PWR",
+    "frame": "twin",
+    "x": 0.0,
+    "y": -1.69,
+    "z": 1.17,
+    "method": "centroid of the eight injector nodes (K5H_Injector_1..8; x 0, y mean of -1.86..-1.525, z 1.17)",
+    "confidence": "low",
+    "source": "docs/wiring/research/2026-10-15_device-positions.md"
+   }
   },
   "COIL-GROUND-RINGS": {
    "id": "COIL-GROUND-RINGS",
@@ -1070,7 +1090,7 @@
    "what": "A/C high-pressure switch",
    "where": "On the A/C liquid line",
    "zone": "engine",
-   "status": "open",
+   "status": "proposed",
    "why": [
     {
      "text": "It is the liquid-line switch.",
@@ -1079,14 +1099,24 @@
    ],
    "open": [
     "The A/C lines are not plumbed: the spot follows them."
-   ]
+   ],
+   "position": {
+    "point": "AC_HP_SW",
+    "frame": "twin",
+    "x": -0.45,
+    "y": -2.48,
+    "z": 0.9,
+    "method": "mounts.yaml \"On the A/C liquid line\": liquid line leaves the condenser at the core support; switch near the drier, passenger side",
+    "confidence": "low",
+    "source": "docs/wiring/research/2026-10-15_device-positions.md"
+   }
   },
   "AC-LP-SW": {
    "id": "AC-LP-SW",
    "what": "A/C low-pressure switch",
    "where": "On the accumulator",
    "zone": "engine",
-   "status": "open",
+   "status": "proposed",
    "why": [
     {
      "text": "It is the accumulator switch.",
@@ -1095,7 +1125,17 @@
    ],
    "open": [
     "The accumulator's spot is not set."
-   ]
+   ],
+   "position": {
+    "point": "AC_LP_SW",
+    "frame": "twin",
+    "x": -0.76,
+    "y": -1.74,
+    "z": 1.0,
+    "method": "accumulator beside the Four-Season case outer end (mounts.yaml \"On the accumulator\")",
+    "confidence": "low",
+    "source": "docs/wiring/research/2026-10-15_device-positions.md"
+   }
   },
   "FAN": {
    "id": "FAN",
@@ -1115,7 +1155,7 @@
    "what": "Fan feed junction (Blue Sea 2103 PowerPost)",
    "where": "Near the engine power box, where the fan leads break out",
    "zone": "engine",
-   "status": "open",
+   "status": "proposed",
    "follows": "PDM15",
    "why": [
     {
@@ -1125,7 +1165,17 @@
    ],
    "open": [
     "It follows the engine power box, which is flagged."
-   ]
+   ],
+   "position": {
+    "point": "FAN_JUNCTION",
+    "frame": "twin",
+    "x": -0.52,
+    "y": -1.72,
+    "z": 1.2,
+    "method": "mounts.yaml follows PDM15 (\"near the engine power box where the fan leads break out\")",
+    "confidence": "low",
+    "source": "docs/wiring/research/2026-10-15_device-positions.md"
+   }
   },
   "IBOOSTER": {
    "id": "IBOOSTER",
@@ -1167,7 +1217,17 @@
    ],
    "open": [
     "It is an option, not decided."
-   ]
+   ],
+   "position": {
+    "point": "BRAKE_FLUID_LVL",
+    "frame": "twin",
+    "x": 0.4,
+    "y": -1.56,
+    "z": 1.22,
+    "method": "top of the iBooster body (K5H_iBooster bbox x 0.31..0.50, y -1.64..-1.40, z 0.92..1.18), reservoir at the forward end",
+    "confidence": "medium",
+    "source": "docs/wiring/research/2026-10-15_device-positions.md"
+   }
   },
   "BRAKE-WARN-SW": {
    "id": "BRAKE-WARN-SW",
@@ -1192,7 +1252,17 @@
    "open": [
     "Which valve is on the truck and its part number: read the valve body.",
     "Its exact spot on the crossmember: from the owner's photos or the brake-line render."
-   ]
+   ],
+   "position": {
+    "point": "BRAKE_WARN_SW",
+    "frame": "twin",
+    "x": 0.15,
+    "y": -2.3,
+    "z": 0.55,
+    "method": "mounts.yaml \"proportioning valve on the front crossmember under the radiator\": crossmember between the rails (rails at |x| 0.39 from ray casts), under the radiator bottom (z 0.73)",
+    "confidence": "low",
+    "source": "docs/wiring/research/2026-10-15_device-positions.md"
+   }
   },
   "WIDEBAND": {
    "id": "WIDEBAND",
@@ -1226,7 +1296,17 @@
      "text": "\"Disconnect wiring harness connector located at rear of unit in engine compartment.\"",
      "source": "reference_documents/k5_factory_docs/1977_Light_Truck_Service_Manual.pdf p.786"
     }
-   ]
+   ],
+   "position": {
+    "point": "HEADLIGHT_L",
+    "frame": "twin",
+    "x": 0.79,
+    "y": -2.467,
+    "z": 1.052,
+    "method": "twin object Headlights, left lamp (connected component x +0.697..+0.882), rear face centre",
+    "confidence": "high",
+    "source": "docs/wiring/research/2026-10-15_device-positions.md"
+   }
   },
   "HEADLIGHT-R": {
    "id": "HEADLIGHT-R",
@@ -1243,7 +1323,17 @@
      "text": "\"Disconnect wiring harness connector located at rear of unit in engine compartment.\"",
      "source": "reference_documents/k5_factory_docs/1977_Light_Truck_Service_Manual.pdf p.786"
     }
-   ]
+   ],
+   "position": {
+    "point": "HEADLIGHT_R",
+    "frame": "twin",
+    "x": -0.79,
+    "y": -2.467,
+    "z": 1.052,
+    "method": "twin object Headlights, right lamp (component x -0.882..-0.697), rear face centre",
+    "confidence": "high",
+    "source": "docs/wiring/research/2026-10-15_device-positions.md"
+   }
   },
   "PARK-TURN-LF": {
    "id": "PARK-TURN-LF",
@@ -1260,7 +1350,17 @@
      "text": "Parking lamp: \"Remove two screws and parking lamp lens ... Remove housing stud nuts and remove housing with pigtail.\"",
      "source": "reference_documents/k5_factory_docs/1977_Light_Truck_Service_Manual.pdf p.786"
     }
-   ]
+   ],
+   "position": {
+    "point": "PARK_TURN_LF",
+    "frame": "twin",
+    "x": 0.789,
+    "y": -2.526,
+    "z": 0.853,
+    "method": "twin object Parking_Lights, left lamp body rear face centre",
+    "confidence": "high",
+    "source": "docs/wiring/research/2026-10-15_device-positions.md"
+   }
   },
   "MARKER-LF": {
    "id": "MARKER-LF",
@@ -1277,7 +1377,17 @@
      "text": "Front side marker lamp replacement.",
      "source": "reference_documents/k5_factory_docs/1977_Light_Truck_Service_Manual.pdf p.786"
     }
-   ]
+   ],
+   "position": {
+    "point": "MARKER_LF",
+    "frame": "twin",
+    "x": 0.971,
+    "y": -2.386,
+    "z": 0.917,
+    "method": "twin object Marker_Lights, left strip (x +0.971..+0.986), inner face centre",
+    "confidence": "medium",
+    "source": "docs/wiring/research/2026-10-15_device-positions.md"
+   }
   },
   "PARK-TURN-RF": {
    "id": "PARK-TURN-RF",
@@ -1294,7 +1404,17 @@
      "text": "Parking lamp: \"Remove two screws and parking lamp lens ... Remove housing stud nuts and remove housing with pigtail.\"",
      "source": "reference_documents/k5_factory_docs/1977_Light_Truck_Service_Manual.pdf p.786"
     }
-   ]
+   ],
+   "position": {
+    "point": "PARK_TURN_RF",
+    "frame": "twin",
+    "x": -0.789,
+    "y": -2.526,
+    "z": 0.853,
+    "method": "twin object Parking_Lights, right lamp body rear face centre",
+    "confidence": "high",
+    "source": "docs/wiring/research/2026-10-15_device-positions.md"
+   }
   },
   "MARKER-RF": {
    "id": "MARKER-RF",
@@ -1311,7 +1431,17 @@
      "text": "Front side marker lamp replacement.",
      "source": "reference_documents/k5_factory_docs/1977_Light_Truck_Service_Manual.pdf p.786"
     }
-   ]
+   ],
+   "position": {
+    "point": "MARKER_RF",
+    "frame": "twin",
+    "x": -0.971,
+    "y": -2.386,
+    "z": 0.917,
+    "method": "twin object Marker_Lights, right strip, inner face centre",
+    "confidence": "medium",
+    "source": "docs/wiring/research/2026-10-15_device-positions.md"
+   }
   },
   "HORN": {
    "id": "HORN",
@@ -1327,7 +1457,17 @@
    ],
    "open": [
     "Which side of the support: read it on the truck."
-   ]
+   ],
+   "position": {
+    "point": "HORN",
+    "frame": "twin",
+    "x": 0.5,
+    "y": -2.48,
+    "z": 0.95,
+    "method": "mounts.yaml zone (radiator support) + twin geometry: core-support plane y -2.48 between headlamp bucket (x +0.70) and radiator core (x +0.38)",
+    "confidence": "low",
+    "source": "docs/wiring/research/2026-10-15_device-positions.md"
+   }
   },
   "WIPER-MOTOR": {
    "id": "WIPER-MOTOR",
@@ -1344,7 +1484,17 @@
      "text": "The factory wiper motor hole is under the cowl.",
      "source": "nuke_frontend/src/components/wiring/objectTraits.ts factory_holes WP"
     }
-   ]
+   ],
+   "position": {
+    "point": "AT_WASHER_PUMP",
+    "frame": "twin",
+    "x": 0.28,
+    "y": -1.5,
+    "z": 1.2,
+    "method": "mounts.yaml \"cowl, engine side of the firewall\": midway between the two wiper-arm pivots (twin Exterior_Windshield_Wiper_Systems pivots x +0.609 and -0.044), 0.05 m forward of the firewall, below the cowl top",
+    "confidence": "low",
+    "source": "docs/wiring/research/2026-10-15_device-positions.md"
+   }
   },
   "WASHER-PUMP": {
    "id": "WASHER-PUMP",
@@ -1375,7 +1525,17 @@
     "The hose numbers are reproduction parts; no GM hose number was found.",
     "Whether the pump on the truck's own motor still works: bench-test it before buying LMC 36-4078.",
     "The registry still lists the Hella 8TW 004 223-031 pump and tank (wire 50's terminal and the OUT26 current note in reconcile_v5.py); the registry owner re-points them."
-   ]
+   ],
+   "position": {
+    "point": "AT_WASHER_PUMP",
+    "frame": "twin",
+    "x": 0.28,
+    "y": -1.5,
+    "z": 1.2,
+    "method": "follows WIPER-MOTOR (pump is on the wiper gear box)",
+    "confidence": "low",
+    "source": "docs/wiring/research/2026-10-15_device-positions.md"
+   }
   },
   "BLOWER-MOTOR": {
    "id": "BLOWER-MOTOR",
@@ -1392,7 +1552,17 @@
      "text": "The retained A/C box mounts at the passenger firewall corner.",
      "source": "docs/wiring/receipts/2026-09-29_where-each-box-goes.md, finding 3"
     }
-   ]
+   ],
+   "position": {
+    "point": "BLOWER_MOTOR",
+    "frame": "twin",
+    "x": -0.7,
+    "y": -1.56,
+    "z": 1.05,
+    "method": "mounts.yaml \"Four-Season case, engine side of the passenger firewall\": outboard end of the case, 0.10 m forward of firewall plane",
+    "confidence": "low",
+    "source": "docs/wiring/research/2026-10-15_device-positions.md"
+   }
   },
   "BLOWER-RES": {
    "id": "BLOWER-RES",
@@ -1409,7 +1579,17 @@
      "text": "The retained A/C box mounts at the passenger firewall corner.",
      "source": "docs/wiring/receipts/2026-09-29_where-each-box-goes.md, finding 3"
     }
-   ]
+   ],
+   "position": {
+    "point": "BLOWER_RES",
+    "frame": "twin",
+    "x": -0.52,
+    "y": -1.56,
+    "z": 1.1,
+    "method": "on the same case, inboard end",
+    "confidence": "low",
+    "source": "docs/wiring/research/2026-10-15_device-positions.md"
+   }
   },
   "UNDERHOOD-LAMP": {
    "id": "UNDERHOOD-LAMP",
@@ -1449,7 +1629,7 @@
    "what": "Accessory battery (Optima YellowTop)",
    "where": "Engine bay, in the battery corner (the working position is the passenger firewall corner)",
    "zone": "engine",
-   "status": "open",
+   "status": "proposed",
    "follows": "BATTERIES",
    "why": [
     {
@@ -1459,7 +1639,17 @@
    ],
    "open": [
     "The battery corner conflicts with the Four-Season box: see the BATTERIES box."
-   ]
+   ],
+   "position": {
+    "point": "ACC_BATT",
+    "frame": "twin",
+    "x": -0.66,
+    "y": -2.14,
+    "z": 1.05,
+    "method": "mounts.yaml BATTERIES working position (passenger firewall corner), second battery forward of the Odyssey on the fender shelf; x and z mirrored from the driver-side twin battery/DEFAULT_POSITIONS BAT z",
+    "confidence": "low",
+    "source": "docs/wiring/research/2026-10-15_device-positions.md"
+   }
   },
   "ISOLATOR": {
    "id": "ISOLATOR",
@@ -1473,7 +1663,17 @@
      "text": "See the ISOLATOR box.",
      "source": "docs/wiring/calc-data/catalog/mounts.yaml (boxes) ISOLATOR"
     }
-   ]
+   ],
+   "position": {
+    "point": "ISOLATOR",
+    "frame": "twin",
+    "x": -0.52,
+    "y": -1.9,
+    "z": 1.1,
+    "method": "mounts.yaml \"on the Odyssey positive cable as close to the battery as it fits\": inboard of the Odyssey (assumed at (-0.66,-1.90,1.05))",
+    "confidence": "low",
+    "source": "docs/wiring/research/2026-10-15_device-positions.md"
+   }
   },
   "DCDC": {
    "id": "DCDC",
@@ -1490,14 +1690,24 @@
    ],
    "open": [
     "Victron: keep it dry. See the DCDC box."
-   ]
+   ],
+   "position": {
+    "point": "DCDC",
+    "frame": "twin",
+    "x": -0.68,
+    "y": -2.3,
+    "z": 1.05,
+    "method": "mounts.yaml current design \"by the batteries in the engine bay\": forward of ACC-BATT",
+    "confidence": "low",
+    "source": "docs/wiring/research/2026-10-15_device-positions.md"
+   }
   },
   "GND-BANK-ENG": {
    "id": "GND-BANK-ENG",
    "what": "Engine ground star (stud bank)",
    "where": "Beside the batteries",
    "zone": "engine",
-   "status": "open",
+   "status": "proposed",
    "follows": "BATTERIES",
    "why": [
     {
@@ -1507,7 +1717,17 @@
    ],
    "open": [
     "It follows the batteries, which are open."
-   ]
+   ],
+   "position": {
+    "point": "GND_BANK_ENG",
+    "frame": "twin",
+    "x": -0.52,
+    "y": -2.02,
+    "z": 1.0,
+    "method": "mounts.yaml \"beside the batteries\": inboard, between the two batteries",
+    "confidence": "low",
+    "source": "docs/wiring/research/2026-10-15_device-positions.md"
+   }
   },
   "PS-STUDS": {
    "id": "PS-STUDS",
@@ -1541,7 +1761,17 @@
    ],
    "open": [
     "It follows the batteries."
-   ]
+   ],
+   "position": {
+    "point": "FUSE_IBOOST_PERM",
+    "frame": "twin",
+    "x": -0.52,
+    "y": -1.81,
+    "z": 1.16,
+    "method": "mounts.yaml \"battery end of its feed, in the battery corner\": above the isolator side",
+    "confidence": "low",
+    "source": "docs/wiring/research/2026-10-15_device-positions.md"
+   }
   },
   "FUSE-ISO_PWR": {
    "id": "FUSE-ISO_PWR",
@@ -1558,7 +1788,17 @@
    ],
    "open": [
     "It follows the batteries."
-   ]
+   ],
+   "position": {
+    "point": "FUSE_ISO_PWR",
+    "frame": "twin",
+    "x": -0.52,
+    "y": -1.84,
+    "z": 1.16,
+    "method": "same",
+    "confidence": "low",
+    "source": "docs/wiring/research/2026-10-15_device-positions.md"
+   }
   },
   "FUSE-ISO_SW_PWR": {
    "id": "FUSE-ISO_SW_PWR",
@@ -1575,7 +1815,17 @@
    ],
    "open": [
     "It follows the batteries."
-   ]
+   ],
+   "position": {
+    "point": "FUSE_ISO_SW_PWR",
+    "frame": "twin",
+    "x": -0.52,
+    "y": -1.87,
+    "z": 1.16,
+    "method": "same",
+    "confidence": "low",
+    "source": "docs/wiring/research/2026-10-15_device-positions.md"
+   }
   },
   "PDM15-A": {
    "id": "PDM15-A",
@@ -1592,7 +1842,17 @@
    ],
    "open": [
     "A sealed PDM16 or PDM32 in the bay, or the box moves to the cab."
-   ]
+   ],
+   "position": {
+    "point": "PDM15",
+    "frame": "twin",
+    "x": -0.52,
+    "y": -1.72,
+    "z": 1.12,
+    "method": "mounts.yaml/endpoints.yaml: engine bay by the battery (working position): firewall side, inboard of the batteries",
+    "confidence": "low",
+    "source": "docs/wiring/research/2026-10-15_device-positions.md"
+   }
   },
   "PDM15-B": {
    "id": "PDM15-B",
@@ -1609,7 +1869,17 @@
    ],
    "open": [
     "A sealed PDM16 or PDM32 in the bay, or the box moves to the cab."
-   ]
+   ],
+   "position": {
+    "point": "PDM15",
+    "frame": "twin",
+    "x": -0.52,
+    "y": -1.72,
+    "z": 1.12,
+    "method": "same box as PDM15-A",
+    "confidence": "low",
+    "source": "docs/wiring/research/2026-10-15_device-positions.md"
+   }
   },
   "PDM15-STUD": {
    "id": "PDM15-STUD",
@@ -1626,14 +1896,24 @@
    ],
    "open": [
     "A sealed PDM16 or PDM32 in the bay, or the box moves to the cab."
-   ]
+   ],
+   "position": {
+    "point": "PDM15",
+    "frame": "twin",
+    "x": -0.52,
+    "y": -1.72,
+    "z": 1.12,
+    "method": "same box as PDM15-A (battery stud on the case)",
+    "confidence": "low",
+    "source": "docs/wiring/research/2026-10-15_device-positions.md"
+   }
   },
   "SPL-PDM15-OUT1": {
    "id": "SPL-PDM15-OUT1",
    "what": "Pigtail splice at the engine power box (OUT1)",
    "where": "At the engine power box's plug",
    "zone": "engine",
-   "status": "open",
+   "status": "proposed",
    "follows": "PDM15",
    "why": [
     {
@@ -1643,14 +1923,24 @@
    ],
    "open": [
     "It moves with the engine power box."
-   ]
+   ],
+   "position": {
+    "point": "PDM15",
+    "frame": "twin",
+    "x": -0.52,
+    "y": -1.72,
+    "z": 1.12,
+    "method": "follows PDM15 (pigtail / stub splice within reach of its connector)",
+    "confidence": "low",
+    "source": "docs/wiring/research/2026-10-15_device-positions.md"
+   }
   },
   "SPL-PDM15-OUT2": {
    "id": "SPL-PDM15-OUT2",
    "what": "Pigtail splice at the engine power box (OUT2)",
    "where": "At the engine power box's plug",
    "zone": "engine",
-   "status": "open",
+   "status": "proposed",
    "follows": "PDM15",
    "why": [
     {
@@ -1660,14 +1950,24 @@
    ],
    "open": [
     "It moves with the engine power box."
-   ]
+   ],
+   "position": {
+    "point": "PDM15",
+    "frame": "twin",
+    "x": -0.52,
+    "y": -1.72,
+    "z": 1.12,
+    "method": "follows PDM15 (pigtail / stub splice within reach of its connector)",
+    "confidence": "low",
+    "source": "docs/wiring/research/2026-10-15_device-positions.md"
+   }
   },
   "SPL-PDM15-OUT3": {
    "id": "SPL-PDM15-OUT3",
    "what": "Pigtail splice at the engine power box (OUT3)",
    "where": "At the engine power box's plug",
    "zone": "engine",
-   "status": "open",
+   "status": "proposed",
    "follows": "PDM15",
    "why": [
     {
@@ -1677,14 +1977,24 @@
    ],
    "open": [
     "It moves with the engine power box."
-   ]
+   ],
+   "position": {
+    "point": "PDM15",
+    "frame": "twin",
+    "x": -0.52,
+    "y": -1.72,
+    "z": 1.12,
+    "method": "follows PDM15 (pigtail / stub splice within reach of its connector)",
+    "confidence": "low",
+    "source": "docs/wiring/research/2026-10-15_device-positions.md"
+   }
   },
   "SPL-PDM15-OUT4": {
    "id": "SPL-PDM15-OUT4",
    "what": "Pigtail splice at the engine power box (OUT4)",
    "where": "At the engine power box's plug",
    "zone": "engine",
-   "status": "open",
+   "status": "proposed",
    "follows": "PDM15",
    "why": [
     {
@@ -1694,14 +2004,24 @@
    ],
    "open": [
     "It moves with the engine power box."
-   ]
+   ],
+   "position": {
+    "point": "PDM15",
+    "frame": "twin",
+    "x": -0.52,
+    "y": -1.72,
+    "z": 1.12,
+    "method": "follows PDM15 (pigtail / stub splice within reach of its connector)",
+    "confidence": "low",
+    "source": "docs/wiring/research/2026-10-15_device-positions.md"
+   }
   },
   "SPL-PDM15-OUT5": {
    "id": "SPL-PDM15-OUT5",
    "what": "Pigtail splice at the engine power box (OUT5)",
    "where": "At the engine power box's plug",
    "zone": "engine",
-   "status": "open",
+   "status": "proposed",
    "follows": "PDM15",
    "why": [
     {
@@ -1711,14 +2031,24 @@
    ],
    "open": [
     "It moves with the engine power box."
-   ]
+   ],
+   "position": {
+    "point": "PDM15",
+    "frame": "twin",
+    "x": -0.52,
+    "y": -1.72,
+    "z": 1.12,
+    "method": "follows PDM15 (pigtail / stub splice within reach of its connector)",
+    "confidence": "low",
+    "source": "docs/wiring/research/2026-10-15_device-positions.md"
+   }
   },
   "SPL-PDM15-OUT6": {
    "id": "SPL-PDM15-OUT6",
    "what": "Pigtail splice at the engine power box (OUT6)",
    "where": "At the engine power box's plug",
    "zone": "engine",
-   "status": "open",
+   "status": "proposed",
    "follows": "PDM15",
    "why": [
     {
@@ -1728,14 +2058,24 @@
    ],
    "open": [
     "It moves with the engine power box."
-   ]
+   ],
+   "position": {
+    "point": "PDM15",
+    "frame": "twin",
+    "x": -0.52,
+    "y": -1.72,
+    "z": 1.12,
+    "method": "follows PDM15 (pigtail / stub splice within reach of its connector)",
+    "confidence": "low",
+    "source": "docs/wiring/research/2026-10-15_device-positions.md"
+   }
   },
   "SPL-PDM15-OUT7": {
    "id": "SPL-PDM15-OUT7",
    "what": "Pigtail splice at the engine power box (OUT7)",
    "where": "At the engine power box's plug",
    "zone": "engine",
-   "status": "open",
+   "status": "proposed",
    "follows": "PDM15",
    "why": [
     {
@@ -1745,14 +2085,24 @@
    ],
    "open": [
     "It moves with the engine power box."
-   ]
+   ],
+   "position": {
+    "point": "PDM15",
+    "frame": "twin",
+    "x": -0.52,
+    "y": -1.72,
+    "z": 1.12,
+    "method": "follows PDM15 (pigtail / stub splice within reach of its connector)",
+    "confidence": "low",
+    "source": "docs/wiring/research/2026-10-15_device-positions.md"
+   }
   },
   "SPL-PDM15-OUT13": {
    "id": "SPL-PDM15-OUT13",
    "what": "Pigtail splice at the engine power box (OUT13)",
    "where": "At the engine power box's plug",
    "zone": "engine",
-   "status": "open",
+   "status": "proposed",
    "follows": "PDM15",
    "why": [
     {
@@ -1762,7 +2112,17 @@
    ],
    "open": [
     "It moves with the engine power box."
-   ]
+   ],
+   "position": {
+    "point": "PDM15",
+    "frame": "twin",
+    "x": -0.52,
+    "y": -1.72,
+    "z": 1.12,
+    "method": "follows PDM15 (pigtail / stub splice within reach of its connector)",
+    "confidence": "low",
+    "source": "docs/wiring/research/2026-10-15_device-positions.md"
+   }
   },
   "FIREWALL-ENGINE": {
    "id": "FIREWALL-ENGINE",
@@ -1815,7 +2175,17 @@
    ],
    "open": [
     "Its wires need a new path: the engine power box, the 61-pin, or a round bulkhead."
-   ]
+   ],
+   "position": {
+    "point": "FIREWALL_BODY_A",
+    "frame": "twin",
+    "x": 0.64,
+    "y": -1.452,
+    "z": 0.86,
+    "method": "endpoints.yaml: \"a plate beside the 61-pin\" (driver side): 0.14 m outboard of FIREWALL_61, firewall plane y -1.452 (ray cast, z 0.7..1.1)",
+    "confidence": "low",
+    "source": "docs/wiring/research/2026-10-15_device-positions.md"
+   }
   },
   "FIREWALL-BODY-B": {
    "id": "FIREWALL-BODY-B",
@@ -1832,7 +2202,17 @@
    ],
    "open": [
     "Its wires need a new path: the engine power box, the 61-pin, or a round bulkhead."
-   ]
+   ],
+   "position": {
+    "point": "FIREWALL_BODY_B",
+    "frame": "twin",
+    "x": 0.64,
+    "y": -1.452,
+    "z": 0.98,
+    "method": "same plate, 0.12 m above A",
+    "confidence": "low",
+    "source": "docs/wiring/research/2026-10-15_device-positions.md"
+   }
   },
   "FIREWALL-BODY-P": {
    "id": "FIREWALL-BODY-P",
@@ -1849,14 +2229,24 @@
    ],
    "open": [
     "Its wires need a new path: the engine power box, the 61-pin, or a round bulkhead."
-   ]
+   ],
+   "position": {
+    "point": "FIREWALL_BODY_P",
+    "frame": "twin",
+    "x": 0.64,
+    "y": -1.452,
+    "z": 0.74,
+    "method": "same plate, 0.12 m below A",
+    "confidence": "low",
+    "source": "docs/wiring/research/2026-10-15_device-positions.md"
+   }
   },
   "FIREWALL-BODY-C": {
    "id": "FIREWALL-BODY-C",
    "what": "Speed sender cab exit (Deutsch DT 6-way)",
    "where": "Floor or kick panel near the transfer case",
    "zone": "firewall",
-   "status": "open",
+   "status": "proposed",
    "follows": "REAR-CONN",
    "why": [
     {
@@ -1866,14 +2256,24 @@
    ],
    "open": [
     "The owner allows round bulkheads only; this is a rectangular DT. It could join the rear connector."
-   ]
+   ],
+   "position": {
+    "point": "FIREWALL_BODY_C",
+    "frame": "twin",
+    "x": 0.3,
+    "y": -0.5,
+    "z": 0.72,
+    "method": "endpoints.yaml \"floor or kick panel near the transfer case\": cab floor beside the tunnel at the transfer case (K5H_TransferCase y -0.62..-0.36)",
+    "confidence": "low",
+    "source": "docs/wiring/research/2026-10-15_device-positions.md"
+   }
   },
   "FIREWALL-GROMMET": {
    "id": "FIREWALL-GROMMET",
    "what": "Power pass-through (battery feed and ground cables)",
    "where": "Firewall, beside the batteries",
    "zone": "firewall",
-   "status": "open",
+   "status": "proposed",
    "why": [
     {
      "text": "These cables are too big for the 61-pin: its #20 contacts take 20-24 AWG.",
@@ -1886,7 +2286,17 @@
    ],
    "open": [
     "Nothing but the 61-pin goes through the firewall (Dave), so the big cables need a ruled exception or another path."
-   ]
+   ],
+   "position": {
+    "point": "FIREWALL_GROMMET",
+    "frame": "twin",
+    "x": -0.6,
+    "y": -1.452,
+    "z": 0.74,
+    "method": "mounts.yaml \"Firewall, beside the batteries\": passenger firewall below the A/C case, plane y -1.452 (ray cast)",
+    "confidence": "low",
+    "source": "docs/wiring/research/2026-10-15_device-positions.md"
+   }
   },
   "M130-A": {
    "id": "M130-A",
@@ -1978,7 +2388,7 @@
    "what": "Pigtail splice at the body power box (OUT1)",
    "where": "At the PDM30's plug",
    "zone": "cab",
-   "status": "open",
+   "status": "proposed",
    "follows": "PDM30",
    "why": [
     {
@@ -1988,14 +2398,24 @@
    ],
    "open": [
     "It moves with the PDM30."
-   ]
+   ],
+   "position": {
+    "point": "PDM30",
+    "frame": "twin",
+    "x": 0.3,
+    "y": -1.3,
+    "z": 0.997,
+    "method": "follows node PDM30 (mounts.yaml \"at the PDM30's plug\")",
+    "confidence": "medium",
+    "source": "docs/wiring/research/2026-10-15_device-positions.md"
+   }
   },
   "SPL-PDM30-OUT2": {
    "id": "SPL-PDM30-OUT2",
    "what": "Pigtail splice at the body power box (OUT2)",
    "where": "At the PDM30's plug",
    "zone": "cab",
-   "status": "open",
+   "status": "proposed",
    "follows": "PDM30",
    "why": [
     {
@@ -2005,14 +2425,24 @@
    ],
    "open": [
     "It moves with the PDM30."
-   ]
+   ],
+   "position": {
+    "point": "PDM30",
+    "frame": "twin",
+    "x": 0.3,
+    "y": -1.3,
+    "z": 0.997,
+    "method": "follows node PDM30 (mounts.yaml \"at the PDM30's plug\")",
+    "confidence": "medium",
+    "source": "docs/wiring/research/2026-10-15_device-positions.md"
+   }
   },
   "SPL-PDM30-OUT3": {
    "id": "SPL-PDM30-OUT3",
    "what": "Pigtail splice at the body power box (OUT3)",
    "where": "At the PDM30's plug",
    "zone": "cab",
-   "status": "open",
+   "status": "proposed",
    "follows": "PDM30",
    "why": [
     {
@@ -2022,14 +2452,24 @@
    ],
    "open": [
     "It moves with the PDM30."
-   ]
+   ],
+   "position": {
+    "point": "PDM30",
+    "frame": "twin",
+    "x": 0.3,
+    "y": -1.3,
+    "z": 0.997,
+    "method": "follows node PDM30 (mounts.yaml \"at the PDM30's plug\")",
+    "confidence": "medium",
+    "source": "docs/wiring/research/2026-10-15_device-positions.md"
+   }
   },
   "SPL-PDM30-OUT4": {
    "id": "SPL-PDM30-OUT4",
    "what": "Pigtail splice at the body power box (OUT4)",
    "where": "At the PDM30's plug",
    "zone": "cab",
-   "status": "open",
+   "status": "proposed",
    "follows": "PDM30",
    "why": [
     {
@@ -2039,14 +2479,24 @@
    ],
    "open": [
     "It moves with the PDM30."
-   ]
+   ],
+   "position": {
+    "point": "PDM30",
+    "frame": "twin",
+    "x": 0.3,
+    "y": -1.3,
+    "z": 0.997,
+    "method": "follows node PDM30 (mounts.yaml \"at the PDM30's plug\")",
+    "confidence": "medium",
+    "source": "docs/wiring/research/2026-10-15_device-positions.md"
+   }
   },
   "SPL-PDM30-OUT5": {
    "id": "SPL-PDM30-OUT5",
    "what": "Pigtail splice at the body power box (OUT5)",
    "where": "At the PDM30's plug",
    "zone": "cab",
-   "status": "open",
+   "status": "proposed",
    "follows": "PDM30",
    "why": [
     {
@@ -2056,14 +2506,24 @@
    ],
    "open": [
     "It moves with the PDM30."
-   ]
+   ],
+   "position": {
+    "point": "PDM30",
+    "frame": "twin",
+    "x": 0.3,
+    "y": -1.3,
+    "z": 0.997,
+    "method": "follows node PDM30 (mounts.yaml \"at the PDM30's plug\")",
+    "confidence": "medium",
+    "source": "docs/wiring/research/2026-10-15_device-positions.md"
+   }
   },
   "SPL-PDM30-OUT6": {
    "id": "SPL-PDM30-OUT6",
    "what": "Pigtail splice at the body power box (OUT6)",
    "where": "At the PDM30's plug",
    "zone": "cab",
-   "status": "open",
+   "status": "proposed",
    "follows": "PDM30",
    "why": [
     {
@@ -2073,14 +2533,24 @@
    ],
    "open": [
     "It moves with the PDM30."
-   ]
+   ],
+   "position": {
+    "point": "PDM30",
+    "frame": "twin",
+    "x": 0.3,
+    "y": -1.3,
+    "z": 0.997,
+    "method": "follows node PDM30 (mounts.yaml \"at the PDM30's plug\")",
+    "confidence": "medium",
+    "source": "docs/wiring/research/2026-10-15_device-positions.md"
+   }
   },
   "SPL-PDM30-OUT7": {
    "id": "SPL-PDM30-OUT7",
    "what": "Pigtail splice at the body power box (OUT7)",
    "where": "At the PDM30's plug",
    "zone": "cab",
-   "status": "open",
+   "status": "proposed",
    "follows": "PDM30",
    "why": [
     {
@@ -2090,14 +2560,24 @@
    ],
    "open": [
     "It moves with the PDM30."
-   ]
+   ],
+   "position": {
+    "point": "PDM30",
+    "frame": "twin",
+    "x": 0.3,
+    "y": -1.3,
+    "z": 0.997,
+    "method": "follows node PDM30 (mounts.yaml \"at the PDM30's plug\")",
+    "confidence": "medium",
+    "source": "docs/wiring/research/2026-10-15_device-positions.md"
+   }
   },
   "SPL-PDM30-OUT8": {
    "id": "SPL-PDM30-OUT8",
    "what": "Pigtail splice at the body power box (OUT8)",
    "where": "At the PDM30's plug",
    "zone": "cab",
-   "status": "open",
+   "status": "proposed",
    "follows": "PDM30",
    "why": [
     {
@@ -2107,14 +2587,24 @@
    ],
    "open": [
     "It moves with the PDM30."
-   ]
+   ],
+   "position": {
+    "point": "PDM30",
+    "frame": "twin",
+    "x": 0.3,
+    "y": -1.3,
+    "z": 0.997,
+    "method": "follows node PDM30 (mounts.yaml \"at the PDM30's plug\")",
+    "confidence": "medium",
+    "source": "docs/wiring/research/2026-10-15_device-positions.md"
+   }
   },
   "GND-BANK-CAB": {
    "id": "GND-BANK-CAB",
    "what": "Cab ground bank (insulated stud bus)",
    "where": "Beside the PDM30",
    "zone": "cab",
-   "status": "open",
+   "status": "proposed",
    "follows": "PDM30",
    "why": [
     {
@@ -2124,7 +2614,17 @@
    ],
    "open": [
     "It follows the PDM30."
-   ]
+   ],
+   "position": {
+    "point": "GND_BANK_CAB",
+    "frame": "twin",
+    "x": 0.15,
+    "y": -1.3,
+    "z": 0.997,
+    "method": "mounts.yaml \"beside the PDM30\": 0.15 m toward the column from node PDM30",
+    "confidence": "low",
+    "source": "docs/wiring/research/2026-10-15_device-positions.md"
+   }
   },
   "FUSE-DAK_CONST": {
    "id": "FUSE-DAK_CONST",
@@ -2141,7 +2641,17 @@
    ],
    "open": [
     "The source end follows the power box that feeds it."
-   ]
+   ],
+   "position": {
+    "point": "PDM30",
+    "frame": "twin",
+    "x": 0.3,
+    "y": -1.3,
+    "z": 0.997,
+    "method": "follows node PDM30 (\"at the source end of its feed\")",
+    "confidence": "low",
+    "source": "docs/wiring/research/2026-10-15_device-positions.md"
+   }
   },
   "FUSE-PCS_BATT": {
    "id": "FUSE-PCS_BATT",
@@ -2158,7 +2668,17 @@
    ],
    "open": [
     "The source end follows the power box that feeds it."
-   ]
+   ],
+   "position": {
+    "point": "PDM30",
+    "frame": "twin",
+    "x": 0.3,
+    "y": -1.3,
+    "z": 0.997,
+    "method": "follows node PDM30 (\"at the source end of its feed\")",
+    "confidence": "low",
+    "source": "docs/wiring/research/2026-10-15_device-positions.md"
+   }
   },
   "PORT-ETH": {
    "id": "PORT-ETH",
@@ -2217,7 +2737,17 @@
      "text": "The M130 shutdown tap joins the switch's yellow wire here.",
      "source": "docs/wiring/calc-data/catalog/endpoints.yaml SPL-ISO-YEL"
     }
-   ]
+   ],
+   "position": {
+    "point": "SPL_ISO_YEL",
+    "frame": "twin",
+    "x": 0.3,
+    "y": -1.21,
+    "z": 1.05,
+    "method": "behind ISO-SWITCH (tee on its yellow lead), 0.05 m further behind the dash face",
+    "confidence": "low",
+    "source": "docs/wiring/research/2026-10-15_device-positions.md"
+   }
   },
   "ISO-SWITCH": {
    "id": "ISO-SWITCH",
@@ -2234,7 +2764,17 @@
    ],
    "open": [
     "The exact dash spot is not picked."
-   ]
+   ],
+   "position": {
+    "point": "ISO_SWITCH",
+    "frame": "twin",
+    "x": 0.3,
+    "y": -1.16,
+    "z": 1.05,
+    "method": "mounts.yaml \"Cab, on the dash\": lower dash, driver reach; face y -1.127 at x 0.3 z 1.05 (ray cast), 0.03 m behind",
+    "confidence": "low",
+    "source": "docs/wiring/research/2026-10-15_device-positions.md"
+   }
   },
   "APS": {
    "id": "APS",
@@ -2264,7 +2804,17 @@
      "text": "Stoplamp switch: see Section 5 (Brakes).",
      "source": "reference_documents/k5_factory_docs/1977_Light_Truck_Service_Manual.pdf p.790"
     }
-   ]
+   ],
+   "position": {
+    "point": "BRAKE_SW",
+    "frame": "twin",
+    "x": 0.42,
+    "y": -1.3,
+    "z": 0.7,
+    "method": "follows node BRAKE_SW (pedal bracket)",
+    "confidence": "medium",
+    "source": "docs/wiring/research/2026-10-15_device-positions.md"
+   }
   },
   "FLOOR-DIMMER": {
    "id": "FLOOR-DIMMER",
@@ -2281,7 +2831,17 @@
      "text": "Dimmer switch diagnosis and wiring.",
      "source": "reference_documents/k5_factory_docs/1977_Light_Truck_Service_Manual.pdf p.779-780"
     }
-   ]
+   ],
+   "position": {
+    "point": "FLOOR_DIMMER",
+    "frame": "twin",
+    "x": 0.68,
+    "y": -1.15,
+    "z": 0.7,
+    "method": "mounts.yaml \"floor under the upper left corner of the mat at the driver left foot\": left of the brake pedal (x 0.42), carpet top z ~0.70",
+    "confidence": "low",
+    "source": "docs/wiring/research/2026-10-15_device-positions.md"
+   }
   },
   "HL-SW": {
    "id": "HL-SW",
@@ -2294,7 +2854,17 @@
      "text": "Light switch removal: \"Reaching up behind instrument cluster, depress shaft retaining button and remove switch knob and rod.\"",
      "source": "reference_documents/k5_factory_docs/1977_Light_Truck_Service_Manual.pdf p.787"
     }
-   ]
+   ],
+   "position": {
+    "point": "AT_HL_SW",
+    "frame": "twin",
+    "x": 0.62,
+    "y": -1.24,
+    "z": 1.05,
+    "method": "follows node DASH_CLUSTER (headlight-switch dash region)",
+    "confidence": "medium",
+    "source": "docs/wiring/research/2026-10-15_device-positions.md"
+   }
   },
   "TURN-SW": {
    "id": "TURN-SW",
@@ -2311,7 +2881,17 @@
      "text": "The hazard switch is a push-pull \"on the right side of the steering column\".",
      "source": "reference_documents/k5_factory_docs/1977_Light_Truck_Service_Manual.pdf p.802"
     }
-   ]
+   ],
+   "position": {
+    "point": "AT_HORN_SW",
+    "frame": "twin",
+    "x": 0.5,
+    "y": -1.2,
+    "z": 0.95,
+    "method": "follows node STEER_COL (column connector under the dash)",
+    "confidence": "medium",
+    "source": "docs/wiring/research/2026-10-15_device-positions.md"
+   }
   },
   "HORN-SW": {
    "id": "HORN-SW",
@@ -2324,7 +2904,17 @@
      "text": "The horn button cap on the steering wheel.",
      "source": "reference_documents/k5_factory_docs/1977_Light_Truck_Service_Manual.pdf p.227-228"
     }
-   ]
+   ],
+   "position": {
+    "point": "AT_HORN_SW",
+    "frame": "twin",
+    "x": 0.5,
+    "y": -1.2,
+    "z": 0.95,
+    "method": "follows node STEER_COL (grounds through the column; the PDM30 DIG6 wire leaves at the column connector)",
+    "confidence": "medium",
+    "source": "docs/wiring/research/2026-10-15_device-positions.md"
+   }
   },
   "IGN-SWITCH": {
    "id": "IGN-SWITCH",
@@ -2350,7 +2940,17 @@
      "text": "The factory wiper/washer dash switch grounds through its mounting.",
      "source": "reference_documents/k5_factory_docs/1977_Light_Truck_Service_Manual.pdf p.803"
     }
-   ]
+   ],
+   "position": {
+    "point": "AT_HL_SW",
+    "frame": "twin",
+    "x": 0.62,
+    "y": -1.24,
+    "z": 1.05,
+    "method": "mounts.yaml says only \"Instrument panel\": shares the headlight-switch dash region (DASH_CLUSTER)",
+    "confidence": "low",
+    "source": "docs/wiring/research/2026-10-15_device-positions.md"
+   }
   },
   "BLOWER-SW": {
    "id": "BLOWER-SW",
@@ -2367,7 +2967,17 @@
      "text": "The factory Four-Season housing is kept.",
      "source": "docs/wiring/K5_WIRING_STATE.md §1 row 40"
     }
-   ]
+   ],
+   "position": {
+    "point": "BLOWER_SW",
+    "frame": "twin",
+    "x": -0.25,
+    "y": -1.19,
+    "z": 1.08,
+    "method": "mounts.yaml \"heater and A/C control head\": centre stack directly below the radio, face y -1.119 at z 1.1, plug 0.07 m behind",
+    "confidence": "low",
+    "source": "docs/wiring/research/2026-10-15_device-positions.md"
+   }
   },
   "DAKOTA-VHX": {
    "id": "DAKOTA-VHX",
@@ -2398,7 +3008,17 @@
      "text": "The RetroSound unit is made for 1973-87 C/K trucks.",
      "source": "docs/wiring/calc-data/catalog/endpoints.yaml RADIO"
     }
-   ]
+   ],
+   "position": {
+    "point": "RADIO",
+    "frame": "twin",
+    "x": -0.25,
+    "y": -1.2,
+    "z": 1.2,
+    "method": "mounts.yaml \"factory radio opening\": centre stack, x between the cluster (Dash_Speedo x -0.09..0.76) and the glovebox (x < -0.4); face y -1.061 from ray cast, plug 0.14 m behind",
+    "confidence": "low",
+    "source": "docs/wiring/research/2026-10-15_device-positions.md"
+   }
   },
   "GSS-3000": {
    "id": "GSS-3000",
@@ -2411,7 +3031,17 @@
      "text": "The decoder goes under the dash; its sensor sits on the transmission.",
      "source": "docs/wiring/calc-data/catalog/endpoints.yaml GSS-3000 (Dakota GSS-3000 MAN# 650715:G)"
     }
-   ]
+   ],
+   "position": {
+    "point": "GSS_3000",
+    "frame": "twin",
+    "x": 0.03,
+    "y": -1.3,
+    "z": 0.99,
+    "method": "mounts.yaml zone \"under the dash\": row of boxes under the dash beside PDM30 (decoder)",
+    "confidence": "low",
+    "source": "docs/wiring/research/2026-10-15_device-positions.md"
+   }
   },
   "PCS-TCM": {
    "id": "PCS-TCM",
@@ -2434,7 +3064,7 @@
    "what": "Transmission controller harness (PCS TCM-4610 kit)",
    "where": "From the controller in the cab to the 6L90 case connector",
    "zone": "cab",
-   "status": "open",
+   "status": "proposed",
    "follows": "PCS-TCM",
    "why": [
     {
@@ -2444,7 +3074,17 @@
    ],
    "open": [
     "It follows the controller."
-   ]
+   ],
+   "position": {
+    "point": "PCS_HARNESS_4610",
+    "frame": "twin",
+    "x": -0.1,
+    "y": -1.3,
+    "z": 0.98,
+    "method": "mounts.yaml \"Cab, under the dash (spot not picked)\": TCM at the under-dash box row, passenger of PDM30",
+    "confidence": "low",
+    "source": "docs/wiring/research/2026-10-15_device-positions.md"
+   }
   },
   "MIRROR-MON": {
    "id": "MIRROR-MON",
@@ -2457,14 +3097,24 @@
      "text": "The kit's replacement rear-view mirror carries the display.",
      "source": "docs/wiring/calc-data/catalog/endpoints.yaml MIRROR-MON"
     }
-   ]
+   ],
+   "position": {
+    "point": "MIRROR_MON",
+    "frame": "twin",
+    "x": 0.0,
+    "y": -0.9,
+    "z": 1.78,
+    "method": "windshield top centre (Exterior_Window_Front: top y -0.85 z 1.88, base y -1.33 z 1.35), 0.1 m down the glass, 0.03 m inboard",
+    "confidence": "medium",
+    "source": "docs/wiring/research/2026-10-15_device-positions.md"
+   }
   },
   "OUTLET-12V": {
    "id": "OUTLET-12V",
    "what": "12 V outlet",
    "where": "Not placed: dash or console",
    "zone": "cab",
-   "status": "open",
+   "status": "proposed",
    "why": [
     {
      "text": "The registry has the outlet but no spot.",
@@ -2473,14 +3123,24 @@
    ],
    "open": [
     "Pick the spot."
-   ]
+   ],
+   "position": {
+    "point": "OUTLET_12V",
+    "frame": "twin",
+    "x": -0.12,
+    "y": -1.19,
+    "z": 1.05,
+    "method": "mounts.yaml \"dash or console\": lower dash centre-passenger side, face y -1.164 at x -0.1 z 1.05 (ray cast), 0.03 m behind",
+    "confidence": "low",
+    "source": "docs/wiring/research/2026-10-15_device-positions.md"
+   }
   },
   "USB-PORT": {
    "id": "USB-PORT",
    "what": "USB charging port",
    "where": "Not placed: dash or console",
    "zone": "cab",
-   "status": "open",
+   "status": "proposed",
    "why": [
     {
      "text": "The registry has the outlet but no spot.",
@@ -2489,14 +3149,24 @@
    ],
    "open": [
     "Pick the spot."
-   ]
+   ],
+   "position": {
+    "point": "USB_PORT",
+    "frame": "twin",
+    "x": -0.02,
+    "y": -1.195,
+    "z": 1.05,
+    "method": "mounts.yaml \"dash or console\": lower dash centre, next to OUTLET-12V, face y -1.165 at x 0.0 z 1.05, 0.03 m behind",
+    "confidence": "low",
+    "source": "docs/wiring/research/2026-10-15_device-positions.md"
+   }
   },
   "CLEARANCE-L": {
    "id": "CLEARANCE-L",
    "what": "Roof clearance lamp, left",
    "where": "Cab roof, left",
    "zone": "cab",
-   "status": "open",
+   "status": "proposed",
    "why": [
     {
      "text": "The registry has three cab-roof clearance lamps.",
@@ -2509,14 +3179,24 @@
    ],
    "open": [
     "The K5 has a removable top: where on it the lamps sit is not set."
-   ]
+   ],
+   "position": {
+    "point": "CLEARANCE_L",
+    "frame": "twin",
+    "x": 0.2,
+    "y": -0.75,
+    "z": 1.91,
+    "method": "mounts.yaml \"cab roof\" + twin geometry: roof top at the windshield header (ray casts y -0.8..-0.6 give z 1.897..1.918)",
+    "confidence": "low",
+    "source": "docs/wiring/research/2026-10-15_device-positions.md"
+   }
   },
   "CLEARANCE-C": {
    "id": "CLEARANCE-C",
    "what": "Roof clearance lamp, centre",
    "where": "Cab roof, centre",
    "zone": "cab",
-   "status": "open",
+   "status": "proposed",
    "why": [
     {
      "text": "The registry has three cab-roof clearance lamps.",
@@ -2529,14 +3209,24 @@
    ],
    "open": [
     "The K5 has a removable top: where on it the lamps sit is not set."
-   ]
+   ],
+   "position": {
+    "point": "CLEARANCE_C",
+    "frame": "twin",
+    "x": 0.0,
+    "y": -0.75,
+    "z": 1.91,
+    "method": "mounts.yaml \"cab roof\" + twin geometry: roof top at the windshield header (ray casts y -0.8..-0.6 give z 1.897..1.918)",
+    "confidence": "low",
+    "source": "docs/wiring/research/2026-10-15_device-positions.md"
+   }
   },
   "CLEARANCE-R": {
    "id": "CLEARANCE-R",
    "what": "Roof clearance lamp, right",
    "where": "Cab roof, right",
    "zone": "cab",
-   "status": "open",
+   "status": "proposed",
    "why": [
     {
      "text": "The registry has three cab-roof clearance lamps.",
@@ -2549,7 +3239,17 @@
    ],
    "open": [
     "The K5 has a removable top: where on it the lamps sit is not set."
-   ]
+   ],
+   "position": {
+    "point": "CLEARANCE_R",
+    "frame": "twin",
+    "x": -0.2,
+    "y": -0.75,
+    "z": 1.91,
+    "method": "mounts.yaml \"cab roof\" + twin geometry: roof top at the windshield header (ray casts y -0.8..-0.6 give z 1.897..1.918)",
+    "confidence": "low",
+    "source": "docs/wiring/research/2026-10-15_device-positions.md"
+   }
   },
   "DOME-LAMP": {
    "id": "DOME-LAMP",
@@ -2562,7 +3262,17 @@
      "text": "The dome and courtesy lamp circuits switch on the ground side.",
      "source": "reference_documents/k5_factory_docs/1977_Light_Truck_Service_Manual.pdf p.833"
     }
-   ]
+   ],
+   "position": {
+    "point": "DOME_LAMP",
+    "frame": "twin",
+    "x": 0.0,
+    "y": 0.2,
+    "z": 1.88,
+    "method": "follows node DOME (headliner cavity)",
+    "confidence": "medium",
+    "source": "docs/wiring/research/2026-10-15_device-positions.md"
+   }
   },
   "DOOR-JAMB-L": {
    "id": "DOOR-JAMB-L",
@@ -2575,7 +3285,17 @@
      "text": "The jamb switches are in the ground side of the dome and courtesy lamp circuits.",
      "source": "reference_documents/k5_factory_docs/1977_Light_Truck_Service_Manual.pdf p.833"
     }
-   ]
+   ],
+   "position": {
+    "point": "DOOR_JAMB_L",
+    "frame": "twin",
+    "x": 0.78,
+    "y": -1.15,
+    "z": 1.05,
+    "method": "mounts.yaml \"driver front door jamb\": hinge-side jamb, 0.14 m inboard of the boot node (door x span 0.70..1.01, y -1.17..-0.12)",
+    "confidence": "low",
+    "source": "docs/wiring/research/2026-10-15_device-positions.md"
+   }
   },
   "DOOR-JAMB-R": {
    "id": "DOOR-JAMB-R",
@@ -2588,7 +3308,17 @@
      "text": "The jamb switches are in the ground side of the dome and courtesy lamp circuits.",
      "source": "reference_documents/k5_factory_docs/1977_Light_Truck_Service_Manual.pdf p.833"
     }
-   ]
+   ],
+   "position": {
+    "point": "DOOR_JAMB_R",
+    "frame": "twin",
+    "x": -0.78,
+    "y": -1.15,
+    "z": 1.05,
+    "method": "mirror of DOOR-JAMB-L",
+    "confidence": "low",
+    "source": "docs/wiring/research/2026-10-15_device-positions.md"
+   }
   },
   "FOOTWELL-LAMPS": {
    "id": "FOOTWELL-LAMPS",
@@ -2601,7 +3331,17 @@
      "text": "An owner-chosen LED strip.",
      "source": "docs/wiring/calc-data/catalog/endpoints.yaml FOOTWELL-LAMPS"
     }
-   ]
+   ],
+   "position": {
+    "point": "FOOTWELL_LAMPS",
+    "frame": "twin",
+    "x": 0.0,
+    "y": -1.25,
+    "z": 0.85,
+    "method": "mounts.yaml \"one in each footwell\": one endpoint for two lamps, placed between the footwells at the dash underside",
+    "confidence": "low",
+    "source": "docs/wiring/research/2026-10-15_device-positions.md"
+   }
   },
   "UNDERDASH-LAMPS": {
    "id": "UNDERDASH-LAMPS",
@@ -2614,7 +3354,17 @@
      "text": "An owner-chosen LED strip.",
      "source": "docs/wiring/calc-data/catalog/endpoints.yaml UNDERDASH-LAMPS"
     }
-   ]
+   ],
+   "position": {
+    "point": "UNDERDASH_LAMPS",
+    "frame": "twin",
+    "x": 0.0,
+    "y": -1.25,
+    "z": 1.0,
+    "method": "mounts.yaml \"Under the dash\": dash underside, centre line",
+    "confidence": "low",
+    "source": "docs/wiring/research/2026-10-15_device-positions.md"
+   }
   },
   "TG-SW-DASH": {
    "id": "TG-SW-DASH",
@@ -2627,7 +3377,17 @@
      "text": "Power rear window: the dash switch.",
      "source": "reference_documents/wiring_diagram_booklets/ST_352_78_CK_Wiring.pdf p.16, sheet A-4"
     }
-   ]
+   ],
+   "position": {
+    "point": "AT_TG_SW_DASH",
+    "frame": "twin",
+    "x": 0.1,
+    "y": -1.14,
+    "z": 1.05,
+    "method": "mounts.yaml \"Instrument panel\": lower dash, driver of centre; face y -1.113 at x 0.1 z 1.05 (ray cast), 0.03 m behind",
+    "confidence": "low",
+    "source": "docs/wiring/research/2026-10-15_device-positions.md"
+   }
   },
   "TG-SW-MASTER": {
    "id": "TG-SW-MASTER",
@@ -2640,7 +3400,17 @@
      "text": "The Nu-Relics reverse-polarity dash switch (option #121).",
      "source": "docs/wiring/calc-data/catalog/endpoints.yaml TG-SW-MASTER"
     }
-   ]
+   ],
+   "position": {
+    "point": "AT_TG_SW_DASH",
+    "frame": "twin",
+    "x": 0.1,
+    "y": -1.14,
+    "z": 1.05,
+    "method": "same slot as TG-SW-DASH (candidate replaces the factory dash switch)",
+    "confidence": "low",
+    "source": "docs/wiring/research/2026-10-15_device-positions.md"
+   }
   },
   "DOOR-L-PASS": {
    "id": "DOOR-L-PASS",
@@ -2653,7 +3423,17 @@
      "text": "The DT 8-way that carries the locks and the speaker across the hinge.",
      "source": "docs/wiring/calc-data/catalog/endpoints.yaml DOOR-L-PASS"
     }
-   ]
+   ],
+   "position": {
+    "point": "AT_DOOR_L_PASS",
+    "frame": "twin",
+    "x": 0.92,
+    "y": -1.13,
+    "z": 1.0,
+    "method": "follows node DOOR_BOOT_L (driver door hinge line)",
+    "confidence": "medium",
+    "source": "docs/wiring/research/2026-10-15_device-positions.md"
+   }
   },
   "DOOR-L-PASS-P": {
    "id": "DOOR-L-PASS-P",
@@ -2666,7 +3446,17 @@
      "text": "The DTP 4-way that carries the window power across the hinge.",
      "source": "docs/wiring/calc-data/catalog/endpoints.yaml DOOR-L-PASS-P"
     }
-   ]
+   ],
+   "position": {
+    "point": "AT_DOOR_L_PASS",
+    "frame": "twin",
+    "x": 0.92,
+    "y": -1.13,
+    "z": 1.0,
+    "method": "follows node DOOR_BOOT_L (driver door hinge line)",
+    "confidence": "medium",
+    "source": "docs/wiring/research/2026-10-15_device-positions.md"
+   }
   },
   "LOCK-SW-L": {
    "id": "LOCK-SW-L",
@@ -2679,7 +3469,17 @@
      "text": "The Nu-Relics door switch panel.",
      "source": "nu-relics.com 17383-2; docs/wiring/calc-data/catalog/endpoints.yaml WIN-SW-L"
     }
-   ]
+   ],
+   "position": {
+    "point": "AT_LOCK_SW_L",
+    "frame": "twin",
+    "x": 0.825,
+    "y": -0.815,
+    "z": 1.245,
+    "method": "same driver door switch panel as WIN-SW-L (lock rocker is on the same panel)",
+    "confidence": "medium",
+    "source": "docs/wiring/research/2026-10-15_device-positions.md"
+   }
   },
   "WIN-SW-L": {
    "id": "WIN-SW-L",
@@ -2692,7 +3492,17 @@
      "text": "The Nu-Relics door switch panel.",
      "source": "nu-relics.com 17383-2"
     }
-   ]
+   ],
+   "position": {
+    "point": "AT_LOCK_SW_L",
+    "frame": "twin",
+    "x": 0.825,
+    "y": -0.815,
+    "z": 1.245,
+    "method": "twin object Door_Left_Handle_Window centre (window crank position, replaced by the switch panel)",
+    "confidence": "medium",
+    "source": "docs/wiring/research/2026-10-15_device-positions.md"
+   }
   },
   "lock_actuator_DS": {
    "id": "lock_actuator_DS",
@@ -2705,7 +3515,17 @@
      "text": "The AutoLoc 2-wire actuator.",
      "source": "autoloc.com AUTZT2000"
     }
-   ]
+   ],
+   "position": {
+    "point": "lock_actuator_DS",
+    "frame": "twin",
+    "x": 0.86,
+    "y": -0.3,
+    "z": 1.1,
+    "method": "driver door lock rod near the latch (door rear edge y -0.12)",
+    "confidence": "low",
+    "source": "docs/wiring/research/2026-10-15_device-positions.md"
+   }
   },
   "window_motor_DS": {
    "id": "window_motor_DS",
@@ -2718,7 +3538,17 @@
      "text": "The Nu-Relics regulator and motor.",
      "source": "nu-relics.com 17383-2"
     }
-   ]
+   ],
+   "position": {
+    "point": "window_motor_DS",
+    "frame": "twin",
+    "x": 0.86,
+    "y": -0.65,
+    "z": 0.95,
+    "method": "follows anchor DOOR_IN_L (in-door devices), moved from the skin (x 0.97) to mid-door thickness (x 0.86)",
+    "confidence": "low",
+    "source": "docs/wiring/research/2026-10-15_device-positions.md"
+   }
   },
   "SPK-FL": {
    "id": "SPK-FL",
@@ -2731,7 +3561,17 @@
      "text": "The registry puts the front speakers in the doors.",
      "source": "docs/wiring/calc-data/catalog/endpoints.yaml SPK-FL"
     }
-   ]
+   ],
+   "position": {
+    "point": "SPK_FL",
+    "frame": "twin",
+    "x": 0.86,
+    "y": -0.75,
+    "z": 0.8,
+    "method": "driver door lower pocket (door z span 0.59..1.85)",
+    "confidence": "low",
+    "source": "docs/wiring/research/2026-10-15_device-positions.md"
+   }
   },
   "DOOR-R-PASS": {
    "id": "DOOR-R-PASS",
@@ -2744,7 +3584,17 @@
      "text": "The DT 8-way that carries the locks and the speaker across the hinge.",
      "source": "docs/wiring/calc-data/catalog/endpoints.yaml DOOR-R-PASS"
     }
-   ]
+   ],
+   "position": {
+    "point": "AT_DOOR_R_PASS",
+    "frame": "twin",
+    "x": -0.92,
+    "y": -1.13,
+    "z": 1.0,
+    "method": "follows node DOOR_BOOT_R (passenger door hinge line)",
+    "confidence": "medium",
+    "source": "docs/wiring/research/2026-10-15_device-positions.md"
+   }
   },
   "DOOR-R-PASS-P": {
    "id": "DOOR-R-PASS-P",
@@ -2757,7 +3607,17 @@
      "text": "The DTP 4-way that carries the window power across the hinge.",
      "source": "docs/wiring/calc-data/catalog/endpoints.yaml DOOR-R-PASS-P"
     }
-   ]
+   ],
+   "position": {
+    "point": "AT_DOOR_R_PASS",
+    "frame": "twin",
+    "x": -0.92,
+    "y": -1.13,
+    "z": 1.0,
+    "method": "follows node DOOR_BOOT_R (passenger door hinge line)",
+    "confidence": "medium",
+    "source": "docs/wiring/research/2026-10-15_device-positions.md"
+   }
   },
   "LOCK-SW-R": {
    "id": "LOCK-SW-R",
@@ -2770,7 +3630,17 @@
      "text": "The Nu-Relics door switch panel.",
      "source": "nu-relics.com 17383-2; docs/wiring/calc-data/catalog/endpoints.yaml WIN-SW-R"
     }
-   ]
+   ],
+   "position": {
+    "point": "AT_LOCK_SW_R",
+    "frame": "twin",
+    "x": -0.825,
+    "y": -0.815,
+    "z": 1.245,
+    "method": "same passenger door switch panel as WIN-SW-R (lock rocker is on the same panel)",
+    "confidence": "medium",
+    "source": "docs/wiring/research/2026-10-15_device-positions.md"
+   }
   },
   "WIN-SW-R": {
    "id": "WIN-SW-R",
@@ -2783,7 +3653,17 @@
      "text": "The Nu-Relics door switch panel.",
      "source": "nu-relics.com 17383-2"
     }
-   ]
+   ],
+   "position": {
+    "point": "AT_LOCK_SW_R",
+    "frame": "twin",
+    "x": -0.825,
+    "y": -0.815,
+    "z": 1.245,
+    "method": "twin object Door_Right_Handle_Window centre (window crank position, replaced by the switch panel)",
+    "confidence": "medium",
+    "source": "docs/wiring/research/2026-10-15_device-positions.md"
+   }
   },
   "lock_actuator_PS": {
    "id": "lock_actuator_PS",
@@ -2796,7 +3676,17 @@
      "text": "The AutoLoc 2-wire actuator.",
      "source": "autoloc.com AUTZT2000"
     }
-   ]
+   ],
+   "position": {
+    "point": "lock_actuator_PS",
+    "frame": "twin",
+    "x": -0.86,
+    "y": -0.3,
+    "z": 1.1,
+    "method": "passenger door lock rod near the latch (door rear edge y -0.12)",
+    "confidence": "low",
+    "source": "docs/wiring/research/2026-10-15_device-positions.md"
+   }
   },
   "window_motor_PS": {
    "id": "window_motor_PS",
@@ -2809,7 +3699,17 @@
      "text": "The Nu-Relics regulator and motor.",
      "source": "nu-relics.com 17383-2"
     }
-   ]
+   ],
+   "position": {
+    "point": "window_motor_PS",
+    "frame": "twin",
+    "x": -0.86,
+    "y": -0.65,
+    "z": 0.95,
+    "method": "mirror of window_motor_DS",
+    "confidence": "low",
+    "source": "docs/wiring/research/2026-10-15_device-positions.md"
+   }
   },
   "SPK-FR": {
    "id": "SPK-FR",
@@ -2822,7 +3722,17 @@
      "text": "The registry puts the front speakers in the doors.",
      "source": "docs/wiring/calc-data/catalog/endpoints.yaml SPK-FR"
     }
-   ]
+   ],
+   "position": {
+    "point": "SPK_FR",
+    "frame": "twin",
+    "x": -0.86,
+    "y": -0.75,
+    "z": 0.8,
+    "method": "passenger door lower pocket (door z span 0.59..1.85)",
+    "confidence": "low",
+    "source": "docs/wiring/research/2026-10-15_device-positions.md"
+   }
   },
   "Tail_Light_Left": {
    "id": "Tail_Light_Left",
@@ -2835,7 +3745,17 @@
      "text": "Rear lighting, C-K 06-14 models: tail combination lamp (gray), back-up lamp (white), marker lamp (cream).",
      "source": "reference_documents/k5_factory_docs/1977_Light_Truck_Service_Manual.pdf p.788, Fig. 8-6"
     }
-   ]
+   ],
+   "position": {
+    "point": "Tail_Light_Left",
+    "frame": "twin",
+    "x": 0.926,
+    "y": 1.78,
+    "z": 0.985,
+    "method": "twin object Tail_Lights_Main, left lamp (component x +0.852..+1.000) centre",
+    "confidence": "high",
+    "source": "docs/wiring/research/2026-10-15_device-positions.md"
+   }
   },
   "Backup_Light_Left": {
    "id": "Backup_Light_Left",
@@ -2848,7 +3768,17 @@
      "text": "Rear lighting, C-K 06-14 models: back-up lamp (white).",
      "source": "reference_documents/k5_factory_docs/1977_Light_Truck_Service_Manual.pdf p.788, Fig. 8-6"
     }
-   ]
+   ],
+   "position": {
+    "point": "Backup_Light_Left",
+    "frame": "twin",
+    "x": 0.935,
+    "y": 1.805,
+    "z": 0.931,
+    "method": "twin object Tail_Lights_Main, lower sub-component of the left lamp (x +0.899..+0.970, z 0.907..0.955) centre",
+    "confidence": "low",
+    "source": "docs/wiring/research/2026-10-15_device-positions.md"
+   }
   },
   "MARKER-LR": {
    "id": "MARKER-LR",
@@ -2861,7 +3791,17 @@
      "text": "Rear lighting, C-K 06-14 models: marker lamp (cream).",
      "source": "reference_documents/k5_factory_docs/1977_Light_Truck_Service_Manual.pdf p.788, Fig. 8-6"
     }
-   ]
+   ],
+   "position": {
+    "point": "MARKER_LR",
+    "frame": "twin",
+    "x": 0.977,
+    "y": 1.75,
+    "z": 0.985,
+    "method": "twin object Tail_Lights_Main, left side-wrap sub-component (x +0.961..+0.992, y 1.709..1.790) centre",
+    "confidence": "low",
+    "source": "docs/wiring/research/2026-10-15_device-positions.md"
+   }
   },
   "Tail_Light_Right": {
    "id": "Tail_Light_Right",
@@ -2874,7 +3814,17 @@
      "text": "Rear lighting, C-K 06-14 models: tail combination lamp (gray), back-up lamp (white), marker lamp (cream).",
      "source": "reference_documents/k5_factory_docs/1977_Light_Truck_Service_Manual.pdf p.788, Fig. 8-6"
     }
-   ]
+   ],
+   "position": {
+    "point": "Tail_Light_Right",
+    "frame": "twin",
+    "x": -0.926,
+    "y": 1.78,
+    "z": 0.985,
+    "method": "twin object Tail_Lights_Main, right lamp centre",
+    "confidence": "high",
+    "source": "docs/wiring/research/2026-10-15_device-positions.md"
+   }
   },
   "Backup_Light_Right": {
    "id": "Backup_Light_Right",
@@ -2887,7 +3837,17 @@
      "text": "Rear lighting, C-K 06-14 models: back-up lamp (white).",
      "source": "reference_documents/k5_factory_docs/1977_Light_Truck_Service_Manual.pdf p.788, Fig. 8-6"
     }
-   ]
+   ],
+   "position": {
+    "point": "Backup_Light_Right",
+    "frame": "twin",
+    "x": -0.935,
+    "y": 1.805,
+    "z": 0.931,
+    "method": "mirror of Backup_Light_Left",
+    "confidence": "low",
+    "source": "docs/wiring/research/2026-10-15_device-positions.md"
+   }
   },
   "MARKER-RR": {
    "id": "MARKER-RR",
@@ -2900,7 +3860,17 @@
      "text": "Rear lighting, C-K 06-14 models: marker lamp (cream).",
      "source": "reference_documents/k5_factory_docs/1977_Light_Truck_Service_Manual.pdf p.788, Fig. 8-6"
     }
-   ]
+   ],
+   "position": {
+    "point": "MARKER_RR",
+    "frame": "twin",
+    "x": -0.977,
+    "y": 1.75,
+    "z": 0.985,
+    "method": "mirror of MARKER-LR",
+    "confidence": "low",
+    "source": "docs/wiring/research/2026-10-15_device-positions.md"
+   }
   },
   "LICENSE-LAMP": {
    "id": "LICENSE-LAMP",
@@ -2916,7 +3886,17 @@
    ],
    "open": [
     "Read on the truck whether the plate sits on the bumper or the tailgate."
-   ]
+   ],
+   "position": {
+    "point": "LICENSE_LAMP",
+    "frame": "twin",
+    "x": 0.0,
+    "y": 1.98,
+    "z": 0.78,
+    "method": "rear bumper face (Exterior_Bumper_Rear_Blazer bbox y 1.80..1.98, z 0.49..0.76) centre line, lamp above the plate",
+    "confidence": "low",
+    "source": "docs/wiring/research/2026-10-15_device-positions.md"
+   }
   },
   "Backup_Camera": {
    "id": "Backup_Camera",
@@ -2929,14 +3909,24 @@
      "text": "A license-plate camera.",
      "source": "docs/wiring/calc-data/catalog/endpoints.yaml Backup_Camera"
     }
-   ]
+   ],
+   "position": {
+    "point": "Backup_Camera",
+    "frame": "twin",
+    "x": 0.0,
+    "y": 1.98,
+    "z": 0.74,
+    "method": "rear bumper face centre line at the plate (camera clamps to the plate frame)",
+    "confidence": "low",
+    "source": "docs/wiring/research/2026-10-15_device-positions.md"
+   }
   },
   "CHMSL": {
    "id": "CHMSL",
    "what": "Third brake light (ORACLE 4514-003, 7 in)",
    "where": "Not placed: top of the tailgate or rear edge of the top",
    "zone": "rear",
-   "status": "open",
+   "status": "proposed",
    "why": [
     {
      "text": "The registry has the lamp but no spot.",
@@ -2945,14 +3935,24 @@
    ],
    "open": [
     "Pick the spot."
-   ]
+   ],
+   "position": {
+    "point": "CHMSL",
+    "frame": "twin",
+    "x": 0.0,
+    "y": 1.8,
+    "z": 1.88,
+    "method": "rear edge of the roof (Exterior_Roof y max 1.80, z max 1.92) centre line",
+    "confidence": "low",
+    "source": "docs/wiring/research/2026-10-15_device-positions.md"
+   }
   },
   "CARGO-LAMP": {
    "id": "CARGO-LAMP",
    "what": "Cargo lamp (Truck-Lite 80251C)",
    "where": "Not placed: cargo area",
    "zone": "rear",
-   "status": "open",
+   "status": "proposed",
    "why": [
     {
      "text": "The registry has the lamp but no spot.",
@@ -2961,7 +3961,17 @@
    ],
    "open": [
     "Pick the spot."
-   ]
+   ],
+   "position": {
+    "point": "CARGO_LAMP",
+    "frame": "twin",
+    "x": 0.0,
+    "y": 1.2,
+    "z": 1.86,
+    "method": "mounts.yaml \"cargo area\": ceiling centre of the rear body (Exterior_Roof z max 1.92)",
+    "confidence": "low",
+    "source": "docs/wiring/research/2026-10-15_device-positions.md"
+   }
   },
   "FUEL-PUMP": {
    "id": "FUEL-PUMP",
@@ -3004,7 +4014,17 @@
      "text": "The M130 and Dakota taps join the sender lead here.",
      "source": "docs/wiring/calc-data/catalog/endpoints.yaml SPL-FUEL-SND"
     }
-   ]
+   ],
+   "position": {
+    "point": "SPL_FUEL_SND",
+    "frame": "twin",
+    "x": 0.15,
+    "y": 1.45,
+    "z": 0.9,
+    "method": "tank sender node FUEL_TANK (x 0.15, y 1.45) lifted to the lid, just above the cargo floor (z 0.854, ray cast)",
+    "confidence": "medium",
+    "source": "docs/wiring/research/2026-10-15_device-positions.md"
+   }
   },
   "VSS-SENDER": {
    "id": "VSS-SENDER",
@@ -3030,7 +4050,17 @@
      "text": "Power rear window: the key switch in the tailgate.",
      "source": "reference_documents/wiring_diagram_booklets/ST_352_78_CK_Wiring.pdf p.16, sheet A-4"
     }
-   ]
+   ],
+   "position": {
+    "point": "AT_TG_SW_KEY",
+    "frame": "twin",
+    "x": 0.0,
+    "y": 1.82,
+    "z": 1.0,
+    "method": "tailgate band centre (Tailgate_Band bbox x -0.85..0.85, y 1.84..1.86, z 0.89..1.08), 0.03 m inside the skin",
+    "confidence": "low",
+    "source": "docs/wiring/research/2026-10-15_device-positions.md"
+   }
   },
   "TG-SW-KEY-REV": {
    "id": "TG-SW-KEY-REV",
@@ -3044,7 +4074,17 @@
      "text": "Power rear window: the key switch.",
      "source": "reference_documents/wiring_diagram_booklets/ST_352_78_CK_Wiring.pdf p.16, sheet A-4"
     }
-   ]
+   ],
+   "position": {
+    "point": "AT_TG_SW_KEY",
+    "frame": "twin",
+    "x": 0.0,
+    "y": 1.82,
+    "z": 1.0,
+    "method": "follows TG-SW-KEY",
+    "confidence": "low",
+    "source": "docs/wiring/research/2026-10-15_device-positions.md"
+   }
   },
   "TG-CUTOUT": {
    "id": "TG-CUTOUT",
@@ -3057,7 +4097,17 @@
      "text": "Power rear window: the tailgate cutout switch in the window-up line.",
      "source": "reference_documents/wiring_diagram_booklets/ST_352_78_CK_Wiring.pdf p.16, sheet A-4"
     }
-   ]
+   ],
+   "position": {
+    "point": "TG_CUTOUT",
+    "frame": "twin",
+    "x": 0.82,
+    "y": 1.78,
+    "z": 1.1,
+    "method": "mounts.yaml \"At the tailgate\": latch-side jamb, driver side (body inner wall x 0.82 at y 1.6..1.75 from ray casts)",
+    "confidence": "low",
+    "source": "docs/wiring/research/2026-10-15_device-positions.md"
+   }
   },
   "TG-MOTOR-ACI": {
    "id": "TG-MOTOR-ACI",
@@ -3070,7 +4120,17 @@
      "text": "The Nu-Relics tailgate regulator with the ACI motor.",
      "source": "docs/wiring/calc-data/catalog/endpoints.yaml TG-MOTOR-ACI"
     }
-   ]
+   ],
+   "position": {
+    "point": "AT_TG_MOTOR_ACI",
+    "frame": "twin",
+    "x": 0.3,
+    "y": 1.74,
+    "z": 0.8,
+    "method": "inside the tailgate on the window regulator: lower tailgate cavity (Tailgate_Main z 0.68..1.36), driver of centre",
+    "confidence": "low",
+    "source": "docs/wiring/research/2026-10-15_device-positions.md"
+   }
   },
   "rear_window_motor": {
    "id": "rear_window_motor",
@@ -3083,7 +4143,17 @@
      "text": "Power rear window: the motor in the tailgate.",
      "source": "reference_documents/wiring_diagram_booklets/ST_352_78_CK_Wiring.pdf p.16, sheet A-4"
     }
-   ]
+   ],
+   "position": {
+    "point": "AT_TG_MOTOR_ACI",
+    "frame": "twin",
+    "x": 0.3,
+    "y": 1.74,
+    "z": 0.8,
+    "method": "same regulator as TG-MOTOR-ACI (factory vs candidate motor)",
+    "confidence": "low",
+    "source": "docs/wiring/research/2026-10-15_device-positions.md"
+   }
   },
   "AMP": {
    "id": "AMP",
@@ -3106,7 +4176,7 @@
    "what": "Amplifier power block",
    "where": "Rear cargo area (spot not picked)",
    "zone": "rear",
-   "status": "open",
+   "status": "proposed",
    "why": [
     {
      "text": "The registry has it in the rear but no spot.",
@@ -3115,14 +4185,24 @@
    ],
    "open": [
     "The audio layout is not designed."
-   ]
+   ],
+   "position": {
+    "point": "AMP_BLOCK",
+    "frame": "twin",
+    "x": -0.55,
+    "y": 1.25,
+    "z": 0.88,
+    "method": "follows node K5H_Amplifier, 0.20 m forward of its centre (\"beside the amplifier\")",
+    "confidence": "low",
+    "source": "docs/wiring/research/2026-10-15_device-positions.md"
+   }
   },
   "SPK-RL": {
    "id": "SPK-RL",
    "what": "Left rear speaker",
    "where": "Rear cargo area (spot not picked)",
    "zone": "rear",
-   "status": "open",
+   "status": "proposed",
    "why": [
     {
      "text": "The registry has it in the rear but no spot.",
@@ -3131,14 +4211,24 @@
    ],
    "open": [
     "The audio layout is not designed."
-   ]
+   ],
+   "position": {
+    "point": "SPK_RL",
+    "frame": "twin",
+    "x": 0.81,
+    "y": 1.35,
+    "z": 1.15,
+    "method": "rear quarter panel above the wheel arch (Interior_Panels_Rear wall x 0.82 at y 1.3..1.75, ray cast)",
+    "confidence": "low",
+    "source": "docs/wiring/research/2026-10-15_device-positions.md"
+   }
   },
   "SPK-RR": {
    "id": "SPK-RR",
    "what": "Right rear speaker",
    "where": "Rear cargo area (spot not picked)",
    "zone": "rear",
-   "status": "open",
+   "status": "proposed",
    "why": [
     {
      "text": "The registry has it in the rear but no spot.",
@@ -3147,7 +4237,17 @@
    ],
    "open": [
     "The audio layout is not designed."
-   ]
+   ],
+   "position": {
+    "point": "SPK_RR",
+    "frame": "twin",
+    "x": -0.81,
+    "y": 1.35,
+    "z": 1.15,
+    "method": "mirror of SPK-RL",
+    "confidence": "low",
+    "source": "docs/wiring/research/2026-10-15_device-positions.md"
+   }
   },
   "SUB": {
    "id": "SUB",
@@ -3170,7 +4270,7 @@
    "what": "Woofer 2 (JBL Club 102SL)",
    "where": "Rear cargo area (spot not picked)",
    "zone": "rear",
-   "status": "open",
+   "status": "proposed",
    "why": [
     {
      "text": "The registry has it in the rear but no spot.",
@@ -3179,7 +4279,17 @@
    ],
    "open": [
     "The audio layout is not designed."
-   ]
+   ],
+   "position": {
+    "point": "SUB_2",
+    "frame": "twin",
+    "x": 0.55,
+    "y": 1.45,
+    "z": 0.95,
+    "method": "follows node K5H_Subwoofer (enclosure bbox x 0.38..0.73, y 1.28..1.62)",
+    "confidence": "medium",
+    "source": "docs/wiring/research/2026-10-15_device-positions.md"
+   }
   },
   "GND-SPLICE-REAR": {
    "id": "GND-SPLICE-REAR",
@@ -3192,7 +4302,17 @@
      "text": "The rear returns land here and go back to the cab bank.",
      "source": "docs/wiring/calc-data/catalog/endpoints.yaml GND-SPLICE-REAR"
     }
-   ]
+   ],
+   "position": {
+    "point": "GND_SPLICE_REAR",
+    "frame": "twin",
+    "x": 0.4,
+    "y": 0.81,
+    "z": 0.66,
+    "method": "follows node REAR_JCT (where the rear harness branches)",
+    "confidence": "low",
+    "source": "docs/wiring/research/2026-10-15_device-positions.md"
+   }
   },
   "AMP-PASS": {
    "id": "AMP-PASS",
@@ -3212,14 +4332,24 @@
    ],
    "open": [
     "The owner allows round bulkheads only; a cable clamp for 2 AWG power is a separate question."
-   ]
+   ],
+   "position": {
+    "point": "AMP_PASS",
+    "frame": "twin",
+    "x": -0.5,
+    "y": 1.2,
+    "z": 0.854,
+    "method": "rear cargo floor (Interior_Main z 0.854, ray cast) beside the amplifier",
+    "confidence": "low",
+    "source": "docs/wiring/research/2026-10-15_device-positions.md"
+   }
   },
   "AMP-STEP-CTRL": {
    "id": "AMP-STEP-CTRL",
    "what": "Power step controller (AMP Research kit)",
    "where": "Not placed: under the body near a step motor",
    "zone": "underbody",
-   "status": "open",
+   "status": "proposed",
    "why": [
     {
      "text": "The guide on file is for the 2011-14 Silverado kit, which ties the controller \"to the motor support arm next to the battery\".",
@@ -3228,7 +4358,17 @@
    ],
    "open": [
     "The K5 kit's own guide is not on file."
-   ]
+   ],
+   "position": {
+    "point": "AMP_STEP_CTRL",
+    "frame": "twin",
+    "x": 0.82,
+    "y": -0.65,
+    "z": 0.52,
+    "method": "mounts.yaml \"under the body near a step motor\": driver-side sill under the door (Door_Left_Main y -1.17..-0.12, bottom z 0.59)",
+    "confidence": "low",
+    "source": "docs/wiring/research/2026-10-15_device-positions.md"
+   }
   },
   "E-STOPP": {
    "id": "E-STOPP",
@@ -3257,7 +4397,17 @@
      "text": "The sensor mounts on the detent shaft.",
      "source": "docs/wiring/calc-data/catalog/endpoints.yaml GSS-SENSOR (Dakota GSS-3000)"
     }
-   ]
+   ],
+   "position": {
+    "point": "GSS_SENSOR",
+    "frame": "twin",
+    "x": 0.18,
+    "y": -0.95,
+    "z": 0.66,
+    "method": "driver-side face of the K5H_6L80E case (bbox x -0.16..0.16, z 0.51..0.83) at the node TUNNEL_6L90 station (y -0.95)",
+    "confidence": "low",
+    "source": "docs/wiring/research/2026-10-15_device-positions.md"
+   }
   },
   "TCASE-4WD-SW": {
    "id": "TCASE-4WD-SW",
@@ -3608,7 +4758,17 @@
    ],
    "open": [
     "It moves with the engine power box, whose bay spot breaks MoTeC's spec."
-   ]
+   ],
+   "position": {
+    "point": "PDM15",
+    "frame": "twin",
+    "x": -0.52,
+    "y": -1.72,
+    "z": 1.12,
+    "method": "follows PDM15 (pigtail / stub splice within reach of its connector)",
+    "confidence": "low",
+    "source": "docs/wiring/research/2026-10-15_device-positions.md"
+   }
   },
   "SPL-PDM15-B-B25": {
    "id": "SPL-PDM15-B-B25",
@@ -3625,7 +4785,17 @@
    ],
    "open": [
     "It moves with the engine power box, whose bay spot breaks MoTeC's spec."
-   ]
+   ],
+   "position": {
+    "point": "PDM15",
+    "frame": "twin",
+    "x": -0.52,
+    "y": -1.72,
+    "z": 1.12,
+    "method": "follows PDM15 (pigtail / stub splice within reach of its connector)",
+    "confidence": "low",
+    "source": "docs/wiring/research/2026-10-15_device-positions.md"
+   }
   },
   "SPL-PDM15-B-B26": {
    "id": "SPL-PDM15-B-B26",
@@ -3642,14 +4812,24 @@
    ],
    "open": [
     "It moves with the engine power box, whose bay spot breaks MoTeC's spec."
-   ]
+   ],
+   "position": {
+    "point": "PDM15",
+    "frame": "twin",
+    "x": -0.52,
+    "y": -1.72,
+    "z": 1.12,
+    "method": "follows PDM15 (pigtail / stub splice within reach of its connector)",
+    "confidence": "low",
+    "source": "docs/wiring/research/2026-10-15_device-positions.md"
+   }
   },
   "SPL-PDM15-OUT8": {
    "id": "SPL-PDM15-OUT8",
    "what": "Pigtail splice at the engine power box (OUT8, the A/C clutch feed)",
    "where": "At the engine power box's plug",
    "zone": "engine",
-   "status": "open",
+   "status": "proposed",
    "follows": "PDM15",
    "why": [
     {
@@ -3659,6 +4839,204 @@
    ],
    "open": [
     "It moves with the engine power box."
+   ],
+   "position": {
+    "point": "PDM15",
+    "frame": "twin",
+    "x": -0.52,
+    "y": -1.72,
+    "z": 1.12,
+    "method": "follows PDM15 (pigtail / stub splice within reach of its connector)",
+    "confidence": "low",
+    "source": "docs/wiring/research/2026-10-15_device-positions.md"
+   }
+  },
+  "ISO-STUD-A": {
+   "id": "ISO-STUD-A",
+   "what": "Isolator stud A (Blue Sea 7700, battery side)",
+   "where": "On the isolator",
+   "zone": "engine",
+   "status": "proposed",
+   "follows": "PS-STUDS",
+   "why": [
+    {
+     "text": "The DC primary's stud set names this stud from its cables' own words (RSI pass 37).",
+     "source": "docs/wiring/calc-data/catalog/endpoints.yaml PS-STUDS (studs, stud_nodes)"
+    }
+   ],
+   "position": {
+    "point": "ISOLATOR",
+    "frame": "twin",
+    "x": -0.52,
+    "y": -1.9,
+    "z": 1.1,
+    "method": "on the isolator (its 3/8-16 stud A)",
+    "confidence": "low",
+    "source": "docs/wiring/receipts/2026-10-15_k5-power-spine-studs.md"
+   }
+  },
+  "ISO-STUD-B": {
+   "id": "ISO-STUD-B",
+   "what": "Isolator stud B (Blue Sea 7700, load side)",
+   "where": "On the isolator",
+   "zone": "engine",
+   "status": "proposed",
+   "follows": "PS-STUDS",
+   "why": [
+    {
+     "text": "The DC primary's stud set names this stud from its cables' own words (RSI pass 37).",
+     "source": "docs/wiring/calc-data/catalog/endpoints.yaml PS-STUDS (studs, stud_nodes)"
+    }
+   ],
+   "position": {
+    "point": "ISOLATOR",
+    "frame": "twin",
+    "x": -0.52,
+    "y": -1.9,
+    "z": 1.1,
+    "method": "on the isolator (its 3/8-16 stud B)",
+    "confidence": "low",
+    "source": "docs/wiring/receipts/2026-10-15_k5-power-spine-studs.md"
+   }
+  },
+  "DIST-STUD": {
+   "id": "DIST-STUD",
+   "what": "Distribution stud and its MEGA/MIDI fuse holders",
+   "where": "Beside the isolator, on its load side",
+   "zone": "engine",
+   "status": "proposed",
+   "follows": "PS-STUDS",
+   "why": [
+    {
+     "text": "The DC primary's stud set names this stud from its cables' own words (RSI pass 37).",
+     "source": "docs/wiring/calc-data/catalog/endpoints.yaml PS-STUDS (studs, stud_nodes)"
+    }
+   ],
+   "position": {
+    "point": "ISOLATOR",
+    "frame": "twin",
+    "x": -0.52,
+    "y": -1.9,
+    "z": 1.1,
+    "method": "beside the isolator: ISO_OUT runs stud B to it (point shared with the isolator until a bracket is drawn)",
+    "confidence": "low",
+    "source": "docs/wiring/receipts/2026-10-15_k5-power-spine-studs.md"
+   }
+  },
+  "STARTER-BPLUS": {
+   "id": "STARTER-BPLUS",
+   "what": "Starter B+ stud",
+   "where": "On the starter, passenger side of the block",
+   "zone": "engine",
+   "status": "proposed",
+   "follows": "PS-STUDS",
+   "why": [
+    {
+     "text": "The DC primary's stud set names this stud from its cables' own words (RSI pass 37).",
+     "source": "docs/wiring/calc-data/catalog/endpoints.yaml PS-STUDS (studs, stud_nodes)"
+    }
+   ],
+   "position": {
+    "point": "STARTER",
+    "frame": "twin",
+    "x": -0.3,
+    "y": -1.45,
+    "z": 0.57,
+    "method": "on the starter (twin anchor STARTER; the twin engine insert sits about 0.15 m too far back)",
+    "confidence": "low",
+    "source": "docs/wiring/receipts/2026-10-15_k5-power-spine-studs.md"
+   }
+  },
+  "GND-BLOCK": {
+   "id": "GND-BLOCK",
+   "what": "Engine block ground stud near the starter (G1)",
+   "where": "On the block beside the starter",
+   "zone": "engine",
+   "status": "proposed",
+   "follows": "PS-STUDS",
+   "why": [
+    {
+     "text": "The DC primary's stud set names this stud from its cables' own words (RSI pass 37).",
+     "source": "docs/wiring/calc-data/catalog/endpoints.yaml PS-STUDS (studs, stud_nodes)"
+    }
+   ],
+   "position": {
+    "point": "STARTER",
+    "frame": "twin",
+    "x": -0.3,
+    "y": -1.45,
+    "z": 0.57,
+    "method": "G1 lands 'near the starter': the starter point (twin engine insert about 0.15 m too far back)",
+    "confidence": "low",
+    "source": "docs/wiring/receipts/2026-10-15_k5-power-spine-studs.md"
+   }
+  },
+  "ALT-BPLUS": {
+   "id": "ALT-BPLUS",
+   "what": "Alternator B+ stud (Holley 197-302)",
+   "where": "On the alternator, Holley mid-mount bracket",
+   "zone": "engine",
+   "status": "open",
+   "follows": "PS-STUDS",
+   "why": [
+    {
+     "text": "The DC primary's stud set names this stud from its cables' own words (RSI pass 37).",
+     "source": "docs/wiring/calc-data/catalog/endpoints.yaml PS-STUDS (studs, stud_nodes)"
+    }
+   ],
+   "open": [
+    "the alternator point stands open: the twin puts K5H_Alternator on the passenger side, mounts.yaml on the driver side"
+   ]
+  },
+  "GND-FRAME": {
+   "id": "GND-FRAME",
+   "what": "Frame rail ground boss (G2)",
+   "where": "On the frame rail below the battery corner",
+   "zone": "engine",
+   "status": "open",
+   "follows": "PS-STUDS",
+   "why": [
+    {
+     "text": "The DC primary's stud set names this stud from its cables' own words (RSI pass 37).",
+     "source": "docs/wiring/calc-data/catalog/endpoints.yaml PS-STUDS (studs, stud_nodes)"
+    }
+   ],
+   "open": [
+    "no frame boss is drawn yet; the frame rail is not an object in the twin engine bay"
+   ]
+  },
+  "GND-HEAD": {
+   "id": "GND-HEAD",
+   "what": "Engine head/block ground strap stud (G3)",
+   "where": "At the rear of the engine",
+   "zone": "engine",
+   "status": "open",
+   "follows": "PS-STUDS",
+   "why": [
+    {
+     "text": "The DC primary's stud set names this stud from its cables' own words (RSI pass 37).",
+     "source": "docs/wiring/calc-data/catalog/endpoints.yaml PS-STUDS (studs, stud_nodes)"
+    }
+   ],
+   "open": [
+    "the rear of the engine is the twin insert face that sits about 0.15 m too far back"
+   ]
+  },
+  "FW-BOND": {
+   "id": "FW-BOND",
+   "what": "Firewall bond stud, engine side (G3)",
+   "where": "On the firewall, engine side",
+   "zone": "engine",
+   "status": "open",
+   "follows": "PS-STUDS",
+   "why": [
+    {
+     "text": "The DC primary's stud set names this stud from its cables' own words (RSI pass 37).",
+     "source": "docs/wiring/calc-data/catalog/endpoints.yaml PS-STUDS (studs, stud_nodes)"
+    }
+   ],
+   "open": [
+    "no bond stud spot is recorded on the firewall"
    ]
   }
  }

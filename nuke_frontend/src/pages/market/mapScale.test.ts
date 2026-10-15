@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { batBaseline, callouts, fitName, moveFill, moveText, pct, relativeMove, tileClass, tileName } from './mapScale';
+import { batBaseline, callouts, fitName, moveFill, moveText, moveTextShort, pct, relativeMove, tileClass, tileName } from './mapScale';
 
 const brands = [
   { count: 28_480, dated: 20_000, sold_12m: 4_506, sold_prior_12m: 3_817 },
@@ -35,9 +35,11 @@ describe('a tile’s move', () => {
   });
   it('says too few under 20 sales in either year, or when BaT holds under half the sales, and shows the count', () => {
     expect(relativeMove(brands[2], base)).toEqual({ kind: 'few', sold: 7, prior: 30, why: 'count' });
-    expect(moveText(relativeMove(brands[2], base))).toBe('n 7');
+    expect(moveText(relativeMove(brands[2], base))).toBe('few BaT sales');
     expect(relativeMove(brands[3], base, true)).toMatchObject({ kind: 'few', why: 'share' });
-    expect(moveText(relativeMove(brands[3], base, true))).toBe('other venues');
+    expect(moveText(relativeMove(brands[3], base, true))).toBe('mostly sold elsewhere');
+    expect(moveTextShort(relativeMove(brands[2], base))).toBe('few sales');
+    expect(moveTextShort(relativeMove(brands[3], base, true))).toBe('sold elsewhere');
   });
   it('sized by BaT itself, a tile is BaT\'s, so the share of other venues does not gate it', () => {
     expect(relativeMove(brands[3], base).kind).toBe('move');

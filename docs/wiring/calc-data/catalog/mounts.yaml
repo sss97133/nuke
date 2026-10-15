@@ -590,6 +590,15 @@ ends:
     why:
       - text: It is daisy-chained to the 8 coil power pins.
         source: docs/wiring/calc-data/catalog/endpoints.yaml RAIL-COIL_PWR
+    position:
+      point: RAIL_COIL_PWR
+      frame: twin
+      x: 0.0
+      y: -1.655
+      z: 1.31
+      method: centroid of the eight coil centres (K5H_Coil_1..8) = node VALLEY (0, -1.655, 1.31)
+      confidence: low
+      source: docs/wiring/research/2026-10-15_device-positions.md
   - id: RAIL-INJ_PWR
     what: Injector power rail (16 AWG, daisy-chained)
     where: Along the fuel rails, one tap per injector
@@ -599,6 +608,15 @@ ends:
     why:
       - text: It is daisy-chained at the fuel rail to the 8 injector pin 1s.
         source: docs/wiring/calc-data/catalog/endpoints.yaml RAIL-INJ_PWR
+    position:
+      point: RAIL_INJ_PWR
+      frame: twin
+      x: 0.0
+      y: -1.69
+      z: 1.17
+      method: centroid of the eight injector nodes (K5H_Injector_1..8; x 0, y mean of -1.86..-1.525, z 1.17)
+      confidence: low
+      source: docs/wiring/research/2026-10-15_device-positions.md
   - id: COIL-GROUND-RINGS
     what: Ring terminals for the coil grounds
     where: Back of the cylinder heads, one bolt position on each
@@ -659,22 +677,40 @@ ends:
     what: A/C high-pressure switch
     where: On the A/C liquid line
     zone: engine
-    status: open
+    status: proposed
     why:
       - text: It is the liquid-line switch.
         source: docs/wiring/calc-data/catalog/endpoints.yaml AC-HP-SW
     open:
       - 'The A/C lines are not plumbed: the spot follows them.'
+    position:
+      point: AC_HP_SW
+      frame: twin
+      x: -0.45
+      y: -2.48
+      z: 0.9
+      method: 'mounts.yaml "On the A/C liquid line": liquid line leaves the condenser at the core support; switch near the drier, passenger side'
+      confidence: low
+      source: docs/wiring/research/2026-10-15_device-positions.md
   - id: AC-LP-SW
     what: A/C low-pressure switch
     where: On the accumulator
     zone: engine
-    status: open
+    status: proposed
     why:
       - text: It is the accumulator switch.
         source: docs/wiring/calc-data/catalog/endpoints.yaml AC-LP-SW
     open:
       - The accumulator's spot is not set.
+    position:
+      point: AC_LP_SW
+      frame: twin
+      x: -0.76
+      y: -1.74
+      z: 1.0
+      method: accumulator beside the Four-Season case outer end (mounts.yaml "On the accumulator")
+      confidence: low
+      source: docs/wiring/research/2026-10-15_device-positions.md
   - id: FAN
     what: Radiator fan (SPAL 30107090, 16 in brushless puller)
     where: On the engine side of the radiator core
@@ -687,13 +723,22 @@ ends:
     what: Fan feed junction (Blue Sea 2103 PowerPost)
     where: Near the engine power box, where the fan leads break out
     zone: engine
-    status: open
+    status: proposed
     follows: PDM15
     why:
       - text: It joins the two 12 AWG feed legs from the engine power box to the fan's one terminal.
         source: docs/wiring/calc-data/catalog/endpoints.yaml FAN-JUNCTION
     open:
       - It follows the engine power box, which is flagged.
+    position:
+      point: FAN_JUNCTION
+      frame: twin
+      x: -0.52
+      y: -1.72
+      z: 1.2
+      method: mounts.yaml follows PDM15 ("near the engine power box where the fan leads break out")
+      confidence: low
+      source: docs/wiring/research/2026-10-15_device-positions.md
   - id: IBOOSTER
     what: Brake booster (Bosch iBooster Gen 1)
     where: Driver side of the firewall, on the factory booster pad
@@ -720,6 +765,15 @@ ends:
         source: docs/wiring/calc-data/catalog/endpoints.yaml BRAKE-FLUID-LVL
     open:
       - It is an option, not decided.
+    position:
+      point: BRAKE_FLUID_LVL
+      frame: twin
+      x: 0.4
+      y: -1.56
+      z: 1.22
+      method: top of the iBooster body (K5H_iBooster bbox x 0.31..0.50, y -1.64..-1.40, z 0.92..1.18), reservoir at the forward end
+      confidence: medium
+      source: docs/wiring/research/2026-10-15_device-positions.md
   - id: BRAKE-WARN-SW
     what: Brake warning switch on the proportioning valve (one wire)
     where: On the proportioning valve, on the front crossmember under the radiator where the brake lines meet
@@ -736,6 +790,15 @@ ends:
     open:
       - 'Which valve is on the truck and its part number: read the valve body.'
       - 'Its exact spot on the crossmember: from the owner''s photos or the brake-line render.'
+    position:
+      point: BRAKE_WARN_SW
+      frame: twin
+      x: 0.15
+      y: -2.3
+      z: 0.55
+      method: 'mounts.yaml "proportioning valve on the front crossmember under the radiator": crossmember between the rails (rails at |x| 0.39 from ray casts), under the radiator bottom (z 0.73)'
+      confidence: low
+      source: docs/wiring/research/2026-10-15_device-positions.md
   - id: WIDEBAND
     what: Lambda controller (MoTeC LTCD) and two sensors
     where: Under the truck, on the inside of a frame rail near the two O2 bungs
@@ -757,6 +820,15 @@ ends:
         source: reference_documents/k5_factory_docs/1977_Light_Truck_Service_Manual.pdf p.785, Fig. 8-3
       - text: '"Disconnect wiring harness connector located at rear of unit in engine compartment."'
         source: reference_documents/k5_factory_docs/1977_Light_Truck_Service_Manual.pdf p.786
+    position:
+      point: HEADLIGHT_L
+      frame: twin
+      x: 0.79
+      y: -2.467
+      z: 1.052
+      method: twin object Headlights, left lamp (connected component x +0.697..+0.882), rear face centre
+      confidence: high
+      source: docs/wiring/research/2026-10-15_device-positions.md
   - id: HEADLIGHT-R
     what: Right headlight (Truck-Lite 27270C)
     where: Front, right headlamp bucket; the plug is at the back of the lamp, engine side
@@ -767,6 +839,15 @@ ends:
         source: reference_documents/k5_factory_docs/1977_Light_Truck_Service_Manual.pdf p.785, Fig. 8-3
       - text: '"Disconnect wiring harness connector located at rear of unit in engine compartment."'
         source: reference_documents/k5_factory_docs/1977_Light_Truck_Service_Manual.pdf p.786
+    position:
+      point: HEADLIGHT_R
+      frame: twin
+      x: -0.79
+      y: -2.467
+      z: 1.052
+      method: twin object Headlights, right lamp (component x -0.882..-0.697), rear face centre
+      confidence: high
+      source: docs/wiring/research/2026-10-15_device-positions.md
   - id: PARK-TURN-LF
     what: Left front park/turn lamp (1157)
     where: Front, left, the rectangular parking lamp below the headlamp
@@ -777,6 +858,15 @@ ends:
         source: reference_documents/k5_factory_docs/1977_Light_Truck_Service_Manual.pdf p.785, Fig. 8-3
       - text: 'Parking lamp: "Remove two screws and parking lamp lens ... Remove housing stud nuts and remove housing with pigtail."'
         source: reference_documents/k5_factory_docs/1977_Light_Truck_Service_Manual.pdf p.786
+    position:
+      point: PARK_TURN_LF
+      frame: twin
+      x: 0.789
+      y: -2.526
+      z: 0.853
+      method: twin object Parking_Lights, left lamp body rear face centre
+      confidence: high
+      source: docs/wiring/research/2026-10-15_device-positions.md
   - id: MARKER-LF
     what: Left front side marker
     where: Front fender, left side, the side marker lamp
@@ -787,6 +877,15 @@ ends:
         source: reference_documents/k5_factory_docs/1977_Light_Truck_Service_Manual.pdf p.785, Fig. 8-3
       - text: Front side marker lamp replacement.
         source: reference_documents/k5_factory_docs/1977_Light_Truck_Service_Manual.pdf p.786
+    position:
+      point: MARKER_LF
+      frame: twin
+      x: 0.971
+      y: -2.386
+      z: 0.917
+      method: twin object Marker_Lights, left strip (x +0.971..+0.986), inner face centre
+      confidence: medium
+      source: docs/wiring/research/2026-10-15_device-positions.md
   - id: PARK-TURN-RF
     what: Right front park/turn lamp (1157)
     where: Front, right, the rectangular parking lamp below the headlamp
@@ -797,6 +896,15 @@ ends:
         source: reference_documents/k5_factory_docs/1977_Light_Truck_Service_Manual.pdf p.785, Fig. 8-3
       - text: 'Parking lamp: "Remove two screws and parking lamp lens ... Remove housing stud nuts and remove housing with pigtail."'
         source: reference_documents/k5_factory_docs/1977_Light_Truck_Service_Manual.pdf p.786
+    position:
+      point: PARK_TURN_RF
+      frame: twin
+      x: -0.789
+      y: -2.526
+      z: 0.853
+      method: twin object Parking_Lights, right lamp body rear face centre
+      confidence: high
+      source: docs/wiring/research/2026-10-15_device-positions.md
   - id: MARKER-RF
     what: Right front side marker
     where: Front fender, right side, the side marker lamp
@@ -807,6 +915,15 @@ ends:
         source: reference_documents/k5_factory_docs/1977_Light_Truck_Service_Manual.pdf p.785, Fig. 8-3
       - text: Front side marker lamp replacement.
         source: reference_documents/k5_factory_docs/1977_Light_Truck_Service_Manual.pdf p.786
+    position:
+      point: MARKER_RF
+      frame: twin
+      x: -0.971
+      y: -2.386
+      z: 0.917
+      method: twin object Marker_Lights, right strip, inner face centre
+      confidence: medium
+      source: docs/wiring/research/2026-10-15_device-positions.md
   - id: HORN
     what: Horn (factory)
     where: On the radiator support
@@ -817,6 +934,15 @@ ends:
         source: reference_documents/k5_factory_docs/1977_Light_Truck_Service_Manual.pdf p.121
     open:
       - 'Which side of the support: read it on the truck.'
+    position:
+      point: HORN
+      frame: twin
+      x: 0.5
+      y: -2.48
+      z: 0.95
+      method: 'mounts.yaml zone (radiator support) + twin geometry: core-support plane y -2.48 between headlamp bucket (x +0.70) and radiator core (x +0.38)'
+      confidence: low
+      source: docs/wiring/research/2026-10-15_device-positions.md
   - id: WIPER-MOTOR
     what: Wiper motor (factory 2-speed)
     where: On the cowl, engine side of the firewall, at the factory wiper hole
@@ -827,6 +953,15 @@ ends:
         source: reference_documents/k5_factory_docs/1977_Light_Truck_Service_Manual.pdf p.802-803, p.810
       - text: The factory wiper motor hole is under the cowl.
         source: nuke_frontend/src/components/wiring/objectTraits.ts factory_holes WP
+    position:
+      point: AT_WASHER_PUMP
+      frame: twin
+      x: 0.28
+      y: -1.5
+      z: 1.2
+      method: 'mounts.yaml "cowl, engine side of the firewall": midway between the two wiper-arm pivots (twin Exterior_Windshield_Wiper_Systems pivots x +0.609 and -0.044), 0.05 m forward of the firewall, below the cowl top'
+      confidence: low
+      source: docs/wiring/research/2026-10-15_device-positions.md
   - id: WASHER-PUMP
     what: Washer pump (factory, on the wiper motor)
     where: On the factory wiper motor at the cowl, engine side; its solenoid takes its own 2-way plug, and soft tube runs jar to pump and pump to nozzles
@@ -851,6 +986,15 @@ ends:
       - 'Whether the pump on the truck''s own motor still works: bench-test it before buying LMC 36-4078.'
       - The registry still lists the Hella 8TW 004 223-031 pump and tank (wire 50's terminal and the OUT26 current note in reconcile_v5.py); the registry
         owner re-points them.
+    position:
+      point: AT_WASHER_PUMP
+      frame: twin
+      x: 0.28
+      y: -1.5
+      z: 1.2
+      method: follows WIPER-MOTOR (pump is on the wiper gear box)
+      confidence: low
+      source: docs/wiring/research/2026-10-15_device-positions.md
   - id: BLOWER-MOTOR
     what: Blower motor (4 Seasons 35587)
     where: In the Four-Season blower-evaporator case, engine side of the passenger firewall
@@ -861,6 +1005,15 @@ ends:
         source: docs/wiring/K5_WIRING_STATE.md §1 row 40
       - text: The retained A/C box mounts at the passenger firewall corner.
         source: docs/wiring/receipts/2026-09-29_where-each-box-goes.md, finding 3
+    position:
+      point: BLOWER_MOTOR
+      frame: twin
+      x: -0.7
+      y: -1.56
+      z: 1.05
+      method: 'mounts.yaml "Four-Season case, engine side of the passenger firewall": outboard end of the case, 0.10 m forward of firewall plane'
+      confidence: low
+      source: docs/wiring/research/2026-10-15_device-positions.md
   - id: BLOWER-RES
     what: Blower resistor (factory)
     where: On the blower-evaporator case, engine side of the passenger firewall
@@ -871,6 +1024,15 @@ ends:
         source: reference_documents/k5_factory_docs/1977_Light_Truck_Service_Manual.pdf p.87-88
       - text: The retained A/C box mounts at the passenger firewall corner.
         source: docs/wiring/receipts/2026-09-29_where-each-box-goes.md, finding 3
+    position:
+      point: BLOWER_RES
+      frame: twin
+      x: -0.52
+      y: -1.56
+      z: 1.1
+      method: on the same case, inboard end
+      confidence: low
+      source: docs/wiring/research/2026-10-15_device-positions.md
   - id: UNDERHOOD-LAMP
     what: Underhood lamp
     where: 'Not placed: the factory spot was not found in the 1977 manual text'
@@ -896,13 +1058,22 @@ ends:
     what: Accessory battery (Optima YellowTop)
     where: Engine bay, in the battery corner (the working position is the passenger firewall corner)
     zone: engine
-    status: open
+    status: proposed
     follows: BATTERIES
     why:
       - text: See the BATTERIES box.
         source: docs/wiring/calc-data/catalog/mounts.yaml (boxes) BATTERIES
     open:
       - 'The battery corner conflicts with the Four-Season box: see the BATTERIES box.'
+    position:
+      point: ACC_BATT
+      frame: twin
+      x: -0.66
+      y: -2.14
+      z: 1.05
+      method: mounts.yaml BATTERIES working position (passenger firewall corner), second battery forward of the Odyssey on the fender shelf; x and z mirrored from the driver-side twin battery/DEFAULT_POSITIONS BAT z
+      confidence: low
+      source: docs/wiring/research/2026-10-15_device-positions.md
   - id: ISOLATOR
     what: Battery isolator (Blue Sea 7700)
     where: Engine bay, on the Odyssey's positive cable as close to the battery as it fits
@@ -912,6 +1083,15 @@ ends:
     why:
       - text: See the ISOLATOR box.
         source: docs/wiring/calc-data/catalog/mounts.yaml (boxes) ISOLATOR
+    position:
+      point: ISOLATOR
+      frame: twin
+      x: -0.52
+      y: -1.9
+      z: 1.1
+      method: 'mounts.yaml "on the Odyssey positive cable as close to the battery as it fits": inboard of the Odyssey (assumed at (-0.66,-1.90,1.05))'
+      confidence: low
+      source: docs/wiring/research/2026-10-15_device-positions.md
   - id: DCDC
     what: DC-DC charger (Victron Orion-Tr 12/12-30)
     where: By the batteries in the current design, which breaks Victron's rule
@@ -923,17 +1103,35 @@ ends:
         source: docs/wiring/calc-data/catalog/mounts.yaml (boxes) DCDC
     open:
       - 'Victron: keep it dry. See the DCDC box.'
+    position:
+      point: DCDC
+      frame: twin
+      x: -0.68
+      y: -2.3
+      z: 1.05
+      method: 'mounts.yaml current design "by the batteries in the engine bay": forward of ACC-BATT'
+      confidence: low
+      source: docs/wiring/research/2026-10-15_device-positions.md
   - id: GND-BANK-ENG
     what: Engine ground star (stud bank)
     where: Beside the batteries
     zone: engine
-    status: open
+    status: proposed
     follows: BATTERIES
     why:
       - text: 'The ground star is a stud bank beside the batteries: both battery negatives, the block and the frame land on it.'
         source: docs/wiring/K5_WIRING_STATE.md §1 (grounds run in the loom, 2026-09-27)
     open:
       - It follows the batteries, which are open.
+    position:
+      point: GND_BANK_ENG
+      frame: twin
+      x: -0.52
+      y: -2.02
+      z: 1.0
+      method: 'mounts.yaml "beside the batteries": inboard, between the two batteries'
+      confidence: low
+      source: docs/wiring/research/2026-10-15_device-positions.md
   - id: PS-STUDS
     what: DC primary cable ends
     where: At the batteries, the isolator, the distribution stud, the starter, the alternator, the block, the frame and the power boxes
@@ -956,6 +1154,15 @@ ends:
         source: docs/wiring/research/2026-06-10_power_spine_builders_study.md §2
     open:
       - It follows the batteries.
+    position:
+      point: FUSE_IBOOST_PERM
+      frame: twin
+      x: -0.52
+      y: -1.81
+      z: 1.16
+      method: 'mounts.yaml "battery end of its feed, in the battery corner": above the isolator side'
+      confidence: low
+      source: docs/wiring/research/2026-10-15_device-positions.md
   - id: FUSE-ISO_PWR
     what: In-line fuse, isolator power
     where: At the battery end of its feed, in the battery corner
@@ -967,6 +1174,15 @@ ends:
         source: docs/wiring/research/2026-06-10_power_spine_builders_study.md §2
     open:
       - It follows the batteries.
+    position:
+      point: FUSE_ISO_PWR
+      frame: twin
+      x: -0.52
+      y: -1.84
+      z: 1.16
+      method: same
+      confidence: low
+      source: docs/wiring/research/2026-10-15_device-positions.md
   - id: FUSE-ISO_SW_PWR
     what: In-line fuse, isolator switch power
     where: At the battery end of its feed, in the battery corner
@@ -978,6 +1194,15 @@ ends:
         source: docs/wiring/research/2026-06-10_power_spine_builders_study.md §2
     open:
       - It follows the batteries.
+    position:
+      point: FUSE_ISO_SW_PWR
+      frame: twin
+      x: -0.52
+      y: -1.87
+      z: 1.16
+      method: same
+      confidence: low
+      source: docs/wiring/research/2026-10-15_device-positions.md
   - id: PDM15-A
     what: Engine power box (MoTeC PDM15), plug A
     where: In the engine bay in the current design, which breaks MoTeC's spec
@@ -989,6 +1214,15 @@ ends:
         source: docs/wiring/calc-data/catalog/mounts.yaml (boxes) PDM15
     open:
       - A sealed PDM16 or PDM32 in the bay, or the box moves to the cab.
+    position:
+      point: PDM15
+      frame: twin
+      x: -0.52
+      y: -1.72
+      z: 1.12
+      method: 'mounts.yaml/endpoints.yaml: engine bay by the battery (working position): firewall side, inboard of the batteries'
+      confidence: low
+      source: docs/wiring/research/2026-10-15_device-positions.md
   - id: PDM15-B
     what: Engine power box (MoTeC PDM15), plug B
     where: In the engine bay in the current design, which breaks MoTeC's spec
@@ -1000,6 +1234,15 @@ ends:
         source: docs/wiring/calc-data/catalog/mounts.yaml (boxes) PDM15
     open:
       - A sealed PDM16 or PDM32 in the bay, or the box moves to the cab.
+    position:
+      point: PDM15
+      frame: twin
+      x: -0.52
+      y: -1.72
+      z: 1.12
+      method: same box as PDM15-A
+      confidence: low
+      source: docs/wiring/research/2026-10-15_device-positions.md
   - id: PDM15-STUD
     what: Engine power box (MoTeC PDM15), battery stud
     where: In the engine bay in the current design, which breaks MoTeC's spec
@@ -1011,94 +1254,175 @@ ends:
         source: docs/wiring/calc-data/catalog/mounts.yaml (boxes) PDM15
     open:
       - A sealed PDM16 or PDM32 in the bay, or the box moves to the cab.
+    position:
+      point: PDM15
+      frame: twin
+      x: -0.52
+      y: -1.72
+      z: 1.12
+      method: same box as PDM15-A (battery stud on the case)
+      confidence: low
+      source: docs/wiring/research/2026-10-15_device-positions.md
   - id: SPL-PDM15-OUT1
     what: Pigtail splice at the engine power box (OUT1)
     where: At the engine power box's plug
     zone: engine
-    status: open
+    status: proposed
     follows: PDM15
     why:
       - text: The splice sits a hand-width from the plug it serves.
         source: docs/wiring/calc-data/catalog/endpoints.yaml SPL-PDM15-OUT1
     open:
       - It moves with the engine power box.
+    position:
+      point: PDM15
+      frame: twin
+      x: -0.52
+      y: -1.72
+      z: 1.12
+      method: follows PDM15 (pigtail / stub splice within reach of its connector)
+      confidence: low
+      source: docs/wiring/research/2026-10-15_device-positions.md
   - id: SPL-PDM15-OUT2
     what: Pigtail splice at the engine power box (OUT2)
     where: At the engine power box's plug
     zone: engine
-    status: open
+    status: proposed
     follows: PDM15
     why:
       - text: The splice sits a hand-width from the plug it serves.
         source: docs/wiring/calc-data/catalog/endpoints.yaml SPL-PDM15-OUT2
     open:
       - It moves with the engine power box.
+    position:
+      point: PDM15
+      frame: twin
+      x: -0.52
+      y: -1.72
+      z: 1.12
+      method: follows PDM15 (pigtail / stub splice within reach of its connector)
+      confidence: low
+      source: docs/wiring/research/2026-10-15_device-positions.md
   - id: SPL-PDM15-OUT3
     what: Pigtail splice at the engine power box (OUT3)
     where: At the engine power box's plug
     zone: engine
-    status: open
+    status: proposed
     follows: PDM15
     why:
       - text: The splice sits a hand-width from the plug it serves.
         source: docs/wiring/calc-data/catalog/endpoints.yaml SPL-PDM15-OUT3
     open:
       - It moves with the engine power box.
+    position:
+      point: PDM15
+      frame: twin
+      x: -0.52
+      y: -1.72
+      z: 1.12
+      method: follows PDM15 (pigtail / stub splice within reach of its connector)
+      confidence: low
+      source: docs/wiring/research/2026-10-15_device-positions.md
   - id: SPL-PDM15-OUT4
     what: Pigtail splice at the engine power box (OUT4)
     where: At the engine power box's plug
     zone: engine
-    status: open
+    status: proposed
     follows: PDM15
     why:
       - text: The splice sits a hand-width from the plug it serves.
         source: docs/wiring/calc-data/catalog/endpoints.yaml SPL-PDM15-OUT4
     open:
       - It moves with the engine power box.
+    position:
+      point: PDM15
+      frame: twin
+      x: -0.52
+      y: -1.72
+      z: 1.12
+      method: follows PDM15 (pigtail / stub splice within reach of its connector)
+      confidence: low
+      source: docs/wiring/research/2026-10-15_device-positions.md
   - id: SPL-PDM15-OUT5
     what: Pigtail splice at the engine power box (OUT5)
     where: At the engine power box's plug
     zone: engine
-    status: open
+    status: proposed
     follows: PDM15
     why:
       - text: The splice sits a hand-width from the plug it serves.
         source: docs/wiring/calc-data/catalog/endpoints.yaml SPL-PDM15-OUT5
     open:
       - It moves with the engine power box.
+    position:
+      point: PDM15
+      frame: twin
+      x: -0.52
+      y: -1.72
+      z: 1.12
+      method: follows PDM15 (pigtail / stub splice within reach of its connector)
+      confidence: low
+      source: docs/wiring/research/2026-10-15_device-positions.md
   - id: SPL-PDM15-OUT6
     what: Pigtail splice at the engine power box (OUT6)
     where: At the engine power box's plug
     zone: engine
-    status: open
+    status: proposed
     follows: PDM15
     why:
       - text: The splice sits a hand-width from the plug it serves.
         source: docs/wiring/calc-data/catalog/endpoints.yaml SPL-PDM15-OUT6
     open:
       - It moves with the engine power box.
+    position:
+      point: PDM15
+      frame: twin
+      x: -0.52
+      y: -1.72
+      z: 1.12
+      method: follows PDM15 (pigtail / stub splice within reach of its connector)
+      confidence: low
+      source: docs/wiring/research/2026-10-15_device-positions.md
   - id: SPL-PDM15-OUT7
     what: Pigtail splice at the engine power box (OUT7)
     where: At the engine power box's plug
     zone: engine
-    status: open
+    status: proposed
     follows: PDM15
     why:
       - text: The splice sits a hand-width from the plug it serves.
         source: docs/wiring/calc-data/catalog/endpoints.yaml SPL-PDM15-OUT7
     open:
       - It moves with the engine power box.
+    position:
+      point: PDM15
+      frame: twin
+      x: -0.52
+      y: -1.72
+      z: 1.12
+      method: follows PDM15 (pigtail / stub splice within reach of its connector)
+      confidence: low
+      source: docs/wiring/research/2026-10-15_device-positions.md
   - id: SPL-PDM15-OUT13
     what: Pigtail splice at the engine power box (OUT13)
     where: At the engine power box's plug
     zone: engine
-    status: open
+    status: proposed
     follows: PDM15
     why:
       - text: The splice sits a hand-width from the plug it serves.
         source: docs/wiring/calc-data/catalog/endpoints.yaml SPL-PDM15-OUT13
     open:
       - It moves with the engine power box.
+    position:
+      point: PDM15
+      frame: twin
+      x: -0.52
+      y: -1.72
+      z: 1.12
+      method: follows PDM15 (pigtail / stub splice within reach of its connector)
+      confidence: low
+      source: docs/wiring/research/2026-10-15_device-positions.md
   - id: FIREWALL-ENGINE
     what: 61-pin firewall connector, engine side (plug, pins)
     where: Driver side, in the original fuse-box hole, on a CNC'd adapter plate
@@ -1132,6 +1456,15 @@ ends:
         source: docs/wiring/calc-data/catalog/mounts.yaml (boxes) BODY-PASS
     open:
       - 'Its wires need a new path: the engine power box, the 61-pin, or a round bulkhead.'
+    position:
+      point: FIREWALL_BODY_A
+      frame: twin
+      x: 0.64
+      y: -1.452
+      z: 0.86
+      method: 'endpoints.yaml: "a plate beside the 61-pin" (driver side): 0.14 m outboard of FIREWALL_61, firewall plane y -1.452 (ray cast, z 0.7..1.1)'
+      confidence: low
+      source: docs/wiring/research/2026-10-15_device-positions.md
   - id: FIREWALL-BODY-B
     what: Deutsch body bulkhead B
     where: 'Not used: nothing but the 61-pin goes through the firewall'
@@ -1143,6 +1476,15 @@ ends:
         source: docs/wiring/calc-data/catalog/mounts.yaml (boxes) BODY-PASS
     open:
       - 'Its wires need a new path: the engine power box, the 61-pin, or a round bulkhead.'
+    position:
+      point: FIREWALL_BODY_B
+      frame: twin
+      x: 0.64
+      y: -1.452
+      z: 0.98
+      method: same plate, 0.12 m above A
+      confidence: low
+      source: docs/wiring/research/2026-10-15_device-positions.md
   - id: FIREWALL-BODY-P
     what: Deutsch body bulkhead P
     where: 'Not used: nothing but the 61-pin goes through the firewall'
@@ -1154,22 +1496,40 @@ ends:
         source: docs/wiring/calc-data/catalog/mounts.yaml (boxes) BODY-PASS
     open:
       - 'Its wires need a new path: the engine power box, the 61-pin, or a round bulkhead.'
+    position:
+      point: FIREWALL_BODY_P
+      frame: twin
+      x: 0.64
+      y: -1.452
+      z: 0.74
+      method: same plate, 0.12 m below A
+      confidence: low
+      source: docs/wiring/research/2026-10-15_device-positions.md
   - id: FIREWALL-BODY-C
     what: Speed sender cab exit (Deutsch DT 6-way)
     where: Floor or kick panel near the transfer case
     zone: firewall
-    status: open
+    status: proposed
     follows: REAR-CONN
     why:
       - text: It is the speed sender's cab exit; the hole is set at the mock-up.
         source: docs/wiring/calc-data/catalog/endpoints.yaml FIREWALL-BODY-C
     open:
       - The owner allows round bulkheads only; this is a rectangular DT. It could join the rear connector.
+    position:
+      point: FIREWALL_BODY_C
+      frame: twin
+      x: 0.3
+      y: -0.5
+      z: 0.72
+      method: 'endpoints.yaml "floor or kick panel near the transfer case": cab floor beside the tunnel at the transfer case (K5H_TransferCase y -0.62..-0.36)'
+      confidence: low
+      source: docs/wiring/research/2026-10-15_device-positions.md
   - id: FIREWALL-GROMMET
     what: Power pass-through (battery feed and ground cables)
     where: Firewall, beside the batteries
     zone: firewall
-    status: open
+    status: proposed
     why:
       - text: 'These cables are too big for the 61-pin: its #20 contacts take 20-24 AWG.'
         source: docs/wiring/K5_WIRING_STATE.md §1 row 43
@@ -1177,6 +1537,15 @@ ends:
         source: docs/wiring/calc-data/catalog/endpoints.yaml FIREWALL-GROMMET
     open:
       - Nothing but the 61-pin goes through the firewall (Dave), so the big cables need a ruled exception or another path.
+    position:
+      point: FIREWALL_GROMMET
+      frame: twin
+      x: -0.6
+      y: -1.452
+      z: 0.74
+      method: 'mounts.yaml "Firewall, beside the batteries": passenger firewall below the A/C case, plane y -1.452 (ray cast)'
+      confidence: low
+      source: docs/wiring/research/2026-10-15_device-positions.md
   - id: M130-A
     what: Engine computer (MoTeC M130), plug A
     where: Under the dash, driver side, with the M130
@@ -1236,101 +1605,182 @@ ends:
     what: Pigtail splice at the body power box (OUT1)
     where: At the PDM30's plug
     zone: cab
-    status: open
+    status: proposed
     follows: PDM30
     why:
       - text: The splice joins the paired output pins to one feed at the PDM30.
         source: docs/wiring/calc-data/catalog/endpoints.yaml SPL-PDM30-OUT1
     open:
       - It moves with the PDM30.
+    position:
+      point: PDM30
+      frame: twin
+      x: 0.3
+      y: -1.3
+      z: 0.997
+      method: follows node PDM30 (mounts.yaml "at the PDM30's plug")
+      confidence: medium
+      source: docs/wiring/research/2026-10-15_device-positions.md
   - id: SPL-PDM30-OUT2
     what: Pigtail splice at the body power box (OUT2)
     where: At the PDM30's plug
     zone: cab
-    status: open
+    status: proposed
     follows: PDM30
     why:
       - text: The splice joins the paired output pins to one feed at the PDM30.
         source: docs/wiring/calc-data/catalog/endpoints.yaml SPL-PDM30-OUT2
     open:
       - It moves with the PDM30.
+    position:
+      point: PDM30
+      frame: twin
+      x: 0.3
+      y: -1.3
+      z: 0.997
+      method: follows node PDM30 (mounts.yaml "at the PDM30's plug")
+      confidence: medium
+      source: docs/wiring/research/2026-10-15_device-positions.md
   - id: SPL-PDM30-OUT3
     what: Pigtail splice at the body power box (OUT3)
     where: At the PDM30's plug
     zone: cab
-    status: open
+    status: proposed
     follows: PDM30
     why:
       - text: The splice joins the paired output pins to one feed at the PDM30.
         source: docs/wiring/calc-data/catalog/endpoints.yaml SPL-PDM30-OUT3
     open:
       - It moves with the PDM30.
+    position:
+      point: PDM30
+      frame: twin
+      x: 0.3
+      y: -1.3
+      z: 0.997
+      method: follows node PDM30 (mounts.yaml "at the PDM30's plug")
+      confidence: medium
+      source: docs/wiring/research/2026-10-15_device-positions.md
   - id: SPL-PDM30-OUT4
     what: Pigtail splice at the body power box (OUT4)
     where: At the PDM30's plug
     zone: cab
-    status: open
+    status: proposed
     follows: PDM30
     why:
       - text: The splice joins the paired output pins to one feed at the PDM30.
         source: docs/wiring/calc-data/catalog/endpoints.yaml SPL-PDM30-OUT4
     open:
       - It moves with the PDM30.
+    position:
+      point: PDM30
+      frame: twin
+      x: 0.3
+      y: -1.3
+      z: 0.997
+      method: follows node PDM30 (mounts.yaml "at the PDM30's plug")
+      confidence: medium
+      source: docs/wiring/research/2026-10-15_device-positions.md
   - id: SPL-PDM30-OUT5
     what: Pigtail splice at the body power box (OUT5)
     where: At the PDM30's plug
     zone: cab
-    status: open
+    status: proposed
     follows: PDM30
     why:
       - text: The splice joins the paired output pins to one feed at the PDM30.
         source: docs/wiring/calc-data/catalog/endpoints.yaml SPL-PDM30-OUT5
     open:
       - It moves with the PDM30.
+    position:
+      point: PDM30
+      frame: twin
+      x: 0.3
+      y: -1.3
+      z: 0.997
+      method: follows node PDM30 (mounts.yaml "at the PDM30's plug")
+      confidence: medium
+      source: docs/wiring/research/2026-10-15_device-positions.md
   - id: SPL-PDM30-OUT6
     what: Pigtail splice at the body power box (OUT6)
     where: At the PDM30's plug
     zone: cab
-    status: open
+    status: proposed
     follows: PDM30
     why:
       - text: The splice joins the paired output pins to one feed at the PDM30.
         source: docs/wiring/calc-data/catalog/endpoints.yaml SPL-PDM30-OUT6
     open:
       - It moves with the PDM30.
+    position:
+      point: PDM30
+      frame: twin
+      x: 0.3
+      y: -1.3
+      z: 0.997
+      method: follows node PDM30 (mounts.yaml "at the PDM30's plug")
+      confidence: medium
+      source: docs/wiring/research/2026-10-15_device-positions.md
   - id: SPL-PDM30-OUT7
     what: Pigtail splice at the body power box (OUT7)
     where: At the PDM30's plug
     zone: cab
-    status: open
+    status: proposed
     follows: PDM30
     why:
       - text: The splice joins the paired output pins to one feed at the PDM30.
         source: docs/wiring/calc-data/catalog/endpoints.yaml SPL-PDM30-OUT7
     open:
       - It moves with the PDM30.
+    position:
+      point: PDM30
+      frame: twin
+      x: 0.3
+      y: -1.3
+      z: 0.997
+      method: follows node PDM30 (mounts.yaml "at the PDM30's plug")
+      confidence: medium
+      source: docs/wiring/research/2026-10-15_device-positions.md
   - id: SPL-PDM30-OUT8
     what: Pigtail splice at the body power box (OUT8)
     where: At the PDM30's plug
     zone: cab
-    status: open
+    status: proposed
     follows: PDM30
     why:
       - text: The splice joins the paired output pins to one feed at the PDM30.
         source: docs/wiring/calc-data/catalog/endpoints.yaml SPL-PDM30-OUT8
     open:
       - It moves with the PDM30.
+    position:
+      point: PDM30
+      frame: twin
+      x: 0.3
+      y: -1.3
+      z: 0.997
+      method: follows node PDM30 (mounts.yaml "at the PDM30's plug")
+      confidence: medium
+      source: docs/wiring/research/2026-10-15_device-positions.md
   - id: GND-BANK-CAB
     what: Cab ground bank (insulated stud bus)
     where: Beside the PDM30
     zone: cab
-    status: open
+    status: proposed
     follows: PDM30
     why:
       - text: Every cab return lands here and goes back to the ground star.
         source: docs/wiring/calc-data/catalog/endpoints.yaml GND-BANK-CAB; docs/wiring/K5_WIRING_STATE.md §1 (grounds in the loom)
     open:
       - It follows the PDM30.
+    position:
+      point: GND_BANK_CAB
+      frame: twin
+      x: 0.15
+      y: -1.3
+      z: 0.997
+      method: 'mounts.yaml "beside the PDM30": 0.15 m toward the column from node PDM30'
+      confidence: low
+      source: docs/wiring/research/2026-10-15_device-positions.md
   - id: FUSE-DAK_CONST
     what: In-line fuse, DAK_CONST
     where: At the source end of its feed
@@ -1342,6 +1792,15 @@ ends:
         source: docs/wiring/research/2026-06-10_power_spine_builders_study.md §2
     open:
       - The source end follows the power box that feeds it.
+    position:
+      point: PDM30
+      frame: twin
+      x: 0.3
+      y: -1.3
+      z: 0.997
+      method: follows node PDM30 ("at the source end of its feed")
+      confidence: low
+      source: docs/wiring/research/2026-10-15_device-positions.md
   - id: FUSE-PCS_BATT
     what: In-line fuse, PCS_BATT
     where: At the source end of its feed
@@ -1353,6 +1812,15 @@ ends:
         source: docs/wiring/research/2026-06-10_power_spine_builders_study.md §2
     open:
       - The source end follows the power box that feeds it.
+    position:
+      point: PDM30
+      frame: twin
+      x: 0.3
+      y: -1.3
+      z: 0.997
+      method: follows node PDM30 ("at the source end of its feed")
+      confidence: low
+      source: docs/wiring/research/2026-10-15_device-positions.md
   - id: PORT-ETH
     what: M130 laptop port (panel RJ45)
     where: Cab, under the dash or in the glovebox
@@ -1391,6 +1859,15 @@ ends:
     why:
       - text: The M130 shutdown tap joins the switch's yellow wire here.
         source: docs/wiring/calc-data/catalog/endpoints.yaml SPL-ISO-YEL
+    position:
+      point: SPL_ISO_YEL
+      frame: twin
+      x: 0.3
+      y: -1.21
+      z: 1.05
+      method: behind ISO-SWITCH (tee on its yellow lead), 0.05 m further behind the dash face
+      confidence: low
+      source: docs/wiring/research/2026-10-15_device-positions.md
   - id: ISO-SWITCH
     what: Isolator dash switch (Blue Sea 2145)
     where: Cab, on the dash
@@ -1402,6 +1879,15 @@ ends:
         source: docs/wiring/calc-data/catalog/mounts.yaml (boxes) ISOLATOR
     open:
       - The exact dash spot is not picked.
+    position:
+      point: ISO_SWITCH
+      frame: twin
+      x: 0.3
+      y: -1.16
+      z: 1.05
+      method: 'mounts.yaml "Cab, on the dash": lower dash, driver reach; face y -1.127 at x 0.3 z 1.05 (ray cast), 0.03 m behind'
+      confidence: low
+      source: docs/wiring/research/2026-10-15_device-positions.md
   - id: APS
     what: Accelerator pedal (DBW)
     where: Driver footwell, on the firewall where the factory pedal was
@@ -1420,6 +1906,15 @@ ends:
         source: reference_documents/k5_factory_docs/1977_Light_Truck_Service_Manual.pdf p.408, Fig. 5-13
       - text: 'Stoplamp switch: see Section 5 (Brakes).'
         source: reference_documents/k5_factory_docs/1977_Light_Truck_Service_Manual.pdf p.790
+    position:
+      point: BRAKE_SW
+      frame: twin
+      x: 0.42
+      y: -1.3
+      z: 0.7
+      method: follows node BRAKE_SW (pedal bracket)
+      confidence: medium
+      source: docs/wiring/research/2026-10-15_device-positions.md
   - id: FLOOR-DIMMER
     what: Headlamp dimmer switch (factory floor switch)
     where: On the floor under the upper left corner of the floor mat, at the driver's left foot
@@ -1430,6 +1925,15 @@ ends:
         source: reference_documents/k5_factory_docs/1977_Light_Truck_Service_Manual.pdf p.787
       - text: Dimmer switch diagnosis and wiring.
         source: reference_documents/k5_factory_docs/1977_Light_Truck_Service_Manual.pdf p.779-780
+    position:
+      point: FLOOR_DIMMER
+      frame: twin
+      x: 0.68
+      y: -1.15
+      z: 0.7
+      method: 'mounts.yaml "floor under the upper left corner of the mat at the driver left foot": left of the brake pedal (x 0.42), carpet top z ~0.70'
+      confidence: low
+      source: docs/wiring/research/2026-10-15_device-positions.md
   - id: HL-SW
     what: Headlight switch (factory push-pull)
     where: Instrument panel, behind the cluster, knob through the dash
@@ -1438,6 +1942,15 @@ ends:
     why:
       - text: 'Light switch removal: "Reaching up behind instrument cluster, depress shaft retaining button and remove switch knob and rod."'
         source: reference_documents/k5_factory_docs/1977_Light_Truck_Service_Manual.pdf p.787
+    position:
+      point: AT_HL_SW
+      frame: twin
+      x: 0.62
+      y: -1.24
+      z: 1.05
+      method: follows node DASH_CLUSTER (headlight-switch dash region)
+      confidence: medium
+      source: docs/wiring/research/2026-10-15_device-positions.md
   - id: TURN-SW
     what: Turn and hazard switch (factory)
     where: In the steering column; its plug is at the column connector under the dash
@@ -1448,6 +1961,15 @@ ends:
         source: reference_documents/k5_factory_docs/1977_Light_Truck_Service_Manual.pdf p.783-784
       - text: The hazard switch is a push-pull "on the right side of the steering column".
         source: reference_documents/k5_factory_docs/1977_Light_Truck_Service_Manual.pdf p.802
+    position:
+      point: AT_HORN_SW
+      frame: twin
+      x: 0.5
+      y: -1.2
+      z: 0.95
+      method: follows node STEER_COL (column connector under the dash)
+      confidence: medium
+      source: docs/wiring/research/2026-10-15_device-positions.md
   - id: HORN-SW
     what: Horn button (factory)
     where: Steering wheel centre, grounding through the column
@@ -1456,6 +1978,15 @@ ends:
     why:
       - text: The horn button cap on the steering wheel.
         source: reference_documents/k5_factory_docs/1977_Light_Truck_Service_Manual.pdf p.227-228
+    position:
+      point: AT_HORN_SW
+      frame: twin
+      x: 0.5
+      y: -1.2
+      z: 0.95
+      method: follows node STEER_COL (grounds through the column; the PDM30 DIG6 wire leaves at the column connector)
+      confidence: medium
+      source: docs/wiring/research/2026-10-15_device-positions.md
   - id: IGN-SWITCH
     what: Ignition switch (factory)
     where: On top of the steering column jacket, near the front of the dash
@@ -1472,6 +2003,15 @@ ends:
     why:
       - text: The factory wiper/washer dash switch grounds through its mounting.
         source: reference_documents/k5_factory_docs/1977_Light_Truck_Service_Manual.pdf p.803
+    position:
+      point: AT_HL_SW
+      frame: twin
+      x: 0.62
+      y: -1.24
+      z: 1.05
+      method: 'mounts.yaml says only "Instrument panel": shares the headlight-switch dash region (DASH_CLUSTER)'
+      confidence: low
+      source: docs/wiring/research/2026-10-15_device-positions.md
   - id: BLOWER-SW
     what: Blower switch (factory Four-Season control head)
     where: Instrument panel, in the heater and A/C control head
@@ -1482,6 +2022,15 @@ ends:
         source: reference_documents/k5_factory_docs/1977_Light_Truck_Service_Manual.pdf p.87-88
       - text: The factory Four-Season housing is kept.
         source: docs/wiring/K5_WIRING_STATE.md §1 row 40
+    position:
+      point: BLOWER_SW
+      frame: twin
+      x: -0.25
+      y: -1.19
+      z: 1.08
+      method: 'mounts.yaml "heater and A/C control head": centre stack directly below the radio, face y -1.119 at z 1.1, plug 0.07 m behind'
+      confidence: low
+      source: docs/wiring/research/2026-10-15_device-positions.md
   - id: DAKOTA-VHX
     what: Gauge control box (Dakota VHX)
     where: Cab, driver side under the dash, within 3 ft of the cluster
@@ -1501,6 +2050,15 @@ ends:
     why:
       - text: The RetroSound unit is made for 1973-87 C/K trucks.
         source: docs/wiring/calc-data/catalog/endpoints.yaml RADIO
+    position:
+      point: RADIO
+      frame: twin
+      x: -0.25
+      y: -1.2
+      z: 1.2
+      method: 'mounts.yaml "factory radio opening": centre stack, x between the cluster (Dash_Speedo x -0.09..0.76) and the glovebox (x < -0.4); face y -1.061 from ray cast, plug 0.14 m behind'
+      confidence: low
+      source: docs/wiring/research/2026-10-15_device-positions.md
   - id: GSS-3000
     what: Gear shift sender decoder (Dakota GSS-3000)
     where: Under the dash
@@ -1509,6 +2067,15 @@ ends:
     why:
       - text: The decoder goes under the dash; its sensor sits on the transmission.
         source: docs/wiring/calc-data/catalog/endpoints.yaml GSS-3000 (Dakota GSS-3000 MAN# 650715:G)
+    position:
+      point: GSS_3000
+      frame: twin
+      x: 0.03
+      y: -1.3
+      z: 0.99
+      method: 'mounts.yaml zone "under the dash": row of boxes under the dash beside PDM30 (decoder)'
+      confidence: low
+      source: docs/wiring/research/2026-10-15_device-positions.md
   - id: PCS-TCM
     what: Transmission controller (PCS TCM-2650)
     where: Cab, under the dash (spot not picked)
@@ -1523,13 +2090,22 @@ ends:
     what: Transmission controller harness (PCS TCM-4610 kit)
     where: From the controller in the cab to the 6L90 case connector
     zone: cab
-    status: open
+    status: proposed
     follows: PCS-TCM
     why:
       - text: The kit harness plugs into the controller and runs to the case.
         source: docs/wiring/calc-data/catalog/endpoints.yaml PCS-HARNESS-4610
     open:
       - It follows the controller.
+    position:
+      point: PCS_HARNESS_4610
+      frame: twin
+      x: -0.1
+      y: -1.3
+      z: 0.98
+      method: 'mounts.yaml "Cab, under the dash (spot not picked)": TCM at the under-dash box row, passenger of PDM30'
+      confidence: low
+      source: docs/wiring/research/2026-10-15_device-positions.md
   - id: MIRROR-MON
     what: Mirror monitor (Rear View Safety kit)
     where: Windshield, in place of the rear-view mirror
@@ -1538,31 +2114,58 @@ ends:
     why:
       - text: The kit's replacement rear-view mirror carries the display.
         source: docs/wiring/calc-data/catalog/endpoints.yaml MIRROR-MON
+    position:
+      point: MIRROR_MON
+      frame: twin
+      x: 0.0
+      y: -0.9
+      z: 1.78
+      method: 'windshield top centre (Exterior_Window_Front: top y -0.85 z 1.88, base y -1.33 z 1.35), 0.1 m down the glass, 0.03 m inboard'
+      confidence: medium
+      source: docs/wiring/research/2026-10-15_device-positions.md
   - id: OUTLET-12V
     what: 12 V outlet
     where: 'Not placed: dash or console'
     zone: cab
-    status: open
+    status: proposed
     why:
       - text: The registry has the outlet but no spot.
         source: docs/wiring/calc-data/catalog/endpoints.yaml OUTLET-12V
     open:
       - Pick the spot.
+    position:
+      point: OUTLET_12V
+      frame: twin
+      x: -0.12
+      y: -1.19
+      z: 1.05
+      method: 'mounts.yaml "dash or console": lower dash centre-passenger side, face y -1.164 at x -0.1 z 1.05 (ray cast), 0.03 m behind'
+      confidence: low
+      source: docs/wiring/research/2026-10-15_device-positions.md
   - id: USB-PORT
     what: USB charging port
     where: 'Not placed: dash or console'
     zone: cab
-    status: open
+    status: proposed
     why:
       - text: The registry has the outlet but no spot.
         source: docs/wiring/calc-data/catalog/endpoints.yaml USB-PORT
     open:
       - Pick the spot.
+    position:
+      point: USB_PORT
+      frame: twin
+      x: -0.02
+      y: -1.195
+      z: 1.05
+      method: 'mounts.yaml "dash or console": lower dash centre, next to OUTLET-12V, face y -1.165 at x 0.0 z 1.05, 0.03 m behind'
+      confidence: low
+      source: docs/wiring/research/2026-10-15_device-positions.md
   - id: CLEARANCE-L
     what: Roof clearance lamp, left
     where: Cab roof, left
     zone: cab
-    status: open
+    status: proposed
     why:
       - text: The registry has three cab-roof clearance lamps.
         source: docs/wiring/calc-data/catalog/endpoints.yaml CLEARANCE-L
@@ -1571,11 +2174,20 @@ ends:
           and identification lamp installations")
     open:
       - 'The K5 has a removable top: where on it the lamps sit is not set.'
+    position:
+      point: CLEARANCE_L
+      frame: twin
+      x: 0.2
+      y: -0.75
+      z: 1.91
+      method: 'mounts.yaml "cab roof" + twin geometry: roof top at the windshield header (ray casts y -0.8..-0.6 give z 1.897..1.918)'
+      confidence: low
+      source: docs/wiring/research/2026-10-15_device-positions.md
   - id: CLEARANCE-C
     what: Roof clearance lamp, centre
     where: Cab roof, centre
     zone: cab
-    status: open
+    status: proposed
     why:
       - text: The registry has three cab-roof clearance lamps.
         source: docs/wiring/calc-data/catalog/endpoints.yaml CLEARANCE-C
@@ -1584,11 +2196,20 @@ ends:
           and identification lamp installations")
     open:
       - 'The K5 has a removable top: where on it the lamps sit is not set.'
+    position:
+      point: CLEARANCE_C
+      frame: twin
+      x: 0.0
+      y: -0.75
+      z: 1.91
+      method: 'mounts.yaml "cab roof" + twin geometry: roof top at the windshield header (ray casts y -0.8..-0.6 give z 1.897..1.918)'
+      confidence: low
+      source: docs/wiring/research/2026-10-15_device-positions.md
   - id: CLEARANCE-R
     what: Roof clearance lamp, right
     where: Cab roof, right
     zone: cab
-    status: open
+    status: proposed
     why:
       - text: The registry has three cab-roof clearance lamps.
         source: docs/wiring/calc-data/catalog/endpoints.yaml CLEARANCE-R
@@ -1597,6 +2218,15 @@ ends:
           and identification lamp installations")
     open:
       - 'The K5 has a removable top: where on it the lamps sit is not set.'
+    position:
+      point: CLEARANCE_R
+      frame: twin
+      x: -0.2
+      y: -0.75
+      z: 1.91
+      method: 'mounts.yaml "cab roof" + twin geometry: roof top at the windshield header (ray casts y -0.8..-0.6 give z 1.897..1.918)'
+      confidence: low
+      source: docs/wiring/research/2026-10-15_device-positions.md
   - id: DOME-LAMP
     what: Dome lamp
     where: Roof, inside
@@ -1605,6 +2235,15 @@ ends:
     why:
       - text: The dome and courtesy lamp circuits switch on the ground side.
         source: reference_documents/k5_factory_docs/1977_Light_Truck_Service_Manual.pdf p.833
+    position:
+      point: DOME_LAMP
+      frame: twin
+      x: 0.0
+      y: 0.2
+      z: 1.88
+      method: follows node DOME (headliner cavity)
+      confidence: medium
+      source: docs/wiring/research/2026-10-15_device-positions.md
   - id: DOOR-JAMB-L
     what: Door jamb switch, driver (factory pin switch)
     where: In the driver front door jamb
@@ -1613,6 +2252,15 @@ ends:
     why:
       - text: The jamb switches are in the ground side of the dome and courtesy lamp circuits.
         source: reference_documents/k5_factory_docs/1977_Light_Truck_Service_Manual.pdf p.833
+    position:
+      point: DOOR_JAMB_L
+      frame: twin
+      x: 0.78
+      y: -1.15
+      z: 1.05
+      method: 'mounts.yaml "driver front door jamb": hinge-side jamb, 0.14 m inboard of the boot node (door x span 0.70..1.01, y -1.17..-0.12)'
+      confidence: low
+      source: docs/wiring/research/2026-10-15_device-positions.md
   - id: DOOR-JAMB-R
     what: Door jamb switch, passenger (factory pin switch)
     where: In the passenger front door jamb
@@ -1621,6 +2269,15 @@ ends:
     why:
       - text: The jamb switches are in the ground side of the dome and courtesy lamp circuits.
         source: reference_documents/k5_factory_docs/1977_Light_Truck_Service_Manual.pdf p.833
+    position:
+      point: DOOR_JAMB_R
+      frame: twin
+      x: -0.78
+      y: -1.15
+      z: 1.05
+      method: mirror of DOOR-JAMB-L
+      confidence: low
+      source: docs/wiring/research/2026-10-15_device-positions.md
   - id: FOOTWELL-LAMPS
     what: Footwell lamps (Lumitec Mini Rail2)
     where: Under the dash, one in each footwell
@@ -1629,6 +2286,15 @@ ends:
     why:
       - text: An owner-chosen LED strip.
         source: docs/wiring/calc-data/catalog/endpoints.yaml FOOTWELL-LAMPS
+    position:
+      point: FOOTWELL_LAMPS
+      frame: twin
+      x: 0.0
+      y: -1.25
+      z: 0.85
+      method: 'mounts.yaml "one in each footwell": one endpoint for two lamps, placed between the footwells at the dash underside'
+      confidence: low
+      source: docs/wiring/research/2026-10-15_device-positions.md
   - id: UNDERDASH-LAMPS
     what: Under-dash lamps (Lumitec Mini Rail2)
     where: Under the dash
@@ -1637,6 +2303,15 @@ ends:
     why:
       - text: An owner-chosen LED strip.
         source: docs/wiring/calc-data/catalog/endpoints.yaml UNDERDASH-LAMPS
+    position:
+      point: UNDERDASH_LAMPS
+      frame: twin
+      x: 0.0
+      y: -1.25
+      z: 1.0
+      method: 'mounts.yaml "Under the dash": dash underside, centre line'
+      confidence: low
+      source: docs/wiring/research/2026-10-15_device-positions.md
   - id: TG-SW-DASH
     what: Tailgate window switch (factory dash switch)
     where: Instrument panel
@@ -1645,6 +2320,15 @@ ends:
     why:
       - text: 'Power rear window: the dash switch.'
         source: reference_documents/wiring_diagram_booklets/ST_352_78_CK_Wiring.pdf p.16, sheet A-4
+    position:
+      point: AT_TG_SW_DASH
+      frame: twin
+      x: 0.1
+      y: -1.14
+      z: 1.05
+      method: 'mounts.yaml "Instrument panel": lower dash, driver of centre; face y -1.113 at x 0.1 z 1.05 (ray cast), 0.03 m behind'
+      confidence: low
+      source: docs/wiring/research/2026-10-15_device-positions.md
   - id: TG-SW-MASTER
     what: 'Tailgate window master switch (Nu-Relics #121)'
     where: Instrument panel
@@ -1653,6 +2337,15 @@ ends:
     why:
       - text: 'The Nu-Relics reverse-polarity dash switch (option #121).'
         source: docs/wiring/calc-data/catalog/endpoints.yaml TG-SW-MASTER
+    position:
+      point: AT_TG_SW_DASH
+      frame: twin
+      x: 0.1
+      y: -1.14
+      z: 1.05
+      method: same slot as TG-SW-DASH (candidate replaces the factory dash switch)
+      confidence: low
+      source: docs/wiring/research/2026-10-15_device-positions.md
   - id: DOOR-L-PASS
     what: Driver door pass-through (locks and speaker, DT 8-way)
     where: At the driver door's hinge side, body to door
@@ -1661,6 +2354,15 @@ ends:
     why:
       - text: The DT 8-way that carries the locks and the speaker across the hinge.
         source: docs/wiring/calc-data/catalog/endpoints.yaml DOOR-L-PASS
+    position:
+      point: AT_DOOR_L_PASS
+      frame: twin
+      x: 0.92
+      y: -1.13
+      z: 1.0
+      method: follows node DOOR_BOOT_L (driver door hinge line)
+      confidence: medium
+      source: docs/wiring/research/2026-10-15_device-positions.md
   - id: DOOR-L-PASS-P
     what: Driver door pass-through (window power, DTP 4-way)
     where: At the driver door's hinge side, body to door
@@ -1669,6 +2371,15 @@ ends:
     why:
       - text: The DTP 4-way that carries the window power across the hinge.
         source: docs/wiring/calc-data/catalog/endpoints.yaml DOOR-L-PASS-P
+    position:
+      point: AT_DOOR_L_PASS
+      frame: twin
+      x: 0.92
+      y: -1.13
+      z: 1.0
+      method: follows node DOOR_BOOT_L (driver door hinge line)
+      confidence: medium
+      source: docs/wiring/research/2026-10-15_device-positions.md
   - id: LOCK-SW-L
     what: Driver lock rocker
     where: In the driver door panel
@@ -1677,6 +2388,15 @@ ends:
     why:
       - text: The Nu-Relics door switch panel.
         source: nu-relics.com 17383-2; docs/wiring/calc-data/catalog/endpoints.yaml WIN-SW-L
+    position:
+      point: AT_LOCK_SW_L
+      frame: twin
+      x: 0.825
+      y: -0.815
+      z: 1.245
+      method: same driver door switch panel as WIN-SW-L (lock rocker is on the same panel)
+      confidence: medium
+      source: docs/wiring/research/2026-10-15_device-positions.md
   - id: WIN-SW-L
     what: Driver window switch panel (Nu-Relics 17383-2)
     where: In the driver door panel
@@ -1685,6 +2405,15 @@ ends:
     why:
       - text: The Nu-Relics door switch panel.
         source: nu-relics.com 17383-2
+    position:
+      point: AT_LOCK_SW_L
+      frame: twin
+      x: 0.825
+      y: -0.815
+      z: 1.245
+      method: twin object Door_Left_Handle_Window centre (window crank position, replaced by the switch panel)
+      confidence: medium
+      source: docs/wiring/research/2026-10-15_device-positions.md
   - id: lock_actuator_DS
     what: Driver door lock actuator (AutoLoc AUTZT2000)
     where: Inside the driver door, on the lock rod
@@ -1693,6 +2422,15 @@ ends:
     why:
       - text: The AutoLoc 2-wire actuator.
         source: autoloc.com AUTZT2000
+    position:
+      point: lock_actuator_DS
+      frame: twin
+      x: 0.86
+      y: -0.3
+      z: 1.1
+      method: driver door lock rod near the latch (door rear edge y -0.12)
+      confidence: low
+      source: docs/wiring/research/2026-10-15_device-positions.md
   - id: window_motor_DS
     what: Driver window motor (Nu-Relics 17383-2)
     where: Inside the driver door, on the regulator
@@ -1701,6 +2439,15 @@ ends:
     why:
       - text: The Nu-Relics regulator and motor.
         source: nu-relics.com 17383-2
+    position:
+      point: window_motor_DS
+      frame: twin
+      x: 0.86
+      y: -0.65
+      z: 0.95
+      method: follows anchor DOOR_IN_L (in-door devices), moved from the skin (x 0.97) to mid-door thickness (x 0.86)
+      confidence: low
+      source: docs/wiring/research/2026-10-15_device-positions.md
   - id: SPK-FL
     what: Driver door speaker (JL Audio C2-650X)
     where: In the driver door
@@ -1709,6 +2456,15 @@ ends:
     why:
       - text: The registry puts the front speakers in the doors.
         source: docs/wiring/calc-data/catalog/endpoints.yaml SPK-FL
+    position:
+      point: SPK_FL
+      frame: twin
+      x: 0.86
+      y: -0.75
+      z: 0.8
+      method: driver door lower pocket (door z span 0.59..1.85)
+      confidence: low
+      source: docs/wiring/research/2026-10-15_device-positions.md
   - id: DOOR-R-PASS
     what: Passenger door pass-through (locks and speaker, DT 8-way)
     where: At the passenger door's hinge side, body to door
@@ -1717,6 +2473,15 @@ ends:
     why:
       - text: The DT 8-way that carries the locks and the speaker across the hinge.
         source: docs/wiring/calc-data/catalog/endpoints.yaml DOOR-R-PASS
+    position:
+      point: AT_DOOR_R_PASS
+      frame: twin
+      x: -0.92
+      y: -1.13
+      z: 1.0
+      method: follows node DOOR_BOOT_R (passenger door hinge line)
+      confidence: medium
+      source: docs/wiring/research/2026-10-15_device-positions.md
   - id: DOOR-R-PASS-P
     what: Passenger door pass-through (window power, DTP 4-way)
     where: At the passenger door's hinge side, body to door
@@ -1725,6 +2490,15 @@ ends:
     why:
       - text: The DTP 4-way that carries the window power across the hinge.
         source: docs/wiring/calc-data/catalog/endpoints.yaml DOOR-R-PASS-P
+    position:
+      point: AT_DOOR_R_PASS
+      frame: twin
+      x: -0.92
+      y: -1.13
+      z: 1.0
+      method: follows node DOOR_BOOT_R (passenger door hinge line)
+      confidence: medium
+      source: docs/wiring/research/2026-10-15_device-positions.md
   - id: LOCK-SW-R
     what: Passenger lock rocker
     where: In the passenger door panel
@@ -1733,6 +2507,15 @@ ends:
     why:
       - text: The Nu-Relics door switch panel.
         source: nu-relics.com 17383-2; docs/wiring/calc-data/catalog/endpoints.yaml WIN-SW-R
+    position:
+      point: AT_LOCK_SW_R
+      frame: twin
+      x: -0.825
+      y: -0.815
+      z: 1.245
+      method: same passenger door switch panel as WIN-SW-R (lock rocker is on the same panel)
+      confidence: medium
+      source: docs/wiring/research/2026-10-15_device-positions.md
   - id: WIN-SW-R
     what: Passenger window switch panel (Nu-Relics 17383-2)
     where: In the passenger door panel
@@ -1741,6 +2524,15 @@ ends:
     why:
       - text: The Nu-Relics door switch panel.
         source: nu-relics.com 17383-2
+    position:
+      point: AT_LOCK_SW_R
+      frame: twin
+      x: -0.825
+      y: -0.815
+      z: 1.245
+      method: twin object Door_Right_Handle_Window centre (window crank position, replaced by the switch panel)
+      confidence: medium
+      source: docs/wiring/research/2026-10-15_device-positions.md
   - id: lock_actuator_PS
     what: Passenger door lock actuator (AutoLoc AUTZT2000)
     where: Inside the passenger door, on the lock rod
@@ -1749,6 +2541,15 @@ ends:
     why:
       - text: The AutoLoc 2-wire actuator.
         source: autoloc.com AUTZT2000
+    position:
+      point: lock_actuator_PS
+      frame: twin
+      x: -0.86
+      y: -0.3
+      z: 1.1
+      method: passenger door lock rod near the latch (door rear edge y -0.12)
+      confidence: low
+      source: docs/wiring/research/2026-10-15_device-positions.md
   - id: window_motor_PS
     what: Passenger window motor (Nu-Relics 17383-2)
     where: Inside the passenger door, on the regulator
@@ -1757,6 +2558,15 @@ ends:
     why:
       - text: The Nu-Relics regulator and motor.
         source: nu-relics.com 17383-2
+    position:
+      point: window_motor_PS
+      frame: twin
+      x: -0.86
+      y: -0.65
+      z: 0.95
+      method: mirror of window_motor_DS
+      confidence: low
+      source: docs/wiring/research/2026-10-15_device-positions.md
   - id: SPK-FR
     what: Passenger door speaker (JL Audio C2-650X)
     where: In the passenger door
@@ -1765,6 +2575,15 @@ ends:
     why:
       - text: The registry puts the front speakers in the doors.
         source: docs/wiring/calc-data/catalog/endpoints.yaml SPK-FR
+    position:
+      point: SPK_FR
+      frame: twin
+      x: -0.86
+      y: -0.75
+      z: 0.8
+      method: passenger door lower pocket (door z span 0.59..1.85)
+      confidence: low
+      source: docs/wiring/research/2026-10-15_device-positions.md
   - id: Tail_Light_Left
     what: Left tail lamp (1157)
     where: 'Rear corner, left: the tail combination lamp (grey plug)'
@@ -1773,6 +2592,15 @@ ends:
     why:
       - text: 'Rear lighting, C-K 06-14 models: tail combination lamp (gray), back-up lamp (white), marker lamp (cream).'
         source: reference_documents/k5_factory_docs/1977_Light_Truck_Service_Manual.pdf p.788, Fig. 8-6
+    position:
+      point: Tail_Light_Left
+      frame: twin
+      x: 0.926
+      y: 1.78
+      z: 0.985
+      method: twin object Tail_Lights_Main, left lamp (component x +0.852..+1.000) centre
+      confidence: high
+      source: docs/wiring/research/2026-10-15_device-positions.md
   - id: Backup_Light_Left
     what: Left backup lamp
     where: 'Rear corner, left: the back-up lamp (white plug)'
@@ -1781,6 +2609,15 @@ ends:
     why:
       - text: 'Rear lighting, C-K 06-14 models: back-up lamp (white).'
         source: reference_documents/k5_factory_docs/1977_Light_Truck_Service_Manual.pdf p.788, Fig. 8-6
+    position:
+      point: Backup_Light_Left
+      frame: twin
+      x: 0.935
+      y: 1.805
+      z: 0.931
+      method: twin object Tail_Lights_Main, lower sub-component of the left lamp (x +0.899..+0.970, z 0.907..0.955) centre
+      confidence: low
+      source: docs/wiring/research/2026-10-15_device-positions.md
   - id: MARKER-LR
     what: Left rear side marker
     where: 'Rear quarter, left: the marker lamp (cream plug)'
@@ -1789,6 +2626,15 @@ ends:
     why:
       - text: 'Rear lighting, C-K 06-14 models: marker lamp (cream).'
         source: reference_documents/k5_factory_docs/1977_Light_Truck_Service_Manual.pdf p.788, Fig. 8-6
+    position:
+      point: MARKER_LR
+      frame: twin
+      x: 0.977
+      y: 1.75
+      z: 0.985
+      method: twin object Tail_Lights_Main, left side-wrap sub-component (x +0.961..+0.992, y 1.709..1.790) centre
+      confidence: low
+      source: docs/wiring/research/2026-10-15_device-positions.md
   - id: Tail_Light_Right
     what: Right tail lamp (1157)
     where: 'Rear corner, right: the tail combination lamp (grey plug)'
@@ -1797,6 +2643,15 @@ ends:
     why:
       - text: 'Rear lighting, C-K 06-14 models: tail combination lamp (gray), back-up lamp (white), marker lamp (cream).'
         source: reference_documents/k5_factory_docs/1977_Light_Truck_Service_Manual.pdf p.788, Fig. 8-6
+    position:
+      point: Tail_Light_Right
+      frame: twin
+      x: -0.926
+      y: 1.78
+      z: 0.985
+      method: twin object Tail_Lights_Main, right lamp centre
+      confidence: high
+      source: docs/wiring/research/2026-10-15_device-positions.md
   - id: Backup_Light_Right
     what: Right backup lamp
     where: 'Rear corner, right: the back-up lamp (white plug)'
@@ -1805,6 +2660,15 @@ ends:
     why:
       - text: 'Rear lighting, C-K 06-14 models: back-up lamp (white).'
         source: reference_documents/k5_factory_docs/1977_Light_Truck_Service_Manual.pdf p.788, Fig. 8-6
+    position:
+      point: Backup_Light_Right
+      frame: twin
+      x: -0.935
+      y: 1.805
+      z: 0.931
+      method: mirror of Backup_Light_Left
+      confidence: low
+      source: docs/wiring/research/2026-10-15_device-positions.md
   - id: MARKER-RR
     what: Right rear side marker
     where: 'Rear quarter, right: the marker lamp (cream plug)'
@@ -1813,6 +2677,15 @@ ends:
     why:
       - text: 'Rear lighting, C-K 06-14 models: marker lamp (cream).'
         source: reference_documents/k5_factory_docs/1977_Light_Truck_Service_Manual.pdf p.788, Fig. 8-6
+    position:
+      point: MARKER_RR
+      frame: twin
+      x: -0.977
+      y: 1.75
+      z: 0.985
+      method: mirror of MARKER-LR
+      confidence: low
+      source: docs/wiring/research/2026-10-15_device-positions.md
   - id: LICENSE-LAMP
     what: License plate lamp (factory)
     where: At the rear license plate
@@ -1823,6 +2696,15 @@ ends:
         source: reference_documents/k5_factory_docs/1977_Light_Truck_Service_Manual.pdf p.787
     open:
       - Read on the truck whether the plate sits on the bumper or the tailgate.
+    position:
+      point: LICENSE_LAMP
+      frame: twin
+      x: 0.0
+      y: 1.98
+      z: 0.78
+      method: rear bumper face (Exterior_Bumper_Rear_Blazer bbox y 1.80..1.98, z 0.49..0.76) centre line, lamp above the plate
+      confidence: low
+      source: docs/wiring/research/2026-10-15_device-positions.md
   - id: Backup_Camera
     what: Backup camera (Rear View Safety RVS-7180355-IR)
     where: At the rear license plate
@@ -1831,26 +2713,53 @@ ends:
     why:
       - text: A license-plate camera.
         source: docs/wiring/calc-data/catalog/endpoints.yaml Backup_Camera
+    position:
+      point: Backup_Camera
+      frame: twin
+      x: 0.0
+      y: 1.98
+      z: 0.74
+      method: rear bumper face centre line at the plate (camera clamps to the plate frame)
+      confidence: low
+      source: docs/wiring/research/2026-10-15_device-positions.md
   - id: CHMSL
     what: Third brake light (ORACLE 4514-003, 7 in)
     where: 'Not placed: top of the tailgate or rear edge of the top'
     zone: rear
-    status: open
+    status: proposed
     why:
       - text: The registry has the lamp but no spot.
         source: docs/wiring/calc-data/catalog/endpoints.yaml CHMSL
     open:
       - Pick the spot.
+    position:
+      point: CHMSL
+      frame: twin
+      x: 0.0
+      y: 1.8
+      z: 1.88
+      method: rear edge of the roof (Exterior_Roof y max 1.80, z max 1.92) centre line
+      confidence: low
+      source: docs/wiring/research/2026-10-15_device-positions.md
   - id: CARGO-LAMP
     what: Cargo lamp (Truck-Lite 80251C)
     where: 'Not placed: cargo area'
     zone: rear
-    status: open
+    status: proposed
     why:
       - text: The registry has the lamp but no spot.
         source: docs/wiring/calc-data/catalog/endpoints.yaml CARGO-LAMP
     open:
       - Pick the spot.
+    position:
+      point: CARGO_LAMP
+      frame: twin
+      x: 0.0
+      y: 1.2
+      z: 1.86
+      method: 'mounts.yaml "cargo area": ceiling centre of the rear body (Exterior_Roof z max 1.92)'
+      confidence: low
+      source: docs/wiring/research/2026-10-15_device-positions.md
   - id: FUEL-PUMP
     what: Fuel pump (QFS-H882 hanger, P367 pump)
     where: In the fuel tank, on the hanger
@@ -1877,6 +2786,15 @@ ends:
     why:
       - text: The M130 and Dakota taps join the sender lead here.
         source: docs/wiring/calc-data/catalog/endpoints.yaml SPL-FUEL-SND
+    position:
+      point: SPL_FUEL_SND
+      frame: twin
+      x: 0.15
+      y: 1.45
+      z: 0.9
+      method: tank sender node FUEL_TANK (x 0.15, y 1.45) lifted to the lid, just above the cargo floor (z 0.854, ray cast)
+      confidence: medium
+      source: docs/wiring/research/2026-10-15_device-positions.md
   - id: VSS-SENDER
     what: Speed sender (Dakota SEN-01-5)
     where: On the NP205 transfer case's speedometer drive
@@ -1893,6 +2811,15 @@ ends:
     why:
       - text: 'Power rear window: the key switch in the tailgate.'
         source: reference_documents/wiring_diagram_booklets/ST_352_78_CK_Wiring.pdf p.16, sheet A-4
+    position:
+      point: AT_TG_SW_KEY
+      frame: twin
+      x: 0.0
+      y: 1.82
+      z: 1.0
+      method: tailgate band centre (Tailgate_Band bbox x -0.85..0.85, y 1.84..1.86, z 0.89..1.08), 0.03 m inside the skin
+      confidence: low
+      source: docs/wiring/research/2026-10-15_device-positions.md
   - id: TG-SW-KEY-REV
     what: Tailgate key switch as the second reversing switch
     where: In the tailgate, at the key lock
@@ -1902,6 +2829,15 @@ ends:
     why:
       - text: 'Power rear window: the key switch.'
         source: reference_documents/wiring_diagram_booklets/ST_352_78_CK_Wiring.pdf p.16, sheet A-4
+    position:
+      point: AT_TG_SW_KEY
+      frame: twin
+      x: 0.0
+      y: 1.82
+      z: 1.0
+      method: follows TG-SW-KEY
+      confidence: low
+      source: docs/wiring/research/2026-10-15_device-positions.md
   - id: TG-CUTOUT
     what: Tailgate-closed cutout switch
     where: At the tailgate
@@ -1910,6 +2846,15 @@ ends:
     why:
       - text: 'Power rear window: the tailgate cutout switch in the window-up line.'
         source: reference_documents/wiring_diagram_booklets/ST_352_78_CK_Wiring.pdf p.16, sheet A-4
+    position:
+      point: TG_CUTOUT
+      frame: twin
+      x: 0.82
+      y: 1.78
+      z: 1.1
+      method: 'mounts.yaml "At the tailgate": latch-side jamb, driver side (body inner wall x 0.82 at y 1.6..1.75 from ray casts)'
+      confidence: low
+      source: docs/wiring/research/2026-10-15_device-positions.md
   - id: TG-MOTOR-ACI
     what: Tailgate window motor (Nu-Relics 17383-1, ACI)
     where: Inside the tailgate, on the window regulator
@@ -1918,6 +2863,15 @@ ends:
     why:
       - text: The Nu-Relics tailgate regulator with the ACI motor.
         source: docs/wiring/calc-data/catalog/endpoints.yaml TG-MOTOR-ACI
+    position:
+      point: AT_TG_MOTOR_ACI
+      frame: twin
+      x: 0.3
+      y: 1.74
+      z: 0.8
+      method: 'inside the tailgate on the window regulator: lower tailgate cavity (Tailgate_Main z 0.68..1.36), driver of centre'
+      confidence: low
+      source: docs/wiring/research/2026-10-15_device-positions.md
   - id: rear_window_motor
     what: Tailgate window motor (factory position)
     where: Inside the tailgate, on the window regulator
@@ -1926,6 +2880,15 @@ ends:
     why:
       - text: 'Power rear window: the motor in the tailgate.'
         source: reference_documents/wiring_diagram_booklets/ST_352_78_CK_Wiring.pdf p.16, sheet A-4
+    position:
+      point: AT_TG_MOTOR_ACI
+      frame: twin
+      x: 0.3
+      y: 1.74
+      z: 0.8
+      method: same regulator as TG-MOTOR-ACI (factory vs candidate motor)
+      confidence: low
+      source: docs/wiring/research/2026-10-15_device-positions.md
   - id: AMP
     what: Amplifier (JL Audio VX700/5i)
     where: Rear cargo area (spot not picked)
@@ -1940,32 +2903,59 @@ ends:
     what: Amplifier power block
     where: Rear cargo area (spot not picked)
     zone: rear
-    status: open
+    status: proposed
     why:
       - text: The registry has it in the rear but no spot.
         source: docs/wiring/calc-data/catalog/endpoints.yaml AMP-BLOCK
     open:
       - The audio layout is not designed.
+    position:
+      point: AMP_BLOCK
+      frame: twin
+      x: -0.55
+      y: 1.25
+      z: 0.88
+      method: follows node K5H_Amplifier, 0.20 m forward of its centre ("beside the amplifier")
+      confidence: low
+      source: docs/wiring/research/2026-10-15_device-positions.md
   - id: SPK-RL
     what: Left rear speaker
     where: Rear cargo area (spot not picked)
     zone: rear
-    status: open
+    status: proposed
     why:
       - text: The registry has it in the rear but no spot.
         source: docs/wiring/calc-data/catalog/endpoints.yaml SPK-RL
     open:
       - The audio layout is not designed.
+    position:
+      point: SPK_RL
+      frame: twin
+      x: 0.81
+      y: 1.35
+      z: 1.15
+      method: rear quarter panel above the wheel arch (Interior_Panels_Rear wall x 0.82 at y 1.3..1.75, ray cast)
+      confidence: low
+      source: docs/wiring/research/2026-10-15_device-positions.md
   - id: SPK-RR
     what: Right rear speaker
     where: Rear cargo area (spot not picked)
     zone: rear
-    status: open
+    status: proposed
     why:
       - text: The registry has it in the rear but no spot.
         source: docs/wiring/calc-data/catalog/endpoints.yaml SPK-RR
     open:
       - The audio layout is not designed.
+    position:
+      point: SPK_RR
+      frame: twin
+      x: -0.81
+      y: 1.35
+      z: 1.15
+      method: mirror of SPK-RL
+      confidence: low
+      source: docs/wiring/research/2026-10-15_device-positions.md
   - id: SUB
     what: Woofer 1 (JBL Club 102SL)
     where: Rear cargo area (spot not picked)
@@ -1980,12 +2970,21 @@ ends:
     what: Woofer 2 (JBL Club 102SL)
     where: Rear cargo area (spot not picked)
     zone: rear
-    status: open
+    status: proposed
     why:
       - text: The registry has it in the rear but no spot.
         source: docs/wiring/calc-data/catalog/endpoints.yaml SUB-2
     open:
       - The audio layout is not designed.
+    position:
+      point: SUB_2
+      frame: twin
+      x: 0.55
+      y: 1.45
+      z: 0.95
+      method: follows node K5H_Subwoofer (enclosure bbox x 0.38..0.73, y 1.28..1.62)
+      confidence: medium
+      source: docs/wiring/research/2026-10-15_device-positions.md
   - id: GND-SPLICE-REAR
     what: Rear ground bus
     where: Inside the rear body, where the rear harness branches
@@ -1994,6 +2993,15 @@ ends:
     why:
       - text: The rear returns land here and go back to the cab bank.
         source: docs/wiring/calc-data/catalog/endpoints.yaml GND-SPLICE-REAR
+    position:
+      point: GND_SPLICE_REAR
+      frame: twin
+      x: 0.4
+      y: 0.81
+      z: 0.66
+      method: follows node REAR_JCT (where the rear harness branches)
+      confidence: low
+      source: docs/wiring/research/2026-10-15_device-positions.md
   - id: AMP-PASS
     what: Amplifier cable pass-through (one CableClam per 2 AWG cable)
     where: Rear floor, near the amplifier
@@ -2006,16 +3014,34 @@ ends:
         source: docs/wiring/research/2026-06-10_power_spine_builders_study.md §1.2
     open:
       - The owner allows round bulkheads only; a cable clamp for 2 AWG power is a separate question.
+    position:
+      point: AMP_PASS
+      frame: twin
+      x: -0.5
+      y: 1.2
+      z: 0.854
+      method: rear cargo floor (Interior_Main z 0.854, ray cast) beside the amplifier
+      confidence: low
+      source: docs/wiring/research/2026-10-15_device-positions.md
   - id: AMP-STEP-CTRL
     what: Power step controller (AMP Research kit)
     where: 'Not placed: under the body near a step motor'
     zone: underbody
-    status: open
+    status: proposed
     why:
       - text: The guide on file is for the 2011-14 Silverado kit, which ties the controller "to the motor support arm next to the battery".
         source: reference_documents/component_drawings/amp_research_75146_install.pdf p.6
     open:
       - The K5 kit's own guide is not on file.
+    position:
+      point: AMP_STEP_CTRL
+      frame: twin
+      x: 0.82
+      y: -0.65
+      z: 0.52
+      method: 'mounts.yaml "under the body near a step motor": driver-side sill under the door (Door_Left_Main y -1.17..-0.12, bottom z 0.59)'
+      confidence: low
+      source: docs/wiring/research/2026-10-15_device-positions.md
   - id: E-STOPP
     what: Electric parking brake (E-Stopp ESK001)
     where: Under the body on the parking-brake cable; dash button in the cab
@@ -2034,6 +3060,15 @@ ends:
     why:
       - text: The sensor mounts on the detent shaft.
         source: docs/wiring/calc-data/catalog/endpoints.yaml GSS-SENSOR (Dakota GSS-3000)
+    position:
+      point: GSS_SENSOR
+      frame: twin
+      x: 0.18
+      y: -0.95
+      z: 0.66
+      method: driver-side face of the K5H_6L80E case (bbox x -0.16..0.16, z 0.51..0.83) at the node TUNNEL_6L90 station (y -0.95)
+      confidence: low
+      source: docs/wiring/research/2026-10-15_device-positions.md
   - id: TCASE-4WD-SW
     what: 4WD indicator switch (fabricated plunger switch)
     where: At the transfer-case shift lever, on a bracket
@@ -2259,6 +3294,15 @@ ends:
         source: docs/wiring/receipts/2026-10-15_k5-pin-lead-wires.md
     open:
       - It moves with the engine power box, whose bay spot breaks MoTeC's spec.
+    position:
+      point: PDM15
+      frame: twin
+      x: -0.52
+      y: -1.72
+      z: 1.12
+      method: follows PDM15 (pigtail / stub splice within reach of its connector)
+      confidence: low
+      source: docs/wiring/research/2026-10-15_device-positions.md
   - id: SPL-PDM15-B-B25
     what: Stub splice beside PDM15-B pin B25, on its 20 AWG lead
     where: Behind PDM15-B pin B25, 4 to 6 in up its lead
@@ -2270,6 +3314,15 @@ ends:
         source: docs/wiring/receipts/2026-10-15_k5-pin-lead-wires.md
     open:
       - It moves with the engine power box, whose bay spot breaks MoTeC's spec.
+    position:
+      point: PDM15
+      frame: twin
+      x: -0.52
+      y: -1.72
+      z: 1.12
+      method: follows PDM15 (pigtail / stub splice within reach of its connector)
+      confidence: low
+      source: docs/wiring/research/2026-10-15_device-positions.md
   - id: SPL-PDM15-B-B26
     what: Stub splice beside PDM15-B pin B26, on its 20 AWG lead
     where: Behind PDM15-B pin B26, 4 to 6 in up its lead
@@ -2281,14 +3334,166 @@ ends:
         source: docs/wiring/receipts/2026-10-15_k5-pin-lead-wires.md
     open:
       - It moves with the engine power box, whose bay spot breaks MoTeC's spec.
+    position:
+      point: PDM15
+      frame: twin
+      x: -0.52
+      y: -1.72
+      z: 1.12
+      method: follows PDM15 (pigtail / stub splice within reach of its connector)
+      confidence: low
+      source: docs/wiring/research/2026-10-15_device-positions.md
   - id: SPL-PDM15-OUT8
     what: Pigtail splice at the engine power box (OUT8, the A/C clutch feed)
     where: At the engine power box's plug
     zone: engine
-    status: open
+    status: proposed
     follows: PDM15
     why:
       - text: The splice sits a hand-width from the plug it serves.
         source: docs/wiring/calc-data/catalog/endpoints.yaml SPL-PDM15-OUT8
     open:
       - It moves with the engine power box.
+    position:
+      point: PDM15
+      frame: twin
+      x: -0.52
+      y: -1.72
+      z: 1.12
+      method: follows PDM15 (pigtail / stub splice within reach of its connector)
+      confidence: low
+      source: docs/wiring/research/2026-10-15_device-positions.md
+  - id: ISO-STUD-A
+    what: "Isolator stud A (Blue Sea 7700, battery side)"
+    where: "On the isolator"
+    zone: engine
+    status: proposed
+    follows: PS-STUDS
+    why:
+      - text: The DC primary's stud set names this stud from its cables' own words (RSI pass 37).
+        source: docs/wiring/calc-data/catalog/endpoints.yaml PS-STUDS (studs, stud_nodes)
+    position:
+      point: ISOLATOR
+      frame: twin
+      x: -0.52
+      y: -1.9
+      z: 1.1
+      method: "on the isolator (its 3/8-16 stud A)"
+      confidence: low
+      source: docs/wiring/receipts/2026-10-15_k5-power-spine-studs.md
+  - id: ISO-STUD-B
+    what: "Isolator stud B (Blue Sea 7700, load side)"
+    where: "On the isolator"
+    zone: engine
+    status: proposed
+    follows: PS-STUDS
+    why:
+      - text: The DC primary's stud set names this stud from its cables' own words (RSI pass 37).
+        source: docs/wiring/calc-data/catalog/endpoints.yaml PS-STUDS (studs, stud_nodes)
+    position:
+      point: ISOLATOR
+      frame: twin
+      x: -0.52
+      y: -1.9
+      z: 1.1
+      method: "on the isolator (its 3/8-16 stud B)"
+      confidence: low
+      source: docs/wiring/receipts/2026-10-15_k5-power-spine-studs.md
+  - id: DIST-STUD
+    what: "Distribution stud and its MEGA/MIDI fuse holders"
+    where: "Beside the isolator, on its load side"
+    zone: engine
+    status: proposed
+    follows: PS-STUDS
+    why:
+      - text: The DC primary's stud set names this stud from its cables' own words (RSI pass 37).
+        source: docs/wiring/calc-data/catalog/endpoints.yaml PS-STUDS (studs, stud_nodes)
+    position:
+      point: ISOLATOR
+      frame: twin
+      x: -0.52
+      y: -1.9
+      z: 1.1
+      method: "beside the isolator: ISO_OUT runs stud B to it (point shared with the isolator until a bracket is drawn)"
+      confidence: low
+      source: docs/wiring/receipts/2026-10-15_k5-power-spine-studs.md
+  - id: STARTER-BPLUS
+    what: "Starter B+ stud"
+    where: "On the starter, passenger side of the block"
+    zone: engine
+    status: proposed
+    follows: PS-STUDS
+    why:
+      - text: The DC primary's stud set names this stud from its cables' own words (RSI pass 37).
+        source: docs/wiring/calc-data/catalog/endpoints.yaml PS-STUDS (studs, stud_nodes)
+    position:
+      point: STARTER
+      frame: twin
+      x: -0.3
+      y: -1.45
+      z: 0.57
+      method: "on the starter (twin anchor STARTER; the twin engine insert sits about 0.15 m too far back)"
+      confidence: low
+      source: docs/wiring/receipts/2026-10-15_k5-power-spine-studs.md
+  - id: GND-BLOCK
+    what: "Engine block ground stud near the starter (G1)"
+    where: "On the block beside the starter"
+    zone: engine
+    status: proposed
+    follows: PS-STUDS
+    why:
+      - text: The DC primary's stud set names this stud from its cables' own words (RSI pass 37).
+        source: docs/wiring/calc-data/catalog/endpoints.yaml PS-STUDS (studs, stud_nodes)
+    position:
+      point: STARTER
+      frame: twin
+      x: -0.3
+      y: -1.45
+      z: 0.57
+      method: "G1 lands 'near the starter': the starter point (twin engine insert about 0.15 m too far back)"
+      confidence: low
+      source: docs/wiring/receipts/2026-10-15_k5-power-spine-studs.md
+  - id: ALT-BPLUS
+    what: "Alternator B+ stud (Holley 197-302)"
+    where: "On the alternator, Holley mid-mount bracket"
+    zone: engine
+    status: open
+    follows: PS-STUDS
+    why:
+      - text: The DC primary's stud set names this stud from its cables' own words (RSI pass 37).
+        source: docs/wiring/calc-data/catalog/endpoints.yaml PS-STUDS (studs, stud_nodes)
+    open:
+      - "the alternator point stands open: the twin puts K5H_Alternator on the passenger side, mounts.yaml on the driver side"
+  - id: GND-FRAME
+    what: "Frame rail ground boss (G2)"
+    where: "On the frame rail below the battery corner"
+    zone: engine
+    status: open
+    follows: PS-STUDS
+    why:
+      - text: The DC primary's stud set names this stud from its cables' own words (RSI pass 37).
+        source: docs/wiring/calc-data/catalog/endpoints.yaml PS-STUDS (studs, stud_nodes)
+    open:
+      - "no frame boss is drawn yet; the frame rail is not an object in the twin engine bay"
+  - id: GND-HEAD
+    what: "Engine head/block ground strap stud (G3)"
+    where: "At the rear of the engine"
+    zone: engine
+    status: open
+    follows: PS-STUDS
+    why:
+      - text: The DC primary's stud set names this stud from its cables' own words (RSI pass 37).
+        source: docs/wiring/calc-data/catalog/endpoints.yaml PS-STUDS (studs, stud_nodes)
+    open:
+      - "the rear of the engine is the twin insert face that sits about 0.15 m too far back"
+  - id: FW-BOND
+    what: "Firewall bond stud, engine side (G3)"
+    where: "On the firewall, engine side"
+    zone: engine
+    status: open
+    follows: PS-STUDS
+    why:
+      - text: The DC primary's stud set names this stud from its cables' own words (RSI pass 37).
+        source: docs/wiring/calc-data/catalog/endpoints.yaml PS-STUDS (studs, stud_nodes)
+    open:
+      - "no bond stud spot is recorded on the firewall"

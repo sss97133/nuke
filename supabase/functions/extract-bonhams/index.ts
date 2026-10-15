@@ -557,6 +557,8 @@ interface ExtractionResult {
   raw_document?: unknown;
   /** Typesense page this lot came from; the lander's cursor reads it back from vehicle_events.metadata.ts_page. */
   ts_page?: number;
+  /** No chassis/frame/VIN line and no year in the title: the lot is an item, not a vehicle (set by the Typesense lander). */
+  non_vehicle_item?: boolean;
   /** Calendar and depth keys merged into the event metadata (session days, sale key, engine/registration numbers). */
   extra_metadata?: Record<string, unknown>;
 }
@@ -1154,7 +1156,7 @@ async function saveVehicle(
     if (error) throw new Error(`Vehicle update failed: ${error.message}`);
     console.log(`[Bonhams] ${action} vehicle: ${targetId}`);
   } else {
-    let ins = await supabase.from("vehicles").insert(vehicleData).select("id").maybeSingle();
+    let ins = await supabase.from("vehicles").insert(opts.fast && extracted.non_vehicle_item ? { ...vehicleData, listing_kind: "non_vehicle_item" } : vehicleData).select("id").maybeSingle();
     const other = ins.error ? vinClash(ins.error.message) : null;
     if (ins.error && other) {
       if (fullVin) {
@@ -1401,29 +1403,35 @@ Deno.serve(async (req) => {
     // not a lot page (a challenge) ends the run at once and marks nothing. Each lot's raw page data is kept on the
     // observation; the episode's metadata is merged, never replaced.
     if (action === "deep_lots") {
+      // The Firecrawl allowance decides how many pages may be bought today (firecrawl_allowance('bonhams'): the source's allocation for
+      // the billing period less spend, spread over the days left); nothing is fetched without one. A page already saved is read from
+      // the saved copy and costs nothing.
+      const allowRes = await supabase.rpc("firecrawl_allowance", { p_source: "bonhams" });
+      const allowance = Number(allowRes.data ?? 0);
       const limit = Math.min(Number(body.limit) || 20, 20);
       const spacing = Math.max(Number(body.spacing_ms) || 2000, 2000);
       const started = Date.now();
       const BUDGET_MS = 110_000;
-      const { data: todo, error: todoErr } = await supabase
+      // tier_one: the vehicle groups the allocation names (1964-1973 American families) go first; cars only, since the walk lands
+      // MOT-CAR lots and no automobilia.
+      const tierOne = body.tier_one !== false;
+      let q = supabase
         .from("vehicle_events")
-        .select("id, vehicle_id, source_url, source_listing_id")
+        .select(tierOne ? "id, vehicle_id, source_url, source_listing_id, vehicles!inner(year, make, model)" : "id, vehicle_id, source_url, source_listing_id")
         .eq("source_platform", "bonhams")
         .eq("extraction_source", "bonhams-typesense")
-        .is("metadata->>deep_at", null)
-        .order("ended_at", { ascending: false, nullsFirst: false })
-        .limit(limit);
+        .is("metadata->>deep_at", null);
+      if (tierOne) {
+        q = q.gte("vehicles.year", 1964).lte("vehicles.year", 1973)
+          .or("make.ilike.chevrolet*,make.ilike.ford*,make.ilike.plymouth*,make.ilike.dodge*,make.ilike.pontiac*,make.ilike.buick*,make.ilike.lincoln*,make.ilike.oldsmobile*,make.ilike.amc*,make.ilike.mercury*,make.ilike.shelby*", { foreignTable: "vehicles" });
+      }
+      const { data: todo, error: todoErr } = await q.order("ended_at", { ascending: false, nullsFirst: false }).limit(limit);
       if (todoErr) throw new Error(`deep_lots queue read failed: ${todoErr.message}`);
       const out = { picked: todo?.length ?? 0, done: 0, gone: 0, images: 0, credits_used: 0, backoff: null as string | null, failed: 0, errors: [] as string[] };
-      // Credit floor: Cars & Bids keeps 5,000 and the eBay private backfill needs the rest. Stop when what is left would cut into it.
-      const floor = Number(body.credit_floor) || 6700; // C&B 5,000 + eBay tier-1 private 588 + 68 a day (lead, 2026-10-15); raise only with a larger plan
       let credits = 0;
-      {
-        const usage = await fetch("https://api.firecrawl.dev/v1/team/credit-usage", { headers: { Authorization: `Bearer ${Deno.env.get("FIRECRAWL_API_KEY") ?? ""}` } }).then((r) => r.json()).catch(() => null); // guardrail-allow: raw-fetch
-        const left = Number(usage?.data?.remaining_credits);
-        if (!Number.isFinite(left) || left - (todo?.length ?? 0) < floor) {
-          return new Response(JSON.stringify({ success: true, picked: todo?.length ?? 0, done: 0, stopped: "credit_floor", remaining_credits: Number.isFinite(left) ? left : null, floor }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
-        }
+      if (!Number.isFinite(allowance) || allowance <= 0) {
+        // Saved pages can still be read for nothing, but with no allowance nothing is bought.
+        out.backoff = "no_allowance";
       }
       let first = true;
       for (const ev of todo ?? []) {
@@ -1431,15 +1439,30 @@ Deno.serve(async (req) => {
         if (!first) await new Promise((r) => setTimeout(r, spacing));
         first = false;
         const url = String(ev.source_url).replace(/\/?$/, "/");
+        // A page saved before is read from the saved copy, free.
+        let savedHtml: string | null = null;
+        {
+          const { data: saved } = await supabase.from("listing_page_snapshots").select("html, html_storage_path")
+            .eq("platform", "bonhams").eq("success", true).in("listing_url", [url, String(ev.source_url)]).order("fetched_at", { ascending: false }).limit(1);
+          const sv = saved?.[0];
+          savedHtml = sv?.html ?? null;
+          if (!savedHtml && sv?.html_storage_path) {
+            const { data: blob } = await supabase.storage.from("listing-snapshots").download(sv.html_storage_path);
+            savedHtml = blob ? await blob.text() : null;
+          }
+        }
+        if (!savedHtml && (credits >= allowance || !Number.isFinite(allowance))) { out.backoff = out.backoff ?? "allowance_spent"; break; }
         // Bonhams answers 403 to this function's address, so the page is read through Firecrawl (rawHtml, 1 credit a page).
         // Every response is retained first: the body goes to the listing-snapshots bucket and a listing_page_snapshots row
         // points at it (the table's own convention for large pages), then the page is parsed and landed.
-        const fc = await firecrawlScrape({ url, formats: ["rawHtml"], onlyMainContent: false, waitFor: 0 });
-        credits++;
+        const fc = savedHtml
+          ? { httpStatus: 200, raw: { data: { metadata: { statusCode: 200 }, rawHtml: savedHtml } }, data: { html: savedHtml }, error: null }
+          : await firecrawlScrape({ url, formats: ["rawHtml"], onlyMainContent: false, waitFor: 0 });
+        if (!savedHtml) credits++;
         const status = Number(fc.raw?.data?.metadata?.statusCode ?? fc.httpStatus ?? 0);
         const rawHtml: string | null = typeof fc.raw?.data?.rawHtml === "string" ? fc.raw.data.rawHtml : fc.data.html;
         if (fc.httpStatus === 402 || fc.httpStatus === 429) { out.backoff = `Firecrawl HTTP ${fc.httpStatus}`; break; }
-        if (rawHtml) {
+        if (rawHtml && !savedHtml) {
           try {
             const bytes = new TextEncoder().encode(rawHtml);
             const sha = Array.from(new Uint8Array(await crypto.subtle.digest("SHA-256", bytes))).map((b) => b.toString(16).padStart(2, "0")).join("");
@@ -1475,7 +1498,11 @@ Deno.serve(async (req) => {
           out.failed++; if (out.errors.length < 5) out.errors.push(`${ev.source_listing_id}: ${String(e?.message ?? e).slice(0, 160)}`);
         }
       }
-      return new Response(JSON.stringify({ success: true, ...out, credits_used: credits, elapsed_ms: Date.now() - started }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      // Record what was spent (failed fetches included) against the allowance.
+      if (credits > 0) {
+        await supabase.rpc("firecrawl_record_spend", { p_source: "bonhams", p_credits: credits, p_lots: out.done, p_lane: "lane-bonhams", p_note: `deep_lots tier_one=${tierOne}, allowance ${allowance}` });
+      }
+      return new Response(JSON.stringify({ success: true, ...out, credits_used: credits, allowance, elapsed_ms: Date.now() - started }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
     // ── Re-enrich action ─────────────────────────────────────────────────

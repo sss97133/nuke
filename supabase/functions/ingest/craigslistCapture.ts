@@ -35,6 +35,8 @@ import { normalizeDrivetrain, normalizeTransmission } from "../_shared/normalize
 import { pickCapture, type CraigslistCapture } from "../_shared/craigslistAttributes.ts";
 import type { ObservationInput, WriteResult } from "../_shared/observationWriter.ts";
 import { writeVehicleEventByKey, type VehicleEventWriteResult } from "../_shared/vehicleEventWrite.ts";
+import { recordSellerTypes } from "../_shared/sellerType.ts";
+import { craigslistSellerTypeRow } from "./craigslistSellerType.ts";
 
 /** What matchOrCreateVehicle was handed (after ingest's gate), so the observation confirms it instead of disagreeing. */
 export interface WrittenColumns {
@@ -65,6 +67,8 @@ export interface CaptureLanding {
   observation_id?: string;
   listing_event?: VehicleEventWriteResult;
   place?: "written" | "duplicate" | "error";
+  /** The seller class (private | dealer | unknown) written as a lot-level signal for the listing episode. */
+  seller_type?: "private" | "dealer" | "unknown" | "error";
   /** The asking price: first reading logged, a changed one applied, an unchanged one left alone. */
   price?: "logged" | "changed" | "unchanged" | "error";
 }
@@ -270,6 +274,8 @@ export async function landCraigslistCapture(
     /** True when ingest created the vehicle from this page a moment ago. Then the columns it wrote are not re-confirmed. */
     isNewVehicle?: boolean;
     /** The span of the post's text the model was read from, when the page's attributes named none. */
+    /** The post's body text, read for dealer wording against a declared private class. */
+    description?: string | null;
     modelCitation?: { value: string; span: { start: number; end: number; text: string }; rule: string } | null;
     timeoutMs?: number;
   },
@@ -345,6 +351,18 @@ export async function landCraigslistCapture(
           },
         }, { preserveEventStatus: true, sourceObservedAt: capture.source_capture.observed_at }), args.timeoutMs ?? 8000);
         if (landing.listing_event.action === "error") landing.errors.push(`listing event: ${landing.listing_event.error}`);
+        // The seller class, one signal row per listing episode (record_lot_quality_signals; failures are counted, not thrown).
+        const eventId = (landing.listing_event as { id?: string | null }).id;
+        if (eventId) {
+          try {
+            const row = craigslistSellerTypeRow(eventId, capture.seller_class, args.description);
+            await withTimeout(recordSellerTypes(deps.supabase, [row], "ingest-craigslist"), args.timeoutMs ?? 8000);
+            landing.seller_type = row.value;
+          } catch (e) {
+            landing.seller_type = "error";
+            landing.errors.push(`seller_type: ${e instanceof Error ? e.message : String(e)}`);
+          }
+        }
       } catch (e) {
         landing.listing_event = { action: "error", error: e instanceof Error ? e.message : String(e), code: null };
         landing.errors.push(`listing event: ${landing.listing_event.error}`);

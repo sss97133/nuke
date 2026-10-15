@@ -2241,7 +2241,7 @@ parts, each with its supplier page as source and no price. (d) #110 itself: sign
 w, every resolvable key filled, every unresolved one held with its text and reason. (e) Parity: the legacy query and
 the new rows return the same four wire ends; the diff is published with the change.
 
-#### 13.12.3 RSI passes 1 to 28: the model measures itself and fills its gaps (lead, 2026-10-14 and 15)
+#### 13.12.3 RSI passes 1 to 34: the model measures itself and fills its gaps (lead, 2026-10-14 and 15)
 
 Owner, on the reshape: "a bit light ... data model goes rsi". The loop each pass ran:
 1. Read the stack SH scoreboard (`v_harness_coverage`, per public vehicle and layer).
@@ -2282,6 +2282,12 @@ Every pass has a receipt in `docs/wiring/receipts/` dated 2026-10-14.
 | 26 | (generator and loader, #1623) | the leads into 19 spliced ECU/PDM pins were words in the splice rows: no wire row, cut length, BOM feet or member key (splice members keyed 147 / 178); the pin's wires were modelled as ending in one contact | TE: one conductor per Superseal cavity; the PDM pigtails' pattern (a splice node and implied wire rows) | each pin splice is a node SPL-<plug>-<cavity> where its wires end; 25 lead wires (19 pin, 6 group; M22759/32 20 AWG, 4 or 6 in staggered, the system's call); splice members keyed 178 / 178; decided wires 392 to 417, all on segments; pin cavities shared by several wires 30 to 11. The load dropped cited ends 88 to 51, factory nets 33 to 26 and topology ends 446 to 398: pass 28 |
 | 27 | 20261015170000 | #86 read "protected by OUT17" though its design feeds it from OUT18: #85 and #86 parallel PDM30 OUT17 and OUT18 at the dimmer, the model held one output per net, and the net's limit read 4 A | MoTeC PDM manual p.6, pp.22-23; registry pdm_settings (4 A each; 20 AWG cap 8 A) | harness_nets.protection_pdm_channel_ids; a net's limits and distinct loads add over its outputs; PDM-fed wires not protected by their output 1 to 0 / 63; the dimmer net 4 to 8 A, 2.95 to 5.90 A |
 | 28 | 20261015180000 | rules that ran once missed what the loader adds: citations stayed on superseded wire ends, 26 plugs had no node kind, and the new nodes never keyed to the route graph | the reshape's node rule; the citations themselves | classify_harness_endpoint_nodes() and carry_harness_termination_evidence(), called by the loader; cited ends 51 to 88 / 985 (279 links to 55 ends); factory nets 26 to 33 / 337; topology ends 398 to 490 / 985 |
+| 29 | (generator, #1639) | woofer 2 was jumpered off woofer 1's push terminals: two 10 AWG wires in a terminal JBL rates for one 14-8 AWG wire, and no MiniSeal takes 10 AWG | JBL Club owner's manual (push terminals 14-8 AWG); JL VX700/5i guide ("two pairs of wire leads ... connected in parallel inside the harness") | woofer 2 on the amp sub harness's second pair (#30c/#30d), jumpers retired; splices 54 to 52; device pins waiting on a lead 12 to 10 |
+| 30 | 20261015190000 | segments made after the reshape got no wire-part key and no option link (both written once, by the reshape and pass 1) | the catalog's exact M22759 parts; the plugs' option couplings | key_harness_segments(), called by the loader; wire-part keys 398 to 427 / 670; option links 476 to 531 / 670 |
+| 31 | 20261015200000 | the M130 and PDM30 points stood with no coordinates, and nothing could write one (254 / 985 wire ends unplaced) | a headless-Blender free-space study of the twin (research/2026-10-15_m130-pdm30-cab-placement.md): the firewall face is full of pedal and column, the dash underside left of the column fits both | M130 (0.55, -1.22, 0.987) and PDM30 (0.30, -1.30, 0.997) proposed in mounts.yaml, medium-low confidence; load_harness_topology_points; unplaced ends 254 to 44 / 985; segments with both plugs standing 46 to 143 / 670 |
+| 32 | 20261015210000 | the node-kind and citation folds matched a plug by row id, so a re-inserted plug lost its citations (88 to 85) and would take the generic kind (PS-STUDS or MARKER-LF as a bus would join supply to ground) | net fold v2's evidence-set kinds | both folds follow a plug by code, evidence-set kinds first; cited ends back to 88 / 985 |
+| 33 | 20261015220000 | routing 0 / 670: the June branches fell with the overtaken points and nothing could write a branch or a routing | a twin route study (research/2026-10-15_route-branches.md): 39 branches, 9 junctions, 536.5 in, the 61-pin the only crossing, 88 mm or more from exhaust | load_harness_branches and route_harness_segments (shortest chain), called by the loader; routed segments 0 to 121 / 670 |
+| 34 | 20261015230000 | 106 of the 121 routed segments had no planned length, and no check compared a plan with its route | the routes; K5_WIRING_STATE row 33 pads (1.20 engine, 1.15 body) | plan_harness_segment_lengths and the check "routed segments planned shorter than their route (must be 0)"; planned segments 268 to 374 / 670; the check 0 / 121 |
 
 **What the loop found that no one asked about:**
 - **A short in the model.** It was found while folding loads. The reshape treated PS-STUDS (nine distinct studs) and
@@ -2325,13 +2331,18 @@ Every pass has a receipt in `docs/wiring/receipts/` dated 2026-10-14.
   4 A where a fault sees 8 A, which is exactly the 20 AWG wires' cap.
 - **A rule that runs once decays.** Node kinds (net fold v2) and citations (passes 1 and 3) were written by
   migrations; every row the loader added later missed them. Both now run after every load.
+- **The twin's engine sits about 15 cm into the cab.** Its block rear is at y -1.30 against a firewall at -1.447 (route
+  study), so the twin cannot settle anything near the rear of the engine; those branches are confidence low. Its
+  iBooster also sits 20 mm above the 61-pin point: on the truck the two share the driver firewall, which needs a look.
+- **The cut list's zone estimates run 4x the twin routes** (15 routed segments that carry one: average 4.0x, minimum
+  1.88x). The estimates may be generous, or the twin may miss slack and service loops. Measured lengths settle it.
 - **The crimp tool's colour bands are not the splice maker's ranges.** On TE's own figures two pin splices the formula
   passed are over D-609-05 (M130-B B16's first group, 7,248 against 6,755 CMA).
 
 **Owed, as the scoreboard names it:**
-- Routing (0 segments routed). The graph is in the model (pass 12). Routing waits on placing the points the record
-  leaves open: the M130, PDM30, DEL-Stributor, CKP, battery, alternator and O2 sensors (199 wire ends). The M130 and
-  PDM30 spots are an engineering call (state row 0aj), and they need a free-space check in the driver kick panel first.
+- Routing beyond the placed points: 121 / 670 segments are routed; 368 have a plug with no position (124 plugs:
+  lamps, switches, rail splices, grounds, fuses, body connectors), and DEL_STRIBUTOR, CKP, BAT, ALT and the O2 sensors
+  stand unplaced. A placement study of the 124 plugs is running.
 - The DC primary's stud-to-stud topology. It waits on the power-spine re-draw.
 - PDM limits still waiting on a cited load current: 12 of 40 outputs, most with no published figure; each status names
   the bench measurement that closes it (coil packs, starter solenoid, PCS ignition, blower, E-Stopp sense, iBooster

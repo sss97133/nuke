@@ -5,7 +5,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 const fixture = vi.hoisted(() => ({ rpc: vi.fn(), from: vi.fn() }));
 vi.mock('../../lib/supabase', () => ({ supabase: { rpc: fixture.rpc, from: fixture.from } }));
-import { assertPulseColumns, fetchPulse, PULSE_COLUMNS, readInventoryTaxonomy, useMarketPulse } from './useMarketPulse';
+import { assertPulseColumns, fetchPulse, parseTape, PULSE_COLUMNS, readInventoryTaxonomy, useMarketPulse, withTapeBids } from './useMarketPulse';
 
 afterEach(() => { vi.useRealTimers(); vi.clearAllMocks(); });
 
@@ -31,6 +31,62 @@ describe('recorded bid pulse lifetime', () => {
       expect(container.textContent).toBe('');
       await act(async () => { await latest!.refetch(); await vi.advanceTimersByTimeAsync(1); });
       expect(container.textContent).toBe('');
+    } finally { await act(async () => root.unmount()); client.clear(); container.remove(); }
+  });
+});
+
+describe('live bids from the stream', () => {
+  it('reads each tape bid and drops malformed ones', () => {
+    const at = '2026-10-15T19:00:00Z';
+    expect(parseTape({ bids: [
+      { id: '1', vehicle_id: 'v', amount: 5000, bid_at: at, end_at: '2026-10-15T19:02:00Z' },
+      { id: 2, vehicle_id: 'v', amount: 6000, bid_at: at },
+      { id: '3', vehicle_id: 'v', amount: 0, bid_at: at },
+      { id: '4', vehicle_id: 'v', amount: 7000, bid_at: 'not a time' },
+    ] })).toEqual([{ id: '1', vehicleId: 'v', amount: 5000, bidAt: Date.parse(at), endAt: Date.parse('2026-10-15T19:02:00Z') }]);
+    expect(parseTape(null)).toEqual([]);
+    expect(parseTape({ auctions: [] })).toEqual([]);
+  });
+
+  it('lifts a lot only while a tape bid is newer than its recorded bid', () => {
+    const lot = { id: 'v', currentBid: 100, endsAt: 1000, updatedAt: 10 } as any;
+    const best = new Map([['v', { id: '1', vehicleId: 'v', amount: 150, bidAt: 20, endAt: 2000 }]]);
+    expect(withTapeBids([lot], best)[0]).toMatchObject({ currentBid: 150, endsAt: 2000, updatedAt: 20 });
+    expect(withTapeBids([{ ...lot, currentBid: 200 }], best)[0]).toMatchObject({ currentBid: 200, endsAt: 1000 });
+    expect(withTapeBids([lot], new Map())[0]).toBe(lot);
+  });
+
+  it('pulses a lot once when a new bid lands, and hands the bid back when the board catches up', async () => {
+    vi.useFakeTimers();
+    (globalThis as any).IS_REACT_ACT_ENVIRONMENT = true;
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    const container = document.createElement('div'); document.body.appendChild(container);
+    const root = createRoot(container);
+    const row = (bid: number) => ['fixture', 1995, 'Ford', 'Mustang', bid, '2026-10-20T00:00:00Z', '2026-10-10T00:00:00Z', '2026-10-09T00:00:00Z', null, false, 'https://bringatrailer.com/listing/fixture/'];
+    let board = 100;
+    let tape: any[] = [];
+    fixture.rpc.mockImplementation(async (name: string) => (name === 'live_bid_tape'
+      ? { data: { bids: tape }, error: null } : { data: { auctions: [row(board)] }, error: null }));
+    let latest: ReturnType<typeof useMarketPulse>;
+    function Probe() {
+      latest = useMarketPulse();
+      return <span>{`${latest.data?.auctions[0]?.currentBid}|${[...latest.risenIds].join(',')}|${latest.newBids.length}`}</span>;
+    }
+    try {
+      await act(async () => { root.render(<QueryClientProvider client={client}><Probe /></QueryClientProvider>); });
+      await act(async () => { await vi.advanceTimersByTimeAsync(1); });
+      expect(container.textContent).toBe('100||0');
+      tape = [{ id: 'b1', vehicle_id: 'fixture', amount: 150, bid_at: '2026-10-15T19:00:00Z', end_at: '2026-10-21T00:00:00Z' }];
+      await act(async () => { await vi.advanceTimersByTimeAsync(15_000); });
+      expect(container.textContent).toBe('150|fixture|1');
+      expect(latest!.data?.auctions[0].endsAt).toBe(Date.parse('2026-10-21T00:00:00Z'));
+      await act(async () => { await vi.advanceTimersByTimeAsync(1800); });
+      expect(container.textContent).toBe('150||1');
+      await act(async () => { await vi.advanceTimersByTimeAsync(15_000); });
+      expect(container.textContent).toBe('150||1');
+      board = 200;
+      await act(async () => { await latest!.refetch(); await vi.advanceTimersByTimeAsync(1); });
+      expect(latest!.data?.auctions[0].currentBid).toBe(200);
     } finally { await act(async () => root.unmount()); client.clear(); container.remove(); }
   });
 });

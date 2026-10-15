@@ -1,6 +1,6 @@
 # Recording seller type as a lot-level observation
 
-Status: proposal, 2026-10-15. Owner rule behind it: non-dealer sellers first (1964-1973 and 1974-1991 vehicles from private
+Status: implemented 2026-10-15 (supabase/functions/_shared/sellerType.ts; eBay's 1,121 lots written). Owner rule behind it: non-dealer sellers first (1964-1973 and 1974-1991 vehicles from private
 sellers rank above dealer stock). The Firecrawl targeting score (`best_v1_1`, docs/ledger/theory/extraction.md) cannot apply that
 rule today: `vehicles` and `vehicle_events` carry no seller-type field, `vehicle_events.seller_identifier` is filled only for
 BaT (about half of events) and a few Cars & Bids rows, and Craigslist, KSL, eBay and Facebook state the class on the page but
@@ -42,3 +42,13 @@ unknown counts 0 in the score, so recording it can only change a source's rank o
 ## Not proposed
 No column on `vehicles` or `vehicle_events` (the signal belongs to a lot-reading and has a method and a date). No inference
 from seller listing counts alone (eBay's audit found 27% of listings carry no seller name).
+
+## Implementation (2026-10-15)
+- Storage and writer are the ones this proposal names: `lot_quality_signal` and `record_lot_quality_signals(p_rows, p_written_by)`.
+  Nothing new in the schema.
+- `supabase/functions/_shared/sellerType.ts` is the lane-facing helper so every lane writes the same shape: `sellerTypeRow(...)` builds one
+  row and `recordSellerTypes(supabase, rows, writtenBy)` sends them in chunks of 500 (a failed chunk throws).
+- The evidence carries a `confidence` (0 to 1): declared by the source's own field 0.9; inferred from handles, feeds or wording 0.5;
+  unknown 0. A `private` class whose own text still uses dealer wording loses 0.4 (floor 0.2) and lists the terms in `wording_terms`;
+  a `dealer` class is not lowered. The score counts a lot's class as known at any confidence above 0.
+- A lane re-running its read overwrites its own row (key: lot, signal, method), so a changed rule or page re-scores cleanly.

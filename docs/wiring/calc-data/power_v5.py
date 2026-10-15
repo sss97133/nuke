@@ -356,7 +356,11 @@ def sheet_a_wires(reg, wires, eps_y):
 
 
 AT_WORDS = {"PDM30-STUD": "PDM30 battery stud", "PDM15-STUD": "PDM15 battery stud", "PS-STUDS": "distribution stud",
-            "ODYSSEY": "Odyssey +", "ACC-BATT": "YellowTop +"}
+            "ODYSSEY": "Odyssey +", "ACC-BATT": "YellowTop +",
+            # RSI pass 37: the DC primary's stud nodes
+            "DIST-STUD": "distribution stud", "ISO-STUD-A": "isolator stud A", "ISO-STUD-B": "isolator stud B",
+            "STARTER-BPLUS": "starter B+ stud", "ALT-BPLUS": "alternator B+ stud", "GND-BLOCK": "block ground stud",
+            "GND-FRAME": "frame ground boss", "GND-HEAD": "head ground stud", "FW-BOND": "firewall bond stud"}
 
 
 def holder_words(wid):

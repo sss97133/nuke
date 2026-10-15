@@ -146,7 +146,7 @@ def pin_splices_at_pins(reg, keep_leads=False):
     Returns a copy; the registry itself keeps the nodes and the lead wires."""
     reg = json.loads(json.dumps(reg))
     ps = {e: ep["pin_splice"] for e, ep in reg["endpoints"].items() if ep.get("pin_splice")}
-    if not ps:
+    if not ps and not any(t.get("stud_of") for t in reg["terminations"]):
         return reg
     lead = {w["id"]: w for w in reg["implied"] if w.get("lead_of")}
     word = lambda x: (f"{PIN_LEAD} AWG group lead" if re.search(r"-G\d+$", x) else f"{PIN_LEAD} AWG pin lead") if x in lead else x
@@ -170,6 +170,33 @@ def pin_splices_at_pins(reg, keep_leads=False):
                                 **{w: p_["cavity"] for w in members}}
     if not keep_leads:
         reg["implied"] = [w for w in reg["implied"] if w["id"] not in lead]
+    # RSI pass 37: the DC primary's stud nodes fold back into their stud set (one end per cable at PS-STUDS, its lugs
+    # joined), and the ground-star ends a set added return to it
+    by_set = OrderedDict()
+    kept = []
+    for t in reg["terminations"]:
+        if t.get("stud_of"):
+            by_set.setdefault((str(t["wire"]), t["stud_of"]), []).append(t)
+        else:
+            kept.append(t)
+    for (w, set_eid), ts in by_set.items():
+        parts_ = [t["part"] for t in ts]
+        kept.append(OrderedDict(wire=w, endpoint=set_eid, where=ts[0].get("where"), cavity="stud, lug " + " + ".join(parts_),
+                                factory_circuit=None, part=" + ".join(parts_), family="lug", doubled=None))
+    reg["terminations"] = kept
+    moved_to = {}
+    for e, ep in list(reg["endpoints"].items()):
+        if ep.get("stud_of"):
+            reg["endpoints"].pop(e)
+    for e, ep in reg["endpoints"].items():
+        if ep.pop("stud_set", None):
+            for w in ep.get("wires") or []:
+                moved_to[str(w)] = e
+    for (w, set_eid), ts in by_set.items():
+        for t in ts:
+            ep = reg["endpoints"].get(t["endpoint"])
+            if ep is not None and not ep.get("stud_of") and t["endpoint"] != set_eid:
+                ep["wires"] = [x for x in ep.get("wires") or [] if str(x) != w]
     for sp in reg["splices"]:
         if sp["at"] in ps:
             p_ = ps[sp["at"]]
@@ -361,6 +388,7 @@ def attach(reg):
     replaced = {}
     splices, unresolved_pins, device_splices = [], [], []
     pin_nodes, leads = OrderedDict(), []          # RSI pass 26: pin splice nodes and their lead wires
+    stud_ends, stud_nodes = [], OrderedDict()      # RSI pass 37: the DC primary's ends on their own studs
     for eid, ep in eps.items():
         spec = ep.get("wires") or []
         wl, cav_of = [], {}
@@ -543,7 +571,16 @@ def attach(reg):
         elif fid == "lug":
             # round 4: a stud end names its stud and lug, so no page prints 'terminal OPEN' for a lugged cable
             lugw = lambda w: ep["lugs"].get(w, []) if isinstance(ep["lugs"].get(w), list) else [ep["lugs"].get(w, "?")]
-            per_end = [{"wires": [w], "part": " + ".join(lugw(w)), "cavity": "stud, lug " + " + ".join(lugw(w))} for w in wl]
+            studs = {str(k): v for k, v in (ep.get("studs") or {}).items()}
+            for w in wl:   # RSI pass 37: each lug of a stud-set cable lands on its own stud node, in lug order
+                for n_, code_ in enumerate(studs.get(w) or []):
+                    lg = lugw(w)
+                    part_ = lg[n_] if n_ < len(lg) else (lg[-1] if lg else "?")
+                    stud_ends.append((w, code_, part_, eid, ep.get("where")))
+            for code_, words in (ep.get("stud_nodes") or {}).items():
+                stud_nodes[code_] = (words, eid, ep.get("where"))
+            per_end = [{"wires": [w], "part": " + ".join(lugw(w)), "cavity": "stud, lug " + " + ".join(lugw(w))}
+                       for w in wl if w not in studs]
         elif fid == "miniseal":
             by_g = fam.get("per_end", {}).get("splice_by_gauge", {})
             def _splice(awg):
@@ -662,6 +699,29 @@ def attach(reg):
             x["color"] = "gray"
     reg["implied"].extend(leads)
     wires.update({x["id"]: x for x in leads})
+
+    # RSI pass 37: the stud nodes of the DC primary take their cable ends (cavity "stud, lug <part>"); the ground star's
+    # ends go on GND-BANK-ENG itself. The stud set (PS-STUDS) keeps its catalog lug table and wire list for the pages.
+    for w, code_, part_, set_eid, where_ in stud_ends:
+        terms.append(OrderedDict(wire=w, endpoint=code_, where=where_, cavity=f"stud, lug {part_}", factory_circuit=None,
+                                 part=part_, family="lug", doubled=None, stud_of=set_eid))
+        if code_ in resolved:
+            if w not in resolved[code_]["wires"]:
+                resolved[code_]["wires"] = list(resolved[code_]["wires"]) + [w]
+            continue
+        words, _, _ = stud_nodes.get(code_, (code_, set_eid, where_))
+        node = resolved.setdefault(code_, OrderedDict(
+            device=words, where=where_, family="lug", kit={}, wires=[], cavities=None, empty=None, doubled=None, range=None,
+            out_of_range=[], pigtailed=[], note=f"RSI pass 37: a stud of the DC primary ({set_eid})", branch_wires_missing=0,
+            unknown_wire_ids=[], open=[], sources=list((resolved.get(set_eid) or {}).get("sources") or []), splice_point=None,
+            range_by_wire=None, stud_of=set_eid))
+        node["wires"] = list(node["wires"]) + [w]
+        eps.setdefault(code_, OrderedDict(device=words, where=where_, family="lug", wires=[], sources=[f"stud of {set_eid}"]))
+    for code_ in stud_nodes:
+        if code_ in eps:
+            eps[code_]["wires"] = list((resolved.get(code_) or {}).get("wires") or [])
+    for set_eid in {x[3] for x in stud_ends}:
+        resolved[set_eid]["stud_set"] = True      # its ends live on the stud nodes; the loader draws no plug for it
 
     # shield terminations: one solder sleeve per shielded cable (ECU end only)
     for sig in SHIELD_CABLES:

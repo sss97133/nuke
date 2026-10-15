@@ -8,6 +8,11 @@ export type PricePopulation = {
   n: number; year_from: number | null; year_to: number | null; thin: boolean;
   p25: number | null; p50: number | null; p75: number | null; at_or_below: number | null;
   by_source?: Record<string, number> | null;
+  // The odometer (20261015160000): n readings among the same rows, their median, and how many read at or below this
+  // listing's miles (null under 10 readings, or when the seller disclosed a broken or rolled-over odometer).
+  miles?: { n: number; p50: number | null; at_or_below: number | null } | null;
+  // Each venue's count and median in the window (20261015215000; a median from 5 prices).
+  venues?: Record<string, { n: number; p50: number | null }> | null;
 };
 export type PositionRead = {
   family: string | null;
@@ -53,4 +58,28 @@ export function headline(p: PositionRead | null | undefined): { word: string; ba
     }
   }
   return null;
+}
+
+// How the listing's miles sit among the readings of the same population: "more miles than 55 of 62 recorded sales".
+export function milesLine(s: PricePopulation | null | undefined, noun: 'sales' | 'asks'): string | null {
+  const m = s?.miles;
+  if (!m || m.at_or_below == null || m.n <= 0) return null;
+  const k = m.at_or_below;
+  const where = k / m.n >= 0.5 ? `more miles than ${k.toLocaleString('en-US')} of ${m.n.toLocaleString('en-US')} recorded ${noun}`
+    : `fewer miles than ${(m.n - k).toLocaleString('en-US')} of ${m.n.toLocaleString('en-US')} recorded ${noun}`;
+  return `${where}${m.p50 != null ? `, median ${Math.round(m.p50).toLocaleString('en-US')} mi` : ''}`;
+}
+
+// The venues a population's prices come from, largest first, each with its median where five prices give one:
+// "BaT $14.5K (34) · Mecum $12K (9)". The comparison names its venue.
+const VENUE_SHORT: Record<string, string> = {
+  bat: 'BaT', bring_a_trailer: 'BaT', 'Bring a Trailer': 'BaT', facebook_marketplace: 'Facebook', 'Facebook Marketplace': 'Facebook',
+  craigslist: 'Craigslist', ksl: 'KSL', mecum: 'Mecum', barrett_jackson: 'Barrett-Jackson', cars_and_bids: 'Cars & Bids',
+};
+export function venuesLine(s: PricePopulation | null | undefined, max = 3): string | null {
+  const v = s?.venues;
+  if (!v) return null;
+  const parts = Object.entries(v).filter(([, x]) => x && x.n > 0).sort((a, b) => b[1].n - a[1].n).slice(0, max)
+    .map(([k, x]) => `${VENUE_SHORT[k] ?? k} ${x.p50 != null ? money(x.p50) + ' ' : ''}(${x.n.toLocaleString('en-US')})`);
+  return parts.length ? parts.join(' · ') : null;
 }

@@ -28,7 +28,7 @@
 **The rule.** Firecrawl stays at USD 100 a month at most and is spent only on the best targets. The targets are not hand-picked: a
 weekly job ranks sources, then vehicle groups, from the data model, and writes the allocation to
 `firecrawl_target_allocation`. Every Firecrawl spender asks `firecrawl_allowance(source)` before a batch, stops at the number it
-returns, and reports the spend with `firecrawl_record_spend(source, credits, lots, lane)`. In `archiveFetch()` the call belongs in
+returns, and reports the spend with `firecrawl_record_spend(source, credits, lots, lane, note, historical)` (`historical` for spend made before the rule or an allocation: it counts toward the observed return, not against the period allowance). In `archiveFetch()` the call belongs in
 the Firecrawl branch. A source we can fetch directly or re-read from retained captures costs no credits and is never allocated any;
 Firecrawl is for the sources that need it. Budget size is the parameter `firecrawl_params.monthly_credits`: 1,000 now, 100,000 if
 the USD 99 Standard plan is taken. Owner tiers: model years 1964-1973 above 1974-1991 above the rest, non-dealer sellers first.
@@ -123,6 +123,19 @@ Seller type is proposed in `docs/proposals/2026-10-15-seller-type-observation.md
 - *Collecting Cars is a trial*, capped at 50 credits (`firecrawl_source_params.credit_cap`): 1964-1991 lots, public listing pages
   only (never the search index), at most 15 a day through daily-capture-master. After 30 scored lots its observed return replaces
   the prior.
+
+### Target classes, scoped gaps and the leftover floor (owner-lead, 2026-10-15)
+
+- **Landing and re-fetch.** A Firecrawl fetch of a URL that already has a successful capture is a *re-fetch*; every other fetch is a
+  *landing*. Only landings count in the observed return (`firecrawl_lot_score.fetch_class`) and only landings are allocated; re-fetch
+  credits are reported as `refetch_credits_excluded` in the source's inputs and are never funded. Cars & Bids' recapture is the
+  negative example (about 85% of it hit removed auctions).
+- **Scoped gap.** A source without a whole-source population can still have a lower-bound gap from a scoped census window: a census
+  row with `universe_historical` NULL and `raw_response.gap_tier_missing` (the tier-relevant ids the window lists that are not held,
+  by slug model year 1964-1991). The gap is labelled `gap_basis = scoped_window`. Cars & Bids: 483 on 2026-10-15.
+- **Leftover floor.** A scoped-window source takes no part in the base stage. The credits left after the base stage go, in rank
+  order, only to sources whose rank key is at least `min_rank_leftover` (0.5), up to the same caps: a low-return source does not
+  soak up leftover just because it has a gap.
 
 **Where it lives.** Tables `firecrawl_params`, `firecrawl_source_params`, `firecrawl_spend_log`, `firecrawl_target_allocation`, `firecrawl_group_score`, `firecrawl_lot_score`;
 functions `refresh_firecrawl_target_allocation` (cron `firecrawl-target-allocation-weekly`, Mondays 05:17Z), `firecrawl_allowance`,
