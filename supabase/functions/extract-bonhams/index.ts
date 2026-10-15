@@ -1457,7 +1457,7 @@ Deno.serve(async (req) => {
         // points at it (the table's own convention for large pages), then the page is parsed and landed.
         const fc = savedHtml
           ? { httpStatus: 200, raw: { data: { metadata: { statusCode: 200 }, rawHtml: savedHtml } }, data: { html: savedHtml }, error: null }
-          : await firecrawlScrape({ url, formats: ["rawHtml"], onlyMainContent: false, waitFor: 0 });
+          : await firecrawlScrape({ url, formats: ["rawHtml"], onlyMainContent: false, waitFor: 0 }, { caller: "extract-bonhams-deep" });
         if (!savedHtml) credits++;
         const status = Number(fc.raw?.data?.metadata?.statusCode ?? fc.httpStatus ?? 0);
         const rawHtml: string | null = typeof fc.raw?.data?.rawHtml === "string" ? fc.raw.data.rawHtml : fc.data.html;
@@ -1500,7 +1500,8 @@ Deno.serve(async (req) => {
       }
       // Record what was spent (failed fetches included) against the allowance.
       if (credits > 0) {
-        await supabase.rpc("firecrawl_record_spend", { p_source: "bonhams", p_credits: credits, p_lots: out.done, p_lane: "lane-bonhams", p_note: `deep_lots tier_one=${tierOne}, allowance ${allowance}` });
+        // Credits are metered where the scrape is sent (firecrawlScrape, since 2026-10-15); only the lots landed are written here.
+        await supabase.rpc("firecrawl_record_spend", { p_source: "bonhams", p_credits: 0, p_lots: out.done, p_lane: "lane-bonhams", p_note: `deep_lots tier_one=${tierOne}, allowance ${allowance}, credits ${credits} metered` });
       }
       return new Response(JSON.stringify({ success: true, ...out, credits_used: credits, allowance, elapsed_ms: Date.now() - started }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
