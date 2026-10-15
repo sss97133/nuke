@@ -369,9 +369,9 @@ struct LiveBoardView: View {
                 }
             } else if loadError {
                 ContentUnavailableView {
-                    Label("Couldn't read the board", systemImage: "wifi.exclamationmark")
+                    Label("Couldn't read the board", systemImage: "exclamationmark.triangle")
                 } description: {
-                    Text(loadErrorDetail ?? "Check your connection.")
+                    Text(loadErrorDetail ?? "The read failed.")
                 } actions: {
                     Button("Retry") { Task { await load() } }.buttonStyle(.borderedProminent)
                 }
@@ -386,7 +386,7 @@ struct LiveBoardView: View {
         }
         .task {
             while !Task.isCancelled {
-                await load()
+                if board == nil || UIApplication.shared.applicationState == .active { await load() }
                 try? await Task.sleep(for: .seconds(60))
             }
         }
@@ -407,7 +407,7 @@ struct LiveBoardView: View {
             }
             #endif
         } catch {
-            if board == nil { loadError = true; loadErrorDetail = (error as? BoardContract.Mismatch)?.errorDescription }
+            if board == nil { loadError = true; loadErrorDetail = (error as? BoardContract.Mismatch)?.errorDescription ?? ReadFailure.text(error) }
             NSLog("NukeCapture live board read failed: %@", String(describing: error))
         }
     }

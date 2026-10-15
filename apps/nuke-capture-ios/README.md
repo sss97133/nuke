@@ -58,6 +58,21 @@ Standing rules the code carries:
   and until it checks `vision_gate_status` a reader that drops the predicate can read rejected frames.
   Thumbnails render through `NukeImage.thumb(url, width:)` (the render endpoint, or BaT's `?w=`), never
   the raw original outside the full-screen viewer.
+- **Uploads are keyed by their bytes.** The storage path is `users/<uid>/capture-relay/<sha256>/<filename>`
+  (`Config.storagePath`). The filename alone wraps at IMG_9999: by 2026-10-15, 586 old paths each held rows of
+  different photos (1,266 rows, at least 598 showing another photo's bytes). Never key an object by a name the
+  camera reuses. A pass reads no original for an asset it already settled (`SyncEngine.processAsset`, by
+  `localIdentifier`), gives each asset three attempts before it stops holding the watermark or the queue, and
+  stops on a refused session (`SupabaseService.isAuthFailure`) instead of failing every remaining photo.
+- **Heat is a budget.** Nothing reads originals in bulk while the app is open: iCloud originals download only in
+  the background job on Wi-Fi; the album review (originals + accurate OCR) runs in the foreground only on a
+  charger at a nominal temperature (`LibraryIngest.mayReviewInForeground`); a foreground backfill slice waits
+  when the phone is already warm (`SyncEngine.deviceWarm`); polls pause when the app is not active. A new loop
+  that reads photos or the network states its bound and its thermal gate. The 2026-10-15 audit of every
+  launch-time cost is in the PR that added this rule.
+- **A failed read says why.** `ReadFailure.text(error)` (SupabaseService.swift): no connection, a server timeout,
+  an HTTP status, a refused sign-in. "Check your connection" was the copy for every failure, including the
+  board's server-side 500s.
 - **Money is never anonymous.** The readers mask it at the source (#1037, #1046, #1048, and the day
   receipt since June); the phone also renders the ledger and value curve only when the read's viewer is
   not `anon`, failing closed without a document. OCR text regions from a day receipt are rendered as
