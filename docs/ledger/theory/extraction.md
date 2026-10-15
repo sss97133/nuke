@@ -91,7 +91,8 @@ The weights are rows in `firecrawl_params` (`best_w_*`, the tier weights). Unkno
   source. Once a source has 30 scored lots its observed best_v1 per credit replaces its prior (mean best_v1 over the cost).
 - **Allocation** follows best_v1 per credit, by source and then vehicle group, capped by the gap and the share. A source whose
   landed lots score low loses budget on the next run without anyone changing a parameter. A paused source
-  (`firecrawl_source_params.paused`) is ranked and shows `would_allocate`, gets no credits, and `firecrawl_allowance` returns 0.
+  (`firecrawl_source_params.paused`) is ranked, takes no credits (they flow down the ranking by the formula), shows what it
+  would receive if unpaused as `would_allocate`, and `firecrawl_allowance` returns 0.
 - **The loop.** Weekly the job rescored the lots and recomputes. As outcomes arrive (eBay endings, Craigslist removals,
   Cars & Bids results) realized value is added to the metric as `best_v2`, published beside `best_v1` in `firecrawl_lot_score`
   (the key is event and version) with its diff against v1 per source. v2 is not built yet: the first outcome feed is the gap.
