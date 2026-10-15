@@ -1,5 +1,5 @@
 import React from 'react';
-import { moveFill, moveText, pct, textWidth, tileClass, tileName, GATE_MIN, type Baseline, type Callout, type Move } from './mapScale';
+import { moveFill, moveText, moveTextShort, pct, textWidth, tileClass, tileName, GATE_MIN, type Baseline, type Callout, type Move } from './mapScale';
 import { venueOf } from './FamilySalesChart';
 import './MarketMap.css';
 
@@ -40,7 +40,7 @@ export function tileLines(node: MarketNode, move: Move, w: number, h: number, ba
   const room = w - 12;
   const moveSize = Math.max(10, Math.round(nameSize * 0.75));
   const full = moveText(move);
-  const short = move.kind === 'move' ? pct(move.rel) : full;
+  const short = moveTextShort(move);
   const moveLine = [full, short].find((t) => t && textWidth(t) * moveSize <= room) ?? '';
   // The figures the tile's area is drawn from: BaT's last 12 months, or every venue and year.
   const usd = basis === 'bat12' ? node.usd_12m : node.usd;
