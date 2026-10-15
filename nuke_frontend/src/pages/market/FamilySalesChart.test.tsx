@@ -87,3 +87,12 @@ it('reads the one value, says when it holds back older sales, and refuses any ot
   await act(async () => root.render(<FamilySalesChart brand="Porsche" familyKey="g911" family="911" width={900} height={500} onOpen={() => {}} />));
   expect(container.textContent).toContain('The sales of this family could not be read.');
 });
+
+it('counts a sale under the $500 floor in the caption and does not draw it below the axis', async () => {
+  const sales = [...[1, 2, 3, 4, 5, 6].map((i) => sale(i, 20 * i, 100000 + i * 1000, 'Bring a Trailer')), sale(7, 30, 320, 'Bring a Trailer')];
+  fixture.rpc.mockResolvedValue({ data: value(sales), error: null });
+  await act(async () => root.render(<FamilySalesChart brand="Porsche" familyKey="f911" family="911" width={900} height={500} onOpen={() => {}} />));
+  expect(container.querySelectorAll('svg.family-sales__plot circle')).toHaveLength(6);
+  expect(container.querySelector('.family-sales__title')?.textContent).toContain('7 sales with a date since');
+  expect(container.querySelector('.family-sales__title')?.textContent).toContain('1 under $500 not drawn');
+});
