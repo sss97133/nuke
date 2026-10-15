@@ -1,6 +1,7 @@
 # Classified exit model: how a `listing_exit_models` row is fitted
 
-The weights behind `classified_ask_board.merit` come from here. Every step is replayable, so a refit can be compared
+The weights behind `classified_ask_board.merit` come from here. `./run.sh [cut-date]` does steps 1 to 4 in one pass and
+prints each variant's held-out AUC and whether it clears the gate (AUC minus 2 standard errors above 0.55). Every step is replayable, so a refit can be compared
 with the active version on the same outcomes.
 
 1. `OUT=~/nuke-logs/classified-exit ./pull.sh listings` collects Facebook listings with their first/last seen and
