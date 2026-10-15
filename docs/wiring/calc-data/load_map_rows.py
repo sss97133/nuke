@@ -789,9 +789,10 @@ def main():
     # plug this run wrote is keyed to its live point on the route graph, by the anchor named in pos_source (RSI pass 12)
     if not PLAN:
         print(f"harness model: {api._req('POST', 'rpc/resync_harness_segments', {'p_vehicle_id': K5})}")
-        # a wire whose segment was made before its ends existed takes them, by the reshape's rule (RSI pass 19); the new
-        # ends are keyed to their terminal and tool parts (key_harness_wire_ends, RSI pass 6)
-        print(f"segment ends: {api._req('POST', 'rpc/fill_harness_segment_ends', {'p_vehicle_id': K5})}")
+        # every decided wire's segments follow its live ends by the reshape's rule: new wires get segments, a segment whose
+        # end changed plug takes the new end (RSI pass 25, which covers pass 19's fill); the new ends are keyed to their
+        # terminal and tool parts (key_harness_wire_ends, RSI pass 6)
+        print(f"segments: {api._req('POST', 'rpc/conform_harness_segments', {'p_vehicle_id': K5})}")
         print(f"wire end keys: {api._req('POST', 'rpc/key_harness_wire_ends', {'p_vehicle_id': K5})}")
         # and to their cavity in the cited library (RSI pass 22: the rules of passes 2 and 9, re-runnable)
         print(f"cavity keys: {api._req('POST', 'rpc/key_harness_wire_end_cavities', {'p_vehicle_id': K5})}")
