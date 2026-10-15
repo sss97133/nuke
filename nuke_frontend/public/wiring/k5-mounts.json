@@ -1,6 +1,6 @@
 {
  "vehicle_id": "e08bf694-970f-4cbe-8a74-8715158a0f2e",
- "generated_at": "2026-10-15T21:20Z",
+ "generated_at": "2026-10-15T23:02Z",
  "source": "docs/wiring/calc-data/catalog/mounts.yaml",
  "boxes": [
   {
@@ -389,8 +389,22 @@
     {
      "text": "GM's 6.0L (Gen IV) sensor sheet shows the crankshaft sensor on the engine's right-hand view.",
      "source": "reference_documents/component_drawings/NHTSA_GM_6.0L_Sensor_Locations.pdf p.2, Fig. 2"
+    },
+    {
+     "text": "Placed on the corrected engine: docs/wiring/calc-data/cad/fab/engine_ls3.py at root (0, -1.432, 0.72); the fore-aft position is triangulated from the owner's photos IMG_6530/6531/6532 against the firewall (cylinder 8 sits 58.6 mm ahead of the passenger flat face).",
+     "source": "docs/wiring/research/2026-10-15_engine-position.md"
     }
-   ]
+   ],
+   "position": {
+    "point": "CKP",
+    "frame": "twin",
+    "x": -0.19,
+    "y": -1.527,
+    "z": 0.755,
+    "method": "passenger side of the block above the starter, 6 mm proud of the block surface (v3 anchor crank, bell-referenced)",
+    "confidence": "low",
+    "source": "docs/wiring/research/2026-10-15_engine-position.md; docs/wiring/calc-data/twin_engine_anchors.json crank"
+   }
   },
   "CMP": {
    "id": "CMP",
@@ -406,8 +420,22 @@
     {
      "text": "GM's 6.0L sensor sheet shows the camshaft sensor on the engine's left-hand view.",
      "source": "reference_documents/component_drawings/NHTSA_GM_6.0L_Sensor_Locations.pdf p.1, Fig. 1"
+    },
+    {
+     "text": "Placed on the corrected engine: docs/wiring/calc-data/cad/fab/engine_ls3.py at root (0, -1.432, 0.72); the fore-aft position is triangulated from the owner's photos IMG_6530/6531/6532 against the firewall (cylinder 8 sits 58.6 mm ahead of the passenger flat face).",
+     "source": "docs/wiring/research/2026-10-15_engine-position.md"
     }
-   ]
+   ],
+   "position": {
+    "point": "CMP",
+    "frame": "twin",
+    "x": 0.06,
+    "y": -1.972,
+    "z": 0.86,
+    "method": "front cover face, driver side, at cam height: the nearest free point (10 mm) to the nominal behind the mid-mount bracket",
+    "confidence": "low",
+    "source": "docs/wiring/research/2026-10-15_engine-position.md"
+   }
   },
   "KNOCK-1": {
    "id": "KNOCK-1",
@@ -431,8 +459,22 @@
     {
      "text": "GM numbers a V8's cylinders from the front: 1, 3, 5 and 7 on the left (driver) bank, 2, 4, 6 and 8 on the right.",
      "source": "reference_documents/k5_factory_docs/1977_Light_Truck_Service_Manual.pdf p.518"
+    },
+    {
+     "text": "Placed on the corrected engine: docs/wiring/calc-data/cad/fab/engine_ls3.py at root (0, -1.432, 0.72); the fore-aft position is triangulated from the owner's photos IMG_6530/6531/6532 against the firewall (cylinder 8 sits 58.6 mm ahead of the passenger flat face).",
+     "source": "docs/wiring/research/2026-10-15_engine-position.md"
     }
-   ]
+   ],
+   "position": {
+    "point": "KS1",
+    "frame": "twin",
+    "x": 0.2,
+    "y": -1.687,
+    "z": 0.765,
+    "method": "driver side of the block, mid-length, 5 mm proud of engine_ls3's block surface at 45 mm above the crank",
+    "confidence": "low",
+    "source": "docs/wiring/research/2026-10-15_engine-position.md"
+   }
   },
   "KNOCK-2": {
    "id": "KNOCK-2",
@@ -456,8 +498,22 @@
     {
      "text": "GM numbers a V8's cylinders from the front: 1, 3, 5 and 7 on the left (driver) bank, 2, 4, 6 and 8 on the right.",
      "source": "reference_documents/k5_factory_docs/1977_Light_Truck_Service_Manual.pdf p.518"
+    },
+    {
+     "text": "Placed on the corrected engine: docs/wiring/calc-data/cad/fab/engine_ls3.py at root (0, -1.432, 0.72); the fore-aft position is triangulated from the owner's photos IMG_6530/6531/6532 against the firewall (cylinder 8 sits 58.6 mm ahead of the passenger flat face).",
+     "source": "docs/wiring/research/2026-10-15_engine-position.md"
     }
-   ]
+   ],
+   "position": {
+    "point": "KS2",
+    "frame": "twin",
+    "x": -0.2,
+    "y": -1.687,
+    "z": 0.765,
+    "method": "passenger side of the block, mid-length, 5 mm proud of the block surface at 45 mm above the crank",
+    "confidence": "low",
+    "source": "docs/wiring/research/2026-10-15_engine-position.md"
+   }
   },
   "CLT-ECU": {
    "id": "CLT-ECU",
@@ -473,8 +529,22 @@
     {
      "text": "GM's 6.0L sensor sheet shows the coolant temperature sensor on the engine's left-hand view.",
      "source": "reference_documents/component_drawings/NHTSA_GM_6.0L_Sensor_Locations.pdf p.1, Fig. 1"
+    },
+    {
+     "text": "Placed on the corrected engine: docs/wiring/calc-data/cad/fab/engine_ls3.py at root (0, -1.432, 0.72); the fore-aft position is triangulated from the owner's photos IMG_6530/6531/6532 against the firewall (cylinder 8 sits 58.6 mm ahead of the passenger flat face).",
+     "source": "docs/wiring/research/2026-10-15_engine-position.md"
     }
-   ]
+   ],
+   "position": {
+    "point": "K5H_CLT",
+    "frame": "twin",
+    "x": 0.19,
+    "y": -1.948,
+    "z": 0.9,
+    "method": "front face of the driver head, below the alternator: the nearest point with 15 mm clearance to the nominal upper-middle of the face (the Holley alternator sits against the head's front)",
+    "confidence": "low",
+    "source": "docs/wiring/research/2026-10-15_engine-position.md"
+   }
   },
   "DAK-CTS": {
    "id": "DAK-CTS",
@@ -490,11 +560,26 @@
     {
      "text": "The sender is 1/8 NPT, two-wire.",
      "source": "reference_documents/component_drawings/dakota_digital_vhx_manual.pdf p.9 (650314:P)"
+    },
+    {
+     "text": "Placed on the corrected engine: docs/wiring/calc-data/cad/fab/engine_ls3.py at root (0, -1.432, 0.72); the fore-aft position is triangulated from the owner's photos IMG_6530/6531/6532 against the firewall (cylinder 8 sits 58.6 mm ahead of the passenger flat face).",
+     "source": "docs/wiring/research/2026-10-15_engine-position.md"
     }
    ],
    "open": [
-    "The port's thread against the sender's 1/8 NPT (adapter or not): read it on the head."
-   ]
+    "The port's thread against the sender's 1/8 NPT (adapter or not): read it on the head.",
+    "Confirm the capped port is the coolant port."
+   ],
+   "position": {
+    "point": "DAK_CTS_HEAD_REAR_P",
+    "frame": "twin",
+    "x": -0.292,
+    "y": -1.445,
+    "z": 1.012,
+    "method": "the capped port at the top outboard corner of the passenger head's rear face (red shipping cap in vehicle_images 8e79c104)",
+    "confidence": "low-medium",
+    "source": "docs/wiring/research/2026-10-15_engine-position.md; Swap_Specialties_LS_Installation_Instructions.pdf p.6; vehicle_images 8e79c104"
+   }
   },
   "OILP-ECU": {
    "id": "OILP-ECU",
@@ -510,15 +595,32 @@
     {
      "text": "GM's 6.0L sensor sheet shows the oil pressure sensor on the engine's right-hand view.",
      "source": "reference_documents/component_drawings/NHTSA_GM_6.0L_Sensor_Locations.pdf p.2, Fig. 2"
+    },
+    {
+     "text": "Placed on the corrected engine: docs/wiring/calc-data/cad/fab/engine_ls3.py at root (0, -1.432, 0.72); the fore-aft position is triangulated from the owner's photos IMG_6530/6531/6532 against the firewall (cylinder 8 sits 58.6 mm ahead of the passenger flat face).",
+     "source": "docs/wiring/research/2026-10-15_engine-position.md"
     }
+   ],
+   "position": {
+    "point": "K5H_OilPress",
+    "frame": "twin",
+    "x": 0.02,
+    "y": -1.502,
+    "z": 0.97,
+    "method": "the factory port at the rear of the valley cover, just driver side of centre, read off the owner's rear view of the long block (sensor about 60-70 mm ahead of the valley cover's rear edge)",
+    "confidence": "low-medium",
+    "source": "docs/wiring/research/2026-10-15_engine-position.md; vehicle_images 8e79c104 (2024-08-25)"
+   },
+   "open": [
+    "The DEL-Stributer plate sits over this port in every model so far (v3 put it 10 mm through the sensor; lifted here); check the Delmo plate's clearance over the sensor on the truck."
    ]
   },
   "DAK-OILP": {
    "id": "DAK-OILP",
    "what": "Dakota oil pressure sender (SEN-03-8)",
-   "where": "Not placed: a tee at the factory oil pressure port, or a port on the oil cooler adapter",
+   "where": "A tee at the factory oil pressure port (upper rear of the valley), beside the M130's sensor",
    "zone": "engine",
-   "status": "open",
+   "status": "flag",
    "why": [
     {
      "text": "The factory port is at the upper rear of the engine and already holds the M130's sensor.",
@@ -527,11 +629,26 @@
     {
      "text": "The Dakota gauge needs its own sender.",
      "source": "reference_documents/component_drawings/dakota_digital_vhx_manual.pdf p.9 (650314:P)"
+    },
+    {
+     "text": "Placed on the corrected engine: docs/wiring/calc-data/cad/fab/engine_ls3.py at root (0, -1.432, 0.72); the fore-aft position is triangulated from the owner's photos IMG_6530/6531/6532 against the firewall (cylinder 8 sits 58.6 mm ahead of the passenger flat face).",
+     "source": "docs/wiring/research/2026-10-15_engine-position.md"
     }
    ],
    "open": [
-    "Pick the tee or a cooler-adapter port."
-   ]
+    "The DEL-Stributer plate and coil cluster sit over the port (v3 placed the plate through the sensor): a tee and sender may not fit under them. Check the Delmo plate on the truck, or use a port on the oil-cooler adapter.",
+    "flag, not open: mounts_v5 lets only decided, proposed, fixed_by_engine or flag ends carry a position."
+   ],
+   "position": {
+    "point": "DAK_OILP_TEE",
+    "frame": "twin",
+    "x": 0.04,
+    "y": -1.502,
+    "z": 0.995,
+    "method": "a tee on the factory oil pressure port (K5H_OilPress), the sender standing 20 mm driver side and 25 mm up (tee geometry assumed)",
+    "confidence": "low",
+    "source": "docs/wiring/research/2026-10-15_engine-position.md; vehicle_images 8e79c104"
+   }
   },
   "OILT": {
    "id": "OILT",
@@ -551,13 +668,27 @@
     {
      "text": "One forum says the pan sensor reads level only and the car models oil temperature, so the part number decides it.",
      "source": "camaro5.com/forums/showthread.php?t=333771 (search snippet, 2026-09-29)"
+    },
+    {
+     "text": "Placed on the corrected engine: docs/wiring/calc-data/cad/fab/engine_ls3.py at root (0, -1.432, 0.72); the fore-aft position is triangulated from the owner's photos IMG_6530/6531/6532 against the firewall (cylinder 8 sits 58.6 mm ahead of the passenger flat face).",
+     "source": "docs/wiring/research/2026-10-15_engine-position.md"
     }
    ],
    "open": [
     "Read the part number off the sensor body: it settles whether it has a temperature element the M130 can read.",
     "The registry names a GT150 2-way plug for OILT; the factory sensor takes a 3-way plug. The registry owner decides.",
     "If it reads level only, a separate oil temperature sensor goes in a tee at the top-rear oil pressure port (with the Dakota sender)."
-   ]
+   ],
+   "position": {
+    "point": "K5H_OilTemp",
+    "frame": "twin",
+    "x": -0.136,
+    "y": -1.642,
+    "z": 0.58,
+    "method": "passenger side of the oil pan, on the boss behind and below KNOCK-2 (pan from engine_ls3; the truck's pan model is not on record)",
+    "confidence": "low",
+    "source": "docs/wiring/research/2026-10-15_engine-position.md"
+   }
   },
   "MAP": {
    "id": "MAP",
@@ -618,11 +749,25 @@
     {
      "text": "The 2026-02-01 photo shows the throttle body set on the intake for the mock-up; it is not bolted down.",
      "source": "vehicle_observations device proof TB (2026-09-27)"
+    },
+    {
+     "text": "Placed on the corrected engine: docs/wiring/calc-data/cad/fab/engine_ls3.py at root (0, -1.432, 0.72); the fore-aft position is triangulated from the owner's photos IMG_6530/6531/6532 against the firewall (cylinder 8 sits 58.6 mm ahead of the passenger flat face).",
+     "source": "docs/wiring/research/2026-10-15_engine-position.md"
     }
    ],
    "open": [
     "The mounting bolts were never found (owner)."
-   ]
+   ],
+   "position": {
+    "point": "THROTTLE_BODY",
+    "frame": "twin",
+    "x": -0.08,
+    "y": -1.652,
+    "z": 1.148,
+    "method": "the TB's motor/TPS housing on the passenger side of the throttle body, on engine_ls3's 4150 pad + Delmo adapter (tb_flange (0, -1.672, 1.108))",
+    "confidence": "low-medium",
+    "source": "docs/wiring/research/2026-10-15_engine-position.md; engine_ls3.py pad_y -240 (IMG_6531/6532)"
+   }
   },
   "INJ-1": {
    "id": "INJ-1",
@@ -638,11 +783,25 @@
     {
      "text": "The Holley receipt includes 534-209 fuel rails, and the owner's photos show the rails on the intake.",
      "source": "docs/wiring/K5_WIRING_STATE.md 0ag(g)"
+    },
+    {
+     "text": "Placed on the corrected engine: docs/wiring/calc-data/cad/fab/engine_ls3.py at root (0, -1.432, 0.72); the fore-aft position is triangulated from the owner's photos IMG_6530/6531/6532 against the firewall (cylinder 8 sits 58.6 mm ahead of the passenger flat face).",
+     "source": "docs/wiring/research/2026-10-15_engine-position.md"
     }
    ],
    "open": [
     "Which intake is on the engine (state 0ag(g)): an injector needs a port-EFI intake's boss."
-   ]
+   ],
+   "position": {
+    "point": "K5H_Injector_1",
+    "frame": "twin",
+    "x": 0.132,
+    "y": -1.876,
+    "z": 1.073,
+    "method": "engine_ls3 injector at the cylinder-1 bore station, under the driver rail (rail x 150 / z 372 local)",
+    "confidence": "medium (fore-aft) / low (height)",
+    "source": "docs/wiring/research/2026-10-15_engine-position.md"
+   }
   },
   "INJ-2": {
    "id": "INJ-2",
@@ -658,11 +817,25 @@
     {
      "text": "The Holley receipt includes 534-209 fuel rails, and the owner's photos show the rails on the intake.",
      "source": "docs/wiring/K5_WIRING_STATE.md 0ag(g)"
+    },
+    {
+     "text": "Placed on the corrected engine: docs/wiring/calc-data/cad/fab/engine_ls3.py at root (0, -1.432, 0.72); the fore-aft position is triangulated from the owner's photos IMG_6530/6531/6532 against the firewall (cylinder 8 sits 58.6 mm ahead of the passenger flat face).",
+     "source": "docs/wiring/research/2026-10-15_engine-position.md"
     }
    ],
    "open": [
     "Which intake is on the engine (state 0ag(g)): an injector needs a port-EFI intake's boss."
-   ]
+   ],
+   "position": {
+    "point": "K5H_Injector_2",
+    "frame": "twin",
+    "x": -0.132,
+    "y": -1.852,
+    "z": 1.073,
+    "method": "engine_ls3 injector at the cylinder-2 bore station, under the passenger rail (rail x 150 / z 372 local)",
+    "confidence": "medium (fore-aft) / low (height)",
+    "source": "docs/wiring/research/2026-10-15_engine-position.md"
+   }
   },
   "INJ-3": {
    "id": "INJ-3",
@@ -678,11 +851,25 @@
     {
      "text": "The Holley receipt includes 534-209 fuel rails, and the owner's photos show the rails on the intake.",
      "source": "docs/wiring/K5_WIRING_STATE.md 0ag(g)"
+    },
+    {
+     "text": "Placed on the corrected engine: docs/wiring/calc-data/cad/fab/engine_ls3.py at root (0, -1.432, 0.72); the fore-aft position is triangulated from the owner's photos IMG_6530/6531/6532 against the firewall (cylinder 8 sits 58.6 mm ahead of the passenger flat face).",
+     "source": "docs/wiring/research/2026-10-15_engine-position.md"
     }
    ],
    "open": [
     "Which intake is on the engine (state 0ag(g)): an injector needs a port-EFI intake's boss."
-   ]
+   ],
+   "position": {
+    "point": "K5H_Injector_3",
+    "frame": "twin",
+    "x": 0.132,
+    "y": -1.764,
+    "z": 1.073,
+    "method": "engine_ls3 injector at the cylinder-3 bore station, under the driver rail (rail x 150 / z 372 local)",
+    "confidence": "medium (fore-aft) / low (height)",
+    "source": "docs/wiring/research/2026-10-15_engine-position.md"
+   }
   },
   "INJ-4": {
    "id": "INJ-4",
@@ -698,11 +885,25 @@
     {
      "text": "The Holley receipt includes 534-209 fuel rails, and the owner's photos show the rails on the intake.",
      "source": "docs/wiring/K5_WIRING_STATE.md 0ag(g)"
+    },
+    {
+     "text": "Placed on the corrected engine: docs/wiring/calc-data/cad/fab/engine_ls3.py at root (0, -1.432, 0.72); the fore-aft position is triangulated from the owner's photos IMG_6530/6531/6532 against the firewall (cylinder 8 sits 58.6 mm ahead of the passenger flat face).",
+     "source": "docs/wiring/research/2026-10-15_engine-position.md"
     }
    ],
    "open": [
     "Which intake is on the engine (state 0ag(g)): an injector needs a port-EFI intake's boss."
-   ]
+   ],
+   "position": {
+    "point": "K5H_Injector_4",
+    "frame": "twin",
+    "x": -0.132,
+    "y": -1.74,
+    "z": 1.073,
+    "method": "engine_ls3 injector at the cylinder-4 bore station, under the passenger rail (rail x 150 / z 372 local)",
+    "confidence": "medium (fore-aft) / low (height)",
+    "source": "docs/wiring/research/2026-10-15_engine-position.md"
+   }
   },
   "INJ-5": {
    "id": "INJ-5",
@@ -718,11 +919,25 @@
     {
      "text": "The Holley receipt includes 534-209 fuel rails, and the owner's photos show the rails on the intake.",
      "source": "docs/wiring/K5_WIRING_STATE.md 0ag(g)"
+    },
+    {
+     "text": "Placed on the corrected engine: docs/wiring/calc-data/cad/fab/engine_ls3.py at root (0, -1.432, 0.72); the fore-aft position is triangulated from the owner's photos IMG_6530/6531/6532 against the firewall (cylinder 8 sits 58.6 mm ahead of the passenger flat face).",
+     "source": "docs/wiring/research/2026-10-15_engine-position.md"
     }
    ],
    "open": [
     "Which intake is on the engine (state 0ag(g)): an injector needs a port-EFI intake's boss."
-   ]
+   ],
+   "position": {
+    "point": "K5H_Injector_5",
+    "frame": "twin",
+    "x": 0.132,
+    "y": -1.653,
+    "z": 1.073,
+    "method": "engine_ls3 injector at the cylinder-5 bore station, under the driver rail (rail x 150 / z 372 local)",
+    "confidence": "medium (fore-aft) / low (height)",
+    "source": "docs/wiring/research/2026-10-15_engine-position.md"
+   }
   },
   "INJ-6": {
    "id": "INJ-6",
@@ -738,11 +953,25 @@
     {
      "text": "The Holley receipt includes 534-209 fuel rails, and the owner's photos show the rails on the intake.",
      "source": "docs/wiring/K5_WIRING_STATE.md 0ag(g)"
+    },
+    {
+     "text": "Placed on the corrected engine: docs/wiring/calc-data/cad/fab/engine_ls3.py at root (0, -1.432, 0.72); the fore-aft position is triangulated from the owner's photos IMG_6530/6531/6532 against the firewall (cylinder 8 sits 58.6 mm ahead of the passenger flat face).",
+     "source": "docs/wiring/research/2026-10-15_engine-position.md"
     }
    ],
    "open": [
     "Which intake is on the engine (state 0ag(g)): an injector needs a port-EFI intake's boss."
-   ]
+   ],
+   "position": {
+    "point": "K5H_Injector_6",
+    "frame": "twin",
+    "x": -0.132,
+    "y": -1.629,
+    "z": 1.073,
+    "method": "engine_ls3 injector at the cylinder-6 bore station, under the passenger rail (rail x 150 / z 372 local)",
+    "confidence": "medium (fore-aft) / low (height)",
+    "source": "docs/wiring/research/2026-10-15_engine-position.md"
+   }
   },
   "INJ-7": {
    "id": "INJ-7",
@@ -758,11 +987,25 @@
     {
      "text": "The Holley receipt includes 534-209 fuel rails, and the owner's photos show the rails on the intake.",
      "source": "docs/wiring/K5_WIRING_STATE.md 0ag(g)"
+    },
+    {
+     "text": "Placed on the corrected engine: docs/wiring/calc-data/cad/fab/engine_ls3.py at root (0, -1.432, 0.72); the fore-aft position is triangulated from the owner's photos IMG_6530/6531/6532 against the firewall (cylinder 8 sits 58.6 mm ahead of the passenger flat face).",
+     "source": "docs/wiring/research/2026-10-15_engine-position.md"
     }
    ],
    "open": [
     "Which intake is on the engine (state 0ag(g)): an injector needs a port-EFI intake's boss."
-   ]
+   ],
+   "position": {
+    "point": "K5H_Injector_7",
+    "frame": "twin",
+    "x": 0.132,
+    "y": -1.541,
+    "z": 1.073,
+    "method": "engine_ls3 injector at the cylinder-7 bore station, under the driver rail (rail x 150 / z 372 local)",
+    "confidence": "medium (fore-aft) / low (height)",
+    "source": "docs/wiring/research/2026-10-15_engine-position.md"
+   }
   },
   "INJ-8": {
    "id": "INJ-8",
@@ -778,11 +1021,25 @@
     {
      "text": "The Holley receipt includes 534-209 fuel rails, and the owner's photos show the rails on the intake.",
      "source": "docs/wiring/K5_WIRING_STATE.md 0ag(g)"
+    },
+    {
+     "text": "Placed on the corrected engine: docs/wiring/calc-data/cad/fab/engine_ls3.py at root (0, -1.432, 0.72); the fore-aft position is triangulated from the owner's photos IMG_6530/6531/6532 against the firewall (cylinder 8 sits 58.6 mm ahead of the passenger flat face).",
+     "source": "docs/wiring/research/2026-10-15_engine-position.md"
     }
    ],
    "open": [
     "Which intake is on the engine (state 0ag(g)): an injector needs a port-EFI intake's boss."
-   ]
+   ],
+   "position": {
+    "point": "K5H_Injector_8",
+    "frame": "twin",
+    "x": -0.132,
+    "y": -1.517,
+    "z": 1.073,
+    "method": "engine_ls3 injector at the cylinder-8 bore station, under the passenger rail (rail x 150 / z 372 local)",
+    "confidence": "medium (fore-aft) / low (height)",
+    "source": "docs/wiring/research/2026-10-15_engine-position.md"
+   }
   },
   "COIL-1": {
    "id": "COIL-1",
@@ -798,11 +1055,26 @@
     {
      "text": "The coils mount on the central DEL-Stributor bracket, not the valve covers.",
      "source": "vehicle_observations device proof COIL-1 (withdrawn row)"
+    },
+    {
+     "text": "Placed on the corrected engine: docs/wiring/calc-data/cad/fab/engine_ls3.py at root (0, -1.432, 0.72); the fore-aft position is triangulated from the owner's photos IMG_6530/6531/6532 against the firewall (cylinder 8 sits 58.6 mm ahead of the passenger flat face).",
+     "source": "docs/wiring/research/2026-10-15_engine-position.md"
     }
    ],
    "open": [
-    "Which coil sits where in the cluster: read it off the bracket."
-   ]
+    "Which coil sits where in the cluster: read it off the bracket.",
+    "The cluster's height and fore-aft spot on the truck: the Del-Stributer is not on the engine in any photo on file (2026-01-31); photograph it once fitted."
+   ],
+   "position": {
+    "point": "K5H_Coil_1",
+    "frame": "twin",
+    "x": -0.098,
+    "y": -1.574,
+    "z": 1.165,
+    "method": "top of the coil in the DEL-Stributor 2 x 4 cluster at the rear centre (v3 cluster layout moved with the bell, lifted 97 mm so the coil bodies clear engine_ls3's intake runners); numbered by position, not by cylinder",
+    "confidence": "low",
+    "source": "docs/wiring/research/2026-10-15_engine-position.md; docs/wiring/twin/build_engine_v3.py coil cluster (Delmo Speed product photos)"
+   }
   },
   "COIL-2": {
    "id": "COIL-2",
@@ -818,11 +1090,26 @@
     {
      "text": "The coils mount on the central DEL-Stributor bracket, not the valve covers.",
      "source": "vehicle_observations device proof COIL-1 (withdrawn row)"
+    },
+    {
+     "text": "Placed on the corrected engine: docs/wiring/calc-data/cad/fab/engine_ls3.py at root (0, -1.432, 0.72); the fore-aft position is triangulated from the owner's photos IMG_6530/6531/6532 against the firewall (cylinder 8 sits 58.6 mm ahead of the passenger flat face).",
+     "source": "docs/wiring/research/2026-10-15_engine-position.md"
     }
    ],
    "open": [
-    "Which coil sits where in the cluster: read it off the bracket."
-   ]
+    "Which coil sits where in the cluster: read it off the bracket.",
+    "The cluster's height and fore-aft spot on the truck: the Del-Stributer is not on the engine in any photo on file (2026-01-31); photograph it once fitted."
+   ],
+   "position": {
+    "point": "K5H_Coil_2",
+    "frame": "twin",
+    "x": -0.033,
+    "y": -1.574,
+    "z": 1.165,
+    "method": "top of the coil in the DEL-Stributor 2 x 4 cluster at the rear centre (v3 cluster layout moved with the bell, lifted 97 mm so the coil bodies clear engine_ls3's intake runners); numbered by position, not by cylinder",
+    "confidence": "low",
+    "source": "docs/wiring/research/2026-10-15_engine-position.md; docs/wiring/twin/build_engine_v3.py coil cluster (Delmo Speed product photos)"
+   }
   },
   "COIL-3": {
    "id": "COIL-3",
@@ -838,11 +1125,26 @@
     {
      "text": "The coils mount on the central DEL-Stributor bracket, not the valve covers.",
      "source": "vehicle_observations device proof COIL-1 (withdrawn row)"
+    },
+    {
+     "text": "Placed on the corrected engine: docs/wiring/calc-data/cad/fab/engine_ls3.py at root (0, -1.432, 0.72); the fore-aft position is triangulated from the owner's photos IMG_6530/6531/6532 against the firewall (cylinder 8 sits 58.6 mm ahead of the passenger flat face).",
+     "source": "docs/wiring/research/2026-10-15_engine-position.md"
     }
    ],
    "open": [
-    "Which coil sits where in the cluster: read it off the bracket."
-   ]
+    "Which coil sits where in the cluster: read it off the bracket.",
+    "The cluster's height and fore-aft spot on the truck: the Del-Stributer is not on the engine in any photo on file (2026-01-31); photograph it once fitted."
+   ],
+   "position": {
+    "point": "K5H_Coil_3",
+    "frame": "twin",
+    "x": 0.033,
+    "y": -1.574,
+    "z": 1.165,
+    "method": "top of the coil in the DEL-Stributor 2 x 4 cluster at the rear centre (v3 cluster layout moved with the bell, lifted 97 mm so the coil bodies clear engine_ls3's intake runners); numbered by position, not by cylinder",
+    "confidence": "low",
+    "source": "docs/wiring/research/2026-10-15_engine-position.md; docs/wiring/twin/build_engine_v3.py coil cluster (Delmo Speed product photos)"
+   }
   },
   "COIL-4": {
    "id": "COIL-4",
@@ -858,11 +1160,26 @@
     {
      "text": "The coils mount on the central DEL-Stributor bracket, not the valve covers.",
      "source": "vehicle_observations device proof COIL-1 (withdrawn row)"
+    },
+    {
+     "text": "Placed on the corrected engine: docs/wiring/calc-data/cad/fab/engine_ls3.py at root (0, -1.432, 0.72); the fore-aft position is triangulated from the owner's photos IMG_6530/6531/6532 against the firewall (cylinder 8 sits 58.6 mm ahead of the passenger flat face).",
+     "source": "docs/wiring/research/2026-10-15_engine-position.md"
     }
    ],
    "open": [
-    "Which coil sits where in the cluster: read it off the bracket."
-   ]
+    "Which coil sits where in the cluster: read it off the bracket.",
+    "The cluster's height and fore-aft spot on the truck: the Del-Stributer is not on the engine in any photo on file (2026-01-31); photograph it once fitted."
+   ],
+   "position": {
+    "point": "K5H_Coil_4",
+    "frame": "twin",
+    "x": 0.098,
+    "y": -1.574,
+    "z": 1.165,
+    "method": "top of the coil in the DEL-Stributor 2 x 4 cluster at the rear centre (v3 cluster layout moved with the bell, lifted 97 mm so the coil bodies clear engine_ls3's intake runners); numbered by position, not by cylinder",
+    "confidence": "low",
+    "source": "docs/wiring/research/2026-10-15_engine-position.md; docs/wiring/twin/build_engine_v3.py coil cluster (Delmo Speed product photos)"
+   }
   },
   "COIL-5": {
    "id": "COIL-5",
@@ -878,11 +1195,26 @@
     {
      "text": "The coils mount on the central DEL-Stributor bracket, not the valve covers.",
      "source": "vehicle_observations device proof COIL-1 (withdrawn row)"
+    },
+    {
+     "text": "Placed on the corrected engine: docs/wiring/calc-data/cad/fab/engine_ls3.py at root (0, -1.432, 0.72); the fore-aft position is triangulated from the owner's photos IMG_6530/6531/6532 against the firewall (cylinder 8 sits 58.6 mm ahead of the passenger flat face).",
+     "source": "docs/wiring/research/2026-10-15_engine-position.md"
     }
    ],
    "open": [
-    "Which coil sits where in the cluster: read it off the bracket."
-   ]
+    "Which coil sits where in the cluster: read it off the bracket.",
+    "The cluster's height and fore-aft spot on the truck: the Del-Stributer is not on the engine in any photo on file (2026-01-31); photograph it once fitted."
+   ],
+   "position": {
+    "point": "K5H_Coil_5",
+    "frame": "twin",
+    "x": -0.098,
+    "y": -1.51,
+    "z": 1.165,
+    "method": "top of the coil in the DEL-Stributor 2 x 4 cluster at the rear centre (v3 cluster layout moved with the bell, lifted 97 mm so the coil bodies clear engine_ls3's intake runners); numbered by position, not by cylinder",
+    "confidence": "low",
+    "source": "docs/wiring/research/2026-10-15_engine-position.md; docs/wiring/twin/build_engine_v3.py coil cluster (Delmo Speed product photos)"
+   }
   },
   "COIL-6": {
    "id": "COIL-6",
@@ -898,11 +1230,26 @@
     {
      "text": "The coils mount on the central DEL-Stributor bracket, not the valve covers.",
      "source": "vehicle_observations device proof COIL-1 (withdrawn row)"
+    },
+    {
+     "text": "Placed on the corrected engine: docs/wiring/calc-data/cad/fab/engine_ls3.py at root (0, -1.432, 0.72); the fore-aft position is triangulated from the owner's photos IMG_6530/6531/6532 against the firewall (cylinder 8 sits 58.6 mm ahead of the passenger flat face).",
+     "source": "docs/wiring/research/2026-10-15_engine-position.md"
     }
    ],
    "open": [
-    "Which coil sits where in the cluster: read it off the bracket."
-   ]
+    "Which coil sits where in the cluster: read it off the bracket.",
+    "The cluster's height and fore-aft spot on the truck: the Del-Stributer is not on the engine in any photo on file (2026-01-31); photograph it once fitted."
+   ],
+   "position": {
+    "point": "K5H_Coil_6",
+    "frame": "twin",
+    "x": -0.033,
+    "y": -1.51,
+    "z": 1.165,
+    "method": "top of the coil in the DEL-Stributor 2 x 4 cluster at the rear centre (v3 cluster layout moved with the bell, lifted 97 mm so the coil bodies clear engine_ls3's intake runners); numbered by position, not by cylinder",
+    "confidence": "low",
+    "source": "docs/wiring/research/2026-10-15_engine-position.md; docs/wiring/twin/build_engine_v3.py coil cluster (Delmo Speed product photos)"
+   }
   },
   "COIL-7": {
    "id": "COIL-7",
@@ -918,11 +1265,26 @@
     {
      "text": "The coils mount on the central DEL-Stributor bracket, not the valve covers.",
      "source": "vehicle_observations device proof COIL-1 (withdrawn row)"
+    },
+    {
+     "text": "Placed on the corrected engine: docs/wiring/calc-data/cad/fab/engine_ls3.py at root (0, -1.432, 0.72); the fore-aft position is triangulated from the owner's photos IMG_6530/6531/6532 against the firewall (cylinder 8 sits 58.6 mm ahead of the passenger flat face).",
+     "source": "docs/wiring/research/2026-10-15_engine-position.md"
     }
    ],
    "open": [
-    "Which coil sits where in the cluster: read it off the bracket."
-   ]
+    "Which coil sits where in the cluster: read it off the bracket.",
+    "The cluster's height and fore-aft spot on the truck: the Del-Stributer is not on the engine in any photo on file (2026-01-31); photograph it once fitted."
+   ],
+   "position": {
+    "point": "K5H_Coil_7",
+    "frame": "twin",
+    "x": 0.033,
+    "y": -1.51,
+    "z": 1.165,
+    "method": "top of the coil in the DEL-Stributor 2 x 4 cluster at the rear centre (v3 cluster layout moved with the bell, lifted 97 mm so the coil bodies clear engine_ls3's intake runners); numbered by position, not by cylinder",
+    "confidence": "low",
+    "source": "docs/wiring/research/2026-10-15_engine-position.md; docs/wiring/twin/build_engine_v3.py coil cluster (Delmo Speed product photos)"
+   }
   },
   "COIL-8": {
    "id": "COIL-8",
@@ -938,11 +1300,26 @@
     {
      "text": "The coils mount on the central DEL-Stributor bracket, not the valve covers.",
      "source": "vehicle_observations device proof COIL-1 (withdrawn row)"
+    },
+    {
+     "text": "Placed on the corrected engine: docs/wiring/calc-data/cad/fab/engine_ls3.py at root (0, -1.432, 0.72); the fore-aft position is triangulated from the owner's photos IMG_6530/6531/6532 against the firewall (cylinder 8 sits 58.6 mm ahead of the passenger flat face).",
+     "source": "docs/wiring/research/2026-10-15_engine-position.md"
     }
    ],
    "open": [
-    "Which coil sits where in the cluster: read it off the bracket."
-   ]
+    "Which coil sits where in the cluster: read it off the bracket.",
+    "The cluster's height and fore-aft spot on the truck: the Del-Stributer is not on the engine in any photo on file (2026-01-31); photograph it once fitted."
+   ],
+   "position": {
+    "point": "K5H_Coil_8",
+    "frame": "twin",
+    "x": 0.098,
+    "y": -1.51,
+    "z": 1.165,
+    "method": "top of the coil in the DEL-Stributor 2 x 4 cluster at the rear centre (v3 cluster layout moved with the bell, lifted 97 mm so the coil bodies clear engine_ls3's intake runners); numbered by position, not by cylinder",
+    "confidence": "low",
+    "source": "docs/wiring/research/2026-10-15_engine-position.md; docs/wiring/twin/build_engine_v3.py coil cluster (Delmo Speed product photos)"
+   }
   },
   "RAIL-COIL_PWR": {
    "id": "RAIL-COIL_PWR",
@@ -955,17 +1332,21 @@
     {
      "text": "It is daisy-chained to the 8 coil power pins.",
      "source": "docs/wiring/calc-data/catalog/endpoints.yaml RAIL-COIL_PWR"
+    },
+    {
+     "text": "Placed on the corrected engine: docs/wiring/calc-data/cad/fab/engine_ls3.py at root (0, -1.432, 0.72); the fore-aft position is triangulated from the owner's photos IMG_6530/6531/6532 against the firewall (cylinder 8 sits 58.6 mm ahead of the passenger flat face).",
+     "source": "docs/wiring/research/2026-10-15_engine-position.md"
     }
    ],
    "position": {
     "point": "RAIL_COIL_PWR",
     "frame": "twin",
     "x": 0.0,
-    "y": -1.655,
-    "z": 1.31,
-    "method": "centroid of the eight coil centres (K5H_Coil_1..8) = node VALLEY (0, -1.655, 1.31)",
+    "y": -1.542,
+    "z": 1.21,
+    "method": "splice node above the centre of the coil cluster, 19 mm over the coil towers",
     "confidence": "low",
-    "source": "docs/wiring/research/2026-10-15_device-positions.md"
+    "source": "docs/wiring/research/2026-10-15_engine-position.md"
    }
   },
   "RAIL-INJ_PWR": {
@@ -979,17 +1360,21 @@
     {
      "text": "It is daisy-chained at the fuel rail to the 8 injector pin 1s.",
      "source": "docs/wiring/calc-data/catalog/endpoints.yaml RAIL-INJ_PWR"
+    },
+    {
+     "text": "Placed on the corrected engine: docs/wiring/calc-data/cad/fab/engine_ls3.py at root (0, -1.432, 0.72); the fore-aft position is triangulated from the owner's photos IMG_6530/6531/6532 against the firewall (cylinder 8 sits 58.6 mm ahead of the passenger flat face).",
+     "source": "docs/wiring/research/2026-10-15_engine-position.md"
     }
    ],
    "position": {
     "point": "RAIL_INJ_PWR",
     "frame": "twin",
     "x": 0.0,
-    "y": -1.69,
-    "z": 1.17,
-    "method": "centroid of the eight injector nodes (K5H_Injector_1..8; x 0, y mean of -1.86..-1.525, z 1.17)",
+    "y": -1.8,
+    "z": 1.11,
+    "method": "splice node between the fuel rails ahead of the throttle body, 27 mm above the intake (the daisy chain runs along the rails; the node is where it joins the route graph)",
     "confidence": "low",
-    "source": "docs/wiring/research/2026-10-15_device-positions.md"
+    "source": "docs/wiring/research/2026-10-15_engine-position.md"
    }
   },
   "COIL-GROUND-RINGS": {
@@ -1006,11 +1391,26 @@
     {
      "text": "Dave's sheet runs the coil a and b grounds to a head ring terminal.",
      "source": "docs/wiring/calc-data/catalog/endpoints.yaml COIL-GROUND-RINGS"
+    },
+    {
+     "text": "Placed on the corrected engine: docs/wiring/calc-data/cad/fab/engine_ls3.py at root (0, -1.432, 0.72); the fore-aft position is triangulated from the owner's photos IMG_6530/6531/6532 against the firewall (cylinder 8 sits 58.6 mm ahead of the passenger flat face).",
+     "source": "docs/wiring/research/2026-10-15_engine-position.md"
     }
    ],
    "open": [
-    "The bolt and thread at the head set the ring size (RING-SMALL is open)."
-   ]
+    "The bolt and thread at the head set the ring size (RING-SMALL is open).",
+    "Which head and which boss: the driver head's rear face (0.208, -1.474, 0.928) is the alternate."
+   ],
+   "position": {
+    "point": "COIL_GND_HEAD_REAR_P",
+    "frame": "twin",
+    "x": -0.208,
+    "y": -1.445,
+    "z": 0.928,
+    "method": "passenger head's rear face, centre, 5 mm proud of it (face plane cross-checked by the photo triangulation of the passenger valve-cover rear)",
+    "confidence": "medium (face) / low (which boss)",
+    "source": "docs/wiring/research/2026-10-15_engine-position.md; Swap_Specialties_LS_Installation_Instructions.pdf p.4"
+   }
   },
   "FUELP": {
    "id": "FUELP",
@@ -1046,8 +1446,22 @@
     {
      "text": "Mounted on the Holley mid-mount drive with the belt on.",
      "source": "vehicle_observations device proof ALTERNATOR-SENSE"
+    },
+    {
+     "text": "Placed on the corrected engine: docs/wiring/calc-data/cad/fab/engine_ls3.py at root (0, -1.432, 0.72); the fore-aft position is triangulated from the owner's photos IMG_6530/6531/6532 against the firewall (cylinder 8 sits 58.6 mm ahead of the passenger flat face).",
+     "source": "docs/wiring/research/2026-10-15_engine-position.md"
     }
-   ]
+   ],
+   "position": {
+    "point": "ALT",
+    "frame": "twin",
+    "x": 0.184,
+    "y": -1.955,
+    "z": 1.058,
+    "method": "the sense/regulator plug on top of the alternator's rear housing (Holley 197-302 on the driver-high mid-mount bracket)",
+    "confidence": "low",
+    "source": "docs/wiring/research/2026-10-15_engine-position.md; engine_ls3.py alt_xz / alt_case_d"
+   }
   },
   "STARTER-S": {
    "id": "STARTER-S",
@@ -1059,11 +1473,25 @@
     {
      "text": "The crank sensor sits \"behind the starter on the passenger side of the block\", which puts the starter on the passenger side.",
      "source": "reference_documents/component_drawings/Swap_Specialties_LS_Installation_Instructions.pdf p.5"
+    },
+    {
+     "text": "Placed on the corrected engine: docs/wiring/calc-data/cad/fab/engine_ls3.py at root (0, -1.432, 0.72); the fore-aft position is triangulated from the owner's photos IMG_6530/6531/6532 against the firewall (cylinder 8 sits 58.6 mm ahead of the passenger flat face).",
+     "source": "docs/wiring/research/2026-10-15_engine-position.md"
     }
    ],
    "open": [
     "The starter model is not recorded."
-   ]
+   ],
+   "position": {
+    "point": "K5H_Starter",
+    "frame": "twin",
+    "x": -0.215,
+    "y": -1.547,
+    "z": 0.625,
+    "method": "centre of the starter body (v3 starter moved with the bell; passenger side, low, behind the down-pipe)",
+    "confidence": "low-medium",
+    "source": "docs/wiring/research/2026-10-15_engine-position.md; docs/wiring/twin/build_engine_v3.py starter_center"
+   }
   },
   "AC-CLUTCH": {
    "id": "AC-CLUTCH",
@@ -4934,17 +5362,21 @@
     {
      "text": "The DC primary's stud set names this stud from its cables' own words (RSI pass 37).",
      "source": "docs/wiring/calc-data/catalog/endpoints.yaml PS-STUDS (studs, stud_nodes)"
+    },
+    {
+     "text": "Placed on the corrected engine: docs/wiring/calc-data/cad/fab/engine_ls3.py at root (0, -1.432, 0.72); the fore-aft position is triangulated from the owner's photos IMG_6530/6531/6532 against the firewall (cylinder 8 sits 58.6 mm ahead of the passenger flat face).",
+     "source": "docs/wiring/research/2026-10-15_engine-position.md"
     }
    ],
    "position": {
     "point": "STARTER",
     "frame": "twin",
-    "x": -0.3,
-    "y": -1.45,
-    "z": 0.57,
-    "method": "on the starter (twin anchor STARTER; the twin engine insert sits about 0.15 m too far back)",
+    "x": -0.22,
+    "y": -1.532,
+    "z": 0.68,
+    "method": "the starter solenoid's B+ stud, on the corrected starter (v3 solenoid moved with the bell); GND-BLOCK shares the point (its block stud is beside the starter)",
     "confidence": "low",
-    "source": "docs/wiring/receipts/2026-10-15_k5-power-spine-studs.md"
+    "source": "docs/wiring/research/2026-10-15_engine-position.md; docs/wiring/twin/build_engine_v3.py starter"
    }
   },
   "GND-BLOCK": {
@@ -4958,17 +5390,21 @@
     {
      "text": "The DC primary's stud set names this stud from its cables' own words (RSI pass 37).",
      "source": "docs/wiring/calc-data/catalog/endpoints.yaml PS-STUDS (studs, stud_nodes)"
+    },
+    {
+     "text": "Placed on the corrected engine: docs/wiring/calc-data/cad/fab/engine_ls3.py at root (0, -1.432, 0.72); the fore-aft position is triangulated from the owner's photos IMG_6530/6531/6532 against the firewall (cylinder 8 sits 58.6 mm ahead of the passenger flat face).",
+     "source": "docs/wiring/research/2026-10-15_engine-position.md"
     }
    ],
    "position": {
     "point": "STARTER",
     "frame": "twin",
-    "x": -0.3,
-    "y": -1.45,
-    "z": 0.57,
-    "method": "G1 lands 'near the starter': the starter point (twin engine insert about 0.15 m too far back)",
+    "x": -0.22,
+    "y": -1.532,
+    "z": 0.68,
+    "method": "the starter solenoid's B+ stud, on the corrected starter (v3 solenoid moved with the bell); GND-BLOCK shares the point (its block stud is beside the starter)",
     "confidence": "low",
-    "source": "docs/wiring/receipts/2026-10-15_k5-power-spine-studs.md"
+    "source": "docs/wiring/research/2026-10-15_engine-position.md; docs/wiring/twin/build_engine_v3.py starter"
    }
   },
   "ALT-BPLUS": {
@@ -4976,17 +5412,31 @@
    "what": "Alternator B+ stud (Holley 197-302)",
    "where": "On the alternator, Holley mid-mount bracket",
    "zone": "engine",
-   "status": "open",
+   "status": "proposed",
    "follows": "PS-STUDS",
    "why": [
     {
      "text": "The DC primary's stud set names this stud from its cables' own words (RSI pass 37).",
      "source": "docs/wiring/calc-data/catalog/endpoints.yaml PS-STUDS (studs, stud_nodes)"
+    },
+    {
+     "text": "Placed on the corrected engine: docs/wiring/calc-data/cad/fab/engine_ls3.py at root (0, -1.432, 0.72); the fore-aft position is triangulated from the owner's photos IMG_6530/6531/6532 against the firewall (cylinder 8 sits 58.6 mm ahead of the passenger flat face).",
+     "source": "docs/wiring/research/2026-10-15_engine-position.md"
     }
    ],
    "open": [
-    "the alternator point stands open: the twin puts K5H_Alternator on the passenger side, mounts.yaml on the driver side"
-   ]
+    "The stud size (5/16 in is the build book's assumption) and its boot."
+   ],
+   "position": {
+    "point": "ALT_BPLUS_STUD",
+    "frame": "twin",
+    "x": 0.25,
+    "y": -1.946,
+    "z": 0.982,
+    "method": "B+ stud on the alternator's rear housing, outboard (driver) side, mid height (Holley 197-302, driver high on the mid-mount)",
+    "confidence": "low-medium",
+    "source": "docs/wiring/research/2026-10-15_engine-position.md; vehicle_images a0ca577c (2024-10-03, driver side); engine_ls3.py alt_xz / alt_len / belt_y"
+   }
   },
   "GND-FRAME": {
    "id": "GND-FRAME",
@@ -5002,7 +5452,8 @@
     }
    ],
    "open": [
-    "no frame boss is drawn yet; the frame rail is not an object in the twin engine bay"
+    "no frame boss is drawn yet; the frame rail is not an object in the twin engine bay",
+    "Proposal, not placed: the passenger frame rail's top flange under GND-BANK-ENG, about (-0.397, -2.02, 0.837) on the FR88 frame model. Pick the hole or a welded boss on the truck."
    ]
   },
   "GND-HEAD": {
@@ -5019,7 +5470,8 @@
     }
    ],
    "open": [
-    "the rear of the engine is the twin insert face that sits about 0.15 m too far back"
+    "the rear of the engine is the twin insert face that sits about 0.15 m too far back",
+    "Proposal, not placed: a boss low on the passenger head's rear face, about (-0.277, -1.445, 0.868), nearest the passenger ground bank and FW-BOND. Pick the head and boss at the bench."
    ]
   },
   "FW-BOND": {
@@ -5036,7 +5488,8 @@
     }
    ],
    "open": [
-    "no bond stud spot is recorded on the firewall"
+    "no bond stud spot is recorded on the firewall",
+    "Proposal, not placed: the passenger firewall flat face outboard of the centre recess, below the open panel, about (-0.40, -1.458, 0.97). Pick the stud spot at the bench."
    ]
   }
  }
