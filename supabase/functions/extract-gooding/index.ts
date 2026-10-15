@@ -1203,6 +1203,46 @@ Deno.serve(async (req) => {
       return new Response(JSON.stringify({ success: true, action, ...out }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
     }
 
+    // Revision worker: claim reparse_retained items for Gooding, run the current parser on the retained capture, land it and
+    // resolve the item landed_whole; a capture that will not parse is released for refetch, an ambiguous identity for relink.
+    if (action === 'revise_retained') {
+      const n = Math.min(Number(body.limit) || 10, 25);
+      const { data: items, error: cErr } = await supabase.rpc('claim_revision_items', { p_source_slug: 'gooding', p_worker: 'extract-gooding', p_limit: n, p_actions: ['reparse_retained'] });
+      if (cErr) throw new Error(`claim failed: ${cErr.message}`);
+      const out = { claimed: items?.length ?? 0, resolved: 0, released_refetch: 0, released_relink: 0, errors: [] as string[] };
+      for (const it of items ?? []) {
+        try {
+          let q = supabase.from('listing_page_snapshots').select('id, html, html_storage_path').eq('platform', 'gooding').eq('success', true);
+          q = it.snapshot_id ? q.eq('id', it.snapshot_id) : q.eq('listing_url', it.listing_url);
+          const { data: snaps } = await q.order('fetched_at', { ascending: false }).limit(1);
+          const snap = snaps?.[0];
+          let text: string | null = snap?.html ?? null;
+          if (!text && snap?.html_storage_path) {
+            const { data: blob } = await supabase.storage.from('listing-snapshots').download(snap.html_storage_path);
+            text = blob ? await blob.text() : null;
+          }
+          let pageData: GoodingPageData | null = null;
+          try { pageData = text ? JSON.parse(text) : null; } catch { pageData = null; }
+          if (!pageData?.result?.data?.contentfulLot) {
+            await supabase.rpc('release_revision_item', { p_id: it.id, p_next_action: 'refetch', p_detail: { why: 'no parsable retained capture' } });
+            out.released_refetch++;
+            continue;
+          }
+          const extracted = extractFromPageData(pageData, it.listing_url);
+          await saveToDatabase(supabase, extracted, { skipImages: true });
+          await supabase.rpc('resolve_revision_item', { p_id: it.id, p_outcome: 'landed_whole', p_detail: { by: 'extract-gooding revise_retained', snapshot_id: snap?.id } });
+          out.resolved++;
+        } catch (e: any) {
+          const msg = String(e?.message ?? e);
+          const relink = /identity refused|multiple \(or no\) rows|Ambiguous/i.test(msg);
+          await supabase.rpc('release_revision_item', { p_id: it.id, p_next_action: relink ? 'relink' : 'refetch', p_detail: { message: msg.slice(0, 200) } });
+          if (relink) out.released_relink++; else out.released_refetch++;
+          if (out.errors.length < 5) out.errors.push(`${it.listing_url}: ${msg.slice(0, 120)}`);
+        }
+      }
+      return new Response(JSON.stringify({ success: true, action, ...out }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+    }
+
     // Stats
     if (action === 'stats') {
       const { data: stats } = await supabase.rpc('count_vehicles_by_source', {

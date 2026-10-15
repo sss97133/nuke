@@ -1342,6 +1342,45 @@ Deno.serve(async (req) => {
       );
     }
 
+    // ── Revision worker: claim reparse_retained items for Bonhams, run the current lot-page parser on the retained Firecrawl
+    // capture and land it; resolve landed_whole. No retained capture: release for refetch.
+    if (action === "revise_retained") {
+      const n = Math.min(Number(body.limit) || 10, 25);
+      const { data: items, error: cErr } = await supabase.rpc("claim_revision_items", { p_source_slug: "bonhams", p_worker: "extract-bonhams", p_limit: n, p_actions: ["reparse_retained"] });
+      if (cErr) throw new Error(`claim failed: ${cErr.message}`);
+      const out = { claimed: items?.length ?? 0, resolved: 0, released_refetch: 0, errors: [] as string[] };
+      for (const it of items ?? []) {
+        try {
+          const norm = String(it.listing_url).replace(/\/?$/, "/");
+          const { data: snaps } = await supabase.from("listing_page_snapshots").select("id, html, html_storage_path")
+            .eq("platform", "bonhams").eq("success", true).in("listing_url", [norm, String(it.listing_url)]).order("fetched_at", { ascending: false }).limit(1);
+          const snap = snaps?.[0];
+          let html: string | null = snap?.html ?? null;
+          if (!html && snap?.html_storage_path) {
+            const { data: blob } = await supabase.storage.from("listing-snapshots").download(snap.html_storage_path);
+            html = blob ? await blob.text() : null;
+          }
+          const page = html ? parseLotPage(html) : null;
+          const { data: evs } = it.vehicle_id
+            ? await supabase.from("vehicle_events").select("vehicle_id, source_url, source_listing_id").eq("source_platform", "bonhams").eq("vehicle_id", it.vehicle_id).limit(1)
+            : { data: null };
+          if (!page || !evs?.length) {
+            await supabase.rpc("release_revision_item", { p_id: it.id, p_next_action: "refetch", p_detail: { why: !page ? "no parsable retained capture" : "no episode to land on" } });
+            out.released_refetch++;
+            continue;
+          }
+          await landLotPage(supabase, evs[0], page, new Date().toISOString());
+          await supabase.rpc("resolve_revision_item", { p_id: it.id, p_outcome: "landed_whole", p_detail: { by: "extract-bonhams revise_retained", snapshot_id: snap?.id } });
+          out.resolved++;
+        } catch (e: any) {
+          await supabase.rpc("release_revision_item", { p_id: it.id, p_next_action: "refetch", p_detail: { message: String(e?.message ?? e).slice(0, 200) } });
+          out.released_refetch++;
+          if (out.errors.length < 5) out.errors.push(`${it.listing_url}: ${String(e?.message ?? e).slice(0, 120)}`);
+        }
+      }
+      return new Response(JSON.stringify({ success: true, action, ...out }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
+
     // ── Deep pass: the lot page for lots the search index landed (gallery, sale, footnotes, condition report) ──
     // One page request per `spacing_ms` (at least 2000), at most 20 lots, newest sales first. 403/429 or a page that is
     // not a lot page (a challenge) ends the run at once and marks nothing. Each lot's raw page data is kept on the
