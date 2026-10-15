@@ -25,6 +25,7 @@ import { archiveFetch } from "../_shared/archiveFetch.ts";
 import { normalizeListingUrl } from "../_shared/urlNormalization.ts";
 import { requireWriteAuth } from "../_shared/writeGuard.ts";
 import { writeObservation } from "../_shared/observationWriter.ts";
+import { insertMissingVehicleImages } from "../_shared/vehicleImageWrite.ts";
 import { applyCraigslistImagePlan, planCraigslistImages } from "../_shared/craigslistImages.ts";
 import { landCraigslistBlip, modelFromText, type ModelCitation } from "./craigslistBlip.ts";
 import { type CraigslistCapture, pickCapture } from "../_shared/craigslistAttributes.ts";
@@ -854,7 +855,8 @@ async function matchOrCreateVehicle(
       ai_processing_status: "skipped", // not requested: see the matched path below
       source_url: parsed.url || null,
     }));
-    await supabaseAdmin.from("vehicle_images").insert(imageRows);
+    const imgWrite = await insertMissingVehicleImages(supabaseAdmin, newVehicle.id, imageRows);
+    if (imgWrite.error) console.error(`[ingest] vehicle_images insert ${newVehicle.id}: ${imgWrite.error.message}`);
   }
 
   // ── Create merge proposals for Tier 3 candidates ──────────────
@@ -969,7 +971,9 @@ async function enrichVehicle(vehicleId: string, data: VehicleEnrichment, platfor
         ai_processing_status: "skipped", // listing photos are not analyzed unless someone asks; "pending" fires the photo pipeline per row
         source_url: data.url || null,
       }));
-      await supabaseAdmin.from("vehicle_images").insert(imageRows);
+      // A revisit never re-adds a photo the vehicle already holds (_shared/vehicleImageWrite.ts).
+      const imgWrite = await insertMissingVehicleImages(supabaseAdmin, vehicleId, imageRows);
+      if (imgWrite.error) console.error(`[ingest] vehicle_images insert ${vehicleId}: ${imgWrite.error.message}`);
 
       // Update primary_image_url if vehicle didn't have one
       if (!hasPrimary) {

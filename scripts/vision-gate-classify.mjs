@@ -158,7 +158,8 @@ function L1_source(row) {
   // vehicle), so provenance is the attribution, as for the auction sources. Measured 2026-10-15: every Craigslist image
   // created since 2026-10-13 22:00Z was still 'pending', so the gallery (which admits pending rows only for BaT) showed
   // one fallback photo per vehicle.
-  if (src === 'craigslist') {
+  if (src === 'craigslist' || src === 'bonhams_import' || src === 'gooding' || src === 'barnfinds' || src === 'barn_finds' ||
+      src === 'rmsothebys' || src === 'rm_sothebys' || src === 'broadarrow' || src === 'collecting_cars' || src === 'collectingcars') {
     return { verdict: 'approved', confidence: 0.9, reasoning: `L1: source=${src} — classified-listing gallery image, attribution by provenance` };
   }
   // Barn Finds post photos: the image URL comes from one post's own article body (extract-barn-finds-listing reads the
