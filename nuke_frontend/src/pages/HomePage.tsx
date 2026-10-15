@@ -40,6 +40,11 @@ interface TreemapNode {
   sold_prior_12m?: number | null;
   usd_12m?: number | null;
   usd_prior_12m?: number | null;
+  // A brand's factory model family (treemap_brand_families, 20261015131500): its key ('other' for the names not yet
+  // keyed to a family) and how many model names in it sold. A model name the seller left out cannot be drilled.
+  familyKey?: string;
+  models?: number | null;
+  noModel?: boolean;
   imageUrl?: string;
   id?: string;
   isVehicle?: boolean;
@@ -58,9 +63,15 @@ interface TreemapRect {
 interface DrillLevel {
   label: string;
   make?: string;
+  family?: string;
+  /** how many model names in the family sold (the family level's models), so the next level can say what it shows */
+  names?: number;
   model?: string;
   year?: number;
 }
+
+// The map's levels: brands, a brand's model families, a family's model names, a name's years, the sales.
+export type MapLevel = 'brands' | 'families' | 'models' | 'years' | 'vehicles';
 
 // ────────────────────────────────────────────────────────────
 // DATA HOOKS
@@ -129,7 +140,7 @@ export function ledgerViewsStamp(refreshedAt: string | null): string | undefined
 /** The count beside the map, with its population and date. At the top level both numbers come from the refresh
  *  receipt (treemap_refreshes.populations), so they share one snapshot: the mapped sales of all public records. Below
  *  it the count is the level's own; the leaf shows at most 200 sales, the largest. */
-export function mapCaption(level: 'brands' | 'models' | 'years' | 'vehicles', levelCount: number, refresh: MapRefresh, now = Date.now()): string {
+export function mapCaption(level: MapLevel, levelCount: number, refresh: MapRefresh, now = Date.now(), clause = ''): string {
   const fmt = (n: number) => n.toLocaleString('en-US');
   const p = refresh.populations;
   const receipt = level === 'brands' && p?.measure === 'confirmed_sale_v1'
@@ -137,14 +148,29 @@ export function mapCaption(level: 'brands' | 'models' | 'years' | 'vehicles', le
   const count = level === 'vehicles'
     ? `${levelCount >= 200 ? 'largest 200' : fmt(levelCount)} confirmed sales`
     : `${fmt(receipt ? p!.mapped_sales! : levelCount)} vehicles with a confirmed sale`;
-  return `${count}${receipt ? ` of ${fmt(p!.public_records!)} public records` : ''}${ledgerViewsClock(refresh.refreshedAt, now)}`;
+  return `${count}${receipt ? ` of ${fmt(p!.public_records!)} public records` : ''}${clause}${ledgerViewsClock(refresh.refreshedAt, now)}`;
+}
+
+/** How much of a brand's sales the family level names: the share of its sales in named families and how many there
+ *  are; the rest sit in "Other models". Empty when the level holds no families. */
+export function familyCoverage(nodes: readonly TreemapNode[] | null): string {
+  if (!nodes?.some((n) => n.familyKey)) return '';
+  const total = nodes.reduce((sum, n) => sum + (n.count || 0), 0);
+  const named = nodes.filter((n) => n.familyKey && n.familyKey !== 'other');
+  const share = total > 0 ? named.reduce((sum, n) => sum + n.count, 0) / total : 0;
+  return ` · ${Math.round(share * 100)}% in ${named.length.toLocaleString('en-US')} model famil${named.length === 1 ? 'y' : 'ies'}`;
+}
+
+/** At a family's model names: when the reader's 200 are fewer than the family's names, say so. */
+export function familyNamesShown(shown: number, names?: number): string {
+  return names && shown > 0 && names > shown ? ` · largest ${shown.toLocaleString('en-US')} of ${names.toLocaleString('en-US')} names` : '';
 }
 
 /** What area and color mean at each level. The readers count public records with a confirmed sale (vehicle_sale_basis)
  *  and its sold amount (vehicle_price_facts); the median is withheld under 5 sales. */
-export function mapLegend(level: 'brands' | 'models' | 'years' | 'vehicles', brandMarketAvailable = true): string {
+export function mapLegend(level: MapLevel, measured = level === 'brands' || level === 'families' || level === 'models'): string {
   if (level === 'vehicles') return 'area = confirmed sale price · click to open the record';
-  if (level === 'brands' && brandMarketAvailable) return 'area = dollars from confirmed sales · of offered sold = share of cars offered at auction that sold · 12 mo = sales and dollars in the last 12 months against the 12 before; color follows sales (gray: too few dated sales) · nominal · click to go down';
+  if (measured) return `area = dollars from confirmed sales · of offered sold = share of cars offered at auction that sold · BaT 12 mo = sales and dollars on Bring a Trailer in the last 12 months against the 12 before, the venue held in full both years; color follows those sales (gray: BaT holds under half the sales, or too few a year earlier) · nominal${level === 'families' ? ' · other models = names not yet keyed to a family, and families with under 3 sales' : ''} · click to go down`;
   return 'area = vehicles with a confirmed sale · color = their median sale price (gray: under 5 sales) · nominal, all years · asks, bids and unknown outcomes are not counted · click to go down';
 }
 
@@ -189,6 +215,58 @@ function useTreemapModels(make: string | null) {
     });
     return () => { cancelled = true; };
   }, [make]);
+  return { data, loading };
+}
+
+// One row of the family readers as a tile: the brand map's measures (dollars, sold, sell-through, 12 months against the
+// 12 before), so a family and a model name read like a brand.
+function marketNode(name: string, r: any): TreemapNode {
+  return { name, count: Number(r.sold) || 0, value: Number(r.usd) || 0, usd: r.usd ?? null, sold_any: r.sold_any ?? null,
+    offered: r.offered ?? null, dated: r.dated ?? null, sold_12m: r.sold_12m ?? null, sold_prior_12m: r.sold_prior_12m ?? null,
+    usd_12m: r.usd_12m ?? null, usd_prior_12m: r.usd_prior_12m ?? null };
+}
+
+// A brand's factory model families (treemap_brand_families over mv_family_market, 2026-10-15): the owner asked for the
+// brand map's "huge development run", and a brand's raw model names split by trim say little on their own. "Other
+// models" holds the names not yet keyed to a family. failed: no families could be read, so the brand opens on its model
+// names, as before families existed.
+function useTreemapFamilies(make: string | null) {
+  const [data, setData] = useState<TreemapNode[] | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [failed, setFailed] = useState(false);
+  useEffect(() => {
+    setFailed(false);
+    if (!make) { setData(null); return; }
+    let cancelled = false;
+    setLoading(true);
+    Promise.resolve(supabase.rpc('treemap_brand_families', { p_brand: make })).then(({ data: result, error }) => {
+      if (cancelled) return;
+      const rows = (error ? null : result) as any[] | null;
+      if (rows?.length) setData(rows.map((r) => ({ ...marketNode(r.family ?? 'Other models', r), familyKey: r.family_key, models: r.models ?? null })));
+      else { setData(null); setFailed(true); }
+      setLoading(false);
+    }, () => { if (!cancelled) { setData(null); setFailed(true); setLoading(false); } });
+    return () => { cancelled = true; };
+  }, [make]);
+  return { data, loading, failed };
+}
+
+// A family's model names (treemap_family_models), the ones with a confirmed sale, largest dollars first; each name
+// matches the years and sales readers.
+function useTreemapFamilyModels(make: string | null, familyKey: string | null) {
+  const [data, setData] = useState<TreemapNode[] | null>(null);
+  const [loading, setLoading] = useState(false);
+  useEffect(() => {
+    if (!make || !familyKey) { setData(null); return; }
+    let cancelled = false;
+    setLoading(true);
+    Promise.resolve(supabase.rpc('treemap_family_models', { p_brand: make, p_family_key: familyKey })).then(({ data: result, error }) => {
+      if (cancelled) return;
+      if (!error && result) setData((result as any[]).map((r) => ({ ...marketNode(r.model ?? 'Model not given', r), noModel: r.model == null })));
+      setLoading(false);
+    }, () => { if (!cancelled) setLoading(false); });
+    return () => { cancelled = true; };
+  }, [make, familyKey]);
   return { data, loading };
 }
 
@@ -304,8 +382,10 @@ function priceToColor(medianPrice: number | undefined): string {
   return 'var(--heat-6)';
 }
 
-/** Sales in the last 12 months against the 12 before, when the brand has enough dated sales to say so: at least 10 a
- *  year earlier and a sale date on at least half its sales. Null otherwise; the tile is then gray, not a guess. */
+/** Sales on Bring a Trailer in the last 12 months against the 12 before (treemap_brand_market and the family readers count
+ *  BaT only since 20261015131500: the all-venue move mixed in venues whose intake is uneven between the two years), when
+ *  there are enough to say so: at least 10 a year earlier, and BaT's dated sales at least half of the tile's sales.
+ *  Null otherwise; the tile is then gray, not a guess. */
 export function brandMomentum(n: Pick<TreemapNode, 'count' | 'dated' | 'sold_12m' | 'sold_prior_12m'>): number | null {
   if (n.sold_12m == null || !n.sold_prior_12m || n.sold_prior_12m < 10) return null;
   if (!n.dated || n.dated < 0.5 * n.count) return null;
@@ -340,7 +420,7 @@ export function brandLines(n: TreemapNode): string[] {
   if (n.offered && n.offered >= 20 && n.sold_any != null) lines.push(`${Math.round((100 * n.sold_any) / n.offered)}% of offered sold`);
   const m = brandMomentum(n);
   const d = brandDollarMomentum(n);
-  if (m !== null) lines.push(`12 mo: sales ${signedPct(m)}${d !== null ? `, $ ${signedPct(d)}` : ''}`);
+  if (m !== null) lines.push(`BaT 12 mo: sales ${signedPct(m)}${d !== null ? `, $ ${signedPct(d)}` : ''}`);
   return lines;
 }
 
@@ -629,12 +709,15 @@ function TreemapTooltip({ node, x, y, totalCount, level }: TooltipData) {
         <div><Text role="measure">{fmtMoney(node.usd)}</Text> <Text role="caption">from {fmtNum(node.count)} confirmed sales</Text></div>
         <div style={{ borderTop: '1px solid var(--border)', paddingTop: 6, display: 'flex', flexDirection: 'column', gap: 3 }}>
           {node.offered && node.sold_any != null ? <Row label={`of ${fmtNum(node.offered)} offered sold`} value={`${Math.round((100 * node.sold_any) / node.offered)}%`} /> : null}
-          {node.sold_12m != null ? <Row label="sold, last 12 months" value={`${fmtNum(node.sold_12m)}${node.usd_12m ? ` · ${fmtMoney(node.usd_12m)}` : ''}`} /> : null}
-          {node.sold_prior_12m != null ? <Row label="sold, the 12 before" value={`${fmtNum(node.sold_prior_12m)}${node.usd_prior_12m ? ` · ${fmtMoney(node.usd_prior_12m)}` : ''}`} /> : null}
-          {m !== null ? <Row label="change, sales" value={signedPct(m)} /> : null}
-          {d !== null ? <Row label="change, dollars" value={signedPct(d)} /> : null}
-          {m === null && node.sold_12m != null ? <Row label="12-month change" value="too few dated sales" /> : null}
+          {node.sold_12m != null ? <Row label="sold on BaT, last 12 months" value={`${fmtNum(node.sold_12m)}${node.usd_12m ? ` · ${fmtMoney(node.usd_12m)}` : ''}`} /> : null}
+          {node.sold_prior_12m != null ? <Row label="sold on BaT, the 12 before" value={`${fmtNum(node.sold_prior_12m)}${node.usd_prior_12m ? ` · ${fmtMoney(node.usd_prior_12m)}` : ''}`} /> : null}
+          {m !== null ? <Row label="change, BaT sales" value={signedPct(m)} /> : null}
+          {d !== null ? <Row label="change, BaT dollars" value={signedPct(d)} /> : null}
+          {m === null && node.sold_12m != null ? <Row label="BaT 12-month change" value="too few BaT sales" /> : null}
           {node.avg_bids ? <Row label="average bids" value={String(node.avg_bids)} /> : null}
+          {node.models ? <Row label="model names sold" value={fmtNum(node.models)} /> : null}
+          {node.familyKey === 'other' ? <Text role="caption" as="div">names not yet keyed to a model family, and families with under 3 sales</Text> : null}
+          {node.noModel ? <Text role="caption" as="div">the listing gave no model name</Text> : null}
         </div>
       </div>
     );
@@ -776,7 +859,14 @@ export function TreemapHomePage({ onBrowse, embedded = false }: { onBrowse: () =
   // Data hooks
   const { data: brandsData, loading: brandsLoading } = useTreemapBrands();
   const refresh = useTreemapRefresh();
-  const { data: modelsData, loading: modelsLoading } = useTreemapModels(currentLevel.make && !currentLevel.model ? currentLevel.make : null);
+  // A brand opens on its model families; when none can be read it opens on its model names, as before.
+  const atFamilies = !!currentLevel.make && !currentLevel.family && !currentLevel.model;
+  const { data: familiesData, loading: familiesLoading, failed: familiesFailed } = useTreemapFamilies(atFamilies ? currentLevel.make ?? null : null);
+  const { data: modelsData, loading: modelsLoading } = useTreemapModels(atFamilies && familiesFailed ? currentLevel.make ?? null : null);
+  const { data: familyModelsData, loading: familyModelsLoading } = useTreemapFamilyModels(
+    currentLevel.family && !currentLevel.model ? currentLevel.make ?? null : null,
+    currentLevel.family && !currentLevel.model ? currentLevel.family : null,
+  );
   const { data: yearsData, loading: yearsLoading } = useTreemapYears(
     currentLevel.model && !currentLevel.year ? currentLevel.make ?? null : null,
     currentLevel.model && !currentLevel.year ? currentLevel.model ?? null : null
@@ -788,10 +878,11 @@ export function TreemapHomePage({ onBrowse, embedded = false }: { onBrowse: () =
   const { data: vehiclesData, loading: vehiclesLoading } = useTreemapVehicles(vehicleMake, vehicleModel, vehicleYear);
 
   // Determine active data and level type
-  const levelType: 'brands' | 'models' | 'years' | 'vehicles' =
+  const levelType: MapLevel =
     currentLevel.year ? 'vehicles' :
     currentLevel.model ? 'years' :
-    currentLevel.make ? 'models' : 'brands';
+    currentLevel.family ? 'models' :
+    currentLevel.make ? 'families' : 'brands';
 
   const activeData = useMemo(() => {
     // Check prefetch cache before hook data — eliminates loading flash on drill-in
@@ -805,13 +896,15 @@ export function TreemapHomePage({ onBrowse, embedded = false }: { onBrowse: () =
     }
     if (levelType === 'vehicles' && vehiclesData) return vehiclesData;
     if (levelType === 'years' && yearsData) return yearsData;
-    if (levelType === 'models' && modelsData) return modelsData;
+    if (levelType === 'models' && familyModelsData) return familyModelsData;
+    if (levelType === 'families' && familiesData) return familiesData;
+    if (levelType === 'families' && familiesFailed && modelsData) return modelsData;
     if (brandsData) return brandsData;
     return null;
     // drillStack triggers recompute when navigating so ref cache is checked
-  }, [levelType, brandsData, modelsData, yearsData, vehiclesData, currentLevel, drillStack]);
+  }, [levelType, brandsData, familiesData, familiesFailed, modelsData, familyModelsData, yearsData, vehiclesData, currentLevel, drillStack]);
 
-  const isLoading = brandsLoading || modelsLoading || yearsLoading || vehiclesLoading;
+  const isLoading = brandsLoading || familiesLoading || modelsLoading || familyModelsLoading || yearsLoading || vehiclesLoading;
 
   // ── Prefetch: fire supabase queries on 200ms hover debounce ──
   const prefetchYears = useCallback((make: string, model: string) => {
@@ -833,7 +926,7 @@ export function TreemapHomePage({ onBrowse, embedded = false }: { onBrowse: () =
   const handleCellMouseEnter = useCallback((node: TreemapNode) => {
     if (hoverTimerRef.current) clearTimeout(hoverTimerRef.current);
     hoverTimerRef.current = setTimeout(() => {
-      if (levelType === 'models' && currentLevel.make) {
+      if (currentLevel.make && !node.noModel && (levelType === 'models' || (levelType === 'families' && !node.familyKey))) {
         prefetchYears(currentLevel.make, node.name);
       } else if (levelType === 'years' && currentLevel.make && currentLevel.model) {
         const year = parseInt(node.name, 10);
@@ -851,7 +944,8 @@ export function TreemapHomePage({ onBrowse, embedded = false }: { onBrowse: () =
 
   // Representative images for aggregate cells (models/years levels)
   const repImages = useRepresentativeImages(
-    levelType === 'models' ? modelsData : levelType === 'years' ? yearsData : null,
+    levelType === 'models' ? familyModelsData : levelType === 'years' ? yearsData
+      : levelType === 'families' && familiesFailed ? modelsData : null,
     currentLevel.make
   );
 
@@ -904,13 +998,17 @@ export function TreemapHomePage({ onBrowse, embedded = false }: { onBrowse: () =
     if (levelType === 'brands') {
       recordInterest('make', node.name);
       setDrillStack(prev => [...prev, { label: node.name, make: node.name }]);
-    } else if (levelType === 'models') {
+    } else if (levelType === 'families' && node.familyKey) {
+      setDrillStack(prev => [...prev, { label: node.name, make: currentLevel.make, family: node.familyKey, names: node.models ?? undefined }]);
+    } else if (levelType === 'families' || levelType === 'models') {
+      // A family's model name, or the brand's own when families could not be read; a sale without a name stops here.
+      if (node.noModel) return;
       recordInterest('model', node.name);
-      setDrillStack(prev => [...prev, { label: node.name, make: currentLevel.make, model: node.name }]);
+      setDrillStack(prev => [...prev, { label: node.name, make: currentLevel.make, family: currentLevel.family, model: node.name }]);
     } else if (levelType === 'years') {
       const year = parseInt(node.name, 10);
       if (Number.isFinite(year)) {
-        setDrillStack(prev => [...prev, { label: String(year), make: currentLevel.make, model: currentLevel.model, year }]);
+        setDrillStack(prev => [...prev, { label: String(year), make: currentLevel.make, family: currentLevel.family, model: currentLevel.model, year }]);
       }
     } else if (levelType === 'vehicles' && node.id) {
       navigate(`/vehicle/${node.id}`);
@@ -1176,7 +1274,8 @@ export function TreemapHomePage({ onBrowse, embedded = false }: { onBrowse: () =
         <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 12, flexShrink: 0 }}>
           {activeData && (
             <Text role="caption" title={ledgerViewsStamp(refresh.refreshedAt)}>
-              {mapCaption(levelType, totalCount, refresh)}
+              {mapCaption(levelType, totalCount, refresh, Date.now(), levelType === 'families' ? familyCoverage(activeData)
+                : levelType === 'models' ? familyNamesShown(activeData?.length ?? 0, currentLevel.names) : '')}
             </Text>
           )}
           {currentLevel.year && currentLevel.make && currentLevel.model && (
@@ -1231,7 +1330,7 @@ export function TreemapHomePage({ onBrowse, embedded = false }: { onBrowse: () =
             </button>
           )}
           <span style={{ fontSize: 8, fontWeight: 700, letterSpacing: '0.12em', textTransform: 'uppercase', color: 'var(--text-disabled)' }}>
-            {levelType === 'brands' ? 'MAKES' : levelType === 'models' ? 'MODELS' : levelType === 'years' ? 'YEARS' : 'VEHICLES'}
+            {levelType === 'brands' ? 'MAKES' : levelType === 'families' ? (familiesData ? 'FAMILIES' : 'MODELS') : levelType === 'models' ? 'MODELS' : levelType === 'years' ? 'YEARS' : 'VEHICLES'}
           </span>
         </div>
       </div>
@@ -1358,7 +1457,8 @@ export function TreemapHomePage({ onBrowse, embedded = false }: { onBrowse: () =
         }}
       >
         <Text role="caption">
-          {mapLegend(levelType, !!activeData?.length && activeData.every(n => n.usd != null && n.usd > 0))}
+          {/* One area and color basis per level (#1342): market measures only when every tile on the map carries dollars. */}
+          {mapLegend(levelType, !!activeData?.length && activeData.filter((node) => node.count > 0).every((node) => node.usd != null && node.usd > 0))}
         </Text>
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
           <button

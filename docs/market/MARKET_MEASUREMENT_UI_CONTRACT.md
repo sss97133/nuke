@@ -308,6 +308,15 @@ the model year that trades, and the last 12 months against the 12 before (color;
 Missing and next: model families (model strings are split by trim, so "what this brand trades" cannot be shown yet),
 and repeat-sale returns (the same car sold twice, and what it gained per year held).
 
+Delivered later that day: model families (mv_family_market, 20261015131500; a brand opens on its families, a family on
+its model names, each with the same measures, "Other models" holding the names not yet keyed). And a correction: the
+all-venue 12-month move mixed in venues whose intake is uneven between the two years. Against the complete local BaT
+archive it read Ferrari dollars -6% where BaT itself rose 93%, BMW sales -7% where BaT rose 2%, Chevrolet +30% / +51%
+against BaT's +17% / +22%. The move is now read on Bring a Trailer only, the venue held in full both years (252,399 of
+264,746 enumerated lots), and a tile is gray unless BaT holds at least half its sales. A move across every venue needs
+each venue's intake to be complete in both windows; until the coverage view can say so per venue and year, it is not
+shown.
+
 **The feed: why is this listing in front of me.** Serving cars newest first over a mixed pile is not an organizing
 method ("what am I doing here, why am I looking at this classified"). A listing earns its place the way social feeds
 measure virality, by a measured reason it is worth a look:
