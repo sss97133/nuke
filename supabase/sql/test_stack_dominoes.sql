@@ -99,6 +99,7 @@ ANALYZE;
 \i supabase/migrations/20261015034500_stack_dominoes.sql
 \i supabase/migrations/20261015050000_stack_dominoes_staged.sql
 \i supabase/migrations/20261015060000_stack_dominoes_population_and_run.sql
+\i supabase/migrations/20261015063000_stack_dominoes_bands_retry_prices.sql
 
 -- Shape ---------------------------------------------------------------------------------------------------------------
 SELECT pg_temp.ok('both tables have RLS on and no anon or authenticated grant',
@@ -170,28 +171,39 @@ SELECT pg_temp.ok('V017 lists three requirements',
 SELECT pg_temp.ok('v_source_dominoes carries the population figure beside the target-list figure',
   (SELECT landed_pct = 40.00 AND landed_of_population = 50.00 AND population = 800 FROM public.v_source_dominoes WHERE source_slug = 'mecum' AND object = 'vehicle_events.ended_at')
   AND (SELECT landed_of_population IS NULL FROM public.v_source_dominoes WHERE source_slug = 'barrett-jackson' AND object = 'vehicle_events.ended_at'));
-SELECT pg_temp.ok('the one-off job unschedules itself first, then runs the same stages',
-  (SELECT command LIKE 'SELECT cron.unschedule(''snapshot-stack-dominoes-firstrun'');%' AND command LIKE '%snapshot_stack_dominoes_finish%' FROM cron.job WHERE jobname = 'snapshot-stack-dominoes-firstrun'));
+SELECT pg_temp.ok('the one-off job is pinned to 02:05 on 15 October, reads BaT in five bands and unschedules itself last',
+  (SELECT schedule = '5 2 15 10 *' AND command LIKE '%read(''bat'', ''2025-01-01'', NULL)%' AND command LIKE '%finish(); SELECT cron.unschedule(''snapshot-stack-dominoes-firstrun'');' FROM cron.job WHERE jobname = 'snapshot-stack-dominoes-firstrun'));
+SELECT pg_temp.ok('the one-call reading stored cohort medians (bat Porsche 1990: 12 lots, median 1006.5)',
+  (SELECT lots = 12 AND median_price = 1006.5 FROM public.stack_cohort_prices WHERE source_key = 'bat' AND year = 1990 AND make = 'porsche' AND measured_at = (SELECT min(measured_at) FROM public.stack_cohort_prices)));
 -- Staged form, as the job runs it: separate statements in one session, a missing source simply absent.
 SELECT public.snapshot_stack_dominoes_begin('staged') \gset
 SELECT public.snapshot_stack_dominoes_read('bat');
 SELECT public.snapshot_stack_dominoes_read('mecum');
 SELECT public.snapshot_stack_dominoes_read('nosuchsource');
+SELECT public.snapshot_stack_dominoes_read('barrett-jackson', NULL, '-infinity');
+SELECT public.snapshot_stack_dominoes_read('barrett-jackson', '-infinity', '2026-01-01');
+SELECT public.snapshot_stack_dominoes_read('barrett-jackson', '2026-01-01', '2026-01-08');
+SELECT public.snapshot_stack_dominoes_read('barrett-jackson', '2026-01-08', NULL);
 SELECT public.snapshot_stack_dominoes_finish() AS f \gset
-SELECT pg_temp.ok('staged reading: depth only for the sources read (bat, mecum), bat x mecum 1 cohort at 10 lots',
-  :'f'::jsonb ->> 'sources_read' = 'bat, mecum'
-  AND (SELECT count(DISTINCT source_a) = 2 FROM public.stack_cohort_depth WHERE registered_by = 'staged')
+SELECT pg_temp.ok('staged reading: depth only for the sources read (barrettjackson, bat, mecum), bat x mecum 1 cohort at 10 lots',
+  :'f'::jsonb ->> 'sources_read' = 'barrettjackson, bat, mecum'
+  AND (SELECT count(DISTINCT source_a) = 3 FROM public.stack_cohort_depth WHERE registered_by = 'staged')
   AND (SELECT cohorts FROM public.stack_cohort_depth WHERE registered_by = 'staged' AND source_a = 'bat' AND source_b = 'mecum' AND min_lots = 10) = 1);
 SELECT pg_temp.fails('read without begin is refused', $$SELECT public.snapshot_stack_dominoes_read('bat')$$, '55000');
 
+SELECT pg_temp.ok('banded read: bands are disjoint and sum to the whole (barrett-jackson 500 lots in one band, median kept whole), every try logged',
+  (:'f'::jsonb ->> 'price_rows')::int > 0
+  AND (SELECT lots = 500 FROM public.stack_cohort_prices WHERE registered_by = 'staged' AND source_key = 'barrettjackson')
+  AND jsonb_array_length(:'f'::jsonb -> 'reads') = 7);
+
 -- Registry, schedule, re-apply ----------------------------------------------------------------------------------------
-SELECT pg_temp.ok('registry rows for both tables', (SELECT count(*) = 2 FROM public.pipeline_registry WHERE owned_by = 'snapshot_stack_dominoes' AND do_not_write_directly));
+SELECT pg_temp.ok('registry rows for the three tables', (SELECT count(*) = 3 FROM public.pipeline_registry WHERE owned_by = 'snapshot_stack_dominoes' AND do_not_write_directly));
 SELECT pg_temp.ok('cron job runs the coverage snapshot then the dominoes, daily, with the 120s timeout',
   (SELECT schedule = '25 4 * * *' AND command LIKE '%statement_timeout = ''120s''%' AND command LIKE '%snapshot_stack_coverage%' AND command LIKE '%snapshot_stack_dominoes_begin%' AND command LIKE '%snapshot_stack_dominoes_finish%' FROM cron.job WHERE jobname = 'snapshot-stack-dominoes'));
 SELECT pg_temp.ok('every column of both tables is described',
   (SELECT count(*) = 0 FROM pg_attribute a JOIN pg_class c ON c.oid = a.attrelid
    WHERE c.relname IN ('stack_input_support', 'stack_cohort_depth') AND a.attnum > 0 AND NOT a.attisdropped AND col_description(c.oid, a.attnum) IS NULL));
-\i supabase/migrations/20261015060000_stack_dominoes_population_and_run.sql
+\i supabase/migrations/20261015063000_stack_dominoes_bands_retry_prices.sql
 SELECT pg_temp.ok('re-apply registered nothing twice',
   (SELECT count(*) = 6 FROM public.vein_ledger WHERE vein_id BETWEEN 'V014' AND 'V019')
-  AND (SELECT count(*) = 2 FROM public.pipeline_registry WHERE owned_by = 'snapshot_stack_dominoes'));
+  AND (SELECT count(*) = 3 FROM public.pipeline_registry WHERE owned_by = 'snapshot_stack_dominoes'));
