@@ -184,8 +184,13 @@ async function main() {
       const sample = Object.values(report).flatMap(v => v.first20).filter(c => c.accept).slice(0, 2);
       report.detail_samples = [];
       for (const c of (stopped() ? [] : sample)) { const r = await visitListing(page, c.id); report.detail_samples.push(r.challenge ? { id: c.id, challenge: r.challenge } : { id: c.id, parsed: readListingPage(r, new Date().toISOString()), raw_text: r.text.slice(0, 20000), images: r.images }); await sleep(jitter(10000, 20000)); }
+      // Keep the variant Facebook actually served the most wanted cards for: params still in the final URL, then most accepted of the first 20, ties to the stricter URL.
+      const order = Object.keys(VARIANTS), usable = order.filter(k => report[k] && (k === 'bare' || /minYear=1964/.test(report[k].actual_url ?? '')));
+      const best = usable.sort((a, b) => report[b].accepted_in_first20 - report[a].accepted_in_first20 || order.indexOf(b) - order.indexOf(a))[0];
+      if (best) { writeAtomic(path.join(dirs.state, 'variant.json'), { name: best, chosen_at: new Date().toISOString(), accepted_in_first20: report[best].accepted_in_first20 }); report.chosen_variant = best; }
       writeAtomic(path.join(dirs.state, `probe-${new Date().toISOString().replace(/[:.]/g, '-')}.json`), report);
-      console.log(JSON.stringify(Object.fromEntries(Object.entries(report).filter(([k]) => k !== 'detail_samples').map(([k, v]) => [k, { actual_url: v.actual_url, filters: v.displayed_filters, accepted_in_first20: v.accepted_in_first20 }])), null, 1));
+      console.log('chosen_variant', report.chosen_variant ?? 'none (kept default years_cartruck)');
+      console.log(JSON.stringify(Object.fromEntries(Object.entries(report).filter(([k]) => k in VARIANTS).map(([k, v]) => [k, { actual_url: v.actual_url, filters: v.displayed_filters, accepted_in_first20: v.accepted_in_first20 }])), null, 1));
     } else if (mode === 'revisit') {
       const log = await revisit(page, nodeClassify); day.push(Date.now());
       writeAtomic(path.join(dirs.state, `revisit-${Date.now()}.json`), { at: new Date().toISOString(), log }); console.log(JSON.stringify(log));
