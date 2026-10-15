@@ -68,8 +68,9 @@ CREATE TABLE public.stack_coverage_snapshots (stack_id text NOT NULL, version in
 INSERT INTO public.stack_coverage_snapshots VALUES
   ('S10', 1, '2026-10-15 00:00Z', 0.0, '[{"layer":"log","kind":"column","object":"vehicle_events.ended_at","verdict":"partial","evidence":"fill 0.3"},{"layer":"key","kind":"abstract","object":"place entity","verdict":"missing","evidence":"no table"}]'),
   ('S05', 1, '2026-10-15 00:00Z', 0.0, '[{"layer":"fold","kind":"abstract","object":"text fold","verdict":"missing","evidence":"no table"}]');
-CREATE TABLE public.source_target_coverage (source_slug text, total_targets bigint, landed bigint, gap bigint, landed_pct numeric, landed_measured_at timestamptz);
-INSERT INTO public.source_target_coverage VALUES ('mecum', 1000, 400, 600, 40.00, '2026-10-15 00:00Z'), ('barrett-jackson', 500, 490, 10, 98.00, '2026-10-15 00:00Z');
+CREATE TABLE public.source_target_coverage (source_slug text, total_targets bigint, landed bigint, gap bigint, landed_pct numeric, landed_measured_at timestamptz,
+  population integer, landed_of_population numeric, population_method text, population_confidence numeric, population_at timestamptz);
+INSERT INTO public.source_target_coverage VALUES ('mecum', 1000, 400, 600, 40.00, '2026-10-15 00:00Z', 800, 50.00, 'fixture', 0.9, '2026-10-15 00:00Z'), ('barrett-jackson', 500, 490, 10, 98.00, '2026-10-15 00:00Z', NULL, NULL, NULL, NULL, NULL);
 CREATE TABLE public.vehicles (id uuid PRIMARY KEY DEFAULT gen_random_uuid(), year integer, make text, model text, deleted_at timestamptz);
 CREATE TABLE public.vehicle_events (id uuid PRIMARY KEY DEFAULT gen_random_uuid(), vehicle_id uuid, source_platform text, event_type text,
   event_status text, started_at timestamptz, ended_at timestamptz, final_price numeric);
@@ -97,6 +98,7 @@ ANALYZE;
 
 \i supabase/migrations/20261015034500_stack_dominoes.sql
 \i supabase/migrations/20261015050000_stack_dominoes_staged.sql
+\i supabase/migrations/20261015060000_stack_dominoes_population_and_run.sql
 
 -- Shape ---------------------------------------------------------------------------------------------------------------
 SELECT pg_temp.ok('both tables have RLS on and no anon or authenticated grant',
@@ -165,6 +167,11 @@ SELECT pg_temp.ok('V019 reads stack S05 coverage 0 against 1.0: unmet',
 SELECT pg_temp.ok('V017 lists three requirements',
   (SELECT count(*) = 3 FROM public.v_hypothesis_support WHERE vein_id = 'V017'));
 
+SELECT pg_temp.ok('v_source_dominoes carries the population figure beside the target-list figure',
+  (SELECT landed_pct = 40.00 AND landed_of_population = 50.00 AND population = 800 FROM public.v_source_dominoes WHERE source_slug = 'mecum' AND object = 'vehicle_events.ended_at')
+  AND (SELECT landed_of_population IS NULL FROM public.v_source_dominoes WHERE source_slug = 'barrett-jackson' AND object = 'vehicle_events.ended_at'));
+SELECT pg_temp.ok('the one-off job unschedules itself first, then runs the same stages',
+  (SELECT command LIKE 'SELECT cron.unschedule(''snapshot-stack-dominoes-firstrun'');%' AND command LIKE '%snapshot_stack_dominoes_finish%' FROM cron.job WHERE jobname = 'snapshot-stack-dominoes-firstrun'));
 -- Staged form, as the job runs it: separate statements in one session, a missing source simply absent.
 SELECT public.snapshot_stack_dominoes_begin('staged') \gset
 SELECT public.snapshot_stack_dominoes_read('bat');
@@ -179,13 +186,12 @@ SELECT pg_temp.fails('read without begin is refused', $$SELECT public.snapshot_s
 
 -- Registry, schedule, re-apply ----------------------------------------------------------------------------------------
 SELECT pg_temp.ok('registry rows for both tables', (SELECT count(*) = 2 FROM public.pipeline_registry WHERE owned_by = 'snapshot_stack_dominoes' AND do_not_write_directly));
-SELECT pg_temp.ok('cron job runs the coverage snapshot then the dominoes, daily, with the 300s timeout',
-  (SELECT schedule = '25 4 * * *' AND command LIKE '%statement_timeout = ''300s''%' AND command LIKE '%snapshot_stack_coverage%' AND command LIKE '%snapshot_stack_dominoes_begin%' AND command LIKE '%snapshot_stack_dominoes_finish%' FROM cron.job WHERE jobname = 'snapshot-stack-dominoes'));
+SELECT pg_temp.ok('cron job runs the coverage snapshot then the dominoes, daily, with the 120s timeout',
+  (SELECT schedule = '25 4 * * *' AND command LIKE '%statement_timeout = ''120s''%' AND command LIKE '%snapshot_stack_coverage%' AND command LIKE '%snapshot_stack_dominoes_begin%' AND command LIKE '%snapshot_stack_dominoes_finish%' FROM cron.job WHERE jobname = 'snapshot-stack-dominoes'));
 SELECT pg_temp.ok('every column of both tables is described',
   (SELECT count(*) = 0 FROM pg_attribute a JOIN pg_class c ON c.oid = a.attrelid
    WHERE c.relname IN ('stack_input_support', 'stack_cohort_depth') AND a.attnum > 0 AND NOT a.attisdropped AND col_description(c.oid, a.attnum) IS NULL));
-\i supabase/migrations/20261015034500_stack_dominoes.sql
-\i supabase/migrations/20261015050000_stack_dominoes_staged.sql
+\i supabase/migrations/20261015060000_stack_dominoes_population_and_run.sql
 SELECT pg_temp.ok('re-apply registered nothing twice',
   (SELECT count(*) = 6 FROM public.vein_ledger WHERE vein_id BETWEEN 'V014' AND 'V019')
   AND (SELECT count(*) = 2 FROM public.pipeline_registry WHERE owned_by = 'snapshot_stack_dominoes'));
