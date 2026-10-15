@@ -1,5 +1,5 @@
 import { assertEquals } from "https://deno.land/std@0.224.0/assert/mod.ts";
-import { identityFromTitle, listingFromText, parseBarnFindsPost, priceFromText } from "./parseArticle.ts";
+import { identityFromTitle, isWidgetText, shownTimeAsUtc, listingFromText, parseBarnFindsPost, priceFromText } from "./parseArticle.ts";
 
 Deno.test("identity from headlines with and without a prefix", () => {
   assertEquals(identityFromTitle("Mild Build 350 V8: 1989 Chevrolet C1500"), { year: 1989, make: "Chevrolet", model: "C1500" });
@@ -33,4 +33,11 @@ Deno.test("a whole post", () => {
   assertEquals(p.comments.length, 1);
   assertEquals([p.comments[0].author, p.comments[0].member, p.comments[0].likes, p.comments[0].text], ["Stan", true, 22, "Favorite & then some"]);
   assertEquals(p.articleText.startsWith("Thanks to"), true);
+});
+
+Deno.test("widget teasers are not article text or a price", () => {
+  assertEquals(isWidgetText("1971 Chevrolet Corvette Convertible Bid Now 6 days $100"), true);
+  assertEquals(priceFromText("Current high bid $100 on the widget").price, null);
+  assertEquals(shownTimeAsUtc("Feb 1, 2026 9:49pm"), "2026-02-01T21:49:00.000Z");
+  assertEquals(shownTimeAsUtc("Jan 8, 2026 12:05am"), "2026-01-08T00:05:00.000Z");
 });
