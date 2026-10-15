@@ -19,7 +19,7 @@ const VEHICLE_COLS = [
   "id", "year", "make", "model", "vin", "mileage", "transmission", "transmission_type", "engine_size", "engine_type",
   "engine_displacement", "engine_liters", "color", "color_primary", "interior_color", "description", "city", "state",
   "zip_code", "gps_latitude", "seller_name", "bat_seller", "sale_price", "winning_bid", "high_bid", "asking_price",
-  "price", "bat_sold_price", "sold_price", "sale_date", "bat_sale_date", "bid_count", "bat_bid_count",
+  "price", "bat_sold_price", "sold_price", "sale_date", "bat_sale_date", "bid_count", "bat_bid_count", "sale_status", "auction_outcome",
 ].join(",");
 
 // deno-lint-ignore no-explicit-any
@@ -65,7 +65,7 @@ async function resolveVehicleId(sb: Sb, platform: string, url: string): Promise<
 async function modelFor(sb: Sb, vehicleId: string): Promise<ModelCtx> {
   const [v, events, locObs, comments, images, obs] = await Promise.all([
     sb.from("vehicles").select(VEHICLE_COLS).eq("id", vehicleId).maybeSingle(),
-    sb.from("vehicle_events").select("final_price,current_price,starting_price,ended_at,sold_at,bid_count,seller_identifier,seller_external_identity_id")
+    sb.from("vehicle_events").select("event_status,final_price,current_price,starting_price,ended_at,sold_at,bid_count,seller_identifier,seller_external_identity_id")
       .eq("vehicle_id", vehicleId).limit(20),
     sb.from("vehicle_location_observations").select("city,region_code,postal_code,latitude,location_text_clean")
       .eq("vehicle_id", vehicleId).limit(10),

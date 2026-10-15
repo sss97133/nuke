@@ -18,7 +18,7 @@ export type RawFields = Record<string, RawRead>;
 export const DEPTH_FIELDS = [
   "year", "make_model", "vin", "mileage", "transmission", "engine", "exterior_color", "interior_color",
   "description", "location_city", "location_state", "location_zip", "location_point",
-  "seller", "price", "end_date", "bid_count", "comment_count", "photo_count",
+  "seller", "price", "sale_outcome", "end_date", "bid_count", "comment_count", "photo_count",
 ] as const;
 export type DepthField = typeof DEPTH_FIELDS[number];
 
@@ -176,6 +176,7 @@ function carsandbids(_html: string, md: string): RawFields {
     if (t.length >= 40) out.description = { n: t.length };
   }
   put(out, "price", /(?:High Bid|Sold For|Current Bid|Final Bid)\s*\$?([\d,]+)/i.exec(md)?.[1], "n");
+  if (/Auction Ended\s*Sold for \$[\d,]+/.test(md)) out.sale_outcome = { sample: "sold" };
   put(out, "bid_count", /-\s*Bids\s*(\d+)/.exec(md)?.[1], "n");
   put(out, "comment_count", /-\s*Comments\s*(\d+)/.exec(md)?.[1], "n");
   put(out, "photo_count", /All Photos \((\d+)\)/.exec(md)?.[1], "n");
@@ -203,6 +204,8 @@ function mecum(html: string): RawFields {
   const d = /"@type":\s*"Car"[\s\S]{0,6000}?"description":\s*"([^"]*)"/.exec(p)?.[1];
   if (d && d.length >= 40) out.description = { n: d.length };
   put(out, "end_date", key("auctionDayStart"));
+  // a result the source states as sold: the saleResults taxonomy term of the lot
+  if (/"saleResults":\{[\s\S]{0,600}?"slug":"sold"/.test(p)) out.sale_outcome = { sample: "sold" };
   return out;
 }
 
@@ -331,6 +334,10 @@ export function modelHolds(field: DepthField, raw: RawRead, c: ModelCtx): Held {
     case "price": {
       const p = any(v, "sale_price", "winning_bid", "high_bid", "asking_price", "price", "bat_sold_price", "sold_price");
       return { profile: p, anywhere: p || anyEv(c.events, "final_price", "current_price", "starting_price") };
+    }
+    case "sale_outcome": {
+      const p = any(v, "sale_status") && String(v!.sale_status) === "sold" || any(v, "auction_outcome") && String(v!.auction_outcome) === "sold";
+      return { profile: p, anywhere: p || c.events.some((e) => e.event_status === "sold") };
     }
     case "end_date": {
       const p = any(v, "sale_date", "bat_sale_date");
