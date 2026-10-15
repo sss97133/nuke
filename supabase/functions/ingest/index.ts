@@ -273,6 +273,7 @@ async function resolveCraigslistShareUrl(shareUrl: string): Promise<{ url: strin
     const canonicalTag = html.match(/<link\b[^>]*\brel\s*=\s*["'][^"']*\bcanonical\b[^"']*["'][^>]*>/i)?.[0];
     const canonical = canonicalTag?.match(/\bhref\s*=\s*(["'])([^"']+)\1/i)?.[2];
     if (canonical === requested.href) {
+      // A post with no asking price has no JSON-LD name; extractFromHtml reads its title line (2026-10-15).
       const detail = extractFromHtml(html, shareUrl);
       if (detail.post_id && detail.title && detail.description) return { url: shareUrl, postId: detail.post_id, error: null };
       // A self-canonical shell/expired page cannot borrow a recommendation's identity.

@@ -76,14 +76,23 @@ function parseYearMakeModel(makeModelStr: string): { make: string | null; model:
   };
 }
 
+function textOf(raw: string | undefined): string | null {
+  const t = (raw ?? "").replace(/&amp;/g, "&").replace(/&#0?39;|&apos;/g, "'").replace(/&quot;/g, '"').replace(/\s+/g, " ").trim();
+  return t || null;
+}
+
 export function extractFromHtml(html: string, url: string): CraigslistExtracted {
   // Parse JSON-LD structured data
   const jsonLd = extractJsonLd(html);
 
   // Extract title and basic info
-  const title = jsonLd?.name || null;
+  // A post with no asking price carries no Product JSON-LD, so no name and no place there (measured 2026-10-15: 25 of 332
+  // post pages in 10 h were refused as "lacks full listing evidence" for this alone). The page's own title line and its
+  // geo.placename meta hold the same two facts.
+  const title = jsonLd?.name || textOf(html.match(/<span id="titletextonly">([^<]*)<\/span>/i)?.[1]) || null;
   const price = jsonLd?.offers?.price ? Math.round(parseFloat(jsonLd.offers.price)) : null;
-  const location = jsonLd?.offers?.availableAtOrFrom?.address?.addressLocality || null;
+  const location = jsonLd?.offers?.availableAtOrFrom?.address?.addressLocality
+    || textOf(html.match(/<meta name="geo\.placename" content="([^"]*)"/i)?.[1]) || null;
 
   // Extract year from HTML attributes (it's a span class, not attr class)
   const yearStr = extractSpanValue(html, 'year');

@@ -1117,8 +1117,8 @@ Deno.serve(async (req) => {
         totalFound += fcResult.items_found;
         totalIngested += fcResult.new_ingested || 0;
 
-        // Small delay between feeds to be polite
-        await new Promise((r) => setTimeout(r, 500));
+        // Small delay between feeds to be polite; Craigslist search pages are one site, so one request per 2 s.
+        await new Promise((r) => setTimeout(r, feed.source_slug === "craigslist" ? SITE_MIN_SPACING_MS : 500));
         continue;
       }
 

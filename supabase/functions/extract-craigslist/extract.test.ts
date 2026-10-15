@@ -97,3 +97,12 @@ Deno.test("the queue row is plain JSON", () => {
   const row = buildQueueRow(extractFromHtml(page("modern-vin-17-full-block.html"), URL1));
   equal(JSON.parse(JSON.stringify(row)), row);
 });
+
+Deno.test("a post with no asking price still has its title and place (no Product JSON-LD on the page)", () => {
+  const html = `<meta name="geo.placename" content="Mission"><span class="postingtitletext"><span id="titletextonly">Jeep 1994</span><span> (Mission)</span></span>
+<section id="postingbody">Jeep 4x4 title limpio</section>`;
+  const d = extractFromHtml(html, "https://www.craigslist.org/view/d/mission-jeep/1W8xkJukDjkMrHYxucmGEH");
+  if (d.title !== "Jeep 1994") throw new Error(`title ${d.title}`);
+  if (d.location !== "Mission") throw new Error(`location ${d.location}`);
+  if (d.price !== null) throw new Error("no price was offered");
+});
