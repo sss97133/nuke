@@ -347,24 +347,28 @@ function useRepresentativeImages(items: TreemapNode[] | null, make?: string | nu
   useEffect(() => {
     if (!items || !make || items.length === 0) { setImages(new Map()); return; }
     let cancelled = false;
+    // The brand's priciest sold cars with a photo, read along the (make, sale_price) index of priced sales. The earlier
+    // shape (make ILIKE, sale_price OR sold_price) walked every vehicle by price and timed out on every brand drill
+    // (HTTP 500 for Ford and Porsche, 2026-10-15), so no tile ever had its image; this one reads 200 rows of the brand.
     supabase
       .from('vehicles')
       .select('model, year, primary_image_url')
-      .ilike('make', make)
+      .eq('make', make)
+      .gt('sale_price', 0)
       .not('primary_image_url', 'is', null)
-      .or('sale_price.gt.0,sold_price.gt.0')
       .is('deleted_at', null)
-      .order('sale_price', { ascending: false, nullsFirst: false })
-      .limit(500)
+      .order('sale_price', { ascending: false })
+      .limit(200)
       .then(({ data: result, error }) => {
         if (cancelled || !result || error) return;
         const map = new Map<string, string>();
         for (const row of result as any[]) {
-          // Key by model name or year depending on what we need
+          // Key by model name, by its first word (a family tile is "911", its sales "911 Carrera") and by year.
           const modelKey = String(row.model || '').toLowerCase();
+          const familyKey = modelKey.split(/\s+/)[0];
           const yearKey = String(row.year || '');
-          if (!map.has(modelKey) && row.primary_image_url) map.set(modelKey, row.primary_image_url);
-          if (!map.has(yearKey) && row.primary_image_url) map.set(yearKey, row.primary_image_url);
+          if (!row.primary_image_url) continue;
+          for (const key of [modelKey, familyKey, yearKey]) if (key && !map.has(key)) map.set(key, row.primary_image_url);
         }
         setImages(map);
       });
@@ -984,9 +988,10 @@ export function TreemapHomePage({ onBrowse, embedded = false }: { onBrowse: () =
     }
   }, []);
 
-  // Representative images for aggregate cells (models/years levels)
+  // Representative images for aggregate cells (models/years levels); none while a family shows its sales chart, which
+  // has no tiles to put them on (the read ran under the chart on every family drill).
   const repImages = useRepresentativeImages(
-    levelType === 'models' ? familyModelsData : levelType === 'years' ? yearsData
+    levelType === 'models' ? (familyView === 'names' ? familyModelsData : null) : levelType === 'years' ? yearsData
       : levelType === 'families' && familiesFailed ? modelsData : null,
     currentLevel.make
   );
