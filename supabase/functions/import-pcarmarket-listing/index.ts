@@ -6,6 +6,7 @@ import { requireWriteAuth } from '../_shared/writeGuard.ts';
 import { projectSecretKey } from "../_shared/supabaseKeys.ts";
 import { parseSsrPage } from "./ssrPage.ts";
 import { fillOnlyIdentity, identityConflict, REVISION_DIFFERENT_CAR } from '../_shared/identityMatch.ts';
+import { insertMissingVehicleImages } from '../_shared/vehicleImageWrite.ts';
 import { parseLocation } from "../_shared/parseLocation.ts";
 import { batchFromTargets, discoverTargets } from "./targets.ts";
 
@@ -67,6 +68,9 @@ function isValidVin(vin: string): boolean {
 
   return true;
 }
+
+// PCarMarket lets a member's handle be an email address; keep the first two characters and the domain only.
+const maskHandle = (h: string) => (h.includes('@') ? h.replace(/^(.{1,2})[^@]*(@.*)$/, '$1***$2') : h);
 
 function normalizeUrl(raw: string): string {
   try {
@@ -388,10 +392,10 @@ async function scrapePCarMarketListing(url: string, providedHtml?: string): Prom
         color: ssr.color,
         interiorColor: ssr.interiorColor,
         transmission: ssr.transmission,
-        bids: ssr.bids,
+        bids: ssr.bids.map((b) => ({ ...b, user: maskHandle(b.user) })),
         reserveMet: ssr.reserveMet,
         photosClaimed: ssr.photosClaimed,
-        buyerUsername: ssr.bids.find((b) => b.kind === 'sold')?.user,
+        buyerUsername: (() => { const u = ssr.bids.find((b) => b.kind === 'sold')?.user; return u ? maskHandle(u) : undefined; })(),
       };
     }
 
@@ -1074,7 +1078,7 @@ Deno.serve(async (req: Request) => {
         view_count: listing.viewCount || null,
         buyer_identifier: listing.auctionOutcome === 'sold' ? listing.buyerUsername ?? null : null,
         metadata: {
-          reserve_status: listing.reserveMet === true ? 'reserve_met' : listing.auctionOutcome === 'reserve_not_met' ? 'reserve_not_met' : (listing.reserveStatus || 'unknown'),
+          reserve_status: listing.reserveMet === true || listing.auctionOutcome === 'sold' ? 'reserve_met' : listing.auctionOutcome === 'reserve_not_met' ? 'reserve_not_met' : (listing.reserveStatus || 'unknown'),
           auction_type: listing.reserveStatus ?? null,
           location: listing.location ?? null,
           bids_on_page: listing.bids?.length ?? 0,
@@ -1155,7 +1159,8 @@ Deno.serve(async (req: Request) => {
         filename: `pcarmarket_${have.size + index}.jpg`,
       }));
       for (let i = 0; i < imageInserts.length; i += 50) {
-        const { error: imgErr } = await supabase.from('vehicle_images').insert(imageInserts.slice(i, i + 50));
+        // One row per URL per vehicle: the helper reads every URL the vehicle holds (superseded copies included) first.
+        const { error: imgErr } = await insertMissingVehicleImages(supabase, vehicleId, imageInserts.slice(i, i + 50));
         if (imgErr) { console.error('[pcarmarket] image insert failed:', imgErr.message); break; }
       }
       console.log(`Imported ${imageInserts.length} of ${listing.images.length} images`);
