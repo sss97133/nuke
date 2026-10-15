@@ -1,0 +1,248 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Blur</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;1,300;1,400&family=Inter:wght@300;400;500&display=swap" rel="stylesheet" />
+<style>
+  :root {
+    --paper: #f5f2ec;
+    --paper-2: #efeae1;
+    --ink: #17140f;
+    --muted: #6c655a;
+    --hair: #ddd6c8;
+    --ease: cubic-bezier(0.16, 1, 0.3, 1);
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  html { scroll-behavior: smooth; }
+
+  body {
+    background: var(--paper);
+    color: var(--ink);
+    font-family: "Inter", system-ui, sans-serif;
+    font-weight: 300;
+    -webkit-font-smoothing: antialiased;
+    line-height: 1.6;
+    overflow-x: hidden;
+  }
+
+  /* editorial label */
+  .label {
+    font-family: "Inter", sans-serif;
+    font-size: 10px;
+    font-weight: 500;
+    letter-spacing: 0.32em;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+
+  .serif {
+    font-family: "Cormorant Garamond", Georgia, serif;
+    font-weight: 300;
+    line-height: 1.08;
+    letter-spacing: -0.01em;
+  }
+
+  section { padding: clamp(72px, 12vh, 160px) clamp(28px, 8vw, 200px); }
+
+  .rule { width: 28px; height: 1px; background: var(--ink); margin: 22px 0; opacity: 0.5; }
+
+  /* ───────── hero ───────── */
+  .hero {
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+  }
+
+  .wordmark {
+    font-family: "Cormorant Garamond", Georgia, serif;
+    font-weight: 300;
+    font-size: clamp(84px, 22vw, 320px);
+    letter-spacing: -0.03em;
+    line-height: 0.9;
+    filter: blur(14px);
+    opacity: 0;
+    transform: translateY(8px);
+    animation: focus-in 1.8s var(--ease) 0.2s forwards;
+  }
+
+  @keyframes focus-in {
+    to { filter: blur(0); opacity: 1; transform: translateY(0); }
+  }
+
+  .hero .tagline {
+    margin-top: 28px;
+    max-width: 30ch;
+    font-size: clamp(19px, 2.4vw, 30px);
+    color: var(--ink);
+    opacity: 0;
+    animation: rise 1.4s var(--ease) 1s forwards;
+  }
+
+  .hero .sub {
+    margin-top: 18px;
+    max-width: 42ch;
+    color: var(--muted);
+    font-size: 15px;
+    opacity: 0;
+    animation: rise 1.4s var(--ease) 1.25s forwards;
+  }
+
+  @keyframes rise { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: translateY(0); } }
+
+  .hero .top {
+    position: absolute; top: clamp(28px, 5vh, 56px); left: clamp(28px, 8vw, 200px);
+    display: flex; gap: 14px; align-items: center;
+  }
+
+  /* ───────── the tension ───────── */
+  .tension .serif {
+    font-size: clamp(34px, 6vw, 88px);
+    max-width: 16ch;
+  }
+  .tension em { font-style: italic; color: var(--muted); }
+
+  /* ───────── depth-of-field motif ───────── */
+  .field { background: var(--paper-2); }
+  .tiles {
+    margin-top: 48px;
+    display: grid;
+    grid-template-columns: repeat(6, 1fr);
+    gap: 14px;
+    max-width: 980px;
+  }
+  .tile {
+    aspect-ratio: 3 / 4;
+    border-radius: 2px;
+    filter: blur(5px);
+    opacity: 0.55;
+    transition: filter 0.9s var(--ease), opacity 0.9s var(--ease), transform 0.9s var(--ease);
+  }
+  .tile:nth-child(1) { background: linear-gradient(160deg, #cfc6b4, #b3a892); }
+  .tile:nth-child(2) { background: linear-gradient(160deg, #c2b9a6, #9c917b); }
+  .tile:nth-child(3) { background: linear-gradient(160deg, #d8d0c0, #bcb29c); }
+  .tile:nth-child(4) { background: linear-gradient(160deg, #b8ad97, #8d8268); }
+  .tile:nth-child(5) { background: linear-gradient(160deg, #cdc4b1, #a89d86); }
+  .tile:nth-child(6) { background: linear-gradient(160deg, #c7bda9, #978c74); }
+  .tile.keep {
+    filter: blur(0);
+    opacity: 1;
+    transform: scale(1.06);
+    box-shadow: 0 18px 50px -20px rgba(23,20,15,0.45);
+  }
+  .field .caption { margin-top: 26px; color: var(--muted); font-size: 14px; max-width: 34ch; }
+
+  @media (max-width: 720px) {
+    .tiles { grid-template-columns: repeat(3, 1fr); }
+  }
+
+  /* ───────── manifesto ───────── */
+  .manifesto { display: grid; gap: clamp(40px, 6vh, 72px); }
+  .principle { display: grid; grid-template-columns: 1.1fr 2fr; gap: clamp(16px, 4vw, 64px); align-items: start; }
+  .principle .n { font-size: clamp(30px, 5vw, 64px); }
+  .principle h3 { font-size: clamp(15px, 1.6vw, 19px); font-weight: 500; letter-spacing: 0.01em; margin-bottom: 10px; }
+  .principle p { color: var(--muted); max-width: 40ch; }
+  @media (max-width: 720px) { .principle { grid-template-columns: 1fr; gap: 14px; } }
+
+  /* ───────── restraint line ───────── */
+  .restraint { background: var(--ink); color: var(--paper); }
+  .restraint .serif { font-size: clamp(28px, 5vw, 64px); max-width: 18ch; }
+  .restraint .label { color: #b3ac9d; }
+
+  /* ───────── close ───────── */
+  .close { text-align: left; }
+  .close .serif { font-size: clamp(30px, 5vw, 70px); max-width: 16ch; }
+  .close .meta { margin-top: 40px; display: flex; gap: 28px; align-items: baseline; flex-wrap: wrap; }
+  .close .meta .label { color: var(--muted); }
+
+  footer { padding: 40px clamp(28px, 8vw, 200px); border-top: 1px solid var(--hair); display: flex; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
+  footer .label { color: var(--muted); }
+</style>
+</head>
+<body>
+
+  <header class="hero">
+    <div class="top">
+      <span class="label">Blur</span>
+      <span class="label" style="opacity:.5">A Nuke Product</span>
+    </div>
+    <h1 class="wordmark">Blur</h1>
+    <p class="serif tagline">The private photo app that organizes itself.</p>
+    <p class="sub">Free. Anonymous. Nothing ever leaves your phone.</p>
+  </header>
+
+  <section class="tension">
+    <span class="label">The problem</span>
+    <div class="rule"></div>
+    <p class="serif">A life worth showing — <em>buried in ten thousand photos.</em></p>
+  </section>
+
+  <section class="field">
+    <span class="label">The idea</span>
+    <div class="rule"></div>
+    <p class="serif" style="font-size:clamp(26px,4vw,52px); max-width:18ch;">Everything softened. Only the one you meant, in focus.</p>
+    <div class="tiles">
+      <div class="tile"></div>
+      <div class="tile"></div>
+      <div class="tile keep"></div>
+      <div class="tile"></div>
+      <div class="tile"></div>
+      <div class="tile"></div>
+    </div>
+    <p class="caption">Hand someone your phone. Flip straight to it. The rest stays blurred.</p>
+  </section>
+
+  <section class="manifesto">
+    <span class="label">What it is</span>
+    <div class="principle">
+      <span class="serif n">01</span>
+      <div>
+        <h3>Private by nature</h3>
+        <p>No account. No cloud. No upload. It works in airplane mode, because everything happens on your phone.</p>
+      </div>
+    </div>
+    <div class="principle">
+      <span class="serif n">02</span>
+      <div>
+        <h3>Quietly ordered</h3>
+        <p>It organizes itself, and finds the photos you missed — completing the albums you started. You never sort by hand again.</p>
+      </div>
+    </div>
+    <div class="principle">
+      <span class="serif n">03</span>
+      <div>
+        <h3>Shown with intention</h3>
+        <p>Flip to exactly what you mean to show. Everything else softens away. No scrolling, no second-guessing.</p>
+      </div>
+    </div>
+  </section>
+
+  <section class="restraint">
+    <span class="label">What it is not</span>
+    <div class="rule" style="background:var(--paper); opacity:.4;"></div>
+    <p class="serif">No feed. No cloud. No clutter. Only your photos, at their best.</p>
+  </section>
+
+  <section class="close">
+    <span class="label">The promise</span>
+    <div class="rule"></div>
+    <p class="serif">Your photos. Your phone. Nothing leaves.</p>
+    <div class="meta">
+      <span class="label">As smooth as Apple Photos</span>
+      <span class="label">Better power, under the hood</span>
+    </div>
+  </section>
+
+  <footer>
+    <span class="label">Blur — A Nuke Product</span>
+    <span class="label">Working identity · for revision</span>
+  </footer>
+
+</body>
+</html>
