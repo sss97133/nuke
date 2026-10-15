@@ -361,7 +361,7 @@ private struct LibraryAlbumPhotosView: View {
         let owner = userId ?? ""
         do {
             evidence = try await Task.detached { try LocalStore.shared.profileEvidence(userId: owner, methodVersion: method) }.value
-            indices = store.indexMap(forLocalIdentifiers: scopedPhotos.map(\.localIdentifier))
+            indices = await store.indexMap(forLocalIdentifiers: scopedPhotos.map(\.localIdentifier))
             let scope = album ?? LocalPhotoAlbum(id: "derived-scope", name: nil, folderPath: [], sourceKind: "derived", photos: scopedPhotos)
             coverage = try await Task.detached { try LocalStore.shared.albumCoverage(scope, methodVersion: method) }.value
             readError = nil

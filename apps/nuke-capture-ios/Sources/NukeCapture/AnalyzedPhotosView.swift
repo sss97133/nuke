@@ -240,20 +240,11 @@ struct AnalyzedEvidenceView: View {
                 Color.black.ignoresSafeArea()
 
                 VStack(spacing: 0) {
-                    // Full-resolution original (IMAGE RULE: only here, not in grid).
-                    AsyncImage(url: URL(string: photo.url ?? "")) { phase in
-                        switch phase {
-                        case .success(let image):
-                            image.resizable().scaledToFit()
-                        case .empty:
-                            ProgressView().tint(.white)
-                        case .failure:
-                            Image(systemName: "photo")
-                                .font(.largeTitle)
-                                .foregroundStyle(.white.opacity(0.4))
-                        @unknown default:
-                            Color.clear
-                        }
+                    // A screen-sized render (2048 px), not the raw original.
+                    CachedAsyncImage(url: NukeImage.thumb(photo.url, width: 2048)) { image in
+                        image.resizable().scaledToFit()
+                    } placeholder: {
+                        ProgressView().tint(.white)
                     }
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
 
