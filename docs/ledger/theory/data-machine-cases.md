@@ -2241,7 +2241,7 @@ parts, each with its supplier page as source and no price. (d) #110 itself: sign
 w, every resolvable key filled, every unresolved one held with its text and reason. (e) Parity: the legacy query and
 the new rows return the same four wire ends; the diff is published with the change.
 
-#### 13.12.3 RSI passes 1 to 7: the model measures itself and fills its gaps (lead, 2026-10-14)
+#### 13.12.3 RSI passes 1 to 24: the model measures itself and fills its gaps (lead, 2026-10-14 and 15)
 
 Owner, on the reshape: "a bit light ... data model goes rsi". The loop each pass ran:
 1. Read the stack SH scoreboard (`v_harness_coverage`, per public vehicle and layer).
@@ -2266,6 +2266,18 @@ Every pass has a receipt in `docs/wiring/receipts/` dated 2026-10-14.
 | (re-plan) | 20261015001000 | four PDM30 to Dakota VHX wires planned shorter than the straight line | the twin's L18 route, 43.4 in unpadded | 0 / 15 planned shorter; the cut pad stays downstream in the BOM |
 | 11 | 20261015003000 | a loader run that supersedes a wire would strand its segments silently | the loader's own supersession links | resync fold, called by the loader after every run; 0 / 638 live segments on superseded rows |
 | 12 | 20261015013000 | the route graph lived only in repo files; 132 plug positions were copied anchor coordinates, ten of them overtaken by the record | k5LandmarkPaths.ts and the landmark YAML; state rows 0ag, 0ah and section 4 | 51 live points, 12 fallen to successors; 7 of 32 branches standing; 435 / 884 wire ends at a node, 199 of them at a node not yet placed; 46 / 638 segments at standing positions; geometry check 0 / 3 |
+| 13 | 20261015023000 | the PDM15 pin map was not MoTeC's (21 of 37 rows wrong, 24 pins missing); 13 / 63 PDM-fed wires sat on an output their design does not name | MoTeC PDM manual, printed p.43 (PDF p.46) | pin map per the manual; protection fold (pin, else the output the design names); PDM-fed wires off their output 0 / 63; protected nets 57 to 62 |
+| 14 | 20261015033000 | wires landed in one pin were separate nets: 89 nets were pieces of 27 electrical nodes | the plugs' own cavity labels (case-sensitive: the 61-pin has F and f) | refold_harness_nets(); 338 live nets; 29 / 602 pin cavities shared |
+| 15 | 20261015043000 | no programmed limit or cited load on any PDM-fed net | the registry's pdm_settings (39 outputs) | 40 channels; PDM-fed nets with a limit 20 / 39 and with a load 20 / 39; 18 / 40 outputs waiting on a cited current; 1 / 40 in conflict; nets with a load 12 to 32 |
+| 16 | 20261015090000, writer re-issued 20261015093000 | the design's splices were not in the model, so 29 shared pins could not be told from crowded contacts | the registry's splices | harness_splices and members, loaded by the loader; shared pins with no splice the design names 29 / 29 to 0 / 29 (0 / 30 after pass 19); 144 / 148 conductors keyed |
+| 17 | (generator) | the registry could not be rebuilt from main (four inputs off main), so design changes were hand-patched | the generator's own inputs, copied in | a fresh main checkout rebuilds k5_registry.json byte-identical; #1238's hand-patched wires now agree with their BOM and readiness |
+| 18 | (generator) | 11 device terminals held several wires with no splice in the registry, though each device is marked a splice point | the endpoints' splice_point marks and open notes | 12 device-terminal splices listed (37 to 49): 7 with a MiniSeal part, 5 past the largest cavity with none; a 10 AWG zero-area bug in the sizing fixed |
+| 19 | 20261015100000 | 47 live wire ends of 21 decided wires sat on no segment (empty segments made before their ends existed), and no measure saw them | the wires' own live ends, by the reshape's rule | fill_harness_segment_ends(); wire ends on no segment 0 / 931; segments with both ends known 458 / 638 to 484 / 643; terminal keys 494 to 523, tool keys 403 to 418 |
+| 20 | 20261015104500 (re-issue of 20261015103000) | the fill check used the AWG formula and the crimp tool's colour bands | TE/Raychem SCD D-609-03/-04/-05 (CMA ranges) and D-436-60/-61 (CMA per gauge) | TE's figures put 2 / 34 checkable sides over (M130-B B16 group 1 7,248 and PDM30-A A24 6,956 against D-609-05's 6,755 CMA), both closed by pass 21; 0 / 56 after |
+| 21 | (generator) | 1 of 31 spliced pins named the lead into its contact, and splices were sized on the formula | TE's CMA figures; MoTeC PDM manual p.6 and p.48 (24-20 AWG on 8 A outputs); ProWire SSC-N (16-24 AWG) | every ECU/PDM pin splice names a 20 AWG pin lead; spliced pins with a named lead 1 / 31 to 19 / 31; B16, A24 and B8 split into groups; splices 49 to 53; sides the check cannot settle 31 / 64 to 12 / 68 |
+| 22 | 20261015110000 | passes 2 and 9 keyed cavities inline, so ends added later were never keyed (344 to 340) | the rules of passes 2 and 9 | key_harness_wire_end_cavities(), called by the loader; 18 ends and 13 housings keyed on its first run; cavity keys 340 to 358 / 931 |
+| 23 | (generator) | 18 of 40 PDM outputs had no cited running current | maker pages and manuals (Sanden SD7 p.14, E-Stopp kit page, RetroSound Motor 2B p.21, RVS mirror specs, MoTeC M130 page, Dakota VHX p.7 and GSS-3000 p.10) | outputs waiting on a cited current 18 / 40 to 12 / 40; PDM-fed nets with a load 20 / 39 to 26 / 39, with a limit 20 / 39 to 24 / 39; outputs in conflict 1 / 40 to 3 / 40 (the A/C clutch on 20 AWG; the radio on its 15 A maximum, which a bench figure closes) |
+| 24 | (generator) | the A/C clutch's cited 4.2 A needs a 6 A limit that its 20 AWG feed cannot carry, and MoTeC wants 24-20 AWG on an 8 A output | MoTeC PDM manual p.6, p.43, p.48; the treatment #64 got in round 4 | #23 moves to PDM15 OUT8 with two 20 AWG pigtails into an M81824/1-2 and an 18 AWG run; outputs in conflict 3 / 40 to 2 / 40. The load also showed that wires the loader adds get no segment (wire ends on no segment 0 to 1; segments on superseded rows 0 to 1): pass 25 |
 
 **What the loop found that no one asked about:**
 - **A short in the model.** It was found while folding loads. The reshape treated PS-STUDS (nine distinct studs) and
@@ -2284,18 +2296,48 @@ Every pass has a receipt in `docs/wiring/receipts/` dated 2026-10-14.
   firewall crossing to the driver fuse-box hole; the M130 and PDM30 follow it; the coils are on the central
   DEL-Stributor; the CKP is above the starter; the battery, alternator and O2 sensors moved. 24 of its 30 branches fell
   with those points. Pass 12 keeps them all, superseded, and counts a plug's position only where its point stands.
+- **The PDM15 pin map was not MoTeC's.** It numbered outputs A1 to A15 in order. MoTeC's manual pairs the 20 A outputs
+  across pins (OUT1 = A1 + A10) and puts the 8 A outputs between them.
+- **Wires in one pin were separate circuits.** The fold joined wires only through bus plugs; 89 nets were pieces of 27
+  electrical nodes. The 8 marker and clearance feeds on PDM30 OUT19 were 8 nets.
+- **Paralleled outputs, on purpose.** PDM30 OUT17 and OUT18 meet at the floor dimmer's feed (receipt 2026-05-14). MoTeC
+  allows outputs in parallel when they are one type and share one condition (PDM manual printed p.6, pp.22-23); both
+  are 8 A outputs. MoTeC does not say how a trip on one behaves for the other.
+- **An output that cannot carry its load.** PDM30 OUT21 (door locks) needs 12 A; an 8 A output's setting caps at 10 A.
+- **The design record could not be rebuilt.** The registry's generator read four files that were not on main, so every
+  design change since late September was a hand patch, and the BOM drifted from the wires.
+- **The scoreboard was blind to ends off segments.** Every wire-end measure counted ends on live segments only, so 47
+  ends the loader added sat unseen until pass 19 counted them.
+- **Production refuses what the contracts allowed.** The production API refuses an UPDATE without a WHERE, even inside a
+  function (pg-safeupdate), and stack_needs objects must be table.column. Both broke a first deploy; each now has a
+  contract or a fixture constraint.
+- **New wires get no segment.** The reshape segmented the wires that existed on 2026-10-14; a wire the loader adds
+  later (the clutch's pigtails, pass 24) has no segment, and no measure counts decided wires without one.
+- **The crimp tool's colour bands are not the splice maker's ranges.** On TE's own figures two pin splices the formula
+  passed are over D-609-05 (M130-B B16's first group, 7,248 against 6,755 CMA).
 
 **Owed, as the scoreboard names it:**
 - Routing (0 segments routed). The graph is in the model (pass 12). Routing waits on placing the points the record
   leaves open: the M130, PDM30, DEL-Stributor, CKP, battery, alternator and O2 sensors (199 wire ends). The M130 and
   PDM30 spots are an engineering call (state row 0aj), and they need a free-space check in the driver kick panel first.
 - The DC primary's stud-to-stud topology. It waits on the power-spine re-draw.
-- Loads and limits on PDM-fed nets. The registry's pdm_settings has 39 outputs: 20 set, 18 open (each names the
-  current it needs) and 1 conflict (PDM30 OUT21 needs 12 A; an 8 A output caps at 10 A). None of it is in the model.
-  pdm_channels.fuse_rating_amps holds the pins' hardware ceiling, not the programmed limit.
+- PDM limits still waiting on a cited load current: 12 of 40 outputs, most with no published figure; each status names
+  the bench measurement that closes it (coil packs, starter solenoid, PCS ignition, blower, E-Stopp sense, iBooster
+  wake, radio ACC, horn, camera, washer solenoid, USB charger input).
+- Two outputs in conflict: PDM30 OUT11 (the radio's published 15 A maximum assumes its own speakers; a bench figure
+  closes it) and OUT21 (door locks, 9 A needing 12 A on an 8 A output; the actuators stall while a rocker is held, so
+  the pulse load wants a measured stall current before the 125 % rule is applied to it).
+- The 31 pin and group leads the design now names (RSI pass 21) as wire rows with cut lengths, so they reach the cut
+  list and the BOM.
 - The factory baseline's own completeness: 35 rows unkeyed and 23 cited circuits absent. The 1978 diagram pages are
   images.
-- The other 589 wire ends' cavities: GM blade, DT, rings and kit terminals each need a cited layout.
+- Cavity layouts for the families with none cited: GM 56-series blade, Metri-Pack, rings and kit terminals.
+- The leads into device terminals the design splices (the dimmer, door jambs, blower, tailgate switches, subwoofer):
+  the factory terminals' ranges are open. Five of those joins have no MiniSeal that fits (2 x 12, 2 x 14, 2 x 10 AWG).
+- Answers only the makers can give: the Superseal seal range against MoTeC's own 22 AWG Tefzel; two wires in one
+  Superseal contact; how paralleled PDM outputs trip.
+- The public map search still opens a device card (DeviceDetailPanel) with the April design's 61-pin pin map, 8 AWG
+  power and ground through the bulkhead, which the engine-only firewall rule retired.
 - Measured lengths (the outcome).
 
 ### Recursive refinement: the original request must cross admission and readers (2026-10-11)
