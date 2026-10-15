@@ -1,12 +1,14 @@
 import { useInfiniteQuery } from '@tanstack/react-query';
 import { supabase } from '../../lib/supabase';
 
-export const LISTING_SOURCES = ['craigslist', 'facebook_marketplace', 'ksl', 'bat', 'cars_and_bids', 'mecum', 'barrett_jackson'] as const;
+export const LISTING_SOURCES = ['craigslist', 'facebook_marketplace', 'ksl', 'bat', 'cars_and_bids', 'mecum', 'barrett_jackson',
+  'barnfinds', 'bonhams', 'rm-sothebys', 'gooding', 'pcarmarket'] as const;
 export const CLASSIFIED_SOURCES = ['craigslist', 'facebook_marketplace', 'ksl'];
-const PLATFORM_ALIASES: Record<string, string[]> = { bat: ['bat', 'bring_a_trailer'], barrett_jackson: ['barrett_jackson', 'barrettjackson'] };
+const PLATFORM_ALIASES: Record<string, string[]> = { bat: ['bat', 'bring_a_trailer'], barrett_jackson: ['barrett_jackson', 'barrettjackson'], 'rm-sothebys': ['rm-sothebys', 'rmsothebys'] };
 const SOURCE_NAMES: Record<string, string> = { craigslist: 'Craigslist', facebook_marketplace: 'Facebook Marketplace', ksl: 'KSL',
   bat: 'Bring a Trailer', bring_a_trailer: 'Bring a Trailer', cars_and_bids: 'Cars & Bids', mecum: 'Mecum',
-  barrett_jackson: 'Barrett-Jackson', barrettjackson: 'Barrett-Jackson' };
+  barrett_jackson: 'Barrett-Jackson', barrettjackson: 'Barrett-Jackson',
+  barnfinds: 'Barn Finds', bonhams: 'Bonhams', 'rm-sothebys': 'RM Sotheby\'s', rmsothebys: 'RM Sotheby\'s', gooding: 'Gooding & Co', pcarmarket: 'PCarMarket' };
 export const sourceName = (platform: string) => SOURCE_NAMES[platform] ?? platform;
 const PAGE_SIZE = 50;
 type Cursor = { at: string | null; id: string };
