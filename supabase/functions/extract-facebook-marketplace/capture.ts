@@ -15,6 +15,10 @@ export function captureReference(capture: BrowserCapture) {
   return { capture_id: capture.capture_id, observed_at: capture.observed_at };
 }
 
+export function isSavedCapture(capture?: BrowserCapture) {
+  return capture?.retrieval_surface === "chrome_mv3_rendered_saved_cards";
+}
+
 async function digest(value: unknown): Promise<string> {
   const hash = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(JSON.stringify(value)));
   return [...new Uint8Array(hash)].map(n => n.toString(16).padStart(2, "0")).join("");
@@ -31,10 +35,11 @@ export function validateCapture(capture: BrowserCapture, batch: any[]) {
   }
   const at = Date.parse(capture.observed_at);
   if (!Number.isFinite(at) || at > Date.now() + 300_000) throw new Error("valid, non-future observed_at required");
+  const saved = isSavedCapture(capture);
   for (const key of ["target_url", "actual_url"] as const) {
     const url = new URL(capture[key]);
     if (url.protocol !== "https:" || !["www.facebook.com", "facebook.com"].includes(url.hostname) ||
-        !url.pathname.startsWith("/marketplace/") || url.username || url.password) {
+        !(saved ? url.pathname === "/saved/" : url.pathname.startsWith("/marketplace/")) || url.username || url.password || url.port) {
       throw new Error("Facebook Marketplace browser surface required");
     }
   }
@@ -45,6 +50,9 @@ export function validateCapture(capture: BrowserCapture, batch: any[]) {
   for (const item of batch) {
     if (!/^\d+$/.test(item.facebook_id ?? "") || ids.has(item.facebook_id) || !item.content_text) {
       throw new Error("unique facebook_id and original content_text required per card");
+    }
+    if (saved && (item.url !== `https://www.facebook.com/marketplace/item/${item.facebook_id}/` || item.status !== "unknown")) {
+      throw new Error("Saved capture requires exact Marketplace item URLs and unknown availability");
     }
     ids.add(item.facebook_id);
   }
@@ -96,6 +104,7 @@ export async function handleBrowserCapture(
     duplicate_sightings: results.filter(r => r.duplicate_capture).length,
     linked_observations: results.filter(r => r.observation_landing?.observation_id).length,
     unlinked: results.filter(r => r.observation_landing?.status === "unlinked").length,
+    private_source: results.filter(r => r.observation_landing?.status === "private_source").length,
     errors: results.filter(r => !r.success).length,
   };
   // Keep the first successful completion receipt when an identical pass is replayed.

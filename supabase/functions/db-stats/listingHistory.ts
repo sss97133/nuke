@@ -43,8 +43,11 @@ export const LISTING_HISTORY_SQL = `WITH runs AS MATERIALIZED (
     AND greatest(source_at,started_at,created_at,completed_at) <= $2::timestamptz
     AND CASE WHEN pg_input_is_valid(capture->>'capture_id','uuid') THEN (capture->>'capture_id')::uuid END=id
     AND capture->>'access_state'='available'
-    AND capture->>'actual_url' ~ '^https://(www[.])?facebook[.]com/marketplace/[^[:space:]]+$'
-    AND capture->>'target_url' ~ '^https://(www[.])?facebook[.]com/marketplace/[^[:space:]]+$'
+    AND ((capture->>'actual_url' ~ '^https://(www[.])?facebook[.]com/marketplace/[^[:space:]]+$'
+      AND capture->>'target_url' ~ '^https://(www[.])?facebook[.]com/marketplace/[^[:space:]]+$')
+      OR (capture->>'retrieval_surface'='chrome_mv3_rendered_saved_cards'
+        AND capture->>'actual_url' ~ '^https://(www[.])?facebook[.]com/saved/([?][^[:space:]]*)?$'
+        AND capture->>'target_url' ~ '^https://(www[.])?facebook[.]com/saved/([?][^[:space:]]*)?$'))
     AND length(capture->>'actual_url')<=2048 AND length(capture->>'target_url')<=2048
     AND CASE WHEN jsonb_typeof(metadata->'batch')='array' THEN jsonb_array_length(metadata->'batch') BETWEEN 1 AND 50 ELSE false END
     AND CASE WHEN jsonb_typeof(metadata->'results')='array' THEN jsonb_array_length(metadata->'results') BETWEEN 1 AND 50 ELSE false END
@@ -58,6 +61,7 @@ export const LISTING_HISTORY_SQL = `WITH runs AS MATERIALIZED (
     j.capture->>'actual_url' AS actual_url,j.capture->>'target_url' AS target_url,
     j.capture->'complete'='true'::jsonb AS source_scope_complete,
     coalesce(page.detail_id=l.facebook_id,false) AS detail_observation,
+    coalesce(j.capture->>'retrieval_surface'='chrome_mv3_rendered_saved_cards',false) AS saved_observation,
     CASE WHEN page.detail_id=l.facebook_id AND j.capture->>'source_listed_at' ~ '(Z|[+-][0-9]{2}:[0-9]{2})$'
       AND pg_input_is_valid(j.capture->>'source_listed_at','timestamptz')
       THEN CASE WHEN isfinite((j.capture->>'source_listed_at')::timestamptz)
@@ -95,7 +99,7 @@ export const LISTING_HISTORY_SQL = `WITH runs AS MATERIALIZED (
 ), query_revisits AS (
   SELECT listing_id,sum(n-1) AS same_query_revisits FROM (
     SELECT listing_id,actual_url,actual_region,count(*) AS n FROM records
-    WHERE NOT detail_observation GROUP BY listing_id,actual_url,actual_region
+    WHERE NOT detail_observation AND NOT saved_observation GROUP BY listing_id,actual_url,actual_region
   ) q GROUP BY listing_id
 ), histories AS MATERIALIZED (
   SELECT o.listing_id,min(o.facebook_id) AS facebook_id,
@@ -103,8 +107,9 @@ export const LISTING_HISTORY_SQL = `WITH runs AS MATERIALIZED (
     (array_agg(o.current_vehicle_id ORDER BY o.observed_at DESC,o.capture_id DESC))[1] AS current_vehicle_id,
     min(o.observed_at) AS first_observed_at,max(o.observed_at) AS last_observed_at,
     extract(epoch FROM max(o.observed_at)-min(o.observed_at))/60 AS observed_span_minutes,
-    count(*) AS observation_count,count(*) FILTER(WHERE NOT o.detail_observation) AS search_sightings,
+    count(*) AS observation_count,count(*) FILTER(WHERE NOT o.detail_observation AND NOT o.saved_observation) AS search_sightings,
     count(*) FILTER(WHERE o.detail_observation) AS detail_observations,
+    count(*) FILTER(WHERE o.saved_observation) AS saved_observations,
     coalesce(max(q.same_query_revisits),0) AS same_query_revisits,
     count(*) FILTER(WHERE o.asking_amount IS NOT NULL AND o.prior_amount IS NOT NULL
       AND o.asking_currency IS NOT DISTINCT FROM o.prior_currency AND o.asking_amount<>o.prior_amount) AS observed_asking_changes,
@@ -113,7 +118,7 @@ export const LISTING_HISTORY_SQL = `WITH runs AS MATERIALIZED (
       'capture_acknowledged_at',o.capture_acknowledged_at,'known_by',o.known_by,
       'asking_amount',o.asking_amount,'asking_currency',o.asking_currency,
       'source_reported_listed_at',o.source_reported_listed_at,'source_reported_age_label',o.source_reported_age_label,
-      'detail_observation',o.detail_observation,'retrieval_surface',o.retrieval_surface,
+      'detail_observation',o.detail_observation,'saved_observation',o.saved_observation,'retrieval_surface',o.retrieval_surface,
       'actual_region',o.actual_region,'actual_url',o.actual_url,'target_url',o.target_url,
       'source_scope_complete',o.source_scope_complete)
       ORDER BY o.observed_at,o.capture_id,o.sighting_id) AS observations

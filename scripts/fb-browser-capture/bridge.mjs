@@ -73,6 +73,8 @@ export async function handleCommand(message, config, execute = runCli) {
     const receipts = fs.readFileSync(`${file}.prepared.json.receipts.jsonl`, 'utf8').trim().split('\n');
     const last = JSON.parse(receipts.at(-1)), receipt = last.receipt, n = packet.batch.length;
     if (last.http_status !== 200 || !receipt?.success || receipt.capture_id !== id || receipt.observed_at !== packet.capture.observed_at || receipt.counts?.errors !== 0 || receipt.counts.raw_landed !== n || receipt.counts.listings_landed !== n || receipt.counts.sightings_landed !== n) throw new Error('canonical_ack_unavailable');
+    if (packet.capture.retrieval_surface === 'chrome_mv3_rendered_saved_cards'
+      && (receipt.counts.private_source !== n || receipt.counts.linked_observations !== 0)) throw new Error('saved_private_ack_unavailable');
     const ack = { success: true, capture_id: id, observed_at: receipt.observed_at, counts: receipt.counts,
       packet_sha256: createHash('sha256').update(bytes).digest('hex'), acknowledged_at: new Date().toISOString() };
     const temp = `${ackFile}.tmp-${process.pid}`;
