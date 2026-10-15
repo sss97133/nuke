@@ -588,6 +588,8 @@ jobs:
         run: deno test supabase/functions/_shared/batChassis.test.ts
       - name: Verify batch-extract-snapshots never calls the model under no_ai, ends queue rows with no vehicle, and does not fail a row on a price or VIN the database refuses
         run: deno test --allow-read=supabase/functions/batch-extract-snapshots supabase/functions/batch-extract-snapshots/aiGate.test.ts supabase/functions/batch-extract-snapshots/writeRules.test.ts
+      - name: Verify photo-pipeline-orchestrator files a photo only through attribute_testimony and writes no upload-clock suggestion
+        run: deno test --node-modules-dir=none --allow-env supabase/functions/photo-pipeline-orchestrator/orchestrator_test.ts supabase/functions/photo-pipeline-orchestrator/persistence_test.ts
 
   sold-context-contract:
     runs-on: ubuntu-latest
