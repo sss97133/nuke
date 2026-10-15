@@ -1,5 +1,5 @@
 // Run: deno test supabase/functions/extract-gooding/
-import { buildFullDescription, fieldText, lotProse } from './goodingText.ts';
+import { buildFullDescription, fieldText, htmlToText, lotProse } from './goodingText.ts';
 
 function equal(actual: unknown, expected: unknown, what = '') {
   if (JSON.stringify(actual) !== JSON.stringify(expected)) {
@@ -38,4 +38,15 @@ Deno.test('the full description orders narrative, sections, note, then highlight
     buildFullDescription(prose, 'From the Example Collection of fine automobiles', ['Matching-Numbers Engine per Kardex', 'abc']),
     'The narrative.\n\nProvenance\nFirst owner Mr Smith.\n\nRacing history\nClass win 1966\n\nFrom the Example Collection of fine automobiles\n\nMatching-Numbers Engine per Kardex',
   );
+});
+
+Deno.test('a tag cannot be rebuilt from its pieces', () => {
+  equal(htmlToText('a<scr<script>ipt>alert(1)</scr</script>ipt>b'), 'aalert(1)b');
+  equal(htmlToText('<<b>script>x'), 'x');
+});
+
+Deno.test('entities decode once, and a tag they spell out is removed, not kept', () => {
+  equal(htmlToText('&amp;lt;script&amp;gt;'), '&lt;script&gt;');
+  equal(htmlToText('&lt;script&gt;alert(1)&lt;/script&gt; ok'), 'alert(1) ok');
+  equal(htmlToText('Ford &amp; Sons&nbsp;&#8217;s'), "Ford & Sons \u2019s");
 });
