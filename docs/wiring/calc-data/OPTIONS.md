@@ -74,19 +74,19 @@ Each cell = wires passing that layer / wires in the group. length = measured · 
 
 | group | wires | L1 plugs | L2 wire | L3 crossing | L4 ends | L5 material | crossings | length |
 |---|---|---|---|---|---|---|---|---|
-| buildable (base + decided) | 384 | 298 | 381 | 384 | 376 | 1 | 90 | m 0 · e 166 · u 26 |
-| composite (every option) | 417 | 303 | 409 | 417 | 407 | 1 | 90 | m 0 · e 173 · u 30 |
+| buildable (base + decided) | 384 | 298 | 381 | 384 | 376 | 2 | 90 | m 0 · e 181 · u 22 |
+| composite (every option) | 417 | 303 | 409 | 417 | 407 | 2 | 90 | m 0 · e 189 · u 26 |
 
 ### By option
 
 | group | wires | L1 plugs | L2 wire | L3 crossing | L4 ends | L5 material | crossings | length |
 |---|---|---|---|---|---|---|---|---|
 | AUD | 21 | 16 | 21 | 21 | 21 | 0 | 0 | m 0 · e 10 · u 0 |
-| BASE | 352 | 278 | 349 | 352 | 344 | 1 | 90 | m 0 · e 153 · u 26 |
+| BASE | 352 | 278 | 349 | 352 | 344 | 2 | 90 | m 0 · e 168 · u 22 |
 | BFL | 2 | 0 | 2 | 2 | 2 | 0 | 0 | m 0 · e 0 · u 0 |
 | IBST-CAN | 2 | 0 | 2 | 2 | 0 | 0 | 0 | m 0 · e 0 · u 2 |
 | PL | 7 | 1 | 7 | 7 | 7 | 0 | 0 | m 0 · e 2 · u 2 |
-| PW | 14 | 4 | 12 | 14 | 14 | 0 | 0 | m 0 · e 5 · u 0 |
+| PW | 14 | 4 | 12 | 14 | 14 | 0 | 0 | m 0 · e 6 · u 0 |
 | RC | 7 | 4 | 7 | 7 | 7 | 0 | 0 | m 0 · e 2 · u 0 |
 | STEPS | 4 | 0 | 4 | 4 | 4 | 0 | 0 | m 0 · e 1 · u 0 |
 | TG | 8 | 0 | 5 | 8 | 8 | 0 | 0 | m 0 · e 0 · u 0 |
@@ -95,12 +95,12 @@ Each cell = wires passing that layer / wires in the group. length = measured · 
 
 | group | wires | L1 plugs | L2 wire | L3 crossing | L4 ends | L5 material | crossings | length |
 |---|---|---|---|---|---|---|---|---|
-| body_convenience | 102 | 59 | 97 | 102 | 102 | 0 | 6 | m 0 · e 38 · u 4 |
-| dash_cabin | 58 | 40 | 58 | 58 | 56 | 0 | 13 | m 0 · e 19 · u 5 |
-| engine | 133 | 128 | 130 | 133 | 128 | 1 | 52 | m 0 · e 83 · u 9 |
+| body_convenience | 102 | 59 | 97 | 102 | 102 | 0 | 6 | m 0 · e 39 · u 4 |
+| dash_cabin | 58 | 40 | 58 | 58 | 56 | 0 | 13 | m 0 · e 19 · u 2 |
+| engine | 133 | 128 | 130 | 133 | 128 | 1 | 52 | m 0 · e 98 · u 9 |
 | lighting_front | 35 | 19 | 35 | 35 | 35 | 0 | 10 | m 0 · e 9 · u 0 |
 | lighting_rear | 23 | 5 | 23 | 23 | 23 | 0 | 0 | m 0 · e 10 · u 0 |
-| power_spine | 40 | 32 | 40 | 40 | 38 | 0 | 8 | m 0 · e 3 · u 10 |
+| power_spine | 40 | 32 | 40 | 40 | 38 | 1 | 8 | m 0 · e 3 · u 9 |
 | powertrain_chassis | 22 | 17 | 22 | 22 | 21 | 0 | 1 | m 0 · e 11 · u 1 |
 | unsectioned | 4 | 3 | 4 | 4 | 4 | 0 | 0 | m 0 · e 0 · u 1 |
 
@@ -132,36 +132,36 @@ Each cell = wires passing that layer / wires in the group. length = measured · 
 
 | item | need ft | in carts ft | on hand ft | status |
 |---|---|---|---|---|
-| M22759/16 22 AWG brown | 39.7 | 0 | not recorded | short by 39.7 ft |
-| M22759/16 22 AWG brown/black | 25.3 | 0 | not recorded | short by 25.3 ft |
+| M22759/16 22 AWG brown | 34.2 | 0 | not recorded | short by 34.2 ft |
+| M22759/16 22 AWG brown/black | 21.2 | 0 | not recorded | short by 21.2 ft |
 | M22759/16 22 AWG red | 213.6 | 0 | not recorded | short by 213.6 ft |
-| M22759/16 22 AWG orange | 32.6 | 0 | not recorded | short by 32.6 ft |
+| M22759/16 22 AWG orange | 25.4 | 0 | not recorded | short by 25.4 ft |
 | M22759/16 22 AWG orange/black | 4.0 | 0 | not recorded | short by 4.0 ft |
-| M22759/16 22 AWG yellow | 8.5 | 0 | not recorded | short by 8.5 ft; also UTC_CANH (length not measured yet) |
+| M22759/16 22 AWG yellow | 7.0 | 0 | not recorded | short by 7.0 ft; also UTC_CANH (length not measured yet) |
 | M22759/16 22 AWG yellow/brown | 5.9 | 0 | not recorded | short by 5.9 ft |
-| M22759/16 22 AWG yellow/red | 6.0 | 0 | not recorded | short by 6.0 ft |
-| M22759/16 22 AWG yellow/orange | 9.0 | 0 | not recorded | short by 9.0 ft |
+| M22759/16 22 AWG yellow/red | 5.5 | 0 | not recorded | short by 5.5 ft |
+| M22759/16 22 AWG yellow/orange | 7.0 | 0 | not recorded | short by 7.0 ft |
 | M22759/16 22 AWG yellow/blue | 9.2 | 0 | not recorded | short by 9.2 ft |
-| M22759/16 22 AWG green | 29.3 | 0 | not recorded | short by 29.3 ft; also UTC_CANL (length not measured yet) |
-| M22759/16 22 AWG green/brown | 6.5 | 0 | not recorded | short by 6.5 ft |
-| M22759/16 22 AWG green/red | 8.2 | 0 | not recorded | short by 8.2 ft |
+| M22759/16 22 AWG green | 23.9 | 0 | not recorded | short by 23.9 ft; also UTC_CANL (length not measured yet) |
+| M22759/16 22 AWG green/brown | 5.5 | 0 | not recorded | short by 5.5 ft |
+| M22759/16 22 AWG green/red | 5.5 | 0 | not recorded | short by 5.5 ft |
 | M22759/16 22 AWG green/orange | 5.5 | 0 | not recorded | short by 5.5 ft |
 | M22759/16 22 AWG green/violet | 4.0 | 0 | not recorded | short by 4.0 ft |
 | M22759/16 22 AWG green/gray | 4.0 | 0 | not recorded | short by 4.0 ft |
 | M22759/16 22 AWG green/white | 9.2 | 0 | not recorded | short by 9.2 ft |
 | M22759/16 22 AWG gray | 39.6 | 0 | not recorded | short by 39.6 ft |
-| M22759/16 22 AWG white | 79.1 | 0 | not recorded | short by 79.1 ft |
-| M22759/16 22 AWG white/orange | 21.0 | 0 | not recorded | short by 21.0 ft |
+| M22759/16 22 AWG white | 84.8 | 0 | not recorded | short by 84.8 ft |
+| M22759/16 22 AWG white/orange | 19.8 | 0 | not recorded | short by 19.8 ft |
 | M22759/16 22 AWG white/blue | 14.6 | 0 | not recorded | short by 14.6 ft |
 | M22759/16 10 AWG black | 42.3 | 30.0 | not recorded | short by 12.3 ft |
 | M22759/16 10 AWG red | 42.3 | 30.0 | not recorded | short by 12.3 ft |
-| M22759/16 8 AWG black | 6.8 | 5.0 | not recorded | short by 1.8 ft; also G3 (length not measured yet) |
+| M22759/16 8 AWG black | 3.4 | 5.0 | not recorded | covered; also G3 (length not measured yet) |
 | M22759/16 8 AWG red | 5.1 | 30.0 | not recorded | covered |
 | M22759/16 6 AWG red | 6.3 | 0 | not recorded | short by 6.3 ft |
 | M22759/16 4 AWG black | 0 | 10.0 | not recorded | claimed by G2 — length not measured yet |
 | M22759/16 4 AWG red | 0 | 24.0 | not recorded | not claimed by this scope |
-| M22759/16 2 AWG black | 8.0 | 6.0 | not recorded | short by 2.0 ft |
-| M22759/16 2 AWG red | 42.4 | 13.0 | not recorded | short by 29.4 ft |
+| M22759/16 2 AWG black | 9.9 | 6.0 | not recorded | short by 3.9 ft |
+| M22759/16 2 AWG red | 46.5 | 13.0 | not recorded | short by 33.5 ft |
 | M22759/32 22 AWG black | 0 | 100.0 | not recorded | not claimed by this scope |
 | M22759/32 22 AWG brown | 0 | 45.0 | not recorded | not claimed by this scope |
 | M22759/32 22 AWG brown/black | 0 | 35.0 | not recorded | not claimed by this scope |
@@ -187,15 +187,15 @@ Each cell = wires passing that layer / wires in the group. length = measured · 
 | M22759/32 22 AWG white | 0 | 1000.0 | not recorded | prototype stock — Dave's method: pull one colour at max length, verify on the truck, cut last (state §2, row 'Calculate maximum distance first'); 61-pin wires white + colour rings (state 0i) |
 | M22759/32 22 AWG white/orange | 0 | 12.0 | not recorded | not claimed by this scope |
 | M22759/32 22 AWG white/yellow | 0 | 15.0 | not recorded | not claimed by this scope |
-| M22759/32 20 AWG black | 18.6 | 50.0 | not recorded | covered |
-| M22759/32 20 AWG red | 166.1 | 40.0 | not recorded | short by 126.1 ft |
+| M22759/32 20 AWG black | 17.7 | 50.0 | not recorded | covered |
+| M22759/32 20 AWG red | 166.6 | 40.0 | not recorded | short by 126.6 ft |
 | M22759/32 20 AWG yellow | 0.6 | 0 | not recorded | short by 0.6 ft; also CAN_LTCD_H (length not measured yet) |
 | M22759/32 20 AWG green | 0.4 | 0 | not recorded | short by 0.4 ft; also CAN_LTCD_L (length not measured yet) |
 | M22759/32 20 AWG green/blue | 42.3 | 0 | not recorded | short by 42.3 ft |
 | M22759/32 20 AWG gray | 48.2 | 0 | not recorded | short by 48.2 ft |
 | M22759/32 20 AWG white | 0 | 100.0 | not recorded | prototype stock — Dave's method: pull one colour at max length, verify on the truck, cut last (state §2, row 'Calculate maximum distance first'); 61-pin wires white + colour rings (state 0i) |
-| M22759/32 20 AWG white/brown | 6.5 | 10.0 | not recorded | covered |
-| M22759/32 20 AWG white/red | 6.5 | 10.0 | not recorded | covered |
+| M22759/32 20 AWG white/brown | 5.5 | 10.0 | not recorded | covered |
+| M22759/32 20 AWG white/red | 5.5 | 10.0 | not recorded | covered |
 | M22759/32 18 AWG black | 21.9 | 0 | not recorded | short by 21.9 ft |
 | M22759/32 18 AWG brown/black | 18.4 | 0 | not recorded | short by 18.4 ft |
 | M22759/32 18 AWG red | 33.2 | 40.0 | not recorded | covered |
@@ -203,16 +203,16 @@ Each cell = wires passing that layer / wires in the group. length = measured · 
 | M22759/32 18 AWG white | 0 | 100.0 | not recorded | prototype stock — Dave's method: pull one colour at max length, verify on the truck, cut last (state §2, row 'Calculate maximum distance first'); 61-pin wires white + colour rings (state 0i) |
 | M22759/32 18 AWG white/violet | 34.0 | 20.0 | not recorded | short by 14.0 ft |
 | M22759/32 16 AWG black | 14.0 | 25.0 | not recorded | covered; also LTCD_GND (length not measured yet) |
-| M22759/32 16 AWG red | 100.0 | 110.0 | not recorded | covered |
+| M22759/32 16 AWG red | 97.5 | 110.0 | not recorded | covered |
 | M22759/32 16 AWG violet | 42.3 | 50.0 | not recorded | covered |
 | M22759/32 16 AWG white | 0 | 250.0 | not recorded | prototype stock — Dave's method: pull one colour at max length, verify on the truck, cut last (state §2, row 'Calculate maximum distance first'); 61-pin wires white + colour rings (state 0i) |
 | M22759/32 16 AWG white/violet | 42.3 | 50.0 | not recorded | covered |
 | M22759/32 14 AWG black | 21.2 | 0 | not recorded | short by 21.2 ft |
-| M22759/32 14 AWG red | 43.7 | 12.0 | not recorded | short by 31.7 ft |
+| M22759/32 14 AWG red | 42.8 | 12.0 | not recorded | short by 30.8 ft |
 | M22759/32 14 AWG white | 0 | 50.0 | not recorded | prototype stock — Dave's method: pull one colour at max length, verify on the truck, cut last (state §2, row 'Calculate maximum distance first'); 61-pin wires white + colour rings (state 0i) |
 | M22759/32 12 AWG red | 10.0 | 20.0 | not recorded | covered |
 | M22759/32 12 AWG white | 0 | 20.0 | not recorded | prototype stock — Dave's method: pull one colour at max length, verify on the truck, cut last (state §2, row 'Calculate maximum distance first'); 61-pin wires white + colour rings (state 0i) |
-| 22 AWG shielded 2-conductor | 29.3 | 30.0 | not recorded | covered |
+| 22 AWG shielded 2-conductor | 22.8 | 30.0 | not recorded | covered |
 
 ### What the candidates would take
 

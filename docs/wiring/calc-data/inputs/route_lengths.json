@@ -1,13 +1,13 @@
 {
- "exported_at": "2026-10-15T20:44Z",
+ "exported_at": "2026-10-15T23:53Z",
  "source": "live route graph (v_harness_route_length_check over harness_segments), vehicle e08bf694-970f-4cbe-8a74-8715158a0f2e",
  "wires": {
   "10": {
-   "route_in": 10.9,
-   "branches": 2,
+   "route_in": 45.9,
+   "branches": 5,
    "segments": 2,
-   "routed": 1,
-   "complete": false,
+   "routed": 2,
+   "complete": true,
    "chain": [
     "M130-A",
     "FIREWALL-CABIN",
@@ -15,7 +15,7 @@
    ]
   },
   "100": {
-   "route_in": 74.2,
+   "route_in": 72.8,
    "branches": 5,
    "segments": 2,
    "routed": 2,
@@ -27,8 +27,8 @@
    ]
   },
   "101": {
-   "route_in": 67.5,
-   "branches": 6,
+   "route_in": 51.5,
+   "branches": 4,
    "segments": 2,
    "routed": 2,
    "complete": true,
@@ -39,8 +39,8 @@
    ]
   },
   "101g": {
-   "route_in": 67.5,
-   "branches": 6,
+   "route_in": 51.5,
+   "branches": 4,
    "segments": 2,
    "routed": 2,
    "complete": true,
@@ -51,8 +51,8 @@
    ]
   },
   "101r": {
-   "route_in": 67.5,
-   "branches": 6,
+   "route_in": 51.5,
+   "branches": 4,
    "segments": 2,
    "routed": 2,
    "complete": true,
@@ -71,8 +71,8 @@
    "chain": null
   },
   "102": {
-   "route_in": 92.9,
-   "branches": 8,
+   "route_in": 42.0,
+   "branches": 4,
    "segments": 2,
    "routed": 2,
    "complete": true,
@@ -83,8 +83,8 @@
    ]
   },
   "102g": {
-   "route_in": 92.9,
-   "branches": 8,
+   "route_in": 42.0,
+   "branches": 4,
    "segments": 2,
    "routed": 2,
    "complete": true,
@@ -95,8 +95,8 @@
    ]
   },
   "102r": {
-   "route_in": 92.9,
-   "branches": 8,
+   "route_in": 42.0,
+   "branches": 4,
    "segments": 2,
    "routed": 2,
    "complete": true,
@@ -107,8 +107,8 @@
    ]
   },
   "103": {
-   "route_in": 64.7,
-   "branches": 6,
+   "route_in": 31.2,
+   "branches": 4,
    "segments": 2,
    "routed": 2,
    "complete": true,
@@ -119,8 +119,8 @@
    ]
   },
   "103g": {
-   "route_in": 64.7,
-   "branches": 6,
+   "route_in": 31.2,
+   "branches": 4,
    "segments": 2,
    "routed": 2,
    "complete": true,
@@ -139,8 +139,8 @@
    "chain": null
   },
   "104": {
-   "route_in": 104.1,
-   "branches": 10,
+   "route_in": 61.8,
+   "branches": 5,
    "segments": 2,
    "routed": 2,
    "complete": true,
@@ -151,8 +151,8 @@
    ]
   },
   "104g": {
-   "route_in": 104.1,
-   "branches": 10,
+   "route_in": 61.8,
+   "branches": 5,
    "segments": 2,
    "routed": 2,
    "complete": true,
@@ -182,8 +182,8 @@
    ]
   },
   "108": {
-   "route_in": 80.5,
-   "branches": 7,
+   "route_in": 41.9,
+   "branches": 4,
    "segments": 2,
    "routed": 2,
    "complete": true,
@@ -194,8 +194,8 @@
    ]
   },
   "108g": {
-   "route_in": 80.5,
-   "branches": 7,
+   "route_in": 41.9,
+   "branches": 4,
    "segments": 2,
    "routed": 2,
    "complete": true,
@@ -206,8 +206,8 @@
    ]
   },
   "108r": {
-   "route_in": 80.5,
-   "branches": 7,
+   "route_in": 41.9,
+   "branches": 4,
    "segments": 2,
    "routed": 2,
    "complete": true,
@@ -242,11 +242,11 @@
    ]
   },
   "11": {
-   "route_in": 10.9,
-   "branches": 2,
+   "route_in": 41.6,
+   "branches": 4,
    "segments": 2,
-   "routed": 1,
-   "complete": false,
+   "routed": 2,
+   "complete": true,
    "chain": [
     "M130-A",
     "FIREWALL-CABIN",
@@ -254,8 +254,8 @@
    ]
   },
   "110": {
-   "route_in": 59.9,
-   "branches": 6,
+   "route_in": 46.3,
+   "branches": 4,
    "segments": 2,
    "routed": 2,
    "complete": true,
@@ -266,8 +266,8 @@
    ]
   },
   "110g": {
-   "route_in": 59.9,
-   "branches": 6,
+   "route_in": 46.3,
+   "branches": 4,
    "segments": 2,
    "routed": 2,
    "complete": true,
@@ -325,8 +325,8 @@
    ]
   },
   "113": {
-   "route_in": 89.2,
-   "branches": 6,
+   "route_in": 68.6,
+   "branches": 5,
    "segments": 2,
    "routed": 2,
    "complete": true,
@@ -337,8 +337,8 @@
    ]
   },
   "113g": {
-   "route_in": 89.2,
-   "branches": 6,
+   "route_in": 68.6,
+   "branches": 5,
    "segments": 2,
    "routed": 2,
    "complete": true,
@@ -349,11 +349,11 @@
    ]
   },
   "114": {
-   "route_in": 14.7,
-   "branches": 3,
+   "route_in": 56.4,
+   "branches": 6,
    "segments": 2,
-   "routed": 1,
-   "complete": false,
+   "routed": 2,
+   "complete": true,
    "chain": [
     "DAK-CTS",
     "FIREWALL-CABIN",
@@ -361,11 +361,11 @@
    ]
   },
   "115": {
-   "route_in": 14.7,
-   "branches": 3,
+   "route_in": 47.1,
+   "branches": 6,
    "segments": 2,
-   "routed": 1,
-   "complete": false,
+   "routed": 2,
+   "complete": true,
    "chain": [
     "DAK-OILP",
     "FIREWALL-CABIN",
@@ -395,7 +395,7 @@
    ]
   },
   "119": {
-   "route_in": 22.3,
+   "route_in": 21.7,
    "branches": 3,
    "segments": 1,
    "routed": 1,
@@ -406,11 +406,11 @@
    ]
   },
   "12": {
-   "route_in": 10.9,
-   "branches": 2,
+   "route_in": 43.3,
+   "branches": 4,
    "segments": 2,
-   "routed": 1,
-   "complete": false,
+   "routed": 2,
+   "complete": true,
    "chain": [
     "M130-A",
     "FIREWALL-CABIN",
@@ -418,7 +418,7 @@
    ]
   },
   "120": {
-   "route_in": 22.3,
+   "route_in": 21.7,
    "branches": 3,
    "segments": 1,
    "routed": 1,
@@ -440,7 +440,7 @@
    ]
   },
   "123": {
-   "route_in": 28.2,
+   "route_in": 27.6,
    "branches": 4,
    "segments": 1,
    "routed": 1,
@@ -451,7 +451,7 @@
    ]
   },
   "13": {
-   "route_in": 55.9,
+   "route_in": 56.5,
    "branches": 6,
    "segments": 2,
    "routed": 2,
@@ -463,8 +463,8 @@
    ]
   },
   "14": {
-   "route_in": 68.9,
-   "branches": 8,
+   "route_in": 62.1,
+   "branches": 7,
    "segments": 2,
    "routed": 2,
    "complete": true,
@@ -475,7 +475,7 @@
    ]
   },
   "15": {
-   "route_in": 49.1,
+   "route_in": 48.4,
    "branches": 5,
    "segments": 2,
    "routed": 2,
@@ -487,8 +487,8 @@
    ]
   },
   "16": {
-   "route_in": 62.1,
-   "branches": 7,
+   "route_in": 59.7,
+   "branches": 6,
    "segments": 2,
    "routed": 2,
    "complete": true,
@@ -499,8 +499,8 @@
    ]
   },
   "17": {
-   "route_in": 55.9,
-   "branches": 6,
+   "route_in": 40.8,
+   "branches": 4,
    "segments": 2,
    "routed": 2,
    "complete": true,
@@ -511,8 +511,8 @@
    ]
   },
   "18": {
-   "route_in": 68.9,
-   "branches": 8,
+   "route_in": 51.7,
+   "branches": 5,
    "segments": 2,
    "routed": 2,
    "complete": true,
@@ -523,8 +523,8 @@
    ]
   },
   "19": {
-   "route_in": 62.6,
-   "branches": 7,
+   "route_in": 32.7,
+   "branches": 3,
    "segments": 2,
    "routed": 2,
    "complete": true,
@@ -535,8 +535,8 @@
    ]
   },
   "20": {
-   "route_in": 75.6,
-   "branches": 9,
+   "route_in": 43.6,
+   "branches": 4,
    "segments": 2,
    "routed": 2,
    "complete": true,
@@ -569,11 +569,11 @@
    ]
   },
   "24": {
-   "route_in": 10.9,
-   "branches": 2,
+   "route_in": 45.9,
+   "branches": 5,
    "segments": 2,
-   "routed": 1,
-   "complete": false,
+   "routed": 2,
+   "complete": true,
    "chain": [
     "M130-A",
     "FIREWALL-CABIN",
@@ -673,8 +673,8 @@
    ]
   },
   "3": {
-   "route_in": 111.6,
-   "branches": 10,
+   "route_in": 106.1,
+   "branches": 12,
    "segments": 1,
    "routed": 1,
    "complete": true,
@@ -750,8 +750,8 @@
    ]
   },
   "33": {
-   "route_in": 19.0,
-   "branches": 3,
+   "route_in": 9.1,
+   "branches": 2,
    "segments": 1,
    "routed": 1,
    "complete": true,
@@ -761,8 +761,8 @@
    ]
   },
   "34": {
-   "route_in": 64.8,
-   "branches": 6,
+   "route_in": 52.6,
+   "branches": 5,
    "segments": 2,
    "routed": 2,
    "complete": true,
@@ -773,8 +773,8 @@
    ]
   },
   "35": {
-   "route_in": 92.4,
-   "branches": 10,
+   "route_in": 80.6,
+   "branches": 9,
    "segments": 2,
    "routed": 2,
    "complete": true,
@@ -785,8 +785,8 @@
    ]
   },
   "38": {
-   "route_in": 64.8,
-   "branches": 6,
+   "route_in": 52.6,
+   "branches": 5,
    "segments": 2,
    "routed": 2,
    "complete": true,
@@ -797,7 +797,7 @@
    ]
   },
   "39": {
-   "route_in": 22.3,
+   "route_in": 21.7,
    "branches": 3,
    "segments": 1,
    "routed": 1,
@@ -841,7 +841,7 @@
    ]
   },
   "46": {
-   "route_in": 22.4,
+   "route_in": 21.8,
    "branches": 4,
    "segments": 1,
    "routed": 1,
@@ -876,8 +876,8 @@
    ]
   },
   "4a": {
-   "route_in": 64.6,
-   "branches": 6,
+   "route_in": 53.3,
+   "branches": 4,
    "segments": 2,
    "routed": 2,
    "complete": true,
@@ -888,8 +888,8 @@
    ]
   },
   "4b": {
-   "route_in": 64.6,
-   "branches": 6,
+   "route_in": 53.3,
+   "branches": 4,
    "segments": 2,
    "routed": 2,
    "complete": true,
@@ -900,8 +900,8 @@
    ]
   },
   "4c": {
-   "route_in": 64.6,
-   "branches": 6,
+   "route_in": 53.3,
+   "branches": 4,
    "segments": 2,
    "routed": 2,
    "complete": true,
@@ -912,8 +912,8 @@
    ]
   },
   "4e": {
-   "route_in": 64.6,
-   "branches": 6,
+   "route_in": 53.3,
+   "branches": 4,
    "segments": 2,
    "routed": 2,
    "complete": true,
@@ -924,8 +924,8 @@
    ]
   },
   "4f": {
-   "route_in": 64.6,
-   "branches": 6,
+   "route_in": 53.3,
+   "branches": 4,
    "segments": 2,
    "routed": 2,
    "complete": true,
@@ -936,11 +936,11 @@
    ]
   },
   "5": {
-   "route_in": 10.9,
-   "branches": 2,
+   "route_in": 44.9,
+   "branches": 5,
    "segments": 2,
-   "routed": 1,
-   "complete": false,
+   "routed": 2,
+   "complete": true,
    "chain": [
     "M130-A",
     "FIREWALL-CABIN",
@@ -1014,9 +1014,31 @@
     "DAKOTA-VHX"
    ]
   },
+  "59": {
+   "route_in": 58.8,
+   "branches": 8,
+   "segments": 1,
+   "routed": 1,
+   "complete": true,
+   "chain": [
+    "ALT-BPLUS",
+    "DIST-STUD"
+   ]
+  },
+  "6": {
+   "route_in": 45.5,
+   "branches": 6,
+   "segments": 1,
+   "routed": 1,
+   "complete": true,
+   "chain": [
+    "DIST-STUD",
+    "STARTER-BPLUS"
+   ]
+  },
   "66": {
-   "route_in": 191.1,
-   "branches": 11,
+   "route_in": 189.0,
+   "branches": 10,
    "segments": 1,
    "routed": 1,
    "complete": true,
@@ -1059,11 +1081,11 @@
    ]
   },
   "7": {
-   "route_in": 10.9,
-   "branches": 2,
+   "route_in": 43.3,
+   "branches": 4,
    "segments": 2,
-   "routed": 1,
-   "complete": false,
+   "routed": 2,
+   "complete": true,
    "chain": [
     "M130-A",
     "FIREWALL-CABIN",
@@ -1082,7 +1104,7 @@
    ]
   },
   "71": {
-   "route_in": 22.3,
+   "route_in": 21.7,
    "branches": 3,
    "segments": 1,
    "routed": 1,
@@ -1182,11 +1204,11 @@
    ]
   },
   "8": {
-   "route_in": 10.9,
-   "branches": 2,
+   "route_in": 41.6,
+   "branches": 4,
    "segments": 2,
-   "routed": 1,
-   "complete": false,
+   "routed": 2,
+   "complete": true,
    "chain": [
     "M130-A",
     "FIREWALL-CABIN",
@@ -1358,11 +1380,11 @@
    ]
   },
   "9": {
-   "route_in": 10.9,
-   "branches": 2,
+   "route_in": 44.9,
+   "branches": 5,
    "segments": 2,
-   "routed": 1,
-   "complete": false,
+   "routed": 2,
+   "complete": true,
    "chain": [
     "M130-A",
     "FIREWALL-CABIN",
@@ -1436,11 +1458,11 @@
    ]
   },
   "99": {
-   "route_in": 10.9,
-   "branches": 2,
+   "route_in": 55.1,
+   "branches": 5,
    "segments": 2,
-   "routed": 1,
-   "complete": false,
+   "routed": 2,
+   "complete": true,
    "chain": [
     "M130-B",
     "FIREWALL-CABIN",
@@ -1448,11 +1470,11 @@
    ]
   },
   "99g": {
-   "route_in": 10.9,
-   "branches": 2,
+   "route_in": 55.1,
+   "branches": 5,
    "segments": 2,
-   "routed": 1,
-   "complete": false,
+   "routed": 2,
+   "complete": true,
    "chain": [
     "SPL-M130-B-B15",
     "FIREWALL-CABIN",
@@ -1460,11 +1482,11 @@
    ]
   },
   "99r": {
-   "route_in": 10.9,
-   "branches": 2,
+   "route_in": 55.1,
+   "branches": 5,
    "segments": 2,
-   "routed": 1,
-   "complete": false,
+   "routed": 2,
+   "complete": true,
    "chain": [
     "SPL-M130-B-B19",
     "FIREWALL-CABIN",
@@ -1510,6 +1532,17 @@
    "chain": [
     "SPL-PDM15-A-A28",
     "AC-LP-SW"
+   ]
+  },
+  "ALT_L": {
+   "route_in": 56.9,
+   "branches": 5,
+   "segments": 1,
+   "routed": 1,
+   "complete": true,
+   "chain": [
+    "PDM15-A",
+    "ALTERNATOR-SENSE"
    ]
   },
   "AMP_GND": {
@@ -1693,8 +1726,8 @@
    ]
   },
   "BLOWER_MOT": {
-   "route_in": 17.4,
-   "branches": 2,
+   "route_in": 7.6,
+   "branches": 1,
    "segments": 1,
    "routed": 1,
    "complete": true,
@@ -1770,8 +1803,8 @@
    ]
   },
   "CAN_FW_H": {
-   "route_in": 88.2,
-   "branches": 10,
+   "route_in": 73.0,
+   "branches": 7,
    "segments": 2,
    "routed": 2,
    "complete": true,
@@ -1782,8 +1815,8 @@
    ]
   },
   "CAN_FW_L": {
-   "route_in": 88.2,
-   "branches": 10,
+   "route_in": 73.0,
+   "branches": 7,
    "segments": 2,
    "routed": 2,
    "complete": true,
@@ -1794,7 +1827,7 @@
    ]
   },
   "CAN_HI": {
-   "route_in": 37.0,
+   "route_in": 35.8,
    "branches": 4,
    "segments": 2,
    "routed": 2,
@@ -1806,7 +1839,7 @@
    ]
   },
   "CAN_LO": {
-   "route_in": 37.0,
+   "route_in": 35.8,
    "branches": 4,
    "segments": 2,
    "routed": 2,
@@ -1872,9 +1905,273 @@
     "GND-BANK-CAB"
    ]
   },
+  "COIL1_GND": {
+   "route_in": 22.1,
+   "branches": 3,
+   "segments": 1,
+   "routed": 1,
+   "complete": true,
+   "chain": [
+    "COIL-1",
+    "COIL-GROUND-RINGS"
+   ]
+  },
+  "COIL1_PWR": {
+   "route_in": 4.5,
+   "branches": 1,
+   "segments": 1,
+   "routed": 1,
+   "complete": true,
+   "chain": [
+    "RAIL-COIL_PWR",
+    "COIL-1"
+   ]
+  },
+  "COIL1_SGND": {
+   "route_in": 22.1,
+   "branches": 3,
+   "segments": 1,
+   "routed": 1,
+   "complete": true,
+   "chain": [
+    "COIL-1",
+    "COIL-GROUND-RINGS"
+   ]
+  },
+  "COIL2_GND": {
+   "route_in": 21.1,
+   "branches": 3,
+   "segments": 1,
+   "routed": 1,
+   "complete": true,
+   "chain": [
+    "COIL-2",
+    "COIL-GROUND-RINGS"
+   ]
+  },
+  "COIL2_PWR": {
+   "route_in": 3.5,
+   "branches": 1,
+   "segments": 1,
+   "routed": 1,
+   "complete": true,
+   "chain": [
+    "RAIL-COIL_PWR",
+    "COIL-2"
+   ]
+  },
+  "COIL2_SGND": {
+   "route_in": 21.1,
+   "branches": 3,
+   "segments": 1,
+   "routed": 1,
+   "complete": true,
+   "chain": [
+    "COIL-2",
+    "COIL-GROUND-RINGS"
+   ]
+  },
+  "COIL3_GND": {
+   "route_in": 21.1,
+   "branches": 3,
+   "segments": 1,
+   "routed": 1,
+   "complete": true,
+   "chain": [
+    "COIL-3",
+    "COIL-GROUND-RINGS"
+   ]
+  },
+  "COIL3_PWR": {
+   "route_in": 3.5,
+   "branches": 1,
+   "segments": 1,
+   "routed": 1,
+   "complete": true,
+   "chain": [
+    "RAIL-COIL_PWR",
+    "COIL-3"
+   ]
+  },
+  "COIL3_SGND": {
+   "route_in": 21.1,
+   "branches": 3,
+   "segments": 1,
+   "routed": 1,
+   "complete": true,
+   "chain": [
+    "COIL-3",
+    "COIL-GROUND-RINGS"
+   ]
+  },
+  "COIL4_GND": {
+   "route_in": 22.1,
+   "branches": 3,
+   "segments": 1,
+   "routed": 1,
+   "complete": true,
+   "chain": [
+    "COIL-4",
+    "COIL-GROUND-RINGS"
+   ]
+  },
+  "COIL4_PWR": {
+   "route_in": 4.5,
+   "branches": 1,
+   "segments": 1,
+   "routed": 1,
+   "complete": true,
+   "chain": [
+    "RAIL-COIL_PWR",
+    "COIL-4"
+   ]
+  },
+  "COIL4_SGND": {
+   "route_in": 22.1,
+   "branches": 3,
+   "segments": 1,
+   "routed": 1,
+   "complete": true,
+   "chain": [
+    "COIL-4",
+    "COIL-GROUND-RINGS"
+   ]
+  },
+  "COIL5_GND": {
+   "route_in": 19.5,
+   "branches": 2,
+   "segments": 1,
+   "routed": 1,
+   "complete": true,
+   "chain": [
+    "COIL-5",
+    "COIL-GROUND-RINGS"
+   ]
+  },
+  "COIL5_PWR": {
+   "route_in": 7.4,
+   "branches": 1,
+   "segments": 1,
+   "routed": 1,
+   "complete": true,
+   "chain": [
+    "RAIL-COIL_PWR",
+    "COIL-5"
+   ]
+  },
+  "COIL5_SGND": {
+   "route_in": 19.5,
+   "branches": 2,
+   "segments": 1,
+   "routed": 1,
+   "complete": true,
+   "chain": [
+    "COIL-5",
+    "COIL-GROUND-RINGS"
+   ]
+  },
+  "COIL6_GND": {
+   "route_in": 17.8,
+   "branches": 2,
+   "segments": 1,
+   "routed": 1,
+   "complete": true,
+   "chain": [
+    "COIL-6",
+    "COIL-GROUND-RINGS"
+   ]
+  },
+  "COIL6_PWR": {
+   "route_in": 2.9,
+   "branches": 1,
+   "segments": 1,
+   "routed": 1,
+   "complete": true,
+   "chain": [
+    "RAIL-COIL_PWR",
+    "COIL-6"
+   ]
+  },
+  "COIL6_SGND": {
+   "route_in": 17.8,
+   "branches": 2,
+   "segments": 1,
+   "routed": 1,
+   "complete": true,
+   "chain": [
+    "COIL-6",
+    "COIL-GROUND-RINGS"
+   ]
+  },
+  "COIL7_GND": {
+   "route_in": 17.8,
+   "branches": 2,
+   "segments": 1,
+   "routed": 1,
+   "complete": true,
+   "chain": [
+    "COIL-7",
+    "COIL-GROUND-RINGS"
+   ]
+  },
+  "COIL7_PWR": {
+   "route_in": 2.9,
+   "branches": 1,
+   "segments": 1,
+   "routed": 1,
+   "complete": true,
+   "chain": [
+    "RAIL-COIL_PWR",
+    "COIL-7"
+   ]
+  },
+  "COIL7_SGND": {
+   "route_in": 17.8,
+   "branches": 2,
+   "segments": 1,
+   "routed": 1,
+   "complete": true,
+   "chain": [
+    "COIL-7",
+    "COIL-GROUND-RINGS"
+   ]
+  },
+  "COIL8_GND": {
+   "route_in": 19.5,
+   "branches": 2,
+   "segments": 1,
+   "routed": 1,
+   "complete": true,
+   "chain": [
+    "COIL-8",
+    "COIL-GROUND-RINGS"
+   ]
+  },
+  "COIL8_PWR": {
+   "route_in": 7.4,
+   "branches": 1,
+   "segments": 1,
+   "routed": 1,
+   "complete": true,
+   "chain": [
+    "RAIL-COIL_PWR",
+    "COIL-8"
+   ]
+  },
+  "COIL8_SGND": {
+   "route_in": 19.5,
+   "branches": 2,
+   "segments": 1,
+   "routed": 1,
+   "complete": true,
+   "chain": [
+    "COIL-8",
+    "COIL-GROUND-RINGS"
+   ]
+  },
   "COIL_PWR": {
-   "route_in": 61.6,
-   "branches": 5,
+   "route_in": 27.5,
+   "branches": 3,
    "segments": 1,
    "routed": 1,
    "complete": true,
@@ -1906,7 +2203,7 @@
    ]
   },
   "DAK_CONST": {
-   "route_in": 22.3,
+   "route_in": 21.7,
    "branches": 3,
    "segments": 1,
    "routed": 1,
@@ -1917,11 +2214,11 @@
    ]
   },
   "DAK_CTS_RET": {
-   "route_in": 14.7,
-   "branches": 3,
+   "route_in": 56.4,
+   "branches": 6,
    "segments": 2,
-   "routed": 1,
-   "complete": false,
+   "routed": 2,
+   "complete": true,
    "chain": [
     "DAKOTA-VHX",
     "FIREWALL-CABIN",
@@ -1929,7 +2226,7 @@
    ]
   },
   "DAK_GEAR": {
-   "route_in": 32.9,
+   "route_in": 32.3,
    "branches": 5,
    "segments": 1,
    "routed": 1,
@@ -1940,11 +2237,11 @@
    ]
   },
   "DAK_OILP_5V": {
-   "route_in": 14.7,
-   "branches": 3,
+   "route_in": 47.1,
+   "branches": 6,
    "segments": 2,
-   "routed": 1,
-   "complete": false,
+   "routed": 2,
+   "complete": true,
    "chain": [
     "DAKOTA-VHX",
     "FIREWALL-CABIN",
@@ -1952,11 +2249,11 @@
    ]
   },
   "DAK_OILP_GND": {
-   "route_in": 14.7,
-   "branches": 3,
+   "route_in": 47.1,
+   "branches": 6,
    "segments": 2,
-   "routed": 1,
-   "complete": false,
+   "routed": 2,
+   "complete": true,
    "chain": [
     "DAKOTA-VHX",
     "FIREWALL-CABIN",
@@ -2007,8 +2304,30 @@
     "GND-BANK-CAB"
    ]
   },
+  "ECU_GND1": {
+   "route_in": 47.4,
+   "branches": 4,
+   "segments": 1,
+   "routed": 1,
+   "complete": true,
+   "chain": [
+    "M130-A",
+    "COIL-GROUND-RINGS"
+   ]
+  },
+  "ECU_GND2": {
+   "route_in": 47.4,
+   "branches": 4,
+   "segments": 1,
+   "routed": 1,
+   "complete": true,
+   "chain": [
+    "M130-A",
+    "COIL-GROUND-RINGS"
+   ]
+  },
   "ECU_PWR": {
-   "route_in": 18.5,
+   "route_in": 17.9,
    "branches": 2,
    "segments": 1,
    "routed": 1,
@@ -2041,8 +2360,8 @@
    ]
   },
   "FAN_GND": {
-   "route_in": 70.2,
-   "branches": 9,
+   "route_in": 34.9,
+   "branches": 1,
    "segments": 1,
    "routed": 1,
    "complete": true,
@@ -2118,6 +2437,17 @@
     "GND-BANK-CAB"
    ]
   },
+  "G1": {
+   "route_in": 51.6,
+   "branches": 7,
+   "segments": 1,
+   "routed": 1,
+   "complete": true,
+   "chain": [
+    "GND-BANK-ENG",
+    "GND-BLOCK"
+   ]
+  },
   "GND_RET_REAR": {
    "route_in": 117.1,
    "branches": 6,
@@ -2152,8 +2482,8 @@
    ]
   },
   "GSS_SENS_B": {
-   "route_in": 65.5,
-   "branches": 6,
+   "route_in": 27.5,
+   "branches": 2,
    "segments": 1,
    "routed": 1,
    "complete": true,
@@ -2163,8 +2493,8 @@
    ]
   },
   "GSS_SENS_G": {
-   "route_in": 65.5,
-   "branches": 6,
+   "route_in": 27.5,
+   "branches": 2,
    "segments": 1,
    "routed": 1,
    "complete": true,
@@ -2174,8 +2504,8 @@
    ]
   },
   "GSS_SENS_R": {
-   "route_in": 65.5,
-   "branches": 6,
+   "route_in": 27.5,
+   "branches": 2,
    "segments": 1,
    "routed": 1,
    "complete": true,
@@ -2207,7 +2537,7 @@
    ]
   },
   "HL_SW_0V": {
-   "route_in": 22.4,
+   "route_in": 21.8,
    "branches": 4,
    "segments": 1,
    "routed": 1,
@@ -2218,7 +2548,7 @@
    ]
   },
   "HL_SW_HEAD": {
-   "route_in": 22.4,
+   "route_in": 21.8,
    "branches": 4,
    "segments": 1,
    "routed": 1,
@@ -2229,7 +2559,7 @@
    ]
   },
   "HL_SW_PARK": {
-   "route_in": 22.4,
+   "route_in": 21.8,
    "branches": 4,
    "segments": 1,
    "routed": 1,
@@ -2251,8 +2581,8 @@
    ]
   },
   "HORN_SW": {
-   "route_in": 19.0,
-   "branches": 3,
+   "route_in": 9.1,
+   "branches": 2,
    "segments": 1,
    "routed": 1,
    "complete": true,
@@ -2307,8 +2637,8 @@
    ]
   },
   "IGN_RUN_B": {
-   "route_in": 18.9,
-   "branches": 2,
+   "route_in": 9.0,
+   "branches": 1,
    "segments": 1,
    "routed": 1,
    "complete": true,
@@ -2318,8 +2648,8 @@
    ]
   },
   "IGN_START": {
-   "route_in": 18.9,
-   "branches": 2,
+   "route_in": 9.0,
+   "branches": 1,
    "segments": 1,
    "routed": 1,
    "complete": true,
@@ -2329,8 +2659,8 @@
    ]
   },
   "IGN_SW_0V": {
-   "route_in": 18.9,
-   "branches": 2,
+   "route_in": 9.0,
+   "branches": 1,
    "segments": 1,
    "routed": 1,
    "complete": true,
@@ -2340,8 +2670,8 @@
    ]
   },
   "INJ1_PWR": {
-   "route_in": 13.3,
-   "branches": 2,
+   "route_in": 6.6,
+   "branches": 1,
    "segments": 1,
    "routed": 1,
    "complete": true,
@@ -2351,8 +2681,8 @@
    ]
   },
   "INJ2_PWR": {
-   "route_in": 13.3,
-   "branches": 2,
+   "route_in": 7.7,
+   "branches": 1,
    "segments": 1,
    "routed": 1,
    "complete": true,
@@ -2362,7 +2692,7 @@
    ]
   },
   "INJ3_PWR": {
-   "route_in": 6.5,
+   "route_in": 6.0,
    "branches": 1,
    "segments": 1,
    "routed": 1,
@@ -2373,7 +2703,7 @@
    ]
   },
   "INJ4_PWR": {
-   "route_in": 6.5,
+   "route_in": 6.2,
    "branches": 1,
    "segments": 1,
    "routed": 1,
@@ -2384,7 +2714,7 @@
    ]
   },
   "INJ5_PWR": {
-   "route_in": 13.3,
+   "route_in": 14.0,
    "branches": 2,
    "segments": 1,
    "routed": 1,
@@ -2395,7 +2725,7 @@
    ]
   },
   "INJ6_PWR": {
-   "route_in": 13.3,
+   "route_in": 14.2,
    "branches": 2,
    "segments": 1,
    "routed": 1,
@@ -2406,7 +2736,7 @@
    ]
   },
   "INJ7_PWR": {
-   "route_in": 20.0,
+   "route_in": 22.1,
    "branches": 3,
    "segments": 1,
    "routed": 1,
@@ -2417,7 +2747,7 @@
    ]
   },
   "INJ8_PWR": {
-   "route_in": 20.0,
+   "route_in": 22.3,
    "branches": 3,
    "segments": 1,
    "routed": 1,
@@ -2428,7 +2758,7 @@
    ]
   },
   "INJ_PWR": {
-   "route_in": 28.5,
+   "route_in": 27.7,
    "branches": 4,
    "segments": 1,
    "routed": 1,
@@ -2439,8 +2769,8 @@
    ]
   },
   "ISO_CLOSE": {
-   "route_in": 104.5,
-   "branches": 13,
+   "route_in": 99.0,
+   "branches": 15,
    "segments": 2,
    "routed": 2,
    "complete": true,
@@ -2462,8 +2792,8 @@
    ]
   },
   "ISO_KILL": {
-   "route_in": 22.6,
-   "branches": 3,
+   "route_in": 13.8,
+   "branches": 1,
    "segments": 1,
    "routed": 1,
    "complete": true,
@@ -2473,8 +2803,8 @@
    ]
   },
   "ISO_LED": {
-   "route_in": 104.5,
-   "branches": 13,
+   "route_in": 99.0,
+   "branches": 15,
    "segments": 2,
    "routed": 2,
    "complete": true,
@@ -2485,8 +2815,8 @@
    ]
   },
   "ISO_OPEN": {
-   "route_in": 104.5,
-   "branches": 13,
+   "route_in": 99.0,
+   "branches": 15,
    "segments": 2,
    "routed": 2,
    "complete": true,
@@ -2508,8 +2838,8 @@
    ]
   },
   "ISO_SW_PWR": {
-   "route_in": 102.3,
-   "branches": 11,
+   "route_in": 96.4,
+   "branches": 14,
    "segments": 2,
    "routed": 2,
    "complete": true,
@@ -2531,8 +2861,8 @@
    ]
   },
   "LOCK_BUS_A": {
-   "route_in": 345.3,
-   "branches": 30,
+   "route_in": 321.3,
+   "branches": 28,
    "segments": 5,
    "routed": 5,
    "complete": true,
@@ -2546,8 +2876,8 @@
    ]
   },
   "LOCK_BUS_B": {
-   "route_in": 345.3,
-   "branches": 30,
+   "route_in": 321.3,
+   "branches": 28,
    "segments": 5,
    "routed": 5,
    "complete": true,
@@ -2561,8 +2891,8 @@
    ]
   },
   "LOCK_FEED_R": {
-   "route_in": 92.4,
-   "branches": 10,
+   "route_in": 80.6,
+   "branches": 9,
    "segments": 2,
    "routed": 2,
    "complete": true,
@@ -2573,8 +2903,8 @@
    ]
   },
   "LOCK_GND_L": {
-   "route_in": 70.7,
-   "branches": 7,
+   "route_in": 58.5,
+   "branches": 6,
    "segments": 2,
    "routed": 2,
    "complete": true,
@@ -2585,8 +2915,8 @@
    ]
   },
   "LOCK_GND_R": {
-   "route_in": 86.5,
-   "branches": 9,
+   "route_in": 74.7,
+   "branches": 8,
    "segments": 2,
    "routed": 2,
    "complete": true,
@@ -2718,8 +3048,8 @@
    ]
   },
   "PCS_IGN": {
-   "route_in": 109.2,
-   "branches": 9,
+   "route_in": 104.9,
+   "branches": 12,
    "segments": 2,
    "routed": 2,
    "complete": true,
@@ -2752,7 +3082,7 @@
    ]
   },
   "PCS_RPM": {
-   "route_in": 34.2,
+   "route_in": 33.6,
    "branches": 5,
    "segments": 1,
    "routed": 1,
@@ -2763,7 +3093,7 @@
    ]
   },
   "PCS_TPS": {
-   "route_in": 34.2,
+   "route_in": 33.6,
    "branches": 5,
    "segments": 1,
    "routed": 1,
@@ -2961,7 +3291,7 @@
    ]
   },
   "START_TRIG": {
-   "route_in": 32.4,
+   "route_in": 34.3,
    "branches": 1,
    "segments": 1,
    "routed": 1,
@@ -2994,8 +3324,8 @@
    ]
   },
   "STEP_GND": {
-   "route_in": 117.7,
-   "branches": 11,
+   "route_in": 112.2,
+   "branches": 13,
    "segments": 1,
    "routed": 1,
    "complete": true,
@@ -3005,8 +3335,8 @@
    ]
   },
   "TCASE_SW_GND": {
-   "route_in": 73.4,
-   "branches": 5,
+   "route_in": 52.6,
+   "branches": 3,
    "segments": 1,
    "routed": 1,
    "complete": true,
@@ -3204,8 +3534,8 @@
    ]
   },
   "TURN_SW_0V": {
-   "route_in": 19.0,
-   "branches": 3,
+   "route_in": 9.1,
+   "branches": 2,
    "segments": 1,
    "routed": 1,
    "complete": true,
@@ -3215,8 +3545,8 @@
    ]
   },
   "TURN_SW_R": {
-   "route_in": 19.0,
-   "branches": 3,
+   "route_in": 9.1,
+   "branches": 2,
    "segments": 1,
    "routed": 1,
    "complete": true,
@@ -3248,7 +3578,7 @@
    ]
   },
   "UTC_0V": {
-   "route_in": 18.5,
+   "route_in": 17.9,
    "branches": 2,
    "segments": 1,
    "routed": 1,
@@ -3259,7 +3589,7 @@
    ]
   },
   "VSS_DAK": {
-   "route_in": 78.0,
+   "route_in": 76.6,
    "branches": 6,
    "segments": 2,
    "routed": 2,
@@ -3271,7 +3601,7 @@
    ]
   },
   "VSS_GND": {
-   "route_in": 78.0,
+   "route_in": 76.6,
    "branches": 6,
    "segments": 2,
    "routed": 2,
@@ -3283,7 +3613,7 @@
    ]
   },
   "VSS_PWR": {
-   "route_in": 78.0,
+   "route_in": 76.6,
    "branches": 6,
    "segments": 2,
    "routed": 2,
@@ -3306,8 +3636,8 @@
    ]
   },
   "WIN_GND_L": {
-   "route_in": 70.7,
-   "branches": 7,
+   "route_in": 58.5,
+   "branches": 6,
    "segments": 2,
    "routed": 2,
    "complete": true,
@@ -3318,8 +3648,8 @@
    ]
   },
   "WIN_GND_R": {
-   "route_in": 86.5,
-   "branches": 9,
+   "route_in": 74.7,
+   "branches": 8,
    "segments": 2,
    "routed": 2,
    "complete": true,
@@ -3374,8 +3704,8 @@
    ]
   },
   "WIN_R_DN": {
-   "route_in": 157.2,
-   "branches": 16,
+   "route_in": 133.2,
+   "branches": 14,
    "segments": 3,
    "routed": 3,
    "complete": true,
@@ -3387,8 +3717,8 @@
    ]
   },
   "WIN_R_UP": {
-   "route_in": 157.2,
-   "branches": 16,
+   "route_in": 133.2,
+   "branches": 14,
    "segments": 3,
    "routed": 3,
    "complete": true,
@@ -3411,7 +3741,7 @@
    ]
   },
   "WIPER_SW_GND": {
-   "route_in": 28.3,
+   "route_in": 27.7,
    "branches": 5,
    "segments": 1,
    "routed": 1,
