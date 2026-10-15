@@ -25,6 +25,7 @@ import { qualityGate } from "../_shared/extractionQualityGate.ts";
 import { normalizeListingUrlKey } from "../_shared/listingUrl.ts";
 import { resolveExistingVehicleId, discoveryUrlIlikePattern } from "../_shared/resolveVehicleForListing.ts";
 import { writeObservation } from "../_shared/observationWriter.ts";
+import { writeVehicleEventByKey } from "../_shared/vehicleEventWrite.ts";
 import { requireWriteAuth } from "../_shared/writeGuard.ts";
 import { projectSecretKey } from "../_shared/supabaseKeys.ts";
 
@@ -544,6 +545,20 @@ interface ExtractionResult {
   image_urls: string[];
   fetch_source: string;
   cost_cents: number;
+  /** Set by the Typesense lander: the lot's own key (auctionId-lotId) and the retained source document. */
+  event_key?: string;
+  hammer_price?: number | null;
+  hammer_premium?: number | null;
+  raw_document?: unknown;
+  /** Typesense page this lot came from; the lander's cursor reads it back from vehicle_events.metadata.ts_page. */
+  ts_page?: number;
+}
+
+interface SaveOptions {
+  /** Typesense lander: resolve by exact keys only (no leading-% ILIKE scan), await the observation write. */
+  fast?: boolean;
+  observedAt?: string;
+  method?: string;
 }
 
 async function extractBonhamsLot(url: string): Promise<ExtractionResult> {
@@ -934,6 +949,7 @@ async function saveVehicle(
   supabase: ReturnType<typeof createClient>,
   extracted: ExtractionResult,
   vehicleId?: string,
+  opts: SaveOptions = {},
 ): Promise<{ vehicleId: string | null; action: string; qualityScore: number; issues: string[] }> {
   // Build the vehicle record
   let vehicleData = buildVehicleRecord(extracted);
@@ -972,7 +988,7 @@ async function saveVehicle(
       const { vehicleId: resolvedId } = await resolveExistingVehicleId(supabase, {
         url: extracted.url,
         platform: "bonhams",
-        discoveryUrlIlikePattern: discoveryUrlIlikePattern(extracted.url),
+        discoveryUrlIlikePattern: opts.fast ? null : discoveryUrlIlikePattern(extracted.url),
       });
       if (resolvedId) targetId = resolvedId;
     } catch (e: any) {
@@ -981,7 +997,8 @@ async function saveVehicle(
   }
 
   // Also check by VIN
-  if (!targetId && extracted.vin) {
+  // Fast path: a chassis number is not unique across makes, so only a full 17-character VIN may join two lots.
+  if (!targetId && extracted.vin && (!opts.fast || /^[A-HJ-NPR-Z0-9]{17}$/i.test(extracted.vin))) {
     try {
       const { data: byVin } = await supabase
         .from("vehicles")
@@ -1027,13 +1044,16 @@ async function saveVehicle(
     for (const [k, v] of Object.entries(vehicleData)) {
       if (v != null && !obsSkip.has(k)) obsFields[k] = v;
     }
-    writeObservation(supabase, {
+    const obsPromise = writeObservation(supabase, {
       vehicleId: targetId,
       source: { platform: "bonhams", url: extracted.url, trustScore: 0.9 },
       fields: obsFields,
       observationKind: extracted.sale_price ? "sale_result" : "listing",
-      extractionMethod: "json_ld_parse",
+      extractionMethod: opts.method ?? "json_ld_parse",
+      observedAt: opts.observedAt,
+      rawData: extracted.raw_document,
     }).catch((e: any) => console.warn(`[BONHAMS] observationWriter error for ${targetId}: ${e?.message}`));
+    if (opts.fast) await obsPromise;
   }
 
   // Save images (non-fatal)
@@ -1060,16 +1080,21 @@ async function saveVehicle(
   // Create vehicle_events record (non-fatal)
   try {
     const listingUrlKey = normalizeListingUrlKey(extracted.url);
-    const { error: listErr } = await supabase.from("vehicle_events").upsert({
+    const res = await writeVehicleEventByKey(supabase, {
       vehicle_id: targetId,
       source_platform: "bonhams",
       event_type: "auction",
       source_url: extracted.url,
-      source_listing_id: listingUrlKey || extracted.lot_number || extracted.sale_id,
+      source_listing_id: extracted.event_key || listingUrlKey || extracted.lot_number || extracted.sale_id,
       event_status: extracted.auction_status === "sold" ? "sold" : (extracted.auction_status === "upcoming" ? "active" : "ended"),
       ended_at: extracted.sale_date,
       final_price: extracted.sale_price,
+      starting_price: extracted.estimate_low,
       sold_at: extracted.auction_status === "sold" ? extracted.sale_date : null,
+      extracted_at: opts.observedAt ?? new Date().toISOString(),
+      extraction_method: opts.method ?? "json_ld_parse",
+      extraction_source: opts.fast ? "bonhams-typesense" : "bonhams-lot-page",
+      extractor_version: EXTRACTOR_VERSION,
       metadata: {
         lot_number: extracted.lot_number,
         sale_id: extracted.sale_id,
@@ -1078,13 +1103,16 @@ async function saveVehicle(
         estimate_low: extracted.estimate_low,
         estimate_high: extracted.estimate_high,
         estimate_currency: extracted.estimate_currency,
+        currency: extracted.price_currency,
+        hammer_price: extracted.hammer_price ?? null,
+        hammer_premium: extracted.hammer_premium ?? null,
+        ...(extracted.ts_page ? { ts_page: extracted.ts_page } : {}),
         chassis_number: extracted.chassis_number,
         quality_score: gateResult.score,
       },
-    }, { onConflict: "source_platform,source_listing_id" });
-
-    if (listErr) console.warn(`[Bonhams] Vehicle event save error (non-fatal): ${listErr.message}`);
-    else console.log("[Bonhams] Created/updated vehicle_events record");
+    });
+    if (res.action === "error") console.warn(`[Bonhams] Vehicle event save error (non-fatal): ${res.error}`);
+    else console.log(`[Bonhams] vehicle_events ${res.action}`);
   } catch (e: any) {
     console.warn(`[Bonhams] Vehicle event creation failed (non-fatal): ${e.message}`);
   }
@@ -1111,6 +1139,38 @@ Deno.serve(async (req) => {
       Deno.env.get("SUPABASE_URL")!,
       projectSecretKey()!,
     );
+
+    // ── Land lots mapped from Bonhams' own search index (extract-bonhams-typesense, mode "land") ──
+    // No page is fetched here: the caller already holds the structured documents. At most 100 lots, small concurrency,
+    // and a time budget under the 150 s edge limit.
+    if (action === "land_lots") {
+      const lots: ExtractionResult[] = Array.isArray(body.lots) ? body.lots.slice(0, 100) : [];
+      const observedAt: string | undefined = body.observed_at;
+      const results = { received: lots.length, created: 0, updated: 0, rejected: 0, failed: 0, errors: [] as string[] };
+      const started = Date.now();
+      const BUDGET_MS = 100_000;
+      let next = 0;
+      async function worker() {
+        while (next < lots.length && Date.now() - started < BUDGET_MS) {
+          const lot = lots[next++];
+          try {
+            const r = await saveVehicle(supabase, lot, undefined, { fast: true, observedAt, method: "typesense_api" });
+            if (r.action === "created") results.created++;
+            else if (r.action === "updated") results.updated++;
+            else if (r.action === "rejected") results.rejected++;
+            else results.failed++;
+          } catch (e: any) {
+            results.failed++;
+            if (results.errors.length < 5) results.errors.push(`${lot.event_key}: ${String(e?.message ?? e).slice(0, 160)}`);
+          }
+        }
+      }
+      await Promise.all([worker(), worker(), worker()]);
+      return new Response(
+        JSON.stringify({ success: true, ...results, not_attempted: lots.length - next, elapsed_ms: Date.now() - started }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      );
+    }
 
     // ── Re-enrich action ─────────────────────────────────────────────────
     if (action === "re_enrich") {

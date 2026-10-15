@@ -24,6 +24,12 @@ import "jsr:@supabase/functions-js/edge-runtime.d.ts";
  *     → Typesense discovers URLs → archiveFetch (Firecrawl) archives raw HTML/markdown
  *     → Stored in listing_page_snapshots. "Fetch once, extract forever."
  *
+ *   POST { "mode": "land", "batch_size": 100 }
+ *     → One Typesense request (sorted oldest auction first), mapped and landed through extract-bonhams
+ *       (vehicles + vehicle_events + vehicle_observations with the source document retained). The page cursor is
+ *       the last landed page, read back from vehicle_events.metadata.ts_page; it wraps to page 1 after the last page
+ *       (a revisit). Run by pg_cron job bonhams-typesense-land. At most 1 request to Bonhams per run.
+ *
  *   POST { "mode": "stats" }
  *     → Return count of available cars and import_queue overlap
  *
@@ -423,6 +429,103 @@ Deno.serve(async (req) => {
       });
     }
 
+    // ─── MODE: land ─────────────────────────────────────────────────────
+    if (mode === "land") {
+      const supabase = createClient(
+        Deno.env.get("SUPABASE_URL") ?? "",
+        projectSecretKey() ?? "",
+      );
+      const size = Math.min(Number(batch_size) || 100, 100);
+      const SORT = "auctionEndDate.timestamp:asc";
+
+      let pageNo = Number(page) > 1 ? Number(page) : 0;
+      if (!pageNo) {
+        const { data: last } = await supabase
+          .from("vehicle_events")
+          .select("metadata")
+          .eq("source_platform", "bonhams")
+          .eq("extraction_source", "bonhams-typesense")
+          .order("updated_at", { ascending: false })
+          .limit(1);
+        const lastPage = Number((last?.[0]?.metadata as Record<string, unknown> | undefined)?.ts_page);
+        pageNo = Number.isFinite(lastPage) && lastPage > 0 ? lastPage + 1 : 1;
+      }
+
+      let data: TypesenseResponse;
+      const params = new URLSearchParams({
+        q: "*", query_by: "title", per_page: String(size), page: String(pageNo),
+        filter_by: DEPARTMENT_FILTER, sort_by: SORT,
+      });
+      const res = await fetch(`${TYPESENSE_HOST}/search-proxy/collections/${TYPESENSE_COLLECTION}/documents/search?${params}`, {
+        headers: { "X-TYPESENSE-API-KEY": TYPESENSE_API_KEY, "Accept": "application/json" },
+      });
+      if (res.status === 403 || res.status === 429) {
+        // Back off: nothing more is asked of Bonhams this run; the next scheduled run tries again.
+        return okJson({ success: false, backoff: true, upstream_status: res.status, page: pageNo });
+      }
+      if (!res.ok) return okJson({ success: false, error: `Typesense HTTP ${res.status}`, page: pageNo }, 502);
+      data = await res.json() as TypesenseResponse;
+
+      const totalPages = Math.max(1, Math.ceil(data.found / size));
+      if (!data.hits?.length) {
+        // Past the end: wrap, so the next run revisits from page 1.
+        return okJson({ success: true, mode: "land", page: pageNo, landed: 0, wrapped: true, found: data.found });
+      }
+
+      const observedAt = new Date().toISOString();
+      const lots = data.hits.filter((h) => h.document?.title && h.document.title.length >= 3).map((h) => {
+        const doc = h.document;
+        const m = mapDocument(doc);
+        const raw = m.raw_data as Record<string, unknown>;
+        const hammer = doc.price?.hammerPrice > 0 ? Math.round(doc.price.hammerPrice) : null;
+        const ended = !!doc.flags?.isAuctionEnded;
+        return {
+          url: m.listing_url,
+          title: m.listing_title,
+          year: m.listing_year,
+          make: m.listing_make,
+          model: m.listing_model,
+          vin: null,
+          chassis_number: (raw.chassis as string | null) ?? null,
+          mileage: null, engine: null, transmission: null, exterior_color: null, interior_color: null, body_style: null,
+          description: (raw.description as string | null) ?? null,
+          sale_price: hammer,
+          price_currency: doc.currency?.iso_code ?? null,
+          auction_status: hammer ? "sold" : (ended ? "unsold" : "upcoming"),
+          lot_number: doc.lotNo?.full || doc.lotId || null,
+          sale_id: doc.auctionId || null,
+          sale_name: null,
+          sale_date: doc.hammerTime?.datetime || doc.auctionEndDate?.datetime || null,
+          sale_location: doc.region?.name || doc.country?.name || null,
+          estimate_low: doc.price?.estimateLow > 0 ? doc.price.estimateLow : null,
+          estimate_high: doc.price?.estimateHigh > 0 ? doc.price.estimateHigh : null,
+          estimate_currency: doc.currency?.iso_code ?? null,
+          image_urls: doc.image?.url ? [doc.image.url] : [],
+          fetch_source: "bonhams-typesense",
+          cost_cents: 0,
+          event_key: doc.id,
+          ts_page: pageNo,
+          hammer_price: hammer,
+          hammer_premium: doc.price?.hammerPremium > 0 ? Math.round(doc.price.hammerPremium) : null,
+          // The source document is retained on the observation (raw_data); the page is stamped for the cursor.
+          raw_document: { ...doc, _capture: { source: "bonhams-typesense", observed_at: observedAt, ts_page: pageNo, sort: SORT } },
+        };
+      });
+
+      const landRes = await fetch(`${Deno.env.get("SUPABASE_URL")}/functions/v1/extract-bonhams`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: req.headers.get("authorization") ?? "" },
+        body: JSON.stringify({ action: "land_lots", lots, observed_at: observedAt }),
+      });
+      const landed = await landRes.json().catch(() => ({ error: `HTTP ${landRes.status}` }));
+
+      // The cursor is metadata.ts_page on each landed vehicle_events row (set by the lander).
+      return okJson({
+        success: landRes.ok, mode: "land", page: pageNo, total_pages: totalPages, found: data.found,
+        next_page: pageNo >= totalPages ? 1 : pageNo + 1, lander: landed,
+      });
+    }
+
     // ─── MODE: search ───────────────────────────────────────────────────
     if (mode === "search") {
       const data = await searchTypesense(query, startPage, perPage, filter || undefined);
@@ -692,7 +795,7 @@ Deno.serve(async (req) => {
       });
     }
 
-    return okJson({ success: false, error: `Unknown mode: ${mode}. Use "search", "ingest", "archive", or "stats".` }, 400);
+    return okJson({ success: false, error: `Unknown mode: ${mode}. Use "search", "ingest", "archive", "land" or "stats".` }, 400);
 
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : "Unknown error";
