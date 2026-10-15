@@ -832,3 +832,17 @@ jobs:
           deno-version: v2.x
       - name: Verify reply-email sends for the service key or an active admin only, before any provider call
         run: deno test --node-modules-dir=none --allow-env --allow-net supabase/functions/_shared/writeGuard.test.ts supabase/functions/reply-email/handler.test.ts
+
+  vision-listing-read:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      - name: Setup Deno
+        uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.x
+      - name: Verify the listing photo read folds per-photo reads, stops YONO at its first failure, and caps a day's writes
+        run: deno test --node-modules-dir=none supabase/functions/api-v1-vision/listing.test.ts
+      - name: Verify /listing refuses anyone but the service key or an active admin before a read, an analyzer call or a write
+        run: deno test --no-check --allow-env supabase/functions/api-v1-vision/wire.test.ts
