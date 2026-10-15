@@ -18,6 +18,15 @@ interface Organization {
   logo_url?: string;
 }
 
+interface ExistingLink {
+  id: string;
+  status: string | null;
+  user_rejected: boolean | null;
+}
+
+// (organization, vehicle, relationship) is unique, so a pending or rejected link is confirmed in place, not re-inserted.
+const isReopenable = (link?: ExistingLink) => !!link && (link.status === 'pending' || link.user_rejected === true);
+
 const RELATIONSHIP_TYPES = [
   { value: 'owner', label: 'Owner', description: 'This organization owns the vehicle' },
   { value: 'service_provider', label: 'In for Service', description: 'Vehicle is in for service/repair here' },
@@ -46,7 +55,7 @@ const AddOrganizationRelationship: React.FC<AddOrganizationRelationshipProps> = 
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [existingRelationships, setExistingRelationships] = useState<Set<string>>(new Set());
+  const [existingRelationships, setExistingRelationships] = useState<Map<string, ExistingLink>>(new Map());
 
   useEffect(() => {
     loadOrganizations();
@@ -106,16 +115,15 @@ const AddOrganizationRelationship: React.FC<AddOrganizationRelationshipProps> = 
     try {
       const { data, error } = await supabase
         .from('organization_vehicles')
-        .select('organization_id, relationship_type')
-        .eq('vehicle_id', vehicleId)
-        .eq('status', 'active');
+        .select('id, organization_id, relationship_type, status, user_rejected')
+        .eq('vehicle_id', vehicleId);
 
       if (error) throw error;
 
-      // Create a set of "orgId:relationshipType" strings
-      const existing = new Set<string>();
+      // Every status, keyed "orgId:relationshipType": the unique key covers pending and rejected rows too
+      const existing = new Map<string, ExistingLink>();
       (data || []).forEach((ov: any) => {
-        existing.add(`${ov.organization_id}:${ov.relationship_type}`);
+        existing.set(`${ov.organization_id}:${ov.relationship_type}`, { id: ov.id, status: ov.status, user_rejected: ov.user_rejected });
       });
       setExistingRelationships(existing);
     } catch (err) {
@@ -131,7 +139,8 @@ const AddOrganizationRelationship: React.FC<AddOrganizationRelationshipProps> = 
 
     // Check if this relationship already exists
     const relationshipKey = `${selectedOrgId}:${relationshipType}`;
-    if (existingRelationships.has(relationshipKey)) {
+    const existingLink = existingRelationships.get(relationshipKey);
+    if (existingLink && !isReopenable(existingLink)) {
       setError('This relationship already exists for this vehicle');
       return;
     }
@@ -140,6 +149,35 @@ const AddOrganizationRelationship: React.FC<AddOrganizationRelationshipProps> = 
     setError(null);
 
     try {
+      if (existingLink) {
+        const now = new Date().toISOString();
+        const { data: confirmed, error: updateError } = await supabase
+          .from('organization_vehicles')
+          .update({
+            status: 'active',
+            user_rejected: false,
+            user_confirmed: true,
+            user_confirmed_by: userId,
+            user_confirmed_at: now,
+            updated_at: now,
+            // notes keeps the writer's provenance; the person's reason for confirming goes in override_notes
+            ...(notes.trim() ? { override_notes: notes.trim() } : {})
+          })
+          .eq('id', existingLink.id)
+          .select('id');
+
+        if (updateError) throw updateError;
+        // RLS filters out a row this user may not change: the update returns no error and no row.
+        if (!confirmed || confirmed.length === 0) {
+          setError('This link is already on record but not confirmed. Only the person who linked it, the vehicle owner or a manager of the organization can confirm it.');
+          return;
+        }
+
+        if (onSuccess) onSuccess();
+        onClose();
+        return;
+      }
+
       const { data, error: insertError } = await supabase
         .from('organization_vehicles')
         .insert({
@@ -178,7 +216,9 @@ const AddOrganizationRelationship: React.FC<AddOrganizationRelationshipProps> = 
 
   const selectedOrg = organizations.find(org => org.id === selectedOrgId);
   const relationshipKey = selectedOrgId ? `${selectedOrgId}:${relationshipType}` : '';
-  const alreadyExists = relationshipKey && existingRelationships.has(relationshipKey);
+  const selectedLink = relationshipKey ? existingRelationships.get(relationshipKey) : undefined;
+  const reopensLink = isReopenable(selectedLink);
+  const alreadyExists = !!selectedLink && !reopensLink;
 
   return (
     <div 
@@ -360,7 +400,7 @@ const AddOrganizationRelationship: React.FC<AddOrganizationRelationshipProps> = 
               style={{ flex: 1, fontSize: '12px' }}
               disabled={saving || !selectedOrgId || alreadyExists}
             >
-              {saving ? 'Adding...' : 'Add Relationship'}
+              {saving ? 'Adding...' : reopensLink ? 'Confirm Relationship' : 'Add Relationship'}
             </button>
           </div>
         </div>
