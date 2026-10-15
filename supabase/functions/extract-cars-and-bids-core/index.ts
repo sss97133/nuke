@@ -994,9 +994,10 @@ Deno.serve(async (req) => {
       console.log(`✅ C&B: First image row: ${JSON.stringify(imageRows[0])}`);
 
       // Exact-URL guard on top of the photo-key filter above: one row per URL per vehicle.
-      const { data: insertedImages, error: imgError } = imageRows.length
+      const { data: insertedImages, error: imgErrorRaw } = imageRows.length
         ? await insertMissingVehicleImages(supabase, vehicleId, imageRows, { select: "id" })
         : { data: [] as { id: string }[], error: null };
+      const imgError = imgErrorRaw as any;
 
       if (imgError) {
         console.error(`⚠️ C&B: Image insert failed: ${imgError.message}`);
