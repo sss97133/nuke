@@ -37,6 +37,7 @@ import { RETAINED_VIN_MODE, RETAINED_VIN_METHOD, retainedVinSelector,
   qualifyRetainedVinReference } from "./retainedVinReference.ts";
 import { RETAINED_VIN_BATCH_MODE, ingestRetainedVinBatch } from "./retainedVinBatch.ts";
 import { ingestBatLive } from "./batLive.ts";
+import { RETAINED_REPORTED_WORK_MODE, retainedReportedWorkSelector, deriveRetainedReportedWork } from "./retainedReportedWork.ts";
 import { RETAINED_PROPERTY_KEYS, RETAINED_PROPERTY_MODES, RETAINED_INTERIOR_METHOD, retainedInteriorSelector, deriveRetainedInterior } from "./retainedInterior.ts";
 import { RETAINED_LISTING_DRAIN_MODE, drainRetainedListingProperties, RetainedBatchLookups } from "./retainedListingDrain.ts";
 import { drainBatSaleQueue } from "../batch-extract-snapshots/batSaleQueue.ts";
@@ -308,7 +309,7 @@ Deno.serve(async function handleObservation(req, internal?: unknown) {
       return new Response(JSON.stringify({ error: "Historical asking testimony requires its protected mode" }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
-    retainedListingBudget = [RETAINED_LISTING_DRAIN_MODE, ...RETAINED_PROPERTY_MODES].includes(input.mode ?? "");
+    retainedListingBudget = [RETAINED_LISTING_DRAIN_MODE, RETAINED_REPORTED_WORK_MODE, ...RETAINED_PROPERTY_MODES].includes(input.mode ?? "");
     // Direct sale leaves must carry the worker's10s record cancellation through
     // every SDK query/download; creating a Request signal alone does not do so.
     retainedSaleBudget = input.mode === "source_sale_qualification";
@@ -368,7 +369,35 @@ Deno.serve(async function handleObservation(req, internal?: unknown) {
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
     let retainedSourceId: string | null = null;
-    if (RETAINED_PROPERTY_MODES.includes(input.mode ?? "")) {
+    const retainedReportedWork = input.mode === RETAINED_REPORTED_WORK_MODE;
+    if (retainedReportedWork) {
+      const denied = await requireWriteAuth(req);
+      if (denied) return denied;
+      const writer = await authenticateWriter(req);
+      if (!writer.ok || writer.caller.kind !== "service_role") return new Response(JSON.stringify({ error: "Retained reported work requires service role" }),
+        { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      const selector = retainedReportedWorkSelector(input as unknown as Record<string, unknown>);
+      if (!selector) return new Response(JSON.stringify({ error: "Expected only a retained report selector", writes: 0, model_calls: 0 }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      const parent = await supabase.from("vehicle_observations")
+        .select("id,vehicle_id,kind,is_superseded,property_id,subject_type,subject_id,source_id,source_url,observed_at,ingested_at,extraction_method,confidence_score,structured_data,content_text")
+        .eq("id", selector.sourceId).abortSignal(AbortSignal.timeout(5000)).maybeSingle();
+      if (parent.error) throw new Error("Retained work source unavailable");
+      const row = parent.data;
+      const vehicle = row && await supabase.from("vehicles").select("id,is_public,deleted_at,listing_kind")
+        .eq("id", row.vehicle_id).abortSignal(AbortSignal.timeout(5000)).maybeSingle();
+      const source = row && await supabase.from("observation_sources").select("id,slug,base_trust_score,supported_observations")
+        .eq("id", row.source_id).abortSignal(AbortSignal.timeout(5000)).maybeSingle();
+      if (vehicle?.error || source?.error) throw new Error("Retained work source qualification unavailable");
+      const derived = row && await deriveRetainedReportedWork(row, vehicle?.data ?? null, source?.data ?? null, selector.reportIndex);
+      if (!derived) return new Response(JSON.stringify({ error: "Retained reported work ineligible", writes: 0, model_calls: 0 }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      input = derived;
+      retainedSourceId = selector.sourceId;
+    } else if (input.extraction_method === RETAINED_REPORTED_WORK_MODE || input.structured_data?.analysis_kind === "retained_reported_work") {
+      return new Response(JSON.stringify({ error: "Retained reported work requires its source selector", writes: 0, model_calls: 0 }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    } else if (RETAINED_PROPERTY_MODES.includes(input.mode ?? "")) {
       const denied = await requireWriteAuth(req);
       if (denied) return denied;
       const writer = await authenticateWriter(req);
@@ -480,6 +509,21 @@ Deno.serve(async function handleObservation(req, internal?: unknown) {
         { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
     const protectedReply = async (row: any, duplicate: boolean) => {
+      if (retainedReportedWork) {
+        const writes = duplicate ? 0 : 1;
+        const unavailable = () => new Response(JSON.stringify({ success: false,
+          error: "Persisted retained reported work unavailable", writes, model_calls: 0 }),
+          { status: 503, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+        try {
+          const verified = row?.id && await supabase.rpc("retained_reported_work_result_matches", {
+            p_source: retainedSourceId, p_result: row.id,
+          }).abortSignal(AbortSignal.timeout(5000));
+          if (!verified || verified.error || verified.data !== true) return unavailable();
+        } catch { return unavailable(); }
+        return new Response(JSON.stringify({ success: true, duplicate, observation_id: row.id,
+          vehicle_id: input.vehicle_id, writes, model_calls: 0 }),
+          { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      }
       if (retainedSourceId && input.property_key === "engine_family_label") {
         // Replay does not fire the insert trigger. Recheck the persisted child,
         // current curator gate and retained source before returning admission.
@@ -612,6 +656,13 @@ Deno.serve(async function handleObservation(req, internal?: unknown) {
       }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
+    // This existing source's new capability is restricted to the protected
+    // report selector, including service callers; generic activity is broader.
+    if (source.id === "4cdc735c-f117-42f2-889f-ba33805639a5" && input.kind === "activity" && !retainedReportedWork) {
+      return new Response(JSON.stringify({ error: "BaT activity requires its retained report selector", writes: 0, model_calls: 0 }),
+        { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
+
     // A claim keyed to the condition dimension must name a live descriptor.
     let descriptorId: string | null = null;
     if (input.descriptor_key) {
@@ -673,7 +724,7 @@ Deno.serve(async function handleObservation(req, internal?: unknown) {
       return query.maybeSingle().returns<Record<string, unknown> | null>();
     };
     const { data: existing, error: replayError } = await replayQuery();
-    if ((input.source_vehicle_event_id && archivedSale?.ok || retainedVin?.ok) && replayError) {
+    if ((input.source_vehicle_event_id && archivedSale?.ok || retainedVin?.ok || retainedReportedWork) && replayError) {
       return new Response(JSON.stringify({ error: "Typed sale replay unavailable" }),
         { status: 503, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }

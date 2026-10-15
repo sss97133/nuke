@@ -28,6 +28,78 @@ interface ObsRow {
   lifecycle_status: string | null;
   source_slug: string | null;
   public_copy?: boolean;
+  reported_work?: ReportedWork;
+}
+
+interface ReportedWork {
+  observation_id: string;
+  kind: 'activity';
+  report_status: 'publisher_reported_completion';
+  occurrence_status: 'unverified';
+  performer_id: null;
+  performer_status: 'unknown';
+  independent_source: false;
+  intent_status: 'unknown';
+  observed_at_basis: 'source_testimony_recorded_at';
+  reported_date: string;
+  date_precision: 'month';
+  reported_date_label: string;
+  performed_clause: string;
+  source_value: string;
+  source_observation_id: string;
+  source_id: string;
+  source_url: string;
+  source_captured_at: string;
+  source_recorded_at: string;
+  source_capture_sha256: string;
+  source_capture_basis: 'direct_fetch' | 'protected_snapshot';
+  source_witness_version: 'retained_description_reported_work_v1';
+  observed_at: string;
+  ingested_at: string;
+  confidence_score: number;
+}
+
+interface PublicWorkRecord {
+  observation_id: string;
+  done_on?: string | null;
+  item?: string | null;
+  category?: string | null;
+  supplier?: string | null;
+  labor_minutes?: number | null;
+  build_stage?: string | null;
+}
+
+const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const record = (value: unknown): value is Record<string, unknown> => !!value && typeof value === 'object' && !Array.isArray(value);
+const text = (value: unknown): value is string => typeof value === 'string' && value.trim().length > 0;
+const clock = (value: unknown): value is string => typeof value === 'string' &&
+  /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,6})?(?:Z|[+-]\d{2}:\d{2})$/.test(value) && Number.isFinite(Date.parse(value));
+
+function isPublicWorkRecord(value: unknown): value is PublicWorkRecord {
+  return record(value) && text(value.observation_id) &&
+    ['done_on', 'item', 'category', 'supplier', 'build_stage'].every(key => value[key] == null || typeof value[key] === 'string') &&
+    (value.labor_minutes == null || typeof value.labor_minutes === 'number' && Number.isFinite(value.labor_minutes));
+}
+
+function isReportedWork(value: unknown): value is ReportedWork {
+  if (!record(value) || value.kind !== 'activity' || value.report_status !== 'publisher_reported_completion' ||
+    value.occurrence_status !== 'unverified' || value.performer_id !== null || value.performer_status !== 'unknown' ||
+    value.independent_source !== false || value.intent_status !== 'unknown' || value.observed_at_basis !== 'source_testimony_recorded_at' ||
+    value.date_precision !== 'month' || typeof value.reported_date !== 'string' || !/^\d{4}-(?:0[1-9]|1[0-2])$/.test(value.reported_date) ||
+    value.reported_date_label !== `${MONTHS[Number(value.reported_date.slice(5)) - 1]} ${value.reported_date.slice(0, 4)}` ||
+    !['observation_id', 'source_observation_id', 'source_id'].every(key => typeof value[key] === 'string' && UUID.test(value[key])) ||
+    !text(value.performed_clause) || !text(value.source_value) || !value.source_value.startsWith(value.performed_clause) ||
+    !['source_captured_at', 'source_recorded_at', 'observed_at', 'ingested_at'].every(key => clock(value[key])) ||
+    typeof value.source_capture_sha256 !== 'string' || !/^[a-f0-9]{64}$/.test(value.source_capture_sha256) ||
+    !['direct_fetch', 'protected_snapshot'].includes(String(value.source_capture_basis)) ||
+    value.source_witness_version !== 'retained_description_reported_work_v1' ||
+    typeof value.confidence_score !== 'number' || !Number.isFinite(value.confidence_score) || value.confidence_score < 0 || value.confidence_score > 0.6 ||
+    typeof value.source_url !== 'string') return false;
+  try {
+    const source = new URL(value.source_url);
+    return source.protocol === 'https:' && !source.username && !source.password;
+  } catch { return false; }
 }
 
 interface VehicleSummary {
@@ -54,6 +126,7 @@ const TablePage: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [publicLogUnavailable, setPublicLogUnavailable] = useState(false);
+  const [reportedWorkUnavailable, setReportedWorkUnavailable] = useState(false);
   const [sortKey, setSortKey] = useState<SortKey>('observed_at');
   const [sortDir, setSortDir] = useState<SortDir>('desc');
   const [filter, setFilter] = useState('');
@@ -65,6 +138,7 @@ const TablePage: React.FC = () => {
     setLoading(true);
     setError(null);
     setPublicLogUnavailable(false);
+    setReportedWorkUnavailable(false);
 
     (async () => {
       // PostgREST caps each call at ~1000 rows; the K5 has ~1900 wire-specs that
@@ -111,9 +185,19 @@ const TablePage: React.FC = () => {
           .limit(500),
         // Source slugs for the kinds we'll merge
         supabase.from('observation_sources').select('id, slug'),
-        supabase.rpc('vehicle_build_log_public', { p_vehicle_id: vehicleId }),
+        supabase.rpc('vehicle_build_log_public', { p_vehicle_id: vehicleId, p_include_reported: true }),
       ]);
 
+      // A missing opt-in overload during deployment/rollback must not remove
+      // confirmed public work. Other RPC errors remain visible failures.
+      let publicLog: unknown = publicWorkRes.data;
+      let publicLogError = publicWorkRes.error;
+      const missingReportedReader = publicWorkRes.error?.code === 'PGRST202';
+      if (missingReportedReader) {
+        const legacy = await supabase.rpc('vehicle_build_log_public', { p_vehicle_id: vehicleId });
+        publicLog = { work_records: legacy.data, reported_work: [] };
+        publicLogError = legacy.error;
+      }
       if (cancelled) return;
 
       if (vehRes.error) {
@@ -122,7 +206,12 @@ const TablePage: React.FC = () => {
         return;
       }
       setVehicle(vehRes.data as VehicleSummary | null);
-      setPublicLogUnavailable(!!publicWorkRes.error);
+      let publicLogIncomplete = true;
+      let publicWork: unknown[] = [], reportedWork: unknown[] = [];
+      if (!publicLogError && record(publicLog) && Array.isArray(publicLog.work_records) && Array.isArray(publicLog.reported_work)) {
+        publicWork = publicLog.work_records; reportedWork = publicLog.reported_work; publicLogIncomplete = false;
+      }
+      setReportedWorkUnavailable(missingReportedReader);
 
       const sourceById = new Map<string, string>();
       for (const s of ((sourceRes.data as any[] | null) || [])) {
@@ -167,8 +256,9 @@ const TablePage: React.FC = () => {
 
       // The RPC owns masking. Keep permitted work searchable for visitors,
       // while an owner's directly readable observation wins on the same ID.
-      for (const r of (publicWorkRes.error ? [] : publicWorkRes.data || [])) {
-        if (!r.observation_id || seen.has(r.observation_id)) continue;
+      for (const r of publicWork) {
+        if (!isPublicWorkRecord(r)) { publicLogIncomplete = true; continue; }
+        if (seen.has(r.observation_id)) continue;
         seen.add(r.observation_id);
         out.push({
           id: r.observation_id,
@@ -192,6 +282,25 @@ const TablePage: React.FC = () => {
         });
       }
 
+      // A publisher report is activity testimony, never a confirmed work record.
+      // Its recording clocks cannot supply a day or a performer for the report.
+      const reportedIds = new Set<string>();
+      for (const report of reportedWork) {
+        if (!isReportedWork(report) || reportedIds.has(report.observation_id)) { publicLogIncomplete = true; continue; }
+        reportedIds.add(report.observation_id);
+        // The qualified report wins over the same directly readable activity:
+        // generic observation clocks/vendor fields cannot replace its meaning.
+        const directIndex = out.findIndex(row => row.id === report.observation_id);
+        if (directIndex !== -1) out.splice(directIndex, 1);
+        seen.add(report.observation_id);
+        out.push({ id: report.observation_id, kind: 'activity', observed_at: null, ingested_at: report.ingested_at,
+          source_url: report.source_url, content_text: report.performed_clause, confidence: null, confidence_score: report.confidence_score,
+          vendor: null, part_number: null, part_description: null, total: null, lifecycle_status: null,
+          source_slug: sourceById.get(report.source_id) || new URL(report.source_url).hostname,
+          public_copy: true, reported_work: report });
+      }
+
+      setPublicLogUnavailable(publicLogIncomplete);
       setRows(out);
       setLoading(false);
     })();
@@ -216,7 +325,7 @@ const TablePage: React.FC = () => {
     return rows.filter((r) => {
       if (kindFilter && r.kind !== kindFilter) return false;
       if (!f) return true;
-      const hay = `${r.vendor || ''} ${r.part_number || ''} ${r.part_description || ''} ${r.content_text || ''} ${r.kind} ${r.source_slug || ''}`.toLowerCase();
+      const hay = `${r.vendor || ''} ${r.part_number || ''} ${r.part_description || ''} ${r.content_text || ''} ${r.kind} ${r.source_slug || ''} ${r.reported_work ? `reported work ${r.reported_work.reported_date_label}` : ''}`.toLowerCase();
       return hay.includes(f);
     });
   }, [rows, filter, kindFilter]);
@@ -224,8 +333,9 @@ const TablePage: React.FC = () => {
   const sorted = useMemo(() => {
     const list = [...filtered];
     list.sort((a, b) => {
-      const av = (a as any)[sortKey];
-      const bv = (b as any)[sortKey];
+      // ISO month strings sort by the reported month without inventing a day.
+      const av = sortKey === 'observed_at' && a.reported_work ? a.reported_work.reported_date : a[sortKey];
+      const bv = sortKey === 'observed_at' && b.reported_work ? b.reported_work.reported_date : b[sortKey];
       if (av === null || av === undefined) return sortDir === 'asc' ? 1 : -1;
       if (bv === null || bv === undefined) return sortDir === 'asc' ? -1 : 1;
       if (typeof av === 'number' && typeof bv === 'number') {
@@ -393,14 +503,22 @@ const TablePage: React.FC = () => {
         SHOWING {sorted.length} OF {rows.length}{totalShown > 0 && ` · TOTAL $${totalShown.toLocaleString()}`}
       </div>
 
-      {rows.some(r => r.public_copy) && (
+      {rows.some(r => r.public_copy && !r.reported_work) && (
         <p style={{ fontSize: 10 }}>
           Public build log: permitted work, suppliers, labor and stages. Receipts, amounts and full details are owner-only.
           Dates are recorded work dates; ingestion times are unavailable for these copies.
         </p>
       )}
+      {rows.some(r => r.reported_work) && (
+        <p style={{ fontSize: 10 }}>
+          Reported work rows are publisher reports. Repeated captures may describe the same repair and do not provide independent confirmation.
+        </p>
+      )}
       {publicLogUnavailable && (
         <p role="status" style={{ fontSize: 10 }}>Public build log unavailable; work history may be incomplete.</p>
+      )}
+      {reportedWorkUnavailable && (
+        <p role="status" style={{ fontSize: 10 }}>Publisher-reported work unavailable; confirmed public work is shown where available.</p>
       )}
 
       {loading && rows.length === 0 && (
@@ -471,7 +589,7 @@ const TablePage: React.FC = () => {
                 }}
               >
                 <span style={{ fontFamily: 'Courier New, monospace', fontSize: 9, color: 'var(--text-secondary)' }}>
-                  {r.observed_at ? r.observed_at.slice(0, 10) : '—'}
+                  {r.reported_work ? <>{r.reported_work.reported_date_label}<br /><span>Reported month</span></> : r.observed_at ? r.observed_at.slice(0, 10) : '—'}
                 </span>
                 <span
                   style={{
@@ -485,10 +603,10 @@ const TablePage: React.FC = () => {
                     alignSelf: 'center',
                   }}
                 >
-                  {r.kind}
+                  {r.reported_work ? 'Reported work' : r.kind}
                 </span>
                 <span style={{ overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis' }}>
-                  {r.vendor || ''}
+                  {r.reported_work ? 'Performer unknown' : r.vendor || ''}
                 </span>
                 <span style={{ fontFamily: 'Courier New, monospace', fontSize: 9, fontWeight: 700 }}>
                   {r.part_number || ''}
@@ -505,12 +623,31 @@ const TablePage: React.FC = () => {
                     letterSpacing: '0.04em',
                   }}
                 >
-                  {r.lifecycle_status || ''}
+                  {r.reported_work ? <>Completion reported<br />Occurrence unverified</> : r.lifecycle_status || ''}
                 </span>
-                <span style={{ overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis', fontSize: 9 }}>
+                <div style={{ overflow: 'hidden', whiteSpace: r.reported_work ? 'normal' : 'nowrap', textOverflow: 'ellipsis', fontSize: 9 }}>
                   {r.content_text || r.part_description || ''}
-                  {r.public_copy && <span> · Owner-only detail</span>}
-                </span>
+                  {r.public_copy && !r.reported_work && <span> · Owner-only detail</span>}
+                  {r.reported_work && <details style={{ marginTop: 4 }}>
+                    <summary>Publisher quotation and source</summary>
+                    <blockquote style={{ margin: '6px 0', whiteSpace: 'pre-wrap' }}>{r.reported_work.source_value}</blockquote>
+                    <p><a href={r.reported_work.source_url} target="_blank" rel="noopener noreferrer">Publisher source</a></p>
+                    <div>Source captured: {r.reported_work.source_captured_at}</div>
+                    <div>Source recorded: {r.reported_work.source_recorded_at}</div>
+                    <div>Publisher intent: unknown. Independent confirmation is not established.</div>
+                    <details style={{ marginTop: 6 }}>
+                      <summary>Technical provenance</summary>
+                      <div>Claim observed (source recording clock): {r.reported_work.observed_at}</div>
+                      <div>Claim recorded (processing clock): {r.reported_work.ingested_at}</div>
+                      <div>These recording clocks do not establish a work date.</div>
+                      <div>Source observation: {r.reported_work.source_observation_id}</div>
+                      <div>Source registry: {r.reported_work.source_id}</div>
+                      <div style={{ overflowWrap: 'anywhere' }}>Capture SHA-256: {r.reported_work.source_capture_sha256}</div>
+                      <div>Capture basis: {r.reported_work.source_capture_basis}</div>
+                      <div>Witness: {r.reported_work.source_witness_version}</div>
+                    </details>
+                  </details>}
+                </div>
                 <span style={{ fontFamily: 'Courier New, monospace', fontSize: 8, color: 'var(--text-secondary, #666)' }}>
                   {r.source_slug || ''}
                 </span>
