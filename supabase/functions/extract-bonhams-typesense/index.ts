@@ -649,7 +649,9 @@ Deno.serve(async (req) => {
         const { data: have } = await supabase.from("vehicle_events").select("source_listing_id").eq("source_platform", "bonhams").eq("event_status", "upcoming").in("source_listing_id", ids);
         for (const r of have ?? []) landed.add(String(r.source_listing_id));
       }
-      const todo = docs.filter((d) => !landed.has(d.doc.id) && d.doc.title && d.doc.title.length >= 3).slice(0, 100);
+      // force_ids: lots to land again although they read as landed (a repair after a mis-resolved landing).
+      const force = new Set<string>(Array.isArray(body.force_ids) ? body.force_ids.map(String) : []);
+      const todo = docs.filter((d) => (!landed.has(d.doc.id) || force.has(d.doc.id)) && d.doc.title && d.doc.title.length >= 3).slice(0, 100);
       const lots = todo.map((d) => lotToExtraction(d.doc, { observedAt, sale: d.sale }));
       const reports: Record<string, unknown>[] = [];
       for (let i = 0; i < lots.length; i += 50) {
