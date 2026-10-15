@@ -9,7 +9,8 @@ export const TIER_NAMES: Record<AskTier, string> = {
   under_5k: 'Under $5K', '5k_15k': '$5K–15K', '15k_40k': '$15K–40K', '40k_100k': '$40K–100K', '100k_plus': '$100K and up',
 };
 export const ASK_WINDOWS = [24, 72, 168] as const;
-export const ASK_SORTS = ['newest', 'nearest', 'band', 'price'] as const;
+// position: lowest against its own family first (classified_ask_board 20261015150000).
+export const ASK_SORTS = ['newest', 'nearest', 'band', 'price', 'position'] as const;
 export type AskSort = typeof ASK_SORTS[number];
 const PAGE_SIZE = 60;
 

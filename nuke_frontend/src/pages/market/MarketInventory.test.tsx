@@ -202,7 +202,8 @@ it('a photo list keeps web addresses only, once each, the lead first', async () 
 it('says where an ask lands: the word, the price line, then the counts it rests on; nothing without a position', async () => {
   fixture.boardQuery.data.pages[0].rows[0].position = {
     family: 'Blazer', family_id: 'f-blazer', share: 40 / 43, basis: 'asked',
-    sold: { n: 16, year_from: 1983, year_to: 1985, thin: false, p25: 9000, p50: 12500, p75: 16000, at_or_below: 15, by_source: { bat: 12, mecum: 4 } },
+    sold: { n: 16, year_from: 1983, year_to: 1985, thin: false, p25: 9000, p50: 12500, p75: 16000, at_or_below: 15, by_source: { bat: 12, mecum: 4 },
+      miles: { n: 12, p50: 96000, at_or_below: 4 }, venues: { bat: { n: 12, p50: 13000 }, mecum: { n: 4, p50: null } } },
     asked: { n: 43, year_from: 1983, year_to: 1985, thin: false, p25: 8000, p50: 11000, p75: 15000, at_or_below: 40 },
   };
   await render('collection=listings');
@@ -211,7 +212,8 @@ it('says where an ask lands: the word, the price line, then the counts it rests 
   expect(placed.querySelector('.k-label')?.textContent).toBe('top of the market · 1983–85 Blazer');
   // Placed by the other asks (ten or more exist), so they come first; the sales follow.
   expect([...placed.querySelectorAll('.k-caption')].map(n => n.textContent)).toEqual([
-    'at or above 40 of 43 asks, median $11K', 'at or above 15 of 16 sales, median $12.5K']);
+    'at or above 40 of 43 asks, median $11K', 'at or above 15 of 16 sales, median $12.5K', 'BaT $13K (12) · Mecum (4)',
+    'fewer miles than 8 of 12 recorded sales, median 96,000 mi']);
   expect(placed.querySelector('svg[role="img"]')?.getAttribute('aria-label')).toBe('ask $18,800; middle half $8,000 to $15,000, median $11,000');
   expect(second.querySelector('.market-ask__position')).toBeNull();
 });
@@ -241,6 +243,14 @@ it('a refused read says why and keeps the control', async () => {
   await act(async () => [...first.querySelectorAll('button')].find(b => b.textContent === 'Analyze photos')!.click());
   expect(first.querySelector('.market-ask__read')?.textContent).toContain('no analyzer available: connect your AI subscription');
   expect([...first.querySelectorAll('button')].some(b => b.textContent === 'Analyze photos')).toBe(true);
+});
+
+it('offers the order lowest for its family', async () => {
+  await render('collection=listings');
+  const order = [...container.querySelectorAll('select')].find(s => s.querySelector('option[value="position"]'))!;
+  expect(order.querySelector('option[value="position"]')?.textContent).toBe('Lowest for its family');
+  await act(async () => { order.value = 'position'; order.dispatchEvent(new Event('change', { bubbles: true })); });
+  expect(lastQuery().sort).toBe('position');
 });
 
 it('tier, band and window are lenses in the URL', async () => {
@@ -377,6 +387,17 @@ describe('how a feed says time', () => {
 });
 
 describe('where an ask lands', () => {
+  it('says how the miles sit and which venues the prices come from', async () => {
+    const { milesLine, venuesLine } = await import('./askPosition');
+    const pop = { n: 62, year_from: 1995, year_to: 1997, thin: false, p25: 6000, p50: 8900, p75: 12500, at_or_below: 4 };
+    expect(milesLine({ ...pop, miles: { n: 40, p50: 168000, at_or_below: 39 } }, 'sales')).toBe('more miles than 39 of 40 recorded sales, median 168,000 mi');
+    expect(milesLine({ ...pop, miles: { n: 8, p50: null, at_or_below: null } }, 'sales')).toBeNull();
+    expect(milesLine(pop, 'sales')).toBeNull();
+    expect(venuesLine({ ...pop, venues: { facebook_marketplace: { n: 30, p50: 5500 }, bat: { n: 34, p50: 14500 }, ksl: { n: 2, p50: null }, mecum: { n: 1, p50: null } } }))
+      .toBe('BaT $14.5K (34) · Facebook $5.5K (30) · KSL (2)');
+    expect(venuesLine(pop)).toBeNull();
+  });
+
   it('places by the reader\'s share, else by asks when they are enough, else by sales, and counts a thin population without placing it', async () => {
     const { headline, placement, spreadLine } = await import('./askPosition');
     expect(placement(0.95)).toBe('top of the market');
