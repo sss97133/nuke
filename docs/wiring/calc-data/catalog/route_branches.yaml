@@ -1,0 +1,908 @@
+# K5 harness ROUTE BRANCHES (curated input -> load_map_rows.py -> load_harness_branches -> route_harness_segments)
+#
+# The route graph's branches between standing points, and the junctions where bundles split, in the twin frame
+# (+x driver, -y front, +z up, metres; K5_harness_workspace_v2.blend). Drawn by the system's route study of 2026-10-15
+# (docs/wiring/research/2026-10-15_route-branches.md). min_clearance_mm is the nearest twin mesh (negative = inside a
+# crude bounding box); confidence is low where the twin's engine sits about 15 cm into the cab. The June branches L08,
+# L09, L21, L25, L26 and L27 stay as they are in the model; K5B_R04 joins the amplifier and subwoofer junction to them.
+method: twin route study 2026-10-15 (hand-routed trunk and branch, headless Blender BVH clearance)
+source: docs/wiring/research/2026-10-15_route-branches.md
+junctions:
+- code: J_CAB_DASH
+  x: 0.55
+  y: -1.38
+  z: 0.9
+  kind: breakout
+  note: where bundles split (route study 2026-10-15)
+  trust: proposed
+- code: J_CAB_FLOOR
+  x: 0.75
+  y: -1.0
+  z: 0.76
+  kind: breakout
+  note: where bundles split (route study 2026-10-15)
+  trust: proposed
+- code: J_REAR_TAIL
+  x: 0.4
+  y: 1.4
+  z: 0.62
+  kind: breakout
+  note: where bundles split (route study 2026-10-15)
+  trust: proposed
+- code: J_BAY_FW
+  x: 0.56
+  y: -1.53
+  z: 0.88
+  kind: breakout
+  note: where bundles split (route study 2026-10-15)
+  trust: proposed
+- code: J_BAY_D_MID
+  x: 0.4
+  y: -1.8
+  z: 1.22
+  kind: breakout
+  note: where bundles split (route study 2026-10-15)
+  trust: proposed
+- code: J_BAY_FRONT
+  x: 0.18
+  y: -2.03
+  z: 1.2
+  kind: breakout
+  note: where bundles split (route study 2026-10-15)
+  trust: proposed
+- code: J_BAY_P_MID
+  x: -0.4
+  y: -1.8
+  z: 1.22
+  kind: breakout
+  note: where bundles split (route study 2026-10-15)
+  trust: proposed
+- code: J_BAY_BLOCK_D
+  x: 0.44
+  y: -1.655
+  z: 0.9
+  kind: breakout
+  note: where bundles split (route study 2026-10-15)
+  trust: proposed
+- code: J_BAY_BLOCK_P
+  x: -0.44
+  y: -1.655
+  z: 0.9
+  kind: breakout
+  note: where bundles split (route study 2026-10-15)
+  trust: proposed
+branches:
+- code: K5B_C01
+  from: FIREWALL_61
+  to: J_CAB_DASH
+  polyline_m:
+  - - 0.5
+    - -1.46
+    - 0.9
+  - - 0.52
+    - -1.42
+    - 0.9
+  - - 0.55
+    - -1.38
+    - 0.9
+  length_in: 3.7
+  min_clearance_mm: 20.6
+  nearest_obstacle: K5H_iBooster
+  follows: cab face of the 61-pin hole, straight to the kick-panel breakout
+  rule_notes: 'cab side of FIREWALL_61; engine-management bundle only; nearest manifold/exhaust 189.2 mm (K5H_Manifold_D), measured away from
+    device endpoints; crosses nothing: starts at the 61-pin plane (the one firewall crossing); only engine-management wires'
+  confidence: medium-high
+- code: K5B_C02
+  from: J_CAB_DASH
+  to: M130
+  polyline_m:
+  - - 0.55
+    - -1.38
+    - 0.9
+  - - 0.55
+    - -1.3
+    - 0.94
+  - - 0.55
+    - -1.22
+    - 0.987
+  length_in: 7.2
+  min_clearance_mm: 61.8
+  nearest_obstacle: K5H_iBooster
+  follows: dash underside, driver side, below Dash_Main (z<1.00)
+  rule_notes: nearest manifold/exhaust 194.7 mm (K5H_Manifold_D), measured away from device endpoints
+  confidence: medium-high
+- code: K5B_C03
+  from: M130
+  to: DASH_CLUSTER
+  polyline_m:
+  - - 0.55
+    - -1.22
+    - 0.987
+  - - 0.62
+    - -1.24
+    - 1.05
+  length_in: 3.8
+  min_clearance_mm: 130.9
+  nearest_obstacle: Steering_Main
+  follows: dash underside to the cluster back
+  rule_notes: ''
+  confidence: medium-high
+- code: K5B_C04
+  from: J_CAB_DASH
+  to: PDM30
+  polyline_m:
+  - - 0.55
+    - -1.38
+    - 0.9
+  - - 0.45
+    - -1.36
+    - 0.95
+  - - 0.36
+    - -1.34
+    - 0.99
+  - - 0.3
+    - -1.3
+    - 0.997
+  length_in: 11.3
+  min_clearance_mm: 19.4
+  nearest_obstacle: Steering_Main
+  follows: dash underside, behind the column, driver kick panel to dash centre
+  rule_notes: PDM30 sits 3 cm from the twin driver head box (head rear y -1.33 is behind the firewall plane); not physical; nearest manifold/exhaust
+    181.1 mm (K5H_Manifold_D), measured away from device endpoints
+  confidence: low
+- code: K5B_C05
+  from: J_CAB_DASH
+  to: STEER_COL
+  polyline_m:
+  - - 0.55
+    - -1.38
+    - 0.9
+  - - 0.53
+    - -1.3
+    - 0.93
+  - - 0.5
+    - -1.2
+    - 0.95
+  length_in: 7.6
+  min_clearance_mm: 61.8
+  nearest_obstacle: K5H_iBooster
+  follows: dash underside to the column
+  rule_notes: nearest manifold/exhaust 194.7 mm (K5H_Manifold_D), measured away from device endpoints
+  confidence: medium-high
+- code: K5B_C06
+  from: J_CAB_DASH
+  to: BRAKE_SW
+  polyline_m:
+  - - 0.55
+    - -1.38
+    - 0.9
+  - - 0.52
+    - -1.3
+    - 0.82
+  - - 0.42
+    - -1.3
+    - 0.7
+  length_in: 10.8
+  min_clearance_mm: 19.2
+  nearest_obstacle: Under_Frame_Blazer
+  follows: kick panel / pedal bracket, down the firewall cab face
+  rule_notes: nearest manifold/exhaust 93.3 mm (K5H_Manifold_D), measured away from device endpoints
+  confidence: medium
+- code: K5B_C07
+  from: J_CAB_DASH
+  to: J_CAB_FLOOR
+  polyline_m:
+  - - 0.55
+    - -1.38
+    - 0.9
+  - - 0.64
+    - -1.24
+    - 0.82
+  - - 0.75
+    - -1.0
+    - 0.76
+  length_in: 17.9
+  min_clearance_mm: 61.8
+  nearest_obstacle: K5H_iBooster
+  follows: driver kick panel down to the rocker (June L24 corridor)
+  rule_notes: nearest manifold/exhaust 194.7 mm (K5H_Manifold_D), measured away from device endpoints
+  confidence: medium-high
+- code: K5B_C08
+  from: J_CAB_FLOOR
+  to: FLOOR_RR
+  polyline_m:
+  - - 0.75
+    - -1.0
+    - 0.76
+  - - 0.82
+    - -0.6
+    - 0.75
+  - - 0.82
+    - -0.3
+    - 0.74
+  length_in: 27.8
+  min_clearance_mm: 12.2
+  nearest_obstacle: Door_Left_Details
+  follows: under-carpet along the driver rocker (June L24)
+  rule_notes: nearest manifold/exhaust 454.0 mm (K5H_Exhaust_D), measured away from device endpoints
+  confidence: medium
+- code: K5B_C09
+  from: J_CAB_FLOOR
+  to: TUNNEL_6L90
+  polyline_m:
+  - - 0.75
+    - -1.0
+    - 0.76
+  - - 0.45
+    - -0.98
+    - 0.7
+  - - 0.2
+    - -0.96
+    - 0.66
+  - - 0.17
+    - -0.95
+    - 0.62
+  length_in: 24.1
+  min_clearance_mm: 30.3
+  nearest_obstacle: Under_Main_Blazer
+  follows: across the floor pan to the transmission tunnel grommet
+  rule_notes: nearest manifold/exhaust 181.0 mm (K5H_Exhaust_D), measured away from device endpoints
+  confidence: medium-high
+- code: K5B_C10
+  from: TUNNEL_6L90
+  to: K5H_TransferCase
+  polyline_m:
+  - - 0.17
+    - -0.95
+    - 0.62
+  - - 0.19
+    - -0.8
+    - 0.62
+  - - 0.19
+    - -0.62
+    - 0.62
+  - - 0.05
+    - -0.491
+    - 0.62
+  length_in: 20.5
+  min_clearance_mm: 20.1
+  nearest_obstacle: Under_Main_Blazer
+  follows: inside the tunnel, along the trans/transfer case side
+  rule_notes: nearest manifold/exhaust 194.8 mm (K5H_Exhaust_D), measured away from device endpoints
+  confidence: medium-high
+- code: K5B_R01
+  from: REAR_JCT
+  to: K5H_EStopp_Actuator
+  polyline_m:
+  - - 0.4
+    - 0.81
+    - 0.66
+  - - 0.35
+    - 0.88
+    - 0.64
+  - - 0.3
+    - 0.95
+    - 0.62
+  length_in: 7.0
+  min_clearance_mm: 143.3
+  nearest_obstacle: Body_Mount_Crossmembers
+  follows: frame rail inside C-channel, short stub off the rear junction
+  rule_notes: nearest manifold/exhaust 1229.3 mm (K5H_Exhaust_D), measured away from device endpoints
+  confidence: medium-high
+- code: K5B_R02
+  from: K5H_Subwoofer
+  to: J_REAR_TAIL
+  polyline_m:
+  - - 0.55
+    - 1.45
+    - 0.95
+  - - 0.48
+    - 1.45
+    - 0.72
+  - - 0.43
+    - 1.42
+    - 0.65
+  - - 0.4
+    - 1.4
+    - 0.62
+  length_in: 14.9
+  min_clearance_mm: 0.2
+  nearest_obstacle: Exterior_Body_Blazer_Rear
+  follows: down the right side of the load floor to the L26 vertex
+  rule_notes: nearest manifold/exhaust 1754.3 mm (K5H_Exhaust_D), measured away from device endpoints
+  confidence: medium
+- code: K5B_R03
+  from: K5H_Amplifier
+  to: J_REAR_TAIL
+  polyline_m:
+  - - -0.55
+    - 1.45
+    - 0.85
+  - - -0.5
+    - 1.45
+    - 0.78
+  - - -0.3
+    - 1.42
+    - 0.76
+  - - 0.0
+    - 1.4
+    - 0.72
+  - - 0.4
+    - 1.4
+    - 0.62
+  length_in: 39.6
+  min_clearance_mm: 39.1
+  nearest_obstacle: K5H_FuelPump_Sender
+  follows: across the rear floor above the fuel tank, to the L26 vertex
+  rule_notes: nearest manifold/exhaust 1754.3 mm (K5H_Exhaust_D), measured away from device endpoints
+  confidence: medium-high
+- code: K5B_B01
+  from: FIREWALL_61
+  to: J_BAY_FW
+  polyline_m:
+  - - 0.5
+    - -1.46
+    - 0.9
+  - - 0.53
+    - -1.495
+    - 0.89
+  - - 0.56
+    - -1.53
+    - 0.88
+  length_in: 3.7
+  min_clearance_mm: 20.6
+  nearest_obstacle: K5H_iBooster
+  follows: engine face of the 61-pin hole, forward past the iBooster (outboard of it)
+  rule_notes: 'nearest manifold/exhaust 181.2 mm (K5H_Manifold_D), measured away from device endpoints; crosses nothing: starts at the 61-pin
+    plane (the one firewall crossing); only engine-management wires'
+  confidence: medium-high
+- code: K5B_B02
+  from: J_BAY_FW
+  to: J_BAY_D_MID
+  polyline_m:
+  - - 0.56
+    - -1.53
+    - 0.88
+  - - 0.57
+    - -1.72
+    - 1.02
+  - - 0.46
+    - -1.76
+    - 1.22
+  - - 0.4
+    - -1.8
+    - 1.22
+  length_in: 21.3
+  min_clearance_mm: 29.1
+  nearest_obstacle: Under_Main_Blazer
+  follows: driver inner fender, then up and along the driver valve cover outer edge
+  rule_notes: nearest manifold/exhaust 190.1 mm (K5H_Manifold_D), measured away from device endpoints
+  confidence: medium-high
+- code: K5B_B03
+  from: J_BAY_D_MID
+  to: J_BAY_FRONT
+  polyline_m:
+  - - 0.4
+    - -1.8
+    - 1.22
+  - - 0.36
+    - -1.95
+    - 1.22
+  - - 0.26
+    - -2.03
+    - 1.21
+  - - 0.18
+    - -2.03
+    - 1.2
+  length_in: 14.3
+  min_clearance_mm: 29.5
+  nearest_obstacle: K5H_ValveCover_D
+  follows: driver valve cover front edge
+  rule_notes: nearest manifold/exhaust 447.8 mm (K5H_Manifold_D), measured away from device endpoints
+  confidence: medium-high
+- code: K5B_B04
+  from: J_BAY_FRONT
+  to: J_BAY_P_MID
+  polyline_m:
+  - - 0.18
+    - -2.03
+    - 1.2
+  - - 0.0
+    - -2.04
+    - 1.22
+  - - -0.3
+    - -2.04
+    - 1.22
+  - - -0.42
+    - -1.92
+    - 1.22
+  - - -0.4
+    - -1.8
+    - 1.22
+  length_in: 30.4
+  min_clearance_mm: 41.4
+  nearest_obstacle: K5H_ValveCover_P
+  follows: across the engine front above the throttle body and damper, then passenger valve cover edge
+  rule_notes: nearest manifold/exhaust 450.0 mm (K5H_Manifold_P), measured away from device endpoints
+  confidence: medium-high
+- code: K5B_B05
+  from: J_BAY_FRONT
+  to: VALLEY
+  polyline_m:
+  - - 0.18
+    - -2.03
+    - 1.2
+  - - 0.04
+    - -2.04
+    - 1.29
+  - - 0.0
+    - -1.96
+    - 1.32
+  - - 0.0
+    - -1.8
+    - 1.32
+  - - 0.0
+    - -1.655
+    - 1.31
+  length_in: 22.3
+  min_clearance_mm: 32.5
+  nearest_obstacle: K5H_DEL_Bracket
+  follows: enters the intake valley corridor from the front, between the coil rows
+  rule_notes: nearest manifold/exhaust 459.6 mm (K5H_Manifold_D), measured away from device endpoints
+  confidence: medium-high
+- code: K5B_B06
+  from: J_BAY_FRONT
+  to: THROTTLE_BODY
+  polyline_m:
+  - - 0.18
+    - -2.03
+    - 1.2
+  - - 0.08
+    - -1.96
+    - 1.2
+  - - 0.0
+    - -1.955
+    - 1.1
+  - - 0.0
+    - -1.95
+    - 0.984
+  length_in: 14.4
+  min_clearance_mm: 29.5
+  nearest_obstacle: K5H_LS3_Block
+  follows: front of the intake down to the throttle body
+  rule_notes: TB sits against the twin block box; nearest manifold/exhaust 426.9 mm (K5H_Manifold_D), measured away from device endpoints
+  confidence: low
+- code: K5B_B07
+  from: J_BAY_FRONT
+  to: CMP
+  polyline_m:
+  - - 0.18
+    - -2.03
+    - 1.2
+  - - 0.14
+    - -2.0
+    - 1.1
+  - - 0.12
+    - -1.99
+    - 0.9
+  - - 0.05
+    - -1.975
+    - 0.875
+  - - 0.0
+    - -1.97
+    - 0.87
+  length_in: 17.3
+  min_clearance_mm: -10.0
+  nearest_obstacle: K5H_LS3_Block
+  follows: front cover, behind the damper
+  rule_notes: CMP sits inside the twin LS3 block/mid-mount boxes; no clean approach exists in the twin; nearest manifold/exhaust 239.6 mm (K5H_Manifold_D),
+    measured away from device endpoints
+  confidence: low
+- code: K5B_B08
+  from: J_BAY_FRONT
+  to: K5H_IAT
+  polyline_m:
+  - - 0.18
+    - -2.03
+    - 1.2
+  - - 0.12
+    - -2.1
+    - 1.12
+  - - 0.1
+    - -2.16
+    - 1.05
+  length_in: 8.5
+  min_clearance_mm: 4.3
+  nearest_obstacle: K5H_MidMount_Accessories
+  follows: front of the throttle inlet
+  rule_notes: nearest manifold/exhaust 426.2 mm (K5H_Manifold_D), measured away from device endpoints
+  confidence: medium
+- code: K5B_B09
+  from: J_BAY_FRONT
+  to: K5H_RadFan_1
+  polyline_m:
+  - - 0.18
+    - -2.03
+    - 1.2
+  - - 0.19
+    - -2.15
+    - 1.15
+  - - 0.19
+    - -2.29
+    - 0.99
+  - - 0.19
+    - -2.34
+    - 0.95
+  length_in: 16.0
+  min_clearance_mm: 42.0
+  nearest_obstacle: K5H_Radiator
+  follows: forward to the fan shroud (rear face)
+  rule_notes: nearest manifold/exhaust 427.0 mm (K5H_Manifold_D), measured away from device endpoints
+  confidence: medium-high
+- code: K5B_B10
+  from: J_BAY_FRONT
+  to: K5H_CLT
+  polyline_m:
+  - - 0.18
+    - -2.03
+    - 1.2
+  - - 0.22
+    - -2.0
+    - 1.16
+  - - 0.22
+    - -2.0
+    - 1.07
+  - - 0.2
+    - -1.91
+    - 1.07
+  length_in: 9.7
+  min_clearance_mm: 10.0
+  nearest_obstacle: K5H_LS3_Block
+  follows: down the front of the driver cover to the coolant sender
+  rule_notes: CLT sits inside the twin head box; nearest manifold/exhaust 318.6 mm (K5H_Manifold_D), measured away from device endpoints
+  confidence: low
+- code: K5B_B11
+  from: J_BAY_D_MID
+  to: K5H_FuelPress
+  polyline_m:
+  - - 0.4
+    - -1.8
+    - 1.22
+  - - 0.3
+    - -1.83
+    - 1.25
+  - - 0.18
+    - -1.86
+    - 1.25
+  length_in: 9.1
+  min_clearance_mm: 44.6
+  nearest_obstacle: K5H_ValveCover_D
+  follows: over the driver valve cover to the fuel rail
+  rule_notes: nearest manifold/exhaust 450.0 mm (K5H_Manifold_D), measured away from device endpoints
+  confidence: medium-high
+- code: K5B_B12
+  from: J_BAY_D_MID
+  to: K5H_Injector_3
+  polyline_m:
+  - - 0.4
+    - -1.8
+    - 1.22
+  - - 0.3
+    - -1.78
+    - 1.25
+  - - 0.186
+    - -1.75
+    - 1.25
+  - - 0.186
+    - -1.748
+    - 1.17
+  - - 0.155
+    - -1.748
+    - 1.17
+  length_in: 13.2
+  min_clearance_mm: 44.6
+  nearest_obstacle: K5H_ValveCover_D
+  follows: over the driver valve cover into the injector row, outboard of the rail
+  rule_notes: nearest manifold/exhaust 450.0 mm (K5H_Manifold_D), measured away from device endpoints
+  confidence: medium-high
+- code: K5B_B13
+  from: K5H_Injector_3
+  to: K5H_Injector_1
+  polyline_m:
+  - - 0.155
+    - -1.748
+    - 1.17
+  - - 0.185
+    - -1.748
+    - 1.17
+  - - 0.185
+    - -1.86
+    - 1.17
+  - - 0.155
+    - -1.86
+    - 1.17
+  length_in: 6.8
+  min_clearance_mm: 57.5
+  nearest_obstacle: K5H_FuelPress
+  follows: driver injector row, outboard of the rail
+  rule_notes: ''
+  confidence: medium-high
+- code: K5B_B14
+  from: K5H_Injector_3
+  to: K5H_Injector_5
+  polyline_m:
+  - - 0.155
+    - -1.748
+    - 1.17
+  - - 0.185
+    - -1.748
+    - 1.17
+  - - 0.185
+    - -1.636
+    - 1.17
+  - - 0.155
+    - -1.636
+    - 1.17
+  length_in: 6.8
+  min_clearance_mm: 60.0
+  nearest_obstacle: K5H_Head_D
+  follows: driver injector row
+  rule_notes: ''
+  confidence: medium-high
+- code: K5B_B15
+  from: K5H_Injector_5
+  to: K5H_Injector_7
+  polyline_m:
+  - - 0.155
+    - -1.636
+    - 1.17
+  - - 0.185
+    - -1.636
+    - 1.17
+  - - 0.185
+    - -1.525
+    - 1.17
+  - - 0.155
+    - -1.525
+    - 1.17
+  length_in: 6.7
+  min_clearance_mm: 60.0
+  nearest_obstacle: K5H_Head_D
+  follows: driver injector row
+  rule_notes: ''
+  confidence: medium-high
+- code: K5B_B16
+  from: J_BAY_P_MID
+  to: K5H_Injector_4
+  polyline_m:
+  - - -0.4
+    - -1.8
+    - 1.22
+  - - -0.3
+    - -1.78
+    - 1.25
+  - - -0.186
+    - -1.75
+    - 1.25
+  - - -0.186
+    - -1.748
+    - 1.17
+  - - -0.155
+    - -1.748
+    - 1.17
+  length_in: 13.2
+  min_clearance_mm: 44.6
+  nearest_obstacle: K5H_ValveCover_P
+  follows: over the passenger valve cover into the injector row
+  rule_notes: nearest manifold/exhaust 450.0 mm (K5H_Manifold_P), measured away from device endpoints
+  confidence: medium-high
+- code: K5B_B17
+  from: K5H_Injector_4
+  to: K5H_Injector_2
+  polyline_m:
+  - - -0.155
+    - -1.748
+    - 1.17
+  - - -0.185
+    - -1.748
+    - 1.17
+  - - -0.185
+    - -1.86
+    - 1.17
+  - - -0.155
+    - -1.86
+    - 1.17
+  length_in: 6.8
+  min_clearance_mm: 60.0
+  nearest_obstacle: K5H_Head_P
+  follows: passenger injector row
+  rule_notes: ''
+  confidence: medium-high
+- code: K5B_B18
+  from: K5H_Injector_4
+  to: K5H_Injector_6
+  polyline_m:
+  - - -0.155
+    - -1.748
+    - 1.17
+  - - -0.185
+    - -1.748
+    - 1.17
+  - - -0.185
+    - -1.636
+    - 1.17
+  - - -0.155
+    - -1.636
+    - 1.17
+  length_in: 6.8
+  min_clearance_mm: 60.0
+  nearest_obstacle: K5H_Head_P
+  follows: passenger injector row
+  rule_notes: ''
+  confidence: medium-high
+- code: K5B_B19
+  from: K5H_Injector_6
+  to: K5H_Injector_8
+  polyline_m:
+  - - -0.155
+    - -1.636
+    - 1.17
+  - - -0.185
+    - -1.636
+    - 1.17
+  - - -0.185
+    - -1.525
+    - 1.17
+  - - -0.155
+    - -1.525
+    - 1.17
+  length_in: 6.7
+  min_clearance_mm: 60.0
+  nearest_obstacle: K5H_Head_P
+  follows: passenger injector row
+  rule_notes: ''
+  confidence: medium-high
+- code: K5B_B20
+  from: J_BAY_D_MID
+  to: J_BAY_BLOCK_D
+  polyline_m:
+  - - 0.4
+    - -1.8
+    - 1.22
+  - - 0.44
+    - -1.7
+    - 1.22
+  - - 0.44
+    - -1.655
+    - 0.9
+  length_in: 17.0
+  min_clearance_mm: 17.8
+  nearest_obstacle: K5H_iBooster
+  follows: outboard of the driver manifold, down to the block side
+  rule_notes: nearest manifold/exhaust 134.6 mm (K5H_Manifold_D), measured away from device endpoints
+  confidence: medium
+- code: K5B_B21
+  from: J_BAY_BLOCK_D
+  to: KS1
+  polyline_m:
+  - - 0.44
+    - -1.655
+    - 0.9
+  - - 0.27
+    - -1.655
+    - 0.9
+  - - 0.27
+    - -1.655
+    - 0.77
+  length_in: 11.8
+  min_clearance_mm: 10.0
+  nearest_obstacle: K5H_LS3_Block
+  follows: under the driver head, above the manifold, 13 cm up from it
+  rule_notes: KS1 is 4 cm from the driver manifold box in the twin; nearest manifold/exhaust 88.2 mm (K5H_Manifold_D), measured away from device
+    endpoints
+  confidence: low
+- code: K5B_B22
+  from: J_BAY_P_MID
+  to: J_BAY_BLOCK_P
+  polyline_m:
+  - - -0.4
+    - -1.8
+    - 1.22
+  - - -0.44
+    - -1.7
+    - 1.22
+  - - -0.44
+    - -1.655
+    - 0.9
+  length_in: 17.0
+  min_clearance_mm: 62.6
+  nearest_obstacle: K5H_ValveCover_P
+  follows: outboard of the passenger manifold, down to the block side
+  rule_notes: nearest manifold/exhaust 134.6 mm (K5H_Manifold_P), measured away from device endpoints
+  confidence: medium-high
+- code: K5B_B23
+  from: J_BAY_BLOCK_P
+  to: KS2
+  polyline_m:
+  - - -0.44
+    - -1.655
+    - 0.9
+  - - -0.27
+    - -1.655
+    - 0.9
+  - - -0.27
+    - -1.655
+    - 0.77
+  length_in: 11.8
+  min_clearance_mm: 10.0
+  nearest_obstacle: K5H_LS3_Block
+  follows: under the passenger head, above the manifold
+  rule_notes: KS2 is 4 cm from the passenger manifold box in the twin; nearest manifold/exhaust 88.2 mm (K5H_Manifold_P), measured away from device
+    endpoints
+  confidence: low
+- code: K5B_B24
+  from: J_BAY_BLOCK_D
+  to: K5H_OilTemp
+  polyline_m:
+  - - 0.44
+    - -1.655
+    - 0.9
+  - - 0.5
+    - -1.655
+    - 0.82
+  - - 0.5
+    - -1.655
+    - 0.5
+  - - 0.22
+    - -1.655
+    - 0.49
+  - - 0.0
+    - -1.655
+    - 0.47
+  length_in: 36.3
+  min_clearance_mm: -0.0
+  nearest_obstacle: K5H_OilPan
+  follows: down outboard of the driver manifold (9 cm lateral), then in under the manifold and block to the pan
+  rule_notes: 'sump leg: last 15 cm is inside the oil-pan box by design; passes under the driver manifold; nearest manifold/exhaust 95.0 mm (K5H_Manifold_D),
+    measured away from device endpoints'
+  confidence: low
+- code: K5B_B25
+  from: MAP_SENSOR
+  to: K5H_OilPress
+  polyline_m:
+  - - 0.0
+    - -1.455
+    - 1.28
+  - - 0.0
+    - -1.455
+    - 1.31
+  - - 0.0
+    - -1.385
+    - 1.3
+  - - 0.0
+    - -1.385
+    - 1.12
+  - - 0.0
+    - -1.4
+    - 1.09
+  length_in: 12.4
+  min_clearance_mm: 17.0
+  nearest_obstacle: Under_Main_Blazer
+  follows: MAP port, behind the intake rear, to the block-top oil pressure sender
+  rule_notes: twin engine overlaps the firewall/dash (block rear y -1.30, firewall y -1.447); the OilPress sender is inside the cowl structure
+    in the twin; nearest manifold/exhaust 503.2 mm (K5H_Manifold_D), measured away from device endpoints
+  confidence: low
+- code: K5B_R04
+  from: REAR_JCT
+  to: J_REAR_TAIL
+  polyline_m:
+  - - 0.4
+    - 0.81
+    - 0.66
+  - - 0.4
+    - 1.4
+    - 0.62
+  length_in: 23.3
+  follows: the first leg of L26 (rear junction to its vertex at the tail), as the June twin drew it
+  rule_notes: joins the amplifier and subwoofer junction to the rear junction; L26 itself is kept unchanged
+  confidence: medium

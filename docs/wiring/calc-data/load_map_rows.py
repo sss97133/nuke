@@ -835,6 +835,24 @@ def main():
                    "method": "placement decision record (catalog/mounts.yaml)", "trust": b["status"]} for a, (b, pos) in PLACED.items()]
         print(f"route points: {api._req('POST', 'rpc/load_harness_topology_points', {'p_vehicle_id': K5, 'p_rows': points, 'p_source': f'catalog/mounts.yaml @ {SHA}'})}")
         print(f"route graph: {api._req('POST', 'rpc/key_harness_endpoints_to_topology', {'p_vehicle_id': K5})}")
+        # the route graph's branches and their junctions from the design record, then every segment between standing
+        # points routed over them (RSI pass 33)
+        rb = yaml.safe_load((CD / "catalog" / "route_branches.yaml").read_text()) if (CD / "catalog" / "route_branches.yaml").exists() else {}
+        junctions = [{"node_code": j["code"], "kind": j.get("kind") or "breakout", "x": j["x"], "y": j["y"], "z": j["z"],
+                      "pos_source": f"route junction {j['code']}: {j.get('note') or 'where bundles split'} (catalog/route_branches.yaml)",
+                      "method": "route study (catalog/route_branches.yaml)", "trust": j.get("trust") or "proposed"}
+                     for j in (rb.get("junctions") or [])]
+        if junctions:
+            print(f"route junctions: {api._req('POST', 'rpc/load_harness_topology_points', {'p_vehicle_id': K5, 'p_rows': junctions, 'p_source': f'catalog/route_branches.yaml @ {SHA}'})}")
+        branches = [{"code": b_["code"], "from": b_["from"], "to": b_["to"], "polyline_m": b_["polyline_m"], "length_in": b_["length_in"],
+                     "description": b_.get("follows"), "method": rb.get("method") or "route study",
+                     "assumptions": "; ".join(x for x in (b_.get("rule_notes"), f"min clearance {b_.get('min_clearance_mm')} mm"
+                                                          if b_.get("min_clearance_mm") is not None else None,
+                                                          f"confidence {b_.get('confidence')}" if b_.get("confidence") else None) if x)}
+                    for b_ in (rb.get("branches") or [])]
+        if branches:
+            print(f"route branches: {api._req('POST', 'rpc/load_harness_branches', {'p_vehicle_id': K5, 'p_rows': branches, 'p_source': f'catalog/route_branches.yaml @ {SHA}'})}")
+        print(f"routing: {api._req('POST', 'rpc/route_harness_segments', {'p_vehicle_id': K5})}")
         # nets re-folded through bus plugs and shared pins (RSI pass 14); it re-folds protection too: each net's PDM output
         # from its wire ends' pins, else the output its wires' design names (RSI pass 13)
         print(f"nets: {api._req('POST', 'rpc/refold_harness_nets', {'p_vehicle_id': K5})}")
