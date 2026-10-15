@@ -67,11 +67,15 @@ function resolveRef(flight: string, ref: string): string | null {
 }
 
 const ENTITIES: Record<string, string> = { amp: "&", lt: "<", gt: ">", quot: '"', apos: "'", nbsp: " " };
+/** Drop everything between "<" and ">" with a scan, not a regex: a stray "<" inside text cannot leave a tag behind. */
 const stripTags = (html: string): string => {
-  // Repeat until stable so nested fragments such as "<<b>script>" cannot survive one pass.
-  let prev = html, next = html.replace(/<[^>]*>/g, "");
-  while (next !== prev) { prev = next; next = next.replace(/<[^>]*>/g, ""); }
-  return next;
+  let out = "", depth = 0;
+  for (const ch of html) {
+    if (ch === "<") depth++;
+    else if (ch === ">" && depth > 0) depth--;
+    else if (depth === 0) out += ch;
+  }
+  return out;
 };
 const plain = (html: string) =>
   stripTags(html.replace(/<\/(p|li|h\d)>/gi, "\n").replace(/<br\s*\/?>/gi, "\n"))
