@@ -67,8 +67,9 @@ export function AuctionCompetition({ vehicleId, sourceUrl, row = true, enabled =
 
 // Draw only the reader's posted bids at their actual time offsets. No peer ranking, interpolation,
 // inferred opening time, rate, price forecast or green/red performance classification.
+type BidPoint = Pick<EpisodeInteraction, 'id' | 'comment_type' | 'posted_at'> & { bid_amount: number | string | null };
 function BidPath({ rows, selected, onSelect }: {
-  rows: EpisodeInteraction[]; selected: string | null; onSelect: (id: string) => void;
+  rows: BidPoint[]; selected: string | null; onSelect: (id: string) => void;
 }) {
   const points = rows.filter(r => r.comment_type === 'bid' && r.bid_amount != null
     && Number.isFinite(Number(r.bid_amount)) && Number(r.bid_amount) >= 0 && Number.isFinite(Date.parse(r.posted_at ?? '')))
@@ -77,8 +78,8 @@ function BidPath({ rows, selected, onSelect }: {
   const lo = Math.min(...points.map(r => Number(r.bid_amount)));
   const hi = Math.max(...points.map(r => Number(r.bid_amount)));
   const from = Date.parse(points[0].posted_at!), to = Date.parse(points[points.length - 1].posted_at!);
-  const x = (r: EpisodeInteraction) => 76 + (to === from ? .5 : (Date.parse(r.posted_at!) - from) / (to - from)) * 614;
-  const y = (r: EpisodeInteraction) => 176 - (hi === lo ? .5 : (Number(r.bid_amount) - lo) / (hi - lo)) * 138;
+  const x = (r: BidPoint) => 76 + (to === from ? .5 : (Date.parse(r.posted_at!) - from) / (to - from)) * 614;
+  const y = (r: BidPoint) => 176 - (hi === lo ? .5 : (Number(r.bid_amount) - lo) / (hi - lo)) * 138;
   return <>
     <div className="auction-evidence-chart-heading"><h4>Bids</h4><span>{points.length} · Pacific time</span></div>
     <svg className="auction-evidence-chart" viewBox="0 0 720 190" role="group" aria-label="Recorded bid amounts over posted time, in US dollars">
@@ -113,6 +114,7 @@ export default function AuctionEvidence({ vehicleId, onClose, compact = false, s
   onInspectionChange?: (view: LotInspection) => void; sourceUrl?: string | null;
 }) {
   const query = useAuctionEpisode(vehicleId, sourceUrl);
+  const book = useBidBook(vehicleId, sourceUrl ?? query.data?.sourceUrl, compact);
   const ids = useMemo(() => query.data ? [vehicleId] : [], [query.data, vehicleId]);
   const activity = useLotMovement(ids);
   const receipt = activity.coverage?.lots.find(l => l.vehicle_id === vehicleId
@@ -152,8 +154,12 @@ export default function AuctionEvidence({ vehicleId, onClose, compact = false, s
         const value = field === 'mileage' && Number.isFinite(Number(raw)) ? Number(raw).toLocaleString('en-US') : String(raw);
         return { field, label, value };
       });
-    const bids = rows.filter(r => r.comment_type === 'bid' && r.bid_amount != null && Number.isFinite(Number(r.bid_amount))
+    // The chart draws every bid the lot's bid book holds (the row's Stack A read, shared through the query cache); the
+    // episode read keeps only the newest 100 interactions, so on a busy lot it would drop the early bids.
+    const pathRows: BidPoint[] = book.data?.bids?.length ? book.data.bids : rows;
+    const bids = pathRows.filter(r => r.comment_type === 'bid' && r.bid_amount != null && Number.isFinite(Number(r.bid_amount))
       && Number(r.bid_amount) >= 0 && Number.isFinite(Date.parse(r.posted_at ?? '')));
+    const latestBid = bids.reduce<BidPoint | null>((best, r) => !best || Date.parse(r.posted_at!) > Date.parse(best.posted_at!) ? r : best, null);
     const seller = rows.find(r => r.is_seller || r.comment_type === 'seller_response');
     const question = rows.find(r => r.comment_type === 'question');
     return <section className="market-lot-inspection" id={`lot-inspection-${vehicleId}`} ref={ref}
@@ -174,7 +180,7 @@ export default function AuctionEvidence({ vehicleId, onClose, compact = false, s
       {query.isError && <p role="status">This auction could not be read. <button type="button" onClick={() => void query.refetch()}>Retry</button></p>}
       {!query.isPending && !query.isError && !evidence && <p role="status">This listing has changed or is no longer publicly available.</p>}
       {evidence && <>
-        {bids.length > 0 ? <BidPath rows={rows} selected={event?.id ?? null} onSelect={setSelected} />
+        {bids.length > 0 ? <BidPath rows={pathRows} selected={selected ?? latestBid?.id ?? null} onSelect={setSelected} />
           : <p className="auction-evidence-note">No bids yet.</p>}
         {(question || seller) && <div className="market-inspection-talk">
           {[question, seller].filter((r): r is EpisodeInteraction => !!r).map(r => <div key={r.id}>

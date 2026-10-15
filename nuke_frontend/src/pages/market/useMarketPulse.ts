@@ -17,7 +17,7 @@ export interface LiveAuction {
   noReserve: boolean;
   listingUrl: string | null;
   title: string | null; // the listing's own title as BaT publishes it
-  // Expected-price band from comparable BaT sales on the lot's model page (hammer_predictions, model 30;
+  // Expected-price band from comparable BaT sales on the lot's model page (hammer_predictions, model 31;
   // scripts/market/live-bands.mjs). Null when the lot isn't priced (no confident model page or < 5 comps).
   band: { p10: number; p50: number; p90: number; tier: string; comps: number } | null;
   // The verdict the read computed (market_pulse_live v3, slot 17, heat_of() with the server's clock); null when the

@@ -137,6 +137,24 @@ it('opens one panel that adds only what the row cannot say, with the venue link 
   } finally { HTMLElement.prototype.scrollIntoView = previous; }
 });
 
+it('draws every bid the bid book holds, not only the newest interactions', async () => {
+  fixture.book = {
+    vehicle: { id }, lot: { id: 'lot', source_url: source, auction_end_date: '2026-10-05T12:00:00Z', total_bids: 4, updated_at: '2026-10-04T11:30:00Z' },
+    readAt: '2026-10-04T11:30:00Z', bids: [
+      row('early-1', 'bid', '2026-10-01T10:00:00Z', { bid_amount: 100 }),
+      row('early-2', 'bid', '2026-10-02T10:00:00Z', { bid_amount: 400 }),
+      row('b1', 'bid', '2026-10-04T10:00:00Z', { bid_amount: 1000 }),
+      row('b2', 'bid', '2026-10-04T11:00:00Z', { bid_amount: 2000 }),
+    ],
+  };
+  await act(async () => root.render(<AuctionEvidence vehicleId={id} sourceUrl={source} compact onClose={() => {}} />));
+  // The episode read holds two dated bids; the book holds four, and the chart draws the four.
+  expect(container.querySelectorAll('svg [role="button"]')).toHaveLength(4);
+  expect(container.querySelector('.auction-evidence-chart-heading')?.textContent).toContain('4');
+  // The latest bid is the highlighted point by default.
+  expect(container.querySelector('svg [aria-pressed="true"]')?.getAttribute('aria-label')).toContain('$2,000');
+});
+
 it('preserves the row owner focus when compact inspection effects replay', async () => {
   const tile = document.createElement('button');
   const vehicle = document.createElement('button');

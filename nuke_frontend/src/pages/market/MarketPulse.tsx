@@ -452,8 +452,7 @@ export default function MarketPulse({ onUnavailable, collection }: { onUnavailab
 
   const scoped = useMemo(() => cohort.filter(a => inWindow(a, win, now)), [cohort, win, now]);
   const distribution = useMemo(() => currentBidDistribution(scoped), [scoped]);
-  // The make map is the wider inventory context. Window/range changes reshape its actual population;
-  // the selected make is highlighted within it rather than erasing all other brands.
+  // The map shows the lots after the window and bid-range filters; a chosen make narrows it to that make's lots.
   const mappedInventory = useMemo(() => live.filter(a => inWindow(a, win, now)
     && (selectedBid == null || bidBucket(a.currentBid) === selectedBid)), [live, win, now, selectedBid]);
 
@@ -530,7 +529,7 @@ export default function MarketPulse({ onUnavailable, collection }: { onUnavailab
         bar={data?.sameHour && boardReadings.length > 0 ? <RangeBar bare value={cohortBids} readings={boardReadings} fmt={bidNumber}
           weekdayUtc={data.sameHour.weekdayUtc} weeks={boardReadings.length} /> : undefined} />
       <Figure value={isLoading ? '…' : count(cohort.length)} label="Open lots" open={mapMeasure === 'lots'} onToggle={() => toggleMap('lots')}
-        title={`Open lots on the board. Compared with earlier weeks as lots with a bid (${count(bidded)} now).`}
+        title={`Open lots on the board. Compared with earlier weeks as lots with a recorded bid number, $0 included (${count(bidded)} now), the unit the hourly readings keep.`}
         relative={[lotWeekPct != null ? `${signed(lotWeekPct)} on a week ago` : null, at(lotRank)]} />
     </section>
   ) : null;
