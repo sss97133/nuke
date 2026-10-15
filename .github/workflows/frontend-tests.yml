@@ -515,7 +515,7 @@ jobs:
         with:
           deno-version: v2.x
       - name: Verify the poller ledger. Complete means data landed, and failed rows retry on a schedule
-        run: deno test supabase/functions/poll-listing-feeds/ledger.test.ts
+        run: deno test --allow-read supabase/functions/poll-listing-feeds/ledger.test.ts supabase/functions/poll-listing-feeds/kslCards.test.ts
       - name: Verify Craigslist public fetch stops access denials without a renderer or immediate retry
         run: |
           deno test supabase/functions/poll-listing-feeds/feedFetch.test.ts

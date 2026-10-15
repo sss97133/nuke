@@ -49,6 +49,7 @@ import {
 } from "./ledger.ts";
 import { projectSecretKey } from "../_shared/supabaseKeys.ts";
 import { noticeFrom, sweepCraigslistRemovals } from "./removal.ts";
+import { parseKslSearchCards } from "./kslCards.ts";
 import { nextYield } from "./schedule.ts";
 
 const corsHeaders = {
@@ -247,6 +248,7 @@ interface FeedResult {
   new_ingested?: number; // firecrawl_html path
   matched_existing?: number; // firecrawl_html path
   rejected?: number; // firecrawl_html path
+  discovery?: { cards: number; written: number; error: string | null }; // KSL search cards written to source_targets
   landed_no_data?: number; // firecrawl_html path: ingest created or matched a vehicle that holds no price, images or description
   retries_due?: number; // firecrawl_html path: failed URLs whose retry came due this poll
   backing_off?: number; // firecrawl_html path: failed URLs skipped because next_attempt_at is ahead
@@ -574,6 +576,7 @@ async function pollFirecrawlHtmlFeed(
   //  - firecrawl_html (default): Craigslist uses the archived public direct
   //    request only. Other sources retain their configured renderer/fallback.
   let urls: string[] = [];
+  let htmlForCards: string | null = null;
   let blockNote = "";
   let confirmedEmptySearch = false;
 
@@ -692,6 +695,7 @@ async function pollFirecrawlHtmlFeed(
       );
     }
 
+    htmlForCards = html;
     // Per-feed regex config generalizes this path beyond Craigslist; feeds
     // without a listing_url_regex keep the CL extractor (the original behavior).
     urls = feed.search_criteria?.listing_url_regex
@@ -706,6 +710,23 @@ async function pollFirecrawlHtmlFeed(
   }
 
   result.items_found = urls.length;
+
+  // KSL: the search cards state year, seller class and created time. Record them as discovered-not-fetched source_targets
+  // rows (no fetch, no ledger row, no attempt), so supply and tier share stay measurable while paid fetching is paused.
+  if (feed.source_slug === "ksl" && htmlForCards) {
+    const cards = parseKslSearchCards(htmlForCards).slice(0, 200);
+    if (cards.length > 0) {
+      const now = new Date().toISOString();
+      const { error: cardError } = await supabase.from("source_targets").upsert(
+        cards.map((c) => ({
+          source_slug: "ksl", listing_url: c.url, last_seen_at: now,
+          card_year: c.year, card_seller_type: c.seller_type, card_created_at: c.created_at, card_price: c.price, card_observed_at: now,
+        })),
+        { onConflict: "listing_url" },
+      );
+      result.discovery = { cards: cards.length, written: cardError ? 0 : cards.length, error: cardError ? cardError.message.slice(0, 200) : null };
+    }
+  }
 
   if (urls.length === 0 && (!confirmedEmptySearch || blockNote)) {
     return await failFeed(`parsed_zero${blockNote}`);
