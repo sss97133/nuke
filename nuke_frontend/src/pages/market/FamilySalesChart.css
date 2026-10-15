@@ -18,3 +18,8 @@
 .family-view__option { padding: 3px 10px; border: 1px solid var(--border); background: transparent; color: var(--text-secondary); cursor: pointer; }
 .family-view__option[aria-pressed="true"] { background: var(--text); color: var(--bg); border-color: var(--text); }
 .family-view__option[aria-pressed="true"] .k-label { color: var(--bg); }
+
+/* A phone: the head stacks, the legend sits under it, the plot starts below both (head = 96 in the chart's layout). */
+.family-sales--narrow .family-sales__head { height: 50px; padding: 4px 12px 0 12px; flex-direction: column; align-items: flex-start; gap: 2px; }
+.family-sales--narrow .family-sales__legend { left: 12px; right: 12px; top: 52px; gap: 8px; }
+.family-sales--narrow .family-sales__plot { top: 96px; }
