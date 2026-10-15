@@ -239,3 +239,43 @@ BEGIN
   RAISE NOTICE 'PASS: read model keeps anon output (base, roster, paging), live priors, permissions, public-only lots, one refresh job';
 END $$;
 REFRESH MATERIALIZED VIEW CONCURRENTLY public.mv_auction_calendar_lots;
+
+-- 20261016170000: each sale carries the census meta's prior_sale (the series' previous sale, from the house's index), or
+-- null; nothing else in the output changes.
+UPDATE public.source_census SET raw_response = jsonb_set(jsonb_set(raw_response, '{sales,synthetic-sale}',
+  '{"prior_sale": {"sale_key": "synthetic-2025", "lots": 12, "vehicle_lots": 10, "sold": 7, "median_price": 30000}}'::jsonb),
+  '{sales,unlanded-sale,prior_sale}', '{"sale_key": "unlanded-2025", "lots": 25, "vehicle_lots": 20, "sold": 15}'::jsonb);
+SET ROLE anon;
+CREATE TEMP TABLE prior_sale_before AS
+  SELECT public.auction_calendar_read(200) AS base, public.auction_calendar_read(200, 'gooding', 'synthetic-sale') AS roster;
+RESET ROLE;
+\ir ../migrations/20261016170000_auction_calendar_prior_sale.sql
+\ir ../migrations/20261016170000_auction_calendar_prior_sale.sql
+SET ROLE anon;
+CREATE TEMP TABLE prior_sale_after AS
+  SELECT public.auction_calendar_read(200) AS base, public.auction_calendar_read(200, 'gooding', 'synthetic-sale') AS roster;
+RESET ROLE;
+DO $$
+DECLARE vb record; va record;
+BEGIN
+  SELECT * INTO vb FROM prior_sale_before; SELECT * INTO va FROM prior_sale_after;
+  IF (SELECT s->'prior_sale' FROM jsonb_array_elements(va.base->'sales') s WHERE s->>'sale_key' = 'synthetic-sale')
+       IS DISTINCT FROM '{"sale_key": "synthetic-2025", "lots": 12, "vehicle_lots": 10, "sold": 7, "median_price": 30000}'::jsonb
+     OR (SELECT s#>>'{prior_sale,sale_key}' FROM jsonb_array_elements(va.base->'sales') s WHERE s->>'sale_key' = 'unlanded-sale')
+       IS DISTINCT FROM 'unlanded-2025' THEN
+    RAISE EXCEPTION 'Each sale must carry its census prior_sale: %', va.base->'sales';
+  END IF;
+  IF (vb.base - 'as_of' - 'sales') IS DISTINCT FROM (va.base - 'as_of' - 'sales')
+     OR (vb.roster - 'as_of' - 'sales') IS DISTINCT FROM (va.roster - 'as_of' - 'sales')
+     OR (SELECT jsonb_agg(s ORDER BY s->>'sale_key') FROM jsonb_array_elements(vb.base->'sales') s)
+        IS DISTINCT FROM (SELECT jsonb_agg(s - 'prior_sale' ORDER BY s->>'sale_key') FROM jsonb_array_elements(va.base->'sales') s) THEN
+    RAISE EXCEPTION 'prior_sale must be the only change';
+  END IF;
+  IF EXISTS (SELECT 1 FROM reader_permissions b CROSS JOIN pg_proc a
+    WHERE a.oid = b.oid
+      AND (a.proowner, a.proacl, a.prosecdef, a.proconfig, a.provolatile)
+          IS DISTINCT FROM (b.proowner, b.proacl, b.prosecdef, b.proconfig, b.provolatile)) THEN
+    RAISE EXCEPTION 'Reader permissions, owner or execution properties changed';
+  END IF;
+  RAISE NOTICE 'PASS: each sale carries its census prior_sale; nothing else changed; permissions kept';
+END $$;
