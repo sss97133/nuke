@@ -178,7 +178,7 @@ export function toLanding(item: EbayItem, htmlToText: (h: string) => string, sou
   const obsFields: Record<string, unknown> = {};
   const put = (k: string, v: unknown) => { if (v != null && v !== "") obsFields[k] = v; };
   put("year", year); put("make", make); put("model", model); put("trim", trim);
-  if (vin.vin && vin.modern) put("vin", vin.vin);
+  if (vin.vin && /^[A-Z0-9]{8,17}$/.test(vin.vin)) put("vin", vin.vin);   // seller-typed: gap-filled by the writer, never creation identity
   put("mileage", mileage); put("color", color); put("interior_color", a["interior color"]);
   put("transmission", transmission); put("drivetrain", a["drive type"] ?? a["drivetrain"]);
   put("engine_size", engine); put("body_style", a["body type"] ?? a["body style"]); put("fuel_type", a["fuel type"]);

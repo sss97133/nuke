@@ -56,3 +56,9 @@ Deno.test("a search page that parses to no cards is an error, not silence", asyn
   assertEquals(rep.ok, false);
   assertEquals(rep.errors[0].includes("0 cards"), true);
 });
+
+Deno.test("item specifics: Condition's explanatory paragraph is not read as a label", () => {
+  const md = "\n# t\n\n## Item specifics\n\nCondition\n\nUsed\n\nA vehicle is considered used if it has been registered and issued a title.\n\nSeller Notes\n\n“Runs and drives. Read moreabout the seller notes”\n\nYear\n\n1966\n\nMake\n\nFord\n\nModel\n\nBronco\n\nCategory\n\n## Item description from the seller\n\nx\n";
+  const p = parseItemPage("", md);
+  assertEquals([p.specifics["Year"], p.specifics["Make"], p.specifics["Model"], p.specifics["Condition"]], ["1966", "Ford", "Bronco", "Used"]);
+});
