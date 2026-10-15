@@ -15,6 +15,7 @@ import { normalizeVehicleFields } from '../_shared/normalizeVehicle.ts';
 import { getKnownAuctions } from './knownAuctions.ts';
 import { classifyLot, type LotSkipReason } from './lotKind.ts';
 import { lotStatus } from './lotStatus.ts';
+import { parseEstimate, saleCalendar } from './calendarKeys.ts';
 import { rmListingUrlVariants } from './lotUrl.ts';
 
 // RM Sotheby's - we'll store metadata in origin_metadata instead of linking to org table
@@ -221,6 +222,11 @@ export async function saveVehicle(
     ? (knownAuctionDate ? new Date(`${knownAuctionDate}T12:00:00Z`).toISOString() : null)
     : null;
 
+  // Calendar keys (the Mecum and Gooding contract): the sale's days from the table, the estimate as numbers. A lot read
+  // before its sale has no sold_at; ended_at is the scheduled last day, so the auction calendar can place it.
+  const calendar = saleCalendar(vehicle.auction_code, vehicle.auction_name);
+  const estimate = parseEstimate(vehicle.estimate_text);
+
   // Create vehicle_events record by its listing key (see _shared/vehicleEventWrite.ts for why not upsert)
   const episode = await deps.writeEvent(supabase, {
     vehicle_id: vehicleId,
@@ -231,11 +237,20 @@ export async function saveVehicle(
     event_status: status.event_status,
     final_price: vehicle.sold_price,
     sold_at: soldAtIso,
+    ...(calendar ? { ended_at: new Date(`${calendar.sale_ends_on}T12:00:00Z`).toISOString() } : {}),
     metadata: {
       lot_number: vehicle.lot_number,
       auction_name: vehicle.auction_name,
       auction_code: vehicle.auction_code,
       estimate_text: vehicle.estimate_text,
+      ...(estimate.low !== null ? { estimate_low: estimate.low, estimate_high: estimate.high, estimate_currency: estimate.currency ?? vehicle.currency } : {}),
+      ...(calendar ? {
+        sale_key: calendar.sale_key,
+        sale_starts_on: calendar.sale_starts_on,
+        sale_ends_on: calendar.sale_ends_on,
+        auction_session_days: calendar.auction_session_days,
+        sale_location: calendar.sale_location,
+      } : {}),
       currency: vehicle.currency,
       collection: vehicle.collection,
       bidding_type: vehicle.bidding_type,
