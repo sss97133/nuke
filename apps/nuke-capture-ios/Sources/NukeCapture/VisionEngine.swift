@@ -356,12 +356,43 @@ enum VisionEngine {
     /// matched KNOWN vin (canonical), not the raw OCR string.
     static func matchVIN(_ cg: CGImage, knownVINs: [String]) -> (vin: String, editDistance: Int)? {
         guard !knownVINs.isEmpty else { return nil }
-        let candidates = vinCandidates(in: recognizeText(cg))
+        return matchSerial(in: recognizeText(cg), known: knownVINs)
+    }
+
+    /// Known serials of every era: 17-character VINs (1981 on) and the shorter chassis numbers
+    /// before them (13 characters on a 1977 K5, 11 on a 1971 Bronco). Matching only 17-character
+    /// runs left 206 of the owner's 211 vehicles unmatchable (2026-10-15). Each known serial is slid
+    /// across each OCR line at its own length: two misreads allowed at 17 characters, one from 11,
+    /// none below; it must mix letters and digits, so a phone number or a price cannot match it.
+    /// 17-character runs also keep the edit-distance-2 recovery for a dropped or doubled character.
+    static func matchSerial(in lines: [String], known: [String]) -> (vin: String, editDistance: Int)? {
         var best: (String, Int)? = nil
-        for cand in candidates {
-            for known in knownVINs {
-                let d = levenshtein(cand, known.uppercased())
-                if d <= 2 && (best == nil || d < best!.1) { best = (known, d) }
+        func consider(_ k: String, _ d: Int) { if best == nil || d < best!.1 { best = (k, d) } }
+        let vins = known.filter { $0.count == 17 }
+        if !vins.isEmpty {
+            for cand in vinCandidates(in: lines) {
+                for k in vins {
+                    let d = levenshtein(cand, k.uppercased())
+                    if d <= 2 { consider(k, d) }
+                }
+            }
+        }
+        let texts = lines.map { Array($0.uppercased().filter { $0.isLetter || $0.isNumber }) }
+        // Every serial, 17-character VINs included, is also slid across each line: a plate read as
+        // "VIN 1GT…" joins the label onto the number, and a 17-character run then never lines up.
+        for k in known where k.count >= 8 {
+            let key = Array(k.uppercased())
+            guard key.contains(where: \.isLetter), key.contains(where: \.isNumber) else { continue }
+            let allowed = key.count >= 17 ? 2 : (key.count >= 11 ? 1 : 0)
+            for a in texts where a.count >= key.count {
+                for start in 0...(a.count - key.count) {
+                    var d = 0
+                    for i in 0..<key.count where a[start + i] != key[i] {
+                        d += 1
+                        if d > allowed { break }
+                    }
+                    if d <= allowed { consider(k, d) }
+                }
             }
         }
         return best.map { (vin: $0.0, editDistance: $0.1) }
