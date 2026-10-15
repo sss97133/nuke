@@ -171,6 +171,13 @@ Reuse the actual owners and tests:
   output without overwriting an existing receipt.
 - [Candidate assay](../../scripts/assay-sale-population.mjs): existing explicit bounded subject/input
   modes locate unresolved candidates. It is a diagnostic, not price qualification or write authority.
+- [Public-reader coverage assay](../../scripts/assays/public-reader-coverage.mjs): run through
+  `scripts/check-ingestion-health.sh --public-readers` with a finite scope and private output.
+  Its HTTP modes accept a current publishable key in `SUPABASE_ANON_KEY` or
+  `VITE_SUPABASE_ANON_KEY`, sent through `apikey` without a bearer identity. Legacy anon JWTs
+  must name the Nuke project and still pass server validation; privileged credentials never
+  substitute for an anonymous read. A successful credential check establishes no population
+  coverage: retain reader failures, unfinished pages and unknown eligible denominators.
 
 Reuse the already pinned HTML parser instead of reconstructing script-tag grammar with a regex.
 Do not repeat the failed `deno check --cached-only` invocation: the installed CLI rejected that

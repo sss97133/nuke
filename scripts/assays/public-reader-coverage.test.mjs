@@ -9,7 +9,7 @@ import { options, anonymousConfiguration, publicClient, inspectPage, runCoverage
 
 // These are offline detector inputs, never production testimony.
 const id = n => `00000000-0000-4000-8000-${String(n).padStart(12, '0')}`;
-const env = role => ({ SUPABASE_ANON_KEY: `test.${Buffer.from(JSON.stringify({ role })).toString('base64url')}.test` });
+const env = (role, ref = 'qkgaybvrernstplzjaam') => ({ SUPABASE_ANON_KEY: `test.${Buffer.from(JSON.stringify({ role, ref })).toString('base64url')}.test` });
 const parent = n => ({ id: id(n), is_public: true, deleted_at: null, listing_kind: null,
   sale_status: 'sold', auction_outcome: 'sold', canonical_outcome: 'sold', canonical_sold_price: 30000,
   year: 1966, make: 'synthetic', model: 'offline', condition_rating: null, body_style: null, engine_type: null, transmission: null, mileage: null });
@@ -31,7 +31,33 @@ test('scope uses explicit finite page/time budgets and a resumable UUID cursor',
 
 test('anonymous assay refuses service JWTs, missing anon config and another project', () => {
   assert.equal(anonymousConfiguration(env('anon')).url, 'https://qkgaybvrernstplzjaam.supabase.co');
-  for (const bad of [env('service_role'), env('authenticated'), { SUPABASE_SERVICE_ROLE_KEY:'secret' }, { SUPABASE_ANON_KEY:'sb_secret_secret' }, { ...env('anon'), SUPABASE_URL:'https://example.com' }]) assert.throws(() => anonymousConfiguration(bad));
+  for (const bad of [env('service_role'), env('authenticated'), env('anon', 'anotherproject'), env('anon', null),
+    { SUPABASE_SERVICE_ROLE_KEY:'secret' }, { SUPABASE_ANON_KEY:'sb_secret_secret' },
+    { SUPABASE_ANON_KEY:'sb_publishable_' }, { SUPABASE_ANON_KEY:'sb_publishable_key\n' },
+    { ...env('anon'), SUPABASE_URL:'https://example.com' },
+    { SUPABASE_ANON_KEY:'sb_publishable_offline', VITE_SUPABASE_URL:'https://example.com' },
+    { ...env('service_role'), VITE_SUPABASE_ANON_KEY:'sb_publishable_offline' },
+  ]) assert.throws(() => anonymousConfiguration(bad), { message: 'anonymous_configuration_required' });
+});
+
+test('current frontend publishable key works only as apikey, without a bearer identity', async () => {
+  const source = await readFile(new URL('../../nuke_frontend/src/lib/env.ts', import.meta.url), 'utf8');
+  const key = source.match(/'(sb_publishable_[A-Za-z0-9_-]+)'/)?.[1];
+  assert.ok(key, 'the current public frontend configuration uses a publishable key');
+  for (const name of ['SUPABASE_ANON_KEY', 'VITE_SUPABASE_ANON_KEY']) {
+    const config = anonymousConfiguration({ [name]: key, SUPABASE_SERVICE_ROLE_KEY:'sb_secret_offline',
+      VITE_SUPABASE_SERVICE_ROLE_KEY:'sb_secret_offline' });
+    const calls = [], client = publicClient(config, async (url, init) => { calls.push({ url, init }); return new Response('[]'); });
+    assert.equal((await client.parents(id(0), 20, 'all')).ok, true);
+    assert.equal((await client.rpc('vehicle_price_facts', { p_vehicle_ids:[id(1)] })).ok, true);
+    for (const { url, init } of calls) {
+      assert.equal(new URL(url).origin, 'https://qkgaybvrernstplzjaam.supabase.co');
+      const headers = new Headers(init.headers);
+      assert.ok(headers.get('apikey') === key);
+      assert.equal(headers.has('authorization'), false);
+      assert.equal(init.redirect, 'error');
+    }
+  }
 });
 
 test('public transport has exact eligibility, keyed pages and a read-only RPC whitelist', async () => {
@@ -47,6 +73,8 @@ test('public transport has exact eligibility, keyed pages and a read-only RPC wh
   assert.equal(u.searchParams.get('order'),'id.asc');
   assert.equal(u.searchParams.has('offset'),false);
   assert.equal(calls[0].init.redirect,'error');
+  assert.equal(calls[0].init.headers.apikey, config.key);
+  assert.equal(calls[0].init.headers.Authorization, `Bearer ${config.key}`);
   await c.rpc('vehicle_price_facts',{ p_vehicle_ids:[id(2)] });
   assert.equal(calls[1].init.method,'POST');
   assert.throws(() => c.rpc('ingest-observation',{}));

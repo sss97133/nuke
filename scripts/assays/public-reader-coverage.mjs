@@ -109,12 +109,15 @@ export function options(args, now = Date.now()) {
 export function anonymousConfiguration(env) {
   const url = (env.SUPABASE_URL || env.VITE_SUPABASE_URL || PROJECT).replace(/\/$/, '');
   const key = env.SUPABASE_ANON_KEY || env.VITE_SUPABASE_ANON_KEY;
-  if (url !== PROJECT || typeof key !== 'string') throw new AssayError('anonymous_configuration_required');
+  if (url !== PROJECT || typeof key !== 'string' || key.trim() !== key) throw new AssayError('anonymous_configuration_required');
   // Never fall back to a service key or let a privileged JWT turn this into a
-  // successful "public" assay. This runner uses the deployed legacy anon JWT.
+  // successful "public" assay. Publishable keys carry no user identity. Legacy
+  // anon JWTs must name this project; the server still decides key validity.
+  if (/^sb_publishable_[A-Za-z0-9_-]+$/.test(key)) return { url, key };
   try {
     const payload = JSON.parse(Buffer.from(key.split('.')[1], 'base64url').toString());
-    if (key.split('.').length !== 3 || payload.role !== 'anon') throw new Error();
+    if (key.split('.').length !== 3 || payload.role !== 'anon' ||
+      payload.ref !== new URL(PROJECT).hostname.split('.')[0]) throw new Error();
   } catch { throw new AssayError('anonymous_configuration_required'); }
   return { url, key };
 }
@@ -126,7 +129,9 @@ export function publicClient(config, fetcher = fetch) {
     requests++;
     try {
       const r = await fetcher(`${config.url}/rest/v1/${route}`, { ...init, redirect: 'error',
-        signal: AbortSignal.timeout(10_000), headers: { apikey: config.key, Authorization: `Bearer ${config.key}`, 'Content-Type': 'application/json' } });
+        signal: AbortSignal.timeout(10_000), headers: { apikey: config.key,
+          ...(config.key.startsWith('sb_publishable_') ? {} : { Authorization: `Bearer ${config.key}` }),
+          'Content-Type': 'application/json' } });
       if (Number(r.headers.get('content-length')) > 2_000_000) {
         await r.body?.cancel();
         return { ok: false, code: 'response_byte_limit', status: r.status };
