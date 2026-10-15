@@ -82,6 +82,20 @@ export interface CraigslistPlace {
   longitude: number | null;
 }
 
+/** The seller class the page states: its breadcrumb links back to the search it belongs to, with purveyor=owner or dealer. */
+export interface CraigslistSellerClass {
+  value: "owner" | "dealer";
+  field: "purveyor";
+  /** The search link the page carries, a short quote. */
+  text: string;
+}
+
+export function parseSellerClass(html: string): CraigslistSellerClass | null {
+  const m = /search\/[^"'<>\s]*?[?&]purveyor=(owner|dealer)\b[^"'<>\s]*/i.exec(html);
+  if (!m) return null;
+  return { value: m[1].toLowerCase() as "owner" | "dealer", field: "purveyor", text: m[0].replace(/&amp;/g, "&").slice(0, 120) };
+}
+
 export interface CraigslistCapture {
   /** Craigslist's own post id (digits), read from the page. Not the share token. */
   post_id: string | null;
@@ -93,6 +107,7 @@ export interface CraigslistCapture {
   /** Archive receipt, carried only by the fetching extractor. Not the processing clock. */
   source_capture?: { snapshot_id: string; observed_at: string };
   asking_price?: number | null;
+  seller_class?: CraigslistSellerClass;
 }
 
 // ─── text helpers ────────────────────────────────────────────────────────
@@ -406,7 +421,8 @@ export function parsePlace(html: string): CraigslistPlace | null {
 
 export function parseCapture(html: string, url?: string | null): CraigslistCapture {
   const place = parsePlace(html);
-  return { ...parsePostInfo(html, url), attributes: parseAttributes(html), ...(place ? { place } : {}) };
+  const sellerClass = parseSellerClass(html);
+  return { ...parsePostInfo(html, url), attributes: parseAttributes(html), ...(place ? { place } : {}), ...(sellerClass ? { seller_class: sellerClass } : {}) };
 }
 
 /** A page that is not a post (blocked, expired, search results) parses to nothing; nothing is then recorded. */

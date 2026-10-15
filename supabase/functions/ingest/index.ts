@@ -1761,6 +1761,7 @@ async function ingestOne(input: IngestInput, userId: string | null): Promise<Ing
           sourceDescription: captureDescription,
           isNewVehicle: match.isNew,
           modelCitation,
+          description: input.description || input.notes,
           written: {
             mileage: input.mileage,
             title_status: input.title_status,
