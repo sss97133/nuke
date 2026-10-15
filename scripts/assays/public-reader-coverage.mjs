@@ -3,6 +3,11 @@
  * Current public parent -> existing price/specification/comment/bid reader assay.
  * Keyset pages, anonymous credentials, bounded requests, append-only PRIVATE receipt.
  * No counts over the store, raw testimony reconstruction, intake, writes or inference.
+ * Typed canonical projection lineage: --family typed-specifications --subjects /private/manifest.json.
+ * The existing public_reader_lineage_subjects_v1 manifest additionally requires
+ * properties:[{key:<existing typed property key>,id:<expected registry UUID>}].
+ * Compare <=20 parent keys per typed read, then only those declared properties;
+ * matching public projections do not certify original-source or physical truth.
  * Example: bash scripts/check-ingestion-health.sh --public-readers --env /private/env
  *   --out /private/new-receipt.jsonl --until 2026-10-05T13:28:04Z --scope sold
  * Offline contract/source-target matrix (no network or environment): same command with
@@ -51,6 +56,7 @@ import { createHash } from 'node:crypto';
 import { createRequire } from 'node:module';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
+import { isDeepStrictEqual } from 'node:util';
 import { readQuery } from './data-model-coverage.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
@@ -60,6 +66,12 @@ const ZERO = '00000000-0000-0000-0000-000000000000';
 const PARENT_FIELDS = 'id,is_public,deleted_at,listing_kind,sale_status,auction_outcome,canonical_outcome,canonical_sold_price,canonical_platform,year,make,model,listing_url,discovery_url,condition_rating,body_style,engine_type,transmission,mileage';
 const READERS = new Set(['vehicle_price_facts', 'get_vehicle_specs', 'get_field_provenance', 'popup_vehicle_intel']);
 const SPEC_FIELDS = new Set(['vin', 'mileage', 'transmission', 'drivetrain', 'body_style', 'color', 'interior_color', 'engine_type', 'fuel_type', 'engine_size']);
+// Existing bulk-reader vocabulary, not authority to register or admit a claim.
+const TYPED_PROPERTIES = Object.freeze({ year: ['integer', null], make: ['string', null], model: ['string', null],
+  vin: ['string', null], interior_color: ['string', null], exterior_color: ['string', null],
+  engine_configuration: ['string', null], engine_displacement_l: ['numeric', 'liters'],
+  engine_family_label: ['string', null], transmission_type: ['enum', null], drivetrain_layout: ['enum', null],
+  mileage_miles: ['integer', 'miles'] });
 const object = x => x !== null && typeof x === 'object' && !Array.isArray(x);
 const present = x => x !== null && x !== undefined && (typeof x !== 'string' || x.trim() !== '');
 const number = x => present(x) && (typeof x === 'number' || typeof x === 'string') && Number.isFinite(Number(x)) ? Number(x) : null;
@@ -85,7 +97,7 @@ export function options(args, now = Date.now()) {
     else if (name === '--until') o.until = Date.parse(v);
     else o[name.slice(2)] = v;
   }
-  if (!o.out || !['price', 'specifications', 'comments', 'bids'].includes(o.family) ||
+  if (!o.out || !['price', 'specifications', 'typed-specifications', 'comments', 'bids'].includes(o.family) ||
     (seen.has('--comment-limit') && o.family !== 'comments') ||
     (seen.has('--comment-measurements') && o.family !== 'comments') ||
     (o.commentLimit !== undefined && (!Number.isInteger(o.commentLimit) || o.commentLimit < 1000 || o.commentLimit > 10000)) ||
@@ -213,10 +225,17 @@ export function publicClient(config, fetcher = fetch) {
     sourceIdentities(ids) { return contexts('external_identities', 'id,platform', ids); },
     rpc(name, args) {
       if (!READERS.has(name)) throw new AssayError('reader_not_allowed');
+      if (name === 'get_vehicle_specs' && Object.hasOwn(args ?? {}, 'p_vehicle_ids')) {
+        if (Object.keys(args).some(key => !['p_vehicle_ids', 'p_include_typed_claims'].includes(key)) ||
+          args.p_include_typed_claims !== true || !Array.isArray(args.p_vehicle_ids) || args.p_vehicle_ids.length < 1 ||
+          args.p_vehicle_ids.length > 20 || !args.p_vehicle_ids.every(id => UUID.test(id)) ||
+          new Set(args.p_vehicle_ids.map(id => id.toLowerCase())).size !== args.p_vehicle_ids.length) throw new AssayError('invalid_reader_scope');
+        return request(`rpc/${name}`, { method: 'POST', body: JSON.stringify(args) });
+      }
       if (name === 'vehicle_price_facts' && (!Array.isArray(args?.p_vehicle_ids) || args.p_vehicle_ids.length < 1 ||
         args.p_vehicle_ids.length > 1000 || !args.p_vehicle_ids.every(id => UUID.test(id)))) throw new AssayError('invalid_reader_scope');
       if (name !== 'vehicle_price_facts' && (!UUID.test(args?.p_vehicle_id ?? '') ||
-        name === 'get_field_provenance' && !SPEC_FIELDS.has(args?.p_field))) throw new AssayError('invalid_reader_scope');
+        name === 'get_field_provenance' && !SPEC_FIELDS.has(args?.p_field) && !Object.hasOwn(TYPED_PROPERTIES, args?.p_field))) throw new AssayError('invalid_reader_scope');
       return request(`rpc/${name}`, { method: 'POST', body: JSON.stringify(args) });
     },
   };
@@ -298,6 +317,15 @@ export function lineageSubjects(input) {
   return { population: input.population, ids, sha256: hash(input) };
 }
 
+export function typedLineageSubjects(input) {
+  const subjects = lineageSubjects(input);
+  if (!Array.isArray(input.properties) || input.properties.length < 1 || input.properties.length > 12 ||
+    !input.properties.every(p => object(p) && Object.keys(p).length === 2 && Object.hasOwn(TYPED_PROPERTIES, p.key) && UUID.test(p.id ?? '')) ||
+    new Set(input.properties.map(p => p.key)).size !== input.properties.length ||
+    new Set(input.properties.map(p => p.id.toLowerCase())).size !== input.properties.length) throw new AssayError('invalid_typed_lineage_properties');
+  return { ...subjects, properties: input.properties.map(p => ({ key: p.key, id: p.id.toLowerCase() })).sort((a, b) => a.key.localeCompare(b.key)) };
+}
+
 // Preserve PostgreSQL's microsecond clock precision and compare offsets rather
 // than rounding a fold-boundary event into the same JavaScript millisecond.
 function instant(value) {
@@ -361,6 +389,127 @@ export function inspectProvenance(id, report, value) {
   ]) if (present(report[source]) && report[source] !== observation[drilled]) fail(issue);
   if (present(report.reported_value) && report.reported_value !== observation.value) fail('selected_observation_reported_value_mismatch');
   result.lineageMatches = Object.keys(result.failures).length === 0;
+  return result;
+}
+
+export function inspectTypedSpecifications(ids, properties, value) {
+  const result = { safe: true, failures: {}, gaps: {}, parents: [] }, seen = new Set();
+  const fail = key => { result.failures[key] = (result.failures[key] ?? 0) + 1; result.safe = false; };
+  if (!Array.isArray(value) || value.length > ids.length) { fail('typed_specification_shape_invalid'); return result; }
+  for (const row of value) {
+    if (!object(row) || !ids.includes(row.vehicle_id) || seen.has(row.vehicle_id) ||
+      row.schema_version !== 'vehicle_data_model_v1' || row.grain !== 'stored_vehicle_record' ||
+      row.physical_identity_status !== 'unresolved' || row.typed_claims_status !== 'current_core_scope_read' ||
+      instant(row.read_at) === null ||
+      !object(row.model_scope) || row.model_scope.complete_vehicle_model !== false ||
+      row.model_scope.retained_metadata_is_typed_testimony !== false ||
+      row.model_scope.retained_record_fields !== 13 || row.model_scope.record_binding_property_keys !== 11 ||
+      ![11, 12].includes(row.model_scope.canonical_property_keys) || row.model_scope.source_event_history !== 'not_reconstructed' ||
+      !Array.isArray(row.typed_claims) || row.typed_claims.length > 32) { fail('typed_specification_scope_or_shape_invalid'); continue; }
+    seen.add(row.vehicle_id);
+    const keys = new Set(), propertyIds = new Set(), claims = [], unavailable = [];
+    for (const c of row.typed_claims) {
+      if (!object(c) || !Object.hasOwn(TYPED_PROPERTIES, c.property_key) || !UUID.test(c.property_id ?? '') ||
+        (c.property_key === 'engine_family_label' && row.model_scope.canonical_property_keys !== 12) ||
+        keys.has(c.property_key) || propertyIds.has(c.property_id.toLowerCase())) { fail('typed_property_identity_invalid_or_duplicate'); continue; }
+      keys.add(c.property_key); propertyIds.add(c.property_id.toLowerCase());
+      const expected = properties.find(p => p.key === c.property_key);
+      if (!expected) continue;
+      const [dataType, unit] = TYPED_PROPERTIES[c.property_key];
+      if (c.property_id.toLowerCase() !== expected.id || c.data_type !== dataType || c.unit !== unit ||
+        c.status !== 'current_canonical_claim' || !UUID.test(c.observation_id ?? '') ||
+        c.kind !== (c.property_key === 'mileage_miles' ? 'condition' : 'specification') ||
+        !(c.source_url === null || typeof c.source_url === 'string') ||
+        !(c.extraction_method === null || typeof c.extraction_method === 'string') ||
+        !(c.source_id === null || UUID.test(c.source_id ?? '')) ||
+        !(c.source_observation_id === null || UUID.test(c.source_observation_id ?? '')) ||
+        !object(c.qualifiers) ||
+        (dataType === 'integer' ? !Number.isSafeInteger(c.value) : dataType === 'numeric' ? typeof c.value !== 'number' || !Number.isFinite(c.value)
+          : typeof c.value !== 'string' || !c.value.trim())) { fail('typed_claim_contract_invalid'); continue; }
+      claims.push(c);
+    }
+    for (const p of properties) if (!keys.has(p.key)) unavailable.push(p.key);
+    result.parents.push({ id: row.vehicle_id, readAt: row.read_at, claims, unavailable });
+  }
+  result.withheldParents = ids.length - seen.size;
+  if (result.withheldParents) result.gaps.typed_parent_unavailable_after_gate = result.withheldParents;
+  return result;
+}
+
+const TYPED_QUALIFIERS = ['claim_role', 'source_profile', 'observed_at_basis', 'source_event_time_status',
+  'source_recorded_at', 'source_observed_at', 'source_value', 'normalization_version', 'source_subject_label', 'source_make_label',
+  'model_label_scope', 'identity_resolution_status', 'factory_configuration_status', 'current_configuration_status',
+  'independent_source', 'reported_precision_miles', 'value_is_approximate', 'reading_role', 'true_mileage_status', 'limitation',
+  'label_role', 'engine_identity_status', 'source_capture_sha256', 'source_captured_at', 'source_capture_basis', 'source_witness_version'];
+const TYPED_REQUIRED_QUALIFIERS = ['source_value', 'claim_role', 'observed_at_basis', 'source_event_time_status',
+  'source_recorded_at', 'source_observed_at', 'normalization_version', 'independent_source',
+  'factory_configuration_status', 'current_configuration_status'];
+const FAMILY_QUALIFIERS = { claim_role: 'listing_claim', label_role: 'publisher_powering_engine_label', engine_identity_status: 'unverified',
+  observed_at_basis: 'source_testimony_recorded_at', source_event_time_status: 'unknown', factory_configuration_status: 'unknown',
+  current_configuration_status: 'unknown', independent_source: false, normalization_version: 'retained_engine_family_label_v1',
+  source_witness_version: 'retained_description_engine_family_label_v1' };
+
+export function inspectTypedProvenance(id, claim, readAt, value) {
+  const result = { failures: {}, gaps: {}, selectedObservationFound: false, projectionMatches: false,
+    originalSourceValidation: 'unmeasured', registryRatificationValidation: 'unmeasured' };
+  const fail = key => { result.failures[key] = 1; }, gap = key => { result.gaps[key] = 1; };
+  if (!object(value) || value.vehicle_id !== id || value.field !== claim.property_key || !Array.isArray(value.observations)) {
+    fail('typed_provenance_shape_or_subject_invalid'); return result;
+  }
+  const matching = value.observations.filter(o => object(o) && o.id === claim.observation_id);
+  if (matching.length !== 1) {
+    if (matching.length) fail('typed_observation_duplicated_in_drill');
+    else gap('typed_observation_unavailable_in_current_drill');
+    return result;
+  }
+  result.selectedObservationFound = true;
+  const source = matching[0], q = claim.qualifiers;
+  const numeric = ['integer', 'numeric'].includes(claim.data_type);
+  const valueMatches = numeric ? typeof source.value === 'string' && /^-?(?:0|[1-9]\d*)(?:\.\d+)?(?:[eE][+-]?\d+)?$/.test(source.value) &&
+    Number.isFinite(Number(source.value)) && Number(source.value) === claim.value : source.value === claim.value;
+  if (!valueMatches) fail('typed_observation_value_mismatch');
+  for (const [left, right] of [['source_observation_id', 'source_observation_id'], ['source_url', 'source_url'],
+    ['kind', 'kind'], ['extraction_method', 'extraction_method'], ['confidence_score', 'confidence']]) {
+    if (!present(claim[left]) || !present(source[right])) gap(`typed_${left}_unmeasured`);
+    else if (!isDeepStrictEqual(claim[left], source[right])) fail(`typed_${left}_mismatch`);
+  }
+  if (present(claim.confidence_score) && (typeof claim.confidence_score !== 'number' || !Number.isFinite(claim.confidence_score) ||
+    claim.confidence_score < 0 || claim.confidence_score > 1)) fail('typed_confidence_invalid');
+  for (const key of ['property_id', 'source_id']) if (present(source[key]) && source[key] !== claim[key]) fail(`typed_${key}_mismatch`);
+  const cutoff = instant(readAt);
+  for (const key of ['observed_at', 'ingested_at']) {
+    if (instant(claim[key]) === null || instant(source[key]) === null || cutoff === null) gap(`typed_${key}_unmeasured`);
+    else {
+      if (!sameClock(claim[key], source[key])) fail(`typed_${key}_mismatch`);
+      if (instant(claim[key]) > cutoff) fail('typed_observation_after_reader_clock');
+    }
+  }
+  for (const key of TYPED_QUALIFIERS) {
+    const left = present(q[key]), right = present(source[key]);
+    if (!left && !right) { if (TYPED_REQUIRED_QUALIFIERS.includes(key)) gap(`typed_qualifier_${key}_unmeasured`); continue; }
+    if (!left || !right) { gap(`typed_qualifier_${key}_unprojected`); continue; }
+    if (['source_recorded_at', 'source_observed_at', 'source_captured_at'].includes(key)) {
+      if (instant(q[key]) === null || instant(source[key]) === null) gap(`typed_qualifier_${key}_unmeasured`);
+      else if (!sameClock(q[key], source[key])) fail(`typed_qualifier_${key}_mismatch`);
+    } else if (!isDeepStrictEqual(q[key], source[key])) fail(`typed_qualifier_${key}_mismatch`);
+  }
+  if (Object.keys(q).some(key => !TYPED_QUALIFIERS.includes(key))) gap('typed_qualifier_outside_assayed_scope');
+  for (const key of ['independent_source', 'value_is_approximate']) if (present(q[key]) && typeof q[key] !== 'boolean') fail(`typed_qualifier_${key}_invalid`);
+  if (q.observed_at_basis === 'source_testimony_recorded_at' && instant(q.source_recorded_at) !== null &&
+    instant(claim.observed_at) !== null && !sameClock(q.source_recorded_at, claim.observed_at)) fail('typed_source_recording_basis_mismatch');
+  if (claim.property_key === 'engine_family_label') {
+    for (const [key, expected] of Object.entries(FAMILY_QUALIFIERS)) {
+      if (!present(q[key])) gap(`typed_family_${key}_unmeasured`);
+      else if (q[key] !== expected) fail(`typed_family_${key}_invalid`);
+    }
+    if (!/^[a-f0-9]{64}$/.test(q.source_capture_sha256 ?? '') || instant(q.source_captured_at) === null ||
+      !present(q.source_capture_basis)) gap('typed_family_capture_witness_unmeasured');
+  }
+  result.projectionMatches = Object.keys(result.failures).length === 0 && Object.keys(result.gaps).length === 0;
+  // The drill omits these FKs; matching projected custody is not independent
+  // registry/source validation, extraction accuracy, or physical truth.
+  if (!present(source.property_id) || !present(source.source_id)) gap('typed_provenance_property_and_source_fk_unprojected');
+  gap('typed_original_source_and_semantic_quality_unmeasured');
   return result;
 }
 
@@ -869,6 +1018,88 @@ export async function runSpecificationLineage(client, o, subjects, { now = Date.
   summary.exitCode = summary.status === 'failed' ? 1 : summary.status === 'incomplete' ? 2 : 0;
   await emit({ type: 'summary', ...summary });
   return summary;
+}
+
+export async function runTypedSpecificationLineage(client, o, subjects, { now = Date.now, emit = async () => {}, progress = () => {} } = {}) {
+  const summary = { stage: 'read_only_public_typed_specification_projection_lineage_assay', startedAt: new Date(now()).toISOString(),
+    requestedParents: subjects.ids.length, requestedPairs: subjects.ids.length * subjects.properties.length,
+    manifestSha256: subjects.sha256, population: subjects.population, properties: subjects.properties,
+    gatedParents: 0, eligibleParents: 0, absentOrIneligibleParents: 0, inspectedParents: 0, completedParents: 0,
+    selectedClaims: 0, drilledClaims: 0, matchedProjectionPairs: 0, mismatchedPairs: 0, unavailablePairs: 0,
+    failures: {}, gaps: {}, databaseWrites: 0, modelCalls: 0, recordRepairs: 0,
+    supportedAnswerCoverage: 'unmeasured', sourceQualification: 'unmeasured', physicalTruth: 'unmeasured',
+    boundary: 'Explicit record/property manifest, at most20 current public parents per typed bulk read. Manifest property UUIDs are operator-supplied registry expectations, not an independent ratification audit. Current canonical claims only; unavailable does not identify absent evidence, privacy, withdrawal or supersession. Separate public gate/bulk/provenance reads are not a snapshot. Quotation and shared attribution/clock/uncertainty projections are compared without storing their contents. Provenance omits property/source FKs; original-source custody, extraction quality, conflicts outside the selected canonical claim, historical replay, factory/installed truth and fleet readiness remain unmeasured. No inferred metadata bindings count as testimony.' };
+  const merge = part => { for (const group of ['failures', 'gaps']) for (const [key, count] of Object.entries(part[group] ?? {})) summary[group][key] = (summary[group][key] ?? 0) + count; };
+  const failuresByReader = {};
+  const readerFailed = reader => {
+    failuresByReader[reader] = (failuresByReader[reader] ?? 0) + 1;
+    merge({ failures: { [`typed_${reader}_reader_failed`]: 1 } });
+    if (failuresByReader[reader] >= 2) summary.stopReason = 'two_typed_reader_failures_inspect_cause';
+  };
+  outer: for (let offset = 0, pages = 0; offset < subjects.ids.length; offset += 20, pages++) {
+    if (now() >= o.until || pages >= o.maxPages) { summary.stopReason = now() >= o.until ? 'time_budget_reached' : 'page_budget_reached'; break; }
+    const batch = subjects.ids.slice(offset, offset + 20), gate = await client.subjects(batch);
+    if (!gate.ok || !Array.isArray(gate.value)) { merge({ failures: { typed_parent_reader_failed: 1 } }); summary.stopReason = 'typed_parent_reader_failed'; break; }
+    const eligible = new Set();
+    for (const p of gate.value) {
+      if (!object(p) || !batch.includes(p.id) || eligible.has(p.id) || p.is_public !== true || p.deleted_at !== null || p.listing_kind === 'non_vehicle_item') {
+        merge({ failures: { typed_parent_gate_invalid: 1 } }); summary.stopReason = 'typed_parent_gate_invalid'; break outer;
+      }
+      eligible.add(p.id);
+    }
+    summary.gatedParents += batch.length; summary.eligibleParents += eligible.size; summary.absentOrIneligibleParents += batch.length - eligible.size;
+    await emit({ type: 'typed_lineage_gate', requested: batch.length, eligible: eligible.size, absentOrIneligible: batch.length - eligible.size,
+      responseSha256: hash(gate.value), durationMs: gate.durationMs });
+    if (!eligible.size) continue;
+    if (now() >= o.until) { summary.stopReason = 'time_budget_reached'; break; }
+    const ids = batch.filter(id => eligible.has(id)), specs = await client.rpc('get_vehicle_specs', { p_vehicle_ids: ids, p_include_typed_claims: true });
+    if (!specs.ok) {
+      readerFailed('specification');
+      await emit({ type: 'typed_lineage_reader_failure', reader: 'get_vehicle_specs', requested: ids.length, status: specs.status, code: specs.code });
+      if (summary.stopReason) break;
+      continue;
+    }
+    const inspected = inspectTypedSpecifications(ids, subjects.properties, specs.value); merge(inspected);
+    await emit({ type: 'typed_lineage_bulk', requested: ids.length, responseSha256: hash(specs.value), durationMs: specs.durationMs,
+      returnedParents: inspected.safe ? inspected.parents.length : 0, failures: inspected.failures, gaps: inspected.gaps });
+    if (!inspected.safe) { summary.stopReason = 'unsafe_typed_specification_output'; break; }
+    for (const p of inspected.parents) {
+      summary.inspectedParents++; summary.selectedClaims += p.claims.length; summary.unavailablePairs += p.unavailable.length;
+      if (p.unavailable.length) merge({ gaps: { requested_typed_property_unavailable: p.unavailable.length } });
+      const drills = []; let complete = true;
+      for (const claim of p.claims) {
+        if (now() >= o.until) { summary.stopReason = 'time_budget_reached'; complete = false; break; }
+        const drill = await client.rpc('get_field_provenance', { p_vehicle_id: p.id, p_field: claim.property_key });
+        if (!drill.ok) {
+          complete = false; readerFailed('provenance');
+          drills.push({ propertyKey: claim.property_key, status: drill.status, code: drill.code, durationMs: drill.durationMs });
+        } else {
+          summary.drilledClaims++;
+          const result = inspectTypedProvenance(p.id, claim, p.readAt, drill.value); merge(result);
+          if (result.projectionMatches) summary.matchedProjectionPairs++;
+          if (Object.keys(result.failures).length) summary.mismatchedPairs++;
+          drills.push({ propertyKey: claim.property_key, observationId: claim.observation_id,
+            responseSha256: hash(drill.value), durationMs: drill.durationMs, ...result });
+        }
+        if (summary.stopReason) { complete = false; break; }
+      }
+      if (complete) summary.completedParents++;
+      await emit({ type: 'typed_lineage_parent', vehicleId: p.id, measuredAt: new Date(now()).toISOString(), selectedClaims: p.claims.length,
+        unavailableProperties: p.unavailable, drills });
+      if (summary.stopReason) break outer;
+    }
+    progress({ inspectedParents: summary.inspectedParents, selectedClaims: summary.selectedClaims, matchedProjectionPairs: summary.matchedProjectionPairs, failures: summary.failures });
+  }
+  summary.stopReason ??= 'manifest_exhausted';
+  summary.eligiblePairs = summary.eligibleParents * subjects.properties.length;
+  summary.unmeasuredPairs = summary.eligiblePairs - summary.matchedProjectionPairs - summary.mismatchedPairs - summary.unavailablePairs;
+  summary.ungatedParents = summary.requestedParents - summary.gatedParents;
+  summary.finishedAt = new Date(now()).toISOString(); summary.networkRequests = client.requests;
+  summary.status = Object.keys(summary.failures).length ? 'failed' : summary.stopReason !== 'manifest_exhausted' || !summary.inspectedParents ? 'incomplete'
+    : summary.matchedProjectionPairs > 0 && summary.matchedProjectionPairs === summary.eligiblePairs ? 'matched_current_typed_projections_in_manifest'
+      : 'measured_with_unavailable_or_unmeasured_pairs';
+  summary.exitCode = summary.status === 'failed' ? 1 : summary.status === 'matched_current_typed_projections_in_manifest' ? 0 : 2;
+  await emit({ type: 'summary', ...summary }); return summary;
 }
 
 export async function runCoverage(client, o, { now = Date.now, emit = async () => {}, progress = () => {} } = {}) {
@@ -1725,7 +1956,7 @@ export async function main(args = process.argv.slice(2), deps = {}) {
     if (o.env) { const require = createRequire(path.join(ROOT, 'nuke_frontend/package.json')); require('dotenv').config({ path: o.env, quiet: true }); }
     const config = anonymousConfiguration(deps.env ?? process.env);
     const client = deps.client ?? publicClient(config);
-    const subjects = o.family !== 'price' ? lineageSubjects(JSON.parse(await readFile(o.subjects, 'utf8'))) : null;
+    const subjects = o.family !== 'price' ? (o.family === 'typed-specifications' ? typedLineageSubjects : lineageSubjects)(JSON.parse(await readFile(o.subjects, 'utf8'))) : null;
     file = await privateOutput(o.out);
     const emit = value => file.writeFile(JSON.stringify(value) + '\n');
     await emit({ type: 'manifest', schemaVersion: 'public_reader_coverage_v2',
@@ -1738,11 +1969,14 @@ export async function main(args = process.argv.slice(2), deps = {}) {
       outputContains: 'response/page hashes, scope, clocks, counts and bounded public failure UUIDs; no raw source/comment bodies or credentials' });
     const report = o.family === 'bids' ? await runBidLineage(client, o, subjects, { ...deps, emit, progress: value => print(JSON.stringify(value)) })
       : o.family === 'comments' ? await runCommentLineage(client, o, subjects, { ...deps, emit, progress: value => print(JSON.stringify(value)) })
+      : o.family === 'typed-specifications' ? await runTypedSpecificationLineage(client, o, subjects, { ...deps, emit, progress: value => print(JSON.stringify(value)) })
       : subjects ? await runSpecificationLineage(client, o, subjects, { ...deps, emit, progress: value => print(JSON.stringify(value)) })
       : await runCoverage(client, o, { ...deps, emit, progress: value => print(JSON.stringify(value)) });
     print(JSON.stringify({ status: report.status, stopReason: report.stopReason, inspectedRecords: report.inspectedRecords,
       measuredFoldRecords: report.measuredFoldRecords, recordsPerSecond: report.recordsPerSecond, failures: report.failures,
       inspectedParents: report.inspectedParents, selectedReports: report.selectedReports, matchingReports: report.matchingReports,
+      selectedClaims: report.selectedClaims, matchedProjectionPairs: report.matchedProjectionPairs, unavailablePairs: report.unavailablePairs,
+      unmeasuredPairs: report.unmeasuredPairs, supportedAnswerCoverage: report.supportedAnswerCoverage,
       measuredCommentHeaders: report.measuredCommentHeaders, identityStates: report.identityStates,
       measured: report.measured, nativeAuthorStates: report.nativeAuthorStates,
       diagnostics: report.diagnostics, gaps: report.gaps, recordRepairs: 0, verifiedRepairs: 0, databaseWrites: 0, modelCalls: 0 }));

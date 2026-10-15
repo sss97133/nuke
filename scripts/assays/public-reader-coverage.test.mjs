@@ -5,7 +5,7 @@ import { createHash } from 'node:crypto';
 import { execFileSync, spawnSync } from 'node:child_process';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
-import { options, anonymousConfiguration, publicClient, inspectPage, runCoverage, lineageSubjects, inspectSpecification, inspectProvenance, runSpecificationLineage, inspectCommentHeaders, inspectCommentLineage, inspectCommentMeasurements, runCommentLineage, inspectBidHeaders, inspectBidLineage, runBidLineage, acceptanceMatrix, reconcilePopulation, comparePopulations, acquireIdentityEvidence, inspectIdentityEvidence, PUBLIC_ACCEPTANCE, main } from './public-reader-coverage.mjs';
+import { options, anonymousConfiguration, publicClient, inspectPage, runCoverage, lineageSubjects, inspectSpecification, inspectProvenance, runSpecificationLineage, typedLineageSubjects, inspectTypedSpecifications, inspectTypedProvenance, runTypedSpecificationLineage, inspectCommentHeaders, inspectCommentLineage, inspectCommentMeasurements, runCommentLineage, inspectBidHeaders, inspectBidLineage, runBidLineage, acceptanceMatrix, reconcilePopulation, comparePopulations, acquireIdentityEvidence, inspectIdentityEvidence, PUBLIC_ACCEPTANCE, main } from './public-reader-coverage.mjs';
 
 // These are offline detector inputs, never production testimony.
 const id = n => `00000000-0000-4000-8000-${String(n).padStart(12, '0')}`;
@@ -304,6 +304,209 @@ test('lineage CLI keeps a private immutable manifest/assay receipt and a distinc
   assert.match(rows.at(-1).manifestSha256,/^[a-f0-9]{64}$/); assert.match(rows[0].assaySourceSha256,/^[a-f0-9]{64}$/);
   assert.equal(body.includes('PRIVATE CLAIM'),false); assert.equal(body.includes('PRIVATE SOURCE BODY'),false); assert.equal((await stat(out)).mode&0o777,0o600);
   assert.equal(await main(['--out',out,'--family','specifications','--subjects',input],{env:env('anon'),client:lineageClient(),print:()=>{}}),1);
+});
+
+const typedClaim = extra => ({ property_id: id(300), property_key: 'engine_family_label', data_type: 'string', unit: null,
+  value: 'SYNTHETIC FAMILY', status: 'current_canonical_claim', observation_id: id(101), source_observation_id: id(100),
+  source_id: id(200), source_url: 'https://example.com/synthetic-private-capture', kind: 'specification',
+  extraction_method: 'synthetic-offline', confidence_score: 0, observed_at: '2026-01-02T00:00:00.123456Z', ingested_at: '2026-01-03T00:00:00Z',
+  qualifiers: { source_value: 'SYNTHETIC PRIVATE ORIGINAL QUOTATION '.repeat(20), claim_role: 'listing_claim',
+    observed_at_basis: 'source_testimony_recorded_at', source_event_time_status: 'unknown',
+    source_recorded_at: '2026-01-02T00:00:00.123456Z', source_observed_at: '2026-01-01T00:00:00.123456Z',
+    normalization_version: 'retained_engine_family_label_v1', independent_source: false,
+    factory_configuration_status: 'unknown', current_configuration_status: 'unknown',
+    label_role: 'publisher_powering_engine_label', engine_identity_status: 'unverified', source_capture_sha256: 'a'.repeat(64),
+    source_captured_at: '2026-01-01T00:00:00.123456Z', source_capture_basis: 'protected_snapshot',
+    source_witness_version: 'retained_description_engine_family_label_v1' }, ...extra });
+const typedRow = (n = 1, claims = [typedClaim()]) => ({ vehicle_id: id(n), schema_version: 'vehicle_data_model_v1',
+  grain: 'stored_vehicle_record', physical_identity_status: 'unresolved', typed_claims_status: 'current_core_scope_read',
+  read_at: '2026-01-04T00:00:00Z', typed_claims: claims, model_scope: { retained_record_fields: 13, record_binding_property_keys: 11,
+    canonical_property_keys: 12, source_event_history: 'not_reconstructed', complete_vehicle_model: false, retained_metadata_is_typed_testimony: false },
+  retained_record: { property_bindings: [{ value: 'SYNTHETIC METADATA IS NOT TESTIMONY' }] } });
+const typedManifest = (ids = [id(1)], claims = [typedClaim()]) => ({ ...manifest(ids), properties: claims.map(c => ({ key:c.property_key, id:c.property_id })) });
+const typedDrill = (n = 1, c = typedClaim()) => ({ vehicle_id: id(n), field: c.property_key, observations: [{ ...c.qualifiers,
+  id: c.observation_id, value: String(c.value), source_observation_id: c.source_observation_id, source_url: c.source_url,
+  kind: c.kind, extraction_method: c.extraction_method, confidence: c.confidence_score, observed_at: c.observed_at, ingested_at: c.ingested_at,
+  content: 'SYNTHETIC PRIVATE OBSERVATION BODY' }] });
+function typedClient(extra = {}) {
+  const calls = [], rows = extra.rows ?? [typedRow()], ok = value => ({ ok:true, status:200, value });
+  return { calls, get requests() { return calls.length; }, async subjects(ids) { calls.push({reader:'vehicles', ids}); return extra.gate ?? ok((extra.parents ?? [parent(1)]).filter(p => ids.includes(p.id))); },
+    async rpc(reader, args) { calls.push({reader,args});
+      if (reader === 'get_vehicle_specs') return extra.bulk ?? ok(rows.filter(r => args.p_vehicle_ids.includes(r.vehicle_id)));
+      return extra.drills?.shift() ?? ok(typedDrill(Number(args.p_vehicle_id.slice(-12)), rows.find(r => r.vehicle_id === args.p_vehicle_id).typed_claims.find(c => c.property_key === args.p_field)));
+    } };
+}
+
+test('typed lineage requires explicit existing property keys and unique expected registry identities', () => {
+  assert.equal(typedLineageSubjects(typedManifest()).properties[0].id, id(300));
+  for (const properties of [undefined, [], [{key:'other',id:id(300)}], [{key:'engine_family_label',id:'bad'}],
+    [{key:'year',id:id(300)},{key:'make',id:id(300)}], [{key:'year',id:id(300)},{key:'year',id:id(301)}],
+    [{key:'year',id:id(300),guess:true}]]) assert.throws(() => typedLineageSubjects({...typedManifest(),properties}));
+  const args=['--out','private','--family','typed-specifications','--subjects','manifest'];
+  assert.equal(options(args).scope,'explicit_manifest');
+  for(const flags of [['--scope','all'],['--page-size','20'],['--comment-limit','1000']]) assert.throws(()=>options([...args,...flags]));
+});
+
+test('typed bulk RPC allows only an explicit true flag and at most20 distinct valid keys', async () => {
+  const calls=[],client=publicClient(anonymousConfiguration(env('anon')),async(url,init)=>{calls.push({url,init});return new Response('[]');});
+  await client.rpc('get_vehicle_specs',{p_vehicle_ids:[id(1),id(2)],p_include_typed_claims:true});
+  assert.deepEqual(JSON.parse(calls[0].init.body),{p_vehicle_ids:[id(1),id(2)],p_include_typed_claims:true});
+  for(const args of [{p_vehicle_ids:[],p_include_typed_claims:true},{p_vehicle_ids:[id(1)],p_include_typed_claims:false},
+    {p_vehicle_ids:[id(1)]},{p_vehicle_ids:[id(1)],p_include_typed:true},{p_vehicle_ids:[id(1),id(1)],p_include_typed_claims:true},
+    {p_vehicle_ids:Array.from({length:21},(_,n)=>id(n)),p_include_typed_claims:true},{p_vehicle_ids:['bad'],p_include_typed_claims:true},
+    {p_vehicle_ids:[id(1)],p_include_typed_claims:true,p_vehicle_id:id(1)}]) assert.throws(()=>client.rpc('get_vehicle_specs',args));
+  await client.rpc('get_field_provenance',{p_vehicle_id:id(1),p_field:'engine_family_label'});
+  assert.throws(()=>client.rpc('get_field_provenance',{p_vehicle_id:id(1),p_field:'unratified_future_property'}));
+  assert.equal(calls.length,2);
+});
+
+test('typed envelopes refuse foreign/duplicate parents, changed property identity and metadata promotion', () => {
+  const properties=typedLineageSubjects(typedManifest()).properties;
+  for(const rows of [[typedRow(2)],[typedRow(),typedRow()], [{...typedRow(),typed_claims_status:'not_requested'}],
+    [{...typedRow(),model_scope:{complete_vehicle_model:true,retained_metadata_is_typed_testimony:false}}],
+    [typedRow(1,[typedClaim({property_id:id(301)})])],[typedRow(1,[typedClaim({unit:'liters'})])],
+    [typedRow(1,[typedClaim({data_type:'integer'})])],[typedRow(1,[typedClaim({value:null})])],
+    [typedRow(1,[typedClaim({kind:'bid'})])], [typedRow(1,[typedClaim({source_url:{location:'other'}})])],
+    [typedRow(1,[typedClaim(),typedClaim()])]]) assert.equal(inspectTypedSpecifications([id(1)],properties,rows).safe,false);
+  const empty=inspectTypedSpecifications([id(1)],properties,[typedRow(1,[])]);
+  assert.equal(empty.safe,true);assert.deepEqual(empty.parents[0].unavailable,['engine_family_label']);assert.equal(empty.parents[0].claims.length,0);
+});
+
+test('current eleven-key and expanded twelve-key v1 scopes stay distinct, including empty reads', () => {
+  // The inspected live v1 owner declares 13 retained fields, 11 record bindings,
+  // 11 canonical keys and no reconstructed history. Values here are synthetic.
+  const make=typedClaim({property_key:'make',value:'SYNTHETIC MAKE'}),current=typedRow(1,[make]);
+  current.model_scope.canonical_property_keys=11;
+  const requested=typedManifest([id(1)],[make]).properties;
+  assert.equal(inspectTypedSpecifications([id(1)],requested,[current]).safe,true);
+  const family=typedRow();
+  assert.equal(inspectTypedSpecifications([id(1)],typedManifest().properties,[family]).safe,true);
+  family.model_scope.canonical_property_keys=11;
+  assert.equal(inspectTypedSpecifications([id(1)],typedManifest().properties,[family]).safe,false);
+  // An undeclared family is invalid even when the operator requests only make.
+  assert.equal(inspectTypedSpecifications([id(1)],requested,[family]).safe,false);
+  const changedHistory=structuredClone(current);changedHistory.model_scope.source_event_history='reconstructed';
+  assert.equal(inspectTypedSpecifications([id(1)],requested,[changedHistory]).safe,false);
+  const changedBindings=structuredClone(current);changedBindings.model_scope.record_binding_property_keys=12;
+  assert.equal(inspectTypedSpecifications([id(1)],requested,[changedBindings]).safe,false);
+  const changedFields=structuredClone(current);changedFields.model_scope.retained_record_fields=14;
+  assert.equal(inspectTypedSpecifications([id(1)],requested,[changedFields]).safe,false);
+  const unknownScope=structuredClone(current);unknownScope.model_scope.canonical_property_keys=13;
+  assert.equal(inspectTypedSpecifications([id(1)],requested,[unknownScope]).safe,false);
+  const empty=structuredClone(current);empty.typed_claims=[];
+  assert.equal(inspectTypedSpecifications([id(1)],requested,[empty]).safe,true);
+  delete empty.read_at;
+  assert.equal(inspectTypedSpecifications([id(1)],requested,[empty]).safe,false);
+  empty.read_at='infinity';
+  assert.equal(inspectTypedSpecifications([id(1)],requested,[empty]).safe,false);
+});
+
+test('typed projection comparison preserves full quotes, microsecond clocks, zero confidence and explicit uncertainty', () => {
+  const c=typedClaim(),drill=typedDrill();
+  drill.observations[0].observed_at='2026-01-01T16:00:00.123456-08:00';
+  const result=inspectTypedProvenance(id(1),c,typedRow().read_at,drill);
+  assert.equal(result.projectionMatches,true);assert.deepEqual(result.failures,{});
+  assert.equal(result.originalSourceValidation,'unmeasured');assert.equal(result.registryRatificationValidation,'unmeasured');
+  assert.equal(result.gaps.typed_provenance_property_and_source_fk_unprojected,1);
+  for(const [field,value,reason] of [['value','ANOTHER CLAIM','typed_observation_value_mismatch'],['source_observation_id',id(999),'typed_source_observation_id_mismatch'],
+    ['source_url','https://example.com/other','typed_source_url_mismatch'],['confidence',0.5,'typed_confidence_score_mismatch'],
+    ['observed_at','2026-01-02T00:00:00.123457Z','typed_observed_at_mismatch'],
+    ['source_value',c.qualifiers.source_value.slice(0,400),'typed_qualifier_source_value_mismatch'],
+    ['source_capture_sha256','b'.repeat(64),'typed_qualifier_source_capture_sha256_mismatch'],
+    ['property_id',id(998),'typed_property_id_mismatch'],['source_id',id(999),'typed_source_id_mismatch'],
+    ['engine_identity_status','verified','typed_qualifier_engine_identity_status_mismatch']]) {
+    const changed=typedDrill();changed.observations[0][field]=value;
+    assert.equal(inspectTypedProvenance(id(1),c,typedRow().read_at,changed).failures[reason],1);
+  }
+});
+
+test('typed numeric/string values remain typed and a family label cannot become verified physical identity', () => {
+  for(const [key,data_type,unit,value,text] of [['engine_displacement_l','numeric','liters',5.7,'5.70'],['year','integer',null,1995,'1995']]) {
+    const c=typedClaim({property_key:key,data_type,unit,value}),p=typedDrill(1,c);p.observations[0].value=text;
+    assert.equal(inspectTypedSpecifications([id(1)],typedManifest([id(1)],[c]).properties,[typedRow(1,[c])]).safe,true);
+    assert.equal(inspectTypedProvenance(id(1),c,typedRow().read_at,p).projectionMatches,true);
+    p.observations[0].value='0x10';assert.equal(inspectTypedProvenance(id(1),c,typedRow().read_at,p).projectionMatches,false);
+  }
+  const c=typedClaim();c.qualifiers.engine_identity_status='verified';
+  assert.equal(inspectTypedProvenance(id(1),c,typedRow().read_at,typedDrill(1,c)).failures.typed_family_engine_identity_status_invalid,1);
+  c.qualifiers.engine_identity_status='unverified';c.observed_at='2026-01-05T00:00:00Z';
+  assert.equal(inspectTypedProvenance(id(1),c,typedRow().read_at,typedDrill(1,c)).failures.typed_observation_after_reader_clock,1);
+});
+
+test('missing quote/clock projections and withdrawn claims stay unmeasured; duplicates and wrong subjects fail', () => {
+  const c=typedClaim();
+  for(const key of ['source_value','source_recorded_at','independent_source','engine_identity_status']) {
+    const p=typedDrill();delete p.observations[0][key];
+    assert.equal(inspectTypedProvenance(id(1),c,typedRow().read_at,p).projectionMatches,false);
+  }
+  const withdrawn=inspectTypedProvenance(id(1),c,typedRow().read_at,{...typedDrill(),observations:[]});
+  assert.equal(withdrawn.projectionMatches,false);assert.equal(withdrawn.gaps.typed_observation_unavailable_in_current_drill,1);assert.deepEqual(withdrawn.failures,{});
+  const duplicate=typedDrill();duplicate.observations.push(duplicate.observations[0]);
+  assert.equal(inspectTypedProvenance(id(1),c,typedRow().read_at,duplicate).failures.typed_observation_duplicated_in_drill,1);
+  assert.equal(inspectTypedProvenance(id(2),c,typedRow().read_at,typedDrill()).failures.typed_provenance_shape_or_subject_invalid,1);
+  const missing=typedClaim();delete missing.qualifiers.source_value;
+  assert.equal(inspectTypedProvenance(id(1),missing,typedRow().read_at,typedDrill()).gaps.typed_qualifier_source_value_unprojected,1);
+  const invalid=typedClaim({confidence_score:NaN});
+  assert.equal(inspectTypedProvenance(id(1),invalid,typedRow().read_at,typedDrill(1,invalid)).failures.typed_confidence_invalid,1);
+});
+
+test('typed runner gates denied parents, emits only private hashes/counters and cannot claim source truth', async () => {
+  const client=typedClient(),events=[];
+  const r=await runTypedSpecificationLineage(client,scope(),typedLineageSubjects(typedManifest([id(1),id(2)])),{emit:x=>events.push(x)});
+  assert.equal(r.eligibleParents,1);assert.equal(r.absentOrIneligibleParents,1);assert.equal(r.matchedProjectionPairs,1);assert.equal(r.unmeasuredPairs,0);
+  assert.equal(r.supportedAnswerCoverage,'unmeasured');assert.equal(r.sourceQualification,'unmeasured');assert.equal(r.databaseWrites,0);assert.equal(r.modelCalls,0);
+  assert.deepEqual(client.calls[1].args,{p_vehicle_ids:[id(1)],p_include_typed_claims:true});
+  assert.equal(r.status,'matched_current_typed_projections_in_manifest');
+  const output=JSON.stringify(events);for(const raw of ['PRIVATE ORIGINAL','PRIVATE OBSERVATION','SYNTHETIC FAMILY','https://example.com',id(2)])assert.equal(output.includes(raw),false);
+});
+
+test('empty and withheld typed responses never count metadata or unavailable answers as successful projections', async () => {
+  for(const rows of [[typedRow(1,[])],[]]) {
+    const c=typedClient({rows}),r=await runTypedSpecificationLineage(c,scope(),typedLineageSubjects(typedManifest()));
+    assert.equal(r.matchedProjectionPairs,0);assert.equal(r.exitCode,2);assert.equal(c.requests,2);assert.equal(r.supportedAnswerCoverage,'unmeasured');
+    assert.equal(r.unavailablePairs+r.unmeasuredPairs,1);
+  }
+  const c=typedClient({parents:[]}),r=await runTypedSpecificationLineage(c,scope(),typedLineageSubjects(typedManifest()));
+  assert.equal(c.requests,1);assert.equal(r.eligiblePairs,0);assert.equal(r.exitCode,2);
+});
+
+test('unsafe typed gate and bulk output stop without foreign IDs or child reads', async () => {
+  for(const extra of [{gate:{ok:true,value:[parent(999)]}},{bulk:{ok:true,value:[typedRow(999)]}}]) {
+    const c=typedClient(extra),events=[],r=await runTypedSpecificationLineage(c,scope(),typedLineageSubjects(typedManifest()),{emit:x=>events.push(x)});
+    assert.equal(r.status,'failed');assert.ok(c.requests<=2);assert.equal(JSON.stringify(events).includes(id(999)),false);
+  }
+});
+
+test('typed requests are batched to20 and two reader failures stop with unmeasured pairs', async () => {
+  const ids=Array.from({length:45},(_,n)=>id(n+1)),parents=ids.map((_,n)=>parent(n+1));
+  const c=typedClient({parents,bulk:{ok:false,status:500,code:'57014'}});
+  const r=await runTypedSpecificationLineage(c,scope(),typedLineageSubjects(typedManifest(ids)));
+  assert.equal(r.stopReason,'two_typed_reader_failures_inspect_cause');assert.equal(r.unmeasuredPairs,40);assert.equal(r.ungatedParents,5);
+  assert.deepEqual(c.calls.filter(x=>x.reader==='get_vehicle_specs').map(x=>x.args.p_vehicle_ids.length),[20,20]);
+});
+
+test('typed deadline and provenance body refusal remain unmeasured and preserve finite stop reasons', async () => {
+  let clock=0;const c=typedClient(),rpc=c.rpc;c.rpc=async(...args)=>{const result=await rpc(...args);clock=10;return result;};
+  const timed=await runTypedSpecificationLineage(c,scope({until:5}),typedLineageSubjects(typedManifest()),{now:()=>clock});
+  assert.equal(timed.stopReason,'time_budget_reached');assert.equal(timed.unmeasuredPairs,1);assert.equal(c.requests,2);
+  const refused=typedClient({drills:[{ok:false,status:200,code:'response_byte_limit'}]});
+  const r=await runTypedSpecificationLineage(refused,scope(),typedLineageSubjects(typedManifest()));
+  assert.equal(r.drilledClaims,0);assert.equal(r.unmeasuredPairs,1);assert.equal(r.status,'failed');
+  const pageClient=typedClient({parents:Array.from({length:21},(_,n)=>parent(n+1)),rows:[]});
+  const limited=await runTypedSpecificationLineage(pageClient,scope({maxPages:1}),typedLineageSubjects(typedManifest(Array.from({length:21},(_,n)=>id(n+1)))));
+  assert.equal(limited.stopReason,'page_budget_reached');assert.equal(limited.ungatedParents,1);assert.equal(pageClient.requests,2);
+});
+
+test('typed CLI preserves the distinct mode, manifest identity, exclusive receipt and omitted testimony', async t => {
+  const dir=await mkdtemp(path.join(tmpdir(),'nuke-typed-lineage-'));t.after(()=>rm(dir,{recursive:true,force:true}));
+  const input=path.join(dir,'manifest.json'),out=path.join(dir,'receipt.jsonl');await writeFile(input,JSON.stringify(typedManifest()));
+  const args=['--out',out,'--family','typed-specifications','--subjects',input];
+  assert.equal(await main(args,{env:env('anon'),client:typedClient(),print:()=>{}}),0);
+  const body=await readFile(out,'utf8'),rows=body.trim().split('\n').map(JSON.parse),summary=rows.at(-1);
+  assert.equal(rows[0].options.family,'typed-specifications');assert.equal(summary.matchedProjectionPairs,1);
+  assert.equal(summary.supportedAnswerCoverage,'unmeasured');assert.match(summary.manifestSha256,/^[a-f0-9]{64}$/);
+  assert.equal(body.includes('PRIVATE ORIGINAL'),false);assert.equal(body.includes('SYNTHETIC FAMILY'),false);assert.equal((await stat(out)).mode&0o777,0o600);
+  assert.equal(await main(args,{env:env('anon'),client:typedClient(),print:()=>{}}),1);
 });
 
 const comment = (n, extra = {}) => ({ id: id(100 + n), vehicle_id: id(1), auction_event_id: id(10),
