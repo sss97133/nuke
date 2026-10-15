@@ -110,7 +110,7 @@ export function extractFromHtml(html: string, url: string): KslExtracted {
         trim: clean(L.trim),
         vin: clean(L.vin),
         price: num(L.price) && L.price > 0 ? L.price : null,
-        mileage: num(L.mileage),
+        mileage: num(L.mileage) && L.mileage > 0 ? L.mileage : null, // KSL stores 0 for "not given"
         location: city && state ? `${city}, ${state}` : city ?? state,
         city, state, zip: clean(loc.zip),
         description,
