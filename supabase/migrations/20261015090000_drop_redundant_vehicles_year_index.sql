@@ -6,7 +6,8 @@
 -- A (year) lookup, range or sort is answered by idx_vehicles_ymm. It is kept; idx_vehicles_year is dropped.
 -- Revert (rebuilds 75 MB; run outside a transaction):
 --   CREATE INDEX CONCURRENTLY idx_vehicles_year ON public.vehicles USING btree (year);
--- DROP INDEX CONCURRENTLY cannot run inside a transaction block, so this file has none.
-SET statement_timeout = '120s';
-SET lock_timeout = '5s';
+-- DROP INDEX CONCURRENTLY cannot run inside a transaction block, so this file has none. It waits for older transactions on
+-- vehicles to finish; the first deploy (lock_timeout 5 s) timed out under intake load, so the wait is 90 s.
+SET statement_timeout = '300s';
+SET lock_timeout = '90s';
 DROP INDEX CONCURRENTLY IF EXISTS public.idx_vehicles_year;
