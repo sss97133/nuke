@@ -403,6 +403,9 @@ def main():
             "_to": dst_end["endpoint"] if dst_end else (tc if tc and tc != fc else None),
             "to_cavity": dst_end.get("cavity") if dst_end else None,
             "planned_length_ft": w.get("length_ft") if isinstance(w.get("length_ft"), (int, float)) else None,
+            # RSI pass 42: what the length is and where it came from
+            "planned_length_kind": w.get("length_kind") if isinstance(w.get("length_ft"), (int, float)) else None,
+            "planned_length_basis": (str(w.get("length_basis") or "")[:1000] or None) if isinstance(w.get("length_ft"), (int, float)) else None,
             "build_state": "uncut", "derivation_version": "k5_registry_v5", "design_status": "decided",
             "notes": "; ".join(x for x in (w.get("notes"), f"switched by: {w['control']}" if w.get("control") else None) if x)[:1000] or None,
             "harness_section": sec, "source": SRC_V5, "method": "registry loader", "observed_at": NOW, "trust": "T3",
@@ -587,7 +590,8 @@ def main():
     WIRE_KEYS = ("circuit_name", "from_component", "to_component", "wire_gauge_awg", "wire_color", "wire_type", "system_category",
                  "from_cavity", "to_cavity", "planned_length_ft", "notes", "harness_section")
     live = api.get("vehicle_custom_circuits",
-                   "select=id,circuit_code,derivation_version,build_state,from_endpoint_id,to_endpoint_id," + ",".join(WIRE_KEYS)
+                   "select=id,circuit_code,derivation_version,build_state,from_endpoint_id,to_endpoint_id,planned_length_kind,"
+                   "planned_length_basis," + ",".join(WIRE_KEYS)
                    + f"&overlay_id=eq.{OVERLAY}&is_superseded=eq.false&limit=5000") or []
     have_c = {(r["circuit_code"], r["derivation_version"]): r["id"] for r in live}
     # v5 rows the registry changed (supersede + insert, bench progress carried) or retired (supersede, no successor)
@@ -705,6 +709,19 @@ def main():
             n_ret += 1
     for r in changed_c:
         api.patch("vehicle_custom_circuits", f"id=eq.{r['id']}", {"superseded_by": have_c[(r["circuit_code"], "k5_registry_v5")]})
+    # RSI pass 42: a wire's length says what it is (kind + basis); written in place on rows the registry left otherwise
+    # unchanged, like the checks (a changed length re-rows the wire, and the new row carries its own)
+    changed_ids = {r["id"] for r in changed_c}
+    n_basis = 0
+    for r in live:
+        c = reg_v5.get(r["circuit_code"]) if r["derivation_version"] == "k5_registry_v5" else None
+        if not c or r["id"] in changed_ids:
+            continue
+        want = {k: c.get(k) for k in ("planned_length_kind", "planned_length_basis")}
+        if any((r.get(k) or None) != (v or None) for k, v in want.items()):
+            api.patch("vehicle_custom_circuits", f"id=eq.{r['id']}", want)
+            n_basis += 1
+    print(f"wire length basis: written on {n_basis} wires")
     n_cov = n_dead = 0
     for code_, (fate, why) in april_fate.items():
         rid = have_c.get((code_, "april_2026_candidate"))
