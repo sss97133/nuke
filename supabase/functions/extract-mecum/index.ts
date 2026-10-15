@@ -1311,7 +1311,7 @@ Deno.serve(async (req) => {
           // its own lots. The pool query below reads status, not locked_by.
           for (let i = 0; i < infos.length; i += 100) {
             const chunk = infos.slice(i, i + 100);
-            const { data: existing, error: exErr } = await supabase.from("import_queue").select("id, listing_url, status, processed_at, raw_data").in("listing_url", chunk.map((c) => c.url));
+            const { data: existing, error: exErr } = await supabase.from("import_queue").select("id, listing_url, status, processed_at, raw_data, locked_by").in("listing_url", chunk.map((c) => c.url));
             if (exErr) throw new Error(`roster lookup failed: ${exErr.message}`);
             const byUrl = new Map((existing ?? []).map((r: any) => [r.listing_url, r]));
             // Road Art is Mecum's automobilia division (signs, pumps, clocks): not vehicles, so not landed or fetched.
@@ -1334,6 +1334,11 @@ Deno.serve(async (req) => {
                 continue;
               }
               const due = !row.raw_data?.sale || (daysToRun <= 7 && ageH >= 24) || (daysToRun <= 30 && ageH >= 168);
+              const was = row.raw_data?.sale;
+              const same = was && row.locked_by === "extract-mecum:upcoming" && row.status !== "skipped"
+                && was.sale_key === c.info.sale_key && was.run_day === c.info.run_day && was.lot_number === c.info.lot_number
+                && JSON.stringify(was.lot_statuses) === JSON.stringify(c.info.lot_statuses);
+              if (same && !due) continue; // nothing to write; one update per lot made the roster read outrun the function limit
               const patch: Record<string, unknown> = { priority: 100, extractor_version: UPCOMING_TAG, locked_by: "extract-mecum:upcoming", raw_data: { ...(row.raw_data ?? {}), sale: { ...c.info, roster_first_seen_at: first } } };
               if (due && row.status !== "processing") { patch.status = "pending"; stat.requeued++; }
               await supabase.from("import_queue").update(patch).eq("id", row.id);
