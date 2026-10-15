@@ -97,7 +97,7 @@ const BATCH_MAX = 50;
 function htmlToMarkdown(html: string): string {
   // Extract h1 title separately (it's outside entry-content on Barn Finds)
   const h1Match = html.match(/<h1[^>]*class="entry-title"[^>]*>([\s\S]*?)<\/h1>/i) || html.match(/<h1[^>]*>([\s\S]*?)<\/h1>/i);
-  const h1Title = h1Match ? h1Match[1].replace(/<[^>]+>/g, "").trim() : "";
+  const h1Title = h1Match ? h1Match[1].replace(/<[^>]*>/g, "").replace(/[<>]/g, "").trim() : "";
   // Match entry-content first (Barn Finds WordPress structure), then fallback
   const mainMatch = html.match(/<div[^>]*class="entry-content"[^>]*>([\s\S]+?)<\/div>\s*(?:<div class="(?:author|post-tags|sharing)|<\/article)/i)
     || html.match(/<main[^>]*>([\s\S]+?)<\/main>/i)
