@@ -269,7 +269,7 @@ enum VisionEngine {
     // so the caller AND-folds it into the final decision.
 
     struct TriageResult {
-        /// isVehicle AND no prominent face. Caller ANDs in `!asset.isSensitivePhoto`.
+        /// Not clutter and not personal (the device rule of record, see triage).
         let pixelsEligible: Bool
         /// Top labels (confidence-desc), for the `apple_ml_labels` column.
         let labels: [String]
@@ -283,8 +283,15 @@ enum VisionEngine {
             return TriageResult(pixelsEligible: false, labels: [], isVehicle: false, classified: false)
         }
         let labels = Array(cls.labels.prefix(labelCap).map { $0.0 })
-        let pixelsEligible = cls.isVehicle && !hasProminentFace(cg)
-        return TriageResult(pixelsEligible: pixelsEligible, labels: labels,
+        // The device rule of record (owner, 2026-10-15: "images have their own rules via ios";
+        // scripts/ios-vision-triage applies it to stored frames): hold clutter (a document,
+        // receipt, web or product label in the top three) and personal (a prominent face and no
+        // vehicle); everything else is work evidence, including a part close-up or a tape measure
+        // on a fuse-box opening that Apple does not label "vehicle". The previous rule required an
+        // affirmative vehicle label, so measurement shots went up as metadata only.
+        let clutter = isUnnecessary(labels: Array(labels.prefix(3)), isScreenshot: false)
+        let personal = hasProminentFace(cg) && !cls.isVehicle
+        return TriageResult(pixelsEligible: !clutter && !personal, labels: labels,
                             isVehicle: cls.isVehicle, classified: true)
     }
 
