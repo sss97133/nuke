@@ -2231,6 +2231,12 @@ Every pass has a receipt in `docs/wiring/receipts/` dated 2026-10-14.
 | 5 | 20261014153000 | one net joined battery + and a PDM output to ground | the fold's own node rule, stated as data | net GND-BANK-CAB superseded, 16 nets added (400 live); supply joined to ground 0 / 400; design loads on 12 nets (battery + 180 A, peak 200 A); protection unchanged at 57. The cab ground bank's return to the engine star now waits with the DC primary (its engine end is a PS-STUDS row) |
 | 6 | 20261014163000 | terminal keys 27, tool keys 211 / 884 | the build catalog (parts.yaml, tools.yaml) | 102 catalog rows added (27 already present); terminal keys 494 / 884, tool keys 403 / 884; key_harness_wire_ends() |
 | 7 | 20261014173000 | planned lengths never checked against geometry | twin positions on 98 plugs | 132 / 638 segments with both plugs positioned; 4 of the 15 with a plan are planned shorter than the straight line (PDM30 to Dakota VHX); harness views revoked of public write grants |
+| 8 | 20261014233000 | no record of any build step; the public key could write build_state (closed first, 20261014193000) | the build_state column's own transitions, logged by trigger | append-only harness_build_events; 0 / 390 decided wires with a recorded step (nothing cut yet) |
+| 9 | 20261014234500 | Deutsch DT/DTP plugs had no cavity layout | stored customconnectorkits pages for DT 2/6/8/12-way and DTP 2/4-way | 49 / 49 Deutsch ends keyed; cavity keys 344 / 884 |
+| 10 | 20261014235500 | measures carried no unit; the owner could not see the scoreboard | the measures themselves | a grain on every measure; owner MODEL tab on the wiring page |
+| (re-plan) | 20261015001000 | four PDM30 to Dakota VHX wires planned shorter than the straight line | the twin's L18 route, 43.4 in unpadded | 0 / 15 planned shorter; the cut pad stays downstream in the BOM |
+| 11 | 20261015003000 | a loader run that supersedes a wire would strand its segments silently | the loader's own supersession links | resync fold, called by the loader after every run; 0 / 638 live segments on superseded rows |
+| 12 | 20261015013000 | the route graph lived only in repo files; 132 plug positions were copied anchor coordinates, ten of them overtaken by the record | k5LandmarkPaths.ts and the landmark YAML; state rows 0ag, 0ah and section 4 | 51 live points, 12 fallen to successors; 7 of 32 branches standing; 435 / 884 wire ends at a node, 199 of them at a node not yet placed; 46 / 638 segments at standing positions; geometry check 0 / 3 |
 
 **What the loop found that no one asked about:**
 - **A short in the model.** It was found while folding loads. The reshape treated PS-STUDS (nine distinct studs) and
@@ -2241,13 +2247,23 @@ Every pass has a receipt in `docs/wiring/receipts/` dated 2026-10-14.
 - **Six colour conflicts** between the 1973 manual and the 1978 chart: circuits 22, 67, 225, 231, 232 and 234. They are
   recorded and not resolved.
 - **Unreadable keys.** Row security was on with no policy on the cavity library and the PDM tables.
-- **Impossible lengths.** Four wires from the PDM30 to the Dakota VHX are planned shorter than the straight line between
-  their plugs. Either the PDM30 position (twin assumption A2) or the plan is wrong; it is an owner placement call.
+- **Impossible lengths.** Four wires from the PDM30 to the Dakota VHX were planned shorter than the straight line
+  between their plugs. They were re-planned from the twin's L18 route (20261015001000). Pass 12 then showed L18's own
+  PDM30 spot (twin assumption A2) was overtaken on 2026-09-29, so that plan's basis is stale. A driver-side PDM30 sits
+  nearer the Dakota box, so the plan errs long.
+- **The twin was overtaken.** Ten of its anchors were replaced by later rows of the record. The one 61-pin moved the
+  firewall crossing to the driver fuse-box hole; the M130 and PDM30 follow it; the coils are on the central
+  DEL-Stributor; the CKP is above the starter; the battery, alternator and O2 sensors moved. 24 of its 30 branches fell
+  with those points. Pass 12 keeps them all, superseded, and counts a plug's position only where its point stands.
 
 **Owed, as the scoreboard names it:**
-- Topology and routing (0 segments routed). The landmark file is length proxies, not a graph.
+- Routing (0 segments routed). The graph is in the model (pass 12). Routing waits on placing the points the record
+  leaves open: the M130, PDM30, DEL-Stributor, CKP, battery, alternator and O2 sensors (199 wire ends). The M130 and
+  PDM30 spots are an engineering call (state row 0aj), and they need a free-space check in the driver kick panel first.
 - The DC primary's stud-to-stud topology. It waits on the power-spine re-draw.
-- Loads on PDM-fed nets. The design sets each output's current from the device's measured draw.
+- Loads and limits on PDM-fed nets. The registry's pdm_settings has 39 outputs: 20 set, 18 open (each names the
+  current it needs) and 1 conflict (PDM30 OUT21 needs 12 A; an 8 A output caps at 10 A). None of it is in the model.
+  pdm_channels.fuse_rating_amps holds the pins' hardware ceiling, not the programmed limit.
 - The factory baseline's own completeness: 35 rows unkeyed and 23 cited circuits absent. The 1978 diagram pages are
   images.
 - The other 589 wire ends' cavities: GM blade, DT, rings and kit terminals each need a cited layout.
