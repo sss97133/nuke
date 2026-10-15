@@ -154,8 +154,19 @@ Deno.test("another platform keeps its existing completeness contract even with s
   equal(write({ status: "created", vehicle_id: "v1" }, WITH_DATA)!.status, "complete");
 });
 
-Deno.test("the poller ledgers nothing for an ingest error or a non-structural rejection", () => {
-  equal(write({ status: "error", error: "ingest HTTP 502" }, null), null);
+Deno.test("attempted errors back off with unknown landing, preserving an earlier vehicle pointer and attempt ceiling", () => {
+  const first = write({ status: "error", error: "ingest HTTP 502" }, WITH_DATA,
+    { status: "complete", vehicle_id: "earlier-vehicle", attempts: 0 })!;
+  equal(first.status, "failed");
+  equal(first.landed, null);
+  equal([first.row.attempts, first.row.next_attempt_at, first.row.vehicle_id], [1, iso(24 * HOUR), "earlier-vehicle"]);
+  equal((first.row.raw_data as Record<string, unknown>).ingest_result_unknown, true);
+  equal((first.row.raw_data as Record<string, unknown>).landed, undefined);
+  const timeout = write({ status: "error", error: "AbortError: timed out" }, null)!;
+  equal([timeout.status, timeout.row.failure_category, timeout.row.next_attempt_at], ["failed", "timeout", iso(HOUR)]);
+  const final = write({ status: "error", error: "HTTP 500" }, null, { status: "failed", attempts: 2, max_attempts: 3 })!;
+  equal([final.row.attempts, final.row.next_attempt_at], [3, null]);
+  equal(write({ status: "rejected", reason: "unspecified" }, null), null);
 });
 
 Deno.test("a post with a blank model is ledgered failed, retried a day later, and final at max attempts", () => {
@@ -507,6 +518,21 @@ Deno.test('measured slow calls defer the next call; fast calls use available wor
   assert(!!budget.reserve('fast'), 'fast cached extraction adapts to observed latency');
   time = 101_000;
   equal(budget.reserve('fast'), null);
+});
+
+Deno.test('feed allocations share remaining slots and redistribute empty or refused targets without raising caps', () => {
+  const budget = createIntakeBudget(intakeThrottle({ max_ingests: 40,
+    sources: { paused: { enabled: false }, small: { max_ingests: 1 } } }), 0, () => 0);
+  equal(budget.feedAllowance(40, 20), 1);
+  equal(budget.feedAllowance(4, 20), 10); // Thirty-six empty targets spent no slots.
+  equal(budget.reserve('paused'), null);
+  equal(budget.feedAllowance(3, 20), 14);
+  assert(!!budget.reserve('small'), 'one configured source slot');
+  equal(budget.reserve('small'), null);
+  equal(budget.feedAllowance(2, 20), 20);
+  equal(budget.snapshot().attempted, 1);
+  equal(budget.feedAllowance(1, 8), 8); // Article-hop ceiling survives redistribution.
+  equal(createIntakeBudget(intakeThrottle({ max_ingests: 0 }), 0, () => 0).feedAllowance(1, 20), 0);
 });
 
 Deno.test('latest source visit outranks its old metro feeds; billing errors persist a six-hour backoff', () => {
