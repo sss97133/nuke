@@ -93,6 +93,7 @@ export function fixture(options = {}) {
         createIntakeBudget: (throttle, start) => ledger.createIntakeBudget(throttle, start, runtimeDate.now) };
       if (name.endsWith('/captureLedger.ts')) return { captureLedgerFields };
       if (name.endsWith('/feedFetch.ts')) return { fetchCraigslistFeed };
+      if (name.endsWith('/schedule.ts')) return { nextYield: () => ({ rate: 0, interval_minutes: 60 }) };
       if (name.endsWith('/removal.ts')) return { sweepCraigslistRemovals: async () => null, noticeFrom: () => null };
       if (name.endsWith('/extractionMetrics.ts')) return metrics.exports;
       if (name.endsWith('/writeGuard.ts')) return { requireWriteAuth: async () => null };
