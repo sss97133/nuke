@@ -124,6 +124,19 @@ Seller type is proposed in `docs/proposals/2026-10-15-seller-type-observation.md
   only (never the search index), at most 15 a day through daily-capture-master. After 30 scored lots its observed return replaces
   the prior.
 
+### Target classes, scoped gaps and the leftover floor (owner-lead, 2026-10-15)
+
+- **Landing and re-fetch.** A Firecrawl fetch of a URL that already has a successful capture is a *re-fetch*; every other fetch is a
+  *landing*. Only landings count in the observed return (`firecrawl_lot_score.fetch_class`) and only landings are allocated; re-fetch
+  credits are reported as `refetch_credits_excluded` in the source's inputs and are never funded. Cars & Bids' recapture is the
+  negative example (about 85% of it hit removed auctions).
+- **Scoped gap.** A source without a whole-source population can still have a lower-bound gap from a scoped census window: a census
+  row with `universe_historical` NULL and `raw_response.gap_tier_missing` (the tier-relevant ids the window lists that are not held,
+  by slug model year 1964-1991). The gap is labelled `gap_basis = scoped_window`. Cars & Bids: 483 on 2026-10-15.
+- **Leftover floor.** A scoped-window source takes no part in the base stage. The credits left after the base stage go, in rank
+  order, only to sources whose rank key is at least `min_rank_leftover` (0.5), up to the same caps: a low-return source does not
+  soak up leftover just because it has a gap.
+
 **Where it lives.** Tables `firecrawl_params`, `firecrawl_source_params`, `firecrawl_spend_log`, `firecrawl_target_allocation`, `firecrawl_group_score`, `firecrawl_lot_score`;
 functions `refresh_firecrawl_target_allocation` (cron `firecrawl-target-allocation-weekly`, Mondays 05:17Z), `firecrawl_allowance`,
 `firecrawl_record_spend`, `firecrawl_score_lots`, `firecrawl_best_v1`, `firecrawl_best_v1_1`, `firecrawl_backtest`, `record_lot_quality_signals`; migrations `20261017010000_firecrawl_target_allocation.sql`, `20261017011000_firecrawl_allocation_supply_clock.sql`, `20261017020000_firecrawl_best_v1.sql`, `20261017030000_firecrawl_best_v1_1_lot_quality.sql`. Read the ranking with
