@@ -24,6 +24,7 @@ import { cleanVehicleFields, stripHtmlTags } from '../_shared/pollutionDetector.
 import { normalizeVehicleFields } from '../_shared/normalizeVehicle.ts';
 import { writeObservation } from "../_shared/observationWriter.ts";
 import { buildFullDescription, DESCRIPTION_LIMIT, htmlToText, lotProse } from "./goodingText.ts";
+import { goodingUrlVariants } from "./lotUrl.ts";
 import { fillOnlyIdentity, identityConflict } from "../_shared/identityMatch.ts";
 import { mustWrite, softWrite } from "../_shared/writeResult.ts";
 import { recordRevision } from "../_shared/revision.ts";
@@ -589,6 +590,18 @@ async function saveToDatabase(
     requireExactListingUrl: true,
   });
   let vehicleId: string | null = resolvedId;
+
+  // The same lot under the other host spelling (or a trailing slash) is the same vehicle. Without this a writer that found nothing
+  // under its own spelling inserted a second vehicle: 638 Gooding lots sit on two vehicles, one per host.
+  if (!vehicleId) {
+    const { data: byVariant } = await supabase
+      .from('vehicles')
+      .select('id')
+      .in('discovery_url', goodingUrlVariants(extracted.url))
+      .limit(1)
+      .maybeSingle();
+    if (byVariant?.id) vehicleId = byVariant.id;
+  }
 
   // Only a successful unmatched listing lookup may continue to VIN resolution.
   if (!vehicleId && extracted.vin && extracted.vin.length >= 5) {
