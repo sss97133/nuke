@@ -1016,7 +1016,8 @@ Deno.serve(async (req) => {
 
     // Upsert vehicle_event
     const vehicleEventData: Record<string, any> = {
-      source_platform: "carsandbids",
+      source_platform: "cars_and_bids", // the 18,7k events already held use this spelling
+      source_listing_id: extracted.lotNumber,
       event_type: "auction",
       source_url: listingUrlCanonical,
       vehicle_id: vehicleId,
@@ -1057,12 +1058,16 @@ Deno.serve(async (req) => {
       }
     });
 
-    const { error: listingError } = await supabase
-      .from("vehicle_events")
-      .upsert(vehicleEventData, { onConflict: "source_platform,source_url" });
+    // No unique index on (source_platform, source_url), so ON CONFLICT cannot be used (that upsert never wrote):
+    // find this vehicle's event, then update or insert.
+    const { data: heldEvent } = await supabase.from("vehicle_events").select("id").eq("vehicle_id", vehicleId)
+      .in("source_platform", ["cars_and_bids", "carsandbids"]).order("created_at", { ascending: true }).limit(1).maybeSingle();
+    const { error: listingError } = heldEvent?.id
+      ? await supabase.from("vehicle_events").update({ ...vehicleEventData, updated_at: new Date().toISOString() }).eq("id", heldEvent.id)
+      : await supabase.from("vehicle_events").insert(vehicleEventData);
 
     if (listingError) {
-      console.warn(`⚠️ C&B: Vehicle event upsert failed: ${listingError.message}`);
+      console.warn(`⚠️ C&B: Vehicle event write failed: ${listingError.message}`);
     }
 
     // Link to Cars & Bids organization
