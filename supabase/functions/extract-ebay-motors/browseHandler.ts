@@ -6,10 +6,11 @@ import { revisit, sweep } from "./browseSweep.ts";
 import { toLanding } from "./browseMap.ts";
 import { firecrawlFetcher } from "./retain.ts";
 import { discover, reland } from "./firecrawlSweep.ts";
+import { endcheck } from "./endState.ts";
 import { emptyReport, landItem } from "./browseSweep.ts";
 import { pageToItem, parseItemPage } from "./ebayPage.ts";
 
-export const BROWSE_ACTIONS = ["sweep", "revisit", "aspects", "status", "preview", "discover", "deep", "reland"];
+export const BROWSE_ACTIONS = ["sweep", "revisit", "aspects", "status", "preview", "discover", "deep", "reland", "endcheck"];
 const json = (b: unknown, status = 200) => new Response(JSON.stringify(b), { status, headers: { ...corsHeaders, "Content-Type": "application/json" } });
 
 export async function handleBrowse(supabase: any, body: any): Promise<Response> {
@@ -20,6 +21,7 @@ export async function handleBrowse(supabase: any, body: any): Promise<Response> 
     });
     return json(rep, rep.ok ? 200 : 500);
   }
+  if (body.action === "endcheck") { const rep = await endcheck(supabase, firecrawlFetcher(supabase, "ebay_motors"), { confirmMax: body.confirm_max, dailyCap: body.daily_cap, dryRun: body.dry_run === true, tiers: body.tiers, skipCensus: body.skip_census === true }); return json(rep, rep.ok ? 200 : 500); }
   if (body.action === "reland") { const rep = await reland(supabase, { limit: body.limit, offset: body.offset }); return json(rep, rep.ok ? 200 : 500); }
   if (body.action === "deep") {         // one item page: read, parse, and (unless dry_run) land
     const url = String(body.url ?? "");
