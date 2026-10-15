@@ -213,6 +213,17 @@ final class AttributionEngine: ObservableObject {
                         filing.refused > 0 ? "\(filing.refused) refused by the server" : nil,
                         "\(vinHits) serial reads"].compactMap { $0 }).joined(separator: " · ")
         NSLog("NukeCapture attribution: %@", lastSummary ?? "")
+        // The same pass report the sync writes (app_events, insert-only): what was filed, refused and
+        // asked of the profile writer, so a pass that changes nothing can be seen from the server.
+        let props: [String: AnyJSON] = [
+            "orphans": .integer(orphans.count), "read": .integer(read), "filed": .integer(filing.filed.count),
+            "refused": .integer(filing.refused), "suggested": .integer(suggested), "unresolved": .integer(unresolved),
+            "album_groups": .integer(albumGroups.count), "profiles": .array(profileResults.map { .string($0) }),
+            "ocr_budget": .integer(ocrBudget),
+        ]
+        struct Row: Encodable { let event: String; let props: [String: AnyJSON]; let user_id: String?; let path: String }
+        let row = Row(event: "ios_attribution_pass", props: props, user_id: userId, path: "ios/attribution")
+        Task.detached { try? await SupabaseService.client.from("app_events").insert(row).execute() }
         return true
     }
 
