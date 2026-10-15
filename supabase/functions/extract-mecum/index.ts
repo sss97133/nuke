@@ -1336,6 +1336,7 @@ Deno.serve(async (req) => {
         .map(([value, count]) => ({ value, count, end: Number(value.split("|")[2]) }))
         .filter((x) => Number.isFinite(x.end) && x.end >= nowEpoch);
       const census: Record<string, number> = {};
+      const salesMeta: Record<string, { name: string; starts_on: string; ends_on: string }> = {};
       const seen = new Set<string>();
       const report: Record<string, { stated: number; read: number; queued: number; requeued: number }> = {};
 
@@ -1356,6 +1357,7 @@ Deno.serve(async (req) => {
             const parsed = term ? parseSaleFacet(sale.value, term.slug) : null;
             if (!parsed || !hit.permalink) continue;
             key = parsed.sale_key;
+            salesMeta[key] = { name: parsed.auction_name, starts_on: parsed.sale_starts_on, ends_on: parsed.sale_ends_on };
             const url = `https://www.mecum.com${hit.permalink}`;
             seen.add(url);
             stat.read++;
@@ -1458,6 +1460,7 @@ Deno.serve(async (req) => {
             census_url: `https://${ALGOLIA_APP}-dsn.algolia.net/1/indexes/${ALGOLIA_INDEX}/query`,
             census_notes: `Algolia index ${ALGOLIA_INDEX}, facet taxonomies.auction_tax.name, sales with end >= read time; by_category keys are the auction_tax slug (events' metadata.sale_key).`,
             by_category: census,
+            raw_response: { sales: Object.fromEntries(Object.keys(census).map((k) => [k, salesMeta[k]])) },
           });
           censusWritten = !error;
           if (error) console.warn(`[MECUM] census not written: ${error.message}`);
