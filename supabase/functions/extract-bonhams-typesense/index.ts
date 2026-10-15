@@ -283,7 +283,13 @@ function lotToExtraction(doc: BonhamsDoc, ctx: LandContext): Record<string, unkn
   const hammer = doc.price?.hammerPrice > 0 ? Math.round(doc.price.hammerPrice) : null;
   const ended = !!doc.flags?.isAuctionEnded;
   const runDay = String(doc.hammerTime?.datetime || doc.auctionEndDate?.datetime || "").slice(0, 10);
+  // Lot-level evidence that a lot is a vehicle (department is the sale's, so MOT-CAR also holds mascots, handbooks and helmets): a chassis,
+  // frame or VIN line in the title or catalog text, or a year the title parser found. Neither: an item, not a car (2026-10-16: 1,249 of the
+  // 2,422 Bonhams episodes with no year had neither, and every one sampled was memorabilia).
+  const hasMarker = /(chassis|frame)\s+no\.?|\bVIN[: .]/i.test(`${doc.title ?? ""} ${doc.catalogDesc ?? ""}`);
+  const nonVehicle = !hasMarker && m.listing_year == null;
   return {
+    non_vehicle_item: nonVehicle,
     url: m.listing_url,
     title: m.listing_title,
     year: m.listing_year,
