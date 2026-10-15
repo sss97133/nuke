@@ -285,6 +285,9 @@ Contract, as delivered in `auction_calendar_read` and the Market tab's `?collect
   unique on `vehicles`, so a resold car lands on its existing record). Outcomes are the source's own; a `sold` written by
   `orphan-backfill-v1` reads "recorded, result unconfirmed" (that backfill labeled any priced row sold, classified asks
   included), except Gooding and Barrett-Jackson, whose published prices `vehicle_sale_basis()` accepts as sales.
+- **Prior occurrence dates.** An earlier record's displayed date comes from `ended_at`, else `sold_at`; when both
+  are absent it stays undated. `created_at` remains a retention clock for existing prior eligibility and ordering,
+  never a source occurrence date. This date correction does not qualify an earlier record's price or sale outcome.
 - **Not claimed.** The calendar is the lots Nuke has landed, not the house's full roster, until the stated count is held
   beside it; an estimate is the house's; "no reserve" is the house's flag.
 
