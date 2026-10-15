@@ -202,8 +202,9 @@ def position(code):
     ps = PIN_SPLICE.get(code)
     if ps:
         at = position(ps["plug"])
-        return dict(at, pos_source=f"beside {ps['plug']} pin {ps['cavity']}: the splice sits behind the plug on its lead; "
-                                   + at["pos_source"]) if at else {}
+        # the plug's own source first: the route graph keys a node by the twin anchor its pos_source starts with (RSI pass 28)
+        return dict(at, pos_source=at["pos_source"] + f" — beside {ps['plug']} pin {ps['cavity']}: the splice sits behind the "
+                                                      "plug on its lead") if at else {}
     a = NODE_ANCHOR.get(code)
     if not a and TWIN_OBJ.get(code) in TWIN_POS:
         x, y, z = TWIN_POS[TWIN_OBJ[code]]
@@ -801,6 +802,9 @@ def main():
     # the harness model (harness_segments) follows the wires and wire ends this run superseded (RSI pass 11), and every
     # plug this run wrote is keyed to its live point on the route graph, by the anchor named in pos_source (RSI pass 12)
     if not PLAN:
+        # a plug this run added takes the reshape's node rule (bus for a splice, ground bus or stud) before any fold reads it
+        # (RSI pass 28)
+        print(f"node kinds: {api._req('POST', 'rpc/classify_harness_endpoint_nodes', {'p_vehicle_id': K5})}")
         print(f"harness model: {api._req('POST', 'rpc/resync_harness_segments', {'p_vehicle_id': K5})}")
         # every decided wire's segments follow its live ends by the reshape's rule: new wires get segments, a segment whose
         # end changed plug takes the new end (RSI pass 25, which covers pass 19's fill); the new ends are keyed to their
@@ -809,6 +813,8 @@ def main():
         print(f"wire end keys: {api._req('POST', 'rpc/key_harness_wire_ends', {'p_vehicle_id': K5})}")
         # and to their cavity in the cited library (RSI pass 22: the rules of passes 2 and 9, re-runnable)
         print(f"cavity keys: {api._req('POST', 'rpc/key_harness_wire_end_cavities', {'p_vehicle_id': K5})}")
+        # citations on a wire end this run re-inserted at the same plug and cavity follow it (RSI pass 28)
+        print(f"evidence carried: {api._req('POST', 'rpc/carry_harness_termination_evidence', {'p_vehicle_id': K5})}")
         print(f"route graph: {api._req('POST', 'rpc/key_harness_endpoints_to_topology', {'p_vehicle_id': K5})}")
         # nets re-folded through bus plugs and shared pins (RSI pass 14); it re-folds protection too: each net's PDM output
         # from its wire ends' pins, else the output its wires' design names (RSI pass 13)
