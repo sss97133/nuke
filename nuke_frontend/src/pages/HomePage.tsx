@@ -188,9 +188,11 @@ export function mapLegend(level: MapLevel, measured = level === 'brands' || leve
 
 /** The legend under the map: the sales chart's when a family shows its chart (the tiles' legend described tiles that
  *  were not on screen, 2026-10-15), the level's otherwise. */
-export const SALES_CHART_LEGEND = 'one dot = one confirmed sale with a date, the last five years · price on a log scale · '
-  + 'color = venue · line = the median of the sales within 60 days either side, every 14 days · BaT median = Bring a '
-  + 'Trailer\'s last 12 months against the 12 before · nominal · click a dot to open its record';
+export const SALES_CHART_LEGEND = 'one dot = one confirmed sale with a date, the last five years · one panel per model-year '
+  + 'decade, all on one log price axis from the family\'s 1st to 99th percentile (sales past it sit on the edge, counted) · '
+  + 'color = venue · line = the median of the sales within 60 days either side, every 14 days; band = their middle half · '
+  + 'headline = Bring a Trailer\'s price move, each decade\'s median weighted by its sales a year earlier · nominal · '
+  + 'click a dot to open its record';
 export function legendFor(level: MapLevel, chartShown: boolean, measured?: boolean): string {
   return chartShown ? SALES_CHART_LEGEND : measured === undefined ? mapLegend(level) : mapLegend(level, measured);
 }
