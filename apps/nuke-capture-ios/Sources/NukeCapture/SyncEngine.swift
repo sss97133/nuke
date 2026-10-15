@@ -430,7 +430,24 @@ final class SyncEngine: ObservableObject {
         let fetch = PHAsset.fetchAssets(with: options)
         var assets: [PHAsset] = []
         fetch.enumerateObjects { asset, _, _ in assets.append(asset) }
-        guard !assets.isEmpty else {
+
+        // Newest first: the last three days lead every pass, so a frame shot this morning uploads
+        // on the next open even while the watermark window is months behind. On 2026-10-15 the
+        // owner's window started in June; every pass re-read the same 200 June photos (all in
+        // iCloud, deferred) and the morning's measurement shots never came up.
+        let recentOptions = PHFetchOptions()
+        recentOptions.predicate = NSPredicate(
+            format: "creationDate > %@ AND mediaType == %d",
+            Date(timeIntervalSinceNow: -Config.recentFirstWindow) as NSDate, PHAssetMediaType.image.rawValue
+        )
+        recentOptions.sortDescriptors = [NSSortDescriptor(key: "creationDate", ascending: false)]
+        recentOptions.fetchLimit = Config.maxPerRun
+        var recent: [PHAsset] = []
+        PHAsset.fetchAssets(with: recentOptions).enumerateObjects { asset, _, _ in recent.append(asset) }
+        let recentIDs = Set(recent.map(\.localIdentifier))
+        let ordered = recent + assets.filter { !recentIDs.contains($0.localIdentifier) }
+
+        guard !ordered.isEmpty else {
             advanceWatermark(to: runStarted, failures: 0)
             return true
         }
@@ -446,8 +463,11 @@ final class SyncEngine: ObservableObject {
         let foreground = UIApplication.shared.applicationState != .background
         var byteWork = 0
         foregroundBudgetReached = false
+        // Originals only in iCloud go to the backfill queue, which the background job drains with
+        // network; they no longer hold the watermark (a window of them used to stall it for good).
+        var deferredIDs: [String] = []
 
-        for asset in assets {
+        for asset in ordered {
             // iOS: BGAppRefreshTask expiration cancels this task — stop
             // cleanly; un-processed assets retry next pass because the
             // watermark below only advances on failures == 0.
@@ -494,9 +514,10 @@ final class SyncEngine: ObservableObject {
             case .gaveUp:
                 break   // failed Config.maxAttemptsPerAsset times; counted in gaveUpCount, holds nothing back
             case .deferred:
-                // In iCloud only and not on Wi-Fi: retried on Wi-Fi, not an attempt against the photo.
-                failed += 1
+                // In iCloud only: the background job downloads it on Wi-Fi. Not an attempt against
+                // the photo, and not a failure that holds the watermark.
                 deferred += 1
+                deferredIDs.append(asset.localIdentifier)
             case .authFailed:
                 failed += 1
                 stop = true
@@ -509,8 +530,9 @@ final class SyncEngine: ObservableObject {
             "\(uploaded) uploaded", "\(deduped) already up", "\(skipped) off-site or not this camera",
             deferred > 0 ? "\(deferred) in iCloud, wait for the charging job" : nil,
             heldPrivate > 0 ? "\(heldPrivate) held private" : nil,
-            failed - deferred > 0 ? "\(failed - deferred) failed" : nil,
-        ].compactMap { $0 }.joined(separator: " · ") + " · of \(assets.count) photos in this pass"
+            failed > 0 ? "\(failed) failed or left for the next pass" : nil,
+        ].compactMap { $0 }.joined(separator: " · ") + " · of \(ordered.count) photos in this pass, newest first"
+        enqueueBackfill(deferredIDs)
 
         persistSeenAssets()
         totalSkippedOffShop += skipped
@@ -528,6 +550,18 @@ final class SyncEngine: ObservableObject {
               uploaded, metadataOnly, skipped, heldPrivate, deduped, failed)
         await refreshAnalyzedCount()
         return failed == 0
+    }
+
+    /// Adds assets to the persisted backfill queue (deduplicated), for the background job.
+    private func enqueueBackfill(_ ids: [String]) {
+        guard !ids.isEmpty else { return }
+        var queue = defaults.stringArray(forKey: Key.backfillQueue) ?? []
+        var known = Set(queue)
+        let add = ids.filter { known.insert($0).inserted }
+        guard !add.isEmpty else { return }
+        queue.append(contentsOf: add)
+        defaults.set(queue, forKey: Key.backfillQueue)
+        backfillRemaining = queue.count
     }
 
     private func advanceWatermark(to date: Date, failures: Int) {
