@@ -33,9 +33,9 @@ export interface MapNode {
   designStatus: 'concept' | 'decided';
   workStatus: WorkStatus;
   assignee: string | null;
-  x: number | null;          // twin coords (m); null = not placed
+  x: number | null;          // twin coords (m) of the plug's live route-graph point; null = not placed
   y: number | null;
-  posSource: string | null;
+  posSource: string | null;  // why it sits there, or why it is not placed yet
   partNumber: string | null;
   notes: string | null;
   source: string | null;
@@ -132,7 +132,7 @@ export function useWiringMap(vehicleId: string | undefined): WiringMapData {
       const [nodes, wires, ends, options, links] = await Promise.all([
         designIds.length
           ? supabase.from('harness_endpoints')
-              .select('id, code, name, endpoint_type, family, harness_section, design_status, work_status, assignee, pos_x_m, pos_y_m, pos_source, part_number, notes, source, trust')
+              .select('id, code, name, endpoint_type, family, harness_section, design_status, work_status, assignee, pos_x_m, pos_y_m, pos_source, part_number, notes, source, trust, topology:harness_topology_nodes(node_code, pos_x_m, pos_y_m, pos_source)')
               .in('design_id', designIds).eq('is_superseded', false).not('code', 'is', null).limit(2000)
           : Promise.resolve({ data: [], error: null }),
         overlayIds.length
@@ -161,14 +161,17 @@ export function useWiringMap(vehicleId: string | undefined): WiringMapData {
       setData({
         loaded: true,
         error: null,
-        nodes: ((nodes.data ?? []) as Row[]).map(r => ({
+        // a plug keyed to the route graph sits at its live point (overtaken twin anchors fall to their successors);
+        // the copied twin coordinates stand only for a plug with no point
+        nodes: ((nodes.data ?? []) as Row[]).map(r => { const t = r.topology as Row | null; return {
           id: r.id as string, code: r.code as string, name: s(r.name) ?? (r.code as string), type: s(r.endpoint_type) ?? 'custom',
           family: s(r.family), section: s(r.harness_section) as Section | null,
           designStatus: (s(r.design_status) ?? 'concept') as MapNode['designStatus'],
           workStatus: (s(r.work_status) ?? 'open') as WorkStatus, assignee: s(r.assignee),
-          x: n(r.pos_x_m), y: n(r.pos_y_m), posSource: s(r.pos_source), partNumber: s(r.part_number),
-          notes: s(r.notes), source: s(r.source), trust: s(r.trust),
-        })),
+          x: n(t ? t.pos_x_m : r.pos_x_m), y: n(t ? t.pos_y_m : r.pos_y_m),
+          posSource: t ? [s(t.node_code), s(t.pos_source)].filter(Boolean).join(': ') || null : s(r.pos_source),
+          partNumber: s(r.part_number), notes: s(r.notes), source: s(r.source), trust: s(r.trust),
+        }; }),
         wires: ((wires.data ?? []) as Row[]).map(r => ({
           id: r.id as string, code: r.circuit_code as string, name: s(r.circuit_name) ?? '', section: s(r.harness_section) as Section | null,
           designStatus: (s(r.design_status) ?? 'concept') as MapWire['designStatus'], derivation: s(r.derivation_version),
