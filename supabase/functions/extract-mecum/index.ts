@@ -34,6 +34,7 @@ import { projectSecretKey } from "../_shared/supabaseKeys.ts";
 import { postFromFlight } from "./rscPost.ts";
 import { mustWrite, softWrite } from "../_shared/writeResult.ts";
 import { indexLot, parseSaleFacet, type IndexLot } from "./indexLot.ts";
+import { fillOnlyIdentity } from "./identityFill.ts";
 import { patchForLiveRow, writeVehicleEventByKey } from "../_shared/vehicleEventWrite.ts";
 
 const EXTRACTOR_VERSION = "2.0.0";
@@ -234,13 +235,6 @@ async function raiseRevision(
     p_snapshot_id: snapshotId ?? null, p_detail: detail, p_vehicle_id: null,
   });
   if (error) softWrite("record_revision_item", { error }, writeErrors);
-}
-
-/** Whether a lot's year, make or VIN is the vehicle's own, ignoring case, spacing and punctuation. */
-function sameIdentityValue(field: string, have: unknown, lot: unknown): boolean {
-  const norm = (v: unknown) => String(v).toUpperCase().replace(/[^A-Z0-9]/g, "");
-  if (field === "year") return Number(have) === Number(lot);
-  return norm(have) === norm(lot);
 }
 
 /** Bookkeeping and optional-enrichment writes that failed during this request (softWrite); reported in the response. */
@@ -1078,14 +1072,9 @@ async function saveVehicle(
     // make or VIN is another vehicle (or a wrong link), never an overwrite: it goes to the revision queue to be relinked, and
     // nothing of it (vehicle fields, event, observation) is written against this vehicle. This update used to write the lot's
     // whole payload, the defect that made vehicles carrying one platform's truck and another's VIN.
-    const disagree: string[] = [];
-    for (const k of ["year", "make", "model", "vin"] as const) {
-      const have = (existing as any)?.[k];
-      if (have === null || have === undefined || have === "") continue; // empty: the lot may fill it
-      const lot = (updateData as any)[k];
-      if (lot !== null && lot !== undefined && lot !== "" && k !== "model" && !sameIdentityValue(k, have, lot)) disagree.push(k);
-      delete (updateData as any)[k];
-    }
+    const filled = fillOnlyIdentity(existing as any, updateData as any);
+    const disagree = filled.disagree;
+    for (const k of ["year", "make", "model", "vin"]) if (!(k in filled.update)) delete (updateData as any)[k];
     if (disagree.length) {
       await raiseRevision(supabase, vehicle.url, disagree, "quality_gate", "relink", {
         vehicle_id: existingId,
