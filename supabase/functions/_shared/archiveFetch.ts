@@ -330,7 +330,7 @@ export async function archiveFetch(
     result.error = directResult.error ?? null;
 
     // The site refused our server's address: one Firecrawl scrape, only for callers that opted in.
-    const refused = !result.html && (/blocked|forbidden|captcha|challenge/i.test(result.error ?? "") || [401, 403, 429].includes(result.statusCode ?? 0));
+    const refused = !result.html && (/blocked|forbidden|captcha|challenge|auth_required|login page/i.test(result.error ?? "") || [401, 403, 429].includes(result.statusCode ?? 0));
     if (options?.firecrawlOnBlock && refused) {
       const fcResult: FirecrawlScrapeResult = await firecrawlScrape({
         url,
