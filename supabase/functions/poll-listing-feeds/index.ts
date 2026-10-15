@@ -759,7 +759,8 @@ async function pollFirecrawlHtmlFeed(
   }
   // New URLs first, then failed ones whose retry is due; the cap applies to both.
   const plan = planIngests(urls, onVehicles, ledgerRows, new Date(), Math.min(MAX_NEW_INGESTS_PER_POLL, allocation),
-    feed.source_slug === "craigslist" ? CRAIGSLIST_REVISIT : null);
+    feed.source_slug === "craigslist" ? { ...CRAIGSLIST_REVISIT, max: Math.min(CRAIGSLIST_REVISIT.max, budget.revisitAllowance()) } : null);
+  budget.spendRevisits(plan.revisits ?? 0);
   result.matched_existing = plan.settled + plan.backoff;
   result.retries_due = plan.retries;
   result.backing_off = plan.backoff;
