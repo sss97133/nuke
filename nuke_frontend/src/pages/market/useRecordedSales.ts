@@ -99,9 +99,15 @@ export function useSalesScopes() {
     staleTime: 30 * 60_000, retry: false, refetchOnWindowFocus: false });
 }
 
+/** A cold cache can carry one read past get_market_trends' 5 s statement_timeout, and that read warms the cache, so one
+ *  retry answers (2026-10-15, logged out: the 7-day Porsche read took 4.2 s cold, 0.9 s warm, and 5.1 s → HTTP 500 at
+ *  06:46Z). Any other failure, or a second timeout, is shown as it is. */
+export const retryColdTimeout = (failureCount: number, error: unknown) =>
+  failureCount < 1 && (error as { code?: unknown } | null)?.code === '57014';
+
 export function useRecordedSales(request: SalesRequest | null) {
   return useQuery({ queryKey: ['market-recorded-sales', request], enabled: request != null,
-    queryFn: () => fetchRecordedSales(request!), staleTime: 60_000, retry: false, refetchOnWindowFocus: false,
+    queryFn: () => fetchRecordedSales(request!), staleTime: 60_000, retry: retryColdTimeout, refetchOnWindowFocus: false,
     // Keep the chart while a focused evidence read arrives, but never carry one population into another.
     placeholderData: (data, previousQuery) => {
       const previous = previousQuery?.queryKey[1] as SalesRequest | null | undefined;
