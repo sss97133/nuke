@@ -20,7 +20,9 @@ spec.loader.exec_module(c)
 
 HANDOFF = {"objective": "Make an existing source failure diagnosable", "acceptance": ["receipt demonstrates the source failure"],
            "status": "active", "next_action": "Inspect the retained capture and its writer", "progress": "Located the writer",
-           "blocker": "", "unblock_condition": "", "prs": [], "superseded_prs": [], "evidence": []}
+           "blocker": "", "unblock_condition": "", "ready_actions": [], "prs": [], "superseded_prs": [], "evidence": []}
+READER_INSPECTION = ("Read loadVehicleData.ts and useVehicleHeaderData.ts to identify the existing anon RPC "
+                     "and acceptance criterion 4 evidence, independently of PR review.")
 
 
 class ContinuationTests(unittest.TestCase):
@@ -46,12 +48,12 @@ class ContinuationTests(unittest.TestCase):
         self.command.start()
         self.addCleanup(self.command.stop)
 
-    def invoke(self, output=None, rc=0, sleep=0):
+    def invoke(self, output=None, rc=0, sleep=0, tick=False):
         payload = output if output is not None else {"session_id": self.controller.state["session_id"], "structured_output": HANDOFF}
         # Actual child process; captures the selected session flags, then returns CLI-shaped JSON.
         program = "import sys,time; time.sleep(float(sys.argv[1])); print(sys.argv[2]); sys.exit(int(sys.argv[3]))"
-        with patch.object(self.controller, "agent_command", return_value=[sys.executable, "-c", program, str(sleep), json.dumps(payload), str(rc)]) as cmd:
-            result = self.controller.invoke(self.wt, 5, self.lock.fileno())
+        with patch.object(self.controller, "agent_command", return_value=[sys.executable, "-c", program, str(sleep), json.dumps(payload), str(rc)]) as cmd, patch.object(self.controller, "worktree", return_value=self.wt):
+            result = self.controller.tick(self.lock.fileno()) if tick else self.controller.invoke(self.wt, 5, self.lock.fileno())
             return result, cmd.call_args.args[1]
 
     def test_two_independent_invocations_resume_same_goal_and_session(self):
@@ -145,6 +147,179 @@ class ContinuationTests(unittest.TestCase):
             self.controller.tick(self.lock.fileno())
             invoke.assert_called_once()
         self.assertEqual(self.controller.state["handoff"]["objective"], HANDOFF["objective"])
+
+    def test_pending_review_continues_independent_reader_inspection_in_same_session(self):
+        self.invoke()
+        first = copy.deepcopy(self.controller.state)
+        pending = [{"number": 123, "state": "OPEN", "headRefOid": "a"}]
+        handoff = {**HANDOFF, "status": "waiting_review", "prs": [123], "ready_actions": [READER_INSPECTION],
+                   "next_action": "Independent of review: " + READER_INSPECTION,
+                   "blocker": "Merge requires review and remains held for the unattended runner",
+                   "unblock_condition": "The authorized owner merges the reviewed PR"}
+        payload = {"session_id": first["session_id"], "structured_output": handoff}
+        with patch.object(self.controller, "pr_state", return_value=pending):
+            self.assertEqual(self.invoke(payload)[0], 0)
+        self.controller = c.Controller()
+        with patch.object(self.controller, "pr_state", return_value=pending):
+            result, identity = self.invoke(payload, tick=True)
+        self.assertEqual(result, 0)
+        self.assertEqual(identity, ["--resume", first["session_id"]])
+        self.assertEqual(self.controller.state["status"], "active")
+        self.assertEqual(self.controller.state["worktree"], first["worktree"])
+        self.assertEqual(self.controller.state["handoff"]["acceptance"], first["handoff"]["acceptance"])
+        self.assertEqual(self.controller.state["handoff"]["blocker"], handoff["blocker"])
+        self.assertGreater(self.controller.state["spent_seconds"], first["spent_seconds"])
+
+    def test_ready_work_does_not_remove_dependent_production_hold(self):
+        handoff = {**HANDOFF, "status": "blocked", "ready_actions": [READER_INSPECTION],
+                   "blocker": "Production writes are not authorized", "unblock_condition": "Explicit owner authorization"}
+        self.controller.accept(handoff, self.wt)
+        self.assertEqual(self.controller.state["status"], "active")
+        self.assertEqual(self.controller.state["handoff"]["status"], "blocked")
+        self.assertEqual(self.controller.state["handoff"]["unblock_condition"], "Explicit owner authorization")
+        # Once independent work is exhausted, the production hold still stops invocation.
+        self.controller.accept({**handoff, "ready_actions": []}, self.wt)
+        with patch.object(self.controller, "invoke") as invoke:
+            self.controller.tick(self.lock.fileno())
+            invoke.assert_not_called()
+        self.assertEqual(self.controller.state["status"], "blocked")
+
+    def test_identical_blocked_handoffs_with_ready_work_still_trigger_stagnation_stop(self):
+        self.invoke()
+        handoff = {**HANDOFF, "status": "blocked", "ready_actions": [READER_INSPECTION],
+                   "blocker": "Production write held", "unblock_condition": "Owner approval"}
+        for _ in range(3):
+            self.controller.accept(handoff, self.wt)
+        self.assertEqual(self.controller.state["status"], "blocked")
+        self.assertIn("Three identical", self.controller.state["reason"])
+        with patch.object(self.controller, "invoke") as invoke:
+            self.controller.tick(self.lock.fileno())
+            invoke.assert_not_called()
+
+    def legacy_checkpoint(self, status="waiting_review"):
+        handoff = {**HANDOFF, "status": status, "next_action": "Independent of review: " + READER_INSPECTION,
+                   "blocker": "Review-dependent change held", "unblock_condition": "Review resolves",
+                   "prs": [123] if status == "waiting_review" else []}
+        del handoff["ready_actions"]
+        pending = [{"number": 123, "state": "OPEN", "headRefOid": "a"}]
+        self.controller.state.update(status=status, handoff=handoff, session_started=True, pr_snapshot=pending)
+        self.controller.save()
+        return handoff, pending
+
+    def test_legacy_waiting_checkpoint_gets_one_reassessment_then_cheap_wait(self):
+        legacy, pending = self.legacy_checkpoint()
+        sid = self.controller.state["session_id"]
+        with patch.object(self.controller, "pr_state", return_value=pending):
+            result, identity = self.invoke({"session_id": sid, "structured_output": {**legacy, "ready_actions": []}}, tick=True)
+        self.assertEqual(result, 0)
+        self.assertEqual(identity, ["--resume", sid])
+        self.assertTrue(self.controller.state["ready_actions_reassessed"])
+        self.assertEqual(self.controller.state["handoff"]["objective"], legacy["objective"])
+        self.controller = c.Controller()
+        with patch.object(self.controller, "pr_state", return_value=pending), patch.object(self.controller, "invoke") as invoke:
+            self.controller.tick(self.lock.fileno())
+            invoke.assert_not_called()
+
+    def test_legacy_agent_blocked_checkpoint_can_identify_independent_ready_work(self):
+        legacy, _ = self.legacy_checkpoint("blocked")
+        result, _ = self.invoke({"session_id": self.controller.state["session_id"],
+                                "structured_output": {**legacy, "ready_actions": [READER_INSPECTION]}}, tick=True)
+        self.assertEqual(result, 0)
+        self.assertEqual(self.controller.state["status"], "active")
+        self.assertEqual(self.controller.state["handoff"]["blocker"], legacy["blocker"])
+
+    def test_legacy_blocked_assessment_restores_hold_when_no_ready_work_remains(self):
+        legacy, _ = self.legacy_checkpoint("blocked")
+        self.assertEqual(self.invoke({"session_id": self.controller.state["session_id"],
+                                      "structured_output": {**legacy, "ready_actions": []}}, tick=True)[0], 0)
+        self.assertEqual(self.controller.state["status"], "blocked")
+        self.assertEqual(self.controller.state["handoff"]["blocker"], legacy["blocker"])
+        with patch.object(self.controller, "invoke") as invoke:
+            self.controller.tick(self.lock.fileno())
+            invoke.assert_not_called()
+
+    def test_legacy_reassessment_respects_budget_backoff_and_controller_stops(self):
+        for overrides in ({"spent_seconds": 2700}, {"next_check": time.time() + 21600},
+                          {"failures": 3}, {"stagnant": 2}):
+            with self.subTest(overrides=overrides):
+                self.legacy_checkpoint("blocked")
+                self.controller.state.update(spent_seconds=0, next_check=0, failures=0, stagnant=0,
+                                             ready_actions_reassessed=False)
+                self.controller.state.update(overrides)
+                with patch.object(self.controller, "invoke") as invoke:
+                    self.controller.tick(self.lock.fileno())
+                    invoke.assert_not_called()
+                self.assertFalse(self.controller.state["ready_actions_reassessed"])
+
+    def test_interrupted_legacy_reassessment_resumes_same_session_after_budget_renews(self):
+        legacy, pending = self.legacy_checkpoint()
+        sid = self.controller.state["session_id"]
+        self.assertEqual(self.invoke({}, rc=124, tick=True)[0], 0)
+        self.controller = c.Controller()
+        self.assertTrue(self.controller.state["ready_actions_reassessed"])
+        self.assertEqual(self.controller.state["status"], "active")
+        self.assertEqual(self.controller.state["handoff"], legacy)
+        self.controller.state["spent_seconds"] = self.controller.cap
+        with patch.object(self.controller, "invoke") as invoke:
+            self.controller.tick(self.lock.fileno())
+            invoke.assert_not_called()
+        resume_at = self.controller.state["next_check"] + 1
+        self.controller = c.Controller()
+        with patch.object(c.time, "time", return_value=resume_at), patch.object(self.controller, "pr_state", return_value=pending):
+            result, identity = self.invoke({"session_id": sid, "structured_output": {**legacy, "ready_actions": []}}, tick=True)
+        self.assertEqual(result, 0)
+        self.assertEqual(identity, ["--resume", sid])
+        self.assertEqual(self.controller.state["worktree"], str(self.wt))
+        self.assertTrue(self.controller.state["ready_actions_reassessed"])
+        self.assertLess(self.controller.state["spent_seconds"], self.controller.cap)
+        self.assertEqual(self.controller.state["budget_day"], c.budget_day(resume_at))
+        self.assertEqual(self.controller.state["status"], "waiting_review")
+        with patch.object(c.time, "time", return_value=resume_at + 1), patch.object(self.controller, "pr_state", return_value=pending), patch.object(self.controller, "invoke") as invoke:
+            self.controller.tick(self.lock.fileno())
+            invoke.assert_not_called()
+
+    def test_crashed_legacy_reassessment_retains_active_state_and_reserved_budget(self):
+        legacy, _ = self.legacy_checkpoint("blocked")
+        with patch.object(self.controller, "worktree", return_value=self.wt), patch.object(c.subprocess, "run", side_effect=KeyboardInterrupt):
+            with self.assertRaises(KeyboardInterrupt):
+                self.controller.tick(self.lock.fileno())
+        self.controller = c.Controller()
+        self.assertTrue(self.controller.state["ready_actions_reassessed"])
+        self.assertEqual(self.controller.state["status"], "active")
+        self.assertEqual(self.controller.state["handoff"], legacy)
+        self.assertEqual(self.controller.state["spent_seconds"], self.controller.cap)
+        with patch.object(self.controller, "invoke") as invoke:
+            self.controller.tick(self.lock.fileno())
+            invoke.assert_not_called()
+        self.assertNotIn("in_flight", self.controller.state)
+        self.assertEqual(self.controller.state["spent_seconds"], self.controller.cap)
+
+    def test_usage_refusal_defers_active_legacy_reassessment_for_six_hours(self):
+        self.legacy_checkpoint()
+        self.assertEqual(self.invoke({"is_error": True, "result": "You've hit your limit"}, rc=1, tick=True)[0], 0)
+        self.assertTrue(self.controller.state["ready_actions_reassessed"])
+        self.assertEqual(self.controller.state["status"], "active")
+        self.assertGreater(self.controller.state["next_check"], time.time() + 21000)
+        with patch.object(self.controller, "invoke") as invoke:
+            self.controller.tick(self.lock.fileno())
+            invoke.assert_not_called()
+
+    def test_ready_action_types_and_nonempty_descriptions_are_required(self):
+        for actions in (None, "inspect", {}, [None], [True], [1], [""], ["   "], [{}]):
+            with self.subTest(actions=actions), self.assertRaisesRegex(ValueError, "ready_actions"):
+                self.controller.accept({**HANDOFF, "ready_actions": actions}, self.wt)
+        missing = dict(HANDOFF)
+        del missing["ready_actions"]
+        with self.assertRaisesRegex(ValueError, "structured handoff"):
+            self.controller.accept(missing, self.wt)
+
+    def test_completion_with_ready_work_is_rejected_without_losing_objective(self):
+        self.invoke()
+        original = copy.deepcopy(self.controller.state["handoff"])
+        with self.assertRaisesRegex(ValueError, "ready actions"):
+            self.controller.accept({**HANDOFF, "status": "complete", "ready_actions": [READER_INSPECTION]}, self.wt)
+        self.assertEqual(self.controller.state["handoff"], original)
+        self.assertEqual(self.controller.state["status"], "active")
 
     def test_premature_completion_does_not_erase_goal(self):
         with patch.object(self.controller, "pr_state", return_value=[{"state": "OPEN"}]):
