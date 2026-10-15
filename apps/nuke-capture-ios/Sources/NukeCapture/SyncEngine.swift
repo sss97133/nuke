@@ -53,6 +53,9 @@ final class SyncEngine: ObservableObject {
     @Published private(set) var authProblem: String?
     /// Photos that failed Config.maxAttemptsPerAsset times and no longer hold the pass back.
     @Published private(set) var gaveUpCount = 0
+    /// What the last live pass did, in counts, for the Engine tab: "0 uploaded, 200 failed" was
+    /// invisible before, so a stalled sync read as stuck analysis.
+    @Published private(set) var lastPassSummary: String?
     @Published private(set) var authorizationDenied = false
     @Published private(set) var lastSyncDate: Date?
     @Published private(set) var uploadsToday: Int
@@ -435,6 +438,7 @@ final class SyncEngine: ObservableObject {
         var heldPrivate = 0   // contributor-mode firewall holds (face / not-a-vehicle)
         var metadataOnly = 0  // owner-triage: row uploaded WITHOUT pixels (personal/sensitive — alibi metadata only)
         var t0Fired = 0   // cap on-device T0 per sync — never thrash the ANE on a bulk catch-up
+        var deferred = 0  // originals in iCloud, left for the background job
 
         for asset in assets {
             // iOS: BGAppRefreshTask expiration cancels this task — stop
@@ -473,6 +477,7 @@ final class SyncEngine: ObservableObject {
             case .deferred:
                 // In iCloud only and not on Wi-Fi: retried on Wi-Fi, not an attempt against the photo.
                 failed += 1
+                deferred += 1
             case .authFailed:
                 failed += 1
                 stop = true
@@ -481,6 +486,12 @@ final class SyncEngine: ObservableObject {
             }
             if stop { break }
         }
+        lastPassSummary = [
+            "\(uploaded) uploaded", "\(deduped) already up", "\(skipped) off-site or not this camera",
+            deferred > 0 ? "\(deferred) in iCloud, wait for the charging job" : nil,
+            heldPrivate > 0 ? "\(heldPrivate) held private" : nil,
+            failed - deferred > 0 ? "\(failed - deferred) failed" : nil,
+        ].compactMap { $0 }.joined(separator: " · ") + " · of \(assets.count) photos in this pass"
 
         persistSeenAssets()
         totalSkippedOffShop += skipped
@@ -1070,30 +1081,86 @@ final class SyncEngine: ObservableObject {
         return CGImageSourceCreateThumbnailAtIndex(src, 0, opts as CFDictionary)
     }
 
-    static func requestOriginalData(for asset: PHAsset, allowNetwork: Bool = true) async throws -> Data {
+    /// The request is cancelled when the calling task is cancelled or after `timeout` (90 s with
+    /// network, 20 s without). With neither, one stalled iCloud download held a pass's lanes and its
+    /// `running` flag indefinitely, so every later pass returned at once and analysis looked stuck.
+    static func requestOriginalData(for asset: PHAsset, allowNetwork: Bool = true,
+                                    timeout: TimeInterval? = nil) async throws -> Data {
         let options = PHImageRequestOptions()
         options.version = .original
         options.deliveryMode = .highQualityFormat
         options.isNetworkAccessAllowed = allowNetwork
         options.isSynchronous = false
 
-        return try await withCheckedThrowingContinuation { continuation in
-            PHImageManager.default().requestImageDataAndOrientation(
-                for: asset, options: options
-            ) { data, _, _, info in
-                if let data {
-                    continuation.resume(returning: data)
-                } else if !allowNetwork, (info?[PHImageResultIsInCloudKey] as? Bool) == true {
-                    continuation.resume(throwing: OriginalInCloud())
-                } else {
-                    let underlying = info?[PHImageErrorKey] as? NSError
-                    continuation.resume(throwing: underlying ?? NSError(
-                        domain: "NukeCapture", code: 1,
-                        userInfo: [NSLocalizedDescriptionKey: "no image data returned"]
-                    ))
+        let request = ImageRequestBox()
+        let limit = timeout ?? (allowNetwork ? 90 : 20)
+        return try await withTaskCancellationHandler {
+            try await withCheckedThrowingContinuation { continuation in
+                let id = PHImageManager.default().requestImageDataAndOrientation(
+                    for: asset, options: options
+                ) { data, _, _, info in
+                    guard request.finish() else { return }
+                    if let data {
+                        continuation.resume(returning: data)
+                    } else if !allowNetwork, (info?[PHImageResultIsInCloudKey] as? Bool) == true {
+                        continuation.resume(throwing: OriginalInCloud())
+                    } else if (info?[PHImageCancelledKey] as? Bool) == true {
+                        continuation.resume(throwing: CancellationError())
+                    } else {
+                        let underlying = info?[PHImageErrorKey] as? NSError
+                        continuation.resume(throwing: underlying ?? NSError(
+                            domain: "NukeCapture", code: 1,
+                            userInfo: [NSLocalizedDescriptionKey: "no image data returned"]
+                        ))
+                    }
                 }
+                request.start(id: id, timeout: limit)
+            }
+        } onCancel: {
+            request.cancel()
+        }
+    }
+}
+
+/// One PhotoKit request's id, its timeout, and whether its handler already ran (thread-safe:
+/// the handler, the timeout and task cancellation arrive on different threads).
+private final class ImageRequestBox: @unchecked Sendable {
+    private let lock = NSLock()
+    private var id: PHImageRequestID = PHInvalidImageRequestID
+    private var done = false
+    private var cancelRequested = false
+    private var timer: Task<Void, Never>?
+
+    func start(id: PHImageRequestID, timeout: TimeInterval) {
+        lock.lock()
+        self.id = id
+        let cancelNow = cancelRequested && !done
+        if !done {
+            timer = Task.detached { [weak self] in
+                try? await Task.sleep(for: .seconds(timeout))
+                if !Task.isCancelled { self?.cancel() }
             }
         }
+        lock.unlock()
+        if cancelNow { PHImageManager.default().cancelImageRequest(id) }
+    }
+
+    /// True the first time only; the handler resumes the continuation exactly once.
+    func finish() -> Bool {
+        lock.lock(); defer { lock.unlock() }
+        guard !done else { return false }
+        done = true
+        timer?.cancel()
+        return true
+    }
+
+    func cancel() {
+        lock.lock()
+        cancelRequested = true
+        let id = self.id
+        let live = !done && id != PHInvalidImageRequestID
+        lock.unlock()
+        if live { PHImageManager.default().cancelImageRequest(id) }
     }
 }
 

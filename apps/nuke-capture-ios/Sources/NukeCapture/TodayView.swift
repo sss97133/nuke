@@ -41,6 +41,12 @@ struct TodayView: View {
                             .foregroundStyle(.orange)
                     }
                 }
+                if let summary = engine.lastPassSummary {
+                    Section {
+                        Text("Last pass: \(summary).")
+                            .font(.footnote).foregroundStyle(.secondary)
+                    }
+                }
                 if engine.gaveUpCount > 0 {
                     Section {
                         Text("\(engine.gaveUpCount) photos failed three times and are no longer retried on open. The last error: \(engine.lastError ?? "not recorded").")
@@ -501,7 +507,7 @@ private struct LiveMetricsStrip: View {
             // stale "…" with no poll. This loads them now + every 30s while open.
             while !Task.isCancelled {
                 if UIApplication.shared.applicationState == .active { await engine.refreshAnalyzedCount() }
-                try? await Task.sleep(nanoseconds: 30_000_000_000)
+                try? await Task.sleep(nanoseconds: 60_000_000_000)   // the stats read can take 15 s server-side
             }
         }
     }

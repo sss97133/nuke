@@ -299,6 +299,7 @@ struct ProfileView: View {
     // Showing both side by side kills the "is it even linked?" doubt — they
     // reconcile in plain sight.
     @State private var sync: SyncStatus?
+    @State private var syncFailureText: String?
     @State private var syncError = false          // failed link-ledger load ≠ a fresh account
     @ObservedObject private var engine = SyncEngine.shared
 
@@ -1015,7 +1016,7 @@ struct ProfileView: View {
                 LabeledContent("Status") {
                     Button("Retry") { Task { await loadSync() } }
                 }
-                Text("Couldn't load the sync ledger — check your connection.")
+                Text("Couldn't load the sync ledger. \(syncFailureText ?? "The read failed.")")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
@@ -1076,6 +1077,7 @@ struct ProfileView: View {
             sync = status
         } catch {
             syncError = true
+            syncFailureText = ReadFailure.text(error)
             NSLog("NukeCapture sync status failed: %@", String(describing: error))
         }
     }
