@@ -2,8 +2,9 @@
 # Land Mecum lots from the public lot index through extract-mecum action land_index_lots, one 100-lot batch at a time.
 # usage: land_index.sh <batch dir> <log.jsonl> [max batches] [sleep s]
 # Run it as dotenvx run -- land_index.sh ... (needs SUPABASE_URL and a service key in the environment; nothing is printed).
-# Before every batch the three gates must pass: anon REST 200 in < 2 s, vehicle_completion_recompute_queue < QMAX, no lock
-# waiters. A closed gate waits 60 s; 30 closed checks in a row stop the run (exit 2). A batch that returns errors in the
+# Before every batch the gate checks REST (200, under 2 s), vehicle_completion_recompute_queue (under QMAX) and lock waiters. It
+# closes only when REST does not answer, or lock waiters show on two checks 15 s apart together with a slow REST or a queue
+# over QMAX. A closed gate waits 60 s; 30 closed checks in a row stop the run (exit 2). A batch that returns errors in the
 # response or a non-200 stops the run (exit 3). Resumable: a batch with a .done marker is skipped. No request goes to Mecum.
 set -u
 DIR=$1; LOG=$2; MAX=${3:-100000}; SLEEP=${4:-5}; QMAX=${QMAX:-2000}
@@ -13,18 +14,30 @@ HERE=$(cd "$(dirname "$0")/../.." && pwd)
 q() { (cd "$HERE" && ./scripts/data/q.sh "$1"); }
 log() { echo "$(date -u +%FT%TZ) $*" >&2; }
 gate() {
+  # Closed only when REST is not answering, or when lock waiters show on two checks 15 s apart AND (REST is slow OR the
+  # completion queue is over the ceiling). A single brief lock waiter, mostly another writer's, does not close it.
   local waits=0
   while :; do
-    local pr code t qd lw
+    local pr code t qd lw lw2 slow=0 over=0 closed=0 why=""
     pr=$(curl -s -o /dev/null --max-time 10 -w "%{http_code} %{time_total}" "$U/rest/v1/vehicles?select=id&limit=1" -H "apikey: $ANON")
     code=${pr% *}; t=${pr#* }
     qd=$(q "set statement_timeout='5s'; select count(*) n from vehicle_completion_recompute_queue" | jq -r '.[0].n // "x"')
     lw=$(q "set statement_timeout='5s'; select count(*) n from pg_stat_activity where wait_event_type='Lock'" | jq -r '.[0].n // "x"')
-    if [ "$code" = "200" ] && [ "$(echo "$t < 2" | bc -l)" = "1" ] && [ "$qd" != "x" ] && [ "$qd" -lt "$QMAX" ] && [ "$lw" = "0" ]; then return 0; fi
-    waits=$((waits+1)); [ "$waits" -ge 30 ] && { log "gates closed 30 checks (rest $code ${t}s, queue $qd, lock waiters $lw); STOPPING"; exit 2; }
-    log "gate closed: rest $code ${t}s, queue $qd, lock waiters $lw; waiting 60s"; sleep 60
+    [ "$(echo "$t >= 2" | bc -l)" = "1" ] && slow=1
+    { [ "$qd" = "x" ] || [ "$qd" -ge "$QMAX" ]; } && over=1
+    if [ "$code" != "200" ]; then closed=1; why="rest $code"
+    elif [ "$lw" = "x" ]; then closed=1; why="lock waiters unreadable"
+    elif [ "$lw" != "0" ] && { [ "$slow" = "1" ] || [ "$over" = "1" ]; }; then
+      sleep 15
+      lw2=$(q "set statement_timeout='5s'; select count(*) n from pg_stat_activity where wait_event_type='Lock'" | jq -r '.[0].n // "x"')
+      if [ "$lw2" != "0" ]; then closed=1; why="lock waiters $lw then $lw2 with rest ${t}s / queue $qd"; fi
+    fi
+    [ "$closed" = "0" ] && return 0
+    waits=$((waits+1)); [ "$waits" -ge 30 ] && { log "gates closed 30 checks ($why); STOPPING"; exit 2; }
+    log "gate closed: $why; waiting 60s"; sleep 60
   done
 }
+
 n=0
 for f in "$DIR"/batch_*.json; do
   [ -f "$f" ] || continue; [ -f "$f.done" ] && continue
