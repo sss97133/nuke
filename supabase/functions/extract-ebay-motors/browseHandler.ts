@@ -5,11 +5,11 @@ import { BrowseClient, yearAspect } from "./browseApi.ts";
 import { revisit, sweep } from "./browseSweep.ts";
 import { toLanding } from "./browseMap.ts";
 import { firecrawlFetcher } from "./retain.ts";
-import { discover } from "./firecrawlSweep.ts";
+import { discover, reland } from "./firecrawlSweep.ts";
 import { emptyReport, landItem } from "./browseSweep.ts";
 import { pageToItem, parseItemPage } from "./ebayPage.ts";
 
-export const BROWSE_ACTIONS = ["sweep", "revisit", "aspects", "status", "preview", "discover", "deep"];
+export const BROWSE_ACTIONS = ["sweep", "revisit", "aspects", "status", "preview", "discover", "deep", "reland"];
 const json = (b: unknown, status = 200) => new Response(JSON.stringify(b), { status, headers: { ...corsHeaders, "Content-Type": "application/json" } });
 
 export async function handleBrowse(supabase: any, body: any): Promise<Response> {
@@ -20,6 +20,7 @@ export async function handleBrowse(supabase: any, body: any): Promise<Response> 
     });
     return json(rep, rep.ok ? 200 : 500);
   }
+  if (body.action === "reland") { const rep = await reland(supabase, { limit: body.limit }); return json(rep, rep.ok ? 200 : 500); }
   if (body.action === "deep") {         // one item page: read, parse, and (unless dry_run) land
     const url = String(body.url ?? "");
     if (!/^https:\/\/(www\.)?ebay\.com\/itm\/\d{6,}/.test(url)) return json({ ok: false, error: "url must be an ebay.com/itm/<id> link" }, 400);

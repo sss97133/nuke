@@ -105,10 +105,14 @@ function section(md: string, head: RegExp): string {
 export function parseItemPage(html: string, md: string): ItemPage {
   const specifics: Record<string, string> = {};
   const lines = section(md, /\n## Item specifics\n/).split(/\n\s*\n/).map((l) => l.trim()).filter(Boolean);
-  for (let i = 0; i + 1 < lines.length; i += 2) {
+  // label, value, label, value ... but Condition is followed by a second paragraph explaining "used" (and the one-line form
+  // "Used: A vehicle is considered ..." exists too), so that paragraph is skipped rather than read as a label.
+  for (let i = 0; i + 1 < lines.length;) {
     const k = lines[i].replace(/\s+/g, " ");
     if (k.length > 60 || /^(Category)$/i.test(k)) break;
     specifics[k] = lines[i + 1].replace(/\s+/g, " ").replace(/\s*Read more.*$/, "").slice(0, 400);
+    i += 2;
+    if (k === "Condition" && lines[i] && /^A vehicle is considered|^Used vehicles have|^New: |^Pre-owned/i.test(lines[i])) i++;
   }
   const title = md.match(/\n# ([^\n]+)\n/)?.[1]?.trim() ?? null;
   const itemId = md.match(/eBay item number:\s*(\d{6,})/)?.[1] ?? null;

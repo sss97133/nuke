@@ -75,6 +75,11 @@ export async function discover(supabase: any, o: DiscoverOptions = {}): Promise<
   const rep: DiscoverReport = { ...base, search_pages: 0, cards: 0, blips_new: 0, blips_duplicate: 0, deep_read: 0, deep_cap_left: null, facet_totals: {} };
   const groups = (o.jobs ?? [{ tiers: o.tiers ?? [1, 2], facets: o.facets ?? ["private"] }])
     .flatMap((j) => TIERS.filter((t) => j.tiers.includes(t.id)).flatMap((tier) => j.facets.map((facet) => ({ tier, facet }))));
+  if (groups.some((g) => g.facet === "unspecified")) {
+    // Measured 2026-10-15: the Not%2520Specified value is not honoured by eBay (4,100+ results, the unfiltered stream), so it would read dealers.
+    rep.ok = false; rep.errors.push("facet 'unspecified' is not a working eBay filter (returns the unfiltered stream); not read");
+    return rep;
+  }
   const now = new Date().toISOString();
   type Cand = { card: Card; tier: number; facet: Facet };
   const cands: Cand[] = [];
@@ -140,6 +145,35 @@ export async function discover(supabase: any, o: DiscoverOptions = {}): Promise<
 }
 
 function finish(rep: DiscoverReport): DiscoverReport {
+  if (rep.errors.length) rep.ok = false;
+  return rep;
+}
+
+/** Re-land item pages already retained in the bucket that have no listing episode yet (a parser fix, a failed write): 0 credits. */
+export async function reland(supabase: any, o: { limit?: number } = {}): Promise<Report> {
+  const rep = emptyReport("reland");
+  try {
+    const snaps = await supabase.from("listing_page_snapshots").select("id,listing_url,html_storage_path,markdown_storage_path")
+      .eq("platform", PLATFORM).eq("success", true).like("listing_url", "%/itm/%").not("markdown_storage_path", "is", null)
+      .order("fetched_at", { ascending: false }).limit(Math.min(o.limit ?? 50, 200));
+    if (snaps.error) throw new Error(`snapshots read failed: ${snaps.error.message}`);
+    const keys = (snaps.data ?? []).map((s: any) => String(s.listing_url).split("/").pop());
+    const ev = await supabase.from("vehicle_events").select("source_listing_id").eq("source_platform", PLATFORM).in("source_listing_id", keys).limit(1000);
+    if (ev.error) throw new Error(`events read failed: ${ev.error.message}`);
+    const have = new Set((ev.data ?? []).map((e: any) => String(e.source_listing_id)));
+    const todo = (snaps.data ?? []).filter((s: any) => !have.has(String(s.listing_url).split("/").pop()));
+    const now = new Date().toISOString();
+    for (const s of todo) {
+      const [h, m] = await Promise.all([supabase.storage.from("listing-snapshots").download(s.html_storage_path), supabase.storage.from("listing-snapshots").download(s.markdown_storage_path)]);
+      if (h.error || m.error || !h.data || !m.data) { rep.errors.push(`${s.listing_url}: bucket read failed`); continue; }
+      const page = parseItemPage(await h.data.text(), await m.data.text());
+      const item = pageToItem({ ...page, itemId: page.itemId ?? String(s.listing_url).split("/").pop() ?? null });
+      const out = await landItem(supabase, item, rep, now, { snapshotId: s.id, source: SOURCE, method: METHOD,
+        extra: { page: { specifics: page.specifics, location: page.location, time_left_text: page.timeLeft, for_sale_by: page.forSaleBy, format: page.format, bids: page.bids, image_count: page.images.length }, relanded_from_snapshot: s.id } });
+      if (out === "landed") rep.landed++;
+    }
+    rep.calls = 0;
+  } catch (e) { rep.ok = false; rep.errors.push((e as Error).message.slice(0, 400)); }
   if (rep.errors.length) rep.ok = false;
   return rep;
 }
