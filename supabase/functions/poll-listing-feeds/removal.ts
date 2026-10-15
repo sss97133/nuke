@@ -23,7 +23,7 @@ export type Probe = { status: number | null; observed_at: string; snapshot_id: s
 /** Which removal notice a page carries, or null. Only a page with no posting body can carry one. */
 export function noticeFrom(html: string | null | undefined): Notice | null {
   if (!html || /id\s*=\s*["']postingbody["']/i.test(html)) return null;
-  const text = html.replace(/<script[\s\S]*?<\/script>|<style[\s\S]*?<\/style>/gi, " ").replace(/<[^>]+>/g, " ").replace(/\s+/g, " ");
+  const text = html.replace(/<script[\s\S]*?<\/script\b[^>]*>|<style[\s\S]*?<\/style\b[^>]*>/gi, " ").replace(/<[^>]+>/g, " ").replace(/\s+/g, " ");
   if (/flagged for removal/i.test(text)) return "flagged";
   if (/deleted by (its|the) author/i.test(text)) return "deleted";
   if (/(posting|post|ad) has expired|this posting has expired/i.test(text)) return "expired";
