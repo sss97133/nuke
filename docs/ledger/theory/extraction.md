@@ -41,8 +41,10 @@ the USD 99 Standard plan is taken. Owner tiers: model years 1964-1973 above 1974
   there is no seller-type field on `vehicles` or `vehicle_events`, so it stays unknown until one is recorded. It is the first gap to
   close for the owner's non-dealer-first rule.
 - *Gap* (lots): for a historical source the known population minus landed lots (the whole-source `source_census` row and
-  `mv_source_target_landed`; no population, no gap); for a live source the new supply per day (events created in the last 14 days)
-  times `live_horizon_days`.
+  `mv_source_target_landed`; no population, no gap); for a live source the new supply per day times `live_horizon_days`.
+  New supply counts the lots that ENDED in the last 14 days where events carry an end time (at least 20% of the sample), because
+  `created_at` is the landing clock and a backfill looks like new supply; a purely live classified source falls back to `created_at`,
+  and the clock used is recorded in the inputs.
 - *Cost* (credits per full lot): `firecrawl_source_params.credits_per_lot` with its basis, replaced by the observed credits per lot
   in `firecrawl_spend_log` once 50 lots are logged. A source with no Firecrawl cost is scored with the floor cost 0.01, so it ranks
   but receives 0 credits.
@@ -56,7 +58,8 @@ verified ownership (`vehicle_ownerships` verified_owner/current, or `vehicle_use
 merely recorded under the owner's account counts 0.1 (ownership there is unclear). The owner's user id is
 `firecrawl_params.owner_user_id`; unset, the input is unknown.
 
-**Allocation.** Sources that consume Firecrawl credits, by score, each capped at its gap in credits and at `max_source_share` (0.5) of
+**Allocation.** Sources that consume Firecrawl credits, by value per credit (the score ranks the size of the opportunity; a credit goes
+first where it buys the most value), each capped at its gap in credits and at `max_source_share` (0.5) of
 the allocatable credits (the monthly credits less `reserve_fraction`, 0.15). Within an allocated source, credits split across the top
 20 groups in proportion to group score. `firecrawl_allowance` spreads a source's period allocation over the days left in the
 billing period (it resets on `period_start_day`, now the 4th) and subtracts today's spend, so an unspent day rolls forward.
