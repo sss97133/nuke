@@ -138,7 +138,7 @@ Kit: CAN-TERM-100R ×2 (on the cart change) [1]
 | #CAN_LO CAN trunk Low: M130 B18 CAN_LO -> PDM30 B25 CAN Low [7] | 22 AWG M22759/16 twisted | M130 B18 · SSC-N · AFM8 + K1S sel 6 [5] | ? · open (connector not picked) [6] (open) |
 | #UTC_CANH PDM config port CAN-HI (XLR pin 5) [8] | 22 AWG M22759/16 twisted yellow [9] | — | ? · open (connector not picked) [6] (open) |
 | #UTC_CANL PDM config port CAN-LO (XLR pin 4) [10] | 22 AWG M22759/16 twisted green [9] | — | ? · open (connector not picked) [6] (open) |
-| #UTC_0V PDM config port 0V (XLR pin 1) [11] | 22 AWG M22759/16 brown [9] | PDM30 B22 · SSC-N · AFM8 + K1S sel 6 [5] | ? · open (connector not picked) [6] (open) |
+| #UTC_0V PDM config port 0V (XLR pin 1) [11] | 22 AWG M22759/16 brown [12] | PDM30 B22 · SSC-N · AFM8 + K1S sel 6 [5] | ? · open (connector not picked) [6] (open) |
 
 **Tools:** none beyond the kit
 
@@ -159,6 +159,7 @@ Kit: CAN-TERM-100R ×2 (on the cart change) [1]
 9. decision: spec M22759/32 -> M22759/16 at 22 AWG — MoTeC C125 manual p.20 + PDM manual p.48 specify M22759/16-22; /32-22 OD 1.09 mm is under the 1.20 mm seal minimum (GT150 12191818), /16-22 is 1.27–1.37 mm
 10. MoTeC PDM manual p.48
 11. MoTeC PDM manual p.48 (UTC 0V) + p.47 (PDM30 B_22 = 0V)
+12. decision: spec M22759/32 -> M22759/16 at 22 AWG — MoTeC C125 manual p.20 + PDM manual p.48 specify M22759/16-22; /32-22 OD 1.09 mm is under the 1.20 mm seal minimum (GT150 12191818), /16-22 is 1.27–1.37 mm; decision: length_ft None -> 1.6 — its route over the twin graph is 18.5 in over 2 branches (2026-10-15T20:19Z, inputs/route_lengths.json)
 
 ## PORT-UTC — PDM30 config port — 5-pin female XLR for the MoTeC UTC · solved
 
@@ -168,7 +169,7 @@ Kit: NC5FD-L-1 ×1 [1]
 |---|---|---|---|
 | #UTC_CANH PDM config port CAN-HI (XLR pin 5) [6] | 22 AWG M22759/16 twisted yellow [7] | — | CAN-BUS (trunk CAN_HI splice) |
 | #UTC_CANL PDM config port CAN-LO (XLR pin 4) [8] | 22 AWG M22759/16 twisted green [7] | — | CAN-BUS (trunk CAN_LO splice) |
-| #UTC_0V PDM config port 0V (XLR pin 1) [9] | 22 AWG M22759/16 brown [7] | PDM30 B22 · SSC-N · AFM8 + K1S sel 6 [10] | — |
+| #UTC_0V PDM config port 0V (XLR pin 1) [9] | 22 AWG M22759/16 brown [10] | PDM30 B22 · SSC-N · AFM8 + K1S sel 6 [11] | — |
 
 **Tools:** Ideal Stripmaster 45-1987 (Tefzel blades) + wire stop L-5270 — to buy [2] · soldering iron + solder — confirm you own it [3] · heat gun with reflector attachments — confirm you own it [3]
 
@@ -185,7 +186,8 @@ Kit: NC5FD-L-1 ×1 [1]
 7. decision: spec M22759/32 -> M22759/16 at 22 AWG — MoTeC C125 manual p.20 + PDM manual p.48 specify M22759/16-22; /32-22 OD 1.09 mm is under the 1.20 mm seal minimum (GT150 12191818), /16-22 is 1.27–1.37 mm
 8. MoTeC PDM manual p.48
 9. MoTeC PDM manual p.48 (UTC 0V) + p.47 (PDM30 B_22 = 0V)
-10. ProWire SSC-N tooling chart; motec_m130_datasheet.pdf p.4–5
+10. decision: spec M22759/32 -> M22759/16 at 22 AWG — MoTeC C125 manual p.20 + PDM manual p.48 specify M22759/16-22; /32-22 OD 1.09 mm is under the 1.20 mm seal minimum (GT150 12191818), /16-22 is 1.27–1.37 mm; decision: length_ft None -> 1.6 — its route over the twin graph is 18.5 in over 2 branches (2026-10-15T20:19Z, inputs/route_lengths.json)
+11. ProWire SSC-N tooling chart; motec_m130_datasheet.pdf p.4–5
 
 ## FIREWALL-ENGINE — D38999/26WJ61PN plug — engine loom side (pins) · solved
 
