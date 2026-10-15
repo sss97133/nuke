@@ -215,3 +215,35 @@ Extend the existing market reader with source-qualified metric series and actual
 PR558 uses the existing Market destination and `/?make=...&board=1` route, but the owner rejected its count-first analytical presentation. Preserve useful source eligibility, clock receipts, keyboard behavior and exact contributor links while replacing its visual hierarchy through the release gates above. Raw recorded model labels remain browse labels until a qualified reader supplies semantic membership. Absolute daily counts can serve an evidence drill; they do not establish relative market performance.
 
 The first evidence-surface implementation extends this same route with `?lot=<public vehicle UUID>`, retaining access to its current recorded listing URL after it leaves the open board. The existing `vehicles`, `auction_comments` and `get_vehicle_specs` readers supply eligible public parent metadata, at most100 latest exact-URL interaction rows, and canonical/reported fields plus optional preserved source text. Public/deleted/nonvehicle eligibility is repeated in the child query. Legacy comment permissions remain a separate database issue. The view draws actual posted bid records, offers a table and source-native anchors, and exposes statements/media without claiming target classifications, paired replies or scored stance. Different relistings on one vehicle are not combined. These separate requests are a current evidence read, not an atomic historical snapshot; the browser response timestamp does not prove source freshness. Listing-page capture receipts must match both vehicle and source URL before their clock or bid agreement can appear.
+
+## Scheduled sales: the auction calendar — owner direction, October 15
+
+The owner, 2026-10-15: the site reads as one market (BaT) when it is meant to be all of them. Give live auctions with
+published rosters their own position: "a timer that's delayed out", a 3-to-6-month lead time instead of a 7-day online
+auction, and a vehicle profile for each consigned car, "often resales". Measured the same day: the live board was
+1,219 of 1,219 lots from BaT, its only live feed; Mecum's public index listed five upcoming sales with 2,407 lots, and
+Nuke held none of them.
+
+Contract, as delivered in `auction_calendar_read` and the Market tab's `?collection=calendar`:
+- **Grain.** One upcoming lot is a `vehicle_events` row with `event_status` `upcoming` (Mecum) or `pending` (Gooding), a
+  run day from today to the horizon, not withdrawn, on a public vehicle. A sale is the lots sharing a house and
+  `metadata.sale_key` (else the slug of `metadata.auction_name` plus the run year). The sale's days come from the house
+  (`sale_starts_on`, `sale_ends_on`), else from the first and last run day landed.
+- **The writer's keys** (agreed with the Mecum intake lane on 2026-10-15, matching what extract-gooding already writes):
+  `ended_at` = run day; `metadata.auction_name`, `auction_session_days`, `sale_key`, `sale_starts_on`, `sale_ends_on`,
+  `sale_location`, `lot_number`, `has_reserve`, `currency`, `roster_first_seen_at` (kept from the first read) and
+  `withdrawn_at`. After the sale the writer flips the status to the house's result and keeps the metadata.
+- **Timers are days.** The house publishes a run day, not a minute: a sale counts days to its first run day, runs "day
+  n of m" during its days, and a lot "runs in n days". No hours, minutes or seconds appear for a day-precision clock.
+- **One axis.** Each sale row draws its run days (height = lots that day) on one axis from today to the last sale landed;
+  the first seven days are shaded as the window a 7-day online auction runs in, so the live board and the calendar read
+  as one timer at two lead times.
+- **Roster fill is a measure.** Lots landed per sale, and those first seen in the last 7 days (the consignment
+  observation is `roster_first_seen_at`). The house's own stated roster count and last year's final roster are the
+  denominator and baseline still owed: Mecum's index states them per sale; no table holds them yet.
+- **Resale history.** Every consigned car shows up to five earlier records of the same vehicle on any venue (VINs are
+  unique on `vehicles`, so a resold car lands on its existing record). Outcomes are the source's own; a `sold` written by
+  `orphan-backfill-v1` reads "recorded, result unconfirmed" (that backfill labeled any priced row sold, classified asks
+  included), except Gooding and Barrett-Jackson, whose published prices `vehicle_sale_basis()` accepts as sales.
+- **Not claimed.** The calendar is the lots Nuke has landed, not the house's full roster, until the stated count is held
+  beside it; an estimate is the house's; "no reserve" is the house's flag.

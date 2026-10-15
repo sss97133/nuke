@@ -1,0 +1,26 @@
+/* The auction calendar: one row per scheduled sale, its run days drawn on one shared axis (today at the left edge).
+   Positions are SVG percentages, so the axis stretches with the column and the text stays at the kit's sizes. */
+.auction-calendar { min-width: 760px; }
+.auction-calendar__axis { width: 46%; min-width: 280px; }
+.auction-axis, .auction-track { display: block; overflow: visible; }
+.auction-axis__online, .auction-track__online { fill: var(--surface); }
+.auction-axis__tick { stroke: var(--border); stroke-width: 1; }
+.auction-axis__label { fill: var(--text-secondary); font-family: 'Courier New', monospace; font-size: 9px; text-transform: uppercase; }
+.auction-track__span { fill: var(--border); }
+.auction-track__day { fill: var(--text); }
+.auction-sale__open { all: unset; display: block; cursor: pointer; }
+.auction-sale__open:focus-visible { outline: 2px solid var(--text); outline-offset: 2px; }
+.auction-sale__open[aria-expanded='true'] .k-entity,
+.auction-sale__open[aria-expanded='true'] .k-measure { text-decoration: underline; }
+.auction-sale__roster > td { border-top: none; padding-top: 0; }
+.auction-roster { border-left: 2px solid var(--border); padding-left: 8px; }
+.auction-roster__day { display: flex; gap: 8px; align-items: baseline; padding: 8px 0 4px; border-bottom: 2px solid var(--border); }
+.auction-roster__lots { list-style: none; margin: 0; padding: 0; }
+.auction-lot { overflow: hidden; padding: 8px 0; border-bottom: 1px solid var(--border); }
+.auction-lot .vehicle-identity__model { font: inherit; }
+.auction-lot__prior { list-style: none; margin: 2px 0 0; padding: 0; }
+/* A phone has no room for the axis: the sale rows keep their timer, sale and roster, and the roster fits the screen. */
+@media (max-width: 640px) {
+  .auction-calendar { min-width: 0; }
+  .auction-calendar .auction-calendar__axis { display: none; }
+}
