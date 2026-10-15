@@ -790,8 +790,9 @@ def main():
     if not PLAN:
         print(f"harness model: {api._req('POST', 'rpc/resync_harness_segments', {'p_vehicle_id': K5})}")
         print(f"route graph: {api._req('POST', 'rpc/key_harness_endpoints_to_topology', {'p_vehicle_id': K5})}")
-        # each net's PDM output from its wire ends' pins, else the output its wires' design names (RSI pass 13)
-        print(f"protection: {api._req('POST', 'rpc/fold_harness_net_protection', {'p_vehicle_id': K5})}")
+        # nets re-folded through bus plugs and shared pins (RSI pass 14); it re-folds protection too: each net's PDM output
+        # from its wire ends' pins, else the output its wires' design names (RSI pass 13)
+        print(f"nets: {api._req('POST', 'rpc/refold_harness_nets', {'p_vehicle_id': K5})}")
 
 
 if __name__ == "__main__":
