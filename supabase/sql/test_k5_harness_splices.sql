@@ -68,8 +68,10 @@ BEGIN
   IF got IS DISTINCT FROM 'pin cavities shared by several wires with no splice the design names (must be 0)=1/2; splice members keyed to a live wire=10/12; splice sides outside the part''s crimp range (must be 0)=1/3; spliced pins whose lead into the pin the design names=1/4' THEN
     RAISE EXCEPTION 'splice measures: %', got;
   END IF;
+  SELECT numerator || '/' || denominator INTO got FROM public.v_harness_coverage WHERE measure = 'splice sides the fill check cannot settle yet';
+  IF got IS DISTINCT FROM '3/6' THEN RAISE EXCEPTION 'unsettled splice sides: %', got; END IF;
   SELECT count(*) INTO n FROM public.v_harness_coverage;
-  IF n <> 35 THEN RAISE EXCEPTION 'scoreboard measures: %, want 35', n; END IF;
+  IF n <> 36 THEN RAISE EXCEPTION 'scoreboard measures: %, want 36', n; END IF;
   IF EXISTS (SELECT 1 FROM public.v_harness_coverage WHERE grain IS NULL) THEN RAISE EXCEPTION 'a measure has no grain'; END IF;
   SELECT numerator INTO n FROM public.v_harness_coverage WHERE measure = 'nets that join a supply to ground (must be 0)';
   IF n <> 0 THEN RAISE EXCEPTION 'supply joined to ground: %', n; END IF;

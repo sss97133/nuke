@@ -21,7 +21,7 @@
 --      also need the lead that goes into the pin; the registry names one only at M130-B B16 ("pin lead").
 --   6. The scoreboard: splice members keyed to a live wire; pin cavities shared by several wires with no splice the
 --      design names (must be 0); spliced pins whose lead into the pin the design names; splice sides outside the part's
---      crimp range (must be 0).
+--      crimp range (must be 0); splice sides the fill check cannot settle yet (no part, a gauge unknown, or no lead).
 -- The rows arrive by the loader's call, not in this migration: the registry is the design's record and the loader its
 -- writer.
 BEGIN;
@@ -512,6 +512,7 @@ FROM (
     FROM public.harness_splices h JOIN public.vehicles v ON v.id = h.vehicle_id AND v.is_public IS TRUE
     WHERE NOT h.is_superseded AND h.placement = 'at_pin' GROUP BY 1
   UNION ALL SELECT vehicle_id, 'residual', 'splice sides outside the part''s crimp range (must be 0)', count(*) FILTER (WHERE status IN ('over the crimp range', 'under the crimp range')), count(*) FILTER (WHERE status IN ('fits', 'over the crimp range', 'under the crimp range')) FROM public.v_harness_splice_check GROUP BY 1
+  UNION ALL SELECT vehicle_id, 'log', 'splice sides the fill check cannot settle yet', count(*) FILTER (WHERE status NOT IN ('fits', 'over the crimp range', 'under the crimp range')), count(*) FROM public.v_harness_splice_check GROUP BY 1
 ) x
 LEFT JOIN (VALUES
     ('segments decided', 'segments'),
@@ -548,7 +549,8 @@ LEFT JOIN (VALUES
     ('splice members keyed to a live wire', 'splice members'),
     ('pin cavities shared by several wires with no splice the design names (must be 0)', 'cavities'),
     ('spliced pins whose lead into the pin the design names', 'pins'),
-    ('splice sides outside the part''s crimp range (must be 0)', 'splice sides')) g(measure, grain) ON g.measure = x.measure;
+    ('splice sides outside the part''s crimp range (must be 0)', 'splice sides'),
+    ('splice sides the fill check cannot settle yet', 'splice sides')) g(measure, grain) ON g.measure = x.measure;
 
 
 COMMENT ON VIEW public.v_harness_coverage IS 'The harness model measuring itself: per public vehicle, per stack layer, a measure with its numerator and denominator and what they count (grain). RSI scoreboard for stack SH; case ledger 13.12.2 / 13.12.3. Baseline and residual since RSI pass 3; the physics check since net fold v2; the geometry check since pass 7; the build log since pass 8; grain since pass 10; the legacy-row drift check since pass 11; route-graph points and standing positions since pass 12; PDM protection against the design since pass 13; shared pin cavities since pass 14; PDM limits and loads since pass 15; the design''s splices since pass 16.';
