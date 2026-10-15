@@ -109,7 +109,11 @@ export async function batchFromTargets(supabase: any, supabaseUrl: string, body:
       supabase.from("import_queue").update({ status, error_message: error?.slice(0, 500) ?? null, vehicle_id: vehicleId ?? null, processed_at: new Date().toISOString() }).eq("id", row.id);
     try {
       const url = `${SITE}/auction/${slugOf(t.listing_url)}`;
-      const page = await archiveFetch(url, { platform: "pcarmarket", useFirecrawl: false, callerName: "import-pcarmarket-listing", directFetchOptions: { publicOnly: true, timeout: 25_000 } });
+      // Ended lots live at /results/<slug> (old /auction/ and /auction/marketplace- URLs redirect there in two hops,
+      // which the direct fetcher does not follow); live ones stay at /auction/<slug>.
+      const get = (u: string) => archiveFetch(u, { platform: "pcarmarket", useFirecrawl: false, callerName: "import-pcarmarket-listing", directFetchOptions: { publicOnly: true, timeout: 25_000 } });
+      let page = await get(`${SITE}/results/${bareSlug(slugOf(t.listing_url))}`);
+      if (!page.html || page.statusCode === 404) { await sleep(delayMs); page = await get(`${SITE}/auction/${bareSlug(slugOf(t.listing_url))}`); }
       const status = page.statusCode ?? 0;
       if (status === 404 || status === 410) { await finish("skipped", "PAGE_NOT_FOUND"); results.not_vehicle++; streak = 0; }
       else if (status === 403 || status === 429) { await finish("failed", `HTTP ${status}`); results.failed++; results.stopped = "blocked_by_source"; break; }
