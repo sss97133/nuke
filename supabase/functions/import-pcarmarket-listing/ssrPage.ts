@@ -25,8 +25,9 @@ export interface SsrListing {
   canonicalUrl?: string;
 }
 
-const decode = (s: string) =>
-  s.replace(/&amp;/g, "&").replace(/&quot;/g, '"').replace(/&#x27;|&#39;/g, "'").replace(/&lt;/g, "<").replace(/&gt;/g, ">");
+const ENTITIES: Record<string, string> = { amp: "&", quot: '"', lt: "<", gt: ">", apos: "'", "#39": "'", "#x27": "'" };
+// One pass, so "&amp;lt;" decodes to "&lt;" and stops there.
+const decode = (s: string) => s.replace(/&(#x?[0-9a-f]+|[a-z]+);/gi, (m, k: string) => ENTITIES[k.toLowerCase()] ?? m);
 const text = (s: string) => decode(s.replace(/<[^>]+>/g, " ")).replace(/\s+/g, " ").trim();
 const num = (s?: string) => {
   const n = Number((s ?? "").replace(/[^0-9.]/g, ""));

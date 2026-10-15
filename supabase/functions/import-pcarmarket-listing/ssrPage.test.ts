@@ -25,3 +25,8 @@ Deno.test("Final bid label is a high bid, never a sale", () => {
 Deno.test("a page without Car Details is null", () => {
   if (parseSsrPage("<title>Rolex</title>") !== null) throw new Error("expected null");
 });
+
+Deno.test("entities decode in one pass", () => {
+  const l = parseSsrPage(page("Sold").replace("<title>1996", "<title>1996 &amp;lt; Rock &amp; Roll"))!;
+  if (!l.title.includes("&lt; Rock & Roll")) throw new Error(l.title);
+});
