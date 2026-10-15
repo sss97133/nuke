@@ -269,6 +269,7 @@ function previewFixture(options = {}) {
         if (specifier === './supabaseKeys.ts' || specifier === '../_shared/supabaseKeys.ts') return load('keys');
         if (specifier === '../_shared/vehicleEventWrite.ts') return { patchForLiveRow: () => assert.fail('No event write in the preview'), writeVehicleEventByKey: () => assert.fail('No event write in the preview') };
         if (specifier === './indexLot.ts') return { indexLot: () => assert.fail('No index read in the preview'), parseSaleFacet: () => assert.fail('No index read in the preview') };
+        if (specifier === '../_shared/writeResult.ts') return { mustWrite: () => assert.fail('No write in the preview'), softWrite: () => assert.fail('No write in the preview') };
         if (specifier === './rscPost.ts') return { postFromFlight: () => assert.fail('No app-router lot read in the preview') };
         if (specifier === './apiKeyAuth.ts') return { hashApiKey: () => assert.fail('No API-key path') };
         if (specifier === './batFetcher.ts') return { fetchBatPage: () => assert.fail('No source fetch'), logFetchCost: () => assert.fail('No paid fetch'), isLoginPage: () => false };
