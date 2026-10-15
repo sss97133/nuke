@@ -7,6 +7,8 @@ import './ClassifiedArrivals.css';
 import { ASK_SORTS, ASK_TIERS, ASK_WINDOWS, type AskRow, type AskSort, type AskTier, TIER_NAMES, readAskBoard, useAskBoard } from './useAskBoard';
 import { photoList, useListingPhotos } from './useListingPhotos';
 import { type PositionRead, headline, spreadLine } from './askPosition';
+import { type ListingRead, readLines, requestListingRead } from './analyzeListing';
+import { useAdminAccess } from '../../hooks/useAdminAccess';
 
 // The classified asks that came online, nationwide, with three lenses: near the viewer, the owner's band, and the
 // asking-price tier. The point stays in memory (never in the URL); logged out there is none until the viewer shares it.
@@ -120,6 +122,24 @@ function PriceStrip({ ask, p25, p50, p75 }: { ask: number; p25: number; p50: num
 
 // Where the ask lands, under its price: a word, the price line, then a line per population, the one it is placed by
 // first. Nothing when the reader has no position for the row.
+// The owner's Analyze control: a photo read of this one listing on request, shown on the card once it returns. Only an
+// admin sees it; the route refuses everyone else and caps reads a day.
+function AnalyzeControl({ vehicleId }: { vehicleId: string }) {
+  const [state, setState] = useState<{ busy: boolean; read?: ListingRead; error?: string }>({ busy: false });
+  const run = async () => {
+    setState({ busy: true });
+    try { setState({ busy: false, read: await requestListingRead(vehicleId) }); }
+    catch (err) { setState({ busy: false, error: err instanceof Error ? err.message : String(err) }); }
+  };
+  if (state.read) return <div className="market-ask__read">{readLines(state.read).map(line => <Text key={line} role="caption" as="div">{line}</Text>)}</div>;
+  return <div className="market-ask__read">
+    <button type="button" className="market-control" aria-busy={state.busy} disabled={state.busy} onClick={() => void run()}
+      title="Read this listing's photos for condition (admins; YONO first, otherwise your connected provider pays)">
+      <Text role="label">{state.busy ? 'Reading photos…' : 'Analyze photos'}</Text></button>
+    {state.error && <Text role="caption" as="div">{state.error}</Text>}
+  </div>;
+}
+
 // The board's position and the seller's stated condition (classified_ask_board 20261015150000).
 type PlacedRow = AskRow & { position?: PositionRead | null; condition?: string | null };
 
@@ -176,6 +196,7 @@ export default function ClassifiedArrivals({ collection, sourcePicker }: { colle
   const first = query.data?.pages[0];
   const population = first?.population;
   const rows = query.data?.pages.flatMap(page => page.rows) ?? [];
+  const { isAdmin } = useAdminAccess();
   const pageIds = useMemo(() => (query.data?.pages ?? []).map(page => page.rows.map(row => row.vehicle_id)), [query.data]);
   const photos = useListingPhotos(pageIds);
 
@@ -300,6 +321,7 @@ export default function ClassifiedArrivals({ collection, sourcePicker }: { colle
             : <Text role="measure">${Number(row.asking_price).toLocaleString('en-US')}</Text>}
           <Text role="body" as="div">{place || 'Place unrecorded'}{row.distance_mi != null ? ` · ${row.distance_mi.toLocaleString('en-US')} mi away` : ''}</Text>
           <AskPlacement ask={row.asking_price == null ? null : Number(row.asking_price)} position={(row as PlacedRow).position} />
+          {isAdmin && <AnalyzeControl vehicleId={row.vehicle_id} />}
         </div>
       </article>;
     })}</div>}

@@ -3,10 +3,12 @@ import React, { act } from 'react';
 import { createRoot } from 'react-dom/client';
 import { BrowserRouter } from 'react-router-dom';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-const fixture = vi.hoisted(() => ({ query: {} as any, source: vi.fn(), more: vi.fn(), board: vi.fn(), poll: vi.fn(), refresh: vi.fn(), boardQuery: {} as any, photos: vi.fn(), photoMap: new Map() as Map<string, any[]> }));
+const fixture = vi.hoisted(() => ({ query: {} as any, source: vi.fn(), more: vi.fn(), board: vi.fn(), poll: vi.fn(), refresh: vi.fn(), boardQuery: {} as any, photos: vi.fn(), photoMap: new Map() as Map<string, any[]>, admin: false, analyze: vi.fn() }));
 vi.mock('./useCapturedListings', async original => ({ ...await original<typeof import('./useCapturedListings')>(), useCapturedListings: (source: string, enabled = true) => { if (enabled) fixture.source(source); return fixture.query; } }));
 vi.mock('./useAskBoard', async original => ({ ...await original<typeof import('./useAskBoard')>(), readAskBoard: fixture.poll, useAskBoard: (q: any, enabled = true) => { fixture.board(q, enabled); return fixture.boardQuery; } }));
 vi.mock('./useListingPhotos', async original => ({ ...await original<typeof import('./useListingPhotos')>(), useListingPhotos: (pages: string[][]) => { fixture.photos(pages); return fixture.photoMap; } }));
+vi.mock('../../hooks/useAdminAccess', () => ({ useAdminAccess: () => ({ isAdmin: fixture.admin, loading: false, refresh: () => {} }) }));
+vi.mock('./analyzeListing', async original => ({ ...await original<typeof import('./analyzeListing')>(), requestListingRead: fixture.analyze }));
 vi.mock('./MarketPulse', () => ({ default: ({ collection }: any) => <section>Existing BaT bid board{collection}</section> }));
 vi.mock('./AuctionCalendar', () => ({ default: ({ collection }: any) => <section>Calendar fixture{collection}</section> }));
 vi.mock('./PrivateCaptureHistory', () => ({ default: () => null }));
@@ -16,7 +18,7 @@ let container: HTMLDivElement, root: ReturnType<typeof createRoot>;
 beforeEach(() => {
   (globalThis as any).IS_REACT_ACT_ENVIRONMENT = true;
   container = document.createElement('div'); document.body.appendChild(container); root = createRoot(container);
-  fixture.source.mockClear(); fixture.more.mockClear(); fixture.board.mockClear(); fixture.photos.mockClear();
+  fixture.source.mockClear(); fixture.more.mockClear(); fixture.board.mockClear(); fixture.photos.mockClear(); fixture.analyze.mockReset(); fixture.admin = false;
   fixture.poll.mockReset(); fixture.refresh.mockReset();
   fixture.photoMap = new Map([['v1', [
     { vehicle_id: 'v1', image_url: 'https://images.craigslist.org/00b_fixtureB_600x450.jpg' },
@@ -212,6 +214,33 @@ it('says where an ask lands: the word, the price line, then the counts it rests 
     'at or above 40 of 43 asks, median $11K', 'at or above 15 of 16 sales, median $12.5K']);
   expect(placed.querySelector('svg[role="img"]')?.getAttribute('aria-label')).toBe('ask $18,800; middle half $8,000 to $15,000, median $11,000');
   expect(second.querySelector('.market-ask__position')).toBeNull();
+});
+
+it('only an admin sees Analyze; a read lands on the card and says what the photos showed', async () => {
+  await render('collection=listings');
+  expect(container.querySelector('.market-ask__read')).toBeNull();
+  await act(async () => root.unmount()); root = createRoot(container);
+  fixture.admin = true;
+  fixture.analyze.mockResolvedValue({ observation_id: 'o1', photos_requested: 12, photos_analyzed: 12, analyzer: 'anthropic/claude-sonnet-4-6',
+    cost_bearer: 'user', cost_usd: null, condition_score: 4, condition_scores_counted: 12, zones_seen: ['exterior', 'interior'],
+    damage_flags: [{ flag: 'paint_fade', photos: 2 }], modification_flags: [{ flag: 'aftermarket_wheels', photos: 3 }], interior_quality: 4 });
+  await render('collection=listings');
+  const first = container.querySelector('.market-ask')!;
+  const analyze = [...first.querySelectorAll('button')].find(b => b.textContent === 'Analyze photos')!;
+  await act(async () => analyze.click());
+  expect(fixture.analyze).toHaveBeenCalledWith('v1');
+  expect([...first.querySelectorAll('.market-ask__read .k-caption')].map(n => n.textContent)).toEqual([
+    'photos: condition 4 of 5, 12 of 12 read by anthropic/claude-sonnet-4-6', 'damage seen: paint fade (2)', 'changes seen: aftermarket wheels (3)']);
+});
+
+it('a refused read says why and keeps the control', async () => {
+  fixture.admin = true;
+  fixture.analyze.mockRejectedValue(new Error('no analyzer available: connect your AI subscription'));
+  await render('collection=listings');
+  const first = container.querySelector('.market-ask')!;
+  await act(async () => [...first.querySelectorAll('button')].find(b => b.textContent === 'Analyze photos')!.click());
+  expect(first.querySelector('.market-ask__read')?.textContent).toContain('no analyzer available: connect your AI subscription');
+  expect([...first.querySelectorAll('button')].some(b => b.textContent === 'Analyze photos')).toBe(true);
 });
 
 it('tier, band and window are lenses in the URL', async () => {
