@@ -816,7 +816,8 @@
               "engine_displacement_l",
               "transmission_type",
               "drivetrain_layout",
-              "mileage_miles"
+              "mileage_miles",
+              "engine_family_label"
             ]
           },
           "data_type": {
@@ -961,6 +962,131 @@
                 }
               }
             }
+          },
+          {
+            "if": {
+              "properties": {
+                "property_key": {
+                  "const": "engine_family_label"
+                }
+              }
+            },
+            "then": {
+              "properties": {
+                "data_type": {
+                  "const": "string"
+                },
+                "unit": {
+                  "type": "null"
+                },
+                "source_id": {
+                  "type": "string"
+                },
+                "source_url": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "source_observation_id": {
+                  "type": "string"
+                },
+                "kind": {
+                  "const": "specification"
+                },
+                "extraction_method": {
+                  "const": "retained_listing_property_projection_v1"
+                },
+                "confidence_score": {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 0.6
+                },
+                "qualifiers": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "claim_role",
+                    "label_role",
+                    "engine_identity_status",
+                    "observed_at_basis",
+                    "source_event_time_status",
+                    "factory_configuration_status",
+                    "current_configuration_status",
+                    "independent_source",
+                    "source_value",
+                    "normalization_version",
+                    "source_witness_version",
+                    "source_capture_sha256",
+                    "source_captured_at",
+                    "source_capture_basis",
+                    "source_observed_at",
+                    "source_recorded_at",
+                    "limitation"
+                  ],
+                  "properties": {
+                    "claim_role": {
+                      "const": "listing_claim"
+                    },
+                    "label_role": {
+                      "const": "publisher_powering_engine_label"
+                    },
+                    "engine_identity_status": {
+                      "const": "unverified"
+                    },
+                    "observed_at_basis": {
+                      "const": "source_testimony_recorded_at"
+                    },
+                    "source_event_time_status": {
+                      "const": "unknown"
+                    },
+                    "factory_configuration_status": {
+                      "const": "unknown"
+                    },
+                    "current_configuration_status": {
+                      "const": "unknown"
+                    },
+                    "independent_source": {
+                      "const": false
+                    },
+                    "source_value": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "normalization_version": {
+                      "const": "retained_engine_family_label_v1"
+                    },
+                    "source_witness_version": {
+                      "const": "retained_description_engine_family_label_v1"
+                    },
+                    "source_capture_sha256": {
+                      "type": "string",
+                      "pattern": "^[0-9a-f]{64}$"
+                    },
+                    "source_captured_at": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "source_capture_basis": {
+                      "enum": [
+                        "direct_fetch",
+                        "protected_snapshot"
+                      ]
+                    },
+                    "source_observed_at": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "source_recorded_at": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "limitation": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  }
+                }
+              }
+            }
           }
         ]
       }
@@ -981,7 +1107,10 @@
           "const": 13
         },
         "canonical_property_keys": {
-          "const": 11
+          "enum": [
+            11,
+            12
+          ]
         },
         "complete_vehicle_model": {
           "const": false
@@ -1003,5 +1132,39 @@
         "current_core_scope_read"
       ]
     }
-  }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "typed_claims": {
+            "contains": {
+              "properties": {
+                "property_key": {
+                  "const": "engine_family_label"
+                }
+              },
+              "required": [
+                "property_key"
+              ]
+            }
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "model_scope": {
+            "properties": {
+              "canonical_property_keys": {
+                "const": 12
+              }
+            }
+          },
+          "typed_claims_status": {
+            "const": "current_core_scope_read"
+          }
+        }
+      }
+    }
+  ]
 }

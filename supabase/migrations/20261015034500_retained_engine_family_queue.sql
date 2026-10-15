@@ -22,7 +22,8 @@ BEGIN
 ('public.claim_retained_listing_properties(text,integer)','ncvsBq569AsAK8l+ZW1NDxa8Mo5eNJsHhFSQ1hd0vfo=','RwTHX/yJJNKBZtyxmJJFknVzWfCoYs0VjfmJxV8300Q='),
 ('public.finish_retained_listing_property(uuid,uuid,text,text,uuid)','1+IFo36IssNNqVtTTUsXyaZzZtPi2MF1fUfViV6ttq4=','Y9w5KssaJKrUeVMd9gE1TycT8BNGCwN9njkttAsIbzs='),
 ('public.assay_retained_listing_properties()','jK1B7ujxFUnh8x2vNbAyNLYH/AsV9i/vMUCdyWOTlNk=','tm0D+mA+bWAMSG0ENHvF9TU0WV5Ads/Oy6T2q5bvtp4='),
-('public.get_vehicle_specs(uuid[],boolean)','aKHB131k4qnfk6wUyBAOulTCuaWC4X2lModTEsDDJEg=','WG7IdhzZMW7zcqXka+OGXTjUhfN1oAP3mfHPAGSpYGc=')) x(signature,before_hash,after_hash) LOOP
+('public.get_vehicle_specs(uuid[],boolean)','aKHB131k4qnfk6wUyBAOulTCuaWC4X2lModTEsDDJEg=','WG7IdhzZMW7zcqXka+OGXTjUhfN1oAP3mfHPAGSpYGc='),
+('public.get_field_provenance(uuid,text)','wCTA3hgg59O2tL/d5sV6EE5KI4LDWl0ROPyMFFedYp4=','roESSrb7eL3KplnMKkiByGsAYlyj8uixkrJ0cfzyRi0=')) x(signature,before_hash,after_hash) LOOP
   h:=encode(sha256(convert_to(pg_get_functiondef(owner_record.signature::regprocedure),'UTF8')),'base64');
   IF h=owner_record.before_hash THEN before_count:=before_count+1;
   ELSIF h=owner_record.after_hash THEN after_count:=after_count+1;
@@ -31,10 +32,10 @@ BEGIN
  SELECT pg_get_constraintdef(oid) INTO current_check FROM pg_constraint
   WHERE conrelid='public.retained_listing_property_work'::regclass AND conname='retained_listing_property_work_property_id_check' AND convalidated;
  new_check:=replace(old_check,']',format(', %L::uuid]',family));
- IF after_count=6 AND current_check=new_check AND EXISTS(SELECT FROM pg_attribute
+ IF after_count=7 AND current_check=new_check AND EXISTS(SELECT FROM pg_attribute
   WHERE attrelid='public.retained_listing_property_replay'::regclass AND attname='engine_family_completed_at' AND NOT attisdropped)
  THEN RETURN;END IF; -- Exact reapplication preserves completed work and replay progress.
- IF before_count<>6 OR current_check IS DISTINCT FROM old_check THEN RAISE EXCEPTION 'Partial or drifted retained queue installation';END IF;
+ IF before_count<>7 OR current_check IS DISTINCT FROM old_check THEN RAISE EXCEPTION 'Partial or drifted retained queue installation';END IF;
  IF encode(sha256(convert_to(pg_get_functiondef('public.retained_listing_property_result_matches(uuid,uuid,uuid)'::regprocedure),'UTF8')),'base64')
   IS DISTINCT FROM 'vnyvGz3Ve1jkLM695kmNwvD3OvTvUpjSX3ZNjXWYZFU=' THEN RAISE EXCEPTION 'Existing completion custody changed';END IF;
  IF EXISTS(SELECT FROM pg_stat_activity WHERE wait_event_type='Lock' AND pid<>pg_backend_pid()) OR
@@ -473,6 +474,13 @@ BEGIN
  FROM gate g ORDER BY g.ord;
 END $function$
 ;$owner5$;
+ -- The guarded definition changes only the main readable-observations projection.
+ -- Keep the existing source/custody/privacy gates and image projection intact.
+ EXECUTE replace(pg_get_functiondef('public.get_field_provenance(uuid,text)'::regprocedure),
+  $provenance_before$ || jsonb_build_object('identity_label_basis',o.structured_data->>'identity_label_basis','source_make_label',o.structured_data->>'source_make_label','model_label_scope',o.structured_data->>'model_label_scope')$provenance_before$,
+  $provenance_after$ || jsonb_build_object('identity_label_basis',o.structured_data->>'identity_label_basis','source_make_label',o.structured_data->>'source_make_label','model_label_scope',o.structured_data->>'model_label_scope')
+            || jsonb_build_object('property_id',o.property_id,'source_id',o.source_id,
+              'limitation',coalesce(o.structured_data->>'limitation',o.extraction_metadata->>'limitation'))$provenance_after$);
  -- SQL/Edge deployment must finish together before the existing CI activation.
  PERFORM cron.alter_job(job_id:=j,active:=false);
 END $install$;

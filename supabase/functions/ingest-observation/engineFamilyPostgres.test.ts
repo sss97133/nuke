@@ -268,6 +268,13 @@ Deno.test({
         WHERE c.vehicle_id=${quote(VEHICLE)}::uuid AND op.property_key=${quote(key)}),
       'bulk',(SELECT COALESCE(jsonb_agg(s),'[]'::jsonb) FROM public.get_vehicle_specs(ARRAY[${quote(VEHICLE)}::uuid],true) s))::text`, "anon");
     const bulkFamilyClaims = (state: Row) => (state.bulk[0]?.typed_claims ?? []).filter((claim: Row) => claim.property_key === "engine_family_label");
+    const assertProvenanceProjection = (state: Row, claim: Row) => {
+      const witness = state.provenance?.observations?.find((row: Row) => row.id === claim.observation_id);
+      assert(witness, "The selected bulk claim must drill into the same readable provenance observation");
+      equal(witness.property_id, claim.property_id, "Provenance preserves the actual selected property's foreign key");
+      equal(witness.source_id, claim.source_id, "Provenance preserves the actual selected source's foreign key");
+      equal(witness.limitation, claim.qualifiers.limitation ?? null, "Provenance preserves the selected claim's limitation without inventing one");
+    };
     const assertBulkFamily = (state: Row, observationId: string, source: Row) => {
       equal(state.bulk.length, 1, "Anonymous bulk specifications return the eligible synthetic vehicle");
       equal(state.bulk[0].typed_claims_status, "current_core_scope_read", "Bulk typed testimony is explicitly requested");
@@ -276,6 +283,7 @@ Deno.test({
       const claims = bulkFamilyClaims(state);
       equal(claims.length, 1, "Bulk specifications expose the one current family claim");
       const claim = claims[0];
+      assertProvenanceProjection(state, claim);
       for (const [key, expected] of Object.entries({ observation_id: observationId, source_observation_id: source.id,
         source_url: source.source_url, value: "M50", data_type: "string", unit: null,
       })) equal(claim[key], expected, `Bulk family ${key}`);
@@ -515,6 +523,8 @@ Deno.test({
         equal(canonical.structured_data.label_role, "publisher_powering_engine_label", "Canonical state preserves the label's scope");
         equal(canonical.structured_data.source_event_time_status, "unknown", "Canonical state does not infer event time");
         equal(bulkFamilyClaims(state), [], "The existing eleven-property bulk reader still omits the admitted family claim");
+        for (const key of ["property_id", "source_id", "limitation"]) assert(!Object.hasOwn(witness, key),
+          `The current provenance projection demonstrates its missing ${key} before the reader repair`);
       }), "The original question is not consumer-usable");
 
       assert(await t.step("superseded or private source context hides both readers and refuses a replay", async () => {
@@ -631,6 +641,7 @@ Deno.test({
       let familyPropertyId: string;
       let replayBeforeQueue: Row;
       let metadataOnlyBefore: Row;
+      let readerMetadataBefore: unknown;
       const queue = (sourceId: string) => json(`SELECT COALESCE(jsonb_agg(to_jsonb(q)),'[]'::jsonb)::text
         FROM public.retained_listing_property_work q WHERE source_observation_id=${quote(sourceId)}::uuid AND property_id=${quote(familyPropertyId)}::uuid`);
       const replayState = () => json("SELECT to_jsonb(r)::text FROM public.retained_listing_property_replay r WHERE id");
@@ -662,9 +673,11 @@ Deno.test({
             native_identity_completed_at=coalesce(native_identity_completed_at,clock_timestamp()) WHERE id`);
         replayBeforeQueue = await replayState();
         metadataOnlyBefore = await json(`SELECT s FROM public.get_vehicle_specs(ARRAY[${quote(VEHICLE)}::uuid]) s`, "anon");
+        readerMetadataBefore = await functionMetadata();
         const before = await testimonyCount();
         const installed = await command(["--file", decodeURIComponent(QUEUE_MIGRATION.pathname)]);
         assert(installed.success, `Queue migration failed: ${decoder.decode(installed.stderr)}`);
+        equal(await functionMetadata(), readerMetadataBefore, "The provenance projection repair preserves function ownership, ACLs and security/runtime attributes");
         const installedReplay = await replayState();
         for (const [key, value] of Object.entries(replayBeforeQueue)) equal(installedReplay[key], value, `Queue migration preserves prior replay ${key}`);
         equal(installedReplay.engine_family_highwater, parentId, "Family repair pins the finite synthetic displacement source frame");
@@ -728,6 +741,12 @@ Deno.test({
         equal(metadataOnly.typed_claims_status, "not_requested", "Default bulk calls remain metadata-only");
         equal(metadataOnly.typed_claims, [], "Default bulk calls do not imply a typed-custody read");
         equal(metadataOnly.retained_record, metadataOnlyBefore.retained_record, "Adding family vocabulary preserves all retained record fields and bindings");
+        for (const key of ["make", "model"]) {
+          const state = await readers(key);
+          const claim = state.bulk[0].typed_claims.find((row: Row) => row.property_key === key);
+          assert(claim, `The existing native ${key} claim remains selectable`);
+          assertProvenanceProjection(state, claim);
+        }
         const oversized = await command(["--command", `SET ROLE anon; SELECT * FROM public.get_vehicle_specs(array_fill(${quote(VEHICLE)}::uuid,ARRAY[21]),true)`]);
         assert(!oversized.success && decoder.decode(oversized.stderr).includes("22023") && decoder.decode(oversized.stderr).includes("at most20"),
           "The actual anonymous bulk reader retains its twenty-key typed budget");
@@ -753,9 +772,12 @@ Deno.test({
 
       assert(await t.step("queue migration reapplication preserves finite progress, completed work and source testimony", async () => {
         const replayBefore = await replayState(), workBefore = await queue(parentId), before = await testimonyCount();
+        const readerDefinitions = await functionDefinitions();
         const activeBefore = await json("SELECT to_jsonb(active)::text FROM cron.job WHERE jobname='project-retained-listing-properties'");
         const reapplied = await command(["--file", decodeURIComponent(QUEUE_MIGRATION.pathname)]);
         assert(reapplied.success, `Queue migration reapplication failed: ${decoder.decode(reapplied.stderr)}`);
+        equal(await functionDefinitions(), readerDefinitions, "Exact reapplication preserves the repaired provenance definition");
+        equal(await functionMetadata(), readerMetadataBefore, "Exact reapplication preserves provenance ownership and permissions");
         equal(await replayState(), replayBefore, "Reapplication cannot reset any old or family replay progress");
         equal(await queue(parentId), workBefore, "Reapplication preserves the exact completed queue receipt");
         equal(await testimonyCount(), before, "Reapplication leaves testimony untouched");
