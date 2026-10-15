@@ -67,10 +67,10 @@ export function moveFill(rel: number): string {
 
 export const pct = (v: number) => (Math.round(v * 100) === 0 ? '0%' : `${v > 0 ? '▲' : '▼'}${Math.abs(Math.round(v * 100))}%`);
 
-/** What a tile says about its move: the relative move, or the count that is too few to say, or nothing. */
+/** What a tile says about its move: the relative move, why it is too few to say (in words), or nothing. */
 export function moveText(m: Move): string {
   if (m.kind === 'move') return `${pct(m.rel)} vs BaT`;
-  if (m.kind === 'few') return m.why === 'share' ? 'other venues' : `n ${Math.min(m.sold, m.prior)}`;
+  if (m.kind === 'few') return m.why === 'share' ? 'mostly sold elsewhere' : 'few BaT sales';
   return '';
 }
 
