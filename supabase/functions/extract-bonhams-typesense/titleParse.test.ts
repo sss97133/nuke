@@ -21,3 +21,16 @@ Deno.test('a multi-word make is kept whole', () => {
   const p = parseTitle('1959 Aston Martin DB4 Series II Chassis no. DB4/1234/R');
   equal([p.year, p.make, p.model], [1959, 'Aston Martin', 'DB4 Series II']);
 });
+
+Deno.test('a leading year range names the car by its first year and keeps the range', () => {
+  const a = parseTitle('1965/2016 Shelby Cobra 427 FIA Competition by Burgol Chassis no. CSX3120 (see text)');
+  equal([a.year, a.make, a.model, a.year_range, a.chassis], [1965, 'Shelby', 'Cobra 427 FIA Competition by Burgol', '1965-2016', 'CSX3120']);
+  const b = parseTitle('1960-2000 Aston Martin DB4GT Zagato Sanction III Coup\u00e9 Chassis no. DB4/424/R');
+  equal([b.year, b.make, b.year_range], [1960, 'Aston Martin', '1960-2000']);
+  const c = parseTitle('1959/1964 AC Ace to Cobra 289 Specification Roadster Chassis no. AEX 141 Engine no. 7C9W');
+  equal([c.year, c.make, c.year_range], [1959, 'AC', '1959-1964']);
+});
+
+Deno.test('a year that is not first, or a reversed range, is not read as a range', () => {
+  equal(parseTitle('2016/1965 Shelby Cobra').year_range, undefined);
+});
