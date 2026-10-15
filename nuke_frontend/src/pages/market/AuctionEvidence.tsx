@@ -6,6 +6,7 @@ import { EPISODE_READ_LIMIT, useAuctionEpisode, type EpisodeInteraction } from '
 import { useLotMovement } from './useLotMovement';
 import { selectRowFacts, vehicleIdentity, type LotInspection, type MarketRowDetails } from './useMarketRowDetails';
 import { bidBookReading, useBidBook } from '../stacks/orderBookReader';
+import { useFinishAnalogs } from './useFinishEstimates';
 import './AuctionEvidence.css';
 
 function stamp(value: string | null | undefined) {
@@ -109,6 +110,37 @@ function BidPath({ rows, selected, onSelect }: {
   </>;
 }
 
+function money(n: number | null) {
+  if (n == null) return '—';
+  return n >= 1_000_000 ? `$${(n / 1_000_000).toFixed(1)}M` : `$${Math.round(n).toLocaleString('en-US')}`;
+}
+function day(value: string | null) {
+  const t = Date.parse(value ?? '');
+  return Number.isFinite(t) ? new Date(t).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', timeZone: 'UTC' }) : null;
+}
+// Where it should finish, said once, at the top of the drawer: the estimate, its 80% range, how often that range has
+// held for lots like this, and the past lots it rests on with their bid at this point and their finish.
+function FinishBlock({ vehicleId }: { vehicleId: string }) {
+  const q = useFinishAnalogs(vehicleId);
+  const e = q.data?.board.byId.get(vehicleId);
+  if (!e) return null;
+  const analogs = q.data?.analogs ?? [];
+  return <section className="market-finish" aria-label="Where it should finish">
+    <Text role="label">Likely finish</Text>
+    <div className="market-finish__value"><Text role="measure">{money(e.estimate)}</Text>
+      <Text role="body">80% range {money(e.low)}–{money(e.high)}</Text></div>
+    {e.sentence && <Text role="body" as="p">{e.sentence}</Text>}
+    {analogs.length > 0 && <ol className="market-finish__analogs" aria-label="Past lots it rests on">{analogs.map((a, i) =>
+      <li key={`${a.url ?? a.title}-${i}`}>
+        {a.url ? <a href={a.url} target="_blank" rel="noopener noreferrer">{a.title}</a> : <span>{a.title}</span>}
+        <Text role="caption">{[day(a.closed), a.bid != null ? `bid ${money(a.bid)} at this point` : null,
+          a.final != null ? `${a.outcome === 'reserve_not_met' ? 'high bid' : 'finished'} ${money(a.final)}` : null].filter(Boolean).join(' · ')}</Text>
+      </li>)}</ol>}
+    <Text role="caption" as="div">{[e.compsThrough ? `Comparable sales through ${day(e.compsThrough)}` : null,
+      `estimated ${ago(e.estimatedAt)}${e.bidAtEstimate != null ? ` at a ${money(e.bidAtEstimate)} bid` : ''}`].filter(Boolean).join(' · ')}</Text>
+  </section>;
+}
+
 export default function AuctionEvidence({ vehicleId, onClose, compact = false, summary, sourceUrl }: {
   vehicleId: string; onClose: () => void; compact?: boolean; inspection?: LotInspection; summary?: MarketRowDetails;
   onInspectionChange?: (view: LotInspection) => void; sourceUrl?: string | null;
@@ -180,6 +212,7 @@ export default function AuctionEvidence({ vehicleId, onClose, compact = false, s
       {query.isError && <p role="status">This auction could not be read. <button type="button" onClick={() => void query.refetch()}>Retry</button></p>}
       {!query.isPending && !query.isError && !evidence && <p role="status">This listing has changed or is no longer publicly available.</p>}
       {evidence && <>
+        <FinishBlock vehicleId={vehicleId} />
         {bids.length > 0 ? <BidPath rows={pathRows} selected={selected ?? latestBid?.id ?? null} onSelect={setSelected} />
           : <p className="auction-evidence-note">No bids yet.</p>}
         {(question || seller) && <div className="market-inspection-talk">

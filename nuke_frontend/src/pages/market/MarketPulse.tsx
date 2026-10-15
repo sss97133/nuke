@@ -10,6 +10,7 @@ import { BID_BUCKETS, bidBucket, currentBidDistribution, NO_MAKE, useMarketPulse
 import RecordedSalesComparison, { MarketScopeControls, type MarketSalesLens } from './RecordedSalesComparison';
 import { MakeLogo } from '../../components/common/MakeIdentity';
 import { selectRowFacts, useMarketRowDetails, useMarketRowSpecs, vehicleIdentity, type LotInspection, type MarketRowDetails } from './useMarketRowDetails';
+import { useFinishEstimates, type FinishEstimate } from './useFinishEstimates';
 
 // The homepage: the live collector-car market as Nuke sees it right now.
 // Activity figures count the rows market_pulse_live() returns; rows open their canonical records.
@@ -216,8 +217,15 @@ function useSeen<T extends HTMLElement>(): [React.RefObject<T | null>, boolean] 
   return [ref, seen];
 }
 
-function BoardRow({ a, risen, stale, detail, expanded, onInspect }: {
-  a: LiveAuction; risen: boolean; stale: boolean; detail?: MarketRowDetails; expanded: boolean;
+// Where the lot should finish, in one line: the estimate and its 80% range; the measured confidence on hover.
+export function FinishLine({ e }: { e: FinishEstimate }) {
+  return <Text role="caption" as="div" className="market-lot-finish" title={e.sentence ?? undefined}>
+    likely <strong>{bidNumber(e.estimate, true)}</strong> · {bidNumber(e.low, true)}–{bidNumber(e.high, true)}
+  </Text>;
+}
+
+function BoardRow({ a, risen, stale, detail, expanded, finish, onInspect }: {
+  a: LiveAuction; risen: boolean; stale: boolean; detail?: MarketRowDetails; expanded: boolean; finish?: FinishEstimate;
   onInspect: (a: LiveAuction, view: LotInspection) => void;
 }) {
   const [rowRef, seen] = useSeen<HTMLDivElement>();
@@ -249,6 +257,7 @@ function BoardRow({ a, risen, stale, detail, expanded, onInspect }: {
         aria-label={`Inspect auction for ${title(a)}`} aria-expanded={expanded}>
         <AuctionCompetition vehicleId={a.id} sourceUrl={a.listingUrl} row enabled={reached}
           fallback={<BidCell auction={bidReading} risen={risen} stale={stale} />} />
+        {finish && <FinishLine e={finish} />}
       </button>
     </div>
   );
@@ -258,8 +267,8 @@ function BoardRow({ a, risen, stale, detail, expanded, onInspect }: {
 // document never grows past one page. A shared link to a lot opens the page that holds it.
 export const PAGE = 24;
 
-function Board({ rows, risenIds, stale, activityId, inspection, onInspect, onInspectionChange, onClose }: {
-  rows: LiveAuction[]; risenIds: Set<string>; stale: boolean; activityId: string | null;
+function Board({ rows, risenIds, stale, activityId, finishes, inspection, onInspect, onInspectionChange, onClose }: {
+  rows: LiveAuction[]; risenIds: Set<string>; stale: boolean; activityId: string | null; finishes?: Map<string, FinishEstimate>;
   inspection: LotInspection; onInspect: (a: LiveAuction, view: LotInspection) => void;
   onInspectionChange: (view: LotInspection) => void; onClose: () => void;
 }) {
@@ -278,7 +287,7 @@ function Board({ rows, risenIds, stale, activityId, inspection, onInspect, onIns
         const expanded = a.id === activityId;
         return (
           <div key={a.id}>
-            <BoardRow a={a} risen={risenIds.has(a.id)} stale={stale} detail={detail} expanded={expanded} onInspect={onInspect} />
+            <BoardRow a={a} risen={risenIds.has(a.id)} stale={stale} detail={detail} expanded={expanded} finish={finishes?.get(a.id)} onInspect={onInspect} />
             {expanded && <AuctionEvidence key={a.id} vehicleId={a.id} compact inspection={inspection} summary={detail}
               sourceUrl={a.listingUrl} onInspectionChange={onInspectionChange} onClose={onClose} />}
           </div>
@@ -301,6 +310,7 @@ function inWindow(a: LiveAuction, w: Window, now: number): boolean {
 export default function MarketPulse({ onUnavailable, collection }: { onUnavailable?: React.ReactNode; collection?: React.ReactNode }) {
   usePageTitle('Market');
   const { data, isLoading, isError, risenIds, refetch, dataUpdatedAt } = useMarketPulse();
+  const finish = useFinishEstimates();
   const [params, setParams] = useSearchParams();
   const boardRef = useRef<HTMLDivElement>(null);
 
@@ -616,7 +626,7 @@ export default function MarketPulse({ onUnavailable, collection }: { onUnavailab
           setParams(next, { replace: true });
         }}><Text role="label">Clear market filters</Text></button></div>}
         {isLoading || mapFilterPending ? null : <Board rows={pageRows} risenIds={risenIds} stale={syncBehind}
-          activityId={activityId} inspection={inspection} onInspect={openActivity} onInspectionChange={setInspection} onClose={closeActivity} />}
+          activityId={activityId} finishes={finish.data?.byId} inspection={inspection} onInspect={openActivity} onInspectionChange={setInspection} onClose={closeActivity} />}
         {!isLoading && !mapFilterPending && board.length > 0 && (
           <nav className="market-board-pager" aria-label="Board pages">
             <Text role="caption">{`${((page - 1) * PAGE + 1).toLocaleString('en-US')}–${Math.min(page * PAGE, board.length).toLocaleString('en-US')} of ${board.length.toLocaleString('en-US')} lots`}</Text>
