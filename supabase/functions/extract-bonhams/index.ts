@@ -26,6 +26,7 @@ import { normalizeListingUrlKey } from "../_shared/listingUrl.ts";
 import { resolveExistingVehicleId, discoveryUrlIlikePattern } from "../_shared/resolveVehicleForListing.ts";
 import { writeObservation } from "../_shared/observationWriter.ts";
 import { writeVehicleEventByKey } from "../_shared/vehicleEventWrite.ts";
+import { parseLotPage } from "./lotPage.ts";
 import { requireWriteAuth } from "../_shared/writeGuard.ts";
 import { projectSecretKey } from "../_shared/supabaseKeys.ts";
 
@@ -1207,6 +1208,99 @@ Deno.serve(async (req) => {
         JSON.stringify({ success: true, ...results, not_attempted: lots.length - next, elapsed_ms: Date.now() - started }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } },
       );
+    }
+
+    // ── Deep pass: the lot page for lots the search index landed (gallery, sale, footnotes, condition report) ──
+    // One page request per `spacing_ms` (at least 2000), at most 20 lots, newest sales first. 403/429 or a page that is
+    // not a lot page (a challenge) ends the run at once and marks nothing. Each lot's raw page data is kept on the
+    // observation; the episode's metadata is merged, never replaced.
+    if (action === "deep_lots") {
+      const limit = Math.min(Number(body.limit) || 20, 20);
+      const spacing = Math.max(Number(body.spacing_ms) || 2000, 2000);
+      const started = Date.now();
+      const BUDGET_MS = 110_000;
+      const { data: todo, error: todoErr } = await supabase
+        .from("vehicle_events")
+        .select("id, vehicle_id, source_url, source_listing_id")
+        .eq("source_platform", "bonhams")
+        .eq("extraction_source", "bonhams-typesense")
+        .is("metadata->>deep_at", null)
+        .order("ended_at", { ascending: false, nullsFirst: false })
+        .limit(limit);
+      if (todoErr) throw new Error(`deep_lots queue read failed: ${todoErr.message}`);
+      const out = { picked: todo?.length ?? 0, done: 0, gone: 0, images: 0, backoff: null as string | null, failed: 0, errors: [] as string[] };
+      let first = true;
+      for (const ev of todo ?? []) {
+        if (Date.now() - started > BUDGET_MS) break;
+        if (!first) await new Promise((r) => setTimeout(r, spacing));
+        first = false;
+        const url = String(ev.source_url).replace(/\/?$/, "/");
+        let res: Response;
+        try {
+          res = await fetch(url, { redirect: "follow", headers: { "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36", "Accept": "text/html" } });
+        } catch (e: any) {
+          out.failed++; if (out.errors.length < 5) out.errors.push(`${ev.source_listing_id}: fetch ${String(e?.message ?? e).slice(0, 100)}`);
+          continue;
+        }
+        if (res.status === 403 || res.status === 429) { out.backoff = `HTTP ${res.status}`; break; }
+        const observedAt = new Date().toISOString();
+        if (res.status === 404 || res.status === 410) {
+          await writeVehicleEventByKey(supabase, {
+            vehicle_id: ev.vehicle_id, source_platform: "bonhams", source_listing_id: ev.source_listing_id, event_type: "auction",
+            source_url: ev.source_url, metadata: { deep_at: observedAt, deep_status: `http_${res.status}` },
+          });
+          out.gone++;
+          continue;
+        }
+        if (!res.ok) { out.failed++; if (out.errors.length < 5) out.errors.push(`${ev.source_listing_id}: HTTP ${res.status}`); continue; }
+        const page = parseLotPage(await res.text());
+        if (!page) { out.backoff = "not a lot page (challenge or changed shape)"; break; }
+
+        try {
+          if (page.images.length > 0) {
+            const records = page.images.slice(0, 100).map((img, i) => ({
+              vehicle_id: ev.vehicle_id, image_url: img.url, position: i, source: "bonhams_import", is_external: true, is_primary: img.primary,
+            }));
+            const { error: imgErr } = await supabase.from("vehicle_images").upsert(records, { onConflict: "vehicle_id,image_url", ignoreDuplicates: true });
+            if (imgErr) throw new Error(`images: ${imgErr.message}`);
+            out.images += records.length;
+          }
+          const fullText = [page.catalog_text, page.footnotes].filter(Boolean).join("\n\n").slice(0, 30000);
+          await writeObservation(supabase, {
+            vehicleId: ev.vehicle_id,
+            source: { platform: "bonhams", url: ev.source_url, trustScore: 0.9, sourceIdentifier: ev.source_listing_id },
+            fields: page.hammer_price ? { sale_price: page.hammer_price } : { lot_page: "read" },
+            observationKind: page.hammer_price ? "sale_result" : "listing",
+            extractionMethod: "lot_page_next_data",
+            observedAt,
+            contentText: fullText || undefined,
+            rawData: page.raw,
+          }).then((r) => { if (r.errors.length) throw new Error(`observation: ${r.errors.join("; ").slice(0, 160)}`); });
+          // The index landed the description cut at 8,000 characters; the page's text is whole. Never shortened.
+          if (fullText) {
+            const { data: cur } = await supabase.from("vehicles").select("description").eq("id", ev.vehicle_id).maybeSingle();
+            if (cur && fullText.length > (cur.description?.length ?? 0)) {
+              const { error: dErr } = await supabase.from("vehicles").update({ description: fullText }).eq("id", ev.vehicle_id);
+              if (dErr) throw new Error(`description: ${dErr.message}`);
+            }
+          }
+          const w = await writeVehicleEventByKey(supabase, {
+            vehicle_id: ev.vehicle_id, source_platform: "bonhams", source_listing_id: ev.source_listing_id, event_type: "auction",
+            source_url: ev.source_url,
+            metadata: {
+              deep_at: observedAt, deep_status: "ok", image_count: page.images.length,
+              auction_name: page.sale_name, sale_venue: page.sale_venue, sale_starts_on: page.sale_starts_on, sale_ends_on: page.sale_ends_on,
+              number_of_lots: page.number_of_lots, footnotes: page.footnotes, condition_report_url: page.condition_report_url,
+              ...(page.engine_number ? { engine_number: page.engine_number } : {}), ...(page.registration ? { registration: page.registration } : {}),
+            },
+          });
+          if (w.action === "error") throw new Error(`event: ${w.error}`);
+          out.done++;
+        } catch (e: any) {
+          out.failed++; if (out.errors.length < 5) out.errors.push(`${ev.source_listing_id}: ${String(e?.message ?? e).slice(0, 160)}`);
+        }
+      }
+      return new Response(JSON.stringify({ success: true, ...out, elapsed_ms: Date.now() - started }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
     // ── Re-enrich action ─────────────────────────────────────────────────
