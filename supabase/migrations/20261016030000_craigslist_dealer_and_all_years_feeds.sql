@@ -6,11 +6,8 @@
 -- (poll-listing-feeds/schedule.ts): 1 and 2 first, 3 the rest of 1960-1999, then these. Dealer starts at a 15-minute
 -- interval (every third run at */5), all-years at 60 minutes, and each feed's interval then follows its rate of new posts
 -- (10 min to 6 h). One row per enabled US metro, same host list as the tier 1-3 feeds.
--- The first run of this file died at the 10 s default (2026-10-15 12:05Z, the database was busy): the SET LOCAL below sat
--- outside a transaction and did nothing. It is now one transaction with a 60 s limit.
-BEGIN;
 SET LOCAL lock_timeout = '5s';
-SET LOCAL statement_timeout = '60s';
+SET LOCAL statement_timeout = '20s';
 
 INSERT INTO listing_feeds (source_slug, display_name, feed_url, feed_type, search_criteria, enabled, poll_interval_minutes)
 SELECT 'craigslist', 'CL T4 dealer - ' || substring(f.feed_url from 'https://([a-z0-9]+)\.craigslist'),
@@ -33,5 +30,3 @@ FROM listing_feeds f
 WHERE f.source_slug = 'craigslist' AND f.enabled
   AND f.feed_url LIKE '%min_auto_year=1960&max_auto_year=1999&purveyor=owner'
 ON CONFLICT (feed_url) DO NOTHING;
-
-COMMIT;
