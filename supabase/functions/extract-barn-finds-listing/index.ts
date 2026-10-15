@@ -179,7 +179,6 @@ async function extractOne(supabase: Supabase, url: string, useFirecrawl: boolean
   const make = (parsed.make as string) || null;
   const model = (parsed.model as string) || null;
   const vin = (parsed.vin as string) || null;
-  const salePrice = parsed.sale_price != null ? Number(parsed.sale_price) : null;
   const title = (parsed.title as string) || null;
   if (!year && !vin && !title) return { status: 422, body: { success: false, error: "No vehicle data extracted" } };
 
@@ -198,7 +197,6 @@ async function extractOne(supabase: Supabase, url: string, useFirecrawl: boolean
     make: norm.make ?? make,
     model: norm.model ?? model,
     vin: vin || undefined,
-    sale_price: salePrice ?? undefined,
     title: title || undefined,
     profile_origin: "barnfinds",
     source: "barnfinds",
@@ -230,7 +228,7 @@ async function extractOne(supabase: Supabase, url: string, useFirecrawl: boolean
   if (make) obsFields.make = make;
   if (model) obsFields.model = model;
   if (vin) obsFields.vin = vin;
-  if (salePrice) obsFields.sale_price = salePrice;
+  // An asking price or high bid is not a sale: it goes on the event (current_price), never as sale_price.
   const observedAt = new Date().toISOString();
   const obs = await writeObservation(supabase, {
     vehicleId: finalVehicleId,
