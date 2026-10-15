@@ -29,6 +29,7 @@ Outputs:
 import csv
 import importlib.util
 import json
+import math
 import re
 from collections import Counter, OrderedDict, defaultdict
 from pathlib import Path
@@ -1698,7 +1699,8 @@ def length_kind(w):
     if not w.get("length_ft"):
         return None
     b = str(w.get("length_basis") or "").lower()
-    return "tape" if b.startswith("tape") else "twin" if b.startswith("twin") else "estimate"
+    return ("tape" if b.startswith("tape") else "twin" if b.startswith("twin") else "route" if b.startswith("route")
+            else "estimate")
 
 
 
@@ -2057,6 +2059,29 @@ def main():
         if w.get("awg") == 22 and str(w.get("spec") or "").startswith("M22759/32"):
             w.setdefault("conflicts", []).append(WIRE22_WHY)
             w["spec"] = "M22759/16" + str(w["spec"])[len("M22759/32"):]
+    # RSI pass 39: a wire's route over the twin graph (inputs/route_lengths.json, export_route_lengths.py from the live
+    # model). No length: the complete route. A zone estimate or an older twin path (taken before the route graph and the
+    # cab placement of the PDM30): the longer of the two, because a twin route carries no modelled slack or service loop
+    # and so never shortens a cut. Tape and design lengths stand. Only a wire with one segment: the segment fold chains
+    # a wire's ends in an order that can double back (26a runs AMP -> door -> AMP -> speaker in the model, 2026-10-15),
+    # so a multi-hop sum is not the wire's length until the chain is fixed.
+    _rl = json.load((INPUTS / "route_lengths.json").open()) if (INPUTS / "route_lengths.json").exists() else {}
+    for w in list(wires) + list(implied):
+        r = (_rl.get("wires") or {}).get(str(w["id"]))
+        if (not r or not r.get("complete") or r.get("segments") != 1 or w.get("retired")
+                or length_kind(w) not in (None, "estimate", "twin")):
+            continue
+        route_ft = math.ceil(r["route_in"] / 12 * 10) / 10
+        old = w.get("length_ft")
+        if isinstance(old, (int, float)) and old >= route_ft:
+            continue
+        w.setdefault("conflicts", []).append(
+            f"decision: length_ft {old} -> {route_ft} — its route over the twin graph is {r['route_in']} in over {r['branches']} "
+            f"branches ({_rl.get('exported_at')}, inputs/route_lengths.json)"
+            + (f", longer than the {'twin path' if length_kind(w) == 'twin' else 'zone estimate'}" if old else ""))
+        w["length_ft"] = route_ft
+        w["length_basis"] = (f"route over the twin graph: {r['route_in']} in over {r['branches']} branches "
+                             f"(inputs/route_lengths.json, {_rl.get('exported_at')}); the cut adds the pad")
     for w in list(wires) + list(implied):
         w["length_kind"] = length_kind(w)
         if isinstance(w.get("awg"), int):          # one printed gauge per cable, parallel conductors included
