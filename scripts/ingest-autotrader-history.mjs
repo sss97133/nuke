@@ -251,7 +251,14 @@ export async function stageAsset(entry, request) {
   const objectPath = 'masters/' + asset.storage_path.split('/').map(encodeURIComponent).join('/');
   const route = '/storage/v1/object/authenticated/' + objectPath;
   let result = await request(route);
-  if (result.status === 404) {
+  // Storage returns missing objects as HTTP 400 with an inner 404. Do not
+  // reinterpret authorization, unknown 400s, or a malformed response as absent.
+  let missing = result.status === 404;
+  if (result.status === 400) {
+    const failure = await result.clone().json().catch(() => null);
+    missing = String(failure?.statusCode) === '404' && failure?.error === 'not_found';
+  }
+  if (missing) {
     const upload = await request('/storage/v1/object/' + objectPath, { method: 'POST', headers: { 'Content-Type': 'image/jpeg', 'x-upsert': 'false' }, body: local });
     // A concurrent uploader is safe only when the exact existing bytes verify below.
     if (!upload.ok && ![400, 409].includes(upload.status)) throw new Error(`immutable_asset_upload_http_${upload.status}`);

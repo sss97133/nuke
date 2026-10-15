@@ -57,12 +57,17 @@ test('immutable master upload addresses masters bucket, verifies SHA and never o
   await stageAsset(entry, async (route, options = {}) => {
     calls.push({ route, method: options.method ?? 'GET' });
     if (options.method === 'POST') { assert.equal(options.headers['x-upsert'], 'false'); assert.ok(Buffer.from(options.body).equals(f.bytes)); uploaded = true; return asJson({}); }
-    return uploaded ? new Response(f.bytes) : new Response('', { status: 404 });
+    return uploaded ? new Response(f.bytes) : new Response(JSON.stringify({ statusCode: '404', error: 'not_found', message: 'Object not found' }), { status: 400 });
   });
   assert.match(calls[0].route, /^\/storage\/v1\/object\/authenticated\/masters\/source-evidence\/autotrader\/[a-f0-9]{64}\.jpg$/);
   assert.match(calls[1].route, /^\/storage\/v1\/object\/masters\/source-evidence\/autotrader\//);
   let writes = 0;
   await assert.rejects(stageAsset(entry, async (_route, options = {}) => { if (options.method) writes++; return new Response('conflicting bytes'); }), /immutable_remote_asset_hash_mismatch/);
+  assert.equal(writes, 0);
+  await assert.rejects(stageAsset(entry, async (_route, options = {}) => {
+    if (options.method) writes++;
+    return new Response(JSON.stringify({ statusCode: '403', error: 'access_denied' }), { status: 400 });
+  }), /retained_asset_download_http_400/);
   assert.equal(writes, 0);
 });
 
