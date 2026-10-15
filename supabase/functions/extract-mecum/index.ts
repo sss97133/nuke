@@ -44,7 +44,7 @@ const ALGOLIA_SEARCH_KEY = "0291c46cde807bcb428a021a96138fcb";
 
 /** One query against Mecum's public search index; throws on a refusal so a permission check is never read as "no lots". */
 async function algolia(params: string): Promise<any> {
-  const resp = await fetch(`https://${ALGOLIA_APP}-dsn.algolia.net/1/indexes/*/queries`, {
+  const resp = await fetch(`https://${ALGOLIA_APP}-dsn.algolia.net/1/indexes/*/queries`, { // guardrail-allow: raw-fetch (JSON search API, not a page)
     method: "POST",
     headers: { "x-algolia-application-id": ALGOLIA_APP, "x-algolia-api-key": ALGOLIA_SEARCH_KEY, "Content-Type": "application/json" },
     body: JSON.stringify({ requests: [{ indexName: ALGOLIA_INDEX, params }] }),
