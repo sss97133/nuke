@@ -1247,9 +1247,29 @@ Deno.serve(async (req) => {
     if (action === "land_lots") {
       const lots: ExtractionResult[] = Array.isArray(body.lots) ? body.lots.slice(0, 100) : [];
       const observedAt: string | undefined = body.observed_at;
-      const results = { received: lots.length, created: 0, updated: 0, rejected: 0, failed: 0, obs_issues: 0, errors: [] as string[] };
+      const results = {
+        received: lots.length, created: 0, updated: 0, rejected: 0, failed: 0, obs_issues: 0,
+        retried_ok: 0, failure_reasons: {} as Record<string, number>, failures: [] as Array<{ key: string; reason: string; message: string }>,
+        errors: [] as string[],
+      };
       const started = Date.now();
       const BUDGET_MS = 100_000;
+      // Every lot that does not land gets a reason. A lock timeout is transient, so those are tried once more at the end.
+      const reasonOf = (msg: string) =>
+        /lock timeout|statement timeout/i.test(msg) ? "lock_timeout"
+        : /already exists on vehicle|duplicate key|unique constraint/i.test(msg) ? "duplicate_key"
+        : /quality gate|rejected/i.test(msg) ? "quality_gate" : "other";
+      const note = (key: string, reason: string, message: string) => {
+        results.failure_reasons[reason] = (results.failure_reasons[reason] ?? 0) + 1;
+        if (results.failures.length < 20) results.failures.push({ key, reason, message: message.slice(0, 160) });
+      };
+      const retry: ExtractionResult[] = [];
+      const count = (r: { action: string }) => {
+        if (r.action === "created") results.created++;
+        else if (r.action === "updated" || r.action === "linked_by_vin") results.updated++;
+        else return false;
+        return true;
+      };
       let next = 0;
       async function worker() {
         while (next < lots.length && Date.now() - started < BUDGET_MS) {
@@ -1259,17 +1279,28 @@ Deno.serve(async (req) => {
               fast: true, observedAt, method: "typesense_api",
               onObservationIssue: (m) => { results.obs_issues++; if (results.errors.length < 8) results.errors.push(`obs ${m}`); },
             });
-            if (r.action === "created") results.created++;
-            else if (r.action === "updated" || r.action === "linked_by_vin") results.updated++;
-            else if (r.action === "rejected") results.rejected++;
-            else results.failed++;
+            if (count(r)) continue;
+            if (r.action === "rejected") { results.rejected++; note(String(lot.event_key), "quality_gate", r.issues.join(", ")); }
+            else { results.failed++; note(String(lot.event_key), "other", r.action); }
           } catch (e: any) {
-            results.failed++;
-            if (results.errors.length < 5) results.errors.push(`${lot.event_key}: ${String(e?.message ?? e).slice(0, 160)}`);
+            const msg = String(e?.message ?? e);
+            if (reasonOf(msg) === "lock_timeout") retry.push(lot);
+            else { results.failed++; note(String(lot.event_key), reasonOf(msg), msg); }
           }
         }
       }
       await Promise.all([worker(), worker()]);
+      for (const lot of retry) {
+        if (Date.now() - started > BUDGET_MS + 20_000) { results.failed++; note(String(lot.event_key), "lock_timeout", "not retried: out of time"); continue; }
+        await new Promise((r) => setTimeout(r, 1500));
+        try {
+          const r = await saveVehicle(supabase, lot, undefined, { fast: true, observedAt, method: "typesense_api" });
+          if (count(r)) results.retried_ok++;
+          else { results.failed++; note(String(lot.event_key), "other", r.action); }
+        } catch (e: any) {
+          results.failed++; note(String(lot.event_key), reasonOf(String(e?.message ?? e)), String(e?.message ?? e));
+        }
+      }
       return new Response(
         JSON.stringify({ success: true, ...results, not_attempted: lots.length - next, elapsed_ms: Date.now() - started }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } },
