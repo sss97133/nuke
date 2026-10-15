@@ -405,6 +405,24 @@ enum VisionEngine {
         return best.map { (vin: $0.0, editDistance: $0.1) }
     }
 
+    /// A 17-character VIN whose check digit (position 9) is right, by the North American rule:
+    /// transliterate, weight, sum mod 11, 10 = "X". I, O and Q never appear. An OCR run that passes
+    /// this is a VIN, not a part number that happens to be 17 characters long.
+    static func isValidVIN(_ raw: String) -> Bool {
+        let v = Array(raw.uppercased())
+        guard v.count == 17, !v.contains(where: { "IOQ".contains($0) }) else { return false }
+        let map: [Character: Int] = ["A":1,"B":2,"C":3,"D":4,"E":5,"F":6,"G":7,"H":8,"J":1,"K":2,"L":3,"M":4,"N":5,
+                                     "P":7,"R":9,"S":2,"T":3,"U":4,"V":5,"W":6,"X":7,"Y":8,"Z":9]
+        let weights = [8,7,6,5,4,3,2,10,0,9,8,7,6,5,4,3,2]
+        var sum = 0
+        for (i, c) in v.enumerated() {
+            guard let n = c.wholeNumberValue ?? map[c] else { return false }
+            sum += n * weights[i]
+        }
+        let check = sum % 11
+        return v[8] == (check == 10 ? "X" : Character(String(check)))
+    }
+
     /// Every 17-char alphanumeric run in the OCR text (VIN-shaped, no spaces).
     static func vinCandidates(in lines: [String]) -> [String] {
         let re = try? NSRegularExpression(pattern: "[A-Z0-9]{17}")
