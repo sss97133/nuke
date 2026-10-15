@@ -515,3 +515,28 @@ and how confident it is. Built from a backtest run offline against the local BaT
 - **Gaps.** The archive stops at 2026-09-27 (a daily append of settled lots is next); production has no BaT model-page
   key (titles map at 92.7-96.4%); bidder and comment counts improve the 24 h miss from 17.4% to 16.7% and come with a
   bounded engagement read later; grade C and reserve-not-met are the weakest cells.
+
+
+### The finish equation is never complete, owner direction, October 15 evening
+
+After model 32 called a 2021 Camaro ZL1 1LE 6-Speed at $59,500 ($52,700–$73,800) an hour out and it sold at $70,000
+to comments calling it "a great deal" (vehicle 918eaf7e…, 2026-10-15 20:46Z), the owner: "if youre missing things like
+trim youre insanely off. you should be measuring vibe. you should be measuring the commentary, the cultural importance,
+the previous sales across all markets... so many factors go into prediction. the predicition equation is NEVER complete."
+Model 32 compared it against its whole model page (SS through ZL1 1LE) on price alone.
+
+What that commits the estimate to:
+- **An open list of factors, each measured.** Trim and specification (title trim codes, transmission, miles,
+  modifications, generation); the room (comments and their rate, commenters, likes, seller replies, questions,
+  sentiment and stance, bidders, bid pace); cultural pull (the model's listing and comment history, sell-through,
+  share trend, how often it beat its estimate, provenance words); and every market (the same family and trim at every
+  venue Nuke holds, the same VIN's earlier sales, classified asks). A factor joins the estimate only when it lowers the
+  held-out miss or improves calibration, point-in-time (events before t only), and it is recorded with its lift and
+  date. The list keeps growing; no version is final.
+- **Each estimate shows what moved it.** Per-lot contributions by factor family, drawn on the card ("trim +12%,
+  room +5%"), so a viewer sees why, not a sentence.
+- **Graded where people can see it.** Every closed lot is placed against its last estimate (the live floor's dots:
+  2026-10-15, 178 lots in 12 h, 133 inside the range, median miss 14.2%), and a new version is written beside the old
+  one until it wins on the same lots.
+- **Acceptance case:** the Camaro above; model 33 must state what it would have said at 1 h and 10 min, with its
+  contributions.
