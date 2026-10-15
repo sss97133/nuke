@@ -6,12 +6,37 @@
 /** Lots not yet written up carry this stock line in item.description; it is not a description. */
 const PLACEHOLDER = /will be available closer to the auction/i;
 
-function stripTags(html: string): string {
-  return html
-    .replace(/<\/(p|div|li|h[1-6])>/gi, '\n')
-    .replace(/<br\s*\/?>/gi, '\n')
-    .replace(/<[^>]+>/g, '')
-    .replace(/&nbsp;/g, ' ').replace(/&amp;/g, '&').replace(/&quot;/g, '"').replace(/&#39;|&rsquo;|&lsquo;/g, "'")
+const ENTITIES: Record<string, string> = {
+  amp: '&', lt: '<', gt: '>', quot: '"', apos: "'", nbsp: ' ', rsquo: "'", lsquo: "'", rdquo: '"', ldquo: '"', ndash: '-', mdash: '-',
+};
+
+/** Decode HTML entities in ONE pass over the string, so "&amp;lt;" becomes "&lt;" and is not decoded a second time. */
+function decodeEntities(text: string): string {
+  return text.replace(/&(#x[0-9a-f]+|#\d+|[a-z]+);/gi, (whole, name: string) => {
+    if (name[0] === '#') {
+      const code = name[1].toLowerCase() === 'x' ? parseInt(name.slice(2), 16) : parseInt(name.slice(1), 10);
+      return Number.isFinite(code) && code > 0 && code <= 0x10ffff ? String.fromCodePoint(code) : whole;
+    }
+    return ENTITIES[name.toLowerCase()] ?? whole;
+  });
+}
+
+/** Remove tags until nothing more is removed, so "<scr<script>ipt>" cannot reassemble into a tag. */
+function removeTags(text: string): string {
+  let prev: string;
+  let cur = text;
+  do {
+    prev = cur;
+    cur = prev.replace(/<[^<>]*>/g, '');
+  } while (cur !== prev);
+  return cur;
+}
+
+/** HTML to plain text: block ends become newlines, tags are removed to a fixed point, entities decoded once, and tags
+ *  that decoding produced ("&lt;script&gt;") are removed again. */
+export function htmlToText(html: string): string {
+  const spaced = html.replace(/<\/(p|div|li|h[1-6])>/gi, '\n').replace(/<br\s*\/?>/gi, '\n');
+  return removeTags(decodeEntities(removeTags(spaced)))
     .replace(/[ \t]+\n/g, '\n').replace(/\n{3,}/g, '\n\n')
     .trim();
 }
@@ -30,11 +55,11 @@ function richTextToText(node: any): string {
 export function fieldText(v: unknown): string | null {
   if (v == null) return null;
   let text = '';
-  if (typeof v === 'string') text = stripTags(v);
+  if (typeof v === 'string') text = htmlToText(v);
   else if (Array.isArray(v)) text = v.map(fieldText).filter(Boolean).join('\n');
   else if (typeof v === 'object') {
     const o = v as Record<string, any>;
-    if (typeof o.childMarkdownRemark?.html === 'string') text = stripTags(o.childMarkdownRemark.html);
+    if (typeof o.childMarkdownRemark?.html === 'string') text = htmlToText(o.childMarkdownRemark.html);
     else if (typeof o.raw === 'string') {
       try { text = richTextToText(JSON.parse(o.raw)).replace(/\n{3,}/g, '\n\n').trim(); } catch { text = ''; }
     }
@@ -74,9 +99,9 @@ export function buildFullDescription(prose: LotProse, note: string | null, highl
   if (prose.exhibition) parts.push(`Exhibition history\n${prose.exhibition}`);
   if (prose.racing) parts.push(`Racing history\n${prose.racing}`);
   if (prose.documentation) parts.push(`Documentation\n${prose.documentation}`);
-  const cleanNote = (note || '').replace(/<[^>]+>/g, '').trim();
+  const cleanNote = htmlToText(note || '');
   if (cleanNote.length > 20) parts.push(cleanNote);
-  const bullets = highlights.map((h) => h.replace(/<[^>]+>/g, '').trim()).filter((h) => h.length > 5);
+  const bullets = highlights.map((h) => htmlToText(h)).filter((h) => h.length > 5);
   if (bullets.length > 0) parts.push(bullets.join('\n'));
   return parts.length ? parts.join('\n\n').slice(0, DESCRIPTION_LIMIT) : null;
 }
