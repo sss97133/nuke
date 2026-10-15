@@ -9,8 +9,8 @@ import { OnboardingSlideshow } from '../components/onboarding/OnboardingSlidesho
 import { useInterests } from '../hooks/useInterests';
 import { optimizeImageUrl } from '../lib/imageOptimizer';
 import { squarify } from '../lib/squarify';
-import { MapLegend, MarketCard, MarketSheet, MarketTile, money as fmtMoneyMap, type MapBasis } from './market/MarketTile';
-import { batBaseline, relativeMove } from './market/mapScale';
+import { MapCallouts, MapLegend, MarketCard, MarketSheet, MarketTile, money as fmtMoneyMap, type MapBasis } from './market/MarketTile';
+import { batBaseline, callouts, relativeMove } from './market/mapScale';
 import { readShareMovers } from './market/FamilyMovers';
 import IntakePage from './intake/IntakePage';
 import { Text } from '../kit';
@@ -1424,6 +1424,14 @@ export function TreemapHomePage({ onBrowse, embedded = false }: { onBrowse: () =
           </span>
         </div>
       </div>
+
+      {/* ─── CALLOUTS: the clearest gain and loss against BaT and the largest tile, each a way into its tile ─── */}
+      {marketLevel && !(levelType === 'brands' && brandView === 'nested') && activeData && (
+        <MapCallouts items={callouts(activeData, baseline)} onPick={(name) => {
+          const node = activeData.find((n) => n.name === name);
+          if (node) { if (coarse) setSheet(node); else drillInto(node); }
+        }} />
+      )}
 
       {/* ─── TREEMAP VIEWPORT ─── */}
       <div

@@ -1,5 +1,5 @@
 import React from 'react';
-import { moveFill, moveText, pct, textWidth, tileClass, tileName, GATE_MIN, type Baseline, type Move } from './mapScale';
+import { moveFill, moveText, pct, textWidth, tileClass, tileName, GATE_MIN, type Baseline, type Callout, type Move } from './mapScale';
 import './MarketMap.css';
 
 /**
@@ -165,6 +165,24 @@ export function MapLegend({ base, clock, basis }: { base: Baseline | null; clock
         {base ? ` (${pct(base.move)}, ${num(base.prior)} → ${num(base.sold)})` : ''}; ends of the scale hold everything past ±50%, and the label
         prints the real value. Area: {basis === 'bat12' ? 'Bring a Trailer dollars, last 12 months' : 'dollars of confirmed sales, all venues and years; hatched where BaT holds under half the sales'}. Nominal{clock}.
       </div>
+    </div>
+  );
+}
+
+const CALLOUT_LABEL: Record<Callout['kind'], string> = { gain: 'Gained most on BaT', loss: 'Lost most', largest: 'Largest' };
+/** The map's counted callouts, one line above it: the clearest gain and loss against BaT and the largest tile's move. */
+export function MapCallouts({ items, onPick }: { items: Callout[]; onPick: (name: string) => void }) {
+  if (!items.length) return null;
+  return (
+    <div className="map-callouts" aria-label="What moved most against BaT">
+      {items.map((c) => (
+        <button key={c.kind} type="button" className={`map-callouts__item map-callouts__item--${c.kind}`} onClick={() => onPick(c.name)}>
+          <span className="map-callouts__label">{CALLOUT_LABEL[c.kind]}</span>
+          <span className="map-callouts__name">{c.name}</span>
+          <span className="map-callouts__move">{pct(c.rel)} vs BaT</span>
+          <span className="map-callouts__n">{c.prior.toLocaleString('en-US')} → {c.sold.toLocaleString('en-US')} BaT sales</span>
+        </button>
+      ))}
     </div>
   );
 }

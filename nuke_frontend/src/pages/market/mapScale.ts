@@ -129,3 +129,23 @@ export function fitName(name: string, w: number, h: number, measure: (t: string)
   const size = Math.floor(Math.min(grow, (w - 12) / width));
   return size >= NAME_MIN[cls] ? size : null;
 }
+
+/** The map's three counted callouts (annotation layer, map design study): the clearest gain against BaT, the clearest
+ *  loss, and the largest tile's move. "Clear" is the movers' test: |ln(1 + move)| at least 2 standard errors
+ *  (Poisson, sqrt(1/sold + 1/prior)). Each carries its counts; none is prose. */
+export interface Callout { kind: 'gain' | 'loss' | 'largest'; name: string; rel: number; sold: number; prior: number }
+export function callouts<T extends MarketCounts & { name: string; usd_12m?: number | null }>(nodes: readonly T[], base: Baseline | null): Callout[] {
+  const moved = nodes.map((n) => ({ n, m: relativeMove(n, base) }))
+    .filter((x): x is { n: T; m: Extract<Move, { kind: 'move' }> } => x.m.kind === 'move');
+  const clear = moved.filter(({ m }) => Math.abs(Math.log(1 + m.rel)) >= 2 * Math.sqrt(1 / m.sold + 1 / m.prior));
+  const out: Callout[] = [];
+  const gain = clear.filter(({ m }) => m.rel > 0).sort((a, b) => b.m.rel - a.m.rel)[0];
+  const loss = clear.filter(({ m }) => m.rel < 0).sort((a, b) => a.m.rel - b.m.rel)[0];
+  const largest = [...moved].sort((a, b) => (b.n.usd_12m ?? 0) - (a.n.usd_12m ?? 0))[0];
+  if (gain) out.push({ kind: 'gain', name: gain.n.name, rel: gain.m.rel, sold: gain.m.sold, prior: gain.m.prior });
+  if (loss) out.push({ kind: 'loss', name: loss.n.name, rel: loss.m.rel, sold: loss.m.sold, prior: loss.m.prior });
+  if (largest && largest.n.name !== gain?.n.name && largest.n.name !== loss?.n.name) {
+    out.push({ kind: 'largest', name: largest.n.name, rel: largest.m.rel, sold: largest.m.sold, prior: largest.m.prior });
+  }
+  return out;
+}
