@@ -2364,8 +2364,9 @@ private struct FullScreenGalleryView: View {
     }
 }
 
-// Pinch-to-zoom + pan-while-zoomed + double-tap toggle, clamped 1…4×. Full-res raw
-// image (IMAGE RULE), cached. Resets on page change (each page is its own instance).
+// Pinch-to-zoom + pan-while-zoomed + double-tap toggle, clamped 1…4×. A 2048-pixel render
+// (enough for 2× zoom on a phone), not the raw original: a 3–10 MB HEIC decoded whole per page
+// was the "loads full res" heat (owner, 2026-10-15). Resets on page change.
 private struct ZoomableImage: View {
     let url: String?
     @State private var scale: CGFloat = 1
@@ -2375,7 +2376,7 @@ private struct ZoomableImage: View {
 
     var body: some View {
         GeometryReader { geo in
-            CachedAsyncImage(url: URL(string: url ?? "")) { image in
+            CachedAsyncImage(url: NukeImage.thumb(url, width: 2048)) { image in
                 image.resizable().scaledToFit()
             } placeholder: {
                 Color.black.overlay { ProgressView().tint(.white) }

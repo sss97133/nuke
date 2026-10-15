@@ -192,7 +192,7 @@ private struct DayPhotosView: View {
             // preserving the takenAt-DESC order. The grid renders from PhotoKit +
             // LocalStore only (no network).
             let lids = await Task.detached { LocalStore.shared.localIdentifiers(onDay: day) }.value
-            let map = LibraryStore.shared.indexMap(forLocalIdentifiers: lids)
+            let map = await LibraryStore.shared.indexMap(forLocalIdentifiers: lids)
             indices = lids.compactMap { map[$0] }
             loaded = true
             await reloadReceipt()

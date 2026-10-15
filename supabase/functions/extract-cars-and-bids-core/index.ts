@@ -513,6 +513,15 @@ Deno.serve(async (req) => {
     if (body?.action === "batch_from_targets") {
       return new Response(JSON.stringify(await batchFromTargets(supabase, supabaseUrl, serviceRoleKey, firecrawlApiKey, body)), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
+    if (body?.action === "mark_gone") {
+      // One-off repair for 2026-10-15: the extractor wrote auction_events outcome 'live' from C&B's not-found shell. A lot with a
+      // live row, no end moment and no bids is not a live auction; set it to 'pending' (no result known) and say why in raw_data.
+      const urls: string[] = (Array.isArray(body.urls) ? body.urls : []).filter((u: unknown) => typeof u === "string").slice(0, 100);
+      const { data: fixed, error: fixErr } = await supabase.from("auction_events")
+        .update({ outcome: "pending", raw_data: { page: "gone", note: "C&B not-found shell read as a live auction on 2026-10-15; no result is known", corrected_at: new Date().toISOString() } })
+        .eq("source", "cars_and_bids").in("source_url", urls).eq("outcome", "live").is("auction_end_date", null).is("total_bids", null).select("id");
+      return new Response(JSON.stringify({ success: !fixErr, error: fixErr?.message ?? null, corrected: fixed?.length ?? 0 }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
     if (body?.action === "revise") {
       return new Response(JSON.stringify(await reviseCab(supabase, supabaseUrl, serviceRoleKey, body)), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }

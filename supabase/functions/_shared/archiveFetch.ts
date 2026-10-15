@@ -129,6 +129,11 @@ function detectPlatform(url: string): string {
   try { return new URL(url).hostname.replace(/^www\./, "").split(".")[0]; } catch { return "unknown"; }
 }
 
+/** Any successful retained snapshot satisfies a cache read; one fetched by the preferred method wins when there are several. */
+export function pickCachedSnapshot<T extends { fetch_method?: string | null }>(rows: T[] | null | undefined, preferredMethod: string): T | null {
+  return rows?.find((r) => r.fetch_method === preferredMethod) ?? rows?.[0] ?? null;
+}
+
 function needsFirecrawl(url: string): boolean {
   // Sites that are JS SPAs or aggressively block direct fetch
   const fcSites = ["carsandbids.com", "collectingcars.com", "pcarmarket.com"];
@@ -146,7 +151,7 @@ async function sha256(text: string): Promise<string> {
  * Examples: Cloudflare challenge pages, bare React/Next.js shells, bot walls.
  * These should be archived as success=false so cache lookups don't return garbage.
  */
-function isGarbageHtml(html: string, platform: string): boolean {
+export function isGarbageHtml(html: string, platform: string): boolean {
   if (!html || html.length === 0) return true;
 
   const lower = html.toLowerCase();
@@ -162,7 +167,10 @@ function isGarbageHtml(html: string, platform: string): boolean {
   if (lower.includes("403 forbidden") && html.length < 5000) return true;
 
   // Login page detection — a login page returned as 200 OK is garbage, not content
-  if (isLoginPage(html)) return true;
+  // The body-signal heuristics in isLoginPage ("sign in to", "register", "forgot password") fire on any large page that
+  // carries a login modal: every Collecting Cars lot page (0.6-1.5 MB) was archived success=false because of it on
+  // 2026-10-15, so no later read could hit the cache and each one paid for a new Firecrawl scrape. A login wall is a small page.
+  if (html.length < 150_000 && isLoginPage(html)) return true;
 
   // React/Next.js shell with no rendered content (Bonhams, Barrett-Jackson)
   // These shells have __NEXT_DATA__ or __next but no actual lot/vehicle content
@@ -232,8 +240,7 @@ export async function archiveFetch(
         .order("fetched_at", { ascending: false })
         .limit(5);
 
-      // Prefer matching fetch_method, fall back to any
-      const cached = rows?.find(r => r.fetch_method === preferredMethod) ?? rows?.[0] ?? null;
+      const cached = pickCachedSnapshot(rows, preferredMethod);
 
       if (cached && (cached.html || cached.html_storage_path)) {
         let cachedHtml = cached.html ?? null;
