@@ -528,8 +528,8 @@ jobs:
         run: deno test --no-check --allow-env supabase/functions/api-v1-vehicle-auction/
       - name: Verify RM Sotheby's writes only vehicles, reads each lot once, finds a vehicle before writing it again, and calls an unheld lot upcoming
         run: deno test supabase/functions/extract-rmsothebys/
-      - name: Verify a Barrett-Jackson lot written to a given vehicle never lands on a new vehicle
-        run: deno test supabase/functions/extract-barrett-jackson/vehicleTarget.test.ts
+      - name: Verify a Barrett-Jackson lot written to a given vehicle never lands on a new vehicle, and its sale date is its own event's
+        run: deno test supabase/functions/extract-barrett-jackson/
       - name: Verify JamesEdition title and detail identity agree before intake
         run: deno test --no-config --no-lock --no-npm --no-remote supabase/functions/extract-jamesedition/
       - name: Verify Gooding listing aliases never resolve a different slug or an ambiguous parent
