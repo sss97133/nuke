@@ -540,3 +540,56 @@ What that commits the estimate to:
   one until it wins on the same lots.
 - **Acceptance case:** the Camaro above; model 33 must state what it would have said at 1 h and 10 min, with its
   contributions.
+
+
+## One scope drives the market page, and search sets it — owner direction, October 16
+
+The owner, on the home page: "lets say i want to drill into the tree map... i cant find mustang but i wanna explore
+mustang. i figure the search bar will help me... i type in mustang.. it sends me to a new page totally different design,
+untrustworthy data.. shows a rare unpopulated motorcycle and a completely random arrangement of mustangs... it shouldnt
+have sent me off the initial home page... if i typed in mustang up top i wouldve wanted all these stacks to reposition to
+mustang. i guess i wouldve wanted the treemap to be sort of the data guide and as i click through the tree map all the
+lower visualizers adjust."
+
+**What the page does today (measured 2026-10-16).**
+- The page answers "what are we looking at" in four unconnected places: the treemap's drill path (React state in
+  `TreemapHomePage`, not in the URL, so Back, a shared link and the search bar cannot reach it); the live board's `make`
+  and `model` (URL params, a separate mechanism); the Sources board (no scope at all); and the header search, which always
+  navigates to `/search` (8 call sites in `AIDataIngestionSearch`, plus `useSearchRouter`).
+- `/search` is the `universal-search` edge function matching text with `ILIKE` on the raw `make`, `model` and `color`
+  columns. For "mustang" it returned 94 vehicle rows, every one with `make = 'Mustang'`: 128 records in the whole database
+  carry that make (the Mustang Motorcycle Corp's minibikes, and cars whose make was recorded wrong, such as "1999 Mustang
+  mustang"); 58 of the 94 have no vehicle type, 28 no photo. Not one is a Ford Mustang, though the treemap's Ford Mustang
+  family holds 9,173 confirmed sales (Bring a Trailer 5,288, Mecum 2,610, no house recorded 1,221, Bonhams 40, Gooding 9,
+  PCarMarket 5) and 48 Ford Mustangs are live on BaT now. Every result scores 0.95, so "Relevance" orders nothing. The treemap
+  speaks in canonical makes and families; search speaks in whatever text the record carries; they disagree about what a
+  Mustang is.
+- The dropdown under the header search mixes vehicles, people ("MustandRM1969", a BaT identity) and typos in the data
+  ("1973 Ford mustand convertible", "1965 Mustang mustang") in one list.
+
+**The rule: one scope, in the URL, read by everything.**
+- The scope is a node of the treemap's own hierarchy, which already exists as canonical readers: all, make, family, model
+  name, year, vehicle (`treemap_brand_families`, `treemap_family_models`, `treemap_years`, `treemap_sales`). It lives in
+  the page URL (`/?tab=market&make=Ford&family=<family_key>`), so Back, a shared link and a reload all return to it.
+- The treemap is the scope's navigator and its legend: its breadcrumb is the scope, and a click sets it. Nothing else on
+  the page keeps a private filter.
+- Every section below the map answers for the scope or says why it cannot, with its own population, method and date:
+  live auctions (the scope's lots), what sold lately, the like-for-like price (`family_price_index_read`), finish
+  estimates for the scope's live lots, the calendar, classifieds, and the Sources board scoped (which houses hold this
+  scope's sales and what each lands). At the top (all makes) each section is market-wide, as now.
+- The header search sets scope. Text resolves to a node (an alias table with typo tolerance over the canonical makes,
+  families and model names, ranked by confirmed sales so cars come before minibikes, with the type shown when two
+  entities share a name: "Ford Mustang, 9,173 sales" and "Mustang minibikes, 12"). A high-confidence match scopes the page
+  in place; an ambiguous one shows its candidates under the box; a VIN opens that vehicle; a pasted listing address is
+  analyzed. `/search` stays only as the fallback for text that names no entity, and then ranks by evidence (photos, sales,
+  completeness), never by a text hit alone.
+
+**Order of work.** (1) A merged-away vehicle address redirects to its record, and merged or deleted records never appear
+in a list (#1778 for the redirect). (2) The scope in the URL, written and read by the treemap and the live board's own
+`make`/`model`. (3) The entity resolver (`market_scope_resolve`) and the header search on the market tab. (4) Each section
+takes the scope, starting with those whose data is already loaded for the family (the sales by house, the like-for-like
+line). (5) `/search` reduced to the fallback.
+
+**Acceptance.** Type "mustang" on the home page: the URL gains the Ford Mustang scope, the treemap shows the Mustang
+family's models, the live board lists the 48 live Ford Mustangs, the price section reads the Mustang family's like-for-like
+change, the Sources board shows the houses behind the 9,173 sales, and Back returns to all makes. Nothing leaves the page.
