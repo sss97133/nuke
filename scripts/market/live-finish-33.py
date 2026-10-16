@@ -15,7 +15,9 @@ factor families, every factor point-in-time and held by prod as well as the arch
 The 80% range is the analog's 10-90 spread moved by the residual and widened by a conformal correction per horizon x
 no-reserve flag x grade measured on archive lots the learner never saw. The estimate is never below the bid. Each row's
 notes.factors splits the dollar step from the analog read (core.est32) to the estimate among the families, in whole
-dollars that add up (log-mean split; "other" is the learner's move no family accounts for).
+dollars that add up (log-mean split; "other" is the learner's move no family accounts for). The backtest block (the
+measured miss and in-range share per horizon) rides on the first row of each run only; readers take the newest model 33
+row that carries one.
 Confidence: confidence_score is the lower of two measured in-range shares for the lot's horizon and grade, the archive
 hold-out (car lots closed 2026-04..09, fit A) and the fresh window (2026-09-28..10-14, fit B, the fit that serves);
 notes.coverage carries both with their n.
@@ -819,7 +821,7 @@ def score(T, facts, coms, a):
                  'model_page': r.cohort if isinstance(r.cohort, str) else None,
                  'vote_share': None if pd.isna(r.share) else round(float(r.share), 3), 'same_page_analogs': int(r.n_same), 'n_analogs': K,
                  'horizon_model': r.horizon, 'method': 'model 33 v2: analog core (price-only) + residual learner (trim, room, cultural, markets, history)',
-                 'factors': {'core': {'est32': int(round(est32))}, **lmdi(est32, est33, contrib)}, 'backtest': a['backtest'], 'analogs': analogs}
+                 'factors': {'core': {'est32': int(round(est32))}, **lmdi(est32, est33, contrib)}, 'analogs': analogs}
         hammer = int(round(est33, -2))
         rows.append({'vehicle_id': r.vehicle_id, 'current_bid': int(round(r.bid)), 'hours_remaining': round(float(r.hours_left), 1),
                      'time_window': 'live', 'price_tier': tier(est33), 'model_version': MODEL_VERSION,
@@ -857,7 +859,9 @@ def run(args):
         print(json.dumps({'dry_run': True, 'live': len(lots), 'due': len(ids), 'estimated': len(rows), 'skipped': len(skipped),
                           'skip_reasons': dict(Counter(s['reason'] for s in skipped)), 'seconds': round(time.time() - t0, 1)}))
         return
-    for s in range(0, len(rows), 200):                    # about 4 KB a row with its notes: 0.8 MB a request
+    if rows:                                              # the backtest block once per run, on the first row written:
+        n0 = json.loads(rows[0]['notes']); n0['backtest'] = a['backtest']; rows[0]['notes'] = json.dumps(n0, default=str)
+    for s in range(0, len(rows), 200):                    # about 2 KB a row with its notes: 0.4 MB a request
         rest('hammer_predictions', service, 'POST', rows[s:s + 200], prefer='return=minimal')
     print(json.dumps({'model': MODEL_VERSION, 'live': len(lots), 'due': len(ids), 'written': len(rows), 'skipped': len(skipped),
                       'skip_reasons': dict(Counter(s['reason'] for s in skipped)), 'seconds': round(time.time() - t0, 1)}))
