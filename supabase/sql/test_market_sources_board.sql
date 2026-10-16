@@ -1,6 +1,6 @@
 -- Empty disposable PG17 only: psql -X -v ON_ERROR_STOP=1 -d dm_refinement_market_sources_board -f this-file.sql
--- Contract for 20261018030000_market_sources_board.sql and 20261018031000_market_sources_live_window.sql (the reader in
--- force). Synthetic rows only; never production.
+-- Contract for 20261018030000_market_sources_board.sql, 20261018031000_market_sources_live_window.sql and
+-- 20261018032000_market_sources_rules_and_landing.sql (the reader in force). Synthetic rows only; never production.
 --   * the migration applies twice and schedules its job once;
 --   * record_market_source_day() writes one row per declared source holding data: held lots and when measured, the latest
 --     whole-source census, map sales under the source's house, sales by sale date (12 months, the 12 before, 24 months);
@@ -9,7 +9,9 @@
 --     carries each source's held lots a week earlier; with no rows it returns an empty list; a live lot counts when its
 --     monitor was read within 24 hours;
 --   * anon reads the board only through the reader; only service_role runs the writer;
---   * refresh-source-target-landed runs once a day at 10:27Z, its command untouched.
+--   * refresh-source-target-landed runs once a day at 10:27Z, its command untouched;
+--   * only markets rank (auction houses first, then marketplaces); capture channels, aggregators and dealers are counted
+--     in not_ranked; each market carries the records it landed in the last 24 hours and 7 days and 14 daily counts.
 \set ON_ERROR_STOP on
 DO $$ BEGIN
   IF current_database() NOT LIKE 'dm_refinement_%'
@@ -65,6 +67,14 @@ CREATE TABLE public.mv_family_sales (vehicle_id uuid, brand text, family_key tex
 CREATE TABLE public.live_auction_sources (id uuid PRIMARY KEY DEFAULT gen_random_uuid(), slug text UNIQUE, display_name text);
 CREATE TABLE public.monitored_auctions (id uuid PRIMARY KEY DEFAULT gen_random_uuid(), source_id uuid, vehicle_id uuid,
   auction_end_time timestamptz, is_live boolean, updated_at timestamptz);
+-- the landing log's source: rows landed per platform, at their own clocks (synthetic, this disposable database only)
+CREATE TABLE public.vehicle_events (id uuid PRIMARY KEY DEFAULT gen_random_uuid(), source_platform text, created_at timestamptz);
+INSERT INTO public.vehicle_events (source_platform, created_at)
+SELECT v.p, now() - v.ago FROM (VALUES
+  ('mecum', interval '10 minutes'), ('mecum', interval '2 hours'), ('Mecum', interval '5 hours'),   -- three in the last day
+  ('mecum', interval '3 days'), ('mecum', interval '20 days'),                                     -- one more in the week
+  ('bat', interval '30 minutes'), ('craigslist', interval '6 days'), ('facebook_saved', interval '1 hour'),
+  (NULL, interval '1 hour')) v(p, ago);
 \ir ../migrations/20261016150000_market_venue_label.sql
 
 INSERT INTO public.observation_sources (slug, display_name, category, created_at) VALUES
@@ -73,6 +83,10 @@ INSERT INTO public.observation_sources (slug, display_name, category, created_at
   ('cars-and-bids', 'Cars & Bids', 'auction', '2025-01-01'),
   ('carsandbids', 'Cars and Bids (dup)', 'auction', '2025-06-01'),
   ('craigslist', 'Craigslist', 'marketplace', '2025-01-01'),
+  ('facebook_marketplace', 'Facebook Marketplace', 'marketplace', '2025-01-01'),
+  ('facebook-saved', 'Facebook Saved Items', 'marketplace', '2025-01-01'),
+  ('jamesedition', 'JamesEdition', 'aggregator', '2025-01-01'),
+  ('streetside-classics', 'Streetside Classics', 'dealer', '2025-01-01'),
   ('nothing-yet', 'Nothing Yet', 'auction', '2025-01-01');
 INSERT INTO public.source_census (source_id, universe_total, universe_historical, census_method, census_confidence, census_at)
 SELECT id, v.t, v.h, v.m, v.c, v.at::timestamptz FROM public.observation_sources o JOIN (VALUES
@@ -84,7 +98,11 @@ INSERT INTO public.mv_source_target_landed VALUES
   ('bat', 250000, 0, 0, 252399, '2026-10-15 02:12Z'),
   ('mecum', 60000, 0, 0, 62314, '2026-10-15 02:12Z'),
   ('carsandbids', 0, 0, 0, 18659, '2026-10-15 02:12Z'),
-  ('craigslist', 0, 0, 0, 8411, '2026-10-15 02:12Z');
+  ('craigslist', 0, 0, 0, 8411, '2026-10-15 02:12Z'),
+  ('facebookmarketplace', 0, 0, 0, 11744, '2026-10-15 02:12Z'),
+  ('facebooksaved', 0, 0, 0, 460, '2026-10-15 02:12Z'),
+  ('jamesedition', 0, 0, 0, 838, '2026-10-15 02:12Z'),
+  ('streetsideclassics', 0, 0, 0, 15, '2026-10-15 02:12Z');
 INSERT INTO public.mv_treemap_outcomes (id, source_name, outcome, sold_amount)
 SELECT gen_random_uuid(), v.h, v.o, v.a FROM (VALUES
   ('Bring a Trailer', 'sold', 50000), ('Bring a Trailer', 'sold', 70000), ('Bring a Trailer', 'not_sold', 40000),
@@ -109,11 +127,18 @@ SELECT s.id, v.e, v.l, v.u FROM public.live_auction_sources s JOIN (VALUES
 \ir ../migrations/20261018030000_market_sources_board.sql
 \ir ../migrations/20261018031000_market_sources_live_window.sql
 \ir ../migrations/20261018031000_market_sources_live_window.sql
+\ir ../migrations/20261018032000_market_sources_rules_and_landing.sql
+\ir ../migrations/20261018032000_market_sources_rules_and_landing.sql
 
 SELECT pg_temp.ok('the writer job is scheduled once, at 10:47Z',
   (SELECT count(*) FROM cron.job WHERE jobname = 'market-source-days') = 1
   AND (SELECT schedule FROM cron.job WHERE jobname = 'market-source-days') = '47 10 * * *'
   AND (SELECT command FROM cron.job WHERE jobname = 'market-source-days') LIKE '%record_market_source_day()%');
+SELECT pg_temp.ok('the landing job is scheduled once, hourly at :09',
+  (SELECT count(*) FROM cron.job WHERE jobname = 'market-source-hours') = 1
+  AND (SELECT schedule FROM cron.job WHERE jobname = 'market-source-hours') = '9 * * * *');
+SELECT pg_temp.ok('the capture channel names its market',
+  (SELECT market_slug FROM public.observation_sources WHERE slug = 'facebook-saved') = 'facebook_marketplace');
 SELECT pg_temp.ok('the held-lot fold runs daily at 10:27Z, active, its command untouched',
   (SELECT schedule = '27 10 * * *' AND active AND command LIKE 'SET statement_timeout = ''300s''; REFRESH%'
    FROM cron.job WHERE jobid = 524));
@@ -124,11 +149,12 @@ SELECT pg_temp.ok('before any reading: an empty board',
 RESET ROLE;
 
 SET ROLE service_role;
-SELECT pg_temp.ok('the writer records the four sources holding data', public.record_market_source_day() = 4);
+SELECT pg_temp.ok('the writer records the eight sources holding data', public.record_market_source_day() = 8);
 RESET ROLE;
 SELECT pg_temp.ok('one row per source holding data; none for a source with nothing',
-  (SELECT array_agg(source_slug ORDER BY source_slug) FROM public.market_source_days)
-    = ARRAY['bat', 'cars-and-bids', 'craigslist', 'mecum']);
+  (SELECT array_agg(source_slug ORDER BY source_slug COLLATE "C") FROM public.market_source_days)
+    = ARRAY['bat', 'cars-and-bids', 'craigslist', 'facebook-saved', 'facebook_marketplace', 'jamesedition', 'mecum',
+            'streetside-classics']);
 SELECT pg_temp.ok('BaT: held lots and when, the whole-source census, map sales with an amount, sales by sale date',
   (SELECT landed_lots = 252399 AND landed_at = '2026-10-15 02:12Z' AND population = 264746 AND population_method = 'enumerated'
       AND population_confidence = 0.90 AND map_sales = 2 AND map_usd = 120000 AND sales_12m = 2 AND usd_12m = 120000
@@ -150,10 +176,14 @@ SELECT pg_temp.ok('24 months of points, oldest first, each [month, sales, dollar
 
 UPDATE public.mv_source_target_landed SET landed_lots = 70000, measured_at = '2026-10-16 10:27Z' WHERE source_slug = 'mecum';
 SET ROLE service_role;
-SELECT pg_temp.ok('a second reading the same day replaces the day''s rows', public.record_market_source_day() = 4);
+SELECT pg_temp.ok('a second reading the same day replaces the day''s rows', public.record_market_source_day() = 8);
+SELECT pg_temp.ok('fourteen days of landings fill in one call', public.record_market_source_hours(336) > 0);
+SELECT pg_temp.ok('a later hourly run writes its last three hours again', public.record_market_source_hours(3) > 0);
 RESET ROLE;
+SELECT pg_temp.ok('and replaces them, never adding to them',
+  (SELECT sum(records) FROM public.market_source_hours) = 7);   -- 8 rows with a platform, one 20 days old
 SELECT pg_temp.ok('still one row per source, with the new count and its time',
-  (SELECT count(*) FROM public.market_source_days) = 4
+  (SELECT count(*) FROM public.market_source_days) = 8
   AND (SELECT landed_lots = 70000 AND landed_at = '2026-10-16 10:27Z' FROM public.market_source_days WHERE source_slug = 'mecum'));
 
 -- a week earlier
@@ -166,10 +196,20 @@ DECLARE b jsonb := public.market_sources_read();
   r jsonb;
 BEGIN
   PERFORM pg_temp.ok('the board names its columns',
-    b->'columns' = '["source","name","category","house","held_lots","held_at","population","population_method","population_confidence","population_at","map_sales","map_usd","sales_12m","usd_12m","sales_prior_12m","usd_prior_12m","months","live_lots","live_at","held_lots_before","before_day"]'::jsonb);
-  PERFORM pg_temp.ok('today''s rows only, ranked by held lots',
+    b->'columns' = '["source","name","category","house","held_lots","held_at","population","population_method","population_confidence","population_at","map_sales","map_usd","sales_12m","usd_12m","sales_prior_12m","usd_prior_12m","months","live_lots","live_at","held_lots_before","before_day","landed_24h","landed_7d","last_landed","days14"]'::jsonb);
+  PERFORM pg_temp.ok('markets only: auction houses by held lots, then marketplaces by held listings',
     (b->>'day')::date = current_date AND (SELECT array_agg(x->>0 ORDER BY ord) FROM jsonb_array_elements(b->'rows') WITH ORDINALITY e(x, ord))
-      = ARRAY['bat', 'mecum', 'cars-and-bids', 'craigslist']);
+      = ARRAY['bat', 'mecum', 'cars-and-bids', 'facebook_marketplace', 'craigslist']);
+  PERFORM pg_temp.ok('the capture channel, the aggregator and the dealer are counted, not ranked',
+    b->'not_ranked' = '{"capture channels": 1, "aggregator": 1, "dealer": 1}'::jsonb);
+  SELECT x INTO r FROM jsonb_array_elements(b->'rows') x WHERE x->>0 = 'mecum';
+  PERFORM pg_temp.ok('landing: three records in the last day, four in the week, 14 daily counts, the last landing hour',
+    (r->>21)::int = 3 AND (r->>22)::int = 4 AND jsonb_array_length(r->24) = 14
+    AND (r->>23)::timestamptz >= date_trunc('hour', now()) - interval '1 hour'
+    AND (SELECT sum(v::int) FROM jsonb_array_elements_text(r->24) v) = 4);
+  SELECT x INTO r FROM jsonb_array_elements(b->'rows') x WHERE x->>0 = 'craigslist';
+  PERFORM pg_temp.ok('a market that landed nothing today: zero today, its week and its last landing kept',
+    (r->>21)::int = 0 AND (r->>22)::int = 1 AND r->>23 IS NOT NULL);
   SELECT x INTO r FROM jsonb_array_elements(b->'rows') x WHERE x->>0 = 'bat';
   PERFORM pg_temp.ok('live lots: live, a future end, read in the last 24 hours', (r->>17)::int = 3 AND r->>18 IS NOT NULL);
   SELECT x INTO r FROM jsonb_array_elements(b->'rows') x WHERE x->>0 = 'cars-and-bids';
@@ -184,7 +224,8 @@ SELECT pg_temp.fails('anon cannot read the table', $s$SELECT count(*) FROM publi
 SELECT pg_temp.fails('anon cannot write the board', $s$SELECT public.record_market_source_day()$s$);
 RESET ROLE;
 SET ROLE authenticated;
-SELECT pg_temp.ok('authenticated reads the board', jsonb_array_length(public.market_sources_read()->'rows') = 4);
+SELECT pg_temp.ok('authenticated reads the board', jsonb_array_length(public.market_sources_read()->'rows') = 5);
+SELECT pg_temp.fails('authenticated cannot write the landing log', $s$SELECT public.record_market_source_hours(3)$s$);
 SELECT pg_temp.fails('authenticated cannot write the board', $s$SELECT public.record_market_source_day()$s$);
 RESET ROLE;
 SELECT pg_temp.ok('both functions are definers with a pinned search_path',

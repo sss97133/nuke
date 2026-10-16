@@ -8,7 +8,8 @@ import './SourcesBoard.css';
 // reader, so a source moves up as more of its data lands. Held counts carry the time their fold was measured.
 const COLUMNS = ['source', 'name', 'category', 'house', 'held_lots', 'held_at', 'population', 'population_method',
   'population_confidence', 'population_at', 'map_sales', 'map_usd', 'sales_12m', 'usd_12m', 'sales_prior_12m',
-  'usd_prior_12m', 'months', 'live_lots', 'live_at', 'held_lots_before', 'before_day'] as const;
+  'usd_prior_12m', 'months', 'live_lots', 'live_at', 'held_lots_before', 'before_day', 'landed_24h', 'landed_7d',
+  'last_landed', 'days14'] as const;
 type Column = typeof COLUMNS[number];
 const SHOWN = 10;
 
@@ -22,8 +23,10 @@ export type SourceRow = {
   months: [string, number, number][];
   live: number; liveAt: string | null;
   heldBefore: number | null; beforeDay: string | null;
+  /** Records landed (vehicle_events) in the last 24 hours and 7 days, the last hour any landed, and 14 daily counts. */
+  landed24: number; landed7: number; lastLanded: string | null; days14: number[];
 };
-export type SourcesBoardData = { asOf: string; day: string | null; rows: SourceRow[] };
+export type SourcesBoardData = { asOf: string; day: string | null; rows: SourceRow[]; notRanked: Record<string, number> };
 
 const num = (x: unknown) => (typeof x === 'number' && Number.isFinite(x) ? x
   : typeof x === 'string' && x.trim() !== '' && Number.isFinite(Number(x)) ? Number(x) : null);
@@ -32,7 +35,7 @@ const str = (x: unknown) => (typeof x === 'string' && x ? x : null);
 /** The reader's value as typed rows, decoded by column name; anything else is null. */
 export function parseSources(value: unknown): SourcesBoardData | null {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
-  const v = value as { as_of?: unknown; day?: unknown; columns?: unknown; rows?: unknown };
+  const v = value as { as_of?: unknown; day?: unknown; columns?: unknown; rows?: unknown; not_ranked?: unknown };
   if (typeof v.as_of !== 'string' || !Array.isArray(v.columns) || !Array.isArray(v.rows)) return null;
   const columns = v.columns as unknown[];
   const at = Object.fromEntries(COLUMNS.map((c) => [c, columns.indexOf(c)])) as Record<Column, number>;
@@ -56,9 +59,15 @@ export function parseSources(value: unknown): SourcesBoardData | null {
       usdPrior12: num(get('usd_prior_12m')), months,
       live: num(get('live_lots')) ?? 0, liveAt: str(get('live_at')),
       heldBefore: num(get('held_lots_before')), beforeDay: str(get('before_day')),
+      landed24: num(get('landed_24h')) ?? 0, landed7: num(get('landed_7d')) ?? 0, lastLanded: str(get('last_landed')),
+      days14: Array.isArray(get('days14')) ? (get('days14') as unknown[]).map((x) => num(x) ?? 0) : [],
     });
   }
-  return { asOf: v.as_of, day: str(v.day), rows };
+  const notRanked: Record<string, number> = {};
+  if (v.not_ranked && typeof v.not_ranked === 'object' && !Array.isArray(v.not_ranked)) {
+    for (const [k, n] of Object.entries(v.not_ranked as Record<string, unknown>)) { const c = num(n); if (c) notRanked[k] = c; }
+  }
+  return { asOf: v.as_of, day: str(v.day), rows, notRanked };
 }
 
 const count = (n: number) => Math.round(n).toLocaleString('en-US');
@@ -120,68 +129,114 @@ function Spark({ bars }: { bars: number[] }) {
   );
 }
 
+/** Landing now: records in the last 24 hours, a dot that says whether any landed in that day, idle since when if not. */
+export function landingState(row: Pick<SourceRow, 'landed24' | 'lastLanded'>, now = Date.now()): { active: boolean; text: string } {
+  if (row.landed24 > 0) return { active: true, text: `+${count(row.landed24)} today` };
+  if (!row.lastLanded) return { active: false, text: 'nothing landed yet' };
+  const t = Date.parse(row.lastLanded);
+  if (Number.isNaN(t)) return { active: false, text: 'idle' };
+  return { active: false, text: `idle since ${new Date(t).toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: 'UTC' })}` };
+}
+function DayBars({ days }: { days: number[] }) {
+  const max = Math.max(0, ...days);
+  if (!(max > 0) || days.length === 0) return null;
+  const w = 4, gap = 1, h = 16;
+  return (
+    <svg className="market-sources__days" width={days.length * (w + gap)} height={h} viewBox={`0 0 ${days.length * (w + gap)} ${h}`}
+      aria-hidden="true">
+      {days.map((n, i) => {
+        const bh = n > 0 ? Math.max(1, (Math.sqrt(n) / Math.sqrt(max)) * h) : 0;
+        return <rect key={i} x={i * (w + gap)} y={h - bh} width={w} height={bh}
+          className={i === days.length - 1 ? 'market-sources__day--today' : 'market-sources__day'} />;
+      })}
+    </svg>
+  );
+}
+const GROUPS: [string, string, string][] = [
+  ['auction', 'Auction houses', 'lots held'],
+  ['marketplace', 'Marketplaces', 'listings held'],
+];
+const NOT_RANKED_WORDS: Record<string, string> = {
+  'capture channels': 'capture channel', aggregator: 'aggregator', dealer: 'dealer', shop: 'shop', registry: 'registry',
+  social_media: 'social channel', forum: 'forum', documentation: 'archive', owner: 'owner source', internal: 'internal source',
+};
+
 export function SourcesBoardView({ data }: { data: SourcesBoardData }) {
   const [all, setAll] = useState(false);
-  const rows = all ? data.rows : data.rows.slice(0, SHOWN);
   const heldAt = data.rows.map((r) => r.heldAt).filter((x): x is string => !!x).sort().at(-1) ?? null;
+  const groups = GROUPS.map(([key, title, unit]) => ({ key, title, unit, rows: data.rows.filter((r) => r.category === key) }))
+    .filter((g) => g.rows.length);
+  const shownPer = all ? Infinity : SHOWN;
+  const hidden = groups.reduce((n, g) => n + Math.max(0, g.rows.length - SHOWN), 0);
+  const notRanked = Object.entries(data.notRanked).sort((x, y) => y[1] - x[1])
+    .map(([k, n]) => `${n} ${NOT_RANKED_WORDS[k] ?? k}${n > 1 ? 's' : ''}`);
   return (
-    <section className="market-sources" aria-label="Sources, ranked by the lots we hold">
+    <section className="market-sources" aria-label="Sources, ranked by what we hold">
       <div className="market-sources__head">
         <span className="market-sources__title">Sources</span>
         <span className="market-sources__note">
-          ranked by the lots we hold · a source moves up as more of it lands{heldAt ? ` · held counts as of ${heldWhen(heldAt)}` : ''}
+          ranked by what we hold · a source moves up as more of it lands{heldAt ? ` · held counts as of ${heldWhen(heldAt)}` : ''}
         </span>
       </div>
-      <div className="market-sources__cols" aria-hidden="true">
-        <span>#</span><span>source</span><span className="n">lots held</span><span>of their total</span>
-        <span className="n">sales on the map</span><span>sales, last 12 months</span><span className="n">live now</span>
+      {groups.map((g) => (
+        <div key={g.key} className="market-sources__group">
+          <div className="market-sources__cols">
+            <span>#</span><span className="market-sources__group-title">{g.title}</span><span className="n">{g.unit}</span>
+            <span>of their total</span><span>landing, last 14 days</span><span>sales, last 12 months</span><span className="n">live now</span>
+          </div>
+          <ol className="market-sources__rows">
+            {g.rows.slice(0, shownPer).map((r, i) => {
+              const s = heldShare(r);
+              const week = r.held != null && r.heldBefore != null ? r.held - r.heldBefore : null;
+              const land = landingState(r);
+              const total = r.population != null
+                ? `${count(r.population)} ${METHOD[r.populationMethod ?? ''] ?? `(${r.populationMethod ?? 'method unrecorded'})`}`
+                  + `${r.populationAt ? `, ${shortDay(r.populationAt)}` : ''}`
+                  + `${r.populationConfidence != null ? `, confidence ${r.populationConfidence.toFixed(2)}` : ''}`
+                : 'their total is not counted yet';
+              return (
+                <li key={r.source} className="market-sources__row">
+                  <span className="market-sources__rank">{i + 1}</span>
+                  <span className="market-sources__name">{r.name}</span>
+                  <span className="market-sources__held n" title={r.heldAt ? `held as of ${heldWhen(r.heldAt)}` : undefined}>
+                    {r.held != null ? count(r.held) : '—'}
+                    {week != null && week !== 0
+                      ? <small className={week > 0 ? 'up' : 'down'}> {week > 0 ? '+' : '−'}{count(Math.abs(week))} since {shortDay(r.beforeDay)}</small>
+                      : null}
+                  </span>
+                  <span className="market-sources__share" title={total}>
+                    <svg className={`market-sources__track${s.share == null ? ' market-sources__track--unknown' : ''}`} viewBox="0 0 100 8"
+                      preserveAspectRatio="none" aria-hidden="true">
+                      {s.share != null ? <rect className="market-sources__fill" x="0" y="0" height="8" width={Math.max(1.5, s.share * 100)} /> : null}
+                    </svg>
+                    <span className="market-sources__sharetext">{s.text}</span>
+                  </span>
+                  <span className="market-sources__landing" title={`${count(r.landed7)} records landed in the last 7 days`}>
+                    <i className={land.active ? 'on' : 'off'} aria-hidden="true" />
+                    <span className={`market-sources__landtext${land.active ? '' : ' idle'}`}>{land.text}</span>
+                    <DayBars days={r.days14} />
+                  </span>
+                  <span className="market-sources__recent"
+                    title={r.mapSales ? `on the map: ${count(r.mapSales)} confirmed sales${r.mapUsd ? `, ${money(r.mapUsd)}` : ''}` : undefined}>
+                    {r.sales12 ? <><span className="n">{count(r.sales12)}</span><Spark bars={monthBars(r.months, data.day)} /></> : <span className="n">—</span>}
+                  </span>
+                  <span className="market-sources__live n">
+                    {r.live > 0 ? <><i aria-hidden="true" />{count(r.live)} live</> : '—'}
+                  </span>
+                </li>
+              );
+            })}
+          </ol>
+        </div>
+      ))}
+      <div className="market-sources__foot">
+        {hidden > 0
+          ? <button type="button" className="market-sources__more" onClick={() => setAll((x) => !x)}>
+            {all ? 'Show the top of each group' : `Show all ${data.rows.length} sources`}
+          </button>
+          : null}
+        {notRanked.length ? <span className="market-sources__note">not ranked: {notRanked.join(', ')}</span> : null}
       </div>
-      <ol className="market-sources__rows">
-        {rows.map((r, i) => {
-          const s = heldShare(r);
-          const week = r.held != null && r.heldBefore != null ? r.held - r.heldBefore : null;
-          const total = r.population != null
-            ? `${count(r.population)} ${METHOD[r.populationMethod ?? ''] ?? `(${r.populationMethod ?? 'method unrecorded'})`}`
-              + `${r.populationAt ? `, ${shortDay(r.populationAt)}` : ''}`
-              + `${r.populationConfidence != null ? `, confidence ${r.populationConfidence.toFixed(2)}` : ''}`
-            : 'their total is not counted yet';
-          return (
-            <li key={r.source} className="market-sources__row">
-              <span className="market-sources__rank">{i + 1}</span>
-              <span className="market-sources__name" title={r.category ?? undefined}>
-                {r.name}{r.category && r.category !== 'auction' ? <small> {r.category}</small> : null}
-              </span>
-              <span className="market-sources__held n" title={r.heldAt ? `held as of ${heldWhen(r.heldAt)}` : undefined}>
-                {r.held != null ? count(r.held) : '—'}
-                {week != null && week !== 0
-                  ? <small className={week > 0 ? 'up' : 'down'}> {week > 0 ? '+' : '−'}{count(Math.abs(week))} since {shortDay(r.beforeDay)}</small>
-                  : null}
-              </span>
-              <span className="market-sources__share" title={total}>
-                <svg className={`market-sources__track${s.share == null ? ' market-sources__track--unknown' : ''}`} viewBox="0 0 100 8"
-                  preserveAspectRatio="none" aria-hidden="true">
-                  {s.share != null ? <rect className="market-sources__fill" x="0" y="0" height="8" width={Math.max(1.5, s.share * 100)} /> : null}
-                </svg>
-                <span className="market-sources__sharetext">{s.text}</span>
-              </span>
-              <span className="market-sources__map n">
-                {r.mapSales ? `${count(r.mapSales)}${r.mapUsd ? ` · ${money(r.mapUsd)}` : ''}` : '—'}
-              </span>
-              <span className="market-sources__recent">
-                {r.sales12 ? <><span className="n">{count(r.sales12)}</span><Spark bars={monthBars(r.months, data.day)} /></> : <span className="n">—</span>}
-              </span>
-              <span className="market-sources__live n">
-                {r.live > 0 ? <><i aria-hidden="true" />{count(r.live)} live</> : '—'}
-              </span>
-            </li>
-          );
-        })}
-      </ol>
-      {data.rows.length > SHOWN
-        ? <button type="button" className="market-sources__more" onClick={() => setAll((x) => !x)}>
-          {all ? `Show the top ${SHOWN}` : `Show all ${data.rows.length} sources`}
-        </button>
-        : null}
     </section>
   );
 }
