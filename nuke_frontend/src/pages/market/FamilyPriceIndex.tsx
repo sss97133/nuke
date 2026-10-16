@@ -32,6 +32,13 @@ export function parseFamilyIndex(value: unknown): FamilyIndex | null {
   const v = value as Record<string, unknown>;
   const counts = (v.counts && typeof v.counts === 'object' ? v.counts : {}) as Record<string, unknown>;
   const fitted = v.change && typeof v.change === 'object';
+  // A family above the sales floor that the nightly fit has not reached yet (it fits the biggest families first) is
+  // not "too few to tell": it has a fit coming. It reads as no index, and the family chart keeps drawing as before.
+  if (!fitted) {
+    const floor = (v.floor && typeof v.floor === 'object' ? v.floor : {}) as Record<string, unknown>;
+    const yr = num(floor.sales_each_year), tot = num(floor.sales_total);
+    if (yr != null && tot != null && (num(counts.n_last12) ?? 0) >= yr && (num(counts.n_prior12) ?? 0) >= yr && (num(counts.n_total) ?? 0) >= tot) return null;
+  }
   const c = (fitted ? v.change : {
     verdict: 'counts' in v ? 'too few to tell' : undefined, n_last12: counts.n_last12, n_prior12: counts.n_prior12,
   }) as Record<string, unknown>;
