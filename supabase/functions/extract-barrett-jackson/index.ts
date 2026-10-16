@@ -34,6 +34,7 @@ import { projectSecretKey } from "../_shared/supabaseKeys.ts";
 import { mustWrite, softWrite } from '../_shared/writeResult.ts';
 import { fillOnlyIdentity, identityConflict, REVISION_DIFFERENT_CAR } from '../_shared/identityMatch.ts';
 import { ForcedVehicleMissing, forcedVehicleId, pickVehicleTarget } from "./vehicleTarget.ts";
+import { lotEventDate } from "./eventDate.ts";
 
 /** The resolved vehicle is a different car than the lot: nothing is written, a revision item is returned (missing: identity_match,
  *  reason: different_car, next action: relink). Photos and episodes for a different car never attach to that vehicle. */
@@ -247,10 +248,9 @@ function parseRscVehicleData(html: string, url: string): BJVehicle | null {
     const eventField = searchBlock.match(/\\?"event_slug\\?":\s*\\?"([^"\\]+)\\?"/);
     if (eventField) vehicle.auction_name = titleCase(eventField[1].replace(/-/g, " "));
 
-    // Event start date = the sale date. It sits in the RSC payload but was never
-    // read — the cause of BJ's 0% dated events. Pull the first ISO date.
-    const startDateField = html.match(/\\?"start_date\\?":\s*\\?"(\d{4}-\d{2}-\d{2})/);
-    if (startDateField) vehicle.event_date = startDateField[1];
+    // Event start date = the sale date: the first start_date in the docket's own event year (eventDate.ts). The page
+    // also advertises upcoming events; the first ISO date dated a 2004 lot to 2026-04-16.
+    vehicle.event_date = lotEventDate(html, url);
 
     // Is sold
     const soldField = searchBlock.match(/\\?"is_sold\\?":\s*(true|false)/);
