@@ -36,6 +36,19 @@ export function logTicks(lo: number, hi: number): number[] {
 
 // The rolling median: every 14 days, the median price of the sales within 60 days either side, where there are at
 // least 5. Sales sorted by date.
+/** The family's median sale over the last 365 days against the 365 before it, every venue, priced sales (null under 5 a year):
+ *  what a plain median line would say, to set beside the like-for-like answer. */
+export function plainMedianChange(sales: Sale[], now = Date.now()): number | null {
+  const med = (v: number[]) => { const s = [...v].sort((a, b) => a - b); const m = s.length >> 1; return s.length % 2 ? s[m] : (s[m - 1] + s[m]) / 2; };
+  const last: number[] = [], prior: number[] = [];
+  for (const x of sales) {
+    const t = Date.parse(x.sale_date);
+    if (!Number.isFinite(t) || !(x.usd >= PRICE_FLOOR) || t > now) continue;
+    if (t > now - 365 * DAY) last.push(x.usd); else if (t > now - 730 * DAY) prior.push(x.usd);
+  }
+  return last.length >= 5 && prior.length >= 5 ? med(last) / med(prior) - 1 : null;
+}
+
 export function rollingMedian(points: { t: number; usd: number }[], stepDays = 14, halfDays = 60, min = 5): { t: number; usd: number }[] {
   if (!points.length) return [];
   const out: { t: number; usd: number }[] = [];
@@ -176,6 +189,8 @@ export default function FamilySalesChart({ brand, familyKey, family, width, heig
   // sale with the like-for-like line over it, and the head answers with its 12-month change instead of a median.
   const ix = useFamilyIndex(brand, familyKey);
   const indexed = !!ix && ix.series.length > 1;
+  // The plain median's own 12-month change over every venue, for the sentence beside the answer when the reader has none.
+  const plain = useMemo(() => (sales ? plainMedianChange(sales) : null), [sales]);
   const [hover, setHover] = useState<{ band: number; dot: number } | null>(null);
   const [refHover, setRefHover] = useState<number | null>(null);
   // Venues hidden from the legend: their dots and their share of the medians go, the axes stay.
@@ -276,7 +291,7 @@ export default function FamilySalesChart({ brand, familyKey, family, width, heig
           + (plot.unpanelled ? ` · ${plot.unpanelled.toLocaleString('en-US')} with a rare or unknown model year not drawn` : '')
           + (hidden.size ? ` · ${plot.shown.toLocaleString('en-US')} shown` : '')}</Text>
       </div>
-      {ix ? <LikeForLike ix={ix} narrow={narrow} /> : (held || move) && <div className="family-sales__move">
+      {ix ? <LikeForLike ix={plain != null && ix.rawChange == null ? { ...ix, rawChange: plain } : ix} narrow={narrow} /> : (held || move) && <div className="family-sales__move">
         {held ? <>
           <Text role="measure">{signed(held.change)}</Text>
           <Text role="caption">{narrow ? `BaT price, decades held at last year's mix · raw median ${raw}`

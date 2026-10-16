@@ -20,6 +20,9 @@ describe('same car, same miles', () => {
     const thin = parseFamilyIndex({ change: null, counts: { n_last12: 12, n_prior12: 9, n_total: 60 }, series: [], period_kind: null });
     expect(thin).toMatchObject({ verdict: 'too few to tell', nLast: 12, nPrior: 9, series: [] });
     expect(evidenceOf(thin!)).toBe('21 sales in the two years · needs 30 a year');
+    // above the floor but not fitted yet: no index, so the chart keeps its median until the fit lands
+    expect(parseFamilyIndex({ change: null, floor: { sales_each_year: 30, sales_total: 150 }, counts: { n_last12: 58, n_prior12: 34, n_total: 150 }, series: [] })).toBeNull();
+    expect(parseFamilyIndex({ change: null, floor: { sales_each_year: 30, sales_total: 150 }, counts: { n_last12: 58, n_prior12: 12, n_total: 150 }, series: [] })?.verdict).toBe('too few to tell');
     // chips come as change.chips; a stale fit says when it was measured
     const chips = parseFamilyIndex({ fitted_at: '2026-10-12T11:31:00Z', stale: true, period_kind: null, series: [],
       change: { verdict: 'flat', change_12m: 0.008, lo: -0.012, hi: 0.028, n_last12: 1418, n_prior12: 1290,

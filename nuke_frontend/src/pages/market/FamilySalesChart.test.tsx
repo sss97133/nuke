@@ -195,10 +195,29 @@ it('answers same car, same miles when the family has a like-for-like index: one 
   expect(container.querySelector('.family-sales')?.classList.contains('family-sales--indexed')).toBe(true);
   expect(container.querySelector('.family-index__answer')?.textContent).toBe('▲39% in 12 months');
   expect(container.querySelector('.family-index')?.textContent).toContain('±10 points (95%) · 122 sales in the two years · plain median said ▲38%');
-  expect([...container.querySelectorAll('.family-index__chip')].map((c) => c.textContent)).toEqual(['Coupe F1 ▲41%', 'Scuderia / 16M too few']);
+  // one readable segment is not a row worth drawing
+  expect(container.querySelectorAll('.family-index__chip')).toHaveLength(0);
+  expect(container.querySelector('.family-index__evidence')?.textContent).toContain('plain median said');
   expect(container.querySelectorAll('svg.family-sales__plot')).toHaveLength(1);
   expect(container.querySelector('path.family-sales__ref')?.getAttribute('d')).toMatch(/^M/);
   expect(container.querySelector('path.family-sales__ref-band')).not.toBeNull();
   expect(container.querySelector('path.family-sales__median--plain')).not.toBeNull();
   expect(container.querySelector('.family-sales__move')).toBeNull();
+});
+
+it('keeps the segment chips when at least two carry a number, and says what the plain median said from the sales it has', async () => {
+  // 12 sales in the last year at about $100k, 12 the year before at about $150k: a plain median that fell by a third
+  const sales = Array.from({ length: 24 }, (_, k) => sale(k + 1, 10 + 30 * k, (k < 12 ? 100000 : 150000) + k * 100, 'Bring a Trailer'));
+  const index = { period_kind: 'quarter', fitted_at: '2026-10-16T11:20:00Z', stale: false, counts: { n_last12: 12, n_prior12: 12, n_total: 200 },
+    change: { verdict: 'flat', change_12m: 0.01, lo: -0.02, hi: 0.04, n_last12: 40, n_prior12: 35, chips: [
+      { key: 'a', label: 'C2 1963–67', change_12m: 0.05, lo: 0.01, hi: 0.09, n_last12: 20, n_prior12: 18, verdict: 'up' },
+      { key: 'b', label: 'C8 2020+', change_12m: -0.11, lo: -0.18, hi: -0.04, n_last12: 30, n_prior12: 22, verdict: 'down' },
+      { key: 'c', label: 'C5 1997–2004', change_12m: null, lo: null, hi: null, n_last12: 3, n_prior12: 2, verdict: 'too few to tell' }] },
+    series: [400, 300, 200, 100, 10].map((d, i) => ({ period_start: new Date(Date.now() - d * 86_400_000).toISOString().slice(0, 10),
+      index_usd: 100000 + i, lo_usd: 95000, hi_usd: 105000, n: 20, raw_median_usd: 120000 })) };
+  fixture.rpc.mockImplementation((fn: string) => Promise.resolve(fn === 'treemap_family_sales' ? { data: value(sales), error: null }
+    : fn === 'family_price_index_read' ? { data: index, error: null } : { data: null, error: { message: 'none' } }));
+  await act(async () => root.render(<FamilySalesChart brand="Chevrolet" familyKey="vette" family="Corvette" width={900} height={500} onOpen={() => {}} />));
+  expect([...container.querySelectorAll('.family-index__chip')].map((c) => c.textContent)).toEqual(['C2 1963–67 ▲5%', 'C8 2020+ ▼11%', 'C5 1997–2004 too few']);
+  expect(container.querySelector('.family-index__evidence')?.textContent).toMatch(/plain median said ▼\d+%/);
 });

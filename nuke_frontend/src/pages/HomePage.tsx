@@ -190,11 +190,12 @@ export function mapLegend(level: MapLevel, measured = level === 'brands' || leve
 
 /** The legend under the map: the sales chart's when a family shows its chart (the tiles' legend described tiles that
  *  were not on screen, 2026-10-15), the level's otherwise. */
-export const SALES_CHART_LEGEND = 'one dot = one confirmed sale with a date, the last five years · one panel per decade the cars '
-  + 'were built, all on one price scale that leaves out the cheapest and dearest 1% (those sit on the edge, counted) · '
-  + 'color = auction house · line = the typical (median) price of sales within 60 days either side; band = their middle half · '
-  + 'headline = the price change at houses held in full both years (today Bring a Trailer), each decade weighted by how much it sold a year earlier · prices not adjusted '
-  + 'for inflation · click a dot to open the car';
+export const SALES_CHART_LEGEND = 'one dot = one confirmed sale with a date, the last five years · color = auction house · '
+  + 'blue (where a family has enough sales) = the price of one standard car, the same mix of variant, miles, gearbox, model year '
+  + 'and venue in every period, with its 95% band, and the headline is that car\'s change over 12 months; gray = the plain median '
+  + 'of every sale, which mixes different cars · otherwise one panel per decade the cars were built, all on one price scale that '
+  + 'leaves out the cheapest and dearest 1% (those sit on the edge, counted), line = the typical (median) price of sales within '
+  + '60 days either side, band = their middle half · prices not adjusted for inflation · click a dot to open the car';
 export function legendFor(level: MapLevel, chartShown: boolean, measured?: boolean): string {
   return chartShown ? SALES_CHART_LEGEND : measured === undefined ? mapLegend(level) : mapLegend(level, measured);
 }
