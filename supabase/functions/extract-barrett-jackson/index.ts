@@ -33,6 +33,7 @@ import { requireWriteAuth } from "../_shared/writeGuard.ts";
 import { projectSecretKey } from "../_shared/supabaseKeys.ts";
 import { mustWrite, softWrite } from '../_shared/writeResult.ts';
 import { fillOnlyIdentity, identityConflict, REVISION_DIFFERENT_CAR } from '../_shared/identityMatch.ts';
+import { ForcedVehicleMissing, forcedVehicleId, pickVehicleTarget } from "./vehicleTarget.ts";
 
 /** The resolved vehicle is a different car than the lot: nothing is written, a revision item is returned (missing: identity_match,
  *  reason: different_car, next action: relink). Photos and episodes for a different car never attach to that vehicle. */
@@ -932,7 +933,8 @@ async function saveVehicle(
     .limit(1)
     .maybeSingle();
 
-  let existingId = forceVehicleId || queueEntry?.vehicle_id || byUrl?.id;
+  const target = pickVehicleTarget({ forced: forceVehicleId, queue: queueEntry?.vehicle_id, url: byUrl?.id });
+  let existingId = target.kind === "new" ? undefined : target.id;
 
   // Also check by VIN (prevents duplicate key violations)
   if (!existingId && vehicle.vin && vehicle.vin.length >= 5) {
@@ -952,6 +954,8 @@ async function saveVehicle(
   if (existingId) {
     const { data: idRow } = await supabase.from("vehicles").select("year,make,model,vin,sale_price").eq("id", existingId).maybeSingle();
     existingIdentity = (idRow as typeof existingIdentity) ?? null;
+    // A forced vehicle must exist: never write the lot to a new vehicle in its place.
+    if (target.kind === "forced" && !idRow) throw new ForcedVehicleMissing(existingId);
     const conflict = existingIdentity ? identityConflict(existingIdentity, { year: vehicle.year, make: vehicle.make, model: vehicle.model, vin: vehicle.vin }) : null;
     if (conflict) throw new IdentityRefused(existingId, vehicle.url, conflict);
   }
@@ -1228,9 +1232,12 @@ Deno.serve(async (req) => {
 
       let saved: Awaited<ReturnType<typeof saveVehicle>>;
       try {
-        saved = await saveVehicle(supabase, vehicle);
+        // body.vehicle_id: the vehicle this lot belongs to (a re-land of an auction result with no episode); it wins over
+        // the URL lookup and must exist.
+        saved = await saveVehicle(supabase, vehicle, forcedVehicleId(body));
       } catch (e) {
         if (e instanceof IdentityRefused) return okJson({ success: false, refused: "different_car", revision: e.revision }, 409);
+        if (e instanceof ForcedVehicleMissing) return okJson({ success: false, error: "forced_vehicle_missing", vehicle_id: e.vehicleId }, 404);
         throw e;
       }
       const { vehicleId, isNew, fieldsUpdated, qualityScore } = saved;
