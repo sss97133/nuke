@@ -857,8 +857,8 @@ def run(args):
         print(json.dumps({'dry_run': True, 'live': len(lots), 'due': len(ids), 'estimated': len(rows), 'skipped': len(skipped),
                           'skip_reasons': dict(Counter(s['reason'] for s in skipped)), 'seconds': round(time.time() - t0, 1)}))
         return
-    for s in range(0, len(rows), 500):
-        rest('hammer_predictions', service, 'POST', rows[s:s + 500], prefer='return=minimal')
+    for s in range(0, len(rows), 200):                    # about 4 KB a row with its notes: 0.8 MB a request
+        rest('hammer_predictions', service, 'POST', rows[s:s + 200], prefer='return=minimal')
     print(json.dumps({'model': MODEL_VERSION, 'live': len(lots), 'due': len(ids), 'written': len(rows), 'skipped': len(skipped),
                       'skip_reasons': dict(Counter(s['reason'] for s in skipped)), 'seconds': round(time.time() - t0, 1)}))
 
