@@ -50,7 +50,7 @@ WEIGHTS = {'lb': 1.0, 'z': 1.0, 'lbidders': 0.7, 'lcom': 0.5, 'l24': 0.5, 'lsinc
 PRICE_WEIGHTS = {'lb': 1.0, 'z': 1.0}                # v1 runs with no engagement reads: bid and price level only
 LAM_PAGE, LAM_MAKE, LAM_YEAR = 1.0, 0.5, 0.5          # squared-distance penalties: another page, another make, year gap
 K = 50
-CACHE_VERSION = 'live_finish_v4'
+CACHE_VERSION = 'live_finish_v5'
 
 
 
@@ -135,13 +135,16 @@ COPY (
 COPY (SELECT l.slug, l.url, l.title, l.year, l.make, l.model, l.cohort, l.no_reserve, l.sold, l.sold_after, l.final_bid,
              epoch(l.f) AS f_epoch, epoch(a.anchor) AS anchor_epoch
       FROM c_lots l JOIN c_anchor a USING (slug)) TO '{cache}/lots.csv' (HEADER);
-COPY (SELECT l.slug, l.year, l.make, l.model, l.cohort, l.kind FROM lots l) TO '{cache}/all_kinds.csv' (HEADER);
+COPY (SELECT l.slug, l.year, l.make, l.model, l.title, l.cohort, l.kind FROM lots l) TO '{cache}/all_kinds.csv' (HEADER);
 COPY (SELECT epoch(max(end_ts)) AS last_close FROM sales) TO '{cache}/meta.csv' (HEADER);
 """
 
 
 def norm_make(m):
-    m = (m if isinstance(m, str) else '').strip().lower()
+    """The archive's make key: the first word of the make, lowercased. The archive keys "Land Rover", "Aston Martin" and
+    "Alfa Romeo" lots as "land", "aston" and "alfa"; prod's two-word makes matched no archive make before 2026-10-15."""
+    w = (m if isinstance(m, str) else '').strip().lower().split()
+    m = w[0] if w else ''
     return {'mercedes': 'mercedes-benz', 'vw': 'volkswagen', 'chevy': 'chevrolet'}.get(m, m)
 
 
@@ -150,33 +153,74 @@ def toks(s):
     return [t for t in re.split(r'[^a-z0-9.\-/]+', s) if t]
 
 
+SECOND = {'land': 'rover', 'alfa': 'romeo', 'aston': 'martin', 'am': 'general', 'rolls': 'royce', 'de': 'tomaso',
+          'range': 'rover', 'mercedes': 'benz', 'austin': 'healey'}
+
+
+def title_make(title, make=None):
+    """The make key a BaT title gives: its first word after the model year (the archive's make), else the make field.
+    "1959 Porsche-Diesel Standard 218 Tractor" is a Porsche-Diesel lot whatever prod's make field says."""
+    m = re.search(r'\b(?:19|20)\d{2}\b\s+(\S+)', title if isinstance(title, str) else '')
+    return norm_make(m.group(1)) if m else norm_make(make)
+
+
+def title_words(title, make=None, model=None):
+    """The model words of a BaT title, the same way for archive and prod lots: the words after the model year without
+    the make's (its first word, and a two-word make's second). Prod's model field is the whole remainder and the
+    archive's is cut to three words, so neither field matches the other; the title does (98.9% on 177 lots, 2026-10-15)."""
+    m = re.search(r'\b(?:19|20)\d{2}\b\s+(.*)$', title if isinstance(title, str) else '')
+    t = toks(m.group(1)) if m else [norm_make(make)] + toks(model)
+    if not t:
+        return []
+    mk, rest = t[0], t[1:]
+    if rest and SECOND.get(mk) == rest[0]:
+        rest = rest[1:]
+    return rest
+
+
 class CohortMap:
-    """Fallback title map: make + leading model words + model year -> BaT model page, narrowest year band first.
-    92.7% exact on 12,942 archive lots closed 2026-07..09 with the map learned before 07-01."""
+    """Fallback title map: make + leading title model words (at least one) + model year -> BaT model page, deepest word
+    match first, narrowest year band first. Never maps on the make alone: that guessed the make's most common page (a
+    go-kart onto bmw/2002, a 2023 Mercedes-AMG GT2 race car onto the Sprinter page). On 13,652 archive car lots closed
+    2026-07..09 with the map learned before 07-01: 96.5% mapped, 95.2% of those exact (the make-alone version mapped
+    99.8% at 92.2%; its extra guesses were about 5% right). On 178 prod lots closed 2026-10-15: 173 mapped, 8 wrong
+    (10 with prod's model field)."""
     def __init__(self, A):
         idx = defaultdict(lambda: defaultdict(list))
-        for mk, md, c, y in zip(A.make, A.model, A.cohort, A.year):
+        for mk, ttl, md, c, y in zip(A.make, A.title, A.model, A.cohort, A.year):
             if not isinstance(c, str):
                 continue
-            t = toks(md)
+            t = title_words(ttl, mk, md)
             for n in range(0, min(4, len(t)) + 1):
                 idx[norm_make(mk)][tuple(t[:n])].append((c, y))
         self.idx = {m: dict(v) for m, v in idx.items()}
 
-    def map(self, make, model, year):
-        m = norm_make(make); t = toks(model)
+    def make_page(self, make, title, year):
+        """The make's most common page in the nearest year band: never a lot's page, only a sign of what kind of lot an
+        unmapped one is (a 2023 Ducati or a 1980 Suzuki with no page match sits among motorcycles)."""
+        cands = self.idx.get(title_make(title, make), {}).get(())
+        if not cands or year is None or (isinstance(year, float) and math.isnan(year)):
+            return None
+        for band in [0, 1, 2, 4, 8]:
+            sel = [c for c, y in cands if y is not None and not math.isnan(y) and abs(y - year) <= band]
+            if len(sel) >= 3:
+                return Counter(sel).most_common(1)[0][0]
+        return None
+
+    def map(self, make, title, model, year):
+        m = title_make(title, make); t = title_words(title, make, model)
         if m not in self.idx:
             return None, 0.0
         has_year = year is not None and not (isinstance(year, float) and math.isnan(year))
-        for n in range(min(4, len(t)), -1, -1):
+        for n in range(min(4, len(t)), 0, -1):
             cands = self.idx[m].get(tuple(t[:n]))
             if not cands or len(cands) < 3:
                 continue
             for band in ([0, 1, 2, 4] if has_year else []) + [None]:
                 sel = [c for c, y in cands if band is None or (y is not None and not math.isnan(y) and abs(y - year) <= band)]
                 if len(sel) >= 3:
-                    c, s = Counter(sel).most_common(1)[0]
-                    return c, s / len(sel)
+                    c, sh = Counter(sel).most_common(1)[0]
+                    return c, sh / len(sel)
         return None, 0.0
 
 
@@ -591,13 +635,15 @@ def run(args):
     lots['map_basis'] = np.where(lots.share >= 0.6, 'title -> model page (live-bands.sql map)', None)
     cm = cache['cohort_map']
     for i, r in lots[lots.map_basis.isna()].iterrows():
-        c, sh = cm.map(r.make, r.model, float(r.year) if r.year is not None and not pd.isna(r.year) else np.nan)
+        c, sh = cm.map(r.make, r.title, r.model, float(r.year) if r.year is not None and not pd.isna(r.year) else np.nan)
         lots.at[i, 'cohort'] = c; lots.at[i, 'share'] = sh
         lots.at[i, 'map_basis'] = 'make, model words and year -> model page (fallback)' if c else 'no model page'
-    # the live-bands map votes among car lots only, so its pages are car pages; a fallback page carries its own kind
-    lots['kind'] = [('car' if basis.startswith('title') else cache['kind_of'].get(c)) if isinstance(c, str) else None
-                    for c, basis in zip(lots.cohort, lots.map_basis)]
-    lots['make_k'] = [norm_make(m) for m in lots.make]
+    # the live-bands map votes among car lots only, so its pages are car pages; a fallback page carries its own kind; a
+    # lot with no page takes the kind of its make's lots in those years
+    lots['kind'] = [('car' if basis.startswith('title') else cache['kind_of'].get(c)) if isinstance(c, str)
+                    else cache['kind_of'].get(cm.make_page(mk, ttl, float(y) if y is not None and not pd.isna(y) else np.nan))
+                    for c, basis, mk, ttl, y in zip(lots.cohort, lots.map_basis, lots.make, lots.title, lots.year)]
+    lots['make_k'] = [title_make(t, m) for t, m in zip(lots.title, lots.make)]
     lots['year'] = pd.to_numeric(lots.year, errors='coerce')
     lots['nr'] = lots.no_reserve.fillna(False).astype(bool).astype(int)
     t_map = time.time() - t0
@@ -612,7 +658,8 @@ def run(args):
         if not r.bid or r.bid <= 0:
             skip(r.vehicle_id, 'no bid yet', hours_left=round(r.hours_left, 2)); continue
         if isinstance(r.kind, str) and r.kind != 'car':
-            skip(r.vehicle_id, f'not a car lot (its model page {r.cohort} holds {r.kind} lots)', hours_left=round(r.hours_left, 2)); continue
+            skip(r.vehicle_id, f'not a car lot (its model page {r.cohort} holds {r.kind} lots)' if isinstance(r.cohort, str)
+                 else f'not a car lot (no model page; its make\'s lots in those years are {r.kind} lots)', hours_left=round(r.hours_left, 2)); continue
         if not isinstance(r.cohort, str) and r.make_k not in cache['comps_index'][1]:
             skip(r.vehicle_id, 'no model page and no archive car lots of its make', hours_left=round(r.hours_left, 2)); continue
         keep.append(r.Index)
