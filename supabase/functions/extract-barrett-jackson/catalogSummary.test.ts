@@ -1,4 +1,4 @@
-import { summarizePage } from "./catalogProbe.ts";
+import { summarizePage } from "./catalogSummary.ts";
 
 const eq = (a: unknown, b: unknown) => { if (JSON.stringify(a) !== JSON.stringify(b)) throw new Error(`${JSON.stringify(a)} != ${JSON.stringify(b)}`); };
 
