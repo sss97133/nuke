@@ -281,7 +281,7 @@ Deno.serve(async (req: Request) => {
       const analysis = await analyzeSiteWithAI(markdown || html.slice(0, 8000), domain);
 
       // Firecrawl map to get URL inventory
-      const mapResult = await firecrawlMap(baseUrl, { limit: 5000, timeout: 30000 });
+      const mapResult = await firecrawlMap(baseUrl, { limit: 5000, timeout: 30000, caller: 'onboard-source' });
       const allLinks = mapResult.links || [];
 
       // Identify listing URLs
@@ -715,7 +715,7 @@ async function handlePollMonitored(supabase: any): Promise<Response> {
       console.log(`[onboard] Polling: ${source.slug}`);
 
       // Get URL map
-      const mapResult = await firecrawlMap(source.discovery_url, { limit: 2000, timeout: 20000 });
+      const mapResult = await firecrawlMap(source.discovery_url, { limit: 2000, timeout: 20000, caller: 'onboard-source' });
 
       if (mapResult.links.length > 0 && source.listing_url_pattern) {
         const regex = new RegExp(source.listing_url_pattern, 'i');

@@ -1648,7 +1648,9 @@ private struct PhotoFullScreenView: View {
 // One read, `user_org_relations`: the person's memberships (organization_contributors) with the relation's weight at
 // now, computed by the server from passive contributions (photos at the organization's locations, its images, timeline
 // events, contractor work) and halving every 6 h. A membership is not a status: "active" was hard-coded on every row
-// (owner, 2026-10-15). Each row opens the organization inside the app. Renders nothing for a person with none.
+// (owner, 2026-10-15). Only live and stalling relations show, the warmest first: "only show active orgs. its
+// annoying that evening side projects surface to top billing" (owner, 2026-10-15). Each row opens the organization
+// inside the app. Renders nothing when no relation is active.
 struct OrgAffiliationsSection: View {
     let rows: [Row]
     let failureText: String?
@@ -1675,7 +1677,7 @@ struct OrgAffiliationsSection: View {
                 } header: {
                     Text("Organizations · \(rows.count)")
                 } footer: {
-                    Text("Each relation is kept warm only by contributions, such as photos taken at the business, and goes dormant a day after the last one.")
+                    Text("Active relations only. Each is kept warm by contributions, such as photos taken at the business, and goes dormant a day after the last one.")
                         .font(.caption2).foregroundStyle(.secondary)
                 }
             } else if let failureText {
@@ -1710,10 +1712,11 @@ struct OrgAffiliationsSection: View {
         s.split(separator: "_").map { $0.prefix(1).uppercased() + $0.dropFirst() }.joined(separator: " ")
     }
 
+    /// Live and stalling relations only, warmest first (the server orders by weight).
     static func load(userId: String) async throws -> [Row] {
         let payload: Payload = try await SupabaseService.client
             .rpc("user_org_relations", params: ["p_user_id": userId])
             .execute().value
-        return payload.relations
+        return payload.relations.filter { $0.relation.state == "live" || $0.relation.state == "stalling" }
     }
 }

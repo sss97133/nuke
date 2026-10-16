@@ -7,8 +7,14 @@
 # L09, L21, L25, L26 and L27 stay as they are in the model; K5B_R04 joins the amplifier and subwoofer junction to them.
 # Second study (2026-10-15, research/2026-10-15_route-branches-2.md): 116 branches and 16 junctions join every point pair
 # the live segments need (196 pairs, 390 segments); 72 low and 44 medium confidence.
+# Third study (2026-10-15, research/2026-10-15_engine-position.md): the engine bay redrawn on the corrected engine
+# (engine_ls3.py at root (0, -1.432, 0.72), triangulated from the owner's photos): 22 branches redrawn under their codes,
+# the June L08/L09 redrawn where VALLEY moved, 17 new (K5B_E01-E17), junctions VALLEY (moved) and J_ENG_REAR.
+# Fourth study (2026-10-15, research/2026-10-15_route-branches-4.md): the engine's rear trunks (the 61-pin across the firewall
+# recess to J_ENG_REAR, down each rear corner to J_ENG_D / J_ENG_P) and shortcuts the walk showed: 27 branches (K5B_E18-E39,
+# K5B_S01-S05) and 2 junctions; segments over 2x their straight line 93 -> 16, each remaining one with its reason.
 method: twin route study 2026-10-15 (hand-routed trunk and branch, headless Blender BVH clearance)
-source: docs/wiring/research/2026-10-15_route-branches.md; docs/wiring/research/2026-10-15_route-branches-2.md
+source: docs/wiring/research/2026-10-15_route-branches.md; docs/wiring/research/2026-10-15_route-branches-2.md; docs/wiring/research/2026-10-15_engine-position.md; docs/wiring/research/2026-10-15_route-branches-4.md
 junctions:
 - code: J_CAB_DASH
   x: 0.55
@@ -184,6 +190,35 @@ junctions:
   z: 1.02
   kind: breakout
   note: passenger radiator support, lamp and A/C switch breakout (route study 2, 2026-10-15)
+  trust: proposed
+- code: VALLEY
+  x: 0.0
+  y: -1.86
+  z: 1.13
+  kind: breakout
+  note: 'intake valley junction, moved onto the corrected engine: over the intake front, 66 mm ahead of the throttle body (was (0, -1.655, 1.31), above
+    the hood inner panel) (route study 3, 2026-10-15)'
+  trust: proposed
+- code: J_ENG_REAR
+  x: 0.0
+  y: -1.44
+  z: 1.12
+  kind: breakout
+  note: 'rear of the engine in the firewall recess, behind the coil cluster: coil grounds to the heads, oil pressure (route study 3, 2026-10-15)'
+  trust: proposed
+- code: J_ENG_D
+  x: 0.31
+  y: -1.47
+  z: 0.81
+  kind: breakout
+  note: 'driver rear of the engine, low, behind the driver header''s rear end: knock 1, coolant temp, cam sensor (route study 4, 2026-10-15)'
+  trust: proposed
+- code: J_ENG_P
+  x: -0.31
+  y: -1.45
+  z: 0.81
+  kind: breakout
+  note: 'passenger rear of the engine, low, behind the passenger header''s rear end: knock 2, crank sensor, oil temp (route study 4, 2026-10-15)'
   trust: proposed
 branches:
 - code: K5B_C01
@@ -373,17 +408,21 @@ branches:
     - -0.8
     - 0.62
   - - 0.19
-    - -0.62
+    - -0.55
+    - 0.62
+  - - 0.05
+    - -0.5
     - 0.62
   - - 0.05
     - -0.491
     - 0.62
-  length_in: 20.5
-  min_clearance_mm: 20.1
-  nearest_obstacle: Under_Main_Blazer
-  follows: inside the tunnel, along the trans/transfer case side
-  rule_notes: nearest manifold/exhaust 194.8 mm (K5H_Exhaust_D), measured away from device endpoints
-  confidence: medium-high
+  length_in: 22.0
+  min_clearance_mm: 17.5
+  nearest_obstacle: E3_6L90_Case
+  follows: along the driver side of the 6L90 case, then in behind its tail to the transfer case
+  rule_notes: redrawn on the corrected engine (engine_ls3 at root (0, -1.432, 0.72); research 2026-10-15_engine-position); nearest manifold/exhaust 349.6
+    mm (downpipe_L), measured away from device endpoints; crosses nothing; hand route
+  confidence: low
 - code: K5B_R01
   from: REAR_JCT
   to: K5H_EStopp_Actuator
@@ -546,24 +585,16 @@ branches:
   - - 0.18
     - -2.03
     - 1.2
-  - - 0.04
-    - -2.04
-    - 1.29
   - - 0.0
-    - -1.96
-    - 1.32
-  - - 0.0
-    - -1.8
-    - 1.32
-  - - 0.0
-    - -1.655
-    - 1.31
-  length_in: 22.3
-  min_clearance_mm: 32.5
-  nearest_obstacle: K5H_DEL_Bracket
-  follows: enters the intake valley corridor from the front, between the coil rows
-  rule_notes: nearest manifold/exhaust 459.6 mm (K5H_Manifold_D), measured away from device endpoints
-  confidence: medium-high
+    - -1.86
+    - 1.13
+  length_in: 10.1
+  min_clearance_mm: 78.6
+  nearest_obstacle: intake_300-131
+  follows: over the front of the intake to the valley junction ahead of the throttle body
+  rule_notes: redrawn on the corrected engine (engine_ls3 at root (0, -1.432, 0.72); research 2026-10-15_engine-position); nearest manifold/exhaust 368.3
+    mm (header_L), measured away from device endpoints; crosses nothing; planner route (10 mm grid, >=10 mm clearance, >=28 mm from exhaust), simplified
+  confidence: medium
 - code: K5B_B06
   from: J_BAY_FRONT
   to: THROTTLE_BODY
@@ -571,20 +602,21 @@ branches:
   - - 0.18
     - -2.03
     - 1.2
-  - - 0.08
-    - -1.96
-    - 1.2
-  - - 0.0
-    - -1.955
-    - 1.1
-  - - 0.0
-    - -1.95
-    - 0.984
-  length_in: 14.4
-  min_clearance_mm: 29.5
-  nearest_obstacle: K5H_LS3_Block
-  follows: front of the intake down to the throttle body
-  rule_notes: TB sits against the twin block box; nearest manifold/exhaust 426.9 mm (K5H_Manifold_D), measured away from device endpoints
+  - - -0.1
+    - -1.67
+    - 1.09
+  - - -0.08
+    - -1.65
+    - 1.11
+  - - -0.08
+    - -1.652
+    - 1.148
+  length_in: 21.3
+  min_clearance_mm: 9.2
+  nearest_obstacle: tb_adapter
+  follows: over the intake front, down the passenger side of the throttle body to its plug
+  rule_notes: redrawn on the corrected engine (engine_ls3 at root (0, -1.432, 0.72); research 2026-10-15_engine-position); nearest manifold/exhaust 303.9
+    mm (header_R), measured away from device endpoints; crosses nothing; planner route (10 mm grid, >=10 mm clearance, >=28 mm from exhaust), simplified
   confidence: low
 - code: K5B_B07
   from: J_BAY_FRONT
@@ -593,24 +625,24 @@ branches:
   - - 0.18
     - -2.03
     - 1.2
-  - - 0.14
-    - -2.0
-    - 1.1
-  - - 0.12
-    - -1.99
-    - 0.9
-  - - 0.05
-    - -1.975
-    - 0.875
-  - - 0.0
-    - -1.97
-    - 0.87
-  length_in: 17.3
-  min_clearance_mm: -10.0
-  nearest_obstacle: K5H_LS3_Block
-  follows: front cover, behind the damper
-  rule_notes: CMP sits inside the twin LS3 block/mid-mount boxes; no clean approach exists in the twin; nearest manifold/exhaust 239.6 mm (K5H_Manifold_D),
-    measured away from device endpoints
+  - - 0.08
+    - -2.08
+    - 0.95
+  - - 0.09
+    - -2.03
+    - 0.82
+  - - 0.08
+    - -1.98
+    - 0.84
+  - - 0.06
+    - -1.972
+    - 0.86
+  length_in: 19.6
+  min_clearance_mm: 8.0
+  nearest_obstacle: midmount_bracket
+  follows: out past the alternator, down outboard of the P/S pump, then in behind it along the front cover to the cam sensor
+  rule_notes: redrawn on the corrected engine (engine_ls3 at root (0, -1.432, 0.72); research 2026-10-15_engine-position); nearest manifold/exhaust 190.1
+    mm (header_L), measured away from device endpoints; crosses nothing; planner route (10 mm grid, >=10 mm clearance, >=28 mm from exhaust), simplified
   confidence: low
 - code: K5B_B08
   from: J_BAY_FRONT
@@ -660,20 +692,21 @@ branches:
   - - 0.18
     - -2.03
     - 1.2
-  - - 0.22
-    - -2.0
-    - 1.16
-  - - 0.22
-    - -2.0
-    - 1.07
+  - - 0.28
+    - -1.98
+    - 0.95
   - - 0.2
-    - -1.91
-    - 1.07
-  length_in: 9.7
-  min_clearance_mm: 10.0
-  nearest_obstacle: K5H_LS3_Block
-  follows: down the front of the driver cover to the coolant sender
-  rule_notes: CLT sits inside the twin head box; nearest manifold/exhaust 318.6 mm (K5H_Manifold_D), measured away from device endpoints
+    - -1.96
+    - 0.9
+  - - 0.19
+    - -1.948
+    - 0.9
+  length_in: 15.2
+  min_clearance_mm: 9.7
+  nearest_obstacle: alternator_197-302
+  follows: out past the alternator, down outboard, then in under the alternator to the front of the driver head
+  rule_notes: redrawn on the corrected engine (engine_ls3 at root (0, -1.432, 0.72); research 2026-10-15_engine-position); nearest manifold/exhaust 102.6
+    mm (header_L), measured away from device endpoints; crosses nothing; planner route (10 mm grid, >=10 mm clearance, >=28 mm from exhaust), simplified
   confidence: low
 - code: K5B_B11
   from: J_BAY_D_MID
@@ -703,88 +736,92 @@ branches:
     - 1.22
   - - 0.3
     - -1.78
-    - 1.25
-  - - 0.186
-    - -1.75
-    - 1.25
-  - - 0.186
-    - -1.748
-    - 1.17
-  - - 0.155
-    - -1.748
-    - 1.17
-  length_in: 13.2
-  min_clearance_mm: 44.6
-  nearest_obstacle: K5H_ValveCover_D
-  follows: over the driver valve cover into the injector row, outboard of the rail
-  rule_notes: nearest manifold/exhaust 450.0 mm (K5H_Manifold_D), measured away from device endpoints
-  confidence: medium-high
+    - 1.16
+  - - 0.177
+    - -1.764
+    - 1.1
+  - - 0.177
+    - -1.764
+    - 1.085
+  - - 0.132
+    - -1.764
+    - 1.073
+  length_in: 12.5
+  min_clearance_mm: 16.0
+  nearest_obstacle: fuel_rail_L
+  follows: off the driver trunk, over the valve cover to the outboard side of the driver rail, into injector 3's plug
+  rule_notes: redrawn on the corrected engine (engine_ls3 at root (0, -1.432, 0.72); research 2026-10-15_engine-position); nearest manifold/exhaust 269.4
+    mm (header_L), measured away from device endpoints; crosses nothing; hand route
+  confidence: medium
 - code: K5B_B13
   from: K5H_Injector_3
   to: K5H_Injector_1
   polyline_m:
-  - - 0.155
-    - -1.748
-    - 1.17
-  - - 0.185
-    - -1.748
-    - 1.17
-  - - 0.185
-    - -1.86
-    - 1.17
-  - - 0.155
-    - -1.86
-    - 1.17
-  length_in: 6.8
-  min_clearance_mm: 57.5
-  nearest_obstacle: K5H_FuelPress
-  follows: driver injector row, outboard of the rail
-  rule_notes: ''
-  confidence: medium-high
+  - - 0.132
+    - -1.764
+    - 1.073
+  - - 0.177
+    - -1.764
+    - 1.085
+  - - 0.177
+    - -1.876
+    - 1.085
+  - - 0.132
+    - -1.876
+    - 1.073
+  length_in: 8.1
+  min_clearance_mm: 16.0
+  nearest_obstacle: fuel_rail_L
+  follows: outboard side of the driver fuel rail, between the rail and the valve cover
+  rule_notes: redrawn on the corrected engine (engine_ls3 at root (0, -1.432, 0.72); research 2026-10-15_engine-position); nearest manifold/exhaust 256.3
+    mm (header_L), measured away from device endpoints; crosses nothing; hand route
+  confidence: medium
 - code: K5B_B14
   from: K5H_Injector_3
   to: K5H_Injector_5
   polyline_m:
-  - - 0.155
-    - -1.748
-    - 1.17
-  - - 0.185
-    - -1.748
-    - 1.17
-  - - 0.185
-    - -1.636
-    - 1.17
-  - - 0.155
-    - -1.636
-    - 1.17
-  length_in: 6.8
-  min_clearance_mm: 60.0
-  nearest_obstacle: K5H_Head_D
-  follows: driver injector row
-  rule_notes: ''
-  confidence: medium-high
+  - - 0.132
+    - -1.764
+    - 1.073
+  - - 0.177
+    - -1.764
+    - 1.085
+  - - 0.177
+    - -1.653
+    - 1.085
+  - - 0.132
+    - -1.653
+    - 1.073
+  length_in: 8.0
+  min_clearance_mm: 16.0
+  nearest_obstacle: fuel_rail_L
+  follows: outboard side of the driver fuel rail, between the rail and the valve cover
+  rule_notes: redrawn on the corrected engine (engine_ls3 at root (0, -1.432, 0.72); research 2026-10-15_engine-position); nearest manifold/exhaust 256.1
+    mm (header_L), measured away from device endpoints; crosses nothing; hand route
+  confidence: medium
 - code: K5B_B15
   from: K5H_Injector_5
   to: K5H_Injector_7
   polyline_m:
-  - - 0.155
-    - -1.636
-    - 1.17
-  - - 0.185
-    - -1.636
-    - 1.17
-  - - 0.185
-    - -1.525
-    - 1.17
-  - - 0.155
-    - -1.525
-    - 1.17
-  length_in: 6.7
-  min_clearance_mm: 60.0
-  nearest_obstacle: K5H_Head_D
-  follows: driver injector row
-  rule_notes: ''
-  confidence: medium-high
+  - - 0.132
+    - -1.653
+    - 1.073
+  - - 0.177
+    - -1.653
+    - 1.085
+  - - 0.177
+    - -1.541
+    - 1.085
+  - - 0.132
+    - -1.541
+    - 1.073
+  length_in: 8.1
+  min_clearance_mm: 16.0
+  nearest_obstacle: fuel_rail_L
+  follows: outboard side of the driver fuel rail, between the rail and the valve cover
+  rule_notes: redrawn on the corrected engine (engine_ls3 at root (0, -1.432, 0.72); research 2026-10-15_engine-position); nearest manifold/exhaust 256.1
+    mm (header_L), measured away from device endpoints; crosses nothing; hand route
+  confidence: medium
 - code: K5B_B16
   from: J_BAY_P_MID
   to: K5H_Injector_4
@@ -793,89 +830,93 @@ branches:
     - -1.8
     - 1.22
   - - -0.3
-    - -1.78
-    - 1.25
-  - - -0.186
-    - -1.75
-    - 1.25
-  - - -0.186
-    - -1.748
-    - 1.17
-  - - -0.155
-    - -1.748
-    - 1.17
-  length_in: 13.2
-  min_clearance_mm: 44.6
-  nearest_obstacle: K5H_ValveCover_P
-  follows: over the passenger valve cover into the injector row
-  rule_notes: nearest manifold/exhaust 450.0 mm (K5H_Manifold_P), measured away from device endpoints
-  confidence: medium-high
+    - -1.76
+    - 1.16
+  - - -0.177
+    - -1.74
+    - 1.1
+  - - -0.177
+    - -1.74
+    - 1.085
+  - - -0.132
+    - -1.74
+    - 1.073
+  length_in: 12.7
+  min_clearance_mm: 16.0
+  nearest_obstacle: fuel_rail_R
+  follows: off the passenger trunk, over the valve cover to the outboard side of the passenger rail, into injector 4's plug
+  rule_notes: redrawn on the corrected engine (engine_ls3 at root (0, -1.432, 0.72); research 2026-10-15_engine-position); nearest manifold/exhaust 269.4
+    mm (header_R), measured away from device endpoints; crosses nothing; hand route
+  confidence: medium
 - code: K5B_B17
   from: K5H_Injector_4
   to: K5H_Injector_2
   polyline_m:
-  - - -0.155
-    - -1.748
-    - 1.17
-  - - -0.185
-    - -1.748
-    - 1.17
-  - - -0.185
-    - -1.86
-    - 1.17
-  - - -0.155
-    - -1.86
-    - 1.17
-  length_in: 6.8
-  min_clearance_mm: 60.0
-  nearest_obstacle: K5H_Head_P
-  follows: passenger injector row
-  rule_notes: ''
-  confidence: medium-high
+  - - -0.132
+    - -1.74
+    - 1.073
+  - - -0.177
+    - -1.74
+    - 1.085
+  - - -0.177
+    - -1.852
+    - 1.085
+  - - -0.132
+    - -1.852
+    - 1.073
+  length_in: 8.1
+  min_clearance_mm: 16.0
+  nearest_obstacle: fuel_rail_R
+  follows: outboard side of the passenger fuel rail, between the rail and the valve cover
+  rule_notes: redrawn on the corrected engine (engine_ls3 at root (0, -1.432, 0.72); research 2026-10-15_engine-position); nearest manifold/exhaust 256.1
+    mm (header_R), measured away from device endpoints; crosses nothing; hand route
+  confidence: medium
 - code: K5B_B18
   from: K5H_Injector_4
   to: K5H_Injector_6
   polyline_m:
-  - - -0.155
-    - -1.748
-    - 1.17
-  - - -0.185
-    - -1.748
-    - 1.17
-  - - -0.185
-    - -1.636
-    - 1.17
-  - - -0.155
-    - -1.636
-    - 1.17
-  length_in: 6.8
-  min_clearance_mm: 60.0
-  nearest_obstacle: K5H_Head_P
-  follows: passenger injector row
-  rule_notes: ''
-  confidence: medium-high
+  - - -0.132
+    - -1.74
+    - 1.073
+  - - -0.177
+    - -1.74
+    - 1.085
+  - - -0.177
+    - -1.629
+    - 1.085
+  - - -0.132
+    - -1.629
+    - 1.073
+  length_in: 8.0
+  min_clearance_mm: 16.0
+  nearest_obstacle: fuel_rail_R
+  follows: outboard side of the passenger fuel rail, between the rail and the valve cover
+  rule_notes: redrawn on the corrected engine (engine_ls3 at root (0, -1.432, 0.72); research 2026-10-15_engine-position); nearest manifold/exhaust 256.1
+    mm (header_R), measured away from device endpoints; crosses nothing; hand route
+  confidence: medium
 - code: K5B_B19
   from: K5H_Injector_6
   to: K5H_Injector_8
   polyline_m:
-  - - -0.155
-    - -1.636
-    - 1.17
-  - - -0.185
-    - -1.636
-    - 1.17
-  - - -0.185
-    - -1.525
-    - 1.17
-  - - -0.155
-    - -1.525
-    - 1.17
-  length_in: 6.7
-  min_clearance_mm: 60.0
-  nearest_obstacle: K5H_Head_P
-  follows: passenger injector row
-  rule_notes: ''
-  confidence: medium-high
+  - - -0.132
+    - -1.629
+    - 1.073
+  - - -0.177
+    - -1.629
+    - 1.085
+  - - -0.177
+    - -1.517
+    - 1.085
+  - - -0.132
+    - -1.517
+    - 1.073
+  length_in: 8.1
+  min_clearance_mm: 16.0
+  nearest_obstacle: fuel_rail_R
+  follows: outboard side of the passenger fuel rail, between the rail and the valve cover
+  rule_notes: redrawn on the corrected engine (engine_ls3 at root (0, -1.432, 0.72); research 2026-10-15_engine-position); nearest manifold/exhaust 256.0
+    mm (header_R), measured away from device endpoints; crosses nothing; hand route
+  confidence: medium
 - code: K5B_B20
   from: J_BAY_D_MID
   to: J_BAY_BLOCK_D
@@ -902,18 +943,24 @@ branches:
   - - 0.44
     - -1.655
     - 0.9
-  - - 0.27
-    - -1.655
-    - 0.9
-  - - 0.27
-    - -1.655
+  - - 0.32
+    - -1.48
+    - 0.82
+  - - 0.25
+    - -1.48
     - 0.77
-  length_in: 11.8
-  min_clearance_mm: 10.0
-  nearest_obstacle: K5H_LS3_Block
-  follows: under the driver head, above the manifold, 13 cm up from it
-  rule_notes: KS1 is 4 cm from the driver manifold box in the twin; nearest manifold/exhaust 88.2 mm (K5H_Manifold_D), measured away from device
-    endpoints
+  - - 0.22
+    - -1.69
+    - 0.77
+  - - 0.2
+    - -1.687
+    - 0.765
+  length_in: 21.5
+  min_clearance_mm: 10.4
+  nearest_obstacle: Under_Frame_Blazer
+  follows: down outboard of the frame rail, under the rail and the header, then up the block side to knock sensor 1
+  rule_notes: redrawn on the corrected engine (engine_ls3 at root (0, -1.432, 0.72); research 2026-10-15_engine-position); nearest manifold/exhaust 27.9
+    mm (header_L), measured away from device endpoints; crosses nothing; planner route (10 mm grid, >=10 mm clearance, >=28 mm from exhaust), simplified
   confidence: low
 - code: K5B_B22
   from: J_BAY_P_MID
@@ -941,44 +988,48 @@ branches:
   - - -0.44
     - -1.655
     - 0.9
+  - - -0.33
+    - -1.47
+    - 0.83
   - - -0.27
-    - -1.655
-    - 0.9
-  - - -0.27
-    - -1.655
+    - -1.45
+    - 0.79
+  - - -0.23
+    - -1.49
+    - 0.75
+  - - -0.22
+    - -1.68
     - 0.77
-  length_in: 11.8
-  min_clearance_mm: 10.0
-  nearest_obstacle: K5H_LS3_Block
-  follows: under the passenger head, above the manifold
-  rule_notes: KS2 is 4 cm from the passenger manifold box in the twin; nearest manifold/exhaust 88.2 mm (K5H_Manifold_P), measured away from device
-    endpoints
+  - - -0.2
+    - -1.687
+    - 0.765
+  length_in: 23.0
+  min_clearance_mm: 8.2
+  nearest_obstacle: Under_Frame_Blazer
+  follows: down outboard of the frame rail, under the rail and the header, then up the block side to knock sensor 2
+  rule_notes: redrawn on the corrected engine (engine_ls3 at root (0, -1.432, 0.72); research 2026-10-15_engine-position); nearest manifold/exhaust 28.6
+    mm (header_R), measured away from device endpoints; crosses nothing; planner route (10 mm grid, >=10 mm clearance, >=28 mm from exhaust), simplified
   confidence: low
 - code: K5B_B24
-  from: J_BAY_BLOCK_D
+  from: J_BAY_BLOCK_P
   to: K5H_OilTemp
   polyline_m:
-  - - 0.44
+  - - -0.44
     - -1.655
     - 0.9
-  - - 0.5
-    - -1.655
-    - 0.82
-  - - 0.5
-    - -1.655
-    - 0.5
-  - - 0.22
-    - -1.655
-    - 0.49
-  - - 0.0
-    - -1.655
-    - 0.47
-  length_in: 36.3
-  min_clearance_mm: -0.0
-  nearest_obstacle: K5H_OilPan
-  follows: down outboard of the driver manifold (9 cm lateral), then in under the manifold and block to the pan
-  rule_notes: 'sump leg: last 15 cm is inside the oil-pan box by design; passes under the driver manifold; nearest manifold/exhaust 95.0 mm (K5H_Manifold_D),
-    measured away from device endpoints'
+  - - -0.42
+    - -1.72
+    - 0.64
+  - - -0.136
+    - -1.642
+    - 0.58
+  length_in: 22.4
+  min_clearance_mm: 14.6
+  nearest_obstacle: frame_rail_R
+  follows: down outboard of the passenger frame rail, under it, along the pan side to the oil temp sensor
+  rule_notes: 'redrawn on the corrected engine (engine_ls3 at root (0, -1.432, 0.72); research 2026-10-15_engine-position); nearest manifold/exhaust 90.6
+    mm (header_R), measured away from device endpoints; crosses nothing; from-point changed J_BAY_BLOCK_D -> J_BAY_BLOCK_P: the sensor is on the passenger
+    side of the pan (mounts.yaml OILT); planner route (10 mm grid, >=10 mm clearance, >=28 mm from exhaust), simplified'
   confidence: low
 - code: K5B_B25
   from: MAP_SENSOR
@@ -988,23 +1039,20 @@ branches:
     - -1.455
     - 1.28
   - - 0.0
-    - -1.455
-    - 1.31
-  - - 0.0
-    - -1.385
-    - 1.3
-  - - 0.0
-    - -1.385
-    - 1.12
-  - - 0.0
-    - -1.4
-    - 1.09
-  length_in: 12.4
-  min_clearance_mm: 17.0
-  nearest_obstacle: Under_Main_Blazer
-  follows: MAP port, behind the intake rear, to the block-top oil pressure sender
-  rule_notes: twin engine overlaps the firewall/dash (block rear y -1.30, firewall y -1.447); the OilPress sender is inside the cowl structure
-    in the twin; nearest manifold/exhaust 503.2 mm (K5H_Manifold_D), measured away from device endpoints
+    - -1.45
+    - 1.24
+  - - 0.01
+    - -1.48
+    - 1.01
+  - - 0.02
+    - -1.502
+    - 0.97
+  length_in: 12.6
+  min_clearance_mm: 8.4
+  nearest_obstacle: E3_DelStributer_Plate
+  follows: down behind the coil cluster and the intake's rear face to the oil pressure port at the rear of the valley
+  rule_notes: redrawn on the corrected engine (engine_ls3 at root (0, -1.432, 0.72); research 2026-10-15_engine-position); nearest manifold/exhaust 325.4
+    mm (header_L), measured away from device endpoints; crosses nothing; planner route (10 mm grid, >=10 mm clearance, >=28 mm from exhaust), simplified
   confidence: low
 - code: K5B_R04
   from: REAR_JCT
@@ -1590,17 +1638,18 @@ branches:
   - - 0.05
     - -0.491
     - 0.62
-  - - 0.12
-    - -0.6
-    - 0.6
+  - - 0.05
+    - -0.5
+    - 0.55
   - - 0.0
     - -0.661
     - 0.55
-  length_in: 10.8
-  min_clearance_mm: 68.5
-  nearest_obstacle: Under_Main_Blazer
-  follows: transfer case tail to the speed sensor
-  rule_notes: nearest manifold/exhaust 241.1 mm (K5H_Exhaust_D), measured away from device endpoints
+  length_in: 9.4
+  min_clearance_mm: 35.0
+  nearest_obstacle: E3_6L90_Case
+  follows: down behind the 6L90's tail, forward under it to the speed sensor
+  rule_notes: redrawn on the corrected engine (engine_ls3 at root (0, -1.432, 0.72); research 2026-10-15_engine-position); nearest manifold/exhaust 732.7
+    mm (downpipe_L), measured away from device endpoints; crosses nothing; hand route
   confidence: low
 - code: K5B_C43
   from: K5H_TransferCase
@@ -2722,20 +2771,24 @@ branches:
   - - -0.52
     - -1.72
     - 1.12
-  - - -0.54
-    - -1.62
-    - 0.94
-  - - -0.44
-    - -1.44
-    - 0.52
-  - - -0.3
-    - -1.45
-    - 0.57
-  length_in: 32.4
-  min_clearance_mm: 30.6
-  nearest_obstacle: Under_Frame_Blazer
-  follows: down the passenger inner fender, outboard of the manifold, to the starter
-  rule_notes: nearest manifold/exhaust 59.7 mm (K5H_Manifold_P), measured away from device endpoints
+  - - -0.41
+    - -1.71
+    - 0.63
+  - - -0.18
+    - -1.55
+    - 0.56
+  - - -0.18
+    - -1.55
+    - 0.59
+  - - -0.215
+    - -1.547
+    - 0.625
+  length_in: 34.3
+  min_clearance_mm: 11.1
+  nearest_obstacle: frame_rail_R
+  follows: down outboard of the passenger frame rail, under the rail and the header collector, in to the starter
+  rule_notes: redrawn on the corrected engine (engine_ls3 at root (0, -1.432, 0.72); research 2026-10-15_engine-position); nearest manifold/exhaust 99.6
+    mm (header_R), measured away from device endpoints; crosses nothing; planner route (10 mm grid, >=10 mm clearance, >=28 mm from exhaust), simplified
   confidence: low
 - code: K5B_B41
   from: PDM15
@@ -3151,51 +3204,1117 @@ branches:
   to: VALLEY
   polyline_m:
   - - 0.0
-    - -1.655
-    - 1.31
+    - -1.542
+    - 1.21
+  - - 0.1
+    - -1.69
+    - 1.2
   - - 0.0
-    - -1.655
-    - 1.31
-  length_in: 0.1
-  min_clearance_mm: 32.5
-  nearest_obstacle: K5H_DEL_Bracket
-  follows: 'coincident points: a placeholder tie (the branch writer rejects length 0)'
-  rule_notes: 'coincident points (distinct codes at one spot): a placeholder tie of 0.1 in, because the branch writer rejects length 0; the true
-    separation is 0'
+    - -1.86
+    - 1.13
+  length_in: 15.3
+  min_clearance_mm: 10.3
+  nearest_obstacle: E3_ThrottleBody_12699160
+  follows: over the coil cluster, down the driver side of the throttle body to the valley junction
+  rule_notes: redrawn on the corrected engine (engine_ls3 at root (0, -1.432, 0.72); research 2026-10-15_engine-position); nearest manifold/exhaust 392.6
+    mm (header_L), measured away from device endpoints; crosses nothing; planner route (10 mm grid, >=10 mm clearance, >=28 mm from exhaust), simplified
   confidence: low
 - code: K5B_B64
   from: RAIL_INJ_PWR
   to: K5H_Injector_3
   polyline_m:
   - - 0.0
-    - -1.69
-    - 1.17
-  - - 0.155
-    - -1.748
-    - 1.17
-  length_in: 6.5
-  min_clearance_mm: 37.5
-  nearest_obstacle: K5H_FuelRail_D
-  follows: injector power rail splice to the driver feed injector
-  rule_notes: 'nearest manifold/exhaust 455.6 mm (K5H_Manifold_D), measured away from device endpoints; with the engine insert moved 150 mm forward:
-    26.5 mm (K5H_Injector_5); RAIL_INJ_PWR sits inside the Holley intake box in the twin; the leg leaves the box, and its clearance excludes the
-    intake the end sits in'
+    - -1.8
+    - 1.11
+  - - 0.12
+    - -1.75
+    - 1.08
+  - - 0.132
+    - -1.764
+    - 1.073
+  length_in: 6.0
+  min_clearance_mm: 19.1
+  nearest_obstacle: intake_300-131
+  follows: over the intake runners, in under the driver rail to injector 3
+  rule_notes: redrawn on the corrected engine (engine_ls3 at root (0, -1.432, 0.72); research 2026-10-15_engine-position); nearest manifold/exhaust 319.7
+    mm (header_L), measured away from device endpoints; crosses nothing; planner route (10 mm grid, >=10 mm clearance, >=28 mm from exhaust), simplified
   confidence: low
 - code: K5B_B65
   from: RAIL_INJ_PWR
   to: K5H_Injector_4
   polyline_m:
   - - 0.0
+    - -1.8
+    - 1.11
+  - - -0.12
+    - -1.74
+    - 1.09
+  - - -0.132
+    - -1.74
+    - 1.073
+  length_in: 6.2
+  min_clearance_mm: 18.3
+  nearest_obstacle: intake_300-131
+  follows: over the intake runners, in under the passenger rail to injector 4
+  rule_notes: redrawn on the corrected engine (engine_ls3 at root (0, -1.432, 0.72); research 2026-10-15_engine-position); nearest manifold/exhaust 324.5
+    mm (header_R), measured away from device endpoints; crosses nothing; planner route (10 mm grid, >=10 mm clearance, >=28 mm from exhaust), simplified
+  confidence: low
+- code: L08
+  from: VALLEY
+  to: THROTTLE_BODY
+  polyline_m:
+  - - 0.0
+    - -1.86
+    - 1.13
+  - - -0.09
+    - -1.66
+    - 1.1
+  - - -0.08
+    - -1.65
+    - 1.11
+  - - -0.08
+    - -1.652
+    - 1.148
+  length_in: 10.9
+  min_clearance_mm: 14.0
+  nearest_obstacle: tb_adapter
+  follows: from the valley junction down the passenger side of the throttle body
+  rule_notes: redrawn on the corrected engine (engine_ls3 at root (0, -1.432, 0.72); research 2026-10-15_engine-position); nearest manifold/exhaust 321.6
+    mm (header_R), measured away from device endpoints; crosses nothing; planner route (10 mm grid, >=10 mm clearance, >=28 mm from exhaust), simplified
+  confidence: low-medium
+- code: L09
+  from: VALLEY
+  to: MAP_SENSOR
+  polyline_m:
+  - - 0.0
+    - -1.86
+    - 1.13
+  - - -0.1
+    - -1.64
+    - 1.22
+  - - 0.0
+    - -1.45
+    - 1.24
+  - - 0.0
+    - -1.455
+    - 1.28
+  length_in: 20.2
+  min_clearance_mm: 15.7
+  nearest_obstacle: E3_ThrottleBody_12699160
+  follows: driver side of the throttle body, over the coil cluster, up to the MAP point
+  rule_notes: redrawn on the corrected engine (engine_ls3 at root (0, -1.432, 0.72); research 2026-10-15_engine-position); nearest manifold/exhaust 400.4
+    mm (header_R), measured away from device endpoints; crosses nothing; planner route (10 mm grid, >=10 mm clearance, >=28 mm from exhaust), simplified
+  confidence: low
+- code: K5B_E01
+  from: RAIL_COIL_PWR
+  to: J_ENG_REAR
+  polyline_m:
+  - - 0.0
+    - -1.542
+    - 1.21
+  - - 0.0
+    - -1.44
+    - 1.15
+  - - 0.0
+    - -1.44
+    - 1.12
+  length_in: 5.8
+  min_clearance_mm: 10.7
+  nearest_obstacle: E3_Coil_7
+  follows: behind the coil cluster down to the rear-of-engine junction
+  rule_notes: 'new: joins a point placed on the corrected engine (research 2026-10-15_engine-position); nearest manifold/exhaust 396.7 mm (header_R), measured
+    away from device endpoints; crosses nothing; planner route (10 mm grid, >=10 mm clearance, >=28 mm from exhaust), simplified'
+  confidence: low
+- code: K5B_E02
+  from: RAIL_COIL_PWR
+  to: K5H_Coil_1
+  polyline_m:
+  - - 0.0
+    - -1.542
+    - 1.21
+  - - -0.08
+    - -1.56
+    - 1.18
+  - - -0.098
+    - -1.574
+    - 1.165
+  length_in: 4.5
+  min_clearance_mm: 13.4
+  nearest_obstacle: E3_Coil_2_Tower
+  follows: over the coil cluster, down onto coil 1's plug
+  rule_notes: 'new: joins a point placed on the corrected engine (research 2026-10-15_engine-position); no manifold/exhaust within the bay''s reach away
+    from device endpoints; crosses nothing; planner route (10 mm grid, >=10 mm clearance, >=28 mm from exhaust), simplified'
+  confidence: low
+- code: K5B_E03
+  from: RAIL_COIL_PWR
+  to: K5H_Coil_2
+  polyline_m:
+  - - 0.0
+    - -1.542
+    - 1.21
+  - - -0.04
+    - -1.55
+    - 1.19
+  - - -0.05
+    - -1.56
+    - 1.18
+  - - -0.033
+    - -1.574
+    - 1.165
+  length_in: 3.5
+  min_clearance_mm: 18.0
+  nearest_obstacle: E3_Coil_2_Tower
+  follows: over the coil cluster, down onto coil 2's plug
+  rule_notes: 'new: joins a point placed on the corrected engine (research 2026-10-15_engine-position); no manifold/exhaust within the bay''s reach away
+    from device endpoints; crosses nothing; planner route (10 mm grid, >=10 mm clearance, >=28 mm from exhaust), simplified'
+  confidence: low
+- code: K5B_E04
+  from: RAIL_COIL_PWR
+  to: K5H_Coil_3
+  polyline_m:
+  - - 0.0
+    - -1.542
+    - 1.21
+  - - 0.05
+    - -1.56
+    - 1.18
+  - - 0.033
+    - -1.574
+    - 1.165
+  length_in: 3.5
+  min_clearance_mm: 15.9
+  nearest_obstacle: E3_Coil_3_Tower
+  follows: over the coil cluster, down onto coil 3's plug
+  rule_notes: 'new: joins a point placed on the corrected engine (research 2026-10-15_engine-position); no manifold/exhaust within the bay''s reach away
+    from device endpoints; crosses nothing; planner route (10 mm grid, >=10 mm clearance, >=28 mm from exhaust), simplified'
+  confidence: low
+- code: K5B_E05
+  from: RAIL_COIL_PWR
+  to: K5H_Coil_4
+  polyline_m:
+  - - 0.0
+    - -1.542
+    - 1.21
+  - - 0.08
+    - -1.56
+    - 1.18
+  - - 0.098
+    - -1.574
+    - 1.165
+  length_in: 4.5
+  min_clearance_mm: 13.4
+  nearest_obstacle: E3_Coil_3_Tower
+  follows: over the coil cluster, down onto coil 4's plug
+  rule_notes: 'new: joins a point placed on the corrected engine (research 2026-10-15_engine-position); no manifold/exhaust within the bay''s reach away
+    from device endpoints; crosses nothing; planner route (10 mm grid, >=10 mm clearance, >=28 mm from exhaust), simplified'
+  confidence: low
+- code: K5B_E06
+  from: RAIL_COIL_PWR
+  to: K5H_Coil_5
+  polyline_m:
+  - - 0.0
+    - -1.542
+    - 1.21
+  - - -0.13
+    - -1.53
+    - 1.2
+  - - -0.12
+    - -1.51
+    - 1.18
+  - - -0.098
+    - -1.51
+    - 1.165
+  length_in: 7.4
+  min_clearance_mm: 16.0
+  nearest_obstacle: E3_Coil_5_Tower
+  follows: over the coil cluster, down onto coil 5's plug
+  rule_notes: 'new: joins a point placed on the corrected engine (research 2026-10-15_engine-position); nearest manifold/exhaust 384.7 mm (header_R), measured
+    away from device endpoints; crosses nothing; planner route (10 mm grid, >=10 mm clearance, >=28 mm from exhaust), simplified'
+  confidence: low
+- code: K5B_E07
+  from: RAIL_COIL_PWR
+  to: K5H_Coil_6
+  polyline_m:
+  - - 0.0
+    - -1.542
+    - 1.21
+  - - -0.01
+    - -1.51
+    - 1.18
+  - - -0.033
+    - -1.51
+    - 1.165
+  length_in: 2.9
+  min_clearance_mm: 20.4
+  nearest_obstacle: E3_Coil_7
+  follows: over the coil cluster, down onto coil 6's plug
+  rule_notes: 'new: joins a point placed on the corrected engine (research 2026-10-15_engine-position); no manifold/exhaust within the bay''s reach away
+    from device endpoints; crosses nothing; planner route (10 mm grid, >=10 mm clearance, >=28 mm from exhaust), simplified'
+  confidence: low
+- code: K5B_E08
+  from: RAIL_COIL_PWR
+  to: K5H_Coil_7
+  polyline_m:
+  - - 0.0
+    - -1.542
+    - 1.21
+  - - 0.01
+    - -1.51
+    - 1.18
+  - - 0.033
+    - -1.51
+    - 1.165
+  length_in: 2.9
+  min_clearance_mm: 20.2
+  nearest_obstacle: E3_Coil_6
+  follows: over the coil cluster, down onto coil 7's plug
+  rule_notes: 'new: joins a point placed on the corrected engine (research 2026-10-15_engine-position); no manifold/exhaust within the bay''s reach away
+    from device endpoints; crosses nothing; planner route (10 mm grid, >=10 mm clearance, >=28 mm from exhaust), simplified'
+  confidence: low
+- code: K5B_E09
+  from: RAIL_COIL_PWR
+  to: K5H_Coil_8
+  polyline_m:
+  - - 0.0
+    - -1.542
+    - 1.21
+  - - 0.13
+    - -1.53
+    - 1.2
+  - - 0.12
+    - -1.51
+    - 1.18
+  - - 0.098
+    - -1.51
+    - 1.165
+  length_in: 7.4
+  min_clearance_mm: 16.0
+  nearest_obstacle: E3_Coil_8_Tower
+  follows: over the coil cluster, down onto coil 8's plug
+  rule_notes: 'new: joins a point placed on the corrected engine (research 2026-10-15_engine-position); nearest manifold/exhaust 384.9 mm (header_L), measured
+    away from device endpoints; crosses nothing; planner route (10 mm grid, >=10 mm clearance, >=28 mm from exhaust), simplified'
+  confidence: low
+- code: K5B_E10
+  from: J_ENG_REAR
+  to: COIL_GND_HEAD_REAR_P
+  polyline_m:
+  - - 0.0
+    - -1.44
+    - 1.12
+  - - -0.21
+    - -1.43
+    - 0.93
+  - - -0.208
+    - -1.445
+    - 0.928
+  length_in: 11.8
+  min_clearance_mm: 15.9
+  nearest_obstacle: head_R
+  follows: across the firewall recess behind the passenger valve cover, down onto the head's rear face
+  rule_notes: 'new: joins a point placed on the corrected engine (research 2026-10-15_engine-position); nearest manifold/exhaust 167.5 mm (header_R), measured
+    away from device endpoints; crosses nothing; planner route (10 mm grid, >=10 mm clearance, >=28 mm from exhaust), simplified'
+  confidence: medium
+- code: K5B_E11
+  from: COIL_GND_HEAD_REAR_P
+  to: DAK_CTS_HEAD_REAR_P
+  polyline_m:
+  - - -0.208
+    - -1.445
+    - 0.928
+  - - -0.21
+    - -1.43
+    - 0.93
+  - - -0.292
+    - -1.445
+    - 1.012
+  length_in: 5.2
+  min_clearance_mm: 13.4
+  nearest_obstacle: head_R
+  follows: along the passenger head's rear face to its top outboard port
+  rule_notes: 'new: joins a point placed on the corrected engine (research 2026-10-15_engine-position); nearest manifold/exhaust 124.7 mm (header_R), measured
+    away from device endpoints; crosses nothing; planner route (10 mm grid, >=10 mm clearance, >=28 mm from exhaust), simplified'
+  confidence: low-medium
+- code: K5B_E12
+  from: J_ENG_REAR
+  to: K5H_OilPress
+  polyline_m:
+  - - 0.0
+    - -1.44
+    - 1.12
+  - - 0.02
+    - -1.502
+    - 0.97
+  length_in: 6.4
+  min_clearance_mm: 15.7
+  nearest_obstacle: E3_DelStributer_Plate
+  follows: down behind the coil cluster and the intake's rear face to the oil pressure port
+  rule_notes: 'new: joins a point placed on the corrected engine (research 2026-10-15_engine-position); nearest manifold/exhaust 325.3 mm (header_L), measured
+    away from device endpoints; crosses nothing; planner route (10 mm grid, >=10 mm clearance, >=28 mm from exhaust), simplified'
+  confidence: low-medium
+- code: K5B_E13
+  from: K5H_OilPress
+  to: DAK_OILP_TEE
+  polyline_m:
+  - - 0.02
+    - -1.502
+    - 0.97
+  - - 0.04
+    - -1.502
+    - 0.995
+  length_in: 1.3
+  min_clearance_mm: 25.1
+  nearest_obstacle: block
+  follows: the tee on the factory oil pressure port
+  rule_notes: 'new: joins a point placed on the corrected engine (research 2026-10-15_engine-position); no manifold/exhaust within the bay''s reach away
+    from device endpoints; crosses nothing; hand route'
+  confidence: low
+- code: K5B_E14
+  from: J_BAY_FRONT
+  to: ALT_BPLUS_STUD
+  polyline_m:
+  - - 0.18
+    - -2.03
+    - 1.2
+  - - 0.27
+    - -1.95
+    - 0.98
+  - - 0.25
+    - -1.946
+    - 0.982
+  length_in: 10.7
+  min_clearance_mm: 12.1
+  nearest_obstacle: alternator_197-302
+  follows: outboard of the alternator, down to its B+ stud on the rear housing
+  rule_notes: 'new: joins a point placed on the corrected engine (research 2026-10-15_engine-position); nearest manifold/exhaust 176.2 mm (header_L), measured
+    away from device endpoints; crosses nothing; planner route (10 mm grid, >=10 mm clearance, >=28 mm from exhaust), simplified'
+  confidence: low-medium
+- code: K5B_E15
+  from: K5H_Starter
+  to: STARTER
+  polyline_m:
+  - - -0.215
+    - -1.547
+    - 0.625
+  - - -0.22
+    - -1.532
+    - 0.68
+  length_in: 2.3
+  min_clearance_mm: 53.6
+  nearest_obstacle: header_R
+  follows: starter body to its solenoid B+ stud
+  rule_notes: 'new: joins a point placed on the corrected engine (research 2026-10-15_engine-position); no manifold/exhaust within the bay''s reach away
+    from device endpoints; crosses nothing; hand route'
+  confidence: low
+- code: K5B_E16
+  from: K5H_Starter
+  to: CKP
+  polyline_m:
+  - - -0.215
+    - -1.547
+    - 0.625
+  - - -0.18
+    - -1.55
+    - 0.59
+  - - -0.16
+    - -1.55
+    - 0.62
+  - - -0.19
+    - -1.527
+    - 0.755
+  length_in: 8.9
+  min_clearance_mm: 9.8
+  nearest_obstacle: E3_Starter_DFSR-8715
+  follows: up from the starter, inboard of the solenoid, to the crank sensor
+  rule_notes: 'new: joins a point placed on the corrected engine (research 2026-10-15_engine-position); nearest manifold/exhaust 95.4 mm (header_R), measured
+    away from device endpoints; crosses nothing; planner route (10 mm grid, >=10 mm clearance, >=28 mm from exhaust), simplified'
+  confidence: low
+- code: K5B_E17
+  from: ALT_BPLUS_STUD
+  to: ALT
+  polyline_m:
+  - - 0.25
+    - -1.946
+    - 0.982
+  - - 0.27
+    - -1.95
+    - 0.98
+  - - 0.22
+    - -1.97
+    - 1.08
+  - - 0.184
+    - -1.955
+    - 1.058
+  length_in: 7.0
+  min_clearance_mm: 8.6
+  nearest_obstacle: alternator_197-302
+  follows: over the alternator's rear housing from the B+ stud to the sense plug
+  rule_notes: 'new: joins a point placed on the corrected engine (research 2026-10-15_engine-position); nearest manifold/exhaust 174.7 mm (header_L), measured
+    away from device endpoints; crosses nothing; planner route (10 mm grid, >=10 mm clearance, >=28 mm from exhaust), simplified'
+  confidence: low
+- code: K5B_E18
+  from: FIREWALL_61
+  to: J_ENG_REAR
+  polyline_m:
+  - - 0.5
+    - -1.46
+    - 0.9
+  - - 0.5
+    - -1.47
+    - 0.9
+  - - 0.31
+    - -1.45
+    - 0.84
+  - - 0.0
+    - -1.44
+    - 1.12
+  length_in: 24.7
+  min_clearance_mm: 14.5
+  nearest_obstacle: Under_Main_Blazer
+  follows: from the 61-pin's engine face inboard along the firewall and across the recess behind the driver valve cover
+  rule_notes: 'route study 4: added to cut a graph detour (carries 26 point pairs on the shortest walk); nearest manifold/exhaust 51.3 mm (header_L), measured
+    away from device endpoints; crosses nothing; planner route (10 mm grid, >=10 mm clearance, >=28 mm from exhaust), line-of-sight simplified'
+  confidence: medium
+- code: K5B_E19
+  from: FIREWALL_61
+  to: J_ENG_D
+  polyline_m:
+  - - 0.5
+    - -1.46
+    - 0.9
+  - - 0.31
+    - -1.47
+    - 0.81
+  length_in: 8.3
+  min_clearance_mm: 17.6
+  nearest_obstacle: Under_Main_Blazer
+  follows: from the 61-pin's engine face down behind the driver header's rear end
+  rule_notes: 'route study 4: added to cut a graph detour (carries 6 point pairs on the shortest walk); nearest manifold/exhaust 44.5 mm (header_L), measured
+    away from device endpoints; crosses nothing; planner route (10 mm grid, >=10 mm clearance, >=28 mm from exhaust), line-of-sight simplified'
+  confidence: medium
+- code: K5B_E20
+  from: J_ENG_D
+  to: KS1
+  polyline_m:
+  - - 0.31
+    - -1.47
+    - 0.81
+  - - 0.25
+    - -1.48
+    - 0.77
+  - - 0.22
     - -1.69
-    - 1.17
-  - - -0.155
-    - -1.748
-    - 1.17
-  length_in: 6.5
-  min_clearance_mm: 37.5
-  nearest_obstacle: K5H_FuelRail_P
-  follows: injector power rail splice to the passenger feed injector
-  rule_notes: 'nearest manifold/exhaust 455.6 mm (K5H_Manifold_P), measured away from device endpoints; with the engine insert moved 150 mm forward:
-    26.5 mm (K5H_Injector_6); RAIL_INJ_PWR sits inside the Holley intake box in the twin; the leg leaves the box, and its clearance excludes the
-    intake the end sits in'
+    - 0.77
+  - - 0.2
+    - -1.687
+    - 0.765
+  length_in: 12.0
+  min_clearance_mm: 10.5
+  nearest_obstacle: Under_Frame_Blazer
+  follows: forward along the driver block side under the head to knock sensor 1
+  rule_notes: 'route study 4: added to cut a graph detour (carries 1 point pairs on the shortest walk); nearest manifold/exhaust 29.6 mm (header_L), measured
+    away from device endpoints; crosses nothing; planner route (10 mm grid, >=10 mm clearance, >=28 mm from exhaust), line-of-sight simplified'
+  confidence: low
+- code: K5B_E21
+  from: J_ENG_D
+  to: K5H_CLT
+  polyline_m:
+  - - 0.31
+    - -1.47
+    - 0.81
+  - - 0.35
+    - -1.53
+    - 0.85
+  - - 0.34
+    - -1.98
+    - 0.9
+  - - 0.19
+    - -1.948
+    - 0.9
+  length_in: 27.1
+  min_clearance_mm: 15.0
+  nearest_obstacle: head_L
+  follows: forward along the driver block side to the front of the driver head
+  rule_notes: 'route study 4: added to cut a graph detour (carries 1 point pairs on the shortest walk); nearest manifold/exhaust 28.3 mm (header_L), measured
+    away from device endpoints; crosses nothing; planner route (10 mm grid, >=10 mm clearance, >=28 mm from exhaust), line-of-sight simplified'
+  confidence: low
+- code: K5B_E22
+  from: J_ENG_D
+  to: CMP
+  polyline_m:
+  - - 0.31
+    - -1.47
+    - 0.81
+  - - 0.26
+    - -1.47
+    - 0.77
+  - - 0.23
+    - -1.52
+    - 0.73
+  - - 0.23
+    - -1.67
+    - 0.66
+  - - 0.2
+    - -1.88
+    - 0.68
+  - - 0.13
+    - -2.01
+    - 0.74
+  - - 0.09
+    - -1.99
+    - 0.83
+  - - 0.08
+    - -1.98
+    - 0.84
+  - - 0.06
+    - -1.972
+    - 0.86
+  length_in: 32.3
+  min_clearance_mm: 12.8
+  nearest_obstacle: front_cover
+  follows: forward along the driver block side to the cam sensor on the front cover
+  rule_notes: 'route study 4: added to cut a graph detour (carries 1 point pairs on the shortest walk); nearest manifold/exhaust 29.3 mm (header_L), measured
+    away from device endpoints; crosses nothing; planner route (10 mm grid, >=10 mm clearance, >=28 mm from exhaust), line-of-sight simplified'
+  confidence: low
+- code: K5B_E23
+  from: J_ENG_D
+  to: J_ENG_P
+  polyline_m:
+  - - 0.31
+    - -1.47
+    - 0.81
+  - - 0.06
+    - -1.42
+    - 1.0
+  - - -0.28
+    - -1.42
+    - 0.83
+  - - -0.31
+    - -1.45
+    - 0.81
+  length_in: 29.3
+  min_clearance_mm: 12.0
+  nearest_obstacle: bell_face
+  follows: across the back of the engine over the bellhousing top, in the firewall recess
+  rule_notes: 'route study 4: added to cut a graph detour (carries 3 point pairs on the shortest walk); nearest manifold/exhaust 36.0 mm (header_L), measured
+    away from device endpoints; crosses nothing; planner route (10 mm grid, >=10 mm clearance, >=28 mm from exhaust), line-of-sight simplified'
+  confidence: medium
+- code: K5B_E24
+  from: J_ENG_P
+  to: KS2
+  polyline_m:
+  - - -0.31
+    - -1.45
+    - 0.81
+  - - -0.27
+    - -1.45
+    - 0.79
+  - - -0.23
+    - -1.49
+    - 0.75
+  - - -0.22
+    - -1.63
+    - 0.77
+  - - -0.22
+    - -1.66
+    - 0.77
+  - - -0.22
+    - -1.67
+    - 0.77
+  - - -0.22
+    - -1.68
+    - 0.77
+  - - -0.22
+    - -1.69
+    - 0.77
+  - - -0.2
+    - -1.687
+    - 0.765
+  length_in: 13.3
+  min_clearance_mm: 13.4
+  nearest_obstacle: Under_Frame_Blazer
+  follows: forward along the passenger block side under the head to knock sensor 2
+  rule_notes: 'route study 4: added to cut a graph detour (carries 1 point pairs on the shortest walk); nearest manifold/exhaust 28.6 mm (header_R), measured
+    away from device endpoints; crosses nothing; planner route (10 mm grid, >=10 mm clearance, >=28 mm from exhaust), line-of-sight simplified'
+  confidence: low
+- code: K5B_E25
+  from: J_ENG_P
+  to: CKP
+  polyline_m:
+  - - -0.31
+    - -1.45
+    - 0.81
+  - - -0.27
+    - -1.45
+    - 0.79
+  - - -0.23
+    - -1.49
+    - 0.75
+  - - -0.19
+    - -1.527
+    - 0.755
+  length_in: 6.6
+  min_clearance_mm: 28.6
+  nearest_obstacle: header_R
+  follows: down the passenger block side to the crank sensor
+  rule_notes: 'route study 4: added to cut a graph detour (carries 1 point pairs on the shortest walk); nearest manifold/exhaust 28.6 mm (header_R), measured
+    away from device endpoints; crosses nothing; planner route (10 mm grid, >=10 mm clearance, >=28 mm from exhaust), line-of-sight simplified'
+  confidence: low
+- code: K5B_E26
+  from: J_ENG_P
+  to: K5H_OilTemp
+  polyline_m:
+  - - -0.31
+    - -1.45
+    - 0.81
+  - - -0.25
+    - -1.4
+    - 0.66
+  - - -0.17
+    - -1.45
+    - 0.56
+  - - -0.14
+    - -1.64
+    - 0.57
+  - - -0.136
+    - -1.642
+    - 0.58
+  length_in: 20.1
+  min_clearance_mm: 16.5
+  nearest_obstacle: E3_Starter_DFSR-8715
+  follows: down the passenger block side to the oil temp sensor on the pan
+  rule_notes: 'route study 4: added to cut a graph detour (carries 1 point pairs on the shortest walk); nearest manifold/exhaust 30.2 mm (header_R), measured
+    away from device endpoints; crosses nothing; planner route (10 mm grid, >=10 mm clearance, >=28 mm from exhaust), line-of-sight simplified'
+  confidence: low
+- code: K5B_E27
+  from: J_ENG_REAR
+  to: MAP_SENSOR
+  polyline_m:
+  - - 0.0
+    - -1.44
+    - 1.12
+  - - 0.0
+    - -1.45
+    - 1.24
+  - - 0.0
+    - -1.455
+    - 1.28
+  length_in: 6.3
+  min_clearance_mm: 40.8
+  nearest_obstacle: E3_Coil_7
+  follows: straight up from the rear-of-engine junction to the MAP point
+  rule_notes: 'route study 4: added to cut a graph detour (carries 1 point pairs on the shortest walk); nearest manifold/exhaust 396.7 mm (header_R), measured
+    away from device endpoints; crosses nothing; planner route (10 mm grid, >=10 mm clearance, >=28 mm from exhaust), line-of-sight simplified'
+  confidence: low
+- code: K5B_E28
+  from: J_ENG_REAR
+  to: THROTTLE_BODY
+  polyline_m:
+  - - 0.0
+    - -1.44
+    - 1.12
+  - - -0.17
+    - -1.48
+    - 1.14
+  - - -0.13
+    - -1.65
+    - 1.12
+  - - -0.1
+    - -1.65
+    - 1.1
+  - - -0.09
+    - -1.65
+    - 1.1
+  - - -0.08
+    - -1.65
+    - 1.11
+  - - -0.08
+    - -1.652
+    - 1.148
+  length_in: 17.7
+  min_clearance_mm: 12.5
+  nearest_obstacle: E3_TB_MotorHousing
+  follows: over the coil cluster to the passenger side of the throttle body
+  rule_notes: 'route study 4: added to cut a graph detour (carries 1 point pairs on the shortest walk); nearest manifold/exhaust 308.3 mm (header_R), measured
+    away from device endpoints; crosses nothing; planner route (10 mm grid, >=10 mm clearance, >=28 mm from exhaust), line-of-sight simplified'
+  confidence: low-medium
+- code: K5B_E29
+  from: J_ENG_REAR
+  to: K5H_Injector_8
+  polyline_m:
+  - - 0.0
+    - -1.44
+    - 1.12
+  - - -0.13
+    - -1.47
+    - 1.07
+  - - -0.15
+    - -1.49
+    - 1.07
+  - - -0.132
+    - -1.517
+    - 1.073
+  length_in: 8.0
+  min_clearance_mm: 12.1
+  nearest_obstacle: E3_DelStributer_Plate
+  follows: behind the passenger rail's rear end, along its outboard side to injector 8
+  rule_notes: 'route study 4: added to cut a graph detour (carries 3 point pairs on the shortest walk); nearest manifold/exhaust 269.4 mm (header_R), measured
+    away from device endpoints; crosses nothing; planner route (10 mm grid, >=10 mm clearance, >=28 mm from exhaust), line-of-sight simplified'
+  confidence: medium
+- code: K5B_E30
+  from: J_ENG_REAR
+  to: K5H_Coil_5
+  polyline_m:
+  - - 0.0
+    - -1.44
+    - 1.12
+  - - -0.12
+    - -1.49
+    - 1.19
+  - - -0.12
+    - -1.51
+    - 1.18
+  - - -0.098
+    - -1.51
+    - 1.165
+  length_in: 7.7
+  min_clearance_mm: 10.2
+  nearest_obstacle: E3_Coil_5
+  follows: from behind the cluster onto coil 5 (rear row)
+  rule_notes: 'route study 4: added to cut a graph detour (carries 2 point pairs on the shortest walk); nearest manifold/exhaust 375.3 mm (header_R), measured
+    away from device endpoints; crosses nothing; planner route (10 mm grid, >=10 mm clearance, >=28 mm from exhaust), line-of-sight simplified'
+  confidence: low
+- code: K5B_E31
+  from: J_ENG_REAR
+  to: K5H_Coil_6
+  polyline_m:
+  - - 0.0
+    - -1.44
+    - 1.12
+  - - 0.0
+    - -1.49
+    - 1.2
+  - - -0.01
+    - -1.51
+    - 1.18
+  - - -0.033
+    - -1.51
+    - 1.165
+  length_in: 6.0
+  min_clearance_mm: 15.0
+  nearest_obstacle: E3_Coil_6
+  follows: from behind the cluster onto coil 6 (rear row)
+  rule_notes: 'route study 4: added to cut a graph detour (carries 2 point pairs on the shortest walk); nearest manifold/exhaust 396.7 mm (header_R), measured
+    away from device endpoints; crosses nothing; planner route (10 mm grid, >=10 mm clearance, >=28 mm from exhaust), line-of-sight simplified'
+  confidence: low
+- code: K5B_E32
+  from: J_ENG_REAR
+  to: K5H_Coil_7
+  polyline_m:
+  - - 0.0
+    - -1.44
+    - 1.12
+  - - 0.0
+    - -1.49
+    - 1.2
+  - - 0.01
+    - -1.51
+    - 1.18
+  - - 0.033
+    - -1.51
+    - 1.165
+  length_in: 6.0
+  min_clearance_mm: 15.0
+  nearest_obstacle: E3_Coil_6
+  follows: from behind the cluster onto coil 7 (rear row)
+  rule_notes: 'route study 4: added to cut a graph detour (carries 2 point pairs on the shortest walk); nearest manifold/exhaust 396.7 mm (header_R), measured
+    away from device endpoints; crosses nothing; planner route (10 mm grid, >=10 mm clearance, >=28 mm from exhaust), line-of-sight simplified'
+  confidence: low
+- code: K5B_E33
+  from: J_ENG_REAR
+  to: K5H_Coil_8
+  polyline_m:
+  - - 0.0
+    - -1.44
+    - 1.12
+  - - 0.12
+    - -1.49
+    - 1.19
+  - - 0.12
+    - -1.51
+    - 1.18
+  - - 0.098
+    - -1.51
+    - 1.165
+  length_in: 7.7
+  min_clearance_mm: 10.2
+  nearest_obstacle: E3_Coil_8
+  follows: from behind the cluster onto coil 8 (rear row)
+  rule_notes: 'route study 4: added to cut a graph detour (carries 2 point pairs on the shortest walk); nearest manifold/exhaust 375.7 mm (header_L), measured
+    away from device endpoints; crosses nothing; planner route (10 mm grid, >=10 mm clearance, >=28 mm from exhaust), line-of-sight simplified'
+  confidence: low
+- code: K5B_E34
+  from: J_BAY_P_MID
+  to: RAIL_COIL_PWR
+  polyline_m:
+  - - -0.4
+    - -1.8
+    - 1.22
+  - - 0.0
+    - -1.542
+    - 1.21
+  length_in: 18.7
+  min_clearance_mm: 19.9
+  nearest_obstacle: E3_Coil_2_Tower
+  follows: from the passenger trunk over the passenger valve cover, behind the throttle body, to the coil power splice
+  rule_notes: 'route study 4: added to cut a graph detour (carries 8 point pairs on the shortest walk); nearest manifold/exhaust 358.6 mm (header_R), measured
+    away from device endpoints; crosses nothing; planner route (10 mm grid, >=10 mm clearance, >=28 mm from exhaust), line-of-sight simplified'
+  confidence: low
+- code: K5B_E35
+  from: RAIL_INJ_PWR
+  to: K5H_Injector_1
+  polyline_m:
+  - - 0.0
+    - -1.8
+    - 1.11
+  - - 0.12
+    - -1.88
+    - 1.09
+  - - 0.132
+    - -1.876
+    - 1.073
+  length_in: 6.6
+  min_clearance_mm: 14.5
+  nearest_obstacle: intake_300-131
+  follows: over the intake runners, in under the driver rail to injector 1
+  rule_notes: 'route study 4: added to cut a graph detour (carries 1 point pairs on the shortest walk); nearest manifold/exhaust 315.9 mm (header_L), measured
+    away from device endpoints; crosses nothing; planner route (10 mm grid, >=10 mm clearance, >=28 mm from exhaust), line-of-sight simplified'
+  confidence: low
+- code: K5B_E36
+  from: RAIL_INJ_PWR
+  to: K5H_Injector_2
+  polyline_m:
+  - - 0.0
+    - -1.8
+    - 1.11
+  - - -0.12
+    - -1.88
+    - 1.08
+  - - -0.13
+    - -1.88
+    - 1.07
+  - - -0.14
+    - -1.87
+    - 1.07
+  - - -0.132
+    - -1.852
+    - 1.073
+  length_in: 7.7
+  min_clearance_mm: 14.5
+  nearest_obstacle: intake_300-131
+  follows: over the intake runners, in under the passenger rail to injector 2
+  rule_notes: 'route study 4: added to cut a graph detour (carries 2 point pairs on the shortest walk); nearest manifold/exhaust 296.8 mm (header_R), measured
+    away from device endpoints; crosses nothing; planner route (10 mm grid, >=10 mm clearance, >=28 mm from exhaust), line-of-sight simplified'
+  confidence: low
+- code: K5B_E37
+  from: K5H_RadFan_1
+  to: GND_BANK_ENG
+  polyline_m:
+  - - 0.19
+    - -2.34
+    - 0.95
+  - - 0.19
+    - -2.2
+    - 0.95
+  - - -0.27
+    - -2.14
+    - 0.95
+  - - -0.52
+    - -2.02
+    - 1.0
+  length_in: 34.9
+  min_clearance_mm: 14.1
+  nearest_obstacle: tensioner
+  follows: across the bay between the fan shroud and the engine front, to the engine ground bank
+  rule_notes: 'route study 4: added to cut a graph detour (carries 1 point pairs on the shortest walk); nearest manifold/exhaust 239.7 mm (header_R), measured
+    away from device endpoints; crosses nothing; planner route (10 mm grid, >=10 mm clearance, >=28 mm from exhaust), line-of-sight simplified'
+  confidence: low
+- code: K5B_E38
+  from: BLOWER_RES
+  to: BLOWER_MOTOR
+  polyline_m:
+  - - -0.52
+    - -1.56
+    - 1.1
+  - - -0.62
+    - -1.56
+    - 1.05
+  - - -0.7
+    - -1.56
+    - 1.05
+  length_in: 7.6
+  min_clearance_mm: 51.4
+  nearest_obstacle: Under_Main_Blazer
+  follows: the blower resistor's leads straight to the blower motor on the same housing
+  rule_notes: 'route study 4: added to cut a graph detour (carries 1 point pairs on the shortest walk); nearest manifold/exhaust 350.6 mm (header_R), measured
+    away from device endpoints; crosses nothing; planner route (10 mm grid, >=10 mm clearance, >=28 mm from exhaust), line-of-sight simplified'
+  confidence: low
+- code: K5B_E39
+  from: FIREWALL_61
+  to: K5H_Injector_7
+  polyline_m:
+  - - 0.5
+    - -1.46
+    - 0.9
+  - - 0.5
+    - -1.47
+    - 0.9
+  - - 0.32
+    - -1.45
+    - 0.85
+  - - 0.15
+    - -1.46
+    - 1.06
+  - - 0.14
+    - -1.52
+    - 1.07
+  - - 0.132
+    - -1.541
+    - 1.073
+  length_in: 21.8
+  min_clearance_mm: 13.0
+  nearest_obstacle: Under_Main_Blazer
+  follows: from the 61-pin inboard under the iBooster, up behind the driver valve cover in the recess, along the driver rail's outboard side to injector
+    7
+  rule_notes: 'route study 4: added to cut a graph detour (carries 2 point pairs on the shortest walk); nearest manifold/exhaust 51.7 mm (header_L), measured
+    away from device endpoints; crosses nothing; planner route (10 mm grid, >=10 mm clearance, >=28 mm from exhaust), line-of-sight simplified'
+  confidence: medium
+- code: K5B_S01
+  from: PDM30
+  to: STEER_COL
+  polyline_m:
+  - - 0.3
+    - -1.3
+    - 0.997
+  - - 0.4
+    - -1.25
+    - 0.975
+  - - 0.5
+    - -1.2
+    - 0.95
+  length_in: 9.0
+  min_clearance_mm: 46.7
+  nearest_obstacle: Dash_Main
+  follows: dash underside from the PDM30 straight across to the steering column
+  rule_notes: 'route study 4: added to cut a graph detour (carries 2 point pairs on the shortest walk); nearest manifold/exhaust 268.9 mm (header_L), measured
+    away from device endpoints; crosses nothing; hand route; the panel the end passes through (door pass-through, door switch, tunnel grommet, behind-the-dash
+    splice) counts as the end''s own device'
+  confidence: low-medium
+- code: K5B_S02
+  from: SPL_ISO_YEL
+  to: M130
+  polyline_m:
+  - - 0.3
+    - -1.21
+    - 1.05
+  - - 0.3
+    - -1.23
+    - 0.96
+  - - 0.5
+    - -1.22
+    - 0.96
+  - - 0.55
+    - -1.22
+    - 0.987
+  length_in: 13.8
+  min_clearance_mm: 37.1
+  nearest_obstacle: Dash_Main
+  follows: behind the dash from the isolator splice to the M130
+  rule_notes: 'route study 4: added to cut a graph detour (carries 9 point pairs on the shortest walk); nearest manifold/exhaust 289.2 mm (header_L), measured
+    away from device endpoints; crosses nothing; hand route; the panel the end passes through (door pass-through, door switch, tunnel grommet, behind-the-dash
+    splice) counts as the end''s own device'
+  confidence: low
+- code: K5B_S03
+  from: TUNNEL_6L90
+  to: GSS_3000
+  polyline_m:
+  - - 0.17
+    - -0.95
+    - 0.62
+  - - 0.18
+    - -0.97
+    - 0.72
+  - - 0.25
+    - -1.06
+    - 0.84
+  - - 0.22
+    - -1.18
+    - 0.94
+  - - 0.08
+    - -1.27
+    - 0.97
+  - - 0.03
+    - -1.3
+    - 0.99
+  length_in: 25.9
+  min_clearance_mm: 3.4
+  nearest_obstacle: Interior_Main
+  follows: cab side of the tunnel grommet, up the tunnel's driver flank clear of its crown, to the dash centre
+  rule_notes: 'route study 4: added to cut a graph detour (carries 2 point pairs on the shortest walk); nearest manifold/exhaust 324.5 mm (header_L), measured
+    away from device endpoints; crosses nothing; hand route; the panel the end passes through (door pass-through, door switch, tunnel grommet, behind-the-dash
+    splice) counts as the end''s own device; under 10 mm for 40 mm where it rises off the tunnel grommet along the tunnel shell (Interior_Main, 3.4 mm);
+    every route from the grommet tried (4 variants) rides that shell at 1.0-3.4 mm, as a loom clipped to the tunnel does'
+  confidence: low
+- code: K5B_S04
+  from: DOOR_BOOT_L
+  to: AT_LOCK_SW_L
+  polyline_m:
+  - - 0.92
+    - -1.13
+    - 1.0
+  - - 0.95
+    - -0.95
+    - 0.97
+  - - 0.93
+    - -0.86
+    - 1.05
+  - - 0.9
+    - -0.784
+    - 1.197
+  - - 0.825
+    - -0.815
+    - 1.245
+  length_in: 22.4
+  min_clearance_mm: 36.3
+  nearest_obstacle: Door_Left_Details
+  follows: inside the driver door from the hinge pass-through up the door's front to the lock switch
+  rule_notes: 'route study 4: added to cut a graph detour (carries 2 point pairs on the shortest walk); nearest manifold/exhaust 753.4 mm (downpipe_L),
+    measured away from device endpoints; crosses nothing; hand route; the panel the end passes through (door pass-through, door switch, tunnel grommet,
+    behind-the-dash splice) counts as the end''s own device'
+  confidence: low
+- code: K5B_S05
+  from: DOOR_BOOT_R
+  to: AT_LOCK_SW_R
+  polyline_m:
+  - - -0.92
+    - -1.13
+    - 1.0
+  - - -0.95
+    - -0.95
+    - 0.97
+  - - -0.93
+    - -0.86
+    - 1.05
+  - - -0.9
+    - -0.784
+    - 1.197
+  - - -0.825
+    - -0.815
+    - 1.245
+  length_in: 22.4
+  min_clearance_mm: 36.3
+  nearest_obstacle: Door_Right_Details
+  follows: inside the passenger door from the hinge pass-through up the door's front to the lock switch
+  rule_notes: 'route study 4: added to cut a graph detour (carries 3 point pairs on the shortest walk); nearest manifold/exhaust 753.4 mm (downpipe_R),
+    measured away from device endpoints; crosses nothing; hand route; the panel the end passes through (door pass-through, door switch, tunnel grommet,
+    behind-the-dash splice) counts as the end''s own device'
   confidence: low

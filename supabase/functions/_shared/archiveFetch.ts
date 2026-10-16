@@ -322,7 +322,7 @@ export async function archiveFetch(
       formats,
       onlyMainContent: false,
       waitFor: options?.waitForJs ?? 3000,
-    });
+    }, { caller: options?.callerName ?? "archiveFetch" });
 
     result.html = fcResult.data.html;
     result.markdown = fcResult.data.markdown;
@@ -357,7 +357,7 @@ export async function archiveFetch(
         formats: ["rawHtml"], // the extractors that opt in read script payloads, which "html" strips
         onlyMainContent: false,
         waitFor: options?.waitForJs ?? 3000,
-      });
+      }, { caller: options?.callerName ?? "archiveFetch" });
       result.html = fcResult.data.html;
       result.markdown = fcResult.data.markdown;
       result.source = "firecrawl";

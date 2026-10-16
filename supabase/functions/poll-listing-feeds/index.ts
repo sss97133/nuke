@@ -28,6 +28,7 @@
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { firecrawlScrape } from "../_shared/firecrawl.ts";
+import { firecrawlGate, ALLOWANCE_EXHAUSTED } from "../_shared/firecrawlGate.ts";
 import { archiveFetch } from "../_shared/archiveFetch.ts";
 import { fetchCraigslistFeed } from "./feedFetch.ts";
 import { extractCraigslistCanonicalUrls } from "../_shared/urlNormalization.ts";
@@ -50,6 +51,7 @@ import {
 import { projectSecretKey } from "../_shared/supabaseKeys.ts";
 import { noticeFrom, sweepCraigslistRemovals } from "./removal.ts";
 import { parseKslSearchCards } from "./kslCards.ts";
+import { splitByYear } from "./yearFilter.ts";
 import { nextYield } from "./schedule.ts";
 
 const corsHeaders = {
@@ -640,11 +642,18 @@ async function pollFirecrawlHtmlFeed(
         }
       }
 
-      if (!html && (Deno.env.get("FIRECRAWL_API_KEY") || "").trim()) {
+      // KSL refuses the server's address, so its search page costs a Firecrawl credit per poll. Ask first, record after:
+      // the "ksl-search" allowance (not the lot allowance, which is paused) covers it, and rawHtml keeps the page's
+      // script payload so the search cards can be read (./kslCards.ts).
+      const kslGate = feed.source_slug === "ksl" ? firecrawlGate(supabase, "ksl-search") : null;
+      const kslDeferred = !html && kslGate !== null && !(await kslGate.allow());
+      if (kslDeferred) fetchErrors.push(ALLOWANCE_EXHAUSTED);
+
+      if (!html && !kslDeferred && (Deno.env.get("FIRECRAWL_API_KEY") || "").trim()) {
         try {
           const scrape = await firecrawlScrape({
             url: feed.feed_url,
-            formats: ["html", "markdown"],
+            formats: kslGate ? ["rawHtml"] : ["html", "markdown"],
             onlyMainContent: false,
             // JS-heavy SPAs (Cars & Bids, Mecum) need longer render waits;
             // bot-walled sites (Hemmings, eBay) need the stealth proxy. Both
@@ -657,6 +666,7 @@ async function pollFirecrawlHtmlFeed(
           });
           html = scrape.data.html;
           markdown = scrape.data.markdown;
+          if (kslGate) await kslGate.record(1, 0, "poll-listing-feeds", "ksl search page");
           if (scrape.blocked) {
             blockNote = ` (blocked: ${scrape.blockedSignals.join(", ")})`;
           }
@@ -689,6 +699,14 @@ async function pollFirecrawlHtmlFeed(
       }
     }
 
+    if (!html && !markdown && fetchErrors.includes(ALLOWANCE_EXHAUSTED)) {
+      // A deferral, not a failure: nothing to count against the feed; read again next window.
+      const { error: deferError } = await supabase.from("listing_feeds")
+        .update({ last_polled_at: new Date().toISOString(), updated_at: new Date().toISOString() }).eq("id", feed.id);
+      result.deferred_reason = "allowance_deferred";
+      if (deferError) result.error = `defer_stamp_failed: ${deferError.message.slice(0, 120)}`;
+      return result;
+    }
     if (!html && !markdown) {
       return await failFeed(
         `fetch_failed: ${fetchErrors.join(" | ") || "empty payload"}`
@@ -710,6 +728,24 @@ async function pollFirecrawlHtmlFeed(
   }
 
   result.items_found = urls.length;
+
+  // A feed can slice by the year in its listing slugs: only that slice is queued for (paid) ingest; the rest stay as
+  // discovered-not-fetched source_targets rows with the year, so supply is still measured for free.
+  const sliceMin = feed.search_criteria?.slug_year_min, sliceMax = feed.search_criteria?.slug_year_max;
+  if (Number.isInteger(sliceMin) && Number.isInteger(sliceMax)) {
+    const { keep, rest } = splitByYear(urls, sliceMin, sliceMax);
+    urls = keep;
+    if (rest.length > 0) {
+      const now = new Date().toISOString();
+      const slug = feed.source_slug === "carsandbids" ? "cars-and-bids" : feed.source_slug;
+      // write-error-ok: a failed write is returned in result.discovery.error for the run receipt
+      const { error: restError } = await supabase.from("source_targets").upsert(
+        rest.slice(0, 300).map((r) => ({ source_slug: slug, listing_url: r.url, last_seen_at: now, card_year: r.year, card_observed_at: now })),
+        { onConflict: "listing_url" },
+      );
+      result.discovery = { cards: rest.length, written: restError ? 0 : Math.min(rest.length, 300), error: restError ? restError.message.slice(0, 200) : null };
+    }
+  }
 
   // KSL: the search cards state year, seller class and created time. Record them as discovered-not-fetched source_targets
   // rows (no fetch, no ledger row, no attempt), so supply and tier share stay measurable while paid fetching is paused.

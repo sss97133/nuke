@@ -15,10 +15,14 @@ export function firecrawlGate(supabase: Rpc, source: string) {
       const r = await supabase.rpc("firecrawl_allowance", { p_source: source });
       return !r.error && Number(r.data) >= 1;
     },
-    /** One row per paid fetch: credits spent, full lots landed (0 when the page did not parse). */
-    async record(credits: number, lots: number, lane: string, note: string): Promise<void> {
-      const r = await supabase.rpc("firecrawl_record_spend", { p_source: source, p_credits: credits, p_lots: lots, p_lane: lane, p_note: note });
-      if (r.error) console.error(`[firecrawlGate] could not record ${credits} credit(s) for ${source}: ${r.error.message}`);
+    /**
+     * Full lots landed by a paid fetch (0 when the page did not parse). Credits are no longer written here: firecrawlScrape records
+     * every scrape it sends (since 2026-10-15), so a credit written here too would count twice. The `credits` argument is kept for
+     * the callers' sake and ignored.
+     */
+    async record(_credits: number, lots: number, lane: string, note: string): Promise<void> {
+      const r = await supabase.rpc("firecrawl_record_spend", { p_source: source, p_credits: 0, p_lots: lots, p_lane: lane, p_note: note });
+      if (r.error) console.error(`[firecrawlGate] could not record ${lots} lot(s) for ${source}: ${r.error.message}`);
     },
   };
 }
