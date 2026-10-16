@@ -35,3 +35,28 @@
 .family-sales__iqr { fill: var(--text); fill-opacity: 0.08; stroke: none; }
 .family-sales__edge { fill: var(--text-secondary); }
 .family-sales--narrow .family-sales__panels { top: 96px; }
+
+/* Same car, same miles (2026-10-16): with a fitted like-for-like index the chart is one panel of every sale, the index's
+   line and 95% band in blue over the plain median (thin gray, which mixes different cars), and the head answers with the
+   12-month change, its evidence and the segments that move apart as chips. */
+.family-sales--indexed .family-sales__head { height: 70px; align-items: flex-start; }
+.family-sales--indexed .family-sales__legend { top: 72px; }
+.family-sales--indexed .family-sales__panels { top: 92px; }
+.family-sales--indexed.family-sales--narrow .family-sales__head { height: 110px; }
+.family-sales--indexed.family-sales--narrow .family-sales__legend { top: 112px; }
+.family-sales--indexed.family-sales--narrow .family-sales__panels { top: 132px; }
+.family-index { display: grid; justify-items: end; gap: 1px; text-align: right; min-width: 0; }
+.family-sales--narrow .family-index { justify-items: start; text-align: left; }
+.family-index__answer { font: 800 24px/1.05 Arial, sans-serif; letter-spacing: -0.01em; white-space: nowrap; }
+.family-index__answer--up { color: var(--success); }
+.family-index__answer--down { color: var(--error); }
+.family-index__answer--flat { color: var(--text); }
+.family-index__answer--too-few-to-tell { color: var(--text-secondary); font-size: 18px; }
+.family-index__chips { display: flex; flex-wrap: wrap; gap: 4px; justify-content: flex-end; margin-top: 2px; }
+.family-index__chip { font: 400 10px Arial, sans-serif; padding: 1px 6px; border: 1px solid var(--border); background: var(--surface); white-space: nowrap; }
+.family-index__chip b { font-weight: 700; }
+.family-index__chip--few { color: var(--text-secondary); }
+.family-sales__ref { fill: none; stroke: var(--info, #2f6fdf); stroke-width: 2.6; stroke-linejoin: round; }
+.family-sales__ref-band { fill: var(--info, #2f6fdf); fill-opacity: 0.14; stroke: none; }
+.family-sales__ref-hit { fill: var(--info, #2f6fdf); stroke: var(--bg); stroke-width: 2; }
+.family-sales__median--plain { stroke: var(--text-secondary); stroke-width: 1.2; opacity: 0.8; }

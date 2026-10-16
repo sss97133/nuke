@@ -172,3 +172,33 @@ it('draws a panel per decade with eight or more sales, counts the rest, and coun
   expect(container.querySelectorAll('svg.family-sales__plot path.family-sales__edge').length).toBeGreaterThan(0);
   expect(container.querySelector('.family-sales__title')?.textContent).toMatch(/· \d+ outside \$[\d.]+K–\$[\d.]+[KM] on the edge/);
 });
+
+it('answers same car, same miles when the family has a like-for-like index: one panel, the blue line, the change and its chips', async () => {
+  const sales = [
+    ...Array.from({ length: 12 }, (_, k) => sale(k + 1, 10 + 8 * k, 100000 + k * 1000, 'Bring a Trailer')),
+    ...[13, 14, 15, 16, 17].map((i) => sale(i, 380 + i * 5, 90000, 'Bring a Trailer')),
+  ];
+  const q = (daysAgo: number) => new Date(Date.now() - daysAgo * 86_400_000).toISOString().slice(0, 10);
+  const index = {
+    period_kind: 'quarter', fitted_at: '2026-10-16T11:20:00Z', stale: false, counts: { n_last12: 79, n_prior12: 43, n_total: 334 },
+    change: { verdict: 'up', change_12m: 0.388, lo: 0.295, hi: 0.488, n_prior12: 43, n_last12: 79, raw_change: 0.375, pairs: 23, rs_change: 0.52,
+      chips: [
+        { key: 'coupe-f1', label: 'Coupe F1', change_12m: 0.41, lo: 0.3, hi: 0.52, n_prior12: 20, n_last12: 31, verdict: 'up' },
+        { key: '16m', label: 'Scuderia / 16M', change_12m: null, lo: null, hi: null, n_prior12: 2, n_last12: 4, verdict: 'too few to tell' }] },
+    series: [400, 300, 200, 100, 10].map((d, i) => ({ period_start: q(d), index_usd: 100000 + i * 10000, lo_usd: 90000 + i * 10000,
+      hi_usd: 110000 + i * 10000, n: 20, raw_median_usd: 95000 + i * 12000 })),
+  };
+  fixture.rpc.mockImplementation((fn: string) => Promise.resolve(fn === 'treemap_family_sales' ? { data: value(sales), error: null }
+    : fn === 'family_price_index_read' ? { data: index, error: null } : { data: null, error: { message: 'none' } }));
+  await act(async () => root.render(<FamilySalesChart brand="Ferrari" familyKey="f430" family="F430" width={900} height={500} onOpen={() => {}} />));
+  expect(fixture.rpc).toHaveBeenCalledWith('family_price_index_read', { p_brand: 'Ferrari', p_family_key: 'f430' });
+  expect(container.querySelector('.family-sales')?.classList.contains('family-sales--indexed')).toBe(true);
+  expect(container.querySelector('.family-index__answer')?.textContent).toBe('▲39% in 12 months');
+  expect(container.querySelector('.family-index')?.textContent).toContain('±10 points (95%) · 122 sales in the two years · plain median said ▲38%');
+  expect([...container.querySelectorAll('.family-index__chip')].map((c) => c.textContent)).toEqual(['Coupe F1 ▲41%', 'Scuderia / 16M too few']);
+  expect(container.querySelectorAll('svg.family-sales__plot')).toHaveLength(1);
+  expect(container.querySelector('path.family-sales__ref')?.getAttribute('d')).toMatch(/^M/);
+  expect(container.querySelector('path.family-sales__ref-band')).not.toBeNull();
+  expect(container.querySelector('path.family-sales__median--plain')).not.toBeNull();
+  expect(container.querySelector('.family-sales__move')).toBeNull();
+});

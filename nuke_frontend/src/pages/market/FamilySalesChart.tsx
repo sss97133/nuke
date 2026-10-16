@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { supabase } from '../../lib/supabase';
 import { Text } from '../../kit';
 import './FamilySalesChart.css';
+import { LikeForLike, useFamilyIndex } from './FamilyPriceIndex';
 
 // One model family's market as a chart, the way classic.com draws a model: every confirmed sale of the last five years
 // as a dot (price against date, colored by venue) and a rolling median through them, so the trading range, the volume
@@ -171,7 +172,12 @@ export default function FamilySalesChart({ brand, familyKey, family, width, heig
   brand: string; familyKey: string; family: string; width: number; height: number; onOpen: (vehicleId: string) => void;
 }) {
   const { sales, n: windowCount, truncated, failed } = useFamilySales(brand, familyKey);
+  // Same car, same miles (family_price_index_read): when the family has a fitted index, the chart is one panel of every
+  // sale with the like-for-like line over it, and the head answers with its 12-month change instead of a median.
+  const ix = useFamilyIndex(brand, familyKey);
+  const indexed = !!ix && ix.series.length > 1;
   const [hover, setHover] = useState<{ band: number; dot: number } | null>(null);
+  const [refHover, setRefHover] = useState<number | null>(null);
   // Venues hidden from the legend: their dots and their share of the medians go, the axes stay.
   const [hidden, setHidden] = useState<ReadonlySet<string>>(new Set());
   useEffect(() => { setHidden(new Set()); }, [brand, familyKey]);
@@ -197,10 +203,11 @@ export default function FamilySalesChart({ brand, familyKey, family, width, heig
     // The rest (a decade with under MIN_BAND sales, or no model year) get a panel of their own only when they fill one;
     // a family with no decade that fills a panel is drawn as one panel of all its years.
     let unpanelled = 0;
-    if (!bands.length) bands = [['all years', shown]];
+    if (indexed) bands = [['all years', shown]];
+    else if (!bands.length) bands = [['all years', shown]];
     else if (rest.length >= MIN_BAND) bands = [...bands, ['other years', rest]];
     else unpanelled = rest.length;
-    const head = narrow ? 96 : 54;
+    const head = ix ? (narrow ? 132 : 92) : narrow ? 96 : 54;
     const cols = narrow ? 1 : Math.min(4, bands.length);
     const rows = Math.ceil(bands.length / cols);
     const pw = Math.floor((width - (cols - 1) * 6) / cols);
@@ -221,11 +228,18 @@ export default function FamilySalesChart({ brand, familyKey, family, width, heig
       return { era, dots, line: mid.length > 1 ? 'M' + mid.join('L') : '', area, move: moves.get(era) ?? null,
         firstCol: i % cols === 0, lastRow: cols === 1 || Math.floor(i / cols) === rows - 1, n: g.length };
     });
+    const refPts = indexed && ix ? ix.series.filter((r) => r.t >= t0 && r.t <= t1).map((r) => ({ ...r, cx: x(r.t), cy: y(r.usd) })) : [];
+    const ref = refPts.length > 1 ? {
+      points: refPts,
+      line: 'M' + refPts.map((r) => `${r.cx.toFixed(1)},${r.cy.toFixed(1)}`).join('L'),
+      area: 'M' + refPts.map((r) => `${r.cx.toFixed(1)},${y(r.hi).toFixed(1)}`).join('L')
+        + 'L' + [...refPts].reverse().map((r) => `${r.cx.toFixed(1)},${y(r.lo).toFixed(1)}`).join('L') + 'Z',
+    } : null;
     const counts = VENUES.map((v) => ({ ...v, n: pts.filter((p) => venueOf(p.source).key === v.key).length })).filter((v) => v.n > 0);
     const outside = shown.filter((p) => p.usd < lo || p.usd > hi).length;
-    return { panels, years, ticks, counts, head, cols, pw, ph, n: dated.length, under: dated.length - pts.length,
+    return { panels, years, ticks, counts, head, cols, pw, ph, ref, n: dated.length, under: dated.length - pts.length,
       shown: shown.length, outside, unpanelled, lo, hi, since: new Date(dated[0].t) };
-  }, [sales, width, height, hidden, narrow]);
+  }, [sales, width, height, hidden, narrow, ix, indexed]);
   const move = useMemo(() => (sales ? batMove(sales) : null), [sales]);
   const held = useMemo(() => (sales ? mixFixed(eraMoves(sales)) : null), [sales]);
 
@@ -235,6 +249,10 @@ export default function FamilySalesChart({ brand, familyKey, family, width, heig
     const mx = e.clientX - r.left, my = e.clientY - r.top;
     let best = -1, bestD = 14 * 14;
     plot.panels[band].dots.forEach((d, i) => { const dd = (d.cx - mx) ** 2 + (d.cy - my) ** 2; if (dd < bestD) { bestD = dd; best = i; } });
+    let ref = -1, refD = 16 * 16;
+    plot.ref?.points.forEach((r, i) => { const dd = (r.cx - mx) ** 2 + (r.cy - my) ** 2; if (dd < refD) { refD = dd; ref = i; } });
+    if (ref >= 0 && refD <= bestD) { setRefHover(ref); setHover(null); return; }
+    setRefHover(null);
     setHover(best >= 0 ? { band, dot: best } : null);
   };
 
@@ -246,17 +264,19 @@ export default function FamilySalesChart({ brand, familyKey, family, width, heig
   const since = plot.since.toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
   const count = truncated ? `newest ${plot.n.toLocaleString('en-US')} of ${windowCount.toLocaleString('en-US')}` : plot.n.toLocaleString('en-US');
   const raw = move ? `${money(move.last)} vs ${money(move.prior)} (${signed(move.last / move.prior - 1)})` : '';
-  return <div className={narrow ? 'family-sales family-sales--narrow' : 'family-sales'}>
+  return <div className={['family-sales', narrow ? 'family-sales--narrow' : '', ix ? 'family-sales--indexed' : ''].filter(Boolean).join(' ')}>
     <div className="family-sales__head">
       <div className="family-sales__title">
         <Text role="entity" dense>{family}</Text>
-        <Text role="caption">{(narrow ? `${count} sales since ${since}` : `${count} sales with a date since ${since} · one dot each · panels by model-year decade · line = rolling median, band = middle half`)
+        <Text role="caption">{(narrow ? `${count} sales since ${since}` : indexed
+          ? `${count} sales with a date since ${since} · one dot each · blue = the same car, same miles (95% band) · gray = plain median, which mixes different cars`
+          : `${count} sales with a date since ${since} · one dot each · panels by model-year decade · line = rolling median, band = middle half`)
           + (plot.under ? ` · ${plot.under.toLocaleString('en-US')} under ${money(PRICE_FLOOR)} not drawn` : '')
           + (plot.outside ? ` · ${plot.outside.toLocaleString('en-US')} outside ${money(plot.lo)}–${money(plot.hi)} on the edge` : '')
           + (plot.unpanelled ? ` · ${plot.unpanelled.toLocaleString('en-US')} with a rare or unknown model year not drawn` : '')
           + (hidden.size ? ` · ${plot.shown.toLocaleString('en-US')} shown` : '')}</Text>
       </div>
-      {(held || move) && <div className="family-sales__move">
+      {ix ? <LikeForLike ix={ix} narrow={narrow} /> : (held || move) && <div className="family-sales__move">
         {held ? <>
           <Text role="measure">{signed(held.change)}</Text>
           <Text role="caption">{narrow ? `BaT price, decades held at last year's mix · raw median ${raw}`
@@ -277,9 +297,9 @@ export default function FamilySalesChart({ brand, familyKey, family, width, heig
     <div className="family-sales__panels" style={{ gridTemplateColumns: `repeat(${plot.cols}, ${plot.pw}px)` }}>
       {plot.panels.map((pn, bi) => <svg key={pn.era} className="family-sales__plot" width={plot.pw} height={plot.ph}
         role="img" aria-label={`${family} ${pn.era}: ${pn.n} sales over five years, price against date`}
-        onMouseMove={onMove(bi)} onMouseLeave={() => setHover(null)} onClick={() => { if (hd && hover?.band === bi) onOpen(hd.vehicle_id); }}>
+        onMouseMove={onMove(bi)} onMouseLeave={() => { setHover(null); setRefHover(null); }} onClick={() => { if (hd && hover?.band === bi) onOpen(hd.vehicle_id); }}>
         <text x={P.left} y={12} className="family-sales__panel-title">{pn.era} · {pn.n.toLocaleString('en-US')}
-          {pn.move ? ` · BaT median ${money(pn.move.last)} ${signed(pn.move.last / pn.move.prior - 1)} (${pn.move.nPrior}→${pn.move.nLast})` : ''}</text>
+          {pn.move && !plot.ref ? ` · median ${money(pn.move.last)} ${signed(pn.move.last / pn.move.prior - 1)} (${pn.move.nPrior}→${pn.move.nLast})` : ''}</text>
         {plot.ticks.map((t) => <g key={t.label}>
           <line x1={P.left} x2={plot.pw - P.right} y1={t.y} y2={t.y} className="family-sales__grid" />
           {pn.firstCol && <text x={P.left - 6} y={t.y + 3} textAnchor="end" className="family-sales__axis">{t.label}</text>}
@@ -292,17 +312,38 @@ export default function FamilySalesChart({ brand, familyKey, family, width, heig
         {pn.dots.map((d) => d.out
           ? <path key={d.vehicle_id} d={d.out > 0 ? `M${d.cx - 3} ${d.cy + 4}L${d.cx} ${d.cy - 1}L${d.cx + 3} ${d.cy + 4}Z` : `M${d.cx - 3} ${d.cy - 4}L${d.cx} ${d.cy + 1}L${d.cx + 3} ${d.cy - 4}Z`} className="family-sales__edge" />
           : <circle key={d.vehicle_id} cx={d.cx} cy={d.cy} r={pn.n > 1500 ? 1.4 : pn.n > 400 ? 2 : 2.6} fill={d.color} fillOpacity={pn.n > 1500 ? 0.35 : 0.55} />)}
-        {pn.line && <path d={pn.line} className="family-sales__median-halo" />}
-        {pn.line && <path d={pn.line} className="family-sales__median" />}
+        {pn.line && !plot.ref && <path d={pn.line} className="family-sales__median-halo" />}
+        {pn.line && <path d={pn.line} className={plot.ref ? 'family-sales__median family-sales__median--plain' : 'family-sales__median'} />}
+        {plot.ref && <path d={plot.ref.area} className="family-sales__ref-band" />}
+        {plot.ref && <path d={plot.ref.line} className="family-sales__ref" />}
+        {plot.ref && refHover != null && plot.ref.points[refHover]
+          && <circle cx={plot.ref.points[refHover].cx} cy={plot.ref.points[refHover].cy} r={5} className="family-sales__ref-hit" />}
         {hd && hover?.band === bi && <circle cx={hd.cx} cy={hd.cy} r={6} className="family-sales__hit" />}
       </svg>)}
     </div>
-    {hd && hover && <div className="family-sales__tip" style={{ left: Math.min((hover.band % plot.cols) * (plot.pw + 6) + hd.cx + 12, width - 240),
-      top: plot.head + Math.floor(hover.band / plot.cols) * (plot.ph + 6) + hd.cy + 12 }}>
-      <Text role="label" as="div">{[hd.year, hd.model].filter(Boolean).join(' ') || family}</Text>
-      <Text role="measure" as="div">${hd.usd.toLocaleString('en-US')}</Text>
-      <Text role="caption" as="div">{venueOf(hd.source).key === 'other' ? hd.source ?? 'venue unrecorded' : hd.source} · {new Date(hd.t).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })} · click to open</Text>
-    </div>}
+    {(() => {
+      // One tip: the like-for-like point when the pointer is nearest it, else the sale under the pointer.
+      const r = plot.ref && refHover != null ? plot.ref.points[refHover] : null;
+      const tip = r ? {
+        left: Math.min(r.cx + 12, width - 260), top: plot.head + r.cy + 12,
+        label: `${ix?.periodKind === 'month'
+          ? new Date(r.t).toLocaleDateString('en-US', { month: 'short', year: 'numeric', timeZone: 'UTC' })
+          : `${new Date(r.t).getUTCFullYear()} Q${Math.floor(new Date(r.t).getUTCMonth() / 3) + 1}`} · the same car`,
+        measure: money(r.usd),
+        caption: `${r.n.toLocaleString('en-US')} sales · 95% ${money(r.lo)}–${money(r.hi)}${r.median ? ` · plain median ${money(r.median)}` : ''}`,
+      } : hd && hover ? {
+        left: Math.min((hover.band % plot.cols) * (plot.pw + 6) + hd.cx + 12, width - 240),
+        top: plot.head + Math.floor(hover.band / plot.cols) * (plot.ph + 6) + hd.cy + 12,
+        label: [hd.year, hd.model].filter(Boolean).join(' ') || family,
+        measure: `$${hd.usd.toLocaleString('en-US')}`,
+        caption: `${venueOf(hd.source).key === 'other' ? hd.source ?? 'venue unrecorded' : hd.source} · ${new Date(hd.t).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })} · click to open`,
+      } : null;
+      return tip && <div className="family-sales__tip" style={{ left: tip.left, top: tip.top }}>
+        <Text role="label" as="div">{tip.label}</Text>
+        <Text role="measure" as="div">{tip.measure}</Text>
+        <Text role="caption" as="div">{tip.caption}</Text>
+      </div>;
+    })()}
   </div>;
 }
 
