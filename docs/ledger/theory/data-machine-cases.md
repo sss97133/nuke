@@ -2353,8 +2353,8 @@ hat the loop found that no one asked about:**
   their plan, without the pad the column promises; 14 were shorter than their own route (#67 dome lamp 3.5 ft over
   11.29 ft). Pass 34's "4x" ran the other way: those 15 were the long ones.
 - **A long route can be a missing branch.** After the engine fix, a fifth of the routed segments ran over twice their
-  straight line; the shortest-path walk was right, the graph lacked the trunk a real engine harness has. A route-to-straight
-  ratio over 2 is now a check the studies run before their branches load.
+  straight line; the shortest-path walk was right, the graph lacked the trunk a real engine harness has. Studies 3 and 4
+  measured the ratio by hand; the scoreboard has no measure for it yet (owed: routed segments over 2x their straight line).
 - **A start in words chose the wrong end.** The loader parsed "AMP CH1+" as no plug and started four speaker leads at
   the door, so their segments doubled back through the amp.
 - **The crimp tool's colour bands are not the splice maker's ranges.** On TE's own figures two pin splices the formula
