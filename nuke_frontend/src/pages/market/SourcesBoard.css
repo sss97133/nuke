@@ -15,24 +15,25 @@
 .market-sources__row { padding: 4px 0; border-bottom: 1px solid var(--border); font-size: 12px; }
 .market-sources__rank { font-size: 11px; color: var(--text-secondary); font-family: 'Courier New', monospace; }
 .market-sources__name { display: flex; align-items: center; gap: 6px; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
-.market-sources__icon { flex: none; width: 14px; height: 14px; border-radius: 3px; }
+.market-sources__icon { flex: none; }
 .market-sources__name small { font-weight: 400; color: var(--text-secondary); font-size: 10px; text-transform: lowercase; }
 .market-sources__held small { font-size: 10px; } .market-sources__held .up { color: var(--success); } .market-sources__held .down { color: var(--error); }
 .market-sources__share { display: grid; grid-template-columns: minmax(60px, 1fr) 11.5em; align-items: center; gap: 8px; min-width: 0; }
 .market-sources__track { display: block; width: 100%; height: 10px; border: 1px solid var(--border); background: var(--surface); box-sizing: border-box; }
-.market-sources__track--unknown { background: repeating-linear-gradient(135deg, var(--surface) 0 4px, var(--border) 4px 5px); }
 .market-sources__fill { fill: var(--text); }
+.market-sources__defs { position: absolute; }
+.market-sources__hatch { stroke: var(--border); stroke-width: 1.5; }
 .market-sources__sharetext { font-size: 11px; color: var(--text-secondary); white-space: nowrap; font-family: 'Courier New', monospace; }
 .market-sources__map { font-size: 11px; color: var(--text-secondary); }
 .market-sources__recent { display: flex; align-items: center; justify-content: flex-end; gap: 8px; }
 .market-sources__spark { display: block; flex-shrink: 0; }
 .market-sources__bar--prior { fill: var(--text-disabled); }
 .market-sources__bar--recent { fill: var(--text); }
-.market-sources__live i { display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: var(--error); margin-right: 5px; vertical-align: 0; }
+.market-sources__live i { display: inline-block; width: 7px; height: 7px; background: var(--error); margin-right: 5px; vertical-align: 0; }
 .market-sources__group + .market-sources__group { margin-top: 14px; }
 .market-sources__group-title { font-size: 11px; color: var(--text); letter-spacing: 0.08em; }
 .market-sources__landing { display: flex; align-items: center; gap: 6px; min-width: 0; }
-.market-sources__landing i { flex: none; width: 7px; height: 7px; border-radius: 50%; }
+.market-sources__landing i { flex: none; width: 7px; height: 7px; }
 .market-sources__landing i.on { background: var(--success); }
 .market-sources__landing i.off { background: var(--text-disabled); }
 .market-sources__landtext { font-size: 11px; font-family: 'Courier New', monospace; white-space: nowrap; min-width: 8.5em; }
