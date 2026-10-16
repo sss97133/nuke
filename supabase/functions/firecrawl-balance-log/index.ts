@@ -6,8 +6,10 @@
  * drop the ledger does not explain shows up with its time range. Never calls a scrape endpoint.
  */
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { requireWriteAuth } from '../_shared/writeGuard.ts';
 
-Deno.serve(async () => {
+Deno.serve(async (req) => {
+  const denied = await requireWriteAuth(req); if (denied) return denied;
   const key = Deno.env.get('FIRECRAWL_API_KEY');
   if (!key) return new Response(JSON.stringify({ ok: false, error: 'no key' }), { status: 500 });
   const res = await fetch('https://api.firecrawl.dev/v1/team/credit-usage', { headers: { Authorization: `Bearer ${key}` } });
