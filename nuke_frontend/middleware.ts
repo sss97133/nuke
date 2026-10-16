@@ -126,6 +126,8 @@ type SourceLine = {
   population: number | null; method: string | null; confidence: number | null; populationAt: string | null;
 };
 type Board = { asOf: string; lines: SourceLine[] } | null;
+// Why the last board read returned nothing, sent as x-nuke-board so a failed read is diagnosable from outside.
+let boardStatus = 'unread';
 
 function numOrNull(x: unknown): number | null {
   const n = typeof x === 'number' ? x : typeof x === 'string' ? Number(x) : NaN;
@@ -135,7 +137,7 @@ function strOrNull(x: unknown): string | null { return typeof x === 'string' && 
 
 /** The Sources board, decoded by column name (same contract as SourcesBoard.tsx). Null when the read fails. */
 async function fetchBoard(): Promise<Board> {
-  if (!SUPABASE_URL || !SUPABASE_ANON) return null;
+  if (!SUPABASE_URL || !SUPABASE_ANON) { boardStatus = !SUPABASE_URL ? 'no-url' : 'no-anon-key'; return null; }
   try {
     const ctl = new AbortController();
     const timer = setTimeout(() => ctl.abort(), 4000);
@@ -146,9 +148,9 @@ async function fetchBoard(): Promise<Board> {
       signal: ctl.signal,
     });
     clearTimeout(timer);
-    if (!resp.ok) return null;
+    if (!resp.ok) { boardStatus = `http-${resp.status}`; return null; }
     const v = await resp.json() as { as_of?: unknown; columns?: unknown; rows?: unknown };
-    if (typeof v.as_of !== 'string' || !Array.isArray(v.columns) || !Array.isArray(v.rows)) return null;
+    if (typeof v.as_of !== 'string' || !Array.isArray(v.columns) || !Array.isArray(v.rows)) { boardStatus = 'unexpected-shape'; return null; }
     const at = (c: string) => (v.columns as unknown[]).indexOf(c);
     const lines: SourceLine[] = [];
     for (const r of v.rows as unknown[][]) {
@@ -163,8 +165,10 @@ async function fetchBoard(): Promise<Board> {
       });
     }
     lines.sort((a, b) => (b.held ?? 0) - (a.held ?? 0));
+    boardStatus = 'ok';
     return { asOf: v.as_of, lines };
-  } catch {
+  } catch (e) {
+    boardStatus = e instanceof Error && e.name === 'AbortError' ? 'timeout' : 'fetch-error';
     return null;
   }
 }
@@ -366,14 +370,14 @@ export default async function middleware(request: Request): Promise<Response | u
   // ── /llms.txt and the readable public pages ──
   if (url.pathname === '/llms.txt') {
     return new Response(llmsTxt(await fetchBoard()), {
-      headers: { 'Content-Type': 'text/plain; charset=utf-8', 'Cache-Control': FACE_CACHE, 'Access-Control-Allow-Origin': '*' },
+      headers: { 'Content-Type': 'text/plain; charset=utf-8', 'Cache-Control': FACE_CACHE, 'Access-Control-Allow-Origin': '*', 'x-nuke-board': boardStatus },
     });
   }
   const face = FACE[url.pathname.length > 1 ? url.pathname.replace(/\/$/, '') : url.pathname];
   if (face) {
     const [html, board] = await Promise.all([getBaseHtml(request.url), face.withBoard ? fetchBoard() : Promise.resolve(null)]);
     return new Response(injectFace(html, face, board), {
-      headers: { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': FACE_CACHE },
+      headers: { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': FACE_CACHE, 'x-nuke-board': face.withBoard ? boardStatus : 'not-needed' },
     });
   }
 
