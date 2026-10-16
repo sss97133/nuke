@@ -57,7 +57,7 @@ export function parseLotPage(html: string): BroadArrowLot {
   const currency = sold ? (sold[3]?.toUpperCase() ?? (sold[1] === "€" ? "EUR" : sold[1] === "£" ? "GBP" : sold[1]?.trim().toUpperCase() === "CHF" ? "CHF" : sold[1] === "$" ? "USD" : null)) : null;
   const soldPrice = sold ? parseAmount(sold[2]) : null;
 
-  const ld = html.match(/<script[^>]*application\/ld\+json[^>]*>([\s\S]*?)<\/script>/i)?.[1];
+  const ld = html.match(/<script[^>]*application\/ld\+json[^>]*>([\s\S]*?)<\/script\s*>/i)?.[1];
   let car: Record<string, any> | null = null;
   if (ld) { try { car = JSON.parse(ld); } catch { car = null; } }
   const vinRaw = typeof car?.vehicleIdentificationNumber === "string" ? car.vehicleIdentificationNumber.trim() : "";
