@@ -5,7 +5,7 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 
 const fixture = vi.hoisted(() => ({ rpc: vi.fn() }));
 vi.mock('../../lib/supabase', () => ({ supabase: { rpc: fixture.rpc } }));
-import SourcesBoard, { heldShare, landingState, monthBars, money, parseSources } from './SourcesBoard';
+import SourcesBoard, { heldShare, landingState, monthBars, money, parseSources, shortName } from './SourcesBoard';
 
 // market_sources_read (20261018030000), shaped as production answers: columns, then one array per source by held lots.
 const columns = ['source', 'name', 'category', 'house', 'held_lots', 'held_at', 'population', 'population_method',
@@ -67,7 +67,9 @@ it('says how much of its own total we hold, in the total\'s terms', () => {
 it('says whether a source is landing data now, or since when it has been idle', () => {
   expect(landingState({ landed24: 151435, lastLanded: '2026-10-16T10:00:00Z' })).toEqual({ active: true, text: '+151,435 today' });
   expect(landingState({ landed24: 0, lastLanded: '2026-10-03T14:00:00Z' })).toEqual({ active: false, text: 'idle since Oct 3' });
-  expect(landingState({ landed24: 0, lastLanded: null })).toEqual({ active: false, text: 'nothing landed yet' });
+  expect(landingState({ landed24: 0, lastLanded: null })).toEqual({ active: false, text: 'idle 14+ days' });
+  expect(shortName('eBay Motors (Browse API)')).toBe('eBay Motors');
+  expect(shortName('Bring a Trailer')).toBe('Bring a Trailer');
 });
 
 it('draws 24 months ending at the board\'s month, empty months as zero', () => {
