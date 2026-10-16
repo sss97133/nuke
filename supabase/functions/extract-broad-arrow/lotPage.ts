@@ -29,7 +29,7 @@ const decode = (s: string) =>
     return Number.isFinite(n) && n > 0 && n < 0x110000 ? String.fromCodePoint(n) : m;
   });
 
-const textOf = (html: string) => decode(html.replace(/<script[\s\S]*?<\/script>|<style[\s\S]*?<\/style>|<svg[\s\S]*?<\/svg>/gi, " ").replace(/<[^>]*>/g, " ")).replace(/\s+/g, " ").trim();
+const textOf = (html: string) => decode(html.replace(/<script[\s\S]*?<\/script\s*>|<style[\s\S]*?<\/style\s*>|<svg[\s\S]*?<\/svg\s*>/gi, " ").replace(/<[^>]*>/g, " ")).replace(/\s+/g, " ").trim();
 
 /** "123,200" | "51.750" | "1.380.000,50" -> a number; a lone dot followed by three digits is a thousands separator. */
 export function parseAmount(raw: string): number | null {
