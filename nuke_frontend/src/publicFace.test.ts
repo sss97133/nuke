@@ -69,6 +69,20 @@ describe('public face', () => {
     expect(out!.body).toContain('counted 2026-10-16');
   });
 
+  it('sends a publishable key in apikey only, never as a Bearer token', async () => {
+    vi.stubEnv('VITE_SUPABASE_ANON_KEY', 'sb_publishable_abc');
+    vi.resetModules();
+    const f = vi.fn(async (input: RequestInfo | URL, _init?: RequestInit) => String(input).includes('market_sources_read')
+      ? new Response(JSON.stringify(BOARD)) : new Response(SHELL));
+    vi.stubGlobal('fetch', f);
+    const mod = await import('../middleware');
+    await mod.default(new Request('https://nuke.ag/market'));
+    const rpc = f.mock.calls.find((c) => String(c[0]).includes('market_sources_read'))!;
+    const h = (rpc[1]?.headers ?? {}) as Record<string, string>;
+    expect(h.apikey).toBe('sb_publishable_abc');
+    expect(h.Authorization).toBeUndefined();
+  });
+
   it('the internal base-HTML fetch is not rendered again', async () => {
     vi.stubGlobal('fetch', vi.fn());
     const mod = await import('../middleware');
