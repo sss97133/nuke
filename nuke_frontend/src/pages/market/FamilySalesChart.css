@@ -47,6 +47,8 @@
 .family-sales--indexed.family-sales--narrow .family-sales__panels { top: 132px; }
 .family-index { display: grid; justify-items: end; gap: 1px; text-align: right; min-width: 0; }
 .family-sales--narrow .family-index { justify-items: start; text-align: left; }
+.family-index__kicker { font: 700 9px Arial, sans-serif; letter-spacing: 0.1em; text-transform: uppercase; color: var(--text-secondary); }
+.family-index__evidence { font: 400 11px 'Courier New', monospace; color: var(--text); }
 .family-index__answer { font: 800 24px/1.05 Arial, sans-serif; letter-spacing: -0.01em; white-space: nowrap; }
 .family-index__answer--up { color: var(--success); }
 .family-index__answer--down { color: var(--error); }

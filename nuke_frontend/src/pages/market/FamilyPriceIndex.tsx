@@ -100,13 +100,15 @@ export function evidenceOf(ix: FamilyIndex): string {
 
 /** The head block: the plain question's answer, its evidence, and the segments that move apart, as chips. */
 export function LikeForLike({ ix, narrow }: { ix: FamilyIndex; narrow: boolean }) {
+  // Segments earn their row when at least two carry a number: a row of "too few" says nothing.
+  const readable = ix.segments.filter((s) => s.verdict !== 'too few to tell' && s.change != null).length;
   const repeat = ix.pairs && ix.repeatChange != null ? `same cars sold twice: ${pct(ix.repeatChange)} (${ix.pairs} pairs, a check, not the headline)` : undefined;
   return (
     <div className="family-index">
-      <Text role="caption">Same car, same miles</Text>
+      <span className="family-index__kicker">Same car, same miles</span>
       <span className={`family-index__answer family-index__answer--${ix.verdict.replace(/ /g, '-')}`} title={repeat}>{answerOf(ix)}</span>
-      <Text role="caption">{evidenceOf(ix)}</Text>
-      {ix.segments.length > 0 && !narrow && (
+      <span className="family-index__evidence">{evidenceOf(ix)}</span>
+      {readable >= 2 && !narrow && (
         <div className="family-index__chips" aria-label="By variant or generation">
           {ix.segments.map((s) => (
             <span key={s.key} className={`family-index__chip${s.verdict === 'too few to tell' || s.change == null ? ' family-index__chip--few' : ''}`}
