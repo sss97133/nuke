@@ -12,6 +12,6 @@ INSERT INTO public.source_census
 SELECT s.id, 7493, 7493, 'sitemap', 0.50::numeric, 'https://www.hagerty.com/marketplace/server-sitemap.xml',
   'Listing URLs in Hagerty Marketplace server-sitemap.xml, read 2026-10-16: 6,511 auction + 982 classified = 7,493 (7,636 URLs less make pages and collections). Lists what Hagerty serves now, not an archive. No lastmod: no sale date, by_year unknown. Model year from slug: 3,419 are 1964-1991 (45.6% of 7,491 with a year). Seller type not in the sitemap.',
   NULL, now()
-FROM public.observation_sources s WHERE s.slug = 'hagerty'
+FROM public.observation_sources s WHERE s.slug = 'hagerty-marketplace'
 ON CONFLICT (source_id, census_at) DO NOTHING;
 COMMIT;
