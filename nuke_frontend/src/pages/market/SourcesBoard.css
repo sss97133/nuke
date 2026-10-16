@@ -15,7 +15,8 @@
 .market-sources__row { padding: 4px 0; border-bottom: 1px solid var(--border); font-size: 12px; }
 .market-sources__rank { font-size: 11px; color: var(--text-secondary); font-family: 'Courier New', monospace; }
 .market-sources__name { display: flex; align-items: center; gap: 6px; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
-.market-sources__icon { flex: none; }
+/* A house's own mark on a white chip, so a dark wordmark reads on either theme; 18 px tall, up to 96 px wide. */
+.market-sources__icon { flex: none; background: #fff; padding: 2px 4px; box-sizing: content-box; }
 .market-sources__name small { font-weight: 400; color: var(--text-secondary); font-size: 10px; text-transform: lowercase; }
 .market-sources__held small { font-size: 10px; } .market-sources__held .up { color: var(--success); } .market-sources__held .down { color: var(--error); }
 .market-sources__share { display: grid; grid-template-columns: minmax(60px, 1fr) 11.5em; align-items: center; gap: 8px; min-width: 0; }

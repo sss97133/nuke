@@ -215,7 +215,7 @@ export function SourcesBoardView({ data }: { data: SourcesBoardData }) {
                     {/* Identity through the shared renderer (frontend rule 2026-10-08): the organization's recorded logo,
                         else its type icon. */}
                     <OrgLogo logoUrl={r.logoUrl} businessType={r.businessType ?? (r.category === 'auction' ? 'auction_house' : null)}
-                      businessName={r.name} size={14} variant="icon" className="market-sources__icon" />
+                      businessName={r.name} size={18} maxWidth={96} variant="logo" className="market-sources__icon" />
                     {shortName(r.name)}
                   </span>
                   <span className="market-sources__held n" title={r.heldAt ? `held as of ${heldWhen(r.heldAt)}` : undefined}>
