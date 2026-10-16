@@ -29,7 +29,7 @@ const decode = (s: string) =>
     return Number.isFinite(n) && n > 0 && n < 0x110000 ? String.fromCodePoint(n) : m;
   });
 
-const textOf = (html: string) => decode(html.replace(/<script[\s\S]*?<\/script\s*>|<style[\s\S]*?<\/style\s*>|<svg[\s\S]*?<\/svg\s*>/gi, " ").replace(/<[^>]*>/g, " ")).replace(/\s+/g, " ").trim();
+const textOf = (html: string) => decode(html.replace(/<script[\s\S]*?<\/script[^>]*>|<style[\s\S]*?<\/style[^>]*>|<svg[\s\S]*?<\/svg[^>]*>/gi, " ").replace(/<[^>]*>/g, " ")).replace(/\s+/g, " ").trim();
 
 /** "123,200" | "51.750" | "1.380.000,50" -> a number; a lone dot followed by three digits is a thousands separator. */
 export function parseAmount(raw: string): number | null {
@@ -57,7 +57,7 @@ export function parseLotPage(html: string): BroadArrowLot {
   const currency = sold ? (sold[3]?.toUpperCase() ?? (sold[1] === "€" ? "EUR" : sold[1] === "£" ? "GBP" : sold[1]?.trim().toUpperCase() === "CHF" ? "CHF" : sold[1] === "$" ? "USD" : null)) : null;
   const soldPrice = sold ? parseAmount(sold[2]) : null;
 
-  const ld = html.match(/<script[^>]*application\/ld\+json[^>]*>([\s\S]*?)<\/script\s*>/i)?.[1];
+  const ld = html.match(/<script[^>]*application\/ld\+json[^>]*>([\s\S]*?)<\/script[^>]*>/i)?.[1];
   let car: Record<string, any> | null = null;
   if (ld) { try { car = JSON.parse(ld); } catch { car = null; } }
   const vinRaw = typeof car?.vehicleIdentificationNumber === "string" ? car.vehicleIdentificationNumber.trim() : "";
