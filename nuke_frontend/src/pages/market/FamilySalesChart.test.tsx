@@ -180,9 +180,9 @@ it('answers same car, same miles when the family has a like-for-like index: one 
   ];
   const q = (daysAgo: number) => new Date(Date.now() - daysAgo * 86_400_000).toISOString().slice(0, 10);
   const index = {
-    period_kind: 'quarter',
+    period_kind: 'quarter', fitted_at: '2026-10-16T11:20:00Z', stale: false, counts: { n_last12: 79, n_prior12: 43, n_total: 334 },
     change: { verdict: 'up', change_12m: 0.388, lo: 0.295, hi: 0.488, n_prior12: 43, n_last12: 79, raw_change: 0.375, pairs: 23, rs_change: 0.52,
-      fitted_at: '2026-10-16T11:20:00Z', segments: [
+      chips: [
         { key: 'coupe-f1', label: 'Coupe F1', change_12m: 0.41, lo: 0.3, hi: 0.52, n_prior12: 20, n_last12: 31, verdict: 'up' },
         { key: '16m', label: 'Scuderia / 16M', change_12m: null, lo: null, hi: null, n_prior12: 2, n_last12: 4, verdict: 'too few to tell' }] },
     series: [400, 300, 200, 100, 10].map((d, i) => ({ period_start: q(d), index_usd: 100000 + i * 10000, lo_usd: 90000 + i * 10000,

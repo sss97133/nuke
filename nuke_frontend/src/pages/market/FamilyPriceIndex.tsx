@@ -16,17 +16,25 @@ export type FamilyIndex = {
   change: number | null; lo: number | null; hi: number | null; nPrior: number; nLast: number;
   periodKind: 'month' | 'quarter' | null; series: IndexPoint[]; segments: Segment[];
   rawChange: number | null; pairs: number | null; repeatChange: number | null; fittedAt: string | null;
+  /** The fit is over 72 hours old (the reader's own flag): shown with its date, never as current. */
+  stale: boolean;
 };
 
 const num = (x: unknown) => (typeof x === 'number' && Number.isFinite(x) ? x
   : typeof x === 'string' && x.trim() !== '' && Number.isFinite(Number(x)) ? Number(x) : null);
 const VERDICTS = new Set(['up', 'down', 'flat', 'too few to tell']);
 
-/** The reader's value as a typed family index; anything else is null. Field names follow family_price_index_read. */
+/** The reader's value as a typed family index; anything else is null. Field names follow family_price_index_read
+ *  (20261018 price-index migration): a fitted family carries `change`; one never fitted (below the floor) carries only
+ *  its live `counts`, and reads as "too few to tell" with them. */
 export function parseFamilyIndex(value: unknown): FamilyIndex | null {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
   const v = value as Record<string, unknown>;
-  const c = (v.change && typeof v.change === 'object' ? v.change : v) as Record<string, unknown>;
+  const counts = (v.counts && typeof v.counts === 'object' ? v.counts : {}) as Record<string, unknown>;
+  const fitted = v.change && typeof v.change === 'object';
+  const c = (fitted ? v.change : {
+    verdict: 'counts' in v ? 'too few to tell' : undefined, n_last12: counts.n_last12, n_prior12: counts.n_prior12,
+  }) as Record<string, unknown>;
   const verdict = String(c.verdict ?? '');
   if (!VERDICTS.has(verdict)) return null;
   const rawSeries = Array.isArray(v.series) ? v.series : [];
@@ -36,7 +44,7 @@ export function parseFamilyIndex(value: unknown): FamilyIndex | null {
     const usd = num(r.index_usd), lo = num(r.lo_usd), hi = num(r.hi_usd);
     return Number.isFinite(t) && usd && lo && hi ? { t, usd, lo, hi, n: num(r.n) ?? 0, median: num(r.raw_median_usd) } : null;
   }).filter((p): p is IndexPoint => p !== null).sort((a, b) => a.t - b.t);
-  const segs = Array.isArray(c.segments) ? c.segments : Array.isArray(v.segments) ? v.segments : [];
+  const segs = Array.isArray(c.chips) ? c.chips : Array.isArray(c.segments) ? c.segments : [];
   const segments = segs.map((s) => {
     const r = (s ?? {}) as Record<string, unknown>;
     const label = String(r.label ?? r.key ?? '');
@@ -47,8 +55,9 @@ export function parseFamilyIndex(value: unknown): FamilyIndex | null {
     verdict: verdict as FamilyIndex['verdict'], change: num(c.change_12m), lo: num(c.lo), hi: num(c.hi),
     nPrior: num(c.n_prior12) ?? 0, nLast: num(c.n_last12) ?? 0,
     periodKind: (v.period_kind === 'month' || v.period_kind === 'quarter') ? v.period_kind : series.length ? 'quarter' : null,
-    series, segments, rawChange: num(c.raw_change), pairs: num(c.pairs), repeatChange: num(c.rs_change),
-    fittedAt: typeof c.fitted_at === 'string' ? c.fitted_at : null,
+    series: fitted ? series : [], segments, rawChange: num(c.raw_change), pairs: num(c.pairs), repeatChange: num(c.rs_change),
+    fittedAt: typeof v.fitted_at === 'string' ? v.fitted_at : typeof c.fitted_at === 'string' ? c.fitted_at : null,
+    stale: v.stale === true,
   };
 }
 
@@ -83,7 +92,9 @@ export function evidenceOf(ix: FamilyIndex): string {
   const parts: string[] = [];
   if (ix.lo != null && ix.hi != null && ix.verdict !== 'too few to tell') parts.push(`±${pts(ix.lo, ix.hi)} points (95%)`);
   parts.push(`${(ix.nPrior + ix.nLast).toLocaleString('en-US')} sales in the two years`);
+  if (ix.verdict === 'too few to tell' && ix.change == null) parts.push('needs 30 a year');
   if (ix.rawChange != null) parts.push(`plain median said ${pct(ix.rawChange)}`);
+  if (ix.stale && ix.fittedAt) parts.push(`measured ${new Date(ix.fittedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: 'UTC' })}`);
   return parts.join(' · ');
 }
 

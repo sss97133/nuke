@@ -207,7 +207,7 @@ export default function FamilySalesChart({ brand, familyKey, family, width, heig
     else if (!bands.length) bands = [['all years', shown]];
     else if (rest.length >= MIN_BAND) bands = [...bands, ['other years', rest]];
     else unpanelled = rest.length;
-    const head = indexed ? (narrow ? 132 : 92) : narrow ? 96 : 54;
+    const head = ix ? (narrow ? 132 : 92) : narrow ? 96 : 54;
     const cols = narrow ? 1 : Math.min(4, bands.length);
     const rows = Math.ceil(bands.length / cols);
     const pw = Math.floor((width - (cols - 1) * 6) / cols);
@@ -264,7 +264,7 @@ export default function FamilySalesChart({ brand, familyKey, family, width, heig
   const since = plot.since.toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
   const count = truncated ? `newest ${plot.n.toLocaleString('en-US')} of ${windowCount.toLocaleString('en-US')}` : plot.n.toLocaleString('en-US');
   const raw = move ? `${money(move.last)} vs ${money(move.prior)} (${signed(move.last / move.prior - 1)})` : '';
-  return <div className={['family-sales', narrow ? 'family-sales--narrow' : '', indexed ? 'family-sales--indexed' : ''].filter(Boolean).join(' ')}>
+  return <div className={['family-sales', narrow ? 'family-sales--narrow' : '', ix ? 'family-sales--indexed' : ''].filter(Boolean).join(' ')}>
     <div className="family-sales__head">
       <div className="family-sales__title">
         <Text role="entity" dense>{family}</Text>
@@ -276,7 +276,7 @@ export default function FamilySalesChart({ brand, familyKey, family, width, heig
           + (plot.unpanelled ? ` · ${plot.unpanelled.toLocaleString('en-US')} with a rare or unknown model year not drawn` : '')
           + (hidden.size ? ` · ${plot.shown.toLocaleString('en-US')} shown` : '')}</Text>
       </div>
-      {indexed && ix ? <LikeForLike ix={ix} narrow={narrow} /> : (held || move) && <div className="family-sales__move">
+      {ix ? <LikeForLike ix={ix} narrow={narrow} /> : (held || move) && <div className="family-sales__move">
         {held ? <>
           <Text role="measure">{signed(held.change)}</Text>
           <Text role="caption">{narrow ? `BaT price, decades held at last year's mix · raw median ${raw}`
