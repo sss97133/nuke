@@ -90,6 +90,7 @@ it('ranks auction houses and marketplaces apart, same row for each, as the reade
   expect(groups.map((g) => [...g.querySelectorAll('.market-sources__name')].map((n) => n.textContent))).toEqual(
     [['Bring a Trailer', 'Mecum Auctions', 'Cars & Bids'], ['Craigslist']]);
   expect(groups[1].querySelector('.market-sources__rank')?.textContent).toBe('1');
+  expect(groups[0].querySelector('.market-sources__icon')?.getAttribute('src')).toBe('/source-icons/bat.png');
   expect(groups[1].querySelector('.market-sources__cols .n')?.textContent).toBe('listings held');
   const rows = [...container.querySelectorAll('li.market-sources__row')];
   expect(rows.every((r) => r.children.length === 7)).toBe(true);
