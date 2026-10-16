@@ -29,6 +29,14 @@ export function getKnownAuctions(): KnownAuction[] {
     // auction page as read on 2026-10-14 (the header line under the auction name); no listing_page_snapshots row holds
     // those pages yet. LF26 is not yet held on 2026-10-14: its lots are upcoming and carry no sale day until the auction.
     { code: 'LF26', name: 'London 2026', date: '2026-10-31' }, // page: "31 October 2026" · live page read 2026-10-14, not archived
+    // Upcoming RM sales whose rosters are published (rmsothebys.com/upcoming/ read 2026-10-15; each date is the range its auction page states, not archived):
+    { code: 'P226', name: 'The Red Catalogue', date: '2026-10-22', lastDate: '2026-10-30' }, // page: "22 - 30 October 2026" (online) · live page read 2026-10-15, not archived
+    { code: 'S1026', name: 'Sealed October 2026', date: '2026-10-28' }, // page: "28 October 2026" · live page read 2026-10-15, not archived
+    { code: 'MU26', name: 'Munich 2026', date: '2026-11-20' }, // page: "20 November 2026" · live page read 2026-10-15, not archived
+    { code: 'ME26', name: 'No Limits: Icons of Formula 1', date: '2026-11-25', lastDate: '2026-12-02' }, // page: "25 November - 2 December 2026" (online) · live page read 2026-10-15, not archived
+    { code: 'S1226', name: 'Sealed December 2026', date: '2026-12-02' }, // page: "2 December 2026" · live page read 2026-10-15, not archived
+    { code: 'AD26', name: 'Abu Dhabi 2026', date: '2026-12-09', lastDate: '2026-12-10' }, // page: "9 - 10 December 2026" · live page read 2026-10-15, not archived
+    { code: 'PA27', name: 'Paris 2027', date: '2027-02-02', lastDate: '2027-02-03' }, // page: "2 - 3 February 2027" · live page read 2026-10-15, not archived
     { code: 'MO26', name: 'Monterey 2026', date: '2026-08-13', lastDate: '2026-08-15' }, // page: "13 - 15 August 2026" · live page read 2026-10-14, not archived
     { code: 'MC26', name: 'Monaco 2026', date: '2026-04-25', lastDate: '2026-04-25' }, // page: "25 April 2026" (the text says hosted 24–25 April) · live page read 2026-10-14, not archived
     { code: 'PA26', name: 'Paris 2026', date: '2026-01-28' }, // page: "28 January 2026" · listing_page_snapshots 0e9e873b-a054-45e0-ac23-481a9908d201
