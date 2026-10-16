@@ -152,6 +152,10 @@ function DayBars({ days }: { days: number[] }) {
     </svg>
   );
 }
+/** A source's own site icon, served from nuke.ag (public/source-icons/<slug>.png, each fetched once from the source's site
+ *  icon, 2026-10-16): no visitor's browser calls the source's site. A source without a file shows its name alone. */
+export const iconOf = (slug: string) => `/source-icons/${encodeURIComponent(slug)}.png`;
+
 /** A source's name without the registry's method note in parentheses ("eBay Motors (Browse API)" reads "eBay Motors"). */
 export const shortName = (name: string) => name.replace(/\s*\([^)]*\)\s*$/, '') || name;
 
@@ -200,7 +204,11 @@ export function SourcesBoardView({ data }: { data: SourcesBoardData }) {
               return (
                 <li key={r.source} className="market-sources__row">
                   <span className="market-sources__rank">{i + 1}</span>
-                  <span className="market-sources__name" title={r.name}>{shortName(r.name)}</span>
+                  <span className="market-sources__name" title={r.name}>
+                    <img className="market-sources__icon" src={iconOf(r.source)} alt="" width={14} height={14} loading="lazy"
+                      onError={(e) => { e.currentTarget.hidden = true; }} />
+                    {shortName(r.name)}
+                  </span>
                   <span className="market-sources__held n" title={r.heldAt ? `held as of ${heldWhen(r.heldAt)}` : undefined}>
                     {r.held != null ? count(r.held) : '—'}
                     {week != null && week !== 0
