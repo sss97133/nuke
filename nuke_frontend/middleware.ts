@@ -117,7 +117,8 @@ async function fetchVehicle(vehicleId: string): Promise<Record<string, unknown> 
 // ── Public face: readable text for crawlers and AI readers ──────────────────
 
 const INTERNAL_HEADER = 'x-nuke-internal';
-const SUPABASE_ANON = process.env.SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY || '';
+// Same order as src/lib/env.ts: the VITE_ value is the one the app itself uses.
+const SUPABASE_ANON = (process.env.VITE_SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY || '').trim();
 // Held-lot counts refresh daily at 10:27Z and the board snapshot at 10:47Z; a few hours of edge cache is enough.
 const FACE_CACHE = 'public, s-maxage=10800, stale-while-revalidate=86400';
 
@@ -143,7 +144,11 @@ async function fetchBoard(): Promise<Board> {
     const timer = setTimeout(() => ctl.abort(), 4000);
     const resp = await fetch(`${SUPABASE_URL}/rest/v1/rpc/market_sources_read`, {
       method: 'POST',
-      headers: { apikey: SUPABASE_ANON, Authorization: `Bearer ${SUPABASE_ANON}`, 'Content-Type': 'application/json' },
+      // A publishable key (sb_publishable_...) is accepted in apikey only; a Bearer token must be a JWT.
+      headers: {
+        apikey: SUPABASE_ANON, 'Content-Type': 'application/json',
+        ...(SUPABASE_ANON.startsWith('eyJ') ? { Authorization: `Bearer ${SUPABASE_ANON}` } : {}),
+      },
       body: '{}',
       signal: ctl.signal,
     });
