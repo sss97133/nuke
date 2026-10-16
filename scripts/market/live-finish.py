@@ -598,6 +598,7 @@ def tier(p):
     return 'a' if p < 25000 else 'b' if p < 50000 else 'c' if p < 100000 else 'd'
 
 
+NOT_CARS = {'MOTORCYCLE'}     # vehicles.canonical_vehicle_type never priced as a car (TRAILER is not used: a Scout II carried it, 2026-10-16)
 KNOWN_FROM = {'lbidders': 'bidders_t', 'lcom': 'ncom_t', 'l24': 'nb24', 'lsince': 'since_s'}
 
 
@@ -607,6 +608,7 @@ def run(args):
     t_cache = time.time() - t0
     lots = load_lots(args.lots)
     eng = load_engagement(args.engagement)
+    kinds = json.load(open(args.kinds)) if args.kinds else {}      # vehicles.canonical_vehicle_type per lot, when given
     now = epoch(args.now) if args.now else time.time()
     lots['moment'] = [epoch(a) if isinstance(a, str) and a else now for a in lots.as_of]
     lots['ends'] = [epoch(e) for e in lots.ends_at]
@@ -657,6 +659,8 @@ def run(args):
             skip(r.vehicle_id, f'more than {GRID[0]} h to close', hours_left=round(r.hours_left, 2)); continue
         if not r.bid or r.bid <= 0:
             skip(r.vehicle_id, 'no bid yet', hours_left=round(r.hours_left, 2)); continue
+        if kinds.get(r.vehicle_id) in NOT_CARS:
+            skip(r.vehicle_id, f'not a car lot (listed as a {kinds[r.vehicle_id].lower()})', hours_left=round(r.hours_left, 2)); continue
         if isinstance(r.kind, str) and r.kind != 'car':
             skip(r.vehicle_id, f'not a car lot (its model page {r.cohort} holds {r.kind} lots)' if isinstance(r.cohort, str)
                  else f'not a car lot (no model page; its make\'s lots in those years are {r.kind} lots)', hours_left=round(r.hours_left, 2)); continue
@@ -743,6 +747,7 @@ def run(args):
 if __name__ == '__main__':
     ap = argparse.ArgumentParser(description=__doc__.split('\n')[0])
     ap.add_argument('--lots', help='the market_pulse_live payload (required unless --build-cache)')
+    ap.add_argument('--kinds', help='optional: {"<vehicle id>": canonical_vehicle_type} from prod; motorcycles are skipped')
     ap.add_argument('--engagement', '--bids', dest='engagement', help='optional: bid and comment rows, or counts, per lot (see load_engagement); without it the match is price-only')
     ap.add_argument('--coverage', default=os.path.join(os.path.dirname(os.path.abspath(__file__)), 'prod_coverage.json'), help='the latest prod measurement of the ranges, per mode and grade')
     ap.add_argument('--archive', default=os.path.expanduser('~/nuke/scripts/data/bat-archive.duckdb'))

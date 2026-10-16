@@ -59,10 +59,19 @@ const rest = async (path, { key = SERVICE, method = 'GET', body, prefer } = {}) 
 const pulse = await rest('rpc/market_pulse_live', { key: ANON, method: 'POST', body: {} });
 writeFileSync(pulseJson, JSON.stringify(pulse));
 const live = Array.isArray(pulse?.auctions) ? pulse.auctions.length : 0;
+// The lots prod lists as motorcycles (vehicles.canonical_vehicle_type, anon-readable) are never priced as cars.
+const kindsJson = join(dir, 'kinds.json');
+const ids = Array.isArray(pulse?.auctions) ? pulse.auctions.map((a) => a[0]).filter(Boolean) : [];
+const kinds = {};
+for (let i = 0; i < ids.length; i += 200) {
+  const got = await rest(`vehicles?select=id,canonical_vehicle_type&id=in.(${ids.slice(i, i + 200).join(',')})`, { key: ANON });
+  for (const v of got ?? []) if (v.canonical_vehicle_type) kinds[v.id] = v.canonical_vehicle_type;
+}
+writeFileSync(kindsJson, JSON.stringify(kinds));
 
 // 2. estimates from the archive (local, read-only)
 const now = new Date();
-execFileSync('python3', [PY, '--lots', pulseJson, '--archive', ARCHIVE, '--cache', CACHE, '--coverage', COVERAGE, '--now', now.toISOString(), '--out', outJson],
+execFileSync('python3', [PY, '--lots', pulseJson, '--kinds', kindsJson, '--archive', ARCHIVE, '--cache', CACHE, '--coverage', COVERAGE, '--now', now.toISOString(), '--out', outJson],
   { stdio: ['ignore', 'inherit', 'inherit'] });
 // The estimator writes {rows, skipped} (each skipped lot with its reason); an older build wrote the row list alone, with
 // the skipped lots beside it.
