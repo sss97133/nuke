@@ -24,6 +24,7 @@
  */
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { readCatalogPages } from "./catalogProbe.ts";
 import { archiveFetch, readArchivedPage } from "../_shared/archiveFetch.ts";
 import { qualityGate } from "../_shared/extractionQualityGate.ts";
 import { cleanVehicleFields } from "../_shared/pollutionDetector.ts";
@@ -1432,6 +1433,14 @@ Deno.serve(async (req) => {
     }
 
     // ── Stats ─────────────────────────────────────────────────────────────
+    // ── Catalog enumeration, stage 1 (owner decision 2026-10-16): read the listed catalog pages, politely ──────────────────
+    // Our identified agent, one request every 3 s, each capture retained as a snapshot, stops on the first sign of blocking.
+    if (action === "catalog_probe") {
+      const urls: string[] = (Array.isArray(body.urls) ? body.urls : []).filter((u: unknown) => typeof u === "string").slice(0, 20);
+      const out = await readCatalogPages(urls);
+      return okJson({ success: true, requested: urls.length, ...out });
+    }
+
     if (action === "stats") {
       const { data: stats } = await supabase.rpc("execute_sql", {
         query: `
