@@ -102,7 +102,7 @@ export default function BrandFamilyMap({ width, height, onPickBrand, onPickFamil
         const move: Move = r.family_key === 'more' || r.family_key === 'other' ? { kind: 'none' } : relativeMove(node, baseline, basis === 'ledger');
         return <MarketTile key={`${r.brand}-${r.family_key}`} node={node} move={move} basis={basis} x={t.x} y={t.y} w={t.w} h={t.h}
           onClick={() => (r.family_key === 'more' || r.family_key === 'other' ? onPickBrand(r.brand) : onPickFamily(r.brand, r.family_key, r.family ?? ''))}
-          title={`${r.brand} ${label(r)}: ${money(r.usd ?? 0)} · ${(r.sold ?? 0).toLocaleString('en-US')} sold${move.kind === 'move' ? ` · BaT 12 mo: ${signedPct(move.rel)} vs BaT (sales ${signedPct(move.raw)})` : ''}`} />;
+          title={`${r.brand} ${label(r)}: ${money(r.usd ?? 0)} · ${(r.sold ?? 0).toLocaleString('en-US')} sold${move.kind === 'move' ? ` · 12 mo: ${signedPct(move.rel)} against the market (sales ${signedPct(move.raw)})` : ''}`} />;
       })}
     </div>)}
   </div>;

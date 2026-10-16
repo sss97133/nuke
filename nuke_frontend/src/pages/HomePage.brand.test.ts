@@ -12,7 +12,7 @@ const porsche = {
 
 describe('a brand tile', () => {
   it('says the market, how often what is offered sells, and the last 12 months against the 12 before', () => {
-    expect(brandLines(porsche)).toEqual(['$2.6B · 27,510 sold', '82% of offered sold', 'BaT 12 mo: sales ▲20%, $ ▲25%']);
+    expect(brandLines(porsche)).toEqual(['$2.6B · 27,510 sold', '82% of offered sold', '12 mo: sales ▲20%, $ ▲25%']);
   });
   it('shows no median, no price band and no model year', () => {
     const said = brandLines(porsche).join(' ');
@@ -21,7 +21,7 @@ describe('a brand tile', () => {
   it('leaves out a line the data cannot support instead of guessing', () => {
     const thin = { ...porsche, offered: 12, sold_prior_12m: 4 };
     expect(brandLines(thin)).toEqual(['$2.6B · 27,510 sold']);
-    expect(brandLines({ ...porsche, usd_prior_12m: null })).toEqual(['$2.6B · 27,510 sold', '82% of offered sold', 'BaT 12 mo: sales ▲20%']);
+    expect(brandLines({ ...porsche, usd_prior_12m: null })).toEqual(['$2.6B · 27,510 sold', '82% of offered sold', '12 mo: sales ▲20%']);
   });
 });
 

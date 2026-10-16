@@ -31,15 +31,15 @@ describe('a tile’s move', () => {
     if (m.kind === 'move') { expect(m.raw).toBeCloseTo(0.25, 9); expect(m.rel).toBeCloseTo(0, 9); }
     const slower = relativeMove({ count: 10_000, dated: 8_000, sold_12m: 110, sold_prior_12m: 100 }, base);
     if (slower.kind === 'move') expect(slower.rel).toBeCloseTo(1.1 / 1.25 - 1, 9);
-    expect(moveText(slower)).toBe('▼12% vs BaT');
+    expect(moveText(slower)).toBe('▼12%');
   });
   it('says too few under 20 sales in either year, or when BaT holds under half the sales, and shows the count', () => {
     expect(relativeMove(brands[2], base)).toEqual({ kind: 'few', sold: 7, prior: 30, why: 'count' });
-    expect(moveText(relativeMove(brands[2], base))).toBe('few BaT sales');
+    expect(moveText(relativeMove(brands[2], base))).toBe('too few sales');
     expect(relativeMove(brands[3], base, true)).toMatchObject({ kind: 'few', why: 'share' });
-    expect(moveText(relativeMove(brands[3], base, true))).toBe('mostly sold elsewhere');
+    expect(moveText(relativeMove(brands[3], base, true))).toBe('mostly unmeasured houses');
     expect(moveTextShort(relativeMove(brands[2], base))).toBe('few sales');
-    expect(moveTextShort(relativeMove(brands[3], base, true))).toBe('sold elsewhere');
+    expect(moveTextShort(relativeMove(brands[3], base, true))).toBe('unmeasured');
   });
   it('sized by BaT itself, a tile is BaT\'s, so the share of other venues does not gate it', () => {
     expect(relativeMove(brands[3], base).kind).toBe('move');
