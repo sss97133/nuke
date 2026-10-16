@@ -26,7 +26,8 @@ closed 2026-10-15, features built from prod rows and from the archive gave the s
 
 One hourly run, after model 32 in ag.nuke.market-live-finish (a failure here never stops model 32):
   1. the public live board (market_pulse_live, anon key);
-  2. the due list: each lot's latest row from live_finish_estimates() (anon); a lot is due at first sight on model 33,
+  2. lots prod lists as motorcycles (vehicles.canonical_vehicle_type, anon) are skipped; then the due list: each lot's
+     latest row from live_finish_estimates() (anon); a lot is due at first sight on model 33,
      when its bid changed, or when it crossed a horizon (120, 72, 48, 24, 12, 6, 3, 1 h, 10 min); when nothing is due the
      lot closing soonest is written, so the reader's two-hour freshness check holds;
   3. the due lots' listing facts and bid and comment rows: live_finish_33_inputs() with the service key, 100 lots per
@@ -360,8 +361,8 @@ def knn(pool, tgt, k=K, lam_cohort=1.0, lam_make=0.5, lam_year=0.5, chunk=400):
     Tf = tgt[KNN_FEATS].copy(); Tf['z'] = tgt.z.fillna(zfill)
     mu = Pf.mean(); sd = Pf.std().replace(0, 1)
     P = ((Pf - mu) / sd).values.astype(np.float32); T = ((Tf - mu) / sd).values.astype(np.float32)
-    pc = pd.Categorical(pool.cohort.fillna('?')); pcoh = pc.codes; tcoh = pd.Categorical(tgt.cohort.fillna('?'), categories=pc.categories).codes
-    pm = pd.Categorical(pool.make_k.fillna('?')); pmake = pm.codes; tmake = pd.Categorical(tgt.make_k.fillna('?'), categories=pm.categories).codes
+    pc = pd.Categorical(pool.cohort.fillna('?')); pcoh = pc.codes; tcoh = pc.categories.get_indexer(tgt.cohort.fillna('?'))      # -1: not in the pool
+    pm = pd.Categorical(pool.make_k.fillna('?')); pmake = pm.codes; tmake = pm.categories.get_indexer(tgt.make_k.fillna('?'))
     pyear = pool.year.fillna(-100).values.astype(np.float32); tyear = tgt.year.fillna(-100).values.astype(np.float32)
     pnr = pool.nr.values; tnr = tgt.nr.values; py = pool.y.values.astype(np.float32)
     P2 = (P ** 2).sum(1); n = len(tgt); kk = min(k, len(pool))
@@ -704,7 +705,20 @@ def skip_row(v, why, h=None):
     return {'vehicle_id': v, 'reason': why, 'hours_remaining': None if h is None or h != h else round(float(h), 2)}
 
 
-def prepare(lots, a):
+NOT_CARS = {'MOTORCYCLE'}     # vehicles.canonical_vehicle_type never priced as a car (TRAILER is not used: a Scout II carried it)
+
+
+def read_kinds(anon, ids):
+    """vehicles.canonical_vehicle_type for the board's lots (anon-readable), 200 ids a request."""
+    out = {}
+    for s in range(0, len(ids), 200):
+        for v in rest(f"vehicles?select=id,canonical_vehicle_type&id=in.({','.join(ids[s:s + 200])})", anon) or []:
+            if v.get('canonical_vehicle_type'):
+                out[v['id']] = v['canonical_vehicle_type']
+    return out
+
+
+def prepare(lots, a, kinds=None):
     """Title words, model page (the model 31 title map, then the make-and-words fallback), page kind and the lots model 33
     can price, before any prod read. Returns the lots kept and the skips."""
     skipped = []
@@ -733,6 +747,8 @@ def prepare(lots, a):
             skipped.append(skip_row(r.vehicle_id, f'more than {MAX_HOURS:g} h to close', r.hours_left))
         elif not float(r.current_bid or 0) > 0:
             skipped.append(skip_row(r.vehicle_id, 'no bid yet', r.hours_left))
+        elif (kinds or {}).get(r.vehicle_id) in NOT_CARS:
+            skipped.append(skip_row(r.vehicle_id, f'not a car lot (listed as a {kinds[r.vehicle_id].lower()})', r.hours_left))
         elif isinstance(r.kind, str) and r.kind != 'car':
             skipped.append(skip_row(r.vehicle_id, 'not a car lot', r.hours_left))
         elif not isinstance(r.cohort, str) and r.make_k not in known:
@@ -843,7 +859,7 @@ def run(args):
     lots['ends'] = [epoch(e) for e in lots.ends_at]
     lots['hours_left'] = (lots.ends - lots.moment) / 3600.0
     lots = lots[(lots.hours_left > 0) & (lots.hours_left <= MAX_HOURS)].copy()
-    T, skipped = prepare(lots.reset_index(drop=True), a)
+    T, skipped = prepare(lots.reset_index(drop=True), a, read_kinds(anon, lots.vehicle_id.tolist()))
     prior = latest_rows(anon, T.vehicle_id.tolist())
     ids = due(T, prior)
     if not ids and len(T):
