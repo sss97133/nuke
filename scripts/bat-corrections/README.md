@@ -39,3 +39,10 @@ timeline rows extract-bat-core wrote before 4.5.0 while a lot was still running 
 the bid of that read) through `supersede_timeline_events` (migration 20261016203000), each kept whole in
 `superseded_rows`. Dry run by default (`--inline` plans with the migration's own query before it is deployed);
 `--apply` only after extract-bat-core 4.5.0 is deployed. Logs: `~/nuke-logs/bat-ended-20261015/`.
+
+BaT results not on the vehicle (2026-10-16): `project-bat-results.mjs` finds BaT lots whose `auction_events` result
+(sold / reserve not met) is not on the vehicles row that is that listing. Two cases: `greatest(high_bid, sale_price)`
+below the final, or a sold lot without its sale. It projects each through `project_bat_result_to_vehicle` (migrations
+20261018041000..043000), and so through `correct_vehicle_sale_provenance_batch`. Only a final with a second witness
+is projected: a page-read receipt, a cited correction or the stream's native sale record. Modes: dry run by default,
+`--profile` (one batch in a rolled-back transaction), `--apply`. Logs: `~/nuke-logs/bat-close-projection-20261016/`.
