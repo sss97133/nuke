@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { selectBestHeroImage } from './loadVehicleData';
+import { mergedTargetOf, selectBestHeroImage } from './loadVehicleData';
 
 type Row = Record<string, unknown>;
 const photo = (id: string, extra: Row = {}): Row => ({
@@ -90,5 +90,19 @@ describe('selectBestHeroImage', () => {
 
   it('does not promote an unchecked vehicle URL when rows are absent', async () => {
     expect(await selectBestHeroImage('no-image-rows', imageClient([]), 'https://images.example/unchecked.jpg')).toBeNull();
+  });
+});
+
+describe('mergedTargetOf', () => {
+  const target = '83f6f033-a3c3-4cf4-a85e-a60d2c588838';
+  it('names the record a merged-away vehicle was folded into', () => {
+    expect(mergedTargetOf({ id: '8bde1dda-ebb4-480e-8942-e561feb36667', merged_into_vehicle_id: target })).toBe(target);
+  });
+  it('names nothing for a live vehicle, a missing pointer, or a pointer to itself', () => {
+    expect(mergedTargetOf({ id: target, merged_into_vehicle_id: null })).toBeNull();
+    expect(mergedTargetOf({ id: target })).toBeNull();
+    expect(mergedTargetOf({ id: target, merged_into_vehicle_id: target })).toBeNull();
+    expect(mergedTargetOf({ id: 'x', merged_into_vehicle_id: 'short' })).toBeNull();
+    expect(mergedTargetOf(null)).toBeNull();
   });
 });
