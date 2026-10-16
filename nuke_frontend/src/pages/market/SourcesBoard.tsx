@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { supabase } from '../../lib/supabase';
+import { OrgLogo } from '../../components/common/OrgLogo';
 import './SourcesBoard.css';
 
 // Every source on one board with the same measures, ranked by the lots we hold for it (market_sources_read,
@@ -9,7 +10,7 @@ import './SourcesBoard.css';
 const COLUMNS = ['source', 'name', 'category', 'house', 'held_lots', 'held_at', 'population', 'population_method',
   'population_confidence', 'population_at', 'map_sales', 'map_usd', 'sales_12m', 'usd_12m', 'sales_prior_12m',
   'usd_prior_12m', 'months', 'live_lots', 'live_at', 'held_lots_before', 'before_day', 'landed_24h', 'landed_7d',
-  'last_landed', 'days14'] as const;
+  'last_landed', 'days14', 'logo_url', 'business_type'] as const;
 type Column = typeof COLUMNS[number];
 const SHOWN = 10;
 
@@ -25,6 +26,8 @@ export type SourceRow = {
   heldBefore: number | null; beforeDay: string | null;
   /** Records landed (vehicle_events) in the last 24 hours and 7 days, the last hour any landed, and 14 daily counts. */
   landed24: number; landed7: number; lastLanded: string | null; days14: number[];
+  /** The source's organization's recorded identity (organizations.logo_url, business_type), drawn by OrgLogo. */
+  logoUrl: string | null; businessType: string | null;
 };
 export type SourcesBoardData = { asOf: string; day: string | null; rows: SourceRow[]; notRanked: Record<string, number> };
 
@@ -61,6 +64,7 @@ export function parseSources(value: unknown): SourcesBoardData | null {
       heldBefore: num(get('held_lots_before')), beforeDay: str(get('before_day')),
       landed24: num(get('landed_24h')) ?? 0, landed7: num(get('landed_7d')) ?? 0, lastLanded: str(get('last_landed')),
       days14: Array.isArray(get('days14')) ? (get('days14') as unknown[]).map((x) => num(x) ?? 0) : [],
+      logoUrl: str(get('logo_url')), businessType: str(get('business_type')),
     });
   }
   const notRanked: Record<string, number> = {};
@@ -152,10 +156,6 @@ function DayBars({ days }: { days: number[] }) {
     </svg>
   );
 }
-/** A source's own site icon, served from nuke.ag (public/source-icons/<slug>.png, each fetched once from the source's site
- *  icon, 2026-10-16): no visitor's browser calls the source's site. A source without a file shows its name alone. */
-export const iconOf = (slug: string) => `/source-icons/${encodeURIComponent(slug)}.png`;
-
 /** A source's name without the registry's method note in parentheses ("eBay Motors (Browse API)" reads "eBay Motors"). */
 export const shortName = (name: string) => name.replace(/\s*\([^)]*\)\s*$/, '') || name;
 
@@ -179,6 +179,13 @@ export function SourcesBoardView({ data }: { data: SourcesBoardData }) {
     .map(([k, n]) => `${n} ${NOT_RANKED_WORDS[k] ?? k}${n > 1 ? 's' : ''}`);
   return (
     <section className="market-sources" aria-label="Sources, ranked by what we hold">
+      <svg width="0" height="0" aria-hidden="true" className="market-sources__defs">
+        <defs>
+          <pattern id="market-sources-hatch" width="4" height="4" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
+            <line x1="0" y1="0" x2="0" y2="4" className="market-sources__hatch" />
+          </pattern>
+        </defs>
+      </svg>
       <div className="market-sources__head">
         <span className="market-sources__title">Sources</span>
         <span className="market-sources__note">
@@ -205,8 +212,10 @@ export function SourcesBoardView({ data }: { data: SourcesBoardData }) {
                 <li key={r.source} className="market-sources__row">
                   <span className="market-sources__rank">{i + 1}</span>
                   <span className="market-sources__name" title={r.name}>
-                    <img className="market-sources__icon" src={iconOf(r.source)} alt="" width={14} height={14} loading="lazy"
-                      onError={(e) => { e.currentTarget.hidden = true; }} />
+                    {/* Identity through the shared renderer (frontend rule 2026-10-08): the organization's recorded logo,
+                        else its type icon. */}
+                    <OrgLogo logoUrl={r.logoUrl} businessType={r.businessType ?? (r.category === 'auction' ? 'auction_house' : null)}
+                      businessName={r.name} size={18} maxWidth={96} variant="logo" className="market-sources__icon" />
                     {shortName(r.name)}
                   </span>
                   <span className="market-sources__held n" title={r.heldAt ? `held as of ${heldWhen(r.heldAt)}` : undefined}>
@@ -216,9 +225,10 @@ export function SourcesBoardView({ data }: { data: SourcesBoardData }) {
                       : null}
                   </span>
                   <span className="market-sources__share" title={total}>
-                    <svg className={`market-sources__track${s.share == null ? ' market-sources__track--unknown' : ''}`} viewBox="0 0 100 8"
-                      preserveAspectRatio="none" aria-hidden="true">
-                      {s.share != null ? <rect className="market-sources__fill" x="0" y="0" height="8" width={Math.max(1.5, s.share * 100)} /> : null}
+                    <svg className="market-sources__track" viewBox="0 0 100 8" preserveAspectRatio="none" aria-hidden="true">
+                      {s.share != null
+                        ? <rect className="market-sources__fill" x="0" y="0" height="8" width={Math.max(1.5, s.share * 100)} />
+                        : <rect className="market-sources__unknown" x="0" y="0" height="8" width="100" fill="url(#market-sources-hatch)" />}
                     </svg>
                     <span className="market-sources__sharetext">{s.text}</span>
                   </span>

@@ -55,7 +55,8 @@ INSERT INTO cron.job (jobid, jobname, schedule, command, active) VALUES
 
 -- the reads, with the columns the migration uses and their live types (2026-10-16)
 CREATE TABLE public.observation_sources (id uuid PRIMARY KEY DEFAULT gen_random_uuid(), slug text, display_name text,
-  category text, created_at timestamptz DEFAULT now());
+  category text, created_at timestamptz DEFAULT now(), business_id uuid);
+CREATE TABLE public.organizations (id uuid PRIMARY KEY DEFAULT gen_random_uuid(), logo_url text, business_type text);
 CREATE TABLE public.source_census (source_id uuid, universe_total integer, universe_historical integer, census_method text,
   census_confidence numeric(3,2), census_at timestamptz);
 CREATE TABLE public.mv_source_target_landed (source_slug text, landed bigint, event_urls bigint, event_urls_without_target bigint,
@@ -129,6 +130,12 @@ SELECT s.id, v.e, v.l, v.u FROM public.live_auction_sources s JOIN (VALUES
 \ir ../migrations/20261018031000_market_sources_live_window.sql
 \ir ../migrations/20261018032000_market_sources_rules_and_landing.sql
 \ir ../migrations/20261018032000_market_sources_rules_and_landing.sql
+\ir ../migrations/20261018033000_market_sources_org_identity.sql
+\ir ../migrations/20261018033000_market_sources_org_identity.sql
+
+-- BaT's organization has a recorded logo; Craigslist has no organization
+WITH org AS (INSERT INTO public.organizations (logo_url, business_type) VALUES ('https://example.test/bat-logo.png', 'auction_house') RETURNING id)
+UPDATE public.observation_sources SET business_id = (SELECT id FROM org) WHERE slug = 'bat';
 
 SELECT pg_temp.ok('the writer job is scheduled once, at 10:47Z',
   (SELECT count(*) FROM cron.job WHERE jobname = 'market-source-days') = 1
@@ -196,7 +203,12 @@ DECLARE b jsonb := public.market_sources_read();
   r jsonb;
 BEGIN
   PERFORM pg_temp.ok('the board names its columns',
-    b->'columns' = '["source","name","category","house","held_lots","held_at","population","population_method","population_confidence","population_at","map_sales","map_usd","sales_12m","usd_12m","sales_prior_12m","usd_prior_12m","months","live_lots","live_at","held_lots_before","before_day","landed_24h","landed_7d","last_landed","days14"]'::jsonb);
+    b->'columns' = '["source","name","category","house","held_lots","held_at","population","population_method","population_confidence","population_at","map_sales","map_usd","sales_12m","usd_12m","sales_prior_12m","usd_prior_12m","months","live_lots","live_at","held_lots_before","before_day","landed_24h","landed_7d","last_landed","days14","logo_url","business_type"]'::jsonb);
+  SELECT x INTO r FROM jsonb_array_elements(b->'rows') x WHERE x->>0 = 'bat';
+  PERFORM pg_temp.ok('a market carries its organization''s recorded logo and type',
+    r->>25 = 'https://example.test/bat-logo.png' AND r->>26 = 'auction_house');
+  SELECT x INTO r FROM jsonb_array_elements(b->'rows') x WHERE x->>0 = 'craigslist';
+  PERFORM pg_temp.ok('a market without an organization carries none', r->25 = 'null'::jsonb AND r->26 = 'null'::jsonb);
   PERFORM pg_temp.ok('markets only: auction houses by held lots, then marketplaces by held listings',
     (b->>'day')::date = current_date AND (SELECT array_agg(x->>0 ORDER BY ord) FROM jsonb_array_elements(b->'rows') WITH ORDINALITY e(x, ord))
       = ARRAY['bat', 'mecum', 'cars-and-bids', 'facebook_marketplace', 'craigslist']);

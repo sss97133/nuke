@@ -11,7 +11,7 @@ import SourcesBoard, { heldShare, landingState, monthBars, money, parseSources, 
 const columns = ['source', 'name', 'category', 'house', 'held_lots', 'held_at', 'population', 'population_method',
   'population_confidence', 'population_at', 'map_sales', 'map_usd', 'sales_12m', 'usd_12m', 'sales_prior_12m',
   'usd_prior_12m', 'months', 'live_lots', 'live_at', 'held_lots_before', 'before_day', 'landed_24h', 'landed_7d',
-  'last_landed', 'days14'];
+  'last_landed', 'days14', 'logo_url', 'business_type'];
 const days = (today: number) => [...Array(13).fill(0), today];
 const value = {
   as_of: '2026-10-16T10:47:00Z', day: '2026-10-16', columns,
@@ -19,14 +19,14 @@ const value = {
     ['bat', 'Bring a Trailer', 'auction', 'Bring a Trailer', 252399, '2026-10-16T10:27:00Z', 264746, 'enumerated', 0.9,
       '2026-09-27T00:00:00Z', 183455, 8488000000, 39173, 2000000000, 34829, 1700000000,
       [['2025-11', 3000, 150000000], ['2026-10', 1500, 80000000]], 1265, '2026-10-16T10:46:00Z', 251000, '2026-10-09',
-      2055, 3321, '2026-10-16T10:00:00Z', days(2055)],
+      2055, 3321, '2026-10-16T10:00:00Z', days(2055), 'https://example.test/bat.png', 'auction_house'],
     ['mecum', 'Mecum Auctions', 'auction', 'Mecum', 62314, '2026-10-16T10:27:00Z', 268979, 'enumerated', 0.85,
       '2026-10-15T00:00:00Z', 51151, 2900000000, 6034, 400000000, 5891, 380000000, [['2026-01', 2000, 90000000]], 0, null,
-      48934, '2026-10-09', 151435, 151435, '2026-10-16T10:00:00Z', days(151435)],
+      48934, '2026-10-09', 151435, 151435, '2026-10-16T10:00:00Z', days(151435), null, 'auction_house'],
     ['cars-and-bids', 'Cars & Bids', 'auction', 'Cars & Bids', 18659, '2026-10-16T10:27:00Z', null, 'unknown', null, null,
-      null, null, null, null, null, null, null, 0, null, null, null, 0, 0, '2026-10-03T14:00:00Z', days(0)],
+      null, null, null, null, null, null, null, 0, null, null, null, 0, 0, '2026-10-03T14:00:00Z', days(0), null, null],
     ['craigslist', 'Craigslist', 'marketplace', null, 8411, '2026-10-16T10:27:00Z', null, null, null, null,
-      null, null, null, null, null, null, null, 0, null, null, null, 1257, 2232, '2026-10-16T09:00:00Z', days(1257)],
+      null, null, null, null, null, null, null, 0, null, null, null, 1257, 2232, '2026-10-16T09:00:00Z', days(1257), null, null],
   ],
   not_ranked: { 'capture channels': 2, aggregator: 2, dealer: 2, shop: 1 },
 };
@@ -90,7 +90,9 @@ it('ranks auction houses and marketplaces apart, same row for each, as the reade
   expect(groups.map((g) => [...g.querySelectorAll('.market-sources__name')].map((n) => n.textContent))).toEqual(
     [['Bring a Trailer', 'Mecum Auctions', 'Cars & Bids'], ['Craigslist']]);
   expect(groups[1].querySelector('.market-sources__rank')?.textContent).toBe('1');
-  expect(groups[0].querySelector('.market-sources__icon')?.getAttribute('src')).toBe('/source-icons/bat.png');
+  expect(groups[0].querySelector('.market-sources__name img')?.getAttribute('src')).toBe('https://example.test/bat.png');
+  expect(groups[0].querySelectorAll('.market-sources__name')[1].querySelector('img')).toBeNull();   // no recorded logo: the type icon
+  expect(groups[0].querySelectorAll('.market-sources__name')[1].querySelector('svg')).not.toBeNull();
   expect(groups[1].querySelector('.market-sources__cols .n')?.textContent).toBe('listings held');
   const rows = [...container.querySelectorAll('li.market-sources__row')];
   expect(rows.every((r) => r.children.length === 7)).toBe(true);
@@ -99,7 +101,7 @@ it('ranks auction houses and marketplaces apart, same row for each, as the reade
   expect(rows[0].querySelector('.market-sources__live')?.textContent).toBe('1,265 live');
   expect(rows[0].querySelectorAll('.market-sources__spark rect')).toHaveLength(24);
   expect(rows[1].querySelector('.market-sources__live')?.textContent).toBe('—');
-  expect(rows[2].querySelector('.market-sources__track--unknown')).not.toBeNull();
+  expect(rows[2].querySelector('.market-sources__unknown')).not.toBeNull();
   expect(rows[2].querySelector('.market-sources__sharetext')?.textContent).toBe('their total unknown');
   expect(rows[1].querySelector('.market-sources__landtext')?.textContent).toBe('+151,435 today');
   expect(rows[1].querySelectorAll('.market-sources__days rect')).toHaveLength(14);
