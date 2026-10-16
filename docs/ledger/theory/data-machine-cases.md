@@ -2241,7 +2241,7 @@ parts, each with its supplier page as source and no price. (d) #110 itself: sign
 w, every resolvable key filled, every unresolved one held with its text and reason. (e) Parity: the legacy query and
 the new rows return the same four wire ends; the diff is published with the change.
 
-#### 13.12.3 RSI passes 1 to 43: the model measures itself and fills its gaps (lead, 2026-10-14 and 15)
+#### 13.12.3 RSI passes 1 to 45: the model measures itself and fills its gaps (lead, 2026-10-14 to 16)
 
 Owner, on the reshape: "a bit light ... data model goes rsi". The loop each pass ran:
 1. Read the stack SH scoreboard (`v_harness_coverage`, per public vehicle and layer).
@@ -2297,7 +2297,9 @@ Every pass has a receipt in `docs/wiring/receipts/` dated 2026-10-14.
 
 **W| 41 | 20261015260000 (#1702) | 106 Deutsch and MIL-splice wire ends had no crimp tool; the loader wrote an end once and read at most 1,000 rows (999 live ends) | ProWire's HDT-48-00 and MiniSeal pages (saved through fetch_sources.py) | tools mapped, two catalog rows, the loader pages and re-writes changed ends; ends keyed to a crimp tool 475 to 581 / 991 |
 | 42 | 20261015270000 (#1705) | 354 wire lengths said nothing about what they were, so the planner called pin leads and twin paths zone estimates; the 32 PDM pigtails had no length | the registry's length kinds; the pin leads' design rule (pass 26) | planned_length_kind and _basis on the wire, the planner names the kind, the pigtails take 4 and 6 in; planned segments 587 to 620 / 669 |
-| 43 | (generator, this pass) | 56 segments sat on an unplaced plug, 7 of the 8 open plugs on the engine; the twin's engine was said to sit 15 cm into the cab | three owner photos triangulated against the true-size engine_ls3 model (research/2026-10-15_engine-position.md) | the engine is where it is (the v2 block box was GM's 710 mm misread); 34 engine ends placed on the corrected engine, 22 branches redrawn, 19 added; a shortest-path walk joins 443 / 443 placed segments |
+| 43 | (generator, #1726) | 56 segments sat on an unplaced plug, 7 of the 8 open plugs on the engine; the twin's engine was said to sit 15 cm into the cab | three owner photos triangulated against the true-size engine_ls3 model (research/2026-10-15_engine-position.md) | the engine is where it is (the v2 block box was GM's 710 mm misread); 34 engine ends placed on the corrected engine, 22 branches redrawn, 19 added; a shortest-path walk joins 443 / 443 placed segments |
+| 44 | (generator, #1729) | 93 of 443 routed segments ran over 2x their straight line (about 246 ft beyond a 1.4x path): the 61-pin had no trunk across the firewall recess, so rear-of-engine wires went round the intake front | a fourth twin route study (research/2026-10-15_route-branches-4.md) | 27 branches and 2 junctions; live, segments over 2x 93 to 16 (each kept one with its reason), excess 344.8 to 164.5 ft |
+| 45 | (generator, #1734) | the cut list still carried the routes from before the engine fix and the trunks | the live routes, re-exported | 82 wire lengths change, 63 fall by 79.2 ft as detours leave; BOM wire feet 1,461.5 to 1,426.4 |
 hat the loop found that no one asked about:**
 - **A short in the model.** It was found while folding loads. The reshape treated PS-STUDS (nine distinct studs) and
   MARKER-LF (a lamp typed ground) as single nodes. The scoreboard now carries the physics check "nets that join a
@@ -2350,6 +2352,9 @@ hat the loop found that no one asked about:**
 - **The cut list's zone estimates were not cut lengths.** 186 segments carried a wire's whole-length estimate as
   their plan, without the pad the column promises; 14 were shorter than their own route (#67 dome lamp 3.5 ft over
   11.29 ft). Pass 34's "4x" ran the other way: those 15 were the long ones.
+- **A long route can be a missing branch.** After the engine fix, a fifth of the routed segments ran over twice their
+  straight line; the shortest-path walk was right, the graph lacked the trunk a real engine harness has. A route-to-straight
+  ratio over 2 is now a check the studies run before their branches load.
 - **A start in words chose the wrong end.** The loader parsed "AMP CH1+" as no plug and started four speaker leads at
   the door, so their segments doubled back through the amp.
 - **The crimp tool's colour bands are not the splice maker's ranges.** On TE's own figures two pin splices the formula
