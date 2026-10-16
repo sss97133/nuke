@@ -132,7 +132,7 @@ function Spark({ bars }: { bars: number[] }) {
 /** Landing now: records in the last 24 hours, a dot that says whether any landed in that day, idle since when if not. */
 export function landingState(row: Pick<SourceRow, 'landed24' | 'lastLanded'>, now = Date.now()): { active: boolean; text: string } {
   if (row.landed24 > 0) return { active: true, text: `+${count(row.landed24)} today` };
-  if (!row.lastLanded) return { active: false, text: 'nothing landed yet' };
+  if (!row.lastLanded) return { active: false, text: 'idle 14+ days' };   // the landing log keeps 14 days
   const t = Date.parse(row.lastLanded);
   if (Number.isNaN(t)) return { active: false, text: 'idle' };
   return { active: false, text: `idle since ${new Date(t).toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: 'UTC' })}` };
@@ -152,6 +152,9 @@ function DayBars({ days }: { days: number[] }) {
     </svg>
   );
 }
+/** A source's name without the registry's method note in parentheses ("eBay Motors (Browse API)" reads "eBay Motors"). */
+export const shortName = (name: string) => name.replace(/\s*\([^)]*\)\s*$/, '') || name;
+
 const GROUPS: [string, string, string][] = [
   ['auction', 'Auction houses', 'lots held'],
   ['marketplace', 'Marketplaces', 'listings held'],
@@ -197,7 +200,7 @@ export function SourcesBoardView({ data }: { data: SourcesBoardData }) {
               return (
                 <li key={r.source} className="market-sources__row">
                   <span className="market-sources__rank">{i + 1}</span>
-                  <span className="market-sources__name">{r.name}</span>
+                  <span className="market-sources__name" title={r.name}>{shortName(r.name)}</span>
                   <span className="market-sources__held n" title={r.heldAt ? `held as of ${heldWhen(r.heldAt)}` : undefined}>
                     {r.held != null ? count(r.held) : '—'}
                     {week != null && week !== 0
