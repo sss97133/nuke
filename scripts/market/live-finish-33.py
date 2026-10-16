@@ -61,7 +61,7 @@ CHUNK = 100                                            # lots per live_finish_33
 WRITER = 'live-finish-33'
 ART = os.path.expanduser(os.environ.get('LIVE_FINISH_33_DIR', '~/Library/Caches/nuke-finish-33'))
 ARCHIVE = os.path.abspath(os.environ.get('BAT_ARCHIVE', 'scripts/data/bat-archive.duckdb'))
-CACHE_VERSION = 'live_finish_33_v2.1'
+CACHE_VERSION = 'live_finish_33_v2.2'
 OUTCOME = {'sold': 'sold', 'no_reserve': 'sold, no reserve', 'rnm': 'reserve not met'}
 
 
@@ -490,31 +490,45 @@ def map_titles(lots, archive, work):
 
 
 class CohortMap:
-    """Fallback map: make key + leading title model words + model year -> BaT model page, narrowest year band first."""
+    """Fallback page map: make key + leading title model words (at least one) + model year -> BaT model page, deepest
+    word match first, narrowest year band first. Never maps on the make alone (that guessed a go-kart onto bmw/2002);
+    the make's own year-band page only tells what kind of lot an unmapped one is. On 13,652 archive car lots closed
+    2026-07..09 with the map learned before 07-01: 96.5% mapped, 95.2% of those exact (model 32's fix, #1737)."""
     def __init__(self, AK):
         idx = defaultdict(lambda: defaultdict(list))
-        for mk, md, c, y in zip(AK.make, AK.model, AK.cohort, AK.year):
+        for ttl, mk, md, c, y in zip(AK.title, AK.make, AK.model, AK.cohort, AK.year):
             if not isinstance(c, str):
                 continue
-            t = toks(md)
+            k, t = title_parts(ttl, mk, md)
             for n in range(0, min(4, len(t)) + 1):
-                idx[make_key(mk)][tuple(t[:n])].append((c, y))
+                idx[k][tuple(t[:n])].append((c, y))
         self.idx = {m: dict(v) for m, v in idx.items()}
+
+    def _vote(self, cands, year, bands):
+        for band in bands:
+            sel = [c for c, y in cands if band is None or (y is not None and not math.isnan(y) and abs(y - year) <= band)]
+            if len(sel) >= 3:
+                c, sh = Counter(sel).most_common(1)[0]
+                return c, sh / len(sel)
+        return None, 0.0
 
     def map(self, mk, words, year):
         if mk not in self.idx:
             return None, 0.0
         has_year = year is not None and not (isinstance(year, float) and math.isnan(year))
-        for n in range(min(4, len(words)), -1, -1):
+        for n in range(min(4, len(words)), 0, -1):
             cands = self.idx[mk].get(tuple(words[:n]))
-            if not cands or len(cands) < 3:
-                continue
-            for band in ([0, 1, 2, 4] if has_year else []) + [None]:
-                sel = [c for c, y in cands if band is None or (y is not None and not math.isnan(y) and abs(y - year) <= band)]
-                if len(sel) >= 3:
-                    c, s = Counter(sel).most_common(1)[0]
-                    return c, s / len(sel)
+            if cands and len(cands) >= 3:
+                c, sh = self._vote(cands, year, ([0, 1, 2, 4] if has_year else []) + [None])
+                if c:
+                    return c, sh
         return None, 0.0
+
+    def make_page(self, mk, year):
+        cands = self.idx.get(mk, {}).get(())
+        if not cands or year is None or (isinstance(year, float) and math.isnan(year)):
+            return None
+        return self._vote(cands, year, [0, 1, 2, 4, 8])[0]
 
 
 # ------------------------------------------------------------------------------------- the history cache (daily)
@@ -552,7 +566,7 @@ COPY (SELECT l.slug, l.url, l.title, l.year, l.make, l.model, l.cohort, l.no_res
              epoch(l.f) f_epoch, epoch(coalesce(an.anchor, l.f)) anchor_epoch,
              (SELECT count(*) FROM events c WHERE c.slug = l.slug AND c.kind = 'comment') ncom_final
       FROM lb l LEFT JOIN anchor an USING (slug)) TO '__DIR__/lots.csv' (HEADER);
-COPY (SELECT slug, year, make, model, cohort, kind FROM lots) TO '__DIR__/all_kinds.csv' (HEADER);
+COPY (SELECT slug, year, make, model, title, cohort, kind FROM lots) TO '__DIR__/all_kinds.csv' (HEADER);
 """
 
 
@@ -586,7 +600,7 @@ def build_cache(archive=ARCHIVE, art=ART):
         lambda s: 'car' if (s == 'car').mean() >= 0.5 else Counter(s).most_common(1)[0][0]).to_dict()
     h = {'version': CACHE_VERSION, 'built_at': time.time(), 'last_close': last, 'archive_mtime': os.path.getmtime(archive),
          'L': L[['slug', 'cohort', 'make_k', 'year', 'mtok', 'f_epoch', 'logp', 'vin', 'cls', 'ncom_final']], 'F': F.reset_index(drop=True),
-         'AK': AK[['make', 'model', 'cohort', 'year']], 'kind_of': kind_of}
+         'AK': AK[['title', 'make', 'model', 'cohort', 'year']], 'kind_of': kind_of}
     with open(f'{art}/history.pkl', 'wb') as f:
         pickle.dump(h, f, protocol=pickle.HIGHEST_PROTOCOL)
     for fn in ('lots.csv', 'pool_states.csv', 'all_kinds.csv'):
@@ -704,8 +718,10 @@ def prepare(lots, a):
         yr = float(r.year) if r.year is not None and not pd.isna(r.year) else np.nan
         c, sh = a['cohort_map'].map(r.make_k, r.mtok, yr)
         T.at[i, 'cohort'] = c; T.at[i, 'share'] = sh; T.at[i, 'basis'] = 'fallback' if c else 'none'
-    T['kind'] = [('car' if b == 'title' else a['kind_of'].get(c)) if isinstance(c, str) else None for c, b in zip(T.cohort, T.basis)]
     T['year'] = pd.to_numeric(T.year, errors='coerce')
+    T['kind'] = [('car' if b == 'title' else a['kind_of'].get(c)) if isinstance(c, str)
+                 else a['kind_of'].get(a['cohort_map'].make_page(mk, float(y) if y is not None and not pd.isna(y) else np.nan))
+                 for c, b, mk, y in zip(T.cohort, T.basis, T.make_k, T.year)]
     T['nr'] = T.no_reserve.fillna(False).astype(bool).astype(int)
     known = set(a['L'].make_k); keep = []
     for r in T.itertuples():
@@ -841,8 +857,8 @@ def run(args):
         print(json.dumps({'dry_run': True, 'live': len(lots), 'due': len(ids), 'estimated': len(rows), 'skipped': len(skipped),
                           'skip_reasons': dict(Counter(s['reason'] for s in skipped)), 'seconds': round(time.time() - t0, 1)}))
         return
-    for s in range(0, len(rows), 500):
-        rest('hammer_predictions', service, 'POST', rows[s:s + 500], prefer='return=minimal')
+    for s in range(0, len(rows), 200):                    # about 4 KB a row with its notes: 0.8 MB a request
+        rest('hammer_predictions', service, 'POST', rows[s:s + 200], prefer='return=minimal')
     print(json.dumps({'model': MODEL_VERSION, 'live': len(lots), 'due': len(ids), 'written': len(rows), 'skipped': len(skipped),
                       'skip_reasons': dict(Counter(s['reason'] for s in skipped)), 'seconds': round(time.time() - t0, 1)}))
 
