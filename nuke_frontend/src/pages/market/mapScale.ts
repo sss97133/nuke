@@ -69,15 +69,15 @@ export const pct = (v: number) => (Math.round(v * 100) === 0 ? '0%' : `${v > 0 ?
 
 /** What a tile says about its move: the relative move, why it is too few to say (in words), or nothing. */
 export function moveText(m: Move): string {
-  if (m.kind === 'move') return `${pct(m.rel)} vs BaT`;
-  if (m.kind === 'few') return m.why === 'share' ? 'mostly sold elsewhere' : 'few BaT sales';
+  if (m.kind === 'move') return pct(m.rel);
+  if (m.kind === 'few') return m.why === 'share' ? 'mostly unmeasured houses' : 'too few sales';
   return '';
 }
 
 /** The same words for a tile too narrow for them: the percentage, or the reason in two words. */
 export function moveTextShort(m: Move): string {
   if (m.kind === 'move') return pct(m.rel);
-  if (m.kind === 'few') return m.why === 'share' ? 'sold elsewhere' : 'few sales';
+  if (m.kind === 'few') return m.why === 'share' ? 'unmeasured' : 'few sales';
   return '';
 }
 

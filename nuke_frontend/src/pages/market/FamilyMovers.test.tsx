@@ -59,8 +59,8 @@ it('lists families gaining and losing share of BaT, volume apart from the averag
   expect(rows[0].querySelector('.map-movers2__price')?.textContent).toBe('avg sale ▼12%');
   expect(rows[0].querySelector('path.map-movers2__mark')).not.toBeNull();
   expect(rows[1].querySelector('circle.map-movers2__mark')).not.toBeNull();
-  expect(container.querySelector('.map-movers2__base')?.textContent).toContain("after taking out BaT's own growth (▲12%, 34,598 → 38,879)");
-  expect(container.querySelector('.map-movers2__base')?.textContent).toContain('61 of 150 families with 30+ BaT sales each year changed for real');
+  expect(container.querySelector('.map-movers2__base')?.textContent).toContain("after taking out the market's own growth (▲12%, 34,598 → 38,879)");
+  expect(container.querySelector('.map-movers2__base')?.textContent).toContain('61 of 150 families with 30+ measured sales each year changed for real');
   expect(container.querySelector('.map-movers2__base')?.textContent).not.toMatch(/standard error|SE range|log axis/);
   await act(async () => (rows[1] as HTMLButtonElement).click());
   expect(onPick).toHaveBeenCalledWith(expect.objectContaining({ brand: 'Acura', family_key: 'fint', family: 'Integra' }));

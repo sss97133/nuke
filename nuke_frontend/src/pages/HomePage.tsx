@@ -184,7 +184,7 @@ export function familyNamesShown(shown: number, names?: number): string {
  *  and its sold amount (vehicle_price_facts); the median is withheld under 5 sales. */
 export function mapLegend(level: MapLevel, measured = level === 'brands' || level === 'families' || level === 'models'): string {
   if (level === 'vehicles') return 'box size = confirmed sale price · click a box to open the car';
-  if (measured) return `box size = dollars from confirmed sales · of offered sold = share of cars offered at auction that sold · BaT 12 mo = sales and dollars on Bring a Trailer in the last 12 months against the 12 before, the one house we hold in full both years; color follows those sales (gray: BaT holds under half the sales, or too few a year earlier) · prices not adjusted for inflation${level === 'families' ? ' · other models = names not yet keyed to a family, and families with under 3 sales' : ''} · click a box to go deeper`;
+  if (measured) return `box size = dollars from confirmed sales · of offered sold = share of cars offered at auction that sold · 12 mo = sales and dollars in the last 12 months against the 12 before, measured at auction houses held in full both years (today Bring a Trailer); color follows those sales (gray: the measured houses hold under half the sales, or too few a year earlier) · prices not adjusted for inflation${level === 'families' ? ' · other models = names not yet keyed to a family, and families with under 3 sales' : ''} · click a box to go deeper`;
   return 'box size = vehicles with a confirmed sale · color = their median sale price (gray: under 5 sales) · prices not adjusted for inflation, all years · asks, bids and unknown outcomes are not counted · click a box to go deeper';
 }
 
@@ -193,7 +193,7 @@ export function mapLegend(level: MapLevel, measured = level === 'brands' || leve
 export const SALES_CHART_LEGEND = 'one dot = one confirmed sale with a date, the last five years · one panel per decade the cars '
   + 'were built, all on one price scale that leaves out the cheapest and dearest 1% (those sit on the edge, counted) · '
   + 'color = auction house · line = the typical (median) price of sales within 60 days either side; band = their middle half · '
-  + 'headline = Bring a Trailer\'s price change, each decade weighted by how much it sold a year earlier · prices not adjusted '
+  + 'headline = the price change at houses held in full both years (today Bring a Trailer), each decade weighted by how much it sold a year earlier · prices not adjusted '
   + 'for inflation · click a dot to open the car';
 export function legendFor(level: MapLevel, chartShown: boolean, measured?: boolean): string {
   return chartShown ? SALES_CHART_LEGEND : measured === undefined ? mapLegend(level) : mapLegend(level, measured);
@@ -458,8 +458,8 @@ export function brandLines(n: TreemapNode, maxChars = Infinity): string[] {
   const m = brandMomentum(n);
   const d = brandDollarMomentum(n);
   if (m !== null) {
-    forms.push([...(d !== null ? [`BaT 12 mo: sales ${signedPct(m)}, $ ${signedPct(d)}`] : []),
-      `BaT 12 mo: sales ${signedPct(m)}`, `12 mo ${signedPct(m)}`]);
+    forms.push([...(d !== null ? [`12 mo: sales ${signedPct(m)}, $ ${signedPct(d)}`] : []),
+      `12 mo: sales ${signedPct(m)}`, `12 mo ${signedPct(m)}`]);
   }
   return forms.map(f => f.find(line => lineChars(line) <= maxChars)).filter((line): line is string => line !== undefined);
 }
@@ -1417,8 +1417,6 @@ export function TreemapHomePage({ onBrowse, embedded = false }: { onBrowse: () =
               ENTER FEED
             </button>
           )}
-          {marketLevel && <MapViewSwitch label="Map size" value={basis} onChange={setBasis}
-            options={[{ value: 'ledger', label: 'All sales' }, { value: 'bat12', label: 'BaT 12 mo' }]} />}
           {levelType === 'brands' && <MapViewSwitch label="Map view" value={brandView} onChange={setBrandView}
             options={[{ value: 'brands', label: 'Brands' }, { value: 'nested', label: 'Families inside' }]} />}
           {levelType === 'models' && currentLevel.family && <FamilyViewSwitch value={familyView} onChange={setFamilyView} />}
