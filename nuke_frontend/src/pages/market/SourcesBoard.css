@@ -15,7 +15,7 @@
 .market-sources__live-summary i { width: 7px; height: 7px; background: var(--success); display: inline-block;
   animation: market-sources-pulse 1.8s ease-in-out infinite; }
 .market-sources__cols, .market-sources__row { display: grid; align-items: center; gap: 12px;
-  grid-template-columns: 22px minmax(120px, 1.1fr) 150px minmax(150px, 1.2fr) minmax(210px, 1.25fr) minmax(130px, 1fr) 90px; }
+  grid-template-columns: 22px minmax(205px, 1.45fr) 115px minmax(140px, 1.15fr) minmax(200px, 1.2fr) minmax(120px, 0.95fr) 85px; }
 .market-sources__cols { font-size: 9px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase;
   color: var(--text-secondary); padding: 2px 0 4px; border-bottom: 1px solid var(--border); }
 .market-sources .n { text-align: right; font-family: 'Courier New', monospace; font-variant-numeric: tabular-nums; white-space: nowrap; }
@@ -24,8 +24,9 @@
 .market-sources__row--open { background: var(--surface); border-bottom-color: transparent; }
 .market-sources__rank { font-size: 11px; color: var(--text-secondary); font-family: 'Courier New', monospace; }
 .market-sources__name { display: flex; align-items: center; gap: 6px; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
-/* A house's own mark on a white chip, so a dark wordmark reads on either theme; 18 px tall, up to 96 px wide. */
-.market-sources__icon { flex: none; background: #fff; padding: 2px 4px; box-sizing: content-box; }
+/* A house's own transparent PNG mark; 18 px tall, up to 76 px wide, with a dark drop-shadow only on light theme. */
+.market-sources__icon { flex: none; object-fit: contain; filter: none; }
+[data-theme="light"] .market-sources__icon { filter: drop-shadow(0 0 0.75px rgba(0, 0, 0, 0.85)) drop-shadow(0 0 1px rgba(0, 0, 0, 0.55)); }
 .market-sources__name small { font-weight: 400; color: var(--text-secondary); font-size: 10px; text-transform: lowercase; }
 .market-sources__held small { font-size: 10px; } .market-sources__held .up { color: var(--success); } .market-sources__held .down { color: var(--error); }
 .market-sources__share { display: grid; grid-template-columns: minmax(60px, 1fr) 11.5em; align-items: center; gap: 8px; min-width: 0; }

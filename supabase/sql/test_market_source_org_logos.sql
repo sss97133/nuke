@@ -38,6 +38,10 @@ INSERT INTO public.organizations (id, business_name, website, business_type, is_
   ('bb6253c0-cb83-4d1c-b95c-09c811064af7', 'Beverly Hills Car Club', 'https://www.beverlyhillscarclub.com', 'dealer', true,
    'https://www.beverlyhillscarclub.com/template/images/logo.png', '{}'),
   ('f7c80592-6725-448d-9b32-2abf3e011cf8', 'PCarMarket', 'https://www.pcarmarket.com', 'auction_house', true, NULL, '{}'),
+  ('7a3d0d2a-c738-4d8a-a199-1a687aa6cdf4', 'Barrett-Jackson', 'https://www.barrett-jackson.com', 'auction_house', true,
+   'https://www.barrett-jackson.com/_next/static/media/186BJ_Logo_Tag.46033550.svg', '{}'),
+  ('0d435048-f2c5-47ba-bba0-4c18c6d58686', 'Collecting Cars', 'https://collectingcars.com', 'auction_house', true,
+   'https://collectingcars.com/images/logos/collecting-cars-logo.svg', '{}'),
   ('d2bd6370-11d1-4af0-8dd2-3de2c3899166', 'Bring a Trailer', 'https://bringatrailer.com', 'auction_house', true,
    'https://bringatrailer.com/wp-content/uploads/2026/01/Screenshot-2026-01-06-at-08-39-18-Welcome-to-Arizona-Car-Week-2026-17563.png', '{}'),
   ('d2f587a0-5993-4d2c-9032-0fb3dd94d995', 'Mecum Auctions', 'https://www.mecum.com', 'auction_house', true,
@@ -51,6 +55,8 @@ INSERT INTO public.observation_sources (slug, display_name, category, business_i
   ('barnfinds', 'Barn Finds', 'marketplace', '0daa5b15-5105-48f0-b6d5-68c71be8dcfb'),
   ('facebook_marketplace', 'Facebook Marketplace', 'marketplace', '6694c750-b216-47c8-a337-d36b4fb8e26b'),
   ('pcarmarket', 'PCarMarket', 'auction', 'f7c80592-6725-448d-9b32-2abf3e011cf8'),
+  ('barrett-jackson', 'Barrett-Jackson', 'auction', '7a3d0d2a-c738-4d8a-a199-1a687aa6cdf4'),
+  ('collecting-cars', 'Collecting Cars', 'auction', '0d435048-f2c5-47ba-bba0-4c18c6d58686'),
   ('bat', 'Bring a Trailer', 'auction', 'd2bd6370-11d1-4af0-8dd2-3de2c3899166'),
   ('mecum', 'Mecum Auctions', 'auction', 'd2f587a0-5993-4d2c-9032-0fb3dd94d995'),
   ('broad-arrow', 'Broad Arrow Auctions', 'auction', 'bf7f8e55-4abc-45dc-aae0-1df86a9f365a'),
@@ -98,8 +104,8 @@ SELECT pg_temp.ok('a different logo already recorded refuses the block and nothi
 -- The real run.
 \ir ../migrations/20261018050000_market_source_org_logos.sql
 
-SELECT pg_temp.ok('all thirteen markets are linked, and the three missing organizations were created',
-  (SELECT count(*) FROM public.observation_sources WHERE business_id IS NOT NULL) = 17
+SELECT pg_temp.ok('all nineteen markets are linked, and the three missing organizations were created',
+  (SELECT count(*) FROM public.observation_sources WHERE business_id IS NOT NULL) = 19
   AND (SELECT count(*) FROM public.organizations) = (SELECT count(*) FROM before_all) + 3);
 SELECT pg_temp.ok('each market links to the organization named for it',
   (SELECT count(*) FROM public.observation_sources s JOIN public.organizations o ON o.id = s.business_id
@@ -107,28 +113,34 @@ SELECT pg_temp.ok('each market links to the organization named for it',
       ('barnfinds','Barn Finds'), ('facebook_marketplace','Facebook Marketplace'), ('cars-and-bids','Cars & Bids'),
       ('craigslist','Craigslist'), ('ebay_motors','eBay Motors'), ('sbx-cars','SBX Cars'),
       ('beverlyhillscarclub','Beverly Hills Car Club'), ('ksl','KSL Cars'), ('motorious','Motorious'),
-      ('classiccars-com','ClassicCars.com'))) = 13);
+      ('classiccars-com','ClassicCars.com'), ('pcarmarket','PCarMarket'), ('barrett-jackson','Barrett-Jackson'),
+      ('collecting-cars','Collecting Cars'))) = 16);
 SELECT pg_temp.ok('the three created organizations came through the sanctioned creator, once each, with no country and no owner',
   (SELECT count(*) FROM public.organizations o JOIN public.observation_sources s ON s.business_id = o.id
     WHERE (s.slug, o.website) IN (('ksl','https://cars.ksl.com'), ('motorious','https://motorious.com'), ('classiccars-com','https://classiccars.com'))
       AND o.discovered_via = 'declared-source:' || s.slug AND o.business_type = 'marketplace' AND o.country IS NULL
       AND o.is_public = false AND o.discovered_by IS NULL AND o.uploaded_by IS NULL) = 3
   AND (SELECT count(*) FROM public.organizations WHERE website IN ('https://cars.ksl.com','https://motorious.com','https://classiccars.com')) = 3);
-SELECT pg_temp.ok('fifteen markets record a hosted copy of the logo their house publishes, with where, how and when it was found',
+SELECT pg_temp.ok('all nineteen markets record a hosted PNG copy of the logo their house publishes, with where, how and when it was found',
   (SELECT count(*) FROM public.observation_sources s JOIN public.organizations o ON o.id = s.business_id
-    WHERE o.logo_url ~ '^https://nuke[.]ag/source-logos/[a-z0-9_-]+[.](png|svg)$'
+    WHERE o.logo_url ~ '^https://nuke[.]ag/source-logos/[a-z0-9_-]+[.]png$'
       AND o.metadata->'logo'->>'asset_url' = o.logo_url AND (o.metadata->'logo'->>'hosted')::boolean
       AND o.metadata->'logo'->>'source_url' ~ '^https://' AND o.metadata->'logo'->>'found_on' ~ '^https://'
       AND length(o.metadata->'logo'->>'found_how') > 10
       AND o.metadata->'logo'->>'observed_at' = '2026-10-15' AND o.metadata->'logo'->>'method' = 'official-site-asset'
       AND o.metadata->'logo'->>'surface' IN ('light', 'dark', 'any') AND (o.metadata->'logo'->>'aspect')::numeric > 0
-      AND s.slug IN ('bonhams','gooding','rm-sothebys','barnfinds','facebook_marketplace','cars-and-bids','ebay_motors',
-                     'sbx-cars','beverlyhillscarclub','ksl','motorious','classiccars-com','bat','mecum','broad-arrow')) = 15);
+      AND s.slug IN ('bonhams','gooding','rm-sothebys','barnfinds','facebook_marketplace','cars-and-bids','craigslist',
+                     'pcarmarket','barrett-jackson','collecting-cars','ebay_motors','sbx-cars','beverlyhillscarclub',
+                     'ksl','motorious','classiccars-com','bat','mecum','broad-arrow')) = 19);
 SELECT pg_temp.ok('the hosted copy is named for the market, and the house''s own address is kept as its source',
   (SELECT logo_url FROM public.organizations WHERE id = 'eb426570-c8e7-43c3-a4f1-8807ed9e075c') = 'https://nuke.ag/source-logos/bonhams.png'
   AND (SELECT metadata->'logo'->>'source_url' FROM public.organizations WHERE id = 'eb426570-c8e7-43c3-a4f1-8807ed9e075c')
     = 'https://www.bonhams.com/web-assets/bonhams-logo-neue-world.png'
-  AND (SELECT logo_url FROM public.organizations WHERE id = '3f8d4e4f-d9cb-41b5-9b3b-58ec2325ea37') = 'https://nuke.ag/source-logos/rm-sothebys.svg'
+  AND (SELECT logo_url FROM public.organizations WHERE id = '3f8d4e4f-d9cb-41b5-9b3b-58ec2325ea37') = 'https://nuke.ag/source-logos/rm-sothebys.png'
+  AND (SELECT logo_url FROM public.organizations WHERE id = '624b7f80-c4c7-455d-8f0a-f7ae7ff67a42') = 'https://nuke.ag/source-logos/craigslist.png'
+  AND (SELECT logo_url FROM public.organizations WHERE id = 'f7c80592-6725-448d-9b32-2abf3e011cf8') = 'https://nuke.ag/source-logos/pcarmarket.png'
+  AND (SELECT logo_url FROM public.organizations WHERE id = '7a3d0d2a-c738-4d8a-a199-1a687aa6cdf4') = 'https://nuke.ag/source-logos/barrett-jackson.png'
+  AND (SELECT logo_url FROM public.organizations WHERE id = '0d435048-f2c5-47ba-bba0-4c18c6d58686') = 'https://nuke.ag/source-logos/collecting-cars.png'
   AND (SELECT logo_url FROM public.organizations WHERE website = 'https://cars.ksl.com') = 'https://nuke.ag/source-logos/ksl.png'
   AND (SELECT metadata->'logo'->>'source_url' FROM public.organizations WHERE website = 'https://cars.ksl.com')
     = 'https://ctfassets.ksldigital.com/prnz0r0d2myc/3e3b8aAYx5ETWVPHXI5YdC/77ece66492affd0e81879a12c9df2c54/ksl-classifieds-app-icon.png' -- gitleaks:allow (a public asset address, not a credential)
@@ -142,15 +154,12 @@ SELECT pg_temp.ok('the wrong image Bring a Trailer, Mecum and Broad Arrow record
   AND (SELECT metadata->'logo'->>'replaced' FROM public.organizations WHERE id = 'd2bd6370-11d1-4af0-8dd2-3de2c3899166') ~ 'Arizona-Car-Week');
 SELECT pg_temp.ok('a row''s other metadata is kept',
   (SELECT metadata->'org_intake'->>'source' FROM public.organizations WHERE id = '0daa5b15-5105-48f0-b6d5-68c71be8dcfb') = 'barnfinds');
-SELECT pg_temp.ok('Craigslist is linked and has no logo, and the other organization on its site is not touched',
-  (SELECT logo_url IS NULL AND NOT (metadata ? 'logo') FROM public.organizations WHERE id = '624b7f80-c4c7-455d-8f0a-f7ae7ff67a42')
+SELECT pg_temp.ok('Craigslist and PCarMarket record their hosted PNG logos, and duplicate organizations on the same site are untouched',
+  (SELECT logo_url FROM public.organizations WHERE id = '624b7f80-c4c7-455d-8f0a-f7ae7ff67a42') = 'https://nuke.ag/source-logos/craigslist.png'
+  AND (SELECT logo_url FROM public.organizations WHERE id = 'f7c80592-6725-448d-9b32-2abf3e011cf8') = 'https://nuke.ag/source-logos/pcarmarket.png'
   AND (SELECT business_id FROM public.observation_sources WHERE slug = 'craigslist') = '624b7f80-c4c7-455d-8f0a-f7ae7ff67a42'
   AND NOT EXISTS (SELECT 1 FROM before_all b JOIN public.organizations o USING (id)
-                   WHERE b.id = 'b91ea58b-9371-4937-9ebb-93c70ec5485e' AND b.org <> to_jsonb(o)));
-SELECT pg_temp.ok('PCarMarket and the duplicate Gooding row are untouched, and PCarMarket has no logo',
-  NOT EXISTS (SELECT 1 FROM before_all b JOIN public.organizations o USING (id)
-               WHERE b.id IN ('f7c80592-6725-448d-9b32-2abf3e011cf8', '98a2e93e-b814-4fda-b48a-0bb5440b7d00') AND b.org <> to_jsonb(o))
-  AND (SELECT logo_url IS NULL FROM public.organizations WHERE id = 'f7c80592-6725-448d-9b32-2abf3e011cf8'));
+                   WHERE b.id IN ('b91ea58b-9371-4937-9ebb-93c70ec5485e', '98a2e93e-b814-4fda-b48a-0bb5440b7d00') AND b.org <> to_jsonb(o)));
 
 -- Replay changes nothing.
 CREATE TEMP TABLE after_first AS SELECT id, to_jsonb(o) AS org FROM public.organizations o;
