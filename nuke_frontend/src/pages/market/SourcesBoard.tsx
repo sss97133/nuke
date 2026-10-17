@@ -21,8 +21,18 @@ export type LandingRecentEvent = {
   source: string;
   eventType: string | null;
   eventStatus: string | null;
+  reserve: string | null;
   price: number | null;
+  bidCount: number | null;
+  year: number | null;
+  make: string | null;
+  model: string | null;
+  trim: string | null;
+  vin: string | null;
+  mileage: number | null;
+  recordDate: string | null;
   title: string | null;
+  rawTitle: string | null;
   lot: string | null;
   vehicleId: string | null;
   sourceUrl: string | null;
@@ -91,6 +101,7 @@ const numArray = (x: unknown, len?: number): number[] => {
   if (len && parsed.length < len) return [...Array(len - parsed.length).fill(0), ...parsed];
   return parsed;
 };
+const normKey = (s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, '');
 
 /** The reader's value as typed rows, decoded by column name; anything else is null. */
 export function parseSources(value: unknown): SourcesBoardData | null {
@@ -201,8 +212,18 @@ export function parseSourceLanding(value: unknown): SourceLandingDetail | null {
         source,
         eventType: str(ev.event_type),
         eventStatus: str(ev.event_status),
+        reserve: str(ev.reserve),
         price: num(ev.price),
+        bidCount: num(ev.bid_count),
+        year: num(ev.year),
+        make: str(ev.make),
+        model: str(ev.model),
+        trim: str(ev.trim),
+        vin: str(ev.vin),
+        mileage: num(ev.mileage),
+        recordDate: str(ev.record_date),
         title: str(ev.title),
+        rawTitle: str(ev.raw_title),
         lot: str(ev.lot),
         vehicleId: str(ev.vehicle_id),
         sourceUrl: str(ev.source_url),
@@ -229,6 +250,11 @@ export function parseSourceLanding(value: unknown): SourceLandingDetail | null {
 }
 
 const count = (n: number) => Math.round(n).toLocaleString('en-US');
+const compactCount = (n: number) => {
+  if (n >= 10000) return `${Math.round(n / 1000)}k`;
+  if (n >= 1000) return `${(n / 1000).toFixed(1).replace(/\.0$/, '')}k`;
+  return String(Math.round(n));
+};
 export function money(n: number | null): string {
   if (n == null || !(n > 0)) return '';
   if (n >= 1e9) return `$${(n / 1e9).toFixed(1)}B`;
@@ -377,6 +403,12 @@ function hourSlotIso(endHourIso: string | null, indexFromStart: number, total = 
   return new Date(Math.floor(slotMs / 3600_000) * 3600_000).toISOString();
 }
 
+function daySlotIso(endDayIso: string | null, indexFromStart: number, total = 14): string {
+  const base = endDayIso ? Date.parse(`${endDayIso.slice(0, 10)}T00:00:00Z`) : Date.now();
+  if (Number.isNaN(base)) return '';
+  return new Date(base - (total - 1 - indexFromStart) * 86400_000).toISOString().slice(0, 10);
+}
+
 function formatHourLabel(iso: string | null): string {
   if (!iso) return '';
   const d = new Date(iso);
@@ -402,12 +434,14 @@ function formatExactTime(iso: string | null): string {
 function SourceLandingInspector({
   row,
   boardLanding,
+  boardDay,
   sourceNames,
   onClose,
   asBlock = false,
 }: {
   row: SourceRow | null;
   boardLanding: BoardLandingMeta;
+  boardDay: string | null;
   sourceNames: ReadonlyMap<string, string>;
   onClose: () => void;
   asBlock?: boolean;
@@ -452,8 +486,10 @@ function SourceLandingInspector({
 
   const fallbackHours = row ? row.hours24 : boardLanding.hours24;
   const fallbackMins = row ? row.mins60 : boardLanding.mins60;
+  const fallbackDays = row ? row.days14 : [];
   const hours24 = detail?.hours24?.length === 24 ? detail.hours24 : fallbackHours;
   const mins60 = detail?.mins60?.length === 12 ? detail.mins60 : fallbackMins;
+  const days14 = detail?.days14?.length === 14 ? detail.days14 : fallbackDays;
   const endHourIso = detail?.hour ?? boardLanding.hour ?? null;
   const landed15m = detail?.landed15m ?? (row ? row.landed15m : boardLanding.landed15m);
   const landed1h = detail?.landed1h ?? (row ? row.landed1h : boardLanding.landed1h);
@@ -464,7 +500,12 @@ function SourceLandingInspector({
 
   const maxHour = Math.max(1, ...hours24);
   const maxMin = Math.max(1, ...mins60);
+  const maxDay = Math.max(1, ...days14);
+  const show14dFallback = landed24 === 0 && days14.some((d) => d > 0);
   const Tag = asBlock ? 'div' : 'li';
+
+  const resolveSourceName = (rawSource: string) =>
+    sourceNames.get(rawSource) ?? sourceNames.get(normKey(rawSource)) ?? rawSource;
 
   return (
     <Tag className="market-sources__drill" aria-label={`Live ingestion for ${displayName}`}>
@@ -483,7 +524,7 @@ function SourceLandingInspector({
             </button>
           ) : (
             <span className="market-sources__drill-live-tag">
-              {loading ? 'syncing…' : 'live stream'}
+              {loading ? 'syncing…' : landed1h > 0 ? 'live stream' : landed24 > 0 ? 'active today' : 'historical log'}
             </span>
           )}
         </div>
@@ -550,7 +591,7 @@ function SourceLandingInspector({
                   onClick={() => slotIso && setSelectedHour((cur) => (cur === slotIso ? null : slotIso))}
                   title={`${hourLabel} UTC: +${count(n)} landed`}
                 >
-                  <span className="market-sources__hour-val">{n > 0 ? count(n) : ''}</span>
+                  <span className="market-sources__hour-val">{n > 0 ? compactCount(n) : ''}</span>
                   <svg className="market-sources__hour-track" viewBox="0 0 10 100" preserveAspectRatio="none" aria-hidden="true">
                     {pct > 0 ? <rect className="market-sources__hour-fill" x="0" y={100 - pct} width="10" height={pct} /> : null}
                   </svg>
@@ -561,28 +602,53 @@ function SourceLandingInspector({
           </div>
         </div>
 
-        <div className="market-sources__chart-box market-sources__chart-box--mins">
-          <div className="market-sources__chart-head">
-            <span>Live 60m burst · 5-min windows</span>
-            <small>{landed1h > 0 ? `${(landed1h / 60).toFixed(1)}/min avg` : 'no arrivals in last 60m'}</small>
+        {show14dFallback ? (
+          <div className="market-sources__chart-box market-sources__chart-box--mins">
+            <div className="market-sources__chart-head">
+              <span>Daily ingestion · last 14 days</span>
+              <small>+{count(days14.reduce((a, b) => a + b, 0))} in 14d</small>
+            </div>
+            <div className="market-sources__day-grid" role="group" aria-label="14 daily ingestion bars">
+              {days14.map((n, idx) => {
+                const dayIso = daySlotIso(boardDay, idx, 14);
+                const lbl = shortDay(dayIso);
+                const pct = n > 0 ? Math.max(10, Math.round((Math.sqrt(n) / Math.sqrt(maxDay)) * 100)) : 0;
+                return (
+                  <div key={idx} className={`market-sources__min-col${idx === 13 ? ' is-now' : ''}`} title={`${lbl}: +${count(n)} landed`}>
+                    <span className="market-sources__hour-val">{n > 0 ? compactCount(n) : ''}</span>
+                    <svg className="market-sources__hour-track" viewBox="0 0 10 100" preserveAspectRatio="none" aria-hidden="true">
+                      {pct > 0 ? <rect className="market-sources__hour-fill" x="0" y={100 - pct} width="10" height={pct} /> : null}
+                    </svg>
+                    <span className="market-sources__hour-lbl">{idx % 3 === 0 || idx === 13 ? lbl.replace(' ', '\u00a0') : ''}</span>
+                  </div>
+                );
+              })}
+            </div>
           </div>
-          <div className="market-sources__min-grid" role="group" aria-label="12 five-minute ingestion bars">
-            {mins60.map((n, idx) => {
-              const minsAgo = (11 - idx) * 5;
-              const lbl = minsAgo === 0 ? 'now' : `-${minsAgo}m`;
-              const pct = n > 0 ? Math.max(10, Math.round((Math.sqrt(n) / Math.sqrt(maxMin)) * 100)) : 0;
-              return (
-                <div key={idx} className={`market-sources__min-col${idx === 11 ? ' is-now' : ''}`} title={`${lbl}: +${count(n)} landed`}>
-                  <span className="market-sources__hour-val">{n > 0 ? count(n) : ''}</span>
-                  <svg className="market-sources__hour-track" viewBox="0 0 10 100" preserveAspectRatio="none" aria-hidden="true">
-                    {pct > 0 ? <rect className="market-sources__hour-fill" x="0" y={100 - pct} width="10" height={pct} /> : null}
-                  </svg>
-                  <span className="market-sources__hour-lbl">{idx % 2 === 1 || idx === 0 ? lbl : ''}</span>
-                </div>
-              );
-            })}
+        ) : (
+          <div className="market-sources__chart-box market-sources__chart-box--mins">
+            <div className="market-sources__chart-head">
+              <span>Live 60m burst · 5-min windows</span>
+              <small>{landed1h > 0 ? `${(landed1h / 60).toFixed(1)}/min avg` : 'no arrivals in last 60m'}</small>
+            </div>
+            <div className="market-sources__min-grid" role="group" aria-label="12 five-minute ingestion bars">
+              {mins60.map((n, idx) => {
+                const minsAgo = (11 - idx) * 5;
+                const lbl = minsAgo === 0 ? 'now' : `-${minsAgo}m`;
+                const pct = n > 0 ? Math.max(10, Math.round((Math.sqrt(n) / Math.sqrt(maxMin)) * 100)) : 0;
+                return (
+                  <div key={idx} className={`market-sources__min-col${idx === 11 ? ' is-now' : ''}`} title={`${lbl}: +${count(n)} landed`}>
+                    <span className="market-sources__hour-val">{n > 0 ? compactCount(n) : ''}</span>
+                    <svg className="market-sources__hour-track" viewBox="0 0 10 100" preserveAspectRatio="none" aria-hidden="true">
+                      {pct > 0 ? <rect className="market-sources__hour-fill" x="0" y={100 - pct} width="10" height={pct} /> : null}
+                    </svg>
+                    <span className="market-sources__hour-lbl">{idx % 2 === 1 || idx === 0 ? lbl : ''}</span>
+                  </div>
+                );
+              })}
+            </div>
           </div>
-        </div>
+        )}
       </div>
 
       <div className="market-sources__drill-feed">
@@ -598,6 +664,7 @@ function SourceLandingInspector({
           <ul className="market-sources__events">
             {recent.slice(0, 12).map((ev) => {
               const label = ev.title || ev.lot || ev.id;
+              const srcDisplay = resolveSourceName(ev.source);
               return (
                 <li key={ev.id} className="market-sources__event">
                   <span className="market-sources__event-time" title={formatExactTime(ev.createdAt)}>
@@ -621,10 +688,10 @@ function SourceLandingInspector({
                   <span className="market-sources__event-link">
                     {ev.sourceUrl ? (
                       <a href={ev.sourceUrl} target="_blank" rel="noreferrer" title={ev.sourceUrl}>
-                        {sourceNames.get(ev.source) ?? ev.source} ↗
+                        {srcDisplay} ↗
                       </a>
                     ) : (
-                      sourceNames.get(ev.source) ?? ev.source
+                      srcDisplay
                     )}
                   </span>
                 </li>
@@ -650,7 +717,14 @@ export function SourcesBoardView({ data, scope }: { data: SourcesBoardData; scop
   const notRanked = Object.entries(data.notRanked).sort((x, y) => y[1] - x[1])
     .map(([k, n]) => `${n} ${NOT_RANKED_WORDS[k] ?? k}${n > 1 ? 's' : ''}`);
   const scopedLabel = scope?.trim() ? 'Sources · all makes' : 'Sources';
-  const sourceNames = new Map(data.rows.map((r) => [r.source, shortName(r.name)]));
+  const sourceNames = new Map<string, string>();
+  for (const r of data.rows) {
+    const clean = shortName(r.name);
+    sourceNames.set(r.source, clean);
+    sourceNames.set(normKey(r.source), clean);
+  }
+  sourceNames.set('classiccars', 'ClassicCars.com');
+  sourceNames.set('bringatrailer', 'Bring a Trailer');
 
   const binsForHorizon = (r: SourceRow): number[] => {
     if (horizon === '24h') return r.hours24;
@@ -689,6 +763,7 @@ export function SourcesBoardView({ data, scope }: { data: SourcesBoardData; scop
         <SourceLandingInspector
           row={null}
           boardLanding={data.landing}
+          boardDay={data.day}
           sourceNames={sourceNames}
           onClose={() => setOpenSource(null)}
           asBlock
@@ -743,7 +818,7 @@ export function SourcesBoardView({ data, scope }: { data: SourcesBoardData; scop
                       {/* Identity through the shared renderer (frontend rule 2026-10-08): the organization's recorded logo,
                           else its type icon. */}
                       <OrgLogo logoUrl={r.logoUrl} businessType={r.businessType ?? (r.category === 'auction' ? 'auction_house' : null)}
-                        businessName={r.name} size={18} maxWidth={76} variant="logo" className="market-sources__icon" />
+                        businessName={r.name} size={18} maxWidth={96} variant="logo" className="market-sources__icon" />
                       {shortName(r.name)}
                     </span>
                     <span className="market-sources__held n" title={r.heldAt ? `held as of ${heldWhen(r.heldAt)}` : undefined}>
@@ -783,6 +858,7 @@ export function SourcesBoardView({ data, scope }: { data: SourcesBoardData; scop
                     <SourceLandingInspector
                       row={r}
                       boardLanding={data.landing}
+                      boardDay={data.day}
                       sourceNames={sourceNames}
                       onClose={() => setOpenSource(null)}
                     />

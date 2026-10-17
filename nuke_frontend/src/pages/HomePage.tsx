@@ -1284,7 +1284,10 @@ export function TreemapHomePage({ onBrowse, embedded = false }: { onBrowse: () =
     return () => { live = false; };
   }, [horizon, baselineHorizon, isCustomBase]);
   const horizonMeta = useMemo(() => MOVER_HORIZONS.find((h) => h.key === horizon) ?? MOVER_HORIZONS[6], [horizon]);
-  const gateMin = useMemo(() => gateMinForHorizon(horizon), [horizon]);
+  const gateMin = useMemo(
+    () => (isCustomBase ? Math.min(gateMinForHorizon(horizon), gateMinForHorizon(baselineHorizon as MoverHorizon)) : gateMinForHorizon(horizon)),
+    [horizon, baselineHorizon, isCustomBase],
+  );
   const horizonWindowLabel = horizon === '1y' && !isCustomBase ? undefined : horizonMeta.windowLabel.toLowerCase();
   const brandsData = useMemo(() => {
     if (!rawBrandsData) return null;
@@ -2276,9 +2279,9 @@ export function TreemapHomePage({ onBrowse, embedded = false }: { onBrowse: () =
         >
           {levelType === 'brands' && brandView === 'nested' && dims.w > 0 ? (
             <BrandFamilyMap width={dims.w} height={dims.h} baseline={baseline} basis={basis}
-              familyMoves={horizon === '1y' ? undefined : moversData?.family_moves}
+              familyMoves={horizon === '1y' && !isCustomBase ? undefined : moversData?.family_moves}
               gateMin={gateMin}
-              horizonShortLabel={horizon === '1y' ? '12 mo' : horizonMeta.label}
+              horizonShortLabel={horizon === '1y' && !isCustomBase ? '12 mo' : horizonMeta.label}
               onPickBrand={(brand) => { recordInterest('make', brand); setDrillStack([{ label: 'ALL MAKES' }, { label: brand, make: brand }]); }}
               onPickFamily={(brand, key, family) => { recordInterest('make', brand); setDrillStack([{ label: 'ALL MAKES' }, { label: brand, make: brand }, { label: family, make: brand, family: key }]); }} />
           ) : levelType === 'models' && currentLevel.family && currentLevel.make && familyView === 'sales' && dims.w > 0 ? (
