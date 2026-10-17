@@ -1,22 +1,28 @@
 export const KNOWN_MAKES: string[] = [
-  'Acura', 'Alfa Romeo', 'AM General', 'Ariel', 'Aston Martin', 'Auburn', 'Audi',
-  'Austin', 'Austin-Healey', 'Backdraft', 'Bentley', 'BMW', 'Bricklin', 'Bugatti',
-  'Buick', 'Cadillac', 'Caterham', 'Chevrolet', 'Chrysler', 'Citroen', 'Cord',
-  'Crane-Simplex', 'Datsun', 'De Tomaso', 'Delage', 'DeSoto', 'Dodge', 'Dual-Ghia',
-  'Ducati', 'Duesenberg', 'Edsel', 'Factory Five', 'Ferrari', 'Fiat', 'Fisker',
-  'Ford', 'GMC', 'Harley-Davidson', 'Henderson', 'Hispano-Suiza', 'Honda',
-  'Hudson', 'Hummer', 'Hyundai', 'Imperial', 'Indian', 'INEOS', 'Infiniti',
-  'International', 'Iso', 'Isuzu', 'Jaguar', 'Jeep', 'Jensen', 'Kaiser',
-  'Kawasaki', 'Lamborghini', 'Lancia', 'Land Rover', 'Lexus', 'Lincoln',
-  'Lister-Chevrolet', 'Locomobile', 'Lotus', 'Lucid', 'Marmon', 'Maserati',
-  'Maybach', 'Mazda', 'McLaren', 'Mercer', 'Mercedes-Benz', 'Mercury', 'Meyers',
-  'MG', 'Mini', 'Mitsubishi', 'Morgan', 'Morris', 'Nash', 'Nissan', 'Oldsmobile',
-  'Opel', 'Packard', 'Pagani', 'Panoz', 'Peugeot', 'Plymouth', 'Pontiac',
-  'Porsche', 'Ram', 'Renault', 'Rivian', 'Rolls-Royce', 'Rossion', 'Ruf',
-  'Saab', 'Saturn', 'Shelby', 'Simplex', 'Spyker', 'Studebaker', 'Stutz',
-  'Subaru', 'Sunbeam', 'Superformance', 'Suzuki', 'Talbot-Lago', 'Tesla',
-  'Toyota', 'Triumph', 'Tucker', 'TVR', 'Vincent', 'Volkswagen', 'Volvo',
-  'Willys', 'Yamaha'
+  'Abarth', 'Acura', 'Airstream', 'Alfa Romeo', 'Alvis', 'AM General', 'AMC',
+  'American Underslung', 'Ariel', 'Aston Martin', 'Auburn', 'Audi', 'Austin',
+  'Austin-Healey', 'Autobianchi', 'Avanti', 'Avions Voisin', 'Backdraft', 'Beck',
+  'Bentley', 'Bizzarrini', 'BMW', 'Bricklin', 'Brough Superior', 'Bugatti',
+  'Buick', 'Cadillac', 'Caterham', 'Chevrolet', 'Chrysler', 'Citroen', 'Citroën',
+  'Cord', 'Crane-Simplex', 'Daimler', 'Datsun', 'De Tomaso', 'Delage', 'Delahaye',
+  'DeSoto', 'Diamond T', 'Doble', 'Dodge', 'Dual-Ghia', 'Ducati', 'Duesenberg',
+  'Edsel', 'Factory Five', 'Ferrari', 'Fiat', 'Fisker', 'Ford', 'Frazer Nash',
+  'Freightliner', 'GMC', 'Harley-Davidson', 'Henderson', 'Hispano-Suiza', 'Honda',
+  'Horch', 'Hudson', 'Hummer', 'Hyundai', 'Imperial', 'Indian', 'INEOS', 'Infiniti',
+  'Intermeccanica', 'International', 'Invicta', 'Iso', 'Isotta Fraschini', 'Isuzu',
+  'Jaguar', 'Jeep', 'Jensen', 'Kaiser', 'Kawasaki', 'Koenigsegg', 'Lagonda',
+  'Lamborghini', 'Lancia', 'Land Rover', 'LaSalle', 'Lexus', 'Lincoln', 'Lister',
+  'Lister-Chevrolet', 'Locomobile', 'Lola', 'Lotus', 'Lozier', 'Lucid', 'Marmon',
+  'Maserati', 'Maybach', 'Mazda', 'McLaren', 'Mercer', 'Mercedes-Benz',
+  'Mercedes-Simplex', 'Mercury', 'Messerschmitt', 'Meyers', 'MG', 'Minerva',
+  'Mini', 'Mitsubishi', 'Morgan', 'Morris', 'Muntz', 'Nash', 'Nash-Healey',
+  'Nissan', 'Noble', 'Oldsmobile', 'Opel', 'Packard', 'Pagani', 'Panhard',
+  'Panoz', 'Peugeot', 'Pierce-Arrow', 'Plymouth', 'Pontiac', 'Porsche', 'Qvale',
+  'Ram', 'Renault', 'Riley', 'Rivian', 'Rolls-Royce', 'Rossion', 'Ruf', 'Saab',
+  'Saturn', 'Shelby', 'Siata', 'Simplex', 'Spyker', 'Stearns', 'Studebaker',
+  'Stutz', 'Subaru', 'Sunbeam', 'Superformance', 'Suzuki', 'Talbot', 'Talbot-Lago',
+  'Tesla', 'Toyota', 'Triumph', 'Tucker', 'TVR', 'Ultima', 'Vauxhall', 'Vincent',
+  'Volkswagen', 'Volvo', 'White', 'Willys', 'Yamaha'
 ];
 
 export const MAKE_ALIASES: Record<string, string> = {
@@ -29,7 +35,11 @@ export const MAKE_ALIASES: Record<string, string> = {
   'detomaso': 'De Tomaso', 'de tomaso': 'De Tomaso',
   'healey': 'Austin-Healey', 'austin healey': 'Austin-Healey',
   'harley': 'Harley-Davidson', 'harley davidson': 'Harley-Davidson', 'hd': 'Harley-Davidson',
-  'ih': 'International', 'international harvester': 'International'
+  'ih': 'International', 'international harvester': 'International',
+  'citroën': 'Citroën', 'pierce arrow': 'Pierce-Arrow', 'isotta': 'Isotta Fraschini',
+  'panhard et levassor': 'Panhard', 'panhard-levassor': 'Panhard',
+  'avions-voisin': 'Avions Voisin', 'voisin': 'Avions Voisin',
+  'frazer-nash': 'Frazer Nash'
 };
 
 export const KNOWN_BODY_STYLES: string[] = [

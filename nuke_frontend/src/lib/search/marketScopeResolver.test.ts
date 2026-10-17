@@ -217,4 +217,36 @@ describe('marketScopeResolver', () => {
     expect(getDefinedFamilyEras('Austin-Healey', '3000').map((e) => e.shortLabel)).toEqual(['100-6', 'Mk I/II', 'BJ8']);
     expect(getDefinedFamilyEras('TVR', 'Griffith').map((e) => e.shortLabel)).toEqual(["'58–'79", 'Wedge', 'Wheeler Era']);
   });
+
+  it('resolves Slice 16 hypercar, coachbuilt, and pre-war shorthands and defined eras', async () => {
+    mockRows.data = [
+      { brand: 'Koenigsegg', family_key: 'f-regera', family: 'Regera', model_key: 'regera', model: 'Regera', sold: 6, usd: 13100000 },
+      { brand: 'Lagonda', family_key: 'f-lg45', family: 'LG45', model_key: 'lg45 rapide', model: 'LG45 Rapide', sold: 65, usd: 18500000 },
+      { brand: 'Pierce-Arrow', family_key: 'f-pa12', family: 'Twelve', model_key: 'silver arrow', model: 'Silver Arrow', sold: 42, usd: 8900000 },
+      { brand: 'Ferrari', family_key: 'f-sp3', family: 'Daytona SP3', model_key: 'daytona sp3', model: 'Daytona SP3', sold: 5, usd: 50840000 },
+      { brand: 'Rolls-Royce', family_key: 'f-rr2025', family: '20/25', model_key: '20/25hp', model: '20/25hp', sold: 112, usd: 5400000 },
+    ];
+    expect(await resolveMarketScopeQuery('regera')).toEqual({
+      make: 'Koenigsegg',
+      family: 'f-regera',
+      family_name: 'Regera',
+    });
+    expect(await resolveMarketScopeQuery('lg45r')).toEqual({
+      make: 'Lagonda',
+      family: 'f-lg45',
+      family_name: 'LG45',
+    });
+    expect(await resolveMarketScopeQuery('silver arrow')).toEqual({
+      make: 'Pierce-Arrow',
+      family: 'f-pa12',
+      family_name: 'Twelve',
+    });
+    expect(await resolveMarketScopeQuery('daytona sp3')).toEqual({
+      make: 'Ferrari',
+      family: 'f-sp3',
+      family_name: 'Daytona SP3',
+    });
+    expect(getDefinedFamilyEras('Rolls-Royce', '20/25').map((e) => e.shortLabel)).toEqual(['20 HP', '20/25 HP', '25/30 HP']);
+    expect(getDefinedFamilyEras('Citroën', 'DS').map((e) => e.shortLabel)).toEqual(["'55–'62", "'63–'67", "'68–'75"]);
+  });
 });
