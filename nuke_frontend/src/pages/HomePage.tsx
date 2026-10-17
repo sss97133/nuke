@@ -1894,6 +1894,7 @@ export function TreemapHomePage({ onBrowse, embedded = false }: { onBrowse: () =
             selectedEra={selectedEra}
             onSelectEra={setSelectedEra}
             selectedModel={currentLevel.model ?? null}
+            selectedYear={currentLevel.year ?? null}
           />
         </div>
       )}

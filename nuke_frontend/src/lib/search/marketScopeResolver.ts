@@ -456,6 +456,71 @@ const CULTURAL_SCOPE_ALIASES: Array<{
     make: 'Avions Voisin',
     familyHint: 'C25',
   },
+  {
+    pattern: /\b(osca\s*(?:1600\s*gt|mt4|750)|mt4\s*spider)\b/i,
+    make: 'Osca',
+    familyHint: '1600 GT',
+  },
+  {
+    pattern: /\b(norton\s*(?:commando|manx|dominator|atlas)|commando\s*(?:750|850|961))\b/i,
+    make: 'Norton',
+    familyHint: 'Commando',
+  },
+  {
+    pattern: /\b(bsa\s*(?:gold\s*star|a10|a65|spitfire|victor)|gold\s*star)\b/i,
+    make: 'BSA',
+    familyHint: 'Gold Star',
+  },
+  {
+    pattern: /\b(bultaco\s*(?:pursang|sherpa|matador|metralla)|pursang)\b/i,
+    make: 'Bultaco',
+    familyHint: 'Pursang',
+  },
+  {
+    pattern: /\b(mv\s*agusta|agusta\s*(?:f4|brutale|750))\b/i,
+    make: 'MV Agusta',
+    familyHint: '750 S',
+  },
+  {
+    pattern: /\b(moto\s*guzzi|guzzi\s*(?:v7|le\s*mans|falcone))\b/i,
+    make: 'Moto Guzzi',
+    familyHint: 'V7 Sport',
+  },
+  {
+    pattern: /\b(tatra\s*(?:t87|t77a?|t600|603)|tatraplan)\b/i,
+    make: 'Tatra',
+    familyHint: 'T87',
+  },
+  {
+    pattern: /\b(opel\s*(?:gt|kadett|manta|speedster))\b/i,
+    make: 'Opel',
+    familyHint: 'GT',
+  },
+  {
+    pattern: /\b(monteverdi\s*(?:high\s*speed|375|hai)|high\s*speed\s*375)\b/i,
+    make: 'Monteverdi',
+    familyHint: 'High Speed 375',
+  },
+  {
+    pattern: /\b(radical\s*(?:sr3|sr8|sr10|rxc))\b/i,
+    make: 'Radical',
+    familyHint: 'SR3',
+  },
+  {
+    pattern: /\b(winnebago\s*(?:revel|minnie\s*winnie|view|navion|brave|chieftain))\b/i,
+    make: 'Winnebago',
+    familyHint: 'Revel',
+  },
+  {
+    pattern: /\b(peterbilt\s*(?:359|379|389|350|352))\b/i,
+    make: 'Peterbilt',
+    familyHint: '359',
+  },
+  {
+    pattern: /\b(kenworth\s*(?:w900|k100|bullnose))\b/i,
+    make: 'Kenworth',
+    familyHint: 'W900',
+  },
 ];
 
 // Words that indicate a natural-language filter query rather than a market scope drill
