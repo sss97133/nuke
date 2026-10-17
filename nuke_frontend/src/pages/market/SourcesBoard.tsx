@@ -380,7 +380,27 @@ function DayBars({ days, mode = '14d' }: { days: number[]; mode?: LandingHorizon
 /** A source's name without the registry's method note in parentheses ("eBay Motors (Browse API)" reads "eBay Motors"). */
 export const shortName = (name: string) => name.replace(/\s*\([^)]*\)\s*$/, '') || name;
 
-const GROUPS: [string, string, string][] = [
+export type SourceCategory = 'auction' | 'marketplace' | 'dealer';
+
+export const CATEGORY_BADGE_LABELS: Record<SourceCategory, string> = {
+  auction: 'AUCTION HOUSE',
+  marketplace: 'MARKETPLACE',
+  dealer: 'DEALER / CONSIGNOR',
+};
+
+export function resolveSourceCategory(row: Pick<SourceRow, 'category' | 'businessType'>): SourceCategory | null {
+  if (row.category === 'dealer' || row.businessType === 'dealer') return 'dealer';
+  if (row.category === 'auction' || row.businessType === 'auction_house') return 'auction';
+  if (row.category === 'marketplace' || row.businessType === 'marketplace') return 'marketplace';
+  return null;
+}
+
+export function categoryBadgeLabel(row: Pick<SourceRow, 'category' | 'businessType'>): string | null {
+  const cat = resolveSourceCategory(row);
+  return cat ? CATEGORY_BADGE_LABELS[cat] : null;
+}
+
+const GROUPS: [SourceCategory, string, string][] = [
   ['auction', 'Auction houses', 'lots held'],
   ['marketplace', 'Marketplaces', 'listings held'],
   ['dealer', 'Dealers', 'vehicles held'],
@@ -680,6 +700,8 @@ function SourceLandingInspector({
   const dateSummaries = recent.map((e) => describeRecordDate(e.recordDate, refNow));
   const currentCount = dateSummaries.filter((d) => d.kind === 'live' || d.kind === 'fresh').length;
   const backfillCount = dateSummaries.filter((d) => d.kind === 'backfill').length;
+  const rowCategory = row ? resolveSourceCategory(row) : null;
+  const rowBadge = row ? categoryBadgeLabel(row) : null;
 
   return (
     <Tag className="market-sources__drill" aria-label={`Live ingestion for ${displayName}`}>
@@ -687,6 +709,11 @@ function SourceLandingInspector({
         <div className="market-sources__drill-title">
           <i className={landed1h > 0 ? 'on live' : landed24 > 0 ? 'on' : 'off'} aria-hidden="true" />
           <strong>{displayName}</strong>
+          {rowBadge && rowCategory ? (
+            <span className={`market-sources__badge market-sources__badge--${rowCategory}`}>
+              {rowBadge}
+            </span>
+          ) : null}
           <span>live &amp; hourly ingestion</span>
           {selectedHour ? (
             <button
@@ -988,12 +1015,18 @@ export function SourcesBoardView({ data, scope }: { data: SourcesBoardData; scop
   const [all, setAll] = useState(false);
   const [horizon, setHorizon] = useState<LandingHorizon>('14d');
   const [openSource, setOpenSource] = useState<string | null>(null);
+  const [categoryFilter, setCategoryFilter] = useState<'all' | SourceCategory>('all');
 
   const heldAt = data.rows.map((r) => r.heldAt).filter((x): x is string => !!x).sort().at(-1) ?? null;
-  const groups = GROUPS.map(([key, title, unit]) => ({ key, title, unit, rows: data.rows.filter((r) => r.category === key) }))
-    .filter((g) => g.rows.length);
-  const shownPer = all ? Infinity : SHOWN;
-  const hidden = groups.reduce((n, g) => n + Math.max(0, g.rows.length - SHOWN), 0);
+  const allGroups = GROUPS.map(([key, title, unit]) => ({
+    key,
+    title,
+    unit,
+    rows: data.rows.filter((r) => resolveSourceCategory(r) === key),
+  })).filter((g) => g.rows.length);
+  const groups = categoryFilter === 'all' ? allGroups : allGroups.filter((g) => g.key === categoryFilter);
+  const shownPer = all || categoryFilter !== 'all' ? Infinity : SHOWN;
+  const hidden = categoryFilter === 'all' ? allGroups.reduce((n, g) => n + Math.max(0, g.rows.length - SHOWN), 0) : 0;
   const notRanked = Object.entries(data.notRanked).sort((x, y) => y[1] - x[1])
     .map(([k, n]) => `${n} ${NOT_RANKED_WORDS[k] ?? k}${n > 1 ? 's' : ''}`);
   const scopedLabel = scope?.trim() ? 'Sources · all makes' : 'Sources';
@@ -1026,6 +1059,27 @@ export function SourcesBoardView({ data, scope }: { data: SourcesBoardData; scop
         <span className="market-sources__note">
           ranked by what we hold · a source moves up as more of it lands{heldAt ? ` · held counts as of ${heldWhen(heldAt)}` : ''}
         </span>
+        <div className="market-sources__cat-filters" role="group" aria-label="Filter sources by category">
+          <button
+            type="button"
+            className={`market-sources__cat-pill${categoryFilter === 'all' ? ' is-active' : ''}`}
+            aria-pressed={categoryFilter === 'all'}
+            onClick={() => setCategoryFilter('all')}
+          >
+            ALL
+          </button>
+          {allGroups.map((g) => (
+            <button
+              key={g.key}
+              type="button"
+              className={`market-sources__cat-pill market-sources__cat-pill--${g.key}${categoryFilter === g.key ? ' is-active' : ''}`}
+              aria-pressed={categoryFilter === g.key}
+              onClick={() => setCategoryFilter((cur) => (cur === g.key ? 'all' : g.key))}
+            >
+              {CATEGORY_BADGE_LABELS[g.key]}
+            </button>
+          ))}
+        </div>
         {data.landing.landed1h > 0 ? (
           <button
             type="button"
@@ -1085,6 +1139,8 @@ export function SourcesBoardView({ data, scope }: { data: SourcesBoardData; scop
               const week = r.held != null && r.heldBefore != null ? r.held - r.heldBefore : null;
               const land = landingState(r, horizon);
               const isOpen = openSource === r.source;
+              const cat = resolveSourceCategory(r);
+              const badge = categoryBadgeLabel(r);
               const total = r.population != null
                 ? `${count(r.population)} ${METHOD[r.populationMethod ?? ''] ?? `(${r.populationMethod ?? 'method unrecorded'})`}`
                   + `${r.populationAt ? `, ${shortDay(r.populationAt)}` : ''}`
@@ -1092,14 +1148,19 @@ export function SourcesBoardView({ data, scope }: { data: SourcesBoardData; scop
                 : 'their total is not counted yet';
               return (
                 <Fragment key={r.source}>
-                  <li className={`market-sources__row${isOpen ? ' market-sources__row--open' : ''}`}>
+                  <li className={`market-sources__row${isOpen ? ' market-sources__row--open' : ''}`} data-category={cat ?? undefined}>
                     <span className="market-sources__rank">{i + 1}</span>
                     <span className="market-sources__name" title={r.name}>
                       {/* Identity through the shared renderer (frontend rule 2026-10-08): the organization's recorded logo,
                           else its type icon. */}
-                      <OrgLogo logoUrl={r.logoUrl} businessType={r.businessType ?? (r.category === 'auction' ? 'auction_house' : r.category === 'dealer' ? 'dealer' : null)}
+                      <OrgLogo logoUrl={r.logoUrl} businessType={r.businessType ?? (cat === 'auction' ? 'auction_house' : cat === 'dealer' ? 'dealer' : null)}
                         businessName={r.name} size={13} maxWidth={42} variant="logo" className="market-sources__icon" />
-                      {shortName(r.name)}
+                      <span className="market-sources__name-text">{shortName(r.name)}</span>
+                      {badge && cat ? (
+                        <span className={`market-sources__badge market-sources__badge--${cat}`}>
+                          {badge}
+                        </span>
+                      ) : null}
                     </span>
                     <span className="market-sources__held n" title={r.heldAt ? `held as of ${heldWhen(r.heldAt)}` : undefined}>
                       {r.held != null ? count(r.held) : '—'}

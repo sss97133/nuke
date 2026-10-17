@@ -5,7 +5,18 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 
 const fixture = vi.hoisted(() => ({ rpc: vi.fn() }));
 vi.mock('../../lib/supabase', () => ({ supabase: { rpc: fixture.rpc } }));
-import SourcesBoard, { describeRecordDate, heldShare, landingState, monthBars, money, parseSourceLanding, parseSources, shortName } from './SourcesBoard';
+import SourcesBoard, {
+  categoryBadgeLabel,
+  describeRecordDate,
+  heldShare,
+  landingState,
+  monthBars,
+  money,
+  parseSourceLanding,
+  parseSources,
+  resolveSourceCategory,
+  shortName,
+} from './SourcesBoard';
 
 // market_sources_read (20261018034000), shaped as production answers: columns, then one array per source by held lots, plus landing.
 const columns = ['source', 'name', 'category', 'house', 'held_lots', 'held_at', 'population', 'population_method',
@@ -187,8 +198,13 @@ it('ranks auction houses, marketplaces, and dealers apart, same row for each, as
   expect(fixture.rpc).toHaveBeenCalledWith('market_sources_read');
   const groups = [...container.querySelectorAll('.market-sources__group')];
   expect(groups.map((g) => g.querySelector('.market-sources__group-title')?.textContent)).toEqual(['Auction houses', 'Marketplaces', 'Dealers']);
-  expect(groups.map((g) => [...g.querySelectorAll('.market-sources__name')].map((n) => n.textContent))).toEqual(
+  expect(groups.map((g) => [...g.querySelectorAll('.market-sources__name-text')].map((n) => n.textContent))).toEqual(
     [['Bring a Trailer', 'Mecum Auctions', 'Cars & Bids'], ['Craigslist'], ['Avant-Garde Collection', 'Beverly Hills Car Club']]);
+  expect(groups.map((g) => [...g.querySelectorAll('.market-sources__badge')].map((b) => b.textContent))).toEqual([
+    ['AUCTION HOUSE', 'AUCTION HOUSE', 'AUCTION HOUSE'],
+    ['MARKETPLACE'],
+    ['DEALER / CONSIGNOR', 'DEALER / CONSIGNOR'],
+  ]);
   expect(groups[1].querySelector('.market-sources__rank')?.textContent).toBe('1');
   expect(groups[2].querySelector('.market-sources__rank')?.textContent).toBe('1');
   expect(groups[0].querySelector('.market-sources__name img')?.getAttribute('src')).toBe('https://example.test/bat.png');
@@ -283,4 +299,62 @@ it('says Sources · all makes when the market page is scoped to a make', async (
   fixture.rpc.mockResolvedValue({ data: value, error: null });
   await act(async () => root.render(<SourcesBoard scope="Ford" />));
   expect(container.querySelector('.market-sources__title')?.textContent).toBe('Sources · all makes');
+});
+
+it('renders DEALER / CONSIGNOR category badges for category="dealer" or business_type="dealer" and filters/inspects by category', async () => {
+  expect(resolveSourceCategory({ category: 'dealer', businessType: null })).toBe('dealer');
+  expect(resolveSourceCategory({ category: null, businessType: 'dealer' })).toBe('dealer');
+  expect(resolveSourceCategory({ category: 'auction', businessType: null })).toBe('auction');
+  expect(resolveSourceCategory({ category: 'marketplace', businessType: null })).toBe('marketplace');
+  expect(categoryBadgeLabel({ category: 'dealer', businessType: null })).toBe('DEALER / CONSIGNOR');
+  expect(categoryBadgeLabel({ category: null, businessType: 'dealer' })).toBe('DEALER / CONSIGNOR');
+  expect(categoryBadgeLabel({ category: 'auction', businessType: 'auction_house' })).toBe('AUCTION HOUSE');
+  expect(categoryBadgeLabel({ category: 'marketplace', businessType: null })).toBe('MARKETPLACE');
+
+  // Include a dealer row where category is null and business_type is 'dealer'
+  const withBusinessTypeDealer = {
+    ...value,
+    rows: [
+      ...value.rows.slice(0, 5),
+      ['beverlyhillscarclub', 'Beverly Hills Car Club', null, null, 1968, '2026-10-16T10:27:00Z', null, null, null,
+        null, 1358, 150000, 1355, null, null, null, [['2026-10', 1355, 150000]], 657, '2026-10-16T10:45:00Z',
+        1968, '2026-10-09', 0, 0, null, days(0), 'https://nuke.ag/source-logos/beverlyhillscarclub.png', 'dealer'],
+    ],
+  };
+
+  fixture.rpc.mockImplementation((fn: string) => {
+    if (fn === 'market_sources_read') return Promise.resolve({ data: withBusinessTypeDealer, error: null });
+    if (fn === 'market_source_landing_read') return Promise.resolve({ data: { ...batLandingDetail, source: 'avant-garde-collection' }, error: null });
+    return Promise.resolve({ data: null, error: { message: 'none' } });
+  });
+
+  await act(async () => root.render(<SourcesBoard />));
+
+  const filterButtons = [...container.querySelectorAll('.market-sources__cat-pill')] as HTMLButtonElement[];
+  expect(filterButtons.map((b) => b.textContent)).toEqual(['ALL', 'AUCTION HOUSE', 'MARKETPLACE', 'DEALER / CONSIGNOR']);
+
+  // Click DEALER / CONSIGNOR filter pill
+  const dealerFilterBtn = filterButtons.find((b) => b.textContent === 'DEALER / CONSIGNOR')!;
+  await act(async () => { dealerFilterBtn.click(); });
+
+  const visibleGroups = [...container.querySelectorAll('.market-sources__group')];
+  expect(visibleGroups).toHaveLength(1);
+  expect(visibleGroups[0].querySelector('.market-sources__group-title')?.textContent).toBe('Dealers');
+  const visibleRows = [...visibleGroups[0].querySelectorAll('li.market-sources__row')];
+  expect(visibleRows).toHaveLength(2);
+  expect(visibleRows.map((r) => r.querySelector('.market-sources__name-text')?.textContent)).toEqual([
+    'Avant-Garde Collection',
+    'Beverly Hills Car Club',
+  ]);
+  expect(visibleRows.map((r) => r.querySelector('.market-sources__badge')?.textContent)).toEqual([
+    'DEALER / CONSIGNOR',
+    'DEALER / CONSIGNOR',
+  ]);
+
+  // Open the ingestion inspector on a dealer row and verify the DEALER / CONSIGNOR badge in the inspector
+  const dealerLandBtn = visibleRows[0].querySelector('button.market-sources__landing') as HTMLButtonElement;
+  await act(async () => { dealerLandBtn.click(); });
+  expect(fixture.rpc).toHaveBeenCalledWith('market_source_landing_read', { p_source: 'avant-garde-collection' });
+  const drill = container.querySelector('.market-sources__drill')!;
+  expect(drill.querySelector('.market-sources__badge--dealer')?.textContent).toBe('DEALER / CONSIGNOR');
 });
