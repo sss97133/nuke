@@ -11,6 +11,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
+import './table-page.css';
 
 interface ObsRow {
   id: string;
@@ -510,7 +511,7 @@ const TablePage: React.FC = () => {
         </p>
       )}
       {rows.some(r => r.reported_work) && (
-        <p style={{ fontSize: 10 }}>
+        <p className="tp-note">
           Reported work rows are publisher reports. Repeated captures may describe the same repair and do not provide independent confirmation.
         </p>
       )}
@@ -518,7 +519,7 @@ const TablePage: React.FC = () => {
         <p role="status" style={{ fontSize: 10 }}>Public build log unavailable; work history may be incomplete.</p>
       )}
       {reportedWorkUnavailable && (
-        <p role="status" style={{ fontSize: 10 }}>Publisher-reported work unavailable; confirmed public work is shown where available.</p>
+        <p role="status" className="tp-note">Publisher-reported work unavailable; confirmed public work is shown where available.</p>
       )}
 
       {loading && rows.length === 0 && (
@@ -628,21 +629,21 @@ const TablePage: React.FC = () => {
                 <div style={{ overflow: 'hidden', whiteSpace: r.reported_work ? 'normal' : 'nowrap', textOverflow: 'ellipsis', fontSize: 9 }}>
                   {r.content_text || r.part_description || ''}
                   {r.public_copy && !r.reported_work && <span> · Owner-only detail</span>}
-                  {r.reported_work && <details style={{ marginTop: 4 }}>
+                  {r.reported_work && <details className="tp-report">
                     <summary>Publisher quotation and source</summary>
-                    <blockquote style={{ margin: '6px 0', whiteSpace: 'pre-wrap' }}>{r.reported_work.source_value}</blockquote>
+                    <blockquote className="tp-report-quote">{r.reported_work.source_value}</blockquote>
                     <p><a href={r.reported_work.source_url} target="_blank" rel="noopener noreferrer">Publisher source</a></p>
                     <div>Source captured: {r.reported_work.source_captured_at}</div>
                     <div>Source recorded: {r.reported_work.source_recorded_at}</div>
                     <div>Publisher intent: unknown. Independent confirmation is not established.</div>
-                    <details style={{ marginTop: 6 }}>
+                    <details className="tp-report-detail">
                       <summary>Technical provenance</summary>
                       <div>Claim observed (source recording clock): {r.reported_work.observed_at}</div>
                       <div>Claim recorded (processing clock): {r.reported_work.ingested_at}</div>
                       <div>These recording clocks do not establish a work date.</div>
                       <div>Source observation: {r.reported_work.source_observation_id}</div>
                       <div>Source registry: {r.reported_work.source_id}</div>
-                      <div style={{ overflowWrap: 'anywhere' }}>Capture SHA-256: {r.reported_work.source_capture_sha256}</div>
+                      <div className="tp-report-hash">Capture SHA-256: {r.reported_work.source_capture_sha256}</div>
                       <div>Capture basis: {r.reported_work.source_capture_basis}</div>
                       <div>Witness: {r.reported_work.source_witness_version}</div>
                     </details>
