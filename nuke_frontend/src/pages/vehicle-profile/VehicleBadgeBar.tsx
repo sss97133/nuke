@@ -1,10 +1,11 @@
-import React, { useContext } from 'react';
+import React, { useContext, useMemo } from 'react';
 import { useVehicleProfile } from './VehicleProfileContext';
 import { PopupStackContext } from '../../components/popups/PopupStack';
 import { useAuctionCommentStats } from '../../hooks/useAuctionComments';
 import { CommentsPopup } from '../../components/popups/CommentsPopup';
 import { BidsPopup } from '../../components/popups/BidsPopup';
 import { WatchersPopup } from '../../components/popups/WatchersPopup';
+import { classifyVehicleFacets, resolveVettedIdentityMarks } from '../familyFacetsAndEmblems';
 
 function formatPrice(n: number | null | undefined): string {
   if (n == null || !Number.isFinite(n) || n <= 0) return '--';
@@ -31,9 +32,34 @@ const VehicleBadgeBar: React.FC = () => {
   const highBid = v.high_bid || auctionPulse?.current_bid;
   const listingUrl = (auctionPulse as any)?.listing_url || v.bat_auction_url || v.discovery_url || null;
 
+  const { identityMarks, facets } = useMemo(() => {
+    if (!v?.make) return { identityMarks: [], facets: { series: null, trim: null, body: null } };
+    const descriptor = [
+      v.model,
+      v.series,
+      v.trim,
+      v.body_style,
+      v.listing_title,
+      v.title,
+    ]
+      .filter((s): s is string => typeof s === 'string' && s.trim().length > 0)
+      .join(' · ');
+    const yr = typeof v.year === 'number' ? v.year : null;
+    const f = classifyVehicleFacets(v.make, v.normalized_model || v.model, descriptor, yr);
+    const marks = resolveVettedIdentityMarks({
+      make: v.make,
+      familyLabel: v.normalized_model || v.model,
+      modelLabel: descriptor,
+      year: yr,
+    });
+    return { identityMarks: marks.slice(0, 4), facets: f };
+  }, [v?.make, v?.model, v?.normalized_model, v?.series, v?.trim, v?.body_style, v?.listing_title, v?.title, v?.year]);
+
   const hasBadges = (bidCount != null && bidCount > 0) ||
     (commentCount != null && commentCount > 0) ||
-    (watcherCount != null && watcherCount > 0);
+    (watcherCount != null && watcherCount > 0) ||
+    identityMarks.length > 0 ||
+    !!(facets.series || facets.trim || facets.body);
 
   if (!hasBadges) return null;
 
@@ -77,7 +103,52 @@ const VehicleBadgeBar: React.FC = () => {
   };
 
   return (
-    <div className="vehicle-sub__badges" style={{ padding: '4px 12px', display: 'flex', flexWrap: 'wrap', gap: '4px', alignItems: 'center', borderBottom: '1px solid var(--vp-ghost, #e0e0e0)' }}>
+    <div className="vehicle-sub__badges" data-testid="vehicle-badge-bar" style={{ padding: '4px 12px', display: 'flex', flexWrap: 'wrap', gap: '6px', alignItems: 'center', borderBottom: '1px solid var(--vp-ghost, #e0e0e0)' }}>
+      {/* VETTED ERA & TRIM EMBLEMS */}
+      {identityMarks.map((mark) => (
+        <span
+          key={mark.id}
+          data-testid={`vehicle-identity-mark-${mark.id}`}
+          title={`${mark.displayLabel} — ${mark.subLabel}${mark.rpoCode ? ` (${mark.rpoCode})` : ''}`}
+          style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: 5,
+            padding: '2px 6px',
+            border: '1px solid var(--border, #333)',
+            background: 'var(--bg, #0d0d0d)',
+            fontSize: 9,
+            fontWeight: 800,
+            letterSpacing: '0.08em',
+            fontFamily: "'Courier New', monospace",
+          }}
+        >
+          <span
+            aria-hidden="true"
+            style={{ display: 'inline-flex', alignItems: 'center', height: 15, width: 54 }}
+            dangerouslySetInnerHTML={{ __html: mark.svgMarkup }}
+          />
+          <span>{mark.displayLabel}</span>
+        </span>
+      ))}
+
+      {/* ORTHOGONAL SERIES / TRIM / BODY STYLE FACET CHIPS */}
+      {facets.series && (
+        <span className="badge" data-testid="vehicle-facet-series" style={{ fontSize: 9, fontWeight: 700, letterSpacing: '0.06em' }}>
+          SERIES · {facets.series}
+        </span>
+      )}
+      {facets.trim && (
+        <span className="badge" data-testid="vehicle-facet-trim" style={{ fontSize: 9, fontWeight: 700, letterSpacing: '0.06em' }}>
+          TRIM · {facets.trim}
+        </span>
+      )}
+      {facets.body && (
+        <span className="badge" data-testid="vehicle-facet-body" style={{ fontSize: 9, fontWeight: 700, letterSpacing: '0.06em' }}>
+          BODY · {facets.body}
+        </span>
+      )}
+
       {/* BIDS */}
       {bidCount != null && bidCount > 0 && (
         <span

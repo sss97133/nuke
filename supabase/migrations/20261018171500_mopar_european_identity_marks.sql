@@ -31,17 +31,8 @@ VALUES
   ('Ferrari', NULL, NULL, NULL, NULL, 1947, 2035, 'marque_emblem', 'SCUDERIA FERRARI', 'Modena Giallo Fender Shield & Cavallino Rampante', NULL, 'Front Fender Scuderia Shield',
    '<svg viewBox="0 0 185 40" xmlns="http://www.w3.org/2000/svg"><rect x="2" y="5" width="181" height="30" rx="2" fill="#991b1b" stroke="#facc15" stroke-width="2"/><path d="M16 7 L38 7 L36 25 Q27 34 27 35 Q27 34 18 25 Z" fill="#facc15" stroke="#111" stroke-width="1.2"/><text x="27" y="29" text-anchor="middle" fill="#111" font-family="Georgia,serif" font-size="7" font-weight="900">S F</text><text x="114" y="26" text-anchor="middle" fill="#fef08a" font-family="Georgia,serif" font-size="14" font-weight="800" letter-spacing="2.8">FERRARI</text></svg>',
    'Scuderia Ferrari Modena yellow fender shield and Pininfarina/Maranello wordmark.')
-ON CONFLICT (
-  lower(brand),
-  COALESCE(lower(family), ''),
-  COALESCE(lower(series_code), ''),
-  COALESCE(lower(trim_package), ''),
-  COALESCE(lower(body_style), ''),
-  year_start,
-  year_end,
-  mark_kind,
-  display_label
-) DO UPDATE SET
+ON CONFLICT (unique_identity_mark_idx) DO UPDATE SET
+  display_label = EXCLUDED.display_label,
   sub_label = EXCLUDED.sub_label,
   rpo_code = EXCLUDED.rpo_code,
   fender_placement = EXCLUDED.fender_placement,
