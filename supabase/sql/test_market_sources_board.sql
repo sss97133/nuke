@@ -263,7 +263,7 @@ SELECT pg_temp.fails('anon cannot read the table', $s$SELECT count(*) FROM publi
 SELECT pg_temp.fails('anon cannot write the board', $s$SELECT public.record_market_source_day()$s$);
 RESET ROLE;
 SET ROLE authenticated;
-SELECT pg_temp.ok('authenticated reads the board', jsonb_array_length(public.market_sources_read()->'rows') = 5);
+SELECT pg_temp.ok('authenticated reads the board', jsonb_array_length(public.market_sources_read()->'rows') = 6);
 SELECT pg_temp.fails('authenticated cannot write the landing log', $s$SELECT public.record_market_source_hours(3)$s$);
 SELECT pg_temp.fails('authenticated cannot write the board', $s$SELECT public.record_market_source_day()$s$);
 RESET ROLE;
