@@ -201,6 +201,26 @@ const CURATED_FAMILY_ERAS: Record<string, FamilyEraCohort[]> = {
     { id: '1960-1972', label: "C/K '60–'72", shortLabel: "'60–'72", yearStart: 1960, yearEnd: 1972 },
     { id: '1973-1987', label: "Squarebody '73–'87", shortLabel: "Squarebody '73–'87", yearStart: 1973, yearEnd: 1987 },
   ],
+  'mercedes-benz:e-class': [
+    { id: '1968-1976', label: "W114/W115 '68–'76", shortLabel: 'W114/W115', yearStart: 1968, yearEnd: 1976 },
+    { id: '1976-1985', label: "W123 '76–'85", shortLabel: 'W123', yearStart: 1976, yearEnd: 1985 },
+    { id: '1986-1995', label: "W124 / 500E '86–'95", shortLabel: 'W124', yearStart: 1986, yearEnd: 1995 },
+    { id: '1996-2009', label: "W210/W211 '96–'09", shortLabel: 'W210/W211', yearStart: 1996, yearEnd: 2009 },
+    { id: '2010-2030', label: "W212/W213 '10+", shortLabel: 'W212/W213', yearStart: 2010, yearEnd: 2030 },
+  ],
+  'mercedes-benz:s-class': [
+    { id: '1965-1972', label: "W108/W109 '65–'72", shortLabel: 'W108/W109', yearStart: 1965, yearEnd: 1972 },
+    { id: '1973-1980', label: "W116 '73–'80", shortLabel: 'W116', yearStart: 1973, yearEnd: 1980 },
+    { id: '1980-1991', label: "W126 '80–'91", shortLabel: 'W126', yearStart: 1980, yearEnd: 1991 },
+    { id: '1992-1999', label: "W140 '92–'99", shortLabel: 'W140', yearStart: 1992, yearEnd: 1999 },
+    { id: '2000-2013', label: "W220/W221 '00–'13", shortLabel: 'W220/W221', yearStart: 2000, yearEnd: 2013 },
+    { id: '2014-2030', label: "W222/W223 '14+", shortLabel: 'W222/W223', yearStart: 2014, yearEnd: 2030 },
+  ],
+  'land rover:series': [
+    { id: '1948-1958', label: "Series I '48–'58", shortLabel: 'Series I', yearStart: 1948, yearEnd: 1958 },
+    { id: '1958-1971', label: "Series II / IIA '58–'71", shortLabel: 'Series II/IIA', yearStart: 1958, yearEnd: 1971 },
+    { id: '1971-1985', label: "Series III '71–'85", shortLabel: 'Series III', yearStart: 1971, yearEnd: 1985 },
+  ],
 };
 
 export function getDefinedFamilyEras(

@@ -231,6 +231,26 @@ const CULTURAL_SCOPE_ALIASES: Array<{
     make: 'Meyers',
     familyHint: 'Manx',
   },
+  {
+    pattern: /\b(w123|w124|240\s*d|300\s*td|500\s*e)\b/i,
+    make: 'Mercedes-Benz',
+    familyHint: 'E-Class',
+  },
+  {
+    pattern: /\b(series\s*ii\s*a|series\s*iii|land\s*rover\s*88|land\s*rover\s*109)\b/i,
+    make: 'Land Rover',
+    familyHint: 'Series',
+  },
+  {
+    pattern: /\b(ducati\s*(?:916|996|998|748)|916\s*sps|916\s*senna)\b/i,
+    make: 'Ducati',
+    familyHint: '916',
+  },
+  {
+    pattern: /\b(mh\s*900\s*e|paul\s*smart\s*1000)\b/i,
+    make: 'Ducati',
+    familyHint: 'SportClassic',
+  },
 ];
 
 // Words that indicate a natural-language filter query rather than a market scope drill

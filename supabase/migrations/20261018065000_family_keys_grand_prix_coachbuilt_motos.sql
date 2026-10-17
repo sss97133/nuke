@@ -2,25 +2,31 @@
 -- Migration: 20261018065000_family_keys_grand_prix_coachbuilt_motos.sql
 -- Purpose:   Close remaining high-value family_key = 'other' gaps across:
 --            1. Year-bound gates on Rolls-Royce Corniche, Silver Wraith, Wraith,
---               Austin-Healey 100, and Ferrari F430.
+--               Austin-Healey 100, Ferrari F430, Mercedes-Benz E-Class / C-Class,
+--               Porsche Cayman, and Jaguar XK140 / XK150.
 --            2. Existing family alias additions on Bugatti Type 35 / Type 43 / Chiron,
 --               Ferrari 857 S / F430, Austin-Healey 100, Delahaye 135, Citroen 2 CV / DS,
---               Rolls-Royce Corniche, and GMC Pickup / Hummer EV.
+--               Rolls-Royce Corniche, GMC Pickup / Hummer EV, Mercedes-Benz E-Class /
+--               S-Class / SL / AMG GT / C-Class / 300, Aston Martin DBX / DB7,
+--               Porsche 911 / 718 / Cayman, Lamborghini Murcielago, Jaguar XK150 /
+--               XK140 / XK120, and Dodge D-Series.
 --            3. Grand Prix, coachbuilt, specialist, replica & vintage motorcycle families
 --               using sequential -f000-0000000001XX UUIDs:
---               Mercedes-Benz 540K / 680S, Mercer Raceabout, Simplex 50 HP, Spyker C8,
---               Audi Quattro, Auburn 851, Dual-Ghia L6.4, Cord 810, Hispano-Suiza J12,
---               Marmon Sixteen, Continental Mark II, Aston Martin DB2/4, AM General Hummer,
---               Renault R5 Turbo, INEOS Grenadier, Ariel Nomad, Ram 1500, Amphicar 770,
---               Lancia Delta Integrale, Morgan 3 Wheeler / Roadster, Sunbeam Alpine,
---               Indian Chief / Four, Harley-Davidson FL / EL, Vincent Black Shadow,
---               Henderson Four, Citroen SM / Mehari / Traction Avant,
---               Factory Five Mk4 Roadster / GTM / Type 65, Superformance MkIII,
---               Backdraft RT4 Roadster, Willys Jeepster / Americar / CJ / Wagon,
---               Studebaker Hawk / Avanti / Commander / Champ, Austin Mini / Healey,
---               DeSoto Adventurer / Fireflite, Imperial Crown, Lucid Air, Maybach 57,
---               Iso Grifo, Kaiser Darrin, Bricklin SV-1, Rossion Q1, Nash Metropolitan,
---               and Lamborghini Islero.
+--               Mercedes-Benz 540K / 680S / 220 / CLS-Class / M-Class, Mercer Raceabout,
+--               Simplex 50 HP, Spyker C8, Audi Quattro, Auburn 851, Dual-Ghia L6.4,
+--               Cord 810, Hispano-Suiza J12, Marmon Sixteen, Continental Mark II,
+--               Aston Martin DB2/4, AM General Hummer, Renault R5 Turbo, INEOS Grenadier,
+--               Ariel Nomad, Ram 1500, Amphicar 770, Lancia Delta Integrale,
+--               Morgan 3 Wheeler / Roadster, Sunbeam Alpine, Indian Chief / Four,
+--               Harley-Davidson FL / EL, Vincent Black Shadow, Henderson Four,
+--               Citroen SM / Mehari / Traction Avant, Factory Five Mk4 Roadster / GTM,
+--               Superformance MkIII, Backdraft RT4 Roadster, Willys Jeepster / Americar /
+--               CJ / Jeep Wagon, Studebaker Hawk / Avanti / Commander, Austin Mini,
+--               DeSoto Adventurer, Imperial Crown, Lucid Air, Maybach 57, Iso Grifo,
+--               Kaiser Darrin, Bricklin SV-1, Rossion Q1, Nash Metropolitan,
+--               Lamborghini Islero / Espada, Land Rover Series, Lincoln Model K,
+--               Packard Super Eight / One-Ten / Hawk, Dodge Polara / A100, and
+--               Ducati 916 / 999 / 1098 / Panigale / SuperSport / SportClassic / Desmosedici RR.
 -- Contract:  supabase/sql/test_family_keys_grand_prix_coachbuilt_motos.sql (db-contracts).
 -- =============================================================================
 
@@ -28,53 +34,19 @@ BEGIN;
 SET LOCAL statement_timeout = '30s';
 SET LOCAL lock_timeout = '5s';
 
--- 1. Ensure canonical_makes rows exist for newly keyed brands.
-INSERT INTO public.canonical_makes (id, canonical_name, display_name, aliases, country_of_origin, is_active, brand_tier)
-VALUES
-  ('10000000-0000-4000-a000-000000000127'::uuid, 'Mercer',          'Mercer',          ARRAY['mercer']::text[],          'USA',         false, 'Volume'),
-  ('10000000-0000-4000-a000-000000000128'::uuid, 'Simplex',         'Simplex',         ARRAY['simplex']::text[],         'USA',         false, 'Volume'),
-  ('10000000-0000-4000-a000-000000000129'::uuid, 'Spyker',          'Spyker',          ARRAY['spyker']::text[],          'Netherlands', true,  'Volume'),
-  ('10000000-0000-4000-a000-000000000130'::uuid, 'Auburn',          'Auburn',          ARRAY['auburn']::text[],          'USA',         false, 'Volume'),
-  ('10000000-0000-4000-a000-000000000131'::uuid, 'Dual-Ghia',       'Dual-Ghia',       ARRAY['dual-ghia', 'dual ghia']::text[], 'USA',  false, 'Volume'),
-  ('10000000-0000-4000-a000-000000000132'::uuid, 'Cord',            'Cord',            ARRAY['cord']::text[],            'USA',         false, 'Volume'),
-  ('10000000-0000-4000-a000-000000000133'::uuid, 'Hispano-Suiza',   'Hispano-Suiza',   ARRAY['hispano-suiza', 'hispano suiza']::text[], 'France', false, 'Volume'),
-  ('10000000-0000-4000-a000-000000000134'::uuid, 'Marmon',          'Marmon',          ARRAY['marmon']::text[],          'USA',         false, 'Volume'),
-  ('10000000-0000-4000-a000-000000000135'::uuid, 'Continental',     'Continental',     ARRAY['continental']::text[],     'USA',         false, 'Volume'),
-  ('10000000-0000-4000-a000-000000000136'::uuid, 'AM General',      'AM General',      ARRAY['am general']::text[],      'USA',         true,  'Volume'),
-  ('10000000-0000-4000-a000-000000000137'::uuid, 'INEOS',           'INEOS',           ARRAY['ineos']::text[],           'UK',          true,  'Volume'),
-  ('10000000-0000-4000-a000-000000000138'::uuid, 'Ariel',           'Ariel',           ARRAY['ariel']::text[],           'UK',          true,  'Volume'),
-  ('10000000-0000-4000-a000-000000000139'::uuid, 'Ram',             'Ram',             ARRAY['ram']::text[],             'USA',         true,  'Volume'),
-  ('10000000-0000-4000-a000-000000000140'::uuid, 'Amphicar',        'Amphicar',        ARRAY['amphicar']::text[],        'Germany',     false, 'Volume'),
-  ('10000000-0000-4000-a000-000000000141'::uuid, 'Indian',          'Indian',          ARRAY['indian']::text[],          'USA',         true,  'Volume'),
-  ('10000000-0000-4000-a000-000000000142'::uuid, 'Harley-Davidson', 'Harley-Davidson', ARRAY['harley-davidson', 'harley davidson']::text[], 'USA', true, 'Volume'),
-  ('10000000-0000-4000-a000-000000000143'::uuid, 'Vincent',         'Vincent',         ARRAY['vincent']::text[],         'UK',          false, 'Volume'),
-  ('10000000-0000-4000-a000-000000000144'::uuid, 'Henderson',       'Henderson',       ARRAY['henderson']::text[],       'USA',         false, 'Volume'),
-  ('10000000-0000-4000-a000-000000000145'::uuid, 'Renault',         'Renault',         ARRAY['renault']::text[],         'France',      true,  'Volume'),
-  ('10000000-0000-4000-a000-000000000146'::uuid, 'Factory Five',    'Factory Five',    ARRAY['factory five', 'factory five racing']::text[], 'USA', true, 'Volume'),
-  ('10000000-0000-4000-a000-000000000147'::uuid, 'Superformance',   'Superformance',   ARRAY['superformance']::text[],   'USA',         true,  'Volume'),
-  ('10000000-0000-4000-a000-000000000148'::uuid, 'Backdraft',       'Backdraft',       ARRAY['backdraft', 'backdraft racing']::text[], 'USA', true, 'Volume'),
-  ('10000000-0000-4000-a000-000000000149'::uuid, 'Willys',          'Willys',          ARRAY['willys', 'willys-overland']::text[], 'USA', false, 'Volume'),
-  ('10000000-0000-4000-a000-000000000150'::uuid, 'Studebaker',      'Studebaker',      ARRAY['studebaker']::text[],      'USA',         false, 'Volume'),
-  ('10000000-0000-4000-a000-000000000151'::uuid, 'Austin',          'Austin',          ARRAY['austin']::text[],          'UK',          false, 'Volume'),
-  ('10000000-0000-4000-a000-000000000152'::uuid, 'DeSoto',          'DeSoto',          ARRAY['desoto', 'de soto']::text[], 'USA',       false, 'Volume'),
-  ('10000000-0000-4000-a000-000000000153'::uuid, 'Imperial',        'Imperial',        ARRAY['imperial', 'chrysler imperial']::text[], 'USA', false, 'Volume'),
-  ('10000000-0000-4000-a000-000000000154'::uuid, 'Lucid',           'Lucid',           ARRAY['lucid', 'lucid motors']::text[], 'USA',   true,  'Volume'),
-  ('10000000-0000-4000-a000-000000000155'::uuid, 'Maybach',         'Maybach',         ARRAY['maybach']::text[],         'Germany',     true,  'Volume'),
-  ('10000000-0000-4000-a000-000000000156'::uuid, 'Iso',             'Iso',             ARRAY['iso', 'iso rivolta']::text[], 'Italy',    false, 'Volume'),
-  ('10000000-0000-4000-a000-000000000157'::uuid, 'Kaiser',          'Kaiser',          ARRAY['kaiser', 'kaiser-darrin']::text[], 'USA', false, 'Volume'),
-  ('10000000-0000-4000-a000-000000000158'::uuid, 'Bricklin',        'Bricklin',        ARRAY['bricklin']::text[],        'Canada',      false, 'Volume'),
-  ('10000000-0000-4000-a000-000000000159'::uuid, 'Rossion',         'Rossion',         ARRAY['rossion']::text[],         'USA',         true,  'Volume'),
-  ('10000000-0000-4000-a000-000000000160'::uuid, 'Nash',            'Nash',            ARRAY['nash']::text[],            'USA',         false, 'Volume')
-ON CONFLICT (id) DO NOTHING;
-
--- 2. Widen restrictive year_start / year_end bounds on existing canonical_models rows.
+-- 1. Widen restrictive year_start / year_end bounds on existing canonical_models rows.
 WITH year_fixes(make, canonical_model, new_year_start, clear_year_end) AS (
   VALUES
     ('Rolls-Royce',   'Corniche',      1966, true),
     ('Rolls-Royce',   'Silver Wraith', 1946, true),
     ('Rolls-Royce',   'Wraith',        1938, true),
     ('Austin-Healey', '100',           1952, true),
-    ('Ferrari',       'F430',          2004, true)
+    ('Ferrari',       'F430',          2004, true),
+    ('Mercedes-Benz', 'E-Class',       1968, true),
+    ('Mercedes-Benz', 'C-Class',       1982, true),
+    ('Porsche',       'Cayman',        2005, true),
+    ('Jaguar',        'XK140',         1954, true),
+    ('Jaguar',        'XK150',         1957, true)
 )
 UPDATE public.canonical_models m
 SET year_start = CASE
@@ -98,21 +70,37 @@ WHERE lower(m.make) = lower(yf.make)
     OR (yf.clear_year_end AND m.year_end IS NOT NULL)
   );
 
--- 3. Add missing aliases to existing canonical_models families.
+-- 2. Add missing aliases to existing canonical_models families.
 WITH target_additions(make, canonical_model, add_aliases) AS (
   VALUES
-    ('Bugatti',       'Type 35',       ARRAY['type 35b', 'type 35c', 'type 35a', 'type 35t']),
-    ('Bugatti',       'Type 43',       ARRAY['type 43a', 'type 43 grand sport']),
-    ('Bugatti',       'Chiron',        ARRAY['chiron super sport', 'chiron supersport', 'chiron pur sport', 'chiron sport']),
-    ('Ferrari',       '857 S',         ARRAY['857 sport', '857 sport spider', '857s']),
-    ('Ferrari',       'F430',          ARRAY['scuderia spider 16m', '16m', '430 scuderia']),
-    ('Austin-Healey', '100',           ARRAY['100s', '100m', '100-4', '100/4']),
-    ('Delahaye',      '135',           ARRAY['135m', '135ms', '135 competition']),
-    ('Citroen',       '2 CV',          ARRAY['2cv', '2cv6', '2cv6 charleston', '2cv6 special', '2cv charleston', '2cv fourgonnette', '2cv6 club', 'dyane 6']),
-    ('Citroen',       'DS',            ARRAY['ds19', 'ds21', 'ds23', 'id19', 'ds21 pallas', 'ds23 pallas', 'ds19 berline', 'ds23 ie pallas', 'd special']),
-    ('Rolls-Royce',   'Corniche',      ARRAY['corniche v', 'corniche ii']),
-    ('GMC',           'Pickup',        ARRAY['100', '150', '250', 'custom']),
-    ('GMC',           'Hummer EV Pickup', ARRAY['hummer ev', 'hummer ev edition 1'])
+    ('Bugatti',       'Type 35',          ARRAY['type 35b', 'type 35c', 'type 35a', 'type 35t']),
+    ('Bugatti',       'Type 43',          ARRAY['type 43a', 'type 43 grand sport']),
+    ('Bugatti',       'Chiron',           ARRAY['chiron super sport', 'chiron supersport', 'chiron pur sport', 'chiron sport']),
+    ('Ferrari',       '857 S',            ARRAY['857 sport', '857 sport spider', '857s']),
+    ('Ferrari',       'F430',             ARRAY['scuderia spider 16m', '16m', '430 scuderia']),
+    ('Austin-Healey', '100',              ARRAY['100s', '100m', '100-4', '100/4']),
+    ('Delahaye',      '135',              ARRAY['135m', '135ms', '135 competition']),
+    ('Citroen',       '2 CV',             ARRAY['2cv', '2cv6', '2cv6 charleston', '2cv6 special', '2cv charleston', '2cv fourgonnette', '2cv6 club', 'dyane 6']),
+    ('Citroen',       'DS',               ARRAY['ds19', 'ds21', 'ds23', 'id19', 'ds21 pallas', 'ds23 pallas', 'ds19 berline', 'ds23 ie pallas', 'd special']),
+    ('Rolls-Royce',   'Corniche',         ARRAY['corniche v', 'corniche ii']),
+    ('GMC',           'Pickup',           ARRAY['100', '150', '250', 'custom']),
+    ('GMC',           'Hummer EV Pickup', ARRAY['hummer ev', 'hummer ev edition 1']),
+    ('Mercedes-Benz', 'E-Class',          ARRAY['240d', '240d 4-speed', '280c', '280ce', '280e', '300cd', '300ce', '300d', '300e', '300td', '300te', '400e', '500e', 'e450', 'e450 4matic wagon']),
+    ('Mercedes-Benz', 'S-Class',          ARRAY['s63', 's65', 's420', 's650', 'cl65', 's65 coupe', 's65 sedan', 's63 coupe', 's63 cabriolet 4matic', 's650 cabriolet']),
+    ('Mercedes-Benz', 'SL',               ARRAY['450slc', '380slc', '280slc', '500slc', 'sl400', 'sl450']),
+    ('Mercedes-Benz', 'AMG GT',           ARRAY['gt', 'gt roadster', 'slr', 'slr mclaren']),
+    ('Mercedes-Benz', 'C-Class',          ARRAY['c55 amg', 'c55', 'c32 amg', 'c43 amg', 'c36 amg']),
+    ('Mercedes-Benz', '300',              ARRAY['300 d', '300 d cabriolet']),
+    ('Aston Martin',  'DBX',              ARRAY['dbx707']),
+    ('Aston Martin',  'DB7',              ARRAY['db ar1', 'db ar1 6-speed']),
+    ('Porsche',       '911',              ARRAY['targa 4 gts', 'targa 4s', 'targa 4']),
+    ('Porsche',       '718',              ARRAY['cayman gt4', 'gt4 rs', 'gt4']),
+    ('Porsche',       'Cayman',           ARRAY['cayman gt4', 'gt4']),
+    ('Lamborghini',   'Murcielago',       ARRAY['murciélago', 'murciélago coupe', 'murciélago roadster', 'murciélago lp640']),
+    ('Jaguar',        'XK150',            ARRAY['xk150s', 'xk150s 3.8 drophead coupe']),
+    ('Jaguar',        'XK140',            ARRAY['xk140mc', 'xk140se']),
+    ('Jaguar',        'XK120',            ARRAY['xk120m', 'xk120se']),
+    ('Dodge',         'D-Series',         ARRAY['pickup', 'custom pickup', 'd-100 custom pickup', 'd-100 pickup', 'sweptside pickup', '1/2 ton', 'half-ton pickup', 'b-3-b pickup', 'b-3b custom pickup', 'wd-15', 'wd-21'])
 ),
 rows_to_update AS (
   SELECT m.id,
@@ -136,7 +124,7 @@ SET aliases = r.next_aliases,
 FROM rows_to_update r
 WHERE m.id = r.id;
 
--- 4. Insert missing canonical families using sequential -f000-0000000001XX UUIDs.
+-- 3. Insert missing canonical families using sequential -f000-0000000001XX UUIDs.
 INSERT INTO public.canonical_models (id, make, canonical_model, year_start, year_end, aliases, notes)
 SELECT nf.id, nf.make, nf.canonical_model, nf.year_start, nf.year_end, nf.aliases, nf.notes
 FROM (
@@ -178,8 +166,8 @@ FROM (
       ARRAY['mark ii'],
       '[2026-10-18 grand-prix-coachbuilt] canonical Continental Mark II family.'),
     ('00000000-0000-4000-f000-000000000113'::uuid, 'Aston Martin', 'DB2/4', 1950, NULL::int,
-      ARRAY['db2/4', 'db2', 'db mark iii'],
-      '[2026-10-18 grand-prix-coachbuilt] canonical Aston Martin DB2 / DB2/4 family.'),
+      ARRAY['db2/4', 'db2', 'db mark iii', 'db mk iii', 'db2/4 drophead coupe', 'db mk iii saloon', 'db mark iii sports saloon'],
+      '[2026-10-18 grand-prix-coachbuilt] canonical Aston Martin DB2 / DB2/4 / DB Mark III family.'),
     ('00000000-0000-4000-f000-000000000114'::uuid, 'AM General', 'Hummer', 1984, NULL::int,
       ARRAY['hummer', 'h1', 'hmmwv', 'm998'],
       '[2026-10-18 grand-prix-coachbuilt] canonical AM General Hummer / H1 family.'),
@@ -199,7 +187,7 @@ FROM (
       ARRAY['model 770', '770'],
       '[2026-10-18 grand-prix-coachbuilt] canonical Amphicar 770 family.'),
     ('00000000-0000-4000-f000-000000000120'::uuid, 'Lancia', 'Delta Integrale', 1979, NULL::int,
-      ARRAY['delta', 'delta integrale', 'delta integrale evo', 'delta integrale evo 2', 'delta s4'],
+      ARRAY['delta', 'delta integrale', 'delta integrale evo', 'delta integrale evo 1', 'delta integrale evo 2', 'delta hf integrale', 'delta hf integrale 16v', 'delta s4'],
       '[2026-10-18 grand-prix-coachbuilt] canonical Lancia Delta Integrale family.'),
     ('00000000-0000-4000-f000-000000000121'::uuid, 'Morgan', '3 Wheeler', 1920, NULL::int,
       ARRAY['3-wheeler', '3 wheeler', '3-wheeler 110th anniversary edition', 'super 3'],
@@ -301,8 +289,62 @@ FROM (
       ARRAY['metropolitan', 'ambassador', 'statesman', 'healey'],
       '[2026-10-18 grand-prix-coachbuilt] canonical Nash Metropolitan / Ambassador family.'),
     ('00000000-0000-4000-f000-000000000154'::uuid, 'Lamborghini', 'Islero', 1968, NULL::int,
-      ARRAY['islero', 'islero s', 'jarama', 'espada', 'urraco'],
-      '[2026-10-18 grand-prix-coachbuilt] canonical Lamborghini Islero / Espada / Jarama family.')
+      ARRAY['islero', 'islero s', 'jarama', 'urraco'],
+      '[2026-10-18 grand-prix-coachbuilt] canonical Lamborghini Islero / Jarama family.'),
+    ('00000000-0000-4000-f000-000000000155'::uuid, 'Lamborghini', 'Espada', 1968, NULL::int,
+      ARRAY['espada', 'espada series ii', 'espada series iii'],
+      '[2026-10-18 grand-prix-coachbuilt] canonical Lamborghini Espada family.'),
+    ('00000000-0000-4000-f000-000000000156'::uuid, 'Mercedes-Benz', '220', 1951, NULL::int,
+      ARRAY['220', '220 s', '220s', '220se', '220a', '220b', '220 cabriolet a', '220 s cabriolet', '220s cabriolet', '220s cabriolet 4-speed'],
+      '[2026-10-18 grand-prix-coachbuilt] canonical Mercedes-Benz 220 / 220S Ponton & Heckflosse family.'),
+    ('00000000-0000-4000-f000-000000000157'::uuid, 'Mercedes-Benz', 'CLS-Class', 2004, NULL::int,
+      ARRAY['cls550', 'cls55 amg', 'cls63 amg', 'cls500', 'cls400', 'cls53 amg', 'cls450'],
+      '[2026-10-18 grand-prix-coachbuilt] canonical Mercedes-Benz CLS-Class family.'),
+    ('00000000-0000-4000-f000-000000000158'::uuid, 'Mercedes-Benz', 'M-Class', 1997, NULL::int,
+      ARRAY['ml350', 'ml350 4matic', 'ml350 bluetec 4matic', 'ml63 amg', 'ml55 amg', 'ml500', 'ml320', 'ml430', 'gle63', 'gls63', 'gls600', 'glk350', 'glk350 4matic', 'r63 amg', 'r63', 'r350 4matic'],
+      '[2026-10-18 grand-prix-coachbuilt] canonical Mercedes-Benz M-Class / GLE / GLS / R-Class SUV family.'),
+    ('00000000-0000-4000-f000-000000000159'::uuid, 'Land Rover', 'Series', 1948, NULL::int,
+      ARRAY['series i', 'series ii', 'series iia', 'series iii', '88 series iia', '88 series iia santana', '88 series iii', '109 series iia', '109 series iii', 'ies iia', '88', '109'],
+      '[2026-10-18 grand-prix-coachbuilt] canonical Land Rover Series I / II / IIA / III family.'),
+    ('00000000-0000-4000-f000-000000000160'::uuid, 'Lincoln', 'Model K', 1920, NULL::int,
+      ARRAY['model k', 'kb', 'ka', 'model l', 'kb convertible sedan'],
+      '[2026-10-18 grand-prix-coachbuilt] canonical Lincoln Model K / KB / Model L family.'),
+    ('00000000-0000-4000-f000-000000000161'::uuid, 'Packard', 'Super Eight', 1906, NULL::int,
+      ARRAY['super 8', 'super eight', 'model 30', 'model 30 seven-passenger touring'],
+      '[2026-10-18 grand-prix-coachbuilt] canonical Packard Super Eight / Model 30 family.'),
+    ('00000000-0000-4000-f000-000000000162'::uuid, 'Packard', 'One-Ten', 1935, NULL::int,
+      ARRAY['110', '110 station wagon', '120', 'one-ten', 'one-twenty'],
+      '[2026-10-18 grand-prix-coachbuilt] canonical Packard 110 / 120 family.'),
+    ('00000000-0000-4000-f000-000000000163'::uuid, 'Packard', 'Hawk', 1958, NULL::int,
+      ARRAY['hawk'],
+      '[2026-10-18 grand-prix-coachbuilt] canonical Packard Hawk family.'),
+    ('00000000-0000-4000-f000-000000000164'::uuid, 'Dodge', 'Polara', 1949, NULL::int,
+      ARRAY['polara', '330', '440', 'custom 880', 'matador', 'wayfarer', 'custom', 'custom sedan'],
+      '[2026-10-18 grand-prix-coachbuilt] canonical Dodge Polara / 330 / 440 / Wayfarer family.'),
+    ('00000000-0000-4000-f000-000000000165'::uuid, 'Dodge', 'A100', 1964, NULL::int,
+      ARRAY['a100', 'a100 pickup', 'a100 custom pickup', 'a108'],
+      '[2026-10-18 grand-prix-coachbuilt] canonical Dodge A100 Van & Pickup family.'),
+    ('00000000-0000-4000-f000-000000000166'::uuid, 'Ducati', '916', 1994, NULL::int,
+      ARRAY['916', '916 spa', '916 sps', '916 senna', '996', '996s', '996r', '998', '998s', '998r', '748', '748s', '748r'],
+      '[2026-10-18 grand-prix-coachbuilt] canonical Ducati 916 / 996 / 998 / 748 Tamburini Superbike family.'),
+    ('00000000-0000-4000-f000-000000000167'::uuid, 'Ducati', '999', 2003, NULL::int,
+      ARRAY['999', '999s', '999r', '749', '749s', '749r'],
+      '[2026-10-18 grand-prix-coachbuilt] canonical Ducati 999 / 749 Superbike family.'),
+    ('00000000-0000-4000-f000-000000000168'::uuid, 'Ducati', '1098', 2007, NULL::int,
+      ARRAY['1098', '1098s', '1098r', '1098s tricolore', '1098r bayliss limited edition', '1198', '1198s', '1198sp', '1198s corse special edition', '848', '848 evo'],
+      '[2026-10-18 grand-prix-coachbuilt] canonical Ducati 1098 / 1198 / 848 Superbike family.'),
+    ('00000000-0000-4000-f000-000000000169'::uuid, 'Ducati', 'Panigale', 2012, NULL::int,
+      ARRAY['1199', '1199 panigale', '1199 superleggera', '1299', '1299 panigale', '1299 panigale s anniversario', 'panigale v4', 'panigale v4 s', 'panigale v4 r', 'panigale v4 speciale', 'panigale v2', '899 panigale', '959 panigale', 'streetfighter v4', 'streetfighter v4 lamborghini', 'diavel 1260 lamborghini', 'xdiavel black star'],
+      '[2026-10-18 grand-prix-coachbuilt] canonical Ducati Panigale / Superleggera / Streetfighter V4 family.'),
+    ('00000000-0000-4000-f000-000000000170'::uuid, 'Ducati', 'SuperSport', 1972, NULL::int,
+      ARRAY['750ss', '750 sport', '750gt', '900ss', '900 super sport', '900 supersport sp', '900ss mike hailwood replica', 'mike hailwood replica', 'mhr'],
+      '[2026-10-18 grand-prix-coachbuilt] canonical Ducati 750SS / 900SS / MHR SuperSport family.'),
+    ('00000000-0000-4000-f000-000000000171'::uuid, 'Ducati', 'SportClassic', 2001, NULL::int,
+      ARRAY['mh900e', 'paul smart 1000 limited edition', 'sportclassic sport 1000 monoposto', 'sportclassic sport 1000s', 'sportclassic gt1000', 'sport 1000', 'gt1000'],
+      '[2026-10-18 grand-prix-coachbuilt] canonical Ducati MH900e / Paul Smart / SportClassic family.'),
+    ('00000000-0000-4000-f000-000000000172'::uuid, 'Ducati', 'Desmosedici RR', 2007, NULL::int,
+      ARRAY['desmosedici rr', 'desmosedici'],
+      '[2026-10-18 grand-prix-coachbuilt] canonical Ducati Desmosedici RR family.')
 ) AS nf(id, make, canonical_model, year_start, year_end, aliases, notes)
 WHERE NOT EXISTS (
   SELECT 1
