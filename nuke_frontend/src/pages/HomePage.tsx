@@ -1971,7 +1971,7 @@ export function TreemapHomePage({ onBrowse, embedded = false }: { onBrowse: () =
             familyKey={currentLevel.family}
             family={drillStack.find((d) => d.family && !d.model)?.label || searchParams.get('family_name') || currentLevel.label}
             width={dims.w}
-            height={340}
+            height={420}
             onOpen={(id) => navigate(`/vehicle/${id}`)}
             selectedEra={selectedEra}
             onSelectEra={setSelectedEra}
@@ -2044,7 +2044,7 @@ export function TreemapHomePage({ onBrowse, embedded = false }: { onBrowse: () =
         }
         .home-embedded-family-chart {
           position: relative;
-          height: 340px;
+          height: 420px;
           border-top: 2px solid var(--border);
           background: var(--bg);
           overflow: hidden;
