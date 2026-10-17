@@ -19,6 +19,14 @@ import BroadArrowMetricsDisplay from '../components/organization/BroadArrowMetri
 import OrganizationBroadcastIntelligence from '../components/organization/OrganizationBroadcastIntelligence';
 import VehicleCardDense from '../components/vehicles/VehicleCardDense';
 import { fetchOrganizationVehicleBooks, withOrganizationVehicleBook } from '../lib/privateMoney';
+import {
+  OrganizationFacetStrip,
+  computeOrganizationFacetBreakdown,
+  filterOrganizationVehiclesByFacet,
+  matchesOrganizationVehicleFacet,
+  type OrganizationFacetAxis,
+  type OrganizationVehicleFacetInput,
+} from '../components/organization/OrganizationFacetStrip';
 import '../styles/unified-design-system.css';
 
 // Lazy-loaded — only pulled in when the relevant tab or modal is activated
@@ -367,6 +375,47 @@ export default function OrganizationProfile() {
   const [comprehensiveData, setComprehensiveData] = useState<any>(null);
   const [sellerTrackRecord, setSellerTrackRecord] = useState<SellerTrackRecord | null>(null);
   const [auctionHeatmapEvents, setAuctionHeatmapEvents] = useState<Array<{ event_date: string; event_type: string; cost_amount?: number }>>([]);
+  const [facetAxis, setFacetAxis] = useState<OrganizationFacetAxis>('series');
+  const [selectedFacet, setSelectedFacet] = useState<string | null>(null);
+
+  const orgFacetBreakdown = useMemo(() => {
+    const byVehicleId = new Map<string, OrganizationVehicleFacetInput>();
+    for (const v of vehicles) {
+      const key = String(v.vehicle_id || v.id);
+      byVehicleId.set(key, v);
+    }
+    if (sellerTrackRecord?.vehicles_sold) {
+      for (const sv of sellerTrackRecord.vehicles_sold) {
+        const key = String(sv.vehicle_id);
+        if (!byVehicleId.has(key)) {
+          byVehicleId.set(key, {
+            vehicle_id: sv.vehicle_id,
+            vehicle_year: sv.year ?? null,
+            vehicle_make: sv.make ?? null,
+            vehicle_model: sv.model ?? null,
+            sale_price: sv.sale_price ?? null,
+            is_sold: Boolean(sv.sale_price || sv.sale_date),
+          });
+        }
+      }
+    }
+    return computeOrganizationFacetBreakdown(Array.from(byVehicleId.values()));
+  }, [vehicles, sellerTrackRecord]);
+
+  useEffect(() => {
+    if (orgFacetBreakdown.totalVehicles === 0) return;
+    const currentBuckets =
+      facetAxis === 'series'
+        ? orgFacetBreakdown.series
+        : facetAxis === 'trim'
+          ? orgFacetBreakdown.trim
+          : orgFacetBreakdown.body;
+    if (currentBuckets.length === 0) {
+      if (orgFacetBreakdown.series.length > 0) setFacetAxis('series');
+      else if (orgFacetBreakdown.trim.length > 0) setFacetAxis('trim');
+      else if (orgFacetBreakdown.body.length > 0) setFacetAxis('body');
+    }
+  }, [orgFacetBreakdown, facetAxis]);
 
   // Grid and sorting controls (similar to CursorHomepage)
   const [cardsPerRow, setCardsPerRow] = useState<number>(() => {
@@ -2352,8 +2401,33 @@ export default function OrganizationProfile() {
               />
             )}
 
+            {/* Multi-Axis Inventory & Sales Facet Strip (SERIES | TRIM | BODY STYLE) */}
+            <OrganizationFacetStrip
+              breakdown={orgFacetBreakdown}
+              activeAxis={facetAxis}
+              selectedFacet={selectedFacet}
+              onSelectAxis={setFacetAxis}
+              onSelectFacet={setSelectedFacet}
+            />
+
             {/* Seller Track Record — GMV bars, volume, geography, vehicle table */}
-            {sellerTrackRecord && sellerTrackRecord.vehicles_sold.length > 0 && (
+            {sellerTrackRecord && sellerTrackRecord.vehicles_sold.length > 0 && (() => {
+              const filteredSoldVehicles = sellerTrackRecord.vehicles_sold.filter((v) =>
+                matchesOrganizationVehicleFacet(
+                  {
+                    vehicle_id: v.vehicle_id,
+                    vehicle_year: v.year ?? null,
+                    vehicle_make: v.make ?? null,
+                    vehicle_model: v.model ?? null,
+                    sale_price: v.sale_price ?? null,
+                    is_sold: true,
+                  },
+                  facetAxis,
+                  selectedFacet,
+                ),
+              );
+              if (filteredSoldVehicles.length === 0) return null;
+              return (
               <div style={{ marginBottom: '16px' }}>
                 {/* Relationship context; listing activity is measured separately. */}
                 <p style={{ fontSize: 11, color: 'var(--text-muted)' }}>
@@ -2375,7 +2449,7 @@ export default function OrganizationProfile() {
                       </tr>
                     </thead>
                     <tbody>
-                      {sellerTrackRecord.vehicles_sold.slice(0, 50).map((v, i) => {
+                      {filteredSoldVehicles.slice(0, 50).map((v, i) => {
                         const roleBadge = v.relationship_type === 'owner' ? 'OWNED'
                           : v.relationship_type === 'consigner' ? 'CONSIGNED'
                           : v.relationship_type === 'supplier_build' ? 'BUILT'
@@ -2436,14 +2510,15 @@ export default function OrganizationProfile() {
                       })}
                     </tbody>
                   </table>
-                  {sellerTrackRecord.vehicles_sold.length > 50 && (
+                  {filteredSoldVehicles.length > 50 && (
                     <div style={{ padding: '8px 12px', fontSize: '10px', color: 'var(--text-muted)', background: 'var(--surface)', borderTop: '1px solid var(--border-light)' }}>
-                      Showing 50 of {sellerTrackRecord.vehicles_sold.length} vehicles
+                      Showing 50 of {filteredSoldVehicles.length} vehicles
                     </div>
                   )}
                 </div>
               </div>
-            )}
+              );
+            })()}
 
             {/* Business docs for advisors — only show for owners or when data room has been granted */}
             {organization && organizationId && (isOwner || dataRoomAccessGranted) && (
@@ -2529,11 +2604,15 @@ export default function OrganizationProfile() {
               });
               
               // Sort by auction end time (ending soon first)
-              const sortedAuctions = [...liveAuctions].sort((a, b) => {
-                const aEnd = a.auction_end_time ? new Date(a.auction_end_time).getTime() : 0;
-                const bEnd = b.auction_end_time ? new Date(b.auction_end_time).getTime() : 0;
-                return aEnd - bEnd;
-              });
+              const sortedAuctions = filterOrganizationVehiclesByFacet(
+                [...liveAuctions].sort((a, b) => {
+                  const aEnd = a.auction_end_time ? new Date(a.auction_end_time).getTime() : 0;
+                  const bEnd = b.auction_end_time ? new Date(b.auction_end_time).getTime() : 0;
+                  return aEnd - bEnd;
+                }),
+                facetAxis,
+                selectedFacet,
+              );
               
               if (sortedAuctions.length > 0) {
                 return (
@@ -2663,10 +2742,17 @@ export default function OrganizationProfile() {
                   if (isServiceOrg) {
                     // serviceVehicles is the shared memo above — the same list
                     // the "In Service N" header counts.
-                    if (serviceVehicles.length === 0) {
+                    const filteredServiceVehicles = filterOrganizationVehiclesByFacet(
+                      serviceVehicles,
+                      facetAxis,
+                      selectedFacet,
+                    );
+                    if (filteredServiceVehicles.length === 0) {
                       return (
                         <div style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)', fontSize: '12px' }}>
-                          No vehicles currently in service. Service vehicles will appear here.
+                          {selectedFacet
+                            ? `No service vehicles matching ${selectedFacet}.`
+                            : 'No vehicles currently in service. Service vehicles will appear here.'}
                         </div>
                       );
                     }
@@ -2680,7 +2766,7 @@ export default function OrganizationProfile() {
                           gap: '8px' 
                         }}
                       >
-                        {serviceVehicles.map((vehicle) => (
+                        {filteredServiceVehicles.map((vehicle) => (
                           <ServiceVehicleCardRich
                             key={vehicle.id}
                             vehicleId={vehicle.vehicle_id}
@@ -2748,16 +2834,24 @@ export default function OrganizationProfile() {
                     return !isSold;
                   });
                   
-                  if (productsForSale.length === 0) {
+                  const filteredProductsForSale = filterOrganizationVehiclesByFacet(
+                    productsForSale,
+                    facetAxis,
+                    selectedFacet,
+                  );
+
+                  if (filteredProductsForSale.length === 0) {
                     return (
                       <div style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)', fontSize: '12px' }}>
-                        No current inventory. Add vehicles to display them here.
+                        {selectedFacet
+                          ? `No current inventory matching ${selectedFacet}.`
+                          : 'No current inventory. Add vehicles to display them here.'}
                       </div>
                     );
                   }
                   
                   // Apply sorting based on sortBy and sortDirection
-                  const sorted = [...productsForSale];
+                  const sorted = [...filteredProductsForSale];
                   const dir = sortDirection === 'desc' ? 1 : -1;
                   
                   switch (sortBy) {
