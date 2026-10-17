@@ -1018,8 +1018,8 @@ export function TreemapHomePage({ onBrowse, embedded = false }: { onBrowse: () =
     currentLevel.family ? currentLevel.family : null,
   );
   const { data: yearsData, loading: yearsLoading } = useTreemapYears(
-    currentLevel.model && !currentLevel.year ? currentLevel.make ?? null : null,
-    currentLevel.model && !currentLevel.year ? currentLevel.model ?? null : null
+    currentLevel.model ? currentLevel.make ?? null : null,
+    currentLevel.model ? currentLevel.model ?? null : null
   );
   // Vehicle-level data: fetched when we have make+model and either a year or coming from years level
   const vehicleMake = currentLevel.year ? currentLevel.make ?? null : null;
@@ -1629,6 +1629,57 @@ export function TreemapHomePage({ onBrowse, embedded = false }: { onBrowse: () =
                   onClick={() => setSelectedEra(active ? null : cohort.id)}
                 >
                   {cohort.label}
+                </button>
+              );
+            })}
+          </div>
+        );
+      })()}
+
+      {/* ─── MODEL-YEAR QUICK-SWITCH BAR: 1-click year hopping when inspecting a sub-model or year ─── */}
+      {(levelType === 'years' || levelType === 'vehicles') && currentLevel.make && currentLevel.model && yearsData && yearsData.length > 1 && (() => {
+        const eraFiltered = selectedEra
+          ? yearsData.filter((n) => matchesEraRange(parseInt(n.name, 10), selectedEra))
+          : yearsData;
+        const pool = (eraFiltered.length > 0 ? eraFiltered : yearsData)
+          .slice()
+          .sort((a, b) => parseInt(a.name, 10) - parseInt(b.name, 10));
+        if (pool.length < 2) return null;
+        return (
+          <div className="home-family-submodels" role="navigation" aria-label="Model years">
+            <button
+              type="button"
+              className={`home-family-submodel-pill${!currentLevel.year ? ' home-family-submodel-pill--active' : ''}`}
+              aria-pressed={!currentLevel.year}
+              onClick={() => {
+                const withoutYear = drillStack.filter((d) => !d.year);
+                setDrillStack(withoutYear);
+              }}
+            >
+              ALL YEARS <span className="home-family-submodel-count">{pool.length}</span>
+            </button>
+            {pool.slice(0, 16).map((yrNode) => {
+              const yr = parseInt(yrNode.name, 10);
+              const active = currentLevel.year === yr;
+              return (
+                <button
+                  key={yrNode.name}
+                  type="button"
+                  className={`home-family-submodel-pill${active ? ' home-family-submodel-pill--active' : ''}`}
+                  aria-pressed={active}
+                  onClick={() => {
+                    const base = drillStack.filter((d) => !d.year);
+                    if (active) {
+                      setDrillStack(base);
+                    } else if (Number.isFinite(yr)) {
+                      setDrillStack([
+                        ...base,
+                        { label: String(yr), make: currentLevel.make, family: currentLevel.family, model: currentLevel.model, year: yr },
+                      ]);
+                    }
+                  }}
+                >
+                  {yrNode.name} <span className="home-family-submodel-count">{yrNode.count.toLocaleString('en-US')}</span>
                 </button>
               );
             })}

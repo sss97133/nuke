@@ -1,12 +1,13 @@
 -- Empty disposable PG17 only: psql -X -v ON_ERROR_STOP=1 -d dm_refinement_family_keys_grand_prix_coachbuilt_motos -f this-file.sql
 -- Contract for 20261018065000_family_keys_grand_prix_coachbuilt_motos.sql. Synthetic rows only; never production.
 -- Verifies that:
--- 1. Year-gated models (Rolls-Royce Corniche, Silver Wraith, Wraith, Austin-Healey 100, Ferrari F430)
---    widen their year bounds and resolve cleanly.
+-- 1. Year-gated models (Rolls-Royce Corniche, Silver Wraith, Wraith, Austin-Healey 100, Ferrari F430,
+--    Mercedes-Benz E-Class / C-Class) widen their year bounds and resolve cleanly.
 -- 2. Existing families (Bugatti Type 35B, Chiron Super Sport, Ferrari 857 Sport, Citroen 2CV6 / DS21,
---    Delahaye 135M) and newly inserted families (Mercedes-Benz 540K, Spyker C8, Audi Sport Quattro,
---    Lancia Delta Integrale, Citroen SM, Factory Five Mk4 Roadster, Willys Jeepster, Studebaker Golden Hawk,
---    Lucid Air, Indian Chief, Vincent Black Shadow) key to their canonical families.
+--    Mercedes-Benz 240D -> E-Class, S65 Coupe -> S-Class, 450SLC -> SL) and newly inserted families
+--    (Mercedes-Benz 540K / 220 / CLS-Class, Spyker C8, Audi Sport Quattro, Lancia Delta Integrale,
+--    Citroen SM, Factory Five Mk4 Roadster, Willys Jeepster, Studebaker Golden Hawk, Lucid Air,
+--    Land Rover Series IIA, Ducati 916 / MH900e, Indian Chief, Vincent Black Shadow) key cleanly.
 -- 3. Applying the migration a second time is idempotent and changes nothing.
 \set ON_ERROR_STOP on
 DO $$ BEGIN
@@ -53,7 +54,9 @@ INSERT INTO public.canonical_makes (id, canonical_name, display_name, aliases) V
   ('00000000-0000-4000-a000-000000000008', 'Audi',          'Audi',          '{}'),
   ('00000000-0000-4000-a000-000000000009', 'Lancia',        'Lancia',        '{}'),
   ('00000000-0000-4000-a000-000000000010', 'Morgan',        'Morgan',        '{}'),
-  ('00000000-0000-4000-a000-000000000011', 'Sunbeam',       'Sunbeam',       '{}');
+  ('00000000-0000-4000-a000-000000000011', 'Sunbeam',       'Sunbeam',       '{}'),
+  ('00000000-0000-4000-a000-000000000012', 'Land Rover',    'Land Rover',    '{}'),
+  ('00000000-0000-4000-a000-000000000013', 'Ducati',        'Ducati',        '{}');
 
 INSERT INTO public.canonical_models (id, make, canonical_model, year_start, year_end, aliases) VALUES
   ('10000000-0000-4000-a000-000000000001', 'Bugatti',       'Type 35',       NULL, NULL, ARRAY['type 35']),
@@ -64,10 +67,17 @@ INSERT INTO public.canonical_models (id, make, canonical_model, year_start, year
   ('10000000-0000-4000-a000-000000000006', 'Delahaye',      '135',           NULL, NULL, ARRAY['135']),
   ('10000000-0000-4000-a000-000000000007', 'Citroen',       '2 CV',          NULL, NULL, ARRAY['2 cv']),
   ('10000000-0000-4000-a000-000000000008', 'Citroen',       'DS',            NULL, NULL, ARRAY['ds']),
-  ('10000000-0000-4000-a000-000000000009', 'Rolls-Royce',   'Corniche',      1971, 1995, ARRAY['corniche']);
+  ('10000000-0000-4000-a000-000000000009', 'Rolls-Royce',   'Corniche',      1971, 1995, ARRAY['corniche']),
+  ('10000000-0000-4000-a000-000000000010', 'Mercedes-Benz', 'E-Class',       1993, NULL, ARRAY['e-class']),
+  ('10000000-0000-4000-a000-000000000011', 'Mercedes-Benz', 'S-Class',       1951, NULL, ARRAY['s-class']),
+  ('10000000-0000-4000-a000-000000000012', 'Mercedes-Benz', 'SL',            1954, NULL, ARRAY['sl']);
 
 INSERT INTO public.mv_vehicle_name_dictionary (make_l, model_l, name_l, vehicles) VALUES
   ('mercedes-benz', '540k special roadster', 'mercedes-benz 540k special roadster', 5),
+  ('mercedes-benz', '220 s cabriolet',       'mercedes-benz 220 s cabriolet',       9),
+  ('mercedes-benz', '240d 4-speed',          'mercedes-benz 240d 4-speed',          79),
+  ('mercedes-benz', 's65 coupe',             'mercedes-benz s65 coupe',             9),
+  ('mercedes-benz', '450slc',                'mercedes-benz 450slc',                74),
   ('bugatti',       'type 35b grand prix',   'bugatti type 35b grand prix',         6),
   ('bugatti',       'chiron super sport',    'bugatti chiron super sport',          4),
   ('ferrari',       '857 sport spider',      'ferrari 857 sport spider',            3),
@@ -81,6 +91,9 @@ INSERT INTO public.mv_vehicle_name_dictionary (make_l, model_l, name_l, vehicles
   ('willys',        'jeepster',              'willys jeepster',                     57),
   ('studebaker',    'golden hawk',           'studebaker golden hawk',              33),
   ('lucid',         'air grand touring',     'lucid air grand touring',             17),
+  ('land rover',    '88 series iia',         'land rover 88 series iia',            30),
+  ('ducati',        '916',                   'ducati 916',                          17),
+  ('ducati',        'mh900e',                'ducati mh900e',                       16),
   ('indian',        'chief',                 'indian chief',                        62),
   ('vincent',       'black shadow',          'vincent black shadow',                18);
 
@@ -88,13 +101,18 @@ INSERT INTO public.mv_vehicle_name_dictionary (make_l, model_l, name_l, vehicles
 \ir ../migrations/20261018065000_family_keys_grand_prix_coachbuilt_motos.sql
 REFRESH MATERIALIZED VIEW public.mv_model_family_names;
 
-SELECT pg_temp.ok('after: Rolls-Royce Corniche and Ferrari F430 year bounds are widened',
+SELECT pg_temp.ok('after: Rolls-Royce Corniche, Ferrari F430, and Mercedes-Benz E-Class year bounds are widened',
   (SELECT year_start FROM public.canonical_models WHERE id = '10000000-0000-4000-a000-000000000009') = 1966
   AND (SELECT year_end FROM public.canonical_models WHERE id = '10000000-0000-4000-a000-000000000009') IS NULL
-  AND (SELECT year_end FROM public.canonical_models WHERE id = '10000000-0000-4000-a000-000000000004') IS NULL);
+  AND (SELECT year_end FROM public.canonical_models WHERE id = '10000000-0000-4000-a000-000000000004') IS NULL
+  AND (SELECT year_start FROM public.canonical_models WHERE id = '10000000-0000-4000-a000-000000000010') = 1968);
 
-SELECT pg_temp.ok('after: Grand Prix, coachbuilt, rally, specialist, and motorcycle icons key cleanly',
+SELECT pg_temp.ok('after: Grand Prix, coachbuilt, rally, specialist, Mercedes, Land Rover, and motorcycle icons key cleanly',
   (SELECT family FROM public.mv_model_family_names WHERE make_l = 'mercedes-benz' AND model_l = '540k special roadster') = '540K'
+  AND (SELECT family FROM public.mv_model_family_names WHERE make_l = 'mercedes-benz' AND model_l = '220 s cabriolet') = '220'
+  AND (SELECT family FROM public.mv_model_family_names WHERE make_l = 'mercedes-benz' AND model_l = '240d 4-speed') = 'E-Class'
+  AND (SELECT family FROM public.mv_model_family_names WHERE make_l = 'mercedes-benz' AND model_l = 's65 coupe') = 'S-Class'
+  AND (SELECT family FROM public.mv_model_family_names WHERE make_l = 'mercedes-benz' AND model_l = '450slc') = 'SL'
   AND (SELECT family FROM public.mv_model_family_names WHERE make_l = 'bugatti' AND model_l = 'type 35b grand prix') = 'Type 35'
   AND (SELECT family FROM public.mv_model_family_names WHERE make_l = 'bugatti' AND model_l = 'chiron super sport') = 'Chiron'
   AND (SELECT family FROM public.mv_model_family_names WHERE make_l = 'ferrari' AND model_l = '857 sport spider') = '857 S'
@@ -108,6 +126,9 @@ SELECT pg_temp.ok('after: Grand Prix, coachbuilt, rally, specialist, and motorcy
   AND (SELECT family FROM public.mv_model_family_names WHERE make_l = 'willys' AND model_l = 'jeepster') = 'Jeepster'
   AND (SELECT family FROM public.mv_model_family_names WHERE make_l = 'studebaker' AND model_l = 'golden hawk') = 'Hawk'
   AND (SELECT family FROM public.mv_model_family_names WHERE make_l = 'lucid' AND model_l = 'air grand touring') = 'Air'
+  AND (SELECT family FROM public.mv_model_family_names WHERE make_l = 'land rover' AND model_l = '88 series iia') = 'Series'
+  AND (SELECT family FROM public.mv_model_family_names WHERE make_l = 'ducati' AND model_l = '916') = '916'
+  AND (SELECT family FROM public.mv_model_family_names WHERE make_l = 'ducati' AND model_l = 'mh900e') = 'SportClassic'
   AND (SELECT family FROM public.mv_model_family_names WHERE make_l = 'indian' AND model_l = 'chief') = 'Chief'
   AND (SELECT family FROM public.mv_model_family_names WHERE make_l = 'vincent' AND model_l = 'black shadow') = 'Black Shadow');
 
