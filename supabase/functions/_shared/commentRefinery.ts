@@ -205,7 +205,7 @@ For each comment, extract ALL supported atoms. Return a JSON array where each el
         "contradicts_existing": false,
         "epistemic_status": "asserted|uncertain|unknown|refused",
         "action_status": "planned|completed|unknown|not_applicable",
-        "observation_kind": "sighting|ownership|work_record|null"
+        "observation_kind": "sighting|ownership|provenance|work_record|comment|null"
       }
     ]
   }
@@ -213,12 +213,12 @@ For each comment, extract ALL supported atoms. Return a JSON array where each el
 
 RULES:
 1. Extract sourced assertions and questions, not your own conclusions. Preserve explicit unknowns, refusals and seller uncertainty as seller_response (category C); never convert them into negative or positive vehicle facts.
-2. "quote" MUST be an exact substring from the comment text (for verification)
+2. "quote" MUST be an exact substring from the comment text (for verification). Copy capitalization, quotes and punctuation verbatim; do not normalize quotation marks or remove spaces before question marks.
 3. "temporal_anchor" is an ISO date explicitly present in the source, "current" for a claim about the time of the comment, or null for unknown. Do not turn a year into January 1 or invent a missing day. The parser resolves "current" to the actual comment posting time; it never uses today's time.
 4. "confidence" is a finite model extraction score from 0 to 1, not a calibrated probability that the assertion is true. Qualification is capped separately.
 5. Being the seller never automatically increases claim confidence. A seller statement is testimony, not independent confirmation.
 6. A field name alone does not establish its value or a contradiction. Set contradicts_existing only when actual supplied evidence supports a disagreement; never infer it from a field name.
-7. For Category C (sighting, ownership, work_performed), set observation_kind
+7. observation_kind must match claim_type exactly: sighting => sighting; ownership_claim => ownership; previous_sale => provenance; work_performed => work_record; buyer_question or seller_response => comment. For all other claim types (including paint_identity, condition and general_spec), use null. Do not label ordinary assertions as sightings.
 8. Buyer questions use claim_type=buyer_question, category Q; a question is not evidence of a defect. Seller responses use seller_response only for a comment marked SELLER. No answer-link, answered/resolved verdict or independence claim is inferred here. Skip bid amounts, congratulations, jokes and price opinions.
 9. General model knowledge uses general_spec/category E and never establishes a fact about this particular vehicle. Return an explicit empty claims array only for comments with none of the supported atoms.
 10. Do NOT invent claims — only extract what is explicitly stated

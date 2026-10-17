@@ -12,19 +12,22 @@ export interface ClaimLandingInput {
   costCents: number;
   promptVersion: string;
   deadlineMs?: number;
+  credential?: "system_api_key" | "local_ollama";
 }
 
 /** Only this qualified derivative is written here; testimony and vehicle facts stay intact. */
 export async function landCommentClaims(supabase: any, input: ClaimLandingInput) {
   const result = {
-    derived: [] as Array<{ observation_id: string; comment_id: string; duplicate: boolean; credential: "system_api_key" }>,
+    derived: [] as Array<{ observation_id: string; comment_id: string; duplicate: boolean; credential: "system_api_key" | "local_ollama" }>,
+    processed_comment_ids: [] as string[],
     comments_processed: 0, claims_total: 0, failed_comments: 0, errors: [] as string[],
   };
   const deadline = Math.min(Date.now() + 45_000, input.deadlineMs ?? Infinity);
   const covered = new Set(input.processedCommentIds);
   const known = new Set(input.comments.map((comment) => comment.id));
   const invalidBatch = input.comments.length === 0 || !uuid(input.vehicleId) || !input.promptVersion || !input.modelUsed ||
-    !Number.isFinite(input.costCents) || input.costCents < 0 || known.size !== input.comments.length ||
+    (input.credential != null && !["system_api_key", "local_ollama"].includes(input.credential)) ||
+    (input.credential === "local_ollama" && input.costCents !== 0) || !Number.isFinite(input.costCents) || input.costCents < 0 || known.size !== input.comments.length ||
     input.claims.some((claim) => !known.has(claim.comment_id)) ||
     input.processedCommentIds.some((id) => !known.has(id));
   if (invalidBatch) {
@@ -65,6 +68,7 @@ export async function landCommentClaims(supabase: any, input: ClaimLandingInput)
             agent_cost_cents: input.costCents / Math.max(1, input.claims.length),
             structured_data: {
               analysis_kind: "comment_atom",
+              derivation_credential: input.credential ?? "system_api_key",
               is_inferred: true,
               claim_type: claim.claim_type,
               category: claim.category,
@@ -109,7 +113,7 @@ export async function landCommentClaims(supabase: any, input: ClaimLandingInput)
         observationIds.add(id);
         if (!result.derived.some((entry) => entry.observation_id === id)) {
           result.derived.push({ observation_id: id, comment_id: comment.id,
-            duplicate: response.data.duplicate === true, credential: "system_api_key" });
+            duplicate: response.data.duplicate === true, credential: input.credential ?? "system_api_key" });
         }
       } catch (error) {
         result.errors.push(error instanceof LandingError ? error.code : "observation_write_failed");
@@ -133,6 +137,7 @@ export async function landCommentClaims(supabase: any, input: ClaimLandingInput)
         if (progress.error || progress.data?.comment_id !== comment.id || progress.data.llm_processed !== true ||
           !sameIds(progress.data.observation_ids, ids)) throw new LandingError("progress_write_failed");
         result.comments_processed++;
+        result.processed_comment_ids.push(comment.id);
       } catch (error) {
         failed = true;
         result.errors.push(error instanceof LandingError ? error.code : "progress_write_failed");
