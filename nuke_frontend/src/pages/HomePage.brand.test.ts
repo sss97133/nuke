@@ -9,6 +9,8 @@ import {
   buildRepresentativeImageCandidates,
   drillStackFromSearchParams,
   lineChars,
+  normalizeFacetSelection,
+  parseFacetAxisParam,
   selectFamilyRepresentativeVehicleIds,
 } from './HomePage';
 import { optimizeImageUrl } from '../lib/imageOptimizer';
@@ -151,6 +153,36 @@ describe('URL scope contract for the market treemap', () => {
     expect(cleared.get('family_name')).toBeNull();
     expect(cleared.get('model')).toBeNull();
     expect(cleared.get('year')).toBeNull();
+  });
+
+  it('parses and preserves facet drilldown links (/?make=...&family=...&axis=series|trim|body&facet=...)', () => {
+    expect(parseFacetAxisParam('series')).toBe('series');
+    expect(parseFacetAxisParam('trim')).toBe('trim');
+    expect(parseFacetAxisParam('body')).toBe('body');
+    expect(parseFacetAxisParam('unknown')).toBeNull();
+
+    expect(normalizeFacetSelection('series', 'C10', 'Chevrolet', 'Pickup')).toBe('C10 (1/2-Ton 2WD)');
+    expect(normalizeFacetSelection('trim', 'Cheyenne', 'Chevrolet', 'Pickup')).toBe('Cheyenne');
+    expect(normalizeFacetSelection('body', 'Fleetside', 'Chevrolet', 'Pickup')).toBe('Fleetside / Styleside');
+
+    const facetUrl = new URLSearchParams('make=Chevrolet&family=Pickup&axis=trim&facet=Cheyenne');
+    const stack = drillStackFromSearchParams(
+      facetUrl,
+      [{ name: 'Chevrolet', count: 18500, value: 890000000 }],
+      [{ name: 'Pickup', count: 3200, value: 145000000, familyKey: 'Pickup', models: 48 }],
+    );
+    expect(stack).toEqual([
+      { label: 'ALL MAKES' },
+      { label: 'Chevrolet', make: 'Chevrolet' },
+      { label: 'Pickup', make: 'Chevrolet', family: 'Pickup', names: 48 },
+      { label: 'Cheyenne', make: 'Chevrolet', family: 'Pickup', model: 'Cheyenne' },
+    ]);
+
+    const synced = applyDrillStackToSearchParams(facetUrl, stack);
+    expect(synced.get('make')).toBe('Chevrolet');
+    expect(synced.get('family')).toBe('Pickup');
+    expect(synced.get('axis')).toBe('trim');
+    expect(synced.get('facet')).toBe('Cheyenne');
   });
 });
 
