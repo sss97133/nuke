@@ -400,6 +400,95 @@ export function categoryBadgeLabel(row: Pick<SourceRow, 'category' | 'businessTy
   return cat ? CATEGORY_BADGE_LABELS[cat] : null;
 }
 
+export type DealerConsignmentBreakdown = {
+  consignedCount: number;
+  directCount: number;
+  totalRecent: number;
+  consignedPct: number | null;
+  directPct: number | null;
+  heldVehicles: number;
+  liveVehicles: number;
+  confirmedSales: number;
+  sales12m: number;
+  usd12m: number | null;
+  modeLabel: string;
+  summaryText: string;
+};
+
+/**
+ * Computes a dealer's consigned vs. direct inventory breakdown from its recent event stream
+ * and source-day inventory/sales metrics so the expanded inspector shows clear dealer context.
+ */
+export function describeDealerConsignment(
+  row: Pick<SourceRow, 'held' | 'live' | 'mapSales' | 'sales12' | 'usd12'>,
+  recent: ReadonlyArray<Pick<LandingRecentEvent, 'eventType' | 'eventStatus' | 'reserve' | 'bidCount'>>,
+): DealerConsignmentBreakdown {
+  let consignedCount = 0;
+  let directCount = 0;
+  for (const ev of recent) {
+    const et = (ev.eventType ?? '').toLowerCase();
+    const isAuctionOrConsigned =
+      et === 'auction' ||
+      et === 'consignment' ||
+      (ev.bidCount != null && ev.bidCount > 0) ||
+      ev.reserve === 'no_reserve' ||
+      ev.reserve === 'reserve';
+    if (isAuctionOrConsigned) consignedCount += 1;
+    else directCount += 1;
+  }
+  const totalRecent = recent.length;
+  const consignedPct = totalRecent > 0 ? Math.round((consignedCount / totalRecent) * 100) : null;
+  const directPct = totalRecent > 0 ? 100 - (consignedPct ?? 0) : null;
+  const heldVehicles = row.held ?? 0;
+  const liveVehicles = row.live ?? 0;
+  const confirmedSales = row.mapSales ?? 0;
+  const sales12m = row.sales12 ?? 0;
+  const usd12m = row.usd12 ?? null;
+
+  let modeLabel = 'Consignment & direct inventory';
+  if (totalRecent > 0) {
+    if (consignedCount > 0 && directCount > 0) {
+      modeLabel = `Mixed · ${consignedPct}% consigned / ${directPct}% direct`;
+    } else if (consignedCount > 0) {
+      modeLabel = `Auction consignment (${consignedCount}/${totalRecent} recent lots)`;
+    } else {
+      modeLabel = `Direct dealer listings (${directCount}/${totalRecent} recent listings)`;
+    }
+  } else if (confirmedSales > 0 && liveVehicles > 0) {
+    modeLabel = 'Consignment & direct showroom';
+  } else if (confirmedSales > 0) {
+    modeLabel = 'Auction consignor';
+  } else if (liveVehicles > 0) {
+    modeLabel = 'Direct dealer showroom';
+  }
+
+  const parts: string[] = [`${count(heldVehicles)} vehicles held`];
+  if (liveVehicles > 0) parts.push(`${count(liveVehicles)} live`);
+  if (sales12m > 0) {
+    parts.push(`${count(sales12m)} sales (12m)${usd12m ? ` · ${money(usd12m)}` : ''}`);
+  } else if (confirmedSales > 0) {
+    parts.push(`${count(confirmedSales)} confirmed sales`);
+  }
+  if (totalRecent > 0) {
+    parts.push(`${consignedCount} consigned · ${directCount} direct in stream`);
+  }
+
+  return {
+    consignedCount,
+    directCount,
+    totalRecent,
+    consignedPct,
+    directPct,
+    heldVehicles,
+    liveVehicles,
+    confirmedSales,
+    sales12m,
+    usd12m,
+    modeLabel,
+    summaryText: parts.join(' · '),
+  };
+}
+
 const GROUPS: [SourceCategory, string, string][] = [
   ['auction', 'Auction houses', 'lots held'],
   ['marketplace', 'Marketplaces', 'listings held'],
@@ -702,6 +791,7 @@ function SourceLandingInspector({
   const backfillCount = dateSummaries.filter((d) => d.kind === 'backfill').length;
   const rowCategory = row ? resolveSourceCategory(row) : null;
   const rowBadge = row ? categoryBadgeLabel(row) : null;
+  const dealerBreakdown = row && rowCategory === 'dealer' ? describeDealerConsignment(row, recent) : null;
 
   return (
     <Tag className="market-sources__drill" aria-label={`Live ingestion for ${displayName}`}>
@@ -747,6 +837,37 @@ function SourceLandingInspector({
           </button>
         </div>
       </div>
+
+      {dealerBreakdown ? (
+        <div className="market-sources__dealer-context" aria-label={`Consignment breakdown for ${displayName}`}>
+          <div className="market-sources__dealer-context-main">
+            <span className="market-sources__dealer-context-label">INVENTORY &amp; CONSIGNMENT BREAKDOWN</span>
+            <strong className="market-sources__dealer-context-mode">{dealerBreakdown.modeLabel}</strong>
+            <span className="market-sources__dealer-context-summary">{dealerBreakdown.summaryText}</span>
+          </div>
+          {dealerBreakdown.totalRecent > 0 ? (
+            <div className="market-sources__dealer-context-split">
+              <svg className="market-sources__dealer-bar" viewBox="0 0 100 6" preserveAspectRatio="none" aria-hidden="true">
+                {dealerBreakdown.consignedPct != null && dealerBreakdown.consignedPct > 0 ? (
+                  <rect className="market-sources__dealer-bar-consigned" x="0" y="0" height="6" width={dealerBreakdown.consignedPct} />
+                ) : null}
+                {dealerBreakdown.directPct != null && dealerBreakdown.directPct > 0 ? (
+                  <rect
+                    className="market-sources__dealer-bar-direct"
+                    x={dealerBreakdown.consignedPct ?? 0}
+                    y="0"
+                    height="6"
+                    width={dealerBreakdown.directPct}
+                  />
+                ) : null}
+              </svg>
+              <span className="market-sources__dealer-split-text">
+                {dealerBreakdown.consignedCount} consigned ({dealerBreakdown.consignedPct}%) · {dealerBreakdown.directCount} direct ({dealerBreakdown.directPct}%)
+              </span>
+            </div>
+          ) : null}
+        </div>
+      ) : null}
 
       <div className="market-sources__drill-kpis">
         <div className="market-sources__kpi">
