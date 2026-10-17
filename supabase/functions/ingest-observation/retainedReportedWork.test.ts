@@ -1,4 +1,4 @@
-import { deriveRetainedReportedWork, descriptionReportedWorkWitnesses, retainedReportedWorkSelector, RETAINED_REPORTED_WORK_MODE as MODE } from "./retainedReportedWork.ts";
+import { deriveRetainedReportedWork, descriptionReportedWorkWitnesses, descriptionReportedWorkWitnessesV2, reportedWorkWitnessList, retainedReportedWorkSelector, RETAINED_REPORTED_WORK_MODE as MODE } from "./retainedReportedWork.ts";
 const equal=(a:unknown,b:unknown)=>{if(JSON.stringify(a)!==JSON.stringify(b))throw Error(`${JSON.stringify(a)} != ${JSON.stringify(b)}`);};
 const HONDA="Work in September 2026 included rebuilding the carburetor, repairing an exhaust leak, and replacing the fuel filter, fuel hoses, and exhaust gaskets.";
 const TIRES="The tires, front struts, and front wheel hubs were replaced in July 2023, an inspection at that time recommended replacing the front brake pads and rotors.";
@@ -67,4 +67,32 @@ Deno.test("source capability, public custody, complete capture and month chronol
   equal(await derive({...source,structured_data:{...source.structured_data,[key]:value}}),null);
  equal(await derive(source,{...vehicle,is_public:false}),null);equal(await derive(source,vehicle,{...registry,supported_observations:["listing"]}),null);
  equal(await deriveRetainedReportedWork(source,vehicle,registry,8),null);
+});
+Deno.test("v2 admits one passive month-dated clause with an open object phrase, after v1 and never twice",()=>{
+ const pass=["A Borgeson power steering box was installed in June 2021.","The shocks, sway bar end links, outer tie rod ends, and upper control arms were replaced in December 2025.",
+  "An oil change was performed in August 2026.","The four-speed automatic transmission as well as the torque converter were rebuilt in December 2008.",
+  "The engine’s timing belt was replaced in May 2024."];
+ for(const q of pass) equal(descriptionReportedWorkWitnessesV2(text(q)),[{source_value:q,performed_clause:q,reported_date:q.match(/(\d{4})\.$/)![1]+"-"+String(["January","February","March","April","May","June","July","August","September","October","November","December"].indexOf(q.match(/ in (\w+) \d{4}\.$/)![1])+1).padStart(2,"0"),reported_date_label:q.match(/ in (\w+ \d{4})\.$/)![1],date_precision:"month"}]);
+ const v1Too="The instrument cluster was replaced in December 2010.";
+ equal(descriptionReportedWorkWitnesses(text(v1Too)).length,1); equal(descriptionReportedWorkWitnessesV2(text(v1Too)),[]);
+ equal(reportedWorkWitnessList(text(`${v1Too} ${pass[0]}`)).map(e=>e.version),["retained_description_reported_work_v1","retained_description_reported_work_v2"]);
+ equal(descriptionReportedWorkWitnessesV2(text(`${pass[0]} ${pass[0]}`)).length,1);
+});
+Deno.test("v2 withholds second clauses, attribution, hedging, a second year and unknown verbs",()=>{
+ for(const q of [
+  "The fuel and air filters were replaced under current ownership, and an oil change was performed in April 2026.",
+  "The oil was changed, and the serpentine belt was replaced in December 2025.",
+  "The thermostat and horns were replaced, and the coolant was flushed in August 2025.",
+  "The tires were replaced by a mechanic in July 2023.","The seller notes the bumper was refinished in May 2019.",
+  "Two of the tires were reportedly replaced in July 2026.","The 2019 battery was replaced in May 2024.",
+  "Fluid services were performed in 2024, and the drive belts were replaced in August 2026.",
+  "The radio was upgraded in May 2024.","A timing belt service is recommended in March 2027.","The brakes were not replaced in May 2024.",
+  "The battery was replaced in May 2024, per the invoice.",
+ ]) equal(descriptionReportedWorkWitnessesV2(text(q)),[]);
+});
+Deno.test("a v2 report carries its own witness version through derivation",async()=>{
+ const q="The brake fluid was flushed in September 2026.";
+ const r=await deriveRetainedReportedWork({...source,content_text:text(q)},vehicle,registry,0);
+ equal(r?.structured_data.source_witness_version,"retained_description_reported_work_v2"); equal(r?.structured_data.reported_date,"2026-09");
+ equal(await deriveRetainedReportedWork({...source,content_text:text(q)},vehicle,registry,1),null);
 });

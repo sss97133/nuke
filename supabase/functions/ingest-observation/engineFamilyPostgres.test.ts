@@ -5,7 +5,7 @@
  * The fixture is installed by the owning schema contract before this test runs.
  */
 import { observationClockMicroseconds } from "../_shared/observationContentHash.ts";
-import { descriptionReportedWorkWitnesses, RETAINED_REPORTED_WORK_MODE } from "./retainedReportedWork.ts";
+import { descriptionReportedWorkWitnesses, descriptionReportedWorkWitnessesV2, RETAINED_REPORTED_WORK_MODE } from "./retainedReportedWork.ts";
 import { proposedDescriptionEngineFamilyLabelWitness } from "./retainedDescriptionPowertrain.ts";
 
 const enabled = Deno.env.get("RUN_ENGINE_FAMILY_PG") === "1";
@@ -790,6 +790,31 @@ Deno.test({
         equal((await honda()).length, 2, "One report per listing page, each with its own source URL");
         equal(bridgeErrors, [], "No external call or unsupported route");
       }), "Reported repeated-capture contract failed");
+      assert(await t.step("v2 grammar admits one passive dated clause and leaves admitted v1 reports unchanged", async () => {
+        const v2Migration = new URL("../../migrations/20261018120500_retained_reported_work_v2.sql", import.meta.url);
+        const before = await workRead(); assert(before.reported_work.length >= 3, "Admitted v1 reports before v2");
+        const applied = await command(["--file", decodeURIComponent(v2Migration.pathname)]);
+        assert(applied.success, `v2 migration failed: ${decoder.decode(applied.stderr)}`);
+        equal(await workRead(), before, "Admitted v1 reports read identically after v2");
+        const passive = "The brake fluid was flushed in September 2026.";
+        const twoClause = "The fuel and air filters were replaced under current ownership, and an oil change was performed in April 2026.";
+        const v2Text = textFor(`${twoClause} ${passive}`);
+        equal(await json(`SELECT public.retained_reported_work_witnesses_v2(${quote(v2Text)})::text`), descriptionReportedWorkWitnessesV2(v2Text), "SQL and intake v2 witnesses agree");
+        equal(descriptionReportedWorkWitnessesV2(v2Text).map((w) => w.source_value), [passive], "The two-clause sentence is withheld");
+        const v2Parent = await seedReport(v2Text, "reported-v2-fixture");
+        const admitted = await workInvoke(v2Parent, 0); equal(admitted.status, 200, JSON.stringify(admitted.data)); equal(admitted.data.writes, 1, "One v2 report");
+        const absent = await workInvoke(v2Parent, 1); assert(absent.status >= 400, "No second report on the page"); equal(absent.data.writes, 0, "No write for an absent report");
+        const replay = await workInvoke(v2Parent, 0); equal(replay.data.writes, 0, "Replay adds nothing");
+        const after = await workRead(); equal(after.reported_work.length, before.reported_work.length + 1, "v2 report reaches the anonymous reader");
+        const row = after.reported_work.find((r: Row) => r.source_value === passive);
+        equal(row?.source_witness_version, "retained_description_reported_work_v2", "Reader shows the v2 witness version");
+        equal(row?.reported_date, "2026-09", "Month precision, no fabricated day");
+        for (const r of after.reported_work.filter((r: Row) => r.source_value !== passive)) equal(r.source_witness_version, "retained_description_reported_work_v1", "v1 reports keep v1");
+        const reapplied = await command(["--file", decodeURIComponent(v2Migration.pathname)]);
+        assert(reapplied.success, `v2 reapply failed (matcher hash ${await sql("SELECT encode(sha256(convert_to(pg_get_functiondef('public.retained_reported_work_matches(vehicle_observations,vehicle_observations)'::regprocedure),'UTF8')),'base64')")}): ${decoder.decode(reapplied.stderr)}`);
+        equal(await workRead(), after, "Reapplication changes nothing");
+        equal(bridgeErrors, [], "No external call or unsupported route");
+      }), "Reported v2 contract failed");
     } finally {
       Deno.serve = originalServe;
       globalThis.fetch = originalFetch;
