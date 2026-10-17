@@ -521,6 +521,96 @@ const CULTURAL_SCOPE_ALIASES: Array<{
     make: 'Kenworth',
     familyHint: 'W900',
   },
+  {
+    pattern: /\b(local\s*motors\s*rally\s*fighter|rally\s*fighter)\b/i,
+    make: 'Local',
+    familyHint: 'Rally Fighter',
+  },
+  {
+    pattern: /\b(autozam\s*az[-\s]?1|az[-\s]?1\s*mazdaspeed)\b/i,
+    make: 'Autozam',
+    familyHint: 'AZ-1',
+  },
+  {
+    pattern: /\b(scion\s*(?:fr[-\s]?s|xb|tc|iq)|fr[-\s]?s)\b/i,
+    make: 'Scion',
+    familyHint: 'FR-S',
+  },
+  {
+    pattern: /\b(smart\s*(?:fortwo|crossblade|roadster)|fortwo)\b/i,
+    make: 'Smart',
+    familyHint: 'Fortwo',
+  },
+  {
+    pattern: /\b(checker\s*(?:marathon|a[-\s]?11|a[-\s]?12|aerobus))\b/i,
+    make: 'Checker',
+    familyHint: 'Marathon',
+  },
+  {
+    pattern: /\b(divco\s*(?:milk\s*truck|b100|300))\b/i,
+    make: 'Divco',
+    familyHint: 'Milk Truck',
+  },
+  {
+    pattern: /\b(vanderhall\s*(?:venice|carmel|laguna))\b/i,
+    make: 'Vanderhall',
+    familyHint: 'Venice',
+  },
+  {
+    pattern: /\b(steyr[-\s]*puch\s*(?:pinzgauer|haflinger)|pinzgauer\s*(?:710|712))\b/i,
+    make: 'Steyr-Puch',
+    familyHint: 'Pinzgauer',
+  },
+  {
+    pattern: /\b(mosler\s*(?:mt900s?|consulier|gtp)|consulier\s*gtp)\b/i,
+    make: 'Mosler',
+    familyHint: 'MT900',
+  },
+  {
+    pattern: /\b(vector\s*(?:m[-\s]?12|w8))\b/i,
+    make: 'Vector',
+    familyHint: 'M12',
+  },
+  {
+    pattern: /\b(hennessey\s*(?:venom\s*(?:gt|f5)|velociraptor|mammoth|exorcist)|venom\s*gt)\b/i,
+    make: 'Hennessey',
+    familyHint: 'Venom GT',
+  },
+  {
+    pattern: /\b(rezvani\s*(?:tank|beast|vengeance))\b/i,
+    make: 'Rezvani',
+    familyHint: 'Tank',
+  },
+  {
+    pattern: /\b(arnolt[-\s]*bristol|bolide)\b/i,
+    make: 'Arnolt-Bristol',
+    familyHint: 'Bolide',
+  },
+  {
+    pattern: /\b(kaiser[-\s]*darrin(?:\s*161)?)\b/i,
+    make: 'Kaiser-Darrin',
+    familyHint: '161',
+  },
+  {
+    pattern: /\b(laverda\s*(?:750\s*sfc?|1000\s*jota|jota|rgs))\b/i,
+    make: 'Laverda',
+    familyHint: '750 SFC',
+  },
+  {
+    pattern: /\b(bimota\s*(?:tesi|db\d|sb\d|kb1|hb1|yb\d+))\b/i,
+    make: 'Bimota',
+    familyHint: 'Tesi',
+  },
+  {
+    pattern: /\b(vespa\s*(?:400|gs\s*160|946|sprint|rally|primavera))\b/i,
+    make: 'Vespa',
+    familyHint: '400',
+  },
+  {
+    pattern: /\b(cushman\s*(?:eagle|truckster|pacemaker|husky))\b/i,
+    make: 'Cushman',
+    familyHint: 'Eagle',
+  },
 ];
 
 // Words that indicate a natural-language filter query rather than a market scope drill
