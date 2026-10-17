@@ -134,6 +134,8 @@ SELECT s.id, v.e, v.l, v.u FROM public.live_auction_sources s JOIN (VALUES
 \ir ../migrations/20261018033000_market_sources_org_identity.sql
 \ir ../migrations/20261018034000_market_sources_hourly_live_landing.sql
 \ir ../migrations/20261018034000_market_sources_hourly_live_landing.sql
+\ir ../migrations/20261018150000_source_pool_depth_estimator.sql
+\ir ../migrations/20261018150000_source_pool_depth_estimator.sql
 
 -- BaT's organization has a recorded logo; Craigslist has no organization
 WITH org AS (INSERT INTO public.organizations (logo_url, business_type) VALUES ('https://example.test/bat-logo.png', 'auction_house') RETURNING id)
@@ -172,11 +174,27 @@ SELECT pg_temp.ok('BaT: held lots and when, the whole-source census, map sales w
 SELECT pg_temp.ok('Mecum: the latest whole-source census, its house named the map''s way',
   (SELECT population = 268979 AND house = 'Mecum' AND map_sales = 1 AND sales_12m = 1
    FROM public.market_source_days WHERE source_slug = 'mecum'));
-SELECT pg_temp.ok('two spellings of one source make one row, under the first declared',
-  (SELECT display_name = 'Cars & Bids' AND landed_lots = 18659 AND map_sales = 1 AND population IS NULL
+SELECT pg_temp.ok('two spellings of one source make one row, under the first declared, with an algorithmic pool-depth estimate when uncounted',
+  (SELECT display_name = 'Cars & Bids' AND landed_lots = 18659 AND map_sales = 1
+          AND population > landed_lots AND population_method = 'capture_model'
+          AND population_confidence BETWEEN 0.15 AND 0.58 AND population_at IS NOT NULL
    FROM public.market_source_days WHERE source_slug = 'cars-and-bids'));
-SELECT pg_temp.ok('a marketplace with held lots and no sales is on the board',
-  (SELECT landed_lots = 8411 AND house IS NULL AND map_sales IS NULL FROM public.market_source_days WHERE source_slug = 'craigslist'));
+SELECT pg_temp.ok('a marketplace with held lots and no sales is on the board with a capture_model pool estimate',
+  (SELECT landed_lots = 8411 AND house IS NULL AND map_sales IS NULL
+          AND population > landed_lots AND population_method = 'capture_model'
+          AND population_confidence BETWEEN 0.15 AND 0.58
+   FROM public.market_source_days WHERE source_slug = 'craigslist'));
+SELECT pg_temp.ok('estimate_source_population supports windowed extrapolation and turnover flow regimes',
+  (SELECT population = 37783 AND population_method = 'window_extrapolated' AND population_confidence BETWEEN 0.50 AND 0.78
+   FROM public.estimate_source_population(
+     19305, now(), 'auction', 180, NULL, NULL, NULL, NULL,
+     11279, NULL, NULL, NULL, '{"missing": 8496}'::jsonb, now()
+   ))
+  AND (SELECT population = 37000 AND population_method = 'turnover_model' AND population_confidence BETWEEN 0.40 AND 0.72
+   FROM public.estimate_source_population(
+     3018, now(), 'marketplace', 30, NULL, NULL, NULL, NULL,
+     NULL, 500, 100, NULL, '{"horizon_days": 365}'::jsonb, now()
+   )));
 SELECT pg_temp.ok('24 months of points, oldest first, each [month, sales, dollars]; nothing older, nothing unpriced',
   (SELECT sum((x->>1)::int) = 3 AND sum((x->>2)::numeric) = 180000
           AND bool_and(x->>0 >= to_char(date_trunc('month', current_date) - interval '23 months', 'YYYY-MM'))

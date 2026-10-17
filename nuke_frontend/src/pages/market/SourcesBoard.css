@@ -29,9 +29,10 @@
 [data-theme="light"] .market-sources__icon { filter: drop-shadow(0 0 0.75px rgba(0, 0, 0, 0.85)) drop-shadow(0 0 1px rgba(0, 0, 0, 0.55)); }
 .market-sources__name small { font-weight: 400; color: var(--text-secondary); font-size: 10px; text-transform: lowercase; }
 .market-sources__held small { font-size: 10px; } .market-sources__held .up { color: var(--success); } .market-sources__held .down { color: var(--error); }
-.market-sources__share { display: grid; grid-template-columns: minmax(60px, 1fr) 11.5em; align-items: center; gap: 8px; min-width: 0; }
+.market-sources__share { display: grid; grid-template-columns: minmax(52px, 1fr) 15.5em; align-items: center; gap: 8px; min-width: 0; }
 .market-sources__track { display: block; width: 100%; height: 10px; border: 1px solid var(--border); background: var(--surface); box-sizing: border-box; }
 .market-sources__fill { fill: var(--text); }
+.market-sources__fill--est { fill: var(--text-secondary); opacity: 0.72; }
 .market-sources__defs { position: absolute; }
 .market-sources__hatch { stroke: var(--border); stroke-width: 1.5; }
 .market-sources__sharetext { font-size: 11px; color: var(--text-secondary); white-space: nowrap; font-family: 'Courier New', monospace; }

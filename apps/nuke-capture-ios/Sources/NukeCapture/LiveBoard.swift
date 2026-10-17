@@ -564,6 +564,7 @@ struct SourcesBoardData: Equatable {
         let heldAt: String?
         let population: Int?
         let populationMethod: String?
+        let populationConfidence: Double?
         let mapSales: Int?
         let mapUsd: Double?
         let sales12: Int?
@@ -579,6 +580,12 @@ struct SourcesBoardData: Equatable {
 
         var id: String { source }
 
+        private static let estimatedMethods: Set<String> = [
+            "window_extrapolated",
+            "turnover_model",
+            "capture_model",
+        ]
+
         var shortName: String {
             guard let range = name.range(of: #"\s*\([^)]*\)\s*$"#, options: .regularExpression) else { return name }
             let trimmed = String(name[..<range.lowerBound])
@@ -587,11 +594,25 @@ struct SourcesBoardData: Equatable {
 
         var heldShareText: String {
             guard let held else { return "" }
-            guard let pop = population, pop > 0 else { return "their total unknown" }
-            let share = Double(held) / Double(pop)
+            if let pop = population, pop > 0 {
+                let share = Double(held) / Double(pop)
+                let pct = share >= 0.995 ? "100%" : (share < 0.01 ? "<1%" : "\(Int((share * 100.0).rounded()))%")
+                let method = populationMethod ?? "enumerated"
+                if Self.estimatedMethods.contains(method) {
+                    let conf = Int(((populationConfidence ?? 0.35) * 100.0).rounded())
+                    return "\(pct) of ~\(pop.formatted()) · \(conf)% conf"
+                }
+                let ofWord = method == "enumerated" ? "of" : "of about"
+                return "\(pct) \(ofWord) \(pop.formatted())"
+            }
+            let h = Double(max(1, held))
+            let unseenRatio = max(0.28, 1.65 / log(M_E + h / 300.0))
+            let estPop = max(held + 1, Int((h * (1.0 + unseenRatio)).rounded()))
+            let share = Double(held) / Double(estPop)
             let pct = share >= 0.995 ? "100%" : (share < 0.01 ? "<1%" : "\(Int((share * 100.0).rounded()))%")
-            let ofWord = populationMethod == "enumerated" ? "of" : "of about"
-            return "\(pct) \(ofWord) \(pop.formatted())"
+            let confRaw = min(0.58, max(0.15, 0.14 + 0.08 * min(1.0, log(1.0 + h) / log(100001.0)) + 0.25 * (h / Double(estPop))))
+            let conf = Int((confRaw * 100.0).rounded())
+            return "\(pct) of ~\(estPop.formatted()) · \(conf)% conf"
         }
 
         func landingText(now: Date = Date()) -> (active: Bool, text: String) {
@@ -646,6 +667,7 @@ struct SourcesBoardData: Equatable {
                 heldAt: str(get("held_at")),
                 population: num(get("population")).map { Int($0.rounded()) },
                 populationMethod: str(get("population_method")),
+                populationConfidence: num(get("population_confidence")),
                 mapSales: num(get("map_sales")).map { Int($0.rounded()) },
                 mapUsd: num(get("map_usd")),
                 sales12: num(get("sales_12m")).map { Int($0.rounded()) },
