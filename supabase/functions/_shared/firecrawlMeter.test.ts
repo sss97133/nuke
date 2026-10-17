@@ -48,6 +48,19 @@ Deno.test("firecrawlScrape asks first and records one credit after, for a succes
   }
 });
 
+Deno.test("firecrawlScrape records five credits for a scrape with an LLM extract", async () => {
+  const calls: Call[] = [];
+  const realFetch = globalThis.fetch;
+  globalThis.fetch = (() => Promise.resolve(new Response(JSON.stringify({ success: true, data: { rawHtml: "<html>lot</html>", extract: { vin: "x" } } }), { status: 200 }))) as typeof fetch;
+  try {
+    const r = await firecrawlScrape({ url: "https://www.pcarmarket.com/auction/x", formats: ["rawHtml", "extract"], extract: { schema: {} } },
+      { apiKey: "test", maxAttempts: 1, caller: "import-pcarmarket-listing", meterClient: stub({ firecrawl_allowance_for_url: { data: 9 }, firecrawl_record_url_spend: { data: 1 } }, calls) });
+    assertEquals(r.data.html, "<html>lot</html>");
+    assertEquals(calls[1][1].p_credits, 5);
+    assertEquals(calls[1][1].p_lane, "import-pcarmarket-listing");
+  } finally { globalThis.fetch = realFetch; }
+});
+
 Deno.test("firecrawlMap is gated and metered like a scrape", async () => {
   const realFetch = globalThis.fetch;
   let fetched = 0;

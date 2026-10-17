@@ -9,6 +9,7 @@ import { fillOnlyIdentity, identityConflict, REVISION_DIFFERENT_CAR } from '../_
 import { recordSellerTypes, sellerTypeRow } from '../_shared/sellerType.ts';
 import { parseLocation } from "../_shared/parseLocation.ts";
 import { batchFromTargets, discoverTargets, readEnded, revisePcm } from "./targets.ts";
+import { firecrawlScrape } from "../_shared/firecrawl.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -279,64 +280,51 @@ async function scrapePCarMarketListing(url: string, providedHtml?: string): Prom
       if (FIRECRAWL_API_KEY) {
         try {
           console.log('[pcarmarket] Fetching via Firecrawl (JS rendering)...');
-          const firecrawlResponse = await fetch('https://api.firecrawl.dev/v1/scrape', {
-            method: 'POST',
-            headers: {
-              'Authorization': `Bearer ${FIRECRAWL_API_KEY}`,
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-              url: url,
-              formats: ['rawHtml', 'markdown', 'extract'],
-              extract: {
-                schema: {
-                  type: 'object',
-                  properties: {
-                    vin: { type: 'string', description: 'Vehicle VIN or chassis number' },
-                    mileage: { type: 'number', description: 'Current mileage/odometer reading' },
-                    price: { type: 'number', description: 'Final sale price or current high bid in dollars' },
-                    sold: { type: 'boolean', description: 'Whether the auction has sold' },
-                    bid_count: { type: 'number', description: 'Number of bids placed' },
-                    end_date: { type: 'string', description: 'Auction end date' },
-                    seller: { type: 'string', description: 'Seller username' },
-                    exterior_color: { type: 'string', description: 'Exterior color' },
-                    interior_color: { type: 'string', description: 'Interior color' },
-                    transmission: { type: 'string', description: 'Transmission type' },
-                    engine: { type: 'string', description: 'Engine description' },
-                  },
+          const firecrawlResult = await firecrawlScrape({
+            url: url,
+            formats: ['rawHtml', 'markdown', 'extract'],
+            extract: {
+              schema: {
+                type: 'object',
+                properties: {
+                  vin: { type: 'string', description: 'Vehicle VIN or chassis number' },
+                  mileage: { type: 'number', description: 'Current mileage/odometer reading' },
+                  price: { type: 'number', description: 'Final sale price or current high bid in dollars' },
+                  sold: { type: 'boolean', description: 'Whether the auction has sold' },
+                  bid_count: { type: 'number', description: 'Number of bids placed' },
+                  end_date: { type: 'string', description: 'Auction end date' },
+                  seller: { type: 'string', description: 'Seller username' },
+                  exterior_color: { type: 'string', description: 'Exterior color' },
+                  interior_color: { type: 'string', description: 'Interior color' },
+                  transmission: { type: 'string', description: 'Transmission type' },
+                  engine: { type: 'string', description: 'Engine description' },
                 },
               },
-              waitFor: 10000,
-              timeout: 45000,
-              mobile: false,
-              actions: [
-                { type: 'wait', milliseconds: 5000 },
-                { type: 'scroll', direction: 'down', pixels: 800 },
-                { type: 'wait', milliseconds: 2000 },
-                { type: 'scroll', direction: 'down', pixels: 1200 },
-                { type: 'wait', milliseconds: 3000 },
-              ],
-            }),
-            signal: AbortSignal.timeout(55_000),
-          });
+            },
+            waitFor: 10000,
+            timeout: 45000,
+            mobile: false,
+            actions: [
+              { type: 'wait', milliseconds: 5000 },
+              { type: 'scroll', direction: 'down', pixels: 800 },
+              { type: 'wait', milliseconds: 2000 },
+              { type: 'scroll', direction: 'down', pixels: 1200 },
+              { type: 'wait', milliseconds: 3000 },
+            ],
+          }, { caller: 'import-pcarmarket-listing', timeoutMs: 55_000, maxAttempts: 1 });
 
-          if (firecrawlResponse.ok) {
-            const firecrawlData = await firecrawlResponse.json();
-            if (firecrawlData.success && firecrawlData.data?.rawHtml) {
-              html = firecrawlData.data.rawHtml;
-              // Store LLM extraction for later use
-              const llmExtract = firecrawlData.data?.extract;
-              if (llmExtract) {
-                console.log(`[pcarmarket] LLM extracted: mileage=${llmExtract.mileage}, price=${llmExtract.price}, sold=${llmExtract.sold}`);
-                html = JSON.stringify({ llmExtract, html });
-              }
-              console.log(`[pcarmarket] Firecrawl returned ${html.length} chars`);
-              firecrawlWorked = true;
-            } else {
-              console.warn(`[pcarmarket] Firecrawl returned no data: ${firecrawlData.error || 'empty'}`);
+          if (firecrawlResult.success && firecrawlResult.data.html) {
+            html = firecrawlResult.data.html;
+            // Store LLM extraction for later use
+            const llmExtract = firecrawlResult.data.extract;
+            if (llmExtract) {
+              console.log(`[pcarmarket] LLM extracted: mileage=${llmExtract.mileage}, price=${llmExtract.price}, sold=${llmExtract.sold}`);
+              html = JSON.stringify({ llmExtract, html });
             }
+            console.log(`[pcarmarket] Firecrawl returned ${html.length} chars`);
+            firecrawlWorked = true;
           } else {
-            console.warn(`[pcarmarket] Firecrawl HTTP ${firecrawlResponse.status}`);
+            console.warn(`[pcarmarket] Firecrawl returned no data: ${firecrawlResult.error || 'empty'}`);
           }
         } catch (fcErr: any) {
           console.warn(`[pcarmarket] Firecrawl failed: ${fcErr.message}`);
