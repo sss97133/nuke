@@ -26,6 +26,9 @@
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.117.3";
 import { normalizeListingUrl, normalizeVin } from "../_shared/urlNormalization.ts";
+import { observationHashInput } from "../_shared/observationIdentity.ts";
+import { propertyBinding } from "../_shared/observationProperty.ts";
+import { mediaCitationColumns, type MediaCitation, type SourceTime } from "../_shared/mediaCitation.ts";
 import { requireWriteAuth, authenticateWriter } from "../_shared/writeGuard.ts";
 import { checkRateLimit, getClientIp } from "../_shared/rateLimit.ts";
 import { validateObservationProperty, isSupportedImagePropertyKey } from "./imageProperties.ts";
@@ -70,6 +73,13 @@ interface ObservationInput {
   content_text?: string;
   structured_data?: Record<string, unknown>;
   vehicle_id?: string;
+  /** Strict sources may resolve only by VIN or listing URL; none preserves unresolved evidence. */
+  resolution_mode?: "exact_only" | "none";
+  /** Stable source-event dedup survives later vehicle attribution and JSON key reordering. */
+  dedup_scope?: "source_event";
+  /** Typed media/time fields; deployed only with the reviewed additive migration. */
+  media_citation?: MediaCitation;
+  source_time?: SourceTime;
   /**
    * Polymorphic subject (engineering-manual/20). Optional + backward-compatible:
    * omit it and the observation is a vehicle observation exactly as before.
@@ -110,7 +120,7 @@ interface ObservationInput {
   /** condition_taxonomy.canonical_key this claim is about (e.g. 'exterior.paint.delamination'). Resolved to
    *  descriptor_id; an unknown or deprecated key is refused, never dropped. C26. */
   descriptor_key?: string;
-  /** Registered property represented by structured_data[property_key]. */
+  /** Registered property represented by structured_data[property_key] or structured_data.property. */
   property_key?: string;
   /** Typed source-comment lineage; PostgreSQL checks quote and same-vehicle identity. */
   source_comment_id?: string;
@@ -699,12 +709,13 @@ Deno.serve(async function handleObservation(req, internal?: unknown) {
     }
 
     let propertyRow = null;
-    if (input.property_key !== undefined) {
-      if (!isSupportedImagePropertyKey(input.property_key) &&
-          !(retainedSourceId && RETAINED_PROPERTY_KEYS.includes(input.property_key))) {
-        return new Response(JSON.stringify({ error: "Unsupported property_key for this intake" }),
-          { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
-      }
+    let propertyId: string | null = null;
+    let organizationSubjectId: string | null = null;
+    const isImageOrRetainedProperty = input.property_key !== undefined && (
+      isSupportedImagePropertyKey(input.property_key) ||
+      Boolean(retainedSourceId && RETAINED_PROPERTY_KEYS.includes(input.property_key))
+    );
+    if (isImageOrRetainedProperty && input.property_key !== undefined) {
       const lookup = (retainedSourceId && batchLookups?.get(`property:${input.property_key}`)) || await supabase.from("observation_properties")
         .select("id, property_key, applies_to_kinds, namespace, deprecated_at")
         .eq("property_key", input.property_key).maybeSingle();
@@ -713,14 +724,34 @@ Deno.serve(async function handleObservation(req, internal?: unknown) {
           { status: 503, headers: { ...corsHeaders, "Content-Type": "application/json" } });
       }
       propertyRow = lookup.data;
+      const property = validateObservationProperty(input, propertyRow, retainedSourceId !== null);
+      if (!property.ok) {
+        return new Response(JSON.stringify({ error: property.error }),
+          { status: property.status, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      }
+      propertyId = property.propertyId ?? null;
+      if (retainedSourceId && input.property_key && propertyRow) {
+        batchLookups?.remember(`property:${input.property_key}`, { data: propertyRow, error: null });
+      }
+    } else if (input.property_key !== undefined) {
+      const { data: property } = await supabase.from("observation_properties")
+        .select("id,property_key,data_type,unit,applies_to_kinds,deprecated_at")
+        .eq("property_key", input.property_key).maybeSingle();
+      try {
+        propertyId = propertyBinding(input.property_key, input.kind, input.structured_data, property);
+      } catch (error) {
+        return new Response(JSON.stringify({
+          error: (error as Error).message,
+          hint: "Reuse observation_properties; unknown or incompatible vocabulary follows schema_proposals/pending_claims. Raw intake remains possible without property_key."
+        }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      }
     }
-    const property = validateObservationProperty(input, propertyRow, retainedSourceId !== null);
-    if (!property.ok) {
-      return new Response(JSON.stringify({ error: property.error }),
-        { status: property.status, headers: { ...corsHeaders, "Content-Type": "application/json" } });
-    }
-    if (retainedSourceId && input.property_key && propertyRow) {
-      batchLookups?.remember(`property:${input.property_key}`, { data: propertyRow, error: null });
+    if (input.subject?.type === "organization") {
+      const { data: organization } = await supabase.from("organizations").select("id")
+        .eq("id", input.subject.id ?? "").maybeSingle();
+      if (!organization) return new Response(JSON.stringify({ error: "Unknown organization subject" }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      organizationSubjectId = organization.id;
     }
 
     // Compute content hash for deduplication.
@@ -729,7 +760,36 @@ Deno.serve(async function handleObservation(req, internal?: unknown) {
     // Bug fix 2026-05-24: previously two observations with same source/kind but different
     // vehicle_id collapsed into one row; cross-vehicle reuse of an observation_id was
     // returned to callers. See ISSUES.md "[MEDIUM] ingest-observation dedup ignores vehicle_id".
-    const contentHash = await observationContentHash(input);
+    if (input.resolution_mode && !["exact_only", "none"].includes(input.resolution_mode)) {
+      return new Response(JSON.stringify({ error: "Invalid resolution_mode" }), {
+        status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+    if (input.resolution_mode === "none" && input.vehicle_id) {
+      return new Response(JSON.stringify({ error: "resolution_mode none cannot include vehicle_id" }), {
+        status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+    if (input.dedup_scope && input.dedup_scope !== "source_event") {
+      return new Response(JSON.stringify({ error: "Invalid dedup_scope" }), {
+        status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+    let mediaColumns: Record<string, unknown>;
+    let contentHash: string;
+    try {
+      mediaColumns = mediaCitationColumns(input.media_citation, input.source_time);
+      if (input.dedup_scope === "source_event") {
+        const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(observationHashInput(input)));
+        contentHash = Array.from(new Uint8Array(digest), b => b.toString(16).padStart(2, "0")).join("");
+      } else {
+        contentHash = await observationContentHash(input);
+      }
+    } catch (error) {
+      return new Response(JSON.stringify({ error: (error as Error).message }), {
+        status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
 
     // Check for duplicate
     const protectedColumns = "id,vehicle_id,ingested_at,structured_data,source_snapshot_id,kind,is_superseded,source_id,extraction_method,extractor_id,raw_source_ref,source_identifier,source_url,observed_at";
@@ -759,26 +819,38 @@ Deno.serve(async function handleObservation(req, internal?: unknown) {
 
     // Resolve vehicle if not provided
     let vehicleId = input.vehicle_id;
-    let vehicleMatchConfidence = 1.0;
+    let vehicleMatchConfidence = vehicleId ? 1.0 : 0;
     let vehicleMatchSignals: Record<string, unknown> = {};
 
-    if (!vehicleId && input.vehicle_hints) {
+    if (!vehicleId && input.vehicle_hints && input.resolution_mode !== "none") {
       const hints = input.vehicle_hints;
 
       // Try VIN match first (highest confidence)
       if (hints.vin) {
         const cleanVin = normalizeVin(hints.vin);
         if (cleanVin) {
-          const { data: vinMatch } = await supabase
-            .from("vehicles")
-            .select("id")
-            .eq("vin", cleanVin)
-            .maybeSingle();
-
-          if (vinMatch) {
-            vehicleId = vinMatch.id;
-            vehicleMatchConfidence = 0.99;
-            vehicleMatchSignals = { vin_match: true, normalized_vin: cleanVin };
+          const strict = input.resolution_mode === "exact_only";
+          const { data: matchedId, error: vinLookupError } = await supabase.rpc("find_vehicle_by_vin", {
+            p_vin: cleanVin, ...(strict ? { p_require_unique: true } : {}),
+          });
+          if (vinLookupError) {
+            // A missing strict overload must fail loudly, never fall back to an unindexed scan.
+            throw new Error(`Indexed VIN resolution unavailable: ${vinLookupError.message}`);
+          }
+          if (matchedId) {
+            let verified = true;
+            if (strict && cleanVin.length < 17) {
+              // Short pre-1981 chassis numbers need make+era context, not global uniqueness alone.
+              const { data: candidate } = await supabase.from("vehicles")
+                .select("year, make").eq("id", matchedId).maybeSingle();
+              verified = !!(hints.year && hints.make && candidate && candidate.year === hints.year &&
+                candidate.make?.trim().toLowerCase() === hints.make.trim().toLowerCase());
+            }
+            if (verified) {
+              vehicleId = matchedId;
+              vehicleMatchConfidence = cleanVin.length < 17 ? 0.95 : 0.99;
+              vehicleMatchSignals = { vin_match: true, normalized_vin: cleanVin, unique_required: strict };
+            }
           }
         }
       }
@@ -854,7 +926,7 @@ Deno.serve(async function handleObservation(req, internal?: unknown) {
       }
 
       // Try year/make/model fuzzy match (lower confidence)
-      if (!vehicleId && hints.year && hints.make) {
+      if (!vehicleId && hints.year && hints.make && input.resolution_mode !== "exact_only") {
         const { data: fuzzyMatches } = await supabase
           .from("vehicles")
           .select("id")
@@ -879,7 +951,7 @@ Deno.serve(async function handleObservation(req, internal?: unknown) {
 
     // Compute confidence score
     const confidenceFactors: Record<string, number> = {};
-    if (vehicleMatchConfidence >= 0.95) confidenceFactors.vehicle_match = 0.1;
+    if (vehicleId && vehicleMatchConfidence >= 0.95) confidenceFactors.vehicle_match = 0.1;
     if (input.source_url) confidenceFactors.has_source_url = 0.05;
     if (input.content_text && input.content_text.length > 100) confidenceFactors.substantial_content = 0.05;
     // The owner signing off on a fact about their own vehicle is the highest-trust
@@ -913,6 +985,7 @@ Deno.serve(async function handleObservation(req, internal?: unknown) {
     const { data: observation, error: insertError } = await supabase
       .from("vehicle_observations")
       .insert({
+        ...mediaColumns,
         vehicle_id: vehicleId,
         // Only freshly verified protected admission sets the typed source key.
         // Generic input, including caller-provided source_snapshot_id, is ignored.
@@ -928,6 +1001,10 @@ Deno.serve(async function handleObservation(req, internal?: unknown) {
         // (subject_type='vehicle', subject_id=NULL) applies.
         ...(input.subject?.type ? { subject_type: input.subject.type } : {}),
         ...(input.subject?.id ? { subject_id: input.subject.id } : {}),
+        ...(organizationSubjectId ? { subject_organization_id: organizationSubjectId } : {}),
+        ...((organizationSubjectId || mediaColumns.citation_publication_id || mediaColumns.auction_event_id)
+          ? { context_bound_at: new Date().toISOString() } : {}),
+        ...(propertyId ? { property_id: propertyId } : {}),
         observed_at: input.observed_at,
         source_id: source.id,
         source_url: input.source_url,
@@ -955,7 +1032,6 @@ Deno.serve(async function handleObservation(req, internal?: unknown) {
         citation_page_number: input.citation?.page_number ?? null,
         citation_excerpt: input.citation?.excerpt ?? null,
         ...(descriptorId ? { descriptor_id: descriptorId } : {}),
-        ...(property.propertyId ? { property_id: property.propertyId } : {}),
         ...(input.source_comment_id ? { source_comment_id: input.source_comment_id } : {}),
         ...(input.rank ? { rank: input.rank } : {})
       })

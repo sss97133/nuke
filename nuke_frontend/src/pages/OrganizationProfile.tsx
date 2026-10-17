@@ -16,6 +16,7 @@ import { getOrganizationProfileData, type SellerTrackRecord } from '../services/
 import { AdminNotificationService } from '../services/adminNotificationService';
 import { fetchVehicleCardImages } from '../services/vehicleCardImages';
 import BroadArrowMetricsDisplay from '../components/organization/BroadArrowMetricsDisplay';
+import OrganizationBroadcastIntelligence from '../components/organization/OrganizationBroadcastIntelligence';
 import VehicleCardDense from '../components/vehicles/VehicleCardDense';
 import { fetchOrganizationVehicleBooks, withOrganizationVehicleBook } from '../lib/privateMoney';
 import '../styles/unified-design-system.css';
@@ -2341,6 +2342,14 @@ export default function OrganizationProfile() {
                 </div>
               ))}
             </div>
+            )}
+
+            {/* Broadcast & Video OCR Intelligence Fold (vehicle_observations where subject_type = 'organization') */}
+            {organizationId && (
+              <OrganizationBroadcastIntelligence
+                organizationId={organizationId}
+                organizationName={organization?.business_name}
+              />
             )}
 
             {/* Seller Track Record — GMV bars, volume, geography, vehicle table */}
