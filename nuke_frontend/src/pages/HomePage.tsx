@@ -916,12 +916,12 @@ function TreemapCell({ rect, onClick, totalCount, showValue, repImage, repImages
         background: isVehicle && showImage ? 'var(--surface-glass)' : undefined,
       }}>
         {canShowName && !isVehicle && (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+          <div className="home-cell-name-stack">
             {node.badgeSvg && w >= 110 && h >= 58 && (
               <div
                 aria-hidden="true"
                 data-testid="treemap-cell-badge"
-                style={{ display: 'inline-flex', alignItems: 'center', height: area > 25000 ? 22 : 16, maxWidth: Math.min(130, w - 12) }}
+                className={`home-cell-badge${area > 25000 ? ' home-cell-badge--lg' : ''}`}
                 dangerouslySetInnerHTML={{ __html: node.badgeSvg }}
               />
             )}
@@ -2100,13 +2100,12 @@ export function TreemapHomePage({ onBrowse, embedded = false }: { onBrowse: () =
               <button
                 type="button"
                 data-testid="toggle-brand-pickup-umbrella"
-                className={`home-family-submodel-pill${groupBrandPickups ? ' home-family-submodel-pill--active' : ''}`}
+                className={`home-family-submodel-pill home-family-submodel-pill--dashed${groupBrandPickups ? ' home-family-submodel-pill--active' : ''}`}
                 aria-pressed={groupBrandPickups}
                 title={groupBrandPickups
                   ? 'All pickup series (C10, K10, C20, 3100, F-100, F-150, F-250, Sierra, etc.) are unified into one Pickup tile. Click to split into separate series tiles.'
                   : 'Click to group all pickup series into one unified Pickup tile.'}
                 onClick={() => setGroupBrandPickups((prev) => !prev)}
-                style={{ borderStyle: 'dashed', marginRight: 4 }}
               >
                 {groupBrandPickups ? 'TRUCKS UNIFIED' : 'SPLIT TRUCKS'}
               </button>
@@ -2153,11 +2152,10 @@ export function TreemapHomePage({ onBrowse, embedded = false }: { onBrowse: () =
       {/* ─── VETTED ERA EMBLEM & FENDER BADGE STRIP: period-accurate marque emblems, RPO fender plates & body scripts ─── */}
       {activeIdentityMarks.length > 0 && currentLevel.make && (currentLevel.family || currentLevel.model) && (
         <div
-          className="home-family-submodels"
+          className="home-family-submodels home-family-submodels--marks"
           role="region"
           aria-label="Vetted factory era emblems and fender badges"
           data-testid="vetted-identity-marks-bar"
-          style={{ gap: 8, paddingTop: 4, paddingBottom: 4 }}
         >
           <span className="home-family-submodels-label">ERA MARKS</span>
           {activeIdentityMarks.slice(0, 6).map((mark) => {
@@ -2171,7 +2169,7 @@ export function TreemapHomePage({ onBrowse, embedded = false }: { onBrowse: () =
               <button
                 key={mark.id}
                 type="button"
-                className={`home-family-submodel-pill${isMarkActive ? ' home-family-submodel-pill--active' : ''}`}
+                className={`home-family-submodel-pill home-family-submodel-pill--mark${isMarkActive ? ' home-family-submodel-pill--active' : ''}`}
                 title={`${mark.displayLabel} (${mark.yearStart}–${mark.yearEnd}) · ${mark.subLabel}${mark.rpoCode ? ` · RPO ${mark.rpoCode}` : ''}\n${mark.provenanceNote}`}
                 onClick={() => {
                   if (!targetModel || !currentLevel.make || !currentLevel.family) return;
@@ -2187,16 +2185,10 @@ export function TreemapHomePage({ onBrowse, embedded = false }: { onBrowse: () =
                     { label: mark.displayLabel, make: currentLevel.make, family: currentLevel.family, model: targetModel },
                   ]);
                 }}
-                style={{
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: 6,
-                  padding: '2px 8px 2px 4px',
-                }}
               >
                 <span
                   aria-hidden="true"
-                  style={{ display: 'inline-flex', alignItems: 'center', height: 18, minWidth: 42 }}
+                  className="home-family-mark-svg"
                   dangerouslySetInnerHTML={{ __html: mark.svgMarkup }}
                 />
                 <span>{mark.displayLabel}</span>
@@ -2222,7 +2214,7 @@ export function TreemapHomePage({ onBrowse, embedded = false }: { onBrowse: () =
         ];
         return (
           <div className="home-family-submodels" role="group" aria-label="Family sub-models" data-testid="family-submodel-pills">
-            <div style={{ display: 'inline-flex', alignItems: 'center', gap: 2, marginRight: 4 }} role="tablist" aria-label="Re-key family by facet axis">
+            <div className="home-facet-axis-tabs" role="tablist" aria-label="Re-key family by facet axis">
               {axisOptions.map((opt) => (
                 <button
                   key={opt.id}
@@ -2230,18 +2222,8 @@ export function TreemapHomePage({ onBrowse, embedded = false }: { onBrowse: () =
                   role="tab"
                   aria-selected={facetAxis === opt.id}
                   data-testid={`facet-axis-${opt.id}`}
+                  className={`home-facet-axis-tab${facetAxis === opt.id ? ' home-facet-axis-tab--active' : ''}`}
                   onClick={() => setFacetAxis(opt.id)}
-                  style={{
-                    fontSize: 8,
-                    fontWeight: 800,
-                    letterSpacing: '0.10em',
-                    padding: '2px 5px',
-                    border: '1px solid var(--border)',
-                    background: facetAxis === opt.id ? 'var(--text)' : 'transparent',
-                    color: facetAxis === opt.id ? 'var(--bg)' : 'var(--text-secondary)',
-                    cursor: 'pointer',
-                    fontFamily: 'Arial, sans-serif',
-                  }}
                 >
                   {opt.label}
                 </button>
@@ -2694,6 +2676,62 @@ export function TreemapHomePage({ onBrowse, embedded = false }: { onBrowse: () =
           font-size: 9px;
           font-family: 'Courier New', monospace;
           opacity: 0.72;
+        }
+        .home-cell-name-stack {
+          display: flex;
+          flex-direction: column;
+          gap: 3px;
+        }
+        .home-cell-badge {
+          display: inline-flex;
+          align-items: center;
+          height: 16px;
+          max-width: min(130px, calc(100% - 12px));
+        }
+        .home-cell-badge--lg {
+          height: 22px;
+        }
+        .home-family-submodel-pill--dashed {
+          border-style: dashed;
+          margin-right: 4px;
+        }
+        .home-family-submodels--marks {
+          gap: 8px;
+          padding-top: 4px;
+          padding-bottom: 4px;
+        }
+        .home-family-submodel-pill--mark {
+          display: inline-flex;
+          align-items: center;
+          gap: 6px;
+          padding: 2px 8px 2px 4px;
+        }
+        .home-family-mark-svg {
+          display: inline-flex;
+          align-items: center;
+          height: 18px;
+          min-width: 42px;
+        }
+        .home-facet-axis-tabs {
+          display: inline-flex;
+          align-items: center;
+          gap: 2px;
+          margin-right: 4px;
+        }
+        .home-facet-axis-tab {
+          font-size: 8px;
+          font-weight: 800;
+          letter-spacing: 0.10em;
+          padding: 2px 5px;
+          border: 1px solid var(--border);
+          background: transparent;
+          color: var(--text-secondary);
+          cursor: pointer;
+          font-family: Arial, sans-serif;
+        }
+        .home-facet-axis-tab--active {
+          background: var(--text);
+          color: var(--bg);
         }
       `}</style>
     </div>
