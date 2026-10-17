@@ -1,32 +1,207 @@
-// LedgerMap.swift — the ledger as a map, the way nuke.ag's Market tab opens (web #1061,
-// HomePage.tsx TreemapHomePage): every public vehicle record with a recorded price, by make,
-// area = count, color = median recorded sale or asking price, drilling to models, years and
-// the records themselves. The readers are the web's: treemap_by_brand, treemap_models_by_brand,
-// treemap_years (three materialized views, refreshed by the 30-minute job `treemap-refresh`)
-// and, at the leaf, the vehicles table with a recorded sale or sold price. The phone draws the
-// same cells with the same captions and lands Explore on this map with the open board below it,
-// as the web page is composed.
+// LedgerMap.swift — the market map (HomePage.tsx on a phone).
+//
+// Reads the same database functions and tables the web's Market Map reads:
+//   - treemap_refreshes          (refresh clock, public_records, mapped_sales, by_house venue mix)
+//   - treemap_by_brand           + treemap_brand_market (brands with 12m BaT relative move & confirmed USD)
+//   - treemap_brand_family_map   (brands with canonical model families nested inside)
+//   - treemap_brand_families     (canonical model families within a brand, mv_family_market)
+//   - treemap_family_models      (sub-models within a canonical family)
+//   - treemap_models_by_brand    (fallback when family grouping is unavailable)
+//   - treemap_years              (model years within a brand + model)
+//   - treemap_sales              (confirmed sales leaf records — replaces raw vehicles table query)
+//   - treemap_family_sales       (5-year confirmed sales scatter + direct family year drill)
+//   - family_price_index_read    (hedonic like-for-like price index, same car & same miles)
+//   - treemap_family_share_movers(Relativity indicator & 8-horizon market/supply movers)
 
 import SwiftUI
+import Charts
 import Supabase
 
-/// One cell of the ledger map as the three readers return it. Fields the year reader lacks are optional.
-struct LedgerNode: Decodable, Identifiable, Hashable {
+// MARK: - Core Map Nodes & Leaves
+
+struct LedgerNode: Decodable, Identifiable, Equatable {
     let name: String
     let count: Int
-    let value: Int
-    let median_price: Int?
-    let min_price: Int?
-    let max_price: Int?
+    let value: Double?
+    let median_price: Double?
+    let min_price: Double?
+    let max_price: Double?
     let sold_count: Int?
     let auction_count: Int?
-    let avg_bids: Int?
-    let avg_watchers: Int?
-    var id: String { name }
+    let avg_bids: Double?
+    let avg_watchers: Double?
+
+    // Canonical market & family measures (treemap_brand_market / treemap_brand_families / treemap_family_models)
+    var usd: Double?
+    var sold_any: Int?
+    var offered: Int?
+    var dated: Int?
+    var sold_12m: Int?
+    var sold_prior_12m: Int?
+    var usd_12m: Double?
+    var usd_prior_12m: Double?
+    var familyKey: String?
+    var models: Int?
+
+    var id: String { familyKey ?? name }
+
+    /// Area measure for squarified layout under the chosen basis.
+    func area(basis: LedgerMapScale.MapBasis, isBrandOrFamily: Bool) -> Double {
+        if isBrandOrFamily {
+            let v = basis == .bat12 ? (usd_12m ?? 0) : (usd ?? value ?? 0)
+            if v > 0 { return v }
+        }
+        if let u = usd, u > 0 { return u }
+        return Double(max(count, 1))
+    }
 }
 
-/// A record at the leaf, as the web's useTreemapVehicles selects it: area = recorded price.
-struct LedgerVehicle: Decodable, Identifiable, Hashable {
+struct BrandMarketRow: Decodable, Equatable {
+    let brand: String
+    let sales: Int?
+    let usd: Double?
+    let sold_any: Int?
+    let offered: Int?
+    let dated: Int?
+    let sold_12m: Int?
+    let sold_prior_12m: Int?
+    let usd_12m: Double?
+    let usd_prior_12m: Double?
+}
+
+struct FamilyMarketRow: Decodable, Equatable {
+    let family_key: String
+    let family_name: String
+    let models: Int?
+    let sales: Int
+    let usd: Double?
+    let median_price: Double?
+    let min_price: Double?
+    let max_price: Double?
+    let sold_any: Int?
+    let offered: Int?
+    let dated: Int?
+    let sold_12m: Int?
+    let sold_prior_12m: Int?
+    let usd_12m: Double?
+    let usd_prior_12m: Double?
+
+    func toLedgerNode() -> LedgerNode {
+        let displayName = family_key == "other" ? "other models" : family_name
+        return LedgerNode(
+            name: displayName,
+            count: sales,
+            value: usd,
+            median_price: median_price,
+            min_price: min_price,
+            max_price: max_price,
+            sold_count: sales,
+            auction_count: offered,
+            avg_bids: nil,
+            avg_watchers: nil,
+            usd: usd,
+            sold_any: sold_any,
+            offered: offered,
+            dated: dated,
+            sold_12m: sold_12m,
+            sold_prior_12m: sold_prior_12m,
+            usd_12m: usd_12m,
+            usd_prior_12m: usd_prior_12m,
+            familyKey: family_key,
+            models: models
+        )
+    }
+}
+
+struct FamilyModelRow: Decodable, Equatable {
+    let model: String
+    let sales: Int
+    let usd: Double?
+    let median_price: Double?
+    let min_price: Double?
+    let max_price: Double?
+    let sold_any: Int?
+    let offered: Int?
+
+    func toLedgerNode() -> LedgerNode {
+        LedgerNode(
+            name: model,
+            count: sales,
+            value: usd,
+            median_price: median_price,
+            min_price: min_price,
+            max_price: max_price,
+            sold_count: sales,
+            auction_count: offered,
+            avg_bids: nil,
+            avg_watchers: nil,
+            usd: usd,
+            sold_any: sold_any,
+            offered: offered,
+            dated: nil,
+            sold_12m: nil,
+            sold_prior_12m: nil,
+            usd_12m: nil,
+            usd_prior_12m: nil,
+            familyKey: nil,
+            models: nil
+        )
+    }
+}
+
+struct BrandFamilyMapRow: Decodable, Equatable, Identifiable {
+    let brand: String
+    let brand_usd: Double
+    let brand_rank: Int
+    let family_key: String
+    let family: String?
+    let usd: Double?
+    let sold: Int?
+    let sold_any: Int?
+    let offered: Int?
+    let dated: Int?
+    let sold_12m: Int?
+    let sold_prior_12m: Int?
+    let usd_12m: Double?
+    let usd_prior_12m: Double?
+    let families: Int
+
+    var id: String { "\(brand)|\(family_key)" }
+    var displayLabel: String {
+        if family_key == "more" { return "more families" }
+        if family_key == "other" { return "other models" }
+        return family ?? family_key
+    }
+
+    func toLedgerNode() -> LedgerNode {
+        LedgerNode(
+            name: displayLabel,
+            count: sold ?? 0,
+            value: usd,
+            median_price: nil,
+            min_price: nil,
+            max_price: nil,
+            sold_count: sold,
+            auction_count: offered,
+            avg_bids: nil,
+            avg_watchers: nil,
+            usd: usd,
+            sold_any: sold_any,
+            offered: offered,
+            dated: dated,
+            sold_12m: sold_12m,
+            sold_prior_12m: sold_prior_12m,
+            usd_12m: usd_12m,
+            usd_prior_12m: usd_prior_12m,
+            familyKey: family_key,
+            models: nil
+        )
+    }
+}
+
+/// Decodes both `treemap_sales` rows (`title`, `price`, `sale_date`, `source`, `url`, `image`, `mileage`)
+/// and legacy `vehicles` rows (`listing_title`, `bat_listing_title`, `sale_price`, `sold_price`, `primary_image_url`).
+struct LedgerVehicle: Decodable, Identifiable, Equatable {
     let id: UUID
     let year: Int?
     let make: String?
@@ -36,42 +211,720 @@ struct LedgerVehicle: Decodable, Identifiable, Hashable {
     let sale_price: Double?
     let sold_price: Double?
     let primary_image_url: String?
-    let mileage: Int?
-    var price: Double { (sale_price ?? 0) > 0 ? sale_price! : (sold_price ?? 0) }
-    var name: String { [year.map(String.init), make, model].compactMap { $0 }.joined(separator: " ") }
+    let mileage: Double?
+    let sale_date: String?
+    let source: String?
+    let url: String?
+
+    enum CodingKeys: String, CodingKey {
+        case id, year, make, model
+        case listing_title, bat_listing_title, title
+        case sale_price, sold_price, price
+        case primary_image_url, image
+        case mileage, sale_date, source, url
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        id = try c.decode(UUID.self, forKey: .id)
+        year = try? c.decodeIfPresent(Int.self, forKey: .year)
+        make = try? c.decodeIfPresent(String.self, forKey: .make)
+        model = try? c.decodeIfPresent(String.self, forKey: .model)
+        let directTitle = try? c.decodeIfPresent(String.self, forKey: .title)
+        let lt = try? c.decodeIfPresent(String.self, forKey: .listing_title)
+        listing_title = directTitle ?? lt
+        bat_listing_title = try? c.decodeIfPresent(String.self, forKey: .bat_listing_title)
+        let directPrice = try? c.decodeIfPresent(Double.self, forKey: .price)
+        let sp = try? c.decodeIfPresent(Double.self, forKey: .sale_price)
+        sale_price = directPrice ?? sp
+        sold_price = try? c.decodeIfPresent(Double.self, forKey: .sold_price)
+        let directImage = try? c.decodeIfPresent(String.self, forKey: .image)
+        let pi = try? c.decodeIfPresent(String.self, forKey: .primary_image_url)
+        primary_image_url = directImage ?? pi
+        mileage = try? c.decodeIfPresent(Double.self, forKey: .mileage)
+        sale_date = try? c.decodeIfPresent(String.self, forKey: .sale_date)
+        source = try? c.decodeIfPresent(String.self, forKey: .source)
+        url = try? c.decodeIfPresent(String.self, forKey: .url)
+    }
+
+    init(id: UUID, year: Int?, make: String?, model: String?, title: String?, price: Double?,
+         image: String?, mileage: Double?, sale_date: String? = nil, source: String? = nil, url: String? = nil) {
+        self.id = id
+        self.year = year
+        self.make = make
+        self.model = model
+        self.listing_title = title
+        self.bat_listing_title = nil
+        self.sale_price = price
+        self.sold_price = nil
+        self.primary_image_url = image
+        self.mileage = mileage
+        self.sale_date = sale_date
+        self.source = source
+        self.url = url
+    }
+
+    var price: Double { (sale_price ?? 0) > 0 ? (sale_price ?? 0) : (sold_price ?? 0) }
+    var name: String {
+        if let t = listing_title ?? bat_listing_title, !t.isEmpty { return t }
+        return [year.map(String.init), make, model].compactMap { $0 }.joined(separator: " ")
+    }
     var headerRow: VehicleHeaderRow {
         VehicleHeaderRow(id: id, year: year, make: make, model: model, trim: nil, primary_image_url: primary_image_url, city: nil, state: nil)
     }
 }
 
+// MARK: - Refresh Receipt & Venue Mix (treemap_refreshes)
+
+struct LedgerRefreshReceipt: Decodable, Equatable {
+    struct HouseRow: Decodable, Equatable, Identifiable {
+        let house: String?
+        let sales: Int
+        let amount: Double
+        var id: String { house ?? "other" }
+    }
+    struct Populations: Decodable, Equatable {
+        let measure: String?
+        let public_records: Int?
+        let mapped_sales: Int?
+        let by_house: [HouseRow]?
+    }
+    let refreshed_at: String?
+    let populations: Populations?
+
+    var isConfirmedSaleMeasure: Bool {
+        populations?.measure == "confirmed_sale_v1"
+    }
+
+    func refreshClock(now: Date = Date()) -> String {
+        guard let raw = refreshed_at, let d = ProfileClock.date(raw) else { return "" }
+        let mins = Int(floor(now.timeIntervalSince(d) / 60.0))
+        if mins < 0 { return "" }
+        if mins < 1 { return " · updated just now" }
+        if mins < 60 { return " · updated \(mins) min ago" }
+        let hrs = mins / 60
+        if hrs < 24 { return " · updated \(hrs) h ago" }
+        let f = DateFormatter()
+        f.locale = Locale(identifier: "en_US_POSIX")
+        f.timeZone = TimeZone(secondsFromGMT: 0)
+        f.dateFormat = "MMM d"
+        return " · updated \(f.string(from: d))"
+    }
+}
+
+// MARK: - Map Scale & Relative Move (mapScale.ts twin)
+
+enum LedgerMapScale {
+    enum MapBasis: String, CaseIterable, Equatable {
+        case ledger = "ledger"
+        case bat12 = "bat12"
+
+        var label: String {
+            switch self {
+            case .ledger: return "All sales"
+            case .bat12: return "BaT 12 mo"
+            }
+        }
+    }
+
+    enum BrandViewMode: String, CaseIterable, Equatable {
+        case brands = "brands"
+        case families = "families"
+
+        var label: String {
+            switch self {
+            case .brands: return "Brands"
+            case .families: return "Families inside"
+            }
+        }
+    }
+
+    static let gateMin = 20
+
+    struct Baseline: Equatable {
+        let sold: Int
+        let prior: Int
+        let move: Double
+    }
+
+    enum FewReason: String, Equatable {
+        case count
+        case share
+    }
+
+    enum Move: Equatable {
+        case move(rel: Double, raw: Double, sold: Int, prior: Int)
+        case few(sold: Int, prior: Int, why: FewReason)
+        case none
+    }
+
+    struct Callout: Equatable, Identifiable {
+        enum Kind: String, Equatable {
+            case gain, loss, largest
+            var label: String {
+                switch self {
+                case .gain: return "Biggest gain"
+                case .loss: return "Biggest drop"
+                case .largest: return "Biggest"
+                }
+            }
+        }
+        let kind: Kind
+        let name: String
+        let rel: Double
+        let sold: Int
+        let prior: Int
+        var id: String { kind.rawValue }
+    }
+
+    static func batBaseline(_ nodes: [LedgerNode]) -> Baseline? {
+        var sold = 0
+        var prior = 0
+        for n in nodes {
+            guard let s = n.sold_12m, let p = n.sold_prior_12m else { continue }
+            sold += s
+            prior += p
+        }
+        guard prior > 0 else { return nil }
+        return Baseline(sold: sold, prior: prior, move: Double(sold) / Double(prior) - 1.0)
+    }
+
+    static func relativeMove(_ n: LedgerNode, base: Baseline?, allVenues: Bool = false) -> Move {
+        guard let sold = n.sold_12m, let prior = n.sold_prior_12m, sold + prior > 0 else {
+            return .none
+        }
+        if sold < gateMin || prior < gateMin {
+            return .few(sold: sold, prior: prior, why: .count)
+        }
+        if allVenues {
+            let dated = n.dated ?? 0
+            if Double(dated) < 0.5 * Double(n.count) {
+                return .few(sold: sold, prior: prior, why: .share)
+            }
+        }
+        let raw = Double(sold) / Double(prior) - 1.0
+        let rel = base.map { (1.0 + raw) / (1.0 + $0.move) - 1.0 } ?? raw
+        return .move(rel: rel, raw: raw, sold: sold, prior: prior)
+    }
+
+    static func pct(_ v: Double) -> String {
+        let r = Int((v * 100.0).rounded())
+        if r == 0 { return "0%" }
+        return "\(v > 0 ? "▲" : "▼")\(abs(r))%"
+    }
+
+    static func moveText(_ m: Move) -> String {
+        switch m {
+        case .move(let rel, _, _, _): return pct(rel)
+        case .few(_, _, let why): return why == .share ? "mostly unmeasured houses" : "too few sales"
+        case .none: return ""
+        }
+    }
+
+    static func moveTextShort(_ m: Move) -> String {
+        switch m {
+        case .move(let rel, _, _, _): return pct(rel)
+        case .few(_, _, let why): return why == .share ? "unmeasured" : "few sales"
+        case .none: return ""
+        }
+    }
+
+    static func callouts(_ nodes: [LedgerNode], base: Baseline?) -> [Callout] {
+        struct Scored {
+            let node: LedgerNode
+            let rel: Double
+            let sold: Int
+            let prior: Int
+        }
+        let moved: [Scored] = nodes.compactMap { n in
+            guard case .move(let rel, _, let sold, let prior) = relativeMove(n, base: base) else { return nil }
+            return Scored(node: n, rel: rel, sold: sold, prior: prior)
+        }
+        let clear = moved.filter { s in
+            guard s.rel > -1.0, s.sold > 0, s.prior > 0 else { return false }
+            let se = sqrt(1.0 / Double(s.sold) + 1.0 / Double(s.prior))
+            return abs(log(1.0 + s.rel)) >= 2.0 * se
+        }
+        var out: [Callout] = []
+        let gain = clear.filter { $0.rel > 0 }.max(by: { $0.rel < $1.rel })
+        let loss = clear.filter { $0.rel < 0 }.min(by: { $0.rel < $1.rel })
+        let largest = moved.max(by: { ($0.node.usd_12m ?? 0) < ($1.node.usd_12m ?? 0) })
+        if let g = gain {
+            out.append(Callout(kind: .gain, name: g.node.name, rel: g.rel, sold: g.sold, prior: g.prior))
+        }
+        if let l = loss {
+            out.append(Callout(kind: .loss, name: l.node.name, rel: l.rel, sold: l.sold, prior: l.prior))
+        }
+        if let lg = largest, lg.node.name != gain?.node.name, lg.node.name != loss?.node.name {
+            out.append(Callout(kind: .largest, name: lg.node.name, rel: lg.rel, sold: lg.sold, prior: lg.prior))
+        }
+        return out
+    }
+
+    static func tileColor(_ m: Move) -> Color {
+        switch m {
+        case .none:
+            return Color(.tertiarySystemFill)
+        case .few:
+            return Color(.secondarySystemFill)
+        case .move(let rel, _, _, _):
+            let clamped = max(-0.5, min(0.5, rel))
+            let t = abs(clamped) / 0.5
+            if abs(clamped) < 0.03 {
+                return Color(.secondarySystemBackground)
+            } else if clamped > 0 {
+                return Color.green.opacity(0.14 + 0.34 * t)
+            } else {
+                return Color.red.opacity(0.14 + 0.34 * t)
+            }
+        }
+    }
+}
+
+// MARK: - Relativity & Horizon Movers (FamilyMovers.tsx twin)
+
+enum MoverHorizon: String, CaseIterable, Equatable, Identifiable {
+    case upcoming = "upcoming"
+    case d1 = "1d"
+    case w1 = "1w"
+    case m1 = "1m"
+    case m3 = "3m"
+    case m6 = "6m"
+    case y1 = "1y"
+    case y5 = "5y"
+
+    var id: String { rawValue }
+
+    var label: String {
+        switch self {
+        case .upcoming: return "UPCOMING"
+        case .d1: return "1D"
+        case .w1: return "1W"
+        case .m1: return "1M"
+        case .m3: return "3M"
+        case .m6: return "6M"
+        case .y1: return "1Y"
+        case .y5: return "5Y"
+        }
+    }
+
+    var windowText: String {
+        switch self {
+        case .upcoming: return "scheduled & live pipeline vs last 30 days"
+        case .d1: return "last 24 hours vs prior 24 hours"
+        case .w1: return "last 7 days vs prior 7 days"
+        case .m1: return "last 30 days vs prior 30 days"
+        case .m3: return "last 90 days vs prior 90 days"
+        case .m6: return "last 6 months vs prior 6 months"
+        case .y1: return "last 12 months vs prior 12 months"
+        case .y5: return "last 2.5 years vs prior 2.5 years"
+        }
+    }
+}
+
+struct ShareMover: Equatable, Identifiable {
+    let brand: String
+    let familyKey: String
+    let family: String
+    let sold: Int
+    let prior: Int
+    let usd: Double
+    let usdPrior: Double
+    let ratio: Double
+    let lo: Double
+    let hi: Double
+    let move: Double
+    let se: Double
+    let z: Double
+
+    var id: String { "\(brand)|\(familyKey)" }
+}
+
+struct ShareMoversRead: Equatable {
+    let marketSold: Int
+    let marketPrior: Int
+    let marketMove: Double
+    let candidates: Int
+    let gaining: [ShareMover]
+    let losing: [ShareMover]
+
+    static func parse(_ data: Data) -> ShareMoversRead? {
+        guard let obj = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let market = obj["market"] as? [String: Any],
+              let gainingRaw = obj["gaining"] as? [[String: Any]],
+              let losingRaw = obj["losing"] as? [[String: Any]] else {
+            return nil
+        }
+        func num(_ v: Any?) -> Double? {
+            if let d = v as? Double, d.isFinite { return d }
+            if let i = v as? Int { return Double(i) }
+            if let s = v as? String, let d = Double(s.trimmingCharacters(in: .whitespaces)), d.isFinite { return d }
+            return nil
+        }
+        guard let mSold = num(market["sold"]),
+              let mPrior = num(market["prior"]),
+              let mMove = num(market["move"]) else { return nil }
+
+        func row(_ r: [String: Any]) -> ShareMover? {
+            guard let brand = r["brand"] as? String, !brand.isEmpty,
+                  let fk = r["family_key"] as? String, !fk.isEmpty,
+                  let fam = r["family"] as? String, !fam.isEmpty,
+                  let sold = num(r["sold"]),
+                  let prior = num(r["prior"]),
+                  let ratio = num(r["ratio"]),
+                  let lo = num(r["lo"]),
+                  let hi = num(r["hi"]),
+                  let move = num(r["move"]),
+                  let se = num(r["se"]),
+                  let z = num(r["z"]) else { return nil }
+            return ShareMover(
+                brand: brand,
+                familyKey: fk,
+                family: fam,
+                sold: Int(sold.rounded()),
+                prior: Int(prior.rounded()),
+                usd: num(r["usd"]) ?? 0,
+                usdPrior: num(r["usd_prior"]) ?? 0,
+                ratio: ratio,
+                lo: lo,
+                hi: hi,
+                move: move,
+                se: se,
+                z: z
+            )
+        }
+        let g = gainingRaw.compactMap(row)
+        let l = losingRaw.compactMap(row)
+        guard g.count == gainingRaw.count, l.count == losingRaw.count else { return nil }
+        return ShareMoversRead(
+            marketSold: Int(mSold.rounded()),
+            marketPrior: Int(mPrior.rounded()),
+            marketMove: mMove,
+            candidates: Int((num(obj["candidates"]) ?? 0).rounded()),
+            gaining: g,
+            losing: l
+        )
+    }
+}
+
+// MARK: - Family Sales & Like-for-Like Price Index (FamilySalesChart.tsx & FamilyPriceIndex.tsx twins)
+
+struct FamilySalesData: Equatable {
+    struct Sale: Equatable, Identifiable {
+        let vehicle_id: String
+        let sale_date: String
+        let usd: Double
+        let source: String?
+        let year: Int?
+        let model: String?
+        var id: String { "\(vehicle_id)|\(sale_date)|\(Int(usd))" }
+    }
+    let sales: [Sale]
+    let n: Int
+    let truncated: Bool
+
+    static let priceFloor: Double = 500
+
+    static func parse(_ data: Data) -> FamilySalesData? {
+        guard let obj = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let n = obj["n"] as? Int,
+              let rows = obj["rows"] as? [[Any]] else { return nil }
+        var out: [Sale] = []
+        out.reserveCapacity(rows.count)
+        for r in rows {
+            guard r.count == 6,
+                  let vid = r[0] as? String,
+                  let date = r[1] as? String else { return nil }
+            let usd: Double?
+            if let d = r[2] as? Double { usd = d }
+            else if let i = r[2] as? Int { usd = Double(i) }
+            else { usd = nil }
+            guard let price = usd else { return nil }
+            let source = r[3] as? String
+            let year: Int?
+            if let y = r[4] as? Int { year = y }
+            else if let d = r[4] as? Double { year = Int(d) }
+            else { year = nil }
+            let model = r[5] as? String
+            out.append(Sale(vehicle_id: vid, sale_date: date, usd: price, source: source, year: year, model: model))
+        }
+        let truncated = (obj["truncated"] as? Bool) == true
+        return FamilySalesData(sales: out, n: n, truncated: truncated)
+    }
+}
+
+struct FamilyIndex: Equatable {
+    struct Point: Equatable, Identifiable {
+        let t: Date
+        let usd: Double
+        let lo: Double
+        let hi: Double
+        let n: Int
+        let median: Double?
+        var id: TimeInterval { t.timeIntervalSince1970 }
+    }
+    struct Segment: Equatable, Identifiable {
+        let key: String
+        let label: String
+        let change: Double?
+        let lo: Double?
+        let hi: Double?
+        let nPrior: Int
+        let nLast: Int
+        let verdict: String
+        var id: String { key }
+    }
+    let verdict: String // "up", "down", "flat", "too few to tell"
+    let change: Double?
+    let lo: Double?
+    let hi: Double?
+    let nPrior: Int
+    let nLast: Int
+    let periodKind: String?
+    let series: [Point]
+    let segments: [Segment]
+    let rawChange: Double?
+    let pairs: Int?
+    let repeatChange: Double?
+    let fittedAt: String?
+    let stale: Bool
+
+    static let validVerdicts: Set<String> = ["up", "down", "flat", "too few to tell"]
+
+    static func parse(_ data: Data) -> FamilyIndex? {
+        guard let v = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else { return nil }
+        func num(_ x: Any?) -> Double? {
+            if let d = x as? Double, d.isFinite { return d }
+            if let i = x as? Int { return Double(i) }
+            if let s = x as? String, !s.trimmingCharacters(in: .whitespaces).isEmpty, let d = Double(s), d.isFinite { return d }
+            return nil
+        }
+        let counts = (v["counts"] as? [String: Any]) ?? [:]
+        let changeObj = v["change"] as? [String: Any]
+        let fitted = changeObj != nil
+        if !fitted {
+            let floor = (v["floor"] as? [String: Any]) ?? [:]
+            if let yr = num(floor["sales_each_year"]),
+               let tot = num(floor["sales_total"]),
+               (num(counts["n_last12"]) ?? 0) >= yr,
+               (num(counts["n_prior12"]) ?? 0) >= yr,
+               (num(counts["n_total"]) ?? 0) >= tot {
+                return nil
+            }
+        }
+        let c: [String: Any]
+        if let changeObj {
+            c = changeObj
+        } else if v["counts"] != nil {
+            c = [
+                "verdict": "too few to tell",
+                "n_last12": counts["n_last12"] as Any,
+                "n_prior12": counts["n_prior12"] as Any
+            ]
+        } else {
+            return nil
+        }
+        let verdict = String(describing: c["verdict"] ?? "")
+        guard validVerdicts.contains(verdict) else { return nil }
+
+        let rawSeries = (v["series"] as? [[String: Any]]) ?? []
+        let series: [Point] = fitted ? rawSeries.compactMap { r in
+            guard let ps = r["period_start"] as? String,
+                  let d = ProfileClock.date(ps.count <= 10 ? "\(ps)T00:00:00Z" : ps),
+                  let usd = num(r["index_usd"]), usd > 0,
+                  let lo = num(r["lo_usd"]), lo > 0,
+                  let hi = num(r["hi_usd"]), hi > 0 else { return nil }
+            return Point(t: d, usd: usd, lo: lo, hi: hi, n: Int(num(r["n"]) ?? 0), median: num(r["raw_median_usd"]))
+        }.sorted(by: { $0.t < $1.t }) : []
+
+        let segsRaw = (c["chips"] as? [[String: Any]]) ?? (c["segments"] as? [[String: Any]]) ?? []
+        let segments: [Segment] = segsRaw.compactMap { r in
+            let label = String(describing: r["label"] ?? r["key"] ?? "")
+            guard !label.isEmpty else { return nil }
+            let key = String(describing: r["key"] ?? label)
+            return Segment(
+                key: key,
+                label: label,
+                change: num(r["change"] ?? r["change_12m"]),
+                lo: num(r["lo"]),
+                hi: num(r["hi"]),
+                nPrior: Int(num(r["n_prior12"]) ?? 0),
+                nLast: Int(num(r["n_last12"]) ?? 0),
+                verdict: String(describing: r["verdict"] ?? "too few to tell")
+            )
+        }
+        let pk = v["period_kind"] as? String
+        let periodKind = (pk == "month" || pk == "quarter") ? pk : (series.isEmpty ? nil : "quarter")
+        return FamilyIndex(
+            verdict: verdict,
+            change: num(c["change_12m"]),
+            lo: num(c["lo"]),
+            hi: num(c["hi"]),
+            nPrior: Int(num(c["n_prior12"]) ?? 0),
+            nLast: Int(num(c["n_last12"]) ?? 0),
+            periodKind: periodKind,
+            series: series,
+            segments: segments,
+            rawChange: num(c["raw_change"]),
+            pairs: num(c["pairs"]).map { Int($0) },
+            repeatChange: num(c["rs_change"]),
+            fittedAt: (v["fitted_at"] as? String) ?? (c["fitted_at"] as? String),
+            stale: (v["stale"] as? Bool) == true
+        )
+    }
+
+    var answerText: String {
+        if verdict == "too few to tell" || change == nil { return "Too few sales to tell" }
+        if verdict == "flat", let c = change {
+            let w: Double
+            if let lo, let hi { w = max(abs(lo), abs(hi)) } else { w = abs(c) }
+            return "Flat: within ±\(max(1, Int((w * 100.0).rounded())))% in 12 months"
+        }
+        guard let c = change else { return "Too few sales to tell" }
+        return "\(LedgerMapScale.pct(c)) in 12 months"
+    }
+
+    var evidenceText: String {
+        var parts: [String] = []
+        if let lo, let hi, verdict != "too few to tell" {
+            let pts = Int((((hi - lo) / 2.0) * 100.0).rounded())
+            parts.append("±\(pts) points (95%)")
+        }
+        parts.append("\((nPrior + nLast).formatted()) sales in the two years")
+        if verdict == "too few to tell" && change == nil {
+            parts.append("needs 30 a year")
+        }
+        if let rc = rawChange {
+            parts.append("plain median said \(LedgerMapScale.pct(rc))")
+        }
+        if stale, let fa = fittedAt, let d = ProfileClock.date(fa) {
+            let f = DateFormatter()
+            f.locale = Locale(identifier: "en_US_POSIX")
+            f.timeZone = TimeZone(secondsFromGMT: 0)
+            f.dateFormat = "MMM d"
+            parts.append("measured \(f.string(from: d))")
+        }
+        return parts.joined(separator: " · ")
+    }
+}
+
+// MARK: - Generation / Era Cohorts (familyEras.ts twin)
+
+struct FamilyEraCohort: Equatable, Identifiable {
+    let id: String
+    let label: String
+    let shortLabel: String
+    let yearStart: Int
+    let yearEnd: Int
+    var count: Int = 0
+
+    static let ckTruckEras: [FamilyEraCohort] = [
+        .init(id: "1960-1966", label: "1st Gen '60–'66", shortLabel: "'60–'66", yearStart: 1960, yearEnd: 1966),
+        .init(id: "1967-1972", label: "Action Line '67–'72", shortLabel: "Action Line '67–'72", yearStart: 1967, yearEnd: 1972),
+        .init(id: "1973-1987", label: "Squarebody '73–'87", shortLabel: "Squarebody '73–'87", yearStart: 1973, yearEnd: 1987),
+        .init(id: "1988-1998", label: "GMT400 '88–'98", shortLabel: "GMT400 '88–'98", yearStart: 1988, yearEnd: 1998)
+    ]
+
+    static let curated: [String: [FamilyEraCohort]] = [
+        "ford:mustang": [
+            .init(id: "1964-1973", label: "1st Gen '64–'73", shortLabel: "1st Gen '64–'73", yearStart: 1964, yearEnd: 1973),
+            .init(id: "1974-1978", label: "Mustang II '74–'78", shortLabel: "Mustang II", yearStart: 1974, yearEnd: 1978),
+            .init(id: "1979-1993", label: "Fox Body '79–'93", shortLabel: "Fox Body '79–'93", yearStart: 1979, yearEnd: 1993),
+            .init(id: "1994-2004", label: "SN95 '94–'04", shortLabel: "SN95 '94–'04", yearStart: 1994, yearEnd: 2004),
+            .init(id: "2005-2014", label: "S197 '05–'14", shortLabel: "S197 '05–'14", yearStart: 2005, yearEnd: 2014),
+            .init(id: "2015-2023", label: "S550 '15–'23", shortLabel: "S550 '15–'23", yearStart: 1915, yearEnd: 2023),
+            .init(id: "2024-2030", label: "S650 '24+", shortLabel: "S650 '24+", yearStart: 2024, yearEnd: 2030)
+        ],
+        "chevrolet:corvette": [
+            .init(id: "1953-1962", label: "C1 '53–'62", shortLabel: "C1", yearStart: 1953, yearEnd: 1962),
+            .init(id: "1963-1967", label: "C2 '63–'67", shortLabel: "C2", yearStart: 1963, yearEnd: 1967),
+            .init(id: "1968-1982", label: "C3 '68–'82", shortLabel: "C3", yearStart: 1968, yearEnd: 1982),
+            .init(id: "1984-1996", label: "C4 '84–'96", shortLabel: "C4", yearStart: 1984, yearEnd: 1996),
+            .init(id: "1997-2004", label: "C5 '97–'04", shortLabel: "C5", yearStart: 1997, yearEnd: 2004),
+            .init(id: "2005-2013", label: "C6 '05–'13", shortLabel: "C6", yearStart: 2005, yearEnd: 2013),
+            .init(id: "2014-2019", label: "C7 '14–'19", shortLabel: "C7", yearStart: 2014, yearEnd: 2019),
+            .init(id: "2020-2030", label: "C8 '20+", shortLabel: "C8", yearStart: 2020, yearEnd: 2030)
+        ],
+        "porsche:911": [
+            .init(id: "1964-1973", label: "F-Body '64–'73", shortLabel: "F-Body", yearStart: 1964, yearEnd: 1973),
+            .init(id: "1974-1988", label: "G-Body '74–'88", shortLabel: "G-Body", yearStart: 1974, yearEnd: 1988),
+            .init(id: "1989-1994", label: "964 '89–'94", shortLabel: "964", yearStart: 1989, yearEnd: 1994),
+            .init(id: "1995-1998", label: "993 '95–'98", shortLabel: "993", yearStart: 1995, yearEnd: 1998),
+            .init(id: "1999-2004", label: "996 '99–'04", shortLabel: "996", yearStart: 1999, yearEnd: 2004),
+            .init(id: "2005-2012", label: "997 '05–'12", shortLabel: "997", yearStart: 2005, yearEnd: 2012),
+            .init(id: "2013-2019", label: "991 '13–'19", shortLabel: "991", yearStart: 2013, yearEnd: 2019),
+            .init(id: "2020-2030", label: "992 '20+", shortLabel: "992", yearStart: 2020, yearEnd: 2030)
+        ],
+        "bmw:m3": [
+            .init(id: "1986-1991", label: "E30 '86–'91", shortLabel: "E30", yearStart: 1986, yearEnd: 1991),
+            .init(id: "1992-1999", label: "E36 '92–'99", shortLabel: "E36", yearStart: 1992, yearEnd: 1999),
+            .init(id: "2000-2006", label: "E46 '00–'06", shortLabel: "E46", yearStart: 2000, yearEnd: 2006),
+            .init(id: "2007-2013", label: "E90/E92 '07–'13", shortLabel: "E90/E92", yearStart: 2007, yearEnd: 2013),
+            .init(id: "2014-2018", label: "F80 '14–'18", shortLabel: "F80", yearStart: 2014, yearEnd: 2018),
+            .init(id: "2021-2030", label: "G80 '21+", shortLabel: "G80", yearStart: 2021, yearEnd: 2030)
+        ],
+        "ford:bronco": [
+            .init(id: "1966-1977", label: "Early Bronco '66–'77", shortLabel: "'66–'77", yearStart: 1966, yearEnd: 1977),
+            .init(id: "1978-1979", label: "2nd Gen '78–'79", shortLabel: "'78–'79", yearStart: 1978, yearEnd: 1979),
+            .init(id: "1980-1986", label: "Bullnose '80–'86", shortLabel: "'80–'86", yearStart: 1980, yearEnd: 1986),
+            .init(id: "1987-1991", label: "Bricknose '87–'91", shortLabel: "'87–'91", yearStart: 1987, yearEnd: 1991),
+            .init(id: "1992-1996", label: "OBS '92–'96", shortLabel: "'92–'96", yearStart: 1992, yearEnd: 1996),
+            .init(id: "2021-2030", label: "6th Gen '21+", shortLabel: "'21+", yearStart: 2021, yearEnd: 2030)
+        ],
+        "chevrolet:c/k pickup": ckTruckEras,
+        "chevrolet:c10": ckTruckEras,
+        "chevrolet:k10": ckTruckEras,
+        "chevrolet:k5 blazer": ckTruckEras
+    ]
+
+    static func cohorts(brand: String?, familyName: String?, years: [Int]) -> [FamilyEraCohort] {
+        let valid = years.filter { $0 >= 1886 && $0 <= 2100 }
+        let key = "\((brand ?? "").trimmingCharacters(in: .whitespaces).lowercased()):\((familyName ?? "").trimmingCharacters(in: .whitespaces).lowercased())"
+        if let list = curated[key] {
+            if valid.isEmpty { return list }
+            let withCounts = list.map { c -> FamilyEraCohort in
+                var copy = c
+                copy.count = valid.filter { $0 >= c.yearStart && $0 <= c.yearEnd }.count
+                return copy
+            }.filter { $0.count > 0 }
+            return withCounts.count >= 2 ? withCounts : list
+        }
+        guard !valid.isEmpty else { return [] }
+        var byDecade: [Int: Int] = [:]
+        for y in valid {
+            let d = (y / 10) * 10
+            byDecade[d, default: 0] += 1
+        }
+        let decades = byDecade.filter { $0.value >= 3 }.sorted(by: { $0.key < $1.key }).map { d, cnt in
+            FamilyEraCohort(id: "\(d)-\(d + 9)", label: "\(d)s", shortLabel: "\(d)s", yearStart: d, yearEnd: d + 9, count: cnt)
+        }
+        return decades.count >= 2 ? decades : []
+    }
+
+    static func matches(year: Int?, eraId: String?) -> Bool {
+        guard let eraId, !eraId.isEmpty else { return true }
+        let parts = eraId.split(whereSeparator: { $0 == "-" || $0 == "–" })
+        guard parts.count == 2, let lo = Int(parts[0]), let hi = Int(parts[1]), lo <= hi else { return true }
+        guard let year else { return false }
+        return year >= lo && year <= hi
+    }
+}
+
+// MARK: - RPC Client & Formatting Surface
+
 enum LedgerMap {
     private struct MakeParams: Encodable { let p_make: String }
-    private struct YearParams: Encodable { let p_source: String?; let p_make: String; let p_model: String }
+    private struct BrandParams: Encodable { let p_brand: String }
+    private struct FamilyParams: Encodable { let p_brand: String; let p_family_key: String }
+    private struct YearParams: Encodable { let p_source: String?; let p_make: String?; let p_model: String? }
+    private struct SalesParams: Encodable { let p_make: String; let p_model: String; let p_year: Int? }
+    private struct MapParams: Encodable { let p_brands: Int; let p_families: Int }
+    private struct ShareMoverParams: Encodable { let p_limit: Int; let p_min_sales: Int; let p_horizon: String }
 
-    static func makes() async throws -> [LedgerNode] {
-        try await SupabaseService.client.rpc("treemap_by_brand").execute().value
-    }
-    static func models(make: String) async throws -> [LedgerNode] {
-        try await SupabaseService.client.rpc("treemap_models_by_brand", params: MakeParams(p_make: make)).execute().value
-    }
-    static func years(make: String, model: String) async throws -> [LedgerNode] {
-        try await SupabaseService.client.rpc("treemap_years", params: YearParams(p_source: nil, p_make: make, p_model: model)).execute().value
-    }
-    /// The web's leaf query, column for column: a recorded sale or sold price, not deleted, priciest first, 200 at most.
-    static func vehicles(make: String, model: String, year: Int?) async throws -> [LedgerVehicle] {
-        var q = SupabaseService.client.from("vehicles")
-            .select("id,year,make,model,listing_title,bat_listing_title,sale_price,sold_price,primary_image_url,mileage")
-            .ilike("make", value: make)
-            .ilike("model", value: model)
-            .or("sale_price.gt.0,sold_price.gt.0")
-            .is("deleted_at", value: nil)
-        if let year { q = q.eq("year", value: year) }
-        return try await q.order("sale_price", ascending: false).limit(200).execute().value
+    static func oneDecimal(_ x: Double) -> String {
+        String(format: "%.1f", (x * 10).rounded(.toNearestOrAwayFromZero) / 10)
     }
 
-    /// The web's fmtMoney: $1.3B, $1.3M, $36K, $900. One decimal the way JavaScript's toFixed(1)
-    /// rounds (a tie goes up: 1.25 → 1.3), not the C library's tie-to-even.
-    static func oneDecimal(_ x: Double) -> String { String(format: "%.1f", (x * 10).rounded(.toNearestOrAwayFromZero) / 10) }
     static func money(_ n: Double) -> String {
         guard n > 0, n.isFinite else { return "--" }
         if n >= 1_000_000_000 { return "$" + oneDecimal(n / 1_000_000_000) + "B" }
@@ -80,244 +933,1318 @@ enum LedgerMap {
         return "$" + Int(n.rounded()).formatted()
     }
 
-    /// The web's priceToColor steps (heat-0 … heat-6): the median price as a seven-step warmth.
     static func color(median: Int?) -> Color {
         guard let m = median, m > 0 else { return Color(.tertiarySystemFill) }
         let step: Double = m < 10_000 ? 1 : m < 25_000 ? 2 : m < 50_000 ? 3 : m < 100_000 ? 4 : m < 250_000 ? 5 : 6
         return Color.orange.opacity(0.12 + 0.13 * step)
     }
+
+    static func makes() async throws -> [LedgerNode] {
+        try await brands()
+    }
+
+    static func refreshReceipt() async -> LedgerRefreshReceipt? {
+        let rows: [LedgerRefreshReceipt]? = try? await SupabaseService.client
+            .from("treemap_refreshes")
+            .select("refreshed_at,populations")
+            .order("refreshed_at", ascending: false)
+            .limit(1)
+            .execute()
+            .value
+        return rows?.first
+    }
+
+    static func brands() async throws -> [LedgerNode] {
+        async let rawBrands: [LedgerNode] = SupabaseService.client.rpc("treemap_by_brand").execute().value
+        async let marketRows: [BrandMarketRow]? = try? SupabaseService.client.rpc("treemap_brand_market").execute().value
+        let list = try await rawBrands
+        let mRows = await marketRows ?? []
+        var byBrand: [String: BrandMarketRow] = [:]
+        for r in mRows { byBrand[r.brand.uppercased()] = r }
+        return list.map { b in
+            var copy = b
+            if let m = byBrand[b.name.uppercased()] {
+                copy.usd = m.usd
+                copy.sold_any = m.sold_any
+                copy.offered = m.offered
+                copy.dated = m.dated
+                copy.sold_12m = m.sold_12m
+                copy.sold_prior_12m = m.sold_prior_12m
+                copy.usd_12m = m.usd_12m
+                copy.usd_prior_12m = m.usd_prior_12m
+            }
+            return copy
+        }
+    }
+
+    static func brandFamilyMap() async -> [BrandFamilyMapRow]? {
+        try? await SupabaseService.client
+            .rpc("treemap_brand_family_map", params: MapParams(p_brands: 60, p_families: 12))
+            .execute().value
+    }
+
+    static func families(brand: String) async throws -> (nodes: [LedgerNode], isCanonicalFamilies: Bool) {
+        if let rows: [FamilyMarketRow] = try? await SupabaseService.client
+            .rpc("treemap_brand_families", params: BrandParams(p_brand: brand))
+            .execute().value, !rows.isEmpty {
+            return (rows.map { $0.toLedgerNode() }, true)
+        }
+        let fallback: [LedgerNode] = try await SupabaseService.client
+            .rpc("treemap_models_by_brand", params: MakeParams(p_make: brand))
+            .execute().value
+        return (fallback, false)
+    }
+
+    static func familyModels(brand: String, familyKey: String) async throws -> [LedgerNode] {
+        let rows: [FamilyModelRow] = try await SupabaseService.client
+            .rpc("treemap_family_models", params: FamilyParams(p_brand: brand, p_family_key: familyKey))
+            .execute().value
+        return rows.map { $0.toLedgerNode() }
+    }
+
+    static func models(make: String) async throws -> [LedgerNode] {
+        try await SupabaseService.client.rpc("treemap_models_by_brand", params: MakeParams(p_make: make)).execute().value
+    }
+
+    static func years(make: String, model: String) async throws -> [LedgerNode] {
+        try await SupabaseService.client.rpc("treemap_years", params: YearParams(p_source: nil, p_make: make, p_model: model)).execute().value
+    }
+
+    static func sales(make: String, model: String, year: Int?) async throws -> [LedgerVehicle] {
+        try await SupabaseService.client
+            .rpc("treemap_sales", params: SalesParams(p_make: make, p_model: model, p_year: year))
+            .execute().value
+    }
+
+    static func familySales(brand: String, familyKey: String) async -> FamilySalesData? {
+        guard let res = try? await SupabaseService.client
+            .rpc("treemap_family_sales", params: FamilyParams(p_brand: brand, p_family_key: familyKey))
+            .execute() else { return nil }
+        return FamilySalesData.parse(res.data)
+    }
+
+    static func familyPriceIndex(brand: String, familyKey: String) async -> FamilyIndex? {
+        guard let res = try? await SupabaseService.client
+            .rpc("family_price_index_read", params: FamilyParams(p_brand: brand, p_family_key: familyKey))
+            .execute() else { return nil }
+        return FamilyIndex.parse(res.data)
+    }
+
+    static func shareMovers(horizon: MoverHorizon) async -> ShareMoversRead? {
+        guard let res = try? await SupabaseService.client
+            .rpc("treemap_family_share_movers", params: ShareMoverParams(p_limit: 5, p_min_sales: 0, p_horizon: horizon.rawValue))
+            .execute() else { return nil }
+        return ShareMoversRead.parse(res.data)
+    }
 }
 
-/// The map with its breadcrumb, count line and legend, drilling make → model → year → record.
+// MARK: - LedgerMapView
+
 struct LedgerMapView: View {
-    private enum Level: Hashable {
-        case makes
-        case models(make: String, of: Int)
-        case years(make: String, model: String, of: Int)
-        case vehicles(make: String, model: String, year: Int?, of: Int)
+    var onSelectVehicle: ((UUID) -> Void)? = nil
 
-        var crumb: String {
-            switch self {
-            case .makes: return "ALL MAKES"
-            case .models(let m, _): return m.uppercased()
-            case .years(_, let model, _): return model.uppercased()
-            case .vehicles(_, _, let y, _): return y.map(String.init) ?? "ALL YEARS"
-            }
-        }
+    enum Level: Equatable {
+        case brands
+        case families
+        case models
+        case years
+        case vehicles
     }
 
-    @State private var stack: [Level] = {
-        #if DEBUG
-        // Screenshot loop: NUKE_DEBUG_LEDGER_MAKE=Chevrolet opens that brand's models (DEBUG only).
-        if let m = ProcessInfo.processInfo.environment["NUKE_DEBUG_LEDGER_MAKE"], !m.isEmpty { return [.makes, .models(make: m, of: 0)] }
-        #endif
-        return [.makes]
-    }()
+    @State private var selectedMake: String?
+    @State private var selectedFamilyKey: String?
+    @State private var selectedFamilyName: String?
+    @State private var selectedModel: String?
+    @State private var selectedYear: Int?
+    @State private var selectedEra: String?
+
+    @State private var basis: LedgerMapScale.MapBasis = .ledger
+    @State private var brandViewMode: LedgerMapScale.BrandViewMode = .brands
+
     @State private var nodes: [LedgerNode] = []
+    @State private var brandNodesCache: [LedgerNode] = []
+    @State private var familyNodesCache: [LedgerNode] = []
+    @State private var modelNodesCache: [LedgerNode] = []
+    @State private var yearNodesCache: [LedgerNode] = []
+    @State private var brandFamilyRows: [BrandFamilyMapRow] = []
+
     @State private var vehicles: [LedgerVehicle] = []
-    @State private var loading = false
+    @State private var receipt: LedgerRefreshReceipt?
+    @State private var familySalesData: FamilySalesData?
+    @State private var familyIndex: FamilyIndex?
+
+    @State private var moverHorizon: MoverHorizon = .y1
+    @State private var movers: ShareMoversRead?
+    @State private var moversLoading = false
+
+    @State private var loading = true
     @State private var failed = false
-    @State private var tailOpen = false
 
-    private var level: Level { stack.last ?? .makes }
-    private var isLeaf: Bool { if case .vehicles = level { return true } else { return false } }
-    private var total: Int { isLeaf ? vehicles.count : nodes.reduce(0) { $0 + $1.count } }
-    /// The parent's count when this level is capped by its reader (models: 200 a brand; records: 200 a model).
-    private var capped: Int? {
-        switch level {
-        case .models(_, let of) where nodes.count >= 200 && of > 0: return of
-        case .vehicles(_, _, _, let of) where vehicles.count >= 200 && of > 0: return of
-        default: return nil
-        }
-    }
-    private var countLine: String {
-        let base = "\(total.formatted()) \(isLeaf ? "vehicles" : "vehicles with a recorded price")"
-        if let of = capped { return base + " in the 200 \(isLeaf ? "priciest records" : "largest models") of \(of.formatted())" }
-        return base
+    @State private var inspectedNode: LedgerNode?
+
+    private var level: Level {
+        if selectedMake == nil { return .brands }
+        if selectedFamilyKey == nil && selectedModel == nil { return .families }
+        if selectedModel == nil && selectedYear == nil { return .models }
+        if selectedYear == nil { return .years }
+        return .vehicles
     }
 
-    /// Cells too small to label are folded into one box that holds its own cells, the way the phone's
-    /// inventory map draws its long tail (web #1043): area stays honest (the box is the tail's count),
-    /// the larger tail members stay visible and tappable inside it, and the box's title opens the whole
-    /// list. The web draws every cell on a canvas five times this size and needs no fold.
-    private static let labelWidth: CGFloat = 56, labelHeight: CGFloat = 30
-    private struct Laid { let shown: [LiveInventory.Cell<LedgerNode>]; let tail: [LedgerNode]; let tailRect: CGRect? }
-    private func layout(_ sorted: [LedgerNode], in size: CGSize) -> Laid {
-        let bounds = CGRect(origin: .zero, size: size)
-        var kept = sorted
-        var tail: [LedgerNode] = []
-        for _ in 0..<4 {
-            let count = tail.reduce(0) { $0 + $1.count }
-            let marker = LedgerNode(name: "+more", count: count, value: 0, median_price: nil, min_price: nil, max_price: nil, sold_count: nil, auction_count: nil, avg_bids: nil, avg_watchers: nil)
-            let items = (tail.isEmpty ? kept : kept + [marker]).map { (item: $0, area: Double($0.count)) }
-            let cells = LiveInventory.squarify(items, in: bounds)
-            let small = cells.filter { $0.item.id != marker.id && ($0.rect.width < Self.labelWidth || $0.rect.height < Self.labelHeight) }.map(\.item.id)
-            if small.isEmpty || kept.count <= 2 {
-                return Laid(shown: cells.filter { $0.item.id != marker.id }, tail: tail, tailRect: tail.isEmpty ? nil : cells.first { $0.item.id == marker.id }?.rect)
-            }
-            let smallSet = Set(small)
-            tail = kept.filter { smallSet.contains($0.id) } + tail
-            kept = kept.filter { !smallSet.contains($0.id) }
-        }
-        return Laid(shown: LiveInventory.squarify(kept.map { (item: $0, area: Double($0.count)) }, in: bounds), tail: tail, tailRect: nil)
+    private var pathKey: String {
+        [selectedMake ?? "", selectedFamilyKey ?? "", selectedModel ?? "", selectedYear.map(String.init) ?? ""].joined(separator: "/")
+    }
+
+    private var baseline: LedgerMapScale.Baseline? {
+        LedgerMapScale.batBaseline(brandNodesCache.isEmpty ? nodes : brandNodesCache)
     }
 
     var body: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            headerSection
+            breadcrumbsBar
+            quickSwitchPills
+            if level == .brands {
+                mapCalloutsBar
+            }
+            if selectedMake != nil, let fk = selectedFamilyKey, fk != "other" {
+                familyChartAndIndexCard
+            }
+            canvas
+                .frame(height: level == .vehicles ? nil : 430)
+            if level == .brands || level == .families {
+                legendFooter
+            }
+            if level == .brands, let houses = receipt?.populations?.by_house, !houses.isEmpty {
+                venueMixBar(houses)
+            }
+            if level == .brands {
+                relativityMoversCard
+            }
+        }
+        .padding(16)
+        .task(id: pathKey) { await load() }
+        .task {
+            if receipt == nil {
+                receipt = await LedgerMap.refreshReceipt()
+            }
+        }
+        .task(id: moverHorizon) {
+            moversLoading = true
+            movers = await LedgerMap.shareMovers(horizon: moverHorizon)
+            moversLoading = false
+        }
+        .sheet(item: $inspectedNode) { node in
+            nodeSheet(node)
+        }
+    }
+
+    // MARK: - Header & Controls
+
+    private var headerSection: some View {
         VStack(alignment: .leading, spacing: 6) {
-            // Breadcrumb: each crumb goes back up, as the web's drill stack.
-            HStack(spacing: 6) {
-                ForEach(Array(stack.enumerated()), id: \.offset) { i, lvl in
-                    if i > 0 { Text("›").font(.caption2).foregroundStyle(.tertiary) }
-                    Button(lvl.crumb) { stack = Array(stack.prefix(i + 1)) }
-                        .font(.caption2.monospaced().weight(i == stack.count - 1 ? .semibold : .regular))
-                        .buttonStyle(.plain)
-                        .foregroundStyle(i == stack.count - 1 ? Color.primary : Color.secondary)
+            HStack(alignment: .firstTextBaseline) {
+                Text(headerTitle)
+                    .font(.system(.title3, design: .monospaced).weight(.semibold))
+                Spacer()
+                Text(headerMeasureLine)
+                    .font(.system(.caption2, design: .monospaced))
+                    .foregroundStyle(.secondary)
+                    .multilineTextAlignment(.trailing)
+            }
+            if level == .brands || level == .families {
+                HStack(spacing: 8) {
+                    if level == .brands {
+                        segmentedPill(
+                            options: LedgerMapScale.BrandViewMode.allCases,
+                            selection: $brandViewMode,
+                            label: \.label
+                        )
+                    }
+                    Spacer()
+                    segmentedPill(
+                        options: LedgerMapScale.MapBasis.allCases,
+                        selection: $basis,
+                        label: \.label
+                    )
                 }
-                Spacer(minLength: 0)
-                if loading { ProgressView().controlSize(.mini) }
             }
-            .lineLimit(1)
-            // The count line on its own row so a capped level's denominator is never cut off.
-            if !loading {
-                Text(countLine).font(.caption2.monospaced()).foregroundStyle(.secondary).lineLimit(2)
+        }
+    }
+
+    private var headerTitle: String {
+        if let make = selectedMake, let model = selectedModel ?? selectedFamilyName, let year = selectedYear {
+            return "\(year) \(make) \(model)"
+        }
+        if let make = selectedMake, let model = selectedModel {
+            return "\(make) \(model)"
+        }
+        if let make = selectedMake, let fam = selectedFamilyName {
+            return "\(make) \(fam)"
+        }
+        if let make = selectedMake {
+            return make
+        }
+        return "Market Map"
+    }
+
+    private var headerMeasureLine: String {
+        let clock = receipt?.refreshClock() ?? ""
+        if level == .vehicles {
+            return "\(vehicles.count.formatted()) confirmed sales\(clock)"
+        }
+        let total = filteredNodes.reduce(0) { $0 + $1.count }
+        guard total > 0 else { return loading ? "reading…" : "0 confirmed sales" }
+        let usdTotal = filteredNodes.reduce(0.0) { $0 + ($1.usd ?? $1.value ?? 0) }
+        let moneyPrefix = usdTotal > 0 ? "\(LedgerMap.money(usdTotal)) · " : ""
+        if level == .brands, let pub = receipt?.populations?.public_records, pub > 0, receipt?.isConfirmedSaleMeasure == true {
+            let mapped = receipt?.populations?.mapped_sales ?? total
+            return "\(moneyPrefix)\(mapped.formatted()) confirmed sales of \(pub.formatted()) public records\(clock)"
+        }
+        return "\(moneyPrefix)\(total.formatted()) confirmed sales\(clock)"
+    }
+
+    private func segmentedPill<T: Hashable>(options: [T], selection: Binding<T>, label: KeyPath<T, String>) -> some View {
+        HStack(spacing: 2) {
+            ForEach(options, id: \.self) { opt in
+                let active = selection.wrappedValue == opt
+                Button {
+                    selection.wrappedValue = opt
+                } label: {
+                    Text(opt[keyPath: label])
+                        .font(.system(.caption2, design: .monospaced).weight(active ? .semibold : .regular))
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 4)
+                        .background(active ? Color.primary.opacity(0.14) : Color.clear, in: Capsule())
+                }
+                .buttonStyle(.plain)
             }
-            GeometryReader { geo in
-                if failed {
-                    ContentUnavailableView { Label("Couldn't read the ledger's views", systemImage: "exclamationmark.triangle") } actions: {
-                        Button("Retry") { Task { await load() } }
+        }
+        .padding(2)
+        .background(Color(.secondarySystemBackground), in: Capsule())
+    }
+
+    // MARK: - Breadcrumbs & Quick-Switch Pills
+
+    private var breadcrumbsBar: some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 6) {
+                crumb("All Makes", active: selectedMake == nil) {
+                    selectedMake = nil
+                    selectedFamilyKey = nil
+                    selectedFamilyName = nil
+                    selectedModel = nil
+                    selectedYear = nil
+                    selectedEra = nil
+                }
+                if let make = selectedMake {
+                    Text("›").foregroundStyle(.tertiary)
+                    crumb(make, active: selectedFamilyKey == nil && selectedModel == nil && selectedYear == nil) {
+                        selectedFamilyKey = nil
+                        selectedFamilyName = nil
+                        selectedModel = nil
+                        selectedYear = nil
+                        selectedEra = nil
                     }
-                } else if isLeaf {
-                    let cells = LiveInventory.squarify(vehicles.map { (item: $0, area: $0.price) }, in: CGRect(origin: .zero, size: geo.size))
-                    ForEach(Array(cells.enumerated()), id: \.offset) { _, c in
-                        NavigationLink(value: c.item.headerRow) { cell(name: c.item.name, line2: LedgerMap.money(c.item.price), line3: nil, median: Int(c.item.price), rect: c.rect) }
-                            .buttonStyle(.plain)
+                }
+                if let fam = selectedFamilyName {
+                    Text("›").foregroundStyle(.tertiary)
+                    crumb(fam, active: selectedModel == nil && selectedYear == nil) {
+                        selectedModel = nil
+                        selectedYear = nil
                     }
-                } else {
-                    // The web sorts by area inside its squarify (lib/squarify.ts); so does this layout.
-                    let laid = layout(nodes.sorted { $0.count > $1.count }, in: geo.size)
-                    let all = max(1, total)
-                    ForEach(Array(laid.shown.enumerated()), id: \.offset) { _, c in
-                        Button { descend(into: c.item) } label: {
-                            cell(name: c.item.name,
-                                 line2: "\(c.item.count.formatted()) vehicles",
-                                 line3: [c.item.median_price.map { LedgerMap.money(Double($0)) + " med" }, String(format: "%.1f%%", Double(c.item.count) / Double(all) * 100)].compactMap { $0 }.joined(separator: " · "),
-                                 median: c.item.median_price, rect: c.rect)
+                }
+                if let model = selectedModel, model.lowercased() != (selectedFamilyName ?? "").lowercased() {
+                    Text("›").foregroundStyle(.tertiary)
+                    crumb(model, active: selectedYear == nil) {
+                        selectedYear = nil
+                    }
+                }
+                if let year = selectedYear {
+                    Text("›").foregroundStyle(.tertiary)
+                    crumb(String(year), active: true) {}
+                }
+            }
+            .font(.system(.footnote, design: .monospaced))
+        }
+    }
+
+    private func crumb(_ label: String, active: Bool, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Text(label)
+                .fontWeight(active ? .semibold : .regular)
+                .foregroundStyle(active ? .primary : .secondary)
+                .padding(.vertical, 4)
+                .padding(.horizontal, 8)
+                .background(active ? Color(.secondarySystemBackground) : Color.clear, in: RoundedRectangle(cornerRadius: 6))
+        }
+        .buttonStyle(.plain)
+        .disabled(active)
+    }
+
+    @ViewBuilder
+    private var quickSwitchPills: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            // 1. Families pill bar when inside a brand
+            if selectedMake != nil, familyNodesCache.count > 1 {
+                pillRow(title: "FAMILIES") {
+                    pillButton("All \(selectedMake ?? "")", active: selectedFamilyKey == nil && selectedModel == nil) {
+                        selectedFamilyKey = nil
+                        selectedFamilyName = nil
+                        selectedModel = nil
+                        selectedYear = nil
+                        selectedEra = nil
+                    }
+                    ForEach(familyNodesCache.prefix(20)) { f in
+                        let fk = f.familyKey ?? f.name
+                        let active = selectedFamilyKey == fk
+                        pillButton("\(f.name) (\(f.count.formatted()))", active: active) {
+                            selectedFamilyKey = fk
+                            selectedFamilyName = f.name
+                            selectedModel = nil
+                            selectedYear = nil
+                            selectedEra = nil
+                        }
+                    }
+                }
+            }
+
+            // 2. Sub-models pill bar when inside a family with >1 sub-models
+            if selectedMake != nil, selectedFamilyKey != nil, modelNodesCache.count > 1 {
+                pillRow(title: "SUB-MODELS") {
+                    pillButton("All \(selectedFamilyName ?? "Family")", active: selectedModel == nil) {
+                        selectedModel = nil
+                        selectedYear = nil
+                    }
+                    ForEach(modelNodesCache.prefix(20)) { m in
+                        let active = selectedModel == m.name
+                        pillButton("\(m.name) (\(m.count.formatted()))", active: active) {
+                            selectedModel = m.name
+                            selectedYear = nil
+                        }
+                    }
+                }
+            }
+
+            // 3. Generation / Era cohort pills when inside a family or model
+            let eras = availableEras
+            if selectedMake != nil, (selectedFamilyName != nil || selectedModel != nil), !eras.isEmpty {
+                pillRow(title: "ERAS") {
+                    pillButton("All Eras", active: selectedEra == nil && selectedYear == nil) {
+                        selectedEra = nil
+                        selectedYear = nil
+                    }
+                    ForEach(eras) { cohort in
+                        let active = selectedEra == cohort.id
+                        let text = cohort.count > 0 ? "\(cohort.shortLabel) (\(cohort.count))" : cohort.shortLabel
+                        pillButton(text, active: active) {
+                            selectedEra = active ? nil : cohort.id
+                            selectedYear = nil
+                        }
+                    }
+                }
+            }
+
+            // 4. Model years pill bar when inside a family or model
+            let yrs = availableYearNodes
+            if selectedMake != nil, (selectedFamilyKey != nil || selectedModel != nil), !yrs.isEmpty {
+                pillRow(title: "YEARS") {
+                    pillButton("All Years", active: selectedYear == nil) {
+                        selectedYear = nil
+                    }
+                    ForEach(yrs, id: \.year) { item in
+                        let active = selectedYear == item.year
+                        pillButton("\(item.year) (\(item.count))", active: active) {
+                            selectedYear = active ? nil : item.year
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    private var availableEras: [FamilyEraCohort] {
+        let yrs = availableYearNodesWithoutEra.map(\.year)
+        return FamilyEraCohort.cohorts(
+            brand: selectedMake,
+            familyName: selectedFamilyName ?? selectedModel,
+            years: yrs
+        )
+    }
+
+    private var availableYearNodesWithoutEra: [(year: Int, count: Int)] {
+        if !yearNodesCache.isEmpty {
+            return yearNodesCache.compactMap { n in
+                guard let y = Int(n.name), y >= 1886, y <= 2100 else { return nil }
+                return (y, n.count)
+            }.sorted(by: { $0.year > $1.year })
+        }
+        if let sales = familySalesData?.sales, !sales.isEmpty {
+            var counts: [Int: Int] = [:]
+            for s in sales {
+                if let y = s.year, y >= 1886, y <= 2100 {
+                    counts[y, default: 0] += 1
+                }
+            }
+            return counts.map { ($0.key, $0.value) }.sorted(by: { $0.year > $1.year })
+        }
+        return []
+    }
+
+    private var availableYearNodes: [(year: Int, count: Int)] {
+        availableYearNodesWithoutEra.filter { FamilyEraCohort.matches(year: $0.year, eraId: selectedEra) }
+    }
+
+    private func pillRow<Content: View>(title: String, @ViewBuilder content: () -> Content) -> some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 6) {
+                Text(title)
+                    .font(.system(size: 10, weight: .semibold, design: .monospaced))
+                    .foregroundStyle(.secondary)
+                    .padding(.trailing, 2)
+                content()
+            }
+        }
+    }
+
+    private func pillButton(_ text: String, active: Bool, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Text(text)
+                .font(.system(.caption2, design: .monospaced).weight(active ? .semibold : .regular))
+                .foregroundStyle(active ? Color(.systemBackground) : .primary)
+                .padding(.horizontal, 8)
+                .padding(.vertical, 4)
+                .background(active ? Color.primary : Color(.secondarySystemBackground), in: Capsule())
+        }
+        .buttonStyle(.plain)
+    }
+
+    // MARK: - Callouts Bar
+
+    @ViewBuilder
+    private var mapCalloutsBar: some View {
+        let items = LedgerMapScale.callouts(nodes, base: baseline)
+        if !items.isEmpty {
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 8) {
+                    ForEach(items) { c in
+                        Button {
+                            selectedMake = c.name
+                        } label: {
+                            HStack(spacing: 6) {
+                                Text(c.kind.label.uppercased())
+                                    .font(.system(size: 9, weight: .semibold, design: .monospaced))
+                                    .foregroundStyle(.secondary)
+                                Text(c.name)
+                                    .font(.system(.caption2, design: .monospaced).weight(.semibold))
+                                Text(LedgerMapScale.pct(c.rel))
+                                    .font(.system(.caption2, design: .monospaced).weight(.bold))
+                                    .foregroundStyle(c.rel >= 0 ? .green : .red)
+                                Text("\(c.prior.formatted())→\(c.sold.formatted())")
+                                    .font(.system(size: 10, design: .monospaced))
+                                    .foregroundStyle(.secondary)
+                            }
+                            .padding(.horizontal, 10)
+                            .padding(.vertical, 6)
+                            .background(Color(.secondarySystemBackground), in: RoundedRectangle(cornerRadius: 6))
                         }
                         .buttonStyle(.plain)
-                        .accessibilityLabel("\(c.item.name), \(c.item.count.formatted()) vehicles")
-                    }
-                    if let r = laid.tailRect {
-                        tailBox(laid.tail, rect: r, all: all)
                     }
                 }
             }
-            .frame(height: 320)
-            Text(isLeaf ? "area = recorded price · tap to open the record"
-                        : "area = vehicles with a recorded price · color = median recorded sale or asking price · tap to go down · as of the last refresh of the ledger's views (a 30-minute job; its last run is not recorded)")
-                .font(.system(size: 9, design: .monospaced)).foregroundStyle(.tertiary)
-        }
-        .task(id: stack) { await load() }
-    }
-
-    private func descend(into node: LedgerNode) {
-        switch level {
-        case .makes: stack.append(.models(make: node.name, of: node.count))
-        case .models(let make, _): stack.append(.years(make: make, model: node.name, of: node.count))
-        case .years(let make, let model, _): stack.append(.vehicles(make: make, model: model, year: Int(node.name), of: node.count))
-        case .vehicles: break
         }
     }
 
-    /// The tail's box: a title row (tap for the list) over the tail's own cells, labeled where they fit.
-    private func tailBox(_ tail: [LedgerNode], rect: CGRect, all: Int) -> some View {
-        let title: CGFloat = 18
-        let inner = CGRect(x: 0, y: 0, width: max(0, rect.width - 4), height: max(0, rect.height - title - 4))
-        let cells = LiveInventory.squarify(tail.sorted { $0.count > $1.count }.map { (item: $0, area: Double($0.count)) }, in: inner)
-        return ZStack(alignment: .topLeading) {
-            RoundedRectangle(cornerRadius: 3).fill(Color(.secondarySystemFill))
-            VStack(alignment: .leading, spacing: 0) {
-                Button { tailOpen = true } label: {
-                    HStack(spacing: 6) {
-                        Text("+\(tail.count.formatted()) more").font(.system(size: 10, weight: .semibold))
-                        Text("\(tail.reduce(0) { $0 + $1.count }.formatted()) vehicles · list").font(.system(size: 8, design: .monospaced)).foregroundStyle(.secondary)
-                        Spacer(minLength: 0)
+    // MARK: - Family Sales Chart & Like-for-Like Index
+
+    @ViewBuilder
+    private var familyChartAndIndexCard: some View {
+        if let salesData = familySalesData, !salesData.sales.isEmpty {
+            VStack(alignment: .leading, spacing: 10) {
+                if let ix = familyIndex {
+                    VStack(alignment: .leading, spacing: 4) {
+                        HStack(spacing: 6) {
+                            Text("SAME CAR, SAME MILES")
+                                .font(.system(size: 10, weight: .semibold, design: .monospaced))
+                                .foregroundStyle(.secondary)
+                            Spacer()
+                            Text(ix.answerText)
+                                .font(.system(.footnote, design: .monospaced).weight(.bold))
+                                .foregroundStyle(ix.verdict == "up" ? .green : ix.verdict == "down" ? .red : .primary)
+                        }
+                        Text(ix.evidenceText)
+                            .font(.system(size: 11, design: .monospaced))
+                            .foregroundStyle(.secondary)
+                        let readableSegs = ix.segments.filter { $0.verdict != "too few to tell" && $0.change != nil }
+                        if readableSegs.count >= 2 {
+                            ScrollView(.horizontal, showsIndicators: false) {
+                                HStack(spacing: 6) {
+                                    ForEach(ix.segments) { seg in
+                                        let val = (seg.verdict == "too few to tell" || seg.change == nil)
+                                            ? "too few"
+                                            : (seg.verdict == "flat" ? "flat" : LedgerMapScale.pct(seg.change ?? 0))
+                                        Text("\(seg.label) \(val)")
+                                            .font(.system(size: 10, design: .monospaced))
+                                            .padding(.horizontal, 7)
+                                            .padding(.vertical, 3)
+                                            .background(Color(.tertiarySystemFill), in: Capsule())
+                                    }
+                                }
+                            }
+                        }
                     }
-                    .padding(.horizontal, 4).frame(height: title)
+                }
+
+                let scopedSales = salesData.sales.filter { s in
+                    guard s.usd >= FamilySalesData.priceFloor else { return false }
+                    if let m = selectedModel, (s.model ?? "").lowercased() != m.lowercased() { return false }
+                    if let y = selectedYear, s.year != y { return false }
+                    return FamilyEraCohort.matches(year: s.year, eraId: selectedEra)
+                }
+
+                HStack {
+                    Text("\(scopedSales.count.formatted()) CONFIRMED SALES (5Y)")
+                        .font(.system(size: 10, weight: .semibold, design: .monospaced))
+                        .foregroundStyle(.secondary)
+                    Spacer()
+                    HStack(spacing: 8) {
+                        venueLegendDot("BaT", color: .primary)
+                        venueLegendDot("Mecum", color: .orange)
+                        venueLegendDot("B-J", color: .purple)
+                        venueLegendDot("Houses", color: .blue)
+                    }
+                }
+
+                if #available(iOS 16.0, *), !scopedSales.isEmpty {
+                    Chart {
+                        ForEach(scopedSales.prefix(600)) { s in
+                            if let d = ProfileClock.date(s.sale_date.count <= 10 ? "\(s.sale_date)T00:00:00Z" : s.sale_date) {
+                                PointMark(
+                                    x: .value("Date", d),
+                                    y: .value("Price", s.usd)
+                                )
+                                .symbolSize(18)
+                                .foregroundStyle(venueColor(s.source).opacity(0.65))
+                            }
+                        }
+                    }
+                    .chartYScale(type: .log)
+                    .frame(height: 130)
+                }
+            }
+            .padding(12)
+            .background(Color(.secondarySystemBackground), in: RoundedRectangle(cornerRadius: 8))
+        }
+    }
+
+    private func venueLegendDot(_ label: String, color: Color) -> some View {
+        HStack(spacing: 3) {
+            Circle().fill(color).frame(width: 6, height: 6)
+            Text(label).font(.system(size: 9, design: .monospaced)).foregroundStyle(.secondary)
+        }
+    }
+
+    private func venueColor(_ source: String?) -> Color {
+        switch source {
+        case "Bring a Trailer": return .primary
+        case "Mecum": return .orange
+        case "Barrett-Jackson": return .purple
+        case "RM Sotheby's", "Gooding & Co", "Bonhams", "Broad Arrow": return .blue
+        case "Cars & Bids", "PCarMarket", "Collecting Cars", "SBX Cars": return .green
+        default: return .gray
+        }
+    }
+
+    // MARK: - Canvas
+
+    private var filteredNodes: [LedgerNode] {
+        if level == .years, let era = selectedEra {
+            return nodes.filter { n in
+                FamilyEraCohort.matches(year: Int(n.name), eraId: era)
+            }
+        }
+        return nodes
+    }
+
+    @ViewBuilder
+    private var canvas: some View {
+        if loading {
+            ProgressView()
+                .frame(maxWidth: .infinity, minHeight: 280)
+        } else if failed {
+            VStack(spacing: 10) {
+                Text("The map could not be read.")
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+                Button("Retry") { Task { await load() } }
+                    .font(.system(.footnote, design: .monospaced))
+            }
+            .frame(maxWidth: .infinity, minHeight: 280)
+        } else if level == .vehicles {
+            vehicleList
+        } else if level == .brands && brandViewMode == .families && !brandFamilyRows.isEmpty {
+            brandFamilyNestedCanvas
+        } else if filteredNodes.isEmpty {
+            Text("Nothing recorded under this selection.")
+                .font(.footnote)
+                .foregroundStyle(.secondary)
+                .frame(maxWidth: .infinity, minHeight: 280)
+        } else {
+            GeometryReader { geo in
+                let isBrandOrFamily = (level == .brands || level == .families)
+                let items = filteredNodes.map { node in
+                    (item: node, area: node.area(basis: basis, isBrandOrFamily: isBrandOrFamily))
+                }
+                let rects = LiveInventory.squarify(items, in: CGRect(origin: .zero, size: geo.size))
+                ZStack(alignment: .topLeading) {
+                    ForEach(Array(rects.enumerated()), id: \.offset) { _, tile in
+                        cell(tile.item, rect: tile.rect)
+                            .frame(width: max(0, tile.rect.width - 2), height: max(0, tile.rect.height - 2))
+                            .offset(x: tile.rect.minX + 1, y: tile.rect.minY + 1)
+                    }
+                }
+            }
+        }
+    }
+
+    private var brandFamilyNestedCanvas: some View {
+        GeometryReader { geo in
+            let areaFn: (BrandFamilyMapRow) -> Double = { r in
+                basis == .bat12 ? (r.usd_12m ?? 0) : (r.usd ?? 0)
+            }
+            let grouped = Dictionary(grouping: brandFamilyRows, by: \.brand)
+            let brandGroups: [(brand: String, usd: Double, rows: [BrandFamilyMapRow])] = grouped.compactMap { brand, rows in
+                let valid = rows.filter { areaFn($0) > 0 }
+                let sum = valid.reduce(0.0) { $0 + areaFn($1) }
+                guard sum > 0 else { return nil }
+                return (brand, sum, valid)
+            }.sorted(by: { $0.usd > $1.usd })
+
+            let outerItems = brandGroups.map { (item: $0, area: $0.usd) }
+            let outerRects = LiveInventory.squarify(outerItems, in: CGRect(origin: .zero, size: geo.size))
+
+            ZStack(alignment: .topLeading) {
+                ForEach(Array(outerRects.enumerated()), id: \.offset) { _, frame in
+                    let b = frame.item
+                    let r = frame.rect
+                    let headH: CGFloat = (r.height > 44 && r.width > 64) ? 16 : 0
+                    let innerRect = CGRect(
+                        x: r.minX + 1,
+                        y: r.minY + headH + 1,
+                        width: max(0, r.width - 2),
+                        height: max(0, r.height - headH - 2)
+                    )
+                    let innerItems = b.rows.map { (item: $0, area: areaFn($0)) }
+                    let innerTiles = LiveInventory.squarify(innerItems, in: innerRect)
+
+                    if headH > 0 {
+                        Button {
+                            selectedMake = b.brand
+                        } label: {
+                            HStack(spacing: 4) {
+                                Text(b.brand.uppercased())
+                                    .font(.system(size: 9, weight: .bold, design: .monospaced))
+                                    .lineLimit(1)
+                                Text(LedgerMap.money(b.usd))
+                                    .font(.system(size: 9, design: .monospaced))
+                                    .foregroundStyle(.secondary)
+                                    .lineLimit(1)
+                                Spacer(minLength: 0)
+                            }
+                            .padding(.horizontal, 4)
+                            .frame(width: r.width, height: headH)
+                            .background(Color(.tertiarySystemBackground))
+                        }
+                        .buttonStyle(.plain)
+                        .offset(x: r.minX, y: r.minY)
+                    }
+
+                    ForEach(Array(innerTiles.enumerated()), id: \.offset) { _, famTile in
+                        let row = famTile.item
+                        let node = row.toLedgerNode()
+                        let move: LedgerMapScale.Move = (row.family_key == "more" || row.family_key == "other")
+                            ? .none
+                            : LedgerMapScale.relativeMove(node, base: baseline, allVenues: basis == .ledger)
+                        Button {
+                            selectedMake = row.brand
+                            if row.family_key != "more" && row.family_key != "other" {
+                                selectedFamilyKey = row.family_key
+                                selectedFamilyName = row.family ?? row.family_key
+                            }
+                        } label: {
+                            ZStack(alignment: .topLeading) {
+                                RoundedRectangle(cornerRadius: 2)
+                                    .fill(LedgerMapScale.tileColor(move))
+                                if famTile.rect.width >= 38 && famTile.rect.height >= 22 {
+                                    VStack(alignment: .leading, spacing: 1) {
+                                        Text(row.displayLabel)
+                                            .font(.system(size: 10, weight: .semibold))
+                                            .lineLimit(1)
+                                        if famTile.rect.height >= 36 {
+                                            let mText = LedgerMapScale.moveTextShort(move)
+                                            if !mText.isEmpty {
+                                                Text(mText)
+                                                    .font(.system(size: 8, design: .monospaced))
+                                                    .foregroundStyle(.secondary)
+                                                    .lineLimit(1)
+                                            }
+                                        }
+                                    }
+                                    .padding(3)
+                                }
+                            }
+                        }
+                        .buttonStyle(.plain)
+                        .frame(width: max(0, famTile.rect.width - 1), height: max(0, famTile.rect.height - 1))
+                        .offset(x: famTile.rect.minX, y: famTile.rect.minY)
+                    }
+                }
+            }
+        }
+    }
+
+    private func cell(_ node: LedgerNode, rect: CGRect) -> some View {
+        let isBrandOrFamily = (level == .brands || level == .families)
+        let move: LedgerMapScale.Move = isBrandOrFamily && node.familyKey != "other"
+            ? LedgerMapScale.relativeMove(node, base: baseline, allVenues: basis == .ledger)
+            : .none
+        let bg: Color = isBrandOrFamily
+            ? LedgerMapScale.tileColor(move)
+            : warmthFill(node.median_price)
+
+        return Button {
+            drill(node)
+        } label: {
+            ZStack(alignment: .topLeading) {
+                RoundedRectangle(cornerRadius: 4)
+                    .fill(bg)
+                RoundedRectangle(cornerRadius: 4)
+                    .strokeBorder(Color.primary.opacity(0.12), lineWidth: 0.5)
+                if rect.width >= 44 && rect.height >= 28 {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(node.name)
+                            .font(.system(size: rect.width > 95 ? 12 : 10, weight: .semibold))
+                            .lineLimit(1)
+                        if rect.height >= 44 {
+                            if isBrandOrFamily {
+                                let mLine = rect.width > 110 ? LedgerMapScale.moveText(move) : LedgerMapScale.moveTextShort(move)
+                                if !mLine.isEmpty {
+                                    Text(mLine)
+                                        .font(.system(size: 10, design: .monospaced).weight(.medium))
+                                        .foregroundStyle(.primary.opacity(0.85))
+                                        .lineLimit(1)
+                                }
+                            } else if let med = node.median_price, med > 0 {
+                                Text(LedgerMap.money(med))
+                                    .font(.system(size: 10, design: .monospaced))
+                                    .foregroundStyle(.secondary)
+                                    .lineLimit(1)
+                            }
+                        }
+                        if rect.height >= 62 && rect.width >= 78 {
+                            let usdVal = basis == .bat12 ? (node.usd_12m ?? node.usd) : (node.usd ?? node.value)
+                            let soldVal = basis == .bat12 ? (node.sold_12m ?? node.count) : node.count
+                            if let u = usdVal, u > 0 {
+                                Text("\(LedgerMap.money(u)) · \(soldVal.formatted())")
+                                    .font(.system(size: 9, design: .monospaced))
+                                    .foregroundStyle(.secondary)
+                                    .lineLimit(1)
+                            } else {
+                                Text("\(soldVal.formatted()) sold")
+                                    .font(.system(size: 9, design: .monospaced))
+                                    .foregroundStyle(.secondary)
+                                    .lineLimit(1)
+                            }
+                        }
+                    }
+                    .padding(6)
+                }
+            }
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .contextMenu {
+            Button("Inspect \(node.name)") { inspectedNode = node }
+            Button("Open \(node.name)") { drill(node) }
+        }
+    }
+
+    private func warmthFill(_ price: Double?) -> Color {
+        guard let p = price, p > 0 else { return Color(.secondarySystemBackground) }
+        let t = min(max((log10(p) - 3.7) / 2.3, 0), 1)
+        return Color.orange.opacity(0.10 + 0.32 * t)
+    }
+
+    // MARK: - Leaf Vehicle List
+
+    private var vehicleList: some View {
+        LazyVStack(alignment: .leading, spacing: 0) {
+            ForEach(vehicles) { v in
+                Group {
+                    if let onSelectVehicle {
+                        Button { onSelectVehicle(v.id) } label: { vehicleRowContent(v) }
+                            .buttonStyle(.plain)
+                    } else {
+                        NavigationLink(value: v.headerRow) { vehicleRowContent(v) }
+                            .buttonStyle(.plain)
+                    }
+                }
+                Divider()
+            }
+        }
+    }
+
+    private func vehicleRowContent(_ v: LedgerVehicle) -> some View {
+        HStack(spacing: 12) {
+            if let url = v.primary_image_url.flatMap(URL.init(string:)) {
+                AsyncImage(url: url) { phase in
+                    if case .success(let img) = phase { img.resizable().scaledToFill() }
+                    else { Color(.secondarySystemBackground) }
+                }
+                .frame(width: 64, height: 48)
+                .clipShape(RoundedRectangle(cornerRadius: 4))
+            } else {
+                RoundedRectangle(cornerRadius: 4)
+                    .fill(Color(.secondarySystemBackground))
+                    .frame(width: 64, height: 48)
+            }
+            VStack(alignment: .leading, spacing: 2) {
+                Text(v.name)
+                    .font(.footnote.weight(.medium))
+                    .lineLimit(2)
+                    .multilineTextAlignment(.leading)
+                HStack(spacing: 6) {
+                    if let src = v.source, !src.isEmpty {
+                        Text(src)
+                            .font(.system(.caption2, design: .monospaced))
+                            .foregroundStyle(.secondary)
+                    }
+                    if let sd = v.sale_date, !sd.isEmpty {
+                        Text(String(sd.prefix(10)))
+                            .font(.system(.caption2, design: .monospaced))
+                            .foregroundStyle(.secondary)
+                    }
+                    if let mi = v.mileage, mi > 0 {
+                        Text("\(Int(mi).formatted()) mi")
+                            .font(.system(.caption2, design: .monospaced))
+                            .foregroundStyle(.secondary)
+                    }
+                }
+            }
+            Spacer(minLength: 8)
+            Text(LedgerMap.money(v.price))
+                .font(.system(.footnote, design: .monospaced).weight(.semibold))
+        }
+        .padding(.vertical, 10)
+        .contentShape(Rectangle())
+    }
+
+    // MARK: - Legend & Venue Mix
+
+    private var legendFooter: some View {
+        let baseText: String = {
+            guard let b = baseline else { return "" }
+            return " (\(LedgerMapScale.pct(b.move)), \(b.prior.formatted()) → \(b.sold.formatted()))"
+        }()
+        let clock = receipt?.refreshClock() ?? ""
+        return VStack(alignment: .leading, spacing: 6) {
+            HStack(spacing: 4) {
+                ForEach(["−50%", "−33%", "−17%", "0", "+17%", "+33%", "+50%"], id: \.self) { lbl in
+                    Text(lbl)
+                        .font(.system(size: 9, design: .monospaced))
+                        .foregroundStyle(.secondary)
+                        .frame(maxWidth: .infinity)
+                }
+            }
+            Text("Color: 12-month Bring a Trailer sales move against the market\(baseText). Size: \(basis == .bat12 ? "measured BaT dollars, last 12 months" : "dollars of confirmed sales across all venues and years"). Prices not adjusted for inflation\(clock).")
+                .font(.system(.caption2, design: .monospaced))
+                .foregroundStyle(.secondary)
+        }
+    }
+
+    private func venueMixBar(_ rows: [LedgerRefreshReceipt.HouseRow]) -> some View {
+        let total = rows.reduce(0) { $0 + $1.sales }
+        return VStack(alignment: .leading, spacing: 6) {
+            if total > 0 {
+                GeometryReader { geo in
+                    HStack(spacing: 1) {
+                        ForEach(rows) { r in
+                            let share = CGFloat(r.sales) / CGFloat(total)
+                            Rectangle()
+                                .fill(venueColor(r.house))
+                                .frame(width: max(2, geo.size.width * share))
+                        }
+                    }
+                }
+                .frame(height: 6)
+                .clipShape(Capsule())
+
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 10) {
+                        ForEach(rows.filter { Double($0.sales) / Double(total) >= 0.02 }) { r in
+                            let pct = max(1, Int((Double(r.sales) * 100.0 / Double(total)).rounded()))
+                            HStack(spacing: 4) {
+                                Circle().fill(venueColor(r.house)).frame(width: 6, height: 6)
+                                Text("\(r.house ?? "other") \(pct)% (\(r.sales.formatted()))")
+                                    .font(.system(size: 10, design: .monospaced))
+                                    .foregroundStyle(.secondary)
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    // MARK: - Relativity & Horizon Movers Card
+
+    private var relativityMoversCard: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(alignment: .firstTextBaseline) {
+                VStack(alignment: .leading, spacing: 2) {
+                    HStack(spacing: 6) {
+                        Text("RELATIVITY")
+                            .font(.system(size: 10, weight: .bold, design: .monospaced))
+                            .padding(.horizontal, 6)
+                            .padding(.vertical, 2)
+                            .background(Color.primary.opacity(0.1), in: RoundedRectangle(cornerRadius: 4))
+                        Text(moverHorizon == .upcoming ? "Upcoming vs recent supply" : "What moved against the market")
+                            .font(.system(.footnote, design: .monospaced).weight(.semibold))
+                    }
+                    if let m = movers {
+                        let mPct = LedgerMapScale.pct(m.marketMove)
+                        Text("\(moverHorizon.windowText) · \(m.marketPrior.formatted()) → \(m.marketSold.formatted()) (\(mPct))")
+                            .font(.system(size: 10, design: .monospaced))
+                            .foregroundStyle(.secondary)
+                    }
+                }
+                Spacer()
+            }
+
+            // 8-step Horizon Dial
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 4) {
+                    ForEach(MoverHorizon.allCases) { h in
+                        let active = moverHorizon == h
+                        Button {
+                            moverHorizon = h
+                        } label: {
+                            Text(h.label)
+                                .font(.system(size: 10, weight: active ? .bold : .regular, design: .monospaced))
+                                .foregroundStyle(active ? Color(.systemBackground) : .primary)
+                                .padding(.horizontal, 8)
+                                .padding(.vertical, 4)
+                                .background(active ? Color.primary : Color(.tertiarySystemFill), in: Capsule())
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+            }
+
+            if moversLoading && movers == nil {
+                ProgressView()
+                    .frame(maxWidth: .infinity, minHeight: 80)
+            } else if let m = movers {
+                if m.gaining.isEmpty && m.losing.isEmpty {
+                    Text("No family moved clearly beyond random variation in this window.")
+                        .font(.system(.caption2, design: .monospaced))
+                        .foregroundStyle(.secondary)
+                } else {
+                    if !m.gaining.isEmpty {
+                        moverColumn(
+                            title: moverHorizon == .upcoming ? "COMING UP MORE" : "SELLING MORE",
+                            rows: m.gaining,
+                            up: true
+                        )
+                    }
+                    if !m.losing.isEmpty {
+                        moverColumn(
+                            title: moverHorizon == .upcoming ? "COMING UP LESS" : "SELLING LESS",
+                            rows: m.losing,
+                            up: false
+                        )
+                    }
+                }
+            }
+        }
+        .padding(12)
+        .background(Color(.secondarySystemBackground), in: RoundedRectangle(cornerRadius: 8))
+    }
+
+    private func moverColumn(title: String, rows: [ShareMover], up: Bool) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            HStack {
+                Text(title)
+                    .font(.system(size: 10, weight: .semibold, design: .monospaced))
+                    .foregroundStyle(.secondary)
+                Spacer()
+                Text("0.5× · 1× PAR · 2×")
+                    .font(.system(size: 9, design: .monospaced))
+                    .foregroundStyle(.tertiary)
+            }
+            ForEach(rows) { r in
+                Button {
+                    selectedMake = r.brand
+                    selectedFamilyKey = r.familyKey
+                    selectedFamilyName = r.family
+                    selectedModel = nil
+                    selectedYear = nil
+                } label: {
+                    HStack(spacing: 8) {
+                        VStack(alignment: .leading, spacing: 1) {
+                            Text("\(r.brand) \(r.family)")
+                                .font(.system(.caption, design: .monospaced).weight(.semibold))
+                                .lineLimit(1)
+                            Text("\(r.prior.formatted()) → \(r.sold.formatted())")
+                                .font(.system(size: 10, design: .monospaced))
+                                .foregroundStyle(.secondary)
+                        }
+                        Spacer(minLength: 4)
+                        relativityDotGauge(r: r, up: up)
+                            .frame(width: 76, height: 14)
+                        Text(LedgerMapScale.pct(r.move))
+                            .font(.system(.caption, design: .monospaced).weight(.bold))
+                            .foregroundStyle(up ? .green : .red)
+                            .frame(width: 48, alignment: .trailing)
+                    }
+                    .padding(.vertical, 4)
                     .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
-                ZStack(alignment: .topLeading) {
-                    ForEach(Array(cells.enumerated()), id: \.offset) { _, c in
-                        Button { descend(into: c.item) } label: {
-                            cell(name: c.item.name, line2: "\(c.item.count.formatted()) vehicles",
-                                 line3: c.item.median_price.map { LedgerMap.money(Double($0)) + " med" }, median: c.item.median_price, rect: c.rect)
-                        }
-                        .buttonStyle(.plain)
-                    }
-                }
-                .frame(width: inner.width, height: inner.height)
-                .padding(2)
             }
         }
-        .frame(width: max(0, rect.width - 2), height: max(0, rect.height - 2))
-        .position(x: rect.midX, y: rect.midY)
-        .sheet(isPresented: $tailOpen) { tailList(tail, all: all) }
     }
 
-    /// The folded tail as a list: every name, its count, its median, each a way down.
-    private func tailList(_ tail: [LedgerNode], all: Int) -> some View {
-        NavigationStack {
-            List(tail) { n in
-                Button { tailOpen = false; descend(into: n) } label: {
-                    HStack {
-                        Text(n.name).font(.subheadline)
-                        Spacer()
-                        Text("\(n.count.formatted()) · \(n.median_price.map { LedgerMap.money(Double($0)) + " med" } ?? "no median") · \(String(format: "%.1f%%", Double(n.count) / Double(all) * 100))")
-                            .font(.caption2.monospaced()).foregroundStyle(.secondary)
+    private func relativityDotGauge(r: ShareMover, up: Bool) -> some View {
+        GeometryReader { geo in
+            let maxLog = log(2.2)
+            let xOf: (Double) -> CGFloat = { ratio in
+                let clamped = max(-maxLog, min(maxLog, log(max(ratio, 0.05))))
+                return CGFloat((clamped + maxLog) / (2.0 * maxLog)) * geo.size.width
+            }
+            let xLo = xOf(r.lo)
+            let xHi = xOf(r.hi)
+            let xPt = xOf(r.ratio)
+            let mid = geo.size.width * 0.5
+            ZStack(alignment: .leading) {
+                Rectangle()
+                    .fill(Color.primary.opacity(0.12))
+                    .frame(height: 1)
+                Rectangle()
+                    .fill(Color.primary.opacity(0.35))
+                    .frame(width: 1, height: 10)
+                    .offset(x: mid)
+                Rectangle()
+                    .fill((up ? Color.green : Color.red).opacity(0.45))
+                    .frame(width: max(2, xHi - xLo), height: 3)
+                    .offset(x: xLo)
+                Circle()
+                    .fill(up ? Color.green : Color.red)
+                    .frame(width: 6, height: 6)
+                    .offset(x: xPt - 3)
+            }
+        }
+    }
+
+    // MARK: - Node Inspection Sheet
+
+    private func nodeSheet(_ node: LedgerNode) -> some View {
+        let move = LedgerMapScale.relativeMove(node, base: baseline, allVenues: basis == .ledger)
+        return NavigationStack {
+            List {
+                Section(node.name) {
+                    if case .move(let rel, let raw, let sold, let prior) = move {
+                        LabeledContent("12m vs Market", value: LedgerMapScale.pct(rel))
+                        LabeledContent("BaT Sales (12m)", value: "\(prior.formatted()) → \(sold.formatted()) (\(LedgerMapScale.pct(raw)))")
+                    }
+                    if let u = node.usd, u > 0 {
+                        LabeledContent("Confirmed Sales", value: "\(node.count.formatted()) · \(LedgerMap.money(u))")
+                    } else {
+                        LabeledContent("Confirmed Sales", value: node.count.formatted())
+                    }
+                    if let off = node.offered, off >= 20, let sa = node.sold_any {
+                        let st = Int((Double(sa) * 100.0 / Double(off)).rounded())
+                        LabeledContent("Sell-through", value: "\(st)% of \(off.formatted()) offered")
+                    }
+                    if let med = node.median_price, med > 0 {
+                        LabeledContent("Median Price", value: LedgerMap.money(med))
+                    }
+                    if let m = node.models, m > 0 {
+                        LabeledContent("Sub-models", value: m.formatted())
                     }
                 }
-                .buttonStyle(.plain)
             }
-            .navigationTitle("\(tail.count.formatted()) more, by count")
+            .navigationTitle(node.name)
             .navigationBarTitleDisplayMode(.inline)
-            .toolbar { ToolbarItem(placement: .confirmationAction) { Button("Done") { tailOpen = false } } }
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Close") { inspectedNode = nil }
+                }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Open") {
+                        let target = node
+                        inspectedNode = nil
+                        drill(target)
+                    }
+                }
+            }
+        }
+        .presentationDetents([.medium])
+    }
+
+    // MARK: - Drill & Data Loading
+
+    private func drill(_ node: LedgerNode) {
+        switch level {
+        case .brands:
+            selectedMake = node.name
+        case .families:
+            if let fk = node.familyKey {
+                selectedFamilyKey = fk
+                selectedFamilyName = node.name
+            } else {
+                selectedModel = node.name
+            }
+        case .models:
+            selectedModel = node.name
+        case .years:
+            selectedYear = Int(node.name)
+        case .vehicles:
+            break
         }
     }
 
     private func load() async {
-        loading = true; failed = false
+        loading = true
+        failed = false
         defer { loading = false }
         do {
             switch level {
-            case .makes: nodes = try await LedgerMap.makes().filter { $0.count > 0 }
-            case .models(let make, _): nodes = try await LedgerMap.models(make: make).filter { $0.count > 0 }
-            case .years(let make, let model, _): nodes = try await LedgerMap.years(make: make, model: model).filter { $0.count > 0 }
-            case .vehicles(let make, let model, let year, _): vehicles = try await LedgerMap.vehicles(make: make, model: model, year: year).filter { $0.price > 0 }
+            case .brands:
+                let list = try await LedgerMap.brands()
+                brandNodesCache = list
+                nodes = list
+                vehicles = []
+                familyNodesCache = []
+                modelNodesCache = []
+                yearNodesCache = []
+                familySalesData = nil
+                familyIndex = nil
+                if brandFamilyRows.isEmpty {
+                    Task {
+                        if let bf = await LedgerMap.brandFamilyMap() {
+                            brandFamilyRows = bf
+                        }
+                    }
+                }
+
+            case .families:
+                guard let make = selectedMake else { return }
+                let (fams, isCanonical) = try await LedgerMap.families(brand: make)
+                if isCanonical {
+                    familyNodesCache = fams
+                } else {
+                    familyNodesCache = []
+                }
+                nodes = fams
+                vehicles = []
+                modelNodesCache = []
+                yearNodesCache = []
+                familySalesData = nil
+                familyIndex = nil
+
+            case .models:
+                guard let make = selectedMake, let fk = selectedFamilyKey else { return }
+                async let modelsTask = LedgerMap.familyModels(brand: make, familyKey: fk)
+                async let salesTask = LedgerMap.familySales(brand: make, familyKey: fk)
+                async let indexTask = LedgerMap.familyPriceIndex(brand: make, familyKey: fk)
+                let subModels = try await modelsTask
+                modelNodesCache = subModels
+                familySalesData = await salesTask
+                familyIndex = await indexTask
+
+                if subModels.count == 1, let only = subModels.first {
+                    selectedModel = only.name
+                    let yrs = try await LedgerMap.years(make: make, model: only.name)
+                    yearNodesCache = yrs
+                    nodes = yrs
+                } else {
+                    nodes = subModels
+                }
+                vehicles = []
+
+            case .years:
+                guard let make = selectedMake else { return }
+                if let model = selectedModel {
+                    let yrs = try await LedgerMap.years(make: make, model: model)
+                    yearNodesCache = yrs
+                    nodes = yrs
+                } else if let fk = selectedFamilyKey {
+                    if familySalesData == nil {
+                        familySalesData = await LedgerMap.familySales(brand: make, familyKey: fk)
+                    }
+                    let derived = deriveYearsFromFamilySales(familySalesData?.sales ?? [])
+                    yearNodesCache = derived
+                    nodes = derived
+                }
+                vehicles = []
+
+            case .vehicles:
+                guard let make = selectedMake, let year = selectedYear else { return }
+                if let model = selectedModel {
+                    vehicles = try await LedgerMap.sales(make: make, model: model, year: year)
+                } else if let fk = selectedFamilyKey {
+                    if familySalesData == nil {
+                        familySalesData = await LedgerMap.familySales(brand: make, familyKey: fk)
+                    }
+                    let fromFamily = (familySalesData?.sales ?? []).filter { $0.year == year }
+                    vehicles = fromFamily.compactMap { s in
+                        guard let uuid = UUID(uuidString: s.vehicle_id) else { return nil }
+                        let title = [s.year.map(String.init), make, s.model ?? selectedFamilyName].compactMap { $0 }.joined(separator: " ")
+                        return LedgerVehicle(
+                            id: uuid,
+                            year: s.year,
+                            make: make,
+                            model: s.model ?? selectedFamilyName,
+                            title: title,
+                            price: s.usd,
+                            image: nil,
+                            mileage: nil,
+                            sale_date: s.sale_date,
+                            source: s.source,
+                            url: nil
+                        )
+                    }
+                }
+                nodes = []
             }
         } catch {
             failed = true
-            NSLog("NukeCapture ledger map read failed: %@", String(describing: error))
         }
     }
 
-    /// A cell: name on top, count and median under it, labels only where they fit (the web labels the same way).
-    private func cell(name: String, line2: String, line3: String?, median: Int?, rect: CGRect) -> some View {
-        ZStack(alignment: .topLeading) {
-            RoundedRectangle(cornerRadius: 3).fill(LedgerMap.color(median: median))
-            if rect.width >= 56, rect.height >= 30 {
-                VStack(alignment: .leading, spacing: 1) {
-                    Text(name).font(.system(size: 10, weight: .semibold)).lineLimit(1)
-                    if rect.height >= 44 { Text(line2).font(.system(size: 8, design: .monospaced)).foregroundStyle(.secondary).lineLimit(1) }
-                    if let line3, rect.height >= 58 { Text(line3).font(.system(size: 8, design: .monospaced)).foregroundStyle(.secondary).lineLimit(1) }
-                }
-                .padding(4)
-            } else if rect.width >= 40, rect.height >= 12 {
-                // The inventory map's floor: a name alone, small, where a full label would not fit.
-                Text(name).font(.system(size: 7, weight: .semibold)).lineLimit(1).padding(2)
-            }
+    private func deriveYearsFromFamilySales(_ sales: [FamilySalesData.Sale]) -> [LedgerNode] {
+        var byYear: [Int: [Double]] = [:]
+        for s in sales {
+            guard let y = s.year, y >= 1886, y <= 2100 else { continue }
+            byYear[y, default: []].append(s.usd)
         }
-        .frame(width: max(0, rect.width - 2), height: max(0, rect.height - 2))
-        .contentShape(Rectangle())
-        .position(x: rect.midX, y: rect.midY)
+        return byYear.map { year, prices in
+            let sorted = prices.sorted()
+            let med = sorted.isEmpty ? 0 : sorted[sorted.count / 2]
+            let total = prices.reduce(0, +)
+            return LedgerNode(
+                name: String(year),
+                count: prices.count,
+                value: total,
+                median_price: med,
+                min_price: sorted.first,
+                max_price: sorted.last,
+                sold_count: prices.count,
+                auction_count: prices.count,
+                avg_bids: nil,
+                avg_watchers: nil,
+                usd: total
+            )
+        }.sorted(by: { $0.count > $1.count })
     }
 }

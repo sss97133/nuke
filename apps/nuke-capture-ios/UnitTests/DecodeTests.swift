@@ -152,4 +152,198 @@ final class DecodeTests: XCTestCase {
         XCTAssertEqual(receipt.is_owner_view, false)
         XCTAssertNil(receipt.work_sessions.first?.total_job_cost)
     }
+
+    func testProfileReadDecodesDescriptionAndTestimonySummary() throws {
+        let json = """
+        {"vehicle_id":"e08bf694-970f-4cbe-8a74-8715158a0f2e","viewer":"owner","read_at":"2026-10-17T12:00:00+00:00",
+         "sections":[],
+         "description":{"text":"One-owner 911 Carrera 4S finished in Arctic Silver.","length":51,
+                        "source":{"kind":"listing","url":"https://bringatrailer.com/listing/2003-porsche-911","method":"bat_description","label":"Bring a Trailer"},
+                        "observed_at":"2026-10-16T00:00:00+00:00"}}
+        """
+        let read = try decode(ProfileRead.self, json)
+        XCTAssertEqual(read.viewer, .owner)
+        XCTAssertEqual(read.description?.length, 51)
+        XCTAssertEqual(read.description?.source.kind, .listing)
+        XCTAssertEqual(read.description?.source.openableURL?.absoluteString, "https://bringatrailer.com/listing/2003-porsche-911")
+
+        let testimony = try decode(VehicleTestimonySummary.self, #"{"total":42,"events":3,"images":28,"observations":8,"documents":2,"service":1}"#)
+        XCTAssertEqual(testimony.total, 42)
+        XCTAssertTrue(testimony.sentence.contains("42 testimony items"))
+        XCTAssertTrue(testimony.sentence.contains("28 photos"))
+    }
+
+    func testGroupRepeatedObservationsCollapsesIdenticalListingClaims() throws {
+        let obs1 = FieldProvenance.Observation(
+            id: UUID(uuidString: "11111111-1111-1111-1111-111111111111")!,
+            content: "6-speed manual transmission",
+            value: "6-Speed Manual",
+            confidence: 0.95,
+            observed_at: "2026-10-01T12:00:00Z",
+            ingested_at: "2026-10-01T12:05:00Z",
+            extraction_method: "bat_listing_scrape",
+            kind: "specification",
+            source_slug: "bat",
+            trust: 0.9,
+            source_url: "https://bringatrailer.com/listing/test"
+        )
+        let obs2 = FieldProvenance.Observation(
+            id: UUID(uuidString: "22222222-2222-2222-2222-222222222222")!,
+            content: "6-speed manual transmission",
+            value: "6-Speed Manual",
+            confidence: 0.95,
+            observed_at: "2026-10-05T12:00:00Z",
+            ingested_at: "2026-10-05T12:05:00Z",
+            extraction_method: "bat_listing_scrape",
+            kind: "specification",
+            source_slug: "bat",
+            trust: 0.9,
+            source_url: "https://bringatrailer.com/listing/test"
+        )
+        let obs3 = FieldProvenance.Observation(
+            id: UUID(uuidString: "33333333-3333-3333-3333-333333333333")!,
+            content: "Confirmed on build sheet",
+            value: "6-Speed Manual",
+            confidence: 1.0,
+            observed_at: "2026-10-06T12:00:00Z",
+            ingested_at: "2026-10-06T12:05:00Z",
+            extraction_method: "owner_document",
+            kind: "specification",
+            source_slug: "owner",
+            trust: 1.0,
+            source_url: nil
+        )
+        let grouped = FieldProvenance.groupRepeatedObservations([obs1, obs2, obs3])
+        XCTAssertEqual(grouped.count, 2)
+        XCTAssertEqual(grouped[0].repeatCount, 2)
+        XCTAssertEqual(grouped[0].firstObservedAt, "2026-10-01T12:00:00Z")
+        XCTAssertEqual(grouped[0].latestObservedAt, "2026-10-05T12:00:00Z")
+        XCTAssertEqual(grouped[1].repeatCount, 1)
+    }
+
+    func testLedgerMapCanonicalHierarchyAndScaleMath() throws {
+        let refreshJSON = """
+        {"refreshed_at":"2026-10-17T08:00:00Z",
+         "populations":{
+           "measure":"confirmed_sale_v1",
+           "public_records":615420,
+           "mapped_sales":412300,
+           "by_house":[
+             {"house":"bat","sales":152000,"amount":12500000000},
+             {"house":"mecum","sales":128000,"amount":4800000000},
+             {"house":"cars_and_bids","sales":42000,"amount":1400000000}
+           ]
+         }}
+        """
+        let receipt = try decode(LedgerRefreshReceipt.self, refreshJSON)
+        XCTAssertTrue(receipt.isConfirmedSaleMeasure)
+        XCTAssertEqual(receipt.populations?.mapped_sales, 412300)
+        XCTAssertEqual(receipt.populations?.by_house?.first?.house, "bat")
+
+        let brandJSON = """
+        [{"brand":"PORSCHE","sales":45000,"usd":4200000000,"sold_any":45000,"offered":56000,
+          "dated":44000,"sold_12m":4200,"sold_prior_12m":3500,"usd_12m":386400000,"usd_prior_12m":294000000}]
+        """
+        let brands = try decode([BrandMarketRow].self, brandJSON)
+        let p = try XCTUnwrap(brands.first)
+        XCTAssertEqual(p.brand, "PORSCHE")
+        XCTAssertEqual(p.sales, 45000)
+        XCTAssertEqual(p.sold_12m, 4200)
+
+        let famJSON = """
+        [{"family_key":"911-997","family_name":"911 (997)","models":4,"sales":3200,"usd":290000000,
+          "median_price":82000,"min_price":28000,"max_price":450000,"sold_any":3200,"offered":4100,
+          "dated":3100,"sold_12m":310,"sold_prior_12m":260,"usd_12m":27900000,"usd_prior_12m":21320000}]
+        """
+        let fams = try decode([FamilyMarketRow].self, famJSON)
+        let famNode = try XCTUnwrap(fams.first?.toLedgerNode())
+        XCTAssertEqual(famNode.familyKey, "911-997")
+        XCTAssertEqual(famNode.count, 3200)
+        XCTAssertEqual(famNode.area(basis: .ledger, isBrandOrFamily: true), 290_000_000)
+        XCTAssertEqual(famNode.area(basis: .bat12, isBrandOrFamily: true), 27_900_000)
+
+        let moversJSON = """
+        {"market":{"sold":4000,"prior":4000,"move":0.0},"candidates":120,
+         "gaining":[{"brand":"PORSCHE","family_key":"911-997","family":"911 (997)","sold":50,"prior":25,"usd":4400000,"usd_prior":2050000,"ratio":2.0,"lo":1.35,"hi":2.96,"move":1.0,"se":0.2,"z":2.5}],
+         "losing":[]}
+        """
+        let movers = try XCTUnwrap(ShareMoversRead.parse(Data(moversJSON.utf8)))
+        XCTAssertEqual(movers.gaining.count, 1)
+        XCTAssertEqual(movers.gaining[0].familyKey, "911-997")
+        XCTAssertEqual(movers.gaining[0].ratio, 2.0)
+
+        let idxJSON = """
+        {"fitted_at":"2026-10-17T06:00:00Z","period_kind":"quarter","stale":false,
+         "counts":{"n_last12":90,"n_prior12":85,"n_total":420},
+         "change":{"verdict":"up","change_12m":0.064,"lo":0.012,"hi":0.118,"n_last12":90,"n_prior12":85,"raw_change":0.081,"pairs":14,"rs_change":0.059,
+                   "chips":[{"key":"carrera-s-manual","label":"Carrera S · Manual","change_12m":0.092,"lo":0.03,"hi":0.15,"n_last12":35,"n_prior12":32,"verdict":"up"}]},
+         "series":[{"period_start":"2026-07-01","index_usd":86000,"lo_usd":81000,"hi_usd":91000,"n":45,"raw_median_usd":88000}]}
+        """
+        let idx = try XCTUnwrap(FamilyIndex.parse(Data(idxJSON.utf8)))
+        XCTAssertEqual(idx.verdict, "up")
+        XCTAssertEqual(idx.change, 0.064)
+        XCTAssertEqual(idx.segments.first?.label, "Carrera S · Manual")
+        XCTAssertEqual(idx.series.count, 1)
+    }
+
+    func testFinishBoardAskBoardCalendarAndSourcesDecode() throws {
+        let finishJSON = """
+        {"fresh":true,"writer_at":"2026-10-17T12:00:00Z",
+         "columns":["vehicle_id","estimate","low","high","grade","coverage","sentence","estimated_at","bid_at_estimate","comps_through"],
+         "rows":[["69c01291-6232-4df8-ad9e-82eaac792462",115000,98000,136000,"A",0.82,"82% of comparable lots landed inside this band","2026-10-17T11:58:00Z",84000,"2026-10-16"]],
+         "analogs":{"69c01291-6232-4df8-ad9e-82eaac792462":[{"url":"https://bringatrailer.com/listing/analog-1","title":"1996 Porsche 911 Turbo","closed":"2026-09-12","bid":82000,"final":118000,"outcome":"sold"}]}}
+        """
+        let finishData = Data(finishJSON.utf8)
+        let finishBoard = FinishBoard.decode(finishData)
+        XCTAssertTrue(finishBoard.fresh)
+        let est = try XCTUnwrap(finishBoard.byId["69c01291-6232-4df8-ad9e-82eaac792462"])
+        XCTAssertEqual(est.estimate, 115000)
+        XCTAssertEqual(est.grade, "A")
+        let analogs = FinishBoard.decodeAnalogs(finishData, vehicleId: "69c01291-6232-4df8-ad9e-82eaac792462")
+        XCTAssertEqual(analogs.count, 1)
+        XCTAssertEqual(analogs[0].finalPrice, 118000)
+
+        let askJSON = """
+        {"as_of":"2026-10-17T12:00:00Z","window_hours":72,"tier":null,"sort":"newest",
+         "population":{"listings":120,"filtered":120,"with_position":85,"below_p25":22,"by_source":{"craigslist":80,"facebook_marketplace":40},"by_tier":{"15k_40k":50},"median_ask":24500,"newest_seen_at":"2026-10-17T11:55:00Z"},
+         "price_population":{"measure":"confirmed_sale_v1","refreshed_at":"2026-10-17T08:00:00Z","sales":412300,"families":1850},
+         "rows":[
+           {"event_id":"ev-1","vehicle_id":"69c01291-6232-4df8-ad9e-82eaac792462","source":"craigslist","url":"https://sfbay.craigslist.org/sfc/cto/d/san-francisco-1999-porsche-911/7777777777.html","seen_at":"2026-10-17T11:50:00Z","year":1999,"make":"PORSCHE","model":"911","title":"1999 Porsche 911 Carrera","ask":22000,"miles":88000,"odometer":"broken","condition":"good","title_status":"salvage","image":null,"location":"San Francisco, CA",
+            "position":{"family":"911","cohort":"1999","match":"year","sales":140,"p25":25000,"p50":32000,"p75":41000,"ratio":0.6875,"rank":"below_p25","median_miles":64000,"share_36m":0.45,"houses":{"bat":95,"cars_and_bids":45}}}
+         ]}
+        """
+        let askBoard = try decode(AskBoard.self, askJSON)
+        XCTAssertEqual(askBoard.rows.count, 1)
+        let askRow = askBoard.rows[0]
+        // Broken odometer says "odometer broken" instead of printing 88,000 mi
+        XCTAssertEqual(askRow.listingFacts, "odometer broken · salvage title · good")
+        let placement = try XCTUnwrap(AskPlacement.placement(pos: askRow.position, ask: askRow.ask))
+        XCTAssertEqual(placement.tone, .below)
+        XCTAssertEqual(placement.headline, "31% below the 1999 911 median ($32,000)")
+        XCTAssertEqual(placement.milesLine, "Sold median 64,000 mi")
+        XCTAssertEqual(placement.venuesLine, "Recorded on BaT (95), Cars & Bids (45)")
+
+        let calJSON = """
+        {"as_of":"2026-10-17T12:00:00Z","horizon_days":200,
+         "population":{"lots":1450,"sales":6,"houses":3,"seen_before":210,"no_reserve":680,"first_seen_7d":190,"updated_at":"2026-10-17T11:00:00Z","listed":1800},
+         "sales":[{"house":"mecum","sale_key":"kissimmee-2027","sale_name":"Kissimmee 2027","location":"Kissimmee, FL","starts_on":"2027-01-05","ends_on":"2027-01-17","lots":850,"seen_before":120,"no_reserve":400,"first_seen_at":"2026-09-01T00:00:00Z","first_seen_7d":90,"updated_at":"2026-10-17T11:00:00Z","run_days":[{"day":"2027-01-05","lots":100}],"lots_listed":1000,"listed_at":"2026-10-17T06:00:00Z","prior_sale":{"sale_key":"kissimmee-2026","lots":3200,"vehicle_lots":2800,"sold":2100,"bid_goes_on":700,"median_price":48000,"ends_on":"2026-01-18"}}],
+         "unplaced":[],"roster":null}
+        """
+        let cal = try decode(AuctionCalendar.self, calJSON)
+        XCTAssertEqual(cal.sales.count, 1)
+        XCTAssertEqual(AuctionCalendar.priorSaleLine(house: "mecum", prior: cal.sales[0].prior_sale),
+                       "Mecum ran 3,200 lots at Kissimmee 2026 · 75% of its vehicles sold")
+
+        let sourcesJSON = """
+        {"as_of":"2026-10-17T12:00:00Z","day":"2026-10-17",
+         "columns":["source","name","category","house","held_lots","held_at","population","population_method","map_sales","map_usd","sales_12m","usd_12m","sales_prior_12m","usd_prior_12m","live_lots","landed_24h","landed_7d","last_landed","logo_url","business_type"],
+         "rows":[["bat","Bring a Trailer (BaT)","online_auction","bat",165000,"2026-10-17T12:00:00Z",166000,"enumerated",152000,12500000000,32000,2800000000,29000,2500000000,980,145,980,"2026-10-17T11:58:00Z",null,"online_auction"]],
+         "not_ranked":{"pcarmarket":4200}}
+        """
+        let sb = try XCTUnwrap(SourcesBoardData.parse(Data(sourcesJSON.utf8)))
+        XCTAssertEqual(sb.rows.count, 1)
+        XCTAssertEqual(sb.rows[0].shortName, "Bring a Trailer")
+        XCTAssertEqual(sb.rows[0].heldShareText, "99% of 166,000")
+        XCTAssertEqual(sb.notRanked["pcarmarket"], 4200)
+    }
 }

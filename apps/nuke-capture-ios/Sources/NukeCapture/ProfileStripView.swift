@@ -28,6 +28,7 @@ struct ProfileHeaderBlock: View {
     let priceOwnedByLiveStack: Bool
 
     @State private var drill: ClaimDrill?
+    @State private var descriptionExpanded = false
 
     /// The strip's dimensions map onto record fields the spec table also knows; the
     /// table drops those rows when the strip owns them (state each datum once).
@@ -60,9 +61,48 @@ struct ProfileHeaderBlock: View {
             if let strip = read.strip, !strip.facets.isEmpty || strip.odometer != nil {
                 stripCard(strip)
             }
+            if let desc = read.description, !desc.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                descriptionCard(desc)
+            }
         }
         // The sheet rides this subview, not the page: the page already hosts provenance + comments.
         .sheet(item: $drill) { d in ClaimSourceSheet(vehicleId: vehicleId, drill: d) }
+    }
+
+    @ViewBuilder private func descriptionCard(_ desc: ProfileDescription) -> some View {
+        let trimmed = desc.text.trimmingCharacters(in: .whitespacesAndNewlines)
+        let sourceLabel = desc.source.label ?? desc.source.kind.displayName
+        VStack(alignment: .leading, spacing: 6) {
+            HStack {
+                Text("RECORDED DESCRIPTION")
+                    .font(.system(.caption2, design: .monospaced))
+                    .foregroundStyle(.secondary)
+                Spacer(minLength: 4)
+                if let url = desc.source.openableURL {
+                    Link("Source ↗", destination: url)
+                        .font(.system(size: 10, design: .monospaced))
+                }
+            }
+            Text(trimmed)
+                .font(.footnote)
+                .foregroundStyle(.primary)
+                .lineLimit(descriptionExpanded ? nil : 5)
+            if trimmed.count > 240 {
+                Button(descriptionExpanded ? "Show less" : "Read full description (\(desc.length.formatted()) chars)") {
+                    descriptionExpanded.toggle()
+                }
+                .font(.caption2.monospaced())
+            }
+            let attrParts = [
+                sourceLabel,
+                desc.source.method,
+                ProfileClock.day(desc.observed_at).map { "observed \($0)" }
+            ].compactMap { $0 }.filter { !$0.isEmpty }
+            Text(attrParts.joined(separator: " · "))
+                .font(.system(size: 9, design: .monospaced))
+                .foregroundStyle(.tertiary)
+        }
+        .nukeCard()
     }
 
     // The one headline result: what kind of price, from which platform, as of when.
