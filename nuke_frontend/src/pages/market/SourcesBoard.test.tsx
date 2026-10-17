@@ -9,12 +9,14 @@ import SourcesBoard, {
   categoryBadgeLabel,
   describeDealerConsignment,
   describeRecordDate,
+  formatDealerHqBadge,
   heldShare,
   landingState,
   monthBars,
   money,
   parseSourceLanding,
   parseSources,
+  resolveDealerProfileHref,
   resolveSourceCategory,
   shortName,
 } from './SourcesBoard';
@@ -352,12 +354,22 @@ it('renders DEALER / CONSIGNOR category badges for category="dealer" or business
     'DEALER / CONSIGNOR',
   ]);
 
-  // Open the ingestion inspector on a dealer row and verify the DEALER / CONSIGNOR badge and consignment breakdown in the inspector
+  // Open the ingestion inspector on a dealer row and verify the DEALER / CONSIGNOR badge, Organization Profile link, and consignment breakdown in the inspector
+  expect(visibleRows.map((r) => r.querySelector('.market-sources__org-link')?.getAttribute('href'))).toEqual([
+    '/organization/avant-garde-collection',
+    '/organization/beverlyhillscarclub',
+  ]);
+  expect(visibleRows.map((r) => r.querySelector('.market-sources__org-link')?.textContent)).toEqual([
+    'Organization Profile →',
+    'Organization Profile →',
+  ]);
   const dealerLandBtn = visibleRows[0].querySelector('button.market-sources__landing') as HTMLButtonElement;
   await act(async () => { dealerLandBtn.click(); });
   expect(fixture.rpc).toHaveBeenCalledWith('market_source_landing_read', { p_source: 'avant-garde-collection' });
   const drill = container.querySelector('.market-sources__drill')!;
   expect(drill.querySelector('.market-sources__badge--dealer')?.textContent).toBe('DEALER / CONSIGNOR');
+  expect(drill.querySelector('.market-sources__org-link')?.getAttribute('href')).toBe('/organization/avant-garde-collection');
+  expect(drill.querySelector('.market-sources__org-link')?.textContent).toBe('Organization Profile →');
   const dealerCtx = drill.querySelector('.market-sources__dealer-context')!;
   expect(dealerCtx).not.toBeNull();
   expect(dealerCtx.querySelector('.market-sources__dealer-context-label')?.textContent).toBe('INVENTORY & CONSIGNMENT BREAKDOWN');
@@ -366,6 +378,55 @@ it('renders DEALER / CONSIGNOR category badges for category="dealer" or business
     .toBe('3,246 vehicles held · 26 live · 322 sales (12m) · $43.9M · 2 consigned · 0 direct in stream');
   expect(dealerCtx.querySelector('.market-sources__dealer-split-text')?.textContent)
     .toBe('2 consigned (100%) · 0 direct (0%)');
+});
+
+it('renders Organization Profile link and headquarters city/state badge in dealer-context when present in row metadata', async () => {
+  expect(resolveDealerProfileHref({ source: 'avant-garde-collection', category: 'dealer', businessType: 'dealer' }))
+    .toBe('/organization/avant-garde-collection');
+  expect(resolveDealerProfileHref({
+    source: 'avant-garde-collection',
+    category: 'dealer',
+    businessType: 'dealer',
+    organizationId: '25937788-215a-4d3a-aca7-ea13fdfd9876',
+  })).toBe('/organization/25937788-215a-4d3a-aca7-ea13fdfd9876');
+  expect(resolveDealerProfileHref({ source: 'bat', category: 'auction', businessType: 'auction_house' })).toBeNull();
+  expect(formatDealerHqBadge({ hqCity: 'Portland', hqState: 'OR' })).toBe('Portland, OR');
+  expect(formatDealerHqBadge({ hqLocation: 'Beverly Hills, CA' })).toBe('Beverly Hills, CA');
+  expect(formatDealerHqBadge({})).toBeNull();
+
+  const colsWithMeta = [...columns, 'organization_id', 'hq_city', 'hq_state'];
+  const dealerMetaPayload = {
+    ...value,
+    columns: colsWithMeta,
+    rows: [
+      ['avant-garde-collection', 'Avant-Garde Collection', 'dealer', null, 3246, '2026-10-16T10:27:00Z', null, null, null,
+        null, 1641, 164210000, 322, 43880000, 390, 35000000, [['2026-10', 34, 3100000]], 26, '2026-10-16T10:45:00Z',
+        3159, '2026-10-09', 3, 87, '2026-10-16T09:00:00Z', days(3), 'https://nuke.ag/source-logos/avant-garde-collection.png', 'dealer',
+        '25937788-215a-4d3a-aca7-ea13fdfd9876', 'Portland', 'OR'],
+    ],
+  };
+
+  fixture.rpc.mockImplementation((fn: string) => {
+    if (fn === 'market_sources_read') return Promise.resolve({ data: dealerMetaPayload, error: null });
+    if (fn === 'market_source_landing_read') return Promise.resolve({ data: { ...batLandingDetail, source: 'avant-garde-collection' }, error: null });
+    return Promise.resolve({ data: null, error: { message: 'none' } });
+  });
+
+  await act(async () => root.render(<SourcesBoard />));
+
+  const dealerRow = container.querySelector('li.market-sources__row')!;
+  const rowOrgLink = dealerRow.querySelector('a.market-sources__org-link') as HTMLAnchorElement;
+  expect(rowOrgLink).not.toBeNull();
+  expect(rowOrgLink.textContent).toBe('Organization Profile →');
+  expect(rowOrgLink.getAttribute('href')).toBe('/organization/25937788-215a-4d3a-aca7-ea13fdfd9876');
+
+  // Clicking the row opens the drill inspector with HQ badge and Organization Profile link
+  await act(async () => { (dealerRow as HTMLLIElement).click(); });
+  const drill = container.querySelector('.market-sources__drill')!;
+  expect(drill.querySelector('a.market-sources__org-link')?.getAttribute('href'))
+    .toBe('/organization/25937788-215a-4d3a-aca7-ea13fdfd9876');
+  const hqBadge = drill.querySelector('.market-sources__dealer-context .market-sources__dealer-hq');
+  expect(hqBadge?.textContent).toBe('Portland, OR');
 });
 
 it('computes consigned vs. direct breakdown for mixed, direct-only, and empty-stream dealer rows', () => {

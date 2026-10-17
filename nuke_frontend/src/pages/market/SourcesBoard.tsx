@@ -92,6 +92,11 @@ export type SourceRow = {
   days14: number[]; hours24: number[]; mins60: number[];
   /** The source's organization's recorded identity (organizations.logo_url, business_type), drawn by OrgLogo. */
   logoUrl: string | null; businessType: string | null;
+  /** Optional dealer organization identifier/slug and headquarters city/state metadata when provided. */
+  organizationId?: string | null;
+  hqCity?: string | null;
+  hqState?: string | null;
+  hqLocation?: string | null;
 };
 
 export type BoardLandingMeta = {
@@ -179,6 +184,17 @@ export function parseSources(value: unknown): SourcesBoardData | null {
 
     const rawLogo = str(get('logo_url'));
     const logoUrl = rawLogo ? rawLogo.replace(/^https:\/\/nuke\.ag\/source-logos\//, '/source-logos/') : null;
+    const getOptional = (...names: string[]): unknown => {
+      for (const n of names) {
+        const idx = columns.indexOf(n);
+        if (idx >= 0 && r[idx] != null) return r[idx];
+      }
+      return null;
+    };
+    const organizationId = str(getOptional('organization_id', 'org_id', 'business_id', 'org_slug', 'organization_slug'));
+    const hqCity = str(getOptional('hq_city', 'city'));
+    const hqState = str(getOptional('hq_state', 'state'));
+    const hqLocation = str(getOptional('hq_location', 'location'));
 
     rows.push({
       source, name, category: str(get('category')), house: str(get('house')),
@@ -193,6 +209,7 @@ export function parseSources(value: unknown): SourcesBoardData | null {
       landed15m, landed1h, landed24, landed7, lastLanded,
       days14, hours24, mins60,
       logoUrl, businessType: str(get('business_type')),
+      organizationId, hqCity, hqState, hqLocation,
     });
   }
   const notRanked: Record<string, number> = {};
@@ -449,6 +466,90 @@ export function categoryBadgeLabel(row: Pick<SourceRow, 'category' | 'businessTy
   return cat ? CATEGORY_BADGE_LABELS[cat] : null;
 }
 
+export const KNOWN_DEALER_ORGANIZATIONS: Record<string, string> = {
+  'avant-garde-collection': 'avant-garde-collection',
+  avantgardecollection: 'avant-garde-collection',
+  beverlyhillscarclub: 'beverlyhillscarclub',
+  'beverly-hills-car-club': 'beverlyhillscarclub',
+  wob: 'wob',
+  'collectible-classics': 'collectible-classics',
+  collectibleclassics: 'collectible-classics',
+  '1600veloce': '1600veloce',
+  'vantage-auto': 'vantage-auto',
+  vantageauto: 'vantage-auto',
+  'geneva-motorcars': 'geneva-motorcars',
+  genevamotorcars: 'geneva-motorcars',
+  'aeg-motorsports': 'aeg-motorsports',
+  aegmotorsports: 'aeg-motorsports',
+  'lart-de-lautomobile': 'lart-de-lautomobile',
+  lartdelautomobile: 'lart-de-lautomobile',
+  'michaels-motor-cars': 'michaels-motor-cars',
+  michaelsmotorcars: 'michaels-motor-cars',
+  'private-collection-motors': 'private-collection-motors',
+  privatecollectionmotors: 'private-collection-motors',
+  'bullet-motorsports': 'bullet-motorsports',
+  bulletmotorsports: 'bullet-motorsports',
+  'mohr-imports': 'mohr-imports',
+  mohrimports: 'mohr-imports',
+  'dean-laumbach': 'dean-laumbach',
+  deanlaumbach: 'dean-laumbach',
+  'silver-arrow-cars': 'silver-arrow-cars',
+  silverarrowcars: 'silver-arrow-cars',
+  mcqueens: 'mcqueens',
+  'fantasy-junction': 'fantasy-junction',
+  fantasyjunction: 'fantasy-junction',
+  'tactical-fleet': 'tactical-fleet',
+  tacticalfleet: 'tactical-fleet',
+  'streetside-classics': 'streetside-classics',
+  streetsideclassics: 'streetside-classics',
+  'grand-prix-classics': 'grand-prix-classics',
+  grandprixclassics: 'grand-prix-classics',
+  'vanguard-motor-sales': 'vanguard-motor-sales',
+  vanguardmotorsales: 'vanguard-motor-sales',
+  'gateway-classic-cars': 'gateway-classic-cars',
+  gatewayclassiccars: 'gateway-classic-cars',
+  'blue-chip-fleet': 'blue-chip-fleet',
+  bluechipfleet: 'blue-chip-fleet',
+  'velocity-restorations': 'velocity-restorations',
+  velocityrestorations: 'velocity-restorations',
+  'volo-auto-museum': 'volo-auto-museum',
+  voloautomuseum: 'volo-auto-museum',
+};
+
+/**
+ * Resolves a direct `/organization/<slug_or_id>` profile URL when a dealer source row
+ * maps to a known dealer organization ID or slug.
+ */
+export function resolveDealerProfileHref(
+  row: Pick<SourceRow, 'source' | 'category' | 'businessType'> & Partial<Pick<SourceRow, 'organizationId'>>,
+): string | null {
+  if (resolveSourceCategory(row) !== 'dealer') return null;
+  const explicitId = row.organizationId?.trim();
+  if (explicitId) return `/organization/${explicitId}`;
+  const rawSource = row.source?.trim();
+  if (!rawSource) return null;
+  const known = KNOWN_DEALER_ORGANIZATIONS[rawSource.toLowerCase()] ?? KNOWN_DEALER_ORGANIZATIONS[normKey(rawSource)];
+  if (known) return `/organization/${known}`;
+  if (/^[a-z0-9][a-z0-9-_]*$/i.test(rawSource)) return `/organization/${rawSource}`;
+  return null;
+}
+
+/**
+ * Formats the dealer headquarters city/state badge when present in row metadata.
+ */
+export function formatDealerHqBadge(
+  row: Partial<Pick<SourceRow, 'hqCity' | 'hqState' | 'hqLocation'>>,
+): string | null {
+  const loc = row.hqLocation?.trim();
+  if (loc) return loc;
+  const city = row.hqCity?.trim();
+  const state = row.hqState?.trim();
+  if (city && state) return `${city}, ${state}`;
+  if (city) return city;
+  if (state) return state;
+  return null;
+}
+
 export type DealerConsignmentBreakdown = {
   consignedCount: number;
   directCount: number;
@@ -462,6 +563,8 @@ export type DealerConsignmentBreakdown = {
   usd12m: number | null;
   modeLabel: string;
   summaryText: string;
+  hqBadge: string | null;
+  profileHref: string | null;
 };
 
 /**
@@ -469,7 +572,8 @@ export type DealerConsignmentBreakdown = {
  * and source-day inventory/sales metrics so the expanded inspector shows clear dealer context.
  */
 export function describeDealerConsignment(
-  row: Pick<SourceRow, 'held' | 'live' | 'mapSales' | 'sales12' | 'usd12'>,
+  row: Pick<SourceRow, 'held' | 'live' | 'mapSales' | 'sales12' | 'usd12'> &
+    Partial<Pick<SourceRow, 'source' | 'category' | 'businessType' | 'organizationId' | 'hqCity' | 'hqState' | 'hqLocation'>>,
   recent: ReadonlyArray<Pick<LandingRecentEvent, 'eventType' | 'eventStatus' | 'reserve' | 'bidCount'>>,
 ): DealerConsignmentBreakdown {
   let consignedCount = 0;
@@ -522,6 +626,16 @@ export function describeDealerConsignment(
     parts.push(`${consignedCount} consigned · ${directCount} direct in stream`);
   }
 
+  const hqBadge = formatDealerHqBadge(row);
+  const profileHref = row.source
+    ? resolveDealerProfileHref({
+        source: row.source,
+        category: row.category ?? 'dealer',
+        businessType: row.businessType ?? 'dealer',
+        organizationId: row.organizationId,
+      })
+    : null;
+
   return {
     consignedCount,
     directCount,
@@ -535,6 +649,8 @@ export function describeDealerConsignment(
     usd12m,
     modeLabel,
     summaryText: parts.join(' · '),
+    hqBadge,
+    profileHref,
   };
 }
 
@@ -841,6 +957,7 @@ function SourceLandingInspector({
   const rowCategory = row ? resolveSourceCategory(row) : null;
   const rowBadge = row ? categoryBadgeLabel(row) : null;
   const dealerBreakdown = row && rowCategory === 'dealer' ? describeDealerConsignment(row, recent) : null;
+  const dealerProfileHref = row ? resolveDealerProfileHref(row) : null;
 
   const statsHeld = detail?.stats?.held ?? row?.held ?? null;
   const statsPop = detail?.stats?.population ?? row?.population ?? null;
@@ -888,6 +1005,15 @@ function SourceLandingInspector({
           )}
         </div>
         <div className="market-sources__drill-actions">
+          {dealerProfileHref ? (
+            <a
+              href={dealerProfileHref}
+              className="market-sources__drill-btn market-sources__org-link"
+              title={`Open ${displayName} organization profile`}
+            >
+              Organization Profile →
+            </a>
+          ) : null}
           {row ? (
             <a
               href={`/browse?source=${encodeURIComponent(row.source)}`}
@@ -918,6 +1044,11 @@ function SourceLandingInspector({
         <div className="market-sources__dealer-context" aria-label={`Consignment breakdown for ${displayName}`}>
           <div className="market-sources__dealer-context-main">
             <span className="market-sources__dealer-context-label">INVENTORY &amp; CONSIGNMENT BREAKDOWN</span>
+            {dealerBreakdown.hqBadge ? (
+              <span className="market-sources__dealer-hq" title={`Dealer headquarters: ${dealerBreakdown.hqBadge}`}>
+                {dealerBreakdown.hqBadge}
+              </span>
+            ) : null}
             <strong className="market-sources__dealer-context-mode">{dealerBreakdown.modeLabel}</strong>
             <span className="market-sources__dealer-context-summary">{dealerBreakdown.summaryText}</span>
           </div>
@@ -1243,6 +1374,8 @@ function SourceLandingInspector({
   );
 }
 
+export { SourceLandingInspector as IngestionDrillPanel };
+
 function resolveInitialSource(rows: SourceRow[], explicit?: string | null): string | null {
   let candidate = explicit ?? null;
   if (!candidate && typeof window !== 'undefined') {
@@ -1395,6 +1528,7 @@ export function SourcesBoardView({
               const isOpen = openSource === r.source;
               const cat = resolveSourceCategory(r);
               const badge = categoryBadgeLabel(r);
+              const dealerProfileHref = resolveDealerProfileHref(r);
               const total = r.population != null
                 ? `${count(r.population)} ${METHOD[r.populationMethod ?? ''] ?? `(${r.populationMethod ?? 'method unrecorded'})`}`
                   + `${r.populationAt ? `, ${shortDay(r.populationAt)}` : ''}`
@@ -1426,6 +1560,16 @@ export function SourcesBoardView({
                         <span className={`market-sources__badge market-sources__badge--${cat}`}>
                           {badge}
                         </span>
+                      ) : null}
+                      {dealerProfileHref ? (
+                        <a
+                          href={dealerProfileHref}
+                          className="market-sources__org-link"
+                          onClick={(e) => e.stopPropagation()}
+                          title={`Open ${shortName(r.name)} organization profile`}
+                        >
+                          Organization Profile →
+                        </a>
                       ) : null}
                     </span>
                     <span className="market-sources__held n" title={r.heldAt ? `held as of ${heldWhen(r.heldAt)}` : undefined}>
