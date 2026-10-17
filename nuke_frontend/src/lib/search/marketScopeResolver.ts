@@ -251,6 +251,76 @@ const CULTURAL_SCOPE_ALIASES: Array<{
     make: 'Ducati',
     familyHint: 'SportClassic',
   },
+  {
+    pattern: /\b(caterham\s*(?:super\s*)?(?:seven|7)|super\s*seven)\b/i,
+    make: 'Caterham',
+    familyHint: 'Seven',
+  },
+  {
+    pattern: /\b(tvr\s*(?:griffith|chimaera|cerbera|tuscan|sagaris|2500\s*m|vixen|grantura)|chimaera|cerbera|sagaris)\b/i,
+    make: 'TVR',
+    familyHint: 'Griffith',
+  },
+  {
+    pattern: /\b(jensen\s*(?:interceptor|healey|ff)|interceptor\s*(?:mk\s*)?iii)\b/i,
+    make: 'Jensen',
+    familyHint: 'Interceptor',
+  },
+  {
+    pattern: /\b(stutz\s*(?:bearcat|blackhawk)|bearcat)\b/i,
+    make: 'Stutz',
+    familyHint: 'Bearcat',
+  },
+  {
+    pattern: /\b(delage\s*d[68](?:[-\s]?120)?)\b/i,
+    make: 'Delage',
+    familyHint: 'D8',
+  },
+  {
+    pattern: /\b(lead\s*sled|mercury\s*eight|merc\s*eight)\b/i,
+    make: 'Mercury',
+    familyHint: 'Eight',
+  },
+  {
+    pattern: /\b(vehicross)\b/i,
+    make: 'Isuzu',
+    familyHint: 'VehiCROSS',
+  },
+  {
+    pattern: /\b(205\s*(?:gti|t16|rallye)|peugeot\s*205)\b/i,
+    make: 'Peugeot',
+    familyHint: '205',
+  },
+  {
+    pattern: /\b(hayabusa|gsx\s*1300\s*r|rg\s*500\s*gamma)\b/i,
+    make: 'Suzuki',
+    familyHint: 'GSX-R',
+  },
+  {
+    pattern: /\b(suzuki\s*carry|carry\s*(?:pickup|dump\s*truck|kei))\b/i,
+    make: 'Suzuki',
+    familyHint: 'Carry',
+  },
+  {
+    pattern: /\b(rd\s*(?:350|400)|rz\s*(?:350|500)|tz\s*750)\b/i,
+    make: 'Yamaha',
+    familyHint: 'RD350',
+  },
+  {
+    pattern: /\b(260\s*z)\b/i,
+    make: 'Nissan',
+    familyHint: '260Z',
+  },
+  {
+    pattern: /\b(big\s*healey|healey\s*3000|bj8|bt7|bn7)\b/i,
+    make: 'Austin-Healey',
+    familyHint: '3000',
+  },
+  {
+    pattern: /\b(fd3s|fc3s|fb\s*rx[-\s]?7|rx[-\s]?7)\b/i,
+    make: 'Mazda',
+    familyHint: 'RX-7',
+  },
 ];
 
 // Words that indicate a natural-language filter query rather than a market scope drill
