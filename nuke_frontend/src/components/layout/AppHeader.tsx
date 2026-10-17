@@ -5,7 +5,7 @@ import { useHeaderHeight } from './hooks/useHeaderHeight';
 import { useSession } from './hooks/useSession';
 import { useNotificationBadge } from './hooks/useNotificationBadge';
 import { useAdminAccess } from '../../hooks/useAdminAccess';
-import AIDataIngestionSearch from '../search/AIDataIngestionSearch';
+import HeaderSearch from '../HeaderSearch';
 import { UserArea } from './UserArea';
 import { UserDropdown } from './UserDropdown';
 import { useBranding } from '../../branding/BrandingContext';
@@ -99,7 +99,7 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
 
         {/* Zone 3: Command Input */}
         <div className="header-command">
-          <AIDataIngestionSearch />
+          <HeaderSearch />
         </div>
 
         {/* Zone 4: Session */}
