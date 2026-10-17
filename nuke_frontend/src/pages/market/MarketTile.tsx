@@ -87,13 +87,13 @@ export function MarketTile({ node, move, basis, x, y, w, h, onClick, title }: Ti
   );
 }
 
-function CardBody({ node, move, base }: { node: MarketNode; move: Move; base: Baseline | null }) {
+function CardBody({ node, move, base, windowLabel, gateMin = GATE_MIN }: { node: MarketNode; move: Move; base: Baseline | null; windowLabel?: string; gateMin?: number }) {
   const dollars = node.usd_12m != null && node.usd_prior_12m != null && node.usd_prior_12m > 0
     ? `${money(node.usd_12m)} vs ${money(node.usd_prior_12m)} (${pct(node.usd_12m / node.usd_prior_12m - 1)})` : null;
   return (
     <>
       <div className="market-card__head">{node.name}</div>
-      <div className="market-card__window">last 12 months against the 12 before · {MEASURED}</div>
+      <div className="market-card__window">{windowLabel ?? 'last 12 months against the 12 before'} · {MEASURED}</div>
       {move.kind === 'move' && (
         <div className="market-card__move">
           <span className="market-card__big">{pct(move.rel)} against the market</span>
@@ -104,7 +104,7 @@ function CardBody({ node, move, base }: { node: MarketNode; move: Move; base: Ba
         <div className="market-card__move">
           <span className="market-card__big">too few to say</span>
           <span>{move.why === 'count'
-            ? `${num(move.prior)} → ${num(move.sold)} measured sales; the color needs ${GATE_MIN} in each year`
+            ? `${num(move.prior)} → ${num(move.sold)} measured sales; the color needs ${gateMin} in each window`
             : `mostly sold at houses we cannot yet measure a year apart: under half of its ${num(node.count)} confirmed sales are measured`}</span>
         </div>
       )}
@@ -122,23 +122,23 @@ function CardBody({ node, move, base }: { node: MarketNode; move: Move; base: Ba
 }
 
 /** The hover card on a desktop, kept on screen. */
-export function MarketCard({ node, move, base, x, y }: { node: MarketNode; move: Move; base: Baseline | null; x: number; y: number }) {
+export function MarketCard({ node, move, base, x, y, windowLabel, gateMin }: { node: MarketNode; move: Move; base: Baseline | null; x: number; y: number; windowLabel?: string; gateMin?: number }) {
   const left = typeof window !== 'undefined' && x > window.innerWidth - 320 ? x - 316 : x + 14;
   const top = typeof window !== 'undefined' && y > window.innerHeight - 240 ? Math.max(8, y - 220) : y + 14;
   return (
     <div className="market-card" style={{ left, top }} role="tooltip">
-      <CardBody node={node} move={move} base={base} />
+      <CardBody node={node} move={move} base={base} windowLabel={windowLabel} gateMin={gateMin} />
       <div className="market-card__foot">click to open</div>
     </div>
   );
 }
 
 /** On a phone a tap opens the card; Open drills, the close button or a tap outside dismisses it. */
-export function MarketSheet({ node, move, base, onOpen, onClose }: { node: MarketNode; move: Move; base: Baseline | null; onOpen: () => void; onClose: () => void }) {
+export function MarketSheet({ node, move, base, onOpen, onClose, windowLabel, gateMin }: { node: MarketNode; move: Move; base: Baseline | null; onOpen: () => void; onClose: () => void; windowLabel?: string; gateMin?: number }) {
   return (
     <div className="market-sheet__scrim" onClick={onClose}>
       <div className="market-sheet" role="dialog" aria-label={node.name} onClick={(e) => e.stopPropagation()}>
-        <CardBody node={node} move={move} base={base} />
+        <CardBody node={node} move={move} base={base} windowLabel={windowLabel} gateMin={gateMin} />
         <div className="market-sheet__actions">
           <button type="button" className="market-sheet__open" onClick={onOpen}>Open {node.name} →</button>
           <button type="button" className="market-sheet__close" onClick={onClose}>Close</button>
@@ -151,7 +151,8 @@ export function MarketSheet({ node, move, base, onOpen, onClose }: { node: Marke
 const SWATCHES = ['−50%', '−33%', '−17%', '0', '+17%', '+33%', '+50%'];
 
 /** The legend: seven swatches with their values, the hatch and the blank, and one line of what the map counts. */
-export function MapLegend({ base, clock, basis }: { base: Baseline | null; clock: string; basis: MapBasis }) {
+export function MapLegend({ base, clock, basis, windowLabel }: { base: Baseline | null; clock: string; basis: MapBasis; windowLabel?: string }) {
+  const winPhrase = windowLabel ? ` (${windowLabel})` : ' than a year ago';
   return (
     <div className="map-legend">
       <div className="map-legend__scale" aria-label="color scale">
@@ -165,7 +166,7 @@ export function MapLegend({ base, clock, basis }: { base: Baseline | null; clock
         <span className="map-legend__stop"><span className="map-legend__swatch map-legend__swatch--none" /><span className="map-legend__value">no measured sales</span></span>
       </div>
       <div className="map-legend__receipt">
-        Color: is each tile selling more or less than a year ago, after taking out the market’s own growth
+        Color: is each tile selling more or less{winPhrase}, after taking out the market’s own growth
         {base ? ` (${pct(base.move)}, ${num(base.prior)} → ${num(base.sold)})` : ''}; the strongest colors mean 50% or more either way, and
         the label gives the exact figure. A move is measured only at auction houses we hold in full in both years: today that is
         Bring a Trailer; others join as their records fill in. Size: {basis === 'bat12' ? 'measured dollars, last 12 months' : 'dollars of confirmed sales at every auction house, all years; striped where the measured houses hold under half the sales'}. Prices not adjusted for inflation{clock}.

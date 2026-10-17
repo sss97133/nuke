@@ -10,8 +10,8 @@ import { useInterests } from '../hooks/useInterests';
 import { optimizeImageUrl } from '../lib/imageOptimizer';
 import { squarify } from '../lib/squarify';
 import { MapCallouts, MapLegend, MarketCard, MarketSheet, MarketTile, VenueMix, money as fmtMoneyMap, type MapBasis } from './market/MarketTile';
-import { batBaseline, callouts, relativeMove } from './market/mapScale';
-import { readShareMovers } from './market/FamilyMovers';
+import { batBaseline, callouts, gateMinForHorizon, relativeMove } from './market/mapScale';
+import { MOVER_HORIZONS, readShareMovers, type MoverHorizon, type ShareMovers } from './market/FamilyMovers';
 import IntakePage from './intake/IntakePage';
 import { Text } from '../kit';
 import FamilyMovers from './market/FamilyMovers';
@@ -987,18 +987,40 @@ export function TreemapHomePage({ onBrowse, embedded = false }: { onBrowse: () =
   const hoverTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Data hooks
-  const { data: brandsData, loading: brandsLoading } = useTreemapBrands();
+  const { data: rawBrandsData, loading: brandsLoading } = useTreemapBrands();
   const refresh = useTreemapRefresh();
+  const [horizon, setHorizon] = useState<MoverHorizon>('1y');
   // The map's color is each tile's BaT move against BaT overall: the whole venue as the movers read it (every family,
   // makes too small for a tile included), so the map and the movers name one baseline; the brands' own sum until it reads.
+  const [moversData, setMoversData] = useState<ShareMovers | null>(null);
   const [venue, setVenue] = useState<{ sold: number; prior: number; move: number } | null>(null);
   useEffect(() => {
     let live = true;
-    readShareMovers().then((v) => {
-      if (live && v && v.bat.sold_prior_12m > 0) setVenue({ sold: v.bat.sold_12m, prior: v.bat.sold_prior_12m, move: v.bat.sold_12m / v.bat.sold_prior_12m - 1 });
+    readShareMovers(horizon).then((v) => {
+      if (!live) return;
+      if (v) {
+        setMoversData(v);
+        if (v.bat.sold_prior_12m > 0) {
+          setVenue({ sold: v.bat.sold_12m, prior: v.bat.sold_prior_12m, move: v.bat.sold_12m / v.bat.sold_prior_12m - 1 });
+        }
+      }
     });
     return () => { live = false; };
-  }, []);
+  }, [horizon]);
+  const horizonMeta = useMemo(() => MOVER_HORIZONS.find((h) => h.key === horizon) ?? MOVER_HORIZONS[6], [horizon]);
+  const gateMin = useMemo(() => gateMinForHorizon(horizon), [horizon]);
+  const horizonWindowLabel = horizon === '1y' ? undefined : horizonMeta.windowLabel.toLowerCase();
+  const brandsData = useMemo(() => {
+    if (!rawBrandsData) return null;
+    if (horizon === '1y' || !moversData?.brand_moves) return rawBrandsData;
+    const bm = moversData.brand_moves;
+    return rawBrandsData.map((n) => {
+      const ov = bm[n.name];
+      return ov
+        ? { ...n, sold_12m: ov.sold_12m, sold_prior_12m: ov.sold_prior_12m, usd_12m: ov.usd_12m, usd_prior_12m: ov.usd_prior_12m }
+        : { ...n, sold_12m: 0, sold_prior_12m: 0, usd_12m: 0, usd_prior_12m: 0 };
+    });
+  }, [rawBrandsData, horizon, moversData]);
   const baseline = useMemo(() => venue ?? batBaseline(brandsData), [venue, brandsData]);
   // Without hover (a phone), a tap on a market tile opens its card; the card's Open drills.
   const [coarse] = useState(() => canMatchMedia && window.matchMedia('(hover: none)').matches);
@@ -1010,7 +1032,19 @@ export function TreemapHomePage({ onBrowse, embedded = false }: { onBrowse: () =
   const [basis, setBasis] = useState<MapBasis>('ledger');
   // A brand opens on its model families; when none can be read it opens on its model names, as before.
   const atFamilies = !!currentLevel.make && !currentLevel.family && !currentLevel.model;
-  const { data: familiesData, loading: familiesLoading, failed: familiesFailed } = useTreemapFamilies(currentLevel.make ?? null);
+  const { data: rawFamiliesData, loading: familiesLoading, failed: familiesFailed } = useTreemapFamilies(currentLevel.make ?? null);
+  const familiesData = useMemo(() => {
+    if (!rawFamiliesData) return null;
+    if (horizon === '1y' || !moversData?.family_moves || !currentLevel.make) return rawFamiliesData;
+    const fm = moversData.family_moves;
+    return rawFamiliesData.map((n) => {
+      if (!n.familyKey || n.familyKey === 'other') return n;
+      const ov = fm[`${currentLevel.make}|${n.familyKey}`];
+      return ov
+        ? { ...n, sold_12m: ov.sold_12m, sold_prior_12m: ov.sold_prior_12m, usd_12m: ov.usd_12m, usd_prior_12m: ov.usd_prior_12m }
+        : { ...n, sold_12m: 0, sold_prior_12m: 0, usd_12m: 0, usd_prior_12m: 0 };
+    });
+  }, [rawFamiliesData, horizon, moversData, currentLevel.make]);
   const { data: modelsData, loading: modelsLoading } = useTreemapModels(atFamilies && familiesFailed ? currentLevel.make ?? null : null);
   const { data: familyModelsData, loading: familyModelsLoading } = useTreemapFamilyModels(
     currentLevel.family ? currentLevel.make ?? null : null,
@@ -1821,7 +1855,7 @@ export function TreemapHomePage({ onBrowse, embedded = false }: { onBrowse: () =
 
       {/* ─── CALLOUTS: the clearest gain and loss against BaT and the largest tile, each a way into its tile ─── */}
       {marketLevel && !(levelType === 'brands' && brandView === 'nested') && activeData && (
-        <MapCallouts items={callouts(activeData, baseline)} onPick={(name) => {
+        <MapCallouts items={callouts(activeData, baseline, gateMin)} onPick={(name) => {
           const node = activeData.find((n) => n.name === name);
           if (node) { if (coarse) setSheet(node); else drillInto(node); }
         }} />
@@ -1879,6 +1913,9 @@ export function TreemapHomePage({ onBrowse, embedded = false }: { onBrowse: () =
         >
           {levelType === 'brands' && brandView === 'nested' && dims.w > 0 ? (
             <BrandFamilyMap width={dims.w} height={dims.h} baseline={baseline} basis={basis}
+              familyMoves={horizon === '1y' ? undefined : moversData?.family_moves}
+              gateMin={gateMin}
+              horizonShortLabel={horizon === '1y' ? '12 mo' : horizonMeta.label}
               onPickBrand={(brand) => { recordInterest('make', brand); setDrillStack([{ label: 'ALL MAKES' }, { label: brand, make: brand }]); }}
               onPickFamily={(brand, key, family) => { recordInterest('make', brand); setDrillStack([{ label: 'ALL MAKES' }, { label: brand, make: brand }, { label: family, make: brand, family: key }]); }} />
           ) : levelType === 'models' && currentLevel.family && currentLevel.make && familyView === 'sales' && dims.w > 0 ? (
@@ -1893,7 +1930,7 @@ export function TreemapHomePage({ onBrowse, embedded = false }: { onBrowse: () =
                   onMouseMove={(e) => { if (!coarse) setTooltip({ node, x: e.clientX, y: e.clientY, totalCount, level: levelType }); }}
                   onMouseEnter={() => handleCellMouseEnter(node)}
                   onMouseLeave={() => { setTooltip(null); handleCellMouseLeave(); }}>
-                  <MarketTile node={node} move={relativeMove(node, baseline, basis === 'ledger')} basis={basis} x={rect.x} y={rect.y} w={rect.w} h={rect.h}
+                  <MarketTile node={node} move={relativeMove(node, baseline, basis === 'ledger', gateMin)} basis={basis} x={rect.x} y={rect.y} w={rect.w} h={rect.h}
                     onClick={(ev) => (coarse ? setSheet(node) : drillInto(node, ev))} />
                 </div>
               );
@@ -1955,9 +1992,9 @@ export function TreemapHomePage({ onBrowse, embedded = false }: { onBrowse: () =
 
       {/* ─── TOOLTIP ─── */}
       {tooltip && (tooltip.level === 'brands' || tooltip.level === 'families') && tooltip.node.usd != null && !tooltip.node.isVehicle
-        ? <MarketCard node={tooltip.node} move={relativeMove(tooltip.node, baseline, basis === 'ledger')} base={baseline} x={tooltip.x} y={tooltip.y} />
+        ? <MarketCard node={tooltip.node} move={relativeMove(tooltip.node, baseline, basis === 'ledger', gateMin)} base={baseline} x={tooltip.x} y={tooltip.y} windowLabel={horizonWindowLabel} gateMin={gateMin} />
         : tooltip && <TreemapTooltip {...tooltip} />}
-      {sheet && <MarketSheet node={sheet} move={relativeMove(sheet, baseline, basis === 'ledger')} base={baseline}
+      {sheet && <MarketSheet node={sheet} move={relativeMove(sheet, baseline, basis === 'ledger', gateMin)} base={baseline} windowLabel={horizonWindowLabel} gateMin={gateMin}
         onOpen={() => { const n = sheet; setSheet(null); drillInto(n); }} onClose={() => setSheet(null)} />}
 
       {/* ─── FAMILY SALES CHART: when embedded on the Market page, keep the family's sales & like-for-like price index + era filter bar visible across models, years & vehicles inside the family ─── */}
@@ -1982,10 +2019,21 @@ export function TreemapHomePage({ onBrowse, embedded = false }: { onBrowse: () =
       )}
 
       {/* ─── WHAT MOVED: the families whose BaT market moved most, a pick drills the map to the family ─── */}
-      {levelType === 'brands' && <FamilyMovers onPick={(m) => {
-        recordInterest('make', m.brand);
-        setDrillStack([{ label: 'ALL MAKES' }, { label: m.brand, make: m.brand }, { label: m.family, make: m.brand, family: m.family_key }]);
-      }} />}
+      {levelType === 'brands' && <FamilyMovers
+        horizon={horizon}
+        onHorizonChange={setHorizon}
+        onMoversData={(d) => {
+          if (d) {
+            setMoversData(d);
+            if (d.bat.sold_prior_12m > 0) {
+              setVenue({ sold: d.bat.sold_12m, prior: d.bat.sold_prior_12m, move: d.bat.sold_12m / d.bat.sold_prior_12m - 1 });
+            }
+          }
+        }}
+        onPick={(m) => {
+          recordInterest('make', m.brand);
+          setDrillStack([{ label: 'ALL MAKES' }, { label: m.brand, make: m.brand }, { label: m.family, make: m.brand, family: m.family_key }]);
+        }} />}
 
       {/* ─── FOOTER ─── */}
       <div
@@ -2003,7 +2051,7 @@ export function TreemapHomePage({ onBrowse, embedded = false }: { onBrowse: () =
       >
         {(levelType === 'brands' || levelType === 'families')
           && !!activeData?.length && activeData.filter((node) => node.count > 0).every((node) => node.usd != null && node.usd > 0)
-          ? <MapLegend base={baseline} basis={basis} clock={ledgerViewsClock(refresh.refreshedAt)} />
+          ? <MapLegend base={baseline} basis={basis} clock={ledgerViewsClock(refresh.refreshedAt)} windowLabel={horizonWindowLabel} />
           : <Text role="caption">
           {/* One area and color basis per level (#1342): market measures only when every tile on the map carries dollars. */}
           {legendFor(levelType, levelType === 'models' && !!currentLevel.family && !!currentLevel.make && familyView === 'sales',

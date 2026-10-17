@@ -92,6 +92,169 @@ export function parseFamilySales(data: unknown): { sales: Sale[]; n: number; tru
   return { sales, n: v.n, truncated: v.truncated === true };
 }
 
+export type UpcomingLiveLot = {
+  vehicle_id: string;
+  year: number | null;
+  make: string | null;
+  model: string | null;
+  title: string;
+  current_bid: number | null;
+  ends_at: string | null;
+  source_url: string | null;
+  no_reserve: boolean;
+  band_p10: number | null;
+  band_p50: number | null;
+  band_p90: number | null;
+  finish_estimate: number | null;
+  finish_low: number | null;
+  finish_high: number | null;
+  finish_grade: string | null;
+  finish_model: number | null;
+};
+
+export type UpcomingCalendarLot = {
+  vehicle_id: string | null;
+  event_id: string | null;
+  year: number | null;
+  make: string | null;
+  model: string | null;
+  title: string;
+  house: string | null;
+  sale_name: string | null;
+  run_on: string | null;
+  source_url: string | null;
+  estimate_low: number | null;
+  estimate_high: number | null;
+};
+
+export type UpcomingClassifiedLot = {
+  id: string;
+  vehicle_id: string | null;
+  year: number | null;
+  make: string | null;
+  model: string | null;
+  title: string;
+  price: number | null;
+  location: string | null;
+  source_url: string | null;
+  scraped_at: string | null;
+};
+
+export type FamilyUpcomingSupply = {
+  finish_model: number | null;
+  finish_fresh: boolean;
+  counts: { bat_live: number; auction_calendar: number; facebook_marketplace: number; total: number };
+  live_lots: UpcomingLiveLot[];
+  calendar_lots: UpcomingCalendarLot[];
+  classified_lots: UpcomingClassifiedLot[];
+};
+
+const optNum = (x: unknown): number | null => (typeof x === 'number' && Number.isFinite(x) ? x : null);
+const optStr = (x: unknown): string | null => (typeof x === 'string' && x.trim() ? x : null);
+
+export function parseFamilyUpcomingSupply(raw: unknown): FamilyUpcomingSupply | null {
+  const v = raw as Record<string, unknown> | null;
+  if (!v || typeof v !== 'object' || Array.isArray(v)) return null;
+  const countsObj = v.counts as Record<string, unknown> | undefined;
+  if (!countsObj || typeof countsObj !== 'object') return null;
+  const liveRaw = Array.isArray(v.live_lots) ? v.live_lots : [];
+  const calRaw = Array.isArray(v.calendar_lots) ? v.calendar_lots : [];
+  const fbRaw = Array.isArray(v.classified_lots) ? v.classified_lots : [];
+
+  const live_lots: UpcomingLiveLot[] = liveRaw.flatMap((r) => {
+    const o = (r ?? {}) as Record<string, unknown>;
+    const vehicle_id = optStr(o.vehicle_id);
+    if (!vehicle_id) return [];
+    return [{
+      vehicle_id,
+      year: optNum(o.year),
+      make: optStr(o.make),
+      model: optStr(o.model),
+      title: optStr(o.title) ?? vehicle_id,
+      current_bid: optNum(o.current_bid),
+      ends_at: optStr(o.ends_at),
+      source_url: optStr(o.source_url),
+      no_reserve: o.no_reserve === true,
+      band_p10: optNum(o.band_p10),
+      band_p50: optNum(o.band_p50),
+      band_p90: optNum(o.band_p90),
+      finish_estimate: optNum(o.finish_estimate),
+      finish_low: optNum(o.finish_low),
+      finish_high: optNum(o.finish_high),
+      finish_grade: optStr(o.finish_grade),
+      finish_model: optNum(o.finish_model),
+    }];
+  });
+
+  const calendar_lots: UpcomingCalendarLot[] = calRaw.flatMap((r) => {
+    const o = (r ?? {}) as Record<string, unknown>;
+    return [{
+      vehicle_id: optStr(o.vehicle_id),
+      event_id: optStr(o.event_id),
+      year: optNum(o.year),
+      make: optStr(o.make),
+      model: optStr(o.model),
+      title: optStr(o.title) ?? 'Scheduled lot',
+      house: optStr(o.house),
+      sale_name: optStr(o.sale_name),
+      run_on: optStr(o.run_on),
+      source_url: optStr(o.source_url),
+      estimate_low: optNum(o.estimate_low),
+      estimate_high: optNum(o.estimate_high),
+    }];
+  });
+
+  const classified_lots: UpcomingClassifiedLot[] = fbRaw.flatMap((r) => {
+    const o = (r ?? {}) as Record<string, unknown>;
+    const id = optStr(o.id);
+    if (!id) return [];
+    return [{
+      id,
+      vehicle_id: optStr(o.vehicle_id),
+      year: optNum(o.year),
+      make: optStr(o.make),
+      model: optStr(o.model),
+      title: optStr(o.title) ?? 'Classified listing',
+      price: optNum(o.price),
+      location: optStr(o.location),
+      source_url: optStr(o.source_url),
+      scraped_at: optStr(o.scraped_at),
+    }];
+  });
+
+  return {
+    finish_model: optNum(v.finish_model),
+    finish_fresh: v.finish_fresh === true,
+    counts: {
+      bat_live: optNum(countsObj.bat_live) ?? live_lots.length,
+      auction_calendar: optNum(countsObj.auction_calendar) ?? calendar_lots.length,
+      facebook_marketplace: optNum(countsObj.facebook_marketplace) ?? classified_lots.length,
+      total: optNum(countsObj.total) ?? (live_lots.length + calendar_lots.length + classified_lots.length),
+    },
+    live_lots,
+    calendar_lots,
+    classified_lots,
+  };
+}
+
+export function useFamilyUpcomingSupply(brand: string | null, familyKey: string | null) {
+  const [supply, setSupply] = useState<FamilyUpcomingSupply | null>(null);
+  useEffect(() => {
+    setSupply(null);
+    if (!brand || !familyKey || typeof (supabase as { rpc?: unknown })?.rpc !== 'function') return;
+    let live = true;
+    Promise.resolve(supabase.rpc('treemap_family_upcoming_supply', { p_brand: brand, p_family_key: familyKey })).then(
+      ({ data, error }) => {
+        if (!live || error) return;
+        setSupply(parseFamilyUpcomingSupply(data));
+      },
+      () => {},
+    );
+    return () => { live = false; };
+  }, [brand, familyKey]);
+  return supply;
+}
+
 export function useFamilySales(brand: string | null, familyKey: string | null) {
   const [state, setState] = useState<{ sales: Sale[] | null; n: number; truncated: boolean; failed: boolean }>({ sales: null, n: 0, truncated: false, failed: false });
   useEffect(() => {
@@ -203,6 +366,33 @@ export default function FamilySalesChart({ brand, familyKey, family, width, heig
   selectedYear?: number | null;
 }) {
   const { sales: allSales, n: windowCount, truncated, failed } = useFamilySales(brand, familyKey);
+  const upcomingSupply = useFamilyUpcomingSupply(brand, familyKey);
+  const filteredSupply = useMemo(() => {
+    if (!upcomingSupply) return null;
+    const matchFilter = (yr: number | null, mdl: string | null) => {
+      if (selectedModel && !matchesSaleSubModel(mdl, selectedModel)) return false;
+      if (selectedEra && !matchesEraRange(yr, selectedEra)) return false;
+      if (selectedYear != null && yr !== selectedYear) return false;
+      return true;
+    };
+    const live_lots = upcomingSupply.live_lots.filter((l) => matchFilter(l.year, l.model));
+    const calendar_lots = upcomingSupply.calendar_lots.filter((l) => matchFilter(l.year, l.model));
+    const classified_lots = upcomingSupply.classified_lots.filter((l) => matchFilter(l.year, l.model));
+    const total = live_lots.length + calendar_lots.length + classified_lots.length;
+    if (total === 0) return null;
+    return {
+      ...upcomingSupply,
+      live_lots,
+      calendar_lots,
+      classified_lots,
+      counts: {
+        bat_live: live_lots.length,
+        auction_calendar: calendar_lots.length,
+        facebook_marketplace: classified_lots.length,
+        total,
+      },
+    };
+  }, [upcomingSupply, selectedModel, selectedEra, selectedYear]);
   const modelSales = useMemo(
     () => (allSales && selectedModel ? allSales.filter((s) => matchesSaleSubModel(s.model, selectedModel)) : null),
     [allSales, selectedModel],
@@ -296,7 +486,27 @@ export default function FamilySalesChart({ brand, familyKey, family, width, heig
       const mid = band.map((b) => `${x(b.t).toFixed(1)},${y(b.p50).toFixed(1)}`);
       const area = band.length > 1 ? 'M' + band.map((b) => `${x(b.t).toFixed(1)},${y(b.p75).toFixed(1)}`).join('L')
         + 'L' + [...band].reverse().map((b) => `${x(b.t).toFixed(1)},${y(b.p25).toFixed(1)}`).join('L') + 'Z' : '';
-      return { era, dots, line: mid.length > 1 ? 'M' + mid.join('L') : '', area, move: moves.get(era) ?? null,
+      const liveForPanel = (filteredSupply?.live_lots ?? []).filter((l) => {
+        const val = l.finish_estimate ?? l.band_p50 ?? l.current_bid;
+        if (!val || val < PRICE_FLOOR) return false;
+        if (era === 'all years') return true;
+        if (era === 'other years') return !bands.some(([e]) => e !== 'other years' && e === eraOf(l.year));
+        return eraOf(l.year) === era;
+      }).slice(0, 8).map((l, idx) => {
+        const est = (l.finish_estimate ?? l.band_p50 ?? l.current_bid)!;
+        const loEst = l.finish_low ?? l.band_p10 ?? null;
+        const hiEst = l.finish_high ?? l.band_p90 ?? null;
+        const cx = P.left + w - Math.min(18, idx * 2.5);
+        return {
+          ...l,
+          cx,
+          cy: y(est),
+          yLo: loEst ? y(loEst) : null,
+          yHi: hiEst ? y(hiEst) : null,
+          yBid: l.current_bid && l.current_bid >= PRICE_FLOOR ? y(l.current_bid) : null,
+        };
+      });
+      return { era, dots, liveDots: liveForPanel, line: mid.length > 1 ? 'M' + mid.join('L') : '', area, move: moves.get(era) ?? null,
         firstCol: i % cols === 0, lastRow: cols === 1 || Math.floor(i / cols) === rows - 1, n: g.length };
     });
     const refPts = indexed && ix ? ix.series.filter((r) => r.t >= t0 && r.t <= t1).map((r) => ({ ...r, cx: x(r.t), cy: y(r.usd) })) : [];
@@ -310,7 +520,7 @@ export default function FamilySalesChart({ brand, familyKey, family, width, heig
     const outside = shown.filter((p) => p.usd < lo || p.usd > hi).length;
     return { panels, years, ticks, counts, head, cols, pw, ph, ref, n: dated.length, under: dated.length - pts.length,
       shown: shown.length, outside, unpanelled, lo, hi, since: new Date(dated[0].t) };
-  }, [sales, width, height, hidden, narrow, ix, indexed, onSelectEra, eraCohorts.length, measuredHead]);
+  }, [sales, width, height, hidden, narrow, ix, indexed, onSelectEra, eraCohorts.length, measuredHead, filteredSupply]);
   const move = useMemo(() => (sales ? batMove(sales) : null), [sales]);
   const held = useMemo(() => (sales ? mixFixed(eraMoves(sales)) : null), [sales]);
 
@@ -392,6 +602,47 @@ export default function FamilySalesChart({ brand, familyKey, family, width, heig
           ))}
         </div>
       )}
+      {filteredSupply && (
+        <div className="family-sales__supply" role="region" aria-label="Upcoming supply and finish estimates">
+          <span className="family-sales__supply-badge">
+            UPCOMING {filteredSupply.counts.total}
+          </span>
+          {filteredSupply.counts.bat_live > 0 && (
+            <span className="family-sales__supply-meta">
+              {filteredSupply.counts.bat_live} BaT live
+              {filteredSupply.finish_model ? ` · M${filteredSupply.finish_model}` : ''}
+            </span>
+          )}
+          {filteredSupply.counts.auction_calendar > 0 && (
+            <span className="family-sales__supply-meta">
+              {filteredSupply.counts.auction_calendar} calendar
+            </span>
+          )}
+          {filteredSupply.counts.facebook_marketplace > 0 && (
+            <span className="family-sales__supply-meta">
+              {filteredSupply.counts.facebook_marketplace} FB
+            </span>
+          )}
+          {!narrow && filteredSupply.live_lots.slice(0, 3).map((lot) => {
+            const est = lot.finish_estimate ?? lot.band_p50;
+            const lo = lot.finish_low ?? lot.band_p10;
+            const hi = lot.finish_high ?? lot.band_p90;
+            return (
+              <button
+                key={lot.vehicle_id}
+                type="button"
+                className="family-sales__supply-chip"
+                onClick={() => onOpen(lot.vehicle_id)}
+                title={`${lot.title}${lot.current_bid ? ` · bid ${money(lot.current_bid)}` : ''}${est ? ` · finish est ${money(est)}${lo && hi ? ` (80% ${money(lo)}–${money(hi)})` : ''}` : ''}`}
+              >
+                <span>{[lot.year, lot.model].filter(Boolean).join(' ') || family}</span>
+                {lot.current_bid ? <span className="family-sales__supply-bid">bid {money(lot.current_bid)}</span> : null}
+                {est ? <span className="family-sales__supply-est">→ est {money(est)}{lo && hi ? ` (${money(lo)}–${money(hi)})` : ''}</span> : null}
+              </button>
+            );
+          })}
+        </div>
+      )}
     </div>
     <div ref={panelsRef} className="family-sales__panels" style={{ gridTemplateColumns: `repeat(${plot.cols}, ${plot.pw}px)` }}>
       {plot.panels.map((pn, bi) => <svg key={pn.era} className="family-sales__plot" width={plot.pw} height={plot.ph}
@@ -413,6 +664,14 @@ export default function FamilySalesChart({ brand, familyKey, family, width, heig
           : <circle key={d.vehicle_id} cx={d.cx} cy={d.cy} r={pn.n > 1500 ? 1.4 : pn.n > 400 ? 2 : 2.6} fill={d.color} fillOpacity={pn.n > 1500 ? 0.35 : 0.55} />)}
         {pn.line && !plot.ref && <path d={pn.line} className="family-sales__median-halo" />}
         {pn.line && <path d={pn.line} className={plot.ref ? 'family-sales__median family-sales__median--plain' : 'family-sales__median'} />}
+        {pn.liveDots.map((ld) => (
+          <g key={`live-${ld.vehicle_id}`} className="family-sales__live-whisker">
+            {ld.yLo != null && ld.yHi != null && (
+              <line x1={ld.cx} x2={ld.cx} y1={ld.yHi} y2={ld.yLo} className="family-sales__live-band" />
+            )}
+            <path d={`M${ld.cx} ${ld.cy - 3.2}L${ld.cx + 3.2} ${ld.cy}L${ld.cx} ${ld.cy + 3.2}L${ld.cx - 3.2} ${ld.cy}Z`} className="family-sales__live-diamond" />
+          </g>
+        ))}
         {plot.ref && <path d={plot.ref.area} className="family-sales__ref-band" />}
         {plot.ref && <path d={plot.ref.line} className="family-sales__ref" />}
         {plot.ref && refHover != null && plot.ref.points[refHover]

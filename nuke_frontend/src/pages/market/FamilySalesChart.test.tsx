@@ -303,3 +303,55 @@ it('reserves vertical headroom for multi-row index chips and generation pills so
   expect(Number(plotEl.getAttribute('height'))).toBe(125);
 });
 
+it('renders upcoming supply strip and right-edge Model 33 finish-estimate bands when treemap_family_upcoming_supply returns live lots', async () => {
+  const sales = [1, 2, 3, 4, 5, 6].map((i) => sale(i, 20 * i, 100000 + i * 1000, 'Bring a Trailer'));
+  const supply = {
+    as_of: '2026-10-17T18:00:00Z',
+    brand: 'Porsche',
+    family_key: 'f911',
+    finish_model: 33,
+    finish_fresh: true,
+    counts: { bat_live: 2, auction_calendar: 3, facebook_marketplace: 1, total: 6 },
+    live_lots: [
+      {
+        vehicle_id: 'live-911-1',
+        year: 1995,
+        make: 'Porsche',
+        model: '911 Carrera',
+        title: '1995 Porsche 911 Carrera',
+        current_bid: 82000,
+        ends_at: '2026-10-19T20:00:00Z',
+        source_url: 'https://bringatrailer.com/listing/1995-porsche-911-carrera/',
+        no_reserve: true,
+        band_p10: 90000,
+        band_p50: 112000,
+        band_p90: 138000,
+        finish_estimate: 118000,
+        finish_low: 96000,
+        finish_high: 142000,
+        finish_grade: 'A',
+        finish_model: 33,
+      },
+    ],
+    calendar_lots: [],
+    classified_lots: [],
+  };
+  const onOpen = vi.fn();
+  fixture.rpc.mockImplementation((fn: string) => {
+    if (fn === 'treemap_family_sales') return Promise.resolve({ data: value(sales), error: null });
+    if (fn === 'treemap_family_upcoming_supply') return Promise.resolve({ data: supply, error: null });
+    return Promise.resolve({ data: null, error: { message: 'none' } });
+  });
+  await act(async () => root.render(<FamilySalesChart brand="Porsche" familyKey="f911" family="911" width={900} height={500} onOpen={onOpen} />));
+  const supplyStrip = container.querySelector('.family-sales__supply');
+  expect(supplyStrip).not.toBeNull();
+  expect(supplyStrip?.textContent).toContain('UPCOMING 1');
+  expect(supplyStrip?.textContent).toContain('1 BaT live · M33');
+  expect(supplyStrip?.textContent).toContain('→ est $118K ($96K–$142K)');
+  expect(container.querySelectorAll('g.family-sales__live-whisker')).toHaveLength(1);
+  expect(container.querySelector('line.family-sales__live-band')).not.toBeNull();
+  expect(container.querySelector('path.family-sales__live-diamond')).not.toBeNull();
+  const chip = container.querySelector('button.family-sales__supply-chip') as HTMLButtonElement;
+  await act(async () => chip.click());
+  expect(onOpen).toHaveBeenCalledWith('live-911-1');
+});

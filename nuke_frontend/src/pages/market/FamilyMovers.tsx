@@ -190,10 +190,24 @@ export type ShareMover = {
   usd_prior_12m: number; share_move: number; share_lo: number; share_hi: number; se: number; avg_price_move: number | null;
   bins?: number[];
 };
+export type HorizonMoveCounts = {
+  sold_12m: number;
+  sold_prior_12m: number;
+  usd_12m: number;
+  usd_prior_12m: number;
+};
+export type UpcomingSources = {
+  bat_live: number;
+  auction_calendar: number;
+  facebook_marketplace: number;
+};
 export type ShareMovers = {
   as_of: string | null; horizon?: MoverHorizon; window_days?: number;
   min_sales: number; families: number; eligible: number; significant: number;
   bat: { sold_12m: number; sold_prior_12m: number; usd_12m: number; usd_prior_12m: number };
+  sources?: UpcomingSources;
+  brand_moves?: Record<string, HorizonMoveCounts>;
+  family_moves?: Record<string, HorizonMoveCounts>;
   gaining: ShareMover[]; losing: ShareMover[];
 };
 
@@ -214,9 +228,27 @@ function parseMover(r: unknown): ShareMover | null {
     ...(bins ? { bins } : {}),
   };
 }
+function parseMoveOverlay(raw: unknown): Record<string, HorizonMoveCounts> | undefined {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return undefined;
+  const out: Record<string, HorizonMoveCounts> = {};
+  let count = 0;
+  for (const [k, val] of Object.entries(raw as Record<string, unknown>)) {
+    if (Array.isArray(val) && val.length >= 4 && isNum(val[0]) && isNum(val[1])) {
+      out[k] = {
+        sold_12m: val[0],
+        sold_prior_12m: val[1],
+        usd_12m: isNum(val[2]) ? val[2] : 0,
+        usd_prior_12m: isNum(val[3]) ? val[3] : 0,
+      };
+      count++;
+    }
+  }
+  return count > 0 ? out : undefined;
+}
+
 /** The reader's value, or null when it is not one (the strip then stays away). */
 export function parseShareMovers(raw: unknown): ShareMovers | null {
-  const v = raw as Partial<ShareMovers> | null;
+  const v = raw as Partial<ShareMovers> & { sources?: unknown; brand_moves?: unknown; family_moves?: unknown } | null;
   if (!v || typeof v !== 'object' || !Array.isArray(v.gaining) || !Array.isArray(v.losing)) return null;
   const b = v.bat as ShareMovers['bat'] | undefined;
   if (!b || !isNum(b.sold_12m) || !isNum(b.sold_prior_12m) || b.sold_prior_12m <= 0) return null;
@@ -226,6 +258,17 @@ export function parseShareMovers(raw: unknown): ShareMovers | null {
   const horizon = typeof v.horizon === 'string' && validHorizons.includes(v.horizon as MoverHorizon)
     ? (v.horizon as MoverHorizon)
     : undefined;
+  const rawSources = v.sources as Partial<UpcomingSources> | undefined;
+  const sources = rawSources && typeof rawSources === 'object'
+    && isNum(rawSources.bat_live) && isNum(rawSources.auction_calendar)
+    ? {
+        bat_live: rawSources.bat_live,
+        auction_calendar: rawSources.auction_calendar,
+        facebook_marketplace: isNum(rawSources.facebook_marketplace) ? rawSources.facebook_marketplace : 0,
+      }
+    : undefined;
+  const brand_moves = parseMoveOverlay(v.brand_moves);
+  const family_moves = parseMoveOverlay(v.family_moves);
   return {
     as_of: typeof v.as_of === 'string' ? v.as_of : null,
     ...(horizon ? { horizon } : {}),
@@ -235,6 +278,9 @@ export function parseShareMovers(raw: unknown): ShareMovers | null {
     eligible: isNum(v.eligible) ? v.eligible : 0,
     significant: isNum(v.significant) ? v.significant : 0,
     bat: b,
+    ...(sources ? { sources } : {}),
+    ...(brand_moves ? { brand_moves } : {}),
+    ...(family_moves ? { family_moves } : {}),
     gaining,
     losing,
   };
@@ -292,8 +338,23 @@ export function MoveDot({ m }: { m: ShareMover }) {
   </svg>;
 }
 
-export default function FamilyMovers({ onPick }: { onPick: (m: Pick<Mover, 'brand' | 'family_key' | 'family'>) => void }) {
-  const [horizon, setHorizon] = useState<MoverHorizon>('1y');
+export default function FamilyMovers({
+  onPick,
+  horizon: controlledHorizon,
+  onHorizonChange,
+  onMoversData,
+}: {
+  onPick: (m: Pick<Mover, 'brand' | 'family_key' | 'family'>) => void;
+  horizon?: MoverHorizon;
+  onHorizonChange?: (h: MoverHorizon) => void;
+  onMoversData?: (data: ShareMovers | null, horizon: MoverHorizon) => void;
+}) {
+  const [internalHorizon, setInternalHorizon] = useState<MoverHorizon>(controlledHorizon ?? '1y');
+  const horizon = controlledHorizon ?? internalHorizon;
+  const setHorizon = (h: MoverHorizon) => {
+    setInternalHorizon(h);
+    onHorizonChange?.(h);
+  };
   const [data, setData] = useState<ShareMovers | null>(null);
   const [initialReady, setInitialReady] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -305,6 +366,7 @@ export default function FamilyMovers({ onPick }: { onPick: (m: Pick<Mover, 'bran
     readShareMovers(horizon).then((r) => {
       if (!live) return;
       setData(r);
+      onMoversData?.(r, horizon);
       if (horizon === '1y' && r && (r.gaining.length > 0 || r.losing.length > 0)) {
         setInitialReady(true);
       } else if (r) {
@@ -402,8 +464,10 @@ export default function FamilyMovers({ onPick }: { onPick: (m: Pick<Mover, 'bran
           listed only when its upcoming wave is bigger than luck explains; the bar is the likely range, from half the pace (−50%) to
           twice the pace (+100%). {data.significant.toLocaleString('en-US')} of {data.eligible.toLocaleString('en-US')} families with{' '}
           {data.min_sales}+ lots each {meta.eachWindowLabel} shifted for real ({data.families.toLocaleString('en-US')} families read).
-          Avg ask = live current bids and catalog mid-estimates against recent sold prices. Sources: live Bring a Trailer auctions and
-          scheduled auction calendar lots.
+          Avg ask = live current bids, catalog mid-estimates, and active classified asks against recent sold prices. Sources:{' '}
+          {data.sources
+            ? `${data.sources.bat_live.toLocaleString('en-US')} live Bring a Trailer auctions, ${data.sources.auction_calendar.toLocaleString('en-US')} scheduled auction calendar lots${data.sources.facebook_marketplace > 0 ? `, and ${data.sources.facebook_marketplace.toLocaleString('en-US')} active Facebook Marketplace captures` : ''}.`
+            : 'live Bring a Trailer auctions, scheduled auction calendar lots, and active Facebook Marketplace captures.'}
         </>
       ) : (
         <>
