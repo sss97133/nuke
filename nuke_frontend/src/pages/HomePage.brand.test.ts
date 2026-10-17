@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 const rpc = vi.hoisted(() => vi.fn());
 vi.mock('../lib/supabase', () => ({ supabase: { rpc } }));
-import { brandDollarMomentum, brandLines, brandMomentum, lineChars } from './HomePage';
+import { applyDrillStackToSearchParams, brandDollarMomentum, brandLines, brandMomentum, drillStackFromSearchParams, lineChars } from './HomePage';
 
 // Porsche's row in mv_brand_market as measured 2026-10-15 (sold, dollars, band, sell-through, year), with 12-month counts.
 const porsche = {
@@ -82,5 +82,44 @@ describe('a partially unavailable brand market', () => {
     const rows = await readTreemapBrands();
     expect(rows?.[0].usd).toBe(200_000);
     expect(mapLegend('brands', true)).toContain('box size = dollars from confirmed sales');
+  });
+});
+
+describe('URL scope contract for the market treemap', () => {
+  it('round-trips make -> family -> model -> year in URL search params and restores canonical names', () => {
+    const stack = [
+      { label: 'ALL MAKES' },
+      { label: 'Ford', make: 'Ford' },
+      { label: 'Mustang', make: 'Ford', family: '8a8271f8-d299-4b55-837a-35ca919f8937', names: 1243 },
+      { label: 'Mustang GT', make: 'Ford', family: '8a8271f8-d299-4b55-837a-35ca919f8937', model: 'Mustang GT' },
+      { label: '1967', make: 'Ford', family: '8a8271f8-d299-4b55-837a-35ca919f8937', model: 'Mustang GT', year: 1967 },
+    ];
+    const params = applyDrillStackToSearchParams(new URLSearchParams('tab=market'), stack);
+    expect(params.get('make')).toBe('Ford');
+    expect(params.get('family')).toBe('8a8271f8-d299-4b55-837a-35ca919f8937');
+    expect(params.get('family_name')).toBe('Mustang');
+    expect(params.get('model')).toBe('Mustang GT');
+    expect(params.get('year')).toBe('1967');
+
+    // Deep-linked with uppercase make from MarketPulse resolves back to canonical brand and family names
+    const fromDeepLink = drillStackFromSearchParams(
+      new URLSearchParams('make=FORD&family=8a8271f8-d299-4b55-837a-35ca919f8937'),
+      [{ name: 'Ford', count: 29489, value: 1479400000 }],
+      [{ name: 'Mustang', count: 11050, value: 595300000, familyKey: '8a8271f8-d299-4b55-837a-35ca919f8937', models: 1243 }],
+    );
+    expect(fromDeepLink).toEqual([
+      { label: 'ALL MAKES' },
+      { label: 'Ford', make: 'Ford' },
+      { label: 'Mustang', make: 'Ford', family: '8a8271f8-d299-4b55-837a-35ca919f8937', names: 1243 },
+    ]);
+
+    // Going back to ALL MAKES clears scope params while keeping tab
+    const cleared = applyDrillStackToSearchParams(params, [{ label: 'ALL MAKES' }]);
+    expect(cleared.get('tab')).toBe('market');
+    expect(cleared.get('make')).toBeNull();
+    expect(cleared.get('family')).toBeNull();
+    expect(cleared.get('family_name')).toBeNull();
+    expect(cleared.get('model')).toBeNull();
+    expect(cleared.get('year')).toBeNull();
   });
 });
