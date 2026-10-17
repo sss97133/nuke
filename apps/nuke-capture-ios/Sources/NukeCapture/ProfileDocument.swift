@@ -25,10 +25,10 @@ enum ProfileViewer: String, Decodable {
 }
 
 /// Where a claim came from: the evidence class, and a pointer at the evidence.
-struct ClaimSource: Decodable {
+struct ClaimSource: Decodable, Equatable {
     /// An evidence class the app does not know is read as the record (legacy), dim and open,
     /// never as a reason to drop the whole document.
-    enum Kind: String, Decodable {
+    enum Kind: String, Decodable, Equatable {
         case listing, owner, image, document, agent, model, legacy
         init(from decoder: Decoder) throws {
             let raw = try decoder.singleValueContainer().decode(String.self)
@@ -252,12 +252,42 @@ enum ProfileSection: Decodable {
     }
 }
 
+/// The seller or auction description carried by `vehicle_profile_read` (`profileDocument.ts`).
+struct ProfileDescription: Decodable, Equatable {
+    let text: String
+    let length: Int
+    let source: ClaimSource
+    let observed_at: String?
+}
+
+/// Full-record testimony counts returned by `vehicle_testimony_summary(p_vehicle_id)`.
+struct VehicleTestimonySummary: Decodable, Equatable {
+    let total: Int
+    let events: Int
+    let images: Int
+    let observations: Int
+    let documents: Int
+    let service: Int
+
+    var sentence: String {
+        var parts: [String] = []
+        if events > 0 { parts.append("\(events.formatted()) \(events == 1 ? "event" : "events")") }
+        if images > 0 { parts.append("\(images.formatted()) \(images == 1 ? "photo" : "photos")") }
+        if observations > 0 { parts.append("\(observations.formatted()) \(observations == 1 ? "observation" : "observations")") }
+        if documents > 0 { parts.append("\(documents.formatted()) \(documents == 1 ? "document" : "documents")") }
+        if service > 0 { parts.append("\(service.formatted()) service") }
+        let breakdown = parts.isEmpty ? "" : " (\(parts.joined(separator: " · ")))"
+        return "\(total.formatted()) testimony items\(breakdown)"
+    }
+}
+
 /// One page, as a document: sections in the order the data supports, for one viewer, at one clock.
 struct ProfileRead: Decodable {
     let vehicle_id: String
     let viewer: ProfileViewer
     let read_at: String
     let sections: [ProfileSection]
+    let description: ProfileDescription?
 
     var masthead: ProfileSection.Masthead? {
         for s in sections { if case .masthead(let m) = s { return m } }
@@ -296,5 +326,9 @@ enum ProfileClock {
 
     static func day(_ iso: String?) -> String? {
         date(iso).map { out.string(from: $0) }
+    }
+
+    static func Absolute(_ iso: String?) -> String {
+        day(iso) ?? iso ?? "unknown date"
     }
 }

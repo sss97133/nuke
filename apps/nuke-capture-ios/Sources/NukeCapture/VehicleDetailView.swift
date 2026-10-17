@@ -324,6 +324,7 @@ struct VehicleDetailView: View {
     // get_vehicle_engagement): the visitor's job is to contribute, every action a
     // typed observation. v1 rungs: follow (signal) + comment (testimony).
     @State private var engagement: VehicleEngagement?
+    @State private var testimonySummary: VehicleTestimonySummary?
     @State private var engagementError = false
     @State private var commentDraft = ""
     @State private var posting = false
@@ -1651,6 +1652,11 @@ struct VehicleDetailView: View {
                     Text(caption).font(.caption2).foregroundStyle(.secondary)
                 }
             }
+            if let ts = testimonySummary, ts.total > 0 {
+                Text(ts.sentence)
+                    .font(.system(size: 10, design: .monospaced))
+                    .foregroundStyle(.tertiary)
+            }
         }
         .padding(.horizontal, 16)
         .padding(.top, 10)
@@ -1668,10 +1674,17 @@ struct VehicleDetailView: View {
     private func loadEngagement() async {
         engagementError = false
         do {
-            engagement = try await SupabaseService.client
+            async let engTask: VehicleEngagement = SupabaseService.client
                 .rpc("get_vehicle_engagement", params: ["p_vehicle_id": vehicleId])
                 .execute()
                 .value
+            async let testTask: VehicleTestimonySummary? = try? SupabaseService.client
+                .rpc("vehicle_testimony_summary", params: ["p_vehicle_id": vehicleId])
+                .execute()
+                .value
+            let (eng, testSum) = try await (engTask, testTask)
+            engagement = eng
+            if let testSum { testimonySummary = testSum }
         } catch {
             engagementError = true
             NSLog("NukeCapture engagement load failed: %@", String(describing: error))
@@ -3221,7 +3234,7 @@ struct FieldProvenance: Decodable {
         let at: String?
         var id: String { (source_type ?? "") + (at ?? "") + (value ?? "") }
     }
-    struct Observation: Decodable, Identifiable {
+    struct Observation: Decodable, Identifiable, Equatable {
         let id: UUID
         let content: String?
         let value: String?
@@ -3233,6 +3246,61 @@ struct FieldProvenance: Decodable {
         let source_slug: String?
         let trust: Double?
         let source_url: String?
+    }
+
+    struct GroupedObservation: Identifiable, Equatable {
+        let observation: Observation
+        let repeatCount: Int
+        let firstObservedAt: String?
+        let latestObservedAt: String?
+        var id: UUID { observation.id }
+    }
+
+    /// Mirrors `groupRepeatedReports` in `nuke_frontend/src/pages/vehicle-profile/useFieldProvenance.ts` (#1469):
+    /// collapses repeated captures of the same listing claim into one row with a repeat count.
+    static func groupRepeatedObservations(_ rows: [Observation]) -> [GroupedObservation] {
+        var groups: [GroupedObservation] = []
+        var byKey: [String: Int] = [:]
+        for row in rows {
+            let key = [
+                row.kind,
+                row.source_slug,
+                row.source_url,
+                row.value,
+                row.content,
+                row.extraction_method
+            ]
+            .map { ($0 ?? "").trimmingCharacters(in: .whitespacesAndNewlines) }
+            .joined(separator: "\u{001F}")
+
+            if let idx = byKey[key] {
+                let prev = groups[idx]
+                let obsAt = row.observed_at
+                let firstAt: String? = {
+                    guard let a = prev.firstObservedAt, let b = obsAt else { return prev.firstObservedAt ?? obsAt }
+                    return b < a ? b : a
+                }()
+                let latestAt: String? = {
+                    guard let a = prev.latestObservedAt, let b = obsAt else { return prev.latestObservedAt ?? obsAt }
+                    return b > a ? b : a
+                }()
+                groups[idx] = GroupedObservation(
+                    observation: prev.observation,
+                    repeatCount: prev.repeatCount + 1,
+                    firstObservedAt: firstAt,
+                    latestObservedAt: latestAt
+                )
+            } else {
+                byKey[key] = groups.count
+                groups.append(GroupedObservation(
+                    observation: row,
+                    repeatCount: 1,
+                    firstObservedAt: row.observed_at,
+                    latestObservedAt: row.observed_at
+                ))
+            }
+        }
+        return groups
     }
 }
 
@@ -3443,13 +3511,26 @@ struct FieldProvenanceSheet: View {
     }
 
     @ViewBuilder private func observationsSection(_ obs: [FieldProvenance.Observation]) -> some View {
+        let grouped = FieldProvenance.groupRepeatedObservations(obs)
         VStack(alignment: .leading, spacing: 10) {
             Text("OBSERVED")
                 .font(.system(.caption2, design: .monospaced)).foregroundStyle(.secondary)
-            ForEach(obs) { o in
+            ForEach(grouped) { g in
+                let o = g.observation
                 VStack(alignment: .leading, spacing: 5) {
-                    if let value = o.value, !value.isEmpty {
-                        Text("Reported: \(value)").font(.system(.footnote, design: .monospaced))
+                    HStack(alignment: .firstTextBaseline, spacing: 6) {
+                        if let value = o.value, !value.isEmpty {
+                            Text("Reported: \(value)").font(.system(.footnote, design: .monospaced))
+                        }
+                        Spacer(minLength: 0)
+                        if g.repeatCount > 1 {
+                            Text("Repeated \(g.repeatCount)×")
+                                .font(.system(size: 9, weight: .semibold, design: .monospaced))
+                                .padding(.horizontal, 6)
+                                .padding(.vertical, 2)
+                                .background(Capsule().fill(Color(.tertiarySystemFill)))
+                                .foregroundStyle(.secondary)
+                        }
                     }
                     if let c = o.content, !c.isEmpty {
                         Text(c).font(.footnote).foregroundStyle(.primary)
@@ -3461,7 +3542,12 @@ struct FieldProvenanceSheet: View {
                                 .foregroundStyle(.secondary)
                         }
                         Spacer()
-                        if let w = whenLabel(o.observed_at) {
+                        if g.repeatCount > 1,
+                           let first = whenLabel(g.firstObservedAt),
+                           let latest = whenLabel(g.latestObservedAt),
+                           first != latest {
+                            Text("\(first) – \(latest)").font(.system(.caption2, design: .monospaced)).foregroundStyle(.secondary)
+                        } else if let w = whenLabel(o.observed_at) {
                             Text(w).font(.system(.caption2, design: .monospaced)).foregroundStyle(.secondary)
                         }
                     }
