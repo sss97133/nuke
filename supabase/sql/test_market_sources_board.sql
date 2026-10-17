@@ -132,6 +132,8 @@ SELECT s.id, v.e, v.l, v.u FROM public.live_auction_sources s JOIN (VALUES
 \ir ../migrations/20261018032000_market_sources_rules_and_landing.sql
 \ir ../migrations/20261018033000_market_sources_org_identity.sql
 \ir ../migrations/20261018033000_market_sources_org_identity.sql
+\ir ../migrations/20261018034000_market_sources_hourly_live_landing.sql
+\ir ../migrations/20261018034000_market_sources_hourly_live_landing.sql
 
 -- BaT's organization has a recorded logo; Craigslist has no organization
 WITH org AS (INSERT INTO public.organizations (logo_url, business_type) VALUES ('https://example.test/bat-logo.png', 'auction_house') RETURNING id)
@@ -231,6 +233,14 @@ BEGIN
     (r->>19)::bigint = 48934 AND (r->>20)::date = current_date - 8 AND (r->>4)::bigint = 70000);
   SELECT x INTO r FROM jsonb_array_elements(b->'rows') x WHERE x->>0 = 'craigslist';
   PERFORM pg_temp.ok('no week-earlier reading: null, not zero', r->19 = 'null'::jsonb);
+  PERFORM pg_temp.ok('the board carries 24 hourly counts and 12 five-minute counts per source under landing',
+    jsonb_array_length(b->'landing'->'sources'->'mecum'->'hours24') = 24
+    AND jsonb_array_length(b->'landing'->'sources'->'mecum'->'mins60') = 12
+    AND (b->'landing'->'sources'->'mecum'->>'landed_24h')::int = 3);
+  PERFORM pg_temp.ok('market_source_landing_read drills into a single source down to the hour and recent events',
+    (public.market_source_landing_read('mecum')->>'landed_24h')::int = 3
+    AND jsonb_array_length(public.market_source_landing_read('mecum')->'hours24') = 24
+    AND jsonb_array_length(public.market_source_landing_read('mecum')->'recent') >= 3);
 END $$;
 SELECT pg_temp.fails('anon cannot read the table', $s$SELECT count(*) FROM public.market_source_days$s$);
 SELECT pg_temp.fails('anon cannot write the board', $s$SELECT public.record_market_source_day()$s$);
@@ -240,9 +250,10 @@ SELECT pg_temp.ok('authenticated reads the board', jsonb_array_length(public.mar
 SELECT pg_temp.fails('authenticated cannot write the landing log', $s$SELECT public.record_market_source_hours(3)$s$);
 SELECT pg_temp.fails('authenticated cannot write the board', $s$SELECT public.record_market_source_day()$s$);
 RESET ROLE;
-SELECT pg_temp.ok('both functions are definers with a pinned search_path',
+SELECT pg_temp.ok('all three functions are definers with a pinned search_path',
   (SELECT bool_and(p.prosecdef AND p.proconfig @> ARRAY['search_path=public, pg_temp']) FROM pg_proc p
-   WHERE p.proname IN ('record_market_source_day', 'market_sources_read')));
-SELECT pg_temp.ok('PUBLIC executes neither',
+   WHERE p.proname IN ('record_market_source_day', 'market_sources_read', 'market_source_landing_read')));
+SELECT pg_temp.ok('PUBLIC executes none of them',
   NOT has_function_privilege('public', 'public.record_market_source_day()', 'execute')
-  AND NOT has_function_privilege('public', 'public.market_sources_read()', 'execute'));
+  AND NOT has_function_privilege('public', 'public.market_sources_read()', 'execute')
+  AND NOT has_function_privilege('public', 'public.market_source_landing_read(text, timestamptz)', 'execute'));
