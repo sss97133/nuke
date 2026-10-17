@@ -11,9 +11,11 @@ const COLLECTIONS = [
   { key: 'listings', label: 'Classifieds' },
 ] as const;
 type Collection = typeof COLLECTIONS[number]['key'];
-// The home page's own params (HomePage reads tab and force_treemap). Every other param belongs to one collection's
-// lenses and does not apply in another: the classifieds' sort=newest re-sorted the BaT board, near=1 rode onto it.
-const PAGE_PARAMS = ['tab', 'force_treemap'];
+// The home page's own params (HomePage reads tab and force_treemap) plus the shared market scope
+// (make, family, family_name, model, year, era) so switching between Auctions, Calendar and Classifieds
+// preserves the vehicle scope the viewer drilled into on the treemap. Every other param belongs to one
+// collection's lenses and does not apply in another: the classifieds' sort=newest re-sorted the BaT board, near=1 rode onto it.
+const PAGE_PARAMS = ['tab', 'force_treemap', 'make', 'family', 'family_name', 'model', 'year', 'era'];
 
 // Asking/recorded prices never enter the BaT bid board's auction calculations.
 // Keep the existing explorer at the Market entry point. Source-only listing

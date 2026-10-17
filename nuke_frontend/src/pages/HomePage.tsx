@@ -16,7 +16,7 @@ import IntakePage from './intake/IntakePage';
 import { Text } from '../kit';
 import FamilyMovers from './market/FamilyMovers';
 import BrandFamilyMap, { MapViewSwitch } from './market/BrandFamilyMap';
-import FamilySalesChart, { FamilyViewSwitch } from './market/FamilySalesChart';
+import FamilySalesChart, { FamilyViewSwitch, useFamilySales, type Sale } from './market/FamilySalesChart';
 import { getDefinedFamilyEras, getFamilyEraCohorts, matchesEraRange } from '../lib/market/familyEras';
 import { buildMarketScopeUrl, resolveMarketScopeQuery } from '../lib/search/marketScopeResolver';
 
@@ -103,12 +103,12 @@ export function drillStackFromSearchParams(
   const rawModel = params.get('model')?.trim();
   if (rawModel) {
     stack.push({ label: rawModel, make, family: rawFamily || undefined, model: rawModel });
-    const rawYear = params.get('year')?.trim();
-    if (rawYear) {
-      const year = parseInt(rawYear, 10);
-      if (Number.isFinite(year)) {
-        stack.push({ label: String(year), make, family: rawFamily || undefined, model: rawModel, year });
-      }
+  }
+  const rawYear = params.get('year')?.trim();
+  if (rawYear && (rawModel || rawFamily)) {
+    const year = parseInt(rawYear, 10);
+    if (Number.isFinite(year)) {
+      stack.push({ label: String(year), make, family: rawFamily || undefined, model: rawModel || undefined, year });
     }
   }
   return stack;
@@ -1020,6 +1020,80 @@ export function TreemapHomePage({ onBrowse, embedded = false }: { onBrowse: () =
     currentLevel.model ? currentLevel.make ?? null : null,
     currentLevel.model ? currentLevel.model ?? null : null
   );
+  // Family-wide sales (5-year dated window via treemap_family_sales): enables direct Family -> Years -> Vehicles navigation
+  // and Era filtering without requiring a fragmented raw model string first.
+  const { sales: familySalesData } = useFamilySales(
+    currentLevel.family ? currentLevel.make ?? null : null,
+    currentLevel.family ? currentLevel.family : null,
+  );
+  const familyYearsNodes = useMemo<TreemapNode[] | null>(() => {
+    if (!familySalesData || familySalesData.length === 0) return null;
+    const byYear = new Map<number, number[]>();
+    for (const s of familySalesData) {
+      if (s.year == null || !Number.isFinite(s.year) || s.usd <= 0) continue;
+      const arr = byYear.get(s.year) ?? [];
+      arr.push(s.usd);
+      byYear.set(s.year, arr);
+    }
+    const out: TreemapNode[] = [];
+    for (const [yr, prices] of byYear.entries()) {
+      const sorted = [...prices].sort((a, b) => a - b);
+      const sum = sorted.reduce((acc, v) => acc + v, 0);
+      const mid = sorted.length >> 1;
+      const median = sorted.length >= 5
+        ? Math.round(sorted.length % 2 ? sorted[mid] : (sorted[mid - 1] + sorted[mid]) / 2)
+        : undefined;
+      out.push({
+        name: String(yr),
+        count: sorted.length,
+        value: sum,
+        median_price: median,
+        sold_count: sorted.length,
+        auction_count: sorted.length,
+      });
+    }
+    return out.sort((a, b) => b.value - a.value || parseInt(b.name, 10) - parseInt(a.name, 10));
+  }, [familySalesData]);
+  const familyYearVehiclesNodes = useMemo<TreemapNode[] | null>(() => {
+    if (!familySalesData || !currentLevel.year || currentLevel.model || !currentLevel.make) return null;
+    const yr = currentLevel.year;
+    return familySalesData
+      .filter((s) => s.year === yr && s.usd > 0)
+      .sort((a, b) => b.usd - a.usd)
+      .slice(0, 200)
+      .map((s) => ({
+        name: [s.year, currentLevel.make, s.model].filter(Boolean).join(' '),
+        count: 1,
+        value: s.usd,
+        median_price: s.usd,
+        id: s.vehicle_id,
+        isVehicle: true,
+      }));
+  }, [familySalesData, currentLevel.year, currentLevel.model, currentLevel.make]);
+  const effectiveYearsData = currentLevel.model ? yearsData : familyYearsNodes;
+  // Filter family sub-model tiles by active Era when familySalesData is loaded
+  const eraFilteredFamilyModels = useMemo<TreemapNode[] | null>(() => {
+    if (!familyModelsData) return null;
+    if (!selectedEra || !familySalesData || familySalesData.length === 0) return familyModelsData;
+    const byModel = new Map<string, { count: number; usd: number }>();
+    for (const s of familySalesData) {
+      if (!matchesEraRange(s.year, selectedEra) || s.usd <= 0 || !s.model) continue;
+      const key = s.model.trim().toLowerCase();
+      const prev = byModel.get(key) ?? { count: 0, usd: 0 };
+      prev.count += 1;
+      prev.usd += s.usd;
+      byModel.set(key, prev);
+    }
+    if (byModel.size === 0) return familyModelsData;
+    const filtered = familyModelsData
+      .map((node) => {
+        const stat = byModel.get(node.name.trim().toLowerCase());
+        if (!stat) return null;
+        return { ...node, count: stat.count, value: stat.usd, usd: stat.usd };
+      })
+      .filter((n): n is TreemapNode => n !== null);
+    return filtered.length > 0 ? filtered : familyModelsData;
+  }, [familyModelsData, selectedEra, familySalesData]);
   // Vehicle-level data: fetched when we have make+model and either a year or coming from years level
   const vehicleMake = currentLevel.year ? currentLevel.make ?? null : null;
   const vehicleModel = currentLevel.year ? currentLevel.model ?? null : null;
@@ -1067,18 +1141,19 @@ export function TreemapHomePage({ onBrowse, embedded = false }: { onBrowse: () =
       }
     }
     if (levelType === 'vehicles' && vehiclesData) return vehiclesData;
+    if (levelType === 'vehicles' && familyYearVehiclesNodes) return familyYearVehiclesNodes;
     if (levelType === 'years' && yearsData) {
       if (!selectedEra) return yearsData;
       const filtered = yearsData.filter((n) => matchesEraRange(parseInt(n.name, 10), selectedEra));
       return filtered.length > 0 ? filtered : yearsData;
     }
-    if (levelType === 'models' && familyModelsData) return familyModelsData;
+    if (levelType === 'models' && eraFilteredFamilyModels) return eraFilteredFamilyModels;
     if (levelType === 'families' && familiesData) return familiesData;
     if (levelType === 'families' && familiesFailed && modelsData) return modelsData;
     if (brandsData) return brandsData;
     return null;
     // drillStack triggers recompute when navigating so ref cache is checked
-  }, [levelType, brandsData, familiesData, familiesFailed, modelsData, familyModelsData, yearsData, vehiclesData, currentLevel, drillStack, selectedEra]);
+  }, [levelType, brandsData, familiesData, familiesFailed, modelsData, eraFilteredFamilyModels, yearsData, vehiclesData, familyYearVehiclesNodes, currentLevel, drillStack, selectedEra]);
 
   const isLoading = brandsLoading || (atFamilies && familiesLoading) || modelsLoading || (levelType === 'models' && familyModelsLoading) || yearsLoading || vehiclesLoading;
 
@@ -1122,6 +1197,7 @@ export function TreemapHomePage({ onBrowse, embedded = false }: { onBrowse: () =
   // has no tiles to put them on (the read ran under the chart on every family drill).
   const repImages = useRepresentativeImages(
     levelType === 'models' ? (familyView === 'names' ? familyModelsData : null) : levelType === 'years' ? yearsData
+      : levelType === 'vehicles' && !currentLevel.model ? familyYearVehiclesNodes
       : levelType === 'families' && familiesFailed ? modelsData : null,
     currentLevel.make
   );
@@ -1510,7 +1586,12 @@ export function TreemapHomePage({ onBrowse, embedded = false }: { onBrowse: () =
                 const params = new URLSearchParams();
                 params.set('tab', 'feed');
                 params.set('make', currentLevel.make!);
+                const familyLabel = drillStack.find((d) => d.family && !d.model)?.label || searchParams.get('family_name');
+                if (currentLevel.family) params.set('family', currentLevel.family);
+                if (familyLabel) params.set('family_name', familyLabel);
                 if (currentLevel.model) params.set('model', currentLevel.model);
+                else if (familyLabel) params.set('model', familyLabel);
+                if (selectedEra) params.set('era', selectedEra);
                 if (currentLevel.year) {
                   params.set('year_min', String(currentLevel.year));
                   params.set('year_max', String(currentLevel.year));
@@ -1648,7 +1729,7 @@ export function TreemapHomePage({ onBrowse, embedded = false }: { onBrowse: () =
         if (!currentLevel.make || (!currentLevel.family && !currentLevel.model)) return null;
         const familyLabel = drillStack.find((d) => d.family && !d.model)?.label || searchParams.get('family_name') || currentLevel.model || currentLevel.label;
         const definedEras = getDefinedFamilyEras(currentLevel.make, familyLabel);
-        const yearList = yearsData ? yearsData.flatMap((n) => {
+        const yearList = effectiveYearsData ? effectiveYearsData.flatMap((n) => {
           const y = parseInt(n.name, 10);
           return Number.isFinite(y) ? Array(Math.max(1, Math.min(n.count, 50))).fill(y) : [];
         }) : [];
@@ -1683,17 +1764,17 @@ export function TreemapHomePage({ onBrowse, embedded = false }: { onBrowse: () =
         );
       })()}
 
-      {/* ─── MODEL-YEAR QUICK-SWITCH BAR: 1-click year hopping when inspecting a sub-model or year ─── */}
-      {(levelType === 'years' || levelType === 'vehicles') && currentLevel.make && currentLevel.model && yearsData && yearsData.length > 1 && (() => {
+      {/* ─── MODEL-YEAR QUICK-SWITCH BAR: 1-click year hopping across a family, sub-model or year ─── */}
+      {(levelType === 'models' || levelType === 'years' || levelType === 'vehicles') && currentLevel.make && (currentLevel.family || currentLevel.model) && effectiveYearsData && effectiveYearsData.length > 1 && (() => {
         const eraFiltered = selectedEra
-          ? yearsData.filter((n) => matchesEraRange(parseInt(n.name, 10), selectedEra))
-          : yearsData;
-        const pool = (eraFiltered.length > 0 ? eraFiltered : yearsData)
+          ? effectiveYearsData.filter((n) => matchesEraRange(parseInt(n.name, 10), selectedEra))
+          : effectiveYearsData;
+        const pool = (eraFiltered.length > 0 ? eraFiltered : effectiveYearsData)
           .slice()
           .sort((a, b) => parseInt(a.name, 10) - parseInt(b.name, 10));
         if (pool.length < 2) return null;
         return (
-          <div className="home-family-submodels" role="navigation" aria-label="Model years">
+          <div className="home-family-submodels" role="navigation" aria-label="Model years" data-testid="family-year-pills">
             <span className="home-family-submodels-label">YEARS</span>
             <button
               type="button"
@@ -1819,7 +1900,8 @@ export function TreemapHomePage({ onBrowse, embedded = false }: { onBrowse: () =
             }
             const repImg = !rect.node.isVehicle
               ? repImages.get(rect.node.name.toLowerCase()) || repImages.get(rect.node.name)
-              : undefined;
+              : rect.node.imageUrl ? undefined
+              : repImages.get(rect.node.name.toLowerCase()) || (currentLevel.year ? repImages.get(String(currentLevel.year)) : undefined);
             return (
               <div
                 key={(rect.node.id || rect.node.name) + '-' + i}
