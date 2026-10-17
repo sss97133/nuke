@@ -99,10 +99,27 @@ it('decodes the reader by column name and refuses anything else', () => {
   expect(parseSourceLanding(batLandingDetail)?.recent[0]).toMatchObject({ title: '1991 Acura NSX 5-Speed', price: 42500 });
 });
 
-it('says how much of its own total we hold, in the total\'s terms', () => {
-  expect(heldShare({ held: 252399, population: 264746, populationMethod: 'enumerated' })).toEqual({ share: 252399 / 264746, text: '95% of 264,746' });
+it('says how much of its own total we hold, in the total\'s terms, and estimates pool depth with confidence when uncounted', () => {
+  expect(heldShare({ held: 252399, population: 264746, populationMethod: 'enumerated' })).toEqual({
+    share: 252399 / 264746,
+    text: '95% of 264,746',
+    estimated: false,
+  });
   expect(heldShare({ held: 6081, population: 27166, populationMethod: 'bounded' }).text).toBe('22% of about 27,166');
-  expect(heldShare({ held: 18659, population: null, populationMethod: 'unknown' })).toEqual({ share: null, text: 'their total unknown' });
+  expect(heldShare({
+    held: 19305,
+    population: 37783,
+    populationMethod: 'window_extrapolated',
+    populationConfidence: 0.56,
+  })).toEqual({
+    share: 19305 / 37783,
+    text: '51% of ~37,783 · 56% conf',
+    estimated: true,
+  });
+  const fallback = heldShare({ held: 18659, population: null, populationMethod: 'unknown' });
+  expect(fallback.estimated).toBe(true);
+  expect(fallback.share).toBeCloseTo(18659 / 26037, 4);
+  expect(fallback.text).toBe('72% of ~26,037 · 39% conf');
   expect(heldShare({ held: 445, population: 56004, populationMethod: 'bounded' }).text).toBe('<1% of about 56,004');
   expect(money(8488000000)).toBe('$8.5B');
   expect(money(575000000)).toBe('$575M');
@@ -148,8 +165,8 @@ it('ranks auction houses and marketplaces apart, same row for each, as the reade
   expect(rows[0].querySelector('.market-sources__live')?.textContent).toBe('1,265 live');
   expect(rows[0].querySelectorAll('.market-sources__spark rect')).toHaveLength(24);
   expect(rows[1].querySelector('.market-sources__live')?.textContent).toBe('—');
-  expect(rows[2].querySelector('.market-sources__unknown')).not.toBeNull();
-  expect(rows[2].querySelector('.market-sources__sharetext')?.textContent).toBe('their total unknown');
+  expect(rows[2].querySelector('.market-sources__fill--est')).not.toBeNull();
+  expect(rows[2].querySelector('.market-sources__sharetext')?.textContent).toBe('72% of ~26,037 · 39% conf');
   expect(rows[1].querySelector('.market-sources__landtext')?.textContent).toBe('+151,435 today');
   expect(rows[1].querySelectorAll('.market-sources__days rect')).toHaveLength(14);
   expect(rows[2].querySelector('.market-sources__landtext')?.textContent).toBe('idle since Oct 3');

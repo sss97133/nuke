@@ -336,14 +336,18 @@ final class DecodeTests: XCTestCase {
 
         let sourcesJSON = """
         {"as_of":"2026-10-17T12:00:00Z","day":"2026-10-17",
-         "columns":["source","name","category","house","held_lots","held_at","population","population_method","map_sales","map_usd","sales_12m","usd_12m","sales_prior_12m","usd_prior_12m","live_lots","landed_24h","landed_7d","last_landed","logo_url","business_type"],
-         "rows":[["bat","Bring a Trailer (BaT)","online_auction","bat",165000,"2026-10-17T12:00:00Z",166000,"enumerated",152000,12500000000,32000,2800000000,29000,2500000000,980,145,980,"2026-10-17T11:58:00Z",null,"online_auction"]],
+         "columns":["source","name","category","house","held_lots","held_at","population","population_method","population_confidence","map_sales","map_usd","sales_12m","usd_12m","sales_prior_12m","usd_prior_12m","live_lots","landed_24h","landed_7d","last_landed","logo_url","business_type"],
+         "rows":[
+           ["bat","Bring a Trailer (BaT)","online_auction","bat",165000,"2026-10-17T12:00:00Z",166000,"enumerated",0.98,152000,12500000000,32000,2800000000,29000,2500000000,980,145,980,"2026-10-17T11:58:00Z",null,"online_auction"],
+           ["cars-and-bids","Cars & Bids","online_auction","cars-and-bids",19305,"2026-10-17T12:00:00Z",37783,"window_extrapolated",0.56,1,50000,1,50000,0,0,0,0,0,"2026-10-17T11:58:00Z",null,"online_auction"]
+         ],
          "not_ranked":{"pcarmarket":4200}}
         """
         let sb = try XCTUnwrap(SourcesBoardData.parse(Data(sourcesJSON.utf8)))
-        XCTAssertEqual(sb.rows.count, 1)
+        XCTAssertEqual(sb.rows.count, 2)
         XCTAssertEqual(sb.rows[0].shortName, "Bring a Trailer")
         XCTAssertEqual(sb.rows[0].heldShareText, "99% of 166,000")
+        XCTAssertEqual(sb.rows[1].heldShareText, "51% of ~37,783 · 56% conf")
         XCTAssertEqual(sb.notRanked["pcarmarket"], 4200)
     }
 }

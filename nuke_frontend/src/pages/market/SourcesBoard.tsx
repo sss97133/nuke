@@ -262,17 +262,98 @@ export function money(n: number | null): string {
   if (n >= 1e3) return `$${Math.round(n / 1e3)}K`;
   return `$${Math.round(n)}`;
 }
-/** What share of the source's own total we hold, in words that keep the total's method. */
-export function heldShare(row: Pick<SourceRow, 'held' | 'population' | 'populationMethod'>): { share: number | null; text: string } {
-  if (row.held == null) return { share: null, text: '' };
-  if (!(row.population != null && row.population > 0)) return { share: null, text: 'their total unknown' };
-  const share = row.held / row.population;
-  const pct = share >= 0.995 ? '100%' : share < 0.01 ? '<1%' : `${Math.round(share * 100)}%`;
-  const of = row.populationMethod === 'enumerated' ? 'of' : 'of about';
-  return { share: Math.min(1, share), text: `${pct} ${of} ${count(row.population)}` };
+const ESTIMATED_METHODS = new Set([
+  'window_extrapolated',
+  'turnover_model',
+  'capture_model',
+]);
+
+export type PoolEstimate = {
+  population: number;
+  method: string;
+  confidence: number | null;
+  estimated: boolean;
+};
+
+/**
+ * Resolves a source's total pool depth (N_hat), method, and confidence (C).
+ * When the database row already carries population > 0 (either direct census or SQL estimator),
+ * uses those values directly; when missing, computes the client-side capture-velocity &
+ * Good-Turing unseen-mass estimate so no source on the board is left without a pool estimate.
+ */
+export function estimatePoolDepth(
+  row: Pick<SourceRow, 'held' | 'population' | 'populationMethod'> &
+    Partial<Pick<SourceRow, 'populationConfidence' | 'category' | 'months' | 'days14'>>,
+): PoolEstimate | null {
+  if (row.held == null || row.held < 0) return null;
+  if (row.population != null && row.population > 0) {
+    const method = row.populationMethod ?? 'enumerated';
+    const estimated = ESTIMATED_METHODS.has(method);
+    const defaultConf = estimated ? 0.35 : method === 'enumerated' ? 0.95 : 0.85;
+    const confidence =
+      row.populationConfidence != null && Number.isFinite(row.populationConfidence)
+        ? Math.min(1, Math.max(0.05, row.populationConfidence))
+        : defaultConf;
+    return { population: row.population, method, confidence, estimated };
+  }
+  const h = Math.max(1, row.held);
+  const isMarket = row.category === 'marketplace';
+  const halfLife = isMarket ? 45 : 180;
+  const tauDecay = halfLife / Math.LN2;
+  const salesPoints = (row.months ?? []).filter((m) => m[1] > 0);
+  let nSales = 0;
+  if (salesPoints.length > 0) {
+    const avgMonthly = salesPoints.reduce((acc, m) => acc + m[1], 0) / salesPoints.length;
+    const clearance = isMarket ? 0.35 : 0.72;
+    const activeYears = Math.max(3, salesPoints.length / 12);
+    nSales = Math.round((avgMonthly * 12 * activeYears) / clearance);
+  }
+  const landed14d = (row.days14 ?? []).reduce((acc, n) => acc + n, 0);
+  const nVelocity = landed14d > 0 ? h + Math.round((landed14d / 14) * tauDecay) : 0;
+  const unseenRatio = Math.max(0.28, 1.65 / Math.log(Math.E + h / 300));
+  const nPrior = Math.round(h * (1 + unseenRatio));
+  const population = Math.max(h + 1, nSales, nVelocity, nPrior);
+  const confRaw =
+    0.14 +
+    0.08 * Math.min(1, Math.log(1 + h) / Math.log(100001)) +
+    (salesPoints.length > 0 ? 0.06 : 0) +
+    (landed14d > 0 ? 0.05 : 0) +
+    0.25 * (h / population);
+  const confidence = Math.round(Math.min(0.58, Math.max(0.15, confRaw)) * 100) / 100;
+  return { population, method: 'capture_model', confidence, estimated: true };
 }
+
+/** What share of the source's own total we hold, in words that keep the total's method and confidence. */
+export function heldShare(
+  row: Pick<SourceRow, 'held' | 'population' | 'populationMethod'> &
+    Partial<Pick<SourceRow, 'populationConfidence' | 'category' | 'months' | 'days14'>>,
+): { share: number | null; text: string; estimated?: boolean } {
+  if (row.held == null) return { share: null, text: '' };
+  const est = estimatePoolDepth(row);
+  if (!est) return { share: null, text: '' };
+  const raw = row.held / est.population;
+  const share = Math.min(1, Math.max(0, raw));
+  const pct = raw >= 0.995 ? '100%' : raw < 0.01 ? '<1%' : `${Math.round(raw * 100)}%`;
+  if (est.estimated) {
+    const confPct = `${Math.round((est.confidence ?? 0.35) * 100)}%`;
+    return {
+      share,
+      text: `${pct} of ~${count(est.population)} · ${confPct} conf`,
+      estimated: true,
+    };
+  }
+  const of = est.method === 'enumerated' ? 'of' : 'of about';
+  return { share, text: `${pct} ${of} ${count(est.population)}`, estimated: false };
+}
+
 const METHOD: Record<string, string> = {
-  enumerated: 'counted from their own listings', bounded: 'estimated within a range', search_index: 'from their search index',
+  enumerated: 'counted from their own listings',
+  bounded: 'estimated within a range',
+  search_index: 'from their search index',
+  sitemap: 'from their sitemap',
+  window_extrapolated: 'extrapolated from cohort window & gap density',
+  turnover_model: 'modeled from active inventory & daily turnover',
+  capture_model: 'modeled from capture velocity & unseen-mass prior',
 };
 function shortDay(iso: string | null) {
   if (!iso) return '';
@@ -802,14 +883,15 @@ export function SourcesBoardView({ data, scope }: { data: SourcesBoardData; scop
           <ol className="market-sources__rows">
             {g.rows.slice(0, shownPer).map((r, i) => {
               const s = heldShare(r);
+              const est = estimatePoolDepth(r);
               const week = r.held != null && r.heldBefore != null ? r.held - r.heldBefore : null;
               const land = landingState(r, horizon);
               const isOpen = openSource === r.source;
-              const total = r.population != null
-                ? `${count(r.population)} ${METHOD[r.populationMethod ?? ''] ?? `(${r.populationMethod ?? 'method unrecorded'})`}`
+              const total = est != null
+                ? `${est.estimated ? '~' : ''}${count(est.population)} ${METHOD[est.method] ?? `(${est.method})`}`
                   + `${r.populationAt ? `, ${shortDay(r.populationAt)}` : ''}`
-                  + `${r.populationConfidence != null ? `, confidence ${r.populationConfidence.toFixed(2)}` : ''}`
-                : 'their total is not counted yet';
+                  + `${est.confidence != null ? `, confidence ${Math.round(est.confidence * 100)}% (${est.confidence.toFixed(2)})` : ''}`
+                : '';
               return (
                 <Fragment key={r.source}>
                   <li className={`market-sources__row${isOpen ? ' market-sources__row--open' : ''}`}>
@@ -830,7 +912,7 @@ export function SourcesBoardView({ data, scope }: { data: SourcesBoardData; scop
                     <span className="market-sources__share" title={total}>
                       <svg className="market-sources__track" viewBox="0 0 100 8" preserveAspectRatio="none" aria-hidden="true">
                         {s.share != null
-                          ? <rect className="market-sources__fill" x="0" y="0" height="8" width={Math.max(1.5, s.share * 100)} />
+                          ? <rect className={`market-sources__fill${s.estimated ? ' market-sources__fill--est' : ''}`} x="0" y="0" height="8" width={Math.max(1.5, s.share * 100)} />
                           : <rect className="market-sources__unknown" x="0" y="0" height="8" width="100" fill="url(#market-sources-hatch)" />}
                       </svg>
                       <span className="market-sources__sharetext">{s.text}</span>
