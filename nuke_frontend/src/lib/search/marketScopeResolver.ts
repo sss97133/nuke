@@ -82,6 +82,80 @@ const CULTURAL_SCOPE_ALIASES: Array<{
     familyHint: 'Mustang',
     modelHint: 'Mustang Mach 1',
   },
+  {
+    pattern: /\b(pagoda|w113|230\s*sl|250\s*sl|280\s*sl)\b/i,
+    make: 'Mercedes-Benz',
+    familyHint: 'SL',
+    era: '1963-1971',
+  },
+  {
+    pattern: /\b(gullwing|300\s*sl)\b/i,
+    make: 'Mercedes-Benz',
+    familyHint: 'SL',
+    modelHint: '300SL',
+    era: '1954-1963',
+  },
+  {
+    pattern: /\b(e30\s*m3)\b/i,
+    make: 'BMW',
+    familyHint: 'M3',
+    era: '1986-1991',
+  },
+  {
+    pattern: /\b(e36\s*m3)\b/i,
+    make: 'BMW',
+    familyHint: 'M3',
+    era: '1992-1999',
+  },
+  {
+    pattern: /\b(e46\s*m3)\b/i,
+    make: 'BMW',
+    familyHint: 'M3',
+    era: '2000-2006',
+  },
+  {
+    pattern: /\b(e9\b|3\.0\s*cs[il]?)\b/i,
+    make: 'BMW',
+    familyHint: '3.0 CSL',
+  },
+  {
+    pattern: /\b(993(?:\s+911)?|911\s+993)\b/i,
+    make: 'Porsche',
+    familyHint: '911',
+    era: '1995-1998',
+  },
+  {
+    pattern: /\b(964(?:\s+911)?|911\s+964)\b/i,
+    make: 'Porsche',
+    familyHint: '911',
+    era: '1989-1994',
+  },
+  {
+    pattern: /\b(split\s*window|c2\s*corvette|sting\s*ray\s*c2)\b/i,
+    make: 'Chevrolet',
+    familyHint: 'Corvette',
+    era: '1963-1967',
+  },
+  {
+    pattern: /\b(p\s*1800\w*|1800\s*(?:s|e|es))\b/i,
+    make: 'Volvo',
+    familyHint: 'P1800',
+  },
+  {
+    pattern: /\b(defender\s*(?:90|110|130))\b/i,
+    make: 'Land Rover',
+    familyHint: 'Defender',
+  },
+  {
+    pattern: /\b(syclone)\b/i,
+    make: 'GMC',
+    familyHint: 'Syclone',
+  },
+  {
+    pattern: /\b(grand\s*national|gnx)\b/i,
+    make: 'Buick',
+    familyHint: 'Grand National',
+  },
 ];
 
 // Words that indicate a natural-language filter query rather than a market scope drill
