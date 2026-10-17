@@ -104,28 +104,42 @@ const VehicleBadgeBar: React.FC = () => {
 
   return (
     <div className="vehicle-sub__badges" data-testid="vehicle-badge-bar" style={{ padding: '4px 12px', display: 'flex', flexWrap: 'wrap', gap: '6px', alignItems: 'center', borderBottom: '1px solid var(--vp-ghost, #e0e0e0)' }}>
+      <style>{`
+        .vp-identity-mark {
+          display: inline-flex;
+          align-items: center;
+          gap: 5px;
+          padding: 2px 6px;
+          border: 1px solid var(--border, #333);
+          background: var(--bg, #0d0d0d);
+          font-size: 9px;
+          font-weight: 800;
+          letter-spacing: 0.08em;
+          font-family: 'Courier New', monospace;
+        }
+        .vp-identity-mark__svg {
+          display: inline-flex;
+          align-items: center;
+          height: 15px;
+          width: 54px;
+        }
+        .vp-facet-chip {
+          font-size: 9px;
+          font-weight: 700;
+          letter-spacing: 0.06em;
+        }
+      `}</style>
       {/* VETTED ERA & TRIM EMBLEMS */}
       {identityMarks.map((mark) => (
         <span
           key={mark.id}
+          className="vp-identity-mark"
           data-testid={`vehicle-identity-mark-${mark.id}`}
           title={`${mark.displayLabel} — ${mark.subLabel}${mark.rpoCode ? ` (${mark.rpoCode})` : ''}`}
-          style={{
-            display: 'inline-flex',
-            alignItems: 'center',
-            gap: 5,
-            padding: '2px 6px',
-            border: '1px solid var(--border, #333)',
-            background: 'var(--bg, #0d0d0d)',
-            fontSize: 9,
-            fontWeight: 800,
-            letterSpacing: '0.08em',
-            fontFamily: "'Courier New', monospace",
-          }}
         >
           <span
             aria-hidden="true"
-            style={{ display: 'inline-flex', alignItems: 'center', height: 15, width: 54 }}
+            className="vp-identity-mark__svg"
             dangerouslySetInnerHTML={{ __html: mark.svgMarkup }}
           />
           <span>{mark.displayLabel}</span>
@@ -134,17 +148,17 @@ const VehicleBadgeBar: React.FC = () => {
 
       {/* ORTHOGONAL SERIES / TRIM / BODY STYLE FACET CHIPS */}
       {facets.series && (
-        <span className="badge" data-testid="vehicle-facet-series" style={{ fontSize: 9, fontWeight: 700, letterSpacing: '0.06em' }}>
+        <span className="badge vp-facet-chip" data-testid="vehicle-facet-series">
           SERIES · {facets.series}
         </span>
       )}
       {facets.trim && (
-        <span className="badge" data-testid="vehicle-facet-trim" style={{ fontSize: 9, fontWeight: 700, letterSpacing: '0.06em' }}>
+        <span className="badge vp-facet-chip" data-testid="vehicle-facet-trim">
           TRIM · {facets.trim}
         </span>
       )}
       {facets.body && (
-        <span className="badge" data-testid="vehicle-facet-body" style={{ fontSize: 9, fontWeight: 700, letterSpacing: '0.06em' }}>
+        <span className="badge vp-facet-chip" data-testid="vehicle-facet-body">
           BODY · {facets.body}
         </span>
       )}

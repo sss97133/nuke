@@ -32,6 +32,7 @@ CREATE TABLE public.vehicles (
   model text,
   canonical_make_id uuid REFERENCES public.canonical_makes(id),
   listing_title text,
+  bat_listing_title text,
   listing_url text,
   discovery_url text,
   primary_image_url text,
@@ -227,8 +228,8 @@ SELECT source AS house, count(*) AS dated_sold FROM public.mv_family_sales GROUP
 CREATE OR REPLACE VIEW public.v_market_measurement_coverage AS
 SELECT 'key'::text AS layer, sum(sold)::bigint AS numerator FROM public.mv_family_market;
 
-\ir ../migrations/20261018173000_apply_canonical_make_family_join_with_views.sql
 \ir ../migrations/20261018174500_apply_canonical_make_family_join_v2.sql
+\ir ../migrations/20261018180000_apply_canonical_make_family_join_v3.sql
 
 DO $assert$
 BEGIN

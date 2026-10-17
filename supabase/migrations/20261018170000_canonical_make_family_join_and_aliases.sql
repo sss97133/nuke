@@ -402,43 +402,40 @@ AS $function$
         CASE WHEN v.sale_date IS NOT NULL AND to_char(v.sale_date, 'MM-DD') <> '01-01' THEN v.sale_date::text END,
         CASE WHEN v.mileage IS NOT NULL AND v.mileage > 0 THEN 'mi:' || v.mileage::text END,
         NULLIF(regexp_replace(lower(COALESCE(NULLIF(btrim(v.listing_url), ''), NULLIF(btrim(v.discovery_url), ''))), '^https?://(www\.)?|/+$|\?.*$', '', 'g'), ''),
-        o.id::text
+        v.id::text
       )
     )
-      o.id,
-      o.year,
-      o.brand_name AS make,
-      o.model,
-      v.listing_title,
+      v.id, v.year, v.make, v.model,
+      COALESCE(v.listing_title, v.bat_listing_title) AS listing_title,
       o.sold_amount::bigint AS sold_amount,
-      o.sale_basis,
-      COALESCE(NULLIF(btrim(v.primary_image_url), ''), NULLIF(btrim(v.images[1]), '')) AS primary_image_url,
-      v.mileage
+      o.sale_basis, v.primary_image_url, v.mileage
     FROM public.mv_treemap_outcomes o
-    JOIN target_models tm ON lower(btrim(o.model)) = tm.model_l
+    JOIN target_models tm ON lower(o.model) = tm.model_l
     JOIN public.vehicles v ON v.id = o.id
-    WHERE o.sold_amount > 0
-      AND lower(o.brand_name) = lower(p_make)
+    WHERE lower(o.brand_name) = lower(p_make)
       AND (p_year IS NULL OR o.year = p_year)
+      AND o.sold_amount > 0
+      AND v.is_public IS TRUE AND v.deleted_at IS NULL
     ORDER BY
       o.year,
-      o.sold_amount::bigint,
+      o.sold_amount::bigint DESC,
       COALESCE(
         CASE WHEN v.sale_date IS NOT NULL AND to_char(v.sale_date, 'MM-DD') <> '01-01' THEN v.sale_date::text END,
         CASE WHEN v.mileage IS NOT NULL AND v.mileage > 0 THEN 'mi:' || v.mileage::text END,
         NULLIF(regexp_replace(lower(COALESCE(NULLIF(btrim(v.listing_url), ''), NULLIF(btrim(v.discovery_url), ''))), '^https?://(www\.)?|/+$|\?.*$', '', 'g'), ''),
-        o.id::text
+        v.id::text
       ),
-      (CASE WHEN COALESCE(NULLIF(btrim(v.primary_image_url), ''), NULLIF(btrim(v.images[1]), '')) IS NOT NULL THEN 0 ELSE 1 END),
-      (CASE WHEN v.vin IS NOT NULL AND length(btrim(v.vin)) = 17 THEN 0 ELSE 1 END),
-      (CASE WHEN v.mileage IS NOT NULL AND v.mileage > 0 THEN 0 ELSE 1 END),
-      length(COALESCE(v.listing_title, '')) DESC,
-      o.id
+      (COALESCE(v.listing_title, v.bat_listing_title) IS NOT NULL) DESC,
+      (v.primary_image_url IS NOT NULL) DESC,
+      (NULLIF(btrim(v.vin), '') IS NOT NULL) DESC,
+      (NULLIF(btrim(v.listing_url), '') IS NOT NULL) DESC,
+      length(COALESCE(v.model, '')) DESC,
+      v.id
   )
   SELECT id, year, make, model, listing_title, sold_amount, sale_basis, primary_image_url, mileage
   FROM deduped
   ORDER BY sold_amount DESC, id
-  LIMIT 36;
+  LIMIT 200;
 $function$;
 
 REVOKE ALL ON FUNCTION public.treemap_sales(text, text, integer) FROM PUBLIC;

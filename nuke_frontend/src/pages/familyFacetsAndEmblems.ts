@@ -1336,11 +1336,14 @@ export function resolveTileBadgeSvg(
   const brandLower = make.trim().toLowerCase();
   const tLower = tileName.trim().toLowerCase();
 
-  for (const mark of VETTED_IDENTITY_MARKS) {
-    if (mark.brand.toLowerCase() !== brandLower) continue;
-    if (mark.markKind === 'marque_emblem') continue;
-    if (year != null && (year < mark.yearStart || year > mark.yearEnd)) continue;
+  const candidates = VETTED_IDENTITY_MARKS.filter((mark) => {
+    if (mark.brand.toLowerCase() !== brandLower) return false;
+    if (mark.markKind === 'marque_emblem') return false;
+    if (year != null && (year < mark.yearStart || year > mark.yearEnd)) return false;
+    return true;
+  }).sort((a, b) => (b.trimPackage?.length ?? 0) - (a.trimPackage?.length ?? 0));
 
+  for (const mark of candidates) {
     if (mark.trimPackage && tLower.includes(mark.trimPackage.toLowerCase())) {
       return mark.svgMarkup;
     }
@@ -1351,6 +1354,9 @@ export function resolveTileBadgeSvg(
       if (!mark.family || !familyLabel || mark.family.toLowerCase() === familyLabel.trim().toLowerCase()) {
         return mark.svgMarkup;
       }
+    }
+    if (mark.markKind === 'model_wordmark' && mark.displayLabel.toLowerCase().includes(tLower)) {
+      return mark.svgMarkup;
     }
   }
   return undefined;

@@ -1,6 +1,7 @@
 import React, { useMemo, useState, useRef, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { supabase, getCurrentUserId } from '../../lib/supabase';
+import { HeaderSearchFacetPills } from '../HeaderSearch';
 import { aiDataIngestion, type ExtractionResult, ingestVehicle } from '../../services/aiDataIngestion';
 import { dataRouter, type DatabaseOperationPlan } from '../../services/dataRouter';
 import { findPublicVehicleByVin } from '../../lib/vehicleByVin';
@@ -381,7 +382,7 @@ export default function AIDataIngestionSearch() {
 
             let queryBuilder = supabase
               .from('vehicles')
-              .select('id, year, make, model, normalized_model, series, trim, title, sale_price, current_value, primary_image_url')
+              .select('id, year, make, model, normalized_model, series, trim, body_style, title, sale_price, current_value, primary_image_url')
               .eq('is_public', true)
               .or(orFilter);
 
@@ -408,6 +409,10 @@ export default function AIDataIngestionSearch() {
                   year: v.year,
                   make: v.make,
                   model: v.model,
+                  normalized_model: v.normalized_model,
+                  series: v.series,
+                  trim: v.trim,
+                  body_style: v.body_style,
                   price: v.sale_price || v.current_value
                 }
               }));
@@ -1844,6 +1849,12 @@ export default function AIDataIngestionSearch() {
                         }}
                       >
                         <span style={{ fontWeight: 600 }}>{m.model}</span>
+                        <HeaderSearchFacetPills
+                          make={makeStats.make}
+                          model={m.model}
+                          label={`${makeStats.make} ${m.model}`}
+                          compact
+                        />
                         <span style={{
                           fontFamily: '"Courier New", monospace',
                           fontSize: '9px', color: 'var(--text-secondary)',
@@ -1984,6 +1995,19 @@ export default function AIDataIngestionSearch() {
                     }}>
                       {result.subtitle}
                     </div>
+                  )}
+                  {(result.type === 'vehicle' || result.type === 'tag' || result.type === 'vin_match') && (
+                    <HeaderSearchFacetPills
+                      year={result.metadata?.year}
+                      make={result.metadata?.make}
+                      model={result.metadata?.model || result.metadata?.normalized_model}
+                      series={result.metadata?.series}
+                      trim={result.metadata?.trim}
+                      bodyStyle={result.metadata?.body_style}
+                      title={result.title}
+                      subtitle={result.subtitle}
+                      description={result.description}
+                    />
                   )}
                 </div>
 
