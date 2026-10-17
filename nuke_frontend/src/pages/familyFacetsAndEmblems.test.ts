@@ -91,11 +91,16 @@ describe('familyFacetsAndEmblems', () => {
     expect(c10Bucket!.count).toBe(1157 + 365 + 54);
     expect(c10Bucket!.usd).toBe(47_520_906 + 21_747_554 + 1_325_340);
     expect(c10Bucket!.sold_12m).toBe(220 + 80 + 12);
+    expect(c10Bucket!.facetAxis).toBe('series');
+    expect(c10Bucket!.familySharePct).toBeCloseTo(((1157 + 365 + 54) / (1157 + 365 + 54 + 11 + 382)) * 100, 1);
+    expect(c10Bucket!.median_price).toBe(Math.round((47_520_906 + 21_747_554 + 1_325_340) / (1157 + 365 + 54)));
 
     const trimNodes = buildFacetNodes('trim', 'Chevrolet', 'Pickup', rawModels, null);
     const cheyenneSuperBucket = trimNodes!.find((n) => n.name === 'Cheyenne Super');
     expect(cheyenneSuperBucket).toBeDefined();
     expect(cheyenneSuperBucket!.count).toBe(11);
+    expect(cheyenneSuperBucket!.facetAxis).toBe('trim');
+    expect(cheyenneSuperBucket!.familySharePct).toBeCloseTo((11 / (1157 + 365 + 54 + 11 + 382)) * 100, 1);
   });
 
   it('resolves period-correct Squarebody 1973–1974 vs 1975–1980 vs 1981–1987 emblems without cross-era contamination', () => {

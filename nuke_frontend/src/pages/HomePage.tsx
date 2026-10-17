@@ -69,9 +69,11 @@ export interface TreemapNode {
   mileage?: number;
   facetRepresentativeModel?: string;
   badgeSvg?: string;
+  facetAxis?: Exclude<FamilyFacetAxis, 'raw'>;
+  familySharePct?: number;
 }
 
-interface TreemapRect {
+export interface TreemapRect {
   node: TreemapNode;
   x: number;
   y: number;
@@ -817,6 +819,75 @@ const fmtMoneyShort = (n: number) => n >= 1_000_000_000 ? `$${(n / 1_000_000_000
   : n >= 1_000_000 ? `$${Math.round(n / 1_000_000)}M` : n >= 1_000 ? `$${Math.round(n / 1_000)}K` : `$${Math.round(n)}`;
 const fmtCountShort = (n: number) => n >= 10_000 ? `${Math.round(n / 1_000)}K` : n >= 1_000 ? `${(n / 1_000).toFixed(1)}K` : `${n}`;
 
+/**
+ * Lines for a facet tile (`SERIES`, `TRIM`, or `BODY STYLE`) inside a model family:
+ * puts lot count, median price, and share-of-family percentage on the primary line so every facet tile
+ * compares its cohort share, volume, and price at a glance without being pushed off by secondary lines.
+ */
+export function facetTileLines(node: TreemapNode, totalCount: number, maxChars = Infinity): string[] {
+  const forms: string[][] = [];
+  const pct = node.familySharePct ?? (totalCount > 0 ? (node.count / totalCount) * 100 : 0);
+  const shareStr = pct >= 0.1 ? `${pct.toFixed(1)}%` : null;
+  const effectivePrice = node.median_price ?? (node.usd && node.count > 0 ? Math.round(node.usd / node.count) : undefined);
+  const tag = node.median_price ? 'med' : 'avg';
+
+  if (effectivePrice && shareStr) {
+    forms.push([
+      `${fmtNum(node.count)} sold · ${fmtMoney(effectivePrice)} ${tag} · ${shareStr} of family`,
+      `${fmtNum(node.count)} sold · ${fmtMoney(effectivePrice)} ${tag} · ${shareStr}`,
+      `${fmtCountShort(node.count)} sold · ${fmtMoneyShort(effectivePrice)} ${tag} · ${shareStr}`,
+      `${fmtCountShort(node.count)} · ${fmtMoneyShort(effectivePrice)} ${tag} · ${shareStr}`,
+      `${fmtCountShort(node.count)} · ${fmtMoneyShort(effectivePrice)} · ${shareStr}`,
+      `${fmtMoneyShort(effectivePrice)} ${tag} · ${shareStr}`,
+      `${fmtCountShort(node.count)} · ${shareStr}`,
+      shareStr,
+    ]);
+  } else if (effectivePrice) {
+    forms.push([
+      `${fmtNum(node.count)} sold · ${fmtMoney(effectivePrice)} ${tag}`,
+      `${fmtCountShort(node.count)} · ${fmtMoneyShort(effectivePrice)} ${tag}`,
+      `${fmtMoneyShort(effectivePrice)} ${tag}`,
+    ]);
+  } else if (shareStr) {
+    forms.push([
+      `${fmtNum(node.count)} sold · ${shareStr} of family`,
+      `${fmtCountShort(node.count)} sold · ${shareStr}`,
+      `${fmtCountShort(node.count)} · ${shareStr}`,
+      shareStr,
+    ]);
+  } else if (node.count > 0) {
+    forms.push([`${fmtNum(node.count)} sold`, `${fmtCountShort(node.count)}`]);
+  }
+
+  if (node.usd && node.usd > 0) {
+    const money = fmtMoneyShort(node.usd);
+    forms.push([`${fmtMoney(node.usd)} total`, `${money} total`, money]);
+  }
+
+  const m = brandMomentum(node);
+  const d = brandDollarMomentum(node);
+  if (m !== null) {
+    forms.push([
+      ...(d !== null ? [`12 mo: sales ${signedPct(m)}, $ ${signedPct(d)}`] : []),
+      `12 mo: sales ${signedPct(m)}`,
+      `12 mo ${signedPct(m)}`,
+    ]);
+  } else if ((node.sold_12m ?? 0) > 0 || (node.sold_prior_12m ?? 0) > 0) {
+    const s12 = node.sold_12m ?? 0;
+    const sp = node.sold_prior_12m ?? 0;
+    forms.push([
+      sp > 0
+        ? `12 mo: ${fmtNum(s12)} sold (${fmtNum(sp)} prior)`
+        : `12 mo: ${fmtNum(s12)} sold${node.usd_12m ? ` · ${fmtMoney(node.usd_12m)}` : ''}`,
+      `12 mo: ${fmtNum(s12)} sold`,
+    ]);
+  }
+
+  return forms
+    .map((f) => f.find((line) => lineChars(line) <= maxChars))
+    .filter((line): line is string => line !== undefined);
+}
+
 // ────────────────────────────────────────────────────────────
 // TREEMAP CELL COMPONENT
 // ────────────────────────────────────────────────────────────
@@ -828,20 +899,23 @@ interface CellProps {
   showValue?: boolean;
   repImage?: string;
   repImages?: string[];
+  facetAxis?: FamilyFacetAxis;
 }
 
-function TreemapCell({ rect, onClick, totalCount, showValue, repImage, repImages }: CellProps) {
+export function TreemapCell({ rect, onClick, totalCount, showValue, repImage, repImages, facetAxis }: CellProps) {
   const { node, x, y, w, h } = rect;
   const [hovered, setHovered] = useState(false);
   const [imgLoaded, setImgLoaded] = useState(false);
   const [failedIdx, setFailedIdx] = useState(0);
 
   const pct = totalCount > 0 ? ((node.count / totalCount) * 100) : 0;
-  const isBrandMarket = node.usd != null && !node.isVehicle;
+  const sharePct = node.familySharePct ?? pct;
+  const isVehicle = !!node.isVehicle;
+  const isFacetTile = !isVehicle && ((!!facetAxis && facetAxis !== 'raw') || !!node.facetAxis);
+  const isBrandMarket = node.usd != null && !isVehicle;
   const effectivePrice = node.median_price ?? (node.usd && node.count > 0 ? Math.round(node.usd / node.count) : undefined);
   const mom = isBrandMarket ? brandMomentum(node) : null;
   const bg = isBrandMarket && mom !== null ? momentumToColor(mom) : priceToColor(effectivePrice);
-  const isVehicle = !!node.isVehicle;
   const candidateUrls = useMemo(() => {
     const list: string[] = [];
     if (isVehicle && node.imageUrl) list.push(node.imageUrl);
@@ -885,7 +959,11 @@ function TreemapCell({ rect, onClick, totalCount, showValue, repImage, repImages
   const maxChars = Math.floor((w - 12) / (dataFontSize * 0.6));
   const maxLines = Math.max(1, Math.floor((h - nameFontSize * 1.4 - 10) / lineHeightPx));
   const marketLines = (() => {
-    if (!isBrandMarket || !canShowCount) return [];
+    if (!canShowCount) return [];
+    if (isFacetTile) {
+      return facetTileLines(node, totalCount, maxChars).slice(0, maxLines);
+    }
+    if (!isBrandMarket) return [];
     const base = brandLines(node, maxChars);
     const pick = (...candidates: string[]) => candidates.find((s) => s.length <= maxChars);
     if (node.count > 1 && effectivePrice) {
@@ -982,15 +1060,27 @@ function TreemapCell({ rect, onClick, totalCount, showValue, repImage, repImages
       }}>
         {canShowName && !isVehicle && (
           <div className="flex flex-col gap-[3px]">
-            {node.badgeSvg && w >= 110 && h >= 58 && (
-              <div
-                aria-hidden="true"
-                data-testid="treemap-cell-badge"
-                className="inline-flex items-center"
-                style={{ height: area > 25000 ? 22 : 16, maxWidth: Math.min(130, w - 12) }}
-                dangerouslySetInnerHTML={{ __html: node.badgeSvg }}
-              />
-            )}
+            {(node.badgeSvg && w >= 110 && h >= 58) || (isFacetTile && canShowCount && sharePct >= 0.1) ? (
+              <div className="treemap-cell-header-row">
+                {node.badgeSvg && w >= 110 && h >= 58 && (
+                  <div
+                    aria-hidden="true"
+                    data-testid="treemap-cell-badge"
+                    className="inline-flex items-center"
+                    style={{ height: area > 25000 ? 22 : 16, maxWidth: Math.min(130, w - 12) }}
+                    dangerouslySetInnerHTML={{ __html: node.badgeSvg }}
+                  />
+                )}
+                {isFacetTile && canShowCount && sharePct >= 0.1 && (
+                  <span
+                    data-testid="treemap-cell-facet-share"
+                    className={`treemap-cell-facet-share${onDark ? ' treemap-cell-facet-share--dark' : ''}`}
+                  >
+                    {w >= 110 ? `${sharePct.toFixed(1)}% OF FAMILY` : `${sharePct.toFixed(1)}%`}
+                  </span>
+                )}
+              </div>
+            ) : null}
             <div
               style={{
                 fontSize: nameFontSize,
@@ -1034,6 +1124,7 @@ function TreemapCell({ rect, onClick, totalCount, showValue, repImage, repImages
           {marketLines.map((line, i) => (
             <div
               key={i}
+              data-testid={isFacetTile && i === 0 ? 'treemap-cell-facet-primary-line' : undefined}
               style={{
                 fontSize: dataFontSize,
                 fontFamily: "'Courier New', monospace",
@@ -1048,7 +1139,7 @@ function TreemapCell({ rect, onClick, totalCount, showValue, repImage, repImages
               {line}
             </div>
           ))}
-          {canShowCount && !isBrandMarket && (
+          {canShowCount && !isBrandMarket && !isFacetTile && (
             <div
               style={{
                 fontSize: dataFontSize,
@@ -1060,7 +1151,7 @@ function TreemapCell({ rect, onClick, totalCount, showValue, repImage, repImages
               {fmtNum(node.count)} sold
             </div>
           )}
-          {canShowPrice && node.median_price && !isBrandMarket && (
+          {canShowPrice && node.median_price && !isBrandMarket && !isFacetTile && (
             <div
               style={{
                 fontSize: isVehicle ? nameFontSize : dataFontSize,
@@ -1085,7 +1176,7 @@ function TreemapCell({ rect, onClick, totalCount, showValue, repImage, repImages
               {fmtNum(node.mileage!)} mi
             </div>
           )}
-          {canShowPct && pct >= 0.1 && !isBrandMarket && (
+          {canShowPct && pct >= 0.1 && !isBrandMarket && !isFacetTile && (
             <div
               style={{
                 fontSize: 8,
@@ -1161,12 +1252,14 @@ function TreemapTooltip({ node, x, y, totalCount, level }: TooltipData) {
     const m = brandMomentum(node);
     const d = brandDollarMomentum(node);
     const effectivePrice = node.median_price ?? (node.usd && node.count > 0 ? Math.round(node.usd / node.count) : undefined);
+    const sharePct = node.familySharePct ?? (totalCount > 0 ? Number(((node.count / totalCount) * 100).toFixed(1)) : null);
     return (
       <div style={containerStyle}>
         <Text role="label" as="div">{node.name}</Text>
         <div><Text role="measure">{fmtMoney(node.usd)}</Text> <Text role="caption">from {fmtNum(node.count)} confirmed sales</Text></div>
         <div className="border-t border-[var(--border)] pt-1.5 flex flex-col gap-[3px]">
-          {node.count > 1 && effectivePrice ? <Row label={node.median_price ? 'median sale' : 'average sale'} value={fmtMoney(effectivePrice)} /> : null}
+          {sharePct != null && sharePct > 0 ? <Row label="share of family" value={`${sharePct.toFixed(1)}%`} /> : null}
+          {node.count >= 1 && effectivePrice ? <Row label={node.median_price ? 'median sale' : 'average sale'} value={fmtMoney(effectivePrice)} /> : null}
           {node.offered && node.sold_any != null ? <Row label={`of ${fmtNum(node.offered)} offered sold`} value={`${Math.round((100 * node.sold_any) / node.offered)}%`} /> : null}
           {node.sold_12m != null ? <Row label="sold (measured houses, 12 mo)" value={`${fmtNum(node.sold_12m)}${node.usd_12m ? ` · ${fmtMoney(node.usd_12m)}` : ''}`} /> : null}
           {node.sold_prior_12m != null ? <Row label="sold (12 mo before)" value={`${fmtNum(node.sold_prior_12m)}${node.usd_prior_12m ? ` · ${fmtMoney(node.usd_prior_12m)}` : ''}`} /> : null}
@@ -2670,6 +2763,7 @@ export function TreemapHomePage({ onBrowse, embedded = false }: { onBrowse: () =
                   totalCount={totalCount}
                   repImage={repImgCandidates?.[0]}
                   repImages={repImgCandidates}
+                  facetAxis={levelType === 'models' ? facetAxis : undefined}
                 />
               </div>
             );
@@ -2915,6 +3009,31 @@ export function TreemapHomePage({ onBrowse, embedded = false }: { onBrowse: () =
         .home-facet-axis-tab--active {
           background: var(--text);
           color: var(--bg);
+        }
+        .treemap-cell-header-row {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 4px;
+          flex-wrap: wrap;
+        }
+        .treemap-cell-facet-share {
+          display: inline-flex;
+          align-items: center;
+          font-size: 8px;
+          font-weight: 700;
+          letter-spacing: 0.05em;
+          font-family: 'Courier New', monospace;
+          padding: 1px 4px;
+          border: 1px solid var(--border);
+          color: var(--text-secondary);
+          background: var(--bg);
+          white-space: nowrap;
+        }
+        .treemap-cell-facet-share--dark {
+          color: var(--bg);
+          background: var(--text);
+          border-color: var(--text);
         }
         .home-empty-state {
           position: absolute;
