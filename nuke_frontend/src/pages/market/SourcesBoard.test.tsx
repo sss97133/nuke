@@ -5,7 +5,7 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 
 const fixture = vi.hoisted(() => ({ rpc: vi.fn() }));
 vi.mock('../../lib/supabase', () => ({ supabase: { rpc: fixture.rpc } }));
-import SourcesBoard, { heldShare, landingState, monthBars, money, parseSourceLanding, parseSources, shortName } from './SourcesBoard';
+import SourcesBoard, { describeRecordDate, heldShare, landingState, monthBars, money, parseSourceLanding, parseSources, shortName } from './SourcesBoard';
 
 // market_sources_read (20261018034000), shaped as production answers: columns, then one array per source by held lots, plus landing.
 const columns = ['source', 'name', 'category', 'house', 'held_lots', 'held_at', 'population', 'population_method',
@@ -29,8 +29,14 @@ const value = {
       null, null, null, null, null, null, null, 0, null, null, null, 0, 0, '2026-10-03T14:00:00Z', days(0), null, null],
     ['craigslist', 'Craigslist', 'marketplace', null, 8411, '2026-10-16T10:27:00Z', null, null, null, null,
       null, null, null, null, null, null, null, 0, null, null, null, 1257, 2232, '2026-10-16T09:00:00Z', days(1257), null, null],
+    ['avant-garde-collection', 'Avant-Garde Collection', 'dealer', null, 3246, '2026-10-16T10:27:00Z', null, null, null,
+      null, 1641, 164210000, 322, 43880000, 390, 35000000, [['2026-10', 34, 3100000]], 26, '2026-10-16T10:45:00Z',
+      3159, '2026-10-09', 3, 87, '2026-10-16T09:00:00Z', days(3), 'https://nuke.ag/source-logos/avant-garde-collection.png', 'dealer'],
+    ['beverlyhillscarclub', 'Beverly Hills Car Club', 'dealer', null, 1968, '2026-10-16T10:27:00Z', null, null, null,
+      null, 1358, 150000, 1355, null, null, null, [['2026-10', 1355, 150000]], 657, '2026-10-16T10:45:00Z',
+      1968, '2026-10-09', 0, 0, null, days(0), 'https://nuke.ag/source-logos/beverlyhillscarclub.png', 'dealer'],
   ],
-  not_ranked: { 'capture channels': 2, aggregator: 2, dealer: 2, shop: 1 },
+  not_ranked: { 'capture channels': 2, aggregator: 2, shop: 1 },
   landing: {
     hour: '2026-10-16T10:00:00Z',
     bucket_5m: '2026-10-16T10:45:00Z',
@@ -62,12 +68,44 @@ const batLandingDetail = {
       source: 'bat',
       event_type: 'auction',
       event_status: 'active',
+      reserve: 'no_reserve',
       price: 42500,
+      bid_count: 14,
+      year: 1991,
+      make: 'Acura',
+      model: 'NSX 5-Speed',
+      trim: 'Base',
+      vin: 'JH4NA1150MT001234',
+      mileage: 38200,
+      record_date: '2026-10-23T18:00:00Z',
       title: '1991 Acura NSX 5-Speed',
+      raw_title: '1991 Acura NSX 5-Speed',
       lot: 'bringatrailer.com/listing/1991-acura-nsx',
       vehicle_id: 'veh-nsx',
       source_url: 'https://bringatrailer.com/listing/1991-acura-nsx',
       created_at: '2026-10-16T10:46:12Z',
+    },
+    {
+      id: 'ev-2',
+      source: 'bat',
+      event_type: 'auction',
+      event_status: 'sold',
+      reserve: 'reserve',
+      price: 18500,
+      bid_count: 9,
+      year: 1972,
+      make: null,
+      model: '500 Jolly Conversion',
+      trim: null,
+      vin: null,
+      mileage: null,
+      record_date: '2023-06-22 15:00:00+00',
+      title: '1972 Fiat 500 Jolly Conversion',
+      raw_title: '1972 Fiat 500 Jolly Conversion',
+      lot: 'T218',
+      vehicle_id: 'veh-jolly',
+      source_url: 'https://bringatrailer.com/listing/1972-fiat-500-jolly',
+      created_at: '2026-10-16T10:45:00Z',
     },
   ],
 };
@@ -81,14 +119,16 @@ afterEach(async () => { await act(async () => root.unmount()); container.remove(
 
 it('decodes the reader by column name and refuses anything else', () => {
   const d = parseSources(value)!;
-  expect(d.rows.map((r) => r.source)).toEqual(['bat', 'mecum', 'cars-and-bids', 'craigslist']);
+  expect(d.rows.map((r) => r.source)).toEqual(['bat', 'mecum', 'cars-and-bids', 'craigslist', 'avant-garde-collection', 'beverlyhillscarclub']);
   expect(d.rows[0]).toMatchObject({ held: 252399, population: 264746, live: 1265, heldBefore: 251000, sales12: 39173, landed15m: 6, landed1h: 18 });
   expect(d.rows[0].hours24).toHaveLength(24);
   expect(d.rows[0].mins60).toHaveLength(12);
   expect(d.rows[2]).toMatchObject({ population: null, months: [], live: 0, landed24: 0 });
   expect(d.rows[1]).toMatchObject({ landed24: 151435, landed7: 151435 });
   expect(d.rows[1].days14).toHaveLength(14);
-  expect(d.notRanked).toEqual({ 'capture channels': 2, aggregator: 2, dealer: 2, shop: 1 });
+  expect(d.rows[4]).toMatchObject({ category: 'dealer', held: 3246, live: 26, logoUrl: '/source-logos/avant-garde-collection.png', businessType: 'dealer' });
+  expect(d.rows[5]).toMatchObject({ category: 'dealer', held: 1968, live: 657, logoUrl: '/source-logos/beverlyhillscarclub.png', businessType: 'dealer' });
+  expect(d.notRanked).toEqual({ 'capture channels': 2, aggregator: 2, shop: 1 });
   // a reordered payload decodes the same
   const order = [...columns].reverse();
   const reordered = { ...value, columns: order, rows: value.rows.map((r) => order.map((c) => r[columns.indexOf(c)])) };
@@ -96,30 +136,26 @@ it('decodes the reader by column name and refuses anything else', () => {
   expect(parseSources(null)).toBeNull();
   expect(parseSources([value])).toBeNull();
   expect(parseSources({ ...value, columns: ['name'] })).toBeNull();
-  expect(parseSourceLanding(batLandingDetail)?.recent[0]).toMatchObject({ title: '1991 Acura NSX 5-Speed', price: 42500 });
+  expect(parseSourceLanding(batLandingDetail)?.recent[0]).toMatchObject({
+    year: 1991,
+    make: 'Acura',
+    model: 'NSX 5-Speed',
+    vin: 'JH4NA1150MT001234',
+    mileage: 38200,
+    recordDate: '2026-10-23T18:00:00Z',
+    price: 42500,
+  });
+  const nowRef = Date.parse('2026-10-17T21:00:00Z');
+  expect(describeRecordDate('2026-10-24T21:00:00Z', nowRef)).toMatchObject({ dateText: 'Oct 24, 2026', ageText: 'ends +7d', kind: 'live' });
+  expect(describeRecordDate('2026-10-17T20:00:00Z', nowRef)).toMatchObject({ dateText: 'Oct 17, 2026', ageText: 'today', kind: 'fresh' });
+  expect(describeRecordDate('2023-06-22 15:00:00+00', nowRef)).toMatchObject({ dateText: 'Jun 22, 2023', ageText: '3.3y old', kind: 'backfill' });
+  expect(describeRecordDate(null, nowRef)).toMatchObject({ dateText: 'no date', ageText: 'missing', kind: 'missing' });
 });
 
-it('says how much of its own total we hold, in the total\'s terms, and estimates pool depth with confidence when uncounted', () => {
-  expect(heldShare({ held: 252399, population: 264746, populationMethod: 'enumerated' })).toEqual({
-    share: 252399 / 264746,
-    text: '95% of 264,746',
-    estimated: false,
-  });
+it('says how much of its own total we hold, in the total\'s terms', () => {
+  expect(heldShare({ held: 252399, population: 264746, populationMethod: 'enumerated' })).toEqual({ share: 252399 / 264746, text: '95% of 264,746' });
   expect(heldShare({ held: 6081, population: 27166, populationMethod: 'bounded' }).text).toBe('22% of about 27,166');
-  expect(heldShare({
-    held: 19305,
-    population: 37783,
-    populationMethod: 'window_extrapolated',
-    populationConfidence: 0.56,
-  })).toEqual({
-    share: 19305 / 37783,
-    text: '51% of ~37,783 · 56% conf',
-    estimated: true,
-  });
-  const fallback = heldShare({ held: 18659, population: null, populationMethod: 'unknown' });
-  expect(fallback.estimated).toBe(true);
-  expect(fallback.share).toBeCloseTo(18659 / 26037, 4);
-  expect(fallback.text).toBe('72% of ~26,037 · 39% conf');
+  expect(heldShare({ held: 18659, population: null, populationMethod: 'unknown' })).toEqual({ share: null, text: 'their total unknown' });
   expect(heldShare({ held: 445, population: 56004, populationMethod: 'bounded' }).text).toBe('<1% of about 56,004');
   expect(money(8488000000)).toBe('$8.5B');
   expect(money(575000000)).toBe('$575M');
@@ -144,35 +180,40 @@ it('draws 24 months ending at the board\'s month, empty months as zero', () => {
   expect(bars.reduce((a, b) => a + b, 0)).toBe(4500);
 });
 
-it('ranks auction houses and marketplaces apart, same row for each, as the reader orders them', async () => {
+it('ranks auction houses, marketplaces, and dealers apart, same row for each, as the reader orders them', async () => {
   fixture.rpc.mockImplementation((fn: string) => Promise.resolve(fn === 'market_sources_read'
     ? { data: value, error: null } : { data: null, error: { message: 'none' } }));
   await act(async () => root.render(<SourcesBoard />));
   expect(fixture.rpc).toHaveBeenCalledWith('market_sources_read');
   const groups = [...container.querySelectorAll('.market-sources__group')];
-  expect(groups.map((g) => g.querySelector('.market-sources__group-title')?.textContent)).toEqual(['Auction houses', 'Marketplaces']);
+  expect(groups.map((g) => g.querySelector('.market-sources__group-title')?.textContent)).toEqual(['Auction houses', 'Marketplaces', 'Dealers']);
   expect(groups.map((g) => [...g.querySelectorAll('.market-sources__name')].map((n) => n.textContent))).toEqual(
-    [['Bring a Trailer', 'Mecum Auctions', 'Cars & Bids'], ['Craigslist']]);
+    [['Bring a Trailer', 'Mecum Auctions', 'Cars & Bids'], ['Craigslist'], ['Avant-Garde Collection', 'Beverly Hills Car Club']]);
   expect(groups[1].querySelector('.market-sources__rank')?.textContent).toBe('1');
+  expect(groups[2].querySelector('.market-sources__rank')?.textContent).toBe('1');
   expect(groups[0].querySelector('.market-sources__name img')?.getAttribute('src')).toBe('https://example.test/bat.png');
+  expect(groups[2].querySelector('.market-sources__name img')?.getAttribute('src')).toBe('/source-logos/avant-garde-collection.png');
+  expect(groups[2].querySelectorAll('.market-sources__name')[1].querySelector('img')?.getAttribute('src')).toBe('/source-logos/beverlyhillscarclub.png');
   expect(groups[0].querySelectorAll('.market-sources__name')[1].querySelector('img')).toBeNull();   // no recorded logo: the type icon
   expect(groups[0].querySelectorAll('.market-sources__name')[1].querySelector('svg')).not.toBeNull();
   expect(groups[1].querySelector('.market-sources__cols .n')?.textContent).toBe('listings held');
+  expect(groups[2].querySelector('.market-sources__cols .n')?.textContent).toBe('vehicles held');
   const rows = [...container.querySelectorAll('li.market-sources__row')];
   expect(rows.every((r) => r.children.length === 7)).toBe(true);
   expect(rows[0].querySelector('.market-sources__held')?.textContent).toBe('252,399 +1,399 since Oct 9');
   expect(rows[0].querySelector('.market-sources__sharetext')?.textContent).toBe('95% of 264,746');
   expect(rows[0].querySelector('.market-sources__live')?.textContent).toBe('1,265 live');
+  expect(rows[4].querySelector('.market-sources__live')?.textContent).toBe('26 live');
   expect(rows[0].querySelectorAll('.market-sources__spark rect')).toHaveLength(24);
   expect(rows[1].querySelector('.market-sources__live')?.textContent).toBe('—');
-  expect(rows[2].querySelector('.market-sources__fill--est')).not.toBeNull();
-  expect(rows[2].querySelector('.market-sources__sharetext')?.textContent).toBe('72% of ~26,037 · 39% conf');
+  expect(rows[2].querySelector('.market-sources__unknown')).not.toBeNull();
+  expect(rows[2].querySelector('.market-sources__sharetext')?.textContent).toBe('their total unknown');
   expect(rows[1].querySelector('.market-sources__landtext')?.textContent).toBe('+151,435 today');
   expect(rows[1].querySelectorAll('.market-sources__days rect')).toHaveLength(14);
   expect(rows[2].querySelector('.market-sources__landtext')?.textContent).toBe('idle since Oct 3');
   expect(rows[2].querySelector('.market-sources__landing i.off')).not.toBeNull();
   expect(container.querySelector('.market-sources__foot .market-sources__note')?.textContent)
-    .toBe('not ranked: 2 capture channels, 2 aggregators, 2 dealers, 1 shop');
+    .toBe('not ranked: 2 capture channels, 2 aggregators, 1 shop');
   expect(container.querySelector('.market-sources__note')?.textContent).toContain('held counts as of Oct 16, 10:27 UTC');
 });
 
@@ -206,8 +247,14 @@ it('switches the landing column to 24h hourly bars and 1h live bars when clicked
   const drill = container.querySelector('.market-sources__drill')!;
   expect(drill).not.toBeNull();
   expect(drill.textContent).toContain('Bring a Trailer');
-  expect(drill.textContent).toContain('1991 Acura NSX 5-Speed');
+  expect(drill.textContent).toContain('Y·M·M 1/2');
+  expect(drill.textContent).toContain('1991');
+  expect(drill.textContent).toContain('Acura');
+  expect(drill.textContent).toContain('NSX 5-Speed');
+  expect(drill.textContent).toContain('JH4NA1150MT001234');
   expect(drill.textContent).toContain('$42,500');
+  expect(drill.textContent).toContain('Jun 22, 2023');
+  expect(drill.querySelector('.market-sources__event-make.is-missing')?.textContent).toBe('missing');
   expect(drill.querySelectorAll('.market-sources__hour-col')).toHaveLength(24);
   expect(drill.querySelectorAll('.market-sources__min-col')).toHaveLength(12);
 

@@ -108,8 +108,11 @@ export const OrgLogo: React.FC<OrgLogoProps> = ({
   const IconComponent = typeIcons[businessType || ''] || DefaultIcon;
 
   useEffect(() => {
-    setFallbackLevel(logoUrl ? 0 : 3);
-    setCurrentSrc(logoUrl || null);
+    const normalized = logoUrl
+      ? logoUrl.replace(/^https:\/\/nuke\.ag\/source-logos\//, '/source-logos/')
+      : null;
+    setFallbackLevel(normalized ? 0 : 3);
+    setCurrentSrc(normalized);
   }, [logoUrl]);
 
   // The recorded logo failed to load: draw the type icon instead of a broken image
@@ -138,10 +141,13 @@ export const OrgLogo: React.FC<OrgLogoProps> = ({
             src={currentSrc}
             alt=""
             style={{
-              maxWidth: '180px',
-              maxHeight: '100px',
+              maxWidth: '160px',
+              maxHeight: '88px',
               objectFit: 'contain',
-              filter: 'drop-shadow(0 4px 12px rgba(0,0,0,0.3))',
+              padding: '8px 12px',
+              borderRadius: '6px',
+              background: 'rgba(255, 255, 255, 0.94)',
+              border: '1px solid rgba(0, 0, 0, 0.08)',
             }}
             onError={handleError}
           />
