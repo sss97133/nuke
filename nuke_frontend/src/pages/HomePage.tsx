@@ -19,20 +19,12 @@ import BrandFamilyMap, { MapViewSwitch } from './market/BrandFamilyMap';
 import FamilySalesChart, { FamilyViewSwitch, matchesSaleSubModel, useFamilySales, type Sale } from './market/FamilySalesChart';
 import { getDefinedFamilyEras, getFamilyEraCohorts, matchesEraRange } from '../lib/market/familyEras';
 import { buildMarketScopeUrl, resolveMarketScopeQuery } from '../lib/search/marketScopeResolver';
-import {
-  buildFacetNodes,
-  consolidateBrandPickupFamilies,
-  isPickupFamilyLabel,
-  resolveTileBadgeSvg,
-  resolveVettedIdentityMarks,
-  type FamilyFacetAxis,
-} from './familyFacetsAndEmblems';
 
 // ────────────────────────────────────────────────────────────
 // TYPES
 // ────────────────────────────────────────────────────────────
 
-export interface TreemapNode {
+interface TreemapNode {
   name: string;
   count: number;
   value: number;
@@ -66,8 +58,6 @@ export interface TreemapNode {
   isVehicle?: boolean;
   listingTitle?: string;
   mileage?: number;
-  facetRepresentativeModel?: string;
-  badgeSvg?: string;
 }
 
 interface TreemapRect {
@@ -464,7 +454,7 @@ export function selectFamilyRepresentativeVehicleIds(
   familySales: readonly Sale[] | null | undefined,
   model?: string | null,
   perTileLimit = 4,
-  maxTotal = 160,
+  maxTotal = 200,
 ): string[] {
   if (!items || items.length === 0 || !familySales || familySales.length === 0) return [];
   const out: string[] = [];
@@ -916,37 +906,26 @@ function TreemapCell({ rect, onClick, totalCount, showValue, repImage, repImages
         background: isVehicle && showImage ? 'var(--surface-glass)' : undefined,
       }}>
         {canShowName && !isVehicle && (
-          <div className="flex flex-col gap-[3px]">
-            {node.badgeSvg && w >= 110 && h >= 58 && (
-              <div
-                aria-hidden="true"
-                data-testid="treemap-cell-badge"
-                className="inline-flex items-center"
-                style={{ height: area > 25000 ? 22 : 16, maxWidth: Math.min(130, w - 12) }}
-                dangerouslySetInnerHTML={{ __html: node.badgeSvg }}
-              />
-            )}
-            <div
-              style={{
-                fontSize: nameFontSize,
-                fontWeight: 700,
-                letterSpacing: isLarge ? '-0.02em' : '0.04em',
-                textTransform: 'uppercase' as const,
-                color: textColor,
-                lineHeight: 1.15,
-                overflow: 'hidden',
-                textOverflow: 'ellipsis',
-                whiteSpace: isLarge ? 'normal' : 'nowrap',
-                fontFamily: 'Arial, sans-serif',
-                wordBreak: isLarge ? 'break-word' : undefined,
-              }}
-            >
-              {node.name}
-            </div>
+          <div
+            style={{
+              fontSize: nameFontSize,
+              fontWeight: 700,
+              letterSpacing: isLarge ? '-0.02em' : '0.04em',
+              textTransform: 'uppercase' as const,
+              color: textColor,
+              lineHeight: 1.15,
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+              whiteSpace: isLarge ? 'normal' : 'nowrap',
+              fontFamily: 'Arial, sans-serif',
+              wordBreak: isLarge ? 'break-word' : undefined,
+            }}
+          >
+            {node.name}
           </div>
         )}
 
-        <div className="mt-auto">
+        <div style={{ marginTop: 'auto' }}>
           {/* Vehicle cell: title + price at bottom */}
           {isVehicle && canShowName && (
             <div
@@ -1100,7 +1079,7 @@ function TreemapTooltip({ node, x, y, totalCount, level }: TooltipData) {
       <div style={containerStyle}>
         <Text role="label" as="div">{node.name}</Text>
         <div><Text role="measure">{fmtMoney(node.usd)}</Text> <Text role="caption">from {fmtNum(node.count)} confirmed sales</Text></div>
-        <div className="border-t border-[var(--border)] pt-1.5 flex flex-col gap-[3px]">
+        <div style={{ borderTop: '1px solid var(--border)', paddingTop: 6, display: 'flex', flexDirection: 'column', gap: 3 }}>
           {node.count > 1 && effectivePrice ? <Row label={node.median_price ? 'median sale' : 'average sale'} value={fmtMoney(effectivePrice)} /> : null}
           {node.offered && node.sold_any != null ? <Row label={`of ${fmtNum(node.offered)} offered sold`} value={`${Math.round((100 * node.sold_any) / node.offered)}%`} /> : null}
           {node.sold_12m != null ? <Row label="sold (measured houses, 12 mo)" value={`${fmtNum(node.sold_12m)}${node.usd_12m ? ` · ${fmtMoney(node.usd_12m)}` : ''}`} /> : null}
@@ -1123,11 +1102,13 @@ function TreemapTooltip({ node, x, y, totalCount, level }: TooltipData) {
 
   return (
     <div style={containerStyle}>
-      <Text role="label" as="div">{node.name}</Text>
-      <div className="mb-1.5">
-        <Text role="measure">{fmtNum(node.count)}</Text> <Text role="caption">with a confirmed sale</Text>
+      <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--text)', marginBottom: 4, textTransform: 'uppercase', letterSpacing: '0.02em' }}>
+        {node.name}
       </div>
-      <div className="border-t border-[var(--border)] pt-1.5 flex flex-col gap-[3px]">
+      <div style={{ fontSize: 18, fontWeight: 700, fontFamily: "'Courier New', monospace", color: 'var(--text)', marginBottom: 6 }}>
+        {fmtNum(node.count)} <span style={{ fontSize: 10, fontWeight: 400, color: 'var(--text-secondary)' }}>with a confirmed sale</span>
+      </div>
+      <div style={{ borderTop: '1px solid var(--border)', paddingTop: 6, display: 'flex', flexDirection: 'column', gap: 3 }}>
         <Row label="of total" value={pct + '%'} />
         <Row label="sales total" value={fmtMoney(node.value)} />
         <Row label="median sale" value={node.median_price ? fmtMoney(node.median_price) : 'under 5 sales'} />
@@ -1141,9 +1122,9 @@ function TreemapTooltip({ node, x, y, totalCount, level }: TooltipData) {
 
 function Row({ label, value }: { label: string; value: string }) {
   return (
-    <div className="flex justify-between items-baseline text-[10px] text-[var(--text-secondary)]">
-      <span className="font-mono text-[var(--text)] font-semibold">{value}</span>
-      <span className="ml-3 text-right text-[9px]">{label}</span>
+    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', fontSize: 10, color: 'var(--text-secondary)' }}>
+      <span style={{ fontFamily: "'Courier New', monospace", color: 'var(--text)', fontWeight: 600 }}>{value}</span>
+      <span style={{ marginLeft: 12, textAlign: 'right', fontSize: 9 }}>{label}</span>
     </div>
   );
 }
@@ -1330,25 +1311,19 @@ export function TreemapHomePage({ onBrowse, embedded = false }: { onBrowse: () =
   const [basis, setBasis] = useState<MapBasis>('ledger');
   // A brand opens on its model families; when none can be read it opens on its model names, as before.
   const atFamilies = !!currentLevel.make && !currentLevel.family && !currentLevel.model;
-  const [groupBrandPickups, setGroupBrandPickups] = useState<boolean>(true);
   const { data: rawFamiliesData, loading: familiesLoading, failed: familiesFailed } = useTreemapFamilies(currentLevel.make ?? null);
-  const hasMultipleBrandPickups = useMemo(
-    () => (rawFamiliesData ? rawFamiliesData.filter((f) => isPickupFamilyLabel(f.name)).length > 1 : false),
-    [rawFamiliesData],
-  );
   const familiesData = useMemo(() => {
     if (!rawFamiliesData) return null;
-    const withMoves = ((horizon === '1y' && !isCustomBase) || !moversData?.family_moves || !currentLevel.make)
-      ? rawFamiliesData
-      : rawFamiliesData.map((n) => {
-          if (!n.familyKey || n.familyKey === 'other') return n;
-          const ov = moversData.family_moves![`${currentLevel.make}|${n.familyKey}`];
-          return ov
-            ? { ...n, sold_12m: ov.sold_12m, sold_prior_12m: ov.sold_prior_12m, usd_12m: ov.usd_12m, usd_prior_12m: ov.usd_prior_12m }
-            : { ...n, sold_12m: 0, sold_prior_12m: 0, usd_12m: 0, usd_prior_12m: 0 };
-        });
-    return consolidateBrandPickupFamilies(currentLevel.make, withMoves, groupBrandPickups);
-  }, [rawFamiliesData, horizon, isCustomBase, moversData, currentLevel.make, groupBrandPickups]);
+    if ((horizon === '1y' && !isCustomBase) || !moversData?.family_moves || !currentLevel.make) return rawFamiliesData;
+    const fm = moversData.family_moves;
+    return rawFamiliesData.map((n) => {
+      if (!n.familyKey || n.familyKey === 'other') return n;
+      const ov = fm[`${currentLevel.make}|${n.familyKey}`];
+      return ov
+        ? { ...n, sold_12m: ov.sold_12m, sold_prior_12m: ov.sold_prior_12m, usd_12m: ov.usd_12m, usd_prior_12m: ov.usd_prior_12m }
+        : { ...n, sold_12m: 0, sold_prior_12m: 0, usd_12m: 0, usd_prior_12m: 0 };
+    });
+  }, [rawFamiliesData, horizon, isCustomBase, moversData, currentLevel.make]);
   const { data: modelsData, loading: modelsLoading } = useTreemapModels(atFamilies && familiesFailed ? currentLevel.make ?? null : null);
   const { data: familyModelsData, loading: familyModelsLoading } = useTreemapFamilyModels(
     currentLevel.family ? currentLevel.make ?? null : null,
@@ -1411,7 +1386,7 @@ export function TreemapHomePage({ onBrowse, embedded = false }: { onBrowse: () =
       .sort((a, b) => b.usd - a.usd)
       .slice(0, 200)
       .map((s) => ({
-        name: [s.year, currentLevel.make, s.model ? s.model.split(' · ')[0].trim() : null].filter(Boolean).join(' '),
+        name: [s.year, currentLevel.make, s.model].filter(Boolean).join(' '),
         count: 1,
         value: s.usd,
         median_price: s.usd,
@@ -1446,7 +1421,7 @@ export function TreemapHomePage({ onBrowse, embedded = false }: { onBrowse: () =
     }>();
     for (const s of familySalesData) {
       if (!matchesEraRange(s.year, selectedEra) || s.usd <= 0 || !s.model) continue;
-      const trimmed = s.model.split(' · ')[0].trim();
+      const trimmed = s.model.trim();
       const key = trimmed.toLowerCase();
       const prev = byModel.get(key) ?? {
         displayName: existingByKey.get(key)?.name ?? trimmed,
@@ -1528,49 +1503,7 @@ export function TreemapHomePage({ onBrowse, embedded = false }: { onBrowse: () =
   const [brandView, setBrandView] = useState<'brands' | 'nested'>('brands');
   // A family keeps its model names as clickable treemap tiles; the sales chart is shown below when embedded (or via the switch).
   const [familyView, setFamilyView] = useState<'sales' | 'names'>('names');
-  const [facetAxis, setFacetAxis] = useState<FamilyFacetAxis>('raw');
-  useEffect(() => {
-    setFamilyView('names');
-    setFacetAxis('raw');
-  }, [currentLevel.make, currentLevel.family]);
-
-  const activeFamilyLabel = useMemo(
-    () => drillStack.find((d) => d.family && !d.model)?.label || searchParams.get('family_name') || currentLevel.model || currentLevel.label,
-    [drillStack, searchParams, currentLevel.model, currentLevel.label],
-  );
-
-  // Re-key family sub-models along the active facet axis ('raw' | 'series' | 'trim' | 'body')
-  const facetedFamilyModels = useMemo<TreemapNode[] | null>(() => {
-    const base = eraFilteredFamilyModels ?? familyModelsData;
-    if (!base) return null;
-    if (facetAxis === 'raw') {
-      return base.map((n) => ({
-        ...n,
-        badgeSvg: n.badgeSvg ?? resolveTileBadgeSvg(currentLevel.make, activeFamilyLabel, n.name),
-      }));
-    }
-    return buildFacetNodes(
-      facetAxis,
-      currentLevel.make,
-      activeFamilyLabel,
-      base,
-      familySalesData,
-      selectedEra ? (yr) => matchesEraRange(yr, selectedEra) : undefined,
-    );
-  }, [eraFilteredFamilyModels, familyModelsData, facetAxis, currentLevel.make, activeFamilyLabel, familySalesData, selectedEra]);
-
-  // Vetted, period-accurate marque emblems, fender plates, and scripts for the active scope
-  const activeIdentityMarks = useMemo(
-    () =>
-      resolveVettedIdentityMarks({
-        make: currentLevel.make,
-        familyLabel: activeFamilyLabel,
-        model: currentLevel.model,
-        year: currentLevel.year,
-        eraId: selectedEra,
-      }),
-    [currentLevel.make, activeFamilyLabel, currentLevel.model, currentLevel.year, selectedEra],
-  );
+  useEffect(() => { setFamilyView('names'); }, [currentLevel.make, currentLevel.family]);
 
   // Determine active data and level type
   const levelType: MapLevel =
@@ -1602,13 +1535,13 @@ export function TreemapHomePage({ onBrowse, embedded = false }: { onBrowse: () =
       const filtered = effectiveYears.filter((n) => matchesEraRange(parseInt(n.name, 10), selectedEra));
       return filtered.length > 0 ? filtered : effectiveYears;
     }
-    if (levelType === 'models' && (facetedFamilyModels ?? eraFilteredFamilyModels)) return facetedFamilyModels ?? eraFilteredFamilyModels;
+    if (levelType === 'models' && eraFilteredFamilyModels) return eraFilteredFamilyModels;
     if (levelType === 'families' && familiesData) return familiesData;
     if (levelType === 'families' && familiesFailed && modelsData) return modelsData;
     if (brandsData) return brandsData;
     return null;
     // drillStack triggers recompute when navigating so ref cache is checked
-  }, [levelType, brandsData, familiesData, familiesFailed, modelsData, facetedFamilyModels, eraFilteredFamilyModels, yearsData, vehiclesData, familyYearVehiclesNodes, currentLevel, drillStack, selectedEra]);
+  }, [levelType, brandsData, familiesData, familiesFailed, modelsData, eraFilteredFamilyModels, yearsData, vehiclesData, familyYearVehiclesNodes, currentLevel, drillStack, selectedEra]);
 
   const isLoading = brandsLoading || (atFamilies && familiesLoading) || modelsLoading || (levelType === 'models' && familyModelsLoading) || yearsLoading || vehiclesLoading;
 
@@ -1651,7 +1584,7 @@ export function TreemapHomePage({ onBrowse, embedded = false }: { onBrowse: () =
   // Representative images for aggregate cells (models/years levels); none while a family shows its sales chart, which
   // has no tiles to put them on (the read ran under the chart on every family drill).
   const repImages = useRepresentativeImages(
-    levelType === 'models' ? (familyView === 'names' ? (facetedFamilyModels ?? eraFilteredFamilyModels ?? familyModelsData) : null) : levelType === 'years' ? effectiveYearsData
+    levelType === 'models' ? (familyView === 'names' ? (eraFilteredFamilyModels ?? familyModelsData) : null) : levelType === 'years' ? effectiveYearsData
       : levelType === 'vehicles' && !currentLevel.model ? familyYearVehiclesNodes
       : levelType === 'families' && familiesFailed ? modelsData : null,
     currentLevel.make,
@@ -1721,9 +1654,8 @@ export function TreemapHomePage({ onBrowse, embedded = false }: { onBrowse: () =
     } else if (levelType === 'families' || levelType === 'models') {
       // A family's model name, or the brand's own when families could not be read; a sale without a name stops here.
       if (node.noModel) return;
-      const targetModel = node.facetRepresentativeModel ?? node.name;
-      recordInterest('model', targetModel);
-      setDrillStack(prev => [...prev, { label: node.name, make: currentLevel.make, family: currentLevel.family, model: targetModel }]);
+      recordInterest('model', node.name);
+      setDrillStack(prev => [...prev, { label: node.name, make: currentLevel.make, family: currentLevel.family, model: node.name }]);
     } else if (levelType === 'years') {
       const year = parseInt(node.name, 10);
       if (Number.isFinite(year)) {
@@ -2095,20 +2027,6 @@ export function TreemapHomePage({ onBrowse, embedded = false }: { onBrowse: () =
         return (
           <div className="home-family-submodels" role="navigation" aria-label="Brand families" data-testid="brand-family-pills">
             <span className="home-family-submodels-label">FAMILIES</span>
-            {hasMultipleBrandPickups && (
-              <button
-                type="button"
-                data-testid="toggle-brand-pickup-umbrella"
-                className={`home-family-submodel-pill home-family-submodel-pill--dashed${groupBrandPickups ? ' home-family-submodel-pill--active' : ''}`}
-                aria-pressed={groupBrandPickups}
-                title={groupBrandPickups
-                  ? 'All pickup series (C10, K10, C20, 3100, F-100, F-150, F-250, Sierra, etc.) are unified into one Pickup tile. Click to split into separate series tiles.'
-                  : 'Click to group all pickup series into one unified Pickup tile.'}
-                onClick={() => setGroupBrandPickups((prev) => !prev)}
-              >
-                {groupBrandPickups ? 'TRUCKS UNIFIED' : 'SPLIT TRUCKS'}
-              </button>
-            )}
             <button
               type="button"
               className={`home-family-submodel-pill${!currentLevel.family ? ' home-family-submodel-pill--active' : ''}`}
@@ -2148,86 +2066,13 @@ export function TreemapHomePage({ onBrowse, embedded = false }: { onBrowse: () =
         );
       })()}
 
-      {/* ─── VETTED ERA EMBLEM & FENDER BADGE STRIP: period-accurate marque emblems, RPO fender plates & body scripts ─── */}
-      {activeIdentityMarks.length > 0 && currentLevel.make && (currentLevel.family || currentLevel.model) && (
-        <div
-          className="home-family-submodels home-era-marks-bar"
-          role="region"
-          aria-label="Vetted factory era emblems and fender badges"
-          data-testid="vetted-identity-marks-bar"
-        >
-          <span className="home-family-submodels-label">ERA MARKS</span>
-          {activeIdentityMarks.slice(0, 6).map((mark) => {
-            const targetModel = mark.trimPackage ?? mark.seriesCode ?? mark.bodyStyle ?? null;
-            const isMarkActive = Boolean(
-              targetModel &&
-              currentLevel.model &&
-              currentLevel.model.toLowerCase().includes(targetModel.toLowerCase()),
-            );
-            return (
-              <button
-                key={mark.id}
-                type="button"
-                className={`home-family-submodel-pill home-era-mark-pill${isMarkActive ? ' home-family-submodel-pill--active' : ''}`}
-                title={`${mark.displayLabel} (${mark.yearStart}–${mark.yearEnd}) · ${mark.subLabel}${mark.rpoCode ? ` · RPO ${mark.rpoCode}` : ''}\n${mark.provenanceNote}`}
-                onClick={() => {
-                  if (!targetModel || !currentLevel.make || !currentLevel.family) return;
-                  const famEntry = drillStack.find((d) => d.family && !d.model) ?? {
-                    label: activeFamilyLabel,
-                    make: currentLevel.make,
-                    family: currentLevel.family,
-                  };
-                  setDrillStack([
-                    { label: 'ALL MAKES' },
-                    { label: currentLevel.make, make: currentLevel.make },
-                    famEntry,
-                    { label: mark.displayLabel, make: currentLevel.make, family: currentLevel.family, model: targetModel },
-                  ]);
-                }}
-              >
-                <span
-                  aria-hidden="true"
-                  className="home-era-mark-svg"
-                  dangerouslySetInnerHTML={{ __html: mark.svgMarkup }}
-                />
-                <span>{mark.displayLabel}</span>
-                <span className="home-family-submodel-count">
-                  '{String(mark.yearStart).slice(-2)}–'{String(mark.yearEnd).slice(-2)}
-                </span>
-              </button>
-            );
-          })}
-        </div>
-      )}
-
-      {/* ─── FAMILY SUB-MODEL & FACET AXIS PILLS: re-key by SERIES / TRIM / BODY STYLE / RAW SUB-MODELS ─── */}
+      {/* ─── FAMILY SUB-MODEL PILLS: direct 1-click sub-model navigation across models, years & vehicles inside a family ─── */}
       {(() => {
-        const rawPool = eraFilteredFamilyModels ?? familyModelsData;
-        const subModelPool = facetedFamilyModels ?? rawPool;
+        const subModelPool = eraFilteredFamilyModels ?? familyModelsData;
         if (!currentLevel.family || !currentLevel.make || !subModelPool || subModelPool.length <= 1) return null;
-        const axisOptions: { id: FamilyFacetAxis; label: string }[] = [
-          { id: 'raw', label: 'SUB-MODELS' },
-          { id: 'series', label: 'SERIES' },
-          { id: 'trim', label: 'TRIM' },
-          { id: 'body', label: 'BODY STYLE' },
-        ];
         return (
           <div className="home-family-submodels" role="group" aria-label="Family sub-models" data-testid="family-submodel-pills">
-            <div className="home-facet-axis-tablist" role="tablist" aria-label="Re-key family by facet axis">
-              {axisOptions.map((opt) => (
-                <button
-                  key={opt.id}
-                  type="button"
-                  role="tab"
-                  aria-selected={facetAxis === opt.id}
-                  data-testid={`facet-axis-${opt.id}`}
-                  className={`home-facet-axis-tab${facetAxis === opt.id ? ' home-facet-axis-tab--active' : ''}`}
-                  onClick={() => setFacetAxis(opt.id)}
-                >
-                  {opt.label}
-                </button>
-              ))}
-            </div>
+            <span className="home-family-submodels-label">SUB-MODELS</span>
             <button
               type="button"
               className={`home-family-submodel-pill${!currentLevel.model ? ' home-family-submodel-pill--active' : ''}`}
@@ -2244,8 +2089,7 @@ export function TreemapHomePage({ onBrowse, embedded = false }: { onBrowse: () =
               ALL <span className="home-family-submodel-count">{subModelPool.length}</span>
             </button>
             {subModelPool.slice(0, 12).map((sub) => {
-              const targetModel = sub.facetRepresentativeModel ?? sub.name;
-              const active = currentLevel.model === sub.name || currentLevel.model === targetModel;
+              const active = currentLevel.model === sub.name;
               return (
                 <button
                   key={sub.name}
@@ -2261,12 +2105,12 @@ export function TreemapHomePage({ onBrowse, embedded = false }: { onBrowse: () =
                     if (active && !currentLevel.year) {
                       setDrillStack([{ label: 'ALL MAKES' }, { label: currentLevel.make!, make: currentLevel.make }, famEntry]);
                     } else {
-                      recordInterest('model', `${currentLevel.make!} ${targetModel}`);
+                      recordInterest('model', `${currentLevel.make!} ${sub.name}`);
                       setDrillStack([
                         { label: 'ALL MAKES' },
                         { label: currentLevel.make!, make: currentLevel.make },
                         famEntry,
-                        { label: sub.name, make: currentLevel.make, family: currentLevel.family, model: targetModel },
+                        { label: sub.name, make: currentLevel.make, family: currentLevel.family, model: sub.name },
                       ]);
                     }
                   }}
@@ -2460,9 +2304,7 @@ export function TreemapHomePage({ onBrowse, embedded = false }: { onBrowse: () =
             const repImgCandidates = !rect.node.isVehicle
               ? repImages.get(rect.node.name.toLowerCase()) || repImages.get(rect.node.name) || repImages.get(rect.node.name.toLowerCase().split(/\s+/)[0])
               : rect.node.imageUrl ? undefined
-              : (rect.node.id ? repImages.get(rect.node.id) : undefined)
-                || repImages.get(rect.node.name.toLowerCase())
-                || (currentLevel.year ? repImages.get(String(currentLevel.year)) : undefined);
+              : rect.node.id ? repImages.get(rect.node.id) : undefined;
             return (
               <div
                 key={(rect.node.id || rect.node.name) + '-' + i}
@@ -2492,13 +2334,22 @@ export function TreemapHomePage({ onBrowse, embedded = false }: { onBrowse: () =
 
         {/* Empty state */}
         {!isLoading && activeData && activeData.length === 0 && (
-          <div className="home-empty-state">
-            <div className="home-empty-state-label">
+          <div style={{
+            position: 'absolute', inset: 0, display: 'flex',
+            alignItems: 'center', justifyContent: 'center',
+            flexDirection: 'column', gap: 8,
+          }}>
+            <div style={{ fontSize: 11, color: 'var(--text-disabled)', fontFamily: "'Courier New', monospace" }}>
               NO DATA
             </div>
             <button
               onClick={() => goBack(drillStack.length - 2)}
-              className="home-empty-state-back"
+              style={{
+                fontSize: 9, fontWeight: 700, letterSpacing: '0.08em',
+                textTransform: 'uppercase', border: '2px solid var(--border)',
+                background: 'transparent', color: 'var(--text-secondary)', cursor: 'pointer',
+                padding: '6px 16px', fontFamily: 'Arial, sans-serif',
+              }}
             >
               GO BACK
             </button>
@@ -2528,11 +2379,7 @@ export function TreemapHomePage({ onBrowse, embedded = false }: { onBrowse: () =
             onOpen={(id) => navigate(`/vehicle/${id}`)}
             selectedEra={selectedEra}
             onSelectEra={setSelectedEra}
-            selectedModel={
-              facetAxis !== 'raw' && currentLevel.model
-                ? drillStack.find((d) => d.model && !d.year)?.label ?? currentLevel.model
-                : currentLevel.model ?? null
-            }
+            selectedModel={currentLevel.model ?? null}
             selectedYear={currentLevel.year ?? null}
           />
         </div>
@@ -2670,72 +2517,6 @@ export function TreemapHomePage({ onBrowse, embedded = false }: { onBrowse: () =
           font-size: 9px;
           font-family: 'Courier New', monospace;
           opacity: 0.72;
-        }
-        .home-family-submodel-pill--dashed {
-          border-style: dashed;
-          margin-right: 4px;
-        }
-        .home-era-marks-bar {
-          gap: 8px;
-          padding-top: 4px;
-          padding-bottom: 4px;
-        }
-        .home-era-mark-pill {
-          gap: 6px;
-          padding: 2px 8px 2px 4px;
-        }
-        .home-era-mark-svg {
-          display: inline-flex;
-          align-items: center;
-          height: 18px;
-          min-width: 42px;
-        }
-        .home-facet-axis-tablist {
-          display: inline-flex;
-          align-items: center;
-          gap: 2px;
-          margin-right: 4px;
-        }
-        .home-facet-axis-tab {
-          font-size: 8px;
-          font-weight: 800;
-          letter-spacing: 0.10em;
-          padding: 2px 5px;
-          border: 1px solid var(--border);
-          background: transparent;
-          color: var(--text-secondary);
-          cursor: pointer;
-          font-family: Arial, sans-serif;
-        }
-        .home-facet-axis-tab--active {
-          background: var(--text);
-          color: var(--bg);
-        }
-        .home-empty-state {
-          position: absolute;
-          inset: 0;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          flex-direction: column;
-          gap: 8px;
-        }
-        .home-empty-state-label {
-          font-size: 11px;
-          color: var(--text-disabled);
-          font-family: 'Courier New', monospace;
-        }
-        .home-empty-state-back {
-          font-size: 9px;
-          font-weight: 700;
-          letter-spacing: 0.08em;
-          text-transform: uppercase;
-          border: 2px solid var(--border);
-          background: transparent;
-          color: var(--text-secondary);
-          cursor: pointer;
-          padding: 6px 16px;
-          font-family: Arial, sans-serif;
         }
       `}</style>
     </div>

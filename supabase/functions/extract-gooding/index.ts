@@ -658,7 +658,7 @@ async function saveToDatabase(
   // another lot's vehicle.
   let identityKeep: Record<string, unknown> | null = null;
   if (vehicleId) {
-    const { data: idRow } = await supabase.from('vehicles').select('year,make,model,vin,discovery_url').eq('id', vehicleId).maybeSingle();
+    const { data: idRow } = await supabase.from('vehicles').select('year,make,model,vin,discovery_url,primary_image_url').eq('id', vehicleId).maybeSingle();
     const slugOf = (u: unknown) => String(u ?? '').split('/lot/')[1]?.split(/[/?#]/)[0] || null;
     const same = idRow && slugOf(idRow.discovery_url) !== null && slugOf(idRow.discovery_url) === slugOf(extracted.url);
     if (idRow && !same) {
@@ -668,6 +668,9 @@ async function saveToDatabase(
         throw new Error(`identity refused: different_car (${conflict})`);
       }
       identityKeep = idRow as Record<string, unknown>;
+    }
+    if (idRow && !idRow.primary_image_url && extracted.image_urls.length > 0) {
+      identityKeep = { ...(identityKeep ?? {}), _fill_primary_image_url: extracted.image_urls[0] };
     }
   }
 
@@ -686,7 +689,11 @@ async function saveToDatabase(
       updated_at: new Date().toISOString(),
       extractor_version: EXTRACTOR_VERSION,
     };
-    if (identityKeep) {
+    if (identityKeep?._fill_primary_image_url) {
+      vehicleUpdate.primary_image_url = identityKeep._fill_primary_image_url;
+      delete identityKeep._fill_primary_image_url;
+    }
+    if (identityKeep && Object.keys(identityKeep).length > 0) {
       const kept = fillOnlyIdentity(vehicleUpdate, identityKeep);
       for (const f of ['year', 'make', 'model', 'vin']) if (!(f in kept)) delete vehicleUpdate[f];
     }
@@ -747,6 +754,7 @@ async function saveToDatabase(
       profile_origin: 'gooding_import',
       discovery_url: extracted.url,
       discovery_source: 'gooding',
+      primary_image_url: extracted.image_urls[0] || undefined,
       is_public: true,
       auction_source: 'gooding',
       description: description || undefined,

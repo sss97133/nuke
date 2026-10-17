@@ -952,9 +952,9 @@ Deno.serve(async (req: Request) => {
 
     // Identity guard: a VIN/URL/slug match is not proof it is the same car. A different car is refused and raised as a
     // revision item (identity_match / different_car / relink); for the same car, year/make/model/vin are fill-only.
-    let existingIdentity: { year: number | null; make: string | null; model: string | null; vin: string | null } | null = null;
+    let existingIdentity: { year: number | null; make: string | null; model: string | null; vin: string | null; primary_image_url?: string | null } | null = null;
     if (vehicleId) {
-      const { data: idRow } = await supabase.from('vehicles').select('year,make,model,vin').eq('id', vehicleId).maybeSingle();
+      const { data: idRow } = await supabase.from('vehicles').select('year,make,model,vin,primary_image_url').eq('id', vehicleId).maybeSingle();
       existingIdentity = (idRow as typeof existingIdentity) ?? null;
       const conflict = existingIdentity ? identityConflict(existingIdentity, { year: vehicleData.year, make: vehicleData.make, model: vehicleData.model, vin: vehicleData.vin }) : null;
       if (conflict) {
@@ -966,6 +966,9 @@ Deno.serve(async (req: Request) => {
         return new Response(JSON.stringify({ success: false, refused: 'different_car', vehicle_id: vehicleId, detail: conflict }),
           { status: 409, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
       }
+    }
+    if (listing.images?.[0] && !existingIdentity?.primary_image_url) {
+      (vehicleData as Record<string, unknown>).primary_image_url = listing.images[0];
     }
 
     if (vehicleId) {
