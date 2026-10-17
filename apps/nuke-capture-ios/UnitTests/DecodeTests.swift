@@ -593,5 +593,142 @@ final class DecodeTests: XCTestCase {
             family: "C10",
             year: 1978
         ))
+
+        // 9. `ProfileRead` (`vehicle_profile_read`) decoding of `identityMarks` and `facets` (`series`, `trim_facet`, `body_facet`)
+        //    and `ProfileHeaderBlock.hudChips` compact HUD chip generation (matching web `VehicleBadgeBar`).
+        let profileWithExplicitMarksAndFacetsJSON = """
+        {
+          "vehicle_id": "10000000-0000-0000-0000-000000000010",
+          "viewer": "anon",
+          "read_at": "2026-10-17T22:00:00Z",
+          "identity_marks": [
+            {
+              "id": "cfa05e17-8074-48da-9336-cbf61e96c89c",
+              "brand": "Chevrolet",
+              "family": "Pickup",
+              "series_code": "K10",
+              "trim_package": "Cheyenne Super",
+              "body_style": "Stepside",
+              "year_start": 1973,
+              "year_end": 1974,
+              "mark_kind": "trim_badge",
+              "display_label": "CHEYENNE SUPER 10",
+              "sub_label": "1973–1974 Woodgrain-Inlaid Fender Plate",
+              "rpo_code": "YE9",
+              "fender_placement": "Rear Quarter / Bedside",
+              "svg_markup": "<svg></svg>",
+              "provenance_note": "1973–1974 Chevrolet K10 Cheyenne Super badge.",
+              "vetted": true
+            }
+          ],
+          "facets": {
+            "series": "K10 (1/2-Ton 4x4)",
+            "trim_facet": "Cheyenne Super",
+            "body_facet": "Stepside / Flareside"
+          },
+          "sections": [
+            {
+              "kind": "masthead",
+              "identity_source": {
+                "year": 1973,
+                "make": "Chevrolet",
+                "model": "K10 Cheyenne Super Stepside",
+                "normalized_model": "C/K",
+                "series": "K10",
+                "trim": "Cheyenne Super",
+                "transmission": "Manual",
+                "transmission_model": "SM465 4-Speed"
+              },
+              "year": 1973,
+              "make": "Chevrolet",
+              "model": "K10 Cheyenne Super Stepside",
+              "price": {
+                "value": 68500,
+                "unit": "USD",
+                "source": {"kind": "listing", "label": "BRING A TRAILER", "method": "sold"},
+                "observed_at": "2026-09-10T00:00:00Z",
+                "trust": 0.9
+              },
+              "priceLabel": "Last recorded sale"
+            }
+          ]
+        }
+        """
+        let profileWithFacets = try decode(ProfileRead.self, profileWithExplicitMarksAndFacetsJSON)
+        XCTAssertEqual(profileWithFacets.resolvedIdentityMarks.count, 1)
+        XCTAssertEqual(profileWithFacets.resolvedIdentityMarks.first?.displayLabel, "CHEYENNE SUPER 10")
+        XCTAssertEqual(profileWithFacets.facets?.series, "K10 (1/2-Ton 4x4)")
+        XCTAssertEqual(profileWithFacets.facets?.trim_facet, "Cheyenne Super")
+        XCTAssertEqual(profileWithFacets.facets?.body_facet, "Stepside / Flareside")
+
+        let hudChips = ProfileHeaderBlock.hudChips(read: profileWithFacets)
+        XCTAssertEqual(hudChips.count, 4)
+        XCTAssertEqual(hudChips.map(\.kind), [.identityMark, .series, .trimFacet, .bodyFacet])
+        XCTAssertEqual(hudChips.map(\.displayText), [
+            "CHEYENNE SUPER 10",
+            "SERIES · K10 (1/2-Ton 4x4)",
+            "TRIM · Cheyenne Super",
+            "BODY · Stepside / Flareside"
+        ])
+        XCTAssertEqual(hudChips.first?.subLabel, "'73–'74")
+        XCTAssertEqual(hudChips.first?.rpoCode, "YE9")
+
+        // Fallback derivation when `vehicle_profile_read` carries `masthead.identity_source` + `strip.facets`
+        let profileDerivedFacetsJSON = """
+        {
+          "vehicle_id": "10000000-0000-0000-0000-000000000011",
+          "viewer": "anon",
+          "read_at": "2026-10-17T22:00:00Z",
+          "sections": [
+            {
+              "kind": "masthead",
+              "identity_source": {
+                "year": 1978,
+                "make": "Chevrolet",
+                "model": "C10 Silverado",
+                "normalized_model": "C10",
+                "series": "C10",
+                "trim": "Silverado",
+                "transmission": "Automatic",
+                "transmission_model": null
+              },
+              "year": 1978,
+              "make": "Chevrolet",
+              "model": "C10 Silverado",
+              "price": null,
+              "priceLabel": null
+            },
+            {
+              "kind": "strip",
+              "coverage": {"n": 1, "of": 1, "grain": "facts attributed", "as_of": "2026-10-01T00:00:00Z"},
+              "facets": [
+                {
+                  "dimension": "body_style",
+                  "label": "Stepside",
+                  "member": {
+                    "value": "Stepside",
+                    "unit": null,
+                    "source": {"kind": "listing", "label": "MECUM"},
+                    "observed_at": "2026-10-01T00:00:00Z",
+                    "trust": 0.8
+                  }
+                }
+              ],
+              "odometer": null
+            }
+          ]
+        }
+        """
+        let profileDerived = try decode(ProfileRead.self, profileDerivedFacetsJSON)
+        XCTAssertEqual(profileDerived.resolvedFacets.series, "C10 / C1500 (1/2-Ton 2WD)")
+        XCTAssertEqual(profileDerived.resolvedFacets.trim_facet, "Silverado")
+        XCTAssertEqual(profileDerived.resolvedFacets.body_facet, "Stepside / Flareside")
+        let derivedChips = ProfileHeaderBlock.hudChips(read: profileDerived, runtimeMarks: [marks[0]])
+        XCTAssertEqual(derivedChips.map(\.displayText), [
+            "CUSTOM DELUXE 10",
+            "SERIES · C10 / C1500 (1/2-Ton 2WD)",
+            "TRIM · Silverado",
+            "BODY · Stepside / Flareside"
+        ])
     }
 }

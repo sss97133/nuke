@@ -205,6 +205,74 @@ struct VehicleIdentityMark: Decodable, Identifiable, Equatable {
     }
 }
 
+/// Compact HUD chip model rendered in the vehicle profile header strip (`ProfileHeaderBlock`),
+/// matching web `VehicleBadgeBar.tsx`.
+struct ProfileHeaderHUDChip: Identifiable, Equatable {
+    enum Kind: String, Equatable {
+        case identityMark = "identity_mark"
+        case series = "series"
+        case trimFacet = "trim_facet"
+        case bodyFacet = "body_facet"
+    }
+
+    let id: String
+    let kind: Kind
+    let prefix: String?
+    let label: String
+    let subLabel: String?
+    let rpoCode: String?
+    let mark: VehicleIdentityMark?
+
+    /// Formatted HUD label matching web `VehicleBadgeBar` (e.g. `"CUSTOM DELUXE 10"` or `"SERIES · C10 (1/2-Ton 2WD)"`).
+    var displayText: String {
+        if let prefix, !prefix.isEmpty {
+            return "\(prefix) · \(label)"
+        }
+        return label
+    }
+}
+
+extension ProfileVehicleFacets {
+    /// Orthogonal facet HUD chips (`SERIES · ...`, `TRIM · ...`, `BODY · ...`) matching web `VehicleBadgeBar`.
+    var hudChips: [ProfileHeaderHUDChip] {
+        var chips: [ProfileHeaderHUDChip] = []
+        if let series, !series.isEmpty {
+            chips.append(ProfileHeaderHUDChip(
+                id: "facet:series:\(series)",
+                kind: .series,
+                prefix: "SERIES",
+                label: series,
+                subLabel: nil,
+                rpoCode: nil,
+                mark: nil
+            ))
+        }
+        if let trim_facet, !trim_facet.isEmpty {
+            chips.append(ProfileHeaderHUDChip(
+                id: "facet:trim_facet:\(trim_facet)",
+                kind: .trimFacet,
+                prefix: "TRIM",
+                label: trim_facet,
+                subLabel: nil,
+                rpoCode: nil,
+                mark: nil
+            ))
+        }
+        if let body_facet, !body_facet.isEmpty {
+            chips.append(ProfileHeaderHUDChip(
+                id: "facet:body_facet:\(body_facet)",
+                kind: .bodyFacet,
+                prefix: "BODY",
+                label: body_facet,
+                subLabel: nil,
+                rpoCode: nil,
+                mark: nil
+            ))
+        }
+        return chips
+    }
+}
+
 /// A tapped claim awaiting its source sheet.
 struct ClaimDrill: Identifiable {
     let title: String
@@ -228,11 +296,36 @@ struct ProfileHeaderBlock: View {
     @State private var identityMarks: [VehicleIdentityMark] = []
     @State private var selectedIdentityMark: VehicleIdentityMark?
 
+    /// Builds the ordered HUD chips (`identityMarks` up to 4 + orthogonal `SERIES`, `TRIM`, `BODY` facets)
+    /// rendered in the vehicle profile header strip, matching web `VehicleBadgeBar`.
+    static func hudChips(read: ProfileRead, runtimeMarks: [VehicleIdentityMark] = []) -> [ProfileHeaderHUDChip] {
+        let marks = !runtimeMarks.isEmpty ? runtimeMarks : read.resolvedIdentityMarks
+        var chips: [ProfileHeaderHUDChip] = marks.prefix(4).map { mark in
+            ProfileHeaderHUDChip(
+                id: "mark:\(mark.id)",
+                kind: .identityMark,
+                prefix: nil,
+                label: mark.displayLabel,
+                subLabel: mark.eraShortLabel,
+                rpoCode: mark.rpoCode,
+                mark: mark
+            )
+        }
+        chips.append(contentsOf: read.resolvedFacets.hudChips)
+        return chips
+    }
+
+    private var headerHUDChips: [ProfileHeaderHUDChip] {
+        Self.hudChips(read: read, runtimeMarks: identityMarks)
+    }
+
     /// The strip's dimensions map onto record fields the spec table also knows; the
     /// table drops those rows when the strip owns them (state each datum once).
     static func field(for dimension: String) -> String? {
         switch dimension {
-        case "body_style": return "body_style"
+        case "series", "series_facet": return "series"
+        case "trim", "trim_facet": return "trim"
+        case "body_style", "body_facet": return "body_style"
         case "engine": return "engine_size"
         case "transmission": return "transmission"
         case "drivetrain": return "drivetrain"
@@ -242,7 +335,9 @@ struct ProfileHeaderBlock: View {
 
     private static func name(for dimension: String) -> String {
         switch dimension {
-        case "body_style": return "Body"
+        case "series", "series_facet": return "Series"
+        case "trim", "trim_facet": return "Trim"
+        case "body_style", "body_facet": return "Body"
         case "engine": return "Engine"
         case "transmission": return "Transmission"
         case "drivetrain": return "Drivetrain"
@@ -256,8 +351,8 @@ struct ProfileHeaderBlock: View {
             if let m = read.masthead, let price = m.price, !priceOwnedByLiveStack {
                 priceRow(enrichedPriceClaim(price, masthead: m), label: m.priceLabel ?? "Recorded price")
             }
-            if !identityMarks.isEmpty {
-                identityMarksCard
+            if !headerHUDChips.isEmpty {
+                vehicleBadgeStrip
             }
             if let strip = read.strip, !strip.facets.isEmpty || strip.odometer != nil {
                 stripCard(strip)
@@ -380,15 +475,22 @@ struct ProfileHeaderBlock: View {
         )
     }
 
-    /// Resolves vetted era emblems and fender badges from `public.resolve_vehicle_identity_marks`.
+    /// Seeds decoded `identityMarks` from `vehicle_profile_read` when present, and otherwise
+    /// resolves vetted era emblems and fender badges from `public.resolve_vehicle_identity_marks`.
     private func loadIdentityMarks() async {
+        let embedded = read.resolvedIdentityMarks
+        if !embedded.isEmpty {
+            identityMarks = embedded
+            return
+        }
         guard let m = read.masthead else { return }
+        let facets = read.resolvedFacets
         let brand = m.make ?? m.identity_source.make
         let family = m.identity_source.normalized_model ?? m.model ?? m.identity_source.model
         let year = m.year ?? m.identity_source.year
-        let series = m.identity_source.series
-        let trim = m.identity_source.trim
-        let body = read.strip?.facets.first(where: { $0.dimension == "body_style" })?.label
+        let series = m.identity_source.series ?? facets.series
+        let trim = m.identity_source.trim ?? facets.trim_facet
+        let body = read.strip?.facets.first(where: { $0.dimension == "body_style" })?.label ?? facets.body_facet
         identityMarks = await VehicleIdentityMark.resolve(
             brand: brand,
             family: family,
@@ -399,24 +501,54 @@ struct ProfileHeaderBlock: View {
         )
     }
 
-    @ViewBuilder private var identityMarksCard: some View {
+    @ViewBuilder private var vehicleBadgeStrip: some View {
+        let chips = headerHUDChips
         VStack(alignment: .leading, spacing: 6) {
-            Text("ERA MARKS & BADGES")
+            Text("IDENTITY MARKS & FACETS")
                 .font(.system(.caption2, design: .monospaced))
                 .foregroundStyle(.secondary)
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 6) {
-                    ForEach(identityMarks.prefix(6)) { mark in
-                        Button {
-                            selectedIdentityMark = mark
-                        } label: {
-                            HStack(spacing: 5) {
-                                Text(mark.displayLabel)
+                    ForEach(chips) { chip in
+                        if let mark = chip.mark {
+                            Button {
+                                selectedIdentityMark = mark
+                            } label: {
+                                HStack(spacing: 5) {
+                                    Text(chip.label)
+                                        .font(.system(size: 10, weight: .bold, design: .monospaced))
+                                        .foregroundStyle(.primary)
+                                    if let sub = chip.subLabel, !sub.isEmpty {
+                                        Text(sub)
+                                            .font(.system(size: 9, design: .monospaced))
+                                            .foregroundStyle(.secondary)
+                                    }
+                                    if let rpo = chip.rpoCode, !rpo.isEmpty {
+                                        Text(rpo)
+                                            .font(.system(size: 8, weight: .semibold, design: .monospaced))
+                                            .foregroundStyle(.tertiary)
+                                    }
+                                }
+                                .padding(.horizontal, 8)
+                                .padding(.vertical, 5)
+                                .background(Color(.secondarySystemBackground), in: RoundedRectangle(cornerRadius: 6))
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: 6)
+                                        .strokeBorder(Color.secondary.opacity(0.3), lineWidth: 0.75)
+                                )
+                            }
+                            .buttonStyle(.plain)
+                            .accessibilityIdentifier("vehicle-identity-mark-\(mark.id)")
+                        } else {
+                            HStack(spacing: 4) {
+                                if let prefix = chip.prefix, !prefix.isEmpty {
+                                    Text("\(prefix) ·")
+                                        .font(.system(size: 9, weight: .bold, design: .monospaced))
+                                        .foregroundStyle(.secondary)
+                                }
+                                Text(chip.label)
                                     .font(.system(size: 10, weight: .bold, design: .monospaced))
                                     .foregroundStyle(.primary)
-                                Text(mark.eraShortLabel)
-                                    .font(.system(size: 9, design: .monospaced))
-                                    .foregroundStyle(.secondary)
                             }
                             .padding(.horizontal, 8)
                             .padding(.vertical, 5)
@@ -425,8 +557,10 @@ struct ProfileHeaderBlock: View {
                                 RoundedRectangle(cornerRadius: 6)
                                     .strokeBorder(Color.secondary.opacity(0.25), lineWidth: 0.5)
                             )
+                            .accessibilityElement(children: .combine)
+                            .accessibilityLabel(chip.displayText)
+                            .accessibilityIdentifier("vehicle-facet-\(chip.kind.rawValue)")
                         }
-                        .buttonStyle(.plain)
                     }
                 }
             }

@@ -378,6 +378,59 @@ struct GalleryImageDoc: Decodable {
     var isApproved: Bool { gate == "approved" }
 }
 
+/// Orthogonal vehicle configuration facets (`series`, `trim_facet`, `body_facet`) decoded from
+/// `vehicle_profile_read` or classified from the record's masthead/strip fields, matching web `VehicleBadgeBar`.
+struct ProfileVehicleFacets: Decodable, Equatable {
+    let series: String?
+    let trim_facet: String?
+    let body_facet: String?
+
+    var trimFacet: String? { trim_facet }
+    var bodyFacet: String? { body_facet }
+    var trim: String? { trim_facet }
+    var body: String? { body_facet }
+
+    var isEmpty: Bool {
+        series == nil && trim_facet == nil && body_facet == nil
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case series, series_facet, seriesFacet
+        case trim_facet, trimFacet, trim
+        case body_facet, bodyFacet, body_style_facet, bodyStyleFacet, body, body_style
+    }
+
+    init(series: String? = nil, trim_facet: String? = nil, body_facet: String? = nil) {
+        self.series = Self.clean(series)
+        self.trim_facet = Self.clean(trim_facet)
+        self.body_facet = Self.clean(body_facet)
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        func firstString(_ keys: [CodingKeys]) -> String? {
+            for k in keys {
+                if let val = try? c.decodeIfPresent(String.self, forKey: k),
+                   let cleaned = Self.clean(val) {
+                    return cleaned
+                }
+            }
+            return nil
+        }
+        let s = firstString([.series, .series_facet, .seriesFacet])
+        let t = firstString([.trim_facet, .trimFacet, .trim])
+        let b = firstString([.body_facet, .bodyFacet, .body_style_facet, .bodyStyleFacet, .body, .body_style])
+        self.init(series: s, trim_facet: t, body_facet: b)
+    }
+
+    static func clean(_ raw: String?) -> String? {
+        guard let trimmed = raw?.trimmingCharacters(in: .whitespacesAndNewlines), !trimmed.isEmpty else {
+            return nil
+        }
+        return trimmed
+    }
+}
+
 /// The masthead as the read ships it: raw identity columns for the client's display hygiene.
 struct IdentitySource: Decodable {
     let year: Int?
@@ -385,9 +438,44 @@ struct IdentitySource: Decodable {
     let model: String?
     let normalized_model: String?
     let series: String?
+    let series_facet: String?
     let trim: String?
+    let trim_facet: String?
+    let body_style: String?
+    let canonical_body_style: String?
+    let body_facet: String?
     let transmission: String?
     let transmission_model: String?
+
+    init(
+        year: Int? = nil,
+        make: String? = nil,
+        model: String? = nil,
+        normalized_model: String? = nil,
+        series: String? = nil,
+        series_facet: String? = nil,
+        trim: String? = nil,
+        trim_facet: String? = nil,
+        body_style: String? = nil,
+        canonical_body_style: String? = nil,
+        body_facet: String? = nil,
+        transmission: String? = nil,
+        transmission_model: String? = nil
+    ) {
+        self.year = year
+        self.make = make
+        self.model = model
+        self.normalized_model = normalized_model
+        self.series = series
+        self.series_facet = series_facet
+        self.trim = trim
+        self.trim_facet = trim_facet
+        self.body_style = body_style
+        self.canonical_body_style = canonical_body_style
+        self.body_facet = body_facet
+        self.transmission = transmission
+        self.transmission_model = transmission_model
+    }
 }
 
 /// One section of the document. Unknown kinds decode to `.unknown` and render nothing: a newer
@@ -400,6 +488,28 @@ enum ProfileSection: Decodable {
         let model: String?
         let price: Claim?
         let priceLabel: String?
+        let identityMarks: [VehicleIdentityMark]?
+        let facets: ProfileVehicleFacets?
+
+        private enum CodingKeys: String, CodingKey {
+            case identity_source, year, make, model, price, priceLabel
+            case identityMarks, identity_marks
+            case facets, vehicle_facets
+        }
+
+        init(from decoder: Decoder) throws {
+            let c = try decoder.container(keyedBy: CodingKeys.self)
+            self.identity_source = try c.decode(IdentitySource.self, forKey: .identity_source)
+            self.year = try c.decodeIfPresent(Int.self, forKey: .year)
+            self.make = try c.decodeIfPresent(String.self, forKey: .make)
+            self.model = try c.decodeIfPresent(String.self, forKey: .model)
+            self.price = try c.decodeIfPresent(Claim.self, forKey: .price)
+            self.priceLabel = try c.decodeIfPresent(String.self, forKey: .priceLabel)
+            self.identityMarks = (try? c.decodeIfPresent([VehicleIdentityMark].self, forKey: .identityMarks))
+                ?? (try? c.decodeIfPresent([VehicleIdentityMark].self, forKey: .identity_marks))
+            self.facets = (try? c.decodeIfPresent(ProfileVehicleFacets.self, forKey: .facets))
+                ?? (try? c.decodeIfPresent(ProfileVehicleFacets.self, forKey: .vehicle_facets))
+        }
     }
     struct Facet: Decodable {
         let dimension: String
@@ -497,6 +607,57 @@ struct ProfileRead: Decodable {
     let read_at: String
     let sections: [ProfileSection]
     let description: ProfileDescription?
+    let identityMarks: [VehicleIdentityMark]?
+    let facets: ProfileVehicleFacets?
+
+    private enum CodingKeys: String, CodingKey {
+        case vehicle_id, viewer, read_at, sections, description
+        case identityMarks, identity_marks
+        case facets, vehicle_facets
+        case series, series_facet, trim_facet, body_facet
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        self.vehicle_id = try c.decode(String.self, forKey: .vehicle_id)
+        self.viewer = try c.decode(ProfileViewer.self, forKey: .viewer)
+        self.read_at = try c.decode(String.self, forKey: .read_at)
+        self.sections = try c.decode([ProfileSection].self, forKey: .sections)
+        self.description = try c.decodeIfPresent(ProfileDescription.self, forKey: .description)
+
+        let topMarks = (try? c.decodeIfPresent([VehicleIdentityMark].self, forKey: .identityMarks))
+            ?? (try? c.decodeIfPresent([VehicleIdentityMark].self, forKey: .identity_marks))
+        var mastheadSection: ProfileSection.Masthead?
+        for s in self.sections {
+            if case .masthead(let m) = s {
+                mastheadSection = m
+                break
+            }
+        }
+        self.identityMarks = topMarks ?? mastheadSection?.identityMarks
+
+        if let explicitFacets = (try? c.decodeIfPresent(ProfileVehicleFacets.self, forKey: .facets))
+            ?? (try? c.decodeIfPresent(ProfileVehicleFacets.self, forKey: .vehicle_facets))
+            ?? mastheadSection?.facets {
+            self.facets = explicitFacets
+        } else {
+            let topSeries = (try? c.decodeIfPresent(String.self, forKey: .series_facet))
+                ?? (try? c.decodeIfPresent(String.self, forKey: .series))
+            let topTrim = try? c.decodeIfPresent(String.self, forKey: .trim_facet)
+            let topBody = try? c.decodeIfPresent(String.self, forKey: .body_facet)
+            let idSrc = mastheadSection?.identity_source
+            let hasExplicitIdSrcFacet = idSrc?.series_facet != nil || idSrc?.trim_facet != nil || idSrc?.body_facet != nil
+            if topSeries != nil || topTrim != nil || topBody != nil || hasExplicitIdSrcFacet {
+                self.facets = ProfileVehicleFacets(
+                    series: topSeries ?? idSrc?.series_facet ?? idSrc?.series,
+                    trim_facet: topTrim ?? idSrc?.trim_facet ?? idSrc?.trim,
+                    body_facet: topBody ?? idSrc?.body_facet ?? idSrc?.canonical_body_style ?? idSrc?.body_style
+                )
+            } else {
+                self.facets = nil
+            }
+        }
+    }
 
     var masthead: ProfileSection.Masthead? {
         for s in sections { if case .masthead(let m) = s { return m } }
@@ -509,6 +670,70 @@ struct ProfileRead: Decodable {
     var timeline: ProfileSection.Timeline? {
         for s in sections { if case .timeline(let t) = s { return t } }
         return nil
+    }
+
+    /// Decoded identity marks carried directly by `vehicle_profile_read` (root or `masthead`).
+    var resolvedIdentityMarks: [VehicleIdentityMark] {
+        identityMarks ?? masthead?.identityMarks ?? []
+    }
+
+    /// Orthogonal `series`, `trim_facet`, and `body_facet` resolved from decoded `facets`,
+    /// `strip.facets`, `masthead.identity_source`, and `VehicleFacetClassifier` (matching web `VehicleBadgeBar.tsx`).
+    var resolvedFacets: ProfileVehicleFacets {
+        let m = masthead
+        let idSrc = m?.identity_source
+        let brand = ProfileVehicleFacets.clean(m?.make ?? idSrc?.make)
+        let family = ProfileVehicleFacets.clean(idSrc?.normalized_model ?? m?.model ?? idSrc?.model)
+        let year = m?.year ?? idSrc?.year
+
+        let stripSeries = strip?.facets.first(where: { $0.dimension == "series" || $0.dimension == "series_facet" })?.label
+        let stripTrim = strip?.facets.first(where: { $0.dimension == "trim_facet" || $0.dimension == "trim" })?.label
+        let stripBodyFacet = strip?.facets.first(where: { $0.dimension == "body_facet" || $0.dimension == "body_style_facet" })?.label
+        let stripBodyStyle = strip?.facets.first(where: { $0.dimension == "body_style" })?.label
+
+        let descriptor = [
+            m?.model ?? idSrc?.model,
+            idSrc?.series,
+            idSrc?.trim,
+            idSrc?.canonical_body_style ?? idSrc?.body_style ?? stripBodyStyle
+        ]
+            .compactMap { ProfileVehicleFacets.clean($0) }
+            .joined(separator: " · ")
+
+        let classified: VehicleFacetClassification? = {
+            guard let brand, !descriptor.isEmpty else { return nil }
+            return VehicleFacetClassifier.classify(
+                make: brand,
+                familyLabel: family,
+                rawModel: descriptor,
+                year: year
+            )
+        }()
+
+        let resolvedSeries = facets?.series
+            ?? ProfileVehicleFacets.clean(idSrc?.series_facet)
+            ?? ProfileVehicleFacets.clean(stripSeries)
+            ?? classified?.series
+            ?? ProfileVehicleFacets.clean(idSrc?.series)
+
+        let resolvedTrim = facets?.trim_facet
+            ?? ProfileVehicleFacets.clean(idSrc?.trim_facet)
+            ?? ProfileVehicleFacets.clean(stripTrim)
+            ?? classified?.trim
+            ?? ProfileVehicleFacets.clean(idSrc?.trim)
+
+        let resolvedBody = facets?.body_facet
+            ?? ProfileVehicleFacets.clean(idSrc?.body_facet)
+            ?? ProfileVehicleFacets.clean(stripBodyFacet)
+            ?? classified?.body
+            ?? ProfileVehicleFacets.clean(stripBodyStyle)
+            ?? ProfileVehicleFacets.clean(idSrc?.canonical_body_style ?? idSrc?.body_style)
+
+        return ProfileVehicleFacets(
+            series: resolvedSeries,
+            trim_facet: resolvedTrim,
+            body_facet: resolvedBody
+        )
     }
 }
 
