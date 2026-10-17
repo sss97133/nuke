@@ -508,5 +508,90 @@ final class DecodeTests: XCTestCase {
         XCTAssertEqual(marks[1].kindLabel, "Marque Emblem")
         let filteredSquarebody = VehicleIdentityMark.filterByEra(marks, year: nil, eraId: "1973-1987")
         XCTAssertEqual(filteredSquarebody.map(\.displayLabel), ["CUSTOM DELUXE 10"])
+
+        // 8. `FamilyFacetAxis` & `VehicleFacetClassifier` (`TRUCKS UNIFIED` + 4-way facet axis selector)
+        XCTAssertEqual(FamilyFacetAxis.allCases.map(\.label), ["SUB-MODELS", "SERIES", "TRIM", "BODY STYLE"])
+        XCTAssertTrue(VehicleFacetClassifier.isPickupFamilyLabel("C10"))
+        XCTAssertTrue(VehicleFacetClassifier.isPickupFamilyLabel("K10"))
+        XCTAssertTrue(VehicleFacetClassifier.isPickupFamilyLabel("F-150"))
+        XCTAssertFalse(VehicleFacetClassifier.isPickupFamilyLabel("Corvette"))
+
+        let chevyFamilies: [LedgerNode] = [
+            LedgerNode(name: "Corvette", count: 800, value: 40_000_000, median_price: 50_000, min_price: 10_000, max_price: 500_000, sold_count: 800, auction_count: 900, avg_bids: nil, avg_watchers: nil, usd: 40_000_000, familyKey: "corvette", models: 8),
+            LedgerNode(name: "C10", count: 500, value: 17_500_000, median_price: 35_000, min_price: 8_000, max_price: 180_000, sold_count: 500, auction_count: 550, avg_bids: nil, avg_watchers: nil, usd: 17_500_000, familyKey: "c10", models: 4),
+            LedgerNode(name: "K10", count: 350, value: 14_000_000, median_price: 40_000, min_price: 12_000, max_price: 160_000, sold_count: 350, auction_count: 380, avg_bids: nil, avg_watchers: nil, usd: 14_000_000, familyKey: "k10", models: 3)
+        ]
+        let unifiedChevy = VehicleFacetClassifier.consolidateBrandPickupFamilies(make: "Chevrolet", families: chevyFamilies, groupPickups: true)
+        XCTAssertEqual(unifiedChevy.count, 2)
+        XCTAssertEqual(unifiedChevy.first?.name, "C/K & Pickup Trucks")
+        XCTAssertEqual(unifiedChevy.first?.count, 850)
+        XCTAssertEqual(unifiedChevy.first?.familyKey, "c10")
+        let splitChevy = VehicleFacetClassifier.consolidateBrandPickupFamilies(make: "Chevrolet", families: chevyFamilies, groupPickups: false)
+        XCTAssertEqual(splitChevy.count, 3)
+
+        let c10Facets = VehicleFacetClassifier.classify(
+            make: "Chevrolet",
+            familyLabel: "C10",
+            rawModel: "C10 · 1978 Chevrolet C10 Silverado Stepside",
+            year: 1978
+        )
+        XCTAssertEqual(c10Facets.series, "C10 / C1500 (1/2-Ton 2WD)")
+        XCTAssertEqual(c10Facets.trim, "Silverado")
+        XCTAssertEqual(c10Facets.body, "Stepside / Flareside")
+
+        let mustangFacets = VehicleFacetClassifier.classify(
+            make: "Ford",
+            familyLabel: "Mustang",
+            rawModel: "Mustang · 1969 Ford Mustang Boss 302 Fastback",
+            year: 1969
+        )
+        XCTAssertEqual(mustangFacets.series, "1st Gen ('64½–'73)")
+        XCTAssertEqual(mustangFacets.trim, "Boss 302")
+        XCTAssertEqual(mustangFacets.body, "Fastback / SportsRoof")
+
+        let baseSubModels: [LedgerNode] = [
+            LedgerNode(name: "C10 Silverado Stepside", count: 60, value: 2_400_000, median_price: 40_000, min_price: 20_000, max_price: 80_000, sold_count: 60, auction_count: 60, avg_bids: nil, avg_watchers: nil, usd: 2_400_000),
+            LedgerNode(name: "K10 Cheyenne Fleetside", count: 40, value: 1_800_000, median_price: 45_000, min_price: 22_000, max_price: 90_000, sold_count: 40, auction_count: 40, avg_bids: nil, avg_watchers: nil, usd: 1_800_000)
+        ]
+        let trimNodes = VehicleFacetClassifier.buildFacetNodes(
+            axis: .trim,
+            make: "Chevrolet",
+            familyLabel: "C/K & Pickup Trucks",
+            baseModels: baseSubModels,
+            salesData: nil
+        )
+        XCTAssertEqual(trimNodes.map(\.name), ["Silverado", "Cheyenne"])
+        XCTAssertEqual(trimNodes.first?.facetRepresentativeModel, "C10 Silverado Stepside")
+
+        let bodyNodes = VehicleFacetClassifier.buildFacetNodes(
+            axis: .body,
+            make: "Chevrolet",
+            familyLabel: "C/K & Pickup Trucks",
+            baseModels: baseSubModels,
+            salesData: nil
+        )
+        XCTAssertEqual(bodyNodes.map(\.name), ["Stepside / Flareside", "Fleetside / Styleside"])
+
+        XCTAssertTrue(VehicleFacetClassifier.matchesSaleSubModel(
+            saleModel: "C10 · 1978 Chevrolet C10 Silverado Stepside",
+            selectedModel: "Silverado",
+            brand: "Chevrolet",
+            family: "C10",
+            year: 1978
+        ))
+        XCTAssertTrue(VehicleFacetClassifier.matchesSaleSubModel(
+            saleModel: "C10 · 1978 Chevrolet C10 Silverado Stepside",
+            selectedModel: "Stepside / Flareside",
+            brand: "Chevrolet",
+            family: "C10",
+            year: 1978
+        ))
+        XCTAssertFalse(VehicleFacetClassifier.matchesSaleSubModel(
+            saleModel: "C10 · 1978 Chevrolet C10 Silverado Stepside",
+            selectedModel: "Cheyenne",
+            brand: "Chevrolet",
+            family: "C10",
+            year: 1978
+        ))
     }
 }

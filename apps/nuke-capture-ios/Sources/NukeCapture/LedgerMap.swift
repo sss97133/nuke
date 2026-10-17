@@ -42,6 +42,7 @@ struct LedgerNode: Decodable, Identifiable, Equatable {
     var usd_prior_12m: Double?
     var familyKey: String?
     var models: Int?
+    var facetRepresentativeModel: String? = nil
 
     var id: String { familyKey ?? name }
 
@@ -1367,6 +1368,587 @@ struct FamilyEraCohort: Equatable, Identifiable {
     }
 }
 
+// MARK: - Pickup Umbrella & 4-Way Facet Axis Re-Keying (familyFacetsAndEmblems.ts twin)
+
+enum FamilyFacetAxis: String, CaseIterable, Identifiable {
+    case raw
+    case series
+    case trim
+    case body
+
+    var id: String { rawValue }
+
+    var label: String {
+        switch self {
+        case .raw: return "SUB-MODELS"
+        case .series: return "SERIES"
+        case .trim: return "TRIM"
+        case .body: return "BODY STYLE"
+        }
+    }
+}
+
+struct VehicleFacetClassification: Equatable {
+    let series: String?
+    let trim: String?
+    let body: String?
+}
+
+enum VehicleFacetClassifier {
+    static let pickupFamilies: Set<String> = [
+        "pickup",
+        "c10", "k10", "c20", "k20", "c30", "k30",
+        "3100", "3600", "3800", "apache", "cameo",
+        "silverado", "sierra",
+        "c1500", "k1500", "c2500", "k2500", "c3500", "k3500", "3500",
+        "454 ss", "s10", "s-10 pickup", "syclone", "sonoma", "s15 pickup", "caballero",
+        "f-series", "f-100", "f-150", "f-250", "f-350", "f-450", "f-1", "f-2", "f-3",
+        "power wagon", "d100", "d150", "w100", "w150"
+    ]
+
+    static func isPickupFamilyLabel(_ familyLabel: String?) -> Bool {
+        guard let raw = familyLabel?.trimmingCharacters(in: .whitespacesAndNewlines).lowercased(), !raw.isEmpty else {
+            return false
+        }
+        if pickupFamilies.contains(raw) { return true }
+        return raw.range(of: #"\b(pickup|truck|c10|k10|c20|k20|c30|k30|3100|apache|f-100|f-150|f-250|f-350|silverado|sierra)\b"#, options: .regularExpression) != nil
+    }
+
+    static func consolidateBrandPickupFamilies(
+        make: String?,
+        families: [LedgerNode],
+        groupPickups: Bool
+    ) -> [LedgerNode] {
+        guard groupPickups, families.count > 1 else { return families }
+        let pickupNodes = families.filter { isPickupFamilyLabel($0.name) }
+        guard pickupNodes.count > 1 else { return families }
+
+        let primary = pickupNodes.max(by: { $0.count < $1.count }) ?? pickupNodes[0]
+        var totalCount = 0
+        var totalValue = 0.0
+        var totalUsd = 0.0
+        var totalSoldAny = 0
+        var totalOffered = 0
+        var totalDated = 0
+        var totalSold12m = 0
+        var totalSoldPrior12m = 0
+        var totalUsd12m = 0.0
+        var totalUsdPrior12m = 0.0
+        var totalModels = 0
+        var weightedMedianNum = 0.0
+        var weightedMedianDen = 0
+        var minPrice = Double.infinity
+        var maxPrice = 0.0
+
+        for n in pickupNodes {
+            totalCount += n.count
+            totalValue += n.value ?? 0
+            totalUsd += n.usd ?? n.value ?? 0
+            totalSoldAny += n.sold_any ?? n.count
+            totalOffered += n.offered ?? n.count
+            totalDated += n.dated ?? n.count
+            totalSold12m += n.sold_12m ?? 0
+            totalSoldPrior12m += n.sold_prior_12m ?? 0
+            totalUsd12m += n.usd_12m ?? 0
+            totalUsdPrior12m += n.usd_prior_12m ?? 0
+            totalModels += n.models ?? 1
+            if let med = n.median_price, med > 0 {
+                weightedMedianNum += med * Double(n.count)
+                weightedMedianDen += n.count
+            }
+            if let lo = n.min_price, lo > 0, lo < minPrice { minPrice = lo }
+            if let hi = n.max_price, hi > maxPrice { maxPrice = hi }
+        }
+
+        let mk = (make ?? "").trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        let umbrellaName: String
+        if mk == "chevrolet" {
+            umbrellaName = "C/K & Pickup Trucks"
+        } else if mk == "gmc" {
+            umbrellaName = "Sierra & C/K Pickups"
+        } else if mk == "ford" {
+            umbrellaName = "F-Series & Pickups"
+        } else {
+            umbrellaName = primary.name
+        }
+
+        let medianPrice = weightedMedianDen > 0
+            ? (weightedMedianNum / Double(weightedMedianDen)).rounded()
+            : primary.median_price
+
+        let mergedNode = LedgerNode(
+            name: umbrellaName,
+            count: totalCount,
+            value: totalValue,
+            median_price: medianPrice,
+            min_price: minPrice.isFinite ? minPrice : primary.min_price,
+            max_price: maxPrice > 0 ? maxPrice : primary.max_price,
+            sold_count: totalCount,
+            auction_count: totalOffered,
+            avg_bids: primary.avg_bids,
+            avg_watchers: primary.avg_watchers,
+            usd: totalUsd,
+            sold_any: totalSoldAny,
+            offered: totalOffered,
+            dated: totalDated,
+            sold_12m: totalSold12m,
+            sold_prior_12m: totalSoldPrior12m,
+            usd_12m: totalUsd12m,
+            usd_prior_12m: totalUsdPrior12m,
+            familyKey: primary.familyKey,
+            models: totalModels
+        )
+
+        let nonPickups = families.filter { !isPickupFamilyLabel($0.name) }
+        return ([mergedNode] + nonPickups).sorted(by: { $0.count > $1.count })
+    }
+
+    private static func matches(_ text: String, _ pattern: String) -> Bool {
+        text.range(of: pattern, options: [.regularExpression, .caseInsensitive]) != nil
+    }
+
+    static func classify(
+        make: String?,
+        familyLabel: String?,
+        rawModel: String?,
+        year: Int? = nil
+    ) -> VehicleFacetClassification {
+        let mk = (make ?? "").trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        let fam = (familyLabel ?? "").trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        let raw = (rawModel ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+        let m = raw.lowercased()
+
+        // 1. GM / Ford / Dodge Trucks & SUVs
+        if isPickupFamilyLabel(fam) || isPickupFamilyLabel(m) || matches(fam, #"\b(blazer|jimmy|suburban|bronco|ramcharger)\b"#) {
+            var series: String?
+            if matches(m, #"\b(c10|c-10|c15|c-15|c1500|1500\s*2wd)\b"#) { series = "C10 / C1500 (1/2-Ton 2WD)" }
+            else if matches(m, #"\b(k10|k-10|k15|k-15|k1500|1500\s*4wd|1500\s*4x4)\b"#) { series = "K10 / K1500 (1/2-Ton 4x4)" }
+            else if matches(m, #"\b(c20|c-20|c25|c-25|c2500|2500\s*2wd)\b"#) { series = "C20 / C2500 (3/4-Ton 2WD)" }
+            else if matches(m, #"\b(k20|k-20|k25|k-25|k2500|2500\s*4wd|2500\s*4x4)\b"#) { series = "K20 / K2500 (3/4-Ton 4x4)" }
+            else if matches(m, #"\b(c30|c-30|c35|c-35|c3500|3500\s*2wd)\b"#) { series = "C30 / C3500 (1-Ton 2WD)" }
+            else if matches(m, #"\b(k30|k-30|k35|k-35|k3500|v30|v3500|3500\s*4wd|3500\s*4x4)\b"#) { series = "K30 / K3500 (1-Ton 4x4)" }
+            else if matches(m, #"\b(r10|r1500|r20|r2500|r30|r3500)\b"#) { series = "R-Series ('87–'91 2WD)" }
+            else if matches(m, #"\b(v10|v1500|v20|v2500)\b"#) { series = "V-Series ('87–'91 4x4)" }
+            else if matches(m, #"\b(3100|3600|3800)\b"#) { series = "Advance-Design / Task Force (3100–3800)" }
+            else if matches(m, #"\b(apache|viking|spartan)\b"#) { series = "Task Force Apache" }
+            else if matches(m, #"\b(s10|s-10|s15|s-15|sonoma|syclone)\b"#) { series = "S-10 / S-15 / Sonoma Compact" }
+            else if matches(m, #"\b(f-?100|f-?1)\b"#) { series = "F-1 / F-100 (1/2-Ton)" }
+            else if matches(m, #"\b(f-?150)\b"#) { series = "F-150 (1/2-Ton)" }
+            else if matches(m, #"\b(f-?250|f-?2)\b"#) { series = "F-2 / F-250 (3/4-Ton)" }
+            else if matches(m, #"\b(f-?350|f-?3|f-?450)\b"#) { series = "F-350+ (1-Ton+)" }
+            else if matches(m, #"\b(w100|w150|w200|w250|w300|power\s*wagon)\b"#) { series = "Power Wagon / W-Series (4x4)" }
+            else if matches(m, #"\b(d100|d150|d200|d250|d300)\b"#) { series = "D-Series (2WD)" }
+            else if let y = year {
+                if y >= 1947 && y <= 1955 { series = "Advance-Design ('47–'55)" }
+                else if y >= 1955 && y <= 1959 { series = "Task Force ('55–'59)" }
+                else if y >= 1960 && y <= 1966 { series = "1st Gen C/K ('60–'66)" }
+                else if y >= 1967 && y <= 1972 { series = "Action Line ('67–'72)" }
+                else if y >= 1973 && y <= 1987 { series = "Squarebody ('73–'87)" }
+                else if y >= 1988 && y <= 1998 { series = "GMT400 ('88–'98)" }
+                else if y >= 1999 { series = "Modern Truck ('99+)" }
+            }
+            if series == nil { series = raw.isEmpty ? "Standard Pickup" : raw }
+
+            var trim: String?
+            if matches(m, #"\b(454\s*ss)\b"#) { trim = "454 SS" }
+            else if matches(m, #"\b(syclone)\b"#) { trim = "Syclone" }
+            else if matches(m, #"\b(cameo)\b"#) { trim = "Cameo Carrier" }
+            else if matches(m, #"\b(cheyenne\s*super)\b"#) { trim = "Cheyenne Super" }
+            else if matches(m, #"\b(cheyenne)\b"#) { trim = "Cheyenne" }
+            else if matches(m, #"\b(silverado)\b"#) { trim = "Silverado" }
+            else if matches(m, #"\b(scottsdale)\b"#) { trim = "Scottsdale" }
+            else if matches(m, #"\b(custom\s*deluxe|deluxe)\b"#) { trim = "Custom Deluxe" }
+            else if matches(m, #"\b(cst|custom\s*sport)\b"#) { trim = "CST (Custom Sport Truck)" }
+            else if matches(m, #"\b(high\s*sierra)\b"#) { trim = "High Sierra" }
+            else if matches(m, #"\b(sierra\s*classic)\b"#) { trim = "Sierra Classic" }
+            else if matches(m, #"\b(sierra\s*grande)\b"#) { trim = "Sierra Grande" }
+            else if matches(m, #"\b(sierra)\b"#) && mk == "gmc" { trim = "Sierra" }
+            else if matches(m, #"\b(indy|pace\s*truck)\b"#) { trim = "Indy Hauler / Special" }
+            else if matches(m, #"\b(big\s*10|big\s*ten)\b"#) { trim = "Big 10" }
+            else if matches(m, #"\b(heavy\s*half)\b"#) { trim = "Heavy Half" }
+            else if matches(m, #"\b(chalet|casa\s*grande)\b"#) { trim = "Chalet Camper" }
+            else if matches(m, #"\b(raptor)\b"#) { trim = "Raptor" }
+            else if matches(m, #"\b(lightning)\b"#) { trim = "SVT Lightning" }
+            else if matches(m, #"\b(harley)\b"#) { trim = "Harley-Davidson" }
+            else if matches(m, #"\b(king\s*ranch)\b"#) { trim = "King Ranch" }
+            else if matches(m, #"\b(platinum|limited)\b"#) { trim = "Platinum / Limited" }
+            else if matches(m, #"\b(lariat)\b"#) { trim = "Lariat" }
+            else if matches(m, #"\b(ranger\s*xlt|xlt)\b"#) { trim = "Ranger / XLT" }
+            else if matches(m, #"\b(explorer)\b"#) { trim = "Explorer Special" }
+            else if matches(m, #"\b(custom\s*cab|custom)\b"#) { trim = "Custom" }
+            else { trim = "Standard / Unspecified Trim" }
+
+            var body: String?
+            if matches(m, #"\b(stepside|step-side|flareside|flare-side|thriftside|utiline|fenderside)\b"#) {
+                body = "Stepside / Flareside"
+            } else if matches(m, #"\b(fleetside|fleet-side|styleside|style-side|wideside|wide-side|sweptline)\b"#) {
+                body = "Fleetside / Styleside"
+            } else if matches(m, #"\b(crew\s*cab|4-door|four-door|bonus\s*cab)\b"#) {
+                body = "Crew Cab"
+            } else if matches(m, #"\b(extended\s*cab|ext\s*cab|supercab|super\s*cab|club\s*cab)\b"#) {
+                body = "Extended / SuperCab"
+            } else if matches(m, #"\b(dually|dual\s*rear|drw)\b"#) {
+                body = "Dually (DRW)"
+            } else if matches(m, #"\b(panel|suburban|carryall)\b"#) {
+                body = "Panel / Carryall"
+            } else if matches(m, #"\b(stake|flatbed|chassis\s*cab|cab\s*&\s*chassis|dump|tow|wrecker)\b"#) {
+                body = "Flatbed / Commercial"
+            } else if matches(m, #"\b(short\s*bed|shortbed|swb)\b"#) {
+                body = "Short-Bed Regular Cab"
+            } else if matches(m, #"\b(long\s*bed|longbed|lwb)\b"#) {
+                body = "Long-Bed Regular Cab"
+            } else {
+                body = "Regular Cab Pickup"
+            }
+
+            return VehicleFacetClassification(series: series, trim: trim, body: body)
+        }
+
+        // 2. Ford Mustang
+        if fam.contains("mustang") || m.contains("mustang") {
+            let series: String = {
+                if let y = year {
+                    if y <= 1973 { return "1st Gen ('64½–'73)" }
+                    if y <= 1978 { return "Mustang II ('74–'78)" }
+                    if y <= 1993 { return "Fox Body ('79–'93)" }
+                    if y <= 2004 { return "SN95 / New Edge ('94–'04)" }
+                    if y <= 2014 { return "S197 ('05–'14)" }
+                    if y <= 2023 { return "S550 ('15–'23)" }
+                    return "S650 ('24+)"
+                }
+                if matches(m, #"\b(gt350|gt500|shelby)\b"#) { return "Shelby Mustang" }
+                if matches(m, #"\b(boss)\b"#) { return "Boss Series" }
+                if matches(m, #"\b(mach\s*1)\b"#) { return "Mach 1 Series" }
+                if matches(m, #"\b(cobra|svt)\b"#) { return "SVT Cobra Series" }
+                return "Mustang Standard"
+            }()
+
+            let trim: String = {
+                if matches(m, #"\b(gt500kr|gt500)\b"#) { return "Shelby GT500" }
+                if matches(m, #"\b(gt350r|gt350h|gt350)\b"#) { return "Shelby GT350" }
+                if matches(m, #"\b(boss\s*429)\b"#) { return "Boss 429" }
+                if matches(m, #"\b(boss\s*302)\b"#) { return "Boss 302" }
+                if matches(m, #"\b(boss\s*351)\b"#) { return "Boss 351" }
+                if matches(m, #"\b(mach\s*1)\b"#) { return "Mach 1" }
+                if matches(m, #"\b(cobra\s*r|svt\s*cobra|cobra\s*jet|cobra)\b"#) { return "SVT Cobra" }
+                if matches(m, #"\b(bullitt)\b"#) { return "Bullitt" }
+                if matches(m, #"\b(saleen)\b"#) { return "Saleen" }
+                if matches(m, #"\b(roush)\b"#) { return "Roush" }
+                if matches(m, #"\b(dark\s*horse)\b"#) { return "Dark Horse" }
+                if matches(m, #"\b(california\s*special|gt/cs)\b"#) { return "California Special" }
+                if matches(m, #"\b(k-code|hi-po|289\s*hi-po)\b"#) { return "K-Code 289 Hi-Po" }
+                if matches(m, #"\b(lx\s*5\.0|5\.0\s*lx)\b"#) { return "LX 5.0" }
+                if matches(m, #"\b(svo)\b"#) { return "SVO" }
+                if matches(m, #"\b(gt)\b"#) { return "Mustang GT" }
+                return "Base / Standard"
+            }()
+
+            let body: String = {
+                if matches(m, #"\b(fastback|sportsroof|2\+2|mach\s*1|boss|gt350|gt500)\b"#) { return "Fastback / SportsRoof" }
+                if matches(m, #"\b(convertible|cabriolet)\b"#) { return "Convertible" }
+                if matches(m, #"\b(notchback|coupe|hardtop)\b"#) { return "Coupe / Hardtop" }
+                if matches(m, #"\b(hatchback)\b"#) { return "Hatchback" }
+                return "Coupe / Fastback"
+            }()
+
+            return VehicleFacetClassification(series: series, trim: trim, body: body)
+        }
+
+        // 3. Chevrolet Corvette
+        if fam.contains("corvette") || m.contains("corvette") {
+            let series: String = {
+                if matches(m, #"\bc1\b"#) || (year != nil && year! <= 1962) { return "C1 ('53–'62)" }
+                if matches(m, #"\bc2\b"#) || (year != nil && year! >= 1963 && year! <= 1967) { return "C2 Sting Ray ('63–'67)" }
+                if matches(m, #"\bc3\b"#) || (year != nil && year! >= 1968 && year! <= 1982) { return "C3 ('68–'82)" }
+                if matches(m, #"\bc4\b"#) || (year != nil && year! >= 1984 && year! <= 1996) { return "C4 ('84–'96)" }
+                if matches(m, #"\bc5\b"#) || (year != nil && year! >= 1997 && year! <= 2004) { return "C5 ('97–'04)" }
+                if matches(m, #"\bc6\b"#) || (year != nil && year! >= 2005 && year! <= 2013) { return "C6 ('05–'13)" }
+                if matches(m, #"\bc7\b"#) || (year != nil && year! >= 2014 && year! <= 2019) { return "C7 ('14–'19)" }
+                if matches(m, #"\bc8\b"#) || (year != nil && year! >= 2020) { return "C8 ('20+)" }
+                return raw.isEmpty ? "Corvette" : raw
+            }()
+
+            let trim: String = {
+                if matches(m, #"\b(zr-?1)\b"#) { return "ZR-1 / ZR1" }
+                if matches(m, #"\b(z06)\b"#) { return "Z06" }
+                if matches(m, #"\b(l88)\b"#) { return "L88 427" }
+                if matches(m, #"\b(427|l71|l72|l36|l68)\b"#) { return "Big-Block 427" }
+                if matches(m, #"\b(454|ls5|ls6)\b"#) { return "Big-Block 454" }
+                if matches(m, #"\b(fuel\s*injected|fuelie)\b"#) { return "Fuelie (283 / 327 FI)" }
+                if matches(m, #"\b(grand\s*sport)\b"#) { return "Grand Sport" }
+                if matches(m, #"\b(pace\s*car)\b"#) { return "Indy Pace Car" }
+                if matches(m, #"\b(callaway)\b"#) { return "Callaway Twin-Turbo" }
+                if matches(m, #"\b(e-ray)\b"#) { return "E-Ray" }
+                if matches(m, #"\b(sting\s*ray|stingray)\b"#) { return "Stingray" }
+                return "Standard Corvette"
+            }()
+
+            let body: String = {
+                if matches(m, #"\b(split-window|split\s*window)\b"#) || (year == 1963 && matches(m, #"\bcoupe\b"#)) {
+                    return "Split-Window Coupe ('63)"
+                }
+                if matches(m, #"\b(convertible|roadster)\b"#) { return "Convertible / Roadster" }
+                if matches(m, #"\b(t-top|targa)\b"#) { return "T-Top / Targa Coupe" }
+                if matches(m, #"\b(frc|fixed\s*roof|z06)\b"#) && (year == nil || (year! >= 1999 && year! <= 2004)) {
+                    return "Fixed-Roof Coupe (FRC)"
+                }
+                return "Coupe"
+            }()
+
+            return VehicleFacetClassification(series: series, trim: trim, body: body)
+        }
+
+        // 4. Porsche 911
+        if fam.contains("911") || matches(m, #"\b(911|930|964|993|996|997|991|992)\b"#) {
+            let series: String = {
+                if matches(m, #"\b930\b"#) { return "930 Turbo ('75–'89)" }
+                if matches(m, #"\b964\b"#) || (year != nil && year! >= 1989 && year! <= 1994) { return "964 ('89–'94)" }
+                if matches(m, #"\b993\b"#) || (year != nil && year! >= 1995 && year! <= 1998) { return "993 ('95–'98)" }
+                if matches(m, #"\b996\b"#) || (year != nil && year! >= 1999 && year! <= 2004) { return "996 ('99–'04)" }
+                if matches(m, #"\b997\b"#) || (year != nil && year! >= 2005 && year! <= 2012) { return "997 ('05–'12)" }
+                if matches(m, #"\b991\b"#) || (year != nil && year! >= 2013 && year! <= 2019) { return "991 ('13–'19)" }
+                if matches(m, #"\b992\b"#) || (year != nil && year! >= 2020) { return "992 ('20+)" }
+                if let y = year, y <= 1973 { return "F-Body Longhood ('64–'73)" }
+                if let y = year, y >= 1974 && y <= 1988 { return "G-Body ('74–'88)" }
+                return raw.isEmpty ? "911" : raw
+            }()
+
+            let trim: String = {
+                if matches(m, #"\b(gt2\s*rs|gt2)\b"#) { return "GT2 / GT2 RS" }
+                if matches(m, #"\b(gt3\s*rs)\b"#) { return "GT3 RS" }
+                if matches(m, #"\b(gt3\s*touring|gt3)\b"#) { return "GT3 / Touring" }
+                if matches(m, #"\b(carrera\s*rs|rs\s*america|2\.7\s*rs)\b"#) { return "Carrera RS" }
+                if matches(m, #"\b(turbo\s*s|turbo|930)\b"#) { return "Turbo / Turbo S" }
+                if matches(m, #"\b(gts)\b"#) { return "Carrera GTS" }
+                if matches(m, #"\b(carrera\s*4s|c4s|4s)\b"#) { return "Carrera 4S" }
+                if matches(m, #"\b(carrera\s*s)\b"#) { return "Carrera S" }
+                if matches(m, #"\b(carrera\s*4|c4)\b"#) { return "Carrera 4" }
+                if matches(m, #"\b(911s|\bs\b)\b"#) && (year == nil || year! <= 1977) { return "911S" }
+                if matches(m, #"\b(911e|\be\b)\b"#) && (year == nil || year! <= 1973) { return "911E" }
+                if matches(m, #"\b(911t|\bt\b)\b"#) && (year == nil || year! <= 1973) { return "911T" }
+                if matches(m, #"\b(sc)\b"#) { return "911 SC" }
+                if matches(m, #"\b(carrera)\b"#) { return "Carrera" }
+                return "Base 911"
+            }()
+
+            let body: String = {
+                if matches(m, #"\b(targa)\b"#) { return "Targa" }
+                if matches(m, #"\b(speedster)\b"#) { return "Speedster" }
+                if matches(m, #"\b(cabriolet|convertible)\b"#) { return "Cabriolet" }
+                return "Coupe"
+            }()
+
+            return VehicleFacetClassification(series: series, trim: trim, body: body)
+        }
+
+        // 5. Generic fallback for any other family
+        let seriesFallback = raw.isEmpty ? (familyLabel ?? "Standard") : raw
+        let trimFallback: String = {
+            if matches(m, #"\b(ss|super\s*sport)\b"#) { return "SS (Super Sport)" }
+            if matches(m, #"\b(rs|rally\s*sport)\b"#) { return "RS (Rally Sport)" }
+            if matches(m, #"\b(z/?28)\b"#) { return "Z/28" }
+            if matches(m, #"\b(yenko|copo|baldwin)\b"#) { return "COPO / Yenko" }
+            if matches(m, #"\b(iroc-?z|z28)\b"#) { return "Z28 / IROC-Z" }
+            if matches(m, #"\b(zl1)\b"#) { return "ZL1" }
+            if matches(m, #"\b(r/t|rt)\b"#) { return "R/T" }
+            if matches(m, #"\b(hemi)\b"#) { return "426 Hemi" }
+            if matches(m, #"\b(hellcat|demon|redeye)\b"#) { return "SRT Hellcat / Demon" }
+            if matches(m, #"\b(amg)\b"#) { return "AMG" }
+            if matches(m, #"\b(alpina)\b"#) { return "Alpina" }
+            if matches(m, #"\b(competition|cs|csl)\b"#) { return "Competition / CSL" }
+            if matches(m, #"\b(type\s*r|nsx-r)\b"#) { return "Type R" }
+            if matches(m, #"\b(gt)\b"#) { return "GT" }
+            return raw.isEmpty ? "Standard" : raw
+        }()
+        let bodyFallback: String = {
+            if matches(m, #"\b(convertible|cabriolet|roadster|spider|spyder)\b"#) { return "Convertible / Roadster" }
+            if matches(m, #"\b(wagon|estate|touring|avant|shooting\s*brake)\b"#) { return "Wagon / Touring" }
+            if matches(m, #"\b(sedan|saloon|4-door)\b"#) { return "Sedan" }
+            if matches(m, #"\b(fastback|hatchback)\b"#) { return "Fastback / Hatchback" }
+            if matches(m, #"\b(targa|t-top)\b"#) { return "Targa / T-Top" }
+            return "Coupe / Hardtop"
+        }()
+
+        return VehicleFacetClassification(series: seriesFallback, trim: trimFallback, body: bodyFallback)
+    }
+
+    static func buildFacetNodes(
+        axis: FamilyFacetAxis,
+        make: String?,
+        familyLabel: String?,
+        baseModels: [LedgerNode],
+        salesData: [FamilySalesData.Sale]?,
+        eraId: String? = nil
+    ) -> [LedgerNode] {
+        guard axis != .raw else { return baseModels }
+
+        let pickFacet: (VehicleFacetClassification) -> String = { c in
+            switch axis {
+            case .raw: return "Unspecified"
+            case .series: return c.series ?? "Unspecified"
+            case .trim: return c.trim ?? "Unspecified"
+            case .body: return c.body ?? "Unspecified"
+            }
+        }
+
+        if let sales = salesData, sales.count >= 10 {
+            struct Bucket {
+                var prices: [Double] = []
+                var totalUsd: Double = 0
+                var modelCounts: [String: Int] = [:]
+            }
+            var buckets: [String: Bucket] = [:]
+            for s in sales {
+                guard s.usd > 0 else { continue }
+                if !FamilyEraCohort.matches(year: s.year, eraId: eraId) { continue }
+                let cls = classify(make: make, familyLabel: familyLabel, rawModel: s.model, year: s.year)
+                let label = pickFacet(cls)
+                var b = buckets[label] ?? Bucket()
+                b.prices.append(s.usd)
+                b.totalUsd += s.usd
+                if let rawMdl = s.model {
+                    let canonical = rawMdl.components(separatedBy: " · ").first?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+                    if !canonical.isEmpty {
+                        b.modelCounts[canonical, default: 0] += 1
+                    }
+                }
+                buckets[label] = b
+            }
+
+            if buckets.count > 1 {
+                return buckets.map { label, b -> LedgerNode in
+                    let sorted = b.prices.sorted()
+                    let mid = sorted.count / 2
+                    let median = sorted.isEmpty
+                        ? 0
+                        : (sorted.count % 2 == 0
+                            ? ((sorted[mid - 1] + sorted[mid]) / 2.0).rounded()
+                            : sorted[mid])
+                    let repModel = b.modelCounts.max(by: { $0.value < $1.value })?.key
+                    return LedgerNode(
+                        name: label,
+                        count: sorted.count,
+                        value: b.totalUsd,
+                        median_price: median,
+                        min_price: sorted.first,
+                        max_price: sorted.last,
+                        sold_count: sorted.count,
+                        auction_count: sorted.count,
+                        avg_bids: nil,
+                        avg_watchers: nil,
+                        usd: b.totalUsd,
+                        sold_any: sorted.count,
+                        offered: sorted.count,
+                        dated: sorted.count,
+                        facetRepresentativeModel: repModel
+                    )
+                }.sorted(by: { $0.count > $1.count })
+            }
+        }
+
+        // Fallback: aggregate baseModels by facet classification
+        struct Agg {
+            var count: Int = 0
+            var value: Double = 0
+            var usd: Double = 0
+            var weightedMedNum: Double = 0
+            var weightedMedDen: Int = 0
+            var minPrice: Double = .infinity
+            var maxPrice: Double = 0
+            var topRepModel: String?
+            var topRepCount: Int = 0
+        }
+        var grouped: [String: Agg] = [:]
+        for n in baseModels {
+            let cls = classify(make: make, familyLabel: familyLabel, rawModel: n.name)
+            let label = pickFacet(cls)
+            var prev = grouped[label] ?? Agg()
+            prev.count += n.count
+            prev.value += n.value ?? 0
+            prev.usd += n.usd ?? n.value ?? 0
+            if let med = n.median_price, med > 0 {
+                prev.weightedMedNum += med * Double(n.count)
+                prev.weightedMedDen += n.count
+            }
+            if let lo = n.min_price, lo > 0, lo < prev.minPrice { prev.minPrice = lo }
+            if let hi = n.max_price, hi > prev.maxPrice { prev.maxPrice = hi }
+            if n.count > prev.topRepCount {
+                prev.topRepCount = n.count
+                prev.topRepModel = n.name
+            }
+            grouped[label] = prev
+        }
+
+        return grouped.map { label, g -> LedgerNode in
+            let med = g.weightedMedDen > 0 ? (g.weightedMedNum / Double(g.weightedMedDen)).rounded() : 0
+            return LedgerNode(
+                name: label,
+                count: g.count,
+                value: g.value,
+                median_price: med,
+                min_price: g.minPrice.isFinite ? g.minPrice : 0,
+                max_price: g.maxPrice,
+                sold_count: g.count,
+                auction_count: g.count,
+                avg_bids: nil,
+                avg_watchers: nil,
+                usd: g.usd,
+                sold_any: g.count,
+                offered: g.count,
+                dated: g.count,
+                facetRepresentativeModel: g.topRepModel
+            )
+        }.sorted(by: { $0.count > $1.count })
+    }
+
+    static func matchesSaleSubModel(
+        saleModel: String?,
+        selectedModel: String?,
+        brand: String? = nil,
+        family: String? = nil,
+        year: Int? = nil
+    ) -> Bool {
+        guard let selected = selectedModel?.trimmingCharacters(in: .whitespacesAndNewlines).lowercased(), !selected.isEmpty else {
+            return true
+        }
+        let raw = (saleModel ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+        let m = raw.lowercased()
+        let canonical = m.components(separatedBy: " · ").first?.trimmingCharacters(in: .whitespacesAndNewlines) ?? m
+        if m == selected || canonical == selected ||
+            m.hasPrefix("\(selected) ") || m.hasPrefix("\(selected)-") ||
+            canonical.hasPrefix("\(selected) ") || canonical.hasPrefix("\(selected)-") {
+            return true
+        }
+        let facets = classify(make: brand, familyLabel: family, rawModel: raw, year: year)
+        if facets.series?.lowercased() == selected ||
+            facets.trim?.lowercased() == selected ||
+            facets.body?.lowercased() == selected {
+            return true
+        }
+        return false
+    }
+
+    static func filterSalesBySubModel(
+        _ sales: [FamilySalesData.Sale],
+        selectedModel: String?,
+        brand: String? = nil,
+        family: String? = nil
+    ) -> [FamilySalesData.Sale] {
+        guard let selected = selectedModel?.trimmingCharacters(in: .whitespacesAndNewlines).lowercased(), !selected.isEmpty else {
+            return sales
+        }
+        let exact = sales.filter { s in
+            let raw = (s.model ?? "").trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+            let canonical = raw.components(separatedBy: " · ").first?.trimmingCharacters(in: .whitespacesAndNewlines) ?? raw
+            return raw == selected || canonical == selected
+        }
+        if !exact.isEmpty { return exact }
+        return sales.filter { s in
+            matchesSaleSubModel(saleModel: s.model, selectedModel: selectedModel, brand: brand, family: family, year: s.year)
+        }
+    }
+}
+
 // MARK: - RPC Client & Formatting Surface
 
 enum LedgerMap {
@@ -1528,8 +2110,12 @@ struct LedgerMapView: View {
     @State private var selectedFamilyKey: String?
     @State private var selectedFamilyName: String?
     @State private var selectedModel: String?
+    @State private var selectedFacetLabel: String?
     @State private var selectedYear: Int?
     @State private var selectedEra: String?
+
+    @State private var groupBrandPickups: Bool = true
+    @State private var facetAxis: FamilyFacetAxis = .raw
 
     @State private var basis: LedgerMapScale.MapBasis = .ledger
     @State private var brandViewMode: LedgerMapScale.BrandViewMode = .brands
@@ -1779,6 +2365,29 @@ struct LedgerMapView: View {
 
     // MARK: - Breadcrumbs & Quick-Switch Pills
 
+    private var hasMultipleBrandPickups: Bool {
+        familyNodesCache.filter { VehicleFacetClassifier.isPickupFamilyLabel($0.name) }.count > 1
+    }
+
+    private var displayedFamilyNodes: [LedgerNode] {
+        VehicleFacetClassifier.consolidateBrandPickupFamilies(
+            make: selectedMake,
+            families: familyNodesCache,
+            groupPickups: groupBrandPickups
+        )
+    }
+
+    private var facetedModelNodes: [LedgerNode] {
+        VehicleFacetClassifier.buildFacetNodes(
+            axis: facetAxis,
+            make: selectedMake,
+            familyLabel: selectedFamilyName,
+            baseModels: modelNodesCache,
+            salesData: familySalesData?.sales,
+            eraId: selectedEra
+        )
+    }
+
     private var breadcrumbsBar: some View {
         ScrollView(.horizontal, showsIndicators: false) {
             HStack(spacing: 6) {
@@ -1787,8 +2396,10 @@ struct LedgerMapView: View {
                     selectedFamilyKey = nil
                     selectedFamilyName = nil
                     selectedModel = nil
+                    selectedFacetLabel = nil
                     selectedYear = nil
                     selectedEra = nil
+                    facetAxis = .raw
                 }
                 if let make = selectedMake {
                     Text("›").foregroundStyle(.tertiary)
@@ -1796,18 +2407,21 @@ struct LedgerMapView: View {
                         selectedFamilyKey = nil
                         selectedFamilyName = nil
                         selectedModel = nil
+                        selectedFacetLabel = nil
                         selectedYear = nil
                         selectedEra = nil
+                        facetAxis = .raw
                     }
                 }
                 if let fam = selectedFamilyName {
                     Text("›").foregroundStyle(.tertiary)
                     crumb(fam, active: selectedModel == nil && selectedYear == nil) {
                         selectedModel = nil
+                        selectedFacetLabel = nil
                         selectedYear = nil
                     }
                 }
-                if let model = selectedModel, model.lowercased() != (selectedFamilyName ?? "").lowercased() {
+                if let model = selectedFacetLabel ?? selectedModel, model.lowercased() != (selectedFamilyName ?? "").lowercased() {
                     Text("›").foregroundStyle(.tertiary)
                     crumb(model, active: selectedYear == nil) {
                         selectedYear = nil
@@ -1841,22 +2455,31 @@ struct LedgerMapView: View {
             // 1. Families pill bar when inside a brand
             if selectedMake != nil, familyNodesCache.count > 1 {
                 pillRow(title: "FAMILIES") {
+                    if hasMultipleBrandPickups {
+                        pillButton(groupBrandPickups ? "TRUCKS UNIFIED" : "SPLIT TRUCKS", active: groupBrandPickups) {
+                            groupBrandPickups.toggle()
+                        }
+                    }
                     pillButton("All \(selectedMake ?? "")", active: selectedFamilyKey == nil && selectedModel == nil) {
                         selectedFamilyKey = nil
                         selectedFamilyName = nil
                         selectedModel = nil
+                        selectedFacetLabel = nil
                         selectedYear = nil
                         selectedEra = nil
+                        facetAxis = .raw
                     }
-                    ForEach(familyNodesCache.prefix(20)) { f in
+                    ForEach(displayedFamilyNodes.prefix(20)) { f in
                         let fk = f.familyKey ?? f.name
                         let active = selectedFamilyKey == fk
                         pillButton("\(f.name) (\(f.count.formatted()))", active: active) {
                             selectedFamilyKey = fk
                             selectedFamilyName = f.name
                             selectedModel = nil
+                            selectedFacetLabel = nil
                             selectedYear = nil
                             selectedEra = nil
+                            facetAxis = .raw
                         }
                     }
                 }
@@ -1872,8 +2495,10 @@ struct LedgerMapView: View {
                             if let target {
                                 if isActive {
                                     selectedModel = nil
+                                    selectedFacetLabel = nil
                                 } else {
                                     selectedModel = target
+                                    selectedFacetLabel = target
                                     selectedYear = nil
                                 }
                             } else {
@@ -1884,18 +2509,50 @@ struct LedgerMapView: View {
                 }
             }
 
-            // 3. Sub-models pill bar when inside a family with >1 sub-models
+            // 3. 4-way facet axis selector (`SUB-MODELS` | `SERIES` | `TRIM` | `BODY STYLE`) + sub-model pills
             if selectedMake != nil, selectedFamilyKey != nil, modelNodesCache.count > 1 {
-                pillRow(title: "SUB-MODELS") {
-                    pillButton("All \(selectedFamilyName ?? "Family")", active: selectedModel == nil) {
-                        selectedModel = nil
-                        selectedYear = nil
-                    }
-                    ForEach(modelNodesCache.prefix(20)) { m in
-                        let active = selectedModel == m.name
-                        pillButton("\(m.name) (\(m.count.formatted()))", active: active) {
-                            selectedModel = m.name
+                let pool = facetedModelNodes
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 6) {
+                        HStack(spacing: 2) {
+                            ForEach(FamilyFacetAxis.allCases) { axis in
+                                let activeAxis = facetAxis == axis
+                                Button {
+                                    facetAxis = axis
+                                    selectedModel = nil
+                                    selectedFacetLabel = nil
+                                } label: {
+                                    Text(axis.label)
+                                        .font(.system(size: 9, weight: .bold, design: .monospaced))
+                                        .foregroundStyle(activeAxis ? Color(.systemBackground) : .secondary)
+                                        .padding(.horizontal, 6)
+                                        .padding(.vertical, 3)
+                                        .background(activeAxis ? Color.primary : Color.clear, in: RoundedRectangle(cornerRadius: 4))
+                                }
+                                .buttonStyle(.plain)
+                            }
+                        }
+                        .padding(2)
+                        .background(Color(.tertiarySystemFill), in: RoundedRectangle(cornerRadius: 6))
+
+                        pillButton("All \(selectedFamilyName ?? "Family")", active: selectedModel == nil) {
+                            selectedModel = nil
+                            selectedFacetLabel = nil
                             selectedYear = nil
+                        }
+                        ForEach(pool.prefix(20)) { m in
+                            let targetModel = m.facetRepresentativeModel ?? m.name
+                            let active = selectedFacetLabel == m.name || selectedModel == m.name || selectedModel == targetModel
+                            pillButton("\(m.name) (\(m.count.formatted()))", active: active) {
+                                if active && selectedYear == nil {
+                                    selectedModel = nil
+                                    selectedFacetLabel = nil
+                                } else {
+                                    selectedFacetLabel = m.name
+                                    selectedModel = targetModel
+                                    selectedYear = nil
+                                }
+                            }
                         }
                     }
                 }
@@ -2070,9 +2727,18 @@ struct LedgerMapView: View {
                     }
                 }
 
+                let activeFilterModel = facetAxis != .raw ? (selectedFacetLabel ?? selectedModel) : selectedModel
                 let scopedSales = salesData.sales.filter { s in
                     guard s.usd >= FamilySalesData.priceFloor else { return false }
-                    if let m = selectedModel, (s.model ?? "").lowercased() != m.lowercased() { return false }
+                    if let m = activeFilterModel, !VehicleFacetClassifier.matchesSaleSubModel(
+                        saleModel: s.model,
+                        selectedModel: m,
+                        brand: selectedMake,
+                        family: selectedFamilyName,
+                        year: s.year
+                    ) {
+                        return false
+                    }
                     if let y = selectedYear, s.year != y { return false }
                     return FamilyEraCohort.matches(year: s.year, eraId: selectedEra)
                 }
@@ -2245,10 +2911,22 @@ struct LedgerMapView: View {
                     FamilyEraCohort.matches(year: Int(n.name), eraId: era)
                 }
             }
+            if level == .models, facetAxis != .raw {
+                let faceted = facetedModelNodes
+                if !faceted.isEmpty { return faceted }
+            }
             return nodes
         }()
-        if level == .brands || level == .families {
+        if level == .brands {
             return baseNodes.map { applyHorizonOverlay($0) }
+        }
+        if level == .families {
+            let overlaid = baseNodes.map { applyHorizonOverlay($0) }
+            return VehicleFacetClassifier.consolidateBrandPickupFamilies(
+                make: selectedMake,
+                families: overlaid,
+                groupPickups: groupBrandPickups
+            )
         }
         return baseNodes
     }
@@ -2891,7 +3569,11 @@ struct LedgerMapView: View {
         switch level {
         case .brands:
             selectedMake = node.name
+            facetAxis = .raw
+            selectedFacetLabel = nil
         case .families:
+            facetAxis = .raw
+            selectedFacetLabel = nil
             if let fk = node.familyKey {
                 selectedFamilyKey = fk
                 selectedFamilyName = node.name
@@ -2899,7 +3581,8 @@ struct LedgerMapView: View {
                 selectedModel = node.name
             }
         case .models:
-            selectedModel = node.name
+            selectedFacetLabel = node.name
+            selectedModel = node.facetRepresentativeModel ?? node.name
         case .years:
             selectedYear = Int(node.name)
         case .vehicles:
@@ -3000,12 +3683,13 @@ struct LedgerMapView: View {
                     let fromFamily = (familySalesData?.sales ?? []).filter { $0.year == year }
                     vehicles = fromFamily.compactMap { s in
                         guard let uuid = UUID(uuidString: s.vehicle_id) else { return nil }
-                        let title = [s.year.map(String.init), make, s.model ?? selectedFamilyName].compactMap { $0 }.joined(separator: " ")
+                        let cleanModel = s.model?.components(separatedBy: " · ").first?.trimmingCharacters(in: .whitespacesAndNewlines) ?? s.model ?? selectedFamilyName
+                        let title = [s.year.map(String.init), make, cleanModel].compactMap { $0 }.joined(separator: " ")
                         return LedgerVehicle(
                             id: uuid,
                             year: s.year,
                             make: make,
-                            model: s.model ?? selectedFamilyName,
+                            model: cleanModel,
                             title: title,
                             price: s.usd,
                             image: nil,
