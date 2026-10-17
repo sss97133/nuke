@@ -483,8 +483,9 @@ WITH new_families(id, make, canonical_model, year_start, year_end, aliases) AS (
       ARRAY[
         '3½ litre roadster',
         '2½ litre roadster',
-        '3 1 2 litre roadster',
-        '2 1 2 litre roadster'
+        '3 1 2 litre',
+        '2 1 2 litre',
+        'roadster'
       ]
     ),
     (
