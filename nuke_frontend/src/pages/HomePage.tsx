@@ -184,9 +184,15 @@ export function drillStackFromSearchParams(
 }
 
 /** Write the treemap's drill stack into the page URL while preserving unrelated parameters. */
-export function applyDrillStackToSearchParams(params: URLSearchParams, stack: readonly DrillLevel[]): URLSearchParams {
+export function applyDrillStackToSearchParams(
+  params: URLSearchParams,
+  stack: readonly DrillLevel[],
+  activeFacetAxis?: FamilyFacetAxis | null,
+): URLSearchParams {
   const prevFamily = params.get('family');
   const prevAxis = parseFacetAxisParam(params.get('axis'));
+  const effectiveAxis: FamilyFacetAxis | null =
+    activeFacetAxis !== undefined ? activeFacetAxis : prevAxis;
   const next = new URLSearchParams(params);
   for (const k of SCOPE_PARAM_KEYS) next.delete(k);
   const leaf = stack[stack.length - 1];
@@ -203,8 +209,14 @@ export function applyDrillStackToSearchParams(params: URLSearchParams, stack: re
     if (familyLevel?.label && familyLevel.label !== leaf.family) {
       next.set('family_name', familyLevel.label);
     }
-    if (prevFamily && prevFamily !== leaf.family) {
+    const switchingFamily = Boolean(prevFamily && prevFamily !== leaf.family);
+    if (switchingFamily) {
       next.delete('era');
+      next.delete('axis');
+      next.delete('facet');
+    } else if (effectiveAxis && effectiveAxis !== 'raw') {
+      next.set('axis', effectiveAxis);
+    } else {
       next.delete('axis');
       next.delete('facet');
     }
@@ -214,10 +226,13 @@ export function applyDrillStackToSearchParams(params: URLSearchParams, stack: re
     next.delete('facet');
   }
   if (leaf.model) {
-    if (prevAxis && prevAxis !== 'raw' && leaf.family) {
+    const switchingFamily = Boolean(prevFamily && leaf.family && prevFamily !== leaf.family);
+    if (!switchingFamily && effectiveAxis && effectiveAxis !== 'raw' && leaf.family) {
       const modelLevel = stack.find((l) => l.model && !l.year);
+      next.set('axis', effectiveAxis);
       next.set('facet', modelLevel?.label ?? leaf.model);
     } else {
+      next.delete('facet');
       next.set('model', leaf.model);
     }
   } else {
@@ -1386,13 +1401,27 @@ export function TreemapHomePage({ onBrowse, embedded = false }: { onBrowse: () =
   const { recordInterest } = useInterests();
 
   // Drill-down state, synced with the page URL so Back, reload, search and lower sections share one scope.
+  const urlAxis = parseFacetAxisParam(searchParams.get('axis'));
+  const [facetAxis, setFacetAxisState] = useState<FamilyFacetAxis>(() => urlAxis ?? 'raw');
+  const facetAxisRef = useRef<FamilyFacetAxis>(facetAxis);
+  facetAxisRef.current = facetAxis;
   const [drillStack, setDrillStackState] = useState<DrillLevel[]>(() => drillStackFromSearchParams(searchParams));
-  const setDrillStack = useCallback((updater: DrillLevel[] | ((prev: DrillLevel[]) => DrillLevel[])) => {
-    setDrillStackState((prev) => {
-      const next = typeof updater === 'function' ? updater(prev) : updater;
-      setSearchParams((curr) => applyDrillStackToSearchParams(curr, next), { preventScrollReset: true });
-      return next;
-    });
+  const drillStackRef = useRef<DrillLevel[]>(drillStack);
+  drillStackRef.current = drillStack;
+  const setDrillStack = useCallback((
+    updater: DrillLevel[] | ((prev: DrillLevel[]) => DrillLevel[]),
+    axisOverride?: FamilyFacetAxis,
+  ) => {
+    if (axisOverride !== undefined) {
+      facetAxisRef.current = axisOverride;
+      setFacetAxisState(axisOverride);
+    }
+    const prev = drillStackRef.current;
+    const next = typeof updater === 'function' ? updater(prev) : updater;
+    drillStackRef.current = next;
+    setDrillStackState(next);
+    const axisForUrl = axisOverride !== undefined ? axisOverride : facetAxisRef.current;
+    setSearchParams((curr) => applyDrillStackToSearchParams(curr, next, axisForUrl), { preventScrollReset: true });
   }, [setSearchParams]);
   const currentLevel = drillStack[drillStack.length - 1];
   const selectedEra = searchParams.get('era');
@@ -1520,24 +1549,27 @@ export function TreemapHomePage({ onBrowse, embedded = false }: { onBrowse: () =
   const [brandView, setBrandView] = useState<'brands' | 'nested'>('brands');
   // A family keeps its model names as clickable treemap tiles; the sales chart is shown below when embedded (or via the switch).
   const [familyView, setFamilyView] = useState<'sales' | 'names'>('names');
-  const urlAxis = parseFacetAxisParam(searchParams.get('axis'));
-  const [facetAxis, setFacetAxisState] = useState<FamilyFacetAxis>(() => urlAxis ?? 'raw');
   const setFacetAxis = useCallback((nextAxis: FamilyFacetAxis) => {
+    facetAxisRef.current = nextAxis;
     setFacetAxisState(nextAxis);
-    setSearchParams((curr) => {
-      const next = new URLSearchParams(curr);
-      if (nextAxis === 'raw') {
-        next.delete('axis');
-        next.delete('facet');
-      } else {
-        next.set('axis', nextAxis);
-      }
-      return next;
-    }, { preventScrollReset: true });
+    const prev = drillStackRef.current;
+    // When switching facet axes inside a family, reset any previously drilled facet/sub-model back to the family level
+    // so the newly selected facet axis tiles/pills and URL (?axis=... without stale ?facet=...) stay in sync.
+    const famEntry = prev.find((d) => d.family && !d.model);
+    const makeEntry = prev.find((d) => d.make && !d.family && !d.model);
+    const nextStack =
+      famEntry && makeEntry && prev.some((d) => d.model)
+        ? [{ label: 'ALL MAKES' }, makeEntry, famEntry]
+        : prev;
+    drillStackRef.current = nextStack;
+    setDrillStackState(nextStack);
+    setSearchParams((curr) => applyDrillStackToSearchParams(curr, nextStack, nextAxis), { preventScrollReset: true });
   }, [setSearchParams]);
   useEffect(() => {
     setFamilyView('names');
-    setFacetAxisState(urlAxis ?? 'raw');
+    const resolvedAxis = urlAxis ?? 'raw';
+    facetAxisRef.current = resolvedAxis;
+    setFacetAxisState(resolvedAxis);
   }, [currentLevel.make, currentLevel.family, urlAxis]);
 
   // Family-wide sales (5-year dated window via treemap_family_sales): enables direct Family -> Years -> Vehicles navigation
@@ -1961,9 +1993,13 @@ export function TreemapHomePage({ onBrowse, embedded = false }: { onBrowse: () =
     } else if (levelType === 'families' || levelType === 'models') {
       // A family's model name, or the brand's own when families could not be read; a sale without a name stops here.
       if (node.noModel) return;
-      const targetModel = node.facetRepresentativeModel ?? node.name;
+      const effectiveAxis = node.facetAxis ?? facetAxisRef.current;
+      const targetModel = effectiveAxis !== 'raw' ? node.name : (node.facetRepresentativeModel ?? node.name);
       recordInterest('model', targetModel);
-      setDrillStack(prev => [...prev, { label: node.name, make: currentLevel.make, family: currentLevel.family, model: targetModel }]);
+      setDrillStack(
+        prev => [...prev, { label: node.name, make: currentLevel.make, family: currentLevel.family, model: targetModel }],
+        effectiveAxis,
+      );
     } else if (levelType === 'years') {
       const year = parseInt(node.name, 10);
       if (Number.isFinite(year)) {
@@ -2402,6 +2438,8 @@ export function TreemapHomePage({ onBrowse, embedded = false }: { onBrowse: () =
           <span className="home-family-submodels-label">ERA MARKS</span>
           {activeIdentityMarks.slice(0, 6).map((mark) => {
             const targetModel = mark.trimPackage ?? mark.seriesCode ?? mark.bodyStyle ?? null;
+            const markAxis: FamilyFacetAxis =
+              mark.trimPackage ? 'trim' : mark.seriesCode ? 'series' : mark.bodyStyle ? 'body' : facetAxis;
             const isMarkActive = Boolean(
               targetModel &&
               currentLevel.model &&
@@ -2420,12 +2458,17 @@ export function TreemapHomePage({ onBrowse, embedded = false }: { onBrowse: () =
                     make: currentLevel.make,
                     family: currentLevel.family,
                   };
-                  setDrillStack([
-                    { label: 'ALL MAKES' },
-                    { label: currentLevel.make, make: currentLevel.make },
-                    famEntry,
-                    { label: mark.displayLabel, make: currentLevel.make, family: currentLevel.family, model: targetModel },
-                  ]);
+                  const canonicalFacet =
+                    normalizeFacetSelection(markAxis, targetModel, currentLevel.make, activeFamilyLabel) ?? targetModel;
+                  setDrillStack(
+                    [
+                      { label: 'ALL MAKES' },
+                      { label: currentLevel.make, make: currentLevel.make },
+                      famEntry,
+                      { label: canonicalFacet, make: currentLevel.make, family: currentLevel.family, model: canonicalFacet },
+                    ],
+                    markAxis,
+                  );
                 }}
               >
                 <span
@@ -2502,9 +2545,10 @@ export function TreemapHomePage({ onBrowse, embedded = false }: { onBrowse: () =
               ALL <span className="home-family-submodel-count">{subModelPool.length}</span>
             </button>
             {visibleSubModels.map((sub) => {
-              const targetModel = facetAxis !== 'raw' ? sub.name : (sub.facetRepresentativeModel ?? sub.name);
+              const effectiveSubAxis = sub.facetAxis ?? facetAxis;
+              const targetModel = effectiveSubAxis !== 'raw' ? sub.name : (sub.facetRepresentativeModel ?? sub.name);
               const active =
-                facetAxis !== 'raw'
+                effectiveSubAxis !== 'raw'
                   ? activeFacetOrModelLabel != null && sub.name.toLowerCase() === activeFacetOrModelLabel.toLowerCase()
                   : currentLevel.model === sub.name || currentLevel.model === targetModel;
               return (
@@ -2521,15 +2565,21 @@ export function TreemapHomePage({ onBrowse, embedded = false }: { onBrowse: () =
                       family: currentLevel.family,
                     };
                     if (active && !currentLevel.year) {
-                      setDrillStack([{ label: 'ALL MAKES' }, { label: currentLevel.make!, make: currentLevel.make }, famEntry]);
+                      setDrillStack(
+                        [{ label: 'ALL MAKES' }, { label: currentLevel.make!, make: currentLevel.make }, famEntry],
+                        effectiveSubAxis,
+                      );
                     } else {
                       recordInterest('model', `${currentLevel.make!} ${targetModel}`);
-                      setDrillStack([
-                        { label: 'ALL MAKES' },
-                        { label: currentLevel.make!, make: currentLevel.make },
-                        famEntry,
-                        { label: sub.name, make: currentLevel.make, family: currentLevel.family, model: targetModel },
-                      ]);
+                      setDrillStack(
+                        [
+                          { label: 'ALL MAKES' },
+                          { label: currentLevel.make!, make: currentLevel.make },
+                          famEntry,
+                          { label: sub.name, make: currentLevel.make, family: currentLevel.family, model: targetModel },
+                        ],
+                        effectiveSubAxis,
+                      );
                     }
                   }}
                 >
