@@ -102,8 +102,12 @@ CREATE UNIQUE INDEX mv_treemap_sale_brands_name ON public.mv_treemap_sale_brands
 CREATE MATERIALIZED VIEW public.mv_treemap_sale_models AS
   SELECT o.brand_name, o.model AS name, count(*) AS count FROM public.mv_treemap_outcomes o GROUP BY 1, 2;
 CREATE UNIQUE INDEX mv_treemap_sale_models_brand_name ON public.mv_treemap_sale_models (brand_name, name);
+-- percentile_cont over an array literal: deparsed text does not re-deparse to the same text (array element casts), the
+-- case the swap's drift check must compare after a re-parse (skylar-08, 2026-10-15).
 CREATE MATERIALIZED VIEW public.mv_brand_market AS
-  SELECT o.brand_name AS name, count(*) AS sold FROM public.mv_treemap_outcomes o JOIN public.vehicles v ON v.id = o.id GROUP BY 1;
+  SELECT o.brand_name AS name, count(*) AS sold,
+         percentile_cont(ARRAY[0.1, 0.5, 0.9]) WITHIN GROUP (ORDER BY o.sold_amount) AS p10_p50_p90
+  FROM public.mv_treemap_outcomes o JOIN public.vehicles v ON v.id = o.id GROUP BY 1;
 CREATE UNIQUE INDEX mv_brand_market_name ON public.mv_brand_market (name);
 CREATE MATERIALIZED VIEW public.mv_family_market AS
   SELECT o.brand_name AS brand, n.family_id AS family_key, o.model AS model_key, count(*) FILTER (WHERE o.source_name = 'Bring a Trailer') AS bat
