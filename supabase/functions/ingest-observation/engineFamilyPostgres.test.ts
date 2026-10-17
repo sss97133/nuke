@@ -5,11 +5,13 @@
  * The fixture is installed by the owning schema contract before this test runs.
  */
 import { observationClockMicroseconds } from "../_shared/observationContentHash.ts";
+import { descriptionReportedWorkWitnesses, RETAINED_REPORTED_WORK_MODE } from "./retainedReportedWork.ts";
 import { proposedDescriptionEngineFamilyLabelWitness } from "./retainedDescriptionPowertrain.ts";
 
 const enabled = Deno.env.get("RUN_ENGINE_FAMILY_PG") === "1";
 const VEHICLE = "22222222-2222-4222-8222-222222222222";
 const SOURCE = "4cdc735c-f117-42f2-889f-ba33805639a5";
+const OTHER_SOURCE = "33333333-3333-4333-8333-333333333333";
 const PROPOSAL = "6b9de10b-1666-4bdf-bb69-7e82d62f8b32";
 const REVIEWER = "00000000-0000-0000-0000-00000000a001";
 const MODE = "retained_listing_engine_family_label_v1";
@@ -58,6 +60,15 @@ Deno.test({
   ignore: !enabled,
   async fn(t) {
     let parentId = "";
+    let reportedWorkPhase = false;
+    let pendingReportText = "";
+    let legacyWorkSeed = false;
+    let otherActivitySeed = false;
+    let tamperWork: Row | null = null;
+    let tamperWorkSource = false;
+    let revokeWorkAtResult = false;
+    let hideReportSiblings = false;
+    const reportParents = new Set<string>();
     const host = Deno.env.get("PGHOST") ?? "";
     const port = Deno.env.get("PGPORT") ?? "";
     const database = Deno.env.get("PGDATABASE") ?? "";
@@ -118,6 +129,14 @@ Deno.test({
         assert(url.origin === ORIGIN, `Unexpected SDK origin: ${url.origin}`);
         assert(request.headers.get("authorization") === `Bearer ${SERVICE_KEY}`, "Unexpected SDK authorization");
         assert(request.headers.get("apikey") === SERVICE_KEY, "SDK must use the fixture's named project secret");
+        if (url.pathname === "/rest/v1/rpc/retained_reported_work_result_matches") {
+          assert(reportedWorkPhase && request.method === "POST" && url.search === "", "Exact reported result RPC only");
+          const args = await request.json();
+          equal(Object.keys(args).sort(), ["p_result", "p_source"], "Reported result RPC arguments");
+          assert(reportParents.has(args.p_source) && /^[0-9a-f-]{36}$/.test(args.p_result), "Only admitted fixture parents/results");
+          if (revokeWorkAtResult) await sql(`UPDATE public.vehicle_observations SET is_superseded=true WHERE id=${quote(args.p_source)}::uuid`);
+          return respond(await json(`SELECT to_jsonb(public.retained_reported_work_result_matches(${quote(args.p_source)}::uuid,${quote(args.p_result)}::uuid))::text`, "service_role"));
+        }
         if (url.pathname === "/rest/v1/rpc/retained_listing_property_result_matches") {
           assert(request.method === "POST" && url.search === "", "Only the exact result-match RPC POST is supported");
           const args = await request.json();
@@ -158,6 +177,9 @@ Deno.test({
           else throw new Error(`Unhandled filter: ${key}=${value}`);
         }
         let statement: string;
+        // Hide intake's same-sentence lookup so the PostgreSQL gate alone decides.
+        if (request.method === "GET" && hideReportSiblings && table === "vehicle_observations" &&
+          url.searchParams.get("extraction_method") === `eq.${RETAINED_REPORTED_WORK_MODE}`) return respond([]);
         if (request.method === "GET") {
           assert(filters.length > 0, "Unfiltered SDK table scans are forbidden");
           statement = `SELECT COALESCE(jsonb_agg(to_jsonb(r)),'[]'::jsonb)::text FROM (SELECT ${selected.join(",")} FROM public.${table} WHERE ${filters.join(" AND ")} LIMIT ${limit}) r`;
@@ -169,8 +191,21 @@ Deno.test({
           const names = Object.keys(body);
           assert(names.length > 0 && names.every((name) => allowed.includes(name)), "Unknown observation insert column");
           assert(!names.some((name) => ["id", "ingested_at", "is_superseded"].includes(name)), "DB identity and defaults must remain authoritative");
-          assert(body.vehicle_id === VEHICLE && body.source_id === SOURCE, "Only this synthetic source/vehicle may be written");
-          if (!parentId) {
+          assert(body.vehicle_id === VEHICLE && (body.source_id === SOURCE || reportedWorkPhase && body.source_id === OTHER_SOURCE), "Only these synthetic sources/vehicle may be written");
+          if (reportedWorkPhase) {
+            if (body.kind === "listing") assert(body.content_text === pendingReportText && !body.source_observation_id && !body.property_id, "Only selected native report parents");
+            else if (legacyWorkSeed) assert(body.kind === "work_record" && body.structured_data?.item === "Synthetic legacy confirmed work" && !body.source_observation_id, "Only existing confirmed-work control");
+            else if (otherActivitySeed) {
+              assert(body.kind === "activity" && body.source_id === OTHER_SOURCE && !body.source_observation_id, "Only other-source activity control");
+              if (tamperWorkSource) body.source_id = SOURCE;
+            }
+            else {
+              assert(body.kind === "activity" && reportParents.has(body.source_observation_id) && body.extraction_method === RETAINED_REPORTED_WORK_MODE, "Only source-bound report children");
+              // Simulate a compromised derived payload at the actual intake-to-DB
+              // boundary; the real PostgreSQL insert trigger must reject it.
+              if (tamperWork) body.structured_data = { ...body.structured_data, ...tamperWork };
+            }
+          } else if (!parentId) {
             assert(parentInserts === 0 && body.source_observation_id === undefined && body.property_id === undefined &&
               body.kind === "listing" && body.extraction_method === "html_description_capture" &&
               body.content_text === SOURCE_TEXT,
@@ -549,6 +584,212 @@ Deno.test({
         equal(await countChildren(), 1, "Migration reapplication does not append observation rows");
         equal((await readers()).canonical[0]?.observation_id, childId, "The same source-backed result remains consumer-visible");
       }), "Migration reapplication changed the reviewed contract");
+      reportedWorkPhase = true;
+      const workMigration = new URL("../../migrations/20261015052316_retained_reported_work.sql", import.meta.url);
+      const workBaseline = new URL("../../sql/fixtures/retained_reported_work_baseline_20261015.sql", import.meta.url);
+      const workQuote = "Work in September 2026 included rebuilding the carburetor, repairing an exhaust leak, and replacing the fuel filter, fuel hoses, and exhaust gaskets.";
+      const tiresQuote = "The tires, front struts, and front wheel hubs were replaced in July 2023, an inspection at that time recommended replacing the front brake pads and rotors.";
+      const gasketQuote = "The transmission oil pan gasket was replaced and the fluid flushed in July 2023, an inspection at that time recommended flushing the rear differential.";
+      const textFor = (quote: string) => `This vehicle is described by its publisher in retained listing text. ${quote} Physical completion has no independent corroboration.`;
+      const workInvoke = async (sourceId: string, reportIndex = 0, extra: Row = {}, token = SERVICE_KEY) => {
+        const response = await handler!(new Request(`${ORIGIN}/functions/v1/ingest-observation`, {
+          method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+          body: JSON.stringify({ mode: RETAINED_REPORTED_WORK_MODE, source_observation_id: sourceId, report_index: reportIndex, ...extra }),
+        }));
+        equal(bridgeErrors, [], "Reported work must use only sanctioned fixture routes");
+        return { status: response.status, data: await response.json() };
+      };
+      const seedReport = async (text: string, key: string, page = key, capturedAt = "2026-10-10T02:40:06.123456Z") => {
+        pendingReportText = text;
+        const response = await handler!(new Request(`${ORIGIN}/functions/v1/ingest-observation`, {
+          method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${SERVICE_KEY}` },
+          body: JSON.stringify({ source_slug: "bat", kind: "listing", vehicle_id: VEHICLE,
+            source_url: `https://bringatrailer.com/listing/${page}/`, source_identifier: key,
+            observed_at: capturedAt, extraction_method: "html_description_capture", content_text: text,
+            defer_analysis: true, agent_cost_cents: 0, structured_data: { extractor: "extract-bat-core", source_text_field: "extract-bat-core.extractDescription",
+              description_capture: true, extractor_input_truncated: false, source_capture_basis: "direct_fetch", source_capture_sha256: "b".repeat(64),
+              source_captured_at: capturedAt, observation_time_basis: "source_capture", source_event_time_status: "unknown" } }),
+        }));
+        const result = await response.json(); equal(response.status, 200, `Native work parent failed: ${JSON.stringify(result)}`);
+        assert(result.success && !result.duplicate, "Source must enter through real native intake");
+        reportParents.add(result.observation_id); return result.observation_id as string;
+      };
+      const workRead = (include = true) => json(`SELECT public.vehicle_build_log_public(${quote(VEHICLE)}::uuid,${include})::text`, "anon");
+      const genericActivity = async (slug: string, key: string, token = SERVICE_KEY) => {
+        const response = await handler!(new Request(`${ORIGIN}/functions/v1/ingest-observation`, {
+          method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+          body: JSON.stringify({ source_slug: slug, kind: "activity", vehicle_id: VEHICLE, observed_at: "2026-09-21T10:00:00Z",
+            source_identifier: key, ...(token === SERVICE_KEY ? { defer_analysis: true } : {}), structured_data: { kind_detail: "synthetic_control", intent_status: "unknown" } }),
+        }));
+        return { status: response.status, data: await response.json() };
+      };
+      let workParent: string; let mixedParent: string; let workChild: string;
+      let originalReader: string; let originalPrivacy: string;
+      assert(await t.step("reported work preserves original reader/privacy and refuses unsupported source capability", async () => {
+        const setup = await command(["--file", decodeURIComponent(workBaseline.pathname)]);
+        assert(setup.success, `Reported baseline failed: ${decoder.decode(setup.stderr)}`);
+        originalReader = await sql("SELECT pg_get_functiondef('public.vehicle_build_log_public(uuid)'::regprocedure)");
+        originalPrivacy = await sql("SELECT pg_get_functiondef('public.observation_is_public(public.observation_kind,jsonb)'::regprocedure)");
+        workParent = await seedReport(textFor(workQuote), "reported-work-fixture");
+        const denied = await workInvoke(workParent); equal(denied.status, 400, "Absent source activity capability must refuse");
+        equal(denied.data.writes, 0, "No unsupported activity write");
+        const sourceBefore = await json(`SELECT to_jsonb(s)::text FROM public.observation_sources s WHERE id=${quote(SOURCE)}::uuid`);
+        await sql("CREATE FUNCTION public.retained_reported_work_witnesses(text) RETURNS jsonb LANGUAGE sql AS $$SELECT '[]'::jsonb$$");
+        const collision = await command(["--file", decodeURIComponent(workMigration.pathname)]);
+        assert(!collision.success && decoder.decode(collision.stderr).includes("helper/overload collision"), "Installation must refuse an existing helper owner");
+        await sql("DROP FUNCTION public.retained_reported_work_witnesses(text)");
+        const applied = await command(["--file", decodeURIComponent(workMigration.pathname)]);
+        assert(applied.success, `Reported migration failed: ${decoder.decode(applied.stderr)}`);
+        const sourceAfter = await json(`SELECT to_jsonb(s)::text FROM public.observation_sources s WHERE id=${quote(SOURCE)}::uuid`);
+        equal(sourceAfter, { ...sourceBefore, supported_observations: [...sourceBefore.supported_observations, "activity"] }, "Held release only appends activity to the exact existing source");
+        equal(await workRead(), { work_records: [], reported_work: [] }, "No report before admitted activity");
+        equal(await sql("SELECT pg_get_functiondef('public.vehicle_build_log_public(uuid)'::regprocedure)"), originalReader, "Legacy reader unchanged");
+        equal(await sql("SELECT pg_get_functiondef('public.observation_is_public(public.observation_kind,jsonb)'::regprocedure)"), originalPrivacy, "General activity privacy unchanged");
+      }), "Reported baseline/capability gate failed");
+      assert(await t.step("real intake admits source-bound reports with exact partial date and anonymous provenance", async () => {
+        // The held migration enabled the exact synthetic existing source only.
+        const admitted = await workInvoke(workParent); equal(admitted.status, 200, JSON.stringify(admitted.data));
+        equal(admitted.data.writes, 1, "One admitted report"); workChild = admitted.data.observation_id;
+        mixedParent = await seedReport(textFor(`${tiresQuote} ${gasketQuote}`), "reported-mixed-fixture");
+        for (const index of [0, 1]) { const r = await workInvoke(mixedParent, index); equal(r.status, 200, JSON.stringify(r.data)); equal(r.data.writes, 1, "Distinct assertion admitted"); }
+        const reader = await workRead(); equal(reader.work_records, [], "Reported completion never enters confirmed work");
+        equal(reader.reported_work.length, 3, "Honda and two Mercedes reports reach anonymous reader");
+        for (const row of reader.reported_work) {
+          equal(row.kind, "activity", "Pre-confirmation kind retained"); equal(row.occurrence_status, "unverified", "Occurrence not verified");
+          equal(row.independent_source, false, "Report is not independent evidence"); equal(row.intent_status, "unknown", "No inferred intent");
+          equal(row.observed_at_basis, "source_testimony_recorded_at", "Reader preserves observation clock basis");
+          equal(row.performer_id, null, "No invented performer"); equal(row.performer_status, "unknown", "Explicit unknown performer");
+          equal(row.date_precision, "month", "Month precision retained"); assert(!("done_on" in row), "No fabricated exact work date"); equal(row.source_id, SOURCE, "Real source FK");
+          equal(row.source_captured_at, "2026-10-10T02:40:06.123456Z", "Capture bytes preserved");
+          equal(observationClockMicroseconds(row.observed_at), observationClockMicroseconds(row.source_recorded_at), "Derived observation basis is parent recording");
+          assert(observationClockMicroseconds(row.ingested_at)! >= observationClockMicroseconds(row.observed_at)!, "Database child record follows source recording");
+          assert(row.confidence_score <= .6, "Report confidence cap");
+          if (row.observation_id === workChild) {
+            equal(row.reported_date, "2026-09", "No September first fabrication"); equal(row.source_value, workQuote, "Exact Honda quote");
+            equal(row.performed_clause, workQuote, "Exact Honda assertion"); equal(row.source_observation_id, workParent, "Typed Honda parent FK");
+          } else {
+            equal(row.reported_date, "2023-07", "Exact Mercedes month"); assert([tiresQuote, gasketQuote].includes(row.source_value), "Full recommendation context retained");
+            assert(!row.performed_clause.includes("recommended"), "Recommendation never becomes performed work"); equal(row.source_observation_id, mixedParent, "Typed Mercedes parent FK");
+          }
+        }
+        equal((await workRead(false)).reported_work, [], "Explicit false excludes activity reports");
+        equal(await json(`SELECT coalesce(jsonb_agg(to_jsonb(w)),'[]'::jsonb)::text FROM public.vehicle_build_log_public(${quote(VEHICLE)}::uuid) w`, "anon"), [], "One-argument reader unchanged");
+        equal(await json(`SELECT to_jsonb(count(*))::text FROM public.vehicle_observations WHERE kind='activity'`, "anon"), 0, "General activity RLS stays private");
+        const replay = await workInvoke(workParent); equal(replay.data.observation_id, workChild, "Replay keeps original child UUID");
+        equal(replay.data.writes, 0, "Replay adds no testimony"); equal(replay.data.duplicate, true, "Replay is validated duplicate");
+      }), "Reported source-to-consumer contract failed");
+      assert(await t.step("recommended and forged claims fail both protected selector and PostgreSQL admission", async () => {
+        for (const extra of [{ reported_date: "2026-09-01" }, { performer_id: REVIEWER }, { source_value: workQuote }, { occurrence_status: "confirmed" }, { structured_data: { analysis_kind: "retained_reported_work" } }]) {
+          const result = await workInvoke(workParent, 0, extra); equal(result.status, 400, "Caller cannot normalize protected fields"); equal(result.data.writes, 0, "Forged selector writes zero");
+        }
+        for (const token of [PUBLISHABLE_KEY, userToken]) assert((await workInvoke(workParent, 0, {}, token)).status >= 400, "Nonservice admission refused");
+        for (const token of [SERVICE_KEY, userToken]) {
+          const generic = await genericActivity("bat", "generic-bat-refusal", token);
+          equal(generic.status, 403, "BaT capability cannot authorize generic activity"); equal(generic.data.writes, 0, "Generic BaT refusal has no writes");
+        }
+        otherActivitySeed = true;
+        try {
+          const other = await genericActivity("reported-work-control", "other-activity-control");
+          equal(other.status, 200, JSON.stringify(other.data)); assert(other.data.success, "Other-source activity remains supported");
+          tamperWorkSource = true;
+          const converted = await genericActivity("reported-work-control", "other-activity-forged-bat");
+          equal(converted.status, 500, "Independent DB gate refuses a BaT activity payload without protected method/source FK");
+          assert(databaseErrors.at(-1)?.message.includes("BaT activity requires protected retained report admission"), "Specific source capability guard fired");
+        } finally { otherActivitySeed = false; tamperWorkSource = false; }
+        const recommended = await seedReport(textFor("An inspection in July 2023 recommended replacing the front brake pads and rotors."), "recommendation-fixture");
+        equal((await workInvoke(recommended)).status, 400, "Recommendation-only source refuses");
+        const forgedParent = await seedReport(textFor(workQuote), "forged-report-fixture");
+        const errorsBefore = databaseErrors.length;
+        for (const [key, value] of Object.entries({ reported_date: "2026-09-01", performer_status: "known", performer_id: REVIEWER,
+          occurrence_status: "confirmed", source_capture_sha256: "f".repeat(64), performed_clause: "replacing the front brake pads and rotors" })) {
+          tamperWork = { [key]: value };
+          try { equal((await workInvoke(forgedParent)).status, 500, `Database must refuse forged ${key}`); }
+          finally { tamperWork = null; }
+        }
+        equal(databaseErrors.length - errorsBefore, 6, "Every compromised intake payload reached the independent PostgreSQL guard");
+        assert(databaseErrors.slice(errorsBefore).every(e => e.code === "23514" && e.message.includes("Retained reported work must match exact public source assertion")), "Only intended custody refusals");
+        for (const sample of [textFor(workQuote), textFor(`${tiresQuote} ${gasketQuote}`), textFor("Work in September 2026 included not rebuilding the carburetor."),
+          textFor("Work in September 2026 included rebuilding the carburetor, pending approval."), textFor("Work in September 2026 included rebuilding the carburetor, subject to approval."),
+          textFor("Work in September 2026 included rebuilding the carburetor, as a hypothetical example."), textFor("Work in September 2026 included replacing the tires, except this was canceled."),
+          textFor("Service in March 2026 included replacing the tubes, tires, and more."),
+          textFor(`Not performed:\n${workQuote}`), textFor(`The work was never completed.\n${workQuote}`), textFor(`Recommended work:\n${workQuote}`), textFor(`The following work was not performed:\n${workQuote}`), textFor(`\u00a0${workQuote}`)])
+          equal(await json(`SELECT public.retained_reported_work_witnesses(${quote(sample)})::text`), descriptionReportedWorkWitnesses(sample), "Independent SQL and intake witnesses agree");
+      }), "Reported refusal contract failed");
+      assert(await t.step("anonymous report visibility follows parent custody and current source capability", async () => {
+        for (const [change, restore] of [
+          [`UPDATE public.vehicle_observations SET is_superseded=true WHERE id=${quote(workParent)}::uuid`, `UPDATE public.vehicle_observations SET is_superseded=false WHERE id=${quote(workParent)}::uuid`],
+          [`UPDATE public.vehicle_observations SET structured_data=structured_data||'{"receipt_id":"private"}'::jsonb WHERE id=${quote(workParent)}::uuid`, `UPDATE public.vehicle_observations SET structured_data=structured_data-'receipt_id' WHERE id=${quote(workParent)}::uuid`],
+          [`UPDATE public.vehicles SET is_public=false WHERE id=${quote(VEHICLE)}::uuid`, `UPDATE public.vehicles SET is_public=true WHERE id=${quote(VEHICLE)}::uuid`],
+          [`UPDATE public.observation_sources SET supported_observations=array_remove(supported_observations,'activity'::public.observation_kind) WHERE id=${quote(SOURCE)}::uuid`, `UPDATE public.observation_sources SET supported_observations=array_append(supported_observations,'activity'::public.observation_kind) WHERE id=${quote(SOURCE)}::uuid`],
+        ]) {
+          await sql(change);
+          try { assert(!(await workRead()).reported_work.some((r: Row) => r.observation_id === workChild), "Revoked report withheld"); assert((await workInvoke(workParent)).status >= 400, "Replay cannot bless a revoked source"); }
+          finally { await sql(restore); }
+        }
+        equal((await workRead()).reported_work.length, 3, "All unchanged sources restore visibility");
+        // Revoke after the selector and hash replay read, immediately before the
+        // actual result RPC. This is a deterministic late-boundary test, not a
+        // claim to exercise concurrent transactions.
+        revokeWorkAtResult = true;
+        try {
+          const late = await workInvoke(workParent); equal(late.status, 503, "Late parent withdrawal prevents success");
+          equal(late.data.writes, 0, "Late replay adds no testimony"); assert(!late.data.success, "No stale duplicate success");
+          assert(!(await workRead()).reported_work.some((r: Row) => r.observation_id === workChild), "Late-withdrawn parent also withholds reader output");
+        } finally { revokeWorkAtResult = false; await sql(`UPDATE public.vehicle_observations SET is_superseded=false WHERE id=${quote(workParent)}::uuid`); }
+      }), "Reported withdrawal/custody contract failed");
+      assert(await t.step("confirmed work remains unchanged and reported migration reapplication adds no testimony", async () => {
+        legacyWorkSeed = true;
+        const response = await handler!(new Request(`${ORIGIN}/functions/v1/ingest-observation`, { method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${SERVICE_KEY}` },
+          body: JSON.stringify({ source_slug: "reported-work-control", kind: "work_record", vehicle_id: VEHICLE, observed_at: "2026-09-21T10:00:00Z", source_identifier: "legacy-confirmed-control",
+            structured_data: { item: "Synthetic legacy confirmed work", transaction_date: "2026-09-20", labor_minutes: 0, build_stage: "maintenance" }, defer_analysis: true }) }));
+        legacyWorkSeed = false; equal(response.status, 200, `Legacy control intake: ${await response.text()}`);
+        const legacy = await json(`SELECT coalesce(jsonb_agg(to_jsonb(w)),'[]'::jsonb)::text FROM public.vehicle_build_log_public(${quote(VEHICLE)}::uuid) w`, "anon");
+        equal(legacy.length, 1, "One existing confirmed control"); equal(legacy[0].done_on, "2026-09-20", "Legacy exact work date preserved");
+        equal((await workRead()).work_records, legacy, "Opt-in preserves legacy rows"); equal((await workRead(false)).work_records, legacy, "False opt-in preserves legacy rows");
+        const before = await json("SELECT to_jsonb(count(*))::text FROM public.vehicle_observations");
+        const reapplied = await command(["--file", decodeURIComponent(workMigration.pathname)]); assert(reapplied.success, `Reapply failed: ${decoder.decode(reapplied.stderr)}`);
+        equal(await json("SELECT to_jsonb(count(*))::text FROM public.vehicle_observations"), before, "No migration testimony mutation");
+        equal((await workRead()).reported_work.length, 3, "Reports survive exact reapplication"); equal((await workRead()).work_records, legacy, "Confirmed control unchanged");
+        const witnessDefinition = await sql("SELECT pg_get_functiondef('public.retained_reported_work_witnesses(text)'::regprocedure)");
+        await sql("CREATE OR REPLACE FUNCTION public.retained_reported_work_witnesses(p_text text) RETURNS jsonb LANGUAGE sql AS $$SELECT '[]'::jsonb$$");
+        try {
+          const drifted = await command(["--file", decodeURIComponent(workMigration.pathname)]);
+          assert(!drifted.success && decoder.decode(drifted.stderr).includes("Reported-work owner drift"), "Reapplication must refuse drifted helper definitions");
+        } finally { await sql(witnessDefinition); }
+        equal(bridgeErrors, [], "No external call or unsupported route");
+      }), "Reported legacy/reapplication contract failed");
+      assert(await t.step("a repeated capture of one listing sentence adds no second public report", async () => {
+        // Live 2026-10-15: each first-admission vehicle held 15-16 identical captures of one listing page.
+        const sameSentence = () => json(`SELECT to_jsonb(count(*))::text FROM public.vehicle_observations WHERE vehicle_id=${quote(VEHICLE)}::uuid
+          AND kind='activity' AND extraction_method=${quote(RETAINED_REPORTED_WORK_MODE)} AND structured_data->>'source_value'=${quote(workQuote)}`);
+        const honda = async () => (await workRead()).reported_work.filter((r: Row) => r.source_value === workQuote);
+        const recapture = await seedReport(textFor(workQuote), "reported-work-fixture-recapture", "reported-work-fixture", "2026-10-12T03:00:00.654321Z");
+        const repeated = await workInvoke(recapture); equal(repeated.status, 200, JSON.stringify(repeated.data));
+        equal([repeated.data.duplicate, repeated.data.writes, repeated.data.observation_id, repeated.data.admitted_source_observation_id],
+          [true, 0, workChild, workParent], "A later capture replays the existing report");
+        equal(await sameSentence(), 1, "No second child for one listing sentence");
+        hideReportSiblings = true;
+        const errorsBefore = databaseErrors.length;
+        try { equal((await workInvoke(recapture)).status, 500, "PostgreSQL refuses a repeated report the intake lookup missed"); }
+        finally { hideReportSiblings = false; }
+        assert(databaseErrors.slice(errorsBefore).some(e => e.code === "23514" && e.message.includes("already admitted for this listing sentence")), "Specific same-sentence refusal");
+        equal(await sameSentence(), 1, "Refused repeat leaves one child");
+        equal((await workRead()).reported_work.length, 3, "Public report count unchanged by repeated captures");
+        await sql(`UPDATE public.vehicle_observations SET is_superseded=true WHERE id=${quote(workParent)}::uuid`);
+        let surviving = "";
+        try {
+          const readmitted = await workInvoke(recapture); equal(readmitted.status, 200, JSON.stringify(readmitted.data));
+          equal([readmitted.data.duplicate, readmitted.data.writes], [false, 1], "A surviving capture may carry a report whose capture was withdrawn");
+          surviving = readmitted.data.observation_id; equal((await honda()).map((r: Row) => r.observation_id), [surviving], "One report, from the surviving capture");
+        } finally { await sql(`UPDATE public.vehicle_observations SET is_superseded=false WHERE id=${quote(workParent)}::uuid`); }
+        assert(surviving && surviving !== workChild, "The surviving capture's report is its own child");
+        equal((await honda()).map((r: Row) => r.observation_id), [workChild], "Both captures current: the reader shows the earliest report once");
+        equal((await workRead()).reported_work.length, 3, "Collapsed reader keeps one report per listing sentence");
+        const relisting = await seedReport(textFor(workQuote), "reported-work-relisting", "reported-work-relisting", "2026-10-13T04:00:00.111111Z");
+        const another = await workInvoke(relisting); equal([another.status, another.data.writes], [200, 1], "A different listing page is a separate publication");
+        equal((await honda()).length, 2, "One report per listing page, each with its own source URL");
+        equal(bridgeErrors, [], "No external call or unsupported route");
+      }), "Reported repeated-capture contract failed");
     } finally {
       Deno.serve = originalServe;
       globalThis.fetch = originalFetch;

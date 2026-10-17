@@ -640,3 +640,72 @@ source-support gains cannot be reported as newly ready records. The private
 full-manifest accounting control traversed 632,014 keys within a 128 MB heap;
 its replies were synthetic and establish no production coverage. Production
 population acquisition and its measured source-support distribution remain pending.
+
+
+### Publisher-reported work with month precision, 2026-10-15
+
+The next retained-evidence case asks what work a publisher reports, when, and by
+whom. A deterministic diagnostic selected 20 retained source observations from
+completed displacement work with native captures but no engine-family witness;
+this is not a random sample or a fleet denominator. Two inspected public
+vehicles contain month-dated work assertions in their retained descriptions,
+but the existing anonymous build-log reader returned no work rows, and the
+indexed observation lookup found no `work_record` rows for those two vehicles.
+At 05:26 UTC the atlas estimated 1,017,178 stored vehicle records. Full public
+and eligible denominators remain unknown; net supported-answer gain is zero.
+
+The existing owners distinguish these meanings: `work_sessions` is the actual
+work ledger, `work_record` is confirmed work, and `activity` can preserve an
+unconfirmed action report. The local proposed integration uses an attributed
+activity child tied to its original listing observation through the existing
+source foreign key and protected `ingest-observation` path. Its selector accepts
+only the source observation and a bounded report index; it derives the exact
+source sentence, performed clause, month, capture witness and unknown performer.
+A source month never becomes a fabricated day, and a recommendation never becomes
+a reported completed repair. The bounded v1 grammar recognizes explicit action
+and literal object phrases from inspected testimony; unknown phrases, qualification
+tails and “and more” remain withheld. These source words establish no parts catalog
+identity.
+
+A report's grain is one sentence on one listing page (source, listing URL, exact
+sentence), not one capture. On 2026-10-15 each of the two first-admission
+vehicles held 15–16 non-superseded captures of a single listing page, all with
+identical text. A later capture of the same sentence replays the existing report
+(`duplicate`, zero writes); the custody trigger refuses a second current child
+under an advisory lock, and the reader returns the earliest admitted report once.
+When the admitted capture is withdrawn, a surviving capture may carry the report.
+A different listing page is a separate publication of the sentence, not
+corroboration.
+
+The proposed required two-argument `vehicle_build_log_public(uuid,boolean)`
+overload returns separate `work_records` and `reported_work` arrays. Its report
+reader rechecks source custody and current eligibility; the one-argument reader,
+general activity visibility and confirmed-work totals keep their existing
+contracts. The table opts in to qualified reports and retains a legacy-reader
+fallback when the overload is absent. Reported work preserves unverified
+occurrence, unknown intent and performer, original quotation, exact source keys
+and distinct capture/recording clocks.
+
+This integration is **local preparation, held from production**. The registered
+BaT source currently excludes `activity`. The held migration prepares an exact
+six-to-seven-kind change on the existing source, adding only `activity` after
+installing intake and database gates that require the protected report selector.
+Other registry values, general activity visibility and unrelated source activity
+remain unchanged. Applying that capability and releasing the new anonymous reader
+scope require a concrete owner-reviewed decision. No production source capability,
+testimony, permissions, queue or capacity changed.
+The existing schema-proposal `add_source` path does not modify a registered slug,
+so it cannot be used to evade that source contract. Local fixtures may simulate
+the proposed capability to prove the actual handler and reader. Final checked
+head, test receipts and release order belong in the private review packet before
+any release decision: `/Users/skylar/nuke-logs/data-model-expand-20261015/REPORTED_WORK_PACKET.json`.
+
+Local proof for this proposal passed 18 actual handler/PostgreSQL steps
+(including the repeated-capture step, which fails against the earlier
+capture-grain identity), 414 cached intake tests and 27 focused table tests. SQL and JavaScript agreed on all
+20 retained diagnostic texts: five candidate assertions across four sources,
+including withholding the vague “and more” assertion. Candidate detection is not
+admission or independent corroboration. The fixture anonymous reader returned
+three attributed reports and one unchanged confirmed-work control. Deployed Edge,
+PostgREST and browser behavior remain unverified. The local withdrawal test
+injects a late replay-boundary change; it is not a concurrent transaction proof.
