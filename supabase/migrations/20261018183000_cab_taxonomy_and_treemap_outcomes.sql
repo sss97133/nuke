@@ -413,4 +413,6 @@ AS $function$
   FROM w;
 $function$;
 
+GRANT EXECUTE ON FUNCTION public.treemap_family_sales(text, text, integer) TO anon, authenticated, service_role;
+
 COMMIT;
