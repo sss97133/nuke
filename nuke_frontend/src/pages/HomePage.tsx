@@ -23,6 +23,7 @@ import {
   buildFacetNodes,
   consolidateBrandPickupFamilies,
   isPickupFamilyLabel,
+  resolveTileBadgeSvg,
   resolveVettedIdentityMarks,
   type FamilyFacetAxis,
 } from './familyFacetsAndEmblems';
@@ -66,6 +67,7 @@ export interface TreemapNode {
   listingTitle?: string;
   mileage?: number;
   facetRepresentativeModel?: string;
+  badgeSvg?: string;
 }
 
 interface TreemapRect {
@@ -914,22 +916,32 @@ function TreemapCell({ rect, onClick, totalCount, showValue, repImage, repImages
         background: isVehicle && showImage ? 'var(--surface-glass)' : undefined,
       }}>
         {canShowName && !isVehicle && (
-          <div
-            style={{
-              fontSize: nameFontSize,
-              fontWeight: 700,
-              letterSpacing: isLarge ? '-0.02em' : '0.04em',
-              textTransform: 'uppercase' as const,
-              color: textColor,
-              lineHeight: 1.15,
-              overflow: 'hidden',
-              textOverflow: 'ellipsis',
-              whiteSpace: isLarge ? 'normal' : 'nowrap',
-              fontFamily: 'Arial, sans-serif',
-              wordBreak: isLarge ? 'break-word' : undefined,
-            }}
-          >
-            {node.name}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+            {node.badgeSvg && w >= 110 && h >= 58 && (
+              <div
+                aria-hidden="true"
+                data-testid="treemap-cell-badge"
+                style={{ display: 'inline-flex', alignItems: 'center', height: area > 25000 ? 22 : 16, maxWidth: Math.min(130, w - 12) }}
+                dangerouslySetInnerHTML={{ __html: node.badgeSvg }}
+              />
+            )}
+            <div
+              style={{
+                fontSize: nameFontSize,
+                fontWeight: 700,
+                letterSpacing: isLarge ? '-0.02em' : '0.04em',
+                textTransform: 'uppercase' as const,
+                color: textColor,
+                lineHeight: 1.15,
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+                whiteSpace: isLarge ? 'normal' : 'nowrap',
+                fontFamily: 'Arial, sans-serif',
+                wordBreak: isLarge ? 'break-word' : undefined,
+              }}
+            >
+              {node.name}
+            </div>
           </div>
         )}
 
@@ -1400,7 +1412,7 @@ export function TreemapHomePage({ onBrowse, embedded = false }: { onBrowse: () =
       .sort((a, b) => b.usd - a.usd)
       .slice(0, 200)
       .map((s) => ({
-        name: [s.year, currentLevel.make, s.model].filter(Boolean).join(' '),
+        name: [s.year, currentLevel.make, s.model ? s.model.split(' · ')[0].trim() : null].filter(Boolean).join(' '),
         count: 1,
         value: s.usd,
         median_price: s.usd,
@@ -1435,7 +1447,7 @@ export function TreemapHomePage({ onBrowse, embedded = false }: { onBrowse: () =
     }>();
     for (const s of familySalesData) {
       if (!matchesEraRange(s.year, selectedEra) || s.usd <= 0 || !s.model) continue;
-      const trimmed = s.model.trim();
+      const trimmed = s.model.split(' · ')[0].trim();
       const key = trimmed.toLowerCase();
       const prev = byModel.get(key) ?? {
         displayName: existingByKey.get(key)?.name ?? trimmed,
@@ -1532,7 +1544,12 @@ export function TreemapHomePage({ onBrowse, embedded = false }: { onBrowse: () =
   const facetedFamilyModels = useMemo<TreemapNode[] | null>(() => {
     const base = eraFilteredFamilyModels ?? familyModelsData;
     if (!base) return null;
-    if (facetAxis === 'raw') return base;
+    if (facetAxis === 'raw') {
+      return base.map((n) => ({
+        ...n,
+        badgeSvg: n.badgeSvg ?? resolveTileBadgeSvg(currentLevel.make, activeFamilyLabel, n.name),
+      }));
+    }
     return buildFacetNodes(
       facetAxis,
       currentLevel.make,
