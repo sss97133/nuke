@@ -152,6 +152,7 @@ struct ProfileTab: View {
     @State private var query = ""
     @State private var results: [ProfileRow] = []
     @State private var searchError = false   // a failed handle search ≠ "no such user"
+    @State private var searchFailureText: String?
     @State private var showAccount = false
 
     private var rootUserId: String {
@@ -166,9 +167,9 @@ struct ProfileTab: View {
                 } else if searchError && results.isEmpty {
                     // The search request failed — never read as "no such handle".
                     ContentUnavailableView {
-                        Label("Couldn't search", systemImage: "wifi.exclamationmark")
+                        Label("Couldn't search", systemImage: "exclamationmark.triangle")
                     } description: {
-                        Text("Check your connection.")
+                        Text(searchFailureText ?? "The search failed.")
                     } actions: {
                         Button("Retry") {
                             Task { await search(query.trimmingCharacters(in: .whitespaces)) }
@@ -238,6 +239,7 @@ struct ProfileTab: View {
                 .value
         } catch {
             searchError = true
+            searchFailureText = ReadFailure.text(error)
             NSLog("NukeCapture profile search failed: %@", String(describing: error))
         }
     }
@@ -297,6 +299,7 @@ struct ProfileView: View {
     // Showing both side by side kills the "is it even linked?" doubt — they
     // reconcile in plain sight.
     @State private var sync: SyncStatus?
+    @State private var syncFailureText: String?
     @State private var syncError = false          // failed link-ledger load ≠ a fresh account
     @ObservedObject private var engine = SyncEngine.shared
 
@@ -308,6 +311,8 @@ struct ProfileView: View {
     @State private var latestError = false
     // Producer signals — the proof-of-work read that replaces vanity counts.
     @State private var producer: ProducerSignals?
+    @State private var affiliations: [OrgAffiliationsSection.Row] = []
+    @State private var affiliationsFailure: String?
 
     var body: some View {
         List {
@@ -350,6 +355,11 @@ struct ProfileView: View {
                     .padding(.vertical, 4)
                 }
             }
+
+            // ORGANIZATIONS — the person's memberships with each relation's weight (user_org_relations), on their
+            // own profile only: the owner took organizations off the profile face on 2026-06-13 ("I don't want those
+            // showing up"; UserWorkspaceContent.tsx), and the web shows them only on the signed-in capsule.
+            if isOwn { OrgAffiliationsSection(rows: affiliations, failureText: affiliationsFailure) }
 
             // GARAGE — the user's vehicles, the way into the whole drill chain.
             // Empty + own profile → a LIVING state that says what's coming, not a
@@ -395,7 +405,7 @@ struct ProfileView: View {
             } else if latestError {
                 Section("Latest work") {
                     HStack {
-                        Label("Couldn't load", systemImage: "wifi.exclamationmark")
+                        Label("Couldn't load", systemImage: "exclamationmark.triangle")
                             .font(.footnote).foregroundStyle(.secondary)
                         Spacer()
                         Button("Retry") { Task { await loadLatest() } }
@@ -417,10 +427,18 @@ struct ProfileView: View {
         .task(id: userId) { await loadProducer() }
         .task(id: userId) {
             guard isOwn else { return }
+            do { affiliations = try await OrgAffiliationsSection.load(userId: userId); affiliationsFailure = nil }
+            catch { if affiliations.isEmpty { affiliationsFailure = ReadFailure.text(error) } }
+        }
+        .task(id: userId) {
+            guard isOwn else { return }
             await loadPhotoEvidence()
             await LibraryStore.shared.refreshAlbums()
             await loadPhotoEvidence()
-            await libraryIngest.runAlbumReview(budget: 24)
+            // OCR over originals: on a charger at a nominal temperature only (LibraryIngest).
+            if LibraryIngest.mayReviewInForeground {
+                await libraryIngest.runAlbumReview(budget: 24)
+            }
             await libraryIngest.syncNativeAlbums()
             await loadPhotoEvidence()
         }
@@ -916,7 +934,7 @@ struct ProfileView: View {
     private var garageErrorSection: some View {
         Section {
             VStack(alignment: .leading, spacing: 8) {
-                Label("Couldn't load the garage", systemImage: "wifi.exclamationmark")
+                Label("Couldn't load the garage", systemImage: "exclamationmark.triangle")
                     .font(.subheadline)
                     .foregroundStyle(Color.primary)
                 Text("Your vehicles are on the record — the connection dropped.")
@@ -1010,7 +1028,7 @@ struct ProfileView: View {
                 LabeledContent("Status") {
                     Button("Retry") { Task { await loadSync() } }
                 }
-                Text("Couldn't load the sync ledger — check your connection.")
+                Text("Couldn't load the sync ledger. \(syncFailureText ?? "The read failed.")")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
@@ -1071,6 +1089,7 @@ struct ProfileView: View {
             sync = status
         } catch {
             syncError = true
+            syncFailureText = ReadFailure.text(error)
             NSLog("NukeCapture sync status failed: %@", String(describing: error))
         }
     }
@@ -1232,9 +1251,9 @@ struct DayReceiptView: View {
                 } else if loadError != nil {
                     // Failed ≠ empty — offer a way back, never a dead red string.
                     ContentUnavailableView {
-                        Label("Couldn't load the day", systemImage: "wifi.exclamationmark")
+                        Label("Couldn't load the day", systemImage: "exclamationmark.triangle")
                     } description: {
-                        Text("Check your connection.")
+                        Text("The read failed. Retry.")
                     } actions: {
                         Button("Retry") { Task { loaded = false; loadError = nil; await load() } }
                             .buttonStyle(.borderedProminent)
@@ -1381,7 +1400,7 @@ private struct PhotoFullScreenView: View {
     var body: some View {
         ZStack(alignment: .bottom) {
             Color.black.ignoresSafeArea()
-            AsyncImage(url: (photo.url ?? photo.thumb).flatMap(URL.init)) { image in
+            CachedAsyncImage(url: NukeImage.thumb(photo.url ?? photo.thumb, width: 2048)) { image in
                 image
                     .resizable()
                     .scaledToFit()
@@ -1621,5 +1640,83 @@ private struct PhotoFullScreenView: View {
                 NSLog("NukeCapture add_photo_comment failed: %@", String(describing: error))
             }
         }
+    }
+}
+
+// ─── Organizations: memberships with each relation's weight ────────────────────
+//
+// One read, `user_org_relations`: the person's memberships (organization_contributors) with the relation's weight at
+// now, computed by the server from passive contributions (photos at the organization's locations, its images, timeline
+// events, contractor work) and halving every 6 h. A membership is not a status: "active" was hard-coded on every row
+// (owner, 2026-10-15). Only live and stalling relations show, the warmest first: "only show active orgs. its
+// annoying that evening side projects surface to top billing" (owner, 2026-10-15). Each row opens the organization
+// inside the app. Renders nothing when no relation is active.
+struct OrgAffiliationsSection: View {
+    let rows: [Row]
+    let failureText: String?
+
+    struct Row: Decodable, Identifiable {
+        let organization_id: String
+        let name: String?
+        let type: String?
+        let role: String?
+        let start_date: String?
+        let relation: OrgPage.Relation
+        var id: String { organization_id + (role ?? "") }
+    }
+    private struct Payload: Decodable { let relations: [Row] }
+
+    var body: some View {
+        if !rows.isEmpty {
+                Section {
+                    ForEach(rows) { r in
+                        NavigationLink {
+                            OrganizationView(orgId: r.organization_id, fallbackName: r.name)
+                        } label: { row(r) }
+                    }
+                } header: {
+                    Text("Organizations · \(rows.count)")
+                } footer: {
+                    Text("Active relations only. Each is kept warm by contributions, such as photos taken at the business, and goes dormant a day after the last one.")
+                        .font(.caption2).foregroundStyle(.secondary)
+                }
+            } else if let failureText {
+                Section("Organizations") {
+                    Text("Couldn't load. \(failureText)").font(.footnote).foregroundStyle(.secondary)
+                }
+            }
+    }
+
+    @ViewBuilder private func row(_ r: Row) -> some View {
+        HStack(alignment: .firstTextBaseline, spacing: 10) {
+            VStack(alignment: .leading, spacing: 2) {
+                Text(r.name ?? "Organization").font(.subheadline.weight(.medium))
+                Text([r.role.map(Self.words), r.type?.replacingOccurrences(of: "_", with: " ")]
+                        .compactMap { $0 }.filter { !$0.isEmpty }.joined(separator: " · "))
+                    .font(.caption).foregroundStyle(.secondary)
+            }
+            Spacer()
+            VStack(alignment: .trailing, spacing: 2) {
+                HStack(spacing: 4) {
+                    Circle().fill(RelationWeight.color(r.relation)).frame(width: 6, height: 6)
+                    Text(RelationWeight.word(r.relation)).font(.caption.weight(.semibold))
+                }
+                Text(RelationWeight.ago(r.relation.last_contribution_at) ?? "nothing in 2 days")
+                    .font(.caption2.monospacedDigit()).foregroundStyle(.secondary)
+            }
+        }
+        .contentShape(Rectangle())
+    }
+
+    private static func words(_ s: String) -> String {
+        s.split(separator: "_").map { $0.prefix(1).uppercased() + $0.dropFirst() }.joined(separator: " ")
+    }
+
+    /// Live and stalling relations only, warmest first (the server orders by weight).
+    static func load(userId: String) async throws -> [Row] {
+        let payload: Payload = try await SupabaseService.client
+            .rpc("user_org_relations", params: ["p_user_id": userId])
+            .execute().value
+        return payload.relations.filter { $0.relation.state == "live" || $0.relation.state == "stalling" }
     }
 }

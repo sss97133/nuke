@@ -8,7 +8,7 @@ export type LotPage = { event_id: string; url: string; snapshot_id: string | nul
 export type Verdict = "publish" | "row_disagrees" | "lots_disagree" | "no_page";
 
 const norm = (s: string | null | undefined) => (s ?? "").toLowerCase().replace(/[^a-z0-9]/g, "");
-const MAKE_ALIASES: Record<string, string> = { chevy: "chevrolet", mercedes: "mercedesbenz", vw: "volkswagen" };
+const MAKE_ALIASES: Record<string, string> = { chevy: "chevrolet", mercedes: "mercedesbenz", vw: "volkswagen", datsun: "nissan" };
 const makeKey = (s: string | null | undefined) => { const k = norm(s); return MAKE_ALIASES[k] ?? k; };
 const vinKey = (s: string | null | undefined) => (s ?? "").toUpperCase().replace(/[^A-Z0-9]/g, "");
 
@@ -24,8 +24,10 @@ export function compareIdentity(a: Identity, b: Identity) {
   return { year, make, model, vin };
 }
 
+// A VIN both sides state (5+ characters) decides: the same VIN with the same year and make is the same car whatever
+// the model label says (slug-derived rows carry fragments like "Custom Convertible"); different VINs are different cars.
 const agrees = (c: ReturnType<typeof compareIdentity>) =>
-  c.year === true && c.make === true && c.model === true && c.vin !== false;
+  c.year !== false && c.make === true && (c.vin === true || (c.vin === null && c.year === true && c.model === true));
 
 /** The verdict for one vehicle and the reasons behind it. */
 export function judge(row: Identity, lots: LotPage[]): { verdict: Verdict; reasons: string[] } {
@@ -52,4 +54,21 @@ export function urlVariants(url: string): string[] {
     for (const s of [b.replace(/^http:/, "https:"), b.replace(/^https:/, "http:")]) { out.add(s); out.add(s + "/"); }
   }
   return [...out];
+}
+
+/** The lot's own price on a Barrett-Jackson page (unescaped RSC data). The page carries the site menu's event promos
+ * first ("label":"Bidder packages start at","price":"$$250.00"); the lot record's price is the one followed by
+ * "is_reserve". A promo price is never the lot's; with no lot-record match, the first other price is used. */
+export function pickBjLotPrice(html: string): number | null {
+  let fallback: number | null = null;
+  for (const m of html.matchAll(/"price"\s*:\s*"\$?\$?([\d,]+(?:\.\d{2})?)"/g)) {
+    const at = m.index ?? 0;
+    // The promo label sits in the same JSON object as its price: look back to that object's opening brace only.
+    if (/"label"\s*:\s*"Bidder packages/i.test(html.slice(Math.max(0, html.lastIndexOf("{", at)), at))) continue;
+    const price = parseInt(m[1].replace(/[,.]\d{2}$/, "").replace(/,/g, ""));
+    if (!(price > 0)) continue;
+    if (/"is_reserve"/.test(html.slice(at + m[0].length, at + m[0].length + 40))) return price;
+    if (fallback == null) fallback = price;
+  }
+  return fallback;
 }

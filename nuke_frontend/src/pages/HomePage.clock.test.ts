@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 vi.mock('../lib/supabase', () => ({ supabase: {} }));
-import { familyCoverage, familyNamesShown, ledgerViewsClock, ledgerViewsStamp, mapCaption, mapLegend } from './HomePage';
+import { familyCoverage, familyNamesShown, legendFor, mapCaptionShort, ledgerViewsClock, ledgerViewsStamp, mapCaption, mapLegend, SALES_CHART_LEGEND } from './HomePage';
 
 describe('the ledger map legend clock', () => {
   it('says how long ago the views were refreshed, and keeps the exact time for the title', () => {
@@ -20,27 +20,29 @@ describe('the ledger map legend clock', () => {
 describe('the ledger map legend measure', () => {
   it('says what a brand tile measures: dollars, the band, sell-through, the year that trades, the 12-month move', () => {
     const legend = mapLegend('brands');
-    expect(legend).toContain('area = dollars from confirmed sales');
+    expect(legend).toContain('box size = dollars from confirmed sales');
     expect(legend).toContain('of offered sold = share of cars offered at auction that sold');
-    expect(legend).toContain('BaT 12 mo = sales and dollars on Bring a Trailer in the last 12 months against the 12 before, the venue held in full both years');
-    expect(legend).toContain('gray: BaT holds under half the sales, or too few a year earlier');
+    expect(legend).toContain('12 mo = sales and dollars in the last 12 months against the 12 before, measured at auction houses held in full both years (today Bring a Trailer)');
+    expect(legend).toContain('prices not adjusted for inflation');
+    expect(legend).not.toMatch(/nominal|area =/);
+    expect(legend).toContain('gray: the measured houses hold under half the sales, or too few a year earlier');
     expect(legend).not.toMatch(/low–|’yy/);
     expect(legend).not.toMatch(/median/);
   });
   it('reads a family and a model name the way it reads a brand, and says what other models holds', () => {
     expect(mapLegend('models')).toBe(mapLegend('brands'));
-    expect(mapLegend('families')).toContain('area = dollars from confirmed sales');
+    expect(mapLegend('families')).toContain('box size = dollars from confirmed sales');
     expect(mapLegend('families')).toContain('other models = names not yet keyed to a family, and families with under 3 sales');
     expect(mapLegend('brands')).not.toContain('other models');
   });
   it('says the area counts confirmed sales and the color is their median where the tiles carry no market measures', () => {
     for (const legend of [mapLegend('years'), mapLegend('families', false), mapLegend('brands', false)]) {
-      expect(legend).toContain('area = vehicles with a confirmed sale');
+      expect(legend).toContain('box size = vehicles with a confirmed sale');
       expect(legend).toContain('color = their median sale price (gray: under 5 sales)');
       expect(legend).toContain('asks, bids and unknown outcomes are not counted');
       expect(legend).not.toMatch(/recorded|asking price/);
     }
-    expect(mapLegend('vehicles')).toBe('area = confirmed sale price · click to open the record');
+    expect(mapLegend('vehicles')).toBe('box size = confirmed sale price · click a box to open the car');
   });
   it('puts the population and the date beside the count, from the refresh receipt', () => {
     const refresh = { refreshedAt: '2026-10-14T09:10:41+00:00', populations: { measure: 'confirmed_sale_v1', public_records: 633581, mapped_sales: 241919 } };
@@ -81,5 +83,24 @@ describe('what a family level shows', () => {
     expect(familyNamesShown(49, 49)).toBe('');
     expect(familyNamesShown(0, 10)).toBe('');
     expect(familyNamesShown(200, undefined)).toBe('');
+  });
+});
+
+describe('the caption on a phone', () => {
+  it('keeps the count and drops the sentence', () => {
+    const refresh = { refreshedAt: '2026-10-14T09:10:00Z', populations: { measure: 'confirmed_sale_v1', mapped_sales: 241959, public_records: 633678 } };
+    expect(mapCaptionShort('brands', 5, refresh)).toBe('241,959 sold');
+    expect(mapCaptionShort('families', 27510, refresh)).toBe('27,510 sold');
+    expect(mapCaptionShort('vehicles', 200, refresh)).toBe('200 shown');
+  });
+});
+
+describe('the legend under the map', () => {
+  it('describes the sales chart when a family shows it, and the tiles otherwise', () => {
+    expect(legendFor('models', true)).toBe(SALES_CHART_LEGEND);
+    expect(SALES_CHART_LEGEND).toContain('one dot = one confirmed sale with a date');
+    expect(SALES_CHART_LEGEND).not.toMatch(/area =|nominal|percentile/);
+    expect(legendFor('models', false)).toBe(mapLegend('models'));
+    expect(legendFor('brands', false, false)).toBe(mapLegend('brands', false));
   });
 });

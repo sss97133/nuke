@@ -1,13 +1,13 @@
 import { parseSsrPage } from "./ssrPage.ts";
 
 const page = (band: string, extra = "") =>
-  `<title>1996 Porsche 993 Turbo — Sold | PCARMARKET</title><meta property="og:url" content="https://www.pcarmarket.com/results/x"/>` +
+  `<title>1996 Porsche 993 Turbo — Sold | PCARMARKET</title><img src="https://assets.basta.app/a/images/1?width=1000&amp;quality=75"/><meta property="og:url" content="https://www.pcarmarket.com/results/x"/>` +
   `<p>Bids</p><p class="a"><svg><path/></svg>9</p>` +
   `<div class="x"><span class="flex h-6 items-center"><span class="whitespace-nowrap font-semibold">${band}</span></span><p data-slot="text" class="z">$127,000</p></div>` +
   `<h2>Car Details</h2><dl><div class="contents"><dt class="a">Year</dt><dd class="b">1996</dd></div><div><dt>Make</dt><dd>Porsche</dd></div>` +
   `<div><dt>Model</dt><dd>911 Turbo</dd></div><div><dt>VIN</dt><dd>WP0AC2995TS375612</dd></div><div><dt>Mileage Shown</dt><dd>37,300 mi</dd></div>` +
   `<div><dt>Ended</dt><dd><span>Mar 15, 2019, 8:30 PM</span></dd></div></dl>` +
-  `<img src="https://assets.basta.app/a/images/1?width=1000&amp;quality=75"/>${extra}`;
+  `<ul><li class="x"><span class="truncate font-medium text-xs">amy</span><time dateTime="2019-03-15T20:29:00Z" class="s">x</time></div><span class="p"><span class="font-bold text-xs uppercase tracking-wide opacity-80">Sold</span><span class="b">$127,000</span></span></li></ul>${extra}`;
 
 Deno.test("Sold label means sold price", () => {
   const l = parseSsrPage(page("Sold"))!;
@@ -29,4 +29,9 @@ Deno.test("a page without Car Details is null", () => {
 Deno.test("entities decode in one pass", () => {
   const l = parseSsrPage(page("Sold").replace("<title>1996", "<title>1996 &amp;lt; Rock &amp; Roll"))!;
   if (!l.title.includes("&lt; Rock & Roll")) throw new Error(l.title);
+});
+
+Deno.test("bid history rows carry user, time, kind and amount", () => {
+  const l = parseSsrPage(page("Sold"))!;
+  if (JSON.stringify(l.bids) !== JSON.stringify([{ user: "amy", at: "2019-03-15T20:29:00Z", amount: 127000, kind: "sold" }])) throw new Error(JSON.stringify(l.bids));
 });

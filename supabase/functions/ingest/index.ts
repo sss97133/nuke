@@ -25,10 +25,13 @@ import { archiveFetch } from "../_shared/archiveFetch.ts";
 import { normalizeListingUrl } from "../_shared/urlNormalization.ts";
 import { requireWriteAuth } from "../_shared/writeGuard.ts";
 import { writeObservation } from "../_shared/observationWriter.ts";
+import { insertMissingVehicleImages } from "../_shared/vehicleImageWrite.ts";
 import { applyCraigslistImagePlan, planCraigslistImages } from "../_shared/craigslistImages.ts";
 import { landCraigslistBlip, modelFromText, type ModelCitation } from "./craigslistBlip.ts";
 import { type CraigslistCapture, pickCapture } from "../_shared/craigslistAttributes.ts";
 import { type CaptureLanding, landCraigslistCapture, ledgerFields } from "./craigslistCapture.ts";
+import { vinMakeCheckApplies } from "./vinGate.ts";
+import { classifiedListingId, classifiedPlatform, landClassifiedListing } from "./classifiedEvent.ts";
 import { slugStubRejection } from "./slugStub.ts";
 import { extractFromHtml } from "../extract-craigslist/extract.ts";
 import { projectSecretKey } from "../_shared/supabaseKeys.ts";
@@ -853,7 +856,9 @@ async function matchOrCreateVehicle(
       ai_processing_status: "skipped", // not requested: see the matched path below
       source_url: parsed.url || null,
     }));
-    await supabaseAdmin.from("vehicle_images").insert(imageRows);
+    // (Deployed 2026-10-15 with #1531: #1528's deploy died on its migration before the functions step.)
+    const imgWrite = await insertMissingVehicleImages(supabaseAdmin, newVehicle.id, imageRows);
+    if (imgWrite.error) console.error(`[ingest] vehicle_images insert ${newVehicle.id}: ${imgWrite.error.message}`);
   }
 
   // ── Create merge proposals for Tier 3 candidates ──────────────
@@ -968,7 +973,9 @@ async function enrichVehicle(vehicleId: string, data: VehicleEnrichment, platfor
         ai_processing_status: "skipped", // listing photos are not analyzed unless someone asks; "pending" fires the photo pipeline per row
         source_url: data.url || null,
       }));
-      await supabaseAdmin.from("vehicle_images").insert(imageRows);
+      // A revisit never re-adds a photo the vehicle already holds (_shared/vehicleImageWrite.ts).
+      const imgWrite = await insertMissingVehicleImages(supabaseAdmin, vehicleId, imageRows);
+      if (imgWrite.error) console.error(`[ingest] vehicle_images insert ${vehicleId}: ${imgWrite.error.message}`);
 
       // Update primary_image_url if vehicle didn't have one
       if (!hasPrimary) {
@@ -1003,6 +1010,10 @@ interface EnrichedData {
   seller_name?: string | null;
   /** Canonicalized listing URL the extractor actually wrote to `vehicles.listing_url`, if it differs from the input URL. */
   listing_url?: string | null;
+  /** When the listing went up, if the extractor read it (ClassicCars and KSL events; ISO). */
+  posted_at?: string | null;
+  /** The seller class the source states (KSL sellerType, ClassicCars Listed By), as written. */
+  seller_type_raw?: string | null;
   /** Craigslist only: the post's attribute block, id and clocks, as extract-craigslist read them (see ./craigslistCapture.ts). */
   capture?: CraigslistCapture | null;
 }
@@ -1135,6 +1146,7 @@ async function tryAutoEnrich(url: string, platform: string): Promise<EnrichResul
     "cars.bonhams.com": "extract-bonhams",
     "broadarrowauctions.com": "extract-broad-arrow",
     "cars.ksl.com": "extract-ksl", // deterministic (page payload); no LLM
+    "collectingcars.com": "extract-collecting-cars", // deterministic (page payload via Firecrawl); no LLM
     "classiccars.com": "extract-classiccars", // deterministic (page JSON-LD + attribute panel); no LLM
   };
   const host = new URL(url).hostname.replace(/^www\./, "").toLowerCase();
@@ -1212,6 +1224,8 @@ async function tryAutoEnrich(url: string, platform: string): Promise<EnrichResul
         seller_name: vehicle.seller || vehicle.seller_username || vehicle.seller_name || null,
         listing_url: vehicle.listing_url || (typeof vehicle.url === "string" ? vehicle.url : null),
         vehicle_id: writtenId || undefined,
+        posted_at: typeof vehicle.posted_at === "string" ? vehicle.posted_at : null,
+        seller_type_raw: typeof vehicle.seller_type === "string" ? vehicle.seller_type : null,
         capture: platform === "craigslist" ? pickCapture(vehicle) : null,
       },
     };
@@ -1432,6 +1446,8 @@ async function ingestOne(input: IngestInput, userId: string | null): Promise<Ing
     let enrichmentSkipped = false;
     let enrichmentError: string | null = null;
     let extractorVehicleId: string | undefined;
+    let enrichedPostedAt: string | null = null;
+    let enrichedSellerType: string | null = null;
 
     if (input.enrich !== false && listingUrl && !input.description) {
       const enrichResult = await tryAutoEnrich(listingUrl, platform);
@@ -1443,6 +1459,8 @@ async function ingestOne(input: IngestInput, userId: string | null): Promise<Ing
             enrichment_error: "Craigslist share detail post identity mismatch", source: platform, external_id: externalId };
         }
         extractorVehicleId = enriched.vehicle_id;
+        enrichedPostedAt = enriched.posted_at ?? null;
+        enrichedSellerType = enriched.seller_type_raw ?? null;
         // The extractor (e.g. extract-bat-core) may have written the vehicle
         // under its own canonicalized URL, which can differ from the URL we
         // were given (trailing slash, www, query params). Adopt it so the
@@ -1616,7 +1634,8 @@ async function ingestOne(input: IngestInput, userId: string | null): Promise<Ing
     const suggestions: Record<string, string> = {};
     if (candidateData.vin && typeof candidateData.vin === "string" && candidateData.vin.length >= 6) {
       const decoded = decodeVin(candidateData.vin);
-      if (decoded.make && candidateData.make) {
+      // Only a 17-character VIN with a valid check digit is decoded for make (./vinGate.ts); a chassis number is a claim.
+      if (vinMakeCheckApplies(candidateData.vin) && decoded.make && candidateData.make) {
         const vinMake = normalizeMake(decoded.make);
         const claimedMake = normalizeMake(candidateData.make);
         if (vinMake && claimedMake && vinMake !== claimedMake) {
@@ -1747,6 +1766,7 @@ async function ingestOne(input: IngestInput, userId: string | null): Promise<Ing
           sourceDescription: captureDescription,
           isNewVehicle: match.isNew,
           modelCitation,
+          description: input.description || input.notes,
           written: {
             mileage: input.mileage,
             title_status: input.title_status,
@@ -1756,6 +1776,24 @@ async function ingestOne(input: IngestInput, userId: string | null): Promise<Ing
           },
         },
       );
+    }
+
+    // ClassicCars and KSL: the same listing projection Craigslist lands, so the classified board can read them.
+    const classified = classifiedPlatform(listingUrl);
+    if (classified && match.vehicleId && !isPreview) {
+      const listingId = classifiedListingId(listingUrl);
+      if (listingId) {
+        try {
+          const landed = await landClassifiedListing(supabaseAdmin, {
+            vehicleId: match.vehicleId, platform: classified, listingUrl: listingUrl ?? "", listingId,
+            price: typeof input.price === "number" ? input.price : null, postedAt: enrichedPostedAt,
+            observedAt: new Date().toISOString(), sellerTypeRaw: enrichedSellerType,
+          });
+          if (landed.event.action === "error") console.error(`[ingest] ${classified} listing event ${match.vehicleId}: ${landed.event.error}`);
+        } catch (e) {
+          console.error(`[ingest] ${classified} listing event ${match.vehicleId}: ${e instanceof Error ? e.message : String(e)}`);
+        }
+      }
     }
 
     // Facebook Saved: set status based on sold flag

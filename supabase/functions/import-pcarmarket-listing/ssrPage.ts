@@ -22,6 +22,9 @@ export interface SsrListing {
   viewCount?: number;
   description?: string;
   images: string[];
+  photosClaimed?: number;
+  reserveMet?: boolean;
+  bids: { user: string; at: string | null; amount: number; kind: "bid" | "sold" | "offer" }[];
   canonicalUrl?: string;
 }
 
@@ -64,13 +67,26 @@ export function parseSsrPage(html: string): SsrListing | null {
   const endedDate = ended ? new Date(`${ended} UTC`) : null;
 
   const images: string[] = [];
-  for (const m of html.matchAll(/<img[^>]+src="(https:\/\/assets\.basta\.app\/[^"]+)"/g)) {
+  for (const m of html.slice(0, html.indexOf("Car Details")).matchAll(/<img[^>]+src="(https:\/\/assets\.basta\.app\/[^"]+)"/g)) {
     const u = decode(m[1]).replace(/\?.*$/, "");
     if (!images.includes(u)) images.push(u);
   }
 
   const para = [...html.matchAll(/<div class="prose[^>]*>([\s\S]*?)<\/div>/g)][0]?.[1];
   const mileage = num((dl.get("Mileage Shown") ?? "").replace(/mi.*/i, ""));
+
+  // Bid History: <li> rows of <span class=truncate>USER</span><time dateTime=ISO> ... <span>Bid|Sold|Offer</span><span>$amount</span>
+  const bids: SsrListing["bids"] = [];
+  const seenBid = new Set<string>();
+  for (const m of html.matchAll(/<li class="[^"]*">[\s\S]*?<span class="truncate[^"]*">([^<]+)<\/span><time dateTime="([^"]+)"[^>]*>[\s\S]*?uppercase tracking-wide opacity-80">([^<]+)<\/span><span[^>]*>\$([0-9,]+)<\/span>/g)) {
+    const kind = m[3].trim().toLowerCase();
+    if (kind !== "bid" && kind !== "sold" && kind !== "offer") continue;
+    const amount = num(m[4]);
+    const key = `${m[1]}|${m[2]}|${kind}|${amount}`;
+    if (!amount || seenBid.has(key)) continue;
+    seenBid.add(key);
+    bids.push({ user: decode(m[1]).trim(), at: m[2], amount, kind });
+  }
 
   return {
     title,
@@ -92,6 +108,9 @@ export function parseSsrPage(html: string): SsrListing | null {
     viewCount: num(html.match(/([0-9,]+) views/)?.[1]),
     description: para ? text(para.replace(/<\/p>/g, "\n")).slice(0, 8000) : undefined,
     images,
+    photosClaimed: num(html.match(/See all photos \(\s*(?:<!-- -->)?\s*(\d+)/)?.[1] ?? html.match(/See all photos \((\d+)\)/)?.[1]),
+    reserveMet: /Reserve met/.test(html) ? true : /Reserve not met/i.test(html) ? false : undefined,
+    bids,
     canonicalUrl: html.match(/property="og:url" content="([^"]+)"/)?.[1],
   };
 }

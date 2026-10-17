@@ -71,6 +71,7 @@ struct LiveAnalysisStream: View {
     @State private var newestSeen: String?            // cursor: max landed_at held
     @State private var loaded = false
     @State private var loadError = false
+    @State private var lastPollFailed = false
     @State private var freshIDs: Set<UUID> = []       // rows that just landed → brief beat
     @State private var selected: AnalyzedPhoto?
 
@@ -92,7 +93,7 @@ struct LiveAnalysisStream: View {
                     }
                 } else if loadError {
                     HStack(spacing: 8) {
-                        Label("Couldn't reach the pipeline", systemImage: "wifi.exclamationmark")
+                        Label("Couldn't reach the pipeline", systemImage: "exclamationmark.triangle")
                             .font(.caption2).foregroundStyle(.secondary)
                         Spacer()
                         Button("Retry") { Task { await poll(reset: true) } }
@@ -131,13 +132,17 @@ struct LiveAnalysisStream: View {
         }
     }
 
-    /// Initial backfill, then poll every 4s with the cursor — newer verdicts
-    /// prepend in front of the owner (the pour is the show).
+    /// Initial backfill, then poll every 15 s with the cursor while the app is in front — newer
+    /// verdicts prepend in front of the owner. A 4 s poll kept the cellular radio from ever idling.
     private func runLoop() async {
         await poll(reset: true)
+        var wait = 15.0
         while !Task.isCancelled {
-            try? await Task.sleep(for: .seconds(4))
-            await poll(reset: false)
+            try? await Task.sleep(for: .seconds(wait))
+            if UIApplication.shared.applicationState == .active { await poll(reset: false) }
+            // The stream's read can take its full 15 s server timeout for a large account
+            // (2026-10-15). After a failure, wait longer each time, up to two minutes.
+            wait = lastPollFailed ? min(wait * 2, 120) : 15
         }
     }
 
@@ -157,8 +162,10 @@ struct LiveAnalysisStream: View {
                 .execute()
                 .value
             loadError = false
+            lastPollFailed = false
             merge(fetched, reset: reset)
         } catch {
+            lastPollFailed = true
             if rows.isEmpty { loadError = true }   // a failed REFRESH never wipes rows on screen
             NSLog("NukeCapture analysis stream failed: %@", String(describing: error))
         }

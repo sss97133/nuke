@@ -20,6 +20,11 @@ import { firecrawlScrape, type FirecrawlScrapeResult } from "./firecrawl.ts";
 import { parseQualifiedBaTSale } from "./batParser.ts";
 import { projectSecretKey } from "./supabaseKeys.ts";
 
+/** Remove NUL characters, which Postgres text columns cannot store. */
+export function stripNul(s: string | null | undefined): string | null {
+  return s == null ? null : s.includes("\u0000") ? s.replace(/\u0000/g, "") : s;
+}
+
 export interface ArchiveFetchResult {
   html: string | null;
   markdown: string | null;
@@ -31,6 +36,8 @@ export interface ArchiveFetchResult {
   statusCode: number | null;
   error: string | null;
   costCents: number;
+  /** Set when the capture could not be retained (the snapshot insert failed); callers can count it. A duplicate is not an error. Same contract as softWrite (writeResult.ts), inlined because this module's imports are pinned by the archive-custody test. */
+  archiveError?: string | null;
 }
 
 export interface ArchiveFetchOptions {
@@ -46,6 +53,8 @@ export interface ArchiveFetchOptions {
   useFirecrawl?: boolean;
   /** Direct fetch first; when the site blocks it (403/429/challenge, "Blocked by site"), fetch the page with Firecrawl. */
   firecrawlOnBlock?: boolean;
+  /** Asked before every paid Firecrawl scrape; when it resolves false the scrape is skipped (error firecrawl_allowance_exhausted). */
+  firecrawlAllowed?: () => Promise<boolean>;
   /** Firecrawl waitFor in ms */
   waitForJs?: number;
   /** Request markdown from Firecrawl in addition to HTML */
@@ -129,6 +138,11 @@ function detectPlatform(url: string): string {
   try { return new URL(url).hostname.replace(/^www\./, "").split(".")[0]; } catch { return "unknown"; }
 }
 
+/** Any successful retained snapshot satisfies a cache read; one fetched by the preferred method wins when there are several. */
+export function pickCachedSnapshot<T extends { fetch_method?: string | null }>(rows: T[] | null | undefined, preferredMethod: string): T | null {
+  return rows?.find((r) => r.fetch_method === preferredMethod) ?? rows?.[0] ?? null;
+}
+
 function needsFirecrawl(url: string): boolean {
   // Sites that are JS SPAs or aggressively block direct fetch
   const fcSites = ["carsandbids.com", "collectingcars.com", "pcarmarket.com"];
@@ -146,7 +160,7 @@ async function sha256(text: string): Promise<string> {
  * Examples: Cloudflare challenge pages, bare React/Next.js shells, bot walls.
  * These should be archived as success=false so cache lookups don't return garbage.
  */
-function isGarbageHtml(html: string, platform: string): boolean {
+export function isGarbageHtml(html: string, platform: string): boolean {
   if (!html || html.length === 0) return true;
 
   const lower = html.toLowerCase();
@@ -162,7 +176,10 @@ function isGarbageHtml(html: string, platform: string): boolean {
   if (lower.includes("403 forbidden") && html.length < 5000) return true;
 
   // Login page detection — a login page returned as 200 OK is garbage, not content
-  if (isLoginPage(html)) return true;
+  // The body-signal heuristics in isLoginPage ("sign in to", "register", "forgot password") fire on any large page that
+  // carries a login modal: every Collecting Cars lot page (0.6-1.5 MB) was archived success=false because of it on
+  // 2026-10-15, so no later read could hit the cache and each one paid for a new Firecrawl scrape. A login wall is a small page.
+  if (html.length < 150_000 && isLoginPage(html)) return true;
 
   // React/Next.js shell with no rendered content (Bonhams, Barrett-Jackson)
   // These shells have __NEXT_DATA__ or __next but no actual lot/vehicle content
@@ -232,8 +249,7 @@ export async function archiveFetch(
         .order("fetched_at", { ascending: false })
         .limit(5);
 
-      // Prefer matching fetch_method, fall back to any
-      const cached = rows?.find(r => r.fetch_method === preferredMethod) ?? rows?.[0] ?? null;
+      const cached = pickCachedSnapshot(rows, preferredMethod);
 
       if (cached && (cached.html || cached.html_storage_path)) {
         let cachedHtml = cached.html ?? null;
@@ -294,6 +310,8 @@ export async function archiveFetch(
     if (batResult.costCents > 0) {
       await logFetchCost(supabase, options?.callerName ?? "archiveFetch", url, batResult).catch(() => {});
     }
+  } else if (useFirecrawl && options?.firecrawlAllowed && !(await options.firecrawlAllowed())) {
+    result.error = "firecrawl_allowance_exhausted";
   } else if (useFirecrawl) {
     // Firecrawl for JS-rendered sites
     const formats = ["html"];
@@ -304,7 +322,7 @@ export async function archiveFetch(
       formats,
       onlyMainContent: false,
       waitFor: options?.waitForJs ?? 3000,
-    });
+    }, { caller: options?.callerName ?? "archiveFetch" });
 
     result.html = fcResult.data.html;
     result.markdown = fcResult.data.markdown;
@@ -331,13 +349,15 @@ export async function archiveFetch(
 
     // The site refused our server's address: one Firecrawl scrape, only for callers that opted in.
     const refused = !result.html && (/blocked|forbidden|captcha|challenge|auth_required|login page/i.test(result.error ?? "") || [401, 403, 429].includes(result.statusCode ?? 0));
-    if (options?.firecrawlOnBlock && refused) {
+    if (options?.firecrawlOnBlock && refused && options.firecrawlAllowed && !(await options.firecrawlAllowed())) {
+      result.error = "firecrawl_allowance_exhausted";
+    } else if (options?.firecrawlOnBlock && refused) {
       const fcResult: FirecrawlScrapeResult = await firecrawlScrape({
         url,
         formats: ["rawHtml"], // the extractors that opt in read script payloads, which "html" strips
         onlyMainContent: false,
         waitFor: options?.waitForJs ?? 3000,
-      });
+      }, { caller: options?.callerName ?? "archiveFetch" });
       result.html = fcResult.data.html;
       result.markdown = fcResult.data.markdown;
       result.source = "firecrawl";
@@ -356,7 +376,10 @@ export async function archiveFetch(
 
   // Step 3: Archive to listing_page_snapshots (non-blocking, never fail the main operation)
   try {
-    const html = result.html;
+    // Postgres text (and the JSON body PostgREST reads) cannot hold a NUL: "unsupported Unicode escape sequence" failed every
+    // PCarMarket snapshot insert (non-fatal, so the capture was silently lost). Drop the NULs; the hash is of what is stored.
+    const html = stripNul(result.html);
+    const markdownStored = stripNul(result.markdown);
     const htmlHash = html ? await sha256(html) : null;
 
     const payload: Record<string, unknown> = {
@@ -368,7 +391,7 @@ export async function archiveFetch(
       success: html !== null && html.length > 0 && !isGarbageHtml(html, platform),
       error_message: result.error,
       html: html,
-      markdown: result.markdown,
+      markdown: markdownStored,
       html_sha256: htmlHash,
       content_length: html?.length ?? 0,
       metadata: {
@@ -389,7 +412,10 @@ export async function archiveFetch(
       if (String((insertErr as any).code || "") === "23505") {
         console.log(`[archiveFetch] Duplicate snapshot for ${url} (content unchanged)`);
       } else {
-        console.warn(`[archiveFetch] Snapshot insert failed (non-fatal): ${insertErr.message}`);
+        // A retention that fails must be visible: the fetch itself is still returned, the failure is logged by softWrite and
+        // carried on the result (archiveError) so callers and counters see it instead of it vanishing.
+        result.archiveError = `listing_page_snapshots insert failed: ${insertErr.message}${(insertErr as { code?: string }).code ? ` (${(insertErr as { code?: string }).code})` : ""}`;
+        console.error(`[archiveFetch] ${result.archiveError}`);
       }
     } else if (inserted) {
       result.snapshotId = inserted.id;

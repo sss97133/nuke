@@ -11,6 +11,7 @@ import RecordedSalesComparison, { MarketScopeControls, type MarketSalesLens } fr
 import { MakeLogo } from '../../components/common/MakeIdentity';
 import { selectRowFacts, useMarketRowDetails, useMarketRowSpecs, vehicleIdentity, type LotInspection, type MarketRowDetails } from './useMarketRowDetails';
 import { useFinishEstimates, type FinishEstimate } from './useFinishEstimates';
+import { ringBids, startBidChime } from './bidChime';
 
 // The homepage: the live collector-car market as Nuke sees it right now.
 // Activity figures count the rows market_pulse_live() returns; rows open their canonical records.
@@ -217,10 +218,33 @@ function useSeen<T extends HTMLElement>(): [React.RefObject<T | null>, boolean] 
 }
 
 // Where the lot should finish, in one line: the estimate and its 80% range; the measured confidence on hover.
-export function FinishLine({ e }: { e: FinishEstimate }) {
-  return <Text role="caption" as="div" className="market-lot-finish" title={e.sentence ?? undefined}>
-    likely <strong>{bidNumber(e.estimate, true)}</strong> · {bidNumber(e.low, true)}–{bidNumber(e.high, true)}
-  </Text>;
+// How far the bid has to run to the likely finish: "+15% to go", "at likely", or past it.
+export function finishGap(bid: number | null | undefined, e: Pick<FinishEstimate, 'estimate'>): string | null {
+  if (!bid || bid <= 0) return null;
+  const g = e.estimate / bid - 1;
+  if (g >= 0.005) return `+${Math.round(g * 100)}% to go`;
+  if (g <= -0.005) return `${Math.abs(Math.round(g * 100))}% past likely`;
+  return 'at likely';
+}
+
+// The finish under the bid: the likely number and how far there is to go, then a bar: the range eight in ten such lots
+// finished inside (shaded), the likely finish (tick) and where the bid stands now (bar), so a lot that must still run
+// reads at a glance.
+export function FinishLine({ e, bid }: { e: FinishEstimate; bid?: number | null }) {
+  const gap = finishGap(bid, e);
+  const now = bid && bid > 0 ? bid : null;
+  const lo = Math.min(e.low, now ?? e.low), hi = Math.max(e.high, now ?? e.high);
+  const pad = (hi - lo) * 0.06 || hi * 0.05 || 1;
+  const x = (v: number) => ((v - lo + pad) / (hi - lo + 2 * pad)) * 100;
+  return <div className="market-lot-finish" title={e.sentence ?? undefined}>
+    <Text role="caption" as="div">likely <strong>{bidNumber(e.estimate, true)}</strong>{gap ? ` · ${gap}` : ''} · {bidNumber(e.low, true)}–{bidNumber(e.high, true)}</Text>
+    <svg className="market-lot-finish__bar" viewBox="0 0 100 8" preserveAspectRatio="none" role="img"
+      aria-label={`likely ${bidNumber(e.estimate, true)}, range ${bidNumber(e.low, true)} to ${bidNumber(e.high, true)}${now ? `, bid ${bidNumber(now, true)}` : ''}`}>
+      <rect x={x(e.low)} y="1.5" width={Math.max(0.5, x(e.high) - x(e.low))} height="5" className="market-lot-finish__band" />
+      <line x1={x(e.estimate)} x2={x(e.estimate)} y1="0" y2="8" className="market-lot-finish__likely" />
+      {now != null && <line x1={x(now)} x2={x(now)} y1="0" y2="8" className="market-lot-finish__bid" />}
+    </svg>
+  </div>;
 }
 
 function BoardRow({ a, risen, stale, detail, expanded, finish, onInspect }: {
@@ -258,7 +282,7 @@ function BoardRow({ a, risen, stale, detail, expanded, finish, onInspect }: {
         aria-label={`Inspect auction for ${title(a)}`} aria-expanded={expanded}>
         <AuctionCompetition vehicleId={a.id} sourceUrl={a.listingUrl} row enabled={reached} bid={a.currentBid}
           fallback={<BidCell auction={bidReading} risen={risen} stale={stale} />} />
-        {finish && <FinishLine e={finish} />}
+        {finish && <FinishLine e={finish} bid={a.currentBid} />}
       </button>
     </div>
   );
@@ -308,9 +332,23 @@ function inWindow(a: LiveAuction, w: Window, now: number): boolean {
   }
 }
 
+export function matchesFamilyScope(a: LiveAuction, familyName: string | null): boolean {
+  if (!familyName) return true;
+  const f = familyName.trim().toLowerCase();
+  if (!f || f === 'other models') return true;
+  const m = (a.model ?? '').trim().toLowerCase();
+  const t = (a.title ?? '').trim().toLowerCase();
+  const escaped = f.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const wordRe = new RegExp(`(^|[^a-z0-9])${escaped}($|[^a-z0-9])`, 'i');
+  return m === f || m.startsWith(`${f} `) || m.startsWith(`${f}-`) || wordRe.test(m) || wordRe.test(t);
+}
+
 export default function MarketPulse({ onUnavailable, collection }: { onUnavailable?: React.ReactNode; collection?: React.ReactNode }) {
   usePageTitle('Market');
-  const { data, isLoading, isError, risenIds, refetch, dataUpdatedAt } = useMarketPulse();
+  const { data, isLoading, isError, risenIds, refetch, dataUpdatedAt, newBids } = useMarketPulse();
+  // A bell for each bid as it lands, off until the viewer turns it on.
+  const [sound, setSound] = useState(false);
+  useEffect(() => (sound && newBids?.length ? ringBids(newBids) : undefined), [newBids, sound]);
   const finish = useFinishEstimates();
   const [params, setParams] = useSearchParams();
   const boardRef = useRef<HTMLDivElement>(null);
@@ -326,6 +364,7 @@ export default function MarketPulse({ onUnavailable, collection }: { onUnavailab
   })() : null;
   const make = makeParam === 'ALL' ? defaultMake : makeParam ?? defaultMake;
   const model = make ? params.get('model') : null;
+  const familyName = make ? params.get('family_name')?.trim() || null : null;
   const inventoryLens = mapLens(params, make);
   const lotParam = params.get('lot');
   const activityId = lotParam && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(lotParam) ? lotParam : null;
@@ -381,7 +420,7 @@ export default function MarketPulse({ onUnavailable, collection }: { onUnavailab
     if (key === 'live' || key === 'make') next.delete('bidRange');
     if (key === 'make' || key === 'view') {
       next.delete('model');
-      ['mapFocus', 'mapChild'].forEach(k => next.delete(k));
+      ['family', 'family_name', 'year', 'mapFocus', 'mapChild'].forEach(k => next.delete(k));
     }
     if (key === 'make') next.delete('mapBy');
     if (key === 'model') ['mapFocus', 'mapChild'].forEach(k => next.delete(k));
@@ -394,7 +433,7 @@ export default function MarketPulse({ onUnavailable, collection }: { onUnavailab
   const setCohort = (nextMake: string | null, scopeKey?: string | null) => {
     const next = new URLSearchParams(params);
     next.set('make', nextMake ?? 'all');
-    ['model', 'bidRange', 'day', 'series', 'salesScope', 'mapFocus', 'mapChild', 'board'].forEach(k => next.delete(k));
+    ['model', 'family', 'family_name', 'year', 'bidRange', 'day', 'series', 'salesScope', 'mapFocus', 'mapChild', 'board'].forEach(k => next.delete(k));
     if (scopeKey?.startsWith('subject:')) next.set('salesScope', scopeKey);
     next.delete('lot');
     setParams(next);
@@ -438,7 +477,8 @@ export default function MarketPulse({ onUnavailable, collection }: { onUnavailab
   }, []);
 
   const live = useMemo(() => (data?.auctions ?? []).filter((a) => a.endsAt > now), [data, now]);
-  const cohort = useMemo(() => live.filter(a => make == null || a.make === make), [live, make]);
+  const cohort = useMemo(() => live.filter(a => (make == null || a.make === make)
+    && (model != null || matchesFamilyScope(a, familyName))), [live, make, model, familyName]);
   const todayUtc = new Date(now).toISOString().slice(0, 10);
   const sameHour = useSameHourReadings(data?.sameHour?.hourUtc ?? '', todayUtc);
   const liveBids = useMemo(() => live.reduce((s, a) => s + (a.currentBid ?? 0), 0), [live]);
@@ -468,7 +508,8 @@ export default function MarketPulse({ onUnavailable, collection }: { onUnavailab
     && (selectedBid == null || bidBucket(a.currentBid) === selectedBid)), [live, win, now, selectedBid]);
 
   const mapAuctions = useMemo(() => mappedInventory.filter(a => (make == null || a.make === make)
-    && (inventoryLens.group === 'model' || model == null || recordedModel(a) === model)), [mappedInventory, make, model, inventoryLens.group]);
+    && (model != null || matchesFamilyScope(a, familyName))
+    && (inventoryLens.group === 'model' || model == null || recordedModel(a) === model)), [mappedInventory, make, model, familyName, inventoryLens.group]);
   const needsTaxonomy = inventoryLens.group === 'type' || inventoryLens.group === 'body';
   const taxonomyQuery = useInventoryTaxonomy(mapAuctions, view === 'inventory' && needsTaxonomy);
   const taxonomy = useMemo(() => taxonomyByListing(taxonomyQuery.data), [taxonomyQuery.data]);
@@ -526,7 +567,7 @@ export default function MarketPulse({ onUnavailable, collection }: { onUnavailab
     </button> : undefined}>
       {view === 'inventory' ? <span className="market-venue">
         <img className="market-venue__mark" src="/vendor/bat/favicon.ico" alt="" width={32} height={32} />
-        <Text role="entity" as="h1">Bring a Trailer{make ? ` · ${make}` : ''}</Text>
+        <Text role="entity" as="h1">Bring a Trailer{make ? ` · ${make}${familyName && !model ? ` · ${familyName}` : ''}` : ''}</Text>
         <Text role="label">Live auctions</Text>
       </span> : <Text role="entity" as="h1">Recorded sales</Text>}
     </Masthead>
@@ -558,7 +599,7 @@ export default function MarketPulse({ onUnavailable, collection }: { onUnavailab
   </>;
 
   // Filters and sorts sit on the lots they change. A count is said only when it narrows the open lots.
-  const filtered = make != null || model != null || win !== 'all' || selectedBid != null || inventoryLens.focus != null;
+  const filtered = make != null || familyName != null || model != null || win !== 'all' || selectedBid != null || inventoryLens.focus != null;
   return (
     <div className="market-explorer">
       {masthead}
@@ -606,6 +647,11 @@ export default function MarketPulse({ onUnavailable, collection }: { onUnavailab
                 <Text role="label">{s.label}</Text>
               </button>
             ))}
+            <button type="button" className="market-control" aria-pressed={sound}
+              title="A short bell for each bid as it lands, about a minute after Bring a Trailer records it"
+              onClick={() => setSound(sound ? false : startBidChime())}>
+              <Text role="label">{sound ? 'Bid sounds on' : 'Bid sounds off'}</Text>
+            </button>
           </div>
         </div>
         {!isLoading && <details open={selectedBid != null} className="market-distribution">

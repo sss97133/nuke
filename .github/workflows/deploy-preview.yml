@@ -4,6 +4,11 @@ on:
   pull_request:
     branches:
       - main
+    # A preview only matters when the frontend changed; backend-only PRs skip it and free a runner.
+    paths:
+      - 'nuke_frontend/**'
+      - 'vercel.json'
+      - '.github/workflows/deploy-preview.yml'
 
 concurrency:
   # A newer push to a pull request supersedes its older run; pushes to main, the schedule and manual runs never cancel.

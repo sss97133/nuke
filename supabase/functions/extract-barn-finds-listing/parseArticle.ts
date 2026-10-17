@@ -28,6 +28,9 @@ export interface BarnFindsPost {
   articleText: string;
   askingPrice: number | null;
   priceText: string | null;
+  priceSentence: string | null;
+  foreignPrice: { currency: Currency; originalAmount: number | null; usdDerived: number | null; sentence: string } | null;
+  priceMentions: PriceMention[];
   obo: boolean;
   location: string | null;
   listingPlatform: string | null;
@@ -91,13 +94,67 @@ export function identityFromTitle(title: string | null): { year: number | null; 
   return { year, make, model };
 }
 
-/** The seller's price quoted in the prose: "set their price at $107,000 OBO", "asking $12,500". */
-export function priceFromText(text: string): { price: number | null; priceText: string | null; obo: boolean } {
-  const m = text.match(/\b(?:price|asking|asks?|listed (?:for|at))\b[^$.]{0,50}\$\s?(\d{1,3}(?:,\d{3})+|\d{3,7})(?!\d)([^.]{0,12})/i);
-  if (!m) return { price: null, priceText: null, obo: false };
-  const price = Number(m[1].replace(/,/g, ""));
-  if (!Number.isFinite(price) || price < 100) return { price: null, priceText: null, obo: false };
-  return { price, priceText: `$${m[1]}${m[2] ?? ""}`.trim(), obo: /\bOBO\b|or best offer/i.test(m[2] ?? "") };
+export type PriceKind = "asking" | "bid" | "original_msrp" | "unknown";
+export type Currency = "USD" | "CAD" | "AUD" | "GBP" | "EUR";
+/**
+ * currency is the currency the amount is stated in. A writer's conversion ("$10,234 U.S." after a Canadian ask) is
+ * currency USD with convertedFrom set: it is derived, not the seller's number, and the seller's own amount is unknown.
+ */
+export interface PriceMention { amount: number; kind: PriceKind; text: string; sentence: string; currency: Currency; convertedFrom: Currency | null }
+
+const MSRP_RE = /\b(?:msrp|sticker|original(?:ly)?\s+(?:price|cost|sold|retail)|new (?:it|they|this)|when new|base price|cost \$|window sticker|retail price)\b/i;
+const BID_RE = /\b(?:high(?:est)? bid|current(?:ly)? bid|bid(?:ding)?\s+(?:is|was|at|to|up to|stands?|has|had|reached|currently)|bids? (?:of|to)|reserve|hammer|sold for|sold at|final bid|winning bid)\b/i;
+const ASK_RE = /\b(?:ask(?:ing)?|asks|set (?:their|the|his|her) price|price (?:at|of|is|tag)|priced (?:at|to)|listed (?:for|at)|for sale (?:for|at)|buy it now|BIN|OBO|or best offer|wants?|offered (?:for|at))\b/i;
+
+function currencyOf(sentence: string): Currency {
+  if (/\bCanadian\b|\bCAD\b|\bC\$/i.test(sentence)) return "CAD";
+  if (/\bAustralian\b|\bAUD\b|\bA\$/i.test(sentence)) return "AUD";
+  if (/£|\bpounds?\b|\bGBP\b/i.test(sentence)) return "GBP";
+  if (/€|\beuros?\b|\bEUR\b/i.test(sentence)) return "EUR";
+  return "USD";
+}
+
+/**
+ * Every dollar amount in the prose, each with the kind the sentence says it is. Only 'asking' is a price someone is
+ * asking for the car; a bid, a sticker/MSRP figure or a number whose sentence says none of those is kept, with its sentence.
+ */
+export function priceMentions(text: string): PriceMention[] {
+  const out: PriceMention[] = [];
+  for (const sentence of text.split(/(?<=[.!?])\s+/)) {
+    for (const m of sentence.matchAll(/\$\s?(\d{1,3}(?:,\d{3})+|\d+(?:\.\d+)?)\s?([kK])?(?![\d,])/g)) {
+      let amount = Number(m[1].replace(/,/g, ""));
+      if (m[2]) amount *= 1000;
+      if (!Number.isFinite(amount) || amount < 100) continue;
+      const after = sentence.slice((m.index ?? 0) + m[0].length, (m.index ?? 0) + m[0].length + 8);
+      const stated = currencyOf(sentence);
+      const usTag = /^\s*(?:U\.?S\.?|USD)\b/i.test(after);
+      const currency: Currency = usTag ? "USD" : stated;
+      const convertedFrom: Currency | null = usTag && stated !== "USD" ? stated : null;
+      const near = sentence.slice(Math.max(0, (m.index ?? 0) - 90), (m.index ?? 0) + m[0].length + 25);
+      const kind: PriceKind = MSRP_RE.test(near) ? "original_msrp" : BID_RE.test(near) ? "bid" : ASK_RE.test(near) ? "asking" : "unknown";
+      out.push({ amount: Math.round(amount), kind, text: m[0].trim(), sentence: sentence.slice(0, 300), currency, convertedFrom });
+    }
+  }
+  return out;
+}
+
+/**
+ * The seller's asking price quoted in the prose: the first USD mention whose sentence says asking. A non-USD ask, or a
+ * writer's USD conversion of one, is returned as foreign: the currency, the seller's own amount when the prose states it
+ * (null when only a conversion is given), the USD figure as derived, and the sentence. It is never the USD price.
+ */
+export function priceFromText(text: string): {
+  price: number | null; priceText: string | null; obo: boolean; sentence: string | null;
+  foreign: { currency: Currency; originalAmount: number | null; usdDerived: number | null; sentence: string } | null;
+} {
+  const asks = priceMentions(text).filter((p) => p.kind === "asking");
+  const hit = asks.find((p) => p.currency === "USD" && !p.convertedFrom);
+  const f = asks.find((p) => p.currency !== "USD" || p.convertedFrom);
+  const foreign = f && !hit
+    ? { currency: (f.convertedFrom ?? f.currency) as Currency, originalAmount: f.convertedFrom ? null : f.amount, usdDerived: f.convertedFrom ? f.amount : null, sentence: f.sentence }
+    : null;
+  if (!hit) return { price: null, priceText: null, obo: false, sentence: foreign?.sentence ?? null, foreign };
+  return { price: hit.amount, priceText: hit.text, obo: /\bOBO\b|or best offer/i.test(hit.sentence), sentence: hit.sentence, foreign: null };
 }
 
 /** "listed here on eBay in Concord, North Carolina": the platform and the place the seller gave. */
@@ -186,12 +243,12 @@ export function parseBarnFindsPost(htmlRaw: string): BarnFindsPost {
   const paragraphs = [...content.matchAll(/<p\b[^>]*>([\s\S]*?)<\/p>/gi)].map((p) => clean(p[1])).filter((t) => t && !/^Disclosure:/i.test(t) && !isWidgetText(t));
   const articleText = paragraphs.join("\n\n");
   const id = identityFromTitle(title);
-  const { price, priceText, obo } = priceFromText(articleText);
+  const { price, priceText, obo, sentence: priceSentence, foreign: foreignPrice } = priceFromText(articleText);
   const { platform, location } = listingFromText(articleText);
   const vin = articleText.match(/\b(?:VIN|chassis|serial)(?:\s*(?:#|number|no\.?))?\s*[:#]?\s*([A-HJ-NPR-Z0-9]{17})\b/i)?.[1]?.toUpperCase() ?? null;
   const tipster = articleText.match(/Barn Finder\s+([A-Z][\w.'-]+)/)?.[1] ?? null;
   return {
-    title, ...id, vin, articleText, askingPrice: price, priceText, obo, location, listingPlatform: platform, tipster,
+    title, ...id, vin, articleText, askingPrice: price, priceText, priceSentence, foreignPrice, priceMentions: priceMentions(articleText).slice(0, 8), obo, location, listingPlatform: platform, tipster,
     publishedAt: article.datePublished ?? html.match(/article:published_time" content="([^"]+)"/)?.[1] ?? null,
     modifiedAt: article.dateModified ?? html.match(/article:modified_time" content="([^"]+)"/)?.[1] ?? null,
     imageUrls: imageUrls(content),

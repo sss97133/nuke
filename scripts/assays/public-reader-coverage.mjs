@@ -4,6 +4,9 @@
  * Keyset pages, anonymous credentials, bounded requests, append-only PRIVATE receipt.
  * No counts over the store, raw testimony reconstruction, intake, writes or inference.
  * Typed canonical projection lineage: --family typed-specifications --subjects /private/manifest.json.
+ * Publisher-reported work: --family reported-work --subjects /private/manifest.json reads
+ * vehicle_build_log_public(p_vehicle_id, p_include_reported:true) and drills each report to its
+ * anonymous parent listing row (same vehicle). An absent overload or zero reports is not agreement.
  * The existing public_reader_lineage_subjects_v1 manifest additionally requires
  * properties:[{key:<existing typed property key>,id:<expected registry UUID>}].
  * Compare <=20 parent keys per typed read, then only those declared properties;
@@ -64,7 +67,11 @@ const PROJECT = 'https://qkgaybvrernstplzjaam.supabase.co';
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const ZERO = '00000000-0000-0000-0000-000000000000';
 const PARENT_FIELDS = 'id,is_public,deleted_at,listing_kind,sale_status,auction_outcome,canonical_outcome,canonical_sold_price,canonical_platform,year,make,model,listing_url,discovery_url,condition_rating,body_style,engine_type,transmission,mileage';
-const READERS = new Set(['vehicle_price_facts', 'get_vehicle_specs', 'get_field_provenance', 'popup_vehicle_intel']);
+const READERS = new Set(['vehicle_price_facts', 'get_vehicle_specs', 'get_field_provenance', 'popup_vehicle_intel', 'vehicle_build_log_public']);
+// Parent listing identity, supersession, capture metadata, clocks and text only; never the private child.
+const REPORT_SOURCE_FIELDS = 'id,vehicle_id,kind,is_superseded,source_id,source_url,observed_at,ingested_at,extraction_method,content_text,' +
+  'source_captured_at:structured_data->>source_captured_at,source_capture_sha256:structured_data->>source_capture_sha256,' +
+  'source_capture_basis:structured_data->>source_capture_basis,extractor_input_truncated:structured_data->extractor_input_truncated';
 const SPEC_FIELDS = new Set(['vin', 'mileage', 'transmission', 'drivetrain', 'body_style', 'color', 'interior_color', 'engine_type', 'fuel_type', 'engine_size']);
 // Existing bulk-reader vocabulary, not authority to register or admit a claim.
 const TYPED_PROPERTIES = Object.freeze({ year: ['integer', null], make: ['string', null], model: ['string', null],
@@ -97,7 +104,7 @@ export function options(args, now = Date.now()) {
     else if (name === '--until') o.until = Date.parse(v);
     else o[name.slice(2)] = v;
   }
-  if (!o.out || !['price', 'specifications', 'typed-specifications', 'comments', 'bids'].includes(o.family) ||
+  if (!o.out || !['price', 'specifications', 'typed-specifications', 'comments', 'bids', 'reported-work'].includes(o.family) ||
     (seen.has('--comment-limit') && o.family !== 'comments') ||
     (seen.has('--comment-measurements') && o.family !== 'comments') ||
     (o.commentLimit !== undefined && (!Number.isInteger(o.commentLimit) || o.commentLimit < 1000 || o.commentLimit > 10000)) ||
@@ -223,8 +230,18 @@ export function publicClient(config, fetcher = fetch) {
       return contexts('auction_events', 'id,vehicle_id,source', ids, id);
     },
     sourceIdentities(ids) { return contexts('external_identities', 'id,platform', ids); },
+    reportSources(id, ids) {
+      if (!UUID.test(id ?? '')) throw new AssayError('invalid_reader_scope');
+      return contexts('vehicle_observations', REPORT_SOURCE_FIELDS, ids, id);
+    },
     rpc(name, args) {
       if (!READERS.has(name)) throw new AssayError('reader_not_allowed');
+      if (name === 'vehicle_build_log_public') {
+        // The opt-in overload only: the one-argument legacy reader is a different contract.
+        if (!object(args) || Object.keys(args).sort().join() !== 'p_include_reported,p_vehicle_id' ||
+          args.p_include_reported !== true || !UUID.test(args.p_vehicle_id ?? '')) throw new AssayError('invalid_reader_scope');
+        return request(`rpc/${name}`, { method: 'POST', body: JSON.stringify(args) });
+      }
       if (name === 'get_vehicle_specs' && Object.hasOwn(args ?? {}, 'p_vehicle_ids')) {
         if (Object.keys(args).some(key => !['p_vehicle_ids', 'p_include_typed_claims'].includes(key)) ||
           args.p_include_typed_claims !== true || !Array.isArray(args.p_vehicle_ids) || args.p_vehicle_ids.length < 1 ||
@@ -506,6 +523,13 @@ export function inspectTypedProvenance(id, claim, readAt, value) {
       !present(q.source_capture_basis)) gap('typed_family_capture_witness_unmeasured');
   }
   result.projectionMatches = Object.keys(result.failures).length === 0 && Object.keys(result.gaps).length === 0;
+  // Other rows carrying the same listing assertion (page, value and quotation) are
+  // repeated captures shown as separate reports, not corroboration. The selected
+  // projection can still match; the public answer overstates its support.
+  result.repeatedListingAssertions = value.observations.filter(o => object(o) && o.id !== source.id &&
+    present(source.source_url) && o.source_url === source.source_url && o.value === source.value &&
+    isDeepStrictEqual(o.source_value ?? null, source.source_value ?? null)).length;
+  if (result.repeatedListingAssertions) gap('typed_provenance_repeated_listing_assertion');
   // The drill omits these FKs; matching projected custody is not independent
   // registry/source validation, extraction accuracy, or physical truth.
   if (!present(source.property_id) || !present(source.source_id)) gap('typed_provenance_property_and_source_fk_unprojected');
@@ -1026,6 +1050,7 @@ export async function runTypedSpecificationLineage(client, o, subjects, { now = 
     manifestSha256: subjects.sha256, population: subjects.population, properties: subjects.properties,
     gatedParents: 0, eligibleParents: 0, absentOrIneligibleParents: 0, inspectedParents: 0, completedParents: 0,
     selectedClaims: 0, drilledClaims: 0, matchedProjectionPairs: 0, mismatchedPairs: 0, unavailablePairs: 0,
+    claimsWithRepeatedAssertion: 0, repeatedAssertionObservations: 0,
     failures: {}, gaps: {}, databaseWrites: 0, modelCalls: 0, recordRepairs: 0,
     supportedAnswerCoverage: 'unmeasured', sourceQualification: 'unmeasured', physicalTruth: 'unmeasured',
     boundary: 'Explicit record/property manifest, at most20 current public parents per typed bulk read. Manifest property UUIDs are operator-supplied registry expectations, not an independent ratification audit. Current canonical claims only; unavailable does not identify absent evidence, privacy, withdrawal or supersession. Separate public gate/bulk/provenance reads are not a snapshot. Quotation and shared attribution/clock/uncertainty projections are compared without storing their contents. Provenance omits property/source FKs; original-source custody, extraction quality, conflicts outside the selected canonical claim, historical replay, factory/installed truth and fleet readiness remain unmeasured. No inferred metadata bindings count as testimony.' };
@@ -1078,6 +1103,7 @@ export async function runTypedSpecificationLineage(client, o, subjects, { now = 
           const result = inspectTypedProvenance(p.id, claim, p.readAt, drill.value); merge(result);
           if (result.projectionMatches) summary.matchedProjectionPairs++;
           if (Object.keys(result.failures).length) summary.mismatchedPairs++;
+          if (result.repeatedListingAssertions) { summary.claimsWithRepeatedAssertion++; summary.repeatedAssertionObservations += result.repeatedListingAssertions; }
           drills.push({ propertyKey: claim.property_key, observationId: claim.observation_id,
             responseSha256: hash(drill.value), durationMs: drill.durationMs, ...result });
         }
@@ -1099,6 +1125,189 @@ export async function runTypedSpecificationLineage(client, o, subjects, { now = 
     : summary.matchedProjectionPairs > 0 && summary.matchedProjectionPairs === summary.eligiblePairs ? 'matched_current_typed_projections_in_manifest'
       : 'measured_with_unavailable_or_unmeasured_pairs';
   summary.exitCode = summary.status === 'failed' ? 1 : summary.status === 'matched_current_typed_projections_in_manifest' ? 0 : 2;
+  await emit({ type: 'summary', ...summary }); return summary;
+}
+
+const REPORT_KEYS = ['confidence_score', 'date_precision', 'independent_source', 'ingested_at', 'intent_status', 'kind',
+  'observation_id', 'observed_at', 'observed_at_basis', 'occurrence_status', 'performed_clause', 'performer_id', 'performer_status',
+  'report_status', 'reported_date', 'reported_date_label', 'source_capture_basis', 'source_capture_sha256', 'source_captured_at',
+  'source_id', 'source_observation_id', 'source_recorded_at', 'source_url', 'source_value', 'source_witness_version'].join();
+// Fixed uncertainty: a report is a publisher assertion, never confirmed work, a performer or corroboration.
+const REPORT_FIXED = Object.freeze({ kind: 'activity', report_status: 'publisher_reported_completion', occurrence_status: 'unverified',
+  performer_id: null, performer_status: 'unknown', independent_source: false, intent_status: 'unknown',
+  observed_at_basis: 'source_testimony_recorded_at', date_precision: 'month', source_witness_version: 'retained_description_reported_work_v1' });
+const MONTH_NAMES = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+
+/** The opt-in reader envelope and each report's own contract; no source text is retained. */
+export function inspectReportedWork(value) {
+  const result = { safe: true, legacyWorkRecords: 0, reports: [], failures: {}, gaps: {} };
+  const fail = key => { result.failures[key] = (result.failures[key] ?? 0) + 1; };
+  if (!object(value) || Object.keys(value).sort().join() !== 'reported_work,work_records' ||
+    !Array.isArray(value.work_records) || !Array.isArray(value.reported_work) || value.reported_work.length > 200) {
+    result.safe = false; fail('reported_work_envelope_invalid'); return result;
+  }
+  result.legacyWorkRecords = value.work_records.length;
+  const ids = new Set(), assertions = new Set();
+  for (const r of value.reported_work) {
+    if (!object(r) || Object.keys(r).sort().join() !== REPORT_KEYS) { fail('reported_work_shape_invalid'); continue; }
+    if (![r.observation_id, r.source_observation_id, r.source_id].every(x => UUID.test(x ?? ''))) { fail('reported_work_key_invalid'); continue; }
+    if (ids.has(r.observation_id)) { fail('reported_work_observation_duplicated'); continue; }
+    ids.add(r.observation_id);
+    const before = Object.values(result.failures).reduce((a, b) => a + b, 0);
+    for (const [key, expected] of Object.entries(REPORT_FIXED)) if (r[key] !== expected) fail(`reported_work_${key}_invalid`);
+    const text = x => typeof x === 'string' && x.trim() === x && x.length > 0 && Buffer.byteLength(x) <= 300;
+    let url = null; try { url = new URL(r.source_url); } catch {}
+    if (url?.protocol !== 'https:' || url.href !== r.source_url) fail('reported_work_source_url_invalid');
+    // One sentence on one listing page is one report; a repeat is inflation, not corroboration.
+    const assertion = `${r.source_id}\n${r.source_url}\n${r.source_value}`;
+    if (assertions.has(assertion)) fail('reported_work_repeated_listing_sentence');
+    assertions.add(assertion);
+    if (!text(r.source_value) || !text(r.performed_clause)) fail('reported_work_text_invalid');
+    else {
+      if (/\b(?:recommend\w*|need\w*|require\w*)\b/i.test(r.performed_clause)) fail('reported_work_recommendation_in_performed_clause');
+      if (r.source_value !== r.performed_clause && !r.source_value.startsWith(`${r.performed_clause}, `)) fail('reported_work_clause_not_source_prefix');
+    }
+    const m = typeof r.reported_date === 'string' ? /^(\d{4})-(0[1-9]|1[0-2])$/.exec(r.reported_date) : null;
+    if (!m) fail('reported_work_month_invalid');
+    else if (r.reported_date_label !== `${MONTH_NAMES[Number(m[2]) - 1]} ${m[1]}`) fail('reported_work_month_label_mismatch');
+    else if (text(r.performed_clause) && !r.performed_clause.includes(r.reported_date_label)) fail('reported_work_month_not_in_clause');
+    const clocks = ['source_captured_at', 'source_recorded_at', 'observed_at', 'ingested_at'].map(key => instant(r[key]));
+    if (clocks.some(x => x === null)) fail('reported_work_clock_invalid');
+    else {
+      const [captured, recorded, observed, ingested] = clocks;
+      if (observed !== recorded) fail('reported_work_observation_clock_basis_mismatch');
+      if (captured > recorded) fail('reported_work_capture_after_source_recording');
+      if (ingested < observed) fail('reported_work_recorded_before_source');
+      if (m && r.reported_date > r.source_captured_at.slice(0, 7)) fail('reported_work_month_after_capture');
+    }
+    if (!/^[0-9a-f]{64}$/.test(r.source_capture_sha256 ?? '') || !present(r.source_capture_basis)) fail('reported_work_capture_witness_invalid');
+    if (typeof r.confidence_score !== 'number' || !(r.confidence_score >= 0 && r.confidence_score <= 0.6)) fail('reported_work_confidence_invalid');
+    if (Object.values(result.failures).reduce((a, b) => a + b, 0) === before) result.reports.push(r);
+  }
+  return result;
+}
+
+function reportSentences(text) {
+  return text.split(/(?<=[.!?])[ \t\r\n]+/).map(s => s.replace(/^[ \t\r\n]+|[ \t\r\n]+$/g, ''));
+}
+
+/** Each report against its anonymous parent listing row. Source custody is checked; publisher truth is not. */
+export function inspectReportedSources(vehicleId, reports, rows) {
+  const result = { safe: true, sourcesFound: 0, matchedReports: 0, failures: {}, gaps: {} };
+  const add = (group, key) => { group[key] = (group[key] ?? 0) + 1; };
+  const wanted = [...new Set(reports.map(r => r.source_observation_id))];
+  if (!Array.isArray(rows) || rows.length > wanted.length || new Set(rows.map(x => x?.id)).size !== rows.length ||
+    !rows.every(x => object(x) && wanted.includes(x.id) && x.vehicle_id === vehicleId)) {
+    result.safe = false; add(result.failures, 'reported_source_scope_or_shape_invalid'); return result;
+  }
+  const sources = new Map(rows.map(x => [x.id, x]));
+  for (const r of reports) {
+    const s = sources.get(r.source_observation_id);
+    if (!s) { add(result.gaps, 'reported_source_unavailable_in_current_read'); continue; }
+    result.sourcesFound++;
+    const before = Object.values(result.failures).reduce((a, b) => a + b, 0);
+    if (s.kind !== 'listing' || s.is_superseded !== false || s.extraction_method !== 'html_description_capture') add(result.failures, 'reported_source_not_current_native_listing');
+    if (s.source_id !== r.source_id) add(result.failures, 'reported_source_id_mismatch');
+    if (s.source_url !== r.source_url) add(result.failures, 'reported_source_url_mismatch');
+    if (instant(s.ingested_at) === null || instant(s.ingested_at) !== instant(r.source_recorded_at)) add(result.failures, 'reported_source_recording_clock_mismatch');
+    if (instant(s.source_captured_at) === null || instant(s.source_captured_at) !== instant(r.source_captured_at)) add(result.failures, 'reported_source_capture_clock_mismatch');
+    if (instant(s.observed_at) !== instant(s.source_captured_at)) add(result.failures, 'reported_source_observation_not_capture_clock');
+    if (s.source_capture_sha256 !== r.source_capture_sha256 || s.source_capture_basis !== r.source_capture_basis) add(result.failures, 'reported_source_capture_witness_mismatch');
+    if (s.extractor_input_truncated !== false) add(result.failures, 'reported_source_truncated_or_unqualified');
+    if (Object.values(result.failures).reduce((a, b) => a + b, 0) !== before) continue;
+    if (typeof s.content_text !== 'string' || !s.content_text.length) { add(result.gaps, 'reported_source_text_withheld'); continue; }
+    if (Buffer.byteLength(s.content_text) > 32000) { add(result.gaps, 'reported_source_text_oversized'); continue; }
+    if (!reportSentences(s.content_text).includes(r.source_value)) { add(result.failures, 'reported_source_sentence_not_found'); continue; }
+    result.matchedReports++;
+  }
+  return result;
+}
+
+export async function runReportedWorkLineage(client, o, subjects, { now = Date.now, emit = async () => {}, progress = () => {} } = {}) {
+  const summary = { stage: 'read_only_public_reported_work_source_lineage_assay', startedAt: new Date(now()).toISOString(),
+    requestedParents: subjects.ids.length, manifestSha256: subjects.sha256, population: subjects.population,
+    gatedParents: 0, eligibleParents: 0, absentOrIneligibleParents: 0, inspectedParents: 0, completedParents: 0,
+    parentsWithReports: 0, parentsWithoutReports: 0, selectedReports: 0, sourcesFound: 0, matchingReports: 0, legacyWorkRecords: 0,
+    failures: {}, gaps: {}, databaseWrites: 0, modelCalls: 0, recordRepairs: 0,
+    supportedAnswerCoverage: 'unmeasured', sourceCapability: 'reader_asserted', childAdmission: 'reader_asserted',
+    captureAuthenticity: 'unmeasured', publisherTruth: 'unmeasured', physicalOccurrence: 'unmeasured',
+    boundary: 'Explicit current public-parent manifest. vehicle_build_log_public(p_vehicle_id, p_include_reported:true) only; an absent overload is incomplete and zero reports is missing support. Each report is drilled to its parent listing on the anonymous vehicle_observations route, constrained by source observation and gated vehicle: identity, kind, supersession, capture metadata, microsecond clocks and the exact full sentence. The private activity child is not read; source capability and protected admission are asserted by the reader, not established here. Stored-source support is not capture authenticity, publisher truth or physical occurrence. Separate reads are not a snapshot. Receipts hold hashes and counters, never source text.' };
+  const merge = part => { for (const group of ['failures', 'gaps']) for (const [key, count] of Object.entries(part[group] ?? {})) summary[group][key] = (summary[group][key] ?? 0) + count; };
+  const failuresByReader = {};
+  const readerFailed = reader => {
+    failuresByReader[reader] = (failuresByReader[reader] ?? 0) + 1;
+    merge({ failures: { [`reported_work_${reader}_reader_failed`]: 1 } });
+    if (failuresByReader[reader] >= 2) summary.stopReason = 'two_reported_work_reader_failures_inspect_cause';
+  };
+  outer: for (let offset = 0, pages = 0; offset < subjects.ids.length; offset += 200, pages++) {
+    if (now() >= o.until || pages >= o.maxPages) { summary.stopReason = now() >= o.until ? 'time_budget_reached' : 'page_budget_reached'; break; }
+    const batch = subjects.ids.slice(offset, offset + 200), gate = await client.subjects(batch);
+    if (!gate.ok || !Array.isArray(gate.value)) { merge({ failures: { reported_work_parent_reader_failed: 1 } }); summary.stopReason = 'reported_work_parent_reader_failed'; break; }
+    const eligible = new Set();
+    for (const p of gate.value) {
+      if (!object(p) || !batch.includes(p.id) || eligible.has(p.id) || p.is_public !== true || p.deleted_at !== null || p.listing_kind === 'non_vehicle_item') {
+        merge({ failures: { reported_work_parent_gate_invalid: 1 } }); summary.stopReason = 'reported_work_parent_gate_invalid'; break outer;
+      }
+      eligible.add(p.id);
+    }
+    summary.gatedParents += batch.length; summary.eligibleParents += eligible.size; summary.absentOrIneligibleParents += batch.length - eligible.size;
+    await emit({ type: 'reported_work_gate', requested: batch.length, eligible: eligible.size, absentOrIneligible: batch.length - eligible.size,
+      responseSha256: hash(gate.value), durationMs: gate.durationMs });
+    for (const id of batch.filter(x => eligible.has(x))) {
+      if (now() >= o.until) { summary.stopReason = 'time_budget_reached'; break outer; }
+      const log = await client.rpc('vehicle_build_log_public', { p_vehicle_id: id, p_include_reported: true });
+      summary.inspectedParents++;
+      if (!log.ok && log.code === 'PGRST202') {
+        // The opt-in overload is not deployed: nothing was measured, nothing agrees.
+        merge({ gaps: { reported_work_reader_absent: 1 } }); summary.stopReason = 'reported_work_reader_absent';
+        await emit({ type: 'reported_work_reader_absent', vehicleId: id, status: log.status, code: log.code, durationMs: log.durationMs });
+        break outer;
+      }
+      if (!log.ok) {
+        readerFailed('build_log');
+        await emit({ type: 'reported_work_reader_failure', reader: 'vehicle_build_log_public', vehicleId: id, status: log.status, code: log.code, durationMs: log.durationMs });
+        if (summary.stopReason) break outer;
+        continue;
+      }
+      const inspected = inspectReportedWork(log.value); merge(inspected);
+      if (!inspected.safe) { summary.stopReason = 'unsafe_reported_work_output'; break outer; }
+      summary.legacyWorkRecords += inspected.legacyWorkRecords;
+      const reported = log.value.reported_work.length;
+      summary.selectedReports += reported;
+      if (!reported) { summary.parentsWithoutReports++; merge({ gaps: { reported_work_absent_for_parent: 1 } }); }
+      else summary.parentsWithReports++;
+      let drill = { sourcesFound: 0, matchedReports: 0, failures: {}, gaps: {} }, drillSha256 = null, drillMs = null;
+      if (inspected.reports.length) {
+        if (now() >= o.until) { summary.stopReason = 'time_budget_reached'; break outer; }
+        const wanted = [...new Set(inspected.reports.map(r => r.source_observation_id))];
+        const sources = await client.reportSources(id, wanted);
+        if (!sources.ok) {
+          readerFailed('source');
+          await emit({ type: 'reported_work_reader_failure', reader: 'vehicle_observations', vehicleId: id, status: sources.status, code: sources.code, durationMs: sources.durationMs });
+          if (summary.stopReason) break outer;
+          continue;
+        }
+        drill = inspectReportedSources(id, inspected.reports, sources.value); merge(drill);
+        if (!drill.safe) { summary.stopReason = 'unsafe_reported_work_source'; break outer; }
+        drillSha256 = hash(sources.value); drillMs = sources.durationMs;
+      }
+      summary.sourcesFound += drill.sourcesFound; summary.matchingReports += drill.matchedReports; summary.completedParents++;
+      await emit({ type: 'reported_work_parent', vehicleId: id, measuredAt: new Date(now()).toISOString(), responseSha256: hash(log.value),
+        durationMs: log.durationMs, legacyWorkRecords: inspected.legacyWorkRecords, reports: reported, sourcesFound: drill.sourcesFound,
+        matchedReports: drill.matchedReports, sourceSha256: drillSha256, sourceDurationMs: drillMs,
+        failures: { ...inspected.failures, ...drill.failures }, gaps: { ...inspected.gaps, ...drill.gaps } });
+      if (summary.inspectedParents % 25 === 0) progress({ inspectedParents: summary.inspectedParents, selectedReports: summary.selectedReports, matchingReports: summary.matchingReports, failures: summary.failures });
+    }
+  }
+  summary.stopReason ??= 'manifest_exhausted';
+  summary.ungatedParents = summary.requestedParents - summary.gatedParents;
+  summary.unmeasuredReports = summary.selectedReports - summary.matchingReports;
+  summary.finishedAt = new Date(now()).toISOString(); summary.networkRequests = client.requests;
+  summary.status = Object.keys(summary.failures).length ? 'failed'
+    : summary.stopReason !== 'manifest_exhausted' || !summary.inspectedParents || summary.completedParents !== summary.eligibleParents ? 'incomplete'
+      : summary.parentsWithoutReports === 0 && summary.selectedReports > 0 && summary.matchingReports === summary.selectedReports ? 'matched_current_reported_work_in_manifest'
+        : 'measured_with_missing_or_unmatched_reports';
+  summary.exitCode = summary.status === 'failed' ? 1 : summary.status === 'matched_current_reported_work_in_manifest' ? 0 : 2;
   await emit({ type: 'summary', ...summary }); return summary;
 }
 
@@ -1964,12 +2173,14 @@ export async function main(args = process.argv.slice(2), deps = {}) {
       options: { ...o, env: undefined, out: undefined, subjects: undefined },
       anonymous: true, readers: o.family === 'bids' ? ['vehicles', 'vehicle_comments_unified', 'auction_comments', 'vehicle_observations', 'auction_events', 'external_identities']
         : o.family === 'comments' ? ['vehicles', 'auction_comments', 'auction_events', 'external_identities']
+        : o.family === 'reported-work' ? ['vehicles', 'vehicle_build_log_public', 'vehicle_observations']
         : subjects ? ['vehicles', 'get_vehicle_specs', 'get_field_provenance'] : ['vehicles', 'vehicle_price_facts'],
       parentFields: subjects ? 'id,is_public,deleted_at,listing_kind' : PARENT_FIELDS,
       outputContains: 'response/page hashes, scope, clocks, counts and bounded public failure UUIDs; no raw source/comment bodies or credentials' });
     const report = o.family === 'bids' ? await runBidLineage(client, o, subjects, { ...deps, emit, progress: value => print(JSON.stringify(value)) })
       : o.family === 'comments' ? await runCommentLineage(client, o, subjects, { ...deps, emit, progress: value => print(JSON.stringify(value)) })
       : o.family === 'typed-specifications' ? await runTypedSpecificationLineage(client, o, subjects, { ...deps, emit, progress: value => print(JSON.stringify(value)) })
+      : o.family === 'reported-work' ? await runReportedWorkLineage(client, o, subjects, { ...deps, emit, progress: value => print(JSON.stringify(value)) })
       : subjects ? await runSpecificationLineage(client, o, subjects, { ...deps, emit, progress: value => print(JSON.stringify(value)) })
       : await runCoverage(client, o, { ...deps, emit, progress: value => print(JSON.stringify(value)) });
     print(JSON.stringify({ status: report.status, stopReason: report.stopReason, inspectedRecords: report.inspectedRecords,
@@ -1979,6 +2190,8 @@ export async function main(args = process.argv.slice(2), deps = {}) {
       unmeasuredPairs: report.unmeasuredPairs, supportedAnswerCoverage: report.supportedAnswerCoverage,
       measuredCommentHeaders: report.measuredCommentHeaders, identityStates: report.identityStates,
       measured: report.measured, nativeAuthorStates: report.nativeAuthorStates,
+      parentsWithReports: report.parentsWithReports, parentsWithoutReports: report.parentsWithoutReports, unmeasuredReports: report.unmeasuredReports,
+      claimsWithRepeatedAssertion: report.claimsWithRepeatedAssertion, repeatedAssertionObservations: report.repeatedAssertionObservations,
       diagnostics: report.diagnostics, gaps: report.gaps, recordRepairs: 0, verifiedRepairs: 0, databaseWrites: 0, modelCalls: 0 }));
     return report.exitCode;
   } catch (e) { print(JSON.stringify({ status: 'failed', error: e instanceof AssayError ? e.code : 'assay_initialization_or_output_failed' })); return 1; }

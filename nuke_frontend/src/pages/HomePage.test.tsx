@@ -8,6 +8,7 @@ vi.mock('../hooks/useAuth', () => ({ useAuth: () => ({ user: null, loading: fals
 vi.mock('../hooks/useVehiclesDashboard', () => ({ useVehiclesDashboard: () => ({}) }));
 vi.mock('../components/onboarding/OnboardingSlideshow', () => ({ OnboardingSlideshow: () => null }));
 vi.mock('./market/MarketInventory', () => ({ default: () => <div role="region" aria-label="Market screen" /> }));
+vi.mock('./market/SourcesBoard', () => ({ default: () => null }));
 vi.mock('../feed/components/FeedPage', () => ({ default: () => <div role="region" aria-label="Feed screen" /> }));
 vi.mock('../components/garage/GarageTab', () => ({ default: () => <div role="region" aria-label="Garage screen" /> }));
 vi.mock('./intake/IntakePage', () => ({ default: () => null }));

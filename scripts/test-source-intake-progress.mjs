@@ -93,7 +93,11 @@ export function fixture(options = {}) {
         createIntakeBudget: (throttle, start) => ledger.createIntakeBudget(throttle, start, runtimeDate.now) };
       if (name.endsWith('/captureLedger.ts')) return { captureLedgerFields };
       if (name.endsWith('/feedFetch.ts')) return { fetchCraigslistFeed };
+      if (name.endsWith('/schedule.ts')) return { nextYield: () => ({ rate: 0, interval_minutes: 60 }) };
       if (name.endsWith('/removal.ts')) return { sweepCraigslistRemovals: async () => null, noticeFrom: () => null };
+      if (name.endsWith('/kslCards.ts')) return { parseKslSearchCards: () => [] };
+      if (name.endsWith('/yearFilter.ts')) return { splitByYear: (u) => ({ keep: u, rest: [] }) };
+      if (name.endsWith('/firecrawlGate.ts')) return { firecrawlGate: () => ({ allow: async () => true, record: async () => {} }), ALLOWANCE_EXHAUSTED: 'allowance_deferred: test' };
       if (name.endsWith('/extractionMetrics.ts')) return metrics.exports;
       if (name.endsWith('/writeGuard.ts')) return { requireWriteAuth: async () => null };
       if (name.endsWith('/supabaseKeys.ts')) return { projectSecretKey: () => 'synthetic-service-key' };

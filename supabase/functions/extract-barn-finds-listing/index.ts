@@ -20,6 +20,7 @@ import { requireWriteAuth } from "../_shared/writeGuard.ts";
 import { projectSecretKey } from "../_shared/supabaseKeys.ts";
 import { writeVehicleEventByKey } from "../_shared/vehicleEventWrite.ts";
 import { parseBarnFindsPost } from "./parseArticle.ts";
+import { fetchHeldImageUrls, insertMissingVehicleImages } from "../_shared/vehicleImageWrite.ts";
 
 const USER_AGENT = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 Chrome/120.0.0.0 Safari/537.36";
 
@@ -161,7 +162,16 @@ async function extractOne(supabase: Supabase, url: string): Promise<Outcome> {
       published_at: post.publishedAt,
       modified_at: post.modifiedAt,
       price_text: post.priceText,
-      price_is_seller_asking_quoted_in_prose: post.askingPrice != null,
+      // current_price is set only from a mention the sentence calls asking; every mention is kept with its kind and sentence
+      price_kind: post.askingPrice != null || post.foreignPrice ? "asking" : post.priceMentions.length ? "unknown" : null,
+      // price_currency: the currency the seller's ask is stated in. current_price is only ever a USD ask; a non-USD ask keeps
+      // the seller's own amount (null when the prose gives only the writer's USD conversion) and the derived USD figure here.
+      price_currency: post.foreignPrice ? post.foreignPrice.currency : post.askingPrice != null ? "USD" : null,
+      price_original_amount: post.foreignPrice ? post.foreignPrice.originalAmount : null,
+      price_usd_derived: post.foreignPrice ? post.foreignPrice.usdDerived : null,
+      price_usd_derived_basis: post.foreignPrice?.usdDerived != null ? "writer's own conversion quoted in the post; rate and date not stated" : null,
+      price_source_sentence: post.priceSentence,
+      price_mentions: post.priceMentions,
       obo: post.obo,
       seller_listing_platform: post.listingPlatform,
       seller_location_claim: post.location,
@@ -174,8 +184,11 @@ async function extractOne(supabase: Supabase, url: string): Promise<Outcome> {
   // Photos: external references to the post's own images.
   let imagesSaved = 0;
   if (post.imageUrls.length > 0) {
-    await supabase.from("vehicle_images").delete().eq("vehicle_id", finalVehicleId).eq("source", platform);
-    const rows = post.imageUrls.slice(0, 100).map((imgUrl, i) => ({
+    // Rows are never deleted: they carry the vision gate state, ids that analyses point at, and history. Insert the URLs the
+    // vehicle does not hold; a photo that left the page is marked superseded.
+    const wanted = post.imageUrls.slice(0, 100);
+    const held = await fetchHeldImageUrls(supabase, finalVehicleId);
+    const rows = wanted.map((imgUrl, i) => ({
       vehicle_id: finalVehicleId,
       image_url: imgUrl,
       source: platform,
@@ -186,12 +199,18 @@ async function extractOne(supabase: Supabase, url: string): Promise<Outcome> {
       redaction_level: "none",
       position: i,
       display_order: i,
-      is_primary: i === 0,
+      is_primary: i === 0 && held.size === 0,
       exif_data: { source_url: url, discovery_url: url, imported_from: platform },
     }));
-    const { data: ins, error: imgErr } = await supabase.from("vehicle_images").insert(rows).select("id");
+    const { data: ins, error: imgErr } = await insertMissingVehicleImages(supabase, finalVehicleId, rows, { select: "id" });
     if (imgErr) console.warn(`[barnfinds] image save ${url}: ${imgErr.message}`);
     else imagesSaved = ins?.length ?? 0;
+    const { data: mine } = await supabase.from("vehicle_images").select("id, image_url").eq("vehicle_id", finalVehicleId).eq("source", platform).or("is_superseded.is.null,is_superseded.eq.false");
+    const gone = (mine ?? []).filter((r: { image_url: string }) => !wanted.includes(r.image_url)).map((r: { id: string }) => r.id);
+    if (gone.length > 0) {
+      const { error: supErr } = await supabase.from("vehicle_images").update({ is_superseded: true, superseded_at: new Date().toISOString() }).in("id", gone);
+      if (supErr) console.warn(`[barnfinds] image supersede ${url}: ${supErr.message}`);
+    }
   }
 
   // Comments: the readers' thread, one row per comment, deduped by (vehicle_id, content_hash).

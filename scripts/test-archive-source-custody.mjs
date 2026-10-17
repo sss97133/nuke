@@ -283,6 +283,7 @@ function fixture(options = {}) {
         if(specifier==='./cachedProperties.ts')return load('cached');
         if(specifier==='../_shared/cors.ts')return {corsHeaders:{'Access-Control-Allow-Origin':'*'}};
         if(specifier==='../_shared/writeResult.ts')return {mustWrite:(_label,result)=>result,softWrite:()=>null};
+        if(specifier==='../_shared/identityMatch.ts')return {identityConflict:()=>null};
         assert.fail(`Unexpected import ${specifier}`);
       }});
     return exports;

@@ -1,0 +1,20 @@
+/* Brands as frames, their families as tiles inside, colored by the BaT 12-month move. */
+.brand-family-map { position: relative; width: 100%; height: 100%; background: var(--bg); }
+.brand-family-map__brand { position: absolute; box-sizing: border-box; display: flex; align-items: center; justify-content: space-between;
+  gap: 6px; padding: 0 5px; border: 0; background: var(--text); color: var(--bg); cursor: pointer; overflow: hidden; text-align: left; }
+.brand-family-map__brand .k-label, .brand-family-map__brand .k-caption { color: var(--bg); white-space: nowrap; }
+.brand-family-map__tile { position: absolute; box-sizing: border-box; display: flex; flex-direction: column; align-items: flex-start;
+  justify-content: flex-start; gap: 2px; padding: 4px 5px; border: 1px solid var(--bg); color: var(--text); cursor: pointer;
+  overflow: hidden; text-align: left; }
+.brand-family-map__tile:hover, .brand-family-map__tile:focus-visible { outline: 2px solid var(--text); outline-offset: -2px; z-index: 1; }
+.brand-family-map__name { color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
+.brand-family-map__empty { display: flex; align-items: center; justify-content: center; width: 100%; height: 100%; }
+.map-view-switch { display: inline-flex; }
+.map-view-switch__option { padding: 3px 10px; border: 1px solid var(--border); background: transparent; color: var(--text-secondary); cursor: pointer; }
+.map-view-switch__option[aria-pressed="true"] { background: var(--text); color: var(--bg); border-color: var(--text); }
+.map-view-switch__option[aria-pressed="true"] .k-label { color: var(--bg); }
+
+/* 2026-10-15: family tiles are market tiles (MarketTile: the brand map's colors, hatch and fitted names); the brand
+   header prints its name and dollars whole, or the name alone, or nothing. */
+.brand-family-map .market-tile { border-width: 1px; border-color: var(--bg); }
+.brand-family-map__head { font: 700 11px Arial, sans-serif; letter-spacing: 0.02em; color: var(--bg); white-space: nowrap; }
