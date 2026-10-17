@@ -168,16 +168,15 @@ export function MapLegend({ base, clock, basis, windowLabel }: { base: Baseline 
       <div className="map-legend__receipt">
         Color: is each tile selling more or less{winPhrase}, after taking out the market’s own growth
         {base ? ` (${pct(base.move)}, ${num(base.prior)} → ${num(base.sold)})` : ''}; the strongest colors mean 50% or more either way, and
-        the label gives the exact figure. A move is measured only at auction houses we hold in full in both years: today that is
-        Bring a Trailer; others join as their records fill in. Size: {basis === 'bat12' ? 'measured dollars, last 12 months' : 'dollars of confirmed sales at every auction house, all years; striped where the measured houses hold under half the sales'}. Prices not adjusted for inflation{clock}.
+        the label gives the exact figure. A move is measured only at auction houses we hold in full in both years: today
+        Bring a Trailer, Mecum and Bonhams; others join as their records fill in. Size: {basis === 'bat12' ? 'measured dollars, last 12 months' : 'dollars of confirmed sales at every auction house, all years; striped where the measured houses hold under half the sales'}. Prices not adjusted for inflation{clock}.
       </div>
     </div>
   );
 }
 
-/** Where a 12-month move is measured: the auction houses held in full in both years. Today one; the coverage gate
- *  (source_census.by_year, 2024-2025) will name them from data. */
-export const MEASURED = 'measured at Bring a Trailer, the one house held in full both years';
+/** Where a 12-month move is measured: the auction houses held in full in both years (source_census.by_year). */
+export const MEASURED = 'measured at Bring a Trailer, Mecum and Bonhams, the houses held in full both years';
 const CALLOUT_LABEL: Record<Callout['kind'], string> = { gain: 'Biggest gain', loss: 'Biggest drop', largest: 'Biggest' };
 /** The map's counted callouts, one line above it: the clearest gain and loss against BaT and the largest tile's move. */
 export function MapCallouts({ items, onPick }: { items: Callout[]; onPick: (name: string) => void }) {

@@ -494,7 +494,7 @@ export default function FamilySalesChart({ brand, familyKey, family, width, heig
     const moves = new Map(eraMoves(sales).map((m) => [m.era, m]));
     const panels = bands.map(([era, g], i) => {
       const dots = g.map((p) => ({ ...p, cx: x(p.t), cy: y(p.usd), color: venueOf(p.source).color, out: p.usd < lo ? -1 : p.usd > hi ? 1 : 0 }));
-      const band = rollingBand(g);
+      const band = g.length >= 40 ? rollingBand(g) : g.length >= 15 ? rollingBand(g, 14, 120, 5) : rollingBand(g, 21, 180, 3);
       const mid = band.map((b) => `${x(b.t).toFixed(1)},${y(b.p50).toFixed(1)}`);
       const area = band.length > 1 ? 'M' + band.map((b) => `${x(b.t).toFixed(1)},${y(b.p75).toFixed(1)}`).join('L')
         + 'L' + [...band].reverse().map((b) => `${x(b.t).toFixed(1)},${y(b.p25).toFixed(1)}`).join('L') + 'Z' : '';
@@ -530,11 +530,33 @@ export default function FamilySalesChart({ brand, familyKey, family, width, heig
     } : null;
     const counts = VENUES.map((v) => ({ ...v, n: pts.filter((p) => venueOf(p.source).key === v.key).length })).filter((v) => v.n > 0);
     const outside = shown.filter((p) => p.usd < lo || p.usd > hi).length;
+    const p25 = Math.round(quantile(sorted, 0.25));
+    const p50 = Math.round(quantile(sorted, 0.5));
+    const p75 = Math.round(quantile(sorted, 0.75));
     return { panels, years, ticks, counts, head, cols, pw, ph, ref, n: dated.length, under: dated.length - pts.length,
-      shown: shown.length, outside, unpanelled, lo, hi, since: new Date(dated[0].t) };
+      shown: shown.length, outside, unpanelled, lo, hi, p25, p50, p75, since: new Date(dated[0].t) };
   }, [sales, width, height, hidden, narrow, ix, indexed, onSelectEra, eraCohorts.length, measuredHead, filteredSupply]);
   const move = useMemo(() => (sales ? batMove(sales) : null), [sales]);
   const held = useMemo(() => (sales ? mixFixed(eraMoves(sales)) : null), [sales]);
+  const allVenueMove = useMemo(() => {
+    if (!sales || move) return null;
+    const now = Date.now();
+    const last = sales.filter((s) => {
+      const t = Date.parse(s.sale_date);
+      return s.usd > 0 && t > now - 365 * DAY && t <= now;
+    }).map((s) => s.usd).sort((a, b) => a - b);
+    const prior = sales.filter((s) => {
+      const t = Date.parse(s.sale_date);
+      return s.usd > 0 && t > now - 730 * DAY && t <= now - 365 * DAY;
+    }).map((s) => s.usd).sort((a, b) => a - b);
+    if (last.length < 5 || prior.length < 5) return null;
+    return {
+      last: Math.round(quantile(last, 0.5)),
+      prior: Math.round(quantile(prior, 0.5)),
+      nLast: last.length,
+      nPrior: prior.length,
+    };
+  }, [sales, move]);
 
   const onMove = (band: number) => (e: React.MouseEvent<SVGSVGElement>) => {
     if (!plot) return;
@@ -574,15 +596,23 @@ export default function FamilySalesChart({ brand, familyKey, family, width, heig
           + (plot.unpanelled ? ` · ${plot.unpanelled.toLocaleString('en-US')} with a rare or unknown model year not drawn` : '')
           + (hidden.size ? ` · ${plot.shown.toLocaleString('en-US')} shown` : '')}</Text>
       </div>
-      {!selectedEra && ix ? <LikeForLike ix={plain != null && ix.rawChange == null ? { ...ix, rawChange: plain } : ix} narrow={narrow} /> : (held || move) && <div className="family-sales__move">
+      {!selectedEra && ix ? <LikeForLike ix={plain != null && ix.rawChange == null ? { ...ix, rawChange: plain } : ix} narrow={narrow} /> : (held || move || allVenueMove || plot.p50 > 0) && <div className="family-sales__move">
         {held ? <>
           <Text role="measure">{signed(held.change)}</Text>
           <Text role="caption">{narrow ? `BaT price, decades held at last year's mix · raw median ${raw}`
             : `BaT price, last 12 mo against the 12 before, each decade's median weighted by its sales a year earlier (${held.nPrior.toLocaleString('en-US')} → ${held.nLast.toLocaleString('en-US')} in ${held.eras} decades) · raw median ${raw}`}</Text>
-        </> : move && <>
+        </> : move ? <>
           <Text role="measure">{money(move.last)}</Text>
           <Text role="caption">{narrow ? `BaT median, 12 mo · ${money(move.prior)} the 12 before · ${signed(move.last / move.prior - 1)}`
             : `BaT median, last 12 mo (${move.nLast}) · ${money(move.prior)} the 12 before (${move.nPrior}) · ${signed(move.last / move.prior - 1)}`}</Text>
+        </> : allVenueMove ? <>
+          <Text role="measure">{money(allVenueMove.last)}</Text>
+          <Text role="caption">{narrow ? `Median, 12 mo · ${money(allVenueMove.prior)} the 12 before · ${signed(allVenueMove.last / allVenueMove.prior - 1)}`
+            : `Median across venues, last 12 mo (${allVenueMove.nLast}) · ${money(allVenueMove.prior)} the 12 before (${allVenueMove.nPrior}) · ${signed(allVenueMove.last / allVenueMove.prior - 1)}`}</Text>
+        </> : <>
+          <Text role="measure">{money(plot.p50)}</Text>
+          <Text role="caption">{narrow ? `Median · middle half ${money(plot.p25)}–${money(plot.p75)}`
+            : `Median sale across ${plot.n.toLocaleString('en-US')} sales · middle half ${money(plot.p25)}–${money(plot.p75)}`}</Text>
         </>}
       </div>}
     </div>

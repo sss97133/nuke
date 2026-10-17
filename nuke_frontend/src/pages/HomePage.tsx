@@ -258,7 +258,7 @@ export function familyNamesShown(shown: number, names?: number): string {
  *  and its sold amount (vehicle_price_facts); the median is withheld under 5 sales. */
 export function mapLegend(level: MapLevel, measured = level === 'brands' || level === 'families' || level === 'models'): string {
   if (level === 'vehicles') return 'box size = confirmed sale price · click a box to open the car';
-  if (measured) return `box size = dollars from confirmed sales · of offered sold = share of cars offered at auction that sold · 12 mo = sales and dollars in the last 12 months against the 12 before, measured at auction houses held in full both years (today Bring a Trailer); color follows those sales (gray: the measured houses hold under half the sales, or too few a year earlier) · prices not adjusted for inflation${level === 'families' ? ' · other models = names not yet keyed to a family, and families with under 3 sales' : ''} · click a box to go deeper`;
+  if (measured) return `box size = dollars from confirmed sales · of offered sold = share of cars offered at auction that sold · 12 mo = sales and dollars in the last 12 months against the 12 before, measured at auction houses held in full both years (today Bring a Trailer, Mecum and Bonhams); color follows those sales (gray: the measured houses hold under half the sales, or too few a year earlier) · prices not adjusted for inflation${level === 'families' ? ' · other models = names not yet keyed to a family, and families with under 3 sales' : ''} · click a box to go deeper`;
   return 'box size = vehicles with a confirmed sale · color = their median sale price (gray: under 5 sales) · prices not adjusted for inflation, all years · asks, bids and unknown outcomes are not counted · click a box to go deeper';
 }
 
@@ -389,9 +389,28 @@ function useTreemapYears(make: string | null, model: string | null) {
 }
 
 // The leaf: the cell's confirmed sales (treemap_sales), each with the sold amount its parent cell counted.
+function dedupVehicleNodes(nodes: TreemapNode[]): TreemapNode[] {
+  const byKey = new Map<string, TreemapNode>();
+  for (const n of nodes) {
+    const imgKey = n.imageUrl ? n.imageUrl.trim().toLowerCase() : '';
+    const miKey = n.mileage && n.mileage > 0 ? `mi:${n.mileage}` : '';
+    const sig = imgKey || miKey || n.id || n.name;
+    const key = `${n.value}|${sig}`;
+    const prev = byKey.get(key);
+    if (!prev) {
+      byKey.set(key, n);
+      continue;
+    }
+    const prevScore = (prev.listingTitle ? 4 : 0) + (prev.imageUrl ? 2 : 0) + (prev.mileage ? 1 : 0);
+    const nextScore = (n.listingTitle ? 4 : 0) + (n.imageUrl ? 2 : 0) + (n.mileage ? 1 : 0);
+    if (nextScore > prevScore) byKey.set(key, n);
+  }
+  return Array.from(byKey.values());
+}
+
 function readTreemapSales(make: string, model: string, year?: number | null): Promise<TreemapNode[] | null> {
   return Promise.resolve().then(() => supabase.rpc('treemap_sales', { p_make: make, p_model: model, p_year: year ?? null })).then(
-    ({ data: result, error }: { data: any[] | null; error: unknown }) => (error || !result ? null : result.map((v: any) => ({
+    ({ data: result, error }: { data: any[] | null; error: unknown }) => (error || !result ? null : dedupVehicleNodes(result.map((v: any) => ({
       name: [v.year, v.make, v.model].filter(Boolean).join(' '),
       count: 1,
       value: v.sold_amount || 0,
@@ -401,7 +420,7 @@ function readTreemapSales(make: string, model: string, year?: number | null): Pr
       isVehicle: true,
       listingTitle: v.listing_title || undefined,
       mileage: v.mileage || undefined,
-    }))),
+    })))),
     () => null,
   );
 }
@@ -744,7 +763,9 @@ function TreemapCell({ rect, onClick, totalCount, showValue, repImage, repImages
 
   const pct = totalCount > 0 ? ((node.count / totalCount) * 100) : 0;
   const isBrandMarket = node.usd != null && !node.isVehicle;
-  const bg = isBrandMarket ? momentumToColor(brandMomentum(node)) : priceToColor(node.median_price);
+  const effectivePrice = node.median_price ?? (node.usd && node.count > 0 ? Math.round(node.usd / node.count) : undefined);
+  const mom = isBrandMarket ? brandMomentum(node) : null;
+  const bg = isBrandMarket && mom !== null ? momentumToColor(mom) : priceToColor(effectivePrice);
   const isVehicle = !!node.isVehicle;
   const candidateUrls = useMemo(() => {
     const list: string[] = [];
@@ -786,9 +807,39 @@ function TreemapCell({ rect, onClick, totalCount, showValue, repImage, repImages
   const textColor = onDark ? '#ffffff' : 'var(--text)';
   const textSecondary = onDark ? 'rgba(255, 255, 255, 0.82)' : 'var(--text-secondary)';
   const lineHeightPx = dataFontSize * 1.3;
-  const marketLines = isBrandMarket && canShowCount
-    ? brandLines(node, Math.floor((w - 12) / (dataFontSize * 0.6))).slice(0, Math.max(1, Math.floor((h - nameFontSize * 1.4 - 10) / lineHeightPx)))
-    : [];
+  const maxChars = Math.floor((w - 12) / (dataFontSize * 0.6));
+  const maxLines = Math.max(1, Math.floor((h - nameFontSize * 1.4 - 10) / lineHeightPx));
+  const marketLines = (() => {
+    if (!isBrandMarket || !canShowCount) return [];
+    const base = brandLines(node, maxChars);
+    const pick = (...candidates: string[]) => candidates.find((s) => s.length <= maxChars);
+    if (node.count > 1 && effectivePrice) {
+      const tag = node.median_price ? 'med' : 'avg';
+      const priceLine = pick(
+        pct >= 0.1 ? `${fmtMoney(effectivePrice)} ${tag} · ${pct.toFixed(1)}% of family` : `${fmtMoney(effectivePrice)} ${tag}`,
+        `${fmtMoney(effectivePrice)} ${tag}`,
+      );
+      if (priceLine) base.push(priceLine);
+    } else if (pct >= 0.5) {
+      const shareLine = pick(`${pct.toFixed(1)}% of family`, `${pct.toFixed(1)}%`);
+      if (shareLine) base.push(shareLine);
+    }
+    if ((!node.offered || node.offered < 20) && node.offered && node.offered >= 2 && node.sold_any != null) {
+      const rate = Math.round((100 * node.sold_any) / node.offered);
+      const sellLine = pick(`${rate}% of ${fmtNum(node.offered)} offered sold`, `${rate}% sold`);
+      if (sellLine) base.push(sellLine);
+    }
+    if (mom === null && ((node.sold_12m ?? 0) > 0 || (node.sold_prior_12m ?? 0) > 0)) {
+      const s12 = node.sold_12m ?? 0;
+      const sp = node.sold_prior_12m ?? 0;
+      const recentLine = pick(
+        sp > 0 ? `12 mo: ${fmtNum(s12)} sold (${fmtNum(sp)} prior)` : `12 mo: ${fmtNum(s12)} sold${node.usd_12m ? ` · ${fmtMoney(node.usd_12m)}` : ''}`,
+        `12 mo: ${fmtNum(s12)} sold`,
+      );
+      if (recentLine) base.push(recentLine);
+    }
+    return base.slice(0, maxLines);
+  })();
 
   return (
     <div
@@ -1023,17 +1074,19 @@ function TreemapTooltip({ node, x, y, totalCount, level }: TooltipData) {
   if (node.usd != null) {
     const m = brandMomentum(node);
     const d = brandDollarMomentum(node);
+    const effectivePrice = node.median_price ?? (node.usd && node.count > 0 ? Math.round(node.usd / node.count) : undefined);
     return (
       <div style={containerStyle}>
         <Text role="label" as="div">{node.name}</Text>
         <div><Text role="measure">{fmtMoney(node.usd)}</Text> <Text role="caption">from {fmtNum(node.count)} confirmed sales</Text></div>
         <div style={{ borderTop: '1px solid var(--border)', paddingTop: 6, display: 'flex', flexDirection: 'column', gap: 3 }}>
+          {node.count > 1 && effectivePrice ? <Row label={node.median_price ? 'median sale' : 'average sale'} value={fmtMoney(effectivePrice)} /> : null}
           {node.offered && node.sold_any != null ? <Row label={`of ${fmtNum(node.offered)} offered sold`} value={`${Math.round((100 * node.sold_any) / node.offered)}%`} /> : null}
-          {node.sold_12m != null ? <Row label="sold on BaT, last 12 months" value={`${fmtNum(node.sold_12m)}${node.usd_12m ? ` · ${fmtMoney(node.usd_12m)}` : ''}`} /> : null}
-          {node.sold_prior_12m != null ? <Row label="sold on BaT, the 12 before" value={`${fmtNum(node.sold_prior_12m)}${node.usd_prior_12m ? ` · ${fmtMoney(node.usd_prior_12m)}` : ''}`} /> : null}
-          {m !== null ? <Row label="change, BaT sales" value={signedPct(m)} /> : null}
-          {d !== null ? <Row label="change, BaT dollars" value={signedPct(d)} /> : null}
-          {m === null && node.sold_12m != null ? <Row label="BaT 12-month change" value="too few BaT sales" /> : null}
+          {node.sold_12m != null ? <Row label="sold (measured houses, 12 mo)" value={`${fmtNum(node.sold_12m)}${node.usd_12m ? ` · ${fmtMoney(node.usd_12m)}` : ''}`} /> : null}
+          {node.sold_prior_12m != null ? <Row label="sold (12 mo before)" value={`${fmtNum(node.sold_prior_12m)}${node.usd_prior_12m ? ` · ${fmtMoney(node.usd_prior_12m)}` : ''}`} /> : null}
+          {m !== null ? <Row label="change, 12-mo sales" value={signedPct(m)} /> : null}
+          {d !== null ? <Row label="change, 12-mo dollars" value={signedPct(d)} /> : null}
+          {m === null && node.sold_12m != null ? <Row label="12-month change" value="under 10 prior-year sales" /> : null}
           {node.avg_bids ? <Row label="average bids" value={String(node.avg_bids)} /> : null}
           {node.models ? <Row label="model names sold" value={fmtNum(node.models)} /> : null}
           {node.familyKey === 'other' ? <Text role="caption" as="div">names not yet keyed to a model family, and families with under 3 sales</Text> : null}
@@ -1286,8 +1339,12 @@ export function TreemapHomePage({ onBrowse, embedded = false }: { onBrowse: () =
   const familyYearsNodes = useMemo<TreemapNode[] | null>(() => {
     if (!familySalesData || familySalesData.length === 0) return null;
     const byYear = new Map<number, number[]>();
+    const seen = new Set<string>();
     for (const s of familySalesData) {
       if (s.year == null || !Number.isFinite(s.year) || s.usd <= 0) continue;
+      const sig = `${s.year}|${s.usd}|${s.source ?? ''}|${s.sale_date ?? s.vehicle_id}`;
+      if (seen.has(sig)) continue;
+      seen.add(sig);
       const arr = byYear.get(s.year) ?? [];
       arr.push(s.usd);
       byYear.set(s.year, arr);
@@ -1314,8 +1371,15 @@ export function TreemapHomePage({ onBrowse, embedded = false }: { onBrowse: () =
   const familyYearVehiclesNodes = useMemo<TreemapNode[] | null>(() => {
     if (!familySalesData || !currentLevel.year || currentLevel.model || !currentLevel.make) return null;
     const yr = currentLevel.year;
+    const seen = new Set<string>();
     return familySalesData
-      .filter((s) => s.year === yr && s.usd > 0)
+      .filter((s) => {
+        if (s.year !== yr || s.usd <= 0) return false;
+        const sig = `${s.year}|${s.usd}|${s.source ?? ''}|${s.sale_date ?? s.vehicle_id}`;
+        if (seen.has(sig)) return false;
+        seen.add(sig);
+        return true;
+      })
       .sort((a, b) => b.usd - a.usd)
       .slice(0, 200)
       .map((s) => ({
@@ -1332,24 +1396,86 @@ export function TreemapHomePage({ onBrowse, embedded = false }: { onBrowse: () =
   const eraFilteredFamilyModels = useMemo<TreemapNode[] | null>(() => {
     if (!familyModelsData) return null;
     if (!selectedEra || !familySalesData || familySalesData.length === 0) return familyModelsData;
-    const byModel = new Map<string, { count: number; usd: number }>();
+    const nowMs = Date.now();
+    const dayMs = 86_400_000;
+    const cutoff12m = nowMs - 365 * dayMs;
+    const cutoff24m = nowMs - 730 * dayMs;
+    const measuredHouses = new Set(['Bring a Trailer', 'Mecum', 'Bonhams']);
+    const existingByKey = new Map<string, TreemapNode>();
+    for (const node of familyModelsData) {
+      existingByKey.set(node.name.trim().toLowerCase(), node);
+    }
+    const byModel = new Map<string, {
+      displayName: string;
+      count: number;
+      usd: number;
+      prices: number[];
+      dated: number;
+      sold12m: number;
+      soldPrior12m: number;
+      usd12m: number;
+      usdPrior12m: number;
+    }>();
     for (const s of familySalesData) {
       if (!matchesEraRange(s.year, selectedEra) || s.usd <= 0 || !s.model) continue;
-      const key = s.model.trim().toLowerCase();
-      const prev = byModel.get(key) ?? { count: 0, usd: 0 };
+      const trimmed = s.model.trim();
+      const key = trimmed.toLowerCase();
+      const prev = byModel.get(key) ?? {
+        displayName: existingByKey.get(key)?.name ?? trimmed,
+        count: 0,
+        usd: 0,
+        prices: [],
+        dated: 0,
+        sold12m: 0,
+        soldPrior12m: 0,
+        usd12m: 0,
+        usdPrior12m: 0,
+      };
       prev.count += 1;
       prev.usd += s.usd;
+      prev.prices.push(s.usd);
+      if (s.source && measuredHouses.has(s.source)) {
+        prev.dated += 1;
+        const t = Date.parse(s.sale_date);
+        if (Number.isFinite(t)) {
+          if (t > cutoff12m && t <= nowMs) {
+            prev.sold12m += 1;
+            prev.usd12m += s.usd;
+          } else if (t > cutoff24m && t <= cutoff12m) {
+            prev.soldPrior12m += 1;
+            prev.usdPrior12m += s.usd;
+          }
+        }
+      }
       byModel.set(key, prev);
     }
     if (byModel.size === 0) return familyModelsData;
-    const filtered = familyModelsData
-      .map((node) => {
-        const stat = byModel.get(node.name.trim().toLowerCase());
-        if (!stat) return null;
-        return { ...node, count: stat.count, value: stat.usd, usd: stat.usd };
-      })
-      .filter((n): n is TreemapNode => n !== null);
-    return filtered.length > 0 ? filtered : familyModelsData;
+    const out: TreemapNode[] = [];
+    for (const [key, stat] of byModel.entries()) {
+      const sorted = [...stat.prices].sort((a, b) => a - b);
+      const mid = sorted.length >> 1;
+      const median = sorted.length > 0
+        ? Math.round(sorted.length % 2 ? sorted[mid] : (sorted[mid - 1] + sorted[mid]) / 2)
+        : undefined;
+      const baseNode = existingByKey.get(key);
+      out.push({
+        ...(baseNode ?? { name: stat.displayName }),
+        name: baseNode?.name ?? stat.displayName,
+        count: stat.count,
+        value: stat.usd,
+        usd: stat.usd,
+        median_price: median,
+        dated: stat.dated,
+        sold_12m: stat.sold12m,
+        sold_prior_12m: stat.soldPrior12m,
+        usd_12m: stat.usd12m,
+        usd_prior_12m: stat.usdPrior12m,
+        offered: baseNode && stat.count === baseNode.count ? baseNode.offered : undefined,
+        sold_any: baseNode && stat.count === baseNode.count ? baseNode.sold_any : undefined,
+      });
+    }
+    out.sort((a, b) => b.value - a.value || b.count - a.count || a.name.localeCompare(b.name));
+    return out.length > 0 ? out.slice(0, 200) : familyModelsData;
   }, [familyModelsData, selectedEra, familySalesData]);
   // Vehicle-level data: fetched when we have make+model and either a year or coming from years level
   const vehicleMake = currentLevel.year ? currentLevel.make ?? null : null;
@@ -1455,7 +1581,7 @@ export function TreemapHomePage({ onBrowse, embedded = false }: { onBrowse: () =
   // Representative images for aggregate cells (models/years levels); none while a family shows its sales chart, which
   // has no tiles to put them on (the read ran under the chart on every family drill).
   const repImages = useRepresentativeImages(
-    levelType === 'models' ? (familyView === 'names' ? familyModelsData : null) : levelType === 'years' ? effectiveYearsData
+    levelType === 'models' ? (familyView === 'names' ? (eraFilteredFamilyModels ?? familyModelsData) : null) : levelType === 'years' ? effectiveYearsData
       : levelType === 'vehicles' && !currentLevel.model ? familyYearVehiclesNodes
       : levelType === 'families' && familiesFailed ? modelsData : null,
     currentLevel.make,
@@ -1817,7 +1943,12 @@ export function TreemapHomePage({ onBrowse, embedded = false }: { onBrowse: () =
             <Text role="caption" title={ledgerViewsStamp(refresh.refreshedAt)}>
               {isNarrow ? mapCaptionShort(levelType, totalCount, refresh)
                 : mapCaption(levelType, totalCount, refresh, Date.now(), levelType === 'families' ? familyCoverage(activeData)
-                  : levelType === 'models' ? familyNamesShown(activeData?.length ?? 0, currentLevel.names) : '')}
+                  : levelType === 'models' ? familyNamesShown(
+                    activeData?.length ?? 0,
+                    selectedEra
+                      ? (eraFilteredFamilyModels?.length ?? activeData?.length)
+                      : Math.max(currentLevel.names ?? 0, familyModelsData?.length ?? 0) || undefined,
+                  ) : '')}
             </Text>
           )}
           {currentLevel.year && currentLevel.make && currentLevel.model && (
@@ -1933,57 +2064,61 @@ export function TreemapHomePage({ onBrowse, embedded = false }: { onBrowse: () =
       })()}
 
       {/* ─── FAMILY SUB-MODEL PILLS: direct 1-click sub-model navigation across models, years & vehicles inside a family ─── */}
-      {currentLevel.family && currentLevel.make && familyModelsData && familyModelsData.length > 1 && (
-        <div className="home-family-submodels" role="group" aria-label="Family sub-models" data-testid="family-submodel-pills">
-          <span className="home-family-submodels-label">SUB-MODELS</span>
-          <button
-            type="button"
-            className={`home-family-submodel-pill${!currentLevel.model ? ' home-family-submodel-pill--active' : ''}`}
-            aria-pressed={!currentLevel.model}
-            onClick={() => {
-              const famEntry = drillStack.find((d) => d.family && !d.model) ?? {
-                label: searchParams.get('family_name') || currentLevel.label,
-                make: currentLevel.make,
-                family: currentLevel.family,
-              };
-              setDrillStack([{ label: 'ALL MAKES' }, { label: currentLevel.make!, make: currentLevel.make }, famEntry]);
-            }}
-          >
-            ALL <span className="home-family-submodel-count">{familyModelsData.length}</span>
-          </button>
-          {familyModelsData.slice(0, 12).map((sub) => {
-            const active = currentLevel.model === sub.name;
-            return (
-              <button
-                key={sub.name}
-                type="button"
-                className={`home-family-submodel-pill${active ? ' home-family-submodel-pill--active' : ''}`}
-                aria-pressed={active}
-                onClick={() => {
-                  const famEntry = drillStack.find((d) => d.family && !d.model) ?? {
-                    label: searchParams.get('family_name') || currentLevel.label,
-                    make: currentLevel.make,
-                    family: currentLevel.family,
-                  };
-                  if (active && !currentLevel.year) {
-                    setDrillStack([{ label: 'ALL MAKES' }, { label: currentLevel.make!, make: currentLevel.make }, famEntry]);
-                  } else {
-                    recordInterest('model', currentLevel.make!, sub.name);
-                    setDrillStack([
-                      { label: 'ALL MAKES' },
-                      { label: currentLevel.make!, make: currentLevel.make },
-                      famEntry,
-                      { label: sub.name, make: currentLevel.make, family: currentLevel.family, model: sub.name },
-                    ]);
-                  }
-                }}
-              >
-                {sub.name} <span className="home-family-submodel-count">{sub.count.toLocaleString('en-US')}</span>
-              </button>
-            );
-          })}
-        </div>
-      )}
+      {(() => {
+        const subModelPool = eraFilteredFamilyModels ?? familyModelsData;
+        if (!currentLevel.family || !currentLevel.make || !subModelPool || subModelPool.length <= 1) return null;
+        return (
+          <div className="home-family-submodels" role="group" aria-label="Family sub-models" data-testid="family-submodel-pills">
+            <span className="home-family-submodels-label">SUB-MODELS</span>
+            <button
+              type="button"
+              className={`home-family-submodel-pill${!currentLevel.model ? ' home-family-submodel-pill--active' : ''}`}
+              aria-pressed={!currentLevel.model}
+              onClick={() => {
+                const famEntry = drillStack.find((d) => d.family && !d.model) ?? {
+                  label: searchParams.get('family_name') || currentLevel.label,
+                  make: currentLevel.make,
+                  family: currentLevel.family,
+                };
+                setDrillStack([{ label: 'ALL MAKES' }, { label: currentLevel.make!, make: currentLevel.make }, famEntry]);
+              }}
+            >
+              ALL <span className="home-family-submodel-count">{subModelPool.length}</span>
+            </button>
+            {subModelPool.slice(0, 12).map((sub) => {
+              const active = currentLevel.model === sub.name;
+              return (
+                <button
+                  key={sub.name}
+                  type="button"
+                  className={`home-family-submodel-pill${active ? ' home-family-submodel-pill--active' : ''}`}
+                  aria-pressed={active}
+                  onClick={() => {
+                    const famEntry = drillStack.find((d) => d.family && !d.model) ?? {
+                      label: searchParams.get('family_name') || currentLevel.label,
+                      make: currentLevel.make,
+                      family: currentLevel.family,
+                    };
+                    if (active && !currentLevel.year) {
+                      setDrillStack([{ label: 'ALL MAKES' }, { label: currentLevel.make!, make: currentLevel.make }, famEntry]);
+                    } else {
+                      recordInterest('model', `${currentLevel.make!} ${sub.name}`);
+                      setDrillStack([
+                        { label: 'ALL MAKES' },
+                        { label: currentLevel.make!, make: currentLevel.make },
+                        famEntry,
+                        { label: sub.name, make: currentLevel.make, family: currentLevel.family, model: sub.name },
+                      ]);
+                    }
+                  }}
+                >
+                  {sub.name} <span className="home-family-submodel-count">{sub.count.toLocaleString('en-US')}</span>
+                </button>
+              );
+            })}
+          </div>
+        );
+      })()}
 
       {/* ─── GENERATION / ERA QUICK-SWITCH BAR: 1-click generation filtering right above the treemap ─── */}
       {(() => {
@@ -1992,7 +2127,7 @@ export function TreemapHomePage({ onBrowse, embedded = false }: { onBrowse: () =
         const definedEras = getDefinedFamilyEras(currentLevel.make, familyLabel);
         const yearList = effectiveYearsData ? effectiveYearsData.flatMap((n) => {
           const y = parseInt(n.name, 10);
-          return Number.isFinite(y) ? Array(Math.max(1, Math.min(n.count, 50))).fill(y) : [];
+          return Number.isFinite(y) ? Array(Math.max(1, n.count)).fill(y) : [];
         }) : [];
         const cohorts = yearList.length > 0 ? getFamilyEraCohorts(currentLevel.make, familyLabel, yearList) : definedEras;
         if (cohorts.length < 2) return null;
@@ -2009,6 +2144,7 @@ export function TreemapHomePage({ onBrowse, embedded = false }: { onBrowse: () =
             </button>
             {cohorts.map((cohort) => {
               const active = selectedEra === cohort.id;
+              const cohortCount = 'count' in cohort && typeof cohort.count === 'number' ? cohort.count : 0;
               return (
                 <button
                   key={cohort.id}
@@ -2017,7 +2153,7 @@ export function TreemapHomePage({ onBrowse, embedded = false }: { onBrowse: () =
                   aria-pressed={active}
                   onClick={() => setSelectedEra(active ? null : cohort.id)}
                 >
-                  {cohort.label}
+                  {cohort.label}{cohortCount > 0 && <> <span className="home-family-submodel-count">{cohortCount.toLocaleString('en-US')}</span></>}
                 </button>
               );
             })}
@@ -2158,12 +2294,12 @@ export function TreemapHomePage({ onBrowse, embedded = false }: { onBrowse: () =
                   onMouseEnter={() => handleCellMouseEnter(node)}
                   onMouseLeave={() => { setTooltip(null); handleCellMouseLeave(); }}>
                   <MarketTile node={node} move={relativeMove(node, baseline, basis === 'ledger', gateMin)} basis={basis} x={rect.x} y={rect.y} w={rect.w} h={rect.h}
-                    onClick={(ev) => (coarse ? setSheet(node) : drillInto(node, ev))} />
+                    onClick={(ev) => (coarse ? setSheet(node) : drillInto(node, 'clientX' in ev ? ev : undefined))} />
                 </div>
               );
             }
             const repImgCandidates = !rect.node.isVehicle
-              ? repImages.get(rect.node.name.toLowerCase()) || repImages.get(rect.node.name)
+              ? repImages.get(rect.node.name.toLowerCase()) || repImages.get(rect.node.name) || repImages.get(rect.node.name.toLowerCase().split(/\s+/)[0])
               : rect.node.imageUrl ? undefined
               : (rect.node.id ? repImages.get(rect.node.id) : undefined)
                 || repImages.get(rect.node.name.toLowerCase())
