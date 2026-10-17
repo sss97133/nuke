@@ -3,6 +3,7 @@ import { supabase } from '../../lib/supabase';
 import { Text } from '../../kit';
 import './FamilySalesChart.css';
 import { LikeForLike, useFamilyIndex } from './FamilyPriceIndex';
+import { getFamilyEraCohorts, matchesEraRange } from '../../lib/market/familyEras';
 
 // One model family's market as a chart, the way classic.com draws a model: every confirmed sale of the last five years
 // as a dot (price against date, colored by venue) and a rolling median through them, so the trading range, the volume
@@ -181,14 +182,29 @@ const signed = (v: number) => (Math.round(v * 100) === 0 ? '0%' : `${v > 0 ? '�
 const P = { left: 50, right: 8, top: 18, bottom: 18 };
 const MIN_BAND = 8;
 
-export default function FamilySalesChart({ brand, familyKey, family, width, height, onOpen }: {
-  brand: string; familyKey: string; family: string; width: number; height: number; onOpen: (vehicleId: string) => void;
+export default function FamilySalesChart({ brand, familyKey, family, width, height, onOpen, selectedEra = null, onSelectEra }: {
+  brand: string;
+  familyKey: string;
+  family: string;
+  width: number;
+  height: number;
+  onOpen: (vehicleId: string) => void;
+  selectedEra?: string | null;
+  onSelectEra?: (era: string | null) => void;
 }) {
-  const { sales, n: windowCount, truncated, failed } = useFamilySales(brand, familyKey);
+  const { sales: allSales, n: windowCount, truncated, failed } = useFamilySales(brand, familyKey);
+  const eraCohorts = useMemo(
+    () => (allSales ? getFamilyEraCohorts(brand, family, allSales.map((s) => s.year)) : []),
+    [brand, family, allSales],
+  );
+  const sales = useMemo(
+    () => (allSales && selectedEra ? allSales.filter((s) => matchesEraRange(s.year, selectedEra)) : allSales),
+    [allSales, selectedEra],
+  );
   // Same car, same miles (family_price_index_read): when the family has a fitted index, the chart is one panel of every
   // sale with the like-for-like line over it, and the head answers with its 12-month change instead of a median.
   const ix = useFamilyIndex(brand, familyKey);
-  const indexed = !!ix && ix.series.length > 1;
+  const indexed = !selectedEra && !!ix && ix.series.length > 1;
   // The plain median's own 12-month change over every venue, for the sentence beside the answer when the reader has none.
   const plain = useMemo(() => (sales ? plainMedianChange(sales) : null), [sales]);
   const [hover, setHover] = useState<{ band: number; dot: number } | null>(null);
@@ -291,7 +307,7 @@ export default function FamilySalesChart({ brand, familyKey, family, width, heig
           + (plot.unpanelled ? ` · ${plot.unpanelled.toLocaleString('en-US')} with a rare or unknown model year not drawn` : '')
           + (hidden.size ? ` · ${plot.shown.toLocaleString('en-US')} shown` : '')}</Text>
       </div>
-      {ix ? <LikeForLike ix={plain != null && ix.rawChange == null ? { ...ix, rawChange: plain } : ix} narrow={narrow} /> : (held || move) && <div className="family-sales__move">
+      {!selectedEra && ix ? <LikeForLike ix={plain != null && ix.rawChange == null ? { ...ix, rawChange: plain } : ix} narrow={narrow} /> : (held || move) && <div className="family-sales__move">
         {held ? <>
           <Text role="measure">{signed(held.change)}</Text>
           <Text role="caption">{narrow ? `BaT price, decades held at last year's mix · raw median ${raw}`
@@ -308,6 +324,29 @@ export default function FamilySalesChart({ brand, familyKey, family, width, heig
         title={hidden.has(v.key) ? `Show ${v.label}` : `Hide ${v.label}`} onClick={() => toggle(v.key)}>
         <svg width="8" height="8" aria-hidden="true"><circle cx="4" cy="4" r="4" fill={v.color} /></svg>
         <Text role="caption">{narrow ? v.short : v.label} {v.n.toLocaleString('en-US')}</Text></button>)}
+      {onSelectEra && eraCohorts.length >= 2 && (
+        <div className="family-sales__eras" role="group" aria-label="Filter by generation">
+          <button
+            type="button"
+            className="family-sales__era"
+            aria-pressed={!selectedEra}
+            onClick={() => onSelectEra(null)}
+          >
+            <Text role="caption">All eras</Text>
+          </button>
+          {eraCohorts.map((c) => (
+            <button
+              key={c.id}
+              type="button"
+              className="family-sales__era"
+              aria-pressed={selectedEra === c.id}
+              onClick={() => onSelectEra(selectedEra === c.id ? null : c.id)}
+            >
+              <Text role="caption">{narrow ? c.shortLabel : c.label} ({c.count.toLocaleString('en-US')})</Text>
+            </button>
+          ))}
+        </div>
+      )}
     </div>
     <div className="family-sales__panels" style={{ gridTemplateColumns: `repeat(${plot.cols}, ${plot.pw}px)` }}>
       {plot.panels.map((pn, bi) => <svg key={pn.era} className="family-sales__plot" width={plot.pw} height={plot.ph}

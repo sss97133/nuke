@@ -221,3 +221,31 @@ it('keeps the segment chips when at least two carry a number, and says what the 
   expect([...container.querySelectorAll('.family-index__chip')].map((c) => c.textContent)).toEqual(['C2 1963–67 ▲5%', 'C8 2020+ ▼11%', 'C5 1997–2004 too few']);
   expect(container.querySelector('.family-index__evidence')?.textContent).toMatch(/plain median said ▼\d+%/);
 });
+
+it('renders automotive generation cohort pills and scopes plotted sales when an era is selected', async () => {
+  const mk = (i: number, ago: number, usd: number, year: number): Sale =>
+    ({ vehicle_id: `00000000-0000-4000-8000-${String(i).padStart(12, '0')}`, sale_date: day(ago), usd, source: 'Bring a Trailer', year, model: 'Mustang' });
+  const sales: Sale[] = [
+    ...Array.from({ length: 10 }, (_, k) => mk(k + 1, 15 + k * 10, 45_000 + k * 500, 1967)),
+    ...Array.from({ length: 8 }, (_, k) => mk(k + 20, 20 + k * 10, 22_000 + k * 500, 1989)),
+  ];
+  const onSelectEra = vi.fn();
+  fixture.rpc.mockResolvedValue({ data: value(sales), error: null });
+  await act(async () => root.render(
+    <FamilySalesChart brand="Ford" familyKey="mustang" family="Mustang" width={900} height={500} onOpen={() => {}} selectedEra={null} onSelectEra={onSelectEra} />,
+  ));
+  const eraBtns = [...container.querySelectorAll('button.family-sales__era')];
+  expect(eraBtns.map((b) => b.textContent)).toEqual([
+    'All eras',
+    "1st Gen '64–'73 (10)",
+    "Fox Body '79–'93 (8)",
+  ]);
+  expect(container.querySelectorAll('svg.family-sales__plot circle')).toHaveLength(18);
+  await act(async () => (eraBtns[2] as HTMLButtonElement).click());
+  expect(onSelectEra).toHaveBeenCalledWith('1979-1993');
+
+  await act(async () => root.render(
+    <FamilySalesChart brand="Ford" familyKey="mustang" family="Mustang" width={900} height={500} onOpen={() => {}} selectedEra="1979-1993" onSelectEra={onSelectEra} />,
+  ));
+  expect(container.querySelectorAll('svg.family-sales__plot circle')).toHaveLength(8);
+});

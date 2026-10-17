@@ -17,6 +17,7 @@ import { Text } from '../kit';
 import FamilyMovers from './market/FamilyMovers';
 import BrandFamilyMap, { MapViewSwitch } from './market/BrandFamilyMap';
 import FamilySalesChart, { FamilyViewSwitch } from './market/FamilySalesChart';
+import { matchesEraRange } from '../lib/market/familyEras';
 import { buildMarketScopeUrl, resolveMarketScopeQuery } from '../lib/search/marketScopeResolver';
 
 // ────────────────────────────────────────────────────────────
@@ -115,10 +116,14 @@ export function drillStackFromSearchParams(
 
 /** Write the treemap's drill stack into the page URL while preserving unrelated parameters. */
 export function applyDrillStackToSearchParams(params: URLSearchParams, stack: readonly DrillLevel[]): URLSearchParams {
+  const prevFamily = params.get('family');
   const next = new URLSearchParams(params);
   for (const k of SCOPE_PARAM_KEYS) next.delete(k);
   const leaf = stack[stack.length - 1];
-  if (!leaf?.make) return next;
+  if (!leaf?.make) {
+    next.delete('era');
+    return next;
+  }
   next.set('make', leaf.make);
   if (leaf.family) {
     next.set('family', leaf.family);
@@ -126,6 +131,11 @@ export function applyDrillStackToSearchParams(params: URLSearchParams, stack: re
     if (familyLevel?.label && familyLevel.label !== leaf.family) {
       next.set('family_name', familyLevel.label);
     }
+    if (prevFamily && prevFamily !== leaf.family) {
+      next.delete('era');
+    }
+  } else {
+    next.delete('era');
   }
   if (leaf.model) next.set('model', leaf.model);
   if (leaf.year != null && Number.isFinite(leaf.year)) next.set('year', String(leaf.year));
@@ -948,6 +958,15 @@ export function TreemapHomePage({ onBrowse, embedded = false }: { onBrowse: () =
     });
   }, [setSearchParams]);
   const currentLevel = drillStack[drillStack.length - 1];
+  const selectedEra = searchParams.get('era');
+  const setSelectedEra = useCallback((era: string | null) => {
+    setSearchParams((curr) => {
+      const next = new URLSearchParams(curr);
+      if (era) next.set('era', era);
+      else next.delete('era');
+      return next;
+    }, { preventScrollReset: true });
+  }, [setSearchParams]);
 
   // Narrow-viewport flag — hides decorative chrome when the header would crush.
   // Threshold matches AppHeader's 768px collapse but tighter (640px) since the
@@ -1042,17 +1061,21 @@ export function TreemapHomePage({ onBrowse, embedded = false }: { onBrowse: () =
     }
     if (levelType === 'years' && currentLevel.make && currentLevel.model) {
       const cached = prefetchCache.current.get(`${currentLevel.make}/${currentLevel.model}`);
-      if (cached) return cached;
+      if (cached) {
+        return selectedEra ? cached.filter((n) => matchesEraRange(parseInt(n.name, 10), selectedEra)) : cached;
+      }
     }
     if (levelType === 'vehicles' && vehiclesData) return vehiclesData;
-    if (levelType === 'years' && yearsData) return yearsData;
+    if (levelType === 'years' && yearsData) {
+      return selectedEra ? yearsData.filter((n) => matchesEraRange(parseInt(n.name, 10), selectedEra)) : yearsData;
+    }
     if (levelType === 'models' && familyModelsData) return familyModelsData;
     if (levelType === 'families' && familiesData) return familiesData;
     if (levelType === 'families' && familiesFailed && modelsData) return modelsData;
     if (brandsData) return brandsData;
     return null;
     // drillStack triggers recompute when navigating so ref cache is checked
-  }, [levelType, brandsData, familiesData, familiesFailed, modelsData, familyModelsData, yearsData, vehiclesData, currentLevel, drillStack]);
+  }, [levelType, brandsData, familiesData, familiesFailed, modelsData, familyModelsData, yearsData, vehiclesData, currentLevel, drillStack, selectedEra]);
 
   const isLoading = brandsLoading || (atFamilies && familiesLoading) || modelsLoading || familyModelsLoading || yearsLoading || vehiclesLoading;
 
@@ -1584,7 +1607,8 @@ export function TreemapHomePage({ onBrowse, embedded = false }: { onBrowse: () =
               onPickFamily={(brand, key, family) => { recordInterest('make', brand); setDrillStack([{ label: 'ALL MAKES' }, { label: brand, make: brand }, { label: family, make: brand, family: key }]); }} />
           ) : levelType === 'models' && currentLevel.family && currentLevel.make && familyView === 'sales' && dims.w > 0 ? (
             <FamilySalesChart brand={currentLevel.make} familyKey={currentLevel.family} family={currentLevel.label}
-              width={dims.w} height={dims.h} onOpen={(id) => navigate(`/vehicle/${id}`)} />
+              width={dims.w} height={dims.h} onOpen={(id) => navigate(`/vehicle/${id}`)}
+              selectedEra={selectedEra} onSelectEra={setSelectedEra} />
           ) : rects.map((rect, i) => {
             if ((levelType === 'brands' || levelType === 'families') && rect.node.usd != null && !rect.node.isVehicle) {
               const node = rect.node;
@@ -1668,10 +1692,12 @@ export function TreemapHomePage({ onBrowse, embedded = false }: { onBrowse: () =
           <FamilySalesChart
             brand={currentLevel.make}
             familyKey={currentLevel.family}
-            familyLabel={currentLevel.label}
+            family={currentLevel.label}
             width={dims.w}
             height={340}
-            onShowModels={currentLevel.names && currentLevel.names > 1 ? () => setFamilyView('sales') : undefined}
+            onOpen={(id) => navigate(`/vehicle/${id}`)}
+            selectedEra={selectedEra}
+            onSelectEra={setSelectedEra}
           />
         </div>
       )}

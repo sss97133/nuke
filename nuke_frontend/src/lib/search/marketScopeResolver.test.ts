@@ -105,18 +105,30 @@ describe('marketScopeResolver', () => {
     });
   });
 
-  it('resolves cultural shorthands like "73-87 gm trucks" and "squarebody"', async () => {
+  it('resolves cultural shorthands like "73-87 gm trucks", "squarebody", and "fox body" with their era range', async () => {
     const gmScope = await resolveMarketScopeQuery('73-87 gm trucks');
     expect(gmScope).toEqual({
       make: 'Chevrolet',
       family: 'c10-family-uuid',
       family_name: 'C10',
+      era: '1973-1987',
     });
+    expect(buildMarketScopeUrl(gmScope!)).toBe(
+      '/?tab=market&make=Chevrolet&family=c10-family-uuid&family_name=C10&era=1973-1987',
+    );
     const sqScope = await resolveMarketScopeQuery('squarebody');
     expect(sqScope).toEqual({
       make: 'Chevrolet',
       family: 'c10-family-uuid',
       family_name: 'C10',
+      era: '1973-1987',
+    });
+    const foxScope = await resolveMarketScopeQuery('fox body');
+    expect(foxScope).toEqual({
+      make: 'Ford',
+      family: '8a8271f8-d299-4b55-837a-35ca919f8937',
+      family_name: 'Mustang',
+      era: '1979-1993',
     });
   });
 
