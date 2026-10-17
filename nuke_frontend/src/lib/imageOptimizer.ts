@@ -18,6 +18,16 @@ const SIZE_CONFIG: Record<ImageSize, { width: number; quality: number }> = {
   full: { width: 0, quality: 100 }, // No resize
 };
 
+function urlHasHost(url: string, domain: string): boolean {
+  try {
+    const host = new URL(url).hostname.toLowerCase();
+    const target = domain.toLowerCase();
+    return host === target || host.endsWith(`.${target}`);
+  } catch {
+    return false;
+  }
+}
+
 /**
  * Optimize an image URL for the given display size
  *
@@ -30,7 +40,7 @@ export function optimizeImageUrl(url: string | null | undefined, size: ImageSize
 
   // Normalize broken Mecum/Cloudinary double-v version segments (/image/upload/vv123/ -> /image/upload/v123/)
   // and strip trailing empty query markers that cause CDN 404s.
-  const normalizedUrl = (url.includes('mecum.com') || url.includes('cloudinary.com'))
+  const normalizedUrl = (urlHasHost(url, 'mecum.com') || urlHasHost(url, 'cloudinary.com'))
     ? url.replace(/(\/image\/upload\/(?:[^/]+\/)*)vv+(\d+\/)/i, '$1v$2').replace(/\?$/, '')
     : url;
 
@@ -41,7 +51,7 @@ export function optimizeImageUrl(url: string | null | undefined, size: ImageSize
 
   try {
     // Bring a Trailer - uses WordPress Photon CDN
-    if (normalizedUrl.includes('bringatrailer.com')) {
+    if (urlHasHost(normalizedUrl, 'bringatrailer.com')) {
       // Remove any existing query params and add resize
       const baseUrl = normalizedUrl.split('?')[0];
       return `${baseUrl}?w=${width}`;
@@ -63,14 +73,14 @@ export function optimizeImageUrl(url: string | null | undefined, size: ImageSize
     }
 
     // Cars & Bids - also WordPress, same pattern
-    if (normalizedUrl.includes('carsandbids.com')) {
+    if (urlHasHost(normalizedUrl, 'carsandbids.com')) {
       const baseUrl = normalizedUrl.split('?')[0];
       return `${baseUrl}?w=${width}`;
     }
 
     // Craigslist - images are typically already small
     // Return as-is
-    if (normalizedUrl.includes('craigslist.org')) {
+    if (urlHasHost(normalizedUrl, 'craigslist.org')) {
       return normalizedUrl;
     }
 
@@ -109,8 +119,8 @@ export function getDetailImageUrl(url: string | null | undefined): string | null
 export function isOptimizableUrl(url: string | null | undefined): boolean {
   if (!url) return false;
   return (
-    url.includes('bringatrailer.com') ||
-    url.includes('carsandbids.com') ||
+    urlHasHost(url, 'bringatrailer.com') ||
+    urlHasHost(url, 'carsandbids.com') ||
     url.includes('/storage/v1/')
   );
 }
