@@ -5,7 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const fixture = vi.hoisted(() => ({ rpc: vi.fn() }));
 vi.mock('../../lib/supabase', () => ({ supabase: { rpc: fixture.rpc } }));
-import FamilySalesChart, { batMove, eraMoves, eraOf, logTicks, mixFixed, parseFamilySales, quantile, rollingBand, rollingMedian, venueOf, type Sale } from './FamilySalesChart';
+import FamilySalesChart, { batMove, eraMoves, eraOf, filterSalesBySubModel, logTicks, mixFixed, parseFamilySales, quantile, rollingBand, rollingMedian, venueOf, type Sale } from './FamilySalesChart';
 
 const DAY = 86_400_000;
 const now = Date.now();
@@ -354,4 +354,17 @@ it('renders upcoming supply strip and right-edge Model 33 finish-estimate bands 
   const chip = container.querySelector('button.family-sales__supply-chip') as HTMLButtonElement;
   await act(async () => chip.click());
   expect(onOpen).toHaveBeenCalledWith('live-911-1');
+});
+
+it('filters to exact sub-model sales when selecting the base sub-model ("Mustang") rather than matching every "Mustang *" variant', () => {
+  const rows = [
+    { model: 'Mustang', id: 1 },
+    { model: 'Mustang', id: 2 },
+    { model: 'Mustang Mach 1', id: 3 },
+    { model: 'Mustang Boss 429', id: 4 },
+    { model: 'Shelby GT500', id: 5 },
+  ];
+  expect(filterSalesBySubModel(rows, 'Mustang').map((r) => r.id)).toEqual([1, 2]);
+  // Prefix fallback still works when a query string has no exact sub-model match
+  expect(filterSalesBySubModel(rows, 'Mustang Boss').map((r) => r.id)).toEqual([4]);
 });

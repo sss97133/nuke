@@ -16,7 +16,7 @@ import IntakePage from './intake/IntakePage';
 import { Text } from '../kit';
 import FamilyMovers from './market/FamilyMovers';
 import BrandFamilyMap, { MapViewSwitch } from './market/BrandFamilyMap';
-import FamilySalesChart, { FamilyViewSwitch, useFamilySales, type Sale } from './market/FamilySalesChart';
+import FamilySalesChart, { FamilyViewSwitch, matchesSaleSubModel, useFamilySales, type Sale } from './market/FamilySalesChart';
 import { getDefinedFamilyEras, getFamilyEraCohorts, matchesEraRange } from '../lib/market/familyEras';
 import { buildMarketScopeUrl, resolveMarketScopeQuery } from '../lib/search/marketScopeResolver';
 
@@ -415,38 +415,216 @@ function useTreemapVehicles(make: string | null, model: string | null, year?: nu
   return { data, loading };
 }
 
-function useRepresentativeImages(items: TreemapNode[] | null, make?: string | null) {
-  const [images, setImages] = useState<Map<string, string>>(new Map());
+export interface RepresentativeImageRow {
+  id?: string | null;
+  model?: string | null;
+  year?: number | string | null;
+  primary_image_url?: string | null;
+}
+
+export function selectFamilyRepresentativeVehicleIds(
+  items: readonly TreemapNode[] | null | undefined,
+  familySales: readonly Sale[] | null | undefined,
+  model?: string | null,
+  perTileLimit = 4,
+  maxTotal = 160,
+): string[] {
+  if (!items || items.length === 0 || !familySales || familySales.length === 0) return [];
+  const out: string[] = [];
+  const seen = new Set<string>();
+  const pushId = (id: string | null | undefined) => {
+    if (!id || seen.has(id) || out.length >= maxTotal) return false;
+    seen.add(id);
+    out.push(id);
+    return true;
+  };
+
+  const vehicleTiles = items.filter((item) => item.isVehicle && item.id);
+  if (vehicleTiles.length > 0) {
+    for (const tile of vehicleTiles) {
+      pushId(tile.id);
+      if (out.length >= maxTotal) break;
+    }
+    return out;
+  }
+
+  const pricedSales = familySales
+    .filter((s) => s.vehicle_id && s.usd > 0)
+    .sort((a, b) => b.usd - a.usd);
+  if (pricedSales.length === 0) return [];
+
+  const targetModel = model?.trim().toLowerCase() || null;
+  const isYearsLevel = items.every((item) => {
+    const yr = parseInt(item.name, 10);
+    return Number.isFinite(yr) && String(yr) === item.name.trim() && yr >= 1886 && yr <= 2100;
+  });
+
+  if (isYearsLevel) {
+    const exactSales = targetModel
+      ? pricedSales.filter((s) => (s.model ?? '').trim().toLowerCase() === targetModel)
+      : [];
+    const prefixSales = targetModel
+      ? pricedSales.filter(
+          (s) =>
+            (s.model ?? '').trim().toLowerCase() !== targetModel &&
+            matchesSaleSubModel(s.model, model),
+        )
+      : pricedSales;
+    const orderedPools = targetModel ? [exactSales, prefixSales] : [pricedSales];
+
+    const sortedTiles = [...items].sort((a, b) => (b.value || b.count || 0) - (a.value || a.count || 0));
+    for (const tile of sortedTiles) {
+      const yr = parseInt(tile.name, 10);
+      if (!Number.isFinite(yr)) continue;
+      let countForTile = 0;
+      for (const pool of orderedPools) {
+        for (const s of pool) {
+          if (s.year !== yr) continue;
+          if (pushId(s.vehicle_id)) {
+            countForTile += 1;
+            if (countForTile >= perTileLimit || out.length >= maxTotal) break;
+          }
+        }
+        if (countForTile >= perTileLimit || out.length >= maxTotal) break;
+      }
+      if (out.length >= maxTotal) break;
+    }
+    return out;
+  }
+
+  const sortedTiles = [...items].sort((a, b) => (b.usd || b.value || b.count || 0) - (a.usd || a.value || a.count || 0));
+  for (const tile of sortedTiles) {
+    const tileModel = tile.name.trim().toLowerCase();
+    if (!tileModel) continue;
+    let countForTile = 0;
+    for (const exactPass of [true, false]) {
+      for (const s of pricedSales) {
+        const saleModel = (s.model ?? '').trim().toLowerCase();
+        const matches = exactPass
+          ? saleModel === tileModel
+          : saleModel !== tileModel && matchesSaleSubModel(s.model, tile.name);
+        if (!matches) continue;
+        if (pushId(s.vehicle_id)) {
+          countForTile += 1;
+          if (countForTile >= perTileLimit || out.length >= maxTotal) break;
+        }
+      }
+      if (countForTile >= perTileLimit || out.length >= maxTotal) break;
+    }
+    if (out.length >= maxTotal) break;
+  }
+
+  return out;
+}
+
+export function buildRepresentativeImageCandidates(
+  rows: readonly RepresentativeImageRow[],
+  model?: string | null,
+  orderedIds?: readonly string[],
+): Map<string, string[]> {
+  const map = new Map<string, string[]>();
+  const addCandidate = (key: string, url: string) => {
+    if (!key || !url) return;
+    const existing = map.get(key);
+    if (!existing) {
+      map.set(key, [url]);
+    } else if (!existing.includes(url)) {
+      existing.push(url);
+    }
+  };
+
+  const targetModel = model?.trim().toLowerCase() || null;
+  const orderMap = orderedIds && orderedIds.length > 0
+    ? new Map(orderedIds.map((id, idx) => [id, idx]))
+    : null;
+
+  const sortedRows = [...rows].sort((a, b) => {
+    if (targetModel) {
+      const aExact = String(a.model || '').trim().toLowerCase() === targetModel ? 0 : 1;
+      const bExact = String(b.model || '').trim().toLowerCase() === targetModel ? 0 : 1;
+      if (aExact !== bExact) return aExact - bExact;
+    }
+    if (orderMap) {
+      const aIdx = a.id ? (orderMap.get(String(a.id)) ?? Number.MAX_SAFE_INTEGER) : Number.MAX_SAFE_INTEGER;
+      const bIdx = b.id ? (orderMap.get(String(b.id)) ?? Number.MAX_SAFE_INTEGER) : Number.MAX_SAFE_INTEGER;
+      if (aIdx !== bIdx) return aIdx - bIdx;
+    }
+    return 0;
+  });
+
+  for (const row of sortedRows) {
+    const rawUrl = typeof row.primary_image_url === 'string' ? row.primary_image_url.trim() : '';
+    if (!rawUrl) continue;
+    const idKey = row.id ? String(row.id) : '';
+    const modelKey = String(row.model || '').trim().toLowerCase();
+    const familyKey = modelKey.split(/\s+/)[0] || '';
+    const yearKey = row.year != null && String(row.year) !== '' ? String(row.year) : '';
+
+    if (idKey) addCandidate(idKey, rawUrl);
+    if (modelKey) addCandidate(modelKey, rawUrl);
+    if (familyKey) addCandidate(familyKey, rawUrl);
+
+    const matchesTargetModel = !targetModel || modelKey === targetModel || matchesSaleSubModel(row.model, model);
+    if (yearKey && matchesTargetModel) {
+      addCandidate(yearKey, rawUrl);
+    }
+  }
+
+  return map;
+}
+
+function useRepresentativeImages(
+  items: TreemapNode[] | null,
+  make?: string | null,
+  model?: string | null,
+  familySales?: readonly Sale[] | null,
+) {
+  const [images, setImages] = useState<Map<string, string[]>>(new Map());
+  const candidateIds = useMemo(
+    () => selectFamilyRepresentativeVehicleIds(items, familySales, model),
+    [items, familySales, model],
+  );
+  const candidateIdsKey = candidateIds.join(',');
+  const itemsKey = useMemo(
+    () => (items ? items.slice(0, 40).map((i) => i.id || i.name).join('|') : ''),
+    [items],
+  );
+
   useEffect(() => {
     if (!items || !make || items.length === 0) { setImages(new Map()); return; }
     let cancelled = false;
-    // The brand's priciest sold cars with a photo, read along the (make, sale_price) index of priced sales. The earlier
-    // shape (make ILIKE, sale_price OR sold_price) walked every vehicle by price and timed out on every brand drill
-    // (HTTP 500 for Ford and Porsche, 2026-10-15), so no tile ever had its image; this one reads 200 rows of the brand.
-    supabase
-      .from('vehicles')
-      .select('model, year, primary_image_url')
-      .eq('make', make)
-      .gt('sale_price', 0)
-      .not('primary_image_url', 'is', null)
-      .is('deleted_at', null)
-      .order('sale_price', { ascending: false })
-      .limit(200)
-      .then(({ data: result, error }) => {
-        if (cancelled || !result || error) return;
-        const map = new Map<string, string>();
-        for (const row of result as any[]) {
-          // Key by model name, by its first word (a family tile is "911", its sales "911 Carrera") and by year.
-          const modelKey = String(row.model || '').toLowerCase();
-          const familyKey = modelKey.split(/\s+/)[0];
-          const yearKey = String(row.year || '');
-          if (!row.primary_image_url) continue;
-          for (const key of [modelKey, familyKey, yearKey]) if (key && !map.has(key)) map.set(key, row.primary_image_url);
-        }
-        setImages(map);
-      });
+    const baseSelect = supabase.from('vehicles')?.select?.('id, model, year, primary_image_url');
+    if (!baseSelect) return;
+
+    if (candidateIds.length > 0 && typeof (baseSelect as any).in === 'function') {
+      (baseSelect as any)
+        .in('id', candidateIds)
+        .not('primary_image_url', 'is', null)
+        .is('deleted_at', null)
+        .then(({ data: result, error }: { data: RepresentativeImageRow[] | null; error: unknown }) => {
+          if (cancelled || !result || error) return;
+          setImages(buildRepresentativeImageCandidates(result, model, candidateIds));
+        });
+      return () => { cancelled = true; };
+    }
+
+    // Fallback: the brand's priciest sold cars with a photo, read along the (make, sale_price) index of priced sales,
+    // scoped in memory to the active sub-model so brand-wide outliers (e.g. GT40 on Mustang years) never cross-contaminate.
+    if (typeof (baseSelect as any).eq === 'function') {
+      (baseSelect as any)
+        .eq('make', make)
+        .gt('sale_price', 0)
+        .not('primary_image_url', 'is', null)
+        .is('deleted_at', null)
+        .order('sale_price', { ascending: false })
+        .limit(200)
+        .then(({ data: result, error }: { data: RepresentativeImageRow[] | null; error: unknown }) => {
+          if (cancelled || !result || error) return;
+          setImages(buildRepresentativeImageCandidates(result, model));
+        });
+    }
     return () => { cancelled = true; };
-  }, [items?.length, make]);
+  }, [itemsKey, make, model, candidateIdsKey]);
   return images;
 }
 
@@ -547,19 +725,36 @@ interface CellProps {
   totalCount: number;
   showValue?: boolean;
   repImage?: string;
+  repImages?: string[];
 }
 
-function TreemapCell({ rect, onClick, totalCount, showValue, repImage }: CellProps) {
+function TreemapCell({ rect, onClick, totalCount, showValue, repImage, repImages }: CellProps) {
   const { node, x, y, w, h } = rect;
   const [hovered, setHovered] = useState(false);
   const [imgLoaded, setImgLoaded] = useState(false);
+  const [failedIdx, setFailedIdx] = useState(0);
 
   const pct = totalCount > 0 ? ((node.count / totalCount) * 100) : 0;
   const isBrandMarket = node.usd != null && !node.isVehicle;
   const bg = isBrandMarket ? momentumToColor(brandMomentum(node)) : priceToColor(node.median_price);
   const isVehicle = !!node.isVehicle;
-  const hasImage = isVehicle ? !!node.imageUrl : !!repImage;
-  const imageUrl = isVehicle ? node.imageUrl : repImage;
+  const candidateUrls = useMemo(() => {
+    const list: string[] = [];
+    if (isVehicle && node.imageUrl) list.push(node.imageUrl);
+    if (repImages && repImages.length > 0) {
+      for (const u of repImages) if (u && !list.includes(u)) list.push(u);
+    }
+    if (repImage && !list.includes(repImage)) list.push(repImage);
+    return list;
+  }, [isVehicle, node.imageUrl, repImage, repImages]);
+  const candidateKey = candidateUrls.join('|');
+  useEffect(() => {
+    setFailedIdx(0);
+    setImgLoaded(false);
+  }, [candidateKey]);
+
+  const imageUrl = candidateUrls[failedIdx];
+  const hasImage = !!imageUrl;
   const isLarge = w > 120 && h > 80;
 
   // Vehicle cells: show image as full background
@@ -569,7 +764,7 @@ function TreemapCell({ rect, onClick, totalCount, showValue, repImage }: CellPro
   // Decide what text fits
   const canShowName = w > 28 && h > 16;
   const canShowCount = w > 40 && h > 30 && !isVehicle;
-  const canShowPrice = w > 60 && (isVehicle ? h > 28 : h > 44);
+  const canShowPrice = w > 42 && (isVehicle ? h > 28 : h > 42);
   const canShowPct = w > 50 && h > 56 && !isVehicle;
   const canShowMileage = isVehicle && w > 80 && h > 44 && node.mileage;
 
@@ -620,6 +815,10 @@ function TreemapCell({ rect, onClick, totalCount, showValue, repImage }: CellPro
           loading="lazy"
           decoding="async"
           onLoad={() => setImgLoaded(true)}
+          onError={() => {
+            setImgLoaded(false);
+            setFailedIdx((idx) => idx + 1);
+          }}
           style={{
             position: 'absolute',
             inset: 0,
@@ -726,7 +925,7 @@ function TreemapCell({ rect, onClick, totalCount, showValue, repImage }: CellPro
                 lineHeight: 1.3,
               }}
             >
-              {fmtMoney(node.median_price)}{!isVehicle && ' med'}
+              {fmtMoney(node.median_price)}{!isVehicle && w > 60 && ' med'}
             </div>
           )}
           {canShowMileage && (
@@ -1233,7 +1432,9 @@ export function TreemapHomePage({ onBrowse, embedded = false }: { onBrowse: () =
     levelType === 'models' ? (familyView === 'names' ? familyModelsData : null) : levelType === 'years' ? yearsData
       : levelType === 'vehicles' && !currentLevel.model ? familyYearVehiclesNodes
       : levelType === 'families' && familiesFailed ? modelsData : null,
-    currentLevel.make
+    currentLevel.make,
+    currentLevel.model,
+    familySalesData,
   );
 
   // Container sizing
@@ -1821,7 +2022,7 @@ export function TreemapHomePage({ onBrowse, embedded = false }: { onBrowse: () =
             >
               ALL YEARS <span className="home-family-submodel-count">{pool.length}</span>
             </button>
-            {pool.slice(0, 16).map((yrNode) => {
+            {pool.map((yrNode) => {
               const yr = parseInt(yrNode.name, 10);
               const active = currentLevel.year === yr;
               return (
@@ -1935,10 +2136,12 @@ export function TreemapHomePage({ onBrowse, embedded = false }: { onBrowse: () =
                 </div>
               );
             }
-            const repImg = !rect.node.isVehicle
+            const repImgCandidates = !rect.node.isVehicle
               ? repImages.get(rect.node.name.toLowerCase()) || repImages.get(rect.node.name)
               : rect.node.imageUrl ? undefined
-              : repImages.get(rect.node.name.toLowerCase()) || (currentLevel.year ? repImages.get(String(currentLevel.year)) : undefined);
+              : (rect.node.id ? repImages.get(rect.node.id) : undefined)
+                || repImages.get(rect.node.name.toLowerCase())
+                || (currentLevel.year ? repImages.get(String(currentLevel.year)) : undefined);
             return (
               <div
                 key={(rect.node.id || rect.node.name) + '-' + i}
@@ -1958,7 +2161,8 @@ export function TreemapHomePage({ onBrowse, embedded = false }: { onBrowse: () =
                   rect={rect}
                   onClick={(ev?: any) => drillInto(rect.node, ev)}
                   totalCount={totalCount}
-                  repImage={repImg}
+                  repImage={repImgCandidates?.[0]}
+                  repImages={repImgCandidates}
                 />
               </div>
             );
