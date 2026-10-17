@@ -145,6 +145,9 @@ export function parseSources(value: unknown): SourcesBoardData | null {
       ? numArray(srcLand.mins60, 12)
       : [...Array(11).fill(0), landed1h];
 
+    const rawLogo = str(get('logo_url'));
+    const logoUrl = rawLogo ? rawLogo.replace(/^https:\/\/nuke\.ag\/source-logos\//, '/source-logos/') : null;
+
     rows.push({
       source, name, category: str(get('category')), house: str(get('house')),
       held: num(get('held_lots')), heldAt: str(get('held_at')),
@@ -157,7 +160,7 @@ export function parseSources(value: unknown): SourcesBoardData | null {
       heldBefore: num(get('held_lots_before')), beforeDay: str(get('before_day')),
       landed15m, landed1h, landed24, landed7, lastLanded,
       days14, hours24, mins60,
-      logoUrl: str(get('logo_url')), businessType: str(get('business_type')),
+      logoUrl, businessType: str(get('business_type')),
     });
   }
   const notRanked: Record<string, number> = {};
@@ -740,7 +743,7 @@ export function SourcesBoardView({ data, scope }: { data: SourcesBoardData; scop
                       {/* Identity through the shared renderer (frontend rule 2026-10-08): the organization's recorded logo,
                           else its type icon. */}
                       <OrgLogo logoUrl={r.logoUrl} businessType={r.businessType ?? (r.category === 'auction' ? 'auction_house' : null)}
-                        businessName={r.name} size={18} maxWidth={96} variant="logo" className="market-sources__icon" />
+                        businessName={r.name} size={18} maxWidth={76} variant="logo" className="market-sources__icon" />
                       {shortName(r.name)}
                     </span>
                     <span className="market-sources__held n" title={r.heldAt ? `held as of ${heldWhen(r.heldAt)}` : undefined}>
