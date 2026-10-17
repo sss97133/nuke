@@ -344,6 +344,11 @@ export function matchesFamilyScope(a: LiveAuction, familyName: string | null): b
   return m === f || m.startsWith(`${f} `) || m.startsWith(`${f}-`) || wordRe.test(m) || wordRe.test(t);
 }
 
+export function matchesModelScope(a: LiveAuction, model: string | null): boolean {
+  if (!model) return true;
+  return recordedModel(a) === model || matchesFamilyScope(a, model);
+}
+
 export default function MarketPulse({ onUnavailable, collection }: { onUnavailable?: React.ReactNode; collection?: React.ReactNode }) {
   usePageTitle('Market');
   const { data, isLoading, isError, risenIds, refetch, dataUpdatedAt, newBids } = useMarketPulse();
@@ -513,7 +518,7 @@ export default function MarketPulse({ onUnavailable, collection }: { onUnavailab
   const mapAuctions = useMemo(() => mappedInventory.filter(a => (make == null || a.make === make)
     && (model != null || matchesFamilyScope(a, familyName))
     && matchesEraRange(a.year, era)
-    && (inventoryLens.group === 'model' || model == null || recordedModel(a) === model)), [mappedInventory, make, model, familyName, era, inventoryLens.group]);
+    && (inventoryLens.group === 'model' || matchesModelScope(a, model))), [mappedInventory, make, model, familyName, era, inventoryLens.group]);
   const needsTaxonomy = inventoryLens.group === 'type' || inventoryLens.group === 'body';
   const taxonomyQuery = useInventoryTaxonomy(mapAuctions, view === 'inventory' && needsTaxonomy);
   const taxonomy = useMemo(() => taxonomyByListing(taxonomyQuery.data), [taxonomyQuery.data]);
@@ -521,7 +526,7 @@ export default function MarketPulse({ onUnavailable, collection }: { onUnavailab
 
   const board = useMemo(() => {
     const rows = scoped.filter(a => (selectedBid == null || bidBucket(a.currentBid) === selectedBid)
-      && (model == null || recordedModel(a) === model)
+      && matchesModelScope(a, model)
       && matchesMapLens(a, inventoryLens, taxonomy));
     // Keep an inspected lot reachable while the board rolls past its deadline.
     if (pinnedAuction?.id === activityId && !rows.some(a => a.id === activityId)) rows.push(pinnedAuction);

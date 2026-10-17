@@ -109,6 +109,24 @@ const CURATED_FAMILY_ERAS: Record<string, FamilyEraCohort[]> = {
     { id: '1970-1972', label: "1800E '70–'72", shortLabel: '1800E', yearStart: 1970, yearEnd: 1972 },
     { id: '1972-1973', label: "1800ES '72–'73", shortLabel: '1800ES', yearStart: 1972, yearEnd: 1973 },
   ],
+  'pontiac:gto': [
+    { id: '1964-1967', label: "1st Gen '64–'67", shortLabel: "'64–'67", yearStart: 1964, yearEnd: 1967 },
+    { id: '1968-1972', label: "2nd Gen '68–'72", shortLabel: "'68–'72", yearStart: 1968, yearEnd: 1972 },
+    { id: '1973-1974', label: "3rd/4th Gen '73–'74", shortLabel: "'73–'74", yearStart: 1973, yearEnd: 1974 },
+    { id: '2004-2006', label: "5th Gen '04–'06", shortLabel: "'04–'06", yearStart: 2004, yearEnd: 2006 },
+  ],
+  'pontiac:firebird': [
+    { id: '1967-1969', label: "1st Gen '67–'69", shortLabel: "'67–'69", yearStart: 1967, yearEnd: 1969 },
+    { id: '1970-1981', label: "2nd Gen '70–'81", shortLabel: "'70–'81", yearStart: 1970, yearEnd: 1981 },
+    { id: '1982-1992', label: "3rd Gen '82–'92", shortLabel: "'82–'92", yearStart: 1982, yearEnd: 1992 },
+    { id: '1993-2002', label: "4th Gen '93–'02", shortLabel: "'93–'02", yearStart: 1993, yearEnd: 2002 },
+  ],
+  'toyota:supra': [
+    { id: '1978-1985', label: "A40/A60 MkI–II '78–'85", shortLabel: 'A40/A60', yearStart: 1978, yearEnd: 1985 },
+    { id: '1986-1992', label: "A70 MkIII '86–'92", shortLabel: 'A70 MkIII', yearStart: 1986, yearEnd: 1992 },
+    { id: '1993-2002', label: "A80 MkIV '93–'02", shortLabel: 'A80 MkIV', yearStart: 1993, yearEnd: 2002 },
+    { id: '2020-2030', label: "A90 MkV '20+", shortLabel: 'A90 MkV', yearStart: 2020, yearEnd: 2030 },
+  ],
 };
 
 export function parseEraRange(eraParam: string | null | undefined): { yearStart: number; yearEnd: number } | null {

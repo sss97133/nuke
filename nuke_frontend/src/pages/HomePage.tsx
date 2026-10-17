@@ -1014,8 +1014,8 @@ export function TreemapHomePage({ onBrowse, embedded = false }: { onBrowse: () =
   const { data: familiesData, loading: familiesLoading, failed: familiesFailed } = useTreemapFamilies(needsFamilyMeta ? currentLevel.make ?? null : null);
   const { data: modelsData, loading: modelsLoading } = useTreemapModels(atFamilies && familiesFailed ? currentLevel.make ?? null : null);
   const { data: familyModelsData, loading: familyModelsLoading } = useTreemapFamilyModels(
-    currentLevel.family && !currentLevel.model ? currentLevel.make ?? null : null,
-    currentLevel.family && !currentLevel.model ? currentLevel.family : null,
+    currentLevel.family ? currentLevel.make ?? null : null,
+    currentLevel.family ? currentLevel.family : null,
   );
   const { data: yearsData, loading: yearsLoading } = useTreemapYears(
     currentLevel.model && !currentLevel.year ? currentLevel.make ?? null : null,
@@ -1077,7 +1077,7 @@ export function TreemapHomePage({ onBrowse, embedded = false }: { onBrowse: () =
     // drillStack triggers recompute when navigating so ref cache is checked
   }, [levelType, brandsData, familiesData, familiesFailed, modelsData, familyModelsData, yearsData, vehiclesData, currentLevel, drillStack, selectedEra]);
 
-  const isLoading = brandsLoading || (atFamilies && familiesLoading) || modelsLoading || familyModelsLoading || yearsLoading || vehiclesLoading;
+  const isLoading = brandsLoading || (atFamilies && familiesLoading) || modelsLoading || (levelType === 'models' && familyModelsLoading) || yearsLoading || vehiclesLoading;
 
   // ── Prefetch: fire supabase queries on 200ms hover debounce ──
   const prefetchYears = useCallback((make: string, model: string) => {
@@ -1540,6 +1540,59 @@ export function TreemapHomePage({ onBrowse, embedded = false }: { onBrowse: () =
         </div>
       </div>
 
+      {/* ─── FAMILY SUB-MODEL PILLS: direct 1-click sub-model navigation across models, years & vehicles inside a family ─── */}
+      {currentLevel.family && currentLevel.make && familyModelsData && familyModelsData.length > 1 && (
+        <div className="home-family-submodels" role="group" aria-label="Family sub-models" data-testid="family-submodel-pills">
+          <span className="home-family-submodels-label">SUB-MODELS</span>
+          <button
+            type="button"
+            className={`home-family-submodel-pill${!currentLevel.model ? ' home-family-submodel-pill--active' : ''}`}
+            aria-pressed={!currentLevel.model}
+            onClick={() => {
+              const famEntry = drillStack.find((d) => d.family && !d.model) ?? {
+                label: searchParams.get('family_name') || currentLevel.label,
+                make: currentLevel.make,
+                family: currentLevel.family,
+              };
+              setDrillStack([{ label: 'ALL MAKES' }, { label: currentLevel.make!, make: currentLevel.make }, famEntry]);
+            }}
+          >
+            ALL <span className="home-family-submodel-count">{familyModelsData.length}</span>
+          </button>
+          {familyModelsData.slice(0, 12).map((sub) => {
+            const active = currentLevel.model === sub.name;
+            return (
+              <button
+                key={sub.name}
+                type="button"
+                className={`home-family-submodel-pill${active ? ' home-family-submodel-pill--active' : ''}`}
+                aria-pressed={active}
+                onClick={() => {
+                  const famEntry = drillStack.find((d) => d.family && !d.model) ?? {
+                    label: searchParams.get('family_name') || currentLevel.label,
+                    make: currentLevel.make,
+                    family: currentLevel.family,
+                  };
+                  if (active && !currentLevel.year) {
+                    setDrillStack([{ label: 'ALL MAKES' }, { label: currentLevel.make!, make: currentLevel.make }, famEntry]);
+                  } else {
+                    recordInterest('model', currentLevel.make!, sub.name);
+                    setDrillStack([
+                      { label: 'ALL MAKES' },
+                      { label: currentLevel.make!, make: currentLevel.make },
+                      famEntry,
+                      { label: sub.name, make: currentLevel.make, family: currentLevel.family, model: sub.name },
+                    ]);
+                  }
+                }}
+              >
+                {sub.name} <span className="home-family-submodel-count">{sub.count.toLocaleString('en-US')}</span>
+              </button>
+            );
+          })}
+        </div>
+      )}
+
       {/* ─── SALES BY HOUSE: what the all-venue map holds, house by house (the refresh's receipt) ─── */}
       {levelType === 'brands' && basis === 'ledger' && <VenueMix rows={refresh.populations?.by_house} clock={ledgerViewsClock(refresh.refreshedAt)} />}
 
@@ -1683,8 +1736,8 @@ export function TreemapHomePage({ onBrowse, embedded = false }: { onBrowse: () =
       {sheet && <MarketSheet node={sheet} move={relativeMove(sheet, baseline, basis === 'ledger')} base={baseline}
         onOpen={() => { const n = sheet; setSheet(null); drillInto(n); }} onClose={() => setSheet(null)} />}
 
-      {/* ─── FAMILY SALES CHART: when embedded on the Market page, show the family's sales & like-for-like price index below its model tiles ─── */}
-      {embedded && levelType === 'models' && currentLevel.family && currentLevel.make && familyView === 'names' && dims.w > 0 && (
+      {/* ─── FAMILY SALES CHART: when embedded on the Market page, keep the family's sales & like-for-like price index + era filter bar visible across models, years & vehicles inside the family ─── */}
+      {embedded && (levelType === 'models' || levelType === 'years' || levelType === 'vehicles') && currentLevel.family && currentLevel.make && !(levelType === 'models' && familyView === 'sales') && dims.w > 0 && (
         <div
           data-testid="embedded-family-sales-chart"
           className="home-embedded-family-chart"
@@ -1692,7 +1745,7 @@ export function TreemapHomePage({ onBrowse, embedded = false }: { onBrowse: () =
           <FamilySalesChart
             brand={currentLevel.make}
             familyKey={currentLevel.family}
-            family={currentLevel.label}
+            family={drillStack.find((d) => d.family && !d.model)?.label || searchParams.get('family_name') || currentLevel.label}
             width={dims.w}
             height={340}
             onOpen={(id) => navigate(`/vehicle/${id}`)}
@@ -1769,6 +1822,58 @@ export function TreemapHomePage({ onBrowse, embedded = false }: { onBrowse: () =
           border-top: 2px solid var(--border);
           background: var(--bg);
           overflow: hidden;
+        }
+        .home-family-submodels {
+          display: flex;
+          align-items: center;
+          gap: 6px;
+          padding: 4px 16px;
+          border-bottom: 1px solid var(--border);
+          background: var(--surface);
+          overflow-x: auto;
+          flex-shrink: 0;
+        }
+        .home-family-submodels-label {
+          font-size: 8px;
+          font-weight: 700;
+          letter-spacing: 0.12em;
+          text-transform: uppercase;
+          color: var(--text-disabled);
+          font-family: Arial, sans-serif;
+          white-space: nowrap;
+          margin-right: 2px;
+        }
+        .home-family-submodel-pill {
+          display: inline-flex;
+          align-items: center;
+          gap: 5px;
+          padding: 2px 8px;
+          font-size: 10px;
+          font-weight: 600;
+          font-family: Arial, sans-serif;
+          color: var(--text-secondary);
+          background: transparent;
+          border: 1px solid var(--border);
+          cursor: pointer;
+          white-space: nowrap;
+        }
+        .home-family-submodel-pill:hover {
+          color: var(--text);
+          border-color: var(--text-secondary);
+        }
+        .home-family-submodel-pill--active {
+          color: var(--bg);
+          background: var(--text);
+          border-color: var(--text);
+        }
+        .home-family-submodel-pill--active:hover {
+          color: var(--bg);
+          border-color: var(--text);
+        }
+        .home-family-submodel-count {
+          font-size: 9px;
+          font-family: 'Courier New', monospace;
+          opacity: 0.72;
         }
       `}</style>
     </div>
