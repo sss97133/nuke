@@ -89,6 +89,26 @@ const CURATED_FAMILY_ERAS: Record<string, FamilyEraCohort[]> = {
     { id: '2008-2021', label: "200 Series '08–'21", shortLabel: '200 Series', yearStart: 2008, yearEnd: 2021 },
     { id: '2024-2030', label: "250 Series '24+", shortLabel: '250 Series', yearStart: 2024, yearEnd: 2030 },
   ],
+  'mercedes-benz:sl': [
+    { id: '1954-1963', label: "W198/W121 '54–'63", shortLabel: '300SL/190SL', yearStart: 1954, yearEnd: 1963 },
+    { id: '1963-1971', label: "W113 Pagoda '63–'71", shortLabel: 'Pagoda W113', yearStart: 1963, yearEnd: 1971 },
+    { id: '1971-1989', label: "R107 '71–'89", shortLabel: 'R107', yearStart: 1971, yearEnd: 1989 },
+    { id: '1990-2002', label: "R129 '90–'02", shortLabel: 'R129', yearStart: 1990, yearEnd: 2002 },
+    { id: '2003-2012', label: "R230 '03–'12", shortLabel: 'R230', yearStart: 2003, yearEnd: 2012 },
+    { id: '2013-2020', label: "R231 '13–'20", shortLabel: 'R231', yearStart: 2013, yearEnd: 2020 },
+    { id: '2022-2030', label: "R232 '22+", shortLabel: 'R232', yearStart: 2022, yearEnd: 2030 },
+  ],
+  'porsche:356': [
+    { id: '1948-1955', label: "Pre-A '48–'55", shortLabel: 'Pre-A', yearStart: 1948, yearEnd: 1955 },
+    { id: '1956-1959', label: "356A '56–'59", shortLabel: '356A', yearStart: 1956, yearEnd: 1959 },
+    { id: '1960-1963', label: "356B '60–'63", shortLabel: '356B', yearStart: 1960, yearEnd: 1963 },
+    { id: '1964-1965', label: "356C/SC '64–'65", shortLabel: '356C/SC', yearStart: 1964, yearEnd: 1965 },
+  ],
+  'volvo:p1800': [
+    { id: '1961-1969', label: "P1800/1800S '61–'69", shortLabel: 'P1800/1800S', yearStart: 1961, yearEnd: 1969 },
+    { id: '1970-1972', label: "1800E '70–'72", shortLabel: '1800E', yearStart: 1970, yearEnd: 1972 },
+    { id: '1972-1973', label: "1800ES '72–'73", shortLabel: '1800ES', yearStart: 1972, yearEnd: 1973 },
+  ],
 };
 
 export function parseEraRange(eraParam: string | null | undefined): { yearStart: number; yearEnd: number } | null {

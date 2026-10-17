@@ -60,6 +60,24 @@ describe('marketScopeResolver', () => {
         sold: 16751,
         usd: 1300400000,
       },
+      {
+        brand: 'Porsche',
+        family_key: '911-family-uuid',
+        family: '911',
+        model_key: '911',
+        model: '911',
+        sold: 22000,
+        usd: 2500000000,
+      },
+      {
+        brand: 'Mercedes-Benz',
+        family_key: 'sl-family-uuid',
+        family: 'SL',
+        model_key: '230sl',
+        model: '230SL',
+        sold: 163,
+        usd: 9170000,
+      },
     ];
     mockRows.error = null;
   });
@@ -129,6 +147,27 @@ describe('marketScopeResolver', () => {
       family: '8a8271f8-d299-4b55-837a-35ca919f8937',
       family_name: 'Mustang',
       era: '1979-1993',
+    });
+    const pagodaScope = await resolveMarketScopeQuery('pagoda');
+    expect(pagodaScope).toEqual({
+      make: 'Mercedes-Benz',
+      family: 'sl-family-uuid',
+      family_name: 'SL',
+      era: '1963-1971',
+    });
+    const p993Scope = await resolveMarketScopeQuery('993');
+    expect(p993Scope).toEqual({
+      make: 'Porsche',
+      family: '911-family-uuid',
+      family_name: '911',
+      era: '1995-1998',
+    });
+    const c2Scope = await resolveMarketScopeQuery('split window');
+    expect(c2Scope).toEqual({
+      make: 'Chevrolet',
+      family: '3f3e7278-f47c-412f-b6fc-0ab5d8485924',
+      family_name: 'Corvette',
+      era: '1963-1967',
     });
   });
 
