@@ -26,7 +26,7 @@
 .market-sources__name { display: flex; align-items: center; gap: 6px; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
 /* A house's own transparent PNG mark; compact (13 px tall, up to 42 px wide) with a crisp border and breathing room. */
 .market-sources__icon { flex: none; object-fit: contain; filter: none; padding: 2px 4px;
-  border: 1px solid var(--border); border-radius: 3px; background: #ffffff; box-sizing: content-box; }
+  border: 1px solid var(--border); background: #ffffff; box-sizing: content-box; }
 .market-sources__name small { font-weight: 400; color: var(--text-secondary); font-size: 10px; text-transform: lowercase; }
 .market-sources__held small { font-size: 10px; } .market-sources__held .up { color: var(--success); } .market-sources__held .down { color: var(--error); }
 .market-sources__share { display: grid; grid-template-columns: minmax(52px, 1fr) 15.5em; align-items: center; gap: 8px; min-width: 0; }
