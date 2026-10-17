@@ -38,6 +38,23 @@ export interface SearchFacetSummary {
   pills: SearchFacetPill[];
 }
 
+export interface QueryFacetAnalysis extends SearchFacetSummary {
+  hasFacetIntent: boolean;
+  requestedAxes: Array<'series' | 'trim' | 'body'>;
+}
+
+export interface VehicleFacetMatchScore {
+  matchesAllQueryFacets: boolean;
+  matchedAxes: Array<'series' | 'trim' | 'body'>;
+  boost: number;
+  candidateFacets: SearchFacetSummary;
+}
+
+export interface BoostVehicleResultsOptions {
+  filterNonMatchingVehicles?: boolean;
+  minMatchingVehiclesToFilter?: number;
+}
+
 const KNOWN_MAKE_PATTERNS: Array<{ canonical: string; regex: RegExp }> = [
   { canonical: 'Mercedes-Benz', regex: /\b(?:MERCEDES[-\s]+BENZ|MERCEDES)\b/i },
   { canonical: 'Aston Martin', regex: /\bASTON\s+MARTIN\b/i },
@@ -101,6 +118,33 @@ function parseMakeFromText(
       return entry.canonical === 'Mustang' ? 'Ford' : entry.canonical;
     }
   }
+  const upper = compositeText.toUpperCase();
+  if (
+    /\b(?:CHEYENNE\s+SUPER|CHEYENNE|SCOTTSDALE|SILVERADO|CUSTOM\s+DELUXE|BIG\s+10|454\s+SS|CAMEO|APACHE|CORVETTE|STING\s*RAY|CAMARO|CHEVELLE|BEL\s+AIR|NOMAD)\b/.test(
+      upper,
+    )
+  ) {
+    return 'Chevrolet';
+  }
+  if (/\b(?:SIERRA\s+CLASSIC|SIERRA\s+GRANDE|HIGH\s+SIERRA|GENTLEMAN\s+JIM|SIERRA|SYCLONE)\b/.test(upper)) {
+    return 'GMC';
+  }
+  if (
+    /\b(?:MUSTANG|MACH\s+1|BOSS\s+(?:302|429)|SHELBY\s+GT(?:350|500)|RANGER\s+XLT|LARIAT|BRONCO|F[-\s]?(?:100|150|250|350))\b/.test(
+      upper,
+    )
+  ) {
+    return 'Ford';
+  }
+  if (/\b(?:CARRERA\s+RS|TARGA|911[SET]?|930)\b/.test(upper)) {
+    return 'Porsche';
+  }
+  if (/\b(?:300\s*SL|190\s*SL|GULLWING|PAGODA)\b/.test(upper)) {
+    return 'Mercedes-Benz';
+  }
+  if (/\b(?:POWER\s+WAGON|WM[-\s]?300|CHARGER|CHALLENGER|SUPERBIRD|DAYTONA)\b/.test(upper)) {
+    return 'Dodge';
+  }
   return null;
 }
 
@@ -118,7 +162,7 @@ function inferFamilyLabel(
 
   const upper = compositeText.toUpperCase();
   if (
-    /\b(?:[CKRV][-\s]?(?:10|20|30|1500|2500|3500)|3100|3600|3800|F[-\s]?(?:1|2|3|100|150|250|350)|W[-\s]?(?:100|150|200|250|300)|WM[-\s]?300|D[-\s]?(?:100|150|200|250)|POWER\s+WAGON|APACHE|CAMEO|STEPSIDE|FLEETSIDE|PICKUP)\b/.test(
+    /\b(?:[CKRV][-\s]?(?:10|20|30|1500|2500|3500)|3100|3600|3800|F[-\s]?(?:1|2|3|100|150|250|350)|W[-\s]?(?:100|150|200|250|300)|WM[-\s]?300|D[-\s]?(?:100|150|200|250)|POWER\s+WAGON|APACHE|CAMEO|CHEYENNE\s+SUPER|CHEYENNE|SCOTTSDALE|CUSTOM\s+DELUXE|SIERRA\s+CLASSIC|SIERRA\s+GRANDE|HIGH\s+SIERRA|GENTLEMAN\s+JIM|STEPSIDE|FLARESIDE|FLEETSIDE|STYLESIDE|PICKUP)\b/.test(
       upper,
     )
   ) {
@@ -127,16 +171,16 @@ function inferFamilyLabel(
   if (/\bMUSTANG\b|\bSHELBY\s+GT(?:350|500)\b|\bBOSS\s+(?:302|429)\b|\bMACH\s+1\b/.test(upper)) {
     return 'Mustang';
   }
-  if (/\bCORVETTE\b|\bSTING\s*RAY\b/.test(upper)) return 'Corvette';
+  if (/\bCORVETTE\b|\bSTING\s*RAY\b|\bSPLIT[-\s]?WINDOW\b/.test(upper)) return 'Corvette';
   if (/\bCAMARO\b|\bZ\/?28\b|\bIROC[-\s]?Z\b/.test(upper)) return 'Camaro';
   if (/\bCHEVELLE\b|\bMALIBU\b/.test(upper)) return 'Chevelle';
   if (/\bBEL\s+AIR\b/.test(upper)) return 'Bel Air';
   if (/\bNOMAD\b/.test(upper)) return 'Nomad';
-  if (/\bBRONCO\b/.test(upper)) return 'Bronco';
+  if (/\bBRONCO\b|\bU1[345]\b/.test(upper)) return 'Bronco';
   if (/\bCHARGER\b/.test(upper)) return 'Charger';
   if (/\bCHALLENGER\b/.test(upper)) return 'Challenger';
   if (/\b911\b|\b930\b|\bCARRERA\b|\bTARGA\b/.test(upper)) return '911';
-  if (/\bM3\b/.test(upper)) return 'M3';
+  if (/\bM3\b|\bE30\b|\bE36\b|\bE46\b/.test(upper)) return 'M3';
   if (/\b(?:300|190|230|250|280|380|450|560)\s*SL\b|\bPAGODA\b|\bGULLWING\b/.test(upper)) {
     return 'SL';
   }
@@ -230,6 +274,378 @@ export function deriveSearchResultFacets(input: SearchFacetInput): SearchFacetSu
     badgeSvg,
     pills,
   };
+}
+
+/**
+ * Extracts explicit Series, Trim, and Body Style facet intent from a user search query.
+ * Unlike vehicle classification, a general pickup query (e.g. "1973 K10 Cheyenne Super")
+ * does not implicitly restrict `body` to "Standard Cab Pickup" unless the query
+ * explicitly names a cab/bed configuration.
+ */
+export function extractQueryFacets(query: string | null | undefined): QueryFacetAnalysis {
+  const trimmed = (query ?? '').trim();
+  if (!trimmed) {
+    return {
+      year: null,
+      make: null,
+      familyLabel: null,
+      series: null,
+      trim: null,
+      body: null,
+      badgeSvg: undefined,
+      pills: [],
+      hasFacetIntent: false,
+      requestedAxes: [],
+    };
+  }
+
+  const base = deriveSearchResultFacets({ label: trimmed });
+  const upper = trimmed.toUpperCase();
+
+  let series = base.series;
+  if (series === 'Mustang Standard' && !/\bSTANDARD\b/.test(upper)) {
+    series = null;
+  } else if (series === 'Corvette Base' && !/\bBASE\b/.test(upper)) {
+    series = null;
+  } else if (series === 'U15 Wagon' && !/\b(?:U15|WAGON)\b/.test(upper)) {
+    series = null;
+  }
+
+  let body = base.body;
+  if (
+    body === 'Standard Cab Pickup' &&
+    !/\b(?:STANDARD\s+CAB|REGULAR\s+CAB|SINGLE\s+CAB)\b/.test(upper)
+  ) {
+    body = null;
+  }
+
+  const trim = base.trim;
+
+  const requestedAxes: Array<'series' | 'trim' | 'body'> = [];
+  if (series) requestedAxes.push('series');
+  if (trim) requestedAxes.push('trim');
+  if (body) requestedAxes.push('body');
+
+  const pills = base.pills.filter((p) => requestedAxes.includes(p.kind));
+
+  return {
+    ...base,
+    series,
+    trim,
+    body,
+    pills,
+    hasFacetIntent: requestedAxes.length > 0,
+    requestedAxes,
+  };
+}
+
+function seriesFacetMatches(querySeries: string, candidateSeries: string | null): boolean {
+  if (!candidateSeries) return false;
+  if (candidateSeries.toLowerCase() === querySeries.toLowerCase()) return true;
+  if (/^sting\s*ray/i.test(querySeries) && /^sting\s*ray/i.test(candidateSeries)) {
+    return true;
+  }
+  if (querySeries === '1500 (1/2-Ton)' && candidateSeries === 'K1500 (1/2-Ton 4x4)') {
+    return true;
+  }
+  return false;
+}
+
+/**
+ * Scores a candidate vehicle against the user query's Series, Trim, and Body Style facets.
+ */
+export function scoreVehicleFacetMatch(
+  queryOrFacets: string | QueryFacetAnalysis,
+  candidate: SearchFacetInput,
+): VehicleFacetMatchScore {
+  const queryFacets =
+    typeof queryOrFacets === 'string' ? extractQueryFacets(queryOrFacets) : queryOrFacets;
+  const candidateFacets = deriveSearchResultFacets(candidate);
+
+  if (!queryFacets.hasFacetIntent) {
+    return {
+      matchesAllQueryFacets: false,
+      matchedAxes: [],
+      boost: 0,
+      candidateFacets,
+    };
+  }
+
+  const matchedAxes: Array<'series' | 'trim' | 'body'> = [];
+  let boost = 0;
+
+  if (queryFacets.series) {
+    if (seriesFacetMatches(queryFacets.series, candidateFacets.series)) {
+      matchedAxes.push('series');
+      boost += 0.4;
+    }
+  }
+
+  if (queryFacets.trim) {
+    if (
+      candidateFacets.trim &&
+      candidateFacets.trim.toLowerCase() === queryFacets.trim.toLowerCase()
+    ) {
+      matchedAxes.push('trim');
+      boost += 0.45;
+    }
+  }
+
+  if (queryFacets.body) {
+    if (
+      candidateFacets.body &&
+      candidateFacets.body.toLowerCase() === queryFacets.body.toLowerCase()
+    ) {
+      matchedAxes.push('body');
+      boost += 0.35;
+    }
+  }
+
+  if (matchedAxes.length > 1) {
+    boost += 0.15 * (matchedAxes.length - 1);
+  }
+
+  const makeContradicts = Boolean(
+    queryFacets.make &&
+      candidateFacets.make &&
+      queryFacets.make.toLowerCase() !== candidateFacets.make.toLowerCase(),
+  );
+  const yearContradicts = Boolean(
+    queryFacets.year &&
+      candidateFacets.year &&
+      queryFacets.year !== candidateFacets.year,
+  );
+
+  if (queryFacets.year && candidateFacets.year === queryFacets.year && matchedAxes.length > 0) {
+    boost += 0.15;
+  } else if (yearContradicts) {
+    boost -= 0.35;
+  }
+
+  if (makeContradicts) {
+    boost -= 0.5;
+  }
+
+  if (matchedAxes.length === 0) {
+    boost -= 0.4;
+  }
+
+  const matchesAllQueryFacets =
+    queryFacets.requestedAxes.length > 0 &&
+    matchedAxes.length === queryFacets.requestedAxes.length &&
+    !makeContradicts &&
+    !yearContradicts;
+
+  return {
+    matchesAllQueryFacets,
+    matchedAxes,
+    boost: Number(boost.toFixed(4)),
+    candidateFacets,
+  };
+}
+
+/**
+ * Boosts and filters local/RPC vehicle search results when the user query matches
+ * a Series, Trim, or Body Style facet from `classifyVehicleFacets`.
+ */
+export function boostAndFilterVehicleSearchResults<T extends Record<string, any>>(
+  query: string,
+  results: T[],
+  options: BoostVehicleResultsOptions = {},
+): T[] {
+  if (!Array.isArray(results) || results.length === 0) return [];
+
+  const queryFacets = extractQueryFacets(query);
+  if (!queryFacets.hasFacetIntent) {
+    return results;
+  }
+
+  const filterNonMatchingVehicles = options.filterNonMatchingVehicles ?? true;
+  const minMatchingVehiclesToFilter = options.minMatchingVehiclesToFilter ?? 1;
+
+  interface ScoredEntry {
+    item: T;
+    index: number;
+    isVehicle: boolean;
+    isPinnedMarketCohort: boolean;
+    score: VehicleFacetMatchScore | null;
+    effectiveRelevance: number;
+  }
+
+  const entries: ScoredEntry[] = results.map((rawItem, index) => {
+    const itemType = typeof rawItem.type === 'string' ? rawItem.type : undefined;
+    const isPinnedMarketCohort =
+      itemType === 'tag' && String(rawItem.id ?? '').startsWith('market_scope:');
+    const isVehicle = !itemType || itemType === 'vehicle' || itemType === 'vin_match';
+
+    if (!isVehicle) {
+      return {
+        item: rawItem,
+        index,
+        isVehicle: false,
+        isPinnedMarketCohort,
+        score: null,
+        effectiveRelevance: typeof rawItem.relevance_score === 'number' ? rawItem.relevance_score : 0.5,
+      };
+    }
+
+    const meta =
+      rawItem.metadata && typeof rawItem.metadata === 'object' ? rawItem.metadata : undefined;
+    const candidateInput: SearchFacetInput = {
+      year: rawItem.year ?? meta?.year,
+      make: rawItem.make ?? meta?.make,
+      model: rawItem.model ?? meta?.model ?? meta?.normalized_model,
+      familyLabel: rawItem.familyLabel ?? meta?.family_name,
+      series: rawItem.series ?? meta?.series,
+      trim: rawItem.trim ?? meta?.trim,
+      bodyStyle:
+        rawItem.bodyStyle ??
+        rawItem.body_style ??
+        meta?.body_style ??
+        meta?.bodyStyle,
+      title: rawItem.title ?? meta?.title,
+      subtitle: rawItem.subtitle,
+      description: rawItem.description,
+      label: rawItem.label,
+    };
+
+    const score = scoreVehicleFacetMatch(queryFacets, candidateInput);
+    const baseRelevance =
+      typeof rawItem.relevance_score === 'number' ? rawItem.relevance_score : 0.5;
+    const effectiveRelevance = Math.max(0, Number((baseRelevance + score.boost).toFixed(4)));
+
+    const updatedItem: Record<string, any> = {
+      ...rawItem,
+      relevance_score: effectiveRelevance,
+    };
+
+    if (meta || itemType) {
+      updatedItem.metadata = {
+        ...(meta ?? {}),
+        series: meta?.series ?? score.candidateFacets.series ?? undefined,
+        trim: meta?.trim ?? score.candidateFacets.trim ?? undefined,
+        body_style: meta?.body_style ?? score.candidateFacets.body ?? undefined,
+        matched_facets: score.matchedAxes,
+        facet_boost: score.boost,
+      };
+    }
+
+    return {
+      item: updatedItem as T,
+      index,
+      isVehicle: true,
+      isPinnedMarketCohort: false,
+      score,
+      effectiveRelevance,
+    };
+  });
+
+  const fullMatchCount = entries.filter(
+    (e) => e.isVehicle && e.score?.matchesAllQueryFacets,
+  ).length;
+  const partialMatchCount = entries.filter(
+    (e) => e.isVehicle && (e.score?.matchedAxes.length ?? 0) > 0,
+  ).length;
+
+  let filtered = entries;
+  if (filterNonMatchingVehicles) {
+    if (fullMatchCount >= minMatchingVehiclesToFilter) {
+      filtered = entries.filter(
+        (e) => !e.isVehicle || Boolean(e.score?.matchesAllQueryFacets),
+      );
+    } else if (partialMatchCount >= minMatchingVehiclesToFilter) {
+      filtered = entries.filter(
+        (e) => !e.isVehicle || (e.score?.matchedAxes.length ?? 0) > 0,
+      );
+    }
+  }
+
+  return [...filtered]
+    .sort((a, b) => {
+      if (a.isPinnedMarketCohort !== b.isPinnedMarketCohort) {
+        return a.isPinnedMarketCohort ? -1 : 1;
+      }
+      const aFull = a.score?.matchesAllQueryFacets ? 1 : 0;
+      const bFull = b.score?.matchesAllQueryFacets ? 1 : 0;
+      if (bFull !== aFull) return bFull - aFull;
+
+      const aAxes = a.score?.matchedAxes.length ?? 0;
+      const bAxes = b.score?.matchedAxes.length ?? 0;
+      if (bAxes !== aAxes) return bAxes - aAxes;
+
+      if (b.effectiveRelevance !== a.effectiveRelevance) {
+        return b.effectiveRelevance - a.effectiveRelevance;
+      }
+      return a.index - b.index;
+    })
+    .map((e) => e.item);
+}
+
+/**
+ * Builds the Supabase `.or(...)` filter for the local vehicle fallback query,
+ * expanding Series, Trim, and Body Style facet synonyms (e.g. Split-Window -> 1963 Corvette,
+ * Stepside -> Flareside, Fastback -> SportsRoof / 2+2).
+ */
+export function buildFacetExpandedOrFilter(
+  rawQuery: string,
+  canonicalFamilyOrModel?: string | null,
+): string {
+  const safeQuery = rawQuery.trim().replace(/([%_\\])/g, '\\$1');
+  const canonicalSafe = (canonicalFamilyOrModel ?? '').trim().replace(/([%_\\])/g, '\\$1');
+  const queryFacets = extractQueryFacets(rawQuery);
+
+  const clauses = new Set<string>();
+  if (canonicalSafe && canonicalSafe.toLowerCase() !== safeQuery.toLowerCase()) {
+    clauses.add(`model.ilike.%${canonicalSafe}%`);
+    clauses.add(`normalized_model.ilike.%${canonicalSafe}%`);
+    clauses.add(`make.ilike.%${safeQuery}%`);
+    clauses.add(`model.ilike.%${safeQuery}%`);
+    clauses.add(`title.ilike.%${canonicalSafe}%`);
+  } else {
+    clauses.add(`make.ilike.%${safeQuery}%`);
+    clauses.add(`model.ilike.%${safeQuery}%`);
+    clauses.add(`normalized_model.ilike.%${safeQuery}%`);
+    clauses.add(`series.ilike.%${safeQuery}%`);
+    clauses.add(`trim.ilike.%${safeQuery}%`);
+    clauses.add(`body_style.ilike.%${safeQuery}%`);
+    clauses.add(`title.ilike.%${safeQuery}%`);
+  }
+
+  if (queryFacets.trim) {
+    const safeTrim = queryFacets.trim.replace(/([%_\\])/g, '\\$1');
+    clauses.add(`trim.ilike.%${safeTrim}%`);
+    clauses.add(`model.ilike.%${safeTrim}%`);
+    clauses.add(`title.ilike.%${safeTrim}%`);
+  }
+
+  if (queryFacets.body === 'Split-Window Coupe') {
+    clauses.add('body_style.ilike.%Split%Window%');
+    clauses.add('title.ilike.%Split%Window%');
+    clauses.add('model.ilike.%Corvette%');
+  } else if (queryFacets.body === 'Stepside / Flareside') {
+    clauses.add('body_style.ilike.%Stepside%');
+    clauses.add('body_style.ilike.%Flareside%');
+    clauses.add('title.ilike.%Stepside%');
+    clauses.add('title.ilike.%Flareside%');
+  } else if (queryFacets.body === 'Fleetside / Styleside') {
+    clauses.add('body_style.ilike.%Fleetside%');
+    clauses.add('body_style.ilike.%Styleside%');
+    clauses.add('title.ilike.%Fleetside%');
+    clauses.add('title.ilike.%Styleside%');
+  } else if (queryFacets.body === 'Fastback') {
+    clauses.add('body_style.ilike.%Fastback%');
+    clauses.add('title.ilike.%Fastback%');
+    clauses.add('title.ilike.%SportsRoof%');
+  } else if (queryFacets.body === 'Targa / T-Top') {
+    clauses.add('body_style.ilike.%Targa%');
+    clauses.add('title.ilike.%Targa%');
+  } else if (queryFacets.body === 'Gullwing Coupe') {
+    clauses.add('body_style.ilike.%Gullwing%');
+    clauses.add('title.ilike.%Gullwing%');
+    clauses.add('model.ilike.%300SL%');
+  }
+
+  return Array.from(clauses).join(',');
 }
 
 export interface HeaderSearchFacetPillsProps extends SearchFacetInput {
