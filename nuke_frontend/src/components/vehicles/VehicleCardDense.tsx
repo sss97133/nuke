@@ -1662,7 +1662,7 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
                     <div
                       style={{
                         background: 'var(--error)',
-                        color: 'var(--surface-elevated)',
+                        color: 'var(--on-dark-overlay)',
                         padding: '4px 10px',
                         fontSize: '9px',
                         fontWeight: 700,
@@ -1678,7 +1678,7 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
                       style={{
                         background: 'rgba(0, 0, 0, 0.75)',
                         backdropFilter: 'blur(6px)',
-                        color: 'var(--surface-elevated)',
+                        color: 'var(--on-dark-overlay)',
                         padding: '4px 8px',
                         fontSize: '9px',
                         fontWeight: 700,
@@ -1838,7 +1838,7 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
                 bottom: 0,
                 padding: '10px 12px',
                 background: 'rgba(0,0,0,0.75)',
-                color: 'var(--surface-elevated)',
+                color: 'var(--on-dark-overlay)',
               }}
             >
               {/* Vehicle name */}
@@ -2025,7 +2025,7 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
                 bottom: '8px',
                 left: '8px',
                 background: 'rgba(0, 0, 0, 0.75)',
-                color: 'var(--surface-elevated)',
+                color: 'var(--on-dark-overlay)',
                 padding: '3px 8px',
                 fontSize: '9px',
                 fontWeight: 600,
@@ -2337,7 +2337,7 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
                   <div
                     style={{
                       background: 'var(--error)',
-                      color: 'var(--surface-elevated)',
+                      color: 'var(--on-dark-overlay)',
                       padding: '3px 8px',
                       fontSize: '9px',
                       fontWeight: 700,
@@ -2354,7 +2354,7 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
                     style={{
                       background: 'rgba(0, 0, 0, 0.75)',
                       backdropFilter: 'blur(6px)',
-                      color: 'var(--surface-elevated)',
+                      color: 'var(--on-dark-overlay)',
                       padding: '4px 8px',
                       fontSize: '6.5pt',
                       fontWeight: 700,
@@ -2525,7 +2525,7 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
                       background: DEAL_SCORE_CONFIG[vehicle.deal_score_label as DealScoreLabel].colorRgba,
                       backdropFilter: 'blur(4px)',
                       border: '1px solid rgba(255,255,255,0.2)',
-                      color: 'var(--surface-elevated)',
+                      color: 'var(--on-dark-overlay)',
                       padding: '2px 6px',
                       fontSize: '11px',
                       fontFamily: 'Courier New, monospace',
@@ -2551,7 +2551,7 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
                         : 'rgba(234,179,8,0.92)',
                       backdropFilter: 'blur(4px)',
                       border: '1px solid rgba(255,255,255,0.2)',
-                      color: 'var(--surface-elevated)',
+                      color: 'var(--on-dark-overlay)',
                       padding: '2px 5px',
                       fontSize: '9px',
                       fontWeight: 800,
@@ -2571,7 +2571,7 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
                       background: 'rgba(234,179,8,0.92)',
                       backdropFilter: 'blur(4px)',
                       border: '1px solid rgba(255,255,255,0.2)',
-                      color: 'var(--surface-elevated)',
+                      color: 'var(--on-dark-overlay)',
                       padding: '2px 5px',
                       fontSize: '9px',
                       fontWeight: 800,
@@ -2670,7 +2670,7 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
                       border: isFollowing
                         ? '1px solid rgba(59, 130, 246, 0.5)'
                         : '1px solid rgba(255,255,255,0.2)',
-                      color: 'var(--surface-elevated)',
+                      color: 'var(--on-dark-overlay)',
                       padding: isCompactCard ? '0' : '4px 8px',
                       width: isCompactCard ? '22px' : undefined,
                       height: isCompactCard ? '22px' : undefined,
@@ -2737,7 +2737,7 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
             bottom: 0,
             padding: '8px',
             background: 'rgba(0,0,0,0.75)',
-            color: 'var(--surface-elevated)',
+            color: 'var(--on-dark-overlay)',
           }}
         >
           {/* Vehicle name - with truncation */}

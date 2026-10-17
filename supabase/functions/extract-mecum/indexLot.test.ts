@@ -5,13 +5,24 @@ const FIXTURE: any[] = [{"post_id": 659101, "post_title": "Chevrolet OK Used Car
 
 const byType = (t: string) => FIXTURE.find((h) => h.taxonomies.lot_type?.[0]?.name === t);
 
-Deno.test("a sold Auto lot becomes a lot with its hammer, run day and sale", () => {
-  const hit = FIXTURE.find((h) => h.sold === 1 && h.taxonomies.lot_type?.[0]?.name === "Auto");
+Deno.test("a sold Auto lot becomes a lot with its hammer, run day, sale and rich Algolia metadata", () => {
+  const hit = structuredClone(FIXTURE.find((h) => h.sold === 1 && h.taxonomies.lot_type?.[0]?.name === "Auto"));
+  hit.color_meta = "Blue";
+  hit.interior_meta = "Blue";
+  hit.transmission_type_meta = "4-Speed Manual";
+  hit.lot_series_meta = "V-Code 440 6-BBL, 4-Speed";
+  hit.images_meta = [{ url: "https://cdn1.mecum.com/auctions/fl23/fl23_f142_1.jpg" }];
   const r: any = indexLot(hit);
   if (!r.lot) throw new Error(JSON.stringify(r));
   if (r.lot.result !== "sold" || r.lot.price !== hit.highest_bid_or_price) throw new Error(JSON.stringify(r.lot));
   if (!r.lot.url.startsWith("https://www.mecum.com/lots/") || !r.lot.url.endsWith("/")) throw new Error(r.lot.url);
   if (!r.lot.sale_key || !/^\d{4}-\d{2}-\d{2}$/.test(r.lot.sale_starts_on)) throw new Error(JSON.stringify(r.lot));
+  if (r.lot.exterior_color !== "Blue" || r.lot.interior_color !== "Blue" || r.lot.transmission !== "4-Speed Manual") {
+    throw new Error(JSON.stringify(r.lot));
+  }
+  if (r.lot.engine !== "V-Code 440 6-BBL, 4-Speed" || r.lot.image_urls[0] !== "https://cdn1.mecum.com/auctions/fl23/fl23_f142_1.jpg") {
+    throw new Error(JSON.stringify(r.lot));
+  }
 });
 
 Deno.test("Road Art is not a vehicle", () => {

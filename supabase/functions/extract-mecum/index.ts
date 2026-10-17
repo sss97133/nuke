@@ -967,23 +967,24 @@ async function saveVehicle(
   forceVehicleId?: string,
   sale?: UpcomingSale,
 ): Promise<{ vehicleId: string; isNew: boolean; fieldsUpdated: string[]; qualityScore: number }> {
-  // Check if vehicle already exists (by URL, queue, or VIN)
-  const { data: byUrl } = await supabase
-    .from("vehicles")
-    .select("id")
-    .in("discovery_url", mecumUrlSpellings(vehicle.url)) // existing vehicles store the lot URL in several spellings
-    .limit(1)
-    .maybeSingle();
+  // Check if vehicle already exists (by discovery_url, listing_url, queue, or VIN)
+  const spellings = mecumUrlSpellings(vehicle.url);
+  const [{ data: byDiscoveryUrl }, { data: byListingUrl }, { data: queueEntry }] = await Promise.all([
+    supabase.from("vehicles").select("id, created_at").is("deleted_at", null).in("discovery_url", spellings).order("created_at", { ascending: true }).limit(2),
+    supabase.from("vehicles").select("id, created_at").is("deleted_at", null).in("listing_url", spellings).order("created_at", { ascending: true }).limit(2),
+    supabase.from("import_queue").select("vehicle_id").eq("listing_url", vehicle.url).not("vehicle_id", "is", null).limit(1).maybeSingle(),
+  ]);
 
-  const { data: queueEntry } = await supabase
-    .from("import_queue")
-    .select("vehicle_id")
-    .eq("listing_url", vehicle.url)
-    .not("vehicle_id", "is", null)
-    .limit(1)
-    .maybeSingle();
+  const urlMatchIds = Array.from(new Set([...(byDiscoveryUrl ?? []).map((r: any) => r.id), ...(byListingUrl ?? []).map((r: any) => r.id)]));
+  if (urlMatchIds.length > 1) {
+    // If a split duplicate pair exists (e.g. one row with listing_url and another with discovery_url), merge into primary
+    const primaryCandidate = urlMatchIds[0];
+    for (let i = 1; i < urlMatchIds.length; i++) {
+      await supabase.rpc("merge_into_primary", { primary_id: primaryCandidate, dup_id: urlMatchIds[i] }).catch(() => {});
+    }
+  }
 
-  let existingId = forceVehicleId || queueEntry?.vehicle_id || byUrl?.id;
+  let existingId = forceVehicleId || queueEntry?.vehicle_id || urlMatchIds[0];
 
   // Also check by VIN if we have one (prevents duplicate key violation)
   if (!existingId && realVin(vehicle.vin)) {
@@ -991,6 +992,7 @@ async function saveVehicle(
       .from("vehicles")
       .select("id")
       .eq("vin", realVin(vehicle.vin)!)
+      .is("deleted_at", null)
       .limit(1)
       .maybeSingle();
     if (byVin?.id) existingId = byVin.id;
@@ -1008,6 +1010,7 @@ async function saveVehicle(
     body_style: vehicle.body_style,
     mileage: vehicle.mileage,
     description: vehicle.description,
+    primary_image_url: vehicle.image_urls[0] ?? null,
     // Sale rule (lock 1, 2026-09-27): Mecum's hammer price is the sale only when the result says
     // sold; on a "not sold" / "bid goes on" lot it is the high bid. The status travels with it
     // (nulls are stripped below, so an unknown result writes neither).
@@ -1016,6 +1019,7 @@ async function saveVehicle(
     sale_status: vehicle.status === "sold" ? "sold" : (vehicle.status === "not sold" ? "not_sold" : null),
     auction_outcome: vehicle.status === "sold" ? "sold" : null,
     sale_date: vehicle.status === "sold" && vehicle.auction_date && /^\d{4}-\d{2}-\d{2}$/.test(vehicle.auction_date) ? vehicle.auction_date : null,
+    listing_url: vehicle.url,
     discovery_url: vehicle.url,
     discovery_source: "mecum",
     listing_source: "mecum",
@@ -1351,13 +1355,23 @@ Deno.serve(async (req) => {
       for (let i = 0; i < lots.length; i += 10) chunks.push(lots.slice(i, i + 10));
       await Promise.all(chunks.map(async (chunk) => {
         const spellings = chunk.flatMap((l) => mecumUrlSpellings(l.url));
-        const [ev, ve] = await Promise.all([
+        const [ev, veDisc, veList] = await Promise.all([
           supabase.from("vehicle_events").select("source_url").eq("source_platform", "mecum").in("source_url", spellings),
-          supabase.from("vehicles").select("id, discovery_url").in("discovery_url", spellings),
+          supabase.from("vehicles").select("id, discovery_url").is("deleted_at", null).in("discovery_url", spellings),
+          supabase.from("vehicles").select("id, listing_url").is("deleted_at", null).in("listing_url", spellings),
         ]);
-        if (ev.error || ve.error) throw new Error(`landed lookup failed: ${(ev.error || ve.error)?.message}`);
+        if (ev.error || veDisc.error || veList.error) throw new Error(`landed lookup failed: ${(ev.error || veDisc.error || veList.error)?.message}`);
         for (const r of ev.data ?? []) eventKeys.add(mecumLotKey(r.source_url));
-        for (const r of ve.data ?? []) vehicleByKey.set(mecumLotKey(r.discovery_url), r.id);
+        for (const r of veList.data ?? []) vehicleByKey.set(mecumLotKey(r.listing_url), r.id);
+        for (const r of veDisc.data ?? []) {
+          const k = mecumLotKey(r.discovery_url);
+          const existing = vehicleByKey.get(k);
+          if (existing && existing !== r.id) {
+            await supabase.rpc("merge_into_primary", { primary_id: existing, dup_id: r.id }).catch(() => {});
+          } else {
+            vehicleByKey.set(k, r.id);
+          }
+        }
       }));
 
       const todo: IndexLot[] = [];
@@ -1374,11 +1388,18 @@ Deno.serve(async (req) => {
           year: l.year,
           make: l.make,
           model: l.model,
+          color: l.exterior_color,
+          interior_color: l.interior_color,
+          transmission: l.transmission,
+          engine_type: l.engine,
+          description: l.description,
+          primary_image_url: l.image_urls[0] ?? null,
           sale_price: l.result === "sold" ? l.price : null,
           high_bid: l.result === "bid-goes-on" ? l.price : null,
           sale_status: l.result === "sold" ? "sold" : null,
           auction_outcome: l.result === "sold" ? "sold" : null,
           sale_date: l.result === "sold" ? l.run_day : null,
+          listing_url: l.url,
           discovery_url: l.url,
           discovery_source: "mecum",
           listing_source: "mecum",
@@ -1463,12 +1484,49 @@ Deno.serve(async (req) => {
         }))).select("id");
         if (!ae.error) out.auction_events_created += ae.data?.length ?? 0;
         else if (out.errors.length < 5) out.errors.push(`auction_events insert: ${ae.error.message}`);
+
+        // Insert gallery photos from Algolia images_meta for newly landed lots
+        const lotsWithImages = landed.filter((l) => l.image_urls?.length > 0);
+        if (lotsWithImages.length) {
+          const vIds = lotsWithImages.map((l) => vehicleIdFor.get(l.lot_id)!);
+          const { data: existingImgs } = await supabase.from("vehicle_images").select("vehicle_id, image_url").in("vehicle_id", vIds).limit(2000);
+          const haveByVeh = new Set((existingImgs ?? []).map((r: any) => `${r.vehicle_id}|${r.image_url}`));
+          const imgRows = lotsWithImages.flatMap((l) => {
+            const vid = vehicleIdFor.get(l.lot_id)!;
+            return l.image_urls.slice(0, 60)
+              .filter((imgUrl) => !haveByVeh.has(`${vid}|${imgUrl}`))
+              .map((imgUrl, idx) => ({
+                vehicle_id: vid,
+                image_url: imgUrl,
+                source: "external_import",
+                source_url: imgUrl,
+                is_external: true,
+                position: idx,
+              }));
+          });
+          for (let i = 0; i < imgRows.length; i += 200) {
+            const { error: imgErr } = await supabase.from("vehicle_images").insert(imgRows.slice(i, i + 200));
+            if (imgErr && out.errors.length < 5) out.errors.push(`vehicle_images insert: ${imgErr.message}`);
+          }
+        }
       }
 
       // Observations: the testimony row. Every field is already on the vehicle, so none is gap-filled or given a receipt.
       for (let i = 0; i < landed.length; i += 5) {
         await Promise.all(landed.slice(i, i + 5).map(async (l) => {
-          const fields: Record<string, unknown> = { year: l.year, make: l.make, model: l.model, lot_number: l.lot_number, run_day: l.run_day, sale_key: l.sale_key };
+          const fields: Record<string, unknown> = {
+            year: l.year,
+            make: l.make,
+            model: l.model,
+            color: l.exterior_color,
+            interior_color: l.interior_color,
+            transmission: l.transmission,
+            engine_type: l.engine,
+            description: l.description,
+            lot_number: l.lot_number,
+            run_day: l.run_day,
+            sale_key: l.sale_key,
+          };
           if (l.result === "sold") fields.sale_price = l.price; else if (l.result === "bid-goes-on") fields.high_bid = l.price;
           const clean = Object.fromEntries(Object.entries(fields).filter(([, v]) => v !== null && v !== undefined));
           const r = await writeObservation(supabase, {

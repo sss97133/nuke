@@ -94,14 +94,22 @@ export function drillStackFromSearchParams(
 
   const rawFamily = params.get('family')?.trim();
   const rawFamilyName = params.get('family_name')?.trim();
+  let familyLabel = '';
   if (rawFamily) {
     const matched = families?.find((f) => f.familyKey === rawFamily);
-    const label = matched?.name ?? rawFamilyName ?? rawFamily;
-    stack.push({ label, make, family: rawFamily, names: matched?.models ?? undefined });
+    familyLabel = matched?.name ?? rawFamilyName ?? rawFamily;
+    stack.push({ label: familyLabel, make, family: rawFamily, names: matched?.models ?? undefined });
   }
 
   const rawModel = params.get('model')?.trim();
-  if (rawModel) {
+  const normKey = (s: string) => s.toLowerCase().replace(/[\s\-_]+/g, '');
+  const isCollapsedDuplicateOfFamily =
+    !!rawFamily &&
+    !!rawModel &&
+    !!familyLabel &&
+    rawModel.toLowerCase() !== familyLabel.toLowerCase() &&
+    normKey(rawModel) === normKey(familyLabel);
+  if (rawModel && !isCollapsedDuplicateOfFamily) {
     stack.push({ label: rawModel, make, family: rawFamily || undefined, model: rawModel });
   }
   const rawYear = params.get('year')?.trim();
@@ -1319,7 +1327,7 @@ export function TreemapHomePage({ onBrowse, embedded = false }: { onBrowse: () =
         isVehicle: true,
       }));
   }, [familySalesData, currentLevel.year, currentLevel.model, currentLevel.make]);
-  const effectiveYearsData = currentLevel.model ? yearsData : familyYearsNodes;
+  const effectiveYearsData = (currentLevel.model && yearsData && yearsData.length > 0) ? yearsData : (familyYearsNodes ?? yearsData);
   // Filter family sub-model tiles by active Era when familySalesData is loaded
   const eraFilteredFamilyModels = useMemo<TreemapNode[] | null>(() => {
     if (!familyModelsData) return null;
@@ -1391,10 +1399,12 @@ export function TreemapHomePage({ onBrowse, embedded = false }: { onBrowse: () =
     }
     if (levelType === 'vehicles' && vehiclesData) return vehiclesData;
     if (levelType === 'vehicles' && familyYearVehiclesNodes) return familyYearVehiclesNodes;
-    if (levelType === 'years' && yearsData) {
-      if (!selectedEra) return yearsData;
-      const filtered = yearsData.filter((n) => matchesEraRange(parseInt(n.name, 10), selectedEra));
-      return filtered.length > 0 ? filtered : yearsData;
+    if (levelType === 'years' && (yearsData || familyYearsNodes)) {
+      const effectiveYears = (yearsData && yearsData.length > 0) ? yearsData : (familyYearsNodes ?? yearsData);
+      if (!effectiveYears) return null;
+      if (!selectedEra) return effectiveYears;
+      const filtered = effectiveYears.filter((n) => matchesEraRange(parseInt(n.name, 10), selectedEra));
+      return filtered.length > 0 ? filtered : effectiveYears;
     }
     if (levelType === 'models' && eraFilteredFamilyModels) return eraFilteredFamilyModels;
     if (levelType === 'families' && familiesData) return familiesData;
@@ -1445,7 +1455,7 @@ export function TreemapHomePage({ onBrowse, embedded = false }: { onBrowse: () =
   // Representative images for aggregate cells (models/years levels); none while a family shows its sales chart, which
   // has no tiles to put them on (the read ran under the chart on every family drill).
   const repImages = useRepresentativeImages(
-    levelType === 'models' ? (familyView === 'names' ? familyModelsData : null) : levelType === 'years' ? yearsData
+    levelType === 'models' ? (familyView === 'names' ? familyModelsData : null) : levelType === 'years' ? effectiveYearsData
       : levelType === 'vehicles' && !currentLevel.model ? familyYearVehiclesNodes
       : levelType === 'families' && familiesFailed ? modelsData : null,
     currentLevel.make,

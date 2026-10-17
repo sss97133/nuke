@@ -35,6 +35,13 @@ export interface IndexLot {
   sale_starts_on: string | null;
   sale_ends_on: string | null;
   lot_statuses: string[];
+  image_urls: string[];
+  exterior_color: string | null;
+  interior_color: string | null;
+  transmission: string | null;
+  engine: string | null;
+  collection_name: string | null;
+  description: string | null;
 }
 
 export const INDEX_VEHICLE_TYPES = new Set(["Auto", "Motorcycle", "Tractor", "Boat"]);
@@ -67,12 +74,33 @@ export function indexLot(hit: any): { lot: IndexLot } | { skip: string; url?: st
   const parsed = sale?.name && sale?.slug ? parseSaleFacet(String(sale.name), String(sale.slug)) : null;
   const runDay = termName(t, "run_date");
   const dayStart = typeof hit.auction_day_start_meta === "string" ? hit.auction_day_start_meta : null;
+  const title = typeof hit.post_title === "string" && hit.post_title.trim() ? hit.post_title.trim() : null;
+  const lotNumber = typeof hit.lot_number_meta === "string" && hit.lot_number_meta ? hit.lot_number_meta : null;
+  const imageUrls = Array.isArray(hit.images_meta)
+    ? hit.images_meta.map((img: any) => (typeof img?.url === "string" ? img.url.trim() : "")).filter((u: string) => u.startsWith("http"))
+    : [];
+  const exteriorColor = typeof hit.color_meta === "string" && hit.color_meta.trim() ? hit.color_meta.trim() : null;
+  const interiorColor = typeof hit.interior_meta === "string" && hit.interior_meta.trim() ? hit.interior_meta.trim() : null;
+  const transmission = typeof hit.transmission_type_meta === "string" && hit.transmission_type_meta.trim() ? hit.transmission_type_meta.trim() : null;
+  const engine = typeof hit.lot_series_meta === "string" && hit.lot_series_meta.trim()
+    ? hit.lot_series_meta.trim()
+    : (typeof hit.engine_configuration_meta === "string" && hit.engine_configuration_meta.trim() ? hit.engine_configuration_meta.trim() : null);
+  const collectionRaw = termName(t, "collection_tax");
+  const collectionName = collectionRaw ? collectionRaw.split("|")[0].replace(/&amp;/g, "&").trim() || null : null;
+  const descParts = [
+    title,
+    engine ? `Highlights: ${engine}.` : null,
+    parsed?.auction_name ? `Offered at Mecum ${parsed.auction_name}${lotNumber ? ` (Lot ${lotNumber})` : ""}.` : null,
+    collectionName ? `Collection: ${collectionName}.` : null,
+  ].filter(Boolean);
+  const description = descParts.length > 1 ? descParts.join(" ") : null;
+
   return {
     lot: {
       url: `https://www.mecum.com${permalink}`,
       lot_id: lotId,
       object_id: hit.objectID ?? null,
-      title: typeof hit.post_title === "string" ? hit.post_title : null,
+      title,
       year,
       make,
       model: termName(t, "model"),
@@ -80,12 +108,19 @@ export function indexLot(hit: any): { lot: IndexLot } | { skip: string; url?: st
       price: result ? price : null,
       run_day: runDay && /^\d{4}-\d{2}-\d{2}$/.test(runDay) ? runDay : null,
       day_start: dayStart && !isNaN(Date.parse(dayStart.replace(" ", "T") + "Z")) ? new Date(dayStart.replace(" ", "T") + "Z").toISOString() : null,
-      lot_number: typeof hit.lot_number_meta === "string" && hit.lot_number_meta ? hit.lot_number_meta : null,
+      lot_number: lotNumber,
       sale_key: parsed?.sale_key ?? null,
       sale_name: parsed?.auction_name ?? null,
       sale_starts_on: parsed?.sale_starts_on ?? null,
       sale_ends_on: parsed?.sale_ends_on ?? null,
       lot_statuses: (Array.isArray(t.lot_status) ? t.lot_status : []).map((x: any) => x?.slug).filter(Boolean),
+      image_urls: imageUrls,
+      exterior_color: exteriorColor,
+      interior_color: interiorColor,
+      transmission,
+      engine,
+      collection_name: collectionName,
+      description,
     },
   };
 }
