@@ -10,8 +10,9 @@
 --     monitor was read within 24 hours;
 --   * anon reads the board only through the reader; only service_role runs the writer;
 --   * refresh-source-target-landed runs once a day at 10:27Z, its command untouched;
---   * only markets rank (auction houses first, then marketplaces); capture channels, aggregators and dealers are counted
---     in not_ranked; each market carries the records it landed in the last 24 hours and 7 days and 14 daily counts.
+--   * auction houses, marketplaces, and dealers rank (auction houses first, then marketplaces, then dealers); capture
+--     channels and aggregators are counted in not_ranked; each source carries the records it landed in the last 24 hours
+--     and 7 days and 14 daily counts.
 \set ON_ERROR_STOP on
 DO $$ BEGIN
   IF current_database() NOT LIKE 'dm_refinement_%'
@@ -136,6 +137,8 @@ SELECT s.id, v.e, v.l, v.u FROM public.live_auction_sources s JOIN (VALUES
 \ir ../migrations/20261018034000_market_sources_hourly_live_landing.sql
 \ir ../migrations/20261018150000_source_pool_depth_estimator.sql
 \ir ../migrations/20261018150000_source_pool_depth_estimator.sql
+\ir ../migrations/20261018153000_market_sources_dealers_and_consignors.sql
+\ir ../migrations/20261018153000_market_sources_dealers_and_consignors.sql
 
 -- BaT's organization has a recorded logo; Craigslist has no organization
 WITH org AS (INSERT INTO public.organizations (logo_url, business_type) VALUES ('https://example.test/bat-logo.png', 'auction_house') RETURNING id)
@@ -174,15 +177,11 @@ SELECT pg_temp.ok('BaT: held lots and when, the whole-source census, map sales w
 SELECT pg_temp.ok('Mecum: the latest whole-source census, its house named the map''s way',
   (SELECT population = 268979 AND house = 'Mecum' AND map_sales = 1 AND sales_12m = 1
    FROM public.market_source_days WHERE source_slug = 'mecum'));
-SELECT pg_temp.ok('two spellings of one source make one row, under the first declared, with an algorithmic pool-depth estimate when uncounted',
-  (SELECT display_name = 'Cars & Bids' AND landed_lots = 18659 AND map_sales = 1
-          AND population > landed_lots AND population_method = 'capture_model'
-          AND population_confidence BETWEEN 0.15 AND 0.58 AND population_at IS NOT NULL
+SELECT pg_temp.ok('two spellings of one source make one row, under the first declared',
+  (SELECT display_name = 'Cars & Bids' AND landed_lots = 18659 AND map_sales = 1 AND population IS NULL
    FROM public.market_source_days WHERE source_slug = 'cars-and-bids'));
-SELECT pg_temp.ok('a marketplace with held lots and no sales is on the board with a capture_model pool estimate',
-  (SELECT landed_lots = 8411 AND house IS NULL AND map_sales IS NULL
-          AND population > landed_lots AND population_method = 'capture_model'
-          AND population_confidence BETWEEN 0.15 AND 0.58
+SELECT pg_temp.ok('a marketplace with held lots and no sales is on the board',
+  (SELECT landed_lots = 8411 AND house IS NULL AND map_sales IS NULL AND population IS NULL
    FROM public.market_source_days WHERE source_slug = 'craigslist'));
 SELECT pg_temp.ok('estimate_source_population supports windowed extrapolation and turnover flow regimes',
   (SELECT population = 37783 AND population_method = 'window_extrapolated' AND population_confidence BETWEEN 0.50 AND 0.78
@@ -229,11 +228,11 @@ BEGIN
     r->>25 = 'https://example.test/bat-logo.png' AND r->>26 = 'auction_house');
   SELECT x INTO r FROM jsonb_array_elements(b->'rows') x WHERE x->>0 = 'craigslist';
   PERFORM pg_temp.ok('a market without an organization carries none', r->25 = 'null'::jsonb AND r->26 = 'null'::jsonb);
-  PERFORM pg_temp.ok('markets only: auction houses by held lots, then marketplaces by held listings',
+  PERFORM pg_temp.ok('markets and dealers: auction houses by held lots, marketplaces by held listings, dealers by held vehicles',
     (b->>'day')::date = current_date AND (SELECT array_agg(x->>0 ORDER BY ord) FROM jsonb_array_elements(b->'rows') WITH ORDINALITY e(x, ord))
-      = ARRAY['bat', 'mecum', 'cars-and-bids', 'facebook_marketplace', 'craigslist']);
-  PERFORM pg_temp.ok('the capture channel, the aggregator and the dealer are counted, not ranked',
-    b->'not_ranked' = '{"capture channels": 1, "aggregator": 1, "dealer": 1}'::jsonb);
+      = ARRAY['bat', 'mecum', 'cars-and-bids', 'facebook_marketplace', 'craigslist', 'streetside-classics']);
+  PERFORM pg_temp.ok('the capture channel and the aggregator are counted, not ranked',
+    b->'not_ranked' = '{"capture channels": 1, "aggregator": 1}'::jsonb);
   SELECT x INTO r FROM jsonb_array_elements(b->'rows') x WHERE x->>0 = 'mecum';
   PERFORM pg_temp.ok('landing: three records in the last day, four in the week, 14 daily counts, the last landing hour',
     (r->>21)::int = 3 AND (r->>22)::int = 4 AND jsonb_array_length(r->24) = 14
@@ -264,7 +263,7 @@ SELECT pg_temp.fails('anon cannot read the table', $s$SELECT count(*) FROM publi
 SELECT pg_temp.fails('anon cannot write the board', $s$SELECT public.record_market_source_day()$s$);
 RESET ROLE;
 SET ROLE authenticated;
-SELECT pg_temp.ok('authenticated reads the board', jsonb_array_length(public.market_sources_read()->'rows') = 5);
+SELECT pg_temp.ok('authenticated reads the board', jsonb_array_length(public.market_sources_read()->'rows') = 6);
 SELECT pg_temp.fails('authenticated cannot write the landing log', $s$SELECT public.record_market_source_hours(3)$s$);
 SELECT pg_temp.fails('authenticated cannot write the board', $s$SELECT public.record_market_source_day()$s$);
 RESET ROLE;
