@@ -14,6 +14,120 @@ export type Mover = {
   eligible: number; families: number;
 };
 
+export type MoverHorizon = 'upcoming' | '1d' | '1w' | '1m' | '3m' | '6m' | '1y' | '5y';
+
+export type HorizonMeta = {
+  key: MoverHorizon;
+  label: string;
+  title: string;
+  relativityLabel: string;
+  windowLabel: string;
+  priorUnit: string;
+  recentUnit: string;
+  eachWindowLabel: string;
+  gainingTitle: string;
+  losingTitle: string;
+};
+
+export const MOVER_HORIZONS: HorizonMeta[] = [
+  {
+    key: 'upcoming',
+    label: 'UPCOMING',
+    title: 'Next 30 days on the block (live Bring a Trailer + scheduled auction calendar) against past 30 days sold',
+    relativityLabel: 'NEXT 30D BLOCK VS PAST 30D SOLD',
+    windowLabel: 'Upcoming supply over the next 30 days against the last 30 days sold',
+    priorUnit: 'the last 30 days',
+    recentUnit: 'the next 30 days',
+    eachWindowLabel: '30-day window',
+    gainingTitle: 'Coming up more',
+    losingTitle: 'Coming up less',
+  },
+  {
+    key: '1d',
+    label: '1D',
+    title: 'Last 24 hours against the prior 24 hours',
+    relativityLabel: 'LAST 24H VS PRIOR 24H',
+    windowLabel: 'Sales over the last 24 hours against the 24 hours before',
+    priorUnit: 'the prior 24 hours',
+    recentUnit: 'the last 24 hours',
+    eachWindowLabel: '24-hour window',
+    gainingTitle: 'Selling more',
+    losingTitle: 'Selling less',
+  },
+  {
+    key: '1w',
+    label: '1W',
+    title: 'Last 7 days against the prior 7 days',
+    relativityLabel: 'LAST 7D VS PRIOR 7D',
+    windowLabel: 'Sales over the last 7 days against the 7 days before',
+    priorUnit: 'the week before',
+    recentUnit: 'this week',
+    eachWindowLabel: 'week',
+    gainingTitle: 'Selling more',
+    losingTitle: 'Selling less',
+  },
+  {
+    key: '1m',
+    label: '1M',
+    title: 'Last 30 days against the prior 30 days',
+    relativityLabel: 'LAST 30D VS PRIOR 30D',
+    windowLabel: 'Sales over the last 30 days against the 30 days before',
+    priorUnit: 'the month before',
+    recentUnit: 'this month',
+    eachWindowLabel: 'month',
+    gainingTitle: 'Selling more',
+    losingTitle: 'Selling less',
+  },
+  {
+    key: '3m',
+    label: '3M',
+    title: 'Last 90 days against the prior 90 days',
+    relativityLabel: 'LAST 3M VS PRIOR 3M',
+    windowLabel: 'Sales over the last 3 months against the 3 months before',
+    priorUnit: 'the 3 months before',
+    recentUnit: 'the last 3 months',
+    eachWindowLabel: 'quarter',
+    gainingTitle: 'Selling more',
+    losingTitle: 'Selling less',
+  },
+  {
+    key: '6m',
+    label: '6M',
+    title: 'Last 180 days against the prior 180 days',
+    relativityLabel: 'LAST 6M VS PRIOR 6M',
+    windowLabel: 'Sales over the last 6 months against the 6 months before',
+    priorUnit: 'the 6 months before',
+    recentUnit: 'the last 6 months',
+    eachWindowLabel: 'half-year',
+    gainingTitle: 'Selling more',
+    losingTitle: 'Selling less',
+  },
+  {
+    key: '1y',
+    label: '1Y',
+    title: 'Last 12 months against the prior 12 months',
+    relativityLabel: 'LAST 1Y VS PRIOR 1Y',
+    windowLabel: 'Sales this year against last year',
+    priorUnit: 'the year before',
+    recentUnit: 'this year',
+    eachWindowLabel: 'year',
+    gainingTitle: 'Selling more',
+    losingTitle: 'Selling less',
+  },
+  {
+    key: '5y',
+    label: '5Y',
+    title: 'Last 5 years against the prior 5 years',
+    relativityLabel: 'LAST 5Y VS PRIOR 5Y',
+    windowLabel: 'Sales over the last 5 years against the 5 years before',
+    priorUnit: 'the 5 years before',
+    recentUnit: 'the last 5 years',
+    eachWindowLabel: '5-year window',
+    gainingTitle: 'Selling more',
+    losingTitle: 'Selling less',
+  },
+];
+
 // One read per page lifetime; a failed read is forgotten so the next mount retries, and the strip stays away.
 let moversRead: Promise<Mover[] | null> | null = null;
 export function readFamilyMovers(): Promise<Mover[] | null> {
@@ -52,7 +166,7 @@ export function readFamilyMonthly(rows: Mover[]): Promise<Map<string, number[]>>
   return monthlyRead;
 }
 
-// 24 bars, the prior year faint and the last year in the chip's direction, each scaled to the family's busiest bin.
+// 24 bars, the prior window faint and the recent/upcoming window in the chip's direction, each scaled to the family's busiest bin.
 export function Spark({ bins, direction }: { bins: number[]; direction: 'up' | 'down' }) {
   const max = Math.max(1, ...bins);
   return <svg className={`map-movers__spark map-movers__spark--${direction}`} width="48" height="14" viewBox="0 0 48 14" aria-hidden="true">
@@ -69,27 +183,36 @@ export function move(now: number, before: number): string {
   return `${m >= 0 ? '▲' : '▼'}${Math.abs(Math.round(m * 100))}%`;
 }
 
-/** A family that gained or lost share of Bring a Trailer's sales (treemap_family_share_movers, 20261016211000): its
- *  move against BaT overall with a ±2 standard error band, its sales both years, and its average sale's move apart. */
+/** A family that gained or lost share of measured auction sales (treemap_family_share_movers): its move against the
+ *  market overall with a ±2 standard error band, its counts in both windows, its average sale's move apart, and optional 24-bar bins. */
 export type ShareMover = {
   brand: string; family_key: string; family: string; sold_12m: number; sold_prior_12m: number; usd_12m: number;
   usd_prior_12m: number; share_move: number; share_lo: number; share_hi: number; se: number; avg_price_move: number | null;
+  bins?: number[];
 };
 export type ShareMovers = {
-  as_of: string | null; min_sales: number; families: number; eligible: number; significant: number;
+  as_of: string | null; horizon?: MoverHorizon; window_days?: number;
+  min_sales: number; families: number; eligible: number; significant: number;
   bat: { sold_12m: number; sold_prior_12m: number; usd_12m: number; usd_prior_12m: number };
   gaining: ShareMover[]; losing: ShareMover[];
 };
 
 const isNum = (v: unknown): v is number => typeof v === 'number' && Number.isFinite(v);
 function parseMover(r: unknown): ShareMover | null {
-  const m = r as Partial<ShareMover> | null;
+  const m = r as Partial<ShareMover> & { bins?: unknown } | null;
   if (!m || typeof m.brand !== 'string' || typeof m.family_key !== 'string' || typeof m.family !== 'string') return null;
   if (![m.sold_12m, m.sold_prior_12m, m.share_move, m.share_lo, m.share_hi].every(isNum)) return null;
-  return { brand: m.brand, family_key: m.family_key, family: m.family, sold_12m: m.sold_12m!, sold_prior_12m: m.sold_prior_12m!,
+  const bins = Array.isArray(m.bins) && m.bins.length === 24 && m.bins.every((n) => isNum(n) && n >= 0)
+    ? (m.bins as number[])
+    : undefined;
+  return {
+    brand: m.brand, family_key: m.family_key, family: m.family,
+    sold_12m: m.sold_12m!, sold_prior_12m: m.sold_prior_12m!,
     usd_12m: isNum(m.usd_12m) ? m.usd_12m : 0, usd_prior_12m: isNum(m.usd_prior_12m) ? m.usd_prior_12m : 0,
     share_move: m.share_move!, share_lo: m.share_lo!, share_hi: m.share_hi!, se: isNum(m.se) ? m.se : 0,
-    avg_price_move: isNum(m.avg_price_move) ? m.avg_price_move : null };
+    avg_price_move: isNum(m.avg_price_move) ? m.avg_price_move : null,
+    ...(bins ? { bins } : {}),
+  };
 }
 /** The reader's value, or null when it is not one (the strip then stays away). */
 export function parseShareMovers(raw: unknown): ShareMovers | null {
@@ -99,21 +222,52 @@ export function parseShareMovers(raw: unknown): ShareMovers | null {
   if (!b || !isNum(b.sold_12m) || !isNum(b.sold_prior_12m) || b.sold_prior_12m <= 0) return null;
   const gaining = v.gaining.map(parseMover).filter((m): m is ShareMover => m !== null);
   const losing = v.losing.map(parseMover).filter((m): m is ShareMover => m !== null);
-  return { as_of: typeof v.as_of === 'string' ? v.as_of : null, min_sales: isNum(v.min_sales) ? v.min_sales : 30,
-    families: isNum(v.families) ? v.families : 0, eligible: isNum(v.eligible) ? v.eligible : 0,
-    significant: isNum(v.significant) ? v.significant : 0, bat: b, gaining, losing };
+  const validHorizons: MoverHorizon[] = ['upcoming', '1d', '1w', '1m', '3m', '6m', '1y', '5y'];
+  const horizon = typeof v.horizon === 'string' && validHorizons.includes(v.horizon as MoverHorizon)
+    ? (v.horizon as MoverHorizon)
+    : undefined;
+  return {
+    as_of: typeof v.as_of === 'string' ? v.as_of : null,
+    ...(horizon ? { horizon } : {}),
+    ...(isNum(v.window_days) ? { window_days: v.window_days } : {}),
+    min_sales: isNum(v.min_sales) ? v.min_sales : 30,
+    families: isNum(v.families) ? v.families : 0,
+    eligible: isNum(v.eligible) ? v.eligible : 0,
+    significant: isNum(v.significant) ? v.significant : 0,
+    bat: b,
+    gaining,
+    losing,
+  };
 }
 
 let shareRead: Promise<ShareMovers | null> | null = null;
-export function readShareMovers(): Promise<ShareMovers | null> {
+const horizonReads = new Map<MoverHorizon, Promise<ShareMovers | null>>();
+
+export function readShareMovers(horizon: MoverHorizon = '1y'): Promise<ShareMovers | null> {
   if (typeof (supabase as { rpc?: unknown })?.rpc !== 'function') return Promise.resolve(null);
-  if (!shareRead) {
-    shareRead = Promise.resolve(supabase.rpc('treemap_family_share_movers', { p_limit: 5 })).then(
-      ({ data, error }) => { const v = error ? null : parseShareMovers(data); if (!v) shareRead = null; return v; },
-      () => { shareRead = null; return null; },
-    );
+  if (horizon === '1y') {
+    if (!shareRead) {
+      shareRead = Promise.resolve(supabase.rpc('treemap_family_share_movers', { p_limit: 5 })).then(
+        ({ data, error }) => { const v = error ? null : parseShareMovers(data); if (!v) shareRead = null; return v; },
+        () => { shareRead = null; return null; },
+      );
+    }
+    return shareRead;
   }
-  return shareRead;
+  const cached = horizonReads.get(horizon);
+  if (cached) return cached;
+  const req = Promise.resolve(
+    supabase.rpc('treemap_family_share_movers', { p_limit: 5, p_min_sales: 0, p_horizon: horizon }),
+  ).then(
+    ({ data, error }) => {
+      const v = error ? null : parseShareMovers(data);
+      if (!v) horizonReads.delete(horizon);
+      return v;
+    },
+    () => { horizonReads.delete(horizon); return null; },
+  );
+  horizonReads.set(horizon, req);
+  return req;
 }
 
 // A share move on one log axis, -50% to +100% (a halving and a doubling sit at equal distances from no change).
@@ -139,50 +293,128 @@ export function MoveDot({ m }: { m: ShareMover }) {
 }
 
 export default function FamilyMovers({ onPick }: { onPick: (m: Pick<Mover, 'brand' | 'family_key' | 'family'>) => void }) {
+  const [horizon, setHorizon] = useState<MoverHorizon>('1y');
   const [data, setData] = useState<ShareMovers | null>(null);
+  const [initialReady, setInitialReady] = useState(false);
+  const [loading, setLoading] = useState(false);
   const [bins, setBins] = useState<Map<string, number[]>>(new Map());
+
   useEffect(() => {
     let live = true;
-    readShareMovers().then((r) => { if (live) setData(r); });
+    setLoading(true);
+    readShareMovers(horizon).then((r) => {
+      if (!live) return;
+      setData(r);
+      if (horizon === '1y' && r && (r.gaining.length > 0 || r.losing.length > 0)) {
+        setInitialReady(true);
+      } else if (r) {
+        setInitialReady(true);
+      }
+      setLoading(false);
+    });
     return () => { live = false; };
-  }, []);
+  }, [horizon]);
+
   useEffect(() => {
+    if (horizon !== '1y') return;
     const rows = data ? [...data.gaining, ...data.losing] : [];
-    if (!rows.length) return;
+    if (!rows.length || rows.every((r) => Array.isArray(r.bins) && r.bins.length === 24)) return;
     let live = true;
     readFamilyMonthly(rows as unknown as Mover[]).then((b) => { if (live) setBins(b); });
     return () => { live = false; };
-  }, [data]);
-  if (!data || (!data.gaining.length && !data.losing.length)) return null;
+  }, [data, horizon]);
+
+  if (!initialReady && (!data || (!data.gaining.length && !data.losing.length))) return null;
+  if (!data) return null;
+
+  const meta = MOVER_HORIZONS.find((h) => h.key === horizon) ?? MOVER_HORIZONS[6];
+  const isUpcoming = horizon === 'upcoming';
   const batMove = data.bat.sold_12m / data.bat.sold_prior_12m - 1;
+
   const row = (m: ShareMover, dir: 'up' | 'down') => {
     const key = `${m.brand}|${m.family_key}`;
-    return <button key={key} type="button" className="map-movers2__row" onClick={() => onPick(m)}
-      title={`${m.brand} ${m.family}: ${m.sold_prior_12m} sold the year before, ${m.sold_12m} this year; ${pct(m.share_move)} after taking out the market's own growth (likely range ${pct(m.share_lo)} to ${pct(m.share_hi)})`}>
+    const rowBins = m.bins ?? (horizon === '1y' ? bins.get(key) : undefined);
+    const countsText = isUpcoming
+      ? `${m.sold_prior_12m.toLocaleString('en-US')} sold → ${m.sold_12m.toLocaleString('en-US')} up`
+      : `${m.sold_prior_12m.toLocaleString('en-US')} → ${m.sold_12m.toLocaleString('en-US')} sold`;
+    const priceLabel = isUpcoming ? 'avg ask' : 'avg sale';
+    const titleText = isUpcoming
+      ? `${m.brand} ${m.family}: ${m.sold_prior_12m} sold in ${meta.priorUnit}, ${m.sold_12m} upcoming in ${meta.recentUnit}; ${pct(m.share_move)} after taking out overall supply pace (likely range ${pct(m.share_lo)} to ${pct(m.share_hi)})`
+      : `${m.brand} ${m.family}: ${m.sold_prior_12m} sold ${meta.priorUnit}, ${m.sold_12m} ${meta.recentUnit}; ${pct(m.share_move)} after taking out the market's own growth (likely range ${pct(m.share_lo)} to ${pct(m.share_hi)})`;
+
+    return <button key={key} type="button" className="map-movers2__row" onClick={() => onPick(m)} title={titleText}>
       <span className="map-movers2__name">{m.brand} {m.family}</span>
       <MoveDot m={m} />
       <span className={`map-movers2__move map-movers2__move--${dir}`}>{pct(m.share_move)}</span>
-      <span className="map-movers2__counts">{m.sold_prior_12m.toLocaleString('en-US')} → {m.sold_12m.toLocaleString('en-US')} sold</span>
-      <span className="map-movers2__price">{m.avg_price_move == null ? '' : `avg sale ${pct(m.avg_price_move)}`}</span>
-      {bins.has(key) ? <Spark bins={bins.get(key)!} direction={dir} /> : <span />}
+      <span className="map-movers2__counts">{countsText}</span>
+      <span className="map-movers2__price">{m.avg_price_move == null ? '' : `${priceLabel} ${pct(m.avg_price_move)}`}</span>
+      {rowBins ? <Spark bins={rowBins} direction={dir} /> : <span />}
     </button>;
   };
+
   const side = (title: string, list: ShareMover[], dir: 'up' | 'down') => <div className="map-movers2__side">
     <div className="map-movers2__title">{title}</div>
-    {list.length ? list.map((m) => row(m, dir)) : <div className="map-movers2__none">no real changes</div>}
+    {list.length ? list.map((m) => row(m, dir)) : <div className="map-movers2__none">{loading ? 'reading window…' : 'no real changes'}</div>}
   </div>;
+
   return <div className="map-movers2" role="group" aria-label="Model families selling more and less">
+    <div className="map-movers2__head">
+      <div className="map-movers2__relativity" aria-label="Relativity indicator">
+        <span className="map-movers2__rel-badge">RELATIVITY</span>
+        <span className="map-movers2__rel-window">{meta.relativityLabel}</span>
+        <span className="map-movers2__rel-baseline">
+          {isUpcoming ? 'SUPPLY PAR' : 'MARKET PAR'} {pct(batMove)} ({data.bat.sold_prior_12m.toLocaleString('en-US')} → {data.bat.sold_12m.toLocaleString('en-US')})
+        </span>
+        <span className="map-movers2__rel-scale" aria-hidden="true">
+          <span>0.5× (−50%)</span>
+          <span className="map-movers2__rel-tick">| 1× PAR</span>
+          <span>2× (+100%)</span>
+        </span>
+      </div>
+      <div className="map-movers2__dial" role="tablist" aria-label="Relativity time horizon">
+        {MOVER_HORIZONS.map((h) => {
+          const active = h.key === horizon;
+          return (
+            <button
+              key={h.key}
+              type="button"
+              role="tab"
+              aria-selected={active}
+              className={`map-movers2__dial-btn${active ? ' map-movers2__dial-btn--active' : ''}${h.key === 'upcoming' ? ' map-movers2__dial-btn--upcoming' : ''}`}
+              title={h.title}
+              onClick={() => setHorizon(h.key)}
+            >
+              {h.label}
+            </button>
+          );
+        })}
+      </div>
+    </div>
     <div className="map-movers2__sides">
-      {side('Selling more', data.gaining, 'up')}
-      {side('Selling less', data.losing, 'down')}
+      {side(meta.gainingTitle, data.gaining, 'up')}
+      {side(meta.losingTitle, data.losing, 'down')}
     </div>
     <div className="map-movers2__base">
-      Sales this year against last year, after taking out the market's own growth ({pct(batMove)},{' '}
-      {data.bat.sold_prior_12m.toLocaleString('en-US')} → {data.bat.sold_12m.toLocaleString('en-US')}). A family is listed only when its
-      change is bigger than luck explains; the bar is the likely range, from half as many sales (−50%) to twice as many (+100%).
-      {' '}{data.significant.toLocaleString('en-US')} of {data.eligible.toLocaleString('en-US')} families with {data.min_sales}+ measured sales each
-      year changed for real ({data.families.toLocaleString('en-US')} families read). Avg sale = dollars divided by cars sold, so it
-      moves with which cars sold. Measured at auction houses we hold in full both years: today Bring a Trailer.
+      {isUpcoming ? (
+        <>
+          {meta.windowLabel}, after taking out overall upcoming supply pace ({pct(batMove)},{' '}
+          {data.bat.sold_prior_12m.toLocaleString('en-US')} sold → {data.bat.sold_12m.toLocaleString('en-US')} upcoming). A family is
+          listed only when its upcoming wave is bigger than luck explains; the bar is the likely range, from half the pace (−50%) to
+          twice the pace (+100%). {data.significant.toLocaleString('en-US')} of {data.eligible.toLocaleString('en-US')} families with{' '}
+          {data.min_sales}+ lots each {meta.eachWindowLabel} shifted for real ({data.families.toLocaleString('en-US')} families read).
+          Avg ask = live current bids and catalog mid-estimates against recent sold prices. Sources: live Bring a Trailer auctions and
+          scheduled auction calendar lots.
+        </>
+      ) : (
+        <>
+          {meta.windowLabel}, after taking out the market's own growth ({pct(batMove)},{' '}
+          {data.bat.sold_prior_12m.toLocaleString('en-US')} → {data.bat.sold_12m.toLocaleString('en-US')}). A family is listed only when its
+          change is bigger than luck explains; the bar is the likely range, from half as many sales (−50%) to twice as many (+100%).
+          {' '}{data.significant.toLocaleString('en-US')} of {data.eligible.toLocaleString('en-US')} families with {data.min_sales}+ measured sales each
+          {' '}{meta.eachWindowLabel} changed for real ({data.families.toLocaleString('en-US')} families read). Avg sale = dollars divided by cars sold, so it
+          moves with which cars sold. Measured at auction houses we hold in full both years: today Bring a Trailer.
+        </>
+      )}
     </div>
   </div>;
 }
