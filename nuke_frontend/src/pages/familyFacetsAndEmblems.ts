@@ -583,6 +583,81 @@ export const VETTED_IDENTITY_MARKS: readonly VehicleIdentityMark[] = [
       '<svg viewBox="0 0 185 40" xmlns="http://www.w3.org/2000/svg"><rect x="2" y="5" width="181" height="30" rx="2" fill="#18181b" stroke="#d4af37" stroke-width="2"/><path d="M18 28 L24 12 L34 12 L38 28" fill="#d4d4d8"/><text x="108" y="26" text-anchor="middle" fill="#facc15" font-family="Georgia,serif" font-style="italic" font-size="16" font-weight="700" letter-spacing="1.5">targa</text></svg>',
     provenanceNote: 'Porsche 911 Targa B-pillar safety hoop and script.',
   },
+  // ── Dodge / Mopar Power Wagon, Challenger, Charger & Hemi Marks ────────────
+  {
+    id: 'dodge-power-wagon-46-80',
+    brand: 'Dodge',
+    family: 'Pickup',
+    seriesCode: 'Power Wagon',
+    yearStart: 1946,
+    yearEnd: 1980,
+    markKind: 'series_badge',
+    displayLabel: 'POWER WAGON',
+    subLabel: 'Stamped Cowl & Fender 4x4 Nameplate',
+    fenderPlacement: 'Hood Side / Front Fender',
+    svgMarkup:
+      '<svg viewBox="0 0 205 40" xmlns="http://www.w3.org/2000/svg"><rect x="2" y="5" width="201" height="30" rx="2" fill="#18181b" stroke="#e5e7eb" stroke-width="2.2"/><rect x="8" y="9" width="38" height="22" fill="#b91c1c"/><text x="27" y="24" text-anchor="middle" fill="#ffffff" font-family="Arial,sans-serif" font-size="10" font-weight="900">WM300</text><text x="124" y="25" text-anchor="middle" fill="#f9fafb" font-family="Arial Black,sans-serif" font-size="12.5" font-weight="900" letter-spacing="2">POWER WAGON</text></svg>',
+    provenanceNote: 'Dodge Power Wagon (WM300 & W100/W200) heavy-duty 4x4 cowl/fender nameplate.',
+  },
+  {
+    id: 'dodge-rt-68-71',
+    brand: 'Dodge',
+    trimPackage: 'R/T (Road/Track)',
+    yearStart: 1967,
+    yearEnd: 1974,
+    markKind: 'trim_badge',
+    displayLabel: 'R/T · 440 · HEMI',
+    subLabel: '1967–1971 Scat Pack Road/Track Grille & Quarter Emblem',
+    rpoCode: 'WS23/XS29',
+    fenderPlacement: 'Grille & Rear Quarter',
+    svgMarkup:
+      '<svg viewBox="0 0 185 40" xmlns="http://www.w3.org/2000/svg"><rect x="2" y="5" width="181" height="30" rx="2" fill="#18181b" stroke="#e5e7eb" stroke-width="2.2"/><text x="52" y="28" text-anchor="middle" fill="#ef4444" stroke="#f9fafb" stroke-width="0.8" font-family="Arial Black,Impact,sans-serif" font-size="20" font-weight="900" letter-spacing="1.5">R/T</text><text x="132" y="25" text-anchor="middle" fill="#facc15" font-family="Arial,sans-serif" font-size="11.5" font-weight="800" letter-spacing="1.8">426 HEMI</text></svg>',
+    provenanceNote: 'Dodge Charger & Challenger R/T (Road/Track) Scat Pack emblem.',
+  },
+  // ── BMW Motorsport (M) & Mercedes-Benz SL Gullwing/Pagoda & Ferrari ────────
+  {
+    id: 'bmw-m-tri-stripe-78-2035',
+    brand: 'BMW',
+    trimPackage: 'M-Power',
+    yearStart: 1978,
+    yearEnd: 2035,
+    markKind: 'trim_badge',
+    displayLabel: '///M MOTORSPORT',
+    subLabel: 'Bavarian Motorsport Tri-Color Grille & Decklid Badge',
+    fenderPlacement: 'Kidney Grille & Rear Decklid',
+    svgMarkup:
+      '<svg viewBox="0 0 185 40" xmlns="http://www.w3.org/2000/svg"><rect x="2" y="5" width="181" height="30" rx="2" fill="#111827" stroke="#e5e7eb" stroke-width="2"/><polygon points="18,32 30,8 40,8 28,32" fill="#38bdf8"/><polygon points="28,32 40,8 50,8 38,32" fill="#1e3a8a"/><polygon points="38,32 50,8 60,8 48,32" fill="#ef4444"/><text x="118" y="27" text-anchor="middle" fill="#f9fafb" font-family="Arial Black,sans-serif" font-size="17" font-weight="900" letter-spacing="2">M3 · M5</text></svg>',
+    provenanceNote: 'BMW Motorsport GmbH tri-color slanted M badge (E30 M3, E28/E39 M5, E46, E92, F80).',
+  },
+  {
+    id: 'mercedes-300sl-gullwing-54-63',
+    brand: 'Mercedes-Benz',
+    family: 'SL',
+    seriesCode: '300SL',
+    yearStart: 1954,
+    yearEnd: 1963,
+    markKind: 'series_badge',
+    displayLabel: '300 SL (W198)',
+    subLabel: '1954–1963 W198 Gullwing Coupe & Roadster Decklid Script',
+    rpoCode: 'W198',
+    fenderPlacement: 'Rear Decklid',
+    svgMarkup:
+      '<svg viewBox="0 0 185 40" xmlns="http://www.w3.org/2000/svg"><rect x="2" y="5" width="181" height="30" rx="2" fill="#111827" stroke="#e5e7eb" stroke-width="2"/><circle cx="26" cy="20" r="11" fill="none" stroke="#e5e7eb" stroke-width="1.8"/><path d="M26 9 L26 20 M26 20 L17 26 M26 20 L35 26" stroke="#e5e7eb" stroke-width="1.8"/><text x="114" y="26" text-anchor="middle" fill="#f9fafb" font-family="Georgia,serif" font-style="italic" font-size="16" font-weight="700" letter-spacing="2">300 SL</text></svg>',
+    provenanceNote: '1954–1963 Mercedes-Benz W198 300 SL Gullwing & Roadster chrome decklid script.',
+  },
+  {
+    id: 'ferrari-scuderia-shield',
+    brand: 'Ferrari',
+    yearStart: 1947,
+    yearEnd: 2035,
+    markKind: 'marque_emblem',
+    displayLabel: 'SCUDERIA FERRARI',
+    subLabel: 'Modena Giallo Fender Shield & Cavallino Rampante',
+    fenderPlacement: 'Front Fender Scuderia Shield',
+    svgMarkup:
+      '<svg viewBox="0 0 185 40" xmlns="http://www.w3.org/2000/svg"><rect x="2" y="5" width="181" height="30" rx="2" fill="#991b1b" stroke="#facc15" stroke-width="2"/><path d="M16 7 L38 7 L36 25 Q27 34 27 35 Q27 34 18 25 Z" fill="#facc15" stroke="#111" stroke-width="1.2"/><text x="27" y="29" text-anchor="middle" fill="#111" font-family="Georgia,serif" font-size="7" font-weight="900">S F</text><text x="114" y="26" text-anchor="middle" fill="#fef08a" font-family="Georgia,serif" font-size="14" font-weight="800" letter-spacing="2.8">FERRARI</text></svg>',
+    provenanceNote: 'Scuderia Ferrari Modena yellow fender shield and Pininfarina/Maranello wordmark.',
+  },
 ];
 
 const PICKUP_FAMILIES = new Set([
@@ -820,6 +895,44 @@ export function classifyVehicleFacets(
     else if (/\bXLT\b/.test(u)) series = 'Bronco XLT';
   }
 
+  // Dodge / Mopar Pickup, Charger, Challenger, Barracuda / 'Cuda
+  if (!series && (brand === 'dodge' || brand === 'plymouth' || isPickupFamilyLabel(fam))) {
+    if (/\bWM[-\s]?300\b/.test(u)) series = 'Power Wagon WM300';
+    else if (/\bPOWER\s+WAGON\b|\bW[-\s]?100\b|\bW[-\s]?150\b|\bW[-\s]?200\b|\bW[-\s]?250\b|\bW[-\s]?300\b/.test(u)) series = 'Power Wagon (4x4)';
+    else if (/\bLIL['\u2019]?\s+RED\s+EXPRESS\b/.test(u)) series = "Lil' Red Express";
+    else if (/\bWARLOCK\b/.test(u)) series = 'Warlock';
+    else if (/\bD[-\s]?100\b|\bD[-\s]?150\b/.test(u)) series = 'D100 / D150 (1/2-Ton 2WD)';
+    else if (/\bD[-\s]?200\b|\bD[-\s]?250\b/.test(u)) series = 'D200 / D250 (3/4-Ton 2WD)';
+    else if (/\bCHARGER\s+DAYTONA\b|\bSUPERBIRD\b/.test(u)) series = 'Aero Wing (Daytona / Superbird)';
+    else if (/\bCHARGER\s+500\b/.test(u)) series = 'Charger 500';
+    else if (/\bCHARGER\s+R\/T\b|\bCHALLENGER\s+R\/T\b/.test(u)) series = 'R/T (Road/Track)';
+    else if (/\bCHALLENGER\s+T\/A\b|\bAAR\s+['\u2019]?CUDA\b/.test(u)) series = 'Trans-Am (T/A · AAR)';
+    else if (/\bHEMI\s+['\u2019]?CUDA\b|\b426\s+HEMI\b/.test(u)) series = '426 Hemi';
+    else if (/\bDEMON\b/.test(u)) series = 'SRT Demon';
+    else if (/\bHELLCAT\b/.test(u)) series = 'SRT Hellcat';
+  }
+
+  // BMW Chassis & M-Division
+  if (!series && brand === 'bmw') {
+    if (/\b2002\s*TURBO\b/.test(u)) series = '2002 Turbo';
+    else if (/\b2002\s*TII\b/.test(u)) series = '2002tii';
+    else if (/\b2002\b/.test(u)) series = '2002';
+    else if (/\bE30\b.*\bM3\b|\bM3\b.*\bE30\b/.test(u) || (fam.includes('m3') && year && year >= 1986 && year <= 1991)) series = 'E30 M3';
+    else if (/\bE36\b.*\bM3\b|\bM3\b.*\bE36\b/.test(u) || (fam.includes('m3') && year && year >= 1992 && year <= 1999)) series = 'E36 M3';
+    else if (/\bE46\b.*\bM3\b|\bM3\b.*\bE46\b|\bM3\s+CSL\b/.test(u) || (fam.includes('m3') && year && year >= 2000 && year <= 2006)) series = 'E46 M3';
+    else if (/\bE9[023]\b.*\bM3\b|\bM3\b.*\bE9[023]\b/.test(u) || (fam.includes('m3') && year && year >= 2007 && year <= 2013)) series = 'E90/E92/E93 M3';
+    else if (/\bE28\b.*\bM5\b|\bE34\b.*\bM5\b|\bE39\b.*\bM5\b|\bE60\b.*\bM5\b/.test(u)) series = 'M5 Heritage';
+  }
+
+  // Mercedes-Benz SL & G-Class Chassis
+  if (!series && (brand === 'mercedes-benz' || brand === 'mercedes')) {
+    if (/\b300\s*SL\b|\bW198\b/.test(u)) series = '300SL (W198)';
+    else if (/\b190\s*SL\b|\bW121\b/.test(u)) series = '190SL (W121)';
+    else if (/\b230\s*SL\b|\b250\s*SL\b|\b280\s*SL\b|\bW113\b|\bPAGODA\b/.test(u)) series = 'Pagoda (W113)';
+    else if (/\b380\s*SL\b|\b450\s*SL\b|\b560\s*SL\b|\bR107\b/.test(u)) series = 'R107 SL (380/450/560SL)';
+    else if (/\b500\s*SL\b|\bSL\s*500\b|\bSL\s*600\b|\bR129\b/.test(u)) series = 'R129 SL';
+  }
+
   // ── 2. TRIM PACKAGE EXTRACTION (Year-aware for Squarebody & Marque Trims) ─
   if (/\bCHEYENNE\s+SUPER\b/.test(u)) trim = 'Cheyenne Super';
   else if (/\bCHEYENNE\b/.test(u)) trim = 'Cheyenne';
@@ -850,19 +963,24 @@ export function classifyVehicleFacets(
   else if (/\bIROC[-\s]?Z\b/.test(u)) trim = 'IROC-Z';
   else if (/\bZL1\b/.test(u)) trim = 'ZL1';
   else if (/\bYENKO\b|\bCOPO\b|\bBALDWIN\b/.test(u)) trim = 'COPO / Yenko';
+  else if (/\bR\/T\b|\bROAD\s*\/?\s*TRACK\b/.test(u)) trim = 'R/T (Road/Track)';
+  else if (/\bCSL\b|\bCOMPETITION\b|\bM3\b|\bM5\b/.test(u) && brand === 'bmw') trim = 'M-Power';
+  else if (/\bAMG\b/.test(u)) trim = 'AMG';
 
   // ── 3. BODY STYLE / DOOR CONFIGURATION EXTRACTION ─────────────────────────
   if (/\bSPLIT[-\s]?WINDOW\b/.test(u) || (fam === 'corvette' && year === 1963 && /\bCOUPE\b/.test(u))) {
     body = 'Split-Window Coupe';
+  } else if (/\bGULLWING\b/.test(u) || (brand.startsWith('mercedes') && /\b300\s*SL\b/.test(u) && /\bCOUPE\b/.test(u))) {
+    body = 'Gullwing Coupe';
   } else if (/\bFASTBACK\b|\bSPORTSROOF\b|\b2\+2\b/.test(u)) {
     body = 'Fastback';
   } else if (/\bCONVERTIBLE\b|\bCABRIOLET\b|\bDROPHEAD\b|\bVOLANTE\b/.test(u)) {
     body = 'Convertible / Cabriolet';
-  } else if (/\bROADSTER\b|\bSPIDER\b|\bSPYDER\b|\bSPEEDSTER\b/.test(u)) {
+  } else if (/\bROADSTER\b|\bSPIDER\b|\bSPYDER\b|\bSPEEDSTER\b|\bGTS\b|\bAPERTA\b/.test(u)) {
     body = 'Roadster / Speedster';
   } else if (/\bTARGA\b|\bT[-\s]?TOP\b/.test(u)) {
     body = 'Targa / T-Top';
-  } else if (/\bCOUPE\b|\bHARDTOP\b|\bBERLINETTA\b|\bNOTCHBACK\b/.test(u)) {
+  } else if (/\bCOUPE\b|\bHARDTOP\b|\bBERLINETTA\b|\bGTB\b|\bNOTCHBACK\b/.test(u)) {
     body = 'Coupe / Hardtop';
   } else if (/\bSTEPSIDE\b|\bFENDERSIDE\b|\bFLARESIDE\b/.test(u)) {
     body = 'Stepside / Flareside';
