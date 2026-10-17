@@ -2556,7 +2556,11 @@ export function TreemapHomePage({ onBrowse, embedded = false }: { onBrowse: () =
             onOpen={(id) => navigate(`/vehicle/${id}`)}
             selectedEra={selectedEra}
             onSelectEra={setSelectedEra}
-            selectedModel={currentLevel.model ?? null}
+            selectedModel={
+              facetAxis !== 'raw' && currentLevel.model
+                ? drillStack.find((d) => d.model && !d.year)?.label ?? currentLevel.model
+                : currentLevel.model ?? null
+            }
             selectedYear={currentLevel.year ?? null}
           />
         </div>

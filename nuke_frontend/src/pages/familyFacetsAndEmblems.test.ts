@@ -7,6 +7,7 @@ import {
   resolveTileBadgeSvg,
   resolveVettedIdentityMarks,
 } from './familyFacetsAndEmblems';
+import { filterSalesBySubModel, matchesSaleSubModel } from './market/FamilySalesChart';
 import type { TreemapNode } from './HomePage';
 
 describe('familyFacetsAndEmblems', () => {
@@ -212,5 +213,48 @@ describe('familyFacetsAndEmblems', () => {
     });
     expect(classifyVehicleFacets('Ford', 'Bronco', 'Bronco U14 Half-Cab Pickup', 1968).series).toBe('U14 Half-Cab Pickup');
     expect(resolveTileBadgeSvg('Porsche', '911', 'Targa / T-Top')).toContain('targa');
+  });
+
+  it('filters FamilySalesChart dots and cohorts by orthogonal Series, Trim, and Body Style facets as well as Dodge/BMW/Mercedes/Ferrari taxonomy', () => {
+    const sales = [
+      { id: '1', year: 1978, model: 'C10 · 1978 Chevrolet C10 Silverado Stepside Short Bed' },
+      { id: '2', year: 1974, model: 'K10 · 1974 Chevrolet K10 Cheyenne Super Fleetside' },
+      { id: '3', year: 1967, model: 'Mustang · 1967 Ford Mustang Shelby GT500 Fastback' },
+    ];
+
+    expect(
+      matchesSaleSubModel(sales[0].model, 'Silverado', { brand: 'Chevrolet', family: 'Pickup', year: 1978 }),
+    ).toBe(true);
+    expect(
+      matchesSaleSubModel(sales[0].model, 'Stepside / Flareside', { brand: 'Chevrolet', family: 'Pickup', year: 1978 }),
+    ).toBe(true);
+    expect(
+      matchesSaleSubModel(sales[0].model, 'C10 (1/2-Ton 2WD)', { brand: 'Chevrolet', family: 'Pickup', year: 1978 }),
+    ).toBe(true);
+    expect(
+      matchesSaleSubModel(sales[1].model, 'Silverado', { brand: 'Chevrolet', family: 'Pickup', year: 1974 }),
+    ).toBe(false);
+
+    const silveradoSales = filterSalesBySubModel(sales, 'Silverado', { brand: 'Chevrolet', family: 'Pickup' });
+    expect(silveradoSales.map((s) => s.id)).toEqual(['1']);
+
+    // Dodge Power Wagon & Charger R/T, BMW E30 M3, Mercedes 300SL Gullwing, Ferrari GTS
+    expect(classifyVehicleFacets('Dodge', 'Pickup', 'WM300 Power Wagon 4x4', 1962).series).toBe('Power Wagon WM300');
+    expect(classifyVehicleFacets('Dodge', 'Charger', 'Charger R/T 426 Hemi Hardtop', 1968)).toEqual({
+      series: 'R/T (Road/Track)',
+      trim: 'R/T (Road/Track)',
+      body: 'Coupe / Hardtop',
+    });
+    expect(classifyVehicleFacets('BMW', 'M3', 'M3 Sport Evolution Coupe', 1990)).toEqual({
+      series: 'E30 M3',
+      trim: 'M-Power',
+      body: 'Coupe / Hardtop',
+    });
+    expect(classifyVehicleFacets('Mercedes-Benz', 'SL', '300SL Gullwing Coupe', 1955)).toEqual({
+      series: '300SL (W198)',
+      trim: null,
+      body: 'Gullwing Coupe',
+    });
+    expect(classifyVehicleFacets('Ferrari', '355', 'F355 GTS Manual', 1997).body).toBe('Roadster / Speedster');
   });
 });

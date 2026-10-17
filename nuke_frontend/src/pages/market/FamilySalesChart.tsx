@@ -4,6 +4,7 @@ import { Text } from '../../kit';
 import './FamilySalesChart.css';
 import { LikeForLike, useFamilyIndex } from './FamilyPriceIndex';
 import { getFamilyEraCohorts, matchesEraRange } from '../../lib/market/familyEras';
+import { classifyVehicleFacets } from '../familyFacetsAndEmblems';
 
 // One model family's market as a chart, the way classic.com draws a model: every confirmed sale of the last five years
 // as a dot (price against date, colored by venue) and a rolling median through them, so the trading range, the volume
@@ -345,24 +346,61 @@ const signed = (v: number) => (Math.round(v * 100) === 0 ? '0%' : `${v > 0 ? '�
 const P = { left: 50, right: 8, top: 18, bottom: 18 };
 const MIN_BAND = 8;
 
-export function matchesSaleSubModel(saleModel: string | null | undefined, selectedModel: string | null | undefined): boolean {
+export function matchesSaleSubModel(
+  saleModel: string | null | undefined,
+  selectedModel: string | null | undefined,
+  context?: { brand?: string | null; family?: string | null; year?: number | null },
+): boolean {
   if (!selectedModel) return true;
   const target = selectedModel.trim().toLowerCase();
   if (!target) return true;
-  const m = (saleModel ?? '').trim().toLowerCase();
-  return m === target || m.startsWith(`${target} `) || m.startsWith(`${target}-`);
+  const raw = (saleModel ?? '').trim();
+  const m = raw.toLowerCase();
+  // Strip any enriched " · <listing_title>" suffix when checking exact/prefix model name
+  const canonicalModel = m.split(' · ')[0].trim();
+  if (
+    m === target ||
+    canonicalModel === target ||
+    m.startsWith(`${target} `) ||
+    m.startsWith(`${target}-`) ||
+    canonicalModel.startsWith(`${target} `) ||
+    canonicalModel.startsWith(`${target}-`)
+  ) {
+    return true;
+  }
+  // Check orthogonal Series / Trim / Body Style facets (e.g. "C10 (1/2-Ton 2WD)", "Silverado", "Fastback", "Stepside / Flareside")
+  const facets = classifyVehicleFacets(context?.brand, context?.family, raw, context?.year);
+  if (
+    facets.series?.toLowerCase() === target ||
+    facets.trim?.toLowerCase() === target ||
+    facets.body?.toLowerCase() === target
+  ) {
+    return true;
+  }
+  return false;
 }
 
-export function filterSalesBySubModel<T extends { model: string | null }>(
+export function filterSalesBySubModel<T extends { model: string | null; year?: number | null }>(
   sales: readonly T[],
   selectedModel: string | null | undefined,
+  context?: { brand?: string | null; family?: string | null },
 ): T[] {
   if (!selectedModel) return [...sales];
   const target = selectedModel.trim().toLowerCase();
   if (!target) return [...sales];
-  const exact = sales.filter((s) => (s.model ?? '').trim().toLowerCase() === target);
+  const exact = sales.filter((s) => {
+    const raw = (s.model ?? '').trim().toLowerCase();
+    const canonical = raw.split(' · ')[0].trim();
+    return raw === target || canonical === target;
+  });
   if (exact.length > 0) return exact;
-  return sales.filter((s) => matchesSaleSubModel(s.model, selectedModel));
+  return sales.filter((s) =>
+    matchesSaleSubModel(s.model, selectedModel, {
+      brand: context?.brand,
+      family: context?.family,
+      year: s.year ?? null,
+    }),
+  );
 }
 
 export default function FamilySalesChart({ brand, familyKey, family, width, height, onOpen, selectedEra = null, onSelectEra, selectedModel = null, selectedYear = null }: {
@@ -382,7 +420,7 @@ export default function FamilySalesChart({ brand, familyKey, family, width, heig
   const filteredSupply = useMemo(() => {
     if (!upcomingSupply) return null;
     const matchFilter = (yr: number | null, mdl: string | null) => {
-      if (selectedModel && !matchesSaleSubModel(mdl, selectedModel)) return false;
+      if (selectedModel && !matchesSaleSubModel(mdl, selectedModel, { brand, family, year: yr })) return false;
       if (selectedEra && !matchesEraRange(yr, selectedEra)) return false;
       if (selectedYear != null && yr !== selectedYear) return false;
       return true;
@@ -404,10 +442,10 @@ export default function FamilySalesChart({ brand, familyKey, family, width, heig
         total,
       },
     };
-  }, [upcomingSupply, selectedModel, selectedEra, selectedYear]);
+  }, [upcomingSupply, selectedModel, selectedEra, selectedYear, brand, family]);
   const modelSales = useMemo(
-    () => (allSales && selectedModel ? filterSalesBySubModel(allSales, selectedModel) : null),
-    [allSales, selectedModel],
+    () => (allSales && selectedModel ? filterSalesBySubModel(allSales, selectedModel, { brand, family }) : null),
+    [allSales, selectedModel, brand, family],
   );
   const baseSales = modelSales && modelSales.length > 0 ? modelSales : allSales;
   const eraCohorts = useMemo(
