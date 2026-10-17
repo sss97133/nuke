@@ -13,6 +13,7 @@
 -- Preserves the 2-argument family_share_movers_build(integer, integer) and treemap_family_share_movers(integer, integer)
 -- signatures and mv_family_share_movers id = 1 contract unchanged. Stores all 8 horizons in mv_family_share_movers
 -- (ids 1..8) and adds a covering sale_date index on mv_family_sales so date-bounded horizon builds use index-only scans.
+-- Resolves make/model names directly from mv_family_market (avoiding lock contention on mv_model_family_names).
 -- Contracts: supabase/sql/test_family_share_movers.sql, supabase/sql/test_family_horizon_movers.sql.
 BEGIN;
 SET LOCAL statement_timeout = '120s';
@@ -90,8 +91,6 @@ BEGIN
     ELSE 2.00
   END;
 
-  -- When mv_family_sales is absent (e.g. minimal 2-arg contract fixtures) or 1y is requested without mv_family_sales,
-  -- fall back to the 2-arg mv_family_market builder.
   IF to_regclass('public.mv_family_sales') IS NULL THEN
     RETURN public.family_share_movers_build(v_limit, v_min)
       || jsonb_build_object('horizon', v_h, 'window_days', v_days);
@@ -109,59 +108,67 @@ BEGIN
 
   -- 1) UPCOMING: next 30d live BaT + scheduled auction calendar lots against past 30d measured sales.
   IF v_h = 'upcoming'
-     AND to_regclass('public.mv_model_family_names') IS NOT NULL
      AND to_regclass('public.market_pulse_live_snapshot') IS NOT NULL
      AND to_regclass('public.mv_auction_calendar_lots') IS NOT NULL THEN
 
     WITH f_names AS MATERIALIZED (
-      SELECT brand, family_key, max(family) AS family
+      SELECT brand, lower(trim(brand)) AS make_l, family_key, max(family) AS family
       FROM public.mv_family_market
       WHERE family_key <> 'other'
       GROUP BY brand, family_key
     ),
-    mfn AS MATERIALIZED (
-      SELECT DISTINCT ON (brand, lower(trim(model)))
-        brand, lower(trim(model)) AS model_norm, family_key
-      FROM public.mv_model_family_names
-      ORDER BY brand, lower(trim(model)), count DESC
+    m_map AS MATERIALIZED (
+      SELECT DISTINCT ON (lower(trim(brand)), model_key)
+        lower(trim(brand)) AS make_l, model_key AS model_l, family_key
+      FROM public.mv_family_market
+      WHERE family_key <> 'other' AND model_key IS NOT NULL
+      ORDER BY lower(trim(brand)), model_key, sold DESC
     ),
     upcoming_lots AS MATERIALIZED (
       SELECT
-        s.make AS brand,
+        lower(trim(a->>2)) AS make_l,
         coalesce(m.family_key, 'other') AS family_key,
-        CASE WHEN s.current_bid > 0 THEN s.current_bid::numeric ELSE NULL END AS usd,
-        coalesce(s.auction_end::date, v_anchor + 3) AS dt
-      FROM public.market_pulse_live_snapshot s
-      LEFT JOIN mfn m ON m.brand = s.make AND m.model_norm = lower(trim(s.model))
-      WHERE s.make IS NOT NULL
-        AND (s.auction_end IS NULL OR (s.auction_end >= now() AND s.auction_end <= now() + interval '30 days'))
+        CASE WHEN (a->>4) ~ '^[0-9]+(\.[0-9]+)?$' AND (a->>4)::numeric > 0 THEN (a->>4)::numeric ELSE NULL END AS usd,
+        coalesce((a->>5)::timestamptz::date, v_anchor + 3) AS dt
+      FROM public.market_pulse_live_snapshot s,
+           jsonb_array_elements(s.payload->'auctions') a
+      LEFT JOIN m_map m
+        ON m.make_l = lower(trim(a->>2))
+       AND m.model_l = lower(trim(coalesce(a->>3, '')))
+      WHERE s.id = 1
+        AND a->>2 IS NOT NULL
       UNION ALL
       SELECT
-        c.make AS brand,
+        lower(trim(c.make)) AS make_l,
         coalesce(m.family_key, 'other') AS family_key,
-        coalesce(
-          CASE WHEN c.lot_estimate_low > 0 AND c.lot_estimate_high > 0 THEN ((c.lot_estimate_low + c.lot_estimate_high) / 2.0)::numeric
-               WHEN c.lot_estimate_low > 0 THEN c.lot_estimate_low::numeric
-               WHEN c.lot_estimate_high > 0 THEN c.lot_estimate_high::numeric
-               WHEN c.current_bid > 0 THEN c.current_bid::numeric
-               ELSE NULL END,
-          NULL
-        ) AS usd,
-        coalesce(c.auction_start_date, c.created_at::date) AS dt
+        CASE
+          WHEN c.estimate_low ~ '^[0-9]+(\.[0-9]+)?$' AND c.estimate_high ~ '^[0-9]+(\.[0-9]+)?$'
+               AND c.estimate_low::numeric > 0 AND c.estimate_high::numeric > 0
+            THEN ((c.estimate_low::numeric + c.estimate_high::numeric) / 2.0)::numeric
+          WHEN c.estimate_low ~ '^[0-9]+(\.[0-9]+)?$' AND c.estimate_low::numeric > 0
+            THEN c.estimate_low::numeric
+          WHEN c.estimate_high ~ '^[0-9]+(\.[0-9]+)?$' AND c.estimate_high::numeric > 0
+            THEN c.estimate_high::numeric
+          ELSE NULL
+        END AS usd,
+        coalesce(c.run_on, c.sale_starts_on, v_anchor + 7) AS dt
       FROM public.mv_auction_calendar_lots c
-      LEFT JOIN mfn m ON m.brand = c.make AND m.model_norm = lower(trim(c.model))
+      LEFT JOIN m_map m
+        ON m.make_l = lower(trim(c.make))
+       AND m.model_l = lower(trim(coalesce(c.model, '')))
       WHERE c.make IS NOT NULL
-        AND coalesce(c.auction_start_date, c.created_at::date) >= v_anchor
-        AND coalesce(c.auction_start_date, c.created_at::date) <= v_anchor + 30
+        AND coalesce(c.run_on, c.sale_starts_on, v_anchor + 7) >= v_anchor
+        AND coalesce(c.run_on, c.sale_starts_on, v_anchor + 7) <= v_anchor + 30
     ),
     past_30d AS MATERIALIZED (
-      SELECT brand, family_key, usd, sale_date AS dt
+      SELECT brand, lower(trim(brand)) AS make_l, family_key, usd, sale_date AS dt
       FROM public.mv_family_sales
       WHERE sale_date > v_anchor - 30 AND sale_date <= v_anchor
     ),
     f AS MATERIALIZED (
       SELECT
         fn.brand,
+        fn.make_l,
         fn.family_key,
         fn.family,
         coalesce(u.s12, 0)::bigint AS s12,
@@ -170,13 +177,13 @@ BEGIN
         coalesce(p.up, 0)::bigint AS up
       FROM f_names fn
       LEFT JOIN (
-        SELECT brand, family_key, count(*)::bigint AS s12, coalesce(sum(usd), 0)::bigint AS u12
-        FROM upcoming_lots WHERE family_key <> 'other' GROUP BY brand, family_key
-      ) u ON u.brand = fn.brand AND u.family_key = fn.family_key
+        SELECT make_l, family_key, count(*)::bigint AS s12, coalesce(sum(usd), 0)::bigint AS u12
+        FROM upcoming_lots WHERE family_key <> 'other' GROUP BY make_l, family_key
+      ) u ON u.make_l = fn.make_l AND u.family_key = fn.family_key
       LEFT JOIN (
-        SELECT brand, family_key, count(*)::bigint AS sp, coalesce(sum(usd), 0)::bigint AS up
-        FROM past_30d WHERE family_key <> 'other' GROUP BY brand, family_key
-      ) p ON p.brand = fn.brand AND p.family_key = fn.family_key
+        SELECT make_l, family_key, count(*)::bigint AS sp, coalesce(sum(usd), 0)::bigint AS up
+        FROM past_30d WHERE family_key <> 'other' GROUP BY make_l, family_key
+      ) p ON p.make_l = fn.make_l AND p.family_key = fn.family_key
       WHERE coalesce(u.s12, 0) > 0 OR coalesce(p.sp, 0) > 0
     ),
     bat AS MATERIALIZED (
@@ -206,26 +213,26 @@ BEGIN
       SELECT * FROM s WHERE lm < 0 ORDER BY lm ASC, brand, family_key LIMIT v_limit
     ),
     picked AS MATERIALIZED (
-      SELECT brand, family_key FROM top_g
+      SELECT brand, make_l, family_key FROM top_g
       UNION
-      SELECT brand, family_key FROM top_l
+      SELECT brand, make_l, family_key FROM top_l
     ),
     bin_counts AS MATERIALIZED (
       SELECT brand, family_key, b_idx, sum(cnt)::bigint AS cnt
       FROM (
-        SELECT p30.brand, p30.family_key,
+        SELECT pk.brand, pk.family_key,
                least(11, greatest(0, floor(((p30.dt - (v_anchor - 29))::numeric / 30.0) * 12)::int)) AS b_idx,
                count(*)::bigint AS cnt
         FROM past_30d p30
-        JOIN picked pk ON pk.brand = p30.brand AND pk.family_key = p30.family_key
-        GROUP BY p30.brand, p30.family_key, 3
+        JOIN picked pk ON pk.make_l = p30.make_l AND pk.family_key = p30.family_key
+        GROUP BY pk.brand, pk.family_key, 3
         UNION ALL
-        SELECT u30.brand, u30.family_key,
+        SELECT pk.brand, pk.family_key,
                12 + least(11, greatest(0, floor(((u30.dt - v_anchor)::numeric / 30.0) * 12)::int)) AS b_idx,
                count(*)::bigint AS cnt
         FROM upcoming_lots u30
-        JOIN picked pk ON pk.brand = u30.brand AND pk.family_key = u30.family_key
-        GROUP BY u30.brand, u30.family_key, 3
+        JOIN picked pk ON pk.make_l = u30.make_l AND pk.family_key = u30.family_key
+        GROUP BY pk.brand, pk.family_key, 3
       ) raw_bins
       GROUP BY brand, family_key, b_idx
     ),
@@ -284,8 +291,7 @@ BEGIN
   --    falling back to mv_family_sales (v_anchor vs v_anchor - 1).
   IF v_h = '1d'
      AND to_regclass('public.vehicle_events') IS NOT NULL
-     AND to_regclass('public.vehicles') IS NOT NULL
-     AND to_regclass('public.mv_model_family_names') IS NOT NULL THEN
+     AND to_regclass('public.vehicles') IS NOT NULL THEN
     SELECT count(*)
       INTO v_live_24h
       FROM public.vehicle_events ve
@@ -296,27 +302,35 @@ BEGIN
 
   IF v_h = '1d' AND v_live_24h >= 10 THEN
     WITH f_names AS MATERIALIZED (
-      SELECT brand, family_key, max(family) AS family
+      SELECT brand, lower(trim(brand)) AS make_l, family_key, max(family) AS family
       FROM public.mv_family_market
       WHERE family_key <> 'other'
       GROUP BY brand, family_key
     ),
-    mfn AS MATERIALIZED (
-      SELECT DISTINCT ON (brand, lower(trim(model)))
-        brand, lower(trim(model)) AS model_norm, family_key
-      FROM public.mv_model_family_names
-      ORDER BY brand, lower(trim(model)), count DESC
+    m_map AS MATERIALIZED (
+      SELECT DISTINCT ON (lower(trim(brand)), model_key)
+        lower(trim(brand)) AS make_l, model_key AS model_l, family_key
+      FROM public.mv_family_market
+      WHERE family_key <> 'other' AND model_key IS NOT NULL
+      ORDER BY lower(trim(brand)), model_key, sold DESC
     ),
     ev AS MATERIALIZED (
       SELECT
-        v.make AS brand,
+        lower(trim(v.make)) AS make_l,
         coalesce(m.family_key, 'other') AS family_key,
-        CASE WHEN ve.amount > 0 AND ve.amount < 50000000 THEN ve.amount::numeric ELSE NULL END AS usd,
+        CASE
+          WHEN coalesce(ve.final_price, ve.current_price) > 0
+               AND coalesce(ve.final_price, ve.current_price) < 50000000
+            THEN coalesce(ve.final_price, ve.current_price)::numeric
+          ELSE NULL
+        END AS usd,
         ve.ended_at,
         CASE WHEN ve.ended_at > now() - interval '24 hours' THEN 1 ELSE 0 END AS is_recent
       FROM public.vehicle_events ve
       JOIN public.vehicles v ON v.id = ve.vehicle_id
-      LEFT JOIN mfn m ON m.brand = v.make AND m.model_norm = lower(trim(v.model))
+      LEFT JOIN m_map m
+        ON m.make_l = lower(trim(v.make))
+       AND m.model_l = lower(trim(coalesce(v.model, '')))
       WHERE ve.event_status = 'sold'
         AND ve.ended_at > now() - interval '48 hours'
         AND ve.ended_at <= now()
@@ -324,19 +338,19 @@ BEGIN
     ),
     agg AS MATERIALIZED (
       SELECT
-        brand,
+        make_l,
         family_key,
         count(*) FILTER (WHERE is_recent = 1)::bigint AS s12,
         count(*) FILTER (WHERE is_recent = 0)::bigint AS sp,
         coalesce(sum(usd) FILTER (WHERE is_recent = 1), 0)::bigint AS u12,
         coalesce(sum(usd) FILTER (WHERE is_recent = 0), 0)::bigint AS up
       FROM ev
-      GROUP BY brand, family_key
+      GROUP BY make_l, family_key
     ),
     f AS MATERIALIZED (
-      SELECT fn.brand, fn.family_key, fn.family, a.s12, a.sp, a.u12, a.up
+      SELECT fn.brand, fn.make_l, fn.family_key, fn.family, a.s12, a.sp, a.u12, a.up
       FROM agg a
-      JOIN f_names fn ON fn.brand = a.brand AND fn.family_key = a.family_key
+      JOIN f_names fn ON fn.make_l = a.make_l AND fn.family_key = a.family_key
       WHERE a.family_key <> 'other'
     ),
     bat AS MATERIALIZED (
@@ -368,19 +382,19 @@ BEGIN
       SELECT * FROM s WHERE lm < 0 ORDER BY lm ASC, brand, family_key LIMIT v_limit
     ),
     picked AS MATERIALIZED (
-      SELECT brand, family_key FROM top_g
+      SELECT brand, make_l, family_key FROM top_g
       UNION
-      SELECT brand, family_key FROM top_l
+      SELECT brand, make_l, family_key FROM top_l
     ),
     bin_counts AS MATERIALIZED (
       SELECT
-        ev.brand,
-        ev.family_key,
+        pk.brand,
+        pk.family_key,
         least(23, greatest(0, floor((extract(epoch FROM (ev.ended_at - (now() - interval '48 hours'))) / 172800.0) * 24)::int)) AS b_idx,
         count(*)::bigint AS cnt
       FROM ev
-      JOIN picked pk ON pk.brand = ev.brand AND pk.family_key = ev.family_key
-      GROUP BY ev.brand, ev.family_key, 3
+      JOIN picked pk ON pk.make_l = ev.make_l AND pk.family_key = ev.family_key
+      GROUP BY pk.brand, pk.family_key, 3
     ),
     family_bins AS MATERIALIZED (
       SELECT pk.brand, pk.family_key,
@@ -655,7 +669,6 @@ BEGIN
 
   IF v_req_min = v_default_min THEN
     SELECT value INTO v_stored FROM public.mv_family_share_movers WHERE id = v_id;
-    -- For 1d and upcoming, if the stored snapshot is older than 1 hour and live tables exist, compute fresh.
     IF v_stored IS NOT NULL AND v_h IN ('1d', 'upcoming') THEN
       BEGIN
         IF ((v_stored->>'as_of')::timestamptz < now() - interval '1 hour') THEN
