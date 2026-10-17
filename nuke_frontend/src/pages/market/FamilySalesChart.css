@@ -53,6 +53,15 @@
 .family-sales__era { padding: 1px 6px; border: 1px solid var(--border); background: var(--surface); color: var(--text-secondary); cursor: pointer; }
 .family-sales__era[aria-pressed="true"] { background: var(--text); color: var(--bg); border-color: var(--text); }
 .family-sales__era[aria-pressed="true"] .k-caption { color: var(--bg); }
+.family-sales__facet-summary { display: flex; flex-wrap: wrap; align-items: center; gap: 5px 8px; width: 100%; padding: 2px 0; }
+.family-sales__facet-badge { font: 700 9px 'Courier New', monospace; letter-spacing: 0.08em; padding: 1px 5px; background: var(--text); color: var(--bg); text-transform: uppercase; }
+.family-sales__facet-metrics { font: 400 10px 'Courier New', monospace; color: var(--text); }
+.family-sales__facet-metrics strong { font-weight: 700; }
+.family-sales__facet-pills { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 4px; }
+.family-sales__facet-pill { display: inline-flex; align-items: baseline; gap: 4px; padding: 1px 6px; border: 1px solid var(--border); background: var(--surface); color: var(--text-secondary); font: 600 10px Arial, sans-serif; cursor: pointer; white-space: nowrap; }
+.family-sales__facet-pill:hover { border-color: var(--text); color: var(--text); }
+.family-sales__facet-pill[aria-pressed="true"] { background: var(--text); color: var(--bg); border-color: var(--text); }
+.family-sales__facet-pill-meta { font: 400 9px 'Courier New', monospace; opacity: 0.8; }
 .family-sales__plot { display: block; cursor: crosshair; }
 .family-sales__grid { stroke: var(--border); stroke-width: 1; opacity: 0.6; }
 .family-sales__axis { font: 400 10px 'Courier New', monospace; fill: var(--text-secondary); }
