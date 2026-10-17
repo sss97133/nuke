@@ -1,50 +1,49 @@
--- Contract test for 20261018063000_family_keys_year_gates_euro_wave.sql on a disposable Postgres 17 instance.
--- Verifies that year-gated models (Silver Ghost, 2026 Corvette, 1959 Porsche 718 RSK, 1989 Mercedes 560SEC,
--- 1966 Ferrari Dino 206 S), consolidated Ferrari 250 variants (250 GTO, 250 LM, 250 GTE), and newly added
--- European/Japanese/EV families (Mercedes 230SL/190E/300TD, BMW 3.0CS, Volvo P1800/V70R, Land Rover Defender 110,
--- Lexus LS430/LC500, Porsche 356SC, Audi RS3/RS7, McLaren 12C, Tesla Roadster/Model S, Rivian R1T/R1S) resolve
--- cleanly in mv_model_family_names and mv_family_market, and that the migration is idempotent.
-
+-- Empty disposable PG17 only: psql -X -v ON_ERROR_STOP=1 -d dm_refinement_family_keys_year_gates_euro_wave -f this-file.sql
+-- Contract for 20261018063000_family_keys_year_gates_euro_wave.sql. Synthetic rows only; never production.
+-- Verifies that year-gated models (Silver Ghost, 2026 Corvette, 1959 Porsche 718 RSK, 1989 Mercedes 560SEC),
+-- consolidated Ferrari 250 / Duesenberg Model J variants, and newly added European/Pre-War/Japanese/EV families
+-- (Mercedes 230SL/190E/300TD, BMW 3.0CS, Volvo P1800/V70R, Land Rover Defender 110, Lexus LS430, Porsche 356SC,
+-- Audi RS3, McLaren 12C, Tesla Roadster/Model S, Rivian R1T/R1S, Maserati A6G/MC12, Packard 734 Speedster,
+-- Talbot-Lago T150-C-SS, Ruf CTR, Fiat 8V, Dodge Ram 1500 TRX / D100) resolve cleanly in mv_model_family_names
+-- and that a second apply changes nothing.
 \set ON_ERROR_STOP on
+DO $$ BEGIN
+  IF current_database() NOT LIKE 'dm_refinement_%'
+     OR current_setting('server_version_num')::int / 10000 <> 17
+     OR to_regclass('public.canonical_models') IS NOT NULL THEN
+    RAISE EXCEPTION 'Requires an empty disposable PG17 dm_refinement_* database';
+  END IF;
+END $$;
+SET statement_timeout = '60s';
+SET lock_timeout = '3s';
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname = 'anon') THEN CREATE ROLE anon NOLOGIN; END IF;
+  IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname = 'authenticated') THEN CREATE ROLE authenticated NOLOGIN; END IF;
+  IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname = 'service_role') THEN CREATE ROLE service_role NOLOGIN; END IF;
+END $$;
+GRANT USAGE ON SCHEMA public TO anon, authenticated, service_role;
+CREATE FUNCTION pg_temp.ok(label text, condition boolean) RETURNS void LANGUAGE plpgsql AS $$ BEGIN
+  IF condition IS NOT TRUE THEN RAISE EXCEPTION 'Contract failed: %', label; END IF;
+  RAISE NOTICE 'PASS %', label;
+END $$;
 
-BEGIN;
+CREATE TABLE public.canonical_makes (id uuid PRIMARY KEY, canonical_name text, display_name text, short_name text,
+  aliases text[], country_of_origin text, founded_year integer, parent_company text, is_active boolean,
+  created_at timestamptz, brand_tier text);
+CREATE TABLE public.canonical_models (id uuid PRIMARY KEY, make text, canonical_model text, canonical_series text,
+  year_start integer, year_end integer, body_styles text[], aliases text[], generation text, notes text, created_at timestamptz);
+CREATE TABLE public.make_model_profiles (id uuid PRIMARY KEY, canonical_model_id uuid REFERENCES public.canonical_models(id));
+CREATE TABLE public.mv_vehicle_name_dictionary (make_l text, model_l text, name_l text, vehicles bigint,
+  PRIMARY KEY (make_l, model_l));
 
-CREATE TABLE public.canonical_makes (
-  canonical_name text PRIMARY KEY,
-  display_name   text,
-  short_name     text,
-  aliases        text[],
-  tier           int,
-  is_active      boolean,
-  country        text
-);
-
-CREATE TABLE public.canonical_models (
-  id              uuid PRIMARY KEY,
-  make            text NOT NULL,
-  canonical_model text NOT NULL,
-  year_start      int,
-  year_end        int,
-  aliases         text[]
-);
-
-CREATE TABLE public.make_model_profiles (
-  id                 uuid PRIMARY KEY,
-  canonical_model_id uuid REFERENCES public.canonical_models(id)
-);
-
-INSERT INTO public.canonical_makes (canonical_name, display_name, aliases, tier, is_active, country) VALUES
-  ('CHEVROLET',     'Chevrolet',     ARRAY['chevrolet', 'chevy'], 1, true, 'USA'),
-  ('FERRARI',       'Ferrari',       ARRAY['ferrari'], 1, true, 'Italy'),
-  ('PORSCHE',       'Porsche',       ARRAY['porsche'], 1, true, 'Germany'),
-  ('MERCEDES-BENZ', 'Mercedes-Benz', ARRAY['mercedes-benz', 'mercedes'], 1, true, 'Germany'),
-  ('BMW',           'BMW',           ARRAY['bmw'], 1, true, 'Germany'),
-  ('AUDI',          'Audi',          ARRAY['audi'], 1, true, 'Germany'),
-  ('MCLAREN',       'McLaren',       ARRAY['mclaren'], 1, true, 'UK'),
-  ('ROLLS-ROYCE',   'Rolls-Royce',   ARRAY['rolls-royce'], 1, true, 'UK'),
-  ('VOLVO',         'Volvo',         ARRAY['volvo'], 1, true, 'Sweden'),
-  ('LAND ROVER',    'Land Rover',    ARRAY['land rover'], 1, true, 'UK'),
-  ('LEXUS',         'Lexus',         ARRAY['lexus'], 1, true, 'Japan');
+INSERT INTO public.canonical_makes (id, canonical_name, display_name, aliases) VALUES
+  ('00000000-0000-4000-a000-000000000001', 'CHEVROLET',     'Chevrolet',     ARRAY['chevrolet', 'chevy']),
+  ('00000000-0000-4000-a000-000000000002', 'FERRARI',       'Ferrari',       ARRAY['ferrari']),
+  ('00000000-0000-4000-a000-000000000003', 'PORSCHE',       'Porsche',       ARRAY['porsche']),
+  ('00000000-0000-4000-a000-000000000004', 'MERCEDES-BENZ', 'Mercedes-Benz', ARRAY['mercedes-benz', 'mercedes']),
+  ('00000000-0000-4000-a000-000000000005', 'BMW',           'BMW',           ARRAY['bmw']),
+  ('00000000-0000-4000-a000-000000000006', 'AUDI',          'Audi',          ARRAY['audi']),
+  ('00000000-0000-4000-a000-000000000007', 'MCLAREN',       'McLaren',       ARRAY['mclaren']);
 
 INSERT INTO public.canonical_models (id, make, canonical_model, year_start, year_end, aliases) VALUES
   ('10000000-0000-4000-a000-000000000001', 'CHEVROLET',     'Corvette', 1953, 2024, ARRAY['corvette']),
@@ -65,49 +64,52 @@ INSERT INTO public.canonical_models (id, make, canonical_model, year_start, year
   ('10000000-0000-4000-a000-000000000016', 'Lexus',         'LS',       NULL, NULL, ARRAY['ls']),
   ('10000000-0000-4000-a000-000000000017', 'Audi',          'RS 3',     NULL, NULL, ARRAY['rs 3']),
   ('10000000-0000-4000-a000-000000000018', 'McLaren',       'MP4-12C',  NULL, NULL, ARRAY['mp4-12c']),
-  ('10000000-0000-4000-a000-000000000019', 'Volvo',         'V70',      NULL, NULL, ARRAY['v70']);
+  ('10000000-0000-4000-a000-000000000019', 'Volvo',         'V70',      NULL, NULL, ARRAY['v70']),
+  ('10000000-0000-4000-a000-000000000020', 'Duesenberg',    'Model J',  NULL, NULL, ARRAY['model j']),
+  ('10000000-0000-4000-a000-000000000021', 'Duesenberg',    'Model SJ', NULL, NULL, ARRAY['model sj']),
+  ('10000000-0000-4000-a000-000000000022', 'Dodge',         'Ram',      1981, 2010, ARRAY['ram', 'ram 1500']),
+  ('10000000-0000-4000-a000-000000000023', 'Dodge',         'D-Series', NULL, NULL, ARRAY['d-series']);
 
-CREATE MATERIALIZED VIEW public.mv_vehicle_name_dictionary AS
-SELECT * FROM (VALUES
-  ('rolls-royce'::text,   '40/50 hp silver ghost limousine'::text, 5::bigint),
-  ('ferrari'::text,       '250 gto'::text,                         2::bigint),
-  ('ferrari'::text,       '250 lm by scaglietti'::text,            1::bigint),
-  ('ferrari'::text,       '250 gte series i'::text,                6::bigint),
-  ('mercedes-benz'::text, '230sl 4-speed'::text,                   89::bigint),
-  ('mercedes-benz'::text, '190e 2.5-16 evolution ii'::text,        14::bigint),
-  ('mercedes-benz'::text, '300td turbo'::text,                     126::bigint),
-  ('mercedes-benz'::text, '560sec'::text,                          138::bigint),
-  ('bmw'::text,           '3.0cs 5-speed'::text,                   39::bigint),
-  ('bmw'::text,           '3.0csi 5-speed'::text,                  17::bigint),
-  ('volvo'::text,         '1800s'::text,                           67::bigint),
-  ('volvo'::text,         'p1800e'::text,                          15::bigint),
-  ('volvo'::text,         'v70r'::text,                            111::bigint),
-  ('land rover'::text,    'er 110'::text,                          33::bigint),
-  ('land rover'::text,    '110'::text,                             49::bigint),
-  ('lexus'::text,         'ls430'::text,                           198::bigint),
-  ('porsche'::text,       '356sc coupe'::text,                     26::bigint),
-  ('audi'::text,          'rs3'::text,                             54::bigint),
-  ('mclaren'::text,       '12c spider'::text,                      23::bigint),
-  ('tesla'::text,         'roadster'::text,                        48::bigint),
-  ('tesla'::text,         'model s plaid'::text,                   29::bigint),
-  ('rivian'::text,        'r1s launch edition'::text,              23::bigint),
-  ('rivian'::text,        'r1t adventure edition'::text,           25::bigint)
-) AS v(make_l, model_l, vehicles);
+INSERT INTO public.mv_vehicle_name_dictionary (make_l, model_l, name_l, vehicles) VALUES
+  ('rolls-royce',   '40/50 hp silver ghost limousine',   'rolls-royce 40/50 hp silver ghost limousine',   5),
+  ('ferrari',       '250 gto',                           'ferrari 250 gto',                               2),
+  ('ferrari',       '250 lm by scaglietti',              'ferrari 250 lm by scaglietti',                  1),
+  ('ferrari',       '250 gte series i',                  'ferrari 250 gte series i',                      6),
+  ('mercedes-benz', '230sl 4-speed',                     'mercedes-benz 230sl 4-speed',                   89),
+  ('mercedes-benz', '190e 2.5-16 evolution ii',          'mercedes-benz 190e 2.5-16 evolution ii',        14),
+  ('mercedes-benz', '300td turbo',                       'mercedes-benz 300td turbo',                     126),
+  ('mercedes-benz', '560sec',                            'mercedes-benz 560sec',                          138),
+  ('bmw',           '3.0cs 5-speed',                     'bmw 3.0cs 5-speed',                             39),
+  ('bmw',           '3.0csi 5-speed',                    'bmw 3.0csi 5-speed',                            17),
+  ('volvo',         '1800s',                             'volvo 1800s',                                   67),
+  ('volvo',         'p1800e',                            'volvo p1800e',                                  15),
+  ('volvo',         'v70r',                              'volvo v70r',                                    111),
+  ('land rover',    'er 110',                            'land rover er 110',                             33),
+  ('land rover',    '110',                               'land rover 110',                                49),
+  ('lexus',         'ls430',                             'lexus ls430',                                   198),
+  ('porsche',       '356sc coupe',                       'porsche 356sc coupe',                           26),
+  ('porsche',       'rs60',                              'porsche rs60',                                  3),
+  ('audi',          'rs3',                               'audi rs3',                                      54),
+  ('mclaren',       '12c spider',                        'mclaren 12c spider',                            23),
+  ('tesla',         'roadster',                          'tesla roadster',                                48),
+  ('tesla',         'model s plaid',                     'tesla model s plaid',                           29),
+  ('rivian',        'r1s launch edition',                'rivian r1s launch edition',                     23),
+  ('rivian',        'r1t adventure edition',             'rivian r1t adventure edition',                  25),
+  ('duesenberg',    'ssj',                               'duesenberg ssj',                                1),
+  ('maserati',      'a6g/54 berlinetta',                 'maserati a6g/54 berlinetta',                    5),
+  ('maserati',      'mc12',                              'maserati mc12',                                 2),
+  ('packard',       '734 speedster runabout',            'packard 734 speedster runabout',                6),
+  ('talbot-lago',   't150-c-ss teardrop coupe',          'talbot-lago t150-c-ss teardrop coupe',          2),
+  ('ruf',           'ctr anniversary',                   'ruf ctr anniversary',                           3),
+  ('fiat',          '8v supersonic',                     'fiat 8v supersonic',                            1),
+  ('dodge',         '1500 trx crew cab 4×4',             'dodge 1500 trx crew cab 4×4',                   22),
+  ('dodge',         'd100',                              'dodge d100',                                    40);
 
-\i supabase/migrations/20261015090000_model_family_names.sql
-\i supabase/migrations/20261018063000_family_keys_year_gates_euro_wave.sql
--- Apply twice to verify idempotency
-\i supabase/migrations/20261018063000_family_keys_year_gates_euro_wave.sql
-
+\ir ../migrations/20261015090000_model_family_names.sql
+\ir ../migrations/20261018063000_family_keys_year_gates_euro_wave.sql
+CREATE TEMP TABLE once AS SELECT id, year_start, year_end, notes, aliases FROM public.canonical_models;
+\ir ../migrations/20261018063000_family_keys_year_gates_euro_wave.sql
 REFRESH MATERIALIZED VIEW public.mv_model_family_names;
-
-CREATE OR REPLACE FUNCTION pg_temp.ok(p_label text, p_cond boolean) RETURNS void LANGUAGE plpgsql AS $$
-BEGIN
-  IF NOT COALESCE(p_cond, false) THEN
-    RAISE EXCEPTION 'contract failed: %', p_label;
-  END IF;
-END
-$$;
 
 SELECT pg_temp.ok('Rolls-Royce 40/50 HP Silver Ghost resolves to Silver Ghost (not 2009+ Ghost)',
   (SELECT family FROM public.mv_model_family_names WHERE make_l = 'rolls-royce' AND model_l = '40/50 hp silver ghost limousine') = 'Silver Ghost');
@@ -118,35 +120,23 @@ SELECT pg_temp.ok('Ferrari 250 GTO, 250 LM, and 250 GTE resolve to consolidated 
      AND model_l IN ('250 gto', '250 lm by scaglietti', '250 gte series i')
      AND family = '250 GT') = 3);
 
-SELECT pg_temp.ok('Chevrolet Corvette year_end is cleared so 2026 Corvettes pass year gate',
-  (SELECT year_end IS NULL FROM public.canonical_models WHERE make = 'CHEVROLET' AND canonical_model = 'Corvette'));
+SELECT pg_temp.ok('Chevrolet Corvette year_end is cleared and Porsche 718 year_start is widened to 1957',
+  (SELECT year_end IS NULL FROM public.canonical_models WHERE make = 'CHEVROLET' AND canonical_model = 'Corvette')
+  AND (SELECT year_start = 1957 FROM public.canonical_models WHERE make = 'Porsche' AND canonical_model = '718')
+  AND (SELECT family FROM public.mv_model_family_names WHERE make_l = 'porsche' AND model_l = 'rs60') = '718');
 
-SELECT pg_temp.ok('Porsche 718 year_start is widened to 1957 for 718 RSK / RS 60 Spyders',
-  (SELECT year_start = 1957 FROM public.canonical_models WHERE make = 'Porsche' AND canonical_model = '718'));
-
-SELECT pg_temp.ok('Mercedes-Benz 560SEC resolves to S-Class (1951+) rather than CL (1996-2014)',
-  (SELECT family = 'S-Class' AND year_start = 1951 FROM public.mv_model_family_names WHERE make_l = 'mercedes-benz' AND model_l = '560sec'));
-
-SELECT pg_temp.ok('Mercedes-Benz 230SL, 190E Evolution II, and 300TD resolve to SL, 190, and 300',
-  (SELECT family FROM public.mv_model_family_names WHERE make_l = 'mercedes-benz' AND model_l = '230sl 4-speed') = 'SL'
+SELECT pg_temp.ok('Mercedes-Benz 560SEC resolves to S-Class (1951+) and 230SL/190E/300TD resolve to SL/190/300',
+  (SELECT family = 'S-Class' AND year_start = 1951 FROM public.mv_model_family_names WHERE make_l = 'mercedes-benz' AND model_l = '560sec')
+  AND (SELECT family FROM public.mv_model_family_names WHERE make_l = 'mercedes-benz' AND model_l = '230sl 4-speed') = 'SL'
   AND (SELECT family FROM public.mv_model_family_names WHERE make_l = 'mercedes-benz' AND model_l = '190e 2.5-16 evolution ii') = '190'
   AND (SELECT family FROM public.mv_model_family_names WHERE make_l = 'mercedes-benz' AND model_l = '300td turbo') = '300');
 
-SELECT pg_temp.ok('BMW 3.0CS and 3.0CSi resolve to 3.0 CSL family',
-  (SELECT count(*) FROM public.mv_model_family_names
-   WHERE make_l = 'bmw' AND model_l IN ('3.0cs 5-speed', '3.0csi 5-speed') AND family = '3.0 CSL') = 2);
-
-SELECT pg_temp.ok('Volvo 1800S / P1800E resolve to P1800 and V70R resolves to V70',
-  (SELECT count(*) FROM public.mv_model_family_names
-   WHERE make_l = 'volvo' AND model_l IN ('1800s', 'p1800e') AND family = 'P1800') = 2
-  AND (SELECT family FROM public.mv_model_family_names WHERE make_l = 'volvo' AND model_l = 'v70r') = 'V70');
-
-SELECT pg_temp.ok('Land Rover 110 and er 110 resolve to Defender',
-  (SELECT count(*) FROM public.mv_model_family_names
-   WHERE make_l = 'land rover' AND model_l IN ('110', 'er 110') AND family = 'Defender') = 2);
-
-SELECT pg_temp.ok('Lexus LS430, Porsche 356SC, Audi RS3, McLaren 12C Spider, Tesla, and Rivian resolve cleanly',
-  (SELECT family FROM public.mv_model_family_names WHERE make_l = 'lexus' AND model_l = 'ls430') = 'LS'
+SELECT pg_temp.ok('BMW 3.0CS/CSi, Volvo P1800/V70R, Land Rover Defender 110, Lexus LS430, Porsche 356SC, Audi RS3, McLaren 12C, Tesla, Rivian resolve cleanly',
+  (SELECT count(*) FROM public.mv_model_family_names WHERE make_l = 'bmw' AND model_l IN ('3.0cs 5-speed', '3.0csi 5-speed') AND family = '3.0 CSL') = 2
+  AND (SELECT count(*) FROM public.mv_model_family_names WHERE make_l = 'volvo' AND model_l IN ('1800s', 'p1800e') AND family = 'P1800') = 2
+  AND (SELECT family FROM public.mv_model_family_names WHERE make_l = 'volvo' AND model_l = 'v70r') = 'V70'
+  AND (SELECT count(*) FROM public.mv_model_family_names WHERE make_l = 'land rover' AND model_l IN ('110', 'er 110') AND family = 'Defender') = 2
+  AND (SELECT family FROM public.mv_model_family_names WHERE make_l = 'lexus' AND model_l = 'ls430') = 'LS'
   AND (SELECT family FROM public.mv_model_family_names WHERE make_l = 'porsche' AND model_l = '356sc coupe') = '356'
   AND (SELECT family FROM public.mv_model_family_names WHERE make_l = 'audi' AND model_l = 'rs3') = 'RS 3'
   AND (SELECT family FROM public.mv_model_family_names WHERE make_l = 'mclaren' AND model_l = '12c spider') = 'MP4-12C'
@@ -155,4 +145,20 @@ SELECT pg_temp.ok('Lexus LS430, Porsche 356SC, Audi RS3, McLaren 12C Spider, Tes
   AND (SELECT family FROM public.mv_model_family_names WHERE make_l = 'rivian' AND model_l = 'r1s launch edition') = 'R1S'
   AND (SELECT family FROM public.mv_model_family_names WHERE make_l = 'rivian' AND model_l = 'r1t adventure edition') = 'R1T');
 
-ROLLBACK;
+SELECT pg_temp.ok('Pre-war & Italian icons (Duesenberg SSJ, Maserati A6G/MC12, Packard 734, Talbot-Lago T150-C-SS, Ruf CTR, Fiat 8V, Dodge TRX/D100) resolve cleanly',
+  (SELECT family FROM public.mv_model_family_names WHERE make_l = 'duesenberg' AND model_l = 'ssj') = 'Model J'
+  AND (SELECT family FROM public.mv_model_family_names WHERE make_l = 'maserati' AND model_l = 'a6g/54 berlinetta') = 'A6G'
+  AND (SELECT family FROM public.mv_model_family_names WHERE make_l = 'maserati' AND model_l = 'mc12') = 'MC12'
+  AND (SELECT family FROM public.mv_model_family_names WHERE make_l = 'packard' AND model_l = '734 speedster runabout') = '734 Speedster'
+  AND (SELECT family FROM public.mv_model_family_names WHERE make_l = 'talbot-lago' AND model_l = 't150-c-ss teardrop coupe') = 'T150-C-SS'
+  AND (SELECT family FROM public.mv_model_family_names WHERE make_l = 'ruf' AND model_l = 'ctr anniversary') = 'CTR'
+  AND (SELECT family FROM public.mv_model_family_names WHERE make_l = 'fiat' AND model_l = '8v supersonic') = '8V'
+  AND (SELECT family FROM public.mv_model_family_names WHERE make_l = 'dodge' AND model_l = '1500 trx crew cab 4×4') = 'Ram'
+  AND (SELECT family FROM public.mv_model_family_names WHERE make_l = 'dodge' AND model_l = 'd100') = 'D-Series');
+
+SELECT pg_temp.ok('a second apply changes nothing',
+  NOT EXISTS (SELECT 1 FROM public.canonical_models m JOIN once o USING (id)
+              WHERE m.year_start IS DISTINCT FROM o.year_start
+                 OR m.year_end IS DISTINCT FROM o.year_end
+                 OR m.notes IS DISTINCT FROM o.notes
+                 OR m.aliases IS DISTINCT FROM o.aliases));
