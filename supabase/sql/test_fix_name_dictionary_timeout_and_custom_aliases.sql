@@ -1,7 +1,7 @@
 -- Empty disposable PG17 only: psql -X -v ON_ERROR_STOP=1 -d dm_refinement_fix_name_dictionary_timeout_and_custom_aliases -f this-file.sql
--- Contract for 20261018068000_fix_name_dictionary_timeout_and_custom_aliases.sql. Synthetic rows only; never production.
+-- Contract for 20261018068500_fix_name_dictionary_timeout_and_custom_aliases_reissue.sql. Synthetic rows only; never production.
 -- Verifies that:
--- 1. cron.job `refresh-vehicle-name-dictionary` is updated to include `SET statement_timeout = '300s'`.
+-- 1. cron.schedule('refresh-vehicle-name-dictionary', ...) updates the job to include `SET statement_timeout = '300s'`.
 -- 2. Catch-all Custom/Deluxe families match standalone "Custom" / "Custom Coupe" via 1-word `'custom'`
 --    WITHOUT hijacking `"Corvette Custom Convertible"`, `"Camaro Custom Coupe"`, `"Mustang Custom Convertible"`,
 --    or `"Barracuda Custom Coupe"`.
@@ -31,11 +31,16 @@ END $$;
 
 CREATE SCHEMA cron;
 CREATE TABLE cron.job (jobid bigserial PRIMARY KEY, jobname text UNIQUE, schedule text, command text, active boolean DEFAULT true);
-CREATE FUNCTION cron.schedule(job_name text, schedule text, command text) RETURNS bigint LANGUAGE sql AS
-$$ INSERT INTO cron.job (jobname, schedule, command) VALUES (job_name, schedule, command) RETURNING jobid $$;
+CREATE FUNCTION cron.schedule(job_name text, schedule text, command text) RETURNS bigint LANGUAGE sql AS $$
+  INSERT INTO cron.job (jobname, schedule, command)
+  VALUES (job_name, schedule, command)
+  ON CONFLICT (jobname) DO UPDATE
+    SET schedule = EXCLUDED.schedule,
+        command = EXCLUDED.command
+  RETURNING jobid
+$$;
 
-INSERT INTO cron.job (jobname, schedule, command) VALUES
-  ('refresh-vehicle-name-dictionary', '50 3 * * *', 'REFRESH MATERIALIZED VIEW CONCURRENTLY public.mv_vehicle_name_dictionary');
+SELECT cron.schedule('refresh-vehicle-name-dictionary', '50 3 * * *', 'REFRESH MATERIALIZED VIEW CONCURRENTLY public.mv_vehicle_name_dictionary');
 
 CREATE TABLE public.canonical_makes (id uuid PRIMARY KEY, canonical_name text, display_name text, short_name text,
   aliases text[], country_of_origin text, founded_year integer, parent_company text, is_active boolean,
@@ -83,6 +88,7 @@ INSERT INTO public.mv_vehicle_name_dictionary (make_l, model_l, name_l, vehicles
 
 \ir ../migrations/20261015090000_model_family_names.sql
 \ir ../migrations/20261018068000_fix_name_dictionary_timeout_and_custom_aliases.sql
+\ir ../migrations/20261018068500_fix_name_dictionary_timeout_and_custom_aliases_reissue.sql
 REFRESH MATERIALIZED VIEW public.mv_model_family_names;
 
 SELECT pg_temp.ok('after: cron job refresh-vehicle-name-dictionary sets statement_timeout = 300s',
@@ -113,7 +119,7 @@ SELECT pg_temp.ok('after: Corvette, Camaro, Nova, Impala, Mustang, and Barracuda
   AND (SELECT family FROM public.mv_model_family_names WHERE make_l = 'daimler' AND model_l = 'sp250') = 'SP250');
 
 CREATE TEMP TABLE once AS SELECT id, year_start, year_end, notes, aliases FROM public.canonical_models;
-\ir ../migrations/20261018068000_fix_name_dictionary_timeout_and_custom_aliases.sql
+\ir ../migrations/20261018068500_fix_name_dictionary_timeout_and_custom_aliases_reissue.sql
 SELECT pg_temp.ok('a second apply changes nothing',
   NOT EXISTS (SELECT id, year_start, year_end, notes, aliases FROM public.canonical_models
               EXCEPT SELECT id, year_start, year_end, notes, aliases FROM once)
