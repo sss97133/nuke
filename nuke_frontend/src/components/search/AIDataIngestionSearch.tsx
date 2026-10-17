@@ -7,6 +7,7 @@ import { findPublicVehicleByVin } from '../../lib/vehicleByVin';
 import { universalSearchService, type UniversalSearchResult } from '../../services/universalSearchService';
 import { classifyIntent, type SearchIntent } from '../../lib/search/intentRouter';
 import { KNOWN_MAKES, MAKE_ALIASES } from '../../lib/search/dictionaries';
+import { buildMarketScopeUrl, isOnMarketTab, resolveMarketScopeQuery } from '../../lib/search/marketScopeResolver';
 import { useToast } from '../../hooks/useToast';
 import VehicleCritiqueMode from './VehicleCritiqueMode';
 import { SmartInvoiceUploader } from '../SmartInvoiceUploader';
@@ -261,6 +262,24 @@ export default function AIDataIngestionSearch() {
   const navigate = useNavigate();
   const location = useLocation();
   const { showToast } = useToast();
+
+  // On the Market page, queries that name a brand, family, model, or era ("mustang", "73-87 gm trucks", "corvette")
+  // set the Market URL scope in place instead of navigating away to /search.
+  const navigateSearchOrScopeMarket = async (rawQuery: string) => {
+    const q = rawQuery.trim();
+    if (!q) {
+      navigate('/search');
+      return;
+    }
+    if (isOnMarketTab(location.pathname, location.search)) {
+      const resolved = await resolveMarketScopeQuery(q);
+      if (resolved) {
+        navigate(buildMarketScopeUrl(resolved, location.search));
+        return;
+      }
+    }
+    navigate(`/search?q=${encodeURIComponent(q)}`);
+  };
 
   const vehicleIdFromRoute = useMemo(() => {
     const m = location.pathname.match(/\/vehicle\/([a-f0-9-]{36})/);
@@ -756,7 +775,7 @@ export default function AIDataIngestionSearch() {
       setExtractionPreview(null);
       setActionsOpen(false);
       setError(null);
-      navigate(`/search?q=${encodeURIComponent(searchQuery)}`);
+      await navigateSearchOrScopeMarket(searchQuery);
       return;
     }
 
@@ -910,15 +929,14 @@ export default function AIDataIngestionSearch() {
 
       // Handle vehicle/image search queries differently
       if (extractionResult.inputType === 'search') {
-        // Navigate to unified search page with search query
+        // Navigate to unified search page with search query (or scope Market in place)
         const searchQuery = extractionResult.rawData?.query || effectiveText;
         // Clear input and close preview
         setInput('');
         setShowPreview(false);
         setExtractionPreview(null);
         setIsProcessing(false);
-        // Navigate to unified search page
-        navigate(`/search?q=${encodeURIComponent(searchQuery)}`);
+        await navigateSearchOrScopeMarket(searchQuery);
         return;
       }
 
@@ -1169,8 +1187,8 @@ export default function AIDataIngestionSearch() {
           if (trimmedInput && !showPreview) {
             const maybeUrl = normalizeUrlInput(trimmedInput);
             if (!trimmedInput.match(/^[A-HJ-NPR-Z0-9]{17}$/i) && !maybeUrl) {
-              // Simple text search - navigate to search page
-              navigate(`/search?q=${encodeURIComponent(trimmedInput)}`);
+              // Simple text search - scope Market in place if on Market tab, else navigate to search page
+              void navigateSearchOrScopeMarket(trimmedInput);
               setInput('');
             } else {
               processInput();
@@ -1196,10 +1214,9 @@ export default function AIDataIngestionSearch() {
       if (!showPreview) {
         const trimmedInput = input.trim();
         const maybeUrl = normalizeUrlInput(trimmedInput);
-        // If it's a simple text query (not VIN, not URL), navigate directly to search
+        // If it's a simple text query (not VIN, not URL), scope Market in place or navigate to search
         if (trimmedInput && !trimmedInput.match(/^[A-HJ-NPR-Z0-9]{17}$/i) && !maybeUrl) {
-          // Simple text search - navigate immediately
-          navigate(`/search?q=${encodeURIComponent(trimmedInput)}`);
+          void navigateSearchOrScopeMarket(trimmedInput);
           setInput('');
           return;
         }
@@ -1728,7 +1745,7 @@ export default function AIDataIngestionSearch() {
                         onMouseDown={(e) => e.preventDefault()}
                         onClick={() => {
                           setInput(`${makeStats.make} ${m.model}`);
-                          navigate(`/search?q=${encodeURIComponent(`${makeStats.make} ${m.model}`)}`);
+                          void navigateSearchOrScopeMarket(`${makeStats.make} ${m.model}`);
                           setInput('');
                         }}
                         style={{
@@ -1760,7 +1777,7 @@ export default function AIDataIngestionSearch() {
                 type="button"
                 onMouseDown={(e) => e.preventDefault()}
                 onClick={() => {
-                  navigate(`/search?q=${encodeURIComponent(input.trim())}`);
+                  void navigateSearchOrScopeMarket(input.trim() || makeStats.make);
                   setInput('');
                 }}
                 style={{

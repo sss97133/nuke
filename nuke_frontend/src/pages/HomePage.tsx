@@ -17,6 +17,7 @@ import { Text } from '../kit';
 import FamilyMovers from './market/FamilyMovers';
 import BrandFamilyMap, { MapViewSwitch } from './market/BrandFamilyMap';
 import FamilySalesChart, { FamilyViewSwitch } from './market/FamilySalesChart';
+import { buildMarketScopeUrl, resolveMarketScopeQuery } from '../lib/search/marketScopeResolver';
 
 // ────────────────────────────────────────────────────────────
 // TYPES
@@ -1188,8 +1189,20 @@ export function TreemapHomePage({ onBrowse, embedded = false }: { onBrowse: () =
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
     const q = searchInput.trim();
-    if (q) navigate(`/search?q=${encodeURIComponent(q)}`);
-    else navigate('/search');
+    if (!q) {
+      navigate('/search');
+      return;
+    }
+    void resolveMarketScopeQuery(q).then((resolved) => {
+      if (resolved) {
+        const nextUrl = buildMarketScopeUrl(resolved, searchParams.toString());
+        setSearchParams(new URLSearchParams(nextUrl.replace(/^\/\?/, '')), { preventScrollReset: true });
+        setSearchInput('');
+        setSearchFocused(false);
+      } else {
+        navigate(`/search?q=${encodeURIComponent(q)}`);
+      }
+    });
   };
 
   useEffect(() => {

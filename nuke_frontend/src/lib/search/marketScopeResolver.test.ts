@@ -1,0 +1,127 @@
+import { describe, expect, it, vi, beforeEach } from 'vitest';
+
+const mockRows = vi.hoisted(() => ({ data: [] as any[], error: null as any }));
+vi.mock('../supabase', () => ({
+  supabase: {
+    from: () => {
+      const builder: any = {
+        select: () => builder,
+        neq: () => builder,
+        gt: () => builder,
+        order: () => builder,
+        limit: () => builder,
+        eq: () => builder,
+        ilike: () => builder,
+        then: (resolve: any) => Promise.resolve(mockRows).then(resolve),
+      };
+      return builder;
+    },
+  },
+}));
+
+import { buildMarketScopeUrl, isOnMarketTab, resolveMarketScopeQuery } from './marketScopeResolver';
+
+describe('marketScopeResolver', () => {
+  beforeEach(() => {
+    mockRows.data = [
+      {
+        brand: 'Ford',
+        family_key: '8a8271f8-d299-4b55-837a-35ca919f8937',
+        family: 'Mustang',
+        model_key: 'mustang',
+        model: 'Mustang',
+        sold: 3826,
+        usd: 158100000,
+      },
+      {
+        brand: 'Ford',
+        family_key: '8a8271f8-d299-4b55-837a-35ca919f8937',
+        family: 'Mustang',
+        model_key: 'mustang mach 1',
+        model: 'Mustang Mach 1',
+        sold: 412,
+        usd: 26500000,
+      },
+      {
+        brand: 'Chevrolet',
+        family_key: 'c10-family-uuid',
+        family: 'C10',
+        model_key: 'c10',
+        model: 'C10',
+        sold: 2777,
+        usd: 95100000,
+      },
+      {
+        brand: 'Chevrolet',
+        family_key: '3f3e7278-f47c-412f-b6fc-0ab5d8485924',
+        family: 'Corvette',
+        model_key: 'corvette',
+        model: 'Corvette',
+        sold: 16751,
+        usd: 1300400000,
+      },
+    ];
+    mockRows.error = null;
+  });
+
+  it('identifies when the user is on the Market tab', () => {
+    expect(isOnMarketTab('/', '')).toBe(true);
+    expect(isOnMarketTab('/', '?tab=market')).toBe(true);
+    expect(isOnMarketTab('/', '?tab=market&make=Ford')).toBe(true);
+    expect(isOnMarketTab('/', '?tab=feed')).toBe(false);
+    expect(isOnMarketTab('/search', '?q=mustang')).toBe(false);
+  });
+
+  it('resolves "mustang" and "ford mustang" to the Ford Mustang family scope', async () => {
+    const scope = await resolveMarketScopeQuery('mustang');
+    expect(scope).toEqual({
+      make: 'Ford',
+      family: '8a8271f8-d299-4b55-837a-35ca919f8937',
+      family_name: 'Mustang',
+    });
+    expect(buildMarketScopeUrl(scope!)).toBe(
+      '/?tab=market&make=Ford&family=8a8271f8-d299-4b55-837a-35ca919f8937&family_name=Mustang',
+    );
+  });
+
+  it('resolves a specific sub-model like "ford mustang mach 1" to family + model', async () => {
+    const scope = await resolveMarketScopeQuery('ford mustang mach 1');
+    expect(scope).toEqual({
+      make: 'Ford',
+      family: '8a8271f8-d299-4b55-837a-35ca919f8937',
+      family_name: 'Mustang',
+      model: 'Mustang Mach 1',
+    });
+  });
+
+  it('resolves a year + family like "1967 mustang" to family + model + year', async () => {
+    const scope = await resolveMarketScopeQuery('1967 mustang');
+    expect(scope).toEqual({
+      make: 'Ford',
+      family: '8a8271f8-d299-4b55-837a-35ca919f8937',
+      family_name: 'Mustang',
+      model: 'Mustang',
+      year: 1967,
+    });
+  });
+
+  it('resolves cultural shorthands like "73-87 gm trucks" and "squarebody"', async () => {
+    const gmScope = await resolveMarketScopeQuery('73-87 gm trucks');
+    expect(gmScope).toEqual({
+      make: 'Chevrolet',
+      family: 'c10-family-uuid',
+      family_name: 'C10',
+    });
+    const sqScope = await resolveMarketScopeQuery('squarebody');
+    expect(sqScope).toEqual({
+      make: 'Chevrolet',
+      family: 'c10-family-uuid',
+      family_name: 'C10',
+    });
+  });
+
+  it('returns null for natural-language price or mileage filter queries so they fall through to /search', async () => {
+    expect(await resolveMarketScopeQuery('manual wagons under $30k')).toBeNull();
+    expect(await resolveMarketScopeQuery('porsche 911 with under 20000 miles')).toBeNull();
+  });
+});
