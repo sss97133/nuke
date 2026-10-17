@@ -285,6 +285,17 @@ const CURATED_FAMILY_ERAS: Record<string, FamilyEraCohort[]> = {
     { id: '1934-1950', label: "T77a / T87 / T97 Streamliners '34–'50", shortLabel: 'T77 / T87', yearStart: 1934, yearEnd: 1950 },
     { id: '1951-1975', label: "T600 Tatraplan / T603 '51–'75", shortLabel: 'T600 / T603', yearStart: 1951, yearEnd: 1975 },
   ],
+  'triumph:bonneville': [
+    { id: '1938-1958', label: "Speed Twin / Tiger 100 / Thunderbird '38–'58", shortLabel: 'Pre-Unit', yearStart: 1938, yearEnd: 1958 },
+    { id: '1959-1970', label: "T120 / TR6 Trophy '59–'70", shortLabel: "T120 / TR6 '59–'70", yearStart: 1959, yearEnd: 1970 },
+    { id: '1971-1988', label: "T140 Oil-in-Frame & X75 Hurricane '71–'88", shortLabel: 'T140 / X75', yearStart: 1971, yearEnd: 1988 },
+    { id: '2001-2025', label: "Hinckley Bonneville '01+", shortLabel: 'Hinckley', yearStart: 2001, yearEnd: 2025 },
+  ],
+  'vespa:400': [
+    { id: '1946-1961', label: "Vespa 400 Microcar & Faro Basso '46–'61", shortLabel: "'46–'61", yearStart: 1946, yearEnd: 1961 },
+    { id: '1962-1979', label: "GS 160 / SS180 / Rally 200 '62–'79", shortLabel: 'GS / Rally', yearStart: 1962, yearEnd: 1979 },
+    { id: '1980-2025', label: "PX / Primavera / 946 '80+", shortLabel: 'Modern', yearStart: 1980, yearEnd: 2025 },
+  ],
 };
 
 export function getDefinedFamilyEras(
