@@ -3,7 +3,10 @@ import { useSearchParams, useNavigate } from 'react-router-dom';
 import type { FeedItem } from '../feed/types';
 import ContentCard from '../feed/ContentCard';
 import VehicleCardDense from '../vehicles/VehicleCardDense';
-import { HeaderSearchFacetPills } from '../HeaderSearch';
+import {
+  HeaderSearchFacetPills,
+  boostAndFilterVehicleSearchResults,
+} from '../HeaderSearch';
 import { highlightSearchTerm } from '../../utils/searchHighlight';
 import { useViewHistory } from '../../hooks/useViewHistory';
 import type { SearchResult } from '../../types/search';
@@ -165,7 +168,12 @@ const SearchResults = ({ results, searchSummary, loading = false, activeFilter, 
       .filter((group) => group.count > 0);
   }, [results]);
 
-  const filteredAndSortedResults = results
+  const facetAdjustedResults = useMemo(
+    () => (searchQuery ? boostAndFilterVehicleSearchResults(searchQuery, results) : results),
+    [searchQuery, results],
+  );
+
+  const filteredAndSortedResults = facetAdjustedResults
     .filter(result => filterBy === 'all' || result.type === filterBy)
     .sort((a, b) => {
       switch (sortBy) {

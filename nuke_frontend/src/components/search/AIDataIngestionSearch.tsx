@@ -1,7 +1,12 @@
 import React, { useMemo, useState, useRef, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { supabase, getCurrentUserId } from '../../lib/supabase';
-import { HeaderSearchFacetPills } from '../HeaderSearch';
+import {
+  HeaderSearchFacetPills,
+  boostAndFilterVehicleSearchResults,
+  buildFacetExpandedOrFilter,
+  extractQueryFacets,
+} from '../HeaderSearch';
 import { aiDataIngestion, type ExtractionResult, ingestVehicle } from '../../services/aiDataIngestion';
 import { dataRouter, type DatabaseOperationPlan } from '../../services/dataRouter';
 import { findPublicVehicleByVin } from '../../lib/vehicleByVin';
@@ -371,14 +376,13 @@ export default function AIDataIngestionSearch() {
 
         let combinedResults = response.results;
         const canonicalFamilyOrModel = resolvedScope?.model || resolvedScope?.family_name || '';
+        const queryFacetAnalysis = extractQueryFacets(trimmedInput);
 
-        if (combinedResults.length < 8 || canonicalFamilyOrModel) {
+        if (combinedResults.length < 8 || canonicalFamilyOrModel || queryFacetAnalysis.hasFacetIntent) {
           try {
             const safeQuery = trimmedInput.replace(/([%_\\])/g, '\\$1');
             const canonicalSafe = canonicalFamilyOrModel.replace(/([%_\\])/g, '\\$1');
-            const orFilter = canonicalSafe && canonicalSafe.toLowerCase() !== safeQuery.toLowerCase()
-              ? `model.ilike.%${canonicalSafe}%,normalized_model.ilike.%${canonicalSafe}%,make.ilike.%${safeQuery}%,model.ilike.%${safeQuery}%,title.ilike.%${canonicalSafe}%`
-              : `make.ilike.%${safeQuery}%,model.ilike.%${safeQuery}%,normalized_model.ilike.%${safeQuery}%,series.ilike.%${safeQuery}%,trim.ilike.%${safeQuery}%,title.ilike.%${safeQuery}%`;
+            const orFilter = buildFacetExpandedOrFilter(trimmedInput, canonicalFamilyOrModel);
 
             let queryBuilder = supabase
               .from('vehicles')
@@ -433,6 +437,10 @@ export default function AIDataIngestionSearch() {
           } catch {
             // Ignore fallback errors; keep edge results.
           }
+        }
+
+        if (queryFacetAnalysis.hasFacetIntent) {
+          combinedResults = boostAndFilterVehicleSearchResults(trimmedInput, combinedResults);
         }
 
         if (resolvedScope) {
