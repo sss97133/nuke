@@ -36,6 +36,13 @@ SELECT proowner,proacl,prosecdef,proargdefaults::text FROM pg_proc
 WHERE oid='public.get_pipeline_pulse(integer)'::regprocedure;
 \ir ../migrations/20261005015418_bound_pipeline_pulse_daily_counts.sql
 \ir ../migrations/20261005015418_bound_pipeline_pulse_daily_counts.sql
+-- Set pulse_fairness_control only to prove the deployed reader fails the new
+-- admission-order regression. Normal CI tests the new migration twice.
+\if :{?pulse_fairness_control}
+\else
+\ir ../migrations/20261005072000_prioritize_recent_pipeline_readings.sql
+\ir ../migrations/20261005072000_prioritize_recent_pipeline_readings.sql
+\endif
 BEGIN;
 CREATE TEMP TABLE checks(label text);
 CREATE FUNCTION pg_temp.check(ok boolean,label text) RETURNS void LANGUAGE plpgsql AS $$
@@ -158,5 +165,44 @@ SELECT pg_temp.check(pg_temp.point('auction_comments',1)->>'n'='1'
  'a failed organ retains independently measured other-organ evidence');
 SELECT pg_temp.check((SELECT value::text NOT LIKE '%PRIVATE_ERROR_MARKER%' FROM readings),
  'public degradation includes safe SQLSTATE only');
+
+-- One old vehicle row consumes the real six-second admission budget. Force
+-- indexed access in this tiny fixture so RLS delays only a matching day, not
+-- rows a sequential plan would inspect and later filter. No fake clock/body.
+TRUNCATE public.vehicles,public.vehicle_observations,public.auction_comments;
+DROP POLICY fixture_cancel ON public.vehicle_observations;
+CREATE POLICY fixture_read ON public.vehicle_observations USING(true);
+INSERT INTO public.vehicles(created_at)
+VALUES((date_trunc('day',statement_timestamp() AT TIME ZONE 'UTC')-interval '12 hours') AT TIME ZONE 'UTC');
+INSERT INTO public.vehicle_observations(ingested_at) VALUES(statement_timestamp());
+INSERT INTO public.auction_comments(created_at) VALUES(statement_timestamp());
+CREATE FUNCTION public.fixture_old_day_delay(at_time timestamptz) RETURNS boolean LANGUAGE plpgsql VOLATILE AS $$
+BEGIN
+ IF at_time < date_trunc('day',statement_timestamp() AT TIME ZONE 'UTC') AT TIME ZONE 'UTC' THEN
+  PERFORM pg_sleep(6.1);
+ END IF;
+ RETURN true;
+END $$;
+ALTER TABLE public.vehicles ENABLE ROW LEVEL SECURITY;
+CREATE POLICY fixture_old_day_delay ON public.vehicles USING(public.fixture_old_day_delay(created_at));
+SET LOCAL enable_seqscan=off;
+UPDATE readings SET value=public.get_pipeline_pulse(3);
+SELECT pg_temp.check(pg_temp.point('observations',0)->>'n'='1'
+ AND pg_temp.point('auction_comments',0)->>'n'='1'
+ AND pg_temp.point('vehicles',0)->>'n'='0',
+ 'newest readings across streams survive slow historical vehicle work');
+SELECT pg_temp.check((SELECT value->'coverage'->'backlogs'->'import_queue_pending'->>'status'='capped'
+ AND value->'coverage'->'backlogs'->'images_analysis_pending_capped'->>'status'='capped'
+ AND value->'coverage'->'backlogs'->'images_analysis_failed_capped'->>'status'='exact' FROM readings),
+ 'all supported current backlogs are admitted before historical work');
+SELECT pg_temp.check(pg_temp.point('observations',1)->>'reason'='reading_budget_exhausted'
+ AND pg_temp.point('observations',1)->'n'='null'::jsonb
+ AND pg_temp.point('vehicles',2)->>'reason'='reading_budget_exhausted',
+ 'skipped history remains explicitly unavailable after admission budget exhaustion');
+SELECT pg_temp.check((SELECT value->'coverage'->'organs'->'observations'->>'status'='unavailable'
+ AND jsonb_array_length(value->'organs'->'observations')=3
+ AND value->'organs'->'observations'->0->>'d'=((statement_timestamp() AT TIME ZONE 'UTC')::date-2)::text
+ AND value->'organs'->'observations'->2->>'d'=((statement_timestamp() AT TIME ZONE 'UTC')::date)::text FROM readings),
+ 'mixed recent success and unavailable history retain dense ascending dates and aggregate coverage');
 SELECT count(*) AS bounded_pulse_checks_passed FROM checks;
 ROLLBACK;
