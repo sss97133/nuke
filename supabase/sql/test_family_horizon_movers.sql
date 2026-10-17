@@ -185,6 +185,8 @@ END $$;
 \ir ../migrations/20261018122000_family_horizon_movers_v2.sql
 \ir ../migrations/20261018123000_treemap_horizon_sync_and_supply.sql
 \ir ../migrations/20261018123000_treemap_horizon_sync_and_supply.sql
+\ir ../migrations/20261018143000_family_share_movers_1y_overlays.sql
+\ir ../migrations/20261018143000_family_share_movers_1y_overlays.sql
 
 SELECT pg_temp.ok('mv_family_share_movers holds all 8 horizons',
   (SELECT count(*) FROM public.mv_family_share_movers) = 8);
@@ -192,9 +194,16 @@ SELECT pg_temp.ok('mv_family_share_movers holds all 8 horizons',
 SELECT pg_temp.ok('refresh-family-share-movers cron runs hourly',
   (SELECT schedule FROM cron.job WHERE jobname = 'refresh-family-share-movers') = '5 * * * *');
 
-SELECT pg_temp.ok('2-arg treemap_family_share_movers still reads 1y movers unchanged',
-  (public.treemap_family_share_movers(5, 30)->'gaining'->0->>'family') = 'GX'
-  AND (public.treemap_family_share_movers(5, 30)->'losing'->0->>'family') = 'Integra');
+SELECT pg_temp.ok('2-arg and 3-arg 1y treemap_family_share_movers carry brand_moves, family_moves, and 24-bin sparklines',
+  (public.treemap_family_share_movers(5, 30)->>'horizon') = '1y'
+  AND (public.treemap_family_share_movers(5, 30)->>'window_days')::int = 365
+  AND (public.treemap_family_share_movers(5, 30)->'gaining'->0->>'family') = 'GX'
+  AND (public.treemap_family_share_movers(5, 30)->'losing'->0->>'family') = 'Integra'
+  AND jsonb_array_length(public.treemap_family_share_movers(5, 30)->'gaining'->0->'bins') = 24
+  AND (public.treemap_family_share_movers(5, 30)->'brand_moves'->'Lexus'->>0)::int = 110
+  AND (public.treemap_family_share_movers(5, 30)->'family_moves'->'Lexus|gx'->>0)::int = 110
+  AND (public.treemap_family_share_movers(5, 0, '1y')->'brand_moves'->'Lexus'->>0)::int = 110
+  AND (public.treemap_family_share_movers(5, 0, '1y')->'family_moves'->'Lexus|gx'->>0)::int = 110);
 
 SELECT public.treemap_family_share_movers(5, 0, '1w')::text AS w1 \gset
 SELECT pg_temp.ok('1w horizon identifies GX gaining and Integra losing with 24 sparkline bins and treemap overlays',

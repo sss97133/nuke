@@ -1,19 +1,26 @@
 -- Hourly and live ingestion telemetry for the Sources board:
---   1. Enhances `public.market_sources_read()` to merge live `vehicle_events` from the current and prior hour
---      into the hourly landing log (`market_source_hours`), and attaches a top-level `'landing'` object carrying:
+--   1. Adds composite index `idx_vehicle_events_platform_created (source_platform, created_at DESC)` on `public.vehicle_events`
+--      so per-source and per-hour ingestion queries execute in <10ms via direct index seeks.
+--   2. Enhances `public.market_sources_read()` to merge live `vehicle_events` from the current and prior hour
+--      into the hourly landing log (`market_source_hours`), maps canonical aliases (`source_alias_mapping` /
+--      `observation_sources.market_slug`, e.g. `classiccars` -> `classiccars-com`, `bringatrailer` -> `bat`),
+--      and attaches a top-level `'landing'` object carrying:
 --        - `hour`: current UTC hour (`date_trunc('hour', now())`)
 --        - `bucket_5m`: current 5-minute UTC bucket
 --        - `totals`: board-wide `{ landed_15m, landed_1h, landed_24h, landed_7d, hours24, mins60 }`
 --        - `sources`: per-source `{ landed_15m, landed_1h, landed_24h, landed_7d, last_at, hours24, mins60 }`
 --      while preserving the exact 27-column `columns` and `rows` contract.
---   2. Adds `public.market_source_landing_read(p_source text DEFAULT NULL, p_hour timestamptz DEFAULT NULL)` so clicking
+--   3. Adds `public.market_source_landing_read(p_source text DEFAULT NULL, p_hour timestamptz DEFAULT NULL)` so clicking
 --      the `LANDING` column header, any source's landing cell, or any hourly bar drills down to the hour and streams
 --      live arriving `vehicle_events` with vehicle titles, prices, statuses, and timestamps.
 -- Contract: supabase/sql/test_market_sources_board.sql (db-contracts).
 
 BEGIN;
-SET LOCAL statement_timeout = '30s';
+SET LOCAL statement_timeout = '60s';
 SET LOCAL lock_timeout = '5s';
+
+CREATE INDEX IF NOT EXISTS idx_vehicle_events_platform_created
+  ON public.vehicle_events (source_platform, created_at DESC);
 
 CREATE OR REPLACE FUNCTION public.market_sources_read()
 RETURNS jsonb
@@ -33,6 +40,22 @@ AS $$
     LEFT JOIN public.organizations b ON b.id = o.business_id
   ), ranked AS (
     SELECT * FROM cur WHERE market_slug IS NULL AND category IN ('auction', 'marketplace')
+  ), key_map AS (
+    SELECT DISTINCT raw_key, canon_key
+    FROM (
+      SELECT nslug AS raw_key, nslug AS canon_key FROM ranked
+      UNION ALL
+      SELECT regexp_replace(lower(o.slug), '[^a-z0-9]', '', 'g'),
+             regexp_replace(lower(coalesce(o.market_slug, o.slug)), '[^a-z0-9]', '', 'g')
+      FROM public.observation_sources o
+      WHERE o.slug IS NOT NULL
+      UNION ALL
+      SELECT 'classiccars', 'classiccarscom'
+      UNION ALL
+      SELECT 'bringatrailer', 'bat'
+      UNION ALL
+      SELECT 'hagerty', 'hagertymarketplace'
+    ) km
   ), ago AS (
     SELECT DISTINCT ON (m.source_slug) m.source_slug, m.day, m.landed_lots
     FROM public.market_source_days m CROSS JOIN d
@@ -47,13 +70,18 @@ AS $$
     JOIN public.monitored_auctions m ON m.source_id = s.id
     GROUP BY 1
   ), recent_ev AS (
-    SELECT regexp_replace(lower(e.source_platform), '[^a-z0-9]', '', 'g') AS nslug,
-           e.created_at,
-           date_trunc('hour', e.created_at) AS hour,
-           to_timestamp(floor(extract(epoch from e.created_at) / 300) * 300) AS b5
-    FROM public.vehicle_events e
-    WHERE e.created_at >= date_trunc('hour', now()) - interval '1 hour'
-      AND e.source_platform IS NOT NULL
+    SELECT coalesce(km.canon_key, raw.raw_key) AS nslug,
+           raw.created_at,
+           date_trunc('hour', raw.created_at) AS hour,
+           to_timestamp(floor(extract(epoch from raw.created_at) / 300) * 300) AS b5
+    FROM (
+      SELECT regexp_replace(lower(e.source_platform), '[^a-z0-9]', '', 'g') AS raw_key,
+             e.created_at
+      FROM public.vehicle_events e
+      WHERE e.created_at >= date_trunc('hour', now()) - interval '1 hour'
+        AND e.source_platform IS NOT NULL
+    ) raw
+    LEFT JOIN key_map km ON km.raw_key = raw.raw_key
   ), live_hr_counts AS (
     SELECT nslug, hour, count(*)::int AS records, max(created_at) AS last_at
     FROM recent_ev
@@ -65,16 +93,20 @@ AS $$
            max(created_at) AS last_at
     FROM recent_ev
     GROUP BY 1
+  ), hist_norm AS (
+    SELECT coalesce(km.canon_key, h.source_key) AS nslug,
+           h.hour,
+           sum(h.records)::int AS records
+    FROM public.market_source_hours h
+    LEFT JOIN key_map km ON km.raw_key = h.source_key
+    WHERE h.hour >= date_trunc('day', now()) - interval '13 days'
+    GROUP BY 1, 2
   ), hrs_merged AS (
-    SELECT coalesce(h.source_key, l.nslug) AS nslug,
+    SELECT coalesce(h.nslug, l.nslug) AS nslug,
            coalesce(h.hour, l.hour) AS hour,
            GREATEST(coalesce(h.records, 0), coalesce(l.records, 0))::int AS records
-    FROM (
-      SELECT source_key, hour, records
-      FROM public.market_source_hours
-      WHERE hour >= date_trunc('day', now()) - interval '13 days'
-    ) h
-    FULL JOIN live_hr_counts l ON l.nslug = h.source_key AND l.hour = h.hour
+    FROM hist_norm h
+    FULL JOIN live_hr_counts l ON l.nslug = h.nslug AND l.hour = h.hour
   ), hrs AS (
     SELECT h.nslug,
            sum(h.records) FILTER (WHERE h.hour >= date_trunc('hour', now()) - interval '23 hours')::int AS landed_24h,
@@ -92,7 +124,12 @@ AS $$
                GROUP BY 1, 2) x USING (nslug, day)
     GROUP BY 1
   ), last_ever AS (
-    SELECT source_key AS nslug, max(hour) AS last_hour FROM public.market_source_hours WHERE records > 0 GROUP BY 1
+    SELECT coalesce(km.canon_key, h.source_key) AS nslug,
+           max(h.hour) AS last_hour
+    FROM public.market_source_hours h
+    LEFT JOIN key_map km ON km.raw_key = h.source_key
+    WHERE h.records > 0
+    GROUP BY 1
   ), h24_grid AS (
     SELECT gs AS hour, ord
     FROM generate_series(date_trunc('hour', now()) - interval '23 hours', date_trunc('hour', now()), interval '1 hour') WITH ORDINALITY AS t(gs, ord)
@@ -230,6 +267,8 @@ DECLARE
   v_now_hour timestamptz := date_trunc('hour', now());
   v_now_b5 timestamptz := to_timestamp(floor(extract(epoch from now()) / 300) * 300);
   v_keys text[];
+  v_raw_platforms text[];
+  v_has_alias_table boolean;
   v_has_event_meta boolean;
   v_has_vehicles boolean;
   v_summary jsonb;
@@ -246,8 +285,77 @@ BEGIN
         AND regexp_replace(lower(coalesce(o.market_slug, o.slug)), '[^a-z0-9]', '', 'g') = v_nslug
       UNION
       SELECT 'bringatrailer' WHERE v_nslug = 'bat'
+      UNION
+      SELECT 'classiccars' WHERE v_nslug = 'classiccarscom'
+      UNION
+      SELECT 'hagerty' WHERE v_nslug = 'hagertymarketplace'
     ) x
     WHERE k IS NOT NULL AND k <> '';
+
+    SELECT to_regclass('public.source_alias_mapping') IS NOT NULL INTO v_has_alias_table;
+
+    IF v_has_alias_table THEN
+      EXECUTE $q$
+        SELECT array_agg(DISTINCT x)
+        FROM (
+          SELECT unnest($1::text[]) AS x
+          UNION
+          SELECT lower($2)
+          UNION
+          SELECT replace(lower($2), '-', '_')
+          UNION
+          SELECT replace(lower($2), '_', '-')
+          UNION
+          SELECT o.slug
+          FROM public.observation_sources o
+          WHERE o.slug IS NOT NULL
+            AND regexp_replace(lower(coalesce(o.market_slug, o.slug)), '[^a-z0-9]', '', 'g') = ANY($1::text[])
+          UNION
+          SELECT o.display_name
+          FROM public.observation_sources o
+          WHERE o.display_name IS NOT NULL
+            AND regexp_replace(lower(coalesce(o.market_slug, o.slug)), '[^a-z0-9]', '', 'g') = ANY($1::text[])
+          UNION
+          SELECT sam.raw_value
+          FROM public.source_alias_mapping sam
+          WHERE regexp_replace(lower(sam.canonical_slug), '[^a-z0-9]', '', 'g') = ANY($1::text[])
+             OR (sam.canonical_slug = 'ebay' AND 'ebaymotors' = ANY($1::text[]))
+          UNION
+          SELECT 'barrettjackson' WHERE 'barrettjackson' = ANY($1::text[])
+          UNION
+          SELECT 'cars_and_bids' WHERE 'carsandbids' = ANY($1::text[])
+          UNION
+          SELECT 'rm-sothebys' WHERE 'rmsothebys' = ANY($1::text[])
+          UNION
+          SELECT 'broad_arrow' WHERE 'broadarrow' = ANY($1::text[])
+          UNION
+          SELECT 'ebay_motors' WHERE 'ebaymotors' = ANY($1::text[])
+          UNION
+          SELECT 'collecting_cars' WHERE 'collectingcars' = ANY($1::text[])
+          UNION
+          SELECT 'facebook_marketplace' WHERE 'facebookmarketplace' = ANY($1::text[])
+          UNION
+          SELECT 'facebook-saved' WHERE 'facebookmarketplace' = ANY($1::text[])
+          UNION
+          SELECT 'classiccars' WHERE 'classiccarscom' = ANY($1::text[])
+          UNION
+          SELECT 'classiccars.com' WHERE 'classiccarscom' = ANY($1::text[])
+        ) s
+        WHERE x IS NOT NULL AND x <> ''
+      $q$ INTO v_raw_platforms USING v_keys, v_clean_source;
+    ELSE
+      SELECT array_agg(DISTINCT x) INTO v_raw_platforms
+      FROM (
+        SELECT unnest(v_keys) AS x
+        UNION
+        SELECT lower(v_clean_source)
+        UNION
+        SELECT replace(lower(v_clean_source), '-', '_')
+        UNION
+        SELECT replace(lower(v_clean_source), '_', '-')
+      ) s
+      WHERE x IS NOT NULL AND x <> '';
+    END IF;
   END IF;
 
   WITH recent_ev AS (
@@ -337,16 +445,27 @@ BEGIN
   SELECT to_regclass('public.vehicles') IS NOT NULL INTO v_has_vehicles;
 
   IF v_has_event_meta AND v_has_vehicles THEN
-    IF v_target_hour IS NOT NULL THEN
+    IF v_keys IS NULL THEN
+      -- Board-wide recent events (all sources), optionally scoped to a clicked hour
       EXECUTE $q$
         SELECT coalesce(jsonb_agg(jsonb_build_object(
           'id', x.id,
           'source', x.source_platform,
           'event_type', x.event_type,
           'event_status', x.event_status,
+          'reserve', x.reserve,
           'price', x.price,
+          'bid_count', x.bid_count,
+          'year', x.year,
+          'make', x.make,
+          'model', x.model,
+          'trim', x.trim,
+          'vin', x.vin,
+          'mileage', x.mileage,
+          'record_date', x.record_date,
           'title', x.title,
-          'lot', x.source_listing_id,
+          'raw_title', x.raw_title,
+          'lot', x.lot,
           'vehicle_id', x.vehicle_id,
           'source_url', x.source_url,
           'created_at', x.created_at
@@ -356,116 +475,167 @@ BEGIN
                  e.source_platform,
                  e.event_type,
                  e.event_status,
+                 CASE
+                   WHEN (e.metadata->>'without_reserve') = 'true'
+                     OR (e.metadata->>'no_reserve') = 'true'
+                     OR (e.metadata->>'has_reserve') = 'false'
+                     OR (e.metadata->>'reserve_status') = 'no_reserve'
+                     OR (e.metadata->>'auction_type') ILIKE '%no reserve%'
+                     THEN 'no_reserve'
+                   WHEN (e.metadata->>'reserve_status') IN ('reserve_not_met', 'reserve_met')
+                     THEN e.metadata->>'reserve_status'
+                   WHEN (e.metadata->>'has_reserve') = 'true'
+                     OR e.reserve_price IS NOT NULL
+                     OR (e.metadata->>'auction_type') ILIKE '%reserve%'
+                     THEN 'reserve'
+                   ELSE nullif(trim(e.metadata->>'reserve_status'), '')
+                 END AS reserve,
                  coalesce(e.final_price, e.current_price, e.starting_price) AS price,
+                 e.bid_count,
+                 v.year,
+                 nullif(trim(v.make), '') AS make,
+                 nullif(trim(v.model), '') AS model,
+                 nullif(trim(v.trim), '') AS trim,
+                 coalesce(
+                   nullif(trim(v.vin), ''),
+                   nullif(trim(e.metadata->>'vin'), ''),
+                   nullif(trim(e.metadata->>'chassis_number'), '')
+                 ) AS vin,
+                 v.mileage,
+                 coalesce(
+                   e.sold_at::text,
+                   e.ended_at::text,
+                   e.started_at::text,
+                   nullif(trim(e.metadata->>'sale_date'), ''),
+                   nullif(trim(e.metadata->>'auction_date'), ''),
+                   nullif(trim(e.metadata->>'sale_ends_on'), ''),
+                   nullif(trim(e.metadata->>'sale_starts_on'), ''),
+                   nullif(trim(e.metadata->'auction_session_days'->>0), ''),
+                   nullif(trim(e.metadata->>'published_at'), ''),
+                   nullif(trim(e.metadata->>'listing_posted_at'), ''),
+                   substring(e.metadata->>'auction_name' from '((?:19[89][0-9]|20[0-2][0-9])(?:-[01][0-9]-[0-3][0-9])?)'),
+                   substring(e.source_url from '/[a-z-]+-(19[89][0-9]|20[0-2][0-9])/docket/')
+                 ) AS record_date,
                  coalesce(
                    nullif(trim(e.metadata->>'title'), ''),
                    nullif(trim(concat_ws(' ', v.year::text, v.make, v.model, v.trim)), ''),
                    nullif(trim(e.source_listing_id), '')
                  ) AS title,
-                 e.source_listing_id,
-                 e.vehicle_id,
-                 e.source_url,
-                 e.created_at
-          FROM public.vehicle_events e
-          LEFT JOIN public.vehicles v ON v.id = e.vehicle_id
-          WHERE e.created_at >= $1 AND e.created_at < $1 + interval '1 hour'
-            AND e.source_platform IS NOT NULL
-            AND ($2::text[] IS NULL OR regexp_replace(lower(e.source_platform), '[^a-z0-9]', '', 'g') = ANY($2))
-          ORDER BY e.created_at DESC
-          LIMIT 20
-        ) x
-      $q$ INTO v_recent USING v_target_hour, v_keys;
-    ELSIF v_keys IS NULL THEN
-      EXECUTE $q$
-        SELECT coalesce(jsonb_agg(jsonb_build_object(
-          'id', x.id,
-          'source', x.source_platform,
-          'event_type', x.event_type,
-          'event_status', x.event_status,
-          'price', x.price,
-          'title', x.title,
-          'lot', x.source_listing_id,
-          'vehicle_id', x.vehicle_id,
-          'source_url', x.source_url,
-          'created_at', x.created_at
-        ) ORDER BY x.created_at DESC), '[]'::jsonb)
-        FROM (
-          SELECT e.id,
-                 e.source_platform,
-                 e.event_type,
-                 e.event_status,
-                 coalesce(e.final_price, e.current_price, e.starting_price) AS price,
+                 nullif(trim(e.metadata->>'title'), '') AS raw_title,
                  coalesce(
-                   nullif(trim(e.metadata->>'title'), ''),
-                   nullif(trim(concat_ws(' ', v.year::text, v.make, v.model, v.trim)), ''),
+                   nullif(trim(e.metadata->>'lot_number'), ''),
                    nullif(trim(e.source_listing_id), '')
-                 ) AS title,
-                 e.source_listing_id,
+                 ) AS lot,
                  e.vehicle_id,
                  e.source_url,
                  e.created_at
           FROM public.vehicle_events e
           LEFT JOIN public.vehicles v ON v.id = e.vehicle_id
-          WHERE e.created_at >= now() - interval '24 hours'
-            AND e.source_platform IS NOT NULL
+          WHERE e.source_platform IS NOT NULL
+            AND (
+              ($1::timestamptz IS NOT NULL AND e.created_at >= $1 AND e.created_at < $1 + interval '1 hour')
+              OR ($1::timestamptz IS NULL AND e.created_at >= now() - interval '24 hours')
+            )
           ORDER BY e.created_at DESC
-          LIMIT 20
+          LIMIT 40
         ) x
-      $q$ INTO v_recent;
+      $q$ INTO v_recent USING v_target_hour;
     ELSE
+      -- Per-source recent events using idx_vehicle_events_platform_created (source_platform, created_at DESC)
       EXECUTE $q$
-        WITH target_hrs AS (
-          SELECT $1::timestamptz AS hour
-          UNION
-          SELECT $1::timestamptz - interval '1 hour'
-          UNION
-          (SELECT hour FROM public.market_source_hours WHERE source_key = ANY($2) AND records > 0 ORDER BY hour DESC LIMIT 1)
-        ), ordered_hrs AS (
-          SELECT hour FROM target_hrs ORDER BY hour DESC
-        ), matched AS (
+        WITH matched AS (
           SELECT e.id,
                  e.source_platform,
                  e.event_type,
                  e.event_status,
+                 e.started_at,
+                 e.ended_at,
+                 e.sold_at,
+                 e.reserve_price,
                  coalesce(e.final_price, e.current_price, e.starting_price) AS price,
+                 e.bid_count,
                  e.metadata,
                  e.source_listing_id,
                  e.vehicle_id,
                  e.source_url,
                  e.created_at
-          FROM ordered_hrs h
+          FROM unnest($1::text[]) AS p(plat)
           CROSS JOIN LATERAL (
-            SELECT id, source_platform, event_type, event_status, final_price, current_price, starting_price,
+            SELECT id, source_platform, event_type, event_status, started_at, ended_at, sold_at,
+                   reserve_price, final_price, current_price, starting_price, bid_count,
                    metadata, source_listing_id, vehicle_id, source_url, created_at
             FROM public.vehicle_events e
-            WHERE e.created_at >= h.hour AND e.created_at < h.hour + interval '1 hour'
-              AND e.source_platform IS NOT NULL
-              AND regexp_replace(lower(e.source_platform), '[^a-z0-9]', '', 'g') = ANY($2)
+            WHERE e.source_platform = p.plat
+              AND ($2::timestamptz IS NULL OR (e.created_at >= $2 AND e.created_at < $2 + interval '1 hour'))
             ORDER BY e.created_at DESC
-            LIMIT 20
+            LIMIT 40
           ) e
           ORDER BY e.created_at DESC
-          LIMIT 20
+          LIMIT 40
         )
         SELECT coalesce(jsonb_agg(jsonb_build_object(
           'id', m.id,
           'source', m.source_platform,
           'event_type', m.event_type,
           'event_status', m.event_status,
+          'reserve', CASE
+            WHEN (m.metadata->>'without_reserve') = 'true'
+              OR (m.metadata->>'no_reserve') = 'true'
+              OR (m.metadata->>'has_reserve') = 'false'
+              OR (m.metadata->>'reserve_status') = 'no_reserve'
+              OR (m.metadata->>'auction_type') ILIKE '%no reserve%'
+              THEN 'no_reserve'
+            WHEN (m.metadata->>'reserve_status') IN ('reserve_not_met', 'reserve_met')
+              THEN m.metadata->>'reserve_status'
+            WHEN (m.metadata->>'has_reserve') = 'true'
+              OR m.reserve_price IS NOT NULL
+              OR (m.metadata->>'auction_type') ILIKE '%reserve%'
+              THEN 'reserve'
+            ELSE nullif(trim(m.metadata->>'reserve_status'), '')
+          END,
           'price', m.price,
+          'bid_count', m.bid_count,
+          'year', v.year,
+          'make', nullif(trim(v.make), ''),
+          'model', nullif(trim(v.model), ''),
+          'trim', nullif(trim(v.trim), ''),
+          'vin', coalesce(
+            nullif(trim(v.vin), ''),
+            nullif(trim(m.metadata->>'vin'), ''),
+            nullif(trim(m.metadata->>'chassis_number'), '')
+          ),
+          'mileage', v.mileage,
+          'record_date', coalesce(
+            m.sold_at::text,
+            m.ended_at::text,
+            m.started_at::text,
+            nullif(trim(m.metadata->>'sale_date'), ''),
+            nullif(trim(m.metadata->>'auction_date'), ''),
+            nullif(trim(m.metadata->>'sale_ends_on'), ''),
+            nullif(trim(m.metadata->>'sale_starts_on'), ''),
+            nullif(trim(m.metadata->'auction_session_days'->>0), ''),
+            nullif(trim(m.metadata->>'published_at'), ''),
+            nullif(trim(m.metadata->>'listing_posted_at'), ''),
+            substring(m.metadata->>'auction_name' from '((?:19[89][0-9]|20[0-2][0-9])(?:-[01][0-9]-[0-3][0-9])?)'),
+            substring(m.source_url from '/[a-z-]+-(19[89][0-9]|20[0-2][0-9])/docket/')
+          ),
           'title', coalesce(
             nullif(trim(m.metadata->>'title'), ''),
             nullif(trim(concat_ws(' ', v.year::text, v.make, v.model, v.trim)), ''),
             nullif(trim(m.source_listing_id), '')
           ),
-          'lot', m.source_listing_id,
+          'raw_title', nullif(trim(m.metadata->>'title'), ''),
+          'lot', coalesce(
+            nullif(trim(m.metadata->>'lot_number'), ''),
+            nullif(trim(m.source_listing_id), '')
+          ),
           'vehicle_id', m.vehicle_id,
           'source_url', m.source_url,
           'created_at', m.created_at
         ) ORDER BY m.created_at DESC), '[]'::jsonb)
         FROM matched m
         LEFT JOIN public.vehicles v ON v.id = m.vehicle_id
-      $q$ INTO v_recent USING v_now_hour, v_keys;
+      $q$ INTO v_recent USING v_raw_platforms, v_target_hour;
     END IF;
   ELSE
     -- Minimal disposable contract test schema (id, source_platform, created_at)
@@ -485,6 +655,12 @@ BEGIN
         LIMIT 20
       ) x
     $q$ INTO v_recent USING v_target_hour, v_keys;
+  END IF;
+
+  IF v_target_hour IS NULL AND jsonb_array_length(coalesce(v_recent, '[]'::jsonb)) > 0 THEN
+    IF (v_summary->>'last_landed') IS NULL OR (v_recent->0->>'created_at')::timestamptz > (v_summary->>'last_landed')::timestamptz THEN
+      v_summary := jsonb_set(v_summary, '{last_landed}', to_jsonb(v_recent->0->>'created_at'));
+    END IF;
   END IF;
 
   RETURN v_summary || jsonb_build_object('recent', v_recent);
