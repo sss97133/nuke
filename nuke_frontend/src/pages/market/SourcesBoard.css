@@ -110,6 +110,19 @@
   font: 700 10px Arial, sans-serif; letter-spacing: 0.06em; text-transform: uppercase; cursor: pointer; }
 .market-sources__drill-btn:hover, .market-sources__drill-btn:focus-visible { border-color: var(--text); }
 
+.market-sources__dealer-context { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between;
+  gap: 8px 16px; padding: 7px 10px; margin-top: 8px; border: 1px solid var(--border); background: var(--bg); }
+.market-sources__dealer-context-main { display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px 10px; min-width: 0; }
+.market-sources__dealer-context-label { font: 700 9px Arial, sans-serif; letter-spacing: 0.06em; text-transform: uppercase;
+  color: var(--text-secondary); }
+.market-sources__dealer-context-mode { font: 700 11px Arial, sans-serif; color: var(--text); }
+.market-sources__dealer-context-summary { font: 11px 'Courier New', monospace; color: var(--text-secondary); }
+.market-sources__dealer-context-split { display: flex; align-items: center; gap: 8px; flex: none; }
+.market-sources__dealer-bar { display: block; width: 76px; height: 8px; border: 1px solid var(--border); background: var(--surface); box-sizing: border-box; }
+.market-sources__dealer-bar-consigned { fill: var(--text); }
+.market-sources__dealer-bar-direct { fill: var(--text-secondary); opacity: 0.55; }
+.market-sources__dealer-split-text { font: 700 10px 'Courier New', monospace; color: var(--text); white-space: nowrap; }
+
 .market-sources__drill-kpis { display: grid; grid-template-columns: repeat(4, minmax(90px, 1fr)) minmax(180px, 1.8fr);
   gap: 8px; padding: 8px 0; border-bottom: 1px solid var(--border); }
 .market-sources__kpi { display: flex; flex-direction: column; gap: 2px; }

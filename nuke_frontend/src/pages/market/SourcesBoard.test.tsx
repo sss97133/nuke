@@ -7,6 +7,7 @@ const fixture = vi.hoisted(() => ({ rpc: vi.fn() }));
 vi.mock('../../lib/supabase', () => ({ supabase: { rpc: fixture.rpc } }));
 import SourcesBoard, {
   categoryBadgeLabel,
+  describeDealerConsignment,
   describeRecordDate,
   heldShare,
   landingState,
@@ -351,10 +352,67 @@ it('renders DEALER / CONSIGNOR category badges for category="dealer" or business
     'DEALER / CONSIGNOR',
   ]);
 
-  // Open the ingestion inspector on a dealer row and verify the DEALER / CONSIGNOR badge in the inspector
+  // Open the ingestion inspector on a dealer row and verify the DEALER / CONSIGNOR badge and consignment breakdown in the inspector
   const dealerLandBtn = visibleRows[0].querySelector('button.market-sources__landing') as HTMLButtonElement;
   await act(async () => { dealerLandBtn.click(); });
   expect(fixture.rpc).toHaveBeenCalledWith('market_source_landing_read', { p_source: 'avant-garde-collection' });
   const drill = container.querySelector('.market-sources__drill')!;
   expect(drill.querySelector('.market-sources__badge--dealer')?.textContent).toBe('DEALER / CONSIGNOR');
+  const dealerCtx = drill.querySelector('.market-sources__dealer-context')!;
+  expect(dealerCtx).not.toBeNull();
+  expect(dealerCtx.querySelector('.market-sources__dealer-context-label')?.textContent).toBe('INVENTORY & CONSIGNMENT BREAKDOWN');
+  expect(dealerCtx.querySelector('.market-sources__dealer-context-mode')?.textContent).toBe('Auction consignment (2/2 recent lots)');
+  expect(dealerCtx.querySelector('.market-sources__dealer-context-summary')?.textContent)
+    .toBe('3,246 vehicles held · 26 live · 322 sales (12m) · $43.9M · 2 consigned · 0 direct in stream');
+  expect(dealerCtx.querySelector('.market-sources__dealer-split-text')?.textContent)
+    .toBe('2 consigned (100%) · 0 direct (0%)');
+});
+
+it('computes consigned vs. direct breakdown for mixed, direct-only, and empty-stream dealer rows', () => {
+  const mixed = describeDealerConsignment(
+    { held: 1200, live: 45, mapSales: 800, sales12: 210, usd12: 18500000 },
+    [
+      { eventType: 'auction', eventStatus: 'sold', reserve: 'no_reserve', bidCount: 22 },
+      { eventType: 'listing', eventStatus: 'active', reserve: null, bidCount: null },
+      { eventType: 'listing', eventStatus: 'active', reserve: null, bidCount: 0 },
+      { eventType: 'consignment', eventStatus: 'active', reserve: 'reserve', bidCount: 5 },
+    ],
+  );
+  expect(mixed).toMatchObject({
+    consignedCount: 2,
+    directCount: 2,
+    totalRecent: 4,
+    consignedPct: 50,
+    directPct: 50,
+    modeLabel: 'Mixed · 50% consigned / 50% direct',
+    summaryText: '1,200 vehicles held · 45 live · 210 sales (12m) · $18.5M · 2 consigned · 2 direct in stream',
+  });
+
+  const directOnly = describeDealerConsignment(
+    { held: 1968, live: 657, mapSales: 0, sales12: 0, usd12: null },
+    [
+      { eventType: 'listing', eventStatus: 'active', reserve: null, bidCount: null },
+    ],
+  );
+  expect(directOnly).toMatchObject({
+    consignedCount: 0,
+    directCount: 1,
+    consignedPct: 0,
+    directPct: 100,
+    modeLabel: 'Direct dealer listings (1/1 recent listings)',
+    summaryText: '1,968 vehicles held · 657 live · 0 consigned · 1 direct in stream',
+  });
+
+  const emptyStream = describeDealerConsignment(
+    { held: 500, live: 30, mapSales: 120, sales12: 0, usd12: null },
+    [],
+  );
+  expect(emptyStream).toMatchObject({
+    consignedCount: 0,
+    directCount: 0,
+    consignedPct: null,
+    directPct: null,
+    modeLabel: 'Consignment & direct showroom',
+    summaryText: '500 vehicles held · 30 live · 120 confirmed sales',
+  });
 });
