@@ -1184,6 +1184,7 @@ export function buildFacetNodes(
       sold_prior_12m: number;
       usd_12m: number;
       usd_prior_12m: number;
+      prices: number[];
       weightedMedianSum: number;
       weightedMedianCount: number;
       representativeModel: string;
@@ -1218,6 +1219,7 @@ export function buildFacetNodes(
         sold_prior_12m: 0,
         usd_12m: 0,
         usd_prior_12m: 0,
+        prices: [],
         weightedMedianSum: 0,
         weightedMedianCount: 0,
         representativeModel: cleanModel,
@@ -1228,6 +1230,7 @@ export function buildFacetNodes(
       prev.usd += s.usd;
       prev.sold_any += 1;
       prev.offered += 1;
+      prev.prices.push(s.usd);
       prev.weightedMedianSum += s.usd;
       prev.weightedMedianCount += 1;
       if (s.source && measuredHouses.has(s.source)) {
@@ -1271,6 +1274,7 @@ export function buildFacetNodes(
       sold_prior_12m: 0,
       usd_12m: 0,
       usd_prior_12m: 0,
+      prices: [],
       weightedMedianSum: 0,
       weightedMedianCount: 0,
       representativeModel: stripEnrichedSuffix(node.name),
@@ -1290,6 +1294,9 @@ export function buildFacetNodes(
     if (node.median_price && node.count > 0) {
       prev.weightedMedianSum += node.median_price * node.count;
       prev.weightedMedianCount += node.count;
+    } else if (nodeUsd > 0 && node.count > 0) {
+      prev.weightedMedianSum += nodeUsd;
+      prev.weightedMedianCount += node.count;
     }
     if (nodeUsd > prev.representativeUsd) {
       prev.representativeUsd = nodeUsd;
@@ -1298,9 +1305,23 @@ export function buildFacetNodes(
     buckets.set(facetLabel, prev);
   }
 
+  let totalFamilyCount = 0;
+  for (const b of buckets.values()) {
+    if (b.count > 0) totalFamilyCount += b.count;
+  }
+
   const out: TreemapNode[] = [];
   for (const b of buckets.values()) {
     if (b.count <= 0) continue;
+    let medianPrice: number | undefined;
+    if (b.prices.length > 0) {
+      const sorted = [...b.prices].sort((x, y) => x - y);
+      const mid = sorted.length >> 1;
+      medianPrice = Math.round(sorted.length % 2 ? sorted[mid] : (sorted[mid - 1] + sorted[mid]) / 2);
+    } else if (b.weightedMedianCount > 0) {
+      medianPrice = Math.round(b.weightedMedianSum / b.weightedMedianCount);
+    }
+    const familySharePct = totalFamilyCount > 0 ? Number(((b.count / totalFamilyCount) * 100).toFixed(1)) : 0;
     out.push({
       name: b.name,
       count: b.count,
@@ -1313,10 +1334,12 @@ export function buildFacetNodes(
       sold_prior_12m: b.sold_prior_12m,
       usd_12m: b.usd_12m,
       usd_prior_12m: b.usd_prior_12m,
-      median_price: b.weightedMedianCount > 0 ? Math.round(b.weightedMedianSum / b.weightedMedianCount) : undefined,
+      median_price: medianPrice,
       facetRepresentativeModel: b.representativeModel,
       badgeSvg: b.badgeSvg,
-    } as TreemapNode & { facetRepresentativeModel?: string; badgeSvg?: string });
+      facetAxis: axis,
+      familySharePct,
+    });
   }
 
   return out.sort((a, b) => (b.usd ?? b.value) - (a.usd ?? a.value) || b.count - a.count);

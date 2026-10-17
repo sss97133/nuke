@@ -1,3 +1,6 @@
+// @vitest-environment jsdom
+import React, { act } from 'react';
+import { createRoot } from 'react-dom/client';
 import { describe, expect, it, vi } from 'vitest';
 const rpc = vi.hoisted(() => vi.fn());
 vi.mock('../lib/supabase', () => ({ supabase: { rpc } }));
@@ -8,10 +11,13 @@ import {
   brandMomentum,
   buildRepresentativeImageCandidates,
   drillStackFromSearchParams,
+  facetTileLines,
   lineChars,
   normalizeFacetSelection,
   parseFacetAxisParam,
   selectFamilyRepresentativeVehicleIds,
+  TreemapCell,
+  type TreemapNode,
 } from './HomePage';
 import { optimizeImageUrl } from '../lib/imageOptimizer';
 
@@ -266,3 +272,88 @@ describe('representative images for model and year tiles', () => {
     expect(ids[199]).toBe('veh-200');
   });
 });
+
+describe('facet treemap tiles (SERIES, TRIM, BODY STYLE)', () => {
+  const silveradoFacet: TreemapNode = {
+    name: 'Silverado',
+    count: 420,
+    value: 19_320_000,
+    usd: 19_320_000,
+    median_price: 46_000,
+    sold_any: 420,
+    offered: 420,
+    dated: 380,
+    sold_12m: 96,
+    sold_prior_12m: 80,
+    usd_12m: 4_600_000,
+    usd_prior_12m: 3_680_000,
+    facetAxis: 'trim',
+    familySharePct: 35.0,
+  };
+
+  it('formats facetTileLines with lot count, median price, and share-of-family percentage on the primary line', () => {
+    const lines = facetTileLines(silveradoFacet, 1200);
+    expect(lines[0]).toBe('420 sold · $46K med · 35.0% of family');
+    expect(lines[1]).toBe('$19.3M total');
+    expect(lines[2]).toBe('12 mo: sales ▲20%, $ ▲25%');
+
+    // Compact widths preserve count, median price, and share percentage without overflowing maxChars
+    expect(facetTileLines(silveradoFacet, 1200, 28)[0]).toBe('420 sold · $46K med · 35.0%');
+    expect(facetTileLines(silveradoFacet, 1200, 20)[0]).toBe('420 · $46K · 35.0%');
+    for (let width = 0; width <= 50; width++) {
+      for (const line of facetTileLines(silveradoFacet, 1200, width)) {
+        expect(lineChars(line)).toBeLessThanOrEqual(width);
+      }
+    }
+  });
+
+  it('renders share-of-family badge alongside lot count and median price on TreemapCell when a facet axis is active', () => {
+    const host = document.createElement('div');
+    document.body.appendChild(host);
+    const root = createRoot(host);
+    act(() => {
+      root.render(
+        React.createElement(TreemapCell, {
+          rect: { node: silveradoFacet, x: 0, y: 0, w: 220, h: 110 },
+          onClick: () => {},
+          totalCount: 1200,
+          facetAxis: 'trim',
+        }),
+      );
+    });
+
+    const shareBadge = host.querySelector('[data-testid="treemap-cell-facet-share"]');
+    expect(shareBadge).not.toBeNull();
+    expect(shareBadge?.textContent).toBe('35.0% OF FAMILY');
+
+    const primaryLine = host.querySelector('[data-testid="treemap-cell-facet-primary-line"]');
+    expect(primaryLine).not.toBeNull();
+    expect(primaryLine?.textContent).toContain('420');
+    expect(primaryLine?.textContent).toContain('$46');
+    expect(primaryLine?.textContent).toContain('35.0%');
+
+    // Raw sub-model tile without facetAxis does not render the facet share badge
+    const rawSubModel: TreemapNode = {
+      name: 'C10 Custom',
+      count: 365,
+      value: 16_000_000,
+      usd: 16_000_000,
+      median_price: 42_000,
+    };
+    act(() => {
+      root.render(
+        React.createElement(TreemapCell, {
+          rect: { node: rawSubModel, x: 0, y: 0, w: 220, h: 110 },
+          onClick: () => {},
+          totalCount: 1200,
+          facetAxis: 'raw',
+        }),
+      );
+    });
+    expect(host.querySelector('[data-testid="treemap-cell-facet-share"]')).toBeNull();
+
+    act(() => root.unmount());
+    host.remove();
+  });
+});
+
