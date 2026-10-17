@@ -691,7 +691,7 @@ export const VETTED_IDENTITY_MARKS: readonly VehicleIdentityMark[] = [
     id: 'porsche-911-carrera-rs-73',
     brand: 'Porsche',
     family: '911',
-    seriesCode: 'Carrera RS',
+    seriesCode: 'Carrera RS 2.7',
     yearStart: 1972,
     yearEnd: 2035,
     markKind: 'series_badge',
