@@ -228,7 +228,7 @@ CREATE OR REPLACE VIEW public.v_market_measurement_coverage AS
 SELECT 'key'::text AS layer, sum(sold)::bigint AS numerator FROM public.mv_family_market;
 
 \ir ../migrations/20261018173000_apply_canonical_make_family_join_with_views.sql
-\ir ../migrations/20261018173000_apply_canonical_make_family_join_with_views.sql
+\ir ../migrations/20261018174500_apply_canonical_make_family_join_v2.sql
 
 DO $assert$
 BEGIN

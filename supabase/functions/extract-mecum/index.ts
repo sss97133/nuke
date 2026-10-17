@@ -33,7 +33,7 @@ import { authenticateWriter, requireWriteAuth } from "../_shared/writeGuard.ts";
 import { projectSecretKey } from "../_shared/supabaseKeys.ts";
 import { postFromFlight } from "./rscPost.ts";
 import { mustWrite, softWrite } from "../_shared/writeResult.ts";
-import { indexLot, parseSaleFacet, priorSaleFacet, saleDay, summarizePriorSale, type IndexLot } from "./indexLot.ts";
+import { extractStructuredLotFacets, indexLot, parseSaleFacet, priorSaleFacet, saleDay, summarizePriorSale, type IndexLot } from "./indexLot.ts";
 import { fillOnlyIdentity } from "./identityFill.ts";
 import { patchForLiveRow, writeVehicleEventByKey } from "../_shared/vehicleEventWrite.ts";
 
@@ -311,6 +311,7 @@ interface MecumVehicle {
   year: number | null;
   make: string | null;
   model: string | null;
+  series: string | null;
   trim: string | null;
   vin: string | null;
   engine: string | null;
@@ -488,6 +489,7 @@ function parseNextData(html: string, url: string, flightPost: any = null): Mecum
     year: null,
     make: null,
     model: null,
+    series: null,
     trim: null,
     vin: post.vinSerial || null,
     engine: post.lotSeries || post.engineConfiguration || null, // lotSeries contains engine/features like "348 CI, Air Ride"
@@ -644,6 +646,22 @@ function parseNextData(html: string, url: string, flightPost: any = null): Mecum
   return vehicle;
 }
 
+function applyStructuredVehicleFacets(vehicle: MecumVehicle): MecumVehicle {
+  const structuredFacets = extractStructuredLotFacets({
+    year: vehicle.year,
+    make: vehicle.make,
+    model: vehicle.model,
+    title: vehicle.title,
+    highlights: [vehicle.engine, vehicle.highlights, vehicle.description].filter(Boolean).join(" "),
+    taxonomyTrim: vehicle.trim,
+    taxonomyBodyStyle: vehicle.body_style,
+  });
+  vehicle.series = structuredFacets.series;
+  vehicle.trim = structuredFacets.trim;
+  vehicle.body_style = structuredFacets.body_style;
+  return vehicle;
+}
+
 // ─── Parse markdown (fallback when __NEXT_DATA__ not available) ─────────
 
 function parseMarkdown(markdown: string, url: string): MecumVehicle {
@@ -653,6 +671,7 @@ function parseMarkdown(markdown: string, url: string): MecumVehicle {
     year: null,
     make: null,
     model: null,
+    series: null,
     trim: null,
     vin: null,
     engine: null,
@@ -807,7 +826,7 @@ async function fetchAndParse(url: string, opts?: { skipFirecrawl?: boolean }): P
       if (!fromArchive && archiveHtml.includes("404 - PAGE NOT FOUND")) throw new Error("PAGE_NOT_FOUND");
       if (fromArchive && fromArchive.year && fromArchive.make) {
         console.log(`[MECUM] Parsed via archived __NEXT_DATA__ (snapshot ${bestSnapshot.id}): ${fromArchive.year} ${fromArchive.make} ${fromArchive.model}`);
-        return fromArchive;
+        return applyStructuredVehicleFacets(fromArchive);
       }
     }
   }
@@ -830,7 +849,7 @@ async function fetchAndParse(url: string, opts?: { skipFirecrawl?: boolean }): P
     if (fromJson && !(fromJson.year && fromJson.make) && opts?.skipFirecrawl) throw new Error("NOT_A_VEHICLE");
     if (fromJson && fromJson.year && fromJson.make) {
       console.log(`[MECUM] Parsed via __NEXT_DATA__ (free): ${fromJson.year} ${fromJson.make} ${fromJson.model}`);
-      return fromJson;
+      return applyStructuredVehicleFacets(fromJson);
     }
   }
 
@@ -857,7 +876,7 @@ async function fetchAndParse(url: string, opts?: { skipFirecrawl?: boolean }): P
     const fromJson = parseNextData(fcResult.html, url);
     if (fromJson && fromJson.year && fromJson.make) {
       console.log(`[MECUM] Parsed via __NEXT_DATA__ (Firecrawl HTML): ${fromJson.year} ${fromJson.make} ${fromJson.model}`);
-      return fromJson;
+      return applyStructuredVehicleFacets(fromJson);
     }
   }
 
@@ -870,7 +889,7 @@ async function fetchAndParse(url: string, opts?: { skipFirecrawl?: boolean }): P
     const fromMd = parseMarkdown(fcResult.markdown, url);
     if (fromMd.year || fromMd.make) {
       console.log(`[MECUM] Parsed via markdown fallback: ${fromMd.year} ${fromMd.make} ${fromMd.model}`);
-      return fromMd;
+      return applyStructuredVehicleFacets(fromMd);
     }
   }
 
@@ -1022,6 +1041,7 @@ async function saveVehicle(
     year: vehicle.year,
     make: vehicle.make,
     model: vehicle.model,
+    series: vehicle.series,
     trim: vehicle.trim,
     vin: realVin(vehicle.vin) ? vehicle.vin : null,
     engine_type: vehicle.engine || vehicle.engine_configuration,
@@ -1414,6 +1434,7 @@ Deno.serve(async (req) => {
           year: l.year,
           make: l.make,
           model: l.model,
+          series: l.series,
           trim: l.trim,
           body_style: l.body_style,
           color: l.exterior_color,
@@ -1509,6 +1530,7 @@ Deno.serve(async (req) => {
           estimate_low: l.estimate_low,
           estimate_high: l.estimate_high,
           collection_name: l.collection_name,
+          series: l.series,
           body_style: l.body_style,
           trim: l.trim,
           ...(l.lot_statuses.length ? { has_reserve: !l.lot_statuses.some((x) => /no-?reserve/i.test(x)) } : {}),
@@ -1567,6 +1589,7 @@ Deno.serve(async (req) => {
             year: l.year,
             make: l.make,
             model: l.model,
+            series: l.series,
             trim: l.trim,
             body_style: l.body_style,
             color: l.exterior_color,

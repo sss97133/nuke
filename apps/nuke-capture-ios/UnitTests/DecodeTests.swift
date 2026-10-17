@@ -490,5 +490,23 @@ final class DecodeTests: XCTestCase {
         XCTAssertEqual(saleClaim.source.video?.startLabel, "12:34")
         XCTAssertEqual(saleClaim.source.video?.watchableURL?.absoluteString, "https://www.youtube.com/watch?v=abc123xyz&t=754s")
         XCTAssertNotNil(saleClaim.youtubeSearchURL(vehicleTitle: "1997 Porsche 911 Turbo"))
+
+        // 7. `VehicleIdentityMark` decoding from `public.resolve_vehicle_identity_marks`
+        let identityMarksJSON = """
+        [
+          {"id":"cfa05e17-8074-48da-9336-cbf61e96c89c","brand":"Chevrolet","family":"Pickup","series_code":"C10","trim_package":"Custom Deluxe","body_style":null,"year_start":1973,"year_end":1980,"mark_kind":"trim_badge","display_label":"CUSTOM DELUXE 10","sub_label":"1973–1980 Rectangular Stacked Fender Plate","rpo_code":"YE8/YF5","fender_placement":"Front Fender (behind wheel arch)","typography_style":"square_block","border_treatment":"chrome_bezel","primary_color":"#111111","secondary_color":"#e5e7eb","accent_color":"#dc2626","svg_markup":"<svg></svg>","provenance_note":"1973–1980 Chevrolet C10/K10 Custom Deluxe front fender nameplate.","vetted":true},
+          {"id":"2c61ca9e-2850-48ce-8d6c-f1c9fbc70cf8","brand":"Chevrolet","family":null,"series_code":null,"trim_package":null,"body_style":null,"year_start":1960,"year_end":1972,"mark_kind":"marque_emblem","display_label":"CHEVROLET","sub_label":"Classic chrome-bordered blue/gold bowtie (1960–1972)","svg_markup":"<svg></svg>","provenance_note":"1960–1972 C/K 1st Gen bowtie.","vetted":true}
+        ]
+        """
+        let marks = try decode([VehicleIdentityMark].self, identityMarksJSON)
+        XCTAssertEqual(marks.count, 2)
+        XCTAssertEqual(marks[0].displayLabel, "CUSTOM DELUXE 10")
+        XCTAssertEqual(marks[0].targetModel, "Custom Deluxe")
+        XCTAssertEqual(marks[0].eraShortLabel, "'73–'80")
+        XCTAssertEqual(marks[0].kindLabel, "Trim Badge")
+        XCTAssertNil(marks[1].targetModel)
+        XCTAssertEqual(marks[1].kindLabel, "Marque Emblem")
+        let filteredSquarebody = VehicleIdentityMark.filterByEra(marks, year: nil, eraId: "1973-1987")
+        XCTAssertEqual(filteredSquarebody.map(\.displayLabel), ["CUSTOM DELUXE 10"])
     }
 }

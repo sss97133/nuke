@@ -22,6 +22,189 @@ struct LotProvenance: Equatable {
     var endSeconds: Int?
 }
 
+/// Vetted, period-correct factory marque emblem, series badge, trim plate, or model script (`public.resolve_vehicle_identity_marks`).
+struct VehicleIdentityMark: Decodable, Identifiable, Equatable {
+    let id: String
+    let brand: String
+    let family: String?
+    let seriesCode: String?
+    let trimPackage: String?
+    let bodyStyle: String?
+    let yearStart: Int
+    let yearEnd: Int
+    let markKind: String
+    let displayLabel: String
+    let subLabel: String?
+    let rpoCode: String?
+    let fenderPlacement: String?
+    let typographyStyle: String?
+    let borderTreatment: String?
+    let primaryColor: String?
+    let secondaryColor: String?
+    let accentColor: String?
+    let svgMarkup: String
+    let provenanceNote: String
+    let vetted: Bool
+
+    private enum CodingKeys: String, CodingKey {
+        case id, brand, family, vetted
+        case seriesCode, series_code
+        case trimPackage, trim_package
+        case bodyStyle, body_style
+        case yearStart, year_start
+        case markKind, mark_kind
+        case yearEnd, year_end
+        case displayLabel, display_label
+        case subLabel, sub_label
+        case rpoCode, rpo_code
+        case fenderPlacement, fender_placement
+        case typographyStyle, typography_style
+        case borderTreatment, border_treatment
+        case primaryColor, primary_color
+        case secondaryColor, secondary_color
+        case accentColor, accent_color
+        case svgMarkup, svg_markup
+        case provenanceNote, provenance_note
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        let brandVal = (try? c.decode(String.self, forKey: .brand)) ?? ""
+        let famVal = try? c.decodeIfPresent(String.self, forKey: .family)
+        let seriesVal = (try? c.decodeIfPresent(String.self, forKey: .series_code))
+            ?? (try? c.decodeIfPresent(String.self, forKey: .seriesCode))
+        let trimVal = (try? c.decodeIfPresent(String.self, forKey: .trim_package))
+            ?? (try? c.decodeIfPresent(String.self, forKey: .trimPackage))
+        let bodyVal = (try? c.decodeIfPresent(String.self, forKey: .body_style))
+            ?? (try? c.decodeIfPresent(String.self, forKey: .bodyStyle))
+        let yStart = (try? c.decodeIfPresent(Int.self, forKey: .year_start))
+            ?? (try? c.decodeIfPresent(Int.self, forKey: .yearStart))
+            ?? 1900
+        let yEnd = (try? c.decodeIfPresent(Int.self, forKey: .year_end))
+            ?? (try? c.decodeIfPresent(Int.self, forKey: .yearEnd))
+            ?? 2035
+        let kindVal = (try? c.decodeIfPresent(String.self, forKey: .mark_kind))
+            ?? (try? c.decodeIfPresent(String.self, forKey: .markKind))
+            ?? "marque_emblem"
+        let labelVal = (try? c.decodeIfPresent(String.self, forKey: .display_label))
+            ?? (try? c.decodeIfPresent(String.self, forKey: .displayLabel))
+            ?? brandVal
+
+        self.id = (try? c.decodeIfPresent(String.self, forKey: .id))
+            ?? "\(brandVal.lowercased())|\(famVal?.lowercased() ?? "")|\(seriesVal?.lowercased() ?? "")|\(trimVal?.lowercased() ?? "")|\(bodyVal?.lowercased() ?? "")|\(yStart)|\(yEnd)|\(kindVal)"
+        self.brand = brandVal
+        self.family = famVal
+        self.seriesCode = seriesVal
+        self.trimPackage = trimVal
+        self.bodyStyle = bodyVal
+        self.yearStart = yStart
+        self.yearEnd = yEnd
+        self.markKind = kindVal
+        self.displayLabel = labelVal
+        self.subLabel = (try? c.decodeIfPresent(String.self, forKey: .sub_label))
+            ?? (try? c.decodeIfPresent(String.self, forKey: .subLabel))
+        self.rpoCode = (try? c.decodeIfPresent(String.self, forKey: .rpo_code))
+            ?? (try? c.decodeIfPresent(String.self, forKey: .rpoCode))
+        self.fenderPlacement = (try? c.decodeIfPresent(String.self, forKey: .fender_placement))
+            ?? (try? c.decodeIfPresent(String.self, forKey: .fenderPlacement))
+        self.typographyStyle = (try? c.decodeIfPresent(String.self, forKey: .typography_style))
+            ?? (try? c.decodeIfPresent(String.self, forKey: .typographyStyle))
+        self.borderTreatment = (try? c.decodeIfPresent(String.self, forKey: .border_treatment))
+            ?? (try? c.decodeIfPresent(String.self, forKey: .borderTreatment))
+        self.primaryColor = (try? c.decodeIfPresent(String.self, forKey: .primary_color))
+            ?? (try? c.decodeIfPresent(String.self, forKey: .primaryColor))
+        self.secondaryColor = (try? c.decodeIfPresent(String.self, forKey: .secondary_color))
+            ?? (try? c.decodeIfPresent(String.self, forKey: .secondaryColor))
+        self.accentColor = (try? c.decodeIfPresent(String.self, forKey: .accent_color))
+            ?? (try? c.decodeIfPresent(String.self, forKey: .accentColor))
+        self.svgMarkup = (try? c.decodeIfPresent(String.self, forKey: .svg_markup))
+            ?? (try? c.decodeIfPresent(String.self, forKey: .svgMarkup))
+            ?? ""
+        self.provenanceNote = (try? c.decodeIfPresent(String.self, forKey: .provenance_note))
+            ?? (try? c.decodeIfPresent(String.self, forKey: .provenanceNote))
+            ?? ""
+        self.vetted = (try? c.decodeIfPresent(Bool.self, forKey: .vetted)) ?? true
+    }
+
+    /// Drillable model facet token (`HomePage.tsx`: `mark.trimPackage ?? mark.seriesCode ?? mark.bodyStyle`).
+    var targetModel: String? {
+        if let t = trimPackage, !t.isEmpty { return t }
+        if let s = seriesCode, !s.isEmpty { return s }
+        if let b = bodyStyle, !b.isEmpty { return b }
+        return nil
+    }
+
+    /// Two-digit year range (`'73–'80`), matching `HomePage.tsx`.
+    var eraShortLabel: String {
+        String(format: "'%02d–'%02d", yearStart % 100, yearEnd % 100)
+    }
+
+    var yearRangeLabel: String {
+        "\(yearStart)–\(yearEnd)"
+    }
+
+    var kindLabel: String {
+        switch markKind {
+        case "marque_emblem": return "Marque Emblem"
+        case "series_badge": return "Series Badge"
+        case "trim_badge": return "Trim Badge"
+        case "model_wordmark": return "Model Wordmark"
+        case "body_silhouette": return "Body Silhouette"
+        default: return markKind.replacingOccurrences(of: "_", with: " ").capitalized
+        }
+    }
+
+    /// Calls `public.resolve_vehicle_identity_marks` and applies optional era-window filtering (`eraId = "YYYY-YYYY"`).
+    static func resolve(
+        brand: String?,
+        family: String? = nil,
+        year: Int? = nil,
+        series: String? = nil,
+        trim: String? = nil,
+        body: String? = nil,
+        eraId: String? = nil
+    ) async -> [VehicleIdentityMark] {
+        guard let b = brand?.trimmingCharacters(in: .whitespacesAndNewlines), !b.isEmpty else { return [] }
+        var params: [String: AnyJSON] = ["p_brand": .string(b)]
+        if let f = family?.trimmingCharacters(in: .whitespacesAndNewlines), !f.isEmpty {
+            params["p_family"] = .string(f)
+        }
+        if let y = year {
+            params["p_year"] = .integer(y)
+        }
+        if let s = series?.trimmingCharacters(in: .whitespacesAndNewlines), !s.isEmpty {
+            params["p_series"] = .string(s)
+        }
+        if let t = trim?.trimmingCharacters(in: .whitespacesAndNewlines), !t.isEmpty {
+            params["p_trim"] = .string(t)
+        }
+        if let bd = body?.trimmingCharacters(in: .whitespacesAndNewlines), !bd.isEmpty {
+            params["p_body"] = .string(bd)
+        }
+        guard let data = try? await SupabaseService.client
+            .rpc("resolve_vehicle_identity_marks", params: params)
+            .execute()
+            .data,
+              let decoded = try? JSONDecoder().decode([VehicleIdentityMark].self, from: data)
+        else { return [] }
+
+        return filterByEra(decoded, year: year, eraId: eraId)
+    }
+
+    static func filterByEra(_ marks: [VehicleIdentityMark], year: Int?, eraId: String?) -> [VehicleIdentityMark] {
+        if let y = year {
+            return marks.filter { y >= $0.yearStart && y <= $0.yearEnd }
+        }
+        if let era = eraId?.trimmingCharacters(in: .whitespacesAndNewlines) {
+            let parts = era.split(separator: "-")
+            if parts.count == 2, let yMin = Int(parts[0]), let yMax = Int(parts[1]) {
+                return marks.filter { $0.yearEnd >= yMin && $0.yearStart <= yMax }
+            }
+        }
+        return marks
+    }
+}
+
 /// A tapped claim awaiting its source sheet.
 struct ClaimDrill: Identifiable {
     let title: String
@@ -42,6 +225,8 @@ struct ProfileHeaderBlock: View {
     @State private var drill: ClaimDrill?
     @State private var descriptionExpanded = false
     @State private var lotProvenance: LotProvenance?
+    @State private var identityMarks: [VehicleIdentityMark] = []
+    @State private var selectedIdentityMark: VehicleIdentityMark?
 
     /// The strip's dimensions map onto record fields the spec table also knows; the
     /// table drops those rows when the strip owns them (state each datum once).
@@ -71,6 +256,9 @@ struct ProfileHeaderBlock: View {
             if let m = read.masthead, let price = m.price, !priceOwnedByLiveStack {
                 priceRow(enrichedPriceClaim(price, masthead: m), label: m.priceLabel ?? "Recorded price")
             }
+            if !identityMarks.isEmpty {
+                identityMarksCard
+            }
             if let strip = read.strip, !strip.facets.isEmpty || strip.odometer != nil {
                 stripCard(strip)
             }
@@ -78,9 +266,14 @@ struct ProfileHeaderBlock: View {
                 descriptionCard(desc)
             }
         }
-        .task(id: vehicleId) { await loadLotProvenance() }
+        .task(id: vehicleId) {
+            async let lpTask: Void = loadLotProvenance()
+            async let marksTask: Void = loadIdentityMarks()
+            _ = await (lpTask, marksTask)
+        }
         // The sheet rides this subview, not the page: the page already hosts provenance + comments.
         .sheet(item: $drill) { d in ClaimSourceSheet(vehicleId: vehicleId, drill: d) }
+        .sheet(item: $selectedIdentityMark) { mark in IdentityMarkSheet(mark: mark) }
     }
 
     private func enrichedPriceClaim(_ base: Claim, masthead: ProfileSection.Masthead) -> Claim {
@@ -185,6 +378,60 @@ struct ProfileHeaderBlock: View {
             startSeconds: a?.broadcast_timestamp_start,
             endSeconds: a?.broadcast_timestamp_end
         )
+    }
+
+    /// Resolves vetted era emblems and fender badges from `public.resolve_vehicle_identity_marks`.
+    private func loadIdentityMarks() async {
+        guard let m = read.masthead else { return }
+        let brand = m.make ?? m.identity_source.make
+        let family = m.identity_source.normalized_model ?? m.model ?? m.identity_source.model
+        let year = m.year ?? m.identity_source.year
+        let series = m.identity_source.series
+        let trim = m.identity_source.trim
+        let body = read.strip?.facets.first(where: { $0.dimension == "body_style" })?.label
+        identityMarks = await VehicleIdentityMark.resolve(
+            brand: brand,
+            family: family,
+            year: year,
+            series: series,
+            trim: trim,
+            body: body
+        )
+    }
+
+    @ViewBuilder private var identityMarksCard: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text("ERA MARKS & BADGES")
+                .font(.system(.caption2, design: .monospaced))
+                .foregroundStyle(.secondary)
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 6) {
+                    ForEach(identityMarks.prefix(6)) { mark in
+                        Button {
+                            selectedIdentityMark = mark
+                        } label: {
+                            HStack(spacing: 5) {
+                                Text(mark.displayLabel)
+                                    .font(.system(size: 10, weight: .bold, design: .monospaced))
+                                    .foregroundStyle(.primary)
+                                Text(mark.eraShortLabel)
+                                    .font(.system(size: 9, design: .monospaced))
+                                    .foregroundStyle(.secondary)
+                            }
+                            .padding(.horizontal, 8)
+                            .padding(.vertical, 5)
+                            .background(Color(.secondarySystemBackground), in: RoundedRectangle(cornerRadius: 6))
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 6)
+                                    .strokeBorder(Color.secondary.opacity(0.25), lineWidth: 0.5)
+                            )
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+            }
+        }
+        .nukeCard()
     }
 
     @ViewBuilder private func descriptionCard(_ desc: ProfileDescription) -> some View {
@@ -438,5 +685,63 @@ struct ClaimSourceSheet: View {
         }
         .presentationDetents([.medium, .large])
         .sheet(item: $fullProvenance) { spec in FieldProvenanceSheet(vehicleId: vehicleId, drill: spec) }
+    }
+}
+
+/// Detail sheet for a vetted period-correct factory emblem or fender badge (`VehicleIdentityMark`).
+struct IdentityMarkSheet: View {
+    let mark: VehicleIdentityMark
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        NavigationStack {
+            List {
+                Section {
+                    LabeledContent("Mark") {
+                        Text(mark.displayLabel)
+                            .font(.system(.footnote, design: .monospaced).weight(.semibold))
+                    }
+                    LabeledContent("Kind") {
+                        Text(mark.kindLabel)
+                            .font(.system(.footnote, design: .monospaced))
+                    }
+                    LabeledContent("Era") {
+                        Text(mark.yearRangeLabel)
+                            .font(.system(.footnote, design: .monospaced))
+                    }
+                    if let sub = mark.subLabel, !sub.isEmpty {
+                        LabeledContent("Variant") {
+                            Text(sub)
+                                .font(.system(.footnote, design: .monospaced))
+                                .multilineTextAlignment(.trailing)
+                        }
+                    }
+                    if let rpo = mark.rpoCode, !rpo.isEmpty {
+                        LabeledContent("RPO / Code") {
+                            Text(rpo)
+                                .font(.system(.footnote, design: .monospaced))
+                        }
+                    }
+                    if let placement = mark.fenderPlacement, !placement.isEmpty {
+                        LabeledContent("Placement") {
+                            Text(placement)
+                                .font(.system(.footnote, design: .monospaced))
+                                .multilineTextAlignment(.trailing)
+                        }
+                    }
+                }
+                if !mark.provenanceNote.isEmpty {
+                    Section("Factory Provenance") {
+                        Text(mark.provenanceNote)
+                            .font(.footnote)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+            }
+            .navigationTitle(mark.displayLabel)
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar { ToolbarItem(placement: .topBarTrailing) { Button("Done") { dismiss() } } }
+        }
+        .presentationDetents([.medium, .large])
     }
 }

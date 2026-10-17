@@ -25,6 +25,7 @@ export interface IndexLot {
   year: number;
   make: string;
   model: string | null;
+  series: string | null;
   trim: string | null;
   body_style: string | null;
   result: "sold" | "bid-goes-on" | null;
@@ -50,6 +51,150 @@ export interface IndexLot {
 }
 
 export const INDEX_VEHICLE_TYPES = new Set(["Auto", "Motorcycle", "Tractor", "Boat"]);
+
+/**
+ * Extracts structured `series`, `trim`, and `body_style` facets from a Mecum lot's
+ * make, model, title, and highlights/description text when the taxonomy leaves them blank or coarse.
+ */
+export function extractStructuredLotFacets(params: {
+  year?: number | null;
+  make?: string | null;
+  model?: string | null;
+  title?: string | null;
+  highlights?: string | null;
+  taxonomyTrim?: string | null;
+  taxonomyBodyStyle?: string | null;
+}): { series: string | null; trim: string | null; body_style: string | null } {
+  const brand = (params.make ?? "").trim().toLowerCase();
+  const modelRaw = (params.model ?? "").trim();
+  const haystack = [params.title, modelRaw, params.highlights].filter(Boolean).join(" ").toUpperCase();
+
+  let series: string | null = null;
+  let trim: string | null = params.taxonomyTrim?.trim() || null;
+  let bodyStyle: string | null = params.taxonomyBodyStyle?.trim() || null;
+
+  // ── 1. SERIES EXTRACTION ───────────────────────────────────────────────────
+  if (brand === "chevrolet" || brand === "gmc" || /\b(PICKUP|TRUCK|SUBURBAN|BLAZER|JIMMY)\b/.test(haystack)) {
+    if (/\bC[-\s]?10\b/.test(haystack)) series = "C10";
+    else if (/\bK[-\s]?10\b/.test(haystack)) series = "K10";
+    else if (/\bC[-\s]?20\b/.test(haystack)) series = "C20";
+    else if (/\bK[-\s]?20\b/.test(haystack)) series = "K20";
+    else if (/\bC[-\s]?30\b/.test(haystack)) series = "C30";
+    else if (/\bK[-\s]?30\b/.test(haystack)) series = "K30";
+    else if (/\bR[-\s]?10\b/.test(haystack)) series = "R10";
+    else if (/\bV[-\s]?10\b/.test(haystack)) series = "V10";
+    else if (/\b3100\b/.test(haystack)) series = "3100";
+    else if (/\b3600\b/.test(haystack)) series = "3600";
+    else if (/\b3800\b/.test(haystack)) series = "3800";
+    else if (/\bAPACHE\b/.test(haystack)) series = "Apache";
+    else if (/\bCAMEO\b/.test(haystack)) series = "Cameo Carrier";
+    else if (/\bK[-\s]?1500\b/.test(haystack)) series = "K1500";
+    else if (/\bC[-\s]?1500\b/.test(haystack)) series = "C1500";
+    else if (/\bK[-\s]?2500\b/.test(haystack)) series = "K2500";
+    else if (/\bC[-\s]?2500\b/.test(haystack)) series = "C2500";
+    else if (/\b1500\b/.test(haystack) && (brand === "chevrolet" || brand === "gmc")) series = "1500";
+    else if (/\b2500\b/.test(haystack) && (brand === "chevrolet" || brand === "gmc")) series = "2500";
+    else if (/\b3500\b/.test(haystack) && (brand === "chevrolet" || brand === "gmc")) series = "3500";
+  }
+
+  if (!series && brand === "ford") {
+    if (/\bF[-\s]?100\b/.test(haystack)) series = "F-100";
+    else if (/\bF[-\s]?150\b/.test(haystack)) series = "F-150";
+    else if (/\bF[-\s]?250\b/.test(haystack)) series = "F-250";
+    else if (/\bF[-\s]?350\b/.test(haystack)) series = "F-350";
+    else if (/\bF[-\s]?1\b/.test(haystack)) series = "F-1";
+    else if (/\bSHELBY\s+GT500KR\b/.test(haystack)) series = "Shelby GT500KR";
+    else if (/\bSHELBY\s+GT500\b|\bGT500\b/.test(haystack)) series = "Shelby GT500";
+    else if (/\bSHELBY\s+GT350R\b|\bGT350R\b/.test(haystack)) series = "Shelby GT350R";
+    else if (/\bSHELBY\s+GT350\b|\bGT350\b/.test(haystack)) series = "Shelby GT350";
+    else if (/\bBOSS\s+429\b/.test(haystack)) series = "Boss 429";
+    else if (/\bBOSS\s+302\b/.test(haystack)) series = "Boss 302";
+    else if (/\bBOSS\s+351\b/.test(haystack)) series = "Boss 351";
+    else if (/\bMACH\s+1\b/.test(haystack)) series = "Mach 1";
+    else if (/\bU13\b/.test(haystack)) series = "U13 Roadster";
+    else if (/\bU14\b/.test(haystack)) series = "U14 Half-Cab";
+    else if (/\bU15\b/.test(haystack)) series = "U15 Wagon";
+  }
+
+  if (!series && (brand === "dodge" || brand === "plymouth")) {
+    if (/\bSUPERBIRD\b/.test(haystack)) series = "Superbird";
+    else if (/\bCHARGER\s+DAYTONA\b/.test(haystack)) series = "Daytona";
+    else if (/\bCHARGER\s+500\b/.test(haystack)) series = "Charger 500";
+    else if (/\bAAR\s+['\u2019]?CUDA\b/.test(haystack)) series = "AAR 'Cuda";
+    else if (/\bCHALLENGER\s+T\/A\b/.test(haystack)) series = "T/A";
+    else if (/\bPOWER\s+WAGON\b/.test(haystack)) series = "Power Wagon";
+    else if (/\bD[-\s]?100\b/.test(haystack)) series = "D100";
+    else if (/\bD[-\s]?150\b/.test(haystack)) series = "D150";
+    else if (/\bW[-\s]?100\b/.test(haystack)) series = "W100";
+    else if (/\bW[-\s]?150\b/.test(haystack)) series = "W150";
+  }
+
+  if (!series && brand === "porsche") {
+    if (/\bGT3\s+RS\b/.test(haystack)) series = "GT3 RS";
+    else if (/\bGT3\b/.test(haystack)) series = "GT3";
+    else if (/\bGT2\s+RS\b/.test(haystack)) series = "GT2 RS";
+    else if (/\bCARRERA\s+RS\b/.test(haystack)) series = "Carrera RS";
+    else if (/\bCARRERA\s+4S\b|\bC4S\b/.test(haystack)) series = "Carrera 4S";
+    else if (/\bCARRERA\s+S\b/.test(haystack)) series = "Carrera S";
+    else if (/\bCARRERA\b/.test(haystack)) series = "Carrera";
+  }
+
+  // ── 2. TRIM PACKAGE EXTRACTION ─────────────────────────────────────────────
+  if (!trim) {
+    if (/\bCHEYENNE\s+SUPER\b/.test(haystack)) trim = "Cheyenne Super";
+    else if (/\bCHEYENNE\b/.test(haystack)) trim = "Cheyenne";
+    else if (/\bSCOTTSDALE\b/.test(haystack)) trim = "Scottsdale";
+    else if (/\bCUSTOM\s+DELUXE\b/.test(haystack)) trim = "Custom Deluxe";
+    else if (/\bSILVERADO\b/.test(haystack) && modelRaw.toUpperCase() !== "SILVERADO") trim = "Silverado";
+    else if (/\bBIG\s+10\b/.test(haystack)) trim = "Big 10";
+    else if (/\b454\s+SS\b/.test(haystack)) trim = "454 SS";
+    else if (/\bCST\b|\bCUSTOM\s+SPORT\s+TRUCK\b/.test(haystack)) trim = "CST";
+    else if (/\bSIERRA\s+CLASSIC\b/.test(haystack)) trim = "Sierra Classic";
+    else if (/\bSIERRA\s+GRANDE\b/.test(haystack)) trim = "Sierra Grande";
+    else if (/\bHIGH\s+SIERRA\b/.test(haystack)) trim = "High Sierra";
+    else if (/\bGENTLEMAN\s+JIM\b/.test(haystack)) trim = "Gentleman Jim";
+    else if (/\bRANGER\s+XLT\b/.test(haystack)) trim = "Ranger XLT";
+    else if (/\bRANGER\s+LARIAT\b|\bLARIAT\b/.test(haystack)) trim = "Lariat";
+    else if (/\bXLT\b/.test(haystack)) trim = "XLT";
+    else if (/\bEDDIE\s+BAUER\b/.test(haystack)) trim = "Eddie Bauer";
+    else if (/\bBOSS\s+429\b/.test(haystack)) trim = "Boss 429";
+    else if (/\bBOSS\s+302\b/.test(haystack)) trim = "Boss 302";
+    else if (/\bMACH\s+1\b/.test(haystack)) trim = "Mach 1";
+    else if (/\bZ\/?28\b/.test(haystack)) trim = "Z/28";
+    else if (/\bIROC[-\s]?Z\b/.test(haystack)) trim = "IROC-Z";
+    else if (/\bRS\/SS\b|\bSS\/RS\b/.test(haystack)) trim = "RS/SS";
+    else if (/\bSS\s*454\b/.test(haystack)) trim = "SS 454";
+    else if (/\bSS\s*396\b/.test(haystack)) trim = "SS 396";
+    else if (/\bSUPER\s+SPORT\b|\bSS\b/.test(haystack)) trim = "SS";
+    else if (/\bZ06\b/.test(haystack)) trim = "Z06";
+    else if (/\bZR[-\s]?1\b/.test(haystack)) trim = "ZR1";
+    else if (/\bR\/T\b/.test(haystack)) trim = "R/T";
+    else if (/\b426\s+HEMI\b|\bHEMI\b/.test(haystack)) trim = "Hemi";
+  }
+
+  // ── 3. BODY STYLE REFINEMENT / EXTRACTION ──────────────────────────────────
+  // Refine generic "Pickup" or missing body_style when the title or highlights specify Stepside/Fleetside/Fastback/etc.
+  const isGenericPickup = !bodyStyle || /^pickup$/i.test(bodyStyle);
+  if (isGenericPickup && /\b(STEPSIDE|FLARESIDE|FENDERSIDE)\b/.test(haystack)) {
+    bodyStyle = /\bFLARESIDE\b/.test(haystack) ? "Flareside Pickup" : "Stepside Pickup";
+  } else if (isGenericPickup && /\b(FLEETSIDE|STYLESIDE|SWEPTLINE|WIDELINE)\b/.test(haystack)) {
+    bodyStyle = /\bSTYLESIDE\b/.test(haystack) ? "Styleside Pickup" : "Fleetside Pickup";
+  } else if (!bodyStyle) {
+    if (/\bSPLIT[-\s]?WINDOW\b/.test(haystack)) bodyStyle = "Split-Window Coupe";
+    else if (/\bFASTBACK\b|\bSPORTSROOF\b/.test(haystack)) bodyStyle = "Fastback";
+    else if (/\bCONVERTIBLE\b|\bCABRIOLET\b/.test(haystack)) bodyStyle = "Convertible";
+    else if (/\bROADSTER\b|\bSPEEDSTER\b|\bSPYDER\b|\bSPIDER\b/.test(haystack)) bodyStyle = "Roadster";
+    else if (/\bTARGA\b/.test(haystack)) bodyStyle = "Targa";
+    else if (/\bHARDTOP\b/.test(haystack)) bodyStyle = "Hardtop";
+    else if (/\bCOUPE\b/.test(haystack)) bodyStyle = "Coupe";
+    else if (/\bSEDAN\b/.test(haystack)) bodyStyle = "Sedan";
+    else if (/\bWAGON\b|\bNOMAD\b|\bSUBURBAN\b/.test(haystack)) bodyStyle = "Wagon";
+    else if (/\bSUV\b|\bBLAZER\b|\bBRONCO\b|\bJIMMY\b|\bCOMMANDO\b/.test(haystack)) bodyStyle = "SUV";
+    else if (/\bPICKUP\b|\bTRUCK\b/.test(haystack)) bodyStyle = "Pickup";
+  }
+
+  return { series, trim, body_style: bodyStyle };
+}
 
 /** First taxonomy term's name (or its slug) from an index record, tolerant of a missing or odd shape. */
 export function termName(t: any, key: string, field: "name" | "slug" = "name"): string | null {
@@ -90,8 +235,9 @@ export function indexLot(hit: any): { lot: IndexLot } | { skip: string; url?: st
   const dayStart = typeof hit.auction_day_start_meta === "string" ? hit.auction_day_start_meta : null;
   const title = typeof hit.post_title === "string" && hit.post_title.trim() ? hit.post_title.trim() : null;
   const lotNumber = typeof hit.lot_number_meta === "string" && hit.lot_number_meta ? hit.lot_number_meta : null;
-  const bodyStyle = termName(t, "body_type");
-  const trim = termName(t, "trim_sub_model");
+  const model = termName(t, "model");
+  const taxonomyBodyStyle = termName(t, "body_type");
+  const taxonomyTrim = termName(t, "trim_sub_model");
   const imageUrls = Array.isArray(hit.images_meta)
     ? hit.images_meta.map((img: any) => (typeof img?.url === "string" ? img.url.trim() : "")).filter((u: string) => u.startsWith("http"))
     : [];
@@ -102,6 +248,15 @@ export function indexLot(hit: any): { lot: IndexLot } | { skip: string; url?: st
   const engine = typeof hit.lot_series_meta === "string" && hit.lot_series_meta.trim()
     ? hit.lot_series_meta.trim()
     : engineConfig;
+  const structuredFacets = extractStructuredLotFacets({
+    year,
+    make,
+    model,
+    title,
+    highlights: engine,
+    taxonomyTrim,
+    taxonomyBodyStyle,
+  });
   const collectionRaw = termName(t, "collection_tax");
   const collectionName = collectionRaw ? collectionRaw.split("|")[0].replace(/&amp;/g, "&").trim() || null : null;
   const descParts = [
@@ -120,9 +275,10 @@ export function indexLot(hit: any): { lot: IndexLot } | { skip: string; url?: st
       title,
       year,
       make,
-      model: termName(t, "model"),
-      trim,
-      body_style: bodyStyle,
+      model,
+      series: structuredFacets.series,
+      trim: structuredFacets.trim,
+      body_style: structuredFacets.body_style,
       result,
       price: result ? price : null,
       estimate_low: estimateLow,
