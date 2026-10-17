@@ -7,11 +7,13 @@ const fixture = vi.hoisted(() => ({ rpc: vi.fn() }));
 vi.mock('../../lib/supabase', () => ({ supabase: { rpc: fixture.rpc } }));
 import FamilySalesChart, {
   batMove,
+  computeFacetDistributionSummary,
   deriveSaleSubModel,
   deriveSaleTooltipFacets,
   eraMoves,
   eraOf,
   filterSalesBySubModel,
+  inferActiveFacetAxis,
   logTicks,
   mixFixed,
   parseFamilySales,
@@ -496,5 +498,133 @@ describe('sale dot tooltip facets and period SVG identity marks', () => {
     expect(seriesPill?.textContent).toBe('SERIES · K10 (1/2-Ton 4x4)');
     expect(trimPill?.textContent).toBe('TRIM · Cheyenne Super');
     expect(bodyPill?.textContent).toBe('BODY · Stepside / Flareside');
+  });
+});
+
+describe('facet distribution summary strip in FamilySalesChart header bar', () => {
+  it('computes matched dot count, median sold price, and sold-through rate for the active facet cohort vs. the overall family cohort', () => {
+    const sales: Sale[] = [
+      { vehicle_id: 's1', sale_date: day(10), usd: 58000, source: 'Bring a Trailer', year: 1977, model: 'C10 Silverado Fleetside' },
+      { vehicle_id: 's2', sale_date: day(20), usd: 62000, source: 'Bring a Trailer', year: 1978, model: 'C10 Silverado Stepside' },
+      { vehicle_id: 's3', sale_date: day(30), usd: 66000, source: 'Mecum', year: 1979, model: 'K10 Silverado Short Bed' },
+      { vehicle_id: 'c1', sale_date: day(40), usd: 42000, source: 'Bring a Trailer', year: 1975, model: 'C10 Cheyenne Fleetside' },
+      { vehicle_id: 'c2', sale_date: day(50), usd: 44000, source: 'Bring a Trailer', year: 1976, model: 'C10 Cheyenne Stepside' },
+      { vehicle_id: 'd1', sale_date: day(60), usd: 28000, source: 'Mecum', year: 1974, model: 'C10 Custom Deluxe Long Bed' },
+      { vehicle_id: 'd2', sale_date: day(70), usd: 30000, source: 'Mecum', year: 1978, model: 'C20 Custom Deluxe Fleetside' },
+      { vehicle_id: 'd3', sale_date: day(80), usd: 32000, source: 'Bring a Trailer', year: 1980, model: 'C10 Scottsdale Fleetside' },
+    ];
+    const familyModels = [
+      { name: 'C10 Silverado', count: 30, sold_any: 27, offered: 30 }, // 90% sold-through
+      { name: 'C10 Cheyenne', count: 20, sold_any: 16, offered: 20 },  // 80% sold-through
+      { name: 'C10 Custom Deluxe', count: 30, sold_any: 21, offered: 30 }, // 70% sold-through
+      { name: 'C10 Scottsdale', count: 20, sold_any: 16, offered: 20 }, // 80% sold-through
+    ];
+
+    expect(inferActiveFacetAxis('Silverado', null, { brand: 'Chevrolet', family: 'Pickup' })).toBe('trim');
+    expect(inferActiveFacetAxis('C10 (1/2-Ton 2WD)', null, { brand: 'Chevrolet', family: 'Pickup' })).toBe('series');
+    expect(inferActiveFacetAxis('Stepside / Flareside', null, { brand: 'Chevrolet', family: 'Pickup' })).toBe('body');
+
+    const summary = computeFacetDistributionSummary({
+      allSales: sales,
+      brand: 'Chevrolet',
+      family: 'Pickup',
+      facetAxis: 'trim',
+      selectedFacet: 'Silverado',
+      familyModels,
+    });
+
+    expect(summary).not.toBeNull();
+    expect(summary?.axis).toBe('trim');
+    expect(summary?.axisLabel).toBe('TRIM');
+    expect(summary?.activeFacet).toBe('Silverado');
+    expect(summary?.matchedCount).toBe(3);
+    expect(summary?.familyCount).toBe(8);
+    expect(summary?.matchedMedianUsd).toBe(62000);
+    // Overall family sorted: [28k, 30k, 32k, 42k, 44k, 58k, 62k, 66k] -> p50 = 43000
+    expect(summary?.familyMedianUsd).toBe(43000);
+    expect(summary?.matchedSellThroughRate).toBeCloseTo(0.9, 5);
+    // Overall family outcomes: (27+16+21+16) / (30+20+30+20) = 80 / 100 = 0.80
+    expect(summary?.familySellThroughRate).toBeCloseTo(0.8, 5);
+  });
+
+  it('renders interactive facet cohort pills and compares active facet vs. family metrics in FamilySalesChart', async () => {
+    const sales: Sale[] = [
+      { vehicle_id: 's1', sale_date: day(10), usd: 58000, source: 'Bring a Trailer', year: 1977, model: 'C10 Silverado Fleetside' },
+      { vehicle_id: 's2', sale_date: day(20), usd: 62000, source: 'Bring a Trailer', year: 1978, model: 'C10 Silverado Stepside' },
+      { vehicle_id: 's3', sale_date: day(30), usd: 66000, source: 'Mecum', year: 1979, model: 'K10 Silverado Short Bed' },
+      { vehicle_id: 'c1', sale_date: day(40), usd: 42000, source: 'Bring a Trailer', year: 1975, model: 'C10 Cheyenne Fleetside' },
+      { vehicle_id: 'c2', sale_date: day(50), usd: 44000, source: 'Bring a Trailer', year: 1976, model: 'C10 Cheyenne Stepside' },
+      { vehicle_id: 'd1', sale_date: day(60), usd: 28000, source: 'Mecum', year: 1974, model: 'C10 Custom Deluxe Long Bed' },
+      { vehicle_id: 'd2', sale_date: day(70), usd: 30000, source: 'Mecum', year: 1978, model: 'C20 Custom Deluxe Fleetside' },
+      { vehicle_id: 'd3', sale_date: day(80), usd: 32000, source: 'Bring a Trailer', year: 1980, model: 'C10 Scottsdale Fleetside' },
+    ];
+    const familyModels = [
+      { name: 'C10 Silverado', count: 30, sold_any: 27, offered: 30 },
+      { name: 'C10 Cheyenne', count: 20, sold_any: 16, offered: 20 },
+      { name: 'C10 Custom Deluxe', count: 30, sold_any: 21, offered: 30 },
+      { name: 'C10 Scottsdale', count: 20, sold_any: 16, offered: 20 },
+    ];
+    const onSelectFacet = vi.fn();
+
+    fixture.rpc.mockResolvedValue({ data: value(sales), error: null });
+    await act(async () =>
+      root.render(
+        <FamilySalesChart
+          brand="Chevrolet"
+          familyKey="Pickup"
+          family="Pickup"
+          width={960}
+          height={520}
+          onOpen={() => {}}
+          facetAxis="trim"
+          selectedModel="Silverado"
+          familyModels={familyModels}
+          onSelectFacet={onSelectFacet}
+        />,
+      ),
+    );
+
+    const summaryEl = container.querySelector('[data-testid="family-sales-facet-summary"]');
+    expect(summaryEl).not.toBeNull();
+    expect(summaryEl?.getAttribute('data-facet-axis')).toBe('trim');
+
+    const badgeEl = container.querySelector('[data-testid="family-sales-facet-badge"]');
+    expect(badgeEl?.textContent).toBe('TRIM');
+
+    const activeEl = container.querySelector('[data-testid="family-sales-facet-active"]');
+    expect(activeEl?.textContent).toBe('Silverado');
+
+    const countsEl = container.querySelector('[data-testid="family-sales-facet-counts"]');
+    expect(countsEl?.textContent).toBe('3 of 8 dots (38%)');
+
+    const mediansEl = container.querySelector('[data-testid="family-sales-facet-medians"]');
+    expect(mediansEl?.textContent).toContain('median $62K vs $43K Pickup (▲44%)');
+
+    const sellThroughEl = container.querySelector('[data-testid="family-sales-facet-sellthrough"]');
+    expect(sellThroughEl?.textContent).toBe('90% vs 80% sold');
+
+    // Plotted dots are scoped to the 3 Silverado sales
+    expect(container.querySelectorAll('svg.family-sales__plot circle')).toHaveLength(3);
+
+    const silveradoPill = container.querySelector<HTMLButtonElement>(
+      '[data-testid="family-sales-facet-pill-Silverado"]',
+    );
+    const cheyennePill = container.querySelector<HTMLButtonElement>(
+      '[data-testid="family-sales-facet-pill-Cheyenne"]',
+    );
+    expect(silveradoPill?.getAttribute('aria-pressed')).toBe('true');
+    expect(cheyennePill?.getAttribute('aria-pressed')).toBe('false');
+
+    // Clicking another facet pill invokes onSelectFacet with that cohort
+    await act(async () => {
+      cheyennePill!.click();
+    });
+    expect(onSelectFacet).toHaveBeenLastCalledWith('Cheyenne');
+
+    // Clicking the active facet pill toggles back to null (all cohorts)
+    await act(async () => {
+      silveradoPill!.click();
+    });
+    expect(onSelectFacet).toHaveBeenLastCalledWith(null);
   });
 });

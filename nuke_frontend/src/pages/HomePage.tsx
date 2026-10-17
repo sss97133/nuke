@@ -2612,7 +2612,26 @@ export function TreemapHomePage({ onBrowse, embedded = false }: { onBrowse: () =
           ) : levelType === 'models' && currentLevel.family && currentLevel.make && familyView === 'sales' && dims.w > 0 ? (
             <FamilySalesChart brand={currentLevel.make} familyKey={currentLevel.family} family={currentLevel.label}
               width={dims.w} height={dims.h} onOpen={(id) => navigate(`/vehicle/${id}`)}
-              selectedEra={selectedEra} onSelectEra={setSelectedEra} />
+              selectedEra={selectedEra} onSelectEra={setSelectedEra}
+              facetAxis={facetAxis}
+              familyModels={familyModelsData}
+              onSelectFacet={(nextFacet) => {
+                const famEntry = drillStack.find((d) => d.family && !d.model) ?? {
+                  label: searchParams.get('family_name') || currentLevel.label,
+                  make: currentLevel.make,
+                  family: currentLevel.family,
+                };
+                if (!nextFacet) {
+                  setDrillStack([{ label: 'ALL MAKES' }, { label: currentLevel.make!, make: currentLevel.make }, famEntry]);
+                } else {
+                  setDrillStack([
+                    { label: 'ALL MAKES' },
+                    { label: currentLevel.make!, make: currentLevel.make },
+                    famEntry,
+                    { label: nextFacet, make: currentLevel.make, family: currentLevel.family, model: nextFacet },
+                  ]);
+                }
+              }} />
           ) : rects.map((rect, i) => {
             if ((levelType === 'brands' || levelType === 'families') && rect.node.usd != null && !rect.node.isVehicle) {
               const node = rect.node;
@@ -2701,6 +2720,25 @@ export function TreemapHomePage({ onBrowse, embedded = false }: { onBrowse: () =
                 : currentLevel.model ?? null
             }
             selectedYear={currentLevel.year ?? null}
+            facetAxis={facetAxis}
+            familyModels={familyModelsData}
+            onSelectFacet={(nextFacet) => {
+              const famEntry = drillStack.find((d) => d.family && !d.model) ?? {
+                label: searchParams.get('family_name') || currentLevel.label,
+                make: currentLevel.make,
+                family: currentLevel.family,
+              };
+              if (!nextFacet) {
+                setDrillStack([{ label: 'ALL MAKES' }, { label: currentLevel.make!, make: currentLevel.make }, famEntry]);
+              } else {
+                setDrillStack([
+                  { label: 'ALL MAKES' },
+                  { label: currentLevel.make!, make: currentLevel.make },
+                  famEntry,
+                  { label: nextFacet, make: currentLevel.make, family: currentLevel.family, model: nextFacet },
+                ]);
+              }
+            }}
           />
         </div>
       )}

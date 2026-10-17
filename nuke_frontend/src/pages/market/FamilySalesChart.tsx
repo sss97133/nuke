@@ -370,6 +370,211 @@ export interface SaleTooltipFacetSummary {
   badgeSvg: string | null;
 }
 
+export interface FacetCohortBucket {
+  label: string;
+  count: number;
+  shareRatio: number;
+  medianUsd: number | null;
+  sellThroughRate: number | null;
+  offeredCount: number | null;
+  soldCount: number | null;
+}
+
+export interface FacetDistributionSummary {
+  axis: Exclude<FamilyFacetAxis, 'raw'>;
+  axisLabel: 'SERIES' | 'TRIM' | 'BODY STYLE';
+  activeFacet: string | null;
+  matchedCount: number;
+  familyCount: number;
+  shareRatio: number;
+  matchedMedianUsd: number | null;
+  familyMedianUsd: number | null;
+  medianDeltaRatio: number | null;
+  matchedSellThroughRate: number | null;
+  familySellThroughRate: number | null;
+  matchedOffered: number | null;
+  familyOffered: number | null;
+  buckets: FacetCohortBucket[];
+}
+
+export function inferActiveFacetAxis(
+  selectedModel: string | null | undefined,
+  explicitAxis?: FamilyFacetAxis | null,
+  context?: { brand?: string | null; family?: string | null; year?: number | null },
+): Exclude<FamilyFacetAxis, 'raw'> | null {
+  if (explicitAxis && explicitAxis !== 'raw') return explicitAxis;
+  if (!selectedModel || !selectedModel.trim()) return null;
+  const trimmed = selectedModel.trim();
+  const tLower = trimmed.toLowerCase();
+  const cls = classifyVehicleFacets(context?.brand, context?.family, trimmed, context?.year);
+  if (cls.trim && cls.trim.toLowerCase() === tLower) return 'trim';
+  if (cls.body && cls.body.toLowerCase() === tLower) return 'body';
+  if (cls.series && cls.series.toLowerCase() === tLower) return 'series';
+  return null;
+}
+
+export function computeFacetDistributionSummary(params: {
+  allSales: readonly Sale[];
+  brand: string;
+  family: string;
+  facetAxis?: FamilyFacetAxis | null;
+  selectedFacet?: string | null;
+  selectedEra?: string | null;
+  selectedYear?: number | null;
+  familyModels?: readonly {
+    name: string;
+    count?: number;
+    sold_any?: number | null;
+    offered?: number | null;
+  }[] | null;
+}): FacetDistributionSummary | null {
+  const {
+    allSales,
+    brand,
+    family,
+    facetAxis,
+    selectedFacet,
+    selectedEra,
+    selectedYear,
+    familyModels,
+  } = params;
+
+  const axis = inferActiveFacetAxis(selectedFacet, facetAxis, { brand, family, year: selectedYear });
+  if (!axis) return null;
+
+  // Scope family baseline sales to the same era/year window so the facet vs. family comparison is apples-to-apples
+  const scopedFamilySales = allSales.filter((s) => {
+    const t = Date.parse(s.sale_date);
+    if (!Number.isFinite(t) || !(s.usd >= PRICE_FLOOR)) return false;
+    if (selectedEra && !matchesEraRange(s.year, selectedEra)) return false;
+    if (selectedYear != null && s.year !== selectedYear) return false;
+    return true;
+  });
+
+  if (scopedFamilySales.length === 0) return null;
+
+  const fallbackLabel =
+    axis === 'series' ? 'Standard Series' : axis === 'trim' ? 'Base / Unbadged Trim' : 'Standard Body';
+
+  const pickAxisFacet = (s: { model: string | null; year?: number | null }): string => {
+    const cls = classifyVehicleFacets(brand, family, s.model, s.year);
+    const val = axis === 'series' ? cls.series : axis === 'trim' ? cls.trim : cls.body;
+    return val ?? fallbackLabel;
+  };
+
+  // Aggregate sell-through from familyModels when offered/sold_any counts are present
+  const modelOutcomesByBucket = new Map<string, { sold: number; offered: number }>();
+  let totalFamilySoldOutcomes = 0;
+  let totalFamilyOfferedOutcomes = 0;
+  if (familyModels && familyModels.length > 0) {
+    for (const m of familyModels) {
+      const offered = m.offered ?? null;
+      const sold = m.sold_any ?? m.count ?? null;
+      if (offered != null && offered > 0 && sold != null && sold >= 0) {
+        totalFamilySoldOutcomes += sold;
+        totalFamilyOfferedOutcomes += offered;
+        const cls = classifyVehicleFacets(brand, family, m.name);
+        const bLabel = (axis === 'series' ? cls.series : axis === 'trim' ? cls.trim : cls.body) ?? fallbackLabel;
+        const prev = modelOutcomesByBucket.get(bLabel) ?? { sold: 0, offered: 0 };
+        prev.sold += sold;
+        prev.offered += offered;
+        modelOutcomesByBucket.set(bLabel, prev);
+      }
+    }
+  }
+
+  const bucketPrices = new Map<string, number[]>();
+  for (const s of scopedFamilySales) {
+    const bLabel = pickAxisFacet(s);
+    const arr = bucketPrices.get(bLabel) ?? [];
+    arr.push(s.usd);
+    bucketPrices.set(bLabel, arr);
+  }
+
+  const medianOf = (vals: readonly number[]): number | null => {
+    if (!vals.length) return null;
+    const sorted = [...vals].sort((a, b) => a - b);
+    return Math.round(quantile(sorted, 0.5));
+  };
+
+  const familyPrices = scopedFamilySales.map((s) => s.usd);
+  const familyCount = scopedFamilySales.length;
+  const familyMedianUsd = medianOf(familyPrices);
+  const familySellThroughRate =
+    totalFamilyOfferedOutcomes > 0 ? totalFamilySoldOutcomes / totalFamilyOfferedOutcomes : null;
+
+  const buckets: FacetCohortBucket[] = [...bucketPrices.entries()]
+    .map(([label, prices]) => {
+      const outcomes = modelOutcomesByBucket.get(label);
+      const sellThroughRate =
+        outcomes && outcomes.offered > 0 ? outcomes.sold / outcomes.offered : null;
+      return {
+        label,
+        count: prices.length,
+        shareRatio: prices.length / familyCount,
+        medianUsd: medianOf(prices),
+        sellThroughRate,
+        offeredCount: outcomes?.offered ?? null,
+        soldCount: outcomes?.sold ?? null,
+      };
+    })
+    .sort((a, b) => b.count - a.count || (b.medianUsd ?? 0) - (a.medianUsd ?? 0));
+
+  const trimmedFacet = selectedFacet?.trim() || null;
+  const matchedBucket = trimmedFacet
+    ? buckets.find((b) => b.label.toLowerCase() === trimmedFacet.toLowerCase()) ?? null
+    : null;
+
+  let matchedSales: Sale[];
+  let activeFacetLabel: string | null = null;
+  if (matchedBucket) {
+    activeFacetLabel = matchedBucket.label;
+    matchedSales = scopedFamilySales.filter(
+      (s) => pickAxisFacet(s).toLowerCase() === matchedBucket.label.toLowerCase(),
+    );
+  } else if (trimmedFacet) {
+    activeFacetLabel = trimmedFacet;
+    matchedSales = filterSalesBySubModel(scopedFamilySales, trimmedFacet, { brand, family });
+  } else {
+    activeFacetLabel = null;
+    matchedSales = scopedFamilySales;
+  }
+
+  const matchedPrices = matchedSales.map((s) => s.usd);
+  const matchedCount = matchedSales.length;
+  const matchedMedianUsd = medianOf(matchedPrices);
+  const medianDeltaRatio =
+    matchedMedianUsd != null && familyMedianUsd != null && familyMedianUsd > 0
+      ? matchedMedianUsd / familyMedianUsd - 1
+      : null;
+
+  const matchedOutcomes = activeFacetLabel ? modelOutcomesByBucket.get(activeFacetLabel) : null;
+  const matchedSellThroughRate =
+    matchedOutcomes && matchedOutcomes.offered > 0
+      ? matchedOutcomes.sold / matchedOutcomes.offered
+      : familySellThroughRate;
+
+  const axisLabel =
+    axis === 'series' ? 'SERIES' : axis === 'trim' ? 'TRIM' : 'BODY STYLE';
+
+  return {
+    axis,
+    axisLabel,
+    activeFacet: activeFacetLabel,
+    matchedCount,
+    familyCount,
+    shareRatio: familyCount > 0 ? matchedCount / familyCount : 0,
+    matchedMedianUsd,
+    familyMedianUsd,
+    medianDeltaRatio,
+    matchedSellThroughRate,
+    familySellThroughRate,
+    matchedOffered: matchedOutcomes?.offered ?? null,
+    familyOffered: totalFamilyOfferedOutcomes > 0 ? totalFamilyOfferedOutcomes : null,
+    buckets,
+  };
+}
+
 /**
  * Derives a sale record's sub-model label along the requested facet axis ('raw' | 'series' | 'trim' | 'body').
  * - 'raw': strips any enriched " · <listing_title>" suffix and returns the base model token (or family fallback).
@@ -612,7 +817,21 @@ export function filterSalesBySubModel<T extends { model: string | null; year?: n
   );
 }
 
-export default function FamilySalesChart({ brand, familyKey, family, width, height, onOpen, selectedEra = null, onSelectEra, selectedModel = null, selectedYear = null }: {
+export default function FamilySalesChart({
+  brand,
+  familyKey,
+  family,
+  width,
+  height,
+  onOpen,
+  selectedEra = null,
+  onSelectEra,
+  selectedModel = null,
+  selectedYear = null,
+  facetAxis = null,
+  onSelectFacet,
+  familyModels = null,
+}: {
   brand: string;
   familyKey: string;
   family: string;
@@ -623,13 +842,33 @@ export default function FamilySalesChart({ brand, familyKey, family, width, heig
   onSelectEra?: (era: string | null) => void;
   selectedModel?: string | null;
   selectedYear?: number | null;
+  facetAxis?: FamilyFacetAxis | null;
+  onSelectFacet?: (facet: string | null) => void;
+  familyModels?: readonly {
+    name: string;
+    count?: number;
+    sold_any?: number | null;
+    offered?: number | null;
+  }[] | null;
 }) {
   const { sales: allSales, n: windowCount, truncated, failed } = useFamilySales(brand, familyKey);
   const upcomingSupply = useFamilyUpcomingSupply(brand, familyKey);
+  const [localSelectedFacet, setLocalSelectedFacet] = useState<string | null>(null);
+  useEffect(() => {
+    setLocalSelectedFacet(null);
+  }, [brand, familyKey, facetAxis, selectedModel]);
+  const effectiveSelectedModel = selectedModel ?? localSelectedFacet;
+  const handleSelectFacet = (nextFacet: string | null) => {
+    if (onSelectFacet) {
+      onSelectFacet(nextFacet);
+    } else {
+      setLocalSelectedFacet(nextFacet);
+    }
+  };
   const filteredSupply = useMemo(() => {
     if (!upcomingSupply) return null;
     const matchFilter = (yr: number | null, mdl: string | null) => {
-      if (selectedModel && !matchesSaleSubModel(mdl, selectedModel, { brand, family, year: yr })) return false;
+      if (effectiveSelectedModel && !matchesSaleSubModel(mdl, effectiveSelectedModel, { brand, family, year: yr })) return false;
       if (selectedEra && !matchesEraRange(yr, selectedEra)) return false;
       if (selectedYear != null && yr !== selectedYear) return false;
       return true;
@@ -651,10 +890,26 @@ export default function FamilySalesChart({ brand, familyKey, family, width, heig
         total,
       },
     };
-  }, [upcomingSupply, selectedModel, selectedEra, selectedYear, brand, family]);
+  }, [upcomingSupply, effectiveSelectedModel, selectedEra, selectedYear, brand, family]);
   const modelSales = useMemo(
-    () => (allSales && selectedModel ? filterSalesBySubModel(allSales, selectedModel, { brand, family }) : null),
-    [allSales, selectedModel, brand, family],
+    () => (allSales && effectiveSelectedModel ? filterSalesBySubModel(allSales, effectiveSelectedModel, { brand, family }) : null),
+    [allSales, effectiveSelectedModel, brand, family],
+  );
+  const facetSummary = useMemo(
+    () =>
+      allSales
+        ? computeFacetDistributionSummary({
+            allSales,
+            brand,
+            family,
+            facetAxis,
+            selectedFacet: effectiveSelectedModel,
+            selectedEra,
+            selectedYear,
+            familyModels,
+          })
+        : null,
+    [allSales, brand, family, facetAxis, effectiveSelectedModel, selectedEra, selectedYear, familyModels],
   );
   const baseSales = modelSales && modelSales.length > 0 ? modelSales : allSales;
   const eraCohorts = useMemo(
@@ -831,7 +1086,7 @@ export default function FamilySalesChart({ brand, familyKey, family, width, heig
       <div className="family-sales__title">
         <Text role="entity" dense>{(() => {
           const parts = [family];
-          if (selectedModel && selectedModel.toLowerCase() !== family.toLowerCase() && modelSales?.length) parts.push(selectedModel);
+          if (effectiveSelectedModel && effectiveSelectedModel.toLowerCase() !== family.toLowerCase() && modelSales?.length) parts.push(effectiveSelectedModel);
           if (selectedYear != null && yearFilteredSales?.length) parts.push(String(selectedYear));
           return parts.join(' · ');
         })()}</Text>
@@ -868,6 +1123,107 @@ export default function FamilySalesChart({ brand, familyKey, family, width, heig
         title={hidden.has(v.key) ? `Show ${v.label}` : `Hide ${v.label}`} onClick={() => toggle(v.key)}>
         <svg width="8" height="8" aria-hidden="true"><circle cx="4" cy="4" r="4" fill={v.color} /></svg>
         <Text role="caption">{narrow ? v.short : v.label} {v.n.toLocaleString('en-US')}</Text></button>)}
+      {facetSummary && (
+        <div
+          className="family-sales__facet-summary"
+          role="region"
+          aria-label={`${facetSummary.axisLabel} facet cohort comparison`}
+          data-testid="family-sales-facet-summary"
+          data-facet-axis={facetSummary.axis}
+        >
+          <span className="family-sales__facet-badge" data-testid="family-sales-facet-badge">
+            {facetSummary.axisLabel}
+          </span>
+          <span className="family-sales__facet-metrics" data-testid="family-sales-facet-metrics">
+            {facetSummary.activeFacet ? (
+              <>
+                <strong data-testid="family-sales-facet-active">{facetSummary.activeFacet}</strong>
+                {' · '}
+                <span data-testid="family-sales-facet-counts">
+                  {facetSummary.matchedCount.toLocaleString('en-US')} of {facetSummary.familyCount.toLocaleString('en-US')} dots ({Math.round(facetSummary.shareRatio * 100)}%)
+                </span>
+                {facetSummary.matchedMedianUsd != null && facetSummary.familyMedianUsd != null && (
+                  <>
+                    {' · '}
+                    <span data-testid="family-sales-facet-medians">
+                      median {money(facetSummary.matchedMedianUsd)} vs {money(facetSummary.familyMedianUsd)} {family}
+                      {facetSummary.medianDeltaRatio != null ? ` (${signed(facetSummary.medianDeltaRatio)})` : ''}
+                    </span>
+                  </>
+                )}
+                {(facetSummary.matchedSellThroughRate != null || facetSummary.familySellThroughRate != null) && (
+                  <>
+                    {' · '}
+                    <span data-testid="family-sales-facet-sellthrough">
+                      {facetSummary.matchedSellThroughRate != null &&
+                      facetSummary.familySellThroughRate != null &&
+                      Math.round(facetSummary.matchedSellThroughRate * 100) !== Math.round(facetSummary.familySellThroughRate * 100)
+                        ? `${Math.round(facetSummary.matchedSellThroughRate * 100)}% vs ${Math.round(facetSummary.familySellThroughRate * 100)}% sold`
+                        : `${Math.round((facetSummary.matchedSellThroughRate ?? facetSummary.familySellThroughRate!) * 100)}% sold`}
+                    </span>
+                  </>
+                )}
+              </>
+            ) : (
+              <>
+                <span data-testid="family-sales-facet-counts">
+                  {facetSummary.buckets.length} {facetSummary.axisLabel.toLowerCase()} cohorts across {facetSummary.familyCount.toLocaleString('en-US')} dots
+                </span>
+                {facetSummary.familyMedianUsd != null && (
+                  <>
+                    {' · '}
+                    <span data-testid="family-sales-facet-medians">
+                      {family} median {money(facetSummary.familyMedianUsd)}
+                    </span>
+                  </>
+                )}
+                {facetSummary.familySellThroughRate != null && (
+                  <>
+                    {' · '}
+                    <span data-testid="family-sales-facet-sellthrough">
+                      {Math.round(facetSummary.familySellThroughRate * 100)}% sold
+                    </span>
+                  </>
+                )}
+              </>
+            )}
+          </span>
+          <div className="family-sales__facet-pills" role="group" aria-label={`Filter by ${facetSummary.axisLabel.toLowerCase()} cohort`}>
+            <button
+              type="button"
+              className="family-sales__facet-pill"
+              data-testid="family-sales-facet-pill-all"
+              aria-pressed={!facetSummary.activeFacet}
+              onClick={() => handleSelectFacet(null)}
+            >
+              ALL ({facetSummary.familyCount.toLocaleString('en-US')})
+            </button>
+            {facetSummary.buckets.slice(0, narrow ? 4 : 6).map((b) => {
+              const active =
+                facetSummary.activeFacet != null &&
+                facetSummary.activeFacet.toLowerCase() === b.label.toLowerCase();
+              return (
+                <button
+                  key={b.label}
+                  type="button"
+                  className="family-sales__facet-pill"
+                  data-testid={`family-sales-facet-pill-${b.label}`}
+                  data-facet-bucket={b.label}
+                  aria-pressed={active}
+                  onClick={() => handleSelectFacet(active ? null : b.label)}
+                  title={`${b.label}: ${b.count.toLocaleString('en-US')} dots (${Math.round(b.shareRatio * 100)}%)${b.medianUsd != null ? ` · median ${money(b.medianUsd)}` : ''}${b.sellThroughRate != null ? ` · ${Math.round(b.sellThroughRate * 100)}% sold` : ''}`}
+                >
+                  <span>{b.label}</span>
+                  <span className="family-sales__facet-pill-meta">
+                    {b.count.toLocaleString('en-US')}
+                    {b.medianUsd != null ? ` · ${money(b.medianUsd)}` : ''}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
       {onSelectEra && eraCohorts.length >= 2 && (
         <div className="family-sales__eras" role="group" aria-label="Filter by generation">
           <button
