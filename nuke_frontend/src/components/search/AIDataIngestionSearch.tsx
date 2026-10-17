@@ -247,6 +247,7 @@ export default function AIDataIngestionSearch() {
   const [showAutocomplete, setShowAutocomplete] = useState(false);
   const [selectedAutocompleteIndex, setSelectedAutocompleteIndex] = useState(-1);
   const autocompleteDebounceRef = useRef<NodeJS.Timeout | null>(null);
+  const autocompleteRequestIdRef = useRef(0);
 
   // Magic Box intent state
   const [currentIntent, setCurrentIntent] = useState<SearchIntent | null>(null);
@@ -263,9 +264,23 @@ export default function AIDataIngestionSearch() {
   const location = useLocation();
   const { showToast } = useToast();
 
+  const dismissAutocomplete = () => {
+    autocompleteRequestIdRef.current += 1;
+    if (autocompleteDebounceRef.current) {
+      clearTimeout(autocompleteDebounceRef.current);
+      autocompleteDebounceRef.current = null;
+    }
+    setShowAutocomplete(false);
+    setAutocompleteResults([]);
+    setAutocompleteAISuggestion(null);
+    setAutocompleteTotalCount(null);
+    setSelectedAutocompleteIndex(-1);
+  };
+
   // On the Market page, queries that name a brand, family, model, or era ("mustang", "73-87 gm trucks", "corvette")
   // set the Market URL scope in place instead of navigating away to /search.
   const navigateSearchOrScopeMarket = async (rawQuery: string) => {
+    dismissAutocomplete();
     const q = rawQuery.trim();
     if (!q) {
       navigate('/search');
@@ -280,6 +295,17 @@ export default function AIDataIngestionSearch() {
     }
     navigate(`/search?q=${encodeURIComponent(q)}`);
   };
+
+  // Dismiss any open autocomplete dropdown whenever the route or query changes
+  useEffect(() => {
+    autocompleteRequestIdRef.current += 1;
+    if (autocompleteDebounceRef.current) {
+      clearTimeout(autocompleteDebounceRef.current);
+      autocompleteDebounceRef.current = null;
+    }
+    setShowAutocomplete(false);
+    setSelectedAutocompleteIndex(-1);
+  }, [location.pathname, location.search]);
 
   const vehicleIdFromRoute = useMemo(() => {
     const m = location.pathname.match(/\/vehicle\/([a-f0-9-]{36})/);
@@ -298,8 +324,11 @@ export default function AIDataIngestionSearch() {
   useEffect(() => {
     if (autocompleteDebounceRef.current) {
       clearTimeout(autocompleteDebounceRef.current);
+      autocompleteDebounceRef.current = null;
     }
 
+    const reqId = ++autocompleteRequestIdRef.current;
+    let cancelled = false;
     const trimmedInput = input.trim();
 
     // Don't show autocomplete if:
@@ -329,23 +358,42 @@ export default function AIDataIngestionSearch() {
 
     autocompleteDebounceRef.current = setTimeout(async () => {
       try {
-        // Use universal search service for rich results with thumbnails
-        const response = await universalSearchService.search(trimmedInput, {
-          limit: 24,
-          includeAI: true
-        });
+        const [response, resolvedScope] = await Promise.all([
+          universalSearchService.search(trimmedInput, {
+            limit: 24,
+            includeAI: true
+          }),
+          resolveMarketScopeQuery(trimmedInput).catch(() => null),
+        ]);
+
+        if (cancelled || reqId !== autocompleteRequestIdRef.current) return;
 
         let combinedResults = response.results;
+        const canonicalFamilyOrModel = resolvedScope?.model || resolvedScope?.family_name || '';
 
-        if (combinedResults.length < 8) {
+        if (combinedResults.length < 8 || canonicalFamilyOrModel) {
           try {
             const safeQuery = trimmedInput.replace(/([%_\\])/g, '\\$1');
-            const { data: vehicles } = await supabase
+            const canonicalSafe = canonicalFamilyOrModel.replace(/([%_\\])/g, '\\$1');
+            const orFilter = canonicalSafe && canonicalSafe.toLowerCase() !== safeQuery.toLowerCase()
+              ? `model.ilike.%${canonicalSafe}%,normalized_model.ilike.%${canonicalSafe}%,make.ilike.%${safeQuery}%,model.ilike.%${safeQuery}%,title.ilike.%${canonicalSafe}%`
+              : `make.ilike.%${safeQuery}%,model.ilike.%${safeQuery}%,normalized_model.ilike.%${safeQuery}%,series.ilike.%${safeQuery}%,trim.ilike.%${safeQuery}%,title.ilike.%${safeQuery}%`;
+
+            let queryBuilder = supabase
               .from('vehicles')
-              .select('id, year, make, model, normalized_model, series, trim, title, sale_price, current_value')
+              .select('id, year, make, model, normalized_model, series, trim, title, sale_price, current_value, primary_image_url')
               .eq('is_public', true)
-              .or(`make.ilike.%${safeQuery}%,model.ilike.%${safeQuery}%,normalized_model.ilike.%${safeQuery}%,series.ilike.%${safeQuery}%,trim.ilike.%${safeQuery}%,title.ilike.%${safeQuery}%`)
+              .or(orFilter);
+
+            if (resolvedScope?.make && canonicalSafe) {
+              queryBuilder = queryBuilder.ilike('make', resolvedScope.make);
+            }
+
+            const { data: vehicles } = await queryBuilder
+              .order('sale_price', { ascending: false, nullsFirst: false })
               .limit(16);
+
+            if (cancelled || reqId !== autocompleteRequestIdRef.current) return;
 
             if (vehicles && vehicles.length > 0) {
               const fallbackResults: UniversalSearchResult[] = vehicles.map((v: any) => ({
@@ -354,7 +402,8 @@ export default function AIDataIngestionSearch() {
                 title: `${v.year || ''} ${v.make || ''} ${v.model || ''}`.trim() || v.title || 'Vehicle',
                 subtitle: v.trim || v.series || v.normalized_model || undefined,
                 description: v.title || undefined,
-                relevance_score: 0.3,
+                image_url: v.primary_image_url || undefined,
+                relevance_score: resolvedScope?.make && String(v.make || '').toLowerCase() === resolvedScope.make.toLowerCase() ? 0.95 : 0.3,
                 metadata: {
                   year: v.year,
                   make: v.make,
@@ -364,7 +413,11 @@ export default function AIDataIngestionSearch() {
               }));
 
               const seen = new Set<string>();
-              const merged = [...combinedResults, ...fallbackResults].filter((r) => {
+              // Put canonical family/make vehicle matches ahead of unnormalized literal matches (e.g. Plymouth Road Runner ahead of RV trailers)
+              const ordered = canonicalSafe && canonicalSafe.toLowerCase() !== safeQuery.toLowerCase()
+                ? [...fallbackResults, ...combinedResults]
+                : [...combinedResults, ...fallbackResults];
+              const merged = ordered.filter((r) => {
                 const key = `${r.type}:${r.id}`;
                 if (seen.has(key)) return false;
                 seen.add(key);
@@ -377,6 +430,27 @@ export default function AIDataIngestionSearch() {
           }
         }
 
+        if (resolvedScope) {
+          const scopeUrl = buildMarketScopeUrl(resolvedScope, isOnMarketTab(location.pathname, location.search) ? location.search : '');
+          const scopeTitle = [resolvedScope.year, resolvedScope.make, resolvedScope.model || resolvedScope.family_name]
+            .filter(Boolean)
+            .join(' ');
+          const marketResult: UniversalSearchResult = {
+            id: `market_scope:${scopeUrl}`,
+            type: 'tag',
+            title: scopeTitle || trimmedInput,
+            subtitle: 'MARKET COHORT · CLICK TO VIEW IN MARKET',
+            relevance_score: 1,
+            metadata: {
+              marketUrl: scopeUrl,
+              tag: scopeTitle || trimmedInput,
+            },
+          };
+          combinedResults = [marketResult, ...combinedResults.slice(0, 23)];
+        }
+
+        if (cancelled || reqId !== autocompleteRequestIdRef.current) return;
+
         setAutocompleteResults(combinedResults);
         setAutocompleteAISuggestion(response.ai_suggestion || null);
         const totalCount = Math.max(response.total_count || 0, combinedResults.length);
@@ -385,6 +459,7 @@ export default function AIDataIngestionSearch() {
         setSelectedAutocompleteIndex(-1);
 
       } catch (error) {
+        if (cancelled || reqId !== autocompleteRequestIdRef.current) return;
         // Autocomplete error - fail silently
         setAutocompleteResults([]);
         setAutocompleteAISuggestion(null);
@@ -394,8 +469,10 @@ export default function AIDataIngestionSearch() {
     }, 300); // 300ms debounce
 
     return () => {
+      cancelled = true;
       if (autocompleteDebounceRef.current) {
         clearTimeout(autocompleteDebounceRef.current);
+        autocompleteDebounceRef.current = null;
       }
     };
   }, [input, isProcessing, attachedImage, showPreview]);
@@ -617,13 +694,15 @@ export default function AIDataIngestionSearch() {
   }, [actionsOpen]);
 
   // Close popovers on outside click WITHOUT blocking the entire page (no full-screen click-catcher)
-  const anyPopoverOpen = showPreview || !!imagePreview || !!error || showCritique || showWiringWorkbench;
+  const anyPopoverOpen = showAutocomplete || showPreview || !!imagePreview || !!error || showCritique || showWiringWorkbench;
   useEffect(() => {
     if (!anyPopoverOpen) return;
     const onMouseDown = (e: MouseEvent) => {
       const el = containerRef.current;
       if (!el) return;
       if (el.contains(e.target as Node)) return;
+      setShowAutocomplete(false);
+      setSelectedAutocompleteIndex(-1);
       setShowPreview(false);
       setExtractionPreview(null);
       setError(null);
@@ -1239,9 +1318,7 @@ export default function AIDataIngestionSearch() {
   };
 
   const handleAutocompleteSelect = (result: UniversalSearchResult) => {
-    setShowAutocomplete(false);
-    setSelectedAutocompleteIndex(-1);
-    setAutocompleteAISuggestion(null);
+    dismissAutocomplete();
 
     switch (result.type) {
       case 'vehicle':
@@ -1260,19 +1337,26 @@ export default function AIDataIngestionSearch() {
         setInput('');
         break;
 
-      case 'external_identity':
+      case 'external_identity': {
         // External identities have id format "external_<uuid>"
         const externalId = result.id.replace('external_', '');
         navigate(`/profile/external/${externalId}`);
         setInput('');
         break;
+      }
 
-      case 'tag':
+      case 'tag': {
+        if (result.metadata?.marketUrl) {
+          navigate(String(result.metadata.marketUrl));
+          setInput('');
+          break;
+        }
         // Tags navigate to search with that tag as query
         const tagName = result.metadata?.tag || result.title;
         navigate(`/search?q=${encodeURIComponent(tagName)}`);
         setInput('');
         break;
+      }
 
       default:
         // Fallback: set input and let user press Enter
@@ -1478,7 +1562,7 @@ export default function AIDataIngestionSearch() {
           }}
           onKeyDown={handleKeyDown}
           onFocus={() => {
-            if (autocompleteResults.length > 0) {
+            if (input.trim().length >= 2 && autocompleteResults.length > 0) {
               setShowAutocomplete(true);
             }
           }}
@@ -1796,7 +1880,7 @@ export default function AIDataIngestionSearch() {
       )}
 
       {/* Standard autocomplete dropdown — for QUERY and other text intents */}
-      {showAutocomplete && autocompleteResults.length > 0 && currentIntent !== 'EXACT_URL' && currentIntent !== 'EXACT_VIN' && !(currentIntent === 'BROWSE' && (makeStats || makeStatsLoading)) && (
+      {input.trim().length >= 2 && showAutocomplete && autocompleteResults.length > 0 && currentIntent !== 'EXACT_URL' && currentIntent !== 'EXACT_VIN' && !(currentIntent === 'BROWSE' && (makeStats || makeStatsLoading)) && (
         <div
           style={{
             position: 'absolute',

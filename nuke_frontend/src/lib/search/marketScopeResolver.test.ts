@@ -249,4 +249,37 @@ describe('marketScopeResolver', () => {
     expect(getDefinedFamilyEras('Rolls-Royce', '20/25').map((e) => e.shortLabel)).toEqual(['20 HP', '20/25 HP', '25/30 HP']);
     expect(getDefinedFamilyEras('Citroën', 'DS').map((e) => e.shortLabel)).toEqual(["'55–'62", "'63–'67", "'68–'75"]);
   });
+
+  it('resolves collapsed compound family names like "roadrunner" to the canonical family without a collapsed sub-model', async () => {
+    mockRows.data = [
+      {
+        brand: 'Plymouth',
+        family_key: '203ad02b-f9e5-4bfd-9ac9-3b0cafe1ea7d',
+        family: 'Road Runner',
+        model_key: 'road runner',
+        model: 'Road Runner',
+        sold: 343,
+        usd: 22600000,
+      },
+      {
+        brand: 'Plymouth',
+        family_key: '203ad02b-f9e5-4bfd-9ac9-3b0cafe1ea7d',
+        family: 'Road Runner',
+        model_key: 'roadrunner',
+        model: 'roadrunner',
+        sold: 2,
+        usd: 45000,
+      },
+    ];
+    expect(await resolveMarketScopeQuery('roadrunner')).toEqual({
+      make: 'Plymouth',
+      family: '203ad02b-f9e5-4bfd-9ac9-3b0cafe1ea7d',
+      family_name: 'Road Runner',
+    });
+    expect(await resolveMarketScopeQuery('plymouth roadrunner')).toEqual({
+      make: 'Plymouth',
+      family: '203ad02b-f9e5-4bfd-9ac9-3b0cafe1ea7d',
+      family_name: 'Road Runner',
+    });
+  });
 });

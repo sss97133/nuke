@@ -123,6 +123,29 @@
   flex-shrink: 0;
 }
 
+.header-session .header-theme-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 24px !important;
+  padding: 0 7px !important;
+  border: 1px solid var(--border);
+  background: var(--bg);
+  color: var(--text-secondary);
+  font-family: var(--font-mono);
+  font-size: var(--fs-8) !important;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.header-session .header-theme-btn:hover {
+  color: var(--text);
+  border-color: var(--text);
+}
+
 /* ============================================================================
    USER AREA
    ============================================================================ */

@@ -611,6 +611,27 @@ const CULTURAL_SCOPE_ALIASES: Array<{
     make: 'Cushman',
     familyHint: 'Eagle',
   },
+  {
+    pattern: /\b((?:plymouth\s+)?hemi\s+road\s*runner)\b/i,
+    make: 'Plymouth',
+    familyHint: 'Road Runner',
+    modelHint: 'Hemi Road Runner',
+  },
+  {
+    pattern: /\b((?:plymouth\s+)?road\s*runner)\b/i,
+    make: 'Plymouth',
+    familyHint: 'Road Runner',
+  },
+  {
+    pattern: /\b((?:plymouth\s+)?(?:hemi\s+)?(?:'?cuda|barracuda))\b/i,
+    make: 'Plymouth',
+    familyHint: 'Barracuda',
+  },
+  {
+    pattern: /\b((?:plymouth\s+)?superbird)\b/i,
+    make: 'Plymouth',
+    familyHint: 'Superbird',
+  },
 ];
 
 // Words that indicate a natural-language filter query rather than a market scope drill
@@ -645,6 +666,28 @@ export function buildMarketScopeUrl(scope: ResolvedMarketScope, currentSearch = 
  * "corvette", "squarebody", "73-87 gm trucks", "porsche 911 gt3") to a Market URL scope.
  * Returns null if the query is a complex filter query or does not match any known brand/family.
  */
+export function resolveSynchronousMarketAlias(rawQuery: string): ResolvedMarketScope | null {
+  const q = rawQuery.trim();
+  if (!q || q.length > 80 || NL_FILTER_WORDS.test(q)) return null;
+  let year: number | undefined;
+  const yearMatch = q.match(/(?:^|\s)((?:19[0-9]{2}|20[0-2][0-9]))(?:\s|$)/);
+  if (yearMatch) {
+    year = parseInt(yearMatch[1], 10);
+  }
+  for (const alias of CULTURAL_SCOPE_ALIASES) {
+    if (alias.pattern.test(q)) {
+      return {
+        make: alias.make,
+        family_name: alias.familyHint,
+        model: alias.modelHint ?? alias.familyHint,
+        ...(alias.era ? { era: alias.era } : {}),
+        ...(year ? { year } : {}),
+      };
+    }
+  }
+  return null;
+}
+
 export async function resolveMarketScopeQuery(rawQuery: string): Promise<ResolvedMarketScope | null> {
   const q = rawQuery.trim();
   if (!q || q.length > 80) return null;
@@ -736,9 +779,12 @@ async function lookupFamilyInMarket(
     if (make) {
       query = query.eq('brand', make);
     }
+    const normKey = (s: string) => s.toLowerCase().replace(/[\s\-_]+/g, '');
+    const cleanNorm = normKey(cleanTerm);
     const firstWord = cleanTerm.split(/[\s-]+/)[0];
     if (firstWord && firstWord.length >= 2) {
-      query = query.ilike('model_key', `%${firstWord}%`);
+      const searchPrefix = !cleanTerm.includes(' ') && firstWord.length >= 7 ? firstWord.slice(0, 4) : firstWord;
+      query = query.ilike('model_key', `%${searchPrefix}%`);
     }
 
     const { data, error } = await Promise.resolve(query);
@@ -762,10 +808,12 @@ async function lookupFamilyInMarket(
       if (!r.family || !r.family_key || r.family_key === 'other') continue;
       const famLower = r.family.toLowerCase();
       const modLower = (r.model_key || r.model || '').toLowerCase();
-      const isExactFamily = famLower === cleanTerm;
-      const isExactModel = modLower === cleanTerm;
-      const isFamilyPrefix = cleanTerm.startsWith(`${famLower} `) || cleanTerm.startsWith(`${famLower}-`);
-      const isModelMatch = modLower.includes(cleanTerm) || cleanTerm.includes(famLower);
+      const famNorm = normKey(famLower);
+      const modNorm = normKey(modLower);
+      const isExactFamily = famLower === cleanTerm || (cleanNorm.length >= 3 && famNorm === cleanNorm);
+      const isExactModel = !isExactFamily && (modLower === cleanTerm || (cleanNorm.length >= 3 && modNorm === cleanNorm));
+      const isFamilyPrefix = cleanTerm.startsWith(`${famLower} `) || cleanTerm.startsWith(`${famLower}-`) || (famNorm.length >= 3 && cleanNorm.startsWith(famNorm) && cleanNorm !== famNorm);
+      const isModelMatch = modLower.includes(cleanTerm) || cleanTerm.includes(famLower) || (cleanNorm.length >= 4 && (modNorm.includes(cleanNorm) || cleanNorm.includes(famNorm)));
 
       if (!isExactFamily && !isExactModel && !isFamilyPrefix && !isModelMatch) continue;
 
@@ -782,7 +830,7 @@ async function lookupFamilyInMarket(
       prev.totalUsd += Number(r.usd) || 0;
       if (isExactFamily) prev.exactFamily = true;
       if (isExactModel && r.model) prev.exactModel = r.model;
-      else if (isFamilyPrefix && modLower.includes(cleanTerm) && r.model && !prev.prefixModel) {
+      else if (isFamilyPrefix && (modLower.includes(cleanTerm) || modNorm.includes(cleanNorm)) && r.model && !prev.prefixModel) {
         prev.prefixModel = r.model;
       }
       families.set(key, prev);
@@ -799,7 +847,9 @@ async function lookupFamilyInMarket(
     }
 
     // If the user typed a sub-model ("mustang mach 1", "911 gt3") or a specific year ("1967 mustang"), include model
-    const subModel = explicitModelHint && explicitModelHint.toLowerCase() !== best.familyName.toLowerCase()
+    const explicitDiffersFromFamily =
+      explicitModelHint && normKey(explicitModelHint) !== normKey(best.familyName);
+    const subModel = explicitDiffersFromFamily
       ? explicitModelHint
       : !best.exactFamily
         ? (best.exactModel ?? best.prefixModel ?? undefined)

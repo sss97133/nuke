@@ -21,7 +21,9 @@ const pg = require('pg');
 const fs = require('fs');
 const path = require('path');
 
-const DATA_DIR = path.join(__dirname, 'data', 'mecum-algolia');
+const DATA_DIR = fs.existsSync(path.join(__dirname, 'data', 'mecum-algolia'))
+  ? path.join(__dirname, 'data', 'mecum-algolia')
+  : '/Users/skylar/nuke/scripts/data/mecum-algolia';
 fs.mkdirSync(DATA_DIR, { recursive: true });
 
 const args = process.argv.slice(2);
@@ -33,8 +35,8 @@ const ALGOLIA_API_KEY = '0291c46cde807bcb428a021a96138fcb';
 const INDEX_NAME = 'wp_posts_lot';
 
 const client = new pg.Client({
-  connectionString: `postgresql://postgres.qkgaybvrernstplzjaam:${process.env.SUPABASE_DB_PASSWORD}@aws-0-us-west-1.pooler.supabase.com:6543/postgres`,
-  statement_timeout: 55000,
+  connectionString: `postgresql://postgres.qkgaybvrernstplzjaam:${process.env.SUPABASE_DB_PASSWORD}@aws-0-us-west-1.pooler.supabase.com:5432/postgres`,
+  statement_timeout: 300000,
 });
 
 // ── Mecum event city → GPS mapping ──
@@ -282,133 +284,321 @@ async function enrichFromSaved() {
   }
   console.log(`  Loaded ${lots.length.toLocaleString()} lots from ${eventFiles.length} event files`);
 
-  // Build permalink → lot data map
+  // Build permalink / lot code → lot data map (case-insensitive)
+  const normLotPath = (u) => {
+    if (!u) return '';
+    const m = String(u).toLowerCase().match(/\/lots\/([^/?#]+)(?:\/([^/?#]+))?/);
+    return m ? (m[2] ? `${m[1]}/${m[2]}` : m[1]) : '';
+  };
+
+  const parseSaleDate = (lot) => {
+    const runDate = lot.taxonomies?.run_date?.[0]?.name;
+    if (runDate && /^\d{4}-\d{2}-\d{2}/.test(runDate)) return runDate.slice(0, 10);
+    if (lot.auction_day_start_meta && /^\d{4}-\d{2}-\d{2}/.test(lot.auction_day_start_meta)) return lot.auction_day_start_meta.slice(0, 10);
+    if (typeof lot.auction_end_date_meta === 'number' && lot.auction_end_date_meta > 0) {
+      return new Date(lot.auction_end_date_meta * 1000).toISOString().slice(0, 10);
+    }
+    return null;
+  };
+
   const lotMap = new Map();
   for (const lot of lots) {
     if (lot.permalink) {
-      // Normalize: /lots/NNNN/description/ → mecum.com/lots/NNNN/description
-      const url = 'https://mecum.com' + lot.permalink.replace(/\/$/, '');
-      lotMap.set(url, lot);
-      // Also store by lot ID for matching
-      const lotId = lot.permalink.match(/\/lots\/(\d+)\//);
-      if (lotId) lotMap.set(lotId[1], lot);
+      const p = normLotPath(lot.permalink);
+      if (p) lotMap.set(p, lot);
+      const firstSeg = p.split('/')[0];
+      if (firstSeg) lotMap.set(firstSeg, lot);
+    }
+    if (lot.web_id_meta) {
+      lotMap.set(String(lot.web_id_meta).toLowerCase(), lot);
     }
   }
   console.log(`  Indexed ${lotMap.size.toLocaleString()} entries`);
 
-  // Load Mecum vehicles
+  // Load Mecum vehicles in a single sequential scan (much faster than 28 pkey range scans)
   console.log('  Loading Mecum vehicles...');
-  const vehicles = [];
-  let lastId = '00000000-0000-0000-0000-000000000000';
-  while (true) {
-    const r = await client.query(`
-      SELECT id, listing_url, year, make, model, sale_price, gps_latitude,
-             listing_location, vin, title, status, mileage
-      FROM vehicles
-      WHERE auction_source = 'mecum' AND deleted_at IS NULL
-        AND id > $1
-      ORDER BY id LIMIT 5000
-    `, [lastId]);
-    if (r.rows.length === 0) break;
-    vehicles.push(...r.rows);
-    lastId = r.rows[r.rows.length - 1].id;
-  }
-  console.log(`  Mecum vehicles: ${vehicles.length.toLocaleString()}`);
+  const rLoad = await client.query(`
+    SELECT id, listing_url, discovery_url, year, make, model, sale_price, sale_status, sale_date,
+           primary_image_url, image_count, color, interior_color, transmission, description,
+           gps_latitude, listing_location, vin, title, status, mileage, user_id, created_at
+    FROM vehicles
+    WHERE auction_source = 'mecum' AND deleted_at IS NULL
+  `);
+  const allVehicles = rLoad.rows;
+  console.log(`  Mecum vehicles loaded: ${allVehicles.length.toLocaleString()}`);
 
-  // Match and update
-  let updated = 0, matched = 0, gpsFixed = 0, priceFixed = 0;
+  // ── Phase 1.5: Deduplicate Mecum vehicles sharing the same canonical lot key ──
+  const byLotKey = new Map();
+  for (const v of allVehicles) {
+    const rawUrl = v.listing_url || v.discovery_url;
+    if (!rawUrl) continue;
+    const p = normLotPath(rawUrl);
+    const k = p ? p.split('/')[0] : null;
+    if (!k) continue;
+    let group = byLotKey.get(k);
+    if (!group) {
+      group = [];
+      byLotKey.set(k, group);
+    }
+    group.push(v);
+  }
+
+  const scoreVehicle = (v) =>
+    (v.user_id ? 1000 : 0) +
+    (Math.min(v.image_count || 0, 50) * 2) +
+    (v.sale_status === 'sold' && v.sale_price > 0 ? 10 : 0) +
+    (v.primary_image_url ? 4 : 0) +
+    (v.listing_url ? 2 : 0) +
+    (v.discovery_url ? 2 : 0) +
+    (v.sale_date ? 2 : 0) +
+    (v.vin ? 2 : 0) +
+    (v.description ? 1 : 0);
+
+  const mergedDupIds = new Set();
+  const mergePairs = [];
+  let dupGroupsCount = 0, mergedCount = 0;
+  for (const [, group] of byLotKey.entries()) {
+    if (group.length < 2) continue;
+    dupGroupsCount++;
+    group.sort((a, b) => {
+      const diff = scoreVehicle(b) - scoreVehicle(a);
+      if (diff !== 0) return diff;
+      return new Date(a.created_at) - new Date(b.created_at);
+    });
+    const primary = group[0];
+    for (let i = 1; i < group.length; i++) {
+      const dup = group[i];
+      if (primary.user_id || dup.user_id) continue; // Gate 2: never auto-merge user-owned vehicles
+      mergePairs.push({ primary, dup });
+    }
+  }
+  console.log(`  Found ${mergePairs.length.toLocaleString()} duplicate Mecum pairs across ${dupGroupsCount.toLocaleString()} lot groups`);
+
+  const MERGE_BATCH = 100;
+  for (let i = 0; i < mergePairs.length; i += MERGE_BATCH) {
+    const chunk = mergePairs.slice(i, i + MERGE_BATCH);
+    try {
+      const res = await client.query(
+        `SELECT merge_into_primary_batch($1::uuid[], $2::uuid[]) AS r`,
+        [chunk.map(c => c.primary.id), chunk.map(c => c.dup.id)]
+      );
+      const r = res.rows[0]?.r;
+      const dupsMerged = r?.merged_dup_ids || [];
+      const byDup = new Map(chunk.map(c => [c.dup.id, c]));
+      for (const dId of dupsMerged) {
+        mergedDupIds.add(dId);
+        mergedCount++;
+        const pair = byDup.get(dId);
+        if (pair) {
+          const { primary, dup } = pair;
+          if (!primary.listing_url && dup.listing_url) primary.listing_url = dup.listing_url;
+          if (!primary.discovery_url && dup.discovery_url) primary.discovery_url = dup.discovery_url;
+          if (!primary.primary_image_url && dup.primary_image_url) primary.primary_image_url = dup.primary_image_url;
+          if (!primary.sale_date && dup.sale_date) primary.sale_date = dup.sale_date;
+        }
+      }
+      if ((i + MERGE_BATCH) % 1000 === 0 || i + MERGE_BATCH >= mergePairs.length) {
+        console.log(`  Merged ${mergedCount.toLocaleString()}/${mergePairs.length.toLocaleString()} duplicate Mecum vehicles...`);
+      }
+    } catch (e) {
+      console.log(`  Batch merge warning at ${i}: ${e.message}`);
+    }
+  }
+  console.log(`  Mecum dedup complete: ${mergedCount.toLocaleString()} duplicate rows merged across ${dupGroupsCount.toLocaleString()} lot groups`);
+
+  const vehicles = allVehicles.filter(v => !mergedDupIds.has(v.id));
+
+  // Match and batch-update
+  let updated = 0, matched = 0, gpsFixed = 0, priceFixed = 0, imgFixed = 0, dateFixed = 0;
+  const pendingUpdates = [];
+  const usedListingUrls = new Set();
+  for (const v of vehicles) {
+    if (v.listing_url) usedListingUrls.add(v.listing_url);
+  }
+
+  const flushBatch = async (batch) => {
+    if (batch.length === 0) return;
+    await client.query(`
+      WITH locked AS (
+        SELECT id FROM vehicles WHERE id = ANY($1::uuid[]) FOR UPDATE SKIP LOCKED
+      )
+      UPDATE vehicles AS v SET
+        listing_url = COALESCE(v.listing_url, CASE
+          WHEN u.listing_url IS NOT NULL AND NOT EXISTS (
+            SELECT 1 FROM vehicles v2 WHERE v2.listing_url = u.listing_url AND v2.deleted_at IS NULL AND v2.id <> v.id
+          ) THEN u.listing_url
+          ELSE NULL
+        END),
+        sale_date = COALESCE(v.sale_date, u.sale_date::date),
+        primary_image_url = COALESCE(v.primary_image_url, u.primary_image_url),
+        color = COALESCE(v.color, u.color),
+        interior_color = COALESCE(v.interior_color, u.interior_color),
+        transmission = COALESCE(v.transmission, u.transmission),
+        description = COALESCE(v.description, u.description),
+        gps_latitude = COALESCE(v.gps_latitude, u.gps_lat::double precision),
+        gps_longitude = COALESCE(v.gps_longitude, u.gps_lng::double precision),
+        listing_location = COALESCE(v.listing_location, u.listing_location),
+        year = COALESCE(v.year, u.year::int),
+        make = COALESCE(NULLIF(v.make, ''), u.make),
+        model = COALESCE(NULLIF(v.model, ''), u.model),
+        title = COALESCE(NULLIF(v.title, ''), u.title),
+        listing_title = COALESCE(NULLIF(v.listing_title, ''), u.title),
+        status = CASE WHEN v.status = 'pending_backfill' THEN 'active' ELSE v.status END
+      FROM UNNEST(
+        $1::uuid[],
+        $2::text[],
+        $3::text[],
+        $4::text[],
+        $5::text[],
+        $6::text[],
+        $7::text[],
+        $8::text[],
+        $9::double precision[],
+        $10::double precision[],
+        $11::text[],
+        $12::int[],
+        $13::text[],
+        $14::text[],
+        $15::text[]
+      ) AS u(
+        id, listing_url, sale_date, primary_image_url, color, interior_color,
+        transmission, description, gps_lat, gps_lng, listing_location,
+        year, make, model, title
+      )
+      JOIN locked l ON l.id = u.id
+      WHERE v.id = l.id
+    `, [
+      batch.map(b => b.id),
+      batch.map(b => b.listing_url),
+      batch.map(b => b.sale_date),
+      batch.map(b => b.primary_image_url),
+      batch.map(b => b.color),
+      batch.map(b => b.interior_color),
+      batch.map(b => b.transmission),
+      batch.map(b => b.description),
+      batch.map(b => b.gps_lat),
+      batch.map(b => b.gps_lng),
+      batch.map(b => b.listing_location),
+      batch.map(b => b.year),
+      batch.map(b => b.make),
+      batch.map(b => b.model),
+      batch.map(b => b.title),
+    ]);
+  };
+
   for (const vehicle of vehicles) {
     let lot = null;
+    const rawUrl = vehicle.listing_url || vehicle.discovery_url;
 
-    if (vehicle.listing_url) {
-      // Try exact URL match
-      const normalUrl = vehicle.listing_url.replace(/\/$/, '');
-      lot = lotMap.get(normalUrl);
-
-      // Try by lot ID
-      if (!lot) {
-        const lotId = vehicle.listing_url.match(/lots\/(\d+)/);
-        if (lotId) lot = lotMap.get(lotId[1]);
+    if (rawUrl) {
+      const p = normLotPath(rawUrl);
+      if (p) lot = lotMap.get(p);
+      if (!lot && p) {
+        const firstSeg = p.split('/')[0];
+        if (firstSeg) lot = lotMap.get(firstSeg);
       }
     }
 
     if (!lot) continue;
     matched++;
 
-    const sets = [];
-    const vals = [vehicle.id];
-    let paramIdx = 2;
+    const rawCanonicalUrl = lot.permalink ? `https://www.mecum.com${lot.permalink}` : rawUrl;
+    let canonicalUrl = null;
+    if (!vehicle.listing_url && rawCanonicalUrl && !usedListingUrls.has(rawCanonicalUrl)) {
+      canonicalUrl = rawCanonicalUrl;
+      usedListingUrls.add(rawCanonicalUrl);
+    }
+    const saleDate = parseSaleDate(lot);
+    const firstImg = lot.images_meta?.[0]?.url || null;
 
-    // GPS from auction event
+    let desc = null;
+    if (!vehicle.description) {
+      const auctionRaw = lot.taxonomies?.auction_tax?.[0]?.name || '';
+      const auctionName = auctionRaw ? auctionRaw.split('|')[0].trim() : null;
+      const collectionRaw = lot.taxonomies?.collection_tax?.[0]?.name || '';
+      const collectionName = collectionRaw ? collectionRaw.split('|')[0].replace(/&amp;/g, '&').trim() : null;
+      const lotNumber = lot.lot_number_meta || null;
+      const seriesSpecs = lot.lot_series_meta || null;
+      const descParts = [
+        lot.post_title,
+        seriesSpecs ? `Highlights: ${seriesSpecs}.` : null,
+        auctionName ? `Offered at Mecum ${auctionName}${lotNumber ? ` (Lot ${lotNumber})` : ''}.` : null,
+        collectionName ? `Collection: ${collectionName}.` : null,
+      ].filter(Boolean);
+      if (descParts.length > 1) desc = descParts.join(' ');
+    }
+
+    let gpsLat = null, gpsLng = null, city = null;
     if (!vehicle.gps_latitude) {
       const auctionTax = lot.taxonomies?.auction_tax?.[0]?.name;
-      const city = extractCity(auctionTax);
-      if (city) {
-        const gps = CITY_GPS[city];
-        if (gps) {
-          sets.push(`gps_latitude = $${paramIdx}`); vals.push(gps[0]); paramIdx++;
-          sets.push(`gps_longitude = $${paramIdx}`); vals.push(gps[1]); paramIdx++;
-          sets.push(`listing_location = COALESCE(listing_location, $${paramIdx})`); vals.push(city); paramIdx++;
-          gpsFixed++;
-        }
+      city = extractCity(auctionTax);
+      if (city && CITY_GPS[city]) {
+        gpsLat = CITY_GPS[city][0];
+        gpsLng = CITY_GPS[city][1];
       }
     }
 
-    // Price
-    if ((!vehicle.sale_price || vehicle.sale_price === 0) && lot.highest_bid_or_price > 0) {
-      sets.push(`sale_price = $${paramIdx}`); vals.push(lot.highest_bid_or_price); paramIdx++;
-      priceFixed++;
-    }
+    const yearTax = lot.taxonomies?.lot_year?.[0]?.name;
+    const parsedYear = yearTax ? parseInt(yearTax, 10) : null;
+    const makeTax = lot.taxonomies?.make?.[0]?.name || null;
+    const modelTax = lot.taxonomies?.model?.[0]?.name || null;
+    const titleVal = lot.post_title || null;
 
-    // Year
-    if (!vehicle.year) {
-      const yearTax = lot.taxonomies?.lot_year?.[0]?.name;
-      if (yearTax) {
-        sets.push(`year = $${paramIdx}`); vals.push(parseInt(yearTax)); paramIdx++;
-      }
-    }
+    const needsUpdate =
+      (!vehicle.listing_url && canonicalUrl) ||
+      (!vehicle.sale_date && saleDate) ||
+      (!vehicle.primary_image_url && firstImg) ||
+      (!vehicle.color && lot.color_meta) ||
+      (!vehicle.interior_color && lot.interior_meta) ||
+      (!vehicle.transmission && lot.transmission_type_meta) ||
+      (!vehicle.description && desc) ||
+      (!vehicle.gps_latitude && gpsLat !== null) ||
+      (!vehicle.year && parsedYear) ||
+      (!vehicle.make && makeTax) ||
+      (!vehicle.model && modelTax) ||
+      (!vehicle.title && titleVal) ||
+      vehicle.status === 'pending_backfill';
 
-    // Make
-    if (!vehicle.make || vehicle.make === '') {
-      const makeTax = lot.taxonomies?.make?.[0]?.name;
-      if (makeTax) {
-        sets.push(`make = $${paramIdx}`); vals.push(makeTax); paramIdx++;
-      }
-    }
+    if (!needsUpdate) continue;
 
-    // Model
-    if (!vehicle.model || vehicle.model === '') {
-      const modelTax = lot.taxonomies?.model?.[0]?.name;
-      if (modelTax) {
-        sets.push(`model = $${paramIdx}`); vals.push(modelTax); paramIdx++;
-      }
-    }
+    if (!vehicle.sale_date && saleDate) dateFixed++;
+    if (!vehicle.primary_image_url && firstImg) imgFixed++;
+    if (!vehicle.gps_latitude && gpsLat !== null) gpsFixed++;
 
-    // Title
-    if ((!vehicle.title || vehicle.title === '') && lot.post_title) {
-      sets.push(`title = $${paramIdx}`); vals.push(lot.post_title); paramIdx++;
-      sets.push(`listing_title = $${paramIdx}`); vals.push(lot.post_title); paramIdx++;
-    }
+    pendingUpdates.push({
+      id: vehicle.id,
+      listing_url: canonicalUrl || null,
+      sale_date: saleDate || null,
+      primary_image_url: firstImg || null,
+      color: lot.color_meta || null,
+      interior_color: lot.interior_meta || null,
+      transmission: lot.transmission_type_meta || null,
+      description: desc || null,
+      gps_lat: gpsLat,
+      gps_lng: gpsLng,
+      listing_location: city || null,
+      year: Number.isFinite(parsedYear) ? parsedYear : null,
+      make: makeTax,
+      model: modelTax,
+      title: titleVal,
+    });
+    updated++;
 
-    // Promote pending_backfill
-    if (vehicle.status === 'pending_backfill') {
-      sets.push(`status = $${paramIdx}`); vals.push('active'); paramIdx++;
+    if (pendingUpdates.length >= 1000) {
+      await flushBatch(pendingUpdates.splice(0, pendingUpdates.length));
+      console.log(`  Updated ${updated.toLocaleString()} (img: ${imgFixed.toLocaleString()}, date: ${dateFixed.toLocaleString()}, GPS: ${gpsFixed.toLocaleString()})`);
     }
+  }
 
-    if (sets.length > 0) {
-      await client.query(`UPDATE vehicles SET ${sets.join(', ')} WHERE id = $1`, vals);
-      updated++;
-    }
-
-    if (updated % 2000 === 0 && updated > 0) {
-      console.log(`  Updated ${updated.toLocaleString()} (GPS: ${gpsFixed}, price: ${priceFixed})`);
-      await sleep(50);
-    }
+  if (pendingUpdates.length > 0) {
+    await flushBatch(pendingUpdates.splice(0, pendingUpdates.length));
   }
 
   console.log(`\n  Enrichment complete:`);
   console.log(`    Matched: ${matched.toLocaleString()}`);
   console.log(`    Updated: ${updated.toLocaleString()}`);
+  console.log(`    Images fixed: ${imgFixed.toLocaleString()}`);
+  console.log(`    Sale dates fixed: ${dateFixed.toLocaleString()}`);
   console.log(`    GPS fixed: ${gpsFixed.toLocaleString()}`);
   console.log(`    Price fixed: ${priceFixed.toLocaleString()}`);
 }
@@ -450,15 +640,17 @@ async function enrichByYearMakePrice() {
 
   console.log(`  Built ${keyMap.size.toLocaleString()} unique year+make+price keys (${dupeKeys.size.toLocaleString()} dupes excluded)`);
 
-  // Load URL-less Mecum vehicles without GPS
+  // Load URL-less Mecum vehicles or vehicles missing images/dates
   const vehicles = [];
   let lastId = '00000000-0000-0000-0000-000000000000';
   while (true) {
     const r = await client.query(`
-      SELECT id, year, make, sale_price, gps_latitude, listing_url, listing_location
+      SELECT id, year, make, sale_price, sale_date, primary_image_url,
+             color, interior_color, transmission, description,
+             gps_latitude, listing_url, discovery_url, listing_location
       FROM vehicles
       WHERE auction_source = 'mecum' AND deleted_at IS NULL
-        AND listing_url IS NULL AND gps_latitude IS NULL
+        AND (listing_url IS NULL OR primary_image_url IS NULL OR sale_date IS NULL)
         AND id > $1
       ORDER BY id LIMIT 5000
     `, [lastId]);
@@ -466,9 +658,9 @@ async function enrichByYearMakePrice() {
     vehicles.push(...r.rows);
     lastId = r.rows[r.rows.length - 1].id;
   }
-  console.log(`  URL-less vehicles without GPS: ${vehicles.length.toLocaleString()}`);
+  console.log(`  Vehicles missing URL/image/date: ${vehicles.length.toLocaleString()}`);
 
-  let matched = 0, gpsFixed = 0, urlFixed = 0;
+  let matched = 0, gpsFixed = 0, urlFixed = 0, imgFixed = 0, dateFixed = 0;
   for (const vehicle of vehicles) {
     if (!vehicle.year || !vehicle.make || !vehicle.sale_price) continue;
 
@@ -482,42 +674,105 @@ async function enrichByYearMakePrice() {
     let paramIdx = 2;
 
     // GPS from auction event
-    const auctionTax = lot.taxonomies?.auction_tax?.[0]?.name;
-    const city = extractCity(auctionTax);
-    if (city) {
-      const gps = CITY_GPS[city];
-      if (gps) {
-        sets.push(`gps_latitude = $${paramIdx}`); vals.push(gps[0]); paramIdx++;
-        sets.push(`gps_longitude = $${paramIdx}`); vals.push(gps[1]); paramIdx++;
-        sets.push(`listing_location = COALESCE(listing_location, $${paramIdx})`); vals.push(city); paramIdx++;
-        gpsFixed++;
+    if (!vehicle.gps_latitude) {
+      const auctionTax = lot.taxonomies?.auction_tax?.[0]?.name;
+      const city = extractCity(auctionTax);
+      if (city) {
+        const gps = CITY_GPS[city];
+        if (gps) {
+          sets.push(`gps_latitude = $${paramIdx}`); vals.push(gps[0]); paramIdx++;
+          sets.push(`gps_longitude = $${paramIdx}`); vals.push(gps[1]); paramIdx++;
+          sets.push(`listing_location = COALESCE(listing_location, $${paramIdx})`); vals.push(city); paramIdx++;
+          gpsFixed++;
+        }
       }
     }
 
-    // Add listing_url from permalink
+    // Add listing_url / discovery_url from permalink
     if (lot.permalink) {
-      const url = 'https://www.mecum.com' + lot.permalink.replace(/\/$/, '');
-      sets.push(`listing_url = $${paramIdx}`); vals.push(url); paramIdx++;
-      urlFixed++;
+      const url = 'https://www.mecum.com' + lot.permalink;
+      if (!vehicle.listing_url) {
+        sets.push(`listing_url = $${paramIdx}`); vals.push(url); paramIdx++;
+        urlFixed++;
+      }
+      if (!vehicle.discovery_url) {
+        sets.push(`discovery_url = $${paramIdx}`); vals.push(url); paramIdx++;
+      }
+    }
+
+    // Sale date
+    const runDate = lot.taxonomies?.run_date?.[0]?.name;
+    const saleDate = (runDate && /^\d{4}-\d{2}-\d{2}/.test(runDate))
+      ? runDate.slice(0, 10)
+      : (typeof lot.auction_end_date_meta === 'number' && lot.auction_end_date_meta > 0
+          ? new Date(lot.auction_end_date_meta * 1000).toISOString().slice(0, 10)
+          : null);
+    if (!vehicle.sale_date && saleDate) {
+      sets.push(`sale_date = $${paramIdx}`); vals.push(saleDate); paramIdx++;
+      dateFixed++;
+    }
+
+    // Primary image
+    const firstImg = lot.images_meta?.[0]?.url || null;
+    if (!vehicle.primary_image_url && firstImg) {
+      sets.push(`primary_image_url = $${paramIdx}`); vals.push(firstImg); paramIdx++;
+      imgFixed++;
+    }
+
+    // Color / interior / transmission
+    if (!vehicle.color && lot.color_meta) {
+      sets.push(`color = $${paramIdx}`); vals.push(lot.color_meta); paramIdx++;
+    }
+    if (!vehicle.interior_color && lot.interior_meta) {
+      sets.push(`interior_color = $${paramIdx}`); vals.push(lot.interior_meta); paramIdx++;
+    }
+    if (!vehicle.transmission && lot.transmission_type_meta) {
+      sets.push(`transmission = $${paramIdx}`); vals.push(lot.transmission_type_meta); paramIdx++;
+    }
+
+    // Description
+    if (!vehicle.description) {
+      const auctionRaw = lot.taxonomies?.auction_tax?.[0]?.name || '';
+      const auctionName = auctionRaw ? auctionRaw.split('|')[0].trim() : null;
+      const collectionRaw = lot.taxonomies?.collection_tax?.[0]?.name || '';
+      const collectionName = collectionRaw ? collectionRaw.split('|')[0].replace(/&amp;/g, '&').trim() : null;
+      const lotNumber = lot.lot_number_meta || null;
+      const seriesSpecs = lot.lot_series_meta || null;
+      const descParts = [
+        lot.post_title,
+        seriesSpecs ? `Highlights: ${seriesSpecs}.` : null,
+        auctionName ? `Offered at Mecum ${auctionName}${lotNumber ? ` (Lot ${lotNumber})` : ''}.` : null,
+        collectionName ? `Collection: ${collectionName}.` : null,
+      ].filter(Boolean);
+      if (descParts.length > 1) {
+        sets.push(`description = $${paramIdx}`); vals.push(descParts.join(' ')); paramIdx++;
+      }
     }
 
     if (sets.length > 0) {
-      await client.query(`UPDATE vehicles SET ${sets.join(', ')} WHERE id = $1`, vals);
+      try {
+        await client.query(`UPDATE vehicles SET ${sets.join(', ')} WHERE id = $1`, vals);
+      } catch (e) {
+        if (e.code !== '23505') throw e;
+      }
     }
 
     if (matched % 2000 === 0 && matched > 0) {
-      console.log(`  Matched ${matched.toLocaleString()} (GPS: ${gpsFixed}, URLs: ${urlFixed})`);
+      console.log(`  Matched ${matched.toLocaleString()} (GPS: ${gpsFixed}, URLs: ${urlFixed}, img: ${imgFixed}, date: ${dateFixed})`);
     }
   }
 
   console.log(`\n  Phase 3 complete:`);
   console.log(`    Matched: ${matched.toLocaleString()}`);
+  console.log(`    Images fixed: ${imgFixed.toLocaleString()}`);
+  console.log(`    Sale dates fixed: ${dateFixed.toLocaleString()}`);
   console.log(`    GPS fixed: ${gpsFixed.toLocaleString()}`);
   console.log(`    URLs added: ${urlFixed.toLocaleString()}`);
 }
 
 async function run() {
   await client.connect();
+  await client.query("SET statement_timeout = '300s'");
 
   if (!ENRICH_ONLY) {
     await downloadAll();
