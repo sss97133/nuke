@@ -14,7 +14,7 @@ vi.mock('./profileDocument', async (original) => {
 vi.mock('../stacks/VehicleCohort', () => ({ VehiclePerformance: ({ facet }: any) => <div>performance stack for {facet.label}</div> }));
 vi.mock('../../hooks/useIsMobile', () => ({ useIsMobile: () => false }));
 vi.mock('../../components/PrefetchLink', () => ({ PrefetchLink: ({ to, children }: any) => <a href={to}>{children}</a> }));
-import ProfileHeader from './ProfileHeader';
+import ProfileHeader, { comparableLotKey, extractInlineLotProvenance } from './ProfileHeader';
 
 if (!('ResizeObserver' in globalThis)) {
   (globalThis as any).ResizeObserver = class { observe() {} unobserve() {} disconnect() {} };
@@ -104,4 +104,51 @@ it('renders nothing until the read answers', () => {
   fixture.read = null;
   render();
   expect(host.querySelector('.vp-header-sticky')).toBeNull();
+});
+
+it('normalizes Mecum lot URLs and extracts inline lot provenance from description or provenance_metadata', () => {
+  expect(comparableLotKey('https://www.mecum.com/lots/FL23-539536/1970-plymouth-road-runner/')).toBe('mecum:539536');
+  expect(comparableLotKey('https://mecum.com/lots/539536/1970-plymouth-road-runner')).toBe('mecum:539536');
+  expect(comparableLotKey('https://mecum.com/lots/371524/1971-plymouth-road-runner-rapid-transit')).toBe('mecum:371524');
+
+  expect(extractInlineLotProvenance({
+    description: '1970 Plymouth Road Runner Highlights: Matching Numbers 383 CI V-8. Offered at Mecum Kissimmee 2023 (Lot F142.1).',
+  })).toEqual({
+    lotNumber: 'F142.1',
+    auctionName: 'Kissimmee 2023',
+  });
+
+  expect(extractInlineLotProvenance({
+    provenance_metadata: { mec_lot_number: 'F130', mec_auction_name: 'Indy 2019' },
+  })).toEqual({
+    lotNumber: 'F130',
+    auctionName: 'Indy 2019',
+  });
+});
+
+it('enriches price claim popover with inline Mecum lot and auction provenance when event rows are absent', () => {
+  const read = mustangRead();
+  const masthead = read.sections[0];
+  if (masthead.kind === 'masthead' && masthead.price) {
+    masthead.price = {
+      ...masthead.price,
+      value: 236500,
+      source: { kind: 'listing', url: 'https://mecum.com/lots/371524/1971-plymouth-road-runner-rapid-transit', label: 'Mecum', method: 'sold' },
+      observed_at: '2019-05-17T00:00:00+00:00',
+    };
+  }
+  fixture.read = read;
+  fixture.vehicle = {
+    id: 'v-rr',
+    year: 1971,
+    make: 'Plymouth',
+    model: 'Road Runner',
+    listing_kind: 'vehicle',
+    provenance_metadata: { mec_lot_number: 'F130', mec_auction_name: 'Indy 2019' },
+  };
+  render();
+  act(() => (host.querySelector('.k-masthead__result button.k-claim__value') as HTMLButtonElement).click());
+  expect(document.body.textContent).toContain('Lot F130');
+  expect(document.body.textContent).toContain('Indy 2019');
+  expect(document.body.textContent).toContain('Watch sale moment');
 });

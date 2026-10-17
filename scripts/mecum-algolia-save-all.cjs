@@ -319,8 +319,8 @@ async function enrichFromSaved() {
   console.log('  Loading Mecum vehicles...');
   const rLoad = await client.query(`
     SELECT id, listing_url, discovery_url, year, make, model, sale_price, sale_status, sale_date,
-           primary_image_url, image_count, color, interior_color, transmission, description,
-           gps_latitude, listing_location, vin, title, status, mileage, user_id, created_at
+           primary_image_url, image_count, color, interior_color, transmission, body_style, engine_size,
+           description, provenance_metadata, gps_latitude, listing_location, vin, title, status, mileage, user_id, created_at
     FROM vehicles
     WHERE auction_source = 'mecum' AND deleted_at IS NULL
   `);
@@ -375,8 +375,32 @@ async function enrichFromSaved() {
   console.log(`  Found ${mergePairs.length.toLocaleString()} duplicate Mecum pairs across ${dupGroupsCount.toLocaleString()} lot groups`);
 
   const MERGE_BATCH = 100;
-  for (let i = 0; i < mergePairs.length; i += MERGE_BATCH) {
-    const chunk = mergePairs.slice(i, i + MERGE_BATCH);
+  // Partition mergePairs into waves so no two pairs in the same batch share a primary.id
+  // (prevents sibling duplicate rows from colliding on unique indexes in a single UPDATE).
+  const mergeBatches = [];
+  let remainingPairs = mergePairs.slice();
+  while (remainingPairs.length > 0) {
+    const wave = [];
+    const nextRemaining = [];
+    const seenPrimary = new Set();
+    for (const pair of remainingPairs) {
+      if (!seenPrimary.has(pair.primary.id)) {
+        seenPrimary.add(pair.primary.id);
+        wave.push(pair);
+      } else {
+        nextRemaining.push(pair);
+      }
+    }
+    for (let j = 0; j < wave.length; j += MERGE_BATCH) {
+      mergeBatches.push(wave.slice(j, j + MERGE_BATCH));
+    }
+    remainingPairs = nextRemaining;
+  }
+
+  let processedPairs = 0;
+  for (let bIdx = 0; bIdx < mergeBatches.length; bIdx++) {
+    const chunk = mergeBatches[bIdx];
+    processedPairs += chunk.length;
     try {
       const res = await client.query(
         `SELECT merge_into_primary_batch($1::uuid[], $2::uuid[]) AS r`,
@@ -397,11 +421,11 @@ async function enrichFromSaved() {
           if (!primary.sale_date && dup.sale_date) primary.sale_date = dup.sale_date;
         }
       }
-      if ((i + MERGE_BATCH) % 1000 === 0 || i + MERGE_BATCH >= mergePairs.length) {
+      if ((bIdx + 1) % 10 === 0 || bIdx + 1 === mergeBatches.length) {
         console.log(`  Merged ${mergedCount.toLocaleString()}/${mergePairs.length.toLocaleString()} duplicate Mecum vehicles...`);
       }
     } catch (e) {
-      console.log(`  Batch merge warning at ${i}: ${e.message}`);
+      console.log(`  Batch merge warning at batch ${bIdx} (${processedPairs}): ${e.message}`);
     }
   }
   console.log(`  Mecum dedup complete: ${mergedCount.toLocaleString()} duplicate rows merged across ${dupGroupsCount.toLocaleString()} lot groups`);
@@ -434,7 +458,13 @@ async function enrichFromSaved() {
         color = COALESCE(v.color, u.color),
         interior_color = COALESCE(v.interior_color, u.interior_color),
         transmission = COALESCE(v.transmission, u.transmission),
+        body_style = COALESCE(v.body_style, u.body_style),
+        engine_size = COALESCE(v.engine_size, u.engine_size),
         description = COALESCE(v.description, u.description),
+        provenance_metadata = CASE
+          WHEN u.prov_meta IS NOT NULL THEN COALESCE(v.provenance_metadata, '{}'::jsonb) || u.prov_meta::jsonb
+          ELSE v.provenance_metadata
+        END,
         gps_latitude = COALESCE(v.gps_latitude, u.gps_lat::double precision),
         gps_longitude = COALESCE(v.gps_longitude, u.gps_lng::double precision),
         listing_location = COALESCE(v.listing_location, u.listing_location),
@@ -453,17 +483,20 @@ async function enrichFromSaved() {
         $6::text[],
         $7::text[],
         $8::text[],
-        $9::double precision[],
-        $10::double precision[],
+        $9::text[],
+        $10::text[],
         $11::text[],
-        $12::int[],
-        $13::text[],
+        $12::double precision[],
+        $13::double precision[],
         $14::text[],
-        $15::text[]
+        $15::int[],
+        $16::text[],
+        $17::text[],
+        $18::text[]
       ) AS u(
         id, listing_url, sale_date, primary_image_url, color, interior_color,
-        transmission, description, gps_lat, gps_lng, listing_location,
-        year, make, model, title
+        transmission, body_style, engine_size, description, prov_meta,
+        gps_lat, gps_lng, listing_location, year, make, model, title
       )
       JOIN locked l ON l.id = u.id
       WHERE v.id = l.id
@@ -475,7 +508,10 @@ async function enrichFromSaved() {
       batch.map(b => b.color),
       batch.map(b => b.interior_color),
       batch.map(b => b.transmission),
+      batch.map(b => b.body_style),
+      batch.map(b => b.engine_size),
       batch.map(b => b.description),
+      batch.map(b => b.prov_meta),
       batch.map(b => b.gps_lat),
       batch.map(b => b.gps_lng),
       batch.map(b => b.listing_location),
@@ -511,14 +547,36 @@ async function enrichFromSaved() {
     const saleDate = parseSaleDate(lot);
     const firstImg = lot.images_meta?.[0]?.url || null;
 
+    const auctionRaw = lot.taxonomies?.auction_tax?.[0]?.name || '';
+    const auctionName = auctionRaw ? auctionRaw.split('|')[0].trim() : null;
+    const collectionRaw = lot.taxonomies?.collection_tax?.[0]?.name || '';
+    const collectionName = collectionRaw ? collectionRaw.split('|')[0].replace(/&amp;/g, '&').trim() : null;
+    const lotNumber = lot.lot_number_meta || null;
+    const seriesSpecs = lot.lot_series_meta || null;
+    const bodyStyleTax = lot.taxonomies?.body_type?.[0]?.name || null;
+    const engineMatch = seriesSpecs
+      ? seriesSpecs.match(/\b(\d{3,4}(?:\/\d{2,4}\s*HP)?\s*(?:CI\s*)?(?:Hemi\s*|Six\s*Pack\s*|6-BBL\s*)?(?:V-?8|V-?6|V-?12|I-?6|L88|LS6|LS5)?|\d\.\dL\s*(?:V-?8|V-?6)?)/i)
+      : null;
+    const engineSizeVal = engineMatch?.[1] ? engineMatch[1].trim() : null;
+
+    let provMetaJson = null;
+    const existingProv = vehicle.provenance_metadata && typeof vehicle.provenance_metadata === 'object'
+      ? vehicle.provenance_metadata
+      : {};
+    if ((lotNumber && !existingProv.mec_lot_number) || (auctionName && !existingProv.mec_auction_name)) {
+      provMetaJson = JSON.stringify({
+        ...(lotNumber ? { mec_lot_number: String(lotNumber) } : {}),
+        ...(auctionName ? { mec_auction_name: auctionName } : {}),
+        ...(lot.web_id_meta ? { mec_web_id: String(lot.web_id_meta) } : {}),
+        ...(seriesSpecs ? { mec_series: seriesSpecs } : {}),
+        ...(collectionName ? { mec_collection: collectionName } : {}),
+        ...(lot.low_estimate_meta ? { mec_estimate_low: Number(lot.low_estimate_meta) || null } : {}),
+        ...(lot.high_estimate_meta ? { mec_estimate_high: Number(lot.high_estimate_meta) || null } : {}),
+      });
+    }
+
     let desc = null;
     if (!vehicle.description) {
-      const auctionRaw = lot.taxonomies?.auction_tax?.[0]?.name || '';
-      const auctionName = auctionRaw ? auctionRaw.split('|')[0].trim() : null;
-      const collectionRaw = lot.taxonomies?.collection_tax?.[0]?.name || '';
-      const collectionName = collectionRaw ? collectionRaw.split('|')[0].replace(/&amp;/g, '&').trim() : null;
-      const lotNumber = lot.lot_number_meta || null;
-      const seriesSpecs = lot.lot_series_meta || null;
       const descParts = [
         lot.post_title,
         seriesSpecs ? `Highlights: ${seriesSpecs}.` : null,
@@ -551,7 +609,10 @@ async function enrichFromSaved() {
       (!vehicle.color && lot.color_meta) ||
       (!vehicle.interior_color && lot.interior_meta) ||
       (!vehicle.transmission && lot.transmission_type_meta) ||
+      (!vehicle.body_style && bodyStyleTax) ||
+      (!vehicle.engine_size && engineSizeVal) ||
       (!vehicle.description && desc) ||
+      provMetaJson !== null ||
       (!vehicle.gps_latitude && gpsLat !== null) ||
       (!vehicle.year && parsedYear) ||
       (!vehicle.make && makeTax) ||
@@ -573,7 +634,10 @@ async function enrichFromSaved() {
       color: lot.color_meta || null,
       interior_color: lot.interior_meta || null,
       transmission: lot.transmission_type_meta || null,
+      body_style: bodyStyleTax,
+      engine_size: engineSizeVal,
       description: desc || null,
+      prov_meta: provMetaJson,
       gps_lat: gpsLat,
       gps_lng: gpsLng,
       listing_location: city || null,
