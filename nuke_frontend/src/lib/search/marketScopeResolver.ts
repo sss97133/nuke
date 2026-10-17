@@ -156,6 +156,51 @@ const CULTURAL_SCOPE_ALIASES: Array<{
     make: 'Buick',
     familyHint: 'Grand National',
   },
+  {
+    pattern: /\b(2000\s*gt)\b/i,
+    make: 'Toyota',
+    familyHint: '2000GT',
+  },
+  {
+    pattern: /\b(fj[-\s]?4[035]|fj[-\s]?55|fj[-\s]?6[02]|fzj[-\s]?80|uzj[-\s]?100)\b/i,
+    make: 'Toyota',
+    familyHint: 'Land Cruiser',
+  },
+  {
+    pattern: /\b((?:datsun|nissan)?\s*510\b)/i,
+    make: 'Nissan',
+    familyHint: '510',
+  },
+  {
+    pattern: /\b(fairlady(?:\s+roadster)?|(?:1600|2000)\s+roadster)\b/i,
+    make: 'Nissan',
+    familyHint: 'Roadster',
+  },
+  {
+    pattern: /\b(figaro)\b/i,
+    make: 'Nissan',
+    familyHint: 'Figaro',
+  },
+  {
+    pattern: /\b(cr[-\s]?x(?:\s+si)?)\b/i,
+    make: 'Honda',
+    familyHint: 'CRX',
+  },
+  {
+    pattern: /\b(gsx(?:\s+stage\s*1)?)\b/i,
+    make: 'Buick',
+    familyHint: 'GS',
+  },
+  {
+    pattern: /\b(vista\s*cruiser)\b/i,
+    make: 'Oldsmobile',
+    familyHint: 'Vista Cruiser',
+  },
+  {
+    pattern: /\b(coupe\s*de\s*ville|sedan\s*de\s*ville)\b/i,
+    make: 'Cadillac',
+    familyHint: 'DeVille',
+  },
 ];
 
 // Words that indicate a natural-language filter query rather than a market scope drill
