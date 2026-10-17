@@ -916,12 +916,13 @@ function TreemapCell({ rect, onClick, totalCount, showValue, repImage, repImages
         background: isVehicle && showImage ? 'var(--surface-glass)' : undefined,
       }}>
         {canShowName && !isVehicle && (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+          <div className="flex flex-col gap-[3px]">
             {node.badgeSvg && w >= 110 && h >= 58 && (
               <div
                 aria-hidden="true"
                 data-testid="treemap-cell-badge"
-                style={{ display: 'inline-flex', alignItems: 'center', height: area > 25000 ? 22 : 16, maxWidth: Math.min(130, w - 12) }}
+                className="inline-flex items-center"
+                style={{ height: area > 25000 ? 22 : 16, maxWidth: Math.min(130, w - 12) }}
                 dangerouslySetInnerHTML={{ __html: node.badgeSvg }}
               />
             )}
@@ -945,7 +946,7 @@ function TreemapCell({ rect, onClick, totalCount, showValue, repImage, repImages
           </div>
         )}
 
-        <div style={{ marginTop: 'auto' }}>
+        <div className="mt-auto">
           {/* Vehicle cell: title + price at bottom */}
           {isVehicle && canShowName && (
             <div
@@ -1099,7 +1100,7 @@ function TreemapTooltip({ node, x, y, totalCount, level }: TooltipData) {
       <div style={containerStyle}>
         <Text role="label" as="div">{node.name}</Text>
         <div><Text role="measure">{fmtMoney(node.usd)}</Text> <Text role="caption">from {fmtNum(node.count)} confirmed sales</Text></div>
-        <div style={{ borderTop: '1px solid var(--border)', paddingTop: 6, display: 'flex', flexDirection: 'column', gap: 3 }}>
+        <div className="border-t border-[var(--border)] pt-1.5 flex flex-col gap-[3px]">
           {node.count > 1 && effectivePrice ? <Row label={node.median_price ? 'median sale' : 'average sale'} value={fmtMoney(effectivePrice)} /> : null}
           {node.offered && node.sold_any != null ? <Row label={`of ${fmtNum(node.offered)} offered sold`} value={`${Math.round((100 * node.sold_any) / node.offered)}%`} /> : null}
           {node.sold_12m != null ? <Row label="sold (measured houses, 12 mo)" value={`${fmtNum(node.sold_12m)}${node.usd_12m ? ` · ${fmtMoney(node.usd_12m)}` : ''}`} /> : null}
@@ -1122,13 +1123,11 @@ function TreemapTooltip({ node, x, y, totalCount, level }: TooltipData) {
 
   return (
     <div style={containerStyle}>
-      <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--text)', marginBottom: 4, textTransform: 'uppercase', letterSpacing: '0.02em' }}>
-        {node.name}
+      <Text role="label" as="div">{node.name}</Text>
+      <div className="mb-1.5">
+        <Text role="measure">{fmtNum(node.count)}</Text> <Text role="caption">with a confirmed sale</Text>
       </div>
-      <div style={{ fontSize: 18, fontWeight: 700, fontFamily: "'Courier New', monospace", color: 'var(--text)', marginBottom: 6 }}>
-        {fmtNum(node.count)} <span style={{ fontSize: 10, fontWeight: 400, color: 'var(--text-secondary)' }}>with a confirmed sale</span>
-      </div>
-      <div style={{ borderTop: '1px solid var(--border)', paddingTop: 6, display: 'flex', flexDirection: 'column', gap: 3 }}>
+      <div className="border-t border-[var(--border)] pt-1.5 flex flex-col gap-[3px]">
         <Row label="of total" value={pct + '%'} />
         <Row label="sales total" value={fmtMoney(node.value)} />
         <Row label="median sale" value={node.median_price ? fmtMoney(node.median_price) : 'under 5 sales'} />
@@ -1142,9 +1141,9 @@ function TreemapTooltip({ node, x, y, totalCount, level }: TooltipData) {
 
 function Row({ label, value }: { label: string; value: string }) {
   return (
-    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', fontSize: 10, color: 'var(--text-secondary)' }}>
-      <span style={{ fontFamily: "'Courier New', monospace", color: 'var(--text)', fontWeight: 600 }}>{value}</span>
-      <span style={{ marginLeft: 12, textAlign: 'right', fontSize: 9 }}>{label}</span>
+    <div className="flex justify-between items-baseline text-[10px] text-[var(--text-secondary)]">
+      <span className="font-mono text-[var(--text)] font-semibold">{value}</span>
+      <span className="ml-3 text-right text-[9px]">{label}</span>
     </div>
   );
 }
