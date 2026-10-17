@@ -219,7 +219,16 @@ INSERT INTO public.mv_treemap_sale_brands (name, count) VALUES ('Meyers', 3), ('
 INSERT INTO public.treemap_refreshes (note, populations) VALUES ('seed', '{}'::jsonb);
 
 \ir ../migrations/20261018170000_canonical_make_family_join_and_aliases.sql
-\ir ../migrations/20261018170000_canonical_make_family_join_and_aliases.sql
+
+-- Simulate dependent views existing before 20261018173000 runs
+CREATE OR REPLACE VIEW public.v_market_house_coverage AS
+SELECT source AS house, count(*) AS dated_sold FROM public.mv_family_sales GROUP BY 1;
+
+CREATE OR REPLACE VIEW public.v_market_measurement_coverage AS
+SELECT 'key'::text AS layer, sum(sold)::bigint AS numerator FROM public.mv_family_market;
+
+\ir ../migrations/20261018173000_apply_canonical_make_family_join_with_views.sql
+\ir ../migrations/20261018173000_apply_canonical_make_family_join_with_views.sql
 
 DO $assert$
 BEGIN

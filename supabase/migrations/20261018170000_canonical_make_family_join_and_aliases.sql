@@ -152,6 +152,8 @@ END $refresh_dict$;
 DO $rebuild_family_folds$
 BEGIN
   IF to_regclass('public.mv_family_market') IS NOT NULL THEN
+    DROP VIEW IF EXISTS public.v_market_measurement_coverage;
+    DROP VIEW IF EXISTS public.v_market_house_coverage;
     DROP MATERIALIZED VIEW IF EXISTS public.mv_family_sales;
     DROP MATERIALIZED VIEW IF EXISTS public.mv_family_market;
 
