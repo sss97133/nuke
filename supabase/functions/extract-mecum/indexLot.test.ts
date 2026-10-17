@@ -23,6 +23,31 @@ Deno.test("a sold Auto lot becomes a lot with its hammer, run day, sale and rich
   if (r.lot.engine !== "V-Code 440 6-BBL, 4-Speed" || r.lot.image_urls[0] !== "https://cdn1.mecum.com/auctions/fl23/fl23_f142_1.jpg") {
     throw new Error(JSON.stringify(r.lot));
   }
+  if (r.lot.body_style !== "Pickup") {
+    throw new Error(JSON.stringify(r.lot));
+  }
+});
+
+Deno.test("indexLot reads hammer_price_meta, run_date timestamps, trim, engine_configuration and estimates", () => {
+  const hit = structuredClone(FIXTURE.find((h) => h.sold === 1 && h.taxonomies.lot_type?.[0]?.name === "Auto"));
+  delete hit.highest_bid_or_price;
+  hit.hammer_price_meta = 148500;
+  hit.low_estimate_meta = 125000;
+  hit.high_estimate_meta = 150000;
+  hit.engine_configuration_meta = "V-8";
+  hit.taxonomies.run_date = [{ name: "2019-05-17 00:00:00", slug: "2019-05-17" }];
+  hit.taxonomies.trim_sub_model = [{ name: "Hemi", slug: "hemi" }];
+  hit.taxonomies.body_type = [{ name: "Hardtop", slug: "hardtop" }];
+  const r: any = indexLot(hit);
+  if (!r.lot) throw new Error(JSON.stringify(r));
+  if (r.lot.price !== 148500) throw new Error(`expected hammer_price_meta 148500, got ${r.lot.price}`);
+  if (r.lot.run_day !== "2019-05-17") throw new Error(`expected run_day 2019-05-17, got ${r.lot.run_day}`);
+  if (r.lot.trim !== "Hemi" || r.lot.body_style !== "Hardtop" || r.lot.engine_configuration !== "V-8") {
+    throw new Error(JSON.stringify(r.lot));
+  }
+  if (r.lot.estimate_low !== 125000 || r.lot.estimate_high !== 150000) {
+    throw new Error(JSON.stringify(r.lot));
+  }
 });
 
 Deno.test("Road Art is not a vehicle", () => {

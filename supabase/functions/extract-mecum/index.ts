@@ -311,8 +311,10 @@ interface MecumVehicle {
   year: number | null;
   make: string | null;
   model: string | null;
+  trim: string | null;
   vin: string | null;
   engine: string | null;
+  engine_configuration: string | null;
   transmission: string | null;
   exterior_color: string | null;
   interior_color: string | null;
@@ -326,6 +328,7 @@ interface MecumVehicle {
   auction_date: string | null;
   auction_day_start: string | null; // source auctionDayStart, "YYYY-MM-DD HH:MM:SS" (UTC)
   lot_statuses: string[]; // source lot status slugs, e.g. "no-reserve"
+  collection_name: string | null;
   sale_price: number | null;
   high_estimate: number | null;
   low_estimate: number | null;
@@ -485,8 +488,10 @@ function parseNextData(html: string, url: string, flightPost: any = null): Mecum
     year: null,
     make: null,
     model: null,
+    trim: null,
     vin: post.vinSerial || null,
-    engine: post.lotSeries || null, // lotSeries contains engine/features like "348 CI, Air Ride"
+    engine: post.lotSeries || post.engineConfiguration || null, // lotSeries contains engine/features like "348 CI, Air Ride"
+    engine_configuration: typeof post.engineConfiguration === "string" && post.engineConfiguration.trim() ? post.engineConfiguration.trim() : null,
     transmission: post.transmission || null,
     exterior_color: post.color || null,
     interior_color: post.interior || null,
@@ -500,6 +505,7 @@ function parseNextData(html: string, url: string, flightPost: any = null): Mecum
     auction_date: null,
     auction_day_start: null,
     lot_statuses: [],
+    collection_name: null,
     sale_price: null,
     high_estimate: null,
     low_estimate: null,
@@ -516,9 +522,11 @@ function parseNextData(html: string, url: string, flightPost: any = null): Mecum
   const makeStr = getEdgeName(post, "makes");
   if (makeStr) vehicle.make = makeStr;
 
-  // Model from taxonomy
+  // Model and trim from taxonomy
   const modelStr = getEdgeName(post, "models");
   if (modelStr) vehicle.model = modelStr;
+  const trimStr = getEdgeName(post, "trimSubModels");
+  if (trimStr) vehicle.trim = trimStr;
 
   // Fallback: parse year/make/model from title "1960 Chevrolet Parkwood Wagon"
   if ((!vehicle.year || !vehicle.make) && post.title) {
@@ -568,18 +576,27 @@ function parseNextData(html: string, url: string, flightPost: any = null): Mecum
     vehicle.auction_name = auctionNode?.name || null;
   }
 
-  // Run date
+  // Run date (WordPress taxonomy often serializes "YYYY-MM-DD 00:00:00")
   const runDate = getEdgeName(post, "runDates");
-  if (runDate) vehicle.auction_date = runDate;
+  if (runDate) {
+    vehicle.auction_date = /^\d{4}-\d{2}-\d{2}/.test(runDate) ? runDate.slice(0, 10) : runDate;
+  }
   if (typeof post.auctionDayStart === "string") vehicle.auction_day_start = post.auctionDayStart;
   const statusEdges = post?.lotStatuses?.edges;
   if (Array.isArray(statusEdges)) {
     vehicle.lot_statuses = statusEdges.map((e: any) => e?.node?.slug).filter((x: unknown) => typeof x === "string");
   }
+  const collectionRaw = getEdgeName(post, "collectionsTax");
+  if (collectionRaw) {
+    vehicle.collection_name = collectionRaw.split("|")[0].replace(/&amp;/g, "&").trim() || null;
+  }
 
-  // Division as body_style hint
+  // Body style from bodyTypes taxonomy first, falling back to non-car division
+  const bodyType = getEdgeName(post, "bodyTypes");
   const division = getEdgeName(post, "divisionsTax");
-  if (division && division !== "Collector Cars") {
+  if (bodyType) {
+    vehicle.body_style = bodyType;
+  } else if (division && division !== "Collector Cars") {
     vehicle.body_style = division; // e.g., "Motorcycles", "Road Art", etc.
   }
 
@@ -636,8 +653,10 @@ function parseMarkdown(markdown: string, url: string): MecumVehicle {
     year: null,
     make: null,
     model: null,
+    trim: null,
     vin: null,
     engine: null,
+    engine_configuration: null,
     transmission: null,
     exterior_color: null,
     interior_color: null,
@@ -651,6 +670,7 @@ function parseMarkdown(markdown: string, url: string): MecumVehicle {
     auction_date: null,
     auction_day_start: null,
     lot_statuses: [],
+    collection_name: null,
     sale_price: null,
     high_estimate: null,
     low_estimate: null,
@@ -883,7 +903,7 @@ interface UpcomingSale {
 const todayUtc = () => new Date().toISOString().slice(0, 10);
 
 async function writeMecumEpisode(supabase: any, vehicleId: string, vehicle: MecumVehicle, sale?: UpcomingSale) {
-  const runDay = /^\d{4}-\d{2}-\d{2}$/.test(vehicle.auction_date ?? "") ? vehicle.auction_date! : (sale?.run_day ?? null);
+  const runDay = /^\d{4}-\d{2}-\d{2}/.test(vehicle.auction_date ?? "") ? vehicle.auction_date!.slice(0, 10) : (sale?.run_day ?? null);
   const hasResult = !!vehicle.status && !["upcoming", "listed"].includes(vehicle.status);
   // No result yet and the run day not past: the lot is upcoming. A past run day with no result stays "listed".
   const eventStatus = hasResult ? vehicle.status! : (runDay && runDay >= todayUtc() ? "upcoming" : (vehicle.status || "listed"));
@@ -1002,8 +1022,10 @@ async function saveVehicle(
     year: vehicle.year,
     make: vehicle.make,
     model: vehicle.model,
+    trim: vehicle.trim,
     vin: realVin(vehicle.vin) ? vehicle.vin : null,
-    engine_type: vehicle.engine,
+    engine_type: vehicle.engine || vehicle.engine_configuration,
+    engine_size: vehicle.engine || vehicle.engine_configuration,
     transmission: vehicle.transmission,
     color: vehicle.exterior_color,
     interior_color: vehicle.interior_color,
@@ -1018,7 +1040,7 @@ async function saveVehicle(
     high_bid: vehicle.status !== "sold" ? vehicle.sale_price : null,
     sale_status: vehicle.status === "sold" ? "sold" : (vehicle.status === "not sold" ? "not_sold" : null),
     auction_outcome: vehicle.status === "sold" ? "sold" : null,
-    sale_date: vehicle.status === "sold" && vehicle.auction_date && /^\d{4}-\d{2}-\d{2}$/.test(vehicle.auction_date) ? vehicle.auction_date : null,
+    sale_date: vehicle.status === "sold" && vehicle.auction_date && /^\d{4}-\d{2}-\d{2}/.test(vehicle.auction_date) ? vehicle.auction_date.slice(0, 10) : null,
     listing_url: vehicle.url,
     discovery_url: vehicle.url,
     discovery_source: "mecum",
@@ -1189,7 +1211,11 @@ async function saveVehicle(
 // slash, a /sitemap.xml suffix, and, on vehicles.discovery_url, a lowercased path because canonicalize_vehicle_url lowercases
 // it: "FL15-204118" is stored as "fl15-204118"), so a lot is landed if any spelling has a row. The key ignores case.
 function mecumLotKey(url: string): string {
-  return url.replace(/^https?:\/\/(www\.)?/, "").replace(/\/(sitemap\.xml)?\/?$/, "").toLowerCase();
+  return url
+    .replace(/^https?:\/\/(www\.)?/, "")
+    .replace(/\/(sitemap\.xml)?\/?$/, "")
+    .replace(/^(mecum\.com\/lots\/)[a-z]{2}\d{2}-(\d+\/)/i, "$1$2")
+    .toLowerCase();
 }
 function mecumUrlSpellings(url: string): string[] {
   const bare = url.replace(/^https?:\/\/(www\.)?/, "").replace(/\/(sitemap\.xml)?\/?$/, "");
@@ -1388,10 +1414,13 @@ Deno.serve(async (req) => {
           year: l.year,
           make: l.make,
           model: l.model,
+          trim: l.trim,
+          body_style: l.body_style,
           color: l.exterior_color,
           interior_color: l.interior_color,
           transmission: l.transmission,
           engine_type: l.engine,
+          engine_size: l.engine,
           description: l.description,
           primary_image_url: l.image_urls[0] ?? null,
           sale_price: l.result === "sold" ? l.price : null,
@@ -1399,6 +1428,19 @@ Deno.serve(async (req) => {
           sale_status: l.result === "sold" ? "sold" : null,
           auction_outcome: l.result === "sold" ? "sold" : null,
           sale_date: l.result === "sold" ? l.run_day : null,
+          provenance_metadata: Object.fromEntries(
+            Object.entries({
+              mec_lot_number: l.lot_number,
+              mec_auction_name: l.sale_name,
+              mec_sale_key: l.sale_key,
+              mec_web_id: l.lot_id,
+              mec_series: l.engine,
+              mec_collection: l.collection_name,
+              mec_estimate_low: l.estimate_low,
+              mec_estimate_high: l.estimate_high,
+              ...(l.lot_statuses.length ? { mec_has_reserve: !l.lot_statuses.some((x) => /no-?reserve/i.test(x)) } : {}),
+            }).filter(([, v]) => v !== null && v !== undefined),
+          ),
           listing_url: l.url,
           discovery_url: l.url,
           discovery_source: "mecum",
@@ -1464,6 +1506,11 @@ Deno.serve(async (req) => {
           sale_ends_on: l.sale_ends_on,
           lot_number: l.lot_number,
           currency: "USD",
+          estimate_low: l.estimate_low,
+          estimate_high: l.estimate_high,
+          collection_name: l.collection_name,
+          body_style: l.body_style,
+          trim: l.trim,
           ...(l.lot_statuses.length ? { has_reserve: !l.lot_statuses.some((x) => /no-?reserve/i.test(x)) } : {}),
         },
       }));
@@ -1481,6 +1528,8 @@ Deno.serve(async (req) => {
         const ae = await supabase.from("auction_events").insert(landed.map((l) => ({
           vehicle_id: vehicleIdFor.get(l.lot_id)!, source: "mecum", source_url: l.url, source_listing_id: l.lot_number ?? l.lot_id, outcome: auctionOutcome(l.result), lot_number: l.lot_number,
           winning_bid: l.result === "sold" ? l.price : null, high_bid: l.result === "bid-goes-on" ? l.price : null,
+          estimate_low: l.estimate_low, estimate_high: l.estimate_high,
+          auction_end_date: l.day_start ?? (l.run_day ? new Date(l.run_day + "T00:00:00Z").toISOString() : null),
         }))).select("id");
         if (!ae.error) out.auction_events_created += ae.data?.length ?? 0;
         else if (out.errors.length < 5) out.errors.push(`auction_events insert: ${ae.error.message}`);
@@ -1518,14 +1567,19 @@ Deno.serve(async (req) => {
             year: l.year,
             make: l.make,
             model: l.model,
+            trim: l.trim,
+            body_style: l.body_style,
             color: l.exterior_color,
             interior_color: l.interior_color,
             transmission: l.transmission,
             engine_type: l.engine,
+            engine_size: l.engine,
             description: l.description,
             lot_number: l.lot_number,
             run_day: l.run_day,
             sale_key: l.sale_key,
+            estimate_low: l.estimate_low,
+            estimate_high: l.estimate_high,
           };
           if (l.result === "sold") fields.sale_price = l.price; else if (l.result === "bid-goes-on") fields.high_bid = l.price;
           const clean = Object.fromEntries(Object.entries(fields).filter(([, v]) => v !== null && v !== undefined));

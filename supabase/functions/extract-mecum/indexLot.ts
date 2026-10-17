@@ -25,8 +25,12 @@ export interface IndexLot {
   year: number;
   make: string;
   model: string | null;
+  trim: string | null;
+  body_style: string | null;
   result: "sold" | "bid-goes-on" | null;
   price: number | null; // the hammer on a sold lot, the high bid otherwise; null when the index states none
+  estimate_low: number | null;
+  estimate_high: number | null;
   run_day: string | null;
   day_start: string | null;
   lot_number: string | null;
@@ -40,6 +44,7 @@ export interface IndexLot {
   interior_color: string | null;
   transmission: string | null;
   engine: string | null;
+  engine_configuration: string | null;
   collection_name: string | null;
   description: string | null;
 }
@@ -68,23 +73,35 @@ export function indexLot(hit: any): { lot: IndexLot } | { skip: string; url?: st
   if (!Number.isInteger(year) || year < 1885 || year > 2100 || !make) return { skip: "no_year_make", url: `https://www.mecum.com${permalink}`, title: typeof hit.post_title === "string" ? hit.post_title : undefined };
   const resultName = termName(t, "sale_result", "slug");
   const result = hit.sold === 1 || resultName === "sold" ? "sold" : (hit.bid_goes_on === 1 || resultName === "bid-goes-on" ? "bid-goes-on" : null);
-  const rawPrice = Number(hit.highest_bid_or_price);
+  const rawPrice = Number(hit.highest_bid_or_price) || Number(hit.hammer_price_meta);
   const price = Number.isFinite(rawPrice) && rawPrice > 0 ? Math.round(rawPrice) : null;
+  const rawEstLow = Number(hit.low_estimate_meta);
+  const estimateLow = Number.isFinite(rawEstLow) && rawEstLow > 0 ? Math.round(rawEstLow) : null;
+  const rawEstHigh = Number(hit.high_estimate_meta);
+  const estimateHigh = Number.isFinite(rawEstHigh) && rawEstHigh > 0 ? Math.round(rawEstHigh) : null;
   const sale = Array.isArray(t.auction_tax) ? t.auction_tax[0] : null;
   const parsed = sale?.name && sale?.slug ? parseSaleFacet(String(sale.name), String(sale.slug)) : null;
-  const runDay = termName(t, "run_date");
+  const runDayRaw = termName(t, "run_date") || termName(t, "run_date", "slug");
+  const parsedRunDay = runDayRaw && /^\d{4}-\d{2}-\d{2}/.test(runDayRaw)
+    ? runDayRaw.slice(0, 10)
+    : (typeof hit.auction_end_date_meta === "number" && hit.auction_end_date_meta > 100000000
+      ? saleDay(hit.auction_end_date_meta)
+      : null);
   const dayStart = typeof hit.auction_day_start_meta === "string" ? hit.auction_day_start_meta : null;
   const title = typeof hit.post_title === "string" && hit.post_title.trim() ? hit.post_title.trim() : null;
   const lotNumber = typeof hit.lot_number_meta === "string" && hit.lot_number_meta ? hit.lot_number_meta : null;
+  const bodyStyle = termName(t, "body_type");
+  const trim = termName(t, "trim_sub_model");
   const imageUrls = Array.isArray(hit.images_meta)
     ? hit.images_meta.map((img: any) => (typeof img?.url === "string" ? img.url.trim() : "")).filter((u: string) => u.startsWith("http"))
     : [];
   const exteriorColor = typeof hit.color_meta === "string" && hit.color_meta.trim() ? hit.color_meta.trim() : null;
   const interiorColor = typeof hit.interior_meta === "string" && hit.interior_meta.trim() ? hit.interior_meta.trim() : null;
   const transmission = typeof hit.transmission_type_meta === "string" && hit.transmission_type_meta.trim() ? hit.transmission_type_meta.trim() : null;
+  const engineConfig = typeof hit.engine_configuration_meta === "string" && hit.engine_configuration_meta.trim() ? hit.engine_configuration_meta.trim() : null;
   const engine = typeof hit.lot_series_meta === "string" && hit.lot_series_meta.trim()
     ? hit.lot_series_meta.trim()
-    : (typeof hit.engine_configuration_meta === "string" && hit.engine_configuration_meta.trim() ? hit.engine_configuration_meta.trim() : null);
+    : engineConfig;
   const collectionRaw = termName(t, "collection_tax");
   const collectionName = collectionRaw ? collectionRaw.split("|")[0].replace(/&amp;/g, "&").trim() || null : null;
   const descParts = [
@@ -104,9 +121,13 @@ export function indexLot(hit: any): { lot: IndexLot } | { skip: string; url?: st
       year,
       make,
       model: termName(t, "model"),
+      trim,
+      body_style: bodyStyle,
       result,
       price: result ? price : null,
-      run_day: runDay && /^\d{4}-\d{2}-\d{2}$/.test(runDay) ? runDay : null,
+      estimate_low: estimateLow,
+      estimate_high: estimateHigh,
+      run_day: parsedRunDay,
       day_start: dayStart && !isNaN(Date.parse(dayStart.replace(" ", "T") + "Z")) ? new Date(dayStart.replace(" ", "T") + "Z").toISOString() : null,
       lot_number: lotNumber,
       sale_key: parsed?.sale_key ?? null,
@@ -119,6 +140,7 @@ export function indexLot(hit: any): { lot: IndexLot } | { skip: string; url?: st
       interior_color: interiorColor,
       transmission,
       engine,
+      engine_configuration: engineConfig,
       collection_name: collectionName,
       description,
     },
@@ -171,7 +193,7 @@ export interface PriorSale {
 export function summarizePriorSale(hits: any[], saleKey: string | null, endsOn: string): PriorSale {
   const vehicle = hits.filter((h) => termName(h?.taxonomies, "lot_type") !== "Road Art");
   const sold = vehicle.filter((h) => h?.sold === 1);
-  const prices = sold.map((h) => Number(h?.highest_bid_or_price)).filter((p) => Number.isFinite(p) && p > 0).sort((a, b) => a - b);
+  const prices = sold.map((h) => Number(h?.highest_bid_or_price) || Number(h?.hammer_price_meta)).filter((p) => Number.isFinite(p) && p > 0).sort((a, b) => a - b);
   const mid = prices.length >> 1;
   const median = prices.length === 0 ? null : (prices.length % 2 ? prices[mid] : (prices[mid - 1] + prices[mid]) / 2);
   return {
