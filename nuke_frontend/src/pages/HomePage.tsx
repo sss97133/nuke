@@ -11,7 +11,7 @@ import { optimizeImageUrl } from '../lib/imageOptimizer';
 import { squarify } from '../lib/squarify';
 import { MapCallouts, MapLegend, MarketCard, MarketSheet, MarketTile, VenueMix, money as fmtMoneyMap, type MapBasis } from './market/MarketTile';
 import { batBaseline, callouts, gateMinForHorizon, relativeMove } from './market/mapScale';
-import { MOVER_HORIZONS, readShareMovers, type MoverHorizon, type ShareMovers } from './market/FamilyMovers';
+import { combineShareMovers, MOVER_HORIZONS, readShareMovers, type BaselineHorizon, type MoverHorizon, type ShareMovers } from './market/FamilyMovers';
 import IntakePage from './intake/IntakePage';
 import { Text } from '../kit';
 import FamilyMovers from './market/FamilyMovers';
@@ -1189,29 +1189,45 @@ export function TreemapHomePage({ onBrowse, embedded = false }: { onBrowse: () =
   const { data: rawBrandsData, loading: brandsLoading } = useTreemapBrands();
   const refresh = useTreemapRefresh();
   const [horizon, setHorizon] = useState<MoverHorizon>('1y');
+  const [baselineHorizon, setBaselineHorizon] = useState<BaselineHorizon>('prior');
+  const isCustomBase = baselineHorizon !== 'prior' && baselineHorizon !== horizon && !(horizon === 'upcoming' && baselineHorizon === '1m');
   // The map's color is each tile's BaT move against BaT overall: the whole venue as the movers read it (every family,
   // makes too small for a tile included), so the map and the movers name one baseline; the brands' own sum until it reads.
   const [moversData, setMoversData] = useState<ShareMovers | null>(null);
   const [venue, setVenue] = useState<{ sold: number; prior: number; move: number } | null>(null);
   useEffect(() => {
     let live = true;
-    readShareMovers(horizon).then((v) => {
-      if (!live) return;
-      if (v) {
-        setMoversData(v);
-        if (v.bat.sold_prior_12m > 0) {
-          setVenue({ sold: v.bat.sold_12m, prior: v.bat.sold_prior_12m, move: v.bat.sold_12m / v.bat.sold_prior_12m - 1 });
+    if (!isCustomBase) {
+      readShareMovers(horizon).then((v) => {
+        if (!live) return;
+        if (v) {
+          setMoversData(v);
+          if (v.bat.sold_prior_12m > 0) {
+            setVenue({ sold: v.bat.sold_12m, prior: v.bat.sold_prior_12m, move: v.bat.sold_12m / v.bat.sold_prior_12m - 1 });
+          }
         }
-      }
-    });
+      });
+    } else {
+      const baseKey = baselineHorizon as Exclude<MoverHorizon, 'upcoming'>;
+      Promise.all([readShareMovers(horizon), readShareMovers(baseKey)]).then(([recentRes, baseRes]) => {
+        if (!live) return;
+        const v = recentRes && baseRes ? combineShareMovers(recentRes, baseRes, horizon, baseKey) : recentRes;
+        if (v) {
+          setMoversData(v);
+          if (v.bat.sold_prior_12m > 0) {
+            setVenue({ sold: v.bat.sold_12m, prior: v.bat.sold_prior_12m, move: v.bat.sold_12m / v.bat.sold_prior_12m - 1 });
+          }
+        }
+      });
+    }
     return () => { live = false; };
-  }, [horizon]);
+  }, [horizon, baselineHorizon, isCustomBase]);
   const horizonMeta = useMemo(() => MOVER_HORIZONS.find((h) => h.key === horizon) ?? MOVER_HORIZONS[6], [horizon]);
   const gateMin = useMemo(() => gateMinForHorizon(horizon), [horizon]);
-  const horizonWindowLabel = horizon === '1y' ? undefined : horizonMeta.windowLabel.toLowerCase();
+  const horizonWindowLabel = horizon === '1y' && !isCustomBase ? undefined : horizonMeta.windowLabel.toLowerCase();
   const brandsData = useMemo(() => {
     if (!rawBrandsData) return null;
-    if (horizon === '1y' || !moversData?.brand_moves) return rawBrandsData;
+    if ((horizon === '1y' && !isCustomBase) || !moversData?.brand_moves) return rawBrandsData;
     const bm = moversData.brand_moves;
     return rawBrandsData.map((n) => {
       const ov = bm[n.name];
@@ -1219,7 +1235,7 @@ export function TreemapHomePage({ onBrowse, embedded = false }: { onBrowse: () =
         ? { ...n, sold_12m: ov.sold_12m, sold_prior_12m: ov.sold_prior_12m, usd_12m: ov.usd_12m, usd_prior_12m: ov.usd_prior_12m }
         : { ...n, sold_12m: 0, sold_prior_12m: 0, usd_12m: 0, usd_prior_12m: 0 };
     });
-  }, [rawBrandsData, horizon, moversData]);
+  }, [rawBrandsData, horizon, isCustomBase, moversData]);
   const baseline = useMemo(() => venue ?? batBaseline(brandsData), [venue, brandsData]);
   // Without hover (a phone), a tap on a market tile opens its card; the card's Open drills.
   const [coarse] = useState(() => canMatchMedia && window.matchMedia('(hover: none)').matches);
@@ -1234,7 +1250,7 @@ export function TreemapHomePage({ onBrowse, embedded = false }: { onBrowse: () =
   const { data: rawFamiliesData, loading: familiesLoading, failed: familiesFailed } = useTreemapFamilies(currentLevel.make ?? null);
   const familiesData = useMemo(() => {
     if (!rawFamiliesData) return null;
-    if (horizon === '1y' || !moversData?.family_moves || !currentLevel.make) return rawFamiliesData;
+    if ((horizon === '1y' && !isCustomBase) || !moversData?.family_moves || !currentLevel.make) return rawFamiliesData;
     const fm = moversData.family_moves;
     return rawFamiliesData.map((n) => {
       if (!n.familyKey || n.familyKey === 'other') return n;
@@ -1243,7 +1259,7 @@ export function TreemapHomePage({ onBrowse, embedded = false }: { onBrowse: () =
         ? { ...n, sold_12m: ov.sold_12m, sold_prior_12m: ov.sold_prior_12m, usd_12m: ov.usd_12m, usd_prior_12m: ov.usd_prior_12m }
         : { ...n, sold_12m: 0, sold_prior_12m: 0, usd_12m: 0, usd_prior_12m: 0 };
     });
-  }, [rawFamiliesData, horizon, moversData, currentLevel.make]);
+  }, [rawFamiliesData, horizon, isCustomBase, moversData, currentLevel.make]);
   const { data: modelsData, loading: modelsLoading } = useTreemapModels(atFamilies && familiesFailed ? currentLevel.make ?? null : null);
   const { data: familyModelsData, loading: familyModelsLoading } = useTreemapFamilyModels(
     currentLevel.family ? currentLevel.make ?? null : null,
@@ -2226,6 +2242,8 @@ export function TreemapHomePage({ onBrowse, embedded = false }: { onBrowse: () =
       {levelType === 'brands' && <FamilyMovers
         horizon={horizon}
         onHorizonChange={setHorizon}
+        baselineHorizon={baselineHorizon}
+        onBaselineHorizonChange={setBaselineHorizon}
         onMoversData={(d) => {
           if (d) {
             setMoversData(d);
