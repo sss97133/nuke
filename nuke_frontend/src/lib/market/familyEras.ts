@@ -221,6 +221,25 @@ const CURATED_FAMILY_ERAS: Record<string, FamilyEraCohort[]> = {
     { id: '1958-1971', label: "Series II / IIA '58–'71", shortLabel: 'Series II/IIA', yearStart: 1958, yearEnd: 1971 },
     { id: '1971-1985', label: "Series III '71–'85", shortLabel: 'Series III', yearStart: 1971, yearEnd: 1985 },
   ],
+  'mazda:rx-7': [
+    { id: '1978-1985', label: "SA/FB 1st Gen '78–'85", shortLabel: 'SA/FB', yearStart: 1978, yearEnd: 1985 },
+    { id: '1986-1991', label: "FC 2nd Gen '86–'91", shortLabel: 'FC3S', yearStart: 1986, yearEnd: 1991 },
+    { id: '1992-2002', label: "FD 3rd Gen '92–'02", shortLabel: 'FD3S', yearStart: 1992, yearEnd: 2002 },
+  ],
+  'austin-healey:3000': [
+    { id: '1956-1959', label: "100-6 '56–'59", shortLabel: '100-6', yearStart: 1956, yearEnd: 1959 },
+    { id: '1959-1963', label: "Mk I / Mk II '59–'63", shortLabel: 'Mk I/II', yearStart: 1959, yearEnd: 1963 },
+    { id: '1964-1967', label: "Mk III BJ8 '64–'67", shortLabel: 'BJ8', yearStart: 1964, yearEnd: 1967 },
+  ],
+  'bmw:z3': [
+    { id: '1996-1998', label: "Pre-LCI '96–'98", shortLabel: "'96–'98", yearStart: 1996, yearEnd: 1998 },
+    { id: '1999-2002', label: "LCI / M '99–'02", shortLabel: "'99–'02", yearStart: 1999, yearEnd: 2002 },
+  ],
+  'tvr:griffith': [
+    { id: '1958-1979', label: "Grantura / Vixen / M-Series '58–'79", shortLabel: "'58–'79", yearStart: 1958, yearEnd: 1979 },
+    { id: '1980-1991', label: "Tasmin / 280i Wedge '80–'91", shortLabel: 'Wedge', yearStart: 1980, yearEnd: 1991 },
+    { id: '1991-2006', label: "Griffith / Chimaera / Cerbera '91–'06", shortLabel: 'Wheeler Era', yearStart: 1991, yearEnd: 2006 },
+  ],
 };
 
 export function getDefinedFamilyEras(

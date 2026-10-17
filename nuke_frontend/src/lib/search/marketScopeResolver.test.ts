@@ -20,6 +20,7 @@ vi.mock('../supabase', () => ({
 }));
 
 import { buildMarketScopeUrl, isOnMarketTab, resolveMarketScopeQuery } from './marketScopeResolver';
+import { getDefinedFamilyEras } from '../market/familyEras';
 import { matchesSaleSubModel } from '../../pages/market/FamilySalesChart';
 
 describe('marketScopeResolver', () => {
@@ -182,5 +183,38 @@ describe('marketScopeResolver', () => {
     expect(matchesSaleSubModel('Shelby GT350 Fastback', 'Shelby GT350')).toBe(true);
     expect(matchesSaleSubModel('Mustang GT', 'Shelby GT350')).toBe(false);
     expect(matchesSaleSubModel('Mustang', null)).toBe(true);
+  });
+
+  it('resolves specialist British, JDM, and classic shorthands and defined eras', async () => {
+    mockRows.data = [
+      { brand: 'Caterham', family_key: 'f-cat7', family: 'Seven', model_key: 'super seven', model: 'Super Seven', sold: 41, usd: 1850000 },
+      { brand: 'TVR', family_key: 'f-tvr', family: 'Griffith', model_key: '2500m', model: '2500M', sold: 25, usd: 750000 },
+      { brand: 'Austin-Healey', family_key: 'f-ah3000', family: '3000', model_key: '3000 mk iii bj8', model: '3000 Mk III BJ8', sold: 493, usd: 25840000 },
+      { brand: 'Mazda', family_key: 'f-rx7', family: 'RX-7', model_key: 'rx-7', model: 'RX-7', sold: 686, usd: 17740000 },
+      { brand: 'Suzuki', family_key: 'f-gsxr', family: 'GSX-R', model_key: 'gsx1300r hayabusa', model: 'GSX1300R Hayabusa', sold: 12, usd: 138000 },
+    ];
+    expect(await resolveMarketScopeQuery('super seven')).toEqual({
+      make: 'Caterham',
+      family: 'f-cat7',
+      family_name: 'Seven',
+    });
+    expect(await resolveMarketScopeQuery('big healey')).toEqual({
+      make: 'Austin-Healey',
+      family: 'f-ah3000',
+      family_name: '3000',
+    });
+    expect(await resolveMarketScopeQuery('fd3s')).toEqual({
+      make: 'Mazda',
+      family: 'f-rx7',
+      family_name: 'RX-7',
+    });
+    expect(await resolveMarketScopeQuery('hayabusa')).toEqual({
+      make: 'Suzuki',
+      family: 'f-gsxr',
+      family_name: 'GSX-R',
+    });
+    expect(getDefinedFamilyEras('Mazda', 'RX-7').map((e) => e.shortLabel)).toEqual(['SA/FB', 'FC3S', 'FD3S']);
+    expect(getDefinedFamilyEras('Austin-Healey', '3000').map((e) => e.shortLabel)).toEqual(['100-6', 'Mk I/II', 'BJ8']);
+    expect(getDefinedFamilyEras('TVR', 'Griffith').map((e) => e.shortLabel)).toEqual(["'58–'79", 'Wedge', 'Wheeler Era']);
   });
 });

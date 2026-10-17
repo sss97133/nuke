@@ -1,13 +1,22 @@
 export const KNOWN_MAKES: string[] = [
-  'Acura', 'Alfa Romeo', 'Aston Martin', 'Audi', 'Bentley', 'BMW', 'Buick',
-  'Cadillac', 'Chevrolet', 'Chrysler', 'Datsun', 'De Tomaso', 'Dodge',
-  'Ferrari', 'Fiat', 'Ford', 'GMC', 'Honda', 'Hummer', 'Hyundai',
-  'Infiniti', 'Jaguar', 'Jeep', 'Lamborghini', 'Land Rover', 'Lexus',
-  'Lincoln', 'Lotus', 'Maserati', 'Mazda', 'McLaren', 'Mercedes-Benz',
-  'Mercury', 'Mini', 'Mitsubishi', 'Nissan', 'Oldsmobile', 'Opel',
-  'Peugeot', 'Plymouth', 'Pontiac', 'Porsche', 'Ram', 'Rolls-Royce',
-  'Saab', 'Saturn', 'Shelby', 'Subaru', 'Suzuki', 'Tesla', 'Toyota',
-  'Triumph', 'Volkswagen', 'Volvo'
+  'Acura', 'Alfa Romeo', 'AM General', 'Ariel', 'Aston Martin', 'Auburn', 'Audi',
+  'Austin', 'Austin-Healey', 'Backdraft', 'Bentley', 'BMW', 'Bricklin', 'Bugatti',
+  'Buick', 'Cadillac', 'Caterham', 'Chevrolet', 'Chrysler', 'Citroen', 'Cord',
+  'Crane-Simplex', 'Datsun', 'De Tomaso', 'Delage', 'DeSoto', 'Dodge', 'Dual-Ghia',
+  'Ducati', 'Duesenberg', 'Edsel', 'Factory Five', 'Ferrari', 'Fiat', 'Fisker',
+  'Ford', 'GMC', 'Harley-Davidson', 'Henderson', 'Hispano-Suiza', 'Honda',
+  'Hudson', 'Hummer', 'Hyundai', 'Imperial', 'Indian', 'INEOS', 'Infiniti',
+  'International', 'Iso', 'Isuzu', 'Jaguar', 'Jeep', 'Jensen', 'Kaiser',
+  'Kawasaki', 'Lamborghini', 'Lancia', 'Land Rover', 'Lexus', 'Lincoln',
+  'Lister-Chevrolet', 'Locomobile', 'Lotus', 'Lucid', 'Marmon', 'Maserati',
+  'Maybach', 'Mazda', 'McLaren', 'Mercer', 'Mercedes-Benz', 'Mercury', 'Meyers',
+  'MG', 'Mini', 'Mitsubishi', 'Morgan', 'Morris', 'Nash', 'Nissan', 'Oldsmobile',
+  'Opel', 'Packard', 'Pagani', 'Panoz', 'Peugeot', 'Plymouth', 'Pontiac',
+  'Porsche', 'Ram', 'Renault', 'Rivian', 'Rolls-Royce', 'Rossion', 'Ruf',
+  'Saab', 'Saturn', 'Shelby', 'Simplex', 'Spyker', 'Studebaker', 'Stutz',
+  'Subaru', 'Sunbeam', 'Superformance', 'Suzuki', 'Talbot-Lago', 'Tesla',
+  'Toyota', 'Triumph', 'Tucker', 'TVR', 'Vincent', 'Volkswagen', 'Volvo',
+  'Willys', 'Yamaha'
 ];
 
 export const MAKE_ALIASES: Record<string, string> = {
@@ -17,7 +26,10 @@ export const MAKE_ALIASES: Record<string, string> = {
   'landy': 'Land Rover', 'rr': 'Rolls-Royce', 'lambo': 'Lamborghini',
   'jag': 'Jaguar', 'poncho': 'Pontiac', 'olds': 'Oldsmobile',
   'mopar': 'Chrysler',
-  'detomaso': 'De Tomaso', 'de tomaso': 'De Tomaso'
+  'detomaso': 'De Tomaso', 'de tomaso': 'De Tomaso',
+  'healey': 'Austin-Healey', 'austin healey': 'Austin-Healey',
+  'harley': 'Harley-Davidson', 'harley davidson': 'Harley-Davidson', 'hd': 'Harley-Davidson',
+  'ih': 'International', 'international harvester': 'International'
 };
 
 export const KNOWN_BODY_STYLES: string[] = [
