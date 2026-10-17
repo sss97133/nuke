@@ -1,4 +1,4 @@
-import { indexLot, parseSaleFacet } from "./indexLot.ts";
+import { extractStructuredLotFacets, indexLot, parseSaleFacet } from "./indexLot.ts";
 
 // Records as Mecum's public index returns them (Algolia wp_posts_lot, pulled 2026-10-15), trimmed of highlight fields.
 const FIXTURE: any[] = [{"post_id": 659101, "post_title": "Chevrolet OK Used Cars Double-Sided Tin Flange", "post_modified": 1736777109, "permalink": "/lots/1139600/chevrolet-ok-used-cars-double-sided-tin-flange/", "taxonomies": {"auction_tax": [{"name": "Kissimmee 2025|1736208000|1737244800", "slug": "kissimmee-2025", "term_id": 221940}], "collection_tax": [{"name": "Geri Bauer's Forest Park Car Collection from Bridgehampton, New York|-97|0", "slug": "geri-bauers-forest-park-car-collection-from-bridgehampton-new-york", "term_id": 226469}], "division_tax": [{"name": "Road Art", "slug": "road-art", "term_id": 1576}], "lot_status": [{"name": "General", "slug": "general", "term_id": 192990}, {"name": "No reserve", "slug": "no-reserve", "term_id": 19}], "lot_type": [{"name": "Road Art", "slug": "road-art", "term_id": 1577}], "make": [{"name": "Chevrolet OK", "slug": "chevrolet-ok", "term_id": 125813}], "make_model": [{"name": "Chevrolet OK", "slug": "chevrolet-ok", "term_id": 1864}, {"name": "Road Art", "slug": "road-art", "term_id": 1578}, {"name": "Used Cars Double-Sided Tin Flange", "slug": "used-cars-double-sided-tin-flange", "term_id": 231450}], "model": [{"name": "Used Cars Double-Sided Tin Flange", "slug": "used-cars-double-sided-tin-flange", "term_id": 231451}], "run_date": [{"name": "2025-01-13", "timestamp": 1736726400, "slug": "2025-01-13", "term_id": 226381}], "sale_result": [{"name": "sold", "slug": "sold", "term_id": 85405}]}, "web_id_meta": "1139600", "auction_end_date_meta": 1737244800, "auction_day_start_meta": "2025-01-13 06:00:00", "lot_number_meta": "Y353", "sold": 1, "bid_goes_on": 0, "highest_bid_or_price": 1416, "objectID": "659101-0"}, {"post_id": 656603, "post_title": "1975 Ford F100 Pickup", "post_modified": 1736796364, "permalink": "/lots/1139314/1975-ford-f100-pickup/", "taxonomies": {"auction_tax": [{"name": "Kissimmee 2025|1736208000|1737244800", "slug": "kissimmee-2025", "term_id": 221940}], "body_type": [{"name": "Pickup", "slug": "pickup", "term_id": 724}], "division_tax": [{"name": "Collector Cars", "slug": "collector-cars", "term_id": 17}], "lot_status": [{"name": "General", "slug": "general", "term_id": 192990}], "lot_tag": [{"name": "1970s", "slug": "1970s", "term_id": 195825}, {"name": "Pickup", "slug": "pickup", "term_id": 195986}], "lot_type": [{"name": "Auto", "slug": "auto", "term_id": 20}], "lot_year": [{"name": 1975, "slug": "1975", "term_id": 891}], "make": [{"name": "Ford", "slug": "ford", "term_id": 85412}], "make_model": [{"name": "Collector Cars", "slug": "collector-cars", "term_id": 718}, {"name": "F100", "slug": "f100", "term_id": 979}, {"name": "Ford", "slug": "ford", "term_id": 731}], "model": [{"name": "F100", "slug": "f100", "term_id": 119606}], "run_date": [{"name": "2025-01-13", "timestamp": 1736726400, "slug": "2025-01-13", "term_id": 226381}], "sale_result": [{"name": "sold", "slug": "sold", "term_id": 85405}]}, "web_id_meta": "1139314", "auction_end_date_meta": 1737244800, "auction_day_start_meta": "2025-01-13 06:00:00", "lot_number_meta": "M261", "sold": 1, "bid_goes_on": 0, "highest_bid_or_price": 30800, "objectID": "656603-0"}, {"post_id": 653683, "post_title": "1973 Jeepster Commando SUV", "post_modified": 1736795686, "permalink": "/lots/1139290/1973-jeepster-commando-suv/", "taxonomies": {"auction_tax": [{"name": "Kissimmee 2025|1736208000|1737244800", "slug": "kissimmee-2025", "term_id": 221940}], "body_type": [{"name": "SUV", "slug": "suv", "term_id": 198626}], "division_tax": [{"name": "Collector Cars", "slug": "collector-cars", "term_id": 17}], "lot_status": [{"name": "General", "slug": "general", "term_id": 192990}], "lot_tag": [{"name": "1970s", "slug": "1970s", "term_id": 195825}], "lot_type": [{"name": "Auto", "slug": "auto", "term_id": 20}], "lot_year": [{"name": 1973, "slug": "1973", "term_id": 881}], "make": [{"name": "Jeepster", "slug": "jeepster", "term_id": 85928}], "make_model": [{"name": "Collector Cars", "slug": "collector-cars", "term_id": 718}, {"name": "Commando", "slug": "commando", "term_id": 2055}, {"name": "Jeepster", "slug": "jeepster", "term_id": 1484}], "model": [{"name": "Commando", "slug": "commando", "term_id": 125613}], "run_date": [{"name": "2025-01-13", "timestamp": 1736726400, "slug": "2025-01-13", "term_id": 226381}], "sale_result": [{"name": "bid-goes-on", "slug": "bid-goes-on", "term_id": 85406}]}, "web_id_meta": "1139290", "auction_end_date_meta": 1737244800, "auction_day_start_meta": "2025-01-13 06:00:00", "lot_number_meta": "M257", "sold": 0, "bid_goes_on": 1, "highest_bid_or_price": 17000, "objectID": "653683-0"}, {"post_id": 653723, "post_title": "2005 Harley-Davidson Night Train", "post_modified": 1736793015, "permalink": "/lots/1138691/2005-harley-davidson-night-train/", "taxonomies": {"auction_tax": [{"name": "Kissimmee 2025|1736208000|1737244800", "slug": "kissimmee-2025", "term_id": 221940}], "division_tax": [{"name": "Motorcycles", "slug": "motorcycles", "term_id": 747}], "lot_status": [{"name": "General", "slug": "general", "term_id": 192990}], "lot_tag": [{"name": "2000s", "slug": "2000s", "term_id": 195959}, {"name": "Motorcycle", "slug": "motorcycle", "term_id": 196607}], "lot_type": [{"name": "Motorcycle", "slug": "motorcycle", "term_id": 748}], "lot_year": [{"name": 2005, "slug": "2005", "term_id": 801}], "make": [{"name": "Harley-Davidson", "slug": "harley-davidson", "term_id": 85796}], "make_model": [{"name": "Harley-Davidson", "slug": "harley-davidson", "term_id": 750}, {"name": "Motorcycles", "slug": "motorcycles", "term_id": 749}, {"name": "Night Train", "slug": "night-train", "term_id": 73664}], "model": [{"name": "Night Train", "slug": "night-train", "term_id": 90214}], "run_date": [{"name": "2025-01-13", "timestamp": 1736726400, "slug": "2025-01-13", "term_id": 226381}], "sale_result": [{"name": "sold", "slug": "sold", "term_id": 85405}]}, "web_id_meta": "1138691", "auction_end_date_meta": 1737244800, "auction_day_start_meta": "2025-01-13 06:00:00", "lot_number_meta": "M214", "sold": 1, "bid_goes_on": 0, "highest_bid_or_price": 3300, "objectID": "653723-0"}];
@@ -47,6 +47,91 @@ Deno.test("indexLot reads hammer_price_meta, run_date timestamps, trim, engine_c
   }
   if (r.lot.estimate_low !== 125000 || r.lot.estimate_high !== 150000) {
     throw new Error(JSON.stringify(r.lot));
+  }
+});
+
+Deno.test("indexLot and extractStructuredLotFacets extract Squarebody C10/K10/C20/K20, Silverado, Cheyenne Super, Scottsdale, Stepside/Fleetside, and Mustang Fastback/Mach 1/Boss 302", () => {
+  const baseHit = structuredClone(FIXTURE.find((h) => h.sold === 1 && h.taxonomies.lot_type?.[0]?.name === "Auto"));
+
+  // 1. 1978 Chevrolet K10 Cheyenne Super Stepside Pickup
+  const k10Hit = structuredClone(baseHit);
+  k10Hit.post_title = "1978 Chevrolet K10 Cheyenne Super Stepside Pickup";
+  k10Hit.lot_series_meta = "400 CI V-8, Automatic, 4WD";
+  k10Hit.taxonomies.lot_year = [{ name: 1978, slug: "1978" }];
+  k10Hit.taxonomies.make = [{ name: "Chevrolet", slug: "chevrolet" }];
+  k10Hit.taxonomies.model = [{ name: "K10", slug: "k10" }];
+  k10Hit.taxonomies.body_type = [{ name: "Pickup", slug: "pickup" }];
+  const k10Res: any = indexLot(k10Hit);
+  if (
+    k10Res.lot.series !== "K10" ||
+    k10Res.lot.trim !== "Cheyenne Super" ||
+    k10Res.lot.body_style !== "Stepside Pickup"
+  ) {
+    throw new Error(`unexpected K10 facets: ${JSON.stringify(k10Res.lot)}`);
+  }
+
+  // 2. 1985 Chevrolet C10 Silverado Fleetside (trim in highlights when title omits it)
+  const c10Hit = structuredClone(baseHit);
+  c10Hit.post_title = "1985 Chevrolet C10 Fleetside Pickup";
+  c10Hit.lot_series_meta = "Silverado Package, 350 CI V-8, Automatic";
+  c10Hit.taxonomies.lot_year = [{ name: 1985, slug: "1985" }];
+  c10Hit.taxonomies.make = [{ name: "Chevrolet", slug: "chevrolet" }];
+  c10Hit.taxonomies.model = [{ name: "C10", slug: "c10" }];
+  c10Hit.taxonomies.body_type = [{ name: "Pickup", slug: "pickup" }];
+  const c10Res: any = indexLot(c10Hit);
+  if (
+    c10Res.lot.series !== "C10" ||
+    c10Res.lot.trim !== "Silverado" ||
+    c10Res.lot.body_style !== "Fleetside Pickup"
+  ) {
+    throw new Error(`unexpected C10 facets: ${JSON.stringify(c10Res.lot)}`);
+  }
+
+  // 3. 1979 Chevrolet C20 Scottsdale & K20 Custom Deluxe
+  const c20Facets = extractStructuredLotFacets({
+    year: 1979,
+    make: "Chevrolet",
+    model: "C20",
+    title: "1979 Chevrolet C20 Scottsdale Camper Special",
+  });
+  if (c20Facets.series !== "C20" || c20Facets.trim !== "Scottsdale") {
+    throw new Error(`unexpected C20 facets: ${JSON.stringify(c20Facets)}`);
+  }
+  const k20Facets = extractStructuredLotFacets({
+    year: 1976,
+    make: "Chevrolet",
+    model: "K20",
+    title: "1976 Chevrolet K20 Custom Deluxe 4x4 Pickup",
+  });
+  if (k20Facets.series !== "K20" || k20Facets.trim !== "Custom Deluxe" || k20Facets.body_style !== "Pickup") {
+    throw new Error(`unexpected K20 facets: ${JSON.stringify(k20Facets)}`);
+  }
+
+  // 4. Mustang Mach 1 Fastback & Boss 302 Fastback
+  const mach1Hit = structuredClone(baseHit);
+  mach1Hit.post_title = "1969 Ford Mustang Mach 1 Fastback";
+  mach1Hit.lot_series_meta = "428 CI Cobra Jet V-8, 4-Speed";
+  mach1Hit.taxonomies.lot_year = [{ name: 1969, slug: "1969" }];
+  mach1Hit.taxonomies.make = [{ name: "Ford", slug: "ford" }];
+  mach1Hit.taxonomies.model = [{ name: "Mustang", slug: "mustang" }];
+  delete mach1Hit.taxonomies.body_type;
+  const mach1Res: any = indexLot(mach1Hit);
+  if (
+    mach1Res.lot.series !== "Mach 1" ||
+    mach1Res.lot.trim !== "Mach 1" ||
+    mach1Res.lot.body_style !== "Fastback"
+  ) {
+    throw new Error(`unexpected Mach 1 facets: ${JSON.stringify(mach1Res.lot)}`);
+  }
+
+  const bossFacets = extractStructuredLotFacets({
+    year: 1970,
+    make: "Ford",
+    model: "Mustang",
+    title: "1970 Ford Mustang Boss 302 Fastback",
+  });
+  if (bossFacets.series !== "Boss 302" || bossFacets.trim !== "Boss 302" || bossFacets.body_style !== "Fastback") {
+    throw new Error(`unexpected Boss 302 facets: ${JSON.stringify(bossFacets)}`);
   }
 });
 
