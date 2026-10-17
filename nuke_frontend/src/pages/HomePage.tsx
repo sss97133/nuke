@@ -1650,13 +1650,7 @@ export function TreemapHomePage({ onBrowse, embedded = false }: { onBrowse: () =
       {embedded && levelType === 'models' && currentLevel.family && currentLevel.make && familyView === 'names' && dims.w > 0 && (
         <div
           data-testid="embedded-family-sales-chart"
-          style={{
-            position: 'relative',
-            height: 340,
-            borderTop: '2px solid var(--border)',
-            background: 'var(--bg)',
-            overflow: 'hidden',
-          }}
+          className="home-embedded-family-chart"
         >
           <FamilySalesChart
             brand={currentLevel.make}
@@ -1729,6 +1723,13 @@ export function TreemapHomePage({ onBrowse, embedded = false }: { onBrowse: () =
         @keyframes livePulse {
           0%, 100% { opacity: 1; }
           50% { opacity: 0.4; }
+        }
+        .home-embedded-family-chart {
+          position: relative;
+          height: 340px;
+          border-top: 2px solid var(--border);
+          background: var(--bg);
+          overflow: hidden;
         }
       `}</style>
     </div>
