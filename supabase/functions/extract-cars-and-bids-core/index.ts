@@ -29,6 +29,7 @@ import { requireWriteAuth } from "../_shared/writeGuard.ts";
 import { projectSecretKey } from "../_shared/supabaseKeys.ts";
 import { batchFromTargets, discoverTargets, reviseCab, recaptureCab } from "./targets.ts";
 import { parseCabDepth } from "./cabPage.ts";
+import { cleanCabText, extractCabFacets } from "./cabFacets.ts";
 import { recordSellerTypes, sellerTypeRow } from "../_shared/sellerType.ts";
 import { insertMissingVehicleImages } from "../_shared/vehicleImageWrite.ts";
 import { fillOnlyIdentity, identityConflict, REVISION_DIFFERENT_CAR } from "../_shared/identityMatch.ts";
@@ -737,13 +738,33 @@ Deno.serve(async (req) => {
     if (norm.model) extracted.model = norm.model;
     if (norm.transmission) extracted.transmission = norm.transmission;
 
+    const cleanTitle = cleanCabText(extracted.title);
+    if (cleanTitle) extracted.title = cleanTitle;
+
+    const facets = extractCabFacets({
+      year: extracted.year,
+      make: extracted.make,
+      model: extracted.model,
+      title: extracted.title,
+      highlights: [extracted.highlights, extracted.equipment, extracted.dougsTake].filter(Boolean).join(" "),
+      existingBodyStyle: extracted.bodyStyle,
+    });
+    if (facets.normalizedModel) extracted.model = facets.normalizedModel;
+
     const parsedLoc = parseLocation(extracted.location);
+    const isSold = extracted.auctionStatus === 'sold';
+    const isEndedUnsold = extracted.auctionStatus === 'reserve_not_met' || extracted.auctionStatus === 'ended';
+    const saleDateIso = isSold && extracted.endDate ? extracted.endDate.slice(0, 10) : null;
 
     // Prepare vehicle data (use actual column names from vehicles table)
     const vehicleData: Record<string, any> = {
       year: extracted.year,
       make: extracted.make,
       model: extracted.model,
+      title: extracted.title,
+      listing_title: extracted.title,
+      series: facets.series,
+      trim: facets.trim,
       vin: extracted.vin,
       mileage: extracted.mileage,
       color: extracted.exteriorColor,
@@ -751,7 +772,7 @@ Deno.serve(async (req) => {
       engine_type: extracted.engine,
       transmission: extracted.transmission,
       drivetrain: extracted.drivetrain,
-      body_style: extracted.bodyStyle,
+      body_style: facets.body_style ?? extracted.bodyStyle,
       title_status: extracted.titleStatus,
       // Set primary image from extracted gallery
       primary_image_url: extracted.images.length > 0 ? extracted.images[0] : null,
@@ -764,15 +785,27 @@ Deno.serve(async (req) => {
       listing_location_observed_at: new Date().toISOString(),
       // sale_price = final sale amount; high_bid = bid that didn't result in sale
       // C&B: 'sold' = auction ended + reserve met, 'reserve_not_met' = ended without sale
-      sale_price: extracted.auctionStatus === 'sold' ? extracted.currentBid : null,
-      high_bid: extracted.auctionStatus !== 'sold' ? extracted.currentBid : null,
+      sale_price: isSold ? extracted.currentBid : null,
+      sold_price: isSold ? extracted.currentBid : null,
+      winning_bid: isSold ? extracted.currentBid : null,
+      high_bid: !isSold ? extracted.currentBid : null,
+      sale_date: saleDateIso,
+      auction_end_date: extracted.endDate,
       // Sale rule (lock 1, 2026-09-27): the status travels with the price (nulls are stripped below).
-      sale_status: extracted.auctionStatus === 'sold' ? 'sold' : (extracted.auctionStatus === 'reserve_not_met' ? 'not_sold' : null),
-      auction_outcome: extracted.auctionStatus === 'sold' ? 'sold' : (extracted.auctionStatus === 'reserve_not_met' ? 'reserve_not_met' : null),
+      sale_status: isSold ? 'sold' : (isEndedUnsold ? 'not_sold' : (extracted.auctionStatus === 'active' ? 'auction_live' : null)),
+      auction_outcome: isSold ? 'sold' : (isEndedUnsold ? 'reserve_not_met' : null),
+      auction_status: isSold ? 'sold' : (isEndedUnsold ? 'ended' : (extracted.auctionStatus === 'active' ? 'active' : null)),
+      reserve_status: extracted.noReserve ? 'no_reserve' : (isSold ? 'reserve_met' : (isEndedUnsold ? 'reserve_not_met' : null)),
       bid_count: extracted.bidCount,
+      listing_url: listingUrlCanonical,
       discovery_url: listingUrlCanonical,
       discovery_source: "carsandbids",
       listing_source: "extract-cars-and-bids-core",
+      auction_source: "cars_and_bids",
+      canonical_platform: "cars-and-bids",
+      platform_source: "cars-and-bids",
+      source: "cars-and-bids",
+      is_public: true,
       status: "active",
       // Full C&B metadata — everything we extracted, structured
       import_metadata: {
