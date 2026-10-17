@@ -113,6 +113,26 @@ describe('URL scope contract for the market treemap', () => {
       { label: 'Mustang', make: 'Ford', family: '8a8271f8-d299-4b55-837a-35ca919f8937', names: 1243 },
     ]);
 
+    // Family-level direct year drill (Make -> Family -> Year without picking a fragmented model string)
+    const familyYearStack = [
+      { label: 'ALL MAKES' },
+      { label: 'Ford', make: 'Ford' },
+      { label: 'Mustang', make: 'Ford', family: '8a8271f8-d299-4b55-837a-35ca919f8937', names: 1243 },
+      { label: '1969', make: 'Ford', family: '8a8271f8-d299-4b55-837a-35ca919f8937', year: 1969 },
+    ];
+    const familyYearParams = applyDrillStackToSearchParams(new URLSearchParams('tab=market&era=1964-1973'), familyYearStack);
+    expect(familyYearParams.get('make')).toBe('Ford');
+    expect(familyYearParams.get('family')).toBe('8a8271f8-d299-4b55-837a-35ca919f8937');
+    expect(familyYearParams.get('family_name')).toBe('Mustang');
+    expect(familyYearParams.get('model')).toBeNull();
+    expect(familyYearParams.get('year')).toBe('1969');
+    expect(familyYearParams.get('era')).toBe('1964-1973');
+    expect(drillStackFromSearchParams(
+      familyYearParams,
+      [{ name: 'Ford', count: 29489, value: 1479400000 }],
+      [{ name: 'Mustang', count: 11050, value: 595300000, familyKey: '8a8271f8-d299-4b55-837a-35ca919f8937', models: 1243 }],
+    )).toEqual(familyYearStack);
+
     // Going back to ALL MAKES clears scope params while keeping tab
     const cleared = applyDrillStackToSearchParams(params, [{ label: 'ALL MAKES' }]);
     expect(cleared.get('tab')).toBe('market');

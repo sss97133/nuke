@@ -9,6 +9,7 @@ import { photoList, useListingPhotos } from './useListingPhotos';
 import { type PositionRead, headline, milesLine, spreadLine, venuesLine } from './askPosition';
 import { type ListingRead, readLines, requestListingRead } from './analyzeListing';
 import { useAdminAccess } from '../../hooks/useAdminAccess';
+import { matchesEraRange } from '../../lib/market/familyEras';
 
 // The classified asks that came online, nationwide, with three lenses: near the viewer, the owner's band, and the
 // asking-price tier. The point stays in memory (never in the URL); logged out there is none until the viewer shares it.
@@ -211,7 +212,49 @@ export default function ClassifiedArrivals({ collection, sourcePicker }: { colle
   const query = useAskBoard(askQuery, !near || locating !== 'asking');
   const first = query.data?.pages[0];
   const population = first?.population;
-  const rows = query.data?.pages.flatMap(page => page.rows) ?? [];
+  const allRows = query.data?.pages.flatMap(page => page.rows) ?? [];
+  const scopeMake = params.get('make')?.trim() || null;
+  const scopeFamily = params.get('family')?.trim() || null;
+  const scopeFamilyName = params.get('family_name')?.trim() || null;
+  const scopeModel = params.get('model')?.trim() || null;
+  const scopeYear = params.get('year')?.trim() ? parseInt(params.get('year')!.trim(), 10) : null;
+  const scopeEra = params.get('era')?.trim() || null;
+  const hasMarketScope = Boolean(scopeMake && scopeMake.toLowerCase() !== 'all');
+  const scopedRows = useMemo(() => {
+    if (!hasMarketScope || !scopeMake) return allRows;
+    const mk = scopeMake.toLowerCase();
+    return allRows.filter((r) => {
+      if ((r.make ?? '').trim().toLowerCase() !== mk) return false;
+      if (scopeModel) {
+        const rm = (r.model ?? '').trim().toLowerCase();
+        const sm = scopeModel.toLowerCase();
+        if (rm !== sm && !rm.startsWith(`${sm} `) && !rm.startsWith(`${sm}-`)) return false;
+      } else if (scopeFamily || scopeFamilyName) {
+        const pos = (r as PlacedRow).position;
+        if (scopeFamily && pos?.family_id === scopeFamily) {
+          // exact family_id match from classified_ask_board
+        } else if (scopeFamilyName) {
+          const fn = scopeFamilyName.toLowerCase();
+          const rm = (r.model ?? '').trim().toLowerCase();
+          const pf = (pos?.family ?? '').trim().toLowerCase();
+          if (pf !== fn && rm !== fn && !rm.startsWith(`${fn} `) && !rm.startsWith(`${fn}-`) && !rm.includes(fn)) return false;
+        }
+      }
+      if (scopeYear != null && Number.isFinite(scopeYear) && r.year !== scopeYear) return false;
+      if (scopeEra && !matchesEraRange(r.year, scopeEra)) return false;
+      return true;
+    });
+  }, [allRows, hasMarketScope, scopeMake, scopeFamily, scopeFamilyName, scopeModel, scopeYear, scopeEra]);
+  // Show scoped rows when matches exist in the loaded window; fall back to allRows so the board never blanks out when 0 of the 60 loaded rows match
+  const rows = hasMarketScope && scopedRows.length > 0 ? scopedRows : allRows;
+  const scopeLabel = hasMarketScope
+    ? [tidyName(scopeMake), scopeModel || scopeFamilyName, scopeEra ? scopeEra.replace('-', '–') : null, scopeYear != null && Number.isFinite(scopeYear) ? String(scopeYear) : null].filter(Boolean).join(' · ')
+    : null;
+  const clearMarketScope = () => {
+    const next = new URLSearchParams(params);
+    ['make', 'family', 'family_name', 'model', 'year', 'era'].forEach((k) => next.delete(k));
+    setParams(next, { replace: true });
+  };
   const { isAdmin } = useAdminAccess();
   const pageIds = useMemo(() => (query.data?.pages ?? []).map(page => page.rows.map(row => row.vehicle_id)), [query.data]);
   const photos = useListingPhotos(pageIds);
@@ -269,6 +312,19 @@ export default function ClassifiedArrivals({ collection, sourcePicker }: { colle
     </Masthead>
     <div className="k-section k-strip market-scope" role="group" aria-label="Market view">
       <div role="group" aria-label="Market view" className="market-scope__views">{collection}</div>
+      {hasMarketScope && scopeLabel && (
+        <div role="group" aria-label="Active vehicle scope" className="market-scope__views">
+          <button
+            type="button"
+            className="market-control"
+            aria-pressed={true}
+            onClick={clearMarketScope}
+            title={`Clear ${scopeLabel} scope`}
+          >
+            <Text role="label">{scopeLabel} ({scopedRows.length}) ×</Text>
+          </button>
+        </div>
+      )}
     </div>
     <details className="k-section market-filters">
       <summary><Text role="label">Filters</Text></summary>

@@ -7,6 +7,7 @@ import {
   type CalendarSale, type PriorResult, type RosterLot, daysUntil, houseLink, houseName, priorSaleLine, runTimer, saleTimer,
   updatedAgo, useAuctionCalendar, useSaleRoster,
 } from './useAuctionCalendar';
+import { matchesEraRange } from '../../lib/market/familyEras';
 import './RecordedSalesComparison.css';
 import './AuctionEvidence.css';
 import './AuctionCalendar.css';
@@ -127,15 +128,35 @@ function LotRow({ lot, house }: { lot: RosterLot; house: string }) {
   </li>;
 }
 
-function Roster({ sale, now }: { sale: CalendarSale; now: number }) {
+function Roster({ sale, now, scopeMake, scopeFamilyName, scopeModel, scopeYear, scopeEra }: {
+  sale: CalendarSale; now: number;
+  scopeMake?: string | null; scopeFamilyName?: string | null; scopeModel?: string | null; scopeYear?: number | null; scopeEra?: string | null;
+}) {
   const query = useSaleRoster({ house: sale.house, key: sale.sale_key });
   const pages = query.data?.pages ?? [];
   const roster = pages[0]?.roster;
-  const rows = pages.flatMap(page => page.roster?.rows ?? []);
+  const allRows = pages.flatMap(page => page.roster?.rows ?? []);
+  const hasMarketScope = Boolean(scopeMake && scopeMake.toLowerCase() !== 'all');
+  const scopedRows = hasMarketScope && scopeMake ? allRows.filter((lot) => {
+    if ((lot.make ?? '').trim().toLowerCase() !== scopeMake.toLowerCase()) return false;
+    if (scopeModel) {
+      const lm = (lot.model ?? '').trim().toLowerCase();
+      const sm = scopeModel.toLowerCase();
+      if (lm !== sm && !lm.startsWith(`${sm} `) && !lm.startsWith(`${sm}-`)) return false;
+    } else if (scopeFamilyName) {
+      const lm = (lot.model ?? '').trim().toLowerCase();
+      const fn = scopeFamilyName.toLowerCase();
+      if (lm !== fn && !lm.startsWith(`${fn} `) && !lm.startsWith(`${fn}-`) && !lm.includes(fn)) return false;
+    }
+    if (scopeYear != null && Number.isFinite(scopeYear) && lot.year !== scopeYear) return false;
+    if (scopeEra && !matchesEraRange(lot.year, scopeEra)) return false;
+    return true;
+  }) : allRows;
+  const rows = hasMarketScope && scopedRows.length > 0 ? scopedRows : allRows;
   const days = rows.reduce<Map<string, RosterLot[]>>((m, lot) => m.set(lot.run_on, [...(m.get(lot.run_on) ?? []), lot]), new Map());
   const byDay = new Map(sale.run_days.map(r => [r.day, r.lots]));
   if (query.isPending) return <p role="status" className="k-body">Reading the roster…</p>;
-  if (!query.isError && rows.length === 0) return <p role="status" className="k-body">No lot of this sale has landed yet{sale.lots_listed != null ? `; ${houseName(sale.house)} lists ${count(sale.lots_listed)}` : ''}.</p>;
+  if (!query.isError && allRows.length === 0) return <p role="status" className="k-body">No lot of this sale has landed yet{sale.lots_listed != null ? `; ${houseName(sale.house)} lists ${count(sale.lots_listed)}` : ''}.</p>;
   if (query.isError) return <p role="status" className="k-body">The roster could not be read. <button type="button" className="market-control"
     onClick={() => void query.refetch()}><Text role="label">Retry</Text></button></p>;
   return <div className="auction-roster" aria-label={`${sale.sale_name} roster`}>
@@ -143,7 +164,7 @@ function Roster({ sale, now }: { sale: CalendarSale; now: number }) {
     {[...days.entries()].map(([day, lots]) => <Fragment key={day}>
       <div className="auction-roster__day">
         <Text role="label">{dayLabel(day)}</Text>
-        <Text role="caption">{count(byDay.get(day) ?? lots.length)} lots · {runTimer(day, now)}</Text>
+        <Text role="caption">{count(hasMarketScope && scopedRows.length > 0 ? lots.length : (byDay.get(day) ?? lots.length))} lots · {runTimer(day, now)}</Text>
       </div>
       <ul className="auction-roster__lots">{lots.map(lot => <LotRow key={lot.event_id} lot={lot} house={sale.house} />)}</ul>
     </Fragment>)}
@@ -159,6 +180,20 @@ export default function AuctionCalendar({ collection }: { collection?: ReactNode
   const data = query.data;
   const population = data?.population;
   const selected = params.get('sale');
+  const scopeMake = params.get('make')?.trim() || null;
+  const scopeFamilyName = params.get('family_name')?.trim() || null;
+  const scopeModel = params.get('model')?.trim() || null;
+  const scopeYear = params.get('year')?.trim() ? parseInt(params.get('year')!.trim(), 10) : null;
+  const scopeEra = params.get('era')?.trim() || null;
+  const hasMarketScope = Boolean(scopeMake && scopeMake.toLowerCase() !== 'all');
+  const scopeLabel = hasMarketScope
+    ? [scopeMake, scopeModel || scopeFamilyName, scopeEra ? scopeEra.replace('-', '–') : null, scopeYear != null && Number.isFinite(scopeYear) ? String(scopeYear) : null].filter(Boolean).join(' · ')
+    : null;
+  const clearMarketScope = () => {
+    const next = new URLSearchParams(params);
+    ['make', 'family', 'family_name', 'model', 'year', 'era'].forEach((k) => next.delete(k));
+    setParams(next, { replace: true });
+  };
   const choose = (key: string | null) => {
     const next = new URLSearchParams(params);
     if (key) next.set('sale', key); else next.delete('sale');
@@ -180,6 +215,19 @@ export default function AuctionCalendar({ collection }: { collection?: ReactNode
     </Masthead>
     <div className="k-section k-strip market-scope" role="group" aria-label="Calendar scope">
       <div role="group" aria-label="Market view" className="market-scope__views">{collection}</div>
+      {hasMarketScope && scopeLabel && (
+        <div role="group" aria-label="Active vehicle scope" className="market-scope__views">
+          <button
+            type="button"
+            className="market-control"
+            aria-pressed={true}
+            onClick={clearMarketScope}
+            title={`Clear ${scopeLabel} scope`}
+          >
+            <Text role="label">{scopeLabel} ×</Text>
+          </button>
+        </div>
+      )}
       <Text role="caption" className="market-scope__note">
         Live sales publish their rosters weeks to months ahead; a lot lands here when the house lists it and leaves if it is withdrawn.
         Timers count days to the house's run day. The shaded band is the {ONLINE_DAYS}-day window an online auction runs in.
@@ -219,7 +267,7 @@ export default function AuctionCalendar({ collection }: { collection?: ReactNode
               {sale.lots > 0 && <Text role="caption" as="div">{count(sale.seen_before)} with an earlier record · {count(sale.no_reserve)} no reserve</Text>}</td>
             <td className="auction-calendar__axis"><SaleTrack sale={sale} now={now} horizon={horizon} /></td>
           </tr>
-          {open && <tr className="auction-sale__roster"><td colSpan={4}><Roster sale={sale} now={now} /></td></tr>}
+          {open && <tr className="auction-sale__roster"><td colSpan={4}><Roster sale={sale} now={now} scopeMake={scopeMake} scopeFamilyName={scopeFamilyName} scopeModel={scopeModel} scopeYear={scopeYear} scopeEra={scopeEra} /></td></tr>}
         </Fragment>;
       })}</tbody>
     </table></div>}
