@@ -21,6 +21,7 @@ import { getDefinedFamilyEras, getFamilyEraCohorts, matchesEraRange } from '../l
 import { buildMarketScopeUrl, resolveMarketScopeQuery } from '../lib/search/marketScopeResolver';
 import {
   buildFacetNodes,
+  classifyVehicleFacets,
   consolidateBrandPickupFamilies,
   isPickupFamilyLabel,
   resolveTileBadgeSvg,
@@ -90,6 +91,38 @@ interface DrillLevel {
 
 const SCOPE_PARAM_KEYS = ['make', 'family', 'family_name', 'model', 'year'] as const;
 
+export function parseFacetAxisParam(raw: string | null | undefined): FamilyFacetAxis | null {
+  if (!raw) return null;
+  const norm = raw.trim().toLowerCase();
+  if (norm === 'series') return 'series';
+  if (norm === 'trim') return 'trim';
+  if (norm === 'body' || norm === 'body_style' || norm === 'bodystyle') return 'body';
+  if (norm === 'raw') return 'raw';
+  return null;
+}
+
+export function normalizeFacetSelection(
+  axis: FamilyFacetAxis | null | undefined,
+  rawFacet: string | null | undefined,
+  make?: string | null,
+  familyLabel?: string | null,
+): string | null {
+  if (!rawFacet) return null;
+  const trimmed = rawFacet.trim();
+  if (!trimmed) return null;
+  if (!axis || axis === 'raw') return trimmed;
+  const classified = classifyVehicleFacets(make, familyLabel, trimmed);
+  const canonical = axis === 'series' ? classified.series : axis === 'trim' ? classified.trim : classified.body;
+  if (canonical) {
+    const isGenericFallback =
+      (canonical === 'Mustang Standard' && !/\bstandard\b/i.test(trimmed)) ||
+      (canonical === 'Corvette Base' && !/\bbase\b/i.test(trimmed)) ||
+      (canonical === 'Standard Cab Pickup' && !/\bstandard\s+cab\b/i.test(trimmed));
+    if (!isGenericFallback) return canonical;
+  }
+  return trimmed;
+}
+
 /** Build the treemap's drill stack from the page URL, resolving canonical brand and family names when loaded. */
 export function drillStackFromSearchParams(
   params: URLSearchParams,
@@ -105,28 +138,44 @@ export function drillStackFromSearchParams(
   const rawFamily = params.get('family')?.trim();
   const rawFamilyName = params.get('family_name')?.trim();
   let familyLabel = '';
+  let resolvedFamilyKey = rawFamily ?? '';
   if (rawFamily) {
-    const matched = families?.find((f) => f.familyKey === rawFamily);
-    familyLabel = matched?.name ?? rawFamilyName ?? rawFamily;
-    stack.push({ label: familyLabel, make, family: rawFamily, names: matched?.models ?? undefined });
+    const matched = families?.find(
+      (f) =>
+        f.familyKey === rawFamily ||
+        (f.familyKey != null && f.familyKey.toLowerCase() === rawFamily.toLowerCase()) ||
+        f.name.toLowerCase() === rawFamily.toLowerCase() ||
+        (rawFamilyName != null && f.name.toLowerCase() === rawFamilyName.toLowerCase()) ||
+        (isPickupFamilyLabel(rawFamily) && f.name.toLowerCase() === 'pickup'),
+    );
+    resolvedFamilyKey = matched?.familyKey ?? rawFamily;
+    familyLabel = matched?.name ?? rawFamilyName ?? (isPickupFamilyLabel(rawFamily) ? 'Pickup' : rawFamily);
+    stack.push({ label: familyLabel, make, family: resolvedFamilyKey, names: matched?.models ?? undefined });
   }
 
-  const rawModel = params.get('model')?.trim();
+  const rawAxis = parseFacetAxisParam(params.get('axis'));
+  const rawFacet = params.get('facet')?.trim();
+  const rawModelParam = params.get('model')?.trim();
+  const effectiveFacet = rawFacet
+    ? normalizeFacetSelection(rawAxis, rawFacet, make, familyLabel || rawFamily) ?? rawFacet
+    : null;
+  const rawModel = effectiveFacet ?? rawModelParam;
   const normKey = (s: string) => s.toLowerCase().replace(/[\s\-_]+/g, '');
   const isCollapsedDuplicateOfFamily =
+    !effectiveFacet &&
     !!rawFamily &&
     !!rawModel &&
     !!familyLabel &&
     rawModel.toLowerCase() !== familyLabel.toLowerCase() &&
     normKey(rawModel) === normKey(familyLabel);
   if (rawModel && !isCollapsedDuplicateOfFamily) {
-    stack.push({ label: rawModel, make, family: rawFamily || undefined, model: rawModel });
+    stack.push({ label: rawModel, make, family: resolvedFamilyKey || undefined, model: rawModel });
   }
   const rawYear = params.get('year')?.trim();
   if (rawYear && (rawModel || rawFamily)) {
     const year = parseInt(rawYear, 10);
     if (Number.isFinite(year)) {
-      stack.push({ label: String(year), make, family: rawFamily || undefined, model: rawModel || undefined, year });
+      stack.push({ label: String(year), make, family: resolvedFamilyKey || undefined, model: rawModel || undefined, year });
     }
   }
   return stack;
@@ -135,11 +184,14 @@ export function drillStackFromSearchParams(
 /** Write the treemap's drill stack into the page URL while preserving unrelated parameters. */
 export function applyDrillStackToSearchParams(params: URLSearchParams, stack: readonly DrillLevel[]): URLSearchParams {
   const prevFamily = params.get('family');
+  const prevAxis = parseFacetAxisParam(params.get('axis'));
   const next = new URLSearchParams(params);
   for (const k of SCOPE_PARAM_KEYS) next.delete(k);
   const leaf = stack[stack.length - 1];
   if (!leaf?.make) {
     next.delete('era');
+    next.delete('axis');
+    next.delete('facet');
     return next;
   }
   next.set('make', leaf.make);
@@ -151,11 +203,24 @@ export function applyDrillStackToSearchParams(params: URLSearchParams, stack: re
     }
     if (prevFamily && prevFamily !== leaf.family) {
       next.delete('era');
+      next.delete('axis');
+      next.delete('facet');
     }
   } else {
     next.delete('era');
+    next.delete('axis');
+    next.delete('facet');
   }
-  if (leaf.model) next.set('model', leaf.model);
+  if (leaf.model) {
+    if (prevAxis && prevAxis !== 'raw' && leaf.family) {
+      const modelLevel = stack.find((l) => l.model && !l.year);
+      next.set('facet', modelLevel?.label ?? leaf.model);
+    } else {
+      next.set('model', leaf.model);
+    }
+  } else {
+    next.delete('facet');
+  }
   if (leaf.year != null && Number.isFinite(leaf.year)) next.set('year', String(leaf.year));
   return next;
 }
@@ -1362,11 +1427,25 @@ export function TreemapHomePage({ onBrowse, embedded = false }: { onBrowse: () =
   const [brandView, setBrandView] = useState<'brands' | 'nested'>('brands');
   // A family keeps its model names as clickable treemap tiles; the sales chart is shown below when embedded (or via the switch).
   const [familyView, setFamilyView] = useState<'sales' | 'names'>('names');
-  const [facetAxis, setFacetAxis] = useState<FamilyFacetAxis>('raw');
+  const urlAxis = parseFacetAxisParam(searchParams.get('axis'));
+  const [facetAxis, setFacetAxisState] = useState<FamilyFacetAxis>(() => urlAxis ?? 'raw');
+  const setFacetAxis = useCallback((nextAxis: FamilyFacetAxis) => {
+    setFacetAxisState(nextAxis);
+    setSearchParams((curr) => {
+      const next = new URLSearchParams(curr);
+      if (nextAxis === 'raw') {
+        next.delete('axis');
+        next.delete('facet');
+      } else {
+        next.set('axis', nextAxis);
+      }
+      return next;
+    }, { preventScrollReset: true });
+  }, [setSearchParams]);
   useEffect(() => {
     setFamilyView('names');
-    setFacetAxis('raw');
-  }, [currentLevel.make, currentLevel.family]);
+    setFacetAxisState(urlAxis ?? 'raw');
+  }, [currentLevel.make, currentLevel.family, urlAxis]);
 
   // Family-wide sales (5-year dated window via treemap_family_sales): enables direct Family -> Years -> Vehicles navigation
   // and Era filtering without requiring a fragmented raw model string first.
@@ -1559,7 +1638,7 @@ export function TreemapHomePage({ onBrowse, embedded = false }: { onBrowse: () =
   const { data: vehiclesData, loading: vehiclesLoading } = useTreemapVehicles(vehicleMake, vehicleModel, vehicleYear);
 
   // Sync URL scope changes (Back/Forward, search, lower sections) and canonical brand/family labels into drillStack.
-  const urlScopeKey = SCOPE_PARAM_KEYS.map((k) => searchParams.get(k) ?? '').join('\x1f');
+  const urlScopeKey = [...SCOPE_PARAM_KEYS, 'axis', 'facet'].map((k) => searchParams.get(k) ?? '').join('\x1f');
   useEffect(() => {
     setDrillStackState((prev) => {
       const fromUrl = drillStackFromSearchParams(searchParams, brandsData, familiesData);
@@ -1574,22 +1653,50 @@ export function TreemapHomePage({ onBrowse, embedded = false }: { onBrowse: () =
   // Re-key family sub-models along the active facet axis ('raw' | 'series' | 'trim' | 'body')
   const facetedFamilyModels = useMemo<TreemapNode[] | null>(() => {
     const base = eraFilteredFamilyModels ?? familyModelsData;
-    if (!base) return null;
+    if (!base || base.length === 0) {
+      if (facetAxis !== 'raw' && activeFacetOrModelLabel && currentLevel.make && currentLevel.family) {
+        return [
+          {
+            name: activeFacetOrModelLabel,
+            count: 1,
+            value: 1,
+            badgeSvg: resolveTileBadgeSvg(currentLevel.make, activeFamilyLabel, activeFacetOrModelLabel),
+          },
+        ];
+      }
+      return null;
+    }
     if (facetAxis === 'raw') {
       return base.map((n) => ({
         ...n,
         badgeSvg: n.badgeSvg ?? resolveTileBadgeSvg(currentLevel.make, activeFamilyLabel, n.name),
       }));
     }
-    return buildFacetNodes(
-      facetAxis,
-      currentLevel.make,
-      activeFamilyLabel,
-      base,
-      familySalesData,
-      selectedEra ? (yr) => matchesEraRange(yr, selectedEra) : undefined,
-    );
-  }, [eraFilteredFamilyModels, familyModelsData, facetAxis, currentLevel.make, activeFamilyLabel, familySalesData, selectedEra]);
+    const built =
+      buildFacetNodes(
+        facetAxis,
+        currentLevel.make,
+        activeFamilyLabel,
+        base,
+        familySalesData,
+        selectedEra ? (yr) => matchesEraRange(yr, selectedEra) : undefined,
+      ) ?? [];
+    if (
+      activeFacetOrModelLabel &&
+      !built.some((n) => n.name.toLowerCase() === activeFacetOrModelLabel.toLowerCase())
+    ) {
+      return [
+        {
+          name: activeFacetOrModelLabel,
+          count: 1,
+          value: 1,
+          badgeSvg: resolveTileBadgeSvg(currentLevel.make, activeFamilyLabel, activeFacetOrModelLabel),
+        },
+        ...built,
+      ];
+    }
+    return built;
+  }, [eraFilteredFamilyModels, familyModelsData, facetAxis, currentLevel.make, currentLevel.family, activeFamilyLabel, activeFacetOrModelLabel, familySalesData, selectedEra]);
 
   // Vetted, period-accurate marque emblems, fender plates, and scripts for the active scope
   const activeIdentityMarks = useMemo(
@@ -2160,7 +2267,10 @@ export function TreemapHomePage({ onBrowse, embedded = false }: { onBrowse: () =
               ALL <span className="home-family-submodel-count">{namedFamilies.length}</span>
             </button>
             {namedFamilies.slice(0, 14).map((fam) => {
-              const active = currentLevel.family === fam.familyKey;
+              const active =
+                currentLevel.family === fam.familyKey ||
+                (!!currentLevel.family && fam.name.toLowerCase() === currentLevel.family.toLowerCase()) ||
+                (!!activeFamilyLabel && fam.name.toLowerCase() === activeFamilyLabel.toLowerCase());
               return (
                 <button
                   key={fam.familyKey}
@@ -2244,7 +2354,22 @@ export function TreemapHomePage({ onBrowse, embedded = false }: { onBrowse: () =
       {(() => {
         const rawPool = eraFilteredFamilyModels ?? familyModelsData;
         const subModelPool = facetedFamilyModels ?? rawPool;
-        if (!currentLevel.family || !currentLevel.make || !subModelPool || subModelPool.length <= 1) return null;
+        if (
+          !currentLevel.family ||
+          !currentLevel.make ||
+          !subModelPool ||
+          subModelPool.length === 0 ||
+          (subModelPool.length <= 1 && facetAxis === 'raw' && !activeFacetOrModelLabel)
+        ) {
+          return null;
+        }
+        const visibleSubModels = (() => {
+          const top = subModelPool.slice(0, 12);
+          if (!activeFacetOrModelLabel) return top;
+          if (top.some((s) => s.name.toLowerCase() === activeFacetOrModelLabel.toLowerCase())) return top;
+          const matched = subModelPool.find((s) => s.name.toLowerCase() === activeFacetOrModelLabel.toLowerCase());
+          return matched ? [...top.slice(0, 11), matched] : top;
+        })();
         const axisOptions: { id: FamilyFacetAxis; label: string }[] = [
           { id: 'raw', label: 'SUB-MODELS' },
           { id: 'series', label: 'SERIES' },
@@ -2283,13 +2408,17 @@ export function TreemapHomePage({ onBrowse, embedded = false }: { onBrowse: () =
             >
               ALL <span className="home-family-submodel-count">{subModelPool.length}</span>
             </button>
-            {subModelPool.slice(0, 12).map((sub) => {
-              const targetModel = sub.facetRepresentativeModel ?? sub.name;
-              const active = currentLevel.model === sub.name || currentLevel.model === targetModel;
+            {visibleSubModels.map((sub) => {
+              const targetModel = facetAxis !== 'raw' ? sub.name : (sub.facetRepresentativeModel ?? sub.name);
+              const active =
+                facetAxis !== 'raw'
+                  ? activeFacetOrModelLabel != null && sub.name.toLowerCase() === activeFacetOrModelLabel.toLowerCase()
+                  : currentLevel.model === sub.name || currentLevel.model === targetModel;
               return (
                 <button
                   key={sub.name}
                   type="button"
+                  data-facet-pill={sub.name}
                   className={`home-family-submodel-pill${active ? ' home-family-submodel-pill--active' : ''}`}
                   aria-pressed={active}
                   onClick={() => {

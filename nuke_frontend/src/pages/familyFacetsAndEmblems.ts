@@ -1370,10 +1370,12 @@ export function resolveVettedIdentityMarks(params: {
   make?: string | null;
   familyLabel?: string | null;
   model?: string | null;
+  modelLabel?: string | null;
   year?: number | null;
   eraId?: string | null;
 }): VehicleIdentityMark[] {
-  const { make, familyLabel, model, year, eraId } = params;
+  const { make, familyLabel, year, eraId } = params;
+  const model = params.model ?? params.modelLabel ?? null;
   if (!make) return [];
   const brandLower = make.trim().toLowerCase();
   const famLower = (familyLabel ?? '').trim().toLowerCase();
