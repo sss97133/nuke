@@ -256,5 +256,37 @@ describe('familyFacetsAndEmblems', () => {
       body: 'Gullwing Coupe',
     });
     expect(classifyVehicleFacets('Ferrari', '355', 'F355 GTS Manual', 1997).body).toBe('Roadster / Speedster');
+
+    // Toyota Land Cruiser J40/J55/J60/J80, K5 Blazer, Pontiac GTO Judge & Trans Am, Porsche 356/Carrera RS, Jaguar E-Type
+    expect(classifyVehicleFacets('Toyota', 'Land Cruiser', 'FJ40 Land Cruiser Hardtop', 1978)).toEqual({
+      series: 'FJ40 / BJ40 (J40)',
+      trim: null,
+      body: 'Coupe / Hardtop',
+    });
+    expect(classifyVehicleFacets('Toyota', 'Land Cruiser', 'FJ62 Land Cruiser Wagon', 1989).series).toBe(
+      'FJ60 / FJ62 (J60 Wagon)',
+    );
+    expect(classifyVehicleFacets('Chevrolet', 'Blazer', 'K5 Blazer Cheyenne 4x4', 1972)).toEqual({
+      series: 'K5 Blazer (Full-Size)',
+      trim: 'Cheyenne',
+      body: null,
+    });
+    expect(classifyVehicleFacets('Pontiac', 'GTO', 'GTO The Judge Convertible', 1969)).toEqual({
+      series: 'GTO The Judge',
+      trim: null,
+      body: 'Convertible / Cabriolet',
+    });
+    expect(classifyVehicleFacets('Porsche', '356', '356A 1600 Speedster', 1957)).toEqual({
+      series: '356A (T1 / T2)',
+      trim: null,
+      body: 'Roadster / Speedster',
+    });
+    expect(classifyVehicleFacets('Jaguar', 'E-Type', 'E-Type Series 1 4.2 Roadster', 1966)).toEqual({
+      series: 'E-Type Series 1',
+      trim: null,
+      body: 'Roadster / Speedster',
+    });
+    expect(resolveTileBadgeSvg('Toyota', 'Land Cruiser', 'FJ40 / BJ40 (J40)', 1978)).toContain('LAND CRUISER');
+    expect(resolveTileBadgeSvg('Chevrolet', 'Blazer', 'K5 Blazer (Full-Size)', 1972)).toContain('BLAZER');
   });
 });
