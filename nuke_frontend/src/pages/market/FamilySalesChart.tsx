@@ -4,7 +4,13 @@ import { Text } from '../../kit';
 import './FamilySalesChart.css';
 import { LikeForLike, useFamilyIndex } from './FamilyPriceIndex';
 import { getFamilyEraCohorts, matchesEraRange } from '../../lib/market/familyEras';
-import { classifyVehicleFacets } from '../familyFacetsAndEmblems';
+import {
+  classifyVehicleFacets,
+  resolveTileBadgeSvg,
+  resolveVettedIdentityMarks,
+  type FamilyFacetAxis,
+  type VehicleIdentityMark,
+} from '../familyFacetsAndEmblems';
 
 // One model family's market as a chart, the way classic.com draws a model: every confirmed sale of the last five years
 // as a dot (price against date, colored by venue) and a rolling median through them, so the trading range, the volume
@@ -345,6 +351,209 @@ export function mixFixed(moves: EraMove[]): { change: number; nLast: number; nPr
 const signed = (v: number) => (Math.round(v * 100) === 0 ? '0%' : `${v > 0 ? '▲' : '▼'}${Math.abs(Math.round(v * 100))}%`);
 const P = { left: 50, right: 8, top: 18, bottom: 18 };
 const MIN_BAND = 8;
+
+const FACET_AXIS_SET = new Set<string>(['raw', 'series', 'trim', 'body']);
+
+export interface SaleTooltipFacetPill {
+  axis: 'series' | 'trim' | 'body';
+  axisLabel: 'SERIES' | 'TRIM' | 'BODY';
+  value: string;
+}
+
+export interface SaleTooltipFacetSummary {
+  rawSubModel: string | null;
+  series: string | null;
+  trim: string | null;
+  body: string | null;
+  pills: SaleTooltipFacetPill[];
+  identityMark: VehicleIdentityMark | null;
+  badgeSvg: string | null;
+}
+
+/**
+ * Derives a sale record's sub-model label along the requested facet axis ('raw' | 'series' | 'trim' | 'body').
+ * - 'raw': strips any enriched " · <listing_title>" suffix and returns the base model token (or family fallback).
+ * - 'series' | 'trim' | 'body': classifies the sale via `classifyVehicleFacets` and returns that axis's facet
+ *   when present, falling back to the raw sub-model string when the sale has no distinct facet on that axis.
+ */
+export function deriveSaleSubModel(
+  saleOrModel: { model: string | null; year?: number | null } | string | null | undefined,
+  axis: FamilyFacetAxis = 'raw',
+  context?: { brand?: string | null; family?: string | null; year?: number | null } | string | null,
+  familyArg?: string | null,
+  yearArg?: number | null,
+): string | null {
+  let resolvedAxis: FamilyFacetAxis = 'raw';
+  let targetSaleOrModel = saleOrModel;
+
+  if (
+    typeof saleOrModel === 'string' &&
+    FACET_AXIS_SET.has(saleOrModel) &&
+    (axis === undefined ||
+      typeof axis === 'object' ||
+      (typeof axis === 'string' && !FACET_AXIS_SET.has(axis)))
+  ) {
+    resolvedAxis = saleOrModel as FamilyFacetAxis;
+    targetSaleOrModel = axis as { model: string | null; year?: number | null } | string | null | undefined;
+  } else if (typeof axis === 'string' && FACET_AXIS_SET.has(axis)) {
+    resolvedAxis = axis;
+  }
+
+  const ctx =
+    typeof context === 'string' || context === null
+      ? { brand: context, family: familyArg ?? null, year: yearArg ?? null }
+      : context;
+
+  const rawModel =
+    typeof targetSaleOrModel === 'object' && targetSaleOrModel !== null
+      ? (targetSaleOrModel.model ?? '')
+      : (targetSaleOrModel ?? '');
+  const year =
+    (typeof targetSaleOrModel === 'object' && targetSaleOrModel !== null && 'year' in targetSaleOrModel
+      ? targetSaleOrModel.year
+      : undefined) ??
+    ctx?.year ??
+    null;
+
+  const trimmed = rawModel.trim();
+  const canonicalRaw = trimmed ? trimmed.split(' · ')[0].trim() : ((ctx?.family ?? '').trim() || null);
+  if (resolvedAxis === 'raw') {
+    return canonicalRaw || null;
+  }
+
+  const facets = classifyVehicleFacets(ctx?.brand, ctx?.family, trimmed, year);
+  const picked =
+    resolvedAxis === 'series'
+      ? facets.series
+      : resolvedAxis === 'trim'
+        ? facets.trim
+        : facets.body;
+
+  return picked ?? canonicalRaw ?? null;
+}
+
+/**
+ * Resolves the most specific period-accurate SVG identity mark for a single sale dot.
+ */
+export function resolveSaleIdentityMark(
+  saleOrModel: { model: string | null; year?: number | null } | string | null | undefined,
+  context?: { brand?: string | null; family?: string | null; year?: number | null },
+): VehicleIdentityMark | null {
+  const rawModel =
+    typeof saleOrModel === 'object' && saleOrModel !== null
+      ? (saleOrModel.model ?? '')
+      : (saleOrModel ?? '');
+  const year =
+    (typeof saleOrModel === 'object' && saleOrModel !== null && 'year' in saleOrModel
+      ? saleOrModel.year
+      : undefined) ??
+    context?.year ??
+    null;
+  const brand = context?.brand ?? null;
+  const family = context?.family ?? null;
+  if (!brand) return null;
+
+  const cls = classifyVehicleFacets(brand, family, rawModel, year);
+  const rawLower = rawModel.toLowerCase();
+  const candidates = resolveVettedIdentityMarks({
+    make: brand,
+    familyLabel: family,
+    model: rawModel,
+    year,
+  });
+
+  const matched = candidates.filter((mark) => {
+    if (mark.trimPackage) {
+      const tLower = mark.trimPackage.toLowerCase();
+      if (cls.trim?.toLowerCase() !== tLower && !rawLower.includes(tLower)) return false;
+    }
+    if (mark.bodyStyle) {
+      const bLower = mark.bodyStyle.toLowerCase();
+      if (!cls.body?.toLowerCase().includes(bLower) && !rawLower.includes(bLower)) return false;
+    }
+    if (mark.seriesCode && !mark.trimPackage) {
+      const sLower = mark.seriesCode.toLowerCase();
+      const clsSeries = (cls.series ?? '').toLowerCase();
+      const seriesMatches =
+        (clsSeries.length > 0 && (clsSeries.includes(sLower) || sLower.includes(clsSeries))) ||
+        rawLower.includes(sLower);
+      if (!seriesMatches) return false;
+    }
+    return true;
+  });
+
+  const kindPriority: Record<VehicleIdentityMark['markKind'], number> = {
+    trim_badge: 1,
+    series_badge: 2,
+    body_silhouette: 3,
+    model_wordmark: 4,
+    marque_emblem: 5,
+  };
+
+  matched.sort((a, b) => {
+    const pa = kindPriority[a.markKind] ?? 9;
+    const pb = kindPriority[b.markKind] ?? 9;
+    if (pa !== pb) return pa - pb;
+    return (b.trimPackage?.length ?? 0) - (a.trimPackage?.length ?? 0);
+  });
+
+  return matched[0] ?? null;
+}
+
+/**
+ * Derives the orthogonal SERIES, TRIM, and BODY facet pills (when distinct from the raw sub-model)
+ * and the matching period SVG identity mark for a hovered/selected sale dot tooltip card.
+ */
+export function deriveSaleTooltipFacets(
+  saleOrModel: { model: string | null; year?: number | null } | string | null | undefined,
+  context?: { brand?: string | null; family?: string | null; year?: number | null },
+): SaleTooltipFacetSummary {
+  const rawModel =
+    typeof saleOrModel === 'object' && saleOrModel !== null
+      ? (saleOrModel.model ?? '')
+      : (saleOrModel ?? '');
+  const year =
+    (typeof saleOrModel === 'object' && saleOrModel !== null && 'year' in saleOrModel
+      ? saleOrModel.year
+      : undefined) ??
+    context?.year ??
+    null;
+  const brand = context?.brand ?? null;
+  const family = context?.family ?? null;
+
+  const rawSubModel = deriveSaleSubModel(saleOrModel, 'raw', { brand, family, year });
+  const rawNorm = (rawSubModel ?? '').trim().toLowerCase();
+
+  const seriesVal = deriveSaleSubModel(saleOrModel, 'series', { brand, family, year });
+  const trimVal = deriveSaleSubModel(saleOrModel, 'trim', { brand, family, year });
+  const bodyVal = deriveSaleSubModel(saleOrModel, 'body', { brand, family, year });
+
+  const series = seriesVal && seriesVal.trim().toLowerCase() !== rawNorm ? seriesVal : null;
+  const trim = trimVal && trimVal.trim().toLowerCase() !== rawNorm ? trimVal : null;
+  const body = bodyVal && bodyVal.trim().toLowerCase() !== rawNorm ? bodyVal : null;
+
+  const pills: SaleTooltipFacetPill[] = [];
+  if (series) pills.push({ axis: 'series', axisLabel: 'SERIES', value: series });
+  if (trim) pills.push({ axis: 'trim', axisLabel: 'TRIM', value: trim });
+  if (body) pills.push({ axis: 'body', axisLabel: 'BODY', value: body });
+
+  const identityMark = resolveSaleIdentityMark(saleOrModel, { brand, family, year });
+  const trimSvg = trim ? resolveTileBadgeSvg(brand, family, trim, year) : undefined;
+  const seriesSvg = series ? resolveTileBadgeSvg(brand, family, series, year) : undefined;
+  const bodySvg = body ? resolveTileBadgeSvg(brand, family, body, year) : undefined;
+  const rawSvg = resolveTileBadgeSvg(brand, family, rawModel, year);
+  const badgeSvg = identityMark?.svgMarkup ?? trimSvg ?? seriesSvg ?? bodySvg ?? rawSvg ?? null;
+
+  return {
+    rawSubModel,
+    series,
+    trim,
+    body,
+    pills,
+    identityMark,
+    badgeSvg,
+  };
+}
 
 export function matchesSaleSubModel(
   saleModel: string | null | undefined,
@@ -739,9 +948,11 @@ export default function FamilySalesChart({ brand, familyKey, family, width, heig
           {pn.lastRow && <text x={t.x + 3} y={plot.ph - 5} className="family-sales__axis">{t.label}</text>}
         </g>)}
         {pn.area && <path d={pn.area} className="family-sales__iqr" />}
-        {pn.dots.map((d) => d.out
-          ? <path key={d.vehicle_id} d={d.out > 0 ? `M${d.cx - 3} ${d.cy + 4}L${d.cx} ${d.cy - 1}L${d.cx + 3} ${d.cy + 4}Z` : `M${d.cx - 3} ${d.cy - 4}L${d.cx} ${d.cy + 1}L${d.cx + 3} ${d.cy - 4}Z`} className="family-sales__edge" />
-          : <circle key={d.vehicle_id} cx={d.cx} cy={d.cy} r={pn.n > 1500 ? 1.4 : pn.n > 400 ? 2 : 2.6} fill={d.color} fillOpacity={pn.n > 1500 ? 0.35 : 0.55} />)}
+        {pn.dots.map((d, di) => d.out
+          ? <path key={d.vehicle_id} data-vehicle-id={d.vehicle_id} d={d.out > 0 ? `M${d.cx - 3} ${d.cy + 4}L${d.cx} ${d.cy - 1}L${d.cx + 3} ${d.cy + 4}Z` : `M${d.cx - 3} ${d.cy - 4}L${d.cx} ${d.cy + 1}L${d.cx + 3} ${d.cy - 4}Z`} className="family-sales__edge"
+              onMouseEnter={() => { setRefHover(null); setHover({ band: bi, dot: di }); }} />
+          : <circle key={d.vehicle_id} data-vehicle-id={d.vehicle_id} cx={d.cx} cy={d.cy} r={pn.n > 1500 ? 1.4 : pn.n > 400 ? 2 : 2.6} fill={d.color} fillOpacity={pn.n > 1500 ? 0.35 : 0.55}
+              onMouseEnter={() => { setRefHover(null); setHover({ band: bi, dot: di }); }} />)}
         {pn.line && !plot.ref && <path d={pn.line} className="family-sales__median-halo" />}
         {pn.line && <path d={pn.line} className={plot.ref ? 'family-sales__median family-sales__median--plain' : 'family-sales__median'} />}
         {pn.liveDots.map((ld) => (
@@ -762,6 +973,7 @@ export default function FamilySalesChart({ brand, familyKey, family, width, heig
     {(() => {
       // One tip: the like-for-like point when the pointer is nearest it, else the sale under the pointer.
       const r = plot.ref && refHover != null ? plot.ref.points[refHover] : null;
+      const saleFacets = !r && hd && hover ? deriveSaleTooltipFacets(hd, { brand, family, year: hd.year }) : null;
       const tip = r ? {
         left: Math.min(r.cx + 12, width - 260), top: plot.head + r.cy + 12,
         label: `${ix?.periodKind === 'month'
@@ -769,16 +981,50 @@ export default function FamilySalesChart({ brand, familyKey, family, width, heig
           : `${new Date(r.t).getUTCFullYear()} Q${Math.floor(new Date(r.t).getUTCMonth() / 3) + 1}`} · the same car`,
         measure: money(r.usd),
         caption: `${r.n.toLocaleString('en-US')} sales · 95% ${money(r.lo)}–${money(r.hi)}${r.median ? ` · plain median ${money(r.median)}` : ''}`,
+        pills: [] as SaleTooltipFacetPill[],
+        identityMark: null as VehicleIdentityMark | null,
+        badgeSvg: null as string | null,
       } : hd && hover ? {
-        left: Math.min((hover.band % plot.cols) * (plot.pw + 6) + hd.cx + 12, width - 240),
+        left: Math.min((hover.band % plot.cols) * (plot.pw + 6) + hd.cx + 12, width - 260),
         top: plot.head + Math.floor(hover.band / plot.cols) * (plot.ph + 6) + hd.cy + 12,
-        label: [hd.year, hd.model].filter(Boolean).join(' ') || family,
+        label: [hd.year, saleFacets?.rawSubModel ?? hd.model].filter(Boolean).join(' ') || family,
         measure: `$${hd.usd.toLocaleString('en-US')}`,
         caption: `${venueOf(hd.source).key === 'other' ? hd.source ?? 'venue unrecorded' : hd.source} · ${new Date(hd.t).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })} · click to open`,
+        pills: saleFacets?.pills ?? [],
+        identityMark: saleFacets?.identityMark ?? null,
+        badgeSvg: saleFacets?.badgeSvg ?? null,
       } : null;
-      return tip && <div className="family-sales__tip" style={{ left: tip.left, top: tip.top }}>
-        <Text role="label" as="div">{tip.label}</Text>
+      return tip && <div className="family-sales__tip" data-testid="family-sales-tooltip" style={{ left: tip.left, top: tip.top }}>
+        <div className="family-sales__tip-head">
+          <Text role="label" as="div">{tip.label}</Text>
+          {tip.badgeSvg && (
+            <span
+              className="family-sales__tip-mark"
+              data-testid="family-sales-tip-mark"
+              data-mark-id={tip.identityMark?.id}
+              title={tip.identityMark ? `${tip.identityMark.displayLabel} — ${tip.identityMark.subLabel}${tip.identityMark.rpoCode ? ` (${tip.identityMark.rpoCode})` : ''}` : undefined}
+              dangerouslySetInnerHTML={{ __html: tip.badgeSvg }}
+            />
+          )}
+        </div>
         <Text role="measure" as="div">{tip.measure}</Text>
+        {tip.pills.length > 0 && (
+          <div className="family-sales__tip-facets" data-testid="family-sales-tip-facets">
+            {tip.pills.map((pill) => (
+              <span
+                key={`${pill.axis}-${pill.value}`}
+                className={`family-sales__tip-facet family-sales__tip-facet--${pill.axis}`}
+                data-testid={`family-sales-tip-facet-${pill.axis}`}
+                data-facet-axis={pill.axis}
+                data-facet-value={pill.value}
+              >
+                <span className="family-sales__tip-facet-axis">{pill.axisLabel}</span>
+                <span className="family-sales__tip-facet-sep"> · </span>
+                <span className="family-sales__tip-facet-val">{pill.value}</span>
+              </span>
+            ))}
+          </div>
+        )}
         <Text role="caption" as="div">{tip.caption}</Text>
       </div>;
     })()}

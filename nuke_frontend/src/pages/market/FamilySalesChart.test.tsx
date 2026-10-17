@@ -5,7 +5,23 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const fixture = vi.hoisted(() => ({ rpc: vi.fn() }));
 vi.mock('../../lib/supabase', () => ({ supabase: { rpc: fixture.rpc } }));
-import FamilySalesChart, { batMove, eraMoves, eraOf, filterSalesBySubModel, logTicks, mixFixed, parseFamilySales, quantile, rollingBand, rollingMedian, venueOf, type Sale } from './FamilySalesChart';
+import FamilySalesChart, {
+  batMove,
+  deriveSaleSubModel,
+  deriveSaleTooltipFacets,
+  eraMoves,
+  eraOf,
+  filterSalesBySubModel,
+  logTicks,
+  mixFixed,
+  parseFamilySales,
+  quantile,
+  resolveSaleIdentityMark,
+  rollingBand,
+  rollingMedian,
+  venueOf,
+  type Sale,
+} from './FamilySalesChart';
 
 const DAY = 86_400_000;
 const now = Date.now();
@@ -367,4 +383,118 @@ it('filters to exact sub-model sales when selecting the base sub-model ("Mustang
   expect(filterSalesBySubModel(rows, 'Mustang').map((r) => r.id)).toEqual([1, 2]);
   // Prefix fallback still works when a query string has no exact sub-model match
   expect(filterSalesBySubModel(rows, 'Mustang Boss').map((r) => r.id)).toEqual([4]);
+});
+
+describe('sale dot tooltip facets and period SVG identity marks', () => {
+  it('derives raw, series, trim, and body sub-models via deriveSaleSubModel and keeps only facets distinct from raw', () => {
+    const c10Sale: Sale = {
+      vehicle_id: 'veh-c10-cheyenne-76',
+      sale_date: day(15),
+      usd: 46500,
+      source: 'Bring a Trailer',
+      year: 1976,
+      model: 'C10 · 1976 Chevrolet C10 Cheyenne Fleetside Short Bed',
+    };
+    const ctx = { brand: 'Chevrolet', family: 'Pickup' };
+
+    expect(deriveSaleSubModel(c10Sale, 'raw', ctx)).toBe('C10');
+    expect(deriveSaleSubModel(c10Sale, 'series', ctx)).toBe('C10 (1/2-Ton 2WD)');
+    expect(deriveSaleSubModel(c10Sale, 'trim', ctx)).toBe('Cheyenne');
+    expect(deriveSaleSubModel(c10Sale, 'body', ctx)).toBe('Fleetside / Styleside');
+
+    const tipFacets = deriveSaleTooltipFacets(c10Sale, ctx);
+    expect(tipFacets.rawSubModel).toBe('C10');
+    expect(tipFacets.pills).toEqual([
+      { axis: 'series', axisLabel: 'SERIES', value: 'C10 (1/2-Ton 2WD)' },
+      { axis: 'trim', axisLabel: 'TRIM', value: 'Cheyenne' },
+      { axis: 'body', axisLabel: 'BODY', value: 'Fleetside / Styleside' },
+    ]);
+    expect(tipFacets.identityMark?.id).toBe('chevy-cheyenne-10-73-81');
+    expect(tipFacets.badgeSvg).toContain('CHEYENNE');
+
+    // When a sale's derived facet on an axis equals raw (e.g. "911 Carrera"), it is omitted from pills
+    const carreraSale: Sale = {
+      vehicle_id: 'veh-911-carrera-90',
+      sale_date: day(20),
+      usd: 98000,
+      source: 'Bring a Trailer',
+      year: 1990,
+      model: '911 Carrera',
+    };
+    const carreraFacets = deriveSaleTooltipFacets(carreraSale, { brand: 'Porsche', family: '911' });
+    expect(carreraFacets.rawSubModel).toBe('911 Carrera');
+    expect(carreraFacets.pills).toEqual([]);
+    expect(resolveSaleIdentityMark(carreraSale, { brand: 'Porsche', family: '911' })?.id).toBe(
+      'porsche-stuttgart-crest',
+    );
+  });
+
+  it('enriches the hovered sale dot tooltip card with SERIES, TRIM, and BODY facet pills and period SVG identity mark', async () => {
+    const sales: Sale[] = [
+      {
+        vehicle_id: 'veh-k10-cheyenne-super-74',
+        sale_date: day(12),
+        usd: 68500,
+        source: 'Bring a Trailer',
+        year: 1974,
+        model: 'K10 · 1974 Chevrolet K10 Cheyenne Super Stepside',
+      },
+      ...[1, 2, 3, 4, 5, 6, 7].map((i) => ({
+        vehicle_id: `veh-c10-${i}`,
+        sale_date: day(30 * i),
+        usd: 32000 + i * 1500,
+        source: 'Bring a Trailer',
+        year: 1976,
+        model: 'C10 Silverado Fleetside',
+      })),
+    ];
+
+    fixture.rpc.mockResolvedValue({ data: value(sales), error: null });
+    await act(async () =>
+      root.render(
+        <FamilySalesChart
+          brand="Chevrolet"
+          familyKey="Pickup"
+          family="Pickup"
+          width={900}
+          height={500}
+          onOpen={() => {}}
+        />,
+      ),
+    );
+
+    const targetCircle = container.querySelector<SVGCircleElement>(
+      'circle[data-vehicle-id="veh-k10-cheyenne-super-74"]',
+    );
+    expect(targetCircle).not.toBeNull();
+
+    const cx = Number(targetCircle!.getAttribute('cx'));
+    const cy = Number(targetCircle!.getAttribute('cy'));
+    const plotSvg = container.querySelector<SVGSVGElement>('svg.family-sales__plot')!;
+
+    await act(async () => {
+      plotSvg.dispatchEvent(
+        new MouseEvent('mousemove', { bubbles: true, clientX: cx, clientY: cy }),
+      );
+    });
+
+    const tooltip = container.querySelector('[data-testid="family-sales-tooltip"]');
+    expect(tooltip).not.toBeNull();
+    expect(tooltip?.textContent).toContain('1974 K10');
+    expect(tooltip?.textContent).toContain('$68,500');
+
+    const markEl = container.querySelector('[data-testid="family-sales-tip-mark"]');
+    expect(markEl).not.toBeNull();
+    expect(markEl?.getAttribute('data-mark-id')).toBe('chevy-cheyenne-super-10-73-74');
+    expect(markEl?.innerHTML).toContain('CHEYENNE');
+    expect(markEl?.innerHTML).toContain('SUPER');
+
+    const seriesPill = container.querySelector('[data-testid="family-sales-tip-facet-series"]');
+    const trimPill = container.querySelector('[data-testid="family-sales-tip-facet-trim"]');
+    const bodyPill = container.querySelector('[data-testid="family-sales-tip-facet-body"]');
+
+    expect(seriesPill?.textContent).toBe('SERIES · K10 (1/2-Ton 4x4)');
+    expect(trimPill?.textContent).toBe('TRIM · Cheyenne Super');
+    expect(bodyPill?.textContent).toBe('BODY · Stepside / Flareside');
+  });
 });
