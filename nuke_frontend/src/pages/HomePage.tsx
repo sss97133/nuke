@@ -1358,11 +1358,32 @@ export function TreemapHomePage({ onBrowse, embedded = false }: { onBrowse: () =
     currentLevel.model ? currentLevel.make ?? null : null,
     currentLevel.model ? currentLevel.model ?? null : null
   );
+  // The top level as brands, or as brands with their families inside (finviz's map of the market).
+  const [brandView, setBrandView] = useState<'brands' | 'nested'>('brands');
+  // A family keeps its model names as clickable treemap tiles; the sales chart is shown below when embedded (or via the switch).
+  const [familyView, setFamilyView] = useState<'sales' | 'names'>('names');
+  const [facetAxis, setFacetAxis] = useState<FamilyFacetAxis>('raw');
+  useEffect(() => {
+    setFamilyView('names');
+    setFacetAxis('raw');
+  }, [currentLevel.make, currentLevel.family]);
+
   // Family-wide sales (5-year dated window via treemap_family_sales): enables direct Family -> Years -> Vehicles navigation
   // and Era filtering without requiring a fragmented raw model string first.
   const { sales: familySalesData } = useFamilySales(
     currentLevel.family ? currentLevel.make ?? null : null,
     currentLevel.family ? currentLevel.family : null,
+  );
+  const activeFamilyLabel = useMemo(
+    () => drillStack.find((d) => d.family && !d.model)?.label || searchParams.get('family_name') || currentLevel.model || currentLevel.label,
+    [drillStack, searchParams, currentLevel.model, currentLevel.label],
+  );
+  const activeFacetOrModelLabel = useMemo(
+    () =>
+      facetAxis !== 'raw' && currentLevel.model
+        ? drillStack.find((d) => d.model && !d.year)?.label ?? currentLevel.model
+        : currentLevel.model ?? null,
+    [facetAxis, currentLevel.model, drillStack],
   );
   const familyYearsNodes = useMemo<TreemapNode[] | null>(() => {
     if (!familySalesData || familySalesData.length === 0) return null;
@@ -1370,6 +1391,16 @@ export function TreemapHomePage({ onBrowse, embedded = false }: { onBrowse: () =
     const seen = new Set<string>();
     for (const s of familySalesData) {
       if (s.year == null || !Number.isFinite(s.year) || s.usd <= 0) continue;
+      if (
+        activeFacetOrModelLabel &&
+        !matchesSaleSubModel(s.model, activeFacetOrModelLabel, {
+          brand: currentLevel.make,
+          family: activeFamilyLabel,
+          year: s.year,
+        })
+      ) {
+        continue;
+      }
       const sig = `${s.year}|${s.usd}|${s.source ?? ''}|${s.sale_date ?? s.vehicle_id}`;
       if (seen.has(sig)) continue;
       seen.add(sig);
@@ -1395,14 +1426,25 @@ export function TreemapHomePage({ onBrowse, embedded = false }: { onBrowse: () =
       });
     }
     return out.sort((a, b) => b.value - a.value || parseInt(b.name, 10) - parseInt(a.name, 10));
-  }, [familySalesData]);
+  }, [familySalesData, activeFacetOrModelLabel, currentLevel.make, activeFamilyLabel]);
   const familyYearVehiclesNodes = useMemo<TreemapNode[] | null>(() => {
-    if (!familySalesData || !currentLevel.year || currentLevel.model || !currentLevel.make) return null;
+    if (!familySalesData || !currentLevel.year || !currentLevel.make) return null;
+    if (currentLevel.model && facetAxis === 'raw') return null;
     const yr = currentLevel.year;
     const seen = new Set<string>();
     return familySalesData
       .filter((s) => {
         if (s.year !== yr || s.usd <= 0) return false;
+        if (
+          activeFacetOrModelLabel &&
+          !matchesSaleSubModel(s.model, activeFacetOrModelLabel, {
+            brand: currentLevel.make,
+            family: activeFamilyLabel,
+            year: s.year,
+          })
+        ) {
+          return false;
+        }
         const sig = `${s.year}|${s.usd}|${s.source ?? ''}|${s.sale_date ?? s.vehicle_id}`;
         if (seen.has(sig)) return false;
         seen.add(sig);
@@ -1418,8 +1460,13 @@ export function TreemapHomePage({ onBrowse, embedded = false }: { onBrowse: () =
         id: s.vehicle_id,
         isVehicle: true,
       }));
-  }, [familySalesData, currentLevel.year, currentLevel.model, currentLevel.make]);
-  const effectiveYearsData = (currentLevel.model && yearsData && yearsData.length > 0) ? yearsData : (familyYearsNodes ?? yearsData);
+  }, [familySalesData, currentLevel.year, currentLevel.model, currentLevel.make, facetAxis, activeFacetOrModelLabel, activeFamilyLabel]);
+  const effectiveYearsData =
+    facetAxis !== 'raw' && familyYearsNodes && familyYearsNodes.length > 0
+      ? familyYearsNodes
+      : (currentLevel.model && yearsData && yearsData.length > 0)
+        ? yearsData
+        : (familyYearsNodes ?? yearsData);
   // Filter family sub-model tiles by active Era when familySalesData is loaded
   const eraFilteredFamilyModels = useMemo<TreemapNode[] | null>(() => {
     if (!familyModelsData) return null;
@@ -1524,21 +1571,6 @@ export function TreemapHomePage({ onBrowse, embedded = false }: { onBrowse: () =
     });
   }, [urlScopeKey, brandsData, familiesData, searchParams]);
 
-  // The top level as brands, or as brands with their families inside (finviz's map of the market).
-  const [brandView, setBrandView] = useState<'brands' | 'nested'>('brands');
-  // A family keeps its model names as clickable treemap tiles; the sales chart is shown below when embedded (or via the switch).
-  const [familyView, setFamilyView] = useState<'sales' | 'names'>('names');
-  const [facetAxis, setFacetAxis] = useState<FamilyFacetAxis>('raw');
-  useEffect(() => {
-    setFamilyView('names');
-    setFacetAxis('raw');
-  }, [currentLevel.make, currentLevel.family]);
-
-  const activeFamilyLabel = useMemo(
-    () => drillStack.find((d) => d.family && !d.model)?.label || searchParams.get('family_name') || currentLevel.model || currentLevel.label,
-    [drillStack, searchParams, currentLevel.model, currentLevel.label],
-  );
-
   // Re-key family sub-models along the active facet axis ('raw' | 'series' | 'trim' | 'body')
   const facetedFamilyModels = useMemo<TreemapNode[] | null>(() => {
     const base = eraFilteredFamilyModels ?? familyModelsData;
@@ -1580,6 +1612,14 @@ export function TreemapHomePage({ onBrowse, embedded = false }: { onBrowse: () =
     currentLevel.make ? 'families' : 'brands';
 
   const activeData = useMemo(() => {
+    if (levelType === 'vehicles' && facetAxis !== 'raw' && familyYearVehiclesNodes && familyYearVehiclesNodes.length > 0) {
+      return familyYearVehiclesNodes;
+    }
+    if (levelType === 'years' && facetAxis !== 'raw' && familyYearsNodes && familyYearsNodes.length > 0) {
+      if (!selectedEra) return familyYearsNodes;
+      const filtered = familyYearsNodes.filter((n) => matchesEraRange(parseInt(n.name, 10), selectedEra));
+      return filtered.length > 0 ? filtered : familyYearsNodes;
+    }
     // Check prefetch cache before hook data — eliminates loading flash on drill-in
     if (levelType === 'vehicles' && currentLevel.make && currentLevel.model && currentLevel.year) {
       const cached = prefetchCache.current.get(`${currentLevel.make}/${currentLevel.model}/${currentLevel.year}`);
