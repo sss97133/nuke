@@ -7,6 +7,7 @@ export interface ResolvedMarketScope {
   family_name?: string;
   model?: string;
   year?: number;
+  era?: string;
 }
 
 interface FamilyMarketRow {
@@ -25,21 +26,31 @@ const CULTURAL_SCOPE_ALIASES: Array<{
   make: string;
   familyHint: string;
   modelHint?: string;
+  era?: string;
 }> = [
   {
     pattern: /\b(square\s*body|squarebody|73\s*[-–/to]+\s*87\s*(gm|chevy|chevrolet|gmc)?(\s*trucks?|\s*pickups?|\s*c\/?k)?)\b/i,
     make: 'Chevrolet',
     familyHint: 'C10',
+    era: '1973-1987',
   },
   {
     pattern: /\b(action\s*line|67\s*[-–/to]+\s*72\s*(gm|chevy|chevrolet|gmc)?(\s*trucks?|\s*pickups?|\s*c\/?k)?)\b/i,
     make: 'Chevrolet',
     familyHint: 'C10',
+    era: '1967-1972',
   },
   {
     pattern: /\b(fox\s*body|foxbody)\b/i,
     make: 'Ford',
     familyHint: 'Mustang',
+    era: '1979-1993',
+  },
+  {
+    pattern: /\b(early\s*bronco)\b/i,
+    make: 'Ford',
+    familyHint: 'Bronco',
+    era: '1966-1977',
   },
   {
     pattern: /\b(shelby\s*gt\s*350\w*)\b/i,
@@ -94,6 +105,8 @@ export function buildMarketScopeUrl(scope: ResolvedMarketScope, currentSearch = 
   else next.delete('model');
   if (scope.year != null && Number.isFinite(scope.year)) next.set('year', String(scope.year));
   else next.delete('year');
+  if (scope.era) next.set('era', scope.era);
+  else next.delete('era');
   ['lot', 'inspect', 'board', 'mapFocus', 'mapChild'].forEach((k) => next.delete(k));
   return `/?${next.toString()}`;
 }
@@ -112,8 +125,8 @@ export async function resolveMarketScopeQuery(rawQuery: string): Promise<Resolve
   for (const alias of CULTURAL_SCOPE_ALIASES) {
     if (alias.pattern.test(q)) {
       const resolved = await lookupFamilyInMarket(alias.make, alias.familyHint, alias.modelHint ?? null, null);
-      if (resolved) return resolved;
-      return { make: alias.make, model: alias.modelHint ?? alias.familyHint };
+      if (resolved) return { ...resolved, ...(alias.era ? { era: alias.era } : {}) };
+      return { make: alias.make, model: alias.modelHint ?? alias.familyHint, ...(alias.era ? { era: alias.era } : {}) };
     }
   }
 
@@ -193,12 +206,10 @@ async function lookupFamilyInMarket(
 
     if (make) {
       query = query.eq('brand', make);
-    } else {
-      // Prefix or word match on model_key or family
-      const firstWord = cleanTerm.split(/[\s-]+/)[0];
-      if (firstWord) {
-        query = query.ilike('model_key', `%${firstWord}%`);
-      }
+    }
+    const firstWord = cleanTerm.split(/[\s-]+/)[0];
+    if (firstWord && firstWord.length >= 2) {
+      query = query.ilike('model_key', `%${firstWord}%`);
     }
 
     const { data, error } = await Promise.resolve(query);
