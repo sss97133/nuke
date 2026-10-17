@@ -259,6 +259,23 @@ const CURATED_FAMILY_ERAS: Record<string, FamilyEraCohort[]> = {
     { id: '1963-1967', label: "Series 2 Second Nose '63–'67", shortLabel: "'63–'67", yearStart: 1963, yearEnd: 1967 },
     { id: '1968-1975', label: "Series 3 Faired Headlamps '68–'75", shortLabel: "'68–'75", yearStart: 1968, yearEnd: 1975 },
   ],
+  'porsche:917': [
+    { id: '1969-1973', label: "917 / 917K / 917/30 '69–'73", shortLabel: '917', yearStart: 1969, yearEnd: 1973 },
+    { id: '1982-1989', label: "956 / 962 Group C '82–'89", shortLabel: '956 / 962', yearStart: 1982, yearEnd: 1989 },
+  ],
+  'ferrari:312t': [
+    { id: '1950-1979', label: "Classic & Lauda Era F1 '50–'79", shortLabel: "'50–'79", yearStart: 1950, yearEnd: 1979 },
+    { id: '1980-1995', label: "Turbo & V12 Era F1 '80–'95", shortLabel: "'80–'95", yearStart: 1980, yearEnd: 1995 },
+    { id: '1996-2010', label: "Schumacher Era F1 '96–'10", shortLabel: 'Schumacher Era', yearStart: 1996, yearEnd: 2010 },
+  ],
+  'lancia:lambda': [
+    { id: '1922-1931', label: "Lambda 1st–9th Series '22–'31", shortLabel: 'Lambda', yearStart: 1922, yearEnd: 1931 },
+    { id: '1931-1939', label: "Dilambda / Astura / Aprilia '31–'39", shortLabel: "Astura / Aprilia", yearStart: 1931, yearEnd: 1939 },
+  ],
+  'bmw:8 series': [
+    { id: '1990-1999', label: "E31 840Ci / 850i / 850CSi '90–'99", shortLabel: 'E31', yearStart: 1990, yearEnd: 1999 },
+    { id: '2019-2026', label: "G15 M850i / M8 '19+", shortLabel: 'G15 / F92', yearStart: 2019, yearEnd: 2026 },
+  ],
 };
 
 export function getDefinedFamilyEras(
