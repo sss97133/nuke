@@ -396,6 +396,66 @@ const CULTURAL_SCOPE_ALIASES: Array<{
     make: 'AMC',
     familyHint: 'Rambler',
   },
+  {
+    pattern: /\b(valkyrie|valhalla|one[-\s]?77|aston\s*martin\s*vulcan)\b/i,
+    make: 'Aston Martin',
+    familyHint: 'Valkyrie',
+  },
+  {
+    pattern: /\b(aston\s*martin\s*ulster|db\s*mk\s*ii)\b/i,
+    make: 'Aston Martin',
+    familyHint: 'Ulster',
+  },
+  {
+    pattern: /\b(ferrari\s*(?:312\s*t|f2002|f300|641|642|126\s*c2)|312\s*t)\b/i,
+    make: 'Ferrari',
+    familyHint: '312T',
+  },
+  {
+    pattern: /\b(500\s*trc|340\s*mm|342\s*america|195\s*inter|500\s*mondial)\b/i,
+    make: 'Ferrari',
+    familyHint: '500 TRC',
+  },
+  {
+    pattern: /\b(porsche\s*(?:917|956|962)|917\s*k)\b/i,
+    make: 'Porsche',
+    familyHint: '917',
+  },
+  {
+    pattern: /\b(bugatti\s*(?:type\s*59|type\s*54|type\s*51|type\s*39|type\s*37|type\s*35)|type\s*59|type\s*35)\b/i,
+    make: 'Bugatti',
+    familyHint: 'Type 35',
+  },
+  {
+    pattern: /\b(bugatti\s*(?:mistral|divo|centodieci|bolide|chiron)|w16\s*mistral)\b/i,
+    make: 'Bugatti',
+    familyHint: 'Chiron',
+  },
+  {
+    pattern: /\b(lamborghini\s*(?:sian|sián|essenza|centenario|veneno|temerario)|sian\s*fkp\s*37|essenza\s*scv12)\b/i,
+    make: 'Lamborghini',
+    familyHint: 'Sian',
+  },
+  {
+    pattern: /\b(alfa\s*romeo\s*tipo\s*33|tipo\s*33|t33\/2)\b/i,
+    make: 'Alfa Romeo',
+    familyHint: 'Tipo 33',
+  },
+  {
+    pattern: /\b(lancia\s*(?:lambda|astura|aprilia|dilambda)|lambda)\b/i,
+    make: 'Lancia',
+    familyHint: 'Lambda',
+  },
+  {
+    pattern: /\b(lancia\s*(?:037|rally\s*037|delta\s*s4)|rally\s*037|037\s*stradale)\b/i,
+    make: 'Lancia',
+    familyHint: '037',
+  },
+  {
+    pattern: /\b(avions\s*voisin|voisin\s*c\d+)\b/i,
+    make: 'Avions Voisin',
+    familyHint: 'C25',
+  },
 ];
 
 // Words that indicate a natural-language filter query rather than a market scope drill
