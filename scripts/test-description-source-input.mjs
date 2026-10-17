@@ -43,6 +43,7 @@ function compile(path) {
 const sources = new Map([
   ['handler', compile('../supabase/functions/discover-description-data/index.ts')],
   ['input', compile('../supabase/functions/discover-description-data/descriptionInput.ts')],
+  ['proposals', compile('../supabase/functions/discover-description-data/reportedWorkProposals.ts')],
   ['guard', compile('../supabase/functions/_shared/writeGuard.ts')],
   ['keys', compile('../supabase/functions/_shared/supabaseKeys.ts')],
   ['hash', compile('../supabase/functions/_shared/observationContentHash.ts')],
@@ -175,6 +176,7 @@ function fixture(options = {}) {
             auth: { persistSession: false, autoRefreshToken: false } }),
         };
         if (specifier === './descriptionInput.ts') return load('input');
+        if (specifier === './reportedWorkProposals.ts') return load('proposals');
         if (specifier === '../_shared/batParser.ts') return load('bat');
         if (specifier === './batChassis.ts') return load('chassis');
         if (specifier === './batAuctionRecord.ts') return load('record');
