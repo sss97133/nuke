@@ -464,7 +464,7 @@ export function selectFamilyRepresentativeVehicleIds(
   familySales: readonly Sale[] | null | undefined,
   model?: string | null,
   perTileLimit = 4,
-  maxTotal = 160,
+  maxTotal = 200,
 ): string[] {
   if (!items || items.length === 0 || !familySales || familySales.length === 0) return [];
   const out: string[] = [];
@@ -2500,9 +2500,7 @@ export function TreemapHomePage({ onBrowse, embedded = false }: { onBrowse: () =
             const repImgCandidates = !rect.node.isVehicle
               ? repImages.get(rect.node.name.toLowerCase()) || repImages.get(rect.node.name) || repImages.get(rect.node.name.toLowerCase().split(/\s+/)[0])
               : rect.node.imageUrl ? undefined
-              : (rect.node.id ? repImages.get(rect.node.id) : undefined)
-                || repImages.get(rect.node.name.toLowerCase())
-                || (currentLevel.year ? repImages.get(String(currentLevel.year)) : undefined);
+              : rect.node.id ? repImages.get(rect.node.id) : undefined;
             return (
               <div
                 key={(rect.node.id || rect.node.name) + '-' + i}
