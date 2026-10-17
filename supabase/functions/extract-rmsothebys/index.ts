@@ -232,7 +232,8 @@ Deno.serve(async (req) => {
 
     const supabase = createClient(
       Deno.env.get('SUPABASE_URL')!,
-      projectSecretKey()!
+      projectSecretKey()!,
+      { global: { headers: { 'X-Nuke-Writer': 'extract-rmsothebys' } } },
     );
 
     console.log(`[RMS] Action: ${action}, Auction: ${auction || 'N/A'}`);
