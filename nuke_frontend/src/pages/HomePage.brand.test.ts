@@ -210,4 +210,27 @@ describe('representative images for model and year tiles', () => {
       'https://images.mecum.com/image/upload/v1763048796/auctions/FL26/1159821/580030.jpg',
     );
   });
+
+  it('requests representative images for all 200 vehicle tiles when drilling into a family year', () => {
+    const vehicleTiles = Array.from({ length: 200 }, (_, i) => ({
+      name: `1967 Chevrolet Chevelle`,
+      count: 1,
+      value: 286000 - i * 1000,
+      id: `veh-${i + 1}`,
+      isVehicle: true,
+    }));
+    const familySales = vehicleTiles.map((t) => ({
+      vehicle_id: t.id!,
+      sale_date: '2026-01-15',
+      usd: t.value,
+      source: 'Mecum',
+      year: 1967,
+      model: 'Chevelle',
+    }));
+
+    const ids = selectFamilyRepresentativeVehicleIds(vehicleTiles, familySales, null);
+    expect(ids).toHaveLength(200);
+    expect(ids[0]).toBe('veh-1');
+    expect(ids[199]).toBe('veh-200');
+  });
 });
