@@ -1,7 +1,17 @@
 import { describe, expect, it, vi } from 'vitest';
 const rpc = vi.hoisted(() => vi.fn());
 vi.mock('../lib/supabase', () => ({ supabase: { rpc } }));
-import { applyDrillStackToSearchParams, brandDollarMomentum, brandLines, brandMomentum, drillStackFromSearchParams, lineChars } from './HomePage';
+import {
+  applyDrillStackToSearchParams,
+  brandDollarMomentum,
+  brandLines,
+  brandMomentum,
+  buildRepresentativeImageCandidates,
+  drillStackFromSearchParams,
+  lineChars,
+  selectFamilyRepresentativeVehicleIds,
+} from './HomePage';
+import { optimizeImageUrl } from '../lib/imageOptimizer';
 
 // Porsche's row in mv_brand_market as measured 2026-10-15 (sold, dollars, band, sell-through, year), with 12-month counts.
 const porsche = {
@@ -141,5 +151,63 @@ describe('URL scope contract for the market treemap', () => {
     expect(cleared.get('family_name')).toBeNull();
     expect(cleared.get('model')).toBeNull();
     expect(cleared.get('year')).toBeNull();
+  });
+});
+
+describe('representative images for model and year tiles', () => {
+  it('never assigns brand-wide outliers (e.g. GT40 or Bronco) to Mustang year tiles', () => {
+    const brandTopRows = [
+      { id: 'gt40-67', model: 'GT40 Mk 1', year: 1967, primary_image_url: 'https://cdn.example.com/1967-gt40.jpg' },
+      { id: 'gt40-69', model: 'GT40', year: 1969, primary_image_url: 'https://cdn.example.com/1969-gt40.jpg' },
+      { id: 'bronco-68', model: 'Bronco', year: 1968, primary_image_url: 'https://cdn.example.com/1968-bronco.jpg' },
+      { id: 'bullitt-68', model: 'Mustang GT "Bullitt"', year: 1968, primary_image_url: 'https://cdn.example.com/1968-bullitt.jpg' },
+      { id: 'mustang-67', model: 'Mustang', year: 1967, primary_image_url: 'https://cdn.example.com/1967-mustang.jpg' },
+      { id: 'mustang-68-a', model: 'Mustang', year: 1968, primary_image_url: 'https://cdn.example.com/1968-mustang-1.jpg' },
+      { id: 'mustang-68-b', model: 'Mustang', year: 1968, primary_image_url: 'https://cdn.example.com/1968-mustang-2.jpg' },
+    ];
+
+    const mustangMap = buildRepresentativeImageCandidates(brandTopRows, 'Mustang');
+    expect(mustangMap.get('1967')).toEqual(['https://cdn.example.com/1967-mustang.jpg']);
+    expect(mustangMap.get('1969')).toBeUndefined();
+    // Exact sub-model ("Mustang") candidates come before prefix variants ("Mustang GT \"Bullitt\"")
+    expect(mustangMap.get('1968')).toEqual([
+      'https://cdn.example.com/1968-mustang-1.jpg',
+      'https://cdn.example.com/1968-mustang-2.jpg',
+      'https://cdn.example.com/1968-bullitt.jpg',
+    ]);
+  });
+
+  it('picks top candidate vehicle IDs per visible year tile from family sales, prioritizing exact sub-model matches', () => {
+    const yearTiles = [
+      { name: '1967', count: 317, value: 317 },
+      { name: '1968', count: 294, value: 294 },
+      { name: '1970', count: 162, value: 162 },
+    ];
+    const familySales = [
+      { vehicle_id: 'v-68-bullitt', sale_date: '2026-01-10', usd: 3_740_000, source: 'Mecum', year: 1968, model: 'Mustang GT "Bullitt"' },
+      { vehicle_id: 'v-68-exact-1', sale_date: '2026-02-01', usd: 215_000, source: 'Bring a Trailer', year: 1968, model: 'Mustang' },
+      { vehicle_id: 'v-68-exact-2', sale_date: '2026-02-02', usd: 185_000, source: 'Mecum', year: 1968, model: 'Mustang' },
+      { vehicle_id: 'v-67-exact-1', sale_date: '2026-03-01', usd: 240_000, source: 'Bring a Trailer', year: 1967, model: 'Mustang' },
+      { vehicle_id: 'v-70-exact-1', sale_date: '2026-03-05', usd: 145_000, source: 'Bring a Trailer', year: 1970, model: 'Mustang' },
+      { vehicle_id: 'v-70-boss', sale_date: '2026-03-06', usd: 310_000, source: 'Mecum', year: 1970, model: 'Shelby GT500' },
+    ];
+
+    const ids = selectFamilyRepresentativeVehicleIds(yearTiles, familySales, 'Mustang', 2);
+    expect(ids).toEqual([
+      'v-67-exact-1',
+      'v-68-exact-1',
+      'v-68-exact-2',
+      'v-70-exact-1',
+    ]);
+  });
+
+  it('normalizes malformed Mecum Cloudinary double-v version URLs so 1966 Mustang photos resolve', () => {
+    const brokenMecumUrl = 'https://images.mecum.com/image/upload/vv1763048796/auctions/FL26/1159821/580030.jpg?';
+    expect(optimizeImageUrl(brokenMecumUrl, 'small')).toBe(
+      'https://images.mecum.com/image/upload/v1763048796/auctions/FL26/1159821/580030.jpg',
+    );
+    expect(optimizeImageUrl(brokenMecumUrl, 'full')).toBe(
+      'https://images.mecum.com/image/upload/v1763048796/auctions/FL26/1159821/580030.jpg',
+    );
   });
 });

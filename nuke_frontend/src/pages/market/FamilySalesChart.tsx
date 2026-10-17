@@ -353,6 +353,18 @@ export function matchesSaleSubModel(saleModel: string | null | undefined, select
   return m === target || m.startsWith(`${target} `) || m.startsWith(`${target}-`);
 }
 
+export function filterSalesBySubModel<T extends { model: string | null }>(
+  sales: readonly T[],
+  selectedModel: string | null | undefined,
+): T[] {
+  if (!selectedModel) return [...sales];
+  const target = selectedModel.trim().toLowerCase();
+  if (!target) return [...sales];
+  const exact = sales.filter((s) => (s.model ?? '').trim().toLowerCase() === target);
+  if (exact.length > 0) return exact;
+  return sales.filter((s) => matchesSaleSubModel(s.model, selectedModel));
+}
+
 export default function FamilySalesChart({ brand, familyKey, family, width, height, onOpen, selectedEra = null, onSelectEra, selectedModel = null, selectedYear = null }: {
   brand: string;
   familyKey: string;
@@ -394,13 +406,13 @@ export default function FamilySalesChart({ brand, familyKey, family, width, heig
     };
   }, [upcomingSupply, selectedModel, selectedEra, selectedYear]);
   const modelSales = useMemo(
-    () => (allSales && selectedModel ? allSales.filter((s) => matchesSaleSubModel(s.model, selectedModel)) : null),
+    () => (allSales && selectedModel ? filterSalesBySubModel(allSales, selectedModel) : null),
     [allSales, selectedModel],
   );
   const baseSales = modelSales && modelSales.length > 0 ? modelSales : allSales;
   const eraCohorts = useMemo(
-    () => (allSales ? getFamilyEraCohorts(brand, family, allSales.map((s) => s.year)) : []),
-    [brand, family, allSales],
+    () => (baseSales ? getFamilyEraCohorts(brand, family, baseSales.map((s) => s.year)) : []),
+    [brand, family, baseSales],
   );
   const eraFilteredSales = useMemo(
     () => (baseSales && selectedEra ? baseSales.filter((s) => matchesEraRange(s.year, selectedEra)) : baseSales),
