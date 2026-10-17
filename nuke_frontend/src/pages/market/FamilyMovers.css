@@ -17,10 +17,32 @@
 .map-movers__spark--up .map-movers__bar--recent { fill: var(--success); }
 .map-movers__spark--down .map-movers__bar--recent { fill: var(--error); }
 
-/* The share movers (2026-10-15): two lists, gaining and losing share of BaT sales, under the map in the page's flow.
-   A row: name, the move as a dot with its ±2 SE band on one log axis, the move, sales both years, the average sale's
-   move apart, and the two years by month. */
+/* The share movers (2026-10-15, extended 2026-10-18 with relativity indicator & multi-horizon dial):
+   two lists, gaining and losing share of market sales across UPCOMING · 1D · 1W · 1M · 3M · 6M · 1Y · 5Y.
+   A row: name, the move as a dot with its ±2 SE band on one log axis, the move, counts in both windows, the average
+   sale's move apart, and 24 sparkline bars across the two windows. */
 .map-movers2 { padding: 10px 16px 12px; border-top: 2px solid var(--border); background: var(--bg); color: var(--text); font-family: Arial, sans-serif; }
+.map-movers2__head { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px 16px;
+  margin-bottom: 8px; padding-bottom: 6px; border-bottom: 1px solid var(--border); }
+.map-movers2__relativity { display: inline-flex; align-items: center; flex-wrap: wrap; gap: 6px 10px;
+  font-size: 11px; font-family: 'Courier New', monospace; color: var(--text-secondary); }
+.map-movers2__rel-badge { font-family: Arial, sans-serif; font-size: 10px; font-weight: 700; letter-spacing: 0.08em;
+  text-transform: uppercase; padding: 1px 6px; border: 1px solid var(--border); background: var(--surface); color: var(--text); }
+.map-movers2__rel-window { font-weight: 700; color: var(--text); letter-spacing: 0.03em; }
+.map-movers2__rel-baseline { color: var(--text-secondary); }
+.map-movers2__rel-scale { display: inline-flex; align-items: center; gap: 6px; padding: 1px 6px;
+  border: 1px dashed var(--border); color: var(--text-secondary); font-size: 10px; }
+.map-movers2__rel-tick { color: var(--text); font-weight: 700; }
+
+.map-movers2__dial { display: inline-flex; align-items: center; gap: 2px; padding: 2px;
+  border: 1px solid var(--border); background: var(--surface); }
+.map-movers2__dial-btn { padding: 2px 8px; border: 1px solid transparent; background: transparent;
+  color: var(--text-secondary); font-family: 'Courier New', monospace; font-size: 11px; font-weight: 700;
+  letter-spacing: 0.04em; cursor: pointer; line-height: 1.3; }
+.map-movers2__dial-btn:hover, .map-movers2__dial-btn:focus-visible { color: var(--text); border-color: var(--border); }
+.map-movers2__dial-btn--upcoming { color: var(--success); }
+.map-movers2__dial-btn--active { background: var(--bg); color: var(--text); border-color: var(--text); }
+
 .map-movers2__sides { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px 28px; }
 .map-movers2__title { font-size: 11px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; margin-bottom: 4px; }
 .map-movers2__row { display: grid; grid-template-columns: minmax(0, 1.3fr) 120px 56px minmax(0, 0.9fr) minmax(0, 0.8fr) 48px;
@@ -41,6 +63,9 @@
 .map-movers2__dot--down .map-movers2__mark { fill: var(--error); }
 .map-movers2__base { margin-top: 8px; font-size: 12px; line-height: 1.4; color: var(--text-secondary); }
 @media (max-width: 760px) {
+  .map-movers2__head { flex-direction: column; align-items: flex-start; }
+  .map-movers2__rel-scale { display: none; }
+  .map-movers2__dial { width: 100%; overflow-x: auto; justify-content: flex-start; }
   .map-movers2__sides { grid-template-columns: minmax(0, 1fr); }
   .map-movers2__row { grid-template-columns: minmax(0, 1fr) 96px 52px; grid-template-rows: auto auto; row-gap: 0; }
   .map-movers2__row .map-movers2__dot { width: 96px; }

@@ -59,6 +59,12 @@ it('lists families gaining and losing share of BaT, volume apart from the averag
   expect(rows[0].querySelector('.map-movers2__price')?.textContent).toBe('avg sale ▼12%');
   expect(rows[0].querySelector('path.map-movers2__mark')).not.toBeNull();
   expect(rows[1].querySelector('circle.map-movers2__mark')).not.toBeNull();
+  expect(container.querySelector('.map-movers2__relativity')?.textContent).toContain('RELATIVITY');
+  expect(container.querySelector('.map-movers2__relativity')?.textContent).toContain('LAST 1Y VS PRIOR 1Y');
+  expect(container.querySelector('.map-movers2__relativity')?.textContent).toContain('MARKET PAR ▲12% (34,598 → 38,879)');
+  expect([...container.querySelectorAll('.map-movers2__dial-btn')].map((b) => b.textContent)).toEqual([
+    'UPCOMING', '1D', '1W', '1M', '3M', '6M', '1Y', '5Y',
+  ]);
   expect(container.querySelector('.map-movers2__base')?.textContent).toContain("after taking out the market's own growth (▲12%, 34,598 → 38,879)");
   expect(container.querySelector('.map-movers2__base')?.textContent).toContain('61 of 150 families with 30+ measured sales each year changed for real');
   expect(container.querySelector('.map-movers2__base')?.textContent).not.toMatch(/standard error|SE range|log axis/);
@@ -86,4 +92,59 @@ it('draws a mover\'s two years as 24 bars when the monthly read answers', async 
   const rows = [...container.querySelectorAll('button.map-movers2__row')];
   expect(rows[0].querySelectorAll('svg.map-movers__spark rect')).toHaveLength(24);
   expect(rows[1].querySelector('svg.map-movers__spark')).toBeNull();
+});
+
+it('switches across the horizon dial (1D and UPCOMING) and renders embedded 24-bar sparklines', async () => {
+  const { default: Fresh } = await import('./FamilyMovers');
+  const bins24 = Array.from({ length: 24 }, (_, i) => (i % 4) + 1);
+  const dayValue = {
+    as_of: '2026-10-17T18:00:00Z', horizon: '1d', window_days: 1, min_sales: 1, families: 93, eligible: 15, significant: 8,
+    bat: { sold_12m: 162, sold_prior_12m: 115, usd_12m: 8_100_000, usd_prior_12m: 5_200_000 },
+    gaining: [{ brand: 'Ford', family_key: 'mustang', family: 'Mustang', sold_12m: 8, sold_prior_12m: 1, usd_12m: 440_000,
+      usd_prior_12m: 50_000, share_move: 4.68, share_lo: 0.71, share_hi: 17.8, se: 1.06, avg_price_move: 0.10, bins: bins24 }],
+    losing: [{ brand: 'Porsche', family_key: '911', family: '911', sold_12m: 7, sold_prior_12m: 8, usd_12m: 980_000,
+      usd_prior_12m: 1_200_000, share_move: -0.379, share_lo: -0.77, share_hi: 0.71, se: 0.52, avg_price_move: -0.07, bins: bins24 }],
+  };
+  const upcomingValue = {
+    as_of: '2026-10-17T18:00:00Z', horizon: 'upcoming', window_days: 30, min_sales: 4, families: 641, eligible: 129, significant: 31,
+    bat: { sold_12m: 2536, sold_prior_12m: 4655, usd_12m: 135_000_000, usd_prior_12m: 220_000_000 },
+    gaining: [{ brand: 'Ferrari', family_key: 'f12', family: 'F12 Berlinetta', sold_12m: 8, sold_prior_12m: 4, usd_12m: 2_800_000,
+      usd_prior_12m: 1_200_000, share_move: 2.67, share_lo: 0.11, share_hi: 11.2, se: 0.61, avg_price_move: 0.17, bins: bins24 }],
+    losing: [{ brand: 'BMW', family_key: '3series', family: '3 Series', sold_12m: 6, sold_prior_12m: 40, usd_12m: 210_000,
+      usd_prior_12m: 1_400_000, share_move: -0.725, share_lo: -0.88, share_hi: -0.35, se: 0.44, avg_price_move: 0.0, bins: bins24 }],
+  };
+
+  fixture.rpc.mockImplementation((fn: string, args?: Record<string, unknown>) => {
+    if (fn === 'treemap_family_share_movers') {
+      if (args?.p_horizon === '1d') return Promise.resolve({ data: dayValue, error: null });
+      if (args?.p_horizon === 'upcoming') return Promise.resolve({ data: upcomingValue, error: null });
+      return Promise.resolve({ data: value, error: null });
+    }
+    return Promise.resolve({ data: null, error: { message: 'none' } });
+  });
+
+  await act(async () => root.render(<Fresh onPick={() => {}} />));
+  const dialBtns = [...container.querySelectorAll('button.map-movers2__dial-btn')] as HTMLButtonElement[];
+  const btn1d = dialBtns.find((b) => b.textContent === '1D')!;
+  const btnUpcoming = dialBtns.find((b) => b.textContent === 'UPCOMING')!;
+
+  await act(async () => btn1d.click());
+  expect(fixture.rpc).toHaveBeenCalledWith('treemap_family_share_movers', { p_limit: 5, p_min_sales: 0, p_horizon: '1d' });
+  expect(container.querySelector('.map-movers2__relativity')?.textContent).toContain('LAST 24H VS PRIOR 24H');
+  expect(container.querySelector('.map-movers2__relativity')?.textContent).toContain('MARKET PAR ▲41% (115 → 162)');
+  const dayRows = [...container.querySelectorAll('button.map-movers2__row')];
+  expect(dayRows[0].querySelector('.map-movers2__name')?.textContent).toBe('Ford Mustang');
+  expect(dayRows[0].querySelector('.map-movers2__counts')?.textContent).toBe('1 → 8 sold');
+  expect(dayRows[0].querySelectorAll('svg.map-movers__spark rect')).toHaveLength(24);
+
+  await act(async () => btnUpcoming.click());
+  expect(fixture.rpc).toHaveBeenCalledWith('treemap_family_share_movers', { p_limit: 5, p_min_sales: 0, p_horizon: 'upcoming' });
+  expect(container.querySelector('.map-movers2__relativity')?.textContent).toContain('NEXT 30D BLOCK VS PAST 30D SOLD');
+  expect(container.querySelector('.map-movers2__relativity')?.textContent).toContain('SUPPLY PAR ▼46% (4,655 → 2,536)');
+  const titles = [...container.querySelectorAll('.map-movers2__title')].map((t) => t.textContent);
+  expect(titles).toEqual(['Coming up more', 'Coming up less']);
+  const upRows = [...container.querySelectorAll('button.map-movers2__row')];
+  expect(upRows[0].querySelector('.map-movers2__name')?.textContent).toBe('Ferrari F12 Berlinetta');
+  expect(upRows[0].querySelector('.map-movers2__counts')?.textContent).toBe('4 sold → 8 up');
+  expect(upRows[0].querySelector('.map-movers2__price')?.textContent).toBe('avg ask ▲17%');
 });
