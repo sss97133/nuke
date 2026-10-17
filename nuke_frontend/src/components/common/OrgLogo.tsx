@@ -23,6 +23,8 @@ interface OrgLogoProps {
   businessType?: string | null;
   businessName?: string;
   size?: number;
+  /** The widest a 'logo' variant may draw, in pixels (default three times its height): a wide wordmark needs more. */
+  maxWidth?: number;
   variant?: 'icon' | 'logo' | 'card';
   className?: string;
   style?: React.CSSProperties;
@@ -93,6 +95,7 @@ export const OrgLogo: React.FC<OrgLogoProps> = ({
   businessType,
   businessName = '',
   size = 24,
+  maxWidth,
   variant = 'icon',
   className = '',
   style = {},
@@ -197,7 +200,7 @@ export const OrgLogo: React.FC<OrgLogoProps> = ({
           className={className}
           style={{
             height: `${size}px`,
-            maxWidth: `${size * 3}px`,
+            maxWidth: `${maxWidth ?? size * 3}px`,
             objectFit: 'contain',
             display: 'block',
             ...style,

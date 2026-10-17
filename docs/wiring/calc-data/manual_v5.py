@@ -388,7 +388,7 @@ def connector_face(p, x, y, labels, title, pitch=26, cav=15, round_=False, href=
 
 # ---------------------------------------------------------------- content
 def load():
-    reg = json.load(open(CD / "k5_registry.json"))
+    reg = kits_v5.pin_splices_at_pins(json.load(open(CD / "k5_registry.json")), keep_leads=True)
     wires = {str(w["id"]): w for w in reg["wires"] + reg["implied"] if not w.get("retired")}
     return reg, wires
 

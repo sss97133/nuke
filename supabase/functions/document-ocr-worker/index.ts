@@ -19,6 +19,7 @@
 import { createClient } from "jsr:@supabase/supabase-js@2";
 import { requireOwnerOrService, requireWriteAuth } from "../_shared/writeGuard.ts";
 import { projectSecretKey } from "../_shared/supabaseKeys.ts";
+import { geminiFetch } from '../_shared/geminiGuard.ts';
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -348,8 +349,8 @@ async function classifyWithGemini(base64Image: string): Promise<any> {
   const apiKey = Deno.env.get("GOOGLE_AI_API_KEY");
   if (!apiKey) throw new Error("GOOGLE_AI_API_KEY not configured");
 
-  const response = await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`,
+  const response = await geminiFetch(
+    `https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent?key=${apiKey}`,
     {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -363,7 +364,7 @@ async function classifyWithGemini(base64Image: string): Promise<any> {
         generationConfig: { temperature: 0.1, maxOutputTokens: 1000 },
       }),
     }
-  );
+  , 'document-ocr-worker');
 
   if (!response.ok) {
     const err = await response.text();

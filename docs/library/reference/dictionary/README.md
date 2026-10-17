@@ -138,6 +138,8 @@ author. Missing, held and ambiguous originals remain unlinked.
 
 **Freeport** — Tax-free storage facilities (Geneva, Luxembourg, Singapore, Delaware). Assets enter and disappear from public record. A freeport period in a provenance chain is a black zone.
 
+**Family price index** — What a model family's price did for the same cars, not what its median did. `family_price_index` holds, per family and calendar month or quarter, the price of one reference car with its 95% range, the sales in the period and their plain median; `family_price_change` holds the 12-month change (last 365 days against the 365 before) with its range, a verdict (up, down, flat, too few to tell), the repeat-sale check and the segment chips. Fitted nightly by `scripts/market/family-price-index.py` (method `hedonic_v1`: log price on period dummies plus variant, gearbox, miles, model year, title flags and venue), written by `record_family_price_index()`, read by `family_price_index_read()`. A family under 30 sales in either year or 150 since 2016 is not fitted. The family's median moves when the mix of what sold moves; this does not.
+
 ## G
 
 **Ghost Text** — Rotating placeholder text in the command input that cycles through input type examples: "Search vehicles...", "Paste a URL...", "Drop an image...", "Ask anything...". Ghost text solves the discoverability problem of polymorphic inputs — the user learns what the input accepts by reading the examples. Each rotation teaches one capability. Styled in `--text-disabled`, animated with subtle fade (4s cycle), disappears on focus.
@@ -283,6 +285,8 @@ can supersede it without editing the original or guessing from model/year.
 **Rhizome** — Deleuzian concept. A network with no center, no hierarchy, no beginning or end. Nuke's architecture is rhizomatic — every concept connects to every other. The observation system is the purest expression. See RHIZOME.md.
 
 **Resolution** — See Entity Resolution.
+
+**Reference car** — The one car a family price index prices: the last 12 months' mix of variants, gearbox, miles, model years and venues. `family_price_index.index_usd` is its price in each period; `family_price_change.ref_car` describes it (sales, median year and miles, manual share, venues, top variants).
 
 **Savant Janitor** — One of three user modes (not personas — modes). The Savant Janitor has 400 photos on their phone, receipts in the glovebox, and doesn't want to organize anything. They want to dump everything into the system and have it sort itself. Their need is a drain — an endpoint that accepts everything and classifies it. The Coaching Flow serves Savant Janitors by telling them exactly what to do next without requiring them to understand the system's structure. See Contemplation: The Three Users and the Finder.
 

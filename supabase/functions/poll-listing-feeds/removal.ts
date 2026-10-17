@@ -67,8 +67,10 @@ export interface SweepDeps {
 }
 
 /** Check up to `max` landed Craigslist listings that are still `unknown`, oldest check first. Never throws. */
-export async function sweepCraigslistRemovals(deps: SweepDeps, max = 5, minAgeMs = 24 * 3600_000, spacingMs = 2000) {
-  const out = { checked: 0, ended: 0, live: 0, stopped: null as string | null, errors: [] as string[] };
+export async function sweepCraigslistRemovals(deps: SweepDeps, max = 5, minAgeMs = 24 * 3600_000, spacingMs = 2000, maxMs = Infinity) {
+  const startedAt = Date.now();
+  const out = { checked: 0, ended: 0, live: 0, unknown: 0, stopped: null as string | null, errors: [] as string[] };
+  let consecutive403 = 0;
   try {
     const before = new Date((deps.now?.() ?? new Date()).getTime() - minAgeMs).toISOString();
     const { data, error } = await deps.supabase.from("vehicle_events")
@@ -79,10 +81,24 @@ export async function sweepCraigslistRemovals(deps: SweepDeps, max = 5, minAgeMs
     if (error) { out.errors.push(error.message); return out; }
     for (const row of data ?? []) {
       if (deps.remainingMs() < 20_000) { out.stopped = "worker_deadline"; break; }
+      if (Date.now() - startedAt > maxMs) { out.stopped = "sweep_time"; break; }
       const probe = await deps.probe(row.source_url);
       out.checked++;
       const verdict = classifyProbe(probe.status, probe.notice ?? null);
-      if (verdict === "blocked") { out.stopped = `http_${probe.status ?? "none"}`; break; }
+      if (verdict === "blocked") {
+        // One post that answers 403 is unknown, not a reason to end the sweep: stamp it so it goes to the back of the line
+        // and carry on. A 429, a server error, no answer, or three 403s in a row means the site is pushing back: stop.
+        if (probe.status === 403 && ++out.unknown && ++consecutive403 < 3) {
+          await writeVehicleEventByKey(deps.supabase, {
+            vehicle_id: row.vehicle_id, source_platform: "craigslist", source_listing_id: row.source_listing_id, source_url: row.source_url,
+            updated_at: probe.observed_at, metadata: { last_checked_at: probe.observed_at, last_check_status: 403, source_observed_at: probe.observed_at },
+          }, { preserveEventStatus: true, sourceObservedAt: probe.observed_at });
+          await deps.sleep(spacingMs);
+          continue;
+        }
+        out.stopped = `http_${probe.status ?? "none"}`; break;
+      }
+      consecutive403 = 0;
       const base = { vehicle_id: row.vehicle_id, source_listing_id: row.source_listing_id, source_url: row.source_url };
       const result = verdict === "ended"
         ? await writeVehicleEventByKey(deps.supabase, endedRow(base, probe), { sourceObservedAt: probe.observed_at })

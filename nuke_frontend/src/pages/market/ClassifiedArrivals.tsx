@@ -6,7 +6,7 @@ import { sourceLink, sourceName } from './useCapturedListings';
 import './ClassifiedArrivals.css';
 import { ASK_SORTS, ASK_TIERS, ASK_WINDOWS, type AskRow, type AskSort, type AskTier, TIER_NAMES, readAskBoard, useAskBoard } from './useAskBoard';
 import { photoList, useListingPhotos } from './useListingPhotos';
-import { type PositionRead, headline, spreadLine } from './askPosition';
+import { type PositionRead, headline, milesLine, spreadLine, venuesLine } from './askPosition';
 import { type ListingRead, readLines, requestListingRead } from './analyzeListing';
 import { useAdminAccess } from '../../hooks/useAdminAccess';
 
@@ -14,7 +14,7 @@ import { useAdminAccess } from '../../hooks/useAdminAccess';
 // asking-price tier. The point stays in memory (never in the URL); logged out there is none until the viewer shares it.
 const RADII = [100, 250, 500] as const;
 const WINDOW_NAMES: Record<number, string> = { 24: 'last 24 hours', 72: 'last 3 days', 168: 'last 7 days' };
-const SORT_NAMES: Record<AskSort, string> = { newest: 'Newest first', nearest: 'Nearest first', band: 'Band first', price: 'Cheapest first' };
+const SORT_NAMES: Record<AskSort, string> = { newest: 'Newest first', nearest: 'Nearest first', band: 'Band first', price: 'Cheapest first', position: 'Lowest for its family' };
 type Locating = 'off' | 'asking' | 'on' | 'refused' | 'unavailable';
 
 // How long ago, the way a feed says it: now, 12 min, 1 h 12 min, 5 h, 2 d. Minutes count while a listing is fresh,
@@ -158,8 +158,11 @@ type PlacedRow = AskRow & { position?: PositionRead | null; condition?: string |
 
 function AskPlacement({ ask, position }: { ask: number | null; position?: PositionRead | null }) {
   const head = headline(position);
-  const lines = [spreadLine(position?.sold, 'sales'), spreadLine(position?.asked, 'asks')];
-  if (head?.basis === 'asks') lines.reverse();
+  // Each population: where the ask sits, then the venues it was read on. Miles come from the sales where they say.
+  const sold = [spreadLine(position?.sold, 'sales'), venuesLine(position?.sold)];
+  const asked = [spreadLine(position?.asked, 'asks'), venuesLine(position?.asked)];
+  const lines = [...(head?.basis === 'asks' ? [...asked, ...sold] : [...sold, ...asked]),
+    milesLine(position?.sold, 'sales') ?? milesLine(position?.asked, 'asks')];
   if (!head && !lines.some(Boolean)) return null;
   const basis = head ? (head.basis === 'sales' ? position?.sold : position?.asked) : null;
   return <div className="market-ask__position">

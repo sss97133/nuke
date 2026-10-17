@@ -249,6 +249,27 @@ describe('market answer -> supporting lots', () => {
     await act(async () => container.querySelector<HTMLInputElement>('.inventory-map-pulse-control input')!.click());
     expect(container.querySelector('.inventory-map-pulse')).toBeNull();
   });
+  it('rings a bell for each new bid only after the viewer turns bid sounds on', async () => {
+    const tones: number[] = [];
+    class FakeAudio {
+      state = 'running'; currentTime = 0; destination = {};
+      resume() { return Promise.resolve(); }
+      createGain() { return { gain: { setValueAtTime() {}, exponentialRampToValueAtTime() {} }, connect: (d: any) => d }; }
+      createOscillator() { return { type: '', frequency: { set value(v: number) { tones.push(v); } }, connect: (g: any) => g, start() {}, stop() {} }; }
+    }
+    vi.stubGlobal('AudioContext', FakeAudio);
+    fixture.pulse.newBids = [{ id: 'b1', vehicleId: 'later', amount: 26_000, bidAt: Date.now(), endAt: null }];
+    await render();
+    expect(button('Bid sounds off').getAttribute('aria-pressed')).toBe('false');
+    await act(async () => { await vi.advanceTimersByTimeAsync(20_000); });
+    expect(tones).toEqual([]);
+    await click('Bid sounds off');
+    expect(button('Bid sounds on').getAttribute('aria-pressed')).toBe('true');
+    await act(async () => { await vi.advanceTimersByTimeAsync(20_000); });
+    expect(tones.length).toBeGreaterThan(0);
+    await click('Bid sounds on');
+    expect(button('Bid sounds off').getAttribute('aria-pressed')).toBe('false');
+  });
   it('drills recorded model labels into exactly their records and replaces inventory when switching views', async () => {
     fixture.pulse.data.auctions[0].model = 'Recorded model A';
     fixture.pulse.data.auctions[1].model = 'Recorded model B';
@@ -374,9 +395,22 @@ describe('where a lot should finish', () => {
       bidAtEstimate: 25000, compsThrough: '2026-09-27' });
     await render();
     const line = container.querySelector('[data-vehicle-id="later"] .market-lot-finish')!;
-    expect(line.textContent).toBe('likely $33K · $26K–$45K');
+    // how far the bid has to run ($25,000 now), then the range bar: the range, the likely tick, the bid
+    expect(line.textContent).toBe('likely $33K · +32% to go · $26K–$45K');
     expect(line.getAttribute('title')).toContain('8 in 10 cars like this');
+    expect(line.querySelector('svg')?.getAttribute('aria-label')).toBe('likely $33K, range $26K to $45K, bid $25K');
+    expect(line.querySelectorAll('svg line')).toHaveLength(2);
     expect(container.querySelector('[data-vehicle-id="first"] .market-lot-finish')).toBeNull();
+  });
+});
+
+describe('how far a lot has to run', () => {
+  it('says the gap from the bid to the likely finish', async () => {
+    const { finishGap } = await import('./MarketPulse');
+    expect(finishGap(500000, { estimate: 575000 })).toBe('+15% to go');
+    expect(finishGap(600000, { estimate: 575000 })).toBe('4% past likely');
+    expect(finishGap(575000, { estimate: 576000 })).toBe('at likely');
+    expect(finishGap(null, { estimate: 575000 })).toBeNull();
   });
 });
 
@@ -516,5 +550,15 @@ describe('inline market row inspection', () => {
     await click('Close listing evidence');
     expect(window.location.search).not.toContain('lot=');
     expect(document.activeElement).toBe(row.querySelector('.market-lot-name'));
+  });
+  it('scopes live auctions to a drilled model family from the URL and shows the family in the heading', async () => {
+    fixture.pulse.data.auctions = [
+      { ...lot('m-1', 'FORD', 38000, 2, 'mustang-gt'), year: 1967, model: 'Mustang GT' },
+      { ...lot('m-2', 'FORD', 52000, 3, 'mustang-mach-1'), year: 1969, model: 'Mustang Mach 1' },
+      { ...lot('f-1', 'FORD', 24000, 4, 'f-150-raptor'), year: 2018, model: 'F-150' },
+    ];
+    await render('make=Ford&family=8a8271f8-d299-4b55-837a-35ca919f8937&family_name=Mustang');
+    expect(container.querySelector('h1')?.textContent).toBe('Bring a Trailer · FORD · Mustang');
+    expect(boardTitles()).toEqual(['m-1', 'm-2']);
   });
 });

@@ -48,6 +48,17 @@ MINISEAL = [("D-609-03", 300, 1510), ("D-609-04", 779, 2680), ("D-609-05", 1900,
 # The lead from a pin splice into its Superseal contact: MoTeC wants 24-20 AWG on 8 A PDM outputs (PDM manual p.6,
 # p.48) and ProWire's SSC-N takes 16-24 AWG; 20 AWG is also what the design's B16 group leads already were.
 PIN_LEAD = 20
+# RSI pass 26: each pin splice is its own node beside the plug (SPL-<plug>-<cavity>, the pigtail splices' pattern), its
+# wires end there, and the lead into the contact is a wire row (LEAD-<plug>-<cavity>; a group lead adds -G<n>) in
+# M22759/32, the pigtails' spec. Lead length is the system's call, not a vendor figure: no document in hand sets a
+# splice's distance from a Superseal housing. 4 in clears the housing and the splice's heat-shrink with room to crimp;
+# splices on one plug alternate 4 and 6 in so they don't stack in the bundle (NASA-STD-8739.4: splice locations are
+# staggered to keep the harness profile down).
+LEAD_IN = (4, 6)
+LEAD_SPEC = "M22759/32"
+PIN_LEAD_WHY = ("RSI pass 26: the lead into a Superseal contact from the stub splice beside it (one wire per contact; "
+                "MoTeC PDM manual p.6, p.48: 24#-20# on 8 A outputs; ProWire SSC-N 24-16 AWG), the PDM pigtails' pattern "
+                "(reconcile_v5.add_pigtails, PCS_IGN_PT)")
 ENGINE_ONLY_OFF = {"23", "50", "73", "83", "84", "87", "88", "80", "82"}     # state row 50 (Dave, 2026-06-18)
 # chassis circuits the June build sheet listed as 61-pin overflow; they cross in the body crossing instead (state row 50)
 CHASSIS_OFF = {"100": "speed sender (Dakota SEN-01-5 on the NP205) is a chassis circuit: crossing = bulkhead C, cavity OPEN "
@@ -128,6 +139,73 @@ def splice_for(awgs):
     return None, awg_equiv(tot)
 
 
+def pin_splices_at_pins(reg, keep_leads=False):
+    """The registry as the build-book pages draw it (RSI pass 26): a pin splice node folds back onto its pin, its wires end
+    in that pin's cavity again, and the leads read as words in the splice (the pages draw a pin splice beside its pin,
+    not as a box of its own). keep_leads leaves the lead wires in the wire list (the spec and BOM pages count them).
+    Returns a copy; the registry itself keeps the nodes and the lead wires."""
+    reg = json.loads(json.dumps(reg))
+    ps = {e: ep["pin_splice"] for e, ep in reg["endpoints"].items() if ep.get("pin_splice")}
+    if not ps and not any(t.get("stud_of") for t in reg["terminations"]):
+        return reg
+    lead = {w["id"]: w for w in reg["implied"] if w.get("lead_of")}
+    word = lambda x: (f"{PIN_LEAD} AWG group lead" if re.search(r"-G\d+$", x) else f"{PIN_LEAD} AWG pin lead") if x in lead else x
+    terms = []
+    for t in reg["terminations"]:
+        if str(t["wire"]) in lead:
+            continue
+        if t["endpoint"] in ps:
+            p_ = ps[t["endpoint"]]
+            fam = (reg["endpoints"].get(p_["plug"]) or {}).get("family")
+            t = OrderedDict(t, endpoint=p_["plug"], cavity=p_["cavity"], part="SSC-N" if fam == "ssc" else t["part"], family=fam)
+        terms.append(t)
+    reg["terminations"] = terms
+    for e, p_ in ps.items():
+        ep = reg["endpoints"].pop(e)
+        plug = reg["endpoints"].get(p_["plug"])
+        if plug is not None:
+            members = [w for w in ep["wires"] if w not in lead]
+            plug["wires"] = [w for w in plug["wires"] if w not in lead] + [w for w in members if w not in plug["wires"]]
+            plug["cavities"] = {**{w: c for w, c in (plug.get("cavities") or {}).items() if w not in lead},
+                                **{w: p_["cavity"] for w in members}}
+    if not keep_leads:
+        reg["implied"] = [w for w in reg["implied"] if w["id"] not in lead]
+    # RSI pass 37: the DC primary's stud nodes fold back into their stud set (one end per cable at PS-STUDS, its lugs
+    # joined), and the ground-star ends a set added return to it
+    by_set = OrderedDict()
+    kept = []
+    for t in reg["terminations"]:
+        if t.get("stud_of"):
+            by_set.setdefault((str(t["wire"]), t["stud_of"]), []).append(t)
+        else:
+            kept.append(t)
+    for (w, set_eid), ts in by_set.items():
+        parts_ = [t["part"] for t in ts]
+        kept.append(OrderedDict(wire=w, endpoint=set_eid, where=ts[0].get("where"), cavity="stud, lug " + " + ".join(parts_),
+                                factory_circuit=None, part=" + ".join(parts_), family="lug", doubled=None))
+    reg["terminations"] = kept
+    moved_to = {}
+    for e, ep in list(reg["endpoints"].items()):
+        if ep.get("stud_of"):
+            reg["endpoints"].pop(e)
+    for e, ep in reg["endpoints"].items():
+        if ep.pop("stud_set", None):
+            for w in ep.get("wires") or []:
+                moved_to[str(w)] = e
+    for (w, set_eid), ts in by_set.items():
+        for t in ts:
+            ep = reg["endpoints"].get(t["endpoint"])
+            if ep is not None and not ep.get("stud_of") and t["endpoint"] != set_eid:
+                ep["wires"] = [x for x in ep.get("wires") or [] if str(x) != w]
+    for sp in reg["splices"]:
+        if sp["at"] in ps:
+            p_ = ps[sp["at"]]
+            sp["at"] = f"{p_['plug']} {p_['cavity']}"
+            sp["wires"] = [word(x) for x in sp["wires"]]
+            sp.pop("type", None)
+    return reg
+
+
 def wire_keys(w):
     """[(spec, awg, MIL colour code)] for a registry wire — one per conductor ("yellow + green" is a
     twisted pair = two conductors; "white/red" is one white wire with a red stripe). [] = not stock."""
@@ -170,6 +248,7 @@ def attach(reg):
     sheets = _load_sheets()
     carts = [json.loads(p.read_text()) for p in sorted(ORD.glob("*.json"))]
 
+    reg["implied"][:] = [w for w in reg["implied"] if not w.get("lead_of")]   # RSI pass 26: leads are rebuilt below
     wires = {w["id"]: w for w in reg["wires"]}
     wires.update({w["id"]: w for w in reg["implied"]})
     retired = {w["id"] for w in reg["wires"] if w.get("retired")}
@@ -308,6 +387,8 @@ def attach(reg):
     resolved, terms, need = OrderedDict(), [], Counter()
     replaced = {}
     splices, unresolved_pins, device_splices = [], [], []
+    pin_nodes, leads = OrderedDict(), []          # RSI pass 26: pin splice nodes and their lead wires
+    stud_ends, stud_nodes = [], OrderedDict()      # RSI pass 37: the DC primary's ends on their own studs
     for eid, ep in eps.items():
         spec = ep.get("wires") or []
         wl, cav_of = [], {}
@@ -386,36 +467,75 @@ def attach(reg):
             empty = (ep.get("cavities") or 0) - len(by_cav)
             if ep.get("cavities"):
                 need["4-1437284-3"] += max(0, empty)
-            for cv, ws in sorted(by_cav.items()):
-                if len(ws) > 1:
-                    # RSI pass 21: the splice beside a Superseal pin takes its wires and the lead into the contact
-                    awgs = [wires[x]["awg"] for x in ws if isinstance(wires[x]["awg"], int)]
-                    code, eq = splice_for(awgs + [PIN_LEAD])
-                    if code:
-                        splices.append({"at": f"{eid} {cv}", "wires": ws + [f"{PIN_LEAD} AWG pin lead"], "splice": code, "equiv_awg": eq})
-                        need[code] += 1
-                        continue
+            moved_here = set()
+            for n_spl, (cv, ws) in enumerate((x for x in sorted(by_cav.items()) if len(x[1]) > 1)):
+                # RSI pass 21: the splice beside a Superseal pin takes its wires and the lead into the contact.
+                # RSI pass 26: the splice is a node (SPL-<plug>-<cavity>) where its wires end, and the lead is a wire.
+                node, lead = f"SPL-{eid}-{cv}", f"LEAD-{eid}-{cv}"
+                inch = LEAD_IN[n_spl % len(LEAD_IN)]
+                awgs = [wires[x]["awg"] for x in ws if isinstance(wires[x]["awg"], int)]
+                code, eq = splice_for(awgs + [PIN_LEAD])
+                if code:
+                    groups = [(node, ws, lead, code, eq)]
+                    join = None
+                else:
                     # too big for one MiniSeal: wires packed in order into groups that each fit D-609-05 with a group
                     # lead out, then one join of the group leads and the pin lead
                     cap = MINISEAL[-1][2] - CMA[PIN_LEAD]
-                    groups, cur, tot = [], [], 0
+                    packed, cur, tot = [], [], 0
                     for x in ws:
                         a = CMA.get(wires[x]["awg"], CMA[22])
                         if cur and tot + a > cap:
-                            groups.append(cur)
+                            packed.append(cur)
                             cur, tot = [], 0
                         cur.append(x)
                         tot += a
-                    groups.append(cur)
-                    for g in groups:
+                    packed.append(cur)
+                    groups = []
+                    for g_n, g in enumerate(packed, 1):
                         gc, ge = splice_for([wires[x]["awg"] for x in g if isinstance(wires[x]["awg"], int)] + [PIN_LEAD])
-                        splices.append({"at": f"{eid} {cv}", "wires": g + [f"{PIN_LEAD} AWG group lead"], "splice": gc, "equiv_awg": ge})
-                        need[gc] += 1
-                    jc, je = splice_for([PIN_LEAD] * (len(groups) + 1))
-                    splices.append({"at": f"{eid} {cv}", "wires": [f"{PIN_LEAD} AWG group lead"] * len(groups) + [f"{PIN_LEAD} AWG pin lead"],
-                                    "splice": jc, "equiv_awg": je})
-                    need[jc] += 1
+                        groups.append((f"{node}-G{g_n}", g, f"{lead}-G{g_n}", gc, ge))
+                    join = splice_for([PIN_LEAD] * (len(packed) + 1))
+                for g_node, g, g_lead, gc, ge in groups:
+                    splices.append({"at": g_node, "wires": g + [g_lead], "splice": gc, "type": "stub", "equiv_awg": ge})
+                    need[gc] += 1
+                    pin_nodes[g_node] = OrderedDict(plug=eid, cavity=cv, splice=gc, members=g, lead=g_lead,
+                                                    joins=node if join else None)
+                if join:
+                    splices.append({"at": node, "wires": [x[2] for x in groups] + [lead], "splice": join[0], "type": "stub",
+                                    "equiv_awg": join[1]})
+                    need[join[0]] += 1
+                    pin_nodes[node] = OrderedDict(plug=eid, cavity=cv, splice=join[0], members=[x[2] for x in groups],
+                                                  lead=lead, joins=None)
+                colour = Counter(wires[x].get("color") for x in ws).most_common(1)[0][0]
+                for g_node, g, g_lead, gc, ge in groups:
+                    if join:
+                        leads.append(OrderedDict(
+                            id=g_lead, label=f"{PIN_LEAD} AWG group lead from the {gc} splice {g_node} into the join {node} "
+                                             f"({eid} pin {cv})",
+                            status="implied", frm=g_node, to=node, awg=PIN_LEAD, spec=LEAD_SPEC, color=colour,
+                            length_ft=round(LEAD_IN[0] / 12, 2), length_kind="design",
+                            length_basis=f"design call, RSI pass 26: {LEAD_IN[0]} in between the group splice and the join",
+                            subsystem=wires[g[0]].get("subsystem"), subsystem_basis=f"lead of {g_node}",
+                            lead_of=g_node, conflicts=[], sources=[PIN_LEAD_WHY]))
+                leads.append(OrderedDict(
+                    id=lead, label=f"{PIN_LEAD} AWG lead from the {join[0] if join else code} splice {node} into {eid} pin {cv}",
+                    status="implied", frm=f"{eid.split('-')[0]}:{cv}", to=node, awg=PIN_LEAD, spec=LEAD_SPEC, color=colour,
+                    length_ft=round(inch / 12, 2), length_kind="design",
+                    length_basis=f"design call, RSI pass 26: {inch} in from the splice to the contact (splices on one plug "
+                                 f"alternate {LEAD_IN[0]} and {LEAD_IN[1]} in, staggered)",
+                    subsystem=wires[ws[0]].get("subsystem"), subsystem_basis=f"lead of {node}",
+                    lead_of=node, conflicts=[], sources=[PIN_LEAD_WHY]))
+                by_cav[cv] = [lead]
+                moved_here.update(ws)
+                for g_node in [x[0] for x in groups] + ([node] if join else []):
+                    pin_nodes[g_node]["where"] = ep.get("where")
             per_end = [{"cavity": cv, "wires": ws, "part": "SSC-N"} for cv, ws in sorted(by_cav.items())]
+            mine = {x["id"]: pin_nodes[x["lead_of"]]["cavity"] for x in leads
+                    if pin_nodes[x["lead_of"]]["plug"] == eid and not pin_nodes[x["lead_of"]]["joins"]}
+            wl = [w for w in wl if w not in moved_here] + list(mine)
+            cav_of = {w: c for w, c in cav_of.items() if w not in moved_here}
+            cav_of.update(mine)
         elif fid == "d38999_20":
             part = fam["per_end"]["contact_cabin" if ep.get("side") == "cabin" else "contact_engine"]
             need[part] += len(wl)
@@ -451,7 +571,16 @@ def attach(reg):
         elif fid == "lug":
             # round 4: a stud end names its stud and lug, so no page prints 'terminal OPEN' for a lugged cable
             lugw = lambda w: ep["lugs"].get(w, []) if isinstance(ep["lugs"].get(w), list) else [ep["lugs"].get(w, "?")]
-            per_end = [{"wires": [w], "part": " + ".join(lugw(w)), "cavity": "stud, lug " + " + ".join(lugw(w))} for w in wl]
+            studs = {str(k): v for k, v in (ep.get("studs") or {}).items()}
+            for w in wl:   # RSI pass 37: each lug of a stud-set cable lands on its own stud node, in lug order
+                for n_, code_ in enumerate(studs.get(w) or []):
+                    lg = lugw(w)
+                    part_ = lg[n_] if n_ < len(lg) else (lg[-1] if lg else "?")
+                    stud_ends.append((w, code_, part_, eid, ep.get("where")))
+            for code_, words in (ep.get("stud_nodes") or {}).items():
+                stud_nodes[code_] = (words, eid, ep.get("where"))
+            per_end = [{"wires": [w], "part": " + ".join(lugw(w)), "cavity": "stud, lug " + " + ".join(lugw(w))}
+                       for w in wl if w not in studs]
         elif fid == "miniseal":
             by_g = fam.get("per_end", {}).get("splice_by_gauge", {})
             def _splice(awg):
@@ -536,6 +665,63 @@ def attach(reg):
             branch_wires_missing=ep.get("branch_wires_missing", 0), unknown_wire_ids=missing_ids,
             open=ep.get("open", []), sources=ep.get("sources", []), splice_point=ep.get("splice_point"),
             range_by_wire=ep.get("range_by_wire"))
+
+    # RSI pass 26: each pin splice node takes its wires and its lead (cavity "splice n", the in-line splices' naming);
+    # the lead's other end is the pin, written above with the plug's contact
+    for node, pn in pin_nodes.items():
+        ws_ = pn["members"] + [pn["lead"]]
+        for i, w in enumerate(ws_, 1):
+            terms.append(OrderedDict(wire=w, endpoint=node, where=pn["where"], cavity=f"splice {i}", factory_circuit=None,
+                                     part=pn["splice"], family="miniseal", doubled=None))
+        resolved[node] = OrderedDict(
+            device=(f"{pn['splice']} stub splice beside {pn['plug']} pin {pn['cavity']}: " +
+                    (f"joins the group leads, its lead {pn['lead']} goes into the pin" if not pn["joins"] and
+                     any(str(m).startswith("LEAD-") for m in pn["members"]) else
+                     f"its lead {pn['lead']} goes to the join {pn['joins']}" if pn["joins"] else
+                     f"its lead {pn['lead']} goes into the pin")),
+            where=pn["where"], family="miniseal", kit={}, wires=ws_, cavities=None, empty=None, doubled=None,
+            range=[26, 12], out_of_range=[], pigtailed=[], note="RSI pass 26: the splice beside the pin as its own node",
+            branch_wires_missing=0, unknown_wire_ids=[], open=[], sources=[PIN_LEAD_WHY], splice_point=None,
+            range_by_wire=None, pin_splice=OrderedDict(plug=pn["plug"], cavity=pn["cavity"], joins=pn["joins"]))
+        # the node's catalog-shaped entry, for the steps below that read the catalog (crimper, dossiers); after the
+        # endpoint loop, so it adds no part to the BOM
+        eps[node] = OrderedDict(device=resolved[node]["device"], where=pn["where"], family="miniseal", wires=ws_,
+                                sources=[PIN_LEAD_WHY])
+    # A lead keeps its circuit's colour where 20 AWG M22759/32 in that colour is already on the BOM; otherwise it is cut
+    # from the stocked gray (the system's call: a new spool for under a foot of lead is waste; the cavity marker names
+    # the circuit at the pin, Dave's colour-ring method)
+    stocked = {k for w in list(reg["wires"]) + list(reg["implied"]) if w.get("id") not in retired
+               for k in wire_keys(w) if k[:2] == (LEAD_SPEC, PIN_LEAD)}
+    for x in leads:
+        if not set(wire_keys(x)) <= stocked:
+            x["conflicts"].append(f"decision: color {x['color']} -> gray — 20 AWG {LEAD_SPEC} in {x['color']} is not otherwise "
+                                  "on the BOM; the lead is cut from the stocked gray and the cavity marker names the circuit")
+            x["color"] = "gray"
+    reg["implied"].extend(leads)
+    wires.update({x["id"]: x for x in leads})
+
+    # RSI pass 37: the stud nodes of the DC primary take their cable ends (cavity "stud, lug <part>"); the ground star's
+    # ends go on GND-BANK-ENG itself. The stud set (PS-STUDS) keeps its catalog lug table and wire list for the pages.
+    for w, code_, part_, set_eid, where_ in stud_ends:
+        terms.append(OrderedDict(wire=w, endpoint=code_, where=where_, cavity=f"stud, lug {part_}", factory_circuit=None,
+                                 part=part_, family="lug", doubled=None, stud_of=set_eid))
+        if code_ in resolved:
+            if w not in resolved[code_]["wires"]:
+                resolved[code_]["wires"] = list(resolved[code_]["wires"]) + [w]
+            continue
+        words, _, _ = stud_nodes.get(code_, (code_, set_eid, where_))
+        node = resolved.setdefault(code_, OrderedDict(
+            device=words, where=where_, family="lug", kit={}, wires=[], cavities=None, empty=None, doubled=None, range=None,
+            out_of_range=[], pigtailed=[], note=f"RSI pass 37: a stud of the DC primary ({set_eid})", branch_wires_missing=0,
+            unknown_wire_ids=[], open=[], sources=list((resolved.get(set_eid) or {}).get("sources") or []), splice_point=None,
+            range_by_wire=None, stud_of=set_eid))
+        node["wires"] = list(node["wires"]) + [w]
+        eps.setdefault(code_, OrderedDict(device=words, where=where_, family="lug", wires=[], sources=[f"stud of {set_eid}"]))
+    for code_ in stud_nodes:
+        if code_ in eps:
+            eps[code_]["wires"] = list((resolved.get(code_) or {}).get("wires") or [])
+    for set_eid in {x[3] for x in stud_ends}:
+        resolved[set_eid]["stud_set"] = True      # its ends live on the stud nodes; the loader draws no plug for it
 
     # shield terminations: one solder sleeve per shielded cable (ECU end only)
     for sig in SHIELD_CABLES:
@@ -823,7 +1009,9 @@ def build_dossiers(reg, resolved, terms, bulk, wires, parts, tools, fams, eps, c
             frm = wr.get("frm") or ""
             m = re.match(r"^(M130|PDM30):([AB]\d{1,2})", frm)
             if m and isinstance(a, int):
-                sp = [s["splice"] for s in splices if s["at"].endswith(" " + m.group(2)[0] + m.group(2)[1:].zfill(2)) and w in s["wires"]]
+                cav = m.group(2)[0] + m.group(2)[1:].zfill(2)
+                sp = [s["splice"] for s in splices if (s["at"].endswith(" " + cav) or re.search(rf"^SPL-{m.group(1)}-[AB]-{cav}(?:-G\d+)?$", s["at"]))
+                      and w in s["wires"]]
                 R(f"#{w} ECU end", f"{frm}: SSC-N, AFM8 + K1S selector {K1S.get(a, '?')}" + (f"; splice {sp[0]}" if sp else ""),
                   "ProWire SSC-N tooling chart; motec_m130_datasheet.pdf p.4–5" + ("; ProWire 3137CT (MiniSeal cavities)" if sp else ""))
                 R(f"#{w} ECU strip length", "measure the SSC-N barrel on the first contact", "no published value", "bench")

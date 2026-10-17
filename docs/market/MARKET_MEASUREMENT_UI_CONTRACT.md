@@ -283,7 +283,9 @@ Contract, as delivered in `auction_calendar_read` and the Market tab's `?collect
   `source_census` row per house with `census_method` 'house_roster_facet' (the Mecum lane writes one per index read,
   keyed by sale_key; read through `house_roster_census()`, since `observation_sources` is not readable logged out).
   A listed sale with no lot landed and no recorded days is shown under the table, not on the axis. Last year's final
-  roster as a baseline is still owed.
+  roster is the baseline: the census meta's `prior_sale` (the same series' previous sale from the house's index, matched by
+  series and location because houses rename sales) reads "Mecum ran 1,459 lots at Dallas 2025 · 71% of its vehicles
+  sold" beside the roster count.
 - **Non-vehicle lots** (`listing_kind` 'non_vehicle_item', e.g. Mecum road art) are not lots on the calendar, as on the map.
 - **A backfilled sale stops reading unconfirmed** once a sale correction on the vehicle cites that lot among its
   `source.lots` (the house's own result was read and applied).
@@ -296,6 +298,25 @@ Contract, as delivered in `auction_calendar_read` and the Market tab's `?collect
   never a source occurrence date. This date correction does not qualify an earlier record's price or sale outcome.
 - **Not claimed.** The calendar is the lots Nuke has landed, not the house's full roster, until the stated count is held
   beside it; an estimate is the house's; "no reserve" is the house's flag.
+- **Read model.** The lots come from `mv_auction_calendar_lots` (one row per public vehicle lot, its earlier-event count),
+  refreshed at :07 and :37 (job `refresh-auction-calendar`); a roster's earlier records are read live for the page's lots.
+  `population.lots_built_at` is the read model's build time. Measured 2026-10-15 14:4xZ: reading lots from
+  `vehicle_events` and `vehicles` on every call timed out at 16 s for anon while intake loaded the disk; from the read
+  model the call answers in 0.13 to 0.5 s.
+
+### Which house a sale belongs to
+
+A confirmed sale's house on the map (`mv_treemap_outcomes.source_name`, and through it the family folds and their venue
+toggles) is `market_venue_label(auction_source, canonical_platform)`: the source string stripped to `[a-z0-9]`, matched to
+one house label (`Bring a Trailer`, `Mecum`, `Barrett-Jackson`, `RM Sotheby's`, `Gooding & Co`, `Bonhams`, `Broad Arrow`,
+`Cars & Bids`, `PCarMarket`, `Collecting Cars`, `SBX Cars`, `Classic.com`), `auction_source` first, `canonical_platform`
+second; null when neither names a house ("venue unrecorded"). The labels are the strings `FamilySalesChart` matches. A
+house's share is quoted with the no-house count beside it. Measured 2026-10-15: the map's earlier CASE missed the slugs the
+rows hold (`cars_and_bids`, `barrett-jackson`, `rm-sothebys`), so 37,688 of 286,610 confirmed sales had no house and Cars &
+Bids, Barrett-Jackson and RM counted zero; with the function 3,532 have none (3,182 more are Barrett-Jackson by their
+listing URL, being filled into `canonical_platform` from that URL). A row whose two fields name different houses is a
+merged record, repaired at the record (241 Mecum lots carrying a Barrett-Jackson docket identity, 2026-10-15), not by a
+precedence rule in the label.
 
 ## The feed and the brand map — owner direction, October 15
 
@@ -494,3 +515,81 @@ and how confident it is. Built from a backtest run offline against the local BaT
 - **Gaps.** The archive stops at 2026-09-27 (a daily append of settled lots is next); production has no BaT model-page
   key (titles map at 92.7-96.4%); bidder and comment counts improve the 24 h miss from 17.4% to 16.7% and come with a
   bounded engagement read later; grade C and reserve-not-met are the weakest cells.
+
+
+### The finish equation is never complete, owner direction, October 15 evening
+
+After model 32 called a 2021 Camaro ZL1 1LE 6-Speed at $59,500 ($52,700–$73,800) an hour out and it sold at $70,000
+to comments calling it "a great deal" (vehicle 918eaf7e…, 2026-10-15 20:46Z), the owner: "if youre missing things like
+trim youre insanely off. you should be measuring vibe. you should be measuring the commentary, the cultural importance,
+the previous sales across all markets... so many factors go into prediction. the predicition equation is NEVER complete."
+Model 32 compared it against its whole model page (SS through ZL1 1LE) on price alone.
+
+What that commits the estimate to:
+- **An open list of factors, each measured.** Trim and specification (title trim codes, transmission, miles,
+  modifications, generation); the room (comments and their rate, commenters, likes, seller replies, questions,
+  sentiment and stance, bidders, bid pace); cultural pull (the model's listing and comment history, sell-through,
+  share trend, how often it beat its estimate, provenance words); and every market (the same family and trim at every
+  venue Nuke holds, the same VIN's earlier sales, classified asks). A factor joins the estimate only when it lowers the
+  held-out miss or improves calibration, point-in-time (events before t only), and it is recorded with its lift and
+  date. The list keeps growing; no version is final.
+- **Each estimate shows what moved it.** Per-lot contributions by factor family, drawn on the card ("trim +12%,
+  room +5%"), so a viewer sees why, not a sentence.
+- **Graded where people can see it.** Every closed lot is placed against its last estimate (the live floor's dots:
+  2026-10-15, 178 lots in 12 h, 133 inside the range, median miss 14.2%), and a new version is written beside the old
+  one until it wins on the same lots.
+- **Acceptance case:** the Camaro above; model 33 must state what it would have said at 1 h and 10 min, with its
+  contributions.
+
+
+## One scope drives the market page, and search sets it — owner direction, October 16
+
+The owner, on the home page: "lets say i want to drill into the tree map... i cant find mustang but i wanna explore
+mustang. i figure the search bar will help me... i type in mustang.. it sends me to a new page totally different design,
+untrustworthy data.. shows a rare unpopulated motorcycle and a completely random arrangement of mustangs... it shouldnt
+have sent me off the initial home page... if i typed in mustang up top i wouldve wanted all these stacks to reposition to
+mustang. i guess i wouldve wanted the treemap to be sort of the data guide and as i click through the tree map all the
+lower visualizers adjust."
+
+**What the page does today (measured 2026-10-16).**
+- The page answers "what are we looking at" in four unconnected places: the treemap's drill path (React state in
+  `TreemapHomePage`, not in the URL, so Back, a shared link and the search bar cannot reach it); the live board's `make`
+  and `model` (URL params, a separate mechanism); the Sources board (no scope at all); and the header search, which always
+  navigates to `/search` (8 call sites in `AIDataIngestionSearch`, plus `useSearchRouter`).
+- `/search` is the `universal-search` edge function matching text with `ILIKE` on the raw `make`, `model` and `color`
+  columns. For "mustang" it returned 94 vehicle rows, every one with `make = 'Mustang'`: 128 records in the whole database
+  carry that make (the Mustang Motorcycle Corp's minibikes, and cars whose make was recorded wrong, such as "1999 Mustang
+  mustang"); 58 of the 94 have no vehicle type, 28 no photo. Not one is a Ford Mustang, though the treemap's Ford Mustang
+  family holds 9,173 confirmed sales (Bring a Trailer 5,288, Mecum 2,610, no house recorded 1,221, Bonhams 40, Gooding 9,
+  PCarMarket 5) and 48 Ford Mustangs are live on BaT now. Every result scores 0.95, so "Relevance" orders nothing. The treemap
+  speaks in canonical makes and families; search speaks in whatever text the record carries; they disagree about what a
+  Mustang is.
+- The dropdown under the header search mixes vehicles, people ("MustandRM1969", a BaT identity) and typos in the data
+  ("1973 Ford mustand convertible", "1965 Mustang mustang") in one list.
+
+**The rule: one scope, in the URL, read by everything.**
+- The scope is a node of the treemap's own hierarchy, which already exists as canonical readers: all, make, family, model
+  name, year, vehicle (`treemap_brand_families`, `treemap_family_models`, `treemap_years`, `treemap_sales`). It lives in
+  the page URL (`/?tab=market&make=Ford&family=<family_key>`), so Back, a shared link and a reload all return to it.
+- The treemap is the scope's navigator and its legend: its breadcrumb is the scope, and a click sets it. Nothing else on
+  the page keeps a private filter.
+- Every section below the map answers for the scope or says why it cannot, with its own population, method and date:
+  live auctions (the scope's lots), what sold lately, the like-for-like price (`family_price_index_read`), finish
+  estimates for the scope's live lots, the calendar, classifieds, and the Sources board scoped (which houses hold this
+  scope's sales and what each lands). At the top (all makes) each section is market-wide, as now.
+- The header search sets scope. Text resolves to a node (an alias table with typo tolerance over the canonical makes,
+  families and model names, ranked by confirmed sales so cars come before minibikes, with the type shown when two
+  entities share a name: "Ford Mustang, 9,173 sales" and "Mustang minibikes, 12"). A high-confidence match scopes the page
+  in place; an ambiguous one shows its candidates under the box; a VIN opens that vehicle; a pasted listing address is
+  analyzed. `/search` stays only as the fallback for text that names no entity, and then ranks by evidence (photos, sales,
+  completeness), never by a text hit alone.
+
+**Order of work.** (1) A merged-away vehicle address redirects to its record, and merged or deleted records never appear
+in a list (#1778 for the redirect). (2) The scope in the URL, written and read by the treemap and the live board's own
+`make`/`model`. (3) The entity resolver (`market_scope_resolve`) and the header search on the market tab. (4) Each section
+takes the scope, starting with those whose data is already loaded for the family (the sales by house, the like-for-like
+line). (5) `/search` reduced to the fallback.
+
+**Acceptance.** Type "mustang" on the home page: the URL gains the Ford Mustang scope, the treemap shows the Mustang
+family's models, the live board lists the 48 live Ford Mustangs, the price section reads the Mustang family's like-for-like
+change, the Sources board shows the houses behind the 9,173 sales, and Back returns to all makes. Nothing leaves the page.

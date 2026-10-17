@@ -32,13 +32,13 @@ on:
         required: false
         default: ''
       migrations_since:
-        description: 'Apply migrations with filename >= this prefix (blank = none)'
+        description: 'Apply migrations with filename >= this prefix (blank = none). Default is blank on purpose: a dated default replayed every migration since June on a blank dispatch (2026-10-15 06:37Z).'
         required: false
-        default: '20260609'
+        default: ''
       functions:
         description: 'Comma-separated edge functions to deploy (blank = none)'
         required: false
-        default: 'universal-search,photo-pipeline-orchestrator'
+        default: ''
 
 concurrency:
   group: supabase-deploy

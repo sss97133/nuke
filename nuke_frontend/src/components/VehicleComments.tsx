@@ -571,12 +571,13 @@ const VehicleComments: React.FC<VehicleCommentsProps> = ({ vehicleId }) => {
         .eq('id', userId)
         .single();
 
-      // Check if user is linked to organizations
+      // Check if user is linked to organizations: a membership that has not ended. organization_contributors has
+      // no is_active column; filtering on it failed the read, so the boost below never applied.
       const { data: orgLinks } = await supabase
         .from('organization_contributors')
         .select('organization_id, role')
         .eq('user_id', userId)
-        .eq('is_active', true);
+        .neq('status', 'inactive');
 
       // Check if user has vehicle relationship (worked for entity that sold vehicle)
       const { data: vehicleOrgs } = await supabase

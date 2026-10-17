@@ -6,11 +6,15 @@ import { supabase } from '../../lib/supabase';
 // 85 KB, 0.55 s cold and 0.17 s warm as a logged-out reader on 2026-10-15). On that date the three newest Craigslist
 // cards held every photo their listing pages showed (21 of 21, 7 of 7, 3 of 3) and showed one.
 // Capture order is not kept (position is 0 on every row), so the board's image leads and the rest follow in a stable order.
+// A Craigslist photo lands at two sizes, the 600x450 row flagged is_duplicate of its 1200x900 row: a 12-photo listing
+// held 24 rows and its stepper read "1/24", each photo twice (15 of 18 readable listings in a sample of 20, 2026-10-15 08:00Z).
+// Flagged duplicates are left out; a row without the flag stays.
 export type ListingPhoto = { vehicle_id: string; image_url: string | null };
 
 export async function readListingPhotos(vehicleIds: string[], signal?: AbortSignal): Promise<ListingPhoto[]> {
   if (!vehicleIds.length) return [];
   let request = supabase.from('vehicle_images').select('vehicle_id,image_url').in('vehicle_id', vehicleIds)
+    .not('is_duplicate', 'is', true)
     .order('vehicle_id').order('position', { ascending: true, nullsFirst: false }).order('id').limit(3000);
   if (signal) request = request.abortSignal(signal);
   const { data, error } = await request;

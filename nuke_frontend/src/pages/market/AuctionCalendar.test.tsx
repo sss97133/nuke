@@ -5,7 +5,7 @@ import { BrowserRouter } from 'react-router-dom';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { readFileSync, readdirSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { daysUntil, houseLink, runTimer, saleTimer, updatedAgo } from './useAuctionCalendar';
+import { daysUntil, houseLink, priorSaleLine, runTimer, saleTimer, updatedAgo } from './useAuctionCalendar';
 
 const fixture = vi.hoisted(() => ({ calendar: {} as any, roster: {} as any, rosterFor: vi.fn(), more: vi.fn() }));
 vi.mock('./useAuctionCalendar', async original => ({
@@ -31,6 +31,7 @@ const SALES = [
   { house: 'mecum', sale_key: 'fixture-fall-2026', sale_name: 'Fixture Fall 2026', location: 'Fixture City, TX', starts_on: '2026-10-21', ends_on: '2026-10-24',
     lots: 612, seen_before: 212, no_reserve: 300, first_seen_at: '2026-08-01T00:00:00Z', first_seen_7d: 40, updated_at: new Date(2026, 9, 15, 11, 48).toISOString(),
     lots_listed: 1037, listed_at: new Date(2026, 9, 15, 10, 0).toISOString(),
+    prior_sale: { sale_key: 'fixture-2025', lots: 1459, vehicle_lots: 1235, sold: 872, median_price: 28600 },
     run_days: [{ day: '2026-10-21', lots: 200 }, { day: '2026-10-22', lots: 280 }, { day: '2026-10-23', lots: 300 }, { day: '2026-10-24', lots: 257 }] },
   { house: 'gooding', sale_key: 'fixture-winter-2027', sale_name: 'Fixture Winter Auction', location: null, starts_on: '2027-01-08', ends_on: '2027-01-08',
     lots: 2, seen_before: 1, no_reserve: 1, first_seen_at: '2026-10-07T00:00:00Z', first_seen_7d: 2, updated_at: new Date(2026, 9, 14, 9, 0).toISOString(),
@@ -88,6 +89,14 @@ describe('day-precision timers', () => {
     expect(updatedAgo(new Date(now - 5 * 86_400_000).toISOString(), now)).toBe('updated 5 days ago');
     expect(updatedAgo(null, now)).toBe('update time unrecorded');
   });
+  it('states the series\' previous sale in the house numbers, and nothing without a roster', () => {
+    expect(priorSaleLine('mecum', { sale_key: 'las-vegas-motorcycles-2026', lots: 1932, vehicle_lots: 1782, sold: 1625, median_price: 6600 }))
+      .toBe('Mecum ran 1,932 lots at Las Vegas Motorcycles 2026 · 91% of its vehicles sold');
+    expect(priorSaleLine('mecum', { sale_key: 'dallas-2025', lots: 1459, vehicle_lots: null, sold: null, median_price: null }))
+      .toBe('Mecum ran 1,459 lots at Dallas 2025');
+    expect(priorSaleLine('mecum', null)).toBeNull();
+    expect(priorSaleLine('mecum', { sale_key: 'x-2025', lots: 0, vehicle_lots: 0, sold: 0, median_price: null })).toBeNull();
+  });
   it('links a house page only on that house host over https', () => {
     expect(houseLink('mecum', 'https://www.mecum.com/lots/1/x/')).toBe('https://www.mecum.com/lots/1/x/');
     expect(houseLink('mecum', 'https://evil.example/lots/1/x/')).toBeNull();
@@ -109,6 +118,8 @@ it('states the lots with their population and lists each sale with its timer and
   expect(rows[0].textContent).toContain('Mecum');
   expect(rows[0].textContent).toContain('612 of 1,037 lots');
   expect(rows[0].textContent).toContain('Mecum lists 1,037, read 2 h ago');
+  expect(rows[0].textContent).toContain('Mecum ran 1,459 lots at Fixture 2025 · 71% of its vehicles sold');
+  expect(rows[1].textContent).not.toContain(' ran ');
   expect(rows[0].textContent).toContain('212 with an earlier record · 300 no reserve');
   expect(rows[0].textContent).toContain('40 first seen in the last 7 days · updated 12 min ago');
   expect(rows[1].textContent).toContain('in 85 days');
@@ -142,6 +153,18 @@ it('opens a roster in place by run day, with earlier records in the source terms
   expect(container.querySelector('.auction-roster')).toBeNull();
 });
 
+it('shows only the house count for a listed sale with no lot landed', async () => {
+  fixture.calendar.data = { ...fixture.calendar.data, sales: [...SALES, { house: 'mecum', sale_key: 'fixture-empty-2027', sale_name: 'Fixture Empty 2027',
+    location: null, starts_on: '2027-01-05', ends_on: '2027-01-17', lots: 0, seen_before: 0, no_reserve: 0, first_seen_at: null,
+    first_seen_7d: 0, updated_at: null, lots_listed: 855, listed_at: new Date(2026, 9, 15, 11, 0).toISOString(), run_days: [] }] };
+  await render();
+  const row = [...container.querySelectorAll('tr.auction-sale')].find(r => r.textContent?.includes('Fixture Empty 2027'))!;
+  expect(row.textContent).toContain('0 of 855 lots');
+  expect(row.textContent).toContain('Mecum lists 855, read 1 h ago');
+  expect(row.textContent).not.toContain('first seen');
+  expect(row.textContent).not.toContain('update time unrecorded');
+  expect(row.textContent).not.toContain('no reserve');
+});
 it('says when a listed sale has no lot landed yet', async () => {
   fixture.roster = { ...fixture.roster, hasNextPage: false, data: { pages: [{ as_of: '2026-10-15T01:00:00Z', roster: { house: 'gooding', sale_key: 'fixture-winter-2027', lots: 0, offset: 0, rows: [] } }] } };
   await render();

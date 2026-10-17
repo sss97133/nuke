@@ -32,7 +32,9 @@ import { writeObservation } from "../_shared/observationWriter.ts";
 import { authenticateWriter, requireWriteAuth } from "../_shared/writeGuard.ts";
 import { projectSecretKey } from "../_shared/supabaseKeys.ts";
 import { postFromFlight } from "./rscPost.ts";
-import { indexLot, parseSaleFacet, type IndexLot } from "./indexLot.ts";
+import { mustWrite, softWrite } from "../_shared/writeResult.ts";
+import { indexLot, parseSaleFacet, priorSaleFacet, saleDay, summarizePriorSale, type IndexLot } from "./indexLot.ts";
+import { fillOnlyIdentity } from "./identityFill.ts";
 import { patchForLiveRow, writeVehicleEventByKey } from "../_shared/vehicleEventWrite.ts";
 
 const EXTRACTOR_VERSION = "2.0.0";
@@ -214,7 +216,34 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type",
 };
 
+/**
+ * A lot that did not land whole goes to the revision queue (record_revision_item) with what is missing, a reason and the next
+ * action, instead of staying a counter. Reason and next_action are the closed vocabularies of import_queue_revision_vocab
+ * (migration 20261015120000_revision_queue.sql); a free-text reason is refused by the table's check.
+ */
+async function raiseRevision(
+  supabase: any,
+  url: string,
+  missing: string[],
+  reason: "parser_gap" | "blocked" | "rate_limited" | "billing" | "timeout" | "lock_timeout" | "duplicate_key" | "quality_gate" | "bad_data" | "not_found" | "thin_landing" | "unlinked_capture" | "other",
+  nextAction: "reparse_retained" | "refetch" | "relink" | "classify_non_vehicle" | "retry" | "wait" | "none",
+  detail: Record<string, unknown> = {},
+  snapshotId?: string,
+) {
+  const { error } = await supabase.rpc("record_revision_item", {
+    p_url: url, p_missing: missing, p_reason: reason, p_next_action: nextAction, p_raised_by: "extract-mecum",
+    p_snapshot_id: snapshotId ?? null, p_detail: detail, p_vehicle_id: null,
+  });
+  if (error) softWrite("record_revision_item", { error }, writeErrors);
+}
+
+/** Bookkeeping and optional-enrichment writes that failed during this request (softWrite); reported in the response. */
+let writeErrors: string[] = [];
+
 function okJson(data: unknown, status = 200) {
+  if (writeErrors.length && data && typeof data === "object" && !Array.isArray(data)) {
+    data = { ...(data as Record<string, unknown>), write_error_count: writeErrors.length, write_errors: writeErrors.slice(0, 10) };
+  }
   return new Response(JSON.stringify(data, null, 2), {
     status,
     headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -1025,7 +1054,7 @@ async function saveVehicle(
   if (existingId) {
     const { data: existing } = await supabase
       .from("vehicles")
-      .select("vin,mileage,color,description,transmission,body_style,engine_type,sale_price,interior_color")
+      .select("year,make,model,vin,mileage,color,description,transmission,body_style,engine_type,sale_price,interior_color")
       .eq("id", existingId)
       .maybeSingle();
 
@@ -1039,7 +1068,25 @@ async function saveVehicle(
     // Strip identity/source fields that should only be set on insert
     const { discovery_url: _du, discovery_source: _ds, source: _src, listing_source: _ls, ...updateData } = cleanData;
 
-    const { error: updateErr } = await supabase.from("vehicles").update(updateData).eq("id", existingId);
+    // Identity is fill-only: a resolved vehicle keeps its own year, make, model and VIN. A lot that states a different year,
+    // make or VIN is another vehicle (or a wrong link), never an overwrite: it goes to the revision queue to be relinked, and
+    // nothing of it (vehicle fields, event, observation) is written against this vehicle. This update used to write the lot's
+    // whole payload, the defect that made vehicles carrying one platform's truck and another's VIN.
+    const filled = fillOnlyIdentity(existing as any, updateData as any);
+    const disagree = filled.disagree;
+    for (const k of ["year", "make", "model", "vin"]) if (!(k in filled.update)) delete (updateData as any)[k];
+    if (disagree.length) {
+      await raiseRevision(supabase, vehicle.url, disagree, "quality_gate", "relink", {
+        vehicle_id: existingId,
+        vehicle_has: Object.fromEntries(disagree.map((k) => [k, (existing as any)[k]])),
+        lot_states: Object.fromEntries(disagree.map((k) => [k, (updateData as any)[k] ?? (cleanData as any)[k]])),
+        raised_in: "extract-mecum saveVehicle",
+      });
+      throw new Error(`IDENTITY_MISMATCH: lot states a different ${disagree.join(", ")} than vehicle ${existingId}`);
+    }
+
+    const updateRes = await supabase.from("vehicles").update(updateData).eq("id", existingId);
+    const updateErr = updateRes.error;
     if (updateErr) {
       // VIN unique constraint violation: another vehicle already has this VIN.
       // Retry without VIN to still update other fields.
@@ -1095,8 +1142,7 @@ async function saveVehicle(
       .map((imgUrl, idx) => ({ vehicle_id: vehicleId, image_url: imgUrl, source: "external_import", source_url: imgUrl, is_external: true, position: idx }))
       .filter((row) => !haveUrls.has(row.image_url));
     if (fresh.length) {
-      const { error: imgErr } = await supabase.from("vehicle_images").insert(fresh);
-      if (imgErr) console.warn(`[MECUM] image insert failed for ${vehicleId}: ${imgErr.message}`);
+      softWrite("vehicle_images insert", await supabase.from("vehicle_images").insert(fresh), writeErrors);
     }
   }
 
@@ -1135,19 +1181,23 @@ async function saveVehicle(
   return { vehicleId, isNew, fieldsUpdated, qualityScore: gate.score };
 }
 
-// Existing mecum events spell one lot several ways (measured 2026-10-15: with and without www, with and without the
-// trailing slash, and a /sitemap.xml suffix), so a target is landed if any spelling has an event.
+// Existing mecum rows spell one lot several ways (measured 2026-10-15: with and without www, with and without the trailing
+// slash, a /sitemap.xml suffix, and, on vehicles.discovery_url, a lowercased path because canonicalize_vehicle_url lowercases
+// it: "FL15-204118" is stored as "fl15-204118"), so a lot is landed if any spelling has a row. The key ignores case.
 function mecumLotKey(url: string): string {
-  return url.replace(/^https?:\/\/(www\.)?/, "").replace(/\/(sitemap\.xml)?\/?$/, "");
+  return url.replace(/^https?:\/\/(www\.)?/, "").replace(/\/(sitemap\.xml)?\/?$/, "").toLowerCase();
 }
 function mecumUrlSpellings(url: string): string[] {
-  const bare = mecumLotKey(url);
-  return [`https://www.${bare}`, `https://www.${bare}/`, `https://${bare}`, `https://${bare}/`, `https://www.${bare}/sitemap.xml`];
+  const bare = url.replace(/^https?:\/\/(www\.)?/, "").replace(/\/(sitemap\.xml)?\/?$/, "");
+  const lower = bare.toLowerCase();
+  const out = [`https://www.${bare}`, `https://www.${bare}/`, `https://${bare}`, `https://${bare}/`, `https://www.${bare}/sitemap.xml`];
+  return lower === bare ? out : [...out, `https://${lower}`, `https://www.${lower}`, `https://${lower}/`];
 }
 
 // ─── Main handler ───────────────────────────────────────────────────────
 
 Deno.serve(async (req) => {
+  writeErrors = [];
   // Writes are never anonymous: service key, signed-in user, or nothing (P0.2, 2026-09-27).
   const denied = await requireWriteAuth(req);
   if (denied) return denied;
@@ -1197,10 +1247,10 @@ Deno.serve(async (req) => {
       const { vehicleId, isNew, fieldsUpdated, qualityScore } = await saveVehicle(supabase, vehicle);
 
       // Update queue entry if exists
-      await supabase
+      softWrite("import_queue complete", await supabase
         .from("import_queue")
         .update({ status: "complete", vehicle_id: vehicleId, error_message: null })
-        .eq("listing_url", url);
+        .eq("listing_url", url), writeErrors);
 
       return okJson({
         success: true,
@@ -1250,7 +1300,7 @@ Deno.serve(async (req) => {
         const { data: row } = await supabase.from("import_queue").select("id, status").eq("listing_url", url).maybeSingle();
         if (row) {
           if (row.status === "processing") continue;
-          await supabase.from("import_queue").update({ status: "pending", priority: 50, extractor_version: REVERIFY_TAG, locked_by: "extract-mecum:reverify", raw_data: raw, error_message: null }).eq("id", row.id);
+          softWrite("import_queue requeue", await supabase.from("import_queue").update({ status: "pending", priority: 50, extractor_version: REVERIFY_TAG, locked_by: "extract-mecum:reverify", raw_data: raw, error_message: null }).eq("id", row.id), writeErrors);
           requeued++;
         } else {
           const { error } = await supabase.from("import_queue").insert({ listing_url: url, status: "pending", priority: 50, extractor_version: REVERIFY_TAG, locked_by: "extract-mecum:reverify", raw_data: raw });
@@ -1274,24 +1324,31 @@ Deno.serve(async (req) => {
       if (!Number.isFinite(pulledAt)) return okJson({ success: false, error: "pulled_at (ISO time of the index pull) is required" }, 400);
       const pulledIso = new Date(pulledAt).toISOString();
       const dryRun = body.dry_run === true;
-      const out = { received: lotsIn.length, skipped: {} as Record<string, number>, already_landed: 0, linked_to_existing_vehicle: 0, vehicles_created: 0, events_created: 0, auction_events_created: 0, observations: 0, observation_errors: 0, rejected_by_gate: 0, errors: [] as string[], dry_run: dryRun };
+      const out = { received: lotsIn.length, revisions_raised: 0, skipped: {} as Record<string, number>, already_landed: 0, linked_to_existing_vehicle: 0, vehicles_created: 0, events_created: 0, auction_events_created: 0, observations: 0, observation_errors: 0, rejected_by_gate: 0, errors: [] as string[], dry_run: dryRun };
       const bump = (k: string) => { out.skipped[k] = (out.skipped[k] ?? 0) + 1; };
 
       const lots: IndexLot[] = [];
       const seenIds = new Set<string>();
       for (const hit of lotsIn) {
         const r = indexLot(hit);
-        if ("skip" in r) { bump(r.skip); continue; }
+        if ("skip" in r) {
+          bump(r.skip);
+          if (r.skip === "no_year_make" && r.url && !dryRun) {
+            await raiseRevision(supabase, r.url, ["year", "make"], "bad_data", "reparse_retained", { title: r.title ?? null, index_pulled_at: pulledIso });
+            out.revisions_raised++;
+          }
+          continue;
+        }
         if (seenIds.has(r.lot.lot_id)) { bump("duplicate_in_batch"); continue; }
         seenIds.add(r.lot.lot_id);
         lots.push(r.lot);
       }
 
-      // Landed lookup: events and vehicles under any spelling of each lot URL, 25 lots (125 URLs) per request.
+      // Landed lookup: events and vehicles under any spelling of each lot URL, 10 lots per request (up to 8 spellings each, about 7 KB of URL; 25 lots reached 16.4 KB on LV23 lots and the gateway refused it, batches 365-367).
       const eventKeys = new Set<string>();
       const vehicleByKey = new Map<string, string>();
       const chunks: IndexLot[][] = [];
-      for (let i = 0; i < lots.length; i += 25) chunks.push(lots.slice(i, i + 25));
+      for (let i = 0; i < lots.length; i += 10) chunks.push(lots.slice(i, i + 10));
       await Promise.all(chunks.map(async (chunk) => {
         const spellings = chunk.flatMap((l) => mecumUrlSpellings(l.url));
         const [ev, ve] = await Promise.all([
@@ -1431,6 +1488,45 @@ Deno.serve(async (req) => {
       return okJson({ ...out, success: true });
     }
 
+    // ── Revision worker: reparse retained pages for Mecum items that did not land whole ──────────
+    // claim_revision_items('mecum', ..., actions [reparse_retained]) hands back import_queue rows with a retained snapshot.
+    // Each is parsed from the stored page and saved through saveVehicle (no request to Mecum); resolved when the lot has a
+    // year and make, released with next_action refetch when the snapshot is missing or holds no lot.
+    if (action === "work_revision_items") {
+      const n = Math.min(Math.max(Math.floor(Number(body.limit)) || 10, 1), 50);
+      const worker = "extract-mecum:reparse";
+      const { data: items, error: cErr } = await supabase.rpc("claim_revision_items", { p_source_slug: "mecum", p_worker: worker, p_limit: n, p_actions: ["reparse_retained"] });
+      if (cErr) throw new Error(`claim_revision_items failed: ${cErr.message}`);
+      const out = { claimed: items?.length ?? 0, resolved: 0, released: 0, failed: 0, errors: [] as string[] };
+      for (const it of items ?? []) {
+        try {
+          let html: string | null = null;
+          if (it.snapshot_id) {
+            const { data: snap } = await supabase.from("listing_page_snapshots").select("html, html_storage_path").eq("id", it.snapshot_id).maybeSingle();
+            if (snap?.html_storage_path) {
+              const { data: blob } = await supabase.storage.from("listing-snapshots").download(snap.html_storage_path);
+              if (blob) html = await blob.text();
+            }
+            html = html ?? snap?.html ?? null;
+          }
+          const vehicle = html ? parseNextData(html, it.listing_url, postFromFlight(html)) : null;
+          if (!vehicle || !(vehicle.year && vehicle.make)) {
+            // reparse_retained, then refetch, then classify_non_vehicle: a page that parses with no year and make is next classified.
+            mustWrite("release_revision_item", await supabase.rpc("release_revision_item", { p_id: it.id, p_next_action: vehicle ? "classify_non_vehicle" : "refetch", p_detail: { reparsed_by: worker, found: vehicle ? "no year or make" : (html ? "no lot object" : "no snapshot body") } }));
+            out.released++;
+            continue;
+          }
+          const { vehicleId } = await saveVehicle(supabase, vehicle);
+          mustWrite("resolve_revision_item", await supabase.rpc("resolve_revision_item", { p_id: it.id, p_outcome: "landed_whole", p_detail: { vehicle_id: vehicleId, reparsed_by: worker } }));
+          out.resolved++;
+        } catch (err: any) {
+          out.failed++;
+          if (out.errors.length < 5) out.errors.push(`${it.listing_url}: ${String(err?.message || err).slice(0, 200)}`);
+        }
+      }
+      return okJson({ ...out, success: true });
+    }
+
     // ── Re-fold retained page snapshots into vehicles (zero requests to Mecum) ──────────────────
     // listing_page_snapshots holds Mecum lot pages from older writers (platform mecum, success). This reads up to `limit`
     // (max 100) of them in id order from the last folded one, skips a lot that already has an event under any URL spelling
@@ -1455,8 +1551,8 @@ Deno.serve(async (req) => {
       const out = { examined: snaps?.length ?? 0, already_landed: 0, folded: 0, created: 0, updated: 0, not_a_vehicle: 0, unreadable: 0, failed: 0, last_snapshot_id: after, stopped: null as string | null, errors: [] as string[] };
       const urls = (snaps ?? []).map((x: any) => x.listing_url);
       const landedKeys = new Set<string>();
-      for (let i = 0; i < urls.length; i += 25) {
-        const chunk = urls.slice(i, i + 25);
+      for (let i = 0; i < urls.length; i += 10) {
+        const chunk = urls.slice(i, i + 10);
         const { data: ev, error: eErr } = await supabase.from("vehicle_events").select("source_url").eq("source_platform", "mecum").in("source_url", chunk.flatMap(mecumUrlSpellings));
         if (eErr) throw new Error(`landed lookup failed: ${eErr.message}`);
         for (const r of ev ?? []) landedKeys.add(mecumLotKey(r.source_url));
@@ -1483,16 +1579,16 @@ Deno.serve(async (req) => {
           }
           if (!html) { out.unreadable++; await supabase.from("import_queue").update({ status: "failed", error_message: "snapshot body unreadable" }).eq("id", row.id); continue; }
           const vehicle = parseNextData(html, snap.listing_url, postFromFlight(html));
-          if (!vehicle) { out.unreadable++; await supabase.from("import_queue").update({ status: "failed", error_message: "snapshot has no lot object" }).eq("id", row.id); continue; }
-          if (!(vehicle.year && vehicle.make)) { out.not_a_vehicle++; await supabase.from("import_queue").update({ status: "skipped", error_message: "NOT_A_VEHICLE" }).eq("id", row.id); continue; }
+          if (!vehicle) { out.unreadable++; await supabase.from("import_queue").update({ status: "failed", error_message: "snapshot has no lot object" }).eq("id", row.id); await raiseRevision(supabase, snap.listing_url, ["lot_object"], "parser_gap", "refetch", {}, snap.id); continue; }
+          if (!(vehicle.year && vehicle.make)) { out.not_a_vehicle++; await supabase.from("import_queue").update({ status: "skipped", error_message: "NOT_A_VEHICLE" }).eq("id", row.id); await raiseRevision(supabase, snap.listing_url, ["year", "make"], "quality_gate", "classify_non_vehicle", {}, snap.id); continue; }
           const { vehicleId, isNew } = await saveVehicle(supabase, vehicle);
-          await supabase.from("import_queue").update({ status: "complete", vehicle_id: vehicleId, processed_at: new Date().toISOString() }).eq("id", row.id);
+          softWrite("import_queue complete", await supabase.from("import_queue").update({ status: "complete", vehicle_id: vehicleId, processed_at: new Date().toISOString() }).eq("id", row.id), writeErrors);
           out.folded++;
           if (isNew) out.created++; else out.updated++;
         } catch (err: any) {
           out.failed++;
           if (out.errors.length < 5) out.errors.push(`${snap.listing_url}: ${String(err?.message || err).slice(0, 200)}`);
-          await supabase.from("import_queue").update({ status: "failed", error_message: String(err?.message || err).slice(0, 500) }).eq("id", row.id);
+          softWrite("import_queue failed", await supabase.from("import_queue").update({ status: "failed", error_message: String(err?.message || err).slice(0, 500) }).eq("id", row.id), writeErrors);
         }
       }
       return okJson({ ...out, success: true });
@@ -1515,7 +1611,8 @@ Deno.serve(async (req) => {
         .map(([value, count]) => ({ value, count, end: Number(value.split("|")[2]) }))
         .filter((x) => Number.isFinite(x.end) && x.end >= nowEpoch);
       const census: Record<string, number> = {};
-      const salesMeta: Record<string, { name: string; starts_on: string; ends_on: string }> = {};
+      const salesMeta: Record<string, { name: string; starts_on: string; ends_on: string; prior_sale?: unknown }> = {};
+      const saleValueByKey: Record<string, string> = {};
       const seen = new Set<string>();
       const report: Record<string, { stated: number; read: number; queued: number; requeued: number }> = {};
 
@@ -1590,11 +1687,32 @@ Deno.serve(async (req) => {
               if (same && !due) continue; // nothing to write; one update per lot made the roster read outrun the function limit
               const patch: Record<string, unknown> = { priority: 100, extractor_version: UPCOMING_TAG, locked_by: "extract-mecum:upcoming", raw_data: { ...(row.raw_data ?? {}), sale: { ...c.info, roster_first_seen_at: first } } };
               if (due && row.status !== "processing") { patch.status = "pending"; stat.requeued++; }
-              await supabase.from("import_queue").update(patch).eq("id", row.id);
+              softWrite("import_queue roster update", await supabase.from("import_queue").update(patch).eq("id", row.id), writeErrors);
             }
           }
         }
-        if (key) { census[key] = sale.count; report[key] = stat; }
+        if (key) { census[key] = sale.count; report[key] = stat; saleValueByKey[key] = sale.value; }
+      }
+
+      // Each series' previous sale (matched by series, not slug: Dallas became Dallas/Fort Worth), read from the same index:
+      // vehicle lots (everything but Road Art), sold, bid-goes-on and the median of sold lots with a stated price.
+      for (const [saleKey, value] of Object.entries(saleValueByKey)) {
+        try {
+          const priorValue = priorSaleFacet(value, Object.keys(facet));
+          if (!priorValue) continue;
+          const days = Object.keys((await algolia(`hitsPerPage=0&filters=${encodeURIComponent(`taxonomies.auction_tax.name:"${priorValue}"`)}&facets=${encodeURIComponent('["taxonomies.run_date.name"]')}`)).facets?.["taxonomies.run_date.name"] ?? {});
+          const hits: any[] = [];
+          for (const day of days.length ? days : [null]) {
+            const filters = `taxonomies.auction_tax.name:"${priorValue}"` + (day ? ` AND taxonomies.run_date.name:"${day}"` : "");
+            const r = await algolia(`hitsPerPage=1000&filters=${encodeURIComponent(filters)}&attributesToRetrieve=${encodeURIComponent('["sold","bid_goes_on","highest_bid_or_price","taxonomies.lot_type","taxonomies.auction_tax"]')}&attributesToHighlight=[]&attributesToSnippet=[]`);
+            hits.push(...(r.hits ?? []));
+          }
+          const [, , priorEnd] = priorValue.split("|");
+          const priorSlug = hits[0]?.taxonomies?.auction_tax?.[0]?.slug ?? null;
+          salesMeta[saleKey].prior_sale = summarizePriorSale(hits, priorSlug, saleDay(Number(priorEnd)));
+        } catch (e: any) {
+          console.warn(`[MECUM] prior sale of ${saleKey} not read: ${e?.message}`);
+        }
       }
 
       // Withdrawn: queued for a sale in this read, run day not yet past, absent from the roster now.
@@ -1608,7 +1726,7 @@ Deno.serve(async (req) => {
           if (!sale.run_day || sale.run_day < todayUtc()) continue;
           const { data: ev } = await supabase.from("vehicle_events").select("id, metadata").eq("vehicle_id", r.vehicle_id).eq("source_platform", "mecum").in("source_url", mecumUrlSpellings(r.listing_url)).limit(1);
           if (ev?.[0] && !ev[0].metadata?.withdrawn_at) {
-            await supabase.from("vehicle_events").update({ metadata: { ...ev[0].metadata, withdrawn_at: startedAt.toISOString() } }).eq("id", ev[0].id);
+            mustWrite("vehicle_events withdrawn_at", await supabase.from("vehicle_events").update({ metadata: { ...ev[0].metadata, withdrawn_at: startedAt.toISOString() } }).eq("id", ev[0].id));
             withdrawn++;
           }
         }
@@ -1620,7 +1738,7 @@ Deno.serve(async (req) => {
       for (const r of pastRows ?? []) {
         const sale = r.raw_data?.sale;
         if (sale?.run_day && sale.run_day < todayUtc() && !r.raw_data?.result_read) {
-          await supabase.from("import_queue").update({ status: "pending" }).eq("id", r.id);
+          softWrite("import_queue result re-read", await supabase.from("import_queue").update({ status: "pending" }).eq("id", r.id), writeErrors);
           resultsDue++;
         }
       }
@@ -1697,12 +1815,12 @@ Deno.serve(async (req) => {
           if (!targets?.length) break;
           cursor = targets[targets.length - 1].id;
           const urls = targets.map((t: { listing_url: string }) => t.listing_url);
-          // 25 targets x 5 spellings keeps each request line near 11 KB; a longer line is refused, and an unread answer must
+          // 10 targets x up to 8 spellings keeps each request line under 8 KB; a longer line is refused, and an unread answer must
           // never count as "nothing landed" (the first scheduled runs added second events that way).
           const queuedUrls = new Set<string>();
           const landedKeys = new Set<string>();
-          for (let i = 0; i < urls.length; i += 25) {
-            const chunk = urls.slice(i, i + 25);
+          for (let i = 0; i < urls.length; i += 10) {
+            const chunk = urls.slice(i, i + 10);
             const [q, e] = await Promise.all([
               supabase.from("import_queue").select("listing_url").in("listing_url", chunk),
               supabase.from("vehicle_events").select("source_url").eq("source_platform", "mecum").in("source_url", chunk.flatMap(mecumUrlSpellings)),
@@ -1724,8 +1842,9 @@ Deno.serve(async (req) => {
         if (Date.now() - started > budgetMs) { results.stopped = "time_budget"; break; }
         let rowId = w.rowId;
         if (rowId) {
-          const { data: won } = await supabase.from("import_queue").update({ status: "processing", locked_at: new Date().toISOString() }).eq("id", rowId).eq("status", "pending").select("id");
-          if (!won?.length) continue; // another run holds this lot
+          const claim = await supabase.from("import_queue").update({ status: "processing", locked_at: new Date().toISOString() }).eq("id", rowId).eq("status", "pending").select("id");
+          if (claim.error) { softWrite("import_queue claim", claim, writeErrors); continue; }
+          if (!claim.data?.length) continue; // another run holds this lot
         } else {
           const { data: row, error: claimErr } = await supabase
             .from("import_queue")
@@ -1742,16 +1861,16 @@ Deno.serve(async (req) => {
             // Keep the backfill's claim on the event before the page's result replaces its state.
             const { data: ev } = await supabase.from("vehicle_events").select("metadata").eq("id", w.reverify.event_id).maybeSingle();
             if (ev && !ev.metadata?.orphan_claim) {
-              await supabase.from("vehicle_events").update({ metadata: { ...(ev.metadata ?? {}), orphan_claim: { event_status: "sold", ...w.reverify.claim } } }).eq("id", w.reverify.event_id);
+              mustWrite("vehicle_events orphan_claim", await supabase.from("vehicle_events").update({ metadata: { ...(ev.metadata ?? {}), orphan_claim: { event_status: "sold", ...w.reverify.claim } } }).eq("id", w.reverify.event_id));
             }
           }
           const { vehicleId, isNew } = await saveVehicle(supabase, vehicle, undefined, w.sale);
           if (w.reverify?.event_id) {
             const confirmed = vehicle.status === "sold" && !!vehicle.sale_price;
             const { data: ev } = await supabase.from("vehicle_events").select("metadata").eq("id", w.reverify.event_id).maybeSingle();
-            await supabase.from("vehicle_events").update({
+            mustWrite("vehicle_events sale_reverified", await supabase.from("vehicle_events").update({
               metadata: { ...(ev?.metadata ?? {}), sale_reverified: confirmed ? "confirmed" : "refused", reverified_at: new Date().toISOString(), reverified_result: vehicle.status ?? null },
-            }).eq("id", w.reverify.event_id);
+            }).eq("id", w.reverify.event_id));
             results.reverified++;
             if (confirmed) results.confirmed++;
           }
@@ -1761,14 +1880,16 @@ Deno.serve(async (req) => {
             done.raw_data = { sale: w.sale, ...(resultRead ? { result_read: true } : {}) };
             results.upcoming++;
           }
-          await supabase.from("import_queue").update(done).eq("id", rowId);
+          softWrite("import_queue complete", await supabase.from("import_queue").update(done).eq("id", rowId), writeErrors);
           results.landed++;
           if (isNew) results.created++; else results.updated++;
           consecutiveFailures = 0;
         } catch (err: any) {
           const msg = String(err?.message || err);
           const gone = msg === "PAGE_NOT_FOUND" || msg === "NOT_A_VEHICLE";
-          await supabase.from("import_queue").update({ status: gone ? "skipped" : "failed", error_message: msg.slice(0, 500), processed_at: new Date().toISOString() }).eq("id", rowId);
+          if (msg === "NOT_A_VEHICLE") await raiseRevision(supabase, w.url, ["year", "make"], "quality_gate", "classify_non_vehicle");
+          else if (msg === "SKIP_NO_NEXT_DATA") await raiseRevision(supabase, w.url, ["lot_object"], "parser_gap", "refetch");
+          softWrite("import_queue outcome", await supabase.from("import_queue").update({ status: gone ? "skipped" : "failed", error_message: msg.slice(0, 500), processed_at: new Date().toISOString() }).eq("id", rowId), writeErrors);
           if (gone) { results.gone++; consecutiveFailures = 0; }
           else {
             results.failed++;
@@ -1805,10 +1926,10 @@ Deno.serve(async (req) => {
       }
 
       const ids = items.map((i: { id: string }) => i.id);
-      await supabase
+      mustWrite("import_queue claim", await supabase
         .from("import_queue")
         .update({ status: "processing", locked_at: new Date().toISOString() })
-        .in("id", ids);
+        .in("id", ids));
 
       const results = {
         total: items.length,
@@ -1826,20 +1947,20 @@ Deno.serve(async (req) => {
           const vehicle = await fetchAndParse(item.listing_url);
 
           if (!vehicle.year && !vehicle.make) {
-            await supabase
+            softWrite("import_queue failed", await supabase
               .from("import_queue")
               .update({ status: "failed", error_message: "Could not parse vehicle data", attempts: 1 })
-              .eq("id", item.id);
+              .eq("id", item.id), writeErrors);
             results.failed++;
             continue;
           }
 
           const { vehicleId, isNew } = await saveVehicle(supabase, vehicle);
 
-          await supabase
+          softWrite("import_queue complete", await supabase
             .from("import_queue")
             .update({ status: "complete", vehicle_id: vehicleId, error_message: null })
-            .eq("id", item.id);
+            .eq("id", item.id), writeErrors);
 
           results.success++;
           if (isNew) results.created++;
@@ -1853,10 +1974,10 @@ Deno.serve(async (req) => {
           const msg = err.message === "PAGE_NOT_FOUND" ? "Page removed/404" : (err.message || String(err));
           results.failed++;
           if (results.errors.length < 5) results.errors.push(`${item.listing_url}: ${msg}`);
-          await supabase
+          softWrite("import_queue failed", await supabase
             .from("import_queue")
             .update({ status: "failed", error_message: msg.slice(0, 500) })
-            .eq("id", item.id);
+            .eq("id", item.id), writeErrors);
         }
       }
 
@@ -1928,7 +2049,7 @@ Deno.serve(async (req) => {
           const msg = err.message || String(err);
           // SKIP_NO_NEXT_DATA means this page needs Firecrawl — bump updated_at so it rotates out
           if (msg === "SKIP_NO_NEXT_DATA" || msg === "PAGE_NOT_FOUND") {
-            await supabase.from("vehicles").update({ updated_at: new Date().toISOString() }).eq("id", cand.id);
+            softWrite("vehicles rotation bump", await supabase.from("vehicles").update({ updated_at: new Date().toISOString() }).eq("id", cand.id), writeErrors);
             results.failed++;
             return;
           }

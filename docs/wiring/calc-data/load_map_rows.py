@@ -22,7 +22,7 @@ import sys
 import urllib.error
 import urllib.parse
 import urllib.request
-from collections import Counter
+from collections import Counter, defaultdict
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -180,6 +180,8 @@ ALIASES = {**{f"Fuel_Injector_{i}": f"INJ-{i}" for i in range(1, 9)},
            "amp_fuse_holder": "ACC-BATT", "amp_remote_in": "AMP", "courtesy_underdash": "UNDERDASH-LAMPS"}
 
 
+# the fields of a wire end the registry owns; a change to any of them re-writes the end (RSI pass 41)
+END_FIELDS = ("cavity", "terminal_contact_pn", "pin_seal_pn", "crimp_tool_pn", "connector_family")
 ALIAS_N = {re.sub(r"[^a-z0-9]", "", k.lower()): v for k, v in ALIASES.items()}
 
 
@@ -195,8 +197,43 @@ _TC = Path(__file__).with_name("twin_centers.json")
 TWIN_POS = json.load(open(_TC)) if _TC.exists() else {}
 
 
+PIN_SPLICE = {}     # RSI pass 26: pin splice node -> its plug and cavity (set by main from the registry)
+# RSI pass 31: boxes the design record has placed (catalog/mounts.yaml `position`, twin frame): anchor code -> (box, position)
+_MOUNTS = yaml.safe_load((Path(__file__).with_name("catalog") / "mounts.yaml").read_text()) or {}
+PLACED = {b["position"]["node"]: (b, b["position"]) for b in (_MOUNTS.get("boxes") or []) if b.get("position")}
+# RSI pass 35: plugs the design record places on a point of their own (mounts.yaml `ends` position): code -> (end, position)
+END_POS = {e["id"]: (e, e["position"]) for e in (_MOUNTS.get("ends") or []) if e.get("position")}
+
+
+def end_source(code):
+    e, pos = END_POS[code]
+    return (f"digital-twin anchor {pos['point']}: {e['where']} ({e['status']}, confidence {pos['confidence']}; {pos['method']}; "
+            f"{pos['source']})")
+
+
+def placed_source(a):
+    b, pos = PLACED[a]
+    return (f"digital-twin anchor {a}: {b['where']} ({b['status']}, confidence {pos['confidence']}; {pos['orientation']}; "
+            f"{pos['source']})")
+
+
 def position(code):
+    ps = PIN_SPLICE.get(code)
+    if ps:
+        at = position(ps["plug"])
+        # the plug's own source first: the route graph keys a node by the twin anchor its pos_source starts with (RSI pass 28)
+        return dict(at, pos_source=at["pos_source"] + f" — beside {ps['plug']} pin {ps['cavity']}: the splice sits behind the "
+                                                      "plug on its lead") if at else {}
+    if code in END_POS and END_POS[code][1]["point"] not in PLACED:   # the end's own placed point (RSI pass 35)
+        pos = END_POS[code][1]
+        return {"pos_x_m": pos["x"], "pos_y_m": pos["y"], "pos_z_m": pos["z"], "pos_source": end_source(code)}
+    if code in END_POS:   # an end placed on a box's point keys through that box (e.g. the PDM30's own pigtail splices)
+        a = END_POS[code][1]["point"]
+        return {"pos_x_m": PLACED[a][1]["x"], "pos_y_m": PLACED[a][1]["y"], "pos_z_m": PLACED[a][1]["z"], "pos_source": placed_source(a)}
     a = NODE_ANCHOR.get(code)
+    if a in PLACED:     # the design record's placement overtakes the twin anchor (RSI pass 31)
+        pos = PLACED[a][1]
+        return {"pos_x_m": pos["x"], "pos_y_m": pos["y"], "pos_z_m": pos["z"], "pos_source": placed_source(a)}
     if not a and TWIN_OBJ.get(code) in TWIN_POS:
         x, y, z = TWIN_POS[TWIN_OBJ[code]]
         return {"pos_x_m": x, "pos_y_m": y, "pos_z_m": z,
@@ -212,6 +249,7 @@ def position(code):
 
 class API:
     def __init__(self):
+        self.failed = []
         self.url = os.environ.get("VITE_SUPABASE_URL") or os.environ.get("SUPABASE_URL")
         self.key = os.environ.get("SUPABASE_SERVICE_ROLE_KEY")
         if not (self.url and self.key):
@@ -230,8 +268,30 @@ class API:
         except urllib.error.HTTPError as e:
             sys.exit(f"{method} {path[:80]} -> HTTP {e.code}: {e.read()[:400].decode(errors='ignore')}")
 
+    def rpc(self, name, body):
+        """An end-of-run fold (RSI pass 36): a failure is reported and the run goes on, so the later folds (nets, splices,
+        settings) never stay un-run behind an earlier one; the run exits non-zero at the end."""
+        try:
+            return self._req("POST", f"rpc/{name}", body)
+        except SystemExit as e:
+            self.failed.append(f"{name}: {e}")
+            return f"FAILED ({e})"
+
     def get(self, table, query):
-        return self._req("GET", f"{table}?{query}")
+        """Every row. PostgREST answers at most 1,000 rows a request whatever the limit (2026-10-15: limit=5000 on the
+        K5's wire ends gave 1,000 of them, with 999 live), so a read without its own limit of 1,000 or less pages by
+        offset in a stable order (RSI pass 41)."""
+        m = re.search(r"(?:^|&)limit=(\d+)", query)
+        if m and int(m.group(1)) <= 1000:
+            return self._req("GET", f"{table}?{query}")
+        q = re.sub(r"(?:^|&)limit=\d+", "", query).lstrip("&")
+        q += "" if "order=" in q else "&order=id"
+        out = []
+        while True:
+            page = self._req("GET", f"{table}?{q}&limit=1000&offset={len(out)}") or []
+            out += page
+            if len(page) < 1000:
+                return out
 
     def insert(self, table, rows):
         """Bulk insert; PostgREST wants every row in a batch to carry the same keys, so fill the gaps with null."""
@@ -256,10 +316,14 @@ def main():
     wires = {str(w["id"]): w for w in reg["wires"] if not w.get("retired")}
     wires.update({str(w["id"]): w for w in reg["implied"]})
     eps, terms, cands = reg["endpoints"], reg["terminations"], reg["candidates"]
+    PIN_SPLICE.update({e: ep["pin_splice"] for e, ep in eps.items() if ep.get("pin_splice")})
 
     # ------------------------------------------------ nodes: v5 endpoints + April candidate devices
     nodes = {}
+    STUD_SET = {e_ for e_, x in eps.items() if x.get("stud_set")}    # RSI pass 37: a stud set's ends live on its stud nodes
     for eid, e in eps.items():
+        if eid in STUD_SET:
+            continue
         fam = e.get("family") if e.get("family") in FAMILIES else "unknown"
         wl = [wires.get(str(w)) for w in (e.get("wires") or []) if isinstance(e.get("wires"), list) and str(w) in wires]
         secs = Counter(SUB2SECTION.get(w.get("subsystem")) for w in wl if w and SUB2SECTION.get(w.get("subsystem")))
@@ -306,13 +370,20 @@ def main():
         tl = ends_of.get(wid, [])
         def _code(x):
             b = re.split(r"\s\(|:|\s->|\s\+", str(x or ""))[0].strip()
-            return ALIAS_N.get(re.sub(r"[^a-z0-9]", "", b.lower())) or (b if b in eps else None)
+            # RSI pass 40: "AMP CH1+" names the AMP plug by its first word; without it the start fell to the first end
+            # listed (the door pass-through), and the segment fold chained 26a/26b/27a/27b AMP -> SPK and door -> AMP
+            first = b.split()[0] if b.split() else ""
+            return (ALIAS_N.get(re.sub(r"[^a-z0-9]", "", b.lower())) or (b if b in eps else None)
+                    or ALIAS_N.get(re.sub(r"[^a-z0-9]", "", first.lower())) or (first if first in eps else None))
         fc = _code(w.get("frm"))
         tc = _code(w["to"].get("device") if isinstance(w.get("to"), dict) else w.get("to"))
+        fc, tc = (None if fc in STUD_SET else fc), (None if tc in STUD_SET else tc)   # the stud nodes carry those ends
         # the start is the plug the record names, else the ECU/PDM pin; a wire whose start plug has no write-up still
         # starts there (2026-09-27: dual-pin PDM outputs had both pins taken as the two ends)
         src_end = (next((t for t in tl if fc and t["endpoint"] == fc), None)
-                   or next((t for t in tl if str(t["endpoint"]).startswith(("M130", "PDM30", "PDM15"))), None))
+                   or next((t for t in tl if str(t["endpoint"]).startswith(("M130", "PDM30", "PDM15"))), None)
+                   # RSI pass 26: a wire that ends at the splice beside a pin starts there
+                   or next((t for t in tl if t["endpoint"] in PIN_SPLICE), None))
         if src_end is None and not fc:
             src_end = next((t for t in tl if t["endpoint"] != tc), None) if tc else (tl[0] if tl else None)
         # the far end is the device, not an inline connector the wire passes through, nor another pin of the start
@@ -332,6 +403,9 @@ def main():
             "_to": dst_end["endpoint"] if dst_end else (tc if tc and tc != fc else None),
             "to_cavity": dst_end.get("cavity") if dst_end else None,
             "planned_length_ft": w.get("length_ft") if isinstance(w.get("length_ft"), (int, float)) else None,
+            # RSI pass 42: what the length is and where it came from
+            "planned_length_kind": w.get("length_kind") if isinstance(w.get("length_ft"), (int, float)) else None,
+            "planned_length_basis": (str(w.get("length_basis") or "")[:1000] or None) if isinstance(w.get("length_ft"), (int, float)) else None,
             "build_state": "uncut", "derivation_version": "k5_registry_v5", "design_status": "decided",
             "notes": "; ".join(x for x in (w.get("notes"), f"switched by: {w['control']}" if w.get("control") else None) if x)[:1000] or None,
             "harness_section": sec, "source": SRC_V5, "method": "registry loader", "observed_at": NOW, "trust": "T3",
@@ -397,7 +471,9 @@ def main():
     # April concept rows the v5 design now carries (a v5 wire on the same two plugs) or a locked decision rules out
     # (R13 in WIRE_CHECKS.json) leave the map; the rest stay as concept for section-by-section review (2026-09-27)
     def _unit(code):
-        # the ECU/PDM connectors and studs count as one box; April pseudo-nodes (M130_HB_spare, PDM30_OUT_*) stay themselves
+        # the ECU/PDM connectors and studs count as one box; April pseudo-nodes (M130_HB_spare, PDM30_OUT_*) stay themselves;
+        # a pin splice node counts as its plug (RSI pass 26)
+        code = (PIN_SPLICE.get(code) or {}).get("plug", code)
         if not code or code not in eps:
             return code or None
         return ("PDM30" if code.startswith("PDM30") else "PDM15" if code.startswith("PDM15")
@@ -489,11 +565,14 @@ def main():
     gone = dict(REPLACED_NODES)
     for code in (reg.get("retired_endpoints") or {}):
         gone.setdefault(code, None)
+    for code in STUD_SET:          # RSI pass 37: a stud set's cable ends live on its stud nodes
+        gone.setdefault(code, None)
     n_gone = 0
     for code, succ in sorted(gone.items()):
         if code not in have or code in nodes:
             continue
-        why = f"replaced by {succ}" if succ else (reg.get("retired_endpoints") or {}).get(code)
+        why = (f"replaced by {succ}" if succ else "its cable ends live on its stud nodes (RSI pass 37)" if code in STUD_SET
+               else (reg.get("retired_endpoints") or {}).get(code))
         if PLAN:
             print(f"   - {code} leaves the map ({why})")
         else:
@@ -511,7 +590,8 @@ def main():
     WIRE_KEYS = ("circuit_name", "from_component", "to_component", "wire_gauge_awg", "wire_color", "wire_type", "system_category",
                  "from_cavity", "to_cavity", "planned_length_ft", "notes", "harness_section")
     live = api.get("vehicle_custom_circuits",
-                   "select=id,circuit_code,derivation_version,build_state,from_endpoint_id,to_endpoint_id," + ",".join(WIRE_KEYS)
+                   "select=id,circuit_code,derivation_version,build_state,from_endpoint_id,to_endpoint_id,planned_length_kind,"
+                   "planned_length_basis," + ",".join(WIRE_KEYS)
                    + f"&overlay_id=eq.{OVERLAY}&is_superseded=eq.false&limit=5000") or []
     have_c = {(r["circuit_code"], r["derivation_version"]): r["id"] for r in live}
     # v5 rows the registry changed (supersede + insert, bench progress carried) or retired (supersede, no successor)
@@ -629,6 +709,19 @@ def main():
             n_ret += 1
     for r in changed_c:
         api.patch("vehicle_custom_circuits", f"id=eq.{r['id']}", {"superseded_by": have_c[(r["circuit_code"], "k5_registry_v5")]})
+    # RSI pass 42: a wire's length says what it is (kind + basis); written in place on rows the registry left otherwise
+    # unchanged, like the checks (a changed length re-rows the wire, and the new row carries its own)
+    changed_ids = {r["id"] for r in changed_c}
+    n_basis = 0
+    for r in live:
+        c = reg_v5.get(r["circuit_code"]) if r["derivation_version"] == "k5_registry_v5" else None
+        if not c or r["id"] in changed_ids:
+            continue
+        want = {k: c.get(k) for k in ("planned_length_kind", "planned_length_basis")}
+        if any((r.get(k) or None) != (v or None) for k, v in want.items()):
+            api.patch("vehicle_custom_circuits", f"id=eq.{r['id']}", want)
+            n_basis += 1
+    print(f"wire length basis: written on {n_basis} wires")
     n_cov = n_dead = 0
     for code_, (fate, why) in april_fate.items():
         rid = have_c.get((code_, "april_2026_candidate"))
@@ -646,20 +739,24 @@ def main():
     print(f"wires: {len(rows)} inserted ({len(changed_c)} of them replace changed rows) · {len(retired_c)} retired · "
           f"June rows: {n_sup} superseded by their v5 row, {n_ret} retired (not in the master)")
     # wire ends
-    live_t = api.get("wire_termination_specs", f"select=circuit_id,endpoint_id&vehicle_id=eq.{K5}&is_superseded=eq.false&circuit_id=not.is.null") or []
+    live_t = api.get("wire_termination_specs", f"select=id,circuit_id,endpoint_id,{','.join(END_FIELDS)}&vehicle_id=eq.{K5}"
+                                               "&is_superseded=eq.false&circuit_id=not.is.null") or []
     have_t = {(r["circuit_id"], r["endpoint_id"]) for r in live_t}
+    live_by = defaultdict(list)
+    for r in live_t:
+        live_by[(r["circuit_id"], r["endpoint_id"])].append(r)
     fam_tool = {}
     for tid, tdef in (tools or {}).items():
         for p in (tdef.get("for") or []):
             fam_tool.setdefault(str(p), tdef.get("pn") or tid)
-    trows = []
+    trows, reend, seen = [], [], set()
     for t in terms:
         cid, nid = have_c.get((str(t["wire"]), "k5_registry_v5")), have.get(t["endpoint"])
-        if not cid or not nid or (cid, nid) in have_t:
+        if not cid or not nid or (cid, nid) in seen:
             continue
-        have_t.add((cid, nid))
+        seen.add((cid, nid))
         codes = [x for x in str(t.get("part") or "").split(" + ") if x]
-        trows.append({
+        row = {
             "vehicle_id": K5, "circuit_id": cid, "endpoint_id": nid, "wire_code": str(t["wire"]), "cavity": t.get("cavity"),
             "endpoint_side": "source" if str(t["endpoint"]).startswith(("M130", "PDM30", "PDM15")) else "device",
             "connector_family": t.get("family"), "terminal_contact_pn": codes[0] if codes else None,
@@ -668,9 +765,23 @@ def main():
             "notes": "doubled over at the terminal (MoTeC C125 p.21)" if t.get("doubled") else None,
             "source": f"k5-wiring:{t['endpoint']}:#{t['wire']} end" if t["endpoint"] in reg["dossiers"] else SRC_V5,
             "method": "registry loader", "observed_at": NOW, "trust": "T3",
-        })
+        }
+        if (cid, nid) in have_t:
+            # RSI pass 41: an end whose cavity, parts or family changed in the registry is written again (the old row
+            # superseded, pointing at the new one); before, the loader wrote an end once and never again
+            old = live_by.get((cid, nid)) or []
+            if len(old) == 1 and any((old[0].get(k) or None) != (row.get(k) or None) for k in END_FIELDS):
+                reend.append((old[0]["id"], row))
+            continue
+        trows.append(row)
     if "--with-ends" in sys.argv:
-        api.insert("wire_termination_specs", trows)
+        for i in range(0, len(reend), 80):
+            api.patch("wire_termination_specs", f"id=in.({','.join(o for o, _ in reend[i:i + 80])})", {"is_superseded": True})
+        new_ids = {(r["circuit_id"], r["endpoint_id"]): r["id"]
+                   for r in api.insert("wire_termination_specs", trows + [r for _, r in reend]) or []}
+        for o, r in reend:
+            if new_ids.get((r["circuit_id"], r["endpoint_id"])):
+                api.patch("wire_termination_specs", f"id=eq.{o}", {"superseded_by": new_ids[(r["circuit_id"], r["endpoint_id"])]})
         # ends the registry no longer has (e.g. a wire the engine PDM now keeps inside the engine bay leaves the 61-pin)
         want = {(have_c.get((str(t["wire"]), "k5_registry_v5")), have.get(t["endpoint"])) for t in terms}
         v5_ids = {cid for (code, dv), cid in have_c.items() if dv == "k5_registry_v5"}
@@ -679,7 +790,8 @@ def main():
                  if r["circuit_id"] in v5_ids and (r["circuit_id"], r["endpoint_id"]) not in want]
         for i in range(0, len(stale), 80):
             api.patch("wire_termination_specs", f"id=in.({','.join(r['id'] for r in stale[i:i + 80])})", {"is_superseded": True})
-        print(f"wire ends: {len(trows)} inserted, {len(stale)} retired (no longer in the registry)")
+        print(f"wire ends: {len(trows)} inserted, {len(reend)} re-written (cavity, parts or family changed), "
+              f"{len(stale)} retired (no longer in the registry)")
     else:
         print(f"wire ends: {len(trows)} ready, held until wire_termination_specs.wire_number is nullable (--with-ends)")
     # rule-check results per wire (check_plug_ends.py --wires -> WIRE_CHECKS.json), replaced in place
@@ -788,22 +900,69 @@ def main():
     # the harness model (harness_segments) follows the wires and wire ends this run superseded (RSI pass 11), and every
     # plug this run wrote is keyed to its live point on the route graph, by the anchor named in pos_source (RSI pass 12)
     if not PLAN:
-        print(f"harness model: {api._req('POST', 'rpc/resync_harness_segments', {'p_vehicle_id': K5})}")
-        # a wire whose segment was made before its ends existed takes them, by the reshape's rule (RSI pass 19); the new
-        # ends are keyed to their terminal and tool parts (key_harness_wire_ends, RSI pass 6)
-        print(f"segment ends: {api._req('POST', 'rpc/fill_harness_segment_ends', {'p_vehicle_id': K5})}")
-        print(f"wire end keys: {api._req('POST', 'rpc/key_harness_wire_ends', {'p_vehicle_id': K5})}")
+        # a plug this run added takes the reshape's node rule (bus for a splice, ground bus or stud) before any fold reads it
+        # (RSI pass 28)
+        print(f"node kinds: {api.rpc('classify_harness_endpoint_nodes', {'p_vehicle_id': K5})}")
+        print(f"harness model: {api.rpc('resync_harness_segments', {'p_vehicle_id': K5})}")
+        # every decided wire's segments follow its live ends by the reshape's rule: new wires get segments, a segment whose
+        # end changed plug takes the new end (RSI pass 25, which covers pass 19's fill); the new ends are keyed to their
+        # terminal and tool parts (key_harness_wire_ends, RSI pass 6)
+        print(f"segments: {api.rpc('conform_harness_segments', {'p_vehicle_id': K5})}")
+        print(f"wire end keys: {api.rpc('key_harness_wire_ends', {'p_vehicle_id': K5})}")
+        # and every segment to its wire's catalog part and its plugs' option couplings (RSI pass 30: the reshape's and pass
+        # 1's rules, re-runnable)
+        print(f"segment keys: {api.rpc('key_harness_segments', {'p_vehicle_id': K5})}")
         # and to their cavity in the cited library (RSI pass 22: the rules of passes 2 and 9, re-runnable)
-        print(f"cavity keys: {api._req('POST', 'rpc/key_harness_wire_end_cavities', {'p_vehicle_id': K5})}")
-        print(f"route graph: {api._req('POST', 'rpc/key_harness_endpoints_to_topology', {'p_vehicle_id': K5})}")
+        print(f"cavity keys: {api.rpc('key_harness_wire_end_cavities', {'p_vehicle_id': K5})}")
+        # citations on a wire end this run re-inserted at the same plug and cavity follow it (RSI pass 28)
+        print(f"evidence carried: {api.rpc('carry_harness_termination_evidence', {'p_vehicle_id': K5})}")
+        # the boxes the design record places land on the route graph first (RSI pass 31), then each plug keys to its point
+        points = [{"node_code": a, "kind": "device", "x": pos["x"], "y": pos["y"], "z": pos["z"], "pos_source": placed_source(a),
+                   "method": "placement decision record (catalog/mounts.yaml)", "trust": b["status"]} for a, (b, pos) in PLACED.items()]
+        # each point the ends sit on, once (a shared point takes its first end's words); a box's point stays the box's
+        seen_pts = set(PLACED)
+        for code, (e, pos) in sorted(END_POS.items()):
+            if pos["point"] in seen_pts:
+                continue
+            seen_pts.add(pos["point"])
+            et = endpoint_type(code, str((eps.get(code) or {}).get("device") or ""))
+            kind = ("splice" if et == "splice" else "ground" if et == "ground"
+                    else "bulkhead" if re.search(r"FIREWALL|BULKHEAD|PASS", code) else "device")
+            points.append({"node_code": pos["point"], "kind": kind, "x": pos["x"], "y": pos["y"], "z": pos["z"],
+                           "pos_source": f"{pos['point']}: {e['where']} (confidence {pos['confidence']}; {pos['method']}; {pos['source']})",
+                           "method": "placement decision record (catalog/mounts.yaml ends)", "trust": e["status"]})
+        print(f"route points: {api.rpc('load_harness_topology_points', {'p_vehicle_id': K5, 'p_rows': points, 'p_source': f'catalog/mounts.yaml @ {SHA}'})}")
+        print(f"route graph: {api.rpc('key_harness_endpoints_to_topology', {'p_vehicle_id': K5})}")
+        # the route graph's branches and their junctions from the design record, then every segment between standing
+        # points routed over them (RSI pass 33)
+        rb = yaml.safe_load((CD / "catalog" / "route_branches.yaml").read_text()) if (CD / "catalog" / "route_branches.yaml").exists() else {}
+        junctions = [{"node_code": j["code"], "kind": j.get("kind") or "breakout", "x": j["x"], "y": j["y"], "z": j["z"],
+                      "pos_source": f"route junction {j['code']}: {j.get('note') or 'where bundles split'} (catalog/route_branches.yaml)",
+                      "method": "route study (catalog/route_branches.yaml)", "trust": j.get("trust") or "proposed"}
+                     for j in (rb.get("junctions") or [])]
+        if junctions:
+            print(f"route junctions: {api.rpc('load_harness_topology_points', {'p_vehicle_id': K5, 'p_rows': junctions, 'p_source': f'catalog/route_branches.yaml @ {SHA}'})}")
+        branches = [{"code": b_["code"], "from": b_["from"], "to": b_["to"], "polyline_m": b_["polyline_m"], "length_in": b_["length_in"],
+                     "description": b_.get("follows"), "method": rb.get("method") or "route study",
+                     "assumptions": "; ".join(x for x in (b_.get("rule_notes"), f"min clearance {b_.get('min_clearance_mm')} mm"
+                                                          if b_.get("min_clearance_mm") is not None else None,
+                                                          f"confidence {b_.get('confidence')}" if b_.get("confidence") else None) if x)}
+                    for b_ in (rb.get("branches") or [])]
+        if branches:
+            print(f"route branches: {api.rpc('load_harness_branches', {'p_vehicle_id': K5, 'p_rows': branches, 'p_source': f'catalog/route_branches.yaml @ {SHA}'})}")
+        print(f"routing: {api.rpc('route_harness_segments', {'p_vehicle_id': K5})}")
+        # a routed segment with no plan gets route length x pad (RSI pass 34); the scoreboard checks every plan against its route
+        print(f"route plans: {api.rpc('plan_harness_segment_lengths', {'p_vehicle_id': K5})}")
         # nets re-folded through bus plugs and shared pins (RSI pass 14); it re-folds protection too: each net's PDM output
         # from its wire ends' pins, else the output its wires' design names (RSI pass 13)
-        print(f"nets: {api._req('POST', 'rpc/refold_harness_nets', {'p_vehicle_id': K5})}")
+        print(f"nets: {api.rpc('refold_harness_nets', {'p_vehicle_id': K5})}")
         # the design's splices and their conductors; the nets re-fold through them, and a splice that would join a
         # supply to ground refuses the whole load (RSI pass 16)
-        print(f"splices: {api._req('POST', 'rpc/load_harness_splices', {'p_vehicle_id': K5, 'p_rows': reg.get('splices') or [], 'p_source': f'k5_registry.json splices @ {SHA}'})}")
+        print(f"splices: {api.rpc('load_harness_splices', {'p_vehicle_id': K5, 'p_rows': reg.get('splices') or [], 'p_source': f'k5_registry.json splices @ {SHA}'})}")
         # each PDM output's programmed limit and cited load onto its channel, then onto the nets it protects (RSI pass 15)
-        print(f"pdm settings: {api._req('POST', 'rpc/load_pdm_settings', {'p_vehicle_id': K5, 'p_rows': reg.get('pdm_settings') or [], 'p_source': f'k5_registry.json pdm_settings @ {SHA}'})}")
+        print(f"pdm settings: {api.rpc('load_pdm_settings', {'p_vehicle_id': K5, 'p_rows': reg.get('pdm_settings') or [], 'p_source': f'k5_registry.json pdm_settings @ {SHA}'})}")
+        if api.failed:
+            sys.exit("end-of-run folds failed (the later ones still ran): " + " | ".join(api.failed))
 
 
 if __name__ == "__main__":

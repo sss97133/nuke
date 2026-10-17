@@ -24,6 +24,7 @@ import { resolveExistingVehicleId, discoveryUrlIlikePattern } from '../_shared/r
 import { writeObservation } from "../_shared/observationWriter.ts";
 import { requireWriteAuth } from '../_shared/writeGuard.ts';
 import { projectSecretKey } from "../_shared/supabaseKeys.ts";
+import { insertMissingVehicleImages } from '../_shared/vehicleImageWrite.ts';
 
 // Direct fetch - BH Auction has no Cloudflare/bot protection
 async function fetchPage(url: string): Promise<{ html: string; success: boolean; error?: string }> {
@@ -794,8 +795,8 @@ Deno.serve(async (req) => {
             is_external: true,
           }));
 
-          // Insert images (no unique constraint, just insert)
-          const { error: imgError } = await supabase.from('vehicle_images').insert(imageRecords);
+          // Insert only the URLs this vehicle does not hold (no unique key on vehicle_id, image_url)
+          const { error: imgError } = await insertMissingVehicleImages(supabase, vehicleId, imageRecords);
           if (imgError) {
             throw new Error(`vehicle_images insert failed: ${imgError.message}`);
           } else {
@@ -935,7 +936,7 @@ Deno.serve(async (req) => {
               }));
 
               // Insert images (no unique constraint)
-              const { error: imgErr } = await supabase.from('vehicle_images').insert(imageRecords);
+              const { error: imgErr } = await insertMissingVehicleImages(supabase, vehicleId, imageRecords);
               if (imgErr) throw new Error(`vehicle_images insert failed: ${imgErr.message}`);
             }
           }

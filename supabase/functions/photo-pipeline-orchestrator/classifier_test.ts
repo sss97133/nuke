@@ -1,3 +1,5 @@
+import { __setGuardDb, allowAllGuardDb } from '../_shared/geminiGuard.ts';
+__setGuardDb(allowAllGuardDb()); // these suites assert exact fetch counts; the guard's own tests are _shared/geminiGuard.test.ts
 import { classifyImage, CLASSIFIER_MODEL, CANDIDATE_CLASSIFIER_MODEL, CLASSIFIER_BUDGET } from './classifier.ts';
 function assert(value: unknown, message = 'assertion failed'): asserts value { if (!value) throw new Error(message); }
 const image = () => new Response(new Uint8Array([1, 2, 3]), { headers: { 'content-type': 'image/jpeg' } });

@@ -58,6 +58,49 @@ Standing rules the code carries:
   and until it checks `vision_gate_status` a reader that drops the predicate can read rejected frames.
   Thumbnails render through `NukeImage.thumb(url, width:)` (the render endpoint, or BaT's `?w=`), never
   the raw original outside the full-screen viewer.
+- **Uploads are keyed by their bytes.** The storage path is `users/<uid>/capture-relay/<sha256>/<filename>`
+  (`Config.storagePath`). The filename alone wraps at IMG_9999: by 2026-10-15, 586 old paths each held rows of
+  different photos (1,266 rows, at least 598 showing another photo's bytes). Never key an object by a name the
+  camera reuses. A pass reads no original for an asset it already settled (`SyncEngine.processAsset`, by
+  `localIdentifier`), gives each asset three attempts before it stops holding the watermark or the queue, and
+  stops on a refused session (`SupabaseService.isAuthFailure`) instead of failing every remaining photo.
+- **Photos file to the owner's vehicles; strong evidence makes a profile.** Owner direction, 2026-10-15: "the app
+  after vision run is supposed to assign the vehicle to a profile under the image owners associated vehicle profiles,
+  its supposed to create new profiles if theres enough data to support it." `AttributionEngine.run` files an uploaded
+  photo through the server (`device_file_images` → `attribute_testimony`, audited) on a serial read matching one of
+  the owner's vehicles (every era's serial, `VisionEngine.matchSerial`) or on the owner's album mapped to a vehicle
+  (`album_sync_map`). A valid 17-character VIN (`VisionEngine.isValidVIN`) that matches nothing, or an unmapped album
+  named "year make model" (`AlbumLabel`) with `Config.albumProfileMinPhotos` uploaded photos, goes to
+  `device_create_vehicle_profile`, which resolves an existing vehicle first and creates a private profile, with the
+  owner as photographer and not as owner, only when the server's thresholds hold. A session inheritance (same day,
+  same ~100 m cell) stays a suggestion: a dealer lot holds many cars. Nothing in the app writes `vehicle_id` directly.
+- **A relation is a weight, not a status.** Owner direction, 2026-10-15: "active cant be a hard code like it is. its
+  a weight. a relation goes dormant immediately after one day if not maintained by contribution. even within 24hr can
+  stall." The app never shows a membership's `status` as ACTIVE. It shows the state the server cuts from
+  `relation_weight` (2^(-age/6 h) of the last contribution): live, stalling, or dormant a day after the last one.
+  Contributions are passive (photos at the organization's locations, its images, timeline events, contractor work),
+  because nobody at work spends a minute in the app. Reads: `user_org_relations` (the profile's list) and
+  `get_org_page` (`OrganizationView`). An organization opens inside the app, never on nuke.ag. The list shows on the
+  person's own profile only (the owner took organizations off the profile face on 2026-06-13), and only live and
+  stalling relations, warmest first: "only show active orgs. its annoying that evening side projects surface to top
+  billing." Membership still
+  decides permissions and the contributor gate (`fetchActiveOrgMemberships`).
+- **Newest first.** Each sync pass leads with the last three days, newest first, ahead of the watermark window, and an
+  original that lives only in iCloud goes to the backfill queue (the background job downloads it on Wi-Fi) instead of
+  holding the watermark. On 2026-10-15 the owner's window sat in June; every open re-read the same 200 iCloud-only June
+  photos and the morning's measurement shots never uploaded. Pixels follow the device rule of record
+  (`VisionEngine.triage`, the same rule `scripts/ios-vision-triage` applies to stored frames): clutter and personal stay
+  on the phone as metadata only; everything else, a part close-up included, uploads.
+- **Heat is a budget.** Nothing reads originals in bulk while the app is open: iCloud originals download only in
+  the background job on Wi-Fi; the album review (originals + accurate OCR) runs in the foreground only on a
+  charger at a nominal temperature (`LibraryIngest.mayReviewInForeground`); a foreground backfill slice waits
+  when the phone is already warm (`SyncEngine.deviceWarm`); polls pause when the app is not active. Low Power
+  Mode holds uploads only on battery (`SyncEngine.lowPowerHolds`): on a charger only heat holds them. A new loop
+  that reads photos or the network states its bound and its thermal gate. The 2026-10-15 audit of every
+  launch-time cost is in the PR that added this rule.
+- **A failed read says why.** `ReadFailure.text(error)` (SupabaseService.swift): no connection, a server timeout,
+  an HTTP status, a refused sign-in. "Check your connection" was the copy for every failure, including the
+  board's server-side 500s.
 - **Money is never anonymous.** The readers mask it at the source (#1037, #1046, #1048, and the day
   receipt since June); the phone also renders the ledger and value curve only when the read's viewer is
   not `anon`, failing closed without a document. OCR text regions from a day receipt are rendered as

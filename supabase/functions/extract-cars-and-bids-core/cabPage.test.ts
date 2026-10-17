@@ -30,7 +30,7 @@ Deno.test("sold page: outcome, price, description, seller, comment and photo", (
   eq([d.outcome, d.amount, d.endedAt, d.seller?.name], ["sold", 16250, "2026-02-11T19:14:00.000Z", "sam"]);
   eq(d.sections[0].text, "one\ntwo");
   eq([d.comments.length, d.comments[0].author, d.comments[0].text, d.comments[0].likes, d.comments[0].postedAt], [1, "amy", "Nice car?", 3, "2026-02-11T18:00:00.000Z"]);
-  eq(d.photos, ["https://media.carsandbids.com/cdn-cgi/image/width=2080,quality=80/h/photos/a/b.jpg"]);
+  eq(d.photos, ["https://media.carsandbids.com/cdn-cgi/image/width=2080,quality=70/h/photos/a/b.jpg"]);
 });
 
 Deno.test("ended without Sold for is not a sale", () => {

@@ -1,0 +1,50 @@
+/* The families that moved most on BaT, under the brand map: a row of risers (green) and a row of fallers (red), each a
+   way into the map, then BaT's own move. */
+.map-movers { display: grid; gap: 3px; padding: 4px 16px; flex-shrink: 0;
+  border-top: 2px solid var(--border); background: var(--bg); color: var(--text); overflow: hidden; }
+.map-movers__row { display: grid; grid-template-columns: 150px minmax(0, 1fr); align-items: center; gap: 10px; }
+.map-movers__list { display: flex; gap: 6px; min-width: 0; overflow-x: auto; scrollbar-width: none; }
+.map-movers__list::-webkit-scrollbar { display: none; }
+.map-movers__item { display: inline-flex; align-items: baseline; gap: 6px; white-space: nowrap; padding: 1px 8px;
+  border: 1px solid var(--border); background: var(--surface); color: var(--text); cursor: pointer; }
+.map-movers__item:hover, .map-movers__item:focus-visible { border-color: var(--text); }
+.map-movers__item--up { border-left: 3px solid var(--success); }
+.map-movers__item--down { border-left: 3px solid var(--error); }
+@media (max-width: 760px) { .map-movers__row { grid-template-columns: 1fr; gap: 2px; } .map-movers__base { display: none; } }
+/* The two years behind a mover: 24 month-length bars, the year before faint, the last year in the chip's direction. */
+.map-movers__spark { display: block; align-self: center; flex-shrink: 0; }
+.map-movers__bar--prior { fill: var(--text-disabled); }
+.map-movers__spark--up .map-movers__bar--recent { fill: var(--success); }
+.map-movers__spark--down .map-movers__bar--recent { fill: var(--error); }
+
+/* The share movers (2026-10-15): two lists, gaining and losing share of BaT sales, under the map in the page's flow.
+   A row: name, the move as a dot with its ±2 SE band on one log axis, the move, sales both years, the average sale's
+   move apart, and the two years by month. */
+.map-movers2 { padding: 10px 16px 12px; border-top: 2px solid var(--border); background: var(--bg); color: var(--text); font-family: Arial, sans-serif; }
+.map-movers2__sides { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px 28px; }
+.map-movers2__title { font-size: 11px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; margin-bottom: 4px; }
+.map-movers2__row { display: grid; grid-template-columns: minmax(0, 1.3fr) 120px 56px minmax(0, 0.9fr) minmax(0, 0.8fr) 48px;
+  align-items: center; gap: 10px; width: 100%; padding: 3px 0; border: 0; border-bottom: 1px solid var(--border);
+  background: transparent; color: var(--text); cursor: pointer; text-align: left; font: inherit; }
+.map-movers2__row:hover, .map-movers2__row:focus-visible { background: var(--surface); }
+.map-movers2__name { font-size: 12px; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.map-movers2__move { font-size: 13px; font-weight: 700; font-variant-numeric: tabular-nums; text-align: right; }
+.map-movers2__move--up { color: var(--success); } .map-movers2__move--down { color: var(--error); }
+.map-movers2__counts, .map-movers2__price { font-size: 11px; color: var(--text-secondary); font-family: 'Courier New', monospace; white-space: nowrap; }
+.map-movers2__none { font-size: 11px; color: var(--text-secondary); padding: 4px 0; }
+.map-movers2__axis { stroke: var(--border); stroke-width: 1; }
+.map-movers2__zero { stroke: var(--text-secondary); stroke-width: 1; }
+.map-movers2__band { stroke-width: 3; }
+.map-movers2__dot--up .map-movers2__band { stroke: color-mix(in srgb, var(--success) 45%, transparent); }
+.map-movers2__dot--down .map-movers2__band { stroke: color-mix(in srgb, var(--error) 45%, transparent); }
+.map-movers2__dot--up .map-movers2__mark { fill: var(--success); }
+.map-movers2__dot--down .map-movers2__mark { fill: var(--error); }
+.map-movers2__base { margin-top: 8px; font-size: 12px; line-height: 1.4; color: var(--text-secondary); }
+@media (max-width: 760px) {
+  .map-movers2__sides { grid-template-columns: minmax(0, 1fr); }
+  .map-movers2__row { grid-template-columns: minmax(0, 1fr) 96px 52px; grid-template-rows: auto auto; row-gap: 0; }
+  .map-movers2__row .map-movers2__dot { width: 96px; }
+  .map-movers2__counts { grid-column: 1; } .map-movers2__price { grid-column: 2 / 4; text-align: right; }
+  .map-movers2__row .map-movers__spark { display: none; }
+  .map-movers2__base { font-size: 11px; }
+}

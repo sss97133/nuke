@@ -81,7 +81,7 @@ struct ConnectedAccountsView: View {
                     HStack(spacing: 8) { ProgressView(); Text("Loading…").font(.footnote).foregroundStyle(.secondary) }
                 } else if loadError {
                     HStack {
-                        Label("Couldn't load", systemImage: "wifi.exclamationmark").font(.footnote).foregroundStyle(.secondary)
+                        Label("Couldn't load", systemImage: "exclamationmark.triangle").font(.footnote).foregroundStyle(.secondary)
                         Spacer()
                         Button("Retry") { Task { await load() } }.font(.footnote)
                     }

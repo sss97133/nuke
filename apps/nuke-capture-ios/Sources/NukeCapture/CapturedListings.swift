@@ -122,6 +122,7 @@ enum CapturedListings {
 struct CapturedListingsView: View {
     @State private var rows: [CapturedListing]?
     @State private var loadError = false
+    @State private var failureText: String?
 
     private var coverageSentence: String {
         let n = rows?.count ?? 0
@@ -156,9 +157,9 @@ struct CapturedListingsView: View {
                 .refreshable { await load() }
             } else if loadError {
                 ContentUnavailableView {
-                    Label("Couldn't read the listings", systemImage: "wifi.exclamationmark")
+                    Label("Couldn't read the listings", systemImage: "exclamationmark.triangle")
                 } description: {
-                    Text("Check your connection.")
+                    Text(failureText ?? "The read failed.")
                 } actions: {
                     Button("Retry") { Task { await load() } }.buttonStyle(.borderedProminent)
                 }
@@ -179,7 +180,7 @@ struct CapturedListingsView: View {
             rows = try await CapturedListings.read()
             loadError = false
         } catch {
-            if rows == nil { loadError = true }
+            if rows == nil { loadError = true; failureText = ReadFailure.text(error) }
             NSLog("NukeCapture captured listings read failed: %@", String(describing: error))
         }
     }

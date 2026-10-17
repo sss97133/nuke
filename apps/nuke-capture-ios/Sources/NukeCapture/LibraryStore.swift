@@ -24,6 +24,10 @@ final class LibraryStore: NSObject, ObservableObject, PHPhotoLibraryChangeObserv
     @Published private(set) var albumError: String?
     @Published private(set) var refreshingAlbums = false
     private var albumRefreshPending = false
+    /// When the last catalog read finished. Each read enumerates every photo and album and stores
+    /// a multi-MB snapshot; it used to run 2-4 times per open plus once per library change.
+    private var lastAlbumRefresh: Date?
+    private var pendingChangeRefresh: Task<Void, Never>?
 
     private let imageManager = PHCachingImageManager()
     private let scale = UIScreen.main.scale
@@ -38,8 +42,12 @@ final class LibraryStore: NSObject, ObservableObject, PHPhotoLibraryChangeObserv
         assets = result
         count = result.count
         super.init()
-        albumCatalog = try? LocalStore.shared.latestAlbumCatalog()
         PHPhotoLibrary.shared().register(self)
+        // The stored catalog is a JSON copy of every photo id: decode it off the main thread.
+        Task { @MainActor [weak self] in
+            let stored = await Task.detached(priority: .utility) { try? LocalStore.shared.latestAlbumCatalog() }.value
+            if let self, self.albumCatalog == nil { self.albumCatalog = stored }
+        }
     }
 
     func asset(at index: Int) -> PHAsset? {
@@ -61,22 +69,40 @@ final class LibraryStore: NSObject, ObservableObject, PHPhotoLibraryChangeObserv
     /// space), so a day's photos (ordered by EXIF takenAt) can drive the existing
     /// global-index pager + cell. The grid sorts by creationDate, the day by takenAt,
     /// so a day's photos are NOT contiguous here — map per id. Ids no longer in the
-    /// library (deleted) drop out (NSNotFound), never a phantom. Main-actor read.
-    func indexMap(forLocalIdentifiers lids: [String]) -> [String: Int] {
+    /// library (deleted) drop out, never a phantom.
+    ///
+    /// One pass over the library builds an id → position table, off the main thread, cached until
+    /// the library changes. The old version called `PHFetchResult.index(of:)` once per photo, a
+    /// linear search of the whole library each time, on the main thread: opening a day or an
+    /// album held the main thread past the 10 s watchdog and iOS killed the app (crash reports
+    /// 2026-10-13 16:15 and 2026-10-15 10:13 on the owner's phone).
+    func indexMap(forLocalIdentifiers lids: [String]) async -> [String: Int] {
         guard !lids.isEmpty else { return [:] }
-        let fetched = PHAsset.fetchAssets(withLocalIdentifiers: lids, options: nil)
+        let table = await positionTable()
         var out: [String: Int] = [:]
-        fetched.enumerateObjects { asset, _, _ in
-            let i = self.assets.index(of: asset)
-            if i != NSNotFound { out[asset.localIdentifier] = i }
-        }
+        for lid in lids { if let i = table[lid] { out[lid] = i } }
         return out
+    }
+
+    private var positionCache: (result: PHFetchResult<PHAsset>, table: [String: Int])?
+    private func positionTable() async -> [String: Int] {
+        let current = assets
+        if let c = positionCache, c.result === current { return c.table }
+        let table = await Task.detached(priority: .userInitiated) { () -> [String: Int] in
+            var t: [String: Int] = [:]
+            t.reserveCapacity(current.count)
+            current.enumerateObjects { asset, i, _ in t[asset.localIdentifier] = i }
+            return t
+        }.value
+        if assets === current { positionCache = (current, table) }
+        return table
     }
 
     /// Metadata-only human pass. No parsing album titles into vehicle IDs, no
     /// photo uploads, and no change to Photos. Limited access cannot fetch user
     /// albums; retain that coverage boundary instead of reporting an empty garage.
-    func refreshAlbums() async {
+    func refreshAlbums(force: Bool = false) async {
+        if !force, let last = lastAlbumRefresh, Date().timeIntervalSince(last) < 60, albumCatalog != nil { return }
         if refreshingAlbums { albumRefreshPending = true; return }
         refreshingAlbums = true
         defer { refreshingAlbums = false }
@@ -90,6 +116,7 @@ final class LibraryStore: NSObject, ObservableObject, PHPhotoLibraryChangeObserv
             } catch {
                 albumError = "Album organization could not be saved. Try again."
             }
+            lastAlbumRefresh = Date()
         } while albumRefreshPending
     }
 
@@ -210,8 +237,14 @@ final class LibraryStore: NSObject, ObservableObject, PHPhotoLibraryChangeObserv
                 count = assets.count
             }
             // An album rename/member edit can happen without changing the global
-            // asset fetch. It must still produce a new human/source snapshot.
-            await refreshAlbums()
+            // asset fetch. It must still produce a new human/source snapshot, once the burst
+            // settles: iCloud delivers changes in storms, each used to re-read the library.
+            pendingChangeRefresh?.cancel()
+            pendingChangeRefresh = Task { @MainActor [weak self] in
+                try? await Task.sleep(for: .seconds(30))
+                guard !Task.isCancelled else { return }
+                await self?.refreshAlbums(force: true)
+            }
         }
     }
 }

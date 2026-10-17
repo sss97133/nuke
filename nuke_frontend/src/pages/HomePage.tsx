@@ -9,8 +9,14 @@ import { OnboardingSlideshow } from '../components/onboarding/OnboardingSlidesho
 import { useInterests } from '../hooks/useInterests';
 import { optimizeImageUrl } from '../lib/imageOptimizer';
 import { squarify } from '../lib/squarify';
+import { MapCallouts, MapLegend, MarketCard, MarketSheet, MarketTile, VenueMix, money as fmtMoneyMap, type MapBasis } from './market/MarketTile';
+import { batBaseline, callouts, relativeMove } from './market/mapScale';
+import { readShareMovers } from './market/FamilyMovers';
 import IntakePage from './intake/IntakePage';
 import { Text } from '../kit';
+import FamilyMovers from './market/FamilyMovers';
+import BrandFamilyMap, { MapViewSwitch } from './market/BrandFamilyMap';
+import FamilySalesChart, { FamilyViewSwitch } from './market/FamilySalesChart';
 
 // ────────────────────────────────────────────────────────────
 // TYPES
@@ -70,6 +76,61 @@ interface DrillLevel {
   year?: number;
 }
 
+const SCOPE_PARAM_KEYS = ['make', 'family', 'family_name', 'model', 'year'] as const;
+
+/** Build the treemap's drill stack from the page URL, resolving canonical brand and family names when loaded. */
+export function drillStackFromSearchParams(
+  params: URLSearchParams,
+  brands?: readonly TreemapNode[] | null,
+  families?: readonly TreemapNode[] | null,
+): DrillLevel[] {
+  const stack: DrillLevel[] = [{ label: 'ALL MAKES' }];
+  const rawMake = params.get('make')?.trim();
+  if (!rawMake || rawMake.toLowerCase() === 'all') return stack;
+  const make = brands?.find((b) => b.name.toLowerCase() === rawMake.toLowerCase())?.name ?? rawMake;
+  stack.push({ label: make, make });
+
+  const rawFamily = params.get('family')?.trim();
+  const rawFamilyName = params.get('family_name')?.trim();
+  if (rawFamily) {
+    const matched = families?.find((f) => f.familyKey === rawFamily);
+    const label = matched?.name ?? rawFamilyName ?? rawFamily;
+    stack.push({ label, make, family: rawFamily, names: matched?.models ?? undefined });
+  }
+
+  const rawModel = params.get('model')?.trim();
+  if (rawModel) {
+    stack.push({ label: rawModel, make, family: rawFamily || undefined, model: rawModel });
+    const rawYear = params.get('year')?.trim();
+    if (rawYear) {
+      const year = parseInt(rawYear, 10);
+      if (Number.isFinite(year)) {
+        stack.push({ label: String(year), make, family: rawFamily || undefined, model: rawModel, year });
+      }
+    }
+  }
+  return stack;
+}
+
+/** Write the treemap's drill stack into the page URL while preserving unrelated parameters. */
+export function applyDrillStackToSearchParams(params: URLSearchParams, stack: readonly DrillLevel[]): URLSearchParams {
+  const next = new URLSearchParams(params);
+  for (const k of SCOPE_PARAM_KEYS) next.delete(k);
+  const leaf = stack[stack.length - 1];
+  if (!leaf?.make) return next;
+  next.set('make', leaf.make);
+  if (leaf.family) {
+    next.set('family', leaf.family);
+    const familyLevel = stack.find((l) => l.family === leaf.family && !l.model);
+    if (familyLevel?.label && familyLevel.label !== leaf.family) {
+      next.set('family_name', familyLevel.label);
+    }
+  }
+  if (leaf.model) next.set('model', leaf.model);
+  if (leaf.year != null && Number.isFinite(leaf.year)) next.set('year', String(leaf.year));
+  return next;
+}
+
 // The map's levels: brands, a brand's model families, a family's model names, a name's years, the sales.
 export type MapLevel = 'brands' | 'families' | 'models' | 'years' | 'vehicles';
 
@@ -108,7 +169,8 @@ export function readTreemapBrands(): Promise<TreemapNode[] | null> {
 // The clock of the ledger's views: the latest treemap_refreshes row, written by treemap_refresh_all() since 2026-10-14
 // (job 175, daily 09:10 UTC), with the map's population receipt (treemap_populations()) since 20261014063000.
 // Absent or unreadable, the legend says what it always said, without a time or a population.
-export interface MapPopulations { measure?: string; public_records?: number; mapped_sales?: number }
+export interface MapPopulations { measure?: string; public_records?: number; mapped_sales?: number;
+  by_house?: { house: string | null; sales: number; amount: number }[] }
 export interface MapRefresh { refreshedAt: string | null; populations: MapPopulations | null }
 const NO_REFRESH: MapRefresh = { refreshedAt: null, populations: null };
 let refreshRead: Promise<MapRefresh> | null = null;
@@ -151,6 +213,13 @@ export function mapCaption(level: MapLevel, levelCount: number, refresh: MapRefr
   return `${count}${receipt ? ` of ${fmt(p!.public_records!)} public records` : ''}${clause}${ledgerViewsClock(refresh.refreshedAt, now)}`;
 }
 
+/** The caption on a phone, where the full sentence does not fit: the count alone, the population still on the title. */
+export function mapCaptionShort(level: MapLevel, levelCount: number, refresh: MapRefresh): string {
+  const p = refresh.populations;
+  const n = level === 'brands' && p?.measure === 'confirmed_sale_v1' && Number.isFinite(p.mapped_sales) ? p.mapped_sales! : levelCount;
+  return `${n.toLocaleString('en-US')} ${level === 'vehicles' ? 'shown' : 'sold'}`;
+}
+
 /** How much of a brand's sales the family level names: the share of its sales in named families and how many there
  *  are; the rest sit in "Other models". Empty when the level holds no families. */
 export function familyCoverage(nodes: readonly TreemapNode[] | null): string {
@@ -169,9 +238,21 @@ export function familyNamesShown(shown: number, names?: number): string {
 /** What area and color mean at each level. The readers count public records with a confirmed sale (vehicle_sale_basis)
  *  and its sold amount (vehicle_price_facts); the median is withheld under 5 sales. */
 export function mapLegend(level: MapLevel, measured = level === 'brands' || level === 'families' || level === 'models'): string {
-  if (level === 'vehicles') return 'area = confirmed sale price · click to open the record';
-  if (measured) return `area = dollars from confirmed sales · of offered sold = share of cars offered at auction that sold · BaT 12 mo = sales and dollars on Bring a Trailer in the last 12 months against the 12 before, the venue held in full both years; color follows those sales (gray: BaT holds under half the sales, or too few a year earlier) · nominal${level === 'families' ? ' · other models = names not yet keyed to a family, and families with under 3 sales' : ''} · click to go down`;
-  return 'area = vehicles with a confirmed sale · color = their median sale price (gray: under 5 sales) · nominal, all years · asks, bids and unknown outcomes are not counted · click to go down';
+  if (level === 'vehicles') return 'box size = confirmed sale price · click a box to open the car';
+  if (measured) return `box size = dollars from confirmed sales · of offered sold = share of cars offered at auction that sold · 12 mo = sales and dollars in the last 12 months against the 12 before, measured at auction houses held in full both years (today Bring a Trailer); color follows those sales (gray: the measured houses hold under half the sales, or too few a year earlier) · prices not adjusted for inflation${level === 'families' ? ' · other models = names not yet keyed to a family, and families with under 3 sales' : ''} · click a box to go deeper`;
+  return 'box size = vehicles with a confirmed sale · color = their median sale price (gray: under 5 sales) · prices not adjusted for inflation, all years · asks, bids and unknown outcomes are not counted · click a box to go deeper';
+}
+
+/** The legend under the map: the sales chart's when a family shows its chart (the tiles' legend described tiles that
+ *  were not on screen, 2026-10-15), the level's otherwise. */
+export const SALES_CHART_LEGEND = 'one dot = one confirmed sale with a date, the last five years · color = auction house · '
+  + 'blue (where a family has enough sales) = the price of one standard car, the same mix of variant, miles, gearbox, model year '
+  + 'and venue in every period, with its 95% band, and the headline is that car\'s change over 12 months; gray = the plain median '
+  + 'of every sale, which mixes different cars · otherwise one panel per decade the cars were built, all on one price scale that '
+  + 'leaves out the cheapest and dearest 1% (those sit on the edge, counted), line = the typical (median) price of sales within '
+  + '60 days either side, band = their middle half · prices not adjusted for inflation · click a dot to open the car';
+export function legendFor(level: MapLevel, chartShown: boolean, measured?: boolean): string {
+  return chartShown ? SALES_CHART_LEGEND : measured === undefined ? mapLegend(level) : mapLegend(level, measured);
 }
 
 function useTreemapRefresh(): MapRefresh {
@@ -207,12 +288,12 @@ function useTreemapModels(make: string | null) {
     if (!make) { setData(null); return; }
     let cancelled = false;
     setLoading(true);
-    supabase.rpc('treemap_models_by_brand', { p_make: make }).then(({ data: result, error }) => {
+    Promise.resolve().then(() => supabase.rpc('treemap_models_by_brand', { p_make: make })).then(({ data: result, error }) => {
       if (!cancelled && result && !error) {
         setData(result as TreemapNode[]);
       }
       if (!cancelled) setLoading(false);
-    });
+    }, () => { if (!cancelled) setLoading(false); });
     return () => { cancelled = true; };
   }, [make]);
   return { data, loading };
@@ -239,7 +320,7 @@ function useTreemapFamilies(make: string | null) {
     if (!make) { setData(null); return; }
     let cancelled = false;
     setLoading(true);
-    Promise.resolve(supabase.rpc('treemap_brand_families', { p_brand: make })).then(({ data: result, error }) => {
+    Promise.resolve().then(() => supabase.rpc('treemap_brand_families', { p_brand: make })).then(({ data: result, error }) => {
       if (cancelled) return;
       const rows = (error ? null : result) as any[] | null;
       if (rows?.length) setData(rows.map((r) => ({ ...marketNode(r.family ?? 'Other models', r), familyKey: r.family_key, models: r.models ?? null })));
@@ -260,7 +341,7 @@ function useTreemapFamilyModels(make: string | null, familyKey: string | null) {
     if (!make || !familyKey) { setData(null); return; }
     let cancelled = false;
     setLoading(true);
-    Promise.resolve(supabase.rpc('treemap_family_models', { p_brand: make, p_family_key: familyKey })).then(({ data: result, error }) => {
+    Promise.resolve().then(() => supabase.rpc('treemap_family_models', { p_brand: make, p_family_key: familyKey })).then(({ data: result, error }) => {
       if (cancelled) return;
       if (!error && result) setData((result as any[]).map((r) => ({ ...marketNode(r.model ?? 'Model not given', r), noModel: r.model == null })));
       setLoading(false);
@@ -277,12 +358,12 @@ function useTreemapYears(make: string | null, model: string | null) {
     if (!make || !model) { setData(null); return; }
     let cancelled = false;
     setLoading(true);
-    supabase.rpc('treemap_years', { p_source: null, p_make: make, p_model: model }).then(({ data: result, error }) => {
+    Promise.resolve().then(() => supabase.rpc('treemap_years', { p_source: null, p_make: make, p_model: model })).then(({ data: result, error }) => {
       if (!cancelled && result && !error) {
         setData(result as TreemapNode[]);
       }
       if (!cancelled) setLoading(false);
-    });
+    }, () => { if (!cancelled) setLoading(false); });
     return () => { cancelled = true; };
   }, [make, model]);
   return { data, loading };
@@ -290,7 +371,7 @@ function useTreemapYears(make: string | null, model: string | null) {
 
 // The leaf: the cell's confirmed sales (treemap_sales), each with the sold amount its parent cell counted.
 function readTreemapSales(make: string, model: string, year?: number | null): Promise<TreemapNode[] | null> {
-  return Promise.resolve(supabase.rpc('treemap_sales', { p_make: make, p_model: model, p_year: year ?? null })).then(
+  return Promise.resolve().then(() => supabase.rpc('treemap_sales', { p_make: make, p_model: model, p_year: year ?? null })).then(
     ({ data: result, error }: { data: any[] | null; error: unknown }) => (error || !result ? null : result.map((v: any) => ({
       name: [v.year, v.make, v.model].filter(Boolean).join(' '),
       count: 1,
@@ -328,24 +409,28 @@ function useRepresentativeImages(items: TreemapNode[] | null, make?: string | nu
   useEffect(() => {
     if (!items || !make || items.length === 0) { setImages(new Map()); return; }
     let cancelled = false;
+    // The brand's priciest sold cars with a photo, read along the (make, sale_price) index of priced sales. The earlier
+    // shape (make ILIKE, sale_price OR sold_price) walked every vehicle by price and timed out on every brand drill
+    // (HTTP 500 for Ford and Porsche, 2026-10-15), so no tile ever had its image; this one reads 200 rows of the brand.
     supabase
       .from('vehicles')
       .select('model, year, primary_image_url')
-      .ilike('make', make)
+      .eq('make', make)
+      .gt('sale_price', 0)
       .not('primary_image_url', 'is', null)
-      .or('sale_price.gt.0,sold_price.gt.0')
       .is('deleted_at', null)
-      .order('sale_price', { ascending: false, nullsFirst: false })
-      .limit(500)
+      .order('sale_price', { ascending: false })
+      .limit(200)
       .then(({ data: result, error }) => {
         if (cancelled || !result || error) return;
         const map = new Map<string, string>();
         for (const row of result as any[]) {
-          // Key by model name or year depending on what we need
+          // Key by model name, by its first word (a family tile is "911", its sales "911 Carrera") and by year.
           const modelKey = String(row.model || '').toLowerCase();
+          const familyKey = modelKey.split(/\s+/)[0];
           const yearKey = String(row.year || '');
-          if (!map.has(modelKey) && row.primary_image_url) map.set(modelKey, row.primary_image_url);
-          if (!map.has(yearKey) && row.primary_image_url) map.set(yearKey, row.primary_image_url);
+          if (!row.primary_image_url) continue;
+          for (const key of [modelKey, familyKey, yearKey]) if (key && !map.has(key)) map.set(key, row.primary_image_url);
         }
         setImages(map);
       });
@@ -410,19 +495,36 @@ function momentumToColor(m: number | null): string {
 }
 
 /** The brand tile's lines, most important first; the cell shows as many as fit. Each is a measured fact of the brand's
- *  confirmed sales, or absent. */
-export function brandLines(n: TreemapNode): string[] {
+ *  confirmed sales, or absent. Each line comes in forms from longest to shortest; a tile `maxChars` wide shows the
+ *  longest form that fits and leaves out a line none of whose forms fits, so no line is cut mid-word (2026-10-15 small
+ *  tiles read "$156.3M · 1,1…", "81% of offere…", "BaT 12 mo: s…"). */
+export function brandLines(n: TreemapNode, maxChars = Infinity): string[] {
   // What a brand's market is, in three lines: its dollars and sales, how often what is offered sells, and how the last
   // twelve months compare with the twelve before, in sales and in dollars (owner, 2026-10-15: the price band is
   // irrelevant; sell-through and the 12-month move are the interest, said clearly).
-  const lines: string[] = [];
-  if (n.usd) lines.push(`${fmtMoney(n.usd)} · ${fmtNum(n.count)} sold`);
-  if (n.offered && n.offered >= 20 && n.sold_any != null) lines.push(`${Math.round((100 * n.sold_any) / n.offered)}% of offered sold`);
+  const forms: string[][] = [];
+  if (n.usd) {
+    const money = fmtMoneyShort(n.usd);
+    forms.push([`${fmtMoney(n.usd)} · ${fmtNum(n.count)} sold`, `${money} · ${fmtCountShort(n.count)} sold`, money]);
+  }
+  if (n.offered && n.offered >= 20 && n.sold_any != null) {
+    const share = Math.round((100 * n.sold_any) / n.offered);
+    forms.push([`${share}% of offered sold`, `${share}% sold`]);
+  }
   const m = brandMomentum(n);
   const d = brandDollarMomentum(n);
-  if (m !== null) lines.push(`BaT 12 mo: sales ${signedPct(m)}${d !== null ? `, $ ${signedPct(d)}` : ''}`);
-  return lines;
+  if (m !== null) {
+    forms.push([...(d !== null ? [`12 mo: sales ${signedPct(m)}, $ ${signedPct(d)}`] : []),
+      `12 mo: sales ${signedPct(m)}`, `12 mo ${signedPct(m)}`]);
+  }
+  return forms.map(f => f.find(line => lineChars(line) <= maxChars)).filter((line): line is string => line !== undefined);
 }
+
+/** Characters a tile line takes in the cell's monospace face; the arrows fall back to a wider face, so they count two. */
+export const lineChars = (line: string) => line.length + (line.match(/[▲▼]/g)?.length ?? 0);
+const fmtMoneyShort = (n: number) => n >= 1_000_000_000 ? `$${(n / 1_000_000_000).toFixed(1)}B`
+  : n >= 1_000_000 ? `$${Math.round(n / 1_000_000)}M` : n >= 1_000 ? `$${Math.round(n / 1_000)}K` : `$${Math.round(n)}`;
+const fmtCountShort = (n: number) => n >= 10_000 ? `${Math.round(n / 1_000)}K` : n >= 1_000 ? `${(n / 1_000).toFixed(1)}K` : `${n}`;
 
 // ────────────────────────────────────────────────────────────
 // TREEMAP CELL COMPONENT
@@ -471,7 +573,7 @@ function TreemapCell({ rect, onClick, totalCount, showValue, repImage }: CellPro
   const textSecondary = onDark ? 'rgba(255, 255, 255, 0.82)' : 'var(--text-secondary)';
   const lineHeightPx = dataFontSize * 1.3;
   const marketLines = isBrandMarket && canShowCount
-    ? brandLines(node).slice(0, Math.max(1, Math.floor((h - nameFontSize * 1.4 - 10) / lineHeightPx)))
+    ? brandLines(node, Math.floor((w - 12) / (dataFontSize * 0.6))).slice(0, Math.max(1, Math.floor((h - nameFontSize * 1.4 - 10) / lineHeightPx)))
     : [];
 
   return (
@@ -831,11 +933,19 @@ function useSearchPreview(query: string) {
 // market page (no header bar of its own, a fixed height) instead of as a page of its own.
 export function TreemapHomePage({ onBrowse, embedded = false }: { onBrowse: () => void; embedded?: boolean }) {
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   usePageTitle(embedded ? 'Market' : 'Nuke — Vehicle Intelligence');
   const { recordInterest } = useInterests();
 
-  // Drill-down state
-  const [drillStack, setDrillStack] = useState<DrillLevel[]>([{ label: 'ALL MAKES' }]);
+  // Drill-down state, synced with the page URL so Back, reload, search and lower sections share one scope.
+  const [drillStack, setDrillStackState] = useState<DrillLevel[]>(() => drillStackFromSearchParams(searchParams));
+  const setDrillStack = useCallback((updater: DrillLevel[] | ((prev: DrillLevel[]) => DrillLevel[])) => {
+    setDrillStackState((prev) => {
+      const next = typeof updater === 'function' ? updater(prev) : updater;
+      setSearchParams((curr) => applyDrillStackToSearchParams(curr, next), { preventScrollReset: true });
+      return next;
+    });
+  }, [setSearchParams]);
   const currentLevel = drillStack[drillStack.length - 1];
 
   // Narrow-viewport flag — hides decorative chrome when the header would crush.
@@ -859,9 +969,29 @@ export function TreemapHomePage({ onBrowse, embedded = false }: { onBrowse: () =
   // Data hooks
   const { data: brandsData, loading: brandsLoading } = useTreemapBrands();
   const refresh = useTreemapRefresh();
+  // The map's color is each tile's BaT move against BaT overall: the whole venue as the movers read it (every family,
+  // makes too small for a tile included), so the map and the movers name one baseline; the brands' own sum until it reads.
+  const [venue, setVenue] = useState<{ sold: number; prior: number; move: number } | null>(null);
+  useEffect(() => {
+    let live = true;
+    readShareMovers().then((v) => {
+      if (live && v && v.bat.sold_prior_12m > 0) setVenue({ sold: v.bat.sold_12m, prior: v.bat.sold_prior_12m, move: v.bat.sold_12m / v.bat.sold_prior_12m - 1 });
+    });
+    return () => { live = false; };
+  }, []);
+  const baseline = useMemo(() => venue ?? batBaseline(brandsData), [venue, brandsData]);
+  // Without hover (a phone), a tap on a market tile opens its card; the card's Open drills.
+  const [coarse] = useState(() => canMatchMedia && window.matchMedia('(hover: none)').matches);
+  const [sheet, setSheet] = useState<TreemapNode | null>(null);
+  // What a market tile's area counts: every venue and year in the ledger (the default: the owner, 2026-10-15, "is
+  // supposed to be all the markets not just one"), or Bring a Trailer's dollars over the last 12 months, the color's
+  // own population. The color stays BaT's move, the one venue held in full both years, hatched where BaT holds under
+  // half a tile's sales.
+  const [basis, setBasis] = useState<MapBasis>('ledger');
   // A brand opens on its model families; when none can be read it opens on its model names, as before.
   const atFamilies = !!currentLevel.make && !currentLevel.family && !currentLevel.model;
-  const { data: familiesData, loading: familiesLoading, failed: familiesFailed } = useTreemapFamilies(atFamilies ? currentLevel.make ?? null : null);
+  const needsFamilyMeta = atFamilies || (!!currentLevel.make && !!currentLevel.family && !currentLevel.names);
+  const { data: familiesData, loading: familiesLoading, failed: familiesFailed } = useTreemapFamilies(needsFamilyMeta ? currentLevel.make ?? null : null);
   const { data: modelsData, loading: modelsLoading } = useTreemapModels(atFamilies && familiesFailed ? currentLevel.make ?? null : null);
   const { data: familyModelsData, loading: familyModelsLoading } = useTreemapFamilyModels(
     currentLevel.family && !currentLevel.model ? currentLevel.make ?? null : null,
@@ -876,6 +1006,25 @@ export function TreemapHomePage({ onBrowse, embedded = false }: { onBrowse: () =
   const vehicleModel = currentLevel.year ? currentLevel.model ?? null : null;
   const vehicleYear = currentLevel.year ?? null;
   const { data: vehiclesData, loading: vehiclesLoading } = useTreemapVehicles(vehicleMake, vehicleModel, vehicleYear);
+
+  // Sync URL scope changes (Back/Forward, search, lower sections) and canonical brand/family labels into drillStack.
+  const urlScopeKey = SCOPE_PARAM_KEYS.map((k) => searchParams.get(k) ?? '').join('\x1f');
+  useEffect(() => {
+    setDrillStackState((prev) => {
+      const fromUrl = drillStackFromSearchParams(searchParams, brandsData, familiesData);
+      const same = prev.length === fromUrl.length && prev.every((a, i) => {
+        const b = fromUrl[i];
+        return a.label === b.label && a.make === b.make && a.family === b.family && a.names === b.names && a.model === b.model && a.year === b.year;
+      });
+      return same ? prev : fromUrl;
+    });
+  }, [urlScopeKey, brandsData, familiesData, searchParams]);
+
+  // The top level as brands, or as brands with their families inside (finviz's map of the market).
+  const [brandView, setBrandView] = useState<'brands' | 'nested'>('brands');
+  // A family keeps its model names as clickable treemap tiles; the sales chart is shown below when embedded (or via the switch).
+  const [familyView, setFamilyView] = useState<'sales' | 'names'>('names');
+  useEffect(() => { setFamilyView('names'); }, [currentLevel.make, currentLevel.family]);
 
   // Determine active data and level type
   const levelType: MapLevel =
@@ -904,7 +1053,7 @@ export function TreemapHomePage({ onBrowse, embedded = false }: { onBrowse: () =
     // drillStack triggers recompute when navigating so ref cache is checked
   }, [levelType, brandsData, familiesData, familiesFailed, modelsData, familyModelsData, yearsData, vehiclesData, currentLevel, drillStack]);
 
-  const isLoading = brandsLoading || familiesLoading || modelsLoading || familyModelsLoading || yearsLoading || vehiclesLoading;
+  const isLoading = brandsLoading || (atFamilies && familiesLoading) || modelsLoading || familyModelsLoading || yearsLoading || vehiclesLoading;
 
   // ── Prefetch: fire supabase queries on 200ms hover debounce ──
   const prefetchYears = useCallback((make: string, model: string) => {
@@ -942,9 +1091,10 @@ export function TreemapHomePage({ onBrowse, embedded = false }: { onBrowse: () =
     }
   }, []);
 
-  // Representative images for aggregate cells (models/years levels)
+  // Representative images for aggregate cells (models/years levels); none while a family shows its sales chart, which
+  // has no tiles to put them on (the read ran under the chart on every family drill).
   const repImages = useRepresentativeImages(
-    levelType === 'models' ? familyModelsData : levelType === 'years' ? yearsData
+    levelType === 'models' ? (familyView === 'names' ? familyModelsData : null) : levelType === 'years' ? yearsData
       : levelType === 'families' && familiesFailed ? modelsData : null,
     currentLevel.make
   );
@@ -968,14 +1118,19 @@ export function TreemapHomePage({ onBrowse, embedded = false }: { onBrowse: () =
   }, []);
 
   // Compute treemap layout
+  // A market level: brands or families where every tile carries dollars (#1342); there the size switch applies.
+  const marketLevel = (levelType === 'brands' || levelType === 'families') && !!activeData?.length
+    && activeData.filter((n) => n.count > 0).every((n) => n.usd != null && n.usd > 0);
   const rects = useMemo(() => {
     if (!activeData || dims.w < 10 || dims.h < 10) return [];
     const PAD = 2; // border space
     const items = activeData
       .filter(n => n.count > 0)
-      .map(node => ({ node, area: node.usd && node.usd > 0 ? node.usd : node.count }));
+      .map(node => ({ node, area: marketLevel && basis === 'bat12' ? (node.usd_12m ?? 0) : node.usd && node.usd > 0 ? node.usd : node.count }))
+      .filter(item => item.area > 0);
     return squarify(items, PAD, PAD, dims.w - PAD * 2, dims.h - PAD * 2);
-  }, [activeData, dims]);
+  }, [activeData, dims, marketLevel, basis]);
+  const bat12Totals = useMemo(() => (activeData ?? []).reduce((t, n) => ({ sold: t.sold + (n.sold_12m ?? 0), usd: t.usd + (n.usd_12m ?? 0) }), { sold: 0, usd: 0 }), [activeData]);
 
   const totalCount = useMemo(
     () => (activeData || []).reduce((s, n) => s + n.count, 0),
@@ -984,6 +1139,9 @@ export function TreemapHomePage({ onBrowse, embedded = false }: { onBrowse: () =
 
   // Tooltip
   const [tooltip, setTooltip] = useState<TooltipData | null>(null);
+  // A drill or a view switch replaces the tiles under the pointer, and the tile a tooltip came from can no longer clear it:
+  // over the sales chart the 911 tile's tooltip stayed on screen (2026-10-15).
+  useEffect(() => { setTooltip(null); setSheet(null); }, [drillStack, brandView, familyView]);
 
   // Drill down — continuous zoom: makes → models → years → vehicles → profile
   const [clickOrigin, setClickOrigin] = useState<{ x: number; y: number } | null>(null);
@@ -1075,12 +1233,12 @@ export function TreemapHomePage({ onBrowse, embedded = false }: { onBrowse: () =
       style={{
         display: 'flex',
         flexDirection: 'column',
-        height: embedded ? '72vh' : '100vh',
-        minHeight: embedded ? 440 : undefined,
+        // Embedded, the map keeps its own height and what explains it (movers, legend) flows below it in the page.
+        height: embedded ? 'auto' : '100vh',
         background: 'var(--bg)',
         color: 'var(--text)',
         fontFamily: 'Arial, sans-serif',
-        overflow: 'hidden',
+        overflow: embedded ? 'visible' : 'hidden',
       }}
     >
       {/* ─── HEADER BAR (the page's own; the app header stands in for it when embedded) ─── */}
@@ -1220,13 +1378,15 @@ export function TreemapHomePage({ onBrowse, embedded = false }: { onBrowse: () =
         </button>
       </div>}
 
-      {/* ─── BREADCRUMB / NAVIGATION BAR ─── */}
+      {/* ─── BREADCRUMB / NAVIGATION BAR ─── (one row on a desktop; on a phone the caption and the view switch wrap
+          to a second row instead of being clipped) */}
       <div
         style={{
           display: 'flex',
           alignItems: 'center',
-          padding: '0 16px',
-          height: 32,
+          flexWrap: 'wrap',
+          padding: '2px 16px',
+          minHeight: 32,
           borderBottom: '2px solid var(--border)',
           background: 'var(--surface)',
           flexShrink: 0,
@@ -1270,12 +1430,18 @@ export function TreemapHomePage({ onBrowse, embedded = false }: { onBrowse: () =
           );
         })}
 
-        {/* Level indicator + feed shortcut */}
-        <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 12, flexShrink: 0 }}>
-          {activeData && (
+        {/* Level indicator + feed shortcut; wraps under itself on a phone rather than pushing the caption off screen */}
+        <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap', justifyContent: 'flex-end', rowGap: 6, minWidth: 0 }}>
+          {activeData && marketLevel && basis === 'bat12' ? (
             <Text role="caption" title={ledgerViewsStamp(refresh.refreshedAt)}>
-              {mapCaption(levelType, totalCount, refresh, Date.now(), levelType === 'families' ? familyCoverage(activeData)
-                : levelType === 'models' ? familyNamesShown(activeData?.length ?? 0, currentLevel.names) : '')}
+              {isNarrow ? `${bat12Totals.sold.toLocaleString('en-US')} BaT sold, 12 mo`
+                : `${bat12Totals.sold.toLocaleString('en-US')} Bring a Trailer sales, last 12 months · ${fmtMoneyMap(bat12Totals.usd)}${ledgerViewsClock(refresh.refreshedAt)}`}
+            </Text>
+          ) : activeData && (
+            <Text role="caption" title={ledgerViewsStamp(refresh.refreshedAt)}>
+              {isNarrow ? mapCaptionShort(levelType, totalCount, refresh)
+                : mapCaption(levelType, totalCount, refresh, Date.now(), levelType === 'families' ? familyCoverage(activeData)
+                  : levelType === 'models' ? familyNamesShown(activeData?.length ?? 0, currentLevel.names) : '')}
             </Text>
           )}
           {currentLevel.year && currentLevel.make && currentLevel.model && (
@@ -1329,17 +1495,32 @@ export function TreemapHomePage({ onBrowse, embedded = false }: { onBrowse: () =
               ENTER FEED
             </button>
           )}
+          {levelType === 'brands' && <MapViewSwitch label="Map view" value={brandView} onChange={setBrandView}
+            options={[{ value: 'brands', label: 'Brands' }, { value: 'nested', label: 'Families inside' }]} />}
+          {levelType === 'models' && currentLevel.family && <FamilyViewSwitch value={familyView} onChange={setFamilyView} />}
           <span style={{ fontSize: 8, fontWeight: 700, letterSpacing: '0.12em', textTransform: 'uppercase', color: 'var(--text-disabled)' }}>
             {levelType === 'brands' ? 'MAKES' : levelType === 'families' ? (familiesData ? 'FAMILIES' : 'MODELS') : levelType === 'models' ? 'MODELS' : levelType === 'years' ? 'YEARS' : 'VEHICLES'}
           </span>
         </div>
       </div>
 
+      {/* ─── SALES BY HOUSE: what the all-venue map holds, house by house (the refresh's receipt) ─── */}
+      {levelType === 'brands' && basis === 'ledger' && <VenueMix rows={refresh.populations?.by_house} clock={ledgerViewsClock(refresh.refreshedAt)} />}
+
+      {/* ─── CALLOUTS: the clearest gain and loss against BaT and the largest tile, each a way into its tile ─── */}
+      {marketLevel && !(levelType === 'brands' && brandView === 'nested') && activeData && (
+        <MapCallouts items={callouts(activeData, baseline)} onPick={(name) => {
+          const node = activeData.find((n) => n.name === name);
+          if (node) { if (coarse) setSheet(node); else drillInto(node); }
+        }} />
+      )}
+
       {/* ─── TREEMAP VIEWPORT ─── */}
       <div
         ref={containerRef}
         style={{
-          flex: 1,
+          flex: embedded ? 'none' : 1,
+          height: embedded ? 'clamp(440px, 64vh, 820px)' : undefined,
           position: 'relative',
           overflow: 'hidden',
           background: 'var(--bg)',
@@ -1384,7 +1565,26 @@ export function TreemapHomePage({ onBrowse, embedded = false }: { onBrowse: () =
             position: 'relative',
           }}
         >
-          {rects.map((rect, i) => {
+          {levelType === 'brands' && brandView === 'nested' && dims.w > 0 ? (
+            <BrandFamilyMap width={dims.w} height={dims.h} baseline={baseline} basis={basis}
+              onPickBrand={(brand) => { recordInterest('make', brand); setDrillStack([{ label: 'ALL MAKES' }, { label: brand, make: brand }]); }}
+              onPickFamily={(brand, key, family) => { recordInterest('make', brand); setDrillStack([{ label: 'ALL MAKES' }, { label: brand, make: brand }, { label: family, make: brand, family: key }]); }} />
+          ) : levelType === 'models' && currentLevel.family && currentLevel.make && familyView === 'sales' && dims.w > 0 ? (
+            <FamilySalesChart brand={currentLevel.make} familyKey={currentLevel.family} family={currentLevel.label}
+              width={dims.w} height={dims.h} onOpen={(id) => navigate(`/vehicle/${id}`)} />
+          ) : rects.map((rect, i) => {
+            if ((levelType === 'brands' || levelType === 'families') && rect.node.usd != null && !rect.node.isVehicle) {
+              const node = rect.node;
+              return (
+                <div key={node.name + '-' + i}
+                  onMouseMove={(e) => { if (!coarse) setTooltip({ node, x: e.clientX, y: e.clientY, totalCount, level: levelType }); }}
+                  onMouseEnter={() => handleCellMouseEnter(node)}
+                  onMouseLeave={() => { setTooltip(null); handleCellMouseLeave(); }}>
+                  <MarketTile node={node} move={relativeMove(node, baseline, basis === 'ledger')} basis={basis} x={rect.x} y={rect.y} w={rect.w} h={rect.h}
+                    onClick={(ev) => (coarse ? setSheet(node) : drillInto(node, ev))} />
+                </div>
+              );
+            }
             const repImg = !rect.node.isVehicle
               ? repImages.get(rect.node.name.toLowerCase()) || repImages.get(rect.node.name)
               : undefined;
@@ -1440,7 +1640,34 @@ export function TreemapHomePage({ onBrowse, embedded = false }: { onBrowse: () =
       </div>
 
       {/* ─── TOOLTIP ─── */}
-      {tooltip && <TreemapTooltip {...tooltip} />}
+      {tooltip && (tooltip.level === 'brands' || tooltip.level === 'families') && tooltip.node.usd != null && !tooltip.node.isVehicle
+        ? <MarketCard node={tooltip.node} move={relativeMove(tooltip.node, baseline, basis === 'ledger')} base={baseline} x={tooltip.x} y={tooltip.y} />
+        : tooltip && <TreemapTooltip {...tooltip} />}
+      {sheet && <MarketSheet node={sheet} move={relativeMove(sheet, baseline, basis === 'ledger')} base={baseline}
+        onOpen={() => { const n = sheet; setSheet(null); drillInto(n); }} onClose={() => setSheet(null)} />}
+
+      {/* ─── FAMILY SALES CHART: when embedded on the Market page, show the family's sales & like-for-like price index below its model tiles ─── */}
+      {embedded && levelType === 'models' && currentLevel.family && currentLevel.make && familyView === 'names' && dims.w > 0 && (
+        <div
+          data-testid="embedded-family-sales-chart"
+          className="home-embedded-family-chart"
+        >
+          <FamilySalesChart
+            brand={currentLevel.make}
+            familyKey={currentLevel.family}
+            familyLabel={currentLevel.label}
+            width={dims.w}
+            height={340}
+            onShowModels={currentLevel.names && currentLevel.names > 1 ? () => setFamilyView('sales') : undefined}
+          />
+        </div>
+      )}
+
+      {/* ─── WHAT MOVED: the families whose BaT market moved most, a pick drills the map to the family ─── */}
+      {levelType === 'brands' && <FamilyMovers onPick={(m) => {
+        recordInterest('make', m.brand);
+        setDrillStack([{ label: 'ALL MAKES' }, { label: m.brand, make: m.brand }, { label: m.family, make: m.brand, family: m.family_key }]);
+      }} />}
 
       {/* ─── FOOTER ─── */}
       <div
@@ -1456,10 +1683,14 @@ export function TreemapHomePage({ onBrowse, embedded = false }: { onBrowse: () =
           gap: 12,
         }}
       >
-        <Text role="caption">
+        {(levelType === 'brands' || levelType === 'families')
+          && !!activeData?.length && activeData.filter((node) => node.count > 0).every((node) => node.usd != null && node.usd > 0)
+          ? <MapLegend base={baseline} basis={basis} clock={ledgerViewsClock(refresh.refreshedAt)} />
+          : <Text role="caption">
           {/* One area and color basis per level (#1342): market measures only when every tile on the map carries dollars. */}
-          {mapLegend(levelType, !!activeData?.length && activeData.filter((node) => node.count > 0).every((node) => node.usd != null && node.usd > 0))}
-        </Text>
+          {legendFor(levelType, levelType === 'models' && !!currentLevel.family && !!currentLevel.make && familyView === 'sales',
+            !!activeData?.length && activeData.filter((node) => node.count > 0).every((node) => node.usd != null && node.usd > 0))}
+        </Text>}
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
           <button
             onClick={onBrowse}
@@ -1476,7 +1707,7 @@ export function TreemapHomePage({ onBrowse, embedded = false }: { onBrowse: () =
               cursor: 'pointer',
             }}
           >
-            {embedded ? 'BAT LIVE BOARD ↓' : 'BROWSE ALL'}
+            {embedded ? 'SOURCES ↓' : 'BROWSE ALL'}
           </button>
           {!embedded && <a
             href="https://nuke.ag"
@@ -1493,6 +1724,13 @@ export function TreemapHomePage({ onBrowse, embedded = false }: { onBrowse: () =
           0%, 100% { opacity: 1; }
           50% { opacity: 0.4; }
         }
+        .home-embedded-family-chart {
+          position: relative;
+          height: 340px;
+          border-top: 2px solid var(--border);
+          background: var(--bg);
+          overflow: hidden;
+        }
       `}</style>
     </div>
   );
@@ -1504,6 +1742,7 @@ export function TreemapHomePage({ onBrowse, embedded = false }: { onBrowse: () =
 
 const FeedPage = lazy(() => import('../feed/components/FeedPage'));
 const MarketPulse = lazy(() => import('./market/MarketInventory'));
+const SourcesBoard = lazy(() => import('./market/SourcesBoard'));
 const GarageTab = lazy(() => import('../components/garage/GarageTab'));
 
 type TabId = 'market' | 'garage' | 'feed';
@@ -1578,7 +1817,10 @@ export default function HomePage() {
 
       <Suspense fallback={<TabSkeleton />}>
         {activeTab === 'market' && <>
-          <TreemapHomePage embedded onBrowse={() => document.querySelector('.market-explorer')?.scrollIntoView({ behavior: 'smooth', block: 'start' })} />
+          <TreemapHomePage embedded onBrowse={() => (document.querySelector('.market-sources') ?? document.querySelector('.market-explorer'))
+            ?.scrollIntoView({ behavior: 'smooth', block: 'start' })} />
+          {/* Every source with the same row, ranked by the lots we hold (owner, 2026-10-15: "treat all sources the same") */}
+          <SourcesBoard scope={searchParams.get('make')} />
           <MarketPulse onUnavailable={user ? <FeedPage /> : <IntakePage variant="homepage" />} />
         </>}
         {activeTab === 'garage' && <GarageTab dashboard={garage} />}

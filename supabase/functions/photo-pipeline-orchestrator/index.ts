@@ -337,10 +337,21 @@ Deno.serve(async (req) => {
     }
     console.log(`[photo-pipeline] Classified as: ${classification.image_type} (${classification.confidence})`);
 
-    // Step 3: If no vehicle_id, try to resolve
+    // Step 3: If no vehicle_id, try to resolve. A resolved vehicle is filed here, before any
+    // handler runs on it, through the sanctioned first-attribution writer attribute_testimony,
+    // which records the signal and confidence in reattribution_audit. A refusal (already filed,
+    // same file already on the target) leaves the photo unfiled and the handlers vehicle-less.
     let resolvedVehicleId = vehicle_id;
+    let attribution: AttributionReceipt | null = null;
     if (!resolvedVehicleId) {
-      resolvedVehicleId = await resolveVehicle(image_id, user_id, classification);
+      const resolved = await resolveVehicle(image_id, user_id, classification);
+      if (resolved) {
+        attribution = await fileResolvedVehicle(image_id, resolved);
+        if (attribution.filed) {
+          resolvedVehicleId = resolved.vehicle_id;
+          processingSource = { image_url: imageRow.image_url, vehicle_id: resolvedVehicleId };
+        }
+      }
     }
 
     // Step 4: Route to appropriate handler
@@ -387,6 +398,7 @@ Deno.serve(async (req) => {
       processed_at: new Date().toISOString(),
       classifier_failed: classifierFailed, // queryable top-level flag, not buried in nested JSON
     };
+    if (attribution) scanMeta.attribution = attribution;
     // P3.2: stamp the observable deep-queue marker in the owned patch here —
     // it only flips the gate column, the real prepare() selection key). NOT
     // byok_deep_analysis, which would make prepare() think the deep work is done.
@@ -401,9 +413,7 @@ Deno.serve(async (req) => {
       ai_processing_status: classifierFailed ? "failed" : "completed",
       ai_processing_completed_at: new Date().toISOString(),
     };
-    if (resolvedVehicleId && !vehicle_id) {
-      updatePayload.vehicle_id = resolvedVehicleId;
-    }
+    // vehicle_id is never written here: a resolved vehicle was filed in step 3 by attribute_testimony.
     // Write image_medium from Gemini classification (Gemini is the authority for this field)
     if (classification.image_medium) {
       updatePayload.image_medium = classification.image_medium;
@@ -501,14 +511,28 @@ async function flagCrossSweepDuplicates(vehicleId: string, takenAt: string): Pro
 }
 
 // ============================================================
-// RESOLVE VEHICLE (GPS, metadata, recent work)
+// RESOLVE VEHICLE (VIN in frame, GPS with possession) and FILE IT
 // ============================================================
+
+interface ResolvedVehicle {
+  vehicle_id: string;
+  signal: "vin_in_frame" | "gps_proximity";
+  confidence: number | null; // the GPS matcher's score; an exact VIN match carries no score
+}
+
+interface AttributionReceipt {
+  vehicle_id: string;
+  signal: ResolvedVehicle["signal"];
+  confidence: number | null;
+  filed: boolean;
+  refusal: string | null;
+}
 
 async function resolveVehicle(
   imageId: string,
   userId: string | null,
   classification: ClassificationResult,
-): Promise<string | null> {
+): Promise<ResolvedVehicle | null> {
   // Strategy 1: VIN detected in image
   if (classification.vin_detected && classification.vin_detected.length === 17) {
     const { data: vinMatch } = await supabase
@@ -519,11 +543,13 @@ async function resolveVehicle(
 
     if (vinMatch) {
       console.log(`[photo-pipeline] Vehicle resolved via VIN: ${classification.vin_detected}`);
-      return vinMatch.id;
+      return { vehicle_id: vinMatch.id, signal: "vin_in_frame", confidence: null };
     }
   }
 
-  // Strategy 2: Image GPS → nearby vehicles with recent work
+  // Strategy 2: Image GPS → nearby vehicles. auto_match_image_to_vehicles scores above the 0.7
+  // bar only for a vehicle this user held at the photo's taken_at, with no other vehicle close in
+  // score; anything else comes back capped at 0.5 and the photo stays in the inbox.
   const { data: image } = await supabase
     .from("vehicle_images")
     .select("latitude, longitude, taken_at")
@@ -531,7 +557,7 @@ async function resolveVehicle(
     .maybeSingle();
 
   if (image?.latitude && image?.longitude) {
-    const { data: nearbyResult } = await supabase
+    const { data: nearbyResult, error: nearbyError } = await supabase
       .rpc("auto_match_image_to_vehicles", {
         p_image_id: imageId,
         p_latitude: image.latitude,
@@ -540,52 +566,40 @@ async function resolveVehicle(
         p_user_id: userId,
       })
       .maybeSingle();
+    if (nearbyError) console.warn(`[photo-pipeline] GPS match failed for ${imageId}: ${nearbyError.code ?? "error"}`);
     const nearbyMatch = nearbyResult as { vehicle_id?: string; confidence?: number } | null;
     if (nearbyMatch?.vehicle_id && Number(nearbyMatch.confidence) > 0.7) {
       console.log(`[photo-pipeline] Vehicle resolved via GPS (confidence: ${nearbyMatch.confidence})`);
-      return nearbyMatch.vehicle_id;
+      return { vehicle_id: nearbyMatch.vehicle_id, signal: "gps_proximity", confidence: Number(nearbyMatch.confidence) };
     }
   }
 
-  // Strategy 3: rolling user context — SUGGEST-ONLY, never hard-assign.
-  // (The hard-assign version was REMOVED 2026-07-02: it stamped ANY unresolved
-  // photo onto whatever vehicle was touched last — zero evidence, the exact
-  // anti-pattern HARD_RULES §10 outlaws. Attribution follows evidence (VIN,
-  // GPS>0.7) or stays NULL; a SUGGESTION is not attribution.)
-  // The hard-assign version cascaded: one filed photo became "most recent
-  // vehicle" for the next, which filed and reinforced it — 102 of user 0's
-  // June frames landed on one truck with no content check (2026-06-10,
-  // pixel-verified the bucket held 2+ different vehicles). Context is a
-  // PRIOR, not evidence: it goes in suggested_vehicle_id for the inbox /
-  // owner-confirmation flow. Only physical evidence (unambiguous GPS above)
-  // may hard-file. Time-bounded 7 days so a stale project never suggests.
-  if (userId) {
-    const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 3600 * 1000).toISOString();
-    const { data: recentVehicle } = await supabase
-      .from("vehicle_images")
-      .select("vehicle_id")
-      .eq("user_id", userId)
-      .not("vehicle_id", "is", null)
-      .gte("created_at", sevenDaysAgo)
-      .order("created_at", { ascending: false })
-      .limit(1)
-      .maybeSingle();
-
-    if (recentVehicle?.vehicle_id) {
-      console.log("[photo-pipeline] Rolling context suggests vehicle (not assigning):", recentVehicle.vehicle_id);
-      await supabase
-        .from("vehicle_images")
-        .update({
-          suggested_vehicle_id: recentVehicle.vehicle_id,
-          image_vehicle_match_status: "ambiguous",
-        })
-        .eq("id", imageId)
-        .is("vehicle_id", null);
-    }
-  }
-
-  console.log("[photo-pipeline] No hard evidence — photo stays in inbox (suggestion recorded if context existed)");
+  // Strategy 3 (rolling user context: "the vehicle this user filed most recently by created_at in
+  // the last 7 days" → suggested_vehicle_id + 'ambiguous') was retired 2026-10-15. It read the upload
+  // clock, so a June 2026 library backfill stamped one truck (b1edd5c1) on 4,328 of the owner's
+  // 5,480 phone photos taken 2017-2026 across 310 days. No suggestion is written without evidence
+  // from the photo itself; the inbox and the owner's session confirm file the rest.
+  console.log("[photo-pipeline] No hard evidence — photo stays in inbox");
   return null;
+}
+
+// Files a resolved vehicle through attribute_testimony (first attribution only; it refuses a photo
+// that is already filed or whose file is already on the target, and audits every filing).
+async function fileResolvedVehicle(imageId: string, resolved: ResolvedVehicle): Promise<AttributionReceipt> {
+  const { data, error } = await supabase.rpc("attribute_testimony", {
+    p_observation_type: "image",
+    p_observation_id: imageId,
+    p_target_vehicle_id: resolved.vehicle_id,
+    p_reason: `photo-pipeline-orchestrator: ${resolved.signal}`,
+    p_actor_user_id: null,
+    p_confidence: resolved.confidence,
+    p_signal: resolved.signal,
+  });
+  if (error) throw new Error("photo_pipeline_attribution_failed");
+  const result = data as { success?: boolean; error?: string } | null;
+  const filed = result?.success === true;
+  if (!filed) console.log(`[photo-pipeline] attribute_testimony refused ${imageId}: ${result?.error ?? "unknown"}`);
+  return { ...resolved, filed, refusal: filed ? null : (result?.error ?? "unknown") };
 }
 
 // ============================================================

@@ -24,6 +24,8 @@ import { ExtractionLogger, validateVin, parsePrice, parseMileage } from '../_sha
 import { writeObservation } from "../_shared/observationWriter.ts";
 import { requireWriteAuth } from '../_shared/writeGuard.ts';
 import { projectSecretKey } from "../_shared/supabaseKeys.ts";
+import { BROWSE_ACTIONS, handleBrowse } from './browseHandler.ts';
+import { insertMissingVehicleImages } from '../_shared/vehicleImageWrite.ts';
 
 // ============================================================================
 // TYPES
@@ -762,7 +764,13 @@ Deno.serve(async (req) => {
   }
 
   try {
-    const { url, save_to_db = false } = await req.json();
+    const body = await req.json();
+    // Browse API intake (official API, keys in function secrets); the Firecrawl single-URL path below is the older door.
+    if (BROWSE_ACTIONS.includes(body?.action)) {
+      const supabase = createClient(Deno.env.get('SUPABASE_URL')!, projectSecretKey()!);
+      return await handleBrowse(supabase, body);
+    }
+    const { url, save_to_db = false } = body;
 
     // Validate URL
     if (!url || (!url.includes('ebay.com/itm/') && !url.includes('ebay.com/p/'))) {
@@ -958,9 +966,7 @@ Deno.serve(async (req) => {
           is_external: true,
         }));
 
-        const { error: imgError } = await supabase
-          .from('vehicle_images')
-          .insert(imageRecords);
+        const { error: imgError } = await insertMissingVehicleImages(supabase, vehicle_id, imageRecords);
 
         if (imgError) {
           console.error('Image save error:', imgError);

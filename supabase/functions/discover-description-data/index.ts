@@ -15,6 +15,7 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { authenticateWriter, requireWriteAuth } from "../_shared/writeGuard.ts";
 import { projectSecretKey } from "../_shared/supabaseKeys.ts";
+import { geminiFetch } from "../_shared/geminiGuard.ts";
 import { conditionExtractionArtifact, conditionObservationInput, descriptionPreview, descriptionSourceMetadata,
   loadDescriptionInput, loadReusableConditionExtraction, requireCompleteInput, type DescriptionInput } from "./descriptionInput.ts";
 
@@ -179,8 +180,8 @@ async function callLLM(prompt: string): Promise<{ content: string; model: string
   const googleKey = Deno.env.get("GEMINI_API_KEY") || Deno.env.get("GOOGLE_AI_API_KEY") || "";
   if (googleKey) {
     try {
-      const resp = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent?key=${googleKey}`,
+      const resp = await geminiFetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-lite-latest:generateContent?key=${googleKey}`,
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -189,12 +190,12 @@ async function callLLM(prompt: string): Promise<{ content: string; model: string
             generationConfig: { temperature: 0.1, maxOutputTokens: 2048 },
           }),
         }
-      );
+      , 'discover-description-data');
       if (resp.ok) {
         const data = await resp.json();
         if (data.candidates?.[0]?.finishReason === "MAX_TOKENS") throw new Error("Gemini output truncated");
         const content = data.candidates?.[0]?.content?.parts?.[0]?.text || "";
-        if (content) return { content, model: data.modelVersion || "gemini-2.5-flash-lite" };
+        if (content) return { content, model: data.modelVersion || "gemini-flash-lite-latest" };
       } else {
         const errBody = await resp.text().catch(() => "");
         errors.push(`Gemini ${resp.status}: ${errBody.slice(0, 100)}`);

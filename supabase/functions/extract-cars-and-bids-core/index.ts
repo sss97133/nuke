@@ -27,8 +27,11 @@ import { parseLocation } from "../_shared/parseLocation.ts";
 import { writeObservation } from "../_shared/observationWriter.ts";
 import { requireWriteAuth } from "../_shared/writeGuard.ts";
 import { projectSecretKey } from "../_shared/supabaseKeys.ts";
-import { batchFromTargets, discoverTargets } from "./targets.ts";
+import { batchFromTargets, discoverTargets, reviseCab, recaptureCab } from "./targets.ts";
 import { parseCabDepth } from "./cabPage.ts";
+import { recordSellerTypes, sellerTypeRow } from "../_shared/sellerType.ts";
+import { insertMissingVehicleImages } from "../_shared/vehicleImageWrite.ts";
+import { fillOnlyIdentity, identityConflict, REVISION_DIFFERENT_CAR } from "../_shared/identityMatch.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -132,6 +135,11 @@ interface CabExtractedData {
  * NOTE: ld+json is NOT present in Firecrawl-rendered HTML (C&B is a React SPA;
  * ld+json is only in pre-hydration server response). All data comes from rendered DOM.
  */
+/** A live or ended C&B auction page carries .bid-stats or the .cnb-details blocks; the not-found shell carries neither. */
+export function isGonePage(html: string): boolean {
+  return html.length > 0 && !html.includes("bid-stats") && !html.includes("cnb-details");
+}
+
 function parseCabHtml(html: string, sourceUrl?: string): CabExtractedData {
   const result: CabExtractedData = {
     vin: null, mileage: null, title: null, year: null, make: null, model: null,
@@ -506,6 +514,21 @@ Deno.serve(async (req) => {
     if (body?.action === "batch_from_targets") {
       return new Response(JSON.stringify(await batchFromTargets(supabase, supabaseUrl, serviceRoleKey, firecrawlApiKey, body)), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
+    if (body?.action === "mark_gone") {
+      // One-off repair for 2026-10-15: the extractor wrote auction_events outcome 'live' from C&B's not-found shell. A lot with a
+      // live row, no end moment and no bids is not a live auction; set it to 'pending' (no result known) and say why in raw_data.
+      const urls: string[] = (Array.isArray(body.urls) ? body.urls : []).filter((u: unknown) => typeof u === "string").slice(0, 100);
+      const { data: fixed, error: fixErr } = await supabase.from("auction_events")
+        .update({ outcome: "pending", raw_data: { page: "gone", note: "C&B not-found shell read as a live auction on 2026-10-15; no result is known", corrected_at: new Date().toISOString() } })
+        .eq("source", "cars_and_bids").in("source_url", urls).eq("outcome", "live").is("auction_end_date", null).is("total_bids", null).select("id");
+      return new Response(JSON.stringify({ success: !fixErr, error: fixErr?.message ?? null, corrected: fixed?.length ?? 0 }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
+    if (body?.action === "revise") {
+      return new Response(JSON.stringify(await reviseCab(supabase, supabaseUrl, serviceRoleKey, body)), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
+    if (body?.action === "recapture") {
+      return new Response(JSON.stringify(await recaptureCab(supabase, supabaseUrl, serviceRoleKey, firecrawlApiKey, body)), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
     if (body?.action === "discover_targets") {
       return new Response(JSON.stringify(await discoverTargets(supabase, firecrawlApiKey)), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
@@ -542,20 +565,27 @@ Deno.serve(async (req) => {
     let responseTimeMs: number;
     let fromCache = false;
 
-    if (cachedSnapshot?.html) {
+    let newSnapshotId: string | null = null;
+    if (cachedSnapshot?.html && body?.recapture !== true) {
       html = cachedSnapshot.html;
       markdown = cachedSnapshot.markdown || '';
       httpStatus = 200;
       responseTimeMs = 0;
       fromCache = true;
       console.log(`✅ C&B: Cache hit — using snapshot from ${cachedSnapshot.fetched_at} (${html.length} chars, markdown: ${markdown.length} chars)`);
+    } else if (body?.retained_only === true) {
+      // reparse_retained: never fetch (a fetch here costs a Firecrawl credit).
+      return new Response(JSON.stringify({ success: false, error: "no_retained_capture" }), { status: 409, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     } else if (typeof body?.html === "string" && body.html.length > 1000) {
       // Page already fetched by this function's batch_from_targets (one Firecrawl credit, no actions): archive and parse it.
       html = body.html;
       markdown = typeof body.markdown === "string" ? body.markdown : "";
       httpStatus = 200;
       responseTimeMs = 0;
-      await trySaveHtmlSnapshot({ supabase, listingUrl: listingUrlNorm, httpStatus, success: true, errorMessage: null, html, metadata: { markdown } });
+      const goneOnArrival = isGonePage(html);
+      await trySaveHtmlSnapshot({ supabase, listingUrl: listingUrlNorm, httpStatus, success: !goneOnArrival, errorMessage: goneOnArrival ? "page gone: no auction DOM (C&B serves its not-found shell with HTTP 200)" : null, html, metadata: { markdown } });
+      const { data: snapRow } = await supabase.from("listing_page_snapshots").select("id").eq("listing_url", listingUrlNorm).eq("success", true).order("fetched_at", { ascending: false }).limit(1).maybeSingle();
+      newSnapshotId = snapRow?.id ?? null;
     } else {
       // Cache miss — fetch via Firecrawl (C&B is a React SPA, blocks direct fetch)
       const scrapeStart = Date.now();
@@ -622,6 +652,15 @@ Deno.serve(async (req) => {
       });
     }
 
+    // C&B answers a removed auction with its not-found shell and HTTP 200: no bid stats, no detail blocks. That is not a result
+    // (reading it as an active auction stamped 'active'/'live' on 70 ended lots, 2026-10-15). Record it and write nothing.
+    if (isGonePage(html)) {
+      await supabase.rpc("record_revision_item", {
+        p_url: listingUrlCanonical, p_missing: ["result"], p_reason: "not_found", p_next_action: "none", p_raised_by: "extract-cars-and-bids-core",
+        p_snapshot_id: newSnapshotId, p_detail: { page: "gone", html_length: html.length }, p_vehicle_id: providedVehicleId,
+      });
+      return new Response(JSON.stringify({ success: false, error: "page_gone", snapshot_id: newSnapshotId }), { status: 410, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
     // Parse HTML directly — no LLM, no markdown, no API cost
     const extracted = parseCabHtml(html, listingUrlCanonical);
     // Depth pass over the same retained capture: full description, comment/bid stream, seller/buyer, end moment, outcome, gallery.
@@ -828,16 +867,36 @@ Deno.serve(async (req) => {
       }
     }
 
+    // Identity guard: a URL/VIN match is not proof it is the same car. A different car is refused and raised as a revision
+    // item (identity_match / different_car / relink); for the same car, year/make/model/vin are fill-only.
+    let existingIdentity: { year: number | null; make: string | null; model: string | null; vin: string | null } | null = null;
+    if (vehicleId) {
+      const { data: idRow } = await supabase.from("vehicles").select("year,make,model,vin").eq("id", vehicleId).maybeSingle();
+      existingIdentity = (idRow as typeof existingIdentity) ?? null;
+      const conflict = existingIdentity ? identityConflict(existingIdentity, { year: extracted.year, make: extracted.make, model: extracted.model, vin: extracted.vin }) : null;
+      if (conflict) {
+        await supabase.rpc("record_revision_item", {
+          p_url: listingUrlCanonical, p_missing: [REVISION_DIFFERENT_CAR.missing], p_reason: REVISION_DIFFERENT_CAR.reason,
+          p_next_action: REVISION_DIFFERENT_CAR.next_action, p_raised_by: "extract-cars-and-bids-core", p_snapshot_id: null,
+          p_detail: { vehicle_id: vehicleId, detail: conflict }, p_vehicle_id: vehicleId,
+        });
+        return new Response(JSON.stringify({ success: false, refused: "different_car", vehicle_id: vehicleId, detail: conflict }), {
+          status: 409, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+    }
+    const fillOnly = <T extends Record<string, unknown>>(row: T, id: string | null, known: typeof existingIdentity) => (id && known ? fillOnlyIdentity(row, known) : row);
+
     // Upsert vehicle
     let created = false;
     if (vehicleId) {
       // Update existing
       const { error: updateError } = await supabase
         .from("vehicles")
-        .update({
+        .update(fillOnly({
           ...vehicleData,
           updated_at: new Date().toISOString(),
-        })
+        }, vehicleId, existingIdentity))
         .eq("id", vehicleId);
 
       if (updateError) {
@@ -871,7 +930,7 @@ Deno.serve(async (req) => {
             vehicleId = dupVehicle.id;
             await supabase
               .from("vehicles")
-              .update({ ...vehicleData, updated_at: new Date().toISOString() })
+              .update(fillOnly({ ...vehicleData, updated_at: new Date().toISOString() }, vehicleId, await supabase.from("vehicles").select("year,make,model,vin").eq("id", vehicleId).maybeSingle().then((r: any) => r.data ?? null)))
               .eq("id", vehicleId);
             console.log(`✅ C&B: Updated existing vehicle via fallback: ${vehicleId}`);
           } else {
@@ -933,8 +992,19 @@ Deno.serve(async (req) => {
       // NOTE: Do NOT include user_id field - omitting it allows the constraint to pass
       // The attribution check requires either user_id OR (source='*_import' with specific fields)
       const photoKey = (u: string) => u.replace(/^.*\/cdn-cgi\/image\/[^/]*\//, "").split("?")[0];
-      const { data: heldImgs } = await supabase.from("vehicle_images").select("image_url").eq("vehicle_id", vehicleId).eq("source", "external_import").or("is_superseded.is.null,is_superseded.eq.false").limit(1000);
-      const held = new Set((heldImgs ?? []).map((r: { image_url: string }) => photoKey(r.image_url)));
+      const { data: heldImgs } = await supabase.from("vehicle_images").select("id, image_url, exif_data").eq("vehicle_id", vehicleId).eq("source", "external_import").or("is_superseded.is.null,is_superseded.eq.false").limit(1000);
+      const fullRes = (u: string) => /width=2080[,/]/.test(u);
+      const current = new Set(extracted.images.map(photoKey));
+      const mine = (heldImgs ?? []).filter((r: { exif_data: any }) => r.exif_data?.imported_from === "cars_and_bids");
+      // Earlier runs stored every media URL on the page (similar-auction thumbnails, avatars) and gallery copies at 542 px.
+      // Supersede those (the original stays, flagged) when this page's gallery is known; keep a full-resolution copy of each.
+      const stale = mine.filter((r: { image_url: string }) => !current.has(photoKey(r.image_url)) || !fullRes(r.image_url)).map((r: { id: string }) => r.id);
+      if (stale.length) {
+        const { error: supErr } = await supabase.from("vehicle_images").update({ is_superseded: true, superseded_at: nowIso }).in("id", stale);
+        if (supErr) console.warn(`⚠️ C&B: supersede images failed: ${supErr.message}`);
+      }
+      const staleSet = new Set(stale);
+      const held = new Set((heldImgs ?? []).filter((r: { id: string }) => !staleSet.has(r.id)).map((r: { image_url: string }) => photoKey(r.image_url)));
       const imageRows = extracted.images.filter((u) => !held.has(photoKey(u))).slice(0, 200).map((url, idx) => ({
         vehicle_id: vehicleId,
         image_url: url,
@@ -960,9 +1030,11 @@ Deno.serve(async (req) => {
       console.log(`✅ C&B: Attempting to insert ${imageRows.length} images for vehicle ${vehicleId}`);
       console.log(`✅ C&B: First image row: ${JSON.stringify(imageRows[0])}`);
 
-      const { data: insertedImages, error: imgError } = imageRows.length
-        ? await supabase.from("vehicle_images").insert(imageRows).select("id")
+      // Exact-URL guard on top of the photo-key filter above: one row per URL per vehicle.
+      const { data: insertedImages, error: imgErrorRaw } = imageRows.length
+        ? await insertMissingVehicleImages(supabase, vehicleId, imageRows, { select: "id" })
         : { data: [] as { id: string }[], error: null };
+      const imgError = imgErrorRaw as any;
 
       if (imgError) {
         console.error(`⚠️ C&B: Image insert failed: ${imgError.message}`);
@@ -1005,7 +1077,8 @@ Deno.serve(async (req) => {
 
     // Upsert vehicle_event
     const vehicleEventData: Record<string, any> = {
-      source_platform: "carsandbids",
+      source_platform: "cars_and_bids", // the 18,7k events already held use this spelling
+      source_listing_id: extracted.lotNumber,
       event_type: "auction",
       source_url: listingUrlCanonical,
       vehicle_id: vehicleId,
@@ -1046,12 +1119,28 @@ Deno.serve(async (req) => {
       }
     });
 
-    const { error: listingError } = await supabase
-      .from("vehicle_events")
-      .upsert(vehicleEventData, { onConflict: "source_platform,source_url" });
+    // No unique index on (source_platform, source_url), so ON CONFLICT cannot be used (that upsert never wrote):
+    // find this vehicle's event, then update or insert.
+    const { data: heldEvent } = await supabase.from("vehicle_events").select("id").eq("vehicle_id", vehicleId)
+      .in("source_platform", ["cars_and_bids", "carsandbids"]).order("created_at", { ascending: true }).limit(1).maybeSingle();
+    const { error: listingError } = heldEvent?.id
+      ? await supabase.from("vehicle_events").update({ ...vehicleEventData, updated_at: new Date().toISOString() }).eq("id", heldEvent.id)
+      : await supabase.from("vehicle_events").insert(vehicleEventData);
 
     if (listingError) {
-      console.warn(`⚠️ C&B: Vehicle event upsert failed: ${listingError.message}`);
+      console.warn(`⚠️ C&B: Vehicle event write failed: ${listingError.message}`);
+    }
+
+    // Seller type of the lot (the source's own "Seller Type" label, declared 0.9; absent = unknown), through record_lot_quality_signals.
+    try {
+      const evId = heldEvent?.id ?? (await supabase.from("vehicle_events").select("id").eq("vehicle_id", vehicleId)
+        .in("source_platform", ["cars_and_bids", "carsandbids"]).order("created_at", { ascending: true }).limit(1).maybeSingle()).data?.id;
+      if (evId) {
+        const value = extracted.sellerId === "dealer" || extracted.sellerId === "private" ? extracted.sellerId : "unknown";
+        await recordSellerTypes(supabase, [sellerTypeRow({ eventId: evId, value, basis: "declared", field: "Seller Type", text: value === "unknown" ? null : `Seller Type: ${value}`, method: "cab_seller_type_label" })], "extract-cars-and-bids-core");
+      }
+    } catch (e) {
+      console.warn(`⚠️ C&B: seller type not written: ${e instanceof Error ? e.message : String(e)}`);
     }
 
     // Link to Cars & Bids organization
@@ -1187,6 +1276,8 @@ Deno.serve(async (req) => {
       },
       images_inserted: imagesInserted,
       image_insert_error: imageInsertError,
+      snapshot_id: newSnapshotId,
+      result: { outcome: depth.outcome, amount: depth.amount, ended_at: depth.endedAt, buyer: depth.buyer?.name ?? null },
       completeness: {
         comments_landed: depth.comments.filter((c) => !c.bidAmount).length, comments_claimed: depth.commentCount,
         bids_landed: depth.comments.filter((c) => c.bidAmount).length, bids_claimed: depth.bidCount,

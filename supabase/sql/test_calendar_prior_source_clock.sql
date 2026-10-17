@@ -182,3 +182,160 @@ BEGIN
   END IF;
   RAISE NOTICE 'PASS: unknown/known clocks, prior retention/order, future/privacy exclusions, exact output boundary and permissions';
 END $$;
+
+-- 20261016160000: the reader takes its lots from a read model (mv_auction_calendar_lots). For anon, every call's output
+-- is unchanged (sales, population, unplaced, roster rows with their live prior records, paging) except the added
+-- population.lots_built_at; the reader keeps its owner, grants and execution properties; the read model holds public
+-- vehicle lots only and anon may read but not write it; its refresh job is scheduled once.
+CREATE SCHEMA IF NOT EXISTS cron;
+CREATE TABLE cron.job (jobid bigserial PRIMARY KEY, jobname text UNIQUE, schedule text, command text);
+CREATE FUNCTION cron.schedule(name text, schedule text, command text) RETURNS bigint LANGUAGE sql AS
+  $$ INSERT INTO cron.job (jobname, schedule, command) VALUES ($1, $2, $3) RETURNING jobid $$;
+SET ROLE anon;
+CREATE TEMP TABLE model_before AS
+  SELECT public.auction_calendar_read(200) AS base, public.auction_calendar_read(200, 'gooding', 'synthetic-sale') AS roster,
+         public.auction_calendar_read(400, 'gooding', 'synthetic-sale', 1, 1) AS page2;
+RESET ROLE;
+\ir ../migrations/20261016160000_auction_calendar_lots_read_model.sql
+\ir ../migrations/20261016160000_auction_calendar_lots_read_model.sql
+SET ROLE anon;
+CREATE TEMP TABLE model_after AS
+  SELECT public.auction_calendar_read(200) AS base, public.auction_calendar_read(200, 'gooding', 'synthetic-sale') AS roster,
+         public.auction_calendar_read(400, 'gooding', 'synthetic-sale', 1, 1) AS page2;
+RESET ROLE;
+DO $$
+DECLARE vb record; va record;
+  strip CONSTANT text := 'lots_built_at';
+BEGIN
+  SELECT * INTO vb FROM model_before; SELECT * INTO va FROM model_after;
+  IF (vb.base - 'as_of') IS DISTINCT FROM jsonb_set(va.base - 'as_of', '{population}', (va.base->'population') - strip)
+     OR (vb.roster - 'as_of') IS DISTINCT FROM jsonb_set(va.roster - 'as_of', '{population}', (va.roster->'population') - strip)
+     OR (vb.page2 - 'as_of') IS DISTINCT FROM jsonb_set(va.page2 - 'as_of', '{population}', (va.page2->'population') - strip) THEN
+    RAISE EXCEPTION 'Read model changed the reader''s output: before % after %', vb.roster, va.roster;
+  END IF;
+  IF jsonb_array_length(va.roster#>'{roster,rows}') <> 2 OR jsonb_array_length(va.roster#>'{roster,rows,0,prior}') = 0
+     OR va.base#>>'{population,lots_built_at}' IS NULL THEN
+    RAISE EXCEPTION 'Roster rows, their prior records and the build time must be present: %', va.roster;
+  END IF;
+  IF EXISTS (SELECT 1 FROM reader_permissions b CROSS JOIN pg_proc a
+    WHERE a.oid = b.oid
+      AND (a.proowner, a.proacl, a.prosecdef, a.proconfig, a.provolatile)
+          IS DISTINCT FROM (b.proowner, b.proacl, b.prosecdef, b.proconfig, b.provolatile)) THEN
+    RAISE EXCEPTION 'Reader permissions, owner or execution properties changed';
+  END IF;
+  IF (SELECT count(*) FROM public.mv_auction_calendar_lots) <> 2
+     OR EXISTS (SELECT 1 FROM public.mv_auction_calendar_lots
+                WHERE vehicle_id IN (md5('private')::uuid, md5('deleted')::uuid, md5('road-art')::uuid)) THEN
+    RAISE EXCEPTION 'The read model must hold public vehicle lots only';
+  END IF;
+  IF NOT has_table_privilege('anon', 'public.mv_auction_calendar_lots', 'SELECT')
+     OR has_table_privilege('anon', 'public.mv_auction_calendar_lots', 'INSERT') THEN
+    RAISE EXCEPTION 'anon reads the read model and cannot write it';
+  END IF;
+  IF (SELECT count(*) FROM cron.job WHERE jobname = 'refresh-auction-calendar' AND schedule = '7,37 * * * *'
+        AND command LIKE '%statement_timeout = ''5min''%' AND command LIKE '%REFRESH MATERIALIZED VIEW CONCURRENTLY public.mv_auction_calendar_lots') <> 1 THEN
+    RAISE EXCEPTION 'The read model''s refresh job must be scheduled once';
+  END IF;
+  RAISE NOTICE 'PASS: read model keeps anon output (base, roster, paging), live priors, permissions, public-only lots, one refresh job';
+END $$;
+REFRESH MATERIALIZED VIEW CONCURRENTLY public.mv_auction_calendar_lots;
+
+-- 20261016170000: each sale carries the census meta's prior_sale (the series' previous sale, from the house's index), or
+-- null; nothing else in the output changes.
+UPDATE public.source_census SET raw_response = jsonb_set(jsonb_set(raw_response, '{sales,synthetic-sale}',
+  '{"prior_sale": {"sale_key": "synthetic-2025", "lots": 12, "vehicle_lots": 10, "sold": 7, "median_price": 30000}}'::jsonb),
+  '{sales,unlanded-sale,prior_sale}', '{"sale_key": "unlanded-2025", "lots": 25, "vehicle_lots": 20, "sold": 15}'::jsonb);
+SET ROLE anon;
+CREATE TEMP TABLE prior_sale_before AS
+  SELECT public.auction_calendar_read(200) AS base, public.auction_calendar_read(200, 'gooding', 'synthetic-sale') AS roster;
+RESET ROLE;
+\ir ../migrations/20261016170000_auction_calendar_prior_sale.sql
+\ir ../migrations/20261016170000_auction_calendar_prior_sale.sql
+SET ROLE anon;
+CREATE TEMP TABLE prior_sale_after AS
+  SELECT public.auction_calendar_read(200) AS base, public.auction_calendar_read(200, 'gooding', 'synthetic-sale') AS roster;
+RESET ROLE;
+DO $$
+DECLARE vb record; va record;
+BEGIN
+  SELECT * INTO vb FROM prior_sale_before; SELECT * INTO va FROM prior_sale_after;
+  IF (SELECT s->'prior_sale' FROM jsonb_array_elements(va.base->'sales') s WHERE s->>'sale_key' = 'synthetic-sale')
+       IS DISTINCT FROM '{"sale_key": "synthetic-2025", "lots": 12, "vehicle_lots": 10, "sold": 7, "median_price": 30000}'::jsonb
+     OR (SELECT s#>>'{prior_sale,sale_key}' FROM jsonb_array_elements(va.base->'sales') s WHERE s->>'sale_key' = 'unlanded-sale')
+       IS DISTINCT FROM 'unlanded-2025' THEN
+    RAISE EXCEPTION 'Each sale must carry its census prior_sale: %', va.base->'sales';
+  END IF;
+  IF (vb.base - 'as_of' - 'sales') IS DISTINCT FROM (va.base - 'as_of' - 'sales')
+     OR (vb.roster - 'as_of' - 'sales') IS DISTINCT FROM (va.roster - 'as_of' - 'sales')
+     OR (SELECT jsonb_agg(s ORDER BY s->>'sale_key') FROM jsonb_array_elements(vb.base->'sales') s)
+        IS DISTINCT FROM (SELECT jsonb_agg(s - 'prior_sale' ORDER BY s->>'sale_key') FROM jsonb_array_elements(va.base->'sales') s) THEN
+    RAISE EXCEPTION 'prior_sale must be the only change';
+  END IF;
+  IF EXISTS (SELECT 1 FROM reader_permissions b CROSS JOIN pg_proc a
+    WHERE a.oid = b.oid
+      AND (a.proowner, a.proacl, a.prosecdef, a.proconfig, a.provolatile)
+          IS DISTINCT FROM (b.proowner, b.proacl, b.prosecdef, b.proconfig, b.provolatile)) THEN
+    RAISE EXCEPTION 'Reader permissions, owner or execution properties changed';
+  END IF;
+  RAISE NOTICE 'PASS: each sale carries its census prior_sale; nothing else changed; permissions kept';
+END $$;
+
+-- 20261016275000: a house's lots and its listed count join on one key whatever the writer's spelling. Broad Arrow's
+-- events carry broad_arrow and its census the slug broad-arrow (production, 2026-10-15 18:37Z): one sale, with its lots
+-- and its listed count, and its roster opens under either spelling. Other sales are unchanged.
+-- ALLOW_RAW_TESTIMONY_WRITE: synthetic fixture rows in this disposable dm_refinement_* PG17 database, never production.
+\ir ../migrations/20261016150000_market_venue_label.sql
+INSERT INTO public.observation_sources VALUES (md5('ba-source')::uuid, 'broad-arrow');
+INSERT INTO public.source_census VALUES
+  (md5('ba-source')::uuid, now() - interval '1 hour', 'house_roster_facet', '{"ba-sale": 3}'::jsonb,
+   jsonb_build_object('sales', jsonb_build_object('ba-sale', jsonb_build_object(
+     'name', 'Arrow sale', 'starts_on', (current_date + 15)::text, 'ends_on', (current_date + 15)::text))));
+INSERT INTO public.vehicles(id, is_public, deleted_at, year, make, model)
+SELECT md5('ba-' || n)::uuid, true, NULL, 1990 + n, 'Synthetic', 'Arrow ' || n FROM generate_series(1, 3) n;
+INSERT INTO public.vehicle_events(id, vehicle_id, source_platform, source_url, event_status, ended_at, created_at, updated_at, metadata)
+SELECT md5('ba-event-' || n)::uuid, md5('ba-' || n)::uuid, 'broad_arrow', 'https://example.test/ba-' || n, 'upcoming',
+       date_trunc('day', now()) + interval '15 days', now() - interval '1 day', now() - interval '1 hour',
+       jsonb_build_object('sale_key', 'ba-sale', 'auction_name', 'Arrow sale', 'lot_number', n::text)
+FROM generate_series(1, 3) n;
+REFRESH MATERIALIZED VIEW public.mv_auction_calendar_lots;
+SET ROLE anon;
+CREATE TEMP TABLE house_key_before AS SELECT public.auction_calendar_read(200) AS base;
+RESET ROLE;
+\ir ../migrations/20261016275000_auction_calendar_house_key.sql
+\ir ../migrations/20261016275000_auction_calendar_house_key.sql
+SET ROLE anon;
+CREATE TEMP TABLE house_key_after AS
+  SELECT public.auction_calendar_read(200) AS base,
+         public.auction_calendar_read(200, 'broad-arrow', 'ba-sale') AS by_slug,
+         public.auction_calendar_read(200, 'broad_arrow', 'ba-sale') AS by_platform;
+RESET ROLE;
+DO $$
+DECLARE vb jsonb; va record;
+BEGIN
+  SELECT base INTO vb FROM house_key_before; SELECT * INTO va FROM house_key_after;
+  IF (SELECT count(*) FROM jsonb_array_elements(vb->'sales') s WHERE s->>'sale_key' = 'ba-sale') <> 2 THEN
+    RAISE EXCEPTION 'Baseline must reproduce the split sale: %', vb->'sales';
+  END IF;
+  IF (SELECT count(*) FROM jsonb_array_elements(va.base->'sales') s WHERE s->>'sale_key' = 'ba-sale') <> 1
+     OR (SELECT s->>'lots' FROM jsonb_array_elements(va.base->'sales') s WHERE s->>'sale_key' = 'ba-sale') <> '3'
+     OR (SELECT s->>'lots_listed' FROM jsonb_array_elements(va.base->'sales') s WHERE s->>'sale_key' = 'ba-sale') <> '3'
+     OR (SELECT jsonb_array_length(s->'run_days') FROM jsonb_array_elements(va.base->'sales') s WHERE s->>'sale_key' = 'ba-sale') <> 1 THEN
+    RAISE EXCEPTION 'One Broad Arrow sale with its lots, listed count and run day: %', va.base->'sales';
+  END IF;
+  IF va.by_slug#>>'{roster,lots}' <> '3' OR jsonb_array_length(va.by_slug#>'{roster,rows}') <> 3
+     OR va.by_platform#>>'{roster,lots}' <> '3' OR jsonb_array_length(va.by_platform#>'{roster,rows}') <> 3 THEN
+    RAISE EXCEPTION 'The roster opens under either spelling: % %', va.by_slug->'roster', va.by_platform->'roster';
+  END IF;
+  IF (SELECT jsonb_agg(s ORDER BY s->>'sale_key') FROM jsonb_array_elements(vb->'sales') s WHERE s->>'sale_key' <> 'ba-sale')
+     IS DISTINCT FROM (SELECT jsonb_agg(s ORDER BY s->>'sale_key') FROM jsonb_array_elements(va.base->'sales') s WHERE s->>'sale_key' <> 'ba-sale')
+     OR va.base#>>'{population,houses}' <> '2' THEN
+    RAISE EXCEPTION 'Other sales unchanged and Broad Arrow counted as one house: %', va.base->'population';
+  END IF;
+  IF EXISTS (SELECT 1 FROM reader_permissions b CROSS JOIN pg_proc a
+    WHERE a.oid = b.oid
+      AND (a.proowner, a.proacl, a.prosecdef, a.proconfig, a.provolatile)
+          IS DISTINCT FROM (b.proowner, b.proacl, b.prosecdef, b.proconfig, b.provolatile)) THEN
+    RAISE EXCEPTION 'Reader permissions, owner or execution properties changed';
+  END IF;
+  RAISE NOTICE 'PASS: one house key joins lots and listed counts across spellings; roster opens under either; others unchanged';
+END $$;

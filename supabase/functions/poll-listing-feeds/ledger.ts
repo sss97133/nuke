@@ -162,6 +162,8 @@ function statusCodes(message: string): number[] {
  */
 export function failureCategoryFor(message: string): string {
   const m = message.toLowerCase();
+  // A paid fetch the source's Firecrawl allowance does not cover today (_shared/firecrawlGate.ts) is a deferral, not a failure.
+  if (/allowance[_ ]deferred/.test(m)) return "deferred";
   const codes = statusCodes(message);
   if (
     /no credits remaining|insufficient[_ ]credits?|insufficient[_ ]quota|exceeded your current quota|payment required/.test(m) ||
@@ -398,6 +400,8 @@ export function ledgerWriteFor(input: {
 }): LedgerWrite | null {
   const { url, feedId, ingest, batch, prev, now } = input;
   if (!shouldLedger(ingest)) return null;
+  // Deferred by the Firecrawl allowance: no ledger row and no attempt, so the URL is read again in the next window.
+  if (failureCategoryFor([ingest.error, ingest.reason, ingest.enrichment_error].filter(Boolean).join(" ")) === "deferred") return null;
 
   // A rejected/failed request need not return a vehicle. Its landing remains unknown even if an earlier row exists.
   let outcome: LedgerOutcome | null;
@@ -482,7 +486,7 @@ export function intakeThrottle(raw: unknown = {}): IntakeThrottle {
     max_ingests: limit(value.max_ingests, 20, 100), sources: normalized };
 }
 
-export function selectIntakeFeeds<T extends { source_slug: string; last_polled_at?: string | null; poll_interval_minutes?: number | null; last_error?: string | null; error_count?: number | null }>(
+export function selectIntakeFeeds<T extends { source_slug: string; last_polled_at?: string | null; poll_interval_minutes?: number | null; last_error?: string | null; error_count?: number | null; search_criteria?: { tier?: unknown } | null }>(
   feeds: T[], limit: number, throttle: IntakeThrottle, now: number, force = false,
 ): T[] {
   const groups = new Map<string, T[]>();
@@ -501,6 +505,9 @@ export function selectIntakeFeeds<T extends { source_slug: string; last_polled_a
     const group = groups.get(feed.source_slug) ?? [];
     group.push(feed); groups.set(feed.source_slug, group);
   }
+  // Within a source, a lower tier (search_criteria.tier) is selected first; the order inside a tier stays oldest-poll-first.
+  const tierRank = (f: T) => { const t = Number(f.search_criteria?.tier); return Number.isInteger(t) && t >= 1 && t <= 9 ? t : 9; };
+  for (const group of groups.values()) group.sort((a, b) => tierRank(a) - tierRank(b));
   // Oldest due source first, then round-robin. Hundreds of metro feeds must
   // not take every slot ahead of a single auction-house feed.
   const selected: T[] = [];
@@ -518,9 +525,12 @@ export function selectIntakeFeeds<T extends { source_slug: string; last_polled_a
 export function createIntakeBudget(throttle: IntakeThrottle, startedAt: number, clock = Date.now) {
   let attempted = 0;
   let sourceShare = 20;
+  // Revisits (a landed post asked again) may take at most a quarter of an invocation's ingests: new posts come first.
+  let revisitsLeft = Math.floor(throttle.max_ingests / 4);
   const sources = new Map<string, { attempted: number; estimate_ms: number; hold: string | null }>();
   const state = (source: string) => {
-    if (!sources.has(source)) sources.set(source, { attempted: 0, estimate_ms: 15_000, hold: null });
+    // Craigslist ingests and search pages are short (1-3 s): a 15 s starting estimate reserved 32 s of every run for nothing.
+    if (!sources.has(source)) sources.set(source, { attempted: 0, estimate_ms: source === "craigslist" ? 5_000 : 15_000, hold: null });
     return sources.get(source)!;
   };
   const remainingMs = () => Math.max(0, startedAt + 110_000 - clock());
@@ -534,6 +544,9 @@ export function createIntakeBudget(throttle: IntakeThrottle, startedAt: number, 
     return null;
   };
   return {
+    /** How many revisits this feed page may still plan; spendRevisits() takes them off after planning. */
+    revisitAllowance() { return revisitsLeft; },
+    spendRevisits(n: number) { revisitsLeft = Math.max(0, revisitsLeft - n); },
     shareAcrossSources(count: number) { sourceShare = Math.max(1, Math.ceil(throttle.max_ingests / Math.max(1, count))); },
     // A source's fair share is still too large for one busy target to spend
     // before the other selected feeds get a turn. Recompute from unspent
@@ -553,7 +566,7 @@ export function createIntakeBudget(throttle: IntakeThrottle, startedAt: number, 
       s.estimate_ms = Math.max(1_000, elapsedMs);
       const error = [outcome.error, outcome.reason, outcome.enrichment_error].filter(Boolean).join(" ");
       const category = failureCategoryFor(error);
-      if (error && ["billing", "rate_limited", "blocked", "timeout"].includes(category)) s.hold = category;
+      if (error && ["billing", "rate_limited", "blocked", "timeout", "deferred"].includes(category)) s.hold = category;
     },
     refusal,
     remainingMs,

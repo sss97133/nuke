@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 const rpc = vi.hoisted(() => vi.fn());
 vi.mock('../lib/supabase', () => ({ supabase: { rpc } }));
-import { brandDollarMomentum, brandLines, brandMomentum } from './HomePage';
+import { applyDrillStackToSearchParams, brandDollarMomentum, brandLines, brandMomentum, drillStackFromSearchParams, lineChars } from './HomePage';
 
 // Porsche's row in mv_brand_market as measured 2026-10-15 (sold, dollars, band, sell-through, year), with 12-month counts.
 const porsche = {
@@ -12,7 +12,7 @@ const porsche = {
 
 describe('a brand tile', () => {
   it('says the market, how often what is offered sells, and the last 12 months against the 12 before', () => {
-    expect(brandLines(porsche)).toEqual(['$2.6B · 27,510 sold', '82% of offered sold', 'BaT 12 mo: sales ▲20%, $ ▲25%']);
+    expect(brandLines(porsche)).toEqual(['$2.6B · 27,510 sold', '82% of offered sold', '12 mo: sales ▲20%, $ ▲25%']);
   });
   it('shows no median, no price band and no model year', () => {
     const said = brandLines(porsche).join(' ');
@@ -21,7 +21,24 @@ describe('a brand tile', () => {
   it('leaves out a line the data cannot support instead of guessing', () => {
     const thin = { ...porsche, offered: 12, sold_prior_12m: 4 };
     expect(brandLines(thin)).toEqual(['$2.6B · 27,510 sold']);
-    expect(brandLines({ ...porsche, usd_prior_12m: null })).toEqual(['$2.6B · 27,510 sold', '82% of offered sold', 'BaT 12 mo: sales ▲20%']);
+    expect(brandLines({ ...porsche, usd_prior_12m: null })).toEqual(['$2.6B · 27,510 sold', '82% of offered sold', '12 mo: sales ▲20%']);
+  });
+});
+
+describe('a narrow brand tile', () => {
+  // Maserati's size of market (2026-10-15 live: $156.3M, 1,1xx sold) on Porsche's 12-month counts.
+  const maserati = { ...porsche, name: 'Maserati', count: 1108, value: 156_300_000, usd: 156_300_000, sold_any: 1108, offered: 1368 };
+  it('shows the longest form of each line that fits its width', () => {
+    expect(brandLines(maserati, 17)).toEqual(['$156M · 1.1K sold', '81% sold', '12 mo ▲20%']);
+    expect(brandLines(maserati, 10)).toEqual(['$156M', '81% sold']);
+    expect(brandLines(maserati, 4)).toEqual([]);
+  });
+  it('never returns a line wider than the tile, at any width', () => {
+    for (const node of [porsche, maserati, { ...maserati, usd: 40_400, count: 3, offered: 25, sold_any: 3 }]) {
+      for (let width = 0; width <= 40; width++) {
+        for (const line of brandLines(node, width)) expect(lineChars(line)).toBeLessThanOrEqual(width);
+      }
+    }
   });
 });
 
@@ -53,7 +70,7 @@ describe('a partially unavailable brand market', () => {
     const rows = await readTreemapBrands();
     expect(rows).toEqual(base);
     const legend = mapLegend('brands', !!rows?.length && rows.every(n => n.usd != null && n.usd > 0));
-    expect(legend).toContain('area = vehicles with a confirmed sale');
+    expect(legend).toContain('box size = vehicles with a confirmed sale');
     expect(legend).toContain('color = their median sale price');
     expect(legend).not.toContain('last 12 months');
   });
@@ -64,6 +81,45 @@ describe('a partially unavailable brand market', () => {
     const { readTreemapBrands, mapLegend } = await import('./HomePage');
     const rows = await readTreemapBrands();
     expect(rows?.[0].usd).toBe(200_000);
-    expect(mapLegend('brands', true)).toContain('area = dollars from confirmed sales');
+    expect(mapLegend('brands', true)).toContain('box size = dollars from confirmed sales');
+  });
+});
+
+describe('URL scope contract for the market treemap', () => {
+  it('round-trips make -> family -> model -> year in URL search params and restores canonical names', () => {
+    const stack = [
+      { label: 'ALL MAKES' },
+      { label: 'Ford', make: 'Ford' },
+      { label: 'Mustang', make: 'Ford', family: '8a8271f8-d299-4b55-837a-35ca919f8937', names: 1243 },
+      { label: 'Mustang GT', make: 'Ford', family: '8a8271f8-d299-4b55-837a-35ca919f8937', model: 'Mustang GT' },
+      { label: '1967', make: 'Ford', family: '8a8271f8-d299-4b55-837a-35ca919f8937', model: 'Mustang GT', year: 1967 },
+    ];
+    const params = applyDrillStackToSearchParams(new URLSearchParams('tab=market'), stack);
+    expect(params.get('make')).toBe('Ford');
+    expect(params.get('family')).toBe('8a8271f8-d299-4b55-837a-35ca919f8937');
+    expect(params.get('family_name')).toBe('Mustang');
+    expect(params.get('model')).toBe('Mustang GT');
+    expect(params.get('year')).toBe('1967');
+
+    // Deep-linked with uppercase make from MarketPulse resolves back to canonical brand and family names
+    const fromDeepLink = drillStackFromSearchParams(
+      new URLSearchParams('make=FORD&family=8a8271f8-d299-4b55-837a-35ca919f8937'),
+      [{ name: 'Ford', count: 29489, value: 1479400000 }],
+      [{ name: 'Mustang', count: 11050, value: 595300000, familyKey: '8a8271f8-d299-4b55-837a-35ca919f8937', models: 1243 }],
+    );
+    expect(fromDeepLink).toEqual([
+      { label: 'ALL MAKES' },
+      { label: 'Ford', make: 'Ford' },
+      { label: 'Mustang', make: 'Ford', family: '8a8271f8-d299-4b55-837a-35ca919f8937', names: 1243 },
+    ]);
+
+    // Going back to ALL MAKES clears scope params while keeping tab
+    const cleared = applyDrillStackToSearchParams(params, [{ label: 'ALL MAKES' }]);
+    expect(cleared.get('tab')).toBe('market');
+    expect(cleared.get('make')).toBeNull();
+    expect(cleared.get('family')).toBeNull();
+    expect(cleared.get('family_name')).toBeNull();
+    expect(cleared.get('model')).toBeNull();
+    expect(cleared.get('year')).toBeNull();
   });
 });
