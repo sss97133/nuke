@@ -145,7 +145,6 @@ export const OrgLogo: React.FC<OrgLogoProps> = ({
               maxHeight: '88px',
               objectFit: 'contain',
               padding: '8px 12px',
-              borderRadius: '6px',
               background: 'rgba(255, 255, 255, 0.94)',
               border: '1px solid rgba(0, 0, 0, 0.08)',
             }}
