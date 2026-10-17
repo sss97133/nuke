@@ -9,6 +9,18 @@
 // database did not hand it for this viewer.
 
 import SwiftUI
+import Supabase
+
+/// Additive lot & broadcast provenance enriched from `auction_events` / `vehicle_events` (`ProfileHeader.tsx` #1823).
+struct LotProvenance: Equatable {
+    var sourceUrl: String?
+    var lotNumber: String?
+    var auctionName: String?
+    var observedAt: String?
+    var videoUrl: String?
+    var startSeconds: Int?
+    var endSeconds: Int?
+}
 
 /// A tapped claim awaiting its source sheet.
 struct ClaimDrill: Identifiable {
@@ -29,6 +41,7 @@ struct ProfileHeaderBlock: View {
 
     @State private var drill: ClaimDrill?
     @State private var descriptionExpanded = false
+    @State private var lotProvenance: LotProvenance?
 
     /// The strip's dimensions map onto record fields the spec table also knows; the
     /// table drops those rows when the strip owns them (state each datum once).
@@ -56,7 +69,7 @@ struct ProfileHeaderBlock: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             if let m = read.masthead, let price = m.price, !priceOwnedByLiveStack {
-                priceRow(price, label: m.priceLabel ?? "Recorded price")
+                priceRow(enrichedPriceClaim(price, masthead: m), label: m.priceLabel ?? "Recorded price")
             }
             if let strip = read.strip, !strip.facets.isEmpty || strip.odometer != nil {
                 stripCard(strip)
@@ -65,8 +78,113 @@ struct ProfileHeaderBlock: View {
                 descriptionCard(desc)
             }
         }
+        .task(id: vehicleId) { await loadLotProvenance() }
         // The sheet rides this subview, not the page: the page already hosts provenance + comments.
         .sheet(item: $drill) { d in ClaimSourceSheet(vehicleId: vehicleId, drill: d) }
+    }
+
+    private func enrichedPriceClaim(_ base: Claim, masthead: ProfileSection.Masthead) -> Claim {
+        guard let lp = lotProvenance else { return base }
+        var c = base
+        if c.observed_at == nil || c.observed_at?.isEmpty == true {
+            c.observed_at = lp.observedAt
+        }
+        if c.source.url == nil || c.source.url?.isEmpty == true {
+            c.source.url = lp.sourceUrl
+        }
+        if c.source.lotNumber == nil || c.source.lotNumber?.isEmpty == true {
+            c.source.lotNumber = lp.lotNumber
+        }
+        if c.source.auctionName == nil || c.source.auctionName?.isEmpty == true {
+            c.source.auctionName = lp.auctionName
+        }
+        if c.source.video == nil {
+            let vTitle = [
+                masthead.year.map { String($0) },
+                masthead.make,
+                masthead.model
+            ].compactMap { $0 }.filter { !$0.isEmpty }.joined(separator: " ")
+            let sourceLabel = c.source.label ?? "Auction"
+            let lotNum = c.source.effectiveLotNumber
+            let aucName = c.source.effectiveAuctionName
+            let sq = [
+                sourceLabel,
+                aucName,
+                lotNum.map { "Lot \($0)" },
+                vTitle.isEmpty ? nil : vTitle
+            ].compactMap { $0 }.filter { !$0.isEmpty }.joined(separator: " ")
+            c.source.video = SaleVideoMoment(
+                url: lp.videoUrl,
+                startSeconds: lp.startSeconds,
+                endSeconds: lp.endSeconds,
+                lotNumber: lotNum,
+                auctionName: aucName,
+                searchQuery: sq,
+                lotUrl: c.source.url,
+                title: vTitle.isEmpty ? nil : vTitle,
+                priceText: Self.money(c)
+            )
+        }
+        return c
+    }
+
+    private struct AuctionLotRow: Decodable {
+        let lot_number: String?
+        let source_url: String?
+        let auction_end_date: String?
+        let auction_start_date: String?
+        let broadcast_video_url: String?
+        let broadcast_video_id: String?
+        let broadcast_timestamp_start: Int?
+        let broadcast_timestamp_end: Int?
+    }
+
+    private struct VehicleEventLotRow: Decodable {
+        struct Meta: Decodable {
+            let lot_number: String?
+            let auction_name: String?
+            let event_name: String?
+            let video_url: String?
+        }
+        let source_url: String?
+        let sold_at: String?
+        let ended_at: String?
+        let extracted_at: String?
+        let metadata: Meta?
+    }
+
+    /// Additive provenance enrichment from `auction_events` and `vehicle_events` (`ProfileHeader.tsx` #1823).
+    private func loadLotProvenance() async {
+        async let auctionTask: [AuctionLotRow]? = try? SupabaseService.client
+            .from("auction_events")
+            .select("lot_number, source_url, auction_end_date, auction_start_date, broadcast_video_url, broadcast_video_id, broadcast_timestamp_start, broadcast_timestamp_end")
+            .eq("vehicle_id", value: vehicleId)
+            .order("auction_end_date", ascending: false, nullsFirst: false)
+            .limit(1)
+            .execute()
+            .value
+        async let eventTask: [VehicleEventLotRow]? = try? SupabaseService.client
+            .from("vehicle_events")
+            .select("source_url, sold_at, ended_at, extracted_at, metadata")
+            .eq("vehicle_id", value: vehicleId)
+            .order("extracted_at", ascending: false, nullsFirst: false)
+            .limit(1)
+            .execute()
+            .value
+        let (auctionRows, eventRows) = await (auctionTask, eventTask)
+        let a = auctionRows?.first
+        let e = eventRows?.first
+        let m = e?.metadata
+        if a == nil && e == nil { return }
+        lotProvenance = LotProvenance(
+            sourceUrl: a?.source_url ?? e?.source_url,
+            lotNumber: a?.lot_number ?? m?.lot_number,
+            auctionName: m?.auction_name ?? m?.event_name,
+            observedAt: a?.auction_end_date ?? a?.auction_start_date ?? e?.sold_at ?? e?.ended_at ?? e?.extracted_at,
+            videoUrl: a?.broadcast_video_url ?? a?.broadcast_video_id ?? m?.video_url,
+            startSeconds: a?.broadcast_timestamp_start,
+            endSeconds: a?.broadcast_timestamp_end
+        )
     }
 
     @ViewBuilder private func descriptionCard(_ desc: ProfileDescription) -> some View {
@@ -269,6 +387,13 @@ struct ClaimSourceSheet: View {
                             .font(.system(.footnote, design: .monospaced))
                             .multilineTextAlignment(.trailing)
                     }
+                    if let lotLine = drill.claim.source.lotLine {
+                        LabeledContent("Lot") {
+                            Text(lotLine)
+                                .font(.system(.footnote, design: .monospaced))
+                                .multilineTextAlignment(.trailing)
+                        }
+                    }
                     LabeledContent("Trust") {
                         Text("\(drill.claim.trustPercent)%")
                             .font(.system(.footnote, design: .monospaced))
@@ -278,10 +403,22 @@ struct ClaimSourceSheet: View {
                          ? "A legacy value comes from the vehicle record itself, with no observation beneath it."
                          : "Trust is the reader's calibration for this evidence class, or the row's own confidence when it carries one.")
                 }
-                if let url = drill.claim.source.openableURL {
+                if drill.claim.source.openableURL != nil || drill.claim.isAuctionSaleClaim {
                     Section {
-                        Link(destination: url) {
-                            Label("Open source", systemImage: "arrow.up.right")
+                        if let videoUrl = drill.claim.source.video?.watchableURL {
+                            Link(destination: videoUrl) {
+                                let ts = drill.claim.source.video?.startLabel.map { " (@ \($0))" } ?? ""
+                                Label("Watch sale moment\(ts)", systemImage: "play.rectangle.fill")
+                            }
+                        } else if drill.claim.isAuctionSaleClaim, let ytUrl = drill.claim.youtubeSearchURL() {
+                            Link(destination: ytUrl) {
+                                Label("Find sale moment on YouTube", systemImage: "play.tv")
+                            }
+                        }
+                        if let url = drill.claim.source.openableURL {
+                            Link(destination: url) {
+                                Label("Open source", systemImage: "arrow.up.right")
+                            }
                         }
                     }
                 }

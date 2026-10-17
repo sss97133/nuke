@@ -168,7 +168,39 @@ enum AskSort: String, CaseIterable, Identifiable {
 }
 
 struct AskPosition: Decodable, Equatable {
+    struct Miles: Decodable, Equatable {
+        let n: Int
+        let p50: Double?
+        let at_or_below: Int?
+    }
+    struct Venue: Decodable, Equatable {
+        let n: Int
+        let p50: Double?
+    }
+    struct PopulationSlice: Decodable, Equatable {
+        let n: Int
+        let year_from: Int?
+        let year_to: Int?
+        let thin: Bool?
+        let p25: Double?
+        let p50: Double?
+        let p75: Double?
+        let at_or_below: Int?
+        let by_source: [String: Int]?
+        let miles: Miles?
+        let venues: [String: Venue]?
+        let offered: Int?
+        let conflicts: Int?
+
+        var yearSpan: String? {
+            guard let yf = year_from, let yt = year_to else { return nil }
+            if yf == yt { return String(yf) }
+            return "\(yf)–\(String(yt).suffix(2))"
+        }
+    }
+
     let family: String
+    var family_id: String? = nil
     let cohort: String
     let match: String // "year" | "decade"
     let sales: Int
@@ -180,6 +212,111 @@ struct AskPosition: Decodable, Equatable {
     let median_miles: Double?
     let share_36m: Double?
     let houses: [String: Int]?
+    var share: Double? = nil
+    var basis: String? = nil
+    var sold: PopulationSlice? = nil
+    var asked: PopulationSlice? = nil
+
+    private enum CodingKeys: String, CodingKey {
+        case family, family_id, cohort, match, sales, p25, p50, p75, ratio, rank, median_miles, share_36m, houses
+        case share, basis, sold, asked
+    }
+
+    init(
+        family: String,
+        family_id: String? = nil,
+        cohort: String,
+        match: String,
+        sales: Int,
+        p25: Double,
+        p50: Double,
+        p75: Double,
+        ratio: Double?,
+        rank: String,
+        median_miles: Double?,
+        share_36m: Double?,
+        houses: [String: Int]?,
+        share: Double? = nil,
+        basis: String? = nil,
+        sold: PopulationSlice? = nil,
+        asked: PopulationSlice? = nil
+    ) {
+        self.family = family
+        self.family_id = family_id
+        self.cohort = cohort
+        self.match = match
+        self.sales = sales
+        self.p25 = p25
+        self.p50 = p50
+        self.p75 = p75
+        self.ratio = ratio
+        self.rank = rank
+        self.median_miles = median_miles
+        self.share_36m = share_36m
+        self.houses = houses
+        self.share = share
+        self.basis = basis
+        self.sold = sold
+        self.asked = asked
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        let familyVal = (try? c.decode(String.self, forKey: .family)) ?? ""
+        let familyIdVal = try? c.decodeIfPresent(String.self, forKey: .family_id)
+        let shareVal = try? c.decodeIfPresent(Double.self, forKey: .share)
+        let basisVal = try? c.decodeIfPresent(String.self, forKey: .basis)
+        let soldVal = try? c.decodeIfPresent(PopulationSlice.self, forKey: .sold)
+        let askedVal = try? c.decodeIfPresent(PopulationSlice.self, forKey: .asked)
+
+        // Choose active population slice when decoding live RPC (`sold` / `asked` nested structure)
+        let primarySlice: PopulationSlice? = {
+            if basisVal == "sold", let s = soldVal, s.thin != true, s.p25 != nil, s.p50 != nil, s.p75 != nil { return s }
+            if basisVal == "asked", let a = askedVal, a.thin != true, a.p25 != nil, a.p50 != nil, a.p75 != nil { return a }
+            if let s = soldVal, s.thin != true, s.p25 != nil, s.p50 != nil, s.p75 != nil { return s }
+            if let a = askedVal, a.thin != true, a.p25 != nil, a.p50 != nil, a.p75 != nil { return a }
+            return soldVal ?? askedVal
+        }()
+
+        self.family = familyVal
+        self.family_id = familyIdVal
+        self.share = shareVal
+        self.basis = basisVal
+        self.sold = soldVal
+        self.asked = askedVal
+        self.cohort = (try? c.decode(String.self, forKey: .cohort))
+            ?? primarySlice?.yearSpan
+            ?? ""
+        self.match = (try? c.decode(String.self, forKey: .match))
+            ?? ((primarySlice?.year_from != nil && primarySlice?.year_from == primarySlice?.year_to) ? "year" : "decade")
+        self.sales = (try? c.decode(Int.self, forKey: .sales))
+            ?? primarySlice?.n
+            ?? 0
+        self.p25 = (try? c.decode(Double.self, forKey: .p25))
+            ?? primarySlice?.p25
+            ?? 0
+        self.p50 = (try? c.decode(Double.self, forKey: .p50))
+            ?? primarySlice?.p50
+            ?? 0
+        self.p75 = (try? c.decode(Double.self, forKey: .p75))
+            ?? primarySlice?.p75
+            ?? 0
+        self.ratio = try? c.decodeIfPresent(Double.self, forKey: .ratio)
+        if let r = try? c.decode(String.self, forKey: .rank) {
+            self.rank = r
+        } else if let sh = shareVal {
+            self.rank = sh <= 0.25 ? "below_p25" : (sh >= 0.75 ? "above_p75" : (sh <= 0.5 ? "below_p50" : "above_p50"))
+        } else {
+            self.rank = "within"
+        }
+        self.median_miles = (try? c.decodeIfPresent(Double.self, forKey: .median_miles))
+            ?? soldVal?.miles?.p50
+            ?? askedVal?.miles?.p50
+        self.share_36m = try? c.decodeIfPresent(Double.self, forKey: .share_36m)
+        self.houses = (try? c.decodeIfPresent([String: Int].self, forKey: .houses))
+            ?? soldVal?.by_source
+            ?? askedVal?.by_source
+    }
 }
 
 struct AskRow: Decodable, Equatable, Identifiable {
@@ -188,18 +325,75 @@ struct AskRow: Decodable, Equatable, Identifiable {
     let source: String
     let url: String?
     let seen_at: String
+    var listed_at: String? = nil
+    var posted_at: String? = nil
     let year: Int?
     let make: String?
     let model: String?
     let title: String?
     let ask: Double
+    var asking_price: Double? = nil
     let miles: Double?
     let odometer: String? // "broken" | "rolled_over" | "exempt"
     let condition: String?
     let title_status: String?
     let image: String?
     let location: String?
+    var city: String? = nil
+    var region: String? = nil
+    var taste: Int? = nil
+    var in_band: Bool? = nil
     let position: AskPosition?
+
+    private enum CodingKeys: String, CodingKey {
+        case event_id, vehicle_id, source, url, seen_at, first_seen_at, listed_at, posted_at
+        case year, make, model, title, ask, asking_price
+        case miles, mileage, listing_mileage, read_miles
+        case odometer, condition, title_status, image, location, city, region, taste, in_band, position
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        self.event_id = try c.decode(String.self, forKey: .event_id)
+        self.vehicle_id = try? c.decodeIfPresent(String.self, forKey: .vehicle_id)
+        self.source = (try? c.decode(String.self, forKey: .source)) ?? "classified"
+        self.url = try? c.decodeIfPresent(String.self, forKey: .url)
+        self.listed_at = try? c.decodeIfPresent(String.self, forKey: .listed_at)
+        self.posted_at = try? c.decodeIfPresent(String.self, forKey: .posted_at)
+        let firstSeen = (try? c.decodeIfPresent(String.self, forKey: .first_seen_at))
+            ?? (try? c.decodeIfPresent(String.self, forKey: .seen_at))
+            ?? ""
+        self.seen_at = firstSeen
+        self.year = try? c.decodeIfPresent(Int.self, forKey: .year)
+        self.make = try? c.decodeIfPresent(String.self, forKey: .make)
+        self.model = try? c.decodeIfPresent(String.self, forKey: .model)
+        self.title = try? c.decodeIfPresent(String.self, forKey: .title)
+        let askVal = (try? c.decodeIfPresent(Double.self, forKey: .asking_price))
+            ?? (try? c.decodeIfPresent(Double.self, forKey: .ask))
+        self.asking_price = askVal
+        self.ask = askVal ?? 0
+        self.miles = (try? c.decodeIfPresent(Double.self, forKey: .listing_mileage))
+            ?? (try? c.decodeIfPresent(Double.self, forKey: .read_miles))
+            ?? (try? c.decodeIfPresent(Double.self, forKey: .mileage))
+            ?? (try? c.decodeIfPresent(Double.self, forKey: .miles))
+        self.odometer = try? c.decodeIfPresent(String.self, forKey: .odometer)
+        self.condition = try? c.decodeIfPresent(String.self, forKey: .condition)
+        self.title_status = try? c.decodeIfPresent(String.self, forKey: .title_status)
+        self.image = try? c.decodeIfPresent(String.self, forKey: .image)
+        let cityVal = try? c.decodeIfPresent(String.self, forKey: .city)
+        let regionVal = try? c.decodeIfPresent(String.self, forKey: .region)
+        self.city = cityVal
+        self.region = regionVal
+        if let loc = try? c.decodeIfPresent(String.self, forKey: .location), !loc.isEmpty {
+            self.location = loc
+        } else {
+            let locParts = [cityVal, regionVal].compactMap { $0 }.filter { !$0.isEmpty }
+            self.location = locParts.isEmpty ? nil : locParts.joined(separator: ", ")
+        }
+        self.taste = try? c.decodeIfPresent(Int.self, forKey: .taste)
+        self.in_band = try? c.decodeIfPresent(Bool.self, forKey: .in_band)
+        self.position = try? c.decodeIfPresent(AskPosition.self, forKey: .position)
+    }
 
     var id: String { event_id }
 
@@ -238,6 +432,11 @@ struct AskRow: Decodable, Equatable, Identifiable {
 
 struct AskPopulation: Decodable, Equatable {
     let listings: Int
+    var priced: Int? = nil
+    var in_band: Int? = nil
+    var keyed: Int? = nil
+    var positioned_sold: Int? = nil
+    var positioned_asked: Int? = nil
     let filtered: Int?
     let with_position: Int
     let below_p25: Int
@@ -245,6 +444,36 @@ struct AskPopulation: Decodable, Equatable {
     let by_tier: [String: Int]?
     let median_ask: Double?
     let newest_seen_at: String?
+
+    private enum CodingKeys: String, CodingKey {
+        case listings, asks, priced, in_band, keyed, positioned_sold, positioned_asked
+        case filtered, with_position, below_p25, by_source, by_tier, median_ask, newest_seen_at
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        self.priced = try? c.decodeIfPresent(Int.self, forKey: .priced)
+        self.in_band = try? c.decodeIfPresent(Int.self, forKey: .in_band)
+        self.keyed = try? c.decodeIfPresent(Int.self, forKey: .keyed)
+        self.positioned_sold = try? c.decodeIfPresent(Int.self, forKey: .positioned_sold)
+        self.positioned_asked = try? c.decodeIfPresent(Int.self, forKey: .positioned_asked)
+        let asksCount = (try? c.decodeIfPresent(Int.self, forKey: .listings))
+            ?? (try? c.decodeIfPresent(Int.self, forKey: .asks))
+            ?? 0
+        self.listings = asksCount
+        self.filtered = try? c.decodeIfPresent(Int.self, forKey: .filtered)
+        self.with_position = (try? c.decodeIfPresent(Int.self, forKey: .with_position))
+            ?? self.positioned_sold
+            ?? self.positioned_asked
+            ?? 0
+        self.below_p25 = (try? c.decodeIfPresent(Int.self, forKey: .below_p25))
+            ?? self.in_band
+            ?? 0
+        self.by_source = (try? c.decode([String: Int].self, forKey: .by_source)) ?? [:]
+        self.by_tier = try? c.decodeIfPresent([String: Int].self, forKey: .by_tier)
+        self.median_ask = try? c.decodeIfPresent(Double.self, forKey: .median_ask)
+        self.newest_seen_at = try? c.decodeIfPresent(String.self, forKey: .newest_seen_at)
+    }
 }
 
 struct AskPricePopulation: Decodable, Equatable {
@@ -256,29 +485,63 @@ struct AskPricePopulation: Decodable, Equatable {
 
 struct AskBoard: Decodable, Equatable {
     let as_of: String
+    var since: String? = nil
     let window_hours: Int
+    var matching: Int? = nil
+    var newest_at: String? = nil
+    var newest_seen_at: String? = nil
     let tier: String?
     let sort: String?
     let population: AskPopulation
     let price_population: AskPricePopulation?
     let rows: [AskRow]
 
-    private struct Params: Encodable {
-        let p_hours: Int
-        let p_make: String?
-        let p_limit: Int
-        let p_tier: String?
-        let p_sort: String
+    private enum CodingKeys: String, CodingKey {
+        case as_of, since, window_hours, matching, newest_at, newest_seen_at
+        case tier, sort, population, price_population, rows, asks
     }
 
-    static func fetch(hours: Int = 72, make: String? = nil, tier: AskTier? = nil, sort: AskSort = .newest, limit: Int = 80) async throws -> AskBoard {
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        self.as_of = (try? c.decode(String.self, forKey: .as_of)) ?? ""
+        self.since = try? c.decodeIfPresent(String.self, forKey: .since)
+        self.window_hours = (try? c.decode(Int.self, forKey: .window_hours)) ?? 72
+        self.matching = try? c.decodeIfPresent(Int.self, forKey: .matching)
+        self.newest_at = try? c.decodeIfPresent(String.self, forKey: .newest_at)
+        self.newest_seen_at = try? c.decodeIfPresent(String.self, forKey: .newest_seen_at)
+        self.tier = try? c.decodeIfPresent(String.self, forKey: .tier)
+        self.sort = try? c.decodeIfPresent(String.self, forKey: .sort)
+        self.population = try c.decode(AskPopulation.self, forKey: .population)
+        self.price_population = try? c.decodeIfPresent(AskPricePopulation.self, forKey: .price_population)
+        self.rows = (try? c.decode([AskRow].self, forKey: .rows))
+            ?? (try? c.decode([AskRow].self, forKey: .asks))
+            ?? []
+    }
+
+    private struct Params: Encodable {
+        let p_hours: Int
+        let p_lat: Double?
+        let p_lng: Double?
+        let p_radius_mi: Int?
+        let p_min_taste: Int?
+        let p_tier: String?
+        let p_sort: String
+        let p_limit: Int
+        let p_offset: Int
+    }
+
+    static func fetch(hours: Int = 72, tier: AskTier? = nil, band: Bool = false, sort: AskSort = .newest, limit: Int = 60, offset: Int = 0) async throws -> AskBoard {
         try await SupabaseService.client
             .rpc("classified_ask_board", params: Params(
                 p_hours: hours,
-                p_make: make,
-                p_limit: limit,
+                p_lat: nil,
+                p_lng: nil,
+                p_radius_mi: nil,
+                p_min_taste: band ? 60 : nil,
                 p_tier: tier?.rawValue,
-                p_sort: sort.rawValue
+                p_sort: sort.rawValue,
+                p_limit: limit,
+                p_offset: offset
             ))
             .execute()
             .value
@@ -547,14 +810,21 @@ struct CapturedListingsView: View {
     private func askCoverageSentence(_ board: AskBoard) -> String {
         let p = board.population
         var parts: [String] = [
-            "\(p.listings.formatted()) listings with a price (\(window.label))",
-            "\(p.with_position.formatted()) placed vs sold cohort",
-            "\(p.below_p25.formatted()) below p25"
+            "\(p.listings.formatted()) listings (\(window.label))",
+            "\(p.with_position.formatted()) placed vs cohort"
         ]
+        if let pa = p.positioned_asked, pa > 0 {
+            parts.append("\(pa.formatted()) placed vs asks")
+        }
+        if let ib = p.in_band, ib > 0 {
+            parts.append("\(ib.formatted()) in band")
+        } else if p.below_p25 > 0 {
+            parts.append("\(p.below_p25.formatted()) below p25")
+        }
         if let med = p.median_ask, med > 0 {
             parts.append("median ask \(AskPlacement.dollars(med))")
         }
-        if let newest = p.newest_seen_at {
+        if let newest = board.newest_seen_at ?? p.newest_seen_at {
             parts.append("newest seen \(ProfileClock.Absolute(newest))")
         }
         return parts.joined(separator: " · ")
