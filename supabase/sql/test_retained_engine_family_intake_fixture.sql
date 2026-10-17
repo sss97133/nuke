@@ -51,3 +51,4 @@ INSERT INTO observation_properties(id,property_key,label,data_type,namespace,cat
  ('a79b528f-7d9d-46ca-96f9-96d899e81d10','model','Model','string','core','identity',
  ARRAY['specification','listing']::observation_kind[],'single',0,
  ARRAY['registry','documentation','auction','marketplace']::source_category[],'2026-05-17 19:29:08.932116+00','both');
+\ir fixtures/retained_engine_family_queue_baseline_20261015.sql

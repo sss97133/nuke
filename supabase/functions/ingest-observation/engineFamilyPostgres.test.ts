@@ -16,10 +16,14 @@ const MODE = "retained_listing_engine_family_label_v1";
 const IDENTITY_QUOTE = "This 1992 BMW 325i is described by its publisher with records.";
 const SOURCE_QUOTE = "Powered by a 2.5-liter M50 inline-six paired with a five-speed manual transmission, the car is described by its publisher.";
 const SOURCE_TEXT = `${IDENTITY_QUOTE} ${SOURCE_QUOTE} Factory and current configuration remain unverified.`;
+const QUEUED_SOURCE_TEXT = `This vehicle is described by its publisher with records. ${SOURCE_QUOTE} Factory and current configuration remain unverified.`;
+const DRAIN_MODE = "retained_listing_property_drain_v1";
+const DISPLACEMENT = "66b2f1f6-b714-4ac0-85b6-60ba89529c1a";
 const ORIGIN = "https://engine-family-fixture.test";
 const SERVICE_KEY = "sb_secret_engine_family_local_fixture";
 const PUBLISHABLE_KEY = "sb_publishable_engine_family_local_fixture";
 const MIGRATION = new URL("../../migrations/20261011230939_retained_engine_family_intake.sql", import.meta.url);
+const QUEUE_MIGRATION = new URL("../../migrations/20261015034500_retained_engine_family_queue.sql", import.meta.url);
 type Row = Record<string, any>;
 type ServiceHeader = "authorization" | "apikey";
 
@@ -41,7 +45,9 @@ function quote(value: string): string {
 const columns = {
   vehicles: ["id", "is_public", "deleted_at", "listing_kind"],
   observation_sources: ["id", "slug", "base_trust_score", "supported_observations"],
-  observation_properties: ["id", "property_key", "applies_to_kinds", "namespace", "deprecated_at"],
+  observation_properties: ["id", "property_key", "label", "applies_to_kinds", "namespace", "deprecated_at", "data_type",
+    "unit", "parent_property_id", "discriminator_key", "cardinality", "verification_scope", "ratified_at", "proposed_by_proposal_id"],
+  schema_proposals: ["id", "status", "promoted_to_id"],
   vehicle_observations: [
     "id", "vehicle_id", "kind", "is_superseded", "property_id", "subject_type", "subject_id", "source_id",
     "source_url", "source_identifier", "observed_at", "ingested_at", "extraction_method", "confidence_score",
@@ -108,6 +114,9 @@ Deno.test({
     let inserts = 0;
     let nativeIdentityInserts = 0;
     let parentInserts = 0;
+    const knownParents = new Set<string>();
+    const drainCalls: { name: string; args: Row }[] = [];
+    const drainWorkers = new Set<string>();
     const respond = (body: unknown, status = 200) => new Response(JSON.stringify(body), {
       status, headers: { "Content-Type": "application/json" },
     });
@@ -118,11 +127,42 @@ Deno.test({
         assert(url.origin === ORIGIN, `Unexpected SDK origin: ${url.origin}`);
         assert(request.headers.get("authorization") === `Bearer ${SERVICE_KEY}`, "Unexpected SDK authorization");
         assert(request.headers.get("apikey") === SERVICE_KEY, "SDK must use the fixture's named project secret");
+        const queueRpc = url.pathname.match(/^\/rest\/v1\/rpc\/(claim_retained_listing_properties|finish_retained_listing_property)$/);
+        if (queueRpc) {
+          assert(request.method === "POST" && url.search === "", "Queue RPC requires its exact POST route");
+          const name = queueRpc[1], args = await request.json();
+          assert(/^retained-listing:[0-9a-f-]{36}$/.test(args.p_worker), "Queue worker must be created by the actual drain");
+          let statement: string;
+          if (name === "claim_retained_listing_properties") {
+            equal(Object.keys(args).sort(), ["p_limit", "p_worker"], "Bounded claim argument names");
+            assert(Number.isInteger(args.p_limit) && args.p_limit >= 1 && args.p_limit <= 120, "Claim limit remains bounded");
+            drainWorkers.add(args.p_worker);
+            statement = `SELECT COALESCE(jsonb_agg(to_jsonb(c)),'[]'::jsonb)::text FROM public.claim_retained_listing_properties(${quote(args.p_worker)},${args.p_limit}) c`;
+          } else {
+            equal(Object.keys(args).sort(), ["p_property", "p_result", "p_source", "p_status", "p_worker"], "Completion argument names");
+            assert(drainWorkers.has(args.p_worker) && knownParents.has(args.p_source), "Completion must belong to this drain's synthetic work");
+            assert(/^[0-9a-f-]{36}$/.test(args.p_property) && ["done", "refused", "retry", "deferred"].includes(args.p_status), "Exact queue property and completion state required");
+            assert(args.p_result === null || /^[0-9a-f-]{36}$/.test(args.p_result), "Completion result must be an exact UUID or null");
+            statement = `SELECT to_jsonb(public.finish_retained_listing_property(${quote(args.p_source)}::uuid,${quote(args.p_property)}::uuid,${quote(args.p_worker)},${quote(args.p_status)},${args.p_result === null ? "NULL" : `${quote(args.p_result)}::uuid`}))::text`;
+          }
+          drainCalls.push({ name, args });
+          try {
+            const result = await json(statement, "service_role");
+            if (name === "claim_retained_listing_properties") {
+              assert(Array.isArray(result) && result.length <= args.p_limit && result.every(row => knownParents.has(row.source_observation_id)), "Claims stay within the synthetic source frame");
+            } else assert(typeof result === "boolean", "Completion returns actual PostgreSQL custody proof");
+            return respond(result);
+          } catch (error) {
+            const failure = error as Error & { code: string };
+            databaseErrors.push({ code: failure.code, message: failure.message });
+            return respond({ code: failure.code, message: failure.message }, 400);
+          }
+        }
         if (url.pathname === "/rest/v1/rpc/retained_listing_property_result_matches") {
           assert(request.method === "POST" && url.search === "", "Only the exact result-match RPC POST is supported");
           const args = await request.json();
           equal(Object.keys(args).sort(), ["p_property", "p_result", "p_source"], "Result-match RPC argument names");
-          equal(args.p_source, parentId, "Result-match RPC must use the synthetic parent");
+          assert(knownParents.has(args.p_source), "Result-match RPC must use a handler-created synthetic parent");
           const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
           assert(uuid.test(args.p_property) && uuid.test(args.p_result), "Result-match RPC requires exact UUIDs");
           try {
@@ -135,7 +175,7 @@ Deno.test({
             return respond({ code: failure.code, message: failure.message }, 400);
           }
         }
-        const match = url.pathname.match(/^\/rest\/v1\/(vehicles|observation_sources|observation_properties|vehicle_observations)$/);
+        const match = url.pathname.match(/^\/rest\/v1\/(vehicles|observation_sources|observation_properties|vehicle_observations|schema_proposals)$/);
         assert(match, `Unhandled SDK route: ${url.pathname}`);
         const table = match[1] as Table;
         const allowed = columns[table] as readonly string[];
@@ -158,6 +198,7 @@ Deno.test({
           else throw new Error(`Unhandled filter: ${key}=${value}`);
         }
         let statement: string;
+        let parentInsert = false;
         if (request.method === "GET") {
           assert(filters.length > 0, "Unfiltered SDK table scans are forbidden");
           statement = `SELECT COALESCE(jsonb_agg(to_jsonb(r)),'[]'::jsonb)::text FROM (SELECT ${selected.join(",")} FROM public.${table} WHERE ${filters.join(" AND ")} LIMIT ${limit}) r`;
@@ -170,14 +211,17 @@ Deno.test({
           assert(names.length > 0 && names.every((name) => allowed.includes(name)), "Unknown observation insert column");
           assert(!names.some((name) => ["id", "ingested_at", "is_superseded"].includes(name)), "DB identity and defaults must remain authoritative");
           assert(body.vehicle_id === VEHICLE && body.source_id === SOURCE, "Only this synthetic source/vehicle may be written");
-          if (!parentId) {
-            assert(parentInserts === 0 && body.source_observation_id === undefined && body.property_id === undefined &&
+          if (body.source_observation_id === undefined) {
+            const identifiers = ["engine-family-native-fixture:v1", "engine-family-queued-fixture:v1", "engine-family-withheld-fixture:v1"];
+            assert(parentInserts < identifiers.length && body.property_id === undefined &&
               body.kind === "listing" && body.extraction_method === "html_description_capture" &&
-              body.content_text === SOURCE_TEXT,
-              "Only the one native parent may be seeded through sanctioned intake");
+              body.content_text === (parentInserts === 0 ? SOURCE_TEXT : QUEUED_SOURCE_TEXT) &&
+              body.source_identifier === identifiers[parentInserts],
+              "Only the three exact native parents may be seeded through sanctioned intake");
+            parentInsert = true;
             parentInserts++;
           } else {
-            equal(body.source_observation_id, parentId, "Child must reference the handler-created native parent");
+            assert(knownParents.has(body.source_observation_id), "Child must reference a handler-created native parent");
             if (body.structured_data?.property_key === "engine_family_label") inserts++;
             else {
               assert(["make", "model"].includes(body.structured_data?.property_key), "Only native identity siblings are allowed");
@@ -193,6 +237,10 @@ Deno.test({
           const failure = error as Error & { code: string };
           databaseErrors.push({ code: failure.code, message: failure.message });
           return respond({ code: failure.code, message: failure.message }, failure.code === "23505" ? 409 : 400);
+        }
+        if (parentInsert) {
+          assert(rows.length === 1 && /^[0-9a-f-]{36}$/.test(rows[0].id), "Native source must receive its PostgreSQL identity");
+          knownParents.add(rows[0].id);
         }
         if (request.headers.get("accept")?.includes("application/vnd.pgrst.object+json")) {
           assert(rows.length <= 1, "Singular SDK result unexpectedly contains multiple rows");
@@ -217,7 +265,37 @@ Deno.test({
       'provenance',public.get_field_provenance(${quote(VEHICLE)}::uuid,${quote(key)}),
       'canonical',(SELECT COALESCE(jsonb_agg(to_jsonb(c)),'[]'::jsonb) FROM public.vehicle_canonical c
         JOIN public.observation_properties op ON op.id=c.property_id
-        WHERE c.vehicle_id=${quote(VEHICLE)}::uuid AND op.property_key=${quote(key)}))::text`, "anon");
+        WHERE c.vehicle_id=${quote(VEHICLE)}::uuid AND op.property_key=${quote(key)}),
+      'bulk',(SELECT COALESCE(jsonb_agg(s),'[]'::jsonb) FROM public.get_vehicle_specs(ARRAY[${quote(VEHICLE)}::uuid],true) s))::text`, "anon");
+    const bulkFamilyClaims = (state: Row) => (state.bulk[0]?.typed_claims ?? []).filter((claim: Row) => claim.property_key === "engine_family_label");
+    const assertProvenanceProjection = (state: Row, claim: Row) => {
+      const witness = state.provenance?.observations?.find((row: Row) => row.id === claim.observation_id);
+      assert(witness, "The selected bulk claim must drill into the same readable provenance observation");
+      equal(witness.property_id, claim.property_id, "Provenance preserves the actual selected property's foreign key");
+      equal(witness.source_id, claim.source_id, "Provenance preserves the actual selected source's foreign key");
+      equal(witness.limitation, claim.qualifiers.limitation ?? null, "Provenance preserves the selected claim's limitation without inventing one");
+    };
+    const assertBulkFamily = (state: Row, observationId: string, source: Row) => {
+      equal(state.bulk.length, 1, "Anonymous bulk specifications return the eligible synthetic vehicle");
+      equal(state.bulk[0].typed_claims_status, "current_core_scope_read", "Bulk typed testimony is explicitly requested");
+      equal(state.bulk[0].model_scope.record_binding_property_keys, 11, "Family vocabulary does not invent a retained vehicle-record binding");
+      equal(state.bulk[0].model_scope.canonical_property_keys, 12, "The bulk canonical scope includes the separately ratified family meaning");
+      const claims = bulkFamilyClaims(state);
+      equal(claims.length, 1, "Bulk specifications expose the one current family claim");
+      const claim = claims[0];
+      assertProvenanceProjection(state, claim);
+      for (const [key, expected] of Object.entries({ observation_id: observationId, source_observation_id: source.id,
+        source_url: source.source_url, value: "M50", data_type: "string", unit: null,
+      })) equal(claim[key], expected, `Bulk family ${key}`);
+      for (const [key, expected] of Object.entries({ source_value: SOURCE_QUOTE,
+        label_role: "publisher_powering_engine_label", engine_identity_status: "unverified",
+        source_capture_sha256: source.structured_data.source_capture_sha256,
+        source_captured_at: source.structured_data.source_captured_at, source_capture_basis: "protected_snapshot",
+        source_witness_version: "retained_description_engine_family_label_v1", source_event_time_status: "unknown",
+        factory_configuration_status: "unknown", current_configuration_status: "unknown", independent_source: false,
+      })) equal(claim.qualifiers[key], expected, `Bulk family qualifier ${key}`);
+      equal(observationClockMicroseconds(claim.observed_at), observationClockMicroseconds(source.ingested_at), "Bulk family observation clock preserves source microseconds");
+    };
     const modifiedFunctions = [
       "public.retained_description_powertrain_witness(text,text)",
       "public.retained_description_property_value_matches(public.vehicle_observations,public.vehicle_observations)",
@@ -322,6 +400,11 @@ Deno.test({
         assert(response.body.error.includes("Unknown, pending or deprecated"), "Refusal must identify the registry boundary");
         equal(inserts, 0, "No insertion attempted before registration");
         equal(await countChildren(), 0, "No child before review");
+        const queueRefusal = await command(["--file", decodeURIComponent(QUEUE_MIGRATION.pathname)]);
+        assert(!queueRefusal.success && decoder.decode(queueRefusal.stderr).includes("requires curator ratification"),
+          "Queue migration must refuse the still-open proposal before modifying its owners");
+        equal(await json("SELECT to_jsonb(EXISTS(SELECT FROM pg_attribute WHERE attrelid='public.retained_listing_property_replay'::regclass AND attname='engine_family_highwater' AND NOT attisdropped))::text"), false,
+          "Rejected installation cannot add family replay state");
       }), "Unapproved-vocabulary contract failed");
 
       assert(await t.step("real review registers vocabulary but the old database guard still refuses the same request", async () => {
@@ -439,6 +522,9 @@ Deno.test({
         equal(canonical.structured_data.engine_identity_status, "unverified", "Canonical state does not certify engine identity");
         equal(canonical.structured_data.label_role, "publisher_powering_engine_label", "Canonical state preserves the label's scope");
         equal(canonical.structured_data.source_event_time_status, "unknown", "Canonical state does not infer event time");
+        equal(bulkFamilyClaims(state), [], "The existing eleven-property bulk reader still omits the admitted family claim");
+        for (const key of ["property_id", "source_id", "limitation"]) assert(!Object.hasOwn(witness, key),
+          `The current provenance projection demonstrates its missing ${key} before the reader repair`);
       }), "The original question is not consumer-usable");
 
       assert(await t.step("superseded or private source context hides both readers and refuses a replay", async () => {
@@ -454,6 +540,7 @@ Deno.test({
             const hidden = await readers();
             equal(hidden.provenance?.observations ?? [], [], `${scenario.name} must hide provenance`);
             equal(hidden.canonical, [], `${scenario.name} must hide canonical state`);
+            equal(bulkFamilyClaims(hidden), [], `${scenario.name} must not expose family through bulk specifications`);
             equal((await invoke()).status, 400, `${scenario.name} must be requalified before a duplicate is returned`);
             equal(await countChildren(), 1, `${scenario.name} must preserve the stored testimony without adding another row`);
           } finally {
@@ -490,6 +577,7 @@ Deno.test({
             const hidden = await readers();
             equal(hidden.provenance?.observations ?? [], [], `${scenario.name} must hide provenance`);
             equal(hidden.canonical, [], `${scenario.name} must hide canonical state`);
+            equal(bulkFamilyClaims(hidden), [], `${scenario.name} must not expose family through bulk specifications`);
             const replay = await invoke();
             equal(replay.status, scenario.status, `${scenario.name} must prevent successful duplicate admission`);
             assert(replay.body.success !== true, `${scenario.name} cannot report success`);
@@ -549,6 +637,283 @@ Deno.test({
         equal(await countChildren(), 1, "Migration reapplication does not append observation rows");
         equal((await readers()).canonical[0]?.observation_id, childId, "The same source-backed result remains consumer-visible");
       }), "Migration reapplication changed the reviewed contract");
+
+      let familyPropertyId: string;
+      let replayBeforeQueue: Row;
+      let metadataOnlyBefore: Row;
+      let readerMetadataBefore: unknown;
+      const queue = (sourceId: string) => json(`SELECT COALESCE(jsonb_agg(to_jsonb(q)),'[]'::jsonb)::text
+        FROM public.retained_listing_property_work q WHERE source_observation_id=${quote(sourceId)}::uuid AND property_id=${quote(familyPropertyId)}::uuid`);
+      const replayState = () => json("SELECT to_jsonb(r)::text FROM public.retained_listing_property_replay r WHERE id");
+      const testimonyCount = () => json(`SELECT count(*)::text FROM public.vehicle_observations WHERE vehicle_id=${quote(VEHICLE)}::uuid`);
+      const drain = async () => {
+        const response = await handler!(new Request(`${ORIGIN}/functions/v1/ingest-observation`, {
+          method: "POST", headers: { "Content-Type": "application/json", apikey: SERVICE_KEY },
+          body: JSON.stringify({ mode: DRAIN_MODE, batch_size: 120 }),
+        }));
+        const body = await response.json();
+        equal(bridgeErrors, [], "Queue drain uses only the bounded synthetic PostgreSQL transport");
+        equal(response.status, 200, `Queue drain failed: ${JSON.stringify(body)}`);
+        assert(body.success === true, `Queue custody failed: ${JSON.stringify(body)}`);
+        equal(body.model_calls, 0, "Queue work makes no model calls");
+        equal(body.provider_calls, 0, "Queue work makes no external provider calls");
+        return body;
+      };
+
+      assert(await t.step("the current queue cannot reach the admitted family property and installation stays paused", async () => {
+        familyPropertyId = await json(`SELECT to_jsonb(promoted_to_id)::text FROM public.schema_proposals WHERE id=${quote(PROPOSAL)}::uuid`);
+        assert(/^[0-9a-f-]{36}$/.test(familyPropertyId), "Use the property ID actually assigned by curator review");
+        await sql(`SELECT public.enqueue_retained_listing_properties(ARRAY[${quote(parentId)}::uuid])`);
+        equal(await queue(parentId), [], "The existing eleven-property enqueue omits family testimony");
+        // These are synthetic queue/replay setup rows, never observation edits.
+        await sql(`INSERT INTO public.retained_listing_property_work(source_observation_id,property_id,vehicle_id)
+          VALUES(${quote(parentId)}::uuid,${quote(DISPLACEMENT)}::uuid,${quote(VEHICLE)}::uuid) ON CONFLICT DO NOTHING;
+          UPDATE public.retained_listing_property_work SET next_attempt_at=now()+interval '1 day' WHERE property_id<>${quote(familyPropertyId)}::uuid;
+          UPDATE public.retained_listing_property_replay SET scan_completed_at=coalesce(scan_completed_at,clock_timestamp()),
+            native_identity_completed_at=coalesce(native_identity_completed_at,clock_timestamp()) WHERE id`);
+        replayBeforeQueue = await replayState();
+        metadataOnlyBefore = await json(`SELECT s FROM public.get_vehicle_specs(ARRAY[${quote(VEHICLE)}::uuid]) s`, "anon");
+        readerMetadataBefore = await functionMetadata();
+        const before = await testimonyCount();
+        const installed = await command(["--file", decodeURIComponent(QUEUE_MIGRATION.pathname)]);
+        assert(installed.success, `Queue migration failed: ${decoder.decode(installed.stderr)}`);
+        equal(await functionMetadata(), readerMetadataBefore, "The provenance projection repair preserves function ownership, ACLs and security/runtime attributes");
+        const installedReplay = await replayState();
+        for (const [key, value] of Object.entries(replayBeforeQueue)) equal(installedReplay[key], value, `Queue migration preserves prior replay ${key}`);
+        equal(installedReplay.engine_family_highwater, parentId, "Family repair pins the finite synthetic displacement source frame");
+        equal(installedReplay.engine_family_cursor, null, "New family repair has not visited its frame");
+        equal(installedReplay.engine_family_keys_seen, 0, "No family source key is credited during installation");
+        equal(installedReplay.engine_family_work_seeded, 0, "No queue work is credited during installation");
+        equal(installedReplay.engine_family_completed_at, null, "Installation does not certify repair completion");
+        equal(await json("SELECT to_jsonb(active)::text FROM cron.job WHERE jobname='project-retained-listing-properties'"), false,
+          "Installation pauses the existing controller");
+        const paused = await drain();
+        equal(paused.claimed, 0, "No queue claim crosses the paused controller");
+        equal(paused.writes, 0, "Paused installation cannot write observations");
+        equal(await testimonyCount(), before, "Queue installation never appends testimony");
+      }), "Queue installation changed history or bypassed its pause");
+
+      assert(await t.step("finite displacement repair and actual drain reuse the existing family child with verified custody", async () => {
+        const before = await testimonyCount();
+        await sql("SELECT public.seed_retained_listing_properties()");
+        const pending = await queue(parentId);
+        equal(pending.length, 1, "Finite displacement repair enqueues exactly one family source-property key");
+        equal(pending[0].status, "pending", "Family repair produces work for sanctioned intake");
+        equal(pending[0].observation_id, null, "Seeding alone never certifies the already stored result");
+        const repairedState = await replayState();
+        equal(repairedState.engine_family_cursor, parentId, "Finite repair visits the pinned displacement source");
+        equal(repairedState.engine_family_keys_seen, 1, "Exactly one source key is visited in the synthetic repair frame");
+        equal(repairedState.engine_family_work_seeded, 1, "The fixture's existing siblings leave only one new family queue key");
+        assert(typeof repairedState.engine_family_completed_at === "string", "The exhausted finite frame records completion");
+        await sql("SELECT public.seed_retained_listing_properties()");
+        equal(await replayState(), repairedState, "Completed finite repair does not restart or revisit keys");
+        equal(await queue(parentId), pending, "Repeated seeding does not alter existing custody");
+        equal(await json("SELECT to_jsonb(public.activate_retained_listing_property_intake())::text"), true,
+          "The existing deployment-owner controller authorizes this synthetic local drain");
+        const casWorker = "engine-family-local-cas";
+        const claimed = await json(`SELECT COALESCE(jsonb_agg(to_jsonb(c)),'[]'::jsonb)::text FROM public.claim_retained_listing_properties(${quote(casWorker)},1) c`);
+        equal(claimed, [{ source_observation_id: parentId, property_id: familyPropertyId, mode: MODE }], "Real SQL claim derives the approved family selector");
+        equal(await json(`SELECT to_jsonb(public.finish_retained_listing_property(${quote(parentId)}::uuid,${quote(familyPropertyId)}::uuid,'wrong-worker','done',${quote(childId)}::uuid))::text`), false,
+          "A valid result cannot close another worker's lease");
+        equal(await json(`SELECT to_jsonb(public.finish_retained_listing_property(${quote(parentId)}::uuid,${quote(familyPropertyId)}::uuid,${quote(casWorker)},'done',${quote(makeId)}::uuid))::text`), false,
+          "A native make child cannot certify family work");
+        equal((await queue(parentId))[0].status, "claimed", "Failed custody checks leave the real lease intact");
+        equal(await json(`SELECT to_jsonb(public.finish_retained_listing_property(${quote(parentId)}::uuid,${quote(familyPropertyId)}::uuid,${quote(casWorker)},'deferred',NULL))::text`), true,
+          "Release synthetic test custody through the existing completion function");
+        await sql(`UPDATE public.retained_listing_property_work SET next_attempt_at=now() WHERE source_observation_id=${quote(parentId)}::uuid AND property_id=${quote(familyPropertyId)}::uuid`);
+        const receipt = await drain();
+        equal({ claimed: receipt.claimed, stored: receipt.stored, writes: receipt.writes, duplicates: receipt.duplicates },
+          { claimed: 1, stored: 1, writes: 0, duplicates: 1 }, "The real handler drain reuses its existing admitted result");
+        const completed = (await queue(parentId))[0];
+        equal(completed.status, "done", "Actual PostgreSQL completion stores verified custody");
+        equal(completed.observation_id, childId, "Queue custody points to the original family child");
+        equal(completed.locked_by, null, "Verified completion releases the lease");
+        equal(await testimonyCount(), before, "A duplicate queue replay creates no testimony");
+        const state = await readers();
+        equal(state.canonical[0]?.observation_id, childId, "Queue completion preserves public answer identity");
+        assertBulkFamily(state, childId, parent);
+        assert(drainCalls.some(call => call.name === "finish_retained_listing_property" && call.args.p_result === childId && call.args.p_status === "done"),
+          "The actual handler must perform its own persisted-result CAS");
+      }), "Existing admission was not reachable through the real queue");
+
+      assert(await t.step("bulk specifications preserve source visibility, default metadata and the typed read budget", async () => {
+        const metadataOnly = await json(`SELECT s FROM public.get_vehicle_specs(ARRAY[${quote(VEHICLE)}::uuid]) s`, "anon");
+        equal(metadataOnly.typed_claims_status, "not_requested", "Default bulk calls remain metadata-only");
+        equal(metadataOnly.typed_claims, [], "Default bulk calls do not imply a typed-custody read");
+        equal(metadataOnly.retained_record, metadataOnlyBefore.retained_record, "Adding family vocabulary preserves all retained record fields and bindings");
+        for (const key of ["make", "model"]) {
+          const state = await readers(key);
+          const claim = state.bulk[0].typed_claims.find((row: Row) => row.property_key === key);
+          assert(claim, `The existing native ${key} claim remains selectable`);
+          assertProvenanceProjection(state, claim);
+        }
+        const oversized = await command(["--command", `SET ROLE anon; SELECT * FROM public.get_vehicle_specs(array_fill(${quote(VEHICLE)}::uuid,ARRAY[21]),true)`]);
+        assert(!oversized.success && decoder.decode(oversized.stderr).includes("22023") && decoder.decode(oversized.stderr).includes("at most20"),
+          "The actual anonymous bulk reader retains its twenty-key typed budget");
+        for (const scenario of [
+          { name: "superseded parent", change: `UPDATE public.vehicle_observations SET is_superseded=true WHERE id=${quote(parentId)}::uuid`,
+            restore: `UPDATE public.vehicle_observations SET is_superseded=false WHERE id=${quote(parentId)}::uuid` },
+          { name: "superseded child", change: `UPDATE public.vehicle_observations SET is_superseded=true WHERE id=${quote(childId)}::uuid`,
+            restore: `UPDATE public.vehicle_observations SET is_superseded=false WHERE id=${quote(childId)}::uuid` },
+          { name: "private vehicle", change: `UPDATE public.vehicles SET is_public=false WHERE id=${quote(VEHICLE)}::uuid`,
+            restore: `UPDATE public.vehicles SET is_public=true WHERE id=${quote(VEHICLE)}::uuid` },
+        ]) {
+          try {
+            await sql(scenario.change);
+            const hidden = await readers();
+            equal(hidden.provenance?.observations ?? [], [], `${scenario.name} hides provenance after bulk reader expansion`);
+            equal(hidden.canonical, [], `${scenario.name} hides canonical state after bulk reader expansion`);
+            equal(bulkFamilyClaims(hidden), [], `${scenario.name} hides family from the actual bulk reader`);
+            if (scenario.name === "private vehicle") equal(hidden.bulk, [], "The bulk reader exposes no private vehicle metadata");
+          } finally { await sql(scenario.restore); }
+        }
+        assertBulkFamily(await readers(), childId, parent);
+      }), "The expanded bulk consumer bypassed existing visibility or read-budget gates");
+
+      assert(await t.step("queue migration reapplication preserves finite progress, completed work and source testimony", async () => {
+        const replayBefore = await replayState(), workBefore = await queue(parentId), before = await testimonyCount();
+        const readerDefinitions = await functionDefinitions();
+        const activeBefore = await json("SELECT to_jsonb(active)::text FROM cron.job WHERE jobname='project-retained-listing-properties'");
+        const reapplied = await command(["--file", decodeURIComponent(QUEUE_MIGRATION.pathname)]);
+        assert(reapplied.success, `Queue migration reapplication failed: ${decoder.decode(reapplied.stderr)}`);
+        equal(await functionDefinitions(), readerDefinitions, "Exact reapplication preserves the repaired provenance definition");
+        equal(await functionMetadata(), readerMetadataBefore, "Exact reapplication preserves provenance ownership and permissions");
+        equal(await replayState(), replayBefore, "Reapplication cannot reset any old or family replay progress");
+        equal(await queue(parentId), workBefore, "Reapplication preserves the exact completed queue receipt");
+        equal(await testimonyCount(), before, "Reapplication leaves testimony untouched");
+        equal(await json("SELECT to_jsonb(active)::text FROM cron.job WHERE jobname='project-retained-listing-properties'"), activeBefore,
+          "Exact reapplication preserves the controller's existing activation state");
+        equal((await drain()).claimed, 0, "Completed repair has no family work to reclaim after reapplication");
+      }), "Queue migration reapplication restarted historical work");
+
+      assert(await t.step("new source intake enqueues family work and curator withdrawal blocks replay until restored", async () => {
+        const seed = await handler!(new Request(`${ORIGIN}/functions/v1/ingest-observation`, {
+          method: "POST", headers: { "Content-Type": "application/json", apikey: SERVICE_KEY },
+          body: JSON.stringify({ source_slug: "bat", kind: "listing", vehicle_id: VEHICLE,
+            source_url: "https://bringatrailer.com/listing/engine-family-queued-fixture/", source_identifier: "engine-family-queued-fixture:v1",
+            observed_at: "2026-10-12T09:45:00.123456Z", extraction_method: "html_description_capture",
+            content_text: QUEUED_SOURCE_TEXT, defer_analysis: true, agent_cost_cents: 0,
+            structured_data: { extractor: "extract-bat-core", source_text_field: "extract-bat-core.extractDescription",
+              description_capture: true, extractor_input_truncated: false, source_capture_basis: "protected_snapshot",
+              source_capture_sha256: "b".repeat(64), source_captured_at: "2026-10-12T09:45:00.123456Z",
+              observation_time_basis: "source_capture", source_event_time_status: "unknown" },
+          }),
+        }));
+        const seeded = await seed.json();
+        equal(seed.status, 200, `Fresh native source failed: ${JSON.stringify(seeded)}`);
+        assert(seeded.success === true && seeded.duplicate === false && knownParents.has(seeded.observation_id), "The second native source must use actual sanctioned intake");
+        const freshId = seeded.observation_id;
+        const pending = await queue(freshId);
+        equal(pending.length, 1, "The existing arrival trigger automatically enqueues the new family witness");
+        equal(pending[0].status, "pending", "New native evidence waits for sanctioned admission");
+        await sql(`UPDATE public.retained_listing_property_work SET next_attempt_at=now()+interval '1 day' WHERE property_id<>${quote(familyPropertyId)}::uuid`);
+        for (const gate of [
+          { name: "withdrawn proposal", change: `UPDATE public.schema_proposals SET status='withdrawn' WHERE id=${quote(PROPOSAL)}::uuid`,
+            restore: `UPDATE public.schema_proposals SET status='approved' WHERE id=${quote(PROPOSAL)}::uuid` },
+          { name: "pending registry", change: `UPDATE public.observation_properties SET namespace='pending' WHERE id=${quote(familyPropertyId)}::uuid`,
+            restore: `UPDATE public.observation_properties SET namespace='core' WHERE id=${quote(familyPropertyId)}::uuid` },
+          { name: "unit drift", change: `UPDATE public.observation_properties SET unit='liters' WHERE id=${quote(familyPropertyId)}::uuid`,
+            restore: `UPDATE public.observation_properties SET unit=NULL WHERE id=${quote(familyPropertyId)}::uuid` },
+        ]) {
+          try {
+            await sql(gate.change);
+            const state = await replayState(), before = await testimonyCount();
+            await sql(`SELECT public.enqueue_retained_listing_properties(ARRAY[${quote(freshId)}::uuid]); SELECT public.seed_retained_listing_properties()`);
+            equal(await replayState(), state, `${gate.name} cannot advance family repair`);
+            equal((await drain()).claimed, 0, `${gate.name} cannot produce a claim`);
+            equal(await queue(freshId), pending, `${gate.name} preserves pending custody without attempting admission`);
+            equal(await testimonyCount(), before, `${gate.name} cannot append a family claim`);
+            const hidden = await readers();
+            equal(hidden.provenance?.observations ?? [], [], `${gate.name} also hides existing family provenance`);
+            equal(hidden.canonical, [], `${gate.name} hides canonical family claims`);
+            equal(bulkFamilyClaims(hidden), [], `${gate.name} hides family claims from anonymous bulk specifications`);
+          } finally { await sql(gate.restore); }
+        }
+        const before = await testimonyCount();
+        const admitted = await drain();
+        equal({ claimed: admitted.claimed, stored: admitted.stored, writes: admitted.writes, duplicates: admitted.duplicates },
+          { claimed: 1, stored: 1, writes: 1, duplicates: 0 }, "The actual queue dispatch admits the fresh source exactly once");
+        const completed = (await queue(freshId))[0];
+        equal(completed.status, "done", "Fresh family work finishes only after persisted-result verification");
+        assert(completed.observation_id !== childId, "Distinct native captures preserve distinct testimony identities");
+        equal(await testimonyCount(), before + 1, "Only one new source-derived family claim is appended");
+        const child = await json(`SELECT to_jsonb(o)::text FROM public.vehicle_observations o WHERE id=${quote(completed.observation_id)}::uuid`);
+        equal(child.source_observation_id, freshId, "Queue intake retains the new native source parent");
+        equal(child.structured_data.source_capture_sha256, "b".repeat(64), "Queue intake preserves the new capture fingerprint");
+        equal(child.structured_data.engine_identity_status, "unverified", "Queue completion never certifies physical engine identity");
+        const state = await readers();
+        equal(state.provenance.observations.length, 2, "Public provenance retains both attributed captures");
+        assert(state.provenance.observations.some((o: Row) => o.id === completed.observation_id && o.source_observation_id === freshId), "Fresh queue result is consumer-visible with its source");
+        equal(state.canonical[0]?.observation_id, completed.observation_id, "Canonical reader selects the newer source-backed result");
+        assertBulkFamily(state, completed.observation_id, await json(`SELECT to_jsonb(o)::text FROM public.vehicle_observations o WHERE id=${quote(freshId)}::uuid`));
+        equal((await drain()).claimed, 0, "Completed fresh source work is not claimed again");
+        equal(bridgeErrors, [], "No unsupported SDK operation or external call occurred");
+        equal(databaseErrors.length, 2, "Queue integration adds no unexpected PostgreSQL failures");
+      }), "New source queue integration failed its source-to-public-reader contract");
+
+      assert(await t.step("withdrawal blocks absent arrival work and unfinished finite repair without losing the source", async () => {
+        const previousReplay = await replayState();
+        let withheldId: string;
+        try {
+          await sql(`UPDATE public.schema_proposals SET status='withdrawn' WHERE id=${quote(PROPOSAL)}::uuid`);
+          const seed = await handler!(new Request(`${ORIGIN}/functions/v1/ingest-observation`, {
+            method: "POST", headers: { "Content-Type": "application/json", apikey: SERVICE_KEY },
+            body: JSON.stringify({ source_slug: "bat", kind: "listing", vehicle_id: VEHICLE,
+              source_url: "https://bringatrailer.com/listing/engine-family-withheld-fixture/", source_identifier: "engine-family-withheld-fixture:v1",
+              observed_at: "2026-10-12T10:00:00.123456Z", extraction_method: "html_description_capture",
+              content_text: QUEUED_SOURCE_TEXT, defer_analysis: true, agent_cost_cents: 0,
+              structured_data: { extractor: "extract-bat-core", source_text_field: "extract-bat-core.extractDescription",
+                description_capture: true, extractor_input_truncated: false, source_capture_basis: "protected_snapshot",
+                source_capture_sha256: "c".repeat(64), source_captured_at: "2026-10-12T10:00:00.123456Z",
+                observation_time_basis: "source_capture", source_event_time_status: "unknown" },
+            }),
+          }));
+          const seeded = await seed.json();
+          equal(seed.status, 200, `Withheld native source failed: ${JSON.stringify(seeded)}`);
+          assert(seeded.success === true && seeded.duplicate === false && knownParents.has(seeded.observation_id),
+            "Curator withdrawal must preserve raw source testimony through sanctioned intake");
+          withheldId = seeded.observation_id;
+          equal(await queue(withheldId), [], "The actual arrival trigger cannot enqueue a withdrawn family property");
+          await sql(`SELECT public.enqueue_retained_listing_properties(ARRAY[${quote(withheldId)}::uuid])`);
+          equal(await queue(withheldId), [], "Explicit enqueue cannot create the previously absent family work while withdrawn");
+          equal(await json(`SELECT count(*)::text FROM public.retained_listing_property_work WHERE source_observation_id=${quote(withheldId)}::uuid AND property_id=${quote(DISPLACEMENT)}::uuid`), 1,
+            "The synthetic source is present in the existing displacement repair frame");
+          // Exercise the guard against real unfinished local fixture work. Restore
+          // this control state exactly afterwards; never reset production replay.
+          await sql(`UPDATE public.retained_listing_property_replay SET engine_family_highwater=${quote(withheldId)}::uuid,
+            engine_family_cursor=NULL,engine_family_keys_seen=0,engine_family_work_seeded=0,engine_family_completed_at=NULL WHERE id;
+            UPDATE public.retained_listing_property_work SET next_attempt_at=now()+interval '1 day' WHERE property_id<>${quote(familyPropertyId)}::uuid`);
+          const unfinished = await replayState();
+          await sql("SELECT public.seed_retained_listing_properties()");
+          equal(await replayState(), unfinished, "Withdrawn vocabulary cannot advance an unfinished eligible repair frame");
+          equal(await queue(withheldId), [], "Unfinished repair cannot enqueue the withdrawn family");
+          equal((await drain()).claimed, 0, "The actual worker cannot turn the withheld arrival into a claim");
+        } finally {
+          await sql(`UPDATE public.schema_proposals SET status='approved' WHERE id=${quote(PROPOSAL)}::uuid;
+            UPDATE public.retained_listing_property_replay SET
+              (engine_family_highwater,engine_family_cursor,engine_family_keys_seen,engine_family_work_seeded,engine_family_started_at,engine_family_completed_at)=
+              (SELECT engine_family_highwater,engine_family_cursor,engine_family_keys_seen,engine_family_work_seeded,engine_family_started_at,engine_family_completed_at
+                FROM jsonb_populate_record(NULL::public.retained_listing_property_replay,${quote(JSON.stringify(previousReplay))}::jsonb)) WHERE id`);
+        }
+        equal(await replayState(), previousReplay, "Synthetic unfinished-frame exercise restores the exact previous progress");
+        equal(await json(`SELECT to_jsonb(public.enqueue_retained_listing_properties(ARRAY[${quote(withheldId!)}::uuid]))::text`), 1,
+          "Restored curator approval admits exactly the previously withheld queue key");
+        equal((await queue(withheldId!))[0].status, "pending", "The preserved source becomes eligible work without a replacement capture");
+        const before = await testimonyCount();
+        const receipt = await drain();
+        equal({ claimed: receipt.claimed, stored: receipt.stored, writes: receipt.writes, duplicates: receipt.duplicates },
+          { claimed: 1, stored: 1, writes: 1, duplicates: 0 }, "The existing drain admits the preserved source after approval is restored");
+        const completed = (await queue(withheldId!))[0];
+        equal(completed.status, "done", "The recovered source receives verified PostgreSQL custody");
+        equal(await testimonyCount(), before + 1, "Recovery appends one family claim and preserves its source");
+        const state = await readers();
+        equal(state.provenance.observations.length, 3, "Public provenance retains all three attributed source captures");
+        equal(state.canonical[0]?.observation_id, completed.observation_id, "Recovered source reaches the actual canonical consumer");
+        assertBulkFamily(state, completed.observation_id, await json(`SELECT to_jsonb(o)::text FROM public.vehicle_observations o WHERE id=${quote(withheldId!)}::uuid`));
+        equal(parentInserts, 3, "All three original captures entered through the actual handler");
+        equal(databaseErrors.length, 2, "Negative queue gates cause no unexpected database failures");
+        equal(bridgeErrors, [], "No unsupported transport or external call was introduced");
+      }), "Withdrawal discarded source evidence or advanced unauthorized repair");
     } finally {
       Deno.serve = originalServe;
       globalThis.fetch = originalFetch;

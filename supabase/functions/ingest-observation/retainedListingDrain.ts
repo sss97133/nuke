@@ -4,6 +4,8 @@ export const RETAINED_LISTING_DRAIN_MODE = "retained_listing_property_drain_v1";
 export const RETAINED_LISTING_DRAIN_LIMIT = 120;
 const ADMISSION_CONCURRENCY = 2;
 const UUID = /^[0-9a-f]{8}(-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i;
+const ENGINE_FAMILY_PROPOSAL = "6b9de10b-1666-4bdf-bb69-7e82d62f8b32";
+const ENGINE_FAMILY_MODE = "retained_listing_engine_family_label_v1";
 const PROPERTY_KEYS: Record<string, string> = {
   "514cacd3-82b4-4330-b3df-e292612ee718": "interior_color",
   "efcb8c61-1ff5-4790-890e-2e09118e87e3": "exterior_color",
@@ -74,12 +76,41 @@ export async function drainRetainedListingProperties(
   const rows = claimed.data, keys = new Set();
   if (rows.length > Number(limit) || rows.some((row: any) => {
     const property = PROPERTY_KEYS[row?.property_id];
-    const expected = property ? `retained_listing_${property}_v1` : null;
+    const expected = property ? `retained_listing_${property}_v1` : ENGINE_FAMILY_MODE;
     const key = `${row?.source_observation_id}:${row?.property_id}`;
-    if (!UUID.test(row?.source_observation_id ?? "") || expected === null || row.mode !== expected ||
+    if (!UUID.test(row?.source_observation_id ?? "") || !UUID.test(row?.property_id ?? "") || row.mode !== expected ||
       !RETAINED_PROPERTY_MODES.includes(row.mode) || keys.has(key)) return true;
     keys.add(key);return false;
   })) return json({ success: false, error: "invalid_claimed_listing_work", writes: 0, model_calls: 0 }, 503);
+  if (rows.some((row: any) => row.mode === ENGINE_FAMILY_MODE)) {
+    // Ratification assigns this property's ID. Resolve it once per drain, never
+    // bake an invented UUID into the existing eleven-property dispatch map.
+    // Admission and completion still recheck current review/source eligibility.
+    const invalid = () => json({ success: false, error: "invalid_claimed_listing_work", writes: 0, model_calls: 0 }, 503);
+    const read = (table: string, fields: string, id: string) => db.from(table).select(fields).eq("id", id).maybeSingle()
+      .abortSignal(AbortSignal.any([req.signal,
+        AbortSignal.timeout(Math.max(1, Math.min(5000, 55000 - (Date.now() - started))))]));
+    try {
+      const proposal = await read("schema_proposals", "id,status,promoted_to_id", ENGINE_FAMILY_PROPOSAL);
+      if (proposal.error) throw new Error("proposal lookup unavailable");
+      const promoted = proposal.data?.promoted_to_id;
+      if (proposal.data?.id !== ENGINE_FAMILY_PROPOSAL || proposal.data?.status !== "approved" ||
+        typeof promoted !== "string" || !UUID.test(promoted) || PROPERTY_KEYS[promoted] ||
+        rows.some((row: any) => row.mode === ENGINE_FAMILY_MODE && row.property_id !== promoted)) return invalid();
+      const property = await read("observation_properties",
+        "id,property_key,label,namespace,data_type,unit,parent_property_id,discriminator_key,cardinality,verification_scope,ratified_at,deprecated_at,applies_to_kinds,proposed_by_proposal_id", promoted);
+      if (property.error) throw new Error("property lookup unavailable");
+      const p = property.data;
+      if (!p || p.id !== promoted || p.proposed_by_proposal_id !== ENGINE_FAMILY_PROPOSAL ||
+        p.property_key !== "engine_family_label" || p.label !== "Publisher engine-family label" ||
+        p.namespace !== "core" || p.data_type !== "string" || p.cardinality !== "single" ||
+        p.verification_scope !== "class" || p.unit !== null || p.parent_property_id !== null ||
+        p.discriminator_key !== null || typeof p.ratified_at !== "string" || !p.ratified_at || p.deprecated_at !== null ||
+        !Array.isArray(p.applies_to_kinds) || !p.applies_to_kinds.includes("specification")) return invalid();
+    } catch {
+      return json({ success: false, error: "listing_property_registry_unavailable", writes: 0, model_calls: 0 }, 503);
+    }
+  }
   const lookups = new RetainedBatchLookups();
   const summary = { claimed: rows.length, stored: 0, writes: 0, duplicates: 0, refused: 0,
     retries: 0, deferred: 0, completion_failures: 0, model_calls: 0, provider_calls: 0,
