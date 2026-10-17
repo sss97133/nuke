@@ -213,6 +213,15 @@
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
 .market-sources__event-model.is-unparsed { font-weight: 400; color: var(--text-secondary); }
 .market-sources__event-trim, .market-sources__event-raw { font-weight: 400; font-size: 10px; color: var(--text-secondary); }
+.market-sources__event-mark { display: inline-flex; align-items: center; vertical-align: middle; margin-right: 5px; height: 14px; }
+.market-sources__event-mark svg { height: 14px; width: auto; max-width: 68px; display: block; }
+.market-sources__event-facets { display: inline-flex; align-items: center; gap: 4px; margin-left: 6px; vertical-align: middle; }
+.market-sources__facet-pill { display: inline-flex; align-items: baseline; gap: 3px; padding: 1px 4px;
+  border: 1px solid var(--border); background: var(--surface); color: var(--text);
+  font: 700 8px 'Courier New', monospace; letter-spacing: 0.03em; text-decoration: none; line-height: 1.25; }
+.market-sources__facet-pill:hover, .market-sources__facet-pill:focus-visible { border-color: var(--text); text-decoration: none; }
+.market-sources__facet-axis { font-style: normal; font-size: 7px; letter-spacing: 0.06em; text-transform: uppercase;
+  color: var(--text-secondary); }
 .market-sources__event-model a, .market-sources__event-link a { color: inherit; text-decoration: none; }
 .market-sources__event-model a:hover, .market-sources__event-link a:hover { text-decoration: underline; }
 

@@ -594,3 +594,104 @@ it('renders high-confidence Regime 1/2 census rows for all 7 audited sources and
   expect(drill.textContent).toContain('$1,655,000');
   expect(drill.querySelector('a[href="/browse?source=rm_sothebys"]')).not.toBeNull();
 });
+
+it('renders SERIES, TRIM, and BODY facet pills linked to /?make=...&family=...&axis=...&facet=... plus matched era SVG identity marks in IngestionDrillPanel', async () => {
+  const facetLandingDetail = {
+    ...batLandingDetail,
+    recent: [
+      {
+        id: 'ev-c10-silverado',
+        source: 'bat',
+        event_type: 'auction',
+        event_status: 'active',
+        reserve: 'no_reserve',
+        price: 38500,
+        bid_count: 11,
+        year: 1979,
+        make: 'Chevrolet',
+        model: 'C10 Silverado Fleetside Pickup',
+        trim: 'Silverado',
+        vin: 'CCZ149F123456',
+        mileage: 44100,
+        record_date: '2026-10-20T18:00:00Z',
+        title: '1979 Chevrolet C10 Silverado Fleetside Pickup',
+        raw_title: '1979 Chevrolet C10 Silverado Fleetside Pickup',
+        lot: 'bat-c10-79',
+        vehicle_id: 'veh-c10-79',
+        source_url: 'https://bringatrailer.com/listing/1979-chevrolet-c10-silverado',
+        created_at: '2026-10-16T10:46:12Z',
+      },
+      {
+        id: 'ev-mustang-boss',
+        source: 'bat',
+        event_type: 'auction',
+        event_status: 'sold',
+        reserve: 'reserve',
+        price: 215000,
+        bid_count: 34,
+        year: 1969,
+        make: 'Ford',
+        model: 'Mustang Boss 429 Fastback',
+        trim: 'Boss 429',
+        vin: '9F02Z123456',
+        mileage: 19200,
+        record_date: '2026-10-15T20:00:00Z',
+        title: '1969 Ford Mustang Boss 429 Fastback',
+        raw_title: '1969 Ford Mustang Boss 429 Fastback',
+        lot: 'bat-boss-69',
+        vehicle_id: 'veh-boss-69',
+        source_url: 'https://bringatrailer.com/listing/1969-ford-mustang-boss-429',
+        created_at: '2026-10-16T10:45:00Z',
+      },
+    ],
+  };
+
+  fixture.rpc.mockImplementation((fn: string) => {
+    if (fn === 'market_sources_read') return Promise.resolve({ data: value, error: null });
+    if (fn === 'market_source_landing_read') return Promise.resolve({ data: facetLandingDetail, error: null });
+    return Promise.resolve({ data: null, error: { message: 'none' } });
+  });
+
+  await act(async () => root.render(<SourcesBoard />));
+  const firstRow = container.querySelector('li.market-sources__row') as HTMLLIElement;
+  await act(async () => { firstRow.click(); });
+
+  const drill = container.querySelector('.market-sources__drill')!;
+  expect(drill).not.toBeNull();
+  const eventRows = [...drill.querySelectorAll('li.market-sources__event')];
+  expect(eventRows).toHaveLength(2);
+
+  // First event: 1979 Chevrolet C10 Silverado Fleetside Pickup
+  const c10Row = eventRows[0];
+  const c10Mark = c10Row.querySelector('.market-sources__event-mark');
+  expect(c10Mark).not.toBeNull();
+  expect(c10Mark?.querySelector('svg')).not.toBeNull();
+
+  const c10Pills = [...c10Row.querySelectorAll('a.market-sources__facet-pill')] as HTMLAnchorElement[];
+  expect(c10Pills.map((p) => p.textContent?.trim())).toEqual([
+    'SERIES C10 (1/2-Ton 2WD)',
+    'TRIM Silverado',
+    'BODY Fleetside / Styleside',
+  ]);
+  expect(c10Pills.map((p) => p.getAttribute('href'))).toEqual([
+    '/?make=Chevrolet&family=Pickup&axis=series&facet=C10+%281%2F2-Ton+2WD%29',
+    '/?make=Chevrolet&family=Pickup&axis=trim&facet=Silverado',
+    '/?make=Chevrolet&family=Pickup&axis=body&facet=Fleetside+%2F+Styleside',
+  ]);
+
+  // Second event: 1969 Ford Mustang Boss 429 Fastback
+  const mustangRow = eventRows[1];
+  const mustangMark = mustangRow.querySelector('.market-sources__event-mark');
+  expect(mustangMark).not.toBeNull();
+  expect(mustangMark?.querySelector('svg')).not.toBeNull();
+
+  const mustangPills = [...mustangRow.querySelectorAll('a.market-sources__facet-pill')] as HTMLAnchorElement[];
+  expect(mustangPills.map((p) => p.textContent?.trim())).toEqual([
+    'SERIES Boss 429',
+    'BODY Fastback',
+  ]);
+  expect(mustangPills.map((p) => p.getAttribute('href'))).toEqual([
+    '/?make=Ford&family=Mustang&axis=series&facet=Boss+429',
+    '/?make=Ford&family=Mustang&axis=body&facet=Fastback',
+  ]);
+});

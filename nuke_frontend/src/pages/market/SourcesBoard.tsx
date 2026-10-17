@@ -1,6 +1,11 @@
 import { Fragment, useEffect, useState } from 'react';
 import { supabase } from '../../lib/supabase';
 import { OrgLogo } from '../../components/common/OrgLogo';
+import {
+  buildFacetDrilldownUrl,
+  classifyVehicleFacet,
+  resolveVehicleIdentityMark,
+} from '../../lib/market/vehicleTaxonomy';
 import './SourcesBoard.css';
 
 // Every source on one board with the same measures, ranked by the lots we hold for it (market_sources_read,
@@ -1290,6 +1295,28 @@ function SourceLandingInspector({
                 const showTrim = !!ev.trim && (!ev.model || !ev.model.toLowerCase().includes(ev.trim.toLowerCase()));
                 const showRawHint = !!ev.rawTitle && (!ev.make || !ev.year) && ev.rawTitle !== modelPrimary;
                 const href = ev.vehicleId ? `/vehicle/${ev.vehicleId}` : ev.sourceUrl;
+                const facetInfo = classifyVehicleFacet({
+                  make: ev.make,
+                  model: ev.model,
+                  trim: ev.trim,
+                  title: ev.title,
+                  rawTitle: ev.rawTitle,
+                  year: ev.year,
+                });
+                const identityMark = resolveVehicleIdentityMark({
+                  make: ev.make,
+                  family: facetInfo.family,
+                  model: ev.model,
+                  trim: ev.trim,
+                  title: ev.title,
+                  rawTitle: ev.rawTitle,
+                  year: ev.year,
+                });
+                const facetEntries = ([
+                  ['series', 'SERIES', facetInfo.series],
+                  ['trim', 'TRIM', facetInfo.trim],
+                  ['body', 'BODY', facetInfo.body],
+                ] as const).filter((entry): entry is ['series' | 'trim' | 'body', string, string] => !!entry[2]);
 
                 return (
                   <li key={ev.id} className="market-sources__event">
@@ -1322,6 +1349,14 @@ function SourceLandingInspector({
                       className={`market-sources__event-model${!ev.model ? ' is-unparsed' : ''}`}
                       title={ev.rawTitle ? `Model: ${ev.model ?? 'unparsed'} · Raw title: ${ev.rawTitle}` : modelPrimary}
                     >
+                      {identityMark ? (
+                        <span
+                          className="market-sources__event-mark"
+                          title={`${identityMark.displayLabel} (${identityMark.yearStart}–${identityMark.yearEnd})`}
+                          aria-label={identityMark.displayLabel}
+                          dangerouslySetInnerHTML={{ __html: identityMark.svgMarkup }}
+                        />
+                      ) : null}
                       {href ? (
                         <a
                           href={href}
@@ -1334,6 +1369,41 @@ function SourceLandingInspector({
                       )}
                       {showTrim ? <small className="market-sources__event-trim"> · {ev.trim}</small> : null}
                       {showRawHint ? <small className="market-sources__event-raw"> ({ev.rawTitle})</small> : null}
+                      {facetEntries.length > 0 ? (
+                        <span className="market-sources__event-facets" aria-label="Vehicle taxonomy facets">
+                          {facetEntries.map(([axis, axisLabel, facetVal]) => {
+                            const facetHref =
+                              ev.make && facetInfo.family
+                                ? buildFacetDrilldownUrl({
+                                    make: ev.make,
+                                    family: facetInfo.family,
+                                    axis,
+                                    facet: facetVal,
+                                  })
+                                : null;
+                            return facetHref ? (
+                              <a
+                                key={axis}
+                                href={facetHref}
+                                className={`market-sources__facet-pill market-sources__facet-pill--${axis}`}
+                                data-axis={axis}
+                                title={`${axisLabel}: ${facetVal} (${ev.make} ${facetInfo.family})`}
+                              >
+                                <em className="market-sources__facet-axis">{axisLabel}</em> {facetVal}
+                              </a>
+                            ) : (
+                              <span
+                                key={axis}
+                                className={`market-sources__facet-pill market-sources__facet-pill--${axis}`}
+                                data-axis={axis}
+                                title={`${axisLabel}: ${facetVal}`}
+                              >
+                                <em className="market-sources__facet-axis">{axisLabel}</em> {facetVal}
+                              </span>
+                            );
+                          })}
+                        </span>
+                      ) : null}
                     </span>
                     <span
                       className={`market-sources__event-vin${vinLot.isVin ? ' is-vin' : vinLot.isMissing ? ' is-missing' : ' is-lot'}`}
