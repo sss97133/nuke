@@ -746,7 +746,7 @@ export default function FamilyMovers({
                   change is bigger than luck explains; the bar is the likely range, from half as many sales (−50%) to twice as many (+100%).
                   {' '}{data.significant.toLocaleString('en-US')} of {data.eligible.toLocaleString('en-US')} families with {data.min_sales}+ measured sales each
                   {' '}{meta.eachWindowLabel} changed for real ({data.families.toLocaleString('en-US')} families read). Avg sale = dollars divided by cars sold, so it
-                  moves with which cars sold. Measured at auction houses we hold in full both years: today Bring a Trailer.
+                  moves with which cars sold. Measured at auction houses we hold in full both years: today Bring a Trailer, Mecum and Bonhams.
                 </>
               )}
             </div>
