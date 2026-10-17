@@ -27,6 +27,11 @@ CREATE FUNCTION pg_temp.ok(label text, condition boolean) RETURNS void LANGUAGE 
   RAISE NOTICE 'PASS %', label;
 END $$;
 
+CREATE SCHEMA cron;
+CREATE TABLE cron.job (jobid bigserial PRIMARY KEY, jobname text UNIQUE, schedule text, command text, active boolean DEFAULT true);
+CREATE FUNCTION cron.schedule(job_name text, schedule text, command text) RETURNS bigint LANGUAGE sql AS
+$$ INSERT INTO cron.job (jobname, schedule, command) VALUES (job_name, schedule, command) RETURNING jobid $$;
+
 CREATE TABLE public.canonical_makes (id uuid PRIMARY KEY, canonical_name text, display_name text, short_name text,
   aliases text[], country_of_origin text, founded_year integer, parent_company text, is_active boolean,
   created_at timestamptz, brand_tier text);
