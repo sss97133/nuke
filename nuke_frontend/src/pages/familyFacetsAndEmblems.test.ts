@@ -4,6 +4,7 @@ import {
   classifyVehicleFacets,
   consolidateBrandPickupFamilies,
   isPickupFamilyLabel,
+  resolveTileBadgeSvg,
   resolveVettedIdentityMarks,
 } from './familyFacetsAndEmblems';
 import type { TreemapNode } from './HomePage';
@@ -167,5 +168,49 @@ describe('familyFacetsAndEmblems', () => {
 
     const split = consolidateBrandPickupFamilies('Chevrolet', chevyFamilies, false);
     expect(split).toHaveLength(5);
+  });
+
+  it('partitions enriched salesData (with trim/body/title suffix) into Series, Trim, and Body Style buckets and attaches vetted SVG badges', () => {
+    const baseModels: TreemapNode[] = [
+      { name: 'C10', count: 500, value: 20_000_000, usd: 20_000_000 },
+    ];
+    const enrichedSales = Array.from({ length: 12 }, (_, idx) => ({
+      vehicle_id: `v-${idx}`,
+      sale_date: '2026-06-15',
+      usd: idx < 6 ? 45_000 : 38_000,
+      source: 'Bring a Trailer',
+      year: idx < 6 ? 1978 : 1974,
+      model:
+        idx < 6
+          ? 'C10 · 1978 Chevrolet C10 Silverado Stepside Short Bed'
+          : 'K10 · 1974 Chevrolet K10 Cheyenne Super Fleetside',
+    }));
+
+    const trimBuckets = buildFacetNodes('trim', 'Chevrolet', 'Pickup', baseModels, enrichedSales);
+    expect(trimBuckets).not.toBeNull();
+    const silveradoNode = trimBuckets!.find((n) => n.name === 'Silverado');
+    const cheyenneSuperNode = trimBuckets!.find((n) => n.name === 'Cheyenne Super');
+    expect(silveradoNode?.count).toBe(6);
+    expect(silveradoNode?.badgeSvg).toContain('Silverado');
+    expect(cheyenneSuperNode?.count).toBe(6);
+    expect(cheyenneSuperNode?.badgeSvg).toContain('CHEYENNE');
+
+    const bodyBuckets = buildFacetNodes('body', 'Chevrolet', 'Pickup', baseModels, enrichedSales);
+    expect(bodyBuckets!.find((n) => n.name === 'Stepside / Flareside')?.count).toBe(6);
+    expect(bodyBuckets!.find((n) => n.name === 'Fleetside / Styleside')?.count).toBe(6);
+
+    // Tri-Five Bel Air, Chevelle SS, Camaro Z/28, and Bronco U13/U14/U15 classification
+    expect(classifyVehicleFacets('Chevrolet', 'Bel Air', 'Bel Air 2-Door Hardtop Sport Coupe', 1957)).toEqual({
+      series: 'Bel Air (2400 Series)',
+      trim: null,
+      body: 'Coupe / Hardtop',
+    });
+    expect(classifyVehicleFacets('Chevrolet', 'Chevelle', 'Chevelle SS 454 LS6 Convertible', 1970)).toEqual({
+      series: 'SS 454',
+      trim: 'SS (Super Sport)',
+      body: 'Convertible / Cabriolet',
+    });
+    expect(classifyVehicleFacets('Ford', 'Bronco', 'Bronco U14 Half-Cab Pickup', 1968).series).toBe('U14 Half-Cab Pickup');
+    expect(resolveTileBadgeSvg('Porsche', '911', 'Targa / T-Top')).toContain('targa');
   });
 });

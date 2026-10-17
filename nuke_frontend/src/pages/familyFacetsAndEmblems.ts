@@ -358,6 +358,231 @@ export const VETTED_IDENTITY_MARKS: readonly VehicleIdentityMark[] = [
       '<svg viewBox="0 0 185 40" xmlns="http://www.w3.org/2000/svg"><path d="M8 28 L32 28 L44 13 L80 13 L90 26 L112 28" fill="none" stroke="#f9fafb" stroke-width="2.2"/><text x="150" y="24" text-anchor="middle" fill="#a3e635" font-family="Arial,sans-serif" font-size="10.5" font-weight="800" letter-spacing="1.4">COUPE</text></svg>',
     provenanceNote: 'Mustang Notchback Hardtop Coupe (Body 65) formal roofline silhouette.',
   },
+  // ── Chevrolet Advance Design, Task Force, Action Line & Muscle Trucks ──────
+  {
+    id: 'chevy-3100-47-55',
+    brand: 'Chevrolet',
+    family: 'Pickup',
+    seriesCode: '3100',
+    yearStart: 1947,
+    yearEnd: 1955,
+    markKind: 'series_badge',
+    displayLabel: 'CHEVROLET 3100',
+    subLabel: "'47–'55 Advance Design Hood Side Emblem",
+    fenderPlacement: 'Hood Side',
+    svgMarkup:
+      '<svg viewBox="0 0 190 40" xmlns="http://www.w3.org/2000/svg"><polygon points="6,8 184,8 174,32 16,32" fill="#1b365d" stroke="#e5e7eb" stroke-width="2.2"/><text x="95" y="25" text-anchor="middle" fill="#f9fafb" font-family="Georgia,serif" font-size="13" font-weight="800" letter-spacing="2.2">CHEVROLET 3100</text></svg>',
+    provenanceNote: '1947–1955 Advance Design 1/2-ton 3100 hood side badge.',
+  },
+  {
+    id: 'chevy-apache-58-61',
+    brand: 'Chevrolet',
+    family: 'Pickup',
+    seriesCode: 'Apache',
+    yearStart: 1958,
+    yearEnd: 1961,
+    markKind: 'series_badge',
+    displayLabel: 'APACHE 10 / 31',
+    subLabel: "'58–'61 Task Force Apache Fender Crest",
+    fenderPlacement: 'Front Fender',
+    svgMarkup:
+      '<svg viewBox="0 0 190 40" xmlns="http://www.w3.org/2000/svg"><polygon points="10,6 180,6 170,34 20,34" fill="#18181b" stroke="#e5e7eb" stroke-width="2.2"/><text x="95" y="25" text-anchor="middle" fill="#facc15" font-family="Georgia,serif" font-size="13.5" font-weight="800" letter-spacing="2.8">APACHE</text></svg>',
+    provenanceNote: '1958–1961 Chevrolet Apache light-duty pickup fender crest.',
+  },
+  {
+    id: 'chevy-cameo-55-58',
+    brand: 'Chevrolet',
+    family: 'Pickup',
+    seriesCode: 'Cameo',
+    yearStart: 1955,
+    yearEnd: 1958,
+    markKind: 'series_badge',
+    displayLabel: 'CAMEO CARRIER',
+    subLabel: "'55–'58 Model 3124 Fiberglass Bedside Script",
+    rpoCode: 'Model 3124',
+    fenderPlacement: 'Front Fender',
+    svgMarkup:
+      '<svg viewBox="0 0 190 40" xmlns="http://www.w3.org/2000/svg"><rect x="4" y="6" width="182" height="28" rx="3" fill="#7f1d1d" stroke="#e5e7eb" stroke-width="2"/><text x="95" y="25" text-anchor="middle" fill="#f9fafb" font-family="Georgia,serif" font-style="italic" font-size="14" font-weight="700" letter-spacing="1.5">Cameo Carrier</text></svg>',
+    provenanceNote: '1955–1958 Chevrolet 3124 Cameo Carrier luxury pickup script.',
+  },
+  {
+    id: 'chevy-cst-10-67-72',
+    brand: 'Chevrolet',
+    family: 'Pickup',
+    seriesCode: 'C10',
+    trimPackage: 'CST (Custom Sport Truck)',
+    yearStart: 1967,
+    yearEnd: 1972,
+    markKind: 'trim_badge',
+    displayLabel: 'CST / 10',
+    subLabel: "'67–'72 Action Line Custom Sport Truck Plate",
+    rpoCode: 'Z84',
+    fenderPlacement: 'Lower Front Fender',
+    svgMarkup:
+      '<svg viewBox="0 0 190 40" xmlns="http://www.w3.org/2000/svg"><rect x="2" y="5" width="186" height="30" rx="2" fill="#111827" stroke="#e5e7eb" stroke-width="2.2"/><rect x="132" y="8" width="52" height="24" fill="#991b1b"/><text x="67" y="25" text-anchor="middle" fill="#facc15" font-family="Georgia,serif" font-size="14" font-weight="800" letter-spacing="3">C S T</text><text x="158" y="26" text-anchor="middle" fill="#ffffff" font-family="Arial,sans-serif" font-size="16" font-weight="900">10</text></svg>',
+    provenanceNote: '1967–1972 Action Line CST (Custom Sport Truck) lower fender badge.',
+  },
+  {
+    id: 'chevy-big-10-75-80',
+    brand: 'Chevrolet',
+    family: 'Pickup',
+    seriesCode: 'C10',
+    trimPackage: 'Big 10',
+    yearStart: 1975,
+    yearEnd: 1980,
+    markKind: 'trim_badge',
+    displayLabel: 'BIG 10',
+    subLabel: "'75–'80 Heavy-Duty F44 Bedside Callout",
+    rpoCode: 'F44',
+    fenderPlacement: 'Upper Bedside',
+    svgMarkup:
+      '<svg viewBox="0 0 190 40" xmlns="http://www.w3.org/2000/svg"><rect x="2" y="5" width="186" height="30" rx="2" fill="#18181b" stroke="#f97316" stroke-width="2.5"/><text x="95" y="27" text-anchor="middle" fill="#facc15" font-family="Arial Black,Impact,sans-serif" font-size="17" font-weight="900" letter-spacing="3.5">BIG 10</text></svg>',
+    provenanceNote: '1975–1980 Chevrolet C10 RPO F44 Big 10 callout.',
+  },
+  {
+    id: 'chevy-454-ss-90-93',
+    brand: 'Chevrolet',
+    family: 'Pickup',
+    seriesCode: 'C1500',
+    trimPackage: '454 SS',
+    yearStart: 1990,
+    yearEnd: 1993,
+    markKind: 'trim_badge',
+    displayLabel: '454 SS',
+    subLabel: "'90–'93 GMT400 Muscle Truck Decal (RPO B4U)",
+    rpoCode: 'B4U',
+    fenderPlacement: 'Rear Bedside',
+    svgMarkup:
+      '<svg viewBox="0 0 190 40" xmlns="http://www.w3.org/2000/svg"><rect x="2" y="5" width="186" height="30" rx="2" fill="#09090b" stroke="#dc2626" stroke-width="2.2"/><text x="95" y="27" text-anchor="middle" fill="#ef4444" font-family="Arial Black,Impact,sans-serif" font-size="17" font-weight="900" letter-spacing="3">454 SS</text></svg>',
+    provenanceNote: '1990–1993 Chevrolet C1500 454 SS big-block sport pickup callout.',
+  },
+  // ── GMC Early '73–'74 Custom / Super Custom vs '75–'87 Sierra Classic ──────
+  {
+    id: 'gmc-super-custom-15-73-74',
+    brand: 'GMC',
+    family: 'Pickup',
+    seriesCode: 'C1500',
+    trimPackage: 'Super Custom',
+    yearStart: 1973,
+    yearEnd: 1974,
+    markKind: 'trim_badge',
+    displayLabel: 'SUPER CUSTOM 15',
+    subLabel: "'73–'74 Early Two-Digit Super Custom Plate",
+    fenderPlacement: 'Front Fender (1973–1974 only)',
+    svgMarkup:
+      '<svg viewBox="0 0 205 40" xmlns="http://www.w3.org/2000/svg"><rect x="2" y="3" width="201" height="34" rx="2" fill="#18181b" stroke="#e5e7eb" stroke-width="2.2"/><rect x="152" y="6" width="47" height="28" fill="#dc2626"/><text x="76" y="17" text-anchor="middle" fill="#facc15" font-family="Arial,sans-serif" font-size="9.5" font-weight="800" letter-spacing="2.5">SUPER</text><text x="76" y="30" text-anchor="middle" fill="#f3f4f6" font-family="Arial,sans-serif" font-size="11" font-weight="800" letter-spacing="2">CUSTOM</text><text x="175" y="26" text-anchor="middle" fill="#ffffff" font-family="Arial,sans-serif" font-size="16" font-weight="900">15</text></svg>',
+    provenanceNote: '1973–1974 GMC Super Custom 15 two-digit fender plate.',
+  },
+  {
+    id: 'gmc-sierra-classic-1500-75-87',
+    brand: 'GMC',
+    family: 'Pickup',
+    seriesCode: 'C1500',
+    trimPackage: 'Sierra Classic',
+    yearStart: 1975,
+    yearEnd: 1987,
+    markKind: 'trim_badge',
+    displayLabel: 'SIERRA CLASSIC 1500',
+    subLabel: "'75–'87 Top-Tier Luxury Trim Plate (Silverado Equiv.)",
+    rpoCode: 'YE9',
+    fenderPlacement: 'Front Fender',
+    svgMarkup:
+      '<svg viewBox="0 0 215 40" xmlns="http://www.w3.org/2000/svg"><rect x="2" y="3" width="211" height="34" rx="2" fill="#18181b" stroke="#e5e7eb" stroke-width="2.2"/><rect x="148" y="6" width="61" height="28" fill="#991b1b"/><text x="75" y="17" text-anchor="middle" fill="#f3f4f6" font-family="Arial,sans-serif" font-size="10.5" font-weight="800" letter-spacing="2.2">SIERRA</text><text x="75" y="30" text-anchor="middle" fill="#facc15" font-family="Georgia,serif" font-style="italic" font-size="11.5" font-weight="700" letter-spacing="1.2">Classic</text><text x="178" y="25" text-anchor="middle" fill="#ffffff" font-family="Arial,sans-serif" font-size="14.5" font-weight="900">1500</text></svg>',
+    provenanceNote: '1975–1987 GMC Sierra Classic 1500 top-of-the-line fender plate.',
+  },
+  // ── Bel Air, Chevelle, Camaro, Mustang Boss/Mach 1/Shelby, Bronco, 911 ─────
+  {
+    id: 'chevy-bel-air-55-57',
+    brand: 'Chevrolet',
+    family: 'Bel Air',
+    yearStart: 1955,
+    yearEnd: 1957,
+    markKind: 'model_wordmark',
+    displayLabel: 'BEL AIR (TRI-FIVE)',
+    subLabel: "'55–'57 Gold Anodized Quarter Script & V-Crest",
+    fenderPlacement: 'Quarter Panel & Hood',
+    svgMarkup:
+      '<svg viewBox="0 0 190 40" xmlns="http://www.w3.org/2000/svg"><rect x="2" y="5" width="186" height="30" rx="2" fill="#18181b" stroke="#d4af37" stroke-width="2"/><path d="M14 14 L26 28 L38 14" fill="none" stroke="#d4af37" stroke-width="2.5"/><text x="112" y="26" text-anchor="middle" fill="#facc15" font-family="Georgia,serif" font-style="italic" font-size="16" font-weight="700" letter-spacing="1.2">Bel Air</text></svg>',
+    provenanceNote: '1955–1957 Tri-Five Bel Air gold script and V-emblem.',
+  },
+  {
+    id: 'chevy-chevelle-ss-65-72',
+    brand: 'Chevrolet',
+    family: 'Chevelle',
+    trimPackage: 'SS (Super Sport)',
+    yearStart: 1965,
+    yearEnd: 1972,
+    markKind: 'trim_badge',
+    displayLabel: 'SS 396 · 454',
+    subLabel: "'65–'72 Chevelle Super Sport Grille & Fender Badge",
+    rpoCode: 'Z15',
+    fenderPlacement: 'Grille & Fender',
+    svgMarkup:
+      '<svg viewBox="0 0 190 40" xmlns="http://www.w3.org/2000/svg"><rect x="2" y="5" width="186" height="30" rx="2" fill="#111827" stroke="#e5e7eb" stroke-width="2.2"/><rect x="14" y="9" width="56" height="22" rx="2" fill="#b91c1c" stroke="#f9fafb" stroke-width="1.5"/><text x="42" y="25" text-anchor="middle" fill="#ffffff" font-family="Arial Black,sans-serif" font-size="14" font-weight="900" letter-spacing="1.5">SS</text><text x="128" y="25" text-anchor="middle" fill="#f9fafb" font-family="Arial,sans-serif" font-size="12.5" font-weight="800" letter-spacing="2">396 · 454</text></svg>',
+    provenanceNote: '1965–1972 Chevrolet Chevelle Super Sport (SS 396 / SS 454) badge.',
+  },
+  {
+    id: 'chevy-camaro-z28-67-81',
+    brand: 'Chevrolet',
+    family: 'Camaro',
+    trimPackage: 'Z/28',
+    yearStart: 1967,
+    yearEnd: 1981,
+    markKind: 'trim_badge',
+    displayLabel: 'CAMARO Z/28',
+    subLabel: "'67–'81 RPO Z28 Trans-Am Homologation Emblem",
+    rpoCode: 'Z28',
+    fenderPlacement: 'Grille & Front Fender',
+    svgMarkup:
+      '<svg viewBox="0 0 185 40" xmlns="http://www.w3.org/2000/svg"><rect x="2" y="5" width="181" height="30" rx="2" fill="#111827" stroke="#e5e7eb" stroke-width="2.2"/><text x="92" y="27" text-anchor="middle" fill="#ef4444" stroke="#f9fafb" stroke-width="0.8" font-family="Arial Black,Impact,sans-serif" font-size="19" font-weight="900" letter-spacing="2.5">Z/28</text></svg>',
+    provenanceNote: 'Factory Chevrolet Camaro RPO Z28 emblem.',
+  },
+  {
+    id: 'mustang-boss-69-70',
+    brand: 'Ford',
+    family: 'Mustang',
+    seriesCode: 'Boss 302',
+    yearStart: 1969,
+    yearEnd: 1970,
+    markKind: 'series_badge',
+    displayLabel: 'BOSS 302 · 429',
+    subLabel: "'69–'70 Shinoda C-Stripe & Kar-Kraft Hemi Callout",
+    fenderPlacement: 'Front Fender',
+    svgMarkup:
+      '<svg viewBox="0 0 190 40" xmlns="http://www.w3.org/2000/svg"><rect x="2" y="5" width="186" height="30" rx="2" fill="#111827" stroke="#facc15" stroke-width="2"/><text x="95" y="26" text-anchor="middle" fill="#facc15" font-family="Georgia,serif" font-size="14" font-weight="900" letter-spacing="2.8">BOSS 302·429</text></svg>',
+    provenanceNote: '1969–1970 Ford Mustang Boss 302 & Boss 429 callout.',
+  },
+  {
+    id: 'mustang-mach-1-69-73',
+    brand: 'Ford',
+    family: 'Mustang',
+    seriesCode: 'Mach 1',
+    yearStart: 1969,
+    yearEnd: 1973,
+    markKind: 'series_badge',
+    displayLabel: 'MACH 1',
+    subLabel: "'69–'73 Body 63C SportsRoof Stencil Callout",
+    rpoCode: 'Body 63C',
+    fenderPlacement: 'Rocker & Decklid',
+    svgMarkup:
+      '<svg viewBox="0 0 185 40" xmlns="http://www.w3.org/2000/svg"><rect x="2" y="5" width="181" height="30" rx="2" fill="#18181b" stroke="#dc2626" stroke-width="2"/><text x="92" y="26" text-anchor="middle" fill="#f87171" font-family="Arial Black,sans-serif" font-size="16" font-weight="900" letter-spacing="3.5">MACH 1</text></svg>',
+    provenanceNote: '1969–1973 Ford Mustang Mach 1 SportsRoof badge.',
+  },
+  {
+    id: 'porsche-911-targa',
+    brand: 'Porsche',
+    family: '911',
+    bodyStyle: 'Targa',
+    yearStart: 1967,
+    yearEnd: 2035,
+    markKind: 'body_silhouette',
+    displayLabel: '911 TARGA',
+    subLabel: 'Brushed Stainless Roll-Bar Hoop & Gold Targa Script',
+    fenderPlacement: 'B-Pillar Roll Hoop',
+    svgMarkup:
+      '<svg viewBox="0 0 185 40" xmlns="http://www.w3.org/2000/svg"><rect x="2" y="5" width="181" height="30" rx="2" fill="#18181b" stroke="#d4af37" stroke-width="2"/><path d="M18 28 L24 12 L34 12 L38 28" fill="#d4d4d8"/><text x="108" y="26" text-anchor="middle" fill="#facc15" font-family="Georgia,serif" font-style="italic" font-size="16" font-weight="700" letter-spacing="1.5">targa</text></svg>',
+    provenanceNote: 'Porsche 911 Targa B-pillar safety hoop and script.',
+  },
 ];
 
 const PICKUP_FAMILIES = new Set([
@@ -557,6 +782,44 @@ export function classifyVehicleFacets(
     else if (/\bSC\b/.test(u)) series = '911 SC';
   }
 
+  if (!series && (fam === 'bel air' || fam === '210' || fam === '150' || fam === 'nomad')) {
+    if (/\bNOMAD\b/.test(u)) series = 'Nomad Sport Wagon';
+    else if (/\bBEL\s+AIR\b/.test(u)) series = 'Bel Air (2400 Series)';
+    else if (/\b210\b|\bTWO[-\s]?TEN\b/.test(u)) series = '210 (2100 Series)';
+    else if (/\b150\b|\bONE[-\s]?FIFTY\b/.test(u)) series = '150 (1500 Series)';
+    else if (/\bBEAUVILLE\b/.test(u)) series = 'Beauville Wagon';
+    else if (/\bTOWNS?MAN\b/.test(u)) series = 'Townsman Wagon';
+  }
+
+  if (!series && fam === 'chevelle') {
+    if (/\bSS\s*454\b|\bLS6\b|\bLS5\b/.test(u)) series = 'SS 454';
+    else if (/\bSS\s*396\b|\bL78\b|\bL89\b/.test(u)) series = 'SS 396';
+    else if (/\bMALIBU\s+SS\b|\bCHEVELLE\s+SS\b|\bSUPER\s+SPORT\b/.test(u)) series = 'Chevelle SS';
+    else if (/\bLAGUNA\b/.test(u)) series = 'Laguna S-3';
+    else if (/\bMALIBU\b/.test(u)) series = 'Malibu';
+    else if (/\b300\s+DELUXE\b|\b300\b/.test(u)) series = 'Chevelle 300';
+  }
+
+  if (!series && fam === 'camaro') {
+    if (/\bCOPO\b|\bYENKO\b|\bBALDWIN\b|\bZL[-\s]?1\b/.test(u)) series = 'COPO / ZL1';
+    else if (/\bZ\/?28\b/.test(u)) series = 'Camaro Z/28';
+    else if (/\bIROC[-\s]?Z\b/.test(u)) series = 'Camaro IROC-Z';
+    else if (/\bRS\/SS\b|\bSS\/RS\b/.test(u)) series = 'Camaro RS/SS';
+    else if (/\bSS\b|\bSUPER\s+SPORT\b/.test(u)) series = 'Camaro SS';
+    else if (/\bRS\b|\bRALLY\s+SPORT\b/.test(u)) series = 'Camaro RS';
+    else if (/\bBERLINETTA\b/.test(u)) series = 'Berlinetta';
+  }
+
+  if (!series && fam === 'bronco') {
+    if (/\bRAPTOR\b/.test(u)) series = 'Bronco Raptor';
+    else if (/\bSTROPPE\b|\bBAJA\b/.test(u)) series = 'Bill Stroppe Baja';
+    else if (/\bU13\b|\bROADSTER\b/.test(u)) series = 'U13 Roadster';
+    else if (/\bU14\b|\bHALF[-\s]?CAB\b|\bSPORTS\s+UTILITY\b/.test(u)) series = 'U14 Half-Cab Pickup';
+    else if (/\bU15\b|\bWAGON\b/.test(u) || (year && year >= 1966 && year <= 1977)) series = 'U15 Wagon';
+    else if (/\bEDDIE\s+BAUER\b/.test(u)) series = 'Eddie Bauer';
+    else if (/\bXLT\b/.test(u)) series = 'Bronco XLT';
+  }
+
   // ── 2. TRIM PACKAGE EXTRACTION (Year-aware for Squarebody & Marque Trims) ─
   if (/\bCHEYENNE\s+SUPER\b/.test(u)) trim = 'Cheyenne Super';
   else if (/\bCHEYENNE\b/.test(u)) trim = 'Cheyenne';
@@ -644,8 +907,13 @@ export function buildFacetNodes(
   const pickFacet = (c: VehicleFacetClassification): string | null =>
     axis === 'series' ? c.series : axis === 'trim' ? c.trim : c.body;
 
-  // Prefer re-keying from raw models when no era filter is active so full ledger USD/sold_12m/offered roll up cleanly;
-  // when salesData has rich year-level records and an era filter is active, baseModels is already era-filtered by HomePage.
+  const fallbackLabel =
+    axis === 'series' ? 'Standard Series' : axis === 'trim' ? 'Base / Unbadged Trim' : 'Standard Body';
+
+  // When salesData is loaded (up to 12,000 dated sales enriched with vehicles.trim + body_style + listing_title),
+  // compute the exact facet distribution from the enriched sales so records whose raw `vehicles.model` is just
+  // "C10", "Pickup", "Mustang", or "Bel Air" are accurately partitioned into Silverado / Cheyenne Super / Scottsdale /
+  // Fastback / 2-Door Hardtop / Stepside / Fleetside buckets!
   const buckets = new Map<
     string,
     {
@@ -663,12 +931,78 @@ export function buildFacetNodes(
       weightedMedianCount: number;
       representativeModel: string;
       representativeUsd: number;
+      badgeSvg?: string;
     }
   >();
 
+  const stripEnrichedSuffix = (m: string) => m.split(' · ')[0].trim();
+
+  if (salesData && salesData.length >= 10) {
+    const nowMs = Date.now();
+    const dayMs = 86_400_000;
+    const cutoff12m = nowMs - 365 * dayMs;
+    const cutoff24m = nowMs - 730 * dayMs;
+    const measuredHouses = new Set(['Bring a Trailer', 'Mecum', 'Bonhams']);
+
+    for (const s of salesData) {
+      if (s.usd <= 0) continue;
+      if (eraFilterFn && s.year != null && !eraFilterFn(s.year)) continue;
+      const cls = classifyVehicleFacets(make, familyLabel, s.model, s.year);
+      const facetLabel = pickFacet(cls) ?? fallbackLabel;
+      const cleanModel = stripEnrichedSuffix(s.model ?? '') || facetLabel;
+      const prev = buckets.get(facetLabel) ?? {
+        name: facetLabel,
+        count: 0,
+        usd: 0,
+        sold_any: 0,
+        offered: 0,
+        dated: 0,
+        sold_12m: 0,
+        sold_prior_12m: 0,
+        usd_12m: 0,
+        usd_prior_12m: 0,
+        weightedMedianSum: 0,
+        weightedMedianCount: 0,
+        representativeModel: cleanModel,
+        representativeUsd: 0,
+        badgeSvg: resolveTileBadgeSvg(make, familyLabel, facetLabel),
+      };
+      prev.count += 1;
+      prev.usd += s.usd;
+      prev.sold_any += 1;
+      prev.offered += 1;
+      prev.weightedMedianSum += s.usd;
+      prev.weightedMedianCount += 1;
+      if (s.source && measuredHouses.has(s.source)) {
+        prev.dated += 1;
+        const t = Date.parse(s.sale_date);
+        if (Number.isFinite(t)) {
+          if (t > cutoff12m && t <= nowMs) {
+            prev.sold_12m += 1;
+            prev.usd_12m += s.usd;
+          } else if (t > cutoff24m && t <= cutoff12m) {
+            prev.sold_prior_12m += 1;
+            prev.usd_prior_12m += s.usd;
+          }
+        }
+      }
+      if (s.usd > prev.representativeUsd) {
+        prev.representativeUsd = s.usd;
+        prev.representativeModel = cleanModel;
+      }
+      buckets.set(facetLabel, prev);
+    }
+  }
+
+  // Merge or fall back to baseModels (all-time ledger) when salesData is absent or when baseModels has specific buckets
   for (const node of baseModels) {
     const cls = classifyVehicleFacets(make, familyLabel, node.name);
-    const facetLabel = pickFacet(cls) ?? (axis === 'series' ? 'Standard Series' : axis === 'trim' ? 'Base / Unbadged Trim' : 'Standard Body');
+    const picked = pickFacet(cls);
+    // If salesData already populated specific buckets, skip dumping generic unbadged baseModels into fallbackLabel
+    if (salesData && salesData.length >= 10 && !picked) continue;
+    const facetLabel = picked ?? fallbackLabel;
+    if (salesData && salesData.length >= 10 && buckets.has(facetLabel)) continue;
+
     const prev = buckets.get(facetLabel) ?? {
       name: facetLabel,
       count: 0,
@@ -682,8 +1016,9 @@ export function buildFacetNodes(
       usd_prior_12m: 0,
       weightedMedianSum: 0,
       weightedMedianCount: 0,
-      representativeModel: node.name,
+      representativeModel: stripEnrichedSuffix(node.name),
       representativeUsd: 0,
+      badgeSvg: resolveTileBadgeSvg(make, familyLabel, facetLabel),
     };
     const nodeUsd = node.usd ?? node.value ?? 0;
     prev.count += node.count ?? 0;
@@ -701,43 +1036,9 @@ export function buildFacetNodes(
     }
     if (nodeUsd > prev.representativeUsd) {
       prev.representativeUsd = nodeUsd;
-      prev.representativeModel = node.name;
+      prev.representativeModel = stripEnrichedSuffix(node.name);
     }
     buckets.set(facetLabel, prev);
-  }
-
-  // Supplement with year-aware trim classification from salesData when Squarebody year distinctions apply
-  if (axis === 'trim' && salesData && salesData.length > 0 && isPickupFamilyLabel(familyLabel)) {
-    const hasExplicitSquarebodyTrims = Array.from(buckets.keys()).some((k) =>
-      /Silverado|Cheyenne|Scottsdale|Custom Deluxe|Sierra/i.test(k),
-    );
-    if (!hasExplicitSquarebodyTrims) {
-      for (const s of salesData) {
-        if (eraFilterFn && !eraFilterFn(s.year)) continue;
-        const cls = classifyVehicleFacets(make, familyLabel, s.model, s.year);
-        if (cls.trim) {
-          // Ensure the trim bucket exists
-          if (!buckets.has(cls.trim)) {
-            buckets.set(cls.trim, {
-              name: cls.trim,
-              count: 1,
-              usd: s.usd,
-              sold_any: 1,
-              offered: 1,
-              dated: 1,
-              sold_12m: 0,
-              sold_prior_12m: 0,
-              usd_12m: 0,
-              usd_prior_12m: 0,
-              weightedMedianSum: s.usd,
-              weightedMedianCount: 1,
-              representativeModel: s.model ?? cls.trim,
-              representativeUsd: s.usd,
-            });
-          }
-        }
-      }
-    }
   }
 
   const out: TreemapNode[] = [];
@@ -756,12 +1057,46 @@ export function buildFacetNodes(
       usd_12m: b.usd_12m,
       usd_prior_12m: b.usd_prior_12m,
       median_price: b.weightedMedianCount > 0 ? Math.round(b.weightedMedianSum / b.weightedMedianCount) : undefined,
-      // Store canonical raw model fallback for drill-through
       facetRepresentativeModel: b.representativeModel,
-    } as TreemapNode & { facetRepresentativeModel?: string });
+      badgeSvg: b.badgeSvg,
+    } as TreemapNode & { facetRepresentativeModel?: string; badgeSvg?: string });
   }
 
   return out.sort((a, b) => (b.usd ?? b.value) - (a.usd ?? a.value) || b.count - a.count);
+}
+
+/**
+ * Resolves a single vetted vector badge SVG for a specific facet tile or sub-model label
+ * (e.g. "Silverado" -> SILVERADO 10 fender plate, "Cheyenne Super" -> CHEYENNE SUPER 10, "Fastback" -> 2+2 FASTBACK).
+ */
+export function resolveTileBadgeSvg(
+  make: string | null | undefined,
+  familyLabel: string | null | undefined,
+  tileName: string | null | undefined,
+  year?: number | null,
+): string | undefined {
+  if (!make || !tileName) return undefined;
+  const brandLower = make.trim().toLowerCase();
+  const tLower = tileName.trim().toLowerCase();
+
+  for (const mark of VETTED_IDENTITY_MARKS) {
+    if (mark.brand.toLowerCase() !== brandLower) continue;
+    if (mark.markKind === 'marque_emblem') continue;
+    if (year != null && (year < mark.yearStart || year > mark.yearEnd)) continue;
+
+    if (mark.trimPackage && tLower.includes(mark.trimPackage.toLowerCase())) {
+      return mark.svgMarkup;
+    }
+    if (mark.seriesCode && tLower.startsWith(mark.seriesCode.toLowerCase())) {
+      return mark.svgMarkup;
+    }
+    if (mark.bodyStyle && tLower.includes(mark.bodyStyle.toLowerCase())) {
+      if (!mark.family || !familyLabel || mark.family.toLowerCase() === familyLabel.trim().toLowerCase()) {
+        return mark.svgMarkup;
+      }
+    }
+  }
+  return undefined;
 }
 
 /**
