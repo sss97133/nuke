@@ -110,7 +110,7 @@ BEGIN
       FROM unnest(coalesce(cm.aliases, ARRAY[]::text[]) || r.new_aliases) AS a
     )
     WHERE cm.make = r.make_name
-      AND cm.model = r.model_name
+      AND cm.canonical_model = r.model_name
       AND NOT (coalesce(cm.aliases, ARRAY[]::text[]) @> r.new_aliases);
   END LOOP;
 END $aliases$;
@@ -121,7 +121,7 @@ UPDATE public.canonical_models
 SET year_start = NULL,
     year_end = NULL
 WHERE make = 'Chevrolet'
-  AND model = 'Styleline'
+  AND canonical_model = 'Styleline'
   AND (year_start IS NOT NULL OR year_end IS NOT NULL);
 
 -- 3. Refresh mv_vehicle_name_dictionary and mv_model_family_names so the new make & model aliases
