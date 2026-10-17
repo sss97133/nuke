@@ -1010,8 +1010,7 @@ export function TreemapHomePage({ onBrowse, embedded = false }: { onBrowse: () =
   const [basis, setBasis] = useState<MapBasis>('ledger');
   // A brand opens on its model families; when none can be read it opens on its model names, as before.
   const atFamilies = !!currentLevel.make && !currentLevel.family && !currentLevel.model;
-  const needsFamilyMeta = atFamilies || (!!currentLevel.make && !!currentLevel.family && !currentLevel.names);
-  const { data: familiesData, loading: familiesLoading, failed: familiesFailed } = useTreemapFamilies(needsFamilyMeta ? currentLevel.make ?? null : null);
+  const { data: familiesData, loading: familiesLoading, failed: familiesFailed } = useTreemapFamilies(currentLevel.make ?? null);
   const { data: modelsData, loading: modelsLoading } = useTreemapModels(atFamilies && familiesFailed ? currentLevel.make ?? null : null);
   const { data: familyModelsData, loading: familyModelsLoading } = useTreemapFamilyModels(
     currentLevel.family ? currentLevel.make ?? null : null,
@@ -1544,6 +1543,53 @@ export function TreemapHomePage({ onBrowse, embedded = false }: { onBrowse: () =
         </div>
       </div>
 
+      {/* ─── BRAND FAMILY PILLS: 1-click navigation across a brand's factory model families at any depth ─── */}
+      {(() => {
+        if (!currentLevel.make || !familiesData) return null;
+        const namedFamilies = familiesData.filter((f) => f.familyKey && f.familyKey !== 'other');
+        if (namedFamilies.length < 2) return null;
+        return (
+          <div className="home-family-submodels" role="navigation" aria-label="Brand families" data-testid="brand-family-pills">
+            <span className="home-family-submodels-label">FAMILIES</span>
+            <button
+              type="button"
+              className={`home-family-submodel-pill${!currentLevel.family ? ' home-family-submodel-pill--active' : ''}`}
+              aria-pressed={!currentLevel.family}
+              onClick={() => {
+                setDrillStack([{ label: 'ALL MAKES' }, { label: currentLevel.make!, make: currentLevel.make }]);
+              }}
+            >
+              ALL <span className="home-family-submodel-count">{namedFamilies.length}</span>
+            </button>
+            {namedFamilies.slice(0, 14).map((fam) => {
+              const active = currentLevel.family === fam.familyKey;
+              return (
+                <button
+                  key={fam.familyKey}
+                  type="button"
+                  className={`home-family-submodel-pill${active ? ' home-family-submodel-pill--active' : ''}`}
+                  aria-pressed={active}
+                  onClick={() => {
+                    if (active && !currentLevel.model && !currentLevel.year) {
+                      setDrillStack([{ label: 'ALL MAKES' }, { label: currentLevel.make!, make: currentLevel.make }]);
+                    } else {
+                      recordInterest('make', currentLevel.make!);
+                      setDrillStack([
+                        { label: 'ALL MAKES' },
+                        { label: currentLevel.make!, make: currentLevel.make },
+                        { label: fam.name, make: currentLevel.make, family: fam.familyKey, names: fam.models ?? undefined },
+                      ]);
+                    }
+                  }}
+                >
+                  {fam.name} <span className="home-family-submodel-count">{fam.count.toLocaleString('en-US')}</span>
+                </button>
+              );
+            })}
+          </div>
+        );
+      })()}
+
       {/* ─── FAMILY SUB-MODEL PILLS: direct 1-click sub-model navigation across models, years & vehicles inside a family ─── */}
       {currentLevel.family && currentLevel.make && familyModelsData && familyModelsData.length > 1 && (
         <div className="home-family-submodels" role="group" aria-label="Family sub-models" data-testid="family-submodel-pills">
@@ -1610,6 +1656,7 @@ export function TreemapHomePage({ onBrowse, embedded = false }: { onBrowse: () =
         if (cohorts.length < 2) return null;
         return (
           <div className="home-family-submodels" role="navigation" aria-label="Generation eras">
+            <span className="home-family-submodels-label">ERAS</span>
             <button
               type="button"
               className={`home-family-submodel-pill${!selectedEra ? ' home-family-submodel-pill--active' : ''}`}
@@ -1647,6 +1694,7 @@ export function TreemapHomePage({ onBrowse, embedded = false }: { onBrowse: () =
         if (pool.length < 2) return null;
         return (
           <div className="home-family-submodels" role="navigation" aria-label="Model years">
+            <span className="home-family-submodels-label">YEARS</span>
             <button
               type="button"
               className={`home-family-submodel-pill${!currentLevel.year ? ' home-family-submodel-pill--active' : ''}`}

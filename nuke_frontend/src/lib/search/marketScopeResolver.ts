@@ -321,6 +321,81 @@ const CULTURAL_SCOPE_ALIASES: Array<{
     make: 'Mazda',
     familyHint: 'RX-7',
   },
+  {
+    pattern: /\b(koenigsegg\s*(?:regera|agera|jesko|cc8s|ccx|ccxr|ccgt|gemera)|regera|agera\s*rs|jesko)\b/i,
+    make: 'Koenigsegg',
+    familyHint: 'Regera',
+  },
+  {
+    pattern: /\b(lagonda\s*(?:lg\s*45|lg\s*6|m\s*45|rapide|taraf)|lg45r?)\b/i,
+    make: 'Lagonda',
+    familyHint: 'LG45',
+  },
+  {
+    pattern: /\b(pierce[-\s]?arrow\s*(?:silver\s*arrow|1247|1245|twelve)|silver\s*arrow)\b/i,
+    make: 'Pierce-Arrow',
+    familyHint: 'Twelve',
+  },
+  {
+    pattern: /\b(pierce[-\s]?arrow\s*(?:model\s*48|model\s*66|great\s*arrow)|great\s*arrow)\b/i,
+    make: 'Pierce-Arrow',
+    familyHint: 'Model 48',
+  },
+  {
+    pattern: /\b(isotta\s*fraschini|tipo\s*8\s*a)\b/i,
+    make: 'Isotta Fraschini',
+    familyHint: 'Tipo 8A',
+  },
+  {
+    pattern: /\b(siata\s*(?:208\s*s?|300\s*bc|daina)|208\s*s\s*spider)\b/i,
+    make: 'Siata',
+    familyHint: '208S',
+  },
+  {
+    pattern: /\b(bizzarrini\s*(?:5300\s*gt|strada|p538)|5300\s*gt\s*strada)\b/i,
+    make: 'Bizzarrini',
+    familyHint: '5300 GT',
+  },
+  {
+    pattern: /\b(lola\s*t\s*(?:70|90|160|163|332)|t70\s*mk)\b/i,
+    make: 'Lola',
+    familyHint: 'T70',
+  },
+  {
+    pattern: /\b(horch\s*(?:853|853a|780|851)|853\s*sport\s*cabriolet)\b/i,
+    make: 'Horch',
+    familyHint: '853',
+  },
+  {
+    pattern: /\b(maybach\s*sw[-\s]?38|sw[-\s]?38\s*special)\b/i,
+    make: 'Maybach',
+    familyHint: 'SW38',
+  },
+  {
+    pattern: /\b(lister\s*(?:knobbly|costin|jaguar)|knobbly)\b/i,
+    make: 'Lister',
+    familyHint: 'Knobbly',
+  },
+  {
+    pattern: /\b(daytona\s*sp3|monza\s*sp[12])\b/i,
+    make: 'Ferrari',
+    familyHint: 'Daytona SP3',
+  },
+  {
+    pattern: /\b(rolls[-\s]?royce\s*(?:20\/25|25\/30|20\s*hp)|20\/25\s*hp|25\/30\s*hp)\b/i,
+    make: 'Rolls-Royce',
+    familyHint: '20/25',
+  },
+  {
+    pattern: /\b(jaguar\s*ss\s*100|ss\s*100\s*(?:2\.5|3\.5|roadster))\b/i,
+    make: 'Jaguar',
+    familyHint: 'SS100',
+  },
+  {
+    pattern: /\b(sc\/rambler|hurst\s*sc\s*rambler|amc\s*(?:rambler|marlin))\b/i,
+    make: 'AMC',
+    familyHint: 'Rambler',
+  },
 ];
 
 // Words that indicate a natural-language filter query rather than a market scope drill

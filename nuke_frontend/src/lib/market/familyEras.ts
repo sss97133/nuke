@@ -240,6 +240,25 @@ const CURATED_FAMILY_ERAS: Record<string, FamilyEraCohort[]> = {
     { id: '1980-1991', label: "Tasmin / 280i Wedge '80–'91", shortLabel: 'Wedge', yearStart: 1980, yearEnd: 1991 },
     { id: '1991-2006', label: "Griffith / Chimaera / Cerbera '91–'06", shortLabel: 'Wheeler Era', yearStart: 1991, yearEnd: 2006 },
   ],
+  'rolls-royce:20/25': [
+    { id: '1922-1929', label: "20 HP '22–'29", shortLabel: '20 HP', yearStart: 1922, yearEnd: 1929 },
+    { id: '1929-1936', label: "20/25 HP '29–'36", shortLabel: '20/25 HP', yearStart: 1929, yearEnd: 1936 },
+    { id: '1936-1938', label: "25/30 HP '36–'38", shortLabel: '25/30 HP', yearStart: 1936, yearEnd: 1938 },
+  ],
+  'lagonda:lg45': [
+    { id: '1933-1935', label: "M45 / M35 '33–'35", shortLabel: 'M45', yearStart: 1933, yearEnd: 1935 },
+    { id: '1936-1940', label: "LG45 / LG6 Rapide '36–'40", shortLabel: 'LG45 / LG6', yearStart: 1936, yearEnd: 1940 },
+  ],
+  'citroen:ds': [
+    { id: '1955-1962', label: "Series 1 First Nose '55–'62", shortLabel: "'55–'62", yearStart: 1955, yearEnd: 1962 },
+    { id: '1963-1967', label: "Series 2 Second Nose '63–'67", shortLabel: "'63–'67", yearStart: 1963, yearEnd: 1967 },
+    { id: '1968-1975', label: "Series 3 Faired Headlamps '68–'75", shortLabel: "'68–'75", yearStart: 1968, yearEnd: 1975 },
+  ],
+  'citroën:ds': [
+    { id: '1955-1962', label: "Series 1 First Nose '55–'62", shortLabel: "'55–'62", yearStart: 1955, yearEnd: 1962 },
+    { id: '1963-1967', label: "Series 2 Second Nose '63–'67", shortLabel: "'63–'67", yearStart: 1963, yearEnd: 1967 },
+    { id: '1968-1975', label: "Series 3 Faired Headlamps '68–'75", shortLabel: "'68–'75", yearStart: 1968, yearEnd: 1975 },
+  ],
 };
 
 export function getDefinedFamilyEras(
