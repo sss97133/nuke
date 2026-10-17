@@ -276,6 +276,15 @@ const CURATED_FAMILY_ERAS: Record<string, FamilyEraCohort[]> = {
     { id: '1990-1999', label: "E31 840Ci / 850i / 850CSi '90–'99", shortLabel: 'E31', yearStart: 1990, yearEnd: 1999 },
     { id: '2019-2026', label: "G15 M850i / M8 '19+", shortLabel: 'G15 / F92', yearStart: 2019, yearEnd: 2026 },
   ],
+  'norton:commando': [
+    { id: '1948-1967', label: "Manx / Dominator / Atlas '48–'67", shortLabel: 'Manx / Atlas', yearStart: 1948, yearEnd: 1967 },
+    { id: '1968-1975', label: "Commando 750 / 850 '68–'75", shortLabel: '750 / 850', yearStart: 1968, yearEnd: 1975 },
+    { id: '2010-2024', label: "Commando 961 '10+", shortLabel: '961', yearStart: 2010, yearEnd: 2024 },
+  ],
+  'tatra:t87': [
+    { id: '1934-1950', label: "T77a / T87 / T97 Streamliners '34–'50", shortLabel: 'T77 / T87', yearStart: 1934, yearEnd: 1950 },
+    { id: '1951-1975', label: "T600 Tatraplan / T603 '51–'75", shortLabel: 'T600 / T603', yearStart: 1951, yearEnd: 1975 },
+  ],
 };
 
 export function getDefinedFamilyEras(

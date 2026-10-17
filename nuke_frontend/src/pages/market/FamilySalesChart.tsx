@@ -190,7 +190,7 @@ export function matchesSaleSubModel(saleModel: string | null | undefined, select
   return m === target || m.startsWith(`${target} `) || m.startsWith(`${target}-`);
 }
 
-export default function FamilySalesChart({ brand, familyKey, family, width, height, onOpen, selectedEra = null, onSelectEra, selectedModel = null }: {
+export default function FamilySalesChart({ brand, familyKey, family, width, height, onOpen, selectedEra = null, onSelectEra, selectedModel = null, selectedYear = null }: {
   brand: string;
   familyKey: string;
   family: string;
@@ -200,6 +200,7 @@ export default function FamilySalesChart({ brand, familyKey, family, width, heig
   selectedEra?: string | null;
   onSelectEra?: (era: string | null) => void;
   selectedModel?: string | null;
+  selectedYear?: number | null;
 }) {
   const { sales: allSales, n: windowCount, truncated, failed } = useFamilySales(brand, familyKey);
   const modelSales = useMemo(
@@ -211,14 +212,19 @@ export default function FamilySalesChart({ brand, familyKey, family, width, heig
     () => (allSales ? getFamilyEraCohorts(brand, family, allSales.map((s) => s.year)) : []),
     [brand, family, allSales],
   );
-  const sales = useMemo(
+  const eraFilteredSales = useMemo(
     () => (baseSales && selectedEra ? baseSales.filter((s) => matchesEraRange(s.year, selectedEra)) : baseSales),
     [baseSales, selectedEra],
   );
+  const yearFilteredSales = useMemo(
+    () => (eraFilteredSales && selectedYear != null ? eraFilteredSales.filter((s) => s.year === selectedYear) : null),
+    [eraFilteredSales, selectedYear],
+  );
+  const sales = yearFilteredSales && yearFilteredSales.length > 0 ? yearFilteredSales : eraFilteredSales;
   // Same car, same miles (family_price_index_read): when the family has a fitted index, the chart is one panel of every
   // sale with the like-for-like line over it, and the head answers with its 12-month change instead of a median.
   const ix = useFamilyIndex(brand, familyKey);
-  const indexed = !selectedEra && !(modelSales && modelSales.length > 0) && !!ix && ix.series.length > 1;
+  const indexed = !selectedEra && !(yearFilteredSales && yearFilteredSales.length > 0) && !(modelSales && modelSales.length > 0) && !!ix && ix.series.length > 1;
   // The plain median's own 12-month change over every venue, for the sentence beside the answer when the reader has none.
   const plain = useMemo(() => (sales ? plainMedianChange(sales) : null), [sales]);
   const [hover, setHover] = useState<{ band: number; dot: number } | null>(null);
@@ -312,7 +318,12 @@ export default function FamilySalesChart({ brand, familyKey, family, width, heig
   return <div className={['family-sales', narrow ? 'family-sales--narrow' : '', ix ? 'family-sales--indexed' : ''].filter(Boolean).join(' ')}>
     <div className="family-sales__head">
       <div className="family-sales__title">
-        <Text role="entity" dense>{selectedModel && selectedModel.toLowerCase() !== family.toLowerCase() && modelSales?.length ? `${family} · ${selectedModel}` : family}</Text>
+        <Text role="entity" dense>{(() => {
+          const parts = [family];
+          if (selectedModel && selectedModel.toLowerCase() !== family.toLowerCase() && modelSales?.length) parts.push(selectedModel);
+          if (selectedYear != null && yearFilteredSales?.length) parts.push(String(selectedYear));
+          return parts.join(' · ');
+        })()}</Text>
         <Text role="caption">{(narrow ? `${count} sales since ${since}` : indexed
           ? `${count} sales with a date since ${since} · one dot each · blue = the same car, same miles (95% band) · gray = plain median, which mixes different cars`
           : `${count} sales with a date since ${since} · one dot each · panels by model-year decade · line = rolling median, band = middle half`)
