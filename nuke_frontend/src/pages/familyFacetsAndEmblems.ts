@@ -658,6 +658,94 @@ export const VETTED_IDENTITY_MARKS: readonly VehicleIdentityMark[] = [
       '<svg viewBox="0 0 185 40" xmlns="http://www.w3.org/2000/svg"><rect x="2" y="5" width="181" height="30" rx="2" fill="#991b1b" stroke="#facc15" stroke-width="2"/><path d="M16 7 L38 7 L36 25 Q27 34 27 35 Q27 34 18 25 Z" fill="#facc15" stroke="#111" stroke-width="1.2"/><text x="27" y="29" text-anchor="middle" fill="#111" font-family="Georgia,serif" font-size="7" font-weight="900">S F</text><text x="114" y="26" text-anchor="middle" fill="#fef08a" font-family="Georgia,serif" font-size="14" font-weight="800" letter-spacing="2.8">FERRARI</text></svg>',
     provenanceNote: 'Scuderia Ferrari Modena yellow fender shield and Pininfarina/Maranello wordmark.',
   },
+  {
+    id: 'toyota-land-cruiser-fj40-60-84',
+    brand: 'Toyota',
+    family: 'Land Cruiser',
+    seriesCode: 'FJ40',
+    yearStart: 1960,
+    yearEnd: 1984,
+    markKind: 'series_badge',
+    displayLabel: 'TOYOTA LAND CRUISER · FJ40',
+    subLabel: '1960–1984 J40 4WD Front Apron & Rear Quarter Emblem',
+    rpoCode: 'FJ40 / FJ43 / FJ45',
+    fenderPlacement: 'Upper Front Apron & Rear Quarter',
+    svgMarkup:
+      '<svg viewBox="0 0 190 40" xmlns="http://www.w3.org/2000/svg"><rect x="2" y="5" width="186" height="30" rx="2" fill="#18181b" stroke="#e5e7eb" stroke-width="2.2"/><rect x="132" y="8" width="52" height="24" fill="#b91c1c"/><text x="68" y="19" text-anchor="middle" fill="#facc15" font-family="Arial Black,sans-serif" font-size="9" font-weight="900" letter-spacing="2">TOYOTA</text><text x="68" y="30" text-anchor="middle" fill="#f9fafb" font-family="Arial,sans-serif" font-size="8.5" font-weight="800" letter-spacing="1.2">LAND CRUISER</text><text x="158" y="25" text-anchor="middle" fill="#ffffff" font-family="Arial Black,sans-serif" font-size="12" font-weight="900">4WD</text></svg>',
+    provenanceNote: '1960–1984 Toyota J40 (FJ40/FJ43/FJ45/BJ40) cast apron script & red/gold 4WD quarter badge.',
+  },
+  {
+    id: 'porsche-stuttgart-crest',
+    brand: 'Porsche',
+    yearStart: 1952,
+    yearEnd: 2035,
+    markKind: 'marque_emblem',
+    displayLabel: 'PORSCHE · STUTTGART',
+    subLabel: 'Württemberg Gold/Red/Black Hood Crest & Rear Decklid Script',
+    fenderPlacement: 'Front Hood Handle & Rear Engine Lid',
+    svgMarkup:
+      '<svg viewBox="0 0 190 40" xmlns="http://www.w3.org/2000/svg"><rect x="2" y="5" width="186" height="30" rx="2" fill="#111827" stroke="#eab308" stroke-width="2"/><path d="M16 7 L38 7 L36 25 Q27 34 27 35 Q27 34 18 25 Z" fill="#eab308" stroke="#dc2626" stroke-width="1.4"/><text x="112" y="26" text-anchor="middle" fill="#fde047" font-family="Arial,sans-serif" font-size="13.5" font-weight="900" letter-spacing="3.5">PORSCHE</text></svg>',
+    provenanceNote: 'Porsche Stuttgart-Zuffenhausen Württemberg crest and spaced rear decklid script.',
+  },
+  {
+    id: 'porsche-911-carrera-rs-73',
+    brand: 'Porsche',
+    family: '911',
+    seriesCode: 'Carrera RS',
+    yearStart: 1972,
+    yearEnd: 2035,
+    markKind: 'series_badge',
+    displayLabel: 'CARRERA RS · GT3',
+    subLabel: 'Rennsport Negative Side Script & Ducktail / Wing Callout',
+    rpoCode: 'M471 / M472 / GT3',
+    fenderPlacement: 'Lower Door Rocker & Engine Grille',
+    svgMarkup:
+      '<svg viewBox="0 0 190 40" xmlns="http://www.w3.org/2000/svg"><rect x="2" y="5" width="186" height="30" rx="2" fill="#f9fafb" stroke="#dc2626" stroke-width="2.2"/><text x="95" y="26" text-anchor="middle" fill="#dc2626" font-family="Georgia,serif" font-style="italic" font-size="15.5" font-weight="900" letter-spacing="2">Carrera RS</text></svg>',
+    provenanceNote: 'Porsche 911 Carrera RS 2.7 / RS America / 964 RS / 993 RS / GT3 RS rocker & decklid script.',
+  },
+  {
+    id: 'chevy-k5-blazer-cheyenne-69-91',
+    brand: 'Chevrolet',
+    family: 'Blazer',
+    seriesCode: 'K5 Blazer',
+    yearStart: 1969,
+    yearEnd: 1991,
+    markKind: 'series_badge',
+    displayLabel: 'K/5 BLAZER · CHEYENNE',
+    subLabel: "'69–'91 Removable-Top K5 Blazer Front Fender Plate",
+    rpoCode: 'K10514 / K10516',
+    fenderPlacement: 'Front Fender Behind Wheel Arch',
+    svgMarkup:
+      '<svg viewBox="0 0 190 40" xmlns="http://www.w3.org/2000/svg"><rect x="2" y="5" width="186" height="30" rx="2" fill="#18181b" stroke="#e5e7eb" stroke-width="2.2"/><rect x="134" y="8" width="50" height="24" fill="#b91c1c"/><text x="68" y="26" text-anchor="middle" fill="#f9fafb" font-family="Arial Black,sans-serif" font-size="14" font-weight="900" letter-spacing="2.2">BLAZER</text><text x="159" y="26" text-anchor="middle" fill="#facc15" font-family="Arial Black,sans-serif" font-size="14" font-weight="900">K/5</text></svg>',
+    provenanceNote: '1969–1991 Chevrolet K/5 Blazer CST / Cheyenne / Silverado removable-hardtop fender plate.',
+  },
+  {
+    id: 'pontiac-gto-trans-am-64-81',
+    brand: 'Pontiac',
+    yearStart: 1964,
+    yearEnd: 2002,
+    markKind: 'series_badge',
+    displayLabel: 'GTO · TRANS AM · JUDGE',
+    subLabel: 'PMD Arrowhead, 6.5 Litre / 455 HO Shaker & Screaming Eagle',
+    rpoCode: 'W62 / WS6 / WT1',
+    fenderPlacement: 'Hood Scoop, Front Fender & Nose Cone',
+    svgMarkup:
+      '<svg viewBox="0 0 190 40" xmlns="http://www.w3.org/2000/svg"><rect x="2" y="5" width="186" height="30" rx="2" fill="#111827" stroke="#f97316" stroke-width="2.2"/><polygon points="22,7 30,20 22,33 14,20" fill="#dc2626" stroke="#e5e7eb" stroke-width="1.2"/><text x="108" y="26" text-anchor="middle" fill="#fb923c" font-family="Arial Black,Impact,sans-serif" font-size="14.5" font-weight="900" letter-spacing="2.2">GTO · TRANS AM</text></svg>',
+    provenanceNote: 'Pontiac Motor Division red arrowhead crest, GTO Judge (WT1), and Firebird Trans Am (WS6) callout.',
+  },
+  {
+    id: 'jaguar-coventry-etype-xk',
+    brand: 'Jaguar',
+    yearStart: 1948,
+    yearEnd: 2035,
+    markKind: 'marque_emblem',
+    displayLabel: 'JAGUAR · E-TYPE · XK',
+    subLabel: 'Coventry Growler Nose Badge & Series 1/2/3 Boot Lid Script',
+    fenderPlacement: 'Bonnet Mouth Bar & Rear Boot Lid',
+    svgMarkup:
+      '<svg viewBox="0 0 190 40" xmlns="http://www.w3.org/2000/svg"><rect x="2" y="5" width="186" height="30" rx="2" fill="#064e3b" stroke="#e5e7eb" stroke-width="2"/><text x="95" y="26" text-anchor="middle" fill="#f9fafb" font-family="Georgia,serif" font-size="14" font-weight="800" letter-spacing="3.2">JAGUAR E-TYPE</text></svg>',
+    provenanceNote: 'Jaguar Cars Ltd. Coventry bonnet badge and XK120/140/150 & E-Type Series 1/2/3 script.',
+  },
 ];
 
 const PICKUP_FAMILIES = new Set([
@@ -931,6 +1019,57 @@ export function classifyVehicleFacets(
     else if (/\b230\s*SL\b|\b250\s*SL\b|\b280\s*SL\b|\bW113\b|\bPAGODA\b/.test(u)) series = 'Pagoda (W113)';
     else if (/\b380\s*SL\b|\b450\s*SL\b|\b560\s*SL\b|\bR107\b/.test(u)) series = 'R107 SL (380/450/560SL)';
     else if (/\b500\s*SL\b|\bSL\s*500\b|\bSL\s*600\b|\bR129\b/.test(u)) series = 'R129 SL';
+  }
+
+  // Toyota Land Cruiser J-Series & Supra / 4Runner
+  if (!series && brand === 'toyota') {
+    if (/\bFJ45\b|\bHJ45\b|\bHJ47\b/.test(u)) series = 'FJ45 / HJ47 Pickup & Troopy';
+    else if (/\bFJ43\b|\bBJ42\b|\bBJ43\b/.test(u)) series = 'FJ43 / BJ42 Mid-Wheelbase';
+    else if (/\bFJ40\b|\bBJ40\b|\bJ40\b/.test(u) || (fam.includes('land cruiser') && year && year >= 1960 && year <= 1984 && !/\bFJ55\b|\bFJ60\b/.test(u))) series = 'FJ40 / BJ40 (J40)';
+    else if (/\bFJ55\b/.test(u)) series = 'FJ55 Iron Pig';
+    else if (/\bFJ60\b|\bFJ62\b|\bHJ60\b|\bHJ61\b/.test(u) || (fam.includes('land cruiser') && year && year >= 1981 && year <= 1990)) series = 'FJ60 / FJ62 (J60 Wagon)';
+    else if (/\bFJ80\b|\bFZJ80\b|\bHDJ80\b|\b80[-\s]?SERIES\b/.test(u) || (fam.includes('land cruiser') && year && year >= 1991 && year <= 1997)) series = 'FZJ80 / FJ80 (J80)';
+    else if (/\bUZJ100\b|\b100[-\s]?SERIES\b/.test(u) || (fam.includes('land cruiser') && year && year >= 1998 && year <= 2007)) series = 'UZJ100 (100-Series)';
+    else if (/\bURJ200\b|\b200[-\s]?SERIES\b/.test(u) || (fam.includes('land cruiser') && year && year >= 2008 && year <= 2021)) series = 'URJ200 (200-Series)';
+  }
+
+  // Chevrolet / GMC K5 Blazer & Jimmy / Suburban
+  if (!series && (fam.includes('blazer') || fam.includes('jimmy'))) {
+    if (/\bK\/?5\b|\bK5\b/.test(u) || (year && year >= 1969 && year <= 1991 && !/\bS[-\s]?10\b|\bS[-\s]?15\b/.test(u))) {
+      series = brand === 'gmc' ? 'K5 Jimmy (Full-Size)' : 'K5 Blazer (Full-Size)';
+    } else if (/\bS[-\s]?10\b|\bS[-\s]?15\b/.test(u)) {
+      series = 'S-10 / S-15 Compact';
+    } else if (/\bTAHOE\b/.test(u)) {
+      series = 'Tahoe / K1500 Blazer';
+    }
+  }
+
+  // Pontiac GTO / Firebird / Trans Am
+  if (!series && brand === 'pontiac') {
+    if (/\bTHE\s+JUDGE\b|\bGTO\s+JUDGE\b|\bJUDGE\b/.test(u)) series = 'GTO The Judge';
+    else if (/\bGTO\b/.test(u)) series = 'GTO';
+    else if (/\bSUPER\s+DUTY\b|\bSD[-\s]?455\b/.test(u)) series = 'Trans Am SD-455';
+    else if (/\bTRANS\s+AM\b/.test(u)) series = 'Firebird Trans Am';
+    else if (/\bFORMULA\b/.test(u)) series = 'Firebird Formula';
+    else if (/\bESPRIT\b/.test(u)) series = 'Firebird Esprit';
+  }
+
+  // Porsche 356 & 911 Chassis / Air-Cooled vs Water-Cooled Generations
+  if (!series && brand === 'porsche' && fam.includes('356')) {
+    if (/\b356\s*C\b|\b356\s*SC\b/.test(u) || (year && year >= 1964 && year <= 1965)) series = '356C / 356SC';
+    else if (/\b356\s*B\b/.test(u) || (year && year >= 1960 && year <= 1963)) series = '356B (T5 / T6)';
+    else if (/\b356\s*A\b/.test(u) || (year && year >= 1956 && year <= 1959)) series = '356A (T1 / T2)';
+    else if (/\bPRE[-\s]?A\b/.test(u) || (year && year <= 1955)) series = '356 Pre-A';
+  }
+
+  // Jaguar E-Type (XKE) & XK Heritage
+  if (!series && brand === 'jaguar') {
+    if (/\bSERIES\s*(?:1|I)\b|\b3\.8\b|\b4\.2\b/.test(u) && (fam.includes('e-type') || fam.includes('xke') || (year && year >= 1961 && year <= 1968))) series = 'E-Type Series 1';
+    else if (/\bSERIES\s*(?:2|II)\b/.test(u) || ((fam.includes('e-type') || fam.includes('xke')) && year && year >= 1969 && year <= 1970)) series = 'E-Type Series 2';
+    else if (/\bSERIES\s*(?:3|III)\b|\bV12\b/.test(u) && (fam.includes('e-type') || fam.includes('xke') || (year && year >= 1971 && year <= 1974))) series = 'E-Type Series 3 V12';
+    else if (/\bXK\s*120\b/.test(u)) series = 'XK120';
+    else if (/\bXK\s*140\b/.test(u)) series = 'XK140';
+    else if (/\bXK\s*150\b/.test(u)) series = 'XK150';
   }
 
   // ── 2. TRIM PACKAGE EXTRACTION (Year-aware for Squarebody & Marque Trims) ─
