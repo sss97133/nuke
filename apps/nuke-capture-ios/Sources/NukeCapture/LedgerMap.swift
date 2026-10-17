@@ -1494,6 +1494,15 @@ enum LedgerMap {
         return FamilyUpcomingSupply.parse(res.data)
     }
 
+    static func identityMarks(
+        brand: String?,
+        family: String? = nil,
+        year: Int? = nil,
+        eraId: String? = nil
+    ) async -> [VehicleIdentityMark] {
+        await VehicleIdentityMark.resolve(brand: brand, family: family, year: year, eraId: eraId)
+    }
+
     static func shareMovers(horizon: MoverHorizon) async -> ShareMoversRead? {
         guard let res = try? await SupabaseService.client
             .rpc("treemap_family_share_movers", params: ShareMoverParams(p_limit: 5, p_min_sales: horizon.gateMinSales, p_horizon: horizon.rawValue))
@@ -1537,6 +1546,8 @@ struct LedgerMapView: View {
     @State private var familySalesData: FamilySalesData?
     @State private var familyIndex: FamilyIndex?
     @State private var familyUpcomingSupply: FamilyUpcomingSupply?
+    @State private var identityMarks: [VehicleIdentityMark] = []
+    @State private var inspectedIdentityMark: VehicleIdentityMark?
 
     @State private var moverHorizon: MoverHorizon = .y1
     @State private var baselineHorizon: BaselineHorizon = .prior
@@ -1560,6 +1571,10 @@ struct LedgerMapView: View {
 
     private var pathKey: String {
         [selectedMake ?? "", selectedFamilyKey ?? "", selectedModel ?? "", selectedYear.map(String.init) ?? ""].joined(separator: "/")
+    }
+
+    private var identityMarksTaskKey: String {
+        [selectedMake ?? "", selectedFamilyName ?? selectedFamilyKey ?? "", selectedModel ?? "", selectedYear.map(String.init) ?? "", selectedEra ?? ""].joined(separator: "|")
     }
 
     private var moverTaskKey: String {
@@ -1637,6 +1652,18 @@ struct LedgerMapView: View {
         }
         .padding(16)
         .task(id: pathKey) { await load() }
+        .task(id: identityMarksTaskKey) {
+            guard let make = selectedMake, (selectedFamilyKey != nil || selectedModel != nil) else {
+                identityMarks = []
+                return
+            }
+            identityMarks = await LedgerMap.identityMarks(
+                brand: make,
+                family: selectedFamilyName ?? selectedFamilyKey ?? selectedModel,
+                year: selectedYear,
+                eraId: selectedEra
+            )
+        }
         .task {
             if receipt == nil {
                 receipt = await LedgerMap.refreshReceipt()
@@ -1656,6 +1683,9 @@ struct LedgerMapView: View {
         }
         .sheet(item: $inspectedNode) { node in
             nodeSheet(node)
+        }
+        .sheet(item: $inspectedIdentityMark) { mark in
+            IdentityMarkSheet(mark: mark)
         }
         .sheet(isPresented: $showRelativityInfo) {
             relativityInfoSheet
@@ -1832,7 +1862,29 @@ struct LedgerMapView: View {
                 }
             }
 
-            // 2. Sub-models pill bar when inside a family with >1 sub-models
+            // 2. Vetted factory era emblems & fender badges (`public.resolve_vehicle_identity_marks`)
+            if selectedMake != nil, (selectedFamilyKey != nil || selectedModel != nil), !identityMarks.isEmpty {
+                pillRow(title: "ERA MARKS") {
+                    ForEach(identityMarks.prefix(6)) { mark in
+                        let target = mark.targetModel
+                        let isActive = target != nil && selectedModel?.lowercased().contains(target!.lowercased()) == true
+                        pillButton("\(mark.displayLabel) \(mark.eraShortLabel)", active: isActive) {
+                            if let target {
+                                if isActive {
+                                    selectedModel = nil
+                                } else {
+                                    selectedModel = target
+                                    selectedYear = nil
+                                }
+                            } else {
+                                inspectedIdentityMark = mark
+                            }
+                        }
+                    }
+                }
+            }
+
+            // 3. Sub-models pill bar when inside a family with >1 sub-models
             if selectedMake != nil, selectedFamilyKey != nil, modelNodesCache.count > 1 {
                 pillRow(title: "SUB-MODELS") {
                     pillButton("All \(selectedFamilyName ?? "Family")", active: selectedModel == nil) {
