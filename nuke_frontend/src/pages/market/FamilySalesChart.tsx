@@ -208,8 +208,8 @@ export default function FamilySalesChart({ brand, familyKey, family, width, heig
   );
   const baseSales = modelSales && modelSales.length > 0 ? modelSales : allSales;
   const eraCohorts = useMemo(
-    () => (baseSales ? getFamilyEraCohorts(brand, family, baseSales.map((s) => s.year)) : []),
-    [brand, family, baseSales],
+    () => (allSales ? getFamilyEraCohorts(brand, family, allSales.map((s) => s.year)) : []),
+    [brand, family, allSales],
   );
   const sales = useMemo(
     () => (baseSales && selectedEra ? baseSales.filter((s) => matchesEraRange(s.year, selectedEra)) : baseSales),
