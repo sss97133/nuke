@@ -127,7 +127,89 @@ const CURATED_FAMILY_ERAS: Record<string, FamilyEraCohort[]> = {
     { id: '1993-2002', label: "A80 MkIV '93–'02", shortLabel: 'A80 MkIV', yearStart: 1993, yearEnd: 2002 },
     { id: '2020-2030', label: "A90 MkV '20+", shortLabel: 'A90 MkV', yearStart: 2020, yearEnd: 2030 },
   ],
+  'bmw:3 series': [
+    { id: '1975-1983', label: "E21 '75–'83", shortLabel: 'E21', yearStart: 1975, yearEnd: 1983 },
+    { id: '1984-1991', label: "E30 '84–'91", shortLabel: 'E30', yearStart: 1984, yearEnd: 1991 },
+    { id: '1992-1999', label: "E36 '92–'99", shortLabel: 'E36', yearStart: 1992, yearEnd: 1999 },
+    { id: '2000-2006', label: "E46 '00–'06", shortLabel: 'E46', yearStart: 2000, yearEnd: 2006 },
+    { id: '2007-2013', label: "E90/E92 '07–'13", shortLabel: 'E90/E92', yearStart: 2007, yearEnd: 2013 },
+    { id: '2012-2018', label: "F30 '12–'18", shortLabel: 'F30', yearStart: 2012, yearEnd: 2018 },
+    { id: '2019-2030', label: "G20 '19+", shortLabel: 'G20', yearStart: 2019, yearEnd: 2030 },
+  ],
+  'bmw:5 series': [
+    { id: '1972-1988', label: "E12/E28 '72–'88", shortLabel: 'E12/E28', yearStart: 1972, yearEnd: 1988 },
+    { id: '1989-1995', label: "E34 '89–'95", shortLabel: 'E34', yearStart: 1989, yearEnd: 1995 },
+    { id: '1996-2003', label: "E39 '96–'03", shortLabel: 'E39', yearStart: 1996, yearEnd: 2003 },
+    { id: '2004-2010', label: "E60 '04–'10", shortLabel: 'E60', yearStart: 2004, yearEnd: 2010 },
+    { id: '2011-2023', label: "F10/G30 '11–'23", shortLabel: 'F10/G30', yearStart: 2011, yearEnd: 2023 },
+  ],
+  'bmw:m5': [
+    { id: '1985-1988', label: "E28 '85–'88", shortLabel: 'E28', yearStart: 1985, yearEnd: 1988 },
+    { id: '1989-1995', label: "E34 '89–'95", shortLabel: 'E34', yearStart: 1989, yearEnd: 1995 },
+    { id: '1998-2003', label: "E39 '98–'03", shortLabel: 'E39', yearStart: 1998, yearEnd: 2003 },
+    { id: '2005-2010', label: "E60 V10 '05–'10", shortLabel: 'E60', yearStart: 2005, yearEnd: 2010 },
+    { id: '2011-2016', label: "F10 '11–'16", shortLabel: 'F10', yearStart: 2011, yearEnd: 2016 },
+    { id: '2018-2030', label: "F90 '18+", shortLabel: 'F90', yearStart: 2018, yearEnd: 2030 },
+  ],
+  'nissan:skyline': [
+    { id: '1968-1977', label: "Hakosuka/Kenmeri '68–'77", shortLabel: 'C10/C110', yearStart: 1968, yearEnd: 1977 },
+    { id: '1981-1988', label: "R30/R31 '81–'88", shortLabel: 'R30/R31', yearStart: 1981, yearEnd: 1988 },
+    { id: '1989-1994', label: "R32 '89–'94", shortLabel: 'R32', yearStart: 1989, yearEnd: 1994 },
+    { id: '1995-1998', label: "R33 '95–'98", shortLabel: 'R33', yearStart: 1995, yearEnd: 1998 },
+    { id: '1999-2002', label: "R34 '99–'02", shortLabel: 'R34', yearStart: 1999, yearEnd: 2002 },
+  ],
+  'mazda:mx-5 miata': [
+    { id: '1990-1997', label: "NA '90–'97", shortLabel: 'NA', yearStart: 1990, yearEnd: 1997 },
+    { id: '1999-2005', label: "NB '99–'05", shortLabel: 'NB', yearStart: 1999, yearEnd: 2005 },
+    { id: '2006-2015', label: "NC '06–'15", shortLabel: 'NC', yearStart: 2006, yearEnd: 2015 },
+    { id: '2016-2030', label: "ND '16+", shortLabel: 'ND', yearStart: 2016, yearEnd: 2030 },
+  ],
+  'jaguar:e-type': [
+    { id: '1961-1967', label: "Series 1 '61–'67", shortLabel: 'Series 1', yearStart: 1961, yearEnd: 1967 },
+    { id: '1968-1970', label: "Series 1.5/2 '68–'70", shortLabel: 'Series 2', yearStart: 1968, yearEnd: 1970 },
+    { id: '1971-1974', label: "Series 3 V12 '71–'74", shortLabel: 'Series 3', yearStart: 1971, yearEnd: 1974 },
+  ],
+  'land rover:defender': [
+    { id: '1948-1984', label: "Series I–III '48–'84", shortLabel: 'Series I–III', yearStart: 1948, yearEnd: 1984 },
+    { id: '1983-2016', label: "Defender 90/110 '83–'16", shortLabel: "90/110 '83–'16", yearStart: 1983, yearEnd: 2016 },
+    { id: '2020-2030', label: "L663 '20+", shortLabel: "L663 '20+", yearStart: 2020, yearEnd: 2030 },
+  ],
+  'jeep:wrangler': [
+    { id: '1987-1995', label: "YJ '87–'95", shortLabel: 'YJ', yearStart: 1987, yearEnd: 1995 },
+    { id: '1997-2006', label: "TJ '97–'06", shortLabel: 'TJ', yearStart: 1997, yearEnd: 2006 },
+    { id: '2007-2018', label: "JK '07–'18", shortLabel: 'JK', yearStart: 2007, yearEnd: 2018 },
+    { id: '2018-2030', label: "JL '18+", shortLabel: 'JL', yearStart: 2018, yearEnd: 2030 },
+  ],
+  'dodge:charger': [
+    { id: '1966-1967', label: "1st Gen '66–'67", shortLabel: "'66–'67", yearStart: 1966, yearEnd: 1967 },
+    { id: '1968-1970', label: "2nd Gen '68–'70", shortLabel: "'68–'70", yearStart: 1968, yearEnd: 1970 },
+    { id: '1971-1974', label: "3rd Gen '71–'74", shortLabel: "'71–'74", yearStart: 1971, yearEnd: 1974 },
+    { id: '2006-2030', label: "Modern LX/LD '06+", shortLabel: "'06+", yearStart: 2006, yearEnd: 2030 },
+  ],
+  'dodge:challenger': [
+    { id: '1970-1974', label: "E-Body '70–'74", shortLabel: "'70–'74", yearStart: 1970, yearEnd: 1974 },
+    { id: '2008-2023', label: "Modern LC '08–'23", shortLabel: "'08–'23", yearStart: 2008, yearEnd: 2023 },
+  ],
+  'dodge:viper': [
+    { id: '1992-2002', label: "SR I/II '92–'02", shortLabel: 'SR I/II', yearStart: 1992, yearEnd: 2002 },
+    { id: '2003-2010', label: "ZB I/II '03–'10", shortLabel: 'ZB I/II', yearStart: 2003, yearEnd: 2010 },
+    { id: '2013-2017', label: "VX '13–'17", shortLabel: 'VX', yearStart: 2013, yearEnd: 2017 },
+  ],
+  'chevrolet:pickup': [
+    { id: '1947-1955', label: "Advance Design '47–'55", shortLabel: "'47–'55", yearStart: 1947, yearEnd: 1955 },
+    { id: '1955-1959', label: "Task Force '55–'59", shortLabel: "'55–'59", yearStart: 1955, yearEnd: 1959 },
+    { id: '1960-1972', label: "C/K '60–'72", shortLabel: "'60–'72", yearStart: 1960, yearEnd: 1972 },
+    { id: '1973-1987', label: "Squarebody '73–'87", shortLabel: "Squarebody '73–'87", yearStart: 1973, yearEnd: 1987 },
+  ],
 };
+
+export function getDefinedFamilyEras(
+  brand: string | null | undefined,
+  familyName: string | null | undefined,
+): FamilyEraCohort[] {
+  const lookupKey = `${(brand ?? '').trim().toLowerCase()}:${(familyName ?? '').trim().toLowerCase()}`;
+  return CURATED_FAMILY_ERAS[lookupKey] ?? [];
+}
 
 export function parseEraRange(eraParam: string | null | undefined): { yearStart: number; yearEnd: number } | null {
   if (!eraParam) return null;

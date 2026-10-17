@@ -17,7 +17,7 @@ import { Text } from '../kit';
 import FamilyMovers from './market/FamilyMovers';
 import BrandFamilyMap, { MapViewSwitch } from './market/BrandFamilyMap';
 import FamilySalesChart, { FamilyViewSwitch } from './market/FamilySalesChart';
-import { matchesEraRange } from '../lib/market/familyEras';
+import { getDefinedFamilyEras, getFamilyEraCohorts, matchesEraRange } from '../lib/market/familyEras';
 import { buildMarketScopeUrl, resolveMarketScopeQuery } from '../lib/search/marketScopeResolver';
 
 // ────────────────────────────────────────────────────────────
@@ -1062,12 +1062,16 @@ export function TreemapHomePage({ onBrowse, embedded = false }: { onBrowse: () =
     if (levelType === 'years' && currentLevel.make && currentLevel.model) {
       const cached = prefetchCache.current.get(`${currentLevel.make}/${currentLevel.model}`);
       if (cached) {
-        return selectedEra ? cached.filter((n) => matchesEraRange(parseInt(n.name, 10), selectedEra)) : cached;
+        if (!selectedEra) return cached;
+        const filtered = cached.filter((n) => matchesEraRange(parseInt(n.name, 10), selectedEra));
+        return filtered.length > 0 ? filtered : cached;
       }
     }
     if (levelType === 'vehicles' && vehiclesData) return vehiclesData;
     if (levelType === 'years' && yearsData) {
-      return selectedEra ? yearsData.filter((n) => matchesEraRange(parseInt(n.name, 10), selectedEra)) : yearsData;
+      if (!selectedEra) return yearsData;
+      const filtered = yearsData.filter((n) => matchesEraRange(parseInt(n.name, 10), selectedEra));
+      return filtered.length > 0 ? filtered : yearsData;
     }
     if (levelType === 'models' && familyModelsData) return familyModelsData;
     if (levelType === 'families' && familiesData) return familiesData;
@@ -1593,6 +1597,45 @@ export function TreemapHomePage({ onBrowse, embedded = false }: { onBrowse: () =
         </div>
       )}
 
+      {/* ─── GENERATION / ERA QUICK-SWITCH BAR: 1-click generation filtering right above the treemap ─── */}
+      {(() => {
+        if (!currentLevel.make || (!currentLevel.family && !currentLevel.model)) return null;
+        const familyLabel = drillStack.find((d) => d.family && !d.model)?.label || searchParams.get('family_name') || currentLevel.model || currentLevel.label;
+        const definedEras = getDefinedFamilyEras(currentLevel.make, familyLabel);
+        const yearList = yearsData ? yearsData.flatMap((n) => {
+          const y = parseInt(n.name, 10);
+          return Number.isFinite(y) ? Array(Math.max(1, Math.min(n.count, 50))).fill(y) : [];
+        }) : [];
+        const cohorts = yearList.length > 0 ? getFamilyEraCohorts(currentLevel.make, familyLabel, yearList) : definedEras;
+        if (cohorts.length < 2) return null;
+        return (
+          <div className="home-family-submodels" role="navigation" aria-label="Generation eras">
+            <button
+              type="button"
+              className={`home-family-submodel-pill${!selectedEra ? ' home-family-submodel-pill--active' : ''}`}
+              aria-pressed={!selectedEra}
+              onClick={() => setSelectedEra(null)}
+            >
+              ALL ERAS
+            </button>
+            {cohorts.map((cohort) => {
+              const active = selectedEra === cohort.id;
+              return (
+                <button
+                  key={cohort.id}
+                  type="button"
+                  className={`home-family-submodel-pill${active ? ' home-family-submodel-pill--active' : ''}`}
+                  aria-pressed={active}
+                  onClick={() => setSelectedEra(active ? null : cohort.id)}
+                >
+                  {cohort.label}
+                </button>
+              );
+            })}
+          </div>
+        );
+      })()}
+
       {/* ─── SALES BY HOUSE: what the all-venue map holds, house by house (the refresh's receipt) ─── */}
       {levelType === 'brands' && basis === 'ledger' && <VenueMix rows={refresh.populations?.by_house} clock={ledgerViewsClock(refresh.refreshedAt)} />}
 
@@ -1751,6 +1794,7 @@ export function TreemapHomePage({ onBrowse, embedded = false }: { onBrowse: () =
             onOpen={(id) => navigate(`/vehicle/${id}`)}
             selectedEra={selectedEra}
             onSelectEra={setSelectedEra}
+            selectedModel={currentLevel.model ?? null}
           />
         </div>
       )}

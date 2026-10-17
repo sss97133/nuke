@@ -201,6 +201,36 @@ const CULTURAL_SCOPE_ALIASES: Array<{
     make: 'Cadillac',
     familyHint: 'DeVille',
   },
+  {
+    pattern: /\b(540\s*k|500\s*k)\b/i,
+    make: 'Mercedes-Benz',
+    familyHint: '540K',
+  },
+  {
+    pattern: /\b(delta\s*integrale(?:\s*evo(?:\s*2)?)?|lancia\s+delta)\b/i,
+    make: 'Lancia',
+    familyHint: 'Delta Integrale',
+  },
+  {
+    pattern: /\b(ur[-\s]?quattro|sport\s*quattro)\b/i,
+    make: 'Audi',
+    familyHint: 'Quattro',
+  },
+  {
+    pattern: /\b(r3[234]\s*(?:gt[-\s]?r|skyline)?|skyline\s*gt[-\s]?r|hakosuka|kenmeri)\b/i,
+    make: 'Nissan',
+    familyHint: 'Skyline',
+  },
+  {
+    pattern: /\b(sunbeam\s+tiger)\b/i,
+    make: 'Sunbeam',
+    familyHint: 'Tiger',
+  },
+  {
+    pattern: /\b(meyers\s+manx|manx\s+dune\s+buggy)\b/i,
+    make: 'Meyers',
+    familyHint: 'Manx',
+  },
 ];
 
 // Words that indicate a natural-language filter query rather than a market scope drill
