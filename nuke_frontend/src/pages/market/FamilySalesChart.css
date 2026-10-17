@@ -124,3 +124,14 @@
 .family-sales__ref-band { fill: var(--info, #2f6fdf); fill-opacity: 0.14; stroke: none; }
 .family-sales__ref-hit { fill: var(--info, #2f6fdf); stroke: var(--bg); stroke-width: 2; }
 .family-sales__median--plain { stroke: var(--text-secondary); stroke-width: 1.2; opacity: 0.8; }
+
+/* Upcoming supply & Model 33 finish-estimate strip and right-edge whiskers */
+.family-sales__supply { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 6px; padding-right: 18px; }
+.family-sales__supply-badge { font: 700 9px 'Courier New', monospace; letter-spacing: 0.08em; padding: 1px 5px; background: var(--text); color: var(--bg); text-transform: uppercase; }
+.family-sales__supply-meta { font: 600 10px 'Courier New', monospace; color: var(--text-secondary); }
+.family-sales__supply-chip { display: inline-flex; align-items: baseline; gap: 5px; padding: 1px 6px; border: 1px solid var(--border); background: var(--surface); color: var(--text); font: 600 10px Arial, sans-serif; cursor: pointer; white-space: nowrap; }
+.family-sales__supply-chip:hover { border-color: var(--text); }
+.family-sales__supply-bid { font: 400 10px 'Courier New', monospace; color: var(--text-secondary); }
+.family-sales__supply-est { font: 700 10px 'Courier New', monospace; color: var(--success); }
+.family-sales__live-band { stroke: var(--success); stroke-width: 1.5; stroke-opacity: 0.45; }
+.family-sales__live-diamond { fill: var(--success); stroke: var(--bg); stroke-width: 1; }

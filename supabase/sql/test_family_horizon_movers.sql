@@ -33,6 +33,8 @@ CREATE SCHEMA cron;
 CREATE TABLE cron.job (jobid bigserial PRIMARY KEY, jobname text UNIQUE, schedule text, command text, active boolean DEFAULT true);
 CREATE FUNCTION cron.schedule(job_name text, schedule text, command text) RETURNS bigint LANGUAGE sql AS
 $$ INSERT INTO cron.job (jobname, schedule, command) VALUES (job_name, schedule, command) RETURNING jobid $$;
+CREATE FUNCTION cron.unschedule(job_name text) RETURNS boolean LANGUAGE sql AS
+$$ DELETE FROM cron.job WHERE jobname = job_name RETURNING true $$;
 
 CREATE TABLE public.mv_family_market (
   brand text, family_key text, family text, model_key text, sold bigint, bat_dated bigint,
@@ -119,6 +121,28 @@ INSERT INTO public.mv_auction_calendar_lots (make, model, estimate_low, estimate
 SELECT 'Ford', 'Mustang', '45000', '55000', current_date + ((i % 15) + 2), current_date + ((i % 15) + 2), now()
 FROM generate_series(1, 8) s(i);
 
+-- Active Facebook Marketplace captures
+CREATE TABLE public.marketplace_listings (
+  id uuid DEFAULT gen_random_uuid() PRIMARY KEY,
+  vehicle_id uuid,
+  suggested_vehicle_id uuid,
+  title text,
+  price integer,
+  current_price numeric,
+  location text,
+  url text,
+  scraped_at timestamptz,
+  parsed_year integer,
+  extracted_year integer,
+  parsed_make text,
+  parsed_model text,
+  status text
+);
+INSERT INTO public.marketplace_listings (title, price, current_price, location, url, scraped_at, parsed_year, parsed_make, parsed_model, status)
+VALUES
+  ('1969 Ford Mustang Boss 302', 68000, 68000, 'Austin, TX', 'https://www.facebook.com/marketplace/item/101', now() - interval '2 hours', 1969, 'Ford', 'Mustang', 'active'),
+  ('1970 Ford Mustang Mach 1', 54000, 54000, 'Dallas, TX', 'https://www.facebook.com/marketplace/item/102', now() - interval '6 hours', 1970, 'Ford', 'Mustang', 'active');
+
 -- Live 24h vehicle_events for '1d'
 CREATE TABLE public.vehicles (id uuid PRIMARY KEY, make text, model text);
 CREATE TABLE public.vehicle_events (
@@ -159,40 +183,59 @@ END $$;
 
 \ir ../migrations/20261016211000_family_share_movers.sql
 \ir ../migrations/20261018122000_family_horizon_movers_v2.sql
-\ir ../migrations/20261018122000_family_horizon_movers_v2.sql
+\ir ../migrations/20261018123000_treemap_horizon_sync_and_supply.sql
+\ir ../migrations/20261018123000_treemap_horizon_sync_and_supply.sql
 
 SELECT pg_temp.ok('mv_family_share_movers holds all 8 horizons',
   (SELECT count(*) FROM public.mv_family_share_movers) = 8);
+
+SELECT pg_temp.ok('refresh-family-share-movers cron runs hourly',
+  (SELECT schedule FROM cron.job WHERE jobname = 'refresh-family-share-movers') = '5 * * * *');
 
 SELECT pg_temp.ok('2-arg treemap_family_share_movers still reads 1y movers unchanged',
   (public.treemap_family_share_movers(5, 30)->'gaining'->0->>'family') = 'GX'
   AND (public.treemap_family_share_movers(5, 30)->'losing'->0->>'family') = 'Integra');
 
 SELECT public.treemap_family_share_movers(5, 0, '1w')::text AS w1 \gset
-SELECT pg_temp.ok('1w horizon identifies GX gaining and Integra losing with 24 sparkline bins',
+SELECT pg_temp.ok('1w horizon identifies GX gaining and Integra losing with 24 sparkline bins and treemap overlays',
   (:'w1')::jsonb->>'horizon' = '1w'
   AND ((:'w1')::jsonb->'gaining'->0->>'family') = 'GX'
   AND ((:'w1')::jsonb->'losing'->0->>'family') = 'Integra'
-  AND jsonb_array_length((:'w1')::jsonb->'gaining'->0->'bins') = 24);
+  AND jsonb_array_length((:'w1')::jsonb->'gaining'->0->'bins') = 24
+  AND ((:'w1')::jsonb->'brand_moves'->'Lexus'->>0)::int = 20
+  AND ((:'w1')::jsonb->'family_moves'->'Lexus|gx'->>0)::int = 20);
 
 SELECT public.treemap_family_share_movers(5, 0, '1d')::text AS d1 \gset
-SELECT pg_temp.ok('1d horizon reads live 24h vehicle_events against prior 24h with 24 bins',
+SELECT pg_temp.ok('1d horizon reads live 24h vehicle_events + FB captures against prior 24h with 24 bins',
   (:'d1')::jsonb->>'horizon' = '1d'
   AND ((:'d1')::jsonb->'gaining'->0->>'family') = 'Mustang'
   AND ((:'d1')::jsonb->'losing'->0->>'family') = '911'
-  AND jsonb_array_length((:'d1')::jsonb->'gaining'->0->'bins') = 24);
+  AND jsonb_array_length((:'d1')::jsonb->'gaining'->0->'bins') = 24
+  AND ((:'d1')::jsonb->'brand_moves'->'Ford'->>0)::int = 12);
 
 SELECT public.treemap_family_share_movers(5, 0, 'upcoming')::text AS up1 \gset
-SELECT pg_temp.ok('upcoming horizon compares next 30d live BaT + calendar lots against past 30d sales',
+SELECT pg_temp.ok('upcoming horizon compares next 30d live BaT + calendar + FB Marketplace against past 30d sales',
   (:'up1')::jsonb->>'horizon' = 'upcoming'
   AND ((:'up1')::jsonb->'gaining'->0->>'family') = 'Mustang'
-  AND ((:'up1')::jsonb->'gaining'->0->>'sold_12m')::int = 18
+  AND ((:'up1')::jsonb->'gaining'->0->>'sold_12m')::int = 20
   AND ((:'up1')::jsonb->'gaining'->0->>'sold_prior_12m')::int = 4
+  AND ((:'up1')::jsonb->'sources'->>'bat_live')::int = 16
+  AND ((:'up1')::jsonb->'sources'->>'auction_calendar')::int = 8
+  AND ((:'up1')::jsonb->'sources'->>'facebook_marketplace')::int = 2
   AND ((:'up1')::jsonb->'losing'->0->>'family') = '911'
   AND jsonb_array_length((:'up1')::jsonb->'gaining'->0->'bins') = 24);
 
-SELECT pg_temp.ok('PUBLIC cannot execute 3-arg reader; anon can',
+SELECT public.treemap_family_upcoming_supply('Ford', 'mustang')::text AS sup1 \gset
+SELECT pg_temp.ok('treemap_family_upcoming_supply returns live BaT, calendar, and FB Marketplace lots for a family',
+  ((:'sup1')::jsonb->'counts'->>'bat_live')::int = 10
+  AND ((:'sup1')::jsonb->'counts'->>'auction_calendar')::int = 8
+  AND ((:'sup1')::jsonb->'counts'->>'facebook_marketplace')::int = 2
+  AND ((:'sup1')::jsonb->'counts'->>'total')::int = 20);
+
+SELECT pg_temp.ok('PUBLIC cannot execute 3-arg reader or upcoming supply reader; anon can',
   NOT has_function_privilege('public', 'public.treemap_family_share_movers(integer, integer, text)', 'execute')
   AND has_function_privilege('anon', 'public.treemap_family_share_movers(integer, integer, text)', 'execute')
   AND NOT has_function_privilege('public', 'public.family_share_movers_build(integer, integer, text)', 'execute')
-  AND has_function_privilege('anon', 'public.family_share_movers_build(integer, integer, text)', 'execute'));
+  AND has_function_privilege('anon', 'public.family_share_movers_build(integer, integer, text)', 'execute')
+  AND NOT has_function_privilege('public', 'public.treemap_family_upcoming_supply(text, text)', 'execute')
+  AND has_function_privilege('anon', 'public.treemap_family_upcoming_supply(text, text)', 'execute'));

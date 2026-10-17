@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { batBaseline, callouts, fitName, moveFill, moveText, moveTextShort, pct, relativeMove, tileClass, tileName } from './mapScale';
+import { batBaseline, callouts, fitName, gateMinForHorizon, moveFill, moveText, moveTextShort, pct, relativeMove, tileClass, tileName } from './mapScale';
 
 const brands = [
   { count: 28_480, dated: 20_000, sold_12m: 4_506, sold_prior_12m: 3_817 },
@@ -48,6 +48,12 @@ describe('a tile’s move', () => {
     expect(relativeMove(brands[4], base)).toEqual({ kind: 'none' });
     expect(relativeMove({ count: 9, sold_12m: 0, sold_prior_12m: 0 }, base)).toEqual({ kind: 'none' });
     expect(moveText({ kind: 'none' })).toBe('');
+  });
+  it('scales the minimum gate across horizons so shorter windows color meaningfully', () => {
+    expect(gateMinForHorizon('1y')).toBe(20);
+    expect(gateMinForHorizon('1w')).toBe(2);
+    expect(gateMinForHorizon('upcoming')).toBe(4);
+    expect(relativeMove({ count: 500, dated: 400, sold_12m: 7, sold_prior_12m: 5 }, base, true, gateMinForHorizon('upcoming')).kind).toBe('move');
   });
 });
 
