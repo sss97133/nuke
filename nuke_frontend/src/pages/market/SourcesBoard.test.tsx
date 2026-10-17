@@ -123,3 +123,9 @@ it('stays off the page when the client itself throws', async () => {
   await act(async () => root.render(<SourcesBoard />));
   expect(container.querySelector('.market-sources')).toBeNull();
 });
+
+it('says Sources · all makes when the market page is scoped to a make', async () => {
+  fixture.rpc.mockResolvedValue({ data: value, error: null });
+  await act(async () => root.render(<SourcesBoard scope="Ford" />));
+  expect(container.querySelector('.market-sources__title')?.textContent).toBe('Sources · all makes');
+});

@@ -551,4 +551,14 @@ describe('inline market row inspection', () => {
     expect(window.location.search).not.toContain('lot=');
     expect(document.activeElement).toBe(row.querySelector('.market-lot-name'));
   });
+  it('scopes live auctions to a drilled model family from the URL and shows the family in the heading', async () => {
+    fixture.pulse.data.auctions = [
+      { ...lot('m-1', 'FORD', 38000, 2, 'mustang-gt'), year: 1967, model: 'Mustang GT' },
+      { ...lot('m-2', 'FORD', 52000, 3, 'mustang-mach-1'), year: 1969, model: 'Mustang Mach 1' },
+      { ...lot('f-1', 'FORD', 24000, 4, 'f-150-raptor'), year: 2018, model: 'F-150' },
+    ];
+    await render('make=Ford&family=8a8271f8-d299-4b55-837a-35ca919f8937&family_name=Mustang');
+    expect(container.querySelector('h1')?.textContent).toBe('Bring a Trailer · FORD · Mustang');
+    expect(boardTitles()).toEqual(['m-1', 'm-2']);
+  });
 });

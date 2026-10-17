@@ -76,6 +76,61 @@ interface DrillLevel {
   year?: number;
 }
 
+const SCOPE_PARAM_KEYS = ['make', 'family', 'family_name', 'model', 'year'] as const;
+
+/** Build the treemap's drill stack from the page URL, resolving canonical brand and family names when loaded. */
+export function drillStackFromSearchParams(
+  params: URLSearchParams,
+  brands?: readonly TreemapNode[] | null,
+  families?: readonly TreemapNode[] | null,
+): DrillLevel[] {
+  const stack: DrillLevel[] = [{ label: 'ALL MAKES' }];
+  const rawMake = params.get('make')?.trim();
+  if (!rawMake || rawMake.toLowerCase() === 'all') return stack;
+  const make = brands?.find((b) => b.name.toLowerCase() === rawMake.toLowerCase())?.name ?? rawMake;
+  stack.push({ label: make, make });
+
+  const rawFamily = params.get('family')?.trim();
+  const rawFamilyName = params.get('family_name')?.trim();
+  if (rawFamily) {
+    const matched = families?.find((f) => f.familyKey === rawFamily);
+    const label = matched?.name ?? rawFamilyName ?? rawFamily;
+    stack.push({ label, make, family: rawFamily, names: matched?.models ?? undefined });
+  }
+
+  const rawModel = params.get('model')?.trim();
+  if (rawModel) {
+    stack.push({ label: rawModel, make, family: rawFamily || undefined, model: rawModel });
+    const rawYear = params.get('year')?.trim();
+    if (rawYear) {
+      const year = parseInt(rawYear, 10);
+      if (Number.isFinite(year)) {
+        stack.push({ label: String(year), make, family: rawFamily || undefined, model: rawModel, year });
+      }
+    }
+  }
+  return stack;
+}
+
+/** Write the treemap's drill stack into the page URL while preserving unrelated parameters. */
+export function applyDrillStackToSearchParams(params: URLSearchParams, stack: readonly DrillLevel[]): URLSearchParams {
+  const next = new URLSearchParams(params);
+  for (const k of SCOPE_PARAM_KEYS) next.delete(k);
+  const leaf = stack[stack.length - 1];
+  if (!leaf?.make) return next;
+  next.set('make', leaf.make);
+  if (leaf.family) {
+    next.set('family', leaf.family);
+    const familyLevel = stack.find((l) => l.family === leaf.family && !l.model);
+    if (familyLevel?.label && familyLevel.label !== leaf.family) {
+      next.set('family_name', familyLevel.label);
+    }
+  }
+  if (leaf.model) next.set('model', leaf.model);
+  if (leaf.year != null && Number.isFinite(leaf.year)) next.set('year', String(leaf.year));
+  return next;
+}
+
 // The map's levels: brands, a brand's model families, a family's model names, a name's years, the sales.
 export type MapLevel = 'brands' | 'families' | 'models' | 'years' | 'vehicles';
 
@@ -233,12 +288,12 @@ function useTreemapModels(make: string | null) {
     if (!make) { setData(null); return; }
     let cancelled = false;
     setLoading(true);
-    supabase.rpc('treemap_models_by_brand', { p_make: make }).then(({ data: result, error }) => {
+    Promise.resolve().then(() => supabase.rpc('treemap_models_by_brand', { p_make: make })).then(({ data: result, error }) => {
       if (!cancelled && result && !error) {
         setData(result as TreemapNode[]);
       }
       if (!cancelled) setLoading(false);
-    });
+    }, () => { if (!cancelled) setLoading(false); });
     return () => { cancelled = true; };
   }, [make]);
   return { data, loading };
@@ -265,7 +320,7 @@ function useTreemapFamilies(make: string | null) {
     if (!make) { setData(null); return; }
     let cancelled = false;
     setLoading(true);
-    Promise.resolve(supabase.rpc('treemap_brand_families', { p_brand: make })).then(({ data: result, error }) => {
+    Promise.resolve().then(() => supabase.rpc('treemap_brand_families', { p_brand: make })).then(({ data: result, error }) => {
       if (cancelled) return;
       const rows = (error ? null : result) as any[] | null;
       if (rows?.length) setData(rows.map((r) => ({ ...marketNode(r.family ?? 'Other models', r), familyKey: r.family_key, models: r.models ?? null })));
@@ -286,7 +341,7 @@ function useTreemapFamilyModels(make: string | null, familyKey: string | null) {
     if (!make || !familyKey) { setData(null); return; }
     let cancelled = false;
     setLoading(true);
-    Promise.resolve(supabase.rpc('treemap_family_models', { p_brand: make, p_family_key: familyKey })).then(({ data: result, error }) => {
+    Promise.resolve().then(() => supabase.rpc('treemap_family_models', { p_brand: make, p_family_key: familyKey })).then(({ data: result, error }) => {
       if (cancelled) return;
       if (!error && result) setData((result as any[]).map((r) => ({ ...marketNode(r.model ?? 'Model not given', r), noModel: r.model == null })));
       setLoading(false);
@@ -303,12 +358,12 @@ function useTreemapYears(make: string | null, model: string | null) {
     if (!make || !model) { setData(null); return; }
     let cancelled = false;
     setLoading(true);
-    supabase.rpc('treemap_years', { p_source: null, p_make: make, p_model: model }).then(({ data: result, error }) => {
+    Promise.resolve().then(() => supabase.rpc('treemap_years', { p_source: null, p_make: make, p_model: model })).then(({ data: result, error }) => {
       if (!cancelled && result && !error) {
         setData(result as TreemapNode[]);
       }
       if (!cancelled) setLoading(false);
-    });
+    }, () => { if (!cancelled) setLoading(false); });
     return () => { cancelled = true; };
   }, [make, model]);
   return { data, loading };
@@ -316,7 +371,7 @@ function useTreemapYears(make: string | null, model: string | null) {
 
 // The leaf: the cell's confirmed sales (treemap_sales), each with the sold amount its parent cell counted.
 function readTreemapSales(make: string, model: string, year?: number | null): Promise<TreemapNode[] | null> {
-  return Promise.resolve(supabase.rpc('treemap_sales', { p_make: make, p_model: model, p_year: year ?? null })).then(
+  return Promise.resolve().then(() => supabase.rpc('treemap_sales', { p_make: make, p_model: model, p_year: year ?? null })).then(
     ({ data: result, error }: { data: any[] | null; error: unknown }) => (error || !result ? null : result.map((v: any) => ({
       name: [v.year, v.make, v.model].filter(Boolean).join(' '),
       count: 1,
@@ -878,11 +933,19 @@ function useSearchPreview(query: string) {
 // market page (no header bar of its own, a fixed height) instead of as a page of its own.
 export function TreemapHomePage({ onBrowse, embedded = false }: { onBrowse: () => void; embedded?: boolean }) {
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   usePageTitle(embedded ? 'Market' : 'Nuke — Vehicle Intelligence');
   const { recordInterest } = useInterests();
 
-  // Drill-down state
-  const [drillStack, setDrillStack] = useState<DrillLevel[]>([{ label: 'ALL MAKES' }]);
+  // Drill-down state, synced with the page URL so Back, reload, search and lower sections share one scope.
+  const [drillStack, setDrillStackState] = useState<DrillLevel[]>(() => drillStackFromSearchParams(searchParams));
+  const setDrillStack = useCallback((updater: DrillLevel[] | ((prev: DrillLevel[]) => DrillLevel[])) => {
+    setDrillStackState((prev) => {
+      const next = typeof updater === 'function' ? updater(prev) : updater;
+      setSearchParams((curr) => applyDrillStackToSearchParams(curr, next), { preventScrollReset: true });
+      return next;
+    });
+  }, [setSearchParams]);
   const currentLevel = drillStack[drillStack.length - 1];
 
   // Narrow-viewport flag — hides decorative chrome when the header would crush.
@@ -927,7 +990,8 @@ export function TreemapHomePage({ onBrowse, embedded = false }: { onBrowse: () =
   const [basis, setBasis] = useState<MapBasis>('ledger');
   // A brand opens on its model families; when none can be read it opens on its model names, as before.
   const atFamilies = !!currentLevel.make && !currentLevel.family && !currentLevel.model;
-  const { data: familiesData, loading: familiesLoading, failed: familiesFailed } = useTreemapFamilies(atFamilies ? currentLevel.make ?? null : null);
+  const needsFamilyMeta = atFamilies || (!!currentLevel.make && !!currentLevel.family && !currentLevel.names);
+  const { data: familiesData, loading: familiesLoading, failed: familiesFailed } = useTreemapFamilies(needsFamilyMeta ? currentLevel.make ?? null : null);
   const { data: modelsData, loading: modelsLoading } = useTreemapModels(atFamilies && familiesFailed ? currentLevel.make ?? null : null);
   const { data: familyModelsData, loading: familyModelsLoading } = useTreemapFamilyModels(
     currentLevel.family && !currentLevel.model ? currentLevel.make ?? null : null,
@@ -943,11 +1007,24 @@ export function TreemapHomePage({ onBrowse, embedded = false }: { onBrowse: () =
   const vehicleYear = currentLevel.year ?? null;
   const { data: vehiclesData, loading: vehiclesLoading } = useTreemapVehicles(vehicleMake, vehicleModel, vehicleYear);
 
+  // Sync URL scope changes (Back/Forward, search, lower sections) and canonical brand/family labels into drillStack.
+  const urlScopeKey = SCOPE_PARAM_KEYS.map((k) => searchParams.get(k) ?? '').join('\x1f');
+  useEffect(() => {
+    setDrillStackState((prev) => {
+      const fromUrl = drillStackFromSearchParams(searchParams, brandsData, familiesData);
+      const same = prev.length === fromUrl.length && prev.every((a, i) => {
+        const b = fromUrl[i];
+        return a.label === b.label && a.make === b.make && a.family === b.family && a.names === b.names && a.model === b.model && a.year === b.year;
+      });
+      return same ? prev : fromUrl;
+    });
+  }, [urlScopeKey, brandsData, familiesData, searchParams]);
+
   // The top level as brands, or as brands with their families inside (finviz's map of the market).
   const [brandView, setBrandView] = useState<'brands' | 'nested'>('brands');
-  // A family opens on its sales chart; its model names as tiles are one switch away.
-  const [familyView, setFamilyView] = useState<'sales' | 'names'>('sales');
-  useEffect(() => { setFamilyView('sales'); }, [currentLevel.make, currentLevel.family]);
+  // A family keeps its model names as clickable treemap tiles; the sales chart is shown below when embedded (or via the switch).
+  const [familyView, setFamilyView] = useState<'sales' | 'names'>('names');
+  useEffect(() => { setFamilyView('names'); }, [currentLevel.make, currentLevel.family]);
 
   // Determine active data and level type
   const levelType: MapLevel =
@@ -976,7 +1053,7 @@ export function TreemapHomePage({ onBrowse, embedded = false }: { onBrowse: () =
     // drillStack triggers recompute when navigating so ref cache is checked
   }, [levelType, brandsData, familiesData, familiesFailed, modelsData, familyModelsData, yearsData, vehiclesData, currentLevel, drillStack]);
 
-  const isLoading = brandsLoading || familiesLoading || modelsLoading || familyModelsLoading || yearsLoading || vehiclesLoading;
+  const isLoading = brandsLoading || (atFamilies && familiesLoading) || modelsLoading || familyModelsLoading || yearsLoading || vehiclesLoading;
 
   // ── Prefetch: fire supabase queries on 200ms hover debounce ──
   const prefetchYears = useCallback((make: string, model: string) => {
@@ -1569,6 +1646,29 @@ export function TreemapHomePage({ onBrowse, embedded = false }: { onBrowse: () =
       {sheet && <MarketSheet node={sheet} move={relativeMove(sheet, baseline, basis === 'ledger')} base={baseline}
         onOpen={() => { const n = sheet; setSheet(null); drillInto(n); }} onClose={() => setSheet(null)} />}
 
+      {/* ─── FAMILY SALES CHART: when embedded on the Market page, show the family's sales & like-for-like price index below its model tiles ─── */}
+      {embedded && levelType === 'models' && currentLevel.family && currentLevel.make && familyView === 'names' && dims.w > 0 && (
+        <div
+          data-testid="embedded-family-sales-chart"
+          style={{
+            position: 'relative',
+            height: 340,
+            borderTop: '2px solid var(--border)',
+            background: 'var(--bg)',
+            overflow: 'hidden',
+          }}
+        >
+          <FamilySalesChart
+            brand={currentLevel.make}
+            familyKey={currentLevel.family}
+            familyLabel={currentLevel.label}
+            width={dims.w}
+            height={340}
+            onShowModels={currentLevel.names && currentLevel.names > 1 ? () => setFamilyView('sales') : undefined}
+          />
+        </div>
+      )}
+
       {/* ─── WHAT MOVED: the families whose BaT market moved most, a pick drills the map to the family ─── */}
       {levelType === 'brands' && <FamilyMovers onPick={(m) => {
         recordInterest('make', m.brand);
@@ -1719,7 +1819,7 @@ export default function HomePage() {
           <TreemapHomePage embedded onBrowse={() => (document.querySelector('.market-sources') ?? document.querySelector('.market-explorer'))
             ?.scrollIntoView({ behavior: 'smooth', block: 'start' })} />
           {/* Every source with the same row, ranked by the lots we hold (owner, 2026-10-15: "treat all sources the same") */}
-          <SourcesBoard />
+          <SourcesBoard scope={searchParams.get('make')} />
           <MarketPulse onUnavailable={user ? <FeedPage /> : <IntakePage variant="homepage" />} />
         </>}
         {activeTab === 'garage' && <GarageTab dashboard={garage} />}

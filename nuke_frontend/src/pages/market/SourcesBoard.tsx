@@ -168,7 +168,7 @@ const NOT_RANKED_WORDS: Record<string, string> = {
   social_media: 'social channel', forum: 'forum', documentation: 'archive', owner: 'owner source', internal: 'internal source',
 };
 
-export function SourcesBoardView({ data }: { data: SourcesBoardData }) {
+export function SourcesBoardView({ data, scope }: { data: SourcesBoardData; scope?: string | null }) {
   const [all, setAll] = useState(false);
   const heldAt = data.rows.map((r) => r.heldAt).filter((x): x is string => !!x).sort().at(-1) ?? null;
   const groups = GROUPS.map(([key, title, unit]) => ({ key, title, unit, rows: data.rows.filter((r) => r.category === key) }))
@@ -177,6 +177,7 @@ export function SourcesBoardView({ data }: { data: SourcesBoardData }) {
   const hidden = groups.reduce((n, g) => n + Math.max(0, g.rows.length - SHOWN), 0);
   const notRanked = Object.entries(data.notRanked).sort((x, y) => y[1] - x[1])
     .map(([k, n]) => `${n} ${NOT_RANKED_WORDS[k] ?? k}${n > 1 ? 's' : ''}`);
+  const scopedLabel = scope?.trim() ? 'Sources · all makes' : 'Sources';
   return (
     <section className="market-sources" aria-label="Sources, ranked by what we hold">
       <svg width="0" height="0" aria-hidden="true" className="market-sources__defs">
@@ -187,7 +188,7 @@ export function SourcesBoardView({ data }: { data: SourcesBoardData }) {
         </defs>
       </svg>
       <div className="market-sources__head">
-        <span className="market-sources__title">Sources</span>
+        <span className="market-sources__title">{scopedLabel}</span>
         <span className="market-sources__note">
           ranked by what we hold · a source moves up as more of it lands{heldAt ? ` · held counts as of ${heldWhen(heldAt)}` : ''}
         </span>
@@ -263,7 +264,7 @@ export function SourcesBoardView({ data }: { data: SourcesBoardData }) {
 }
 
 /** The board as the market page mounts it: one read, nothing shown until it answers, nothing shown if it fails. */
-export default function SourcesBoard() {
+export default function SourcesBoard({ scope }: { scope?: string | null } = {}) {
   const [data, setData] = useState<SourcesBoardData | null>(null);
   useEffect(() => {
     let live = true;
@@ -274,5 +275,5 @@ export default function SourcesBoard() {
     return () => { live = false; };
   }, []);
   if (!data || !data.rows.length) return null;
-  return <SourcesBoardView data={data} />;
+  return <SourcesBoardView data={data} scope={scope} />;
 }
