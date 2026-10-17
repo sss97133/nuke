@@ -5,14 +5,16 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 
 const fixture = vi.hoisted(() => ({ rpc: vi.fn() }));
 vi.mock('../../lib/supabase', () => ({ supabase: { rpc: fixture.rpc } }));
-import SourcesBoard, { heldShare, landingState, monthBars, money, parseSources, shortName } from './SourcesBoard';
+import SourcesBoard, { heldShare, landingState, monthBars, money, parseSourceLanding, parseSources, shortName } from './SourcesBoard';
 
-// market_sources_read (20261018030000), shaped as production answers: columns, then one array per source by held lots.
+// market_sources_read (20261018034000), shaped as production answers: columns, then one array per source by held lots, plus landing.
 const columns = ['source', 'name', 'category', 'house', 'held_lots', 'held_at', 'population', 'population_method',
   'population_confidence', 'population_at', 'map_sales', 'map_usd', 'sales_12m', 'usd_12m', 'sales_prior_12m',
   'usd_prior_12m', 'months', 'live_lots', 'live_at', 'held_lots_before', 'before_day', 'landed_24h', 'landed_7d',
   'last_landed', 'days14', 'logo_url', 'business_type'];
 const days = (today: number) => [...Array(13).fill(0), today];
+const hours = (lastHour: number) => [...Array(22).fill(2), 14, lastHour];
+const mins = (last5m: number) => [...Array(10).fill(0), 4, last5m];
 const value = {
   as_of: '2026-10-16T10:47:00Z', day: '2026-10-16', columns,
   rows: [
@@ -29,7 +31,47 @@ const value = {
       null, null, null, null, null, null, null, 0, null, null, null, 1257, 2232, '2026-10-16T09:00:00Z', days(1257), null, null],
   ],
   not_ranked: { 'capture channels': 2, aggregator: 2, dealer: 2, shop: 1 },
+  landing: {
+    hour: '2026-10-16T10:00:00Z',
+    bucket_5m: '2026-10-16T10:45:00Z',
+    totals: { landed_15m: 18, landed_1h: 64, landed_24h: 154747, landed_7d: 156988, hours24: hours(64), mins60: mins(9) },
+    sources: {
+      bat: { landed_15m: 6, landed_1h: 18, landed_24h: 2055, landed_7d: 3321, last_at: '2026-10-16T10:46:12Z', hours24: hours(18), mins60: mins(6) },
+      mecum: { landed_15m: 12, landed_1h: 46, landed_24h: 151435, landed_7d: 151435, last_at: '2026-10-16T10:45:50Z', hours24: hours(46), mins60: mins(3) },
+    },
+  },
 };
+
+const batLandingDetail = {
+  as_of: '2026-10-16T10:47:05Z',
+  source: 'bat',
+  hour: '2026-10-16T10:00:00Z',
+  selected_hour: null,
+  bucket_5m: '2026-10-16T10:45:00Z',
+  landed_15m: 6,
+  landed_1h: 18,
+  landed_24h: 2055,
+  landed_7d: 3321,
+  last_landed: '2026-10-16T10:46:12Z',
+  hours24: hours(18),
+  mins60: mins(6),
+  days14: days(2055),
+  recent: [
+    {
+      id: 'ev-1',
+      source: 'bat',
+      event_type: 'auction',
+      event_status: 'active',
+      price: 42500,
+      title: '1991 Acura NSX 5-Speed',
+      lot: 'bringatrailer.com/listing/1991-acura-nsx',
+      vehicle_id: 'veh-nsx',
+      source_url: 'https://bringatrailer.com/listing/1991-acura-nsx',
+      created_at: '2026-10-16T10:46:12Z',
+    },
+  ],
+};
+
 let root: Root, container: HTMLDivElement;
 beforeEach(() => {
   (globalThis as any).IS_REACT_ACT_ENVIRONMENT = true;
@@ -40,7 +82,9 @@ afterEach(async () => { await act(async () => root.unmount()); container.remove(
 it('decodes the reader by column name and refuses anything else', () => {
   const d = parseSources(value)!;
   expect(d.rows.map((r) => r.source)).toEqual(['bat', 'mecum', 'cars-and-bids', 'craigslist']);
-  expect(d.rows[0]).toMatchObject({ held: 252399, population: 264746, live: 1265, heldBefore: 251000, sales12: 39173 });
+  expect(d.rows[0]).toMatchObject({ held: 252399, population: 264746, live: 1265, heldBefore: 251000, sales12: 39173, landed15m: 6, landed1h: 18 });
+  expect(d.rows[0].hours24).toHaveLength(24);
+  expect(d.rows[0].mins60).toHaveLength(12);
   expect(d.rows[2]).toMatchObject({ population: null, months: [], live: 0, landed24: 0 });
   expect(d.rows[1]).toMatchObject({ landed24: 151435, landed7: 151435 });
   expect(d.rows[1].days14).toHaveLength(14);
@@ -52,6 +96,7 @@ it('decodes the reader by column name and refuses anything else', () => {
   expect(parseSources(null)).toBeNull();
   expect(parseSources([value])).toBeNull();
   expect(parseSources({ ...value, columns: ['name'] })).toBeNull();
+  expect(parseSourceLanding(batLandingDetail)?.recent[0]).toMatchObject({ title: '1991 Acura NSX 5-Speed', price: 42500 });
 });
 
 it('says how much of its own total we hold, in the total\'s terms', () => {
@@ -64,8 +109,10 @@ it('says how much of its own total we hold, in the total\'s terms', () => {
   expect(money(null)).toBe('');
 });
 
-it('says whether a source is landing data now, or since when it has been idle', () => {
+it('says whether a source is landing data now, or since when it has been idle, across 14d / 24h / 1h horizons', () => {
   expect(landingState({ landed24: 151435, lastLanded: '2026-10-16T10:00:00Z' })).toEqual({ active: true, text: '+151,435 today' });
+  expect(landingState({ landed24: 2055, landed1h: 18, lastLanded: '2026-10-16T10:46:00Z' }, '24h')).toEqual({ active: true, text: '+18/hr · 2,055 24h' });
+  expect(landingState({ landed24: 2055, landed1h: 18, landed15m: 6, lastLanded: '2026-10-16T10:46:00Z' }, '1h')).toEqual({ active: true, text: '+6/15m · 18 1h' });
   expect(landingState({ landed24: 0, lastLanded: '2026-10-03T14:00:00Z' })).toEqual({ active: false, text: 'idle since Oct 3' });
   expect(landingState({ landed24: 0, lastLanded: null })).toEqual({ active: false, text: 'idle 14+ days' });
   expect(shortName('eBay Motors (Browse API)')).toBe('eBay Motors');
@@ -110,6 +157,50 @@ it('ranks auction houses and marketplaces apart, same row for each, as the reade
   expect(container.querySelector('.market-sources__foot .market-sources__note')?.textContent)
     .toBe('not ranked: 2 capture channels, 2 aggregators, 2 dealers, 1 shop');
   expect(container.querySelector('.market-sources__note')?.textContent).toContain('held counts as of Oct 16, 10:27 UTC');
+});
+
+it('switches the landing column to 24h hourly bars and 1h live bars when clicked, and opens the live hourly inspector on row click', async () => {
+  fixture.rpc.mockImplementation((fn: string) => {
+    if (fn === 'market_sources_read') return Promise.resolve({ data: value, error: null });
+    if (fn === 'market_source_landing_read') return Promise.resolve({ data: batLandingDetail, error: null });
+    return Promise.resolve({ data: null, error: { message: 'none' } });
+  });
+  await act(async () => root.render(<SourcesBoard />));
+
+  // Click the "landing, last 14 days" column header toggle -> switches to 24h (hourly)
+  const colToggle = container.querySelector('.market-sources__col-toggle') as HTMLButtonElement;
+  expect(colToggle.textContent).toBe('landing, last 14 days');
+  await act(async () => { colToggle.click(); });
+  expect(colToggle.textContent).toBe('landing, last 24 hours');
+  const firstRow = container.querySelector('li.market-sources__row')!;
+  expect(firstRow.querySelector('.market-sources__landtext')?.textContent).toBe('+18/hr · 2,055 24h');
+  expect(firstRow.querySelectorAll('.market-sources__days rect')).toHaveLength(24);
+
+  // Click again -> switches to 1h live (12 x 5-min bars)
+  await act(async () => { colToggle.click(); });
+  expect(colToggle.textContent).toBe('landing, live 60m');
+  expect(firstRow.querySelector('.market-sources__landtext')?.textContent).toBe('+6/15m · 18 1h');
+  expect(firstRow.querySelectorAll('.market-sources__days rect')).toHaveLength(12);
+
+  // Click a row's landing button -> opens the inline live & hourly ingestion inspector
+  const landBtn = firstRow.querySelector('button.market-sources__landing') as HTMLButtonElement;
+  await act(async () => { landBtn.click(); });
+  expect(fixture.rpc).toHaveBeenCalledWith('market_source_landing_read', { p_source: 'bat' });
+  const drill = container.querySelector('.market-sources__drill')!;
+  expect(drill).not.toBeNull();
+  expect(drill.textContent).toContain('Bring a Trailer');
+  expect(drill.textContent).toContain('1991 Acura NSX 5-Speed');
+  expect(drill.textContent).toContain('$42,500');
+  expect(drill.querySelectorAll('.market-sources__hour-col')).toHaveLength(24);
+  expect(drill.querySelectorAll('.market-sources__min-col')).toHaveLength(12);
+
+  // Click one of the 24 hourly bars to inspect a specific hour
+  const hourButtons = drill.querySelectorAll('.market-sources__hour-col');
+  await act(async () => { (hourButtons[20] as HTMLButtonElement).click(); });
+  expect(fixture.rpc).toHaveBeenCalledWith('market_source_landing_read', {
+    p_source: 'bat',
+    p_hour: '2026-10-16T07:00:00.000Z',
+  });
 });
 
 it('shows nothing when the reader fails or holds no rows', async () => {
