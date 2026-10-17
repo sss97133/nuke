@@ -234,6 +234,21 @@ export default function FamilySalesChart({ brand, familyKey, family, width, heig
   useEffect(() => { setHidden(new Set()); }, [brand, familyKey]);
   const toggle = (key: string) => setHidden((h) => { const next = new Set(h); if (!next.delete(key)) next.add(key); return next; });
   const narrow = width < NARROW;
+  const panelsRef = useRef<HTMLDivElement | null>(null);
+  const [measuredHead, setMeasuredHead] = useState(0);
+  useEffect(() => {
+    const el = panelsRef.current;
+    if (!el) return;
+    const update = () => {
+      const top = el.offsetTop;
+      if (top > 0) setMeasuredHead((prev) => (Math.abs(prev - top) > 1 ? top : prev));
+    };
+    update();
+    if (typeof ResizeObserver === 'undefined') return;
+    const ro = new ResizeObserver(update);
+    if (el.parentElement) ro.observe(el.parentElement);
+    return () => ro.disconnect();
+  }, [sales, width, height, narrow, ix, eraCohorts.length, selectedEra]);
   const plot = useMemo(() => {
     if (!sales?.length || width < 200 || height < 160) return null;
     const dated = sales.map((s) => ({ ...s, t: Date.parse(s.sale_date) })).filter((s) => Number.isFinite(s.t) && s.usd > 0).sort((a, b) => a.t - b.t);
@@ -258,7 +273,12 @@ export default function FamilySalesChart({ brand, familyKey, family, width, heig
     else if (!bands.length) bands = [['all years', shown]];
     else if (rest.length >= MIN_BAND) bands = [...bands, ['other years', rest]];
     else unpanelled = rest.length;
-    const head = ix ? (narrow ? 132 : 92) : narrow ? 96 : 54;
+    const hasEras = Boolean(onSelectEra && eraCohorts.length >= 2);
+    const readableChips = ix ? ix.segments.filter((s) => s.verdict !== 'too few to tell' && s.change != null).length : 0;
+    const chipExtra = !narrow && ix && readableChips >= 2 ? (ix.segments.length > 5 ? 44 : 22) : 0;
+    const eraExtra = hasEras ? (narrow ? 48 : 28) : 0;
+    const fallbackHead = (ix ? (narrow ? 132 : 92) : (narrow ? 96 : 54)) + chipExtra + eraExtra;
+    const head = measuredHead > 0 ? measuredHead : fallbackHead;
     const cols = narrow ? 1 : Math.min(4, bands.length);
     const rows = Math.ceil(bands.length / cols);
     const pw = Math.floor((width - (cols - 1) * 6) / cols);
@@ -290,7 +310,7 @@ export default function FamilySalesChart({ brand, familyKey, family, width, heig
     const outside = shown.filter((p) => p.usd < lo || p.usd > hi).length;
     return { panels, years, ticks, counts, head, cols, pw, ph, ref, n: dated.length, under: dated.length - pts.length,
       shown: shown.length, outside, unpanelled, lo, hi, since: new Date(dated[0].t) };
-  }, [sales, width, height, hidden, narrow, ix, indexed]);
+  }, [sales, width, height, hidden, narrow, ix, indexed, onSelectEra, eraCohorts.length, measuredHead]);
   const move = useMemo(() => (sales ? batMove(sales) : null), [sales]);
   const held = useMemo(() => (sales ? mixFixed(eraMoves(sales)) : null), [sales]);
 
@@ -373,7 +393,7 @@ export default function FamilySalesChart({ brand, familyKey, family, width, heig
         </div>
       )}
     </div>
-    <div className="family-sales__panels" style={{ gridTemplateColumns: `repeat(${plot.cols}, ${plot.pw}px)` }}>
+    <div ref={panelsRef} className="family-sales__panels" style={{ gridTemplateColumns: `repeat(${plot.cols}, ${plot.pw}px)` }}>
       {plot.panels.map((pn, bi) => <svg key={pn.era} className="family-sales__plot" width={plot.pw} height={plot.ph}
         role="img" aria-label={`${family} ${pn.era}: ${pn.n} sales over five years, price against date`}
         onMouseMove={onMove(bi)} onMouseLeave={() => { setHover(null); setRefHover(null); }} onClick={() => { if (hd && hover?.band === bi) onOpen(hd.vehicle_id); }}>

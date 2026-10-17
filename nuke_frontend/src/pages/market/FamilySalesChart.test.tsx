@@ -249,3 +249,57 @@ it('renders automotive generation cohort pills and scopes plotted sales when an 
   ));
   expect(container.querySelectorAll('svg.family-sales__plot circle')).toHaveLength(8);
 });
+
+it('reserves vertical headroom for multi-row index chips and generation pills so panels never overlap the header or legend', async () => {
+  const mk = (i: number, ago: number, usd: number, year: number): Sale =>
+    ({ vehicle_id: `00000000-0000-4000-8000-${String(i).padStart(12, '0')}`, sale_date: day(ago), usd, source: 'Bring a Trailer', year, model: 'Mustang' });
+  const sales: Sale[] = [
+    ...Array.from({ length: 10 }, (_, k) => mk(k + 1, 15 + k * 10, 45_000 + k * 500, 1967)),
+    ...Array.from({ length: 10 }, (_, k) => mk(k + 20, 20 + k * 10, 32_000 + k * 500, 1972)),
+    ...Array.from({ length: 10 }, (_, k) => mk(k + 40, 25 + k * 10, 22_000 + k * 500, 1989)),
+    ...Array.from({ length: 10 }, (_, k) => mk(k + 60, 30 + k * 10, 25_000 + k * 500, 1998)),
+    ...Array.from({ length: 10 }, (_, k) => mk(k + 80, 35 + k * 10, 30_000 + k * 500, 2008)),
+  ];
+  const index = {
+    period_kind: 'month',
+    fitted_at: '2026-10-16T11:20:00Z',
+    stale: false,
+    counts: { n_last12: 1820, n_prior12: 1626, n_total: 7157 },
+    change: {
+      verdict: 'up',
+      change_12m: 0.0388,
+      lo: 0.0129,
+      hi: 0.0654,
+      n_last12: 1820,
+      n_prior12: 1626,
+      chips: [
+        { key: 's197', label: 'S197 2005–14', change: 0.0257, lo: -0.0212, hi: 0.0747, n_last12: 362, n_prior12: 337, verdict: 'flat' },
+        { key: 'g1-64-66', label: '1964½–66', change: 0.0139, lo: -0.0333, hi: 0.0635, n_last12: 329, n_prior12: 299, verdict: 'flat' },
+        { key: 'sn95', label: 'SN95 1994–2004', change: 0.087, lo: 0.0177, hi: 0.161, n_last12: 171, n_prior12: 172, verdict: 'up' },
+        { key: 's550', label: 'S550 2015–23', change: null, lo: null, hi: null, n_last12: 255, n_prior12: 212, verdict: 'too few to tell' },
+        { key: 'fox', label: 'Fox 1979–93', change: null, lo: null, hi: null, n_last12: 239, n_prior12: 202, verdict: 'too few to tell' },
+        { key: 's650', label: 'S650 2024+', change: null, lo: null, hi: null, n_last12: 19, n_prior12: 12, verdict: 'too few to tell' },
+      ],
+    },
+    series: [],
+  };
+  fixture.rpc.mockImplementation((fn: string) =>
+    Promise.resolve(fn === 'treemap_family_sales' ? { data: value(sales), error: null }
+      : fn === 'family_price_index_read' ? { data: index, error: null }
+      : { data: null, error: { message: 'none' } }),
+  );
+  await act(async () => root.render(
+    <FamilySalesChart brand="Ford" familyKey="mustang" family="Mustang" width={1000} height={420} onOpen={() => {}} selectedEra={null} onSelectEra={() => {}} />,
+  ));
+  const rootEl = container.querySelector('.family-sales')!;
+  expect([...rootEl.children].map((el) => el.className)).toEqual([
+    'family-sales__head',
+    'family-sales__legend',
+    'family-sales__panels',
+  ]);
+  const plotEl = container.querySelector('svg.family-sales__plot')!;
+  // With 2 rows of panels in a 420px container and extra headroom for chips + eras (92 + 44 + 28 = 164),
+  // each panel height is floor((420 - 164 - 6) / 2) = 125 (< 161 without headroom).
+  expect(Number(plotEl.getAttribute('height'))).toBe(125);
+});
+
