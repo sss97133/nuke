@@ -24,6 +24,112 @@ enum ProfileViewer: String, Decodable {
     }
 }
 
+/// Optional broadcast / auction video moment for a sale claim (`kit/types.ts` #1823).
+struct SaleVideoMoment: Decodable, Equatable {
+    var url: String? = nil
+    var startSeconds: Int? = nil
+    var endSeconds: Int? = nil
+    var lotNumber: String? = nil
+    var auctionName: String? = nil
+    var searchQuery: String? = nil
+    var lotUrl: String? = nil
+    var title: String? = nil
+    var priceText: String? = nil
+    var imageUrl: String? = nil
+
+    private enum CodingKeys: String, CodingKey {
+        case url
+        case startSeconds, start_seconds
+        case endSeconds, end_seconds
+        case lotNumber, lot_number
+        case auctionName, auction_name
+        case searchQuery, search_query
+        case lotUrl, lot_url
+        case title
+        case priceText, price_text
+        case imageUrl, image_url
+    }
+
+    init(
+        url: String? = nil,
+        startSeconds: Int? = nil,
+        endSeconds: Int? = nil,
+        lotNumber: String? = nil,
+        auctionName: String? = nil,
+        searchQuery: String? = nil,
+        lotUrl: String? = nil,
+        title: String? = nil,
+        priceText: String? = nil,
+        imageUrl: String? = nil
+    ) {
+        self.url = url
+        self.startSeconds = startSeconds
+        self.endSeconds = endSeconds
+        self.lotNumber = lotNumber
+        self.auctionName = auctionName
+        self.searchQuery = searchQuery
+        self.lotUrl = lotUrl
+        self.title = title
+        self.priceText = priceText
+        self.imageUrl = imageUrl
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        self.url = try? c.decodeIfPresent(String.self, forKey: .url)
+        self.startSeconds = (try? c.decodeIfPresent(Int.self, forKey: .startSeconds))
+            ?? (try? c.decodeIfPresent(Int.self, forKey: .start_seconds))
+        self.endSeconds = (try? c.decodeIfPresent(Int.self, forKey: .endSeconds))
+            ?? (try? c.decodeIfPresent(Int.self, forKey: .end_seconds))
+        self.lotNumber = (try? c.decodeIfPresent(String.self, forKey: .lotNumber))
+            ?? (try? c.decodeIfPresent(String.self, forKey: .lot_number))
+        self.auctionName = (try? c.decodeIfPresent(String.self, forKey: .auctionName))
+            ?? (try? c.decodeIfPresent(String.self, forKey: .auction_name))
+        self.searchQuery = (try? c.decodeIfPresent(String.self, forKey: .searchQuery))
+            ?? (try? c.decodeIfPresent(String.self, forKey: .search_query))
+        self.lotUrl = (try? c.decodeIfPresent(String.self, forKey: .lotUrl))
+            ?? (try? c.decodeIfPresent(String.self, forKey: .lot_url))
+        self.title = try? c.decodeIfPresent(String.self, forKey: .title)
+        self.priceText = (try? c.decodeIfPresent(String.self, forKey: .priceText))
+            ?? (try? c.decodeIfPresent(String.self, forKey: .price_text))
+        self.imageUrl = (try? c.decodeIfPresent(String.self, forKey: .imageUrl))
+            ?? (try? c.decodeIfPresent(String.self, forKey: .image_url))
+    }
+
+    /// Formats `startSeconds` as `m:ss` or `h:mm:ss` (`Claim.tsx`).
+    var startLabel: String? {
+        guard let s = startSeconds, s >= 0 else { return nil }
+        let h = s / 3600
+        let m = (s % 3600) / 60
+        let sec = s % 60
+        if h > 0 { return String(format: "%d:%02d:%02d", h, m, sec) }
+        return String(format: "%d:%02d", m, sec)
+    }
+
+    /// Resolves a direct or YouTube watch URL (`https://www.youtube.com/watch?v=...&t=...`) when `url` is a URL or 11-char YouTube ID.
+    var watchableURL: URL? {
+        guard let raw = url?.trimmingCharacters(in: .whitespacesAndNewlines), !raw.isEmpty else { return nil }
+        if raw.lowercased().hasPrefix("http"), var comps = URLComponents(string: raw) {
+            if let s = startSeconds, s > 0, comps.host?.contains("youtube.com") == true || comps.host?.contains("youtu.be") == true {
+                var items = comps.queryItems ?? []
+                if !items.contains(where: { $0.name == "t" || $0.name == "start" }) {
+                    items.append(URLQueryItem(name: "t", value: "\(s)s"))
+                    comps.queryItems = items
+                }
+            }
+            return comps.url
+        }
+        // Bare 11-char YouTube video ID
+        let idChars = CharacterSet(charactersIn: "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789_-")
+        if raw.count == 11, raw.unicodeScalars.allSatisfy({ idChars.contains($0) }) {
+            var s = "https://www.youtube.com/watch?v=\(raw)"
+            if let start = startSeconds, start > 0 { s += "&t=\(start)s" }
+            return URL(string: s)
+        }
+        return nil
+    }
+}
+
 /// Where a claim came from: the evidence class, and a pointer at the evidence.
 struct ClaimSource: Decodable, Equatable {
     /// An evidence class the app does not know is read as the record (legacy), dim and open,
@@ -48,15 +154,85 @@ struct ClaimSource: Decodable, Equatable {
         }
     }
     let kind: Kind
-    let url: String?
+    var url: String?
     let id: String?
     let method: String?
     let label: String?
+    var logoUrl: String? = nil
+    var lotNumber: String? = nil
+    var auctionName: String? = nil
+    var video: SaleVideoMoment? = nil
+
+    private enum CodingKeys: String, CodingKey {
+        case kind, url, id, method, label, name, video
+        case logoUrl, logo_url
+        case lotNumber, lot_number
+        case auctionName, auction_name
+    }
+
+    init(
+        kind: Kind,
+        url: String? = nil,
+        id: String? = nil,
+        method: String? = nil,
+        label: String? = nil,
+        logoUrl: String? = nil,
+        lotNumber: String? = nil,
+        auctionName: String? = nil,
+        video: SaleVideoMoment? = nil
+    ) {
+        self.kind = kind
+        self.url = url
+        self.id = id
+        self.method = method
+        self.label = label
+        self.logoUrl = logoUrl
+        self.lotNumber = lotNumber
+        self.auctionName = auctionName
+        self.video = video
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        self.kind = (try? c.decode(Kind.self, forKey: .kind)) ?? .legacy
+        self.url = try? c.decodeIfPresent(String.self, forKey: .url)
+        self.id = try? c.decodeIfPresent(String.self, forKey: .id)
+        self.method = try? c.decodeIfPresent(String.self, forKey: .method)
+        self.label = (try? c.decodeIfPresent(String.self, forKey: .label))
+            ?? (try? c.decodeIfPresent(String.self, forKey: .name))
+        self.logoUrl = (try? c.decodeIfPresent(String.self, forKey: .logoUrl))
+            ?? (try? c.decodeIfPresent(String.self, forKey: .logo_url))
+        self.lotNumber = (try? c.decodeIfPresent(String.self, forKey: .lotNumber))
+            ?? (try? c.decodeIfPresent(String.self, forKey: .lot_number))
+        self.auctionName = (try? c.decodeIfPresent(String.self, forKey: .auctionName))
+            ?? (try? c.decodeIfPresent(String.self, forKey: .auction_name))
+        self.video = try? c.decodeIfPresent(SaleVideoMoment.self, forKey: .video)
+    }
 
     /// A URL only when it is one the phone can open; the read ships listing URLs, never storage keys.
     var openableURL: URL? {
         guard let url, url.lowercased().hasPrefix("http") else { return nil }
         return URL(string: url)
+    }
+
+    var effectiveLotNumber: String? {
+        if let lotNumber, !lotNumber.isEmpty { return lotNumber }
+        if let vLot = video?.lotNumber, !vLot.isEmpty { return vLot }
+        return nil
+    }
+
+    var effectiveAuctionName: String? {
+        if let auctionName, !auctionName.isEmpty { return auctionName }
+        if let vName = video?.auctionName, !vName.isEmpty { return vName }
+        return nil
+    }
+
+    var lotLine: String? {
+        let parts = [
+            effectiveLotNumber.map { "Lot \($0)" },
+            effectiveAuctionName
+        ].compactMap { $0 }.filter { !$0.isEmpty }
+        return parts.isEmpty ? nil : parts.joined(separator: " · ")
     }
 }
 
@@ -89,8 +265,8 @@ enum ClaimValue: Decodable {
 struct Claim: Decodable {
     let value: ClaimValue
     let unit: String?
-    let source: ClaimSource
-    let observed_at: String?
+    var source: ClaimSource
+    var observed_at: String?
     let trust: Double
 
     /// Trust as the web shows it: a whole percentage, clamped.
@@ -123,6 +299,39 @@ struct Claim: Decodable {
         let base = source.label?.isEmpty == false ? source.label! : source.kind.displayName
         if let m = source.method, !m.isEmpty, m != source.label { return "\(base) · \(m)" }
         return base
+    }
+
+    /// True when this claim represents an auction sale or carries a broadcast video moment (`Claim.tsx`).
+    var isAuctionSaleClaim: Bool {
+        if source.video != nil { return true }
+        if source.method == "sold" || unit == "USD" {
+            let combined = "\(source.label ?? "") \(source.url ?? "")".lowercased()
+            let knownHouses = ["mecum", "bring a trailer", "bringatrailer", "bat", "cars & bids", "cars and bids", "carsandbids", "rm sotheby", "rmsothebys", "gooding", "bonhams", "broad arrow", "broadarrow", "sbx", "barrett"]
+            if knownHouses.contains(where: { combined.contains($0) }) || source.effectiveLotNumber != nil {
+                return true
+            }
+        }
+        return false
+    }
+
+    /// Fallback YouTube search URL for finding the auction sale broadcast moment (`Claim.tsx`).
+    func youtubeSearchURL(vehicleTitle: String? = nil) -> URL? {
+        let sourceName = source.label?.isEmpty == false ? source.label! : source.kind.displayName
+        let q: String
+        if let sq = source.video?.searchQuery, !sq.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            q = sq
+        } else {
+            q = [
+                sourceName,
+                source.effectiveAuctionName,
+                source.effectiveLotNumber.map { "Lot \($0)" },
+                source.video?.title ?? vehicleTitle,
+                "auction sold"
+            ].compactMap { $0 }.filter { !$0.isEmpty }.joined(separator: " ")
+        }
+        var comps = URLComponents(string: "https://www.youtube.com/results")
+        comps?.queryItems = [URLQueryItem(name: "search_query", value: q)]
+        return comps?.url
     }
 }
 

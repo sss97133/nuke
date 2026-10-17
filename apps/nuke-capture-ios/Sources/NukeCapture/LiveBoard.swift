@@ -554,7 +554,25 @@ struct AuctionCalendar: Decodable, Equatable {
 
 // MARK: - Sources Board (SourcesBoard.tsx twin)
 
+enum LandingHorizon: String, CaseIterable, Identifiable {
+    case d14 = "14d"
+    case h24 = "24h"
+    case h1 = "1h"
+    var id: String { rawValue }
+}
+
 struct SourcesBoardData: Equatable {
+    struct BoardLandingMeta: Equatable {
+        let hour: String?
+        let bucket5m: String?
+        let landed15m: Int
+        let landed1h: Int
+        let landed24: Int
+        let landed7: Int
+        let hours24: [Int]
+        let mins60: [Int]
+    }
+
     struct SourceRow: Equatable, Identifiable {
         let source: String
         let name: String
@@ -572,9 +590,14 @@ struct SourcesBoardData: Equatable {
         let salesPrior12: Int?
         let usdPrior12: Double?
         let live: Int
+        var landed15m: Int = 0
+        var landed1h: Int = 0
         let landed24: Int
         let landed7: Int
         let lastLanded: String?
+        var days14: [Int] = []
+        var hours24: [Int] = []
+        var mins60: [Int] = []
         let logoUrl: String?
         let businessType: String?
 
@@ -615,9 +638,30 @@ struct SourcesBoardData: Equatable {
             return "\(pct) of ~\(estPop.formatted()) · \(conf)% conf"
         }
 
-        func landingText(now: Date = Date()) -> (active: Bool, text: String) {
-            if landed24 > 0 {
-                return (true, "+\(landed24.formatted()) today")
+        func bins(for horizon: LandingHorizon) -> [Int] {
+            switch horizon {
+            case .d14: return days14
+            case .h24: return hours24
+            case .h1: return mins60
+            }
+        }
+
+        func landingText(horizon: LandingHorizon = .d14, now: Date = Date()) -> (active: Bool, text: String) {
+            switch horizon {
+            case .h1:
+                if landed1h > 0 {
+                    let sub = landed15m > 0 ? " (+\(landed15m.formatted()) in 15m)" : ""
+                    return (true, "+\(landed1h.formatted()) in 1h\(sub)")
+                }
+            case .h24:
+                if landed24 > 0 {
+                    let sub = landed1h > 0 ? " (+\(landed1h.formatted()) in 1h)" : ""
+                    return (true, "+\(landed24.formatted()) in 24h\(sub)")
+                }
+            case .d14:
+                if landed24 > 0 {
+                    return (true, "+\(landed24.formatted()) today")
+                }
             }
             guard let lastLanded else { return (false, "idle 14+ days") }
             guard let d = ProfileClock.date(lastLanded) else { return (false, "idle") }
@@ -633,6 +677,7 @@ struct SourcesBoardData: Equatable {
     let day: String?
     let rows: [SourceRow]
     let notRanked: [String: Int]
+    var landing: BoardLandingMeta = BoardLandingMeta(hour: nil, bucket5m: nil, landed15m: 0, landed1h: 0, landed24: 0, landed7: 0, hours24: Array(repeating: 0, count: 24), mins60: Array(repeating: 0, count: 12))
 
     static func parse(_ data: Data) -> SourcesBoardData? {
         guard let v = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
@@ -651,6 +696,21 @@ struct SourcesBoardData: Equatable {
             guard let s = x as? String, !s.isEmpty else { return nil }
             return s
         }
+        func intArray(_ x: Any?, len: Int? = nil) -> [Int] {
+            guard let arr = x as? [Any] else {
+                return len.map { Array(repeating: 0, count: $0) } ?? []
+            }
+            let parsed = arr.map { Int((num($0) ?? 0).rounded()) }
+            if let len, parsed.count < len {
+                return Array(repeating: 0, count: len - parsed.count) + parsed
+            }
+            return parsed
+        }
+
+        let rawLanding = v["landing"] as? [String: Any]
+        let rawSourcesLanding = (rawLanding?["sources"] as? [String: Any]) ?? [:]
+        let rawTotals = (rawLanding?["totals"] as? [String: Any]) ?? [:]
+
         var out: [SourceRow] = []
         for r in rawRows {
             func get(_ c: String) -> Any? {
@@ -658,6 +718,16 @@ struct SourcesBoardData: Equatable {
                 return r[idx]
             }
             guard let source = str(get("source")), let name = str(get("name")) else { continue }
+            let srcLand = rawSourcesLanding[source] as? [String: Any]
+            let l24 = Int((num(srcLand?["landed_24h"]) ?? num(get("landed_24h")) ?? 0).rounded())
+            let l7 = Int((num(srcLand?["landed_7d"]) ?? num(get("landed_7d")) ?? 0).rounded())
+            let l15m = Int((num(srcLand?["landed_15m"]) ?? 0).rounded())
+            let l1h = Int((num(srcLand?["landed_1h"]) ?? 0).rounded())
+            let lastAt = str(srcLand?["last_at"]) ?? str(get("last_landed"))
+            let d14 = intArray(get("days14"))
+            let h24 = (srcLand?["hours24"] != nil) ? intArray(srcLand?["hours24"], len: 24) : (Array(repeating: 0, count: 23) + [l24])
+            let m60 = (srcLand?["mins60"] != nil) ? intArray(srcLand?["mins60"], len: 12) : (Array(repeating: 0, count: 11) + [l1h])
+
             out.append(SourceRow(
                 source: source,
                 name: name,
@@ -675,9 +745,14 @@ struct SourcesBoardData: Equatable {
                 salesPrior12: num(get("sales_prior_12m")).map { Int($0.rounded()) },
                 usdPrior12: num(get("usd_prior_12m")),
                 live: Int((num(get("live_lots")) ?? 0).rounded()),
-                landed24: Int((num(get("landed_24h")) ?? 0).rounded()),
-                landed7: Int((num(get("landed_7d")) ?? 0).rounded()),
-                lastLanded: str(get("last_landed")),
+                landed15m: l15m,
+                landed1h: l1h,
+                landed24: l24,
+                landed7: l7,
+                lastLanded: lastAt,
+                days14: d14,
+                hours24: h24,
+                mins60: m60,
                 logoUrl: str(get("logo_url")),
                 businessType: str(get("business_type"))
             ))
@@ -688,11 +763,127 @@ struct SourcesBoardData: Equatable {
                 if let c = num(val), c > 0 { notRanked[k] = Int(c.rounded()) }
             }
         }
-        return SourcesBoardData(asOf: asOf, day: str(v["day"]), rows: out, notRanked: notRanked)
+        let landingMeta = BoardLandingMeta(
+            hour: str(rawLanding?["hour"]) ?? asOf,
+            bucket5m: str(rawLanding?["bucket_5m"]) ?? asOf,
+            landed15m: Int((num(rawTotals["landed_15m"]) ?? Double(out.reduce(0) { $0 + $1.landed15m })).rounded()),
+            landed1h: Int((num(rawTotals["landed_1h"]) ?? Double(out.reduce(0) { $0 + $1.landed1h })).rounded()),
+            landed24: Int((num(rawTotals["landed_24h"]) ?? Double(out.reduce(0) { $0 + $1.landed24 })).rounded()),
+            landed7: Int((num(rawTotals["landed_7d"]) ?? Double(out.reduce(0) { $0 + $1.landed7 })).rounded()),
+            hours24: intArray(rawTotals["hours24"], len: 24),
+            mins60: intArray(rawTotals["mins60"], len: 12)
+        )
+        return SourcesBoardData(asOf: asOf, day: str(v["day"]), rows: out, notRanked: notRanked, landing: landingMeta)
     }
 
     static func fetch() async -> SourcesBoardData? {
         guard let res = try? await SupabaseService.client.rpc("market_sources_read").execute() else { return nil }
+        return parse(res.data)
+    }
+}
+
+/// Hourly & live landing drill-down for a source (`market_source_landing_read` #1825).
+struct SourceLandingDetail: Equatable {
+    struct RecentEvent: Equatable, Identifiable {
+        let id: String
+        let source: String
+        let eventType: String?
+        let eventStatus: String?
+        let price: Double?
+        let title: String?
+        let lot: String?
+        let vehicleId: String?
+        let sourceUrl: String?
+        let createdAt: String
+
+        var vehicleUUID: UUID? { vehicleId.flatMap(UUID.init(uuidString:)) }
+        var openableURL: URL? {
+            guard let sourceUrl, sourceUrl.lowercased().hasPrefix("http") else { return nil }
+            return URL(string: sourceUrl)
+        }
+    }
+
+    let asOf: String
+    let source: String?
+    let hour: String?
+    let selectedHour: String?
+    let bucket5m: String?
+    let landed15m: Int
+    let landed1h: Int
+    let landed24: Int
+    let landed7: Int
+    let lastLanded: String?
+    let hours24: [Int]
+    let mins60: [Int]
+    let days14: [Int]
+    let recent: [RecentEvent]
+
+    static func parse(_ data: Data) -> SourceLandingDetail? {
+        guard let v = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let asOf = v["as_of"] as? String else { return nil }
+        func num(_ x: Any?) -> Double? {
+            if let d = x as? Double, d.isFinite { return d }
+            if let i = x as? Int { return Double(i) }
+            if let s = x as? String, !s.trimmingCharacters(in: .whitespaces).isEmpty, let d = Double(s), d.isFinite { return d }
+            return nil
+        }
+        func str(_ x: Any?) -> String? {
+            guard let s = x as? String, !s.isEmpty else { return nil }
+            return s
+        }
+        func intArray(_ x: Any?, len: Int) -> [Int] {
+            guard let arr = x as? [Any] else { return Array(repeating: 0, count: len) }
+            let parsed = arr.map { Int((num($0) ?? 0).rounded()) }
+            if parsed.count < len { return Array(repeating: 0, count: len - parsed.count) + parsed }
+            return parsed
+        }
+        var recent: [RecentEvent] = []
+        if let rawRecent = v["recent"] as? [[String: Any]] {
+            for ev in rawRecent {
+                guard let id = str(ev["id"]),
+                      let source = str(ev["source"]),
+                      let createdAt = str(ev["created_at"]) else { continue }
+                recent.append(RecentEvent(
+                    id: id,
+                    source: source,
+                    eventType: str(ev["event_type"]),
+                    eventStatus: str(ev["event_status"]),
+                    price: num(ev["price"]),
+                    title: str(ev["title"]),
+                    lot: str(ev["lot"]),
+                    vehicleId: str(ev["vehicle_id"]),
+                    sourceUrl: str(ev["source_url"]),
+                    createdAt: createdAt
+                ))
+            }
+        }
+        return SourceLandingDetail(
+            asOf: asOf,
+            source: str(v["source"]),
+            hour: str(v["hour"]),
+            selectedHour: str(v["selected_hour"]),
+            bucket5m: str(v["bucket_5m"]),
+            landed15m: Int((num(v["landed_15m"]) ?? 0).rounded()),
+            landed1h: Int((num(v["landed_1h"]) ?? 0).rounded()),
+            landed24: Int((num(v["landed_24h"]) ?? 0).rounded()),
+            landed7: Int((num(v["landed_7d"]) ?? 0).rounded()),
+            lastLanded: str(v["last_landed"]),
+            hours24: intArray(v["hours24"], len: 24),
+            mins60: intArray(v["mins60"], len: 12),
+            days14: intArray(v["days14"], len: 14),
+            recent: recent
+        )
+    }
+
+    private struct Params: Encodable {
+        let p_source: String?
+        let p_hour: String?
+    }
+
+    static func fetch(source: String, hour: String? = nil) async -> SourceLandingDetail? {
+        guard let res = try? await SupabaseService.client
+            .rpc("market_source_landing_read", params: Params(p_source: source, p_hour: hour))
+            .execute() else { return nil }
         return parse(res.data)
     }
 }
@@ -712,6 +903,8 @@ struct LiveBoardView: View {
     @State private var calendar: AuctionCalendar?
     @State private var sourcesBoard: SourcesBoardData?
     @State private var selectedSale: AuctionCalendar.CalendarSale?
+    @State private var selectedSource: SourcesBoardData.SourceRow?
+    @State private var landingHorizon: LandingHorizon = .d14
     @State private var loadError = false
     @State private var loadErrorDetail: String?
     // The map's selection narrows the list to one brand, then one decade: one population, one
@@ -865,6 +1058,9 @@ struct LiveBoardView: View {
                 .sheet(item: $selectedSale) { sale in
                     SaleRosterSheet(sale: sale)
                 }
+                .sheet(item: $selectedSource) { src in
+                    SourceLandingSheet(sourceRow: src)
+                }
             } else if loadError {
                 ContentUnavailableView {
                     Label("Couldn't read the board", systemImage: "exclamationmark.triangle")
@@ -985,17 +1181,39 @@ struct LiveBoardView: View {
     @ViewBuilder private var sourcesSection: some View {
         if let sb = sourcesBoard {
             let totalHeld = sb.rows.reduce(0) { $0 + ($1.held ?? 0) }
-            let total24 = sb.rows.reduce(0) { $0 + $1.landed24 }
+            let total24 = sb.landing.landed24 > 0 ? sb.landing.landed24 : sb.rows.reduce(0) { $0 + $1.landed24 }
+            let total1h = sb.landing.landed1h
+            let total15m = sb.landing.landed15m
             Section {
+                HStack(spacing: 8) {
+                    Text("LANDING WINDOW")
+                        .font(.system(size: 10, weight: .semibold, design: .monospaced))
+                        .foregroundStyle(.secondary)
+                    Spacer()
+                    Picker("Window", selection: $landingHorizon) {
+                        ForEach(LandingHorizon.allCases) { h in
+                            Text(h.rawValue).tag(h)
+                        }
+                    }
+                    .pickerStyle(.segmented)
+                    .frame(maxWidth: 160)
+                }
+                .padding(.vertical, 2)
                 ForEach(sb.rows) { src in
-                    sourceRow(src)
+                    Button {
+                        selectedSource = src
+                    } label: {
+                        sourceRow(src)
+                    }
+                    .buttonStyle(.plain)
                 }
             } header: {
                 VStack(alignment: .leading, spacing: 2) {
-                    Text("\(sb.rows.count) ranked sources · \(totalHeld.formatted()) records held · +\(total24.formatted()) landed in 24h")
+                    let livePulse = total1h > 0 ? " · +\(total1h.formatted()) in 1h" + (total15m > 0 ? " (+\(total15m.formatted()) in 15m)" : "") : ""
+                    Text("\(sb.rows.count) ranked sources · \(totalHeld.formatted()) records held · +\(total24.formatted()) in 24h\(livePulse)")
                         .font(.caption2.monospaced())
                         .textCase(nil)
-                    Text("as of \(ProfileClock.Absolute(sb.asOf))")
+                    Text("as of \(ProfileClock.Absolute(sb.asOf)) · tap a source for hourly & live intake")
                         .font(.caption2.monospaced())
                         .foregroundStyle(.secondary)
                         .textCase(nil)
@@ -1020,7 +1238,9 @@ struct LiveBoardView: View {
     }
 
     @ViewBuilder private func sourceRow(_ src: SourcesBoardData.SourceRow) -> some View {
-        let land = src.landingText(now: now)
+        let land = src.landingText(horizon: landingHorizon, now: now)
+        let bins = src.bins(for: landingHorizon)
+        let peak = max(bins.max() ?? 0, 1)
         VStack(alignment: .leading, spacing: 4) {
             HStack(alignment: .firstTextBaseline) {
                 Text(src.shortName)
@@ -1031,6 +1251,17 @@ struct LiveBoardView: View {
                         .foregroundStyle(.secondary)
                 }
                 Spacer(minLength: 4)
+                if !bins.isEmpty, bins.contains(where: { $0 > 0 }) {
+                    HStack(alignment: .bottom, spacing: 1.5) {
+                        ForEach(Array(bins.enumerated()), id: \.offset) { idx, val in
+                            let h = max(val > 0 ? 3.0 : 1.0, (Double(val) / Double(peak)) * 14.0)
+                            RoundedRectangle(cornerRadius: 1)
+                                .fill(idx == bins.count - 1 && val > 0 ? Color.green : Color.secondary.opacity(val > 0 ? 0.65 : 0.2))
+                                .frame(width: 2.5, height: h)
+                        }
+                    }
+                    .frame(height: 14)
+                }
                 Text(land.text)
                     .font(.caption2.monospaced().weight(land.active ? .semibold : .regular))
                     .foregroundStyle(land.active ? Color.green : Color.secondary)
@@ -1359,5 +1590,142 @@ struct SaleRosterSheet: View {
                 detail = try? await AuctionCalendar.fetch(house: sale.house, saleKey: sale.sale_key)
             }
         }
+    }
+}
+
+/// Source hourly & live landing drill-down sheet (`market_source_landing_read` #1825).
+struct SourceLandingSheet: View {
+    let sourceRow: SourcesBoardData.SourceRow
+    @State private var detail: SourceLandingDetail?
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        NavigationStack {
+            List {
+                Section("Intake Velocity") {
+                    let l15 = detail?.landed15m ?? sourceRow.landed15m
+                    let l1h = detail?.landed1h ?? sourceRow.landed1h
+                    let l24 = detail?.landed24 ?? sourceRow.landed24
+                    let l7d = detail?.landed7 ?? sourceRow.landed7
+                    HStack {
+                        metricCell(label: "15m", value: "+\(l15.formatted())")
+                        Spacer()
+                        metricCell(label: "1h", value: "+\(l1h.formatted())")
+                        Spacer()
+                        metricCell(label: "24h", value: "+\(l24.formatted())")
+                        Spacer()
+                        metricCell(label: "7d", value: "+\(l7d.formatted())")
+                    }
+                    .padding(.vertical, 2)
+
+                    let h24 = detail?.hours24 ?? sourceRow.hours24
+                    if h24.contains(where: { $0 > 0 }) {
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text("LAST 24 HOURS (HOURLY)")
+                                .font(.system(size: 9, weight: .semibold, design: .monospaced))
+                                .foregroundStyle(.secondary)
+                            barRow(bins: h24)
+                        }
+                        .padding(.vertical, 2)
+                    }
+
+                    let m60 = detail?.mins60 ?? sourceRow.mins60
+                    if m60.contains(where: { $0 > 0 }) {
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text("LAST 60 MINUTES (5-MIN BINS)")
+                                .font(.system(size: 9, weight: .semibold, design: .monospaced))
+                                .foregroundStyle(.secondary)
+                            barRow(bins: m60)
+                        }
+                        .padding(.vertical, 2)
+                    }
+                }
+
+                if let detail {
+                    Section("Recent Landed Events (\(detail.recent.count))") {
+                        if detail.recent.isEmpty {
+                            Text("No recent events in this window.")
+                                .font(.caption.monospaced())
+                                .foregroundStyle(.secondary)
+                        } else {
+                            ForEach(detail.recent) { ev in
+                                VStack(alignment: .leading, spacing: 3) {
+                                    HStack(alignment: .firstTextBaseline) {
+                                        Text(ev.title ?? ev.lot.map { "Lot \($0)" } ?? "Event")
+                                            .font(.subheadline.weight(.semibold))
+                                            .lineLimit(1)
+                                        Spacer(minLength: 4)
+                                        if let p = ev.price, p > 0 {
+                                            Text(LiveBoardView.bidNumber(p, compact: true))
+                                                .font(.caption.monospaced().weight(.semibold))
+                                        }
+                                    }
+                                    HStack(spacing: 6) {
+                                        if let lot = ev.lot {
+                                            Text("Lot \(lot)")
+                                                .font(.caption2.monospaced())
+                                                .foregroundStyle(.secondary)
+                                        }
+                                        if let et = ev.eventType {
+                                            Text(et)
+                                                .font(.caption2.monospaced())
+                                                .foregroundStyle(.secondary)
+                                        }
+                                        Spacer()
+                                        Text(ProfileClock.Absolute(ev.createdAt))
+                                            .font(.system(size: 9, design: .monospaced))
+                                            .foregroundStyle(.tertiary)
+                                    }
+                                    if let url = ev.openableURL {
+                                        Link("Open source ↗", destination: url)
+                                            .font(.system(size: 10, design: .monospaced))
+                                    }
+                                }
+                                .padding(.vertical, 2)
+                            }
+                        }
+                    }
+                } else {
+                    Section {
+                        HStack(spacing: 8) {
+                            ProgressView()
+                            Text("Reading live intake…")
+                                .font(.caption.monospaced())
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                }
+            }
+            .navigationTitle(sourceRow.shortName)
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar { ToolbarItem(placement: .confirmationAction) { Button("Done") { dismiss() } } }
+            .task {
+                detail = await SourceLandingDetail.fetch(source: sourceRow.source)
+            }
+        }
+    }
+
+    private func metricCell(label: String, value: String) -> some View {
+        VStack(alignment: .leading, spacing: 2) {
+            Text(label.uppercased())
+                .font(.system(size: 9, weight: .semibold, design: .monospaced))
+                .foregroundStyle(.secondary)
+            Text(value)
+                .font(.system(.subheadline, design: .monospaced).weight(.semibold))
+        }
+    }
+
+    private func barRow(bins: [Int]) -> some View {
+        let peak = max(bins.max() ?? 0, 1)
+        return HStack(alignment: .bottom, spacing: 2) {
+            ForEach(Array(bins.enumerated()), id: \.offset) { idx, val in
+                let h = max(val > 0 ? 4.0 : 1.5, (Double(val) / Double(peak)) * 28.0)
+                RoundedRectangle(cornerRadius: 1.5)
+                    .fill(idx == bins.count - 1 && val > 0 ? Color.green : Color.primary.opacity(val > 0 ? 0.65 : 0.15))
+                    .frame(maxWidth: .infinity)
+                    .frame(height: h)
+            }
+        }
+        .frame(height: 28)
     }
 }

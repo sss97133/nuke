@@ -62,11 +62,43 @@ struct BrandMarketRow: Decodable, Equatable {
     let usd: Double?
     let sold_any: Int?
     let offered: Int?
+    let p10: Double?
+    let p50: Double?
+    let p90: Double?
+    let year_p50: Int?
     let dated: Int?
     let sold_12m: Int?
     let sold_prior_12m: Int?
     let usd_12m: Double?
     let usd_prior_12m: Double?
+
+    private enum CodingKeys: String, CodingKey {
+        case brand, name
+        case sales, sold
+        case usd, sold_any, offered, p10, p50, p90, year_p50, dated
+        case sold_12m, sold_prior_12m, usd_12m, usd_prior_12m
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        self.brand = (try? c.decode(String.self, forKey: .name))
+            ?? (try? c.decode(String.self, forKey: .brand))
+            ?? ""
+        self.sales = (try? c.decodeIfPresent(Int.self, forKey: .sold))
+            ?? (try? c.decodeIfPresent(Int.self, forKey: .sales))
+        self.usd = try? c.decodeIfPresent(Double.self, forKey: .usd)
+        self.sold_any = try? c.decodeIfPresent(Int.self, forKey: .sold_any)
+        self.offered = try? c.decodeIfPresent(Int.self, forKey: .offered)
+        self.p10 = try? c.decodeIfPresent(Double.self, forKey: .p10)
+        self.p50 = try? c.decodeIfPresent(Double.self, forKey: .p50)
+        self.p90 = try? c.decodeIfPresent(Double.self, forKey: .p90)
+        self.year_p50 = try? c.decodeIfPresent(Int.self, forKey: .year_p50)
+        self.dated = try? c.decodeIfPresent(Int.self, forKey: .dated)
+        self.sold_12m = try? c.decodeIfPresent(Int.self, forKey: .sold_12m)
+        self.sold_prior_12m = try? c.decodeIfPresent(Int.self, forKey: .sold_prior_12m)
+        self.usd_12m = try? c.decodeIfPresent(Double.self, forKey: .usd_12m)
+        self.usd_prior_12m = try? c.decodeIfPresent(Double.self, forKey: .usd_prior_12m)
+    }
 }
 
 struct FamilyMarketRow: Decodable, Equatable {
@@ -85,6 +117,43 @@ struct FamilyMarketRow: Decodable, Equatable {
     let sold_prior_12m: Int?
     let usd_12m: Double?
     let usd_prior_12m: Double?
+
+    private enum CodingKeys: String, CodingKey {
+        case family_key
+        case family_name, family
+        case models
+        case sales, sold
+        case usd, median_price, min_price, max_price, p10, p50, p90
+        case sold_any, offered, dated
+        case sold_12m, sold_prior_12m, usd_12m, usd_prior_12m
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        let fk = (try? c.decode(String.self, forKey: .family_key)) ?? "other"
+        self.family_key = fk
+        let fam = (try? c.decodeIfPresent(String.self, forKey: .family))
+            ?? (try? c.decodeIfPresent(String.self, forKey: .family_name))
+        self.family_name = (fam?.isEmpty == false) ? fam! : (fk == "other" ? "Model not in a family" : fk)
+        self.models = try? c.decodeIfPresent(Int.self, forKey: .models)
+        self.sales = (try? c.decodeIfPresent(Int.self, forKey: .sold))
+            ?? (try? c.decodeIfPresent(Int.self, forKey: .sales))
+            ?? 0
+        self.usd = try? c.decodeIfPresent(Double.self, forKey: .usd)
+        self.median_price = (try? c.decodeIfPresent(Double.self, forKey: .median_price))
+            ?? (try? c.decodeIfPresent(Double.self, forKey: .p50))
+        self.min_price = (try? c.decodeIfPresent(Double.self, forKey: .min_price))
+            ?? (try? c.decodeIfPresent(Double.self, forKey: .p10))
+        self.max_price = (try? c.decodeIfPresent(Double.self, forKey: .max_price))
+            ?? (try? c.decodeIfPresent(Double.self, forKey: .p90))
+        self.sold_any = try? c.decodeIfPresent(Int.self, forKey: .sold_any)
+        self.offered = try? c.decodeIfPresent(Int.self, forKey: .offered)
+        self.dated = try? c.decodeIfPresent(Int.self, forKey: .dated)
+        self.sold_12m = try? c.decodeIfPresent(Int.self, forKey: .sold_12m)
+        self.sold_prior_12m = try? c.decodeIfPresent(Int.self, forKey: .sold_prior_12m)
+        self.usd_12m = try? c.decodeIfPresent(Double.self, forKey: .usd_12m)
+        self.usd_prior_12m = try? c.decodeIfPresent(Double.self, forKey: .usd_prior_12m)
+    }
 
     func toLedgerNode() -> LedgerNode {
         let displayName = family_key == "other" ? "other models" : family_name
@@ -122,6 +191,39 @@ struct FamilyModelRow: Decodable, Equatable {
     let max_price: Double?
     let sold_any: Int?
     let offered: Int?
+    let dated: Int?
+    let sold_12m: Int?
+    let sold_prior_12m: Int?
+    let usd_12m: Double?
+    let usd_prior_12m: Double?
+
+    private enum CodingKeys: String, CodingKey {
+        case model
+        case sales, sold
+        case usd, median_price, min_price, max_price
+        case sold_any, offered, dated
+        case sold_12m, sold_prior_12m, usd_12m, usd_prior_12m
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        let m = try? c.decodeIfPresent(String.self, forKey: .model)
+        self.model = (m?.isEmpty == false) ? m! : "Model not given"
+        self.sales = (try? c.decodeIfPresent(Int.self, forKey: .sold))
+            ?? (try? c.decodeIfPresent(Int.self, forKey: .sales))
+            ?? 0
+        self.usd = try? c.decodeIfPresent(Double.self, forKey: .usd)
+        self.median_price = try? c.decodeIfPresent(Double.self, forKey: .median_price)
+        self.min_price = try? c.decodeIfPresent(Double.self, forKey: .min_price)
+        self.max_price = try? c.decodeIfPresent(Double.self, forKey: .max_price)
+        self.sold_any = try? c.decodeIfPresent(Int.self, forKey: .sold_any)
+        self.offered = try? c.decodeIfPresent(Int.self, forKey: .offered)
+        self.dated = try? c.decodeIfPresent(Int.self, forKey: .dated)
+        self.sold_12m = try? c.decodeIfPresent(Int.self, forKey: .sold_12m)
+        self.sold_prior_12m = try? c.decodeIfPresent(Int.self, forKey: .sold_prior_12m)
+        self.usd_12m = try? c.decodeIfPresent(Double.self, forKey: .usd_12m)
+        self.usd_prior_12m = try? c.decodeIfPresent(Double.self, forKey: .usd_prior_12m)
+    }
 
     func toLedgerNode() -> LedgerNode {
         LedgerNode(
@@ -138,11 +240,11 @@ struct FamilyModelRow: Decodable, Equatable {
             usd: usd,
             sold_any: sold_any,
             offered: offered,
-            dated: nil,
-            sold_12m: nil,
-            sold_prior_12m: nil,
-            usd_12m: nil,
-            usd_prior_12m: nil,
+            dated: dated,
+            sold_12m: sold_12m,
+            sold_prior_12m: sold_prior_12m,
+            usd_12m: usd_12m,
+            usd_prior_12m: usd_prior_12m,
             familyKey: nil,
             models: nil
         )
@@ -199,8 +301,8 @@ struct BrandFamilyMapRow: Decodable, Equatable, Identifiable {
     }
 }
 
-/// Decodes both `treemap_sales` rows (`title`, `price`, `sale_date`, `source`, `url`, `image`, `mileage`)
-/// and legacy `vehicles` rows (`listing_title`, `bat_listing_title`, `sale_price`, `sold_price`, `primary_image_url`).
+/// Decodes `treemap_sales` rows (`sold_amount`, `sale_basis`, `listing_title`, `primary_image_url`, `mileage`)
+/// as well as `title`, `price`, `sale_price`, `sold_price`, `sale_date`, `source`, `url`, `image`.
 struct LedgerVehicle: Decodable, Identifiable, Equatable {
     let id: UUID
     let year: Int?
@@ -219,9 +321,9 @@ struct LedgerVehicle: Decodable, Identifiable, Equatable {
     enum CodingKeys: String, CodingKey {
         case id, year, make, model
         case listing_title, bat_listing_title, title
-        case sale_price, sold_price, price
+        case sale_price, sold_price, sold_amount, price
         case primary_image_url, image
-        case mileage, sale_date, source, url
+        case mileage, sale_date, source, sale_basis, url
     }
 
     init(from decoder: Decoder) throws {
@@ -235,15 +337,17 @@ struct LedgerVehicle: Decodable, Identifiable, Equatable {
         listing_title = directTitle ?? lt
         bat_listing_title = try? c.decodeIfPresent(String.self, forKey: .bat_listing_title)
         let directPrice = try? c.decodeIfPresent(Double.self, forKey: .price)
+        let soldAmt = try? c.decodeIfPresent(Double.self, forKey: .sold_amount)
         let sp = try? c.decodeIfPresent(Double.self, forKey: .sale_price)
-        sale_price = directPrice ?? sp
+        sale_price = directPrice ?? soldAmt ?? sp
         sold_price = try? c.decodeIfPresent(Double.self, forKey: .sold_price)
         let directImage = try? c.decodeIfPresent(String.self, forKey: .image)
         let pi = try? c.decodeIfPresent(String.self, forKey: .primary_image_url)
         primary_image_url = directImage ?? pi
         mileage = try? c.decodeIfPresent(Double.self, forKey: .mileage)
         sale_date = try? c.decodeIfPresent(String.self, forKey: .sale_date)
-        source = try? c.decodeIfPresent(String.self, forKey: .source)
+        source = (try? c.decodeIfPresent(String.self, forKey: .source))
+            ?? (try? c.decodeIfPresent(String.self, forKey: .sale_basis))
         url = try? c.decodeIfPresent(String.self, forKey: .url)
     }
 
@@ -520,6 +624,49 @@ enum MoverHorizon: String, CaseIterable, Equatable, Identifiable {
         case .y5: return "last 2.5 years vs prior 2.5 years"
         }
     }
+
+    var gateMinSales: Int {
+        switch self {
+        case .upcoming: return 4
+        case .d1: return 1
+        case .w1: return 2
+        case .m1: return 5
+        case .m3: return 10
+        case .m6: return 15
+        case .y1: return 20
+        case .y5: return 30
+        }
+    }
+}
+
+enum BaselineHorizon: String, CaseIterable, Equatable, Identifiable {
+    case prior = "prior"
+    case d1 = "1d"
+    case w1 = "1w"
+    case m1 = "1m"
+    case m3 = "3m"
+    case m6 = "6m"
+    case y1 = "1y"
+    case y5 = "5y"
+
+    var id: String { rawValue }
+
+    var label: String {
+        switch self {
+        case .prior: return "PRIOR"
+        case .d1: return "1D"
+        case .w1: return "1W"
+        case .m1: return "1M"
+        case .m3: return "3M"
+        case .m6: return "6M"
+        case .y1: return "1Y"
+        case .y5: return "5Y"
+        }
+    }
+
+    var moverHorizon: MoverHorizon? {
+        MoverHorizon(rawValue: rawValue)
+    }
 }
 
 struct ShareMover: Equatable, Identifiable {
@@ -536,21 +683,41 @@ struct ShareMover: Equatable, Identifiable {
     let move: Double
     let se: Double
     let z: Double
+    var avgPriceMove: Double? = nil
+    var bins: [Double]? = nil
 
     var id: String { "\(brand)|\(familyKey)" }
 }
 
 struct ShareMoversRead: Equatable {
+    struct MoveTuple: Equatable {
+        let sold12m: Int
+        let soldPrior12m: Int
+        let usd12m: Double
+        let usdPrior12m: Double
+    }
+    struct UpcomingSources: Equatable {
+        let batLive: Int
+        let auctionCalendar: Int
+        let facebookMarketplace: Int
+    }
+
     let marketSold: Int
     let marketPrior: Int
+    var marketUsd: Double = 0
+    var marketUsdPrior: Double = 0
     let marketMove: Double
     let candidates: Int
+    var families: Int = 0
+    var significant: Int = 0
+    var sources: UpcomingSources? = nil
+    var brandMoves: [String: MoveTuple] = [:]
+    var familyMoves: [String: MoveTuple] = [:]
     let gaining: [ShareMover]
     let losing: [ShareMover]
 
     static func parse(_ data: Data) -> ShareMoversRead? {
         guard let obj = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-              let market = obj["market"] as? [String: Any],
               let gainingRaw = obj["gaining"] as? [[String: Any]],
               let losingRaw = obj["losing"] as? [[String: Any]] else {
             return nil
@@ -561,48 +728,338 @@ struct ShareMoversRead: Equatable {
             if let s = v as? String, let d = Double(s.trimmingCharacters(in: .whitespaces)), d.isFinite { return d }
             return nil
         }
-        guard let mSold = num(market["sold"]),
-              let mPrior = num(market["prior"]),
-              let mMove = num(market["move"]) else { return nil }
+        let bat = obj["bat"] as? [String: Any]
+        let market = obj["market"] as? [String: Any]
+        guard let mSold = num(bat?["sold_12m"]) ?? num(market?["sold"]),
+              let mPrior = num(bat?["sold_prior_12m"]) ?? num(market?["prior"]) else { return nil }
+        let mUsd = num(bat?["usd_12m"]) ?? 0
+        let mUsdPrior = num(bat?["usd_prior_12m"]) ?? 0
+        let mMove = num(market?["move"]) ?? (mPrior > 0 ? (mSold - mPrior) / mPrior : 0)
 
         func row(_ r: [String: Any]) -> ShareMover? {
             guard let brand = r["brand"] as? String, !brand.isEmpty,
                   let fk = r["family_key"] as? String, !fk.isEmpty,
                   let fam = r["family"] as? String, !fam.isEmpty,
-                  let sold = num(r["sold"]),
-                  let prior = num(r["prior"]),
-                  let ratio = num(r["ratio"]),
-                  let lo = num(r["lo"]),
-                  let hi = num(r["hi"]),
-                  let move = num(r["move"]),
-                  let se = num(r["se"]),
-                  let z = num(r["z"]) else { return nil }
+                  let sold = num(r["sold_12m"]) ?? num(r["sold"]),
+                  let prior = num(r["sold_prior_12m"]) ?? num(r["prior"]),
+                  let move = num(r["share_move"]) ?? num(r["move"]),
+                  let lo = num(r["share_lo"]) ?? num(r["lo"]),
+                  let hi = num(r["share_hi"]) ?? num(r["hi"]),
+                  let se = num(r["se"]) else { return nil }
+            let ratio = num(r["ratio"]) ?? (1.0 + move)
+            let z = num(r["z"]) ?? (se > 0 ? log(max(0.01, ratio)) / se : 0)
+            let usd = num(r["usd_12m"]) ?? num(r["usd"]) ?? 0
+            let usdPrior = num(r["usd_prior_12m"]) ?? num(r["usd_prior"]) ?? 0
+            let avgPriceMove = num(r["avg_price_move"])
+            let bins: [Double]? = (r["bins"] as? [Any])?.compactMap(num)
             return ShareMover(
                 brand: brand,
                 familyKey: fk,
                 family: fam,
                 sold: Int(sold.rounded()),
                 prior: Int(prior.rounded()),
-                usd: num(r["usd"]) ?? 0,
-                usdPrior: num(r["usd_prior"]) ?? 0,
+                usd: usd,
+                usdPrior: usdPrior,
                 ratio: ratio,
                 lo: lo,
                 hi: hi,
                 move: move,
                 se: se,
-                z: z
+                z: z,
+                avgPriceMove: avgPriceMove,
+                bins: (bins?.isEmpty == false) ? bins : nil
             )
         }
         let g = gainingRaw.compactMap(row)
         let l = losingRaw.compactMap(row)
         guard g.count == gainingRaw.count, l.count == losingRaw.count else { return nil }
+
+        func parseMoves(_ raw: Any?, isFamily: Bool) -> [String: MoveTuple] {
+            var out: [String: MoveTuple] = [:]
+            if let dict = raw as? [String: Any] {
+                for (k, val) in dict {
+                    guard let arr = val as? [Any], arr.count >= 4,
+                          let s12 = num(arr[0]), let sp12 = num(arr[1]),
+                          let u12 = num(arr[2]), let up12 = num(arr[3]) else { continue }
+                    let normKey = k.replacingOccurrences(of: "::", with: "|")
+                    out[normKey] = MoveTuple(sold12m: Int(s12.rounded()), soldPrior12m: Int(sp12.rounded()), usd12m: u12, usdPrior12m: up12)
+                }
+            } else if let list = raw as? [[String: Any]] {
+                for item in list {
+                    guard let brand = item["brand"] as? String, !brand.isEmpty,
+                          let s12 = num(item["sold_12m"]) ?? num(item["sold"]),
+                          let sp12 = num(item["sold_prior_12m"]) ?? num(item["prior"]) else { continue }
+                    let u12 = num(item["usd_12m"]) ?? num(item["usd"]) ?? 0
+                    let up12 = num(item["usd_prior_12m"]) ?? num(item["usd_prior"]) ?? 0
+                    let key: String
+                    if isFamily {
+                        guard let fk = item["family_key"] as? String, !fk.isEmpty else { continue }
+                        key = "\(brand)|\(fk)"
+                    } else {
+                        key = brand
+                    }
+                    out[key] = MoveTuple(sold12m: Int(s12.rounded()), soldPrior12m: Int(sp12.rounded()), usd12m: u12, usdPrior12m: up12)
+                }
+            }
+            return out
+        }
+
+        let sources: UpcomingSources? = {
+            guard let s = obj["sources"] as? [String: Any],
+                  let bl = num(s["bat_live"]),
+                  let ac = num(s["auction_calendar"]),
+                  let fb = num(s["facebook_marketplace"]) else { return nil }
+            return UpcomingSources(batLive: Int(bl.rounded()), auctionCalendar: Int(ac.rounded()), facebookMarketplace: Int(fb.rounded()))
+        }()
+
+        let eligible = Int((num(obj["eligible"]) ?? num(obj["candidates"]) ?? 0).rounded())
+        let families = Int((num(obj["families"]) ?? Double(eligible)).rounded())
+        let significant = Int((num(obj["significant"]) ?? Double(g.count + l.count)).rounded())
+
         return ShareMoversRead(
             marketSold: Int(mSold.rounded()),
             marketPrior: Int(mPrior.rounded()),
+            marketUsd: mUsd,
+            marketUsdPrior: mUsdPrior,
             marketMove: mMove,
-            candidates: Int((num(obj["candidates"]) ?? 0).rounded()),
+            candidates: eligible,
+            families: families,
+            significant: significant,
+            sources: sources,
+            brandMoves: parseMoves(obj["brand_moves"], isFamily: false),
+            familyMoves: parseMoves(obj["family_moves"], isFamily: true),
             gaining: g,
             losing: l
+        )
+    }
+
+    /// Dual-window comparator (`combineShareMovers` in `FamilyMovers.tsx` #1819):
+    /// compares `target`'s current window against `baseline`'s current window using log-share standard error.
+    static func combine(target: ShareMoversRead, baseline: ShareMoversRead, targetHorizon: MoverHorizon, limit: Int = 5) -> ShareMoversRead {
+        let bSoldTotal = max(1, baseline.marketSold)
+        let tSoldTotal = max(1, target.marketSold)
+        let minGate = targetHorizon.gateMinSales
+
+        var combinedBrands: [String: MoveTuple] = [:]
+        let allBrands = Set(target.brandMoves.keys).union(baseline.brandMoves.keys)
+        for b in allBrands {
+            let tm = target.brandMoves[b]
+            let bm = baseline.brandMoves[b]
+            combinedBrands[b] = MoveTuple(
+                sold12m: tm?.sold12m ?? 0,
+                soldPrior12m: bm?.sold12m ?? 0,
+                usd12m: tm?.usd12m ?? 0,
+                usdPrior12m: bm?.usd12m ?? 0
+            )
+        }
+
+        var combinedFamilies: [String: MoveTuple] = [:]
+        let allFams = Set(target.familyMoves.keys).union(baseline.familyMoves.keys)
+        var nameByKey: [String: String] = [:]
+        var binsByKey: [String: [Double]] = [:]
+        for r in target.gaining + target.losing + baseline.gaining + baseline.losing {
+            let k = "\(r.brand)|\(r.familyKey)"
+            nameByKey[k] = r.family
+            if let b = r.bins, binsByKey[k] == nil { binsByKey[k] = b }
+        }
+
+        var scored: [ShareMover] = []
+        var eligibleCount = 0
+
+        for k in allFams {
+            let tm = target.familyMoves[k]
+            let bm = baseline.familyMoves[k]
+            let s12 = tm?.sold12m ?? 0
+            let sp12 = bm?.sold12m ?? 0
+            let u12 = tm?.usd12m ?? 0
+            let up12 = bm?.usd12m ?? 0
+            combinedFamilies[k] = MoveTuple(sold12m: s12, soldPrior12m: sp12, usd12m: u12, usdPrior12m: up12)
+
+            guard s12 >= minGate && sp12 >= minGate else { continue }
+            eligibleCount += 1
+            let parts = k.split(separator: "|", maxSplits: 1).map(String.init)
+            guard parts.count == 2 else { continue }
+            let brand = parts[0], fk = parts[1]
+            let family = nameByKey[k] ?? fk
+
+            let logRatio = log((Double(s12) / Double(tSoldTotal)) / (Double(sp12) / Double(bSoldTotal)))
+            let se = sqrt(1.0 / Double(s12) + 1.0 / Double(sp12))
+            let ratio = exp(logRatio)
+            let shareMove = ratio - 1.0
+            let shareLo = exp(logRatio - 1.96 * se) - 1.0
+            let shareHi = exp(logRatio + 1.96 * se) - 1.0
+            let z = se > 0 ? logRatio / se : 0
+            let avgPriceMove: Double? = (s12 >= 3 && sp12 >= 3 && u12 > 0 && up12 > 0)
+                ? ((u12 / Double(s12)) / (up12 / Double(sp12)) - 1.0)
+                : nil
+
+            scored.append(ShareMover(
+                brand: brand,
+                familyKey: fk,
+                family: family,
+                sold: s12,
+                prior: sp12,
+                usd: u12,
+                usdPrior: up12,
+                ratio: ratio,
+                lo: shareLo,
+                hi: shareHi,
+                move: shareMove,
+                se: se,
+                z: z,
+                avgPriceMove: avgPriceMove,
+                bins: binsByKey[k]
+            ))
+        }
+
+        let sigGaining = scored.filter { $0.lo > 0 }.sorted { $0.lo > $1.lo }
+        let sigLosing = scored.filter { $0.hi < 0 }.sorted { $0.hi < $1.hi }
+        let gaining = Array((sigGaining.isEmpty ? scored.filter { $0.move > 0 }.sorted { $0.move > $1.move } : sigGaining).prefix(limit))
+        let losing = Array((sigLosing.isEmpty ? scored.filter { $0.move < 0 }.sorted { $0.move < $1.move } : sigLosing).prefix(limit))
+
+        return ShareMoversRead(
+            marketSold: target.marketSold,
+            marketPrior: baseline.marketSold,
+            marketUsd: target.marketUsd,
+            marketUsdPrior: baseline.marketUsd,
+            marketMove: baseline.marketSold > 0 ? Double(target.marketSold - baseline.marketSold) / Double(baseline.marketSold) : 0,
+            candidates: eligibleCount,
+            families: allFams.count,
+            significant: sigGaining.count + sigLosing.count,
+            sources: target.sources,
+            brandMoves: combinedBrands,
+            familyMoves: combinedFamilies,
+            gaining: gaining,
+            losing: losing
+        )
+    }
+}
+
+/// Family upcoming supply & live finish estimates (`treemap_family_upcoming_supply` in `FamilySalesChart.tsx` #1819).
+struct FamilyUpcomingSupply: Equatable {
+    struct Counts: Equatable {
+        let batLive: Int
+        let auctionCalendar: Int
+        let facebookMarketplace: Int
+        let total: Int
+    }
+    struct LiveLot: Equatable, Identifiable {
+        let vehicleId: String
+        let year: Int?
+        let make: String?
+        let model: String?
+        let title: String
+        let currentBid: Double?
+        let endsAt: String?
+        let sourceUrl: String?
+        let noReserve: Bool
+        let finishEstimate: Double?
+        let finishLow: Double?
+        let finishHigh: Double?
+        let finishGrade: String?
+        var id: String { vehicleId }
+        var vehicleUUID: UUID? { UUID(uuidString: vehicleId) }
+    }
+    struct CalendarLot: Equatable, Identifiable {
+        let id: String
+        let vehicleId: String?
+        let year: Int?
+        let title: String
+        let house: String?
+        let saleName: String?
+        let runOn: String?
+        let estimateLow: Double?
+        let estimateHigh: Double?
+        var vehicleUUID: UUID? { vehicleId.flatMap(UUID.init(uuidString:)) }
+    }
+    struct ClassifiedLot: Equatable, Identifiable {
+        let id: String
+        let vehicleId: String?
+        let year: Int?
+        let title: String
+        let price: Double?
+        let location: String?
+        var vehicleUUID: UUID? { vehicleId.flatMap(UUID.init(uuidString:)) }
+    }
+
+    let finishModel: Int?
+    let finishFresh: Bool
+    let counts: Counts
+    let liveLots: [LiveLot]
+    let calendarLots: [CalendarLot]
+    let classifiedLots: [ClassifiedLot]
+
+    static func parse(_ data: Data) -> FamilyUpcomingSupply? {
+        guard let v = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let countsObj = v["counts"] as? [String: Any] else { return nil }
+        func num(_ x: Any?) -> Double? {
+            if let d = x as? Double, d.isFinite { return d }
+            if let i = x as? Int { return Double(i) }
+            if let s = x as? String, let d = Double(s.trimmingCharacters(in: .whitespaces)), d.isFinite { return d }
+            return nil
+        }
+        func str(_ x: Any?) -> String? {
+            guard let s = x as? String else { return nil }
+            let t = s.trimmingCharacters(in: .whitespacesAndNewlines)
+            return t.isEmpty ? nil : t
+        }
+        let batLive = Int((num(countsObj["bat_live"]) ?? 0).rounded())
+        let calCount = Int((num(countsObj["auction_calendar"]) ?? 0).rounded())
+        let fbCount = Int((num(countsObj["facebook_marketplace"]) ?? 0).rounded())
+        let total = Int((num(countsObj["total"]) ?? Double(batLive + calCount + fbCount)).rounded())
+
+        let liveLots: [LiveLot] = ((v["live_lots"] as? [[String: Any]]) ?? []).compactMap { o in
+            guard let vid = str(o["vehicle_id"]) else { return nil }
+            return LiveLot(
+                vehicleId: vid,
+                year: num(o["year"]).map { Int($0.rounded()) },
+                make: str(o["make"]),
+                model: str(o["model"]),
+                title: str(o["title"]) ?? vid,
+                currentBid: num(o["current_bid"]),
+                endsAt: str(o["ends_at"]),
+                sourceUrl: str(o["source_url"]),
+                noReserve: (o["no_reserve"] as? Bool) == true,
+                finishEstimate: num(o["finish_estimate"]),
+                finishLow: num(o["finish_low"]),
+                finishHigh: num(o["finish_high"]),
+                finishGrade: str(o["finish_grade"])
+            )
+        }
+        let calLots: [CalendarLot] = ((v["calendar_lots"] as? [[String: Any]]) ?? []).enumerated().map { idx, o in
+            let vid = str(o["vehicle_id"])
+            let eid = str(o["event_id"])
+            return CalendarLot(
+                id: eid ?? vid ?? "cal-\(idx)",
+                vehicleId: vid,
+                year: num(o["year"]).map { Int($0.rounded()) },
+                title: str(o["title"]) ?? "Scheduled lot",
+                house: str(o["house"]),
+                saleName: str(o["sale_name"]),
+                runOn: str(o["run_on"]),
+                estimateLow: num(o["estimate_low"]),
+                estimateHigh: num(o["estimate_high"])
+            )
+        }
+        let fbLots: [ClassifiedLot] = ((v["classified_lots"] as? [[String: Any]]) ?? []).enumerated().map { idx, o in
+            let vid = str(o["vehicle_id"])
+            let id = str(o["id"]) ?? vid ?? "fb-\(idx)"
+            return ClassifiedLot(
+                id: id,
+                vehicleId: vid,
+                year: num(o["year"]).map { Int($0.rounded()) },
+                title: str(o["title"]) ?? "Classified listing",
+                price: num(o["price"]),
+                location: str(o["location"])
+            )
+        }
+        return FamilyUpcomingSupply(
+            finishModel: num(v["finish_model"]).map { Int($0.rounded()) },
+            finishFresh: (v["finish_fresh"] as? Bool) == true,
+            counts: Counts(batLive: batLive, auctionCalendar: calCount, facebookMarketplace: fbCount, total: total),
+            liveLots: liveLots,
+            calendarLots: calLots,
+            classifiedLots: fbLots
         )
     }
 }
@@ -1030,9 +1487,16 @@ enum LedgerMap {
         return FamilyIndex.parse(res.data)
     }
 
+    static func familyUpcomingSupply(brand: String, familyKey: String) async -> FamilyUpcomingSupply? {
+        guard let res = try? await SupabaseService.client
+            .rpc("treemap_family_upcoming_supply", params: FamilyParams(p_brand: brand, p_family_key: familyKey))
+            .execute() else { return nil }
+        return FamilyUpcomingSupply.parse(res.data)
+    }
+
     static func shareMovers(horizon: MoverHorizon) async -> ShareMoversRead? {
         guard let res = try? await SupabaseService.client
-            .rpc("treemap_family_share_movers", params: ShareMoverParams(p_limit: 5, p_min_sales: 0, p_horizon: horizon.rawValue))
+            .rpc("treemap_family_share_movers", params: ShareMoverParams(p_limit: 5, p_min_sales: horizon.gateMinSales, p_horizon: horizon.rawValue))
             .execute() else { return nil }
         return ShareMoversRead.parse(res.data)
     }
@@ -1072,10 +1536,14 @@ struct LedgerMapView: View {
     @State private var receipt: LedgerRefreshReceipt?
     @State private var familySalesData: FamilySalesData?
     @State private var familyIndex: FamilyIndex?
+    @State private var familyUpcomingSupply: FamilyUpcomingSupply?
 
     @State private var moverHorizon: MoverHorizon = .y1
+    @State private var baselineHorizon: BaselineHorizon = .prior
     @State private var movers: ShareMoversRead?
+    @State private var baselineMovers: ShareMoversRead?
     @State private var moversLoading = false
+    @State private var showRelativityInfo = false
 
     @State private var loading = true
     @State private var failed = false
@@ -1094,8 +1562,54 @@ struct LedgerMapView: View {
         [selectedMake ?? "", selectedFamilyKey ?? "", selectedModel ?? "", selectedYear.map(String.init) ?? ""].joined(separator: "/")
     }
 
+    private var moverTaskKey: String {
+        "\(moverHorizon.rawValue)|\(baselineHorizon.rawValue)"
+    }
+
+    private var activeMovers: ShareMoversRead? {
+        guard let m = movers else { return nil }
+        if baselineHorizon == .prior || baselineHorizon.moverHorizon == moverHorizon {
+            return m
+        }
+        guard let bm = baselineMovers else { return m }
+        return ShareMoversRead.combine(target: m, baseline: bm, targetHorizon: moverHorizon)
+    }
+
+    private var isCustomHorizonOverlay: Bool {
+        moverHorizon != .y1 || baselineHorizon != .prior
+    }
+
+    /// Overlays active `moverHorizon` / `baselineHorizon` counts onto a node (`applyMoverHorizon` in `HomePage.tsx`).
+    private func applyHorizonOverlay(_ node: LedgerNode) -> LedgerNode {
+        guard isCustomHorizonOverlay, let am = activeMovers else { return node }
+        var copy = node
+        if level == .brands {
+            if let tuple = am.brandMoves[node.name] {
+                copy.sold_12m = tuple.sold12m
+                copy.sold_prior_12m = tuple.soldPrior12m
+                copy.usd_12m = tuple.usd12m
+                copy.usd_prior_12m = tuple.usdPrior12m
+            }
+        } else if level == .families, let make = selectedMake, let fk = node.familyKey {
+            if let tuple = am.familyMoves["\(make)::\(fk)"] ?? am.familyMoves["\(make)|\(fk)"] {
+                copy.sold_12m = tuple.sold12m
+                copy.sold_prior_12m = tuple.soldPrior12m
+                copy.usd_12m = tuple.usd12m
+                copy.usd_prior_12m = tuple.usdPrior12m
+            }
+        }
+        return copy
+    }
+
     private var baseline: LedgerMapScale.Baseline? {
-        LedgerMapScale.batBaseline(brandNodesCache.isEmpty ? nodes : brandNodesCache)
+        if isCustomHorizonOverlay, let am = activeMovers, am.marketSold > 0, am.marketPrior > 0 {
+            return LedgerMapScale.Baseline(
+                sold: am.marketSold,
+                prior: am.marketPrior,
+                move: am.marketMove
+            )
+        }
+        return LedgerMapScale.batBaseline(brandNodesCache.isEmpty ? nodes : brandNodesCache)
     }
 
     var body: some View {
@@ -1128,13 +1642,23 @@ struct LedgerMapView: View {
                 receipt = await LedgerMap.refreshReceipt()
             }
         }
-        .task(id: moverHorizon) {
+        .task(id: moverTaskKey) {
             moversLoading = true
-            movers = await LedgerMap.shareMovers(horizon: moverHorizon)
+            async let targetTask = LedgerMap.shareMovers(horizon: moverHorizon)
+            let baseH = baselineHorizon.moverHorizon
+            async let baseTask: ShareMoversRead? = (baseH != nil && baseH != moverHorizon)
+                ? LedgerMap.shareMovers(horizon: baseH!)
+                : nil
+            let (tRes, bRes) = await (targetTask, baseTask)
+            movers = tRes
+            baselineMovers = bRes
             moversLoading = false
         }
         .sheet(item: $inspectedNode) { node in
             nodeSheet(node)
+        }
+        .sheet(isPresented: $showRelativityInfo) {
+            relativityInfoSheet
         }
     }
 
@@ -1422,7 +1946,7 @@ struct LedgerMapView: View {
 
     @ViewBuilder
     private var mapCalloutsBar: some View {
-        let items = LedgerMapScale.callouts(nodes, base: baseline)
+        let items = LedgerMapScale.callouts(filteredNodes, base: baseline)
         if !items.isEmpty {
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 8) {
@@ -1530,9 +2054,115 @@ struct LedgerMapView: View {
                     .chartYScale(type: .log)
                     .frame(height: 130)
                 }
+
+                // Upcoming supply & live finish estimates (`FamilySalesChart.tsx` #1819)
+                if let up = familyUpcomingSupply, up.counts.total > 0 {
+                    VStack(alignment: .leading, spacing: 6) {
+                        HStack(spacing: 6) {
+                            Text("UPCOMING \(up.counts.total.formatted())")
+                                .font(.system(size: 9, weight: .bold, design: .monospaced))
+                                .padding(.horizontal, 6)
+                                .padding(.vertical, 2)
+                                .background(Color.primary.opacity(0.1), in: RoundedRectangle(cornerRadius: 4))
+                            if up.counts.batLive > 0 {
+                                let mTag = (up.finishFresh && up.finishModel != nil) ? " · M\(up.finishModel!)" : ""
+                                Text("\(up.counts.batLive) BaT live\(mTag)")
+                                    .font(.system(size: 10, design: .monospaced))
+                                    .foregroundStyle(.secondary)
+                            }
+                            if up.counts.auctionCalendar > 0 {
+                                Text("\(up.counts.auctionCalendar) calendar")
+                                    .font(.system(size: 10, design: .monospaced))
+                                    .foregroundStyle(.secondary)
+                            }
+                            if up.counts.facebookMarketplace > 0 {
+                                Text("\(up.counts.facebookMarketplace) FB")
+                                    .font(.system(size: 10, design: .monospaced))
+                                    .foregroundStyle(.secondary)
+                            }
+                            Spacer()
+                        }
+                        ScrollView(.horizontal, showsIndicators: false) {
+                            HStack(spacing: 6) {
+                                ForEach(up.liveLots.prefix(8)) { lot in
+                                    let bidStr = lot.currentBid.map { "Bid \(LedgerMap.money($0))" } ?? "Live"
+                                    let estStr = lot.finishEstimate.map { " → Est \(LedgerMap.money($0))" } ?? ""
+                                    upcomingLotChip(
+                                        badge: "LIVE",
+                                        badgeColor: .green,
+                                        title: lot.title,
+                                        sub: "\(bidStr)\(estStr)",
+                                        uuid: lot.vehicleUUID
+                                    )
+                                }
+                                ForEach(up.calendarLots.prefix(6)) { lot in
+                                    let est: String = {
+                                        if let lo = lot.estimateLow, let hi = lot.estimateHigh {
+                                            return "\(LedgerMap.money(lo))–\(LedgerMap.money(hi))"
+                                        }
+                                        return lot.runOn ?? "Scheduled"
+                                    }()
+                                    upcomingLotChip(
+                                        badge: (lot.house ?? "CAL").uppercased(),
+                                        badgeColor: .orange,
+                                        title: lot.title,
+                                        sub: est,
+                                        uuid: lot.vehicleUUID
+                                    )
+                                }
+                                ForEach(up.classifiedLots.prefix(6)) { lot in
+                                    let pStr = lot.price.map { "Ask \(LedgerMap.money($0))" } ?? (lot.location ?? "Classified")
+                                    upcomingLotChip(
+                                        badge: "FB",
+                                        badgeColor: .blue,
+                                        title: lot.title,
+                                        sub: pStr,
+                                        uuid: lot.vehicleUUID
+                                    )
+                                }
+                            }
+                        }
+                    }
+                    .padding(.top, 2)
+                }
             }
             .padding(12)
             .background(Color(.secondarySystemBackground), in: RoundedRectangle(cornerRadius: 8))
+        }
+    }
+
+    @ViewBuilder
+    private func upcomingLotChip(badge: String, badgeColor: Color, title: String, sub: String, uuid: UUID?) -> some View {
+        let content = VStack(alignment: .leading, spacing: 2) {
+            HStack(spacing: 4) {
+                Text(badge)
+                    .font(.system(size: 8, weight: .bold, design: .monospaced))
+                    .foregroundStyle(badgeColor)
+                Text(title)
+                    .font(.system(size: 10, weight: .semibold))
+                    .lineLimit(1)
+            }
+            Text(sub)
+                .font(.system(size: 9, design: .monospaced))
+                .foregroundStyle(.secondary)
+                .lineLimit(1)
+        }
+        .frame(width: 155, alignment: .leading)
+        .padding(.horizontal, 8)
+        .padding(.vertical, 5)
+        .background(Color(.tertiarySystemFill), in: RoundedRectangle(cornerRadius: 6))
+
+        if let uuid {
+            if let onSelectVehicle {
+                Button { onSelectVehicle(uuid) } label: { content }.buttonStyle(.plain)
+            } else {
+                NavigationLink(value: VehicleHeaderRow(id: uuid, year: nil, make: selectedMake, model: selectedFamilyName, trim: nil, primary_image_url: nil, city: nil, state: nil)) {
+                    content
+                }
+                .buttonStyle(.plain)
+            }
+        } else {
+            content
         }
     }
 
@@ -1557,12 +2187,18 @@ struct LedgerMapView: View {
     // MARK: - Canvas
 
     private var filteredNodes: [LedgerNode] {
-        if level == .years, let era = selectedEra {
-            return nodes.filter { n in
-                FamilyEraCohort.matches(year: Int(n.name), eraId: era)
+        let baseNodes: [LedgerNode] = {
+            if level == .years, let era = selectedEra {
+                return nodes.filter { n in
+                    FamilyEraCohort.matches(year: Int(n.name), eraId: era)
+                }
             }
+            return nodes
+        }()
+        if level == .brands || level == .families {
+            return baseNodes.map { applyHorizonOverlay($0) }
         }
-        return nodes
+        return baseNodes
     }
 
     @ViewBuilder
@@ -1660,7 +2296,18 @@ struct LedgerMapView: View {
 
                     ForEach(Array(innerTiles.enumerated()), id: \.offset) { _, famTile in
                         let row = famTile.item
-                        let node = row.toLedgerNode()
+                        let rawNode = row.toLedgerNode()
+                        let node: LedgerNode = {
+                            guard isCustomHorizonOverlay,
+                                  let m = activeMovers,
+                                  let mv = m.familyMoves["\(row.brand)|\(row.family_key)"] ?? m.familyMoves["\(row.brand)::\(row.family_key)"] else {
+                                return rawNode
+                            }
+                            var copy = rawNode
+                            copy.sold_12m = mv.sold12m
+                            copy.sold_prior_12m = mv.soldPrior12m
+                            return copy
+                        }()
                         let move: LedgerMapScale.Move = (row.family_key == "more" || row.family_key == "other")
                             ? .none
                             : LedgerMapScale.relativeMove(node, base: baseline, allVenues: basis == .ledger)
@@ -1898,21 +2545,32 @@ struct LedgerMapView: View {
     // MARK: - Relativity & Horizon Movers Card
 
     private var relativityMoversCard: some View {
-        VStack(alignment: .leading, spacing: 10) {
+        let displayMovers = activeMovers
+        return VStack(alignment: .leading, spacing: 10) {
             HStack(alignment: .firstTextBaseline) {
                 VStack(alignment: .leading, spacing: 2) {
                     HStack(spacing: 6) {
-                        Text("RELATIVITY")
+                        Button {
+                            showRelativityInfo = true
+                        } label: {
+                            HStack(spacing: 3) {
+                                Text("RELATIVITY")
+                                Image(systemName: "info.circle")
+                                    .font(.system(size: 9))
+                            }
                             .font(.system(size: 10, weight: .bold, design: .monospaced))
                             .padding(.horizontal, 6)
                             .padding(.vertical, 2)
                             .background(Color.primary.opacity(0.1), in: RoundedRectangle(cornerRadius: 4))
+                        }
+                        .buttonStyle(.plain)
                         Text(moverHorizon == .upcoming ? "Upcoming vs recent supply" : "What moved against the market")
                             .font(.system(.footnote, design: .monospaced).weight(.semibold))
                     }
-                    if let m = movers {
+                    if let m = displayMovers {
                         let mPct = LedgerMapScale.pct(m.marketMove)
-                        Text("\(moverHorizon.windowText) · \(m.marketPrior.formatted()) → \(m.marketSold.formatted()) (\(mPct))")
+                        let vsLabel = baselineHorizon == .prior ? moverHorizon.windowText : "\(moverHorizon.label) vs \(baselineHorizon.label)"
+                        Text("\(vsLabel) · \(m.marketPrior.formatted()) → \(m.marketSold.formatted()) (\(mPct))")
                             .font(.system(size: 10, design: .monospaced))
                             .foregroundStyle(.secondary)
                     }
@@ -1920,7 +2578,7 @@ struct LedgerMapView: View {
                 Spacer()
             }
 
-            // 8-step Horizon Dial
+            // 8-step Horizon Dial + VS Baseline Selector (#1817)
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 4) {
                     ForEach(MoverHorizon.allCases) { h in
@@ -1940,10 +2598,36 @@ struct LedgerMapView: View {
                 }
             }
 
-            if moversLoading && movers == nil {
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 4) {
+                    Text("VS")
+                        .font(.system(size: 9, weight: .bold, design: .monospaced))
+                        .foregroundStyle(.secondary)
+                        .padding(.trailing, 2)
+                    ForEach(BaselineHorizon.allCases) { bh in
+                        let active = baselineHorizon == bh
+                        let disabled = bh.moverHorizon == moverHorizon
+                        Button {
+                            guard !disabled else { return }
+                            baselineHorizon = bh
+                        } label: {
+                            Text(bh.label)
+                                .font(.system(size: 9, weight: active ? .bold : .regular, design: .monospaced))
+                                .foregroundStyle(disabled ? Color.secondary.opacity(0.45) : (active ? Color(.systemBackground) : Color.secondary))
+                                .padding(.horizontal, 7)
+                                .padding(.vertical, 3)
+                                .background(active ? Color.primary.opacity(0.85) : Color(.tertiarySystemFill), in: Capsule())
+                        }
+                        .buttonStyle(.plain)
+                        .disabled(disabled)
+                    }
+                }
+            }
+
+            if moversLoading && displayMovers == nil {
                 ProgressView()
                     .frame(maxWidth: .infinity, minHeight: 80)
-            } else if let m = movers {
+            } else if let m = displayMovers {
                 if m.gaining.isEmpty && m.losing.isEmpty {
                     Text("No family moved clearly beyond random variation in this window.")
                         .font(.system(.caption2, design: .monospaced))
@@ -1970,6 +2654,40 @@ struct LedgerMapView: View {
         .background(Color(.secondarySystemBackground), in: RoundedRectangle(cornerRadius: 8))
     }
 
+    private var relativityInfoSheet: some View {
+        NavigationStack {
+            ScrollView {
+                VStack(alignment: .leading, spacing: 12) {
+                    Text("How Relativity Is Measured")
+                        .font(.headline)
+                    Text("Every tile and mover row compares a brand or family's sales against the whole market over the selected horizon:")
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                    Text("move = (family_now / family_base) ÷ (market_now / market_base) − 1")
+                        .font(.system(.caption, design: .monospaced))
+                        .padding(8)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .background(Color(.secondarySystemBackground), in: RoundedRectangle(cornerRadius: 6))
+                    Text("• **Confidence gating**: On the Relativity board, a family only appears if its 95% Poisson log-ratio confidence band (`lo` to `hi`) stays entirely above or below 1.0× par.")
+                        .font(.footnote)
+                    Text("• **VS Baseline**: `PRIOR` compares the window against the immediately preceding window of the same length. Selecting `1D`–`5Y` compares the target window's per-day rate against the chosen baseline horizon.")
+                        .font(.footnote)
+                    Text("• **UPCOMING**: Compares currently live + scheduled + classified supply against the last 30 days of completed sales across all venues.")
+                        .font(.footnote)
+                }
+                .padding(16)
+            }
+            .navigationTitle("Relativity")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Done") { showRelativityInfo = false }
+                }
+            }
+        }
+        .presentationDetents([.medium])
+    }
+
     private func moverColumn(title: String, rows: [ShareMover], up: Bool) -> some View {
         VStack(alignment: .leading, spacing: 6) {
             HStack {
@@ -1994,13 +2712,24 @@ struct LedgerMapView: View {
                             Text("\(r.brand) \(r.family)")
                                 .font(.system(.caption, design: .monospaced).weight(.semibold))
                                 .lineLimit(1)
-                            Text("\(r.prior.formatted()) → \(r.sold.formatted())")
-                                .font(.system(size: 10, design: .monospaced))
-                                .foregroundStyle(.secondary)
+                            HStack(spacing: 6) {
+                                Text("\(r.prior.formatted()) → \(r.sold.formatted())")
+                                    .font(.system(size: 10, design: .monospaced))
+                                    .foregroundStyle(.secondary)
+                                if let pm = r.avgPriceMove, abs(pm) >= 0.01 {
+                                    Text("avg \(LedgerMapScale.pct(pm))")
+                                        .font(.system(size: 9, design: .monospaced))
+                                        .foregroundStyle(.secondary)
+                                }
+                            }
                         }
                         Spacer(minLength: 4)
+                        if let bins = r.bins, !bins.isEmpty {
+                            moverMiniSparkline(bins: bins, up: up)
+                                .frame(width: 40, height: 14)
+                        }
                         relativityDotGauge(r: r, up: up)
-                            .frame(width: 76, height: 14)
+                            .frame(width: 72, height: 14)
                         Text(LedgerMapScale.pct(r.move))
                             .font(.system(.caption, design: .monospaced).weight(.bold))
                             .foregroundStyle(up ? .green : .red)
@@ -2010,6 +2739,19 @@ struct LedgerMapView: View {
                     .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
+            }
+        }
+    }
+
+    private func moverMiniSparkline(bins: [Double], up: Bool) -> some View {
+        let maxV = max(bins.max() ?? 1.0, 1.0)
+        let half = bins.count / 2
+        return HStack(alignment: .bottom, spacing: 1) {
+            ForEach(Array(bins.enumerated()), id: \.offset) { idx, v in
+                let h = max(1, CGFloat(v / maxV) * 14)
+                Rectangle()
+                    .fill(idx >= half ? (up ? Color.green.opacity(0.75) : Color.red.opacity(0.75)) : Color.secondary.opacity(0.35))
+                    .frame(width: 1, height: h)
             }
         }
     }
@@ -2129,6 +2871,7 @@ struct LedgerMapView: View {
                 yearNodesCache = []
                 familySalesData = nil
                 familyIndex = nil
+                familyUpcomingSupply = nil
                 if brandFamilyRows.isEmpty {
                     Task {
                         if let bf = await LedgerMap.brandFamilyMap() {
@@ -2151,16 +2894,19 @@ struct LedgerMapView: View {
                 yearNodesCache = []
                 familySalesData = nil
                 familyIndex = nil
+                familyUpcomingSupply = nil
 
             case .models:
                 guard let make = selectedMake, let fk = selectedFamilyKey else { return }
                 async let modelsTask = LedgerMap.familyModels(brand: make, familyKey: fk)
                 async let salesTask = LedgerMap.familySales(brand: make, familyKey: fk)
                 async let indexTask = LedgerMap.familyPriceIndex(brand: make, familyKey: fk)
+                async let upcomingTask = LedgerMap.familyUpcomingSupply(brand: make, familyKey: fk)
                 let subModels = try await modelsTask
                 modelNodesCache = subModels
                 familySalesData = await salesTask
                 familyIndex = await indexTask
+                familyUpcomingSupply = await upcomingTask
 
                 if subModels.count == 1, let only = subModels.first {
                     selectedModel = only.name
@@ -2181,6 +2927,9 @@ struct LedgerMapView: View {
                 } else if let fk = selectedFamilyKey {
                     if familySalesData == nil {
                         familySalesData = await LedgerMap.familySales(brand: make, familyKey: fk)
+                    }
+                    if familyUpcomingSupply == nil {
+                        familyUpcomingSupply = await LedgerMap.familyUpcomingSupply(brand: make, familyKey: fk)
                     }
                     let derived = deriveYearsFromFamilySales(familySalesData?.sales ?? [])
                     yearNodesCache = derived
