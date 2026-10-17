@@ -182,7 +182,15 @@ const signed = (v: number) => (Math.round(v * 100) === 0 ? '0%' : `${v > 0 ? '鈻
 const P = { left: 50, right: 8, top: 18, bottom: 18 };
 const MIN_BAND = 8;
 
-export default function FamilySalesChart({ brand, familyKey, family, width, height, onOpen, selectedEra = null, onSelectEra }: {
+export function matchesSaleSubModel(saleModel: string | null | undefined, selectedModel: string | null | undefined): boolean {
+  if (!selectedModel) return true;
+  const target = selectedModel.trim().toLowerCase();
+  if (!target) return true;
+  const m = (saleModel ?? '').trim().toLowerCase();
+  return m === target || m.startsWith(`${target} `) || m.startsWith(`${target}-`);
+}
+
+export default function FamilySalesChart({ brand, familyKey, family, width, height, onOpen, selectedEra = null, onSelectEra, selectedModel = null }: {
   brand: string;
   familyKey: string;
   family: string;
@@ -191,20 +199,26 @@ export default function FamilySalesChart({ brand, familyKey, family, width, heig
   onOpen: (vehicleId: string) => void;
   selectedEra?: string | null;
   onSelectEra?: (era: string | null) => void;
+  selectedModel?: string | null;
 }) {
   const { sales: allSales, n: windowCount, truncated, failed } = useFamilySales(brand, familyKey);
+  const modelSales = useMemo(
+    () => (allSales && selectedModel ? allSales.filter((s) => matchesSaleSubModel(s.model, selectedModel)) : null),
+    [allSales, selectedModel],
+  );
+  const baseSales = modelSales && modelSales.length > 0 ? modelSales : allSales;
   const eraCohorts = useMemo(
-    () => (allSales ? getFamilyEraCohorts(brand, family, allSales.map((s) => s.year)) : []),
-    [brand, family, allSales],
+    () => (baseSales ? getFamilyEraCohorts(brand, family, baseSales.map((s) => s.year)) : []),
+    [brand, family, baseSales],
   );
   const sales = useMemo(
-    () => (allSales && selectedEra ? allSales.filter((s) => matchesEraRange(s.year, selectedEra)) : allSales),
-    [allSales, selectedEra],
+    () => (baseSales && selectedEra ? baseSales.filter((s) => matchesEraRange(s.year, selectedEra)) : baseSales),
+    [baseSales, selectedEra],
   );
   // Same car, same miles (family_price_index_read): when the family has a fitted index, the chart is one panel of every
   // sale with the like-for-like line over it, and the head answers with its 12-month change instead of a median.
   const ix = useFamilyIndex(brand, familyKey);
-  const indexed = !selectedEra && !!ix && ix.series.length > 1;
+  const indexed = !selectedEra && !(modelSales && modelSales.length > 0) && !!ix && ix.series.length > 1;
   // The plain median's own 12-month change over every venue, for the sentence beside the answer when the reader has none.
   const plain = useMemo(() => (sales ? plainMedianChange(sales) : null), [sales]);
   const [hover, setHover] = useState<{ band: number; dot: number } | null>(null);
@@ -298,7 +312,7 @@ export default function FamilySalesChart({ brand, familyKey, family, width, heig
   return <div className={['family-sales', narrow ? 'family-sales--narrow' : '', ix ? 'family-sales--indexed' : ''].filter(Boolean).join(' ')}>
     <div className="family-sales__head">
       <div className="family-sales__title">
-        <Text role="entity" dense>{family}</Text>
+        <Text role="entity" dense>{selectedModel && selectedModel.toLowerCase() !== family.toLowerCase() && modelSales?.length ? `${family} 路 ${selectedModel}` : family}</Text>
         <Text role="caption">{(narrow ? `${count} sales since ${since}` : indexed
           ? `${count} sales with a date since ${since} 路 one dot each 路 blue = the same car, same miles (95% band) 路 gray = plain median, which mixes different cars`
           : `${count} sales with a date since ${since} 路 one dot each 路 panels by model-year decade 路 line = rolling median, band = middle half`)

@@ -1751,6 +1751,7 @@ export function TreemapHomePage({ onBrowse, embedded = false }: { onBrowse: () =
             onOpen={(id) => navigate(`/vehicle/${id}`)}
             selectedEra={selectedEra}
             onSelectEra={setSelectedEra}
+            selectedModel={currentLevel.model ?? null}
           />
         </div>
       )}

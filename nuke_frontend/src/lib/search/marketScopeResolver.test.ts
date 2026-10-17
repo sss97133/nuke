@@ -20,6 +20,7 @@ vi.mock('../supabase', () => ({
 }));
 
 import { buildMarketScopeUrl, isOnMarketTab, resolveMarketScopeQuery } from './marketScopeResolver';
+import { matchesSaleSubModel } from '../../pages/market/FamilySalesChart';
 
 describe('marketScopeResolver', () => {
   beforeEach(() => {
@@ -174,5 +175,12 @@ describe('marketScopeResolver', () => {
   it('returns null for natural-language price or mileage filter queries so they fall through to /search', async () => {
     expect(await resolveMarketScopeQuery('manual wagons under $30k')).toBeNull();
     expect(await resolveMarketScopeQuery('porsche 911 with under 20000 miles')).toBeNull();
+  });
+
+  it('matches sub-model sales for FamilySalesChart sub-model filtering', () => {
+    expect(matchesSaleSubModel('Mustang Mach 1', 'Mustang Mach 1')).toBe(true);
+    expect(matchesSaleSubModel('Shelby GT350 Fastback', 'Shelby GT350')).toBe(true);
+    expect(matchesSaleSubModel('Mustang GT', 'Shelby GT350')).toBe(false);
+    expect(matchesSaleSubModel('Mustang', null)).toBe(true);
   });
 });
