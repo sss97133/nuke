@@ -39,6 +39,26 @@ export type LandingRecentEvent = {
   createdAt: string;
 };
 
+export type SourceDrillStats = {
+  source: string | null;
+  name: string | null;
+  category: string | null;
+  house: string | null;
+  held: number | null;
+  heldAt: string | null;
+  population: number | null;
+  populationMethod: string | null;
+  populationConfidence: number | null;
+  populationAt: string | null;
+  coverageShare: number | null;
+  mapSales: number | null;
+  mapUsd: number | null;
+  sales12: number | null;
+  usd12: number | null;
+  salesPrior12: number | null;
+  usdPrior12: number | null;
+};
+
 export type SourceLandingDetail = {
   asOf: string;
   source: string | null;
@@ -53,6 +73,7 @@ export type SourceLandingDetail = {
   hours24: number[];
   mins60: number[];
   days14: number[];
+  stats: SourceDrillStats | null;
   recent: LandingRecentEvent[];
 };
 
@@ -231,6 +252,30 @@ export function parseSourceLanding(value: unknown): SourceLandingDetail | null {
       });
     }
   }
+  const rawStats = v.stats && typeof v.stats === 'object' && !Array.isArray(v.stats)
+    ? (v.stats as Record<string, unknown>)
+    : null;
+  const stats: SourceDrillStats | null = rawStats
+    ? {
+        source: str(rawStats.source),
+        name: str(rawStats.name),
+        category: str(rawStats.category),
+        house: str(rawStats.house),
+        held: num(rawStats.held_lots),
+        heldAt: str(rawStats.held_at),
+        population: num(rawStats.population),
+        populationMethod: str(rawStats.population_method),
+        populationConfidence: num(rawStats.population_confidence),
+        populationAt: str(rawStats.population_at),
+        coverageShare: num(rawStats.coverage_share),
+        mapSales: num(rawStats.map_sales),
+        mapUsd: num(rawStats.map_usd),
+        sales12: num(rawStats.sales_12m),
+        usd12: num(rawStats.usd_12m),
+        salesPrior12: num(rawStats.sales_prior_12m),
+        usdPrior12: num(rawStats.usd_prior_12m),
+      }
+    : null;
   return {
     asOf: v.as_of,
     source: str(v.source),
@@ -245,6 +290,7 @@ export function parseSourceLanding(value: unknown): SourceLandingDetail | null {
     hours24: numArray(v.hours24, 24),
     mins60: numArray(v.mins60, 12),
     days14: numArray(v.days14, 14),
+    stats,
     recent,
   };
 }
@@ -278,6 +324,9 @@ const METHOD: Record<string, string> = {
   api_count: 'from their API total',
   sitemap: 'from their sitemap index',
   docket_and_broadcast_census: 'from docket & broadcast census',
+  window_extrapolated: 'extrapolated from cohort window & gap density',
+  turnover_model: 'modeled from active inventory & daily turnover',
+  capture_model: 'modeled from capture velocity & unseen-mass prior',
 };
 function shortDay(iso: string | null) {
   if (!iso) return '';
@@ -793,6 +842,25 @@ function SourceLandingInspector({
   const rowBadge = row ? categoryBadgeLabel(row) : null;
   const dealerBreakdown = row && rowCategory === 'dealer' ? describeDealerConsignment(row, recent) : null;
 
+  const statsHeld = detail?.stats?.held ?? row?.held ?? null;
+  const statsPop = detail?.stats?.population ?? row?.population ?? null;
+  const statsMethod = detail?.stats?.populationMethod ?? row?.populationMethod ?? null;
+  const statsConf = detail?.stats?.populationConfidence ?? row?.populationConfidence ?? null;
+  const statsMapSales = detail?.stats?.mapSales ?? row?.mapSales ?? null;
+  const statsMapUsd = detail?.stats?.mapUsd ?? row?.mapUsd ?? null;
+  const statsSales12 = detail?.stats?.sales12 ?? row?.sales12 ?? null;
+  const statsUsd12 = detail?.stats?.usd12 ?? row?.usd12 ?? null;
+  const statsShare = row
+    ? heldShare({
+        held: statsHeld,
+        population: statsPop,
+        populationMethod: statsMethod,
+      })
+    : null;
+  const statsMethodNote = statsMethod
+    ? `${METHOD[statsMethod] ?? statsMethod}${statsConf != null ? ` (${Math.round(statsConf * 100)}% conf)` : ''}`
+    : undefined;
+
   return (
     <Tag className="market-sources__drill" aria-label={`Live ingestion for ${displayName}`}>
       <div className="market-sources__drill-head">
@@ -804,7 +872,7 @@ function SourceLandingInspector({
               {rowBadge}
             </span>
           ) : null}
-          <span>live &amp; hourly ingestion</span>
+          <span>{row ? 'vehicles, stats & live ingestion' : 'live & hourly ingestion'}</span>
           {selectedHour ? (
             <button
               type="button"
@@ -820,6 +888,14 @@ function SourceLandingInspector({
           )}
         </div>
         <div className="market-sources__drill-actions">
+          {row ? (
+            <a
+              href={`/browse?source=${encodeURIComponent(row.source)}`}
+              className="market-sources__drill-btn"
+            >
+              Browse vehicles →
+            </a>
+          ) : null}
           <button
             type="button"
             className="market-sources__drill-btn"
@@ -866,6 +942,41 @@ function SourceLandingInspector({
               </span>
             </div>
           ) : null}
+        </div>
+      ) : null}
+
+      {row ? (
+        <div className="market-sources__drill-stats" aria-label={`Source stats for ${displayName}`}>
+          <div className="market-sources__kpi">
+            <span className="market-sources__kpi-label">{row.category === 'marketplace' ? 'Listings held' : 'Lots held'}</span>
+            <strong>{statsHeld != null ? count(statsHeld) : '—'}</strong>
+          </div>
+          <div className="market-sources__kpi">
+            <span className="market-sources__kpi-label">Census &amp; coverage</span>
+            <strong title={statsMethodNote}>
+              {statsShare?.text || '—'}
+            </strong>
+          </div>
+          <div className="market-sources__kpi">
+            <span className="market-sources__kpi-label">Confirmed map sales</span>
+            <strong>
+              {statsMapSales != null && statsMapSales > 0
+                ? `${count(statsMapSales)}${statsMapUsd ? ` · ${money(statsMapUsd)}` : ''}`
+                : '—'}
+            </strong>
+          </div>
+          <div className="market-sources__kpi">
+            <span className="market-sources__kpi-label">Sales (last 12m)</span>
+            <strong>
+              {statsSales12 != null && statsSales12 > 0
+                ? `${count(statsSales12)}${statsUsd12 ? ` · ${money(statsUsd12)}` : ''}`
+                : '—'}
+            </strong>
+          </div>
+          <div className="market-sources__kpi">
+            <span className="market-sources__kpi-label">Live now</span>
+            <strong className={row.live > 0 ? 'up' : ''}>{row.live > 0 ? `${count(row.live)} live` : '0 live'}</strong>
+          </div>
         </div>
       ) : null}
 
@@ -1132,10 +1243,32 @@ function SourceLandingInspector({
   );
 }
 
-export function SourcesBoardView({ data, scope }: { data: SourcesBoardData; scope?: string | null }) {
-  const [all, setAll] = useState(false);
+function resolveInitialSource(rows: SourceRow[], explicit?: string | null): string | null {
+  let candidate = explicit ?? null;
+  if (!candidate && typeof window !== 'undefined') {
+    const pathMatch = window.location.pathname.match(/^\/sources\/([^/?#]+)/);
+    candidate = pathMatch?.[1]
+      ? decodeURIComponent(pathMatch[1])
+      : new URLSearchParams(window.location.search).get('source');
+  }
+  if (!candidate) return null;
+  const nk = normKey(candidate);
+  const found = rows.find((r) => r.source === candidate || normKey(r.source) === nk || normKey(r.name) === nk);
+  return found ? found.source : null;
+}
+
+export function SourcesBoardView({
+  data,
+  scope,
+  initialSource,
+}: {
+  data: SourcesBoardData;
+  scope?: string | null;
+  initialSource?: string | null;
+}) {
+  const [all, setAll] = useState(() => !!resolveInitialSource(data.rows, initialSource));
   const [horizon, setHorizon] = useState<LandingHorizon>('14d');
-  const [openSource, setOpenSource] = useState<string | null>(null);
+  const [openSource, setOpenSource] = useState<string | null>(() => resolveInitialSource(data.rows, initialSource));
   const [categoryFilter, setCategoryFilter] = useState<'all' | SourceCategory>('all');
 
   const heldAt = data.rows.map((r) => r.heldAt).filter((x): x is string => !!x).sort().at(-1) ?? null;
@@ -1269,7 +1402,19 @@ export function SourcesBoardView({ data, scope }: { data: SourcesBoardData; scop
                 : 'their total is not counted yet';
               return (
                 <Fragment key={r.source}>
-                  <li className={`market-sources__row${isOpen ? ' market-sources__row--open' : ''}`} data-category={cat ?? undefined}>
+                  <li
+                    className={`market-sources__row${isOpen ? ' market-sources__row--open' : ''}`}
+                    data-category={cat ?? undefined}
+                    onClick={() => setOpenSource((cur) => (cur === r.source ? null : r.source))}
+                    onKeyDown={(e) => {
+                      if (e.target === e.currentTarget && (e.key === 'Enter' || e.key === ' ')) {
+                        e.preventDefault();
+                        setOpenSource((cur) => (cur === r.source ? null : r.source));
+                      }
+                    }}
+                    tabIndex={0}
+                    aria-expanded={isOpen}
+                  >
                     <span className="market-sources__rank">{i + 1}</span>
                     <span className="market-sources__name" title={r.name}>
                       {/* Identity through the shared renderer (frontend rule 2026-10-08): the organization's recorded logo,
@@ -1300,7 +1445,10 @@ export function SourcesBoardView({ data, scope }: { data: SourcesBoardData; scop
                     <button
                       type="button"
                       className={`market-sources__landing${isOpen ? ' is-open' : ''}`}
-                      onClick={() => setOpenSource((cur) => (cur === r.source ? null : r.source))}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setOpenSource((cur) => (cur === r.source ? null : r.source));
+                      }}
                       aria-expanded={isOpen}
                       title={`${count(r.landed7)} records landed in 7d · +${count(r.landed1h)} in 1h · click for live hourly breakdown`}
                     >
@@ -1344,7 +1492,13 @@ export function SourcesBoardView({ data, scope }: { data: SourcesBoardData; scop
 }
 
 /** The board as the market page mounts it: one read, refreshed every 30s in live browser sessions. */
-export default function SourcesBoard({ scope }: { scope?: string | null } = {}) {
+export default function SourcesBoard({
+  scope,
+  initialSource,
+}: {
+  scope?: string | null;
+  initialSource?: string | null;
+} = {}) {
   const [data, setData] = useState<SourcesBoardData | null>(null);
   useEffect(() => {
     let live = true;
@@ -1365,5 +1519,5 @@ export default function SourcesBoard({ scope }: { scope?: string | null } = {}) 
     };
   }, []);
   if (!data || !data.rows.length) return null;
-  return <SourcesBoardView data={data} scope={scope} />;
+  return <SourcesBoardView data={data} scope={scope} initialSource={initialSource} />;
 }

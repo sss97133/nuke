@@ -24,6 +24,7 @@ const DealRead = React.lazy(() => import('../pages/DealRead'));
 const BrandStudio = React.lazy(() => import('../pages/BrandStudio'));
 const PublicMap = React.lazy(() => import('../components/map/PublicMap'));
 const Valuation = React.lazy(() => import('../pages/Valuation'));
+const SourcesBoard = React.lazy(() => import('../pages/market/SourcesBoard'));
 // Stacks: a page per stack, a path through the nine layers (case ledger §13.2)
 const StacksIndex = React.lazy(() => import('../pages/stacks/StacksIndex'));
 const OrderBookStack = React.lazy(() => import('../pages/stacks/OrderBookStack'));
@@ -196,6 +197,8 @@ export const DomainRoutes = () => {
         <Route path="/browse" element={<BrowseVehicles />} />
         <Route path="/live" element={<LiveFloor />} />
         <Route path="/map" element={<MapPage />} />
+        <Route path="/sources" element={<SourcesBoard />} />
+        <Route path="/sources/:source" element={<SourcesBoard />} />
         <Route path="/valuation" element={<Valuation />} />
         <Route path="/stacks" element={<StacksIndex />} />
         <Route path="/stacks/order-book/:vehicleId" element={<OrderBookStack />} />

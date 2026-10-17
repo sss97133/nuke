@@ -139,6 +139,8 @@ SELECT s.id, v.e, v.l, v.u FROM public.live_auction_sources s JOIN (VALUES
 \ir ../migrations/20261018150000_source_pool_depth_estimator.sql
 \ir ../migrations/20261018153000_market_sources_dealers_and_consignors.sql
 \ir ../migrations/20261018153000_market_sources_dealers_and_consignors.sql
+\ir ../migrations/20261018183000_source_census_audit_and_drill.sql
+\ir ../migrations/20261018183000_source_census_audit_and_drill.sql
 
 -- BaT's organization has a recorded logo; Craigslist has no organization
 WITH org AS (INSERT INTO public.organizations (logo_url, business_type) VALUES ('https://example.test/bat-logo.png', 'auction_house') RETURNING id)
@@ -274,3 +276,68 @@ SELECT pg_temp.ok('PUBLIC executes none of them',
   NOT has_function_privilege('public', 'public.record_market_source_day()', 'execute')
   AND NOT has_function_privilege('public', 'public.market_sources_read()', 'execute')
   AND NOT has_function_privilege('public', 'public.market_source_landing_read(text, timestamptz)', 'execute'));
+
+-- Audit contract across RM Sotheby's, Bonhams, Gooding, Collecting Cars, PCarMarket, Hemmings, Classic.com (+ SBX & GAA)
+INSERT INTO public.observation_sources (slug, display_name, category, created_at) VALUES
+  ('rm-sothebys', 'RM Sotheby''s', 'auction', '2025-01-01'),
+  ('bonhams', 'Bonhams', 'auction', '2025-01-01'),
+  ('gooding', 'Gooding & Company', 'auction', '2025-01-01'),
+  ('collecting-cars', 'Collecting Cars', 'auction', '2025-01-01'),
+  ('pcarmarket', 'PCarMarket', 'auction', '2025-01-01'),
+  ('hemmings', 'Hemmings', 'marketplace', '2025-01-01'),
+  ('classic-com', 'Classic.com', 'aggregator', '2025-01-01'),
+  ('sbx-cars', 'SBX Cars', 'auction', '2025-01-01'),
+  ('gaa-classic-cars', 'GAA Classic Cars', 'auction', '2025-01-01');
+INSERT INTO public.source_census (source_id, universe_total, universe_historical, census_method, census_confidence, census_at)
+SELECT id, NULL, NULL, 'unknown', NULL, '2026-10-15 03:00:00+00'::timestamptz
+FROM public.observation_sources WHERE slug IN ('rm-sothebys', 'hemmings');
+INSERT INTO public.mv_source_target_landed VALUES
+  ('rmsothebys', 0, 0, 0, 1404, '2026-10-17 10:27Z'),
+  ('bonhams', 0, 0, 0, 32174, '2026-10-17 10:27Z'),
+  ('gooding', 0, 0, 0, 6993, '2026-10-17 10:27Z'),
+  ('collecting-cars', 0, 0, 0, 651, '2026-10-17 10:27Z'),
+  ('pcarmarket', 0, 0, 0, 6857, '2026-10-17 10:27Z'),
+  ('hemmings', 0, 0, 0, 70, '2026-10-17 10:27Z'),
+  ('classiccom', 0, 0, 0, 82, '2026-10-17 10:27Z'),
+  ('sbxcars', 0, 0, 0, 102, '2026-10-17 10:27Z'),
+  ('sbx', 0, 0, 0, 38, '2026-10-17 10:27Z'),
+  ('gaaclassiccars', 0, 0, 0, 510, '2026-10-17 10:27Z');
+INSERT INTO public.vehicle_events (source_platform, created_at) VALUES
+  ('rmsothebys', now() - interval '5 minutes'),
+  ('bonhams', now() - interval '10 minutes'),
+  ('gooding', now() - interval '15 minutes'),
+  ('collecting_cars', now() - interval '20 minutes'),
+  ('pcarmarket', now() - interval '25 minutes'),
+  ('hemmings', now() - interval '30 minutes'),
+  ('classic-com', now() - interval '35 minutes');
+
+\ir ../migrations/20261018183000_source_census_audit_and_drill.sql
+
+SELECT pg_temp.ok('Classic.com is promoted to marketplace and all 9 audited venues carry high-confidence Regime 1/2 census rows',
+  (SELECT category = 'marketplace' FROM public.observation_sources WHERE slug = 'classic-com')
+  AND (SELECT count(*) = 9
+              AND bool_and(population IS NOT NULL AND population >= landed_lots)
+              AND bool_and(population_method IN ('search_index', 'sitemap', 'bounded'))
+              AND bool_and(population_confidence >= 0.80)
+       FROM public.market_source_days
+       WHERE source_slug IN ('rm-sothebys', 'bonhams', 'gooding', 'collecting-cars', 'pcarmarket', 'hemmings', 'classic-com', 'sbx-cars', 'gaa-classic-cars'))
+  AND (SELECT population = 55740 AND population_method = 'search_index' FROM public.market_source_days WHERE source_slug = 'rm-sothebys')
+  AND (SELECT population = 34101 AND population_method = 'search_index' FROM public.market_source_days WHERE source_slug = 'bonhams')
+  AND (SELECT population = 9600 AND population_method = 'sitemap' FROM public.market_source_days WHERE source_slug = 'gooding')
+  AND (SELECT population = 20578 AND population_method = 'search_index' FROM public.market_source_days WHERE source_slug = 'collecting-cars')
+  AND (SELECT population = 19446 AND population_method = 'sitemap' FROM public.market_source_days WHERE source_slug = 'pcarmarket')
+  AND (SELECT population = 36496 AND population_method = 'search_index' FROM public.market_source_days WHERE source_slug = 'hemmings')
+  AND (SELECT population = 1054187 AND population_method = 'search_index' FROM public.market_source_days WHERE source_slug = 'classic-com')
+  AND (SELECT landed_lots = 140 AND population = 655 AND population_method = 'bounded' FROM public.market_source_days WHERE source_slug = 'sbx-cars'));
+
+SELECT pg_temp.ok('every audited source appears on market_sources_read() and drills cleanly into vehicles and stats via market_source_landing_read()',
+  (SELECT count(*) = 7
+   FROM jsonb_array_elements(public.market_sources_read()->'rows') x
+   WHERE x->>0 IN ('rm-sothebys', 'bonhams', 'gooding', 'collecting-cars', 'pcarmarket', 'hemmings', 'classic-com'))
+  AND (SELECT bool_and(
+         jsonb_array_length(public.market_source_landing_read(s)->'recent') >= 1
+         AND (public.market_source_landing_read(s)->'stats'->>'population')::int > 0
+         AND (public.market_source_landing_read(s)->'stats'->>'held_lots')::int > 0
+       )
+       FROM unnest(ARRAY['rm-sothebys', 'bonhams', 'gooding', 'collecting-cars', 'pcarmarket', 'hemmings', 'classic-com']) s));
+

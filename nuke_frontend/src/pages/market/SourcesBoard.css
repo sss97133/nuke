@@ -25,7 +25,8 @@
   color: var(--text-secondary); padding: 2px 0 4px; border-bottom: 1px solid var(--border); }
 .market-sources .n { text-align: right; font-family: 'Courier New', monospace; font-variant-numeric: tabular-nums; white-space: nowrap; }
 .market-sources__rows { list-style: none; margin: 0; padding: 0; }
-.market-sources__row { padding: 4px 0; border-bottom: 1px solid var(--border); font-size: 12px; }
+.market-sources__row { padding: 4px 0; border-bottom: 1px solid var(--border); font-size: 12px; cursor: pointer; }
+.market-sources__row:hover { background: var(--surface); }
 .market-sources__row--open { background: var(--surface); border-bottom-color: transparent; }
 .market-sources__rank { font-size: 11px; color: var(--text-secondary); font-family: 'Courier New', monospace; }
 .market-sources__name { display: flex; align-items: center; gap: 6px; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
@@ -107,7 +108,8 @@
   font: 700 10px 'Courier New', monospace; cursor: pointer; }
 .market-sources__drill-actions { display: inline-flex; gap: 6px; }
 .market-sources__drill-btn { padding: 2px 8px; border: 1px solid var(--border); background: var(--bg); color: var(--text);
-  font: 700 10px Arial, sans-serif; letter-spacing: 0.06em; text-transform: uppercase; cursor: pointer; }
+  font: 700 10px Arial, sans-serif; letter-spacing: 0.06em; text-transform: uppercase; cursor: pointer; text-decoration: none;
+  display: inline-flex; align-items: center; }
 .market-sources__drill-btn:hover, .market-sources__drill-btn:focus-visible { border-color: var(--text); }
 
 .market-sources__dealer-context { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between;
@@ -122,6 +124,9 @@
 .market-sources__dealer-bar-consigned { fill: var(--text); }
 .market-sources__dealer-bar-direct { fill: var(--text-secondary); opacity: 0.55; }
 .market-sources__dealer-split-text { font: 700 10px 'Courier New', monospace; color: var(--text); white-space: nowrap; }
+
+.market-sources__drill-stats { display: grid; grid-template-columns: repeat(5, minmax(90px, 1fr));
+  gap: 8px; padding: 8px 0; border-bottom: 1px solid var(--border); }
 
 .market-sources__drill-kpis { display: grid; grid-template-columns: repeat(4, minmax(90px, 1fr)) minmax(180px, 1.8fr);
   gap: 8px; padding: 8px 0; border-bottom: 1px solid var(--border); }
@@ -231,6 +236,7 @@
   .market-sources__rank { grid-area: rank; } .market-sources__name { grid-area: name; } .market-sources__held { grid-area: held; }
   .market-sources__share { grid-area: share; } .market-sources__recent { grid-area: recent; justify-content: flex-start; }
   .market-sources__live { grid-area: live; } .market-sources__landing { grid-area: landing; }
+  .market-sources__drill-stats { grid-template-columns: repeat(2, 1fr); }
   .market-sources__drill-kpis { grid-template-columns: repeat(2, 1fr); }
   .market-sources__drill-charts { grid-template-columns: 1fr; }
 }

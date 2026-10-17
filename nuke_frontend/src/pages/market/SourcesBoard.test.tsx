@@ -416,3 +416,120 @@ it('computes consigned vs. direct breakdown for mixed, direct-only, and empty-st
     summaryText: '500 vehicles held · 30 live · 120 confirmed sales',
   });
 });
+
+it('renders high-confidence Regime 1/2 census rows for all 7 audited sources and drills into vehicles & stats on row click', async () => {
+  const auditedValue = {
+    ...value,
+    rows: [
+      ['rm_sothebys', "RM Sotheby's", 'auction', "RM Sotheby's", 43573, '2026-10-17T10:27:00Z',
+        55740, 'search_index', 0.9, '2026-10-17T22:00:00Z', 30678, 9162000000, 3294, 980000000, 3100, 890000000,
+        [['2026-09', 260, 75000000], ['2026-10', 180, 52000000]], 5, '2026-10-17T06:00:00Z', 43200, '2026-10-10',
+        12, 85, '2026-10-17T08:00:00Z', [0, 2, 0, 5, 0, 10, 0, 8, 12, 6, 4, 9, 17, 12],
+        'https://nuke.ag/source-logos/rm-sothebys.png', 'auction_house'],
+      ['bonhams', 'Bonhams', 'auction', 'Bonhams', 32292, '2026-10-17T10:27:00Z',
+        34101, 'search_index', 0.88, '2026-10-17T22:00:00Z', 17325, 2930000000, 835, 145000000, 790, 132000000,
+        [['2026-09', 70, 12000000], ['2026-10', 65, 11000000]], 33, '2026-10-17T06:00:00Z', 32100, '2026-10-10',
+        8, 44, '2026-10-17T07:30:00Z', [1, 2, 3, 4, 2, 1, 5, 3, 2, 4, 6, 3, 0, 8],
+        'https://nuke.ag/source-logos/bonhams.png', 'auction_house'],
+      ['gooding', 'Gooding & Company', 'auction', 'Gooding & Company', 6611, '2026-10-17T10:27:00Z',
+        9600, 'sitemap', 0.88, '2026-10-17T22:00:00Z', 5120, 2410000000, 412, 215000000, 395, 198000000,
+        [['2026-08', 180, 108000000], ['2026-10', 45, 22000000]], 0, null, 6590, '2026-10-10',
+        3, 21, '2026-10-17T05:00:00Z', [0, 0, 1, 2, 0, 3, 1, 4, 2, 1, 2, 2, 0, 3],
+        'https://nuke.ag/source-logos/gooding.png', 'auction_house'],
+      ['collecting_cars', 'Collecting Cars', 'auction', 'Collecting Cars', 8922, '2026-10-17T10:27:00Z',
+        20578, 'search_index', 0.95, '2026-10-17T22:00:00Z', 8065, 608000000, 1890, 142000000, 1750, 131000000,
+        [['2026-09', 155, 11800000], ['2026-10', 160, 12400000]], 183, '2026-10-17T08:00:00Z', 8840, '2026-10-10',
+        19, 112, '2026-10-17T08:10:00Z', [5, 8, 6, 9, 7, 10, 8, 12, 9, 11, 8, 14, 15, 19],
+        'https://nuke.ag/source-logos/collecting-cars.png', 'auction_house'],
+      ['pcarmarket', 'PCarMarket', 'auction', 'PCarMarket', 4111, '2026-10-17T10:27:00Z',
+        19446, 'sitemap', 0.88, '2026-10-17T22:00:00Z', 3304, 255700000, 620, 48000000, 580, 44000000,
+        [['2026-09', 52, 4100000], ['2026-10', 48, 3900000]], 22, '2026-10-17T08:00:00Z', 4080, '2026-10-10',
+        7, 38, '2026-10-17T07:50:00Z', [2, 3, 1, 4, 2, 3, 5, 2, 4, 3, 2, 5, 4, 7],
+        'https://nuke.ag/source-logos/pcarmarket.png', 'auction_house'],
+      ['hemmings', 'Hemmings', 'marketplace', 'Hemmings', 9906, '2026-10-17T10:27:00Z',
+        36496, 'search_index', 0.85, '2026-10-17T22:00:00Z', 991, 42100000, 310, 14200000, 285, 12900000,
+        [['2026-09', 28, 1200000], ['2026-10', 24, 1100000]], 42, '2026-10-17T08:00:00Z', 9850, '2026-10-10',
+        14, 92, '2026-10-17T08:05:00Z', [4, 6, 5, 7, 8, 6, 9, 5, 7, 8, 6, 10, 11, 14],
+        'https://nuke.ag/source-logos/hemmings.png', 'marketplace'],
+      ['classic-com', 'Classic.com', 'marketplace', null, 110566, '2026-10-17T10:27:00Z',
+        1054187, 'search_index', 0.92, '2026-10-17T22:00:00Z', 16562, 1480000000, 4120, 380000000, 3890, 355000000,
+        [['2026-09', 340, 31000000], ['2026-10', 360, 33000000]], 0, null, 109800, '2026-10-10',
+        64, 410, '2026-10-17T08:12:00Z', [20, 25, 30, 28, 35, 40, 32, 29, 38, 42, 36, 45, 50, 64],
+        'https://nuke.ag/source-logos/classic-com.png', 'marketplace'],
+    ],
+  };
+
+  fixture.rpc.mockImplementation((fn: string, params?: { p_source?: string }) => {
+    if (fn === 'market_sources_read') return Promise.resolve({ data: auditedValue, error: null });
+    if (fn === 'market_source_landing_read') {
+      return Promise.resolve({
+        data: {
+          ...batLandingDetail,
+          source: params?.p_source ?? 'rm_sothebys',
+          stats: {
+            source: params?.p_source ?? 'rm_sothebys',
+            name: "RM Sotheby's",
+            category: 'auction',
+            house: "RM Sotheby's",
+            held_lots: 43573,
+            population: 55740,
+            population_method: 'search_index',
+            population_confidence: 0.9,
+            coverage_share: 0.7817,
+            map_sales: 30678,
+            map_usd: 9162000000,
+            sales_12m: 3294,
+            usd_12m: 980000000,
+          },
+          recent: [
+            {
+              id: 'ev-rms-1',
+              source: 'rm_sothebys',
+              event_type: 'auction_result',
+              event_status: 'sold',
+              price: 1655000,
+              year: 1967,
+              make: 'Ferrari',
+              model: '275 GTB/4',
+              trim: 'by Scaglietti',
+              vin: '10453',
+              mileage: 14200,
+              record_date: '2026-08-15T20:00:00Z',
+              title: '1967 Ferrari 275 GTB/4 by Scaglietti',
+              raw_title: '1967 Ferrari 275 GTB/4 by Scaglietti',
+              lot: 'R0012',
+              vehicle_id: 'veh-275gtb4',
+              source_url: 'https://rmsothebys.com/auctions/mo26/lots/r0012-1967-ferrari-275-gtb4/',
+              created_at: '2026-10-17T08:00:00Z',
+            },
+          ],
+        },
+        error: null,
+      });
+    }
+    return Promise.resolve({ data: null, error: { message: 'none' } });
+  });
+
+  await act(async () => root.render(<SourcesBoard />));
+  const rows = [...container.querySelectorAll('li.market-sources__row')];
+  expect(rows).toHaveLength(7);
+  // None of the 7 audited sources fall back to estimated low-confidence bars
+  expect(container.querySelectorAll('.market-sources__fill--est')).toHaveLength(0);
+  expect(container.querySelectorAll('.market-sources__fill')).toHaveLength(7);
+
+  // Clicking directly on the RM Sotheby's row drills cleanly into its vehicles and stats
+  await act(async () => { (rows[0] as HTMLLIElement).click(); });
+  expect(fixture.rpc).toHaveBeenCalledWith('market_source_landing_read', { p_source: 'rm_sothebys' });
+  const drill = container.querySelector('.market-sources__drill')!;
+  expect(drill).not.toBeNull();
+  const statsBox = drill.querySelector('.market-sources__drill-stats')!;
+  expect(statsBox).not.toBeNull();
+  expect(statsBox.textContent).toContain('43,573');
+  expect(statsBox.textContent).toContain('78% of about 55,740');
+  expect(statsBox.textContent).toContain('30,678 · $9.2B');
+  expect(drill.textContent).toContain('1967');
+  expect(drill.textContent).toContain('Ferrari');
+  expect(drill.textContent).toContain('275 GTB/4');
+  expect(drill.textContent).toContain('$1,655,000');
+  expect(drill.querySelector('a[href="/browse?source=rm_sothebys"]')).not.toBeNull();
+});
