@@ -1890,7 +1890,11 @@ export function TreemapHomePage({ onBrowse, embedded = false }: { onBrowse: () =
     // drillStack triggers recompute when navigating so ref cache is checked
   }, [levelType, brandsData, familiesData, familiesFailed, modelsData, facetedFamilyModels, eraFilteredFamilyModels, yearsData, vehiclesData, familyYearVehiclesNodes, currentLevel, drillStack, selectedEra]);
 
-  const isLoading = brandsLoading || (atFamilies && familiesLoading) || modelsLoading || (levelType === 'models' && familyModelsLoading) || yearsLoading || vehiclesLoading;
+  const isLoading = levelType === 'brands' ? brandsLoading
+    : levelType === 'families' ? familiesLoading || (familiesFailed && modelsLoading)
+    : levelType === 'models' ? familyModelsLoading
+    : levelType === 'years' ? yearsLoading
+    : vehiclesLoading;
 
   // ── Prefetch: fire supabase queries on 200ms hover debounce ──
   const prefetchYears = useCallback((make: string, model: string) => {

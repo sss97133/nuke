@@ -191,7 +191,8 @@ enum VisionEngine {
         let request = VNClassifyImageRequest()
         let handler = VNImageRequestHandler(cgImage: cg, options: [:])
         do { try handler.perform([request]) } catch { return nil }
-        let results = (request.results ?? [])
+        guard let observations = request.results else { return nil }
+        let results = observations
             .filter { $0.confidence > 0.02 }
             .sorted { $0.confidence > $1.confidence }
             .map { ($0.identifier, $0.confidence) }
@@ -209,25 +210,42 @@ enum VisionEngine {
     // The geo-gate keeps OFF-site photos out; it does NOTHING for a private
     // photo shot AT the shop (a selfie, a paycheck on the bench, a coworker's
     // kid). For the CONTRIBUTOR (multi-user) path such a photo must never
-    // auto-upload into the shared org record, so the firewall holds anything
-    // with a prominent human face — default-EXCLUDE, faces lose ties. The
-    // OWNER path does not use this (founder ruling: an owner's own at-site
-    // photos upload ungated); this is the contributor gate only.
+    // auto-upload into the shared org record. The firewall and owner triage
+    // use a prominent face without a vehicle as the personal-photo signal.
+    // A failed detector is not evidence of an absent face.
+
+    enum TriageFailure: String, Error, LocalizedError {
+        case imageUndecodable, classifierUnavailable, faceDetectorUnavailable
+
+        var errorDescription: String? {
+            switch self {
+            case .imageUndecodable: return "The original photo couldn't be decoded for its privacy check."
+            case .classifierUnavailable: return "Apple Vision couldn't classify the photo for its privacy check."
+            case .faceDetectorUnavailable: return "Apple Vision couldn't finish the photo's face privacy check."
+            }
+        }
+    }
 
     /// True when a human face occupies a meaningful share of the frame — a
     /// person-centric photo, not a worker incidentally in a wide garage shot.
     /// `minAreaFraction` is the bbox area fraction: a distant bystander stays
-    /// under it, a selfie/portrait trips it. Returns false on detector failure.
-    static func hasProminentFace(_ cg: CGImage, minAreaFraction: CGFloat = 0.045) -> Bool {
+    /// under it, a selfie/portrait trips it. A failed detector is unknown.
+    static func detectProminentFace(_ cg: CGImage, minAreaFraction: CGFloat = 0.045) throws -> Bool {
         let request = VNDetectFaceRectanglesRequest()
         let handler = VNImageRequestHandler(cgImage: cg, options: [:])
-        do { try handler.perform([request]) } catch { return false }
-        guard let faces = request.results else { return false }
+        try handler.perform([request])
+        guard let faces = request.results else { throw TriageFailure.faceDetectorUnavailable }
         // VNFaceObservation.boundingBox is normalized [0,1] in image space;
         // width*height is the fraction of the frame the face covers.
         return faces.contains {
             CGFloat($0.boundingBox.width * $0.boundingBox.height) >= minAreaFraction
         }
+    }
+
+    /// Existing local-review callers still use a Boolean face result. Upload
+    /// triage uses detectProminentFace directly so a failed read remains pending.
+    static func hasProminentFace(_ cg: CGImage, minAreaFraction: CGFloat = 0.045) -> Bool {
+        (try? detectProminentFace(cg, minAreaFraction: minAreaFraction)) ?? false
     }
 
     // MARK: - 1c. Contributor upload verdict (default-exclude firewall)
@@ -243,15 +261,21 @@ enum VisionEngine {
     enum ContributorVerdict: Equatable {
         case allow
         case hold(reason: String)
+        case unavailable(reason: String)
     }
 
-    static func contributorVerdict(_ cg: CGImage) -> ContributorVerdict {
-        guard let cls = classify(cg) else { return .hold(reason: "unclassifiable") }
+    static func contributorVerdict(_ cg: CGImage,
+                                   classifyImage: (CGImage) -> Classification? = { classify($0) },
+                                   detectFace: (CGImage) throws -> Bool = { try detectProminentFace($0) }) -> ContributorVerdict {
+        guard let cls = classifyImage(cg) else { return .unavailable(reason: TriageFailure.classifierUnavailable.localizedDescription) }
         let top3 = Array(cls.labels.prefix(3).map { $0.0 })
         if isUnnecessary(labels: top3, isScreenshot: false) {
             return .hold(reason: "clutter")
         }
-        if hasProminentFace(cg) && !cls.isVehicle {
+        let face: Bool
+        do { face = try detectFace(cg) }
+        catch { return .unavailable(reason: TriageFailure.faceDetectorUnavailable.localizedDescription) }
+        if face && !cls.isVehicle {
             return .hold(reason: "prominent_face")
         }
         return .allow
@@ -277,13 +301,18 @@ enum VisionEngine {
         /// Top labels (confidence-desc), for the `apple_ml_labels` column.
         let labels: [String]
         let isVehicle: Bool
-        /// false ⇒ classify() returned nil (unclassifiable). Caller fails safe to metadata-only.
+        /// false ⇒ classify() returned nil (unclassifiable); upload preparation retries.
         let classified: Bool
+        /// Operational failure, never a personal/clutter verdict or upload permission.
+        let failure: TriageFailure?
     }
 
-    static func triage(_ cg: CGImage, labelCap: Int = 12) -> TriageResult {
-        guard let cls = classify(cg) else {
-            return TriageResult(pixelsEligible: false, labels: [], isVehicle: false, classified: false)
+    static func triage(_ cg: CGImage, labelCap: Int = 12,
+                       classifyImage: (CGImage) -> Classification? = { classify($0) },
+                       detectFace: (CGImage) throws -> Bool = { try detectProminentFace($0) }) -> TriageResult {
+        guard let cls = classifyImage(cg) else {
+            return TriageResult(pixelsEligible: false, labels: [], isVehicle: false, classified: false,
+                                failure: .classifierUnavailable)
         }
         let labels = Array(cls.labels.prefix(labelCap).map { $0.0 })
         // The device rule of record (owner, 2026-10-15: "images have their own rules via ios";
@@ -293,9 +322,18 @@ enum VisionEngine {
         // on a fuse-box opening that Apple does not label "vehicle". The previous rule required an
         // affirmative vehicle label, so measurement shots went up as metadata only.
         let clutter = isUnnecessary(labels: Array(labels.prefix(3)), isScreenshot: false)
-        let personal = hasProminentFace(cg) && !cls.isVehicle
+        if clutter {
+            return TriageResult(pixelsEligible: false, labels: labels, isVehicle: cls.isVehicle, classified: true, failure: nil)
+        }
+        let face: Bool
+        do { face = try detectFace(cg) }
+        catch {
+            return TriageResult(pixelsEligible: false, labels: labels, isVehicle: cls.isVehicle, classified: true,
+                                failure: .faceDetectorUnavailable)
+        }
+        let personal = face && !cls.isVehicle
         return TriageResult(pixelsEligible: !clutter && !personal, labels: labels,
-                            isVehicle: cls.isVehicle, classified: true)
+                            isVehicle: cls.isVehicle, classified: true, failure: nil)
     }
 
     /// Classify one library photo by its PHAsset id — the cheap, on-device
