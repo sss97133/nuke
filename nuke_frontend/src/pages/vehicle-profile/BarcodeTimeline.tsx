@@ -305,7 +305,10 @@ const BarcodeTimeline: React.FC<BarcodeTimelineProps> = ({ selectedAuctionUrl, o
   // Per-day image-analysis depth (Tier 0-4) → illuminates the timeline as deep analysis
   // fills in. A day with raw photos and no verdicts stays dim; as T1/T2 land it warms,
   // an owner-confirmed T4 day glows brightest. One RPC per vehicle (get_vehicle_day_depth).
-  const [depthByDay, setDepthByDay] = useState<Record<string, number>>({});
+  const [depthRead, setDepthRead] = useState<{ vehicleId: typeof vehicleId; values: Record<string, number> }>(() => ({ vehicleId, values: {} }));
+  // A changed route starts a fresh optional-read lifetime, including a return to a prior vehicle.
+  if (depthRead.vehicleId !== vehicleId) setDepthRead({ vehicleId, values: {} });
+  const depthByDay = depthRead.vehicleId === vehicleId ? depthRead.values : {};
   useEffect(() => {
     if (!vehicleId) return;
     let cancelled = false;
@@ -316,7 +319,7 @@ const BarcodeTimeline: React.FC<BarcodeTimelineProps> = ({ selectedAuctionUrl, o
         const dp = Number(r.depth) || 0;
         m[r.day] = dp >= 0.5 ? 4 : dp >= 0.35 ? 3 : dp >= 0.18 ? 2 : dp > 0 ? 1 : 0;
       }
-      if (!cancelled) setDepthByDay(m);
+      if (!cancelled) setDepthRead(current => current.vehicleId === vehicleId ? { vehicleId, values: m } : current);
     }).catch(() => { /* coverage is best-effort; timeline still renders from events */ });
     return () => { cancelled = true; };
   }, [vehicleId]);
@@ -336,7 +339,9 @@ const BarcodeTimeline: React.FC<BarcodeTimelineProps> = ({ selectedAuctionUrl, o
   // the activity record — get_vehicle_contribution_days returns
   // (day, kind photo|work|event, n); 'event' kind is skipped here because
   // timelineEvents already carries the real events.
-  const [dayRows, setDayRows] = useState<{ day: string; kind: string; n: number }[]>([]);
+  const [contributionRead, setContributionRead] = useState<{ vehicleId: typeof vehicleId; values: { day: string; kind: string; n: number }[] }>(() => ({ vehicleId, values: [] }));
+  if (contributionRead.vehicleId !== vehicleId) setContributionRead({ vehicleId, values: [] });
+  const dayRows = contributionRead.vehicleId === vehicleId ? contributionRead.values : [];
   useEffect(() => {
     if (!vehicleId) return;
     let cancelled = false;
@@ -344,7 +349,7 @@ const BarcodeTimeline: React.FC<BarcodeTimelineProps> = ({ selectedAuctionUrl, o
       .rpc('get_vehicle_contribution_days', { p_vehicle_id: vehicleId })
       .then(({ data, error }) => {
         if (error) console.warn('[BarcodeTimeline] contribution days:', error.message);
-        if (!cancelled && data) setDayRows(data as any[]);
+        if (!cancelled && data) setContributionRead(current => current.vehicleId === vehicleId ? { vehicleId, values: data as any[] } : current);
       });
     return () => { cancelled = true; };
   }, [vehicleId]);
