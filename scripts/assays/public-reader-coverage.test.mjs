@@ -679,6 +679,33 @@ test('source drills keep withheld, missing and oversized sources as gaps and fai
   for (const rows of [[reportSource({ vehicle_id: id(2) })], [reportSource({ id: id(999) })], [reportSource(), reportSource()], null]) assert.equal(run(rows).safe, false);
 });
 
+test('source-wide completion qualifications prevent an exact sentence from passing reported-work lineage', async () => {
+  // The existing retained-work witness withholds these governing contexts across sentence boundaries.
+  // Matching the isolated sentence must not turn a stale or misprojected reader row into agreement.
+  for (const [version, sentence] of [
+    ['retained_description_reported_work_v1', 'Work in September 2026 included rebuilding the carburetor.'],
+    ['retained_description_reported_work_v2', 'The SYNTHETIC PRIVATE FLUID was flushed in September 2026.'],
+  ]) {
+    const r = report(1, { source_witness_version: version, source_value: sentence, performed_clause: sentence });
+    const ordinary = reportSource({ content_text: `SYNTHETIC PRIVATE SOURCE BODY opens here. ${sentence} It closes here.` });
+    assert.equal(inspectReportedSources(id(1), [r], [ordinary]).matchedReports, 1);
+    for (const context of ['The work was never completed.', 'The following work was not performed.',
+      'Only the following proposed work is described.', 'This was recommended for the next service.',
+      `The following ${'😀'.repeat(101)} proposed work is described.`]) {
+      const content_text = `SYNTHETIC PRIVATE SOURCE BODY opens here. ${context}\n${sentence} It closes here.`;
+      const rows = [reportSource({ content_text })], inspected = inspectReportedSources(id(1), [r], rows);
+      assert.equal(inspected.matchedReports, 0, `${version}: ${context}`);
+      assert.equal(inspected.failures.reported_source_completion_context_withheld, 1);
+      const events = [], result = await runReportedWorkLineage(reportClient({ log: { ok: true, status: 200, value: buildLog([r]) }, rows }),
+        scope(), lineageSubjects(manifest([id(1)])), { emit: x => events.push(x) });
+      assert.equal(result.status, 'failed'); assert.equal(result.exitCode, 1); assert.equal(result.matchingReports, 0);
+      assert.equal(result.unmeasuredReports, 1); assert.equal(JSON.stringify(events).includes('SYNTHETIC PRIVATE'), false);
+    }
+  }
+  const rows = [reportSource({ content_text: `SYNTHETIC PRIVATE SOURCE BODY opens here. ${WORK} Recommended work is separate.` })];
+  assert.equal(inspectReportedSources(id(1), [report()], rows).matchedReports, 1, 'Unrelated recommendations do not negate a completion assertion');
+});
+
 test('unsafe reader or source output stops without foreign IDs; two reader failures and the deadline stay unmeasured', async () => {
   for (const extra of [{ log: { ok: true, status: 200, value: { reported_work: [] } } }, { rows: [reportSource({ vehicle_id: id(999) })] }, { gate: { ok: true, value: [parent(999)] } }]) {
     const events = [], r = await runReportedWorkLineage(reportClient(extra), scope(), lineageSubjects(manifest([id(1)])), { emit: x => events.push(x) });

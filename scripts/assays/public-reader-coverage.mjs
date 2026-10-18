@@ -1222,6 +1222,13 @@ export function inspectReportedSources(vehicleId, reports, rows) {
     if (Object.values(result.failures).reduce((a, b) => a + b, 0) !== before) continue;
     if (typeof s.content_text !== 'string' || !s.content_text.length) { add(result.gaps, 'reported_source_text_withheld'); continue; }
     if (Buffer.byteLength(s.content_text) > 32000) { add(result.gaps, 'reported_source_text_oversized'); continue; }
+    // The v1/v2 retained-work witness refuses these page-wide completion contexts.
+    // Exact sentence membership cannot validate a reader that discarded their scope.
+    // Count Unicode code points for the PostgreSQL witness's 200-character bound.
+    if (/\b(?:not|never) (?:performed|done|completed)\b/i.test(s.content_text) ||
+      /\b(?:following|below|next)\b[^.!?]{0,200}\b(?:not|never|planned|proposed|recommended|hypothetical)\b|\b(?:not|never|planned|proposed|recommended|hypothetical)\b[^.!?]{0,200}\b(?:following|below|next)\b/iu.test(s.content_text)) {
+      add(result.failures, 'reported_source_completion_context_withheld'); continue;
+    }
     if (!reportSentences(s.content_text).includes(r.source_value)) { add(result.failures, 'reported_source_sentence_not_found'); continue; }
     result.matchedReports++;
   }
