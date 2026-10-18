@@ -5,13 +5,13 @@ import { createClient } from '@supabase/supabase-js';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 
 const fixture = vi.hoisted(() => ({ context: {} as any, condition: null as any, price: null as any,
-  priceSettled: true, client: null as any }));
+  priceSettled: true, client: null as any, readOverride: null as (() => any) | null }));
 vi.mock('./VehicleProfileContext', () => ({ useVehicleProfile: () => fixture.context }));
 vi.mock('./hooks/useVehiclePriceFacts', () => ({
   useVehiclePriceFacts: () => ({ priceFacts: fixture.price, priceSettled: fixture.priceSettled }), priceKindLabel: () => null,
 }));
 vi.mock('../../lib/supabase', () => ({ supabase: {
-  from: (...args: unknown[]) => fixture.client.from(...args),
+  from: (...args: unknown[]) => fixture.readOverride ? fixture.readOverride() : fixture.client.from(...args),
 } }));
 vi.mock('../../components/PrefetchLink', () => ({ PrefetchLink: ({ to, children, ...props }: any) => <a href={to} {...props}>{children}</a> }));
 import VehicleBriefing from './VehicleBriefing';
@@ -26,7 +26,7 @@ const json = (body: unknown, status = 200) => new Response(JSON.stringify(body),
 beforeEach(() => {
   (globalThis as any).IS_REACT_ACT_ENVIRONMENT = true;
   fixture.context = { vehicle: { id: 'offline-subject' }, vehicleIntelLoading: false, observationCount: 0 };
-  fixture.condition = null; fixture.price = null; fixture.priceSettled = true;
+  fixture.condition = null; fixture.price = null; fixture.priceSettled = true; fixture.readOverride = null;
   reply = null; requests.length = 0;
   fixture.client = createClient('https://briefing-appraisal.test', 'anonymous-fixture', {
     auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false,
@@ -113,6 +113,31 @@ it('keeps a score-only record outside the appraisal range surface', async () => 
   fixture.condition = { descriptor_summary: {}, observation_count: 79, computed_at: '2026-07-14T00:30:00Z' };
   await mount(null);
   expect(host.textContent).toBe('');
+});
+
+it.each([
+  [20000], [20000, null], [null, 30000], [20000, ''], [20000, ' '], [false, 30000],
+  ['NaN', 30000], [20000, 'Infinity'], [20000, '-Infinity'], ['not-money', 30000], {},
+].map(band => ({ band })))('withholds incomplete or nonfinite stored amount bounds: $band', async ({ band }) => {
+  fixture.condition = { descriptor_summary: { as_is_band_usd: band }, observation_count: 79,
+    computed_at: '2026-07-14T00:30:00Z' };
+  await mount(null);
+  expect(host.textContent).toBe('');
+  expect(host.textContent).not.toMatch(/NaN|Infinity|APPRAISAL|COMPUTED|INPUT COUNT/);
+});
+
+it.each([
+  { band: [0, 30000], range: '$0k–$30k' },
+  { band: [0, 0], range: '$0k–$0k' },
+  { band: ['20000', '30000'], range: '$20k–$30k' },
+])('preserves finite stored bounds $band without losing a reported zero', async ({ band, range }) => {
+  fixture.condition = { descriptor_summary: { as_is_band_usd: band }, observation_count: 79,
+    computed_at: '2026-07-14T00:30:00Z' };
+  await mount(null);
+  expect(host.textContent).toContain(`Stored appraisal range: ${range} USD`);
+  expect(host.textContent).toContain('INPUT COUNT79 reported');
+  expect(host.textContent).toContain('COMPUTED (UTC)Jul 14, 2026');
+  expect(host.textContent).toContain('Input IDs, count meaning and calibration unavailable. Condition matching unverified.');
 });
 
 const subjectA = '00000000-0000-0000-0000-0000000000a1';
@@ -205,6 +230,35 @@ it.each(['resolved', 'empty', 'denied'])('ignores a late %s A response after B h
   expect(host.textContent).toContain('Stored appraisal range: $40k–$50k USD');
   await act(async () => release(result === 'resolved' ? json([appraisalA]) : result === 'empty' ? json([])
     : json({ code: '42501', message: 'permission denied' }, 403)));
+  expectNoAppraisalA();
+  expect(host.textContent).toContain('Stored appraisal range: $40k–$50k USD');
+});
+
+// The installed SDK returns normal HTTP/fetch failures as result.error above. These
+// adapters separately exercise a throwing or rejecting additive reader boundary.
+it.each(['throw', 'reject'])('settles a synthetic %s read without retaining A or leaking a rejection', async failure => {
+  reply = () => json([appraisalA]);
+  await renderSubject(subjectA);
+  expect(host.textContent).toContain('79 reported');
+  fixture.readOverride = () => {
+    if (failure === 'throw') throw new Error('synthetic reader construction failed');
+    return { select: () => ({ eq: () => ({ maybeSingle: () => Promise.reject(new Error('synthetic read rejected')) }) }) };
+  };
+  await renderSubject(subjectB);
+  expectNoAppraisalA();
+  expect(host.textContent).toContain('Reported comment summary: unknown');
+});
+
+it('ignores a synthetic late A rejection after B has a supported current appraisal', async () => {
+  let reject!: (reason: Error) => void;
+  const pending = new Promise((_, fail) => { reject = fail; });
+  fixture.readOverride = () => ({ select: () => ({ eq: () => ({ maybeSingle: () => pending }) }) });
+  await renderSubject(subjectA);
+  fixture.readOverride = null;
+  reply = () => json([appraisalB]);
+  await renderSubject(subjectB);
+  expect(host.textContent).toContain('Stored appraisal range: $40k–$50k USD');
+  await act(async () => reject(new Error('synthetic stale read rejected')));
   expectNoAppraisalA();
   expect(host.textContent).toContain('Stored appraisal range: $40k–$50k USD');
 });
