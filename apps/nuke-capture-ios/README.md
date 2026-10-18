@@ -294,6 +294,16 @@ The pass retains raw OCR lines as well as modern VIN-shaped candidates, so short
 classic-vehicle serials are preserved for later identity review. It is a source and
 coverage foundation; it does not yet identify every vehicle from appearance.
 
+Customer cloud subject analysis uses Nuke's server credential and existing prepaid
+wallet, following the owner's 2026-10-18 direction. Customers do not connect a
+provider key for this path. The resolver reserves a bounded amount before one
+provider call and settles only after protected reading storage acknowledges it.
+Cached reading replay performs no inference or new charge. Uncertain transport or
+settlement outcomes retain a pending reservation rather than starting another paid
+call. The platform key, monetary migration and phone runtime must be verified
+before claiming this path is active; monthly plan fulfillment is not established
+by this wallet integration.
+
 The own-user profile opens this same album/source viewer. Its local projection
 matches complete OCR serial tokens against the account's cached exact vehicles,
 retains duplicate-serial conflicts and never assigns the rest of an album to a

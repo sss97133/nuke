@@ -231,7 +231,7 @@ async function callAnthropic(config: LLMConfig, messages: any[], options?: any):
     body: JSON.stringify({
       model: config.model,
       max_tokens: options?.maxTokens ?? 4096,
-      temperature: options?.temperature ?? 0.7,
+      ...(config.model === "claude-haiku-5-5" ? { output_config: { effort: "low" } } : { temperature: options?.temperature ?? 0.7 }),
       system: systemMessage,
       messages: conversationMessages,
     }),

@@ -1,7 +1,7 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "jsr:@supabase/supabase-js@2";
 import { corsHeaders } from "../_shared/cors.ts";
-import { cloudVisionJSON, cloudVisionMultiJSON } from "../_shared/visionFallback.ts";
+import { cloudVisionJSON, cloudVisionMultiJSON, platformVisionMultiJSON } from "../_shared/visionFallback.ts";
 import { authenticateWriter, requireWriteAuth, writeAuthResponse } from "../_shared/writeGuard.ts";
 import { projectSecretKey } from "../_shared/supabaseKeys.ts";
 import { mustWrite } from '../_shared/writeResult.ts';
@@ -298,8 +298,8 @@ Deno.serve(async (req: Request) => {
 
     const supabase = createClient(supabaseUrl, serviceKey);
     const body: CheckRequest = await req.json();
-    // BYOK: vision runs on the vehicle owner's connected provider (they pay). Falls to the
-    // system bootstrap pool only if no user key. user_id is the owner whose photos we're sorting.
+    // Subject resolution uses Nuke's funded server key and the owner's wallet.
+    // Other legacy comparison modes retain their existing provider selection.
     const userId = body.user_id ?? null;
     const mode = body.mode || "check";
     const batchSize = Math.min(body.batch_size || 10, 50);
@@ -322,13 +322,16 @@ Deno.serve(async (req: Request) => {
       } else if (mode === "read_subject_reinspections") {
         result = await readSubjectReinspections(supabase, supabaseSubjectStore(supabase), owner, body);
       } else {
+        if (dryRun) return new Response(JSON.stringify({ error: "subject_preview_unavailable" }), {
+          status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
         const store = supabaseSubjectStore(supabase);
         store.context = async (user, fresh) => {
           const context = await selectResolutionContext(supabase, user, fresh.id);
           return { sources: context.image_ids.length ? await store.sources(user, context.image_ids) : [], coverage: context.coverage };
         };
         result = await resolveSubjectBatch(store, { ...body, user_id: owner }, supabaseUrl, {
-          vision: options => cloudVisionMultiJSON(supabase, owner, { ...options, throwOnUnavailable: true }),
+          vision: options => platformVisionMultiJSON(supabase, owner, options),
         });
       }
       return new Response(JSON.stringify(result), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
