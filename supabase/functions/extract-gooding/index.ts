@@ -834,9 +834,11 @@ async function saveToDatabase(
         mustWrite('vehicles insert', insertRes);
       }
     } else {
-      vehicleId = newVehicle?.id;
+      vehicleId = newVehicle?.id ?? null;
     }
   }
+  // An insert that returns no row (a trigger or policy dropped it) must not go on to write an episode with no vehicle.
+  if (!vehicleId) throw new Error(`No vehicle row for ${extracted.url}`);
 
   // Observation write (awaited: a refold run ends right after its response)
   if (vehicleId) {
@@ -1331,7 +1333,7 @@ if (import.meta.main) Deno.serve(async (req) => {
       return new Response(
         JSON.stringify({
           success: true,
-          vehicles_in_db: stats?.count || 0,
+          vehicles_in_db: (stats as { count?: number } | null)?.count || 0,
           vehicle_events: listingCount || 0,
         }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
