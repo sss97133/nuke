@@ -923,6 +923,7 @@ const BarcodeTimeline: React.FC<BarcodeTimelineProps> = ({ selectedAuctionUrl, o
               <VehicleDayDrawer
                 date={receiptDate}
                 auctions={auctions}
+                hasWorkSummary={dayRows.some(row => row.day === receiptDate && row.kind === 'work' && Number.isFinite(row.n) && row.n > 0)}
                 onClose={closeDay}
                 onPrev={() => navigateReceipt(-1)}
                 onNext={() => navigateReceipt(1)}
