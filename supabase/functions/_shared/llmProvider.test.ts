@@ -56,3 +56,21 @@ Deno.test('the actual Claude request serializer sends native image blocks and pr
     equal(result.content, '{"ok":true}');
   } finally { globalThis.fetch = previous; }
 });
+Deno.test('platform Haiku uses its supported effort configuration and retains text after thinking blocks', async () => {
+  const previous = globalThis.fetch; let body: any; let headers: any;
+  globalThis.fetch = (async (_url, init) => {
+    body = JSON.parse(String(init?.body));
+    headers = init?.headers;
+    return new Response(JSON.stringify({ content: [{ type: 'thinking', thinking: 'private' },
+      { type: 'text', text: '{"ok":true}' }], usage: { input_tokens: 1, output_tokens: 1 } }),
+      { headers: { 'content-type': 'application/json' } });
+  }) as typeof fetch;
+  try {
+    const result = await callLLM({ provider: 'anthropic', model: 'claude-haiku-5-5', apiKey: 'fixture', source: 'system', workspaceId: 'workspace-fixture' },
+      [{ role: 'user', content: 'fixture' }], { maxTokens: 1600, temperature: 0.2 });
+    equal(body.model, 'claude-haiku-5-5'); equal(body.max_tokens, 1600);
+    equal(headers['anthropic-workspace-id'], 'workspace-fixture');
+    equal('temperature' in body, false); equal(body.output_config, { effort: 'low' });
+    equal(result.content, '{"ok":true}');
+  } finally { globalThis.fetch = previous; }
+});

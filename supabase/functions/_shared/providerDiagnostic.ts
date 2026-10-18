@@ -5,7 +5,8 @@ export type CredentialKind = "api_key" | "oauth" | "unrecognized";
 export type ProviderDiagnosticCode = "no_connected_key" | "credential_lookup_failed" |
   "credential_not_accepted" | "permission_denied" | "billing_or_usage_limit" |
   "rate_or_quota_limit" | "provider_transient" | "request_refused" |
-  "request_failed" | "response_unreadable" | "service_guard_held";
+  "request_failed" | "response_unreadable" | "service_guard_held" |
+  "platform_not_configured" | "platform_unavailable" | "platform_result_unreadable" | "analysis_balance_required" | "analysis_pending";
 export interface ProviderDiagnostic {
   code: ProviderDiagnosticCode;
   provider: DiagnosticProvider | null;
@@ -13,7 +14,7 @@ export interface ProviderDiagnostic {
   credential_kind: CredentialKind | null;
 }
 export interface ProviderAttemptCoverage {
-  method: "byok_vision_attempts_v1";
+  method: "byok_vision_attempts_v1" | "platform_vision_attempt_v1";
   expected_providers: number;
   assessed_providers: number;
   outcomes_observed: number;
@@ -25,6 +26,12 @@ export interface AnthropicTokenUsage {
   output_tokens: number;
   cache_creation_input_tokens: number | null;
   cache_read_input_tokens: number | null;
+}
+export interface PlatformAnalysisBilling {
+  source: "nuke_wallet";
+  status: "settled" | "pending";
+  hold_id: string;
+  charged_cents: number | null;
 }
 
 /** Provider-reported counters, not an invoice or a zero-cost claim when absent. */
@@ -41,7 +48,8 @@ export function safeAnthropicUsage(value: unknown): AnthropicTokenUsage | null {
 
 const codes = new Set<unknown>(["no_connected_key", "credential_lookup_failed", "credential_not_accepted",
   "permission_denied", "billing_or_usage_limit", "rate_or_quota_limit", "provider_transient",
-  "request_refused", "request_failed", "response_unreadable", "service_guard_held"]);
+  "request_refused", "request_failed", "response_unreadable", "service_guard_held",
+  "platform_not_configured", "platform_unavailable", "platform_result_unreadable", "analysis_balance_required", "analysis_pending"]);
 const providers = new Set<unknown>(["google", "anthropic", "openai"]);
 const kinds = new Set<unknown>(["api_key", "oauth", "unrecognized"]);
 
@@ -101,12 +109,22 @@ export class ProviderHTTPError extends Error {
 export class VisionProviderUnavailable extends Error {
   readonly diagnostics: ProviderDiagnostic[];
   readonly coverage: ProviderAttemptCoverage;
-  constructor(diagnostics: ProviderDiagnostic[]) {
+  constructor(diagnostics: ProviderDiagnostic[], scope: "byok" | "platform" = "byok") {
     super("vision_provider_unavailable");
     this.name = "VisionProviderUnavailable";
     this.diagnostics = safeProviderDiagnostics(diagnostics);
     const observed = Array.isArray(diagnostics) ? diagnostics.length : 0;
     const assessed = new Set(this.diagnostics.map(d => d.provider).filter(provider => providers.has(provider)));
+    if (scope === "platform") {
+      const complete = observed === 1 && this.diagnostics.length === 1 && assessed.size === 1 &&
+        this.diagnostics[0].provider === "anthropic" && diagnostics[0].http_status === this.diagnostics[0].http_status;
+      const noReading = complete && this.diagnostics.every(d =>
+        ["platform_not_configured", "analysis_balance_required"].includes(d.code) && d.http_status === null ||
+        d.code === "platform_unavailable" && d.http_status === 401);
+      this.coverage = { method: "platform_vision_attempt_v1", expected_providers: 1, assessed_providers: assessed.size,
+        outcomes_observed: observed, complete, no_reading_started: noReading };
+      return;
+    }
     // Check the original list before truncation. Every existing provider selection
     // must have one terminal outcome; no first-error or partial-list certificate.
     const complete = observed === 3 && this.diagnostics.length === observed && assessed.size === 3 &&

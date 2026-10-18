@@ -117,6 +117,28 @@ final class SubjectProviderDiagnosticTests: XCTestCase {
         XCTAssertEqual(SubjectProviderDiagnostic.primary(failures)?.provider, "anthropic")
     }
 
+    func testPlatformOutcomesNeverAskCustomersToConfigureProviderKeys() {
+        for code in ["platform_not_configured", "platform_unavailable", "platform_result_unreadable", "analysis_balance_required", "analysis_pending"] {
+            XCTAssertFalse(diagnostic(code).needsConnectionReview)
+        }
+    }
+
+    func testPlatformRetryRequiresAnExactSingleProviderNoReadingCertificate() {
+        let proof = SubjectProviderDiagnostic.AttemptCoverage(method: "platform_vision_attempt_v1",
+            expected_providers: 1, assessed_providers: 1, outcomes_observed: 1,
+            complete: true, no_reading_started: true)
+        for code in ["platform_not_configured", "analysis_balance_required"] {
+            XCTAssertTrue(SubjectProviderDiagnostic.provesNoReading([diagnostic(code)], coverage: proof))
+            XCTAssertFalse(SubjectProviderDiagnostic.provesNoReading([diagnostic(code, provider: "google")], coverage: proof))
+            XCTAssertFalse(SubjectProviderDiagnostic.provesNoReading([diagnostic(code), diagnostic(code)], coverage: proof))
+        }
+        XCTAssertTrue(SubjectProviderDiagnostic.provesNoReading([diagnostic("platform_unavailable", status: 401)], coverage: proof))
+        for code in ["analysis_pending", "platform_result_unreadable", "request_failed"] {
+            XCTAssertFalse(SubjectProviderDiagnostic.provesNoReading([diagnostic(code)], coverage: proof))
+        }
+        XCTAssertFalse(SubjectProviderDiagnostic.provesNoReading([diagnostic("platform_unavailable", status: 503)], coverage: proof))
+    }
+
     func testNotDueRepublishKeepsTheReviewLinkOnlyForTheSameOutcomeAndAccount() {
         func flag(user: String = "own", summary: String = "unchanged", explicit: Bool? = nil) -> Bool {
             SubjectProviderDiagnostic.reviewFlag(previousUser: "own", user: user, previousSummary: "unchanged", summary: summary,
