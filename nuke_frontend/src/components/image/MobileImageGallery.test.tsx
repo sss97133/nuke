@@ -173,3 +173,41 @@ it('read-status: current B error retains its own lead without reviving known A r
   await render(); await open(); await settle(0); await render('synthetic-b'); expect(reads).toHaveLength(2); await settle(1, [], 403);
   expect(galleryView()).toEqual(pending(fixture.lead, 'Gallery could not be read.')); expect(reads).toHaveLength(2);
 });
+
+it.each([
+  { name: 'zero start X', from: [0, 100], to: [100, 100], index: 0 },
+  { name: 'zero end X', from: [100, 100], to: [0, 100], index: 0 },
+  { name: 'zero start Y', from: [200, 0], to: [100, 20], index: 0 },
+  { name: 'zero end Y', from: [200, 20], to: [100, 0], index: 0 },
+  { name: 'ordinary horizontal positive', from: [200, 100], to: [100, 100], index: 0 },
+  { name: 'below threshold positive', from: [100, 100], to: [60, 100], index: 1 },
+  { name: 'exactly fifty pixels positive', from: [0, 100], to: [50, 100], index: 1 },
+  { name: 'equal-axis upward tie stays vertical', from: [100, 100], to: [20, 20], index: 1 },
+])('zero-swipe: $name preserves the existing movement rule', async ({ from, to, index }) => {
+  await render(); await open(); await settle(0); const before = galleryView(); expect(before).toEqual(loaded('synthetic-a'));
+  expect([...from, ...to].every(Number.isFinite)).toBe(true); await swipe(from as [number, number], to as [number, number]);
+  expect(galleryView()).toEqual(loaded('synthetic-a', index)); expect(reads).toHaveLength(1);
+});
+it('zero-swipe: closes downward from a zero origin without changing the known read', async () => {
+  await render(); await open(); await settle(0); expect(galleryView()).toEqual(loaded('synthetic-a'));
+  await swipe([0, 0], [0, 100]); expect(gallery()).toBeNull(); expect(host.textContent).toBe('FILL'); expect(reads).toHaveLength(1);
+});
+async function touch(type: string, coordinates: [number, number]) {
+  await act(async () => { const event = new Event(type, { bubbles: true });
+    Object.defineProperty(event, 'targetTouches', { value: [{ clientX: coordinates[0], clientY: coordinates[1] }] }); gallery()!.dispatchEvent(event); });
+}
+it('zero-swipe: refuses an unfinished gesture with no move endpoint', async () => {
+  await render(); await open(); await settle(0); const before = galleryView();
+  await touch('touchstart', [0, 0]); await touch('touchend', [100, 100]);
+  expect(galleryView()).toEqual(before); expect(before).toEqual(loaded('synthetic-a')); expect(reads).toHaveLength(1);
+});
+it('zero-swipe: refuses a move and end without a start coordinate', async () => {
+  await render(); await open(); await settle(0); const before = galleryView();
+  await touch('touchmove', [0, 0]); await touch('touchend', [100, 100]);
+  expect(galleryView()).toEqual(before); expect(reads).toHaveLength(1);
+});
+it('zero-swipe: preserves touch-start reset instead of reusing a prior endpoint', async () => {
+  await render(); await open(); await settle(0); await swipe([200, 100], [100, 100]); expect(galleryView()).toEqual(loaded('synthetic-a', 0));
+  await touch('touchstart', [0, 0]); await touch('touchend', [100, 100]);
+  expect(galleryView()).toEqual(loaded('synthetic-a', 0)); expect(reads).toHaveLength(1);
+});
