@@ -18,7 +18,7 @@ interface Props {
 interface CommentRow {
   comment_id: string;
   comment_text: string;
-  observed_at: string;
+  observed_at: string | null;
   author_username: string | null;
   comment_type: string | null;
   bid_amount: number | null;
@@ -29,7 +29,8 @@ interface CommentRow {
 const MONO = "'Courier New', Courier, monospace";
 const SANS = 'Arial, Helvetica, sans-serif';
 
-function formatTimeAgo(dateString: string): string {
+function formatTimeAgo(dateString: string | null): string {
+  if (dateString === null) return 'Time unavailable';
   try {
     const d = new Date(dateString);
     const ms = Date.now() - d.getTime();
