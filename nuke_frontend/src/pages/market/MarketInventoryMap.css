@@ -7,6 +7,7 @@
 .inventory-map-note { margin: 6px 0; }
 .inventory-map-description { min-height: 32px; padding: 8px 0 4px; overflow-wrap: anywhere; }
 .inventory-map-canvas { position: relative; width: 100%; background: var(--border); }
+.inventory-map-canvas:focus-visible::after { content: ''; position: absolute; inset: 0; border: 2px solid var(--text); z-index: 4; pointer-events: none; }
 .inventory-map-region { position: absolute; overflow: hidden; }
 .inventory-map-group, .inventory-map-child { border: none; padding: 8px; text-align: left; display: flex; justify-content: space-between; gap: 4px; min-width: 0; overflow: hidden; transition: background-color 180ms cubic-bezier(.16,1,.3,1); }
 .inventory-map-group { width: 100%; }
@@ -51,6 +52,7 @@
   .inventory-map-controls { gap: 8px; }
   .inventory-map-controls label { flex: 1 1 150px; flex-direction: column; align-items: stretch; gap: 4px; }
   .inventory-map-controls select, .inventory-map-pulse-control { min-height: 44px; }
+  .inventory-map-notes > summary { min-height: 44px; padding-block: 15px; }
   .inventory-map-roomy > .inventory-map-whole { padding: 12px; }
   .inventory-map-list, .inventory-map-list-grid { grid-template-columns: 1fr; }
 }
