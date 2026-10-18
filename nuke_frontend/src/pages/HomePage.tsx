@@ -1684,11 +1684,7 @@ export function TreemapHomePage({ onBrowse, embedded = false }: { onBrowse: () =
       return next;
     }, { preventScrollReset: true });
   }, [setSearchParams]);
-  const truckSales = useMemo<Sale[]>(() => {
-    const now = Date.now(), from = now - 1826 * 86400000;
-    return truckMembers.filter(m => m.sale_date && Date.parse(m.sale_date) >= from && Date.parse(m.sale_date) <= now)
-      .map(m => ({ vehicle_id: m.id, sale_date: m.sale_date!, usd: m.usd, source: m.source, year: m.year, model: m.model }));
-  }, [truckMembers]);
+  const truckMemberIds = useMemo(() => new Set(truckMembers.map(m => m.id)), [truckMembers]);
   const activeFacetOrModelLabel = useMemo(
     () =>
       facetAxis !== 'raw' && currentLevel.model
@@ -3069,7 +3065,7 @@ export function TreemapHomePage({ onBrowse, embedded = false }: { onBrowse: () =
             width={dims.w}
             height={420}
             onOpen={(id) => navigate(`/vehicle/${id}`)}
-            scopedSales={truckMode ? truckSales : undefined}
+            memberIds={truckMode ? truckMemberIds : undefined}
             selectedEra={truckMode ? null : selectedEra}
             onSelectEra={truckMode ? undefined : setSelectedEra}
             selectedModel={truckMode ? null :

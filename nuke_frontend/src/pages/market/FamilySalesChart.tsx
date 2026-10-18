@@ -862,9 +862,9 @@ export default function FamilySalesChart({
   facetAxis = null,
   onSelectFacet,
   familyModels = null,
-  scopedSales,
+  memberIds,
 }: {
-  scopedSales?: Sale[];
+  memberIds?: ReadonlySet<string>;
   brand: string;
   familyKey: string;
   family: string;
@@ -884,13 +884,18 @@ export default function FamilySalesChart({
     offered?: number | null;
   }[] | null;
 }) {
-  const familyRead = useFamilySales(scopedSales === undefined ? brand : null, familyKey);
-  const allSales = scopedSales ?? familyRead.sales;
-  const windowCount = scopedSales?.length ?? familyRead.n;
-  const truncated = scopedSales === undefined && familyRead.truncated;
-  const failed = scopedSales === undefined && familyRead.failed;
+  const familyRead = useFamilySales(brand, familyKey);
+  // Preserve this reader's date, source and deduplication eligibility. The map
+  // supplies membership IDs, never replacement historical sale rows.
+  const allSales = useMemo(() => memberIds !== undefined
+    ? familyRead.sales?.filter(s => memberIds.has(s.vehicle_id)) ?? null : familyRead.sales,
+    [familyRead.sales, memberIds]);
+  const incompleteSelection = memberIds !== undefined && memberIds.size > 0 && familyRead.truncated;
+  const windowCount = memberIds !== undefined ? allSales?.length ?? 0 : familyRead.n;
+  const truncated = memberIds === undefined && familyRead.truncated;
+  const failed = familyRead.failed || incompleteSelection;
   // These readers still measure one underlying family; the Truck umbrella spans several.
-  const singleFamilyBrand = scopedSales !== undefined || isGmTruckBrand(brand) && family === 'Truck' ? null : brand;
+  const singleFamilyBrand = memberIds !== undefined || isGmTruckBrand(brand) && family === 'Truck' ? null : brand;
   const upcomingSupply = useFamilyUpcomingSupply(singleFamilyBrand, familyKey);
   const [localSelectedFacet, setLocalSelectedFacet] = useState<string | null>(null);
   useEffect(() => {
@@ -1112,7 +1117,7 @@ export default function FamilySalesChart({
     setHover(best >= 0 ? { band, dot: best } : null);
   };
 
-  if (failed) return <div className="family-sales__empty"><Text role="caption">The sales of this family could not be read.</Text></div>;
+  if (failed) return <div className="family-sales__empty"><Text role="caption">{incompleteSelection ? 'Complete sales for this selection are unavailable.' : 'The sales of this family could not be read.'}</Text></div>;
   if (!sales) return <div className="family-sales__empty"><Text role="caption">Reading sales…</Text></div>;
   if (!plot) return <div className="family-sales__empty"><Text role="caption">No dated sales of this family in the last five years.</Text></div>;
   const hp = hover ? plot.panels[hover.band] : null;
