@@ -10,7 +10,7 @@ import { WatchersPopup } from './WatchersPopup';
 
 type Read = { resolve: (response: Response) => void; reject: (reason: Error) => void };
 let root: Root, host: HTMLDivElement, reads: Read[];
-const hero = '50PEOPLE WATCHED THIS AUCTION1,234 page views';
+const hero = '50RECORDED WATCHERS1,234 page views';
 const privateMessage = 'Synthetic private peer error';
 const text = () => host.textContent;
 async function draw(make: string | null = 'Synthetic', model: string | null = 'Coupe') {
@@ -53,7 +53,7 @@ it('watcher-read: qualifies a successful bounded empty reply', async () => {
 });
 it('watcher-read: preserves the complete successful known count result and bars', async () => {
   await draw(); await settle([50]);
-  expect(text()).toBe(`${hero}VS SYNTHETIC COUPE (1 AUCTIONS)THIS VEHICLE50MEDIAN50AVERAGE50MAX500% vs medianTypical interest level`);
+  expect(text()).toBe(`${hero}VS SYNTHETIC COUPE (1 RECORDS IN THIS READ)THIS VEHICLE50MEDIAN50AVERAGE50MAX500% vs medianTypical interest levelComparisons use up to 500 returned vehicle records with positive watcher counts and matching stored make and model.`);
   expect([...host.querySelectorAll<HTMLElement>('div[style*="transition: width"]')].map(div => div.style.width)).toEqual(['100%', '100%', '100%', '100%']);
   expect(reads).toHaveLength(1);
 });

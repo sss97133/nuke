@@ -13,7 +13,7 @@ const main = () => host.firstElementChild as HTMLElement;
 const rank = () => [...main().querySelectorAll('div')].find(div => /^(?:\d+th percentile|Top \d+% most-watched|Bottom \d+% in attention)$/.test(div.textContent ?? '')) ?? null;
 const spans = () => [...main().querySelectorAll('span')].map(span => span.textContent);
 const bars = () => [...main().querySelectorAll<HTMLElement>('div[style*="transition: width"]')].map(div => div.style.width);
-const hero = '50PEOPLE WATCHED THIS AUCTION1,234 page views';
+const hero = '50RECORDED WATCHERS1,234 page views';
 async function draw(watcherCount = 50) {
   await act(async () => root.render(<WatchersPopup vehicleId="synthetic-watchers" watcherCount={watcherCount} viewCount={1234} make="Synthetic" model="Coupe" />));
 }
@@ -53,7 +53,7 @@ it.each([
 });
 it('preserves the complete single-member result without a rank caption', async () => {
   await draw(); await settle([50]);
-  expect(main().textContent).toBe(`${hero}VS SYNTHETIC COUPE (1 AUCTIONS)THIS VEHICLE50MEDIAN50AVERAGE50MAX500% vs medianTypical interest level`);
+  expect(main().textContent).toBe(`${hero}VS SYNTHETIC COUPE (1 RECORDS IN THIS READ)THIS VEHICLE50MEDIAN50AVERAGE50MAX500% vs medianTypical interest levelComparisons use up to 500 returned vehicle records with positive watcher counts and matching stored make and model.`);
   expect(bars()).toEqual(['100%', '100%', '100%', '100%']); expect(rank()).toBeNull(); expect(reads).toHaveLength(1);
 });
 it('preserves the complete empty-read result and its existing demand', async () => {
@@ -71,7 +71,7 @@ it('preserves the current API-error presentation and one-read boundary', async (
 });
 it('preserves one pending current peer read when only the supplied watcher count rerenders', async () => {
   await draw(); await draw(40); expect(reads).toHaveLength(1); await settle();
-  expect(main().firstElementChild!.textContent).toBe('40PEOPLE WATCHED THIS AUCTION1,234 page views');
+  expect(main().firstElementChild!.textContent).toBe('40RECORDED WATCHERS1,234 page views');
   expect(spans()).toEqual(['THIS VEHICLE', '40', 'MEDIAN', '25', 'AVERAGE', '40', 'MAX', '100', '+60% vs median', 'Exceptionally high interest']);
   expect(bars()).toEqual(['40%', '25%', '40%', '100%']); expect(reads).toHaveLength(1);
 });
