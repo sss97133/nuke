@@ -185,7 +185,7 @@ export function CommentsPopup({ vehicleId, expectedCount, searchQuery }: Props) 
                   color: isSeller ? '#8a0020' : '#1a1a1a',
                   maxWidth: 140, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
                 }}>
-                  {c.author_username || 'Anonymous'}
+                  {c.author_username || 'Author unavailable'}
                 </span>
 
                 {isSeller && (

@@ -109,3 +109,24 @@ it('comments-read: keeps a pending current read useful across search and expecte
 it('comments-read: preserves cancellation when a popup closes before its response', async () => {
   await draw(); await act(async () => root.render(null)); await settle([], 403); expect(host.textContent).toBe(''); expect(reads).toHaveLength(1);
 });
+
+it.each([
+  { name: 'null projected author', value: null, label: 'Author unavailable' },
+  { name: 'omitted projected author', value: undefined, label: 'Author unavailable' },
+  { name: 'empty projected author', value: '', label: 'Author unavailable' },
+  { name: 'reported name', value: 'Alpha', label: 'Alpha' },
+  { name: 'literal reported Anonymous', value: 'Anonymous', label: 'Anonymous' },
+  { name: 'literal reported whitespace', value: '   ', label: '   ' },
+])('author-read: preserves source facts for $name', async ({ value, label }) => {
+  const row: Record<string, unknown> = { ...retained[0] };
+  if (value === undefined) delete row.author_username;
+  else row.author_username = value;
+  const raw = structuredClone(row); await draw(undefined, 1); expect(body().textContent).toBe('Loading comments...');
+  await settle([row]); expect(rows()).toHaveLength(1);
+  const author = rows()[0].firstElementChild!.querySelector('span')!;
+  // Inspect the actual untrimmed author span: whitespace is a retained literal, not the empty-string fallback.
+  expect(author.textContent).toBe(label);
+  expect(rows()[0].textContent).toBe(`${label}$${Number(12345).toLocaleString()}bat${new Date(retained[0].observed_at).toLocaleDateString()}${retained[0].comment_text}`);
+  expect(rows()[0].lastElementChild!.textContent).toBe(retained[0].comment_text);
+  expect(summary().value).toBe('1'); expect(summary().qualifier).toBeNull(); expect(row).toEqual(raw); expect(reads).toHaveLength(1);
+});
