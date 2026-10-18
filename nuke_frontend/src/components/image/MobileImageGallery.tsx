@@ -18,6 +18,7 @@ interface VehicleImage {
 
 const MobileImageGallery: React.FC<MobileImageGalleryProps> = ({ vehicleId, leadImageUrl, onClose }) => {
   const [images, setImages] = useState<VehicleImage[]>([]);
+  const [readState, setReadState] = useState<'pending' | 'ready' | 'unavailable'>(vehicleId ? 'pending' : 'unavailable');
   const [currentIndex, setCurrentIndex] = useState(0);
   const [touchStartX, setTouchStartX] = useState<number | null>(null);
   const [touchStartY, setTouchStartY] = useState<number | null>(null);
@@ -45,7 +46,13 @@ const MobileImageGallery: React.FC<MobileImageGalleryProps> = ({ vehicleId, lead
       .order('taken_at', { ascending: false, nullsFirst: false })
       .order('created_at', { ascending: false });
 
-    if (!isCancelled() && !error && data) {
+    if (isCancelled()) return;
+    if (error || !Array.isArray(data)) {
+      setReadState('unavailable');
+      return;
+    }
+    setReadState('ready');
+    if (!error && data) {
       setImages(data);
       // Find index of lead image
       const leadIndex = data.findIndex(img => img.image_url === leadImageUrl || img.large_url === leadImageUrl);
@@ -68,7 +75,7 @@ const MobileImageGallery: React.FC<MobileImageGalleryProps> = ({ vehicleId, lead
   };
 
   const onTouchEnd = () => {
-    if (!touchStartX || !touchStartY || !touchEndX || !touchEndY) return;
+    if (touchStartX === null || touchStartY === null || touchEndX === null || touchEndY === null) return;
     
     const distanceX = touchStartX - touchEndX;
     const distanceY = touchStartY - touchEndY;
@@ -91,7 +98,7 @@ const MobileImageGallery: React.FC<MobileImageGalleryProps> = ({ vehicleId, lead
   };
 
   const handlePrevious = () => {
-    setCurrentIndex((prev) => (prev > 0 ? prev - 1 : images.length - 1));
+    setCurrentIndex((prev) => (images.length === 0 ? 0 : (prev > 0 ? prev - 1 : images.length - 1)));
   };
 
   const handleNext = () => {
@@ -136,7 +143,9 @@ const MobileImageGallery: React.FC<MobileImageGalleryProps> = ({ vehicleId, lead
         }}
       >
         <div style={{ color: 'var(--surface-elevated)', fontSize: '13px' }}>
-          {currentIndex + 1} / {images.length}
+          {images.length > 0 ? `${currentIndex + 1} / ${images.length}` :
+            readState === 'pending' ? 'Reading gallery…' :
+              readState === 'unavailable' ? 'Gallery could not be read.' : 'No additional photos in this read.'}
         </div>
         <button
           onClick={onClose}
@@ -247,7 +256,7 @@ const MobileImageGallery: React.FC<MobileImageGalleryProps> = ({ vehicleId, lead
             </div>
           )}
           <div style={{ fontSize: '9px', color: 'var(--text-muted)', marginTop: 'var(--space-2)' }}>
-            {new Date(currentImage.created_at).toLocaleDateString()}
+            RECORD DATE {new Date(currentImage.created_at).toLocaleDateString()} · CAPTURE DATE UNKNOWN
           </div>
           <div
             style={{

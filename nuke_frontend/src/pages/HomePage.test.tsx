@@ -12,12 +12,14 @@ vi.mock('./market/SourcesBoard', () => ({ default: () => null }));
 vi.mock('../feed/components/FeedPage', () => ({ default: () => <div role="region" aria-label="Feed screen" /> }));
 vi.mock('../components/garage/GarageTab', () => ({ default: () => <div role="region" aria-label="Garage screen" /> }));
 vi.mock('./intake/IntakePage', () => ({ default: () => null }));
-vi.mock('../lib/supabase', () => ({ supabase: {} }));
+const fixture = vi.hoisted(() => ({ client: {} as any }));
+vi.mock('../lib/supabase', () => ({ supabase: fixture.client }));
 
-import HomePage from './HomePage';
+import HomePage, { TreemapHomePage } from './HomePage';
 let root: Root, container: HTMLDivElement;
 
 beforeEach(() => {
+  for (const key of Object.keys(fixture.client)) delete fixture.client[key];
   (globalThis as any).IS_REACT_ACT_ENVIRONMENT = true;
   // Node 25 exposes a native storage placeholder to Vitest's worker. Supply
   // browser storage for this navigation test instead of using that host API.
@@ -32,7 +34,7 @@ beforeEach(() => {
   container = document.createElement('div'); document.body.append(container);
   root = createRoot(container);
 });
-afterEach(async () => { await act(async () => root.unmount()); container.remove(); vi.unstubAllGlobals(); });
+afterEach(async () => { await act(async () => root.unmount()); container.remove(); vi.unstubAllGlobals(); vi.restoreAllMocks(); });
 
 async function render() {
   await act(async () => root.render(<BrowserRouter><HomePage /></BrowserRouter>));
@@ -71,5 +73,63 @@ describe('public market navigation', () => {
     await act(async () => feed.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, button: 0 })));
     expect(screen()).toBe('Feed screen');
     expect(window.location.search).toBe('?tab=feed');
+  });
+});
+
+function deferredRead() {
+  let resolve!: (result: { data: any[]; error: null }) => void;
+  const promise = new Promise<{ data: any[]; error: null }>(done => { resolve = done; });
+  return { promise, resolve };
+}
+const brands = [{ name: 'Porsche', count: 20, value: 2_000_000, usd: 2_000_000 }];
+const families = [{ family: '911', family_key: '911', models: 2, sold: 20, usd: 2_000_000 }];
+function installTreemapReads(overrides: Record<string, unknown> = {}) {
+  const query: any = Promise.resolve({ data: [], error: null });
+  for (const method of ['select', 'order', 'limit', 'eq', 'gt', 'not', 'is', 'in']) query[method] = () => query;
+  fixture.client.from = () => query;
+  fixture.client.rpc = vi.fn((name: string) => overrides[name] ?? Promise.resolve({ error: null, data:
+    name === 'treemap_by_brand' || name === 'treemap_brand_market' ? brands : name === 'treemap_brand_families' ? families : [] }));
+  vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockReturnValue({ x: 0, y: 0, top: 0, left: 0, right: 600, bottom: 400, width: 600, height: 400, toJSON() {} });
+}
+async function renderTreemap(query = 'tab=market') {
+  window.history.replaceState({}, '', '/?' + query);
+  await act(async () => root.render(<BrowserRouter><TreemapHomePage embedded onBrowse={() => {}} /></BrowserRouter>));
+}
+function loadingMessages() { return [...container.querySelectorAll('div')].filter(el => el.childElementCount === 0 && el.textContent === 'LOADING...'); }
+
+describe('map loading belongs to its current level', () => {
+  it('shows the initial brand read until its real response arrives', async () => {
+    const pending = deferredRead(); installTreemapReads({ treemap_by_brand: pending.promise });
+    await renderTreemap(); expect(loadingMessages()).toHaveLength(1);
+    await act(async () => pending.resolve({ data: brands, error: null }));
+    expect(loadingMessages()).toHaveLength(0);
+    expect(container.querySelector('button.market-tile[aria-label="Porsche"]')).not.toBeNull();
+  });
+  it.each([
+    ['fallback models', 'make=Porsche', 'treemap_models_by_brand'],
+    ['model years', 'make=Porsche&model=911', 'treemap_years'],
+    ['year sales', 'make=Porsche&model=911&year=1974', 'treemap_sales'],
+  ])('unblocks ALL MAKES after leaving pending %s', async (_, scope, reader) => {
+    const pending = deferredRead();
+    installTreemapReads({ [reader]: pending.promise,
+      ...(reader === 'treemap_models_by_brand' ? { treemap_brand_families: Promise.resolve({ data: [], error: null }) } : {}) });
+    await renderTreemap('tab=market&' + scope);
+    expect(fixture.client.rpc).toHaveBeenCalledWith(reader, expect.any(Object));
+    expect(loadingMessages()).toHaveLength(1);
+    const all = [...container.querySelectorAll<HTMLButtonElement>('button.home-map-crumb')].find(button => button.textContent === 'ALL MAKES')!;
+    await act(async () => all.click());
+    expect(window.location.search).toBe('?tab=market');
+    expect(container.querySelector('button.market-tile[aria-label="Porsche"]')).not.toBeNull();
+    expect(loadingMessages()).toHaveLength(0);
+  });
+  it.each([
+    ['brand families', 'make=Porsche', 'treemap_brand_families', families],
+    ['family models', 'make=Porsche&family=911', 'treemap_family_models', [{ model: '911', sold: 20, usd: 2_000_000 }]],
+  ])('keeps the active %s read visible until it settles', async (_, scope, reader, rows) => {
+    const pending = deferredRead(); installTreemapReads({ [reader]: pending.promise });
+    await renderTreemap('tab=market&' + scope);
+    expect(loadingMessages()).toHaveLength(1);
+    await act(async () => pending.resolve({ data: rows as any[], error: null }));
+    expect(loadingMessages()).toHaveLength(0);
   });
 });

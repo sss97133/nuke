@@ -18,7 +18,7 @@ interface Props {
 interface CommentRow {
   comment_id: string;
   comment_text: string;
-  observed_at: string;
+  observed_at: string | null;
   author_username: string | null;
   comment_type: string | null;
   bid_amount: number | null;
@@ -29,7 +29,8 @@ interface CommentRow {
 const MONO = "'Courier New', Courier, monospace";
 const SANS = 'Arial, Helvetica, sans-serif';
 
-function formatTimeAgo(dateString: string): string {
+function formatTimeAgo(dateString: string | null): string {
+  if (dateString === null) return 'Time unavailable';
   try {
     const d = new Date(dateString);
     const ms = Date.now() - d.getTime();
@@ -101,10 +102,10 @@ export function CommentsPopup({ vehicleId, expectedCount, searchQuery }: Props) 
       }}>
         <div>
           <span style={{ fontFamily: SANS, fontSize: 7, fontWeight: 800, textTransform: 'uppercase' as const, letterSpacing: '0.5px', color: '#999' }}>
-            TOTAL
+            IN THIS READ
           </span>
           <span style={{ fontFamily: MONO, fontSize: 13, fontWeight: 700, color: '#1a1a1a', marginLeft: 6 }}>
-            {loading ? '...' : filtered.length}
+            {loading ? '...' : error ? '?' : filtered.length}
           </span>
           {sq && !loading && (
             <span style={{ fontFamily: MONO, fontSize: 9, color: '#999', marginLeft: 4 }}>
@@ -160,7 +161,7 @@ export function CommentsPopup({ vehicleId, expectedCount, searchQuery }: Props) 
         {!loading && !error && filtered.length === 0 && (
           <div style={{ padding: '20px 12px', textAlign: 'center' }}>
             <span style={{ fontFamily: MONO, fontSize: 9, color: '#999', textTransform: 'uppercase' as const, letterSpacing: '0.08em' }}>
-              {sq ? 'No matching comments' : 'No comments extracted yet'}
+              {sq ? 'No matching comments in this read.' : 'No comments in this read.'}
             </span>
           </div>
         )}
@@ -185,7 +186,7 @@ export function CommentsPopup({ vehicleId, expectedCount, searchQuery }: Props) 
                   color: isSeller ? '#8a0020' : '#1a1a1a',
                   maxWidth: 140, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
                 }}>
-                  {c.author_username || 'Anonymous'}
+                  {c.author_username || 'Author unavailable'}
                 </span>
 
                 {isSeller && (
