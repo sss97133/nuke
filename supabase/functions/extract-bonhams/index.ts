@@ -1145,8 +1145,12 @@ async function addVehicleImages(
       exif_data: { source_url: context.source_url, imported_from: "bonhams", lot_number: context.lot_number ?? null },
     };
   });
-  const { error } = await supabase.from("vehicle_images").insert(rows);
-  if (error) throw new Error(`images: ${error.message}`);
+  // In parts: one statement for a 66-photo gallery ran past the statement timeout under vehicle_images' insert triggers. A part
+  // that fails leaves the earlier parts, and the next read adds only the photos still missing.
+  for (let i = 0; i < rows.length; i += 20) {
+    const { error } = await supabase.from("vehicle_images").insert(rows.slice(i, i + 20));
+    if (error) throw new Error(`images: ${error.message}`);
+  }
   return rows.length;
 }
 
@@ -1632,13 +1636,15 @@ if (import.meta.main) Deno.serve(async (req) => {
       const BUDGET_MS = 110_000;
       // tier_one: the vehicle groups the allocation names (1964-1973 American families) go first; cars only, since the walk lands
       // MOT-CAR lots and no automobilia.
-      const tierOne = body.tier_one !== false;
+      // listing_ids: named episodes (source_listing_id, e.g. "26809-114"), read again whether or not their page was read before.
+      const listingIds: string[] = Array.isArray(body.listing_ids) ? body.listing_ids.map(String).slice(0, limit) : [];
+      const tierOne = listingIds.length === 0 && body.tier_one !== false;
       let q = supabase
         .from("vehicle_events")
         .select(tierOne ? "id, vehicle_id, source_url, source_listing_id, vehicles!inner(year, make, model)" : "id, vehicle_id, source_url, source_listing_id")
-        .eq("source_platform", "bonhams")
-        .eq("extraction_source", "bonhams-typesense")
-        .is("metadata->>deep_at", null);
+        .eq("source_platform", "bonhams");
+      if (listingIds.length) q = q.in("source_listing_id", listingIds);
+      else q = q.eq("extraction_source", "bonhams-typesense").is("metadata->>deep_at", null);
       if (tierOne) {
         q = q.gte("vehicles.year", 1964).lte("vehicles.year", 1973)
           .or("make.ilike.chevrolet*,make.ilike.ford*,make.ilike.plymouth*,make.ilike.dodge*,make.ilike.pontiac*,make.ilike.buick*,make.ilike.lincoln*,make.ilike.oldsmobile*,make.ilike.amc*,make.ilike.mercury*,make.ilike.shelby*", { foreignTable: "vehicles" });
@@ -2022,6 +2028,7 @@ if (import.meta.main) Deno.serve(async (req) => {
           single_lot: { url: "https://cars.bonhams.com/auction/28012/lot/48/...", save_to_db: true },
           catalog: { catalog_url: "https://cars.bonhams.com/auction/28012/...", save_to_db: true },
           re_enrich: { action: "re_enrich", limit: 15, concurrency: 3 },
+          deep_lots: { action: "deep_lots", limit: 20, listing_ids: ["26809-114"] },
         },
       }),
       { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } },
