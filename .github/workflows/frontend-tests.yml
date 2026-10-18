@@ -122,6 +122,10 @@ jobs:
         run: createdb dm_bat_live_pull_inflight_ci
       - name: Verify the live pull's run-time pause samples, per-slot in-flight accounting and row locking
         run: psql -X -v ON_ERROR_STOP=1 -d dm_bat_live_pull_inflight_ci -f supabase/sql/test_bat_live_pull_inflight_slots.sql
+      - name: Create disposable live board sync database
+        run: createdb dm_live_board_sync_ci
+      - name: Verify the board-synced houses' schedule writer, bid moves, complete-board ending and health
+        run: psql -X -v ON_ERROR_STOP=1 -d dm_live_board_sync_ci -f supabase/sql/test_live_auction_board_sync.sql
       - name: Create disposable comment author key database
         run: createdb dm_refinement_comment_author_keys_ci
       - name: Verify comment author keys at insert and by bounded backfill; retired twin untouched
@@ -496,6 +500,8 @@ jobs:
         run: deno test --node-modules-dir=none supabase/functions/map-vehicles/cells.test.ts
       - name: Verify archiveFetch cache hits any successful snapshot and does not archive large lot pages as login walls
         run: deno test --no-check --node-modules-dir=none --allow-env --allow-net --allow-read supabase/functions/_shared/archiveFetch.cache.test.ts supabase/functions/_shared/firecrawlGate.test.ts
+      - name: Verify the live board readers for PCarMarket and Bonhams
+        run: deno test --node-modules-dir=none --allow-read supabase/functions/sync-live-auctions/boards.test.ts
 
   discovery-contract:
     runs-on: ubuntu-latest
