@@ -96,6 +96,9 @@ it('reads the one value, says when it holds back older sales, and refuses any ot
   const sales = [1, 2, 3, 4, 5, 6].map((i) => sale(i, 20 * i, 100000 + i * 1000, 'Bring a Trailer'));
   expect(parseFamilySales(value(sales))?.sales).toEqual(sales);
   expect(parseFamilySales(sales)).toBeNull(); // the old set of objects
+  const bare = value(sales).rows;
+  expect(parseFamilySales(bare)).toEqual({ sales, n: sales.length, truncated: false });
+  expect(parseFamilySales([...bare, ['x', '2026-01-01']])).toBeNull();
   expect(parseFamilySales({ n: 1, rows: [{ vehicle_id: 'x' }] })).toBeNull();
   expect(parseFamilySales(null)).toBeNull();
   fixture.rpc.mockResolvedValue({ data: value(sales, 15000), error: null });
