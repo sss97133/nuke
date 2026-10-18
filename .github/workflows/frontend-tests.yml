@@ -530,6 +530,8 @@ jobs:
         run: deno test supabase/functions/extract-rmsothebys/
       - name: Verify a Barrett-Jackson lot written to a given vehicle never lands on a new vehicle, and its sale date is its own event's
         run: deno test supabase/functions/extract-barrett-jackson/
+      - name: Verify Bonhams lot pages and titles extract deterministic series, trim, and body_style facets
+        run: deno test --allow-read supabase/functions/extract-bonhams/
       - name: Verify a model's reported-work proposal is kept only where the stored listing text literally carries it
         run: deno test --no-check supabase/functions/discover-description-data/reportedWorkProposals.test.ts
       - name: Verify JamesEdition title and detail identity agree before intake
