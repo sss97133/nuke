@@ -46,3 +46,11 @@ export function fillOnlyIdentity(
   }
   return { update: out, disagree };
 }
+
+/**
+ * The queue status for a lot that landed. A lot whose VIN another vehicle holds raised a relink revision on its own queue
+ * row (record_revision_item sets status 'revision'); writing 'complete' over it would hide that revision from its readers.
+ */
+export function landedStatus(relinkVin: boolean): "complete" | "revision" {
+  return relinkVin ? "revision" : "complete";
+}

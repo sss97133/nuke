@@ -1,4 +1,9 @@
-import { fillOnlyIdentity, vinConflictHolder } from "./identityFill.ts";
+import { fillOnlyIdentity, landedStatus, vinConflictHolder } from "./identityFill.ts";
+
+Deno.test("a lot landed after a VIN relink revision keeps the revision status", () => {
+  if (landedStatus(true) !== "revision") throw new Error("relink masked as complete");
+  if (landedStatus(false) !== "complete") throw new Error("plain landing not complete");
+});
 
 Deno.test("the VIN trigger's refusal is a VIN conflict and names the holder", () => {
   const holder = vinConflictHolder({ code: "23505", message: "VIN 1FMNU40L1YED53580 already exists on vehicle fd5a0e85-98be-41a8-a841-2b3c334c6a60" });
