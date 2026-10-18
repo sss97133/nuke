@@ -89,6 +89,23 @@ Standing rules the code carries:
   supported new subject. The [autonomous subject-resolution contract](../../docs/ledger/theory/data-machine-cases.md)
   records the required flow and missing admission. Current VIN/album routing does not implement visual subject
   discovery, and a time group, dirty cover or model confidence cannot substitute for that missing mechanism.
+  The own-user profile also opens **Observed cars**, private photo-backed subject profiles from the existing
+  `check-image-vehicle-match` reader's `read_subjects` mode. They retain visual interpretations and unresolved physical
+  identity separately from Garage vehicles, owner statements and fleet value. The profile and gallery carry source-photo
+  coverage, exclusions, clocks and bounded-read limits. Visual labels use `RootedValueView` at the projected rung, dated
+  by their actual reading clock and rooted in the source gallery; opening them starts no inference or filing. `LocalStore` mirrors
+  exact owner-scoped backend response pages for offline use, marked saved and potentially stale. Refreshing a page clears
+  its old continuations; a source withdrawal is reflected by the next qualified backend read. This consumer does not
+  activate the held processing pipeline or establish autonomous identity accuracy.
+  Acknowledged pixel uploads also enter an account-scoped visual-reading work queue. Each active, cool-phone sync
+  submits at most one bounded comparison request: two fresh photos to start, or one fresh photo with up to two
+  source-qualified retained references. Unused photos remain queued. A lone photo with no reference waits for another
+  view. The server preserves complete unknown readings separately from supported memberships, reuses exact retained
+  contexts before inference, and refuses to restore later-withdrawn memberships from old readings. Native ambiguous
+  retries request retained results only. These operational leases bound one device's work; they are not a cross-device
+  exactly-once inference guarantee. Retained-reference retrieval is bounded and reports unassessed scope; private
+  subject profiles remain unresolved hypotheses, outside canonical vehicle and ownership totals. This code requires
+  the held protected-writer migration and separate production activation; it does not unpause the photo pipeline.
 - **A relation is a weight, not a status.** Owner direction, 2026-10-15: "active cant be a hard code like it is. its
   a weight. a relation goes dormant immediately after one day if not maintained by contribution. even within 24hr can
   stall." The app never shows a membership's `status` as ACTIVE. It shows the state the server cuts from
