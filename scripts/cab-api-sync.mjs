@@ -38,16 +38,21 @@ if (!SUPABASE_URL || !SUPABASE_KEY) {
 }
 
 // Shared writer gate (.claude/LANES.md): hold while more than 3 client queries wait on IO. One shared Management API
-// rate limit serves every agent, so read it at most once a minute and back off a minute on a 429 or any failure.
+// rate limit serves every agent, so read it at most once a minute (an open reading stands for that minute) and back
+// off a minute on a 429 or any failure.
 const IO_GATE_MAX_WAITERS = 3;
 let ioGateLastCheck = 0;
+let ioGateLastOpen = false;
 async function waitForIoGate() {
   const token = process.env.SUPABASE_ACCESS_TOKEN;
   const ref = (SUPABASE_URL || "").match(/https:\/\/([a-z0-9]+)\.supabase\.co/)?.[1];
   if (!token || !ref) return;
   for (;;) {
     const sinceLast = Date.now() - ioGateLastCheck;
-    if (sinceLast < 60_000) await new Promise((r) => setTimeout(r, 60_000 - sinceLast));
+    if (sinceLast < 60_000) {
+      if (ioGateLastOpen) return;
+      await new Promise((r) => setTimeout(r, 60_000 - sinceLast));
+    }
     ioGateLastCheck = Date.now();
     let waiters = null;
     try {
@@ -61,7 +66,8 @@ async function waitForIoGate() {
       });
       if (res.ok) waiters = (await res.json())?.[0]?.n ?? null;
     } catch {}
-    if (waiters !== null && waiters <= IO_GATE_MAX_WAITERS) return;
+    ioGateLastOpen = waiters !== null && waiters <= IO_GATE_MAX_WAITERS;
+    if (ioGateLastOpen) return;
     console.log(`  [io-gate] ${waiters === null ? "gate read failed" : `${waiters} queries waiting on IO`}; holding 60 s`);
   }
 }
