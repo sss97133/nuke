@@ -157,6 +157,11 @@ Standing rules the code carries:
   permission remain held. This separate private qualification policy requires activation approval.
   Unread historical photos are not enrolled by this replay bridge. They require a separate bounded source-enrollment
   path and approval for new paid analysis; preserving a source or correcting its filing does not create a reading.
+  A finite approved repair can instead retain and verify protected readings while its original sources still qualify,
+  before any separately approved NULL correction. After the audited correction, each pending leaf needs its own
+  current privacy proof; the bridge then reuses the original reading and anchor. Provider authentication, an explicit
+  cumulative paid-attempt budget and source/correction approval are prerequisites. An expanded cohort never resets
+  the existing pilot's attempts or activates general historical enrollment.
 - **Heat is a budget.** Nothing reads originals in bulk while the app is open: iCloud originals download only in
   the background job on Wi-Fi; the album review (originals + accurate OCR) runs in the foreground only on a
   charger at a nominal temperature (`LibraryIngest.mayReviewInForeground`); a foreground backfill slice waits
