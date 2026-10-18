@@ -288,6 +288,10 @@ export interface AuctionCommentRow {
   likers_count: number | null;
   /** The platform's own comment id where it has a stable text one (Cars & Bids); BaT's stays in bat_comment_id. */
   source_comment_id?: string | null;
+  /** Handles the comment addresses: its reply target and any @handle in the text (Cars & Bids). */
+  mentions?: string[] | null;
+  /** The platform flagged, hid or deleted the comment (Cars & Bids). */
+  is_flagged?: boolean;
 }
 
 export interface BatCommentIdentityStore<P extends AuctionCommentPlatform = "bat"> {
@@ -420,6 +424,14 @@ export interface CabCommentInput {
   likes: number;
   bidAmount: number | null;
   isSeller: boolean;
+  /** The platform's own result line, comments API type 5: "Sold to <buyer> for $X" or "Reserve not met, bid to $X". */
+  isResult?: boolean;
+  /** Full URLs of the comment's attachments. */
+  mediaUrls?: string[];
+  /** Handle the comment replies to. */
+  replyTo?: string | null;
+  /** Flagged, system-flagged or deleted on the platform. */
+  flagged?: boolean;
 }
 
 export function cabCommentContentHash(commentId: string): Promise<string> {
@@ -439,7 +451,13 @@ export async function buildCabAuctionCommentRows(args: {
   auctionEventId: string | null;
   endAt: Date | null;
 }): Promise<AuctionCommentRow[]> {
-  const { comments, listingUrlNorm, vehicleId, auctionEventId, endAt } = args;
+  const { listingUrlNorm, vehicleId, auctionEventId, endAt } = args;
+  // sequence_number is the position in the thread, 1 = first; the comments API lists newest first.
+  const at = (c: CabCommentInput) => {
+    const t = c.postedAt ? new Date(c.postedAt).getTime() : NaN;
+    return Number.isNaN(t) ? Number.POSITIVE_INFINITY : t;
+  };
+  const comments = args.comments.map((c, i) => ({ c, i })).sort((a, b) => at(a.c) - at(b.c) || a.i - b.i).map((x) => x.c);
   const rows: AuctionCommentRow[] = [];
   for (let i = 0; i < comments.length; i++) {
     const c = comments[i];
@@ -451,6 +469,14 @@ export async function buildCabAuctionCommentRows(args: {
     const text = String(c.text ?? "").replace(/\s+/g, " ").trim();
     const bidAmount = Number(c.bidAmount) > 0 ? Number(c.bidAmount) : null;
     const hoursUntilClose = endAt && ts ? (endAt.getTime() - postedAt.getTime()) / 3600000 : 0;
+    const media = (c.mediaUrls ?? []).filter(Boolean);
+    const mentions = [...new Set([c.replyTo, ...[...text.matchAll(/@([A-Za-z0-9_.-]+)/g)].map((m) => m[1])]
+      .map((h) => String(h ?? "").trim()).filter(Boolean))];
+    const comment_type = bidAmount ? "bid"
+      : c.isResult && /^sold\b/i.test(text) ? "sold"
+      : c.isSeller ? "seller_response"
+      : text.includes("?") ? "question"
+      : "observation";
     rows.push({
       auction_event_id: auctionEventId,
       vehicle_id: vehicleId,
@@ -463,12 +489,12 @@ export async function buildCabAuctionCommentRows(args: {
       author_username: author,
       is_seller: Boolean(c.isSeller),
       author_total_likes: 0,
-      comment_type: bidAmount ? "bid" : c.isSeller ? "seller_response" : text.includes("?") ? "question" : "observation",
+      comment_type,
       comment_text: text,
       word_count: text ? text.split(/\s+/).length : 0,
       has_question: text.includes("?"),
-      has_media: false,
-      media_urls: null,
+      has_media: media.length > 0,
+      media_urls: media.length > 0 ? media : null,
       bid_amount: bidAmount,
       comment_likes: typeof c.likes === "number" ? c.likes : 0,
       bat_author_id: null,
@@ -476,6 +502,8 @@ export async function buildCabAuctionCommentRows(args: {
       bat_author_likes: null,
       likers_count: null,
       source_comment_id: id,
+      mentions: mentions.length > 0 ? mentions : null,
+      is_flagged: Boolean(c.flagged),
     });
   }
   return rows;

@@ -24,6 +24,7 @@
  *   node scripts/cab-api-sync.mjs --mode=live
  *   node scripts/cab-api-sync.mjs --mode=extract --ids=9em6ZaVd,3yBXgzN7
  *   node scripts/cab-api-sync.mjs --mode=backfill --start-page=1 --end-page=853
+ *   node scripts/cab-api-sync.mjs --mode=backfill --start-page=1 --end-page=853 --refresh   (re-read every lot)
  */
 
 import { chromium } from "playwright";
@@ -31,6 +32,7 @@ import crypto from "crypto";
 import fs from "fs";
 import { createClient } from "@supabase/supabase-js";
 import { writeObservation } from "../supabase/functions/_shared/observationWriter.ts";
+import { buildCabAuctionCommentRows } from "../supabase/functions/_shared/batAuctionRecord.ts";
 
 const SUPABASE_URL = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL;
 const SUPABASE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -1568,49 +1570,44 @@ async function extractSingleAuctionGoldStandard(cab, auctionId) {
   let bidRowsCount = 0;
   let commentRowsCount = 0;
   if (auctionRow?.id && commentsAndBids.length > 0) {
-    const endMs = endDateIso ? new Date(endDateIso).getTime() : null;
-    const commentRows = commentsAndBids.map((c, idx) => {
-      const postedIso = c.timestamp ? new Date(c.timestamp).toISOString() : nowIso;
-      const isBid = c.type === 2 || !!c.amount;
-      if (isBid) bidRowsCount++;
-      else commentRowsCount++;
-      const text = isBid ? `Bid $${Number(c.amount).toLocaleString()}` : String(c.text || "").trim();
-      const username = c.user?.username || "anonymous";
-      return {
-        auction_event_id: auctionRow.id,
-        vehicle_id: vehicleId,
-        platform: "cars_and_bids",
-        source_url: canonicalUrl,
-        content_hash: `cab_${vehicleId}_${c.id}`,
-        sequence_number: idx + 1,
-        posted_at: postedIso,
-        hours_until_close: endMs
-          ? Math.max(0, (endMs - new Date(postedIso).getTime()) / 3600000)
-          : null,
-        author_username: username,
-        author_external_identity_id: identityIds.get(username) || null,
-        external_identity_id: identityIds.get(username) || null,
-        is_seller: !!c.user?.is_seller || username === d.seller?.username,
-        comment_type: isBid
-          ? "bid"
-          : c.user?.is_seller
-          ? "seller_response"
-          : text.includes("?")
-          ? "question"
-          : "observation",
-        comment_text: text || "(empty)",
-        word_count: (text || "").split(/\s+/).filter(Boolean).length,
-        has_question: text.includes("?"),
-        comment_likes: c.upvotes || 0,
-        bid_amount: isBid ? c.amount : null,
-      };
+    const endAt = endDateIso ? new Date(endDateIso) : null;
+    const mediaUrl = (a) => (a?.attachment?.base_url && a?.attachment?.path ? `https://${a.attachment.base_url}/${a.attachment.path}` : null);
+    const builtRows = await buildCabAuctionCommentRows({
+      comments: commentsAndBids.map((c) => {
+        const isBid = c.type === 2 || !!c.amount;
+        if (isBid) bidRowsCount++;
+        else commentRowsCount++;
+        const username = c.user?.username || "";
+        return {
+          id: c.id,
+          author: username,
+          postedAt: c.timestamp || null,
+          text: isBid ? `Bid $${Number(c.amount).toLocaleString()}` : String(c.text || ""),
+          likes: c.upvotes || 0,
+          bidAmount: isBid ? c.amount : null,
+          isSeller: !!c.user?.is_seller || (!!username && username === d.seller?.username),
+          isResult: c.type === 5,
+          mediaUrls: (c.attachments || []).map(mediaUrl).filter(Boolean),
+          replyTo: c.reply_to?.username || null,
+          flagged: !!(c.flagged || c.system_flagged || c.deleted_at),
+        };
+      }),
+      listingUrlNorm: canonicalUrl,
+      vehicleId,
+      auctionEventId: auctionRow.id,
+      endAt: endAt && !Number.isNaN(endAt.getTime()) ? endAt : null,
+    });
+    const commentRows = builtRows.map((r) => {
+      const identityId = identityIds.get(r.author_username) || null;
+      return { ...r, author_external_identity_id: identityId, external_identity_id: identityId };
     });
 
     for (let k = 0; k < commentRows.length; k += 100) {
       const { error: cErr } = await supabase
         .from("auction_comments")
         .upsert(commentRows.slice(k, k + 100), { onConflict: "vehicle_id,content_hash" });
-      if (!cErr) commentsUpserted += commentRows.slice(k, k + 100).length;
+      if (cErr) throw new Error(`Comment upsert failed for ${d.id}: ${describePgError(cErr)}`);
+      commentsUpserted += commentRows.slice(k, k + 100).length;
     }
   }
 
@@ -1677,7 +1674,7 @@ async function extractSingleAuctionGoldStandard(cab, auctionId) {
  * extracts each one via `extractSingleAuctionGoldStandard`, and writes real-time
  * propagation telemetry (`total_data_model_rows` per listing) to console + JSONL log.
  */
-async function runHistoricalBackfill(cab, startPage = 1, endPage = 853, concurrency = 3) {
+async function runHistoricalBackfill(cab, startPage = 1, endPage = 853, concurrency = 3, { refresh = false } = {}) {
   const logDir = "/Users/skylar/nuke-logs/lane-online";
   fs.mkdirSync(logDir, { recursive: true });
   const logPath = `${logDir}/cab_backfill_telemetry_20261017.jsonl`;
@@ -1733,7 +1730,8 @@ async function runHistoricalBackfill(cab, startPage = 1, endPage = 853, concurre
       .in("source_listing_id", pageIds);
 
     const completeSet = new Set();
-    if (existingAe?.length) {
+    // --refresh re-reads every lot on the page (the upserts rewrite what changed), skipping nothing as complete.
+    if (!refresh && existingAe?.length) {
       const vids = existingAe.map((r) => r.vehicle_id).filter(Boolean);
       const { data: vRows } = await supabase
         .from("vehicles")
@@ -1851,7 +1849,7 @@ async function main() {
       const startPage = parseInt(args["start-page"] || "1", 10);
       const endPage = parseInt(args["end-page"] || "853", 10);
       const concurrency = parseInt(args.concurrency || "3", 10);
-      await runHistoricalBackfill(cab, startPage, endPage, concurrency);
+      await runHistoricalBackfill(cab, startPage, endPage, concurrency, { refresh: args.refresh === "true" || args.refresh === "" });
     }
   } finally {
     await cab.close();
