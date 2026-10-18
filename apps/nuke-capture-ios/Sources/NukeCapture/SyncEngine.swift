@@ -321,19 +321,18 @@ final class SyncEngine: ObservableObject {
         defaults.set(on, forKey: Key.contributorMode)
     }
 
-    /// The contributor firewall. True ⇒ HOLD this frame (do not upload to the
-    /// pool). Loads the LOCAL downscaled frame (no network) and runs
+    /// The contributor firewall. A hold keeps this frame out of the
+    /// pool. Loads the LOCAL downscaled frame (no network) and runs
     /// `VisionEngine.contributorVerdict`, the device rule of record (hold clutter
     /// and personal). Only ever consulted when contributorMode is true.
-    private func contributorGateHolds(assetID: String) async -> Bool {
+    private func contributorGateVerdict(assetID: String) async -> VisionEngine.ContributorVerdict {
         guard let cg = await VisionEngine.loadCGImage(assetID: assetID, allowNetwork: false) else {
             // No local frame (an iCloud-only original): requestOriginalData defers it, and once the
             // bytes are local `prepare` runs the same triage, so clutter and personal frames upload
             // as metadata only.
-            return false
+            return .allow
         }
-        if case .allow = VisionEngine.contributorVerdict(cg) { return false }
-        return true
+        return VisionEngine.contributorVerdict(cg)
     }
 
     private func recordHeldPrivate(_ n: Int) {
@@ -940,13 +939,19 @@ final class SyncEngine: ObservableObject {
         let labels: [String]
     }
 
-    nonisolated static func prepare(_ data: Data) async -> PreparedOriginal {
-        let (make, model) = CameraEXIF.cameraInfo(from: data)
+    nonisolated static func prepare(_ data: Data,
+        cameraInfo: (Data) -> (String?, String?) = { CameraEXIF.cameraInfo(from: $0) },
+        decode: (Data) -> CGImage? = { downsampledCGImage(from: $0) },
+        triage: (CGImage) -> VisionEngine.TriageResult = { VisionEngine.triage($0) }
+    ) async throws -> PreparedOriginal {
+        let (make, model) = cameraInfo(data)
         var eligible = false
         var labels: [String] = []
         // Owner triage only matters for our own camera's frames; skip the decode otherwise.
-        if make == "Apple", let cg = downsampledCGImage(from: data) {
-            let t = VisionEngine.triage(cg)
+        if make == "Apple" {
+            guard let cg = decode(data) else { throw VisionEngine.TriageFailure.imageUndecodable }
+            let t = triage(cg)
+            if let failure = t.failure { throw failure }
             labels = t.labels
             eligible = t.pixelsEligible
         }
@@ -978,7 +983,13 @@ final class SyncEngine: ObservableObject {
         // paycheck, a person) clears the GPS gate but must NEVER reach the
         // shared pool — hold clutter and personal frames (the triage rule).
         // Owner mode skips this entirely.
-        if contributorMode, await contributorGateHolds(assetID: id) { return .heldPrivate }
+        if contributorMode {
+            switch await contributorGateVerdict(assetID: id) {
+            case .allow: break
+            case .hold: return .heldPrivate
+            case .unavailable(let reason): return noteFailure(id, message: reason)
+            }
+        }
 
         let filename = Self.originalFilename(for: asset)
         let data: Data
@@ -992,7 +1003,9 @@ final class SyncEngine: ObservableObject {
             return noteFailure(id, message: "\(filename): \(error.localizedDescription)")
         }
 
-        let prep = await Self.prepare(data)
+        let prep: PreparedOriginal
+        do { prep = try await Self.prepare(data) }
+        catch { return noteFailure(id, message: "\(filename): \(error.localizedDescription)") }
         // ── Gate 2 (ownership): require Apple camera EXIF ──
         // iMessage-received photos have EXIF stripped → make == nil.
         guard prep.cameraMake == "Apple" else { markAssetSeen(id); return .notOwnCamera }
@@ -1002,10 +1015,10 @@ final class SyncEngine: ObservableObject {
         if seenSet.contains(key) { markAssetSeen(id); return .deduped }
 
         // ── Owner triage (on-device): pixels vs metadata-only ──
-        // Pixels upload ONLY when it's vehicle work, no prominent face,
-        // and not flagged sensitive; everything else uploads metadata
-        // only (EXIF alibi) with the pixels left on the phone. Fail-safe:
-        // undecodable/unclassifiable ⇒ metadata-only.
+        // The completed on-device triage chooses pixels or metadata-only.
+        // Clutter and personal frames upload metadata
+        // only (EXIF alibi) with the pixels left on the phone. An unavailable
+        // privacy read returned above as a retryable failure, never a verdict.
         let meta = PhotoMeta(
             assetIdentifier: id,
             filename: filename,
@@ -1213,7 +1226,7 @@ final class SyncEngine: ObservableObject {
     /// on-device triage classify — reuses the bytes from requestOriginalData
     /// (no second PhotoKit/iCloud round-trip) and thumbnails at ~512px so the
     /// Neural Engine isn't handed a 48 MP original. Returns nil on undecodable
-    /// data → the caller fails safe to metadata-only.
+    /// data → upload preparation reports a retryable privacy-read failure.
     nonisolated static func downsampledCGImage(from data: Data, maxPixel: CGFloat = 512) -> CGImage? {
         guard let src = CGImageSourceCreateWithData(data as CFData, nil) else { return nil }
         let opts: [CFString: Any] = [
