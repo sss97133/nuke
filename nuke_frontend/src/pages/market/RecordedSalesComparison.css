@@ -56,3 +56,6 @@
 .market-control[aria-pressed="true"] { background: var(--text); color: var(--bg); border-color: var(--text); }
 .market-control[aria-pressed="true"] .k-label { color: inherit; }
 select.market-control { padding-right: 24px; }
+@media (max-width: 760px) {
+  .market-scope__views[aria-label="Market view"] > button { min-height: 44px; }
+}

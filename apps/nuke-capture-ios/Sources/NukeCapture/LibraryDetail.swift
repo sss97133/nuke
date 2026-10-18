@@ -95,7 +95,7 @@ private struct ZoomableImage: UIViewRepresentable {
     let image: UIImage
 
     func makeUIView(context: Context) -> UIScrollView {
-        let scroll = UIScrollView()
+        let scroll = FittingScrollView()
         scroll.delegate = context.coordinator
         scroll.minimumZoomScale = 1
         scroll.maximumZoomScale = 4
@@ -130,6 +130,22 @@ private struct ZoomableImage: UIViewRepresentable {
     }
 
     func makeCoordinator() -> Coordinator { Coordinator() }
+
+    /// Fits the image view to the visible bounds on every layout pass while at minimum zoom.
+    /// `UIImageView(image:)` starts at the photo's pixel size (a 4032-pixel photo is a 4032-point
+    /// view); updateUIView ran before the scroll view had bounds, so the photo opened zoomed into
+    /// one corner instead of fitting the screen (owner, 2026-10-15).
+    final class FittingScrollView: UIScrollView {
+        override func layoutSubviews() {
+            super.layoutSubviews()
+            guard zoomScale <= minimumZoomScale, bounds.size != .zero,
+                  let iv = subviews.first(where: { $0 is UIImageView }) else { return }
+            if iv.frame.size != bounds.size {
+                iv.frame = CGRect(origin: .zero, size: bounds.size)
+                contentSize = bounds.size
+            }
+        }
+    }
 
     final class Coordinator: NSObject, UIScrollViewDelegate {
         weak var scrollView: UIScrollView?

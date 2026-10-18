@@ -49,11 +49,13 @@ K1S:
 HDT-48-00:
   name: Deutsch HDT-48-00 solid-barrel crimp tool
   does: 8-indent crimp, Deutsch size 20/16/12 solid contacts; no positioner
-  for: [SSC-N]
+  for: [SSC-N, 0460-202-16141, 0460-204-12141, 0462-201-20141, 0462-005-20141]
   status: alt
   note: listed by ProWire as an SSC-N tool; AFM8 + K1S covers the same job and shares the frame with the 61-pin contacts.
   buy: {vendor: prowire, url: "https://www.prowireusa.com/deutsch-hdt-48-00-solid-barrel-crimp-tool.html", price: 445.20}
-  sources: [prowire HDT-48-00 page + SSC-N tooling chart, fetched 2026-09-26]
+  sources:
+    - prowire HDT-48-00 page + SSC-N tooling chart, fetched 2026-09-26
+    - "web_snapshots/www.prowireusa.com__deutsch-hdt-48-00-solid-barrel-crimp-tool.md (fetched 2026-10-15): 'the ideal option when crimping any of the Deutsch size 20, 16, 12 solid contacts'; its related items list 0460-202-16141, 0460-204-12141, 0462-201-20141 and 0462-005-20141 (RSI pass 41)"
 
 GT150_CRIMPER:
   name: Delphi/Aptiv GT150 hand crimper
@@ -92,10 +94,12 @@ MINISEAL_CRIMPER:
   name: MiniSeal splice crimper (ProWire 3137CT = Raychem AD-1377)
   pn: 3137CT
   does: indent crimp with a splice locator; cavities 26–20 AWG (red), 20–16 (blue), 16–12 (yellow)
-  for: [D-609-03, D-609-04, D-609-05]
+  for: [D-609-03, D-609-04, D-609-05, M81824/1-1, M81824/1-2, M81824/1-3]
   status: to_buy
   buy: {vendor: prowire, url: "https://www.prowireusa.com/3137ct.html", price: 158.40}
-  sources: [prowire 3137ct page + Nuke catalog_parts name "BUTT SPLICE CRIMP TOOL (RAYCHEM AD 1377)", fetched 2026-09-26]
+  sources:
+    - prowire 3137ct page + Nuke catalog_parts name "BUTT SPLICE CRIMP TOOL (RAYCHEM AD 1377)", fetched 2026-09-26
+    - "web_snapshots/www.prowireusa.com__raychem-miniseal-splices.md: MiniSeal splices carry 'MIL-S-81824/1 qualification', 'The recommended crimp tool is 3137 CT', 'Butt: M81824/1 series' (RSI pass 41)"
 
 HEX_CRIMPER:
   name: 18840 hex crimper, rotating die set, 8–4/0 AWG

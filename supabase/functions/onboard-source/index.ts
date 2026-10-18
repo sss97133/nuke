@@ -50,7 +50,8 @@ function normalizeUrl(raw: string): string {
 function inferCategory(analysis: any): string {
   const t = (analysis?.site_type || '').toLowerCase();
   if (t.includes('auction')) return 'auction';
-  if (t.includes('marketplace') || t.includes('classified')) return 'marketplace';
+  if (t.includes('classified')) return 'classifieds';
+  if (t.includes('marketplace')) return 'marketplace';
   if (t.includes('dealer')) return 'dealer';
   if (t.includes('forum')) return 'forum';
   if (t.includes('registry')) return 'registry';
@@ -233,7 +234,7 @@ Deno.serve(async (req: Request) => {
     // Check if source already exists
     const { data: existingSource } = await supabase
       .from('observation_sources')
-      .select('id, slug, display_name, category, business_id')
+      .select('id, slug, display_name, category, business_id, species')
       .or(`slug.eq.${slug},base_url.eq.${baseUrl}`)
       .limit(1)
       .maybeSingle();
@@ -281,7 +282,7 @@ Deno.serve(async (req: Request) => {
       const analysis = await analyzeSiteWithAI(markdown || html.slice(0, 8000), domain);
 
       // Firecrawl map to get URL inventory
-      const mapResult = await firecrawlMap(baseUrl, { limit: 5000, timeout: 30000 });
+      const mapResult = await firecrawlMap(baseUrl, { limit: 5000, timeout: 30000, caller: 'onboard-source' });
       const allLinks = mapResult.links || [];
 
       // Identify listing URLs
@@ -302,7 +303,9 @@ Deno.serve(async (req: Request) => {
       };
 
       if (observationSourceId) {
-        await supabase.from('observation_sources').update(osRow).eq('id', observationSourceId);
+        // A kind read from the source with evidence (species set) is not replaced by the model's guess.
+        const { category: _guessed, ...kept } = osRow;
+        await supabase.from('observation_sources').update(existingSource?.species ? kept : osRow).eq('id', observationSourceId);
       } else {
         const { data: created, error: osErr } = await supabase
           .from('observation_sources')
@@ -715,7 +718,7 @@ async function handlePollMonitored(supabase: any): Promise<Response> {
       console.log(`[onboard] Polling: ${source.slug}`);
 
       // Get URL map
-      const mapResult = await firecrawlMap(source.discovery_url, { limit: 2000, timeout: 20000 });
+      const mapResult = await firecrawlMap(source.discovery_url, { limit: 2000, timeout: 20000, caller: 'onboard-source' });
 
       if (mapResult.links.length > 0 && source.listing_url_pattern) {
         const regex = new RegExp(source.listing_url_pattern, 'i');

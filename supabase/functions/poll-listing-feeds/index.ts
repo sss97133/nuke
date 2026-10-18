@@ -28,6 +28,7 @@
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { firecrawlScrape } from "../_shared/firecrawl.ts";
+import { firecrawlGate, ALLOWANCE_EXHAUSTED } from "../_shared/firecrawlGate.ts";
 import { archiveFetch } from "../_shared/archiveFetch.ts";
 import { fetchCraigslistFeed } from "./feedFetch.ts";
 import { extractCraigslistCanonicalUrls } from "../_shared/urlNormalization.ts";
@@ -48,6 +49,10 @@ import {
   type LedgerKnown,
 } from "./ledger.ts";
 import { projectSecretKey } from "../_shared/supabaseKeys.ts";
+import { noticeFrom, sweepCraigslistRemovals } from "./removal.ts";
+import { parseKslSearchCards } from "./kslCards.ts";
+import { splitByYear } from "./yearFilter.ts";
+import { nextYield } from "./schedule.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -225,6 +230,10 @@ function cleanListingUrl(url: string, sourceSlug: string): string {
 
 /** Cost bound: max NEW listings sent to `ingest` per feed per poll. */
 const MAX_NEW_INGESTS_PER_POLL = 20;
+// Craigslist asking prices and edits change after posting; revisit a landed listing daily while it is still listed.
+const CRAIGSLIST_REVISIT = { afterMs: 24 * 3600_000, max: 5 };
+// One request to a site per 2 s (owner rule); other sources keep the 250 ms pause below.
+const SITE_MIN_SPACING_MS = 2000;
 
 /**
  * Ingest outcomes wait for one read-back of their vehicle rows (ledger.ts). A poll that is killed mid-loop would lose
@@ -241,6 +250,7 @@ interface FeedResult {
   new_ingested?: number; // firecrawl_html path
   matched_existing?: number; // firecrawl_html path
   rejected?: number; // firecrawl_html path
+  discovery?: { cards: number; written: number; error: string | null }; // KSL search cards written to source_targets
   landed_no_data?: number; // firecrawl_html path: ingest created or matched a vehicle that holds no price, images or description
   retries_due?: number; // firecrawl_html path: failed URLs whose retry came due this poll
   backing_off?: number; // firecrawl_html path: failed URLs skipped because next_attempt_at is ahead
@@ -354,7 +364,7 @@ const MAX_ARTICLE_HOPS_PER_POLL = 8;
  * curated posts age out of the RSS within a day, and a login-walled target
  * (FB) would otherwise burn a hop slot retrying forever. One shot per article.
  */
-async function pollArticleHopFeed(supabase: any, feed: any, budget: IntakeBudget): Promise<FeedResult> {
+async function pollArticleHopFeed(supabase: any, feed: any, budget: IntakeBudget, allocation = MAX_ARTICLE_HOPS_PER_POLL): Promise<FeedResult> {
   const result: FeedResult = {
     feed: feed.display_name,
     source: feed.source_slug,
@@ -420,7 +430,7 @@ async function pollArticleHopFeed(supabase: any, feed: any, budget: IntakeBudget
     for (const q of ledgered || []) known.add(q.listing_url);
   }
   result.matched_existing = known.size;
-  const fresh = articleUrls.filter((u) => !known.has(u)).slice(0, MAX_ARTICLE_HOPS_PER_POLL);
+  const fresh = articleUrls.filter((u) => !known.has(u)).slice(0, Math.min(MAX_ARTICLE_HOPS_PER_POLL, allocation));
 
   const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
   const serviceKey = projectSecretKey()!;
@@ -527,6 +537,7 @@ async function pollFirecrawlHtmlFeed(
   supabase: any,
   feed: any,
   budget: IntakeBudget,
+  allocation = MAX_NEW_INGESTS_PER_POLL,
 ): Promise<FeedResult> {
   const result: FeedResult = {
     feed: feed.display_name,
@@ -567,7 +578,9 @@ async function pollFirecrawlHtmlFeed(
   //  - firecrawl_html (default): Craigslist uses the archived public direct
   //    request only. Other sources retain their configured renderer/fallback.
   let urls: string[] = [];
+  let htmlForCards: string | null = null;
   let blockNote = "";
+  let confirmedEmptySearch = false;
 
   if (feed.search_criteria?.fetch_strategy === "rss_direct_ingest") {
     try {
@@ -605,6 +618,8 @@ async function pollFirecrawlHtmlFeed(
       const direct = await fetchCraigslistFeed(feed.feed_url, archiveFetch);
       if (!direct.html) return await failFeed(`fetch_failed: ${direct.error}`);
       html = direct.html;
+      // A configured parser still has to prove it works, even on a source-empty page.
+      confirmedEmptySearch = direct.confirmedEmpty === true && !feed.search_criteria?.listing_url_regex;
     } else {
       // Server-rendered sources (KSL, Hagerty, ClassicCars) carry their listing
       // links in plain HTML — fetching them through Firecrawl works but spends
@@ -627,11 +642,18 @@ async function pollFirecrawlHtmlFeed(
         }
       }
 
-      if (!html && (Deno.env.get("FIRECRAWL_API_KEY") || "").trim()) {
+      // KSL refuses the server's address, so its search page costs a Firecrawl credit per poll. Ask first, record after:
+      // the "ksl-search" allowance (not the lot allowance, which is paused) covers it, and rawHtml keeps the page's
+      // script payload so the search cards can be read (./kslCards.ts).
+      const kslGate = feed.source_slug === "ksl" ? firecrawlGate(supabase, "ksl-search") : null;
+      const kslDeferred = !html && kslGate !== null && !(await kslGate.allow());
+      if (kslDeferred) fetchErrors.push(ALLOWANCE_EXHAUSTED);
+
+      if (!html && !kslDeferred && (Deno.env.get("FIRECRAWL_API_KEY") || "").trim()) {
         try {
           const scrape = await firecrawlScrape({
             url: feed.feed_url,
-            formats: ["html", "markdown"],
+            formats: kslGate ? ["rawHtml"] : ["html", "markdown"],
             onlyMainContent: false,
             // JS-heavy SPAs (Cars & Bids, Mecum) need longer render waits;
             // bot-walled sites (Hemmings, eBay) need the stealth proxy. Both
@@ -644,6 +666,7 @@ async function pollFirecrawlHtmlFeed(
           });
           html = scrape.data.html;
           markdown = scrape.data.markdown;
+          if (kslGate) await kslGate.record(1, 0, "poll-listing-feeds", "ksl search page");
           if (scrape.blocked) {
             blockNote = ` (blocked: ${scrape.blockedSignals.join(", ")})`;
           }
@@ -676,12 +699,21 @@ async function pollFirecrawlHtmlFeed(
       }
     }
 
+    if (!html && !markdown && fetchErrors.includes(ALLOWANCE_EXHAUSTED)) {
+      // A deferral, not a failure: nothing to count against the feed; read again next window.
+      const { error: deferError } = await supabase.from("listing_feeds")
+        .update({ last_polled_at: new Date().toISOString(), updated_at: new Date().toISOString() }).eq("id", feed.id);
+      result.deferred_reason = "allowance_deferred";
+      if (deferError) result.error = `defer_stamp_failed: ${deferError.message.slice(0, 120)}`;
+      return result;
+    }
     if (!html && !markdown) {
       return await failFeed(
         `fetch_failed: ${fetchErrors.join(" | ") || "empty payload"}`
       );
     }
 
+    htmlForCards = html;
     // Per-feed regex config generalizes this path beyond Craigslist; feeds
     // without a listing_url_regex keep the CL extractor (the original behavior).
     urls = feed.search_criteria?.listing_url_regex
@@ -697,7 +729,42 @@ async function pollFirecrawlHtmlFeed(
 
   result.items_found = urls.length;
 
-  if (urls.length === 0) {
+  // A feed can slice by the year in its listing slugs: only that slice is queued for (paid) ingest; the rest stay as
+  // discovered-not-fetched source_targets rows with the year, so supply is still measured for free.
+  const sliceMin = feed.search_criteria?.slug_year_min, sliceMax = feed.search_criteria?.slug_year_max;
+  if (Number.isInteger(sliceMin) && Number.isInteger(sliceMax)) {
+    const { keep, rest } = splitByYear(urls, sliceMin, sliceMax);
+    urls = keep;
+    if (rest.length > 0) {
+      const now = new Date().toISOString();
+      const slug = feed.source_slug === "carsandbids" ? "cars-and-bids" : feed.source_slug;
+      // write-error-ok: a failed write is returned in result.discovery.error for the run receipt
+      const { error: restError } = await supabase.from("source_targets").upsert(
+        rest.slice(0, 300).map((r) => ({ source_slug: slug, listing_url: r.url, last_seen_at: now, card_year: r.year, card_observed_at: now })),
+        { onConflict: "listing_url" },
+      );
+      result.discovery = { cards: rest.length, written: restError ? 0 : Math.min(rest.length, 300), error: restError ? restError.message.slice(0, 200) : null };
+    }
+  }
+
+  // KSL: the search cards state year, seller class and created time. Record them as discovered-not-fetched source_targets
+  // rows (no fetch, no ledger row, no attempt), so supply and tier share stay measurable while paid fetching is paused.
+  if (feed.source_slug === "ksl" && htmlForCards) {
+    const cards = parseKslSearchCards(htmlForCards).slice(0, 200);
+    if (cards.length > 0) {
+      const now = new Date().toISOString();
+      const { error: cardError } = await supabase.from("source_targets").upsert(
+        cards.map((c) => ({
+          source_slug: "ksl", listing_url: c.url, last_seen_at: now,
+          card_year: c.year, card_seller_type: c.seller_type, card_created_at: c.created_at, card_price: c.price, card_observed_at: now,
+        })),
+        { onConflict: "listing_url" },
+      );
+      result.discovery = { cards: cards.length, written: cardError ? 0 : cards.length, error: cardError ? cardError.message.slice(0, 200) : null };
+    }
+  }
+
+  if (urls.length === 0 && (!confirmedEmptySearch || blockNote)) {
     return await failFeed(`parsed_zero${blockNote}`);
   }
 
@@ -721,38 +788,34 @@ async function pollFirecrawlHtmlFeed(
   // (HTTP/2 stream error), so query in batches of 40.
   const onVehicles = new Set<string>();
   const ledgerRows = new Map<string, LedgerKnown>();
-  for (let i = 0; i < urls.length; i += 40) {
-    const chunk = urls.slice(i, i + 40);
-    // Independent tables, neither query depends on the other's result —
-    // run concurrently instead of paying two sequential round trips per chunk.
-    const [
-      { data: known, error: knownError },
-      { data: ledgered, error: ledgerError },
-    ] = await Promise.all([
-      supabase.from("vehicles").select("listing_url").in("listing_url", chunk),
-      supabase
-        .from("import_queue")
-        .select("listing_url, status, attempts, max_attempts, next_attempt_at, failure_category")
-        .in("listing_url", chunk)
-        .in("status", ["complete", "skipped", "failed"]),
-    ]);
-
-    if (knownError) {
-      return await failFeed(
-        `fetch_failed: known-url lookup: ${knownError.message}`
-      );
+  // A Craigslist search page lists ~350 posts: nine chunks of two lookups each, one after another, cost several seconds of a
+  // 110 s run per feed (measured 2026-10-15: 9 feeds finished per run). The chunks are independent, so they go in waves of four.
+  const chunks: string[][] = [];
+  for (let i = 0; i < urls.length; i += 40) chunks.push(urls.slice(i, i + 40));
+  for (let w = 0; w < chunks.length; w += 4) {
+    const wave = await Promise.all(chunks.slice(w, w + 4).map(async (chunk) => {
+      // Independent tables, neither query depends on the other's result: run them together too.
+      const [known, ledgered] = await Promise.all([
+        supabase.from("vehicles").select("listing_url").in("listing_url", chunk),
+        supabase
+          .from("import_queue")
+          .select("listing_url, status, vehicle_id, attempts, max_attempts, next_attempt_at, failure_category, processed_at")
+          .in("listing_url", chunk)
+          .in("status", ["complete", "skipped", "failed"]),
+      ]);
+      return { known, ledgered };
+    }));
+    for (const { known, ledgered } of wave) {
+      if (known.error) return await failFeed(`fetch_failed: known-url lookup: ${known.error.message}`);
+      if (ledgered.error) return await failFeed(`fetch_failed: ledger lookup: ${ledgered.error.message}`);
+      for (const v of known.data || []) onVehicles.add(v.listing_url);
+      for (const q of ledgered.data || []) ledgerRows.set(q.listing_url, q);
     }
-    for (const v of known || []) onVehicles.add(v.listing_url);
-
-    if (ledgerError) {
-      return await failFeed(
-        `fetch_failed: ledger lookup: ${ledgerError.message}`
-      );
-    }
-    for (const q of ledgered || []) ledgerRows.set(q.listing_url, q);
   }
   // New URLs first, then failed ones whose retry is due; the cap applies to both.
-  const plan = planIngests(urls, onVehicles, ledgerRows, new Date(), MAX_NEW_INGESTS_PER_POLL);
+  const plan = planIngests(urls, onVehicles, ledgerRows, new Date(), Math.min(MAX_NEW_INGESTS_PER_POLL, allocation),
+    feed.source_slug === "craigslist" ? { ...CRAIGSLIST_REVISIT, max: Math.min(CRAIGSLIST_REVISIT.max, budget.revisitAllowance()) } : null);
+  budget.spendRevisits(plan.revisits ?? 0);
   result.matched_existing = plan.settled + plan.backoff;
   result.retries_due = plan.retries;
   result.backing_off = plan.backoff;
@@ -763,10 +826,9 @@ async function pollFirecrawlHtmlFeed(
 
   // Ledger the settled outcome so future polls skip this share URL (vehicles
   // stores the canonical form, which never matches the share form — see the
-  // lookup above). Errors are NOT ledgered: they retry next poll. Rejections
-  // only ledger when STRUCTURAL (editorial / not-a-vehicle / implausible-year /
-  // quality-gate reject); identity-insufficient rejects are often a transient
-  // enrichment failure and deserve a retry (the 2026-07-02 VW Thing miss).
+  // lookup above). Attempted errors retain an unknown-outcome failed receipt and backoff.
+  // Structural rejects (editorial / not-a-vehicle / implausible-year / quality-gate)
+  // are skipped; identity-insufficient and enrichment-failed rejects use the failed retry schedule.
   // "quality_gate_reject" covers deterministic gate rejects (e.g.
   // vin_make_mismatch) added 2026-07-07 — the same URL fails the same way
   // every time, so without this it burns a MAX_NEW_INGESTS_PER_POLL slot on
@@ -807,7 +869,7 @@ async function pollFirecrawlHtmlFeed(
       if (Object.keys(captureFields).length > 0) {
         write.row.raw_data = { ...((write.row.raw_data as Record<string, unknown> | undefined) ?? {}), ...captureFields };
       }
-      if (write.status === "failed") result.landed_no_data!++;
+      if (write.status === "failed" && w.ingest.status !== "error") result.landed_no_data!++;
       const { error: ledgerWriteError, data: ledgerReceipt } = await supabase
         .from("import_queue")
         .upsert(write.row, { onConflict: "listing_url" }).select('id,status,listing_url');
@@ -831,15 +893,15 @@ async function pollFirecrawlHtmlFeed(
     const grant = budget.reserve(feed.source_slug);
     if (!grant) { result.deferred_reason = budget.refusal(feed.source_slug); break; }
     const attemptStarted = Date.now();
+    let timeout: ReturnType<typeof setTimeout> | undefined;
     try {
       const controller = new AbortController();
       // ingest's own enrichment call (tryAutoEnrich) uses a 75s internal
       // timeout (ingest/index.ts), so a shorter caller-side timeout here
       // aborts mid-enrichment on any listing taking 30-75s to extract,
-      // reports it back as a client "error" — which is NOT ledgered (errors
-      // retry next poll, by design) — and re-burns a MAX_NEW_INGESTS_PER_POLL
-      // slot on the exact same slow URL every future poll. Must exceed 75s.
-      const timeout = setTimeout(() => controller.abort(), grant.timeout_ms);
+      // reports an unknown request outcome and spends a retry. Retain the
+      // existing allowance when enough time remains, instead of cutting it short.
+      timeout = setTimeout(() => controller.abort(), grant.timeout_ms);
 
       const resp = await fetch(`${supabaseUrl}/functions/v1/ingest`, {
         method: "POST",
@@ -858,6 +920,7 @@ async function pollFirecrawlHtmlFeed(
         error: `ingest HTTP ${resp.status} (non-JSON body)`,
       }))) as IngestOutcome;
       const status = ingest.status || "error";
+      ingest.status = status;
 
       const outcomeEntry: NonNullable<FeedResult["ingest_outcomes"]>[number] = {
         url,
@@ -880,19 +943,25 @@ async function pollFirecrawlHtmlFeed(
 
       if (shouldLedger(ingest)) waiting.push({ url, ingest, entry: outcomeEntry });
     } catch (err: any) {
-      budget.record(feed.source_slug, Date.now() - attemptStarted, { error: err?.message || String(err) });
-      result.ingest_outcomes!.push({
+      const ingest: IngestOutcome = { status: "error", error: err?.message || String(err) };
+      budget.record(feed.source_slug, Date.now() - attemptStarted, ingest);
+      const entry = {
         url,
         status: "error",
         ingest_attempted: true,
         error: (err?.message || String(err)).slice(0, 200),
-      });
+      };
+      result.ingest_outcomes!.push(entry);
+      waiting.push({ url, ingest, entry });
+    } finally {
+      clearTimeout(timeout);
     }
 
     if (Date.now() - lastFlushAt >= FLUSH_AFTER_MS) await flushLedger();
 
-    // Small delay between ingests to be polite
-    await new Promise((r) => setTimeout(r, 250));
+    // Small delay between ingests to be polite; a Craigslist ingest is a live page fetch, so keep it to 1 per 2 s.
+    const spacing = feed.source_slug === "craigslist" ? Math.max(250, SITE_MIN_SPACING_MS - (Date.now() - attemptStarted)) : 250;
+    await new Promise((r) => setTimeout(r, spacing));
   }
   await flushLedger();
 
@@ -919,6 +988,12 @@ async function pollFirecrawlHtmlFeed(
       error_count: 0,
       last_error: null,
       updated_at: new Date().toISOString(),
+      // Craigslist: the feed's poll interval follows its rate of new posts (schedule.ts).
+      ...(feed.source_slug === "craigslist" ? (() => {
+        const hoursSince = feed.last_polled_at ? (Date.now() - Date.parse(feed.last_polled_at)) / 3_600_000 : null;
+        const y = nextYield(feed.new_rate_per_hour === null || feed.new_rate_per_hour === undefined ? null : Number(feed.new_rate_per_hour), plan.fresh, hoursSince);
+        return { new_rate_per_hour: y.rate, last_new_count: plan.fresh, poll_interval_minutes: y.interval_minutes };
+      })() : {}),
     })
     .eq("id", feed.id);
 
@@ -946,6 +1021,7 @@ Deno.serve(async (req) => {
 
     // Parse options
     let source: string | null = null;
+    let excludeSource: string | null = null;
     let feedId: string | null = null;
     let batchSize = 10;
     let force = false;
@@ -956,6 +1032,7 @@ Deno.serve(async (req) => {
       feedId = body.feed_id || null;
       batchSize = body.batch_size ?? 10;
       force = body.force || false;
+      excludeSource = typeof body.exclude_source === "string" ? body.exclude_source : null;
     } catch (_) {
       /* no body is fine */
     }
@@ -988,6 +1065,9 @@ Deno.serve(async (req) => {
       query = query.eq("id", feedId);
     } else if (source) {
       query = query.eq("source_slug", source);
+    } else if (excludeSource) {
+      // The Craigslist-only job polls Craigslist alone, so the general job leaves it out (one site, one pacing clock).
+      query = query.neq("source_slug", excludeSource);
     }
 
     // Read bounded enabled-feed metadata, including each source's latest
@@ -1036,6 +1116,29 @@ Deno.serve(async (req) => {
 
     const results: FeedResult[] = [];
 
+    // Removal sweep, first: the Craigslist-only job reserves the first part of every run for asking landed posts whether
+    // they still exist (a 404 or a notice page ends the listing). 12 a run at one request per 2 s is about 1,700 checks
+    // a day at a 10-minute cadence, against about 600 new posts a day: every post is checked about 3 times a day, oldest
+    // check first. Feeds then use what is left of the run.
+    let removals: Awaited<ReturnType<typeof sweepCraigslistRemovals>> | null = null;
+    if (source === "craigslist" && !feedId) {
+      removals = await sweepCraigslistRemovals({
+        supabase,
+        remainingMs: () => budget.remainingMs(),
+        sleep: (ms) => new Promise((r) => setTimeout(r, ms)),
+        probe: async (url) => {
+          const r = await archiveFetch(url, {
+            platform: "craigslist", skipCache: true, useFirecrawl: false, includeMarkdown: false,
+            directFetchOptions: { publicOnly: true }, callerName: "poll-listing-feeds",
+          } as any);
+          return { status: r.statusCode, observed_at: new Date().toISOString(), snapshot_id: r.snapshotId, notice: noticeFrom(r.html) };
+        },
+      // 12 checks, but at most 30 s of the run: measured 2026-10-15, an uncapped sweep took the whole 110 s and 94-99 of 100
+      // feeds were deferred at the worker deadline.
+      }, 12, 24 * 3600_000, 2000, 30_000);
+    }
+
+
     let totalQueued = 0;
     let totalFound = 0;
     let totalIngested = 0;
@@ -1059,7 +1162,7 @@ Deno.serve(async (req) => {
     // the invocation first.
     const FEED_LOOP_TIME_BUDGET_MS = 110_000;
 
-    for (const feed of dueFeeds) {
+    for (const [feedIndex, feed] of dueFeeds.entries()) {
       if (Date.now() - startTime > FEED_LOOP_TIME_BUDGET_MS) {
         console.log(`[poll-feeds] Time budget exceeded (${Date.now() - startTime}ms) — stopping early, ${dueFeeds.length - results.length} feed(s) deferred to next cron tick`);
         break;
@@ -1073,6 +1176,7 @@ Deno.serve(async (req) => {
       }
       await runReceipt.begin(feed.id);
       const resultIndex = results.length;
+      const allocation = budget.feedAllowance(dueFeeds.length - feedIndex, MAX_NEW_INGESTS_PER_POLL);
       try {
 
       // CLAIM BEFORE WORK. Stamp last_polled_at up front so a mid-feed kill
@@ -1093,7 +1197,7 @@ Deno.serve(async (req) => {
       // RSS). Both bypass the legacy import_queue path entirely and route
       // through `ingest` with the share-URL ledger.
       if (feed.search_criteria?.fetch_strategy === "rss_article_hop") {
-        const hopResult = await pollArticleHopFeed(supabase, feed, budget);
+        const hopResult = await pollArticleHopFeed(supabase, feed, budget, allocation);
         results.push(hopResult);
         totalFound += hopResult.items_found;
         totalIngested += hopResult.new_ingested || 0;
@@ -1106,13 +1210,13 @@ Deno.serve(async (req) => {
           feed.search_criteria?.fetch_strategy
         )
       ) {
-        const fcResult = await pollFirecrawlHtmlFeed(supabase, feed, budget);
+        const fcResult = await pollFirecrawlHtmlFeed(supabase, feed, budget, allocation);
         results.push(fcResult);
         totalFound += fcResult.items_found;
         totalIngested += fcResult.new_ingested || 0;
 
-        // Small delay between feeds to be polite
-        await new Promise((r) => setTimeout(r, 500));
+        // Small delay between feeds to be polite; Craigslist search pages are one site, so one request per 2 s.
+        await new Promise((r) => setTimeout(r, feed.source_slug === "craigslist" ? SITE_MIN_SPACING_MS : 500));
         continue;
       }
 
@@ -1276,6 +1380,7 @@ Deno.serve(async (req) => {
         feeds_selected: dueFeeds.length,
         feed_selection_complete: feeds.length <= 2000,
         throttle: budget.snapshot(),
+        removals,
         total_items_found: totalFound,
         total_new_queued: totalQueued,
         total_new_ingested: totalIngested,

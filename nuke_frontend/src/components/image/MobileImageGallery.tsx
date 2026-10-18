@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { supabase } from '../../lib/supabase';
 
 interface MobileImageGalleryProps {
+  vehicleId: string | undefined;
   leadImageUrl: string;
   onClose: () => void;
 }
@@ -15,8 +16,9 @@ interface VehicleImage {
   created_at: string;
 }
 
-const MobileImageGallery: React.FC<MobileImageGalleryProps> = ({ leadImageUrl, onClose }) => {
+const MobileImageGallery: React.FC<MobileImageGalleryProps> = ({ vehicleId, leadImageUrl, onClose }) => {
   const [images, setImages] = useState<VehicleImage[]>([]);
+  const [readState, setReadState] = useState<'pending' | 'ready' | 'unavailable'>(vehicleId ? 'pending' : 'unavailable');
   const [currentIndex, setCurrentIndex] = useState(0);
   const [touchStartX, setTouchStartX] = useState<number | null>(null);
   const [touchStartY, setTouchStartY] = useState<number | null>(null);
@@ -27,16 +29,14 @@ const MobileImageGallery: React.FC<MobileImageGalleryProps> = ({ leadImageUrl, o
   const minSwipeDistance = 50;
 
   useEffect(() => {
-    // Extract vehicle ID from URL or context
-    const pathParts = window.location.pathname.split('/');
-    const vehicleId = pathParts[pathParts.indexOf('vehicles') + 1];
-    
+    let cancelled = false;
     if (vehicleId) {
-      loadImages(vehicleId);
+      loadImages(vehicleId, () => cancelled);
     }
-  }, []);
+    return () => { cancelled = true; };
+  }, [vehicleId]);
 
-  const loadImages = async (vehicleId: string) => {
+  const loadImages = async (vehicleId: string, isCancelled: () => boolean) => {
     const { data, error } = await supabase
       .from('vehicle_images')
       .select('id, image_url, large_url, caption, angle_tag, created_at')
@@ -46,6 +46,12 @@ const MobileImageGallery: React.FC<MobileImageGalleryProps> = ({ leadImageUrl, o
       .order('taken_at', { ascending: false, nullsFirst: false })
       .order('created_at', { ascending: false });
 
+    if (isCancelled()) return;
+    if (error || !Array.isArray(data)) {
+      setReadState('unavailable');
+      return;
+    }
+    setReadState('ready');
     if (!error && data) {
       setImages(data);
       // Find index of lead image
@@ -69,7 +75,7 @@ const MobileImageGallery: React.FC<MobileImageGalleryProps> = ({ leadImageUrl, o
   };
 
   const onTouchEnd = () => {
-    if (!touchStartX || !touchStartY || !touchEndX || !touchEndY) return;
+    if (touchStartX === null || touchStartY === null || touchEndX === null || touchEndY === null) return;
     
     const distanceX = touchStartX - touchEndX;
     const distanceY = touchStartY - touchEndY;
@@ -92,7 +98,7 @@ const MobileImageGallery: React.FC<MobileImageGalleryProps> = ({ leadImageUrl, o
   };
 
   const handlePrevious = () => {
-    setCurrentIndex((prev) => (prev > 0 ? prev - 1 : images.length - 1));
+    setCurrentIndex((prev) => (images.length === 0 ? 0 : (prev > 0 ? prev - 1 : images.length - 1)));
   };
 
   const handleNext = () => {
@@ -137,7 +143,9 @@ const MobileImageGallery: React.FC<MobileImageGalleryProps> = ({ leadImageUrl, o
         }}
       >
         <div style={{ color: 'var(--surface-elevated)', fontSize: '13px' }}>
-          {currentIndex + 1} / {images.length}
+          {images.length > 0 ? `${currentIndex + 1} / ${images.length}` :
+            readState === 'pending' ? 'Reading gallery…' :
+              readState === 'unavailable' ? 'Gallery could not be read.' : 'No additional photos in this read.'}
         </div>
         <button
           onClick={onClose}
@@ -248,7 +256,7 @@ const MobileImageGallery: React.FC<MobileImageGalleryProps> = ({ leadImageUrl, o
             </div>
           )}
           <div style={{ fontSize: '9px', color: 'var(--text-muted)', marginTop: 'var(--space-2)' }}>
-            {new Date(currentImage.created_at).toLocaleDateString()}
+            RECORD DATE {new Date(currentImage.created_at).toLocaleDateString()} · CAPTURE DATE UNKNOWN
           </div>
           <div
             style={{

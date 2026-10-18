@@ -135,7 +135,7 @@ export function UploadProgressNotifications({
     // Get vehicle data
     const { data: vehicle } = await supabase
       .from('vehicles')
-      .select('vin, mileage, owner_name')
+      .select('vin, mileage')
       .eq('id', vehicleId)
       .single();
 

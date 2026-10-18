@@ -24,6 +24,7 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { requireWriteAuth, authenticateWriter } from "../_shared/writeGuard.ts";
 import { COMMENT_MODEL, OPENAI_COMMENT_MODEL, classifyCommentModelFailure, derivePublicComment } from "./deriveComment.ts";
 import { projectSecretKey } from "../_shared/supabaseKeys.ts";
+import { geminiFetch } from '../_shared/geminiGuard.ts';
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -564,8 +565,8 @@ async function extractClaims(
       const googleKey = Deno.env.get("GEMINI_API_KEY") || Deno.env.get("GOOGLE_AI_API_KEY") || "";
       if (!content && googleKey) {
         try {
-          const gemResp = await fetch(
-            `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent?key=${googleKey}`,
+          const gemResp = await geminiFetch(
+            `https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-lite-latest:generateContent?key=${googleKey}`,
             {
               method: "POST",
               headers: { "Content-Type": "application/json" },
@@ -574,11 +575,11 @@ async function extractClaims(
                 generationConfig: { temperature: 0.1, maxOutputTokens: 4096 },
               }),
             }
-          );
+          , 'batch-comment-discovery');
           if (gemResp.ok) {
             const gd = await gemResp.json();
             content = gd.candidates?.[0]?.content?.parts?.[0]?.text || "";
-            modelUsed = "gemini-2.5-flash-lite";
+            modelUsed = "gemini-flash-lite-latest";
             costCents = 0;
           } else {
             const gemErr = await gemResp.text().catch(() => "");
@@ -731,8 +732,8 @@ QUESTIONS:
 ${questionBlock}`;
 
     try {
-      const resp = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent?key=${googleKey}`,
+      const resp = await geminiFetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-lite-latest:generateContent?key=${googleKey}`,
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -741,7 +742,7 @@ ${questionBlock}`;
             generationConfig: { temperature: 0.1, maxOutputTokens: 8192 },
           }),
         }
-      );
+      , 'batch-comment-discovery');
 
       if (!resp.ok) {
         const errText = await resp.text().catch(() => "");

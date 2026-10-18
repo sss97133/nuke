@@ -8,6 +8,22 @@ The observation system is the unified data ingestion layer. Every piece of infor
 
 ## Key Tables and Functions
 
+### Testing a newly admitted retained property (2026-10-11)
+
+The engine-family contract runs `bash scripts/test-engine-family-intake.sh` with explicit local
+`PGHOST`, `PGPORT`, `PGUSER`, an empty `PGDATABASE=dm_refinement_*`, and installed `psql` and `deno`.
+Set `PSQL_BIN` to the installed PostgreSQL 17 binary when another major version is on PATH.
+The script refuses remote targets. It loads the existing proposal/review contract and frozen canonical
+reader/guard definitions, then runs the actual Edge handler against PostgreSQL through a narrow test
+transport. Both the synthetic native source and its derived claim enter through that handler.
+
+Keep the baseline rejection in the test: local curator review must register vocabulary without making
+the old admission guard pass. After migration, assert the stored claim, duplicate identity, source
+quotation, fingerprint, capture/recording clocks and unknown identity through both public readers.
+Test loss of eligibility and RPC errors as well as admission. This proves handler/database behavior;
+it does not verify deployed HTTP, PostgREST configuration, production RLS as a whole, a scheduled worker,
+or fleet coverage. Schema/application deployment and curator ratification remain separate stages.
+
 ### Tables
 
 | Table | Purpose |

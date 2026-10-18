@@ -80,8 +80,12 @@ async function cycle() {
     await guard(state); if (!owned.created) await chrome.tabs.reload(tab.id); await waitPage(tab.id);
     await new Promise(resolve => setTimeout(resolve, 2500));
     await guard(state);
-    const results = await chrome.scripting.executeScript({ target: { tabId: tab.id, allFrames: false }, files: ['dom.js','content.js'], world: 'ISOLATED' });
+    const results = await chrome.scripting.executeScript({ target: { tabId: tab.id, allFrames: false }, files: ['classify.js','dom.js','content.js'], world: 'ISOLATED' });
     const pass = results.at(-1)?.result;
+    if (pass && !pass.packets?.length) {
+      // Every rendered card failed the targeting gate: nothing to land, but the pass and its reasons are kept visibly.
+      state.inFlight = null; state.lastCycle = { ...state.lastCycle, state: 'all_cards_rejected', cards: 0, screening: pass.screening, finishedAt: new Date().toISOString() }; await write(state); return;
+    }
     if (!pass?.packets?.length || pass.packets.length > 4) throw new Error('source_packet_budget');
     for (const packet of pass.packets) enqueue(state, packet); state.inFlight = null;
     for (const card of pass.packets.flatMap(packet => packet.batch)) { const prior = state.seen[card.facebook_id]; state.seen[card.facebook_id] = { first: prior?.first ?? pass.packets[0].capture.observed_at, last: pass.packets[0].capture.observed_at, visits: (prior?.visits ?? 0) + 1 }; }

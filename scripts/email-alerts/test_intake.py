@@ -7,6 +7,7 @@ import zlib
 import sqlite3
 import tempfile
 import unittest
+from unittest.mock import patch
 import contextlib
 import io
 from types import SimpleNamespace
@@ -328,6 +329,64 @@ class FakeSupabase(m.Supabase):
 
 
 class WriteTests(unittest.TestCase):
+    def test_priority_mail_precedes_newer_noise_and_replays_without_loss(self):
+        class KslDB(FakeSupabase):
+            def source_config(self, source):
+                return None
+
+            def rows(self, table, **query):
+                if table in ('vehicles', 'vehicle_events'):
+                    return []
+                return super().rows(table, **query)
+
+        with tempfile.TemporaryDirectory() as d:
+            root = Path(d)
+            manifest = []
+            for name, titles, received in (
+                    ('noise', ['2020 Ford Mustang'], '2026-10-18T22:00:00Z'),
+                    ('priority', ['1992 Ford Mustang', '1960 Ford Falcon', '1991 Buick Riviera',
+                                  '1959 Ford Thunderbird', 'Ford Model 1968'], '2026-10-17T22:00:00Z')):
+                msg = EmailMessage()
+                msg['From'] = 'cars@ksl.com'
+                msg['To'] = 'private-recipient@example.test'
+                msg['Subject'] = 'Saved search 1960-1991'
+                msg['Message-ID'] = f'<{name}@example.test>'
+                msg.set_content('Saved search alert')
+                msg.add_alternative(''.join(
+                    f'<!-- a listing --><a href="https://cars.ksl.com/listing/{100 + i if name == "priority" else 200 + i}">'
+                    '<img src="https://img.ksl.com/car.jpg"></a>'
+                    f'<div>{title}</div><div>$5,000.00</div><!-- end listing -->'
+                    for i, title in enumerate(titles)), subtype='html')
+                path = root / f'{name}.eml'
+                path.write_bytes(msg.as_bytes())
+                manifest.append({'path': str(path), 'received_at': received})
+            path = root / 'manifest.json'
+            path.write_text(json.dumps(manifest))
+            args = SimpleNamespace(state_dir=root, message_manifest=path, source='ksl',
+                                   target_email='private-recipient@example.test', days=None, limit=10,
+                                   dry_run=False, refresh_sitemap=False, stale_hours=72,
+                                   priority_years=[1960, 1991], batch_size=1, replay=False)
+            client = KslDB()
+            with patch.object(m, 'Supabase', return_value=client), contextlib.redirect_stdout(io.StringIO()):
+                self.assertEqual(m.run(args), 0)
+            observations = list(client.observations.values())
+            self.assertEqual([x['structured_data'].get('year') for x in observations],
+                             [1960, 1991, 1992, 1959, None])
+            self.assertEqual(client.posts, 5)
+            report = json.loads((root / 'last-run.json').read_text())
+            self.assertEqual([x['priority'] for x in report['results']], [True, True, False, False, False])
+            self.assertEqual(report['latest_email_received_at'], '2026-10-18T22:00:00+00:00')
+            self.assertEqual(len(json.loads((root / 'state.json').read_text())['completed']), 1)
+            with patch.object(m, 'Supabase', return_value=client), contextlib.redirect_stdout(io.StringIO()):
+                self.assertEqual(m.run(args), 0)
+                self.assertEqual(m.run(args), 0)
+            self.assertEqual(client.posts, 6)
+            self.assertEqual(len(json.loads((root / 'state.json').read_text())['completed']), 2)
+            args.replay = True
+            with patch.object(m, 'Supabase', return_value=client), contextlib.redirect_stdout(io.StringIO()):
+                self.assertEqual(m.run(args), 0)
+            self.assertEqual(client.posts, 6)
+
     def test_ksl_evidence_does_not_depend_on_blocked_scraper_queue(self):
         class KslDB(FakeSupabase):
             def rows(self, table, **query):

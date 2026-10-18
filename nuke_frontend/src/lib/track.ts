@@ -10,6 +10,7 @@
  * Auto-attached: session_key, user_id (when signed in), path, referrer.
  */
 import { supabase } from './supabase';
+import { SUPABASE_URL, SUPABASE_ANON_KEY } from './env';
 
 interface AppEvent {
   event: string;
@@ -47,8 +48,9 @@ function sessionKey(): string {
 }
 
 function restUrl(): string | null {
-  const base = (import.meta as any).env?.VITE_SUPABASE_URL;
-  const anon = (import.meta as any).env?.VITE_SUPABASE_ANON_KEY;
+  // env.ts trims the deploy's values (Vercel's VITE_SUPABASE_URL carried a trailing newline on 2026-10-14).
+  const base = SUPABASE_URL;
+  const anon = SUPABASE_ANON_KEY;
   if (!base || !anon) return null;
   // apikey as query param so navigator.sendBeacon (no headers) works on pagehide
   return `${base}/rest/v1/app_events?apikey=${encodeURIComponent(anon)}`;

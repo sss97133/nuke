@@ -257,9 +257,9 @@ Deno.serve(async (req) => {
     let llmResponse;
     const providerModels: [LLMProvider, string][] = [
       // Google (lite) first — free tier, separate quota from 2.5-flash
-      ['google', 'gemini-2.5-flash-lite'],
+      ['google', 'gemini-flash-lite-latest'],
       // Google (full) — may hit 10K/day quota
-      ['google', 'gemini-2.5-flash'],
+      ['google', 'gemini-3.1-flash-lite'],
       // Anthropic fallback — $1/MTok input (may have no credits)
       ['anthropic', 'claude-haiku-4-5-20251001'],
       // OpenAI last resort — quota may be exhausted

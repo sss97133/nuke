@@ -4062,6 +4062,9 @@ Tables are grouped by domain and sorted by row count within each group.
 | `created_at` | timestamp with time zone | YES | now() |  |
 | `updated_at` | timestamp with time zone | YES | now() |  |
 | `business_id` | uuid | YES |  | Unified org: this source is represented as a business for discovery, metrics, and UI. |
+| `species` | source_species | YES |  | How its listings live (data-machine-cases.md §6): timed_auction, block_house, dealer, classifieds, auth_walled_marketplace, aggregator, media_forum_video, owner_private. NULL = not examined. Refused without `species_set` and `species_evidence` (CHECK `observation_sources_species_evidenced`). 2026-10-18. |
+| `species_set` | source_species[] | YES |  | Every species the source's listings take; contains `species`. A listing's own: `listing_species_from_evidence()` / `v_listing_species`. |
+| `species_evidence` | jsonb | YES |  | `{examined_at, examined[], seen, doc, extractor, listing_rule}`: what the species was read from. |
 
 ### `source_registry`
 

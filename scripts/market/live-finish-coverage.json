@@ -1,0 +1,48 @@
+{
+ "price": {
+  "A": {
+   "coverage": 0.8001,
+   "n": 6539,
+   "lots": 2275,
+   "median_miss": 0.1513,
+   "window": "prod vehicle lots closed 2026-09-28..2026-10-14 (2857 lots, each read at 3 moments 10 min..160 h before close; price-only; scored 2026-10-15)"
+  },
+  "B": {
+   "coverage": 0.7772,
+   "n": 1535,
+   "lots": 616,
+   "median_miss": 0.2,
+   "window": "prod vehicle lots closed 2026-09-28..2026-10-14 (2857 lots, each read at 3 moments 10 min..160 h before close; price-only; scored 2026-10-15)"
+  },
+  "C": {
+   "coverage": 0.7383,
+   "n": 470,
+   "lots": 157,
+   "median_miss": 0.2379,
+   "window": "prod vehicle lots closed 2026-09-28..2026-10-14 (2857 lots, each read at 3 moments 10 min..160 h before close; price-only; scored 2026-10-15)"
+  }
+ },
+ "full": {
+  "A": {
+   "coverage": 0.7921,
+   "n": 5329,
+   "lots": 1985,
+   "median_miss": 0.1429,
+   "window": "prod vehicle lots closed 2026-09-28..2026-10-14 (2857 lots, each read at 3 moments 10 min..160 h before close; with bid and comment rows; scored 2026-10-15)"
+  },
+  "B": {
+   "coverage": 0.7851,
+   "n": 2745,
+   "lots": 1137,
+   "median_miss": 0.1711,
+   "window": "prod vehicle lots closed 2026-09-28..2026-10-14 (2857 lots, each read at 3 moments 10 min..160 h before close; with bid and comment rows; scored 2026-10-15)"
+  },
+  "C": {
+   "coverage": 0.7532,
+   "n": 470,
+   "lots": 157,
+   "median_miss": 0.2273,
+   "window": "prod vehicle lots closed 2026-09-28..2026-10-14 (2857 lots, each read at 3 moments 10 min..160 h before close; with bid and comment rows; scored 2026-10-15)"
+  }
+ }
+}

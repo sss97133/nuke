@@ -24,6 +24,12 @@ import "jsr:@supabase/functions-js/edge-runtime.d.ts";
  *     → Typesense discovers URLs → archiveFetch (Firecrawl) archives raw HTML/markdown
  *     → Stored in listing_page_snapshots. "Fetch once, extract forever."
  *
+ *   POST { "mode": "land", "batch_size": 100 }
+ *     → One Typesense request (sorted oldest auction first), mapped and landed through extract-bonhams
+ *       (vehicles + vehicle_events + vehicle_observations with the source document retained). The page cursor is
+ *       the last landed page, read back from vehicle_events.metadata.ts_page; it wraps to page 1 after the last page
+ *       (a revisit). Run by pg_cron job bonhams-typesense-land. At most 1 request to Bonhams per run.
+ *
  *   POST { "mode": "stats" }
  *     → Return count of available cars and import_queue overlap
  *
@@ -32,6 +38,8 @@ import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { corsHeaders } from "../_shared/cors.ts";
+import { parseTitle } from "./titleParse.ts";
+import { extractBonhamsHighlights, isBonhamsNonVehicleLot, parseSellerAssessment } from "../extract-bonhams/lotPage.ts";
 import { archiveFetch } from "../_shared/archiveFetch.ts";
 import { requireWriteAuth } from "../_shared/writeGuard.ts";
 import { projectSecretKey } from "../_shared/supabaseKeys.ts";
@@ -45,21 +53,6 @@ const DEPARTMENT_FILTER = "department.code:MOT-CAR";
 
 const EXTRACTOR_VERSION = "bonhams-typesense-v1";
 const MAX_PER_PAGE = 250; // Typesense max
-
-// ─── Known multi-word makes for title parsing ─────────────────────────────────
-
-const KNOWN_MAKES = [
-  "Alfa Romeo", "Aston Martin", "Austin-Healey", "Mercedes-Benz", "Rolls-Royce",
-  "Land Rover", "De Tomaso", "Facel Vega", "Hispano-Suiza", "Brough Superior",
-  "Pierce-Arrow", "De Dion-Bouton", "Isotta Fraschini", "Invicta",
-  "AC", "BMW", "Bentley", "Bugatti", "Cadillac", "Chevrolet", "Chrysler",
-  "Citroën", "Daimler", "Delage", "Delahaye", "Dodge", "Ferrari", "Fiat",
-  "Ford", "Jaguar", "Jensen", "Lamborghini", "Lancia", "Lincoln", "Lotus",
-  "Maserati", "McLaren", "MG", "Morgan", "Oldsmobile", "Packard", "Peugeot",
-  "Plymouth", "Pontiac", "Porsche", "Renault", "Riley", "Rover", "Shelby",
-  "Singer", "Studebaker", "Sunbeam", "Talbot", "Toyota", "Triumph",
-  "TVR", "Vauxhall", "Volvo", "Volkswagen",
-];
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -78,94 +71,6 @@ function stripHtml(html: string): string {
     .replace(/&[a-z]+;/gi, "")
     .replace(/\n{3,}/g, "\n\n")
     .trim();
-}
-
-// ─── Title parser: "1966 Ferrari 330 GT Chassis no. 8023 Engine no. 8023" ─────
-
-interface ParsedTitle {
-  year: number | null;
-  make: string | null;
-  model: string | null;
-  chassis: string | null;
-}
-
-function parseTitle(title: string): ParsedTitle {
-  const result: ParsedTitle = { year: null, make: null, model: null, chassis: null };
-  if (!title) return result;
-
-  // Extract chassis/VIN from title
-  // Patterns: "Chassis no. XXXXX", "Chassis no XXXXX", "VIN XXXXX"
-  const chassisPatterns = [
-    /Chassis\s+no\.?\s+([A-Z0-9*-]+(?:\s+[A-Z0-9*-]+)?)/i,
-    /VIN[:\s]+([A-HJ-NPR-Z0-9]{17})/i,
-    /Frame\s+no\.?\s+([A-Z0-9*-]+)/i,
-  ];
-  for (const pat of chassisPatterns) {
-    const m = title.match(pat);
-    if (m) {
-      result.chassis = m[1].trim().toUpperCase();
-      break;
-    }
-  }
-
-  // Strip chassis/engine suffixes for cleaner parsing
-  let clean = title
-    .replace(/\s*Chassis\s+no\.?\s+.*/i, "")
-    .replace(/\s*Engine\s+no\.?\s+.*/i, "")
-    .replace(/\s*Frame\s+no\.?\s+.*/i, "")
-    .replace(/\s*VIN[:\s]+.*/i, "")
-    .trim();
-
-  // Year: leading 4-digit year (1886-2030)
-  const yearMatch = clean.match(/^(\d{4})\s+/);
-  if (yearMatch) {
-    const y = parseInt(yearMatch[1], 10);
-    if (y >= 1886 && y <= 2030) {
-      result.year = y;
-      clean = clean.slice(yearMatch[0].length).trim();
-    }
-  }
-  // Fallback: "c.1960" or "Circa 1960"
-  if (!result.year) {
-    const circaMatch = clean.match(/(?:c\.?\s*|circa\s+)(\d{4})/i);
-    if (circaMatch) {
-      const y = parseInt(circaMatch[1], 10);
-      if (y >= 1886 && y <= 2030) {
-        result.year = y;
-        clean = clean.replace(circaMatch[0], "").trim();
-      }
-    }
-  }
-
-  // Make: check multi-word makes first, then take first word
-  const lowerClean = clean.toLowerCase();
-  let foundMake: string | null = null;
-  for (const make of KNOWN_MAKES) {
-    if (lowerClean.startsWith(make.toLowerCase())) {
-      foundMake = make;
-      clean = clean.slice(make.length).trim();
-      break;
-    }
-  }
-  if (!foundMake && clean.length > 0) {
-    // Hyphenated makes: "Harley-Davidson", unknown compound
-    const firstWordMatch = clean.match(/^([A-Za-zÀ-ÿ][\w-]*(?:\s[A-Za-zÀ-ÿ][\w-]*)?)\s/);
-    if (firstWordMatch) {
-      foundMake = firstWordMatch[1];
-      clean = clean.slice(firstWordMatch[0].length).trim();
-    } else {
-      foundMake = clean;
-      clean = "";
-    }
-  }
-  result.make = foundMake;
-
-  // Model: everything remaining (strip trailing punctuation)
-  if (clean.length > 0) {
-    result.model = clean.replace(/[,;]+$/, "").trim() || null;
-  }
-
-  return result;
 }
 
 // ─── Map Bonhams Typesense doc → our standard vehicle format ──────────────────
@@ -284,6 +189,8 @@ function mapDocument(doc: BonhamsDoc): MappedVehicle {
       bonhams_lot_item_id: doc.lotItemId,
       lot_number: doc.lotNo?.full || doc.lotId,
       chassis: parsed.chassis,
+      title_year_range: parsed.year_range ?? null,
+      title_blurb: parsed.blurb ?? null,
       description,
       image_url: imageUrl,
       currency,
@@ -357,6 +264,89 @@ async function searchTypesense(
   return await res.json() as TypesenseResponse;
 }
 
+
+// ─── One search-index lot document as an ExtractionResult for extract-bonhams (land_lots) ──────────────────────────────
+
+interface LandContext {
+  observedAt: string;
+  pageNo?: number;
+  pass?: number;
+  SORT?: string;
+  sortTag?: string;
+  /** The sale (auctions collection) when the lot is read for the calendar: its title, days and place. */
+  sale?: { title: string; starts_on: string | null; ends_on: string | null; days: string[]; location: string | null };
+}
+
+function lotToExtraction(doc: BonhamsDoc, ctx: LandContext): Record<string, unknown> {
+  const { observedAt, pageNo, pass, SORT, sortTag, sale } = ctx;
+  const m = mapDocument(doc);
+  const raw = m.raw_data as Record<string, unknown>;
+  const hammer = doc.price?.hammerPrice > 0 ? Math.round(doc.price.hammerPrice) : null;
+  const ended = !!doc.flags?.isAuctionEnded;
+  const runDay = String(doc.hammerTime?.datetime || doc.auctionEndDate?.datetime || "").slice(0, 10);
+  // Lot-level evidence decides whether a lot is a vehicle (department is the sale's, so MOT-CAR also holds mascots, handbooks and helmets).
+  // 2026-10-16: 1,249 of the 2,422 Bonhams episodes with no year had no identity line, and every one sampled was memorabilia.
+  const nonVehicle = isBonhamsNonVehicleLot({ title: doc.title ?? null, catalogText: doc.catalogDesc, footnotes: doc.footnotes, year: m.listing_year ?? null });
+  const sellerAssessment = doc.footnotes ? parseSellerAssessment(doc.footnotes) : null;
+  const highlights = doc.catalogDesc ? extractBonhamsHighlights(doc.catalogDesc) : [];
+  const registration = (doc.catalogDesc || "").match(/Registration\s+no\.?\s*:?\s*([^<\n]{2,20})/i)?.[1]?.trim() ?? null;
+  return {
+    non_vehicle_item: nonVehicle,
+    url: m.listing_url,
+    title: m.listing_title,
+    year: m.listing_year,
+    make: m.listing_make,
+    model: m.listing_model,
+    vin: null,
+    chassis_number: (raw.chassis as string | null) ?? null,
+    mileage: null, engine: null, transmission: null, exterior_color: null, interior_color: null, body_style: null,
+    description: (raw.description as string | null) ?? null,
+    sale_price: hammer,
+    price_currency: doc.currency?.iso_code ?? null,
+    auction_status: hammer ? "sold" : (ended ? "unsold" : "upcoming"),
+    lot_number: doc.lotNo?.full || doc.lotId || null,
+    sale_id: doc.auctionId || null,
+    sale_name: sale?.title ?? null,
+    sale_date: doc.hammerTime?.datetime || doc.auctionEndDate?.datetime || null,
+    sale_location: sale?.location ?? (doc.region?.name || doc.country?.name || null),
+    estimate_low: doc.price?.estimateLow > 0 ? doc.price.estimateLow : null,
+    estimate_high: doc.price?.estimateHigh > 0 ? doc.price.estimateHigh : null,
+    estimate_currency: doc.currency?.iso_code ?? null,
+    image_urls: doc.image?.url ? [doc.image.url] : [],
+    fetch_source: "bonhams-typesense",
+    cost_cents: 0,
+    event_key: doc.id,
+    ...(pageNo ? { ts_page: pageNo } : {}),
+    ...(highlights.length ? { highlights } : {}),
+    ...(sellerAssessment ? { seller_assessment: sellerAssessment } : {}),
+    extra_metadata: {
+      ...(pageNo ? { ts_landed_at: observedAt, ts_sort: sortTag ?? "desc", ts_pass: pass ?? 0 } : {}),
+      sale_key: `bonhams-${doc.auctionId}`,
+      auction_name: sale?.title ?? null,
+      auction_session_days: sale?.days?.length ? sale.days : (runDay ? [runDay] : []),
+      sale_starts_on: sale?.starts_on ?? (doc as unknown as { biddableFrom?: { datetime?: string } }).biddableFrom?.datetime?.slice(0, 10) ?? null,
+      sale_ends_on: sale?.ends_on ?? doc.auctionEndDate?.datetime?.slice(0, 10) ?? null,
+      sale_location: sale?.location ?? (doc.region?.name || doc.country?.name || null),
+      country_code: doc.country?.code ?? null,
+      lot_unique_id: doc.lotUniqueId ?? null,
+      has_reserve: !doc.flags?.isWithoutReserve,
+      ...(raw.title_year_range ? { title_year_range: raw.title_year_range } : {}),
+      ...(raw.title_blurb ? { title_blurb: raw.title_blurb } : {}),
+      currency: doc.currency?.iso_code ?? null,
+      roster_first_seen_at: observedAt, // kept from the first read by extract-bonhams
+      engine_number: (doc.catalogDesc || "").match(/Engine\s+no\.?\s*:?\s*([A-Z0-9*][A-Z0-9*./-]*)/i)?.[1]?.toUpperCase() ?? null,
+      registration: registration && !/^(?:not\s+(?:uk\s+)?registered|unregistered|none|n\/a|tba|tbc)$/i.test(registration) ? registration : null,
+      ...(sellerAssessment ? { seller_assessment: sellerAssessment } : {}),
+      without_reserve: !!doc.flags?.isWithoutReserve,
+      bonhams_status: doc.status ?? null,
+    },
+    hammer_price: hammer,
+    hammer_premium: doc.price?.hammerPremium > 0 ? Math.round(doc.price.hammerPremium) : null,
+    // The source document is retained on the observation (raw_data); a walk page is stamped for the cursor.
+    raw_document: { ...doc, styledDescription: undefined, _capture: { source: "bonhams-typesense", observed_at: observedAt, ts_page: pageNo ?? null, sort: SORT ?? null } },
+  };
+}
+
 // ─── HTTP handler ─────────────────────────────────────────────────────────────
 
 Deno.serve(async (req) => {
@@ -381,6 +371,27 @@ Deno.serve(async (req) => {
 
     const perPage = Math.min(Number(batch_size) || 50, MAX_PER_PAGE);
     const startPage = Math.max(Number(page) || 1, 1);
+
+    // ─── MODE: departments ──────────────────────────────────────────────
+    // Which departments the search index holds, with lot counts (one request, read only), and, for named lots, each lot's own department.
+    //   POST { "mode": "departments" }                       -> facet counts of department.code (+ name) over the whole lots collection
+    //   POST { "mode": "departments", "ids": ["31858-214"] } -> [{ id, department: {code, name} | null }] for up to 250 lot ids
+    if (mode === "departments") {
+      const headers = { "X-TYPESENSE-API-KEY": TYPESENSE_API_KEY, "Accept": "application/json" };
+      const ids: string[] = (Array.isArray(body.ids) ? body.ids : []).map(String).filter((x: string) => /^[0-9]+-[0-9]+[A-Za-z]{0,2}$/.test(x)).slice(0, 250); // lot numbers can carry a letter ("908A")
+      const params: Record<string, string> = ids.length
+        ? { q: "*", query_by: "title", per_page: "250", filter_by: `id:=[${ids.map((x) => (/^[0-9]+-[0-9]+$/.test(x) ? x : "`" + x + "`")).join(",")}]`, include_fields: "id,department" }
+        : { q: "*", query_by: "title", per_page: "0", facet_by: "department.code,department.name", max_facet_values: "60" };
+      const res = await fetch(`${TYPESENSE_HOST}/search-proxy/collections/${TYPESENSE_COLLECTION}/documents/search?${new URLSearchParams(params)}`, { headers });
+      if (res.status === 403 || res.status === 429) return okJson({ success: false, backoff: true, upstream_status: res.status });
+      if (!res.ok) return okJson({ success: false, error: `Typesense HTTP ${res.status}` }, 502);
+      const j = await res.json() as { found: number; hits?: Array<{ document: { id: string; department?: { code: string; name: string } } }>; facet_counts?: Array<{ field_name: string; counts: Array<{ value: string; count: number }> }> };
+      if (ids.length) {
+        const byId = new Map((j.hits ?? []).map((h) => [h.document.id, h.document.department ?? null]));
+        return okJson({ success: true, mode: "departments", asked: ids.length, found: j.hits?.length ?? 0, lots: ids.map((id) => ({ id, department: byId.get(id) ?? null })) });
+      }
+      return okJson({ success: true, mode: "departments", total: j.found, facets: Object.fromEntries((j.facet_counts ?? []).map((f) => [f.field_name, f.counts])) });
+    }
 
     // ─── MODE: stats ────────────────────────────────────────────────────
     if (mode === "stats") {
@@ -421,6 +432,230 @@ Deno.serve(async (req) => {
           coverage_pct: queueCount ? ((queueCount / allCars.found) * 100).toFixed(1) + "%" : "0%",
         },
       });
+    }
+
+    // ─── MODE: land ─────────────────────────────────────────────────────
+    if (mode === "land") {
+      const supabase = createClient(
+        Deno.env.get("SUPABASE_URL") ?? "",
+        projectSecretKey() ?? "",
+      );
+      // The cursor counts pages of 50 lots. A run asked for 100 reads two consecutive pages of 50 (2 s apart), never one page of 100, so the
+      // cursor keeps its meaning and the walk neither skips nor repeats lots.
+      const size = 50;
+      const pagesPerRun = Math.min(Number(batch_size) || 50, 100) > 50 ? 2 : 1;
+      // Newest sale first (2026-10-15): the first walk went oldest-first and landed 2003-2014; the calendar and the deep pass want the newest.
+      const SORT = "auctionEndDate.timestamp:desc";
+
+      let pageNo = Number(page) > 1 ? Number(page) : 0;
+      let pass = 0;
+      if (!pageNo) {
+        // The cursor is the furthest page of the newest pass (metadata.ts_pass, absent = pass 0), not the latest row written:
+        // a stray page-1 landing, or a failed read read as "nothing landed", used to send the walk back to page 1 (10:42Z
+        // 2026-10-15: 150 lots per 20 minutes became re-landing pages 1-4). A failed read now stops the run.
+        const { data: last, error: curErr } = await supabase
+          .from("vehicle_events")
+          .select("metadata")
+          .eq("source_platform", "bonhams")
+          .eq("extraction_source", "bonhams-typesense")
+          .eq("metadata->>ts_sort", "desc")
+          .not("metadata->>ts_page", "is", null)
+          .order("metadata->ts_pass", { ascending: false, nullsFirst: false })
+          .order("metadata->ts_page", { ascending: false })
+          .limit(1);
+        if (curErr) return okJson({ success: false, error: `cursor read failed: ${curErr.message}` }, 503);
+        const m = (last?.[0]?.metadata ?? {}) as Record<string, unknown>;
+        const lastPage = Number(m.ts_page);
+        pass = Number.isFinite(Number(m.ts_pass)) ? Number(m.ts_pass) : 0;
+        pageNo = Number.isFinite(lastPage) && lastPage > 0 ? lastPage + 1 : 1;
+      }
+
+      const fetchPage = (n: number) => {
+        const params = new URLSearchParams({
+          q: "*", query_by: "title", per_page: String(size), page: String(n),
+          filter_by: DEPARTMENT_FILTER, sort_by: SORT,
+        });
+        return fetch(`${TYPESENSE_HOST}/search-proxy/collections/${TYPESENSE_COLLECTION}/documents/search?${params}`, {
+          headers: { "X-TYPESENSE-API-KEY": TYPESENSE_API_KEY, "Accept": "application/json" },
+        });
+      };
+      let res = await fetchPage(pageNo);
+      if (res.status === 403 || res.status === 429) {
+        // Back off: nothing more is asked of Bonhams this run; the next scheduled run tries again.
+        return okJson({ success: false, backoff: true, upstream_status: res.status, page: pageNo });
+      }
+      if (!res.ok) return okJson({ success: false, error: `Typesense HTTP ${res.status}`, page: pageNo }, 502);
+      let data = await res.json() as TypesenseResponse;
+      if (!data.hits?.length && pageNo > 1) {
+        // Past the last page: wrap to page 1 (a revisit), 2 s after the previous request.
+        await new Promise((r) => setTimeout(r, 2000));
+        pageNo = 1;
+        pass += 1; // a new pass over the index: its cursor outranks every page of the last pass
+        res = await fetchPage(pageNo);
+        if (res.status === 403 || res.status === 429) return okJson({ success: false, backoff: true, upstream_status: res.status, page: pageNo });
+        if (!res.ok) return okJson({ success: false, error: `Typesense HTTP ${res.status}`, page: pageNo }, 502);
+        data = await res.json() as TypesenseResponse;
+      }
+
+      const totalPages = Math.max(1, Math.ceil(data.found / size));
+      if (!data.hits?.length) {
+        return okJson({ success: true, mode: "land", page: pageNo, landed: 0, found: data.found });
+      }
+
+      const observedAt = new Date().toISOString();
+      const lots = data.hits.filter((h) => h.document?.title && h.document.title.length >= 3).map((h) =>
+        lotToExtraction(h.document, { observedAt, pageNo, pass, SORT, sortTag: "desc" }));
+      let pagesRead = 1;
+      if (pagesPerRun > 1 && data.hits.length === size && pageNo < totalPages) {
+        await new Promise((r) => setTimeout(r, 2000));
+        const res2 = await fetchPage(pageNo + 1);
+        if (res2.status === 403 || res2.status === 429) {
+          // Keep the first page; the next run starts at the page after it.
+          console.log(`[bonhams-typesense] second page ${pageNo + 1} backed off (${res2.status})`);
+        } else if (res2.ok) {
+          const data2 = await res2.json() as TypesenseResponse;
+          for (const h of data2.hits ?? []) {
+            if (h.document?.title && h.document.title.length >= 3) {
+              lots.push(lotToExtraction(h.document, { observedAt, pageNo: pageNo + 1, pass, SORT, sortTag: "desc" }));
+            }
+          }
+          pagesRead = 2;
+        }
+      }
+
+      // Two calls of 50: one 100-lot call hit WORKER_RESOURCE_LIMIT (2026-10-15 01:41Z).
+      const landed: Record<string, unknown>[] = [];
+      let landOk = true;
+      for (let i = 0; i < lots.length; i += 50) {
+        const landRes = await fetch(`${Deno.env.get("SUPABASE_URL")}/functions/v1/extract-bonhams`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json", Authorization: req.headers.get("authorization") ?? "" },
+          body: JSON.stringify({ action: "land_lots", lots: lots.slice(i, i + 50), observed_at: observedAt }),
+        });
+        landOk = landOk && landRes.ok;
+        landed.push(await landRes.json().catch(() => ({ error: `HTTP ${landRes.status}` })));
+      }
+
+      // The cursor is metadata.ts_page on each landed vehicle_events row (set by the lander).
+      return okJson({
+        success: landOk, mode: "land", page: pageNo, pages_read: pagesRead, total_pages: totalPages, found: data.found,
+        next_page: pageNo + pagesRead > totalPages ? 1 : pageNo + pagesRead, lander: landed,
+      });
+    }
+
+    // ─── MODE: reland ───────────────────────────────────────────────────
+    // Land named lots again (up to 50, one search-index request): a repair after a landing resolved or parsed a lot wrongly.
+    // The lots are fetched by id and go through the same mapping and land_lots as the walk; the identity guard applies.
+    if (mode === "reland") {
+      const ids: string[] = (Array.isArray(body.ids) ? body.ids : []).map(String).filter((x: string) => /^[0-9]+(-[0-9]+)?$/.test(x)).slice(0, 50);
+      if (!ids.length) return okJson({ success: false, error: "ids required" }, 400);
+      const res = await fetch(`${TYPESENSE_HOST}/search-proxy/collections/${TYPESENSE_COLLECTION}/documents/search?${new URLSearchParams({
+        q: "*", query_by: "title", per_page: "50", filter_by: `id:=[${ids.join(",")}]`,
+      })}`, { headers: { "X-TYPESENSE-API-KEY": TYPESENSE_API_KEY, "Accept": "application/json" } });
+      if (res.status === 403 || res.status === 429) return okJson({ success: false, backoff: true, upstream_status: res.status });
+      if (!res.ok) return okJson({ success: false, error: `Typesense HTTP ${res.status}` }, 502);
+      const found = (await res.json() as TypesenseResponse).hits ?? [];
+      const observedAt = new Date().toISOString();
+      const lots = found.filter((h) => h.document?.title).map((h) => lotToExtraction(h.document, { observedAt }));
+      const landRes = await fetch(`${Deno.env.get("SUPABASE_URL")}/functions/v1/extract-bonhams`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: req.headers.get("authorization") ?? "" },
+        body: JSON.stringify({ action: "land_lots", lots, observed_at: observedAt }),
+      });
+      return okJson({ success: landRes.ok, mode: "reland", asked: ids.length, found: found.length, lander: await landRes.json().catch(() => ({ error: `HTTP ${landRes.status}` })) });
+    }
+
+    // ─── MODE: upcoming ─────────────────────────────────────────────────
+    // The calendar grain: the lots of Bonhams' car sales that have not ended, read from the search index (0 credits, no lot page).
+    // One request to the auctions collection, then one request per page of 250 lots per sale, 2 s apart. New or not-yet-upcoming
+    // lots are landed (up to 100 a run, two land_lots calls of 50) with event_status upcoming, ended_at the run day and the keys the
+    // calendar contract names; a source_census row (house_roster_facet) states the lots the house lists per sale.
+    if (mode === "upcoming") {
+      const supabase = createClient(Deno.env.get("SUPABASE_URL") ?? "", projectSecretKey() ?? "");
+      const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+      const todayUtc = new Date().toISOString().slice(0, 10);
+      const headers = { "X-TYPESENSE-API-KEY": TYPESENSE_API_KEY, "Accept": "application/json" };
+      const get = async (collection: string, params: Record<string, string>) => {
+        const res = await fetch(`${TYPESENSE_HOST}/search-proxy/collections/${collection}/documents/search?${new URLSearchParams(params)}`, { headers });
+        if (res.status === 403 || res.status === 429) throw Object.assign(new Error(`backoff ${res.status}`), { backoff: res.status });
+        if (!res.ok) throw new Error(`Typesense ${collection} HTTP ${res.status}`);
+        return await res.json();
+      };
+      let sales: Array<Record<string, any>> = [];
+      try {
+        const a = await get("auctions", { q: "*", query_by: "brand", per_page: "60", filter_by: "departments.code:=MOT-CAR", sort_by: "dates.end.timestamp:desc" });
+        sales = (a.hits ?? []).map((h: any) => h.document).filter((d: any) => !d.flags?.isAuctionEnded && String(d.dates?.end?.datetime ?? "").slice(0, 10) >= todayUtc);
+      } catch (e: any) {
+        if (e.backoff) return okJson({ success: false, backoff: true, upstream_status: e.backoff });
+        throw e;
+      }
+      const observedAt = new Date().toISOString();
+      const rosterBySale: Record<string, number> = {};
+      const salesMeta: Record<string, { name: string; starts_on: string | null; ends_on: string | null }> = {};
+      const docs: Array<{ doc: BonhamsDoc; sale: LandContext["sale"] }> = [];
+      for (const sale of sales) {
+        await sleep(2000);
+        const saleKey = `bonhams-${sale.id}`;
+        const endsOn = String(sale.dates?.end?.datetime ?? "").slice(0, 10) || null;
+        const startsOn = (sale.dates?.start?.[0]?.date?.datetime ?? sale.dates?.start?.datetime ?? sale.hammerTime?.datetime ?? "")?.slice(0, 10) || endsOn;
+        const days: string[] = [];
+        for (let t = Date.parse(`${startsOn}T00:00:00Z`); startsOn && endsOn && t <= Date.parse(`${endsOn}T00:00:00Z`) && days.length < 14; t += 86400000) days.push(new Date(t).toISOString().slice(0, 10));
+        const ctx = { title: String(sale.auctionTitle ?? sale.auctionHeading ?? saleKey), starts_on: startsOn, ends_on: endsOn, days, location: sale.country?.name ?? sale.region?.name ?? null };
+        salesMeta[saleKey] = { name: ctx.title, starts_on: startsOn, ends_on: endsOn };
+        let n = 0;
+        for (let pg = 1; pg <= 6; pg++) {
+          if (pg > 1) await sleep(2000);
+          let r: any;
+          try {
+            r = await get("lots", { q: "*", query_by: "title", per_page: "250", page: String(pg), filter_by: `auctionId:=${sale.id} && department.code:=MOT-CAR` });
+          } catch (e: any) {
+            if (e.backoff) return okJson({ success: false, backoff: true, upstream_status: e.backoff });
+            throw e;
+          }
+          for (const h of r.hits ?? []) { docs.push({ doc: h.document, sale: ctx }); n++; }
+          if ((r.hits ?? []).length < 250) break;
+        }
+        rosterBySale[saleKey] = n;
+      }
+
+      // Lots not yet landed as upcoming (new, or landed earlier by the walk as something else).
+      const landed = new Set<string>();
+      for (let i = 0; i < docs.length; i += 100) {
+        const ids = docs.slice(i, i + 100).map((d) => d.doc.id);
+        const { data: have } = await supabase.from("vehicle_events").select("source_listing_id").eq("source_platform", "bonhams").eq("event_status", "upcoming").in("source_listing_id", ids);
+        for (const r of have ?? []) landed.add(String(r.source_listing_id));
+      }
+      // force_ids: lots to land again although they read as landed (a repair after a mis-resolved landing).
+      const force = new Set<string>(Array.isArray(body.force_ids) ? body.force_ids.map(String) : []);
+      const todo = docs.filter((d) => (!landed.has(d.doc.id) || force.has(d.doc.id)) && d.doc.title && d.doc.title.length >= 3).slice(0, 100);
+      const lots = todo.map((d) => lotToExtraction(d.doc, { observedAt, sale: d.sale }));
+      const reports: Record<string, unknown>[] = [];
+      for (let i = 0; i < lots.length; i += 50) {
+        const landRes = await fetch(`${Deno.env.get("SUPABASE_URL")}/functions/v1/extract-bonhams`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json", Authorization: req.headers.get("authorization") ?? "" },
+          body: JSON.stringify({ action: "land_lots", lots: lots.slice(i, i + 50), observed_at: observedAt }),
+        });
+        reports.push(await landRes.json().catch(() => ({ error: `HTTP ${landRes.status}` })));
+      }
+
+      // The roster the house lists per sale: lots found in the index for the car department, per sale_key.
+      let censusWritten = false;
+      if (Object.keys(rosterBySale).length) {
+        const { data: src } = await supabase.from("observation_sources").select("id").eq("slug", "bonhams").maybeSingle();
+        if (src?.id) {
+          const total = Object.values(rosterBySale).reduce((a, b) => a + b, 0);
+          const cen = await supabase.from("source_census").insert({
+            source_id: src.id, universe_total: total, universe_active: total, census_method: "house_roster_facet", census_confidence: 0.9,
+            census_at: observedAt, census_url: `${TYPESENSE_HOST}/search-proxy/collections/lots/documents/search`,
+            census_notes: "Bonhams search index: car-department lots (department.code MOT-CAR) of sales not yet ended, per sale; by_category keys are the events' metadata.sale_key (bonhams-<auctionId>).",
+            by_category: rosterBySale, raw_response: { sales: salesMeta },
+          });
+          censusWritten = !cen.error;
+          if (cen.error) console.warn(`[bonhams-typesense] census not written: ${cen.error.message}`);
+        }
+      }
+      return okJson({ success: true, mode: "upcoming", sales: Object.keys(rosterBySale).length, roster: rosterBySale, read: docs.length, already_upcoming: landed.size, landing: lots.length, lander: reports, census_written: censusWritten });
     }
 
     // ─── MODE: search ───────────────────────────────────────────────────
@@ -692,7 +927,7 @@ Deno.serve(async (req) => {
       });
     }
 
-    return okJson({ success: false, error: `Unknown mode: ${mode}. Use "search", "ingest", "archive", or "stats".` }, 400);
+    return okJson({ success: false, error: `Unknown mode: ${mode}. Use "search", "ingest", "archive", "land" or "stats".` }, 400);
 
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : "Unknown error";

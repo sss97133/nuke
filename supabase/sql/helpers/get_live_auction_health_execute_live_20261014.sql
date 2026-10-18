@@ -1,0 +1,6 @@
+-- EXECUTE grants on the two get_live_auction_health overloads as read from production on 2026-10-14 (pg_proc.proacl):
+--   get_live_auction_health()      anon, authenticated, service_role, postgres  (the leak this migration closes)
+--   get_live_auction_health(date)  service_role, postgres                       (already owner-only)
+-- The no-argument body, base64 SHA-256 of prosrc bBNkzpW+afIvgr4vGHP/URLD4/9gKh6G5iGUREyN+S0=, is a thin wrapper:
+--   SELECT public.get_live_auction_health((now() AT TIME ZONE 'America/Los_Angeles')::date);
+-- Test fixture only (supabase/sql/test_live_auction_health_execute_owner_only.sql); not run by the migration.

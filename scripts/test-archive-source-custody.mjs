@@ -52,7 +52,13 @@ const sources = new Map([
   ['chassis',compile('../supabase/functions/_shared/batChassis.ts')],
   ['handler',compile('../supabase/functions/batch-extract-snapshots/index.ts')],
   ['batSaleQueue',compile('../supabase/functions/batch-extract-snapshots/batSaleQueue.ts')],
+  ['aiGate',compile('../supabase/functions/batch-extract-snapshots/aiGate.ts')],
+  ['queueRows',compile('../supabase/functions/batch-extract-snapshots/queueRows.ts')],
+  ['writeRules',compile('../supabase/functions/batch-extract-snapshots/writeRules.ts')],
+  ['snapshotCompare',compile('../supabase/functions/batch-extract-snapshots/snapshotCompare.ts')],
   ['intake',compile('../supabase/functions/ingest-observation/index.ts')],
+  ['historicalAsks',compile('../supabase/functions/ingest-observation/historicalAsks.ts')],
+  ['historicalAskIntake',compile('../supabase/functions/ingest-observation/historicalAskIntake.ts')],
   ['liveIntake',compile('../supabase/functions/ingest-observation/batLive.ts')],
   ['liveEvents',compile('../supabase/functions/_shared/batLiveEvents.ts')],
   ['auctionRecord',compile('../supabase/functions/_shared/batAuctionRecord.ts')],
@@ -65,6 +71,7 @@ const sources = new Map([
   ['retainedDescriptionIdentity',compile('../supabase/functions/ingest-observation/retainedDescriptionIdentity.ts')],
   ['retainedPowertrain',compile('../supabase/functions/ingest-observation/retainedPowertrain.ts')],
   ['retainedDescriptionPowertrain',compile('../supabase/functions/ingest-observation/retainedDescriptionPowertrain.ts')],
+  ['retainedReportedWork',compile('../supabase/functions/ingest-observation/retainedReportedWork.ts')],
   ['retainedOdometer',compile('../supabase/functions/ingest-observation/retainedOdometer.ts')],
   ['retainedListingIdentity',compile('../supabase/functions/ingest-observation/retainedListingIdentity.ts')],
   ['retainedDescriptionPresentation',compile('../supabase/functions/ingest-observation/retainedDescriptionPresentation.ts')],
@@ -72,6 +79,8 @@ const sources = new Map([
   ['retainedVin',compile('../supabase/functions/ingest-observation/retainedVinReference.ts')],
   ['retainedVinBatch',compile('../supabase/functions/ingest-observation/retainedVinBatch.ts')],
   ['retainedListingDrain',compile('../supabase/functions/ingest-observation/retainedListingDrain.ts')],
+  ['titleFacets',compile('../supabase/functions/ingest-observation/titleFacets.ts')],
+  ['vehicleFacets',compile('../supabase/functions/_shared/vehicleFacets.ts')],
   ['hash',compile('../supabase/functions/_shared/observationContentHash.ts')],
   ['proxy',compile('../supabase/functions/ingest-observation-batch/index.ts')],
   ['cached',compile('../supabase/functions/ingest-observation-batch/cachedProperties.ts')],
@@ -243,6 +252,10 @@ function fixture(options = {}) {
         if(specifier==='../_shared/writeGuard.ts')return load('guard');
         if(specifier==='./supabaseKeys.ts'||specifier==='../_shared/supabaseKeys.ts')return load('keys');
         if(specifier==='./batSaleQueue.ts')return load('batSaleQueue');
+        if(specifier==='./aiGate.ts')return load('aiGate');
+        if(specifier==='./queueRows.ts')return load('queueRows');
+        if(specifier==='./writeRules.ts')return load('writeRules');
+        if(specifier==='./snapshotCompare.ts')return load('snapshotCompare');
         if(specifier==='../batch-extract-snapshots/batSaleQueue.ts')return load('batSaleQueue');
         if(specifier==='./apiKeyAuth.ts')return {hashApiKey:()=>assert.fail('No API-key route')};
         if(specifier==='../_shared/agentTiers.ts')return {callTier:()=>assert.fail('No paid inference'),parseJsonResponse:()=>assert.fail('No inference')};
@@ -258,18 +271,25 @@ function fixture(options = {}) {
         if(specifier==='./retainedDescriptionIdentity.ts')return load('retainedDescriptionIdentity');
         if(specifier==='./retainedPowertrain.ts')return load('retainedPowertrain');
         if(specifier==='./retainedDescriptionPowertrain.ts')return load('retainedDescriptionPowertrain');
+        if(specifier==='./retainedReportedWork.ts')return load('retainedReportedWork');
         if(specifier==='./retainedOdometer.ts')return load('retainedOdometer');
         if(specifier==='./retainedListingIdentity.ts')return load('retainedListingIdentity');
         if(specifier==='./retainedDescriptionPresentation.ts')return load('retainedDescriptionPresentation');
         if(specifier==='./retainedVinReference.ts')return load('retainedVin');
         if(specifier==='./retainedVinBatch.ts')return load('retainedVinBatch');
         if(specifier==='./retainedListingDrain.ts')return load('retainedListingDrain');
+        if(specifier==='./titleFacets.ts')return load('titleFacets');
+        if(specifier==='../_shared/vehicleFacets.ts')return load('vehicleFacets');
         if(specifier==='./retainedIdentity.ts')return load('retainedIdentity');
+        if(specifier==='./historicalAsks.ts')return load('historicalAsks');
+        if(specifier==='./historicalAskIntake.ts')return load('historicalAskIntake');
         if(specifier==='../_shared/batAuctionRecord.ts')return load('auctionRecord');
         if(specifier==='../_shared/observationContentHash.ts')return load('hash');
         if(specifier==='../ingest-observation/imageProperties.ts')return load('property');
         if(specifier==='./cachedProperties.ts')return load('cached');
         if(specifier==='../_shared/cors.ts')return {corsHeaders:{'Access-Control-Allow-Origin':'*'}};
+        if(specifier==='../_shared/writeResult.ts')return {mustWrite:(_label,result)=>result,softWrite:()=>null};
+        if(specifier==='../_shared/identityMatch.ts')return {identityConflict:()=>null};
         assert.fail(`Unexpected import ${specifier}`);
       }});
     return exports;

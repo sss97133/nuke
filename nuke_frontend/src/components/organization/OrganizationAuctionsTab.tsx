@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
 import VehicleCardDense from '../vehicles/VehicleCardDense';
+import { fetchVehicleCardImages } from '../../services/vehicleCardImages';
 
 type AuctionSource = 'external';
 
@@ -214,12 +215,7 @@ export function OrganizationAuctionsTab({ organizationId }: { organizationId: st
             .from('vehicles')
             .select('id, year, make, model, listing_location, listing_location_raw')
             .in('id', vehicleIds),
-          supabase
-            .from('vehicle_images')
-            .select('vehicle_id, thumbnail_url, medium_url, image_url, variants, is_primary, created_at')
-            .in('vehicle_id', vehicleIds)
-            .order('is_primary', { ascending: false })
-            .order('created_at', { ascending: true }),
+          fetchVehicleCardImages(vehicleIds),
         ]);
 
         if (!mounted) return;

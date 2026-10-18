@@ -32,13 +32,13 @@ on:
         required: false
         default: ''
       migrations_since:
-        description: 'Apply migrations with filename >= this prefix (blank = none)'
+        description: 'Apply migrations with filename >= this prefix (blank = none). Default is blank on purpose: a dated default replayed every migration since June on a blank dispatch (2026-10-15 06:37Z).'
         required: false
-        default: '20260609'
+        default: ''
       functions:
         description: 'Comma-separated edge functions to deploy (blank = none)'
         required: false
-        default: 'universal-search,photo-pipeline-orchestrator'
+        default: ''
 
 concurrency:
   group: supabase-deploy
@@ -298,6 +298,25 @@ jobs:
             PERFORM cron.alter_job(job_id:=j,active:=true);
           END $activate$;
           SQL
+
+      - name: Every source holding data declares its species with evidence
+        # observation_sources.species, refused without evidence (20261019050000_source_species.sql). Runs last so a gap
+        # never holds back a function deploy; it turns the run red until the source is labelled by a migration.
+        if: steps.db.outputs.url != ''
+        env:
+          SUPABASE_DB_URL: ${{ steps.db.outputs.url }}
+          PGOPTIONS: -c statement_timeout=30s
+        run: |
+          if [ "$(psql "$SUPABASE_DB_URL" -X -qAt -c "SELECT to_regprocedure('public.source_species_gaps()') IS NOT NULL")" != t ]; then
+            echo "source_species_gaps() not installed yet"; exit 0
+          fi
+          gaps="$(psql "$SUPABASE_DB_URL" -X -v ON_ERROR_STOP=1 -qAt -F ' | ' -c 'SELECT slug, category, holds FROM public.source_species_gaps()')"
+          if [ -n "$gaps" ]; then
+            echo "::error title=Source without species::these sources hold data but carry no species with evidence (see .claude/rules/extraction.md, Source species):"
+            echo "$gaps"
+            exit 1
+          fi
+          echo "every source holding data carries a species with evidence"
 
       - name: Summary
         if: always()

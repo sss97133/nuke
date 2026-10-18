@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
 import { optimizeImageUrl } from '../../lib/imageOptimizer';
 import { fetchOrganizationVehicleBooks, withOrganizationVehicleBook } from '../../lib/privateMoney';
+import { fetchVehicleCardImages } from '../../services/vehicleCardImages';
 
 interface SoldVehicle {
   id: string;
@@ -39,6 +40,8 @@ interface Props {
   organizationId: string;
   title?: string; // Optional custom title (e.g., "Service Archive" for service orgs)
 }
+
+const IN_FILTER_CHUNK = 150;
 
 type ViewMode = 'gallery' | 'grid' | 'technical';
 type SortBy = 'date' | 'price' | 'year' | 'make' | 'model';
@@ -97,7 +100,11 @@ export default function SoldInventoryBrowser({ organizationId, title = 'Sold Inv
         return;
       }
 
-      const { data, error } = await supabase
+      // An `in` filter travels in the GET URL: 1,000 ids are ~39k characters and the API answers 400.
+      const idChunks: string[][] = [];
+      for (let i = 0; i < vehicleIds.length; i += IN_FILTER_CHUNK) idChunks.push(vehicleIds.slice(i, i + IN_FILTER_CHUNK));
+
+      const vehicleReads = await Promise.all(idChunks.map((ids) => supabase
         .from('vehicles')
         .select(`
           id,
@@ -114,11 +121,13 @@ export default function SoldInventoryBrowser({ organizationId, title = 'Sold Inv
           sale_price,
           sale_date,
           listing_url,
-          listing_source
+          listing_source,
+          image_count
         `)
-        .in('id', vehicleIds);
-
-      if (error) throw error;
+        .in('id', ids)));
+      const vehicleReadError = vehicleReads.find((r) => r.error)?.error;
+      if (vehicleReadError) throw vehicleReadError;
+      const data = vehicleReads.flatMap((r) => r.data || []);
 
       // Create map of vehicle_id -> orgVehicle data
       const orgVehicleMap = new Map(orgVehicles.map(ov => [ov.vehicle_id, ov]));
@@ -132,10 +141,11 @@ export default function SoldInventoryBrowser({ organizationId, title = 'Sold Inv
       const proofMap = new Map((proofData || []).map((p: any) => [p.vehicle_id, p]));
 
       // Fetch vehicle event data (BaT, C&B, etc) in one shot
-      const { data: vehicleEvents } = await supabase
+      const eventReads = await Promise.all(idChunks.map((ids) => supabase
         .from('vehicle_events')
         .select('vehicle_id, source_platform, source_url, final_price, sold_at, event_status, current_price, metadata')
-        .in('vehicle_id', vehicleIds);
+        .in('vehicle_id', ids)));
+      const vehicleEvents = eventReads.flatMap((r) => r.data || []);
       // Build maps: one for non-BaT events, one for BaT events (which have richer metadata)
       const eventMap = new Map((vehicleEvents || []).map((e: any) => [e.vehicle_id, e]));
       const batEventMap = new Map(
@@ -144,26 +154,17 @@ export default function SoldInventoryBrowser({ organizationId, title = 'Sold Inv
           .map((e: any) => [e.vehicle_id, e])
       );
 
-      // Fetch images in one shot and build:
-      // - primary image per vehicle (primary first, newest first)
-      // - image count per vehicle
-      const { data: images } = await supabase
-        .from('vehicle_images')
-        .select('vehicle_id, image_url, thumbnail_url, medium_url, is_primary, created_at, taken_at')
-        .in('vehicle_id', vehicleIds)
-        .order('is_primary', { ascending: false })
-        .order('created_at', { ascending: false });
+      // One card image per vehicle (vehicle_card_images: the primary the viewer can see, else the earliest). Reading
+      // every image of every linked vehicle to keep one hit the anon 15 s timeout for Viva (167 vehicles, 60,860
+      // images, 2026-10-14), and PostgREST's 1,000-row cap cut the counts. The count is vehicles.image_count.
+      const { data: images } = await fetchVehicleCardImages(vehicleIds);
 
-      const imageCountByVehicle = new Map<string, number>();
       const primaryImageByVehicle = new Map<string, string>();
       (images || []).forEach((img: any) => {
         const vid = img?.vehicle_id;
-        if (!vid) return;
-        imageCountByVehicle.set(vid, (imageCountByVehicle.get(vid) || 0) + 1);
-        if (!primaryImageByVehicle.has(vid)) {
-          const url = img.thumbnail_url || img.medium_url || img.image_url;
-          if (url) primaryImageByVehicle.set(vid, optimizeImageUrl(url, 'small') || url);
-        }
+        if (!vid || primaryImageByVehicle.has(vid)) return;
+        const url = img.thumbnail_url || img.medium_url || img.image_url;
+        if (url) primaryImageByVehicle.set(vid, optimizeImageUrl(url, 'small') || url);
       });
 
       // Enrich and filter
@@ -246,7 +247,7 @@ export default function SoldInventoryBrowser({ organizationId, title = 'Sold Inv
             final_price: vehicleEvent?.final_price || (batEvent?.final_price || batEvent?.current_price ? Number(batEvent.final_price || batEvent.current_price) : null),
             sold_at: vehicleEvent?.sold_at || batEvent?.sold_at,
             primary_image: primaryImageByVehicle.get(v.id) || null,
-            image_count: imageCountByVehicle.get(v.id) || 0,
+            image_count: typeof v.image_count === 'number' ? v.image_count : 0,
             // Proof data
             proof_url: proof?.proof_url,
             proof_platform: proof?.proof_platform,

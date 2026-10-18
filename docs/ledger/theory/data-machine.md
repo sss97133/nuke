@@ -42,12 +42,33 @@ When an interpretation is superseded, trace its affected relationships, measures
 verify their revised results. Preserve the original testimony and the inputs/method needed to replay
 the earlier evaluation. A changed current answer and a reproducible earlier answer are separate proofs.
 
+Model canonicalization needs a source-supported negative separation case. A spelling alias and a
+broader browsing-family member are different relationships. Binding more names to one named model
+does not establish identity accuracy; preserve unresolved names and the make-level market context.
+An alias correction must revisit its materialized groups, saved price fits, normalizers and cohorts,
+not merely replace the label printed by one consumer.
+A long corrective fold must also preserve reader availability and replication. Diagnose repeated
+blocking before retrying; compare identical source snapshots and output multiplicity when caching
+repeated expressions. Preparing a private copy is not a completed build or a reader cutover.
+
 Every claimed correction loop needs a plausible wrong interpretation, later discriminating evidence,
 the same source-to-consumer assay and an unaffected counterexample. Contradiction may correctly withhold
 an answer; withholding is not resolution. Repeated improvement needs separately selected held-out
 evaluations, with correction cost, regressions and population coverage. Parser accuracy, schema growth,
 a proposal approval and one passing fixture cannot substitute for that evidence. The bounded comparison
 contract and its delivery limits are recorded in the case ledger, §12.
+
+**Recursive refinement, owner clarification 2026-10-11.** Discussion must change the executable model
+and the instructions that guide its next iteration. Re-run the original question after a repair, through
+the sanctioned writer and the actual consumer. If registration succeeds but intake refuses the claim,
+the next gap is admission; if admission succeeds but the reader drops its qualification, repair the
+reader. A retry must validate the persisted result rather than equating an existing ID with success.
+Keep a disagreement or withdrawal case beside each positive case. This is a method for choosing and
+verifying authorized work, not standing permission for production DDL or autonomous vocabulary approval.
+
+Artist, buyer and researcher are contextual descriptions supported by actions and relationships. They
+are not necessarily permanent person types or onboarding categories. The engine-family intake case
+below tests the repair method on an existing proposal; it does not implement that cross-domain role model.
 
 **Fleet-relative reporting, owner correction 2026-10-11.** The owner requires the full lot as the
 reference for data-model work. A small successful cohort does not establish a material fleet gain.

@@ -57,6 +57,8 @@ export function useLiveFloor(initial: LiveParams = {}) {
         p_has_image: true,
         p_sort_by: p.sortBy || 'newest',
         p_sort_dir: p.sortDir || 'desc',
+        // the floor never shows a total; counting every match was what timed the page out
+        p_include_total: false,
       };
       if (p.make) rpcParams.p_make = p.make;
       if (p.model) rpcParams.p_model = p.model;

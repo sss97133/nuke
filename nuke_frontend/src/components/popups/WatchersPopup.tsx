@@ -31,24 +31,31 @@ const SANS = 'Arial, Helvetica, sans-serif';
 export function WatchersPopup({ vehicleId, watcherCount, viewCount, make, model }: Props) {
   const [stats, setStats] = useState<ModelStats | null>(null);
   const [loading, setLoading] = useState(true);
+  const [unavailable, setUnavailable] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
 
     async function load() {
+      setUnavailable(false);
       if (!make || !model) {
         setLoading(false);
         return;
       }
       try {
-        const { data } = await supabase
+        // make and model are this vehicle's own stored spellings, so equality finds its peers through
+        // idx_vehicles_make_model; `ilike` is not leakproof, cannot be an index qual under the row policies, and
+        // timed out at 10 s as anon (Ford Mustang, 2026-10-14) where equality answers in 70 ms warm.
+        const { data, error } = await supabase
           .from('vehicles')
           .select('bat_watchers')
-          .ilike('make', make)
-          .ilike('model', model)
+          .eq('make', make)
+          .eq('model', model)
           .not('bat_watchers', 'is', null)
           .gt('bat_watchers', 0)
           .limit(500);
+
+        if (error) throw error;
 
         if (!cancelled && data && data.length > 0) {
           const watchers = data
@@ -71,7 +78,7 @@ export function WatchersPopup({ vehicleId, watcherCount, viewCount, make, model 
           }
         }
       } catch {
-        // ignore
+        if (!cancelled) setUnavailable(true);
       }
       if (!cancelled) setLoading(false);
     }
@@ -81,21 +88,6 @@ export function WatchersPopup({ vehicleId, watcherCount, viewCount, make, model 
   }, [vehicleId, make, model]);
 
   // Comparison
-  const percentile = stats && stats.count > 1
-    ? (() => {
-        // Estimate where this watcherCount falls
-        // Simple: (count below) / total * 100
-        const below = stats.count > 0 && stats.medianWatchers > 0
-          ? Math.min(100, Math.max(0, Math.round(
-              (watcherCount <= stats.minWatchers ? 0 :
-               watcherCount >= stats.maxWatchers ? 100 :
-               ((watcherCount - stats.minWatchers) / (stats.maxWatchers - stats.minWatchers)) * 100)
-            )))
-          : null;
-        return below;
-      })()
-    : null;
-
   const vsMedian = stats?.medianWatchers
     ? Math.round(((watcherCount - stats.medianWatchers) / stats.medianWatchers) * 100)
     : null;
@@ -116,7 +108,7 @@ export function WatchersPopup({ vehicleId, watcherCount, viewCount, make, model 
           textTransform: 'uppercase' as const, letterSpacing: '0.5px',
           color: '#999', marginTop: 4,
         }}>
-          PEOPLE WATCHED THIS AUCTION
+          RECORDED WATCHERS
         </div>
         {viewCount != null && viewCount > 0 && (
           <div style={{
@@ -143,7 +135,7 @@ export function WatchersPopup({ vehicleId, watcherCount, viewCount, make, model 
             textTransform: 'uppercase' as const, letterSpacing: '0.5px',
             color: '#999', marginBottom: 8,
           }}>
-            VS {make?.toUpperCase()} {model?.toUpperCase()} ({stats.count} AUCTIONS)
+            VS {make?.toUpperCase()} {model?.toUpperCase()} (RECORDS IN THIS READ: {stats.count})
           </div>
 
           {/* Visual comparison */}
@@ -197,23 +189,16 @@ export function WatchersPopup({ vehicleId, watcherCount, viewCount, make, model 
             </div>
           )}
 
-          {percentile != null && (
-            <div style={{
-              fontFamily: MONO, fontSize: 9, color: '#999', marginTop: 6,
-            }}>
-              {percentile >= 90 ? `Top ${100 - percentile}% most-watched` :
-               percentile >= 75 ? `Top ${100 - percentile}% most-watched` :
-               percentile <= 10 ? `Bottom ${percentile}% in attention` :
-               `${percentile}th percentile`}
-            </div>
-          )}
+          <div style={{ marginTop: 8, fontFamily: SANS, fontSize: 8, color: '#999', lineHeight: 1.4 }}>
+            Comparisons use up to 500 returned vehicle records with positive watcher counts and matching stored make and model.
+          </div>
         </div>
       )}
 
       {!loading && !stats && (make && model) && (
         <div style={{ padding: '12px', textAlign: 'center' }}>
           <span style={{ fontFamily: MONO, fontSize: 9, color: '#999', textTransform: 'uppercase' as const, letterSpacing: '0.08em' }}>
-            No comparable watcher data for this model
+            {unavailable ? 'Watcher comparisons unavailable.' : 'No comparable watcher counts in this read.'}
           </span>
         </div>
       )}

@@ -7,7 +7,21 @@ import type { VehicleIdentityToken } from '../utils/vehicleIdentity';
 export type Viewer = 'anon' | 'contributor' | 'owner';
 
 /** The five text roles. Their sizes live in kit.css and nowhere else. */
-export type Role = 'entity' | 'measure' | 'body' | 'caption' | 'label';
+export type Role = 'entity' | 'figure' | 'measure' | 'body' | 'caption' | 'label';
+
+/** Broadcast / sale moment video metadata attached to an auction or listing source. */
+export type SaleVideoMoment = {
+  url?: string | null;
+  startSeconds?: number | null;
+  endSeconds?: number | null;
+  lotNumber?: string | null;
+  auctionName?: string | null;
+  searchQuery?: string | null;
+  lotUrl?: string | null;
+  title?: string | null;
+  priceText?: string | null;
+  imageUrl?: string | null;
+};
 
 /** Where a claim came from: the evidence class, and a pointer at the evidence. */
 export type Source = {
@@ -16,6 +30,10 @@ export type Source = {
   id?: string | null;
   method?: string | null;
   label?: string | null;
+  logoUrl?: string | null;
+  lotNumber?: string | null;
+  auctionName?: string | null;
+  video?: SaleVideoMoment | null;
 };
 
 /** One attributed fact: a value, who said it, when it was observed, how far to trust it (0 to 1). */
@@ -53,7 +71,7 @@ export type IdentityTokens = { primary: VehicleIdentityToken[]; differentiators:
 export type GalleryImage = { id: string; url: string; taken_at?: string | null; gate: 'approved' };
 
 export type Section =
-  | { kind: 'masthead'; identity: IdentityTokens; year: number | null; make: string | null; model: string | null; price?: Claim<number> | null; priceLabel?: string | null }
+  | { kind: 'masthead'; identity: IdentityTokens; year: number | null; make: string | null; model: string | null; price?: Claim<number> | null; priceLabel?: string | null; identity_marks?: Record<string, unknown>[] }
   | { kind: 'strip'; coverage: Coverage; facets: Array<{ dimension: string; label: string; member: Claim<string> }>; odometer?: Claim<number> | null }
   | { kind: 'measures'; stack: string; title: string; coverage: Coverage; items: Measure[] }
   | { kind: 'timeline'; coverage: Coverage; days: Array<{ day: string; kinds: Record<string, number> }> }

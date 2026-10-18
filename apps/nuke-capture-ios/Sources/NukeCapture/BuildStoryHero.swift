@@ -158,7 +158,14 @@ struct IdentityChips: View {
 
     @ViewBuilder private func chip(_ word: String, drillable: Bool) -> some View {
         let ink: Color = onScrim ? .white : .primary
-        Text(word)
+        Group {
+            if let make, word.trimmingCharacters(in: .whitespacesAndNewlines)
+                .caseInsensitiveCompare(make.trimmingCharacters(in: .whitespacesAndNewlines)) == .orderedSame {
+                MakeIdentityView(make: make, height: 22, maxWidth: 150)
+            } else {
+                Text(word)
+            }
+        }
             .font(.title3.weight(.bold))
             .foregroundStyle(ink)
             .padding(.horizontal, drillable ? 9 : 0)

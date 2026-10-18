@@ -48,6 +48,24 @@ The earlier draft of this chapter named a generic `claims`, `properties`, `sourc
 
 ## 1. When you must file a schema proposal
 
+### Executable connection after registration (2026-10-11)
+
+Registration alone does not make a claim admissible or readable. The retained `engine_family_label`
+case connects an existing proposal to the existing `ingest-observation` selector, PostgreSQL source
+guard and both `get_field_provenance` and `vehicle_canonical`. It preserves a publisher's literal
+powering-engine label, quotation, capture fingerprint and clocks. It does not establish a casting or
+serial code, physical engine identity, factory/current configuration or event date.
+
+The feature migration `20261011230939_retained_engine_family_intake.sql` does not approve the proposal
+or start replay. Its family path requires the reviewed proposal's ratified core property, and its
+shared reader predicate withdraws the claim when that registration or source becomes ineligible.
+The actual handler revalidates stored results on retries through `retained_listing_property_result_matches`.
+The reproducible local/CI contract is `scripts/test-engine-family-intake.sh`: the same selector fails
+with absent vocabulary, still fails after local review against the old SQL, and must succeed after
+the migration with cited reader output. Synthetic review is confined to a disposable database.
+
+This is prepared implementation, not evidence of production approval, deployment or fleet coverage.
+
 You file a proposal whenever the write API rejects your deposit for a vocabulary reason — not because your data was malformed, but because the institution has no slot for it. The four trigger cases:
 
 1. **Unknown property.** You attempted to deposit a claim whose `property_id` does not exist in either the `core` or `pending` namespace. The write API responds `400 unknown_property` with the proposal-needed link in the body.

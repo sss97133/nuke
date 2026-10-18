@@ -41,6 +41,8 @@ export interface DirectInput {
   seller_name?: string;
   contact_info?: Record<string, unknown>;
   status?: string;
+  /** A revisit that saw the listing gone: the evidence, never a sale. removed_at is fill-only. */
+  removal?: { observed_at: string; reason: "revisit_unavailable" | "displayed_sold"; basis: string; evidence?: string };
   agent_context?: {
     agent_id?: string;
     on_behalf_of?: string | null;
@@ -66,7 +68,7 @@ export async function handleDirect(body: DirectInput, deps: DirectDeps) {
   // Check existing
   const { data: existing, error: readError } = await supabase
     .from("marketplace_listings")
-    .select("id, vehicle_id, submission_count, first_seen_at, last_seen_at, raw_scrape_data")
+    .select("id, vehicle_id, submission_count, first_seen_at, last_seen_at, raw_scrape_data, removed_at")
     .eq("facebook_id", facebookId)
     .maybeSingle();
   if (readError) throw readError;
@@ -113,6 +115,12 @@ export async function handleDirect(body: DirectInput, deps: DirectDeps) {
       }
     }
 
+    if (body.removal && isLatest && !duplicateCapture) {
+      updates.status = body.removal.reason === "displayed_sold" ? "sold" : "removed";
+      updates.removed_at = existing.removed_at ?? body.removal.observed_at;
+      updates.removal_reason = body.removal.reason;
+    }
+
     // Retain previous raw material and attribution. The full new browser testimony lives in its sweep row.
     {
       updates.raw_scrape_data = {
@@ -120,6 +128,7 @@ export async function handleDirect(body: DirectInput, deps: DirectDeps) {
         direct_submissions: [...(Array.isArray(raw.direct_submissions) ? raw.direct_submissions : []),
           ...(!body.capture ? [{ agent_context: body.agent_context, submitted_at: observedAt, input: body }] : [])],
         browser_captures: [...history, ...(body.capture && !duplicateCapture ? [captureReference(body.capture)] : [])],
+        ...(body.removal && !duplicateCapture ? { removals: [...(Array.isArray(raw.removals) ? raw.removals : []), body.removal] } : {}),
       };
     }
 

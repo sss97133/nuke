@@ -4,6 +4,12 @@ import { normalizeMake, normalizeVehicleFields } from '../_shared/normalizeVehic
 import { writeObservation } from '../_shared/observationWriter.ts';
 import { requireWriteAuth } from '../_shared/writeGuard.ts';
 import { projectSecretKey } from "../_shared/supabaseKeys.ts";
+import { parseSsrPage } from "./ssrPage.ts";
+import { fillOnlyIdentity, identityConflict, REVISION_DIFFERENT_CAR } from '../_shared/identityMatch.ts';
+import { recordSellerTypes, sellerTypeRow } from '../_shared/sellerType.ts';
+import { parseLocation } from "../_shared/parseLocation.ts";
+import { batchFromTargets, discoverTargets, readEnded, revisePcm } from "./targets.ts";
+import { firecrawlScrape } from "../_shared/firecrawl.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -43,6 +49,10 @@ interface PCarMarketListing {
   interiorColor?: string;
   engine?: string;
   transmission?: string;
+  sellerTypeLabel?: string | null;
+  bids?: { user: string; at: string | null; amount: number; kind: 'bid' | 'sold' | 'offer' }[];
+  reserveMet?: boolean;
+  photosClaimed?: number;
 }
 
 // Validate VIN - reject obvious placeholders
@@ -270,64 +280,51 @@ async function scrapePCarMarketListing(url: string, providedHtml?: string): Prom
       if (FIRECRAWL_API_KEY) {
         try {
           console.log('[pcarmarket] Fetching via Firecrawl (JS rendering)...');
-          const firecrawlResponse = await fetch('https://api.firecrawl.dev/v1/scrape', {
-            method: 'POST',
-            headers: {
-              'Authorization': `Bearer ${FIRECRAWL_API_KEY}`,
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-              url: url,
-              formats: ['rawHtml', 'markdown', 'extract'],
-              extract: {
-                schema: {
-                  type: 'object',
-                  properties: {
-                    vin: { type: 'string', description: 'Vehicle VIN or chassis number' },
-                    mileage: { type: 'number', description: 'Current mileage/odometer reading' },
-                    price: { type: 'number', description: 'Final sale price or current high bid in dollars' },
-                    sold: { type: 'boolean', description: 'Whether the auction has sold' },
-                    bid_count: { type: 'number', description: 'Number of bids placed' },
-                    end_date: { type: 'string', description: 'Auction end date' },
-                    seller: { type: 'string', description: 'Seller username' },
-                    exterior_color: { type: 'string', description: 'Exterior color' },
-                    interior_color: { type: 'string', description: 'Interior color' },
-                    transmission: { type: 'string', description: 'Transmission type' },
-                    engine: { type: 'string', description: 'Engine description' },
-                  },
+          const firecrawlResult = await firecrawlScrape({
+            url: url,
+            formats: ['rawHtml', 'markdown', 'extract'],
+            extract: {
+              schema: {
+                type: 'object',
+                properties: {
+                  vin: { type: 'string', description: 'Vehicle VIN or chassis number' },
+                  mileage: { type: 'number', description: 'Current mileage/odometer reading' },
+                  price: { type: 'number', description: 'Final sale price or current high bid in dollars' },
+                  sold: { type: 'boolean', description: 'Whether the auction has sold' },
+                  bid_count: { type: 'number', description: 'Number of bids placed' },
+                  end_date: { type: 'string', description: 'Auction end date' },
+                  seller: { type: 'string', description: 'Seller username' },
+                  exterior_color: { type: 'string', description: 'Exterior color' },
+                  interior_color: { type: 'string', description: 'Interior color' },
+                  transmission: { type: 'string', description: 'Transmission type' },
+                  engine: { type: 'string', description: 'Engine description' },
                 },
               },
-              waitFor: 10000,
-              timeout: 45000,
-              mobile: false,
-              actions: [
-                { type: 'wait', milliseconds: 5000 },
-                { type: 'scroll', direction: 'down', pixels: 800 },
-                { type: 'wait', milliseconds: 2000 },
-                { type: 'scroll', direction: 'down', pixels: 1200 },
-                { type: 'wait', milliseconds: 3000 },
-              ],
-            }),
-            signal: AbortSignal.timeout(55_000),
-          });
+            },
+            waitFor: 10000,
+            timeout: 45000,
+            mobile: false,
+            actions: [
+              { type: 'wait', milliseconds: 5000 },
+              { type: 'scroll', direction: 'down', pixels: 800 },
+              { type: 'wait', milliseconds: 2000 },
+              { type: 'scroll', direction: 'down', pixels: 1200 },
+              { type: 'wait', milliseconds: 3000 },
+            ],
+          }, { caller: 'import-pcarmarket-listing', timeoutMs: 55_000, maxAttempts: 1 });
 
-          if (firecrawlResponse.ok) {
-            const firecrawlData = await firecrawlResponse.json();
-            if (firecrawlData.success && firecrawlData.data?.rawHtml) {
-              html = firecrawlData.data.rawHtml;
-              // Store LLM extraction for later use
-              const llmExtract = firecrawlData.data?.extract;
-              if (llmExtract) {
-                console.log(`[pcarmarket] LLM extracted: mileage=${llmExtract.mileage}, price=${llmExtract.price}, sold=${llmExtract.sold}`);
-                html = JSON.stringify({ llmExtract, html });
-              }
-              console.log(`[pcarmarket] Firecrawl returned ${html.length} chars`);
-              firecrawlWorked = true;
-            } else {
-              console.warn(`[pcarmarket] Firecrawl returned no data: ${firecrawlData.error || 'empty'}`);
+          if (firecrawlResult.success && firecrawlResult.data.html) {
+            html = firecrawlResult.data.html;
+            // Store LLM extraction for later use
+            const llmExtract = firecrawlResult.data.extract;
+            if (llmExtract) {
+              console.log(`[pcarmarket] LLM extracted: mileage=${llmExtract.mileage}, price=${llmExtract.price}, sold=${llmExtract.sold}`);
+              html = JSON.stringify({ llmExtract, html });
             }
+            console.log(`[pcarmarket] Firecrawl returned ${html.length} chars`);
+            firecrawlWorked = true;
           } else {
-            console.warn(`[pcarmarket] Firecrawl HTTP ${firecrawlResponse.status}`);
+            console.warn(`[pcarmarket] Firecrawl returned no data: ${firecrawlResult.error || 'empty'}`);
           }
         } catch (fcErr: any) {
           console.warn(`[pcarmarket] Firecrawl failed: ${fcErr.message}`);
@@ -352,6 +349,40 @@ async function scrapePCarMarketListing(url: string, providedHtml?: string): Prom
           html = '';
         }
       }
+    }
+
+    // Current pages are server-rendered (Car Details block in the HTML): read them without JS rendering.
+    const ssr = parseSsrPage(html);
+    if (ssr) {
+      const slug = url.match(/\/auction\/([^\/\?]+)/)?.[1];
+      return {
+        url: normalizeUrl(url),
+        title: ssr.title,
+        year: ssr.year,
+        make: ssr.make,
+        model: ssr.model,
+        vin: ssr.vin,
+        mileage: ssr.mileage,
+        salePrice: ssr.salePrice,
+        auctionEndDate: ssr.auctionEndDate,
+        saleDate: ssr.auctionOutcome === 'sold' ? ssr.auctionEndDate : undefined,
+        auctionOutcome: ssr.auctionOutcome === 'sold' ? 'sold' : ssr.auctionOutcome === 'reserve_not_met' ? 'reserve_not_met' : null,
+        description: ssr.description,
+        images: ssr.images,
+        slug,
+        auctionId: slug?.split('-').pop() || undefined,
+        bidCount: ssr.bidCount,
+        viewCount: ssr.viewCount,
+        location: ssr.location,
+        reserveStatus: ssr.auctionType,
+        color: ssr.color,
+        interiorColor: ssr.interiorColor,
+        transmission: ssr.transmission,
+        bids: ssr.bids,
+        reserveMet: ssr.reserveMet,
+        photosClaimed: ssr.photosClaimed,
+        buyerUsername: ssr.bids.find((b) => b.kind === 'sold')?.user,
+      };
     }
 
     // Initialize listing
@@ -753,6 +784,19 @@ Deno.serve(async (req: Request) => {
 
   try {
     const body = await req.json();
+    if (body.action === 'batch_from_targets' || body.action === 'discover_targets' || body.action === 'revise' || body.action === 'read_ended') {
+      const sb = createClient(Deno.env.get('SUPABASE_URL')!, projectSecretKey()!, {
+        global: { headers: { 'X-Nuke-Writer': 'import-pcarmarket-listing' } },
+      });
+      const out = body.action === 'discover_targets'
+        ? await discoverTargets(sb)
+        : body.action === 'read_ended'
+          ? await readEnded(body)
+        : body.action === 'revise'
+          ? await revisePcm(sb, Deno.env.get('SUPABASE_URL')!, body)
+          : await batchFromTargets(sb, Deno.env.get('SUPABASE_URL')!, body);
+      return new Response(JSON.stringify(out), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+    }
     const listing_url = body.listing_url || body.url;
     const providedHtml = body.html;
 
@@ -776,32 +820,15 @@ Deno.serve(async (req: Request) => {
       global: { headers: { 'X-Nuke-Writer': 'import-pcarmarket-listing' } },
     });
 
-    // Get or create scrape source
+    // Source health row: scrape_sources is keyed by url (it has no domain/source_name/base_url columns).
     const { data: source } = await supabase
       .from('scrape_sources')
       .select('id')
-      .eq('domain', 'pcarmarket.com')
+      .ilike('url', '%pcarmarket.com%')
+      .order('created_at', { ascending: true })
+      .limit(1)
       .maybeSingle();
-
-    let sourceId = source?.id;
-
-    if (!sourceId) {
-      const { data: newSource } = await supabase
-        .from('scrape_sources')
-        .insert({
-          domain: 'pcarmarket.com',
-          source_name: 'PCarMarket',
-          source_type: 'auction_house',
-          base_url: 'https://www.pcarmarket.com',
-          is_active: true,
-        })
-        .select('id')
-        .maybeSingle();
-
-      if (newSource) {
-        sourceId = newSource.id;
-      }
-    }
+    const sourceId = source?.id;
 
     console.log(`Importing PCarMarket listing: ${listing_url}`);
 
@@ -885,6 +912,9 @@ Deno.serve(async (req: Request) => {
       sale_price: listing.auctionOutcome === 'sold' ? listing.salePrice || null : null,
       high_bid: listing.salePrice || null,
       ...(listing.auctionOutcome === 'sold' ? { sale_status: 'sold' } : {}),
+      ...(listing.auctionOutcome === 'reserve_not_met' ? { sale_status: 'not_sold' } : {}),
+      bid_count: listing.bidCount || null,
+      ...(listing.location ? (() => { const loc = parseLocation(listing.location); return { listing_location: loc.clean, listing_location_raw: loc.raw, listing_location_source: 'pcarmarket', listing_location_confidence: loc.confidence, listing_location_observed_at: new Date().toISOString() }; })() : {}),
       sale_date: listing.saleDate || null,
       auction_end_date: listing.auctionEndDate || null,
       auction_outcome: listing.auctionOutcome || null,
@@ -920,10 +950,31 @@ Deno.serve(async (req: Request) => {
       status: 'active'
     };
 
+    // Identity guard: a VIN/URL/slug match is not proof it is the same car. A different car is refused and raised as a
+    // revision item (identity_match / different_car / relink); for the same car, year/make/model/vin are fill-only.
+    let existingIdentity: { year: number | null; make: string | null; model: string | null; vin: string | null; primary_image_url?: string | null } | null = null;
+    if (vehicleId) {
+      const { data: idRow } = await supabase.from('vehicles').select('year,make,model,vin,primary_image_url').eq('id', vehicleId).maybeSingle();
+      existingIdentity = (idRow as typeof existingIdentity) ?? null;
+      const conflict = existingIdentity ? identityConflict(existingIdentity, { year: vehicleData.year, make: vehicleData.make, model: vehicleData.model, vin: vehicleData.vin }) : null;
+      if (conflict) {
+        await supabase.rpc('record_revision_item', {
+          p_url: listing.url, p_missing: [REVISION_DIFFERENT_CAR.missing], p_reason: REVISION_DIFFERENT_CAR.reason,
+          p_next_action: REVISION_DIFFERENT_CAR.next_action, p_raised_by: 'import-pcarmarket-listing', p_snapshot_id: null,
+          p_detail: { vehicle_id: vehicleId, detail: conflict }, p_vehicle_id: vehicleId,
+        });
+        return new Response(JSON.stringify({ success: false, refused: 'different_car', vehicle_id: vehicleId, detail: conflict }),
+          { status: 409, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+      }
+    }
+    if (listing.images?.[0] && !existingIdentity?.primary_image_url) {
+      (vehicleData as Record<string, unknown>).primary_image_url = listing.images[0];
+    }
+
     if (vehicleId) {
       await supabase
         .from('vehicles')
-        .update(vehicleData)
+        .update(existingIdentity ? fillOnlyIdentity(vehicleData, existingIdentity) : vehicleData)
         .eq('id', vehicleId);
       console.log(`Updated existing vehicle: ${vehicleId}`);
     } else {
@@ -951,7 +1002,7 @@ Deno.serve(async (req: Request) => {
             .maybeSingle()).data?.id : null);
           if (dupId) {
             vehicleId = dupId;
-            await supabase.from('vehicles').update(vehicleData).eq('id', vehicleId);
+            await supabase.from('vehicles').update(fillOnlyIdentity(vehicleData, (await supabase.from('vehicles').select('year,make,model,vin').eq('id', vehicleId).maybeSingle()).data ?? {})).eq('id', vehicleId);
             console.log(`[pcarmarket] Updated existing vehicle after dedup: ${vehicleId}`);
           } else {
             throw vehicleError;
@@ -1003,7 +1054,9 @@ Deno.serve(async (req: Request) => {
 
     // Step 5b: Create/update vehicle_events record for countdown timer support
     if (vehicleId) {
-      const eventStatus = listing.auctionOutcome === 'sold' ? 'sold' : 'active';
+      const endedAlready = !!listing.auctionEndDate && new Date(listing.auctionEndDate).getTime() < Date.now();
+      const eventStatus = listing.auctionOutcome === 'sold' ? 'sold'
+        : endedAlready ? (listing.auctionOutcome === 'reserve_not_met' ? 'reserve_not_met' : 'ended') : 'active';
       const vehicleEventData: Record<string, any> = {
         vehicle_id: vehicleId,
         source_platform: 'pcarmarket',
@@ -1011,9 +1064,22 @@ Deno.serve(async (req: Request) => {
         source_url: listing.url,
         source_listing_id: listing.auctionId || listing.slug || null,
         event_status: eventStatus,
+        extraction_method: 'ssr_parse',
+        extractor_version: 'import-pcarmarket-listing:2',
         current_price: listing.salePrice || null,
         bid_count: listing.bidCount || null,
         view_count: listing.viewCount || null,
+        buyer_identifier: listing.auctionOutcome === 'sold' ? listing.buyerUsername ?? null : null,
+        metadata: {
+          reserve_status: listing.reserveMet === true ? 'reserve_met' : listing.auctionOutcome === 'reserve_not_met' ? 'reserve_not_met' : (listing.reserveStatus || 'unknown'),
+          auction_type: listing.reserveStatus ?? null,
+          location: listing.location ?? null,
+          bids_on_page: listing.bids?.length ?? 0,
+          bids_claimed: listing.bidCount ?? null,
+          photos_on_page: listing.images?.length ?? 0,
+          photos_claimed: listing.photosClaimed ?? null,
+          seller: 'not_exposed_on_page',
+        },
         updated_at: new Date().toISOString(),
       };
       // Only set ended_at if we extracted it (don't clear existing)
@@ -1036,6 +1102,7 @@ Deno.serve(async (req: Request) => {
         .eq('source_platform', 'pcarmarket')
         .maybeSingle();
 
+      let sellerEventId: string | null = existingListing?.id ?? null;
       if (existingListing) {
         await supabase
           .from('vehicle_events')
@@ -1052,7 +1119,18 @@ Deno.serve(async (req: Request) => {
 
         if (!listingError && newListing) {
           console.log(`Created vehicle_event: ${newListing.id}`);
+          sellerEventId = newListing.id;
         }
+      }
+      // Seller type: the page's own "Seller Type" label (declared 0.9); no label on the page = unknown.
+      try {
+        if (sellerEventId && listing.url) {
+          const label = listing.sellerTypeLabel ?? '';
+          const value = /dealer/i.test(label) ? 'dealer' : /private/i.test(label) ? 'private' : 'unknown';
+          await recordSellerTypes(supabase, [sellerTypeRow({ eventId: sellerEventId, value, basis: 'declared', field: 'Seller Type', text: label || null, method: 'pcarmarket_seller_type_label' })], 'import-pcarmarket-listing');
+        }
+      } catch (e) {
+        console.warn(`[pcarmarket] seller type not written: ${e instanceof Error ? e.message : String(e)}`);
       }
     }
 
@@ -1066,45 +1144,30 @@ Deno.serve(async (req: Request) => {
         .maybeSingle();
       
       const userId = vehicle?.user_id || vehicle?.uploaded_by || null;
-      
-      if (!userId) {
-        console.error('Missing user_id for image import');
-      } else {
-        // Supersede the previous PCarMarket import of this vehicle's photos instead of deleting it.
-        // Testimony is never deleted (lock 3, 2026-09-27, revoked DELETE on vehicle_images from
-        // service_role: the old delete failed silently and left the duplicates behind). The live
-        // unique index (vehicle_id, file_hash) ignores superseded rows, so the re-import lands.
-        const { error: supersedeError } = await supabase
-          .from('vehicle_images')
-          .update({ is_superseded: true, superseded_at: new Date().toISOString() })
-          .eq('vehicle_id', vehicleId)
-          .eq('source', 'pcarmarket_listing')
-          .or('is_superseded.is.null,is_superseded.eq.false');
-        if (supersedeError) console.error('Failed to supersede prior vehicle_images:', supersedeError?.message || supersedeError);
-        
-        // Import ALL images (not just 10)
-        const imageInserts = listing.images.map((imageUrl, index) => ({
-          vehicle_id: vehicleId,
-          image_url: imageUrl,
-          user_id: userId, // Required field
-          category: 'general',
-          image_category: 'exterior',
-          source: 'pcarmarket_listing',
-          is_primary: index === 0,
-          filename: `pcarmarket_${index}.jpg`
-        }));
-
-        // Insert in batches to avoid timeouts
-        const batchSize = 50;
-        for (let i = 0; i < imageInserts.length; i += batchSize) {
-          const batch = imageInserts.slice(i, i + batchSize);
-          await supabase
-            .from('vehicle_images')
-            .insert(batch);
-        }
-        
-        console.log(`Imported ${listing.images.length} images`);
+      const nowIso = new Date().toISOString();
+      // Rows already held (any earlier run) stay; only gallery photos not yet held are added. A vehicle with no owner
+      // user is attributed the way the other auction importers do it: source external_import, no user_id.
+      const { data: held } = await supabase.from('vehicle_images').select('image_url').eq('vehicle_id', vehicleId)
+        .or('is_superseded.is.null,is_superseded.eq.false').limit(1000);
+      const have = new Set((held ?? []).map((r: { image_url: string }) => r.image_url.split('?')[0]));
+      const fresh = listing.images.filter((u) => !have.has(u.split('?')[0]));
+      const imageInserts = fresh.slice(0, 300).map((imageUrl, index) => ({
+        vehicle_id: vehicleId,
+        image_url: imageUrl,
+        ...(userId ? { user_id: userId, source: 'pcarmarket_listing', category: 'general', image_category: 'exterior' } : {
+          source: 'external_import', source_url: imageUrl, is_external: true, approval_status: 'auto_approved', is_approved: true,
+          redaction_level: 'none', exif_data: { source_url: listing.url, imported_from: 'pcarmarket', photos_claimed: listing.photosClaimed ?? null },
+        }),
+        is_primary: have.size === 0 && index === 0,
+        position: have.size + index,
+        display_order: have.size + index,
+        filename: `pcarmarket_${have.size + index}.jpg`,
+      }));
+      for (let i = 0; i < imageInserts.length; i += 50) {
+        const { error: imgErr } = await supabase.from('vehicle_images').insert(imageInserts.slice(i, i + 50));
+        if (imgErr) { console.error('[pcarmarket] image insert failed:', imgErr.message); break; }
       }
+      console.log(`Imported ${imageInserts.length} of ${listing.images.length} images`);
     }
 
     // Step 7: Create external_identities for seller and buyer (claimable profiles)
@@ -1164,6 +1227,51 @@ Deno.serve(async (req: Request) => {
           }
           console.log(`[pcarmarket] Saved ${identitiesSaved.length} external identities: ${identitiesSaved.join(', ')}`);
         }
+      }
+    }
+
+    // Step 8: auction_events row, and the visible bid history as bid rows in auction_comments under bidder identities.
+    // PCarMarket renders the last few bids on the page (the rest, and the comment thread, load on demand); the claimed
+    // counts go in raw_data so the gap is recorded, not hidden.
+    if (vehicleId) {
+      const bids = listing.bids ?? [];
+      const ids = new Map<string, string>();
+      const handles = [...new Set([...bids.map((b) => b.user), ...(listing.buyerUsername ? [listing.buyerUsername] : [])])];
+      if (handles.length) {
+        const nowIso = new Date().toISOString();
+        const { data: idRows, error: idErr } = await supabase.from('external_identities').upsert(
+          handles.map((h) => ({ platform: 'pcarmarket', handle: h, profile_url: `https://www.pcarmarket.com/member/${h}/`, last_seen_at: nowIso, updated_at: nowIso })),
+          { onConflict: 'platform,handle' },
+        ).select('id, handle');
+        if (idErr) console.warn(`[pcarmarket] bidder identities failed: ${idErr.message}`);
+        for (const r of idRows ?? []) ids.set(r.handle, r.id);
+      }
+      const auctionEvent: Record<string, any> = {
+        vehicle_id: vehicleId, source: 'pcarmarket', source_url: listing.url, source_listing_id: listing.auctionId || listing.slug || null,
+        auction_end_date: listing.auctionEndDate ?? null,
+        outcome: listing.auctionOutcome === 'sold' ? 'sold' : listing.auctionOutcome === 'reserve_not_met' ? 'reserve_not_met' : (listing.auctionEndDate && new Date(listing.auctionEndDate).getTime() < Date.now() ? 'pending' : 'live'),
+        high_bid: listing.salePrice ?? null, winning_bid: listing.auctionOutcome === 'sold' ? listing.salePrice ?? null : null,
+        total_bids: listing.bidCount ?? null, winning_bidder: listing.auctionOutcome === 'sold' ? listing.buyerUsername ?? null : null,
+        high_bidder: bids.find((b) => b.kind === 'bid')?.user ?? null,
+        seller_location: listing.location ?? null, page_views: listing.viewCount ?? null, scraped_at: new Date().toISOString(),
+        bid_history: bids.length ? bids : null,
+        raw_data: { bids_on_page: bids.length, bids_claimed: listing.bidCount ?? null, photos_on_page: listing.images?.length ?? 0, photos_claimed: listing.photosClaimed ?? null, reserve_met: listing.reserveMet ?? null, auction_type: listing.reserveStatus ?? null, comments: 'not_on_page' },
+      };
+      Object.keys(auctionEvent).forEach((k) => { if (auctionEvent[k] === null || auctionEvent[k] === undefined) delete auctionEvent[k]; });
+      const { data: ae, error: aeErr } = await supabase.from('auction_events').upsert(auctionEvent, { onConflict: 'vehicle_id,source_url' }).select('id').maybeSingle();
+      if (aeErr) console.warn(`[pcarmarket] auction_events failed: ${aeErr.message}`);
+      if (ae?.id && bids.length) {
+        const endMs = listing.auctionEndDate ? new Date(listing.auctionEndDate).getTime() : null;
+        const rows = bids.filter((b) => b.at).map((b, i) => ({
+          auction_event_id: ae.id, vehicle_id: vehicleId, platform: 'pcarmarket', source_url: listing.url,
+          content_hash: `pcm_${vehicleId}_${b.at}_${b.user}_${b.amount}_${b.kind}`, sequence_number: i + 1, posted_at: b.at,
+          hours_until_close: endMs ? Math.max(0, (endMs - new Date(b.at!).getTime()) / 3_600_000) : null,
+          author_username: b.user, author_external_identity_id: ids.get(b.user) ?? null, external_identity_id: ids.get(b.user) ?? null,
+          is_seller: false, comment_type: 'bid', comment_text: `${b.kind === 'sold' ? 'Sold' : b.kind === 'offer' ? 'Offer' : 'Bid'} $${b.amount.toLocaleString('en-US')}`,
+          word_count: 2, has_question: false, bid_amount: b.amount,
+        }));
+        const { error: cErr } = await supabase.from('auction_comments').upsert(rows, { onConflict: 'vehicle_id,content_hash' });
+        if (cErr) console.warn(`[pcarmarket] bid rows failed: ${cErr.message}`);
       }
     }
 

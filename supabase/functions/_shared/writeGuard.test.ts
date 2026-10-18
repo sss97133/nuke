@@ -6,10 +6,12 @@
  */
 
 import { assertEquals } from "https://deno.land/std@0.224.0/assert/mod.ts";
+import { knownSecretKeys, projectSecretKey } from "./supabaseKeys.ts";
 import {
   authenticateWriter,
   decodeJwt,
   isServiceCaller,
+  requireAdminOrService,
   requireOwnerOrService,
   requireWriteAuth,
   type WriteGuardDeps,
@@ -136,24 +138,39 @@ Deno.test("the publishable key → 401, even signed into both headers", async ()
   assertEquals(v, { ok: false, status: 401, reason: "not a secret key" });
 });
 
-// ── legacy credentials: only the platform can vouch for them ─────────────────────
+// ── legacy credentials: never accepted ──────────────────────────────────────────
 
-Deno.test("the legacy service JWT, byte-equal to SERVICE_ROLE_KEY in the env → no env match; refused once the platform refuses it", async () => {
-  const v = await authenticateWriter(req({ Authorization: `Bearer ${LEGACY_SERVICE_JWT}` }), { deps: deps() });
-  assertEquals(v, { ok: false, status: 401, reason: "service token rejected by the platform" });
+Deno.test("the legacy service JWT, byte-equal to SERVICE_ROLE_KEY in the env → refused, and the platform is not asked", async () => {
+  const calls: string[] = [];
+  const v = await authenticateWriter(req({ Authorization: `Bearer ${LEGACY_SERVICE_JWT}` }), {
+    deps: deps({ fetch: platformAccepting(LEGACY_SERVICE_JWT, calls) }),
+  });
+  assertEquals(v, { ok: false, status: 401, reason: "HS256 token: the legacy JWT secret is revoked" });
+  assertEquals(calls, []);
 });
 
-Deno.test("a service JWT forged with the legacy secret, which sits in JWT_SIGNING_SECRET → not trusted locally; refused", async () => {
+Deno.test("a service JWT signed with the legacy secret, which sits in JWT_SIGNING_SECRET → refused", async () => {
   const forged = await hs256({ role: "service_role", exp: NOW + 3600 });
   const v = await authenticateWriter(req({ Authorization: `Bearer ${forged}` }), { deps: deps() });
-  assertEquals(v, { ok: false, status: 401, reason: "service token rejected by the platform" });
+  assertEquals(v, { ok: false, status: 401, reason: "HS256 token: the legacy JWT secret is revoked" });
 });
 
-Deno.test("the legacy service JWT while the platform still accepts it → allowed via remote", async () => {
-  const v = await authenticateWriter(req({ Authorization: `Bearer ${LEGACY_SERVICE_JWT}` }), {
-    deps: deps({ fetch: platformAccepting(LEGACY_SERVICE_JWT) }),
-  });
-  assertEquals(v, { ok: true, caller: { kind: "service_role", via: "remote" } });
+Deno.test("an HS256 user token → refused without asking GoTrue", async () => {
+  const user = await hs256({ role: "authenticated", sub: "u-remote", exp: NOW + 3600 });
+  const calls: string[] = [];
+  const gotrue = ((url: string | URL | Request) => {
+    calls.push(String(url));
+    return Promise.resolve(new Response(JSON.stringify({ id: "u-remote" }), { status: 200 }));
+  }) as typeof fetch;
+  const v = await authenticateWriter(req({ Authorization: `Bearer ${user}` }), { deps: deps({ fetch: gotrue }) });
+  assertEquals(v, { ok: false, status: 401, reason: "HS256 token: the legacy JWT secret is revoked" });
+  assertEquals(calls, []);
+});
+
+Deno.test("SERVICE_ROLE_KEY is never read: an opaque value there is not a key this guard holds", async () => {
+  const env = { ...baseEnv, SERVICE_ROLE_KEY: "sb_secret_test_deleted_01" };
+  const v = await authenticateWriter(req({ Authorization: "Bearer sb_secret_test_deleted_01" }), { deps: deps({ env }) });
+  assertEquals(v, { ok: false, status: 401, reason: "secret key rejected by the platform" });
 });
 
 Deno.test("the public anon JWT → 401 even with a valid signature", async () => {
@@ -162,8 +179,9 @@ Deno.test("the public anon JWT → 401 even with a valid signature", async () =>
   assertEquals(v, { ok: false, status: 401, reason: "anon key" });
 });
 
-Deno.test("HS256 user token: GoTrue confirms → user via remote; GoTrue refuses → 401", async () => {
-  const user = await hs256({ role: "authenticated", sub: "u-remote", exp: NOW + 3600 });
+Deno.test("an ES256 user token the JWKS cannot check: GoTrue confirms → user via remote, with the publishable key", async () => {
+  const other = await crypto.subtle.generateKey({ name: "ECDSA", namedCurve: "P-256" }, true, ["sign", "verify"]);
+  const user = await es256({ role: "authenticated", sub: "u-remote", exp: NOW + 3600 }, other.privateKey);
   const calls: string[] = [];
   const gotrue = ((url: string | URL | Request, init?: RequestInit) => {
     const u = String(url);
@@ -176,7 +194,6 @@ Deno.test("HS256 user token: GoTrue confirms → user via remote; GoTrue refuses
   }) as typeof fetch;
   const ok = await authenticateWriter(req({ Authorization: `Bearer ${user}` }), { deps: deps({ fetch: gotrue }) });
   assertEquals(ok, { ok: true, caller: { kind: "user", userId: "u-remote", via: "remote" } });
-  // The user check sends the publishable key, not a legacy one.
   assertEquals(calls, [`GET https://example.supabase.co/auth/v1/user apikey=${PUBLISHABLE_KEY}`]);
   const refused = await authenticateWriter(req({ Authorization: `Bearer ${user}` }), { deps: deps() });
   assertEquals(refused, { ok: false, status: 401, reason: "user token rejected by the platform" });
@@ -239,7 +256,7 @@ Deno.test("refused bearer + a user JWT on apikey → still refused: only a secre
   const forged = await hs256({ role: "service_role", exp: NOW + 3600 });
   const user = await es256({ role: "authenticated", sub: "user-123", exp: NOW + 3600 });
   const v = await authenticateWriter(req({ Authorization: `Bearer ${forged}`, apikey: user }), { deps: deps() });
-  assertEquals(v, { ok: false, status: 401, reason: "service token rejected by the platform" });
+  assertEquals(v, { ok: false, status: 401, reason: "HS256 token: the legacy JWT secret is revoked" });
 });
 
 // ── exceptions and helpers ─────────────────────────────────────────────────────
@@ -307,4 +324,73 @@ Deno.test("owner-only: owner lookup fails → the owner is refused too (fails cl
 Deno.test("owner-only: no token → 403; OPTIONS → not judged", async () => {
   assertEquals((await requireOwnerOrService(req(), { deps: deps({ fetch: ownerLookup(OWNER) }) }))?.status, 403);
   assertEquals(await requireOwnerOrService(req({}, "OPTIONS"), { deps: deps() }), null);
+});
+
+// ── requireAdminOrService (2026-10-14) ─────────────────────────────────────────────
+const ADMIN = "0b9f107a-0000-4000-8000-0000000000a1";
+const adminLookup = (admins: string[], status = 200, seen: string[] = []): typeof fetch => ((input: RequestInfo | URL, init?: RequestInit) => {
+  const u = String(input);
+  if (u.includes("/rest/v1/admin_users")) {
+    seen.push(((init?.headers ?? {}) as Record<string, string>).apikey ?? "");
+    const id = new URL(u).searchParams.get("user_id")?.replace(/^eq\./, "") ?? "";
+    const active = new URL(u).searchParams.get("is_active") === "eq.true";
+    return Promise.resolve(new Response(JSON.stringify(active && admins.includes(id) ? [{ user_id: id }] : []), { status }));
+  }
+  return Promise.resolve(new Response("", { status: 401 }));
+}) as typeof fetch;
+
+Deno.test("admin-only: a secret key passes without a lookup", async () => {
+  const seen: string[] = [];
+  const res = await requireAdminOrService(req({ authorization: `Bearer ${CRON_KEY}` }), { deps: deps({ fetch: adminLookup([], 200, seen) }) });
+  assertEquals(res, null);
+  assertEquals(seen, []);
+});
+
+Deno.test("admin-only: an active admin's sign-in passes; the lookup uses the injected secret key", async () => {
+  const token = await es256({ role: "authenticated", sub: ADMIN, exp: NOW + 600 });
+  const seen: string[] = [];
+  const res = await requireAdminOrService(req({ authorization: `Bearer ${token}` }), { deps: deps({ fetch: adminLookup([ADMIN], 200, seen) }) });
+  assertEquals(res, null);
+  assertEquals(seen, [INJECTED_KEY]);
+});
+
+Deno.test("admin-only: any other signed-in user, an anonymous sign-in included → 403", async () => {
+  for (const extra of [{}, { is_anonymous: true }]) {
+    const token = await es256({ role: "authenticated", sub: "0b9f107a-0000-4000-8000-0000000000f9", exp: NOW + 600, ...extra });
+    const res = await requireAdminOrService(req({ authorization: `Bearer ${token}` }), { deps: deps({ fetch: adminLookup([ADMIN]) }) });
+    assertEquals(res?.status, 403);
+    assertEquals((await res!.json()).reason, "admins only");
+  }
+});
+
+Deno.test("admin-only: admin lookup fails → the admin is refused too (fails closed)", async () => {
+  const token = await es256({ role: "authenticated", sub: ADMIN, exp: NOW + 600 });
+  const res = await requireAdminOrService(req({ authorization: `Bearer ${token}` }), { deps: deps({ fetch: adminLookup([ADMIN], 500) }) });
+  assertEquals(res?.status, 403);
+});
+
+Deno.test("admin-only: no token or the publishable key → 403; OPTIONS → not judged", async () => {
+  assertEquals((await requireAdminOrService(req(), { deps: deps({ fetch: adminLookup([ADMIN]) }) }))?.status, 403);
+  assertEquals((await requireAdminOrService(req({ authorization: `Bearer ${PUBLISHABLE_KEY}` }), { deps: deps({ fetch: adminLookup([ADMIN]) }) }))?.status, 403);
+  assertEquals(await requireAdminOrService(req({}, "OPTIONS"), { deps: deps() }), null);
+});
+
+// ── supabaseKeys: which key a function sends, which keys it accepts ──────────────────
+const envOf = (e: Record<string, string>) => (n: string) => e[n];
+
+Deno.test("projectSecretKey: a `functions` key first, then the platform's secret key, then `default`", () => {
+  const named = (keys: Record<string, string>) => JSON.stringify(keys);
+  assertEquals(projectSecretKey(envOf({ ...baseEnv, SUPABASE_SECRET_KEYS: named({ default: DEFAULT_KEY, functions: "sb_secret_test_functions_01" }) })),
+    "sb_secret_test_functions_01");
+  assertEquals(projectSecretKey(envOf(baseEnv)), INJECTED_KEY);
+  assertEquals(projectSecretKey(envOf({ ...baseEnv, SUPABASE_SERVICE_ROLE_KEY: LEGACY_SERVICE_JWT })), DEFAULT_KEY);
+  assertEquals(projectSecretKey(envOf({ SUPABASE_SERVICE_ROLE_KEY: LEGACY_SERVICE_JWT })), LEGACY_SERVICE_JWT);
+  // The deleted user-set secret is never a fallback.
+  assertEquals(projectSecretKey(envOf({ SERVICE_ROLE_KEY: "sb_secret_test_deleted_01" })), undefined);
+});
+
+Deno.test("knownSecretKeys: every named secret key and the platform's secret key; never a JWT or SERVICE_ROLE_KEY", () => {
+  assertEquals(knownSecretKeys(envOf(baseEnv)).sort(), [CRON_KEY, DEFAULT_KEY, INJECTED_KEY].sort());
+  assertEquals(knownSecretKeys(envOf({ ...baseEnv, SUPABASE_SERVICE_ROLE_KEY: LEGACY_SERVICE_JWT })).sort(), [CRON_KEY, DEFAULT_KEY].sort());
+  assertEquals(knownSecretKeys(envOf({ SERVICE_ROLE_KEY: "sb_secret_test_deleted_01" })), []);
 });

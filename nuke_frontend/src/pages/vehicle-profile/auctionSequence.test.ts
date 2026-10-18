@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { auctionMomentDayTitle, buildAuctionSequence, buildAuctionSequences, commentPermalink, dedupeComments, fmtMoment, hasRecordedAuctionEnd, lotKey, momentDay, uploadMonth, type AuctionCommentRow } from './auctionSequence';
+import { auctionMomentDayTitle, buildAuctionSequence, buildAuctionSequences, commentPermalink, dedupeComments, fmtMoment, hasRecordedAuctionEnd, isBatHosted, lotKey, momentDay, uploadMonth, type AuctionCommentRow } from './auctionSequence';
 
 const LOT = 'https://bringatrailer.com/listing/1985-pontiac-fiero-gt-3/';
 
@@ -252,5 +252,89 @@ describe('recorded end clocks and categorical outcomes', () => {
   it('reports unsupported sold/no-sale disagreement instead of inferring a transaction outcome', () => {
     const seq = buildAuctionSequence(input(null, null, 'unsold', 'sold'))!;
     expect(seq.outcome).toBe('unknown'); expect(seq.outcomeConflict).toBe(true);
+  });
+});
+
+
+describe('unpositioned activity follows canonical native assignment', () => {
+  const native = (id: string, posted_at: string | null, source_url: string | null = LOT, bat_comment_id: number | null = 1): AuctionCommentRow =>
+    ({ ...comment({ id, posted_at: '2026-09-17T18:00:00Z' }), posted_at, source_url, bat_comment_id });
+  const timed = native('synthetic-timed', '2026-09-17T18:00:00Z');
+  it.each([
+    { name: 'native missing clock', rows: [timed, native('synthetic-null', null, LOT, 2)], hint: LOT, expected: true, items: ['synthetic-timed'], keys: ['1985-pontiac-fiero-gt-3'] },
+    { name: 'native invalid clock', rows: [timed, native('synthetic-invalid', 'not-a-time', LOT, 2)], hint: LOT, expected: true, items: ['synthetic-timed'], keys: ['1985-pontiac-fiero-gt-3'] },
+    { name: 'blank native fallback', rows: [timed, native('synthetic-blank', null, '  ', 2)], hint: LOT, expected: true, items: ['synthetic-timed'], keys: ['1985-pontiac-fiero-gt-3'] },
+    { name: 'foreign alongside native', rows: [timed, native('synthetic-foreign', null, 'https://example.invalid/other', 2)], hint: LOT, expected: false, items: ['synthetic-timed'], keys: ['1985-pontiac-fiero-gt-3'] },
+    { name: 'foreign only under known key', rows: [native('synthetic-foreign', null, 'https://example.invalid/other', 2)], hint: LOT, expected: false, items: [], keys: ['1985-pontiac-fiero-gt-3'] },
+    { name: 'blank without a native key', rows: [native('synthetic-blank', null, null, 2)], hint: null, expected: false, items: [], keys: [] },
+    { name: 'fully positioned native', rows: [timed], hint: LOT, expected: false, items: ['synthetic-timed'], keys: ['1985-pontiac-fiero-gt-3'] },
+    { name: 'invalid duplicate discarded by current earliest policy', rows: [timed, native('synthetic-invalid', 'not-a-time')], hint: LOT, expected: false, items: ['synthetic-timed'], keys: ['1985-pontiac-fiero-gt-3'] },
+    { name: 'null duplicate retained by current earliest policy', rows: [timed, native('synthetic-null', null)], hint: LOT, expected: true, items: [], keys: ['1985-pontiac-fiero-gt-3'] },
+    { name: 'foreign duplicate excluded before native identity', rows: [timed, native('synthetic-foreign', null, 'https://example.invalid/other')], hint: LOT, expected: false, items: ['synthetic-timed'], keys: ['1985-pontiac-fiero-gt-3'] },
+  ])('qualifies $name without changing sequence membership or source clocks', control => {
+    const result = buildAuctionSequences({ comments: control.rows, auctionEvents: [], vehicleEvents: [], timelineEvents: [], images: [], lotUrlHint: control.hint });
+    expect(result.sequences.map(s => s.key)).toEqual(control.keys);
+    expect(result.sequences.flatMap(s => s.items.map(i => i.id))).toEqual(control.items);
+    expect(result.sequences.flatMap(s => s.items.map(i => i.at))).toEqual(control.items.map(() => '2026-09-17T18:00:00.000Z'));
+    expect(result.sequences.flatMap(s => s.items.map(i => i.url))).toEqual(control.items.map(() => `${LOT}#comment-1`));
+    expect(result.importStampedDays).toEqual([]);
+    expect((result as any).hasUnpositionedActivity).toBe(control.expected);
+  });
+});
+
+
+describe('native source eligibility precedes projection identity', () => {
+  const native = comment({ id: 'synthetic-native', posted_at: '2026-09-17T18:00:00Z', comment_type: 'bid', bid_amount: 100, author_username: 'Native witness', bat_comment_id: 501 });
+  it.each([
+    { name: 'native only', source: undefined, at: '2026-09-17T17:00:00Z', only: false, kept: 'synthetic-native', amount: 100, clock: '2026-09-17T18:00:00.000Z', generic: 'synthetic-native' },
+    { name: 'foreign earlier', source: 'https://example.invalid/other', at: '2026-09-17T17:00:00Z', only: false, kept: 'synthetic-native', amount: 100, clock: '2026-09-17T18:00:00.000Z', generic: 'synthetic-extra' },
+    { name: 'foreign missing clock', source: 'https://example.invalid/other', at: null, only: false, kept: 'synthetic-native', amount: 100, clock: '2026-09-17T18:00:00.000Z', generic: 'synthetic-extra' },
+    { name: 'foreign later', source: 'https://example.invalid/other', at: '2026-09-17T19:00:00Z', only: false, kept: 'synthetic-native', amount: 100, clock: '2026-09-17T18:00:00.000Z', generic: 'synthetic-native' },
+    { name: 'native earlier', source: LOT, at: '2026-09-17T17:00:00Z', only: false, kept: 'synthetic-extra', amount: 200, clock: '2026-09-17T17:00:00.000Z', generic: 'synthetic-extra' },
+    { name: 'blank earlier', source: '  ', at: '2026-09-17T17:00:00Z', only: false, kept: 'synthetic-extra', amount: 200, clock: '2026-09-17T17:00:00.000Z', generic: 'synthetic-extra' },
+    { name: 'foreign only', source: 'https://example.invalid/other', at: '2026-09-17T17:00:00Z', only: true, kept: null, amount: null, clock: null, generic: 'synthetic-extra' },
+  ])('keeps $name scoped without changing generic dedupe or raw rows', control => {
+    const extra = { ...native, id: 'synthetic-extra', source_url: control.source ?? null, posted_at: control.at,
+      bid_amount: control.source?.includes('example.invalid') ? 900 : 200, author_username: 'Duplicate witness' };
+    const rows = [...(control.only ? [] : [native]), ...(control.source === undefined ? [] : [extra])];
+    const before = structuredClone(rows);
+    expect(dedupeComments(rows).map(c => c.id)).toEqual([control.generic]);
+    const result = buildAuctionSequences({ comments: rows, auctionEvents: [], images: [], timelineEvents: [], lotUrlHint: LOT,
+      vehicleEvents: [{ id: 'synthetic-window', source_platform: 'bat', source_url: LOT, started_at: '2026-09-10T15:00:00Z', ended_at: '2026-09-17T20:00:00Z', sold_at: null, final_price: null, event_status: null }] });
+    expect(rows).toEqual(before); expect(result.sequences).toHaveLength(1);
+    const sequence = result.sequences[0];
+    expect(sequence.open?.at).toBe('2026-09-10T15:00:00.000Z'); expect(sequence.close?.at).toBe('2026-09-17T20:00:00.000Z');
+    expect(sequence.items.map(i => i.id)).toEqual(control.kept ? [control.kept] : []);
+    if (control.kept) expect(sequence.lastObservedBid).toMatchObject({ id: control.kept, amount: control.amount, at: control.clock,
+      author: control.kept === 'synthetic-native' ? 'Native witness' : 'Duplicate witness', url: `${LOT}#comment-501` });
+    else expect(sequence.lastObservedBid).toBeNull();
+    expect(sequence.items.some(i => i.amount === 900)).toBe(false);
+  });
+  it('retains the eligible lowest-id tie and distinct ID-less rows', () => {
+    const rows = [{ ...native, id: 'z' }, { ...native, id: 'a', bid_amount: 200 },
+      { ...native, id: 'none-1', bat_comment_id: null }, { ...native, id: 'none-2', bat_comment_id: null }];
+    const result = buildAuctionSequences({ comments: rows, auctionEvents: [], vehicleEvents: [], timelineEvents: [], images: [], lotUrlHint: LOT });
+    expect(result.sequences[0].items.map(i => i.id)).toEqual(['none-1', 'none-2', 'a']);
+    expect(dedupeComments(rows).map(c => c.id)).toEqual(['none-1', 'none-2', 'a']);
+  });
+});
+
+
+describe('native photo timestamp authority', () => {
+  it.each([
+    { source: 'bat_import', url: null, imported: true },
+    { source: 'owner_upload', url: 'https://photos.bringatrailer.com/wp-content/uploads/2026/09/synthetic.jpg', imported: true },
+    { source: 'external_import', url: '//bringatrailer.com/wp-content/uploads/2026/09/synthetic.jpg', imported: true },
+    { source: 'combat_archive', url: null, imported: true }, // Preserve the existing /bat/i vocabulary.
+    { source: 'owner_upload', url: 'https://notbringatrailer.com/wp-content/uploads/2026/09/synthetic.jpg', imported: false },
+    { source: 'owner_upload', url: null, imported: false },
+  ])('retains $source/$url clock classification and raw inputs', ({ source, url, imported }) => {
+    const image = { id: 'synthetic-clock-authority', source, source_url: url, taken_at: '2026-09-02T12:10:00Z' };
+    const before = structuredClone(image);
+    const result = buildAuctionSequences({ comments: [], auctionEvents: [], vehicleEvents: [], timelineEvents: [], images: [image], lotUrlHint: LOT });
+    expect(isBatHosted(image)).toBe(imported);
+    expect(result.importStampedDays).toEqual(imported ? [new Date(image.taken_at).toLocaleDateString('en-CA')] : []);
+    expect(result.sequences[0].photos.publishedWithListing).toBe(imported ? 1 : 0);
+    expect(image).toEqual(before);
   });
 });
