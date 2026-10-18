@@ -44,6 +44,22 @@ ANALYZE public.vehicle_observations;
 \ir ../migrations/20261019053000_broadcast_profile_reader_source_index.sql
 \ir ../migrations/20261019053000_broadcast_profile_reader_source_index.sql
 
+-- The derived-claim branch already exempts these rows from the general visibility check.
+-- Its redundant OR still calls the JSON regex helper in production. Make that work observable:
+-- the previous indexed reader reaches it, while the repair must keep the same rows without it.
+CREATE OR REPLACE FUNCTION public.observation_is_public(text, jsonb) RETURNS boolean
+LANGUAGE plpgsql IMMUTABLE AS $$ BEGIN RAISE EXCEPTION 'redundant visibility scan evaluated'; END $$;
+DO $$ BEGIN
+  BEGIN
+    PERFORM public.read_broadcast_entity_profile(fixture_uid(1), 20);
+    RAISE EXCEPTION 'expected the previous reader to evaluate the redundant check';
+  EXCEPTION WHEN raise_exception THEN
+    IF SQLERRM <> 'redundant visibility scan evaluated' THEN RAISE; END IF;
+  END;
+END $$;
+\ir ../migrations/20261019074500_broadcast_profile_skip_redundant_privacy_scan.sql
+\ir ../migrations/20261019074500_broadcast_profile_skip_redundant_privacy_scan.sql
+
 DO $$ DECLARE r jsonb; ids uuid[]; plan text; BEGIN
   r := public.read_broadcast_entity_profile(fixture_uid(1), 20);
   SELECT array_agg((c->>'id')::uuid ORDER BY c->>'ingested_at' DESC) INTO ids FROM jsonb_array_elements(r->'derived_subject_claims') c;
