@@ -395,6 +395,34 @@ event), described (COMMENT ON), owned (a registry row) and read. Not fewer table
 
 The species is a column (2026-10-18): `observation_sources.species`, with `species_set` and the evidence it was read from (`species_evidence`); a listing takes its own species where its URL or metadata shows it (`v_listing_species`). The extractor's builder declares it from the source itself (`.claude/rules/extraction.md`, Source species), and the Sources board groups by it with the names above. Barn Finds is an aggregator (a curator: its posts point at eBay, Craigslist and Facebook listings), with its own 'BF Exclusive' ads as classifieds.
 
+### Cars & Bids capture integrity — bounded repair, 2026-10-18
+
+The source question is whether a retained auction reading contains a usable keyed and clocked
+thread, before its current state is updated. `scripts/cab-api-sync.mjs` previously treated a failed
+comments request as an empty thread. The existing `inspect-cab-snapshot.mjs` now owns the deterministic
+`cab-capture-integrity-v1` assessment, called before the collector's first write. Failed/malformed
+responses, wrong listing identity, missing/duplicate thread IDs, missing source clocks, invalid bid
+amounts, source bid-count disagreement and a full limited page refuse the extraction. A disagreement
+between concurrently fetched detail and thread can cause refusal; it is not proof the source is wrong.
+No pagination protocol is invented. Unknown source bid counts remain unassessed; matching counts do
+not prove source enumeration or semantic accuracy. Comment-counter semantics, retained DB links and
+public delivery remain separate, unassessed gates.
+
+Offline replay: `node scripts/inspect-cab-snapshot.mjs --api-json <retained-json-file>`. Output contains
+counts and reasons, not comment bodies or handles. `scripts/inspect-cab-snapshot.test.mjs` exercises
+the actual collector's pre-write refusal and unknown/disagreement cases. The historical skip rule and
+dispatch population are unchanged, labelled previously processed rather than complete; legacy mixed
+row telemetry is explicitly not new-row or model coverage. No collection, replay or paused job is
+started by this repair. Three explicit retained captures passed the local capture assessment; their
+bid counts matched the stored totals. This is bounded validation, not fleet/public readiness.
+
+Next relationship to assay: the collector's listing observation uses source URL/identifier but does
+not pass typed snapshot or presentation pointers through `observationWriter`. Inspect canonical intake
+admission and existing binding owners before extending that path. Original source-ID reconciliation,
+capture identity, disagreement, withdrawal and anonymous-reader behavior must be proved together;
+adding a pointer alone does not close the case. Current stage: local implementation and focused tests;
+publication/deployment evidence belongs in the private lane receipt.
+
 ## 7. Hypotheses the owner wants tested as veins (in the vocabulary)
 
 - **The repair chain precedes the market event.** "How many thermostats had to sell before an AC system sold, before
