@@ -284,7 +284,7 @@ Deno.test("trusted derivation requires exact live storage path, content hash, pr
   const variants: VisionInputSource[] = [
     { ...original, storage_path: null },
     { ...original, storage_path: original.storage_path!.replace(/\/[a-f0-9]{64}\//, `/${"a".repeat(64)}/`) },
-    { ...original, storage_path: original.storage_path!.replace("IMG_0001.HEIC", "%2e%2e") },
+    { ...original, storage_path: [...original.storage_path!.split("/").slice(0, -1), "%2e%2e"].join("/") },
     { ...original, source_url: original.source_url.replace(project, "https://untrusted.invalid") },
     { ...original, source_url: original.source_url + "?unrecorded-transform=true" },
     { ...original, input_url: original.source_url + "?thumbnail=true" },
