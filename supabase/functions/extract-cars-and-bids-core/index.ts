@@ -28,7 +28,7 @@ import { writeObservation } from "../_shared/observationWriter.ts";
 import { requireWriteAuth } from "../_shared/writeGuard.ts";
 import { projectSecretKey } from "../_shared/supabaseKeys.ts";
 import { batchFromTargets, discoverTargets, reviseCab, recaptureCab } from "./targets.ts";
-import { cabLotPhotos, parseCabDepth } from "./cabPage.ts";
+import { cabCapturePredatesResult, cabLotPhotos, parseCabDepth } from "./cabPage.ts";
 import { cleanCabText, extractCabFacets } from "./cabFacets.ts";
 import { recordSellerTypes, sellerTypeRow } from "../_shared/sellerType.ts";
 import { insertMissingVehicleImages } from "../_shared/vehicleImageWrite.ts";
@@ -909,10 +909,11 @@ Deno.serve(async (req) => {
 
     // Identity guard: a URL/VIN match is not proof it is the same car. A different car is refused and raised as a revision
     // item (identity_match / different_car / relink); for the same car, year/make/model/vin are fill-only.
-    let existingIdentity: { year: number | null; make: string | null; model: string | null; vin: string | null } | null = null;
+    type ExistingIdentity = { year: number | null; make: string | null; model: string | null; vin: string | null; auction_status: string | null; auction_end_date: string | null };
+    let existingIdentity: ExistingIdentity | null = null;
     if (vehicleId) {
-      const { data: idRow } = await supabase.from("vehicles").select("year,make,model,vin").eq("id", vehicleId).maybeSingle();
-      existingIdentity = (idRow as typeof existingIdentity) ?? null;
+      const { data: idRow } = await supabase.from("vehicles").select("year,make,model,vin,auction_status,auction_end_date").eq("id", vehicleId).maybeSingle();
+      existingIdentity = (idRow as ExistingIdentity | null) ?? null;
       const conflict = existingIdentity ? identityConflict(existingIdentity, { year: extracted.year, make: extracted.make, model: extracted.model, vin: extracted.vin }) : null;
       if (conflict) {
         await supabase.rpc("record_revision_item", {
@@ -924,8 +925,14 @@ Deno.serve(async (req) => {
           status: 409, headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
+      if (fromCache && existingIdentity && cabCapturePredatesResult(cachedSnapshot?.fetched_at, depth.outcome, existingIdentity)) {
+        return new Response(JSON.stringify({
+          success: false, refused: "cached_live_precedes_result", vehicle_id: vehicleId,
+          fetched_at: cachedSnapshot?.fetched_at, known_end_at: existingIdentity.auction_end_date,
+        }), { status: 409, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      }
     }
-    const fillOnly = <T extends Record<string, unknown>>(row: T, id: string | null, known: typeof existingIdentity) => (id && known ? fillOnlyIdentity(row, known) : row);
+    const fillOnly = <T extends Record<string, unknown>>(row: T, id: string | null, known: ExistingIdentity | null) => (id && known ? fillOnlyIdentity(row, known) : row);
 
     // Upsert vehicle
     let created = false;
