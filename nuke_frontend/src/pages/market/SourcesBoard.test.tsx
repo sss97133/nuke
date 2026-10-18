@@ -214,11 +214,7 @@ it('ranks auction houses, marketplaces, and dealers apart, same row for each, as
   expect(groups.map((g) => g.querySelector('.market-sources__group-title')?.textContent)).toEqual(['Auction houses', 'Marketplaces', 'Dealers']);
   expect(groups.map((g) => [...g.querySelectorAll('.market-sources__name-text')].map((n) => n.textContent))).toEqual(
     [['Bring a Trailer', 'Mecum Auctions', 'Cars & Bids'], ['Craigslist'], ['Avant-Garde Collection', 'Beverly Hills Car Club']]);
-  expect(groups.map((g) => [...g.querySelectorAll('.market-sources__badge')].map((b) => b.textContent))).toEqual([
-    ['AUCTION HOUSE', 'AUCTION HOUSE', 'AUCTION HOUSE'],
-    ['MARKETPLACE'],
-    ['DEALER / CONSIGNOR', 'DEALER / CONSIGNOR'],
-  ]);
+  expect(container.querySelectorAll('.market-sources__row .market-sources__badge')).toHaveLength(0);
   expect(groups[1].querySelector('.market-sources__rank')?.textContent).toBe('1');
   expect(groups[2].querySelector('.market-sources__rank')?.textContent).toBe('1');
   expect(groups[0].querySelector('.market-sources__name img')?.getAttribute('src')).toBe('https://example.test/bat.png');
@@ -315,7 +311,7 @@ it('says Sources · all makes when the market page is scoped to a make', async (
   expect(container.querySelector('.market-sources__title')?.textContent).toBe('Sources · all makes');
 });
 
-it('renders DEALER / CONSIGNOR category badges for category="dealer" or business_type="dealer" and filters/inspects by category', async () => {
+it('keeps dealer category context in the inspector and filters without repeating row badges', async () => {
   expect(resolveSourceCategory({ category: 'dealer', businessType: null })).toBe('dealer');
   expect(resolveSourceCategory({ category: null, businessType: 'dealer' })).toBe('dealer');
   expect(resolveSourceCategory({ category: 'auction', businessType: null })).toBe('auction');
@@ -360,27 +356,14 @@ it('renders DEALER / CONSIGNOR category badges for category="dealer" or business
     'Avant-Garde Collection',
     'Beverly Hills Car Club',
   ]);
-  expect(visibleRows.map((r) => r.querySelector('.market-sources__badge')?.textContent)).toEqual([
-    'DEALER / CONSIGNOR',
-    'DEALER / CONSIGNOR',
-  ]);
-
-  // Open the ingestion inspector on a dealer row and verify the DEALER / CONSIGNOR badge, Organization Profile link, and consignment breakdown in the inspector
-  expect(visibleRows.map((r) => r.querySelector('.market-sources__org-link')?.getAttribute('href'))).toEqual([
-    '/organization/avant-garde-collection',
-    '/organization/beverlyhillscarclub',
-  ]);
-  expect(visibleRows.map((r) => r.querySelector('.market-sources__org-link')?.textContent)).toEqual([
-    'Organization Profile →',
-    'Organization Profile →',
-  ]);
+  expect(visibleRows.every((r) => !r.querySelector('.market-sources__badge, .market-sources__org-link'))).toBe(true);
   const dealerLandBtn = visibleRows[0].querySelector('button.market-sources__landing') as HTMLButtonElement;
   await act(async () => { dealerLandBtn.click(); });
   expect(fixture.rpc).toHaveBeenCalledWith('market_source_landing_read', { p_source: 'avant-garde-collection' });
   const drill = container.querySelector('.market-sources__drill')!;
   expect(drill.querySelector('.market-sources__badge--dealer')?.textContent).toBe('DEALER / CONSIGNOR');
   expect(drill.querySelector('.market-sources__org-link')?.getAttribute('href')).toBe('/organization/avant-garde-collection');
-  expect(drill.querySelector('.market-sources__org-link')?.textContent).toBe('Organization Profile →');
+  expect(drill.querySelector('.market-sources__org-link')?.textContent).toBe('Full profile');
   const dealerCtx = drill.querySelector('.market-sources__dealer-context')!;
   expect(dealerCtx).not.toBeNull();
   expect(dealerCtx.querySelector('.market-sources__dealer-context-label')?.textContent).toBe('INVENTORY & CONSIGNMENT BREAKDOWN');
@@ -426,13 +409,9 @@ it('renders Organization Profile link and headquarters city/state badge in deale
   await act(async () => root.render(<SourcesBoard />));
 
   const dealerRow = container.querySelector('li.market-sources__row')!;
-  const rowOrgLink = dealerRow.querySelector('a.market-sources__org-link') as HTMLAnchorElement;
-  expect(rowOrgLink).not.toBeNull();
-  expect(rowOrgLink.textContent).toBe('Organization Profile →');
-  expect(rowOrgLink.getAttribute('href')).toBe('/organization/25937788-215a-4d3a-aca7-ea13fdfd9876');
-
-  // Clicking the row opens the drill inspector with HQ badge and Organization Profile link
-  await act(async () => { (dealerRow as HTMLLIElement).click(); });
+  expect(dealerRow.querySelector('a')).toBeNull();
+  await act(async () => { (dealerRow.querySelector('button.market-sources__name') as HTMLButtonElement).click(); });
+  expect(container.querySelector('dialog')?.getAttribute('aria-label')).toBe('Avant-Garde Collection');
   const drill = container.querySelector('.market-sources__drill')!;
   expect(drill.querySelector('a.market-sources__org-link')?.getAttribute('href'))
     .toBe('/organization/25937788-215a-4d3a-aca7-ea13fdfd9876');
@@ -1150,10 +1129,10 @@ it('groups the board by species with the doc\'s names, aggregators apart, and sh
   expect(groups.map((g) => [...g.querySelectorAll('.market-sources__name-text')].map((n) => n.textContent))).toEqual([
     ['Bring a Trailer', 'Cars & Bids'], ['Mecum Auctions'], ['Avant-Garde Collection', 'Beverly Hills Car Club'], ['Craigslist'],
     ['Barn Finds']]);
-  expect(groups[3].querySelector('.market-sources__badge')?.textContent).toBe('CLASSIFIEDS');
+  expect(groups[3].querySelector('.market-sources__badge')).toBeNull();
   expect(groups[3].querySelector('.market-sources__cols .n')?.textContent).toBe('posts held');
   expect(groups[4].querySelector('.market-sources__cols .n')?.textContent).toBe('pages read, not listings held');
-  expect(groups[4].querySelector('.market-sources__badge--aggregator')?.textContent).toBe('AGGREGATOR');
+  expect(groups[4].querySelector('.market-sources__badge--aggregator')).toBeNull();
   expect([...container.querySelectorAll('.market-sources__cat-pill')].map((b) => b.textContent)).toEqual(
     ['ALL', 'TIMED AUCTION', 'BLOCK HOUSE', 'DEALER SITE', 'CLASSIFIEDS', 'AGGREGATOR']);
   expect(container.querySelector('.market-sources__foot .market-sources__note')?.textContent)
@@ -1169,4 +1148,42 @@ it('groups the board by species with the doc\'s names, aggregators apart, and sh
   expect(ev.querySelector('.market-sources__species-seen')?.textContent).toBe(craigslistEvidence.seen);
   expect(ev.querySelector('.market-sources__species-examined li')?.textContent).toBe(craigslistEvidence.examined[0]);
   expect(container.querySelector('.market-sources__drill .market-sources__kpi-label')?.textContent?.trim()).toBe('Posts held');
+});
+
+it('opens source details from its name and dismisses with Escape without navigating', async () => {
+  fixture.rpc.mockImplementation((fn: string) => Promise.resolve(fn === 'market_sources_read'
+    ? { data: value, error: null } : { data: batLandingDetail, error: null }));
+  await act(async () => root.render(<SourcesBoard />));
+  const name = container.querySelector('button.market-sources__name') as HTMLButtonElement;
+  const location = window.location.href;
+  expect(name.getAttribute('aria-haspopup')).toBe('dialog');
+  await act(async () => name.click());
+  expect(container.querySelector('dialog')?.getAttribute('aria-label')).toBe('Bring a Trailer');
+  expect(name.getAttribute('aria-expanded')).toBe('true');
+  expect(fixture.rpc).toHaveBeenCalledWith('market_source_landing_read', { p_source: 'bat' });
+  await act(async () => container.querySelector('dialog')!.dispatchEvent(new Event('cancel', { bubbles: false })));
+  expect(container.querySelector('dialog')).toBeNull();
+  expect(name.getAttribute('aria-expanded')).toBe('false');
+  expect(window.location.href).toBe(location);
+});
+
+it('shows a dated source-reported active count without dividing historical holdings by it', async () => {
+  const withCurrent = { ...value, current_inventory: {
+    bat: { count: 67878, observed_at: '2026-10-18', url: 'https://example.test/search', method: 'search_result_count' },
+  } };
+  const parsed = parseSources(withCurrent)!;
+  expect(heldShare(parsed.rows[0])).toEqual({ share: null, text: '67,878 current listings' });
+  expect(heldShare({ ...parsed.rows[0], currentInventory: { count: 0, observedAt: '2026-10-18', url: null } }))
+    .toEqual({ share: null, text: '0 current listings' });
+  expect(parseSources({ ...value, current_inventory: { bat: { count: -1, method: 'search_result_count' } } })!.rows[0].currentInventory)
+    .toBeUndefined();
+  fixture.rpc.mockImplementation((fn: string) => Promise.resolve(fn === 'market_sources_read'
+    ? { data: withCurrent, error: null } : { data: batLandingDetail, error: null }));
+  await act(async () => root.render(<SourcesBoard />));
+  const row = container.querySelector('.market-sources__row')!;
+  expect(row.querySelector('.market-sources__share')?.textContent).toBe('67,878 current listingsOct 18 · search results');
+  expect(row.querySelector('.market-sources__track')).toBeNull();
+  await act(async () => (row.querySelector('.market-sources__name') as HTMLButtonElement).click());
+  expect(container.querySelector('dialog .market-sources__drill-stats')?.textContent).toContain('67,878 current listings');
+  expect(container.querySelector('dialog .market-sources__drill-stats')?.textContent).not.toContain('95% of');
 });

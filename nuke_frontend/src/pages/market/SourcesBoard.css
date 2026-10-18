@@ -29,7 +29,9 @@
 .market-sources__row:hover { background: var(--surface); }
 .market-sources__row--open { background: var(--surface); border-bottom-color: transparent; }
 .market-sources__rank { font-size: 11px; color: var(--text-secondary); font-family: 'Courier New', monospace; }
-.market-sources__name { display: flex; align-items: center; gap: 6px; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+.market-sources__name { padding: 0; border: 0; background: transparent; color: inherit; font: inherit; text-align: left; cursor: pointer; display: flex; align-items: center; gap: 6px; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+.market-sources__name:hover .market-sources__name-text { text-decoration: underline; text-underline-offset: 3px; }
+.market-sources__name:focus-visible { outline: 2px solid var(--text); outline-offset: 2px; }
 .market-sources__name-text { overflow: hidden; text-overflow: ellipsis; min-width: 0; }
 .market-sources__badge { flex: none; padding: 1px 5px; border: 1px solid var(--border); background: var(--surface);
   color: var(--text-secondary); font: 700 8px 'Courier New', monospace; letter-spacing: 0.05em; text-transform: uppercase; line-height: 1.3; }
@@ -304,3 +306,13 @@
   .market-sources__drill-kpis { grid-template-columns: repeat(2, 1fr); }
   .market-sources__drill-charts { grid-template-columns: 1fr; }
 }
+
+/* Native modal keeps source inspection on the board, with focus containment and Escape dismissal. */
+.market-sources__dialog { width: min(1200px, calc(100vw - 32px)); max-width: none; max-height: calc(100dvh - 32px);
+  box-sizing: border-box; padding: 0; border: 2px solid var(--border); border-radius: 0;
+  background: var(--bg); color: var(--text); font-family: Arial, sans-serif; }
+.market-sources__dialog::backdrop { background: var(--overlay-bg, rgba(0, 0, 0, 0.45)); }
+.market-sources__dialog .market-sources__drill { margin: 0; border: 0; }
+.market-sources__dialog .n { text-align: right; font-family: 'Courier New', monospace; font-variant-numeric: tabular-nums; }
+
+.market-sources__share--current { grid-template-columns: 1fr; }
