@@ -78,6 +78,8 @@ Gallery and technical views use standard `<Link>` navigation (these are compact 
 
 Focus markers on the tiles, breadcrumb and Sales by house summary use inset borders: the shared Tailwind overrides suppress outlines even when a component declares one. Verify the rendered marker rather than treating a local `outline` rule as proof of visible focus.
 
+**Bypass dense maps:** A focus-visible Skip map tiles link precedes the viewport. It moves focus to Market comparisons and legend immediately after the map and centers that heading below the site header, preserving the URL scope. The next Tab continues into the following controls. Every tile remains available; a keyboard user can bypass the 594-stop overview observed on 2026-10-18 without entering it. The skip link and destination heading remain available to assistive technology and appear visually when focused.
+
 The logged-out treemap homepage uses continuous zoom to navigate 4 levels of vehicle hierarchy. Each drill action replaces the entire treemap viewport with the next level's data, animated as a scale+fade transition from the click origin.
 
 ```
