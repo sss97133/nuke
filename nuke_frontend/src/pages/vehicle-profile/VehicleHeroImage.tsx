@@ -318,6 +318,8 @@ const VehicleHeroImage: React.FC<VehicleHeroImageProps> = ({ overlayNode }) => {
 
       {isMobile && showGallery && (
         <MobileImageGallery
+          key={vehicleId}
+          vehicleId={vehicleId}
           leadImageUrl={leadImageUrl}
           onClose={() => setShowGallery(false)}
         />

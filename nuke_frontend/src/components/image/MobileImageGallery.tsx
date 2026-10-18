@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { supabase } from '../../lib/supabase';
 
 interface MobileImageGalleryProps {
+  vehicleId: string | undefined;
   leadImageUrl: string;
   onClose: () => void;
 }
@@ -15,7 +16,7 @@ interface VehicleImage {
   created_at: string;
 }
 
-const MobileImageGallery: React.FC<MobileImageGalleryProps> = ({ leadImageUrl, onClose }) => {
+const MobileImageGallery: React.FC<MobileImageGalleryProps> = ({ vehicleId, leadImageUrl, onClose }) => {
   const [images, setImages] = useState<VehicleImage[]>([]);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [touchStartX, setTouchStartX] = useState<number | null>(null);
@@ -27,16 +28,14 @@ const MobileImageGallery: React.FC<MobileImageGalleryProps> = ({ leadImageUrl, o
   const minSwipeDistance = 50;
 
   useEffect(() => {
-    // Extract vehicle ID from URL or context
-    const pathParts = window.location.pathname.split('/');
-    const vehicleId = pathParts[pathParts.indexOf('vehicles') + 1];
-    
+    let cancelled = false;
     if (vehicleId) {
-      loadImages(vehicleId);
+      loadImages(vehicleId, () => cancelled);
     }
-  }, []);
+    return () => { cancelled = true; };
+  }, [vehicleId]);
 
-  const loadImages = async (vehicleId: string) => {
+  const loadImages = async (vehicleId: string, isCancelled: () => boolean) => {
     const { data, error } = await supabase
       .from('vehicle_images')
       .select('id, image_url, large_url, caption, angle_tag, created_at')
@@ -46,7 +45,7 @@ const MobileImageGallery: React.FC<MobileImageGalleryProps> = ({ leadImageUrl, o
       .order('taken_at', { ascending: false, nullsFirst: false })
       .order('created_at', { ascending: false });
 
-    if (!error && data) {
+    if (!isCancelled() && !error && data) {
       setImages(data);
       // Find index of lead image
       const leadIndex = data.findIndex(img => img.image_url === leadImageUrl || img.large_url === leadImageUrl);
