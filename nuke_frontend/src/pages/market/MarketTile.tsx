@@ -70,14 +70,15 @@ interface TileProps {
   onClick: (e: React.MouseEvent | React.KeyboardEvent) => void;
   title?: string;
   describedBy?: string;
+  ariaLabel?: string;
 }
 
-export function MarketTile({ node, move, basis, x, y, w, h, onClick, title, describedBy }: TileProps) {
+export function MarketTile({ node, move, basis, x, y, w, h, onClick, title, describedBy, ariaLabel }: TileProps) {
   const t = tileLines(node, move, w, h, basis);
   const style = { left: x, top: y, width: w, height: h, backgroundColor: tileFill(move),
     '--name-size': `${t.nameSize ?? 0}px`, '--move-size': `${t.moveSize}px` } as React.CSSProperties;
   return (
-    <button type="button" className={`market-tile market-tile--${move.kind}`} style={style} aria-label={node.name} title={title}
+    <button type="button" className={`market-tile market-tile--${move.kind}`} style={style} aria-label={ariaLabel ?? node.name} title={title}
       aria-describedby={describedBy}
       onClick={(e) => { e.stopPropagation(); onClick(e); }}>
       {t.nameSize != null && <span className="market-tile__name">{t.name}</span>}
