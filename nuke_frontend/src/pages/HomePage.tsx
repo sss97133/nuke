@@ -2819,7 +2819,7 @@ export function TreemapHomePage({ onBrowse, embedded = false }: { onBrowse: () =
                   <MarketTile node={node} move={relativeMove(node, baseline, basis === 'ledger', gateMin)} basis={basis} x={rect.x} y={rect.y} w={rect.w} h={rect.h}
                     describedBy={tooltip?.node === node ? tooltipId : undefined}
                     onClick={(ev) => {
-                      if (coarse) { setSheet(node); return; }
+                      if (coarse) { setTooltip(null); setSheet(node); return; }
                       focusAfterDrill.current = ev.detail === 0 && (!node.noModel || !!node.familyKey);
                       drillInto(node, 'clientX' in ev && ev.detail > 0 ? ev : undefined);
                     }} />
