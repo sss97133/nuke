@@ -112,7 +112,8 @@ export function candidates(m) {
     transmission: c([['vehicles.transmission*', joined(v.transmission, v.transmission_type, v.transmission_speeds)]]),
     estimate_low: c([['auction_events.estimate_low', ae.estimate_low], ['vehicle_events.metadata.estimate_low', md.estimate_low ?? md.low_estimate]]),
     estimate_high: c([['auction_events.estimate_high', ae.estimate_high], ['vehicle_events.metadata.estimate_high', md.estimate_high ?? md.high_estimate]]),
-    currency: c([['vehicle_events.metadata.currency', md.currency ?? md.currency_code], ['auction_events.raw_data.currency', raw.currency]]),
+    currency: c([['vehicle_events.metadata.currency', md.currency ?? md.currency_code], ['auction_events.raw_data.currency', raw.currency],
+      ['monitored_auctions.stream_state.currency', m?.ma?.stream_state?.currency], ['vehicles.origin_metadata.currency', v.origin_metadata?.currency]]),
     outcome: c([['vehicle_events.event_status', ve.event_status], ['auction_events.outcome', ae.outcome], ['vehicles.auction_outcome', v.auction_outcome], ['vehicles.sale_status', v.sale_status]]),
     hammer_price: c([['vehicle_events.final_price', ve.final_price], ['auction_events.winning_bid', ae.winning_bid], ['vehicles.sale_price', v.sale_price], ['vehicles.sold_price', v.sold_price], ['vehicles.bat_sold_price', v.bat_sold_price]]),
     price_with_premium: c([['vehicle_events.final_price', ve.final_price], ['auction_events.winning_bid', ae.winning_bid], ['vehicles.sale_price', v.sale_price], ['vehicles.sold_price', v.sold_price]]),
@@ -124,7 +125,8 @@ export function candidates(m) {
     seller: c([['vehicle_events.seller_identifier', ve.seller_identifier], ['auction_events.seller_name', ae.seller_name], ['vehicles.bat_seller', v.bat_seller], ['vehicles.seller_name', v.seller_name]]),
     no_reserve: c([['vehicle_events.metadata.no_reserve', md.no_reserve], ['auction_events.raw_data.no_reserve', raw.no_reserve]]),
     comment_count: c([['auction_comments(non-bid)', m?.comments?.non_bid || null], ['auction_events.comments_count', ae.comments_count], ['vehicle_events.comment_count', ve.comment_count]]),
-    bid_count: c([['auction_comments(bid)', m?.comments?.bid || null], ['auction_events.total_bids', ae.total_bids], ['vehicle_events.bid_count', ve.bid_count], ['vehicles.bid_count', v.bid_count]]),
+    bid_count: c([['auction_comments(bid)', m?.comments?.bid || null], ['auction_events.total_bids', ae.total_bids], ['vehicle_events.bid_count', ve.bid_count], ['vehicles.bid_count', v.bid_count],
+      ['monitored_auctions.bid_count', m?.ma?.bid_count], ['vehicles.origin_metadata.bid_count', v.origin_metadata?.bid_count]]),
   };
 }
 
@@ -175,7 +177,7 @@ vid as (select coalesce((select vehicle_id from ve),
           (select id from vehicles where listing_url = any(${urls}) and deleted_at is null limit 1)) as id),
 ae as (select * from auction_events where vehicle_id = (select id from vid)
         order by (source_url = any(${urls})) desc, updated_at desc nulls last limit 1),
-ma as (select current_bid_cents, auction_end_time, last_synced_at, bid_count from monitored_auctions
+ma as (select current_bid_cents, auction_end_time, last_synced_at, bid_count, stream_state from monitored_auctions
         where vehicle_id = (select id from vid) order by last_synced_at desc nulls last limit 1)
 select (select id from vid) as vehicle_id,
   (select to_jsonb(v) - 'description' - 'search_vector' from vehicles v where v.id = (select id from vid)) as v,
