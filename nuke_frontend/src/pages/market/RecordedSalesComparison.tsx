@@ -55,7 +55,7 @@ export function MarketScopeControls({ make, scopeKey, view, onMakeChange, onView
       {children}
     </div>
     <label className="market-scope__cohort"><Text role="label">Make</Text>
-      <select aria-label="Recorded sales scope" className="market-control k-body" value={option?.key ?? (unmatchedMake ? `stored:${unmatchedMake}` : '')}
+      <select aria-label={view === 'inventory' ? 'Live inventory make' : 'Recorded sales scope'} className="market-control k-body" value={option?.key ?? (unmatchedMake ? `stored:${unmatchedMake}` : '')}
         onChange={e => onMakeChange(options.find(o => o.key === e.target.value)?.make ?? null, e.target.value || null)}>
         <option value="">{view === 'inventory' ? 'All makes' : 'Choose a make or grouping'}</option>
         {unmatchedMake && <option value={`stored:${unmatchedMake}`} disabled>{unmatchedMake} · {view === 'inventory' ? 'recorded inventory label' : 'no registered sales scope'}</option>}
@@ -127,7 +127,7 @@ export default function RecordedSalesComparison({ make, onMakeChange, view = 'sa
     </div>}
     <div style={{ display: 'flex', gap: 8, alignItems: 'end', flexWrap: 'wrap', marginBottom: 8 }}>
       {controls && <label style={{ ...label, minWidth: 0, maxWidth: '100%' }}>{onMakeChange ? 'Market cohort' : 'Recorded sales scope'}<br />
-        <select aria-label="Recorded sales scope" className="market-control k-body" value={option?.key ?? (unmatchedMake ? `stored:${unmatchedMake}` : '')}
+        <select aria-label={view === 'inventory' ? 'Live inventory make' : 'Recorded sales scope'} className="market-control k-body" value={option?.key ?? (unmatchedMake ? `stored:${unmatchedMake}` : '')}
           onChange={e => { setChosen(e.target.value || null); setDrill(null); onMakeChange?.(options.find(o => o.key === e.target.value)?.make ?? null, e.target.value || null); }}>
           <option value="">{onMakeChange ? 'All makes · live inventory' : 'Choose a registered make or supported grouping'}</option>
           {unmatchedMake && <option value={`stored:${unmatchedMake}`} disabled>{unmatchedMake} · {view === 'inventory' ? 'recorded inventory label' : 'no registered sales scope'}</option>}

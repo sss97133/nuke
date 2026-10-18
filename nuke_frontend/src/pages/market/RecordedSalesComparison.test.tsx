@@ -8,7 +8,7 @@ const fixture = vi.hoisted(() => ({ catalog: {} as any, query: {} as any, reques
 vi.mock('./useRecordedSales', async original => ({ ...await original<typeof import('./useRecordedSales')>(),
   useSalesScopes: () => fixture.catalog, useRecordedSales: (request: SalesRequest | null) => { fixture.request = request; return fixture.query; } }));
 vi.mock('../../components/PrefetchLink', () => ({ PrefetchLink: ({ to, ...props }: any) => <a href={to} {...props} /> }));
-import RecordedSalesComparison from './RecordedSalesComparison';
+import RecordedSalesComparison, { MarketScopeControls } from './RecordedSalesComparison';
 
 const make: SalesScopeOption = { key: 'make:fixture-make', label: 'FIXTURE MAKE', make: 'FIXTURE MAKE',
   scope: { kind: 'canonical_make', canonical_make_id: 'fixture-make' } };
@@ -58,10 +58,22 @@ describe('recorded sales evidence comparison', () => {
     expect(container.querySelector('[aria-label="Recorded sales event window"]')).toBeNull();
     expect(container.querySelector('[aria-label="Daily recorded sales counts"]')).toBeNull();
   });
+  it.each(['inventory', 'sales'] as const)('names the shared make control for the %s view', async view => {
+    await act(async () => root.render(<MarketScopeControls make="FIXTURE MAKE" scopeKey={make.key} view={view} onMakeChange={vi.fn()} onViewChange={vi.fn()} />));
+    const scope = container.querySelector('select')!;
+    expect(scope.getAttribute('aria-label')).toBe(view === 'inventory' ? 'Live inventory make' : 'Recorded sales scope');
+    expect(scope.value).toBe(make.key);
+  });
+  it.each(['inventory', 'sales'] as const)('names the standalone make control for the %s view', async view => {
+    await act(async () => root.render(<RecordedSalesComparison make="FIXTURE MAKE" view={view} />));
+    const scope = container.querySelector('select')!;
+    expect(scope.getAttribute('aria-label')).toBe(view === 'inventory' ? 'Live inventory make' : 'Recorded sales scope');
+    expect(scope.value).toBe(make.key);
+  });
   it('preserves an unregistered stored make in the shared control without inventing a sales scope', async () => {
     const onMakeChange = vi.fn();
     await act(async () => root.render(<RecordedSalesComparison make="UNREGISTERED" view="inventory" onMakeChange={onMakeChange} />));
-    const scope = container.querySelector('select[aria-label="Recorded sales scope"]') as HTMLSelectElement;
+    const scope = container.querySelector('select[aria-label="Live inventory make"]') as HTMLSelectElement;
     expect(scope.selectedOptions[0].textContent).toBe('UNREGISTERED · recorded inventory label');
     expect(fixture.request).toBeNull();
     await act(async () => root.render(<RecordedSalesComparison make="UNREGISTERED" view="sales" onMakeChange={onMakeChange} />));
