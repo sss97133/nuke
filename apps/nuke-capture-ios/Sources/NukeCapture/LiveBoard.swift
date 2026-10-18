@@ -470,6 +470,8 @@ struct AuctionCalendar: Decodable, Equatable {
         let first_seen_7d: Int
         let updated_at: String?
         let listed: Int?
+        /// Snapshot of the lot read model, distinct from the source-write and request clocks.
+        let lots_built_at: String?
     }
 
     let as_of: String
@@ -538,6 +540,7 @@ struct AuctionCalendar: Decodable, Equatable {
         return base
     }
 
+    static let rosterPageSize = 100
     private struct Params: Encodable {
         let p_days: Int
         let p_house: String?
@@ -548,7 +551,7 @@ struct AuctionCalendar: Decodable, Equatable {
 
     static func fetch(house: String? = nil, saleKey: String? = nil, offset: Int = 0) async throws -> AuctionCalendar {
         try await SupabaseService.client
-            .rpc("auction_calendar_read", params: Params(p_days: 200, p_house: house, p_sale_key: saleKey, p_limit: 100, p_offset: offset))
+            .rpc("auction_calendar_read", params: Params(p_days: 200, p_house: house, p_sale_key: saleKey, p_limit: rosterPageSize, p_offset: offset))
             .execute()
             .value
     }
@@ -1014,6 +1017,8 @@ struct LiveBoardView: View {
     @State private var board: LiveBoard?
     @State private var finishBoard: FinishBoard?
     @State private var calendar: AuctionCalendar?
+    @State private var calendarLoading = false
+    @State private var calendarFailure: String?
     @State private var sourcesBoard: SourcesBoardData?
     @State private var selectedSale: AuctionCalendar.CalendarSale?
     @State private var selectedSource: SourcesBoardData.SourceRow?
@@ -1230,8 +1235,14 @@ struct LiveBoardView: View {
     }
 
     @ViewBuilder private var calendarSection: some View {
+        Section {
+            Button(calendarLoading ? "Reading calendar…" : "Refresh calendar") { Task { await loadCalendar() } }
+                .disabled(calendarLoading)
+            if let calendarFailure { Text(calendarFailure).font(.footnote).foregroundStyle(.secondary) }
+        }
         if let cal = calendar {
             Section {
+                if cal.sales.isEmpty { Text("No scheduled sale has a lot landed for the next \(cal.horizon_days) days.") }
                 ForEach(cal.sales) { sale in
                     Button {
                         selectedSale = sale
@@ -1242,22 +1253,23 @@ struct LiveBoardView: View {
                 }
             } header: {
                 VStack(alignment: .leading, spacing: 2) {
-                    Text("\(cal.population.lots.formatted()) consigned lots across \(cal.population.sales) sales (\(cal.population.houses) houses · next \(cal.horizon_days)d)")
+                    Text("\(cal.population.lots.formatted())\(cal.population.listed.flatMap { $0 > cal.population.lots ? " of \($0.formatted())" : nil } ?? "") lots · \(cal.population.sales) sale rosters · \(cal.population.houses) houses · \(cal.horizon_days)-day lot window")
                         .font(.caption2.monospaced())
                         .textCase(nil)
-                    Text("\(cal.population.seen_before.formatted()) seen in Nuke before · \(cal.population.no_reserve.formatted()) no reserve · +\(cal.population.first_seen_7d.formatted()) in 7d")
+                    Text("\(cal.population.seen_before.formatted()) with an earlier record · \(cal.population.no_reserve.formatted()) no reserve · \(cal.population.first_seen_7d.formatted()) first seen in 7d · \(AuctionCalendar.updatedAgo(cal.population.updated_at, now: now))")
                         .font(.caption2.monospaced())
                         .foregroundStyle(.secondary)
                         .textCase(nil)
                 }
             } footer: {
+                Text("Retained lots for the next \(cal.horizon_days) days, against house-listed counts where recorded. Listed counts can include undated rosters below. Whole-market coverage is unknown.")
                 if let unplaced = cal.unplaced, !unplaced.isEmpty {
                     let line = unplaced.map { "\(AuctionCalendar.houseName($0.house)) \($0.sale_name) (\($0.lots_listed.formatted()) listed on site)" }.joined(separator: " · ")
                     Text("Listed on house site without run dates yet: \(line)")
                         .font(.caption2)
                 }
             }
-        } else {
+        } else if calendarLoading {
             Section {
                 HStack(spacing: 8) {
                     ProgressView()
@@ -1293,7 +1305,7 @@ struct LiveBoardView: View {
             HStack(spacing: 8) {
                 Text("\(sale.lots.formatted()) lots in Nuke")
                     .font(.caption2.monospaced().weight(.semibold))
-                if let listed = sale.lots_listed, listed > 0 {
+                if let listed = sale.lots_listed {
                     Text("of \(listed.formatted()) on site")
                         .font(.caption2.monospaced())
                         .foregroundStyle(.secondary)
@@ -1304,7 +1316,7 @@ struct LiveBoardView: View {
                         .foregroundStyle(.secondary)
                 }
                 if sale.seen_before > 0 {
-                    Text("· \(sale.seen_before.formatted()) repeat")
+                    Text("· \(sale.seen_before.formatted()) with an earlier record")
                         .font(.caption2.monospaced())
                         .foregroundStyle(.secondary)
                 }
@@ -1313,6 +1325,12 @@ struct LiveBoardView: View {
                 Text(priorLine)
                     .font(.caption2)
                     .foregroundStyle(.secondary)
+            }
+            Text(AuctionCalendar.updatedAgo(sale.updated_at, now: now))
+                .font(.caption2).foregroundStyle(.secondary)
+            if sale.lots_listed != nil {
+                Text("House roster \(AuctionCalendar.updatedAgo(sale.listed_at, now: now).replacingOccurrences(of: "updated", with: "read"))")
+                    .font(.caption2).foregroundStyle(.secondary)
             }
         }
         .padding(.vertical, 4)
@@ -1446,12 +1464,29 @@ struct LiveBoardView: View {
             break
         case .calendar:
             if calendar == nil {
-                calendar = try? await AuctionCalendar.fetch()
+                await loadCalendar()
             }
         case .sources:
             if sourcesBoard == nil {
                 sourcesBoard = await SourcesBoardData.fetch()
             }
+        }
+    }
+
+    private func loadCalendar() async {
+        guard !calendarLoading else { return }
+        calendarLoading = true
+        defer { calendarLoading = false }
+        do {
+            let read = try await AuctionCalendar.fetch()
+            try Task.checkCancellation()
+            calendar = read
+            calendarFailure = nil
+            now = Date()
+        } catch is CancellationError {
+        } catch {
+            calendarFailure = ReadFailure.text(error)
+            NSLog("NukeCapture auction calendar read failed: %@", String(describing: error))
         }
     }
 
@@ -1653,20 +1688,26 @@ struct HeatReadingSheet: View {
 /// Scheduled auction sale roster sheet (`auction_calendar_read` with `p_house` and `p_sale_key`).
 struct SaleRosterSheet: View {
     let sale: AuctionCalendar.CalendarSale
-    @State private var detail: AuctionCalendar?
+    @State private var roster: AuctionCalendarRoster
+    @State private var loading = false
+    @State private var failure: String?
+    @State private var refreshRequired = false
+    @State private var failedOffset = 0
     @Environment(\.dismiss) private var dismiss
+
+    init(sale: AuctionCalendar.CalendarSale) {
+        self.sale = sale
+        _roster = State(initialValue: AuctionCalendarRoster(house: sale.house, saleKey: sale.sale_key))
+    }
 
     var body: some View {
         NavigationStack {
             List {
                 Section {
-                    HStack {
-                        Text("\(sale.starts_on) → \(sale.ends_on)")
-                            .font(.caption.monospaced())
-                        Spacer()
-                        Text("\(sale.lots.formatted()) lots")
-                            .font(.caption.monospaced().weight(.semibold))
-                    }
+                    Text("\(sale.starts_on) → \(sale.ends_on)").font(.caption.monospaced())
+                    Text("\(AuctionCalendar.saleTimer(startsOn: sale.starts_on, endsOn: sale.ends_on)) · \(AuctionCalendar.updatedAgo(sale.updated_at))")
+                        .font(.caption).foregroundStyle(.secondary)
+                    if let location = sale.location { Text(location).font(.caption) }
                     if !sale.run_days.isEmpty {
                         ScrollView(.horizontal, showsIndicators: false) {
                             HStack(spacing: 8) {
@@ -1680,64 +1721,148 @@ struct SaleRosterSheet: View {
                             }
                         }
                     }
+                } footer: {
+                    Text("The house publishes run days, not a time of day. Lots here are retained vehicle lots; the house's full roster may be larger.")
                 }
-                if let roster = detail?.roster {
-                    Section("Consigned roster (\(roster.rows.count) of \(roster.lots.formatted()))") {
+                if let total = roster.total {
+                    Section {
+                        if roster.rows.isEmpty {
+                            Text("No lot of this sale has landed in this read.").font(.footnote)
+                        }
                         ForEach(roster.rows) { lot in
-                            VStack(alignment: .leading, spacing: 3) {
-                                HStack(alignment: .firstTextBaseline) {
-                                    if let num = lot.lot_number {
-                                        Text("Lot \(num)")
-                                            .font(.caption2.monospaced().weight(.semibold))
-                                            .foregroundStyle(.secondary)
-                                    }
-                                    Text(lot.title)
-                                        .font(.subheadline.weight(.semibold))
-                                    Spacer(minLength: 4)
-                                    if lot.has_reserve == false {
-                                        Text("NO RESERVE")
-                                            .font(.caption2.monospaced().weight(.semibold))
-                                            .foregroundStyle(.secondary)
-                                    }
-                                }
-                                HStack(spacing: 8) {
-                                    Text("Runs \(lot.run_on)")
-                                        .font(.caption2.monospaced())
-                                        .foregroundStyle(.secondary)
-                                    if let lo = lot.estimate_low, let hi = lot.estimate_high {
-                                        Text("Est. \(LiveBoardView.bidNumber(lo, compact: true))–\(LiveBoardView.bidNumber(hi, compact: true))")
-                                            .font(.caption2.monospaced().weight(.semibold))
-                                    }
-                                }
-                                if let priors = lot.prior, !priors.isEmpty {
-                                    ForEach(priors) { p in
-                                        Text("Prior: \(AuctionCalendar.houseName(p.house)) \(p.on ?? "") · \(p.outcome)\(p.amount.map { " \(LiveBoardView.bidNumber($0, compact: true))" } ?? "")")
-                                            .font(.caption2.monospaced())
-                                            .foregroundStyle(.secondary)
-                                    }
-                                }
+                            SaleRosterLotRow(lot: lot, house: sale.house)
+                        }
+                    } header: {
+                        Text("\(roster.rows.count.formatted()) of \(total.formatted()) retained lots read")
+                            .textCase(nil)
+                    } footer: {
+                        VStack(alignment: .leading, spacing: 3) {
+                            Text("Lot read model built \(ProfileClock.day(roster.builtAt) ?? "at an unrecorded time"). Earlier records are live reads for each page, up to five per lot; they are not price comparables.")
+                            if roster.continuationUnavailable {
+                                Text("The reader could not establish the remaining page. The roster above is incomplete; refresh to try again.")
                             }
-                            .padding(.vertical, 3)
                         }
                     }
-                } else {
+                }
+                if let failure {
+                    Section {
+                        Text(failure).font(.footnote).foregroundStyle(.secondary)
+                        Button(refreshRequired ? "Refresh roster" : "Retry roster page") {
+                            Task { await load(offset: refreshRequired ? 0 : failedOffset) }
+                        }.disabled(loading)
+                    }
+                }
+                if loading {
                     Section {
                         HStack(spacing: 8) {
                             ProgressView()
-                            Text("Reading sale roster…")
+                            Text(roster.total == nil ? "Reading sale roster…" : "Reading roster page…")
                                 .font(.caption.monospaced())
                                 .foregroundStyle(.secondary)
                         }
+                    }
+                } else if let offset = roster.nextOffset, failure == nil {
+                    Section {
+                        Button("More lots") { Task { await load(offset: offset) } }
                     }
                 }
             }
             .navigationTitle("\(AuctionCalendar.houseName(sale.house)) · \(sale.sale_name)")
             .navigationBarTitleDisplayMode(.inline)
-            .toolbar { ToolbarItem(placement: .confirmationAction) { Button("Done") { dismiss() } } }
-            .task {
-                detail = try? await AuctionCalendar.fetch(house: sale.house, saleKey: sale.sale_key)
+            .toolbar {
+                ToolbarItem(placement: .topBarLeading) {
+                    Button("Refresh") { Task { await load(offset: 0) } }.disabled(loading)
+                }
+                ToolbarItem(placement: .confirmationAction) { Button("Done") { dismiss() } }
             }
+            .refreshable { await load(offset: 0) }
+            .task { if roster.total == nil { await load(offset: 0) } }
         }
+    }
+
+    private func load(offset: Int) async {
+        guard !loading else { return }
+        loading = true
+        defer { loading = false }
+        do {
+            let response = try await AuctionCalendar.fetch(house: sale.house, saleKey: sale.sale_key, offset: offset)
+            try Task.checkCancellation()
+            try roster.accept(response, requestedOffset: offset)
+            failure = nil
+            refreshRequired = false
+        } catch is CancellationError {
+            // Dismissing the sheet cancels its read; it does not establish an empty roster.
+        } catch {
+            refreshRequired = error is AuctionCalendarRoster.ReceiptError
+            failedOffset = offset
+            failure = (error as? AuctionCalendarRoster.ReceiptError)?.errorDescription ?? ReadFailure.text(error)
+            NSLog("NukeCapture auction roster read failed: %@", String(describing: error))
+        }
+    }
+}
+
+private struct SaleRosterLotRow: View {
+    let lot: AuctionCalendar.RosterLot
+    let house: String
+    @Environment(\.openURL) private var openURL
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            if let uuid = lot.vehicleUUID {
+                NavigationLink {
+                    VehicleDetailView(vehicleId: uuid.uuidString.lowercased(), embedInNavigationStack: false)
+                } label: { identity }
+                .buttonStyle(.plain)
+            } else { identity }
+            Text("\(lot.run_on) · \(AuctionCalendar.runTimer(lot.run_on))")
+                .font(.caption.monospaced()).foregroundStyle(.secondary)
+            Text([lot.lot_number.map { "Lot \($0)" },
+                  lot.has_reserve.map { $0 ? "reserve" : "no reserve" },
+                  lot.vin_present.map { $0 ? "VIN or chassis recorded" : "no VIN recorded" } ?? "VIN status unrecorded"]
+                .compactMap { $0 }.joined(separator: " · "))
+                .font(.caption).foregroundStyle(.secondary)
+            if let estimate = lot.estimateText(house: house) {
+                RootedValueView(label: "House estimate", value: estimate, status: .attributed,
+                                decay: "Scheduled lot · \(lot.run_on)",
+                                onDrill: sourceAction(AuctionCalendar.houseLink(house: house, value: lot.source_url)))
+            }
+            if let source = AuctionCalendar.houseLink(house: house, value: lot.source_url) {
+                Link("\(AuctionCalendar.houseName(house)) lot page", destination: source).font(.caption)
+            }
+            if let prior = lot.prior, !prior.isEmpty {
+                ForEach(Array(prior.enumerated()), id: \.offset) { _, result in
+                    VStack(alignment: .leading, spacing: 2) {
+                        RootedValueView(label: AuctionCalendar.houseName(result.house), value: result.outcomeText,
+                                        status: result.basis == "source" ? .attributed : .recorded,
+                                        decay: AuctionCalendar.dayLabel(result.on), onDrill: sourceAction(result.sourceLink))
+                        if let url = result.sourceLink { Link("Earlier source record", destination: url).font(.caption2) }
+                    }
+                }
+            } else if lot.prior != nil {
+                Text("No earlier record of this vehicle on Nuke").font(.caption).foregroundStyle(.secondary)
+            } else {
+                Text("Earlier records were not returned by this read").font(.caption).foregroundStyle(.secondary)
+            }
+        }.padding(.vertical, 4)
+    }
+
+    private var identity: some View {
+        HStack(alignment: .top, spacing: 10) {
+            if let raw = lot.image, let url = URL(string: raw), url.scheme == "https", url.user == nil, url.password == nil {
+                CachedAsyncImage(url: NukeImage.thumb(raw, width: 200)) { image in
+                    image.resizable().scaledToFill()
+                } placeholder: { Color(.secondarySystemFill) }
+                .frame(width: 64, height: 48).clipped()
+            }
+            Text(lot.title).font(.subheadline.weight(.semibold))
+            Spacer(minLength: 0)
+            if lot.vehicleUUID != nil { Image(systemName: "chevron.right").font(.caption).foregroundStyle(.secondary) }
+        }
+    }
+
+    private func sourceAction(_ url: URL?) -> (() -> Void)? {
+        guard let url else { return nil }
+        return { openURL(url) }
     }
 }
 
