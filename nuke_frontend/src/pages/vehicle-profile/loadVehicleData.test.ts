@@ -1,5 +1,76 @@
 import { describe, expect, it, vi } from 'vitest';
-import { mergedTargetOf, selectBestHeroImage } from './loadVehicleData';
+import { createClient } from '@supabase/supabase-js';
+import { loadVehicleImpl, mergedTargetOf, selectBestHeroImage } from './loadVehicleData';
+
+describe('profile fallback transport', () => {
+  const id = '00000000-0000-0000-0000-0000000000a1';
+  const target = '00000000-0000-0000-0000-0000000000b2';
+  async function load(row: Row | null, emptyRpc = false) {
+    const requests: URL[] = [];
+    const json = (body: unknown, status = 200) => new Response(JSON.stringify(body), {
+      status, headers: { 'Content-Type': 'application/json' },
+    });
+    const fetcher = vi.fn(async (input: RequestInfo | URL) => {
+      const url = new URL(input instanceof Request ? input.url : String(input));
+      requests.push(url);
+      if (url.pathname === '/rest/v1/rpc/get_vehicle_profile_data') {
+        return emptyRpc ? json({ vehicle: null }) : json({ code: '57014', message: 'statement timeout' }, 500);
+      }
+      if (url.pathname === '/rest/v1/vehicles') {
+        if (!row) return json({ code: 'PGRST116', message: 'No visible row' }, 406);
+        // Return only the requested columns, as PostgREST does: merge routing must carry its field.
+        const columns = new Set(url.searchParams.get('select')?.split(','));
+        return json(Object.fromEntries(Object.entries(row).filter(([key]) => columns.has(key))));
+      }
+      if (url.pathname === '/rest/v1/vehicle_events') return json([]);
+      return json({ code: 'PGRST205', message: 'Relation not found in schema cache' }, 404);
+    });
+    const supabase = createClient('https://profile-fallback.test', 'anonymous-fixture', {
+      auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false },
+      global: { fetch: fetcher },
+    });
+    const navigate = vi.fn(), setVehicle = vi.fn(), setLoading = vi.fn();
+    const result = await loadVehicleImpl({
+      vehicleId: id, session: null, supabase, navigate, setVehicle, setLoading,
+      leadImageUrl: null, ranBatSyncRef: { current: null }, setIsPublic: vi.fn(),
+      setLeadImageUrl: vi.fn(), setVehicleImages: vi.fn(), setTimelineEvents: vi.fn(), setAuctionPulse: vi.fn(),
+    });
+    return { result, requests, navigate, setVehicle, setLoading };
+  }
+
+  it.each([false, true])('loads the public record after an unusable RPC (empty=%s)', async empty => {
+    const row = { id, is_public: true, year: 1977, make: 'Chevrolet', model: 'K5 Blazer', observation_count: 12 };
+    const out = await load(row, empty);
+    expect(out.setVehicle).toHaveBeenCalledWith(expect.objectContaining(row));
+    expect(out.result.observationCount).toBe(12);
+    expect(out.navigate).not.toHaveBeenCalled();
+    expect(out.requests.map(url => url.pathname)).toEqual([
+      '/rest/v1/rpc/get_vehicle_profile_data', '/rest/v1/vehicles', '/rest/v1/vehicle_events',
+    ]);
+    expect(out.requests[1].searchParams.get('id')).toBe(`eq.${id}`);
+    expect(out.setLoading).toHaveBeenLastCalledWith(false);
+  });
+
+  it('routes a merged fallback record to its target before displaying the stub', async () => {
+    const out = await load({ id, is_public: true, merged_into_vehicle_id: target });
+    expect(out.navigate).toHaveBeenCalledWith(`/vehicle/${target}`, { replace: true });
+    expect(out.setVehicle).not.toHaveBeenCalled();
+    expect(out.requests).toHaveLength(2);
+  });
+
+  it('retains the anonymous private-record refusal', async () => {
+    const out = await load({ id, is_public: false });
+    expect(out.navigate).toHaveBeenCalledWith('/login');
+    expect(out.setVehicle).not.toHaveBeenCalled();
+  });
+
+  it('leaves a denied or missing fallback record undisplayed', async () => {
+    const out = await load(null);
+    expect(out.setVehicle).toHaveBeenCalledWith(null);
+    expect(out.navigate).not.toHaveBeenCalled();
+    expect(out.setLoading).toHaveBeenLastCalledWith(false);
+  });
+});
 
 type Row = Record<string, unknown>;
 const photo = (id: string, extra: Row = {}): Row => ({
