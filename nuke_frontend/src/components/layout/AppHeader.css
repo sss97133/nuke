@@ -123,6 +123,29 @@
   flex-shrink: 0;
 }
 
+.header-session .header-theme-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 24px !important;
+  padding: 0 7px !important;
+  border: 1px solid var(--border);
+  background: var(--bg);
+  color: var(--text-secondary);
+  font-family: var(--font-mono);
+  font-size: var(--fs-8) !important;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.header-session .header-theme-btn:hover {
+  color: var(--text);
+  border-color: var(--text);
+}
+
 /* ============================================================================
    USER AREA
    ============================================================================ */
@@ -324,3 +347,122 @@
     max-width: none;
   }
 }
+
+/* ============================================================================
+   HEADER SEARCH FACET PILLS & EMBLEMS
+   ============================================================================ */
+
+.header-search-facets {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+  margin-top: 3px;
+}
+
+.header-search-facets--compact {
+  display: inline-flex;
+  margin-top: 0;
+  margin-left: 4px;
+  gap: 3px;
+}
+
+.header-search-facet-emblem {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 15px;
+  max-width: 82px;
+  flex-shrink: 0;
+}
+
+.header-search-facet-emblem svg {
+  height: 14px;
+  width: auto;
+  max-width: 80px;
+  display: block;
+}
+
+.header-search-facet-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 1px 5px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text);
+  font-family: var(--font-mono);
+  font-size: var(--fs-8);
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  line-height: 1.25;
+  white-space: nowrap;
+}
+
+.header-search-facet-pill--series {
+  border-color: var(--text-secondary);
+}
+
+.header-search-facet-pill--trim {
+  border-color: var(--accent);
+}
+
+.header-search-facet-pill--body {
+  border-color: var(--border);
+  color: var(--text-secondary);
+}
+
+.header-search-facet-axis {
+  color: var(--text-secondary);
+  font-weight: 600;
+}
+
+.header-search-facet-sep {
+  opacity: 0.55;
+}
+
+.header-search-facet-value {
+  color: var(--text);
+  font-weight: 700;
+}
+
+.search-overlay-market-body {
+  padding: 6px 12px;
+}
+
+.search-overlay-market-title {
+  font-weight: 700;
+  font-size: 12px;
+  margin-bottom: 4px;
+}
+
+.search-overlay-market-label {
+  font-weight: 400;
+  opacity: 0.6;
+}
+
+.search-overlay-market-stats {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  line-height: 18px;
+}
+
+.search-overlay-market-row {
+  display: flex;
+  justify-content: space-between;
+}
+
+.search-overlay-market-muted {
+  opacity: 0.5;
+}
+
+.search-overlay-market-sources {
+  font-size: 10px;
+  opacity: 0.5;
+  margin-top: 4px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+

@@ -390,6 +390,42 @@ const BODY_STYLE_DISPLAY: Record<string, string> = {
   'shooting brake': 'Shooting Brake', 'hardtop': 'Hardtop', 'bus': 'Bus',
 };
 
+/** Collector-specific body style facets preserved before generic substring collapse */
+const COLLECTOR_BODY_STYLE_DISPLAY: Record<string, string> = {
+  'split-window coupe': 'Split-Window Coupe',
+  'split window coupe': 'Split-Window Coupe',
+  'gullwing coupe': 'Gullwing Coupe',
+  'stepside': 'Stepside',
+  'stepside pickup': 'Stepside',
+  'flareside': 'Flareside',
+  'flareside pickup': 'Flareside',
+  'fleetside': 'Fleetside',
+  'fleetside pickup': 'Fleetside',
+  'styleside': 'Styleside',
+  'styleside pickup': 'Styleside',
+  'sweptline': 'Sweptline',
+  'sweptline pickup': 'Sweptline',
+  'short bed': 'Short Bed',
+  'short bed pickup': 'Short Bed',
+  'long bed': 'Long Bed',
+  'long bed pickup': 'Long Bed',
+  'half-cab': 'Half-Cab',
+  'half cab': 'Half-Cab',
+  'half-cab pickup': 'Half-Cab',
+  '2-door hardtop': '2-Door Hardtop',
+  '2 door hardtop': '2-Door Hardtop',
+  '4-door hardtop': '4-Door Hardtop',
+  '4 door hardtop': '4-Door Hardtop',
+  'sport coupe': '2-Door Hardtop',
+  't-top': 'T-Top',
+  't-top coupe': 'T-Top',
+  'crew cab': 'Crew Cab',
+  'crew cab pickup': 'Crew Cab',
+  'panel': 'Panel',
+  'panel truck': 'Panel',
+  'panel delivery': 'Panel',
+};
+
 /** Values that should be nulled out */
 const BODY_STYLE_NULLS = new Set(['n/a', 'n/a', 'none', 'other', 'unknown', 'custom', '--', '-']);
 
@@ -406,6 +442,11 @@ export function normalizeBodyStyle(bodyStyle: string | null | undefined): { body
 
   // Null out known garbage values
   if (BODY_STYLE_NULLS.has(lower)) return { body_style: null };
+
+  // Preserve collector-specific body style facets (e.g. Split-Window Coupe, Stepside, Half-Cab)
+  if (COLLECTOR_BODY_STYLE_DISPLAY[lower]) {
+    return { body_style: COLLECTOR_BODY_STYLE_DISPLAY[lower] };
+  }
 
   // Map Spider/Spyder → Convertible
   if (lower === 'spider' || lower === 'spyder') return { body_style: 'Convertible' };

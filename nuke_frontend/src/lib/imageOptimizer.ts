@@ -18,6 +18,16 @@ const SIZE_CONFIG: Record<ImageSize, { width: number; quality: number }> = {
   full: { width: 0, quality: 100 }, // No resize
 };
 
+function urlHasHost(url: string, domain: string): boolean {
+  try {
+    const host = new URL(url).hostname.toLowerCase();
+    const target = domain.toLowerCase();
+    return host === target || host.endsWith(`.${target}`);
+  } catch {
+    return false;
+  }
+}
+
 /**
  * Optimize an image URL for the given display size
  *
@@ -28,51 +38,57 @@ const SIZE_CONFIG: Record<ImageSize, { width: number; quality: number }> = {
 export function optimizeImageUrl(url: string | null | undefined, size: ImageSize = 'medium'): string | null {
   if (!url) return null;
 
+  // Normalize broken Mecum/Cloudinary double-v version segments (/image/upload/vv123/ -> /image/upload/v123/)
+  // and strip trailing empty query markers that cause CDN 404s.
+  const normalizedUrl = (urlHasHost(url, 'mecum.com') || urlHasHost(url, 'cloudinary.com'))
+    ? url.replace(/(\/image\/upload\/(?:[^/]+\/)*)vv+(\d+\/)/i, '$1v$2').replace(/\?$/, '')
+    : url;
+
   // Don't resize if full size requested
-  if (size === 'full') return url;
+  if (size === 'full') return normalizedUrl;
 
   const { width, quality } = SIZE_CONFIG[size];
 
   try {
     // Bring a Trailer - uses WordPress Photon CDN
-    if (url.includes('bringatrailer.com')) {
+    if (urlHasHost(normalizedUrl, 'bringatrailer.com')) {
       // Remove any existing query params and add resize
-      const baseUrl = url.split('?')[0];
+      const baseUrl = normalizedUrl.split('?')[0];
       return `${baseUrl}?w=${width}`;
     }
 
     // Supabase Storage - use render API
     // resize=contain required — /render/image defaults to resize=cover, which
     // crops portrait iPhone photos (standing rule: feedback_supabase_render_default_crops).
-    if (url.includes('/storage/v1/object/public/')) {
-      return url
+    if (normalizedUrl.includes('/storage/v1/object/public/')) {
+      return normalizedUrl
         .replace('/storage/v1/object/public/', '/storage/v1/render/image/public/')
         + `?width=${width}&quality=${quality}&resize=contain`;
     }
 
     // Already using Supabase render API - update params
-    if (url.includes('/storage/v1/render/image/')) {
-      const baseUrl = url.split('?')[0];
+    if (normalizedUrl.includes('/storage/v1/render/image/')) {
+      const baseUrl = normalizedUrl.split('?')[0];
       return `${baseUrl}?width=${width}&quality=${quality}&resize=contain`;
     }
 
     // Cars & Bids - also WordPress, same pattern
-    if (url.includes('carsandbids.com')) {
-      const baseUrl = url.split('?')[0];
+    if (urlHasHost(normalizedUrl, 'carsandbids.com')) {
+      const baseUrl = normalizedUrl.split('?')[0];
       return `${baseUrl}?w=${width}`;
     }
 
     // Craigslist - images are typically already small
     // Return as-is
-    if (url.includes('craigslist.org')) {
-      return url;
+    if (urlHasHost(normalizedUrl, 'craigslist.org')) {
+      return normalizedUrl;
     }
 
     // Unknown source - return original
-    return url;
+    return normalizedUrl;
   } catch (e) {
     console.warn('[imageOptimizer] Error processing URL:', e);
-    return url;
+    return normalizedUrl;
   }
 }
 
@@ -103,8 +119,8 @@ export function getDetailImageUrl(url: string | null | undefined): string | null
 export function isOptimizableUrl(url: string | null | undefined): boolean {
   if (!url) return false;
   return (
-    url.includes('bringatrailer.com') ||
-    url.includes('carsandbids.com') ||
+    urlHasHost(url, 'bringatrailer.com') ||
+    urlHasHost(url, 'carsandbids.com') ||
     url.includes('/storage/v1/')
   );
 }

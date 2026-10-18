@@ -8,7 +8,8 @@
        its fitted artifacts in ~/Library/Caches/nuke-finish-33). A model 33 failure is logged and never stops model 32;
        the job's exit status is model 32's. Minute 45, clear of model 31 at :40 and the daily archive append at 23:10 UTC.
        Installed copy: ~/Library/LaunchAgents/ag.nuke.market-live-finish.plist (launchctl bootout + bootstrap after an
-       edit). Model 32 added 2026-10-15; model 33 2026-10-15. -->
+       edit). Model 32 added 2026-10-15; model 33 2026-10-15. PATH carries /usr/sbin and /sbin: scikit-learn's joblib
+       (loky) calls sysctl to count cores, and without it every model 33 run logged a traceback (2026-10-16). -->
   <key>Label</key><string>ag.nuke.market-live-finish</string>
   <key>ProgramArguments</key>
   <array>
@@ -18,7 +19,7 @@
   </array>
   <key>WorkingDirectory</key><string>/Users/skylar/nuke</string>
   <key>EnvironmentVariables</key>
-  <dict><key>PATH</key><string>/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin</string></dict>
+  <dict><key>PATH</key><string>/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin</string></dict>
   <key>StartCalendarInterval</key><dict><key>Minute</key><integer>45</integer></dict>
   <key>RunAtLoad</key><false/>
   <key>StandardOutPath</key><string>/tmp/market-live-finish.log</string>

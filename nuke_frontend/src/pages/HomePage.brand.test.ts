@@ -1,7 +1,25 @@
+// @vitest-environment jsdom
+import React, { act } from 'react';
+import { createRoot } from 'react-dom/client';
 import { describe, expect, it, vi } from 'vitest';
 const rpc = vi.hoisted(() => vi.fn());
 vi.mock('../lib/supabase', () => ({ supabase: { rpc } }));
-import { brandDollarMomentum, brandLines, brandMomentum, lineChars } from './HomePage';
+import {
+  applyDrillStackToSearchParams,
+  brandDollarMomentum,
+  brandLines,
+  brandMomentum,
+  buildRepresentativeImageCandidates,
+  drillStackFromSearchParams,
+  facetTileLines,
+  lineChars,
+  normalizeFacetSelection,
+  parseFacetAxisParam,
+  selectFamilyRepresentativeVehicleIds,
+  TreemapCell,
+  type TreemapNode,
+} from './HomePage';
+import { optimizeImageUrl } from '../lib/imageOptimizer';
 
 // Porsche's row in mv_brand_market as measured 2026-10-15 (sold, dollars, band, sell-through, year), with 12-month counts.
 const porsche = {
@@ -12,7 +30,7 @@ const porsche = {
 
 describe('a brand tile', () => {
   it('says the market, how often what is offered sells, and the last 12 months against the 12 before', () => {
-    expect(brandLines(porsche)).toEqual(['$2.6B · 27,510 sold', '82% of offered sold', 'BaT 12 mo: sales ▲20%, $ ▲25%']);
+    expect(brandLines(porsche)).toEqual(['$2.6B · 27,510 sold', '82% of offered sold', '12 mo: sales ▲20%, $ ▲25%']);
   });
   it('shows no median, no price band and no model year', () => {
     const said = brandLines(porsche).join(' ');
@@ -21,7 +39,7 @@ describe('a brand tile', () => {
   it('leaves out a line the data cannot support instead of guessing', () => {
     const thin = { ...porsche, offered: 12, sold_prior_12m: 4 };
     expect(brandLines(thin)).toEqual(['$2.6B · 27,510 sold']);
-    expect(brandLines({ ...porsche, usd_prior_12m: null })).toEqual(['$2.6B · 27,510 sold', '82% of offered sold', 'BaT 12 mo: sales ▲20%']);
+    expect(brandLines({ ...porsche, usd_prior_12m: null })).toEqual(['$2.6B · 27,510 sold', '82% of offered sold', '12 mo: sales ▲20%']);
   });
 });
 
@@ -84,3 +102,258 @@ describe('a partially unavailable brand market', () => {
     expect(mapLegend('brands', true)).toContain('box size = dollars from confirmed sales');
   });
 });
+
+describe('URL scope contract for the market treemap', () => {
+  it('round-trips make -> family -> model -> year in URL search params and restores canonical names', () => {
+    const stack = [
+      { label: 'ALL MAKES' },
+      { label: 'Ford', make: 'Ford' },
+      { label: 'Mustang', make: 'Ford', family: '8a8271f8-d299-4b55-837a-35ca919f8937', names: 1243 },
+      { label: 'Mustang GT', make: 'Ford', family: '8a8271f8-d299-4b55-837a-35ca919f8937', model: 'Mustang GT' },
+      { label: '1967', make: 'Ford', family: '8a8271f8-d299-4b55-837a-35ca919f8937', model: 'Mustang GT', year: 1967 },
+    ];
+    const params = applyDrillStackToSearchParams(new URLSearchParams('tab=market'), stack);
+    expect(params.get('make')).toBe('Ford');
+    expect(params.get('family')).toBe('8a8271f8-d299-4b55-837a-35ca919f8937');
+    expect(params.get('family_name')).toBe('Mustang');
+    expect(params.get('model')).toBe('Mustang GT');
+    expect(params.get('year')).toBe('1967');
+
+    // Deep-linked with uppercase make from MarketPulse resolves back to canonical brand and family names
+    const fromDeepLink = drillStackFromSearchParams(
+      new URLSearchParams('make=FORD&family=8a8271f8-d299-4b55-837a-35ca919f8937'),
+      [{ name: 'Ford', count: 29489, value: 1479400000 }],
+      [{ name: 'Mustang', count: 11050, value: 595300000, familyKey: '8a8271f8-d299-4b55-837a-35ca919f8937', models: 1243 }],
+    );
+    expect(fromDeepLink).toEqual([
+      { label: 'ALL MAKES' },
+      { label: 'Ford', make: 'Ford' },
+      { label: 'Mustang', make: 'Ford', family: '8a8271f8-d299-4b55-837a-35ca919f8937', names: 1243 },
+    ]);
+
+    // Family-level direct year drill (Make -> Family -> Year without picking a fragmented model string)
+    const familyYearStack = [
+      { label: 'ALL MAKES' },
+      { label: 'Ford', make: 'Ford' },
+      { label: 'Mustang', make: 'Ford', family: '8a8271f8-d299-4b55-837a-35ca919f8937', names: 1243 },
+      { label: '1969', make: 'Ford', family: '8a8271f8-d299-4b55-837a-35ca919f8937', year: 1969 },
+    ];
+    const familyYearParams = applyDrillStackToSearchParams(new URLSearchParams('tab=market&era=1964-1973'), familyYearStack);
+    expect(familyYearParams.get('make')).toBe('Ford');
+    expect(familyYearParams.get('family')).toBe('8a8271f8-d299-4b55-837a-35ca919f8937');
+    expect(familyYearParams.get('family_name')).toBe('Mustang');
+    expect(familyYearParams.get('model')).toBeNull();
+    expect(familyYearParams.get('year')).toBe('1969');
+    expect(familyYearParams.get('era')).toBe('1964-1973');
+    expect(drillStackFromSearchParams(
+      familyYearParams,
+      [{ name: 'Ford', count: 29489, value: 1479400000 }],
+      [{ name: 'Mustang', count: 11050, value: 595300000, familyKey: '8a8271f8-d299-4b55-837a-35ca919f8937', models: 1243 }],
+    )).toEqual(familyYearStack);
+
+    // Going back to ALL MAKES clears scope params while keeping tab
+    const cleared = applyDrillStackToSearchParams(params, [{ label: 'ALL MAKES' }]);
+    expect(cleared.get('tab')).toBe('market');
+    expect(cleared.get('make')).toBeNull();
+    expect(cleared.get('family')).toBeNull();
+    expect(cleared.get('family_name')).toBeNull();
+    expect(cleared.get('model')).toBeNull();
+    expect(cleared.get('year')).toBeNull();
+  });
+
+  it('parses and preserves facet drilldown links (/?make=...&family=...&axis=series|trim|body&facet=...)', () => {
+    expect(parseFacetAxisParam('series')).toBe('series');
+    expect(parseFacetAxisParam('trim')).toBe('trim');
+    expect(parseFacetAxisParam('body')).toBe('body');
+    expect(parseFacetAxisParam('unknown')).toBeNull();
+
+    expect(normalizeFacetSelection('series', 'C10', 'Chevrolet', 'Pickup')).toBe('C10 (1/2-Ton 2WD)');
+    expect(normalizeFacetSelection('trim', 'Cheyenne', 'Chevrolet', 'Pickup')).toBe('Cheyenne');
+    expect(normalizeFacetSelection('body', 'Fleetside', 'Chevrolet', 'Pickup')).toBe('Fleetside / Styleside');
+
+    const facetUrl = new URLSearchParams('make=Chevrolet&family=Pickup&axis=trim&facet=Cheyenne');
+    const stack = drillStackFromSearchParams(
+      facetUrl,
+      [{ name: 'Chevrolet', count: 18500, value: 890000000 }],
+      [{ name: 'Pickup', count: 3200, value: 145000000, familyKey: 'Pickup', models: 48 }],
+    );
+    expect(stack).toEqual([
+      { label: 'ALL MAKES' },
+      { label: 'Chevrolet', make: 'Chevrolet' },
+      { label: 'Pickup', make: 'Chevrolet', family: 'Pickup', names: 48 },
+      { label: 'Cheyenne', make: 'Chevrolet', family: 'Pickup', model: 'Cheyenne' },
+    ]);
+
+    const synced = applyDrillStackToSearchParams(facetUrl, stack);
+    expect(synced.get('make')).toBe('Chevrolet');
+    expect(synced.get('family')).toBe('Pickup');
+    expect(synced.get('axis')).toBe('trim');
+    expect(synced.get('facet')).toBe('Cheyenne');
+  });
+});
+
+describe('representative images for model and year tiles', () => {
+  it('never assigns brand-wide outliers (e.g. GT40 or Bronco) to Mustang year tiles', () => {
+    const brandTopRows = [
+      { id: 'gt40-67', model: 'GT40 Mk 1', year: 1967, primary_image_url: 'https://cdn.example.com/1967-gt40.jpg' },
+      { id: 'gt40-69', model: 'GT40', year: 1969, primary_image_url: 'https://cdn.example.com/1969-gt40.jpg' },
+      { id: 'bronco-68', model: 'Bronco', year: 1968, primary_image_url: 'https://cdn.example.com/1968-bronco.jpg' },
+      { id: 'bullitt-68', model: 'Mustang GT "Bullitt"', year: 1968, primary_image_url: 'https://cdn.example.com/1968-bullitt.jpg' },
+      { id: 'mustang-67', model: 'Mustang', year: 1967, primary_image_url: 'https://cdn.example.com/1967-mustang.jpg' },
+      { id: 'mustang-68-a', model: 'Mustang', year: 1968, primary_image_url: 'https://cdn.example.com/1968-mustang-1.jpg' },
+      { id: 'mustang-68-b', model: 'Mustang', year: 1968, primary_image_url: 'https://cdn.example.com/1968-mustang-2.jpg' },
+    ];
+
+    const mustangMap = buildRepresentativeImageCandidates(brandTopRows, 'Mustang');
+    expect(mustangMap.get('1967')).toEqual(['https://cdn.example.com/1967-mustang.jpg']);
+    expect(mustangMap.get('1969')).toBeUndefined();
+    // Exact sub-model ("Mustang") candidates come before prefix variants ("Mustang GT \"Bullitt\"")
+    expect(mustangMap.get('1968')).toEqual([
+      'https://cdn.example.com/1968-mustang-1.jpg',
+      'https://cdn.example.com/1968-mustang-2.jpg',
+      'https://cdn.example.com/1968-bullitt.jpg',
+    ]);
+  });
+
+  it('picks top candidate vehicle IDs per visible year tile from family sales, prioritizing exact sub-model matches', () => {
+    const yearTiles = [
+      { name: '1967', count: 317, value: 317 },
+      { name: '1968', count: 294, value: 294 },
+      { name: '1970', count: 162, value: 162 },
+    ];
+    const familySales = [
+      { vehicle_id: 'v-68-bullitt', sale_date: '2026-01-10', usd: 3_740_000, source: 'Mecum', year: 1968, model: 'Mustang GT "Bullitt"' },
+      { vehicle_id: 'v-68-exact-1', sale_date: '2026-02-01', usd: 215_000, source: 'Bring a Trailer', year: 1968, model: 'Mustang' },
+      { vehicle_id: 'v-68-exact-2', sale_date: '2026-02-02', usd: 185_000, source: 'Mecum', year: 1968, model: 'Mustang' },
+      { vehicle_id: 'v-67-exact-1', sale_date: '2026-03-01', usd: 240_000, source: 'Bring a Trailer', year: 1967, model: 'Mustang' },
+      { vehicle_id: 'v-70-exact-1', sale_date: '2026-03-05', usd: 145_000, source: 'Bring a Trailer', year: 1970, model: 'Mustang' },
+      { vehicle_id: 'v-70-boss', sale_date: '2026-03-06', usd: 310_000, source: 'Mecum', year: 1970, model: 'Shelby GT500' },
+    ];
+
+    const ids = selectFamilyRepresentativeVehicleIds(yearTiles, familySales, 'Mustang', 2);
+    expect(ids).toEqual([
+      'v-67-exact-1',
+      'v-68-exact-1',
+      'v-68-exact-2',
+      'v-70-exact-1',
+    ]);
+  });
+
+  it('normalizes malformed Mecum Cloudinary double-v version URLs so 1966 Mustang photos resolve', () => {
+    const brokenMecumUrl = 'https://images.mecum.com/image/upload/vv1763048796/auctions/FL26/1159821/580030.jpg?';
+    expect(optimizeImageUrl(brokenMecumUrl, 'small')).toBe(
+      'https://images.mecum.com/image/upload/v1763048796/auctions/FL26/1159821/580030.jpg',
+    );
+    expect(optimizeImageUrl(brokenMecumUrl, 'full')).toBe(
+      'https://images.mecum.com/image/upload/v1763048796/auctions/FL26/1159821/580030.jpg',
+    );
+  });
+
+  it('requests representative images for all 200 vehicle tiles when drilling into a family year', () => {
+    const vehicleTiles = Array.from({ length: 200 }, (_, i) => ({
+      name: `1967 Chevrolet Chevelle`,
+      count: 1,
+      value: 286000 - i * 1000,
+      id: `veh-${i + 1}`,
+      isVehicle: true,
+    }));
+    const familySales = vehicleTiles.map((t) => ({
+      vehicle_id: t.id!,
+      sale_date: '2026-01-15',
+      usd: t.value,
+      source: 'Mecum',
+      year: 1967,
+      model: 'Chevelle',
+    }));
+
+    const ids = selectFamilyRepresentativeVehicleIds(vehicleTiles, familySales, null);
+    expect(ids).toHaveLength(200);
+    expect(ids[0]).toBe('veh-1');
+    expect(ids[199]).toBe('veh-200');
+  });
+});
+
+describe('facet treemap tiles (SERIES, TRIM, BODY STYLE)', () => {
+  const silveradoFacet: TreemapNode = {
+    name: 'Silverado',
+    count: 420,
+    value: 19_320_000,
+    usd: 19_320_000,
+    median_price: 46_000,
+    sold_any: 420,
+    offered: 420,
+    dated: 380,
+    sold_12m: 96,
+    sold_prior_12m: 80,
+    usd_12m: 4_600_000,
+    usd_prior_12m: 3_680_000,
+    facetAxis: 'trim',
+    familySharePct: 35.0,
+  };
+
+  it('formats facetTileLines with lot count, median price, and share-of-family percentage on the primary line', () => {
+    const lines = facetTileLines(silveradoFacet, 1200);
+    expect(lines[0]).toBe('420 sold · $46K med · 35.0% of family');
+    expect(lines[1]).toBe('$19.3M total');
+    expect(lines[2]).toBe('12 mo: sales ▲20%, $ ▲25%');
+
+    // Compact widths preserve count, median price, and share percentage without overflowing maxChars
+    expect(facetTileLines(silveradoFacet, 1200, 28)[0]).toBe('420 sold · $46K med · 35.0%');
+    expect(facetTileLines(silveradoFacet, 1200, 20)[0]).toBe('420 · $46K · 35.0%');
+    for (let width = 0; width <= 50; width++) {
+      for (const line of facetTileLines(silveradoFacet, 1200, width)) {
+        expect(lineChars(line)).toBeLessThanOrEqual(width);
+      }
+    }
+  });
+
+  it('renders share-of-family badge alongside lot count and median price on TreemapCell when a facet axis is active', () => {
+    const host = document.createElement('div');
+    document.body.appendChild(host);
+    const root = createRoot(host);
+    act(() => {
+      root.render(
+        React.createElement(TreemapCell, {
+          rect: { node: silveradoFacet, x: 0, y: 0, w: 220, h: 110 },
+          onClick: () => {},
+          totalCount: 1200,
+          facetAxis: 'trim',
+        }),
+      );
+    });
+
+    const shareBadge = host.querySelector('[data-testid="treemap-cell-facet-share"]');
+    expect(shareBadge).not.toBeNull();
+    expect(shareBadge?.textContent).toBe('35.0% OF FAMILY');
+
+    const primaryLine = host.querySelector('[data-testid="treemap-cell-facet-primary-line"]');
+    expect(primaryLine).not.toBeNull();
+    expect(primaryLine?.textContent).toContain('420');
+    expect(primaryLine?.textContent).toContain('$46');
+    expect(primaryLine?.textContent).toContain('35.0%');
+
+    // Raw sub-model tile without facetAxis does not render the facet share badge
+    const rawSubModel: TreemapNode = {
+      name: 'C10 Custom',
+      count: 365,
+      value: 16_000_000,
+      usd: 16_000_000,
+      median_price: 42_000,
+    };
+    act(() => {
+      root.render(
+        React.createElement(TreemapCell, {
+          rect: { node: rawSubModel, x: 0, y: 0, w: 220, h: 110 },
+          onClick: () => {},
+          totalCount: 1200,
+          facetAxis: 'raw',
+        }),
+      );
+    });
+    expect(host.querySelector('[data-testid="treemap-cell-facet-share"]')).toBeNull();
+
+    act(() => root.unmount());
+    host.remove();
+  });
+});
+

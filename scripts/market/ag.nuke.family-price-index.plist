@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <!-- Nightly: the like-for-like price index of every eligible model family (scripts/market/family-price-index.py, method
+       hedonic_v1), written through record_family_price_index() into family_price_index and family_price_change, which the market
+       page's family chart reads through family_price_index_read(). Runs main's copy of the script, fetched into a runner cache, without
+       touching the /Users/skylar/nuke working tree, which may sit on another branch.
+       04:20 local = 11:20 UTC in PDT (12:20 UTC in PST): after the family folds (refresh-family-sales 10:10Z), the held-lot fold
+       (10:27Z) and the sources snapshot (10:47Z), clear of model 32/33 at :45 and the archive append at 16:10 local.
+       A failure on a family leaves its previous rows in place; the exit status is 1 when a family failed, a write did not land when read
+       back, or the 40-minute budget ran out. Per-run receipt: ~/nuke-logs/family-price-index/run-<UTC>.json; log: launchd.log beside it.
+       Install only after the migration (20261018050000_family_price_index.sql) is live: the job reads its functions.
+       Installed copy: ~/Library/LaunchAgents/ag.nuke.family-price-index.plist (launchctl bootout + bootstrap after an edit). Added 2026-10-16. -->
+  <key>Label</key><string>ag.nuke.family-price-index</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>/bin/bash</string>
+    <string>-c</string>
+    <string>set -uo pipefail; D="$HOME/Library/Caches/nuke-family-price-index-runner"; mkdir -p "$D" "$HOME/nuke-logs/family-price-index"; git fetch -q origin main || exit 1; git show origin/main:scripts/market/family-price-index.py &gt; "$D/family-price-index.py" || exit 1; echo "$(date -u +%FT%TZ) $(git rev-parse --short origin/main)"; exec dotenvx run -q -- python3 "$D/family-price-index.py"</string>
+  </array>
+  <key>WorkingDirectory</key><string>/Users/skylar/nuke</string>
+  <key>EnvironmentVariables</key>
+  <dict><key>PATH</key><string>/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin</string></dict>
+  <key>StartCalendarInterval</key><dict><key>Hour</key><integer>4</integer><key>Minute</key><integer>20</integer></dict>
+  <key>RunAtLoad</key><false/>
+  <key>StandardOutPath</key><string>/Users/skylar/nuke-logs/family-price-index/launchd.log</string>
+  <key>StandardErrorPath</key><string>/Users/skylar/nuke-logs/family-price-index/launchd.log</string>
+</dict>
+</plist>

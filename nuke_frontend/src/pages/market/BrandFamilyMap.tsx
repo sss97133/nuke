@@ -2,8 +2,9 @@ import { useEffect, useMemo, useState } from 'react';
 import { supabase } from '../../lib/supabase';
 import { squarify } from '../../lib/squarify';
 import { Text } from '../../kit';
-import { relativeMove, textWidth, pct as signedPct, type Baseline, type Move } from './mapScale';
+import { relativeMove, textWidth, pct as signedPct, GATE_MIN, type Baseline, type Move } from './mapScale';
 import { MarketTile, money as moneyShort, type MapBasis, type MarketNode } from './MarketTile';
+import type { HorizonMoveCounts } from './FamilyMovers';
 import './BrandFamilyMap.css';
 
 // The brand map with each brand's families inside it, the way finviz maps a market: every brand a frame sized by its
@@ -63,18 +64,28 @@ export function headerText(brand: string, dollars: string, width: number, size =
   return textWidth(brand) * size <= room ? brand : '';
 }
 
-export default function BrandFamilyMap({ width, height, onPickBrand, onPickFamily, baseline = null, basis = 'ledger' }: {
+export default function BrandFamilyMap({ width, height, onPickBrand, onPickFamily, baseline = null, basis = 'ledger', familyMoves, gateMin = GATE_MIN, horizonShortLabel = '12 mo' }: {
   width: number; height: number; onPickBrand: (brand: string) => void; onPickFamily: (brand: string, familyKey: string, family: string) => void;
-  baseline?: Baseline | null; basis?: MapBasis;
+  baseline?: Baseline | null; basis?: MapBasis; familyMoves?: Record<string, HorizonMoveCounts>; gateMin?: number; horizonShortLabel?: string;
 }) {
   const [rows, setRows] = useState<MapRow[] | null | undefined>(undefined);
   useEffect(() => { let live = true; readBrandFamilyMap().then((r) => { if (live) setRows(r); }); return () => { live = false; }; }, []);
+  const effectiveRows = useMemo(() => {
+    if (!rows || !familyMoves) return rows;
+    return rows.map((r) => {
+      if (r.family_key === 'more' || r.family_key === 'other') return r;
+      const ov = familyMoves[`${r.brand}|${r.family_key}`];
+      return ov
+        ? { ...r, sold_12m: ov.sold_12m, sold_prior_12m: ov.sold_prior_12m, usd_12m: ov.usd_12m, usd_prior_12m: ov.usd_prior_12m }
+        : { ...r, sold_12m: 0, sold_prior_12m: 0, usd_12m: 0, usd_prior_12m: 0 };
+    });
+  }, [rows, familyMoves]);
   const layout = useMemo(() => {
-    if (!rows?.length || width < 100 || height < 100) return null;
+    if (!effectiveRows?.length || width < 100 || height < 100) return null;
     // Sized as the brand map is: Bring a Trailer's 12 months by default, every venue and year in the ledger view.
     const area = (r: MapRow) => (basis === 'bat12' ? r.usd_12m ?? 0 : r.usd ?? 0);
     const brands = new Map<string, { brand: string; usd: number; rows: MapRow[] }>();
-    for (const r of rows) {
+    for (const r of effectiveRows) {
       const b = brands.get(r.brand) ?? { brand: r.brand, usd: 0, rows: [] };
       if (area(r) > 0) { b.rows.push(r); b.usd += area(r); }
       brands.set(r.brand, b);
@@ -85,7 +96,7 @@ export default function BrandFamilyMap({ width, height, onPickBrand, onPickFamil
       const tiles = squarify(f.node.rows.map((r) => ({ node: r, area: area(r) })), f.x + 1, f.y + head + 1, Math.max(0, f.w - 2), Math.max(0, f.h - head - 2));
       return { ...f, head, tiles, text: head ? headerText(f.node.brand.toUpperCase(), moneyShort(f.node.usd), f.w) : '' };
     });
-  }, [rows, width, height, basis]);
+  }, [effectiveRows, width, height, basis]);
 
   if (rows === undefined) return <div className="brand-family-map__empty"><Text role="caption">Reading the map…</Text></div>;
   if (!layout) return <div className="brand-family-map__empty"><Text role="caption">The map with families inside could not be read.</Text></div>;
@@ -99,10 +110,10 @@ export default function BrandFamilyMap({ width, height, onPickBrand, onPickFamil
         const r = t.node;
         const node = toNode(r);
         // "more families" and "other models" are not a family: never colored.
-        const move: Move = r.family_key === 'more' || r.family_key === 'other' ? { kind: 'none' } : relativeMove(node, baseline, basis === 'ledger');
+        const move: Move = r.family_key === 'more' || r.family_key === 'other' ? { kind: 'none' } : relativeMove(node, baseline, basis === 'ledger', gateMin);
         return <MarketTile key={`${r.brand}-${r.family_key}`} node={node} move={move} basis={basis} x={t.x} y={t.y} w={t.w} h={t.h}
           onClick={() => (r.family_key === 'more' || r.family_key === 'other' ? onPickBrand(r.brand) : onPickFamily(r.brand, r.family_key, r.family ?? ''))}
-          title={`${r.brand} ${label(r)}: ${money(r.usd ?? 0)} · ${(r.sold ?? 0).toLocaleString('en-US')} sold${move.kind === 'move' ? ` · BaT 12 mo: ${signedPct(move.rel)} vs BaT (sales ${signedPct(move.raw)})` : ''}`} />;
+          title={`${r.brand} ${label(r)}: ${money(r.usd ?? 0)} · ${(r.sold ?? 0).toLocaleString('en-US')} sold${move.kind === 'move' ? ` · ${horizonShortLabel}: ${signedPct(move.rel)} against the market (sales ${signedPct(move.raw)})` : ''}`} />;
       })}
     </div>)}
   </div>;

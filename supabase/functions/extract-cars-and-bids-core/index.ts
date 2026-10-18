@@ -29,6 +29,7 @@ import { requireWriteAuth } from "../_shared/writeGuard.ts";
 import { projectSecretKey } from "../_shared/supabaseKeys.ts";
 import { batchFromTargets, discoverTargets, reviseCab, recaptureCab } from "./targets.ts";
 import { parseCabDepth } from "./cabPage.ts";
+import { cleanCabText, extractCabFacets } from "./cabFacets.ts";
 import { recordSellerTypes, sellerTypeRow } from "../_shared/sellerType.ts";
 import { insertMissingVehicleImages } from "../_shared/vehicleImageWrite.ts";
 import { fillOnlyIdentity, identityConflict, REVISION_DIFFERENT_CAR } from "../_shared/identityMatch.ts";
@@ -138,6 +139,10 @@ interface CabExtractedData {
 /** A live or ended C&B auction page carries .bid-stats or the .cnb-details blocks; the not-found shell carries neither. */
 export function isGonePage(html: string): boolean {
   return html.length > 0 && !html.includes("bid-stats") && !html.includes("cnb-details");
+}
+
+function isCabThumbUrl(u: string): boolean {
+  return /\/cdn-cgi\/image\/[^/]*(?:width=(?:80|148|160|320)[,/]|height=126[,/])/i.test(u);
 }
 
 function parseCabHtml(html: string, sourceUrl?: string): CabExtractedData {
@@ -370,12 +375,12 @@ function parseCabHtml(html: string, sourceUrl?: string): CabExtractedData {
     }
     if (result.bidHistory.length > 0) console.log(`✅ C&B [bids]: ${result.bidHistory.length} bids extracted`);
 
-    // 11. Gallery images — CDN URLs (skip small thumbnails width=80/160/320)
+    // 11. Gallery images — CDN URLs (skip small thumbnails width=80/148/160/320 and 148x126 sidebar cards)
     const seenImages = new Set<string>();
     for (const m of html.matchAll(/https:\/\/media\.carsandbids\.com\/[^"'\s)>]+/gi)) {
       const url = m[0];
       const cleanUrl = url.split('?')[0];
-      if (/\/cdn-cgi\/image\/[^/]*width=(?:80|160|320)[,/]/.test(url)) continue;
+      if (isCabThumbUrl(url)) continue;
       if (!seenImages.has(cleanUrl)) {
         seenImages.add(cleanUrl);
         result.images.push(url);
@@ -737,13 +742,33 @@ Deno.serve(async (req) => {
     if (norm.model) extracted.model = norm.model;
     if (norm.transmission) extracted.transmission = norm.transmission;
 
+    const cleanTitle = cleanCabText(extracted.title);
+    if (cleanTitle) extracted.title = cleanTitle;
+
+    const facets = extractCabFacets({
+      year: extracted.year,
+      make: extracted.make,
+      model: extracted.model,
+      title: extracted.title,
+      highlights: [extracted.highlights, extracted.equipment, extracted.dougsTake].filter(Boolean).join(" "),
+      existingBodyStyle: extracted.bodyStyle,
+    });
+    if (facets.normalizedModel) extracted.model = facets.normalizedModel;
+
     const parsedLoc = parseLocation(extracted.location);
+    const isSold = extracted.auctionStatus === 'sold';
+    const isEndedUnsold = extracted.auctionStatus === 'reserve_not_met' || extracted.auctionStatus === 'ended';
+    const saleDateIso = isSold && extracted.endDate ? extracted.endDate.slice(0, 10) : null;
 
     // Prepare vehicle data (use actual column names from vehicles table)
     const vehicleData: Record<string, any> = {
       year: extracted.year,
       make: extracted.make,
       model: extracted.model,
+      title: extracted.title,
+      listing_title: extracted.title,
+      series: facets.series,
+      trim: facets.trim,
       vin: extracted.vin,
       mileage: extracted.mileage,
       color: extracted.exteriorColor,
@@ -751,10 +776,13 @@ Deno.serve(async (req) => {
       engine_type: extracted.engine,
       transmission: extracted.transmission,
       drivetrain: extracted.drivetrain,
-      body_style: extracted.bodyStyle,
+      body_style: facets.body_style ?? extracted.bodyStyle,
       title_status: extracted.titleStatus,
       // Set primary image from extracted gallery
-      primary_image_url: extracted.images.length > 0 ? extracted.images[0] : null,
+      primary_image_url:
+        extracted.images.find((u) => /width=2080[,/]/i.test(u)) ||
+        extracted.images.find((u) => !isCabThumbUrl(u)) ||
+        null,
       // Rich description: all content sections combined
       description: [extracted.description, depth.fullDescription].filter(Boolean).join('\n\n') || null,
       listing_location: parsedLoc.clean,
@@ -764,15 +792,27 @@ Deno.serve(async (req) => {
       listing_location_observed_at: new Date().toISOString(),
       // sale_price = final sale amount; high_bid = bid that didn't result in sale
       // C&B: 'sold' = auction ended + reserve met, 'reserve_not_met' = ended without sale
-      sale_price: extracted.auctionStatus === 'sold' ? extracted.currentBid : null,
-      high_bid: extracted.auctionStatus !== 'sold' ? extracted.currentBid : null,
+      sale_price: isSold ? extracted.currentBid : null,
+      sold_price: isSold ? extracted.currentBid : null,
+      winning_bid: isSold ? extracted.currentBid : null,
+      high_bid: !isSold ? extracted.currentBid : null,
+      sale_date: saleDateIso,
+      auction_end_date: extracted.endDate,
       // Sale rule (lock 1, 2026-09-27): the status travels with the price (nulls are stripped below).
-      sale_status: extracted.auctionStatus === 'sold' ? 'sold' : (extracted.auctionStatus === 'reserve_not_met' ? 'not_sold' : null),
-      auction_outcome: extracted.auctionStatus === 'sold' ? 'sold' : (extracted.auctionStatus === 'reserve_not_met' ? 'reserve_not_met' : null),
+      sale_status: isSold ? 'sold' : (isEndedUnsold ? 'not_sold' : (extracted.auctionStatus === 'active' ? 'auction_live' : null)),
+      auction_outcome: isSold ? 'sold' : (isEndedUnsold ? 'reserve_not_met' : null),
+      auction_status: isSold ? 'sold' : (isEndedUnsold ? 'ended' : (extracted.auctionStatus === 'active' ? 'active' : null)),
+      reserve_status: extracted.noReserve ? 'no_reserve' : (isSold ? 'reserve_met' : (isEndedUnsold ? 'reserve_not_met' : null)),
       bid_count: extracted.bidCount,
+      listing_url: listingUrlCanonical,
       discovery_url: listingUrlCanonical,
       discovery_source: "carsandbids",
       listing_source: "extract-cars-and-bids-core",
+      auction_source: "cars_and_bids",
+      canonical_platform: "cars-and-bids",
+      platform_source: "cars-and-bids",
+      source: "cars-and-bids",
+      is_public: true,
       status: "active",
       // Full C&B metadata — everything we extracted, structured
       import_metadata: {

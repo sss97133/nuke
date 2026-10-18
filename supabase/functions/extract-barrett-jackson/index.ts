@@ -24,6 +24,7 @@
  */
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { readCatalogPages } from "./catalogProbe.ts";
 import { archiveFetch, readArchivedPage } from "../_shared/archiveFetch.ts";
 import { qualityGate } from "../_shared/extractionQualityGate.ts";
 import { cleanVehicleFields } from "../_shared/pollutionDetector.ts";
@@ -33,6 +34,12 @@ import { requireWriteAuth } from "../_shared/writeGuard.ts";
 import { projectSecretKey } from "../_shared/supabaseKeys.ts";
 import { mustWrite, softWrite } from '../_shared/writeResult.ts';
 import { fillOnlyIdentity, identityConflict, REVISION_DIFFERENT_CAR } from '../_shared/identityMatch.ts';
+import { ForcedVehicleMissing, forcedVehicleId, pickVehicleTarget } from "./vehicleTarget.ts";
+import { lotEventDate } from "./eventDate.ts";
+import {
+  applyBarrettJacksonVehicleFacets,
+  parseBarrettJacksonHeadline,
+} from "./vehicleFacets.ts";
 
 /** The resolved vehicle is a different car than the lot: nothing is written, a revision item is returned (missing: identity_match,
  *  reason: different_car, next action: relink). Photos and episodes for a different car never attach to that vehicle. */
@@ -64,6 +71,9 @@ interface BJVehicle {
   year: number | null;
   make: string | null;
   model: string | null;
+  series_code: string | null;
+  trim_package: string | null;
+  body_style_facet: string | null;
   style: string | null;
   vin: string | null;
   transmission: string | null;
@@ -143,23 +153,26 @@ function parseRscVehicleData(html: string, url: string): BJVehicle | null {
     const titleField = searchBlock.match(/\\?"title\\?":\s*\\?"([^"\\]+)\\?"/);
     if (titleField) {
       vehicle.title = titleCase(titleField[1]);
-      const ymm = titleField[1].match(/^(\d{4})\s+(\S+)\s+(.+)$/);
-      if (ymm) {
-        vehicle.year = parseInt(ymm[1], 10);
-        vehicle.make = titleCase(ymm[2]);
-        vehicle.model = titleCase(ymm[3]);
-      }
     }
 
-    // Structured year/make/model fields
+    // Structured year/make/model fields (preferred over raw title tail)
     const yearField = searchBlock.match(/\\?"year\\?":\s*\\?"(\d{4})\\?"/);
-    if (yearField && !vehicle.year) vehicle.year = parseInt(yearField[1], 10);
+    if (yearField) vehicle.year = parseInt(yearField[1], 10);
 
     const makeField = searchBlock.match(/\\?"make\\?":\s*\\?"([^"\\]+)\\?"/);
-    if (makeField && !vehicle.make) vehicle.make = titleCase(makeField[1]);
+    if (makeField) vehicle.make = titleCase(makeField[1]);
 
     const modelField = searchBlock.match(/\\?"model\\?":\s*\\?"([^"\\]+)\\?"/);
-    if (modelField && !vehicle.model) vehicle.model = titleCase(modelField[1]);
+    if (modelField) vehicle.model = titleCase(modelField[1]);
+
+    if (titleField) {
+      const parsedHeadline = parseBarrettJacksonHeadline(titleField[1]);
+      if (!vehicle.year && parsedHeadline.year) vehicle.year = parsedHeadline.year;
+      if (!vehicle.make && parsedHeadline.make) vehicle.make = parsedHeadline.make;
+      if (!vehicle.model && parsedHeadline.modelRest) {
+        vehicle.model = titleCase(parsedHeadline.modelRest);
+      }
+    }
 
     // VIN
     const vinField = searchBlock.match(/\\?"vin\\?":\s*\\?"([A-Z0-9]+)\\?"/i);
@@ -246,10 +259,9 @@ function parseRscVehicleData(html: string, url: string): BJVehicle | null {
     const eventField = searchBlock.match(/\\?"event_slug\\?":\s*\\?"([^"\\]+)\\?"/);
     if (eventField) vehicle.auction_name = titleCase(eventField[1].replace(/-/g, " "));
 
-    // Event start date = the sale date. It sits in the RSC payload but was never
-    // read — the cause of BJ's 0% dated events. Pull the first ISO date.
-    const startDateField = html.match(/\\?"start_date\\?":\s*\\?"(\d{4}-\d{2}-\d{2})/);
-    if (startDateField) vehicle.event_date = startDateField[1];
+    // Event start date = the sale date: the first start_date in the docket's own event year (eventDate.ts). The page
+    // also advertises upcoming events; the first ISO date dated a 2004 lot to 2026-04-16.
+    vehicle.event_date = lotEventDate(html, url);
 
     // Is sold
     const soldField = searchBlock.match(/\\?"is_sold\\?":\s*(true|false)/);
@@ -271,8 +283,15 @@ function parseRscVehicleData(html: string, url: string): BJVehicle | null {
     // Fallback: extract auction from URL
     extractAuctionFromUrl(vehicle, url);
 
+    // Deterministic facet extraction from headline + description + structured fields
+    applyBarrettJacksonVehicleFacets(vehicle);
+
     if (vehicle.year || vehicle.make) {
-      console.log(`[BJ] RSC extraction found: ${vehicle.year} ${vehicle.make} ${vehicle.model}, vin=${vehicle.vin}, price=$${vehicle.sale_price}`);
+      console.log(
+        `[BJ] RSC extraction found: ${vehicle.year} ${vehicle.make} ${vehicle.model} ` +
+          `(series=${vehicle.series_code}, trim=${vehicle.trim_package}, body=${vehicle.body_style_facet}), ` +
+          `vin=${vehicle.vin}, price=$${vehicle.sale_price}`,
+      );
       return vehicle;
     }
   }
@@ -315,22 +334,23 @@ function parseJsonLd(html: string, url: string): BJVehicle | null {
             if (price >= 100 && price < 100_000_000) vehicle.sale_price = price;
           }
 
-          // Parse year/make/model from name: "1966 CHEVROLET EL CAMINO"
+          // Structured fields first, then headline fallback
+          if (item.brand?.name) vehicle.make = titleCase(String(item.brand.name));
+          if (item.model) vehicle.model = titleCase(String(item.model));
+          if (item.vehicleModelDate) vehicle.year = parseInt(String(item.vehicleModelDate), 10) || null;
+
           if (item.name) {
-            const titleMatch = String(item.name).match(/^(\d{4})\s+(\S+)\s+(.+)$/);
-            if (titleMatch) {
-              vehicle.year = parseInt(titleMatch[1], 10);
-              vehicle.make = titleCase(titleMatch[2]);
-              vehicle.model = titleCase(titleMatch[3]);
+            const parsedHeadline = parseBarrettJacksonHeadline(String(item.name));
+            if (!vehicle.year && parsedHeadline.year) vehicle.year = parsedHeadline.year;
+            if (!vehicle.make && parsedHeadline.make) vehicle.make = parsedHeadline.make;
+            if (!vehicle.model && parsedHeadline.modelRest) {
+              vehicle.model = titleCase(parsedHeadline.modelRest);
             }
           }
-          // Or use structured fields
-          if (item.brand?.name && !vehicle.make) vehicle.make = titleCase(String(item.brand.name));
-          if (item.model && !vehicle.model) vehicle.model = titleCase(String(item.model));
-          if (item.vehicleModelDate && !vehicle.year) vehicle.year = parseInt(String(item.vehicleModelDate), 10) || null;
 
           // Extract auction info from URL
           extractAuctionFromUrl(vehicle, url);
+          applyBarrettJacksonVehicleFacets(vehicle);
 
           if (vehicle.year || vehicle.make) return vehicle;
         }
@@ -379,12 +399,10 @@ function parseEmbeddedJsonVehicle(embedded: Record<string, unknown>, url: string
 
   if (typeof embedded.title === "string") {
     vehicle.title = titleCase(embedded.title);
-    const titleMatch = embedded.title.match(/^(\d{4})\s+(\S+)\s+(.+)$/);
-    if (titleMatch) {
-      vehicle.year = parseInt(titleMatch[1], 10);
-      vehicle.make = titleCase(titleMatch[2]);
-      vehicle.model = titleCase(titleMatch[3]);
-    }
+    const parsedHeadline = parseBarrettJacksonHeadline(embedded.title);
+    if (parsedHeadline.year) vehicle.year = parsedHeadline.year;
+    if (parsedHeadline.make) vehicle.make = parsedHeadline.make;
+    if (parsedHeadline.modelRest) vehicle.model = titleCase(parsedHeadline.modelRest);
   }
 
   if (typeof embedded.full_description === "string" && embedded.full_description.length > 20) {
@@ -413,8 +431,12 @@ function parseEmbeddedJsonVehicle(embedded: Record<string, unknown>, url: string
   if (typeof embedded.year === "number") vehicle.year = embedded.year as number;
   if (typeof embedded.make === "string") vehicle.make = titleCase(String(embedded.make));
   if (typeof embedded.model === "string") vehicle.model = titleCase(String(embedded.model));
+  if (typeof embedded.style === "string" && embedded.style.trim()) {
+    vehicle.style = titleCase(String(embedded.style));
+  }
 
   extractAuctionFromUrl(vehicle, url);
+  applyBarrettJacksonVehicleFacets(vehicle);
 
   return (vehicle.year || vehicle.make) ? vehicle : null;
 }
@@ -428,25 +450,24 @@ function parseHtmlStructured(html: string, url: string): BJVehicle | null {
   // Try og:title meta tag for vehicle name
   const ogTitle = html.match(/<meta[^>]*property=["']og:title["'][^>]*content=["']([^"']+)["']/i);
   if (ogTitle) {
-    vehicle.title = titleCase(ogTitle[1].trim());
-    const titleMatch = ogTitle[1].match(/(\d{4})\s+(\S+)\s+(.+?)(?:\s*[-|]|$)/);
-    if (titleMatch) {
-      vehicle.year = parseInt(titleMatch[1], 10);
-      vehicle.make = titleCase(titleMatch[2]);
-      vehicle.model = titleCase(titleMatch[3].trim());
-    }
+    const cleanOg = ogTitle[1].replace(/\s*[-|].*$/, "").trim();
+    vehicle.title = titleCase(cleanOg);
+    const parsedHeadline = parseBarrettJacksonHeadline(cleanOg);
+    if (parsedHeadline.year) vehicle.year = parsedHeadline.year;
+    if (parsedHeadline.make) vehicle.make = parsedHeadline.make;
+    if (parsedHeadline.modelRest) vehicle.model = titleCase(parsedHeadline.modelRest);
   }
 
   // Try <title> tag
   if (!vehicle.year) {
     const htmlTitle = html.match(/<title[^>]*>([^<]+)<\/title>/i);
     if (htmlTitle) {
-      const titleMatch = htmlTitle[1].match(/(\d{4})\s+(\S+)\s+(.+?)(?:\s*[-|]|$)/);
-      if (titleMatch) {
-        vehicle.year = parseInt(titleMatch[1], 10);
-        vehicle.make = titleCase(titleMatch[2]);
-        vehicle.model = titleCase(titleMatch[3].trim());
-      }
+      const cleanHtmlTitle = htmlTitle[1].replace(/\s*[-|].*$/, "").trim();
+      if (!vehicle.title) vehicle.title = titleCase(cleanHtmlTitle);
+      const parsedHeadline = parseBarrettJacksonHeadline(cleanHtmlTitle);
+      if (parsedHeadline.year) vehicle.year = parsedHeadline.year;
+      if (parsedHeadline.make) vehicle.make = parsedHeadline.make;
+      if (parsedHeadline.modelRest) vehicle.model = titleCase(parsedHeadline.modelRest);
     }
   }
 
@@ -457,6 +478,7 @@ function parseHtmlStructured(html: string, url: string): BJVehicle | null {
   }
 
   extractAuctionFromUrl(vehicle, url);
+  applyBarrettJacksonVehicleFacets(vehicle);
 
   return (vehicle.year || vehicle.make) ? vehicle : null;
 }
@@ -509,12 +531,12 @@ function parseMarkdown(markdown: string, url: string): BJVehicle {
   }
 
   // Fallback: parse year/make/model from title text
-  if (!vehicle.year && vehicle.title) {
-    const titleYMM = vehicle.title.match(/^(\d{4})\s+(\S+)\s+(.+)$/);
-    if (titleYMM) {
-      vehicle.year = parseInt(titleYMM[1], 10);
-      if (!vehicle.make) vehicle.make = titleCase(titleYMM[2]);
-      if (!vehicle.model) vehicle.model = titleCase(titleYMM[3]);
+  if (vehicle.title) {
+    const parsedHeadline = parseBarrettJacksonHeadline(vehicle.title);
+    if (!vehicle.year && parsedHeadline.year) vehicle.year = parsedHeadline.year;
+    if (!vehicle.make && parsedHeadline.make) vehicle.make = parsedHeadline.make;
+    if (!vehicle.model && parsedHeadline.modelRest) {
+      vehicle.model = titleCase(parsedHeadline.modelRest);
     }
   }
 
@@ -594,6 +616,8 @@ function parseMarkdown(markdown: string, url: string): BJVehicle {
   // Mileage from text
   extractMileageFromText(vehicle, (vehicle.description || "") + " " + markdown);
 
+  applyBarrettJacksonVehicleFacets(vehicle);
+
   return vehicle;
 }
 
@@ -671,6 +695,9 @@ function newEmptyVehicle(url: string): BJVehicle {
     year: null,
     make: null,
     model: null,
+    series_code: null,
+    trim_package: null,
+    body_style_facet: null,
     style: null,
     vin: null,
     transmission: null,
@@ -881,7 +908,10 @@ async function fetchAndParse(url: string, opts?: { retainedFirst?: boolean; noFi
             .replace(/&nbsp;/g, " ")
             .replace(/\s+/g, " ")
             .trim();
-          if (desc.length > 30) fromMd.description = desc.slice(0, 5000);
+          if (desc.length > 30) {
+            fromMd.description = desc.slice(0, 5000);
+            applyBarrettJacksonVehicleFacets(fromMd);
+          }
         }
       }
 
@@ -915,6 +945,9 @@ async function saveVehicle(
   vehicle: BJVehicle,
   forceVehicleId?: string,
 ): Promise<{ vehicleId: string; isNew: boolean; fieldsUpdated: string[]; qualityScore: number }> {
+  // Ensure deterministic facet extraction has run on the vehicle before identity check & write
+  applyBarrettJacksonVehicleFacets(vehicle);
+
   // Check if vehicle already exists by URL
   const { data: byUrl } = await supabase
     .from("vehicles")
@@ -932,7 +965,8 @@ async function saveVehicle(
     .limit(1)
     .maybeSingle();
 
-  let existingId = forceVehicleId || queueEntry?.vehicle_id || byUrl?.id;
+  const target = pickVehicleTarget({ forced: forceVehicleId, queue: queueEntry?.vehicle_id, url: byUrl?.id });
+  let existingId = target.kind === "new" ? undefined : target.id;
 
   // Also check by VIN (prevents duplicate key violations)
   if (!existingId && vehicle.vin && vehicle.vin.length >= 5) {
@@ -952,6 +986,8 @@ async function saveVehicle(
   if (existingId) {
     const { data: idRow } = await supabase.from("vehicles").select("year,make,model,vin,sale_price").eq("id", existingId).maybeSingle();
     existingIdentity = (idRow as typeof existingIdentity) ?? null;
+    // A forced vehicle must exist: never write the lot to a new vehicle in its place.
+    if (target.kind === "forced" && !idRow) throw new ForcedVehicleMissing(existingId);
     const conflict = existingIdentity ? identityConflict(existingIdentity, { year: vehicle.year, make: vehicle.make, model: vehicle.model, vin: vehicle.vin }) : null;
     if (conflict) throw new IdentityRefused(existingId, vehicle.url, conflict);
   }
@@ -968,6 +1004,10 @@ async function saveVehicle(
     year: vehicle.year,
     make: vehicle.make,
     model: vehicle.model,
+    series: vehicle.series_code,
+    trim: vehicle.trim_package,
+    body_style: vehicle.body_style_facet || vehicle.style || null,
+    listing_title: vehicle.title,
     vin: vehicle.vin && vehicle.vin.length >= 5 ? vehicle.vin : null,
     transmission: vehicle.transmission,
     engine_type: vehicle.engine,
@@ -984,7 +1024,6 @@ async function saveVehicle(
     listing_source: "barrett-jackson",
     source: "barrett-jackson",
     extractor_version: EXTRACTOR_VERSION,
-    ...(vehicle.style ? { body_style: vehicle.style } : {}),
   };
 
   // Normalize fields (transmission, trim, model, colors)
@@ -1022,12 +1061,16 @@ async function saveVehicle(
     // Track which fields we're adding
     const { data: existing } = await supabase
       .from("vehicles")
-      .select("vin,mileage,color,description,transmission,body_style,engine_type,sale_price,interior_color")
+      .select("vin,mileage,color,description,transmission,body_style,engine_type,sale_price,interior_color,series,trim,listing_title")
       .eq("id", existingId)
       .maybeSingle();
 
     if (existing) {
-      const trackFields = ["vin", "mileage", "color", "description", "transmission", "body_style", "engine_type", "sale_price", "interior_color"];
+      const trackFields = [
+        "vin", "mileage", "color", "description", "transmission",
+        "body_style", "engine_type", "sale_price", "interior_color",
+        "series", "trim", "listing_title",
+      ];
       for (const f of trackFields) {
         if (!(existing as any)[f] && cleanData[f]) fieldsUpdated.push(f);
       }
@@ -1228,9 +1271,12 @@ Deno.serve(async (req) => {
 
       let saved: Awaited<ReturnType<typeof saveVehicle>>;
       try {
-        saved = await saveVehicle(supabase, vehicle);
+        // body.vehicle_id: the vehicle this lot belongs to (a re-land of an auction result with no episode); it wins over
+        // the URL lookup and must exist.
+        saved = await saveVehicle(supabase, vehicle, forcedVehicleId(body));
       } catch (e) {
         if (e instanceof IdentityRefused) return okJson({ success: false, refused: "different_car", revision: e.revision }, 409);
+        if (e instanceof ForcedVehicleMissing) return okJson({ success: false, error: "forced_vehicle_missing", vehicle_id: e.vehicleId }, 404);
         throw e;
       }
       const { vehicleId, isNew, fieldsUpdated, qualityScore } = saved;
@@ -1257,6 +1303,9 @@ Deno.serve(async (req) => {
           year: vehicle.year,
           make: vehicle.make,
           model: vehicle.model,
+          series_code: vehicle.series_code,
+          trim_package: vehicle.trim_package,
+          body_style_facet: vehicle.body_style_facet,
           vin: vehicle.vin,
           mileage: vehicle.mileage,
           sale_price: vehicle.sale_price,
@@ -1425,6 +1474,14 @@ Deno.serve(async (req) => {
     }
 
     // ── Stats ─────────────────────────────────────────────────────────────
+    // ── Catalog enumeration, stage 1 (owner decision 2026-10-16): read the listed catalog pages, politely ──────────────────
+    // Our identified agent, one request every 3 s, each capture retained as a snapshot, stops on the first sign of blocking.
+    if (action === "catalog_probe") {
+      const urls: string[] = (Array.isArray(body.urls) ? body.urls : []).filter((u: unknown) => typeof u === "string").slice(0, 20);
+      const out = await readCatalogPages(urls);
+      return okJson({ success: true, requested: urls.length, ...out });
+    }
+
     if (action === "stats") {
       const { data: stats } = await supabase.rpc("execute_sql", {
         query: `

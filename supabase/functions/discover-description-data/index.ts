@@ -10,6 +10,8 @@
  * POST /functions/v1/discover-description-data
  * Body: { "vehicle_id": "uuid" } or { "batch_size": 10 } or { "mode": "condition_backfill" }
  * Service-only { "mode": "preview", "vehicle_id": "uuid" } reads preserved evidence without mining.
+ * Service-only { "mode": "reported_work_preview", "source_observation_id": "uuid" } makes one model call on one
+ * stored BaT description capture and returns verified reported-work proposals; it writes nothing.
  */
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
@@ -18,6 +20,7 @@ import { projectSecretKey } from "../_shared/supabaseKeys.ts";
 import { geminiFetch } from "../_shared/geminiGuard.ts";
 import { conditionExtractionArtifact, conditionObservationInput, descriptionPreview, descriptionSourceMetadata,
   loadDescriptionInput, loadReusableConditionExtraction, requireCompleteInput, type DescriptionInput } from "./descriptionInput.ts";
+import { parseProposalArray, REPORTED_WORK_PROPOSAL_PROMPT_VERSION, reportedWorkPrompt, verifyReportedWorkProposal } from "./reportedWorkProposals.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -121,7 +124,8 @@ Be thorough — extract every condition-relevant statement. Include both positiv
 Return ONLY a valid JSON array. If no conditions found, return [].`;
 
 // Multi-LLM fallback: Kimi (fast, cheap) → Grok → Gemini → Haiku
-async function callLLM(prompt: string): Promise<{ content: string; model: string }> {
+type LLMUsage = { input_tokens: number | null; output_tokens: number | null };
+async function callLLM(prompt: string): Promise<{ content: string; model: string; usage?: LLMUsage }> {
   const errors: string[] = [];
 
   // 1. Kimi k2-turbo (OpenAI-compatible, fast ~2s, good JSON)
@@ -142,7 +146,7 @@ async function callLLM(prompt: string): Promise<{ content: string; model: string
         const data = await resp.json();
         if (data.choices?.[0]?.finish_reason === "length") throw new Error("Kimi output truncated");
         const content = data.choices?.[0]?.message?.content || "";
-        if (content) return { content, model: data.model || "kimi-k2-turbo-preview" };
+        if (content) return { content, model: data.model || "kimi-k2-turbo-preview", usage: { input_tokens: data.usage?.prompt_tokens ?? null, output_tokens: data.usage?.completion_tokens ?? null } };
       } else {
         const errBody = await resp.text().catch(() => "");
         errors.push(`Kimi ${resp.status}: ${errBody.slice(0, 100)}`);
@@ -168,7 +172,7 @@ async function callLLM(prompt: string): Promise<{ content: string; model: string
         const data = await resp.json();
         if (data.choices?.[0]?.finish_reason === "length") throw new Error("Grok output truncated");
         const content = data.choices?.[0]?.message?.content || "";
-        if (content) return { content, model: data.model || "grok-3-mini" };
+        if (content) return { content, model: data.model || "grok-3-mini", usage: { input_tokens: data.usage?.prompt_tokens ?? null, output_tokens: data.usage?.completion_tokens ?? null } };
       } else {
         const errBody = await resp.text().catch(() => "");
         errors.push(`Grok ${resp.status}: ${errBody.slice(0, 100)}`);
@@ -195,7 +199,7 @@ async function callLLM(prompt: string): Promise<{ content: string; model: string
         const data = await resp.json();
         if (data.candidates?.[0]?.finishReason === "MAX_TOKENS") throw new Error("Gemini output truncated");
         const content = data.candidates?.[0]?.content?.parts?.[0]?.text || "";
-        if (content) return { content, model: data.modelVersion || "gemini-flash-lite-latest" };
+        if (content) return { content, model: data.modelVersion || "gemini-flash-lite-latest", usage: { input_tokens: data.usageMetadata?.promptTokenCount ?? null, output_tokens: data.usageMetadata?.candidatesTokenCount ?? null } };
       } else {
         const errBody = await resp.text().catch(() => "");
         errors.push(`Gemini ${resp.status}: ${errBody.slice(0, 100)}`);
@@ -225,7 +229,7 @@ async function callLLM(prompt: string): Promise<{ content: string; model: string
         const data = await resp.json();
         if (data.stop_reason === "max_tokens") throw new Error("Anthropic output truncated");
         const content = data.content?.[0]?.text || "";
-        if (content) return { content, model: data.model || "claude-3-5-haiku-latest" };
+        if (content) return { content, model: data.model || "claude-3-5-haiku-latest", usage: { input_tokens: data.usage?.input_tokens ?? null, output_tokens: data.usage?.output_tokens ?? null } };
       } else {
         const errBody = await resp.text().catch(() => "");
         errors.push(`Anthropic ${resp.status}: ${errBody.slice(0, 100)}`);
@@ -398,6 +402,42 @@ Deno.serve(async (req) => {
       const input = await loadDescriptionInput(supabase, vehicle);
       return new Response(JSON.stringify({ success: true, mode, vehicle_id: vehicleId,
         ...descriptionPreview(input), model_calls: 0, writes: 0 }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
+
+    // Service-only: one model reading of one stored BaT description capture, returned with each
+    // proposal's verdict against the exact stored text. Writes nothing; admission is a separate decision.
+    if (mode === "reported_work_preview") {
+      const writer = await authenticateWriter(req);
+      if (!writer.ok || writer.caller.kind !== "service_role") {
+        return new Response(JSON.stringify({ error: "Reported-work preview requires service role" }),
+          { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      }
+      const sourceId = body.source_observation_id;
+      if (typeof sourceId !== "string" || !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(sourceId)) {
+        throw new Error("Reported-work preview requires one source_observation_id");
+      }
+      const { data: source, error: sourceError } = await supabase.from("vehicle_observations")
+        .select("id,vehicle_id,kind,extraction_method,source_url,content_text,is_superseded,structured_data")
+        .eq("id", sourceId).maybeSingle();
+      if (sourceError) throw new Error("Reported-work source lookup failed");
+      const capturedAt = source?.structured_data?.source_captured_at;
+      if (!source || source.kind !== "listing" || source.extraction_method !== "html_description_capture" || source.is_superseded !== false ||
+          !/^https:\/\/bringatrailer[.]com\/listing\/[^/?#]+\/?$/.test(source.source_url ?? "") ||
+          typeof source.content_text !== "string" || source.content_text.length < 100 || source.content_text.length > 32_000 ||
+          typeof capturedAt !== "string" || !/^[0-9]{4}-[0-9]{2}/.test(capturedAt)) {
+        return new Response(JSON.stringify({ success: false, refused: "source_not_a_current_bat_description_capture", model_calls: 0, writes: 0 }),
+          { status: 422, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      }
+      await requirePublicParent(supabase, source.vehicle_id);
+      const { data: vehicle } = await supabase.from("vehicles").select("year,make,model").eq("id", source.vehicle_id).maybeSingle();
+      const { content, model, usage } = await callLLM(reportedWorkPrompt(source.content_text, vehicle ?? {}));
+      const proposals = parseProposalArray(content);
+      const verdicts = (proposals ?? []).slice(0, 20).map((proposal) => verifyReportedWorkProposal(proposal, source.content_text, capturedAt.slice(0, 7)));
+      return new Response(JSON.stringify({ success: proposals !== null, mode, source_observation_id: source.id, vehicle_id: source.vehicle_id,
+        model, prompt_version: REPORTED_WORK_PROPOSAL_PROMPT_VERSION, usage: usage ?? null, parse_failed: proposals === null,
+        proposals: proposals?.length ?? 0, kept: verdicts.filter((v) => v.kept), refused: verdicts.filter((v) => !v.kept).map((v) => (v as { reason: string }).reason),
+        model_calls: 1, writes: 0 }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 

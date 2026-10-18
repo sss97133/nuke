@@ -71,6 +71,7 @@ const sources = new Map([
   ['retainedDescriptionIdentity',compile('../supabase/functions/ingest-observation/retainedDescriptionIdentity.ts')],
   ['retainedPowertrain',compile('../supabase/functions/ingest-observation/retainedPowertrain.ts')],
   ['retainedDescriptionPowertrain',compile('../supabase/functions/ingest-observation/retainedDescriptionPowertrain.ts')],
+  ['retainedReportedWork',compile('../supabase/functions/ingest-observation/retainedReportedWork.ts')],
   ['retainedOdometer',compile('../supabase/functions/ingest-observation/retainedOdometer.ts')],
   ['retainedListingIdentity',compile('../supabase/functions/ingest-observation/retainedListingIdentity.ts')],
   ['retainedDescriptionPresentation',compile('../supabase/functions/ingest-observation/retainedDescriptionPresentation.ts')],
@@ -78,6 +79,8 @@ const sources = new Map([
   ['retainedVin',compile('../supabase/functions/ingest-observation/retainedVinReference.ts')],
   ['retainedVinBatch',compile('../supabase/functions/ingest-observation/retainedVinBatch.ts')],
   ['retainedListingDrain',compile('../supabase/functions/ingest-observation/retainedListingDrain.ts')],
+  ['titleFacets',compile('../supabase/functions/ingest-observation/titleFacets.ts')],
+  ['vehicleFacets',compile('../supabase/functions/_shared/vehicleFacets.ts')],
   ['hash',compile('../supabase/functions/_shared/observationContentHash.ts')],
   ['proxy',compile('../supabase/functions/ingest-observation-batch/index.ts')],
   ['cached',compile('../supabase/functions/ingest-observation-batch/cachedProperties.ts')],
@@ -268,12 +271,15 @@ function fixture(options = {}) {
         if(specifier==='./retainedDescriptionIdentity.ts')return load('retainedDescriptionIdentity');
         if(specifier==='./retainedPowertrain.ts')return load('retainedPowertrain');
         if(specifier==='./retainedDescriptionPowertrain.ts')return load('retainedDescriptionPowertrain');
+        if(specifier==='./retainedReportedWork.ts')return load('retainedReportedWork');
         if(specifier==='./retainedOdometer.ts')return load('retainedOdometer');
         if(specifier==='./retainedListingIdentity.ts')return load('retainedListingIdentity');
         if(specifier==='./retainedDescriptionPresentation.ts')return load('retainedDescriptionPresentation');
         if(specifier==='./retainedVinReference.ts')return load('retainedVin');
         if(specifier==='./retainedVinBatch.ts')return load('retainedVinBatch');
         if(specifier==='./retainedListingDrain.ts')return load('retainedListingDrain');
+        if(specifier==='./titleFacets.ts')return load('titleFacets');
+        if(specifier==='../_shared/vehicleFacets.ts')return load('vehicleFacets');
         if(specifier==='./retainedIdentity.ts')return load('retainedIdentity');
         if(specifier==='./historicalAsks.ts')return load('historicalAsks');
         if(specifier==='./historicalAskIntake.ts')return load('historicalAskIntake');

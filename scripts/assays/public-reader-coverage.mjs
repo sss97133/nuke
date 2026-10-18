@@ -1135,7 +1135,9 @@ const REPORT_KEYS = ['confidence_score', 'date_precision', 'independent_source',
 // Fixed uncertainty: a report is a publisher assertion, never confirmed work, a performer or corroboration.
 const REPORT_FIXED = Object.freeze({ kind: 'activity', report_status: 'publisher_reported_completion', occurrence_status: 'unverified',
   performer_id: null, performer_status: 'unknown', independent_source: false, intent_status: 'unknown',
-  observed_at_basis: 'source_testimony_recorded_at', date_precision: 'month', source_witness_version: 'retained_description_reported_work_v1' });
+  observed_at_basis: 'source_testimony_recorded_at', date_precision: 'month' });
+// v2 witnesses one whole passive sentence, so its performed clause is the source sentence itself.
+const REPORT_WITNESS_VERSIONS = Object.freeze({ retained_description_reported_work_v1: 'prefix', retained_description_reported_work_v2: 'sentence' });
 const MONTH_NAMES = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
 
 /** The opt-in reader envelope and each report's own contract; no source text is retained. */
@@ -1155,6 +1157,8 @@ export function inspectReportedWork(value) {
     ids.add(r.observation_id);
     const before = Object.values(result.failures).reduce((a, b) => a + b, 0);
     for (const [key, expected] of Object.entries(REPORT_FIXED)) if (r[key] !== expected) fail(`reported_work_${key}_invalid`);
+    const witness = Object.hasOwn(REPORT_WITNESS_VERSIONS, r.source_witness_version) ? REPORT_WITNESS_VERSIONS[r.source_witness_version] : null;
+    if (!witness) fail('reported_work_source_witness_version_invalid');
     const text = x => typeof x === 'string' && x.trim() === x && x.length > 0 && Buffer.byteLength(x) <= 300;
     let url = null; try { url = new URL(r.source_url); } catch {}
     if (url?.protocol !== 'https:' || url.href !== r.source_url) fail('reported_work_source_url_invalid');
@@ -1166,6 +1170,7 @@ export function inspectReportedWork(value) {
     else {
       if (/\b(?:recommend\w*|need\w*|require\w*)\b/i.test(r.performed_clause)) fail('reported_work_recommendation_in_performed_clause');
       if (r.source_value !== r.performed_clause && !r.source_value.startsWith(`${r.performed_clause}, `)) fail('reported_work_clause_not_source_prefix');
+      else if (witness === 'sentence' && r.source_value !== r.performed_clause) fail('reported_work_v2_clause_not_whole_sentence');
     }
     const m = typeof r.reported_date === 'string' ? /^(\d{4})-(0[1-9]|1[0-2])$/.exec(r.reported_date) : null;
     if (!m) fail('reported_work_month_invalid');

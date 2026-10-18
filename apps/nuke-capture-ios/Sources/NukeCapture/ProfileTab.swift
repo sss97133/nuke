@@ -1650,7 +1650,8 @@ private struct PhotoFullScreenView: View {
 // events, contractor work) and halving every 6 h. A membership is not a status: "active" was hard-coded on every row
 // (owner, 2026-10-15). Only live and stalling relations show, the warmest first: "only show active orgs. its
 // annoying that evening side projects surface to top billing" (owner, 2026-10-15). Each row opens the organization
-// inside the app. Renders nothing when no relation is active.
+// inside the app. When no relation is live or stalling, the dormant ones with a last contribution show in the server's
+// order (most recent first), so a day off does not empty the section; it renders nothing only when none has one.
 struct OrgAffiliationsSection: View {
     let rows: [Row]
     let failureText: String?
@@ -1717,6 +1718,8 @@ struct OrgAffiliationsSection: View {
         let payload: Payload = try await SupabaseService.client
             .rpc("user_org_relations", params: ["p_user_id": userId])
             .execute().value
-        return payload.relations.filter { $0.relation.state == "live" || $0.relation.state == "stalling" }
+        let warm = payload.relations.filter { $0.relation.state == "live" || $0.relation.state == "stalling" }
+        if !warm.isEmpty { return warm }
+        return payload.relations.filter { $0.relation.last_contribution_at != nil }
     }
 }

@@ -12,6 +12,7 @@
 import { normalizeListingUrlKey } from '../_shared/listingUrl.ts';
 import { discoveryUrlIlikePattern } from '../_shared/resolveVehicleForListing.ts';
 import { normalizeVehicleFields } from '../_shared/normalizeVehicle.ts';
+import { extractVehicleFacets } from '../_shared/vehicleFacets.ts';
 import { getKnownAuctions } from './knownAuctions.ts';
 import { classifyLot, type LotSkipReason } from './lotKind.ts';
 import { lotStatus } from './lotStatus.ts';
@@ -39,6 +40,9 @@ export interface ExtractedVehicle {
   year: number | null;
   make: string | null;
   model: string | null;
+  series?: string | null;
+  trim?: string | null;
+  body_style?: string | null;
   lot_number: string;
   auction_name: string;
   auction_code: string;
@@ -89,6 +93,28 @@ export async function saveVehicle(
   const status = lotStatus({ sold: vehicle.sold, auctioned: vehicle.auctioned, is_still_for_sale: vehicle.is_still_for_sale });
   const listingUrlKey = normalizeListingUrlKey(vehicle.url);
 
+  // Extract deterministic collector facets (series, trim, body_style) from title, model, and URL slug
+  const facets = extractVehicleFacets({
+    year: vehicle.year,
+    make: vehicle.make,
+    model: vehicle.model,
+    title: vehicle.title,
+    url: vehicle.url,
+    seriesHint: vehicle.series ?? null,
+    trimHint: vehicle.trim ?? null,
+    bodyStyleHint: vehicle.body_style ?? null,
+  });
+  const normalizedFacets = normalizeVehicleFields({
+    make: vehicle.make,
+    model: vehicle.model,
+    year: vehicle.year,
+    body_style: vehicle.body_style ?? facets.body_style_facet,
+    drivetrain: facets.drivetrain_hint,
+  });
+  const resolvedSeries = vehicle.series ?? facets.series_code ?? null;
+  const resolvedTrim = vehicle.trim ?? facets.trim_package ?? null;
+  const resolvedBodyStyle = normalizedFacets.body_style ?? vehicle.body_style ?? facets.body_style_facet ?? null;
+
   // Resolve existing vehicle (listing key, discovery_url exact, or URL pattern) to avoid duplicate
   let { vehicleId: resolvedId } = await deps.resolveExisting(supabase, {
     url: vehicle.url,
@@ -117,7 +143,11 @@ export async function saveVehicle(
     // Identity guard: a URL or listing-key match is not proof it is the same car. A lot whose VIN or make differs, whose
     // year is more than 1 apart, or whose model shares no word with the resolved vehicle is refused and raised as a
     // revision item (identity_match / different_car / relink); nothing is written to that vehicle.
-    const { data: idRow } = await supabase.from('vehicles').select('year,make,model,vin').eq('id', resolvedId).maybeSingle();
+    const { data: idRow } = await supabase
+      .from('vehicles')
+      .select('year,make,model,vin,series,trim,body_style,primary_image_url')
+      .eq('id', resolvedId)
+      .maybeSingle();
     const conflict = idRow ? identityConflict(idRow, { year: vehicle.year, make: vehicle.make, model: vehicle.model }) : null;
     if (conflict) {
       try {
@@ -132,14 +162,20 @@ export async function saveVehicle(
       return { skipped: 'different_car', vehicleId: resolvedId, detail: conflict };
     }
 
+    const updatePayload: Record<string, unknown> = {
+      sale_price: vehicle.sold_price,
+      sale_status: status.sale_status,
+      status: 'active',
+      updated_at: new Date().toISOString(),
+    };
+    if (resolvedSeries && !idRow?.series) updatePayload.series = resolvedSeries;
+    if (resolvedTrim && !idRow?.trim) updatePayload.trim = resolvedTrim;
+    if (resolvedBodyStyle && !idRow?.body_style) updatePayload.body_style = resolvedBodyStyle;
+    if (vehicle.image_url && !idRow?.primary_image_url) updatePayload.primary_image_url = vehicle.image_url;
+
     mustWrite('vehicles update', await supabase
       .from('vehicles')
-      .update({
-        sale_price: vehicle.sold_price,
-        sale_status: status.sale_status,
-        status: 'active',
-        updated_at: new Date().toISOString(),
-      })
+      .update(updatePayload)
       .eq('id', resolvedId));
 
     // Fire-and-forget observation write
@@ -147,6 +183,9 @@ export async function saveVehicle(
     if (vehicle.year) obsFields.year = vehicle.year;
     if (vehicle.make) obsFields.make = vehicle.make;
     if (vehicle.model) obsFields.model = vehicle.model;
+    if (resolvedSeries) obsFields.series = resolvedSeries;
+    if (resolvedTrim) obsFields.trim = resolvedTrim;
+    if (resolvedBodyStyle) obsFields.body_style = resolvedBodyStyle;
     if (vehicle.sold_price) obsFields.sale_price = vehicle.sold_price;
     deps.writeObservation(supabase, {
       vehicleId: resolvedId,
@@ -161,7 +200,7 @@ export async function saveVehicle(
     isNew = false;
   } else {
     // Normalize before insert
-    const normalized = normalizeVehicleFields({ make: vehicle.make, model: vehicle.model, year: vehicle.year });
+    const normalized = normalizedFacets;
 
     // Create new vehicle
     const { data: newVehicle, error: vehicleError } = await supabase
@@ -170,6 +209,9 @@ export async function saveVehicle(
         year: normalized.year ?? vehicle.year,
         make: normalized.make ?? vehicle.make,
         model: normalized.model ?? vehicle.model,
+        ...(resolvedSeries ? { series: resolvedSeries } : {}),
+        ...(resolvedTrim ? { trim: resolvedTrim } : {}),
+        ...(resolvedBodyStyle ? { body_style: resolvedBodyStyle } : {}),
         sale_price: vehicle.sold_price,
         sale_status: status.sale_status,
         listing_url: vehicle.url,
@@ -191,6 +233,9 @@ export async function saveVehicle(
           rms_lot_id: vehicle.rms_lot_id,
           rms_auction_id: vehicle.rms_auction_id,
           bidding_type: vehicle.bidding_type,
+          ...(resolvedSeries ? { series: resolvedSeries } : {}),
+          ...(resolvedTrim ? { trim: resolvedTrim } : {}),
+          ...(resolvedBodyStyle ? { body_style: resolvedBodyStyle } : {}),
           imported_at: new Date().toISOString(),
         },
       })
@@ -210,6 +255,9 @@ export async function saveVehicle(
       if (vehicle.year) obsFields.year = vehicle.year;
       if (vehicle.make) obsFields.make = vehicle.make;
       if (vehicle.model) obsFields.model = vehicle.model;
+      if (resolvedSeries) obsFields.series = resolvedSeries;
+      if (resolvedTrim) obsFields.trim = resolvedTrim;
+      if (resolvedBodyStyle) obsFields.body_style = resolvedBodyStyle;
       if (vehicle.sold_price) obsFields.sale_price = vehicle.sold_price;
       if (vehicle.lot_number) obsFields.lot_number = vehicle.lot_number;
       deps.writeObservation(supabase, {
@@ -274,6 +322,9 @@ export async function saveVehicle(
         auction_session_days: calendar.auction_session_days,
         sale_location: calendar.sale_location,
       } : {}),
+      ...(resolvedSeries ? { series: resolvedSeries } : {}),
+      ...(resolvedTrim ? { trim: resolvedTrim } : {}),
+      ...(resolvedBodyStyle ? { body_style: resolvedBodyStyle } : {}),
       currency: vehicle.currency,
       collection: vehicle.collection,
       bidding_type: vehicle.bidding_type,

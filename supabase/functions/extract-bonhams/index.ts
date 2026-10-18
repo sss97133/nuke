@@ -33,6 +33,8 @@ import { mustWrite, softWrite } from "../_shared/writeResult.ts";
 import { type LotPage, parseLotPage } from "./lotPage.ts";
 import { requireWriteAuth } from "../_shared/writeGuard.ts";
 import { projectSecretKey } from "../_shared/supabaseKeys.ts";
+import { extractGeneralBodyStyle, extractVehicleFacets } from "../_shared/vehicleFacets.ts";
+import { normalizeVehicleFields } from "../_shared/normalizeVehicle.ts";
 
 const EXTRACTOR_VERSION = "bonhams-v3";
 
@@ -109,16 +111,19 @@ function extractJsonLd(html: string): JsonLdProduct | null {
 
 // ─── Title/Name Parsing ─────────────────────────────────────────────────────
 
-interface ParsedTitle {
+export interface ParsedTitle {
   year: number | null;
   make: string | null;
   model: string | null;
+  series: string | null;
+  trim: string | null;
+  body_style: string | null;
   vin: string | null;
   chassis: string | null;
   cleanTitle: string;
 }
 
-function parseBonhamsName(name: string): ParsedTitle {
+export function parseBonhamsName(name: string): ParsedTitle {
   let cleanTitle = name.trim();
   let vin: string | null = null;
   let chassis: string | null = null;
@@ -208,7 +213,24 @@ function parseBonhamsName(name: string): ParsedTitle {
     if (!model) model = null;
   }
 
-  return { year, make, model, vin, chassis, cleanTitle };
+  const facets = extractVehicleFacets({
+    year,
+    make,
+    model,
+    title: cleanTitle,
+  });
+
+  return {
+    year,
+    make,
+    model,
+    series: facets.series_code,
+    trim: facets.trim_package,
+    body_style: facets.body_style_facet,
+    vin,
+    chassis,
+    cleanTitle,
+  };
 }
 
 // ─── Price Helpers ──────────────────────────────────────────────────────────
@@ -224,7 +246,7 @@ function extractCurrency(raw: string | null): string | null {
 
 // ─── Spec Extraction from Markdown/HTML ─────────────────────────────────────
 
-function extractSpecsFromContent(text: string): {
+export function extractSpecsFromContent(text: string): {
   mileage: number | null;
   engine: string | null;
   transmission: string | null;
@@ -316,27 +338,25 @@ function extractSpecsFromContent(text: string): {
     }
   }
 
-  // Body style from title/description
-  const lowerText = text.toLowerCase();
-  if (lowerText.includes("coup\u00E9") || lowerText.includes("coupe")) body_style = "Coupe";
-  else if (lowerText.includes("convertible") || lowerText.includes("cabriolet") || lowerText.includes("roadster") || lowerText.includes("spider") || lowerText.includes("spyder")) body_style = "Convertible";
-  else if (lowerText.includes("sedan") || lowerText.includes("saloon")) body_style = "Sedan";
-  else if (lowerText.includes("wagon") || lowerText.includes("estate") || lowerText.includes("shooting brake")) body_style = "Wagon";
-  else if (lowerText.includes("pickup") || lowerText.includes("truck")) body_style = "Truck";
-  else if (lowerText.includes("limousine")) body_style = "Limousine";
-  else if (lowerText.includes("targa")) body_style = "Targa";
-  else if (lowerText.includes("berlinetta") || lowerText.includes("fastback")) body_style = "Fastback";
+  // Body style from title/description using shared collector body-style rules
+  // (checks "Drophead Coupé" / "Shooting Brake" / "Fixed-Head Coupé" before generic "Coupe")
+  body_style = extractGeneralBodyStyle(text);
 
   return { mileage, engine, transmission, exterior_color, interior_color, body_style };
 }
 
 // ─── Image Extraction ───────────────────────────────────────────────────────
 
+function isBonhamsJunkImageUrl(url: string): boolean {
+  return /web-assets|\/flags\/|width%3D230|width%3D650|[?&]w=(?:16|24|32|48|64)\b|\.svg(?:[?#]|$)/i.test(url);
+}
+
 function extractImages(html: string, markdown: string | null): string[] {
   const images: string[] = [];
   const seen = new Set<string>();
 
   function addImage(url: string) {
+    if (isBonhamsJunkImageUrl(url)) return;
     // Clean URL: remove resize params for full resolution
     let clean = url
       .replace(/[?&]width=\d+/gi, "")
@@ -521,12 +541,14 @@ function extractVinFromText(text: string): { vin: string | null; chassis: string
 
 // ─── Main extraction function ───────────────────────────────────────────────
 
-interface ExtractionResult {
+export interface ExtractionResult {
   url: string;
   title: string | null;
   year: number | null;
   make: string | null;
   model: string | null;
+  series?: string | null;
+  trim?: string | null;
   vin: string | null;
   chassis_number: string | null;
   mileage: number | null;
@@ -737,6 +759,19 @@ async function extractBonhamsLot(url: string): Promise<ExtractionResult> {
     if (titleSpecs.body_style) specs.body_style = titleSpecs.body_style;
   }
 
+  // Deterministic collector facets (series, trim, body_style)
+  const facets = extractVehicleFacets({
+    year: titleData.year,
+    make: titleData.make,
+    model: titleData.model,
+    title: titleData.cleanTitle || nameStr || null,
+    url,
+    description,
+    seriesHint: titleData.series,
+    trimHint: titleData.trim,
+    bodyStyleHint: titleData.body_style ?? specs.body_style,
+  });
+
   // 5. Extract VIN/chassis from full text (supplement what's in the title)
   const textVin = extractVinFromText(markdown || stripHtmlTags(html.slice(0, 50000)));
   const vin = titleData.vin || textVin.vin;
@@ -758,6 +793,8 @@ async function extractBonhamsLot(url: string): Promise<ExtractionResult> {
     year: titleData.year,
     make: titleData.make,
     model: titleData.model,
+    series: facets.series_code,
+    trim: facets.trim_package,
     vin,
     chassis_number: chassis,
     mileage: specs.mileage,
@@ -765,7 +802,7 @@ async function extractBonhamsLot(url: string): Promise<ExtractionResult> {
     transmission: specs.transmission,
     exterior_color: specs.exterior_color,
     interior_color: specs.interior_color,
-    body_style: specs.body_style,
+    body_style: facets.body_style_facet ?? specs.body_style,
     description,
     sale_price: auctionMeta.total_price,
     price_currency: auctionMeta.price_currency,
@@ -790,7 +827,7 @@ async function extractBonhamsLot(url: string): Promise<ExtractionResult> {
 
 function emptyResult(url: string, source: string, costCents: number): ExtractionResult {
   return {
-    url, title: null, year: null, make: null, model: null, vin: null,
+    url, title: null, year: null, make: null, model: null, series: null, trim: null, vin: null,
     chassis_number: null, mileage: null, engine: null, transmission: null,
     exterior_color: null, interior_color: null, body_style: null,
     description: null, sale_price: null, price_currency: null,
@@ -802,11 +839,36 @@ function emptyResult(url: string, source: string, costCents: number): Extraction
 
 // ─── Build vehicle record (maps extraction to vehicles table columns) ───────
 
-function buildVehicleRecord(extracted: ExtractionResult): Record<string, any> {
+export function buildVehicleRecord(extracted: ExtractionResult): Record<string, any> {
+  const primaryImageUrl = extracted.image_urls.find((u) => u && !isBonhamsJunkImageUrl(u)) || null;
+  const facets = extractVehicleFacets({
+    year: extracted.year,
+    make: extracted.make,
+    model: extracted.model,
+    title: extracted.title,
+    url: extracted.url,
+    description: extracted.description,
+    seriesHint: extracted.series ?? null,
+    trimHint: extracted.trim ?? null,
+    bodyStyleHint: extracted.body_style ?? null,
+  });
+  const normalized = normalizeVehicleFields({
+    year: extracted.year,
+    make: extracted.make,
+    model: extracted.model,
+    body_style: extracted.body_style ?? facets.body_style_facet,
+  });
+  const resolvedSeries = extracted.series ?? facets.series_code ?? null;
+  const resolvedTrim = extracted.trim ?? facets.trim_package ?? null;
+  const resolvedBodyStyle = normalized.body_style ?? extracted.body_style ?? facets.body_style_facet ?? null;
+
   return {
     year: extracted.year,
     make: extracted.make?.toLowerCase() || null,
     model: extracted.model?.toLowerCase() || null,
+    series: resolvedSeries,
+    trim: resolvedTrim,
+    ...(primaryImageUrl ? { primary_image_url: primaryImageUrl } : {}),
     // Store chassis in VIN field for vintage vehicles if no modern VIN
     vin: extracted.vin
       ? extracted.vin.toUpperCase()
@@ -816,7 +878,7 @@ function buildVehicleRecord(extracted: ExtractionResult): Record<string, any> {
     interior_color: extracted.interior_color,
     transmission: extracted.transmission,
     engine_type: extracted.engine,
-    body_style: extracted.body_style,
+    body_style: resolvedBodyStyle,
     description: extracted.description,
     sale_price: extracted.sale_price,
     sale_date: extracted.sale_date,
@@ -847,6 +909,9 @@ function buildVehicleRecord(extracted: ExtractionResult): Record<string, any> {
       estimate_high: extracted.estimate_high,
       estimate_currency: extracted.estimate_currency,
       price_currency: extracted.price_currency,
+      ...(resolvedSeries ? { series: resolvedSeries } : {}),
+      ...(resolvedTrim ? { trim: resolvedTrim } : {}),
+      ...(resolvedBodyStyle ? { body_style: resolvedBodyStyle } : {}),
       imported_at: new Date().toISOString(),
     },
   };
@@ -863,6 +928,9 @@ interface CatalogLot {
   year: number | null;
   make: string | null;
   model: string | null;
+  series: string | null;
+  trim: string | null;
+  body_style: string | null;
   vin: string | null;
   availability: string | null;
 }
@@ -944,6 +1012,9 @@ async function extractCatalog(catalogUrl: string): Promise<{
       year: parsed.year,
       make: parsed.make,
       model: parsed.model,
+      series: parsed.series,
+      trim: parsed.trim,
+      body_style: parsed.body_style,
       vin: parsed.vin,
       availability,
     });
@@ -975,13 +1046,33 @@ async function addVehicleImages(
   images: Array<{ url: string; primary?: boolean }>,
   context: { source_url: string; lot_number?: string | null },
 ): Promise<number> {
-  if (images.length === 0) return 0;
+  const validImages = images.filter((img) => img.url && !isBonhamsJunkImageUrl(img.url));
+  if (validImages.length === 0) return 0;
   const { data: have, error: readErr } = await supabase
-    .from("vehicle_images").select("image_url, is_primary").eq("vehicle_id", vehicleId).limit(500);
+    .from("vehicle_images").select("id, image_url, is_primary, is_superseded").eq("vehicle_id", vehicleId).limit(500);
   if (readErr) throw new Error(`images read: ${readErr.message}`);
+  const junkIds = (have ?? [])
+    .filter((r: { image_url: string; is_superseded?: boolean | null; is_primary?: boolean | null }) =>
+      isBonhamsJunkImageUrl(r.image_url) && (!r.is_superseded || r.is_primary))
+    .map((r: { id: string }) => r.id);
+  if (junkIds.length > 0) {
+    softWrite("vehicle_images supersede junk", await supabase
+      .from("vehicle_images")
+      .update({ is_superseded: true, is_primary: false, superseded_at: new Date().toISOString() })
+      .in("id", junkIds));
+  }
   const urls = new Set((have ?? []).map((r: { image_url: string }) => r.image_url));
-  let hasPrimary = (have ?? []).some((r: { is_primary: boolean | null }) => r.is_primary === true);
-  const fresh = images.slice(0, 100).filter((img) => !urls.has(img.url));
+  let hasPrimary = (have ?? []).some(
+    (r: { image_url: string; is_primary: boolean | null }) => r.is_primary === true && !isBonhamsJunkImageUrl(r.image_url),
+  );
+  const fresh = validImages.slice(0, 100).filter((img) => !urls.has(img.url));
+  const heroUrl = validImages.find((img) => img.primary)?.url || validImages[0]?.url || null;
+  if (heroUrl) {
+    const { data: vRow } = await supabase.from("vehicles").select("primary_image_url").eq("id", vehicleId).maybeSingle();
+    if (!vRow?.primary_image_url || isBonhamsJunkImageUrl(vRow.primary_image_url)) {
+      softWrite("vehicles primary_image_url", await supabase.from("vehicles").update({ primary_image_url: heroUrl }).eq("id", vehicleId));
+    }
+  }
   if (fresh.length === 0) return 0;
   const rows = fresh.map((img, i) => {
     const primary = !hasPrimary && (img.primary || i === 0);
@@ -998,7 +1089,7 @@ async function addVehicleImages(
   return rows.length;
 }
 
-/** Write what one lot page holds: gallery, observation (full text + raw data), description lengthened, episode metadata. */
+/** Write what one lot page holds: gallery, observation (full text + raw data), description lengthened, facets gap-filled, episode metadata. */
 async function landLotPage(
   supabase: ReturnType<typeof createClient>,
   ev: { vehicle_id: string; source_url: string; source_listing_id: string },
@@ -1008,10 +1099,28 @@ async function landLotPage(
   let imagesWritten = 0;
   imagesWritten += await addVehicleImages(supabase, ev.vehicle_id, page.images, { source_url: ev.source_url });
   const fullText = [page.catalog_text, page.footnotes].filter(Boolean).join("\n\n").slice(0, 30000);
+  const rawLotTitle = typeof (page.raw?.lot as any)?.sDesc === "string" ? String((page.raw?.lot as any).sDesc) : "";
+  const parsedPageTitle = rawLotTitle ? parseBonhamsName(rawLotTitle) : null;
+  const pageFacets = extractVehicleFacets({
+    year: parsedPageTitle?.year ?? null,
+    make: parsedPageTitle?.make ?? null,
+    model: parsedPageTitle?.model ?? null,
+    title: parsedPageTitle?.cleanTitle || rawLotTitle || null,
+    url: ev.source_url,
+    description: page.catalog_text,
+    seriesHint: parsedPageTitle?.series ?? null,
+    trimHint: parsedPageTitle?.trim ?? null,
+    bodyStyleHint: parsedPageTitle?.body_style ?? null,
+  });
+  const obsFields: Record<string, unknown> = page.hammer_price ? { sale_price: page.hammer_price } : { lot_page: "read" };
+  if (pageFacets.series_code) obsFields.series = pageFacets.series_code;
+  if (pageFacets.trim_package) obsFields.trim = pageFacets.trim_package;
+  if (pageFacets.body_style_facet) obsFields.body_style = pageFacets.body_style_facet;
+
   await writeObservation(supabase, {
     vehicleId: ev.vehicle_id,
     source: { platform: "bonhams", url: ev.source_url, trustScore: 0.9, sourceIdentifier: ev.source_listing_id },
-    fields: page.hammer_price ? { sale_price: page.hammer_price } : { lot_page: "read" },
+    fields: obsFields,
     observationKind: page.hammer_price ? "sale_result" : "listing",
     extractionMethod: "lot_page_next_data",
     observedAt,
@@ -1019,11 +1128,18 @@ async function landLotPage(
     rawData: page.raw,
   }).then((r) => { if (r.errors.length) throw new Error(`observation: ${r.errors.join("; ").slice(0, 160)}`); });
   // The index landed the description cut at 8,000 characters; the page's text is whole. Never shortened.
-  if (fullText) {
-    const { data: cur } = await supabase.from("vehicles").select("description").eq("id", ev.vehicle_id).maybeSingle();
-    if (cur && fullText.length > (cur.description?.length ?? 0)) {
-      const { error: dErr } = await supabase.from("vehicles").update({ description: fullText }).eq("id", ev.vehicle_id);
-      if (dErr) throw new Error(`description: ${dErr.message}`);
+  if (fullText || pageFacets.series_code || pageFacets.trim_package || pageFacets.body_style_facet) {
+    const { data: cur } = await supabase.from("vehicles").select("description, series, trim, body_style").eq("id", ev.vehicle_id).maybeSingle();
+    if (cur) {
+      const vUpdate: Record<string, unknown> = {};
+      if (fullText && fullText.length > (cur.description?.length ?? 0)) vUpdate.description = fullText;
+      if (pageFacets.series_code && !cur.series) vUpdate.series = pageFacets.series_code;
+      if (pageFacets.trim_package && !cur.trim) vUpdate.trim = pageFacets.trim_package;
+      if (pageFacets.body_style_facet && !cur.body_style) vUpdate.body_style = pageFacets.body_style_facet;
+      if (Object.keys(vUpdate).length > 0) {
+        const { error: dErr } = await supabase.from("vehicles").update(vUpdate).eq("id", ev.vehicle_id);
+        if (dErr) throw new Error(`description: ${dErr.message}`);
+      }
     }
   }
   const w = await writeVehicleEventByKey(supabase, {
@@ -1254,6 +1370,9 @@ async function saveVehicle(
         hammer_premium: extracted.hammer_premium ?? null,
         ...(extracted.ts_page ? { ts_page: extracted.ts_page } : {}),
         ...(extracted.extra_metadata ?? {}),
+        ...(vehicleData.series ? { series: vehicleData.series } : {}),
+        ...(vehicleData.trim ? { trim: vehicleData.trim } : {}),
+        ...(vehicleData.body_style ? { body_style: vehicleData.body_style } : {}),
         chassis_number: extracted.chassis_number,
         quality_score: gateResult.score,
       },
@@ -1269,7 +1388,7 @@ async function saveVehicle(
 
 // ─── HTTP Handler ───────────────────────────────────────────────────────────
 
-Deno.serve(async (req) => {
+if (import.meta.main) Deno.serve(async (req) => {
   // Writes are never anonymous: service key, signed-in user, or nothing (P0.2, 2026-09-27).
   const denied = await requireWriteAuth(req);
   if (denied) return denied;
@@ -1609,6 +1728,9 @@ Deno.serve(async (req) => {
               year: lot.year,
               make: lot.make?.toLowerCase() || null,
               model: lot.model?.toLowerCase() || null,
+              series: lot.series || null,
+              trim: lot.trim || null,
+              body_style: lot.body_style || null,
               vin: lot.vin?.toUpperCase() || null,
               sale_price: lot.price,
               listing_url: lot.url,

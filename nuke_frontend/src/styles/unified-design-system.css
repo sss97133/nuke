@@ -201,6 +201,7 @@
   --surface-raised: var(--surface);
   --accent-light: var(--accent-dim);
   --black: #000000;
+  --on-dark-overlay: #ffffff;
 
   /* ── gray-* aliases (American spelling → British grey-*) ───────── */
   --gray-50: #fafafa;
@@ -283,16 +284,17 @@
   --surface-glass: rgba(37, 37, 38, 0.92);
 
   --border: #3e3e42;
-  --border-focus: #cccccc;
+  --border-focus: #ebebeb;
 
-  --text: #cccccc;
-  --text-secondary: #858585;
-  --text-disabled: #656565;
+  --text: #ebebeb;
+  --text-secondary: #a8a8a8;
+  --text-disabled: #767676;
+  --on-dark-overlay: #f5f5f5;
 
-  --accent: #cccccc;
-  --accent-dim: rgba(204, 204, 204, 0.12);
+  --accent: #ebebeb;
+  --accent-dim: rgba(235, 235, 235, 0.12);
   --accent-bright: #ffffff;
-  --accent-alt: #cccccc;
+  --accent-alt: #ebebeb;
 
   /* Heatmap tokens (muted for dark mode) */
   --heat-0: #2d2d30;
@@ -374,6 +376,7 @@
   --surface-raised: var(--surface);
   --accent-light: var(--accent-dim);
   --black: #000000;
+  --on-dark-overlay: #ffffff;
 
   /* ── gray-* aliases (American spelling → dark mode remaps) ─────── */
   --gray-50: var(--bg);
@@ -509,6 +512,13 @@
   --accent: #2a2a2a;
   --accent-alt: #2a2a2a;
   --accent-dim: rgba(42, 42, 42, 0.08);
+  --border-focus: var(--accent);
+}
+
+:root[data-theme="dark"][data-accent="neutral"] {
+  --accent: #ebebeb;
+  --accent-alt: #ebebeb;
+  --accent-dim: rgba(235, 235, 235, 0.12);
   --border-focus: var(--accent);
 }
 

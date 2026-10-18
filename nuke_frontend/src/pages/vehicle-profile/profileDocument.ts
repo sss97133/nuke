@@ -22,7 +22,11 @@ export type ProfileDescription = {
   observed_at: string | null;
 };
 /** What vehicle_profile_read returns. */
-export type ProfileRead = Omit<ProfileDocument, 'sections'> & { sections: ReadSection[]; description?: ProfileDescription | null };
+export type ProfileRead = Omit<ProfileDocument, 'sections'> & {
+  sections: ReadSection[];
+  description?: ProfileDescription | null;
+  identity_marks?: Record<string, unknown>[];
+};
 
 const SECTION_KINDS = new Set(['masthead', 'strip', 'measures', 'timeline', 'table', 'gallery']);
 const VIEWERS = new Set(['anon', 'contributor', 'owner']);

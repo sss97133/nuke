@@ -435,7 +435,10 @@ Deno.serve(async (req) => {
         Deno.env.get("SUPABASE_URL") ?? "",
         projectSecretKey() ?? "",
       );
-      const size = Math.min(Number(batch_size) || 100, 100);
+      // The cursor counts pages of 50 lots. A run asked for 100 reads two consecutive pages of 50 (2 s apart), never one page of 100, so the
+      // cursor keeps its meaning and the walk neither skips nor repeats lots.
+      const size = 50;
+      const pagesPerRun = Math.min(Number(batch_size) || 50, 100) > 50 ? 2 : 1;
       // Newest sale first (2026-10-15): the first walk went oldest-first and landed 2003-2014; the calendar and the deep pass want the newest.
       const SORT = "auctionEndDate.timestamp:desc";
 
@@ -497,6 +500,23 @@ Deno.serve(async (req) => {
       const observedAt = new Date().toISOString();
       const lots = data.hits.filter((h) => h.document?.title && h.document.title.length >= 3).map((h) =>
         lotToExtraction(h.document, { observedAt, pageNo, pass, SORT, sortTag: "desc" }));
+      let pagesRead = 1;
+      if (pagesPerRun > 1 && data.hits.length === size && pageNo < totalPages) {
+        await new Promise((r) => setTimeout(r, 2000));
+        const res2 = await fetchPage(pageNo + 1);
+        if (res2.status === 403 || res2.status === 429) {
+          // Keep the first page; the next run starts at the page after it.
+          console.log(`[bonhams-typesense] second page ${pageNo + 1} backed off (${res2.status})`);
+        } else if (res2.ok) {
+          const data2 = await res2.json() as TypesenseResponse;
+          for (const h of data2.hits ?? []) {
+            if (h.document?.title && h.document.title.length >= 3) {
+              lots.push(lotToExtraction(h.document, { observedAt, pageNo: pageNo + 1, pass, SORT, sortTag: "desc" }));
+            }
+          }
+          pagesRead = 2;
+        }
+      }
 
       // Two calls of 50: one 100-lot call hit WORKER_RESOURCE_LIMIT (2026-10-15 01:41Z).
       const landed: Record<string, unknown>[] = [];
@@ -513,8 +533,8 @@ Deno.serve(async (req) => {
 
       // The cursor is metadata.ts_page on each landed vehicle_events row (set by the lander).
       return okJson({
-        success: landOk, mode: "land", page: pageNo, total_pages: totalPages, found: data.found,
-        next_page: pageNo >= totalPages ? 1 : pageNo + 1, lander: landed,
+        success: landOk, mode: "land", page: pageNo, pages_read: pagesRead, total_pages: totalPages, found: data.found,
+        next_page: pageNo + pagesRead > totalPages ? 1 : pageNo + pagesRead, lander: landed,
       });
     }
 

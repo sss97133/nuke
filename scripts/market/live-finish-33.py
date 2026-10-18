@@ -15,7 +15,9 @@ factor families, every factor point-in-time and held by prod as well as the arch
 The 80% range is the analog's 10-90 spread moved by the residual and widened by a conformal correction per horizon x
 no-reserve flag x grade measured on archive lots the learner never saw. The estimate is never below the bid. Each row's
 notes.factors splits the dollar step from the analog read (core.est32) to the estimate among the families, in whole
-dollars that add up (log-mean split; "other" is the learner's move no family accounts for).
+dollars that add up (log-mean split; "other" is the learner's move no family accounts for). The backtest block (the
+measured miss and in-range share per horizon) rides on the first row of each run only; readers take the newest model 33
+row that carries one.
 Confidence: confidence_score is the lower of two measured in-range shares for the lot's horizon and grade, the archive
 hold-out (car lots closed 2026-04..09, fit A) and the fresh window (2026-09-28..10-14, fit B, the fit that serves);
 notes.coverage carries both with their n.
@@ -26,7 +28,8 @@ closed 2026-10-15, features built from prod rows and from the archive gave the s
 
 One hourly run, after model 32 in ag.nuke.market-live-finish (a failure here never stops model 32):
   1. the public live board (market_pulse_live, anon key);
-  2. the due list: each lot's latest row from live_finish_estimates() (anon); a lot is due at first sight on model 33,
+  2. lots prod lists as motorcycles (vehicles.canonical_vehicle_type, anon) are skipped; then the due list: each lot's
+     latest row from live_finish_estimates() (anon); a lot is due at first sight on model 33,
      when its bid changed, or when it crossed a horizon (120, 72, 48, 24, 12, 6, 3, 1 h, 10 min); when nothing is due the
      lot closing soonest is written, so the reader's two-hour freshness check holds;
   3. the due lots' listing facts and bid and comment rows: live_finish_33_inputs() with the service key, 100 lots per
@@ -61,7 +64,7 @@ CHUNK = 100                                            # lots per live_finish_33
 WRITER = 'live-finish-33'
 ART = os.path.expanduser(os.environ.get('LIVE_FINISH_33_DIR', '~/Library/Caches/nuke-finish-33'))
 ARCHIVE = os.path.abspath(os.environ.get('BAT_ARCHIVE', 'scripts/data/bat-archive.duckdb'))
-CACHE_VERSION = 'live_finish_33_v2.1'
+CACHE_VERSION = 'live_finish_33_v2.2'
 OUTCOME = {'sold': 'sold', 'no_reserve': 'sold, no reserve', 'rnm': 'reserve not met'}
 
 
@@ -360,8 +363,8 @@ def knn(pool, tgt, k=K, lam_cohort=1.0, lam_make=0.5, lam_year=0.5, chunk=400):
     Tf = tgt[KNN_FEATS].copy(); Tf['z'] = tgt.z.fillna(zfill)
     mu = Pf.mean(); sd = Pf.std().replace(0, 1)
     P = ((Pf - mu) / sd).values.astype(np.float32); T = ((Tf - mu) / sd).values.astype(np.float32)
-    pc = pd.Categorical(pool.cohort.fillna('?')); pcoh = pc.codes; tcoh = pd.Categorical(tgt.cohort.fillna('?'), categories=pc.categories).codes
-    pm = pd.Categorical(pool.make_k.fillna('?')); pmake = pm.codes; tmake = pd.Categorical(tgt.make_k.fillna('?'), categories=pm.categories).codes
+    pc = pd.Categorical(pool.cohort.fillna('?')); pcoh = pc.codes; tcoh = pc.categories.get_indexer(tgt.cohort.fillna('?'))      # -1: not in the pool
+    pm = pd.Categorical(pool.make_k.fillna('?')); pmake = pm.codes; tmake = pm.categories.get_indexer(tgt.make_k.fillna('?'))
     pyear = pool.year.fillna(-100).values.astype(np.float32); tyear = tgt.year.fillna(-100).values.astype(np.float32)
     pnr = pool.nr.values; tnr = tgt.nr.values; py = pool.y.values.astype(np.float32)
     P2 = (P ** 2).sum(1); n = len(tgt); kk = min(k, len(pool))
@@ -490,31 +493,45 @@ def map_titles(lots, archive, work):
 
 
 class CohortMap:
-    """Fallback map: make key + leading title model words + model year -> BaT model page, narrowest year band first."""
+    """Fallback page map: make key + leading title model words (at least one) + model year -> BaT model page, deepest
+    word match first, narrowest year band first. Never maps on the make alone (that guessed a go-kart onto bmw/2002);
+    the make's own year-band page only tells what kind of lot an unmapped one is. On 13,652 archive car lots closed
+    2026-07..09 with the map learned before 07-01: 96.5% mapped, 95.2% of those exact (model 32's fix, #1737)."""
     def __init__(self, AK):
         idx = defaultdict(lambda: defaultdict(list))
-        for mk, md, c, y in zip(AK.make, AK.model, AK.cohort, AK.year):
+        for ttl, mk, md, c, y in zip(AK.title, AK.make, AK.model, AK.cohort, AK.year):
             if not isinstance(c, str):
                 continue
-            t = toks(md)
+            k, t = title_parts(ttl, mk, md)
             for n in range(0, min(4, len(t)) + 1):
-                idx[make_key(mk)][tuple(t[:n])].append((c, y))
+                idx[k][tuple(t[:n])].append((c, y))
         self.idx = {m: dict(v) for m, v in idx.items()}
+
+    def _vote(self, cands, year, bands):
+        for band in bands:
+            sel = [c for c, y in cands if band is None or (y is not None and not math.isnan(y) and abs(y - year) <= band)]
+            if len(sel) >= 3:
+                c, sh = Counter(sel).most_common(1)[0]
+                return c, sh / len(sel)
+        return None, 0.0
 
     def map(self, mk, words, year):
         if mk not in self.idx:
             return None, 0.0
         has_year = year is not None and not (isinstance(year, float) and math.isnan(year))
-        for n in range(min(4, len(words)), -1, -1):
+        for n in range(min(4, len(words)), 0, -1):
             cands = self.idx[mk].get(tuple(words[:n]))
-            if not cands or len(cands) < 3:
-                continue
-            for band in ([0, 1, 2, 4] if has_year else []) + [None]:
-                sel = [c for c, y in cands if band is None or (y is not None and not math.isnan(y) and abs(y - year) <= band)]
-                if len(sel) >= 3:
-                    c, s = Counter(sel).most_common(1)[0]
-                    return c, s / len(sel)
+            if cands and len(cands) >= 3:
+                c, sh = self._vote(cands, year, ([0, 1, 2, 4] if has_year else []) + [None])
+                if c:
+                    return c, sh
         return None, 0.0
+
+    def make_page(self, mk, year):
+        cands = self.idx.get(mk, {}).get(())
+        if not cands or year is None or (isinstance(year, float) and math.isnan(year)):
+            return None
+        return self._vote(cands, year, [0, 1, 2, 4, 8])[0]
 
 
 # ------------------------------------------------------------------------------------- the history cache (daily)
@@ -552,7 +569,7 @@ COPY (SELECT l.slug, l.url, l.title, l.year, l.make, l.model, l.cohort, l.no_res
              epoch(l.f) f_epoch, epoch(coalesce(an.anchor, l.f)) anchor_epoch,
              (SELECT count(*) FROM events c WHERE c.slug = l.slug AND c.kind = 'comment') ncom_final
       FROM lb l LEFT JOIN anchor an USING (slug)) TO '__DIR__/lots.csv' (HEADER);
-COPY (SELECT slug, year, make, model, cohort, kind FROM lots) TO '__DIR__/all_kinds.csv' (HEADER);
+COPY (SELECT slug, year, make, model, title, cohort, kind FROM lots) TO '__DIR__/all_kinds.csv' (HEADER);
 """
 
 
@@ -586,7 +603,7 @@ def build_cache(archive=ARCHIVE, art=ART):
         lambda s: 'car' if (s == 'car').mean() >= 0.5 else Counter(s).most_common(1)[0][0]).to_dict()
     h = {'version': CACHE_VERSION, 'built_at': time.time(), 'last_close': last, 'archive_mtime': os.path.getmtime(archive),
          'L': L[['slug', 'cohort', 'make_k', 'year', 'mtok', 'f_epoch', 'logp', 'vin', 'cls', 'ncom_final']], 'F': F.reset_index(drop=True),
-         'AK': AK[['make', 'model', 'cohort', 'year']], 'kind_of': kind_of}
+         'AK': AK[['title', 'make', 'model', 'cohort', 'year']], 'kind_of': kind_of}
     with open(f'{art}/history.pkl', 'wb') as f:
         pickle.dump(h, f, protocol=pickle.HIGHEST_PROTOCOL)
     for fn in ('lots.csv', 'pool_states.csv', 'all_kinds.csv'):
@@ -690,7 +707,20 @@ def skip_row(v, why, h=None):
     return {'vehicle_id': v, 'reason': why, 'hours_remaining': None if h is None or h != h else round(float(h), 2)}
 
 
-def prepare(lots, a):
+NOT_CARS = {'MOTORCYCLE'}     # vehicles.canonical_vehicle_type never priced as a car (TRAILER is not used: a Scout II carried it)
+
+
+def read_kinds(anon, ids):
+    """vehicles.canonical_vehicle_type for the board's lots (anon-readable), 200 ids a request."""
+    out = {}
+    for s in range(0, len(ids), 200):
+        for v in rest(f"vehicles?select=id,canonical_vehicle_type&id=in.({','.join(ids[s:s + 200])})", anon) or []:
+            if v.get('canonical_vehicle_type'):
+                out[v['id']] = v['canonical_vehicle_type']
+    return out
+
+
+def prepare(lots, a, kinds=None):
     """Title words, model page (the model 31 title map, then the make-and-words fallback), page kind and the lots model 33
     can price, before any prod read. Returns the lots kept and the skips."""
     skipped = []
@@ -704,8 +734,10 @@ def prepare(lots, a):
         yr = float(r.year) if r.year is not None and not pd.isna(r.year) else np.nan
         c, sh = a['cohort_map'].map(r.make_k, r.mtok, yr)
         T.at[i, 'cohort'] = c; T.at[i, 'share'] = sh; T.at[i, 'basis'] = 'fallback' if c else 'none'
-    T['kind'] = [('car' if b == 'title' else a['kind_of'].get(c)) if isinstance(c, str) else None for c, b in zip(T.cohort, T.basis)]
     T['year'] = pd.to_numeric(T.year, errors='coerce')
+    T['kind'] = [('car' if b == 'title' else a['kind_of'].get(c)) if isinstance(c, str)
+                 else a['kind_of'].get(a['cohort_map'].make_page(mk, float(y) if y is not None and not pd.isna(y) else np.nan))
+                 for c, b, mk, y in zip(T.cohort, T.basis, T.make_k, T.year)]
     T['nr'] = T.no_reserve.fillna(False).astype(bool).astype(int)
     known = set(a['L'].make_k); keep = []
     for r in T.itertuples():
@@ -717,6 +749,8 @@ def prepare(lots, a):
             skipped.append(skip_row(r.vehicle_id, f'more than {MAX_HOURS:g} h to close', r.hours_left))
         elif not float(r.current_bid or 0) > 0:
             skipped.append(skip_row(r.vehicle_id, 'no bid yet', r.hours_left))
+        elif (kinds or {}).get(r.vehicle_id) in NOT_CARS:
+            skipped.append(skip_row(r.vehicle_id, f'not a car lot (listed as a {kinds[r.vehicle_id].lower()})', r.hours_left))
         elif isinstance(r.kind, str) and r.kind != 'car':
             skipped.append(skip_row(r.vehicle_id, 'not a car lot', r.hours_left))
         elif not isinstance(r.cohort, str) and r.make_k not in known:
@@ -803,7 +837,7 @@ def score(T, facts, coms, a):
                  'model_page': r.cohort if isinstance(r.cohort, str) else None,
                  'vote_share': None if pd.isna(r.share) else round(float(r.share), 3), 'same_page_analogs': int(r.n_same), 'n_analogs': K,
                  'horizon_model': r.horizon, 'method': 'model 33 v2: analog core (price-only) + residual learner (trim, room, cultural, markets, history)',
-                 'factors': {'core': {'est32': int(round(est32))}, **lmdi(est32, est33, contrib)}, 'backtest': a['backtest'], 'analogs': analogs}
+                 'factors': {'core': {'est32': int(round(est32))}, **lmdi(est32, est33, contrib)}, 'analogs': analogs}
         hammer = int(round(est33, -2))
         rows.append({'vehicle_id': r.vehicle_id, 'current_bid': int(round(r.bid)), 'hours_remaining': round(float(r.hours_left), 1),
                      'time_window': 'live', 'price_tier': tier(est33), 'model_version': MODEL_VERSION,
@@ -827,7 +861,7 @@ def run(args):
     lots['ends'] = [epoch(e) for e in lots.ends_at]
     lots['hours_left'] = (lots.ends - lots.moment) / 3600.0
     lots = lots[(lots.hours_left > 0) & (lots.hours_left <= MAX_HOURS)].copy()
-    T, skipped = prepare(lots.reset_index(drop=True), a)
+    T, skipped = prepare(lots.reset_index(drop=True), a, read_kinds(anon, lots.vehicle_id.tolist()))
     prior = latest_rows(anon, T.vehicle_id.tolist())
     ids = due(T, prior)
     if not ids and len(T):
@@ -841,8 +875,10 @@ def run(args):
         print(json.dumps({'dry_run': True, 'live': len(lots), 'due': len(ids), 'estimated': len(rows), 'skipped': len(skipped),
                           'skip_reasons': dict(Counter(s['reason'] for s in skipped)), 'seconds': round(time.time() - t0, 1)}))
         return
-    for s in range(0, len(rows), 500):
-        rest('hammer_predictions', service, 'POST', rows[s:s + 500], prefer='return=minimal')
+    if rows:                                              # the backtest block once per run, on the first row written:
+        n0 = json.loads(rows[0]['notes']); n0['backtest'] = a['backtest']; rows[0]['notes'] = json.dumps(n0, default=str)
+    for s in range(0, len(rows), 200):                    # about 2 KB a row with its notes: 0.4 MB a request
+        rest('hammer_predictions', service, 'POST', rows[s:s + 200], prefer='return=minimal')
     print(json.dumps({'model': MODEL_VERSION, 'live': len(lots), 'due': len(ids), 'written': len(rows), 'skipped': len(skipped),
                       'skip_reasons': dict(Counter(s['reason'] for s in skipped)), 'seconds': round(time.time() - t0, 1)}))
 

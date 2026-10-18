@@ -12,6 +12,7 @@ import { MakeLogo } from '../../components/common/MakeIdentity';
 import { selectRowFacts, useMarketRowDetails, useMarketRowSpecs, vehicleIdentity, type LotInspection, type MarketRowDetails } from './useMarketRowDetails';
 import { useFinishEstimates, type FinishEstimate } from './useFinishEstimates';
 import { ringBids, startBidChime } from './bidChime';
+import { matchesEraRange } from '../../lib/market/familyEras';
 
 // The homepage: the live collector-car market as Nuke sees it right now.
 // Activity figures count the rows market_pulse_live() returns; rows open their canonical records.
@@ -332,6 +333,22 @@ function inWindow(a: LiveAuction, w: Window, now: number): boolean {
   }
 }
 
+export function matchesFamilyScope(a: LiveAuction, familyName: string | null): boolean {
+  if (!familyName) return true;
+  const f = familyName.trim().toLowerCase();
+  if (!f || f === 'other models') return true;
+  const m = (a.model ?? '').trim().toLowerCase();
+  const t = (a.title ?? '').trim().toLowerCase();
+  const escaped = f.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const wordRe = new RegExp(`(^|[^a-z0-9])${escaped}($|[^a-z0-9])`, 'i');
+  return m === f || m.startsWith(`${f} `) || m.startsWith(`${f}-`) || wordRe.test(m) || wordRe.test(t);
+}
+
+export function matchesModelScope(a: LiveAuction, model: string | null): boolean {
+  if (!model) return true;
+  return recordedModel(a) === model || matchesFamilyScope(a, model);
+}
+
 export default function MarketPulse({ onUnavailable, collection }: { onUnavailable?: React.ReactNode; collection?: React.ReactNode }) {
   usePageTitle('Market');
   const { data, isLoading, isError, risenIds, refetch, dataUpdatedAt, newBids } = useMarketPulse();
@@ -353,6 +370,8 @@ export default function MarketPulse({ onUnavailable, collection }: { onUnavailab
   })() : null;
   const make = makeParam === 'ALL' ? defaultMake : makeParam ?? defaultMake;
   const model = make ? params.get('model') : null;
+  const familyName = make ? params.get('family_name')?.trim() || null : null;
+  const era = make ? params.get('era')?.trim() || null : null;
   const inventoryLens = mapLens(params, make);
   const lotParam = params.get('lot');
   const activityId = lotParam && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(lotParam) ? lotParam : null;
@@ -408,7 +427,7 @@ export default function MarketPulse({ onUnavailable, collection }: { onUnavailab
     if (key === 'live' || key === 'make') next.delete('bidRange');
     if (key === 'make' || key === 'view') {
       next.delete('model');
-      ['mapFocus', 'mapChild'].forEach(k => next.delete(k));
+      ['family', 'family_name', 'year', 'era', 'mapFocus', 'mapChild'].forEach(k => next.delete(k));
     }
     if (key === 'make') next.delete('mapBy');
     if (key === 'model') ['mapFocus', 'mapChild'].forEach(k => next.delete(k));
@@ -421,7 +440,7 @@ export default function MarketPulse({ onUnavailable, collection }: { onUnavailab
   const setCohort = (nextMake: string | null, scopeKey?: string | null) => {
     const next = new URLSearchParams(params);
     next.set('make', nextMake ?? 'all');
-    ['model', 'bidRange', 'day', 'series', 'salesScope', 'mapFocus', 'mapChild', 'board'].forEach(k => next.delete(k));
+    ['model', 'family', 'family_name', 'year', 'era', 'bidRange', 'day', 'series', 'salesScope', 'mapFocus', 'mapChild', 'board'].forEach(k => next.delete(k));
     if (scopeKey?.startsWith('subject:')) next.set('salesScope', scopeKey);
     next.delete('lot');
     setParams(next);
@@ -465,7 +484,9 @@ export default function MarketPulse({ onUnavailable, collection }: { onUnavailab
   }, []);
 
   const live = useMemo(() => (data?.auctions ?? []).filter((a) => a.endsAt > now), [data, now]);
-  const cohort = useMemo(() => live.filter(a => make == null || a.make === make), [live, make]);
+  const cohort = useMemo(() => live.filter(a => (make == null || a.make === make)
+    && (model != null || matchesFamilyScope(a, familyName))
+    && matchesEraRange(a.year, era)), [live, make, model, familyName, era]);
   const todayUtc = new Date(now).toISOString().slice(0, 10);
   const sameHour = useSameHourReadings(data?.sameHour?.hourUtc ?? '', todayUtc);
   const liveBids = useMemo(() => live.reduce((s, a) => s + (a.currentBid ?? 0), 0), [live]);
@@ -495,7 +516,9 @@ export default function MarketPulse({ onUnavailable, collection }: { onUnavailab
     && (selectedBid == null || bidBucket(a.currentBid) === selectedBid)), [live, win, now, selectedBid]);
 
   const mapAuctions = useMemo(() => mappedInventory.filter(a => (make == null || a.make === make)
-    && (inventoryLens.group === 'model' || model == null || recordedModel(a) === model)), [mappedInventory, make, model, inventoryLens.group]);
+    && (model != null || matchesFamilyScope(a, familyName))
+    && matchesEraRange(a.year, era)
+    && (inventoryLens.group === 'model' || matchesModelScope(a, model))), [mappedInventory, make, model, familyName, era, inventoryLens.group]);
   const needsTaxonomy = inventoryLens.group === 'type' || inventoryLens.group === 'body';
   const taxonomyQuery = useInventoryTaxonomy(mapAuctions, view === 'inventory' && needsTaxonomy);
   const taxonomy = useMemo(() => taxonomyByListing(taxonomyQuery.data), [taxonomyQuery.data]);
@@ -503,7 +526,7 @@ export default function MarketPulse({ onUnavailable, collection }: { onUnavailab
 
   const board = useMemo(() => {
     const rows = scoped.filter(a => (selectedBid == null || bidBucket(a.currentBid) === selectedBid)
-      && (model == null || recordedModel(a) === model)
+      && matchesModelScope(a, model)
       && matchesMapLens(a, inventoryLens, taxonomy));
     // Keep an inspected lot reachable while the board rolls past its deadline.
     if (pinnedAuction?.id === activityId && !rows.some(a => a.id === activityId)) rows.push(pinnedAuction);
@@ -553,7 +576,7 @@ export default function MarketPulse({ onUnavailable, collection }: { onUnavailab
     </button> : undefined}>
       {view === 'inventory' ? <span className="market-venue">
         <img className="market-venue__mark" src="/vendor/bat/favicon.ico" alt="" width={32} height={32} />
-        <Text role="entity" as="h1">Bring a Trailer{make ? ` · ${make}` : ''}</Text>
+        <Text role="entity" as="h1">Bring a Trailer{make ? ` · ${make}${familyName && !model ? ` · ${familyName}` : ''}${era ? ` · ${era.replace('-', '–')}` : ''}` : ''}</Text>
         <Text role="label">Live auctions</Text>
       </span> : <Text role="entity" as="h1">Recorded sales</Text>}
     </Masthead>
@@ -585,7 +608,7 @@ export default function MarketPulse({ onUnavailable, collection }: { onUnavailab
   </>;
 
   // Filters and sorts sit on the lots they change. A count is said only when it narrows the open lots.
-  const filtered = make != null || model != null || win !== 'all' || selectedBid != null || inventoryLens.focus != null;
+  const filtered = make != null || familyName != null || model != null || era != null || win !== 'all' || selectedBid != null || inventoryLens.focus != null;
   return (
     <div className="market-explorer">
       {masthead}
@@ -653,7 +676,7 @@ export default function MarketPulse({ onUnavailable, collection }: { onUnavailab
         {mapFilterPending && <Text role="caption" as="div" className="market-board__scope">Reading classifications…</Text>}
         {!isLoading && !mapFilterPending && board.length === 0 && <div role="status" className="market-board__empty">No open lots match these filters. <button type="button" className="market-control" onClick={() => {
           const next = new URLSearchParams(params);
-          ['make', 'live', 'bidRange', 'mapFocus', 'mapChild'].forEach(k => next.delete(k));
+          ['make', 'family', 'family_name', 'year', 'era', 'live', 'bidRange', 'mapFocus', 'mapChild'].forEach(k => next.delete(k));
           next.delete('model');
           next.set('make', 'all');
           setParams(next, { replace: true });

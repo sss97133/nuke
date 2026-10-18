@@ -80,6 +80,12 @@ function scoreHeroCandidate(row: any, options: { frontExterior?: boolean } = {})
   return moneyShotScore + qualityScore + zoneScore + getHeroAspectScore(row);
 }
 
+/** The record a merged-away vehicle was folded into, or null: the vehicle's own id (a loop) is not a target. */
+export function mergedTargetOf(vehicle: { id?: unknown; merged_into_vehicle_id?: unknown } | null | undefined): string | null {
+  const to = vehicle?.merged_into_vehicle_id;
+  return typeof to === 'string' && to.length >= 20 && to !== vehicle?.id ? to : null;
+}
+
 // In-flight dedupe for the hero-candidate query. The identical vehicle_images
 // query was observed firing 2-4x per page load (StrictMode double-mount +
 // RPC-fallback path both selecting a hero). Key = vehicleId — the rest of the
@@ -320,7 +326,7 @@ export interface LoadVehicleParams {
   session: any;
   leadImageUrl: string | null;
   supabase: any;
-  navigate: (path: string) => void;
+  navigate: (path: string, options?: { replace?: boolean }) => void;
   ranBatSyncRef: React.MutableRefObject<string | null>;
   setLoading: (v: boolean) => void;
   setVehicle: (v: any) => void;
@@ -417,8 +423,8 @@ export async function loadVehicleImpl({
       // Fallback to direct query — use explicit columns (not select(*)) for speed
       try {
         const { data, error } = await supabase
-          .from('vehicles')
-          .select('id,year,make,model,normalized_model,series,trim,vin,primary_image_url,image_url,sale_price,nuke_estimate,nuke_estimate_confidence,status,is_public,sale_status,auction_outcome,auction_source,bat_auction_url,discovery_url,listing_url,listing_source,listing_location,uploaded_by,user_id,owner_id,color,interior_color,mileage,fuel_type,transmission,engine_size,engine_type,engine_displacement,horsepower,torque,drivetrain,body_style,doors,is_modified,modification_details,condition_rating,notes,created_at,updated_at,is_for_sale,is_draft,deleted_at,asking_price,current_value,msrp,msrp_source,completion_percentage,displacement,auction_end_date,bid_count,view_count,bat_sold_price,bat_sale_date,bat_listing_title,bat_location,bat_seller,bat_lot_number,sale_date,ownership_verified,ownership_verified_at,data_quality_score,platform_source,discovery_source,profile_origin,listing_kind,reserve_status,origin_organization_id,origin_metadata,description,description_source,highlights,equipment,modifications,known_flaws,recent_service_history,title_status,location,observation_count,image_count')
+          .from('vehicles,merged_into_vehicle_id')
+          .select('id,year,make,model,normalized_model,series,trim,vin,primary_image_url,image_url,sale_price,nuke_estimate,nuke_estimate_confidence,status,is_public,sale_status,auction_outcome,auction_source,bat_auction_url,discovery_url,listing_url,listing_source,listing_location,uploaded_by,user_id,owner_id,color,interior_color,mileage,fuel_type,transmission,engine_size,engine_type,engine_displacement,horsepower,torque,drivetrain,body_style,doors,is_modified,modification_details,condition_rating,notes,created_at,updated_at,is_for_sale,is_draft,deleted_at,asking_price,current_value,msrp,msrp_source,completion_percentage,displacement,auction_end_date,bid_count,view_count,bat_sold_price,bat_sale_date,bat_listing_title,bat_location,bat_seller,bat_lot_number,sale_date,ownership_verified,ownership_verified_at,data_quality_score,platform_source,discovery_source,profile_origin,listing_kind,reserve_status,origin_organization_id,origin_metadata,import_metadata,provenance_metadata,description,description_source,highlights,equipment,modifications,known_flaws,recent_service_history,title_status,location,observation_count,image_count')
           .eq('id', vehicleId)
           .single();
 
@@ -545,6 +551,15 @@ export async function loadVehicleImpl({
     }
 
     rpcLoaded.observationCount = observationTotal(rpcLoaded.observationCount, vehicleData);
+
+    // A vehicle merged into another stays at its old address as a stub: no photos, no owner, only the specs it was
+    // created with (2026-10-16: an owner's old link opened a bare "NO IMAGES" page for a car with 1,800 photos under
+    // its merge target). Send the visitor to the record that holds the data; replace, so Back does not bounce again.
+    const mergedTarget = mergedTargetOf(vehicleData);
+    if (mergedTarget) {
+      navigate(`/vehicle/${mergedTarget}`, { replace: true });
+      return rpcLoaded;
+    }
 
     // For non-authenticated users, only show public vehicles
     if (!session && !vehicleData.is_public) {
