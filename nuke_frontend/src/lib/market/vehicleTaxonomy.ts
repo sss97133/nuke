@@ -308,6 +308,18 @@ const MARKET_COHORT_SHORTCUT_CATALOG: readonly MarketCohortShortcutSeed[] = [
     keywords: ['fj80', 'fzj80', 'hdj80', 'j80', '80-series', 'land cruiser fj80'],
   },
   {
+    id: 'porsche-911-964',
+    make: 'Porsche',
+    family: '911',
+    axis: 'series',
+    facet: '911 Carrera',
+    markId: 'porsche-stuttgart-crest',
+    fallbackYear: 1991,
+    yearRangeLabel: '1989–1994',
+    subLabel: '964 Air-Cooled Generation Carrera 2 / Carrera 4 / Turbo',
+    keywords: ['964', 'porsche 964'],
+  },
+  {
     id: 'porsche-911-993',
     make: 'Porsche',
     family: '911',
@@ -317,7 +329,31 @@ const MARKET_COHORT_SHORTCUT_CATALOG: readonly MarketCohortShortcutSeed[] = [
     fallbackYear: 1996,
     yearRangeLabel: '1995–1998',
     subLabel: '993 Final Air-Cooled Generation Carrera / Turbo',
-    keywords: ['993', 'porsche 993', '964', 'porsche 964'],
+    keywords: ['993', 'porsche 993'],
+  },
+  {
+    id: 'porsche-911-997',
+    make: 'Porsche',
+    family: '911',
+    axis: 'series',
+    facet: '911 Carrera',
+    markId: 'porsche-stuttgart-crest',
+    fallbackYear: 2008,
+    yearRangeLabel: '2005–2012',
+    subLabel: '997 Water-Cooled Generation Carrera / Turbo / GT3',
+    keywords: ['997', 'porsche 997'],
+  },
+  {
+    id: 'porsche-911-991',
+    make: 'Porsche',
+    family: '911',
+    axis: 'series',
+    facet: '911 Carrera',
+    markId: 'porsche-stuttgart-crest',
+    fallbackYear: 2016,
+    yearRangeLabel: '2012–2019',
+    subLabel: '991 Generation Carrera / Turbo / GT3',
+    keywords: ['991', 'porsche 991'],
   },
   {
     id: 'porsche-911-992',
@@ -329,7 +365,7 @@ const MARKET_COHORT_SHORTCUT_CATALOG: readonly MarketCohortShortcutSeed[] = [
     fallbackYear: 2022,
     yearRangeLabel: '2019–2025',
     subLabel: '992 Modern Generation Carrera / Turbo / GT3',
-    keywords: ['992', 'porsche 992', '991', '997'],
+    keywords: ['992', 'porsche 992'],
   },
   {
     id: 'porsche-911-gt3-rs',
@@ -401,7 +437,7 @@ const MARKET_COHORT_SHORTCUT_CATALOG: readonly MarketCohortShortcutSeed[] = [
     fallbackYear: 1965,
     yearRangeLabel: '1963–1967',
     subLabel: "C2 Two-Word 'Sting Ray' Coupe & Convertible",
-    keywords: ['sting ray', 'stingray', 'c2 corvette', 'split-window', 'split window'],
+    keywords: ['sting ray', 'c2 corvette', 'split-window', 'split window'],
   },
   {
     id: 'ford-mustang-shelby-gt350',
@@ -531,6 +567,12 @@ function axisToDisplayLabel(axis: Exclude<FamilyFacetAxis, 'raw'>): 'SERIES' | '
   return 'BODY';
 }
 
+/** Bounded by non-alphanumerics so `991` does not match inside a year like `1991`. */
+function containsWholeTerm(haystack: string, term: string): boolean {
+  const escaped = term.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  return new RegExp(`(^|[^a-z0-9])${escaped}($|[^a-z0-9])`).test(haystack);
+}
+
 /**
  * Matches a user search query (2+ characters) against vetted identity marks (`VETTED_IDENTITY_MARKS`)
  * and canonical `SERIES` / `TRIM` / `BODY STYLE` Market Map cohorts, returning up to `maxResults` (default 3)
@@ -558,7 +600,7 @@ export function resolveMarketCohortShortcuts(
         bestScore = Math.max(bestScore, 100);
       } else if (kwLower.startsWith(cleaned)) {
         bestScore = Math.max(bestScore, 85);
-      } else if (cleaned.includes(kwLower) && kwLower.length >= 2) {
+      } else if (kwLower.length >= 2 && containsWholeTerm(cleaned, kwLower)) {
         bestScore = Math.max(bestScore, 80);
       } else if (kwLower.includes(cleaned) && cleaned.length >= 3) {
         bestScore = Math.max(bestScore, 65);
@@ -633,7 +675,7 @@ export function resolveMarketCohortShortcuts(
         .filter(Boolean)
         .join(' ')
         .toLowerCase();
-      if (!haystack.includes(cleaned)) continue;
+      if (!containsWholeTerm(haystack, cleaned)) continue;
 
       const axis: Exclude<FamilyFacetAxis, 'raw'> = mark.trimPackage
         ? 'trim'

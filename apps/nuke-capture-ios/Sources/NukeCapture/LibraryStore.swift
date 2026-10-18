@@ -24,6 +24,7 @@ final class LibraryStore: NSObject, ObservableObject, PHPhotoLibraryChangeObserv
     @Published private(set) var albumError: String?
     @Published private(set) var refreshingAlbums = false
     private var albumRefreshPending = false
+    private var albumRefreshWaiters: [CheckedContinuation<Void, Never>] = []
     /// When the last catalog read finished. Each read enumerates every photo and album and stores
     /// a multi-MB snapshot; it used to run 2-4 times per open plus once per library change.
     private var lastAlbumRefresh: Date?
@@ -102,10 +103,20 @@ final class LibraryStore: NSObject, ObservableObject, PHPhotoLibraryChangeObserv
     /// photo uploads, and no change to Photos. Limited access cannot fetch user
     /// albums; retain that coverage boundary instead of reporting an empty garage.
     func refreshAlbums(force: Bool = false) async {
+        if refreshingAlbums {
+            if force { albumRefreshPending = true }
+            // A filing pass needs the completed catalog, not a stale or absent snapshot.
+            await withCheckedContinuation { albumRefreshWaiters.append($0) }
+            return
+        }
         if !force, let last = lastAlbumRefresh, Date().timeIntervalSince(last) < 60, albumCatalog != nil { return }
-        if refreshingAlbums { albumRefreshPending = true; return }
         refreshingAlbums = true
-        defer { refreshingAlbums = false }
+        defer {
+            refreshingAlbums = false
+            let waiters = albumRefreshWaiters
+            albumRefreshWaiters.removeAll()
+            waiters.forEach { $0.resume() }
+        }
         repeat {
             albumRefreshPending = false
             let catalog = await Task.detached(priority: .utility) { Self.readAlbums() }.value

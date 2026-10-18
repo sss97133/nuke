@@ -480,12 +480,16 @@ Deno.serve(async (req) => {
           String(text),
         ].join('|'))
 
+        // C&B's own comment id: trg_key_cab_auction_comment keys the row on it, the same key extract-cars-and-bids-core uses
+        const sourceCommentId = typeof commentData?.id === 'string' && /^[A-Za-z0-9_-]{4,64}$/.test(commentData.id) ? commentData.id : null
+
         comments.push({
           auction_event_id: eventId,
           vehicle_id: vehicleId,
           platform: 'cars_and_bids',
           source_url: String(auctionUrlNorm),
           content_hash,
+          source_comment_id: sourceCommentId,
           sequence_number: i + 1,
           posted_at: posted_at.toISOString(),
           hours_until_close: Math.max(0, hours_until_close),

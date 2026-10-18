@@ -15,6 +15,16 @@
  *
  * Usage: dotenvx run -- node scripts/mecum-algolia-save-all.cjs
  *        dotenvx run -- node scripts/mecum-algolia-save-all.cjs --enrich-only
+ *        dotenvx run -- node scripts/mecum-algolia-save-all.cjs --dedup-only [--dry-run]
+ *        dotenvx run -- node scripts/mecum-algolia-save-all.cjs --phase3-only [--dry-run]
+ *        dotenvx run -- node scripts/mecum-algolia-save-all.cjs --lot-urls-only [--enqueue=N] [--dry-run]
+ *
+ * --dedup-only     merge duplicate Mecum lot pairs, skip enrichment
+ * --phase3-only    run only the year+make+price match (Phase 3)
+ * --lot-urls-only  set listing_url from a canonical Mecum lot discovery_url (Phase 4); merge vehicles that share the lot
+ * --enqueue=N      with --lot-urls-only: queue up to N promoted lots (this run's, then earlier runs' not yet landed) for
+ *                  extract-mecum's targets lane
+ * --dry-run        count what dedup / Phase 3 / Phase 4 would write, write nothing
  */
 
 const pg = require('pg');
@@ -28,7 +38,47 @@ fs.mkdirSync(DATA_DIR, { recursive: true });
 
 const args = process.argv.slice(2);
 const ENRICH_ONLY = args.includes('--enrich-only');
+const DEDUP_ONLY = args.includes('--dedup-only');
+const PHASE3_ONLY = args.includes('--phase3-only');
+const DRY_RUN = args.includes('--dry-run');
+const LOT_URLS_ONLY = args.includes('--lot-urls-only');
+const ENQUEUE_LIMIT = Math.max(0, parseInt((args.find(a => a.startsWith('--enqueue=')) || '--enqueue=0').split('=')[1], 10) || 0);
 const sleep = ms => new Promise(r => setTimeout(r, ms));
+
+// vehicles has no auction_source index: page by uuid prefix so each statement is a short pkey range scan
+const ID_WINDOWS = Array.from({ length: 256 }, (_, i) => i.toString(16).padStart(2, '0'));
+async function loadMecumVehicles(columns, extraWhere = 'TRUE') {
+  const rows = [];
+  for (let i = 0; i < ID_WINDOWS.length; i++) {
+    const lo = `${ID_WINDOWS[i]}000000-0000-0000-0000-000000000000`;
+    const hi = i + 1 < ID_WINDOWS.length ? `${ID_WINDOWS[i + 1]}000000-0000-0000-0000-000000000000` : null;
+    const r = await client.query(`
+      SELECT ${columns}
+      FROM vehicles
+      WHERE id >= $1::uuid ${hi ? 'AND id < $2::uuid' : ''}
+        AND auction_source = 'mecum' AND deleted_at IS NULL
+        AND (${extraWhere})
+    `, hi ? [lo, hi] : [lo]);
+    rows.push(...r.rows);
+    if ((i + 1) % 64 === 0) console.log(`  [${i + 1}/${ID_WINDOWS.length} id windows] ${rows.length.toLocaleString()} rows`);
+  }
+  return rows;
+}
+
+const normLotPath = (u) => {
+  if (!u) return '';
+  const m = String(u).toLowerCase().match(/\/lots\/([^/?#]+)(?:\/([^/?#]+))?/);
+  return m ? (m[2] ? `${m[1]}/${m[2]}` : m[1]) : '';
+};
+const lotKey = (u) => normLotPath(u).split('/')[0] || null;
+
+const isMecumHost = (u) => {
+  try {
+    return /(^|\.)mecum\.com$/i.test(new URL(u).hostname);
+  } catch {
+    return false;
+  }
+};
 
 const ALGOLIA_APP_ID = 'U6CFCQ7V52';
 const ALGOLIA_API_KEY = '0291c46cde807bcb428a021a96138fcb';
@@ -285,12 +335,6 @@ async function enrichFromSaved() {
   console.log(`  Loaded ${lots.length.toLocaleString()} lots from ${eventFiles.length} event files`);
 
   // Build permalink / lot code → lot data map (case-insensitive)
-  const normLotPath = (u) => {
-    if (!u) return '';
-    const m = String(u).toLowerCase().match(/\/lots\/([^/?#]+)(?:\/([^/?#]+))?/);
-    return m ? (m[2] ? `${m[1]}/${m[2]}` : m[1]) : '';
-  };
-
   const parseSaleDate = (lot) => {
     const runDate = lot.taxonomies?.run_date?.[0]?.name;
     if (runDate && /^\d{4}-\d{2}-\d{2}/.test(runDate)) return runDate.slice(0, 10);
@@ -315,19 +359,20 @@ async function enrichFromSaved() {
   }
   console.log(`  Indexed ${lotMap.size.toLocaleString()} entries`);
 
-  // Load Mecum vehicles in a single sequential scan (much faster than 28 pkey range scans)
   console.log('  Loading Mecum vehicles...');
-  const rLoad = await client.query(`
-    SELECT id, listing_url, discovery_url, year, make, model, sale_price, sale_status, sale_date,
-           primary_image_url, image_count, color, interior_color, transmission, body_style, engine_size,
-           description, provenance_metadata, gps_latitude, listing_location, vin, title, status, mileage, user_id, created_at
-    FROM vehicles
-    WHERE auction_source = 'mecum' AND deleted_at IS NULL
+  const allVehicles = await loadMecumVehicles(`
+    id, listing_url, discovery_url, year, make, model, sale_price, sale_status, sale_date,
+    primary_image_url, image_count, color, interior_color, transmission, body_style, engine_size,
+    description, provenance_metadata, gps_latitude, listing_location, vin, title, status, mileage, user_id, created_at
   `);
-  const allVehicles = rLoad.rows;
   console.log(`  Mecum vehicles loaded: ${allVehicles.length.toLocaleString()}`);
 
-  // ── Phase 1.5: Deduplicate Mecum vehicles sharing the same canonical lot key ──
+  const mergedDupIds = await dedupMecumVehicles(allVehicles);
+  await enrichVehicles(allVehicles.filter(v => !mergedDupIds.has(v.id)), lotMap, parseSaleDate);
+}
+
+// ── Phase 1.5: Deduplicate Mecum vehicles sharing the same canonical lot key ──
+async function dedupMecumVehicles(allVehicles) {
   const byLotKey = new Map();
   for (const v of allVehicles) {
     const rawUrl = v.listing_url || v.discovery_url;
@@ -343,37 +388,45 @@ async function enrichFromSaved() {
     group.push(v);
   }
 
-  const scoreVehicle = (v) =>
-    (v.user_id ? 1000 : 0) +
-    (Math.min(v.image_count || 0, 50) * 2) +
-    (v.sale_status === 'sold' && v.sale_price > 0 ? 10 : 0) +
-    (v.primary_image_url ? 4 : 0) +
-    (v.listing_url ? 2 : 0) +
-    (v.discovery_url ? 2 : 0) +
-    (v.sale_date ? 2 : 0) +
-    (v.vin ? 2 : 0) +
-    (v.description ? 1 : 0);
-
-  const mergedDupIds = new Set();
   const mergePairs = [];
-  let dupGroupsCount = 0, mergedCount = 0;
+  let dupGroupsCount = 0, userOwnedSkipped = 0;
   for (const [, group] of byLotKey.entries()) {
     if (group.length < 2) continue;
     dupGroupsCount++;
-    group.sort((a, b) => {
-      const diff = scoreVehicle(b) - scoreVehicle(a);
-      if (diff !== 0) return diff;
-      return new Date(a.created_at) - new Date(b.created_at);
-    });
+    group.sort(byMergePriority);
     const primary = group[0];
     for (let i = 1; i < group.length; i++) {
       const dup = group[i];
-      if (primary.user_id || dup.user_id) continue; // Gate 2: never auto-merge user-owned vehicles
+      if (primary.user_id || dup.user_id) { // Gate 2: never auto-merge user-owned vehicles
+        userOwnedSkipped++;
+        continue;
+      }
       mergePairs.push({ primary, dup });
     }
   }
-  console.log(`  Found ${mergePairs.length.toLocaleString()} duplicate Mecum pairs across ${dupGroupsCount.toLocaleString()} lot groups`);
+  console.log(`  Found ${mergePairs.length.toLocaleString()} duplicate Mecum pairs across ${dupGroupsCount.toLocaleString()} lot groups (${userOwnedSkipped.toLocaleString()} user-owned pairs skipped)`);
+  if (DRY_RUN) return new Set();
+  const mergedDupIds = await mergeDuplicatePairs(mergePairs);
+  console.log(`  Mecum dedup complete: ${mergedDupIds.size.toLocaleString()} duplicate rows merged across ${dupGroupsCount.toLocaleString()} lot groups`);
+  return mergedDupIds;
+}
 
+const scoreVehicle = (v) =>
+  (v.user_id ? 1000 : 0) +
+  (Math.min(v.image_count || 0, 50) * 2) +
+  (v.sale_status === 'sold' && v.sale_price > 0 ? 10 : 0) +
+  (v.primary_image_url ? 4 : 0) +
+  (v.listing_url ? 2 : 0) +
+  (v.discovery_url ? 2 : 0) +
+  (v.sale_date ? 2 : 0) +
+  (v.vin ? 2 : 0) +
+  (v.description ? 1 : 0);
+const byMergePriority = (a, b) => (scoreVehicle(b) - scoreVehicle(a)) || (new Date(a.created_at) - new Date(b.created_at));
+
+// Merge { primary, dup } pairs through merge_into_primary_batch; returns the dup ids that merged.
+async function mergeDuplicatePairs(mergePairs) {
+  const mergedDupIds = new Set();
+  let mergedCount = 0, failedPairs = 0;
   const MERGE_BATCH = 100;
   // Partition mergePairs into waves so no two pairs in the same batch share a primary.id
   // (prevents sibling duplicate rows from colliding on unique indexes in a single UPDATE).
@@ -425,13 +478,15 @@ async function enrichFromSaved() {
         console.log(`  Merged ${mergedCount.toLocaleString()}/${mergePairs.length.toLocaleString()} duplicate Mecum vehicles...`);
       }
     } catch (e) {
+      failedPairs += chunk.length;
       console.log(`  Batch merge warning at batch ${bIdx} (${processedPairs}): ${e.message}`);
     }
   }
-  console.log(`  Mecum dedup complete: ${mergedCount.toLocaleString()} duplicate rows merged across ${dupGroupsCount.toLocaleString()} lot groups`);
+  if (failedPairs > 0) console.log(`  Unmerged pairs (failed batches): ${failedPairs.toLocaleString()}`);
+  return mergedDupIds;
+}
 
-  const vehicles = allVehicles.filter(v => !mergedDupIds.has(v.id));
-
+async function enrichVehicles(vehicles, lotMap, parseSaleDate) {
   // Match and batch-update
   let updated = 0, matched = 0, gpsFixed = 0, priceFixed = 0, imgFixed = 0, dateFixed = 0;
   const pendingUpdates = [];
@@ -705,32 +760,70 @@ async function enrichByYearMakePrice() {
   console.log(`  Built ${keyMap.size.toLocaleString()} unique year+make+price keys (${dupeKeys.size.toLocaleString()} dupes excluded)`);
 
   // Load URL-less Mecum vehicles or vehicles missing images/dates
-  const vehicles = [];
-  let lastId = '00000000-0000-0000-0000-000000000000';
-  while (true) {
-    const r = await client.query(`
-      SELECT id, year, make, sale_price, sale_date, primary_image_url,
-             color, interior_color, transmission, description,
-             gps_latitude, listing_url, discovery_url, listing_location
-      FROM vehicles
-      WHERE auction_source = 'mecum' AND deleted_at IS NULL
-        AND (listing_url IS NULL OR primary_image_url IS NULL OR sale_date IS NULL)
-        AND id > $1
-      ORDER BY id LIMIT 5000
-    `, [lastId]);
-    if (r.rows.length === 0) break;
-    vehicles.push(...r.rows);
-    lastId = r.rows[r.rows.length - 1].id;
-  }
+  const vehicles = await loadMecumVehicles(`
+    id, year, make, sale_price, sale_date, primary_image_url,
+    color, interior_color, transmission, description,
+    gps_latitude, listing_url, discovery_url, listing_location
+  `, 'listing_url IS NULL OR primary_image_url IS NULL OR sale_date IS NULL');
   console.log(`  Vehicles missing URL/image/date: ${vehicles.length.toLocaleString()}`);
 
-  let matched = 0, gpsFixed = 0, urlFixed = 0, imgFixed = 0, dateFixed = 0;
-  for (const vehicle of vehicles) {
-    if (!vehicle.year || !vehicle.make || !vehicle.sale_price) continue;
+  const vehicleKey = (v) => (v.year && v.make && v.sale_price > 0)
+    ? `${v.year}|${v.make.toLowerCase()}|${v.sale_price}`
+    : null;
+  const vehicleKeyCounts = new Map();
+  for (const v of vehicles) {
+    const k = vehicleKey(v);
+    if (k) vehicleKeyCounts.set(k, (vehicleKeyCounts.get(k) || 0) + 1);
+  }
 
-    const key = `${vehicle.year}|${vehicle.make.toLowerCase()}|${vehicle.sale_price}`;
+  // A year+make+price hit is only trusted when it cannot contradict a lot the vehicle already points at:
+  // the key must be unique on both sides, the vehicle's URLs must be Mecum lot URLs for the same lot (or absent),
+  // and the lot URL must not already belong to another live vehicle.
+  const lotUrl = (lot) => (lot.permalink ? 'https://www.mecum.com' + lot.permalink : null);
+  const lotKeysOf = (lot) => new Set(
+    [lotKey(lot.permalink), lot.web_id_meta ? String(lot.web_id_meta).toLowerCase() : null].filter(Boolean)
+  );
+  let keyHits = 0, sharedKey = 0, foreignUrl = 0, urlConflict = 0, urlOwnedElsewhere = 0;
+  const candidates = [];
+  for (const vehicle of vehicles) {
+    const key = vehicleKey(vehicle);
+    if (!key) continue;
     const lot = keyMap.get(key);
     if (!lot) continue;
+    keyHits++;
+    if (vehicleKeyCounts.get(key) > 1) { sharedKey++; continue; }
+    const urls = [vehicle.listing_url, vehicle.discovery_url].filter(Boolean);
+    if (urls.some(u => !isMecumHost(u))) { foreignUrl++; continue; }
+    const ownKeys = urls.map(lotKey).filter(Boolean);
+    const lotKeys = lotKeysOf(lot);
+    if (ownKeys.length > 0 && !ownKeys.some(k => lotKeys.has(k))) { urlConflict++; continue; }
+    candidates.push({ vehicle, lot });
+  }
+
+  const urlOwners = new Map(); // listing_url → live vehicle ids
+  const urlsToCheck = [...new Set(candidates.map(c => lotUrl(c.lot)).filter(Boolean))];
+  for (let i = 0; i < urlsToCheck.length; i += 1000) {
+    const r = await client.query(
+      `SELECT id, listing_url FROM vehicles WHERE deleted_at IS NULL AND listing_url = ANY($1::text[])`,
+      [urlsToCheck.slice(i, i + 1000)]
+    );
+    for (const row of r.rows) {
+      if (!urlOwners.has(row.listing_url)) urlOwners.set(row.listing_url, new Set());
+      urlOwners.get(row.listing_url).add(row.id);
+    }
+  }
+  const accepted = candidates.filter(({ vehicle, lot }) => {
+    const owners = urlOwners.get(lotUrl(lot));
+    const ownedByOther = !!owners && [...owners].some(id => id !== vehicle.id);
+    if (ownedByOther) urlOwnedElsewhere++;
+    return !ownedByOther;
+  });
+
+  console.log(`  Key hits: ${keyHits.toLocaleString()} — rejected: shared vehicle key ${sharedKey.toLocaleString()}, non-Mecum URL ${foreignUrl.toLocaleString()}, different lot URL ${urlConflict.toLocaleString()}, lot URL owned by another vehicle ${urlOwnedElsewhere.toLocaleString()}`);
+  console.log(`  Accepted matches: ${accepted.length.toLocaleString()}${DRY_RUN ? ' (dry run, nothing written)' : ''}`);
+
+  let matched = 0, gpsFixed = 0, urlFixed = 0, imgFixed = 0, dateFixed = 0, rowsUpdated = 0, uniqueConflicts = 0;
+  for (const { vehicle, lot } of accepted) {
     matched++;
 
     const sets = [];
@@ -813,30 +906,240 @@ async function enrichByYearMakePrice() {
       }
     }
 
-    if (sets.length > 0) {
+    if (sets.length > 0 && !DRY_RUN) {
       try {
-        await client.query(`UPDATE vehicles SET ${sets.join(', ')} WHERE id = $1`, vals);
+        const r = await client.query(`UPDATE vehicles SET ${sets.join(', ')} WHERE id = $1`, vals);
+        rowsUpdated += r.rowCount;
       } catch (e) {
         if (e.code !== '23505') throw e;
+        uniqueConflicts++;
       }
     }
 
-    if (matched % 2000 === 0 && matched > 0) {
-      console.log(`  Matched ${matched.toLocaleString()} (GPS: ${gpsFixed}, URLs: ${urlFixed}, img: ${imgFixed}, date: ${dateFixed})`);
+    if (matched % 500 === 0) {
+      console.log(`  Matched ${matched.toLocaleString()} (updated: ${rowsUpdated}, GPS: ${gpsFixed}, URLs: ${urlFixed}, img: ${imgFixed}, date: ${dateFixed})`);
     }
   }
 
-  console.log(`\n  Phase 3 complete:`);
+  console.log(`\n  Phase 3 complete${DRY_RUN ? ' (dry run)' : ''}:`);
   console.log(`    Matched: ${matched.toLocaleString()}`);
+  console.log(`    Rows updated: ${rowsUpdated.toLocaleString()} (unique-index conflicts skipped: ${uniqueConflicts.toLocaleString()})`);
   console.log(`    Images fixed: ${imgFixed.toLocaleString()}`);
   console.log(`    Sale dates fixed: ${dateFixed.toLocaleString()}`);
   console.log(`    GPS fixed: ${gpsFixed.toLocaleString()}`);
   console.log(`    URLs added: ${urlFixed.toLocaleString()}`);
 }
 
+// ── Phase 4: the lot page a URL-less vehicle was discovered at is its listing ──
+// Stored Mecum listing URLs are Algolia permalinks: www host, upper-case lot code, trailing slash.
+const MECUM_LOT_URL = /^https?:\/\/(?:www\.)?mecum\.com\/lots\/([A-Za-z0-9-]+)\/([A-Za-z0-9-]+)\/?$/;
+const canonicalLotUrl = (u) => {
+  const m = u ? String(u).match(MECUM_LOT_URL) : null;
+  return m ? `https://www.mecum.com/lots/${m[1].toUpperCase()}/${m[2].toLowerCase()}/` : null;
+};
+const lotUrlSpellings = (canon) => {
+  const [, id, slug] = canon.match(MECUM_LOT_URL);
+  const out = new Set();
+  for (const code of [id, id.toLowerCase()]) {
+    for (const host of ['https://www.mecum.com', 'https://mecum.com']) {
+      out.add(`${host}/lots/${code}/${slug}/`);
+      out.add(`${host}/lots/${code}/${slug}`);
+    }
+  }
+  return [...out];
+};
+const MECUM_TARGETS_TAG = 'mecum-targets:1'; // extract-mecum batch_from_targets lands pending rows with this tag first
+
+async function promoteLotUrls() {
+  console.log('\n=== Phase 4: Promoting canonical Mecum lot discovery_urls to listing_url ===');
+  const VEHICLE_COLS = `id, listing_url, discovery_url, year, make, sale_price, sale_status, sale_date,
+    primary_image_url, image_count, vin, description IS NOT NULL AS description, user_id, created_at`;
+  const urlless = await loadMecumVehicles(VEHICLE_COLS, 'listing_url IS NULL');
+  const candidates = [];
+  let notLotUrl = 0;
+  for (const v of urlless) {
+    const url = canonicalLotUrl(v.discovery_url);
+    if (url) candidates.push({ v, url, key: lotKey(url) });
+    else notLotUrl++;
+  }
+  console.log(`  URL-less live Mecum vehicles: ${urlless.length.toLocaleString()} — canonical lot discovery_url: ${candidates.length.toLocaleString()}, other: ${notLotUrl.toLocaleString()}`);
+
+  // A lot is owned by another live vehicle when that vehicle holds any spelling of it as listing_url or
+  // discovery_url, or carries the Mecum event for it.
+  const ownersByKey = new Map();
+  const ownerRows = new Map();
+  const addOwner = (key, row) => {
+    if (!ownersByKey.has(key)) ownersByKey.set(key, new Set());
+    ownersByKey.get(key).add(row.id);
+    ownerRows.set(row.id, row);
+  };
+  for (let i = 0; i < candidates.length; i += 200) {
+    const chunk = candidates.slice(i, i + 200);
+    const spellings = chunk.flatMap(c => lotUrlSpellings(c.url));
+    const held = await client.query(`
+      SELECT ${VEHICLE_COLS} FROM vehicles
+      WHERE deleted_at IS NULL AND status IS DISTINCT FROM 'merged'
+        AND (listing_url = ANY($1::text[]) OR discovery_url = ANY($1::text[]))`, [spellings]);
+    for (const row of held.rows) {
+      for (const u of [row.listing_url, row.discovery_url]) if (u && spellings.includes(u)) addOwner(lotKey(u), row);
+    }
+    const events = await client.query(`
+      SELECT DISTINCT e.vehicle_id, e.source_url FROM vehicle_events e
+      WHERE e.source_url = ANY($1::text[]) AND e.source_platform = 'mecum' AND e.vehicle_id IS NOT NULL`, [spellings]);
+    const eventVehicleIds = [...new Set(events.rows.map(r => r.vehicle_id))].filter(id => !ownerRows.has(id));
+    const eventOwners = eventVehicleIds.length
+      ? (await client.query(`SELECT ${VEHICLE_COLS} FROM vehicles WHERE id = ANY($1::uuid[]) AND deleted_at IS NULL AND status IS DISTINCT FROM 'merged'`, [eventVehicleIds])).rows
+      : [];
+    const liveById = new Map([...held.rows.map(r => [r.id, r]), ...ownerRows.entries(), ...eventOwners.map(r => [r.id, r])]);
+    for (const e of events.rows) if (liveById.has(e.vehicle_id)) addOwner(lotKey(e.source_url), liveById.get(e.vehicle_id));
+    await sleep(200);
+  }
+
+  const byKey = new Map();
+  for (const c of candidates) {
+    if (!byKey.has(c.key)) byKey.set(c.key, []);
+    byKey.get(c.key).push(c);
+  }
+  const promote = [];
+  const mergePairs = [];
+  const survivorOf = new Map(); // lot key → { primary, url } when the lot's vehicles merge
+  let sharedLots = 0, identityConflicts = 0, userOwnedSkipped = 0;
+  for (const [key, cs] of byKey) {
+    const groupIds = new Set([...cs.map(c => c.v.id), ...(ownersByKey.get(key) || [])]);
+    if (groupIds.size === 1) { promote.push(cs[0]); continue; }
+    sharedLots++;
+    const group = [...groupIds].map(id => ownerRows.get(id) || cs.find(c => c.v.id === id).v).sort(byMergePriority);
+    const primary = group[0];
+    survivorOf.set(key, { primary, url: cs[0].url, dupIds: group.slice(1).map(d => d.id) });
+    for (const dup of group.slice(1)) {
+      const pair = JSON.stringify({ lot: key, primary: primary.id, dup: dup.id });
+      const disagree = (primary.year && dup.year && primary.year !== dup.year)
+        || (primary.make && dup.make && primary.make.toLowerCase() !== dup.make.toLowerCase());
+      if (disagree) { identityConflicts++; console.log(`  identity conflict, not merged: ${pair}`); continue; }
+      if (primary.user_id || dup.user_id) { userOwnedSkipped++; continue; } // Gate 2: never auto-merge user-owned vehicles
+      mergePairs.push({ primary, dup });
+      console.log(`  duplicate: ${pair}`);
+    }
+  }
+  console.log(`  To promote: ${promote.length.toLocaleString()} — lots held by more than one live vehicle: ${sharedLots.toLocaleString()} (merge pairs ${mergePairs.length}, identity conflicts ${identityConflicts}, user-owned skipped ${userOwnedSkipped})`);
+
+  let merged = new Set();
+  if (!DRY_RUN && mergePairs.length > 0) merged = await mergeDuplicatePairs(mergePairs);
+  for (const { primary, url, dupIds } of survivorOf.values()) {
+    if (!DRY_RUN && !primary.listing_url && dupIds.every(id => merged.has(id))) promote.push({ v: primary, url, key: lotKey(url) });
+  }
+
+  let promoted = 0, outcomeChanged = 0;
+  const promotedIds = new Set();
+  const PROMOTE_BATCH = 500;
+  const promoteSql = `
+    WITH u AS (SELECT * FROM unnest($1::uuid[], $2::text[]) AS u(id, url)),
+    before AS (SELECT v.id, v.canonical_outcome FROM vehicles v JOIN u ON u.id = v.id),
+    locked AS (
+      SELECT id FROM vehicles WHERE id = ANY($1::uuid[]) AND listing_url IS NULL AND deleted_at IS NULL
+      FOR UPDATE SKIP LOCKED
+    )
+    UPDATE vehicles v SET listing_url = u.url
+    FROM u JOIN locked l ON l.id = u.id JOIN before b ON b.id = u.id
+    WHERE v.id = u.id
+      AND NOT EXISTS (SELECT 1 FROM vehicles v2 WHERE v2.listing_url = u.url AND v2.deleted_at IS NULL AND v2.id <> v.id)
+    RETURNING v.id, v.canonical_outcome IS DISTINCT FROM b.canonical_outcome AS outcome_changed`;
+  if (DRY_RUN && promote.length > 0) {
+    const probe = promote.slice(0, 50);
+    await client.query('BEGIN');
+    const r = await client.query(promoteSql, [probe.map(c => c.v.id), probe.map(c => c.url)]);
+    await client.query('ROLLBACK');
+    console.log(`  Dry-run probe (rolled back): ${r.rowCount}/${probe.length} rows would update, canonical_outcome changes: ${r.rows.filter(x => x.outcome_changed).length}`);
+  } else {
+    for (let i = 0; i < promote.length; i += PROMOTE_BATCH) {
+      const chunk = promote.slice(i, i + PROMOTE_BATCH);
+      const r = await client.query(promoteSql, [chunk.map(c => c.v.id), chunk.map(c => c.url)]);
+      promoted += r.rowCount;
+      for (const x of r.rows) promotedIds.add(x.id);
+      const recomputed = r.rows.filter(x => x.outcome_changed).map(x => x.id);
+      outcomeChanged += recomputed.length;
+      if (recomputed.length) console.log(`  canonical_outcome recomputed by trg_resolve_canonical_columns: ${JSON.stringify(recomputed)}`);
+      console.log(`  Promoted ${promoted.toLocaleString()}/${promote.length.toLocaleString()} (canonical_outcome changed: ${outcomeChanged})`);
+      await sleep(2000);
+    }
+  }
+
+  // Enrichment goes through extract-mecum's targets lane (batch_from_targets), never a direct crawl from here.
+  const limit = ENQUEUE_LIMIT;
+  let queued = 0, alreadyQueued = 0;
+  const toQueue = [];
+  if (limit > 0) {
+    const pool = promote.filter(c => DRY_RUN || promotedIds.has(c.v.id));
+    // Lots an earlier run promoted that never landed: listing_url is the canonical form of the discovery lot and the vehicle
+    // carries no Mecum event yet.
+    if (pool.length < limit) {
+      const inPool = new Set(pool.map(c => c.v.id));
+      const unlanded = await loadMecumVehicles(VEHICLE_COLS, `listing_url LIKE 'https://www.mecum.com/lots/%' AND discovery_url IS NOT NULL
+        AND status IS DISTINCT FROM 'merged'
+        AND NOT EXISTS (SELECT 1 FROM vehicle_events e WHERE e.vehicle_id = vehicles.id AND e.source_platform = 'mecum')`);
+      let earlier = 0;
+      for (const v of unlanded) {
+        const url = canonicalLotUrl(v.discovery_url);
+        if (!url || url !== v.listing_url || inPool.has(v.id)) continue;
+        pool.push({ v, url, key: lotKey(url) });
+        earlier++;
+      }
+      console.log(`  Promoted earlier and not landed yet: ${earlier.toLocaleString()}`);
+    }
+    pool.sort((a, b) => (Number(!!a.v.primary_image_url) - Number(!!b.v.primary_image_url)) || (new Date(b.v.created_at) - new Date(a.v.created_at)));
+    for (let i = 0; i < pool.length && toQueue.length < limit; i += 200) {
+      const chunk = pool.slice(i, i + 200);
+      const q = await client.query(`SELECT listing_url FROM import_queue WHERE listing_url = ANY($1::text[])`, [chunk.flatMap(c => lotUrlSpellings(c.url))]);
+      const queuedKeys = new Set(q.rows.map(r => lotKey(r.listing_url)));
+      for (const c of chunk) {
+        if (queuedKeys.has(c.key)) { alreadyQueued++; continue; }
+        if (toQueue.length < limit) toQueue.push(c);
+      }
+    }
+    if (!DRY_RUN && toQueue.length > 0) {
+      for (let i = 0; i < toQueue.length; i += 500) {
+        const chunk = toQueue.slice(i, i + 500);
+        const r = await client.query(`
+          INSERT INTO import_queue (listing_url, status, extractor_version, vehicle_id, raw_data)
+          SELECT u.url, 'pending', $3, u.id, jsonb_build_object('reason', 'listing_url promoted from discovery_url; land lot page')
+          FROM unnest($1::uuid[], $2::text[]) AS u(id, url)
+          ON CONFLICT (listing_url) DO NOTHING`, [chunk.map(c => c.v.id), chunk.map(c => c.url), MECUM_TARGETS_TAG]);
+        queued += r.rowCount;
+        await sleep(2000);
+      }
+    }
+  }
+
+  console.log(`\n  Phase 4 complete${DRY_RUN ? ' (dry run)' : ''}:`);
+  console.log(`    listing_url promoted: ${promoted.toLocaleString()}${DRY_RUN ? ` (would promote ${promote.length.toLocaleString()})` : ''}`);
+  console.log(`    duplicates merged: ${merged.size.toLocaleString()}${DRY_RUN ? ` (would merge ${mergePairs.length})` : ''}`);
+  console.log(`    queued for extract-mecum: ${queued.toLocaleString()}${DRY_RUN ? ` (would queue ${toQueue.length.toLocaleString()})` : ''}, already in import_queue: ${alreadyQueued.toLocaleString()}`);
+}
+
 async function run() {
   await client.connect();
   await client.query("SET statement_timeout = '300s'");
+
+  if (LOT_URLS_ONLY) {
+    await promoteLotUrls();
+    await client.end();
+    return;
+  }
+
+  if (DEDUP_ONLY || PHASE3_ONLY) {
+    if (DEDUP_ONLY) {
+      console.log('=== Dedup only: merging duplicate Mecum lot pairs ===');
+      const vehicles = await loadMecumVehicles(`
+        id, listing_url, discovery_url, sale_price, sale_status, sale_date, primary_image_url,
+        image_count, vin, description IS NOT NULL AS description, user_id, created_at
+      `);
+      console.log(`  Mecum vehicles loaded: ${vehicles.length.toLocaleString()}`);
+      await dedupMecumVehicles(vehicles);
+    }
+    if (PHASE3_ONLY) await enrichByYearMakePrice();
+    await client.end();
+    return;
+  }
 
   if (!ENRICH_ONLY) {
     await downloadAll();

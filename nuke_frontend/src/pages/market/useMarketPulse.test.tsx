@@ -91,6 +91,43 @@ describe('live bids from the stream', () => {
   });
 });
 
+describe('tape bids play back at their own moments', () => {
+  it('spaces two bids read together as far apart as they were placed, and the board does not flash them again', async () => {
+    vi.useFakeTimers();
+    const t0 = Date.parse('2026-10-18T04:00:00Z');
+    vi.setSystemTime(t0);
+    (globalThis as any).IS_REACT_ACT_ENVIRONMENT = true;
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    const container = document.createElement('div'); document.body.appendChild(container);
+    const root = createRoot(container);
+    const row = (id: string, bid: number) => [id, 1995, 'Ford', 'Mustang', bid, '2026-10-20T00:00:00Z', '2026-10-10T00:00:00Z', '2026-10-09T00:00:00Z', null, false, `https://bringatrailer.com/listing/${id}/`];
+    let board = [row('a', 100), row('b', 100)];
+    let tape: any[] = [];
+    fixture.rpc.mockImplementation(async (name: string) => (name === 'live_bid_tape'
+      ? { data: { bids: tape }, error: null } : { data: { auctions: board }, error: null }));
+    let latest: ReturnType<typeof useMarketPulse>;
+    const played: string[] = [];
+    function Probe() {
+      latest = useMarketPulse();
+      React.useEffect(() => { for (const b of latest.newBids) played.push(`${b.vehicleId}@${Math.round((Date.now() - t0) / 1000)}`); }, [latest.newBids]);
+      return <span>{[...latest.risenIds].sort().join(',')}</span>;
+    }
+    const at = (s: number) => new Date(t0 + s * 1000).toISOString();
+    try {
+      await act(async () => { root.render(<QueryClientProvider client={client}><Probe /></QueryClientProvider>); });
+      await act(async () => { await vi.advanceTimersByTimeAsync(1); });
+      // Placed at +2 s and +8 s; the stream records them about a minute late, so the 15 s read at +75 s sees both.
+      tape = [{ id: 'x', vehicle_id: 'a', amount: 150, bid_at: at(2) }, { id: 'y', vehicle_id: 'b', amount: 160, bid_at: at(8) }];
+      await act(async () => { await vi.advanceTimersByTimeAsync(74_999); });
+      for (let s = 0; s < 10; s++) await act(async () => { await vi.advanceTimersByTimeAsync(1000); });
+      expect(played).toEqual(['a@75', 'b@81']);
+      board = [row('a', 150), row('b', 160)];
+      await act(async () => { await latest!.refetch(); await vi.advanceTimersByTimeAsync(1); });
+      expect(container.textContent).toBe('');
+    } finally { await act(async () => root.unmount()); client.clear(); container.remove(); }
+  });
+});
+
 describe('bounded public taxonomy reader', () => {
   it('repeats public eligibility for every bounded batch and refuses partial failures', async () => {
     const queries: any[] = [];

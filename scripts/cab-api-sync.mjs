@@ -17,17 +17,22 @@
  *   7. `external_identities`    (every unique seller, buyer, bidder, and commenter handle)
  *   8. `vehicle_images`         (all full-res width=2080 gallery photos with category metadata)
  *   9. `auction_comments`       (every individual comment + timestamped bid linked to identity)
+ *  10. `vehicle_observations`   (one sourced `listing` observation per lot + field_evidence, through the shared
+ *                                _shared/observationWriter.ts the edge extractor uses)
  *
  * Modes:
  *   node scripts/cab-api-sync.mjs --mode=live
  *   node scripts/cab-api-sync.mjs --mode=extract --ids=9em6ZaVd,3yBXgzN7
  *   node scripts/cab-api-sync.mjs --mode=backfill --start-page=1 --end-page=853
+ *   node scripts/cab-api-sync.mjs --mode=backfill --start-page=1 --end-page=853 --refresh   (re-read every lot)
  */
 
 import { chromium } from "playwright";
 import crypto from "crypto";
 import fs from "fs";
 import { createClient } from "@supabase/supabase-js";
+import { writeObservation } from "../supabase/functions/_shared/observationWriter.ts";
+import { buildCabAuctionCommentRows } from "../supabase/functions/_shared/batAuctionRecord.ts";
 
 const SUPABASE_URL = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL;
 const SUPABASE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -35,6 +40,68 @@ const SUPABASE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
 if (!SUPABASE_URL || !SUPABASE_KEY) {
   console.error("Missing SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY");
   process.exit(1);
+}
+
+// Shared writer gate (.claude/LANES.md): hold while more than 3 client queries wait on IO. One shared Management API
+// rate limit serves every agent, so read it at most once a minute (an open reading stands for that minute) and back
+// off a minute on a 429 or any failure.
+const IO_GATE_MAX_WAITERS = 3;
+let ioGateLastCheck = 0;
+let ioGateLastOpen = false;
+async function waitForIoGate() {
+  const token = process.env.SUPABASE_ACCESS_TOKEN;
+  const ref = (SUPABASE_URL || "").match(/https:\/\/([a-z0-9]+)\.supabase\.co/)?.[1];
+  if (!token || !ref) return;
+  for (;;) {
+    const sinceLast = Date.now() - ioGateLastCheck;
+    if (sinceLast < 60_000) {
+      if (ioGateLastOpen) return;
+      await new Promise((r) => setTimeout(r, 60_000 - sinceLast));
+    }
+    ioGateLastCheck = Date.now();
+    let waiters = null;
+    try {
+      const res = await fetch(`https://api.supabase.com/v1/projects/${ref}/database/query`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+        signal: AbortSignal.timeout(20_000),
+        body: JSON.stringify({
+          query: "SELECT count(*)::int AS n FROM pg_stat_activity WHERE backend_type = 'client backend' AND state = 'active' AND wait_event_type = 'IO'",
+        }),
+      });
+      if (res.ok) waiters = (await res.json())?.[0]?.n ?? null;
+    } catch {}
+    ioGateLastOpen = waiters !== null && waiters <= IO_GATE_MAX_WAITERS;
+    if (ioGateLastOpen) return;
+    console.log(`  [io-gate] ${waiters === null ? "gate read failed" : `${waiters} queries waiting on IO`}; holding 60 s`);
+  }
+}
+
+// observation_sources rows for Cars & Bids: `cars-and-bids` (the extractors) and the older `cars_and_bids`.
+let cabSourceIds = null;
+async function cabObservationSourceIds() {
+  if (cabSourceIds) return cabSourceIds;
+  const { data, error } = await supabase.from("observation_sources").select("id").in("slug", ["cars-and-bids", "cars_and_bids"]);
+  if (error || !data?.length) throw new Error(`observation_sources lookup failed: ${error ? describePgError(error) : "no rows"}`);
+  cabSourceIds = data.map((r) => r.id);
+  return cabSourceIds;
+}
+
+// Row bookkeeping, not testimony from the listing; description goes in as the observation's content_text.
+const OBSERVATION_EXCLUDED_KEYS = new Set([
+  "description", "description_source", "import_metadata", "origin_metadata", "updated_at", "is_public", "status",
+  "listing_source", "extractor_version", "discovery_source", "auction_source", "canonical_platform", "platform_source",
+  "source", "listing_location_source", "listing_location_observed_at", "listing_location_confidence",
+  // Section texts travel in content_text (fullDescription, labelled); as fields they overflow the btree row limit of
+  // idx_vobs_specs_covering, which INCLUDEs structured_data.
+  "highlights", "equipment", "modifications", "known_flaws", "recent_service_history",
+]);
+
+// PostgREST errors from a gateway timeout or an empty 5xx body carry code/details/hint but no message.
+function describePgError(err) {
+  const parts = [err?.message, err?.code && `code=${err.code}`, err?.details && `details=${err.details}`, err?.hint && `hint=${err.hint}`]
+    .filter(Boolean);
+  return parts.length ? parts.join(" ") : JSON.stringify(err);
 }
 
 const supabase = createClient(SUPABASE_URL, SUPABASE_KEY, {
@@ -1051,7 +1118,7 @@ async function extractSingleAuctionGoldStandard(cab, auctionId) {
     : [];
 
   // 1. Archive JSON snapshot in listing_page_snapshots (exact schema columns)
-  const jsonSnapshotText = JSON.stringify({ detail: d, comments_count: commentsAndBids.length });
+  const jsonSnapshotText = JSON.stringify({ detail: d, comments_count: commentsAndBids.length, comments_and_bids: commentsAndBids });
   const htmlBody = `<!-- cab-v2-api-json:${d.id} class="bid-bar ${isEnded ? "ended" : "live"}" -->\n<script id="cab-v2-json" type="application/json">${jsonSnapshotText}</script>`;
   const htmlSha256 = crypto.createHash("sha256").update(htmlBody).digest("hex");
 
@@ -1104,8 +1171,9 @@ async function extractSingleAuctionGoldStandard(cab, auctionId) {
     let q = supabase
       .from("vehicles")
       .select("id")
-      .eq("vin", vin)
-      .neq("status", "merged")
+      // Case variants as an exact IN, so idx_vehicles_vin serves it (an ILIKE seq-scans vehicles).
+      .in("vin", [...new Set([vin.trim(), vin.trim().toUpperCase(), vin.trim().toLowerCase()])])
+      .or("status.is.null,status.neq.merged")
       .is("deleted_at", null);
     if (vin.length < 11 && (l.make || parseTitleYmm(l.title).make)) {
       q = q.ilike("make", l.make || parseTitleYmm(l.title).make);
@@ -1185,6 +1253,12 @@ async function extractSingleAuctionGoldStandard(cab, auctionId) {
     drivetrain,
     body_style: facets.body_style || bodyStyle,
     title_status: l.title_status || null,
+    // The listing's own sections on the root columns the profile reader shows (also kept in import_metadata).
+    highlights: sections.highlights || null,
+    equipment: sections.equipment || null,
+    modifications: sections.modifications || null,
+    known_flaws: sections.known_flaws || null,
+    recent_service_history: sections.recent_service_history || null,
     primary_image_url: allPhotos[0]?.url || null,
     description: fullDescription || null,
     description_source: "source_imported",
@@ -1269,20 +1343,55 @@ async function extractSingleAuctionGoldStandard(cab, auctionId) {
   });
 
   if (vehicleId) {
-    const { error: uErr } = await supabase
+    let { error: uErr } = await supabase
       .from("vehicles")
       .update(vehiclePayload)
       .eq("id", vehicleId);
-    if (uErr) throw new Error(`Vehicle update failed for ${d.id}: ${uErr.message}`);
+    // A merged-away duplicate can still hold this listing's discovery_url; keep the target's own discovery_url then.
+    if (uErr?.code === "23505" && uErr.message?.includes("vehicles_discovery_url_unique")) {
+      const { discovery_url: _held, ...withoutDiscoveryUrl } = vehiclePayload;
+      ({ error: uErr } = await supabase.from("vehicles").update(withoutDiscoveryUrl).eq("id", vehicleId));
+    }
+    if (uErr) throw new Error(`Vehicle update failed for ${d.id}: ${describePgError(uErr)}`);
   } else {
     const { data: insV, error: iErr } = await supabase
       .from("vehicles")
       .insert(vehiclePayload)
       .select("id")
       .single();
-    if (iErr) throw new Error(`Vehicle insert failed for ${d.id}: ${iErr.message}`);
+    if (iErr) throw new Error(`Vehicle insert failed for ${d.id}: ${describePgError(iErr)}`);
     vehicleId = insV.id;
   }
+
+  // 2b. The lot's sourced listing observation: every field this read produced, with source, clock and trust.
+  const observationFields = Object.fromEntries(
+    Object.entries(vehiclePayload).filter(([k]) => !OBSERVATION_EXCLUDED_KEYS.has(k))
+  );
+  Object.assign(observationFields, {
+    cab_auction_id: d.id,
+    transmission_details: l.transmission_details || null,
+    is_not_car: l.is_not_car ?? null,
+    make_slug: l.make_slug || null,
+    model_slug: l.model_slug || null,
+    seller_type_details: l.seller_type_details || null,
+    seller_is_certified: d.seller?.is_certified_seller ?? null,
+    history_report_vendor: l.history_report?.vendor || null,
+    questions_count: stats.questions ?? null,
+  });
+  for (const k of Object.keys(observationFields)) if (observationFields[k] === null) delete observationFields[k];
+  const obsResult = await writeObservation(supabase, {
+    vehicleId,
+    source: { platform: "cars-and-bids", url: canonicalUrl, trustScore: 0.8, sourceIdentifier: d.id },
+    fields: observationFields,
+    observationKind: "listing",
+    extractionMethod: "cab_v2_api",
+    observedAt: nowIso,
+    contentText: fullDescription || undefined,
+  });
+  if (!obsResult.observationId) {
+    throw new Error(`Listing observation failed for ${d.id}: ${obsResult.errors.join("; ") || "no observation id"}`);
+  }
+  const observationWritten = obsResult.duplicate ? 0 : 1;
 
   // 3. Upsert external_identities for seller, buyer, and commenters/bidders
   const handles = new Map();
@@ -1470,49 +1579,44 @@ async function extractSingleAuctionGoldStandard(cab, auctionId) {
   let bidRowsCount = 0;
   let commentRowsCount = 0;
   if (auctionRow?.id && commentsAndBids.length > 0) {
-    const endMs = endDateIso ? new Date(endDateIso).getTime() : null;
-    const commentRows = commentsAndBids.map((c, idx) => {
-      const postedIso = c.timestamp ? new Date(c.timestamp).toISOString() : nowIso;
-      const isBid = c.type === 2 || !!c.amount;
-      if (isBid) bidRowsCount++;
-      else commentRowsCount++;
-      const text = isBid ? `Bid $${Number(c.amount).toLocaleString()}` : String(c.text || "").trim();
-      const username = c.user?.username || "anonymous";
-      return {
-        auction_event_id: auctionRow.id,
-        vehicle_id: vehicleId,
-        platform: "cars_and_bids",
-        source_url: canonicalUrl,
-        content_hash: `cab_${vehicleId}_${c.id}`,
-        sequence_number: idx + 1,
-        posted_at: postedIso,
-        hours_until_close: endMs
-          ? Math.max(0, (endMs - new Date(postedIso).getTime()) / 3600000)
-          : null,
-        author_username: username,
-        author_external_identity_id: identityIds.get(username) || null,
-        external_identity_id: identityIds.get(username) || null,
-        is_seller: !!c.user?.is_seller || username === d.seller?.username,
-        comment_type: isBid
-          ? "bid"
-          : c.user?.is_seller
-          ? "seller_response"
-          : text.includes("?")
-          ? "question"
-          : "observation",
-        comment_text: text || "(empty)",
-        word_count: (text || "").split(/\s+/).filter(Boolean).length,
-        has_question: text.includes("?"),
-        comment_likes: c.upvotes || 0,
-        bid_amount: isBid ? c.amount : null,
-      };
+    const endAt = endDateIso ? new Date(endDateIso) : null;
+    const mediaUrl = (a) => (a?.attachment?.base_url && a?.attachment?.path ? `https://${a.attachment.base_url}/${a.attachment.path}` : null);
+    const builtRows = await buildCabAuctionCommentRows({
+      comments: commentsAndBids.map((c) => {
+        const isBid = c.type === 2 || !!c.amount;
+        if (isBid) bidRowsCount++;
+        else commentRowsCount++;
+        const username = c.user?.username || "";
+        return {
+          id: c.id,
+          author: username,
+          postedAt: c.timestamp || null,
+          text: isBid ? `Bid $${Number(c.amount).toLocaleString()}` : String(c.text || ""),
+          likes: c.upvotes || 0,
+          bidAmount: isBid ? c.amount : null,
+          isSeller: !!c.user?.is_seller || (!!username && username === d.seller?.username),
+          isResult: c.type === 5,
+          mediaUrls: (c.attachments || []).map(mediaUrl).filter(Boolean),
+          replyTo: c.reply_to?.username || null,
+          flagged: !!(c.flagged || c.system_flagged || c.deleted_at),
+        };
+      }),
+      listingUrlNorm: canonicalUrl,
+      vehicleId,
+      auctionEventId: auctionRow.id,
+      endAt: endAt && !Number.isNaN(endAt.getTime()) ? endAt : null,
+    });
+    const commentRows = builtRows.map((r) => {
+      const identityId = identityIds.get(r.author_username) || null;
+      return { ...r, author_external_identity_id: identityId, external_identity_id: identityId };
     });
 
     for (let k = 0; k < commentRows.length; k += 100) {
       const { error: cErr } = await supabase
         .from("auction_comments")
         .upsert(commentRows.slice(k, k + 100), { onConflict: "vehicle_id,content_hash" });
-      if (!cErr) commentsUpserted += commentRows.slice(k, k + 100).length;
+      if (cErr) throw new Error(`Comment upsert failed for ${d.id}: ${describePgError(cErr)}`);
+      commentsUpserted += commentRows.slice(k, k + 100).length;
     }
   }
 
@@ -1538,6 +1642,7 @@ async function extractSingleAuctionGoldStandard(cab, auctionId) {
   const totalDataModelRows =
     1 + // vehicles
     snapshotSaved + // listing_page_snapshots
+    observationWritten + // vehicle_observations
     1 + // vehicle_events
     (auctionRow?.id ? 1 : 0) + // auction_events
     orgLinked + // organization_vehicles
@@ -1562,6 +1667,7 @@ async function extractSingleAuctionGoldStandard(cab, auctionId) {
     comments_upserted: commentsUpserted,
     identities_upserted: identityIds.size,
     snapshot_saved: snapshotSaved,
+    observation_written: observationWritten,
     org_linked: orgLinked,
     total_data_model_rows: totalDataModelRows,
     seller: d.seller?.username || null,
@@ -1577,7 +1683,7 @@ async function extractSingleAuctionGoldStandard(cab, auctionId) {
  * extracts each one via `extractSingleAuctionGoldStandard`, and writes real-time
  * propagation telemetry (`total_data_model_rows` per listing) to console + JSONL log.
  */
-async function runHistoricalBackfill(cab, startPage = 1, endPage = 853, concurrency = 3) {
+async function runHistoricalBackfill(cab, startPage = 1, endPage = 853, concurrency = 3, { refresh = false } = {}) {
   const logDir = "/Users/skylar/nuke-logs/lane-online";
   fs.mkdirSync(logDir, { recursive: true });
   const logPath = `${logDir}/cab_backfill_telemetry_20261017.jsonl`;
@@ -1607,6 +1713,7 @@ async function runHistoricalBackfill(cab, startPage = 1, endPage = 853, concurre
   };
 
   for (let pageNum = startPage; pageNum <= endPage; pageNum++) {
+    await waitForIoGate();
     const offset = (pageNum - 1) * 50;
     const res = await cab.callApi("v2", "autos/auctions", {
       limit: "50",
@@ -1632,16 +1739,25 @@ async function runHistoricalBackfill(cab, startPage = 1, endPage = 853, concurre
       .in("source_listing_id", pageIds);
 
     const completeSet = new Set();
-    if (existingAe?.length) {
+    // --refresh re-reads every lot on the page (the upserts rewrite what changed), skipping nothing as complete.
+    if (!refresh && existingAe?.length) {
       const vids = existingAe.map((r) => r.vehicle_id).filter(Boolean);
       const { data: vRows } = await supabase
         .from("vehicles")
         .select("id, vin")
         .in("id", vids);
       const vinMap = new Map((vRows || []).map((v) => [v.id, v.vin]));
+      const { data: obsRows, error: obsErr } = await supabase
+        .from("vehicle_observations")
+        .select("vehicle_id")
+        .in("vehicle_id", vids)
+        .in("source_id", await cabObservationSourceIds())
+        .eq("kind", "listing");
+      if (obsErr) throw new Error(`Listing observation check failed on page ${pageNum}: ${describePgError(obsErr)}`);
+      const observed = new Set((obsRows || []).map((r) => r.vehicle_id));
       for (const ae of existingAe) {
         const vVin = vinMap.get(ae.vehicle_id);
-        if (vVin && vVin.length >= 5 && ae.comments_count !== null) {
+        if (vVin && vVin.length >= 5 && ae.comments_count !== null && observed.has(ae.vehicle_id)) {
           completeSet.add(ae.source_listing_id);
         }
       }
@@ -1742,7 +1858,7 @@ async function main() {
       const startPage = parseInt(args["start-page"] || "1", 10);
       const endPage = parseInt(args["end-page"] || "853", 10);
       const concurrency = parseInt(args.concurrency || "3", 10);
-      await runHistoricalBackfill(cab, startPage, endPage, concurrency);
+      await runHistoricalBackfill(cab, startPage, endPage, concurrency, { refresh: args.refresh === "true" || args.refresh === "" });
     }
   } finally {
     await cab.close();

@@ -28,11 +28,12 @@ import { writeObservation } from "../_shared/observationWriter.ts";
 import { requireWriteAuth } from "../_shared/writeGuard.ts";
 import { projectSecretKey } from "../_shared/supabaseKeys.ts";
 import { batchFromTargets, discoverTargets, reviseCab, recaptureCab } from "./targets.ts";
-import { parseCabDepth } from "./cabPage.ts";
+import { cabLotPhotos, parseCabDepth } from "./cabPage.ts";
 import { cleanCabText, extractCabFacets } from "./cabFacets.ts";
 import { recordSellerTypes, sellerTypeRow } from "../_shared/sellerType.ts";
 import { insertMissingVehicleImages } from "../_shared/vehicleImageWrite.ts";
 import { fillOnlyIdentity, identityConflict, REVISION_DIFFERENT_CAR } from "../_shared/identityMatch.ts";
+import { buildCabAuctionCommentRows, legacyCabCommentId, linkAuctionCommentIdentities } from "../_shared/batAuctionRecord.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -375,17 +376,10 @@ function parseCabHtml(html: string, sourceUrl?: string): CabExtractedData {
     }
     if (result.bidHistory.length > 0) console.log(`✅ C&B [bids]: ${result.bidHistory.length} bids extracted`);
 
-    // 11. Gallery images — CDN URLs (skip small thumbnails width=80/148/160/320 and 148x126 sidebar cards)
-    const seenImages = new Set<string>();
-    for (const m of html.matchAll(/https:\/\/media\.carsandbids\.com\/[^"'\s)>]+/gi)) {
-      const url = m[0];
-      const cleanUrl = url.split('?')[0];
-      if (isCabThumbUrl(url)) continue;
-      if (!seenImages.has(cleanUrl)) {
-        seenImages.add(cleanUrl);
-        result.images.push(url);
-      }
-    }
+    // 11. Gallery images — the lot's own only: its gallery and photos sharing the gallery's photo-set id. The 768 and
+    // 356x260 renders elsewhere on the page are cards linking to other auctions; small thumbnails are skipped too.
+    const pageLotId = (sourceUrl || '').match(/\/auctions\/([A-Za-z0-9]+)/i)?.[1] ?? null;
+    result.images = cabLotPhotos(html, pageLotId).filter((u) => !isCabThumbUrl(u));
     // og:image as primary if gallery is empty
     if (result.images.length === 0) {
       const ogImg = html.match(/<meta[^>]*property=["']og:image["'][^>]*content=["']([^"']+)["']/i) ||
@@ -669,7 +663,7 @@ Deno.serve(async (req) => {
     // Parse HTML directly — no LLM, no markdown, no API cost
     const extracted = parseCabHtml(html, listingUrlCanonical);
     // Depth pass over the same retained capture: full description, comment/bid stream, seller/buyer, end moment, outcome, gallery.
-    const depth = parseCabDepth(html, cachedSnapshot?.fetched_at ? new Date(cachedSnapshot.fetched_at) : new Date());
+    const depth = parseCabDepth(html, cachedSnapshot?.fetched_at ? new Date(cachedSnapshot.fetched_at) : new Date(), extracted.lotNumber);
     if (depth.seller) { extracted.sellerName = depth.seller.name; extracted.sellerProfileUrl = depth.seller.profileUrl; }
     if (depth.endedAt) extracted.endDate = depth.endedAt;
     extracted.auctionStatus = depth.outcome;
@@ -1038,7 +1032,9 @@ Deno.serve(async (req) => {
       const mine = (heldImgs ?? []).filter((r: { exif_data: any }) => r.exif_data?.imported_from === "cars_and_bids");
       // Earlier runs stored every media URL on the page (similar-auction thumbnails, avatars) and gallery copies at 542 px.
       // Supersede those (the original stays, flagged) when this page's gallery is known; keep a full-resolution copy of each.
-      const stale = mine.filter((r: { image_url: string }) => !current.has(photoKey(r.image_url)) || !fullRes(r.image_url)).map((r: { id: string }) => r.id);
+      const stale = depth.photos.length
+        ? mine.filter((r: { image_url: string }) => !current.has(photoKey(r.image_url)) || !fullRes(r.image_url)).map((r: { id: string }) => r.id)
+        : [];
       if (stale.length) {
         const { error: supErr } = await supabase.from("vehicle_images").update({ is_superseded: true, superseded_at: nowIso }).in("id", stale);
         if (supErr) console.warn(`⚠️ C&B: supersede images failed: ${supErr.message}`);
@@ -1207,6 +1203,8 @@ Deno.serve(async (req) => {
     }
 
     // Upsert auction_event (columns as in the live table) and land the comment/bid stream under it
+    let commentsWritten = 0;
+    let commentsWriteError: string | null = null;
     if (vehicleId) {
       const auctionEventData: Record<string, any> = {
         vehicle_id: vehicleId,
@@ -1242,34 +1240,44 @@ Deno.serve(async (req) => {
         .maybeSingle();
       if (auctionError) console.warn(`⚠️ C&B: Auction event upsert failed: ${auctionError.message}`);
 
-      if (auctionRow?.id && depth.comments.length) {
-        const endMs = extracted.endDate ? new Date(extracted.endDate).getTime() : null;
-        const rows = depth.comments.map((c, i) => {
-          const posted = c.postedAt ?? new Date().toISOString();
-          return {
-            auction_event_id: auctionRow.id,
-            vehicle_id: vehicleId,
-            platform: "cars_and_bids",
-            source_url: listingUrlCanonical,
-            content_hash: `cab_${vehicleId}_${c.id}`,
-            sequence_number: i + 1,
-            posted_at: posted,
-            hours_until_close: endMs ? Math.max(0, (endMs - new Date(posted).getTime()) / 3_600_000) : null,
-            author_username: c.author,
-            author_external_identity_id: identityIds.get(c.author) ?? null,
-            external_identity_id: identityIds.get(c.author) ?? null,
-            is_seller: c.isSeller,
-            comment_type: c.bidAmount ? "bid" : c.isSeller ? "seller_response" : c.text.includes("?") ? "question" : "observation",
-            comment_text: c.text,
-            word_count: c.text.split(/\s+/).length,
-            has_question: c.text.includes("?"),
-            comment_likes: c.likes,
-            bid_amount: c.bidAmount,
-          };
-        });
-        for (let k = 0; k < rows.length; k += 100) {
-          const { error: cErr } = await supabase.from("auction_comments").upsert(rows.slice(k, k + 100), { onConflict: "vehicle_id,content_hash" });
-          if (cErr) { console.warn(`⚠️ C&B: comments upsert failed: ${cErr.message}`); break; }
+      // The BaT recipe (_shared/batAuctionRecord.ts): one builder, dedupe on the platform's own comment id, exact
+      // (cars_and_bids, handle) identity link, and a failed write stops the stream and is reported, never skipped.
+      // Bids reach external_auction_bids through trg_external_auction_bids_from_comments, as BaT's do.
+      if (auctionError) commentsWriteError = `auction event not written: ${auctionError.message}`;
+      else if (auctionRow?.id && depth.comments.length) {
+        try {
+          const endAt = extracted.endDate ? new Date(extracted.endDate) : null;
+          const rows = await buildCabAuctionCommentRows({
+            comments: depth.comments, listingUrlNorm: listingUrlCanonical, vehicleId, auctionEventId: auctionRow.id,
+            endAt: endAt && !Number.isNaN(endAt.getTime()) ? endAt : null,
+          });
+          const { data: have, error: haveError } = await supabase.from("auction_comments")
+            .select("source_comment_id,content_hash").eq("vehicle_id", vehicleId).eq("platform", "cars_and_bids").limit(5000);
+          if (haveError) throw new Error(`Comment replay lookup failed: ${haveError.message}`);
+          const haveIds = new Set((have ?? []).map((x: any) => x.source_comment_id ?? legacyCabCommentId(x.content_hash)).filter(Boolean));
+          const fresh = rows.filter((r) => !haveIds.has(r.source_comment_id));
+          const linked = await linkAuctionCommentIdentities(fresh, {
+            async find(handles) {
+              const { data, error } = await supabase.from("external_identities")
+                .select("id,handle").eq("platform", "cars_and_bids").in("handle", handles);
+              if (error) throw new Error(`Comment identity lookup failed: ${error.message}`);
+              return data ?? [];
+            },
+            async insertMissing(identities) {
+              const { error } = await supabase.from("external_identities")
+                .upsert(identities, { onConflict: "platform,handle", ignoreDuplicates: true });
+              if (error) throw new Error(`Comment identity insert failed: ${error.message}`);
+            },
+          }, "cars_and_bids");
+          for (let k = 0; k < linked.length; k += 200) {
+            const { data: inserted, error: cErr } = await supabase.from("auction_comments")
+              .upsert(linked.slice(k, k + 200), { onConflict: "vehicle_id,content_hash", ignoreDuplicates: true }).select("id");
+            if (cErr) throw new Error(`auction_comments upsert failed: ${cErr.message}`);
+            commentsWritten += inserted?.length ?? 0;
+          }
+        } catch (e) {
+          commentsWriteError = e instanceof Error ? e.message : String(e);
+          console.error(`C&B: comments/bids write failed: ${commentsWriteError}`);
         }
       }
     }
@@ -1318,6 +1326,8 @@ Deno.serve(async (req) => {
       image_insert_error: imageInsertError,
       snapshot_id: newSnapshotId,
       result: { outcome: depth.outcome, amount: depth.amount, ended_at: depth.endedAt, buyer: depth.buyer?.name ?? null },
+      comments_written: commentsWritten,
+      comments_write_error: commentsWriteError,
       completeness: {
         comments_landed: depth.comments.filter((c) => !c.bidAmount).length, comments_claimed: depth.commentCount,
         bids_landed: depth.comments.filter((c) => c.bidAmount).length, bids_claimed: depth.bidCount,

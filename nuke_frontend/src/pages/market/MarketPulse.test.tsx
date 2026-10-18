@@ -35,7 +35,7 @@ vi.mock('./RecordedSalesComparison', () => ({
 }));
 vi.mock('../../components/PrefetchLink', () => ({ PrefetchLink: ({ to, ...props }: any) => <a href={to} {...props} /> }));
 
-import MarketPulse from './MarketPulse';
+import MarketPulse, { matchesFamilyScope } from './MarketPulse';
 import { currentBidDistribution, type LiveAuction } from './useMarketPulse';
 
 
@@ -387,6 +387,26 @@ describe('market answer -> supporting lots', () => {
   });
 });
 
+
+describe('a family keeps its numbered members on the live board', () => {
+  const live = (make: string, model: string, title = `2022 ${make} ${model}`) => ({ ...lot('x', make, 1000, 2), model, title });
+  it('keeps name-plus-number members of a family', () => {
+    expect(matchesFamilyScope(live('Lexus', 'LC500 Convertible'), 'LC')).toBe(true);
+    expect(matchesFamilyScope(live('Lexus', '', '2022 Lexus LC500 Convertible Inspiration Series'), 'LC')).toBe(true);
+    expect(matchesFamilyScope(live('Ford', 'F-150 XLT'), 'F-Series')).toBe(true);
+    expect(matchesFamilyScope(live('Ford', 'F250'), 'F-Series')).toBe(true);
+    expect(matchesFamilyScope(live('BMW', '328i'), '3 Series')).toBe(true);
+    expect(matchesFamilyScope(live('Chevrolet', 'C10'), 'C/K')).toBe(true);
+    expect(matchesFamilyScope(live('Chevrolet', 'K20 Scottsdale'), 'C/K')).toBe(true);
+    expect(matchesFamilyScope(live('Lexus', 'LC 500'), 'LC')).toBe(true);
+  });
+  it('does not pull in another family that only contains the letters', () => {
+    expect(matchesFamilyScope(live('Ford', 'Mustang Shelby GT350'), 'GT')).toBe(false);
+    expect(matchesFamilyScope(live('Lexus', 'LS460'), 'LC')).toBe(false);
+    expect(matchesFamilyScope(live('BMW', 'M3'), '3 Series')).toBe(false);
+    expect(matchesFamilyScope(live('Porsche', '9110'), '911')).toBe(false);
+  });
+});
 
 describe('where a lot should finish', () => {
   it('puts the estimate and its range under the bid, with the measured confidence on hover, and nothing without one', async () => {

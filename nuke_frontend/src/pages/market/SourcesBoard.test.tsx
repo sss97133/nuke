@@ -1092,3 +1092,81 @@ it('keeps the all-makes board, labeled so, for a make alone', async () => {
   expect(container.querySelector('.market-sources__title')?.textContent).toBe('Sources · all makes');
   expect(fixture.rpc).not.toHaveBeenCalledWith('treemap_family_sales', expect.anything());
 });
+
+// market_sources_read (20261019050000): the same rows with species, label, counts_as_held and evidence appended, plus the
+// reader's species groups in the doc's order.
+const speciesOf: Record<string, [string, string, boolean]> = {
+  bat: ['timed_auction', 'Timed with soft close', true],
+  mecum: ['block_house', 'Block houses', true],
+  'cars-and-bids': ['timed_auction', 'Timed with soft close', true],
+  craigslist: ['classifieds', 'Classifieds', true],
+  'avant-garde-collection': ['dealer', 'Dealer sites', true],
+  beverlyhillscarclub: ['dealer', 'Dealer sites', true],
+};
+const craigslistEvidence = {
+  examined_at: '2026-10-18',
+  examined: ['listing_page_snapshots craigslist https://www.craigslist.org/view/d/spokane-1989-volkswagen-cabriolet/x'],
+  seen: "Post page: 'post id: 7985432409 posted: 2026-10-17 16:14'; no bid, lot or close time.",
+  doc: 'docs/ledger/theory/data-machine-cases.md §6 names it under Classifieds',
+};
+const speciesValue = {
+  ...value,
+  columns: [...columns, 'species', 'species_label', 'counts_as_held', 'species_evidence'],
+  rows: [
+    ...value.rows.map((r) => [...r, ...speciesOf[r[0] as string], r[0] === 'craigslist' ? craigslistEvidence : null]),
+    ['barnfinds', 'Barn Finds', 'aggregator', null, 13451, '2026-10-16T10:27:00Z', null, null, null, null, null, null, null,
+      null, null, null, null, 0, null, null, null, 300, 2100, '2026-10-16T09:00:00Z', days(300), null, null,
+      'aggregator', 'Aggregators', false, { examined_at: '2026-10-18', examined: ['barnfinds posts'], seen: "190 of 200 posts say 'here on' another site." }],
+  ],
+  not_ranked: { 'capture channels': 1, 'no species evidence': 1 },
+  species_groups: [
+    { species: 'timed_auction', label: 'Timed with soft close', unit: 'lots held', counts_as_held: true },
+    { species: 'block_house', label: 'Block houses', unit: 'lots held', counts_as_held: true },
+    { species: 'dealer', label: 'Dealer sites', unit: 'vehicles held', counts_as_held: true },
+    { species: 'classifieds', label: 'Classifieds', unit: 'posts held', counts_as_held: true },
+    { species: 'auth_walled_marketplace', label: 'Auth-walled marketplaces', unit: 'listings held', counts_as_held: true },
+    { species: 'aggregator', label: 'Aggregators', unit: 'pages read, not listings held', counts_as_held: false },
+  ],
+};
+
+it('groups the board by species with the doc\'s names, aggregators apart, and shows each source\'s evidence', async () => {
+  const d = parseSources(speciesValue)!;
+  expect(d.speciesGroups?.map((g) => g.label)).toEqual(['Timed with soft close', 'Block houses', 'Dealer sites', 'Classifieds',
+    'Auth-walled marketplaces', 'Aggregators']);
+  expect(d.rows.find((r) => r.source === 'craigslist')).toMatchObject({ species: 'classifieds', speciesLabel: 'Classifieds',
+    countsAsHeld: true, speciesEvidence: { examinedAt: '2026-10-18', seen: craigslistEvidence.seen } });
+  expect(d.rows.find((r) => r.source === 'barnfinds')).toMatchObject({ species: 'aggregator', countsAsHeld: false });
+  expect(parseSources(value)!.speciesGroups).toBeNull();
+
+  fixture.rpc.mockImplementation((fn: string) => {
+    if (fn === 'market_sources_read') return Promise.resolve({ data: speciesValue, error: null });
+    if (fn === 'market_source_landing_read') return Promise.resolve({ data: { ...batLandingDetail, source: 'craigslist', recent: [] }, error: null });
+    return Promise.resolve({ data: null, error: { message: 'none' } });
+  });
+  await act(async () => root.render(<SourcesBoard />));
+  const groups = [...container.querySelectorAll('.market-sources__group')];
+  expect(groups.map((g) => g.querySelector('.market-sources__group-title')?.textContent)).toEqual(
+    ['Timed with soft close', 'Block houses', 'Dealer sites', 'Classifieds', 'Aggregators']);
+  expect(groups.map((g) => [...g.querySelectorAll('.market-sources__name-text')].map((n) => n.textContent))).toEqual([
+    ['Bring a Trailer', 'Cars & Bids'], ['Mecum Auctions'], ['Avant-Garde Collection', 'Beverly Hills Car Club'], ['Craigslist'],
+    ['Barn Finds']]);
+  expect(groups[3].querySelector('.market-sources__badge')?.textContent).toBe('CLASSIFIEDS');
+  expect(groups[3].querySelector('.market-sources__cols .n')?.textContent).toBe('posts held');
+  expect(groups[4].querySelector('.market-sources__cols .n')?.textContent).toBe('pages read, not listings held');
+  expect(groups[4].querySelector('.market-sources__badge--aggregator')?.textContent).toBe('AGGREGATOR');
+  expect([...container.querySelectorAll('.market-sources__cat-pill')].map((b) => b.textContent)).toEqual(
+    ['ALL', 'TIMED AUCTION', 'BLOCK HOUSE', 'DEALER SITE', 'CLASSIFIEDS', 'AGGREGATOR']);
+  expect(container.querySelector('.market-sources__foot .market-sources__note')?.textContent)
+    .toBe('not ranked: 1 capture channel, 1 source without species evidence');
+
+  const classifiedsPill = [...container.querySelectorAll('.market-sources__cat-pill')].find((b) => b.textContent === 'CLASSIFIEDS') as HTMLButtonElement;
+  await act(async () => classifiedsPill.click());
+  expect([...container.querySelectorAll('.market-sources__group-title')].map((t) => t.textContent)).toEqual(['Classifieds']);
+  const land = container.querySelector('li.market-sources__row button.market-sources__landing') as HTMLButtonElement;
+  await act(async () => land.click());
+  const ev = container.querySelector('.market-sources__species-evidence')!;
+  expect(ev.querySelector('.market-sources__dealer-context-label')?.textContent).toBe('CLASSIFIEDS · FROM THE SOURCE ITSELF, 2026-10-18');
+  expect(ev.querySelector('.market-sources__species-seen')?.textContent).toBe(craigslistEvidence.seen);
+  expect(ev.querySelector('.market-sources__species-examined li')?.textContent).toBe(craigslistEvidence.examined[0]);
+  expect(container.querySelector('.market-sources__drill .market-sources__kpi-label')?.textContent?.trim()).toBe('Posts held');
+});

@@ -412,14 +412,18 @@ export function extractFromPageData(pageData: GoodingPageData, url: string): Goo
     saleroom_addendum = htmlToText(sraHtml.replace(/>/g, '> ')).replace(/\s+/g, ' ').trim();
   }
 
+  // Gooding sends lotNumber 0 for a consigned lot not yet given a number (measured 2026-10-18 on the upcoming
+  // Retromobile New York 300 SL); 0 is never a lot, so it is unknown.
+  const lotNumber = typeof lot.lotNumber === 'number' && lot.lotNumber > 0 ? lot.lotNumber : null;
+
   // Auction calendar position: "2025 Pebble Beach Auctions (Lot 38)"
   let auction_calendar_position: string | null = null;
   const auctionSlug = auction?.webpage__auction?.[0]?.slug;
   const yearFromSlug = auctionSlug ? auctionSlug.match(/(\d{4})$/)?.[1] : null;
-  if (auction?.name && lot.lotNumber != null) {
+  if (auction?.name && lotNumber != null) {
     auction_calendar_position = yearFromSlug
-      ? `${yearFromSlug} ${auction.name} (Lot ${lot.lotNumber})`
-      : `${auction.name} (Lot ${lot.lotNumber})`;
+      ? `${yearFromSlug} ${auction.name} (Lot ${lotNumber})`
+      : `${auction.name} (Lot ${lotNumber})`;
   }
 
   const canonicalUrl = `https://www.goodingco.com/lot/${slug}`;
@@ -449,7 +453,7 @@ export function extractFromPageData(pageData: GoodingPageData, url: string): Goo
     chassis,
     coachwork,
 
-    lot_number: lot.lotNumber,
+    lot_number: lotNumber,
     auction_name: auction?.name || null,
     auction_date: auctionDate,
     auction_location: auction?.location?.address?.addressCountry || null,
@@ -593,7 +597,7 @@ async function discoverLotsFromSitemap(): Promise<string[]> {
 // DATABASE OPERATIONS
 // ============================================================================
 
-async function saveToDatabase(
+export async function saveToDatabase(
   supabase: any,
   extracted: GoodingExtracted,
   opts: { skipImages?: boolean } = {},
@@ -601,11 +605,23 @@ async function saveToDatabase(
   const listingUrlKey = normalizeListingUrlKey(extracted.url);
 
   // Never equate Gooding lot slugs solely because one is a prefix of another.
-  const { vehicleId: resolvedId } = await resolveExistingVehicleId(supabase, {
-    url: extracted.url,
-    platform: 'gooding',
-    requireExactListingUrl: true,
-  });
+  let resolvedId: string | null;
+  try {
+    ({ vehicleId: resolvedId } = await resolveExistingVehicleId(supabase, {
+      url: extracted.url,
+      platform: 'gooding',
+      requireExactListingUrl: true,
+    }));
+  } catch (e: any) {
+    // PGRST116: the lot's episode key is on more than one row, i.e. the lot sits on two vehicles (one per host spelling,
+    // 637 of 6,992 Gooding lots on 2026-10-18). Writing to either would pick one at random, so the lot is refused and
+    // raised for relinking; the vehicle merge belongs to the identity owner, not this writer.
+    if (e?.code === 'PGRST116') {
+      await recordRevision(supabase, { url: extracted.url, missing: ['identity_match'], reason: 'duplicate_key', next_action: 'relink', raised_by: 'extract-gooding', detail: { reason: 'lot_on_multiple_vehicles', listing_key: listingUrlKey } });
+      throw new Error(`identity refused: lot ${listingUrlKey} is on more than one vehicle`);
+    }
+    throw e instanceof Error ? e : new Error(`vehicle lookup failed: ${e?.message ?? String(e)}${e?.code ? ` (${e.code})` : ''}`);
+  }
   let vehicleId: string | null = resolvedId;
 
   // The same lot under the other host spelling (or a trailing slash) is the same vehicle. Without this a writer that found nothing
@@ -915,12 +931,16 @@ async function saveToDatabase(
   // Save images
   let imagesSaved = 0;
   if (extracted.image_urls.length > 0 && !opts.skipImages) {
-    // Delete existing gooding images for this vehicle
-    softWrite('vehicle_images replace', await supabase
+    // Add only the photos this vehicle does not already hold. The old delete-then-insert doubled the gallery whenever
+    // the delete did not take (its failure was swallowed): the 300 SL gold lot went from 55 to 110 rows on one re-read
+    // (2026-10-18). Existing rows are kept, with whatever analysis already points at them.
+    const { data: have, error: haveErr } = await supabase
       .from('vehicle_images')
-      .delete()
+      .select('image_url')
       .eq('vehicle_id', vehicleId)
-      .eq('source', 'gooding'));
+      .limit(1000);
+    if (haveErr) throw new Error(`vehicle_images read failed: ${haveErr.message}`);
+    const haveUrls = new Set((have ?? []).map((r: { image_url: string }) => r.image_url));
 
     const imageRecords = extracted.image_urls.slice(0, 100).map((imgUrl, i) => ({
       vehicle_id: vehicleId,
@@ -933,7 +953,7 @@ async function saveToDatabase(
       redaction_level: 'none',
       position: i,
       display_order: i,
-      is_primary: i === 0,
+      is_primary: i === 0 && haveUrls.size === 0,
       exif_data: {
         source_url: extracted.url,
         discovery_url: extracted.url,
@@ -941,14 +961,16 @@ async function saveToDatabase(
         auction_name: extracted.auction_name,
         lot_number: extracted.lot_number,
       },
-    }));
+    })).filter((row) => !haveUrls.has(row.image_url));
 
-    const imgRes = await supabase
-      .from('vehicle_images')
-      .insert(imageRecords)
-      .select('id');
-    softWrite('vehicle_images insert', imgRes);
-    if (!imgRes.error) imagesSaved = imgRes.data?.length || 0;
+    if (imageRecords.length > 0) {
+      const imgRes = await supabase
+        .from('vehicle_images')
+        .insert(imageRecords)
+        .select('id');
+      softWrite('vehicle_images insert', imgRes);
+      if (!imgRes.error) imagesSaved = imgRes.data?.length || 0;
+    }
   }
 
   return { vehicle_id: vehicleId, images_saved: imagesSaved, is_new: isNew };
@@ -1354,7 +1376,7 @@ if (import.meta.main) Deno.serve(async (req) => {
   } catch (error: any) {
     console.error('[gooding] Error:', error);
     return new Response(
-      JSON.stringify({ success: false, error: error instanceof Error ? error.message : String(error) }),
+      JSON.stringify({ success: false, error: error instanceof Error ? error.message : (error?.message ?? String(error)) }),
       { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   }

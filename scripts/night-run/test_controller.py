@@ -90,6 +90,55 @@ class ContinuationTests(unittest.TestCase):
         self.assertGreater(self.controller.state["next_check"], time.time() + 21000)
         self.assertEqual(self.controller.state["session_id"], sid)
 
+    def test_weekly_limit_defers_scheduled_retries_then_resumes_same_session(self):
+        self.invoke()
+        original = copy.deepcopy(self.controller.state)
+        refusal = {"type": "result", "subtype": "success", "is_error": True,
+                   "session_id": original["session_id"],
+                   "result": "You've hit your weekly limit · resets later"}
+        now = time.time()
+        for attempt in range(3):
+            retry_at = now + attempt * 21601
+            with patch.object(c.time, "time", return_value=retry_at):
+                result, identity = self.invoke(refusal, rc=1, tick=True)
+            self.assertEqual(result, 0)
+            self.assertEqual(identity, ["--resume", original["session_id"]])
+            self.controller = c.Controller()
+            self.assertEqual(self.controller.state["status"], "active")
+            self.assertEqual(self.controller.state["failures"], 0)
+            self.assertEqual(self.controller.state["next_check"], retry_at + 21600)
+            self.assertEqual(self.controller.state["handoff"], original["handoff"])
+            self.assertEqual(self.controller.state["worktree"], original["worktree"])
+            self.assertGreater(self.controller.state["spent_seconds"], 0)
+            self.assertLess(self.controller.state["spent_seconds"], self.controller.cap)
+            with patch.object(c.time, "time", return_value=retry_at + 1), patch.object(self.controller, "invoke") as invoke:
+                self.controller.tick(self.lock.fileno())
+                invoke.assert_not_called()
+        # Once the subscription permits work, ordinary checkpoint acceptance restores its holds.
+        held = {**HANDOFF, "status": "blocked", "blocker": "Production writes are not authorized",
+                "unblock_condition": "Explicit owner authorization", "progress": "Independent inspection complete"}
+        with patch.object(c.time, "time", return_value=self.controller.state["next_check"] + 1):
+            result, identity = self.invoke({"session_id": original["session_id"], "structured_output": held}, tick=True)
+        self.assertEqual(result, 0)
+        self.assertEqual(identity, ["--resume", original["session_id"]])
+        self.assertEqual(self.controller.state["status"], "blocked")
+        self.assertEqual(self.controller.state["handoff"], held)
+        with patch.object(self.controller, "invoke") as invoke:
+            self.controller.tick(self.lock.fileno())
+            invoke.assert_not_called()
+
+    def test_existing_controller_failure_stop_still_requires_explicit_resume(self):
+        self.invoke()
+        self.controller.state.update(status="blocked", failures=3,
+                                     reason="Three consecutive controller failures; inspect then use --resume.")
+        self.controller.save()
+        self.controller = c.Controller()
+        with patch.object(self.controller, "invoke") as invoke:
+            self.controller.tick(self.lock.fileno())
+            invoke.assert_not_called()
+        self.assertEqual(self.controller.state["status"], "blocked")
+        self.assertEqual(self.controller.state["failures"], 3)
+
     def test_timeout_preserves_objective_and_records_elapsed_budget(self):
         self.invoke()
         self.assertEqual(self.invoke({}, rc=124)[0], 0)

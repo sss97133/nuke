@@ -34,8 +34,10 @@ window; it does not initiate another migration. Subscription limits retain the e
 A valid checkpoint with an empty ready list restores its declared wait/block. Controller failure and
 stagnation stops remain enforced. No live state edit or timer replacement is needed for this migration.
 
-Subscription-limit responses defer for six hours and retry automatically. Other errors back off before
-blocking after three consecutive failures. Nothing switches to API billing or discards context to evade
+Subscription-limit responses, including weekly limits, defer for six hours and retry automatically. A
+controller already stopped after three failures remains blocked until its cause is resolved and `--resume`
+is explicitly used. Other errors back off before blocking after three consecutive failures.
+Nothing switches to API billing or discards context to evade
 a limit. The launcher retains the existing `acceptEdits`, allowed-tool and denied-tool configuration.
 These and the work-order rules are not a new OS security boundary. Existing repo/user safety settings
 continue to apply; this change does not authorize production writes, unattended merges or deployment.

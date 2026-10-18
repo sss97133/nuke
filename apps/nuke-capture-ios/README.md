@@ -77,6 +77,9 @@ Standing rules the code carries:
   Confirming one at a time is unrealistic at the owner's volume (owner, 2026-10-17): `SessionConfirmView` files a
   session to its server suggestion (`get_orphan_sessions.suggested_vehicle_id`) with one tap, or all suggested at once,
   and `WorkDaySignView` signs every loaded day, or every day for one vehicle, in one `confirm_work_sessions_bulk` call.
+  Every pixel-uploading sync pass also runs metadata-only album filing, after the album catalog finishes loading.
+  Album-name fallback collapses whitespace and preserves competing mappings. A failed evidence read stops filing;
+  a profile request counts only photos acknowledged as filed or already filed in the server's receipt.
 - **A relation is a weight, not a status.** Owner direction, 2026-10-15: "active cant be a hard code like it is. its
   a weight. a relation goes dormant immediately after one day if not maintained by contribution. even within 24hr can
   stall." The app never shows a membership's `status` as ACTIVE. It shows the state the server cuts from

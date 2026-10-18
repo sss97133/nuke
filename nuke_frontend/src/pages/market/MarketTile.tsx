@@ -211,15 +211,19 @@ export function VenueMix({ rows, clock }: { rows: HouseRow[] | null | undefined;
   const parts = [...named.map((r) => ({ key: r.house as string, label: r.house as string, sales: r.sales, color: venueOf(r.house).color })),
     ...(restSales > 0 ? [{ key: 'rest', label: 'other houses and venue unrecorded', sales: restSales, color: 'var(--text-disabled)' }] : [])];
   return (
-    <div className="venue-mix" aria-label="Confirmed sales by house">
-      <span className="venue-mix__label">Sales by house</span>
-      <div className="venue-mix__bar" title={parts.map((p) => `${p.label}: ${p.sales.toLocaleString('en-US')} (${share(p.sales)})`).join(' · ')}>
-        {parts.map((p) => <span key={p.key} className="venue-mix__seg" style={{ flexGrow: p.sales, background: p.color }} />)}
-      </div>
+    <details className="venue-mix">
+      <summary className="venue-mix__summary">
+        <span className="venue-mix__chevron" aria-hidden="true">▸</span>
+        <span className="venue-mix__label">Sales by house</span>
+        <span className="venue-mix__bar" aria-hidden="true" title={parts.map((p) => `${p.label}: ${p.sales.toLocaleString('en-US')} (${share(p.sales)})`).join(' · ')}>
+          {parts.map((p) => <span key={p.key} className="venue-mix__seg" style={{ flexGrow: p.sales, background: p.color }} />)}
+        </span>
+        <span className="venue-mix__hint">All time</span>
+      </summary>
       <span className="venue-mix__names">
         {parts.map((p) => <span key={p.key}>{p.key === 'rest' ? 'rest' : p.label} {share(p.sales)}</span>)}
         <span className="venue-mix__n">{total.toLocaleString('en-US')} confirmed sales with an amount{clock}</span>
       </span>
-    </div>
+    </details>
   );
 }

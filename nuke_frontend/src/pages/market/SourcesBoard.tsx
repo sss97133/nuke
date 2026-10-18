@@ -17,7 +17,8 @@ import './SourcesBoard.css';
 const COLUMNS = ['source', 'name', 'category', 'house', 'held_lots', 'held_at', 'population', 'population_method',
   'population_confidence', 'population_at', 'map_sales', 'map_usd', 'sales_12m', 'usd_12m', 'sales_prior_12m',
   'usd_prior_12m', 'months', 'live_lots', 'live_at', 'held_lots_before', 'before_day', 'landed_24h', 'landed_7d',
-  'last_landed', 'days14', 'logo_url', 'business_type', 'population_grade'] as const;
+  'last_landed', 'days14', 'logo_url', 'business_type', 'population_grade', 'species', 'species_label', 'counts_as_held',
+  'species_evidence'] as const;
 type Column = typeof COLUMNS[number];
 const SHOWN = 10;
 
@@ -140,6 +141,10 @@ export type SourceRow = {
   days14: number[]; hours24: number[]; mins60: number[];
   /** The source's organization's recorded identity (organizations.logo_url, business_type), drawn by OrgLogo. */
   logoUrl: string | null; businessType: string | null;
+  /** How its listings live (observation_sources.species, data-machine-cases.md §6), the doc's name for it, whether its
+   *  pages count as listings held (aggregators' do not), and what the label was read from. */
+  species?: string | null; speciesLabel?: string | null; countsAsHeld?: boolean | null;
+  speciesEvidence?: SpeciesEvidence | null;
   /** Optional dealer organization identifier/slug and headquarters city/state metadata when provided. */
   organizationId?: string | null;
   hqCity?: string | null;
@@ -158,12 +163,19 @@ export type BoardLandingMeta = {
   mins60: number[];
 };
 
+export type SpeciesEvidence = { examinedAt: string | null; examined: string[]; seen: string | null; doc: string | null };
+
+/** One board group as the reader names it (source_species_groups()). */
+export type SpeciesGroup = { species: string; label: string; unit: string; countsAsHeld: boolean };
+
 export type SourcesBoardData = {
   asOf: string;
   day: string | null;
   rows: SourceRow[];
   notRanked: Record<string, number>;
   landing: BoardLandingMeta;
+  /** Present once the reader groups by species; absent from older payloads, which group by category. */
+  speciesGroups?: SpeciesGroup[] | null;
 };
 
 const num = (x: unknown) => (typeof x === 'number' && Number.isFinite(x) ? x
@@ -183,6 +195,24 @@ function parseGrade(x: unknown): PopulationGrade | null {
   if (reference == null || census == null || error == null || !referenceMethod) return null;
   return { reference, referenceMethod, referenceAt: str(g.reference_at), census, censusAt: str(g.census_at), error };
 }
+function parseSpeciesEvidence(x: unknown): SpeciesEvidence | null {
+  if (!x || typeof x !== 'object' || Array.isArray(x)) return null;
+  const e = x as Record<string, unknown>;
+  const examined = Array.isArray(e.examined) ? e.examined.filter((u): u is string => typeof u === 'string' && !!u) : [];
+  const seen = str(e.seen);
+  if (!seen && !examined.length) return null;
+  return { examinedAt: str(e.examined_at), examined, seen, doc: str(e.doc) };
+}
+function parseSpeciesGroups(x: unknown): SpeciesGroup[] | null {
+  if (!Array.isArray(x)) return null;
+  const out = x.flatMap((g) => {
+    if (!g || typeof g !== 'object' || Array.isArray(g)) return [];
+    const o = g as Record<string, unknown>;
+    const species = str(o.species), label = str(o.label);
+    return species && label ? [{ species, label, unit: str(o.unit) ?? 'held', countsAsHeld: o.counts_as_held !== false }] : [];
+  });
+  return out.length ? out : null;
+}
 
 /** The reader's value as typed rows, decoded by column name; anything else is null. */
 export function parseSources(value: unknown): SourcesBoardData | null {
@@ -194,6 +224,7 @@ export function parseSources(value: unknown): SourcesBoardData | null {
     rows?: unknown;
     not_ranked?: unknown;
     landing?: unknown;
+    species_groups?: unknown;
   };
   if (typeof v.as_of !== 'string' || !Array.isArray(v.columns) || !Array.isArray(v.rows)) return null;
   const columns = v.columns as unknown[];
@@ -265,6 +296,9 @@ export function parseSources(value: unknown): SourcesBoardData | null {
       landed15m, landed1h, landed24, landed7, lastLanded,
       days14, hours24, mins60,
       logoUrl, businessType: str(get('business_type')),
+      species: str(get('species')), speciesLabel: str(get('species_label')),
+      countsAsHeld: typeof get('counts_as_held') === 'boolean' ? get('counts_as_held') as boolean : null,
+      speciesEvidence: parseSpeciesEvidence(get('species_evidence')),
       organizationId, hqCity, hqState, hqLocation,
     });
   }
@@ -284,7 +318,7 @@ export function parseSources(value: unknown): SourcesBoardData | null {
     mins60: Array.isArray(rawTotals.mins60) ? numArray(rawTotals.mins60, 12) : Array(12).fill(0),
   };
 
-  return { asOf: v.as_of, day: str(v.day), rows, notRanked, landing };
+  return { asOf: v.as_of, day: str(v.day), rows, notRanked, landing, speciesGroups: parseSpeciesGroups(v.species_groups) };
 }
 
 function parseTopMakesList(raw: unknown): SourceTopMakeEntry[] {
@@ -662,6 +696,35 @@ export function categoryBadgeLabel(row: Pick<SourceRow, 'category' | 'businessTy
   return cat ? CATEGORY_BADGE_LABELS[cat] : null;
 }
 
+export const SPECIES_BADGE_LABELS: Record<string, string> = {
+  timed_auction: 'TIMED AUCTION',
+  block_house: 'BLOCK HOUSE',
+  dealer: 'DEALER SITE',
+  classifieds: 'CLASSIFIEDS',
+  auth_walled_marketplace: 'AUTH-WALLED',
+  aggregator: 'AGGREGATOR',
+};
+
+/** A row's badge: its species when the reader labels one, else its category. */
+export function sourceBadge(
+  row: Pick<SourceRow, 'category' | 'businessType'> & Partial<Pick<SourceRow, 'species' | 'speciesLabel'>>,
+): { key: string; label: string } | null {
+  if (row.species) {
+    return { key: row.species, label: SPECIES_BADGE_LABELS[row.species] ?? (row.speciesLabel ?? row.species).toUpperCase() };
+  }
+  const cat = resolveSourceCategory(row);
+  return cat ? { key: cat, label: CATEGORY_BADGE_LABELS[cat] } : null;
+}
+
+const SPECIES_HELD_LABELS: Record<string, string> = {
+  timed_auction: 'Lots held',
+  block_house: 'Lots held',
+  dealer: 'Vehicles held',
+  classifieds: 'Posts held',
+  auth_walled_marketplace: 'Listings held',
+  aggregator: 'Pages read (not listings held)',
+};
+
 export const KNOWN_DEALER_ORGANIZATIONS: Record<string, string> = {
   'avant-garde-collection': 'avant-garde-collection',
   avantgardecollection: 'avant-garde-collection',
@@ -858,6 +921,7 @@ const GROUPS: [SourceCategory, string, string][] = [
 const NOT_RANKED_WORDS: Record<string, string> = {
   'capture channels': 'capture channel', aggregator: 'aggregator', dealer: 'dealer', shop: 'shop', registry: 'registry',
   social_media: 'social channel', forum: 'forum', documentation: 'archive', owner: 'owner source', internal: 'internal source',
+  'no species evidence': 'source without species evidence', media_forum_video: 'media source', owner_private: 'owner source',
 };
 
 const HORIZON_LABELS: Record<LandingHorizon, string> = {
@@ -1361,7 +1425,8 @@ function SourceLandingInspector({
   const currentCount = dateSummaries.filter((d) => d.kind === 'live' || d.kind === 'fresh').length;
   const backfillCount = dateSummaries.filter((d) => d.kind === 'backfill').length;
   const rowCategory = row ? resolveSourceCategory(row) : null;
-  const rowBadge = row ? categoryBadgeLabel(row) : null;
+  const rowBadge = row ? sourceBadge(row) : null;
+  const speciesEvidence = row?.speciesEvidence ?? null;
   const dealerBreakdown = row && rowCategory === 'dealer' ? describeDealerConsignment(row, recent) : null;
   const dealerProfileHref = row ? resolveDealerProfileHref(row) : null;
   const topMakes = resolveDrillTopMakes(detail, recent);
@@ -1449,9 +1514,9 @@ function SourceLandingInspector({
         <div className="market-sources__drill-title">
           <i className={landed1h > 0 ? 'on live' : landed24 > 0 ? 'on' : 'off'} aria-hidden="true" />
           <strong>{displayName}</strong>
-          {rowBadge && rowCategory ? (
-            <span className={`market-sources__badge market-sources__badge--${rowCategory}`}>
-              {rowBadge}
+          {rowBadge ? (
+            <span className={`market-sources__badge market-sources__badge--${rowBadge.key}`}>
+              {rowBadge.label}
             </span>
           ) : null}
           <span>{row ? 'vehicles, stats & live ingestion' : 'live & hourly ingestion'}</span>
@@ -1505,6 +1570,22 @@ function SourceLandingInspector({
         </div>
       </div>
 
+      {speciesEvidence ? (
+        <div className="market-sources__species-evidence" aria-label={`Species evidence for ${displayName}`}>
+          <span className="market-sources__dealer-context-label">
+            {(row?.speciesLabel ?? row?.species ?? 'species').toUpperCase()} · FROM THE SOURCE ITSELF
+            {speciesEvidence.examinedAt ? `, ${speciesEvidence.examinedAt}` : ''}
+          </span>
+          {speciesEvidence.seen ? <span className="market-sources__species-seen">{speciesEvidence.seen}</span> : null}
+          {speciesEvidence.examined.length ? (
+            <ul className="market-sources__species-examined">
+              {speciesEvidence.examined.map((e) => <li key={e}>{e}</li>)}
+            </ul>
+          ) : null}
+          {speciesEvidence.doc ? <small className="market-sources__species-doc">{speciesEvidence.doc}</small> : null}
+        </div>
+      ) : null}
+
       {dealerBreakdown ? (
         <div className="market-sources__dealer-context" aria-label={`Consignment breakdown for ${displayName}`}>
           <div className="market-sources__dealer-context-main">
@@ -1544,7 +1625,9 @@ function SourceLandingInspector({
       {row ? (
         <div className="market-sources__drill-stats" aria-label={`Source stats for ${displayName}`}>
           <div className="market-sources__kpi">
-            <span className="market-sources__kpi-label">{row.category === 'marketplace' ? 'Listings held' : 'Lots held'}</span>
+            <span className="market-sources__kpi-label">
+              {(row.species && SPECIES_HELD_LABELS[row.species]) ?? (row.category === 'marketplace' ? 'Listings held' : 'Lots held')}
+            </span>
             <strong>{statsHeld != null ? count(statsHeld) : '—'}</strong>
           </div>
           <div className="market-sources__kpi">
@@ -2162,17 +2245,24 @@ export function SourcesBoardView({
   const [all, setAll] = useState(() => !!resolveInitialSource(data.rows, initialSource));
   const [horizon, setHorizon] = useState<LandingHorizon>('14d');
   const [openSource, setOpenSource] = useState<string | null>(() => resolveInitialSource(data.rows, initialSource));
-  const [categoryFilter, setCategoryFilter] = useState<'all' | SourceCategory>('all');
+  const [categoryFilter, setCategoryFilter] = useState<string>('all');
 
   const heldAt = data.rows.map((r) => r.heldAt).filter((x): x is string => !!x).sort().at(-1) ?? null;
   const scopeTotal = (r: SourceRow) => scoped?.bySource.get(r.source)?.total ?? 0;
-  const allGroups = GROUPS.map(([key, title, unit]) => {
-    const rows = data.rows.filter((r) => resolveSourceCategory(r) === key && (!scoped || all || scopeTotal(r) > 0));
-    return { key, title, unit, rows: scoped ? [...rows].sort((a, b) => scopeTotal(b) - scopeTotal(a)) : rows };
+  // The reader's species groups when it sends them (the doc's names, in its order); older payloads group by category.
+  const bySpecies = !!data.speciesGroups?.length;
+  const groupDefs = bySpecies
+    ? data.speciesGroups!.map((g) => ({ key: g.species, title: g.label, unit: g.unit,
+        badge: SPECIES_BADGE_LABELS[g.species] ?? g.label.toUpperCase() }))
+    : GROUPS.map(([key, title, unit]) => ({ key: key as string, title, unit, badge: CATEGORY_BADGE_LABELS[key] }));
+  const groupOf = (r: SourceRow): string | null => (bySpecies ? r.species ?? null : resolveSourceCategory(r));
+  const allGroups = groupDefs.map((g) => {
+    const rows = data.rows.filter((r) => groupOf(r) === g.key && (!scoped || all || scopeTotal(r) > 0));
+    return { ...g, rows: scoped ? [...rows].sort((a, b) => scopeTotal(b) - scopeTotal(a)) : rows };
   }).filter((g) => g.rows.length);
   const groups = categoryFilter === 'all' ? allGroups : allGroups.filter((g) => g.key === categoryFilter);
   const shownPer = scoped || all || categoryFilter !== 'all' ? Infinity : SHOWN;
-  const hidden = scoped ? data.rows.filter((r) => resolveSourceCategory(r) && scopeTotal(r) === 0).length
+  const hidden = scoped ? data.rows.filter((r) => groupOf(r) && scopeTotal(r) === 0).length
     : categoryFilter === 'all' ? allGroups.reduce((n, g) => n + Math.max(0, g.rows.length - SHOWN), 0) : 0;
   const notRanked = Object.entries(data.notRanked).sort((x, y) => y[1] - x[1])
     .map(([k, n]) => `${n} ${NOT_RANKED_WORDS[k] ?? k}${n > 1 ? 's' : ''}`);
@@ -2225,7 +2315,7 @@ export function SourcesBoardView({
               aria-pressed={categoryFilter === g.key}
               onClick={() => setCategoryFilter((cur) => (cur === g.key ? 'all' : g.key))}
             >
-              {CATEGORY_BADGE_LABELS[g.key]}
+              {g.badge}
             </button>
           ))}
         </div>
@@ -2289,7 +2379,7 @@ export function SourcesBoardView({
               const land = landingState(r, horizon);
               const isOpen = openSource === r.source;
               const cat = resolveSourceCategory(r);
-              const badge = categoryBadgeLabel(r);
+              const badge = sourceBadge(r);
               const dealerProfileHref = resolveDealerProfileHref(r);
               const graded = gradeText(r.populationGrade);
               const total = r.population == null
@@ -2307,6 +2397,7 @@ export function SourcesBoardView({
                   <li
                     className={`market-sources__row${isOpen ? ' market-sources__row--open' : ''}`}
                     data-category={cat ?? undefined}
+                    data-species={r.species ?? undefined}
                     onClick={() => setOpenSource((cur) => (cur === r.source ? null : r.source))}
                     onKeyDown={(e) => {
                       if (e.target === e.currentTarget && (e.key === 'Enter' || e.key === ' ')) {
@@ -2325,9 +2416,10 @@ export function SourcesBoardView({
                         businessName={r.name} size={13} maxWidth={42} variant="logo"
                         className={`market-sources__icon${sourceLogoInk(r.logoUrl) ? ` market-sources__icon--${sourceLogoInk(r.logoUrl)}` : ''}`} />
                       <span className="market-sources__name-text">{shortName(r.name)}</span>
-                      {badge && cat ? (
-                        <span className={`market-sources__badge market-sources__badge--${cat}`}>
-                          {badge}
+                      {badge ? (
+                        <span className={`market-sources__badge market-sources__badge--${badge.key}`}
+                          title={r.speciesEvidence?.seen ?? undefined}>
+                          {badge.label}
                         </span>
                       ) : null}
                       {dealerProfileHref ? (

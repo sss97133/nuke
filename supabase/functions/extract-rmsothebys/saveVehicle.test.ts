@@ -158,10 +158,19 @@ Deno.test('an auction code with no known day gets no timeline row: the day of ex
   equal(calls.some((c) => c.table === 'timeline_events'), false);
 });
 
-Deno.test('an unsold lot of a held auction stays ended, as before', async () => {
+Deno.test('an unsold lot of a held auction is not sold on the vehicle and unsold on its episode', async () => {
   const { client, calls } = stubClient({ 'vehicles.insert': { data: { id: 'v-un' } } });
   const { d, events } = deps();
   await saveVehicle(client, lot({ sold: false, sold_price: null, sold_price_text: null }), d);
+  const insert = calls.find((c) => c.table === 'vehicles' && c.op === 'insert')!.row as Record<string, unknown>;
+  equal(insert.sale_status, 'not_sold');
+  equal(events[0].event_status, 'unsold');
+});
+
+Deno.test('an unsold lot read from a page that does not say whether it was auctioned stays ended', async () => {
+  const { client, calls } = stubClient({ 'vehicles.insert': { data: { id: 'v-unk' } } });
+  const { d, events } = deps();
+  await saveVehicle(client, lot({ sold: false, sold_price: null, sold_price_text: null, auctioned: null }), d);
   const insert = calls.find((c) => c.table === 'vehicles' && c.op === 'insert')!.row as Record<string, unknown>;
   equal(insert.sale_status, 'ended');
   equal(events[0].event_status, 'ended');
@@ -218,7 +227,7 @@ Deno.test('a resolved vehicle that is a different car is refused, raised as a re
   equal(calls.some((c) => c.op === 'update' || c.op === 'insert'), false, 'no vehicle write');
   equal(observations.length + events.length, 0, 'no observation or episode');
   const rev = calls.find((c) => c.table === 'rpc:record_revision_item');
-  equal((rev?.row as any).p_reason, 'different_car');
+  equal((rev?.row as any).p_reason, 'bad_data');
   equal((rev?.row as any).p_next_action, 'relink');
 });
 

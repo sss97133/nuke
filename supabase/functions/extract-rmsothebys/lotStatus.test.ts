@@ -11,11 +11,17 @@ function equal(actual: unknown, expected: unknown, what = '') {
   }
 }
 
-Deno.test('sold, for sale, upcoming and ended each get their own status', () => {
+Deno.test('sold, for sale, upcoming and not sold each get their own status', () => {
   equal(lotStatus({ sold: true, auctioned: true, is_still_for_sale: false }), { sale_status: 'sold', event_status: 'sold' });
   equal(lotStatus({ sold: false, auctioned: true, is_still_for_sale: true }), { sale_status: 'available', event_status: 'active' });
   equal(lotStatus({ sold: false, auctioned: false, is_still_for_sale: false }), { sale_status: 'upcoming', event_status: 'pending' });
-  equal(lotStatus({ sold: false, auctioned: true, is_still_for_sale: false }), { sale_status: 'ended', event_status: 'ended' });
+  equal(lotStatus({ sold: false, auctioned: true, is_still_for_sale: false }), { sale_status: 'not_sold', event_status: 'unsold' });
+});
+
+Deno.test('the 55 held-auction lots that went through the sale unsold are not sold, never ended', () => {
+  const unsold = FIXTURE.filter((l) => l.a !== 'LF26' && !l.sold && l.auctioned);
+  equal(unsold.length, 55);
+  equal(unsold.every((l) => lotStatus({ sold: l.sold, auctioned: l.auctioned, is_still_for_sale: false }).event_status === 'unsold'), true);
 });
 
 Deno.test('a lot whose auctioned flag is unknown stays as before: ended, never upcoming', () => {
@@ -40,11 +46,11 @@ Deno.test('all 65 lots of the London Auction (not yet held) are upcoming; none o
   equal(held.some((l) => status(l) === 'upcoming'), false);
 });
 
-Deno.test('MO26: 180 sold lots are sold and 19 unsold lots are ended', () => {
+Deno.test('MO26: 180 sold lots are sold and 19 unsold lots are not sold', () => {
   const counts: Record<string, number> = {};
   for (const l of FIXTURE.filter((x) => x.a === 'MO26')) {
     const s = lotStatus({ sold: l.sold, auctioned: l.auctioned, is_still_for_sale: false }).sale_status;
     counts[s] = (counts[s] ?? 0) + 1;
   }
-  equal(counts, { sold: 180, ended: 19 });
+  equal(counts, { sold: 180, not_sold: 19 });
 });

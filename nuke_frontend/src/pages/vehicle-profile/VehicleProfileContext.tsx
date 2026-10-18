@@ -115,7 +115,7 @@ export const VehicleProfileProvider: React.FC<{ children: React.ReactNode }> = (
   const navigate = useNavigate();
 
   // ── Core data ──
-  const [vehicle, setVehicle] = useState<Vehicle | null>(null);
+  const [loadedVehicle, setVehicle] = useState<Vehicle | null>(null);
   const [vehicleImages, setVehicleImages] = useState<string[]>([]);
   const [fallbackListingImageUrls, setFallbackListingImageUrls] = useState<string[]>([]);
   const [timelineEvents, setTimelineEvents] = useState<any[]>([]);
@@ -129,8 +129,25 @@ export const VehicleProfileProvider: React.FC<{ children: React.ReactNode }> = (
   const heroResolvedRef = React.useRef(false);
   const heroSelectionRequestRef = React.useRef(0);
   const activeVehicleIdRef = React.useRef(vehicleId);
-  activeVehicleIdRef.current = vehicleId;
   const vehicleLoadedForRouteRef = React.useRef<string | undefined>(undefined);
+  const primaryLoadRequestRef = React.useRef(0);
+  const primaryLoadMountedRef = React.useRef(false);
+  // Invalidate before children commit the next route, including A → B → A.
+  if (activeVehicleIdRef.current !== vehicleId) {
+    activeVehicleIdRef.current = vehicleId;
+    vehicleLoadedForRouteRef.current = undefined;
+    primaryLoadRequestRef.current += 1;
+  }
+  useEffect(() => {
+    primaryLoadMountedRef.current = true;
+    return () => {
+      primaryLoadMountedRef.current = false;
+      primaryLoadRequestRef.current += 1;
+    };
+  }, []);
+  const primaryRouteLoaded = vehicleLoadedForRouteRef.current === vehicleId;
+  // Existing effects and permission inputs must also see the current subject.
+  const vehicle = primaryRouteLoaded ? loadedVehicle : null;
 
   // ── Auction ──
   const [auctionPulse, setAuctionPulse] = useState<AuctionPulse | null>(null);
@@ -191,7 +208,22 @@ export const VehicleProfileProvider: React.FC<{ children: React.ReactNode }> = (
   // ── Data fetching ──
 
   const loadVehicle = useCallback(async () => {
-    if (!vehicleId) return;
+    if (!vehicleId || !primaryLoadMountedRef.current || activeVehicleIdRef.current !== vehicleId) return;
+    const request = ++primaryLoadRequestRef.current;
+    const isCurrent = () => activeVehicleIdRef.current === vehicleId && primaryLoadRequestRef.current === request;
+    const resetPrimaryState = () => {
+      setVehicle(null);
+      setVehicleImages([]);
+      setFallbackListingImageUrls([]);
+      setTimelineEvents([]);
+      setAuctionPulse(null);
+      setTotalCommentCount(0);
+      setObservationCount(0);
+      setIsPublic(false);
+      setLeadImageUrl(null);
+      setHeroMeta(null);
+    };
+    if (vehicleLoadedForRouteRef.current !== vehicleId) resetPrimaryState();
     const heroRequest = ++heroSelectionRequestRef.current;
     heroResolvedRef.current = false;
     rpcLoadedRef.current = { images: false, timeline: false, commentCount: null, observationCount: null };
@@ -200,25 +232,30 @@ export const VehicleProfileProvider: React.FC<{ children: React.ReactNode }> = (
       session,
       leadImageUrl,
       supabase,
-      navigate,
+      navigate: (path, options) => { if (isCurrent()) navigate(path, options); },
       ranBatSyncRef,
-      setLoading,
+      setLoading: (value) => { if (isCurrent()) setLoading(value); },
       setVehicle: (row) => {
-        if (activeVehicleIdRef.current !== vehicleId) return;
+        if (!isCurrent()) return;
         vehicleLoadedForRouteRef.current = vehicleId;
-        setVehicle(row);
+        if (row) setVehicle(row);
+        else resetPrimaryState();
       },
-      setIsPublic,
+      setIsPublic: (value) => { if (isCurrent()) setIsPublic(value); },
       setLeadImageUrl: (url) => {
-        if (activeVehicleIdRef.current === vehicleId && !heroResolvedRef.current) setLeadImageUrl(url);
+        if (isCurrent() && !heroResolvedRef.current) setLeadImageUrl(url);
       },
       setVehicleImages: (urls) => {
-        if (activeVehicleIdRef.current === vehicleId) setVehicleImages(urls);
+        if (isCurrent()) setVehicleImages(urls);
       },
-      setTimelineEvents,
-      setAuctionPulse: setAuctionPulse as any,
+      setTimelineEvents: (next) => {
+        if (isCurrent()) setTimelineEvents(prev => !isCurrent() ? prev : typeof next === 'function' ? next(prev) : next);
+      },
+      setAuctionPulse: (next) => {
+        if (isCurrent()) setAuctionPulse(prev => !isCurrent() ? prev : typeof next === 'function' ? next(prev) : next);
+      },
     });
-    if (activeVehicleIdRef.current !== vehicleId) return;
+    if (!isCurrent()) return;
     rpcLoadedRef.current = rpcResult;
     // Use RPC stats for counts if available
     if (rpcResult.commentCount !== null) setTotalCommentCount(rpcResult.commentCount);
@@ -233,12 +270,12 @@ export const VehicleProfileProvider: React.FC<{ children: React.ReactNode }> = (
     // paths duplicated the 60-row candidate query on every profile load.
     if (rpcResult.images) {
       selectBestHeroImage(vehicleId, supabase).then((result) => {
-        if (activeVehicleIdRef.current !== vehicleId || heroSelectionRequestRef.current !== heroRequest) return;
+        if (!isCurrent() || heroSelectionRequestRef.current !== heroRequest) return;
         setLeadImageUrl(result?.url || null);
         setHeroMeta(result?.meta || null);
         heroResolvedRef.current = true;
       }).catch(() => {
-        if (activeVehicleIdRef.current !== vehicleId || heroSelectionRequestRef.current !== heroRequest) return;
+        if (!isCurrent() || heroSelectionRequestRef.current !== heroRequest) return;
         setLeadImageUrl(null);
         setHeroMeta(null);
         heroResolvedRef.current = true;
@@ -272,6 +309,8 @@ export const VehicleProfileProvider: React.FC<{ children: React.ReactNode }> = (
 
   const loadTimelineEvents = useCallback(async () => {
     if (!vehicleId) return;
+    const request = primaryLoadRequestRef.current;
+    const isCurrent = () => activeVehicleIdRef.current === vehicleId && primaryLoadRequestRef.current === request;
     try {
       // Load timeline_events + work_sessions in parallel. image_sets is
       // supplementary and slow for anon (measured 15s/500 against the anon
@@ -336,11 +375,12 @@ export const VehicleProfileProvider: React.FC<{ children: React.ReactNode }> = (
         const db = b.event_date || b.session_date || '';
         return db.localeCompare(da);
       });
+      if (!isCurrent()) return;
       setTimelineEvents(sortByDateDesc(events));
 
       // Convert image_sets to timeline event shape and merge when it lands.
       void imageSetsPromise.then((isResult: any) => {
-        if (isResult.error || !Array.isArray(isResult.data) || isResult.data.length === 0) return;
+        if (!isCurrent() || isResult.error || !Array.isArray(isResult.data) || isResult.data.length === 0) return;
         const sessionEvents = isResult.data.map((s: any) => ({
           id: s.id,
           vehicle_id: vehicleId,
@@ -356,6 +396,7 @@ export const VehicleProfileProvider: React.FC<{ children: React.ReactNode }> = (
           },
         }));
         setTimelineEvents((prev: any[]) => {
+          if (!isCurrent()) return prev;
           const have = new Set((prev || []).map((e: any) => e.id));
           return sortByDateDesc([...(prev || []), ...sessionEvents.filter((e: any) => !have.has(e.id))]);
         });
@@ -714,6 +755,7 @@ export const VehicleProfileProvider: React.FC<{ children: React.ReactNode }> = (
   // ── Fallback listing images (BaT/C&B vehicles with no DB images) ──
 
   useEffect(() => {
+    let cancelled = false;
     (async () => {
       try {
         if (!vehicle?.id) return;
@@ -797,6 +839,7 @@ export const VehicleProfileProvider: React.FC<{ children: React.ReactNode }> = (
               .eq('source_url', listingUrl)
               .order('updated_at', { ascending: false })
               .limit(5);
+            if (cancelled) return;
             const meta = Array.isArray(listings) && listings.length > 0 ? (listings[0] as any)?.metadata : null;
             const images: string[] =
               (Array.isArray(meta?.image_urls) ? meta.image_urls : null) ||
@@ -815,6 +858,7 @@ export const VehicleProfileProvider: React.FC<{ children: React.ReactNode }> = (
         const { data, error } = await supabase.functions.invoke('simple-scraper', {
           body: { url: listingUrl },
         });
+        if (cancelled) return;
         if (error) throw error;
         const images: string[] =
           (data?.success && Array.isArray(data?.data?.images) ? data.data.images : null) ||
@@ -827,8 +871,10 @@ export const VehicleProfileProvider: React.FC<{ children: React.ReactNode }> = (
         }
       } catch { /* ignore */ }
     })();
+    return () => { cancelled = true; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [vehicle?.id, (vehicle as any)?.profile_origin, (vehicle as any)?.discovery_url, auctionPulse?.listing_url, vehicleImages.length]);
+  }, [vehicle?.id, (vehicle as any)?.profile_origin, (vehicle as any)?.discovery_url,
+    (vehicle as any)?.bat_auction_url, (vehicle as any)?.listing_url, auctionPulse?.listing_url, vehicleImages.length]);
 
   // ── Event listeners ──
 
@@ -938,17 +984,17 @@ export const VehicleProfileProvider: React.FC<{ children: React.ReactNode }> = (
 
   const value = useMemo<VehicleProfileContextValue>(() => ({
     vehicleId,
-    vehicle,
-    vehicleImages,
-    fallbackListingImageUrls,
-    timelineEvents,
-    totalCommentCount,
-    observationCount,
+    vehicle: primaryRouteLoaded ? vehicle : null,
+    vehicleImages: primaryRouteLoaded ? vehicleImages : [],
+    fallbackListingImageUrls: primaryRouteLoaded ? fallbackListingImageUrls : [],
+    timelineEvents: primaryRouteLoaded ? timelineEvents : [],
+    totalCommentCount: primaryRouteLoaded ? totalCommentCount : 0,
+    observationCount: primaryRouteLoaded ? observationCount : 0,
     vehicleIntel,
     vehicleIntelLoading,
-    leadImageUrl,
-    heroMeta,
-    auctionPulse,
+    leadImageUrl: primaryRouteLoaded ? leadImageUrl : null,
+    heroMeta: primaryRouteLoaded ? heroMeta : null,
+    auctionPulse: primaryRouteLoaded ? auctionPulse : null,
     liveSession,
     session,
     permissions,
@@ -962,9 +1008,9 @@ export const VehicleProfileProvider: React.FC<{ children: React.ReactNode }> = (
     responsibleName,
     linkedOrganizations,
     auctionCurrency,
-    loading,
+    loading: primaryRouteLoaded ? loading : true,
     isMobile,
-    isPublic,
+    isPublic: primaryRouteLoaded ? isPublic : false,
     vehicleHeaderHeight,
     galleryFilter,
     reloadVehicle: loadVehicle,
@@ -976,7 +1022,7 @@ export const VehicleProfileProvider: React.FC<{ children: React.ReactNode }> = (
     setGalleryFilter,
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }), [
-    vehicleId, vehicle, vehicleImages, fallbackListingImageUrls,
+    vehicleId, primaryRouteLoaded, vehicle, vehicleImages, fallbackListingImageUrls,
     timelineEvents, totalCommentCount, observationCount,
     vehicleIntel, vehicleIntelLoading,
     leadImageUrl, heroMeta, auctionPulse, liveSession,

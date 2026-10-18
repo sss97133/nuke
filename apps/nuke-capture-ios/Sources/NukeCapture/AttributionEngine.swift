@@ -83,12 +83,24 @@ final class AttributionEngine: ObservableObject {
         defer { isRunning = false }
 
         // Known vehicles + VINs (the small set we fuzzy-match against).
-        let knownVehicles = await fetchKnownVehicles(userId: userId)
+        let knownVehicles: [VehicleRow]
+        let orphans: [OrphanRow]
+        let albumMap: [String: Set<String>]
+        do {
+            knownVehicles = try await fetchKnownVehicles(userId: userId)
+            orphans = try await fetchOrphans(userId: userId, limit: limit)
+            albumMap = try await fetchAlbumMap(userId: userId)
+        } catch {
+            lastSummary = "Photo filing couldn't load its evidence. \(ReadFailure.text(error))"
+            return false
+        }
+        // Sync also runs on PhotoKit changes and refresh wakes. Do not depend on the delayed
+        // screen task to populate the album catalog before trying to file its new photos.
+        await LibraryStore.shared.refreshAlbums()
         let knownVINs = knownVehicles.compactMap { $0.vin?.uppercased() }.filter { $0.count >= 8 }
         let vinToVehicle = Dictionary(knownVehicles.compactMap { v in v.vin.map { ($0.uppercased(), v.id) } },
                                       uniquingKeysWith: { first, _ in first })
 
-        let orphans = await fetchOrphans(userId: userId, limit: limit)
         guard !orphans.isEmpty else { lastSummary = "No orphan photos to attribute"; return true }
         progress = (0, orphans.count)
 
@@ -103,6 +115,7 @@ final class AttributionEngine: ObservableObject {
 
         for row in orphans {
             defer { progress.done += 1 }
+            guard !Task.isCancelled else { return false }
             guard read < ocrBudget else { break }
             guard let assetID = row.exif_data?.uuid,
                   let cg = await VisionEngine.loadCGImage(assetID: assetID, maxPixel: 1600) else { skippedNonLocal += 1; continue }
@@ -143,19 +156,10 @@ final class AttributionEngine: ObservableObject {
         // Albums: the owner's own grouping. Mapped albums file; unmapped "year make model" albums
         // with enough uploaded photos become profile requests.
         let albumsByAsset = Self.albumsByAsset()
-        let albumMap = await fetchAlbumMap(userId: userId)
         var albumGroups: [String: (name: String, ids: [String])] = [:]
         for row in orphans where !filedIDs.contains(row.id) {
             guard let uuid = row.exif_data?.uuid, let albums = albumsByAsset[uuid], !albums.isEmpty else { continue }
-            let mapped = Set(albums.compactMap { album -> String? in
-                if let vid = albumMap[album.id] { return vid }
-                if let name = album.name?.trimmingCharacters(in: .whitespacesAndNewlines).lowercased(),
-                   !name.isEmpty,
-                   let vid = albumMap["name:\(name)"] {
-                    return vid
-                }
-                return nil
-            })
+            let mapped = Self.mappedVehicles(for: albums, in: albumMap)
             if mapped.count == 1, let vid = mapped.first {
                 let names = albums.compactMap(\.name).prefix(2).joined(separator: " | ")
                 fileItems.append(DeviceFileItem(image_id: row.id, vehicle_id: vid, method: "album_map", confidence: 0.9,
@@ -169,6 +173,7 @@ final class AttributionEngine: ObservableObject {
         }
 
         let filing = await deviceFile(fileItems)
+        var completedIDs = filing.filed
 
         // New profiles: unmatched valid VINs, and "year make model" albums with enough photos.
         var profileResults: [String] = []
@@ -177,27 +182,31 @@ final class AttributionEngine: ObservableObject {
             if let v = s.unknownVIN { byVIN[v, default: []].append(s.row.id) }
         }
         for (vin, ids) in byVIN {
-            if let r = await createProfile(DeviceProfileRequest(basis: "vin", vin: vin, serial: nil, year: nil, make: nil,
+            let result = await createProfile(DeviceProfileRequest(basis: "vin", vin: vin, serial: nil, year: nil, make: nil,
                     model: nil, album_name: nil, album_native_id: nil, image_ids: ids,
-                    evidence: ["edit_distance": "0", "read": "on_device_ocr"])) { profileResults.append(r) }
-            ids.forEach { filedIDs.insert($0) }
+                    evidence: ["edit_distance": "0", "read": "on_device_ocr"]))
+            profileResults.append(result.summary)
+            completedIDs.formUnion(result.filed)
+            filedIDs.formUnion(result.filed)
         }
         for (albumId, group) in albumGroups where group.ids.count >= Config.albumProfileMinPhotos {
             // The server needs year, make and model, each present in the album name.
             guard let label = AlbumLabel.parse(group.name), label.model != nil else { continue }
             let ids = group.ids.filter { !filedIDs.contains($0) }
             guard ids.count >= Config.albumProfileMinPhotos else { continue }
-            if let r = await createProfile(DeviceProfileRequest(basis: "album", vin: nil, serial: nil, year: label.year,
+            let result = await createProfile(DeviceProfileRequest(basis: "album", vin: nil, serial: nil, year: label.year,
                     make: label.make, model: label.model, album_name: group.name, album_native_id: albumId,
-                    image_ids: ids, evidence: ["album": group.name])) { profileResults.append(r) }
-            ids.forEach { filedIDs.insert($0) }
+                    image_ids: ids, evidence: ["album": group.name]))
+            profileResults.append(result.summary)
+            completedIDs.formUnion(result.filed)
+            filedIDs.formUnion(result.filed)
         }
 
         // Fallback and sessions: what the server did not file stays a suggestion for the owner.
         var sessionVehicle: [String: String] = [:]
         for s in signals where s.vinVehicleId != nil { sessionVehicle[s.session] = s.vinVehicleId }
         var suggested = 0, unresolved = 0
-        for s in signals where !filing.filed.contains(s.row.id) {
+        for s in signals where !completedIDs.contains(s.row.id) {
             if let vid = s.vinVehicleId {
                 let conf = [0: 0.99, 1: 0.97, 2: 0.93][s.vinDist ?? 0] ?? 0.93
                 await suggest(imageId: s.row.id, vehicleId: vid, conf: conf,
@@ -214,9 +223,12 @@ final class AttributionEngine: ObservableObject {
             }
         }
 
-        lastSummary = (["\(filing.filed.count) filed (\(filing.byMethod.map { "\($0.key) \($0.value)" }.sorted().joined(separator: ", ")))",
+        let readIDs = Set(signals.map { $0.row.id })
+        let awaitingRead = orphans.filter { !completedIDs.contains($0.id) && !readIDs.contains($0.id) }.count
+        lastSummary = (["\(completedIDs.count) filed (\(filing.byMethod.map { "\($0.key) \($0.value)" }.sorted().joined(separator: ", ")))",
                         profileResults.isEmpty ? nil : "profiles: " + profileResults.joined(separator: "; "),
                         "\(suggested) suggested", "\(unresolved) unresolved",
+                        awaitingRead > 0 ? "\(awaitingRead) awaiting a read" : nil,
                         skippedNonLocal > 0 ? "\(skippedNonLocal) not on this phone" : nil,
                         filing.refused > 0 ? "\(filing.refused) refused by the server" : nil,
                         "\(vinHits) serial reads"].compactMap { $0 }).joined(separator: " · ")
@@ -224,7 +236,8 @@ final class AttributionEngine: ObservableObject {
         // The same pass report the sync writes (app_events, insert-only): what was filed, refused and
         // asked of the profile writer, so a pass that changes nothing can be seen from the server.
         let props: [String: AnyJSON] = [
-            "orphans": .integer(orphans.count), "read": .integer(read), "filed": .integer(filing.filed.count),
+            "orphans": .integer(orphans.count), "read": .integer(read), "filed": .integer(completedIDs.count),
+            "awaiting_read": .integer(awaitingRead), "album_map_keys": .integer(albumMap.count),
             "refused": .integer(filing.refused), "suggested": .integer(suggested), "unresolved": .integer(unresolved),
             "album_groups": .integer(albumGroups.count), "profiles": .array(profileResults.map { .string($0) }),
             "ocr_budget": .integer(ocrBudget),
@@ -296,7 +309,7 @@ final class AttributionEngine: ObservableObject {
     }
 
     /// image_id → status, from device_file_images' results.
-    private static func statuses(from res: AnyJSON) -> [String: String] {
+    nonisolated static func statuses(from res: AnyJSON) -> [String: String] {
         guard case .object(let o) = res, case .array(let results)? = o["results"] else { return [:] }
         var out: [String: String] = [:]
         for r in results {
@@ -308,20 +321,27 @@ final class AttributionEngine: ObservableObject {
     }
 
     /// Asks the server to resolve or create a profile; returns a one-line outcome for the summary.
-    private func createProfile(_ req: DeviceProfileRequest) async -> String? {
+    private func createProfile(_ req: DeviceProfileRequest) async -> (summary: String, filed: Set<String>) {
         struct P: Encodable { let p_profile: DeviceProfileRequest }
+        let label = req.vin ?? [req.year.map(String.init), req.make, req.model].compactMap { $0 }.joined(separator: " ")
         do {
             let res: AnyJSON = try await SupabaseService.client.rpc("device_create_vehicle_profile", params: P(p_profile: req)).execute().value
-            guard case .object(let o) = res, case .string(let status)? = o["status"] else { return nil }
-            let label = req.vin ?? [req.year.map(String.init), req.make, req.model].compactMap { $0 }.joined(separator: " ")
-            return "\(label): \(status)"
+            guard case .object(let o) = res, case .string(let status)? = o["status"] else {
+                return ("\(label): unreadable profile response", [])
+            }
+            return ("\(label): \(status)", Self.profileFiledIDs(from: res).intersection(req.image_ids))
         } catch {
             NSLog("NukeCapture device_create_vehicle_profile failed: %@", String(describing: error))
-            return nil
+            return ("\(label): \(ReadFailure.text(error))", [])
         }
     }
 
-    private struct AlbumMapRow: Decodable {
+    nonisolated static func profileFiledIDs(from res: AnyJSON) -> Set<String> {
+        guard case .object(let o) = res, let filing = o["filing"] else { return [] }
+        return Set(statuses(from: filing).filter { $0.value == "filed" || $0.value == "already" }.map(\.key))
+    }
+
+    struct AlbumMapRow: Decodable {
         let apple_album_id: String
         let apple_album_name: String?
         let vehicle_id: String?
@@ -329,28 +349,40 @@ final class AttributionEngine: ObservableObject {
     /// The owner's album → vehicle map (album_sync_map; row security limits it to the owner).
     /// Indexes by full apple_album_id, stripped PhotoKit localIdentifier (without "ios-source:<uid>:"),
     /// and normalized album name ("name:<lowercased>") so local albums always resolve.
-    private func fetchAlbumMap(userId: String) async -> [String: String] {
-        do {
-            let rows: [AlbumMapRow] = try await SupabaseService.client.from("album_sync_map")
-                .select("apple_album_id,apple_album_name,vehicle_id").eq("user_id", value: userId)
-                .not("vehicle_id", operator: .is, value: "null").execute().value
-            var out: [String: String] = [:]
-            for r in rows {
-                guard let vid = r.vehicle_id, !vid.isEmpty else { continue }
-                out[r.apple_album_id] = vid
-                let parts = r.apple_album_id.split(separator: ":", maxSplits: 2, omittingEmptySubsequences: false)
-                if parts.count == 3, parts[0] == "ios-source" {
-                    out[String(parts[2])] = vid
-                }
-                if let name = r.apple_album_name?.trimmingCharacters(in: .whitespacesAndNewlines).lowercased(),
-                   !name.isEmpty {
-                    out["name:\(name)"] = vid
-                }
+    private func fetchAlbumMap(userId: String) async throws -> [String: Set<String>] {
+        let rows: [AlbumMapRow] = try await SupabaseService.client.from("album_sync_map")
+            .select("apple_album_id,apple_album_name,vehicle_id").eq("user_id", value: userId)
+            .not("vehicle_id", operator: .is, value: "null").execute().value
+        return Self.albumMap(rows)
+    }
+
+    nonisolated static func albumNameKey(_ name: String?) -> String? {
+        guard let name else { return nil }
+        let normalized = name.split(whereSeparator: \.isWhitespace).joined(separator: " ").lowercased()
+        return normalized.isEmpty ? nil : "name:\(normalized)"
+    }
+
+    /// Keep competing mappings unresolved; database return order must never pick a vehicle.
+    nonisolated static func albumMap(_ rows: [AlbumMapRow]) -> [String: Set<String>] {
+        var out: [String: Set<String>] = [:]
+        for r in rows {
+            guard let vid = r.vehicle_id, !vid.isEmpty else { continue }
+            out[r.apple_album_id, default: []].insert(vid)
+            let parts = r.apple_album_id.split(separator: ":", maxSplits: 2, omittingEmptySubsequences: false)
+            if parts.count == 3, parts[0] == "ios-source" {
+                out[String(parts[2]), default: []].insert(vid)
             }
-            return out
-        } catch {
-            NSLog("NukeCapture album map read failed: %@", String(describing: error))
-            return [:]
+            if let name = albumNameKey(r.apple_album_name) {
+                out[name, default: []].insert(vid)
+            }
+        }
+        return out
+    }
+
+    nonisolated static func mappedVehicles(for albums: [LocalPhotoAlbum], in map: [String: Set<String>]) -> Set<String> {
+        albums.reduce(into: Set<String>()) { vehicles, album in
+            if let exact = map[album.id] { vehicles.formUnion(exact) }
+            else if let key = albumNameKey(album.name), let named = map[key] { vehicles.formUnion(named) }
         }
     }
 
@@ -374,25 +406,26 @@ final class AttributionEngine: ObservableObject {
         return "\(day)|\(lat),\(lon)"
     }
 
-    private func fetchKnownVehicles(userId: String) async -> [VehicleRow] {
-        do {
-            return try await SupabaseService.client.from("vehicles")
-                .select("id, vin").or("user_id.eq.\(userId),owner_id.eq.\(userId)").execute().value
-        } catch { NSLog("attribution fetchKnownVehicles: %@", String(describing: error)); return [] }
+    private func fetchKnownVehicles(userId: String) async throws -> [VehicleRow] {
+        return try await SupabaseService.client.from("vehicles")
+            .select("id, vin").or("user_id.eq.\(userId),owner_id.eq.\(userId)").execute().value
     }
 
-    private func fetchOrphans(userId: String, limit: Int) async -> [OrphanRow] {
-        do {
-            return try await SupabaseService.client.from("vehicle_images")
-                .select("id, latitude, longitude, taken_at, exif_data")
-                .eq("user_id", value: userId)
-                .is("vehicle_id", value: nil)
-                .eq("source", value: Config.sourceTag)
-                .neq("image_url", value: "")          // metadata-only rows have no picture to file
-                .order("taken_at", ascending: false)
-                .limit(limit)
-                .execute().value
-        } catch { NSLog("attribution fetchOrphans: %@", String(describing: error)); return [] }
+    private func fetchOrphans(userId: String, limit: Int) async throws -> [OrphanRow] {
+        return try await SupabaseService.client.from("vehicle_images")
+            .select("id, latitude, longitude, taken_at, exif_data")
+            .eq("user_id", value: userId)
+            .is("vehicle_id", value: nil)
+            .eq("source", value: Config.sourceTag)
+            .neq("image_url", value: "")          // metadata-only rows have no picture to file
+            .not("is_superseded", operator: .is, value: true)
+            .not("is_duplicate", operator: .is, value: true)
+            .or("vision_gate_status.is.null,vision_gate_status.not.in.(rejected_personal,rejected_misattributed)")
+            // A newly uploaded historic or undated photo still deserves its first filing pass.
+            .order("created_at", ascending: false)
+            .order("id", ascending: false)
+            .limit(limit)
+            .execute().value
     }
 
     private func suggest(imageId: String, vehicleId: String, conf: Double, reasons: [String]) async {

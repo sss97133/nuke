@@ -50,7 +50,8 @@ function normalizeUrl(raw: string): string {
 function inferCategory(analysis: any): string {
   const t = (analysis?.site_type || '').toLowerCase();
   if (t.includes('auction')) return 'auction';
-  if (t.includes('marketplace') || t.includes('classified')) return 'marketplace';
+  if (t.includes('classified')) return 'classifieds';
+  if (t.includes('marketplace')) return 'marketplace';
   if (t.includes('dealer')) return 'dealer';
   if (t.includes('forum')) return 'forum';
   if (t.includes('registry')) return 'registry';
@@ -233,7 +234,7 @@ Deno.serve(async (req: Request) => {
     // Check if source already exists
     const { data: existingSource } = await supabase
       .from('observation_sources')
-      .select('id, slug, display_name, category, business_id')
+      .select('id, slug, display_name, category, business_id, species')
       .or(`slug.eq.${slug},base_url.eq.${baseUrl}`)
       .limit(1)
       .maybeSingle();
@@ -302,7 +303,9 @@ Deno.serve(async (req: Request) => {
       };
 
       if (observationSourceId) {
-        await supabase.from('observation_sources').update(osRow).eq('id', observationSourceId);
+        // A kind read from the source with evidence (species set) is not replaced by the model's guess.
+        const { category: _guessed, ...kept } = osRow;
+        await supabase.from('observation_sources').update(existingSource?.species ? kept : osRow).eq('id', observationSourceId);
       } else {
         const { data: created, error: osErr } = await supabase
           .from('observation_sources')

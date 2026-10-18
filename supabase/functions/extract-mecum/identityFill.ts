@@ -15,6 +15,21 @@ export function sameIdentityValue(field: string, have: unknown, lot: unknown): b
 
 const empty = (v: unknown) => v === null || v === undefined || v === "";
 
+/**
+ * A vehicles update refused because the lot's VIN is already on another vehicle: enforce_vin_uniqueness raises 23505 with
+ * "VIN <vin> already exists on vehicle <id>", and the native unique indexes name `vin` in the constraint. Returns the
+ * holder's id when the message names one ("" when it does not), or null when the error is not a VIN conflict.
+ */
+export function vinConflictHolder(err: { code?: string | null; message?: string | null } | null | undefined): string | null {
+  if (!err) return null;
+  const message = String(err.message ?? "");
+  const named = /already exists on vehicle\s+([0-9a-f-]{8,36})/i.exec(message);
+  if (named) return named[1];
+  if (/already exists on vehicle/i.test(message)) return "";
+  if (err.code === "23505" && /\bvin\b|vehicles_vin/i.test(message)) return "";
+  return null;
+}
+
 /** `update` without the identity fields the vehicle already has, and the fields where the lot disagrees. */
 export function fillOnlyIdentity(
   existing: Record<string, unknown> | null | undefined,
@@ -30,4 +45,12 @@ export function fillOnlyIdentity(
     delete out[k];
   }
   return { update: out, disagree };
+}
+
+/**
+ * The queue status for a lot that landed. A lot whose VIN another vehicle holds raised a relink revision on its own queue
+ * row (record_revision_item sets status 'revision'); writing 'complete' over it would hide that revision from its readers.
+ */
+export function landedStatus(relinkVin: boolean): "complete" | "revision" {
+  return relinkVin ? "revision" : "complete";
 }

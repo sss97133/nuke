@@ -125,24 +125,31 @@ async function visitListing(page, id) {
   return { ...first, images: [...seen.values()], final_url: page.url() };
 }
 
+/** One packet per listing page: its testimony belongs to that item, so the capture names the item and the URL the
+ *  page actually landed on (the listing-history reader drops listing-page captures without the exact item URL). */
+export function listingPagePackets(pages, cycleId = randomUUID()) {
+  return pages.map(({ card, finalUrl, observedAt }, i) => {
+    const target = `https://www.facebook.com/marketplace/item/${card.facebook_id}/`;
+    // An unknown or off-Marketplace landing keeps the generic surface, which claims no item and still validates.
+    const actual = /^https:\/\/(www\.)?facebook\.com\/marketplace\//.test(finalUrl ?? '') ? finalUrl : 'https://www.facebook.com/marketplace/item/';
+    return { mode: 'browser_capture', capture: { capture_id: randomUUID(), observed_at: observedAt, target_url: target, actual_url: actual,
+      retrieval_surface: 'playwright_rendered_listing_page', actual_region: 'listing page', access_state: 'available', complete: false, source_listed_at: null, source_cycle_id: cycleId, packet_index: i, revisit: true }, batch: [card] };
+  });
+}
+
 async function revisit(page, nodeClassify) {
   const list = readJson(path.join(dirs.inbox, 'revisit.json'), { ids: [] }).ids.slice(0, LIMITS.revisitPerRun);
-  const cards = [], log = [];
+  const pages = [], log = [];
   for (const id of list) {
     const r = await visitListing(page, id);
     if (r.challenge) { halt('source_access_challenge', { challenge: r.challenge, during: 'revisit' }); break; }
     const observedAt = new Date().toISOString();
     const parsed = readListingPage(r, observedAt);
-    cards.push(revisitCard(id, parsed, r)); log.push({ id, unavailable: parsed.unavailable, status_label: parsed.status_label, photos: parsed.images.length, max_photo_px: Math.max(0, ...parsed.images.map(i => i.width ?? 0)), description_chars: parsed.description?.length ?? 0, seller_type: parsed.seller_type });
+    pages.push({ card: revisitCard(id, parsed, r), finalUrl: r.final_url, observedAt }); log.push({ id, unavailable: parsed.unavailable, status_label: parsed.status_label, photos: parsed.images.length, max_photo_px: Math.max(0, ...parsed.images.map(i => i.width ?? 0)), description_chars: parsed.description?.length ?? 0, seller_type: parsed.seller_type });
     await sleep(jitter(8000, 20000));
   }
-  if (cards.length) {
-    const now = new Date().toISOString(), cycleId = randomUUID();
-    for (let o = 0; o < cards.length; o += 50) {
-      const capture_id = randomUUID();
-      writeAtomic(path.join(dirs.out, `${capture_id}.json`), { mode: 'browser_capture', capture: { capture_id, observed_at: now, target_url: 'https://www.facebook.com/marketplace/item/', actual_url: 'https://www.facebook.com/marketplace/item/',
-        retrieval_surface: 'playwright_rendered_listing_page', actual_region: 'listing page', access_state: 'available', complete: false, source_listed_at: null, source_cycle_id: cycleId, packet_index: o / 50, revisit: true }, batch: cards.slice(o, o + 50) });
-    }
+  if (pages.length) {
+    for (const p of listingPagePackets(pages)) writeAtomic(path.join(dirs.out, `${p.capture.capture_id}.json`), p);
     fs.rmSync(path.join(dirs.inbox, 'revisit.json'), { force: true });
   }
   return log;

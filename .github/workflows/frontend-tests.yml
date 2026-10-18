@@ -28,6 +28,18 @@ jobs:
       - name: Verify immutable assets, retry receipts and revision discovery
         run: node --test scripts/ingest-autotrader-history.test.mjs
 
+  broadcast-overlay-contract:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      - name: Setup Node.js for the broadcast overlay readers
+        uses: actions/setup-node@v4
+        with:
+          node-version: '25'
+      - name: Verify overlay parsing, lot segmentation and displayed-outcome refusals
+        run: node --test scripts/broadcast/broadcast-overlay.test.mjs scripts/broadcast/overlay-barrett-jackson.test.mjs
+
   db-contracts:
     # Every supabase/sql/test_*.sql runs here, each in its own fresh database on this one service, unless a job in a
     # workflow names it or scripts/ci/db-contracts-skip.txt lists it. A new contract needs only its file, not a job.
@@ -105,7 +117,7 @@ jobs:
         with:
           node-version: '22'
       - name: Verify agent declarations and source-reader monitoring boundaries
-        run: node --test scripts/assays/data-model-coverage.test.mjs scripts/assays/agent-work-coverage.test.mjs scripts/assays/model-snapshot-comparison.test.mjs
+        run: node --test scripts/assays/data-model-coverage.test.mjs scripts/assays/agent-work-coverage.test.mjs scripts/assays/model-snapshot-comparison.test.mjs scripts/assays/extraction-gold.test.mjs
       - name: Create disposable value-queue retry database
         run: createdb dm_refinement_value_retry_ci
       - name: Verify retained failures, bounded drain and concurrent row locking
@@ -122,6 +134,10 @@ jobs:
         run: createdb dm_bat_live_pull_inflight_ci
       - name: Verify the live pull's run-time pause samples, per-slot in-flight accounting and row locking
         run: psql -X -v ON_ERROR_STOP=1 -d dm_bat_live_pull_inflight_ci -f supabase/sql/test_bat_live_pull_inflight_slots.sql
+      - name: Create disposable live board sync database
+        run: createdb dm_live_board_sync_ci
+      - name: Verify the board-synced houses' schedule writer, bid moves, complete-board ending and health
+        run: psql -X -v ON_ERROR_STOP=1 -d dm_live_board_sync_ci -f supabase/sql/test_live_auction_board_sync.sql
       - name: Create disposable comment author key database
         run: createdb dm_refinement_comment_author_keys_ci
       - name: Verify comment author keys at insert and by bounded backfill; retired twin untouched
@@ -496,6 +512,8 @@ jobs:
         run: deno test --node-modules-dir=none supabase/functions/map-vehicles/cells.test.ts
       - name: Verify archiveFetch cache hits any successful snapshot and does not archive large lot pages as login walls
         run: deno test --no-check --node-modules-dir=none --allow-env --allow-net --allow-read supabase/functions/_shared/archiveFetch.cache.test.ts supabase/functions/_shared/firecrawlGate.test.ts
+      - name: Verify the live board readers for PCarMarket and Bonhams
+        run: deno test --node-modules-dir=none --allow-read supabase/functions/sync-live-auctions/boards.test.ts
 
   discovery-contract:
     runs-on: ubuntu-latest
@@ -532,6 +550,10 @@ jobs:
         run: deno test supabase/functions/extract-barrett-jackson/
       - name: Verify Bonhams lot pages and titles extract deterministic series, trim, and body_style facets
         run: deno test --no-check --allow-read supabase/functions/extract-bonhams/
+      - name: Verify Broad Arrow roster cards and lot pages keep every digit of comma and Swiss apostrophe amounts
+        run: |
+          deno check --node-modules-dir=none supabase/functions/extract-broad-arrow/roster.ts supabase/functions/extract-broad-arrow/lotPage.ts
+          deno test --no-check --node-modules-dir=none supabase/functions/extract-broad-arrow/
       - name: Verify Gooding and Mecum lots extract the shared collector series, trim, and body_style facets
         run: |
           deno test supabase/functions/extract-mecum/

@@ -424,3 +424,22 @@ BEGIN
   PERFORM pg_temp.ok('a reference newer than the census is not graded by it', r->27 = 'null'::jsonb);
 END $$;
 RESET ROLE;
+
+-- A docket_and_broadcast_census figure sums our own capture; it is not the source's total (20261019073000).
+INSERT INTO public.observation_sources (slug, display_name, category, created_at)
+VALUES ('barrett-jackson', 'Barrett-Jackson', 'auction', '2025-01-01');
+INSERT INTO public.source_census (source_id, universe_total, universe_historical, census_method, census_confidence, census_at)
+SELECT id, 64000, 64000, 'docket_and_broadcast_census', 0.92, '2026-10-16'::timestamptz
+FROM public.observation_sources WHERE slug = 'barrett-jackson';
+INSERT INTO public.mv_source_target_landed VALUES ('barrettjackson', 0, 0, 0, 39766, '2026-10-17 10:27Z');
+\ir ../migrations/20261019073000_fold_docket_census_is_capture_model.sql
+\ir ../migrations/20261019073000_fold_docket_census_is_capture_model.sql
+SELECT pg_temp.ok('a capture-model docket census is not folded as the source''s population',
+  (SELECT count(*) = 1 AND bool_and(population IS NULL) FROM public.market_source_days
+   WHERE source_slug = 'barrett-jackson' AND day = (SELECT max(day) FROM public.market_source_days)));
+SELECT pg_temp.ok('an enumerated census is still the population',
+  (SELECT population = 264746 AND population_method = 'enumerated' FROM public.market_source_days
+   WHERE source_slug = 'bat' ORDER BY day DESC LIMIT 1));
+SELECT pg_temp.ok('a labelled reference is still carried as an estimate',
+  (SELECT population = 80000 AND population_method = 'owner_reference' FROM public.market_source_days
+   WHERE source_slug = 'ksl' ORDER BY day DESC LIMIT 1));

@@ -34,7 +34,7 @@ import { projectSecretKey } from "../_shared/supabaseKeys.ts";
 import { postFromFlight } from "./rscPost.ts";
 import { mustWrite, softWrite } from "../_shared/writeResult.ts";
 import { extractStructuredLotFacets, indexLot, parseSaleFacet, priorSaleFacet, saleDay, summarizePriorSale, type IndexLot } from "./indexLot.ts";
-import { fillOnlyIdentity } from "./identityFill.ts";
+import { fillOnlyIdentity, landedStatus, vinConflictHolder } from "./identityFill.ts";
 import { patchForLiveRow, writeVehicleEventByKey } from "../_shared/vehicleEventWrite.ts";
 
 const EXTRACTOR_VERSION = "2.0.0";
@@ -1009,7 +1009,7 @@ async function saveVehicle(
   vehicle: MecumVehicle,
   forceVehicleId?: string,
   sale?: UpcomingSale,
-): Promise<{ vehicleId: string; isNew: boolean; fieldsUpdated: string[]; qualityScore: number }> {
+): Promise<{ vehicleId: string; isNew: boolean; fieldsUpdated: string[]; qualityScore: number; relinkVin: boolean }> {
   // Check if vehicle already exists (by discovery_url, listing_url, queue, or VIN)
   const spellings = mecumUrlSpellings(vehicle.url);
   const [{ data: byDiscoveryUrl }, { data: byListingUrl }, { data: queueEntry }] = await Promise.all([
@@ -1099,6 +1099,7 @@ async function saveVehicle(
 
   let vehicleId: string;
   let isNew = false;
+  let relinkVin = false;
   const fieldsUpdated: string[] = [];
 
   if (existingId) {
@@ -1138,10 +1139,26 @@ async function saveVehicle(
     const updateRes = await supabase.from("vehicles").update(updateData).eq("id", existingId);
     const updateErr = updateRes.error;
     if (updateErr) {
-      // VIN unique constraint violation: another vehicle already has this VIN.
-      // Retry without VIN to still update other fields.
-      if (updateErr.code === "23505" && updateErr.message?.includes("vin")) {
-        console.warn(`[MECUM] VIN conflict for ${existingId} (vin=${cleanData.vin}), retrying without VIN`);
+      // The lot's VIN is already on another vehicle (usually the same car consigned under an earlier lot). The VIN is not
+      // written and nothing is merged: the pair goes to the revision queue to be relinked, and the rest of the lot lands.
+      const vinHolder = vinConflictHolder(updateErr);
+      if (vinHolder !== null && "vin" in updateData) {
+        // A unique-index refusal does not name the holder; read it by the exact VIN (indexed). An unnamed holder is left
+        // out of the detail rather than written as null, so a re-landing never erases a holder recorded earlier.
+        let holderId = vinHolder;
+        if (!holderId) {
+          const { data: holder } = await supabase.from("vehicles").select("id").eq("vin", (updateData as any).vin)
+            .is("merged_into_vehicle_id", null).neq("id", existingId).limit(1).maybeSingle();
+          holderId = (holder as { id?: string } | null)?.id ?? "";
+        }
+        console.warn(`[MECUM] VIN conflict for ${existingId} (vin=${cleanData.vin}, holder=${holderId || "unnamed"}), retrying without VIN`);
+        relinkVin = true;
+        await raiseRevision(supabase, vehicle.url, ["vin"], "duplicate_key", "relink", {
+          vehicle_id: existingId,
+          lot_states: { vin: cleanData.vin },
+          ...(holderId ? { vin_held_by_vehicle_id: holderId } : {}),
+          raised_in: "extract-mecum saveVehicle",
+        });
         const { vin: _skipVin, ...dataWithoutVin } = updateData;
         const { error: retryErr } = await supabase.from("vehicles").update(dataWithoutVin).eq("id", existingId);
         if (retryErr) {
@@ -1228,7 +1245,7 @@ async function saveVehicle(
     }
   }
 
-  return { vehicleId, isNew, fieldsUpdated, qualityScore: gate.score };
+  return { vehicleId, isNew, fieldsUpdated, qualityScore: gate.score, relinkVin };
 }
 
 // Existing mecum rows spell one lot several ways (measured 2026-10-15: with and without www, with and without the trailing
@@ -1298,12 +1315,12 @@ Deno.serve(async (req) => {
           `${vehicle.image_urls.length} images, method=${vehicle.extraction_method}`,
       );
 
-      const { vehicleId, isNew, fieldsUpdated, qualityScore } = await saveVehicle(supabase, vehicle);
+      const { vehicleId, isNew, fieldsUpdated, qualityScore, relinkVin } = await saveVehicle(supabase, vehicle);
 
       // Update queue entry if exists
       softWrite("import_queue complete", await supabase
         .from("import_queue")
-        .update({ status: "complete", vehicle_id: vehicleId, error_message: null })
+        .update({ status: landedStatus(relinkVin), vehicle_id: vehicleId, error_message: null })
         .eq("listing_url", url), writeErrors);
 
       return okJson({
@@ -1722,8 +1739,8 @@ Deno.serve(async (req) => {
           const vehicle = parsedVehicle ? applyStructuredVehicleFacets(parsedVehicle) : null;
           if (!vehicle) { out.unreadable++; await supabase.from("import_queue").update({ status: "failed", error_message: "snapshot has no lot object" }).eq("id", row.id); await raiseRevision(supabase, snap.listing_url, ["lot_object"], "parser_gap", "refetch", {}, snap.id); continue; }
           if (!(vehicle.year && vehicle.make)) { out.not_a_vehicle++; await supabase.from("import_queue").update({ status: "skipped", error_message: "NOT_A_VEHICLE" }).eq("id", row.id); await raiseRevision(supabase, snap.listing_url, ["year", "make"], "quality_gate", "classify_non_vehicle", {}, snap.id); continue; }
-          const { vehicleId, isNew } = await saveVehicle(supabase, vehicle);
-          softWrite("import_queue complete", await supabase.from("import_queue").update({ status: "complete", vehicle_id: vehicleId, processed_at: new Date().toISOString() }).eq("id", row.id), writeErrors);
+          const { vehicleId, isNew, relinkVin } = await saveVehicle(supabase, vehicle);
+          softWrite("import_queue complete", await supabase.from("import_queue").update({ status: landedStatus(relinkVin), vehicle_id: vehicleId, processed_at: new Date().toISOString() }).eq("id", row.id), writeErrors);
           out.folded++;
           if (isNew) out.created++; else out.updated++;
         } catch (err: any) {
@@ -1934,10 +1951,12 @@ Deno.serve(async (req) => {
 
       let cursor = 0;
       if (work.length < limit && body.upcoming_only !== true) {
+        // Only walk rows carry target_id; rows queued by vehicle id (mecum-algolia-save-all --enqueue) must not reset the cursor.
         const { data: last } = await supabase
           .from("import_queue")
           .select("raw_data")
           .eq("extractor_version", TARGETS_TAG)
+          .not("raw_data->target_id", "is", null)
           .order("created_at", { ascending: false })
           .limit(1)
           .maybeSingle();
@@ -2005,7 +2024,7 @@ Deno.serve(async (req) => {
               mustWrite("vehicle_events orphan_claim", await supabase.from("vehicle_events").update({ metadata: { ...(ev.metadata ?? {}), orphan_claim: { event_status: "sold", ...w.reverify.claim } } }).eq("id", w.reverify.event_id));
             }
           }
-          const { vehicleId, isNew } = await saveVehicle(supabase, vehicle, undefined, w.sale);
+          const { vehicleId, isNew, relinkVin } = await saveVehicle(supabase, vehicle, undefined, w.sale);
           if (w.reverify?.event_id) {
             const confirmed = vehicle.status === "sold" && !!vehicle.sale_price;
             const { data: ev } = await supabase.from("vehicle_events").select("metadata").eq("id", w.reverify.event_id).maybeSingle();
@@ -2015,7 +2034,7 @@ Deno.serve(async (req) => {
             results.reverified++;
             if (confirmed) results.confirmed++;
           }
-          const done: Record<string, unknown> = { status: "complete", vehicle_id: vehicleId, processed_at: new Date().toISOString(), error_message: null };
+          const done: Record<string, unknown> = { status: landedStatus(relinkVin), vehicle_id: vehicleId, processed_at: new Date().toISOString(), error_message: null };
           if (w.sale) {
             const resultRead = !!vehicle.status && !["upcoming", "listed"].includes(vehicle.status);
             done.raw_data = { sale: w.sale, ...(resultRead ? { result_read: true } : {}) };
@@ -2096,11 +2115,11 @@ Deno.serve(async (req) => {
             continue;
           }
 
-          const { vehicleId, isNew } = await saveVehicle(supabase, vehicle);
+          const { vehicleId, isNew, relinkVin } = await saveVehicle(supabase, vehicle);
 
           softWrite("import_queue complete", await supabase
             .from("import_queue")
-            .update({ status: "complete", vehicle_id: vehicleId, error_message: null })
+            .update({ status: landedStatus(relinkVin), vehicle_id: vehicleId, error_message: null })
             .eq("id", item.id), writeErrors);
 
           results.success++;
