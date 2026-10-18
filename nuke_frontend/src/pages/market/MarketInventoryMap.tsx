@@ -27,8 +27,8 @@ export default function MarketInventoryMap({ auctions, lens, taxonomy, taxonomyL
   const [width, setWidth] = useState(0);
   const [pulses, setPulses] = useState(true);
   const [hovered, setHovered] = useState<string | null>(null);
-  const [selectedOpener, setSelectedOpener] = useState<HTMLButtonElement | null>(null);
   const [list, setList] = useState<{ keys: string[]; dimension: MapDimension | 'lot'; parent?: string; parentKey?: string } | null>(null);
+  const selectedOpener = useRef<{ button: HTMLButtonElement; lens: InventoryMapLens; model: string | null; list: typeof list } | null>(null);
   useLayoutEffect(() => {
     const element = ref.current;
     if (!element) return;
@@ -66,16 +66,24 @@ export default function MarketInventoryMap({ auctions, lens, taxonomy, taxonomyL
     });
   }, [groups, lens.focus, lens.inside, lens.group, taxonomy, width, height, measure]);
   useLayoutEffect(() => {
-    if (!selectedOpener) return;
-    setSelectedOpener(null);
-    if (!selectedOpener.isConnected && document.activeElement === document.body) ref.current?.focus({ preventScroll: true });
-  }, [selectedOpener, rects, list]);
+    const selected = selectedOpener.current;
+    if (!selected) return;
+    const changed = selected.lens.group !== lens.group || selected.lens.inside !== lens.inside || selected.lens.focus !== lens.focus
+      || selected.lens.child !== lens.child || selected.model !== selectedModel || selected.list !== list;
+    if (!changed) {
+      if (!selected.button.isConnected || document.activeElement !== selected.button) selectedOpener.current = null;
+      return;
+    }
+    selectedOpener.current = null;
+    if (!selected.button.isConnected && document.activeElement === document.body) ref.current?.focus({ preventScroll: true });
+  }, [lens.group, lens.inside, lens.focus, lens.child, selectedModel, rects, list]);
   const needsTaxonomy = lens.group === 'type' || lens.group === 'body';
   const pending = needsTaxonomy && taxonomyLoading;
   const failed = needsTaxonomy && taxonomyError;
   const updates = auctions.filter(a => risenIds.has(a.id)).length;
   const select = (dimension: MapDimension | 'lot', group: InventoryMapGroup, child = false, opener?: HTMLButtonElement) => {
-    setSelectedOpener(dimension !== 'lot' && opener === document.activeElement ? opener ?? null : null);
+    selectedOpener.current = dimension !== 'lot' && opener && opener === document.activeElement
+      ? { button: opener, lens: { ...lens }, model: selectedModel, list } : null;
     setList(null); setHovered(null); onSelect(dimension, group, child);
   };
   const plural = (dimension: MapDimension | 'lot') => ({ make: 'brands', model: 'models', type: 'vehicle types', body: 'body styles', era: 'decades', year: 'years', lot: 'vehicles' })[dimension];

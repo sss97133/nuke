@@ -14,9 +14,10 @@ const lots = [lot('p1', 'PORSCHE', 2011), lot('p2', 'PORSCHE', 2004), lot('p3', 
 const initialLens: InventoryMapLens = { group: 'make', inside: 'lot', focus: null, child: null };
 let root: Root, container: HTMLDivElement, outside: HTMLButtonElement;
 let refresh: (rows: LiveAuction[]) => void;
+let finishSelection: () => void;
 const selected = vi.fn();
 
-function Parent({ mode = 'drill' }: { mode?: 'drill' | 'keep' | 'move' | 'inspect' }) {
+function Parent({ mode = 'drill' }: { mode?: 'drill' | 'keep' | 'move' | 'inspect' | 'defer' }) {
   const [rows, setRows] = useState(lots);
   const [lens, setLens] = useState(initialLens);
   refresh = setRows;
@@ -25,8 +26,8 @@ function Parent({ mode = 'drill' }: { mode?: 'drill' | 'keep' | 'move' | 'inspec
     if (mode === 'keep') return;
     if (mode === 'move' || mode === 'inspect') outside.focus();
     if (dimension === 'lot') { setLens({ ...initialLens, inside: 'none' }); return; }
-    setRows(group.lots);
-    setLens({ group: 'era', inside: 'lot', focus: null, child: null });
+    const commit = () => { setRows(group.lots); setLens({ group: 'era', inside: 'lot', focus: null, child: null }); };
+    if (mode === 'defer') finishSelection = commit; else commit();
   };
   return <MarketInventoryMap auctions={rows} lens={lens} taxonomy={new Map()} taxonomyLoading={false} taxonomyError={false}
     onRetryTaxonomy={vi.fn()} risenIds={new Set()} onLensChange={(change) => setLens({ ...lens, ...change })}
@@ -63,7 +64,7 @@ it('orients focus to the named map after an explicitly selected brand button is 
   expect(canvas().querySelector<HTMLButtonElement>('.inventory-map-group')?.tabIndex).toBe(0);
 });
 
-it('keeps a connected opener focused and consumes the request before a later background refresh', async () => {
+it('keeps a connected opener focused without allowing a later background refresh to claim focus', async () => {
   await act(async () => root.render(<Parent mode="keep" />));
   const opener = brand();
   await act(async () => opener.focus());
@@ -72,6 +73,30 @@ it('keeps a connected opener focused and consumes the request before a later bac
   await act(async () => refresh(lots.filter((row) => row.make === 'FORD')));
   expect(opener.isConnected).toBe(false);
   expect(document.activeElement).toBe(document.body);
+});
+
+it('retains explicit drill intent through a local commit before the parent navigation commit', async () => {
+  await act(async () => root.render(<Parent mode="defer" />));
+  const opener = brand();
+  await act(async () => opener.focus());
+  await act(async () => opener.click());
+  expect(opener.isConnected).toBe(true);
+  expect(document.activeElement).toBe(opener);
+  await act(async () => finishSelection());
+  expect(opener.isConnected).toBe(false);
+  expect(document.activeElement).toBe(canvas());
+  expect(canvas().getAttribute('aria-label')).toBe('Captured inventory by Era (decade)');
+});
+
+it('preserves user focus moved before a deferred navigation commit', async () => {
+  await act(async () => root.render(<Parent mode="defer" />));
+  const opener = brand();
+  await act(async () => opener.focus());
+  await act(async () => opener.click());
+  outside.focus();
+  await act(async () => finishSelection());
+  expect(opener.isConnected).toBe(false);
+  expect(document.activeElement).toBe(outside);
 });
 
 it('does not hand off focus when a background refresh removes a focused group', async () => {
