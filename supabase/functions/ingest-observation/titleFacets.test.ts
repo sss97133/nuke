@@ -25,6 +25,24 @@ Deno.test("a value the parser infers rather than reads is refused", () => {
   assertEquals(titleFacetWitness("body_style", "1970 Ford Mustang Mach 1", id(1970, "Ford", "Mustang")), null, "Mach 1 does not state Fastback");
 });
 
+Deno.test("an engine option is not a trim", () => {
+  for (const title of ["1967 Chevrolet Corvette 427/435 Convertible", "1966 Chevrolet Corvette 427 Coupe",
+    "1967 Chevrolet Corvette L88 Coupe", "1969 Ford Mustang Cobra Jet Fastback"]) {
+    const make = title.includes("Ford") ? "Ford" : "Chevrolet";
+    const model = title.includes("Mustang") ? "Mustang" : "Corvette";
+    assertEquals(titleFacetWitness("trim", title, id(Number(title.slice(0, 4)), make, model)), null, title);
+  }
+  assertEquals(titleFacetWitness("body_style", "1967 Chevrolet Corvette 427/435 Convertible", id(1967, "Chevrolet", "Corvette")),
+    "Convertible", "the body word in the same title still counts");
+  assertEquals(titleFacetWitness("trim", "2001 Chevrolet Corvette Z06", id(2001, "Chevrolet", "Corvette")), "Z06", "Z06 is a package");
+});
+
+Deno.test("bed length and cab configuration are not a body style", () => {
+  assertEquals(titleFacetWitness("body_style", "1985 Chevrolet C10 Short Bed", id(1985, "Chevrolet", "C10")), null, "short bed");
+  assertEquals(titleFacetWitness("body_style", "1988 GMC Sierra Crew Cab", id(1988, "GMC", "Sierra")), null, "crew cab");
+  assertEquals(titleFacetWitness("body_style", "1975 Ford Bronco Half-Cab", id(1975, "Ford", "Bronco")), "Half-Cab", "half-cab body stays");
+});
+
 Deno.test("a copy, a part or a conversion yields no label", () => {
   assertEquals(titleFacetWitness("trim", "1966 Ford Mustang Shelby GT350-R Replica", id(1966, "Ford", "Mustang")), null, "replica");
   assertEquals(titleFacetWitness("trim", "1963 Chevrolet Corvette Grand Sport Replica", id(1963, "Chevrolet", "Corvette")), null, "replica");
