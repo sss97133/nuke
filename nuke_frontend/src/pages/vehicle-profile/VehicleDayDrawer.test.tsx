@@ -114,12 +114,12 @@ async function draw(auctions: AuctionSequence[] = [], date = day) {
 }
 async function close() { await act(async () => root.render(null)); }
 const visible = () => [...host.querySelectorAll('img')].map(img => ({ src: img.getAttribute('src'), title: img.closest('button')?.title }));
-const listingPhoto = (id: string) => ({ src: `https://photos.test/${id}.jpg`, title: 'published with the listing — no capture time' });
+const listingPhoto = (id: string) => ({ src: `https://photos.test/${id}.jpg`, title: 'listing association inferred; capture and publication times unknown' });
 function deferred() { let resolve!: (response: Response) => void; return { promise: new Promise<Response>(done => { resolve = done; }), resolve }; }
 
 it('preserves a valid same-input capture cache and its recorded-time title', async () => {
   await draw(); const first = visible(); expect(first).toHaveLength(1); expect(first[0].src).toBe(captured.image_url);
-  expect(first[0].title).not.toBe('published with the listing — no capture time');
+  expect(first[0].title).not.toBe('listing association inferred; capture and publication times unknown');
   await close(); await draw(); expect(visible()).toEqual(first); expect(requests).toHaveLength(1);
 });
 it('preserves a successful known-empty cache without repeated reads', async () => {
@@ -131,7 +131,7 @@ it('does not let a failed photo read permanently hide useful photos on reopen', 
   await draw(); await close(); reply = null; await draw();
   expect({ photos: visible().map(p => p.src), reads: requests.length }).toEqual({ photos: [captured.image_url], reads: 2 });
 });
-it('does not relabel a captured-photo cache as listing-published photos when listing context arrives', async () => {
+it('does not relabel a captured-photo cache as an inferred listing group when listing context arrives', async () => {
   await draw(); expect(visible()[0].src).toBe(captured.image_url);
   await draw(onlyA());
   expect(visible()).toEqual([listingPhoto('addressed'), listingPhoto('unaddressed')]);
@@ -139,7 +139,7 @@ it('does not relabel a captured-photo cache as listing-published photos when lis
 it('does not relabel a listing-photo cache as a captured-day photo when listing context is removed', async () => {
   await draw(onlyA()); expect(visible()).toHaveLength(2); await draw();
   expect(visible().map(p => p.src)).toEqual([captured.image_url]);
-  expect(visible()[0].title).not.toBe('published with the listing — no capture time');
+  expect(visible()[0].title).not.toBe('listing association inferred; capture and publication times unknown');
 });
 it('rechecks same-mode attribution when a newly known listing changes the existing owner result', async () => {
   await draw(onlyA()); expect(visible()).toHaveLength(2);
@@ -226,7 +226,7 @@ it.each(['999000', '999001', '999999'])('shows a real capture at the final-day f
     photos: [rows[0].image_url], body: expect.not.stringContaining('NO ACTIVITY'),
   });
   expect(host.textContent).not.toContain('NO ACTIVITY');
-  expect(visible()[0].title).not.toBe('published with the listing — no capture time');
+  expect(visible()[0].title).not.toBe('listing association inferred; capture and publication times unknown');
   await close(); await draw(); expect(visible().map(p => p.src)).toEqual([rows[0].image_url]); expect(requests).toHaveLength(1);
 });
 it('keeps start, ordinary and final-microsecond captures but excludes adjacent UTC days', async () => {
