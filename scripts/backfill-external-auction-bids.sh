@@ -11,17 +11,21 @@
 # bat_bids read ~1,200 scattered pages for 1,100 rows (9 s cold, 2026-10-17), a 60-page range reads them in order
 # (1.4 s cold). Rows a concurrent update moves to another page are caught by a re-run; new bid comments are recorded
 # at insert by trg_external_auction_bids_from_comments.
-# Each slice is one statement under the server's statement_timeout (10 s for postgres), then a 0.1 s pause. Slices run in
+# Each slice is one statement under the server's statement_timeout (10 s for postgres), then a PAUSE (default 2 s) while
+# disk IO is contended; db-safety's floor is 0.1 s. Slices run in
 # chunks of 32; before each chunk the shared writer gate holds while more than 3 client queries wait on IO, and after it
 # lock waits are logged. Output: one line per slice (phase, slice, finished_at, the writer's counts) appended to LOG.
 #
 # usage: dotenvx run -q -- sh -c 'PGPASSWORD="$SUPABASE_DB_PASSWORD" scripts/backfill-external-auction-bids.sh <phase> [first] [last]'
-#   PGHOST/PGPORT/PGUSER/PGDATABASE default to the production pooler; LOG defaults to ./external-auction-bids-backfill.log
+#   PGHOST/PGPORT/PGUSER/PGDATABASE default to the production pooler; LOG defaults to ./external-auction-bids-backfill.log;
+#   PAUSE is the seconds between slices
 set -euo pipefail
 phase="${1:?usage: $0 <cab-comments|cab-history|cab-legacy|bat-bids|bat-comments> [first-slice] [last-slice]}"
 : "${PGHOST:=aws-0-us-west-1.pooler.supabase.com}" "${PGPORT:=6543}" "${PGUSER:=postgres.qkgaybvrernstplzjaam}" "${PGDATABASE:=postgres}"
 export PGHOST PGPORT PGUSER PGDATABASE
 LOG="${LOG:-./external-auction-bids-backfill.log}"
+PAUSE="${PAUSE:-2}"
+[[ "$PAUSE" =~ ^[0-9]+(\.[0-9]+)?$ ]] || { echo "PAUSE must be seconds" >&2; exit 2; }
 psql_at() { psql -X -q -At -F $'\t' -v ON_ERROR_STOP=1 "$@"; }
 
 pages=0
@@ -95,7 +99,7 @@ for ((chunk = first; chunk <= last; chunk += 32)); do
     echo '\set ON_ERROR_STOP on'
     for ((i = chunk; i <= last && i < chunk + 32; i++)); do
       echo "SELECT '$phase', $i, clock_timestamp(), public.record_external_auction_bids('$(source_of "$phase")', $(ids_for "$phase" "$(range_for "$i")"));"
-      echo "SELECT pg_sleep(0.1) \\g /dev/null"
+      echo "SELECT pg_sleep($PAUSE) \\g /dev/null"
     done
     echo "SELECT '$phase', $((i - 1)), clock_timestamp(), json_build_object('lock_waits', count(*)) FROM pg_stat_activity WHERE wait_event_type = 'Lock';"
   } | psql_at -f - | tee -a "$LOG"
