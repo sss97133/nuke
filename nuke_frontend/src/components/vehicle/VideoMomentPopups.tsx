@@ -37,24 +37,12 @@ export const PriceBreakdownPopup: React.FC<PriceBreakdownProps> = ({
   hammerPrice,
   estimateLow,
   estimateHigh,
-  source = 'mecum',
   vehicleId,
   onClose
 }) => {
   const [comparables, setComparables] = useState<ComparableSale[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeDefinition, setActiveDefinition] = useState<string | null>(null);
-
-  // Calculate fees based on source
-  const buyerPremiumPct = source === 'mecum' ? 0.10 : source === 'barrett_jackson' ? 0.10 : 0.10;
-  const sellerCommPct = source === 'mecum' ? 0.10 : source === 'barrett_jackson' ? 0.10 : 0.10;
-  const sellerEntryFee = source === 'mecum' ? 350 : 300;
-
-  const buyerPremium = hammerPrice * buyerPremiumPct;
-  const buyerTotal = hammerPrice + buyerPremium;
-  const sellerComm = hammerPrice * sellerCommPct;
-  const sellerNet = hammerPrice - sellerComm - sellerEntryFee;
-  const houseTake = buyerPremium + sellerComm + sellerEntryFee;
 
   // Price vs estimate
   let vsEstimate = '';
@@ -139,36 +127,9 @@ export const PriceBreakdownPopup: React.FC<PriceBreakdownProps> = ({
       highlight: (vsEstimate.startsWith('+') ? 'success' : vsEstimate.startsWith('-') ? 'warning' : 'muted') as 'success' | 'warning' | 'muted'
     }] : []),
     {
-      label: `Buyer Premium (${(buyerPremiumPct*100).toFixed(0)}%)`,
-      value: buyerPremium,
-      definition: `Fee charged to the buyer on top of hammer price. ${source?.toUpperCase()} charges ${(buyerPremiumPct*100).toFixed(0)}% for in-person bidders.`,
-    },
-    {
-      label: 'Buyer Total',
-      value: buyerTotal,
-      definition: 'Total amount the buyer pays = Hammer Price + Buyer Premium. Does not include taxes, transport, or registration.',
-      highlight: 'success'
-    },
-    {
-      label: `Seller Commission (${(sellerCommPct*100).toFixed(0)}%)`,
-      value: sellerComm,
-      definition: `Commission taken from the seller\'s proceeds. Standard rate is ${(sellerCommPct*100).toFixed(0)}% for reserve listings.`,
-    },
-    {
-      label: 'Entry Fee',
-      value: sellerEntryFee,
-      definition: `Flat fee charged to sellers to list their vehicle. Ranges from $${sellerEntryFee} to $1,000 depending on lot placement.`,
-    },
-    {
-      label: 'Seller Net',
-      value: sellerNet,
-      definition: 'Amount the seller receives after commission and entry fee are deducted from the hammer price.',
-      highlight: 'warning'
-    },
-    {
-      label: 'House Take',
-      value: houseTake,
-      definition: 'Total revenue the auction house earns from this transaction (buyer premium + seller commission + entry fee).',
+      label: 'Fees and proceeds',
+      value: 'Unrecorded',
+      definition: 'Lot-specific buyer fees, seller commission and entry fees are not recorded in this read, so buyer total, seller proceeds and house revenue are unknown.',
       highlight: 'muted'
     },
   ];
