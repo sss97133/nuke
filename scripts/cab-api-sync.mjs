@@ -1146,8 +1146,8 @@ async function extractSingleAuctionGoldStandard(cab, auctionId) {
     let q = supabase
       .from("vehicles")
       .select("id")
-      .eq("vin", vin)
-      .neq("status", "merged")
+      .ilike("vin", vin.trim())
+      .or("status.is.null,status.neq.merged")
       .is("deleted_at", null);
     if (vin.length < 11 && (l.make || parseTitleYmm(l.title).make)) {
       q = q.ilike("make", l.make || parseTitleYmm(l.title).make);
@@ -1311,10 +1311,15 @@ async function extractSingleAuctionGoldStandard(cab, auctionId) {
   });
 
   if (vehicleId) {
-    const { error: uErr } = await supabase
+    let { error: uErr } = await supabase
       .from("vehicles")
       .update(vehiclePayload)
       .eq("id", vehicleId);
+    // A merged-away duplicate can still hold this listing's discovery_url; keep the target's own discovery_url then.
+    if (uErr?.code === "23505" && uErr.message?.includes("vehicles_discovery_url_unique")) {
+      const { discovery_url: _held, ...withoutDiscoveryUrl } = vehiclePayload;
+      ({ error: uErr } = await supabase.from("vehicles").update(withoutDiscoveryUrl).eq("id", vehicleId));
+    }
     if (uErr) throw new Error(`Vehicle update failed for ${d.id}: ${describePgError(uErr)}`);
   } else {
     const { data: insV, error: iErr } = await supabase
