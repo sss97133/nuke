@@ -479,6 +479,39 @@ def emlx_index(mail_dir, emails):
     return index
 
 
+def priority_listing(listing, years):
+    """Rank only a card's stated year, never its saved-search name or neighbor."""
+    year = listing.get('year')
+    return bool(years and type(year) is int and years[0] <= year <= years[1])
+
+
+def prioritize_emails(emails, files, args, index):
+    years = getattr(args, 'priority_years', None)
+    if not years:
+        return emails
+    priority = set()
+    for em in emails:
+        path = files.get(str(em['msg_id']))
+        if path is None:
+            continue
+        try:
+            if args.message_manifest:
+                raw = path.read_bytes()
+                msg = email.message_from_bytes(raw, policy=email.policy.default)
+            else:
+                msg, raw = read_emlx(path)
+            source = next(key for key, values in SENDERS.items() if em['sender'] in values)
+            alert = parse_alert(msg, raw, source, em['received_ts'], index)
+            if any(priority_listing(card, years) for card in alert['listings']):
+                priority.add(str(em['msg_id']))
+        except Exception:
+            # The normal processing pass records errors and preserves retry behavior.
+            continue
+    # Stable sorting keeps newest first within each group. Nonpriority and unknown
+    # cards remain eligible, and a message is acknowledged only after every card.
+    return sorted(emails, key=lambda em: str(em['msg_id']) not in priority)
+
+
 class Supabase:
     def __init__(self):
         self.url = (os.environ.get('VITE_SUPABASE_URL') or os.environ.get('SUPABASE_URL') or '').rstrip('/')
@@ -691,6 +724,9 @@ def run(args):
     report = {'method': VERSION, 'started_at': utc(), 'dry_run': args.dry_run, 'selected': len(emails),
               'cached': 0, 'already_completed': 0, 'holds': {}, 'errors': [], 'results': [],
               'sitemap_sha256': sitemap_sha, 'latest_email_received_at': utc(emails[0]['received_ts']) if emails else None}
+    years = getattr(args, 'priority_years', None)
+    report['priority_years'] = years
+    emails = prioritize_emails(emails, files, args, index)
     client = None
     attempted = 0
     for em in emails:
@@ -732,14 +768,15 @@ def run(args):
                 continue
             if not args.dry_run:
                 attempted += 1
-            for listing in alert['listings']:
+            for listing in sorted(alert['listings'], key=lambda card: not priority_listing(card, years)):
                 if args.dry_run:
                     report['results'].append({**listing, 'message_key': key, 'source': source,
                                               'observed_at': alert['observed_at']})
                 else:
                     client = client or Supabase()
                     source_id = client.source_config(source)
-                    report['results'].append(client.ingest(alert, listing, source_id, sitemap_sha))
+                    result = client.ingest(alert, listing, source_id, sitemap_sha)
+                    report['results'].append({**result, 'priority': priority_listing(listing, years)})
             if not args.dry_run:
                 state['completed'][key] = {'raw_sha256': alert['raw_sha256'], 'completed_at': utc(),
                                            'resolution_pending': any(not x['url'] for x in alert['listings']),
@@ -753,7 +790,6 @@ def run(args):
     report['finished_at'] = utc()
     report['queue_inserted'] = sum(r.get('queued', 0) for r in report['results'])
     report['observations_verified'] = sum(bool(r.get('observation_id')) for r in report['results'])
-    report['source_stale'] = not emails or time.time() - emails[0]['received_ts'] > args.stale_hours * 3600
     report['source_freshness'] = {}
     for source in SOURCE_SLUGS if args.source == 'all' else (args.source,):
         latest = max((e['received_ts'] for e in emails if e['sender'] in SENDERS[source]), default=None)
@@ -776,6 +812,8 @@ def main():
     p.add_argument('--days', type=int)
     p.add_argument('--limit', type=int, default=1000)
     p.add_argument('--batch-size', type=int, default=10, help='Maximum unprocessed messages attempted per cycle')
+    p.add_argument('--priority-years', nargs=2, type=int, metavar=('FROM', 'TO'),
+                   help='Process messages and cards with a stated year in this inclusive range first')
     p.add_argument('--mail-db', type=Path, default=MAIL_DB)
     p.add_argument('--mail-dir', type=Path, default=MAIL_DIR)
     p.add_argument('--message-manifest', type=Path, help='Private JSON array of raw .eml paths and timezone-aware received_at values')
@@ -797,6 +835,8 @@ def main():
         return 0 if healthy else 1
     if args.limit < 1 or args.limit > 10000 or not 1 <= args.batch_size <= 100 or args.days is not None and args.days < 1:
         p.error('limit must be 1..10000; batch-size 1..100; days must be positive')
+    if args.priority_years and not 1800 <= args.priority_years[0] <= args.priority_years[1] <= 2100:
+        p.error('priority-years must be an ascending range within 1800..2100')
     args.state_dir.mkdir(parents=True, exist_ok=True, mode=0o700)
     with (args.state_dir / 'intake.lock').open('a') as lock:
         try:
