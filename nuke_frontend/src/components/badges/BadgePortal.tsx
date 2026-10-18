@@ -261,7 +261,7 @@ export function BadgePortal({
 }: BadgePortalProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [hovered, setHovered] = useState(false);
-  const { data, loading, load } = useBadgeDepth(dimension, value);
+  const { data, loading, unavailable, load } = useBadgeDepth(dimension, value);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const containerRef = useRef<HTMLSpanElement>(null);
   const popupCtx = useContext(PopupStackContext);
@@ -403,6 +403,7 @@ export function BadgePortal({
           preview={data.preview}
           stats={data.stats}
           loading={loading}
+          unavailable={unavailable}
           onClose={handleClose}
         />
       )}
