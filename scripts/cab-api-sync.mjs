@@ -37,6 +37,13 @@ if (!SUPABASE_URL || !SUPABASE_KEY) {
   process.exit(1);
 }
 
+// PostgREST errors from a gateway timeout or an empty 5xx body carry code/details/hint but no message.
+function describePgError(err) {
+  const parts = [err?.message, err?.code && `code=${err.code}`, err?.details && `details=${err.details}`, err?.hint && `hint=${err.hint}`]
+    .filter(Boolean);
+  return parts.length ? parts.join(" ") : JSON.stringify(err);
+}
+
 const supabase = createClient(SUPABASE_URL, SUPABASE_KEY, {
   auth: { persistSession: false },
   global: { headers: { "X-Nuke-Writer": "extract-cars-and-bids-core" } },
@@ -1273,14 +1280,14 @@ async function extractSingleAuctionGoldStandard(cab, auctionId) {
       .from("vehicles")
       .update(vehiclePayload)
       .eq("id", vehicleId);
-    if (uErr) throw new Error(`Vehicle update failed for ${d.id}: ${uErr.message}`);
+    if (uErr) throw new Error(`Vehicle update failed for ${d.id}: ${describePgError(uErr)}`);
   } else {
     const { data: insV, error: iErr } = await supabase
       .from("vehicles")
       .insert(vehiclePayload)
       .select("id")
       .single();
-    if (iErr) throw new Error(`Vehicle insert failed for ${d.id}: ${iErr.message}`);
+    if (iErr) throw new Error(`Vehicle insert failed for ${d.id}: ${describePgError(iErr)}`);
     vehicleId = insV.id;
   }
 
