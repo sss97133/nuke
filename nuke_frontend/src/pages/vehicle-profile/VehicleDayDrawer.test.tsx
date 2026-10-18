@@ -25,6 +25,33 @@ import BarcodeTimeline from './BarcodeTimeline';
 import { listingForPhoto } from './auctionSequence';
 
 const day = '2026-09-02', nextDay = '2026-09-03';
+const edgeDays = [
+  { date: '2026-09-30', next: '2026-10-01' },
+  { date: '2024-02-29', next: '2024-03-01' },
+  { date: '2026-12-31', next: '2027-01-01' },
+  { date: '2026-03-08', next: '2026-03-09' },
+  { date: '2026-11-01', next: '2026-11-02' },
+];
+const allowedDays = new Set([day, nextDay, ...edgeDays.flatMap(d => [d.date, d.next])]);
+// Generic UTC timestamp comparison for the local transport. Parse only whole seconds with Date;
+// retain all six fractional digits separately so fixture filtering never rounds microseconds.
+function utcMicros(timestamp: string): bigint {
+  const match = /^(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2})(?:\.(\d{1,6}))?Z$/.exec(timestamp);
+  if (!match) throw new Error(`Unexpected synthetic timestamp: ${timestamp}`);
+  return BigInt(Date.parse(`${match[1]}Z`)) * 1000n + BigInt((match[2] ?? '').padEnd(6, '0'));
+}
+function matchesTime(timestamp: string | null, predicates: string[]): boolean {
+  if (timestamp == null) return false;
+  const value = utcMicros(timestamp);
+  return predicates.every(predicate => {
+    const dot = predicate.indexOf('.');
+    const operator = predicate.slice(0, dot), bound = utcMicros(predicate.slice(dot + 1));
+    if (operator === 'gte') return value >= bound;
+    if (operator === 'lt') return value < bound;
+    throw new Error(`Unexpected time operator: ${operator}`);
+  });
+}
+
 const image = (id: string, extra: Record<string, unknown> = {}) => ({ id, image_url: `https://photos.test/${id}.jpg`,
   taken_at: null, source: 'bat_import', source_url: null, is_duplicate: false, ...extra });
 const captured = image('captured', { source: 'owner_upload', taken_at: `${day}T12:30:00Z` });
@@ -65,10 +92,13 @@ beforeEach(() => {
         selected = selected.filter(row => /bat/i.test(row.source ?? '') || /bringatrailer.com/i.test(row.source_url ?? '') || row.taken_at == null);
       } else {
         const requestedDay = url.searchParams.getAll('taken_at')[0].slice(4, 14);
-        expect([day, nextDay]).toContain(requestedDay);
-        expect(url.searchParams.getAll('taken_at')).toEqual([`gte.${requestedDay}T00:00:00Z`, `lt.${requestedDay}T23:59:59.999Z`]);
+        expect(allowedDays.has(requestedDay)).toBe(true);
+        const predicates = url.searchParams.getAll('taken_at');
+        expect(predicates).toHaveLength(2); expect(predicates[0]).toBe(`gte.${requestedDay}T00:00:00Z`);
+        expect(predicates[1]).toMatch(/^lt\.\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,6})?Z$/);
         expect(url.searchParams.get('order')).toBe('taken_at.asc'); expect(url.searchParams.get('limit')).toBe('120');
-        selected = selected.filter(row => row.taken_at && row.taken_at >= `${requestedDay}T00:00:00Z` && row.taken_at < `${requestedDay}T23:59:59.999Z`);
+        selected = selected.filter(row => matchesTime(row.taken_at, url.searchParams.getAll('taken_at')))
+          .sort((a, b) => utcMicros(a.taken_at) < utcMicros(b.taken_at) ? -1 : utcMicros(a.taken_at) > utcMicros(b.taken_at) ? 1 : 0);
       }
       const fields = url.searchParams.get('select')!.split(',');
       return json(selected.map(row => Object.fromEntries(fields.map(field => [field, row[field]]))));
@@ -178,7 +208,7 @@ it('does not cache a departed pending response over explicit reopen demand', asy
 });
 it('uses the actual Barcode NEXT caller without committing the previous day photo under the next day', async () => {
   fixture.timeline = [{ id: 'day-a', event_date: day, event_type: 'photo_session' }, { id: 'day-b', event_date: nextDay, event_type: 'photo_session' }];
-  const pending = deferred(); reply = url => url.searchParams.getAll('taken_at').some(value => value.includes(nextDay)) ? pending.promise : undefined;
+  const pending = deferred(); reply = url => url.searchParams.getAll('taken_at').includes(`gte.${nextDay}T00:00:00Z`) ? pending.promise : undefined;
   await act(async () => root.render(<MemoryRouter><BarcodeTimeline /></MemoryRouter>));
   await act(async () => host.querySelector<HTMLButtonElement>('[aria-label="Vehicle timeline"]')!.click());
   await act(async () => host.querySelector<HTMLElement>(`[data-date="${day}"]`)!.click());
@@ -187,4 +217,42 @@ it('uses the actual Barcode NEXT caller without committing the previous day phot
   expect(photoFrames.find(frame => frame.date === nextDay)?.photos).toEqual([]);
   await act(async () => pending.resolve(json([image('next-capture', { source: 'owner_upload', taken_at: `${nextDay}T12:00:00Z` })])));
   expect(visible().map(p => p.src)).toEqual(['https://photos.test/next-capture.jpg']);
+});
+
+it.each(['999000', '999001', '999999'])('shows a real capture at the final-day fractional second .%s instead of successful empty', async fraction => {
+  rows = [image(`edge-${fraction}`, { source: 'owner_upload', taken_at: `${day}T23:59:59.${fraction}Z` })];
+  await draw();
+  expect({ photos: visible().map(p => p.src), body: host.textContent, bounds: requests[0].searchParams.getAll('taken_at') }).toMatchObject({
+    photos: [rows[0].image_url], body: expect.not.stringContaining('NO ACTIVITY'),
+  });
+  expect(host.textContent).not.toContain('NO ACTIVITY');
+  expect(visible()[0].title).not.toBe('published with the listing — no capture time');
+  await close(); await draw(); expect(visible().map(p => p.src)).toEqual([rows[0].image_url]); expect(requests).toHaveLength(1);
+});
+it('keeps start, ordinary and final-microsecond captures but excludes adjacent UTC days', async () => {
+  rows = [
+    image('previous-us', { source: 'owner_upload', taken_at: '2026-09-01T23:59:59.999999Z' }),
+    image('start', { source: 'owner_upload', taken_at: `${day}T00:00:00.000000Z` }),
+    captured,
+    image('before-final-ms', { source: 'owner_upload', taken_at: `${day}T23:59:59.998999Z` }),
+    image('last-us', { source: 'owner_upload', taken_at: `${day}T23:59:59.999999Z` }),
+    image('next-midnight', { source: 'owner_upload', taken_at: `${nextDay}T00:00:00.000000Z` }),
+  ];
+  await draw(); expect(visible().map(p => p.src)).toEqual(['start', 'captured', 'before-final-ms', 'last-us'].map(id => `https://photos.test/${id}.jpg`));
+});
+it.each(edgeDays)('retains final microseconds across UTC calendar boundary $date -> $next', async ({ date, next }) => {
+  rows = [image('last-us', { source: 'owner_upload', taken_at: `${date}T23:59:59.999999Z` }),
+    image('next-midnight', { source: 'owner_upload', taken_at: `${next}T00:00:00.000000Z` })];
+  await draw([], date); expect(visible().map(p => p.src)).toEqual(['https://photos.test/last-us.jpg']);
+});
+it('includes exact next midnight on its own UTC day and excludes the previous final microsecond', async () => {
+  rows = [image('last-us', { source: 'owner_upload', taken_at: `${day}T23:59:59.999999Z` }),
+    image('next-midnight', { source: 'owner_upload', taken_at: `${nextDay}T00:00:00.000000Z` })];
+  await draw([], nextDay); expect(visible().map(p => p.src)).toEqual(['https://photos.test/next-midnight.jpg']);
+});
+
+it('retains unavailable-photo handling for an invalid date instead of introducing a render exception', async () => {
+  reply = () => json({ code: '22007', message: 'Synthetic invalid date' }, 400);
+  await draw([], 'invalid-date'); expect(host.textContent).toContain('Photos unavailable');
+  expect(host.textContent).not.toContain('NO ACTIVITY');
 });

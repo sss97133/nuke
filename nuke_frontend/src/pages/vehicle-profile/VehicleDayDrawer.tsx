@@ -135,13 +135,15 @@ const VehicleDayDrawer: React.FC<VehicleDayDrawerProps> = ({ date, auctions = []
       .select('id, image_url, taken_at, source, source_url')
       .eq('vehicle_id', vehicleId)
       .not('is_duplicate', 'is', true);
+    const captureStart = Date.parse(`${date}T00:00:00Z`);
+    const captureEnd = Number.isFinite(captureStart) ? new Date(captureStart + 86_400_000).toISOString() : `${date}T23:59:59.999Z`;
     const query = isListingDay
       // published with the listing: BaT-hosted photos carry no capture time; each one's
       // upload path names its listing (the same rule the timeline uses)
       ? base.or('source.ilike.%bat%,source_url.ilike.%bringatrailer.com%,taken_at.is.null').limit(600)
       : base
           .gte('taken_at', `${date}T00:00:00Z`)
-          .lt('taken_at', `${date}T23:59:59.999Z`)
+          .lt('taken_at', captureEnd)
           .order('taken_at', { ascending: true })
           .limit(120);
     query
