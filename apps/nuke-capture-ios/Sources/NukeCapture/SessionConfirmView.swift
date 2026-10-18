@@ -1,12 +1,12 @@
 // SessionConfirmView.swift — the owner-confirm sweep (the backlog surface).
 //
-// A session = one day at one GPS cell = one truck. The owner taps a session, picks
-// the vehicle, and the WHOLE session routes home in one call (attribute_image_session
+// A session groups photos by day and GPS cell and may contain several vehicles.
+// The owner can review it and explicitly pick a vehicle (attribute_image_session
 // → attribute_testimony, audited). This is the reliable path for sessions with no VIN
 // in frame, and the place an "unknown vehicle" gets a record instead of a mis-file.
 // A session the server matched (get_orphan_sessions.suggested_vehicle_id: the phone's
-// own suggestion for its photos, else the vehicle most worked on that day) confirms
-// with one tap on its row, or all at once. Still a suggestion until the owner taps.
+// own suggestion for its photos, else the vehicle most worked on that day) is a
+// review lead. Quick/bulk filing accepts only a photo's own serial match.
 //
 // CODEX: square thumbnails, mono digits, ALL-CAPS labels, facet doctrine (no row
 // unless count > 0), no empty-state illustration — an honest one-line truth instead.
@@ -44,17 +44,17 @@ struct SessionConfirmView: View {
                             defer { isBatchConfirming = false }
                             do {
                                 let res = try await attribution.confirmAllSuggested()
-                                routedNote = "Confirmed \(res.sessions) sessions (\(res.photos) photos)"
+                                routedNote = "Filed \(res.photos) matched photos. Photos still needing review remain below."
                             } catch {
-                                routedNote = "Batch confirm stopped: \(ReadFailure.text(error)). Filed sessions are gone from the list; the rest remain."
+                                routedNote = "Filing stopped: \(error.localizedDescription). Refresh to see what remains."
                             }
                         }
                     } label: {
                         HStack {
                             Label(
                                 isBatchConfirming
-                                    ? "Confirming suggested sessions…"
-                                    : "Confirm All Suggested (\(suggestedSessions.count))",
+                                    ? "Filing matched photos…"
+                                    : "File Matched Photos",
                                 systemImage: "checkmark.circle.fill"
                             )
                             .font(.subheadline.weight(.semibold))
@@ -63,7 +63,7 @@ struct SessionConfirmView: View {
                                 ProgressView()
                             } else {
                                 let totalPhotos = suggestedSessions.reduce(0) { $0 + $1.photo_count }
-                                Text("\(totalPhotos) PHOTOS")
+                                Text("\(totalPhotos) TO CHECK")
                                     .font(.caption2.monospacedDigit().weight(.semibold))
                                     .foregroundStyle(.secondary)
                             }
@@ -71,7 +71,7 @@ struct SessionConfirmView: View {
                     }
                     .disabled(isBatchConfirming || attribution.isLoadingConfirm)
                 } footer: {
-                    Text("Files every session to its suggested vehicle: a VIN read on this phone, else the vehicle you worked on most that day.")
+                    Text("Files photos with their own vehicle match. Sharing a day and place does not identify a car; unmatched photos stay for review.")
                         .font(.caption2).foregroundStyle(.secondary)
                 }
             }
@@ -95,7 +95,7 @@ struct SessionConfirmView: View {
                             .disabled(attribution.isLoadingConfirm || attribution.confirmLoadError != nil || isBatchConfirming)
                     }
                 } footer: {
-                    Text("Each session is one day at one place — tap a session to pick a vehicle, or tap Confirm when a suggested vehicle matches.")
+                    Text("A session groups photos by day and place and can contain several vehicles. File individual matches, or review the session before choosing a vehicle.")
                         .font(.caption2).foregroundStyle(.secondary)
                 }
             }
@@ -105,8 +105,8 @@ struct SessionConfirmView: View {
         .task { await attribution.loadConfirmData() }
         .refreshable { await attribution.loadConfirmData() }
         .sheet(item: $picking) { session in
-            VehiclePickerSheet(session: session) { vehicle in
-                let n = try await attribution.confirm(session: session, vehicleId: vehicle.id)
+            VehiclePickerSheet(session: session) { vehicle, selectedIDs in
+                let n = try await attribution.confirm(session: session, vehicleId: vehicle.id, selectedImageIDs: selectedIDs)
                 routedNote = "\(n) photos → \(vehicle.label)"
                 picking = nil
             }
@@ -140,24 +140,24 @@ struct SessionConfirmView: View {
             }
             .buttonStyle(.plain)
 
-            if let vid = s.suggested_vehicle_id, let label = s.suggested_vehicle_label {
+            if s.suggested_vehicle_id != nil, let label = s.suggested_vehicle_label {
                 Button {
                     guard quickConfirmingID == nil else { return }
                     quickConfirmingID = s.id
                     Task {
                         defer { quickConfirmingID = nil }
                         do {
-                            let n = try await attribution.confirm(session: s, vehicleId: vid)
+                            let n = try await attribution.confirmSuggested(session: s)
                             routedNote = "\(n) photos → \(label)"
                         } catch {
-                            picking = s
+                            routedNote = error.localizedDescription
                         }
                     }
                 } label: {
                     if quickConfirmingID == s.id {
                         ProgressView().controlSize(.small)
                     } else {
-                        Text("Confirm")
+                        Text("File matches")
                             .font(.caption.weight(.semibold))
                     }
                 }
@@ -183,15 +183,21 @@ struct SessionConfirmView: View {
     }
 }
 
-/// Vehicle picker — the owner's vehicles, square thumbnails. Tap routes the session.
+/// Review source photos before choosing a vehicle; a day/place group can contain several cars.
 private struct VehiclePickerSheet: View {
     let session: AttributionEngine.OrphanSession
-    let onPick: (AttributionEngine.OwnerVehicle) async throws -> Void
+    let onPick: (AttributionEngine.OwnerVehicle, [String]) async throws -> Void
     @ObservedObject private var attribution = AttributionEngine.shared
     @Environment(\.dismiss) private var dismiss
     @State private var isRouting = false
     @State private var routingError: String?
     @State private var query = ""
+    private struct ReviewPhoto: Decodable, Identifiable { let id: String; let image_url: String? }
+    @State private var reviewPhotos: [ReviewPhoto] = []
+    @State private var selectedIDs = Set<String>()
+    @State private var reviewOffset = 0
+    @State private var loadingPhotos = false
+    @State private var photoError: String?
     /// The phone's own suggestion for this session (a VIN read, or a session the VIN anchored),
     /// read from the rows' auto_suggested_vehicle_id. Shown first; the owner still decides.
     @State private var suggestion: (vehicleId: String, reason: String)?
@@ -205,6 +211,45 @@ private struct VehiclePickerSheet: View {
     var body: some View {
         NavigationStack {
             List {
+                Section {
+                    Text("\(selectedIDs.count) selected · \(reviewPhotos.count) shown of \(session.image_ids.count) session photos")
+                        .font(.caption.monospacedDigit())
+                    LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 3), count: 3), spacing: 3) {
+                        ForEach(reviewPhotos) { photo in
+                            Button {
+                                if !selectedIDs.insert(photo.id).inserted { selectedIDs.remove(photo.id) }
+                            } label: {
+                                AsyncImage(url: NukeImage.thumb(photo.image_url, width: 240)) { image in
+                                    image.resizable().scaledToFill()
+                                } placeholder: { Rectangle().fill(Color(.secondarySystemFill)) }
+                                .frame(height: 90).frame(maxWidth: .infinity).clipped()
+                                .overlay(alignment: .topTrailing) {
+                                    Image(systemName: selectedIDs.contains(photo.id) ? "checkmark.circle.fill" : "circle")
+                                        .foregroundStyle(.white).shadow(radius: 2).padding(5)
+                                }
+                            }
+                            .buttonStyle(.plain)
+                            .accessibilityLabel("Photo \(photo.id.prefix(8))")
+                            .accessibilityValue(selectedIDs.contains(photo.id) ? "Selected" : "Not selected")
+                        }
+                    }
+                    if !reviewPhotos.isEmpty {
+                        HStack {
+                            Button("Select displayed") { selectedIDs.formUnion(reviewPhotos.map(\.id)) }
+                            Spacer()
+                            Button("Clear selection") { selectedIDs.removeAll() }
+                        }.font(.caption)
+                    }
+                    if let photoError {
+                        Text(photoError).font(.caption).foregroundStyle(.secondary)
+                        Button("Retry photos") { Task { await loadReviewPhotos() } }
+                    } else if loadingPhotos {
+                        ProgressView("Reading photos…")
+                    } else if reviewOffset < session.image_ids.count {
+                        Button("Load more photos") { Task { await loadReviewPhotos() } }
+                    }
+                } header: { Text("Select photos of one vehicle") }
+                footer: { Text("Choose a vehicle below after reviewing your selection. Other photos stay in this session.") }
                 if let error = routingError {
                     Section {
                         Text(error).font(.footnote).foregroundStyle(.red)
@@ -221,15 +266,16 @@ private struct VehiclePickerSheet: View {
                 Section {
                     ForEach(shown) { v in vehicleRow(v) }
                 } header: {
-                    Text("\(session.photo_count) photos · \(session.session_day)")
+                    Text("File \(selectedIDs.count) selected photos · \(session.session_day)")
                 } footer: {
                     Text(isRouting ? "Moving photos…"
-                         : "Pick the vehicle these photos belong to. If it's not here, add it on nuke.ag first.")
+                         : "Select photos above, then choose their vehicle. If it's not here, add it on nuke.ag first.")
                         .font(.caption2).foregroundStyle(.secondary)
                 }
             }
             .searchable(text: $query, prompt: "Year, make or model")
             .task { await loadSuggestion() }
+            .task { await loadReviewPhotos() }
             .navigationTitle("Which vehicle?")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -245,6 +291,29 @@ private struct VehiclePickerSheet: View {
     private struct SuggestionRow: Decodable {
         let auto_suggested_vehicle_id: String?
         let auto_suggestion_reasons: [String]?
+    }
+
+    /// At most 60 owner-scoped references per explicit page; pixels load only as cells appear.
+    private func loadReviewPhotos() async {
+        guard !loadingPhotos, reviewOffset < session.image_ids.count,
+              let userId = SupabaseService.currentUserId else { return }
+        loadingPhotos = true
+        photoError = nil
+        defer { loadingPhotos = false }
+        let end = min(reviewOffset + 60, session.image_ids.count)
+        let ids = Array(session.image_ids[reviewOffset..<end])
+        do {
+            let photos: [ReviewPhoto] = try await SupabaseService.client.from("vehicle_images")
+                .select("id,image_url").eq("user_id", value: userId).in("id", values: ids)
+                .is("vehicle_id", value: nil).neq("image_url", value: "")
+                .not("is_superseded", operator: .is, value: true)
+                .not("is_duplicate", operator: .is, value: true)
+                .or("vision_gate_status.is.null,vision_gate_status.not.in.(rejected_personal,rejected_misattributed)")
+                .execute().value
+            guard SupabaseService.currentUserId == userId else { return }
+            reviewPhotos.append(contentsOf: photos)
+            reviewOffset = end
+        } catch { photoError = ReadFailure.text(error) }
     }
 
     /// The most frequent phone suggestion among this session's photos; a VIN read outranks a
@@ -276,13 +345,13 @@ private struct VehiclePickerSheet: View {
 
     @ViewBuilder private func vehicleRow(_ v: AttributionEngine.OwnerVehicle) -> some View {
         Button {
-            guard !isRouting else { return }
+            guard !isRouting, !selectedIDs.isEmpty else { return }
             isRouting = true
             routingError = nil
             Task {
                 defer { isRouting = false }
                 do {
-                    try await onPick(v)
+                    try await onPick(v, selectedIDs.sorted())
                 } catch {
                     routingError = error is AttributionEngine.SessionConfirmationError
                         ? error.localizedDescription
@@ -303,6 +372,6 @@ private struct VehiclePickerSheet: View {
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
-        .disabled(isRouting)
+        .disabled(isRouting || selectedIDs.isEmpty)
     }
 }

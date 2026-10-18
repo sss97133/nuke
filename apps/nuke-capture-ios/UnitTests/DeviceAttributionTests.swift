@@ -7,6 +7,31 @@ import Supabase
 @testable import NukeCapture
 
 final class DeviceAttributionTests: XCTestCase {
+    func testManualReviewFilesOnlyTheExplicitSelection() {
+        let session = ["mustang", "corvette", "porsche"]
+        XCTAssertEqual(AttributionEngine.reviewedPhotoIDs(["mustang", "mustang", "outside-session"], sessionIDs: session), ["mustang"])
+        XCTAssertTrue(AttributionEngine.reviewedPhotoIDs([], sessionIDs: session).isEmpty)
+    }
+
+    func testMixedShopSessionFilesOnlyEachPhotosOwnSerialMatch() throws {
+        let json = #"[{"id":"mustang","vehicle_id":null,"auto_suggested_vehicle_id":"vehicle-a","auto_suggestion_confidence":0.99,"auto_suggestion_reasons":["vin_ocr_match","edit_distance=0"]},{"id":"corvette","vehicle_id":null,"auto_suggested_vehicle_id":"vehicle-a","auto_suggestion_confidence":0.8,"auto_suggestion_reasons":["session_inheritance"]},{"id":"porsche","vehicle_id":null,"auto_suggested_vehicle_id":"vehicle-b","auto_suggestion_confidence":0.99,"auto_suggestion_reasons":["vin_ocr_match"]},{"id":"no-photo-evidence","vehicle_id":null,"auto_suggested_vehicle_id":null,"auto_suggestion_confidence":null,"auto_suggestion_reasons":null},{"id":"already-filed","vehicle_id":"vehicle-b","auto_suggested_vehicle_id":"vehicle-a","auto_suggestion_confidence":0.99,"auto_suggestion_reasons":["vin_ocr_match"]}]"#
+        let rows = try JSONDecoder().decode([AttributionEngine.PhotoSuggestion].self, from: Data(json.utf8))
+        let ids = Set(rows.map(\.id))
+        XCTAssertEqual(AttributionEngine.photoBackedIDs(rows, requestedIDs: ids, vehicleId: "VEHICLE-A"), ["mustang"])
+        XCTAssertEqual(AttributionEngine.photoBackedIDs(rows, requestedIDs: ids, vehicleId: "vehicle-b"), ["porsche"])
+        XCTAssertTrue(AttributionEngine.photoBackedIDs(rows, requestedIDs: ["corvette", "no-photo-evidence"], vehicleId: "vehicle-a").isEmpty)
+        XCTAssertTrue(AttributionEngine.photoBackedIDs(rows, requestedIDs: [], vehicleId: "vehicle-a").isEmpty)
+    }
+
+    func testAHighScoreDoesNotTurnSessionInheritanceIntoPhotoEvidence() {
+        let row = AttributionEngine.PhotoSuggestion(id: "a", vehicle_id: nil, auto_suggested_vehicle_id: "v",
+            auto_suggestion_confidence: 0.99, auto_suggestion_reasons: ["vin_ocr_match", "session_inheritance"])
+        XCTAssertTrue(AttributionEngine.photoBackedIDs([row], requestedIDs: ["a"], vehicleId: "v").isEmpty)
+        let invalid = AttributionEngine.PhotoSuggestion(id: "a", vehicle_id: nil, auto_suggested_vehicle_id: "v",
+            auto_suggestion_confidence: 1.5, auto_suggestion_reasons: ["vin_ocr_match"])
+        XCTAssertTrue(AttributionEngine.photoBackedIDs([invalid], requestedIDs: ["a"], vehicleId: "v").isEmpty)
+    }
+
     func testAProfileRequestCountsOnlyPhotosTheServerActuallyFiled() throws {
         func response(_ json: String) throws -> AnyJSON { try JSONDecoder().decode(AnyJSON.self, from: Data(json.utf8)) }
         let partial = try response(#"{"status":"created","filing":{"results":[{"image_id":"a","status":"filed"},{"image_id":"b","status":"deferred"},{"image_id":"c","status":"gate_rejected"},{"image_id":"d","status":"already"}]}}"#)

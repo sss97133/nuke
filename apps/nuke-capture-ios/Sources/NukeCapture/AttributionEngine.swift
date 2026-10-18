@@ -438,9 +438,9 @@ final class AttributionEngine: ObservableObject {
     }
 
     // ─── Owner-confirm sweep (the backlog surface) ───────────────────────────
-    // Lists orphan sessions (one truck per day+GPS) and the owner's vehicles, so
-    // the owner routes a whole session with one tap — the reliable path for
-    // VIN-less sessions and the place "unknown vehicle?" surfaces. Routes through
+    // Sessions organize review by day and place; a shop can hold several vehicles.
+    // Suggested filing needs each photo's own serial match. A manually chosen vehicle
+    // remains an explicit session selection. Both route through
     // the canonical attribute_image_session → attribute_testimony (audited).
 
     struct OrphanSession: Decodable, Identifiable, Sendable {
@@ -502,21 +502,94 @@ final class AttributionEngine: ObservableObject {
         }
     }
 
-    /// Route a whole session to a vehicle (one tap). auth.uid() gates server-side.
+    /// File the owner's explicitly reviewed subset. auth.uid() gates server-side.
     @discardableResult
-    func confirm(session: OrphanSession, vehicleId: String) async throws -> Int {
-        let routed: Int = try await SupabaseService.client
-            .rpc("attribute_image_session",
-                 params: ConfirmParams(p_image_ids: session.image_ids, p_vehicle_id: vehicleId))
-            .execute().value
+    func confirm(session: OrphanSession, vehicleId: String, selectedImageIDs: [String]) async throws -> Int {
+        let ids = Self.reviewedPhotoIDs(selectedImageIDs, sessionIDs: session.image_ids)
+        guard !ids.isEmpty else { throw SessionConfirmationError.noPhotoMatches }
+        let routed: Int
+        do { routed = try await fileMatchedPhotos(ids, vehicleId: vehicleId) }
+        catch { await loadConfirmData(); throw error }
         // A zero-row result is not proof that this session was filed.
         guard routed > 0 else { throw SessionConfirmationError.noPhotosRouted }
-        orphanSessions.removeAll { $0.id == session.id }
+        await loadConfirmData()
         return routed
     }
 
-    /// Confirm all sessions that already have a suggested vehicle, grouped by vehicle_id
-    /// so each vehicle is routed in a single batched RPC call.
+    nonisolated static func reviewedPhotoIDs(_ selected: [String], sessionIDs: [String]) -> [String] {
+        Set(selected).intersection(sessionIDs).sorted()
+    }
+
+    struct PhotoSuggestion: Decodable {
+        let id: String
+        let vehicle_id: String?
+        let auto_suggested_vehicle_id: String?
+        let auto_suggestion_confidence: Double?
+        let auto_suggestion_reasons: [String]?
+    }
+
+    /// A day/location fallback and a session-inherited guess are not photo identity evidence.
+    nonisolated static func photoBackedIDs(_ rows: [PhotoSuggestion], requestedIDs: Set<String>, vehicleId: String) -> [String] {
+        rows.filter {
+            requestedIDs.contains($0.id) && $0.vehicle_id == nil &&
+            $0.auto_suggested_vehicle_id?.lowercased() == vehicleId.lowercased() &&
+            ($0.auto_suggestion_confidence ?? 0) >= 0.9 &&
+            ($0.auto_suggestion_confidence ?? 0) <= 1 &&
+            $0.auto_suggestion_reasons?.contains("vin_ocr_match") == true &&
+            $0.auto_suggestion_reasons?.contains("session_inheritance") != true
+        }.map(\.id)
+    }
+
+    private func matchedPhotoIDs(_ ids: [String], vehicleId: String) async throws -> [String] {
+        guard let userId = SupabaseService.currentUserId else { throw SessionConfirmationError.noPhotoMatches }
+        var matches: [String] = []
+        for start in stride(from: 0, to: ids.count, by: 250) {
+            try Task.checkCancellation()
+            let chunk = Array(ids[start..<min(start + 250, ids.count)])
+            let rows: [PhotoSuggestion] = try await SupabaseService.client.from("vehicle_images")
+                .select("id,vehicle_id,auto_suggested_vehicle_id,auto_suggestion_confidence,auto_suggestion_reasons")
+                .eq("user_id", value: userId).in("id", values: chunk)
+                .is("vehicle_id", value: nil)
+                .not("is_superseded", operator: .is, value: true)
+                .not("is_duplicate", operator: .is, value: true)
+                .or("vision_gate_status.is.null,vision_gate_status.not.in.(rejected_personal,rejected_misattributed)")
+                .execute().value
+            matches.append(contentsOf: Self.photoBackedIDs(rows, requestedIDs: Set(chunk), vehicleId: vehicleId))
+        }
+        return matches
+    }
+
+    private func fileMatchedPhotos(_ ids: [String], vehicleId: String) async throws -> Int {
+        var filed = 0
+        for start in stride(from: 0, to: ids.count, by: 40) {
+            try Task.checkCancellation()
+            let chunk = Array(ids[start..<min(start + 40, ids.count)])
+            let n: Int = try await SupabaseService.client.rpc("attribute_image_session",
+                params: ConfirmParams(p_image_ids: chunk, p_vehicle_id: vehicleId)).execute().value
+            filed += n
+        }
+        return filed
+    }
+
+    @discardableResult
+    func confirmSuggested(session: OrphanSession) async throws -> Int {
+        guard let vehicleId = session.suggested_vehicle_id else { throw SessionConfirmationError.noPhotoMatches }
+        let ids = try await matchedPhotoIDs(session.image_ids, vehicleId: vehicleId)
+        guard !ids.isEmpty else { throw SessionConfirmationError.noPhotoMatches }
+        let filed: Int
+        do {
+            filed = try await fileMatchedPhotos(ids, vehicleId: vehicleId)
+        } catch {
+            await loadConfirmData()
+            throw error
+        }
+        await loadConfirmData()
+        guard filed > 0 else { throw SessionConfirmationError.noPhotosRouted }
+        return filed
+    }
+
+    /// One explicit action files photo-backed matches across sessions. Unmatched photos stay
+    /// available for manual review, including after a partial write or a later request failure.
     @discardableResult
     func confirmAllSuggested(limit: Int? = nil) async throws -> (sessions: Int, photos: Int) {
         let candidates = orphanSessions.filter { $0.suggested_vehicle_id != nil }
@@ -524,32 +597,30 @@ final class AttributionEngine: ObservableObject {
         guard !slice.isEmpty else { return (0, 0) }
 
         let byVehicle = Dictionary(grouping: slice, by: { $0.suggested_vehicle_id ?? "" })
-        var totalSessions = 0
         var totalPhotos = 0
-
-        for (vehicleId, group) in byVehicle {
-            let allImageIDs = group.flatMap(\.image_ids)
-            for chunkStart in stride(from: 0, to: allImageIDs.count, by: 250) {
-                let chunk = Array(allImageIDs[chunkStart..<min(chunkStart + 250, allImageIDs.count)])
-                let routed: Int = try await SupabaseService.client
-                    .rpc("attribute_image_session",
-                         params: ConfirmParams(p_image_ids: chunk, p_vehicle_id: vehicleId))
-                    .execute().value
-                totalPhotos += routed
+        do {
+            for (vehicleId, group) in byVehicle {
+                let ids = try await matchedPhotoIDs(group.flatMap(\.image_ids), vehicleId: vehicleId)
+                totalPhotos += try await fileMatchedPhotos(ids, vehicleId: vehicleId)
             }
-            // Drop each vehicle's sessions as soon as they are filed, so a later failure
-            // leaves only the unfiled ones on screen.
-            let filed = Set(group.map(\.id))
-            orphanSessions.removeAll { filed.contains($0.id) }
-            totalSessions += group.count
+        } catch {
+            await loadConfirmData()
+            throw error
         }
+        await loadConfirmData()
+        guard totalPhotos > 0 else { throw SessionConfirmationError.noPhotoMatches }
+        let remaining = Set(orphanSessions.map(\.id))
+        let totalSessions = slice.filter { !remaining.contains($0.id) }.count
         return (totalSessions, totalPhotos)
     }
 
     enum SessionConfirmationError: LocalizedError {
-        case noPhotosRouted
+        case noPhotosRouted, noPhotoMatches
         var errorDescription: String? {
-            "No photos were moved. Close this sheet and refresh sessions before trying again."
+            switch self {
+            case .noPhotosRouted: return "No photos were moved. Refresh sessions before trying again."
+            case .noPhotoMatches: return "No individual photo matches this suggestion yet. Review the photos before choosing a vehicle."
+            }
         }
     }
 }
