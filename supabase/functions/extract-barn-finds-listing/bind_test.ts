@@ -70,3 +70,18 @@ Deno.test("an unheld listing leaves the post on its own vehicle; a different car
   assertEquals(conflict.state, "identity_conflict");
   assertEquals((await bindToListing(stub({}), { postUrl: "u", postVehicleId: null, cites: [{ ...subject, link_state: "replaced_by_barnfinds" }], subject: null, identity: { year: 1965, make: "Ford" } })).state, "link_replaced");
 });
+
+Deno.test("a post vehicle holding a VIN the listing's vehicle lacks is only proposed, not merged", async () => {
+  const calls: unknown[][] = [];
+  const postUrl = "https://barnfinds.com/vin-post";
+  const sb = stub({
+    vehicle_events: [[{ vehicle_id: "ebay-v", source_platform: "ebay_motors" }], [], []],
+    vehicles: [[], [{ id: "ebay-v", year: 1965, make: "Ford", status: "active", deleted_at: null }],
+      [{ id: "post-v", status: "active", discovery_source: "barnfinds", discovery_url: postUrl, user_id: null, vin: "5F09C123456" }],
+      [{ vin: null }]],
+  }, calls);
+  const b = await bindToListing(sb, { postUrl, postVehicleId: "post-v", cites: [subject], subject, identity: { year: 1965, make: "Ford" } });
+  assertEquals(b.merge?.outcome, "proposed");
+  assertEquals((b.merge?.detail as Record<string, unknown>).post_vin_not_on_listing_vehicle, true);
+  assertEquals(calls.some((c) => c[0] === "rpc"), false);
+});

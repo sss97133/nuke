@@ -96,18 +96,27 @@ export type MergeOutcome = { outcome: "merged" | "proposed" | "skipped" | "error
  * holds no other platform's listing is merged automatically; anything else is left as a 'detected' proposal for review.
  */
 export async function mergePostVehicle(supabase: Supabase, o: { primaryId: string; dupId: string; postUrl: string; subject: ListingLink; via: string }): Promise<MergeOutcome> {
-  const dup = await supabase.from("vehicles").select("id, status, discovery_url, discovery_source, profile_origin, user_id").eq("id", o.dupId).maybeSingle();
+  const dup = await supabase.from("vehicles").select("id, status, discovery_url, discovery_source, profile_origin, user_id, vin").eq("id", o.dupId).maybeSingle();
   if (dup.error || !dup.data) return { outcome: "error", detail: dup.error?.message ?? "post vehicle not found" };
   if (dup.data.status === "merged") return { outcome: "skipped", detail: "post vehicle already merged" };
   const fromPost = (dup.data.discovery_source === "barnfinds" || dup.data.profile_origin === "barnfinds")
     && urlVariants(o.postUrl).includes(String(dup.data.discovery_url ?? "").replace(/\/+$/, "").replace(/^http:/, "https:"));
   const other = await supabase.from("vehicle_events").select("id").eq("vehicle_id", o.dupId).neq("source_platform", "barnfinds").limit(1);
   if (other.error) return { outcome: "error", detail: other.error.message };
-  const clean = fromPost && !dup.data.user_id && (other.data ?? []).length === 0;
+  // merge_into_primary does not carry vin to the primary: a post vehicle whose VIN the listing's vehicle lacks (or contradicts)
+  // is only proposed, so the VIN is not left behind on a merged row.
+  const dupVin = String(dup.data.vin ?? "").trim().toUpperCase();
+  let vinNotOnListing = false;
+  if (dupVin) {
+    const prim = await supabase.from("vehicles").select("vin").eq("id", o.primaryId).maybeSingle();
+    if (prim.error) return { outcome: "error", detail: prim.error.message };
+    vinNotOnListing = String(prim.data?.vin ?? "").trim().toUpperCase() !== dupVin;
+  }
+  const clean = fromPost && !dup.data.user_id && (other.data ?? []).length === 0 && !vinNotOnListing;
   const reasoning = {
     basis: "the Barn Finds post links to this listing (one vehicle, many citations)",
     post_url: o.postUrl, cited_platform: o.subject.platform, cited_listing_key: o.subject.listing_key, cited_url: o.subject.url,
-    target_resolved_via: o.via, auto_merge_guard: { post_vehicle_from_this_post: fromPost, owned: !!dup.data.user_id, other_platform_events: (other.data ?? []).length },
+    target_resolved_via: o.via, auto_merge_guard: { post_vehicle_from_this_post: fromPost, owned: !!dup.data.user_id, other_platform_events: (other.data ?? []).length, post_vin_not_on_listing_vehicle: vinNotOnListing },
   };
   const prop = await supabase.from("vehicle_merge_proposals").upsert({
     primary_vehicle_id: o.primaryId, duplicate_vehicle_id: o.dupId, match_type: "exact_listing_url", confidence_score: clean ? 95 : 70,
