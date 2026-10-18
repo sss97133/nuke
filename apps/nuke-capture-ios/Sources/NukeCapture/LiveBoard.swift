@@ -1233,9 +1233,11 @@ struct LiveBoardView: View {
                         }
                         // The board drawn as the web draws it: brands as boxes, decades inside.
                         Section {
-                            LiveInventoryMapView(lots: mappedLots) { make, decade in
-                                if filterMake != make { bidRange = .all } // the web clears the bid lens on a make change
-                                filterMake = make; filterDecade = decade
+                            DisclosureGroup("Browse live auctions by make") {
+                                LiveInventoryMapView(lots: mappedLots) { make, decade in
+                                    if filterMake != make { bidRange = .all } // the web clears the bid lens on a make change
+                                    filterMake = make; filterDecade = decade
+                                }
                             }
                             .listRowInsets(EdgeInsets(top: 4, leading: 8, bottom: 4, trailing: 8))
                             .listRowBackground(Color.clear)
