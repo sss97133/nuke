@@ -89,6 +89,16 @@ Standing rules the code carries:
   supported new subject. The [autonomous subject-resolution contract](../../docs/ledger/theory/data-machine-cases.md)
   records the required flow and missing admission. Current VIN/album routing does not implement visual subject
   discovery, and a time group, dirty cover or model confidence cannot substitute for that missing mechanism.
+  **Uploaded photos remains a source history, separate from supported photo profiles.** The own-profile
+  door reads the existing `check-image-vehicle-match` owner with `mode=read_subjects` and a `source_inbox`
+  scope. It includes historical and already-filed source records; opening, paging and refreshing never
+  enrolls analysis or starts inference. A single photograph or all-unknown reading remains inspectable
+  without claiming one physical vehicle. Each page checks current source locators, hashes, clocks and protected
+  reading heads; held or unpinned sources expose metadata without pixels. Metadata-only uploads state
+  that pixels were not retained and their reason is unknown, rather than inferring personal content or
+  successful analysis. Counters describe source records in the bounded page, not distinct photographs,
+  account totals or accessible Photos coverage. Cached fallback is dated and requires a live visibility
+  check before showing remote pixels. This does not lift privacy, source-restoration or paid-intake holds.
   The own-user profile also opens **Observed cars**, private photo-backed subject profiles from the existing
   `check-image-vehicle-match` reader's `read_subjects` mode. They retain visual interpretations and unresolved physical
   identity separately from Garage vehicles, owner statements and fleet value. The profile and gallery carry source-photo

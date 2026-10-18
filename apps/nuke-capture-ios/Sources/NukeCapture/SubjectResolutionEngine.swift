@@ -69,6 +69,7 @@ final class SubjectResolutionEngine: ObservableObject {
         let method: String
         let status: String
         let persisted_image_ids: [String]
+        let retained_reading_image_ids: [String]?
         let deferred_image_ids: [String]
         let unresolved: [Unresolved]
         let refusal: String?
@@ -155,7 +156,10 @@ final class SubjectResolutionEngine: ObservableObject {
             guard stillOwnAccount(userId) else { return }
             let requested = Set(batch.inputs.map { $0.imageId.lowercased() })
             let deferred = Set(response.deferred_image_ids.map { $0.lowercased() })
+            let sourceReadChange = SubjectResolutionQueue.sourceReadChange(requested: requested,
+                persisted: response.persisted_image_ids, retained: response.retained_reading_image_ids ?? [], deferred: response.deferred_image_ids)
             guard response.method == SubjectResolutionQueue.method,
+                  sourceReadChange != .invalid,
                   deferred.count == response.deferred_image_ids.count && deferred.isSubset(of: requested),
                   Set(response.persisted_image_ids.map { $0.lowercased() }).isSubset(of: requested),
                   response.unresolved.allSatisfy({ requested.contains($0.image_id.lowercased()) }),
@@ -198,7 +202,7 @@ final class SubjectResolutionEngine: ObservableObject {
             }
             try save(queue, userId)
             state(queue.lastOutcome ?? "Visual analysis is waiting.", userId: userId)
-            if !response.persisted_image_ids.isEmpty {
+            if sourceReadChange == .changed {
                 NotificationCenter.default.post(name: Self.didChange, object: nil)
             }
         } catch { state("Visual analysis couldn't load its sources. \(ReadFailure.text(error))", userId: userId) }
@@ -208,7 +212,7 @@ final class SubjectResolutionEngine: ObservableObject {
         guard stillOwnAccount(userId) else { return }
         if lastSummaryUserId != userId.lowercased() { lastSummary = nil }
         lastSummaryUserId = userId.lowercased()
-        lastSummary = summary
+        lastSummary = SubjectResolutionCopy.summary(summary)
         NSLog("NukeCapture visual subjects: %@", summary)
     }
 }
