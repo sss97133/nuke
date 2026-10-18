@@ -93,6 +93,7 @@ GRANT SELECT ON ALL TABLES IN SCHEMA public TO anon, authenticated, service_role
 \ir ../migrations/20261018170000_vehicle_profile_read_facets_and_provenance.sql
 \ir ../migrations/20261018190000_vehicle_profile_read_identity_marks.sql
 \ir ../migrations/20261018193000_profile_read_masthead_identity_marks.sql
+\ir ../migrations/20261018200000_identity_marks_require_recorded_trim.sql
 
 -- Seeds. v1: the documented case; v2: nothing recorded; v3: a sourceless odometer; v4: private;
 -- v5: a classified asking price; v6: competing evidence; v7: a live auction bid.
@@ -115,6 +116,9 @@ INSERT INTO public.vehicles (id, year, make, model, engine_type, listing_locatio
  ('10000000-0000-0000-0000-000000000009', 1970, 'Plymouth', 'Hemi Road Runner', '426 Hemi V-8', 'Kissimmee, FL', 'https://www.mecum.com/lots/539536/1970-plymouth-hemi-road-runner/');
 INSERT INTO public.vehicles (id, year, make, model, normalized_model, series, trim, body_style) VALUES
  ('10000000-0000-0000-0000-000000000010', 1973, 'Chevrolet', 'K10 Cheyenne Super Stepside', 'C/K', 'K10', 'Cheyenne Super', 'Stepside');
+INSERT INTO public.vehicles (id, year, make, model, normalized_model, trim) VALUES
+ ('10000000-0000-0000-0000-000000000011', 1978, 'Chevrolet', 'Pickup', 'C/K', NULL),
+ ('10000000-0000-0000-0000-000000000012', 1979, 'Chevrolet', 'K5 Blazer', 'K5 Blazer', 'Cheyenne');
 
 INSERT INTO public.field_evidence (vehicle_id, field_name, proposed_value, source_type, source_confidence, extracted_at, status) VALUES
  ('10000000-0000-0000-0000-000000000001', 'engine_size',  '4.7L V8',   'user-submission_listing', 80, '2026-09-01T00:00:00Z', 'accepted'),
@@ -251,7 +255,15 @@ BEGIN
 
   d := public.vehicle_profile_read('10000000-0000-0000-0000-000000000008');
   PERFORM public.t_assert((SELECT string_agg(x->>'display_label', '|' ORDER BY o) FROM jsonb_array_elements(d->'sections'->0->'identity_marks') WITH ORDINALITY AS t(x, o))
-    = 'K/5 BLAZER · CHEYENNE|CHEVROLET', format('v8 (1977 Chevrolet K5 Blazer) masthead resolves K5 Blazer series badge and Squarebody Chevrolet bowtie; got %s', d->'sections'->0->'identity_marks'));
+    = 'CHEVROLET', format('v8 (1977 Chevrolet K5 Blazer, no recorded trim) gets the era bowtie and no Cheyenne plate; got %s', d->'sections'->0->'identity_marks'));
+
+  d := public.vehicle_profile_read('10000000-0000-0000-0000-000000000012');
+  PERFORM public.t_assert((SELECT string_agg(x->>'display_label', '|' ORDER BY o) FROM jsonb_array_elements(d->'sections'->0->'identity_marks') WITH ORDINALITY AS t(x, o))
+    = 'K/5 BLAZER · CHEYENNE|CHEVROLET', format('v12 (1979 K5 Blazer recorded as Cheyenne) gets the Cheyenne plate; got %s', d->'sections'->0->'identity_marks'));
+
+  d := public.vehicle_profile_read('10000000-0000-0000-0000-000000000011');
+  PERFORM public.t_assert((SELECT string_agg(x->>'display_label', '|' ORDER BY o) FROM jsonb_array_elements(d->'sections'->0->'identity_marks') WITH ORDINALITY AS t(x, o))
+    = 'CHEVROLET', format('v11 (1978 C/K pickup, no series, trim or body) gets no trim or series plate; got %s', d->'sections'->0->'identity_marks'));
 
   d := public.vehicle_profile_read('10000000-0000-0000-0000-000000000010');
   PERFORM public.t_assert((SELECT string_agg(x->>'display_label', '|' ORDER BY o) FROM jsonb_array_elements(d->'sections'->0->'identity_marks') WITH ORDINALITY AS t(x, o))
