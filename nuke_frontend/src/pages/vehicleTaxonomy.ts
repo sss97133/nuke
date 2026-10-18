@@ -4,6 +4,7 @@ import {
   resolveTileBadgeSvg,
   resolveVettedIdentityMarks,
   VETTED_IDENTITY_MARKS,
+  VEHICLE_IDENTITY_MARKS,
   type FamilyFacetAxis,
   type VehicleFacetClassification,
   type VehicleIdentityMark,
@@ -16,6 +17,7 @@ export {
   resolveTileBadgeSvg,
   resolveVettedIdentityMarks,
   VETTED_IDENTITY_MARKS,
+  VEHICLE_IDENTITY_MARKS,
   type FamilyFacetAxis,
   type VehicleFacetClassification,
   type VehicleIdentityMark,
@@ -66,6 +68,15 @@ export function inferVehicleFamilyLabel(
   if (/\bCHALLENGER\b/.test(u)) return 'Challenger';
   if (/\bGTO\b/.test(u)) return 'GTO';
   if (/\bFIREBIRD\b|\bTRANS\s+AM\b/.test(u)) return 'Firebird';
+  if (/\bGRAND\s+NATIONAL\b|\bGNX\b/.test(u)) return 'Grand National';
+  if (/\b4[-\s]?4[-\s]?2\b|\b442\b/.test(u)) return '442';
+  if (/\bCJ[-\s]?[578]\b|\bSCRAMBLER\b/.test(u)) return 'CJ';
+  if (/\bGRAND\s+WAGONEER\b|\bWAGONEER\b/.test(u)) return 'Grand Wagoneer';
+  if (/\bWRANGLER\b|\bRUBICON\b/.test(u)) return 'Wrangler';
+  if (/\bSCOUT\b/.test(u)) return 'Scout';
+  if (/\b2[468]0Z\b|\bFAIRLADY\s*Z\b|\bS30\b/.test(u)) return '240Z';
+  if (/\bSKYLINE\b|\bGT[-\s]?R\b|\bBNR3[24]\b|\bBCNR33\b/.test(u)) return 'Skyline';
+  if (/\bSUPRA\b|\bJZA80\b|\bMA70\b|\bA90\b/.test(u)) return 'Supra';
   if (/\b\d{3}\s*SL\b|\bSL\s*\d{3}\b/.test(u) && (make ?? '').toLowerCase().includes('mercedes')) return 'SL';
   return m.split(/\s+/)[0] || m;
 }
