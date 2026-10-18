@@ -14,6 +14,8 @@ const at = '2026-09-12T10:25:00Z', date = '2026-09-12', clock = 'Sep 12, 2026, 1
 type Photo = { id: string; image_url: string; taken_at: string | null; source: string | null; source_url?: string | null };
 let root: Root, host: HTMLDivElement, serial = 0, rows: Photo[], calls: URL[];
 let fallbackRows: (Photo & { vehicle_id: string })[], deniedFallback: boolean;
+let reply: ((url: URL) => Response | Promise<Response> | undefined) | null;
+let frames: { text: string | null; photoParam: string | null }[];
 const json = (body: unknown) => new Response(JSON.stringify(body), { status: 200, headers: { 'Content-Type': 'application/json' } });
 const photo = (name: string, source: string | null = 'bat_import', taken_at: string | null = at): Photo => ({
   id: `synthetic-${serial}-${name}`, image_url: `https://images.test/${serial}-${name}.jpg`, source, taken_at,
@@ -23,13 +25,14 @@ beforeEach(() => {
   vi.stubEnv('TZ', 'UTC'); expect(new Date('2026-09-12T00:00:00Z').getHours()).toBe(0);
   fixture.vehicleId = `00000000-0000-4000-8000-${String(++serial).padStart(12, '0')}`;
   window.history.replaceState({}, '', `/vehicle/${fixture.vehicleId}`);
-  rows = [photo('native')]; calls = []; fallbackRows = []; deniedFallback = false;
+  rows = [photo('native')]; calls = []; fallbackRows = []; deniedFallback = false; reply = null; frames = [];
   vi.stubGlobal('fetch', vi.fn(() => { throw new Error('Real network forbidden'); }));
   fixture.client = createClient('https://lightbox-clock.test', 'synthetic-anon', {
     auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false, storageKey: `synthetic-lightbox-${serial}` },
     global: { fetch: async (input, init) => {
       const url = new URL(input instanceof Request ? input.url : String(input));
       expect(init?.method ?? 'GET').toBe('GET'); expect(url.pathname).toBe('/rest/v1/vehicle_images'); calls.push(url);
+      const special = reply?.(url); if (special) return (await special).clone();
       const fields = url.searchParams.get('select')!;
       if (fields === 'id,image_url,taken_at,source') {
         if (url.searchParams.has('id')) {
@@ -61,7 +64,8 @@ const view = () => ({ text: dialog().textContent,
   images: [...dialog().querySelectorAll('img')].map(img => img.getAttribute('src')),
   buttons: [...dialog().querySelectorAll('button')].map(button => ({ label: button.getAttribute('aria-label'), text: button.textContent })),
   original: dialog().querySelector('a')?.getAttribute('href'), photoParam: new URLSearchParams(window.location.search).get('photo') });
-async function mount() { await act(async () => root.render(<VehiclePhotoLightbox />)); }
+async function mount() { await act(async () => root.render(<React.Profiler id="lightbox" onRender={() => { frames.push({ text: document.querySelector('[role="dialog"]')?.textContent ?? null,
+  photoParam: new URLSearchParams(window.location.search).get('photo') }); }}><VehiclePhotoLightbox /></React.Profiler>)); }
 async function open(id = rows[0].id) { await mount(); await act(async () => openVehiclePhoto(id)); }
 async function click(label: string) { await act(async () => dialog().querySelector<HTMLButtonElement>(`[aria-label="${label}"]`)!.click()); }
 const expectedView = (row: Photo, clockText: string, sourceText: string, hasDay = true) => ({
@@ -141,16 +145,16 @@ it('subject-binding retains an own missing-index fallback with the same entire r
 it('subject-binding refuses an independently readable foreign fallback before portal, atoms or current index admission', async () => {
   const foreign = { ...photo('foreign-fallback', 'user_upload'), vehicle_id: foreignVehicle }; rows = []; fallbackRows = [foreign];
   await open(foreign.id);
-  expect(dialog()).toBeNull(); expect(atomsFor(foreign.id)).toHaveLength(0); expect(calls).toHaveLength(2);
+  expectReadStatus('No photo available in this read.'); expect(atomsFor(foreign.id)).toHaveLength(0); expect(calls).toHaveLength(2);
   expect(fallbackQuery().searchParams.get('vehicle_id')).toBe(`eq.${fixture.vehicleId}`);
   expect(fallbackQuery().searchParams.get('id')).toBe(`eq.${foreign.id}`);
 });
 it('subject-binding keeps preexisting refused foreign fallback absent with two requests and no atoms', async () => {
   const foreign = { ...photo('refused-foreign', 'user_upload'), vehicle_id: foreignVehicle }; rows = []; fallbackRows = [foreign]; deniedFallback = true;
-  await open(foreign.id); expect(dialog()).toBeNull(); expect(calls).toHaveLength(2); expect(atomsFor(foreign.id)).toHaveLength(0);
+  await open(foreign.id); expectReadStatus('Photo could not be read.'); expect(calls).toHaveLength(2); expect(atomsFor(foreign.id)).toHaveLength(0);
 });
 it('subject-binding preserves a successful missing fallback without fabricating a viewer or atoms', async () => {
-  rows = []; await open(`synthetic-${serial}-missing`); expect(dialog()).toBeNull(); expect(calls).toHaveLength(2);
+  rows = []; await open(`synthetic-${serial}-missing`); expectReadStatus('No photo available in this read.'); expect(calls).toHaveLength(2);
   expect(calls.some(url => url.searchParams.get('select') === 'ai_scan_metadata')).toBe(false);
 });
 it('subject-binding prevents foreign cache contamination from changing the later own-photo counter and day count', async () => {
@@ -161,4 +165,87 @@ it('subject-binding prevents foreign cache contamination from changing the later
   expect(atomsFor(foreign.id)).toHaveLength(0); expect(calls).toHaveLength(3);
   await click('Close photo viewer'); await act(async () => root.render(null)); await mount();
   await act(async () => openVehiclePhotoByUrl(own.image_url)); expect(view()).toEqual(expectedView(own, `TAKEN${clock}`, 'OWNER UPLOAD')); expect(calls).toHaveLength(3);
+});
+
+
+const indexRead = (url: URL) => url.searchParams.get('select') === 'id,image_url,taken_at,source' && !url.searchParams.has('id');
+const fallbackRead = (url: URL) => url.searchParams.get('select') === 'id,image_url,taken_at,source' && url.searchParams.has('id');
+const privateMessage = 'synthetic-private-read-message';
+const unavailable = () => new Response(JSON.stringify({ code: '42501', message: privateMessage }), { status: 403, headers: { 'Content-Type': 'application/json' } });
+function deferred() { let resolve!: (value: Response) => void; return { promise: new Promise<Response>(done => { resolve = done; }), resolve }; }
+function expectReadStatus(text: string) {
+  expect(dialog()?.querySelector('[role="status"]')?.textContent).toBe(text);
+  expect(dialog().querySelectorAll('img')).toHaveLength(0); expect(dialog().querySelector('a')).toBeNull();
+  expect(dialog().textContent).not.toMatch(/TAKEN|IMPORT CLOCK|SOURCE|PART OF|VEHICLE|not found|does not exist|denied/i);
+  expect(dialog().textContent).not.toContain(privateMessage); expect(dialog().querySelector('[aria-label="Close photo viewer"]')).not.toBeNull();
+}
+async function escape() { await act(async () => document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))); }
+const pendingText = 'Reading photo…', errorText = 'Photo could not be read.', emptyText = 'No photo available in this read.';
+it.each(['index', 'fallback', 'empty', 'malformed-index', 'malformed-fallback'])('read-status makes settled %s explicit without fabricating evidence and close clears the param', async kind => {
+  const target = photo('read-status-target', 'user_upload'); rows = [];
+  reply = url => kind === 'index' && indexRead(url) ? unavailable() : kind === 'fallback' && fallbackRead(url) ? unavailable()
+    : kind === 'malformed-index' && indexRead(url) ? json(null) : kind === 'malformed-fallback' && fallbackRead(url) ? json({ unsupported: true }) : undefined;
+  await open(target.id); expectReadStatus(kind === 'empty' ? emptyText : errorText);
+  expect(calls).toHaveLength(kind.includes('index') ? 1 : 2); expect(atomsFor(target.id)).toHaveLength(0);
+  expect(new URLSearchParams(window.location.search).get('photo')).toBe(target.id);
+  await click('Close photo viewer'); expect(dialog()).toBeNull(); expect(window.location.search).toBe('');
+});
+it.each(['index', 'fallback'])('read-status keeps deferred %s pending until the existing read settles successfully', async phase => {
+  const target = photo('deferred', 'user_upload'), pending = deferred(); rows = [];
+  reply = url => (phase === 'index' ? indexRead(url) : fallbackRead(url)) ? pending.promise : undefined;
+  await open(target.id); expectReadStatus(pendingText); expect(calls).toHaveLength(phase === 'index' ? 1 : 2);
+  await act(async () => pending.resolve(json([target])));
+  expect(view()).toEqual(expectedView(target, `TAKEN${clock}`, 'OWNER UPLOAD')); expect(calls).toHaveLength(phase === 'index' ? 2 : 3);
+});
+it.each(['index', 'fallback'])('read-status ignores a late old-target %s refusal after a new known photo is selected', async phase => {
+  const old = photo('old-target', 'user_upload'), next = photo('new-target', 'user_upload'), pending = deferred(); rows = [];
+  fallbackRows = [{ ...next, vehicle_id: fixture.vehicleId }]; let indexAttempts = 0;
+  reply = url => phase === 'index' && indexRead(url) ? (++indexAttempts === 1 ? pending.promise : json([next]))
+    : phase === 'fallback' && fallbackRead(url) && url.searchParams.get('id') === `eq.${old.id}` ? pending.promise : undefined;
+  await open(old.id); await open(next.id); const known = view(); expect(known).toEqual(expectedView(next, `TAKEN${clock}`, 'OWNER UPLOAD'));
+  const count = calls.length; await act(async () => pending.resolve(unavailable())); expect(view()).toEqual(known); expect(calls).toHaveLength(count);
+});
+it.each(['index', 'fallback'])('read-status ignores late %s refusal after close', async phase => {
+  const pending = deferred(); rows = []; reply = url => (phase === 'index' ? indexRead(url) : fallbackRead(url)) ? pending.promise : undefined;
+  await open(`synthetic-${serial}-closed-pending`); await escape(); expect(window.location.search).toBe(''); const count = calls.length;
+  await act(async () => pending.resolve(unavailable())); expect(dialog()).toBeNull(); expect(calls).toHaveLength(count);
+});
+it.each(['index-error', 'fallback-error', 'empty'])('read-status preserves existing explicit reopen recovery for %s without caching a failure or adding retry', async kind => {
+  const target = photo('recovered', 'user_upload'); rows = kind === 'index-error' ? [target] : [];
+  reply = url => kind === 'index-error' && indexRead(url) || kind === 'fallback-error' && fallbackRead(url) ? unavailable() : undefined;
+  await open(target.id); expect(calls).toHaveLength(kind === 'index-error' ? 1 : 2); await escape();
+  reply = null; fallbackRows = [{ ...target, vehicle_id: fixture.vehicleId }]; await open(target.id);
+  expect(view()).toEqual(expectedView(target, `TAKEN${clock}`, 'OWNER UPLOAD')); expect(calls).toHaveLength(kind === 'index-error' ? 3 : 4);
+});
+it('read-status withholds old-target terminal error from the first committed new pending frame', async () => {
+  rows = []; reply = url => indexRead(url) ? unavailable() : undefined; await open(photo('old-error').id);
+  const target = photo('new-pending', 'user_upload'), pending = deferred(); reply = url => indexRead(url) ? pending.promise : undefined;
+  const start = frames.length; await open(target.id);
+  expect(frames.slice(start).find(frame => frame.photoParam === target.id)?.text ?? '').toContain(pendingText); expectReadStatus(pendingText);
+  await act(async () => pending.resolve(json([target]))); expect(view()).toEqual(expectedView(target, `TAKEN${clock}`, 'OWNER UPLOAD'));
+});
+it('read-status binds an explicit same-id reopen to its fresh pending request in the first commit', async () => {
+  const target = photo('same-id', 'user_upload'), pending = deferred(); rows = [target]; reply = url => indexRead(url) ? unavailable() : undefined;
+  await open(target.id); await escape(); reply = url => indexRead(url) ? pending.promise : undefined; const start = frames.length; await open(target.id);
+  expect(frames.slice(start).find(frame => frame.photoParam === target.id)?.text ?? '').toContain(pendingText); expectReadStatus(pendingText);
+  await act(async () => pending.resolve(json([target]))); expect(view()).toEqual(expectedView(target, `TAKEN${clock}`, 'OWNER UPLOAD')); expect(calls).toHaveLength(3);
+});
+it('read-status does not carry a former vehicle error into the current vehicle pending frame', async () => {
+  rows = []; reply = url => indexRead(url) ? unavailable() : undefined; await open(photo('vehicle-switch').id);
+  fixture.vehicleId = `00000000-0000-4000-8001-${String(serial).padStart(12, '0')}`;
+  const pending = deferred(); reply = url => indexRead(url) ? pending.promise : undefined; const start = frames.length; await mount();
+  expect(frames[start]?.text ?? '').toContain(pendingText); expectReadStatus(pendingText);
+  await act(async () => pending.resolve(unavailable())); expectReadStatus(errorText); expect(calls).toHaveLength(2);
+});
+it.each(['pending', 'unavailable'])('read-status preserves the exact raw-URL minimal viewer while its index is %s', async phase => {
+  const url = `https://images.test/${serial}-raw-url.jpg`, pending = deferred(); rows = [];
+  reply = request => indexRead(request) ? phase === 'pending' ? pending.promise : unavailable() : undefined;
+  await mount(); await act(async () => openVehiclePhotoByUrl(url));
+  const expected = { text: '✕VEHICLE1972 SYNTHETIC COUPEORIGINAL ↗', images: [url, url], buttons: [{ label: 'Close photo viewer', text: '✕' }], original: url, photoParam: null };
+  expect(view()).toEqual(expected); expect(calls).toHaveLength(1);
+  if (phase === 'pending') { await act(async () => pending.resolve(json([]))); expect(view()).toEqual(expected); expect(calls).toHaveLength(1); }
+});
+it('read-status retains a fresh URL-open resolved to a known photo with exact two-request demand', async () => {
+  rows = [photo('known-url', 'user_upload')]; await mount(); await act(async () => openVehiclePhotoByUrl(rows[0].image_url));
+  expect(view()).toEqual(expectedView(rows[0], `TAKEN${clock}`, 'OWNER UPLOAD')); expect(calls).toHaveLength(2);
 });
