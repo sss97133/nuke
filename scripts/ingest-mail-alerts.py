@@ -46,6 +46,11 @@ def utc(ts=None):
     return datetime.fromtimestamp(ts, timezone.utc).isoformat() if ts is not None else datetime.now(timezone.utc).isoformat()
 
 
+def iso_timestamp(value):
+    # Python 3.9 ships on Intel Macs and requires an explicit offset for UTC.
+    return datetime.fromisoformat(value[:-1] + '+00:00' if value.endswith('Z') else value)
+
+
 def digest(data):
     return hashlib.sha256(data).hexdigest()
 
@@ -678,7 +683,7 @@ class Supabase:
                              select='id,source_identifier,source_url,observed_at,ingested_at,vehicle_id,structured_data')
             if (len(rows) != 1 or rows[0]['source_identifier'] != payload['source_identifier']
                     or rows[0]['source_url'] != listing['url'] or rows[0]['structured_data'] != payload['structured_data']
-                    or datetime.fromisoformat(rows[0]['observed_at']) != datetime.fromisoformat(alert['observed_at'])):
+                    or iso_timestamp(rows[0]['observed_at']) != iso_timestamp(alert['observed_at'])):
                 raise RuntimeError('observation readback differs from email testimony')
             result.update(observation_id=obs_id, duplicate=bool(observation.get('duplicate')),
                           vehicle_id=rows[0].get('vehicle_id'), ingested_at=rows[0]['ingested_at'])
@@ -707,7 +712,7 @@ def run(args):
                 raise ValueError('manifest message recipient differs from selected mailbox')
             if source is None or args.source not in ('all', source):
                 continue
-            received = datetime.fromisoformat(item['received_at'])
+            received = iso_timestamp(item['received_at'])
             if received.tzinfo is None:
                 raise ValueError('manifest receipt timestamp requires a timezone')
             if args.days and received.timestamp() < time.time() - args.days * 86400:
@@ -828,7 +833,7 @@ def main():
         report = json.loads(path.read_text()) if path.exists() else {}
         healthy = bool(report) and not report.get('errors') and not report.get('source_stale', True)
         if report:
-            healthy = healthy and time.time() - datetime.fromisoformat(report['finished_at']).timestamp() < 900
+            healthy = healthy and time.time() - iso_timestamp(report['finished_at']).timestamp() < 900
         print(json.dumps({'healthy': healthy, 'last_run': report.get('finished_at'),
                           'latest_email_received_at': report.get('latest_email_received_at'),
                           'errors': report.get('errors', []), 'holds': report.get('holds', {})}))
