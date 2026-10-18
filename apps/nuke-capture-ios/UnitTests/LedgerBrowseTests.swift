@@ -2,6 +2,14 @@ import XCTest
 @testable import NukeCapture
 
 final class LedgerBrowseTests: XCTestCase {
+    func testAllSourceYearRequestIncludesTheRequiredNullSourceArgument() throws {
+        let params = LedgerMap.YearParams(p_source: nil, p_make: "Ferrari", p_model: "250 GT SWB California Spider")
+        let payload = try XCTUnwrap(JSONSerialization.jsonObject(with: JSONEncoder().encode(params)) as? [String: Any])
+        XCTAssertTrue(payload["p_source"] is NSNull, "Omitting the required source argument makes the year RPC return 404")
+        XCTAssertEqual(payload["p_make"] as? String, "Ferrari")
+        XCTAssertEqual(payload["p_model"] as? String, "250 GT SWB California Spider")
+    }
+
     private func node(_ name: String, familyKey: String? = nil) -> LedgerNode {
         LedgerNode(name: name, count: 12, value: 1_200_000, median_price: nil, min_price: nil, max_price: nil,
                    sold_count: 12, auction_count: 15, avg_bids: nil, avg_watchers: nil, usd: 1_200_000, familyKey: familyKey)

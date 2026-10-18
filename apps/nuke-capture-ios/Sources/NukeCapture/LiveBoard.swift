@@ -1233,9 +1233,11 @@ struct LiveBoardView: View {
                         }
                         // The board drawn as the web draws it: brands as boxes, decades inside.
                         Section {
-                            LiveInventoryMapView(lots: mappedLots) { make, decade in
-                                if filterMake != make { bidRange = .all } // the web clears the bid lens on a make change
-                                filterMake = make; filterDecade = decade
+                            DisclosureGroup("Browse live auctions by make") {
+                                LiveInventoryMapView(lots: mappedLots) { make, decade in
+                                    if filterMake != make { bidRange = .all } // the web clears the bid lens on a make change
+                                    filterMake = make; filterDecade = decade
+                                }
                             }
                             .listRowInsets(EdgeInsets(top: 4, leading: 8, bottom: 4, trailing: 8))
                             .listRowBackground(Color.clear)
@@ -1974,10 +1976,6 @@ struct SourceLandingSheet: View {
             List {
                 Section {
                     MarketSourceIdentity(source: sourceRow)
-                    if let held = sourceRow.held, sourceRow.countsAsHeld != false {
-                        RootedValueView(label: "Retained records", value: held.formatted(), status: .recorded,
-                                        decay: "Counted " + ProfileClock.Absolute(sourceRow.heldAt))
-                    }
                     if let sales = sourceRow.sales12, sales > 0 {
                         RootedValueView(label: "Measured sales · last 12 months", value: sales.formatted(), status: .recorded,
                                         decay: "Read " + ProfileClock.Absolute(readAt))
@@ -2006,6 +2004,9 @@ struct SourceLandingSheet: View {
                                 }
                                 if let url = event.openableURL {
                                     DisclosureGroup("Source") {
+                                        if let title = event.title, !title.isEmpty, title != event.headline {
+                                            Text(title).font(.caption).foregroundStyle(.secondary)
+                                        }
                                         Link("Original source record", destination: url).font(.caption)
                                     }
                                     .font(.caption)

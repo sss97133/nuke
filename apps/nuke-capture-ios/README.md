@@ -196,6 +196,12 @@ Standing rules the code carries:
   source cohort, not appreciation; custom windows stay on the activity board with a neutral map. The all-time
   ledger, five-year family chart ($500+; at most 600 plotted rows) and sale leaf (at most 200 rows) retain distinct
   labels. Native make labels use the shared bundled `MakeIdentityView`, with readable missing-artwork text.
+- **Context survives the scroll.** The global live board, calendar and source directory start with an explicit
+  All Makes boundary after the selected ledger cohort. Source rows use recorded artwork and source type;
+  operational arrivals and census comparisons belong under Data coverage. A source introduction leads to its
+  linked vehicle records inside Nuke. Preserve source record-date precision and keep intake clocks separate;
+  an ingestion timestamp is not a new listing. Unknown vehicle bindings stay unresolved, with the attributed
+  source headline and original URL behind a deliberate Source disclosure. Counts and sample limits remain qualified.
 - **The board is the web's board.** `market_pulse_live` is read once per 30 s and rendered as nuke.ag renders it:
   bids in dollars (BaT runs every auction in USD; web #1061), the heat tag per lot computed exactly as
   `MarketPulse.tsx heatOf` (curve share by tier at hours left, typical = band p50 × share, hot ≥ 1.25×, cold ≤ 0.8×,

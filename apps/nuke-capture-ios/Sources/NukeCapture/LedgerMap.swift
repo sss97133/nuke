@@ -1955,7 +1955,21 @@ enum LedgerMap {
     private struct MakeParams: Encodable { let p_make: String }
     private struct BrandParams: Encodable { let p_brand: String }
     private struct FamilyParams: Encodable { let p_brand: String; let p_family_key: String }
-    private struct YearParams: Encodable { let p_source: String?; let p_make: String?; let p_model: String? }
+    struct YearParams: Encodable {
+        let p_source: String?
+        let p_make: String
+        let p_model: String
+
+        private enum CodingKeys: String, CodingKey { case p_source, p_make, p_model }
+        func encode(to encoder: Encoder) throws {
+            var values = encoder.container(keyedBy: CodingKeys.self)
+            // The RPC requires this key even when all sources are selected.
+            // Synthesized optional encoding omits nil and selects no matching function.
+            try values.encode(p_source, forKey: .p_source)
+            try values.encode(p_make, forKey: .p_make)
+            try values.encode(p_model, forKey: .p_model)
+        }
+    }
     private struct SalesParams: Encodable { let p_make: String; let p_model: String; let p_year: Int? }
     private struct MapParams: Encodable { let p_brands: Int; let p_families: Int }
     private struct ShareMoverParams: Encodable { let p_limit: Int; let p_min_sales: Int; let p_horizon: String }
@@ -2405,7 +2419,7 @@ struct LedgerMapView: View {
 
     private var headerSection: some View {
         VStack(alignment: .leading, spacing: 6) {
-            HStack(alignment: .firstTextBaseline) {
+            HStack(alignment: .top) {
                 if selectedMake != nil {
                     Button { stepBack() } label: { Label("Back", systemImage: "chevron.left") }
                         .buttonStyle(.plain).frame(minHeight: 44)
@@ -2423,21 +2437,22 @@ struct LedgerMapView: View {
                     } else { Text(headerTitle).font(.title3.weight(.semibold)) }
                 }
                 Spacer()
-                Button { presentation = .list } label: {
-                    VStack(alignment: .trailing, spacing: 3) {
-                        Text(headerMeasureLine)
-                            .font(.system(.caption2, design: .monospaced))
-                            .multilineTextAlignment(.trailing)
-                        Text("Explore sales")
-                            .font(.caption.weight(.semibold)).foregroundStyle(.tint)
-                    }
-                    .frame(minHeight: 44)
-                }
-                .buttonStyle(.plain)
-                .disabled(loading || failed)
-                .accessibilityLabel("Explore \(headerMeasureLine)")
-                .accessibilityHint("Shows the groups in the current cohort as a list")
             }
+            Button { presentation = .list } label: {
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(headerMeasureLine)
+                        .font(.system(.caption2, design: .monospaced))
+                        .multilineTextAlignment(.leading)
+                        .fixedSize(horizontal: false, vertical: true)
+                    Text("Explore sales")
+                        .font(.caption.weight(.semibold)).foregroundStyle(.tint)
+                }
+                .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
+            }
+            .buttonStyle(.plain)
+            .disabled(loading || failed)
+            .accessibilityLabel("Explore \(headerMeasureLine)")
+            .accessibilityHint("Shows the groups in the current cohort as a list")
         }
     }
 

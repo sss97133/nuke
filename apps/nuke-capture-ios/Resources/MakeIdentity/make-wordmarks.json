@@ -1,6 +1,6 @@
 {
   "aliasSource": "nuke_frontend/src/components/common/MakeIdentity.tsx",
-  "aliasSourceSha256Base64": "8ewdIdeQYHQrmyfMCIHN9d20IFkzGrLTA20aLaAowQ4=",
+  "aliasSourceSha256Base64": "fTEUSrCGBaYOH5yzVV+MFdLUqjnEU5c1qjspU3sHi0Q=",
   "aliases": {
     "landrover": "land-rover",
     "mercedes": "mercedes-benz",
@@ -229,6 +229,7 @@
           "brand": "Chevrolet",
           "era": null,
           "file": "chevrolet-wordmark.svg",
+          "labelPresentation": "emblem-and-name",
           "license": "CARDOG-LICENSE.txt",
           "localSha256Base64": "0oiog1vw8yetYBitfsTV1yL5x+23enAhV2HTLhTfEYM=",
           "palette": [
@@ -283,6 +284,7 @@
           "brand": "Dodge",
           "era": null,
           "file": "dodge-wordmark.svg",
+          "labelPresentation": "name",
           "license": "CARDOG-LICENSE.txt",
           "localSha256Base64": "FF2JsLyYyY7D8UQ8J+9eH8WT+lM4A+ApC1RoAsgnRdA=",
           "palette": [
@@ -1147,6 +1149,6 @@
   ],
   "schemaVersion": 1,
   "sourceCatalogue": "nuke_frontend/public/stacks/makes/wordmarks.json",
-  "sourceCatalogueSha256Base64": "V25JiNlo3T9XVfnf8bp6vE8tKI1pxZhKkuawvMB8tLY=",
+  "sourceCatalogueSha256Base64": "apzWH8cu8ytdynUL1CKP1TaalHLoO+TPFDMjFhINNZs=",
   "sourceDateEpoch": 0
 }
