@@ -37,7 +37,13 @@ export interface ObservationSource {
 }
 
 export interface ObservationInput {
-  vehicleId: string;
+  /** Null only with `unresolved: true`. */
+  vehicleId: string | null;
+  /**
+   * A listing that is not yet any vehicle (a blip): the row is written with vehicle_id NULL and a match confidence of 0,
+   * and the vehicle-only gap-fill and field evidence are skipped. Retained, not guessed (AGENTS.md).
+   */
+  unresolved?: boolean;
   /**
    * Polymorphic subject (engineering-manual/20). Optional + backward-compatible:
    * when omitted, the observation is a vehicle observation exactly as before.
@@ -50,6 +56,8 @@ export interface ObservationInput {
   fields: Record<string, any>;       // extracted key-value pairs
   observationKind?: string;           // observation_kind enum; default "specification"
   rawData?: any;                      // optional raw extraction payload
+  /** Include rawData in dedup when large evidence is kept outside indexed fields. Omitted preserves legacy hashes. */
+  hashRawData?: boolean;
   extractionMethod?: string;          // "html_parse" | "regex" | "ai" | etc.
   observedAt?: string;                // ISO timestamp; defaults to now
   contentText?: string;               // optional free-text content
@@ -57,6 +65,12 @@ export interface ObservationInput {
   agentModel?: string;
   agentCostCents?: number;
   agentDurationMs?: number;
+  /**
+   * Keys of `fields` that stay testimony on the observation row only: not gap-filled onto the vehicle and not
+   * written as field_evidence. For a caller that has just created the vehicle from the same page, so the values are
+   * already on it and a receipt for each would only repeat them. Omitted = every field is processed, as before.
+   */
+  testimonyOnly?: string[];
 }
 
 export interface WriteResult {
@@ -160,6 +174,7 @@ export async function writeObservation(
     fields,
     observationKind = "specification",
     rawData,
+    hashRawData,
     extractionMethod = "unknown",
     observedAt,
     contentText,
@@ -167,7 +182,14 @@ export async function writeObservation(
     agentModel,
     agentCostCents,
     agentDurationMs,
+    testimonyOnly,
+    unresolved,
   } = params;
+
+  // The fields the vehicle row and the evidence ledger see; the observation row always keeps all of `fields`.
+  const derivedFields = testimonyOnly && testimonyOnly.length > 0
+    ? Object.fromEntries(Object.entries(fields).filter(([k]) => !testimonyOnly.includes(k)))
+    : fields;
 
   // A vehicle observation (the default, and every existing caller) requires a
   // vehicleId. A non-vehicle subject requires a subjectId instead.
@@ -177,7 +199,7 @@ export async function writeObservation(
     errors.push("source.platform and source.url are required");
     return result;
   }
-  if (isVehicleSubject && !vehicleId) {
+  if (isVehicleSubject && !vehicleId && !unresolved) {
     errors.push("vehicleId is required for vehicle observations");
     return result;
   }
@@ -189,12 +211,14 @@ export async function writeObservation(
   // --- 1. Write observation (independent of gap-fill) ---
   const observationPromise = writeObservationRow(supabase, {
     vehicleId,
+    unresolved,
     subjectType,
     subjectId,
     source,
     fields,
     observationKind,
     rawData,
+    hashRawData,
     extractionMethod,
     observedAt,
     contentText,
@@ -210,15 +234,15 @@ export async function writeObservation(
   // --- 2 & 3. Gap-fill + field-evidence are VEHICLE-only post-processing.
   // Skip them entirely for non-vehicle subjects (they are keyed on vehicleId).
   // For vehicle observations this path is unchanged.
-  const gapFillPromise = isVehicleSubject
-    ? gapFillVehicle(supabase, vehicleId, source, fields, extractionMethod).catch((e: any) => {
+  const gapFillPromise = isVehicleSubject && vehicleId
+    ? gapFillVehicle(supabase, vehicleId, source, derivedFields, extractionMethod).catch((e: any) => {
         errors.push(`gap-fill: ${e?.message || e}`);
         return null;
       })
     : Promise.resolve(null);
 
-  const evidencePromise = isVehicleSubject
-    ? writeFieldEvidence(supabase, vehicleId, source, fields, extractionMethod).catch((e: any) => {
+  const evidencePromise = isVehicleSubject && vehicleId
+    ? writeFieldEvidence(supabase, vehicleId, source, derivedFields, extractionMethod).catch((e: any) => {
         errors.push(`field-evidence: ${e?.message || e}`);
         return [];
       })
@@ -290,13 +314,15 @@ export async function writeObservationBatch(
 async function writeObservationRow(
   supabase: any,
   params: {
-    vehicleId: string;
+    vehicleId: string | null;
+    unresolved?: boolean;
     subjectType?: string;
     subjectId?: string;
     source: ObservationSource;
     fields: Record<string, any>;
     observationKind: string;
     rawData?: any;
+    hashRawData?: boolean;
     extractionMethod: string;
     observedAt?: string;
     contentText?: string;
@@ -329,6 +355,7 @@ async function writeObservationRow(
     identifier: params.source.sourceIdentifier,
     text: params.contentText,
     data: params.fields,
+    ...(params.hashRawData ? { raw: params.rawData } : {}),
   });
   const contentHash = await hashContent(contentForHash);
 
@@ -355,7 +382,7 @@ async function writeObservationRow(
     .from("vehicle_observations")
     .insert({
       vehicle_id: params.vehicleId,
-      vehicle_match_confidence: 1.0, // caller provides vehicleId directly
+      vehicle_match_confidence: params.unresolved ? 0 : 1.0, // caller provides vehicleId directly, or none (a blip)
       // Polymorphic subject (engineering-manual/20). Conditional spread: when the
       // caller passes no subject, this object is byte-identical to before and the
       // DB default (subject_type='vehicle', subject_id=NULL) applies.
@@ -420,6 +447,15 @@ async function gapFillVehicle(
 
   if (fetchError || !existing) {
     throw new Error(`Vehicle ${vehicleId} not found: ${fetchError?.message || "no data"}`);
+  }
+
+  // Only real vehicles columns gap-fill. Any other field (e.g. mileage_claim) stays testimony in the observation
+  // and its field evidence; sending it in the UPDATE would fail the whole gap-fill for every field.
+  for (const k of Object.keys(safeFields)) {
+    if (!Object.prototype.hasOwnProperty.call(existing, k)) delete safeFields[k];
+  }
+  if (Object.keys(safeFields).length === 0) {
+    return { gapFilled: [], confirmed: [], conflicted: [] };
   }
 
   const defaultMetadata: ProvenanceMetadata = {

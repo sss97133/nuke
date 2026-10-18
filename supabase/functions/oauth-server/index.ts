@@ -345,15 +345,18 @@ async function handleAuthorize(req: Request): Promise<Response> {
   <title>NUKE — Authorize</title>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <style>
-    body { margin: 0; font-family: Arial, sans-serif; background: #f5f5f5; color: #111; }
-    .card { max-width: 420px; margin: 80px auto; background: #fff; border: 2px solid #111; padding: 28px 24px; }
+    *, *::before, *::after { box-sizing: border-box; }
+    body { margin: 0; padding: 16px; font-family: Arial, sans-serif; background: #f5f5f5; color: #111; }
+    .card { max-width: 420px; margin: 40px auto; background: #fff; border: 2px solid #111; padding: 24px 20px; }
     h1 { font-size: 14px; letter-spacing: 2px; text-transform: uppercase; margin: 0 0 12px; }
     p  { font-size: 13px; line-height: 1.5; }
     label { display: block; font-size: 9px; letter-spacing: 1px; text-transform: uppercase; margin: 16px 0 6px; }
-    input[type=email] { width: 100%; padding: 10px; border: 2px solid #111; font-family: 'Courier New', monospace; font-size: 14px; box-sizing: border-box; }
+    input[type=email] { width: 100%; padding: 10px; border: 2px solid #111; font-family: 'Courier New', monospace; font-size: 16px; }
     button { margin-top: 16px; width: 100%; padding: 12px; background: #111; color: #fff; border: 2px solid #111; font-size: 11px; letter-spacing: 1px; text-transform: uppercase; cursor: pointer; }
     .meta { margin-top: 16px; font-size: 10px; color: #666; }
     .pill { display: inline-block; padding: 2px 6px; border: 1px solid #ccc; font-size: 10px; font-family: 'Courier New', monospace; margin-right: 4px; }
+    .scopes { display: flex; flex-wrap: wrap; gap: 4px; align-items: center; }
+    .scopes code { font-size: 11px; padding: 2px 6px; background: #f0f0f0; border: 1px solid #ddd; overflow-wrap: anywhere; }
     .err  { color: #b00020; font-size: 11px; margin-top: 8px; }
   </style>
 </head>
@@ -361,8 +364,8 @@ async function handleAuthorize(req: Request): Promise<Response> {
   <div class="card">
     <h1>Connect ${escapedClientName} to NUKE</h1>
     <p><strong>${escapedClientName}</strong> wants permission to write vehicle events on your behalf.</p>
-    <div class="meta">
-      <span class="pill">scope</span> ${scope.split(" ").map((s) => `<code>${s}</code>`).join(" ")}
+    <div class="meta scopes">
+      <span class="pill">scope</span> ${scope.split(" ").filter(Boolean).map((s) => `<code>${s.replace(/[<>&"']/g, "")}</code>`).join(" ")}
     </div>
     <form method="post" action="${LOGIN_ENDPOINT}">
       <label for="email">Your NUKE email</label>
@@ -449,24 +452,24 @@ async function handleLogin(req: Request): Promise<Response> {
     return errorPage("Could not start login session");
   }
 
-  // Generate Supabase magic link via admin API; redirectTo points to /oauth/callback.
+  // Send the magic link. signInWithOtp is the call that emails it; redirectTo points to /oauth/callback.
+  // shouldCreateUser: false keeps this to registered NUKE accounts (an unknown email is refused, never created).
+  // Measured 2026-10-01: the previous admin.generateLink call first minted a token without sending any email, which
+  // started Supabase's per-user cooldown, so this send was refused with 429 one second later and the error was
+  // swallowed: the page said "Check your email" and no email ever went out.
   const callbackUrl = `${CALLBACK_ENDPOINT}?session=${sessionId}`;
-  const { data, error: linkErr } = await supabase.auth.admin.generateLink({
-    type: "magiclink",
+  const { error: otpErr } = await supabase.auth.signInWithOtp({
     email,
-    options: { redirectTo: callbackUrl },
+    options: { emailRedirectTo: callbackUrl, shouldCreateUser: false },
   });
-  if (linkErr || !data?.properties?.action_link) {
-    console.error("[oauth-server] generateLink error:", linkErr?.message ?? "no link returned");
-    return errorPage("Could not send magic link. Check that your email is registered with NUKE.");
+  if (otpErr) {
+    console.error("[oauth-server] signInWithOtp error:", otpErr.status, otpErr.message);
+    logEvent("oauth_login_magic_link_failed", { session_id: sessionId, status: otpErr.status ?? null });
+    if (otpErr.status === 429) {
+      return errorPage("A sign-in link was requested for this email moments ago. Wait one minute, then go back and try again.");
+    }
+    return errorPage("Could not send the sign-in link. Check that this email is registered with NUKE.");
   }
-
-  // Send the email by piggybacking on Supabase's standard flow:
-  // generateLink already triggers email via the configured SMTP if `should_send_email` defaults true.
-  // For some Supabase plans/configurations, we may need to call signInWithOtp instead. Try that as a
-  // fallback so the email goes out.
-  // Best-effort: also call signInWithOtp. Idempotent enough.
-  await supabase.auth.signInWithOtp({ email, options: { emailRedirectTo: callbackUrl } }).catch(() => null);
 
   logEvent("oauth_login_magic_link_sent", { session_id: sessionId });
 

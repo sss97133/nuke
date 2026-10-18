@@ -12,9 +12,9 @@ interface ScoreConfig {
 
 const SCORES: ScoreConfig[] = [
   {
-    // Reads the Eye's rollup (vehicle_condition_scores), not the dead
-    // vehicles.condition_rating column — injected in the component below.
-    label: 'Condition',
+    // Stored assessment, with the existing recorded-rating fallback.
+    // Neither source establishes matched condition or calibrated performance.
+    label: 'Reported condition',
     field: 'vehicle_condition_scores.condition_score',
     getValue: (v) => v?.condition_rating != null ? v.condition_rating * 10 : null,
     format: (v) => `${Math.round(v)}/100`,
@@ -69,9 +69,12 @@ const VehicleScoresWidget: React.FC = () => {
     return () => { alive = false; };
   }, [vehicle?.id]);
 
+  const rawCondition = eyeCondition ?? SCORES[0].getValue(vehicle);
+  const reportedCondition = rawCondition != null && Number.isFinite(rawCondition)
+    && rawCondition >= 0 && rawCondition <= 100 ? rawCondition : null;
   const valueFor = (score: ScoreConfig) =>
-    score.field === 'vehicle_condition_scores.condition_score' && eyeCondition != null
-      ? eyeCondition
+    score.field === 'vehicle_condition_scores.condition_score'
+      ? reportedCondition
       : score.getValue(vehicle);
 
   // Don't render if all scores are null
@@ -82,7 +85,7 @@ const VehicleScoresWidget: React.FC = () => {
     <div className={`widget ${collapsed ? 'widget--collapsed' : ''}`} id="widgetScores">
       <div className="widget__header">
         <div className="widget__header-left">
-          <span className="widget__label">Vehicle Scores</span>
+          <span className="widget__label">Stored Vehicle Scores</span>
           <span className="widget__db">
             DB
             <span className="widget__db-tooltip">
@@ -94,7 +97,8 @@ const VehicleScoresWidget: React.FC = () => {
           <button
             className="widget__toggle"
             onClick={() => setCollapsed(!collapsed)}
-            title="Toggle"
+            title="Toggle vehicle scores"
+            aria-expanded={!collapsed}
           >
             {collapsed ? '▶' : '▼'}
           </button>
@@ -118,6 +122,11 @@ const VehicleScoresWidget: React.FC = () => {
             </div>
           );
         })}
+        {valueFor(SCORES[0]) != null && (
+          <div style={{ fontSize: '9px', color: 'var(--text-secondary)', marginTop: '6px' }}>
+            Condition inputs, method and assessment time unavailable. Condition matching unverified.
+          </div>
+        )}
       </div>
     </div>
   );

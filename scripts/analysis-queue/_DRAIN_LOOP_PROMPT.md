@@ -5,7 +5,7 @@ Paste this into a fresh Claude Code session with `/loop` (no interval — let th
 ```
 /loop drain the BYOK deep-image-analysis backlog for Skylar's vehicles, one batch at a time. each tick:
 
-1. cd /Users/skylar/nuke
+1. cd ~/nuke
 2. pick the vehicle with the most pending images:
    dotenvx run -- node scripts/analysis-queue/pick-next-vehicle.mjs
 3. if it prints EMPTY (exit 1), report "queue drained" and stop the loop (do not ScheduleWakeup).
@@ -32,7 +32,7 @@ stop the loop only when pick-next-vehicle.mjs prints EMPTY twice in a row, or wh
 ## One-liner to start it
 
 ```bash
-cd /Users/skylar/nuke && claude
+cd ~/nuke && claude
 # then paste the /loop ... block above
 ```
 

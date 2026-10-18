@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
 import VehicleCardDense from '../vehicles/VehicleCardDense';
+import { VEHICLE_CARD_COLUMNS } from '../vehicles/vehicleCardColumns';
 
 interface VehicleCollectionProps {
   userId: string;
@@ -61,10 +62,11 @@ const VehicleCollection: React.FC<VehicleCollectionProps> = ({ userId, isOwnProf
       let query = supabase
         .from('vehicles')
         .select(`
-          *,
+          ${VEHICLE_CARD_COLUMNS},
           vehicle_images(image_url, is_primary)
         `)
         .in('id', ownedIds);
+
 
       // For public profiles, only show public vehicles
       if (!isOwnProfile) {

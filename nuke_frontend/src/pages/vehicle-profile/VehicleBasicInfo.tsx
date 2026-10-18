@@ -78,6 +78,7 @@ const VehicleBasicInfo: React.FC<VehicleBasicInfoProps> = ({
   onEditClick,
   onOpenVINProofImages,
 }) => {
+
   // Ensure onDataPointClick is always a function - defensive wrapper
   const safeOnDataPointClick = React.useMemo(() => {
     if (onDataPointClick && typeof onDataPointClick === 'function') {
@@ -937,36 +938,7 @@ const VehicleBasicInfo: React.FC<VehicleBasicInfoProps> = ({
           {/* Additional details */}
           {renderVehicleDetails()}
 
-          {/* Data Quality Score */}
-          {typeof (vehicle as any).data_quality_score === 'number' && (
-            <div className="vehicle-detail" style={{ padding: '2px 0', margin: 0, marginTop: '6px', borderTop: '1px solid transparent' }}>
-              <span>Data Quality</span>
-              <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                <span style={{
-                  fontWeight: 700,
-                  color: (vehicle as any).data_quality_score >= 70 ? 'var(--success)' :
-                         (vehicle as any).data_quality_score >= 40 ? 'var(--warning)' : 'var(--error)',
-                  fontSize: '12px',
-                  fontFamily: "'Courier New', monospace"
-                }}>
-                  {(vehicle as any).data_quality_score}/100
-                </span>
-                <span style={{
-                  display: 'inline-block',
-                  width: '48px',
-                  height: '4px',
-                  background: 'var(--border)', overflow: 'hidden'
-                }}>
-                  <span style={{
-                    display: 'block',
-                    height: '100%',
-                    width: `${Math.min(100, Math.max(0, (vehicle as any).data_quality_score))}%`,
-                    background: (vehicle as any).data_quality_score >= 70 ? 'var(--success)' :
-                                (vehicle as any).data_quality_score >= 40 ? 'var(--warning)' : 'var(--error)'}} />
-                </span>
-              </span>
-            </div>
-          )}
+
         </div>
       </div>
 

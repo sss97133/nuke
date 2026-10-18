@@ -8,7 +8,7 @@
 | VIN | **CKR187F127263** (corrected 2026-05-17 from prior `CCL187Z210370`) |
 | Year/Make/Model | 1977 Chevrolet Blazer (K5) |
 | Owner | Skylar (NUKE LTD) — current owner + builder |
-| Client | Scott (scott@li3go.com) — soon-to-be-owner; takes title on completion |
+| Client | the client (contact in the DB) — soon-to-be-owner; takes title on completion |
 | Builder | NUKE LTD, 676 Wells Rd, Boulder City NV 89005 |
 | Wiring Sub | Desert Performance (same address) |
 
@@ -35,10 +35,10 @@
 
 | Invoice | Date | Amount | Cumulative |
 |---------|------|--------|-----------|
-| SW77002 | Oct 2023 | $42,379 | $42,379 |
-| SW77003 | Feb 2024 | $18,946 | $61,325 |
-| SW77005 | Sep 2024 | $28,540 | $89,865 |
-| SW77006 | Mar 2025 | $29,678 | $119,543 |
+| Inv. 1 | Oct 2023 | (DB) | (DB) |
+| Inv. 2 | Feb 2024 | (DB) | (DB) |
+| Inv. 3 | Sep 2024 | (DB) | (DB) |
+| Inv. 4 | Mar 2025 | (DB) | (DB) |
 
 ## Wiring System Outputs
 

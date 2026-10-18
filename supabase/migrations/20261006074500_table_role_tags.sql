@@ -1,0 +1,45 @@
+-- Role tags on 14 table comments (owner, 2026-10-05): CANONICAL for <entity>, PROJECTION of <table>, RETIRED in favor
+-- of <table>, set only where the evidence in the tag supports it. Each comment is re-issued whole (the text merged in
+-- 20261006073000 / 20261006061500 / 20261006063000) with the tag prepended. Lane C, night shift 2026-10-05. Comments only.
+-- Also: the table purpose of geocoding_cache, which became live after 20261006073000 was written.
+-- Not tagged on purpose: lot and bid (lane K is deciding auction_events vs bat_listings; auction_comments also holds bids).
+
+SET statement_timeout = '60s';
+SET lock_timeout = '10s';
+
+BEGIN;
+
+COMMENT ON TABLE public.vehicle_images IS
+'CANONICAL for photo (40 tables key to it; every image writer lands here). One row per image attached to, or awaiting attribution to, a vehicle (grain: one image file reference); 52M rows, 40 tables key to it. Event time = taken_at (EXIF capture; 2018-11 .. 2026-09 in a 0.05% sample). Ingest time = created_at. Writers: extractors (extract-bat-core and others store listing images as URLs), user upload, Apple Photos sync, and analysis functions that fill the analysis columns; pipeline_registry owners photo-pipeline-orchestrator, photo-sync-orchestrator, check-image-vehicle-match, yono-analyze, yono-classify. source says where the image came from.';
+COMMENT ON TABLE public.vehicles IS
+'CANONICAL for vehicle (291 tables key to it; docs/ledger/theory/data-machine.md names it the vehicle entity). The vehicle entity: one row per physical vehicle (grain: one vehicle); 291 tables key to it. Columns hold the current best value per field; canonical columns are resolved by trigger trg_resolve_canonical_columns, and the testimony behind them lives in vehicle_observations and the field evidence tables. Not an event table: created_at is when the row was created (ingest, 2025-11-28 onward), updated_at the last write. Writers: every extractor and many enrichment functions (pipeline_registry owners include extractor, decode-vin-and-update, compute-vehicle-valuation, calculate-vehicle-scores, enrich-msrp, ownership-transfer-system).';
+COMMENT ON TABLE public.external_listings IS
+'RETIRED in favor of vehicle_events (commit 216f9c545 moved its writers there; no rows since 2026-04-14). Legacy listing table (BaT, Cars and Bids, eBay Motors and others): one row per vehicle listing on a platform (grain: vehicle x platform listing). Superseded for new listings by vehicle_events (commit 216f9c545). No edge function writes it in the repo; SQL maintenance functions still name it (reconcile_listing_status, cleanup_stale_listings, merge_duplicate_listings). Rows created 2025-12-07 .. 2026-04-14, none since; 1 row write since the statistics reset.';
+COMMENT ON TABLE public.organizations IS
+'CANONICAL for organization (105 tables key to it; businesses was renamed into it, 20260215200000, and the shops and pre-2026-01-29 organizations tables were archived in its favor). The organization entity: one row per business (dealer, shop, auction house, publisher, venue) (grain: one organization); 105 tables key to it. Writers: extract-bat-core (seller organization resolution), classify-organization-type, extract-gaa-classics, link-document-entities, SQL enrich_organization, and undeclared writers (v_schema_atlas); pipeline_registry owner update_organization_stats. Not an event table: created_at is row creation (2025-11-01 .. 2026-07-25).';
+COMMENT ON TABLE public.mv_bidder_profiles IS
+'PROJECTION of bat_bids (rebuildable by the 20260215500000 batch). BaT bidder aggregates: one row per bat_username with total bids, auctions entered, wins, win rate, average and max bid, first and last seen (grain: one bidder handle). Built from bat_bids by 20260215500000_bid_analytics_foundation (a table populated in batches, not a materialized view). Lifetime numbers as of the build: not point-in-time, never feed a past prediction. No row writes since the statistics reset.';
+COMMENT ON TABLE public.catalog_parts IS
+'CANONICAL for catalog part (docs/ledger/CAPABILITY_MAP.md designates it; parts_catalog and part_catalog are smaller parallels). The parts catalog (designated in docs/ledger/CAPABILITY_MAP.md): one row per part in an indexed supplier catalog with part number, name, price, application data and name embedding (grain: catalog x part); 11 tables key to it. Writer: index-reference-document; readers recommend-parts-for-vehicle, query-wiring-needs, generate-wiring-quote. Rows 2025-12-03 .. 2026-05-11; no row writes since the statistics reset.';
+COMMENT ON TABLE public.bat_users IS
+'RETIRED in favor of external_identities (every FK column pointing here is NULL). Earlier BaT user table: one row per BaT username (1,207 rows, created 2025-12-07 .. 2025-12-31). external_identities (611K BaT handles) is the identity entity now; the FK columns that point here (bat_listings, bat_bids, auction_comments.author_bat_user_id) are NULL on every row. Writers: SQL get_or_create_bat_user, update_bat_user_stats.';
+COMMENT ON TABLE public.author_personas IS
+'PROJECTION of comment_persona_signals (aggregate_author_personas rebuilds it). Aggregated commenter personas: one row per platform author with average tone and expertise scores and primary persona (grain: one author). Writer: SQL aggregate_author_personas over comment_persona_signals. Lifetime aggregates, not point-in-time.';
+COMMENT ON TABLE public.organizations_archived_20260129 IS
+'RETIRED in favor of organizations. Archive of the organizations table as it was before the 2026-01-29 rebuild (169 rows); vehicles still has an FK to it. No writer.';
+COMMENT ON TABLE public.vehicle_build_manifest_pre_v2 IS
+'RETIRED in favor of vehicle_build_manifest (the v2 table harness_endpoints keys to). Copy of the vehicle build manifest (devices, parts, suppliers, prices, purchase status) as it was before the v2 rebuild; rows created 2026-03-23 .. 2026-04-13. No code or migration refers to it. Amounts are private.';
+COMMENT ON TABLE public.vehicle_timeline IS
+'RETIRED in favor of timeline_events (no row writes since the statistics reset; 72 rows vs 1.2M). An earlier vehicle timeline table (72 rows): one row per event with type, date, source and confidence (grain: one event). timeline_events is the live history table. Referenced by work-session and merge_vehicle_into_primary_by_url. Event time = event_date; ingest time = inserted_at.';
+COMMENT ON TABLE public.shops_archived_20260129 IS
+'RETIRED in favor of organizations. Archive of the shops table as it was before the 2026-01-29 consolidation into organizations (2 rows); 9 tables still have FKs to it (vehicles, technicians, ...). No writer.';
+COMMENT ON TABLE public.auction_comments IS
+'CANONICAL for comment (data-machine.md: the auction log; the only table every comment writer lands in). The auction log: one row per comment or bid posted on an auction lot (grain: one comment; BaT 99.7%, Cars and Bids the rest). Append-only by writer contract: upserts ignore duplicates on (vehicle_id, content_hash), and extract-bat-core also skips any bat_comment_id the vehicle already holds. Event time = posted_at (BaT comment timestamp). Ingest time = created_at. Writers: extract-bat-core and scripts/bat-corrections/load_archive_comments.ts through the shared builder batAuctionRecord.ts; ingest-observation for live BaT frames; extract-auction-comments (older). Author keys: external_identity_id is the one current writers set; author_external_identity_id is its twin, written only on rows created before 2026-03.';
+COMMENT ON TABLE public.external_identities IS
+'CANONICAL for identity (data-machine.md: the identity entity, extend it and never mint a parallel one; 20 tables key to it). The identity entity for people seen on outside platforms: one row per platform handle (grain: platform x handle, UNIQUE). 20 tables key to it (comment authors, bidders, sellers, buyers). Not an event table: first_seen_at and last_seen_at are ingest clocks (when our writers first and last saw the handle), not when the person first acted on the platform; for that use min(auction_comments.posted_at) by identity. Writers insert on conflict (platform, handle) do nothing, so a handle is never reset. platform spellings are not normalized (cars_and_bids and carsandbids both occur). claimed_by_user_id links a handle to a Nuke account after a claim.';
+
+-- geocoding_cache turned live (read-only) after 20261006073000 was written: lane C's geography probes read it.
+COMMENT ON TABLE public.geocoding_cache IS
+'Geocoding lookup cache: one row per location string (PK, e.g. "Las Vegas, NV 89123") with latitude, longitude, city, state, country and source (grain: one location string). Sources: vehicle_data 25,803, nominatim 1,275, fb_marketplace 582; all rows created 2026-03-01. Writer: scripts/geocode-cache-misses.cjs; read by SQL geocode_from_cache_batch. A lookup, not a place entity: it has no id to key to. Matches 49% of auction_events.seller_location exactly (8% sample, 2026-10-06).';
+
+COMMIT;

@@ -55,7 +55,7 @@ Low context (<10)    → GPT-4o → Find gaps → $0.02
 
 **Live monitoring:**
 ```bash
-tail -f /Users/skylar/nuke/context-backfill.log
+tail -f ~/nuke/context-backfill.log
 ```
 
 **Current observations:**
@@ -211,7 +211,7 @@ Your system is running. Check back in 90 minutes.
 
 **Optional monitoring:**
 ```bash
-tail -f /Users/skylar/nuke/context-backfill.log
+tail -f ~/nuke/context-backfill.log
 ```
 
 **When complete:**

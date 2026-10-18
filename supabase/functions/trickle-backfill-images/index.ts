@@ -1,5 +1,7 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { requireWriteAuth } from '../_shared/writeGuard.ts';
+import { projectSecretKey } from "../_shared/supabaseKeys.ts";
 
 /**
  * Trickle Backfill Images
@@ -27,9 +29,12 @@ interface TrickleRequest {
 }
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL') || '';
-const SERVICE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
+const SERVICE_KEY = projectSecretKey() || '';
 
 Deno.serve(async (req) => {
+  // Writes are never anonymous: service key, signed-in user, or nothing (P0.2, 2026-09-27).
+  const denied = await requireWriteAuth(req);
+  if (denied) return denied;
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }

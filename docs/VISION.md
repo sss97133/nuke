@@ -1,6 +1,10 @@
 # nuke Vision
 
-> **Read this before touching anything in the product. This is the founder's vision, not a spec.**
+> **Read this for where the system is going, not for what exists.** This is the founder's long-range direction,
+> first written 2026-02-05 and last edited 2026-10-04. What the system is today is [`README.md`](../README.md) and
+> [`docs/ledger/theory/data-machine.md`](ledger/theory/data-machine.md). How to say it to someone outside, with the
+> measured results, is [`docs/POSITIONING.md`](POSITIONING.md). The financial instruments and physical infrastructure
+> below are direction; none of them is built, and none should be the first thing a stranger reads.
 
 ## The One-Liner
 
@@ -89,6 +93,8 @@ Source filtering is critical: we must be able to toggle BaT off and see only oth
 
 ### Search
 Not a text search across 10 entity types. A terminal. "1969 Camaro" → market overview, price trends, active inventory, recent comps. Answer the question before showing the list.
+
+**Owner steering, 2026-10-04:** the market answer is measured performance relative to a stated population, timeframe and auction phase. Inventory counts and shared model names do not establish comparable performance. A component finding opens further evidence and purpose-specific cohorts; commentary is measured per target/comment, then episode, cohort and time. Venue coverage must be visible before interpreting the result. The durable direction, Packard acceptance case and release gates are in [Market analysis contract](market/MARKET_MEASUREMENT_UI_CONTRACT.md). This is product direction; delivery and live coverage require their own receipts.
 
 ### Vehicle Pages
 The digital entity mirror. Complete provenance, market context, comparable sales, ownership lineage, condition documentation. This is the canonical record for this vehicle in the world.

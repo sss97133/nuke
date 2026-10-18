@@ -563,7 +563,7 @@ Follows existing cursor design system:
 
 ```bash
 # 1. Apply database migration
-cd /Users/skylar/nuke
+cd ~/nuke
 supabase db push
 
 # Or manually:
@@ -624,7 +624,7 @@ WHERE vehicle_id IS NOT NULL
 
 - [Image Sets System](./IMAGE_SETS_ERD_AND_WIREFRAME.md) - Album management (built Nov 23)
 - [Image Processing Standards](./IMAGE_PROCESSING_PROFESSIONAL_STANDARDS.md) - AI analysis pipeline
-- [Mobile Lightbox System](./MOBILE_LIGHTBOX_SWIPE_FRAMEWORK.md) - Mobile photo viewing
+- [Mobile Lightbox System](../../archive/architecture/system/MOBILE_LIGHTBOX_SWIPE_FRAMEWORK.md) - Mobile photo viewing
 
 ---
 

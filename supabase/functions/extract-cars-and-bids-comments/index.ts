@@ -7,6 +7,8 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { DOMParser } from 'https://deno.land/x/deno_dom@v0.1.38/deno-dom-wasm.ts'
 import { firecrawlScrape } from '../_shared/firecrawl.ts'
+import { requireWriteAuth } from '../_shared/writeGuard.ts';
+import { projectSecretKey } from "../_shared/supabaseKeys.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -123,12 +125,15 @@ function parseCarsAndBidsDate(dateText: string, auctionEndDate: Date): Date {
 }
 
 Deno.serve(async (req) => {
+  // Writes are never anonymous: service key, signed-in user, or nothing (P0.2, 2026-09-27).
+  const denied = await requireWriteAuth(req);
+  if (denied) return denied;
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders })
 
   try {
     const supabase = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? Deno.env.get('SERVICE_ROLE_KEY') ?? ''
+      projectSecretKey() ?? ''
     )
 
     const { auction_url, auction_event_id, vehicle_id } = await req.json()
@@ -475,12 +480,16 @@ Deno.serve(async (req) => {
           String(text),
         ].join('|'))
 
+        // C&B's own comment id: trg_key_cab_auction_comment keys the row on it, the same key extract-cars-and-bids-core uses
+        const sourceCommentId = typeof commentData?.id === 'string' && /^[A-Za-z0-9_-]{4,64}$/.test(commentData.id) ? commentData.id : null
+
         comments.push({
           auction_event_id: eventId,
           vehicle_id: vehicleId,
           platform: 'cars_and_bids',
           source_url: String(auctionUrlNorm),
           content_hash,
+          source_comment_id: sourceCommentId,
           sequence_number: i + 1,
           posted_at: posted_at.toISOString(),
           hours_until_close: Math.max(0, hours_until_close),

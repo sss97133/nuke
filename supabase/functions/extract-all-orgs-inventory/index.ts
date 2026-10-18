@@ -1,5 +1,7 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { requireWriteAuth } from '../_shared/writeGuard.ts';
+import { projectPublishableKey, projectSecretKey } from "../_shared/supabaseKeys.ts";
 
 /**
  * Extract All Organizations Inventory
@@ -28,8 +30,8 @@ interface ExtractRequest {
 }
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL') || '';
-const SERVICE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || Deno.env.get('SERVICE_ROLE_KEY') || '';
-const ANON_KEY = Deno.env.get('SUPABASE_ANON_KEY') || Deno.env.get('ANON_KEY') || Deno.env.get('SUPABASE_ANON_KEY') || '';
+const SERVICE_KEY = projectSecretKey() || '';
+const ANON_KEY = projectPublishableKey() || '';
 
 if (!SUPABASE_URL || !SERVICE_KEY) {
   console.error('Missing SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY in Edge Function secrets');
@@ -39,6 +41,9 @@ if (!SUPABASE_URL || !SERVICE_KEY) {
 const API_KEY = SERVICE_KEY;
 
 Deno.serve(async (req) => {
+  // Writes are never anonymous: service key, signed-in user, or nothing (P0.2, 2026-09-27).
+  const denied = await requireWriteAuth(req);
+  if (denied) return denied;
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
@@ -148,7 +153,7 @@ Deno.serve(async (req) => {
 
       try {
         // Get service key fresh each time (in case it wasn't set at module load)
-        const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || Deno.env.get('SERVICE_ROLE_KEY') || SERVICE_KEY;
+        const serviceKey = projectSecretKey() || SERVICE_KEY;
         
         // Call discover-organization-full using fetch with both apikey and Authorization headers
         // Direct HTTP call works (curl test confirmed), supabase.functions.invoke() has auth issues

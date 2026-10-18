@@ -1,0 +1,2144 @@
+# K5 Blazer vehicle geometry -- every published dimension we hold that locates something on a 1973-91 K5 Blazer
+# or C/K body, frame, cab, doors, tailgate or rear body. Read by harness-cad for the margin-of-error table
+# against the Blender body (~/k5-harness-pull/K5_harness_workspace_v3.blend).
+#
+# Owner, 2026-09-29: "figure out your margin of error situation by actually knowing the vehicle ... the repair
+# manuals the service manuals at some point you actually find like measurements and you can fill in based on
+# the information you actually have."
+#
+# Rules for this file
+#   - Every number is as printed, with its page and figure. value_mm is the printed value converted
+#     (1 in = 25.4 mm exactly); original keeps the printed value and unit.
+#   - points names the measuring points in the source's own words. A point the source does not name says so.
+#   - A figure scanned without a text layer (Mitchell, KLM, GM TX000469) is read by eye; `where` says where on
+#     the figure the number sits, so an auditor can find it.
+#   - Nothing here is measured on the truck. Measurements go in tape_list.yaml and come back as their own rows.
+#   - check_dimensions.py validates shape, units, the value on its page (text-layer sources), and closes the
+#     Mitchell figures on themselves (their own margin of error).
+#
+# confidence -- how sure we are the number is right for Skylar's 1977 K5 at the named points
+#   high    printed by GM for the K10 Blazer in a table that covers 1977, points named
+#   medium  printed for a sister year or a C/K model that shares the part, points named; or a GM 1977 value
+#           whose point is read off a "typical" drawing
+#   low     implied by a procedure, printed for a different series, or the points are not named
+# applies_to_1977: yes | assumed (same part family, not proven by this source) | unverified (the part changed
+#   between 1977 and the source's year, or we can't tell)
+#
+# kind
+#   width           left point to the matching right point (the source prints them combined; half is each side)
+#   to_centerline   one point to the frame centreline
+#   length          fore-aft, parallel to the datum line (side view)
+#   height          above the datum line, perpendicular to it (side view)
+#   point_to_point  straight-line (tram) distance between two points
+#   diagonal        point-to-point from one side to the other
+#
+# Coordinates in the twin: metres, +x = driver, -y = front, +z = up; front axle y = -1.896, rear axle y = 0.807,
+# firewall about y = -1.46 (task brief 2026-09-30). Nothing in this file is in twin coordinates.
+
+schema_version: 1
+lane: geometry-scan (research for harness-cad), 2026-09-30
+checker: docs/wiring/calc-data/cad/check_dimensions.py
+
+sources:
+  FR88:
+    title: "Dimension Information - 2-Door 4WD, 1988 Chevrolet Blazer. Fig 1 Complete underbody frame (93D07036), Fig 2 Complete upperbody (93F07037)"
+    publisher: Mitchell International Inc. (C) 2001; printed Monday September 28, 2009 10:14AM
+    doc: reference_documents/k5_factory_docs/1988_Blazer_4WD_Frame_Dimensions.pdf
+    library_slug: k5_factory_docs__1988_blazer_4wd_frame_dimensions
+    text_layer: false
+    figure_note: "2 scanned pages, printed rotated 90 degrees (turn the page so FRONT is on the left). The measuring-explanation page the sheet refers to ('PLEASE SEE MEASURING EXPLANATION AT FRONT OF MANUAL') is not in our copy."
+    years_printed: "1988 Blazer 2-door 4WD"
+  KLM84:
+    title: "Unibody and chassis dimensions and specifications, Chevrolet 1984 Blazer 4WD, 106.5 in wheelbase, chart CHT-1"
+    publisher: KLM Automotive Publishing Inc. (C) 1983 (copy watermarked 73-87chevytrucks.com)
+    doc: reference_documents/k5_factory_docs/KLM_1984_Blazer_4WD_CHT-1.jpg
+    text_layer: false
+    figure_note: "One scanned chart; FRONT on the left. It names no measuring points; the procedure-explanation page it refers to is not in our copy."
+    years_printed: "1984 Blazer 4WD"
+  GM73:
+    title: 1973 Chevrolet Light Duty Truck Service Manual, Section 2 Frame
+    doc: reference_documents/service_manuals/1973_Chevy_Service_Manual.pdf
+    library_slug: service_manuals__1973_chevy_service_manual
+    text_layer: true
+  GM74:
+    title: 1974 Chevrolet Light Truck Service Manual (ST-330-74), Section 2 Frame
+    doc: reference_documents/service_manuals/pending/ST_330_74_1974_Chevrolet_Light_Truck_Service_Manual.pdf
+    library_slug: service_manuals__pending__st_330_74_1974_chevrolet_light_truck_service_manual
+    text_layer: true
+  GM75:
+    title: 1975 Chevrolet Light Truck Service & Overhaul Supplement (ST-330-75), Frame
+    doc: reference_documents/service_manuals/pending/ST_330_75_1975_Chevrolet_Light_Truck_Service_Overhaul_Supplement.pdf
+    library_slug: service_manuals__pending__st_330_75_1975_chevrolet_light_truck_service_overhaul_supplement
+    text_layer: true
+  GM76:
+    title: 1976 Chevrolet Light Truck Service & Overhaul Supplement (ST-330-76), Frame
+    doc: reference_documents/service_manuals/pending/ST_330_76_1976_Chevrolet_Light_Truck_Service_Overhaul_Supplement.pdf
+    library_slug: service_manuals__pending__st_330_76_1976_chevrolet_light_truck_service_overhaul_supplement
+    text_layer: true
+  GM77:
+    title: 1977 Chevrolet Light Duty Truck (Series 10-35) Chassis Service Manual
+    doc: reference_documents/service_manuals/1977_Chevy_Service_Manual.pdf
+    also_at: reference_documents/k5_factory_docs/1977_Light_Truck_Service_Manual.pdf (same file, same size)
+    library_slug: service_manuals__1977_chevy_service_manual
+    text_layer: true
+  GM78:
+    title: 1978 Chevrolet Light Truck Service Manual (ST-330-78), Section 2A Frame
+    doc: reference_documents/service_manuals/pending/ST_330_78_1978_Chevrolet_Light_Truck_Service_Manual.pdf
+    library_slug: service_manuals__pending__st_330_78_1978_chevrolet_light_truck_service_manual
+    text_layer: true
+  GM79:
+    title: 1979 Chevrolet Light Truck Service Manual (ST-330-79), Section 2A Frame
+    doc: reference_documents/service_manuals/pending/ST_330_79_1979_Chevrolet_Light_Truck_Service_Manual.pdf
+    library_slug: service_manuals__pending__st_330_79_1979_chevrolet_light_truck_service_manual
+    text_layer: true
+  GM80:
+    title: 1980 Chevrolet Light Truck Service Manual (ST-330-80), Section 2A Frame
+    doc: reference_documents/service_manuals/pending/ST_330_80_1980_Chevrolet_Light_Truck_Service_Manual.pdf
+    library_slug: service_manuals__pending__st_330_80_1980_chevrolet_light_truck_service_manual
+    text_layer: true
+  GM81:
+    title: 1981 Chevrolet Light Duty Truck Service Manual, Section 2A Frame
+    doc: reference_documents/service_manuals/1981_Chevy_Service_Manual.pdf
+    library_slug: service_manuals__1981_chevy_service_manual
+    text_layer: true
+  TX469:
+    title: "GM drawing TX000469, sheet 2 of 2: cab-chassis dimensions, series CV & TV 309-310-314, body style (03)"
+    publisher: General Motors (engineering/body-builder drawing; copy from the web, see reference_documents/vehicle_base_drawings/SOURCES.md)
+    doc: reference_documents/vehicle_base_drawings/GM_cab_chassis_TX000469_dimensions.jpg
+    text_layer: false
+    figure_note: "One image, 1500 x 966 px. A 30-series 4x4 cab-chassis (131.5-159.5 in wheelbase), not a Blazer; only the cab and front-end numbers can carry over to the K5."
+    years_printed: "mid-1980s (lists the 6.2 L diesel LL4 and 454 LE8)"
+  ORTHO77:
+    title: "Chevrolet Blazer 1977, 4-view orthographic (top, side, front, rear) with two interior dimension lines"
+    publisher: "the-blueprints.com (per reference_documents/vehicle_base_drawings/SOURCES.md); the drawing style and the 29.3 / 64.8 dimension lines look like GM sales literature, not confirmed"
+    doc: reference_documents/vehicle_base_drawings/K5_blazer_1977_4view_orthographic.gif
+    text_layer: false
+    figure_note: "One image, 1005 x 555 px; the numbers are printed without units or labels."
+    years_printed: "1977 (as titled)"
+  LS3M:
+    title: 2009 "LS3" 6.2L V8 Marine Engine specification sheet, page 3 (Specifications, with two outline views)
+    publisher: GM Powertrain, (C) 2008 General Motors Corporation, printed 01/31/08
+    doc: reference_documents/component_drawings/Marine_LS3_6.2L_Specs.pdf
+    library_slug: component_drawings__marine_ls3_6_2l_specs
+    text_layer: true
+  GM87:
+    title: 1987 Chevrolet Light Duty Truck Service Manual
+    doc: reference_documents/service_manuals/1987_Chevy_Service_Manual.pdf
+    library_slug: service_manuals__1987_chevy_service_manual
+    text_layer: true
+
+dimensions:
+
+# =====================================================================================================
+# MITCHELL 1988 BLAZER 2-DOOR 4WD -- FIG 2, COMPLETE UPPERBODY (FR88 page 2)
+# The body and cab. The cab (windshield, doors, A and B pillars) is the 1973-87 C/K cab the K5 shares;
+# the engine-compartment points sit on 1981-91 front sheet metal (the 1977 has the 1973-80 front end).
+# =====================================================================================================
+
+- id: fr88.body.engcomp.rear-width
+  what: Engine compartment, rear pair of measuring points, left to right
+  kind: width
+  value_mm: 1715
+  original: {value: 1715, unit: mm}
+  points: "The rear pair of the four black-dot measuring points in the ENGINE COMPARTMENT top view (the pair at the cowl end, where the inner-fender lines meet the cowl crossbar). Mitchell names no points in this view."
+  src: FR88
+  pdf_page: 2
+  figure: "Fig 2 upperbody, ENGINE COMPARTMENT (top-left box)"
+  where: "horizontal dimension across the top of the box, labelled 1715, above the word Centerline"
+  years: "1988 as printed; the cowl end is shared by 1973-91 C/K"
+  applies_to_1977: assumed
+  confidence: medium
+  why: "Mitchell prints it for 1988. The cowl did not change 1973-91, but the points are unnamed. KLM 1984 prints 67-3/4 in (1721) for what looks like the same pair (6 mm apart)."
+
+- id: fr88.body.engcomp.front-width
+  what: Engine compartment, front pair of measuring points, left to right
+  kind: width
+  value_mm: 1523
+  original: {value: 1523, unit: mm}
+  points: "The front pair of the four black-dot measuring points (the pair at the radiator-support end, just ahead of the crossbar drawn with a row of holes). Unnamed in the source."
+  src: FR88
+  pdf_page: 2
+  figure: "Fig 2 upperbody, ENGINE COMPARTMENT"
+  where: "horizontal dimension across the bottom of the box, labelled 1523"
+  years: "1988 as printed (1981-91 front sheet metal)"
+  applies_to_1977: unverified
+  confidence: low
+  why: "The front points sit on the radiator support. The 1973-80 and 1981-87 radiator supports are different parts, and the points are unnamed. KLM 1984 prints 60 in (1524) for the same view."
+
+- id: fr88.body.engcomp.side.driver
+  what: Engine compartment, rear point to front point on the same side (left side of the drawing)
+  kind: point_to_point
+  value_mm: 1102
+  original: {value: 1102, unit: mm}
+  points: "Rear black-dot point to the front black-dot point on the same side (unnamed)."
+  src: FR88
+  pdf_page: 2
+  figure: "Fig 2 upperbody, ENGINE COMPARTMENT"
+  where: "vertical dimension on the left edge of the box, labelled 1102"
+  years: "1988 as printed"
+  applies_to_1977: unverified
+  confidence: low
+  why: "Same point-identity caveat as the front width. Closes with the widths and diagonal to about 1 mm (check_dimensions.py), so it is point-to-point, not fore-aft: the fore-aft part is about 1098 mm. KLM 1984 prints 43-5/8 in (1108) fore-aft."
+  note: "The older K5_dimensions_atoms.yaml read this as 'centreline to inner shock tower'. It is not; see the receipt."
+
+- id: fr88.body.engcomp.side.passenger
+  what: Engine compartment, rear point to front point on the same side (right side of the drawing)
+  kind: point_to_point
+  value_mm: 1102
+  original: {value: 1102, unit: mm}
+  points: "Rear black-dot point to the front black-dot point on the other side (unnamed)."
+  src: FR88
+  pdf_page: 2
+  figure: "Fig 2 upperbody, ENGINE COMPARTMENT"
+  where: "vertical dimension on the right edge of the box, labelled 1102"
+  years: "1988 as printed"
+  applies_to_1977: unverified
+  confidence: low
+  why: "As the driver-side entry."
+
+- id: fr88.body.engcomp.diag
+  what: Engine compartment diagonal, rear point one side to front point the other side (both diagonals print the same)
+  kind: diagonal
+  value_mm: 1957
+  original: {value: 1957, unit: mm}
+  points: "Rear black-dot point to the opposite front black-dot point (unnamed). Two crossing diagonals, both 1957."
+  src: FR88
+  pdf_page: 2
+  figure: "Fig 2 upperbody, ENGINE COMPARTMENT"
+  where: "the X in the middle of the box, two labels 1957"
+  years: "1988 as printed"
+  applies_to_1977: unverified
+  confidence: low
+  why: "As above. KLM 1984 prints 77-1/4 in (1962)."
+
+- id: fr88.body.windshield.top-A-B
+  what: Windshield opening, upper corners, one pillar to the other
+  kind: width
+  value_mm: 1417
+  original: {value: 1417, unit: mm}
+  points: "A to B, each the 'Center of Arc at Moulding' (centre of the corner radius of the reveal moulding), upper corners."
+  src: FR88
+  pdf_page: 2
+  figure: "Fig 2 upperbody, FRONT WINDSHIELD (main view and the A/B/C/D insets)"
+  where: "horizontal dimension along the top of the windshield, labelled 1417"
+  years: "1988 as printed; the 1973-87 C/K cab"
+  applies_to_1977: assumed
+  confidence: medium
+  why: "Same cab and glass 1973-87 C/K (K5 through 1991). The glass wraps, so these are straight chords between corners."
+
+- id: fr88.body.windshield.bottom-D-C
+  what: Windshield opening, lower corners, one pillar to the other
+  kind: width
+  value_mm: 1686
+  original: {value: 1686, unit: mm}
+  points: "D to C, centre of arc at moulding, lower corners."
+  src: FR88
+  pdf_page: 2
+  figure: "Fig 2 upperbody, FRONT WINDSHIELD"
+  where: "horizontal dimension below the windshield, labelled 1686"
+  years: "1988 as printed; 1973-87 C/K cab"
+  applies_to_1977: assumed
+  confidence: medium
+  why: "As top-A-B."
+
+- id: fr88.body.windshield.side-A-D
+  what: Windshield opening, upper corner to lower corner on the same pillar (A side)
+  kind: point_to_point
+  value_mm: 600
+  original: {value: 600, unit: mm}
+  points: "A (upper) to D (lower), centre of arc at moulding."
+  src: FR88
+  pdf_page: 2
+  figure: "Fig 2 upperbody, FRONT WINDSHIELD"
+  where: "vertical dimension at the left of the windshield, labelled 600"
+  years: "1988 as printed; 1973-87 C/K cab"
+  applies_to_1977: assumed
+  confidence: medium
+  why: "As top-A-B. Closes with the widths and diagonal to about 1 mm."
+
+- id: fr88.body.windshield.side-B-C
+  what: Windshield opening, upper corner to lower corner on the same pillar (B side)
+  kind: point_to_point
+  value_mm: 600
+  original: {value: 600, unit: mm}
+  points: "B (upper) to C (lower), centre of arc at moulding."
+  src: FR88
+  pdf_page: 2
+  figure: "Fig 2 upperbody, FRONT WINDSHIELD"
+  where: "vertical dimension at the right of the windshield, labelled 600"
+  years: "1988 as printed; 1973-87 C/K cab"
+  applies_to_1977: assumed
+  confidence: medium
+  why: "As top-A-B."
+
+- id: fr88.body.windshield.diag-A-C
+  what: Windshield opening diagonal, upper corner A to the opposite lower corner C
+  kind: diagonal
+  value_mm: 1657
+  original: {value: 1657, unit: mm}
+  points: "A to C, centre of arc at moulding."
+  src: FR88
+  pdf_page: 2
+  figure: "Fig 2 upperbody, FRONT WINDSHIELD"
+  where: "diagonal inside the glass, labelled 1657"
+  years: "1988 as printed; 1973-87 C/K cab"
+  applies_to_1977: assumed
+  confidence: medium
+  why: "As top-A-B."
+
+- id: fr88.body.door.A-D
+  what: Door opening diagonal, upper rear corner to lower front corner
+  kind: diagonal
+  value_mm: 1572
+  original: {value: 1572, unit: mm}
+  points: "A = 'Seam at Opening', upper rear corner (top of the lock pillar); D = 'Corner of Rocker Panel', lower front."
+  src: FR88
+  pdf_page: 2
+  figure: "Fig 2 upperbody, DOOR OPENING (main view and the A-F insets)"
+  where: "the diagonal from A (top left) to D (bottom right), label 1572 near D"
+  years: "1988 as printed; 1973-87 C/K cab door opening"
+  applies_to_1977: assumed
+  confidence: medium
+  why: "Same cab door opening 1973-87 C/K. The drawing shows the striker (F) on the left and the jamb switch (C) on the right, so the front of the truck is to the right of the drawing."
+
+- id: fr88.body.door.B-E
+  what: Door opening diagonal, upper front corner to lower rear corner
+  kind: diagonal
+  value_mm: 1445
+  original: {value: 1445, unit: mm}
+  points: "B = 'Seam at Opening', upper front corner (at the windshield pillar); E = 'Corner of Rocker Panel', lower rear."
+  src: FR88
+  pdf_page: 2
+  figure: "Fig 2 upperbody, DOOR OPENING"
+  where: "the diagonal from B (top right) to E (bottom left), label 1445 near B"
+  years: "1988 as printed; 1973-87 C/K cab"
+  applies_to_1977: assumed
+  confidence: medium
+  why: "As door.A-D."
+
+- id: fr88.body.door.F-C
+  what: Door opening, striker bolt to the hinge-pillar jamb-switch surface, straight across the opening
+  kind: point_to_point
+  value_mm: 940
+  original: {value: 940, unit: mm}
+  points: "F = 'Center of Striker Bolt' (lock pillar); C = 'Surface Above Switch' (hinge pillar, the door-jamb switch)."
+  src: FR88
+  pdf_page: 2
+  figure: "Fig 2 upperbody, DOOR OPENING"
+  where: "near-horizontal dimension across the opening from F to C, labelled 940"
+  years: "1988 as printed; 1973-87 C/K cab"
+  applies_to_1977: assumed
+  confidence: medium
+  why: "As door.A-D. The door-jamb switch is where the dome-lamp and door circuits enter the hinge pillar."
+
+- id: fr88.body.apillar.A-B
+  what: Cab width inside, left hinge-pillar jamb-switch surface to the right one
+  kind: width
+  value_mm: 1746
+  original: {value: 1746, unit: mm}
+  points: "A and B = 'Surface Above Switch' on each hinge pillar (the door-jamb switch), measured across the cab."
+  src: FR88
+  pdf_page: 2
+  figure: "Fig 2 upperbody, INSIDE PASSENGER COMPARTMENT, 'A' PILLAR (with the 'Surface Above Switch' inset)"
+  where: "horizontal dimension across the dash view, labelled 1746"
+  years: "1988 as printed; 1973-87 C/K cab"
+  applies_to_1977: assumed
+  confidence: medium
+  why: "The kick-panel to kick-panel span the dash harness crosses. Same cab 1973-87."
+
+- id: fr88.body.bpillar.C-D
+  what: Cab width at the top rear corners of the two door openings
+  kind: width
+  value_mm: 1416
+  original: {value: 1416, unit: mm}
+  points: "C and D = 'Rear Corner of Opening' (upper rear corner of each door opening), measured across the cab."
+  src: FR88
+  pdf_page: 2
+  figure: "Fig 2 upperbody, INSIDE PASSENGER COMPARTMENT, 'B' PILLAR (with the 'Rear Corner of Opening' inset)"
+  where: "horizontal dimension along the roof rail, labelled 1416"
+  years: "1988 as printed; 1976-91 K5 half-cab (steel roof over the front seats)"
+  applies_to_1977: assumed
+  confidence: medium
+  why: "The 1976-91 K5 has the steel half-cab roof; 1973-75 K5 did not. Owner's 1977 has it."
+
+- id: fr88.body.bpillar.E-F
+  what: Cab width at the door striker bolts
+  kind: width
+  value_mm: 1858
+  original: {value: 1858, unit: mm}
+  points: "E and F = 'Center of Striker Bolt' on each lock pillar, measured across the cab."
+  src: FR88
+  pdf_page: 2
+  figure: "Fig 2 upperbody, 'B' PILLAR (with the 'Center of Striker Bolt' inset)"
+  where: "dimension across the B-pillar view at mid height, labelled 1858"
+  years: "1988 as printed; 1973-87 C/K cab"
+  applies_to_1977: assumed
+  confidence: medium
+  why: "Same cab lock pillars 1973-87."
+
+- id: fr88.body.bpillar.D-E
+  what: B-pillar diagonal, right upper rear door-opening corner to the left striker bolt
+  kind: diagonal
+  value_mm: 1797
+  original: {value: 1797, unit: mm}
+  points: "D (rear corner of opening, one side) to E (centre of striker bolt, the other side)."
+  src: FR88
+  pdf_page: 2
+  figure: "Fig 2 upperbody, 'B' PILLAR"
+  where: "diagonal from D down to E, labelled 1797"
+  years: "1988 as printed; 1976-91 K5 half-cab"
+  applies_to_1977: assumed
+  confidence: medium
+  why: "With C-D and E-F it implies about 741 mm (height plus fore-aft) from the striker to the upper rear corner (check_dimensions.py)."
+
+- id: fr88.body.tailgate.top-A-B
+  what: Tailgate opening, upper inner corners, left to right
+  kind: width
+  value_mm: 1657
+  original: {value: 1657, unit: mm}
+  points: "A and B = 'Inner Corner of Opening', upper (at the tailgate latch, top of the rear body pillars)."
+  src: FR88
+  pdf_page: 2
+  figure: "Fig 2 upperbody, TAILGATE OPENING (main view and the A-D insets)"
+  where: "horizontal dimension at the top of the tailgate opening, labelled 1657"
+  years: "1988 as printed; K5 rear body 1973-91"
+  applies_to_1977: assumed
+  confidence: medium
+  why: "The inner width of the rear body at the tailgate, i.e. between the rear double walls at their back edge."
+
+- id: fr88.body.tailgate.bottom-D-C
+  what: Tailgate opening, lower inner corners (at the floor), left to right
+  kind: width
+  value_mm: 1657
+  original: {value: 1657, unit: mm}
+  points: "D and C = 'Inner Corner of Opening', lower (at the floor)."
+  src: FR88
+  pdf_page: 2
+  figure: "Fig 2 upperbody, TAILGATE OPENING"
+  where: "horizontal dimension under the bumper, labelled 1657"
+  years: "1988 as printed; K5 rear body 1973-91"
+  applies_to_1977: assumed
+  confidence: medium
+  why: "As top-A-B."
+
+- id: fr88.body.tailgate.side-A-D
+  what: Tailgate opening height, upper inner corner to lower inner corner (A side)
+  kind: point_to_point
+  value_mm: 505
+  original: {value: 505, unit: mm}
+  points: "A (upper inner corner) to D (lower inner corner)."
+  src: FR88
+  pdf_page: 2
+  figure: "Fig 2 upperbody, TAILGATE OPENING"
+  where: "vertical dimension at the left, labelled 505"
+  years: "1988 as printed; K5 rear body"
+  applies_to_1977: assumed
+  confidence: medium
+  why: "Does not close: 1657 x 505 gives a 1732 diagonal, the sheet prints 1724 (8 mm short). One of the four numbers is measured differently than drawn -- tape it (tape_list T-08)."
+
+- id: fr88.body.tailgate.side-B-C
+  what: Tailgate opening height, upper inner corner to lower inner corner (B side)
+  kind: point_to_point
+  value_mm: 505
+  original: {value: 505, unit: mm}
+  points: "B (upper inner corner) to C (lower inner corner)."
+  src: FR88
+  pdf_page: 2
+  figure: "Fig 2 upperbody, TAILGATE OPENING"
+  where: "vertical dimension at the right, labelled 505"
+  years: "1988 as printed; K5 rear body"
+  applies_to_1977: assumed
+  confidence: medium
+  why: "As side-A-D."
+
+- id: fr88.body.tailgate.diag-A-C
+  what: Tailgate opening diagonal, upper corner A to the opposite lower corner C
+  kind: diagonal
+  value_mm: 1724
+  original: {value: 1724, unit: mm}
+  points: "A (upper inner corner) to C (opposite lower inner corner)."
+  src: FR88
+  pdf_page: 2
+  figure: "Fig 2 upperbody, TAILGATE OPENING"
+  where: "diagonal across the opening, labelled 1724"
+  years: "1988 as printed; K5 rear body"
+  applies_to_1977: assumed
+  confidence: medium
+  why: "8 mm shorter than the rectangle the other numbers describe; see side-A-D."
+
+# =====================================================================================================
+# MITCHELL 1988 BLAZER 2-DOOR 4WD -- FIG 1, COMPLETE UNDERBODY FRAME (FR88 page 1)
+# Measuring points, as printed in the MEASURING POINT DESIGNATIONS box:
+#   A centre of 15 mm (9/16 in) round hole, inside on front frame rail   B tip of bolt, leaf spring mount
+#   C D.S. tip of rivet, crossmember mount    D P.S. tip of rivet, crossmember mount    E tip of bolt, motor mount
+#   F tip of bolt, leaf spring mount          G centre of 16 mm (5/8 in) round hole (datum line control point)
+#   H centre of 16 x 31 mm oval hole          I head of bolt, leaf spring mount
+#   J centre of 18 x 33 mm oval hole (datum line control point)   K centre of 17 x 33 mm oval hole
+#   L D.S. tip of rivet, exhaust hanger bracket    L' P.S. centre of 10 mm (3/8 in) round hole
+#   M head of bolt, leaf spring mount         N tip of bolt, tow package, rear mount
+# Sheet notes: "Dimensions from Centerline are Combined When Equal. Divide by 2 for Individual Dimensions from
+# Centerline. All Bolt and Holes are Measured to Center Unless Otherwise Described." D.S. = driver side,
+# P.S. = passenger side; blt = measurement to bolt, frm = measurement to frame.
+# The bottom view gives widths and tram (point-to-point) distances; the side view gives fore-aft lengths from
+# the control points G and J, and heights above the datum line. The three views close on each other to under
+# 1 mm (check_dimensions.py), so the readings below are consistent.
+# =====================================================================================================
+
+- id: fr88.frame.wheelbase
+  what: Wheelbase
+  kind: length
+  value_mm: 2705
+  original: {value: 2705, unit: mm, printed: "2705 mm (106 1/2\") WHEELBASE"}
+  points: "Front axle centreline to rear axle centreline."
+  src: FR88
+  pdf_page: 1
+  figure: "Fig 1 underbody frame, title line"
+  where: "top left: '2705 mm (106 1/2\") WHEELBASE'"
+  years: "1988 as printed; 106.5 in for every 1973-91 K5"
+  applies_to_1977: "yes"
+  confidence: high
+  why: "106.5 in is the K5 wheelbase all generations of this body; GM's own 1977 model code KA105 is the Blazer ('05 - Blazer, Jimmy', 1977 manual p.6). The twin measures 2703."
+
+# ---- widths (bottom view)
+- id: fr88.frame.width.A-A
+  what: Frame width at A, front-rail gauge holes, left to right
+  kind: width
+  value_mm: 706
+  original: {value: 706, unit: mm}
+  points: "A to A: centre of 15 mm round hole, inside on front frame rail."
+  src: FR88
+  pdf_page: 1
+  figure: "Fig 1 underbody frame, BOTTOM VIEW"
+  where: "vertical arrow at station A between the two rails, labelled 706 (left end of the bottom view)"
+  years: "1988 as printed"
+  applies_to_1977: assumed
+  confidence: medium
+  why: "GM 1987 prints 704.85 mm (27.75 in) between the front points 1-2 on the inside of the web; GM 1977 prints 14 in each side of centre (711 mm) to the inside of the outer surface."
+
+- id: fr88.frame.width.B-B
+  what: Width at B, front leaf-spring front hanger bolt tips, left to right
+  kind: width
+  value_mm: 958
+  original: {value: 958, unit: mm}
+  points: "B to B: tip of bolt, leaf spring mount."
+  src: FR88
+  pdf_page: 1
+  figure: "Fig 1, BOTTOM VIEW"
+  where: "vertical arrow at station B, labelled 958"
+  years: "1988 as printed"
+  applies_to_1977: assumed
+  confidence: medium
+  why: "Printed for 1988; the K5 front leaf-spring hangers carry over, not proven for 1977 here."
+
+- id: fr88.frame.cl.C
+  what: C (driver side) to frame centreline
+  kind: to_centerline
+  value_mm: 331
+  original: {value: 331, unit: mm}
+  points: "C: D.S. tip of rivet, crossmember mount, to the frame centreline."
+  src: FR88
+  pdf_page: 1
+  figure: "Fig 1, BOTTOM VIEW"
+  where: "arrow from the driver rail down to the centreline at station C, labelled 331"
+  years: "1988 as printed"
+  applies_to_1977: assumed
+  confidence: medium
+  why: "One-sided point, so the sheet gives it to centre, not combined."
+
+- id: fr88.frame.cl.D
+  what: D (passenger side) to frame centreline
+  kind: to_centerline
+  value_mm: 340
+  original: {value: 340, unit: mm}
+  points: "D: P.S. tip of rivet, crossmember mount, to the frame centreline."
+  src: FR88
+  pdf_page: 1
+  figure: "Fig 1, BOTTOM VIEW"
+  where: "arrow from the centreline down to the passenger rail at station D, labelled 340"
+  years: "1988 as printed"
+  applies_to_1977: assumed
+  confidence: medium
+  why: "One-sided point."
+
+- id: fr88.frame.width.E-E
+  what: Width at E, engine (motor) mount bolt tips, left to right
+  kind: width
+  value_mm: 706
+  original: {value: 706, unit: mm}
+  points: "E to E: tip of bolt, motor mount."
+  src: FR88
+  pdf_page: 1
+  figure: "Fig 1, BOTTOM VIEW"
+  where: "vertical arrow just behind station E with leaders to the E bolts, labelled 706"
+  years: "1988 as printed"
+  applies_to_1977: assumed
+  confidence: medium
+  why: "The frame-side motor-mount bolts. The LS3 sits on ICT adapter plates on the factory perches (K5_dimensions_atoms.yaml, owner 2026-05-06), so these bolts locate the engine in the frame."
+
+- id: fr88.frame.width.F-F
+  what: Width at F, front leaf-spring rear hanger bolt tips, left to right
+  kind: width
+  value_mm: 952
+  original: {value: 952, unit: mm}
+  points: "F to F: tip of bolt, leaf spring mount."
+  src: FR88
+  pdf_page: 1
+  figure: "Fig 1, BOTTOM VIEW"
+  where: "vertical arrow at station F, labelled 952"
+  years: "1988 as printed"
+  applies_to_1977: assumed
+  confidence: medium
+  why: "As B-B."
+
+- id: fr88.frame.width.G-G
+  what: Width at G, 16 mm gauge holes (datum control point), left to right
+  kind: width
+  value_mm: 866
+  original: {value: 866, unit: mm}
+  points: "G to G: centre of 16 mm (5/8 in) round hole."
+  src: FR88
+  pdf_page: 1
+  figure: "Fig 1, BOTTOM VIEW"
+  where: "vertical arrow at station G, labelled 866"
+  years: "1988 as printed"
+  applies_to_1977: assumed
+  confidence: medium
+  why: "G is a datum-line control point (triangle mark under G in the side view)."
+
+- id: fr88.frame.width.H-H
+  what: Width at H, 16 x 31 mm oval holes, left to right
+  kind: width
+  value_mm: 954
+  original: {value: 954, unit: mm}
+  points: "H to H: centre of 16 x 31 mm (5/8 x 1-1/4 in) oval hole."
+  src: FR88
+  pdf_page: 1
+  figure: "Fig 1, BOTTOM VIEW"
+  where: "vertical arrow at station H, labelled 954"
+  years: "1988 as printed"
+  applies_to_1977: assumed
+  confidence: medium
+  why: "Printed for 1988."
+
+- id: fr88.frame.width.I-I
+  what: Width at I, rear leaf-spring front hanger bolt heads, left to right
+  kind: width
+  value_mm: 1184
+  original: {value: 1184, unit: mm}
+  points: "I to I: head of bolt, leaf spring mount."
+  src: FR88
+  pdf_page: 1
+  figure: "Fig 1, BOTTOM VIEW"
+  where: "vertical arrow at station I (outboard, across the spring hangers), labelled 1184"
+  years: "1988 as printed"
+  applies_to_1977: assumed
+  confidence: medium
+  why: "Bolt heads sit outboard of the rails, so this is wider than the rails."
+
+- id: fr88.frame.width.J-J
+  what: Width at J, 18 x 33 mm oval holes (datum control point), left to right
+  kind: width
+  value_mm: 890
+  original: {value: 890, unit: mm}
+  points: "J to J: centre of 18 x 33 mm (11/16 x 1-5/16 in) oval hole."
+  src: FR88
+  pdf_page: 1
+  figure: "Fig 1, BOTTOM VIEW"
+  where: "vertical arrow at station J, labelled 890"
+  years: "1988 as printed"
+  applies_to_1977: assumed
+  confidence: medium
+  why: "J is the second datum-line control point."
+
+- id: fr88.frame.width.K-K
+  what: Width at K, 17 x 33 mm oval holes, left to right
+  kind: width
+  value_mm: 862
+  original: {value: 862, unit: mm}
+  points: "K to K: centre of 17 x 33 mm (11/16 x 1-1/4 in) oval hole."
+  src: FR88
+  pdf_page: 1
+  figure: "Fig 1, BOTTOM VIEW"
+  where: "vertical arrow at station K, labelled 862"
+  years: "1988 as printed"
+  applies_to_1977: assumed
+  confidence: medium
+  why: "GM 1975-81 prints 16-7/8 in each side (857.25 mm) to the inside of the rear rails; the hole centres sit about one web thickness wider."
+
+- id: fr88.frame.cl.L
+  what: L (driver side) to frame centreline
+  kind: to_centerline
+  value_mm: 439
+  original: {value: 439, unit: mm}
+  points: "L: D.S. tip of rivet, exhaust hanger bracket, to the frame centreline."
+  src: FR88
+  pdf_page: 1
+  figure: "Fig 1, BOTTOM VIEW"
+  where: "arrow from the driver rail down to the centreline at station L, labelled 439"
+  years: "1988 as printed"
+  applies_to_1977: assumed
+  confidence: medium
+  why: "One-sided point."
+
+- id: fr88.frame.cl.Lprime
+  what: "L' (passenger side) to frame centreline"
+  kind: to_centerline
+  value_mm: 432
+  original: {value: 432, unit: mm}
+  points: "L': P.S. centre of 10 mm (3/8 in) round hole, to the frame centreline."
+  src: FR88
+  pdf_page: 1
+  figure: "Fig 1, BOTTOM VIEW"
+  where: "arrow from the centreline down to the passenger rail at station L', labelled 432"
+  years: "1988 as printed"
+  applies_to_1977: assumed
+  confidence: medium
+  why: "One-sided point."
+
+- id: fr88.frame.width.M-M
+  what: Width at M, rear leaf-spring rear hanger bolt heads, left to right
+  kind: width
+  value_mm: 1186
+  original: {value: 1186, unit: mm}
+  points: "M to M: head of bolt, leaf spring mount."
+  src: FR88
+  pdf_page: 1
+  figure: "Fig 1, BOTTOM VIEW"
+  where: "vertical arrow at station M across the spring hangers, labelled 1186"
+  years: "1988 as printed"
+  applies_to_1977: assumed
+  confidence: medium
+  why: "Bolt heads outboard of the rails."
+
+- id: fr88.frame.width.N-N
+  what: Width at N, tow-package rear mount bolt tips, left to right
+  kind: width
+  value_mm: 824
+  original: {value: 824, unit: mm}
+  points: "N to N: tip of bolt, tow package, rear mount."
+  src: FR88
+  pdf_page: 1
+  figure: "Fig 1, BOTTOM VIEW"
+  where: "vertical arrow at the rear end (station N), labelled 824"
+  years: "1988 as printed"
+  applies_to_1977: assumed
+  confidence: medium
+  why: "Printed for 1988; the tow-package holes may not exist on every truck."
+
+# ---- tram (point-to-point) and diagonals (bottom view)
+- id: fr88.frame.p2p.A-G.driver
+  what: A to G along the driver rail (tram)
+  kind: point_to_point
+  value_mm: 1587
+  original: {value: 1587, unit: mm}
+  points: "A (front-rail 15 mm hole) to G (16 mm hole), driver side."
+  src: FR88
+  pdf_page: 1
+  figure: "Fig 1, BOTTOM VIEW"
+  where: "top edge of the bottom view (DRIVER SIDE), A to G, labelled 1587"
+  years: "1988 as printed"
+  applies_to_1977: assumed
+  confidence: medium
+  why: "Rebuilt from the side-view length, heights and widths it comes out 1586.8 (check_dimensions.py)."
+
+- id: fr88.frame.p2p.A-G.passenger
+  what: A to G along the passenger rail (tram)
+  kind: point_to_point
+  value_mm: 1587
+  original: {value: 1587, unit: mm}
+  points: "A to G, passenger side."
+  src: FR88
+  pdf_page: 1
+  figure: "Fig 1, BOTTOM VIEW"
+  where: "bottom edge of the bottom view, A to G, labelled 1587"
+  years: "1988 as printed"
+  applies_to_1977: assumed
+  confidence: medium
+  why: "Equals the driver side: the front of the frame is square."
+
+- id: fr88.frame.p2p.G-J.driver
+  what: G to J along the driver rail (tram)
+  kind: point_to_point
+  value_mm: 1366
+  original: {value: 1366, unit: mm}
+  points: "G (16 mm hole) to J (18 x 33 oval), driver side."
+  src: FR88
+  pdf_page: 1
+  figure: "Fig 1, BOTTOM VIEW"
+  where: "top edge, G to J, labelled 1366"
+  years: "1988 as printed"
+  applies_to_1977: assumed
+  confidence: medium
+  why: "Rebuilt: 1365.8."
+
+- id: fr88.frame.p2p.G-J.passenger
+  what: G to J along the passenger rail (tram)
+  kind: point_to_point
+  value_mm: 1366
+  original: {value: 1366, unit: mm}
+  points: "G to J, passenger side."
+  src: FR88
+  pdf_page: 1
+  figure: "Fig 1, BOTTOM VIEW"
+  where: "bottom edge, G to J, labelled 1366"
+  years: "1988 as printed"
+  applies_to_1977: assumed
+  confidence: medium
+  why: "As driver."
+
+- id: fr88.frame.p2p.J-N.driver
+  what: J to N along the driver rail (tram)
+  kind: point_to_point
+  value_mm: 1411
+  original: {value: 1411, unit: mm}
+  points: "J (oval hole) to N (tow-package bolt tip), driver side."
+  src: FR88
+  pdf_page: 1
+  figure: "Fig 1, BOTTOM VIEW"
+  where: "top edge, J to N, labelled 1411"
+  years: "1988 as printed"
+  applies_to_1977: assumed
+  confidence: medium
+  why: "Rebuilt: 1411.4."
+
+- id: fr88.frame.p2p.J-N.passenger
+  what: J to N along the passenger rail (tram)
+  kind: point_to_point
+  value_mm: 1411
+  original: {value: 1411, unit: mm}
+  points: "J to N, passenger side."
+  src: FR88
+  pdf_page: 1
+  figure: "Fig 1, BOTTOM VIEW"
+  where: "bottom edge, J to N, labelled 1411"
+  years: "1988 as printed"
+  applies_to_1977: assumed
+  confidence: medium
+  why: "As driver."
+
+- id: fr88.frame.diag.A-G
+  what: Frame diagonal, A on one rail to G on the other (both diagonals print the same)
+  kind: diagonal
+  value_mm: 1769
+  original: {value: 1769, unit: mm}
+  points: "A (15 mm hole) to the opposite G (16 mm hole)."
+  src: FR88
+  pdf_page: 1
+  figure: "Fig 1, BOTTOM VIEW"
+  where: "the X between stations A and G, two labels 1769"
+  years: "1988 as printed"
+  applies_to_1977: assumed
+  confidence: medium
+  why: "Rebuilt: 1769.0."
+
+- id: fr88.frame.diag.G-J
+  what: Frame diagonal, G on one rail to J on the other
+  kind: diagonal
+  value_mm: 1624
+  original: {value: 1624, unit: mm}
+  points: "G to the opposite J."
+  src: FR88
+  pdf_page: 1
+  figure: "Fig 1, BOTTOM VIEW"
+  where: "the X between stations G and J, two labels 1624"
+  years: "1988 as printed"
+  applies_to_1977: assumed
+  confidence: medium
+  why: "Rebuilt: 1623.6."
+
+- id: fr88.frame.diag.J-N
+  what: Frame diagonal, J on one rail to N on the other
+  kind: diagonal
+  value_mm: 1651
+  original: {value: 1651, unit: mm}
+  points: "J to the opposite N."
+  src: FR88
+  pdf_page: 1
+  figure: "Fig 1, BOTTOM VIEW"
+  where: "the X between stations J and N, two labels 1651"
+  years: "1988 as printed"
+  applies_to_1977: assumed
+  confidence: medium
+  why: "Rebuilt: 1650.9."
+
+# ---- fore-aft lengths from the control points (side view, parallel to the datum line)
+- id: fr88.frame.len.A-G
+  what: A to G, fore-aft
+  kind: length
+  value_mm: 1582
+  original: {value: 1582, unit: mm}
+  points: "A (front-rail hole) to G (control point)."
+  src: FR88
+  pdf_page: 1
+  figure: "Fig 1, SIDE VIEW"
+  where: "top row of side-view dimensions, A to G, labelled 1582"
+  years: "1988 as printed"
+  applies_to_1977: assumed
+  confidence: medium
+  why: "Printed for 1988."
+
+- id: fr88.frame.len.B-G
+  what: B to G, fore-aft
+  kind: length
+  value_mm: 1475
+  original: {value: 1475, unit: mm}
+  points: "B (front spring front hanger bolt) to G."
+  src: FR88
+  pdf_page: 1
+  figure: "Fig 1, SIDE VIEW"
+  where: "second row, B to G, labelled 1475"
+  years: "1988 as printed"
+  applies_to_1977: assumed
+  confidence: medium
+  why: "Printed for 1988."
+
+- id: fr88.frame.len.C-G
+  what: C to G, fore-aft
+  kind: length
+  value_mm: 1020
+  original: {value: 1020, unit: mm}
+  points: "C (D.S. crossmember rivet) to G."
+  src: FR88
+  pdf_page: 1
+  figure: "Fig 1, SIDE VIEW"
+  where: "third row, C to G, labelled 1020"
+  years: "1988 as printed"
+  applies_to_1977: assumed
+  confidence: medium
+  why: "Printed for 1988."
+
+- id: fr88.frame.len.D-G
+  what: D to G, fore-aft
+  kind: length
+  value_mm: 961
+  original: {value: 961, unit: mm}
+  points: "D (P.S. crossmember rivet) to G."
+  src: FR88
+  pdf_page: 1
+  figure: "Fig 1, SIDE VIEW"
+  where: "fourth row, D to G, labelled 961"
+  years: "1988 as printed"
+  applies_to_1977: assumed
+  confidence: medium
+  why: "Printed for 1988."
+
+- id: fr88.frame.len.E-G
+  what: E to G, fore-aft (engine-mount bolt to the control point)
+  kind: length
+  value_mm: 791
+  original: {value: 791, unit: mm}
+  points: "E (motor mount bolt tip) to G."
+  src: FR88
+  pdf_page: 1
+  figure: "Fig 1, SIDE VIEW"
+  where: "fifth row, E to G, labelled 791"
+  years: "1988 as printed"
+  applies_to_1977: assumed
+  confidence: medium
+  why: "Locates the frame-side engine-mount bolts fore-aft. K5_WIRING_STATE.md s.4 lists 'motor mount fore-aft offset from firewall' as unknown; this gives the frame half of that, not the firewall half."
+
+- id: fr88.frame.len.F-G
+  what: F to G, fore-aft
+  kind: length
+  value_mm: 286
+  original: {value: 286, unit: mm}
+  points: "F (front spring rear hanger bolt) to G."
+  src: FR88
+  pdf_page: 1
+  figure: "Fig 1, SIDE VIEW"
+  where: "short dimension just above the frame, F to G, labelled 286"
+  years: "1988 as printed"
+  applies_to_1977: assumed
+  confidence: medium
+  why: "Printed for 1988."
+
+- id: fr88.frame.len.G-H
+  what: G to H, fore-aft
+  kind: length
+  value_mm: 579
+  original: {value: 579, unit: mm}
+  points: "G to H (16 x 31 oval hole)."
+  src: FR88
+  pdf_page: 1
+  figure: "Fig 1, SIDE VIEW"
+  where: "third row right of G, G to H, labelled 579"
+  years: "1988 as printed"
+  applies_to_1977: assumed
+  confidence: medium
+  why: "Printed for 1988."
+
+- id: fr88.frame.len.G-I
+  what: G to I, fore-aft
+  kind: length
+  value_mm: 1148
+  original: {value: 1148, unit: mm}
+  points: "G to I (rear spring front hanger bolt head)."
+  src: FR88
+  pdf_page: 1
+  figure: "Fig 1, SIDE VIEW"
+  where: "second row right of G, G to I, labelled 1148"
+  years: "1988 as printed"
+  applies_to_1977: assumed
+  confidence: medium
+  why: "Printed for 1988."
+
+- id: fr88.frame.len.G-J
+  what: G to J, fore-aft (control point to control point)
+  kind: length
+  value_mm: 1364
+  original: {value: 1364, unit: mm}
+  points: "G to J."
+  src: FR88
+  pdf_page: 1
+  figure: "Fig 1, SIDE VIEW"
+  where: "top row right of G, G to J, labelled 1364"
+  years: "1988 as printed"
+  applies_to_1977: assumed
+  confidence: medium
+  why: "The bottom view prints 1366 for the same pair; the 2 mm is the height and width change between G and J."
+
+- id: fr88.frame.len.J-K
+  what: J to K, fore-aft
+  kind: length
+  value_mm: 382
+  original: {value: 382, unit: mm}
+  points: "J to K (17 x 33 oval hole)."
+  src: FR88
+  pdf_page: 1
+  figure: "Fig 1, SIDE VIEW"
+  where: "fourth row right of J, J to K, labelled 382"
+  years: "1988 as printed"
+  applies_to_1977: assumed
+  confidence: medium
+  why: "Printed for 1988."
+
+- id: fr88.frame.len.J-L
+  what: "J to L/L', fore-aft"
+  kind: length
+  value_mm: 810
+  original: {value: 810, unit: mm}
+  points: "J to L (D.S. exhaust-hanger rivet) and L' (P.S. 10 mm hole), same station."
+  src: FR88
+  pdf_page: 1
+  figure: "Fig 1, SIDE VIEW"
+  where: "third row right of J, J to L L', labelled 810"
+  years: "1988 as printed"
+  applies_to_1977: assumed
+  confidence: medium
+  why: "Printed for 1988."
+
+- id: fr88.frame.len.J-M
+  what: J to M, fore-aft
+  kind: length
+  value_mm: 1093
+  original: {value: 1093, unit: mm}
+  points: "J to M (rear spring rear hanger bolt head)."
+  src: FR88
+  pdf_page: 1
+  figure: "Fig 1, SIDE VIEW"
+  where: "second row right of J, J to M, labelled 1093"
+  years: "1988 as printed"
+  applies_to_1977: assumed
+  confidence: medium
+  why: "Printed for 1988."
+
+- id: fr88.frame.len.J-N
+  what: J to N, fore-aft
+  kind: length
+  value_mm: 1411
+  original: {value: 1411, unit: mm}
+  points: "J to N (tow-package bolt)."
+  src: FR88
+  pdf_page: 1
+  figure: "Fig 1, SIDE VIEW"
+  where: "top row right of J, J to N, labelled 1411"
+  years: "1988 as printed"
+  applies_to_1977: assumed
+  confidence: medium
+  why: "Printed for 1988."
+
+# ---- heights above the datum line (side view)
+- id: fr88.frame.height.A
+  what: Height of A above the datum line
+  kind: height
+  value_mm: 461
+  original: {value: 461, unit: mm}
+  points: "A (15 mm front-rail hole) to the datum line."
+  src: FR88
+  pdf_page: 1
+  figure: "Fig 1, SIDE VIEW"
+  where: "under the frame at station A, labelled 461"
+  years: "1988 as printed"
+  applies_to_1977: assumed
+  confidence: medium
+  why: "The datum line is Mitchell's reference below the frame, set by the control points G and J; it is not the ground."
+
+- id: fr88.frame.height.B
+  what: Height of B above the datum line
+  kind: height
+  value_mm: 332
+  original: {value: 332, unit: mm}
+  points: "B (front spring front hanger bolt tip)."
+  src: FR88
+  pdf_page: 1
+  figure: "Fig 1, SIDE VIEW"
+  where: "station B, labelled 332"
+  years: "1988 as printed"
+  applies_to_1977: assumed
+  confidence: medium
+  why: "Printed for 1988."
+
+- id: fr88.frame.height.C
+  what: Height of C above the datum line
+  kind: height
+  value_mm: 463
+  original: {value: 463, unit: mm}
+  points: "C (D.S. crossmember rivet tip)."
+  src: FR88
+  pdf_page: 1
+  figure: "Fig 1, SIDE VIEW"
+  where: "station C, labelled 463"
+  years: "1988 as printed"
+  applies_to_1977: assumed
+  confidence: medium
+  why: "Printed for 1988. (The older K5_dimensions_atoms.yaml filed these heights as distances from centreline.)"
+
+- id: fr88.frame.height.D
+  what: Height of D above the datum line
+  kind: height
+  value_mm: 464
+  original: {value: 464, unit: mm}
+  points: "D (P.S. crossmember rivet tip)."
+  src: FR88
+  pdf_page: 1
+  figure: "Fig 1, SIDE VIEW"
+  where: "station D, labelled 464"
+  years: "1988 as printed"
+  applies_to_1977: assumed
+  confidence: medium
+  why: "Printed for 1988."
+
+- id: fr88.frame.height.E
+  what: Height of E above the datum line (engine-mount bolt)
+  kind: height
+  value_mm: 448
+  original: {value: 448, unit: mm}
+  points: "E (motor mount bolt tip)."
+  src: FR88
+  pdf_page: 1
+  figure: "Fig 1, SIDE VIEW"
+  where: "station E, labelled 448"
+  years: "1988 as printed"
+  applies_to_1977: assumed
+  confidence: medium
+  why: "Printed for 1988."
+
+- id: fr88.frame.height.F
+  what: Height of F above the datum line
+  kind: height
+  value_mm: 366
+  original: {value: 366, unit: mm}
+  points: "F (front spring rear hanger bolt tip)."
+  src: FR88
+  pdf_page: 1
+  figure: "Fig 1, SIDE VIEW"
+  where: "station F, labelled 366"
+  years: "1988 as printed"
+  applies_to_1977: assumed
+  confidence: medium
+  why: "Printed for 1988."
+
+- id: fr88.frame.height.G
+  what: Height of G above the datum line (control point)
+  kind: height
+  value_mm: 367
+  original: {value: 367, unit: mm}
+  points: "G (16 mm hole)."
+  src: FR88
+  pdf_page: 1
+  figure: "Fig 1, SIDE VIEW"
+  where: "station G (triangle below the letter), labelled 367"
+  years: "1988 as printed"
+  applies_to_1977: assumed
+  confidence: medium
+  why: "Printed for 1988."
+
+- id: fr88.frame.height.H
+  what: Height of H above the datum line
+  kind: height
+  value_mm: 337
+  original: {value: 337, unit: mm}
+  points: "H (16 x 31 oval hole)."
+  src: FR88
+  pdf_page: 1
+  figure: "Fig 1, SIDE VIEW"
+  where: "station H, labelled 337"
+  years: "1988 as printed"
+  applies_to_1977: assumed
+  confidence: medium
+  why: "Printed for 1988."
+
+- id: fr88.frame.height.I
+  what: Height of I above the datum line
+  kind: height
+  value_mm: 305
+  original: {value: 305, unit: mm}
+  points: "I (rear spring front hanger bolt head)."
+  src: FR88
+  pdf_page: 1
+  figure: "Fig 1, SIDE VIEW"
+  where: "station I, labelled 305"
+  years: "1988 as printed"
+  applies_to_1977: assumed
+  confidence: medium
+  why: "Printed for 1988."
+
+- id: fr88.frame.height.J
+  what: Height of J above the datum line (control point)
+  kind: height
+  value_mm: 436
+  original: {value: 436, unit: mm}
+  points: "J (18 x 33 oval hole)."
+  src: FR88
+  pdf_page: 1
+  figure: "Fig 1, SIDE VIEW"
+  where: "station J (triangle below the letter), labelled 436"
+  years: "1988 as printed"
+  applies_to_1977: assumed
+  confidence: medium
+  why: "Printed for 1988."
+
+- id: fr88.frame.height.K
+  what: Height of K above the datum line (top of the rear kick-up)
+  kind: height
+  value_mm: 575
+  original: {value: 575, unit: mm}
+  points: "K (17 x 33 oval hole)."
+  src: FR88
+  pdf_page: 1
+  figure: "Fig 1, SIDE VIEW"
+  where: "station K, labelled 575"
+  years: "1988 as printed"
+  applies_to_1977: assumed
+  confidence: medium
+  why: "Printed for 1988."
+
+- id: fr88.frame.height.L
+  what: "Height of L/L' above the datum line"
+  kind: height
+  value_mm: 489
+  original: {value: 489, unit: mm}
+  points: "L (D.S. exhaust-hanger rivet) and L' (P.S. 10 mm hole)."
+  src: FR88
+  pdf_page: 1
+  figure: "Fig 1, SIDE VIEW"
+  where: "station L L', labelled 489"
+  years: "1988 as printed"
+  applies_to_1977: assumed
+  confidence: medium
+  why: "Printed for 1988."
+
+- id: fr88.frame.height.M
+  what: Height of M above the datum line
+  kind: height
+  value_mm: 367
+  original: {value: 367, unit: mm}
+  points: "M (rear spring rear hanger bolt head)."
+  src: FR88
+  pdf_page: 1
+  figure: "Fig 1, SIDE VIEW"
+  where: "station M, labelled 367"
+  years: "1988 as printed"
+  applies_to_1977: assumed
+  confidence: medium
+  why: "Printed for 1988."
+
+- id: fr88.frame.height.N-bolt
+  what: Height of N above the datum line, to the bolt
+  kind: height
+  value_mm: 433
+  original: {value: 433, unit: mm}
+  points: "N, tow-package rear mount, measured to the bolt ('blt')."
+  src: FR88
+  pdf_page: 1
+  figure: "Fig 1, SIDE VIEW"
+  where: "station N, upper of the two labels, 433 blt"
+  years: "1988 as printed"
+  applies_to_1977: assumed
+  confidence: medium
+  why: "Printed for 1988."
+
+- id: fr88.frame.height.N-frame
+  what: Height of the frame at N above the datum line
+  kind: height
+  value_mm: 464
+  original: {value: 464, unit: mm}
+  points: "N station, measured to the frame ('frm')."
+  src: FR88
+  pdf_page: 1
+  figure: "Fig 1, SIDE VIEW"
+  where: "station N, lower of the two labels, 464 frm"
+  years: "1988 as printed"
+  applies_to_1977: assumed
+  confidence: medium
+  why: "Printed for 1988."
+
+# =====================================================================================================
+# GM 1975-81 LIGHT TRUCK SERVICE MANUALS -- FRAME REFERENCE DIMENSIONS, ROW KA105 (the K10 Blazer)
+# Table: Fig. 2A-3 C-K-P Series Frame Reference Dimensions (1977 PDF p.110, printed 2A-4). Points: Fig. 2A-2
+# C-K-P Series Truck Frame (1977 PDF p.109, printed 2A-3). Model code: K = 4x4, 1 = 10 series, 05 = "Blazer,
+# Jimmy" (1977 manual PDF p.6, Truck Model Identification). The KA105 row is character-for-character the same
+# in the 1975, 1976, 1977, 1978, 1979, 1980 and 1981 manuals (also_in; check_dimensions.py reads each page).
+# Figure notes, as printed: "DIMENSIONS TO HOLES OR SLOTS ARE MEASURED TO THE CENTER OF HOLE OR SLOT. GAUGE
+# HOLES ARE 5/8" DIAMETER. (+) INDICATES THAT THE DIMENSION IS TO THE UNDERSIDE OF THE FRAME TOP SURFACE OR
+# INSIDE OF THE FRAME OUTER SURFACE. NOTE: FRAME ILLUSTRATED IS TYPICAL. FRAME DESIGN VARIES ACCORDING TO
+# TRUCK MODEL." The drawing is a 2WD C frame, so where each lettered point falls on the K5 frame is read by
+# analogy; the heights are to GM's datum line, which is not Mitchell's.
+# Columns H and I are blank for KA105 (the Blazer frame has no such points).
+# =====================================================================================================
+
+- id: gm77.frame.KA105.A
+  what: "K5 frame, point A height above GM's datum line (front gauge hole)"
+  kind: height
+  value_mm: 339.7
+  original: {value: "13-3/8", unit: in}
+  points: "A: the gauge hole at the front of the frame horn, to the datum line."
+  src: GM77
+  pdf_page: 110
+  printed_page: 2A-4
+  row: KA105
+  figure: "Fig. 2A-3 table, column A; point on Fig. 2A-2 (PDF p.109)"
+  also_in: [{src: GM75, pdf_page: 37}, {src: GM76, pdf_page: 41}, {src: GM78, pdf_page: 104}, {src: GM79, pdf_page: 110}, {src: GM80, pdf_page: 107}, {src: GM81, pdf_page: 114}]
+  years: "1975-1981 (same row in seven manuals)"
+  applies_to_1977: "yes"
+  confidence: medium
+  why: "GM prints it for the K10 Blazer; the point is placed from a typical (2WD) drawing."
+
+- id: gm77.frame.KA105.B
+  what: "K5 frame, point B height above GM's datum line (underside of frame top)"
+  kind: height
+  value_mm: 387.35
+  original: {value: "15-1/4", unit: in}
+  points: "B (+): underside of the frame top surface at the second station from the front."
+  src: GM77
+  pdf_page: 110
+  printed_page: 2A-4
+  row: KA105
+  figure: "Fig. 2A-3 column B; Fig. 2A-2"
+  also_in: [{src: GM75, pdf_page: 37}, {src: GM76, pdf_page: 41}, {src: GM78, pdf_page: 104}, {src: GM79, pdf_page: 110}, {src: GM80, pdf_page: 107}, {src: GM81, pdf_page: 114}]
+  years: "1975-1981"
+  applies_to_1977: "yes"
+  confidence: medium
+  why: "As A."
+
+- id: gm77.frame.KA105.C
+  what: "K5 frame, point C height above GM's datum line (gauge hole)"
+  kind: height
+  value_mm: 431.8
+  original: {value: "17", unit: in}
+  points: "C: gauge hole on the front section where the rail rises."
+  src: GM77
+  pdf_page: 110
+  printed_page: 2A-4
+  row: KA105
+  figure: "Fig. 2A-3 column C; Fig. 2A-2"
+  also_in: [{src: GM75, pdf_page: 37}, {src: GM76, pdf_page: 41}, {src: GM78, pdf_page: 104}, {src: GM79, pdf_page: 110}, {src: GM80, pdf_page: 107}, {src: GM81, pdf_page: 114}]
+  years: "1975-1981"
+  applies_to_1977: "yes"
+  confidence: medium
+  why: "As A."
+
+- id: gm77.frame.KA105.D
+  what: "K5 frame, point D height above GM's datum line (underside of frame top, high point of the front section)"
+  kind: height
+  value_mm: 504.8
+  original: {value: "19-7/8", unit: in}
+  points: "D (+): underside of the frame top surface at the high point of the front section."
+  src: GM77
+  pdf_page: 110
+  printed_page: 2A-4
+  row: KA105
+  figure: "Fig. 2A-3 column D; Fig. 2A-2"
+  also_in: [{src: GM75, pdf_page: 37}, {src: GM76, pdf_page: 41}, {src: GM78, pdf_page: 104}, {src: GM79, pdf_page: 110}, {src: GM80, pdf_page: 107}, {src: GM81, pdf_page: 114}]
+  years: "1975-1981"
+  applies_to_1977: "yes"
+  confidence: medium
+  why: "As A."
+
+- id: gm77.frame.KA105.E
+  what: "K5 frame, point E height above GM's datum line (gauge hole where the level mid-section starts)"
+  kind: height
+  value_mm: 317.5
+  original: {value: "12-1/2", unit: in}
+  points: "E: gauge hole at the start of the level mid-section behind the front section; P ends and R and S start here."
+  src: GM77
+  pdf_page: 110
+  printed_page: 2A-4
+  row: KA105
+  figure: "Fig. 2A-3 column E; Fig. 2A-2"
+  also_in: [{src: GM75, pdf_page: 37}, {src: GM76, pdf_page: 41}, {src: GM78, pdf_page: 104}, {src: GM79, pdf_page: 110}, {src: GM80, pdf_page: 107}, {src: GM81, pdf_page: 114}]
+  years: "1975-1981"
+  applies_to_1977: "yes"
+  confidence: medium
+  why: "As A. CA105 (the 2WD Blazer) prints 12 here; the 4x4 is half an inch higher."
+
+- id: gm77.frame.KA105.F
+  what: "K5 frame, point F height above GM's datum line (underside of frame top)"
+  kind: height
+  value_mm: 330.2
+  original: {value: "13", unit: in}
+  points: "F (+): underside of the frame top surface just behind E."
+  src: GM77
+  pdf_page: 110
+  printed_page: 2A-4
+  row: KA105
+  figure: "Fig. 2A-3 column F; Fig. 2A-2"
+  also_in: [{src: GM75, pdf_page: 37}, {src: GM76, pdf_page: 41}, {src: GM78, pdf_page: 104}, {src: GM79, pdf_page: 110}, {src: GM80, pdf_page: 107}, {src: GM81, pdf_page: 114}]
+  years: "1975-1981"
+  applies_to_1977: "yes"
+  confidence: medium
+  why: "As A."
+
+- id: gm77.frame.KA105.G
+  what: "K5 frame, point G height above GM's datum line (gauge hole)"
+  kind: height
+  value_mm: 254.0
+  original: {value: "10", unit: in}
+  points: "G: gauge hole just behind F on the level mid-section."
+  src: GM77
+  pdf_page: 110
+  printed_page: 2A-4
+  row: KA105
+  figure: "Fig. 2A-3 column G; Fig. 2A-2"
+  also_in: [{src: GM75, pdf_page: 37}, {src: GM76, pdf_page: 41}, {src: GM78, pdf_page: 104}, {src: GM79, pdf_page: 110}, {src: GM80, pdf_page: 107}, {src: GM81, pdf_page: 114}]
+  years: "1975-1981"
+  applies_to_1977: "yes"
+  confidence: medium
+  why: "As A."
+
+- id: gm77.frame.KA105.J
+  what: "K5 frame, point J height above GM's datum line (gauge hole at the top of the rear kick-up)"
+  kind: height
+  value_mm: 361.95
+  original: {value: "14-1/4", unit: in}
+  points: "J: gauge hole where the rear kick-up levels out; R ends here."
+  src: GM77
+  pdf_page: 110
+  printed_page: 2A-4
+  row: KA105
+  figure: "Fig. 2A-3 column J; Fig. 2A-2"
+  also_in: [{src: GM75, pdf_page: 37}, {src: GM76, pdf_page: 41}, {src: GM78, pdf_page: 104}, {src: GM79, pdf_page: 110}, {src: GM80, pdf_page: 107}, {src: GM81, pdf_page: 114}]
+  years: "1975-1981"
+  applies_to_1977: "yes"
+  confidence: medium
+  why: "As A. Fore-aft it lands within about 10 mm of Mitchell's J (A+P+R = 2937 mm from A vs Mitchell A to J 2946), so it is probably the same oval hole."
+
+- id: gm77.frame.KA105.K
+  what: "K5 frame, point K height above GM's datum line (underside of frame top, over the rear axle)"
+  kind: height
+  value_mm: 508.0
+  original: {value: "20", unit: in}
+  points: "K (+): underside of the frame top surface behind J."
+  src: GM77
+  pdf_page: 110
+  printed_page: 2A-4
+  row: KA105
+  figure: "Fig. 2A-3 column K; Fig. 2A-2"
+  also_in: [{src: GM75, pdf_page: 37}, {src: GM76, pdf_page: 41}, {src: GM78, pdf_page: 104}, {src: GM79, pdf_page: 110}, {src: GM80, pdf_page: 107}, {src: GM81, pdf_page: 114}]
+  years: "1975-1981"
+  applies_to_1977: "yes"
+  confidence: medium
+  why: "As A."
+
+- id: gm77.frame.KA105.L
+  what: "K5 frame, point L height above GM's datum line (gauge hole)"
+  kind: height
+  value_mm: 450.85
+  original: {value: "17-3/4", unit: in, printed: "17 3/4"}
+  points: "L: gauge hole on the rear section."
+  src: GM77
+  pdf_page: 110
+  printed_page: 2A-4
+  row: KA105
+  figure: "Fig. 2A-3 column L; Fig. 2A-2"
+  also_in: [{src: GM75, pdf_page: 37}, {src: GM76, pdf_page: 41}, {src: GM78, pdf_page: 104}, {src: GM79, pdf_page: 110}, {src: GM80, pdf_page: 107}, {src: GM81, pdf_page: 114}]
+  years: "1975-1981"
+  applies_to_1977: "yes"
+  confidence: medium
+  why: "As A."
+
+- id: gm77.frame.KA105.M
+  what: "K5 frame, point M height above GM's datum line (gauge hole near the rear spring rear hanger)"
+  kind: height
+  value_mm: 396.9
+  original: {value: "15-5/8", unit: in}
+  points: "M: gauge hole near the rear spring rear hanger; S ends here."
+  src: GM77
+  pdf_page: 110
+  printed_page: 2A-4
+  row: KA105
+  figure: "Fig. 2A-3 column M; Fig. 2A-2"
+  also_in: [{src: GM75, pdf_page: 37}, {src: GM76, pdf_page: 41}, {src: GM78, pdf_page: 104}, {src: GM79, pdf_page: 110}, {src: GM80, pdf_page: 107}, {src: GM81, pdf_page: 114}]
+  years: "1975-1981"
+  applies_to_1977: "yes"
+  confidence: medium
+  why: "As A."
+
+- id: gm77.frame.KA105.N
+  what: "K5 frame, point N height above GM's datum line (underside of frame top at the rear end)"
+  kind: height
+  value_mm: 450.85
+  original: {value: "17-3/4", unit: in, printed: "17 3/4"}
+  points: "N (+): underside of the frame top surface at the rear end."
+  src: GM77
+  pdf_page: 110
+  printed_page: 2A-4
+  row: KA105
+  figure: "Fig. 2A-3 column N; Fig. 2A-2"
+  also_in: [{src: GM75, pdf_page: 37}, {src: GM76, pdf_page: 41}, {src: GM78, pdf_page: 104}, {src: GM79, pdf_page: 110}, {src: GM80, pdf_page: 107}, {src: GM81, pdf_page: 114}]
+  years: "1975-1981"
+  applies_to_1977: "yes"
+  confidence: medium
+  why: "As A."
+
+- id: gm77.frame.KA105.P
+  what: "K5 frame, A to E fore-aft (front gauge hole to the mid-section gauge hole)"
+  kind: length
+  value_mm: 1768.5
+  original: {value: "69-5/8", unit: in}
+  points: "P: horizontal, parallel to the datum, from A to E."
+  src: GM77
+  pdf_page: 110
+  printed_page: 2A-4
+  row: KA105
+  figure: "Fig. 2A-3 column P; Fig. 2A-2"
+  also_in: [{src: GM75, pdf_page: 37}, {src: GM76, pdf_page: 41}, {src: GM78, pdf_page: 104}, {src: GM79, pdf_page: 110}, {src: GM80, pdf_page: 107}, {src: GM81, pdf_page: 114}]
+  years: "1975-1981"
+  applies_to_1977: "yes"
+  confidence: high
+  why: "GM for the K10 Blazer, between two named gauge holes; only E's exact station is read by analogy."
+
+- id: gm77.frame.KA105.R
+  what: "K5 frame, E to J fore-aft"
+  kind: length
+  value_mm: 1168.4
+  original: {value: "46", unit: in}
+  points: "R: horizontal from E to J."
+  src: GM77
+  pdf_page: 110
+  printed_page: 2A-4
+  row: KA105
+  figure: "Fig. 2A-3 column R; Fig. 2A-2"
+  also_in: [{src: GM75, pdf_page: 37}, {src: GM76, pdf_page: 41}, {src: GM78, pdf_page: 104}, {src: GM79, pdf_page: 110}, {src: GM80, pdf_page: 107}, {src: GM81, pdf_page: 114}]
+  years: "1975-1981"
+  applies_to_1977: "yes"
+  confidence: high
+  why: "As P."
+
+- id: gm77.frame.KA105.S
+  what: "K5 frame, E to M fore-aft"
+  kind: length
+  value_mm: 2235.2
+  original: {value: "88", unit: in}
+  points: "S: horizontal from E to M."
+  src: GM77
+  pdf_page: 110
+  printed_page: 2A-4
+  row: KA105
+  figure: "Fig. 2A-3 column S; Fig. 2A-2"
+  also_in: [{src: GM75, pdf_page: 37}, {src: GM76, pdf_page: 41}, {src: GM78, pdf_page: 104}, {src: GM79, pdf_page: 110}, {src: GM80, pdf_page: 107}, {src: GM81, pdf_page: 114}]
+  years: "1975-1981"
+  applies_to_1977: "yes"
+  confidence: high
+  why: "As P."
+
+- id: gm77.frame.KA105.T
+  what: "K5 frame, centreline to the inside of the rail, rear"
+  kind: to_centerline
+  value_mm: 428.6
+  original: {value: "16-7/8", unit: in}
+  points: "T (+): frame centreline to the inside of the frame outer surface (the web), at the rear."
+  src: GM77
+  pdf_page: 110
+  printed_page: 2A-4
+  row: KA105
+  figure: "Fig. 2A-3 column T; Fig. 2A-2 top view"
+  also_in: [{src: GM75, pdf_page: 37}, {src: GM76, pdf_page: 41}, {src: GM78, pdf_page: 104}, {src: GM79, pdf_page: 110}, {src: GM80, pdf_page: 107}, {src: GM81, pdf_page: 114}]
+  years: "1975-1981"
+  applies_to_1977: "yes"
+  confidence: high
+  why: "Twice this is 33-3/4 in (857.25 mm) web to web; the 1987 manual prints 33.75 in for the rear points 11-12. Mitchell K-K (hole centres in the web) is 862."
+
+- id: gm77.frame.KA105.U
+  what: "K5 frame, centreline to the inside of the rail, mid-frame"
+  kind: to_centerline
+  value_mm: 428.6
+  original: {value: "16-7/8", unit: in}
+  points: "U (+): frame centreline to the inside of the frame outer surface, mid-frame."
+  src: GM77
+  pdf_page: 110
+  printed_page: 2A-4
+  row: KA105
+  figure: "Fig. 2A-3 column U; Fig. 2A-2 top view"
+  also_in: [{src: GM75, pdf_page: 37}, {src: GM76, pdf_page: 41}, {src: GM78, pdf_page: 104}, {src: GM79, pdf_page: 110}, {src: GM80, pdf_page: 107}, {src: GM81, pdf_page: 114}]
+  years: "1975-1981"
+  applies_to_1977: "yes"
+  confidence: high
+  why: "As T."
+
+- id: gm77.frame.KA105.V
+  what: "K5 frame, centreline to the inside of the rail, front"
+  kind: to_centerline
+  value_mm: 355.6
+  original: {value: "14", unit: in}
+  points: "V (+): frame centreline to the inside of the frame outer surface, at the front."
+  src: GM77
+  pdf_page: 110
+  printed_page: 2A-4
+  row: KA105
+  figure: "Fig. 2A-3 column V; Fig. 2A-2 top view"
+  also_in: [{src: GM75, pdf_page: 37}, {src: GM76, pdf_page: 41}, {src: GM78, pdf_page: 104}, {src: GM79, pdf_page: 110}, {src: GM80, pdf_page: 107}, {src: GM81, pdf_page: 114}]
+  years: "1975-1981"
+  applies_to_1977: "yes"
+  confidence: high
+  why: "Twice this is 28 in (711.2 mm). The 1987 manual prints 27.75 in (704.85 mm) inside the webs at the front points 1-2; Mitchell A-A is 706. The 6 mm spread is the between-source margin at the front rails."
+
+# =====================================================================================================
+# GM 1973-74 LIGHT TRUCK SERVICE MANUALS -- FIG 3 KA FRAME, ROW KA105 (1973 PDF p.172, printed 2-4;
+# the 1974 manual PDF p.176 prints the same row). The 1973-74 figure is a 4x4 (K) frame but it names no
+# points and has no legend: heights A-L are drawn at stations along the rail, M/N/O are fore-aft, P/Q/R/S are
+# centreline to rail. The 1975 supplement replaced this point set ("configuration and alignment reference
+# dimension changes"; frames "essentially carryover"), so these are the same frame measured at other points.
+# Only the fore-aft and width columns are kept; the 1973-74 heights (A-L) are to unnamed frame surfaces.
+# =====================================================================================================
+
+- id: gm73.frame.KA105.M
+  what: "K5 frame (1973-74 point set), A to E fore-aft"
+  kind: length
+  value_mm: 1092.2
+  original: {value: "43", unit: in}
+  points: "M: from the front-horn gauge hole A to station E at the bottom of the front kick-down."
+  src: GM73
+  pdf_page: 172
+  printed_page: 2-4
+  row: KA105
+  figure: "Fig 3 KA Frame and its table, column M"
+  also_in: [{src: GM74, pdf_page: 176}]
+  years: "1973-1974"
+  applies_to_1977: assumed
+  confidence: low
+  why: "GM for the K10 Blazer, but an earlier point set with no legend; the 1975 supplement says frames carried over."
+
+- id: gm73.frame.KA105.N
+  what: "K5 frame (1973-74 point set), E to H fore-aft"
+  kind: length
+  value_mm: 2057.4
+  original: {value: "81", unit: in}
+  points: "N: from station E to the gauge hole H at the top of the rear kick-up."
+  src: GM73
+  pdf_page: 172
+  printed_page: 2-4
+  row: KA105
+  figure: "Fig 3 KA Frame, column N"
+  also_in: [{src: GM74, pdf_page: 176}]
+  years: "1973-1974"
+  applies_to_1977: assumed
+  confidence: low
+  why: "As M."
+
+- id: gm73.frame.KA105.O
+  what: "K5 frame (1973-74 point set), E to K fore-aft"
+  kind: length
+  value_mm: 2965.45
+  original: {value: "116-3/4", unit: in}
+  points: "O: from station E to point K above the rear spring rear hanger."
+  src: GM73
+  pdf_page: 172
+  printed_page: 2-4
+  row: KA105
+  figure: "Fig 3 KA Frame, column O"
+  also_in: [{src: GM74, pdf_page: 176}]
+  years: "1973-1974"
+  applies_to_1977: assumed
+  confidence: low
+  why: "As M. A to K = M + O = 159-3/4 in (4058 mm); Mitchell A to M (rear spring rear hanger bolt) is 4039."
+
+- id: gm73.frame.KA105.P
+  what: "K5 frame (1973-74 point set), centreline to rail, front"
+  kind: to_centerline
+  value_mm: 355.6
+  original: {value: "14", unit: in}
+  points: "P: frame centreline to the rail at the front (top view)."
+  src: GM73
+  pdf_page: 172
+  printed_page: 2-4
+  row: KA105
+  figure: "Fig 3 KA Frame top view, column P"
+  also_in: [{src: GM74, pdf_page: 176}]
+  years: "1973-1974"
+  applies_to_1977: assumed
+  confidence: medium
+  why: "Same 14 in as the 1975-81 V column, so the front rail spacing did not change 1973-81."
+
+- id: gm73.frame.KA105.S
+  what: "K5 frame (1973-74 point set), centreline to rail, rear"
+  kind: to_centerline
+  value_mm: 428.6
+  original: {value: "16-7/8", unit: in}
+  points: "S: frame centreline to the rail at the rear (top view)."
+  src: GM73
+  pdf_page: 172
+  printed_page: 2-4
+  row: KA105
+  figure: "Fig 3 KA Frame top view, column S"
+  also_in: [{src: GM74, pdf_page: 176}]
+  years: "1973-1974"
+  applies_to_1977: assumed
+  confidence: medium
+  why: "Same 16-7/8 in as the 1975-81 T column. Q and R (mid-frame) also print 16-7/8 for KA105."
+
+# =====================================================================================================
+# GM 1987 LIGHT DUTY TRUCK SERVICE MANUAL -- SECTION 2A, R/V FRAMES (PDF p.147 figure, p.148 text)
+# Points 1-12 on Figure 1 (R/V and P Model Frames); 1, 2, 11, 12 are the rail ends, transferred to the floor
+# "from the inside of the web". R/V = the 1987-91 square-body C/K; V10 = the K5.
+# =====================================================================================================
+
+- id: gm87.frame.width.points-1-2
+  what: Frame width inside the webs at the front rail ends (points 1 and 2), standard front axle
+  kind: width
+  value_mm: 704.85
+  original: {value: 27.75, unit: in, printed: "704.85"}
+  points: "Points 1 and 2 (front ends of the rails, Figure 1), measured from the inside of the web."
+  src: GM87
+  pdf_page: 148
+  printed_page: 2A-5
+  figure: "text 'Determining the frame centerline' step 4; points on Figure 1 (PDF p.147)"
+  years: "1987 (R/V frames; the V10 is the 1987 K5)"
+  applies_to_1977: assumed
+  confidence: medium
+  why: "Prints 704.85 mm (27.75-inch). GM 1975-81 V gives 28 in at the front; Mitchell A-A 706."
+
+- id: gm87.frame.width.points-11-12
+  what: Frame width inside the webs at the rear rail ends (points 11 and 12)
+  kind: width
+  value_mm: 857.25
+  original: {value: 33.75, unit: in, printed: "33.75"}
+  points: "Points 11 and 12 (rear ends of the rails, Figure 1), measured from the inside of the web."
+  src: GM87
+  pdf_page: 148
+  printed_page: 2A-5
+  figure: "text step 5; points on Figure 1 (PDF p.147)"
+  years: "1987 (R/V frames)"
+  applies_to_1977: assumed
+  confidence: medium
+  why: "The page prints '847.25 mm (33.75-inch)'. 33.75 in is 857.25 mm, so the metric figure is a typo; the inch value matches GM 1975-81 T (16-7/8 in each side)."
+
+# =====================================================================================================
+# KLM 1984 BLAZER 4WD, CHART CHT-1 -- UNDERHOOD VIEW (the same trapezoid as Mitchell's engine compartment)
+# FRONT is on the left of the view. Front pair of black dots on the ends of the radiator-support crossbar;
+# rear pair on the cowl ends. KLM names no points. Values print in inches with KLM's own mm in brackets.
+# KLM's bottom-view and side-view frame numbers are not entered: their points are unnamed and several are
+# ambiguous (e.g. two unequal front diagonals, 31-1/8 and 33-5/16 in); Mitchell and GM cover the frame.
+# =====================================================================================================
+
+- id: klm84.body.underhood.front-width
+  what: Engine compartment, front pair of measuring points, left to right (KLM)
+  kind: width
+  value_mm: 1524.0
+  original: {value: "60", unit: in, printed: "60'' (1524)"}
+  points: "Black dots at the two ends of the radiator-support crossbar (front of the UNDERHOOD VIEW). Unnamed."
+  src: KLM84
+  pdf_page: 1
+  figure: "CHT-1, UNDERHOOD VIEW (top left of the chart)"
+  where: "vertical dimension on the FRONT (left) side of the view: 60'' (1524)"
+  years: "1984 as printed (1981-91 front sheet metal)"
+  applies_to_1977: unverified
+  confidence: low
+  why: "1981+ radiator support; the 1977 has the 1973-80 part. Mitchell 1988 prints 1523 for the same pair."
+
+- id: klm84.body.underhood.rear-width
+  what: Engine compartment, rear pair of measuring points, left to right (KLM)
+  kind: width
+  value_mm: 1720.85
+  original: {value: "67-3/4", unit: in, printed: "67 3/4'' (1721)"}
+  points: "Black dots on the cowl ends (rear of the UNDERHOOD VIEW). Unnamed."
+  src: KLM84
+  pdf_page: 1
+  figure: "CHT-1, UNDERHOOD VIEW"
+  where: "vertical dimension on the rear (right) side of the view: 67-3/4'' (1721)"
+  years: "1984 as printed"
+  applies_to_1977: assumed
+  confidence: medium
+  why: "The cowl is shared 1973-91. Mitchell 1988 prints 1715: 6 mm between the two publishers."
+
+- id: klm84.body.underhood.length
+  what: Engine compartment, front points to rear points, fore-aft (KLM)
+  kind: length
+  value_mm: 1108.08
+  original: {value: "43-5/8", unit: in, printed: "43 5/8'' (1108)"}
+  points: "From the front pair's station to the rear pair's station, parallel to the centreline. Unnamed points."
+  src: KLM84
+  pdf_page: 1
+  figure: "CHT-1, UNDERHOOD VIEW"
+  where: "horizontal dimension under the view: 43-5/8'' (1108)"
+  years: "1984 as printed"
+  applies_to_1977: unverified
+  confidence: low
+  why: "Mitchell's 1102 side is point-to-point; its fore-aft part is about 1098, so the two publishers differ by about 10 mm here. The front points moved with the 1981 front end."
+
+- id: klm84.body.underhood.diag
+  what: Engine compartment diagonal (KLM; both diagonals print the same)
+  kind: diagonal
+  value_mm: 1962.15
+  original: {value: "77-1/4", unit: in, printed: "77 1/4'' (1962)"}
+  points: "Front dot one side to the rear dot the other side. Unnamed."
+  src: KLM84
+  pdf_page: 1
+  figure: "CHT-1, UNDERHOOD VIEW"
+  where: "the X inside the view, two labels 77-1/4'' (1962)"
+  years: "1984 as printed"
+  applies_to_1977: unverified
+  confidence: low
+  why: "Mitchell 1988 prints 1957."
+
+# ---- KLM bottom view: the two pairs of body-mount pads on the outriggers (drawn as a circled dot on a pad
+# bracket; KLM gives no legend in our copy, so "body mount" is read from the symbol). Pair A is the forward
+# pair, pair B the next one back. The block closes on itself to about 6 mm (check_dimensions.py). GM's
+# utility body has four mounts a side, mount 1 at the front of the cab and mount 2 at its rear (1981 manual
+# Fig. 2D-94 Body Mounting (Utility), PDF p.167, printed 2D-36; no dimensions there), so A and B read as
+# mounts 1 and 2.
+- id: klm84.frame.bodymount.A-B.driver
+  what: Body-mount pad A to pad B, fore-aft, driver side (KLM)
+  kind: length
+  value_mm: 1039.81
+  original: {value: "40-15/16", unit: in, printed: "40 15/16'' (1040)"}
+  points: "Circled-dot pad on the forward outrigger (A) to the circled-dot pad on the next outrigger back (B), driver side."
+  src: KLM84
+  pdf_page: 1
+  figure: "CHT-1, BOTTOM VIEW, top row of dimensions"
+  where: "above the driver rail, between the two outrigger pads: 40 15/16'' (1040)"
+  years: "1984 as printed; cab mounts shared 1973-87 C/K"
+  applies_to_1977: assumed
+  confidence: low
+  why: "Pad identity read from the symbol; the cab-mount positions did not change 1973-87 as far as any source we hold shows."
+
+- id: klm84.frame.bodymount.A.width
+  what: Body-mount pad A, left to right (KLM)
+  kind: width
+  value_mm: 1082.68
+  original: {value: "42-5/8", unit: in, printed: "42 5/8'' (1083)"}
+  points: "Forward pair of outrigger pads (A), driver to passenger."
+  src: KLM84
+  pdf_page: 1
+  figure: "CHT-1, BOTTOM VIEW"
+  where: "vertical dimension just behind pad A: 42 5/8'' (1083)"
+  years: "1984 as printed"
+  applies_to_1977: assumed
+  confidence: low
+  why: "As A-B."
+
+- id: klm84.frame.bodymount.B.width
+  what: Body-mount pad B, left to right (KLM)
+  kind: width
+  value_mm: 1039.81
+  original: {value: "40-15/16", unit: in, printed: "40 15/16'' (1040)"}
+  points: "Rear pair of outrigger pads (B), driver to passenger."
+  src: KLM84
+  pdf_page: 1
+  figure: "CHT-1, BOTTOM VIEW"
+  where: "vertical dimension at pad B, in the middle of the chart: 40 15/16'' (1040)"
+  years: "1984 as printed"
+  applies_to_1977: assumed
+  confidence: low
+  why: "As A-B."
+
+- id: klm84.frame.bodymount.diag-1
+  what: Body-mount diagonal, pad A passenger to pad B driver (KLM)
+  kind: diagonal
+  value_mm: 1479.55
+  original: {value: "58-1/4", unit: in, printed: "58 1/4'' (1480)"}
+  points: "Passenger pad A to driver pad B."
+  src: KLM84
+  pdf_page: 1
+  figure: "CHT-1, BOTTOM VIEW"
+  where: "the X between the pads, label 58 1/4'' (1480)"
+  years: "1984 as printed"
+  applies_to_1977: assumed
+  confidence: low
+  why: "The other diagonal prints 1489; a square rectangle of these widths and length gives 1486, so the two diagonals bracket it."
+
+- id: klm84.frame.bodymount.diag-2
+  what: Body-mount diagonal, pad A driver to pad B passenger (KLM)
+  kind: diagonal
+  value_mm: 1489.08
+  original: {value: "58-5/8", unit: in, printed: "58 5/8'' (1489)"}
+  points: "Driver pad A to passenger pad B."
+  src: KLM84
+  pdf_page: 1
+  figure: "CHT-1, BOTTOM VIEW"
+  where: "the X between the pads, label 58 5/8'' (1489)"
+  years: "1984 as printed"
+  applies_to_1977: assumed
+  confidence: low
+  why: "As diag-1."
+
+- id: klm84.frame.bodymount.B-rear-end.driver
+  what: Body-mount pad B to the rear end of the frame, driver side (KLM)
+  kind: length
+  value_mm: 1860.55
+  original: {value: "73-1/4", unit: in, printed: "73 1/4'' (1861)"}
+  points: "Driver pad B to the rear end of the driver rail."
+  src: KLM84
+  pdf_page: 1
+  figure: "CHT-1, BOTTOM VIEW, top row of dimensions"
+  where: "top right: 73 1/4'' (1861)"
+  years: "1984 as printed"
+  applies_to_1977: assumed
+  confidence: low
+  why: "Ties the cab mounts to the frame's rear end; the passenger side prints 73-1/2 (1867)."
+
+- id: klm84.frame.bodymount.B-rear-end.passenger
+  what: Body-mount pad B to the rear end of the frame, passenger side (KLM)
+  kind: length
+  value_mm: 1866.9
+  original: {value: "73-1/2", unit: in, printed: "73 1/2'' (1867)"}
+  points: "Passenger pad B to the rear end of the passenger rail."
+  src: KLM84
+  pdf_page: 1
+  figure: "CHT-1, BOTTOM VIEW, bottom row of dimensions"
+  where: "bottom right: 73 1/2'' (1867)"
+  years: "1984 as printed"
+  applies_to_1977: assumed
+  confidence: low
+  why: "6 mm longer than the driver side; the chart does not say why."
+
+- id: klm84.frame.rear-spring-hangers
+  what: Rear spring front hanger bolt to rear spring rear hanger bolt, fore-aft, driver side (KLM)
+  kind: length
+  value_mm: 1306.51
+  original: {value: "51-7/16", unit: in, printed: "51 7/16'' (1307)"}
+  points: "The two rear leaf-spring hanger bolts on the driver rail."
+  src: KLM84
+  pdf_page: 1
+  figure: "CHT-1, BOTTOM VIEW, top row of dimensions"
+  where: "between the rear spring hangers: 51 7/16'' (1307)"
+  years: "1984 as printed"
+  applies_to_1977: assumed
+  confidence: medium
+  why: "Mitchell's I to M (the same two bolts) is 1309 fore-aft (1148 to 2457 from G), so the two publishers agree to 2 mm here."
+
+# =====================================================================================================
+# GM BODY PROCEDURES THAT IMPLY A LOCATION (not printed as body dimensions)
+# =====================================================================================================
+
+- id: gm77.body.top.lower-holes-width
+  what: Removable top, lower attaching holes (top to body side), left to right
+  kind: width
+  value_mm: 1600.2
+  original: {value: "63", unit: in, printed: "63 inches"}
+  points: "The 'bottom rear top-to-pickup box attaching holes' and the 'front bottom top-to-pickup box attaching holes', left to right: the brace GM tells you to make bolts into one pair, then the other."
+  src: GM77
+  pdf_page: 155
+  printed_page: 2D-29
+  figure: "text, REMOVABLE TOP-FOLDING TOP (16 ONLY), Removal step 6a: 'Fabricate 2 braces 72\" long ... Drill two (2) 3/8\" diameter holes, 63 inches apart in the brace.'"
+  years: "1977 (model 16, the 1976+ half-cab Blazer)"
+  applies_to_1977: "yes"
+  confidence: low
+  why: "Implied by a fabrication step, not printed as a body dimension; the holes may be slotted. The top clamps 'against the steel cab' (Mandatory Assembly Sequence, same page)."
+
+- id: gm87.body.utility.top-strap-anchor.fore-aft
+  what: Utility (K5) rear-seat child-seat anchor hole, forward of the rear edge of the floor pan
+  kind: length
+  value_mm: 140
+  original: {value: 140, unit: mm, printed: "140 mm"}
+  points: "From the rear edge of the floor pan, forward, measured in the centre of a depressed floor-pan rib."
+  src: GM87
+  pdf_page: 1296
+  printed_page: 10A2-19
+  figure: "text, UTILITY VEHICLE REAR SEAT step 1 (Figure 28, PDF p.1297)"
+  years: "1987 (R/V utility = K5)"
+  applies_to_1977: assumed
+  confidence: medium
+  why: "Printed as '140 mm (5 1/2-inches)'. A hole GM tells you to drill, so it locates a spot on the rear floor, not a factory feature."
+
+- id: gm87.body.utility.top-strap-anchor.lateral
+  what: Utility (K5) rear-seat child-seat anchor hole, inboard of the right quarter inner panel
+  kind: length
+  value_mm: 1330
+  original: {value: 1330, unit: mm, printed: "1330 mm"}
+  points: "From the right quarter inner panel (the inner skin of the rear double wall), inboard."
+  src: GM87
+  pdf_page: 1296
+  printed_page: 10A2-19
+  figure: "text, UTILITY VEHICLE REAR SEAT step 1"
+  years: "1987 (R/V utility)"
+  applies_to_1977: assumed
+  confidence: medium
+  why: "Printed as '1330 mm (52.25-inches)' (52.25 in is 1327 mm; GM rounded). It says the rear floor runs at least 1330 mm from the right quarter inner panel."
+
+# =====================================================================================================
+# GM TX000469 -- 30-SERIES CAB-CHASSIS DRAWING (front end and cab only; low confidence for the K5)
+# =====================================================================================================
+
+- id: tx469.cab.bumper-to-back-of-cab
+  what: Front bumper face to the back of the cab (BBC), C/K 30-series cab-chassis
+  kind: length
+  value_mm: 2775.71
+  original: {value: 109.28, unit: in, printed: "109.28 BBC"}
+  points: "Front face of the front bumper to the back of the cab, horizontal."
+  src: TX469
+  pdf_page: 1
+  figure: "TX000469 sheet 2, side view"
+  where: "dimension line above the cab, labelled 109.28 BBC"
+  years: "mid-1980s CV/TV 30-series cab-chassis"
+  applies_to_1977: unverified
+  confidence: low
+  why: "A different series; the K5 has no back-of-cab wall. Kept because the front end and cab are the shared C/K parts; do not use it for the K5 without a tape check."
+
+- id: tx469.front.overhang
+  what: Front bumper face to the front-wheel centreline, C/K 30-series cab-chassis
+  kind: length
+  value_mm: 858.01
+  original: {value: 33.78, unit: in, printed: "33.78"}
+  points: "Front face of the front bumper to the centreline of the front wheels."
+  src: TX469
+  pdf_page: 1
+  figure: "TX000469 sheet 2, side view"
+  where: "bottom left, between the bumper extension line and 'CL FRONT WHEELS', labelled 33.78"
+  years: "mid-1980s CV/TV 30-series"
+  applies_to_1977: unverified
+  confidence: low
+  why: "The twin's bumper face (y -2.717) to its front axle (y -1.8955) is 821 mm. A 30-series front axle and bumper need not sit where a K10's do."
+
+# =====================================================================================================
+# 1977 BLAZER 4-VIEW ORTHOGRAPHIC (web copy) -- one interior dimension line
+# =====================================================================================================
+
+- id: ortho77.body.rear-cargo-width
+  what: Rear body, inside width across the cargo area at about belt height (as drawn)
+  kind: width
+  value_mm: 1645.92
+  original: {value: 64.8, unit: in, printed: "64.8"}
+  points: "Left inner body side to the right inner body side, on the dimension line drawn across the rear view just above the tailgate top. The drawing names no points and gives no units."
+  src: ORTHO77
+  pdf_page: 1
+  figure: "rear view (bottom right of the image)"
+  where: "the only number in the rear view, 64.8"
+  years: "1977 (as titled)"
+  applies_to_1977: "yes"
+  confidence: low
+  why: "Unlabelled number on a web copy; inches assumed from its size. It sits 11 mm inside Mitchell's 1657 tailgate-opening width, which fits a belt-height width between the rear double walls. Tape it (tape_list T-07)."
+
+# =====================================================================================================
+# ENGINE -- GM LS3 OUTLINE (marine sheet). The only LS3 outline in the documents we hold. It is the marine
+# package (its own accessory drive and exhaust manifolds), not this truck's Holley Mid-Mount, 300-129/131
+# intake and headers, so use it as the long-block scale only. The Holley numbers in the older
+# K5_dimensions_atoms.yaml (411/433/406/393/339 mm) are from the 20-131 bracket-kit guide
+# (holley_midmount_fitment.pdf p.2), not the Mid-Mount the truck has; the 20-185-family Mid-Mount guide we
+# hold has no outline figure. See the receipt.
+# =====================================================================================================
+
+- id: ls3m.engine.outline.length
+  what: LS3 marine engine, overall length in the side-view outline
+  kind: length
+  value_mm: 710
+  original: {value: 710, unit: mm, printed: "710"}
+  points: "Extreme ends of the side-view outline (flywheel end to the front of the front drive), as drawn."
+  src: LS3M
+  pdf_page: 3
+  figure: "side-view outline (left drawing), top dimension '710 (27.95)'"
+  years: "2009 marine LS3"
+  applies_to_1977: unverified
+  confidence: low
+  why: "GM's number for the marine package; the truck's front drive is a Holley Mid-Mount, so the front end of the length differs."
+
+- id: ls3m.engine.outline.height
+  what: LS3 marine engine, overall height in both outline views
+  kind: height
+  value_mm: 716
+  original: {value: 716, unit: mm, printed: "716"}
+  points: "Oil pan bottom to the top of the engine, as drawn (both views print 716)."
+  src: LS3M
+  pdf_page: 3
+  figure: "side and end outlines, vertical dimensions '716 (28.19)'"
+  years: "2009 marine LS3"
+  applies_to_1977: unverified
+  confidence: low
+  why: "The top is the marine intake/cover; the truck's Holley intake and throttle body change it."
+
+- id: ls3m.engine.outline.width
+  what: LS3 marine engine, overall width in the end-view outline
+  kind: width
+  value_mm: 705
+  original: {value: 705, unit: mm, printed: "705"}
+  points: "Extreme sides of the end-view outline (the view shows the flywheel), as drawn."
+  src: LS3M
+  pdf_page: 3
+  figure: "end-view outline (right drawing), top dimension '705 (27.75)'"
+  years: "2009 marine LS3"
+  applies_to_1977: unverified
+  confidence: low
+  why: "Marine exhaust manifolds set the width; the truck runs headers."
+
+- id: ls3m.engine.bore-center
+  what: LS3 bore centre (cylinder-to-cylinder pitch)
+  kind: length
+  value_mm: 111.76
+  original: {value: 111.76, unit: mm, printed: "111.76"}
+  points: "Cylinder bore centreline to the next along the bank."
+  src: LS3M
+  pdf_page: 3
+  figure: "Specifications list: 'Bore Center (mm): 111.76'"
+  years: "Gen IV LS3 (all)"
+  applies_to_1977: "yes"
+  confidence: high
+  why: "A block dimension, the same in any LS3; it spaces the coil and injector connectors along each bank."
+
+# =====================================================================================================
+# TOLERANCES THE SOURCES PRINT (for the margin-of-error bands; not dimensions)
+# =====================================================================================================
+tolerances:
+  - id: gm77.frame.tram
+    text: 'Tramming Sequence step 2: "Dimensions must be within 3/16"." Horizontal Check step 2: "Opposite side measurement should correspond within 3/16"."'
+    value_mm: 4.76
+    src: GM77
+    pdf_page: 108
+    printed_page: 2A-2
+    applies: GM frame reference dimensions (1975-81 table)
+  - id: gm87.frame.centreline
+    text: "Each pair of corresponding points should be an equal distance from the centerline within 3 mm (1/8-inch)."
+    value_mm: 3
+    src: GM87
+    pdf_page: 148
+    printed_page: 2A-5
+    applies: R/V frame points 3-10 to the centreline
+  - id: gm87.frame.diagonals
+    text: "The diagonals should measure the same distance within 5 mm (3/16-inch), and should cross at the centerline."
+    value_mm: 5
+    src: GM87
+    pdf_page: 148
+    printed_page: 2A-5
+    applies: R/V frame diagonals
+  - id: fr88.self-closure
+    text: "Mitchell 1988 frame: widths, lengths and heights rebuild the printed tram and diagonal values to 0.4 mm or better; engine compartment and windshield close to about 1 mm; the tailgate opening does not close (8.2 mm)."
+    value_mm: 0.4
+    src: FR88
+    pdf_page: 1
+    applies: computed by check_dimensions.py
+
+# =====================================================================================================
+# GM ROUTING CLEARANCES (harness rules the manuals print; not locations)
+# =====================================================================================================
+rules:
+  - id: gm87.routing.accel-linkage-50mm
+    text: "Flexible components (hoses, wires, conduit, etc.) must not be routed within 50 mm (2-inches) of the moving parts of the accelerator linkage unless routing is positively controlled."
+    value_mm: 50
+    src: GM87
+    pdf_page: 721
+    applies: "accelerator linkage (Section 6C). The LS3 is drive-by-wire, so this bites only where a cable or rod still moves: transfer-case linkage, the column shift linkage, the park-brake cable (by analogy, not by GM's words)."
+  - id: gm87.routing.cable-13mm
+    text: "Wire, hoses, cable, and other flexible components must not be placed within 13 mm (0.52-inch) of the cable or rod at any point in their travel."
+    value_mm: 13
+    src: GM87
+    pdf_page: 722
+    applies: "accelerator/cruise cable or rod (Section 6C)."

@@ -15,6 +15,7 @@
 // profiles.username).
 
 import SwiftUI
+import Supabase
 
 // ─── Row models (exact column shapes, verified against prod) ─────────────────
 
@@ -64,7 +65,10 @@ struct CalendarDay: Decodable {
     let events: Int
     let work: Int            // confirmed work SESSIONS that day
     let work_minutes: Int    // confirmed labor minutes — the real value signal
-    let work_cost: Int       // job dollars on confirmed work
+    /// Job dollars on confirmed work. Null for everyone but the record's own user since
+    /// #1048 (money_masked true), so a non-owner's calendar must decode, not throw.
+    let work_cost: Int?
+    let money_masked: Bool?
 }
 
 /// Day rows after grouping (one per calendar day, newest first). Carries the
@@ -134,6 +138,8 @@ struct DayReceipt: Decodable {
     let photos: [Photo]
     let work_sessions: [WorkSession]
     let receipts: [Receipt]
+    /// The database's verdict on who is reading (auth.uid() against the record's user).
+    let is_owner_view: Bool?
 }
 
 // ─── Tab root: own profile (or the sample) + handle search ──────────────────
@@ -146,6 +152,7 @@ struct ProfileTab: View {
     @State private var query = ""
     @State private var results: [ProfileRow] = []
     @State private var searchError = false   // a failed handle search ≠ "no such user"
+    @State private var searchFailureText: String?
     @State private var showAccount = false
 
     private var rootUserId: String {
@@ -156,13 +163,13 @@ struct ProfileTab: View {
         NavigationStack {
             Group {
                 if query.trimmingCharacters(in: .whitespaces).isEmpty {
-                    ProfileView(userId: rootUserId, isOwn: ownUserId != nil)
+                    ProfileView(userId: rootUserId, isOwn: ownUserId != nil, onSignIn: onSignIn)
                 } else if searchError && results.isEmpty {
                     // The search request failed — never read as "no such handle".
                     ContentUnavailableView {
-                        Label("Couldn't search", systemImage: "wifi.exclamationmark")
+                        Label("Couldn't search", systemImage: "exclamationmark.triangle")
                     } description: {
-                        Text("Check your connection.")
+                        Text(searchFailureText ?? "The search failed.")
                     } actions: {
                         Button("Retry") {
                             Task { await search(query.trimmingCharacters(in: .whitespaces)) }
@@ -172,7 +179,7 @@ struct ProfileTab: View {
                 } else {
                     List(results) { row in
                         NavigationLink {
-                            ProfileView(userId: row.id.uuidString.lowercased(), isOwn: false)
+                            ProfileView(userId: row.id.uuidString.lowercased(), isOwn: false, onSignIn: onSignIn)
                         } label: {
                             VStack(alignment: .leading) {
                                 Text(row.username ?? row.id.uuidString.prefix(8).lowercased())
@@ -232,31 +239,13 @@ struct ProfileTab: View {
                 .value
         } catch {
             searchError = true
+            searchFailureText = ReadFailure.text(error)
             NSLog("NukeCapture profile search failed: %@", String(describing: error))
         }
     }
 }
 
 // ─── The profile: name/handle · connections (own) · the day record ──────────
-
-/// One row from get_user_garage — the user's vehicle, enough to render a card
-/// and open VehicleDetailView.
-struct GarageVehicle: Decodable, Identifiable, Hashable {
-    let vehicle_id: String
-    let year: Int?
-    let make: String?
-    let model: String?
-    let trim_name: String?
-    let image_url: String?
-    let current_value: Double?
-    let image_count: Int
-    let relationship: String
-
-    var id: String { vehicle_id }
-    var title: String {
-        [year.map(String.init), make, model].compactMap { $0 }.joined(separator: " ")
-    }
-}
 
 struct ProfileView: View {
     let userId: String
@@ -270,8 +259,20 @@ struct ProfileView: View {
     // The garage — the user's real vehicles (get_user_garage). The app had no
     // way in to a vehicle before this; each card opens VehicleDetailView.
     @State private var garage: [GarageVehicle] = []
+    @State private var unresolvedGarageSources: [GarageUnresolvedSource] = []
     @State private var garageLoaded = false      // gate the empty state so it never flashes
     @State private var garageError = false        // a FAILED load must never read as "no vehicles"
+    /// The user readers (get_user_garage, get_user_understanding, get_user_producer_signals,
+    /// the calendar) are EXECUTE authenticated only: a stranger, or a session whose token
+    /// lapsed, gets 42501 from each. That is one permission state, said once, never three
+    /// "connection dropped" cards (2026-10-13, the Profile tab as anon).
+    @State private var signInNeeded = false
+    var onSignIn: (() -> Void)? = nil
+    private static func isPermissionDenied(_ error: Error) -> Bool {
+        // 42501: EXECUTE denied. PGRST301/PGRST303: PostgREST rejected the JWT (expired, bad) before any grant.
+        guard let code = (error as? PostgrestError)?.code else { return false }
+        return ["42501", "PGRST301", "PGRST303"].contains(code)
+    }
     // Offline fallback (LocalStore garage_vehicle mirror, write-through cache of
     // get_user_garage). When the live call fails, we render the last-cached rows
     // instead of the error card — but the UI must say so, never pretend it's live.
@@ -279,18 +280,26 @@ struct ProfileView: View {
     @State private var garageCachedAt: Date?
     @State private var openVehicle: GarageVehicle?
     @State private var showPast = false           // "Past & contributions" stays collapsed
+    @State private var photoEvidence: LocalProfileEvidence?
+    @State private var photoEvidenceError: String?
+    @State private var showAlbums = false
+    @ObservedObject private var libraryIngest = LibraryIngest.shared
 
     // CURRENT stewardship headlines the garage; previously-owned / contributed-to
     // (departed — e.g. shipped-out trucks) are demoted to a collapsed section, not
     // mixed into "what I'm building now". Reads the relationship the RPC already returns.
     private var currentGarage: [GarageVehicle] { garage.filter { $0.relationship == "owner" } }
-    private var pastGarage: [GarageVehicle] { garage.filter { $0.relationship != "owner" } }
+    private var pastGarage: [GarageVehicle] { garage.filter { ["previously_owned", "contributor"].contains($0.relationship) } }
+    private var otherRelationships: [String] {
+        Array(Set(garage.map(\.relationship))).filter { !["owner", "previously_owned", "contributor"].contains($0) }.sorted()
+    }
 
     // Owner-only: the phone↔record link, made visible. `sync` is the record's
     // server-side truth (the RPC); `engine` is this device's local truth.
     // Showing both side by side kills the "is it even linked?" doubt — they
     // reconcile in plain sight.
     @State private var sync: SyncStatus?
+    @State private var syncFailureText: String?
     @State private var syncError = false          // failed link-ledger load ≠ a fresh account
     @ObservedObject private var engine = SyncEngine.shared
 
@@ -302,6 +311,8 @@ struct ProfileView: View {
     @State private var latestError = false
     // Producer signals — the proof-of-work read that replaces vanity counts.
     @State private var producer: ProducerSignals?
+    @State private var affiliations: [OrgAffiliationsSection.Row] = []
+    @State private var affiliationsFailure: String?
 
     var body: some View {
         List {
@@ -310,6 +321,8 @@ struct ProfileView: View {
             Section { identityHeader }
                 .listRowBackground(Color.clear)
                 .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 8, trailing: 16))
+
+            if isOwn { photoEvidenceSection }
 
             // BARCODE — the proof-of-work graph, directly under the identity (the
             // labor story IS the headline; it belongs with the producer signals,
@@ -322,10 +335,36 @@ struct ProfileView: View {
                 }
             }
 
+            // The user readers refused this viewer: one card with the door, in place of the
+            // garage, calendar and latest-work sections it would have filled.
+            if signInNeeded {
+                Section {
+                    VStack(alignment: .leading, spacing: 8) {
+                        Label(isOwn ? "Sign in to see your garage, calendar and latest work" : "Sign in to see the calendar and latest work", systemImage: "person.crop.circle.badge.questionmark")
+                            .font(.subheadline)
+                            .foregroundStyle(Color.primary)
+                        Text("Those readers answer only a signed-in viewer. The public vehicles below are what any visitor sees, as on nuke.ag.")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                        if let onSignIn {
+                            Button("Sign in") { onSignIn() }
+                                .buttonStyle(.bordered)
+                                .controlSize(.small)
+                        }
+                    }
+                    .padding(.vertical, 4)
+                }
+            }
+
+            // ORGANIZATIONS — the person's memberships with each relation's weight (user_org_relations), on their
+            // own profile only: the owner took organizations off the profile face on 2026-06-13 ("I don't want those
+            // showing up"; UserWorkspaceContent.tsx), and the web shows them only on the signed-in capsule.
+            if isOwn { OrgAffiliationsSection(rows: affiliations, failureText: affiliationsFailure) }
+
             // GARAGE — the user's vehicles, the way into the whole drill chain.
             // Empty + own profile → a LIVING state that says what's coming, not a
             // hidden section that reads as a dead profile (the cold-start gravestone).
-            if !garage.isEmpty {
+            if !garage.isEmpty || !unresolvedGarageSources.isEmpty {
                 garageSection
             } else if garageError {
                 // A failed load is NOT an empty garage — say so, with a way back.
@@ -335,6 +374,9 @@ struct ProfileView: View {
             } else if isOwn && garageLoaded {
                 emptyGarageSection
             }
+
+            if isOwn { ObservedCarsSection(userId: userId) }
+            if isOwn { SourceInboxSection(userId: userId) }
 
             // SYNC — owner-only ledger that proves the phone↔record link.
             if isOwn { syncSection }
@@ -366,7 +408,7 @@ struct ProfileView: View {
             } else if latestError {
                 Section("Latest work") {
                     HStack {
-                        Label("Couldn't load", systemImage: "wifi.exclamationmark")
+                        Label("Couldn't load", systemImage: "exclamationmark.triangle")
                             .font(.footnote).foregroundStyle(.secondary)
                         Spacer()
                         Button("Retry") { Task { await loadLatest() } }
@@ -379,12 +421,68 @@ struct ProfileView: View {
             DayReceiptView(userId: userId, date: day.day)
                 .presentationDetents([.medium, .large])
         }
+        .sheet(isPresented: $showAlbums) { LibraryAlbumsView(userId: userId) }
         // (openVehicle sheet moved onto garageSection — avoids two .sheet on one view)
         .task(id: userId) { await load() }
         .task(id: userId) { await loadSync() }   // owner-only inside loadSync
         .task(id: userId) { await loadGarage() }
         .task(id: userId) { await loadLatest() }
         .task(id: userId) { await loadProducer() }
+        .task(id: userId) {
+            guard isOwn else { return }
+            do { affiliations = try await OrgAffiliationsSection.load(userId: userId); affiliationsFailure = nil }
+            catch { if affiliations.isEmpty { affiliationsFailure = ReadFailure.text(error) } }
+        }
+        .task(id: userId) {
+            guard isOwn else { return }
+            await loadPhotoEvidence()
+            await LibraryStore.shared.refreshAlbums()
+            await loadPhotoEvidence()
+            // OCR over originals: on a charger at a nominal temperature only (LibraryIngest).
+            if LibraryIngest.mayReviewInForeground {
+                await libraryIngest.runAlbumReview(budget: 24)
+            }
+            await libraryIngest.syncNativeAlbums()
+            await loadPhotoEvidence()
+        }
+        .onChange(of: libraryIngest.running) { _, running in
+            if !running && isOwn { Task { await loadPhotoEvidence() } }
+        }
+    }
+
+    @ViewBuilder private var photoEvidenceSection: some View {
+        Section("Photo record") {
+            Button { showAlbums = true } label: {
+                VStack(alignment: .leading, spacing: 4) {
+                    if let evidence = photoEvidence {
+                        if let visible = evidence.catalog.photos?.count {
+                            Text("\(visible) accessible photos · \(evidence.reviewed) read on-device")
+                                .monospacedDigit()
+                        }
+                        if evidence.catalog.accessScope == "full" {
+                            Text("\(evidence.catalog.albums.count) albums · \(evidence.matched) serial matches")
+                                .font(.caption).foregroundStyle(.secondary)
+                        } else { Text("Album coverage unknown").font(.caption).foregroundStyle(.secondary) }
+                        if evidence.unresolved > 0 {
+                            Text("\(evidence.unresolved) vehicle frames awaiting identity")
+                                .font(.caption).foregroundStyle(.secondary)
+                        }
+                    } else { Label("Albums & source photos", systemImage: "photo.on.rectangle") }
+                }
+            }
+            if let photoEvidenceError { Text(photoEvidenceError).font(.caption).foregroundStyle(.secondary) }
+            if let summary = libraryIngest.albumSyncSummary { Text(summary).font(.caption).foregroundStyle(.secondary) }
+        }
+    }
+
+    private func loadPhotoEvidence() async {
+        do {
+            let method = LibraryIngest.albumMethodVersion
+            photoEvidence = try await Task.detached {
+                try LocalStore.shared.profileEvidence(userId: userId, methodVersion: method)
+            }.value
+            photoEvidenceError = nil
+        } catch { photoEvidenceError = "Photo evidence unavailable" }
     }
 
     // ─── Latest work — recent understood days as stories (get_user_understanding) ─
@@ -436,6 +534,7 @@ struct ProfileView: View {
                 .value
             latest = u.latest
         } catch {
+            if Self.isPermissionDenied(error) { signInNeeded = true; return }
             latestError = true
             NSLog("NukeCapture profile latest work failed: %@", String(describing: error))
         }
@@ -449,6 +548,7 @@ struct ProfileView: View {
                 .execute()
                 .value
         } catch {
+            if Self.isPermissionDenied(error) { signInNeeded = true; return }
             NSLog("NukeCapture producer signals failed: %@", String(describing: error))
         }
     }
@@ -510,7 +610,14 @@ struct ProfileView: View {
                     if let hy = p.hours_year, hy > 0 { stat("\(hy)h", "this year") }
                     if let wy = p.work_days_year, wy > 0 { stat("\(wy)", "work-days") }
                     if let ls = p.longest_streak, ls > 0 { stat("\(ls)", "best streak") }
-                    if let an = p.images_analyzed, an > 0 { stat(an.formatted(), "analyzed") }
+                    // A count with its population: analyzed frames out of the record's frames.
+                    if let an = p.images_analyzed, an > 0 {
+                        if let total = p.images_total, total > 0 {
+                            stat("\(an.formatted()) of \(total.formatted())", "analyzed")
+                        } else {
+                            stat(an.formatted(), "analyzed · total unknown")
+                        }
+                    }
                 }
             }
 
@@ -562,12 +669,10 @@ struct ProfileView: View {
     //     one row down — each car drills to its own WorthBracketView, C10).
     /// Defensible fleet worth = sum of the class-stratified "est" values already on
     /// the garage rows (get_user_garage only emits defensible estimates).
-    private var fleetWorth: Double {
-        currentGarage.compactMap(\.current_value).filter { $0 > 0 }.reduce(0, +)
-    }
-    private var fleetPricedCount: Int {
-        currentGarage.filter { ($0.current_value ?? 0) > 0 }.count
-    }
+    /// Zero until the garage reader carries a defense verdict per vehicle: the same rule that hides
+    /// an undefended estimate on the vehicle page (#1065) hides its sum here.
+    private var fleetWorth: Double { 0 }
+    private var fleetPricedCount: Int { 0 }
 
     /// The Tenet-9 worth-hiring sentence — proven LABOR across the fleet, not a
     /// vanity count. Lifetime totals, distinct from the "this year" producer chips
@@ -584,7 +689,7 @@ struct ProfileView: View {
     /// fleet is defensibly priced — never a firm fleet number (the valuation law).
     private var fleetWorthLine: String {
         guard fleetPricedCount > 0 else {
-            return "Not priced yet — a body of work, not a comp average"
+            return "Not priced by the reader — a body of work, not a comp average"
         }
         let money = fleetWorth.formatted(.currency(code: "USD").precision(.fractionLength(0)))
         let thin = fleetPricedCount < currentGarage.count
@@ -593,6 +698,7 @@ struct ProfileView: View {
 
     // ─── Garage ──────────────────────────────────────────────────────────────
     @ViewBuilder private var garageSection: some View {
+      Group {
         if !currentGarage.isEmpty {
             Section {
                 // Offline mirror notice — never let cached rows silently pass as
@@ -616,8 +722,11 @@ struct ProfileView: View {
             // Vehicle sheet lives HERE (on the garage section), NOT stacked as a second
             // .sheet on the same List as the day-receipt sheet — two .sheet(item:) on one
             // view is the SwiftUI pitfall where the second silently fails to present.
-            .sheet(item: $openVehicle) { v in
-                VehicleDetailView(vehicleId: v.vehicle_id, embedInNavigationStack: true)
+        }
+        ForEach(otherRelationships, id: \.self) { role in
+            let rows = garage.filter { $0.relationship == role }
+            Section(rows.first?.relationshipLabel ?? role) {
+                ForEach(rows) { v in garageRow(v) }
             }
         }
         // Past & contributions — departed/peripheral, collapsed by default so the
@@ -628,7 +737,7 @@ struct ProfileView: View {
             } header: {
                 Button { withAnimation(.snappy(duration: 0.2)) { showPast.toggle() } } label: {
                     HStack {
-                        Text("Past & contributions · \(pastGarage.count)")
+                        Text("History & other relationships · \(pastGarage.count)")
                         Spacer()
                         Image(systemName: showPast ? "chevron.up" : "chevron.down")
                             .font(.caption2)
@@ -638,6 +747,29 @@ struct ProfileView: View {
                 .buttonStyle(.plain)
             }
         }
+        if isOwn && SupabaseService.currentUserId == userId.lowercased() && !unresolvedGarageSources.isEmpty {
+            Section("Identity pending") {
+                if garageIsCached { Text("Showing saved source statements — may be out of date").font(.caption).foregroundStyle(.secondary) }
+                ForEach(unresolvedGarageSources) { source in
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(source.label).font(.subheadline.weight(.medium))
+                        Text(source.statedRoles.map { $0.replacingOccurrences(of: "_", with: " ") }.joined(separator: " · ") + " · account stated")
+                            .font(.caption).foregroundStyle(.secondary)
+                        Text("Photo evidence still needs to identify this vehicle.").font(.caption).foregroundStyle(.secondary)
+                        if let quote = source.sourceExcerpt {
+                            DisclosureGroup("Source statement") {
+                                Text(quote).font(.caption)
+                                Text("Recorded \(source.observedAt.prefix(10))").font(.caption2).foregroundStyle(.secondary)
+                            }.font(.caption)
+                        }
+                    }
+                }
+            }
+        }
+      }
+      .sheet(item: $openVehicle) { v in
+          VehicleDetailView(vehicleId: v.vehicle_id, embedInNavigationStack: true)
+      }
     }
 
     @ViewBuilder private func garageRow(_ v: GarageVehicle) -> some View {
@@ -657,58 +789,123 @@ struct ProfileView: View {
                             .font(.caption2).monospacedDigit()
                             .foregroundStyle(.secondary)
                         if v.relationship != "owner" {
-                            Text(v.relationship.replacingOccurrences(of: "_", with: " "))
+                            Text(v.relationshipLabel)
                                 .font(.caption2).foregroundStyle(.secondary)
                         }
                     }
+                    if let detail = v.relationshipDetail {
+                        Text(detail).font(.caption2).foregroundStyle(.secondary)
+                    }
+                    if let period = v.relationshipPeriod {
+                        Text(period).font(.caption2).foregroundStyle(.secondary)
+                    }
                 }
                 Spacer()
-                if let val = v.current_value, val > 0 {
-                    // A modeled comp-estimate (rooted in nuke_estimates), labeled "est"
-                    // so it never reads as a firm price. Only the defensible
-                    // (class-stratified) estimates reach here — see get_user_garage.
-                    Text("est \(val.formatted(.currency(code: "USD").precision(.fractionLength(0))))")
-                        .font(.caption).monospacedDigit().foregroundStyle(.secondary)
-                }
+                // No estimate on a garage row: get_user_garage's current_value is the class-stratified
+                // model estimate that the vehicle page hides unless the market defends it (#1065, the
+                // web's marketDefends), and the garage reader carries no such verdict. It returns when
+                // the reader does (review round two, 2026-10-13).
                 Image(systemName: "chevron.right").font(.caption2).foregroundStyle(.tertiary)
             }
         }
     }
 
+    /// A stranger's view of a garage, as the web's VehicleCollection reads it for a public profile:
+    /// the vehicles the person holds by an active owner or co_owner permission or an approved
+    /// title, public only, not deleted, newest first, 50 at most. Never get_user_garage, which is
+    /// the owner's own reader: SECURITY DEFINER with no viewer check, it answers any signed-in
+    /// account with private and deleted vehicles and purchase prices (review round two,
+    /// 2026-10-13; migration 20260709180000 called its anon revoke "NOT the root fix").
+    private func loadPublicGarage() async {
+        garageError = false
+        defer { garageLoaded = true }
+        struct IdRow: Decodable { let vehicle_id: String }
+        do {
+            async let permsT: [IdRow] = SupabaseService.client.from("vehicle_user_permissions").select("vehicle_id")
+                .eq("user_id", value: userId).is("revoked_at", value: nil).in("role", values: ["owner", "co_owner"]).execute().value
+            async let titlesT: [IdRow] = SupabaseService.client.from("ownership_verifications").select("vehicle_id")
+                .eq("user_id", value: userId).eq("status", value: "approved").execute().value
+            let ids = Array(Set((try await permsT + titlesT).map(\.vehicle_id)))
+            guard !ids.isEmpty else { garage = []; garageIsCached = false; return }
+            let metadata: [GarageMetadata] = try await SupabaseService.client.from("vehicles")
+                .select("id,year,make,model,normalized_model,trim,vin,primary_image_url,image_count")
+                .in("id", values: ids).eq("is_public", value: true).is("deleted_at", value: nil)
+                .order("year", ascending: false).limit(50).execute().value
+            garage = metadata.map { m in
+                GarageVehicle(vehicle_id: m.id, year: m.year, make: m.make,
+                              model: m.normalized_model?.isEmpty == false ? m.normalized_model : m.model,
+                              trim_name: m.trim, image_url: m.primary_image_url, current_value: nil,
+                              image_count: m.image_count ?? 0, relationship: "owner", vin: m.vin)
+            }
+            garageIsCached = false; garageCachedAt = nil
+        } catch {
+            NSLog("NukeCapture public garage load failed: %@", String(describing: error))
+            garageError = true
+        }
+    }
+
     private func loadGarage() async {
+        guard isOwn else { await loadPublicGarage(); return }
         garageError = false
         do {
-            let rows: [GarageVehicle] = try await SupabaseService.client
+            async let legacyRows: [GarageVehicle] = SupabaseService.client
                 .rpc("get_user_garage", params: ["p_user_id": userId])
                 .execute()
                 .value
+            async let correctionRows = fetchOwnGarageCorrections()
+            var rows = try await legacyRows
+            let fetchedCorrections = try await correctionRows
+            let corrections = isOwn && SupabaseService.currentUserId == userId.lowercased() ? fetchedCorrections : []
+            let unresolved = GarageUnresolvedSource.from(corrections)
+            let ids = Array(Set(rows.map(\.vehicle_id) + corrections.compactMap(\.vehicle_id)))
+            if !ids.isEmpty {
+                let metadata: [GarageMetadata] = try await SupabaseService.client.from("vehicles")
+                    .select("id,year,make,model,normalized_model,trim,vin,primary_image_url,image_count")
+                    .in("id", values: ids).execute().value
+                let byID = Dictionary(uniqueKeysWithValues: metadata.map { ($0.id, $0) })
+                let present = Set(rows.map(\.vehicle_id))
+                for m in metadata where !present.contains(m.id) {
+                    rows.append(GarageVehicle(vehicle_id: m.id, year: m.year, make: m.make,
+                        model: m.normalized_model ?? m.model, trim_name: m.trim, image_url: m.primary_image_url,
+                        current_value: nil, image_count: m.image_count ?? 0, relationship: "relationship_review", vin: m.vin))
+                }
+                for index in rows.indices {
+                    if let m = byID[rows[index].id] {
+                        rows[index].vin = m.vin
+                        let normalized = m.normalized_model?.trimmingCharacters(in: .whitespaces)
+                        rows[index].model = normalized?.isEmpty == false ? normalized : m.model
+                    }
+                }
+            }
+            rows = GarageVehicle.applying(corrections, to: rows)
             garage = rows
+            unresolvedGarageSources = unresolved
             garageIsCached = false
             garageCachedAt = nil
             // Write-through: mirror the live rows into the offline cache (same
             // pattern as LocalStore's v4 cloud-verdict cache) so a later
             // network-down load can render this instead of the error card.
-            LocalStore.shared.cacheGarage(userId: userId, vehicles: rows.map {
-                (vehicleId: $0.vehicle_id, year: $0.year, make: $0.make, model: $0.model,
-                 trimName: $0.trim_name, imageUrl: $0.image_url, currentValue: $0.current_value,
-                 imageCount: $0.image_count, relationship: $0.relationship)
-            })
+            LocalStore.shared.cacheGarage(userId: userId, vehicles: rows)
+            if isOwn && SupabaseService.currentUserId == userId.lowercased() {
+                try LocalStore.shared.cacheUnresolvedGarageSources(userId: userId, sources: unresolved)
+            }
+            if isOwn { await loadPhotoEvidence() }
         } catch {
+            if Self.isPermissionDenied(error) { signInNeeded = true; garageError = false; return }
             NSLog("NukeCapture garage load failed: %@", String(describing: error))
+            unresolvedGarageSources = isOwn && SupabaseService.currentUserId == userId.lowercased()
+                ? ((try? LocalStore.shared.cachedUnresolvedGarageSources(userId: userId)) ?? []) : []
             // No network (or a real server error) — fall back to the offline
             // mirror rather than the error card, IF we have one cached. A truly
             // fresh account/device with nothing cached yet still surfaces the
             // honest "couldn't load" state, same as before this change.
             if let cached = LocalStore.shared.cachedGarage(userId: userId), !cached.vehicles.isEmpty {
-                garage = cached.vehicles.map {
-                    GarageVehicle(vehicle_id: $0.vehicleId, year: $0.year, make: $0.make,
-                                  model: $0.model, trim_name: $0.trimName, image_url: $0.imageUrl,
-                                  current_value: $0.currentValue, image_count: $0.imageCount,
-                                  relationship: $0.relationship)
-                }
+                garage = GarageVehicle.applying([], to: cached.vehicles.map(\.projection))
                 garageIsCached = true
                 garageCachedAt = cached.cachedAt
                 garageError = false
+            } else if !unresolvedGarageSources.isEmpty {
+                garage = []; garageIsCached = true; garageError = false
             } else {
                 // Don't swallow: a failed load with nothing cached must surface as
                 // "couldn't load", never fall through to the empty state.
@@ -719,11 +916,28 @@ struct ProfileView: View {
         garageLoaded = true
     }
 
+    private struct GarageMetadata: Decodable {
+        let id: String
+        let year: Int?
+        let make: String?
+        let model: String?
+        let normalized_model: String?
+        let trim: String?
+        let vin: String?
+        let primary_image_url: String?
+        let image_count: Int?
+    }
+
+    private func fetchOwnGarageCorrections() async throws -> [GarageOwnerCorrection] {
+        guard isOwn, SupabaseService.currentUserId == userId.lowercased() else { return [] }
+        return try await SupabaseService.client.rpc("get_my_garage_owner_corrections", params: ["p_include_unresolved": true]).execute().value
+    }
+
     // ─── Garage failed to load — distinct from "no vehicles yet". ─────────────
     private var garageErrorSection: some View {
         Section {
             VStack(alignment: .leading, spacing: 8) {
-                Label("Couldn't load the garage", systemImage: "wifi.exclamationmark")
+                Label("Couldn't load the garage", systemImage: "exclamationmark.triangle")
                     .font(.subheadline)
                     .foregroundStyle(Color.primary)
                 Text("Your vehicles are on the record — the connection dropped.")
@@ -817,7 +1031,7 @@ struct ProfileView: View {
                 LabeledContent("Status") {
                     Button("Retry") { Task { await loadSync() } }
                 }
-                Text("Couldn't load the sync ledger — check your connection.")
+                Text("Couldn't load the sync ledger. \(syncFailureText ?? "The read failed.")")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
@@ -878,6 +1092,7 @@ struct ProfileView: View {
             sync = status
         } catch {
             syncError = true
+            syncFailureText = ReadFailure.text(error)
             NSLog("NukeCapture sync status failed: %@", String(describing: error))
         }
     }
@@ -886,7 +1101,7 @@ struct ProfileView: View {
         do {
             let rows: [ProfileRow] = try await SupabaseService.client
                 .from("profiles")
-                .select("id,username,full_name,avatar_url,bio,location,city,role")
+                .select("id,username,full_name,avatar_url,bio,location,role")
                 .eq("id", value: userId)
                 .limit(1)
                 .execute()
@@ -902,13 +1117,19 @@ struct ProfileView: View {
             // deployed yet (404), fall back to the capped (day,kind) RPC so the
             // timeline still renders a working organ (C4) — it auto-upgrades to
             // full history once the migration lands.
-            if let calendar = try? await loadCalendar(), !calendar.isEmpty {
-                days = calendar
-            } else {
+            // Fall back to the capped reader only when the full-history RPC is missing
+            // (PostgREST 404, code PGRST202); any other failure is a failure, never a
+            // silent downgrade to the 1,000-row reader (that is how a decoder change hid
+            // every non-owner's history).
+            do {
+                let calendar = try await loadCalendar()
+                days = calendar.isEmpty ? try await loadContributionDays() : calendar
+            } catch let e as PostgrestError where e.code == "PGRST202" {
                 days = try await loadContributionDays()
             }
             loadError = nil
         } catch {
+            if Self.isPermissionDenied(error) { signInNeeded = true; loadError = nil; profileSettled = true; return }
             loadError = "Load failed"
             NSLog("NukeCapture profile load failed: %@", String(describing: error))
         }
@@ -931,7 +1152,7 @@ struct ProfileView: View {
             .value
         return cal
             .map { DayRecord(day: $0.day, photos: $0.photos, events: $0.events,
-                             work: $0.work, workMinutes: $0.work_minutes, workCost: $0.work_cost) }
+                             work: $0.work, workMinutes: $0.work_minutes, workCost: $0.work_cost ?? 0) }
             .sorted { $0.day > $1.day }   // newest first (matches the day list)
     }
 
@@ -977,15 +1198,20 @@ struct DayReceiptView: View {
                                 .listRowInsets(EdgeInsets(top: 8, leading: 12, bottom: 8, trailing: 12))
                         }
                     }
+                    // Money is the owner's. get_user_day_receipt has nulled total_job_cost and skipped
+                    // receipts for anyone but the record's own user since its first migration
+                    // (20260610140000), and its CI contract asserts it; is_owner_view is the server's
+                    // verdict. The phone follows that verdict so a masked cost is never a bare $0.
+                    let moneyVisible = receipt.is_owner_view == true
                     if !receipt.work_sessions.isEmpty {
-                        Section("Work") {
+                        Section {
                             ForEach(receipt.work_sessions) { ws in
                                 LabeledContent(ws.title ?? "work session") {
                                     HStack(spacing: 8) {
                                         if let minutes = ws.duration_minutes {
                                             Text(formatMinutes(minutes)).monospacedDigit()
                                         }
-                                        if let cost = ws.total_job_cost, cost > 0 {
+                                        if moneyVisible, let cost = ws.total_job_cost, cost > 0 {
                                             Text(cost, format: .currency(code: "USD"))
                                                 .monospacedDigit()
                                                 .foregroundStyle(.secondary)
@@ -993,26 +1219,44 @@ struct DayReceiptView: View {
                                     }
                                 }
                             }
+                        } header: {
+                            Text("Work")
+                        } footer: {
+                            if !moneyVisible { Text("Costs are shown to the record's owner.") }
                         }
                     }
                     if !receipt.receipts.isEmpty {
-                        Section("Receipts") {
+                        Section {
                             ForEach(receipt.receipts) { r in
                                 LabeledContent(r.vendor ?? "—") {
-                                    if let total = r.total {
+                                    if moneyVisible, let total = r.total {
                                         Text(total, format: .currency(code: "USD"))
                                             .monospacedDigit()
+                                    } else if !moneyVisible {
+                                        Text("amount owner-only")
+                                            .font(.caption2).foregroundStyle(.tertiary)
                                     }
                                 }
                             }
+                        } header: {
+                            Text("Receipts")
+                        } footer: {
+                            if !moneyVisible { Text("Amounts are shown to the record's owner.") }
                         }
+                    }
+                } else if let loadError, loadError.hasPrefix("Sign in") {
+                    // Not a network failure: the reader is for signed-in accounts.
+                    ContentUnavailableView {
+                        Label(loadError, systemImage: "person.crop.circle.badge.questionmark")
+                    } description: {
+                        Text("Day receipts are read by signed-in accounts.")
                     }
                 } else if loadError != nil {
                     // Failed ≠ empty — offer a way back, never a dead red string.
                     ContentUnavailableView {
-                        Label("Couldn't load the day", systemImage: "wifi.exclamationmark")
+                        Label("Couldn't load the day", systemImage: "exclamationmark.triangle")
                     } description: {
-                        Text("Check your connection.")
+                        Text("The read failed. Retry.")
                     } actions: {
                         Button("Retry") { Task { loaded = false; loadError = nil; await load() } }
                             .buttonStyle(.borderedProminent)
@@ -1056,7 +1300,13 @@ struct DayReceiptView: View {
                 receipt = try dec.decode([DayReceipt].self, from: raw).first
             }
         } catch {
-            loadError = "Load failed"
+            // The reader is EXECUTE authenticated only (42501 for anon): say that, never
+            // "check your connection" for a permission the viewer does not have.
+            if let pg = error as? PostgrestError, pg.code == "42501" {
+                loadError = "Sign in to open a day receipt"
+            } else {
+                loadError = "Load failed"
+            }
             NSLog("NukeCapture day receipt failed: %@", String(describing: error))
         }
         loaded = true    // flip regardless of result — stops the infinite spinner
@@ -1153,7 +1403,7 @@ private struct PhotoFullScreenView: View {
     var body: some View {
         ZStack(alignment: .bottom) {
             Color.black.ignoresSafeArea()
-            AsyncImage(url: (photo.url ?? photo.thumb).flatMap(URL.init)) { image in
+            CachedAsyncImage(url: NukeImage.thumb(photo.url ?? photo.thumb, width: 2048)) { image in
                 image
                     .resizable()
                     .scaledToFit()
@@ -1393,5 +1643,86 @@ private struct PhotoFullScreenView: View {
                 NSLog("NukeCapture add_photo_comment failed: %@", String(describing: error))
             }
         }
+    }
+}
+
+// ─── Organizations: memberships with each relation's weight ────────────────────
+//
+// One read, `user_org_relations`: the person's memberships (organization_contributors) with the relation's weight at
+// now, computed by the server from passive contributions (photos at the organization's locations, its images, timeline
+// events, contractor work) and halving every 6 h. A membership is not a status: "active" was hard-coded on every row
+// (owner, 2026-10-15). Only live and stalling relations show, the warmest first: "only show active orgs. its
+// annoying that evening side projects surface to top billing" (owner, 2026-10-15). Each row opens the organization
+// inside the app. When no relation is live or stalling, the dormant ones with a last contribution show in the server's
+// order (most recent first), so a day off does not empty the section; it renders nothing only when none has one.
+struct OrgAffiliationsSection: View {
+    let rows: [Row]
+    let failureText: String?
+
+    struct Row: Decodable, Identifiable {
+        let organization_id: String
+        let name: String?
+        let type: String?
+        let role: String?
+        let start_date: String?
+        let relation: OrgPage.Relation
+        var id: String { organization_id + (role ?? "") }
+    }
+    private struct Payload: Decodable { let relations: [Row] }
+
+    var body: some View {
+        if !rows.isEmpty {
+                Section {
+                    ForEach(rows) { r in
+                        NavigationLink {
+                            OrganizationView(orgId: r.organization_id, fallbackName: r.name)
+                        } label: { row(r) }
+                    }
+                } header: {
+                    Text("Organizations · \(rows.count)")
+                } footer: {
+                    Text("Active relations only. Each is kept warm by contributions, such as photos taken at the business, and goes dormant a day after the last one.")
+                        .font(.caption2).foregroundStyle(.secondary)
+                }
+            } else if let failureText {
+                Section("Organizations") {
+                    Text("Couldn't load. \(failureText)").font(.footnote).foregroundStyle(.secondary)
+                }
+            }
+    }
+
+    @ViewBuilder private func row(_ r: Row) -> some View {
+        HStack(alignment: .firstTextBaseline, spacing: 10) {
+            VStack(alignment: .leading, spacing: 2) {
+                Text(r.name ?? "Organization").font(.subheadline.weight(.medium))
+                Text([r.role.map(Self.words), r.type?.replacingOccurrences(of: "_", with: " ")]
+                        .compactMap { $0 }.filter { !$0.isEmpty }.joined(separator: " · "))
+                    .font(.caption).foregroundStyle(.secondary)
+            }
+            Spacer()
+            VStack(alignment: .trailing, spacing: 2) {
+                HStack(spacing: 4) {
+                    Circle().fill(RelationWeight.color(r.relation)).frame(width: 6, height: 6)
+                    Text(RelationWeight.word(r.relation)).font(.caption.weight(.semibold))
+                }
+                Text(RelationWeight.ago(r.relation.last_contribution_at) ?? "nothing in 2 days")
+                    .font(.caption2.monospacedDigit()).foregroundStyle(.secondary)
+            }
+        }
+        .contentShape(Rectangle())
+    }
+
+    private static func words(_ s: String) -> String {
+        s.split(separator: "_").map { $0.prefix(1).uppercased() + $0.dropFirst() }.joined(separator: " ")
+    }
+
+    /// Live and stalling relations only, warmest first (the server orders by weight).
+    static func load(userId: String) async throws -> [Row] {
+        let payload: Payload = try await SupabaseService.client
+            .rpc("user_org_relations", params: ["p_user_id": userId])
+            .execute().value
+        let warm = payload.relations.filter { $0.relation.state == "live" || $0.relation.state == "stalling" }
+        if !warm.isEmpty { return warm }
+        return payload.relations.filter { $0.relation.last_contribution_at != nil }
     }
 }

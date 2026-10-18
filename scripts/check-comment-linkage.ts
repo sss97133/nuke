@@ -1,109 +1,54 @@
-import { createClient } from '@supabase/supabase-js';
-import * as dotenv from 'dotenv';
-dotenv.config({ path: '.env.local' });
+// Bounded live assay for the auction-comment identity edge (data-machine C6).
+// node scripts/check-comment-linkage.ts [--since <ISO timestamp>]
+// Uses the sanctioned read-only q.sh path. No full-table counts, names, text, or writes.
+import { execFileSync } from "node:child_process";
+import { fileURLToPath } from "node:url";
 
-const supabase = createClient(
-  process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL || '',
-  process.env.SUPABASE_SERVICE_ROLE_KEY || ''
-);
-
-async function checkLinkage() {
-  console.log('=== COMMENT LINKAGE ANALYSIS ===\n');
-
-  // 1. Check auction_comments table structure
-  const { data: sampleComments } = await supabase
-    .from('auction_comments')
-    .select('id, vehicle_id, auction_event_id, auction_platform, author_username, bid_amount, posted_at')
-    .limit(10);
-
-  console.log('Sample auction_comments:');
-  console.log(JSON.stringify(sampleComments, null, 2));
-
-  // 2. Count comments WITH vehicle_id
-  const { count: withVehicleId } = await supabase
-    .from('auction_comments')
-    .select('*', { count: 'exact', head: true })
-    .not('vehicle_id', 'is', null);
-
-  // 3. Count comments WITHOUT vehicle_id
-  const { count: withoutVehicleId } = await supabase
-    .from('auction_comments')
-    .select('*', { count: 'exact', head: true })
-    .is('vehicle_id', null);
-
-  console.log(`\nComments WITH vehicle_id: ${withVehicleId?.toLocaleString()}`);
-  console.log(`Comments WITHOUT vehicle_id: ${withoutVehicleId?.toLocaleString()}`);
-
-  // 4. Get distinct vehicle_ids
-  const { data: vehicleIds } = await supabase
-    .from('auction_comments')
-    .select('vehicle_id')
-    .not('vehicle_id', 'is', null)
-    .limit(100000);
-
-  const uniqueVehicleIds = new Set(vehicleIds?.map(c => c.vehicle_id) || []);
-  console.log(`Unique vehicle_ids in comments: ${uniqueVehicleIds.size}`);
-
-  // 5. Check auction_events linkage
-  const { count: totalAuctionEvents } = await supabase
-    .from('auction_events')
-    .select('*', { count: 'exact', head: true });
-
-  console.log(`\nTotal auction_events: ${totalAuctionEvents?.toLocaleString()}`);
-
-  // 6. Check comments by auction_event_id
-  const { count: withEventId } = await supabase
-    .from('auction_comments')
-    .select('*', { count: 'exact', head: true })
-    .not('auction_event_id', 'is', null);
-
-  console.log(`Comments WITH auction_event_id: ${withEventId?.toLocaleString()}`);
-
-  // 7. Sample auction_events
-  const { data: sampleEvents } = await supabase
-    .from('auction_events')
-    .select('id, vehicle_id, platform, auction_url, total_comments, total_bids')
-    .limit(5);
-
-  console.log('\nSample auction_events:');
-  console.log(JSON.stringify(sampleEvents, null, 2));
-
-  // 8. Check if we can link comments through auction_events
-  if (sampleEvents && sampleEvents.length > 0) {
-    const eventId = sampleEvents[0].id;
-    const { count: commentsForEvent } = await supabase
-      .from('auction_comments')
-      .select('*', { count: 'exact', head: true })
-      .eq('auction_event_id', eventId);
-
-    console.log(`\nComments for first auction_event: ${commentsForEvent}`);
-  }
-
-  // 9. Check vehicles table has matching IDs
-  const sampleVehicleId = Array.from(uniqueVehicleIds)[0];
-  if (sampleVehicleId) {
-    const { data: matchingVehicle } = await supabase
-      .from('vehicles')
-      .select('id, listing_title, bat_auction_url')
-      .eq('id', sampleVehicleId)
-      .single();
-
-    console.log(`\nSample vehicle match for ${sampleVehicleId}:`);
-    console.log(JSON.stringify(matchingVehicle, null, 2));
-  }
-
-  // 10. Find unlinked comments that could be linked
-  const { data: orphanedByUrl } = await supabase
-    .from('auction_comments')
-    .select('id, auction_url')
-    .is('vehicle_id', null)
-    .not('auction_url', 'is', null)
-    .limit(10);
-
-  console.log('\nOrphaned comments with auction_url (could be linked):');
-  for (const c of orphanedByUrl || []) {
-    console.log(`  ${c.auction_url?.slice(0, 60)}...`);
-  }
+const args = process.argv.slice(2);
+if (args.length && (args.length !== 2 || args[0] !== "--since" || !Number.isFinite(Date.parse(args[1])))) {
+  console.error("usage: node scripts/check-comment-linkage.ts [--since <ISO timestamp>]");
+  process.exit(2);
 }
+const since = args.length ? new Date(args[1]).toISOString() : null;
+const query = `BEGIN READ ONLY;
+SET LOCAL statement_timeout = '15s';
+WITH recent AS MATERIALIZED (
+  SELECT platform, author_username, bat_author_id, external_identity_id, vehicle_id, auction_event_id, created_at
+  FROM public.auction_comments
+  ${since ? `WHERE created_at > '${since}'::timestamptz` : ""}
+  ORDER BY created_at DESC LIMIT 10000
+), sampled AS (
+  SELECT r.*, e.id AS exact_match_id,
+    (r.platform = 'bat' AND r.author_username IS NOT NULL
+      AND btrim(r.author_username) NOT IN ('', 'Unknown')
+      AND NOT (lower(r.author_username) = 'anonymous' AND coalesce(r.bat_author_id,0) <= 0)) AS identifiable
+  FROM recent r LEFT JOIN public.external_identities e
+    ON e.platform = r.platform AND e.handle = r.author_username
+), metrics AS (
+  SELECT platform, count(*) AS sampled,
+    min(created_at) AS oldest, max(created_at) AS newest,
+    count(*) FILTER (WHERE identifiable) AS identifiable,
+    count(*) FILTER (WHERE identifiable AND external_identity_id IS NOT NULL) AS linked,
+    count(*) FILTER (WHERE identifiable AND external_identity_id IS NULL) AS missing,
+    count(*) FILTER (WHERE identifiable AND external_identity_id IS NULL AND exact_match_id IS NOT NULL) AS missing_with_existing_identity,
+    count(*) FILTER (WHERE identifiable AND external_identity_id IS NOT NULL AND external_identity_id IS DISTINCT FROM exact_match_id) AS mismatched_identity,
+    count(*) FILTER (WHERE vehicle_id IS NULL) AS missing_vehicle,
+    count(*) FILTER (WHERE auction_event_id IS NULL) AS missing_auction_event
+  FROM sampled GROUP BY platform
+)
+SELECT jsonb_build_object('assay','auction_comment_identity_v1','measured_at',now(),
+  'sample_limit',10000,'since',${since ? `'${since}'` : "null"},
+  'platforms',coalesce((SELECT jsonb_agg(to_jsonb(m)) FROM metrics m),'[]'::jsonb)) AS assay;
+COMMIT;`;
 
-checkLinkage().catch(console.error);
+try {
+  const qPath = fileURLToPath(new URL("./data/q.sh", import.meta.url));
+  const raw = execFileSync("/bin/bash", [qPath, query], { encoding: "utf8", timeout: 25000, stdio: ["ignore", "pipe", "pipe"] });
+  const result = JSON.parse(raw);
+  if (!Array.isArray(result) || !result[0]?.assay) throw new Error("Query returned no assay; do not report a successful measurement");
+  console.log(JSON.stringify(result[0].assay, null, 2));
+} catch {
+  // Don't echo subprocess stderr: credential-bearing tools may print their arguments on failure.
+  console.error("Comment identity assay failed; no coverage claim can be made.");
+  process.exitCode = 1;
+}

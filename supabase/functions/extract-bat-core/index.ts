@@ -1,10 +1,31 @@
 /**
  * extract-bat-core
  *
- * Version: 3.0.0
+ * Version: 4.5.1 — a withdrawn lot is closed: outcome 'cancelled', end = its "Withdrawn on" stamp (2026-10-15)
+ * Version: 4.5.0 — an end event only once the auction is over; the lot's own end, never the widget's (2026-10-15)
+ * - A running lot gets no auction_sold / auction_reserve_not_met / auction_ended row and no end-dated mileage reading
+ *   (auctionClose.ts): every live read had written "BaT ended • bid to $<current bid>" dated the scheduled end.
+ * - Closing reads retire the listing's earlier auction_ended rows through supersede_timeline_events (kept whole).
+ * - The end comes from the lot's own countdown or result stamp (readOwnAuctionEnd): a closed page's first
+ *   data-auction-ends belongs to the "Current BaT Auctions" widget, and dated May 2026 sales 2026-10-15.
+ * Version: 4.4.0 — the Chassis/VIN line is read by _shared/batChassis.ts: a short or I/O/Q/separator chassis lands (2026-10-06)
+ * - The Listing Details "Chassis:" line used to need 11-17 characters of the VIN alphabet; 18% of the lots that state
+ *   one (short pre-1981 and import chassis) and every chassis with I, O, Q or a separator were left VIN-less.
+ *   Identity lookups (find_vehicle_by_vin, the INSERT) still trust only that old 11-17 region: isIdentityGradeVin().
+ * Version: 4.3.0 — continuous public closing-auction events through canonical intake (2026-10-04)
+ * - listing_page_snapshots gets a fetch RECEIPT (url, fetched_at, sha256, length, status), never the page.
+ *   The DB is an index of BaT's public data, not a copy of it (17 GB / 711K stored pages before this).
+ * - Price = the lot page's own auction record ("Sold on … for $X to buyer" in the comments JSON,
+ *   _shared/batAuctionRecord.ts). For "sold after reserve not met" lots the stats table and the
+ *   listings-filter catalog carry the HIGH BID; the record has the price paid (2,554 lots).
+ * - Buyer is written only on a sold lot. A 17-character VIN must pass its check digit or it is not written.
+ * - A sale field that already holds a DIFFERENT value is superseded through
+ *   correct_vehicle_sale_provenance_batch (original + this page kept as the citation), never overwritten.
+ * - Bid / comment counts are aggregates from the comments JSON; no comment text is stored here.
+ *
  * Free-mode BaT core extractor:
  * - Fetch HTML directly (no Firecrawl)
- * - Save HTML evidence to listing_page_snapshots
+ * - Save a fetch receipt to listing_page_snapshots (html column stays NULL)
  * - Extract clean title/year/make/model (avoid SEO chrome like "for sale on BaT Auctions")
  * - Extract BaT Essentials (seller/location/lot + key specs)
  * - Extract description + images
@@ -20,9 +41,21 @@ import { normalizeVehicleFields } from "../_shared/normalizeVehicle.ts";
 import { qualityGate } from "../_shared/extractionQualityGate.ts";
 import { batchUpsertWithProvenance, quarantineRecord, type ProvenanceMetadata } from "../_shared/batUpsertWithProvenance.ts";
 import { writeObservation } from "../_shared/observationWriter.ts";
+import { readCommentsJson, readOwnAuctionEnd, summarizeAuction, vinCheckDigitOk, buildAuctionCommentRows, linkAuctionCommentIdentities, sha256Hex } from "../_shared/batAuctionRecord.ts";
+import { parseBatIdentityFromUrl, parseBatIdentityFromTitle, readBatTaxonomy } from "../_shared/batParser.ts";
+import { chassisFromListItemText, isIdentityGradeVin } from "../_shared/batChassis.ts";
+import { authenticateWriter, requireWriteAuth } from "../_shared/writeGuard.ts";
+import { sourceReadClock } from "./sourceReadClock.ts";
+import { auctionClose, planEndRows, writtenBeforeItsEnd, END_EVENT_TYPES, type EndRow } from "./auctionClose.ts";
+import { recordListingDescription } from "./descriptionObservation.ts";
+import { loadDescriptionInput, descriptionInputFingerprint, descriptionPreview } from "../discover-description-data/descriptionInput.ts";
+import { closingBatTargets, collectBatLive, batStreamIO } from "./liveStream.ts";
+import { BAT_LIVE_MODE } from "../_shared/batLiveEvents.ts";
+import { projectSecretKey } from "../_shared/supabaseKeys.ts";
+declare const EdgeRuntime: { waitUntil(promise: Promise<unknown>): void };
 
 // Extractor versioning - update on each significant change
-const EXTRACTOR_VERSION = 'extract-bat-core:3.0.0';
+const EXTRACTOR_VERSION = 'extract-bat-core:4.5.1';
 
 // Shared column list for the four vehicle-existence lookups below
 // (discovery_url / bat_auction_url / listing_url / update-existing-vehicle
@@ -30,19 +63,13 @@ const EXTRACTOR_VERSION = 'extract-bat-core:3.0.0';
 // source of truth means a future column addition can't silently drift and
 // produce inconsistent read-back data across the branches.
 const VEHICLE_MATCH_COLUMNS =
-  "id, year, make, model, listing_title, bat_listing_title, vin, description, description_source, discovery_url, listing_url, listing_source, listing_location, listing_kind, bat_seller, bat_buyer, bat_location, bat_lot_number, bat_views, bat_watchers, bat_bids, bat_comments, mileage, mileage_source, color, color_source, interior_color, transmission, transmission_source, drivetrain, engine_size, engine_source, body_style, sale_price, high_bid, auction_end_date, reserve_status, sale_status, sale_date, auction_outcome, winning_bid";
+  "id, year, make, model, listing_title, bat_listing_title, vin, description, description_source, discovery_url, listing_url, listing_source, listing_location, city, state, listing_kind, bat_seller, bat_buyer, bat_location, bat_lot_number, bat_views, bat_watchers, bat_bids, bat_comments, mileage, mileage_source, color, color_source, interior_color, transmission, transmission_source, drivetrain, engine_size, engine_source, body_style, sale_price, high_bid, auction_end_date, reserve_status, sale_status, sale_date, auction_outcome, winning_bid, platform_source";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-async function sha256Hex(text: string): Promise<string> {
-  const data = new TextEncoder().encode(text);
-  const digest = await crypto.subtle.digest("SHA-256", data);
-  const bytes = Array.from(new Uint8Array(digest));
-  return bytes.map((b) => b.toString(16).padStart(2, "0")).join("");
-}
 
 function normalizeUrl(raw: string): string {
   try {
@@ -131,74 +158,6 @@ function cleanBatTitle(raw: string): string {
   return t;
 }
 
-function parseBatIdentityFromUrl(listingUrl: string): {
-  year: number | null;
-  make: string | null;
-  model: string | null;
-  title: string | null;
-} {
-  try {
-    const u = new URL(listingUrl);
-    // NOTE: u.pathname is percent-encoded; BaT slugs can include things like %C2%BC (¼) and %C2%BD (½).
-    // We capture the full slug (until next '/') then decode it.
-    const m = u.pathname.match(/\/listing\/(\d{4})-([^/]+)\/?$/i);
-    if (!m?.[1] || !m?.[2]) return { year: null, make: null, model: null, title: null };
-    const year = Number(m[1]);
-    if (!Number.isFinite(year) || year < 1885 || year > new Date().getFullYear() + 1) {
-      return { year: null, make: null, model: null, title: null };
-    }
-    let slug = String(m[2]);
-    try {
-      slug = decodeURIComponent(slug);
-    } catch {
-      // keep raw slug if decoding fails
-    }
-
-    const parts = slug.split("-").filter(Boolean);
-    if (parts.length < 2) return { year, make: null, model: null, title: null };
-
-    const multiWordMakes: Record<string, string> = {
-      alfa: "Alfa Romeo",
-      mercedes: "Mercedes-Benz",
-      land: "Land Rover",
-      aston: "Aston Martin",
-    };
-
-    let make: string | null = null;
-    let model: string | null = null;
-
-    const firstPart = parts[0].toLowerCase();
-    if (multiWordMakes[firstPart] && parts.length > 1) {
-      // Split on hyphen OR space. "Mercedes-Benz" is the only entry joined by a
-      // hyphen, so `.split(" ")` returned a ONE-element array, makeParts[1] was
-      // undefined, the second-token check could never match, and every Benz fell
-      // through to the single-word branch: make "Mercedes" (canonicalised back
-      // to "Mercedes-Benz" downstream) with "Benz ..." left at the head of the
-      // model. 2,343 rows carried a "-Benz ..." model, 44 of them in the 24h
-      // before this fix — it was still producing them.
-      const makeParts = multiWordMakes[firstPart].split(/[\s-]+/);
-      const secondPart = parts[1].toLowerCase();
-      if (secondPart === makeParts[1]?.toLowerCase()) {
-        make = multiWordMakes[firstPart];
-        model = parts.slice(2).map(titleCaseToken).join(" ").trim() || null;
-      } else {
-        make = titleCaseToken(parts[0]);
-        model = parts.slice(1).map(titleCaseToken).join(" ").trim() || null;
-      }
-    } else {
-      make = titleCaseToken(parts[0]);
-      model = parts.slice(1).map(titleCaseToken).join(" ").trim() || null;
-    }
-
-    if (model) model = model.replace(/\s+\d+$/, "").trim();
-
-    const title = [year, make, model].filter(Boolean).join(" ");
-    return { year, make, model, title: title || null };
-  } catch {
-    return { year: null, make: null, model: null, title: null };
-  }
-}
-
 async function trySaveHtmlSnapshot(args: {
   supabase: any;
   listingUrl: string;
@@ -206,6 +165,7 @@ async function trySaveHtmlSnapshot(args: {
   success: boolean;
   errorMessage: string | null;
   html: string | null;
+  fetchedAt?: string | null;
   metadata?: Record<string, unknown>;
 }): Promise<void> {
   const { supabase, listingUrl, httpStatus, success, errorMessage, html, metadata } = args;
@@ -220,11 +180,13 @@ async function trySaveHtmlSnapshot(args: {
       fetch_method: "direct",
       http_status: httpStatus,
       success,
+      fetched_at: args.fetchedAt ?? new Date().toISOString(),
       error_message: errorMessage,
-      html: htmlText,
+      // v4: a receipt, not a copy. The hash + length prove what was read; the page lives at BaT.
+      html: null,
       html_sha256: htmlSha,
       content_length: contentLength,
-      metadata: metadata || {},
+      metadata: { ...(metadata || {}), rows_only: true, extractor_version: EXTRACTOR_VERSION },
     };
 
     const { error } = await supabase.from("listing_page_snapshots").insert(payload);
@@ -311,16 +273,14 @@ function extractTitleIdentity(html: string, listingUrl: string): { title: string
   const yearMatch = cleanedTitle.match(/\b(19|20)\d{2}\b/);
   const year = yearMatch?.[0] ? parseInt(yearMatch[0], 10) : null;
 
-  let make = urlIdentity.make;
-  let model = urlIdentity.model;
-
-  if (yearMatch?.[0] && make) {
-    const afterYear = cleanedTitle.slice(cleanedTitle.indexOf(yearMatch[0]) + yearMatch[0].length).trim();
-    if (afterYear && afterYear.toLowerCase().startsWith(make.toLowerCase())) {
-      const afterMake = afterYear.slice(make.length).trim();
-      if (afterMake) model = afterMake;
-    }
-  }
+  // v4.1 (2026-09-27): BaT's own Make link on the page is the make (readBatTaxonomy), the slug's make the
+  // fallback; the title's decoration never is ("Coyote-Powered …", "38-Years-Owned, …", "Pair of …" stood as
+  // makes on 69 rows). The model is the title after the make — which also reads a year-less title once the make
+  // is known ("Coyote-Powered Ford Mustang GT Fastback by Revology" → Mustang GT Fastback by Revology).
+  const taxonomy = readBatTaxonomy(h);
+  const fromTitle = parseBatIdentityFromTitle(cleanedTitle, taxonomy.make ?? urlIdentity.make);
+  const make = taxonomy.make ?? urlIdentity.make ?? fromTitle.make;
+  let model = fromTitle.model ?? urlIdentity.model;
 
   // Guard against SEO chrome pollution
   const modelLower = String(model || "").toLowerCase();
@@ -344,6 +304,7 @@ function extractEssentials(html: string): {
   listing_category: string | null;
   vin: string | null;
   mileage: number | null;
+  mileage_claim: string | null; // BaT's qualifier on the reading: "shown", "shown, TMU", "TMU"
   exterior_color: string | null;
   interior_color: string | null;
   transmission: string | null;
@@ -353,6 +314,9 @@ function extractEssentials(html: string): {
   reserve_status: string | null;
   auction_end_date: string | null; // YYYY-MM-DD
   auction_end_at: string | null; // ISO timestamp (UTC) when available
+  auction_end_source: string | null; // data-ends | result_stamp | countdown | auction_record
+  auction_closed_at: string | null; // the closed page's own result stamp; null while the lot runs
+  auction_withdrawn: boolean; // the result line says "Withdrawn on <date>": no sale, no reserve result
   bid_count: number;
   comment_count: number;
   view_count: number;
@@ -508,23 +472,14 @@ function extractEssentials(html: string): {
   if (/\bReserve Met\b/i.test(reserveScope)) reserve_status = "reserve_met";
   if (statsHasReserveNotMet) reserve_status = "reserve_not_met";
 
-  // Auction end date
-  let auction_end_date: string | null = null;
-  let auction_end_at: string | null = null;
-  const endsMatch = h.match(/data-ends="(\d+)"/i);
-  if (endsMatch?.[1]) {
-    const ts = parseInt(endsMatch[1], 10);
-    if (Number.isFinite(ts) && ts > 0) {
-      const dt = new Date(ts * 1000);
-      auction_end_at = dt.toISOString();
-      auction_end_date = auction_end_at.split("T")[0];
-    }
-  }
-  if (!auction_end_date) {
-    // Active listings often expose a countdown date string like "2025-12-16-19-08-57".
-    const m = h.match(/data-auction-ends="(\d{4}-\d{2}-\d{2})-\d{2}-\d{2}-\d{2}"/i);
-    if (m?.[1]) auction_end_date = String(m[1]);
-  }
+  // Auction end: the lot's own countdown while it runs, its own result stamp once closed — never the countdown of
+  // another lot in the page's "Current BaT Auctions" widget (readOwnAuctionEnd, _shared/batAuctionRecord.ts).
+  const ownEnd = readOwnAuctionEnd(h);
+  const auction_end_at: string | null = ownEnd.endsAt ?? ownEnd.closedAt;
+  const auction_end_date: string | null = auction_end_at ? auction_end_at.slice(0, 10) : ownEnd.endsDate;
+  const auction_end_source: string | null = ownEnd.endsFrom ?? (ownEnd.closedAt ? "result_stamp" : null);
+  const auction_closed_at: string | null = ownEnd.closedAt;
+  const auction_withdrawn = ownEnd.withdrawn;
 
   // Bid/comment/view/watcher counts
   const bidCountMatch = h.match(/"type":"bat-bid"/g);
@@ -561,7 +516,7 @@ function extractEssentials(html: string): {
   const bidToMatch = text.match(/Bid\s+to\s+(?:USD\s*)?\$?\s*([0-9,.]+(?:\.[0-9]+)?\s*[kKmM]?)/i);
   if (!sale_price && bidToMatch?.[1]) {
     const n = parseMoney(bidToMatch[1]);
-    if (Number.isFinite(n) && n > 0) high_bid = n;
+    if (n !== null && Number.isFinite(n) && n > 0) high_bid = n;
   }
 
   // SOLD signals (prefer title for low-noise extraction).
@@ -571,7 +526,7 @@ function extractEssentials(html: string): {
     : null;
   if (!sale_price && !statsHasReserveNotMet && titleSoldMatch?.[1]) {
     const n = parseMoney(titleSoldMatch[1]);
-    if (Number.isFinite(n) && n > 0) {
+    if (n !== null && Number.isFinite(n) && n > 0) {
       sale_price = n;
       high_bid = high_bid || n;
     }
@@ -595,7 +550,7 @@ function extractEssentials(html: string): {
       const m = soldSearchScope.match(p);
       if (m?.[1]) {
         const n = parseMoney(m[1]);
-        if (Number.isFinite(n) && n > 0) {
+        if (n !== null && Number.isFinite(n) && n > 0) {
           sale_price = n;
           high_bid = high_bid || n;
           break;
@@ -631,6 +586,7 @@ function extractEssentials(html: string): {
   // Listing Details list items (VIN/chassis, mileage, colors, transmission, engine)
   let vin: string | null = null;
   let mileage: number | null = null;
+  let mileage_claim: string | null = null;
   let exterior_color: string | null = null;
   let interior_color: string | null = null;
   let transmission: string | null = null;
@@ -651,8 +607,10 @@ function extractEssentials(html: string): {
 
     for (const t of items) {
       if (!vin) {
-        const idMatch = t.match(/^(?:VIN|Chassis)\s*:\s*([A-HJ-NPR-Z0-9]{11,17})\b/i);
-        if (idMatch?.[1]) vin = idMatch[1].toUpperCase().trim();
+        // _shared/batChassis.ts: a 17-character VIN, or a 5-16 character chassis. A 17-character VIN that fails its check
+        // digit is handed on as stated, so the vinCheckDigitOk guard below still nulls it and keeps its receipt.
+        const chassis = chassisFromListItemText(t);
+        if (chassis) vin = chassis.value ?? (chassis.rejected === "check_digit" ? chassis.candidate : null);
       }
       if (!mileage) {
         const milesMatch =
@@ -669,6 +627,14 @@ function extractEssentials(html: string): {
           const n = Math.round(parseFloat(milesKMatch[1]) * 1000);
           if (Number.isFinite(n) && n > 0 && n < 10000000) mileage = n;
         }
+      }
+      // BaT's qualifier on the reading: "10k Miles Shown, TMU" = the odometer shows 10k and the true total is
+      // unknown; "Miles Shown" = the reading, not verified. A plain "Miles" line carries no qualifier.
+      if (!mileage_claim && t.length <= 80 && /\b(?:miles?|kilometers?|km|TMU)\b/i.test(t) &&
+          /\b(?:TMU|true mileage unknown|shown|indicated)\b/i.test(t)) {
+        const tmu = /\bTMU\b|true mileage unknown/i.test(t);
+        const shown = /\b(?:shown|indicated)\b/i.test(t);
+        mileage_claim = tmu ? (shown ? "shown, TMU" : "TMU") : "shown";
       }
       if (!transmission) {
         const looksLikeTransmission =
@@ -760,6 +726,7 @@ function extractEssentials(html: string): {
     listing_category,
     vin,
     mileage,
+    mileage_claim,
     exterior_color,
     interior_color,
     transmission,
@@ -769,6 +736,9 @@ function extractEssentials(html: string): {
     reserve_status,
     auction_end_date,
     auction_end_at,
+    auction_end_source,
+    auction_closed_at,
+    auction_withdrawn,
     bid_count,
     comment_count,
     view_count,
@@ -984,7 +954,7 @@ async function trySaveExtractionMetadata(args: {
 async function tryUpsertAuctionTimelineEvent(args: {
   supabase: any;
   vehicleId: string;
-  eventType: "auction_sold" | "auction_reserve_not_met" | "auction_ended";
+  eventType: "auction_listed" | "auction_sold" | "auction_reserve_not_met" | "auction_ended";
   eventDateYmd: string; // YYYY-MM-DD
   title: string;
   description?: string | null;
@@ -1032,6 +1002,75 @@ async function tryUpsertAuctionTimelineEvent(args: {
   } catch (e: any) {
     console.warn(`timeline_events insert failed (non-fatal): ${e?.message || String(e)}`);
   }
+}
+
+// The end event of one listing, written once the auction is over (auctionClose). An auction_ended row the listing
+// got while it ran, on another day, or beside its result is retired through supersede_timeline_events with this row
+// as its replacement — kept whole in superseded_rows, never edited (planEndRows, ./auctionClose.ts).
+async function writeAuctionEndEvent(args: {
+  supabase: any;
+  vehicleId: string;
+  eventType: "auction_sold" | "auction_reserve_not_met" | "auction_ended";
+  eventDateYmd: string;
+  title: string;
+  description: string | null;
+  sourceUrl: string;
+  costAmount: number | null;
+  metadata: Record<string, any>;
+  readAt: string | null;
+  readBasis: string;
+}): Promise<{ id: string | null; inserted: boolean; retired: number; error: string | null }> {
+  const ymd = String(args.eventDateYmd || "").slice(0, 10);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(ymd)) return { id: null, inserted: false, retired: 0, error: `end event date ${ymd || "missing"}` };
+  const { data: rows, error: readError } = await args.supabase
+    .from("timeline_events")
+    .select("id, event_type, event_date, created_at, metadata, data_source")
+    .eq("vehicle_id", args.vehicleId)
+    .in("event_type", END_EVENT_TYPES as unknown as string[])
+    .contains("metadata", { source_url: args.sourceUrl })
+    .limit(50);
+  if (readError) return { id: null, inserted: false, retired: 0, error: `end event lookup failed: ${readError.message}` };
+  const plan = planEndRows((rows ?? []) as EndRow[], { eventType: args.eventType, eventDate: ymd });
+  let id = plan.keepId;
+  let inserted = false;
+  if (!id) {
+    const { data, error } = await args.supabase.from("timeline_events").insert({
+      vehicle_id: args.vehicleId,
+      user_id: null,
+      event_type: args.eventType,
+      source: "bat",
+      title: args.title,
+      description: args.description,
+      event_date: ymd,
+      cost_amount: typeof args.costAmount === "number" && Number.isFinite(args.costAmount) ? args.costAmount : null,
+      cost_currency: typeof args.costAmount === "number" ? "USD" : null,
+      metadata: { ...args.metadata, source_url: args.sourceUrl, read_at: args.readAt, read_basis: args.readBasis },
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+      confidence_score: 85,
+      data_source: "extract-bat-core",
+      source_type: "system",
+    }).select("id").single();
+    if (error) return { id: null, inserted: false, retired: 0, error: `end event insert failed: ${error.message}` };
+    id = String(data.id);
+    inserted = true;
+  }
+  if (!plan.retire.length) return { id, inserted, retired: 0, error: null };
+  const { data: result, error: retireError } = await args.supabase.rpc("supersede_timeline_events", {
+    p_rows: plan.retire.map((r) => ({
+      event_id: r.id,
+      expected_vehicle_id: args.vehicleId,
+      expected_event_type: r.event_type,
+      replacement_event_id: id,
+      source: { type: "listing_page", ref: args.sourceUrl, read_at: args.readAt, basis: args.readBasis },
+      reason: writtenBeforeItsEnd(r)
+        ? "BaT end event written while the auction was still running: its date was the scheduled end and its amount the bid at that read, not a result"
+        : `BaT end event replaced by this listing's ${args.eventType} on ${ymd}, read after the close`,
+    })),
+    p_asserted_by: EXTRACTOR_VERSION,
+  });
+  if (retireError) return { id, inserted, retired: 0, error: `end event supersession failed: ${retireError.message}` };
+  return { id, inserted, retired: Number(result?.retired ?? 0), error: null };
 }
 
 async function tryUpsertMileageTimelineEvent(args: {
@@ -1084,17 +1123,107 @@ async function tryUpsertMileageTimelineEvent(args: {
 }
 
 Deno.serve(async (req) => {
+  // Writes are never anonymous: service key, signed-in user, or nothing (P0.2, 2026-09-27).
+  const denied = await requireWriteAuth(req);
+  if (denied) return denied;
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
 
   try {
     const supabaseUrl = (Deno.env.get("SUPABASE_URL") ?? "").trim();
-    const serviceRoleKey = (Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? Deno.env.get("SERVICE_ROLE_KEY") ?? "").trim();
+    const serviceRoleKey = (projectSecretKey() ?? "").trim();
     if (!supabaseUrl) throw new Error("Missing SUPABASE_URL");
     if (!serviceRoleKey) throw new Error("Missing SUPABASE_SERVICE_ROLE_KEY");
 
-    const supabase = createClient(supabaseUrl, serviceRoleKey);
-
     const body = await req.json().catch(() => ({}));
+    if (body?.mode === "live_stream") {
+      const writer = await authenticateWriter(req);
+      if (!writer.ok || writer.caller.kind !== "service_role") {
+        return new Response(JSON.stringify({ error: "Live collection requires service role" }),
+          { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      }
+      if (Object.keys(body).some(k => !["mode", "dry_run"].includes(k))
+        || (body.dry_run !== undefined && typeof body.dry_run !== "boolean")) throw new Error("Invalid live stream selectors");
+      const db = createClient(supabaseUrl, serviceRoleKey, { global: { headers: { "X-Nuke-Writer": "extract-bat-core" } } });
+      const targets = await closingBatTargets(db);
+      if (body.dry_run !== true && targets.length) {
+        EdgeRuntime.waitUntil(collectBatLive(targets, batStreamIO(supabaseUrl, serviceRoleKey)));
+      }
+      return new Response(JSON.stringify({ success: true, mode: body.mode, dry_run: body.dry_run === true,
+        selected_lots: targets.length, collector_duration_seconds: 115, model_calls: 0,
+        transport: "public_pusher", targets: body.dry_run === true ? targets : undefined }),
+        { status: body.dry_run === true ? 200 : 202, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
+    if (body?.mode === "description_source") {
+      const writer = await authenticateWriter(req);
+      if (!writer.ok || writer.caller.kind !== "service_role") {
+        return new Response(JSON.stringify({ error: "Protected description source requires service role" }),
+          { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      }
+      const allowed = new Set(["mode", "vehicle_id", "snapshot_id", "expected_capture_sha256", "dry_run"]);
+      if (req.method !== "POST" || Object.keys(body).some(key => !allowed.has(key)) ||
+          typeof body.vehicle_id !== "string" || typeof body.snapshot_id !== "string" ||
+          !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(body.vehicle_id) ||
+          !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(body.snapshot_id) ||
+          typeof body.expected_capture_sha256 !== "string" || !/^[0-9a-f]{64}$/i.test(body.expected_capture_sha256) ||
+          (body.dry_run !== undefined && typeof body.dry_run !== "boolean")) {
+        return new Response(JSON.stringify({ error: "One vehicle, pinned snapshot/hash and boolean dry_run only" }),
+          { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      }
+      const supabase = createClient(supabaseUrl, serviceRoleKey, {
+        global: { headers: { "X-Nuke-Writer": "extract-bat-core" } },
+      });
+      const publicParent = async () => {
+        const { data, error } = await supabase.from("vehicles")
+          .select("id,listing_url,discovery_url,origin_metadata").eq("id", body.vehicle_id)
+          .eq("is_public", true).is("deleted_at", null)
+          .or("listing_kind.is.null,listing_kind.neq.non_vehicle_item").maybeSingle();
+        if (error || !data || data.id !== body.vehicle_id) throw new Error("Public description parent unavailable");
+        const source = new URL(data.listing_url || data.discovery_url || "");
+        if (!["http:", "https:"].includes(source.protocol) ||
+            !["bringatrailer.com", "www.bringatrailer.com"].includes(source.hostname) ||
+            !source.pathname.startsWith("/listing/")) throw new Error("Public BaT listing source unknown");
+        return data;
+      };
+      const pin = { id: body.snapshot_id, sha256: body.expected_capture_sha256 };
+      let input = await loadDescriptionInput(supabase, await publicParent(), new Date().toISOString(), pin);
+      if (input.custody !== "protected_snapshot" || input.sourceRef !== `listing_page_snapshots:${pin.id}`) {
+        throw new Error("Pinned protected description source unavailable; no fallback");
+      }
+      const textFingerprint = await descriptionInputFingerprint(input);
+      const dryRun = body.dry_run !== false;
+      if (!dryRun) {
+        const current = await loadDescriptionInput(supabase, await publicParent(), new Date().toISOString(), pin);
+        if (current.sourceRef !== input.sourceRef || current.sourceUrl !== input.sourceUrl ||
+            current.capturedAt !== input.capturedAt || current.ingestedAt !== input.ingestedAt ||
+            current.captureSha256 !== input.captureSha256 || current.textField !== input.textField ||
+            await descriptionInputFingerprint(current) !== textFingerprint) {
+          throw new Error("Protected description source changed during admission; intake refused");
+        }
+        input = current;
+      }
+      const receipt = await recordListingDescription(supabase, {
+        vehicleId: body.vehicle_id, sourceUrl: input.sourceUrl, text: input.text,
+        capturedAt: input.capturedAt || null, extractorVersion: EXTRACTOR_VERSION,
+        captureBasis: "snapshot", captureSha256: input.captureSha256 || "", snapshotId: pin.id,
+        snapshotCustody: { vehicleId: body.vehicle_id, matched: true, sha256: input.captureSha256 },
+        sourceTextField: input.textField, sourceArchiveIngestedAt: input.ingestedAt,
+        dryRun, strictReceipt: true,
+      });
+      if (receipt.status !== (dryRun ? "preview" : "recorded")) {
+        throw new Error(`Protected description ${receipt.status}: ${receipt.reason || "No receipt"}`);
+      }
+      return new Response(JSON.stringify({ success: true, mode: body.mode, dry_run: dryRun,
+        vehicle_id: body.vehicle_id, snapshot_id: pin.id, ...descriptionPreview(input),
+        input_sha256: textFingerprint, description_receipt: receipt, model_calls: 0,
+        writes: dryRun || receipt.duplicate ? 0 : 1,
+        admission_basis: "service-verified protected capture with repeated checks; multi-request, not atomic" }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
+
+    const supabase = createClient(supabaseUrl, serviceRoleKey, {
+      global: { headers: { "X-Nuke-Writer": "extract-bat-core" } },
+    });
+
     const inputUrl = String(body?.url || body?.auction_url || "").trim();
     const providedVehicleId = body?.vehicle_id ? String(body.vehicle_id) : null;
 
@@ -1116,10 +1245,18 @@ Deno.serve(async (req) => {
       ].filter(Boolean))
     );
 
+    // v4: phase timings (ms) in the response and the log — the per-lot cost has to be measurable
+    const phaseStart = Date.now();
+    let phaseLast = phaseStart;
+    const timings: Record<string, number> = {};
+    const mark = (k: string) => { const now = Date.now(); timings[k] = (timings[k] ?? 0) + (now - phaseLast); phaseLast = now; };
     let html = "";
     let httpStatus: number | null = null;
     let userAgent = "";
     let htmlSource: "snapshot" | "direct" = "direct";
+    let sourceFetchedAt: string | null = null;
+    let descriptionSnapshotId: string | null = null;
+    let descriptionSnapshotCustody: { vehicleId?: string; matched?: boolean; sha256?: string | null } | undefined;
 
     // Prefer existing DB snapshots (reduces BaT load + avoids bans). Can be disabled per-request.
     const preferSnapshot = body?.prefer_snapshot === false ? false : true;
@@ -1127,7 +1264,7 @@ Deno.serve(async (req) => {
       try {
         const { data: snap, error: snapErr } = await supabase
           .from("listing_page_snapshots")
-          .select("id, html, http_status, fetched_at")
+          .select("id, html, http_status, fetched_at, html_sha256, metadata")
           .eq("platform", "bat")
           .eq("success", true)
           .eq("http_status", 200)
@@ -1142,6 +1279,10 @@ Deno.serve(async (req) => {
           httpStatus = typeof (snap as any)?.http_status === "number" ? (snap as any).http_status : 200;
           userAgent = `snapshot:${String((snap as any)?.id || "")}`;
           htmlSource = "snapshot";
+          sourceFetchedAt = typeof snap.fetched_at === "string" ? snap.fetched_at : null;
+          descriptionSnapshotId = String(snap.id);
+          descriptionSnapshotCustody = { vehicleId: snap.metadata?.vehicle_id,
+            matched: snap.metadata?.vehicle_matched, sha256: snap.html_sha256 };
           console.log(`extract-bat-core: using snapshot for ${listingUrlCanonical}`);
         }
       } catch (e: any) {
@@ -1152,6 +1293,7 @@ Deno.serve(async (req) => {
       console.log(`extract-bat-core: fetching ${listingUrlNorm}`);
       try {
         const fetched = await fetchHtmlDirect(listingUrlNorm);
+        sourceFetchedAt = new Date().toISOString();
         html = fetched.html;
         httpStatus = fetched.status;
         userAgent = fetched.userAgent;
@@ -1174,14 +1316,69 @@ Deno.serve(async (req) => {
         listingUrl: listingUrlNorm,
         httpStatus,
         success: true,
+        fetchedAt: sourceFetchedAt,
         errorMessage: null,
         html,
         metadata: { extractor: "extract-bat-core", mode: "free", user_agent: userAgent },
       });
     }
 
+    mark("fetch_or_snapshot");
     const identity = extractTitleIdentity(html, listingUrlCanonical);
     const essentials = extractEssentials(html);
+
+    // v4: the page's own auction record is the price authority. The stats table / title say
+    // "Bid to $23,000 (Reserve Not Met)" on a lot whose record says "Sold on 04/11/2025 for
+    // $24,000 to nocera76" (seller accepted after the close) — the record wins.
+    const auction = summarizeAuction(html);
+    // the comments JSON, parsed once: the first comment or bid is the auction's public start, the sale /
+    // reserve-not-met record its close (Skylar: interactions on the timeline at their precise moments)
+    const rawComments: any[] = readCommentsJson(html) ?? [];
+    const firstActivityAt: string | null = (() => {
+      let min = Infinity;
+      for (const c of rawComments) { const t = Number(c?.timestamp); if (Number.isFinite(t) && t > 0 && t < min) min = t; }
+      return Number.isFinite(min) ? new Date(min * 1000).toISOString() : null;
+    })();
+    if (auction.parsed) {
+      if (auction.sold) {
+        essentials.sale_price = auction.saleAmount ?? essentials.sale_price;
+        essentials.buyer_username = auction.buyer ?? essentials.buyer_username;
+        essentials.high_bid = auction.highBid ?? essentials.high_bid ?? essentials.sale_price;
+        essentials.reserve_status = auction.soldAfterReserveNotMet
+          ? "reserve_not_met"
+          : (essentials.reserve_status === "reserve_not_met" ? "reserve_met" : essentials.reserve_status);
+      } else if (auction.reserveNotMet) {
+        essentials.sale_price = null;
+        essentials.buyer_username = null;
+        essentials.high_bid = auction.highBid ?? auction.reserveNotMetAmount ?? essentials.high_bid;
+        essentials.reserve_status = "reserve_not_met";
+      } else {
+        // no closing record (live auction, or a comments payload without one): never assert a sale
+        essentials.sale_price = null;
+        essentials.buyer_username = null;
+        if (auction.highBid) essentials.high_bid = auction.highBid;
+      }
+      if (auction.bidCount) essentials.bid_count = auction.bidCount;
+      if (auction.commentCount) essentials.comment_count = auction.commentCount;
+      // a closed page carries no data-ends; the sale / reserve-not-met record is stamped at the close
+      if (!essentials.auction_end_date && auction.recordAt) {
+        essentials.auction_end_at = auction.recordAt;
+        essentials.auction_end_date = auction.recordAt.slice(0, 10);
+        essentials.auction_end_source = "auction_record";
+      }
+    }
+    // buyer only on a sold lot
+    const saleNow = Number(essentials.sale_price) > 0;
+    if (!saleNow) essentials.buyer_username = null;
+    // a 17-character VIN must pass its check digit; a failing one is kept as a receipt, never written
+    const vinRejected = vinCheckDigitOk(essentials.vin) === false ? String(essentials.vin) : null;
+    if (vinRejected) essentials.vin = null;
+    let saleSupersession: any = null;
+    let auctionEventId: string | null = null;
+    let commentsWritten = 0;
+    let commentsWriteError: string | null = null;
+    let bidsWritten = 0;
+
     const batCategory = essentials.listing_category ? String(essentials.listing_category).trim() : null;
     const listingKind = batCategory && batCategory.toLowerCase() === "parts" ? "non_vehicle_item" : "vehicle";
     const descriptionRaw = extractDescription(html);
@@ -1198,6 +1395,7 @@ Deno.serve(async (req) => {
     const bestListingLocation = essentials.location || null;
     const parsedLocation = parseLocation(essentials.location);
 
+    mark("parse");
     // Resolve existing vehicle
     let vehicleId: string | null = providedVehicleId;
     let existing: any | null = null;
@@ -1241,19 +1439,37 @@ Deno.serve(async (req) => {
         vehicleId = String(data.id);
       }
     }
-    // Also check by VIN to prevent duplicate key constraint violations
-    if (!vehicleId && essentials.vin && essentials.vin.length >= 5) {
-      const { data } = await supabase
-        .from("vehicles")
-        .select("id")
-        .eq("vin", essentials.vin)
-        .limit(1)
-        .maybeSingle();
-      if (data?.id) {
-        vehicleId = String(data.id);
+    // Also check by VIN to prevent duplicate key constraint violations.
+    // v4: through find_vehicle_by_vin() — `vin = $1` matched none of the four VIN indexes (all partial or
+    // on upper(vin)) and cost a 920K-row seq scan per new lot (16–60 s measured 2026-09-27); the function
+    // reads idx_vehicles_vin_norm_trim. The column filter stays as a loud fallback only.
+    // Only the region this lookup always trusted (11-17 characters of the VIN alphabet) may pick a vehicle: a 5-10
+    // character chassis is shared between makes, and resolving by it would fold two cars into one row.
+    if (!vehicleId && isIdentityGradeVin(essentials.vin)) {
+      const { data: byVin, error: byVinErr } = await supabase.rpc("find_vehicle_by_vin", { p_vin: essentials.vin });
+      if (!byVinErr && byVin) {
+        vehicleId = String(byVin);
+      } else if (byVinErr) {
+        console.warn(`find_vehicle_by_vin unavailable (${byVinErr.message}); falling back to the column filter (slow)`);
+        const { data } = await supabase
+          .from("vehicles")
+          .select("id")
+          .eq("vin", essentials.vin)
+          .limit(1)
+          .maybeSingle();
+        if (data?.id) vehicleId = String(data.id);
       }
     }
 
+    mark("resolve_vehicle");
+    let streamOwnsAuction = false;
+    if (vehicleId) {
+      const { data: liveMonitor } = await supabase.from("monitored_auctions")
+        .select("stream_state").eq("vehicle_id", vehicleId).in("external_auction_url", urlCandidates).limit(1).maybeSingle();
+      const state = liveMonitor?.stream_state;
+      streamOwnsAuction = Object.values(state?.sessions || {}).some((s: any) => s.connected && Date.parse(s.at) > Date.now() - 15000)
+        || (state?.last_frame_received_at && Date.parse(state.last_frame_received_at) > Date.parse(sourceFetchedAt || ""));
+    }
     const createdIds: string[] = [];
     const updatedIds: string[] = [];
 
@@ -1269,7 +1485,9 @@ Deno.serve(async (req) => {
         year: identity.year || null,
         make: identity.make || null,
         model: identity.model || null,
-        vin: essentials.vin || null,
+        // an identity-grade VIN goes in the INSERT as before; any other chassis lands right after it (below), so a same-make
+        // unique conflict on a short chassis can never fail the lot
+        vin: isIdentityGradeVin(essentials.vin) ? essentials.vin : null,
         description: description || null,
         description_source: description ? "source_imported" : null,
         listing_title: identity.title || null,
@@ -1278,6 +1496,7 @@ Deno.serve(async (req) => {
         listing_kind: listingKind,
         discovery_url: listingUrlCanonical,
         discovery_source: "bat_core",
+        platform_source: "bringatrailer", // C7: the platform key (source_registry.slug); the live pull schedules on it
         profile_origin: "url_scraper",
         import_method: "scraper",
         is_public: true,
@@ -1287,6 +1506,10 @@ Deno.serve(async (req) => {
         bat_buyer: essentials.buyer_username || null,
         bat_location: essentials.location || null,
         listing_location: parsedLocation.clean,
+        // city / state as their own columns: marketplace_metro_pulse and the EXPLORE metro map roll up
+        // by them (the July line persisted them; the public-history rewrite dropped it — drift audit 2026-09-27)
+        city: parsedLocation.city,
+        state: parsedLocation.state,
         listing_location_raw: parsedLocation.raw,
         listing_location_source: 'bat',
         listing_location_confidence: parsedLocation.confidence,
@@ -1300,6 +1523,10 @@ Deno.serve(async (req) => {
         auction_end_date: essentials.auction_end_date || null,
         sale_price: essentials.sale_price || null,
         high_bid: essentials.high_bid || null,
+        // v4: a consummated sale is a STATUS (clean_vehicle_prices.is_sold reads sale_status)
+        sale_status: saleNow ? "sold" : (essentials.reserve_status === "reserve_not_met" ? "not_sold" : null),
+        auction_outcome: saleNow ? "sold" : (essentials.reserve_status === "reserve_not_met" ? "reserve_not_met" : null),
+        sale_date: saleNow ? (essentials.auction_end_date || null) : null,
         mileage: essentials.mileage || null,
         color: bestExteriorColor || null,
         interior_color: bestInteriorColor || null,
@@ -1337,6 +1564,11 @@ Deno.serve(async (req) => {
       if (!inserted?.id) throw new Error("vehicles insert succeeded but no ID returned");
       vehicleId = String(inserted.id);
       createdIds.push(vehicleId);
+      if (essentials.vin && !isIdentityGradeVin(essentials.vin)) {
+        // a unique conflict here only means another row of the same make already holds this chassis; the lot stays VIN-less
+        const { error: chassisErr } = await supabase.from("vehicles").update({ vin: essentials.vin }).eq("id", vehicleId);
+        if (chassisErr) console.warn(`chassis ${essentials.vin} not landed on ${vehicleId}: ${chassisErr.message || chassisErr}`);
+      }
     } else {
       // Update existing vehicle (conservative: only fill missing or polluted fields)
       if (!existing) {
@@ -1353,6 +1585,7 @@ Deno.serve(async (req) => {
         discovery_url: existing?.discovery_url || listingUrlCanonical,
         listing_url: existing?.listing_url || listingUrlCanonical,
         listing_source: existing?.listing_source || "bat",
+        platform_source: existing?.platform_source || "bringatrailer", // C7: fill the platform key when missing
         // Prefer to only mark non-vehicle, never downgrade.
         ...(listingKind === "non_vehicle_item" ? { listing_kind: "non_vehicle_item" } : {}),
         updated_at: new Date().toISOString(),
@@ -1375,7 +1608,14 @@ Deno.serve(async (req) => {
         // reference vehicle, the K5 Blazer). A blanket <=2 would flag every
         // existing K5 as "polluted" and overwrite it on re-extraction.
         modelLower.trim().length <= 1 ||
-        /^(benz|rover|romeo|martin|davidson)\s/.test(modelLower.trim());
+        /^(benz|rover|romeo|martin|davidson|royce|healey|tomaso|general|camino)\s/.test(modelLower.trim());
+      // A title descriptor the old first-word split took for the make ("Coyote-Powered", "38-Years-Owned,",
+      // "Modified", "Pair"): the same shapes is_garbage_make() now rejects at the table (2026-09-27). A row that
+      // carries one loses to the page's own Make link on re-read.
+      const makeIsPolluted =
+        /-(powered|owned|mile|miles|kilometer|kilometers|swapped|built|driven|equipped)[,:]?$/.test(makeLower.trim()) ||
+        /^(modified|custom|supercharged|turbocharged|restored|backdated|lifted|euro|jdm|japanese-market|no-reserve|one-owner|original-owner|single-family-owned|fuel-injected|pair|set|lot|group)[,:]?$/.test(makeLower.trim()) ||
+        /^[0-9]/.test(makeLower.trim());
 
       const looksLikeBatBoilerplate = (t: string): boolean => {
         const s = String(t || "").toLowerCase();
@@ -1462,6 +1702,7 @@ Deno.serve(async (req) => {
         !existing?.year ||
         !existing?.make ||
         makeLower === "unknown" ||
+        makeIsPolluted ||
         !existing?.model ||
         modelLower === "unknown" ||
         modelIsPolluted
@@ -1492,9 +1733,13 @@ Deno.serve(async (req) => {
 
       if ((!existing?.bat_seller || listingIsLatestOrEqual) && essentials.seller_username) updatePayload.bat_seller = essentials.seller_username;
       if ((!existing?.bat_buyer || listingIsLatestOrEqual) && essentials.buyer_username) updatePayload.bat_buyer = essentials.buyer_username;
+      // v4: buyer only on a sold lot — the latest listing did not sell, so no buyer stands
+      if (listingIsLatestOrEqual && !saleNow && existing?.bat_buyer && String(existing.sale_status || "").toLowerCase() !== "sold") updatePayload.bat_buyer = null;
       if ((!existing?.bat_location || listingIsLatestOrEqual) && essentials.location) updatePayload.bat_location = essentials.location;
       if ((!existing?.listing_location || listingIsLatestOrEqual) && parsedLocation.clean) {
         updatePayload.listing_location = parsedLocation.clean;
+        if (parsedLocation.city) updatePayload.city = parsedLocation.city;
+        if (parsedLocation.state) updatePayload.state = parsedLocation.state;
         updatePayload.listing_location_raw = parsedLocation.raw;
         updatePayload.listing_location_source = 'bat';
         updatePayload.listing_location_confidence = parsedLocation.confidence;
@@ -1575,9 +1820,17 @@ Deno.serve(async (req) => {
       const hasExtractedSale = typeof extractedSalePrice === "number" && Number.isFinite(extractedSalePrice) && extractedSalePrice > 0;
       const hasExtractedBid = typeof extractedHighBid === "number" && Number.isFinite(extractedHighBid) && extractedHighBid > 0;
 
-      // Always keep auction_end_date in sync when we have it (it's used for auction state and display).
-      if (extractedEndDate && listingIsLatestOrEqual && (!existing?.auction_end_date || existing?.auction_end_date !== extractedEndDate)) {
-        updatePayload.auction_end_date = extractedEndDate;
+      // Keep auction_end_date in sync (auction state and display), with the full end time when the page gives one.
+      // A bare date lands as midnight UTC, which reads as ended for a lot still running: a 2006 Tundra left the live
+      // board 00:04-00:15Z on 2026-09-30 until the next sync restored it (bat-data coverage audit, P0b). A date-only
+      // value never overwrites a known time on the same day.
+      const extractedEndAt = essentials.auction_end_at || null;
+      const extractedEndValue = extractedEndAt || extractedEndDate;
+      if (extractedEndValue && listingIsLatestOrEqual) {
+        const existingEnd = existing?.auction_end_date ? String(existing.auction_end_date) : null;
+        const sameInstant = existingEnd != null && Date.parse(existingEnd) === Date.parse(extractedEndValue);
+        const wouldTruncate = !extractedEndAt && existingEnd != null && existingEnd.slice(0, 10) === extractedEndDate;
+        if (!sameInstant && !wouldTruncate) updatePayload.auction_end_date = extractedEndValue;
       }
 
       // Reserve status: if we have a confident extraction, allow overwriting stale/wrong values.
@@ -1597,9 +1850,11 @@ Deno.serve(async (req) => {
           updatePayload.sale_price = extractedSalePrice;
         }
 
-        // When sold, high_bid should equal the sold price.
-        if (!existingHighBid || existingHighBid !== extractedSalePrice) {
-          updatePayload.high_bid = extractedSalePrice;
+        // When sold, high_bid is the closing bid — equal to the price unless the seller accepted a
+        // post-auction offer (then the record's price beats the bid; v4).
+        const soldHighBid = hasExtractedBid ? extractedHighBid : extractedSalePrice;
+        if (!existingHighBid || existingHighBid !== soldHighBid) {
+          updatePayload.high_bid = soldHighBid;
         }
 
         // Make the vehicle row consistent (some UIs fall back to vehicles.* if vehicle_events is blocked by RLS).
@@ -1640,9 +1895,14 @@ Deno.serve(async (req) => {
           updatePayload.high_bid = extractedHighBid;
         }
 
-        // Keep auction_outcome consistent (best-effort; depends on schema).
-        if (extractedReserve === "reserve_not_met") updatePayload.auction_outcome = "reserve_not_met";
-        if (extractedReserve === "no_sale") updatePayload.auction_outcome = "no_sale";
+        // Keep auction_outcome consistent — unless the vehicle already carries a sale from an earlier lot. A later
+        // auction that didn't sell doesn't undo that sale: vehicle_sale_basis reads a no-sale outcome next to
+        // sale_status 'sold' as contradicting testimony and drops the real sale from comps (1,910 relisted BaT cars on
+        // 2026-09-28). This lot's own result is kept in its auction_events row.
+        if (!alreadySold) {
+          if (extractedReserve === "reserve_not_met") updatePayload.auction_outcome = "reserve_not_met";
+          if (extractedReserve === "no_sale") updatePayload.auction_outcome = "no_sale";
+        }
         }
       } else if (!hasExtractedBid && (extractedReserve === "reserve_not_met" || extractedReserve === "no_sale")) {
         // CRITICAL: Reserve Not Met with no bid data extracted (extraction may have failed).
@@ -1653,8 +1913,11 @@ Deno.serve(async (req) => {
             updatePayload.sale_price = null;
             updatePayload.high_bid = null;
           }
-          if (extractedReserve === "reserve_not_met") updatePayload.auction_outcome = "reserve_not_met";
-          if (extractedReserve === "no_sale") updatePayload.auction_outcome = "no_sale";
+          // an earlier lot's sale stands (see above); this lot's result lives in auction_events
+          if (!alreadySold) {
+            if (extractedReserve === "reserve_not_met") updatePayload.auction_outcome = "reserve_not_met";
+            if (extractedReserve === "no_sale") updatePayload.auction_outcome = "no_sale";
+          }
         }
       } else {
         if (listingIsLatestOrEqual) {
@@ -1670,6 +1933,10 @@ Deno.serve(async (req) => {
       if (!existing?.bat_comments && essentials.comment_count) updatePayload.bat_comments = essentials.comment_count;
 
       // Normalize fields (transmission, trim, model, body_style, colors)
+      if (streamOwnsAuction && !auction.sold && !auction.reserveNotMet) {
+        for (const field of ["high_bid", "sale_status", "auction_outcome", "reserve_status", "auction_end_date", "sale_price", "sale_date", "bat_bids", "bat_comments"])
+          delete updatePayload[field];
+      }
       normalizeVehicleFields(updatePayload);
 
       // ── Tetris provenance layer: write extraction_metadata receipts ──
@@ -1734,6 +2001,47 @@ Deno.serve(async (req) => {
         }
       }
 
+      // v4: a sale field that already holds a DIFFERENT value is superseded through the chokepoint
+      // (correct_vehicle_sale_provenance_batch keeps the original + this page as the citation and
+      // refuses a stale expectation). Gap-fills stay in the direct update with their Tetris receipts.
+      const SALE_FIELDS = ["sale_price", "sale_status", "auction_outcome", "reserve_status", "high_bid", "sale_date", "auction_end_date", "bat_buyer"];
+      const supersede: Record<string, { value: string | null; expected: string }> = {};
+      for (const f of SALE_FIELDS) {
+        if (!(f in updatePayload)) continue;
+        const cur = (existing as any)?.[f];
+        if (cur === null || cur === undefined || String(cur).trim() === "") continue; // gap-fill
+        const next = updatePayload[f];
+        if (String(cur) === String(next ?? "")) { delete updatePayload[f]; continue; } // no-op
+        supersede[f] = { value: next === null || next === undefined ? null : String(next), expected: String(cur) };
+        delete updatePayload[f];
+      }
+      if (Object.keys(supersede).length > 0) {
+        const { data: sup, error: supErr } = await supabase.rpc("correct_vehicle_sale_provenance_batch", {
+          p_rows: [{
+            vehicle_id: vehicleId,
+            source: {
+              type: "bat",
+              ref: listingUrlCanonical,
+              method: auction.parsed ? "lot page auction record (comments JSON) + essentials" : "lot page essentials",
+              observed_at: new Date().toISOString(),
+              extractor: EXTRACTOR_VERSION,
+              html_source: htmlSource,
+            },
+            corrections: supersede,
+          }],
+          p_asserted_by: EXTRACTOR_VERSION,
+          p_reason: "BaT lot page re-read",
+        });
+        if (supErr) {
+          // chokepoint missing (migration 20260927010100 not applied): keep v3 behaviour, loudly
+          console.warn(`[supersede] correct_vehicle_sale_provenance_batch unavailable (${supErr.message}); writing sale fields directly`);
+          for (const [f, s] of Object.entries(supersede)) updatePayload[f] = s.value;
+          saleSupersession = { error: supErr.message, fields: Object.keys(supersede), fallback: "direct" };
+        } else {
+          saleSupersession = sup;
+        }
+      }
+
       const { error } = await supabase.from("vehicles").update(updatePayload).eq("id", vehicleId);
       if (error) {
         const e: any = error;
@@ -1791,6 +2099,23 @@ Deno.serve(async (req) => {
       updatedIds.push(vehicleId);
     }
 
+    mark("vehicle_write");
+    // v4: a VIN that failed its check digit is kept as a receipt on the vehicle, never as the vehicle's VIN
+    if (vehicleId && vinRejected) {
+      await trySaveExtractionMetadata({
+        supabase,
+        vehicleId,
+        fieldName: "vin",
+        fieldValue: vinRejected,
+        sourceUrl: listingUrlCanonical,
+        extractionMethod: "essentials_block",
+        scraperVersion: EXTRACTOR_VERSION,
+        confidenceScore: 0.2,
+        validationStatus: "invalid",
+        rawExtractionData: { reason: "vin_check_digit_failed", extractor: "extract-bat-core" },
+      });
+    }
+
     // Fire-and-forget observation write
     if (vehicleId) {
       const obsFields: Record<string, any> = {};
@@ -1801,6 +2126,7 @@ Deno.serve(async (req) => {
       if (essentials.sale_price) obsFields.sale_price = essentials.sale_price;
       if (essentials.high_bid) obsFields.high_bid = essentials.high_bid;
       if (essentials.mileage) obsFields.mileage = essentials.mileage;
+      if (essentials.mileage_claim) obsFields.mileage_claim = essentials.mileage_claim;
       if (bestExteriorColor) obsFields.color = bestExteriorColor;
       if (bestInteriorColor) obsFields.interior_color = bestInteriorColor;
       if (essentials.transmission) obsFields.transmission = essentials.transmission;
@@ -1840,6 +2166,129 @@ Deno.serve(async (req) => {
     }
 
     // Save images (external URLs only)
+    // v4: the timeline events land BEFORE the gallery. The gallery statement is the one place the lot
+    // is graded (trg_regrade_on_image, statement-level; trg_regrade_on_timeline skips system rows since
+    // 20260927090100), and compute_vehicle_grade() reads timeline_events — so the auction result and the
+    // mileage reading must exist when that single grade runs.
+    // Persist auction timeline events so the 7-day BaT window is visible: listed (start) + sold/ended (end).
+    // A running lot gets no end event (and no end-dated mileage reading): its end is a schedule, its bid not a result.
+    let endEvent: { close: ReturnType<typeof auctionClose>; id: string | null; inserted: boolean; retired: number; error: string | null } = {
+      close: auctionClose({
+        hasSale: Number.isFinite(essentials.sale_price) && (essentials.sale_price || 0) > 0,
+        recordClosed: auction.parsed && (auction.sold || auction.reserveNotMet),
+        closedAt: essentials.auction_closed_at,
+        endAt: essentials.auction_end_at,
+        readAt: sourceFetchedAt,
+      }),
+      id: null, inserted: false, retired: 0, error: null,
+    };
+    if (vehicleId && essentials.auction_end_date) {
+      const endYmd = String(essentials.auction_end_date).slice(0, 10);
+      if (/^\d{4}-\d{2}-\d{2}$/.test(endYmd)) {
+        // Standard BaT auctions run 7 days: list date = end - 7 days
+        const endDate = new Date(endYmd + "T12:00:00Z");
+        const listDate = new Date(endDate);
+        listDate.setUTCDate(listDate.getUTCDate() - 7);
+        const listDateYmd = listDate.toISOString().slice(0, 10);
+
+        await tryUpsertAuctionTimelineEvent({
+          supabase,
+          vehicleId,
+          eventType: "auction_listed",
+          eventDateYmd: firstActivityAt ? firstActivityAt.slice(0, 10) : listDateYmd,
+          title: `Listed on Bring a Trailer${essentials.lot_number ? ` (Lot #${essentials.lot_number})` : ""}`,
+          description: essentials.seller_username
+            ? `Listed by @${essentials.seller_username}. ${essentials.reserve_status === "no_reserve" ? "No Reserve." : ""}`
+            : "Auction started.",
+          source: "bat",
+          sourceUrl: listingUrlCanonical,
+          costAmount: null,
+          metadata: {
+            lot_number: essentials.lot_number,
+            seller_username: essentials.seller_username,
+            reserve_status: essentials.reserve_status,
+            auction_end_date: endYmd,
+            // the exact moment: the first comment or bid on the page, else the 7-day convention
+            listed_at: firstActivityAt ?? `${listDateYmd}T12:00:00Z`,
+            listed_at_source: firstActivityAt ? "first_comment_or_bid" : "end_minus_7_days",
+          },
+        });
+      }
+    }
+    if (vehicleId && essentials.auction_end_date && endEvent.close.over) {
+      const hasSale = Number.isFinite(essentials.sale_price) && (essentials.sale_price || 0) > 0;
+      const hasBid = Number.isFinite(essentials.high_bid) && (essentials.high_bid || 0) > 0;
+      const withdrawn = essentials.auction_withdrawn && !hasSale;
+      const eventType =
+        hasSale ? "auction_sold" :
+        (!withdrawn && essentials.reserve_status === "reserve_not_met" ? "auction_reserve_not_met" : "auction_ended");
+
+      const amount = hasSale ? (essentials.sale_price || null) : (hasBid ? (essentials.high_bid || null) : null);
+      const amountText = typeof amount === "number" && amount > 0 ? `$${Math.round(amount).toLocaleString()}` : "";
+      const title =
+        eventType === "auction_sold"
+          ? `BaT sold${amountText ? ` for ${amountText}` : ""}`
+          : eventType === "auction_reserve_not_met"
+            ? `BaT ended (RNM)${amountText ? ` • bid to ${amountText}` : ""}`
+            : withdrawn
+              ? `BaT withdrawn${amountText ? ` • bid to ${amountText}` : ""}`
+              : `BaT ended${amountText ? ` • bid to ${amountText}` : ""}`;
+
+      const descParts: string[] = [];
+      if (essentials.lot_number) descParts.push(`Lot #${essentials.lot_number}`);
+      if (essentials.bid_count) descParts.push(`${essentials.bid_count} bids`);
+      if (essentials.comment_count) descParts.push(`${essentials.comment_count} comments`);
+      const desc = descParts.length ? descParts.join(" • ") : null;
+
+      const written = await writeAuctionEndEvent({
+        supabase,
+        vehicleId,
+        eventType,
+        eventDateYmd: essentials.auction_end_date,
+        title,
+        description: desc,
+        sourceUrl: listingUrlCanonical,
+        costAmount: typeof amount === "number" ? amount : null,
+        metadata: {
+          reserve_status: essentials.reserve_status,
+          high_bid: essentials.high_bid,
+          sale_price: essentials.sale_price,
+          buyer_username: essentials.buyer_username,
+          seller_username: essentials.seller_username,
+          lot_number: essentials.lot_number,
+          bid_count: essentials.bid_count,
+          comment_count: essentials.comment_count,
+          // the exact close: the lot's own countdown or result stamp, else the sale / reserve-not-met record's timestamp
+          occurred_at: essentials.auction_end_at ?? auction.recordAt ?? null,
+          occurred_at_source: essentials.auction_end_source ?? (auction.recordAt ? "auction_record" : null),
+          close_basis: endEvent.close.basis,
+          ...(withdrawn ? { withdrawn: true } : {}),
+        },
+        readAt: sourceFetchedAt,
+        readBasis: htmlSource === "direct" ? "direct_fetch" : "cached_snapshot",
+      });
+      endEvent = { ...endEvent, ...written };
+      if (written.error) console.warn(`[BAT] ${written.error} (${listingUrlCanonical})`);
+
+      // Mileage reading timeline event (per auction)
+      if (typeof essentials.mileage === "number" && Number.isFinite(essentials.mileage) && essentials.mileage > 0) {
+        await tryUpsertMileageTimelineEvent({
+          supabase,
+          vehicleId,
+          eventDateYmd: essentials.auction_end_date,
+          mileage: essentials.mileage,
+          source: "bat",
+          sourceUrl: listingUrlCanonical,
+          metadata: {
+            lot_number: essentials.lot_number,
+            auction_event: true,
+          },
+        });
+      }
+    }
+
+    mark("timeline");
+
     if (vehicleId && images.length > 0) {
       const nowIso = new Date().toISOString();
 
@@ -1855,20 +2304,26 @@ Deno.serve(async (req) => {
         cleanedImages.push(u);
       }
 
+      mark("observation_receipts");
       if (cleanedImages.length > 0) {
         try {
-          const { data: existingRows, error: existingErr } = await supabase
-            .from("vehicle_images")
-            .select("id, image_url, source_url, exif_data, is_primary, is_document, is_duplicate, file_hash")
-            .eq("vehicle_id", vehicleId)
-            // Keep parity with gallery filters
-            .not("is_document", "is", true)
-            .not("is_duplicate", "is", true)
-            .limit(5000);
-
-          if (existingErr) throw existingErr;
-
-          const existing = Array.isArray(existingRows) ? existingRows : [];
+          // Read every held row, a page at a time: one .limit() read is capped by the API, so a vehicle with more rows than
+          // the cap looked empty past it and every run inserted the rest again (9,972 rows for 719 URLs, 2026-02).
+          const existing: any[] = [];
+          for (let from = 0; ; from += 1000) {
+            const { data: page, error: existingErr } = await supabase
+              .from("vehicle_images")
+              .select("id, image_url, source_url, exif_data, is_primary, is_document, is_duplicate, file_hash")
+              .eq("vehicle_id", vehicleId)
+              // Keep parity with gallery filters
+              .not("is_document", "is", true)
+              .not("is_duplicate", "is", true)
+              .order("id", { ascending: true })
+              .range(from, from + 999);
+            if (existingErr) throw existingErr;
+            if (Array.isArray(page)) existing.push(...page);
+            if (!Array.isArray(page) || page.length < 1000) break;
+          }
           const hasPrimaryAlready = existing.some((r: any) => Boolean(r?.is_primary));
 
           const keyFromRow = (r: any): string => {
@@ -1891,8 +2346,12 @@ Deno.serve(async (req) => {
             const k = keyFromRow(r);
             if (!k) continue;
             if (!byKey.has(k)) byKey.set(k, r);
+            // Only BaT link rows carry hashes made by the recipe below (sha256 of the text-decoded download). An
+            // owner's uploaded photo carries the app's byte hash, which that recipe never reproduces, so hashing
+            // every gallery photo against them matched nothing and spent the worker's CPU: on the owner's 1966
+            // Mustang (373 hashed photos) every read died "CPU Time exceeded" before its auction record (2026-09-28).
             const fh = String((r as any)?.file_hash || "").trim();
-            if (fh) existingFileHashes.add(fh);
+            if (fh && k.includes("bringatrailer.com")) existingFileHashes.add(fh);
           }
 
           const updates: any[] = [];
@@ -1963,13 +2422,30 @@ Deno.serve(async (req) => {
               source: "bat_import",
               source_url: imgUrl,
               is_external: true,
+              // v4: a BaT photo is a link, not a job. 'pending' fires trigger_photo_pipeline_on_image_insert →
+              // photo-pipeline-orchestrator → a Gemini call per image (78–140 per lot; 66K lots = ~7M calls).
+              // Vision on external links is a deliberate, paid pass (BYOK), never a side effect of indexing.
+              ai_processing_status: "skipped",
+              // Admission policy, not an analysis receipt. Only new links get this declaration.
+              ai_scan_metadata: {
+                image_intake: {
+                  version: 1,
+                  producer: "extract-bat-core",
+                  mode: "source_link_only",
+                  analysis_requested: false,
+                  reason: "external_link_analysis_requires_explicit_request",
+                },
+              },
               approval_status: "auto_approved",
               is_approved: true,
               redaction_level: "none",
               position: idx,
               display_order: idx,
               is_primary: makePrimary,
-              taken_at: nowIso,
+              // v4: a BaT photo's capture time is unknown; stamping the import time made every link row
+              // look like a dated photo and sent it through auto_group_photos_into_events (a
+              // timeline_events read + write per image).
+              taken_at: null,
               exif_data: {
                 original_url: imgUrl,
                 source_url: listingUrlCanonical,
@@ -2055,19 +2531,16 @@ Deno.serve(async (req) => {
           console.warn(`vehicle_images save failed (non-fatal): ${e?.message || String(e)}`);
         }
 
-        // Fire-and-forget: async image-vehicle match validation
-        if (vehicleId) {
-          fetch(`${Deno.env.get("SUPABASE_URL")}/functions/v1/check-image-vehicle-match`, {
-            method: "POST",
-            headers: { "Authorization": `Bearer ${Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")}`, "Content-Type": "application/json" },
-            body: JSON.stringify({ vehicle_id: vehicleId, batch_size: 10 }),
-          }).catch(() => {});
-        }
+        // No image-vehicle match check for a BaT lot: its photos belong to the listing, there is nothing to
+        // match. The fire-and-forget check-image-vehicle-match call that stood here sent every photo to the
+        // system vision pool, where every provider failed (~17,600 failed calls in 2.3 h on 2026-09-27) and each
+        // failure stamped the photo 'ambiguous'. Removed 2026-09-27 (lead's measurement).
       }
     }
 
+    mark("images");
     // vehicle_events (platform tracking)
-    if (vehicleId) {
+    if (vehicleId && !streamOwnsAuction) {
       const hasSale = Number.isFinite(essentials.sale_price) && (essentials.sale_price || 0) > 0;
       const endAtIso = essentials.auction_end_at ||
         (essentials.auction_end_date ? new Date(`${essentials.auction_end_date}T00:00:00Z`).toISOString() : null);
@@ -2117,6 +2590,7 @@ Deno.serve(async (req) => {
         watcher_count: essentials.watcher_count,
         metadata: {
           source: "extract-bat-core",
+          source_read: { at: sourceFetchedAt, basis: htmlSource === "direct" ? "direct_fetch" : "snapshot" },
           lot_number: essentials.lot_number,
           seller_username: essentials.seller_username,
           buyer_username: essentials.buyer_username,
@@ -2178,6 +2652,7 @@ Deno.serve(async (req) => {
       }
     }
 
+    mark("vehicle_events");
     // Resolve seller_username → organization via bat_seller_monitors
     if (vehicleId && essentials.seller_username) {
       try {
@@ -2201,7 +2676,7 @@ Deno.serve(async (req) => {
           const eiId = ei?.id;
 
           // Classify ownership from description (v2 — expanded patterns)
-          const desc = (essentials.description || "").toLowerCase();
+          const desc = (descriptionRaw || "").toLowerCase();
           let relType = "sold_by";
           // OWNER: selling dealer acquired/purchased/possesses the vehicle
           if (/sell(er|ing dealer).s (acquisition|purchase|possession|care|ownership|collection|inventory)|acquired by the sell(er|ing dealer)|purchased by the sell(er|ing dealer)|bought by the sell(er|ing dealer)|the sell(er|ing dealer) (acquired|purchased|bought|obtained)|prior to the sell(er|ing dealer)|before the sell(er|ing dealer)|(miles|kilometers) (were |have been )?(added|driven) by the sell(er|ing dealer)|sell(er|ing dealer) in \d{4}/.test(desc)) {
@@ -2250,18 +2725,30 @@ Deno.serve(async (req) => {
       }
     }
 
+    mark("org_link");
     // auction_events (multi-auction history per vehicle)
-    if (vehicleId) {
+    if (vehicleId && !streamOwnsAuction) {
       const hasSale = Number.isFinite(essentials.sale_price) && (essentials.sale_price || 0) > 0;
       const hasBid = Number.isFinite(essentials.high_bid) && (essentials.high_bid || 0) > 0;
+      // A lot whose end time is still ahead has no result yet: it is 'live' (auction_events_outcome_check allows it).
+      // Reading one wrote 'bid_to' on 15 running lots on 2026-09-29 (bat-data coverage audit, P0a).
+      const endMsForOutcome = essentials.auction_end_at ? Date.parse(essentials.auction_end_at) : NaN;
+      const stillRunning = !hasSale && Number.isFinite(endMsForOutcome) && endMsForOutcome > Date.now();
+      // BaT withdrew the lot ("Withdrawn on 10/5/26"): a terminal no-sale, 'cancelled' in auction_events. 'bid_to' kept
+      // six withdrawn lots live in the stream schedule (only sold / reserve_not_met / cancelled retire a monitor).
       const outcome = hasSale
         ? "sold"
+        : essentials.auction_withdrawn
+        ? "cancelled"
+        : stillRunning
+        ? "live"
         : (essentials.reserve_status === "reserve_not_met" ? "reserve_not_met" : (hasBid ? "bid_to" : "no_sale"));
 
       const endAt = essentials.auction_end_at ||
         (essentials.auction_end_date ? new Date(`${essentials.auction_end_date}T00:00:00Z`).toISOString() : null);
+      const readClock = sourceReadClock(htmlSource, sourceFetchedAt, outcome === 'live' ? essentials.high_bid : null);
 
-      const { error } = await supabase
+      const { data, error } = await supabase
         .from("auction_events")
         .upsert({
           vehicle_id: vehicleId,
@@ -2276,12 +2763,15 @@ Deno.serve(async (req) => {
           winning_bidder: hasSale ? (essentials.buyer_username || null) : null,
           seller_name: essentials.seller_username || null,
           total_bids: essentials.bid_count || null,
+          unique_bidders: auction.parsed ? auction.uniqueBidders : null,
           comments_count: essentials.comment_count || null,
           page_views: essentials.view_count || null,
           watchers: essentials.watcher_count || null,
+          scraped_at: readClock.scraped_at,
           updated_at: new Date().toISOString(),
           raw_data: {
             extractor: "extract-bat-core",
+            source_read: readClock.source_read,
             listing_url: listingUrlCanonical,
             listing_details: {
               vin: essentials.vin,
@@ -2294,15 +2784,132 @@ Deno.serve(async (req) => {
               body_style: inferredBodyStyle,
             },
           },
-        }, { onConflict: "vehicle_id,source_url" });
+        }, { onConflict: "vehicle_id,source_url" })
+        .select("id")
+        .maybeSingle();
 
       if (error) console.warn(`auction_events upsert failed (non-fatal): ${error?.message || error}`);
+      else auctionEventId = (data as any)?.id ? String((data as any).id) : null;
+    }
+
+    // v4.1 (2026-09-27): the auction's interactions, exactly timed — every comment and bid from the page's
+    // comments JSON, into auction_comments with the row shape and content_hash recipe extract-auction-comments
+    // uses (sha256 of 'bat'|url|sequence|posted_at|author|text; rows built by the shared builder), so the two writers dedupe on
+    // (vehicle_id, content_hash); bids also into bat_bids when the lot has a bat_listings row. Skylar's rule:
+    // a BaT auction's comments, bids, open and close belong on the vehicle's timeline at their precise moments.
+    const closingCommentMonitor = vehicleId && auction.parsed ? await supabase.from("monitored_auctions")
+      .select("id,auction_end_time,stream_state").eq("vehicle_id",vehicleId).in("external_auction_url",urlCandidates).limit(1).maybeSingle() : null;
+    const closingCommentId = closingCommentMonitor?.data?.id;
+    const nativeClosingIntake = closingCommentId && (streamOwnsAuction ||
+      (Date.parse(closingCommentMonitor!.data!.auction_end_time) <= Date.now()+15*60000
+        && Date.parse(closingCommentMonitor!.data!.auction_end_time) > Date.now()-24*60*60000));
+    if (nativeClosingIntake) {
+      // Shared front door and monitor lock with the WebSocket reader. An HTML
+      // fallback cannot race its native comment/profile INSERT or create a fork.
+      for (let at=0;at<rawComments.length;at+=50) {
+        const response = await fetch(`${supabaseUrl}/functions/v1/ingest-observation`, {
+          method:"POST",headers:{Authorization:`Bearer ${serviceRoleKey}`,"Content-Type":"application/json"},
+          body:JSON.stringify({mode:BAT_LIVE_MODE,heartbeats:[],frames:rawComments.slice(at,at+50).map((comment:any)=>({
+            monitored_auction_id:closingCommentId,event:"comment-added",data:{post_id:Number(comment.post),comment},
+            received_at:sourceFetchedAt || new Date().toISOString(),transport:"direct_html"}))}),
+          signal:AbortSignal.timeout(15000),
+        });
+        if (!response.ok || (await response.json()).success!==true) throw new Error("Closing HTML native intake failed; no raw comment fallback");
+      }
+    } else if (vehicleId && auction.parsed && !streamOwnsAuction) {
+      try {
+        const endAt = essentials.auction_end_at ? new Date(essentials.auction_end_at) : (auction.recordAt ? new Date(auction.recordAt) : null);
+        // one builder for the reader and the archive loader (_shared/batAuctionRecord.ts); every comment lands,
+        // a text-less one too (v4.1, 2026-09-27) — the earlier "< 3 chars" skip dropped 443 of 30,805 comments on 400 pages
+        const rows = await buildAuctionCommentRows({ rawComments, listingUrlNorm, vehicleId, auctionEventId, endAt });
+        // A BaT comment this vehicle already holds — by BaT's own comment id — is never written again, whatever
+        // its position in today's JSON. content_hash carries the sequence number, which shifts as a thread grows:
+        // a re-read of 1981-honda-civic-7 (71 rows from 2026-03-31) added 57 rows of which 45 were the same
+        // comments; 65 of the 302 lots re-read on 2026-09-27 gained 1,924 such rows. Older rows stay as they are.
+        const { data: have, error: haveError } = await supabase
+          .from("auction_comments").select("bat_comment_id").eq("vehicle_id", vehicleId).not("bat_comment_id", "is", null).limit(5000);
+        if (haveError) throw new Error(`Comment replay lookup failed: ${haveError.message}`);
+        const haveIds = new Set((have ?? []).map((x: any) => Number(x.bat_comment_id)).filter(Number.isFinite));
+        const fresh = haveIds.size ? rows.filter((r) => r.bat_comment_id == null || !haveIds.has(r.bat_comment_id)) : rows;
+        // Author keys: exact (bat, handle); Unknown, blank and anonymous authors stay NULL (2026-10-06, same rule as the DB trigger).
+        const linked = await linkAuctionCommentIdentities(fresh, {
+          async find(handles) {
+            const { data, error } = await supabase.from("external_identities")
+              .select("id,handle").eq("platform", "bat").in("handle", handles);
+            if (error) throw new Error(`Comment identity lookup failed: ${error.message}`);
+            return data ?? [];
+          },
+          async insertMissing(identities) {
+            const { error } = await supabase.from("external_identities")
+              .upsert(identities, { onConflict: "platform,handle", ignoreDuplicates: true });
+            if (error) throw new Error(`Comment identity insert failed: ${error.message}`);
+          },
+        });
+        for (let i = 0; i < linked.length; i += 200) {
+          const { data: inserted, error: cErr } = await supabase
+            .from("auction_comments")
+            .upsert(linked.slice(i, i + 200), { onConflict: "vehicle_id,content_hash", ignoreDuplicates: true })
+            .select("id");
+          if (cErr) throw new Error(`auction_comments upsert failed: ${cErr.message}`);
+          commentsWritten += inserted?.length ?? 0;
+        }
+
+        // bids also into bat_bids (keyed by the lot's bat_listings row; absent for lots the catalog sync never saw)
+        const bidRows = rows.filter((r) => typeof r.bid_amount === "number" && r.bid_amount > 0);
+        if (bidRows.length > 0) {
+          const { data: bl } = await supabase
+            .from("bat_listings")
+            .select("id")
+            .in("bat_listing_url", urlCandidates)
+            .limit(1)
+            .maybeSingle();
+          const batListingId = (bl as any)?.id ? String((bl as any).id) : null;
+          if (batListingId) {
+            const nowIso2 = new Date().toISOString();
+            const { error: bErr } = await supabase.from("bat_bids").upsert(
+              bidRows.map((r) => ({
+                bat_listing_id: batListingId,
+                vehicle_id: vehicleId,
+                bat_user_id: null,
+                bat_username: r.author_username,
+                bid_amount: r.bid_amount,
+                bid_timestamp: r.posted_at,
+                is_winning_bid: false,
+                is_final_bid: false,
+                source: "comment",
+                auction_event_id: auctionEventId,
+                metadata: { source_url: listingUrlNorm, comment_content_hash: r.content_hash, sequence_number: r.sequence_number, extractor: EXTRACTOR_VERSION },
+                updated_at: nowIso2,
+              })),
+              { onConflict: "bat_listing_id,bat_username,bid_amount,bid_timestamp" },
+            );
+            if (bErr) console.warn(`bat_bids upsert failed (non-fatal): ${bErr.message}`);
+            else bidsWritten = bidRows.length;
+          }
+        }
+      } catch (e: any) {
+        commentsWriteError = e?.message || String(e);
+        console.warn(`comments/bids write failed (non-fatal): ${e?.message || String(e)}`);
+      }
+      mark("comments_bids");
     }
 
     // vehicle_events BaT-specific auction record (consolidated from bat_listings)
     // NOTE: This is now handled by the vehicle_events upsert above with source_platform='bat'.
     // The bat_listings table has been consolidated into vehicle_events.
 
+    mark("auction_events");
+    // Await the existing sanctioned intake. Capture time is not the seller's event time;
+    // preserve full parsed prose independently of manual text and the 480-character summary.
+    const descriptionReceipt = vehicleId ? await recordListingDescription(supabase, {
+      vehicleId, sourceUrl: listingUrlCanonical, text: descriptionRaw || "", extractorVersion: EXTRACTOR_VERSION,
+      capturedAt: sourceFetchedAt, captureBasis: htmlSource,
+      captureSha256: await sha256Hex(html), snapshotId: descriptionSnapshotId,
+      snapshotCustody: descriptionSnapshotCustody,
+    }) : { status: "unavailable", reason: "Vehicle unresolved" };
+    if (descriptionReceipt.status === "failed" || descriptionReceipt.status === "refused") {
+      console.warn(`[BAT] description receipt ${descriptionReceipt.status}: ${descriptionReceipt.reason}`);
+    }
     // Save raw listing description history (for Description Entries UI)
     if (vehicleId && descriptionRaw) {
       await trySaveExtractionMetadata({
@@ -2363,96 +2970,7 @@ Deno.serve(async (req) => {
       }
     }
 
-    // Persist auction timeline events so the 7-day BaT window is visible: listed (start) + sold/ended (end).
-    if (vehicleId && essentials.auction_end_date) {
-      const endYmd = String(essentials.auction_end_date).slice(0, 10);
-      if (/^\d{4}-\d{2}-\d{2}$/.test(endYmd)) {
-        // Standard BaT auctions run 7 days: list date = end - 7 days
-        const endDate = new Date(endYmd + "T12:00:00Z");
-        const listDate = new Date(endDate);
-        listDate.setUTCDate(listDate.getUTCDate() - 7);
-        const listDateYmd = listDate.toISOString().slice(0, 10);
-
-        await tryUpsertAuctionTimelineEvent({
-          supabase,
-          vehicleId,
-          eventType: "auction_listed",
-          eventDateYmd: listDateYmd,
-          title: `Listed on Bring a Trailer${essentials.lot_number ? ` (Lot #${essentials.lot_number})` : ""}`,
-          description: essentials.seller_username
-            ? `Listed by @${essentials.seller_username}. ${essentials.reserve_status === "no_reserve" ? "No Reserve." : ""}`
-            : "Auction started.",
-          source: "bat",
-          sourceUrl: listingUrlCanonical,
-          costAmount: null,
-          metadata: {
-            lot_number: essentials.lot_number,
-            seller_username: essentials.seller_username,
-            reserve_status: essentials.reserve_status,
-            auction_end_date: endYmd,
-          },
-        });
-      }
-      const hasSale = Number.isFinite(essentials.sale_price) && (essentials.sale_price || 0) > 0;
-      const hasBid = Number.isFinite(essentials.high_bid) && (essentials.high_bid || 0) > 0;
-      const eventType =
-        hasSale ? "auction_sold" :
-        (essentials.reserve_status === "reserve_not_met" ? "auction_reserve_not_met" : "auction_ended");
-
-      const amount = hasSale ? (essentials.sale_price || null) : (hasBid ? (essentials.high_bid || null) : null);
-      const amountText = typeof amount === "number" && amount > 0 ? `$${Math.round(amount).toLocaleString()}` : "";
-      const title =
-        eventType === "auction_sold"
-          ? `BaT sold${amountText ? ` for ${amountText}` : ""}`
-          : eventType === "auction_reserve_not_met"
-            ? `BaT ended (RNM)${amountText ? ` • bid to ${amountText}` : ""}`
-            : `BaT ended${amountText ? ` • bid to ${amountText}` : ""}`;
-
-      const descParts: string[] = [];
-      if (essentials.lot_number) descParts.push(`Lot #${essentials.lot_number}`);
-      if (essentials.bid_count) descParts.push(`${essentials.bid_count} bids`);
-      if (essentials.comment_count) descParts.push(`${essentials.comment_count} comments`);
-      const desc = descParts.length ? descParts.join(" • ") : null;
-
-      await tryUpsertAuctionTimelineEvent({
-        supabase,
-        vehicleId,
-        eventType,
-        eventDateYmd: essentials.auction_end_date,
-        title,
-        description: desc,
-        source: "bat",
-        sourceUrl: listingUrlCanonical,
-        costAmount: typeof amount === "number" ? amount : null,
-        metadata: {
-          reserve_status: essentials.reserve_status,
-          high_bid: essentials.high_bid,
-          sale_price: essentials.sale_price,
-          buyer_username: essentials.buyer_username,
-          seller_username: essentials.seller_username,
-          lot_number: essentials.lot_number,
-          bid_count: essentials.bid_count,
-          comment_count: essentials.comment_count,
-        },
-      });
-
-      // Mileage reading timeline event (per auction)
-      if (typeof essentials.mileage === "number" && Number.isFinite(essentials.mileage) && essentials.mileage > 0) {
-        await tryUpsertMileageTimelineEvent({
-          supabase,
-          vehicleId,
-          eventDateYmd: essentials.auction_end_date,
-          mileage: essentials.mileage,
-          source: "bat",
-          sourceUrl: listingUrlCanonical,
-          metadata: {
-            lot_number: essentials.lot_number,
-            auction_event: true,
-          },
-        });
-      }
-    }
-
+    mark("description_timeline");
     // Non-blocking MSRP enrichment for newly created vehicles
     if (vehicleId && createdIds.length > 0) {
       try {
@@ -2467,9 +2985,11 @@ Deno.serve(async (req) => {
       } catch (_) { /* non-blocking */ }
     }
 
+    console.log(`extract-bat-core timings ${listingUrlCanonical}: ${JSON.stringify({ ...timings, total_ms: Date.now() - phaseStart })}`);
     return new Response(
       JSON.stringify({
         success: true,
+        description_receipt: descriptionReceipt,
         source: "Bring a Trailer",
         site_type: "bat",
         listing_url: listingUrlCanonical,
@@ -2480,6 +3000,25 @@ Deno.serve(async (req) => {
         updated_vehicle_ids: updatedIds,
         issues: [],
         extraction_method: "direct_html_parsing_free_mode",
+        timings: { ...timings, total_ms: Date.now() - phaseStart },
+        snapshot: "receipt_only",
+        auction: {
+          record_parsed: auction.parsed,
+          sold: saleNow,
+          sale_price: saleNow ? essentials.sale_price : null,
+          buyer: saleNow ? essentials.buyer_username : null,
+          high_bid: essentials.high_bid,
+          sold_after_reserve_not_met: auction.soldAfterReserveNotMet,
+          bids: essentials.bid_count,
+          unique_bidders: auction.parsed ? auction.uniqueBidders : null,
+          comments: essentials.comment_count,
+        },
+        vin_rejected: vinRejected,
+        sale_supersession: saleSupersession,
+        end_event: endEvent,
+        comments_written: commentsWritten,
+        comments_write_error: commentsWriteError,
+        bids_written: bidsWritten,
         timestamp: new Date().toISOString(),
       }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } },
@@ -2493,4 +3032,3 @@ Deno.serve(async (req) => {
     });
   }
 });
-

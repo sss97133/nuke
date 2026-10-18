@@ -621,7 +621,7 @@ const ActiveAuctionsPanel: React.FC<ActiveAuctionsPanelProps> = ({ onClose, onNa
     // 2) Live auctions from vehicles (sync-live-auctions: Mecum, PCarMarket, RM Sotheby's, Gooding, Bonhams, etc.)
     const { data: liveVehicles, error: vErr } = await supabase
       .from('vehicles')
-      .select('id, year, make, model, primary_image_url, image_url, listing_url, bat_auction_url, sale_price, auction_end_date, platform_source, origin_metadata')
+      .select('id, year, make, model, primary_image_url, image_url, listing_url, bat_auction_url, sale_price, high_bid, auction_end_date, platform_source, origin_metadata')
       .eq('sale_status', 'auction_live')
       .eq('auction_status', 'active')
       .or('listing_url.not.is.null,bat_auction_url.not.is.null')
@@ -651,7 +651,7 @@ const ActiveAuctionsPanel: React.FC<ActiveAuctionsPanelProps> = ({ onClose, onNa
       platform: (v.platform_source || 'unknown').replace(/-/g, '_'),
       listing_url: v.listing_url || v.bat_auction_url || '',
       listing_status: 'active',
-      current_bid: v.sale_price ?? null,
+      current_bid: v.high_bid ?? v.sale_price ?? null, // live bid = high_bid since 2026-09-27; sale_price only on old rows
       bid_count: (v.origin_metadata as any)?.bid_count ?? 0,
       watcher_count: 0,
       view_count: 0,

@@ -1,0 +1,340 @@
+import { describe, it, expect } from 'vitest';
+import { auctionMomentDayTitle, buildAuctionSequence, buildAuctionSequences, commentPermalink, dedupeComments, fmtMoment, hasRecordedAuctionEnd, isBatHosted, lotKey, momentDay, uploadMonth, type AuctionCommentRow } from './auctionSequence';
+
+const LOT = 'https://bringatrailer.com/listing/1985-pontiac-fiero-gt-3/';
+
+const comment = (over: Partial<AuctionCommentRow> & { id: string; posted_at: string }): AuctionCommentRow => ({
+  comment_type: 'observation', bid_amount: null, author_username: 'someone', is_seller: false, comment_text: 'text',
+  bat_comment_id: 1, source_url: LOT, sequence_number: null, comment_likes: 0, ...over,
+});
+
+it.each(['sold', 'observation', 'question', null])('retains an amount-bearing %s report without inventing a bid event', comment_type => {
+  const sequence = buildAuctionSequence({ comments: [comment({ id: 'synthetic-amount-report', posted_at: '2025-01-01T10:00:00Z', comment_type, bid_amount: 4000 })], auctionEvents: [], vehicleEvents: [], timelineEvents: [], images: [], lotUrlHint: LOT })!;
+  expect(sequence.items).toHaveLength(1);
+  expect(sequence.items[0]).toMatchObject({ id: 'synthetic-amount-report', kind: 'comment', at: '2025-01-01T10:00:00.000Z', url: `${LOT}#comment-1` });
+  expect(sequence.lastObservedBid).toBeNull();
+  expect(sequence.days[0].bids).toBe(0);
+  expect(sequence.outcome).toBe('unknown');
+});
+
+describe('buildAuctionSequence — one listing', () => {
+  const comments: AuctionCommentRow[] = [
+    comment({ id: 'b1', posted_at: '2024-02-15T22:09:15Z', comment_type: 'bid', bid_amount: 1985, author_username: 'Jdimora', bat_comment_id: 13676223, sequence_number: 1 }),
+    comment({ id: 'c1', posted_at: '2024-02-15T22:46:55Z', author_username: '_OZ_', comment_text: 'Great first bid!', bat_comment_id: 13676789, sequence_number: 2 }),
+    comment({ id: 's1', posted_at: '2024-02-16T01:00:00Z', comment_type: 'seller_response', is_seller: true, author_username: 'SSAB194', bat_comment_id: 13677000 }),
+    comment({ id: 'b2', posted_at: '2024-02-22T20:32:08Z', comment_type: 'bid', bid_amount: 10420, author_username: 'Threepedalauto', bat_comment_id: 13720000 }),
+    comment({ id: 'c2', posted_at: '2024-02-22T22:30:41Z', author_username: 'later', comment_text: 'Congrats', bat_comment_id: 13720500, source_url: null }),
+  ];
+  const auctionEvents = [{ id: 'ae', source: 'bat', source_url: LOT.replace(/\/$/, ''), lot_number: '137270', outcome: 'sold', winning_bid: 10420, total_bids: 32, winning_bidder: 'Threepedalauto', seller_name: 'SSAB194', page_views: 7116, watchers: 685, comments_count: 42 }];
+  const images = [
+    { id: 'i1', taken_at: '2026-01-31T18:52:37.111Z', source: 'bat_import', source_url: null },   // import stamp
+    { id: 'i2', taken_at: null, source: 'bat_import', source_url: null },                          // no capture time
+    { id: 'i3', taken_at: '2024-02-10T15:00:00Z', source: 'owner_upload', source_url: null },      // a real capture
+  ];
+
+  it('reads open from first activity and keeps an end day separate from the last observed bid', () => {
+    const { sequences, importStampedDays } = buildAuctionSequences({
+      comments, auctionEvents,
+      vehicleEvents: [{ id: 've', source_platform: 'bat', source_url: LOT, started_at: null, ended_at: '2024-02-22T00:00:00+00:00', sold_at: '2024-02-22T00:00:00+00:00', final_price: 10420, event_status: 'sold' }],
+      timelineEvents: [{ event_type: 'auction_sold', event_date: '2024-02-22' }],
+      images, lotUrlHint: LOT,
+    });
+    expect(sequences).toHaveLength(1);
+    const seq = sequences[0];
+    expect(seq.open).toMatchObject({ at: '2024-02-15T22:09:15.000Z', exact: false });
+    expect(seq.open!.basis).toMatch(/first bid/);
+    expect(seq.close).toMatchObject({ at: '2024-02-22T00:00:00.000Z', exact: false, role: 'auction_end' });
+    expect(seq.lastObservedBid).toMatchObject({ id: 'b2', at: '2024-02-22T20:32:08.000Z' });
+    expect(seq).toMatchObject({ outcome: 'sold', price: 10420, buyer: 'Threepedalauto', lotNumber: '137270', bidCount: 32, watchers: 685, ordinal: 1, listingCount: 1 });
+    // the null-source comment joined the car's own listing
+    expect(seq.items.map(i => i.kind)).toEqual(['bid', 'comment', 'seller', 'bid', 'comment']);
+    expect(seq.items.map(i => i.postClose)).toEqual([null, null, null, null, null]);
+    expect(seq.items[0].url).toBe('https://bringatrailer.com/listing/1985-pontiac-fiero-gt-3/#comment-13676223');
+    expect(seq.photos).toEqual({ publishedWithListing: 2, attributionUncertain: false });
+    expect(importStampedDays).toEqual([new Date('2026-01-31T18:52:37.111Z').toLocaleDateString('en-CA')]);
+    expect(seq.days.reduce((n, d) => n + d.bids, 0)).toBe(2);
+    expect(seq.days[seq.days.length - 1].high).toBe(10420);
+    expect(buildAuctionSequence({ comments, auctionEvents, vehicleEvents: [], timelineEvents: [], images: [], lotUrlHint: LOT })?.key).toBe('1985-pontiac-fiero-gt-3');
+  });
+
+  it('takes an exact recorded end and a listing day when the extractor held them, and reports an unextracted sequence', () => {
+    const { sequences } = buildAuctionSequences({
+      comments: [],
+      auctionEvents: [],
+      vehicleEvents: [{ id: 've', source_platform: 'bat', source_url: 'https://bringatrailer.com/listing/2012-bentley-continental-gt-w12-24', started_at: null, ended_at: '2026-09-23T17:58:05+00:00', sold_at: '2026-09-23T17:58:05+00:00', final_price: 44000, event_status: 'sold' }],
+      timelineEvents: [{ event_type: 'auction_listed', event_date: '2026-09-16' }, { event_type: 'auction_sold', event_date: '2026-09-23' }],
+      images: [{ id: 'i', taken_at: null, source: 'bat_import', source_url: null }],
+    });
+    const seq = sequences[0];
+    expect(seq.close).toMatchObject({ at: '2026-09-23T17:58:05.000Z', exact: true });
+    expect(seq.open!.basis).toMatch(/listing day/);
+    expect(seq.activityExtracted).toBe(false);
+    expect(seq.price).toBe(44000);
+    expect(seq.photos.publishedWithListing).toBe(1);
+  });
+
+  it('returns nothing for a vehicle with no BaT lot', () => {
+    expect(buildAuctionSequences({ comments: [], auctionEvents: [], vehicleEvents: [], timelineEvents: [], images: [] }).sequences).toEqual([]);
+  });
+});
+
+describe('buildAuctionSequences — a car that ran three times (1951 Ford F-1)', () => {
+  const U17 = 'https://bringatrailer.com/listing/1951-ford-f-100-pick-up-truck/';
+  const U18 = 'https://bringatrailer.com/listing/1951-ford-f-1-pickup-5/';
+  const U26 = 'https://bringatrailer.com/listing/1951-ford-f-1-pickup-92/';
+  const comments: AuctionCommentRow[] = [
+    comment({ id: 'a1', posted_at: '2017-06-12T18:17:40Z', comment_type: 'bid', bid_amount: 5000, source_url: U17, bat_comment_id: 101 }),
+    comment({ id: 'a2', posted_at: '2017-06-23T13:58:52Z', comment_type: 'bid', bid_amount: 20750, source_url: U17, bat_comment_id: 102 }),
+    comment({ id: 'b1', posted_at: '2018-07-25T16:04:12Z', comment_type: 'bid', bid_amount: 6000, source_url: U18, bat_comment_id: 103 }),
+    comment({ id: 'b2', posted_at: '2018-08-01T20:52:55Z', comment_type: 'bid', bid_amount: 21750, source_url: U18, bat_comment_id: 104 }),
+    comment({ id: 'c1', posted_at: '2026-01-17T19:22:20Z', comment_type: 'bid', bid_amount: 7000, source_url: U26, bat_comment_id: 105 }),
+    comment({ id: 'c2', posted_at: '2026-01-24T18:49:16Z', comment_type: 'bid', bid_amount: 21250, source_url: U26, bat_comment_id: 106 }),
+    comment({ id: 'c3', posted_at: '2026-01-25T10:00:00Z', comment_text: 'congrats', source_url: null, bat_comment_id: 107 }), // no URL → the car's own listing
+  ];
+  const auctionEvents = [
+    { id: 'e26', source: 'bat', source_url: U26.replace(/\/$/, ''), lot_number: '227632', outcome: 'sold', winning_bid: 21250, total_bids: 15, winning_bidder: 'mohlster', seller_name: null, page_views: null, watchers: null, comments_count: 37 },
+    { id: 'e17', source: 'bat', source_url: U17.replace(/\/$/, ''), lot_number: '4653', outcome: 'sold', winning_bid: 20750, total_bids: 18, winning_bidder: 'Paul_Gelpi', seller_name: null, page_views: null, watchers: null, comments_count: 23 },
+    { id: 'e18', source: 'bat', source_url: U18.replace(/\/$/, ''), lot_number: '11293', outcome: 'sold', winning_bid: 21750, total_bids: 38, winning_bidder: 'EvanEllis', seller_name: null, page_views: null, watchers: null, comments_count: 31 },
+  ];
+  const vehicleEvents = [
+    // prod holds the 2026 close on the 2017 listing's row — a moment far outside that listing's week is not its own
+    { id: 'v17', source_platform: 'bat', source_url: U17.replace(/\/$/, ''), started_at: null, ended_at: '2026-01-24T00:00:00+00:00', sold_at: '2026-01-24T00:00:00+00:00', final_price: 21250, event_status: 'sold' },
+    { id: 'v18', source_platform: 'bat', source_url: U18.replace(/\/$/, ''), started_at: null, ended_at: null, sold_at: null, final_price: 21750, event_status: 'sold' },
+    { id: 'v26', source_platform: 'bat', source_url: U26.replace(/\/$/, ''), started_at: null, ended_at: null, sold_at: null, final_price: 21250, event_status: 'sold' },
+  ];
+  const timelineEvents = [
+    { event_type: 'auction_listed', event_date: '2026-01-17', title: 'Listed on Bring a Trailer (Lot #227632)' },
+    { event_type: 'auction_sold', event_date: '2026-01-24', title: 'Sold at Auction', image_urls: [U26.replace(/\/$/, '')] },
+  ];
+  const images = [
+    { id: 'p18', taken_at: null, source: 'bat_import', source_url: 'https://bringatrailer.com/wp-content/uploads/2018/07/1951_ford_f-1_pickup_IMG_4912.jpg' },
+    { id: 'p26', taken_at: '2026-01-23T20:00:00Z', source: 'bat_import', source_url: 'https://bringatrailer.com/wp-content/uploads/2026/01/EM4A6686-90547.jpg' },
+    { id: 'p00', taken_at: null, source: 'bat_import', source_url: null },
+  ];
+
+  it('builds one sequence per listing, newest first, each with its own open, close, result and photos', () => {
+    const { sequences, importStampedDays } = buildAuctionSequences({ comments, auctionEvents, vehicleEvents, timelineEvents, images, lotUrlHint: U26 });
+    expect(sequences.map(s => s.key)).toEqual(['1951-ford-f-1-pickup-92', '1951-ford-f-1-pickup-5', '1951-ford-f-100-pick-up-truck']);
+    expect(sequences.map(s => s.ordinal)).toEqual([3, 2, 1]);
+    expect(sequences.every(s => s.listingCount === 3)).toBe(true);
+    const [s26, s18, s17] = sequences;
+    expect(s26).toMatchObject({ lotNumber: '227632', price: 21250, buyer: 'mohlster', outcome: 'sold' });
+    expect(s26.open!.basis).toMatch(/listing day/);          // the named listed event
+    expect(s26.close).toMatchObject({ role: 'sale', exact: false });
+    expect(s26.lastObservedBid!.at).toBe('2026-01-24T18:49:16.000Z');
+    expect(s26.items.map(i => i.id)).toEqual(['c1', 'c2', 'c3']);
+    expect(s26.items[2].postClose).toBeNull();
+    expect(s18).toMatchObject({ lotNumber: '11293', price: 21750, buyer: 'EvanEllis' });
+    expect(s18.close).toBeNull();
+    expect(s18.lastObservedBid!.at).toBe('2018-08-01T20:52:55.000Z');
+    expect(s17).toMatchObject({ lotNumber: '4653', price: 20750, buyer: 'Paul_Gelpi' });
+    expect(s17.close).toBeNull(); // the misfiled 2026 end is ignored
+    expect(s17.lastObservedBid!.at).toBe('2017-06-23T13:58:52.000Z');
+    expect(s17.days[s17.days.length - 1].high).toBe(20750);   // the running high does not carry across listings
+    expect(s26.days[s26.days.length - 1].high).toBe(21250);
+    // photos: by upload month; the one with no path sits on the car's own listing, flagged
+    expect(s18.photos).toEqual({ publishedWithListing: 1, attributionUncertain: false });
+    expect(s26.photos).toEqual({ publishedWithListing: 2, attributionUncertain: true });
+    expect(importStampedDays).toEqual([new Date('2026-01-23T20:00:00Z').toLocaleDateString('en-CA')]);
+  });
+});
+
+describe('dedupeComments — a re-read wrote the same BaT comment twice', () => {
+  it('keeps one row per bat_comment_id (earliest posted_at, then lowest id) and passes null ids through', () => {
+    // 1981 Honda Civic 719d0e6d: 128 rows, 83 distinct bat_comment_id, 45 repeated pairs with identical posted_at
+    const rows: AuctionCommentRow[] = [
+      comment({ id: '350bb6ba', posted_at: '2025-08-28T16:12:33Z', bat_comment_id: 900001, comment_type: 'bid', bid_amount: 5000 }),
+      comment({ id: '16d4490e', posted_at: '2025-08-28T16:12:33Z', bat_comment_id: 900001, comment_type: 'bid', bid_amount: 5000 }), // the re-read's copy
+      comment({ id: 'zz-late', posted_at: '2025-08-28T18:00:00Z', bat_comment_id: 900002 }),
+      comment({ id: 'aa-early', posted_at: '2025-08-28T17:00:00Z', bat_comment_id: 900002 }),                                       // earlier posted_at wins
+      comment({ id: 'n1', posted_at: '2025-08-29T10:00:00Z', bat_comment_id: null }),
+      comment({ id: 'n2', posted_at: '2025-08-29T10:00:00Z', bat_comment_id: null }),
+    ];
+    const kept = dedupeComments(rows).map(c => c.id).sort();
+    expect(kept).toEqual(['16d4490e', 'aa-early', 'n1', 'n2']);
+    const { sequences } = buildAuctionSequences({ comments: rows, auctionEvents: [], vehicleEvents: [], timelineEvents: [], images: [], lotUrlHint: LOT });
+    expect(sequences[0].items.map(i => i.id)).toEqual(['16d4490e', 'aa-early', 'n1', 'n2']);
+    expect(sequences[0].items.filter(i => i.kind === 'bid')).toHaveLength(1);
+  });
+});
+
+describe('helpers', () => {
+  it('keys a lot by its slug whatever the URL form', () => {
+    expect(lotKey('https://bringatrailer.com/listing/1951-Ford-F-1-Pickup-92/')).toBe('1951-ford-f-1-pickup-92');
+    expect(lotKey('http://www.bringatrailer.com/listing/1951-ford-f-1-pickup-92?x=1#comment-1')).toBe('1951-ford-f-1-pickup-92');
+    expect(lotKey('https://bringatrailer.com/wp-content/uploads/2018/07/x.jpg')).toBeNull();
+    expect(lotKey(null)).toBeNull();
+  });
+  it('reads the upload month off a BaT photo path', () => {
+    expect(uploadMonth('https://bringatrailer.com/wp-content/uploads/2018/07/1951_ford_f-1_pickup_IMG_4912.jpg')).toBe('2018-07');
+    expect(uploadMonth('https://example.com/x.jpg')).toBeNull();
+  });
+  it('builds a comment permalink from the lot URL', () => {
+    expect(commentPermalink('https://bringatrailer.com/listing/x', 5)).toBe('https://bringatrailer.com/listing/x/#comment-5');
+    expect(commentPermalink('https://bringatrailer.com/listing/x/', null)).toBe('https://bringatrailer.com/listing/x/');
+  });
+});
+
+describe('recorded end clocks and categorical outcomes', () => {
+  const input = (ended_at: string | null, sold_at: string | null = null, event_status = 'sold', outcome: string | null = null) => ({
+    comments: [
+      comment({ id: 'synthetic-bid', posted_at: '2025-01-10T20:00:00Z', bat_comment_id: 101, comment_type: 'bid', bid_amount: 3000 }),
+      comment({ id: 'synthetic-between', posted_at: '2025-01-10T20:10:00Z', bat_comment_id: 102 }),
+      comment({ id: 'synthetic-later', posted_at: '2025-01-10T20:31:00Z', bat_comment_id: 103 }),
+    ],
+    auctionEvents: outcome == null ? [] : [{ id: 'synthetic-auction', source: 'bat', source_url: LOT, lot_number: null, outcome, winning_bid: null, total_bids: null, winning_bidder: null, seller_name: null, page_views: null, watchers: null, comments_count: null }],
+    vehicleEvents: [{ id: 'synthetic-event', source_platform: 'bat', source_url: LOT, started_at: null, ended_at, sold_at, final_price: null, event_status }],
+    timelineEvents: [], images: [], lotUrlHint: LOT,
+  });
+
+  it('retains the last observed bid source mark without creating an end or a post-close classification', () => {
+    const seq = buildAuctionSequence(input(null))!;
+    expect(seq.close).toBeNull();
+    expect(seq.lastObservedBid).toMatchObject({ id: 'synthetic-bid', at: '2025-01-10T20:00:00.000Z' });
+    expect(seq.lastObservedBid!.url).toContain('#comment-101');
+    expect(seq.items.every(i => i.postClose == null)).toBe(true);
+    expect(seq.days.every(d => d.postClose == null)).toBe(true);
+  });
+
+  it('uses the recorded end rather than the earlier last bid to classify intervening comments', () => {
+    const seq = buildAuctionSequence(input('2025-01-10T20:30:00Z'))!;
+    expect(hasRecordedAuctionEnd(seq)).toBe(true);
+    expect(seq.items.map(i => i.postClose)).toEqual([false, false, true]);
+    expect(auctionMomentDayTitle(seq)).toBe('Auction Closed · sold');
+  });
+
+  it('does not manufacture a clock or closed day title from a date-only end', () => {
+    const seq = buildAuctionSequence(input('2025-01-10T00:00:00Z'))!;
+    expect(hasRecordedAuctionEnd(seq)).toBe(false);
+    expect(seq.items.every(i => i.postClose == null)).toBe(true);
+    expect(auctionMomentDayTitle(seq)).toBe('Auction end day recorded · time unknown');
+  });
+
+  it.each([
+    ['UTC', 'auction_end'], ['America/Los_Angeles', 'auction_end'],
+    ['UTC', 'sale'], ['America/Los_Angeles', 'sale'],
+  ])('preserves recorded day in %s for %s without shifting timestamped first activity', (timezone, role) => {
+    const previous = process.env.TZ;
+    try {
+      process.env.TZ = timezone;
+      const fixture = role === 'auction_end' ? input('2025-01-10T00:00:00Z') : input(null, '2025-01-10T00:00:00Z');
+      fixture.comments[0].posted_at = '2025-01-10T01:00:00Z';
+      const seq = buildAuctionSequence(fixture)!;
+      expect(momentDay(seq.close!)).toBe('2025-01-10');
+      expect(fmtMoment(seq.close)).toBe('Jan 10, 2025');
+      expect(seq.close!.exact).toBe(false);
+      expect(seq.close).toMatchObject({ grain: 'day', day: '2025-01-10', role });
+      expect(seq.open).toMatchObject({ grain: 'instant', exact: false, at: '2025-01-10T01:00:00.000Z' });
+      expect(momentDay(seq.open!)).toBe(timezone === 'UTC' ? '2025-01-10' : '2025-01-09');
+      expect(fmtMoment(seq.open)).toContain(timezone === 'UTC' ? 'Jan 10, 2025' : 'Jan 9, 2025');
+    } finally {
+      if (previous == null) delete process.env.TZ; else process.env.TZ = previous;
+    }
+  });
+
+  it('keeps a precise sale or accepted-RNM timestamp distinct from the auction end', () => {
+    const seq = buildAuctionSequence(input(null, '2025-01-10T20:30:00Z'))!;
+    expect(seq.close).toMatchObject({ role: 'sale', exact: true, at: '2025-01-10T20:30:00.000Z' });
+    expect(hasRecordedAuctionEnd(seq)).toBe(false);
+    expect(seq.items.every(i => i.postClose == null)).toBe(true);
+    expect(auctionMomentDayTitle(seq)).toBe('Sale recorded · auction end unknown');
+  });
+
+  it.each([
+    ['unsold', null, 'no_sale'],
+    ['unsold', 'reserve_not_met', 'reserve_not_met'],
+    ['active', 'sold', 'sold'],
+    ['pre_sold', null, 'unknown'],
+  ])('interprets %s and canonical %s as exact recorded categories', (status, outcome, expected) => {
+    expect(buildAuctionSequence(input(null, null, status, outcome))!.outcome).toBe(expected);
+  });
+
+  it('reports unsupported sold/no-sale disagreement instead of inferring a transaction outcome', () => {
+    const seq = buildAuctionSequence(input(null, null, 'unsold', 'sold'))!;
+    expect(seq.outcome).toBe('unknown'); expect(seq.outcomeConflict).toBe(true);
+  });
+});
+
+
+describe('unpositioned activity follows canonical native assignment', () => {
+  const native = (id: string, posted_at: string | null, source_url: string | null = LOT, bat_comment_id: number | null = 1): AuctionCommentRow =>
+    ({ ...comment({ id, posted_at: '2026-09-17T18:00:00Z' }), posted_at, source_url, bat_comment_id });
+  const timed = native('synthetic-timed', '2026-09-17T18:00:00Z');
+  it.each([
+    { name: 'native missing clock', rows: [timed, native('synthetic-null', null, LOT, 2)], hint: LOT, expected: true, items: ['synthetic-timed'], keys: ['1985-pontiac-fiero-gt-3'] },
+    { name: 'native invalid clock', rows: [timed, native('synthetic-invalid', 'not-a-time', LOT, 2)], hint: LOT, expected: true, items: ['synthetic-timed'], keys: ['1985-pontiac-fiero-gt-3'] },
+    { name: 'blank native fallback', rows: [timed, native('synthetic-blank', null, '  ', 2)], hint: LOT, expected: true, items: ['synthetic-timed'], keys: ['1985-pontiac-fiero-gt-3'] },
+    { name: 'foreign alongside native', rows: [timed, native('synthetic-foreign', null, 'https://example.invalid/other', 2)], hint: LOT, expected: false, items: ['synthetic-timed'], keys: ['1985-pontiac-fiero-gt-3'] },
+    { name: 'foreign only under known key', rows: [native('synthetic-foreign', null, 'https://example.invalid/other', 2)], hint: LOT, expected: false, items: [], keys: ['1985-pontiac-fiero-gt-3'] },
+    { name: 'blank without a native key', rows: [native('synthetic-blank', null, null, 2)], hint: null, expected: false, items: [], keys: [] },
+    { name: 'fully positioned native', rows: [timed], hint: LOT, expected: false, items: ['synthetic-timed'], keys: ['1985-pontiac-fiero-gt-3'] },
+    { name: 'invalid duplicate discarded by current earliest policy', rows: [timed, native('synthetic-invalid', 'not-a-time')], hint: LOT, expected: false, items: ['synthetic-timed'], keys: ['1985-pontiac-fiero-gt-3'] },
+    { name: 'null duplicate retained by current earliest policy', rows: [timed, native('synthetic-null', null)], hint: LOT, expected: true, items: [], keys: ['1985-pontiac-fiero-gt-3'] },
+    { name: 'foreign duplicate excluded before native identity', rows: [timed, native('synthetic-foreign', null, 'https://example.invalid/other')], hint: LOT, expected: false, items: ['synthetic-timed'], keys: ['1985-pontiac-fiero-gt-3'] },
+  ])('qualifies $name without changing sequence membership or source clocks', control => {
+    const result = buildAuctionSequences({ comments: control.rows, auctionEvents: [], vehicleEvents: [], timelineEvents: [], images: [], lotUrlHint: control.hint });
+    expect(result.sequences.map(s => s.key)).toEqual(control.keys);
+    expect(result.sequences.flatMap(s => s.items.map(i => i.id))).toEqual(control.items);
+    expect(result.sequences.flatMap(s => s.items.map(i => i.at))).toEqual(control.items.map(() => '2026-09-17T18:00:00.000Z'));
+    expect(result.sequences.flatMap(s => s.items.map(i => i.url))).toEqual(control.items.map(() => `${LOT}#comment-1`));
+    expect(result.importStampedDays).toEqual([]);
+    expect((result as any).hasUnpositionedActivity).toBe(control.expected);
+  });
+});
+
+
+describe('native source eligibility precedes projection identity', () => {
+  const native = comment({ id: 'synthetic-native', posted_at: '2026-09-17T18:00:00Z', comment_type: 'bid', bid_amount: 100, author_username: 'Native witness', bat_comment_id: 501 });
+  it.each([
+    { name: 'native only', source: undefined, at: '2026-09-17T17:00:00Z', only: false, kept: 'synthetic-native', amount: 100, clock: '2026-09-17T18:00:00.000Z', generic: 'synthetic-native' },
+    { name: 'foreign earlier', source: 'https://example.invalid/other', at: '2026-09-17T17:00:00Z', only: false, kept: 'synthetic-native', amount: 100, clock: '2026-09-17T18:00:00.000Z', generic: 'synthetic-extra' },
+    { name: 'foreign missing clock', source: 'https://example.invalid/other', at: null, only: false, kept: 'synthetic-native', amount: 100, clock: '2026-09-17T18:00:00.000Z', generic: 'synthetic-extra' },
+    { name: 'foreign later', source: 'https://example.invalid/other', at: '2026-09-17T19:00:00Z', only: false, kept: 'synthetic-native', amount: 100, clock: '2026-09-17T18:00:00.000Z', generic: 'synthetic-native' },
+    { name: 'native earlier', source: LOT, at: '2026-09-17T17:00:00Z', only: false, kept: 'synthetic-extra', amount: 200, clock: '2026-09-17T17:00:00.000Z', generic: 'synthetic-extra' },
+    { name: 'blank earlier', source: '  ', at: '2026-09-17T17:00:00Z', only: false, kept: 'synthetic-extra', amount: 200, clock: '2026-09-17T17:00:00.000Z', generic: 'synthetic-extra' },
+    { name: 'foreign only', source: 'https://example.invalid/other', at: '2026-09-17T17:00:00Z', only: true, kept: null, amount: null, clock: null, generic: 'synthetic-extra' },
+  ])('keeps $name scoped without changing generic dedupe or raw rows', control => {
+    const extra = { ...native, id: 'synthetic-extra', source_url: control.source ?? null, posted_at: control.at,
+      bid_amount: control.source?.includes('example.invalid') ? 900 : 200, author_username: 'Duplicate witness' };
+    const rows = [...(control.only ? [] : [native]), ...(control.source === undefined ? [] : [extra])];
+    const before = structuredClone(rows);
+    expect(dedupeComments(rows).map(c => c.id)).toEqual([control.generic]);
+    const result = buildAuctionSequences({ comments: rows, auctionEvents: [], images: [], timelineEvents: [], lotUrlHint: LOT,
+      vehicleEvents: [{ id: 'synthetic-window', source_platform: 'bat', source_url: LOT, started_at: '2026-09-10T15:00:00Z', ended_at: '2026-09-17T20:00:00Z', sold_at: null, final_price: null, event_status: null }] });
+    expect(rows).toEqual(before); expect(result.sequences).toHaveLength(1);
+    const sequence = result.sequences[0];
+    expect(sequence.open?.at).toBe('2026-09-10T15:00:00.000Z'); expect(sequence.close?.at).toBe('2026-09-17T20:00:00.000Z');
+    expect(sequence.items.map(i => i.id)).toEqual(control.kept ? [control.kept] : []);
+    if (control.kept) expect(sequence.lastObservedBid).toMatchObject({ id: control.kept, amount: control.amount, at: control.clock,
+      author: control.kept === 'synthetic-native' ? 'Native witness' : 'Duplicate witness', url: `${LOT}#comment-501` });
+    else expect(sequence.lastObservedBid).toBeNull();
+    expect(sequence.items.some(i => i.amount === 900)).toBe(false);
+  });
+  it('retains the eligible lowest-id tie and distinct ID-less rows', () => {
+    const rows = [{ ...native, id: 'z' }, { ...native, id: 'a', bid_amount: 200 },
+      { ...native, id: 'none-1', bat_comment_id: null }, { ...native, id: 'none-2', bat_comment_id: null }];
+    const result = buildAuctionSequences({ comments: rows, auctionEvents: [], vehicleEvents: [], timelineEvents: [], images: [], lotUrlHint: LOT });
+    expect(result.sequences[0].items.map(i => i.id)).toEqual(['none-1', 'none-2', 'a']);
+    expect(dedupeComments(rows).map(c => c.id)).toEqual(['none-1', 'none-2', 'a']);
+  });
+});
+
+
+describe('native photo timestamp authority', () => {
+  it.each([
+    { source: 'bat_import', url: null, imported: true },
+    { source: 'owner_upload', url: 'https://photos.bringatrailer.com/wp-content/uploads/2026/09/synthetic.jpg', imported: true },
+    { source: 'external_import', url: '//bringatrailer.com/wp-content/uploads/2026/09/synthetic.jpg', imported: true },
+    { source: 'combat_archive', url: null, imported: true }, // Preserve the existing /bat/i vocabulary.
+    { source: 'owner_upload', url: 'https://notbringatrailer.com/wp-content/uploads/2026/09/synthetic.jpg', imported: false },
+    { source: 'owner_upload', url: null, imported: false },
+  ])('retains $source/$url clock classification and raw inputs', ({ source, url, imported }) => {
+    const image = { id: 'synthetic-clock-authority', source, source_url: url, taken_at: '2026-09-02T12:10:00Z' };
+    const before = structuredClone(image);
+    const result = buildAuctionSequences({ comments: [], auctionEvents: [], vehicleEvents: [], timelineEvents: [], images: [image], lotUrlHint: LOT });
+    expect(isBatHosted(image)).toBe(imported);
+    expect(result.importStampedDays).toEqual(imported ? [new Date(image.taken_at).toLocaleDateString('en-CA')] : []);
+    expect(result.sequences[0].photos.publishedWithListing).toBe(imported ? 1 : 0);
+    expect(image).toEqual(before);
+  });
+});

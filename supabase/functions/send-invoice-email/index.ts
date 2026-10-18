@@ -11,6 +11,8 @@
 import { corsHeaders } from "../_shared/cors.ts";
 import { sendEmail } from "../_shared/email.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { requireOwnerOrService, requireWriteAuth } from "../_shared/writeGuard.ts";
+import { projectSecretKey } from "../_shared/supabaseKeys.ts";
 
 interface LineItem {
   description: string;
@@ -175,6 +177,13 @@ function buildInvoiceHtml(p: InvoicePayload): string {
 }
 
 Deno.serve(async (req) => {
+  // Writes are never anonymous: service key, signed-in user, or nothing (P0.2, 2026-09-27).
+  const denied = await requireWriteAuth(req);
+  if (denied) return denied;
+  // Sends mail as Nuke to any address: the owner or the service key only, because "signed in" is anyone while
+  // sign-up is open (2026-09-29).
+  const notOwner = await requireOwnerOrService(req, { headers: corsHeaders });
+  if (notOwner) return notOwner;
   if (req.method === "OPTIONS") {
     return new Response(null, { status: 200, headers: corsHeaders });
   }
@@ -207,7 +216,7 @@ Deno.serve(async (req) => {
     // Update sent_at on the generated_invoices record (safety net — frontend also sets this)
     try {
       const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
-      const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+      const serviceKey = projectSecretKey()!;
       const sb = createClient(supabaseUrl, serviceKey);
 
       await sb

@@ -1,5 +1,15 @@
 #!/usr/bin/env node
 /**
+ * RETIRED 2026-09-28. Its heuristic 4 (date proximity to vehicle photo activity, self-scored 0.80)
+ * attached 433 receipts that the receipts table holds with no vehicle to 8 of the owner's cars
+ * ($122K personal, $60K org) on the date alone; all were demoted on 2026-09-28. Successor:
+ * scripts/receipts/reconcile.mjs (npm run receipts:reconcile) — who paid first, never the date alone.
+ */
+console.error('receipt-attribution-cleanup.mjs is retired: use `npm run receipts:reconcile` (scripts/receipts/reconcile.mjs).');
+process.exit(1);
+
+/* original body kept below for the record; unreachable */
+/**
  * WS-8: Receipt Attribution Cleanup
  *
  * Heuristically attributes receipts that have no vehicle_id and no

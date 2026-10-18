@@ -39,6 +39,7 @@ const VehicleMergeInterface = React.lazy(() => import('../../components/vehicle/
 const UserWorkLedger = React.lazy(() => import('./UserWorkLedger'));
 const UserBatTrackRecord = React.lazy(() => import('./UserBatTrackRecord'));
 const UserMoneyFlow = React.lazy(() => import('./UserMoneyFlow'));
+const UserReconciliationPanel = React.lazy(() => import('./UserReconciliationPanel'));
 
 // Right column
 const UserRecentPhotos = React.lazy(() => import('./UserRecentPhotos'));
@@ -53,6 +54,8 @@ const UserWorkspaceContent: React.FC = () => {
     userId,
     profile,
     isOwnProfile,
+    photoLibraryStats,
+    photoLibraryError,
   } = useUserProfile();
 
   const [leftPct, setLeftPct] = useState(DEFAULT_LEFT_PCT);
@@ -85,6 +88,14 @@ const UserWorkspaceContent: React.FC = () => {
           <React.Suspense fallback={null}>
             <UserConnectionStateStrip />
           </React.Suspense>
+
+          {/* Reconciliation — owner-only inside the component (visitors: null, no fetch) */}
+          {userId && (
+            <React.Suspense fallback={null}>
+              <UserReconciliationPanel userId={userId} isOwnProfile={isOwnProfile}
+                sourceAnalysis={photoLibraryStats?.source_analysis} sourceError={photoLibraryError} />
+            </React.Suspense>
+          )}
 
           {/* Dossier — grouped field display */}
           <React.Suspense fallback={null}>

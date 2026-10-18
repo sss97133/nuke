@@ -1,0 +1,21 @@
+RADIO:
+  family: miniseal
+  pins:
+    '31': red IGNITION/ACC lead (power harness, bare end) — splice
+    RADIO_CONST: yellow CONSTANT +12V lead — splice
+    RADIO_GND: black GROUND lead — splice
+    RADIO_REM: blue/white REMOTE/AMP TURN-ON lead — splice
+    RCA_FRONT: FRONT RCA LINE OUT jacks, black cable (plug-in, no splice)
+    RCA_REAR: REAR RCA LINE OUT jacks, grey cable (plug-in, no splice)
+    RCA_SUB: SUBWOOFER RCA pre-out (plug-in, no splice)
+  kit: {}
+  mate: RetroSound main wiring harness female plug (power + speaker harnesses plug into it)
+  open:
+  - Figure 5 is from the Motor 2 manual; the Motor 2B box diagram confirms the blue/white amp lead and shows the sub RCA cable colour
+  - power-harness lead gauge (splice sizing uses our wire only)
+  - 'RCA cables are plug-in: the MiniSeal family does not apply to them'
+  sources:
+  - 'RetroSound Motor 2 user manual Figure 5 p.10 (PDF p.11): red IGNITION/ACC, yellow CONSTANT +12V, black GROUND, blue/white REMOTE/AMP TURN-ON, front RCA line out on the black cable, rear on the grey
+    (reference_documents/web_snapshots/help.retromanufacturing.com__Motor-2-User-Manual.md, figure transcribed at the end)'
+  - 'RetroSound Motor 2B user manual p.3: pre-outs front, rear, subwoofer; separate amp turn-on lead (reference_documents/component_drawings/RetroSound_Motor-2B_User_Manual.pdf)'
+  - 'RetroSound Installation & Assembly Manual step 6: power and speaker harnesses end in bare wires joined to the vehicle wiring (reference_documents/web_snapshots/help.retromanufacturing.com__InstallationAssembly_Manual.md)'

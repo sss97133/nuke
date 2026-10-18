@@ -25,6 +25,9 @@ import { normalizeVehicleFields } from '../_shared/normalizeVehicle.ts';
 
 import { createClient, SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { writeObservation } from "../_shared/observationWriter.ts";
+import { requireWriteAuth } from '../_shared/writeGuard.ts';
+import { projectSecretKey } from "../_shared/supabaseKeys.ts";
+import { mustWrite } from '../_shared/writeResult.ts';
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -676,6 +679,9 @@ async function crawlAndInsertPage(
 }
 
 Deno.serve(async (req) => {
+  // Writes are never anonymous: service key, signed-in user, or nothing (P0.2, 2026-09-27).
+  const denied = await requireWriteAuth(req);
+  if (denied) return denied;
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
   }
@@ -686,7 +692,7 @@ Deno.serve(async (req) => {
 
     const supabase = createClient(
       Deno.env.get("SUPABASE_URL") ?? "",
-      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? ""
+      projectSecretKey() ?? ""
     );
 
     // Get or create GAA org
@@ -831,7 +837,7 @@ Deno.serve(async (req) => {
           const extracted = extractVehicleDetails(html, vehicle.listing_url);
 
           // Update with full details
-          await supabase
+          mustWrite('vehicles update', await supabase
             .from("vehicles")
             .update({
               trim: extracted.sub_model,
@@ -850,7 +856,7 @@ Deno.serve(async (req) => {
                 enriched_at: new Date().toISOString(),
               },
             })
-            .eq("id", vehicle.id);
+            .eq("id", vehicle.id));
 
           // Save images
           if (extracted.image_urls.length > 0) {

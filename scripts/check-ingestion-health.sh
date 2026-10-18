@@ -2,6 +2,27 @@
 # Quick ingestion health check script
 # Run: bash scripts/check-ingestion-health.sh
 
+# Bounded operator view of existing model metadata, output assays and agent
+# declarations. No database changes, inference or new monitoring endpoint.
+if [ "${1:-}" = "--data-model" ]; then
+    shift
+    exec node "$(dirname "$0")/assays/data-model-coverage.mjs" "$@"
+fi
+
+# Public-reader mode is an anonymous, bounded assay. It does not execute the
+# legacy full-count checks below, process intake or invoke a writer.
+if [ "${1:-}" = "--public-readers" ]; then
+    shift
+    exec node "$(dirname "$0")/assays/public-reader-coverage.mjs" "$@"
+fi
+
+# Bounded C17 mode uses the existing read-only Management API path. It never
+# invokes a consumer, model or intake writer. Other legacy modes stay separate.
+if [ "${1:-}" = "--image-observations" ]; then
+    shift
+    exec node "$(dirname "$0")/check-image-observation-health.mjs" "$@"
+fi
+
 echo "🔍 INGESTION HEALTH CHECK"
 echo "========================="
 echo ""
@@ -74,4 +95,3 @@ SELECT
 FROM cron.job
 WHERE jobname LIKE '%import%' OR jobname LIKE '%queue%';
 "
-

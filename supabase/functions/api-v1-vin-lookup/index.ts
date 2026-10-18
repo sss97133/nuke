@@ -7,6 +7,10 @@
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.0";
 import { authenticateRequest, logApiUsage } from "../_shared/apiKeyAuth.ts";
+import { decodeOneVin } from "../_shared/nhtsa-vin.ts";
+import { decodeVin as decodeVinLocally } from "../_shared/vin-decoder.ts";
+import { projectSecretKey } from "../_shared/supabaseKeys.ts";
+import { maskOwnerMoney } from "../_shared/ownerMoney.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -32,7 +36,7 @@ Deno.serve(async (req) => {
 
   try {
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
-    const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+    const supabaseKey = projectSecretKey()!;
     const supabase = createClient(supabaseUrl, supabaseKey);
 
     // Authenticate
@@ -41,6 +45,7 @@ Deno.serve(async (req) => {
       return jsonResponse({ error: auth.error || "Authentication required" }, auth.status || 401);
     }
     const userId = auth.userId;
+    const isServiceRole = auth.isServiceRole;
 
     // Extract VIN from URL path
     const url = new URL(req.url);
@@ -51,17 +56,60 @@ Deno.serve(async (req) => {
       return jsonResponse({ error: "VIN is required. Use GET /api-v1-vin-lookup/{vin}" }, 400);
     }
 
-    // Look up vehicle by VIN
+    // Resolve VIN → id through find_vehicle_by_vin (SQL, STABLE), which
+    // filters on upper(btrim(vin)) and so uses idx_vehicles_vin_norm_trim.
+    // A plain vin = $1 has no usable index (every vin index is partial or an
+    // expression), so both ilike and eq sequential-scanned ~1.1M rows and a
+    // miss hit the 10 s statement_timeout. Measured 2026-10-06, EXPLAIN:
+    // eq → statement timeout; upper(vin) = $1 → Index Scan, 0.5 ms.
+    const { data: vehicleId, error: resolveError } = await supabase
+      .rpc("find_vehicle_by_vin", { p_vin: vin });
+
+    if (resolveError || !vehicleId) {
+      // Nuke holds no record for this VIN. Answer with a cited factory decode
+      // instead of a bare 404: NHTSA vPIC for 17-character VINs, the local
+      // WMI/year-code decoder for pre-1981 VINs or when NHTSA is unreachable.
+      // held:false tells the caller these are reference facts, not testimony.
+      const cleanVin = vin.trim().toUpperCase();
+      if (cleanVin.length === 17) {
+        try {
+          const nhtsa = await decodeOneVin(cleanVin);
+          if (nhtsa) {
+            return jsonResponse({
+              data: null,
+              held: false,
+              vin: cleanVin,
+              decode: nhtsa.fields,
+              source: { ...nhtsa.source, error_code: nhtsa.error_code, error_text: nhtsa.error_text, trust: "T1 reference (manufacturer filing)" },
+            });
+          }
+        } catch (e) {
+          console.warn("[vin-lookup] NHTSA decode failed:", e instanceof Error ? e.message : String(e));
+        }
+      }
+      const local = decodeVinLocally(cleanVin);
+      if (local.year || local.make || local.manufacturer) {
+        const { is_pre_1981, ...fields } = local;
+        return jsonResponse({
+          data: null,
+          held: false,
+          vin: cleanVin,
+          decode: Object.fromEntries(Object.entries(fields).filter(([, v]) => v !== null && v !== "")),
+          source: { name: "Nuke vin-decoder", method: is_pre_1981 ? "pre-1981 WMI/year-code tables" : "WMI/year-code tables", trust: "T3 heuristic" },
+        });
+      }
+      return jsonResponse({ error: "Vehicle not found for VIN", vin }, 404);
+    }
+
     const { data: vehicle, error: vehicleError } = await supabase
       .from("vehicles")
       .select(`
         id, year, make, model, trim, series, vin, mileage,
         color, interior_color, transmission, engine_type, engine_displacement,
         drivetrain, body_style, sale_price, purchase_price, description,
-        is_public, created_at, updated_at, primary_image_url
+        is_public, created_at, updated_at, owner_id, primary_image_url
       `)
-      .ilike("vin", vin)
-      .limit(1)
+      .eq("id", vehicleId)
       .maybeSingle();
 
     if (vehicleError || !vehicle) {
@@ -141,9 +189,11 @@ Deno.serve(async (req) => {
       }
     }
 
+    // Owner money is owner-only (#1164): the owner and the service role keep purchase_price, every other API
+    // key gets null.
     const response = {
       data: {
-        ...vehicle,
+        ...maskOwnerMoney(vehicle, userId, isServiceRole),
         valuation: valuationResult.data || null,
         counts: {
           listings: listingCountResult.count || 0,

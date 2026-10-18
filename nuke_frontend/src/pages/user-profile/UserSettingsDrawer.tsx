@@ -31,7 +31,7 @@ interface UserSettingsDrawerProps {
 }
 
 const UserSettingsDrawer: React.FC<UserSettingsDrawerProps> = ({ open: openProp, onClose }) => {
-  const { profile, userId, isAdmin, saveProfileField, uploadAvatar } = useUserProfile();
+  const { profile, userId, isAdmin, isOwnProfile, saveProfileField, uploadAvatar } = useUserProfile();
 
   const [internalOpen, setInternalOpen] = useState(false);
   const isOpen = openProp !== undefined ? openProp : internalOpen;
@@ -111,6 +111,8 @@ const UserSettingsDrawer: React.FC<UserSettingsDrawerProps> = ({ open: openProp,
       setSaving(null);
     }
   };
+
+  if (!isOwnProfile) return null;
 
   return (
     <>

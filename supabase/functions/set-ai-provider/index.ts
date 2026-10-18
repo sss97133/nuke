@@ -15,17 +15,22 @@ import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.0";
 import { corsHeaders } from "../_shared/cors.ts";
 import { encryptSecret, decryptSecret, isEncrypted } from "../_shared/secretBox.ts";
+import { requireWriteAuth } from "../_shared/writeGuard.ts";
+import { projectSecretKey } from "../_shared/supabaseKeys.ts";
 
 const json = (o: unknown, s = 200) =>
   new Response(JSON.stringify(o), { status: s, headers: { ...corsHeaders, "content-type": "application/json" } });
 
 Deno.serve(async (req) => {
+  // Writes are never anonymous: service key, signed-in user, or nothing (P0.2, 2026-09-27).
+  const denied = await requireWriteAuth(req);
+  if (denied) return denied;
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
   if (req.method !== "POST") return json({ error: "method_not_allowed" }, 405);
 
   const svc = createClient(
     Deno.env.get("SUPABASE_URL")!,
-    Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
+    projectSecretKey()!,
     { auth: { persistSession: false, autoRefreshToken: false } },
   );
   const bearer = (req.headers.get("authorization") ?? "").replace(/^Bearer\s+/i, "");
@@ -70,7 +75,7 @@ Deno.serve(async (req) => {
   const enc = await encryptSecret(apiKey);
   const { data: existing } = await svc.from("user_ai_providers")
     .select("id").eq("user_id", userId).eq("provider", provider).maybeSingle();
-  const row: any = { user_id: userId, provider, api_key_encrypted: enc, is_active: true };
+  const row: any = { user_id: userId, provider, api_key_encrypted: enc, is_active: true, updated_at: new Date().toISOString() };
   if (modelName) row.model_name = modelName;
   const { error } = existing
     ? await svc.from("user_ai_providers").update(row).eq("id", existing.id)

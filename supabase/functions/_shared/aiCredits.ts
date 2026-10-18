@@ -25,9 +25,14 @@ const PRICING_PER_MTOK: Record<string, { input: number; output: number }> = {
   "claude-opus-4-8":   { input: 15, output: 75 },
   "claude-sonnet-4-6": { input: 3,  output: 15 },
   "claude-haiku-4-5":  { input: 1,  output: 5  },
+  "claude-haiku-5-5":  { input: 0.1, output: 0.5 }, // official short-context price, verified 2026-10-18
 };
 const DEFAULT_MODEL = "claude-opus-4-8";
-const PLATFORM_MARGIN = Number(Deno.env.get("AI_CREDIT_MARGIN") ?? "1.2"); // 20% over cost
+function platformMargin(): number {
+  const margin = Number(Deno.env.get("AI_CREDIT_MARGIN") ?? "1.2");
+  if (!Number.isFinite(margin) || margin < 1 || margin > 10) throw new Error("invalid AI credit margin");
+  return margin;
+}
 
 export interface ClaudeUsage {
   input_tokens?: number;
@@ -35,17 +40,18 @@ export interface ClaudeUsage {
 }
 
 /** Convert Anthropic `usage` + model into cents to bill (cost × margin, rounded up). */
-export function usageToCents(model: string, usage: ClaudeUsage): number {
+export function usageToCents(model: string, usage: ClaudeUsage, margin = platformMargin()): number {
+  if (!Number.isFinite(margin) || margin < 1 || margin > 10) throw new Error("invalid AI credit margin");
   const p = PRICING_PER_MTOK[model] ?? PRICING_PER_MTOK[DEFAULT_MODEL];
   const inTok = usage.input_tokens ?? 0;
   const outTok = usage.output_tokens ?? 0;
   const dollars = ((inTok * p.input) + (outTok * p.output)) / 1_000_000;
-  return Math.ceil(dollars * PLATFORM_MARGIN * 100);
+  return Math.ceil(dollars * margin * 100);
 }
 
 /** Rough pre-call estimate for the hold, from expected output budget. */
-export function estimateCents(model: string, expectedInputTokens: number, maxOutputTokens: number): number {
-  return usageToCents(model, { input_tokens: expectedInputTokens, output_tokens: maxOutputTokens });
+export function estimateCents(model: string, expectedInputTokens: number, maxOutputTokens: number, margin = platformMargin()): number {
+  return usageToCents(model, { input_tokens: expectedInputTokens, output_tokens: maxOutputTokens }, margin);
 }
 
 export async function availableCents(supabase: any, userId: string): Promise<number> {
@@ -72,21 +78,25 @@ export async function creditCents(
 
 /**
  * Reserve `cents` against a job. Returns the hold id, or null if insufficient funds.
- * Reads available, then inserts the hold — there's a small TOCTOU window; for an
- * MVP that's acceptable (worst case two concurrent jobs both pass with a thin
- * balance). Tighten later with a SECURITY DEFINER RPC that checks+inserts atomically.
+ * The existing ledger's service-only writer serializes reservation and settlement
+ * per account. Never check a balance and insert a debit in separate requests.
  */
 export async function holdCredits(
   supabase: any, userId: string, cents: number, ref: string, metadata: Record<string, unknown> = {},
 ): Promise<string | null> {
-  const amount = Math.max(1, Math.round(cents));
-  const avail = await availableCents(supabase, userId);
-  if (avail < amount) return null;
-  const { data, error } = await supabase.from("ai_credit_ledger").insert({
-    user_id: userId, entry_type: "hold", amount_cents: -amount, status: "open", ref, metadata,
-  }).select("id").single();
-  if (error) throw new Error(`holdCredits: ${error.message}`);
-  return data.id as string;
+  const result = await reserveCredits(supabase, userId, cents, ref, metadata);
+  return result.status === "reserved" ? result.hold_id : null;
+}
+
+export async function reserveCredits(supabase: any, userId: string, cents: number, ref: string,
+  metadata: Record<string, unknown> = {}): Promise<{ status: "reserved"; hold_id: string } | { status: "insufficient_funds" | "duplicate" }> {
+  if (!Number.isSafeInteger(cents) || cents < 1) throw new Error("invalid credit reservation amount");
+  const { data, error } = await supabase.rpc("reserve_ai_credit_hold", {
+    p_user_id: userId, p_cents: cents, p_ref: ref, p_metadata: metadata,
+  });
+  if (error || !data || !["reserved", "insufficient_funds", "duplicate"].includes(data.status) ||
+      data.status === "reserved" && typeof data.hold_id !== "string") throw new Error("credit reservation unavailable");
+  return data;
 }
 
 /**
@@ -97,25 +107,14 @@ export async function holdCredits(
 export async function settleHold(
   supabase: any, userId: string, holdId: string, actualCents: number, metadata: Record<string, unknown> = {},
 ): Promise<void> {
-  const charge = Math.max(0, Math.round(actualCents));
-  // Release the reservation. Capture which rows actually flipped open->closed: if none
-  // (a duplicate/replayed settle), the hold was already settled — return without inserting
-  // a second `settle` debit row (idempotent against double-debit).
-  const { data: released, error: relErr } = await supabase.from("ai_credit_ledger")
-    .update({ status: "closed" }).eq("id", holdId).eq("user_id", userId).eq("status", "open")
-    .select("id");
-  if (relErr) throw new Error(`settleHold release: ${relErr.message}`);
-  if (!released || released.length === 0) return; // already settled/released — idempotent no-op
-  if (charge > 0) {
-    const { error } = await supabase.from("ai_credit_ledger").insert({
-      user_id: userId, entry_type: "settle", amount_cents: -charge, hold_id: holdId, status: "closed",
-      ref: "settle", metadata,
-    });
-    if (error) throw new Error(`settleHold charge: ${error.message}`);
-  }
+  if (!Number.isSafeInteger(actualCents) || actualCents < 0) throw new Error("invalid credit settlement amount");
+  const { data, error } = await supabase.rpc("settle_ai_credit_hold", {
+    p_user_id: userId, p_hold_id: holdId, p_cents: actualCents, p_metadata: metadata,
+  });
+  if (error || !data || !["settled", "already_settled"].includes(data.status)) throw new Error("credit settlement unavailable");
 }
 
 /** Release a hold without charging (e.g. the call failed before incurring cost). */
-export async function releaseHold(supabase: any, userId: string, holdId: string): Promise<void> {
-  await settleHold(supabase, userId, holdId, 0);
+export async function releaseHold(supabase: any, userId: string, holdId: string, metadata: Record<string, unknown> = {}): Promise<void> {
+  await settleHold(supabase, userId, holdId, 0, metadata);
 }

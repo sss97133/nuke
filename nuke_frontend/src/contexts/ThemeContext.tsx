@@ -85,7 +85,7 @@ const ThemeContext = createContext<ThemeContextType | undefined>(undefined);
 
 const STORAGE_KEYS = {
   preference: 'themePreference',
-  autoSource: 'themeAutoSource',
+  autoSource: 'themeAutoSource_v2',
   schedule: 'themeSchedule',
   accent: 'uiAccent',
   contrast: 'uiContrast',
@@ -172,7 +172,7 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const [autoSource, setAutoSourceState] = useState<AutoThemeSource>(() => {
     const saved = localStorage.getItem(STORAGE_KEYS.autoSource);
     if (saved === 'system' || saved === 'time') return saved;
-    return 'system';
+    return 'time';
   });
 
   const [schedule, setScheduleState] = useState<TimeSchedule>(() => {
@@ -354,5 +354,9 @@ export const useTheme = (): ThemeContextType => {
   const context = useContext(ThemeContext);
   if (!context) throw new Error('useTheme must be used within ThemeProvider');
   return context;
+};
+
+export const useOptionalTheme = (): ThemeContextType | undefined => {
+  return useContext(ThemeContext);
 };
 

@@ -1,0 +1,140 @@
+/* Deal read — design properties live here; inline styles are layout only.
+   Tokens: src/styles/unified-design-system.css. Book: docs/library/technical/design-book. */
+
+.dr-page {
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 16px 12px 40px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  font-family: var(--font-family);
+  color: var(--text);
+}
+
+.dr-mono { font-family: var(--font-mono); }
+
+.dr-label {
+  font-family: var(--font-family);
+  font-size: var(--fs-8);
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-secondary);
+}
+
+.dr-muted { color: var(--text-secondary); }
+
+.dr-strong { font-weight: 700; color: var(--text); }
+
+/* A drillable datum. It is a button: same type as the text around it, a dotted
+   rule under it says "opens", solid when open. Nothing else changes. */
+.dr-drill {
+  font: inherit;
+  color: inherit;
+  background: none;
+  border: 0;
+  border-bottom: 1px dotted var(--text-secondary);
+  padding: 0;
+  margin: 0;
+  cursor: pointer;
+  text-align: inherit;
+  white-space: nowrap;
+}
+.dr-drill[aria-expanded="true"] { border-bottom: 1px solid var(--text); }
+.dr-drill:hover { border-bottom-color: var(--text); }
+.dr-drill:focus-visible { outline: 2px solid var(--border-focus); outline-offset: 2px; }
+
+.dr-link {
+  color: var(--text);
+  text-decoration: underline;
+  text-decoration-style: dotted;
+  white-space: nowrap;
+}
+.dr-link:hover { text-decoration-style: solid; }
+
+/* Expansion — the rows behind a number, opened in place. */
+.dr-expand {
+  margin-top: 8px;
+  border-top: 1px solid var(--border);
+  padding-top: 8px;
+}
+
+.dr-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-family: var(--font-mono);
+  font-size: var(--fs-9);
+}
+.dr-table th {
+  text-align: left;
+  font-family: var(--font-family);
+  font-size: var(--fs-8);
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-secondary);
+  padding: 0 8px 4px 0;
+  border-bottom: 1px solid var(--border);
+  white-space: nowrap;
+}
+.dr-table td {
+  padding: 4px 8px 4px 0;
+  border-bottom: 1px solid var(--border);
+  vertical-align: top;
+  white-space: nowrap;
+}
+.dr-table tr:last-child td { border-bottom: 0; }
+.dr-table th.num, .dr-table td.num { text-align: right; }
+.dr-table td.wrap { white-space: normal; }
+.dr-scroll { overflow-x: auto; }
+
+/* Key/value rows (the ask's source DNA, the claim inventory) */
+.dr-kv {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: 4px 12px;
+  font-family: var(--font-mono);
+  font-size: var(--fs-9);
+}
+.dr-kv dt { color: var(--text-secondary); margin: 0; }
+.dr-kv dd { margin: 0; color: var(--text); overflow-wrap: anywhere; }
+
+/* Two-column band on desktop, one column on phones */
+.dr-grid-2 {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 12px;
+}
+
+.dr-masthead-row {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.dr-status-line {
+  margin-top: 12px;
+  border-top: 1px solid var(--border);
+  padding-top: 8px;
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  flex-wrap: wrap;
+  font-family: var(--font-mono);
+  font-size: var(--fs-8);
+  color: var(--text-secondary);
+}
+
+.dr-strip { display: block; width: 100%; height: auto; overflow: visible; }
+.dr-strip text { font-family: var(--font-mono); font-size: 9px; }
+.dr-strip .lbl { font-family: var(--font-family); font-size: 8px; font-weight: 700; letter-spacing: 0.08em; }
+
+.dr-skeleton { height: 96px; border: 2px solid var(--border); background: var(--surface); }
+
+@media (max-width: 767px) {
+  .dr-page { padding: 12px 12px 72px; }
+  .dr-masthead-row { align-items: flex-start; }
+}

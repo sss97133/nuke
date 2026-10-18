@@ -8,68 +8,18 @@ interface ToolImageSearchResult {
 }
 
 export class ToolImageService {
-  private static CLAUDE_API_KEY = import.meta.env.VITE_NUKE_CLAUDE_API || import.meta.env.VITE_CLAUDE_API_KEY;
   private static GOOGLE_API_KEY = import.meta.env.VITE_GOOGLE_API_KEY;
   private static GOOGLE_CSE_ID = import.meta.env.VITE_GOOGLE_CSE_ID;
-  
+
   /**
-   * Use Claude to generate optimized search queries for finding tool images
+   * Search query for a tool's images. Built from the part fields; the browser
+   * never calls an AI provider (its key would ship in public JavaScript).
    */
   static async generateImageSearchQuery(
     partNumber: string,
     description: string,
     brandName?: string
   ): Promise<string> {
-    if (!this.CLAUDE_API_KEY) {
-      // Fallback to basic query if no Claude API
-      return `${brandName || ''} ${partNumber} ${description} tool`.trim();
-    }
-
-    try {
-      const response = await fetch('https://api.anthropic.com/v1/messages', {
-        method: 'POST',
-        headers: {
-          'x-api-key': this.CLAUDE_API_KEY,
-          'Content-Type': 'application/json',
-          'anthropic-version': '2023-06-01'
-        },
-        body: JSON.stringify({
-          model: 'claude-3-haiku-20240307',
-          max_tokens: 150,
-          messages: [
-            {
-              role: 'user',
-              content: `You are helping find product images for professional tools. Generate TWO search queries for this tool:
-              1. An exact search using the part number
-              2. A broader search using the description
-              
-              Tool details:
-              - Part Number: ${partNumber}
-              - Description: ${description}
-              - Brand: ${brandName || 'Unknown'}
-              
-              Return ONLY the two queries separated by a pipe (|) character.
-              Example: SNAP-ON FR80A ratchet|3/8 drive 80 tooth ratchet
-              
-              Focus on terms that would appear on product pages and catalogs.`
-            }
-          ]
-        })
-      });
-
-      if (response.ok) {
-        const data = await response.json();
-        const query = data.content[0]?.text?.trim();
-        if (query) {
-          console.log('Claude generated search query:', query);
-          return query;
-        }
-      }
-    } catch (error) {
-      console.error('Claude API error:', error);
-    }
-
-    // Fallback query
     return `${brandName || ''} ${partNumber} ${description} tool`.trim();
   }
 

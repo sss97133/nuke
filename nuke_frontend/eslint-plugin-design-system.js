@@ -265,6 +265,83 @@ const noBannedFonts = {
   },
 };
 
+/**
+ * Rule: no-inline-style
+ * A page may not set style inline. Type and layout come from the kit's text roles and
+ * containers (src/kit). eslint.config.js scopes this rule so src/kit itself is exempt.
+ */
+const noInlineStyle = {
+  meta: {
+    type: 'suggestion',
+    docs: {
+      description: 'No inline style attribute outside src/kit',
+      recommended: true,
+    },
+    messages: {
+      inlineStyle: 'Inline style is not allowed here. Use a kit text role or container (src/kit).',
+    },
+    schema: [],
+  },
+  create(context) {
+    return {
+      JSXAttribute(node) {
+        if (node.name?.name !== 'style') return;
+        context.report({ node, messageId: 'inlineStyle' });
+      },
+    };
+  },
+};
+
+/**
+ * Rule: no-font-props
+ * Font size, family, weight, tracking, case and line-height are decided once by the kit's
+ * text roles. Setting them in a style object or a CSSProperties constant anywhere else is
+ * a violation.
+ */
+const FONT_PROPS = new Set(['font', 'fontSize', 'fontFamily', 'fontWeight', 'letterSpacing', 'textTransform', 'lineHeight']);
+
+function isInsideStyleObject(node, sourceCode) {
+  let current = node.parent;
+  let depth = 0;
+  while (current && depth < 12) {
+    if (current.type === 'JSXAttribute' && current.name?.name === 'style') return true;
+    if (current.type === 'VariableDeclarator') {
+      if (current.id?.name && /style/i.test(current.id.name)) return true;
+      const annotation = current.id?.typeAnnotation;
+      if (annotation && /CSSProperties/.test(sourceCode.getText(annotation))) return true;
+    }
+    if (current.type === 'TSAsExpression' && /CSSProperties/.test(sourceCode.getText(current.typeAnnotation))) return true;
+    current = current.parent;
+    depth++;
+  }
+  return false;
+}
+
+const noFontProps = {
+  meta: {
+    type: 'suggestion',
+    docs: {
+      description: 'Type is set by kit text roles, never by style objects',
+      recommended: true,
+    },
+    messages: {
+      fontProp: '"{{prop}}" sets type outside the kit. Use a text role (k-entity, k-measure, k-body, k-caption, k-label).',
+    },
+    schema: [],
+  },
+  create(context) {
+    const sourceCode = context.sourceCode || context.getSourceCode();
+    return {
+      Property(node) {
+        const propName = node.key?.name || node.key?.value || '';
+        if (!FONT_PROPS.has(propName)) return;
+        if (!isInsideStyleObject(node, sourceCode)) return;
+        context.report({ node, messageId: 'fontProp', data: { prop: propName } });
+      },
+    };
+  },
+};
+
 // Helper: walk up the AST to check if node is inside a `style` JSX attribute
 function isInsideStyleProp(node) {
   let current = node.parent;
@@ -303,6 +380,8 @@ const plugin = {
     'no-box-shadow': noBoxShadow,
     'no-gradient': noGradient,
     'no-banned-fonts': noBannedFonts,
+    'no-inline-style': noInlineStyle,
+    'no-font-props': noFontProps,
   },
 };
 

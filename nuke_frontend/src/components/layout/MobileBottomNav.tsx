@@ -11,18 +11,13 @@ export const MobileBottomNav: React.FC = () => {
     let cancelled = false;
     const fetchCount = async () => {
       try {
-        // Scope to the signed-in user: hits the partial index
-        // idx_vehicle_images_unorganized (user_id, created_at) WHERE vehicle_id IS NULL.
-        // The unscoped variant counted every user's orphans and timed out (15s 500).
+        // The badge prints the number up to 999 and "999+" above, so it never needs an exact count.
+        // my_unorganized_photo_count counts the signed-in user's own rows and stops at 1,000; the old
+        // count=exact read fetched every unorganized row from the heap (5.5 s cold for 10k photos).
         const { data: { user } } = await supabase.auth.getUser();
         if (!user) return;
-        const { count } = await supabase
-          .from('vehicle_images')
-          .select('id', { count: 'exact', head: true })
-          .eq('user_id', user.id)
-          .is('vehicle_id', null)
-          .or('organization_status.eq.unorganized,organization_status.is.null');
-        if (!cancelled && count != null) setInboxCount(count);
+        const { data: count } = await supabase.rpc('my_unorganized_photo_count');
+        if (!cancelled && typeof count === 'number') setInboxCount(count);
       } catch { /* ignore */ }
     };
     fetchCount();
@@ -31,7 +26,7 @@ export const MobileBottomNav: React.FC = () => {
 
   const items = [
     { to: '/', label: 'Home', match: (p: string) => p === '/' },
-    { to: '/search', label: 'Search', match: (p: string) => p.startsWith('/search') },
+    { to: '/stacks', label: 'Stacks', match: (p: string) => p.startsWith('/stacks') },
     { to: '/capture', label: '+', match: (p: string) => p === '/capture', isAdd: true },
     { to: '/inbox', label: 'Inbox', match: (p: string) => p.startsWith('/inbox') || p.startsWith('/photo-library'), badge: inboxCount },
     { to: '/profile', label: 'Profile', match: (p: string) => p.startsWith('/profile') },

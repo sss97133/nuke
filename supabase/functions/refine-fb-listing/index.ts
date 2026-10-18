@@ -12,6 +12,8 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { corsHeaders } from "../_shared/cors.ts";
 import { isGarbageMake } from "../_shared/normalizeVehicle.ts";
+import { requireWriteAuth } from "../_shared/writeGuard.ts";
+import { projectSecretKey } from "../_shared/supabaseKeys.ts";
 
 // Googlebot works for FB Marketplace individual listings (bingbot blocked as of 2026-03)
 const GOOGLEBOT_UA =
@@ -425,6 +427,9 @@ async function extractFullListing(url: string, debug = false): Promise<RefinedDa
 // ---------------------------------------------------------------------------
 
 Deno.serve(async (req) => {
+  // Writes are never anonymous: service key, signed-in user, or nothing (P0.2, 2026-09-27).
+  const denied = await requireWriteAuth(req);
+  if (denied) return denied;
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
@@ -432,7 +437,7 @@ Deno.serve(async (req) => {
   try {
     const supabase = createClient(
       Deno.env.get("SUPABASE_URL")!,
-      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
+      projectSecretKey()!
     );
 
     const body = await req.json().catch(() => ({}));

@@ -8,7 +8,7 @@
 
 The first pass built the truck from primitive boxes using only the dimensional atoms — ignoring the existing digital twin. Recon (3-agent sweep: directory inventory, objectTraits extraction, transcript history) recovered the full lineage:
 
-- **The twin:** `~/k5-harness-pull/1978_Chevrolet_Blazer.blend` — TurboSquid #1764639, $99, order 6425842 (Dec 2024). Designated digital twin in `K5_DIMENSIONAL_SUBSTRATE.md`. Real body/dash/doors/interior/lights; placeholder underbody (`Under_Engine_Simple`).
+- **The twin:** `~/k5-harness-pull/1978_Chevrolet_Blazer.blend` — TurboSquid #1764639, bought Dec 2024. Designated digital twin in `K5_DIMENSIONAL_SUBSTRATE.md`. Real body/dash/doors/interior/lights; placeholder underbody (`Under_Engine_Simple`).
 - **Scale VERIFIED this session:** model wheelbase 2,703 mm vs FR-88 cited 2,705 mm (Δ2 mm). Closes the substrate caveat "frame mesh accuracy not yet verified."
 - **Prior harness work was LOST:** `docs/wiring/output/formboard/` (incl. `model_analysis.json` and `K5_routed_harness.blend` with routed curves) no longer exists — swept to SSD ~May 3. `build_harness.py` + `devices.json` (141 devices) survive in `~/k5-harness-pull/` but the workspace .blend contains zero harness geometry.
 
@@ -34,4 +34,4 @@ The first pass built the truck from primitive boxes using only the dimensional a
 
 ## Sources
 
-TurboSquid origin: Gmail order 6425842 via session 4078eae4 (2026-04-30). Conventions: `objectTraits.ts` (x driver+, y front−, z up+, meters) — confirmed against model geometry (speedo at x=+0.334). Envelopes: LS3-Marine p3, Holley mid-mount p2, 6L80E vendor dims, FR-88 (wheelbase check). Allowances: `scripts/compute_wire_lengths.py`.
+TurboSquid origin: Gmail order via session 4078eae4 (2026-04-30). Conventions: `objectTraits.ts` (x driver+, y front−, z up+, meters) — confirmed against model geometry (speedo at x=+0.334). Envelopes: LS3-Marine p3, Holley mid-mount p2, 6L80E vendor dims, FR-88 (wheelbase check). Allowances: `scripts/compute_wire_lengths.py`.

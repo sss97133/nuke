@@ -112,11 +112,11 @@ function formatLinkDisplay(url: string): string {
 const UserDossierPanel: React.FC = () => {
   const { profile, isOwnProfile, saveProfileField } = useUserProfile();
 
-  if (!profile) return null;
-
   const handleSave = useCallback(async (key: string, value: string) => {
     await saveProfileField(key, value);
   }, [saveProfileField]);
+
+  if (!profile) return null;
 
   // ── Field groups ──
 
@@ -134,6 +134,10 @@ const UserDossierPanel: React.FC = () => {
     { key: 'website', label: 'WEBSITE', value: profile.website, isLink: true, editable: true },
     { key: 'github_url', label: 'GITHUB', value: profile.github_url, isLink: true, editable: true },
     { key: 'linkedin_url', label: 'LINKEDIN', value: profile.linkedin_url, isLink: true, editable: true },
+  ];
+
+  const expertiseFields: FieldDef[] = [
+    { key: 'expertise_areas', label: 'AREAS', value: profile.expertise_areas?.join(' · ') },
   ];
 
   // ACCOUNT group removed from the public record (audit P3/P5):
@@ -168,13 +172,15 @@ const UserDossierPanel: React.FC = () => {
 
   const identityGroup = renderGroup('IDENTITY', identityFields);
   const socialGroup = renderGroup('SOCIAL', socialFields);
+  const expertiseGroup = profile.expertise_areas?.length ? renderGroup('PROFILE-LISTED EXPERTISE', expertiseFields) : null;
 
-  if (!identityGroup && !socialGroup) return null;
+  if (!identityGroup && !socialGroup && !expertiseGroup) return null;
 
   return (
     <CollapsibleWidget variant="profile" title="Dossier">
       {identityGroup}
       {socialGroup}
+      {expertiseGroup}
     </CollapsibleWidget>
   );
 };

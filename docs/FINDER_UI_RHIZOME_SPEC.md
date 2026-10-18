@@ -5,6 +5,8 @@
 **Scope**: The complete finder interface, every interaction, every component, every data path.  
 **Prerequisite**: Read `docs/DESIGN_BIBLE.md`, `docs/FINDER_ARCHITECTURE.md`, and `docs/library/prompts/DESIGN_INTERFACE_ENCYCLOPEDIA.md` first. This prompt extends those — it does not replace them.
 
+**Market steering, 2026-10-04:** use the [Market analysis product/reader contract](market/MARKET_MEASUREMENT_UI_CONTRACT.md) for the public market route. Relationships fan out from source-qualified findings into component/build evidence and measure-specific cohorts. Show relative performance and its source/time/coverage boundary before the list; raw model-label counts are browse groups, not comparable cohorts. The Packard case and nested episode-map requirements there supersede count-first market examples. Historical counts and proposed queries here do not establish live capability.
+
 ---
 
 ## PART 1: THE SYSTEM YOU ARE BUILDING

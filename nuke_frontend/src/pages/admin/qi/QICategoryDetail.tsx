@@ -33,9 +33,6 @@ export default function QICategoryDetail({ l2, taxonomyRow }: Props) {
   const [vehicles, setVehicles] = useState<VehicleBreakdown[]>([]);
   const [loading, setLoading] = useState(true);
 
-  // Sanitize l2 for SQL — only alphanumeric + underscore allowed
-  const l2Safe = l2.replace(/[^a-zA-Z0-9_]/g, '');
-
   useEffect(() => {
     let cancelled = false;
 
@@ -67,16 +64,10 @@ export default function QICategoryDetail({ l2, taxonomyRow }: Props) {
         setTotalComments(count || 0);
       }
 
-      // Fetch vehicle breakdown (only on first page without vehicle filter)
+      // Fetch vehicle breakdown (only on first page without vehicle filter) — admin-gated,
+      // parameterized RPC (migration 20260927170400); execute_sql is closed to user sessions.
       if (page === 0 && !vehicleFilter) {
-        const { data: vehData } = await supabase.rpc('execute_sql', {
-          query: `SELECT ac.vehicle_id, v.year, v.make, v.model, count(*)::int as q_count
-            FROM auction_comments ac
-            JOIN vehicles v ON v.id = ac.vehicle_id
-            WHERE ac.question_primary_l2 = '${l2Safe}' AND ac.has_question = true AND ac.question_primary_l1 IS NOT NULL
-            GROUP BY ac.vehicle_id, v.year, v.make, v.model
-            ORDER BY q_count DESC LIMIT 20`
-        });
+        const { data: vehData } = await supabase.rpc('admin_qi_category_vehicles', { p_l2: l2 });
 
         if (!cancelled && vehData) {
           setVehicles(vehData);
@@ -88,7 +79,7 @@ export default function QICategoryDetail({ l2, taxonomyRow }: Props) {
 
     load();
     return () => { cancelled = true; };
-  }, [l2, l2Safe, vehicleFilter, page]);
+  }, [l2, vehicleFilter, page]);
 
   const color = taxonomyRow ? L1_COLORS[taxonomyRow.l1_category] || '#6b7d9d' : '#6b7d9d';
 

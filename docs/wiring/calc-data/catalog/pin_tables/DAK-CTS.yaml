@@ -1,0 +1,11 @@
+DAK-CTS:
+  family: miniseal
+  pins:
+    '114': sender lead (either; to WTR SND)
+    DAK_CTS_RET: sender lead (the other; to WTR -)
+  note: 'maker''s document: Dakota Digital SEN-04-5 temp sender with its two-wire harness; the harness wires join its leads · family miniseal: the sender comes with
+    a two-wire harness and ''it does not matter which wire goes into either location'' (VHX manual p.9), so each harness wire joins one lead in a MiniSeal stub splice'
+  open:
+  - 'SEN-04-5 lead gauge (splice colour): bench'
+  sources:
+  - 'Dakota VHX manual 650314:P p.9 (reference_documents/component_drawings/dakota_digital_vhx_manual.pdf): WTR SND / WTR - text'

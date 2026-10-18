@@ -12,6 +12,8 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "jsr:@supabase/supabase-js@2";
 import { corsHeaders } from "../_shared/cors.ts";
+import { requireWriteAuth } from "../_shared/writeGuard.ts";
+import { projectSecretKey } from "../_shared/supabaseKeys.ts";
 
 const URL_PATTERNS: Record<string, { regex: RegExp; extractUsername: (m: RegExpMatchArray) => string }> = {
   bat: {
@@ -29,6 +31,9 @@ const URL_PATTERNS: Record<string, { regex: RegExp; extractUsername: (m: RegExpM
 };
 
 Deno.serve(async (req) => {
+  // Writes are never anonymous: service key, signed-in user, or nothing (P0.2, 2026-09-27).
+  const denied = await requireWriteAuth(req);
+  if (denied) return denied;
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
   }
@@ -68,7 +73,7 @@ Deno.serve(async (req) => {
     // --- DB operations ---
     const supabase = createClient(
       Deno.env.get("SUPABASE_URL") ?? "",
-      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "",
+      projectSecretKey() ?? "",
     );
 
     // Upsert external_identities (trigger auto-queues at priority 40)

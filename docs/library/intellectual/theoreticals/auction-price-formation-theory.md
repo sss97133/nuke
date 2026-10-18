@@ -635,3 +635,16 @@ A theory that can be killed cleanly is worth more than one that can never be tes
 - **Integrate CBT into valuation**: CompBase should weight prices by serious bidder count. Auctions with <4 serious bidders get discounted.
 
 The ATM Auctions source (`observation_sources` slug: `atm-auctions`) is registered. It represents a whole category of sources (regional equipment liquidation) that we may want to monitor systematically in the future. Now that the CBT is validated, the ROI calculation for regional auction monitoring has a concrete anchor: you are looking for auctions where fewer than 4 serious bidders attend.
+
+
+## Measurement qualification before market comparisons
+
+The historical studies above are dated claims with their own populations and methods. They do not establish current reader coverage or authorize applying a price multiplier. A threshold defined using the eventual auction maximum is retrospective; using it to predict an unfinished auction would leak its future outcome.
+
+A market comparison needs a defined measurement path: a source comment or bid, its listing episode and event clock, a qualified asset/cohort membership, and an explicitly compatible baseline. Repeated comments do not establish independent participants. Equal handles across platforms do not establish one person. Current membership and later-discovered evidence do not reconstruct what was known during a prior sale.
+
+Community stance toward a seller's claims, condition/authenticity opinion and general sentiment describe different axes. Preserve each score's scale, method, model, rubric and scoring clock. Zero is a scored result; NULL is unscored; an unavailable column is an unavailable contract. A condition opinion is testimony about the asset, not an inspection finding or proved sale-time condition. A valid numeric scale is a structural check, not validation of the scoring method.
+
+Report the eligible and compatible-scored denominator for each axis and time window. A comment-weighted average and a vehicle-weighted average answer different questions: a heavily discussed auction can dominate the former. Cohort comparisons must retain coverage gaps, repeated-source dependence, asset mix and source exposure rather than assuming every movement is demand or a causal price effect.
+
+The existing public-reader assay can inspect stored scoring metadata with `--family comments --comment-measurements true`. It reuses the anonymous parent gate and bounded complete collection, records only private coverage/provenance receipts, and does not generate sentiment, claims, condition matches or predictions. Missing or incompatible measurement inputs belong in the existing owner's repair queue before they become colors or performance labels.

@@ -90,7 +90,7 @@ async function fetchFacets(
   // Use a raw query via RPC or fall back to a simple group-by approximation
   // Since supabase-js doesn't support GROUP BY, we fetch the facet column values
   // and count client-side from a larger sample
-  const { data } = await supabase
+  const { data, error } = await supabase
     .from('vehicles')
     .select(facetCol)
     .eq('is_public', true)
@@ -98,6 +98,7 @@ async function fetchFacets(
     .not(facetCol, 'is', null)
     .limit(500);
 
+  if (error) throw error;
   if (!data || data.length === 0) return [];
 
   const counts = new Map<string, number>();
@@ -120,7 +121,7 @@ async function fetchAggregates(
   filterValue: string | number,
 ): Promise<{ avg_price: number | null; min_year: number | null; max_year: number | null }> {
   // Fetch a sample of prices and years to compute aggregates client-side
-  const { data } = await supabase
+  const { data, error } = await supabase
     .from('vehicles')
     .select('sale_price, year')
     .eq('is_public', true)
@@ -129,6 +130,7 @@ async function fetchAggregates(
     .gt('sale_price', 0)
     .limit(500);
 
+  if (error) throw error;
   if (!data || data.length === 0) {
     return { avg_price: null, min_year: null, max_year: null };
   }
@@ -157,13 +159,14 @@ async function fetchFillRates(
   filterValue: string | number,
 ): Promise<{ field: string; pct: number }[]> {
   const fields = ['sale_price', 'mileage', 'vin', 'primary_image_url', 'canonical_body_style'];
-  const { data, count } = await supabase
+  const { data, count, error } = await supabase
     .from('vehicles')
     .select('sale_price, mileage, vin, primary_image_url, canonical_body_style', { count: 'exact' })
     .eq('is_public', true)
     .eq(filterCol, filterValue)
     .limit(500);
 
+  if (error) throw error;
   const total = data?.length || 0;
   if (total === 0) return [];
 
@@ -190,12 +193,15 @@ async function fetchFillRates(
 export function useBadgeDepth(dimension: BadgeDimension, value: string | number | null) {
   const [data, setData] = useState<BadgeDepthData | null>(null);
   const [loading, setLoading] = useState(false);
+  const [unavailable, setUnavailable] = useState(false);
   const fetchedRef = useRef(false);
 
   const cacheKey = `${dimension}:${value}`;
 
   const load = useCallback(async () => {
     if (!value || fetchedRef.current || loading) return;
+
+    setUnavailable(false);
 
     // Check cache first
     const cached = depthCache.get(cacheKey);
@@ -246,6 +252,9 @@ export function useBadgeDepth(dimension: BadgeDimension, value: string | number 
         ...statPromises,
       ]);
 
+      if (countResult.error) throw countResult.error;
+      if (previewResult.error) throw previewResult.error;
+
       const aggregates = statResults[0] as { avg_price: number | null; min_year: number | null; max_year: number | null };
       const facets = facetCol ? (statResults[1] as { label: string; count: number }[]) : [];
       const fillRates = dimension === 'source'
@@ -269,6 +278,7 @@ export function useBadgeDepth(dimension: BadgeDimension, value: string | number 
       depthCache.set(cacheKey, result);
       setData(result);
     } catch {
+      setUnavailable(true);
       setData({ count: 0, preview: [], stats: null });
     } finally {
       setLoading(false);
@@ -283,5 +293,5 @@ export function useBadgeDepth(dimension: BadgeDimension, value: string | number 
     setData(null);
   }
 
-  return { data, loading, load };
+  return { data, loading, unavailable, load };
 }

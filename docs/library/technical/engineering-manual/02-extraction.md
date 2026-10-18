@@ -661,7 +661,7 @@ Add an entry to `TOOLS.md` so other agents know the extractor exists:
 ### Step 6: Deploy
 
 ```bash
-cd /Users/skylar/nuke
+cd ~/nuke
 supabase functions deploy extract-xyz --no-verify-jwt
 ```
 

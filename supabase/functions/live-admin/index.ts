@@ -3,9 +3,11 @@
 // Ensures a per-user Mux live stream and stores stream key + playback id in user_live_state
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.4";
+import { requireWriteAuth } from "../_shared/writeGuard.ts";
+import { projectSecretKey } from "../_shared/supabaseKeys.ts";
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
-const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+const SUPABASE_SERVICE_ROLE_KEY = projectSecretKey()!;
 const MUX_TOKEN_ID = Deno.env.get('MUX_TOKEN_ID')!;
 const MUX_TOKEN_SECRET = Deno.env.get('MUX_TOKEN_SECRET')!;
 
@@ -62,6 +64,9 @@ async function ensureLiveStream(user_id: string) {
 }
 
 Deno.serve(async (req) => {
+  // Writes are never anonymous: service key, signed-in user, or nothing (P0.2, 2026-09-27).
+  const denied = await requireWriteAuth(req);
+  if (denied) return denied;
   const origin = req.headers.get('origin') || '';
   const allowedOrigins = new Set([
     'http://localhost:5173',

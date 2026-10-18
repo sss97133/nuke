@@ -3,11 +3,14 @@
  */
 
 import { decryptSecret } from "./secretBox.ts";
+import { credentialKind, type CredentialKind } from "./providerDiagnostic.ts";
 
 interface ApiKeyResult {
   apiKey: string | null;
   source: 'user' | 'system';
   modelName?: string;
+  credentialKind?: CredentialKind;
+  userKeyStatus?: 'available' | 'missing' | 'lookup_failed';
 }
 
 export async function getUserApiKey(
@@ -18,7 +21,7 @@ export async function getUserApiKey(
 ): Promise<ApiKeyResult> {
   // If no user ID, use system key
   if (!userId) {
-    let systemKey = Deno.env.get(systemKeyEnvVar);
+    let systemKey: string | null | undefined = Deno.env.get(systemKeyEnvVar);
     // Fallback env var names for Google (GOOGLE_AI_API_KEY -> GEMINI_API_KEY)
     if (!systemKey && provider === 'google') {
       systemKey = Deno.env.get('GEMINI_API_KEY') || Deno.env.get('GOOGLE_API_KEY') || null;
@@ -60,19 +63,22 @@ export async function getUserApiKey(
     return {
       apiKey: decryptedKey,
       source: 'user',
-      modelName: userKeyInfo.model_name
+      modelName: userKeyInfo.model_name,
+      credentialKind: credentialKind(decryptedKey, provider),
+      userKeyStatus: 'available'
     };
   }
 
   // No user key - use system key
-  let systemKey = Deno.env.get(systemKeyEnvVar);
+  let systemKey: string | null | undefined = Deno.env.get(systemKeyEnvVar);
   // Fallback env var names for Google (GOOGLE_AI_API_KEY -> GEMINI_API_KEY)
   if (!systemKey && provider === 'google') {
     systemKey = Deno.env.get('GEMINI_API_KEY') || Deno.env.get('GOOGLE_API_KEY') || null;
   }
   return {
     apiKey: systemKey || null,
-    source: 'system'
+    source: 'system',
+    userKeyStatus: keyError ? 'lookup_failed' : 'missing'
   };
 }
 

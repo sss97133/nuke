@@ -12,6 +12,7 @@ import {
   scopeAllowsWriteTier,
   type WriteTier,
 } from "../_shared/scopeGrammar.ts";
+import { projectSecretKey } from "../_shared/supabaseKeys.ts";
 
 // =============================================================================
 // NUKE MCP CONNECTOR — Full-Resolution Vehicle Digital Twin Access
@@ -28,7 +29,7 @@ import {
 // ── Config ──────────────────────────────────────────────────────────────────
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
-const SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+const SERVICE_ROLE_KEY = projectSecretKey()!;
 
 function getSupabase() {
   return createClient(SUPABASE_URL, SERVICE_ROLE_KEY, {
@@ -41,227 +42,33 @@ function getSupabase() {
 const CORS = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers":
-    "authorization, x-api-key, x-client-info, content-type, mcp-session-id, mcp-protocol-version",
+    "authorization, x-api-key, x-client-info, content-type, mcp-session-id, mcp-protocol-version, x-nuke-surface",
   "Access-Control-Allow-Methods": "GET, POST, DELETE, OPTIONS",
   "Access-Control-Expose-Headers": "mcp-session-id",
 };
 
-// ── JWT Helpers (Stateless OAuth) ────────────────────────────────────────────
+// ── OAuth discovery ─────────────────────────────────────────────────────────
+// This function issues no tokens. Its authorization server is https://nuke.ag (the oauth-server function:
+// /.well-known/* and /oauth/* on nuke.ag route there), which is where the 401s below send a client. Until
+// 2026-10-14 this function also served its own /authorize, /token and /register: /authorize approved every
+// request without a login, /token skipped PKCE when no verifier was sent, and the result was a 90-day token with
+// write:canonical, signed with the service key. Those routes are gone, and the tokens they issued are refused.
 
-const BASE_URL = `${SUPABASE_URL}/functions/v1/mcp-connector`;
-
-let _jwtKey: CryptoKey | null = null;
-async function getJwtKey(): Promise<CryptoKey> {
-  if (!_jwtKey) {
-    _jwtKey = await crypto.subtle.importKey(
-      "raw",
-      new TextEncoder().encode(SERVICE_ROLE_KEY),
-      { name: "HMAC", hash: "SHA-256" },
-      false,
-      ["sign", "verify"],
-    );
-  }
-  return _jwtKey;
-}
-
-function b64UrlEncode(data: Uint8Array): string {
-  return btoa(String.fromCharCode(...data))
-    .replace(/\+/g, "-")
-    .replace(/\//g, "_")
-    .replace(/=+$/, "");
-}
-
-function b64UrlDecode(str: string): Uint8Array {
-  str = str.replace(/-/g, "+").replace(/_/g, "/");
-  while (str.length % 4) str += "=";
-  return new Uint8Array([...atob(str)].map((c) => c.charCodeAt(0)));
-}
-
-async function signJwt(payload: Record<string, unknown>, expiresInSec: number): Promise<string> {
-  const key = await getJwtKey();
-  const enc = new TextEncoder();
-  const now = Math.floor(Date.now() / 1000);
-  const hdr = b64UrlEncode(enc.encode(JSON.stringify({ alg: "HS256", typ: "JWT" })));
-  const pay = b64UrlEncode(enc.encode(JSON.stringify({ ...payload, iat: now, exp: now + expiresInSec })));
-  const sig = await crypto.subtle.sign("HMAC", key, enc.encode(`${hdr}.${pay}`));
-  return `${hdr}.${pay}.${b64UrlEncode(new Uint8Array(sig))}`;
-}
-
-async function verifyJwt(token: string): Promise<Record<string, unknown> | null> {
-  try {
-    const parts = token.split(".");
-    if (parts.length !== 3) return null;
-    const key = await getJwtKey();
-    const enc = new TextEncoder();
-    const valid = await crypto.subtle.verify("HMAC", key, b64UrlDecode(parts[2]), enc.encode(`${parts[0]}.${parts[1]}`));
-    if (!valid) return null;
-    const payload = JSON.parse(new TextDecoder().decode(b64UrlDecode(parts[1])));
-    if (payload.exp && payload.exp < Math.floor(Date.now() / 1000)) return null;
-    return payload;
-  } catch {
-    return null;
-  }
-}
-
-// ── OAuth Endpoints ─────────────────────────────────────────────────────────
+const AUTHORIZATION_SERVER = "https://nuke.ag";
 
 function oauthResourceMetadata(): Response {
   return new Response(JSON.stringify({
-    resource: BASE_URL,
-    authorization_servers: [BASE_URL],
+    resource: `${AUTHORIZATION_SERVER}/mcp`,
+    authorization_servers: [AUTHORIZATION_SERVER],
     bearer_methods_supported: ["header"],
   }), { headers: { ...CORS, "Content-Type": "application/json" } });
 }
 
-function oauthServerMetadata(): Response {
+function oauthNotHere(): Response {
   return new Response(JSON.stringify({
-    issuer: BASE_URL,
-    authorization_endpoint: `${BASE_URL}/authorize`,
-    token_endpoint: `${BASE_URL}/token`,
-    registration_endpoint: `${BASE_URL}/register`,
-    response_types_supported: ["code"],
-    grant_types_supported: ["authorization_code"],
-    token_endpoint_auth_methods_supported: ["client_secret_post", "client_secret_basic"],
-    code_challenge_methods_supported: ["S256"],
-  }), { headers: { ...CORS, "Content-Type": "application/json" } });
-}
-
-// Allowed scope universe for OAuth-issued tokens. read is implicit (read tools are public),
-// but we carry it for transparency. write:observations = autonomous governed claims.
-// write:canonical = direct canonical mutation, owner-login only.
-const ALLOWED_SCOPES = ["read", "write:observations", "write:canonical"];
-
-/**
- * Compute the scope string to grant. Requested scopes are intersected with the allowed universe;
- * a non-owner (external/walk-in) leg is clamped to strip write:canonical so it can never escalate.
- * With nothing requested, owner login defaults to full power, external defaults to read + observations.
- */
-function grantedScope(requested: string | null | undefined, ownerLogin: boolean): string {
-  const universe = ownerLogin ? ALLOWED_SCOPES : ALLOWED_SCOPES.filter((s) => s !== "write:canonical");
-  let grants: string[];
-  if (requested && requested.trim()) {
-    const want = requested.trim().split(/\s+/);
-    grants = universe.filter((s) => want.includes(s));
-    if (grants.length === 0) grants = ["read"]; // requested only unknown scopes → minimal
-  } else {
-    grants = ownerLogin ? universe.slice() : ["read", "write:observations"];
-  }
-  if (!grants.includes("read")) grants.unshift("read");
-  return grants.join(" ");
-}
-
-async function oauthAuthorize(req: Request): Promise<Response> {
-  const url = new URL(req.url);
-  const redirectUri = url.searchParams.get("redirect_uri");
-  const state = url.searchParams.get("state");
-  const codeChallenge = url.searchParams.get("code_challenge");
-  const clientId = url.searchParams.get("client_id");
-  const requestedScope = url.searchParams.get("scope");
-
-  if (!redirectUri) {
-    return new Response("Missing redirect_uri", { status: 400, headers: CORS });
-  }
-
-  // This /authorize is the owner-login (single-owner, auto-approved) leg. Completing it IS the
-  // human gate, so the owner may be granted write:canonical. An external agent that wants an
-  // autonomous token requests a narrower scope (e.g. "read write:observations") and is clamped to
-  // it by grantedScope() below — it can never escalate to canonical.
-  const code = await signJwt({
-    type: "auth_code",
-    client_id: clientId,
-    redirect_uri: redirectUri,
-    code_challenge: codeChallenge,
-    scope: grantedScope(requestedScope, /* ownerLogin */ true),
-  }, 300);
-
-  // Auto-approve (single-owner system) — redirect back with code
-  const redirect = new URL(redirectUri);
-  redirect.searchParams.set("code", code);
-  if (state) redirect.searchParams.set("state", state);
-
-  return new Response(null, {
-    status: 302,
-    headers: { ...CORS, Location: redirect.toString() },
-  });
-}
-
-async function oauthToken(req: Request): Promise<Response> {
-  let params: URLSearchParams;
-  const ct = req.headers.get("content-type") || "";
-  if (ct.includes("application/x-www-form-urlencoded")) {
-    params = new URLSearchParams(await req.text());
-  } else if (ct.includes("application/json")) {
-    const json = await req.json();
-    params = new URLSearchParams(Object.entries(json).map(([k, v]) => [k, String(v)]));
-  } else {
-    params = new URLSearchParams(await req.text());
-  }
-
-  const grantType = params.get("grant_type");
-  const code = params.get("code");
-  const codeVerifier = params.get("code_verifier");
-
-  if (grantType === "authorization_code" && code) {
-    const payload = await verifyJwt(code);
-    if (!payload || payload.type !== "auth_code") {
-      return new Response(JSON.stringify({ error: "invalid_grant" }), {
-        status: 400, headers: { ...CORS, "Content-Type": "application/json" },
-      });
-    }
-
-    // PKCE verification
-    if (payload.code_challenge && codeVerifier) {
-      const hash = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(String(codeVerifier)));
-      const computed = b64UrlEncode(new Uint8Array(hash));
-      if (computed !== payload.code_challenge) {
-        return new Response(JSON.stringify({ error: "invalid_grant", error_description: "PKCE failed" }), {
-          status: 400, headers: { ...CORS, "Content-Type": "application/json" },
-        });
-      }
-    }
-
-    // Issue access token (90-day JWT). Carry the scope minted at /authorize so the write-tier
-    // gate can enforce it. Fall back to read+observations for legacy auth codes lacking a scope.
-    const tokenScope = typeof payload.scope === "string" && payload.scope.trim()
-      ? payload.scope
-      : "read write:observations";
-    const accessToken = await signJwt({
-      type: "access_token",
-      sub: payload.client_id || "claude-ai",
-      scope: tokenScope,
-    }, 90 * 24 * 3600);
-
-    return new Response(JSON.stringify({
-      access_token: accessToken,
-      token_type: "Bearer",
-      expires_in: 90 * 24 * 3600,
-      scope: tokenScope,
-    }), { headers: { ...CORS, "Content-Type": "application/json" } });
-  }
-
-  return new Response(JSON.stringify({ error: "unsupported_grant_type" }), {
-    status: 400, headers: { ...CORS, "Content-Type": "application/json" },
-  });
-}
-
-async function oauthRegister(req: Request): Promise<Response> {
-  // Dynamic Client Registration (RFC 7591) — auto-register any client
-  const body = await req.json().catch(() => ({}));
-  const clientId = `nuke-${crypto.randomUUID().slice(0, 8)}`;
-  // Client secret = signed JWT so we can verify it statelessly later
-  const clientSecret = await signJwt({ type: "client_secret", client_id: clientId }, 365 * 24 * 3600);
-
-  return new Response(JSON.stringify({
-    client_id: clientId,
-    client_secret: clientSecret,
-    client_id_issued_at: Math.floor(Date.now() / 1000),
-    client_secret_expires_at: 0,
-    redirect_uris: body.redirect_uris || [],
-    token_endpoint_auth_method: "client_secret_post",
-    grant_types: ["authorization_code"],
-    response_types: ["code"],
-    client_name: body.client_name || "Nuke MCP Client",
-  }), { status: 201, headers: { ...CORS, "Content-Type": "application/json" } });
+    error: "not_found",
+    error_description: `This server issues no tokens; its authorization server is ${AUTHORIZATION_SERVER}.`,
+  }), { status: 404, headers: { ...CORS, "Content-Type": "application/json" } });
 }
 
 // ── Auth ────────────────────────────────────────────────────────────────────
@@ -292,22 +99,12 @@ async function authenticate(req: Request): Promise<AuthResult> {
     if (token === SERVICE_ROLE_KEY) {
       return { ok: true, userId: "service-role", scopes: ["admin"] };
     }
-    const alt = Deno.env.get("SERVICE_ROLE_KEY");
+    const alt = projectSecretKey();
     if (alt && token === alt) {
       return { ok: true, userId: "service-role", scopes: ["admin"] };
     }
-
-    // 1b. OAuth JWT access token — carry its minted scope through to the write-tier gate.
-    const jwt = await verifyJwt(token);
-    if (jwt && jwt.type === "access_token") {
-      const scope = typeof jwt.scope === "string" ? jwt.scope : "";
-      // Legacy "mcp:tools" tokens predate the tier grammar; treat as read + observations
-      // (NOT canonical — tightening is intentional; canonical now needs an explicit grant).
-      const scopes = scope && scope !== "mcp:tools"
-        ? scope.split(/\s+/).filter(Boolean)
-        : ["read", "write:observations"];
-      return { ok: true, userId: String(jwt.sub || "oauth-user"), scopes };
-    }
+    // No other bearer token is accepted, including the ones this function used to mint without a login.
+    if (!apiKey) return { ok: false, error: "Invalid or expired token", status: 401 };
   }
 
   // 2. API key (nk_live_...)
@@ -438,18 +235,26 @@ interface ToolDef {
   name: string;
   description: string;
   inputSchema: Record<string, unknown>;
+  annotations: {
+    readOnlyHint: boolean;
+    destructiveHint: boolean;
+    openWorldHint: boolean;
+    title: string;
+  };
 }
 
 const TOOLS: ToolDef[] = [
   // ── Schema Discovery ──────────────────────────────────────────────────
   {
     name: "describe_platform",
+    annotations: { readOnlyHint: true, destructiveHint: false, openWorldHint: false, title: "Describe Nuke Platform" },
     description:
       "Get a high-level overview of the Nuke vehicle data platform: total vehicles, images, observations, sources, organizations, and a description of the 6 architecture layers. Call this first to understand what's available.",
     inputSchema: { type: "object", properties: {}, required: [] },
   },
   {
     name: "describe_schema",
+    annotations: { readOnlyHint: true, destructiveHint: false, openWorldHint: false, title: "Describe Database Schema" },
     description:
       "Describe database tables. Pass a table_name to get columns, types, and pipeline ownership. Pass a layer name (identity, factory_spec, vehicle_state, market, observations, actors) to get all tables in that architecture layer.",
     inputSchema: {
@@ -466,6 +271,7 @@ const TOOLS: ToolDef[] = [
   },
   {
     name: "get_pipeline_registry",
+    annotations: { readOnlyHint: true, destructiveHint: false, openWorldHint: false, title: "Get Pipeline Registry" },
     description:
       "Show which edge functions own which database fields. Returns pipeline_registry entries showing field ownership, whether direct writes are prohibited, and what function to use instead. Query by table name or get all entries.",
     inputSchema: {
@@ -479,6 +285,7 @@ const TOOLS: ToolDef[] = [
   // ── Search ────────────────────────────────────────────────────────────
   {
     name: "search_vehicles",
+    annotations: { readOnlyHint: true, destructiveHint: false, openWorldHint: false, title: "Search Vehicles" },
     description:
       "Quick search across 1.25M+ vehicles. Accepts VIN (17 chars), listing URL, year, make/model text, or free-text query. Returns matching vehicles with thumbnails. " +
       "Results contain only confirmed data. Never fabricate missing fields — null means 'not recorded'. For location/price/body_style filtering, use browse_inventory instead.",
@@ -493,6 +300,7 @@ const TOOLS: ToolDef[] = [
   },
   {
     name: "search_vehicles_advanced",
+    annotations: { readOnlyHint: true, destructiveHint: false, openWorldHint: false, title: "Advanced Vehicle Search" },
     description:
       "Full-text search with filters, pagination, and inline valuations. Filter by make, model, year range. Results include VIN, price, mileage, Nuke Estimate when available. " +
       "Returns paginated results — tell the user the total count and whether more exist. For location/body_style filtering, use browse_inventory instead.",
@@ -514,6 +322,7 @@ const TOOLS: ToolDef[] = [
 
   {
     name: "decode_vin",
+    annotations: { readOnlyHint: true, destructiveHint: false, openWorldHint: true, title: "Decode VIN" },
     description:
       "Decode a VIN to factory specifications via NHTSA VPIC database. Returns year, make, model, trim, engine, " +
       "transmission, drivetrain, body style, plant of manufacture, and more. Works for all US-market vehicles 1981+. " +
@@ -529,6 +338,7 @@ const TOOLS: ToolDef[] = [
 
   {
     name: "browse_inventory",
+    annotations: { readOnlyHint: true, destructiveHint: false, openWorldHint: false, title: "Browse Vehicle Inventory" },
     description:
       "Browse vehicles with location, body style, status, and price filters. Use this for queries like 'find me a truck in Las Vegas' or 'show Porsches under $80K in California'. " +
       "Queries the database directly with WHERE clauses. Results contain only confirmed data — never fabricate missing fields. Null values mean 'not recorded'.",
@@ -553,6 +363,7 @@ const TOOLS: ToolDef[] = [
   // ── Vehicle Deep Graph ────────────────────────────────────────────────
   {
     name: "vehicle",
+    annotations: { readOnlyHint: true, destructiveHint: false, openWorldHint: false, title: "Get Full Vehicle Record" },
     description:
       "Get all populated fields for a vehicle by ID. Returns every non-null field on the record: " +
       "year, make, model, VIN, mileage, colors, engine, transmission, drivetrain, price, " +
@@ -568,6 +379,7 @@ const TOOLS: ToolDef[] = [
   },
   {
     name: "get_vehicle",
+    annotations: { readOnlyHint: true, destructiveHint: false, openWorldHint: false, title: "Get Vehicle Detail" },
     description:
       "Get a vehicle profile by ID. Returns identity (year/make/model/VIN), pricing, location, images, and summary counts for observations, events, and images.",
     inputSchema: {
@@ -580,6 +392,7 @@ const TOOLS: ToolDef[] = [
   },
   {
     name: "query_vehicle_deep",
+    annotations: { readOnlyHint: true, destructiveHint: false, openWorldHint: false, title: "Query Vehicle Digital Twin" },
     description:
       "Full-resolution digital twin for one vehicle. Returns the complete entity across all 6 architecture layers: identity, market events, observations with sources, image summary, analysis signals, and valuations. " +
       "Also returns description, highlights, equipment, modifications, known_flaws, comment/description discoveries, and a _data_guidance section showing completeness. " +
@@ -598,6 +411,7 @@ const TOOLS: ToolDef[] = [
   },
   {
     name: "query_field_evidence",
+    annotations: { readOnlyHint: true, destructiveHint: false, openWorldHint: false, title: "Query Field Evidence" },
     description:
       "Get the provenance chain for a specific field on a vehicle. Shows every source that contributed to the field's value, with confidence scores, timestamps, and source material references. This is how you answer 'how do you know that?'",
     inputSchema: {
@@ -613,6 +427,7 @@ const TOOLS: ToolDef[] = [
   // ── Observations ──────────────────────────────────────────────────────
   {
     name: "query_observations",
+    annotations: { readOnlyHint: true, destructiveHint: false, openWorldHint: false, title: "Query Vehicle Observations" },
     description:
       "Get observations for a vehicle with full provenance. Each observation includes source name, trust score, confidence, timestamp, and content. Filter by source or observation kind. " +
       "Observations are verified data from registered sources — present them faithfully with source attribution.",
@@ -633,6 +448,7 @@ const TOOLS: ToolDef[] = [
   // ── Market Intelligence ───────────────────────────────────────────────
   {
     name: "get_valuation",
+    annotations: { readOnlyHint: true, destructiveHint: false, openWorldHint: false, title: "Get Cached Vehicle Valuation" },
     description:
       "Look up a cached Nuke Estimate (valuation) by vehicle_id or VIN. Returns estimated value, confidence, range, deal score, heat score, and price tier. " +
       "Quote all price figures exactly as returned. Do not round or approximate.",
@@ -646,6 +462,7 @@ const TOOLS: ToolDef[] = [
   },
   {
     name: "compute_valuation",
+    annotations: { readOnlyHint: false, destructiveHint: true, openWorldHint: false, title: "Recompute Vehicle Valuation" },
     description:
       "Force-recompute 'The Nuke Estimate' — a confidence-weighted 8-signal valuation. More expensive than get_valuation but always fresh. Returns value, confidence, deal score, heat score, price tier.",
     inputSchema: {
@@ -659,6 +476,7 @@ const TOOLS: ToolDef[] = [
   },
   {
     name: "get_comps",
+    annotations: { readOnlyHint: true, destructiveHint: false, openWorldHint: false, title: "Get Comparable Sales" },
     description:
       "Find comparable vehicle sales. Query by make/model, vehicle_id, or VIN. Returns actual auction results from BaT, Mecum, Barrett-Jackson, RM Sotheby's, Cars & Bids, and more. Includes price statistics.",
     inputSchema: {
@@ -676,6 +494,7 @@ const TOOLS: ToolDef[] = [
   },
   {
     name: "get_make_model_terminal",
+    annotations: { readOnlyHint: true, destructiveHint: false, openWorldHint: false, title: "Get Make and Model Market Terminal" },
     description:
       "Return the cohort terminal for a year-make-model: the full market-intelligence envelope for a model line, not a single VIN. Includes population count, price distribution (min/median/max, percentiles), market flow (listing/sale velocity over time), sentiment, dealer flow, comparable sales, production/survival estimates, and the cited consensus fields that summarize the cohort. Backed by the get_make_model_terminal RPC. Pass grain='generation' to widen the cohort to a full generation; default 'year'.",
     inputSchema: {
@@ -691,6 +510,7 @@ const TOOLS: ToolDef[] = [
   },
   {
     name: "query_market_history",
+    annotations: { readOnlyHint: true, destructiveHint: false, openWorldHint: false, title: "Query Vehicle Market History" },
     description:
       "Get all auction and listing events for a vehicle or model cohort. Returns chronological event history including final prices, bid counts, platforms, and outcomes.",
     inputSchema: {
@@ -709,6 +529,7 @@ const TOOLS: ToolDef[] = [
   // ── Reference Library ─────────────────────────────────────────────────
   {
     name: "query_library",
+    annotations: { readOnlyHint: true, destructiveHint: false, openWorldHint: false, title: "Query Reference Library" },
     description:
       "Search the vehicle reference library. Types: paint_codes (76 GM colors), condition_knowledge (1,084 entries from service manuals), condition_taxonomy (descriptors), vehicle_nomenclature (naming standards). Returns factory reference data.",
     inputSchema: {
@@ -729,6 +550,7 @@ const TOOLS: ToolDef[] = [
   },
   {
     name: "search_service_manuals",
+    annotations: { readOnlyHint: true, destructiveHint: false, openWorldHint: false, title: "Search Service Manuals" },
     description:
       "Search ingested GM service manuals (1,111 chunks). Find torque specs, procedures, part numbers, service intervals. Returns matching text chunks with page references.",
     inputSchema: {
@@ -744,6 +566,7 @@ const TOOLS: ToolDef[] = [
   // ── Vision ────────────────────────────────────────────────────────────
   {
     name: "analyze_image",
+    annotations: { readOnlyHint: false, destructiveHint: true, openWorldHint: true, title: "Analyze or Requeue Vehicle Image" },
     description:
       "YONO vision analysis: make classification, condition (1-5), zone (41 zones), damage flags, modification flags, photo quality. $0/image — local inference, zero cloud API calls.",
     inputSchema: {
@@ -757,6 +580,7 @@ const TOOLS: ToolDef[] = [
   },
   {
     name: "identify_vehicle_image",
+    annotations: { readOnlyHint: true, destructiveHint: false, openWorldHint: true, title: "Identify Vehicle from Image" },
     description:
       "AI identification of year/make/model/trim from a vehicle photo. Tiered approach: Gemini Flash → GPT-4o-mini → GPT-4o. Returns identification with confidence score and reasoning.",
     inputSchema: {
@@ -777,6 +601,7 @@ const TOOLS: ToolDef[] = [
   },
   {
     name: "query_vehicle_images",
+    annotations: { readOnlyHint: true, destructiveHint: false, openWorldHint: false, title: "Query Vehicle Images" },
     description:
       "Get images for a vehicle with zone classification, condition scores, and AI analysis metadata. Filter by zone (ext_front, ext_rear, interior, engine_bay, etc.).",
     inputSchema: {
@@ -791,6 +616,7 @@ const TOOLS: ToolDef[] = [
   },
   {
     name: "get_vehicle_wiki",
+    annotations: { readOnlyHint: true, destructiveHint: false, openWorldHint: false, title: "Get Vehicle Wiki" },
     description:
       "The finite-asset wiki for one VIN: a readable, fully-sourced page where every field is the weighted consensus of evidence-cited claims (evidence_class × contributor reputation × confidence × recency). Each cited field carries its value, citation, confidence, contributors, and any conflict (surfaced inline, never silently resolved). The canonical header is the denormalized cache; cited_fields are the live projection — the truth. This is the read-side product surface of the agent-write loop: a Wikipedia for one physical object, every line cited.",
     inputSchema: {
@@ -803,6 +629,7 @@ const TOOLS: ToolDef[] = [
   },
   {
     name: "get_attribute_checklist",
+    annotations: { readOnlyHint: true, destructiveHint: false, openWorldHint: false, title: "Get Attribute Checklist" },
     description:
       "Return the checklist of attributes a caller agent can answer about a subject (image, vehicle, person, cluster). Each entry includes the prompt to run, the expected_shape of the answer, the L1–L5 layer, modality hints, and depends_on so callers can iterate in dependency order. " +
       "Use this as the laser-tag harness: Nuke supplies the checklist + (later) the substrate landing zone; the caller's own model runs the vision/text inference. Surface-level extractions (bbox, viewpoint, year/make/model) are L1–L2; deeper attributes (condition cues, modifications, era-correctness) are L3+ and are where caller agents add the most value. " +
@@ -830,6 +657,7 @@ const TOOLS: ToolDef[] = [
   },
   {
     name: "submit_attribute_value",
+    annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false, title: "Submit Attribute Claim" },
     description:
       "Submit a caller-extracted answer for a single attribute from get_attribute_checklist. The caller's model ran the inference; this tool records the result in projection_event with full audit envelope per cockpit-unified-interface.md. " +
       "The caller's model is auto-registered in model_registry on first submission (caller_kind='walkin', base_trust=0.30 — accumulates reputation over time). The prompt is auto-registered in prompt_template_registry on first submission. " +
@@ -863,6 +691,7 @@ const TOOLS: ToolDef[] = [
   },
   {
     name: "confirm_work_session",
+    annotations: { readOnlyHint: false, destructiveHint: true, openWorldHint: false, title: "Confirm, Amend or Reject Work Session" },
     description:
       "Owner-confirmation gate for the labor ledger. Turns an inferred work_session (status auto_inferred/completed — produced by the photo→labor pipeline or the dT cluster.work_transition operator, base_trust ~0.30) into an owner-confirmed FACT. Per the value-accrual rule, labor value reaches the ledger ONLY on confirm/amend, never from inference alone. " +
       "decision='confirm' accepts the existing inferred numbers; 'amend' applies owner-supplied labor_hours/labor_rate/parts (recomputes total_job_cost); 'reject' records that no billable labor happened (no value; the row is NOT deleted). Sets work_sessions.status + finalized_at + metadata.owner_confirmation, and logs the decision as a high-trust projection_event atom (attribute cluster.work_transition_confirmed) for the audit trail.",
@@ -885,6 +714,7 @@ const TOOLS: ToolDef[] = [
   },
   {
     name: "project_invoice",
+    annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false, title: "Compose and Record Invoice Projection" },
     description:
       "Project a customer invoice as a deterministic SQL composition over substrate atoms. Wraps `resolve_work_order_status(query)` and writes the result to projection_event with audit envelope per cockpit-unified-interface.md. Same engine the tax-meld pipeline (per project_tax_filing_as_first_meld_mvp.md) is built on. " +
       "subject = vehicle/work_order; attribute = 'invoice_artifact'; audience selects field set ('client' = customer-facing, 'irs' = audit-defensible with full provenance, 'internal' = unredacted). Re-projects on substrate change; the audit row in projection_event is the durable record.",
@@ -903,6 +733,7 @@ const TOOLS: ToolDef[] = [
   },
   {
     name: "project_work_log",
+    annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false, title: "Compose and Record Work Log Projection" },
     description:
       "Project a shop work-log for a given date as a deterministic SQL composition over substrate atoms (photos + work_order labor + work_order parts + payments + receipts). Same engine as project_invoice, time-bounded subject. " +
       "Audience tiers: public = customer-facing journal post (atom-attributed but redacted), owner = full shop diary, counterparty = customer-facing per-vehicle. Pass vehicle_id to scope to one build; omit to compose across all activity that day. " +
@@ -923,6 +754,7 @@ const TOOLS: ToolDef[] = [
   },
   {
     name: "project_money_flow",
+    annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false, title: "Compose and Record Money Flow Projection" },
     description:
       "Project a money-flow artifact for a date range — composes (1) accounts receivable: open invoices / work-orders less collected payments, (2) expenses out grouped by scope (NUKE LTD / Viva / Personal / Per-Vehicle), (3) monthly income vs expense over the trailing window. Same projection_event audit pattern as project_work_log. Powers nuke.ag/me/money. " +
       "Audience: owner = unredacted full ledger (default); counterparty = scoped to caller's own AR/AP only.",
@@ -942,6 +774,7 @@ const TOOLS: ToolDef[] = [
   },
   {
     name: "query_subject_atoms",
+    annotations: { readOnlyHint: true, destructiveHint: false, openWorldHint: false, title: "Query Subject Claims" },
     description:
       "Read-side companion to submit_attribute_value. Returns every projection_event atom recorded for a subject, grouped by attribute with all observer submissions visible (no top-K curation per feedback_authentic_data_no_topk_curation.md). Each atom carries caller model + caller's base_trust + confidence + recorded_at. " +
       "Consumers synthesize: corroborated atoms from multiple callers raise effective confidence; contradicting atoms surface dialectic. Use this to query what the laser-tag harness has accumulated for any image / vehicle / shop_day before composing a projection (work_log, invoice, profile, journal post).",
@@ -958,6 +791,7 @@ const TOOLS: ToolDef[] = [
   },
   {
     name: "find_subjects_needing_atoms",
+    annotations: { readOnlyHint: true, destructiveHint: false, openWorldHint: false, title: "Find Subjects Needing Claims" },
     description:
       "Discovery surface for walk-in callers: given a subject_kind (image / vehicle / user), return subjects with thin atom coverage (fewer than min_atoms in projection_event). Activates the laser-tag harness at scale — any caller can hit this, get a worklist, run get_attribute_checklist for each subject, submit answers via submit_attribute_value. " +
       "Without this, callers don't know where to start. With it, the entire third-party-LLM compute base can attack thin substrate spots in priority order. Defaults: subject_kind=image, min_atoms=3, limit=20, recent_only=true (last 90 days). 'user' was added 2026-05-24 per Skylar directive — surfaces auth.users rows whose user-profile attributes (display_identity / contact_surface / role_set / possession_set / etc.) need filling.",
@@ -975,6 +809,7 @@ const TOOLS: ToolDef[] = [
   },
   {
     name: "synthesize_attribute",
+    annotations: { readOnlyHint: true, destructiveHint: false, openWorldHint: false, title: "Synthesize Attribute Consensus" },
     description:
       "Dialectic synthesis (L4 of project_signal-substrate-five-layer.md). Given a subject + attribute, returns a single consensus value computed from all non-retracted atoms, weighted by each caller's base_trust × confidence. " +
       "Output: { consensus: { label, weighted_confidence, support, contradiction_score, distinct_callers }, contributing_atoms[] }. Consumers (vehicle profile, work_log render, invoice composer) use this when they want ONE answer per attribute instead of the raw atom stream from query_subject_atoms. " +
@@ -990,6 +825,7 @@ const TOOLS: ToolDef[] = [
   },
   {
     name: "project_attribute",
+    annotations: { readOnlyHint: true, destructiveHint: false, openWorldHint: false, title: "Get Attribute Consensus Projection" },
     description:
       "Canonical weighted-consensus projection. Calls the SQL function project_attribute(p_subject_id, p_attribute) — the SAME engine that powers vehicle_wiki_view — so the answer you get here is byte-for-byte the answer the vehicle profile renders. " +
       "Prefer this over synthesize_attribute when you want the system's authoritative single value for a (subject, attribute): synthesize_attribute is a separate TS reimplementation of the same idea and can drift from the SQL truth. This tool has no drift — it IS the canonical engine. " +
@@ -1005,6 +841,7 @@ const TOOLS: ToolDef[] = [
   },
   {
     name: "propose_attribute",
+    annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false, title: "Propose New Attribute" },
     description:
       "Propose a NOVEL attribute the registry LACKS (e.g. 'image.weld_pattern_type', 'image.media_blast_profile', 'image.period_correct_finish') so a real discovery isn't lost when get_attribute_checklist has no slot for it. " +
       "This is the ONLY tool that can grow the attribute vocabulary — without it, anything the checklist doesn't already name is dropped. Records a schema_proposals row (proposal_type='add_image_attribute', status='open') with full source DNA. A human curator reviews and promotes accepted proposals into attribute-registry.ts; promotion stays HUMAN by design (laser-tag doctrine — the agent grows the vocabulary, the human signs it). " +
@@ -1030,6 +867,7 @@ const TOOLS: ToolDef[] = [
   },
   {
     name: "submit_attribute_values",
+    annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false, title: "Submit Batch Attribute Claims" },
     description:
       "Batch version of submit_attribute_value. Caller submits an array of {attribute, value, confidence, basis_signals?, candidates?} for the same subject + model_slug in a single call. Returns array of projection_event_ids in submission order, with per-row error if validation/insert failed. " +
       "Drastically reduces round-trips when iterating a checklist (17 atoms in 1 call instead of 17). Same auto-registration semantics as submit_attribute_value (caller_kind=walkin, base_trust=0.30 on first call).",
@@ -1073,6 +911,7 @@ const TOOLS: ToolDef[] = [
   // ── Actors & Organizations ────────────────────────────────────────────
   {
     name: "search_organizations",
+    annotations: { readOnlyHint: true, destructiveHint: false, openWorldHint: false, title: "Search Organizations" },
     description:
       "Search 4,975 organizations — dealers, auction houses, restoration shops, builders, collectors. " +
       "Filter by business type and/or location. Results contain only confirmed data. Null values mean 'not recorded'.",
@@ -1093,6 +932,7 @@ const TOOLS: ToolDef[] = [
   },
   {
     name: "get_organization",
+    annotations: { readOnlyHint: true, destructiveHint: false, openWorldHint: false, title: "Get Organization Record" },
     description:
       "Get full organization profile by ID. Includes inventory summary, reputation, location, and linked vehicles.",
     inputSchema: {
@@ -1107,6 +947,7 @@ const TOOLS: ToolDef[] = [
   // ── Ingestion ─────────────────────────────────────────────────────────
   {
     name: "extract_listing",
+    annotations: { readOnlyHint: false, destructiveHint: true, openWorldHint: true, title: "Extract and Ingest Vehicle Listing" },
     description:
       "Extract structured vehicle data from any listing URL. Works on BaT, Cars & Bids, Craigslist, eBay Motors, FB Marketplace, Hagerty, and thousands more. Returns year, make, model, VIN, price, images.",
     inputSchema: {
@@ -1120,6 +961,7 @@ const TOOLS: ToolDef[] = [
   },
   {
     name: "submit_observation",
+    annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false, title: "Submit Vehicle Observation" },
     description:
       "Submit an observation about a vehicle through the governed pipeline. All writes go through ingest-observation, respecting pipeline_registry. Returns observation_id and dedup status.",
     inputSchema: {
@@ -1141,6 +983,7 @@ const TOOLS: ToolDef[] = [
   // ── External Agent Write API (v1/events) ──────────────────────────────
   {
     name: "submit_vehicle_event",
+    annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false, title: "Submit Vehicle Event" },
     description:
       "Submit a vehicle event via the public /v1/events envelope, keyed by VIN. Use this when a user describes work performed, observations made, or notes about a specific vehicle they own. event_type='service' for shop work / inspections / modifications, 'note' for general comments. Returns event_id (= observation_id) on success. The vehicle must already exist in NUKE — call create_profile or vehicle ingestion first if it doesn't.",
     inputSchema: {
@@ -1169,6 +1012,7 @@ const TOOLS: ToolDef[] = [
   },
   {
     name: "get_event_schema",
+    annotations: { readOnlyHint: true, destructiveHint: false, openWorldHint: false, title: "Get Vehicle Event Schema" },
     description:
       "Return the JSON Schema for a given event_type so an agent can self-validate its payload before calling submit_vehicle_event. Currently supports 'service' and 'note'. Use this to discover what fields are expected.",
     inputSchema: {
@@ -1181,6 +1025,7 @@ const TOOLS: ToolDef[] = [
   },
   {
     name: "get_event_checklist",
+    annotations: { readOnlyHint: true, destructiveHint: false, openWorldHint: false, title: "Get Vehicle Event Checklist" },
     description:
       "Return a Claude-actionable per-field checklist for a given event_type. Each field includes type, required flag, plain-language description, why_it_matters, and three booleans — vision_fillable, context_fillable, tool_fillable — that tell the agent how to source the value. Use this BEFORE submit_vehicle_event so the agent fills the structured form instead of dumping a free-form blob. Supported event_types: service, note, inspection, modification, condition_assessment.",
     inputSchema: {
@@ -1197,6 +1042,7 @@ const TOOLS: ToolDef[] = [
   },
   {
     name: "verify_vehicle_access",
+    annotations: { readOnlyHint: true, destructiveHint: false, openWorldHint: false, title: "Check Vehicle Access" },
     description:
       "Given the caller's API key, return whether it has read or write access to events for a specific VIN. Use this BEFORE attempting submit_vehicle_event so you can surface a 'connect Nuke and grant scope' message instead of triggering a 403. Returns { can_write, can_read, scopes_matched, vehicle_in_nuke }.",
     inputSchema: {
@@ -1211,6 +1057,7 @@ const TOOLS: ToolDef[] = [
   // ── Auction Readiness ───────────────────────────────────────────────
   {
     name: "get_auction_readiness",
+    annotations: { readOnlyHint: false, destructiveHint: true, openWorldHint: false, title: "Get or Recompute Auction Readiness" },
     description:
       "Get the Auction Readiness Score for a vehicle. Returns a 6-dimension score (0-100) indicating how ready the vehicle is for auction submission, with specific coaching prompts for closing gaps.",
     inputSchema: {
@@ -1223,6 +1070,7 @@ const TOOLS: ToolDef[] = [
   },
   {
     name: "get_coaching_plan",
+    annotations: { readOnlyHint: false, destructiveHint: true, openWorldHint: false, title: "Get Coaching Plan and Persist Readiness" },
     description:
       "Get a prioritized coaching plan for improving a vehicle's auction readiness. Returns ordered actions (photo uploads, data entry, narrative writing) with specific prompts and point values.",
     inputSchema: {
@@ -1235,6 +1083,7 @@ const TOOLS: ToolDef[] = [
   },
   {
     name: "prepare_listing",
+    annotations: { readOnlyHint: false, destructiveHint: true, openWorldHint: false, title: "Prepare Listing Preview and Persist Readiness" },
     description:
       "Generate a listing package preview for a vehicle. Pulls identity, ordered photos, structured fields, and valuation data into a submission-ready bundle. Vehicle should be TIER 1 or TIER 2.",
     inputSchema: {
@@ -1250,6 +1099,7 @@ const TOOLS: ToolDef[] = [
   // ── User Onboarding & Account Linking ────────────────────────────
   {
     name: "create_profile",
+    annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false, title: "Create User Profile and API Key" },
     description:
       "Create a new Nuke user profile via email. Zero-friction onboarding — call this when a user wants to join Nuke. " +
       "If the email already exists, returns the existing profile (idempotent). " +
@@ -1267,6 +1117,7 @@ const TOOLS: ToolDef[] = [
   },
   {
     name: "get_profile",
+    annotations: { readOnlyHint: true, destructiveHint: false, openWorldHint: false, title: "Get User Profile" },
     description:
       "Look up an existing Nuke user profile by email or user_id. Returns profile details, linked accounts, and vehicle count.",
     inputSchema: {
@@ -1279,6 +1130,7 @@ const TOOLS: ToolDef[] = [
   },
   {
     name: "link_account",
+    annotations: { readOnlyHint: false, destructiveHint: true, openWorldHint: false, title: "Link External Account" },
     description:
       "Request to link an external platform account (BaT, Cars & Bids, Hemmings, Instagram, etc.) to a Nuke user. " +
       "Creates a pending claim that must be verified. Returns a preview of what data would be linked (comments, bids, vehicles).",
@@ -1299,6 +1151,7 @@ const TOOLS: ToolDef[] = [
   },
   {
     name: "verify_account_link",
+    annotations: { readOnlyHint: false, destructiveHint: true, openWorldHint: false, title: "Verify External Account Link" },
     description:
       "Complete verification of a pending account link claim. Methods: email_match (compare emails), profile_url_proof (user provides proof URL), manual_review (submit for admin review).",
     inputSchema: {
@@ -1317,6 +1170,7 @@ const TOOLS: ToolDef[] = [
   },
   {
     name: "list_linked_accounts",
+    annotations: { readOnlyHint: true, destructiveHint: false, openWorldHint: false, title: "List Linked Accounts" },
     description:
       "Show all external platform accounts linked to a Nuke user, with verification status and data counts.",
     inputSchema: {
@@ -1331,6 +1185,7 @@ const TOOLS: ToolDef[] = [
   // ── Photo Ingest ────────────────────────────────────────────────────
   {
     name: "ingest_photos",
+    annotations: { readOnlyHint: false, destructiveHint: true, openWorldHint: false, title: "Upload and Ingest Vehicle Photos" },
     description:
       "Ingest vehicle photos into Nuke. Accepts base64-encoded images or URLs. " +
       "Use this when a user wants to upload, catalog, or document their vehicle with photos. " +
@@ -1378,6 +1233,8 @@ const TOOLS: ToolDef[] = [
   // ── SQL Query ──────────────────────────────────────────────────────
   {
     name: "execute_sql",
+    // SELECT expressions may invoke mutating RPCs; the keyword guard cannot guarantee read-only.
+    annotations: { readOnlyHint: false, destructiveHint: true, openWorldHint: false, title: "Execute SQL Query" },
     description:
       "Execute raw SQL against the Nuke Postgres database. Use this for ad-hoc queries, " +
       "data exploration, and analytics that aren't covered by other tools. Returns rows " +
@@ -1399,6 +1256,7 @@ const TOOLS: ToolDef[] = [
   // ── Composite Auction Briefing ───────────────────────────────────────
   {
     name: "get_auction_briefing",
+    annotations: { readOnlyHint: true, destructiveHint: false, openWorldHint: false, title: "Get Auction Briefing" },
     description:
       "Get a complete auction briefing for a vehicle in one call. Returns identity, live auction data (bids/views/watchers), " +
       "Nuke Estimate valuation, seller profile and analytics, comparable sales, market history, comment sentiment, " +
@@ -1798,6 +1656,29 @@ async function handleVehicle(args: Record<string, unknown>): Promise<ToolResult>
   return toolOk(populated);
 }
 
+// A vehicle's price as agents should read it: one answer with its kind (sold, bid, ask, estimate)
+// and each fact kept apart with its date. A sale is only a sale when vehicle_sale_basis() says so,
+// so an ask or a bid is never reported as sold (vehicle_price_facts, 2026-09-28).
+async function priceFacts(supabase: ReturnType<typeof sb>, vid: string) {
+  const { data } = await supabase.rpc("vehicle_price_facts", { p_vehicle_ids: [vid] });
+  const r = Array.isArray(data) ? data[0] : null;
+  if (!r) return null;
+  return {
+    kind: r.price_kind,
+    amount: r.price_amount,
+    as_of: r.price_as_of,
+    live: r.price_live,
+    outcome: r.outcome,
+    sold: r.sold_basis ? { amount: r.sold_amount, on: r.sold_on, basis: r.sold_basis, from: r.sold_amount_from } : null,
+    ask: r.ask_amount != null ? { amount: r.ask_amount, as_of: r.ask_as_of } : null,
+    bid: r.bid_amount != null ? { amount: r.bid_amount, on: r.bid_on, from: r.bid_from } : null,
+    estimate: r.estimate_amount != null
+      ? { amount: r.estimate_amount, confidence: r.estimate_confidence, as_of: r.estimate_as_of }
+      : null,
+    source_url: r.source_url,
+  };
+}
+
 async function handleGetVehicle(args: Record<string, unknown>): Promise<ToolResult> {
   const supabase = sb();
   const vid = String(args.vehicle_id);
@@ -1807,7 +1688,7 @@ async function handleGetVehicle(args: Record<string, unknown>): Promise<ToolResu
     .select(
       "id, vin, year, make, model, trim, series, body_style, engine_type, engine_displacement, " +
       "transmission, drivetrain, exterior_color:color, interior_color, mileage, " +
-      "sale_price, asking_price, canonical_sold_price, canonical_outcome, canonical_platform, " +
+      "canonical_platform, " +
       "status, auction_status, reserve_status, " +
       "nuke_estimate, nuke_estimate_confidence, deal_score, heat_score, " +
       "primary_image_url, image_count, observation_count, " +
@@ -1827,7 +1708,7 @@ async function handleGetVehicle(args: Record<string, unknown>): Promise<ToolResu
     .select("id", { count: "exact", head: true })
     .eq("vehicle_id", vid);
 
-  return toolOk({ ...vehicle, event_count: eventCount ?? 0 });
+  return toolOk({ ...vehicle, price: await priceFacts(supabase, vid), event_count: eventCount ?? 0 });
 }
 
 async function handleQueryVehicleDeep(args: Record<string, unknown>): Promise<ToolResult> {
@@ -1925,6 +1806,7 @@ async function handleQueryVehicleDeep(args: Record<string, unknown>): Promise<To
 
   const vehicle = results[idx++]?.data;
   if (!vehicle) return toolErr("Vehicle not found");
+  const price = await priceFacts(supabase, vid);
 
   const response: Record<string, unknown> = {
     identity: {
@@ -1957,15 +1839,12 @@ async function handleQueryVehicleDeep(args: Record<string, unknown>): Promise<To
     recent_service_history: vehicle.recent_service_history || null,
     title_status: vehicle.title_status || null,
     documents_on_hand: vehicle.documents_on_hand || null,
+    price,
     valuation: {
       nuke_estimate: vehicle.nuke_estimate,
       confidence: vehicle.nuke_estimate_confidence,
       deal_score: vehicle.deal_score,
       heat_score: vehicle.heat_score,
-      canonical_sold_price: vehicle.canonical_sold_price,
-      canonical_outcome: vehicle.canonical_outcome,
-      asking_price: vehicle.asking_price,
-      sale_price: vehicle.sale_price,
     },
     status: {
       status: vehicle.status,
@@ -2172,10 +2051,31 @@ async function handleQueryFieldEvidence(args: Record<string, unknown>): Promise<
     .select("*")
     .eq("vehicle_id", vid)
     .eq("field_name", field)
+    .eq("flagged_as_incorrect", false)
     .order("confidence_score", { ascending: false });
 
   if (error) return toolErr(error.message);
   if (!evidence?.length) {
+    // An empty qualified result can mean the retained evidence was rejected.
+    // Do not resurrect its value through the legacy scalar fallback (some
+    // evidence fields do not even have matching vehicle/source columns).
+    const { data: withheld, error: withheldError } = await supabase
+      .from("vehicle_field_evidence")
+      .select("id")
+      .eq("vehicle_id", vid)
+      .eq("field_name", field)
+      .eq("flagged_as_incorrect", true)
+      .limit(1);
+    if (withheldError) return toolErr(withheldError.message);
+    if (withheld?.length) {
+      return toolOk({
+        field,
+        vehicle_id: vid,
+        evidence_count: 0,
+        evidence: [],
+        note: "No unflagged detailed evidence remains for this field. Incorrect evidence and scalar fallback are withheld.",
+      });
+    }
     // Fall back to checking the vehicle record directly
     const { data: vehicle } = await supabase
       .from("vehicles")
@@ -6159,14 +6059,39 @@ function handleInitialize(req: JsonRpcRequest): JsonRpcResponse {
   });
 }
 
-function handleToolsList(req: JsonRpcRequest): JsonRpcResponse {
-  return rpcResult(req.id, { tools: TOOLS });
+// Explicit allowlist: adding a tool to the full connector never exposes it to ChatGPT.
+// Keep broad record/observation reads, private projections, SQL and all writes out.
+const CHATGPT_TOOL_NAMES = new Set([
+  "describe_platform",
+  "search_vehicles",
+  "search_vehicles_advanced",
+  "browse_inventory",
+  "decode_vin",
+  "get_vehicle",
+  "get_valuation",
+  "get_comps",
+  "query_market_history",
+  "search_organizations",
+]);
+
+function isChatGptSurface(req: Request): boolean {
+  return req.headers.get("x-nuke-surface") === "chatgpt" ||
+    new URL(req.url).searchParams.get("surface") === "chatgpt";
 }
 
-async function handleToolsCall(req: JsonRpcRequest): Promise<JsonRpcResponse> {
+function handleToolsList(req: JsonRpcRequest, chatgptSurface = false): JsonRpcResponse {
+  const tools = chatgptSurface ? TOOLS.filter((tool) => CHATGPT_TOOL_NAMES.has(tool.name)) : TOOLS;
+  return rpcResult(req.id, { tools });
+}
+
+async function handleToolsCall(req: JsonRpcRequest, chatgptSurface = false): Promise<JsonRpcResponse> {
   const params = req.params as { name: string; arguments?: Record<string, unknown> } | undefined;
   if (!params?.name) {
     return rpcError(req.id, -32602, "Missing tool name");
+  }
+
+  if (chatgptSurface && !CHATGPT_TOOL_NAMES.has(params.name)) {
+    return rpcError(req.id, -32602, `Tool not available on ChatGPT surface: ${params.name}`);
   }
 
   const handler = TOOL_HANDLERS[params.name];
@@ -6187,7 +6112,7 @@ function handlePing(req: JsonRpcRequest): JsonRpcResponse {
   return rpcResult(req.id, {});
 }
 
-async function handleJsonRpc(body: JsonRpcRequest): Promise<JsonRpcResponse | null> {
+async function handleJsonRpc(body: JsonRpcRequest, chatgptSurface = false): Promise<JsonRpcResponse | null> {
   // Notifications (no id) — return null to signal 202
   if (body.id === undefined || body.id === null) {
     if (body.method === "notifications/initialized") {
@@ -6203,9 +6128,9 @@ async function handleJsonRpc(body: JsonRpcRequest): Promise<JsonRpcResponse | nu
     case "initialize":
       return handleInitialize(body);
     case "tools/list":
-      return handleToolsList(body);
+      return handleToolsList(body, chatgptSurface);
     case "tools/call":
-      return await handleToolsCall(body);
+      return await handleToolsCall(body, chatgptSurface);
     case "ping":
       return handlePing(body);
     default:
@@ -6232,11 +6157,8 @@ Deno.serve(async (req: Request) => {
     if (path.endsWith("/.well-known/oauth-protected-resource")) {
       return oauthResourceMetadata();
     }
-    if (path.endsWith("/.well-known/oauth-authorization-server")) {
-      return oauthServerMetadata();
-    }
-    if (path.endsWith("/authorize")) {
-      return await oauthAuthorize(req);
+    if (path.endsWith("/.well-known/oauth-authorization-server") || path.endsWith("/authorize")) {
+      return oauthNotHere();
     }
     // GET on root = SSE stream (required by MCP Streamable HTTP spec)
     // Return an open SSE connection that sends a keepalive then closes
@@ -6248,11 +6170,8 @@ Deno.serve(async (req: Request) => {
 
   // OAuth token + registration endpoints (POST)
   if (req.method === "POST") {
-    if (path.endsWith("/token")) {
-      return await oauthToken(req);
-    }
-    if (path.endsWith("/register")) {
-      return await oauthRegister(req);
+    if (path.endsWith("/token") || path.endsWith("/register")) {
+      return oauthNotHere();
     }
   }
 
@@ -6285,12 +6204,11 @@ Deno.serve(async (req: Request) => {
 
   // Auth — required for write tools, optional for read tools.
   // When a write tool is called without valid auth, return 401 + WWW-Authenticate
-  // pointing at the OAuth resource metadata. Claude.ai sees this and triggers the
-  // OAuth flow at https://nuke.ag/oauth/authorize. After the user logs in via
-  // magic link, Claude.ai gets a Bearer token that it includes on every retry.
+  // pointing at the OAuth resource metadata, which names https://nuke.ag (magic-link login)
+  // as the authorization server. Accepted here: the service key, and API keys on X-API-Key.
   // Write tools are tiered. Governed append-only claims need write:observations (autonomous for
-  // external agents). Canonical-record mutations (identity) need write:canonical, which is only
-  // grantable via owner login — an autonomous walk-in token can never reach them.
+  // external agents). Canonical-record mutations (identity) need write:canonical, which only the
+  // service key and an API key granted it carry.
   const WRITE_TIERS: Record<string, WriteTier> = {
     submit_observation: "observations",
     submit_attribute_value: "observations",
@@ -6351,7 +6269,7 @@ Deno.serve(async (req: Request) => {
   }
 
   // Route to MCP handler
-  const response = await handleJsonRpc(body);
+  const response = await handleJsonRpc(body, isChatGptSurface(req));
 
   // Notifications get 202 (no body)
   if (response === null) {

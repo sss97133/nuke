@@ -1,0 +1,21 @@
+TG-SW-KEY:
+  family: gm_blade
+  pins:
+    TG_BUS_UP: CLOSE terminal (circuit 183, window up)
+    TG_CUT_IN: CLOSE terminal (circuit 183, window up; to the tailgate-closed cutout)
+    TG_BUS_DN: OPEN terminal (circuit 184, window down)
+    TG_MOT_B: OPEN terminal (circuit 184, window down)
+  closed: 'FEED terminal (circuit 60) carries TG_KEY_FEED (+ the candidate TGR_FEED); drawn in parallel with the dash switch; the tailgate-closed cutout 2977647 is endpoint TG-CUTOUT (1978 booklet p.16) — 2026-09-28'
+  mate: GM 8900713 3-way connector body (1978 booklet p.16); a new-part equivalent is OPEN
+  splice_point: true
+  note: 'maker''s document: factory tailgate window key switch, 1978 GM connector 8900713: three terminals OPEN (circuit 184) / FEED (circuit 60) / CLOSE (circuit
+    183) · The factory key switch is NOT in series: it has one FEED terminal (circuit 60, battery via circuit breaker) and switches it to CLOSE (183) or OPEN (184).
+    Its outputs join the dash switch outputs at splices 183/184 on the way to the motor (1978 booklet p.16). Mapping the registry''s series wires onto it puts the
+    bus and motor wire of each direction on the same terminal (the factory splice moved to the switch), hence splice_point. · family gm_blade: the 1978 booklet draws
+    GM factory blade connectors here (key switch connector 8900713, 1978 booklet p.16); the Packard 56-series identity is the family''s (families.yaml), not printed
+    on the drawing'
+  open:
+  - '1977-specific key switch drawing: not on file (1978 booklet used; same body)'
+  sources:
+  - '1978 C-K wiring booklet ST-352-78 (reference_documents/wiring_diagram_booklets/ST_352_78_CK_Wiring.pdf) p.16 (sheet A-4) ''Power Rear Window (RPO A33)'' panel:
+    tailgate window switch 8900713 OPEN 184 / FEED 60 / CLOSE 183; splice-183, splice-184; cutout SW N/O 2977647'

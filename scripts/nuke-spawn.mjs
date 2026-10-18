@@ -2,7 +2,7 @@
 /**
  * nuke-spawn — visual multi-agent spawner for the Nuke Command Center
  *
- * Queries agent_tasks, spawns claude sessions into tmux panes so you can
+ * Queries agent_tasks, spawns claude or codex sessions into tmux panes so you can
  * watch them work. Each agent gets their CLAUDE.md persona + task description.
  *
  * Usage:
@@ -21,6 +21,7 @@ import { execSync } from 'child_process';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
 import { tmpdir } from 'os';
+import { routeTask } from './lib/jev-route.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const NUKE_DIR = join(__dirname, '..');
@@ -59,8 +60,26 @@ const MODEL_MAP = {
   cwtfo: 'opus',
 };
 
+// Every claude -p run gets a spend ceiling (--max-budget-usd); override with NUKE_SPAWN_BUDGET_USD.
+const BUDGET_USD = process.env.NUKE_SPAWN_BUDGET_USD || '5';
+
 function getModel(agentType) {
   return MODEL_MAP[agentType] || 'sonnet';
+}
+
+// Jev picks the model per task; the static map above is the fallback.
+// --static skips Jev. JEV_ROUTE_MAX_TIER=sonnet caps the pick.
+async function routeModel(task) {
+  const fallback = getModel(task.agent_type);
+  if (flag('--static')) return { runner: 'claude', model: fallback };
+  const r = await routeTask({ title: task.title, description: task.description, fallback });
+  // routeTask in lib/jev-route.mjs blocks codex for flagged or unknown private data.
+  if (r.runner === 'codex') {
+    // Only fixed, approved profiles; long descriptions (>2,000 chars) use deep.
+    const model = Number(task.priority) === 1 || (task.description || '').length > 2000 ? 'deep' : 'fast';
+    return { runner: 'codex', model };
+  }
+  return { runner: 'claude', model: r.modelArg || fallback };
 }
 
 // ─── Terminal colors ─────────────────────────────────────────────────────
@@ -122,7 +141,7 @@ function tmuxSessionExists() {
 
 function spawnPane(task) {
   const { id, agent_type, title, description } = task;
-  const model = getModel(agent_type);
+  const model = task.model || getModel(agent_type);
 
   // Write prompt to temp file (avoids shell escaping issues)
   const promptFile = join(tmpdir(), `nuke-agent-${id}.txt`);
@@ -135,14 +154,15 @@ function spawnPane(task) {
     `2. Append to DONE.md`,
     `3. Remove yourself from ACTIVE_AGENTS.md`,
   ].filter(Boolean).join('\n');
-  writeFileSync(promptFile, taskPrompt);
-
   // Build persona flag
   const personaFile = join(AGENTS_DIR, agent_type, 'CLAUDE.md');
   const hasPersona = existsSync(personaFile);
   const personaFlag = hasPersona
     ? `--append-system-prompt "$(cat '${personaFile}')"`
     : '';
+  writeFileSync(promptFile, task.runner === 'codex' && hasPersona
+    ? `${readFileSync(personaFile, 'utf8')}\n\n${taskPrompt}`
+    : taskPrompt);
 
   // Truncate title for pane label
   const shortTitle = title.length > 45 ? title.slice(0, 42) + '...' : title;
@@ -162,7 +182,10 @@ function spawnPane(task) {
     execSync(`tmux select-pane -t "${paneId}" -T "${agent_type}: ${shortTitle}"`);
 
     // Build the command — CLAUDECODE= prevents nested session detection
-    const cmd = `CLAUDECODE= claude -p "$(cat '${promptFile}')" --model ${model} ${personaFlag}; echo ''; echo '━━━ AGENT COMPLETE ━━━'; rm -f '${promptFile}'; read -p 'Enter to close...'`;
+    const launch = task.runner === 'codex'
+      ? `codex exec -p ${model === 'deep' ? 'deep' : 'fast'} - < '${promptFile}'`
+      : `CLAUDECODE= claude -p "$(cat '${promptFile}')" --model ${model} --max-budget-usd ${BUDGET_USD} ${personaFlag}`;
+    const cmd = `${launch}; echo ''; echo '━━━ AGENT COMPLETE ━━━'; rm -f '${promptFile}'; read -p 'Enter to close...'`;
 
     // Send it (using base64 encoding to avoid escaping issues)
     const b64 = Buffer.from(cmd).toString('base64');
@@ -204,7 +227,8 @@ async function main() {
 
   console.log(`${C.bold}${tasks.length} pending tasks:${C.reset}`);
   for (const t of tasks) {
-    const model = getModel(t.agent_type);
+    Object.assign(t, await routeModel(t));
+    const model = t.runner === 'codex' ? `codex:${t.model}` : t.model;
     const hasPersona = existsSync(join(AGENTS_DIR, t.agent_type, 'CLAUDE.md'));
     const hint = hasPersona ? '' : ` ${C.yellow}(no persona)${C.reset}`;
     console.log(`  ${C.cyan}[${t.agent_type}]${C.reset} P${t.priority} ${C.dim}[${model}]${C.reset} ${t.title}${hint}`);

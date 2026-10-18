@@ -21,17 +21,19 @@ Building a duplicate wastes compute, creates data forks, and breaks pipeline tra
 | Intent | Use This | Notes |
 |--------|----------|-------|
 | Extract any listing URL (unknown source) | `extract-vehicle-data-ai` | Handles generic AI extraction |
-| Extract Bring a Trailer listing | `extract-bat-core` | Call directly, then trigger `extract-auction-comments` yourself — not auto-chained. (`complete-bat-import` was deleted from deployment in the March 2026 triage; it 404s live.) |
+| Extract Bring a Trailer listing | `extract-bat-core` | Call directly, then trigger `extract-auction-comments` yourself — not auto-chained. Service-only `mode: live_stream` continuously multiplexes every closing BaT lot through `ingest-observation` `bat_live_events_v1`; `dry_run: true` previews targets. Private `ingest_bat_live_events` admits/folds native frames atomically. Current coverage: `get_live_auction_health().closing_stream` and `v_job_health` `bat-live-pull` assay. `daily_closes` reconciles known BaT URLs for today in Pacific time: expected lots, confirmed results, gaps, native terminal receipts and late admission. Missing overdue results or failed terminal capture fail the existing job assay even after streams settle. The date overload requires caller table privileges. Source-wide inventory and historical continuous capture remain unverified. See `docs/ledger/BAT_CLOSING_STREAM_2026-10-04.md` for rollout stages. (`complete-bat-import` was deleted/404s.) |
 | Extract Cars & Bids listing | `extract-cars-and-bids-core` | Handles C&B structure |
 | Extract Hagerty Marketplace listing | `extract-hagerty-listing` | |
 | Extract PCarMarket listing | `import-pcarmarket-listing` | |
 | Extract Craigslist listing | `extract-craigslist` | |
-| Extract eBay Motors listing | `extract-ebay-motors` | |
-| Extract Facebook Marketplace listing | `extract-facebook-marketplace` or `fb-marketplace-orchestrator` | Use orchestrator for bulk. Supports `mode: "direct"` for agent-extracted data (skips Firecrawl). |
+| Extract eBay Motors listing | `extract-ebay-motors` | Firecrawl single URL, or Browse API (action sweep/revisit/aspects/status/preview); actions discover/deep read eBay public pages through Firecrawl; cron jobs ebay-motors-endcheck (daily end states), ebay-motors-discover-t1, -t2, ebay-motors-sweep, ebay-motors-revisit (all INACTIVE until the gate passes) |
+| Receive eBay account-deletion notices | `ebay-account-deletion` | Public endpoint eBay requires for production keys |
+| Extract Facebook Marketplace listing | `extract-facebook-marketplace` | `direct` accepts agent-extracted fields; `browser_capture` retains a bounded permitted browser pass in existing sweep/sighting ledgers with checked landing receipts. Stage/retry using `scripts/fb-import-urls.ts --capture <file>`; `--land` submits to this writer. Source access is separate from landing; no cookies/private endpoints or paid fetch fallback. Local `scripts/fb-browser-capture/extension` is a reviewed-install MV3 rendered-card producer for this same owner; `bridge.mjs` stages immutable packets and calls the existing CLI, with no browser credentials or new testimony store. Initial install disabled; per-cycle200-card/four-scroll budget, 15-minute cadence,96 cycles/day, split into at most50-card packets. See `scripts/fb-browser-capture/README.md` for installation and evidence limits. |
+| Measure raw-vs-model landing depth | `measure-landing-depth` | Nightly per source (pg_cron): samples recently landed lots, reads each retained capture with the independent probes in `_shared/landingDepthProbes.ts`, resolves the vehicle, and writes raw-present / model-present / profile-present counts per field to `landing_depth_measurements` (views `v_landing_depth_latest`, `v_landing_depth_drops`). Reads captures and the model; writes only its own table. `{source, sample, dry_run}`. |
 | Import Facebook Saved vehicles | MCP `import_facebook_saved` tool or `scripts/fb-saved-extractor.js` | Two-step: extract (returns browser JS) → submit (POSTs to ingest). Runs client-side in user's browser on facebook.com/saved. |
 | Extract Bonhams auction | `extract-bonhams` | |
 | Extract RM Sotheby's | `extract-rmsothebys` | |
-| Extract Mecum | `extract-mecum` | |
+| Extract Mecum | `extract-mecum` | Service-only `action: source_result_preview` with one explicit `snapshot_id` reads/hash-verifies that retained capture and returns private unqualified result/run-day claims and gaps. No source fetching, intake, metadata/profile/queue writes or inference; `dry_run: false` and extraction options refuse. Scheduled run day is not sale/settlement time. Parent custody, currency and fee basis remain unestablished. |
 | Extract Gooding & Co | `extract-gooding` | |
 | Extract Barrett-Jackson | `extract-barrett-jackson` | |
 | Extract Collecting Cars | `extract-collecting-cars-core` | |
@@ -260,6 +262,7 @@ pending_review → [sonnet-supervisor] → complete (approved or corrected)
 |--------|----------|-------|
 | Queue BaT listings for extraction | `crawl-bat-active` | Discovers active auctions |
 | Process BaT extraction queue | `process-bat-extraction-queue` | Works `bat_extraction_queue` |
+| Admit supported retained BaT sales automatically | `qualify-bat-archived-sales` cron → existing `batch-extract-snapshots` → canonical `ingest-observation` | Service-only protected-v1 route in existing `derivation_queue`;20 captures/5min, finite replay plus metadata arrival,0 model calls. Busy parent rows defer capture work for bounded retry without aborting intake or source pages. Inspect `assay_bat_sale_intake()` (including deferred work) and `read_bat_sale_intake(snapshot_uuid)`. Unknown/conflicting current sold facts remain explicit refusals; native/episode-v2 holds persist. Do not manually drain. |
 | Monitor a BaT seller | `bat-seller-monitors` table | Insert record to start monitoring |
 | Monitor a BaT buyer | `bat-buyer-monitors` table | Insert record to start monitoring |
 | Parse BaT snapshot HTML | `bat-snapshot-parser` | Parses archived BaT pages |
@@ -382,6 +385,7 @@ Agent: → UPDATE location_zone = 'dash' in manifest
 | Intent | Use This | Notes |
 |--------|----------|-------|
 | Ingest a single observation | `ingest-observation` | Unified intake: dedup, vehicle resolution, confidence scoring. All extractors write through here. |
+| Retain US historical AutoTrader asking evidence | `scripts/ingest-autotrader-history.mjs` → `ingest-observation` mode `historical_asking_v1` | Bounded private manifests; immutable JPEGs in private `masters`, SHA-256 and pixel citations, separate capture/reading/withdrawal observations under `autotrader_us_historical_v1`. Service-only; physical identity stays NULL. A new reading cites its predecessor instead of editing testimony. The private reader reconciles exact manifest IDs and folds revisions; incomplete/branched/withdrawn ancestry withholds prices. Issue dates, AI reading clocks and database ingest clocks remain separate. No OCR/model calls, public reader, seller outreach or complete-archive claim. See the historical asking-evidence contract in `docs/market/MARKET_MEASUREMENT_UI_CONTRACT.md`. |
 | Ingest observations in bulk | `ingest-observation-batch` | Wraps `ingest-observation` for batch processing. Max 200 per request. Options: `gap_fill` (backfill vehicles table), `write_evidence` (field_evidence rows). |
 | Write observation + gap-fill + evidence (from code) | `import { writeObservation } from "../_shared/observationWriter.ts"` | Shared module for edge functions. Wraps observation + Tetris gap-fill + field_evidence in one call. |
 | Migrate legacy data to observations | `migrate-to-observations` | Ports existing auction_comments, vehicle_events, etc. to vehicle_observations |
@@ -449,7 +453,7 @@ Lets a Nuke user run analysis on **their own Claude plan**: subscription token a
 | Run a Claude call through the funnel | `_shared/claudeSubscriptionAuth.ts → runWithChain()` | `mode:"slow"` returns the 429 for the caller to back off; `mode:"upgrade"` re-runs on API. `maxWaitSeconds` forces upgrade if the rate-limit reset is too far out. |
 | Resolve best Claude auth for a user | `_shared/claudeSubscriptionAuth.ts → resolveClaudeAuth()` | Order: subscription → user `anthropic` key → system `ANTHROPIC_API_KEY`. `allowSubscription:false` skips straight to API (the upgrade branch). |
 | BYOK API key (any provider, system fallback) | `_shared/getUserApiKey.ts → getUserApiKey()` | Pre-existing. Returns user-key-or-system with a `source` tag. |
-| Read/move AI credits (prepaid wallet) | `_shared/aiCredits.ts` (`availableCents`, `holdCredits`, `settleHold`, `creditCents`) | Backed by `ai_credit_ledger` (append-only; balance DERIVED via `ai_credit_available_cents()` / `my_ai_credit_balance()` RPC). Platform-key spend reserves→settles here; user never spends past funded balance. |
+| Read/move AI credits (prepaid wallet) | `_shared/aiCredits.ts` (`availableCents`, `reserveCredits`, `holdCredits`, `settleHold`, `creditCents`) | Backed by `ai_credit_ledger`; balance derives from `ai_credit_available_cents()` / `my_ai_credit_balance()`. Service-only `reserve_ai_credit_hold` and `settle_ai_credit_hold` serialize debits per account and atomically close holds with settlement. Photo references reject duplicate paid attempts. Migration and runtime verification remain required before activation. |
 | Fund the wallet (Stripe) | `create-api-access-checkout` (`subscription_type: wallet_10/25/50`) → `stripe-webhook` | Checkout sets `metadata.amount_cents`; the webhook credits the ledger idempotently on `checkout.session.completed`. Deploy webhook `--no-verify-jwt`; set `STRIPE_WEBHOOK_SECRET`. |
 | Connect-Claude + balance UI | `nuke_frontend/.../settings/ClaudeSubscriptionSettings.tsx` (mounted in `AIProviderSettings.tsx`) | Settings card: connect subscription, show balance, top up. |
 | Run user analysis on their own Claude (web + iOS) | `analyze-with-claude` | User-JWT entrypoint → `runWithChain`. POST `{ prompt, vehicle_id?, mode?: slow\|upgrade, model?, max_tokens? }`. Returns `{ source, text, chargedCents, needsFunding }`. 429→slow, 402→needs funding. Retires archived `imessage-router`. |
@@ -466,6 +470,7 @@ Lets a Nuke user run analysis on **their own Claude plan**: subscription token a
 | Classify make from image | `api-v1-vision/classify` or `yono-classify` | Hierarchical: tier1 family, tier2 make. $0/image |
 | Analyze condition/zone/damage | `yono-analyze` | Florence-2 vision analysis. Writes to vehicle_images if image_id provided |
 | Batch classify images | `api-v1-vision/batch` or `yono-batch-process` | Bulk version, max 100 images |
+| Condition read of a listing's photos, on request | `api-v1-vision/listing` | POST `{vehicle_id, max_photos?}` (admins or the service key). Reads up to 16 photos with YONO, then the caller's own connected provider (BYOK), and writes one `kind=condition` observation (source `nuke-vision`, `analysis_kind=listing_photo_condition_v1`) through `ingest-observation`. At most `LISTING_ANALYSES_PER_DAY` (default 40) a day |
 | Background vision processing | `yono-vision-worker` | Cron worker, claims batches, writes to vehicle_images |
 | Keep sidecar warm | `yono-keepalive` | Pings Modal every 5 min (cron job 249) |
 | Export training data | `export-training-batch` | Prepares training dataset |
@@ -566,7 +571,7 @@ VALUES ('vehicle-docs/abc123.pdf', 'pending', 50, 'title');
 
 ### Check queue depth
 ```bash
-cd /Users/skylar/nuke && dotenvx run -- bash -c \
+cd ~/nuke && dotenvx run -- bash -c \
   'curl -s "$VITE_SUPABASE_URL/functions/v1/queue-status" \
   -H "Authorization: Bearer $SUPABASE_SERVICE_ROLE_KEY"' | jq
 ```

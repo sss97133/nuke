@@ -13,6 +13,8 @@
 
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.0";
+import { isServiceCaller, requireWriteAuth } from "../_shared/writeGuard.ts";
+import { projectSecretKey } from "../_shared/supabaseKeys.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -26,21 +28,20 @@ const VALID_KINDS = [
 ];
 
 Deno.serve(async (req) => {
+  // Writes are never anonymous: service key, signed-in user, or nothing (P0.2, 2026-09-27).
+  const denied = await requireWriteAuth(req);
+  if (denied) return denied;
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
 
   try {
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
-    const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+    const supabaseKey = projectSecretKey()!;
     const supabase = createClient(supabaseUrl, supabaseKey);
 
-    // Verify this is called by cron or service role
-    const authHeader = req.headers.get("Authorization");
-    const token = authHeader?.replace("Bearer ", "") || "";
-    const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
-    const altServiceKey = Deno.env.get("SERVICE_ROLE_KEY") || "";
-    if (!token || (token !== serviceKey && token !== altServiceKey)) {
+    // Require the service role, judged as writeGuard judges it (2026-10-14)
+    if (!(await isServiceCaller(req))) {
       return new Response(JSON.stringify({ error: "Unauthorized — service role key required" }), {
         status: 401,
         headers: { ...corsHeaders, "Content-Type": "application/json" },

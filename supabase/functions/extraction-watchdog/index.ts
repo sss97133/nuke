@@ -17,6 +17,8 @@
  */
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { requireWriteAuth } from "../_shared/writeGuard.ts";
+import { projectSecretKey } from "../_shared/supabaseKeys.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -285,7 +287,7 @@ async function getQueueHealth(supabase: any): Promise<QueueHealth> {
 async function runRecoveryActions(supabase: any, health: QueueHealth): Promise<string[]> {
   const actions: string[] = [];
   const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? "";
-  const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
+  const serviceKey = projectSecretKey() ?? "";
 
   // ── 1. Clear stale locks ──
   if (health.stale_locks > 0) {
@@ -774,12 +776,15 @@ function formatStatusMessage(health: QueueHealth): string {
 }
 
 Deno.serve(async (req) => {
+  // Writes are never anonymous: service key, signed-in user, or nothing (P0.2, 2026-09-27).
+  const denied = await requireWriteAuth(req);
+  if (denied) return denied;
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
   }
 
   const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? "";
-  const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
+  const serviceKey = projectSecretKey() ?? "";
   const supabase = createClient(supabaseUrl, serviceKey);
 
   try {

@@ -7,6 +7,8 @@
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { DOMParser } from 'https://deno.land/x/deno_dom@v0.1.38/deno-dom-wasm.ts';
+import { requireWriteAuth } from '../_shared/writeGuard.ts';
+import { projectSecretKey } from "../_shared/supabaseKeys.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -21,6 +23,9 @@ interface ExtractRequest {
 }
 
 Deno.serve(async (req) => {
+  // Writes are never anonymous: service key, signed-in user, or nothing (P0.2, 2026-09-27).
+  const denied = await requireWriteAuth(req);
+  if (denied) return denied;
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders });
   }
@@ -28,7 +33,7 @@ Deno.serve(async (req) => {
   try {
     const supabase = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
+      projectSecretKey() ?? '',
       {
         auth: {
           persistSession: false,
@@ -121,6 +126,7 @@ Deno.serve(async (req) => {
 
     // Store extracted parts
     const storedParts = [];
+    const writeErrors: string[] = [];
     for (const part of extracted) {
       const { data: stored, error: insertError } = await supabase
         .from('bat_listing_parts')
@@ -139,18 +145,19 @@ Deno.serve(async (req) => {
         .select()
         .maybeSingle();
 
+      if (insertError) writeErrors.push(`bat_listing_parts upsert (${part.part_name}): ${insertError.message}`);
       if (!insertError && stored) {
         storedParts.push(stored);
 
         // Link to matching image tags if requested
         if (linkToImageTags) {
-          await linkToImageTags(stored, vehicleId, supabase);
+          await linkPartToImageTags(stored, vehicleId, supabase);
         }
       }
     }
 
     // Update vehicle with BAT listing URL if not set
-    await supabase
+    const { error: vehicleUpdateError } = await supabase
       .from('vehicles')
       .update({ 
         discovery_url: batListingUrl,
@@ -159,15 +166,17 @@ Deno.serve(async (req) => {
       })
       .eq('id', vehicleId)
       .is('discovery_url', null);
+    if (vehicleUpdateError) writeErrors.push(`vehicles update: ${vehicleUpdateError.message}`);
 
     return new Response(
       JSON.stringify({
-        success: true,
+        success: writeErrors.length === 0,
+        write_errors: writeErrors.slice(0, 5),
         extracted: storedParts,
         count: storedParts.length,
         message: `Extracted ${storedParts.length} parts/brands from BAT listing`
       }),
-      { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      { status: writeErrors.length === 0 ? 200 : 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
 
   } catch (error: any) {
@@ -262,7 +271,7 @@ Be precise - only extract if you're confident the part/brand is mentioned.`
   return Array.isArray(extracted) ? extracted : [];
 }
 
-async function linkToImageTags(batPart: any, vehicleId: string, supabase: any) {
+async function linkPartToImageTags(batPart: any, vehicleId: string, supabase: any) {
   // Find image tags that match this part name
   const { data: matchingTags } = await supabase
     .from('image_tags')
@@ -274,7 +283,7 @@ async function linkToImageTags(batPart: any, vehicleId: string, supabase: any) {
 
   // Link each matching tag to the BAT part
   for (const tag of matchingTags) {
-    await supabase
+    const { error: refError } = await supabase
       .from('image_tag_bat_references')
       .upsert({
         image_tag_id: tag.id,
@@ -283,6 +292,7 @@ async function linkToImageTags(batPart: any, vehicleId: string, supabase: any) {
       }, {
         onConflict: 'image_tag_id,bat_listing_part_id'
       });
+    if (refError) throw new Error(`image_tag_bat_references upsert failed: ${refError.message}`);
   }
 }
 

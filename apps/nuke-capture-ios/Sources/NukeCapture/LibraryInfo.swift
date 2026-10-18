@@ -15,10 +15,13 @@ import SwiftUI
 
 struct LibraryInfoView: View {
     let asset: PHAsset
+    var localOnly: Bool = false
     @Environment(\.dismiss) private var dismiss
     @State private var ledger: ImageLedger?
     @State private var isAnalyzing = false
     @State private var loadingCloud = false
+    @State private var sourceReview: LocalAlbumImageReview?
+    @ObservedObject private var library = LibraryStore.shared
 
     var body: some View {
         NavigationStack {
@@ -36,6 +39,34 @@ struct LibraryInfoView: View {
                                                loc.coordinate.latitude, loc.coordinate.longitude))
                     }
                     if asset.isFavorite { row("Favorite", "Yes") }
+                }
+
+                if library.albumCatalog?.accessScope == "full" {
+                    let albums = library.albumCatalog?.albums.filter { album in
+                        album.photos.contains { $0.localIdentifier == asset.localIdentifier }
+                    } ?? []
+                    if !albums.isEmpty {
+                        Section("Photos albums") {
+                            ForEach(albums) { album in
+                                Text(album.name ?? "Album name unavailable")
+                            }
+                            Text("Existing grouping; vehicle identity is assessed separately.")
+                                .font(.caption).foregroundStyle(.secondary)
+                        }
+                    }
+                }
+
+                if let review = sourceReview {
+                    Section("On-device source read") {
+                        row("Method", review.methodVersion)
+                        row("Read", relativeText(review.analyzedAt))
+                        row("Source SHA256", review.inputSHA256)
+                        if !review.textLines.isEmpty {
+                            ForEach(Array(review.textLines.enumerated()), id: \.offset) { _, text in
+                                Text(text).font(.caption).textSelection(.enabled)
+                            }
+                        }
+                    }
                 }
 
                 // ── The Nuke ledger — each row is a rung the photo has ACTUALLY
@@ -97,8 +128,14 @@ struct LibraryInfoView: View {
         .presentationDetents([.medium, .large])
         .task {
             let id = asset.localIdentifier
+            let photo = LocalAlbumPhoto(localIdentifier: id,
+                sourceVersion: asset.modificationDate.map { String($0.timeIntervalSince1970) })
+            let method = LibraryIngest.albumMethodVersion
+            sourceReview = try? await Task.detached {
+                try LocalStore.shared.albumImageReview(for: photo, methodVersion: method)
+            }.value
             var l = await Task.detached { LocalStore.shared.ledger(for: id) }.value
-            if l?.classified != true {
+            if !localOnly && l?.classified != true {
                 isAnalyzing = true
                 if let v = await VisionEngine.classifyAsset(localIdentifier: id) {
                     await Task.detached {
@@ -114,7 +151,7 @@ struct LibraryInfoView: View {
             // Bring the prod BYOK verdict DOWN if it isn't cached yet. Online-only
             // (offline → [] fast); once cached it renders with no network next open.
             // Joined by the exact uuid bridge (localIdentifier == exif_data.uuid).
-            if l?.cloudNarrative == nil {
+            if !localOnly && l?.cloudNarrative == nil {
                 loadingCloud = true
                 let verdicts = await SupabaseService.fetchCloudVerdicts(forLocalIdentifiers: [id])
                 if let v = verdicts?.first {

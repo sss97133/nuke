@@ -16,7 +16,7 @@ Morning health check for the Nuke platform. Run this daily or on-demand to get a
 Run these checks sequentially and produce a severity-rated report.
 
 ```bash
-cd /Users/skylar/nuke
+cd ~/nuke
 ```
 
 ### 1. Database Health

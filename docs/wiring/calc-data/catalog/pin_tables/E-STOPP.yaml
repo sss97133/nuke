@@ -1,0 +1,12 @@
+E-STOPP:
+  family: open
+  note: 'control-box leads per the ESK001 drawing: E green ''Ground Sync Trigger'', F blue ''Safety to Ignition'', G red ''+12VDC (from battery)'', H black ground;
+    actuator leads A brown / B blue come from the box''s C red / D black'
+  open:
+  - '#126 ''button harness (kit plug)'': the button harness plugs into the control box and the drawing gives no cavity or lead for it — the base entry''s pin text
+    is not a cavity. Read the kit plug; #126 may be an extension of the kit button harness rather than one wire'
+  - 'the leads are flying (drawing photo): a miniseal family fits E/F/G/H once #126 is settled — one family per plug in the toolchain'
+  sources:
+  - reference_documents/component_drawings/extracted/estopp_esk001_wiring.png (ESK001 component overview & wiring diagram)
+  - reference_documents/web_snapshots/estopp.com__troubleshooting.md ('power to the control box are 16 gauge'; 'The green wire is a low-current switched ground',
+    about 25 mA)

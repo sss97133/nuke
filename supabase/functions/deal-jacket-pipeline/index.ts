@@ -11,6 +11,8 @@
  */
 
 import { createClient } from "jsr:@supabase/supabase-js@2";
+import { requireWriteAuth } from "../_shared/writeGuard.ts";
+import { projectSecretKey } from "../_shared/supabaseKeys.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -19,7 +21,7 @@ const corsHeaders = {
 
 const supabase = createClient(
   Deno.env.get("SUPABASE_URL")!,
-  Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
+  projectSecretKey()!
 );
 
 // ─── EXTRACTION PROMPT ──────────────────────────────────────────────────────
@@ -44,6 +46,9 @@ Extract EVERY reconditioning line item. Be precise with amounts. If unclear, not
 
 // ─── MAIN HANDLER ───────────────────────────────────────────────────────────
 Deno.serve(async (req) => {
+  // Writes are never anonymous: service key, signed-in user, or nothing (P0.2, 2026-09-27).
+  const denied = await requireWriteAuth(req);
+  if (denied) return denied;
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
@@ -267,7 +272,7 @@ async function processExtraction(imageId: string, vehicleId: string | null, extr
   const forensicResp = await fetch(forensicUrl, {
     method: "POST",
     headers: {
-      Authorization: `Bearer ${Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")}`,
+      Authorization: `Bearer ${projectSecretKey()}`,
       "Content-Type": "application/json",
     },
     body: JSON.stringify({

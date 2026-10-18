@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
 import ForgotPasswordForm from '../auth/ForgotPasswordForm';
+import { friendlyAuthError } from './friendlyAuthError';
 import '../../styles/unified-design-system.css';
 
 const Login = () => {
@@ -157,7 +158,9 @@ const Login = () => {
         }
       }
     } catch (err: any) {
-      setError(err.message || 'An error occurred during authentication');
+      setError(authMethod === 'phone'
+        ? friendlyAuthError(err?.message)
+        : err.message || 'An error occurred during authentication');
     } finally {
       setLoading(false);
     }
@@ -248,7 +251,7 @@ const Login = () => {
             {/* Header */}
             <div style={{ textAlign: 'center', marginBottom: '32px' }}>
               <h1 className="heading-1" style={{ marginBottom: '8px' }}>Nuke</h1>
-              <p className="text text-muted">Vehicle Provenance Engine</p>
+              <p className="text text-muted">An observational ledger for physical assets</p>
             </div>
 
             {/* Sign in / Sign up toggle */}

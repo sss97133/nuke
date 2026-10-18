@@ -1,3 +1,4 @@
+import { ProfileService } from '../../services/profileService';
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
 import rbacService from '../../services/rbacService';
@@ -130,11 +131,7 @@ const RoleRequestWorkflow: React.FC<RoleRequestWorkflowProps> = ({
 
   const loadUserProfile = async () => {
     try {
-      const { data } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('id', userId)
-        .single();
+      const { data } = await ProfileService.getProfileRecord(userId);
       setUserProfile(data);
     } catch (error) {
       console.error('Error loading user profile:', error);

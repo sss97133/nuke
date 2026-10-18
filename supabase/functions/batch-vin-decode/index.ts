@@ -13,44 +13,17 @@
  * }
  */
 
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.117.3";
+import { requireWriteAuth, authenticateWriter } from "../_shared/writeGuard.ts";
+import { drainRetainedReferenceQueue } from "./retainedReferenceQueue.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-// NHTSA field mapping: NHTSA variable name -> our column
-const NHTSA_FIELD_MAP: Record<string, { col: string; transform?: (v: string) => any }> = {
-  "Make": { col: "make" },
-  "Model": { col: "model" },
-  "Model Year": { col: "year", transform: (v) => parseInt(v) || null },
-  "Body Class": { col: "body_style" },
-  "Drive Type": { col: "drivetrain", transform: normalizeDrivetrain },
-  "Transmission Style": { col: "transmission_type" },
-  "Transmission Speeds": { col: "transmission_speeds", transform: (v) => parseInt(v) || null },
-  "Engine Number of Cylinders": { col: "engine_type", transform: (v) => `${v}-Cylinder` },
-  "Displacement (L)": { col: "engine_liters", transform: (v) => parseFloat(v) || null },
-  "Displacement (CC)": { col: "engine_displacement", transform: (v) => `${v}cc` },
-  "Engine Brake (hp) From": { col: "horsepower", transform: (v) => parseInt(v) || null },
-  "Fuel Type - Primary": { col: "fuel_type" },
-  "Doors": { col: "doors", transform: (v) => parseInt(v) || null },
-  "Seat Belts (Seats)": { col: "seats", transform: (v) => parseInt(v) || null },
-  "Gross Vehicle Weight Rating From": { col: "weight_lbs", transform: (v) => Math.round(parseFloat(v) * 2.20462) || null }, // kg to lbs
-  "Wheel Base (inches) From": { col: "wheelbase_inches", transform: (v) => parseFloat(v) || null },
-  "Trim": { col: "trim" },
-  "Series": { col: "series" },
-  "Plant City": { col: "location" },
-};
-
-function normalizeDrivetrain(v: string): string | null {
-  const lower = v.toLowerCase();
-  if (lower.includes("4x4") || lower.includes("4wd") || lower.includes("four wheel")) return "4WD";
-  if (lower.includes("awd") || lower.includes("all wheel") || lower.includes("all-wheel")) return "AWD";
-  if (lower.includes("fwd") || lower.includes("front wheel") || lower.includes("front-wheel")) return "FWD";
-  if (lower.includes("rwd") || lower.includes("rear wheel") || lower.includes("rear-wheel")) return "RWD";
-  return v;
-}
+import { NHTSA_FIELD_MAP, decodeVinsBatch } from "../_shared/nhtsa-vin.ts";
+import { projectSecretKey } from "../_shared/supabaseKeys.ts";
 
 interface VinDecodeResult {
   vin: string;
@@ -60,43 +33,10 @@ interface VinDecodeResult {
   nhtsa_error?: string;
 }
 
-async function decodeVinsBatch(vins: string[]): Promise<Map<string, Record<string, string>>> {
-  // NHTSA Batch Decode: POST with semicolon-separated VINs
-  const url = "https://vpic.nhtsa.dot.gov/api/vehicles/DecodeVINValuesBatch/";
-  const body = new URLSearchParams();
-  body.append("format", "json");
-  body.append("data", vins.join(";"));
-
-  const resp = await fetch(url, {
-    method: "POST",
-    headers: { "Content-Type": "application/x-www-form-urlencoded" },
-    body: body.toString(),
-    signal: AbortSignal.timeout(30000),
-  });
-
-  if (!resp.ok) throw new Error(`NHTSA API returned ${resp.status}`);
-
-  const data = await resp.json();
-  const results = new Map<string, Record<string, string>>();
-
-  for (const item of data?.Results ?? []) {
-    const vin = item.VIN;
-    if (!vin) continue;
-
-    const fields: Record<string, string> = {};
-    for (const [nhtsaKey, mapping] of Object.entries(NHTSA_FIELD_MAP)) {
-      const val = item[nhtsaKey];
-      if (val && val !== "" && val !== "Not Applicable" && val !== "0" && val !== "0.0") {
-        fields[nhtsaKey] = val;
-      }
-    }
-    results.set(vin, fields);
-  }
-
-  return results;
-}
-
 Deno.serve(async (req) => {
+  // Writes are never anonymous: service key, signed-in user, or nothing (P0.2, 2026-09-27).
+  const denied = await requireWriteAuth(req);
+  if (denied) return denied;
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
   }
@@ -106,10 +46,17 @@ Deno.serve(async (req) => {
   try {
     const supabase = createClient(
       Deno.env.get("SUPABASE_URL") ?? "",
-      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "",
+      projectSecretKey() ?? "",
     );
 
     const body = req.method === "POST" ? await req.json().catch(() => ({})) : {};
+    if (body.use_retained_reference_queue !== undefined) {
+      const writer = await authenticateWriter(req);
+      if (!writer.ok || writer.caller.kind !== "service_role") {
+        return okJson({ error: "Retained reference queue requires service role" }, 403);
+      }
+      return await drainRetainedReferenceQueue(supabase, body);
+    }
     const batchSize = Math.min(Math.max(Number(body.batch_size) || 50, 1), 500);
     const dryRun = body.dry_run === true;
     const sourceFilter = body.source_filter || null;
@@ -120,7 +67,7 @@ Deno.serve(async (req) => {
     // Find vehicles with VINs but missing factory specs using PostgREST
     let query = supabase
       .from("vehicles")
-      .select("id, vin, year, make, model, horsepower, engine_type, engine_liters, drivetrain, body_style, fuel_type, doors, seats, weight_lbs, trim, series, transmission_type, transmission_speeds, wheelbase_inches")
+      .select("id, vin, year, make, model, horsepower, engine_type, engine_liters, engine_displacement, drivetrain, body_style, fuel_type, doors, seats, weight_lbs, trim, series, transmission_type, transmission_speeds, wheelbase_inches")
       .not("vin", "is", null)
       .is("deleted_at", null)
       .or("horsepower.is.null,engine_type.is.null,drivetrain.is.null,body_style.is.null,fuel_type.is.null,doors.is.null")

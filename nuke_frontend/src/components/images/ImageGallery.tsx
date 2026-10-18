@@ -132,9 +132,10 @@ const rehydrateGalleryRows = (rows: any[]): any[] =>
     };
   });
 
-const fetchGalleryImages = async (vehicleId: string): Promise<any[]> =>
+type LoadCoverage = { loaded: number; total: number };
+const fetchGalleryImages = async (vehicleId: string, onLoadCoverage?: (coverage: LoadCoverage) => void): Promise<any[]> =>
   rehydrateGalleryRows(
-    await fetchVehicleImages<any>(vehicleId, GALLERY_IMAGE_SELECT, { includeMismatchFilter: true }),
+    await fetchVehicleImages<any>(vehicleId, GALLERY_IMAGE_SELECT, { includeMismatchFilter: true, onLoadCoverage }),
   );
 const UNKNOWN_DEVICE_FINGERPRINT = 'Unknown-Unknown-Unknown-Unknown';
 
@@ -185,13 +186,15 @@ const getOptimalImageUrl = (image: any, size: 'thumbnail' | 'medium' | 'large' |
     const variant = image.variants[size];
     if (variant) return variant;
     
-    // Fallback order: try other sizes in order of preference
+    // Fallback order: try other sizes in order of preference. An empty variants object ({} on every
+    // iPhoto, archive and upload row) must not short-circuit to the original: a 241 px tile loading a
+    // 3024x4032 original made one profile view 198 MB (measured 2026-10-13). Transform instead.
     if (size === 'thumbnail') {
-      return image.variants.thumbnail || image.variants.medium || image.thumbnail_url || image.image_url;
+      return image.variants.thumbnail || image.variants.medium || image.thumbnail_url || supabaseTransformUrl(image.image_url, 200);
     } else if (size === 'medium') {
-      return image.variants.medium || image.variants.large || image.variants.thumbnail || image.medium_url || image.image_url;
+      return image.variants.medium || image.variants.large || image.variants.thumbnail || image.medium_url || supabaseTransformUrl(image.image_url, 800);
     } else if (size === 'large') {
-      return image.variants.large || image.variants.full || image.variants.medium || image.large_url || image.image_url;
+      return image.variants.large || image.variants.full || image.variants.medium || image.large_url || supabaseTransformUrl(image.image_url, 1600);
     }
   }
   
@@ -358,6 +361,13 @@ const ImageGallery = ({
   onAddToSetRequested
 }: ImageGalleryProps) => {
   const [allImages, setAllImages] = useState<any[]>([]);
+  // How much of what the database admits actually loaded (fetchVehicleImages reports it). The count
+  // label says "n of N" only when a cap or the deadline left rows behind; what loaded is never the whole.
+  const [loadCoverage, setLoadCoverage] = useState<LoadCoverage | null>(null);
+  const partialLoad = !!loadCoverage && loadCoverage.total > loadCoverage.loaded;
+  const countLabel = (shown: number, noun: string) =>
+    partialLoad ? `${shown} of ${loadCoverage!.total.toLocaleString('en-US')} ${noun}` : `${shown} ${noun}`;
+  const countTitle = partialLoad ? `${loadCoverage!.loaded.toLocaleString('en-US')} of ${loadCoverage!.total.toLocaleString('en-US')} admitted images loaded before the time budget` : undefined;
   const [displayedImages, setDisplayedImages] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   // Dedup user_tools loads across auth-state churn (Supabase fires INITIAL_SESSION on subscribe).
@@ -365,7 +375,7 @@ const ImageGallery = ({
   const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [lightboxOpen, setLightboxOpen] = useState(false);
-  const [currentImageIndex, setCurrentImageIndex] = useState(0);
+  const [currentImageId, setCurrentImageId] = useState<string | null>(null);
   const [viewModeInternal, setViewModeInternal] = useState<'zones' | 'grid' | 'masonry' | 'list' | 'bundles'>('zones');
   // When parent passes galleryView, derive viewMode; otherwise use internal state
   const viewMode = galleryView != null ? galleryViewToViewMode(galleryView) : viewModeInternal;
@@ -446,6 +456,8 @@ const ImageGallery = ({
     setAllImages([]);
     setDisplayedImages([]);
     setShowImages(false);
+    setLightboxOpen(false);
+    setCurrentImageId(null);
     setUsingFallback(false);
     setError(null);
     setLoading(true);
@@ -498,7 +510,7 @@ const ImageGallery = ({
     setDisplayedImages(sorted.slice(0, Math.max(imagesPerPage, 50)));
     if (sorted.length > 0) setShowImages(true);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [galleryFilter]);
+  }, [galleryFilter, allImages]);
 
   useEffect(() => {
     let cancelled = false;
@@ -1111,9 +1123,11 @@ const ImageGallery = ({
   // Cap how many images we render at once to avoid 1000+ broken/slow grids (infinite scroll loads more).
   const MAX_INITIAL_DISPLAY = 200;
 
-  // When vehicle meta arrives, re-filter any already-loaded images so the UI doesn't briefly show
-  // unrelated BaT homepage / other-lot images for bat_import vehicles.
+  // Legacy URL fallbacks still need scrape-noise heuristics. Real image rows
+  // already passed vehicle_image_gallery_eligible in fetchGalleryImages; a
+  // filename or date bucket must not override that database admission.
   useEffect(() => {
+    if (!usingFallback) return;
     if (!vehicleMeta) return;
     if (!allImages || allImages.length === 0) return;
     const nextAll = applyBatCanonicalOverlay(filterBatNoiseRows(allImages), vehicleMeta);
@@ -1123,7 +1137,7 @@ const ImageGallery = ({
     setDisplayedImages(sorted.slice(0, MAX_INITIAL_DISPLAY));
     setAutoLoad(true);
     // Do not toggle usingFallback here; we only filter the current view.
-  }, [vehicleMeta, applySourceFilter]); // intentionally not depending on allImages to avoid loops
+  }, [vehicleMeta, applySourceFilter, usingFallback]); // intentionally not depending on allImages to avoid loops
 
   const isUuid = (v: string) => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(v);
   const normalizeFallbackUrls = (urls: string[]) => {
@@ -1197,9 +1211,9 @@ const ImageGallery = ({
       }
 
       // Refresh DB-backed gallery view immediately
-      const refreshed = await fetchGalleryImages(vehicleId);
+      const refreshed = await fetchGalleryImages(vehicleId, setLoadCoverage);
 
-      const images = filterBatNoiseRows(dedupeFetchedImages(refreshed || []));
+      const images = dedupeFetchedImages(refreshed || []);
       setUsingFallback(false);
       setAllImages(images);
       const sorted = sortRows(applySourceFilter(images), sortBy);
@@ -1707,8 +1721,17 @@ const ImageGallery = ({
 
   // Infinite scroll observer
   useEffect(() => {
-    if (!infiniteScrollEnabled || !sentinelRef.current || !showImages) return;
+    if (loading || !infiniteScrollEnabled || !sentinelRef.current || !showImages) return;
     if (displayedImages.length >= galleryFilteredImages.length) return; // All images already loaded
+
+    // Vehicle profiles scroll inside a column. Watching the window can leave
+    // its sentinel clipped even when that column has reached its bottom.
+    let scrollRoot: HTMLElement | null = sentinelRef.current.parentElement;
+    while (scrollRoot && scrollRoot !== document.body && scrollRoot !== document.documentElement) {
+      if (/(auto|scroll|overlay)/.test(window.getComputedStyle(scrollRoot).overflowY)) break;
+      scrollRoot = scrollRoot.parentElement;
+    }
+    if (scrollRoot === document.body || scrollRoot === document.documentElement) scrollRoot = null;
 
     const observer = new IntersectionObserver(
       (entries) => {
@@ -1717,12 +1740,12 @@ const ImageGallery = ({
           loadMoreImages();
         }
       },
-      { threshold: 0.1, rootMargin: '100px' }
+      { root: scrollRoot, threshold: 0.1, rootMargin: '100px' }
     );
 
     observer.observe(sentinelRef.current);
     return () => observer.disconnect();
-  }, [infiniteScrollEnabled, loadingMore, displayedImages.length, galleryFilteredImages.length, showImages, loadMoreImages]);
+  }, [loading, infiniteScrollEnabled, loadingMore, displayedImages.length, galleryFilteredImages.length, showImages, viewMode, loadMoreImages]);
 
   // Check authentication and permissions
   useEffect(() => {
@@ -1831,7 +1854,7 @@ const ImageGallery = ({
 
         // Fetch images and duplicate count in parallel
         const [rawImages, dupCountResult] = await Promise.all([
-          fetchGalleryImages(vehicleId),
+          fetchGalleryImages(vehicleId, setLoadCoverage),
           // Count duplicates filtered out (for "dupes removed" display)
           supabase
             .from('vehicle_images')
@@ -1844,7 +1867,7 @@ const ImageGallery = ({
         setDuplicateCount(dupCountResult.count || 0);
         const deduped = dedupeFetchedImages(rawImages || []);
         const cleaned = applyQuarantinePolicy(deduped);
-        const images = applyBatCanonicalOverlay(filterBatNoiseRows(cleaned, meta), meta);
+        const images = cleaned;
 
         // If DB is empty, show fallback URLs (scraped listing images) to avoid empty profiles.
         const fallback = normalizeFallbackUrls(fallbackImageUrls);
@@ -1914,12 +1937,12 @@ const ImageGallery = ({
         setTimeout(async () => {
           try {
             console.log(`Refresh attempt ${index + 1}/${refreshAttempts.length} after ${delay}ms...`);
-            const refreshedImages = await fetchGalleryImages(vehicleId);
+            const refreshedImages = await fetchGalleryImages(vehicleId, setLoadCoverage);
 
             if (refreshedImages) {
               const refreshedDeduped = dedupeFetchedImages(refreshedImages || []);
               const refreshedCleaned = applyQuarantinePolicy(refreshedDeduped);
-              const refreshedFiltered = applyBatCanonicalOverlay(filterBatNoiseRows(refreshedCleaned), vehicleMeta);
+              const refreshedFiltered = refreshedCleaned;
               // Check if the specific image was updated
               const updatedImage = refreshedFiltered.find(img => img.id === imageId) || (refreshedImages || []).find((img: any) => img.id === imageId);
               if (updatedImage) {
@@ -2131,7 +2154,7 @@ const ImageGallery = ({
 
       const refreshedDeduped = dedupeFetchedImages(refreshedImages || []);
       const refreshedCleaned = applyQuarantinePolicy(refreshedDeduped);
-      const refreshedFiltered = applyBatCanonicalOverlay(filterBatNoiseRows(refreshedCleaned), vehicleMeta);
+      const refreshedFiltered = refreshedCleaned;
       setAllImages(refreshedFiltered);
       
       // Always show images after upload and refresh the display
@@ -2181,37 +2204,31 @@ const ImageGallery = ({
     }
   };
 
-  const openLightbox = (index: number) => {
-    setCurrentImageIndex(index);
+  // Thumbnail paging must not limit the viewer's navigation. Keep selection by
+  // identity so appending or sorting thumbnails cannot change the open photo.
+  const lightboxImages = getSortedImages();
+  const currentImageIndex = lightboxImages.findIndex(image => String(image.id) === currentImageId);
+  const openLightboxById = (imageId: string) => {
+    if (!lightboxImages.some(image => String(image.id) === imageId)) return;
+    setCurrentImageId(imageId);
     setLightboxOpen(true);
-
-    // Load tags for the current image
-    const image = displayedImages[index];
-    if (image?.id) {
-      loadImageTags(image.id);
-    }
+    loadImageTags(imageId);
+  };
+  const openLightbox = (index: number) => {
+    const imageId = displayedImages[index]?.id;
+    if (imageId) openLightboxById(String(imageId));
   };
 
   const nextImage = () => {
-    const newIndex = (currentImageIndex + 1) % displayedImages.length;
-    setCurrentImageIndex(newIndex);
-
-    // Load tags for the new image
-    const image = displayedImages[newIndex];
-    if (image?.id) {
-      loadImageTags(image.id);
-    }
+    if (!lightboxImages.length) return;
+    const image = lightboxImages[(currentImageIndex + 1) % lightboxImages.length];
+    openLightboxById(String(image.id));
   };
 
   const previousImage = () => {
-    const newIndex = (currentImageIndex - 1 + displayedImages.length) % displayedImages.length;
-    setCurrentImageIndex(newIndex);
-
-    // Load tags for the new image
-    const image = displayedImages[newIndex];
-    if (image?.id) {
-      loadImageTags(image.id);
-    }
+    if (!lightboxImages.length) return;
+    const image = lightboxImages[(currentImageIndex - 1 + lightboxImages.length) % lightboxImages.length];
+    openLightboxById(String(image.id));
   };
 
   const getDisplayDate = (image: any) => {
@@ -2306,12 +2323,12 @@ const ImageGallery = ({
     try {
       const { data, error } = await supabase
         .from('profiles')
-        .select('id, username, email')
+        .select('id, username, full_name')
         .in('id', ids);
       if (error) return;
       const byId: Record<string, string> = {};
       (data || []).forEach((p: any) => {
-        byId[p.id] = p.username || (p.email ? p.email.split('@')[0] : 'user');
+        byId[p.id] = p.username || p.full_name || 'user';
       });
       setImageUploaderNames(prev => ({ ...prev, ...byId }));
     } catch (e) {
@@ -2639,7 +2656,7 @@ const ImageGallery = ({
     );
   }
 
-  const currentImage = displayedImages[currentImageIndex];
+  const currentImage = lightboxImages[currentImageIndex];
   const lightboxImageId = currentImage && String((currentImage as any).__external) === 'true' ? undefined : (isUuid(String(currentImage?.id || '')) ? String(currentImage.id) : undefined);
 
   return (
@@ -2858,7 +2875,7 @@ const ImageGallery = ({
         };
 
         const parts: React.ReactNode[] = [];
-        parts.push(<span key="count">{totalCount} photos</span>);
+        parts.push(<span key="count" title={countTitle}>{countLabel(totalCount, 'photos')}</span>);
         if (duplicateCount > 0) {
           parts.push(
             <span key="dupes" style={{ color: 'var(--text-muted)', opacity: 0.7 }}>
@@ -2939,7 +2956,7 @@ const ImageGallery = ({
             flexShrink: 0,
             marginRight: 'auto'
           }}>
-            {allImages.length} {allImages.length === 1 ? 'image' : 'images'}
+            <span title={countTitle}>{countLabel(allImages.length, allImages.length === 1 ? 'image' : 'images')}</span>
           </span>
 
           {/* View Mode — hidden when parent controls via galleryView (e.g. vehicle profile toolbar) */}
@@ -3349,14 +3366,6 @@ const ImageGallery = ({
               </>
             );
           })()}
-          {/* Infinite scroll sentinel */}
-          {displayedImages.length < allImages.length && (
-            <div ref={sentinelRef} style={{ height: '40px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              {loadingMore && (
-                <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Loading more...</span>
-              )}
-            </div>
-          )}
         </div>
       )}
 
@@ -3954,19 +3963,6 @@ const ImageGallery = ({
         </div>
       )}
 
-      {/* Load More - Infinite Scroll */}
-      {showImages && displayedImages.length < allImages.length && (
-        <div className="card-body" style={{ textAlign: 'center', padding: 'var(--space-2)' }}>
-          {loadingMore && (
-            <div style={{ padding: 'var(--space-2)', color: 'var(--text-muted)', fontSize: '11px' }}>
-              Loading more images...
-            </div>
-          )}
-          {/* Infinite scroll sentinel */}
-          <div ref={sentinelRef} style={{ height: '1px' }} />
-        </div>
-      )}
-
       {/* Full View - Single column, full width images */}
       {viewMode === 'masonry' && showImages && (
         <div>
@@ -4296,10 +4292,7 @@ const ImageGallery = ({
                           key={imgId}
                           src={getOptimalImageUrl(img, 'thumbnail')}
                           style={{ width: '100%', aspectRatio: '1', objectFit: 'cover', cursor: 'pointer' }}
-                          onClick={() => {
-                            const globalIdx = allImages.findIndex(i => i.id === imgId);
-                            if (globalIdx >= 0) openLightbox(globalIdx);
-                          }}
+                          onClick={() => openLightboxById(String(imgId))}
                           loading="lazy"
                         />
                       );
@@ -4357,7 +4350,7 @@ const ImageGallery = ({
                       return (
                         <img key={imgId} src={getOptimalImageUrl(img, 'thumbnail')}
                           style={{ width: '100%', aspectRatio: '1', objectFit: 'cover', cursor: 'pointer' }}
-                          onClick={() => { const gi = allImages.findIndex(i => i.id === imgId); if (gi >= 0) openLightbox(gi); }}
+                          onClick={() => openLightboxById(String(imgId))}
                           loading="lazy" />
                       );
                     })}
@@ -4369,6 +4362,18 @@ const ImageGallery = ({
         </div>
       )}
 
+      {/* One sentinel after every gallery view, including FULL and INFO. */}
+      {showImages && displayedImages.length < galleryFilteredImages.length && (
+        <div className="card-body" style={{ textAlign: 'center', padding: 'var(--space-2)' }}>
+          {loadingMore && (
+            <div style={{ padding: 'var(--space-2)', color: 'var(--text-muted)', fontSize: '11px' }}>
+              Loading more images...
+            </div>
+          )}
+          <div ref={sentinelRef} data-gallery-load-more="true" style={{ height: '1px' }} />
+        </div>
+      )}
+
       {/* Image Lightbox - Using proper ImageLightbox component with tags */}
       {lightboxOpen && currentImage && (
         <ImageLightbox
@@ -4377,10 +4382,10 @@ const ImageGallery = ({
           vehicleId={vehicleId}
           isOpen={lightboxOpen}
           onClose={() => setLightboxOpen(false)}
-          onNext={displayedImages.length > 1 ? nextImage : undefined}
-          onPrev={displayedImages.length > 1 ? previousImage : undefined}
+          onNext={lightboxImages.length > 1 ? nextImage : undefined}
+          onPrev={lightboxImages.length > 1 ? previousImage : undefined}
           canEdit={canCreateTags && !usingFallback}
-          title={`${currentImageIndex + 1} of ${displayedImages.length}`}
+          title={`${currentImageIndex + 1} of ${lightboxImages.length}`}
           description={getDisplayDate(currentImage)}
           imageDisplayName={getImageDisplayName(currentImage)}
           imageRecord={currentImage}

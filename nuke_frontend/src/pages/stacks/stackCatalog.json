@@ -1,0 +1,392 @@
+[
+  {
+    "id": "S01",
+    "name": "County performance surface per model",
+    "question": "Per model, which counties sell above their cohort baseline, and how often and how fast do lots there sell?",
+    "family": "geography"
+  },
+  {
+    "id": "S02",
+    "name": "Flip ledger and arbitrage corridors",
+    "question": "When one vehicle is bought and resold, across which platforms, places and seasons, with what hold time, spread and fees?",
+    "family": "economics"
+  },
+  {
+    "id": "S03",
+    "name": "Bidder record as of a date",
+    "question": "As of a date, what is each bidder's record, and how does who is bidding now change the chance that the reserve is met?",
+    "family": "people"
+  },
+  {
+    "id": "S04",
+    "name": "Seller trust and its price",
+    "question": "As of a date, how far can a seller be trusted, and what premium or discount does that trust realize?",
+    "family": "people"
+  },
+  {
+    "id": "S05",
+    "name": "Crowd disclosure gap",
+    "question": "What did the crowd flag on a lot that the seller did not state, and how much of the price residual does it explain?",
+    "family": "information"
+  },
+  {
+    "id": "S06",
+    "name": "Cohort-relative condition from photos",
+    "question": "Zone by zone, where does a vehicle's photographed condition sit in its cohort, and what is each zone worth?",
+    "family": "asset"
+  },
+  {
+    "id": "S07",
+    "name": "Hidden-defect prior",
+    "question": "Given its model's failure modes and its own repair evidence, what is likely to fail on a vehicle, and which inspection is worth paying for?",
+    "family": "asset"
+  },
+  {
+    "id": "S08",
+    "name": "Odometer honesty",
+    "question": "Do a vehicle's mileage readings agree across sources and over time?",
+    "family": "information"
+  },
+  {
+    "id": "S09",
+    "name": "Shill and ring detection",
+    "question": "Which lots carry bidding patterns that look coordinated, and how much should that discount their prices?",
+    "family": "bidding"
+  },
+  {
+    "id": "S10",
+    "name": "Liquidity surface",
+    "question": "Per cohort and county, how likely is a listing to sell within N days at a given price-to-estimate ratio?",
+    "family": "economics"
+  },
+  {
+    "id": "S11",
+    "name": "Buyer migration maps",
+    "question": "Per cohort, where do winners live relative to sellers, and which platform reaches which region?",
+    "family": "geography"
+  },
+  {
+    "id": "S12",
+    "name": "Dimensions as evidence, not lists",
+    "question": "Can a cohort be filtered by generation, body style, engine, paint and color family as keyed values with a denominator?",
+    "family": "asset"
+  },
+  {
+    "id": "S13",
+    "name": "Where to set up shop",
+    "question": "Which county best combines supply, demand, flip margin and buyer proximity against the cost of operating there?",
+    "family": "geography"
+  },
+  {
+    "id": "S14",
+    "name": "Option and color premiums",
+    "question": "Per cohort and as of a date, what premium does each option and color carry, and with what confidence?",
+    "family": "asset"
+  },
+  {
+    "id": "S15",
+    "name": "Build ROI",
+    "question": "What has each build decision cost over time, against what the cohort pays for the result?",
+    "family": "economics"
+  },
+  {
+    "id": "S16",
+    "name": "Provenance depth and exposure history",
+    "question": "How long and complete is a vehicle's chain of ownership, where has it lived, and what is that worth?",
+    "family": "asset"
+  },
+  {
+    "id": "S17",
+    "name": "Shop and dealer performance",
+    "question": "Which shops and dealers touch vehicles that hold their value afterwards?",
+    "family": "people"
+  },
+  {
+    "id": "S18",
+    "name": "Seasonality and macro per cohort",
+    "question": "Per cohort, how do dated residuals move with season, the auction calendar and macro conditions?",
+    "family": "economics"
+  },
+  {
+    "id": "S19",
+    "name": "Claims ledger from text",
+    "question": "Which claims were made about a vehicle, by whom, with what trust, and which were disputed?",
+    "family": "information"
+  },
+  {
+    "id": "S20",
+    "name": "The machine's own health as data",
+    "question": "Which pipeline decays next, and which repair helps the most downstream readers and features?",
+    "family": "machine"
+  },
+  {
+    "id": "S21",
+    "name": "Bid hazard model",
+    "question": "On a live lot, what is the chance of a next bid within each interval?",
+    "family": "bidding"
+  },
+  {
+    "id": "S22",
+    "name": "Snipe cascades and rivalry pairs",
+    "question": "How do late bids chain into extensions, and which bidder pairs keep meeting?",
+    "family": "bidding"
+  },
+  {
+    "id": "S23",
+    "name": "Reserve inference",
+    "question": "What reserve does a lot's bidding and outcome imply?",
+    "family": "bidding"
+  },
+  {
+    "id": "S24",
+    "name": "Demand nowcast with calibrated intervals",
+    "question": "How much demand does a lot or cohort have right now, with intervals that hold their stated coverage?",
+    "family": "bidding"
+  },
+  {
+    "id": "S25",
+    "name": "Attention saturation",
+    "question": "When comparable lots close at once across venues, do bids and prices thin out?",
+    "family": "bidding"
+  },
+  {
+    "id": "S26",
+    "name": "Catalogue position effects",
+    "question": "Does a lot's position in its auction's catalogue move its price?",
+    "family": "bidding"
+  },
+  {
+    "id": "S27",
+    "name": "Corrosion exposure prior",
+    "question": "Given where a vehicle has lived and the climate there, how likely is corrosion, zone by zone?",
+    "family": "asset"
+  },
+  {
+    "id": "S28",
+    "name": "Use profile from odometer curves",
+    "question": "How has a vehicle been used, from its mileage over time and its receipts?",
+    "family": "asset"
+  },
+  {
+    "id": "S29",
+    "name": "Survival by production",
+    "question": "Of each configuration built, how many survive, and how does that rarity price?",
+    "family": "asset"
+  },
+  {
+    "id": "S30",
+    "name": "Factory batch effects",
+    "question": "Do vehicles built in the same batch or sequence share defects or premiums?",
+    "family": "asset"
+  },
+  {
+    "id": "S31",
+    "name": "Modification recipes and outcomes",
+    "question": "Which combinations of modifications raise or lower a vehicle's outcome?",
+    "family": "asset"
+  },
+  {
+    "id": "S32",
+    "name": "Documentation premium",
+    "question": "What is documentation worth, by kind of document?",
+    "family": "asset"
+  },
+  {
+    "id": "S33",
+    "name": "Title brand arbitrage",
+    "question": "Where do branded titles price differently across states and venues?",
+    "family": "asset"
+  },
+  {
+    "id": "S34",
+    "name": "Information half-life",
+    "question": "How long does new information about a vehicle keep moving its price?",
+    "family": "information"
+  },
+  {
+    "id": "S35",
+    "name": "Disclosure drift",
+    "question": "How does a listing's description change over its life, and does the change predict the outcome?",
+    "family": "information"
+  },
+  {
+    "id": "S36",
+    "name": "Expertise graph",
+    "question": "Who knows what about which models, by the record of what they wrote?",
+    "family": "information"
+  },
+  {
+    "id": "S37",
+    "name": "Photographer fingerprints and image reuse",
+    "question": "Which images are reused across listings, and who took them?",
+    "family": "information"
+  },
+  {
+    "id": "S38",
+    "name": "Event impact studies",
+    "question": "How do outside events move the prices of the cohorts they touch?",
+    "family": "information"
+  },
+  {
+    "id": "S39",
+    "name": "Inconsistency graphs",
+    "question": "Where do a vehicle's records contradict one another?",
+    "family": "information"
+  },
+  {
+    "id": "S40",
+    "name": "Delivered-price surface",
+    "question": "What does a vehicle cost delivered to a given place?",
+    "family": "geography"
+  },
+  {
+    "id": "S41",
+    "name": "Tax and rule geography",
+    "question": "How do taxes and rules by jurisdiction change the cost of owning and selling?",
+    "family": "geography"
+  },
+  {
+    "id": "S42",
+    "name": "Regional taste maps",
+    "question": "Which colors, options and body styles does each region prefer?",
+    "family": "geography"
+  },
+  {
+    "id": "S43",
+    "name": "Demographic overlays",
+    "question": "How do population and income line up with where cohorts sell and for how much?",
+    "family": "geography"
+  },
+  {
+    "id": "S44",
+    "name": "Cohort migration",
+    "question": "How do cohorts move between states over time?",
+    "family": "geography"
+  },
+  {
+    "id": "S45",
+    "name": "Service capacity market",
+    "question": "Where is service capacity short or idle, and at what price?",
+    "family": "geography"
+  },
+  {
+    "id": "S46",
+    "name": "Unified dealer entity",
+    "question": "Which accounts across platforms are the same dealer?",
+    "family": "people"
+  },
+  {
+    "id": "S47",
+    "name": "Dealer markdown curves",
+    "question": "How do dealers mark down unsold inventory over time?",
+    "family": "people"
+  },
+  {
+    "id": "S48",
+    "name": "Tenure mix as stability",
+    "question": "Does a cohort's mix of short and long ownerships signal its stability?",
+    "family": "people"
+  },
+  {
+    "id": "S49",
+    "name": "Venue integrity index",
+    "question": "How clean is each venue, from its shill, disclosure and reserve signals?",
+    "family": "people"
+  },
+  {
+    "id": "S50",
+    "name": "Restorer lineage",
+    "question": "Which restorers' work holds value years later?",
+    "family": "people"
+  },
+  {
+    "id": "S51",
+    "name": "Rate and fuel betas",
+    "question": "How do interest rates and fuel prices move each cohort's prices?",
+    "family": "economics"
+  },
+  {
+    "id": "S52",
+    "name": "Carry-adjusted returns",
+    "question": "What does a flip return after the cost of carrying the vehicle?",
+    "family": "economics"
+  },
+  {
+    "id": "S53",
+    "name": "Guide lag",
+    "question": "How far do published price guides lag realized sales?",
+    "family": "economics"
+  },
+  {
+    "id": "S54",
+    "name": "Portfolio construction",
+    "question": "Which mix of cohorts balances return, liquidity and seasonality?",
+    "family": "economics"
+  },
+  {
+    "id": "S55",
+    "name": "Parts price indices",
+    "question": "How do parts prices move over time by part family?",
+    "family": "economics"
+  },
+  {
+    "id": "S56",
+    "name": "Venue design replays",
+    "question": "How would lots have closed under a different venue rule?",
+    "family": "counterfactuals"
+  },
+  {
+    "id": "S57",
+    "name": "Feature attribution by matched siblings",
+    "question": "What is one feature worth, measured between otherwise matched vehicles?",
+    "family": "counterfactuals"
+  },
+  {
+    "id": "S58",
+    "name": "What-if pricing for one VIN",
+    "question": "What would one VIN bring under a different listing, timing or build?",
+    "family": "counterfactuals"
+  },
+  {
+    "id": "S59",
+    "name": "Value of information",
+    "question": "Which single observation would most reduce a price's uncertainty, and what is it worth?",
+    "family": "machine"
+  },
+  {
+    "id": "S60",
+    "name": "Trust calibration",
+    "question": "How often do each source's claims prove true against outcomes?",
+    "family": "machine"
+  },
+  {
+    "id": "SA",
+    "name": "The auction as an order book",
+    "question": "From a live lot's bid and comment frames, what demand curve does it imply against its cohort, and where will the hammer land?",
+    "family": "bidding"
+  },
+  {
+    "id": "SB",
+    "name": "The car as a bond",
+    "question": "What will a vehicle cost to own, and what will it be worth after 1, 3 and 5 years, per county?",
+    "family": "economics"
+  },
+  {
+    "id": "SC",
+    "name": "Liquidity as an option",
+    "question": "Per cohort and venue, what discount sells a vehicle within 14 days, and how far is that from the patient price?",
+    "family": "economics"
+  },
+  {
+    "id": "SD",
+    "name": "Ownership as flow",
+    "question": "Per cohort and quarter, how do vehicles flow between counties, and where will supply thin next?",
+    "family": "geography"
+  },
+  {
+    "id": "S61",
+    "name": "Funding opportunity fit",
+    "question": "How far is the company from a given funding program's award, and which keys are missing?",
+    "family": "machine"
+  }
+]

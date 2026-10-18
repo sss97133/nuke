@@ -15,7 +15,7 @@ I can see it processing:
 ### Option 1: Watch the Processing Log (Most Detail)
 
 ```bash
-tail -f /Users/skylar/nuke/context-backfill.log
+tail -f ~/nuke/context-backfill.log
 ```
 
 **Shows:**
@@ -34,7 +34,7 @@ tail -f /Users/skylar/nuke/context-backfill.log
 ### Option 2: Quick Progress Check (Run Anytime)
 
 ```bash
-cd /Users/skylar/nuke && node scripts/check-progress.js
+cd ~/nuke && node scripts/check-progress.js
 ```
 
 **Shows:**
@@ -47,7 +47,7 @@ cd /Users/skylar/nuke && node scripts/check-progress.js
 ### Option 3: Auto-Refresh Loop (Hands-Free)
 
 ```bash
-cd /Users/skylar/nuke && ./scripts/watch-live.sh
+cd ~/nuke && ./scripts/watch-live.sh
 ```
 
 Refreshes every 5 seconds automatically.
@@ -58,7 +58,7 @@ Refreshes every 5 seconds automatically.
 
 **Run this now:**
 ```bash
-cd /Users/skylar/nuke && node scripts/check-progress.js
+cd ~/nuke && node scripts/check-progress.js
 ```
 
 **Should show:**
@@ -80,9 +80,9 @@ If empty → Finished or crashed
 
 **Check log is growing:**
 ```bash
-wc -l /Users/skylar/nuke/context-backfill.log
+wc -l ~/nuke/context-backfill.log
 # Wait 10 seconds
-wc -l /Users/skylar/nuke/context-backfill.log
+wc -l ~/nuke/context-backfill.log
 # Line count should increase
 ```
 
@@ -130,7 +130,7 @@ Routing Decision:
 **Just run this in a terminal and leave it open:**
 
 ```bash
-watch -n 5 'cd /Users/skylar/nuke && node scripts/check-progress.js'
+watch -n 5 'cd ~/nuke && node scripts/check-progress.js'
 ```
 
 Updates every 5 seconds, shows live progress bar.

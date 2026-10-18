@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <!-- Subscription RSI controller. 01:30 starts the local daily budget window; inexpensive
+       15-minute wake-ups resume unfinished work and inspect pending PR gates. Inference is capped
+       at 45 minutes TOTAL per window, not per wake-up. No merge/deploy/production-write authority.
+       State and receipts: ~/nuke-logs/night-run/. Unfinished worktrees are never force-pruned.
+       Repo copy is source of truth; install with launchctl bootout/bootstrap after validation. -->
+  <key>Label</key><string>ag.nuke.night-run</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>/bin/bash</string>
+    <string>-c</string>
+    <string>cd "$HOME/nuke" &amp;&amp; git fetch -q origin main &amp;&amp; git show origin/main:scripts/night-run/run.sh | /bin/bash -s</string>
+  </array>
+  <key>EnvironmentVariables</key>
+  <dict>
+    <key>PATH</key><string>/Users/skylar/.local/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin</string>
+  </dict>
+  <key>StartInterval</key><integer>900</integer>
+  <key>StartCalendarInterval</key>
+  <dict><key>Hour</key><integer>1</integer><key>Minute</key><integer>30</integer></dict>
+  <key>StandardOutPath</key><string>/Users/skylar/nuke-logs/night-run/launchd.log</string>
+  <key>StandardErrorPath</key><string>/Users/skylar/nuke-logs/night-run/launchd.log</string>
+</dict>
+</plist>

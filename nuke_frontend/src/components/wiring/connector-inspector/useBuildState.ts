@@ -1,9 +1,10 @@
 // connector-inspector/useBuildState.ts — build_state workflow map for the
 // BUILD skin. Reads vehicle_custom_circuits keyed on (overlay_id, circuit_code),
 // advances states optimistically, persists via the scoped client write path
-// (column-level GRANT UPDATE (build_state) — migration
-// 2026-06-11_custom_circuits_build_state_client_write.sql; receipt
-// docs/wiring/receipts/2026-06-10_connector-inspector-skins.md).
+// (column-level GRANT UPDATE (build_state) to authenticated; since migration
+// 20261014193000 only the vehicle's signed-in owner may write — anyone else's
+// write returns no row and the state reverts; receipt
+// docs/wiring/receipts/2026-10-14_build-state-owner-only.md).
 // build_state is mutable workflow state per WIRING_SUBSTRATE_V2_SPEC.md,
 // NOT testimony — this is the one column the browser may write.
 
@@ -62,6 +63,7 @@ export function useBuildState(vehicleId: string | undefined): BuildStateApi {
         .from('vehicle_custom_circuits')
         .select('circuit_code, build_state')
         .eq('overlay_id', ov.id)
+        .eq('is_superseded', false)          // live rows only; replaced rows keep their history
         .limit(1000);
       if (cancelled) return;
       const map: Record<string, BuildState> = {};
@@ -92,6 +94,7 @@ export function useBuildState(vehicleId: string | undefined): BuildStateApi {
           .update({ build_state: next })
           .eq('overlay_id', overlayId)
           .eq('circuit_code', circuitCode)
+          .eq('is_superseded', false)
           .select('circuit_code');
         if (error) failure = error.message;
         else if (!data || data.length === 0) failure = 'no DB row for this circuit (write blocked or not ingested)';

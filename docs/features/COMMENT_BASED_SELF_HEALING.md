@@ -139,7 +139,7 @@ Added automatic BAT URL detection for **existing comments** when the comments se
 ## Deployment
 
 ```bash
-cd /Users/skylar/nuke/nuke_frontend
+cd ~/nuke/nuke_frontend
 vercel --prod --force --yes
 ```
 
@@ -183,5 +183,5 @@ WHERE id = '3f1791fe-4fe2-4994-b6fe-b137ffa57370'
 - `nuke_frontend/src/components/VehicleComments.tsx` - Comment component with self-healing
 - `supabase/functions/scrape-vehicle/index.ts` - BAT scraping edge function
 - `docs/SELF_HEALING_WORKFLOW.md` - Original self-healing workflow docs
-- `docs/SELF_HEALING_IMPLEMENTATION.md` - Self-healing service implementation
+- `docs/archive/deployment/SELF_HEALING_IMPLEMENTATION.md` - Self-healing service implementation
 

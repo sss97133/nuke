@@ -18,9 +18,11 @@
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { corsHeaders } from '../_shared/cors.ts';
+import { requireOwnerOrService, requireWriteAuth } from '../_shared/writeGuard.ts';
+import { projectSecretKey } from "../_shared/supabaseKeys.ts";
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
-const SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+const SERVICE_ROLE_KEY = projectSecretKey()!;
 
 interface VendorResult {
   vendor: string;
@@ -164,7 +166,7 @@ async function checkFirecrawl(): Promise<VendorResult> {
   }
 
   try {
-    const res = await fetch('https://api.firecrawl.dev/v1/team/credits', {
+    const res = await fetch('https://api.firecrawl.dev/v1/team/credit-usage', {
       headers: { Authorization: `Bearer ${key}` },
     });
 
@@ -172,23 +174,12 @@ async function checkFirecrawl(): Promise<VendorResult> {
       return { vendor: 'Firecrawl', status: 'suspended', balance: null, note: 'Invalid API key', error: `HTTP ${res.status}` };
     }
     if (!res.ok) {
-      // Credits endpoint might not exist on all plans — just check auth
-      const pingRes = await fetch('https://api.firecrawl.dev/v1/scrape', {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${key}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ url: 'https://example.com', formats: [] }),
-      });
-      const authOk = pingRes.status !== 401 && pingRes.status !== 403;
-      return {
-        vendor: 'Firecrawl',
-        status: authOk ? 'active' : 'suspended',
-        balance: null,
-        note: authOk ? 'Auth OK — check dashboard for credit balance' : 'Invalid API key',
-      };
+      // Never fall back to a scrape to test the key: a scrape spends a credit, and this runs every 6 hours (found 2026-10-16).
+      return { vendor: 'Firecrawl', status: 'unknown', balance: null, note: `credit-usage returned HTTP ${res.status}`, error: `HTTP ${res.status}` };
     }
 
     const data = await res.json();
-    const credits = data.remaining_credits ?? data.credits ?? null;
+    const credits = data.data?.remaining_credits ?? data.remaining_credits ?? data.credits ?? null;
     const status = credits === null ? 'active' : credits <= 0 ? 'suspended' : credits < 100 ? 'degraded' : 'active';
 
     return {
@@ -206,6 +197,13 @@ async function checkFirecrawl(): Promise<VendorResult> {
 // Main
 // ---------------------------------------------------------------------------
 Deno.serve(async (req) => {
+  // Writes are never anonymous: service key, signed-in user, or nothing (P0.2, 2026-09-27).
+  const denied = await requireWriteAuth(req);
+  if (denied) return denied;
+  // Reads the platform's vendor balances and sends a probe email: the owner or the service key only, because "signed in" is anyone while
+  // sign-up is open (2026-09-29).
+  const notOwner = await requireOwnerOrService(req, { headers: corsHeaders });
+  if (notOwner) return notOwner;
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
 
   const supabase = createClient(SUPABASE_URL, SERVICE_ROLE_KEY);

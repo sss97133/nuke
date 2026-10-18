@@ -339,7 +339,7 @@ trickle-backfill-images, dedup-vehicle-images, validate-vehicle-image (contested
 
 ## 9. COMMS & BOTS
 
-**Live core:** four in-repo email/webhook fns on routed pages (agent-email, reply-email, send-invoice-email, webhooks-manage — registration-only, delivery is dead), the two notification tables the FE actually reads (user_notifications, admin_notifications), and the live **concierge system owned by a SEPARATE repo (/Users/skylar/lofficiel-concierge) deploying into the same Supabase project — never recreate concierge code in nuke**.
+**Live core:** four in-repo email/webhook fns on routed pages (agent-email, reply-email, send-invoice-email, webhooks-manage — registration-only, delivery is dead), the two notification tables the FE actually reads (user_notifications, admin_notifications), and the live **concierge system owned by a SEPARATE repo (~/lofficiel-concierge) deploying into the same Supabase project — never recreate concierge code in nuke**.
 **Dead shell:** nearly all of CODEBASE_MAP §9 — all Telegram fns, all 4 bots, all SMS/X/Instagram fns deleted Mar-2026, yet ~14 remain deployed as zombies. **send-transaction-sms is a zombie ON A LIVE PATH (BuyVehicleButton) — recover source before touching.** No COMMS asset is on any active cron.
 
 ### Canonical

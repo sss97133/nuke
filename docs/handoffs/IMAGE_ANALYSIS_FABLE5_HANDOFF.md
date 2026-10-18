@@ -5,7 +5,7 @@ Assembled 2026-07-01 (Opus 4.8 session). The prompt below was produced by a 7-ag
 critique caught and fixed two factual errors before they could burn a session.
 
 ## How to use this
-1. Open a fresh **Fable 5** session in `/Users/skylar/nuke`.
+1. Open a fresh **Fable 5** session in `~/nuke`.
 2. Paste everything under `=== HANDOFF PROMPT ===` below as the opening message.
 3. The **full session transcript** — the reasoning behind every decision this session — is at:
    `docs/handoffs/image-analysis-2026-07-01.transcript.jsonl` (10M, 894 turns, git-ignored).
@@ -29,7 +29,7 @@ You are Fable 5. From here on out you OWN Nuke's image-analysis organ: the backe
 ---
 
 ## MISSION
-Make the analysis organ (a) cheaper and self-terminating via saturation + model tiering, (b) land ENTITY confirmation (parts seen ↔ receipts bought) so worth becomes defensible, and (c) eventually reach the images it currently can't (10,203 orphans = 38%). You are the sole editor of the backend analysis pipeline (`scripts/deep-image-analysis-byok.mjs`, the byok cron chain, the sync RPC) on `feat/cohort-terminal` in `/Users/skylar/nuke`. Report coverage toward worth-proof on real builds — never raw row counts as "progress."
+Make the analysis organ (a) cheaper and self-terminating via saturation + model tiering, (b) land ENTITY confirmation (parts seen ↔ receipts bought) so worth becomes defensible, and (c) eventually reach the images it currently can't (10,203 orphans = 38%). You are the sole editor of the backend analysis pipeline (`scripts/deep-image-analysis-byok.mjs`, the byok cron chain, the sync RPC) on `feat/cohort-terminal` in `~/nuke`. Report coverage toward worth-proof on real builds — never raw row counts as "progress."
 
 ---
 
@@ -51,7 +51,7 @@ Hard doctrine (non-negotiable): supersede-never-overwrite testimony (no DELETE/i
 ---
 
 ## WHAT IS ALREADY BUILT (structure + status)
-All paths in `/Users/skylar/nuke` unless noted. **Line numbers below are APPROXIMATE — the file is actively git-modified and shifts. Before editing anything, re-grep by function name (`prepare`/`ingest`/`buildContext`/`queue`/`resolve`/`computeSaturation`/`isSaturatedRow`). Do not trust a line number blind.**
+All paths in `~/nuke` unless noted. **Line numbers below are APPROXIMATE — the file is actively git-modified and shifts. Before editing anything, re-grep by function name (`prepare`/`ingest`/`buildContext`/`queue`/`resolve`/`computeSaturation`/`isSaturatedRow`). Do not trust a line number blind.**
 
 **`scripts/deep-image-analysis-byok.mjs`** (900 lines — the extraction ledger, YOUR core file). It is a MULTI-COMMAND broker: `prepare`, `ingest`, `context` (buildContext), **`queue`, `resolve`** dispatched in `main()` (~`:895-898`). Do not treat `prepare` as the only entry point.
 - `SCHEMA_VERSIONS` registry (one entry: `byok_v3_camera_pose_2026-05-23`); `CURRENT_SCHEMA_VERSION`. **LIVE.**
@@ -73,7 +73,7 @@ All paths in `/Users/skylar/nuke` unless noted. **Line numbers below are APPROXI
 - **YOURS:** launchd `com.nuke.byok-image-analysis` (LOADED, confirmed via `launchctl list`, PID present) → `byok-fleet-batch.sh` → `byok-image-batch.sh` → `deep-image-analysis-byok.mjs`. Model default `MODEL="${BYOK_MODEL:-claude-opus-4-8}"` at `byok-image-batch.sh:156` (single var for the WHOLE run; comment at `:152` notes Sonnet is fast/accurate enough for the bulk drain).
 - **NOT yours, but touches the same table:** `.github/workflows/process-images.yml` runs **hourly** (`cron: '0 * * * *'`), executes `scripts/process-all-3000-images.js`, and writes `vehicle_images.ai_scan_metadata.appraiser`. This is a SECOND scheduler and a FOURTH co-tenant namespace. Any "pause my cron and observe" reasoning is wrong — this cloud cron keeps writing regardless. Confirm it doesn't collide with byok work.
 
-**`Sources/NukeCapture/LocalTagPush.swift`** (blur's worktree `/Users/skylar/.worktrees/foundation-ios/apps/nuke-capture-ios`) — reads `LocalStore.appearance`, POSTs to the sync RPC (reverse of runCloudBackfill). **WRITTEN-UNBUILT: zero call sites, no xcodebuild verification. This is blur's file to build/wire — NOT yours; you authored it, blur owns it going forward.** (The read side — `LocalStore.TagSyncRow` + `appearanceTagsForSync` — has already been moved into `LocalStore.swift:553/562` by blur; the seam is intact.)
+**`Sources/NukeCapture/LocalTagPush.swift`** (blur's worktree `~/.worktrees/foundation-ios/apps/nuke-capture-ios`) — reads `LocalStore.appearance`, POSTs to the sync RPC (reverse of runCloudBackfill). **WRITTEN-UNBUILT: zero call sites, no xcodebuild verification. This is blur's file to build/wire — NOT yours; you authored it, blur owns it going forward.** (The read side — `LocalStore.TagSyncRow` + `appearanceTagsForSync` — has already been moved into `LocalStore.swift:553/562` by blur; the seam is intact.)
 
 **"Unit-tested 10/10"** — the exported pure funcs have NO committed test file; the run was ad-hoc. If you want the claim reproducible, write the spec (extend, don't mint a framework).
 
@@ -140,7 +140,7 @@ Well-covered deep: Blazer ~81% / K2500 ~88% / Mustang ~88% — but only ~13% sat
 ---
 
 ## COORDINATION WITH PARALLEL SESSIONS
-**Topology (verified):** `/Users/skylar/.worktrees/foundation-ios` is a LINKED WORKTREE of the same nuke repo, branch `fable5/ignition-ios`; the iOS app is at `apps/nuke-capture-ios`. `/Users/skylar/nuke` is on `feat/cohort-terminal`. Both trees contain full copies of `supabase/migrations/` and `scripts/`. They share objects/branches but NOT working-tree state — an uncommitted file in one is invisible to the other (that's exactly why the sync migration is present in nuke but absent in foundation-ios). "Don't clobber" is a branch-and-working-tree discipline, not a filesystem one; the same path collides only at commit/merge.
+**Topology (verified):** `~/.worktrees/foundation-ios` is a LINKED WORKTREE of the same nuke repo, branch `fable5/ignition-ios`; the iOS app is at `apps/nuke-capture-ios`. `~/nuke` is on `feat/cohort-terminal`. Both trees contain full copies of `supabase/migrations/` and `scripts/`. They share objects/branches but NOT working-tree state — an uncommitted file in one is invisible to the other (that's exactly why the sync migration is present in nuke but absent in foundation-ios). "Don't clobber" is a branch-and-working-tree discipline, not a filesystem one; the same path collides only at commit/merge.
 
 **YOU (Fable5-image-analysis) OWN:** `scripts/deep-image-analysis-byok.mjs`, `byok-vision-prompt.md`, `living-state-report.mjs`, the launchd byok cron chain, saturation/tiering/model-tier decisions, the BACKEND half of the tag seam (`sync_local_vision_tags` migration + RPC), and you ARE the caller-BYOK compute. You ADD new verdict claims (additive, supersede-never). You do NOT repair or re-key historical rows.
 
@@ -155,7 +155,7 @@ Well-covered deep: Blazer ~81% / K2500 ~88% / Mustang ~88% — but only ~13% sat
 
 **Don't-clobber rules:** No agent touches a file another shows dirty. You stay out of `Sources/NukeCapture/*` and `nuke_frontend`; blur stays out of `scripts/` + `supabase/migrations/`; nuke-library stays out of your scripts and the sync RPC. **Migrations:** one author at a time; before naming a new migration run `ls supabase/migrations | tail` and use a fresh unique `YYYYMMDDHHMMSS` (the tree already has duplicate timestamps — do NOT reuse). **Merge order:** the sync RPC (yours) must reach prod BEFORE `LocalTagPush`'s call site ships to TestFlight (blur) — a phone calling an undeployed RPC fails silently. Deploys go through `supabase-deploy.yml`, never hand-applied.
 
-**Handoff mechanics:** in `/Users/skylar/nuke`, register `.claude/agents/active/<PID>.md` (one file per agent, never edit another's), log via `claude-log-done "area" "desc"`, hand off via `claude-handoff "..."` (writes per-agent file under lockf — never `cat > HANDOFF.md`). Deregister when done.
+**Handoff mechanics:** in `~/nuke`, register `.claude/agents/active/<PID>.md` (one file per agent, never edit another's), log via `claude-log-done "area" "desc"`, hand off via `claude-handoff "..."` (writes per-agent file under lockf — never `cat > HANDOFF.md`). Deregister when done.
 
 ---
 
@@ -164,21 +164,21 @@ Well-covered deep: Blazer ~81% / K2500 ~88% / Mustang ~88% — but only ~13% sat
 - Skylar user_id: `0b9f107a-d124-49de-9ded-94698f63c1c4`
 - K5 Blazer: `e08bf694-970f-4cbe-8a74-8715158a0f2e`
 - Mustang: `83f6f033-a3c3-4cf4-a85e-a60d2c588838`
-- Backend repo: `/Users/skylar/nuke` (branch `feat/cohort-terminal`)
-- iOS worktree: `/Users/skylar/.worktrees/foundation-ios/apps/nuke-capture-ios` (branch `fable5/ignition-ios`)
-- Core file: `/Users/skylar/nuke/scripts/deep-image-analysis-byok.mjs`
-- Rollup: `/Users/skylar/nuke/scripts/daily-receipt/living-state-report.mjs`
-- Prompt: `/Users/skylar/nuke/scripts/daily-receipt/byok-vision-prompt.md`
-- Your cron: `/Users/skylar/nuke/scripts/daily-receipt/byok-fleet-batch.sh` + `byok-image-batch.sh`
-- Other scheduler: `/Users/skylar/nuke/.github/workflows/process-images.yml` → `scripts/process-all-3000-images.js`
-- Sync migration: `/Users/skylar/nuke/supabase/migrations/20260701120000_sync_local_vision_tags.sql`
-- **This session's full transcript:** `/Users/skylar/nuke/docs/handoffs/image-analysis-2026-07-01.transcript.jsonl` (search it, don't read whole)
+- Backend repo: `~/nuke` (branch `feat/cohort-terminal`)
+- iOS worktree: `~/.worktrees/foundation-ios/apps/nuke-capture-ios` (branch `fable5/ignition-ios`)
+- Core file: `~/nuke/scripts/deep-image-analysis-byok.mjs`
+- Rollup: `~/nuke/scripts/daily-receipt/living-state-report.mjs`
+- Prompt: `~/nuke/scripts/daily-receipt/byok-vision-prompt.md`
+- Your cron: `~/nuke/scripts/daily-receipt/byok-fleet-batch.sh` + `byok-image-batch.sh`
+- Other scheduler: `~/nuke/.github/workflows/process-images.yml` → `scripts/process-all-3000-images.js`
+- Sync migration: `~/nuke/supabase/migrations/20260701120000_sync_local_vision_tags.sql`
+- **This session's full transcript:** `~/nuke/docs/handoffs/image-analysis-2026-07-01.transcript.jsonl` (search it, don't read whole)
 - Rules: `.claude/rules/db-safety.md`, `agent-coordination.md`, `agent-trust-invariants.md`, `platform-hygiene.md`, `library.md`
 
 ---
 
 ## FIRST MOVES (ordered checklist)
-1. **Register once, capturing the resolved path** (don't rely on `$PPID` matching across separate Bash calls): `REG=/Users/skylar/nuke/.claude/agents/active/$$.md; echo "$(date +%H:%M) | image-analysis | own backend vision pipeline | deep-image-analysis-byok.mjs, byok cron, sync RPC" > "$REG"` — remember `$REG` for deregistration. Read `.claude/HANDOFF.md` + `tail -60 DONE.md` + `.claude/agents/active/*.md` to see who's live.
+1. **Register once, capturing the resolved path** (don't rely on `$PPID` matching across separate Bash calls): `REG=~/nuke/.claude/agents/active/$$.md; echo "$(date +%H:%M) | image-analysis | own backend vision pipeline | deep-image-analysis-byok.mjs, byok cron, sync RPC" > "$REG"` — remember `$REG` for deregistration. Read `.claude/HANDOFF.md` + `tail -60 DONE.md` + `.claude/agents/active/*.md` to see who's live.
 2. **Confirm the byok cron is actually loaded:** `launchctl list | grep nuke` (expect `com.nuke.byok-image-analysis`). If it's disabled, the "6,750 re-run on Opus each cycle" premise is wrong — re-check before optimizing.
 3. **Check whether #0 is already done:** `git log --oneline -5` on `feat/cohort-terminal` — the assembling session likely already committed the sync migration + ledger/roster/report files with this handoff. If so, skip; if not, commit `20260701120000_sync_local_vision_tags.sql`.
 4. **Re-derive the scorecard — trust nothing blind.** MCP Supabase, user_id-scoped: orphan-by-source counts, saturated vs stale-open, `component_identifications` recency. Re-grep the ledger function anchors before any edit.

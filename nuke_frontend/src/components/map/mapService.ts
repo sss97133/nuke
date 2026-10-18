@@ -1,7 +1,8 @@
 import { supabase } from '../../lib/supabase';
+import { SUPABASE_URL, SUPABASE_ANON_KEY } from '../../lib/env';
 import type { MapFeatureCollection, HistogramResponse } from './types';
 
-const BASE_URL = import.meta.env.VITE_SUPABASE_URL;
+const BASE_URL = SUPABASE_URL; // trimmed by env.ts
 
 async function mapFetch<T>(params: Record<string, string | number | undefined>): Promise<T> {
   const filtered = Object.fromEntries(
@@ -16,7 +17,7 @@ async function mapFetch<T>(params: Record<string, string | number | undefined>):
   const res = await fetch(url, {
     headers: {
       'Content-Type': 'application/json',
-      ...(token ? { Authorization: `Bearer ${token}` } : { apikey: import.meta.env.VITE_SUPABASE_ANON_KEY }),
+      ...(token ? { Authorization: `Bearer ${token}` } : { apikey: SUPABASE_ANON_KEY }),
     },
   });
 

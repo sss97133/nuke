@@ -17,7 +17,7 @@
 - Transaction SMS → `send-transaction-sms` ⚠ (live FE path but source deleted — restore from git FIRST; all other sms-* are dead)
 - Outbound webhooks → `webhooks-manage` — REGISTRATION ONLY; delivery is dead and `webhook_endpoints`/`webhook_deliveries` tables DO NOT EXIST (half-capability)
 - Conversational DB access → `mcp-connector` edge fn (prod /mcp per vercel.json; nuke-data-bot was folded into it 2026-03-20)
-- Concierge → EXTERNAL repo `/Users/skylar/lofficiel-concierge` — never mint concierge code inside nuke
+- Concierge → EXTERNAL repo `~/lofficiel-concierge` — never mint concierge code inside nuke
 
 **Do NOT:** resurrect telegram-*, the bot quartet, inbound-email, gmail-alert-poller, send-inquiry-notification, x-post/instagram fns, webhooks-deliver, or transfer-email/sms-webhook; create a new notification/preferences/templates table; build webhook delivery without a design decision (its tables don't exist); rebuild bot logic outside mcp-connector; draft client communications for Skylar (surface substrate; he sends).
 

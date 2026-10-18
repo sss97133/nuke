@@ -7,7 +7,7 @@ When asked to "get agents on it," "keep working," or "backfill/repair extractors
 Repairs all Gooding lots (chassis, coachwork, estimate, calendar, SRA, full highlights/specs). Run in chunks to avoid client timeouts.
 
 ```bash
-cd /Users/skylar/nuke
+cd ~/nuke
 
 # Run 5 chunks of 20 lots (100 lots total)
 npx tsx scripts/backfill-gooding-now.ts --batch 20 --chunks 5

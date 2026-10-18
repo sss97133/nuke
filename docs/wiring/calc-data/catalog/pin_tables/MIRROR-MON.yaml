@@ -1,0 +1,17 @@
+MIRROR-MON:
+  family: miniseal
+  pins:
+    MIRROR_PWR: RED 12 V power wire (ignition) — splice
+    MIRROR_GND: BLACK ground wire — splice
+    MIRROR_TRIG: GREEN reverse trigger wire — splice
+    CAM_VIDEO: camera input on the harness RCA adapter (plug-in, no splice)
+  kit: {}
+  mate: kit power harness with two camera inputs (flying leads + RCA adapter)
+  open:
+  - colours are from the RVS-718-BB G-Series manual; the RVS-7180355-IR page names only a 'G-Series Mirror Monitor' — confirm red/black/green on the kit harness when it arrives
+  - mirror harness lead gauge (splice sizing uses our 20 AWG only)
+  - 'CAM_VIDEO is a kit RCA cable: no crimp or splice, the MiniSeal family does not apply to it'
+  sources:
+  - 'Rear View Safety RVS-718-BB ''G-Series Rear View Replacement Mirror Monitor'' manual p.9 Wiring: RED 12 V power to ignition, BLACK ground, GREEN reverse trigger, camera cable to the harness RCA adapter
+    (reference_documents/web_snapshots/www.surveillance-video.com__RVS-718-BB-Instruction-Manual.md)'
+  - 'RVS-7180355-IR kit page: ''OEM style G-Series Mirror Monitor'', ''Power Harness with Two Camera Inputs'' (reference_documents/web_snapshots/www.rearviewsafety.com__license-plate-backup-camera-system-rvs-7180355-ir.md)'

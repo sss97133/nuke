@@ -69,7 +69,7 @@ Each chapter follows the same structure:
 6. **Known Problems** -- current limitations and technical debt
 7. **Target Architecture** -- where the system is heading
 
-Code snippets are taken from the actual codebase. File paths are absolute from the repository root (`/Users/skylar/nuke/`). When a snippet is abbreviated, the full file is referenced.
+Code snippets are taken from the actual codebase. File paths are absolute from the repository root (`~/nuke/`). When a snippet is abbreviated, the full file is referenced.
 
 ---
 

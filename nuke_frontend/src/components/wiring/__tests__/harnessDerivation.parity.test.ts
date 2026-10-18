@@ -133,13 +133,13 @@ describe('cross-dependency keeps (python cross_keep)', () => {
   it('#53 brake switch survives BRAKES_IBOOSTER off while lighting/trans on', () => {
     const h = deriveHarness({ devices: [], toggles: { BRAKES_IBOOSTER: false } });
     const ids = new Set(h.wires.map(w => w.id));
-    expect(ids.has('53')).toBe(true);   // kept by LIGHTING_EXTERIOR / TRANS_6L80E
+    expect(ids.has('53')).toBe(true);   // kept by LIGHTING_EXTERIOR / TRANS_6L90
     expect(ids.has('52')).toBe(false);  // iBooster feed drops
     expect(ids.has('95')).toBe(false);  // iBooster relay drops
   });
 
-  it('#57 reverse switch survives TRANS_6L80E off while camera on', () => {
-    const h = deriveHarness({ devices: [], toggles: { TRANS_6L80E: false } });
+  it('#57 reverse switch survives TRANS_6L90 off while camera on', () => {
+    const h = deriveHarness({ devices: [], toggles: { TRANS_6L90: false } });
     const ids = new Set(h.wires.map(w => w.id));
     expect(ids.has('57')).toBe(true);
     expect(ids.has('58')).toBe(false);  // controller drops

@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>ag.nuke.fb-probe</string>
+    <key>ProgramArguments</key>
+    <array>
+        <string>/bin/bash</string>
+        <string>-c</string>
+        <string>export PATH="$HOME/.local/bin:/opt/homebrew/bin:/usr/bin:/bin"; exec node "$HOME/nuke-fb/app/playwright/runner.mjs" --mode probe</string>
+    </array>
+    <key>StandardOutPath</key>
+    <string>/Users/skylarwilliams/nuke-fb/logs/probe.log</string>
+    <key>StandardErrorPath</key>
+    <string>/Users/skylarwilliams/nuke-fb/logs/probe.log</string>
+</dict>
+</plist>

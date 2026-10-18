@@ -1,0 +1,67 @@
+{
+ "captured": "2026-09-26",
+ "status": "NOT ordered \u2014 owner clicks; ordering paused",
+ "lines": [
+  {
+   "vendor": "ictbillet",
+   "code": "ICT-GEN4-OILP",
+   "qty": 1,
+   "ext": 23.0,
+   "url": "https://www.ictbillet.com",
+   "note": "Gen IV round 3-pin oil-pressure housing; terminals/seals come from ProWire GT150 lines",
+   "name": "LS Wire Connector - Oil Pressure for Gen 4"
+  },
+  {
+   "vendor": "ebay",
+   "code": "D38999/24WJ61SN",
+   "listing": "335514195501",
+   "qty": 1,
+   "ext": 35.6,
+   "note": "$25 + $10.60 ship, Test Gear Nation, new surplus"
+  },
+  {
+   "vendor": "ebay",
+   "code": "D38999/26WJ61PN",
+   "listing": "395558321750",
+   "qty": 1,
+   "ext": 55.6,
+   "note": "$45 + $10.60 ship, Test Gear Nation, new surplus"
+  },
+  {
+   "vendor": "ebay",
+   "code": "M22520/2-01",
+   "listing": "336813500716",
+   "qty": 1,
+   "ext": 50.0,
+   "note": "genuine Daniels frame, no positioner, no returns \u2014 purchase status UNCONFIRMED"
+  },
+  {
+   "vendor": "ebay",
+   "code": "M22520/2-10",
+   "listing": "178217121942",
+   "qty": 1,
+   "ext": 30.0,
+   "note": "positioner for M39029/56-351 + /58-363 \u2014 purchase status UNCONFIRMED"
+  },
+  {
+   "vendor": "amazon",
+   "code": "Blue Sea 2019",
+   "qty": 2,
+   "ext": 47.66,
+   "note": "marine \u2014 kept because it matches Dave's photographed block and ProWire studs are 60 \u00b0C",
+   "asin": "B0026KWM58"
+  },
+  {
+   "vendor": "amazon",
+   "code": "MS25171-3S",
+   "qty": 1,
+   "ext": 14.45,
+   "note": "stud boots",
+   "asin": "B097NP9CLX",
+   "pack": 6
+  }
+ ],
+ "sources": [
+  "receipts/2026-09-25_orders-staged-prowire-ksv-ict.md"
+ ]
+}

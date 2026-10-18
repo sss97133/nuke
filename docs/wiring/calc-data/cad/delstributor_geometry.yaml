@@ -1,0 +1,239 @@
+# DEL-Stributor coil cluster -- geometry in the twin's world axes, for parts-artist (build123d) and harness-cad (Blender).
+#
+# Research (method, photos, reasoning): docs/wiring/research/2026-09-30_delstributor-coil-geometry.md
+# Receipt:                               docs/wiring/receipts/2026-09-30_research-delstributor-coil-geometry.md
+# Replaces the placeholder 4 x 2 grid ANCHOR_coil_1..8 (twin_engine_anchors.json, "numbered by position only").
+#
+# Rules for this file
+#   - Every number has a source (src) and a margin (pm). "unknown" is an answer; a working value is only there so the
+#     CAD can draw something, and it says so.
+#   - Photo measurements use one ruler: the coil bolt spread, 2 7/8 in = 73.0 mm (Delmo listing DELCB01, same bracket
+#     family). Method per number in the research doc, section 4.
+#   - Relative numbers (to the post base F) are the good ones. World numbers inherit two unmeasured things: the twin's
+#     engine root (twin HANDOFF open unknown 1) and the post-base height and bell-flange thickness below.
+#   - No order numbers, dates or amounts here (they are in the lane report and Gmail).
+#
+# Frame: twin metres, +x = driver, -y = forward, +z = up (twin_engine_anchors.json _frame).
+# Engine-local mm (used for the relative numbers): x = world x, y = rearward of the block's rear face (bell face),
+# z = above the crank centreline.
+
+schema_version: 1
+lane: delstributor (research), 2026-09-30
+frame: "twin metres: +x driver, -y forward, +z up"
+engine_root:
+  world: {x: 0.000, y: -1.400, z: 0.720}
+  what: "bell face (block rear face) at y, crank centreline at z"
+  src: "docs/wiring/calc-data/twin_engine_anchors.json _engine_root (Y_BELL, Z_CRANK)"
+  status: "physical-constraint placement, not a measurement (docs/wiring/twin/HANDOFF.md open unknown 1)"
+
+parts:
+  post:
+    maker: Delmo Speed
+    sku: DELSTRIB01
+    name: Del-Stributer
+    what: "billet aluminium post; the four coil brackets bolt to its four faces"
+    src: "https://delmospeed.com/products/del-stributer (Shopify product JSON read 2026-09-29): 'Billet Aluminum machined for LS1 and LS3 coil relocation brackets ... Coils and coil relocation brackets sold separately.'"
+  brackets:
+    maker: Delmo Speed
+    sku: DELCB04
+    name: Coil Relocation Brackets For GM LS3 Coils
+    count: 4
+    coils_per_bracket: 2
+    src: "owner's Delmo shipping notice (Gmail) for the SKU; count and two-per-bracket from Delmo DELCB01 photo IMG_3914 (card of 4 brackets + a mounted pair) and owner photo IMG_1101 (vehicle_images 71a33780-0884-4df5-bbbd-582b1165d084)"
+    note: "DELCB04 is no longer in Delmo's catalog; DELCB01 (same family) is: 'coil relocation brackets for all 8 coils ... Fits LS Coils (2 Styles) ... Bolt spread 2 7/8\"'"
+  coils:
+    pn: "GM 12611424 (ACDelco D510C)"
+    count: 8
+    marking_on_bracket_pair: H6T55272ZC
+    src: "eBay order in vehicle_observations (COIL-1..8 device proof rows); IMG_1101 pair reads H6T55272ZC, the marking Delmo photographs on an 'ACDelco 12611424' coil (https://cdn.shopify.com/s/files/1/0861/4261/5835/products/IMG_3918.jpg?v=1709224084)"
+    open: "a second, squat coil style is on the bench in IMG_1101 (4 or more, PN not legible): read the GM number on each of the 8 before crimping"
+  plug_wires:
+    maker: Delmo Speed
+    sku: DELPW03
+    name: Vintage Plug Wire Kit, Black w/Red Tracers
+    wire_od_mm: 7.8
+    lengths_in: [43, 43, 40, 40, 36, 36, 32, 32]
+    ends: "plug end made up; coil end left to crimp (boots and terminals in the kit)"
+    src: "https://delmospeed.com/products/vintage-plug-wires (Shopify product JSON read 2026-09-29)"
+
+ruler:
+  coil_bolt_spread_mm: 73.0
+  src: "https://delmospeed.com/products/ls-2-coil-relocation-bracket (DELCB01): 'Bolt spread 2 7/8\"'"
+
+# ---------------------------------------------------------------------------------------------------------------
+# Unknowns and working values (the world numbers below use the working values; replace them with the tape readings)
+# ---------------------------------------------------------------------------------------------------------------
+unknowns:
+  h_F:
+    what: "height of the post-base bolt (12 o'clock bell bolt) above the crank centreline"
+    working_value_m: 0.242
+    pm_m: 0.035
+    status: photo_estimate
+    method: "owner photo IMG_0123 (vehicle_images 7e2efddd-4593-472e-b554-2ec49f429910, 2024-08-24, LS3 rear face, no trans): the rear top-centre tapped hole (carrying the crate lift bracket) is 1241 px from the crank flange centre; scale from the two deck/head joint lines, which sit 234.7 mm (deck height 9.240 in, twin dimensions_v3.json) from the crank and meet 331.9 mm above it. The two joint lines give 5.02 and 5.23 px/mm; perspective spread is the margin."
+    needs: "tape on the truck: crank centreline (balancer bolt) to the 12 o'clock bell bolt, vertical"
+  t_bell:
+    what: "6L90 bell flange thickness at the 12 o'clock bolt boss (the post foot sits on its rear face, under the bolt head)"
+    working_value_m: 0.0
+    status: unknown
+    needs: "calipers on the bell boss, or bolt length minus exposed thread; add it to every world y below"
+  post_depth:
+    what: "post fore-aft depth (the photos show its width only)"
+    working_value_m: 0.0526
+    status: unknown
+    note: "working value = the measured width (square section assumed); moves the front and rear coil pairs +/- by half the difference"
+    needs: "calipers on the post (the part is in hand)"
+  foot_thickness:
+    what: "post foot thickness at the bolt pocket (sets the longer bell bolt)"
+    status: unknown
+    needs: "calipers on the post"
+
+# ---------------------------------------------------------------------------------------------------------------
+# The post base: which bolt
+# ---------------------------------------------------------------------------------------------------------------
+post_base:
+  id: F
+  what: "axis of the post's single foot bolt, at the foot's front (bearing) face"
+  bolt: "12 o'clock bellhousing bolt, through the post foot, the bell flange, into the block"
+  status: probable
+  thread: "M10 x 1.5"
+  thread_src: "reference_documents/component_drawings/GM_Supermatic_6L80_Installation_Kit.pdf p.2 (kit 19367014): 8 x 11515768 'Bolt M10x1.5x40 - Transmission Attachment', 58 Nm; 'Install bracket from transmission kit under center top bolt'"
+  bolt_length: "longer than the stock 40 mm by the foot thickness (unknown)"
+  evidence:
+    - "Delmo install photo CRInstalled3 (https://cdn.shopify.com/s/files/1/0861/4261/5835/files/CRInstalled3.jpg?v=1754341937): the post's foot drops into the joint between the block's rear top and the bellhousing top, centred, just right of the oil-pressure sensor."
+    - "The foot has one through hole, 10.5 +/- 0.8 mm (Delmo photo NewCR1 at 16.15 px/mm), axis square to the post's DELMO face: an M10 clearance hole, one bolt."
+    - "GM's own 6L80 kit hangs a bracket under the centre top bell bolt (thread_src)."
+    - "Owner photo IMG_0123: the LS3's rear top-centre tapped hole sits within about 1.6 deg (about 7 mm) of the block's centre plane."
+  confirm: "owner, on the truck: is there a bolt at 12 o'clock on the 6L90 bell, and does the post foot sit flat under it?"
+  world: {x: 0.000, y: -1.400, z: 0.962}
+  world_pm: {x: 0.010, y: "+t_bell, and the engine root", z: 0.035}
+  engine_local_mm: {x: 0.0, y: "t_bell", z: 242.0}
+
+# ---------------------------------------------------------------------------------------------------------------
+# The post (Delmo NewCR1 face-on, DELMO face up; installed the DELMO face looks rearward, so photo-left = driver)
+# ---------------------------------------------------------------------------------------------------------------
+post:
+  axis: vertical (square to the block's rear face; the engine's installed pitch carries through)
+  axis_world: {x: -0.0111, y: -1.3737}
+  axis_rel_F_mm: {x: -11.1, y: 26.3}
+  axis_src: "foot hole 11.1 mm driver-side of the post centreline (NewCR1); post front face flush with the foot's bearing face (the part lies flat on its back in NewCR1); y = half the working depth"
+  width_mm: {value: 52.6, pm: 2.0, src: "NewCR1 post edges x 1095..1945 px at 16.15 px/mm"}
+  depth_mm: {value: unknown, working: 52.6}
+  top_rel_F_mm: {value: 127.4, pm: 4.0, src: "NewCR1 post top y 1225 px vs foot hole y 3282 px"}
+  bottom_rel_F_mm: {value: -16, pm: 3, src: "NewCR1 foot edge y 3540 px"}
+  faces: "rear = DELMO face (bolt-head pocket at the foot); front = flat bearing face; one coil bracket on each of the 4 faces"
+  anti_rotation: "unknown (one bolt; ask Delmo)"
+
+brackets:
+  shape: "U: web on the post face (2 countersunk screws, 24.8 mm apart vertically), a top and a bottom arm reaching out radially; each arm tip is tapped through, tangentially"
+  tip_hole_radius_mm: {value: 58.9, pm: 2.0, src: "NewCR1 side brackets: 57.7 (driver) and 60.1 (passenger) mm from the post axis"}
+  tip_hole_spacing_mm: {value: 73.0, src: "= the coil bolt spread (the ruler)"}
+  tip_depth_mm: {value: 36, pm: 3, src: "NewCR1 front bracket arm, 620 px, corrected for its height toward the camera"}
+  top_arm_hole_rel_F_mm: {value: 146.6, pm: 4.5, src: "NewCR1 tip holes y 915 px vs foot hole 3282 px"}
+  bottom_arm_hole_rel_F_mm: {value: 73.7, pm: 2.5, src: "NewCR1 tip holes y 2092 px"}
+  web_thickness_mm: {value: 11, pm: 2, src: "NewCR1 left bracket web 918..1090 px"}
+  all_four_same_height: "yes (NewCR1: the front bracket's arms line up with the side brackets' once perspective is taken out)"
+  tip_thread: unknown
+
+coil_shape:  # GM 12611424 as Delmo photographs it (IMG_3918, 5.45 px/mm from the same 73.0 mm spread)
+  orientation: "tower up, plug down (every Delmo install photo; owner IMG_1101)"
+  ears: "two lobes on the coil's inner edge, one at the tower end and one 73.0 mm lower under the plug end; bolted tangentially into the bracket arm tips, bolt heads on the pair's outer sides (IMG_3917, IMG_1101)"
+  pair: "two coils per bracket, back to back, the arm tips clamped between their ears (IMG_3914, IMG_3917, IMG_1101)"
+  outer_face: "the face printed H6T55272ZC looks radially outward (IMG_1101); the face printed ACDelco 12611424 carries the ear bolts and looks tangentially outward (IMG_3918)"
+  axis_out_of_ear_line_mm: {value: 34, pm: 3, src: "IMG_3918, 32.6 mm on the oblique face, foreshortening allowed"}
+  axis_tangential_mm: {value: 22.7, pm: 3.0, src: "0.63 x tip depth: tower centres vs arm-tip width in IMG_1101 (0.65) and IMG_3917 (0.61)"}
+  body_height_mm: {value: 64.7, pm: 3, src: "IMG_3918"}
+  body_radial_mm: {inner: 16, outer: 21, pm: 3, note: "from the coil axis", src: "IMG_3918"}
+  body_tangential_mm: {value: 36, pm: 5, src: "IMG_1101 and IMG_3917 against the arm-tip width"}
+  tower_od_mm: {value: 17.4, pm: 2, src: "IMG_3918"}
+  tower_tip_above_top_ear_mm: {value: 31.9, pm: 2, src: "IMG_3918"}
+  plug_tip_below_top_ear_mm: {value: 92.8, pm: 3, src: "IMG_3918 (19.8 below the lower ear)"}
+  plug_latch_facing: unknown
+
+# ---------------------------------------------------------------------------------------------------------------
+# The circle
+# ---------------------------------------------------------------------------------------------------------------
+circle:
+  centre_world: {x: -0.0111, y: -1.3737, z: 1.0762}
+  coil_axis_radius_mm: {value: 95.6, pm: 6}
+  coil_axis_spread: "two coils per bracket at +/-13.7 deg (pm 3) either side of the bracket's face normal; gaps 27.4 deg inside a pair, 62.6 deg between pairs"
+  tower_tip_z: 1.1405
+  body_top_z: 1.1086
+  body_mid_z: 1.0762
+  body_bottom_z: 1.0438
+  lower_ear_z: 1.0357
+  plug_tip_z: 1.0157
+  z_pm_m: "0.005 relative to F; 0.035 absolute (h_F)"
+  outer_envelope_radius_mm: {value: 114, pm: 8, note: "coil outer faces; add boots and plug wires above 1.14"}
+  footprint_world: {x: [-0.125, 0.103], y: [-1.488, -1.260], z: [0.946, 1.16]}
+  azimuth_convention: "deg from forward (-y) toward driver (+x), seen from above"
+
+# COIL-n fires cylinder n (its plug wire goes to cylinder n). GM V8 numbering: 1-3-5-7 left (driver) bank, 2-4-6-8
+# right, counted from the front (1977 LTSM p.518; reference_documents/k5_factory_docs/1977_Light_Truck_Service_Manual.pdf).
+# LS3 firing order 1-8-7-2-6-5-4-3 (LS3_Long_Block_Installation_Guide.pdf p.5; Marine_LS3_6.2L_Specs.pdf p.3) does
+# not constrain the ring: each coil has its own ECU output. The ring order below is the owner's/builder's call
+# (proposed: each bank's coils on its own side, front coil to front cylinder, so the wires fan out without crossing).
+coils:
+  - {id: COIL-1, cylinder: 1, bank: driver,    bracket: front,     side_of_pair: driver,    azimuth_deg: 13.7,  axis_world: {x:  0.0115, y: -1.4666}, rel_post_mm: {x:  22.7, y: -92.9}, outer_face: -y, ear_bolt_heads: +x, plug_wire_in: 43}
+  - {id: COIL-3, cylinder: 3, bank: driver,    bracket: driver,    side_of_pair: front,     azimuth_deg: 76.3,  axis_world: {x:  0.0818, y: -1.3964}, rel_post_mm: {x:  92.9, y: -22.7}, outer_face: +x, ear_bolt_heads: -y, plug_wire_in: 40}
+  - {id: COIL-5, cylinder: 5, bank: driver,    bracket: driver,    side_of_pair: rear,      azimuth_deg: 103.7, axis_world: {x:  0.0818, y: -1.3510}, rel_post_mm: {x:  92.9, y:  22.7}, outer_face: +x, ear_bolt_heads: +y, plug_wire_in: 36}
+  - {id: COIL-7, cylinder: 7, bank: driver,    bracket: rear,      side_of_pair: driver,    azimuth_deg: 166.3, axis_world: {x:  0.0115, y: -1.2808}, rel_post_mm: {x:  22.7, y:  92.9}, outer_face: +y, ear_bolt_heads: +x, plug_wire_in: 32}
+  - {id: COIL-8, cylinder: 8, bank: passenger, bracket: rear,      side_of_pair: passenger, azimuth_deg: 193.7, axis_world: {x: -0.0338, y: -1.2808}, rel_post_mm: {x: -22.7, y:  92.9}, outer_face: +y, ear_bolt_heads: -x, plug_wire_in: 32}
+  - {id: COIL-6, cylinder: 6, bank: passenger, bracket: passenger, side_of_pair: rear,      azimuth_deg: 256.3, axis_world: {x: -0.1040, y: -1.3510}, rel_post_mm: {x: -92.9, y:  22.7}, outer_face: -x, ear_bolt_heads: +y, plug_wire_in: 36}
+  - {id: COIL-4, cylinder: 4, bank: passenger, bracket: passenger, side_of_pair: front,     azimuth_deg: 283.7, axis_world: {x: -0.1040, y: -1.3964}, rel_post_mm: {x: -92.9, y: -22.7}, outer_face: -x, ear_bolt_heads: -y, plug_wire_in: 40}
+  - {id: COIL-2, cylinder: 2, bank: passenger, bracket: front,     side_of_pair: passenger, azimuth_deg: 346.3, axis_world: {x: -0.0338, y: -1.4666}, rel_post_mm: {x: -22.7, y: -92.9}, outer_face: -y, ear_bolt_heads: -x, plug_wire_in: 43}
+coils_common:
+  z_world: {tower_tip: 1.1405, body_top: 1.1086, body_bottom: 1.0438, plug_tip: 1.0157}
+  facing: {tower: +z, plug: -z, plug_mates: "from below, upward"}
+  pm_xy_mm: "6 relative to the post; world adds the root, t_bell and the post depth"
+  plug_wire_in_note: "Delmo's set has 2 of each length; longest to the front cylinders. A proposal; cut at the coil end."
+
+# ---------------------------------------------------------------------------------------------------------------
+# Harness around the circle (proposed layout; the route on the truck is Dave's call)
+# ---------------------------------------------------------------------------------------------------------------
+harness:
+  topology: split_star
+  what: "one Y where the engine trunk arrives (driver side of the post, below the plug ring), then two 4-coil stars: driver half COIL-1/3/5/7, passenger half COIL-2/4/6/8"
+  y_zone_world: {x: [0.02, 0.07], y: [-1.42, -1.37], z: [0.97, 1.00], status: proposed}
+  why:
+    - "trunk comes from the 61-pin at the driver-side fuse-box hole (catalog/mounts.yaml FIREWALL-61)"
+    - "grounds stay star-shaped, never daisy-chained (chapters/17 section 17.4.1); each half's 4 a-grounds and 4 b-grounds go to that side's head (Dave: coil a and b to a head ring; registry COIL-GROUND-RINGS, 4 rings)"
+    - "leaves the rear face clear: the post's bolt head is in the pocket on the DELMO face at the foot"
+    - "nothing wraps the post, so the cluster comes off with its looms"
+  power_rail: "16 AWG in to the Y; 16+18+18 splice there; each 18 AWG half feeds its 4 coils through 3 stub splices (18+18+18): the same 7 D-609-05 splices the registry already lists (RAIL-COIL_PWR), split 1 + 3 + 3"
+  power_upstream: "depends on where the engine PDM goes (K5_WIRING_STATE.md 0ag(b), 0ah: open) -- not drawn"
+  ground_rings:
+    - {side: driver,    where: "back of the driver cylinder head, upper inboard corner", zone_world: {x: [0.09, 0.20], y: -1.472, z: [0.95, 1.04]}, src: "twin E3_Head_L rear face (estimated skin); Swap Specialties LS install p.4: 'fastened to the back of the cylinder head'", hole: "pick an open tapped hole on the bench; thread unknown (RING-SMALL open)"}
+    - {side: passenger, where: "back of the passenger cylinder head, upper inboard corner", zone_world: {x: [-0.20, -0.09], y: -1.448, z: [0.95, 1.04]}, src: "twin E3_Head_R rear face (estimated skin); same", hole: "same"}
+  legs: "each coil's 4 wires (a chassis ground, b signal ground, c trigger, d +12 V; registry COIL-n cavities) rise into its plug from below; plug wire exits sit about 20-50 mm above the bell top at the working values: tight, mock-up"
+  protection: "branch ties every 75 mm, trunk every 150 mm (chapters/16 section 8.5); the coil-trunk Y is one of the K5's named Y-splices needing an AS81765/1 boot PN (chapters/16 section 7.4)"
+
+# ---------------------------------------------------------------------------------------------------------------
+# Fit checks (each needs a tape or the owner's eyes; none is decided here)
+# ---------------------------------------------------------------------------------------------------------------
+fit_checks:
+  - id: FIT-FIREWALL
+    what: "the rear coil pair (COIL-7, COIL-8) reaches 0.140 m + t_bell behind the bell face (0.114 m behind the post axis), at z 1.02..1.16"
+    against: "twin firewall at the centreline is only 0.033 m behind the bell face (ray cast on Under_Main_Blazer at x 0, z 0.95..1.25: y -1.367); the real firewall has a large centre dish (IMG_6531)"
+    delmo: "Delmo sells the kit as 'Designed for applications with a deep firewall like most pickups' (https://delmospeed.com/products/delmos-coil-relocation-kit)"
+    needs: "tape: block rear face (or bell face) to the firewall dish at the centreline, at bolt height + 0.10..0.20 m"
+  - id: FIT-OIL-PSI
+    what: "COIL-1 (front bracket, driver side) and its plug sit over the Gen IV oil-pressure sensor"
+    against: "sensor threads into the block's rear top, about 40 mm driver-side of centre, its plug top about crank + 0.35 m (owner photo IMG_0123, same scale as h_F, pm 0.04); twin ANCHOR_oil_psi (0.025, -1.48, 0.99) sits inside COIL-1's plan footprint (x -0.006..0.030, y -1.488..-1.451), 26 mm under its plug tip, where COIL-1's mating plug and leg go"
+    delmo: "Delmo's current Delstributor listings: 'Some applications require the oil sensor to be relocated or deleted.'"
+    needs: "owner's eyes with the cluster offered up; if it hits, relocating the sensor is an owner/Dave call (the build uses it: oil PSI, M130 AV5)"
+  - id: FIT-INTAKE
+    what: "the front pair's outer faces reach about 0.088 m ahead of the bell face (-1.488 at t_bell 0)"
+    against: "twin intake port flanges 7/8 end at y -1.534 / -1.510 (z 0.976..1.05): about 22 mm clear at the working values; the intake on the truck is still unresolved (K5_WIRING_STATE.md 0ag(g))"
+    needs: "look with the cluster offered up; also the fuel-rail rear fittings"
+  - id: FIT-BELL
+    what: "the post base at crank + 0.242 needs the bell flange to reach that high"
+    against: "twin E3_6L90_Bell tops out at z 0.94 (crank + 0.22, estimated 440 mm envelope)"
+    needs: "same tape as h_F"
+  - id: FIT-HOOD
+    what: "plug-wire boots at about z 1.16..1.18"
+    against: "twin hood/cowl skin at about z 1.35..1.40 over y -1.72..-1.31"
+    needs: "nothing now; recheck once the engine root is taped"
+
+supersedes_in_twin:
+  anchors: "ANCHOR_coil_1..8 (twin_engine_anchors.json coil_1..8) -> coils[] above (axis at plug_tip_z for the plug anchors)"
+  mesh: "E3_DelStributer_Plate + E3_Coil_1..8 (flat plate, 4 x 2 grid) -> post + 4 brackets + 8 coils above"

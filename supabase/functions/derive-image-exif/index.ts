@@ -27,8 +27,13 @@
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { corsHeaders } from "../_shared/cors.ts";
+import { requireWriteAuth } from "../_shared/writeGuard.ts";
+import { projectPublishableKey, projectSecretKey } from "../_shared/supabaseKeys.ts";
 
 Deno.serve(async (req) => {
+  // Writes are never anonymous: service key, signed-in user, or nothing (P0.2, 2026-09-27).
+  const denied = await requireWriteAuth(req);
+  if (denied) return denied;
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
 
   try {
@@ -37,20 +42,20 @@ Deno.serve(async (req) => {
 
     const caller = createClient(
       Deno.env.get("SUPABASE_URL")!,
-      Deno.env.get("SUPABASE_ANON_KEY")!,
+      projectPublishableKey()!,
       { global: { headers: { Authorization: authHeader } } },
     );
     const { data: userData } = await caller.auth.getUser();
 
     const internal = req.headers.get("x-nuke-internal");
     const isServiceRole = roleOf(authHeader) === "service_role"
-      || (!!internal && internal === Deno.env.get("SUPABASE_SERVICE_ROLE_KEY"));
+      || (!!internal && internal === projectSecretKey());
 
     const body = await req.json().catch(() => ({}));
     const userId = userData?.user?.id ?? (isServiceRole ? body.user_id : undefined);
     if (!userId) return json({ error: "Invalid session" }, 401);
 
-    const admin = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
+    const admin = createClient(Deno.env.get("SUPABASE_URL")!, projectSecretKey()!);
     const dryRun = body.dry_run === true;
     const limit = Math.min(Math.max(Number(body.limit) || 20, 1), 100);
 

@@ -6,6 +6,13 @@ This is the technical schematic book for the Nuke vehicle data platform. These d
 
 Each document covers one architectural dimension of the system. Together they form a complete engineering blueprint.
 
+The private garage source path also retains testimony without a physical identity:
+the existing account correction writer → `vehicle_observations` with NULL vehicle
+and property → explicit unresolved-reader opt-in → web/native identity-pending
+section. An account-keyed native derived cache preserves the source offline. No
+canonical asset is minted; named identified supersession retains the raw source.
+See [the garage evidence contract](../../../design/GARAGE_EVIDENCE_MODEL.md).
+
 ---
 
 ## Table of Contents
@@ -21,6 +28,10 @@ The extraction pipeline in detail: the three-tier AI agent hierarchy (Haiku/Sonn
 
 ### [4. Observation System](./observation-system.md)
 The observation architecture: how ingest-observation works, the trust scoring mechanism, content hashing for deduplication, vehicle resolution logic (VIN match, URL match, fuzzy match), the relationship between observation_sources and vehicle_observations, and the path toward a fully source-agnostic data model.
+
+### Source-qualified sale episodes (staged 2026-10-04)
+
+The existing `valuation_by_ymm` extension follows current public cohort members → native `vehicle_events` / compatibility `bat_listings` episode URLs → exact indexed protected `listing_page_snapshots` aliases → independently verified source tuples. Native price/outcome/row clocks are locators and context; they do not supply an earlier sale's amount, units or availability. Already-admitted canonical archived observations retain their separate snapshot/observation ingestion and typed ancestry checks. Agreeing captures deduplicate by source episode; different episodes of a persistent vehicle survive. Member, native-presentation and capture sentinels refuse sampled distributions. The additive receipt declares current membership, capture/DB-ingestion/parse knowledge clocks, unavailable historical native availability and exact subject-episode exclusion; unknown subject identity withholds comparison while retaining evidence. No source admission or permissions change. Deployment and runtime stages are recorded separately from the executable contract: `scripts/discovery/valuation-source-sale-receipt-test.sql`.
 
 ---
 
@@ -42,7 +53,7 @@ ASCII diagrams use the following conventions:
 1                 -- Cardinality marker (one)
 ```
 
-All file paths are relative to `/Users/skylar/nuke/` unless otherwise noted.
+All file paths are relative to `~/nuke/` unless otherwise noted.
 
 ## Source Files
 

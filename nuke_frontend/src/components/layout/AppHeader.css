@@ -89,6 +89,12 @@
   color: var(--text);
 }
 
+.header-nav-link:focus-visible {
+  /* The shared reset suppresses all outlines with !important. */
+  outline: 2px solid var(--text) !important;
+  outline-offset: 2px;
+}
+
 .header-nav-link.active {
   color: var(--text);
   font-weight: 700;
@@ -115,6 +121,29 @@
   align-items: center;
   gap: 8px;
   flex-shrink: 0;
+}
+
+.header-session .header-theme-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 24px !important;
+  padding: 0 7px !important;
+  border: 1px solid var(--border);
+  background: var(--bg);
+  color: var(--text-secondary);
+  font-family: var(--font-mono);
+  font-size: var(--fs-8) !important;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.header-session .header-theme-btn:hover {
+  color: var(--text);
+  border-color: var(--text);
 }
 
 /* ============================================================================
@@ -282,7 +311,25 @@
    RESPONSIVE — MOBILE
    ============================================================================ */
 
+.home-mobile-nav {
+  display: none;
+}
+
 @media (max-width: 767px) {
+  .home-mobile-nav {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 12px;
+    border-bottom: 2px solid var(--border);
+    background: var(--surface);
+  }
+
+  .home-mobile-nav .header-nav-link {
+    padding: 8px;
+    font-size: 11px;
+  }
+
   .header {
     grid-template-columns: max-content 1fr max-content;
     gap: 6px;
@@ -300,3 +347,265 @@
     max-width: none;
   }
 }
+
+/* ============================================================================
+   HEADER SEARCH FACET PILLS & EMBLEMS
+   ============================================================================ */
+
+.header-search-facets {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+  margin-top: 3px;
+}
+
+.header-search-facets--compact {
+  display: inline-flex;
+  margin-top: 0;
+  margin-left: 4px;
+  gap: 3px;
+}
+
+.header-search-facet-emblem {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 15px;
+  max-width: 82px;
+  flex-shrink: 0;
+}
+
+.header-search-facet-emblem svg {
+  height: 14px;
+  width: auto;
+  max-width: 80px;
+  display: block;
+}
+
+.header-search-facet-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 1px 5px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text);
+  font-family: var(--font-mono);
+  font-size: var(--fs-8);
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  line-height: 1.25;
+  white-space: nowrap;
+}
+
+.header-search-facet-pill--series {
+  border-color: var(--text-secondary);
+}
+
+.header-search-facet-pill--trim {
+  border-color: var(--accent);
+}
+
+.header-search-facet-pill--body {
+  border-color: var(--border);
+  color: var(--text-secondary);
+}
+
+.header-search-facet-axis {
+  color: var(--text-secondary);
+  font-weight: 600;
+}
+
+.header-search-facet-sep {
+  opacity: 0.55;
+}
+
+.header-search-facet-value {
+  color: var(--text);
+  font-weight: 700;
+}
+
+/* Vetted era mark on a header search vehicle row (sits with the facet pills) */
+.header-search-era-mark {
+  display: inline-flex;
+  align-items: center;
+  height: 16px;
+  max-width: 74px;
+  flex-shrink: 0;
+}
+
+.header-search-era-mark svg {
+  height: 15px;
+  width: auto;
+  max-width: 74px;
+  display: block;
+}
+
+/* Market cohort shortcuts above header search results */
+.header-search-cohorts {
+  border-bottom: 2px solid var(--border);
+  background: var(--surface);
+}
+
+.header-search-cohorts-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 4px 10px;
+  border-bottom: 1px solid var(--border-light);
+  font-family: var(--font-family);
+  font-size: var(--fs-8);
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  color: var(--text-secondary);
+}
+
+.header-search-cohort {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 6px 10px;
+  border: none;
+  border-bottom: 1px solid var(--border-light);
+  background: transparent;
+  color: var(--text);
+  text-align: left;
+  font-family: var(--font-family);
+  cursor: pointer;
+  transition: background 180ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.header-search-cohort:last-child {
+  border-bottom: none;
+}
+
+.header-search-cohort:hover,
+.header-search-cohort:focus-visible,
+.header-search-cohort--active {
+  background: var(--grey-100);
+}
+
+.header-search-cohort-mark {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 78px;
+  height: 22px;
+  flex-shrink: 0;
+}
+
+.header-search-cohort-mark svg {
+  height: 20px;
+  width: auto;
+  max-width: 78px;
+  display: block;
+}
+
+.header-search-cohort-text {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-width: 0;
+}
+
+.header-search-cohort-label,
+.header-search-cohort-sub {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.header-search-cohort-label {
+  font-size: var(--fs-11);
+  font-weight: 700;
+}
+
+.header-search-cohort-sub {
+  font-size: var(--fs-9);
+  color: var(--text-secondary);
+}
+
+.header-search-cohort-era,
+.header-search-cohort-pill {
+  flex-shrink: 0;
+  padding: 1px 5px;
+  border: 1px solid var(--border);
+  font-size: var(--fs-8);
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.header-search-cohort-era {
+  font-family: var(--font-mono);
+  background: var(--white);
+  color: var(--text-secondary);
+}
+
+.header-search-cohort-pill {
+  letter-spacing: 0.04em;
+  background: var(--text);
+  color: var(--white);
+}
+
+@media (max-width: 767px) {
+  .header-search-cohorts-head span:last-child,
+  .header-search-cohort-pill {
+    display: none;
+  }
+
+  .header-search-cohort {
+    gap: 6px;
+    padding: 6px 8px;
+  }
+
+  .header-search-cohort-mark {
+    width: 52px;
+  }
+
+  .header-search-cohort-mark svg {
+    max-width: 52px;
+  }
+}
+
+.search-overlay-market-body {
+  padding: 6px 12px;
+}
+
+.search-overlay-market-title {
+  font-weight: 700;
+  font-size: 12px;
+  margin-bottom: 4px;
+}
+
+.search-overlay-market-label {
+  font-weight: 400;
+  opacity: 0.6;
+}
+
+.search-overlay-market-stats {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  line-height: 18px;
+}
+
+.search-overlay-market-row {
+  display: flex;
+  justify-content: space-between;
+}
+
+.search-overlay-market-muted {
+  opacity: 0.5;
+}
+
+.search-overlay-market-sources {
+  font-size: 10px;
+  opacity: 0.5;
+  margin-top: 4px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+

@@ -43,9 +43,10 @@ export default function OwnerAuctionDashboard({ listingId, onClose }: OwnerAucti
       // Load vehicle details
       const { data: vehicleData } = await supabase
         .from('vehicles')
-        .select('*')
+        .select('id, year, make, model')
         .eq('id', listingData.vehicle_id)
         .single();
+
       setVehicle(vehicleData);
 
       // Load bids

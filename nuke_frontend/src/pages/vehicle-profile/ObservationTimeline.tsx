@@ -29,6 +29,8 @@ interface Observation {
   structured_data: Record<string, unknown> | null;
   source_name: string | null;
   source_slug: string | null;
+  // a masked copy from vehicle_build_log_public: the detail page can't open it for a visitor
+  public_copy?: boolean;
 }
 
 /* ------------------------------------------------------------------ */
@@ -112,13 +114,39 @@ function formatTimeAgo(iso: string | null): string {
 /* ------------------------------------------------------------------ */
 
 function extractSummary(obs: Observation): string | null {
+  const sd = obs.structured_data;
+  // Atomic source claims carry an explicit property/value/role. Prefer that
+  // readable grain to a serialized extraction sentence; retain the full body
+  // in the existing observation detail and never promote an amount to a sale.
+  if (sd && typeof sd.property === 'string' && 'value' in sd) {
+    const value = sd.value;
+    if (sd.property === 'publisher_reported_result' && value && typeof value === 'object') {
+      const amount = (value as Record<string, unknown>).amount;
+      const currency = (value as Record<string, unknown>).currency;
+      if (typeof amount === 'number' && Number.isFinite(amount) && currency === 'USD') {
+        return `$${amount.toLocaleString('en-US')} · publisher reported result`;
+      }
+    }
+    if (value !== null && ['string', 'number', 'boolean'].includes(typeof value)) {
+      return `${sd.property.replace(/_/g, ' ')}: ${String(value)}${typeof sd.unit === 'string' ? ` ${sd.unit.replace(/_/g, ' ')}` : ''}`;
+    }
+    if (value && typeof value === 'object' && !Array.isArray(value)) {
+      const vObj = value as Record<string, unknown>;
+      if (typeof vObj.paraphrase === 'string') {
+        return `${sd.property.replace(/_/g, ' ')}: ${vObj.paraphrase}`;
+      }
+      if (typeof vObj.amount === 'number' && Number.isFinite(vObj.amount)) {
+        const role = typeof vObj.role === 'string' ? ` (${vObj.role.replace(/_/g, ' ')})` : '';
+        return `${sd.property.replace(/_/g, ' ')}: $${vObj.amount.toLocaleString('en-US')}${role}`;
+      }
+    }
+  }
   if (obs.content_text) {
     const text = obs.content_text.trim();
     if (text.length > 200) return text.substring(0, 197) + '...';
     return text;
   }
 
-  const sd = obs.structured_data;
   if (!sd) return null;
 
   // Sale result
@@ -153,6 +181,70 @@ function extractSummary(obs: Observation): string | null {
   return null;
 }
 
+function sourceContextLabel(obs: Observation): string | null {
+  const data = obs.structured_data;
+  const context = data?.event_context as Record<string, unknown> | undefined;
+  const media = data?.media as Record<string, unknown> | undefined;
+  const parts: string[] = [];
+  const auction = typeof context?.auction === 'string'
+    ? context.auction
+    : typeof context?.auction_name_claim === 'string'
+      ? context.auction_name_claim
+      : null;
+  if (auction) parts.push(auction);
+  const lot = typeof context?.lot === 'string'
+    ? context.lot
+    : typeof context?.lot_claim === 'string'
+      ? context.lot_claim
+      : null;
+  if (lot) parts.push(`Lot ${lot}`);
+  const eventDate = typeof context?.event_date === 'string'
+    ? context.event_date
+    : typeof context?.event_date_claim === 'string'
+      ? context.event_date_claim
+      : null;
+  if (eventDate && context?.event_date_precision === 'day') {
+    // A date-only auction claim must not shift to the prior day in local time.
+    parts.push(`${eventDate} (day)`);
+  }
+  if (typeof media?.video_id === 'string') {
+    parts.push(`YouTube ${media.video_id}`);
+  }
+  if (typeof media?.start_seconds === 'number' && Number.isFinite(media.start_seconds) && media.start_seconds >= 0) {
+    parts.push(`Source offset ${media.start_seconds}s`);
+  }
+  return parts.length ? parts.join(' · ') : null;
+}
+
+/* ------------------------------------------------------------------ */
+/*  Public build log                                                    */
+/* ------------------------------------------------------------------ */
+
+// Work records are owner-only (2026-09-28). A visitor gets the masked public build log instead —
+// vehicle_build_log_public: date, item, category, supplier, labor, stage; no money, no people —
+// minus any row already read directly.
+async function fetchPublicBuildLog(vehicleId: string, have: Set<string>): Promise<Observation[]> {
+  const { data, error } = await supabase.rpc('vehicle_build_log_public', { p_vehicle_id: vehicleId });
+  if (error || !Array.isArray(data)) return [];
+  return data
+    .filter((r: any) => r.observation_id && !have.has(r.observation_id))
+    .map((r: any) => ({
+      id: r.observation_id,
+      kind: 'work_record',
+      observed_at: r.done_on ?? null,
+      ingested_at: r.done_on ?? '',
+      source_url: null,
+      confidence: null,
+      confidence_score: null,
+      content_text: [r.item, r.supplier, r.labor_minutes ? `${Math.round(Number(r.labor_minutes))} min` : null]
+        .filter(Boolean).join(' · ') || null,
+      structured_data: { category: r.category, supplier: r.supplier, labor_minutes: r.labor_minutes, build_stage: r.build_stage },
+      source_name: 'Build log',
+      source_slug: null,
+      public_copy: true,
+    }));
+}
+
 /* ------------------------------------------------------------------ */
 /*  Source host extraction                                              */
 /* ------------------------------------------------------------------ */
@@ -178,7 +270,7 @@ const ALL_KINDS = ['listing', 'sale_result', 'comment', 'bid', 'work_record', 'o
 /* ------------------------------------------------------------------ */
 
 const ObservationTimeline: React.FC = () => {
-  const { vehicle, observationCount } = useVehicleProfile();
+  const { vehicle, observationCount, isRowOwner } = useVehicleProfile();
   const [observations, setObservations] = useState<Observation[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeFilter, setActiveFilter] = useState<string | null>(null);
@@ -211,18 +303,18 @@ const ObservationTimeline: React.FC = () => {
           .order('observed_at', { ascending: false, nullsFirst: false })
           .limit(200);
 
-        if (fallback) {
-          setObservations(fallback.map((r: any) => ({
-            ...r,
-            source_name: null,
-            source_slug: null,
-          })));
-        }
+        let rows: Observation[] = (fallback || []).map((r: any) => ({
+          ...r,
+          source_name: null,
+          source_slug: null,
+        }));
+        if (!isRowOwner) rows = rows.concat(await fetchPublicBuildLog(vehicle.id, new Set(rows.map(r => r.id))));
+        setObservations(rows);
         return;
       }
 
       if (data) {
-        setObservations(data.map((r: any) => ({
+        let rows: Observation[] = data.map((r: any) => ({
           id: r.id,
           kind: r.kind,
           observed_at: r.observed_at,
@@ -234,14 +326,16 @@ const ObservationTimeline: React.FC = () => {
           structured_data: r.structured_data,
           source_name: r.observation_sources?.display_name ?? null,
           source_slug: r.observation_sources?.slug ?? null,
-        })));
+        }));
+        if (!isRowOwner) rows = rows.concat(await fetchPublicBuildLog(vehicle.id, new Set(rows.map(r => r.id))));
+        setObservations(rows);
       }
     } catch (err) {
       console.error('[ObservationTimeline] error:', err);
     } finally {
       setLoading(false);
     }
-  }, [vehicle?.id]);
+  }, [vehicle?.id, isRowOwner]);
 
   useEffect(() => {
     fetchObservations();
@@ -398,6 +492,7 @@ const ObservationTimeline: React.FC = () => {
       {!loading && displayed.map((obs) => {
         const kc = getKindConfig(obs.kind);
         const summary = extractSummary(obs);
+        const sourceContext = sourceContextLabel(obs);
         const host = extractHost(obs.source_url);
         const confLabel = confidenceLabel(obs.confidence, obs.confidence_score);
         const confColor = confidenceColor(obs.confidence, obs.confidence_score);
@@ -465,6 +560,12 @@ const ObservationTimeline: React.FC = () => {
                 )}
               </div>
 
+              {sourceContext && (
+                <div className="obi-source-context">
+                  {sourceContext}
+                </div>
+              )}
+
               {/* Source URL (truncated) */}
               {obs.source_url && (
                 <a
@@ -519,7 +620,7 @@ const ObservationTimeline: React.FC = () => {
                   {ago || dateDisplay}
                 </span>
               )}
-              {vehicle?.id && (
+              {vehicle?.id && !obs.public_copy && (
                 <Link
                   to={`/vehicle/${vehicle.id}/observation/${obs.id}`}
                   aria-label="Open observation detail"

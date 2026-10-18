@@ -1,0 +1,159 @@
+{
+  "fixture_note": "Captured public source frames; one opaque liker hash is replaced with a label. Production intake preserves the original raw payload.",
+  "source_url": "https://bringatrailer.com/listing/2000-toyota-land-cruiser-155/",
+  "post_id": 122706961,
+  "events": [
+    {
+      "event": "comment-added",
+      "data": {
+        "post_id": 122706961,
+        "comment": {
+          "channels": [
+            "comment;item;22780538",
+            "comment;user;716244"
+          ],
+          "approved": "0",
+          "authorId": 716244,
+          "authorLikes": 85,
+          "authorName": "mwh1177",
+          "authorUrl": "https://bringatrailer.com/member/mwh1177/",
+          "authorDeleted": false,
+          "dislikes": 0,
+          "id": 22780538,
+          "likes": 0,
+          "likers": [
+            "public-liker-hash-omitted-from-fixture"
+          ],
+          "loggedOutLink": "https://bringatrailer.com/account/login/?redirect=aHR0cHM6Ly9icmluZ2F0cmFpbGVyLmNvbS93cC1hZG1pbi9hZG1pbi1hamF4LnBocD9hY3Rpb249YmF0X3RoZW1lX2NvbW1lbnRfcmF0aW5nJmNhY3Rpb249YWRkJmlkPTIyNzgwNTM4Jm5vbmNlPTgzMGJhMTA4Y2UmcGF0aD15ZXMmcmVkaXJlY3Q9eWVz",
+          "post": "122706961",
+          "markup": "<p>USD $30,750 bid placed by <a href=\"https://bringatrailer.com/member/mwh1177/\" class=\"bid-notification-link\" target=\"_blank\">mwh1177</a></p>",
+          "content": "USD $30,750 bid placed by mwh1177",
+          "timestamp": 1791136816,
+          "type": "bat-bid",
+          "unflaggable": false,
+          "unratable": false,
+          "bidAmount": 30750,
+          "wasEdited": false,
+          "commentParent": null,
+          "images": [],
+          "videos": [],
+          "videosUrl": "https://bringatrailer.com/wp-json/bringatrailer/1.0/comment/22780538/videos",
+          "hasErrorVideos": false,
+          "hasPendingVideos": false,
+          "featured": false,
+          "end_timestamp": 1791136936
+        }
+      },
+      "received_at": "2026-10-04T18:00:16.586Z"
+    },
+    {
+      "event": "endtime-updated",
+      "data": {
+        "post_id": 122706961,
+        "end_timestamp": 1791136936
+      },
+      "received_at": "2026-10-04T18:00:16.383Z"
+    },
+    {
+      "event": "stats-updated",
+      "data": {
+        "post_id": 122706961,
+        "views_numeric": 5941,
+        "views": "5,941 views",
+        "watchers_noun": "Watchers",
+        "watchers_number": "675",
+        "watchers_numeric": 675,
+        "watchers": "675 watchers"
+      },
+      "received_at": "2026-10-04T18:00:18.589Z"
+    },
+    {
+      "event": "metadata-updated",
+      "data": {
+        "post_id": 122706961,
+        "button_text": "Current Bid: USD $32,750",
+        "count": 16,
+        "count_text": "16",
+        "current_numeric": 33000,
+        "current_bid_row": "<tr class=\"listing-stats-stat\" id=\"current-bid-row\"><td class=\"listing-stats-label current-bid-label\">Current Bid</td><td class=\"listing-stats-value current-bid-value\"><span data-listing-current=\"122706961\" data-amount=\"33000\" data-high-bidder=\"639775\" data-minimum=\"33250\"><strong>USD $33,000</strong></span> <span data-listing-high-bidder-link=\"122706961\"><a href=\"https://bringatrailer.com/member/juergenjanzen/\" target=\"_blank\">JuergenJanzen</a></span></td></tr>",
+        "current_text": "$33,000",
+        "current_text_bold": "<strong>USD $33,000</strong>",
+        "current_text_expanded": "Current bid: <strong>$$33,000</strong>",
+        "current_text_plain": "$33,000",
+        "current_text_home": "$33,000",
+        "current_text_home_label": "Current Bid:",
+        "high_bidder_id": 639775,
+        "high_bidder_username": "JuergenJanzen",
+        "high_bidder_link": "<span class=\"data-listing-high-bidder-link-text-by\">by</span> <a href=\"https://bringatrailer.com/member/juergenjanzen/\" target=\"_blank\">JuergenJanzen</a>",
+        "minimum_bid_numeric": 33250,
+        "minimum_text": "Enter $33,250 or more",
+        "withdrawn": false,
+        "listing_card_data": {
+          "id": 122706961,
+          "current_bid": 33000,
+          "current_bid_formatted": "USD $33,000",
+          "current_bid_label": "Bid:",
+          "timestamp_end": 1791137313
+        },
+        "currently": "<span data-listing-currently=\"122706961\"><span class=\"info-label\">Current Bid:</span> <strong class=\"info-value\">USD $33,000</strong></span>"
+      },
+      "received_at": "2026-10-04T18:06:34.089Z"
+    },
+    {
+      "event": "comment-added",
+      "data": {
+        "post_id": 122706961,
+        "comment": {
+          "channels": [
+            "comment;item;22780669",
+            "comment;user;639775"
+          ],
+          "approved": "1",
+          "authorId": 639775,
+          "authorLikes": 1,
+          "authorName": "JuergenJanzen",
+          "authorUrl": "https://bringatrailer.com/member/juergenjanzen/",
+          "authorDeleted": false,
+          "dislikes": 0,
+          "id": 22780669,
+          "likes": 0,
+          "likers": [],
+          "loggedOutLink": "https://bringatrailer.com/account/login/?redirect=aHR0cHM6Ly9icmluZ2F0cmFpbGVyLmNvbS93cC1hZG1pbi9hZG1pbi1hamF4LnBocD9hY3Rpb249YmF0X3RoZW1lX2NvbW1lbnRfcmF0aW5nJmNhY3Rpb249YWRkJmlkPTIyNzgwNjY5Jm5vbmNlPTEzYmRkMjA3OTQmcGF0aD15ZXMmcmVkaXJlY3Q9eWVz",
+          "post": "122706961",
+          "markup": "<p>Sold on 10/04/2026 for USD $33,000 to <a href=\"https://bringatrailer.com/member/juergenjanzen/\" class=\"bid-notification-link\" target=\"_blank\">JuergenJanzen</a></p>",
+          "content": "Sold on 10/4/26 for USD $33,000.00 to JuergenJanzen",
+          "timestamp": 1791137314,
+          "type": "bat-bid-reserve",
+          "unflaggable": false,
+          "unratable": false,
+          "bidAmount": 0,
+          "wasEdited": false,
+          "commentParent": null,
+          "images": [],
+          "videos": [],
+          "videosUrl": "https://bringatrailer.com/wp-json/bringatrailer/1.0/comment/22780669/videos",
+          "hasErrorVideos": false,
+          "hasPendingVideos": false,
+          "featured": false,
+          "biddable_markup": {
+            "box": "<div id=\"listing-bid-container\" class=\"listing-closed\" data-listing-bid-id=\"122706961\" >\n\t\t<div id=\"bidding\"></div>\n\n\t\t<h2 class=\"listing-component-heading\" id=\"bid-actions\">\n\t\t\tAuction Result\t\t</h2>\n\n\t\t<table class=\"listing-stats ended\" id=\"listing-bid\" data-listing-bid-id=\"122706961\">\n\t\t\t<tbody>\n\t\t\t\n\t\t\t\t\n\t\t\t\t\t<tr class=\"listing-stats-stat\">\n\t\t\t\t\t\t<td class=\"listing-stats-label\">Winning Bid</td>\n\t\t\t\t\t\t<td class=\"listing-stats-value\">\n\t\t\t\t\t\t\t<span>\n\t\t\t\t\t\t\t\tUSD <strong>$33,000</strong>\t\t\t\t\t\t\t</span>\n\n\t\t\t\t\t\t\t<span data-listing-high-bidder-link=\"122706961\">\n\t\t\t\t\t\t\t\tby <a href=\"https://bringatrailer.com/member/juergenjanzen/\" target=\"_blank\">JuergenJanzen</a>\t\t\t\t\t\t\t</span>\n\t\t\t\t\t\t</td>\n\t\t\t\t\t</tr>\n\n\t\t\t\t\n\t\t\t\t<tr class=\"listing-stats-stat\">\n\t\t\t\t\t<td class=\"listing-stats-label\">Auction Ended</td>\n\t\t\t\t\t<td class=\"listing-stats-value\">\n\t\t\t\t\t\t<span class=\"date-localize\" data-timestamp=\"1791137313\" data-format=\"dddd, MMMM D [at] h:mma\">Sunday, October 4 at 11:08am</span>\n\t\t\t\t\t</td>\n\t\t\t\t</tr>\n\n\t\t\t\t<tr class=\"listing-stats-stat\">\n\t\t\t\t\t<td class=\"listing-stats-label\">Bids</td>\n\t\t\t\t\t<td class=\"listing-stats-value number-bids-value\">16</td>\n\t\t\t\t</tr>\n\n\t\t\t\n\t\t\t</tbody>\n\t\t</table>\n\n\n\t\t<div id=\"listing-actions-stats\" class=\"listing-actions-stats\">\n\t\t\t\n\t\t\t\n\t\t\t<div><span data-stats-id=\"122706961\" data-stats-item=\"views\">6,055 views</span></div><div><span data-stats-id=\"122706961\" data-stats-item=\"watchers\">675 watchers</span></div>\n\t\t\t<div>\n\n<div class=\"share-auction-ctrl\" data-item-title=\"2000 Toyota Land Cruiser UZJ100\" data-item-url=\"https://bringatrailer.com/listing/2000-toyota-land-cruiser-155/\">\n    <div class=\"share-button\">\n        <span class=\"share-label\">Share</span>\n        <span class=\"bat-icon share\"></span>\n    </div>\n\n    <div class=\"share-auction\" style=\"display: none\">\n        <div class=\"share-auction-content\">\n            <a href=\"javascript:;\" class=\"copy-clipboard\" data-clipboard-text=\"test\" data-success-text=\"Copied!\" onClick=\"BaT_Theme.gtagEvent(&#039;share_listing_copy_clipboard&#039;, &#039;share_listing_copy_clipboard&#039;, &#039;&#039;)\">Copy auction link to clipboard</a>\n\n            <a class=\"poppable-link\" href=\"https://bringatrailer.com/message/send/122706961/\">Send this auction via email</a>\n        </div>\n    </div>\n</div>\n</div>\n\n\t\t\t\n\t\t</div>\n\n\t\t<iframe class=\"poppable mfp-hide\" name=\"listing-bid-form-target\"></iframe>\n\t</div>\n\n\t<div class=\"pusher-connection-status\" data-status=\"connecting\">\n\t\tYou are not connected to real-time updates. Attempting to connect.\t</div>\n\n\t<div class=\"pusher-connection-status pusher-connection-status-warning\" data-status=\"disconnected\">\n\t\tYour real-time updates could not be connected. Missed updates will be sent once your connection has been reestablished.\t</div>\n\n\t<div class=\"pusher-connection-status pusher-connection-status-warning\" data-status=\"unavailable\">\n\t\tYour real-time updates could not be connected. Missed updates will be sent once your connection has been reestablished.\t</div>\n\n\t<div class=\"pusher-connection-status pusher-connection-status-warning\" data-status=\"failed\">\n\t\tYour real-time updates could not be connected. Missed updates will be sent once your connection has been reestablished.\t</div>\n\n\t<div class=\"pusher-connection-status\" data-status=\"fetching\">\n\t\tReconnected! Checking for missed updates&hellip;\t</div>",
+            "available": "<div class=\"listing-available\">\n\t\t\t\t<div class=\"listing-available-info\">\n\t\t\t\t\t<span data-listing-currently=\"122706961\"></span><span class=\"info-value noborder-tiny\">Sold for <strong>USD $33,000</strong> <span class=\"date date-localize\" data-timestamp=\"1791137313\" data-format=\"L\">on 10/4/26</span></span><a class=\"comments-anchor-link\" href=\"#comments-anchor\"><img src=\"https://bringatrailer.com/wp-content/themes/bringatrailer/assets/img/listings/comments.svg\" alt=\"comments-icon\" class=\"comments_header_icon\" /><span class=\"comments_header_html\" data-realtime_id=\"122706961\" data-realtime_prop=\"comments-updated.header_html\"><span class=\"info-value\">17</span><span class=\"info-label\">Comments</span></span></a>\t\t\t\t</div>\n\n\t\t\t\t<div class=\"listing-available-actions\">\n\t\t\t\t\t<a class=\"button button-black\" href=\"#listing-bid\">View Result</a>\t\t\t\t</div>\n\t\t\t</div>",
+            "sold_notice": "<tr class=\"listing-bid-row listing-stats-stat\"><td class=\"listing-stats-label listing-stats-label-centered\" colspan=\"2\">Sold to JuergenJanzen for $33,000!</td></tr>"
+          }
+        }
+      },
+      "received_at": "2026-10-04T18:08:35.245Z"
+    },
+    {
+      "event": "listing-ended",
+      "data": {
+        "post_id": 122706961,
+        "post_status": "paid",
+        "current_numeric": 33000,
+        "high_bidder_id": 639775,
+        "high_bidder_username": "JuergenJanzen"
+      },
+      "received_at": "2026-10-04T18:08:46.683Z"
+    }
+  ]
+}

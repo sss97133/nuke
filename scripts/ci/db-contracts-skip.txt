@@ -1,0 +1,18 @@
+# supabase/sql/test_*.sql files the db-contracts job leaves out (scripts/ci/run-db-contracts.sh); it also leaves out
+# every file a workflow job names. One file per line with its reason, sorted. Each file was run alone in a fresh
+# dm_refinement_* database on PostgreSQL 17 on 2026-10-14, except dedicated mixed-runtime fixtures identified below.
+# Delete a standalone contract's line when it passes; keep a mixed-runtime fixture with its owning job.
+test_atomic_image_witnesses.sql              # passes alone; not run in CI (its concurrency .py loads it)
+test_bat_daily_close_reconciliation.sql      # fails alone; scripts/check-auction-reconciliation.test.mjs runs it
+test_bat_live_relisted_lot_fold.sql          # fails alone; needs nuke_soft_close_test and the BaT fixture; not in CI
+test_bat_public_live_events.sql              # fails alone; needs prepare_bat_public_live_fixture.ts output
+test_comment_write_receipts.sql              # passes alone; test_cached_image_source_ancestry.sql includes it
+test_create_organization_batch_contract.sql  # passes alone; included by test_source_public_organization_profiles.sql
+test_field_provenance_image_observations.sql # passes alone; not run in CI
+test_image_observation_health.sql            # passes alone; not run in CI
+test_image_write_receipts.sql                # passes alone; not run in CI
+test_organization_listing_activity.sql       # fails alone; scripts/test-organization-listing-activity.mjs runs it
+test_retained_engine_family_intake_fixture.sql # setup only; engine-family-intake runs it with the Deno handler/PG contract
+test_retained_engine_family_proposal.sql     # fails alone; included by test_schema_proposal_add_source_contract.sql
+test_search_vehicles_fts_pagination.sql      # fails alone; scripts/test-search-reader-pagination.sh runs it
+test_structure_review_closeout.sql           # fails alone; scripts/check-structure-review-closeout.test.mjs runs it

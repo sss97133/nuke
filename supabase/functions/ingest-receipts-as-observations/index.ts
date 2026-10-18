@@ -30,6 +30,8 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { corsHeaders } from "../_shared/cors.ts";
+import { requireOwnerOrService, requireWriteAuth } from "../_shared/writeGuard.ts";
+import { projectSecretKey } from "../_shared/supabaseKeys.ts";
 
 interface ReceiptRow {
   id: string;
@@ -197,12 +199,19 @@ function buildStructuredData(r: ReceiptRow): Record<string, unknown> {
 // ─── Main handler ──────────────────────────────────────────────
 
 Deno.serve(async (req) => {
+  // Writes are never anonymous: service key, signed-in user, or nothing (P0.2, 2026-09-27).
+  const denied = await requireWriteAuth(req);
+  if (denied) return denied;
+  // Works on deals, documents, receipts or profiles by id (several run paid AI): the owner or the
+  // service key only, because "signed in" is anyone while sign-up is open (2026-09-29).
+  const notOwner = await requireOwnerOrService(req);
+  if (notOwner) return notOwner;
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
   }
 
   const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? "";
-  const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
+  const serviceKey = projectSecretKey() ?? "";
   const supabase = createClient(supabaseUrl, serviceKey);
 
   const body: BridgeRequest = await req.json().catch(() => ({}));

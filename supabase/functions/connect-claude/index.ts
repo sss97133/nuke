@@ -33,6 +33,8 @@ import {
   storeSubscriptionToken,
 } from "../_shared/claudeSubscriptionAuth.ts";
 import { decryptSecret } from "../_shared/secretBox.ts";
+import { requireWriteAuth } from "../_shared/writeGuard.ts";
+import { projectSecretKey } from "../_shared/supabaseKeys.ts";
 
 function json(body: unknown, status = 200): Response {
   return new Response(JSON.stringify(body), {
@@ -44,7 +46,7 @@ function json(body: unknown, status = 200): Response {
 function svc() {
   return createClient(
     Deno.env.get("SUPABASE_URL")!,
-    Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
+    projectSecretKey()!,
     { auth: { persistSession: false, autoRefreshToken: false } },
   );
 }
@@ -94,6 +96,9 @@ async function popVerifier(supabase: any, userId: string, state: string): Promis
 }
 
 Deno.serve(async (req) => {
+  // Writes are never anonymous: service key, signed-in user, or nothing (P0.2, 2026-09-27).
+  const denied = await requireWriteAuth(req);
+  if (denied) return denied;
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
   const url = new URL(req.url);

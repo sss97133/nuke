@@ -15,11 +15,11 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { supabase } from '../../lib/supabase';
 
-interface PaymentEventRow {
+export interface PaymentEventRow {
   id: string;
   direction: 'in' | 'out' | string;
-  amount_usd: number | string;
-  paid_at: string;
+  amount_usd: number | string | null;
+  paid_at: string | null;
   counterparty_name: string | null;
 }
 
@@ -43,81 +43,77 @@ const fmtUsd = (n: number): string =>
 const fmtUsdWhole = (n: number): string =>
   `$${Math.round(n).toLocaleString('en-US')}`;
 
-const fmtDate = (iso: string): string => {
+const fmtDate = (iso: string | null): string => {
+  if (!iso) return 'unknown date';
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return iso.slice(0, 10);
-  const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, '0');
-  const day = String(d.getDate()).padStart(2, '0');
+  const y = d.getUTCFullYear();
+  const m = String(d.getUTCMonth() + 1).padStart(2, '0');
+  const day = String(d.getUTCDate()).padStart(2, '0');
   return `${y}-${m}-${day}`;
+};
+
+const paymentAmount = (value: PaymentEventRow['amount_usd']): number | null => {
+  if (value == null || String(value).trim() === '') return null;
+  const amount = Number(value);
+  return Number.isFinite(amount) && amount >= 0 ? amount : null;
+};
+
+// Unknown directions/amounts cannot become income or zero. Undated valid
+// payments still belong in captured totals; they do not establish a year.
+export const computeMoneyFlow = (rows: PaymentEventRow[]) => {
+  let inTotal = 0; let outTotal = 0; let excluded = 0; let undated = 0;
+  const byYear = new Map<number, YearFlow>();
+  for (const row of rows) {
+    const amount = paymentAmount(row.amount_usd);
+    if (amount == null || !['in', 'out'].includes(row.direction)) { excluded++; continue; }
+    if (row.direction === 'in') inTotal += amount; else outTotal += amount;
+    const year = row.paid_at ? new Date(row.paid_at).getUTCFullYear() : NaN;
+    if (!Number.isFinite(year)) { undated++; continue; }
+    const flow = byYear.get(year) || { year, inTotal: 0, outTotal: 0 };
+    if (row.direction === 'in') flow.inTotal += amount; else flow.outTotal += amount;
+    byYear.set(year, flow);
+  }
+  return { inTotal, outTotal, excluded, undated, years: [...byYear.values()].sort((a, b) => a.year - b.year), lastFive: rows.slice(0, 5) };
 };
 
 const UserMoneyFlow: React.FC<UserMoneyFlowProps> = ({ userId, isOwnProfile }) => {
   const [rows, setRows] = useState<PaymentEventRow[]>([]);
   const [loaded, setLoaded] = useState(false);
+  const [rowCount, setRowCount] = useState<number | null>(null);
+  const [failed, setFailed] = useState(false);
 
   useEffect(() => {
     // Owner-only: never even fetch for visitors.
     if (!userId || !isOwnProfile) return;
     let cancelled = false;
+    setRows([]); setLoaded(false); setFailed(false); setRowCount(null);
 
     (async () => {
-      const { data, error } = await supabase
+      const { data, error, count } = await supabase
         .from('payment_events')
-        .select('id, direction, amount_usd, paid_at, counterparty_name')
+        .select('id, direction, amount_usd, paid_at, counterparty_name', { count: 'exact' })
         .eq('user_id', userId)
         .not('is_superseded', 'is', true) // IS NOT TRUE — keeps false AND null
-        .order('paid_at', { ascending: false })
+        .order('paid_at', { ascending: false, nullsFirst: false })
+        .order('id', { ascending: false })
         .limit(1000);
 
       if (cancelled) return;
       if (error) {
         setRows([]);
+        setFailed(true);
       } else {
         setRows((data || []) as PaymentEventRow[]);
       }
+      setRowCount(count);
       setLoaded(true);
     })();
 
     return () => { cancelled = true; };
   }, [userId, isOwnProfile]);
 
-  const { inTotal, outTotal, years, lastFive } = useMemo(() => {
-    let inSum = 0;
-    let outSum = 0;
-    const byYear = new Map<number, YearFlow>();
-
-    for (const r of rows) {
-      const amt = Number(r.amount_usd) || 0;
-      const year = new Date(r.paid_at).getFullYear();
-      if (!Number.isFinite(year)) continue;
-      const yf = byYear.get(year) || { year, inTotal: 0, outTotal: 0 };
-      if (r.direction === 'out') {
-        outSum += amt;
-        yf.outTotal += amt;
-      } else {
-        inSum += amt;
-        yf.inTotal += amt;
-      }
-      byYear.set(year, yf);
-    }
-
-    // Continuous year range from first to last year with events
-    const present = Array.from(byYear.keys()).sort((a, b) => a - b);
-    const yearRows: YearFlow[] = [];
-    if (present.length > 0) {
-      for (let y = present[0]; y <= present[present.length - 1]; y++) {
-        yearRows.push(byYear.get(y) || { year: y, inTotal: 0, outTotal: 0 });
-      }
-    }
-
-    return {
-      inTotal: inSum,
-      outTotal: outSum,
-      years: yearRows,
-      lastFive: rows.slice(0, 5), // already ordered paid_at desc
-    };
-  }, [rows]);
+  const { inTotal, outTotal, years, lastFive, excluded, undated } = useMemo(() => computeMoneyFlow(rows), [rows]);
 
   const maxYearFlow = useMemo(
     () => Math.max(1, ...years.map((y) => Math.max(y.inTotal, y.outTotal))),
@@ -127,6 +123,7 @@ const UserMoneyFlow: React.FC<UserMoneyFlowProps> = ({ userId, isOwnProfile }) =
   // Self-guards: visitors never see this card; no rows = no shell.
   if (!isOwnProfile) return null;
   if (!loaded) return null;
+  if (failed) return <p role="status">Captured payment records could not load. Totals are unknown.</p>;
   if (rows.length === 0) return null;
 
   return (
@@ -154,12 +151,20 @@ const UserMoneyFlow: React.FC<UserMoneyFlowProps> = ({ userId, isOwnProfile }) =
         }}
       >
         <span style={{ fontSize: '9px', fontWeight: 700, letterSpacing: '0.1em' }}>
-          MONEY FLOW
+          CAPTURED CASH FLOW
         </span>
         <span style={{ fontSize: '8px', color: MUTED, letterSpacing: '0.06em' }}>
           OWNER ONLY
         </span>
       </div>
+
+      <p style={{ fontSize: '9px', color: MUTED }}>
+        {rows.length} of {rowCount ?? 'unknown'} current payment records.
+        {' '}Cash flow is not verified income or profit.
+        {rowCount == null || rowCount > rows.length ? ' Totals cover only the displayed records.' : ''}
+        {excluded > 0 ? ` ${excluded} records excluded for unknown direction or invalid amount.` : ''}
+        {undated > 0 ? ` ${undated} valid payments have no known year; included in totals.` : ''}
+      </p>
 
       {/* IN / OUT totals */}
       <div style={{ display: 'flex', gap: '24px', marginBottom: '12px' }}>
@@ -181,7 +186,7 @@ const UserMoneyFlow: React.FC<UserMoneyFlowProps> = ({ userId, isOwnProfile }) =
         </div>
         <div>
           <div style={{ fontSize: '8px', color: MUTED, letterSpacing: '0.1em', marginBottom: '2px' }}>
-            NET
+            CAPTURED NET
           </div>
           <div style={{ fontFamily: '"Courier New", monospace', fontSize: '15px', fontWeight: 700 }}>
             {inTotal - outTotal >= 0 ? '+' : '−'}{fmtUsd(Math.abs(inTotal - outTotal))}
@@ -193,7 +198,7 @@ const UserMoneyFlow: React.FC<UserMoneyFlowProps> = ({ userId, isOwnProfile }) =
       {years.length > 0 && (
         <div style={{ marginBottom: '12px' }}>
           <div style={{ fontSize: '8px', color: MUTED, letterSpacing: '0.1em', marginBottom: '4px' }}>
-            BY YEAR
+            BY RECORDED YEAR (UTC)
           </div>
           {years.map((y) => (
             <div
@@ -274,7 +279,7 @@ const UserMoneyFlow: React.FC<UserMoneyFlowProps> = ({ userId, isOwnProfile }) =
                   color: r.direction === 'out' ? MUTED : INK,
                 }}
               >
-                {r.direction === 'out' ? '→' : '←'}
+                {r.direction === 'out' ? '→' : r.direction === 'in' ? '←' : '?'}
               </span>
               <span
                 style={{
@@ -284,7 +289,7 @@ const UserMoneyFlow: React.FC<UserMoneyFlowProps> = ({ userId, isOwnProfile }) =
                   color: r.direction === 'out' ? MUTED : INK,
                 }}
               >
-                {fmtUsd(Number(r.amount_usd) || 0)}
+                {paymentAmount(r.amount_usd) == null ? 'unknown amount' : fmtUsd(paymentAmount(r.amount_usd)!)}
               </span>
               <span
                 style={{

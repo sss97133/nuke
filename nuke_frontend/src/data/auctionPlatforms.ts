@@ -1,6 +1,6 @@
 /**
  * Static registry of collector vehicle auction platforms.
- * Sourced from database/seeds/live_auction_platforms.sql
+ * Sourced from docs/archive/database/seeds/live_auction_platforms.sql
  */
 
 export interface AuctionPlatform {

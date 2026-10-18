@@ -1,12 +1,12 @@
 /**
  * useVehiclesDashboard.ts
- * Garage data hook — queries 5 relationship sources in parallel,
- * resolves a canonical relationship per vehicle via priority ranking,
+ * Garage data hook — reads ownership periods and their verification evidence,
  * and provides view/sort/filter state for the garage UI.
  */
 
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '../lib/supabase';
+import { applyGarageOwnerCorrections, unresolvedGarageSources, type GarageOwnerCorrection, type UnresolvedGarageSource } from './garageOwnerCorrections';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -18,6 +18,13 @@ export type RelationshipType =
   | 'CO-OWNER'
   | 'PREVIOUSLY OWNED'
   | 'CONSIGNED'
+  | 'SHARED INTEREST'
+  | 'CLAIMED INTEREST'
+  | 'BUSINESS HANDLING'
+  | 'SALES REPRESENTATIVE'
+  | 'TRANSFER PENDING'
+  | 'RELATIONSHIP REVIEW'
+  | 'OWNERSHIP CLAIM'
   | 'CONTRIBUTOR';
 
 export type ViewMode = 'GRID' | 'LIST' | 'COMPACT';
@@ -45,6 +52,7 @@ export interface GarageVehicle {
   purchase_price: number | null;
   value_delta: number | null;
   health_score: number | null;
+  confidence_score?: number | null;
   image_count: number | null;
   event_count: number | null;
   view_count: number | null;
@@ -53,7 +61,13 @@ export interface GarageVehicle {
   created_at: string;
   updated_at: string;
   relationship_type: RelationshipType;
-  relationship_source: 'verification' | 'permission' | 'contributor' | 'discovered' | 'uploaded_by';
+  relationship_source: 'verification' | 'ownership' | 'permission' | 'contributor' | 'discovered' | 'uploaded_by' | 'owner_statement';
+  relationship_roles?: RelationshipType[];
+  relationship_detail?: string;
+  relationship_id?: string;
+  ownership_start_date?: string | null;
+  ownership_end_date?: string | null;
+  estimate_calculated_at?: string | null;
   permission_role?: string;
   event_weeks: string[] | null;
   event_summary: EventSummary | null;
@@ -101,6 +115,9 @@ export interface DashboardSummary {
 }
 
 export interface VehiclesDashboardState {
+  /** False for a visitor who is not signed in: the garage then explains itself instead of offering an add. */
+  signedIn: boolean;
+  unresolvedSources?: UnresolvedGarageSource[];
   sections: GarageSection[];
   vehicles: GarageVehicle[];
   totalEstimatedValue: number;
@@ -129,7 +146,14 @@ export interface VehiclesDashboardState {
 // ---------------------------------------------------------------------------
 
 const RELATIONSHIP_PRIORITY: RelationshipType[] = [
+  'RELATIONSHIP REVIEW',
   'CONTRIBUTOR',
+  'SALES REPRESENTATIVE',
+  'BUSINESS HANDLING',
+  'OWNERSHIP CLAIM',
+  'TRANSFER PENDING',
+  'CLAIMED INTEREST',
+  'SHARED INTEREST',
   'PREVIOUSLY OWNED',
   'CONSIGNED',
   'CO-OWNER',
@@ -137,18 +161,86 @@ const RELATIONSHIP_PRIORITY: RelationshipType[] = [
   'VERIFIED OWNER',
 ];
 
-function higherPriority(a: RelationshipType, b: RelationshipType): RelationshipType {
-  return RELATIONSHIP_PRIORITY.indexOf(a) >= RELATIONSHIP_PRIORITY.indexOf(b) ? a : b;
+interface OwnershipPeriod {
+  id: string;
+  vehicle_id: string;
+  role: string | null;
+  is_current: boolean;
+  start_date: string | null;
+  end_date: string | null;
+  verification_id: string | null;
+  created_at: string;
 }
 
-function permissionRoleToRelationship(role: string): RelationshipType {
-  const r = role.toLowerCase();
-  if (r === 'owner') return 'OWNER';
-  if (r === 'co_owner' || r === 'co-owner') return 'CO-OWNER';
-  if (r === 'consigned') return 'CONSIGNED';
-  if (r === 'previously_owned' || r === 'prev_owner') return 'PREVIOUSLY OWNED';
-  if (r === 'contributor') return 'CONTRIBUTOR';
-  return 'CONTRIBUTOR';
+interface Verification {
+  id: string;
+  vehicle_id: string;
+  status: string;
+  expires_at: string | null;
+}
+
+interface GarageRelationship {
+  type: RelationshipType;
+  source: GarageVehicle['relationship_source'];
+  id: string;
+  role?: string;
+  start_date: string | null;
+  end_date: string | null;
+}
+
+function verificationIsCurrent(row: Verification | undefined, now: Date): boolean {
+  return !!row && row.status === 'approved' &&
+    (!row.expires_at || new Date(row.expires_at).getTime() > now.getTime());
+}
+
+// The period establishes the relationship; verification corroborates it.
+// A past approval cannot override a disposal or turn an unknown role into title.
+export function resolveGarageRelationships(
+  periods: OwnershipPeriod[],
+  verifications: Verification[],
+  discoveries: { id: string; vehicle_id: string }[],
+  now = new Date(),
+): Map<string, GarageRelationship> {
+  const result = new Map<string, GarageRelationship>();
+  const proofs = new Map(verifications.map(v => [v.id, v]));
+  const today = now.toISOString().slice(0, 10);
+  const current = (p: OwnershipPeriod) => p.is_current && !p.end_date &&
+    (!p.start_date || p.start_date <= today);
+
+  for (const d of discoveries) {
+    result.set(d.vehicle_id, { type: 'PREVIOUSLY OWNED', source: 'discovered', id: d.id, start_date: null, end_date: null });
+  }
+  for (const v of verifications) {
+    const existing = result.get(v.vehicle_id);
+    if (!existing || (existing.type === 'OWNERSHIP CLAIM' && verificationIsCurrent(v, now))) {
+      result.set(v.vehicle_id, { type: verificationIsCurrent(v, now) ? 'VERIFIED OWNER' : 'OWNERSHIP CLAIM',
+        source: 'verification', id: v.id, start_date: null, end_date: null });
+    }
+  }
+  // Reacquisition wins over an earlier ended period; otherwise use the latest
+  // recorded period deterministically. Row creation is never acquisition time.
+  const selected = new Map<string, OwnershipPeriod>();
+  for (const p of [...periods].sort((a, b) => Number(current(b)) - Number(current(a)) ||
+    (b.start_date ?? '').localeCompare(a.start_date ?? '') ||
+    b.created_at.localeCompare(a.created_at) || a.id.localeCompare(b.id))) {
+    if (!selected.has(p.vehicle_id)) selected.set(p.vehicle_id, p);
+  }
+  for (const p of selected.values()) {
+    const role = p.role?.toLowerCase();
+    const ownerRoles = ['verified_owner', 'owner', 'current_owner', 'co_owner', 'co-owner', 'previous_owner'];
+    let type: RelationshipType = 'OWNERSHIP CLAIM';
+    if ((!p.start_date || p.start_date <= today) && role && ownerRoles.includes(role)) {
+      if (role === 'previous_owner' || (p.end_date && p.end_date <= today)) type = 'PREVIOUSLY OWNED';
+      else if (current(p)) {
+        const proof = proofs.get(p.verification_id ?? '');
+        type = role === 'co_owner' || role === 'co-owner' ? 'CO-OWNER'
+          : proof?.vehicle_id === p.vehicle_id && verificationIsCurrent(proof, now) ? 'VERIFIED OWNER' : 'OWNER';
+      }
+    } else if (role === 'consigned' && current(p)) type = 'CONSIGNED';
+    result.set(p.vehicle_id, { type, source: 'ownership', id: p.id, role: p.role ?? undefined,
+      start_date: p.start_date, end_date: p.end_date });
+  }
+  return result;
 }
 
 
@@ -158,7 +250,7 @@ function permissionRoleToRelationship(role: string): RelationshipType {
 
 function matchesFilter(v: GarageVehicle, filter: FilterMode): boolean {
   if (filter === 'ALL') return true;
-  if (filter === 'OWNED') return ['VERIFIED OWNER', 'OWNER', 'CO-OWNER', 'PREVIOUSLY OWNED', 'CONSIGNED'].includes(v.relationship_type);
+  if (filter === 'OWNED') return ['VERIFIED OWNER', 'OWNER', 'CO-OWNER', 'PREVIOUSLY OWNED'].includes(v.relationship_type);
   if (filter === 'CONTRIBUTED') return v.relationship_type === 'CONTRIBUTOR';
   return true;
 }
@@ -186,11 +278,11 @@ function garageToMyVehicle(v: GarageVehicle): MyVehicle {
     year: v.year,
     make: v.make,
     model: v.model,
-    acquisition_date: v.created_at ?? null,
+    acquisition_date: v.ownership_start_date ?? null,
     last_activity_date: v.last_event_at ?? v.updated_at ?? null,
     event_count: v.event_count,
     image_count: v.image_count,
-    confidence_score: v.health_score ?? 0,
+    confidence_score: v.confidence_score ?? 0,
     interaction_score: 0,
     primary_image_url: v.resolved_image_url ?? v.primary_image_url ?? null,
     current_value: v.estimated_value,
@@ -198,7 +290,7 @@ function garageToMyVehicle(v: GarageVehicle): MyVehicle {
   };
 }
 
-const MY_RELATIONSHIP_TYPES: RelationshipType[] = ['VERIFIED OWNER', 'OWNER', 'CO-OWNER', 'PREVIOUSLY OWNED', 'CONSIGNED'];
+const MY_RELATIONSHIP_TYPES: RelationshipType[] = ['VERIFIED OWNER', 'OWNER', 'CO-OWNER', 'PREVIOUSLY OWNED'];
 
 function buildDashboardData(
   sections: GarageSection[],
@@ -210,7 +302,7 @@ function buildDashboardData(
     const list = s.vehicles.map(garageToMyVehicle);
     if (MY_RELATIONSHIP_TYPES.includes(s.relationship_type)) {
       myVehicles.push(...list);
-    } else if (s.relationship_type === 'CONTRIBUTOR') {
+    } else if (['CONTRIBUTOR', 'CONSIGNED', 'SALES REPRESENTATIVE'].includes(s.relationship_type)) {
       clientVehicles.push(...list);
     }
   }
@@ -250,7 +342,7 @@ function buildSections(vehicles: GarageVehicle[]): GarageSection[] {
 // Vehicle select columns (only columns that exist on the vehicles table)
 // ---------------------------------------------------------------------------
 
-const VEHICLE_SELECT = 'id, year, make, model, trim, vin, current_value, purchase_price, primary_image_url, image_count, confidence_score, heat_score, view_count, created_at, updated_at, status';
+const VEHICLE_SELECT = 'id, year, make, model, normalized_model, trim, vin, purchase_price, primary_image_url, image_count, confidence_score, heat_score, view_count, created_at, updated_at, status';
 
 const VISIBLE_STATUSES = new Set(['active', 'pending', 'discovered', 'pending_backfill']);
 
@@ -259,9 +351,9 @@ interface VehicleRow {
   year: number | null;
   make: string | null;
   model: string | null;
+  normalized_model?: string | null;
   trim: string | null;
   vin: string | null;
-  current_value: number | null;
   purchase_price: number | null;
   primary_image_url: string | null;
   image_count: number | null;
@@ -275,33 +367,31 @@ interface VehicleRow {
 
 function rowToGarageVehicle(
   row: VehicleRow,
-  relationship_type: RelationshipType,
-  relationship_source: GarageVehicle['relationship_source'],
-  permission_role?: string,
+  relationship: GarageRelationship,
+  estimate?: { estimated_value: number; calculated_at: string } | null,
   image_count?: number | null,
   fallback_image_url?: string | null,
   event_weeks?: string[] | null,
   event_summary?: EventSummary | null,
 ): GarageVehicle {
-  const estimated_value = row.current_value ?? row.purchase_price ?? null;
-  const value_delta =
-    row.current_value != null && row.purchase_price != null
-      ? row.current_value - row.purchase_price
-      : null;
+  const estimated_value = estimate?.estimated_value ?? null;
 
   return {
     id: row.id,
     year: row.year,
     make: row.make,
-    model: row.model,
+    model: row.normalized_model?.trim() || row.model,
     trim: row.trim,
     vin: row.vin,
     primary_image_url: row.primary_image_url,
     resolved_image_url: row.primary_image_url || fallback_image_url || null,
     estimated_value,
     purchase_price: row.purchase_price,
-    value_delta,
-    health_score: row.confidence_score,
+    // Vehicle-level purchase price is not an attributed ownership-period cost.
+    value_delta: null,
+    // Data confidence does not describe the vehicle's mechanical condition.
+    health_score: null,
+    confidence_score: row.confidence_score,
     image_count: image_count ?? null,
     event_count: event_summary?.total_events ?? null,
     view_count: row.view_count,
@@ -309,9 +399,13 @@ function rowToGarageVehicle(
     last_event_at: event_summary?.last_event_date ?? null,
     created_at: row.created_at,
     updated_at: row.updated_at,
-    relationship_type,
-    relationship_source,
-    permission_role,
+    relationship_type: relationship.type,
+    relationship_source: relationship.source,
+    relationship_id: relationship.id,
+    ownership_start_date: relationship.start_date,
+    ownership_end_date: relationship.end_date,
+    estimate_calculated_at: estimate?.calculated_at ?? null,
+    permission_role: relationship.role,
     event_weeks: event_weeks ?? null,
     event_summary: event_summary ?? null,
   };
@@ -323,6 +417,7 @@ function rowToGarageVehicle(
 
 export function useVehiclesDashboard(userId: string | undefined | null): VehiclesDashboardState {
   const [rawVehicles, setRawVehicles] = useState<GarageVehicle[]>([]);
+  const [unresolvedSources, setUnresolvedSources] = useState<UnresolvedGarageSource[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [viewMode, setViewMode] = useState<ViewMode>('GRID');
@@ -335,113 +430,50 @@ export function useVehiclesDashboard(userId: string | undefined | null): Vehicle
   useEffect(() => {
     if (!userId) {
       setRawVehicles([]);
+      setUnresolvedSources([]);
+      setError(null);
       setIsLoading(false);
       return;
     }
 
     let cancelled = false;
+    setRawVehicles([]);
+    setUnresolvedSources([]);
     setIsLoading(true);
     setError(null);
 
     async function fetchAll() {
       try {
-        // Garage = vehicles the user has an EXPLICIT ownership relationship with.
-        //
-        // Removed sources (2026-05-23 cleanup):
-        //  - vehicle_user_permissions  -- auto-granted by import triggers; was
-        //    producing 70+ junk "owner" rows for vehicles Skylar only ran a
-        //    dropbox import on (Viva inventory etc).
-        //  - vehicle_contributors      -- same problem; auto-set by ingestion.
-        //  - profile_origin='local_photos' AND uploaded_by=me -- promoted every
-        //    user-triggered import to OWNER.
-        //
-        // Kept sources (all explicit user signals):
-        //  Q1 ownership_verifications  -- approved verification flow
-        //  Q4 discovered_vehicles      -- previously_owned discoveries
-        //  Q5 vehicle_ownerships       -- the authoritative current ownership table
-        //
-        // Q2/Q3 results below are hard-coded empty so the rest of the file's
-        // ordering stays untouched.
-        const [verifiedRes, prevOwnedRes, localPhotosRes] = await Promise.all([
-          supabase
-            .from('ownership_verifications')
-            .select('vehicle_id, created_at')
+        // Preserve the May 23 owner decision: import permissions, contributors
+        // and uploaded_by are not evidence of ownership and stay excluded.
+        const [verifiedRes, prevOwnedRes, ownershipRes, correctionRes] = await Promise.all([
+          supabase.from('ownership_verifications')
+            .select('id, vehicle_id, status, expires_at')
             .eq('user_id', userId)
             .eq('status', 'approved'),
-          supabase
-            .from('discovered_vehicles')
-            .select('vehicle_id, relationship_type, created_at')
+          supabase.from('discovered_vehicles')
+            .select('id, vehicle_id')
             .eq('user_id', userId)
             .eq('relationship_type', 'previously_owned')
             .eq('is_active', true),
-          supabase
-            .from('vehicle_ownerships')
-            .select('vehicle_id, role, is_current')
-            .eq('owner_profile_id', userId)
-            .eq('is_current', true),
+          supabase.from('vehicle_ownerships')
+            .select('id, vehicle_id, role, is_current, start_date, end_date, verification_id, created_at')
+            .eq('owner_profile_id', userId),
+          supabase.rpc('get_my_garage_owner_corrections', { p_user_id: userId, p_include_unresolved: true }),
         ]);
-        const permRes: { data: any[] } = { data: [] };
-        const contribRes: { data: any[] } = { data: [] };
-
         if (cancelled) return;
-
-        // Build relationship map: vehicle_id → { type, source, role }
-        const relMap = new Map<string, {
-          type: RelationshipType;
-          source: GarageVehicle['relationship_source'];
-          role?: string;
-        }>();
-
-        function setRel(id: string, type: RelationshipType, source: GarageVehicle['relationship_source'], role?: string) {
-          const existing = relMap.get(id);
-          if (!existing || RELATIONSHIP_PRIORITY.indexOf(type) > RELATIONSHIP_PRIORITY.indexOf(existing.type)) {
-            relMap.set(id, { type, source, role });
-          }
+        for (const res of [verifiedRes, prevOwnedRes, ownershipRes, correctionRes]) {
+          if (res.error) throw new Error('Garage relationships unavailable. Please retry.');
         }
-
-        // Q1: verified owners (highest priority)
-        if (verifiedRes.data) {
-          for (const row of verifiedRes.data) {
-            setRel(row.vehicle_id, 'VERIFIED OWNER', 'verification');
-          }
-        }
-
-        // Q2: permissions
-        if (permRes.data) {
-          for (const row of permRes.data) {
-            const rel = permissionRoleToRelationship(row.role);
-            setRel(row.vehicle_id, rel, 'permission', row.role);
-          }
-        }
-
-        // Q3: contributors
-        if (contribRes.data) {
-          for (const row of contribRes.data) {
-            if (row.status === 'inactive') continue;
-            setRel(row.vehicle_id, 'CONTRIBUTOR', 'contributor', row.role || 'contributor');
-          }
-        }
-
-        // Q4: previously owned
-        if (prevOwnedRes.data) {
-          for (const row of prevOwnedRes.data) {
-            setRel(row.vehicle_id, 'PREVIOUSLY OWNED', 'discovered');
-          }
-        }
-
-        // Q5: explicit vehicle_ownerships (authoritative current ownership)
-        if (localPhotosRes.data) {
-          for (const row of localPhotosRes.data as { vehicle_id: string; role: string | null }[]) {
-            const role = String(row.role || '').toLowerCase();
-            // verified_owner → VERIFIED OWNER, owner/current_owner → OWNER,
-            // co_owner → CO-OWNER, previous_owner → PREVIOUSLY OWNED
-            const rel: RelationshipType =
-              role === 'verified_owner' ? 'VERIFIED OWNER'
-              : role === 'co_owner' || role === 'co-owner' ? 'CO-OWNER'
-              : role === 'previous_owner' ? 'PREVIOUSLY OWNED'
-              : 'OWNER';
-            setRel(row.vehicle_id, rel, 'verification', row.role || undefined);
-          }
+        const relMap = resolveGarageRelationships(
+          ownershipRes.data ?? [], verifiedRes.data ?? [], prevOwnedRes.data ?? [],
+        );
+        const corrections = (correctionRes.data ?? []) as GarageOwnerCorrection[];
+        // Statements can concern a vehicle missing from the legacy ownership union.
+        for (const c of corrections) {
+          if (!c.vehicle_id) continue;
+          if (!relMap.has(c.vehicle_id)) relMap.set(c.vehicle_id, { type: 'RELATIONSHIP REVIEW',
+            source: 'owner_statement', id: c.id, start_date: null, end_date: null });
         }
 
         // Hydrate all vehicle IDs in the relationship map
@@ -460,6 +492,7 @@ export function useVehiclesDashboard(userId: string | undefined | null): Vehicle
             )
           );
           for (const res of chunkResults) {
+            if (res.error) throw new Error('Garage vehicles unavailable. Please retry.');
             if (res.data) {
               for (const v of res.data as VehicleRow[]) {
                 allRows.set(v.id, v);
@@ -476,6 +509,7 @@ export function useVehiclesDashboard(userId: string | undefined | null): Vehicle
         const fallbackImages = new Map<string, string>();
         const eventSummaries = new Map<string, EventSummary>();
         const eventWeeksMap = new Map<string, string[]>();
+        const estimates = new Map<string, { estimated_value: number; calculated_at: string }>();
 
         if (vehicleIdArray.length > 0) {
           // IDs missing primary_image_url need fallback images
@@ -489,7 +523,7 @@ export function useVehiclesDashboard(userId: string | undefined | null): Vehicle
             if (row.image_count != null) imageCounts.set(vid, Number(row.image_count));
           }
 
-          const [fallbackRes, eventSummaryRes, eventWeeksRes] = await Promise.all([
+          const [fallbackRes, eventSummaryRes, eventWeeksRes, estimateRes] = await Promise.all([
             needsFallback.length > 0
               ? supabase.rpc('get_first_image_batch', { vehicle_ids: needsFallback })
               : Promise.resolve({ data: [] }),
@@ -498,7 +532,22 @@ export function useVehiclesDashboard(userId: string | undefined | null): Vehicle
               .select('vehicle_id, total_events, times_sold, platform_list, first_event_date, last_event_date')
               .in('vehicle_id', vehicleIdArray),
             supabase.rpc('get_vehicle_event_weeks_batch', { vehicle_ids: vehicleIdArray }),
+            // Preserve get_user_garage's existing build-class admission policy.
+            // Never replace absent evidence with legacy value or purchase price.
+            supabase.from('nuke_estimates')
+              .select('vehicle_id, estimated_value, calculated_at')
+              .in('vehicle_id', vehicleIdArray)
+              .eq('comp_method', 'class_stratified')
+              .eq('is_stale', false)
+              .eq('is_circular', false),
           ]);
+          if (estimateRes.error) throw new Error('Garage estimates unavailable. Please retry.');
+          for (const e of estimateRes.data ?? []) {
+            if (Number.isFinite(Number(e.estimated_value)) && Number(e.estimated_value) > 0 &&
+                e.calculated_at && Number.isFinite(Date.parse(e.calculated_at))) {
+              estimates.set(e.vehicle_id, { estimated_value: Number(e.estimated_value), calculated_at: e.calculated_at });
+            }
+          }
 
           if (fallbackRes.data) {
             for (const f of fallbackRes.data as { vehicle_id: string; image_url: string }[]) {
@@ -532,10 +581,11 @@ export function useVehiclesDashboard(userId: string | undefined | null): Vehicle
           const rel = relMap.get(id);
           if (!rel) continue;
           if (row.status && !VISIBLE_STATUSES.has(row.status)) continue;
-          garage.push(rowToGarageVehicle(row, rel.type, rel.source, rel.role, imageCounts.get(id), fallbackImages.get(id), eventWeeksMap.get(id), eventSummaries.get(id)));
+          garage.push(rowToGarageVehicle(row, rel, estimates.get(id), imageCounts.get(id), fallbackImages.get(id), eventWeeksMap.get(id), eventSummaries.get(id)));
         }
 
-        setRawVehicles(garage);
+        setRawVehicles(applyGarageOwnerCorrections(garage, corrections));
+        setUnresolvedSources(unresolvedGarageSources(corrections));
       } catch (err: unknown) {
         if (!cancelled) {
           const msg = err instanceof Error ? err.message : 'Unknown error fetching vehicles';
@@ -557,16 +607,17 @@ export function useVehiclesDashboard(userId: string | undefined | null): Vehicle
 
   const sections = buildSections(vehicles);
 
-  // Only sum OWNED-class relationships. Contributors / previously-owned are
-  // not yours to sum into "my garage value." See garage audit 2026-05-05.
+  // Current ownership only; ended periods, claims and consignments are not assets.
   const totalEstimatedValue = vehicles
-    .filter((v) => MY_RELATIONSHIP_TYPES.includes(v.relationship_type))
+    .filter((v) => ['VERIFIED OWNER', 'OWNER', 'CO-OWNER'].includes(v.relationship_type))
     .reduce((sum, v) => sum + (v.estimated_value ?? 0), 0);
 
   const data = userId ? buildDashboardData(sections, vehicles) : null;
 
   return {
+    signedIn: !!userId,
     sections,
+    unresolvedSources,
     vehicles,
     totalEstimatedValue,
     isLoading,

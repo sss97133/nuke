@@ -1,0 +1,10 @@
+FIREWALL-GROMMET:
+  device: Blue Sea 1003 CableClam 1.40 in, one per 2 AWG cable (max cable 0.56 in; M22759/16-2 is 0.388 in)
+  kit:
+    BLUESEA-1003: 2
+  open:
+  - 'the 16-20 AWG ECU and PDM30 grounds in this crossing: a clam each, or a sealed grommet — not picked'
+  sources:
+  - reference_documents/web_snapshots/www.bluesea.com__CableClam_1.40in.md ('Max Cable Diameter 0.56in (14.22 mm)')
+  - reference_documents/web_snapshots/www.prowireusa.com__m22759-16-tefzel-wire.md (M22759/16-2-X OD .388 in)
+  - docs/wiring/research/2026-09-28_unpicked-parts-and-fuel-hanger.md §2

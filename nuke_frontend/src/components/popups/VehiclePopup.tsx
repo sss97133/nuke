@@ -17,6 +17,7 @@ import React, { useEffect, useState } from 'react';
 import type { FeedVehicle } from '../../feed/types/feed';
 import { resolveVehiclePrice } from '../../feed/utils/feedPriceResolution';
 import { supabase } from '../../lib/supabase';
+import { VEHICLE_POPUP_COLUMNS } from './vehiclePopupColumns';
 import { usePopup } from './usePopup';
 import { optimizeImageUrl } from '../../lib/imageOptimizer';
 import { useViewHistory } from '../../hooks/useViewHistory';
@@ -24,6 +25,7 @@ import { useInterests } from '../../hooks/useInterests';
 import { MakePopup } from './MakePopup';
 import { ModelPopup } from './ModelPopup';
 import { SourcePopup } from './SourcePopup';
+import type { CompScope } from '../../pages/vehicle-profile/hooks/useVehicleIntel';
 
 interface Props {
   vehicle: FeedVehicle;
@@ -36,6 +38,7 @@ interface VehicleIntel {
   scores: ScoreData | null;
   apparitions: Apparition[] | null;
   recent_comps: CompSale[] | null;
+  recent_comps_scope?: CompScope | null;
 }
 
 interface CommentIntel {
@@ -108,6 +111,7 @@ export function VehiclePopup({ vehicle, searchQuery }: Props) {
   const price = resolveVehiclePrice(vehicle);
   const [intel, setIntel] = useState<VehicleIntel | null>(null);
   const [loading, setLoading] = useState(true);
+  const [unavailable, setUnavailable] = useState(false);
 
   // Track view
   useEffect(() => {
@@ -122,15 +126,17 @@ export function VehiclePopup({ vehicle, searchQuery }: Props) {
     let cancelled = false;
 
     async function fetchIntel() {
+      setUnavailable(false);
       try {
         const { data, error } = await supabase.rpc('popup_vehicle_intel', {
           p_vehicle_id: vehicle.id,
         });
+        if (error) throw error;
         if (!cancelled && !error && data) {
           setIntel(data as VehicleIntel);
         }
       } catch {
-        // fail silently
+        if (!cancelled) setUnavailable(true);
       }
       if (!cancelled) setLoading(false);
     }
@@ -152,7 +158,7 @@ export function VehiclePopup({ vehicle, searchQuery }: Props) {
     if (src) openPopup(<SourcePopup source={src} />, src.toUpperCase(), 420);
   };
   const handleCompClick = (comp: CompSale) => {
-    supabase.from('vehicles').select('*').eq('id', comp.id).single().then(({ data }) => {
+    supabase.from('vehicles').select(VEHICLE_POPUP_COLUMNS).eq('id', comp.id).single().then(({ data }) => {
       if (data) openPopup(<VehiclePopup vehicle={data as unknown as FeedVehicle} />, [comp.year, comp.model].filter(Boolean).join(' '), 480);
     });
   };
@@ -334,11 +340,12 @@ export function VehiclePopup({ vehicle, searchQuery }: Props) {
 
           {/* Quick badges */}
           <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginTop: 4, marginBottom: 4 }}>
-            {di.title_status && <IntelBadge label={`TITLE: ${di.title_status}`} color="var(--vp-brg, #004225)" />}
+            {/* title_status / owner_count are raw extraction output and can arrive as objects or lists */}
+            {typeof di.title_status === 'string' && di.title_status && <IntelBadge label={`TITLE: ${di.title_status}`} color="var(--vp-brg, #004225)" />}
             {di.matching_numbers === true && <IntelBadge label="MATCHING NUMBERS" color="var(--vp-brg, #004225)" />}
             {di.matching_numbers === false && <IntelBadge label="NOT MATCHING" color="var(--vp-danger, #8a0020)" />}
             {di.condition && <IntelBadge label={di.condition.toUpperCase()} color="#1a1a1a" />}
-            {di.owner_count != null && <IntelBadge label={`${di.owner_count} OWNER${di.owner_count !== 1 ? 'S' : ''}`} color="#666" />}
+            {typeof di.owner_count === 'number' && <IntelBadge label={`${di.owner_count} OWNER${di.owner_count !== 1 ? 'S' : ''}`} color="#666" />}
           </div>
 
           {/* Red flags */}
@@ -383,7 +390,11 @@ export function VehiclePopup({ vehicle, searchQuery }: Props) {
       {/* Comparable sales — specific vehicles, not stats */}
       {comps && comps.length > 0 && (
         <div style={{ padding: '8px 12px', borderBottom: '1px solid #ccc' }}>
-          <Label>RECENT COMPARABLE SALES</Label>
+          <Label>RECENT SOLD CONTEXT</Label>
+          <div title={intel?.recent_comps_scope?.basis || undefined} style={{ fontFamily: SANS, fontSize: 9, color: '#666', marginTop: 4 }}>
+            {intel?.recent_comps_scope?.label && <span>{intel.recent_comps_scope.label} · </span>}
+            Condition not matched
+          </div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 0, marginTop: 6 }}>
             {comps.slice(0, 5).map((c) => (
               <div
@@ -500,10 +511,10 @@ export function VehiclePopup({ vehicle, searchQuery }: Props) {
       </div>
 
       {/* Loading state for intel */}
-      {loading && (
+      {(loading || unavailable) && (
         <div style={{ padding: '8px 12px', textAlign: 'center' }}>
           <span style={{ fontFamily: MONO, fontSize: 8, color: '#999', textTransform: 'uppercase', letterSpacing: '0.08em' }}>
-            Loading intelligence...
+            {unavailable ? 'Vehicle intelligence unavailable.' : 'Loading intelligence...'}
           </span>
         </div>
       )}

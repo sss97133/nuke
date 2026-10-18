@@ -1,8 +1,7 @@
 /**
- * BidsPopup — Shows bid history for a vehicle in a stacking popup.
+ * BidsPopup — Shows a bounded window of recorded bid reports for a vehicle.
  *
- * Extracts bids from auction_comments where bid_amount > 0.
- * Falls back to showing the source auction link if no granular bid data.
+ * Uses the existing unified reader's explicit bid role; an amount alone is not a bid.
  */
 
 import React, { useEffect, useState } from 'react';
@@ -18,20 +17,25 @@ interface Props {
 
 interface BidRow {
   comment_id: string;
+  vehicle_id: string;
+  comment_type: string;
   author_username: string | null;
   bid_amount: number;
-  observed_at: string;
+  observed_at: string | null;
   platform: string | null;
+  comment_url: string | null;
 }
 
 const MONO = "'Courier New', Courier, monospace";
 const SANS = 'Arial, Helvetica, sans-serif';
 
-function formatTimeAgo(dateString: string): string {
+function formatTimeAgo(dateString: string | null): string {
+  if (!dateString) return 'time unrecorded';
   try {
     const d = new Date(dateString);
     const ms = Date.now() - d.getTime();
-    if (ms < 0 || !Number.isFinite(ms)) return '';
+    if (!Number.isFinite(ms)) return 'time unrecorded';
+    if (ms < 0) return 'recorded time is in the future';
     const mins = Math.floor(ms / 60000);
     if (mins < 1) return 'just now';
     if (mins < 60) return `${mins}m ago`;
@@ -41,44 +45,69 @@ function formatTimeAgo(dateString: string): string {
     if (days < 365) return `${days}d ago`;
     return d.toLocaleDateString();
   } catch {
-    return '';
+    return 'time unrecorded';
   }
 }
 
+function sourceUrl(value: string | null | undefined): string | null {
+  try {
+    const url = new URL(value || '');
+    return ['https:', 'http:'].includes(url.protocol) ? url.href : null;
+  } catch { return null; }
+}
+
 export function BidsPopup({ vehicleId, bidCount, highBid, listingUrl, searchQuery }: Props) {
-  const [bids, setBids] = useState<BidRow[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const [loadedBids, setBids] = useState<BidRow[]>([]);
+  const [reading, setLoading] = useState(true);
+  const [readError, setError] = useState<string | null>(null);
+  const [parentAccessible, setAccessible] = useState(false);
+  const [readVehicleId, setReadVehicleId] = useState(vehicleId);
 
   useEffect(() => {
     let cancelled = false;
+    const controller = new AbortController();
+    const deadline = setTimeout(() => controller.abort(), 10_000);
 
     async function load() {
       setLoading(true);
+      setReadVehicleId(vehicleId);
       setError(null);
+      setBids([]);
+      setAccessible(false);
       try {
-        // Fetch comments that are bids (have bid_amount)
+        const parent = await supabase.from('vehicles').select('id').eq('id', vehicleId).limit(1).abortSignal(controller.signal);
+        if (parent.error || parent.data?.length !== 1 || parent.data[0].id !== vehicleId) throw new Error('parent unavailable');
+        if (cancelled) return;
+        setAccessible(true);
         const { data, error: err } = await supabase
           .from('vehicle_comments_unified')
-          .select('comment_id, author_username, bid_amount, observed_at, platform')
+          .select('comment_id, vehicle_id, comment_type, author_username, bid_amount, observed_at, platform, comment_url')
           .eq('vehicle_id', vehicleId)
-          .not('bid_amount', 'is', null)
+          .eq('comment_type', 'bid')
           .gt('bid_amount', 0)
-          .order('bid_amount', { ascending: false })
-          .limit(100);
+          .order('observed_at', { ascending: false, nullsFirst: false })
+          .order('comment_id', { ascending: true })
+          .limit(100)
+          .abortSignal(controller.signal);
 
-        if (err) throw err;
-        if (!cancelled) setBids((data || []) as BidRow[]);
-      } catch (e: any) {
-        if (!cancelled) setError(e?.message || 'Failed to load bids');
+        if (err || !Array.isArray(data) || data.length > 100 || new Set(data.map(row => row.comment_id)).size !== data.length || data.some(row => typeof row.comment_id !== 'string' || !row.comment_id || row.vehicle_id !== vehicleId || row.comment_type !== 'bid' || !Number.isFinite(Number(row.bid_amount)) || Number(row.bid_amount) <= 0)) throw new Error('bid reports unavailable');
+        if (!cancelled) setBids(data as BidRow[]);
+      } catch {
+        if (!cancelled) setError('Bid reports are unavailable for this vehicle.');
       }
+      clearTimeout(deadline);
       if (!cancelled) setLoading(false);
     }
 
     load();
-    return () => { cancelled = true; };
+    return () => { cancelled = true; controller.abort(); clearTimeout(deadline); };
   }, [vehicleId]);
 
+  const currentScope = readVehicleId === vehicleId;
+  const bids = currentScope ? loadedBids : [];
+  const loading = !currentScope || reading;
+  const error = currentScope ? readError : null;
+  const accessible = currentScope && parentAccessible;
   const sq = (searchQuery || '').toLowerCase().trim();
   const filtered = sq
     ? bids.filter(b =>
@@ -86,8 +115,6 @@ export function BidsPopup({ vehicleId, bidCount, highBid, listingUrl, searchQuer
         String(b.bid_amount).includes(sq) ||
         `$${Number(b.bid_amount).toLocaleString()}`.toLowerCase().includes(sq))
     : bids;
-
-  const maxBid = filtered.length > 0 ? Math.max(...filtered.map(b => Number(b.bid_amount))) : (highBid || null);
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column' }}>
@@ -101,23 +128,18 @@ export function BidsPopup({ vehicleId, bidCount, highBid, listingUrl, searchQuer
       }}>
         <div>
           <span style={{ fontFamily: SANS, fontSize: 7, fontWeight: 800, textTransform: 'uppercase' as const, letterSpacing: '0.5px', color: '#999' }}>
-            BIDS
+            REPORTS SHOWN
           </span>
           <span style={{ fontFamily: MONO, fontSize: 13, fontWeight: 700, color: '#1a1a1a', marginLeft: 6 }}>
-            {loading ? '...' : filtered.length > 0 ? filtered.length : (bidCount || 0)}
+            {loading ? '...' : error ? 'unavailable' : filtered.length}
           </span>
         </div>
-        {maxBid != null && maxBid > 0 && (
-          <div>
-            <span style={{ fontFamily: SANS, fontSize: 7, fontWeight: 800, textTransform: 'uppercase' as const, letterSpacing: '0.5px', color: '#999' }}>
-              HIGH BID
-            </span>
-            <span style={{ fontFamily: MONO, fontSize: 13, fontWeight: 700, color: '#004225', marginLeft: 6 }}>
-              ${maxBid.toLocaleString()}
-            </span>
-          </div>
-        )}
       </div>
+
+      {accessible && <div style={{ padding: '6px 12px', fontFamily: SANS, fontSize: 10, color: '#666' }}>
+        Up to 100 newest readable entries marked as bids with positive amounts, across this vehicle's recorded auction episodes. This is a read window, not the full bid count. Currency is unrecorded by this reader; times may be source postings or observation times.
+        {bidCount != null && <div style={{ marginTop: 4 }}>Reported count supplied by the vehicle summary: {bidCount.toLocaleString()}.</div>}
+      </div>}
 
       {/* Bid list */}
       <div style={{ maxHeight: '55vh', overflowY: 'auto' }}>
@@ -131,7 +153,7 @@ export function BidsPopup({ vehicleId, bidCount, highBid, listingUrl, searchQuer
 
         {error && (
           <div style={{ padding: '20px 12px', textAlign: 'center' }}>
-            <span style={{ fontFamily: MONO, fontSize: 9, color: '#8a0020' }}>{error}</span>
+            <span role="status" style={{ fontFamily: MONO, fontSize: 9, color: '#8a0020' }}>{error}</span>
           </div>
         )}
 
@@ -146,21 +168,16 @@ export function BidsPopup({ vehicleId, bidCount, highBid, listingUrl, searchQuer
         {!loading && !error && bids.length === 0 && !sq && (
           <div style={{ padding: '16px 12px' }}>
             <div style={{ fontFamily: SANS, fontSize: 10, color: '#666', marginBottom: 8 }}>
-              No granular bid data extracted for this vehicle.
+              No positive bid reports in this read. Other retained interactions may carry amounts without being bids.
             </div>
-            {bidCount != null && bidCount > 0 && (
-              <div style={{ fontFamily: MONO, fontSize: 10, color: '#1a1a1a', marginBottom: 8 }}>
-                {bidCount} bid{bidCount !== 1 ? 's' : ''} reported by the auction platform.
-              </div>
-            )}
             {highBid != null && highBid > 0 && (
               <div style={{ fontFamily: MONO, fontSize: 11, fontWeight: 700, color: '#004225', marginBottom: 8 }}>
-                High bid: ${highBid.toLocaleString()}
+                Bid number supplied by the vehicle summary: {highBid.toLocaleString()}
               </div>
             )}
-            {listingUrl && (
+            {sourceUrl(listingUrl) && (
               <a
-                href={listingUrl}
+                href={sourceUrl(listingUrl)!}
                 target="_blank"
                 rel="noopener noreferrer"
                 style={{
@@ -177,48 +194,36 @@ export function BidsPopup({ vehicleId, bidCount, highBid, listingUrl, searchQuer
           </div>
         )}
 
-        {!loading && filtered.map((b, i) => {
-          const isHighest = i === 0;
-          const barWidth = maxBid && maxBid > 0 ? Math.max(4, (Number(b.bid_amount) / maxBid) * 100) : 100;
-
+        {!loading && filtered.map(b => {
           return (
             <div
               key={b.comment_id}
               style={{
                 padding: '6px 12px',
                 borderBottom: '1px solid #e0e0e0',
-                background: isHighest ? 'rgba(0,66,37,0.03)' : 'transparent',
               }}
             >
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 3 }}>
                 <span style={{
                   fontFamily: MONO, fontSize: 12, fontWeight: 700,
-                  color: isHighest ? '#004225' : '#1a1a1a', flexShrink: 0,
+                  color: '#1a1a1a', flexShrink: 0,
                 }}>
-                  ${Number(b.bid_amount).toLocaleString()}
+                  {Number(b.bid_amount).toLocaleString()}
                 </span>
                 <span style={{
                   fontFamily: MONO, fontSize: 9, fontWeight: 700,
                   color: '#666', maxWidth: 120,
                   overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
                 }}>
-                  {b.author_username || 'Anonymous'}
+                  {b.author_username || 'author unrecorded'}{b.platform ? ` · ${b.platform}` : ''}
                 </span>
                 <span style={{
                   fontFamily: MONO, fontSize: 8, color: '#999', marginLeft: 'auto', flexShrink: 0,
                 }}>
-                  {formatTimeAgo(b.observed_at)}
+                  Recorded {formatTimeAgo(b.observed_at)}
                 </span>
               </div>
-              {/* Visual bar */}
-              <div style={{ height: 2, background: '#e0e0e0', width: '100%' }}>
-                <div style={{
-                  height: 2,
-                  width: `${barWidth}%`,
-                  background: isHighest ? '#004225' : '#2a6fa0',
-                  transition: 'width 180ms cubic-bezier(0.16, 1, 0.3, 1)',
-                }} />
-              </div>
+              {sourceUrl(b.comment_url) ? <a href={sourceUrl(b.comment_url)!} target="_blank" rel="noopener noreferrer" style={{ fontFamily: SANS, fontSize: 9 }}>Source ↗</a> : <span style={{ fontFamily: SANS, fontSize: 9, color: '#666' }}>Source link unrecorded</span>}
             </div>
           );
         })}

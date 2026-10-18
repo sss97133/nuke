@@ -8,6 +8,14 @@ export interface VehicleIntel {
   scores: ScoreData | null;
   apparitions: Apparition[] | null;
   recent_comps: CompSale[] | null;
+  recent_comps_scope?: CompScope | null;
+}
+
+export interface CompScope {
+  label: string | null;
+  basis: string | null;
+  condition_matched: boolean;
+  condition_note: string;
 }
 
 export interface CommentIntel {
@@ -63,6 +71,10 @@ export interface CompSale {
   sale_date: string | null;
   thumbnail: string | null;
   mileage: number | null;
+  source_url?: string | null;
+  platform?: string | null;
+  sold_basis?: string | null;
+  sold_amount_from?: string | null;
 }
 
 export function useVehicleIntel(vehicleId: string | undefined) {

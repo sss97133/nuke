@@ -59,7 +59,7 @@ ALTER DATABASE postgres SET app.settings.service_role_key = 'YOUR_SERVICE_ROLE_K
 Deploy the two new edge functions:
 
 ```bash
-cd /Users/skylar/nuke
+cd ~/nuke
 
 # Deploy discovery function
 supabase functions deploy discover-cl-squarebodies

@@ -343,7 +343,9 @@ function PopupWindow({
   const effectiveWidth = resized?.w ?? entry.width;
 
   // Center on screen, then offset by stack position + drag
-  const baseLeft = `calc(50% - ${effectiveWidth / 2}px + ${index * STACK_OFFSET}px + ${dragOffset.x}px)`;
+  const visibleWidth = `min(${effectiveWidth}px, calc(100vw - 32px))`;
+  const centeredLeft = `calc(50% - ${visibleWidth} / 2 + ${index * STACK_OFFSET}px + ${dragOffset.x}px)`;
+  const baseLeft = `clamp(16px, ${centeredLeft}, calc(100vw - ${visibleWidth} - 16px))`;
   const baseTop = `calc(15vh + ${index * STACK_OFFSET}px + ${dragOffset.y}px)`;
 
   // Inject searchQuery into content via cloneElement

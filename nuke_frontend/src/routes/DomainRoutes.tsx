@@ -5,6 +5,7 @@ import { ProtectedRoute } from '../components/auth/ProtectedRoute';
 
 // Static pages (footer/legal) — lazy-loaded since rarely visited
 const About = React.lazy(() => import('../pages/About'));
+const NotFound = React.lazy(() => import('../pages/NotFound'));
 const PrivacyPolicy = React.lazy(() => import('../pages/PrivacyPolicy'));
 const TermsOfService = React.lazy(() => import('../pages/TermsOfService'));
 const DataDeletion = React.lazy(() => import('../pages/DataDeletion'));
@@ -17,10 +18,16 @@ const BrowseVehicles = React.lazy(() => import('../pages/BrowseVehicles'));
 const LiveFloor = React.lazy(() => import('../live/LiveFloor'));
 // Cohort terminal — Bloomberg-for-a-cohort (year-make-model landing)
 const CohortTerminal = React.lazy(() => import('../pages/CohortTerminal'));
+// Deal read — a marketplace ask placed on the cohort's BaT sales record
+const DealRead = React.lazy(() => import('../pages/DealRead'));
 // R&D: white-label / "make this my app" showroom
 const BrandStudio = React.lazy(() => import('../pages/BrandStudio'));
 const PublicMap = React.lazy(() => import('../components/map/PublicMap'));
 const Valuation = React.lazy(() => import('../pages/Valuation'));
+const SourcesBoard = React.lazy(() => import('../pages/market/SourcesBoard'));
+// Stacks: a page per stack, a path through the nine layers (case ledger §13.2)
+const StacksIndex = React.lazy(() => import('../pages/stacks/StacksIndex'));
+const OrderBookStack = React.lazy(() => import('../pages/stacks/OrderBookStack'));
 
 // Public map page — no auth, no DeckGL
 function MapPage() {
@@ -186,10 +193,15 @@ export const DomainRoutes = () => {
         {/* Search + Browse + Map: public */}
         <Route path="/search" element={<Search />} />
         <Route path="/cohort/:make/:model/:year" element={<CohortTerminal />} />
+        <Route path="/deal/:vehicleId" element={<DealRead />} />
         <Route path="/browse" element={<BrowseVehicles />} />
         <Route path="/live" element={<LiveFloor />} />
         <Route path="/map" element={<MapPage />} />
+        <Route path="/sources" element={<SourcesBoard />} />
+        <Route path="/sources/:source" element={<SourcesBoard />} />
         <Route path="/valuation" element={<Valuation />} />
+        <Route path="/stacks" element={<StacksIndex />} />
+        <Route path="/stacks/order-book/:vehicleId" element={<OrderBookStack />} />
         {/* Public auction listings */}
         <Route path="/auctions" element={<AuctionMarketplace />} />
         <Route path="/auction/:listingId" element={<AuctionListing />} />
@@ -299,8 +311,8 @@ export const DomainRoutes = () => {
           </Route>
         </Route>
 
-        {/* ── Fallback ─────────────────────────────────────────────────── */}
-        <Route path="*" element={<Navigate to="/" replace />} />
+        {/* ── Fallback: a path with no page says so, instead of landing on the board unannounced ── */}
+        <Route path="*" element={<NotFound />} />
       </Routes>
     </Suspense>
   );

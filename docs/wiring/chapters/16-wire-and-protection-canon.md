@@ -18,8 +18,11 @@ This chapter is the durable reference for the *physical conductor* and everythin
 
 | AWG range | Spec | Locked |
 |---|---|---|
-| 12–22 AWG | M22759/32 | 2026-05-11 |
+| 12–20 AWG | M22759/32 | 2026-05-11 (was 12–22; 22 moved 2026-09-26) |
+| 22 AWG | M22759/16 | 2026-09-26 |
 | 4–10 AWG | M22759/16 | 2026-05-11 |
+
+**REVERSAL (2026-09-26) — 22 AWG is M22759/16-22, not /32-22.** MoTeC specifies "22# Tefzel wire (Mil Spec M22759/16-22)" for its Superseal connectors (source: `reference_documents/component_drawings/motec_c125_user_manual.pdf` printed p.20 = PDF p.21, and PDF p.71 — cited for MoTeC's wiring practice, the C125 display itself is not in this build) and tables M22759/16 as its wire (source: `motec_pdm_user_manual.pdf` printed p.48 = PDF p.51, "Wire Specification"). The thin /32 wall that makes /32 attractive (§1.2) is too thin at 22 AWG to seal: /32-22 is 0.043 in = 1.09 mm OD (source: ProWire AS22759/32 datasheet, fetched 2026-09-26), under the 1.20–1.85 mm cable range of the GT150 22–20 terminal seal (source: 12191818 distributor technical data, fetched 2026-09-26); /16-22 is 1.27–1.37 mm (source: ProWire M22759/16 datasheet). 20 AWG /32 (≥ 1.27 mm) stays. Receipt: `docs/wiring/receipts/2026-09-26_dave-sheet-alignment-22awg-m22759-16-dossiers.md`.
 
 Tefzel-only — no TXL, no marine-cable substitution for 4 AWG. (source: `docs/wiring/K5_WIRING_STATE.md` §1 "DECISIONS LOCKED IN" — Skylar verbal "ONLY TEFZEL", 2026-05-11)
 

@@ -115,4 +115,4 @@ Counts before → after:
 
 - ISSUES.md: doppelganger CRITICAL updated to IN_PROGRESS with exact remainder; new HIGH filed for the `reattribute_observation()` structural defects (unique_observation scope, ssd_blast dedup, is_primary copy, INSERT-trigger timeout chain).
 - e04bf9c5 end-state oddity (out of approved scope, untouched): `status='active'` + `is_public=true` + `deleted_at` set. As a now-unlinked ghost for the GAA truck it should likely become a clean non-public ghost record; note that ghost `135cb20e` already holds the GAA sale event `826883df` — the two GAA records may themselves deserve resolution.
-- `owner_id` on the REAL K5 e08bf694 is NULL and `owner_name` still says "Scott (li3go)" (the 2026-04-28 A/R-sweep error flagged in the 05-17 audit). Ownership promotion requires Skylar's explicit signal + title-proof flow — NOT done here by design.
+- `owner_id` on the REAL K5 e08bf694 is NULL and `owner_name` still says "the client" (the 2026-04-28 A/R-sweep error flagged in the 05-17 audit). Ownership promotion requires Skylar's explicit signal + title-proof flow — NOT done here by design.

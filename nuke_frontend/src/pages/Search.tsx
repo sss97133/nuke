@@ -209,6 +209,7 @@ export default function Search() {
     searchMeta,
     handleLoadMore,
     loadingMore,
+    loadMoreError,
     browseStats,
     detectedMake,
     urlExtraction,
@@ -233,6 +234,13 @@ export default function Search() {
       {/* Active search: filters + results */}
       {query && !urlExtraction && (
         <>
+          {vehicleCount > 0 && (
+            <p style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>
+              {displayVehicleCount} of {vehicleCount} loaded vehicle records shown.
+              {' '}Recorded prices may be past sales, estimates, or asks. Current purchase availability is unverified.
+              {(filters.priceMin || filters.priceMax) && ' Price bounds apply to these loaded records; unknown prices are excluded. This is not an exhaustive market shortlist.'}
+            </p>
+          )}
           {/* Cohort terminal link — only when the query is a clean year-make-model */}
           {cohortTarget && (
             <Link
@@ -285,9 +293,11 @@ export default function Search() {
               activeFilter={resultFilter}
               onFilterChange={setResultFilter}
               totalCount={searchMeta?.total_count}
-              hasMore={searchMeta?.has_more}
+              hasMore={searchMeta?.has_more && !searchMeta.pagination_limited}
+              paginationLimited={searchMeta?.pagination_limited}
               onLoadMore={handleLoadMore}
               loadingMore={loadingMore}
+              loadMoreError={loadMoreError}
             />
           </div>
 

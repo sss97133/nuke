@@ -9,6 +9,8 @@ export interface UserProfile {
   email: string | null;
   avatar_url: string | null;
   bio: string | null;
+  profession?: string | null;
+  expertise_areas?: string[] | null;
   location: string | null; // free-text legacy field — prefer city/state below
   city: string | null;
   state: string | null;

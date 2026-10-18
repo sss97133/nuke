@@ -36,6 +36,16 @@ The system manages three entity types. These are universal across all verticals.
 - Has a profile that accumulates reputation from traced actions, not from declared identity.
 - May operate personal business entities (LLC, GmbH, estate) — those are organizations, not users.
 
+The native user profile starts with source image intake. Its garage is a projection
+of that user record: native album membership is human organization, independent
+original-byte readings supply candidate physical identity, and attributed role/title
+statements supply the person's relationship. An album, upload or work photograph
+does not establish ownership or the performer. Personal ownership, business handling,
+consignment, representation, shared/disputed interest and pending transfer remain
+distinct, with unknown period bounds and conflicts retained. See the current
+[garage evidence contract](../../../design/GARAGE_EVIDENCE_MODEL.md) for implemented
+stages and remaining identity/synchronization work.
+
 ### ORGANIZATION (gallery, auction house, museum, magazine, shop, foundation, estate, studio, publisher, racing team, dealer, freeport, university, shipping company)
 - CAN become an asset (a magazine's archive has value; a gallery's roster is intellectual property; an auction house's records are historical documents).
 - Accumulates value through the assets it touches and the actors it connects.
@@ -407,6 +417,22 @@ appraisals (
 ```
 
 The Nuke Estimate for art = the same concept as the Nuke Estimate for vehicles. A computed value derived from comparable sales, trajectory analysis, and condition assessment, with confidence scoring and source citations.
+
+### Vehicle sale-event population and explicit relevance
+
+The deterministic `selectSourceSalePopulation` contract in existing `lib/dealRead/batComps.ts` starts with every supplied sale presentation. Its identity is canonical source platform × listing episode. A vehicle can have several sale episodes; repeated agreeing captures of one episode contribute one sale. Contradictory supported captures refuse that episode and retain all presentation and snapshot references. Native sold/price rows and unadmitted archives remain candidates, not qualified prices.
+
+Qualification requires attributed outcome, positive amount, event day or instant, independent knowledge time, original currency and fee basis. A day remains an interval. Event and knowledge cutoffs are independent; later evidence cannot rewrite an earlier receipt. Episode-bound relevance claims have their own evidence references and knowledge clocks. A missing condition claim remains unknown.
+
+Broad-market distributions are partitioned by currency and fee basis. Matched distributions use an explicit caller policy over named dimensions, retain every matching episode, and disclose mismatches and unknowns. Incomplete supplied populations and sparse matched pools withhold distributions. There is no default exact-year trim, row-count sample, weighting, conversion or fair-value conclusion. Only the subject episode is excluded from comparisons; its earlier resales survive. Consecutive supported resales can show nominal observed price changes, which are not market-index returns or condition-adjusted assessments.
+
+This is an additive local contract, tested with synthetic captures. Existing `valuation_by_ymm` → `/valuation` and its v1 calculator remain unchanged until an existing reader supplies qualified population evidence and explicit coverage. The pure selector does not establish public-source custody or perform source qualification.
+
+The existing v1 `/valuation` evidence view uses the complete qualified source-lot receipt, with display paging rather than the ten-row recent preview. It exposes original source/vehicle links, separate event and knowledge clocks, sanitized snapshot/observation ancestry and capture-versus-vehicle-versus-lot coverage. Unknown ancestry stays unknown. An explicit all-years action uses the existing exact recorded make/model reader; related registered model aliases may be absent, so its price position is a different population, not market movement. The public reader still supplies current recorded sale facts per vehicle; this view does not create earlier resale history or condition-adjusted value. Local DOM/browser acceptance is distinct from production deployment.
+
+The read-only `scripts/discovery/sale-event-candidates.sql` receives explicit parent IDs and retains their `vehicle_events` and `bat_listings` presentations without an event-age, exact-year or sold-only filter. Optional event and knowledge cutoffs annotate candidates; they do not discard history. Each native source has a separate declared limit and an overflow sentinel that refuses a sampled result. Protected snapshot headers are independently bounded pointers, never raw-source qualification. Native prices retain unknown currency, fee basis, claim availability and source-publication status; a public vehicle does not make every attached source public. Page results must be reconciled across source episodes before population completeness can be claimed.
+
+`scripts/assay-sale-population.mjs` runs the existing selector on saved `{schemaVersion: 'sale_event_population_v1', rows, options}` JSON, without network, intake, database writes or inference. Run `node scripts/assay-sale-population.mjs --input /private/saved-input.json --out /private/new-receipt.json` with Node 22.18 or newer. The receipt records the input SHA-256 and every candidate, conflict and exclusion; it requires a new private output outside the checkout. Its explicit 256 MiB file limit rejects oversized input instead of truncating it. Do not promote candidate rows or mark a bounded page as the whole market. Synthetic PostgreSQL contracts and offline CLI contracts run in the existing frontend CI workflow.
 
 ---
 

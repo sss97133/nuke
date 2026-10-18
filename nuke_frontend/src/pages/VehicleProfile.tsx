@@ -1,53 +1,49 @@
 import React, { useState, useEffect } from 'react';
-import { Link, useNavigate, useLocation } from 'react-router-dom';
+import { Link, useNavigate, useLocation, useParams } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
+import { PrefetchLink } from '../components/PrefetchLink';
 import { useValuationIntel } from '../hooks/useValuationIntel';
 import { useVehicleMemeDrops } from '../hooks/useVehicleMemeDrops';
 import { TimelineEventService } from '../services/timelineEventService';
 const AddEventWizard = React.lazy(() => import('../components/AddEventWizard'));
-const VehicleHeader = React.lazy(() => import('./vehicle-profile/VehicleHeader'));
 const VehicleHeroImage = React.lazy(() => import('./vehicle-profile/VehicleHeroImage'));
 import '../styles/unified-design-system.css';
 import '../styles/vehicle-profile.css';
 import '../styles/barcode-timeline.css';
-const VehicleSubHeader = React.lazy(() => import('./vehicle-profile/VehicleSubHeader'));
 const AddOrganizationRelationship = React.lazy(() => import('../components/vehicle/AddOrganizationRelationship'));
 import { usePageTitle, getVehicleTitle } from '../hooks/usePageTitle';
+import { useVehiclePriceFacts } from './vehicle-profile/hooks/useVehiclePriceFacts';
+import ProfileHeader from './vehicle-profile/ProfileHeader';
+import { useOrderBook } from './stacks/orderBookReader';
 const ValidationPopupV2 = React.lazy(() => import('../components/vehicle/ValidationPopupV2'));
 import VehicleMemeOverlay from '../components/vehicle/VehicleMemeOverlay';
 const VehicleOwnershipPanel = React.lazy(() => import('../components/ownership/VehicleOwnershipPanel'));
 import { VehicleProfileProvider, useVehicleProfile } from './vehicle-profile/VehicleProfileContext';
+import { isVehicleVinAddress, resolveVehicleVinAddress, type VinAddressResolution } from './vehicle-profile/loadVehicleData';
 const WorkspaceContent = React.lazy(() => import('./vehicle-profile/WorkspaceContent'));
 const VehicleBanners = React.lazy(() => import('./vehicle-profile/VehicleBanners'));
+const VehicleBadgeBar = React.lazy(() => import('./vehicle-profile/VehicleBadgeBar'));
 const BarcodeTimeline = React.lazy(() => import('./vehicle-profile/BarcodeTimeline'));
 const VehicleBriefing = React.lazy(() => import('./vehicle-profile/VehicleBriefing'));
+const VehiclePerformance = React.lazy(() => import('./stacks/VehicleCohort').then(module => ({ default: module.VehiclePerformance })));
 const VehiclePhotoLightbox = React.lazy(() => import('./vehicle-profile/VehiclePhotoLightbox'));
+const VehicleEvidenceView = React.lazy(() => import('./vehicle-profile/VehicleEvidenceView'));
 
 
 const VehicleProfileInner: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
+  const returnTo = new URLSearchParams(location.search).get('returnTo');
   const ctx = useVehicleProfile();
 
   // Aliases from context — single source of truth
-  const { vehicleId, vehicle, session, auctionPulse, isRowOwner, isVerifiedOwner, hasContributorAccess, userOwnershipClaim, permissions, isPublic } = ctx;
+  const { vehicleId, vehicle, session, isRowOwner, isVerifiedOwner, hasContributorAccess, userOwnershipClaim, permissions, isPublic } = ctx;
+  const { priceFacts } = useVehiclePriceFacts(vehicleId ?? undefined);
+  const selectedEpisode = useOrderBook(vehicleId ?? '', new URLSearchParams(location.search).get('performanceLot') ?? 'latest');
 
   // Local-only state (not in context)
   const [referenceLibraryRefreshKey, setReferenceLibraryRefreshKey] = useState(0);
   const [showAddEvent, setShowAddEvent] = useState(false);
-  const vehicleHeaderRef = React.useRef<HTMLDivElement | null>(null);
-
-  // Measure VehicleHeader height for sticky positioning
-  useEffect(() => {
-    const el = vehicleHeaderRef.current;
-    if (!el) return;
-    const update = () => ctx.setVehicleHeaderHeight(el.offsetHeight);
-    update();
-    const ro = new ResizeObserver(update);
-    ro.observe(el);
-    return () => ro.disconnect();
-  }, [vehicle, auctionPulse]); // eslint-disable-line react-hooks/exhaustive-deps
-
   const [showAddOrgRelationship, setShowAddOrgRelationship] = useState(false);
   const [showOwnershipClaim, setShowOwnershipClaim] = useState(false);
   const { lastMemeDrop } = useVehicleMemeDrops(vehicle?.id);
@@ -194,20 +190,25 @@ const VehicleProfileInner: React.FC = () => {
         </div>
     );
   }
+  if (new URLSearchParams(location.search).get('view') === 'evidence') {
+    return <React.Suspense fallback={null}><VehicleEvidenceView /></React.Suspense>;
+  }
   return (
       <div className="vehicle-profile-page">
-        {/* Vehicle Sub-Header with Price — sticky, z-900 per V3 spec */}
-        <div ref={vehicleHeaderRef} className="vehicle-profile-sub-header" style={{ position: 'sticky', top: 'var(--header-height, 40px)', zIndex: 900, background: 'var(--surface)', borderBottom: '2px solid var(--border)' }}>
-          <React.Suspense fallback={null}>
-            <VehicleHeader
-              onClaimClick={() => setShowOwnershipClaim(true)}
-            />
-          </React.Suspense>
-        </div>
+        {returnTo?.startsWith(`/stacks/order-book/${vehicleId}?`) && (
+          <div role="status" style={{ padding: '8px 12px', borderBottom: '2px solid var(--border)', fontSize: 11 }}>
+            This is the current vehicle record. <Link to={returnTo}>Return to the selected auction and replay →</Link>
+          </div>
+        )}
+        {/* The header through the kit: identity and price stay in view; recorded facts scroll with the page. */}
+        <ProfileHeader key={vehicleId} priceLotId={selectedEpisode.data?.lots.find(lot =>
+          priceFacts?.source_url && lot.source_url.replace(/\/+$/, '') === priceFacts.source_url.replace(/\/+$/, '')
+        )?.id} />
 
-        {/* Vehicle Sub-Header — sticky badge bar */}
         <React.Suspense fallback={null}>
-          <VehicleSubHeader />
+          <VehicleBadgeBar />
+          <VehiclePerformance key={vehicleId} vehicleId={vehicleId!} />
+          <VehicleBriefing collapsed />
         </React.Suspense>
 
         {/* Banners: BaT data flag, live auction, external auction, orphaned vehicle, merge proposals */}
@@ -217,13 +218,18 @@ const VehicleProfileInner: React.FC = () => {
           />
         </React.Suspense>
 
-        {/* Barcode Timeline — sticky, 10px collapsed, expandable to heatmap */}
+        {/* Optional timeline — one episode, with calendar controls on request */}
         <React.Suspense fallback={null}>
-          <BarcodeTimeline />
+          <BarcodeTimeline selectionPending={selectedEpisode.isPending} selectedAuctionUrl={selectedEpisode.data?.lot?.source_url ?? null} onSelectAuction={(url: string) => {
+            const selected = selectedEpisode.data?.lots.find(lot => lot.source_url.replace(/\/+$/, '') === url.replace(/\/+$/, ''));
+            if (!selected) return;
+            const next = new URLSearchParams(location.search); next.set('performanceLot', selected.id);
+            navigate(`${location.pathname}?${next}`, { replace: true });
+          }} />
         </React.Suspense>
 
         {/* Hero Image Section */}
-        <div id="vehicle-hero" className="hero" style={{ scrollMarginTop: 'calc(var(--header-height, 40px) + 88px)' }}>
+        <div id="vehicle-hero" className="hero" style={{ scrollMarginTop: 'var(--vp-sticky-top)' }}>
           <React.Suspense fallback={null}>
             <VehicleHeroImage
               overlayNode={<VehicleMemeOverlay lastEvent={lastMemeDrop} />}
@@ -246,11 +252,6 @@ const VehicleProfileInner: React.FC = () => {
             />
           </React.Suspense>
         )}
-
-        {/* Vehicle Briefing — L0 headline + L1 stat pills, immediately after hero */}
-        <React.Suspense fallback={null}>
-          <VehicleBriefing />
-        </React.Suspense>
 
         {/* Main Content */}
         <div style={{ marginTop: '8px' }}>
@@ -376,11 +377,37 @@ const VehicleProfileInner: React.FC = () => {
   );
 };
 
-/** Wraps VehicleProfileInner with the shared context provider. */
-const VehicleProfile: React.FC = () => (
-  <VehicleProfileProvider>
-    <VehicleProfileInner />
-  </VehicleProfileProvider>
-);
+const VehicleVinAddress: React.FC<{ vin: string }> = ({ vin }) => {
+  const navigate = useNavigate();
+  const location = useLocation();
+  const [status, setStatus] = useState<VinAddressResolution['status'] | null>(null);
+  useEffect(() => {
+    let cancelled = false;
+    setStatus(null);
+    void resolveVehicleVinAddress(vin, supabase).then(resolution => {
+      if (cancelled) return;
+      if (resolution.status === 'resolved') {
+        navigate(`/vehicle/${resolution.id}${location.search}${location.hash}`, { replace: true });
+      } else {
+        setStatus(resolution.status);
+      }
+    });
+    return () => { cancelled = true; };
+  }, [vin, navigate, location.search, location.hash]);
+
+  return <main className="vehicle-profile" role="status"><p>{status === 'missing' ? 'No public vehicle matches this VIN.'
+      : status === 'ambiguous' ? 'More than one public vehicle matches this VIN.'
+      : status === 'unavailable' ? 'The VIN record could not be read.'
+      : status === 'malformed' ? 'The VIN record could not be resolved.' : 'Resolving VIN…'}</p>
+      {status && <PrefetchLink to="/search">Search vehicles</PrefetchLink>}
+  </main>;
+};
+
+/** Resolve VIN addresses before mounting any UUID-dependent profile readers. */
+const VehicleProfile: React.FC = () => {
+  const { vehicleId } = useParams<{ vehicleId: string }>();
+  if (isVehicleVinAddress(vehicleId)) return <VehicleVinAddress key={vehicleId} vin={vehicleId} />;
+  return <VehicleProfileProvider><VehicleProfileInner /></VehicleProfileProvider>;
+};
 
 export default VehicleProfile;

@@ -37,7 +37,10 @@ struct ShareCardContent: View {
                     Text(title.isEmpty ? "VEHICLE" : title)
                         .font(.system(size: 54, weight: .bold)).foregroundStyle(.white)
                         .lineLimit(2).minimumScaleFactor(0.6)
-                    if let v = valuation, let mid = v.value, mid > 0 {
+                    // The same rule as the screen (WorthBracketView): a thin or class-blind
+                    // estimate is "Not priced yet" there, so it is nothing here. A shared
+                    // image is the most public surface the app has; never a price it blocks.
+                    if let v = valuation, !v.isThin, let mid = v.value, mid > 0 {
                         worthLine(mid: mid, lo: v.value_low, hi: v.value_high)
                     }
                 }

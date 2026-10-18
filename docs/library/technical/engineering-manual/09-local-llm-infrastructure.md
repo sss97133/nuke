@@ -190,7 +190,7 @@ OLLAMA_MODELS=/Volumes/NukePortable/ollama-models \
 ### Creating a Model from Modelfile
 
 ```bash
-cd /Users/skylar/nuke
+cd ~/nuke
 ollama create nuke -f yono/Modelfile.nuke
 ollama run nuke
 ```

@@ -59,7 +59,7 @@ interface ImageComment {
   content: string;
   created_at: string;
   user?: {
-    email?: string;
+    username?: string;
     full_name?: string;
   };
 }
@@ -298,7 +298,7 @@ const ProImageViewer: React.FC<ProImageViewerProps> = ({
         .from('image_comments')
         .select(`
           *,
-          user:profiles(email, full_name)
+          user:profiles(username, full_name)
         `)
         .eq('image_id', imageId)
         .order('created_at', { ascending: true });
@@ -1580,7 +1580,7 @@ const ProImageViewer: React.FC<ProImageViewerProps> = ({
                         <div key={comment.id} className="comment-item">
                           <div className="comment-header">
                             <span className="text-small font-bold">
-                              {comment.user?.full_name || comment.user?.email || 'Anonymous'}
+                              {comment.user?.full_name || comment.user?.username || 'Anonymous'}
                             </span>
                             <span className="text-small text-muted">
                               {formatDate(comment.created_at)}

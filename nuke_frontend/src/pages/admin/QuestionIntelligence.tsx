@@ -310,21 +310,18 @@ export default function QuestionIntelligence() {
       if (qiErr) throw new Error(qiErr.message);
       setRows(qiData || []);
 
-      // Load progress (how far through classification)
-      const { data: progressData } = await supabase.rpc('execute_sql', {
-        query: `SELECT
-          (SELECT count(*) FROM auction_comments WHERE question_classified_at IS NOT NULL) as classified,
-          (SELECT count(*) FROM auction_comments WHERE question_primary_l1 IS NOT NULL) as has_l1`
-      });
+      // Load progress: questions that carry a category, summed from the same materialized view the
+      // table above is built from (admin-gated RPC, migration 20260927170400). The live counts over
+      // 14.8M auction_comments do not fit a request, and execute_sql is closed to user sessions.
+      const { data: progressData } = await supabase.rpc('admin_qi_progress');
 
       if (progressData?.[0]) {
-        const classified = Number(progressData[0].classified);
         const has_l1 = Number(progressData[0].has_l1);
         setProgress({
           total_questions: 1653943, // Known from initial count
-          classified,
+          classified: has_l1,
           has_l1,
-          pct_done: Math.round(classified / 1653943 * 1000) / 10,
+          pct_done: Math.round(has_l1 / 1653943 * 1000) / 10,
         });
       }
 
@@ -430,7 +427,7 @@ export default function QuestionIntelligence() {
         }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
             <span style={{ fontSize: 'var(--fs-8)', textTransform: 'uppercase', color: 'var(--text-secondary)' }}>
-              Classification Progress
+              Categorized questions (as of the view's last refresh)
             </span>
             <span style={{ fontSize: 'var(--fs-8)', fontFamily: "'Courier New', monospace", color: 'var(--text)' }}>
               {fmtK(progress.classified)} / {fmtK(progress.total_questions)} ({fmtPct(progress.pct_done)})

@@ -21,184 +21,19 @@ import { qualityGate } from '../_shared/extractionQualityGate.ts';
 import { archiveFetch } from '../_shared/archiveFetch.ts';
 import { normalizeListingUrl } from '../_shared/urlNormalization.ts';
 import { writeObservation } from '../_shared/observationWriter.ts';
+import { requireWriteAuth } from '../_shared/writeGuard.ts';
+import { projectSecretKey } from "../_shared/supabaseKeys.ts";
+import { parseListingMarkdown, parseListingUrls } from "./listingParser.ts";
 
-const VERSION = '1.1.0';
+const VERSION = '1.1.1';
 const JAMESEDITION_SOURCE_ID = '77c149de-7866-4a7c-ad24-3423ee6c1f22';
-
-// ─── Markdown parsing helpers ───────────────────────────────────────────────
-
-function extractBetween(md: string, startMarker: string, endMarker: string): string {
-  const startIdx = md.indexOf(startMarker);
-  if (startIdx === -1) return '';
-  const afterStart = startIdx + startMarker.length;
-  const endIdx = endMarker ? md.indexOf(endMarker, afterStart) : md.length;
-  return md.slice(afterStart, endIdx === -1 ? md.length : endIdx).trim();
-}
-
-function extractField(md: string, label: string): string | null {
-  // Pattern: "Label\n\nValue" or "Label\nValue" in markdown
-  const patterns = [
-    new RegExp(`(?:^|\\n)${label}\\s*\\n\\n([^\\n]+)`, 'i'),
-    new RegExp(`(?:^|\\n)${label}\\s*\\n([^\\n]+)`, 'i'),
-    new RegExp(`${label}[:\\s]+([^\\n]+)`, 'i'),
-  ];
-  for (const p of patterns) {
-    const m = md.match(p);
-    if (m && m[1]?.trim()) return m[1].trim();
-  }
-  return null;
-}
-
-function parsePrice(text: string | null): number | null {
-  if (!text) return null;
-  const m = text.match(/[\$€£]?\s*([\d,]+(?:\.\d{2})?)/);
-  if (!m) return null;
-  const val = parseFloat(m[1].replace(/,/g, ''));
-  return isNaN(val) || val < 100 ? null : val;
-}
-
-function parseMileage(text: string | null): { value: number; unit: string } | null {
-  if (!text) return null;
-  const m = text.match(/([\d,]+)\s*(mi|km|miles|kilometers)/i);
-  if (!m) return null;
-  const value = parseInt(m[1].replace(/,/g, ''));
-  const unit = m[2].toLowerCase().startsWith('km') ? 'km' : 'mi';
-  return { value: unit === 'km' ? Math.round(value * 0.621371) : value, unit };
-}
-
-function extractImages(md: string): string[] {
-  const images: string[] = [];
-  const imgPattern = /!\[.*?\]\((https:\/\/img\.jamesedition\.com\/[^)]+)\)/g;
-  let match;
-  while ((match = imgPattern.exec(md)) !== null) {
-    // Get full-res version by removing size suffix
-    let url = match[1];
-    // Replace size suffixes like /je/507x312xc.jpg with /je/1100xxs.jpg for bigger images
-    url = url.replace(/\/je\/\d+x\d+[a-z]*\./, '/je/1100xxs.');
-    if (!images.includes(url)) images.push(url);
-  }
-  return images;
-}
-
-function extractVin(md: string): string | null {
-  // Look for VIN field
-  const vinField = extractField(md, 'VIN');
-  if (vinField && /^[A-HJ-NPR-Z0-9]{17}$/i.test(vinField)) return vinField.toUpperCase();
-  // Fallback: find 17-char VIN pattern in text
-  const m = md.match(/\b([A-HJ-NPR-Z0-9]{17})\b/i);
-  return m ? m[1].toUpperCase() : null;
-}
-
-// ─── Extract single listing ─────────────────────────────────────────────────
-
-interface JamesEditionListing {
-  url: string;
-  title: string | null;
-  year: number | null;
-  make: string | null;
-  model: string | null;
-  vin: string | null;
-  asking_price: number | null;
-  mileage: number | null;
-  exterior_color: string | null;
-  interior_color: string | null;
-  engine: string | null;
-  transmission: string | null;
-  drivetrain: string | null;
-  body_style: string | null;
-  condition: string | null;
-  drive_side: string | null;
-  location: string | null;
-  description: string | null;
-  seller_name: string | null;
-  image_urls: string[];
-  listing_id: string | null;
-}
-
-function parseListingMarkdown(md: string, url: string): JamesEditionListing {
-  // Title: "# YYYY Make Model"
-  const titleMatch = md.match(/^#\s+(.+)$/m);
-  const title = titleMatch?.[1]?.trim() || null;
-
-  // Price: "$XXX,XXX" near the top
-  const priceMatch = md.match(/\$\s*([\d,]+(?:\.\d{2})?)/);
-  const asking_price = priceMatch ? parsePrice(priceMatch[0]) : null;
-
-  // Year/Make/Model from title
-  let year: number | null = null;
-  let make: string | null = null;
-  let model: string | null = null;
-  if (title) {
-    const ymmMatch = title.match(/^(\d{4})\s+(\S+)\s+(.+)$/);
-    if (ymmMatch) {
-      year = parseInt(ymmMatch[1]);
-      make = ymmMatch[2];
-      model = ymmMatch[3];
-    }
-  }
-
-  // Car Details section — most reliable structured data
-  const detailsSection = extractBetween(md, '## Car Details', '## ');
-  const yearField = extractField(detailsSection || md, 'Year');
-  if (yearField && !year) year = parseInt(yearField) || null;
-
-  const mileageRaw = extractField(detailsSection || md, 'Mileage');
-  const mileageData = parseMileage(mileageRaw);
-  const mileage = mileageData?.value || null;
-
-  const engine = extractField(detailsSection || md, 'Engine');
-  const body_style = extractField(detailsSection || md, 'Car type');
-  const drivetrain = extractField(detailsSection || md, 'Drive train');
-  const drive_side = extractField(detailsSection || md, 'Drive');
-  const condition = extractField(detailsSection || md, 'Condition');
-  const exterior_color = extractField(detailsSection || md, 'Color');
-  const interior_color = extractField(detailsSection || md, 'Interior color');
-  const transmission = extractField(detailsSection || md, 'Transmission');
-  const vin = extractVin(detailsSection || md);
-
-  // Location
-  const locField = extractField(detailsSection || md, 'Location');
-  const location = locField || extractField(md, 'Address');
-
-  // Description: "## About This Car" section
-  const description = extractBetween(md, '## About This Car', '## ') || null;
-
-  // Seller — take first line only, strip markdown escapes
-  const sellerMatch = md.match(/## For Sale by\s*\n\n\[([^\]]+)/);
-  let seller_name = sellerMatch?.[1]?.split('\n')[0]?.replace(/\\+$/g, '').trim() || null;
-
-  // Images
-  const image_urls = extractImages(md);
-
-  // Listing ID from URL
-  const idMatch = url.match(/-(\d+)$/);
-  const listing_id = idMatch?.[1] || null;
-
-  return {
-    url, title, year, make, model, vin, asking_price,
-    mileage, exterior_color, interior_color, engine,
-    transmission, drivetrain, body_style, condition,
-    drive_side, location, description, seller_name,
-    image_urls, listing_id,
-  };
-}
-
-// ─── Discover listings from category page ───────────────────────────────────
-
-function parseListingUrls(md: string): string[] {
-  const urls: string[] = [];
-  const pattern = /\(https:\/\/www\.jamesedition\.com\/cars\/[^)]+for-sale-\d+[^)]*\)/g;
-  let match;
-  while ((match = pattern.exec(md)) !== null) {
-    const url = match[0].slice(1, -1); // remove parens
-    if (!urls.includes(url)) urls.push(url);
-  }
-  return urls;
-}
 
 // ─── Main handler ───────────────────────────────────────────────────────────
 
 Deno.serve(async (req: Request) => {
+  // Writes are never anonymous: service key, signed-in user, or nothing (P0.2, 2026-09-27).
+  const denied = await requireWriteAuth(req);
+  if (denied) return denied;
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders });
   }
@@ -206,7 +41,7 @@ Deno.serve(async (req: Request) => {
   try {
     const supabase = createClient(
       Deno.env.get('SUPABASE_URL')!,
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!,
+      projectSecretKey()!,
     );
 
     const body = await req.json().catch(() => ({}));
@@ -245,6 +80,13 @@ Deno.serve(async (req: Request) => {
       }
 
       const extracted = parseListingMarkdown(markdown, url);
+      if (extracted.identity_issues.length > 0) {
+        return new Response(JSON.stringify({
+          success: false,
+          error: 'Incomplete or conflicting listing identity',
+          identity_issues: extracted.identity_issues,
+        }), { status: 422, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+      }
       const normalized = normalizeVehicleFields({
         year: extracted.year,
         make: extracted.make,
@@ -422,7 +264,7 @@ Deno.serve(async (req: Request) => {
             // Fire-and-forget: async image-vehicle match validation
             fetch(`${Deno.env.get('SUPABASE_URL')}/functions/v1/check-image-vehicle-match`, {
               method: 'POST',
-              headers: { 'Authorization': `Bearer ${Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')}`, 'Content-Type': 'application/json' },
+              headers: { 'Authorization': `Bearer ${projectSecretKey()}`, 'Content-Type': 'application/json' },
               body: JSON.stringify({ vehicle_id: vehicleId, batch_size: 10 }),
             }).catch(() => {});
           }
@@ -530,7 +372,7 @@ Deno.serve(async (req: Request) => {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
-              'Authorization': `Bearer ${Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')}`,
+              'Authorization': `Bearer ${projectSecretKey()}`,
             },
             body: JSON.stringify({ action: 'extract', url: item.listing_url }),
           });

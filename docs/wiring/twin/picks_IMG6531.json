@@ -1,0 +1,18 @@
+{
+ "_width": 1200,
+ "_note": "Direct pixel picks on the 1200 px working copy of IMG_6531 for plugs the camera can see; [x, y, hidden]. Read off ref-photos/grid_engine.jpg. Everything not listed here is placed by the twin projection (anchors2d).",
+ "tps": [575, 374, false],
+ "inj_7": [738, 300, false],
+ "inj_5": [743, 390, false],
+ "inj_3": [750, 483, false],
+ "inj_1": [755, 572, false],
+ "inj_8": [483, 300, false],
+ "inj_6": [478, 388, false],
+ "inj_4": [471, 480, false],
+ "inj_2": [464, 567, false],
+ "alternator": [790, 690, false],
+ "coil_1": [612, 232, false], "coil_2": [612, 232, false], "coil_3": [612, 232, false], "coil_4": [612, 232, false],
+ "coil_5": [612, 232, false], "coil_6": [612, 232, false], "coil_7": [612, 232, false], "coil_8": [612, 232, false],
+ "oil_psi": [628, 262, false],
+ "coolant_temp": [852, 640, false]
+}

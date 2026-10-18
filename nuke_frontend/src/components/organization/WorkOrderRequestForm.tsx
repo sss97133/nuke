@@ -1,3 +1,4 @@
+import { ProfileService } from '../../services/profileService';
 /**
  * Work Order Request Form
  * Allows customers to submit work requests to a shop
@@ -50,11 +51,7 @@ export const WorkOrderRequestForm: React.FC<WorkOrderRequestFormProps> = ({
     setCustomerEmail(user.email || '');
 
     // Load user's profile for name/phone
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('username, phone')
-      .eq('id', user.id)
-      .single();
+    const { data: profile } = await ProfileService.getProfileRecord(user.id);
 
     if (profile) {
       setCustomerName(profile.username || '');

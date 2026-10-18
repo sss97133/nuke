@@ -176,9 +176,11 @@ function LoadingSkeleton({ viewMode }: { viewMode: ViewMode }) {
 function EmptyState({
   filterMode,
   onClearFilter,
+  signedIn = true,
 }: {
   filterMode: FilterMode;
   onClearFilter: () => void;
+  signedIn?: boolean;
 }) {
   const isFiltered = filterMode !== 'ALL';
   return (
@@ -203,7 +205,7 @@ function EmptyState({
           color: 'var(--text, #2a2a2a)',
         }}
       >
-        {isFiltered ? `NO ${filterMode} VEHICLES` : 'NO VEHICLES'}
+        {isFiltered ? `NO ${filterMode} VEHICLES` : signedIn ? 'NO VEHICLES' : 'YOUR GARAGE'}
       </span>
       <span
         style={{
@@ -216,7 +218,8 @@ function EmptyState({
       >
         {isFiltered
           ? `No vehicles match the "${filterMode}" filter.`
-          : 'Add your first vehicle to start building your garage.'}
+          : signedIn ? 'Add your first vehicle to start building your garage.'
+          : 'The vehicles you own and the records you hold for them, once you are signed in.'}
       </span>
       <div style={{ display: 'flex', gap: 8, marginTop: 4 }}>
         {isFiltered && (
@@ -238,7 +241,7 @@ function EmptyState({
             CLEAR FILTER
           </button>
         )}
-        <Link to="/vehicle/add" style={{ textDecoration: 'none' }}>
+        <Link to={signedIn ? '/vehicle/add' : '/login'} style={{ textDecoration: 'none' }}>
           <div
             style={{
               fontSize: '9px',
@@ -252,7 +255,7 @@ function EmptyState({
               whiteSpace: 'nowrap' as const,
             }}
           >
-            ADD VEHICLE
+            {signedIn ? 'ADD VEHICLE' : 'LOG IN'}
           </div>
         </Link>
       </div>
@@ -335,6 +338,7 @@ export default function GarageTab({ dashboard }: { dashboard: VehiclesDashboardS
     filterMode,
     setFilterMode,
     refresh,
+    unresolvedSources = [],
   } = dashboard;
 
   const [draggingVehicle, setDraggingVehicle] = useState<GarageVehicle | null>(null);
@@ -374,12 +378,33 @@ export default function GarageTab({ dashboard }: { dashboard: VehiclesDashboardS
 
   return (
     <div style={s.wrap}>
+      {!isLoading && !error && unresolvedSources.length > 0 && (
+        <section style={{ padding: 12, border: '2px solid var(--border)', marginBottom: 16 }}>
+          <SectionHeaderRow title="IDENTITY PENDING" count={unresolvedSources.length} />
+          {unresolvedSources.map(source => (
+            <article key={source.id} style={{ padding: '8px 0' }}>
+              <strong>{source.label}</strong>
+              <p style={{ margin: '4px 0', fontSize: 12 }}>
+                {source.stated_roles.map(role => role.replaceAll('_', ' ')).join(' · ')} · account stated
+              </p>
+              <p style={{ margin: '4px 0', fontSize: 12 }}>Photo evidence still needs to identify this vehicle.</p>
+              {source.source_excerpt && (
+                <details style={{ fontSize: 12 }}>
+                  <summary>Source statement</summary>
+                  <p>{source.source_excerpt}</p>
+                  <p>Recorded <time dateTime={source.observed_at}>{source.observed_at.slice(0, 10)}</time></p>
+                </details>
+              )}
+            </article>
+          ))}
+        </section>
+      )}
       {isLoading ? (
         <LoadingSkeleton viewMode={viewMode} />
       ) : error ? (
         <ErrorState message={error} onRetry={refresh} />
-      ) : vehicles.length === 0 ? (
-        <EmptyState filterMode={filterMode} onClearFilter={clearFilter} />
+      ) : vehicles.length === 0 && unresolvedSources.length === 0 ? (
+        <EmptyState filterMode={filterMode} onClearFilter={clearFilter} signedIn={dashboard.signedIn} />
       ) : (
         <div style={{ ...s.content, paddingBottom: draggingVehicle ? 132 : undefined }}>
           {pinned && (

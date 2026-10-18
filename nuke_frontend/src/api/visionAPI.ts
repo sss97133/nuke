@@ -90,14 +90,21 @@ class VisionAPI {
   private baseURL: string;
 
   constructor() {
-    // In production, these would come from environment variables
-    this.apiKey = import.meta.env.VITE_OPENAI_API_KEY || import.meta.env.REACT_APP_OPENAI_API_KEY || '';
+    // The browser holds no provider key: anything read from VITE_* ships in public JavaScript.
+    this.apiKey = '';
     this.baseURL = 'https://api.openai.com/v1';
+  }
+
+  private assertAvailable(): void {
+    if (!this.apiKey) {
+      throw new Error('Vision analysis runs on the server and is not available in the browser.');
+    }
   }
 
   // Step 1: Detect if image contains a vehicle
   async detectVehicle(base64Image: string): Promise<VehicleDetectionResult> {
     try {
+      this.assertAvailable();
       const response = await fetch(`${this.baseURL}/chat/completions`, {
         method: 'POST',
         headers: {
@@ -174,6 +181,7 @@ class VisionAPI {
         ? `\n\nIMPORTANT USER CONTEXT: ${userContext}\n\nUse this context to cross-reference and improve your analysis accuracy. If this is a Bring a Trailer link, reference the listing details for verification.`
         : '';
 
+      this.assertAvailable();
       const response = await fetch(`${this.baseURL}/chat/completions`, {
         method: 'POST',
         headers: {
@@ -366,6 +374,7 @@ RESPOND WITH STRUCTURED JSON - NO DESCRIPTIONS, ONLY DATA:
 
   async analyzeVehicle(base64Image: string): Promise<VehicleAnalysisResult> {
     try {
+      this.assertAvailable();
       const response = await fetch(`${this.baseURL}/chat/completions`, {
         method: 'POST',
         headers: {
@@ -513,6 +522,7 @@ Respond with JSON including INDIVIDUAL CONFIDENCE SCORES for each field:
         throw new Error('OpenAI API key not configured');
       }
 
+      this.assertAvailable();
       const response = await fetch(`${this.baseURL}/chat/completions`, {
         method: 'POST',
         headers: {
@@ -605,6 +615,7 @@ Respond with JSON including INDIVIDUAL CONFIDENCE SCORES for each field:
   // Step 3: Detect VIN in image
   async detectVIN(base64Image: string): Promise<VINDetectionResult> {
     try {
+      this.assertAvailable();
       const response = await fetch(`${this.baseURL}/chat/completions`, {
         method: 'POST',
         headers: {

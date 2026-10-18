@@ -39,7 +39,7 @@ GROUP BY status;
 
 ### 3. Check Anthropic API Credits
 ```bash
-cd /Users/skylar/nuke && dotenvx run -- bash -c 'echo "Key starts with: ${ANTHROPIC_API_KEY:0:10}..."'
+cd ~/nuke && dotenvx run -- bash -c 'echo "Key starts with: ${ANTHROPIC_API_KEY:0:10}..."'
 ```
 If the key is exhausted, extraction will silently fail. Check Supabase secrets too:
 ```bash

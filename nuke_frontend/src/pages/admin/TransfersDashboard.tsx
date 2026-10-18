@@ -13,6 +13,13 @@ import { supabase } from '../../lib/supabase';
 const SUPABASE_URL = (import.meta as any).env?.VITE_SUPABASE_URL || '';
 const SERVICE_ROLE_KEY = (import.meta as any).env?.VITE_SUPABASE_ANON_KEY || '';
 
+// The signed-in admin's JWT. transfer-advance and transfer-automator refuse the public anon key since 2026-10-07,
+// so the dashboard sends its session token (the constant above holds the anon key, despite its name).
+async function adminBearer(): Promise<string> {
+  const { data } = await supabase.auth.getSession();
+  return `Bearer ${data.session?.access_token ?? SERVICE_ROLE_KEY}`;
+}
+
 const MILESTONE_LABELS: Record<string, string> = {
   agreement_reached: 'Deal agreed',
   contact_exchanged: 'Contact exchanged',
@@ -116,9 +123,8 @@ export default function TransfersDashboard() {
       let q = supabase
         .from('ownership_transfers')
         .select(`
-          id, vehicle_id, agreed_price, currency, status, inbox_email,
+          id, vehicle_id, agreed_price, currency, status,
           created_at, last_milestone_at,
-          buyer_access_token, seller_access_token,
           seller:external_identities!from_identity_id(platform, handle),
           buyer:external_identities!to_identity_id(platform, handle),
           vehicles!inner(year, make, model),
@@ -154,7 +160,6 @@ export default function TransfersDashboard() {
           agreed_price: t.agreed_price ? parseFloat(t.agreed_price) : null,
           currency: t.currency ?? 'USD',
           status: t.status,
-          inbox_email: t.inbox_email,
           created_at: t.created_at,
           last_milestone_at: t.last_milestone_at,
           seller_handle: t.seller?.handle ?? null,
@@ -165,10 +170,30 @@ export default function TransfersDashboard() {
           completed_count: completedMs.length,
           total_milestones: ms.length,
           current_milestone_type: currentMs?.milestone_type ?? null,
-          buyer_access_token: t.buyer_access_token,
-          seller_access_token: t.seller_access_token,
+          inbox_email: null as string | null,
+          buyer_access_token: '',
+          seller_access_token: '',
         };
       });
+
+      // The party tokens and inbox email are not readable off ownership_transfers; an active admin reads them for
+      // this page of rows through transfer_admin_links. If the reader is not deployed yet, the party links are
+      // simply absent until it is.
+      const ids = rows.map((r) => r.id);
+      if (ids.length > 0) {
+        const { data: links, error: linksErr } = await supabase.rpc('transfer_admin_links', { p_ids: ids });
+        if (!linksErr && Array.isArray(links)) {
+          const byId = new Map((links as any[]).map((l) => [l.id, l]));
+          for (const r of rows) {
+            const l = byId.get(r.id);
+            if (l) {
+              r.inbox_email = l.inbox_email ?? null;
+              r.buyer_access_token = l.buyer_access_token ?? '';
+              r.seller_access_token = l.seller_access_token ?? '';
+            }
+          }
+        }
+      }
 
       // Client-side sort
       const sorted = [...rows].sort((a, b) => {
@@ -228,7 +253,7 @@ export default function TransfersDashboard() {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          Authorization: `Bearer ${SERVICE_ROLE_KEY}`,
+          Authorization: await adminBearer(),
         },
         body: JSON.stringify({
           action: 'advance_manual',
@@ -263,7 +288,7 @@ export default function TransfersDashboard() {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          Authorization: `Bearer ${SERVICE_ROLE_KEY}`,
+          Authorization: await adminBearer(),
         },
         body: JSON.stringify({
           action: 'seed_from_listing',
@@ -504,28 +529,32 @@ export default function TransfersDashboard() {
                     {fmtDate(t.last_milestone_at)}
                   </div>
 
-                  {/* Actions */}
+                  {/* Actions — the party links appear once transfer_admin_links has supplied the tokens */}
                   <div style={{ display: 'flex', gap: '6px' }} onClick={e => e.stopPropagation()}>
-                    <Link
-                      to={`/t/${t.id}?token=${t.buyer_access_token}`}
-                      target="_blank"
-                      style={{
-                        background: 'var(--surface)', color: 'var(--accent)', padding: '4px 8px', fontSize: '11px', fontWeight: 600, textDecoration: 'none',
-                      }}
-                      title="Open buyer view"
-                    >
-                      Buyer
-                    </Link>
-                    <Link
-                      to={`/t/${t.id}?token=${t.seller_access_token}`}
-                      target="_blank"
-                      style={{
-                        background: 'var(--surface)', color: 'var(--accent)', padding: '4px 8px', fontSize: '11px', fontWeight: 600, textDecoration: 'none',
-                      }}
-                      title="Open seller view"
-                    >
-                      Seller
-                    </Link>
+                    {t.buyer_access_token && (
+                      <Link
+                        to={`/t/${t.id}?token=${t.buyer_access_token}`}
+                        target="_blank"
+                        style={{
+                          background: 'var(--surface)', color: 'var(--accent)', padding: '4px 8px', fontSize: '11px', fontWeight: 600, textDecoration: 'none',
+                        }}
+                        title="Open buyer view"
+                      >
+                        Buyer
+                      </Link>
+                    )}
+                    {t.seller_access_token && (
+                      <Link
+                        to={`/t/${t.id}?token=${t.seller_access_token}`}
+                        target="_blank"
+                        style={{
+                          background: 'var(--surface)', color: 'var(--accent)', padding: '4px 8px', fontSize: '11px', fontWeight: 600, textDecoration: 'none',
+                        }}
+                        title="Open seller view"
+                      >
+                        Seller
+                      </Link>
+                    )}
                   </div>
                 </div>
 

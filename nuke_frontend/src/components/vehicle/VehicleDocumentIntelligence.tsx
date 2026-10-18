@@ -82,6 +82,8 @@ const VehicleDocumentIntelligence = ({ vehicleId }: VehicleDocumentIntelligenceP
     try {
       const { data: { session } } = await supabase.auth.getSession();
       const token = session?.access_token;
+      // analyze-vehicle-documents writes; it refuses the anon key (writeGuard).
+      if (!token) throw new Error('Sign in to analyze documents');
 
       // Process in batches of 5
       let totalProcessed = 0;
@@ -94,7 +96,7 @@ const VehicleDocumentIntelligence = ({ vehicleId }: VehicleDocumentIntelligenceP
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
-              'Authorization': `Bearer ${token || import.meta.env.VITE_SUPABASE_ANON_KEY}`,
+              'Authorization': `Bearer ${token}`,
             },
             body: JSON.stringify({
               vehicle_id: vehicleId,

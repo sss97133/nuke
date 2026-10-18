@@ -1,0 +1,81 @@
+.status-view { container: status-view / inline-size; }
+.status-kicker { font-size: 9px; font-weight: 700; letter-spacing: .08em; }
+.status-basis { font-size: 11px; color: var(--text-secondary); line-height: 1.5; }
+.status-flow { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); border: 2px solid var(--text); margin-top: 16px; }
+.status-flow > a { position: relative; display: flex; flex-direction: column; gap: 7px; color: var(--text); padding: 16px; text-decoration: none; background: var(--bg); }
+.status-flow > a + a { border-left: 2px solid var(--text); }
+.status-flow > a + a::before { content: '→'; position: absolute; left: -10px; top: 48%; background: var(--bg); font-size: 16px; padding: 0 2px; }
+.status-flow > a:hover, .status-flow > a:focus-visible { background: var(--surface-hover); }
+.status-flow strong { font: 700 clamp(18px, 2.1vw, 32px) 'Courier New', monospace; overflow-wrap: anywhere; }
+.status-flow small { line-height: 1.5; color: var(--text-secondary); min-height: 34px; }
+.status-flow em { font-size: 11px; font-style: normal; margin-top: auto; text-decoration: underline; text-underline-offset: 3px; }
+.status-flow [data-attention=true] .status-kicker { color: var(--error); }
+.status-operating-panels { display: grid; grid-template-columns: minmax(0, 1.7fr) minmax(260px, 1fr); gap: 16px; margin: 16px 0; align-items: start; }
+.status-attention { grid-column: 2; grid-row: 1; border: 2px solid var(--border); border-left: 4px solid var(--warning, var(--text)); padding: 12px; }
+.status-incident { padding: 12px 0; border-top: 1px solid var(--border); }
+.status-incident summary { cursor: pointer; }
+.status-incident summary strong { display: block; font: 700 12px 'Courier New', monospace; margin: 6px 0; overflow-wrap: anywhere; }
+.status-incident p { max-width: 86ch; line-height: 1.5; margin: 6px 0; }
+.status-incident .status-kicker { color: var(--error); }
+.status-incident-actions { display: flex; flex-direction: column; gap: 10px; margin-top: 12px; }
+.status-assay-counts { display: flex; flex-wrap: wrap; gap: 10px 20px; margin: 10px 0; }
+.status-assay-counts dt { font-size: 9px; text-transform: uppercase; color: var(--text-secondary); }
+.status-assay-counts dd { margin: 4px 0 0; font: 700 15px 'Courier New', monospace; }
+.status-reading-gap { border-top: 1px solid var(--border); padding: 10px 0; }
+.status-delivery { grid-column: 1; grid-row: 1; border: 2px solid var(--text); padding: 16px; background: var(--bg); }
+.status-delivery:last-child:first-child { grid-column: 1 / -1; }
+.status-section-head, .status-replay-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; }
+.status-section-head h3 { font-size: 20px; margin: 8px 0; }
+.status-section-head p { line-height: 1.5; margin: 4px 0; }
+.status-delivery button, .status-incident a { font-size: 11px; }
+.status-delivery button { padding: 8px 12px; border: 2px solid var(--text); color: var(--text); background: var(--bg); }
+.status-replay { border-top: 2px solid var(--border); margin-top: 16px; padding-top: 16px; }
+.status-trace { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; margin: 16px 0; padding: 12px 0; border-top: 1px solid var(--border); border-bottom: 1px solid var(--border); }
+.status-trace span { line-height: 1.5; }
+.status-trace b { display: block; font-size: 9px; text-transform: uppercase; margin-bottom: 4px; }
+.status-replay-grid { display: grid; grid-template-columns: minmax(0, 1fr); gap: 16px; }
+.status-bid-chart { display: block; width: 100%; height: auto; margin: 8px 0; color: var(--text); }
+.status-chart-scale { display: flex; justify-content: space-between; gap: 12px; font: 10px 'Courier New', monospace; color: var(--text-secondary); margin-bottom: 12px; }
+.status-replay-controls { display: flex; align-items: center; gap: 12px; }
+.status-replay-controls label { flex: 1; font-size: 11px; text-align: center; }
+.status-replay-controls input { display: block; width: 100%; margin-top: 8px; accent-color: var(--text); }
+.status-replay-answer { border-top: 1px solid var(--border); padding-top: 12px; }
+.status-price { display: block; font: 700 30px 'Courier New', monospace; margin-top: 8px; }
+.status-question { font-size: 13px; line-height: 1.4; margin: 4px 0 8px; max-width: 75ch; }
+.status-source-operating { margin: 16px 0; border: 2px solid var(--border); padding: 12px; }
+.status-source-operating p { line-height: 1.5; }
+.status-source-inventories { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+.status-source-owner { min-width: 0; border: 2px solid var(--border); padding: 12px; }
+.status-source-owner h4 { font-size: 14px; margin: 0; }
+.status-source-owner-name { font: 10px 'Courier New', monospace; color: var(--text-secondary); overflow-wrap: anywhere; }
+.status-source-counts { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; margin: 12px 0; }
+.status-source-counts dt { font-size: 9px; text-transform: uppercase; color: var(--text-secondary); }
+.status-source-counts dd { margin: 4px 0 0; font: 700 14px 'Courier New', monospace; overflow-wrap: anywhere; }
+.status-source-details { border-top: 2px solid var(--border); padding-top: 12px; }
+.status-source-details summary { cursor: pointer; font-weight: 700; }
+.status-source-filters { display: flex; flex-wrap: wrap; align-items: end; gap: 12px; margin: 12px 0; }
+.status-source-filters label { display: flex; flex-direction: column; gap: 5px; font-size: 11px; min-width: 0; }
+.status-source-filters input[type=search], .status-source-filters select { min-width: 0; max-width: 100%; border: 2px solid var(--border); padding: 6px; color: var(--text); background: var(--bg); }
+.status-source-filters .status-source-error-filter { flex-direction: row; align-items: center; }
+.status-source-table-scroll { overflow-x: auto; }
+.status-source-table { width: 100%; border-collapse: collapse; }
+.status-source-table caption { text-align: left; font-size: 10px; color: var(--text-secondary); padding: 6px 0; }
+.status-source-table th, .status-source-table td { padding: 6px 8px; border-bottom: 1px solid var(--border); text-align: left; vertical-align: top; overflow-wrap: anywhere; }
+.status-source-table th[scope=col] { font-size: 9px; text-transform: uppercase; }
+@container status-view (max-width: 760px) {
+  .status-source-inventories { grid-template-columns: minmax(0, 1fr); }
+  .status-operating-panels { grid-template-columns: minmax(0, 1fr); }
+  .status-attention { grid-column: 1; grid-row: 2; }
+  .status-flow, .status-trace { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .status-flow > a:nth-child(3) { border-left: 0; }
+  .status-flow > a:nth-child(n+3) { border-top: 2px solid var(--text); }
+  .status-flow > a:nth-child(3)::before { content: none; }
+  .status-incident, .status-replay-grid { grid-template-columns: minmax(0, 1fr); }
+  .status-replay-answer { border-left: 0; border-top: 2px solid var(--border); padding: 12px 0 0; }
+  .status-replay-controls { flex-wrap: wrap; }
+}
+@container status-view (max-width: 420px) {
+  .status-flow, .status-trace { grid-template-columns: minmax(0, 1fr); }
+  .status-flow > a + a { border-left: 0; border-top: 2px solid var(--text); }
+  .status-flow > a + a::before { content: none; }
+}

@@ -36,6 +36,12 @@ Canonical definitions. Every term means exactly one thing. When in doubt, this i
 
 ## B
 
+**Byte-qualified album context** — An image-set member link supported by the same
+account's PhotoKit source identifier, known source version and SHA-256 of the
+uploaded original. It confirms that this source photograph was observed in the
+album. It does not confirm the vehicle assignment, ownership, performer or album
+author. Missing, held and ambiguous originals remain unlinked.
+
 **Badge** — A clickable data token in the UI. "1991", "GMC", "V3500", "Basquiat", "1982", "Acrylic" — each is a badge. Badges are portals, not labels. Clicking a badge explodes into the cluster it belongs to.
 
 **Briefing** — The user-facing intelligence summary rendered at the top of a vehicle profile. Inverts the query model: instead of the user asking questions, the system presents the most relevant computed intelligence unprompted. Structured as a pyramid: L0 headline (one sentence, highest-severity signal), L1 signal cards (3-5 dimension-specific insights), L2 evidence layer (expandable full-provenance backing for each signal). The briefing is a computation surface — it reads from the knowledge graph and computes on render. See Discourse: The Knowing System, Design Book Ch. 11.
@@ -132,6 +138,8 @@ Canonical definitions. Every term means exactly one thing. When in doubt, this i
 
 **Freeport** — Tax-free storage facilities (Geneva, Luxembourg, Singapore, Delaware). Assets enter and disappear from public record. A freeport period in a provenance chain is a black zone.
 
+**Family price index** — What a model family's price did for the same cars, not what its median did. `family_price_index` holds, per family and calendar month or quarter, the price of one reference car with its 95% range, the sales in the period and their plain median; `family_price_change` holds the 12-month change (last 365 days against the 365 before) with its range, a verdict (up, down, flat, too few to tell), the repeat-sale check and the segment chips. Fitted nightly by `scripts/market/family-price-index.py` (method `hedonic_v1`: log price on period dummies plus variant, gearbox, miles, model year, title flags and venue), written by `record_family_price_index()`, read by `family_price_index_read()`. A family under 30 sales in either year or 150 since 2016 is not fitted. The family's median moves when the mix of what sold moves; this does not.
+
 ## G
 
 **Ghost Text** — Rotating placeholder text in the command input that cycles through input type examples: "Search vehicles...", "Paste a URL...", "Drop an image...", "Ask anything...". Ghost text solves the discoverability problem of polymorphic inputs — the user learns what the input accepts by reading the examples. Each rotation teaches one capability. Styled in `--text-disabled`, animated with subtle fade (4s cycle), disappears on focus.
@@ -214,7 +222,21 @@ Canonical definitions. Every term means exactly one thing. When in doubt, this i
 
 ## O
 
+**Observed native album state** — An immutable private capture of an app-visible
+PhotoKit grouping: source identifier, name, folders, ordered references, source
+versions and presence. The grouping-observation clock is separate from the image
+capture clock. A changed or removed album appends a successor; limited access is
+unknown coverage. Existing `image_sets` retains the source state and
+`album_sync_map` selects the current capture.
+
+
 **Observation** — The fundamental unit of data in Nuke. Every piece of information is an observation from a source with a trust weight, confidence score, and timestamp. Comments, listings, images, metadata, user inputs — all observations.
+
+**Unresolved garage source** — An exact private account statement whose physical
+vehicle is not yet identified. Its bounded label and stated roles describe the
+source; `vehicle_id` and `property_id` remain NULL. It appears as identity pending,
+outside vehicle counts and asset value. A named, explicitly identified successor
+can supersede it without editing the original or guessing from model/year.
 
 **Observation Source** — A registered origin of observations. Each source has a slug, display name, category, base trust score, and list of supported observation kinds. BaT (trust: 0.85), Christie's (trust: 0.90), Instagram (trust: 0.40).
 
@@ -264,6 +286,8 @@ Canonical definitions. Every term means exactly one thing. When in doubt, this i
 
 **Resolution** — See Entity Resolution.
 
+**Reference car** — The one car a family price index prices: the last 12 months' mix of variants, gearbox, miles, model years and venues. `family_price_index.index_usd` is its price in each period; `family_price_change.ref_car` describes it (sales, median year and miles, manual share, venues, top variants).
+
 **Savant Janitor** — One of three user modes (not personas — modes). The Savant Janitor has 400 photos on their phone, receipts in the glovebox, and doesn't want to organize anything. They want to dump everything into the system and have it sort itself. Their need is a drain — an endpoint that accepts everything and classifies it. The Coaching Flow serves Savant Janitors by telling them exactly what to do next without requiring them to understand the system's structure. See Contemplation: The Three Users and the Finder.
 
 **Segment Dashboard** — A market-level intelligence surface for a vehicle segment (all K5 Blazers, all C10s). Route: `/market/:make/:model`. Shows: price trend chart, recent sales with photos, active listings, segment statistics (avg DOM, sell-through rate, common configurations, price by condition tier). The segment dashboard is where enthusiasts track markets, buyers do deep comp research, and sellers time their listings. See Design Book Ch. 11: SegmentDashboard.
@@ -273,6 +297,8 @@ Canonical definitions. Every term means exactly one thing. When in doubt, this i
 **Smart Search** — The natural-language-to-structured-query search interface. Accepts human language ("red trucks under 30k from the seventies") and decomposes it into structured filters using client-side regex pattern matching (no API call). Extracted filters appear as removable pills below the search bar. What remains after extraction becomes the text search query. The user doesn't need to know that `body_style: truck` is a filter — they type naturally and the system translates. See Design Book Ch. 11: SmartSearchBar.
 
 ## S
+
+**Source-qualified Sale Episode** — One sourced listing presentation of a persistent vehicle with an independently supported sold outcome, amount, original currency, fee basis and event date. Several agreeing captures count once; a later resale at another listing URL remains a different episode. Native listing/event rows locate source evidence but their mutable prices and row clocks do not qualify it. Capture, parse and actual database ingestion bound evidence availability, not source publication or historical native-row availability. Unknown or contrary evidence remains excluded or conflicted. The staged `valuation_by_ymm` episode extension retains explicit current membership, source/capture limits and exact subject-episode exclusion; it does not establish complete sale history or fair value.
 
 **Snapshot** — An archived copy of a web page stored in `listing_page_snapshots`. Created automatically by `archiveFetch()`. Contains raw HTML and/or markdown representation. Snapshots enable re-extraction from stored content without re-fetching. The table holds 440K+ snapshots totaling 79GB. Snapshots are being migrated to Supabase Storage via `migrate-snapshots-to-storage` cron.
 
@@ -354,6 +380,14 @@ The vocabulary is Nuke-specific, but every underlying concept descends from a we
 - **Source Trust / Trust Weight** → reliability-weighted evidence combination at the heart of record linkage. [fellegi-sunter-1969]
 - **Half-Life / trust decay** → the accuracy/currency dimension of provenance: a datum's value depends on how and when it was derived. [buneman-2001-why-where-provenance]
 - **Dimensional Shadow / Digital Twin (five fixed perspectives)** → separation of facts (measures) from dimensions, i.e. Kimball star-schema dimensional modeling. [kimball-2013-dw-toolkit]
+
+### Publisher engine-family label (implementation prepared 2026-10-11)
+
+`engine_family_label` is the literal label in a publisher's direct statement about the engine powering
+the subject. It is distinct from the existing casting/serial-derived `engine_code`. A derived label
+retains its exact quote, source observation, capture fingerprint, capture/recording clocks and
+`engine_identity_status=unverified`; factory/current configuration and event time remain unknown.
+The existing property proposal governs ratification. An intake implementation does not itself approve it.
 
 ### Bibliography
 

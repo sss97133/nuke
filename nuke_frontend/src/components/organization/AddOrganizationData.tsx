@@ -34,7 +34,7 @@ export default function AddOrganizationData({ organizationId, onClose, onSaved }
 
   // Member form state
   const [memberUserId, setMemberUserId] = useState('');
-  const [memberEmail, setMemberEmail] = useState('');
+  const [memberHandle, setMemberHandle] = useState('');
   const [memberRole, setMemberRole] = useState('employee');
 
   const handleInfoSubmit = async (e: React.FormEvent) => {
@@ -155,12 +155,12 @@ export default function AddOrganizationData({ organizationId, onClose, onSaved }
 
       let targetUserId = memberUserId;
 
-      // If email provided but no userId, try to find user by email
-      if (!targetUserId && memberEmail) {
+      // Resolve the public Nuke handle; private email is not a user directory.
+      if (!targetUserId && memberHandle) {
         const { data: existingUser } = await supabase
           .from('profiles')
           .select('id')
-          .eq('email', memberEmail)
+          .eq('username', memberHandle.trim())
           .maybeSingle();
 
         if (existingUser) {
@@ -605,16 +605,16 @@ export default function AddOrganizationData({ organizationId, onClose, onSaved }
             <form onSubmit={handleMemberSubmit}>
               <div style={{ marginBottom: '12px' }}>
                 <label style={{ display: 'block', fontSize: '12px', fontWeight: 700, marginBottom: '4px' }}>
-                  User Email *
+                  Nuke Username *
                 </label>
                 <input
-                  type="email"
-                  value={memberEmail}
-                  onChange={(e) => setMemberEmail(e.target.value)}
+                  type="text"
+                  value={memberHandle}
+                  onChange={(e) => setMemberHandle(e.target.value)}
                   required
                   className="form-input"
                   style={{ width: '100%', fontSize: '12px' }}
-                  placeholder="user@example.com"
+                  placeholder="username"
                 />
                 <div style={{ fontSize: '9px', color: 'var(--text-muted)', marginTop: '2px' }}>
                   User must be registered on the platform

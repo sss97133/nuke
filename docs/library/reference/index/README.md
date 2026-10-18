@@ -86,6 +86,10 @@ Updated: 2026-03-27
 - **Related**: `certificates_of_authenticity`, `conservation_history` (ENCYCLOPEDIA Section 4)
 
 ### Valuation / Nuke Estimate
+- **Dated source-sale calculators**: `nuke_frontend/src/lib/dealRead/batComps.ts` — existing `comparePriceToSourceSales`; additive `selectSourceSalePopulation` retains episode candidates, qualified captures, explicit relevance and repeat-sale observations. V2 is not yet wired to `/valuation`.
+- **Contracts**: `nuke_frontend/src/lib/dealRead/batComps.test.ts`; ENCYCLOPEDIA Section 5, "Vehicle sale-event population and explicit relevance".
+- **Qualified source evidence view**: `nuke_frontend/src/pages/Valuation.tsx` and its DOM tests — full v1 source-lot receipt with display paging, sanitized ancestry, exact-source/vehicle navigation and explicit optional-year membership scope; no earlier-resale reader or v2 population promotion.
+- **Private population assay**: `scripts/discovery/sale-event-candidates.sql` retains explicitly supplied parents' native episode candidates and bounded protected headers; `scripts/assay-sale-population.mjs` audits saved inputs offline. Neither qualifies native prices, admits historical evidence, installs a DB reader or changes `/valuation`.
 - **Column**: `vehicles.nuke_estimate`
 - **Compute**: `supabase/functions/compute-vehicle-valuation/index.ts`
 - **Hammer price**: `supabase/functions/predict-hammer-price/index.ts` (active cron)
@@ -161,6 +165,26 @@ Updated: 2026-03-27
 - **Spec**: Design Book Chapter 2 (Components), Chapter 3 (Interactions)
 
 ### Image Pipeline / YONO
+- **Native profile source record**: `apps/nuke-capture-ios/Sources/NukeCapture/LibraryStore.swift`
+  (Photos catalog), `LibraryIngest.swift` (independent original-byte reading),
+  `LocalStore.swift` (versioned local evidence and account projection),
+  `LibraryView.swift`/`LibraryDetail.swift`/`LibraryInfo.swift` (original-source drill),
+  `ProfileTab.swift` (own-user profile/garage consumer).
+- **Private native album source intake**: existing `bulk_add_to_image_set(jsonb,jsonb)`
+  overload; `image_sets` source capture/typed predecessor, `album_sync_map` current
+  selector and byte-qualified `image_set_members`. Native outbox/receipts:
+  `LocalStore.swift`, `LocalTagPush.swift`. Web current selector:
+  `nuke_frontend/src/services/imageSetService.ts`. Migration:
+  `20261008070000_native_album_source_capture.sql`; isolated assay:
+  `scripts/tests/native-album-source.sql`.
+- **Private garage correction intake/read**: `record_garage_owner_correction`,
+  `get_my_garage_owner_corrections`; migration `20261008050000_garage_owner_corrections.sql`.
+  Web fold: `nuke_frontend/src/hooks/garageOwnerCorrections.ts`. Contract and release
+  limits: `docs/design/GARAGE_EVIDENCE_MODEL.md`.
+- **Unresolved garage source presentation**: same private correction writer and
+  opt-in reader; `20261008080000_garage_unresolved_source_statements.sql` and
+  `scripts/tests/garage-unresolved-source.sql`. Web `GarageTab.tsx` and native
+  `ProfileTab.swift` render raw source context outside identified vehicles.
 - **Vehicle images table**: `vehicle_images`
 - **YONO classify**: `supabase/functions/yono-classify/index.ts` (make classification, $0/image)
 - **YONO analyze**: `supabase/functions/yono-analyze/index.ts` (condition/zone/damage via Florence-2)
@@ -256,7 +280,7 @@ Updated: 2026-03-27
 - **Predict hammer price**: `supabase/functions/predict-hammer-price/index.ts` (active cron)
 - **ARS SQL**: `compute_auction_readiness()`, `persist_auction_readiness()`
 - **Tables**: `auction_readiness`, `ars_tier_transitions`
-- **Strategy doc**: `auction-readiness-strategy.md`
+- **Strategy doc**: `docs/strategy/auction-readiness-strategy.md`
 
 ### User / Persona Intelligence
 - **Stylometric analyzer**: `scripts/user-stylometric-analyzer.mjs` (Layer 0, zero-cost)
@@ -428,11 +452,11 @@ These functions are called by users, agents, or other functions but do not run o
 | INDEX | This file | Concept-to-location mapping |
 | ALMANAC | `docs/library/reference/almanac/` | Facts, figures, platform metrics |
 | ATLAS | `docs/library/reference/atlas/` | Scraping sources, geographic data |
-| CLAUDE.md | `/Users/skylar/nuke/CLAUDE.md` | Agent instructions, hard rules, principles |
-| TOOLS.md | `/Users/skylar/nuke/TOOLS.md` | Canonical intent-to-function map |
-| PROJECT_STATE.md | `/Users/skylar/nuke/PROJECT_STATE.md` | Current sprint focus |
-| DONE.md | `/Users/skylar/nuke/DONE.md` | Completed work log |
-| ISSUES.md | `/Users/skylar/nuke/.claude/ISSUES.md` | Known bugs and regressions |
+| CLAUDE.md | `~/nuke/CLAUDE.md` | Agent instructions, hard rules, principles |
+| TOOLS.md | `~/nuke/TOOLS.md` | Canonical intent-to-function map |
+| PROJECT_STATE.md | `~/nuke/PROJECT_STATE.md` | Current sprint focus |
+| DONE.md | `~/nuke/DONE.md` | Completed work log |
+| ISSUES.md | `~/nuke/.claude/ISSUES.md` | Known bugs and regressions |
 | Extraction Handbook | `docs/library/technical/extraction-playbook.md` | Complete extraction reference (2,998 lines) |
 | Engineering Manual | `docs/library/technical/engineering-manual/` | 10 chapters, build guides |
 | Design Book | `docs/library/technical/design-book/` | 10 chapters, UI specifications |
@@ -483,6 +507,16 @@ These functions are called by users, agents, or other functions but do not run o
 ---
 
 ## Key Architectural Principles
+
+Engine-family intake implementation and verification (2026-10-11, prepared for review):
+
+- `supabase/migrations/20261011230939_retained_engine_family_intake.sql` — existing witness, admission,
+  shared reader predicate and provenance response changes; leaves proposal review and replay untouched.
+- `supabase/functions/ingest-observation/retainedInterior.ts` and `retainedDescriptionPowertrain.ts` —
+  explicit native-source selector and literal publisher label derivation.
+- `supabase/functions/ingest-observation/engineFamilyPostgres.test.ts` and
+  `scripts/test-engine-family-intake.sh` — actual handler, local curator review, PostgreSQL guard and
+  anonymous readers, with before/after and withdrawal cases.
 
 | Principle | Location | Summary |
 |-----------|----------|---------|

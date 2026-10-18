@@ -137,8 +137,8 @@ The existing `BuildImportService` is compatible with the new schema. The service
 ## 📁 File Changes
 
 ### New Files:
-- `/Users/skylar/build_management_schema_revised.sql` - Complete database schema
-- `/Users/skylar/BUILD_MANAGEMENT_IMPLEMENTATION.md` - This documentation
+- `~/build_management_schema_revised.sql` - Complete database schema
+- `~/BUILD_MANAGEMENT_IMPLEMENTATION.md` - This documentation
 
 ### Modified Files:
 - `/src/components/vehicle/VehicleBuildManager.tsx` - Complete rewrite with design system

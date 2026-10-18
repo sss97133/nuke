@@ -50,6 +50,7 @@ import { mkdirSync, writeFileSync, readFileSync, existsSync } from 'fs';
 import { dirname } from 'path';
 import { createHash } from 'crypto';
 import { fileURLToPath } from 'node:url';
+import { projectImageProperties, applyImagePropertyClaims } from './lib/image-property-projection.mjs';
 
 const SUPABASE_URL = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL;
 const SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -1292,8 +1293,8 @@ async function queue() {
       .not('vehicle_id', 'is', null)
       .order('vehicle_id', { ascending: true })
       .range(offset, offset + PAGE - 1);
-    if (error) { console.error(`queue: ${error.message}`); process.exit(1); }
-    if (!data || data.length === 0) break;
+    if (error || !Array.isArray(data)) { console.error('queue: eligible image query failed'); process.exit(1); }
+    if (data.length === 0) break;
     for (const r of data) approved.set(r.vehicle_id, (approved.get(r.vehicle_id) || 0) + 1);
     if (data.length < PAGE) break;
   }
@@ -1307,10 +1308,9 @@ async function queue() {
       .not('ai_scan_metadata->byok_deep_analysis', 'is', null)
       .order('vehicle_id', { ascending: true })
       .range(offset, offset + PAGE - 1);
-    // Non-fatal: if this filter is rejected, fall back to pending-desc ordering rather
-    // than killing the drain (an empty `analyzed` map just means everyone reads as 0).
-    if (error) { console.error(`queue: analyzed-count pass skipped (${error.message})`); break; }
-    if (!data || data.length === 0) break;
+    // Failed coverage queries are unknown, never zero or a new processing order.
+    if (error || !Array.isArray(data)) { console.error('queue: analyzed image query failed'); process.exit(1); }
+    if (data.length === 0) break;
     for (const r of data) analyzed.set(r.vehicle_id, (analyzed.get(r.vehicle_id) || 0) + 1);
     if (data.length < PAGE) break;
   }
@@ -1391,13 +1391,59 @@ async function resolve() {
   for (const line of out) console.log(line);
 }
 
+/**
+ * Deterministic repair of a named vehicle cohort, using stored observations only.
+ * Dry-run by default. No provider calls, downloads, queue/schedule changes or
+ * 52-million-row JSON scan. Latest 500 condition rows is an explicit window,
+ * not a claim of complete history. Repeat uses stable content identities.
+ */
+async function projectCached() {
+  const vehicleId = arg('--vehicle-id');
+  const limit = Number(arg('--limit') || 100);
+  const before = arg('--before') || new Date().toISOString();
+  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(vehicleId || '') ||
+      !Number.isInteger(limit) || limit < 1 || limit > 500 || !Number.isFinite(Date.parse(before))) {
+    throw new Error('project-cached requires --vehicle-id UUID, --limit 1..500 and optional --before timestamp');
+  }
+  const apply = args.includes('--apply');
+  const result = await sb.from('vehicle_observations')
+    .select('id,vehicle_id,kind,is_superseded,observed_at,ingested_at,agent_model,agent_tier,extraction_method,confidence,confidence_score,structured_data')
+    .eq('vehicle_id', vehicleId).eq('kind', 'condition')
+    .lt('ingested_at', before)
+    .order('ingested_at', { ascending: false }).order('id', { ascending: false })
+    .limit(limit).abortSignal(AbortSignal.timeout(10000));
+  if (result.error || !Array.isArray(result.data)) throw new Error('project-cached: source query failed');
+  const sources = result.data.filter(row => row.structured_data?.analysis_kind === 'image_deep_byok');
+  const ids = [...new Set(sources.map(row => row.structured_data?.image_id)
+    .filter(id => typeof id === 'string' && /^[0-9a-f-]{36}$/i.test(id)))];
+  const images = ids.length ? await sb.from('vehicle_images')
+    .select('id,vehicle_id,is_sensitive,is_superseded,is_duplicate,vision_gate_status,image_vehicle_match_status')
+    .in('id', ids).abortSignal(AbortSignal.timeout(10000)) : { data: [], error: null };
+  if (images.error || !Array.isArray(images.data)) throw new Error('project-cached: image query failed');
+  const byId = new Map(images.data.map(row => [row.id, row]));
+  const claims = [];
+  const deferred = {};
+  for (const source of sources) {
+    const projected = projectImageProperties(source, byId.get(source.structured_data.image_id));
+    claims.push(...projected.claims);
+    if (projected.deferred) deferred[projected.deferred] = (deferred[projected.deferred] || 0) + 1;
+  }
+  const receipt = { mode: apply ? 'apply' : 'dry_run', vehicle_id: vehicleId,
+    sampled_condition_rows: result.data.length, source_rows: sources.length,
+    window_limit: limit, window_before: before, full_history_verified: false, model_calls: 0,
+    eligible_claims: claims.length, deferred,
+    ...(apply ? await applyImagePropertyClaims(sb, claims) : {}) };
+  console.log(JSON.stringify(receipt));
+  if (receipt.failed > 0 || (apply && claims.length === 0)) process.exitCode = 1;
+}
+
 // Pure ledger functions exported for unit tests (importing does not run the pipeline — see isMain).
 export { computeSaturation, classifyOpenQuestions, factFingerprint, isSaturatedRow, CURRENT_SCHEMA_VERSION, DRY_PASS_LIMIT };
 
 const isMain = process.argv[1] && process.argv[1] === fileURLToPath(import.meta.url);
 if (isMain) {
-  if (!['prepare', 'ingest', 'context', 'queue', 'resolve', 'entities'].includes(mode)) {
-    console.error('mode must be "prepare", "ingest", "context", "queue", "resolve", or "entities"');
+  if (!['prepare', 'ingest', 'context', 'queue', 'resolve', 'entities', 'project-cached'].includes(mode)) {
+    console.error('mode must be "prepare", "ingest", "context", "queue", "resolve", "entities", or "project-cached"');
     process.exit(1);
   }
   if (mode === 'prepare') await prepare();
@@ -1405,5 +1451,6 @@ if (isMain) {
   else if (mode === 'queue') await queue();
   else if (mode === 'resolve') await resolve();
   else if (mode === 'entities') await entities();
+  else if (mode === 'project-cached') await projectCached();
   else await ingest();
 }

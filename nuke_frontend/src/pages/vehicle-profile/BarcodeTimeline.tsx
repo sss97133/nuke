@@ -1,9 +1,13 @@
-import React, { useMemo, useState, useCallback, useRef, useEffect } from 'react';
+import React, { useMemo, useState, useCallback, useRef, useEffect, useContext } from 'react';
 import { useVehicleProfile } from './VehicleProfileContext';
 import { supabase } from '../../lib/supabase';
 import { VEHICLE_DAY_OPEN_EVENT } from './VehiclePhotoLightbox';
+import { useAuctionSequence } from './useAuctionSequence';
+import { auctionMomentDayTitle, auctionOpenDayTitle, momentDay } from './auctionSequence';
+import { PopupStackContext } from '../../components/popups/PopupStack';
+import { BidsPopup } from '../../components/popups/BidsPopup';
 
-interface BarcodeTimelineProps {}
+interface BarcodeTimelineProps { selectedAuctionUrl?: string | null; onSelectAuction?: (url: string) => void; selectionPending?: boolean }
 
 
 interface EventDay {
@@ -35,11 +39,13 @@ function dateStr(d: Date): string {
   return `${y}-${m}-${dd}`;
 }
 
-/** Normalize to YYYY-MM-DD in local timezone so midnight UTC doesn't shift days. */
+/** Calendar dates keep their source day; timestamped events use the viewer's timezone. */
 function toDateOnly(d: string | undefined): string | null {
   if (!d) return null;
-  const date = new Date(String(d).trim());
+  const raw = String(d).trim();
+  const date = new Date(raw);
   if (isNaN(date.getTime())) return null;
+  if (/^\d{4}-\d{2}-\d{2}$/.test(raw)) return raw;
   return date.toLocaleDateString('en-CA'); // YYYY-MM-DD in local tz
 }
 
@@ -102,6 +108,7 @@ const EVENT_LABELS: Record<string, string> = {
   auction_sold: 'Sold',
   auction_started: 'Auction Started',
   auction_ended: 'Auction Ended',
+  auction_day: 'Auction Day',
   vehicle_added: 'Profile Created',
   mileage_reading: 'Mileage Recorded',
   repair: 'Repair',
@@ -192,6 +199,12 @@ function formatEventLabel(ev: any): string {
 
   if (eventType === 'auction_sold' && platform) return `Sold on ${platform}`;
 
+  // A day of the auction: what landed (from auction_comments, timestamped to the moment)
+  if (eventType === 'auction_day') return ev.title || 'Auction Day';
+  if (eventType === 'auction_started' && ev.metadata?.moment_role && ev.title) return `${ev.title} (${ev.metadata.basis})`;
+  if (eventType === 'auction_started' && ev.metadata?.basis) return `Auction Opened (${ev.metadata.basis})`;
+  if (eventType === 'auction_ended' && ev.title) return ev.title;
+
   const base = EVENT_LABELS[eventType];
   if (base) return base;
 
@@ -244,6 +257,8 @@ function extractAreas(description: string): string[] {
 
 // Day drawer — the complete day document (C10); lazy since it renders on click
 const VehicleDayDrawer = React.lazy(() => import('./VehicleDayDrawer'));
+// BaT lots only: the auction's week as it happened (open, bids, comments, close)
+const AuctionSequenceBand = React.lazy(() => import('./AuctionSequenceBand'));
 
 /** Sync ?day=YYYY-MM-DD without touching scroll or history depth. */
 function setDayParam(date: string | null): void {
@@ -277,13 +292,23 @@ const TIMELINE_FILTERS: { key: string; label: string; match: (ev: any) => boolea
   }},
 ];
 
-const BarcodeTimeline: React.FC<BarcodeTimelineProps> = () => {
-  const { vehicle, vehicleId, timelineEvents, setGalleryFilter } = useVehicleProfile();
+const BarcodeTimeline: React.FC<BarcodeTimelineProps> = ({ selectedAuctionUrl, onSelectAuction, selectionPending = false }) => {
+  const { vehicle, vehicleId, timelineEvents, timelineReadState, setGalleryFilter } = useVehicleProfile();
+  const popup = useContext(PopupStackContext);
+
+  // A BaT lot's real sequence — bids and comments at their times, the open and the
+  // close — from auction_comments / auction_events / vehicle_events, one per listing
+  // when the car ran more than once. Empty for any vehicle that was never a BaT lot
+  // (no query is made).
+  const { auctions, importStampedDays, activityUnavailable, hasUnpositionedActivity } = useAuctionSequence(vehicleId, vehicle as Record<string, unknown> | null, timelineEvents);
 
   // Per-day image-analysis depth (Tier 0-4) → illuminates the timeline as deep analysis
   // fills in. A day with raw photos and no verdicts stays dim; as T1/T2 land it warms,
   // an owner-confirmed T4 day glows brightest. One RPC per vehicle (get_vehicle_day_depth).
-  const [depthByDay, setDepthByDay] = useState<Record<string, number>>({});
+  const [depthRead, setDepthRead] = useState<{ vehicleId: typeof vehicleId; values: Record<string, number> }>(() => ({ vehicleId, values: {} }));
+  // A changed route starts a fresh optional-read lifetime, including a return to a prior vehicle.
+  if (depthRead.vehicleId !== vehicleId) setDepthRead({ vehicleId, values: {} });
+  const depthByDay = depthRead.vehicleId === vehicleId ? depthRead.values : {};
   useEffect(() => {
     if (!vehicleId) return;
     let cancelled = false;
@@ -294,11 +319,12 @@ const BarcodeTimeline: React.FC<BarcodeTimelineProps> = () => {
         const dp = Number(r.depth) || 0;
         m[r.day] = dp >= 0.5 ? 4 : dp >= 0.35 ? 3 : dp >= 0.18 ? 2 : dp > 0 ? 1 : 0;
       }
-      if (!cancelled) setDepthByDay(m);
+      if (!cancelled) setDepthRead(current => current.vehicleId === vehicleId ? { vehicleId, values: m } : current);
     }).catch(() => { /* coverage is best-effort; timeline still renders from events */ });
     return () => { cancelled = true; };
   }, [vehicleId]);
-  const [expanded, setExpanded] = useState(true);
+  const [expanded, setExpanded] = useState(false);
+  const [selectedAuctionKey, setSelectedAuctionKey] = useState<string | null>(null);
   const [activeFilter, setActiveFilter] = useState('all');
   const [receiptDate, setReceiptDate] = useState<string | null>(null);
   const [tooltipContent, setTooltipContent] = useState<string | null>(null);
@@ -313,7 +339,9 @@ const BarcodeTimeline: React.FC<BarcodeTimelineProps> = () => {
   // the activity record — get_vehicle_contribution_days returns
   // (day, kind photo|work|event, n); 'event' kind is skipped here because
   // timelineEvents already carries the real events.
-  const [dayRows, setDayRows] = useState<{ day: string; kind: string; n: number }[]>([]);
+  const [contributionRead, setContributionRead] = useState<{ vehicleId: typeof vehicleId; values: { day: string; kind: string; n: number }[] }>(() => ({ vehicleId, values: [] }));
+  if (contributionRead.vehicleId !== vehicleId) setContributionRead({ vehicleId, values: [] });
+  const dayRows = contributionRead.vehicleId === vehicleId ? contributionRead.values : [];
   useEffect(() => {
     if (!vehicleId) return;
     let cancelled = false;
@@ -321,14 +349,40 @@ const BarcodeTimeline: React.FC<BarcodeTimelineProps> = () => {
       .rpc('get_vehicle_contribution_days', { p_vehicle_id: vehicleId })
       .then(({ data, error }) => {
         if (error) console.warn('[BarcodeTimeline] contribution days:', error.message);
-        if (!cancelled && data) setDayRows(data as any[]);
+        if (!cancelled && data) setContributionRead(current => current.vehicleId === vehicleId ? { vehicleId, values: data as any[] } : current);
       });
     return () => { cancelled = true; };
   }, [vehicleId]);
 
   // Synthesize photo/work day events for days the event feed doesn't cover.
   const enrichedEvents = useMemo(() => {
-    if (dayRows.length === 0) return timelineEvents;
+    // Photo days whose stamps are import times, not capture times (a BaT-imported
+    // photo carries the importer's run time, never a capture time): those days never render.
+    const importDays = new Set(importStampedDays);
+    const rows = importDays.size ? dayRows.filter(r => !(r.kind === 'photo' && importDays.has(r.day))) : dayRows;
+
+    // Each listing's own days, timestamped to the moment — nothing here uses created_at.
+    const auctionDays: Array<Record<string, unknown>> = [];
+    for (const auction of auctions) {
+      const lot = auctions.length > 1 ? `Lot ${auction.lotNumber ?? auction.ordinal} · ` : '';
+      const openDay = auction.open ? momentDay(auction.open) : null;
+      const closeDay = auction.close ? momentDay(auction.close) : null;
+      if (openDay) {
+        auctionDays.push({ event_date: openDay, event_type: 'auction_started', title: `${lot}${auctionOpenDayTitle(auction)}`, metadata: { auction: true, basis: auction.open!.basis, moment_role: auction.open!.role, time_known: auction.open!.grain === 'instant' } });
+        if (auction.photos.publishedWithListing > 0) {
+          auctionDays.push({ event_date: openDay, event_type: 'photo_session', title: `${lot}${auction.photos.publishedWithListing} images grouped with listing (association inferred)`, metadata: { image_count: auction.photos.publishedWithListing, published_with_listing: true, auction: true } });
+        }
+      }
+      for (const d of auction.days) {
+        const parts = [d.bids ? `${d.bids} bid${d.bids === 1 ? '' : 's'}` : null, d.comments ? `${d.comments} comment${d.comments === 1 ? '' : 's'}` : null].filter(Boolean);
+        auctionDays.push({ event_date: d.date, event_type: 'auction_day', title: `${lot}${parts.join(' · ')}${d.high != null ? ` · high bid $${Math.round(d.high).toLocaleString()}` : ''}${d.postClose ? ' · after the close' : ''}`, metadata: { auction: true, bids: d.bids, comments: d.comments } });
+      }
+      if (closeDay) {
+        auctionDays.push({ event_date: closeDay, event_type: 'auction_ended', title: `${lot}${auctionMomentDayTitle(auction)}${auction.price != null ? ` $${Math.round(auction.price).toLocaleString()}` : ''}`, metadata: { auction: true, basis: auction.close!.basis, moment_role: auction.close!.role, time_known: auction.close!.grain === 'instant' } });
+      }
+    }
+
+    if (rows.length === 0 && auctionDays.length === 0) return timelineEvents;
     const coveredPhotoDays = new Set(
       timelineEvents
         .filter((ev: any) => (ev.metadata?.image_count > 0) || String(ev.event_type || '').toLowerCase() === 'photo_session')
@@ -339,8 +393,8 @@ const BarcodeTimeline: React.FC<BarcodeTimelineProps> = () => {
         .filter((ev: any) => ['work_session', 'repair', 'modification', 'maintenance', 'service'].includes(String(ev.event_type || '').toLowerCase()))
         .map((ev: any) => String(ev.event_date || '').slice(0, 10)),
     );
-    const synthetic: any[] = [];
-    for (const r of dayRows) {
+    const synthetic: any[] = [...auctionDays];
+    for (const r of rows) {
       if (r.kind === 'photo' && !coveredPhotoDays.has(r.day)) {
         synthetic.push({ event_date: r.day, event_type: 'photo_session', title: `${r.n} photos`, metadata: { image_count: r.n, synthetic_day: true } });
       } else if (r.kind === 'work' && !coveredWorkDays.has(r.day)) {
@@ -348,7 +402,7 @@ const BarcodeTimeline: React.FC<BarcodeTimelineProps> = () => {
       }
     }
     return synthetic.length ? [...timelineEvents, ...synthetic] : timelineEvents;
-  }, [timelineEvents, dayRows]);
+  }, [timelineEvents, dayRows, auctions, importStampedDays]);
 
   // Filter counts — always computed from the full set so pills show totals before clicking
   const filterCounts = useMemo(() => {
@@ -673,36 +727,6 @@ const BarcodeTimeline: React.FC<BarcodeTimelineProps> = () => {
     });
   }, [weeks.length]);
 
-  // Collapse on scroll past the hero area, re-expand when scrolled back near top.
-  // Hysteresis: expand threshold (40) is lower than collapse threshold (320) so the
-  // timeline doesn't strobe open/closed during normal page interaction. Prior threshold
-  // of 10 caused the timeline to slam shut on the slightest scroll.
-  useEffect(() => {
-    const COLLAPSE_AT = 320;
-    const EXPAND_AT = 40;
-    const onScroll = () => {
-      // Never auto-collapse while the user is reading a day document.
-      if (receiptDate) return;
-      const y = window.scrollY;
-      if (y <= EXPAND_AT && !expanded) {
-        setExpanded(true);
-      } else if (y > COLLAPSE_AT && expanded) {
-        setExpanded(false);
-        setReceiptDate(null);
-        setHighlightGroup(null);
-        setGalleryFilter(null);
-      }
-    };
-    // Defer so the expand click's own scroll doesn't immediately collapse
-    const raf = requestAnimationFrame(() => {
-      window.addEventListener('scroll', onScroll, { passive: true });
-    });
-    return () => {
-      cancelAnimationFrame(raf);
-      window.removeEventListener('scroll', onScroll);
-    };
-  }, [expanded, receiptDate, setGalleryFilter]);
-
   // Escape: close the day drawer first, then the strip (mirrors the
   // user-profile drawer contract — reversible, layer by layer).
   useEffect(() => {
@@ -760,10 +784,20 @@ const BarcodeTimeline: React.FC<BarcodeTimelineProps> = () => {
     [receiptDate, sortedDates, eventMap, setGalleryFilter]
   );
 
-  // If no timeline events at all, hide the section entirely
-  if (timelineEvents.length === 0) {
-    return null;
+  const availableAuctions = auctions.filter(a => a.activityExtracted || a.open || a.close);
+  const auctionStatus = <>
+    {timelineReadState?.timeline === 'unavailable' && <p role="status">Timeline events could not be fully read.</p>}
+    {timelineReadState?.work === 'unavailable' && <p role="status">Work-session details could not be fully read.</p>}
+    {activityUnavailable && <p role="status">Auction activity could not be fully read. Timeline activity counts are unavailable.</p>}
+    {hasUnpositionedActivity && <p role="status">Some retained auction interactions lack usable posting times and cannot be placed on this timeline.</p>}
+  </>;
+  // Native auction evidence can supply the timeline without raw event rows.
+  if (timelineEvents.length === 0 && availableAuctions.length === 0) {
+    return auctionStatus;
   }
+
+  const selectedAuction = availableAuctions.find(a => selectedAuctionUrl && a.lotUrl.replace(/\/+$/, '') === selectedAuctionUrl.replace(/\/+$/, ''))
+    ?? availableAuctions.find(a => a.key === selectedAuctionKey) ?? availableAuctions[0];
 
   return (
     <>
@@ -772,8 +806,8 @@ const BarcodeTimeline: React.FC<BarcodeTimelineProps> = () => {
         className={`barcode-strip ${expanded ? 'barcode-strip--expanded' : 'barcode-strip--collapsed'}`}
       >
         {/* Collapsed bar */}
-        <div className="barcode-bar" onClick={toggleExpand}>
-          <span className="barcode-bar__label-left">TIMELINE</span>
+        <button type="button" className="barcode-bar" onClick={toggleExpand} aria-expanded={expanded} aria-label="Vehicle timeline">
+          <span className="barcode-bar__label-left">TIMELINE {expanded ? '▴' : '▾'}</span>
           <div className="barcode-canvas">
             {weeks.map((w, i) => (
               <div
@@ -790,10 +824,12 @@ const BarcodeTimeline: React.FC<BarcodeTimelineProps> = () => {
             ))}
           </div>
           <span className="barcode-bar__label-right">{yearRange}</span>
-        </div>
+        </button>
 
         {/* Expanded heatmap — full timeline from vehicle year to present */}
         <div className="barcode-heatmap" ref={heatmapRef}>
+          <details className="timeline-view-options">
+            <summary>Calendar & view options</summary>
           {/* Filter pills — one data source, filtered views */}
           <div className="timeline-filter-pills">
             {TIMELINE_FILTERS.map((f) => (
@@ -866,12 +902,33 @@ const BarcodeTimeline: React.FC<BarcodeTimelineProps> = () => {
             {/* Month labels are now rendered inline inside each .hm-week column */}
           </div>
 
+          </details>
+          {availableAuctions.length > 1 && !onSelectAuction && <label className="timeline-auction-select">Auction episode <select
+            aria-label="Timeline auction episode" value={selectedAuction?.key ?? ''}
+            onChange={event => { setSelectedAuctionKey(event.target.value); closeDay(); const selected = availableAuctions.find(a => a.key === event.target.value); if (selected) onSelectAuction?.(selected.lotUrl); }}>
+            {availableAuctions.map(a => <option key={a.key} value={a.key}>
+              {a.close?.at?.slice(0, 10) ?? a.open?.at?.slice(0, 10) ?? 'Date unknown'} · {a.outcome.replace(/_/g, ' ')}{a.lotNumber ? ` · lot ${a.lotNumber}` : ''}
+            </option>)}
+          </select></label>}
+          {/* Each BaT listing's week, newest first: open, every bid and comment at its
+              time, the close and result, post-close comments. Each mark opens its source. */}
+          {auctionStatus}
+          {selectionPending && <p role="status">Reading selected auction…</p>}
+          {(!selectionPending && selectedAuction ? [selectedAuction] : []).map(a => (
+            <React.Suspense key={a.key} fallback={null}>
+              <AuctionSequenceBand auction={a} showResult={!onSelectAuction} activeDay={receiptDate} onOpenDay={openDay}
+                onOpenBidReports={popup && vehicleId ? () => popup.push(<BidsPopup vehicleId={vehicleId} listingUrl={a.lotUrl} />, 'Recorded vehicle bid amounts', 420) : undefined} />
+            </React.Suspense>
+          ))}
+
           {/* Day document — inline drawer below the grid (C10: a day click
               answers "what happened that day" completely, in place) */}
           {receiptDate && (
             <React.Suspense fallback={null}>
               <VehicleDayDrawer
                 date={receiptDate}
+                auctions={auctions}
+                hasWorkSummary={dayRows.some(row => row.day === receiptDate && row.kind === 'work' && Number.isFinite(row.n) && row.n > 0)}
                 onClose={closeDay}
                 onPrev={() => navigateReceipt(-1)}
                 onNext={() => navigateReceipt(1)}

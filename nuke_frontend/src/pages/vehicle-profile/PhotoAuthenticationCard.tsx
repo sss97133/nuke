@@ -1,9 +1,8 @@
 /**
- * PhotoAuthenticationCard — shows the EXIF chain-of-custody rollup for a
- * vehicle's photos. Counts authenticated (have device_attributions) vs
- * unauthenticated, with a per-device breakdown for the authenticated set.
+ * PhotoAuthenticationCard — shows retained camera labels for vehicle photos.
+ * A device attribution row with camera text is metadata, not authentication.
  *
- * Renders null if the vehicle has zero photos (per "no empty shells" rule).
+ * Renders only when camera labels exist (per "no empty shells" rule).
  */
 import React, { useEffect, useState } from 'react';
 import { supabase } from '../../lib/supabase';
@@ -17,9 +16,8 @@ interface DeviceCount { device: string; n: number }
 
 interface State {
   total: number;
-  authenticated: number;
-  unauthenticated: number;
-  bySource: { source: string; n: number; authed: number }[];
+  withCamera: number;
+  bySource: { source: string; n: number; withCamera: number }[];
   byDevice: DeviceCount[];
 }
 
@@ -29,6 +27,8 @@ const PhotoAuthenticationCard: React.FC<Props> = ({ vehicleId }) => {
 
   useEffect(() => {
     let cancelled = false;
+    setState(null);
+    setError(null);
     (async () => {
       // Pull image_id+source for the vehicle, then check which have attribution rows.
       const imgRes = await supabase
@@ -38,7 +38,7 @@ const PhotoAuthenticationCard: React.FC<Props> = ({ vehicleId }) => {
         .limit(5000);
       if (imgRes.error) { if (!cancelled) setError(imgRes.error.message); return; }
       const imgs = imgRes.data || [];
-      if (imgs.length === 0) { if (!cancelled) setState({ total: 0, authenticated: 0, unauthenticated: 0, bySource: [], byDevice: [] }); return; }
+      if (imgs.length === 0) { if (!cancelled) setState({ total: 0, withCamera: 0, bySource: [], byDevice: [] }); return; }
 
       const ids = imgs.map(r => r.id);
       // Chunk in case of very large galleries
@@ -57,18 +57,18 @@ const PhotoAuthenticationCard: React.FC<Props> = ({ vehicleId }) => {
       }
 
       const total = imgs.length;
-      let authenticated = 0;
-      const sourceMap = new Map<string, { n: number; authed: number }>();
+      let withCamera = 0;
+      const sourceMap = new Map<string, { n: number; withCamera: number }>();
       const deviceMap = new Map<string, number>();
       for (const img of imgs) {
         const src = img.source || '—';
-        const cur = sourceMap.get(src) || { n: 0, authed: 0 };
+        const cur = sourceMap.get(src) || { n: 0, withCamera: 0 };
         cur.n++;
         const a = attribByImage.get(img.id);
-        if (a && (a.make || a.model)) {
-          authenticated++;
-          cur.authed++;
-          const dev = [a.make, a.model].filter(Boolean).join(' ');
+        if (a && (a.make?.trim() || a.model?.trim())) {
+          withCamera++;
+          cur.withCamera++;
+          const dev = [a.make?.trim(), a.model?.trim()].filter(Boolean).join(' ');
           deviceMap.set(dev, (deviceMap.get(dev) || 0) + 1);
         }
         sourceMap.set(src, cur);
@@ -76,8 +76,7 @@ const PhotoAuthenticationCard: React.FC<Props> = ({ vehicleId }) => {
       if (cancelled) return;
       setState({
         total,
-        authenticated,
-        unauthenticated: total - authenticated,
+        withCamera,
         bySource: Array.from(sourceMap.entries()).map(([source, v]) => ({ source, ...v })).sort((a, b) => b.n - a.n),
         byDevice: Array.from(deviceMap.entries()).map(([device, n]) => ({ device, n })).sort((a, b) => b.n - a.n),
       });
@@ -86,22 +85,12 @@ const PhotoAuthenticationCard: React.FC<Props> = ({ vehicleId }) => {
   }, [vehicleId]);
 
   if (error) return null;
-  if (!state || state.total === 0) return null;
-
-  const pct = state.total > 0 ? Math.round((state.authenticated / state.total) * 100) : 0;
+  if (!state || state.withCamera === 0) return null;
 
   return (
-    <CollapsibleWidget variant="profile" title="Photo Authentication" defaultCollapsed={false}
-      badge={<span className="widget__count">{state.authenticated}/{state.total}</span>}
-    >
+    <CollapsibleWidget variant="profile" title="Camera metadata" defaultCollapsed={true}>
       <div style={{ padding: '8px 12px', fontFamily: 'Arial, sans-serif', color: 'var(--text, #1a1a1a)' }}>
-        {/* Headline */}
-        <div style={{ display: 'flex', gap: 12, alignItems: 'baseline', borderBottom: '2px solid var(--text, #1a1a1a)', paddingBottom: 6, marginBottom: 8 }}>
-          <div style={{ fontFamily: 'Courier New, monospace', fontSize: 18, fontWeight: 700 }}>{pct}%</div>
-          <div style={{ fontSize: 9, letterSpacing: '0.08em', textTransform: 'uppercase', fontWeight: 700 }}>
-            EXIF-authenticated · {state.authenticated} of {state.total} photos
-          </div>
-        </div>
+        <p style={{ fontSize: 10 }}>Stored camera labels; image authenticity is unverified.</p>
 
         {/* Per-device breakdown */}
         {state.byDevice.length > 0 && (
@@ -123,17 +112,14 @@ const PhotoAuthenticationCard: React.FC<Props> = ({ vehicleId }) => {
         {/* Per-source breakdown */}
         <div>
           <div style={{ fontSize: 8, letterSpacing: '0.08em', textTransform: 'uppercase', fontWeight: 700, marginBottom: 4 }}>
-            by source pipeline
+            camera labels / images read · by source
           </div>
           <div style={{ fontFamily: 'Courier New, monospace', fontSize: 10, lineHeight: 1.5 }}>
             {state.bySource.map((s) => {
-              const sourcePct = s.n > 0 ? Math.round((s.authed / s.n) * 100) : 0;
-              const allBad = s.authed === 0;
               return (
-                <div key={s.source} style={{ display: 'grid', gridTemplateColumns: '1fr 60px 60px', gap: 8, borderBottom: '1px solid var(--text-disabled, #ddd)', padding: '2px 0' }}>
+                <div key={s.source} style={{ display: 'grid', gridTemplateColumns: '1fr 60px', gap: 8, borderBottom: '1px solid var(--text-disabled, #ddd)', padding: '2px 0' }}>
                   <span>{s.source}</span>
-                  <span style={{ textAlign: 'right', color: 'var(--text-secondary, #666)' }}>{s.authed}/{s.n}</span>
-                  <span style={{ textAlign: 'right', color: allBad ? 'var(--error, #c00)' : 'var(--success, #0a7)' }}>{sourcePct}%</span>
+                  <span style={{ textAlign: 'right', color: 'var(--text-secondary, #666)' }}>{s.withCamera}/{s.n}</span>
                 </div>
               );
             })}

@@ -44,12 +44,12 @@
 ### Migration Strategy
 
 1. **Canonical migration**
-   - Location: `/Users/skylar/nuke/supabase/migrations/20251119XXXXXX_viff_schema.sql`.
+   - Location: `~/nuke/supabase/migrations/20251119XXXXXX_viff_schema.sql`.
    - Contains full `CREATE TABLE/TYPE/INDEX` statements plus RLS policies.
    - Uses strict SQL (no IF NOT EXISTS) so we catch drift during deploys.
 
 2. **Reset shim**
-   - Location: `/Users/skylar/nuke/supabase/sql/shims/viff_schema.sql`.
+   - Location: `~/nuke/supabase/sql/shims/viff_schema.sql`.
    - Mirrors the canonical migration but wraps everything in `CREATE TABLE IF NOT EXISTS` / `ALTER TABLE ... ADD COLUMN IF NOT EXISTS`, `DO $$ BEGIN CREATE TYPE IF NOT EXISTS ... END $$;`.
    - Loaded inside `supabase/config.toml` `scripts.setup` pipeline so `supabase db reset` stays idempotent.
 

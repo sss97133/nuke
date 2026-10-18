@@ -45,9 +45,8 @@ interface OrgData {
   city: string | null;
   state: string | null;
   country: string | null;
-  instagram_handle: string | null;
   website: string | null;
-  established_date: string | null;
+  founded_year: number | null;
   brand_design_language: BrandDesignLanguage | null;
   vehicles: OrgVehicle[];
 }
@@ -62,9 +61,10 @@ export default function MapOrgDetail({ orgId, onBack, onNavigate }: Props) {
       setLoading(true);
 
       // Try by slug first, then by id
+      // organizations, not the businesses view: the view has no name, founded year or brand_design_language
       let { data: o } = await supabase
-        .from('businesses')
-        .select('id, name, entity_type, business_type, city, state, country, instagram_handle, website, established_date, brand_design_language')
+        .from('organizations')
+        .select('id, name, entity_type, business_type, city, state, country, website, founded_year, brand_design_language')
         .or(`slug.eq.${orgId},id.eq.${orgId}`)
         .limit(1)
         .single();
@@ -190,20 +190,14 @@ export default function MapOrgDetail({ orgId, onBack, onNavigate }: Props) {
         )}
 
         {/* Established */}
-        {org.established_date && (
+        {org.founded_year && (
           <div style={{ fontSize: 9, color: 'var(--text-disabled)', marginBottom: 8 }}>
-            EST. {new Date(org.established_date).getFullYear()}
+            EST. {org.founded_year}
           </div>
         )}
 
         {/* Links */}
         <div style={{ display: 'flex', gap: 6, marginBottom: 12 }}>
-          {org.instagram_handle && (
-            <a href={`https://instagram.com/${org.instagram_handle}`} target="_blank" rel="noopener noreferrer"
-              style={{ fontSize: 9, color: 'var(--text)', border: '1px solid var(--border)', padding: '3px 6px', textDecoration: 'none' }}>
-              @{org.instagram_handle}
-            </a>
-          )}
           {org.website && (
             <a href={org.website} target="_blank" rel="noopener noreferrer"
               style={{ fontSize: 9, color: 'var(--text)', border: '1px solid var(--border)', padding: '3px 6px', textDecoration: 'none' }}>

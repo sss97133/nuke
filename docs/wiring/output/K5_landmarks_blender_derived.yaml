@@ -5,7 +5,7 @@
 #          the from-primitives build; v1 values are superseded)
 # model: /Users/skylar/k5-harness-pull/K5_harness_workspace_v2.blend
 #        base = 1978_Chevrolet_Blazer.blend (TurboSquid #1764639, $99, Dec 2024
-#        order 6425842) — designated digital twin in K5_DIMENSIONAL_SUBSTRATE.md.
+#        Dec 2024 order) — designated digital twin in K5_DIMENSIONAL_SUBSTRATE.md.
 #        SCALE VERIFIED THIS SESSION: model wheelbase 2,703 mm vs FR-88 cited
 #        2,705 mm (Δ 2 mm). Body/dash/doors/lights = real geometry anchors.
 #        Engine bay contents = atom-built insert (LS3-Marine envelope, Holley

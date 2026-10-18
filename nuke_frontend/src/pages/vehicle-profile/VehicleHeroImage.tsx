@@ -11,7 +11,7 @@ interface VehicleHeroImageProps {
 }
 
 const VehicleHeroImage: React.FC<VehicleHeroImageProps> = ({ overlayNode }) => {
-  const { leadImageUrl, heroMeta, vehicleId, vehicleImages } = useVehicleProfile();
+  const { leadImageUrl, heroMeta, vehicleId } = useVehicleProfile();
   // Default to contain: show the full vehicle, letterbox if needed.
   // "The user came to see the vehicle, not a cropped fragment." — 2026-03-21 audit
   const [fitMode, setFitMode] = useState<'contain' | 'cover'>('contain');
@@ -23,12 +23,17 @@ const VehicleHeroImage: React.FC<VehicleHeroImageProps> = ({ overlayNode }) => {
   // the request flood. Measured 2026-06-10: heroImgs=0 at t+30s, first paint t+40s.)
   // VehicleMediaKit stays mounted regardless and upgrades the slot via
   // onCurationResolved when curation lands.
-  const [mediaKitActive, setMediaKitActive] = useState<boolean>(false);
+  const [mediaKitState, setMediaKitState] = useState({ vehicleId, active: false });
+  // A new vehicle entry starts with its static lead, including A → B → A.
+  if (mediaKitState.vehicleId !== vehicleId) {
+    setMediaKitState({ vehicleId, active: false });
+  }
+  const mediaKitActive = mediaKitState.vehicleId === vehicleId && mediaKitState.active;
   const isMobile = useIsMobile();
 
   const handleCurationResolved = useCallback((count: number) => {
-    setMediaKitActive(count >= 3);
-  }, []);
+    setMediaKitState(current => current.vehicleId === vehicleId ? { ...current, active: count >= 3 } : current);
+  }, [vehicleId]);
 
   const getSupabaseRenderUrl = (publicObjectUrl: string, width: number, quality = 90): string | null => {
     try {
@@ -50,21 +55,21 @@ const VehicleHeroImage: React.FC<VehicleHeroImageProps> = ({ overlayNode }) => {
   const { vehicle } = useVehicleProfile();
   const v = vehicle as any;
 
-  // 404 resilience: if the lead image fails to load, walk forward through the
-  // vehicle's other photos instead of leaving a black void.
+  // The canonical reader has screened the lead image. Gallery URLs have not
+  // passed that selection and must not re-promote a rejected document on error.
   const [failedUrls, setFailedUrls] = useState<Set<string>>(() => new Set());
   const [fullLoaded, setFullLoaded] = useState(false);
   const candidates = React.useMemo(() => {
     const seen = new Set<string>();
     const out: string[] = [];
-    for (const u of [leadImageUrl, ...vehicleImages]) {
+    for (const u of [leadImageUrl]) {
       const s = u ? String(u).trim() : '';
       if (!s || s === 'undefined' || s === 'null' || seen.has(s)) continue;
       seen.add(s);
       out.push(s);
     }
     return out;
-  }, [leadImageUrl, vehicleImages]);
+  }, [leadImageUrl]);
   const src = candidates.find((u) => !failedUrls.has(u)) || '';
   const handleHeroError = useCallback(() => {
     if (!src) return;
@@ -151,13 +156,13 @@ const VehicleHeroImage: React.FC<VehicleHeroImageProps> = ({ overlayNode }) => {
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', justifyContent: 'center' }}>
             {v?.year && <BadgePortal dimension="year" value={v.year} label={String(v.year)} variant="source" />}
             {v?.make && <BadgePortal dimension="make" value={v.make} label={String(v.make).toUpperCase()} variant="source" />}
-            {v?.model && <BadgePortal dimension="model" value={v.model} label={String(v.model).toUpperCase()} variant="source" />}
+            {v?.model && <BadgePortal dimension="model" value={v.model} modelMake={v.make} label={String(v.model).toUpperCase()} variant="source" />}
             {v?.body_style && <BadgePortal dimension="body_style" value={v.body_style} label={String(v.body_style).toUpperCase()} variant="status" />}
             {v?.transmission && (
               <BadgePortal
                 dimension="transmission"
                 value={v.transmission}
-                label={String(v.transmission).toLowerCase().includes('manual') ? 'MANUAL' : 'AUTO'}
+                label={String(v.transmission).toUpperCase()}
                 variant="status"
               />
             )}
@@ -171,7 +176,7 @@ const VehicleHeroImage: React.FC<VehicleHeroImageProps> = ({ overlayNode }) => {
             textTransform: 'uppercase' as const,
             marginTop: '4px',
           }}>
-            NO PHOTO · EXPLORE BY BADGE
+            {candidates.length > 0 ? 'PHOTO UNAVAILABLE' : 'NO PHOTO'} · EXPLORE BY BADGE
           </span>
         </div>
       </div>
@@ -224,6 +229,7 @@ const VehicleHeroImage: React.FC<VehicleHeroImageProps> = ({ overlayNode }) => {
                   upgrade the static hero to the slideshow when ready. */}
               {vehicleId && (
                 <VehicleMediaKit
+                  key={vehicleId}
                   vehicleId={vehicleId}
                   onCurationResolved={handleCurationResolved}
                   onImageClick={isMobile ? () => setShowGallery(true) : (imageId) => openVehiclePhoto(imageId)}
@@ -312,6 +318,8 @@ const VehicleHeroImage: React.FC<VehicleHeroImageProps> = ({ overlayNode }) => {
 
       {isMobile && showGallery && (
         <MobileImageGallery
+          key={vehicleId}
+          vehicleId={vehicleId}
           leadImageUrl={leadImageUrl}
           onClose={() => setShowGallery(false)}
         />

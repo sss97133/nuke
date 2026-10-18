@@ -3,22 +3,15 @@
  *
  * Runs on every matched request BEFORE static file serving.
  *
- * /market/competitors — static OG tag injection for link previews
  * /vehicle/:id        — dynamic vehicle data injection for AI readability,
  *                        OG tags, JSON-LD, and Accept: application/json support
+ * /, /market, /journal, /llms.txt — readable text for crawlers and AI readers (the app is drawn by JavaScript, so
+ *                        without this they see a title and nothing else). Numbers come from market_sources_read()
+ *                        through the anon key, each with its own date; if the read fails the page says so and shows no number.
  */
 
 export const config = {
-  matcher: ['/market/competitors', '/vehicle/:path*', '/api/v1/vehicle/:path*'],
-};
-
-// ── Static OG for /market/competitors ────────────────────────────────────────
-
-const COMPETITORS_OG = {
-  title: 'Nuke vs. Rally vs. TheCarCrowd — Fractional Car Ownership Compared',
-  description:
-    'Rally raised $112M, has 9 cars, was fined $350K by the SEC. TheCarCrowd says on their own site they\'re "not FCA-regulated." The whole market is under $100M AUM. Nuke tracks 1.25M vehicles with real auction data.',
-  url: 'https://nuke.ag/market/competitors',
+  matcher: ['/', '/market', '/journal', '/llms.txt', '/vehicle/:path*', '/api/v1/vehicle/:path*'],
 };
 
 // ── Vehicle data config ──────────────────────────────────────────────────────
@@ -120,43 +113,173 @@ async function fetchVehicle(vehicleId: string): Promise<Record<string, unknown> 
   return null;
 }
 
+
+// ── Public face: readable text for crawlers and AI readers ──────────────────
+
+const INTERNAL_HEADER = 'x-nuke-internal';
+// Same order as src/lib/env.ts: the VITE_ value is the one the app itself uses.
+const SUPABASE_ANON = (process.env.VITE_SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY || '').trim();
+// Held-lot counts refresh daily at 10:27Z and the board snapshot at 10:47Z; a few hours of edge cache is enough.
+const FACE_CACHE = 'public, s-maxage=10800, stale-while-revalidate=86400';
+
+type SourceLine = {
+  name: string; category: string | null; held: number | null; heldAt: string | null;
+  population: number | null; method: string | null; confidence: number | null; populationAt: string | null;
+};
+type Board = { asOf: string; lines: SourceLine[] } | null;
+// Why the last board read returned nothing, sent as x-nuke-board so a failed read is diagnosable from outside.
+let boardStatus = 'unread';
+
+function numOrNull(x: unknown): number | null {
+  const n = typeof x === 'number' ? x : typeof x === 'string' ? Number(x) : NaN;
+  return Number.isFinite(n) ? n : null;
+}
+function strOrNull(x: unknown): string | null { return typeof x === 'string' && x ? x : null; }
+
+/** The Sources board, decoded by column name (same contract as SourcesBoard.tsx). Null when the read fails. */
+async function fetchBoard(): Promise<Board> {
+  if (!SUPABASE_URL || !SUPABASE_ANON) { boardStatus = !SUPABASE_URL ? 'no-url' : 'no-anon-key'; return null; }
+  try {
+    const ctl = new AbortController();
+    const timer = setTimeout(() => ctl.abort(), 4000);
+    const resp = await fetch(`${SUPABASE_URL}/rest/v1/rpc/market_sources_read`, {
+      method: 'POST',
+      // A publishable key (sb_publishable_...) is accepted in apikey only; a Bearer token must be a JWT.
+      headers: {
+        apikey: SUPABASE_ANON, 'Content-Type': 'application/json',
+        ...(SUPABASE_ANON.startsWith('eyJ') ? { Authorization: `Bearer ${SUPABASE_ANON}` } : {}),
+      },
+      body: '{}',
+      signal: ctl.signal,
+    });
+    clearTimeout(timer);
+    if (!resp.ok) { boardStatus = `http-${resp.status}`; return null; }
+    const v = await resp.json() as { as_of?: unknown; columns?: unknown; rows?: unknown };
+    if (typeof v.as_of !== 'string' || !Array.isArray(v.columns) || !Array.isArray(v.rows)) { boardStatus = 'unexpected-shape'; return null; }
+    const at = (c: string) => (v.columns as unknown[]).indexOf(c);
+    const lines: SourceLine[] = [];
+    for (const r of v.rows as unknown[][]) {
+      if (!Array.isArray(r)) continue;
+      const g = (c: string) => (at(c) >= 0 ? r[at(c)] : null);
+      const name = strOrNull(g('name'));
+      if (!name) continue;
+      lines.push({
+        name, category: strOrNull(g('category')), held: numOrNull(g('held_lots')), heldAt: strOrNull(g('held_at')),
+        population: numOrNull(g('population')), method: strOrNull(g('population_method')),
+        confidence: numOrNull(g('population_confidence')), populationAt: strOrNull(g('population_at')),
+      });
+    }
+    lines.sort((a, b) => (b.held ?? 0) - (a.held ?? 0));
+    boardStatus = 'ok';
+    return { asOf: v.as_of, lines };
+  } catch (e) {
+    boardStatus = e instanceof Error && e.name === 'AbortError' ? 'timeout' : 'fetch-error';
+    return null;
+  }
+}
+
+const day = (iso: string | null) => (iso ? iso.slice(0, 10) : 'unknown');
+const fmt = (n: number | null) => (n == null ? 'unknown' : n.toLocaleString('en-US'));
+
+/** One line per source: the lots held with the day counted, and the source's own total with method, confidence, day. */
+function sourceSentence(l: SourceLine): string {
+  const held = `${fmt(l.held)} lots held (counted ${day(l.heldAt)})`;
+  const pop = l.population == null
+    ? 'source total unknown'
+    : `source total ${fmt(l.population)} (${l.method ?? 'method not recorded'}, confidence ${l.confidence ?? 'not recorded'}, ${day(l.populationAt)})`;
+  return `${l.name}: ${held}; ${pop}.`;
+}
+
+const ABOUT = 'Nuke (nuke.ag) is a data machine: an append-only, bitemporal record of observations about physical assets, ' +
+  'with provenance on every row and computed stacks over it. Vehicles are the first entity. Every bid, comment, photo, ' +
+  'receipt or title transfer lands once in a log, is keyed to every entity it mentions, and is folded into state, ' +
+  'baselines, residuals and predictions that are later graded against what happened.';
+
+type FacePage = { path: string; title: string; heading: string; lead: string; withBoard: boolean };
+const FACE: Record<string, FacePage> = {
+  '/': {
+    path: '/', title: 'Nuke — a data machine for physical assets', heading: 'Nuke',
+    lead: ABOUT, withBoard: true,
+  },
+  '/market': {
+    path: '/market', title: 'Nuke Market — every auction house, same measures',
+    heading: 'Market: every source on the same measures',
+    lead: 'Each market is ranked by the lots Nuke holds for it. Every count carries the day it was measured and, where known, ' +
+      'the size of the source it is measured against, with the method and confidence of that size.',
+    withBoard: true,
+  },
+  '/journal': {
+    path: '/journal', title: 'Nuke Journal — a shop work-log from the record', heading: 'Journal',
+    lead: 'Each date projects a shop work-log from the record: photos, receipts and work on the vehicles in the build. ' +
+      'The entries are drawn in the app and are not listed here.',
+    withBoard: false,
+  },
+};
+
+function boardHtml(b: Board): string {
+  if (!b) return '<p>The live source counts could not be read at this moment, so none are shown here. Open the page in a browser for the board.</p>';
+  const top = b.lines.slice(0, 15);
+  return `<h2>Sources, ranked by lots held (read ${escapeHtml(b.asOf)})</h2><ol>${
+    top.map((l) => `<li>${escapeHtml(sourceSentence(l))}</li>`).join('')}</ol>` +
+    `<p>${b.lines.length} sources are on the board; the first ${top.length} are listed. A count is lots Nuke holds, not the number that exist; ` +
+    'where the source total is unknown the line says so.</p>';
+}
+
+function faceBody(page: FacePage, b: Board): string {
+  return `<main><h1>${escapeHtml(page.heading)}</h1><p>${escapeHtml(page.lead)}</p>${page.withBoard ? boardHtml(b) : ''}` +
+    '<h2>Read it</h2><ul>' +
+    '<li><a href="https://github.com/sss97133/nuke">The repository and its generated, dated numbers</a></li>' +
+    '<li><a href="https://nuke.ag/llms.txt">llms.txt</a></li>' +
+    '<li><a href="https://nuke.ag/mcp">MCP endpoint</a> · <a href="https://nuke.ag/developers">API and developers</a></li>' +
+    '<li><a href="https://nuke.ag/market">Market</a> · <a href="https://nuke.ag/journal">Journal</a></li></ul></main>';
+}
+
+function injectFace(html: string, page: FacePage, b: Board): string {
+  const t = escapeHtml(page.title);
+  const d = escapeHtml(page.lead.slice(0, 300));
+  const url = `https://nuke.ag${page.path === '/' ? '' : page.path}`;
+  html = html.replace(/<title>[^<]*<\/title>/, `<title>${t}</title>`);
+  html = html.replace(/<meta name="description" content="[^"]*"\s*\/>/, `<meta name="description" content="${d}" />`);
+  html = html.replace(/<meta property="og:title" content="[^"]*"\s*\/>/, `<meta property="og:title" content="${t}" />`);
+  html = html.replace(/<meta property="og:description" content="[^"]*"\s*\/>/, `<meta property="og:description" content="${d}" />`);
+  html = html.replace(/<meta property="og:url" content="[^"]*"\s*\/>/, `<meta property="og:url" content="${url}" />`);
+  html = html.replace(/<link rel="canonical" href="[^"]*"\s*\/>/, `<link rel="canonical" href="${url}" />`);
+  // React's createRoot replaces everything inside #root on mount, so people see the app and readers without JS see this.
+  return html.replace('<div id="root"></div>', `<div id="root">${faceBody(page, b)}</div>`);
+}
+
+function llmsTxt(b: Board): string {
+  const lines = [
+    '# Nuke', '', `> ${ABOUT}`, '',
+    '## Read these first',
+    '- [Repository README, with generated and dated numbers](https://github.com/sss97133/nuke)',
+    '- [The data machine: nine layers from log to outcome](https://github.com/sss97133/nuke/blob/main/docs/ledger/theory/data-machine.md)',
+    '- [Evidence: graded predictions and the stack registry](https://nuke.ag/evidence.md)',
+    '', '## Use it',
+    '- [MCP endpoint](https://nuke.ag/mcp)',
+    '- [Vehicle API: GET /api/v1/vehicle/{id}](https://nuke.ag/api/v1/vehicle)',
+    '- [Developers](https://nuke.ag/developers)',
+    '- [Sitemap](https://nuke.ag/sitemap.xml)',
+    '', '## Sources and their coverage',
+  ];
+  if (b) {
+    lines.push(`Read ${b.asOf}. A count is lots Nuke holds; the source total is what exists, with its method.`, '');
+    for (const l of b.lines.slice(0, 15)) lines.push(`- ${sourceSentence(l)}`);
+  } else {
+    lines.push('The live counts could not be read when this file was produced, so none are listed.');
+  }
+  lines.push('', '## Notes',
+    '- Every number on the site carries a date. A bare number without one is a bug; report it.',
+    '- Pages are drawn by JavaScript; this file and the HTML text on each page are the readable summary.');
+  return lines.join('\n') + '\n';
+}
+
 // ── Fetch base HTML ──────────────────────────────────────────────────────────
 
 async function getBaseHtml(requestUrl: string): Promise<string> {
   const rootUrl = new URL('/', requestUrl).toString();
-  const base = await fetch(rootUrl);
+  const base = await fetch(rootUrl, { headers: { [INTERNAL_HEADER]: '1' } });
   return base.text();
-}
-
-// ── Inject OG tags (static, for competitors) ────────────────────────────────
-
-function injectStaticOg(html: string, og: typeof COMPETITORS_OG): string {
-  return html
-    .replace(/<title>[^<]*<\/title>/, `<title>${og.title}</title>`)
-    .replace(
-      /<meta name="description" content="[^"]*"\s*\/>/,
-      `<meta name="description" content="${og.description}" />`,
-    )
-    .replace(
-      /<meta property="og:title" content="[^"]*"\s*\/>/,
-      `<meta property="og:title" content="${og.title}" />`,
-    )
-    .replace(
-      /<meta property="og:description" content="[^"]*"\s*\/>/,
-      `<meta property="og:description" content="${og.description}" />`,
-    )
-    .replace(
-      /<meta property="og:url" content="[^"]*"\s*\/>/,
-      `<meta property="og:url" content="${og.url}" />`,
-    )
-    .replace(
-      /<meta name="twitter:title" content="[^"]*"\s*\/>/,
-      `<meta name="twitter:title" content="${og.title}" />`,
-    )
-    .replace(
-      /<meta name="twitter:description" content="[^"]*"\s*\/>/,
-      `<meta name="twitter:description" content="${og.description}" />`,
-    );
 }
 
 // ── Inject vehicle data into HTML ────────────────────────────────────────────
@@ -219,6 +342,20 @@ function injectVehicleData(html: string, v: Record<string, unknown>): string {
     `<script type="application/ld+json">\n${buildJsonLd(v)}\n</script>`,
   );
 
+  // Visible text for readers that do not run JavaScript; React's createRoot replaces it on mount.
+  const facts: [string, unknown][] = [
+    ['VIN', v.vin], ['Color', v.color], ['Engine', v.engine_type], ['Transmission', v.transmission],
+    ['Drivetrain', v.drivetrain], ['Body', v.body_style],
+    ['Mileage', v.mileage ? `${Number(v.mileage).toLocaleString('en-US')} miles` : null],
+    ['Sold for', v.sale_price ? `$${Number(v.sale_price).toLocaleString('en-US')}` : null],
+    ['Location', v.city && v.state ? `${v.city}, ${v.state}` : null],
+  ];
+  const rows = facts.filter(([, x]) => x).map(([k, x]) => `<dt>${k}</dt><dd>${escapeHtml(String(x))}</dd>`).join('');
+  const blurb = typeof v.description === 'string' ? `<p>${escapeHtml(v.description.slice(0, 1200))}</p>` : '';
+  html = html.replace('<div id="root"></div>',
+    `<div id="root"><article><h1>${escapeHtml(vehicleTitle(v))}</h1><dl>${rows}</dl>${blurb}` +
+    `<p>Record last updated ${escapeHtml(day(typeof v.updated_at === 'string' ? v.updated_at : null))}. <a href="https://nuke.ag/api/v1/vehicle/${escapeHtml(String(v.id))}">JSON</a></p></article></div>`);
+
   // Inject vehicle data JSON and API meta tag before </head>
   const vehicleDataScript = `<script type="application/json" id="vehicle-data">${JSON.stringify(v)}</script>`;
   const apiMeta = `<meta name="nuke:api" content="https://nuke.ag/api/v1/vehicle/${v.id}" />`;
@@ -232,14 +369,20 @@ function injectVehicleData(html: string, v: Record<string, unknown>): string {
 export default async function middleware(request: Request): Promise<Response | undefined> {
   const url = new URL(request.url);
 
-  // ── /market/competitors (static OG) ──
-  if (url.pathname === '/market/competitors') {
-    const html = await getBaseHtml(request.url);
-    return new Response(injectStaticOg(html, COMPETITORS_OG), {
-      headers: {
-        'Content-Type': 'text/html; charset=utf-8',
-        'Cache-Control': 'public, s-maxage=3600, stale-while-revalidate=86400',
-      },
+  // The base-HTML fetch below calls this deployment's own root; let it through to the static shell.
+  if (request.headers.get(INTERNAL_HEADER)) return undefined;
+
+  // ── /llms.txt and the readable public pages ──
+  if (url.pathname === '/llms.txt') {
+    return new Response(llmsTxt(await fetchBoard()), {
+      headers: { 'Content-Type': 'text/plain; charset=utf-8', 'Cache-Control': FACE_CACHE, 'Access-Control-Allow-Origin': '*', 'x-nuke-board': boardStatus },
+    });
+  }
+  const face = FACE[url.pathname.length > 1 ? url.pathname.replace(/\/$/, '') : url.pathname];
+  if (face) {
+    const [html, board] = await Promise.all([getBaseHtml(request.url), face.withBoard ? fetchBoard() : Promise.resolve(null)]);
+    return new Response(injectFace(html, face, board), {
+      headers: { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': FACE_CACHE, 'x-nuke-board': face.withBoard ? boardStatus : 'not-needed' },
     });
   }
 

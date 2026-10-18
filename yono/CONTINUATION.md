@@ -89,7 +89,7 @@ Right now only Gemini/GPT runs (no YONO gate). Adding the gate is Phase 3.
 ## Quick Commands
 
 ```bash
-cd /Users/skylar/nuke/yono
+cd ~/nuke/yono
 
 # Check scan progress
 python3 -c "

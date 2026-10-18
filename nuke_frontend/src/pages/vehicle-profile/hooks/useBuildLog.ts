@@ -100,6 +100,8 @@ export interface DailyReceipt {
   parts_total: number;
   component_events: DayComponentEvent[];
   line_items: DayLineItem[];
+  /** True when the reader masked every amount for this caller (money is the owner's). */
+  money_masked?: boolean;
   summary: {
     has_photos: boolean;
     has_parts: boolean;

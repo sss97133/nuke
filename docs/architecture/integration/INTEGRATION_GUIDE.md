@@ -23,7 +23,7 @@
 
 ### 1. Add ContributorOnboarding to Vehicle Profile
 
-**File**: `/Users/skylar/nuke/nuke_frontend/src/pages/VehicleProfile.tsx`
+**File**: `~/nuke/nuke_frontend/src/pages/VehicleProfile.tsx`
 
 **Where to add**:
 ```tsx
@@ -99,7 +99,7 @@ const [showContributorOnboarding, setShowContributorOnboarding] = useState(false
 
 ### 2. Display Shop Context in Image Gallery
 
-**File**: `/Users/skylar/nuke/nuke_frontend/src/components/images/ImageGallery.tsx`
+**File**: `~/nuke/nuke_frontend/src/components/images/ImageGallery.tsx`
 
 **Current**: Images display with user info
 **Add**: Query and display shop_name when image has contributor role with shop
@@ -137,7 +137,7 @@ const { data: images, error } = await supabase
 
 ### 3. Add Admin Link to Navigation
 
-**File**: `/Users/skylar/nuke/nuke_frontend/src/components/layout/MainNavigation.tsx`
+**File**: `~/nuke/nuke_frontend/src/components/layout/MainNavigation.tsx`
 
 ```tsx
 // Check if user is admin, then show link:

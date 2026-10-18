@@ -4,6 +4,8 @@
  *
  * Decodes all 17-char VINs in the vehicles table via NHTSA batch API.
  * NHTSA batch endpoint accepts 50 VINs per request, ~5 req/s.
+ * 2026-10-07: the VIN query moved to the session pooler (5432) with statement_timeout 110s; on the transaction
+ * pooler (6543) the 10 s role default cancelled it once the undecoded set passed about 90k rows.
  * 118K VINs / 50 per batch = 2,360 requests at 5/s = ~8 minutes.
  *
  * Usage:
@@ -44,7 +46,7 @@ const stats = {
 };
 
 const DB_HOST = 'aws-0-us-west-1.pooler.supabase.com';
-const DB_PORT = '6543';
+const DB_PORT = '5432'; // session pooler: the SET statement_timeout below holds; the 6543 transaction pooler kept the 10 s role default and the full VIN query timed out (2026-10-07)
 const DB_USER = 'postgres.qkgaybvrernstplzjaam';
 const DB_PASS = `${process.env.SUPABASE_DB_PASSWORD}`;
 
@@ -52,10 +54,12 @@ async function executeSql(query: string): Promise<string[]> {
   const { execSync } = await import('child_process');
   const env = { ...process.env, PGPASSWORD: DB_PASS };
   // Collapse multiline SQL to single line for psql -c
-  const singleLine = query.replace(/\s+/g, ' ').trim();
+  // A bounded session timeout (never 0): the no-LIMIT VIN query joins 1M vehicles to the decode table and exceeds the
+  // pooler role default of 10 s; 110 s stays under the role ceiling of 120 s.
+  const singleLine = "set statement_timeout = '110s'; " + query.replace(/\s+/g, ' ').trim();
   try {
     const result = execSync(
-      `psql -h ${DB_HOST} -p ${DB_PORT} -U ${DB_USER} -d postgres -t -A -c ${JSON.stringify(singleLine)}`,
+      `psql -h ${DB_HOST} -p ${DB_PORT} -U ${DB_USER} -d postgres -q -t -A -c ${JSON.stringify(singleLine)}`,
       { env, timeout: 120000, encoding: 'utf-8', maxBuffer: 50 * 1024 * 1024 }
     );
     return result.trim().split('\n').filter(Boolean);

@@ -3,7 +3,7 @@
 **Read this + `PULSE_EXPERT_PANEL_2026-07-12.md` (the build bible) before touching Explore.**
 
 Repo facts: iOS app LIVE on TestFlight, branch `fable5/ignition-ios`, worktree
-`/Users/skylar/.worktrees/foundation-ios`. Push = Xcode Cloud → TestFlight (CI owns build
+`~/.worktrees/foundation-ios`. Push = Xcode Cloud → TestFlight (CI owns build
 number). iOS 26 deploy target (full Liquid Glass). Sim: iPhone 17 Pro
 `7086B1BA-4650-4EAB-9959-8D471DA3A6DF`, `SIMCTL_CHILD_NUKE_DEBUG_SCREEN=explore`.
 

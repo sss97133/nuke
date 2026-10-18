@@ -21,7 +21,6 @@ import { track } from './lib/track';
 import { useAuth } from './hooks/useAuth';
 const HomePage = React.lazy(() => import('./pages/HomePage'));
 const LandingPage = React.lazy(() => import('./pages/landing/LandingPage'));
-const IntakePage = React.lazy(() => import('./pages/intake/IntakePage'));
 const ProductPage = React.lazy(() => import('./pages/landing/ProductPage'));
 const PublicMap = React.lazy(() => import('./components/map/PublicMap'));
 const NukeMap = React.lazy(() => import('./components/map/NukeMap'));
@@ -38,13 +37,10 @@ const queryClient = new QueryClient({
 const LazyFallback = <div style={{ height: '100vh', background: 'var(--bg)' }} />;
 
 /**
- * Home route gate — IntakePage (Janitor drain, F6) for logged-out visitors,
- * HomePage (in AppLayout) for logged-in users.
- *
- * Pre-F6 this rendered LandingPage; the canon (the-three-users-and-the-finder.md)
- * says the front door is the dump prompt, not a hero/search splash. LandingPage
- * is preserved (still imported below) as a fallback for ?legacy_landing=1 if we
- * need to A/B compare; otherwise unused.
+ * Home route gate — HomePage (in AppLayout) for everyone. Its first tab is the
+ * live market (MarketPulse, 2026-09-27); logged-out visitors get the same market,
+ * with the intake form (still at /intake) as the fallback if it can't load.
+ * LandingPage is kept behind ?legacy_landing=1.
  */
 function HomeGate() {
   const { user, loading } = useAuth();
@@ -58,20 +54,7 @@ function HomeGate() {
     if (params.get('legacy_landing') === '1') {
       return <Suspense fallback={LazyFallback}><LandingPage /></Suspense>;
     }
-    // /explore (or any treemap deep-link) routes here with ?force_treemap=1.
-    // Hand off to HomePage so it can render TreemapHomePage.
-    if (params.get('force_treemap') === '1') {
-      return (
-        <AppLayout>
-          <Suspense fallback={LazyFallback}><HomePage /></Suspense>
-        </AppLayout>
-      );
-    }
-    return (
-      <AppLayout>
-        <Suspense fallback={LazyFallback}><IntakePage variant="homepage" /></Suspense>
-      </AppLayout>
-    );
+    // /explore lands here with ?force_treemap=1; HomePage renders the treemap for it.
   }
   return (
     <AppLayout>

@@ -4,6 +4,9 @@
 // See: nuke_frontend/src/constants/vehicleZones.ts for the canonical zone taxonomy.
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { writeObservation } from "../_shared/observationWriter.ts"
+import { isServiceCaller, requireWriteAuth } from "../_shared/writeGuard.ts";
+import { projectSecretKey } from "../_shared/supabaseKeys.ts";
+import { geminiFetch } from '../_shared/geminiGuard.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -28,17 +31,17 @@ interface ImageAnalysisResult {
 }
 
 Deno.serve(async (req) => {
+  // Writes are never anonymous: service key, signed-in user, or nothing (P0.2, 2026-09-27).
+  const denied = await requireWriteAuth(req);
+  if (denied) return denied;
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders })
   }
 
   try {
-    // Require service role key authentication
-    const authHeader = req.headers.get('Authorization')
-    const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
-    const altServiceRoleKey = Deno.env.get('SERVICE_ROLE_KEY') ?? ''
-    const token = authHeader?.replace('Bearer ', '') ?? ''
-    if (!authHeader?.startsWith('Bearer ') || (token !== serviceRoleKey && token !== altServiceRoleKey)) {
+    // Require the service role, judged as writeGuard judges it (2026-10-14)
+    const serviceRoleKey = projectSecretKey() ?? ''
+    if (!(await isServiceCaller(req))) {
       return new Response(
         JSON.stringify({ error: 'Authentication required' }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 401 }
@@ -73,7 +76,7 @@ Deno.serve(async (req) => {
 
     // Step 1: Scrape the listing
     const supabaseUrl = Deno.env.get('SUPABASE_URL') ?? ''
-    const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+    const serviceRoleKey = projectSecretKey() ?? ''
     
     const scrapeResponse = await fetch(`${supabaseUrl}/functions/v1/scrape-vehicle`, {
       method: 'POST',
@@ -849,8 +852,8 @@ async function analyzeWithGemini(base64Image: string, prompt: string): Promise<I
     throw new Error('GOOGLE_AI_API_KEY not configured')
   }
 
-  const response = await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${geminiApiKey}`,
+  const response = await geminiFetch(
+    `https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent?key=${geminiApiKey}`,
     {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -871,7 +874,7 @@ async function analyzeWithGemini(base64Image: string, prompt: string): Promise<I
         }
       })
     }
-  )
+  , 'import-classiccars-listing')
 
   if (!response.ok) {
     throw new Error(`Gemini API error: ${response.status}`)

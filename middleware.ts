@@ -3,22 +3,12 @@
  *
  * Runs on every matched request BEFORE static file serving.
  *
- * /market/competitors — static OG tag injection for link previews
  * /vehicle/:id        — dynamic vehicle data injection for AI readability,
  *                        OG tags, JSON-LD, and Accept: application/json support
  */
 
 export const config = {
-  matcher: ['/market/competitors', '/vehicle/:path*', '/api/v1/vehicle/:path*'],
-};
-
-// ── Static OG for /market/competitors ────────────────────────────────────────
-
-const COMPETITORS_OG = {
-  title: 'Nuke vs. Rally vs. TheCarCrowd — Fractional Car Ownership Compared',
-  description:
-    'Rally raised $112M, has 9 cars, was fined $350K by the SEC. TheCarCrowd says on their own site they\'re "not FCA-regulated." The whole market is under $100M AUM. Nuke tracks 1.25M vehicles with real auction data.',
-  url: 'https://nuke.ag/market/competitors',
+  matcher: ['/vehicle/:path*', '/api/v1/vehicle/:path*'],
 };
 
 // ── Vehicle data config ──────────────────────────────────────────────────────
@@ -128,37 +118,6 @@ async function getBaseHtml(requestUrl: string): Promise<string> {
   return base.text();
 }
 
-// ── Inject OG tags (static, for competitors) ────────────────────────────────
-
-function injectStaticOg(html: string, og: typeof COMPETITORS_OG): string {
-  return html
-    .replace(/<title>[^<]*<\/title>/, `<title>${og.title}</title>`)
-    .replace(
-      /<meta name="description" content="[^"]*"\s*\/>/,
-      `<meta name="description" content="${og.description}" />`,
-    )
-    .replace(
-      /<meta property="og:title" content="[^"]*"\s*\/>/,
-      `<meta property="og:title" content="${og.title}" />`,
-    )
-    .replace(
-      /<meta property="og:description" content="[^"]*"\s*\/>/,
-      `<meta property="og:description" content="${og.description}" />`,
-    )
-    .replace(
-      /<meta property="og:url" content="[^"]*"\s*\/>/,
-      `<meta property="og:url" content="${og.url}" />`,
-    )
-    .replace(
-      /<meta name="twitter:title" content="[^"]*"\s*\/>/,
-      `<meta name="twitter:title" content="${og.title}" />`,
-    )
-    .replace(
-      /<meta name="twitter:description" content="[^"]*"\s*\/>/,
-      `<meta name="twitter:description" content="${og.description}" />`,
-    );
-}
-
 // ── Inject vehicle data into HTML ────────────────────────────────────────────
 
 function injectVehicleData(html: string, v: Record<string, unknown>): string {
@@ -231,17 +190,6 @@ function injectVehicleData(html: string, v: Record<string, unknown>): string {
 
 export default async function middleware(request: Request): Promise<Response | undefined> {
   const url = new URL(request.url);
-
-  // ── /market/competitors (static OG) ──
-  if (url.pathname === '/market/competitors') {
-    const html = await getBaseHtml(request.url);
-    return new Response(injectStaticOg(html, COMPETITORS_OG), {
-      headers: {
-        'Content-Type': 'text/html; charset=utf-8',
-        'Cache-Control': 'public, s-maxage=3600, stale-while-revalidate=86400',
-      },
-    });
-  }
 
   // ── /api/v1/vehicle/:id (REST API) ──
   const apiMatch = url.pathname.match(/^\/api\/v1\/vehicle\/([^/]+)/);

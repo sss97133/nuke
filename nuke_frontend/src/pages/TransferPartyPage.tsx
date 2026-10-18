@@ -8,6 +8,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { useParams, useSearchParams } from 'react-router-dom';
+import { supabase } from '../lib/supabase';
 
 const SUPABASE_URL = (import.meta as any).env?.VITE_SUPABASE_URL || '';
 const SUPABASE_ANON_KEY = (import.meta as any).env?.VITE_SUPABASE_ANON_KEY || '';
@@ -154,30 +155,15 @@ export default function TransferPartyPage() {
       if (!data.transfer_id) throw new Error('Transfer not found');
       setTransfer(data);
 
-      // Determine role from token
-      // We need the raw tokens — fetch ownership_transfers directly
-      const tokenResp = await fetch(`${SUPABASE_URL}/functions/v1/transfer-status-api`, {
-        method: 'GET',
-        headers: { Authorization: `Bearer ${SUPABASE_ANON_KEY}` },
-      });
-      // Token check: we'll use a separate DB call
+      // Determine role from the token WITHOUT ever reading a token into the browser: the token columns are not
+      // readable by anon, and transfer_party_role compares server-side and returns buyer | seller | observer. If the
+      // reader is not deployed yet (brief window on first ship), it errors and the viewer stays an observer.
       if (token) {
-        const roleResp = await fetch(
-          `${SUPABASE_URL}/rest/v1/ownership_transfers?id=eq.${transferId}&select=buyer_access_token,seller_access_token`,
-          {
-            headers: {
-              Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
-              apikey: SUPABASE_ANON_KEY,
-            },
-          }
-        );
-        if (roleResp.ok) {
-          const rows = await roleResp.json();
-          if (rows.length > 0) {
-            if (rows[0].buyer_access_token === token) setRole('buyer');
-            else if (rows[0].seller_access_token === token) setRole('seller');
-          }
-        }
+        const { data: roleData, error: roleErr } = await supabase.rpc('transfer_party_role', {
+          p_transfer_id: transferId,
+          p_token: token,
+        });
+        if (!roleErr && (roleData === 'buyer' || roleData === 'seller')) setRole(roleData);
       }
 
       // Fetch vehicle details
@@ -264,6 +250,7 @@ export default function TransferPartyPage() {
         body: JSON.stringify({
           action: 'advance_manual',
           transfer_id: transferId,
+          access_token: token,
           milestone_type: milestoneType,
           notes: `Confirmed by ${role} via transfer page`,
         }),

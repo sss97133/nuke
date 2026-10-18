@@ -332,7 +332,7 @@ shells are well-built and Skylar-approved:
 - iOS: full market-read terminal, already the leftmost/front-door tab, anon-safe;
   `CohortTerminalView` is the app's gold-standard populated-flag-honest surface. The
   "market read terminal" IS `ExploreView.swift` (MetroDetailView is a struct inside it).
-  Live app: `/Users/skylar/.worktrees/foundation-ios`, branch `fable5/ignition-ios`.
+  Live app: `~/.worktrees/foundation-ios`, branch `fable5/ignition-ios`.
 
 **The cardinal-rule violation (live in prod now):** every "market" surface aggregates the
 `vehicles` census (dominated by ~165k BaT auction rows + ~149k historical SOLD events),
@@ -396,8 +396,124 @@ FB rows, 14 re-seen/7d); `avg_hours_on_market` hardcoded NULL; `unique_sellers` 
 distinct `bat_seller` (BaT-only); pulse-vs-velocity make-rows under-sum ~12-20% (disclose,
 never silently sum); `pg_stat` n_live_tup is badly wrong here — always `count(*)`.
 
-**TWO FORKS FOR SKYLAR (unanswered — do not build past these):**
+**TWO FORKS FOR SKYLAR (answered 2026-10-13, below):**
 1. Ask-side scope: enrich all 441 feeds, or concentrate cohorts + top metros first?
    (recommendation: concentrate.)
 2. Explore's headline: the DEAL READ (ask × sold-comp band, per this doc), or the
    GEOGRAPHY MAP (what the built iOS surface currently leads with)?
+
+### Owner answer, 2026-10-13: the forks, and the morning board
+
+Two Facebook Marketplace finds that never reached him (a 2009 H3T in St George at $12,500 and a 1984 M1010 CUCV in
+Las Vegas at $13,500, both listed within hours) prompted this. In substance:
+
+- **When he sits down, he wants every good available buy:** the ones around him, and the national ones. The whole
+  country's arrivals, with **his band** first among them.
+- **Stacks vary by level of the economy.** He wants to see what is happening at each price level, and what is around
+  him.
+- **The system should say what to ask the seller.** On the H3T it should have asked: is it an Alpha, does it have the
+  lockers, the Adventure package? That is the AGENTS.md rule "ask for the next evidence needed for the current
+  decision", applied to a live ask: the unresolved fact that moves the cohort's price, and the cheapest evidence that
+  resolves it (a VIN character, a dash switch, the glovebox RPO label).
+
+**What this settles.** Fork 1: the ask side is national (every feed), and the band is a lens, not a scope limit.
+Fork 2: the headline is neither the map nor a reverse-chron list but the arrivals with lenses: near me, my band,
+price tier, each with its deal read and its next question. The build order above still holds: atoms first.
+
+**Measured the same day (2026-10-13 ~23:00Z).**
+- Arrivals: `poll-listing-feeds` polled all 441 enabled feeds in 24 h; ~740 vehicles landed, 469 from Craigslist,
+  all priced, 0 with a point. Classified `vehicle_events` begin 2026-10-13 (374 Craigslist; 0 Facebook, 0 KSL in
+  30 days).
+- Facebook: `fb_sweep_jobs` ran 36 times on 10-12 and once on 10-13. The rendered collector's native host is
+  installed (10-12 19:14) but its capture folder is empty: the extension was never loaded and started (an owner
+  action, scripts/fb-browser-capture/README.md). Neither find could have surfaced.
+- Place: every retained Craigslist page carries city, region, postal code and an approximate point (60 of 60 sampled);
+  ingest kept only the town. The last Craigslist row in `vehicle_location_observations` is 2026-02-26.
+- Band: `compute_taste_score` (applied in production, not in the repo) already scores his taste by make, model, year,
+  body and region; 67 of 374 asks scored 60 or more.
+
+**Built in response.** #1083 lands each Craigslist post's place (never the street line) in
+`vehicle_location_observations`. #1084 adds `classified_ask_board`, one read for the arrivals with the near-me, band
+and tier lenses and its populations. Still open: the deal read per ask (the comps join; see the H3T case below), the
+next-question read, cross-post collapse, expiry, and the surface on the Market tab.
+
+**The H3T case, as the next-question read should have produced it.** Sold H3Ts on BaT (local archive, 2026-09-27):
+13 Alphas (5.3 V8) sold, median $34,000; 2 five-cylinder trucks sold, $17,250 at 141k miles (2021) and $23,750 at
+50k (2024). The listing says "5 cylinder", which answers the Alpha question from the seller's text. The open value
+question was the ZM6 Off-Road Adventure package (4.03:1 low range, lockers, LT285/75R16 tires). It is resolved by the
+glovebox RPO label or the locker switches, neither of which was in the eight photos. A five-cylinder H3T's price
+cannot be defended from two sales; the read should say so.
+
+## Owner notes, 2026-09-29: the auction temperature
+
+Skylar, relayed word for word from the pieces lane's window, on the live-auction hot/cold label: "this is a lame
+metric everyone has. we can calc percentiles and much better with the data we have... prediction market on auction
+then advise on what action to take". Earlier the same day: "we're not measuring hot and cold properly ... you haven't
+analyze the comments you haven't mapped out the [bid] velocity".
+
+**What the label measures today.** `market_pulse_live()` and `heatOf` in `nuke_frontend/src/pages/market/MarketPulse.tsx`
+use price only. The live bid is divided by the typical bid at this time to close (the p50 of comparable sales × the tier's
+bid-curve share). At 1.25× or more it reads hot; at 0.8× or less, cold. There's no activity input.
+
+**The case that showed it (1999 SL500, vehicle f8c68f0e, 2026-09-29 about 22:30Z, 19 h to close):**
+- The price reads cold. The bid was $7,900 against about $9,975 typical (p50 $17,500 of 745 comparable sales × 0.57),
+  or 0.79×. After one more bid, $8,888 read 0.89×.
+- The activity reads warm. Extracted that night (extract-bat-core, one call): 29 bids from 13 bidders.
+- Against 389 past SL500 BaT lots at 19 h or more before close: median 23 bids (p25 13, p75 32) and median 11 bidders.
+
+**What he's asking for:**
+1. **Percentiles, not one cutoff.** Place the live bid in the distribution of comparable lots at the same time to
+   close. Do the same for bids, bidders and comment pace.
+2. **A prediction per live auction.** Forecast the final price from the bid curve plus activity: bids, bidders and
+   comment velocity. Backtest it on sold lots, priced only from sales before each one, as the hot/cold label was.
+3. **Advice on action, by role:** bid, wait or pass for a buyer; hold, promote or relist for a seller. This follows his
+   role-based-views note in the design book (vehicle-profile-computation-surface.md, owner notes 2026-09-29).
+
+**What it needs first (data-audit is counting these):**
+- Live lots' comments and bids pulled on a schedule. Today they arrive only when a lot is re-read.
+- bat_listings rows for the lots the catalog sync missed. Without one, extract-bat-core writes no bat_bids row, as
+  happened with the SL500.
+
+This follows the 2026-07-09 ruling above: data handling is the product, and the prediction comes free with it.
+
+## Owner notes, 2026-09-30: hot is a calibrated spectrum, with its why
+
+Skylar, typed directly to the lead from the airport, looking at the live homepage (the Porsche drill: "RUNNING HOT 200",
+"HOT 1.6×" tags on the ending-next list, timers reading "2h 19m"), word for word:
+
+> running hot should run hot should show the metrics what hot means should show how much outside the regular patterns its
+> operating and why... this is so easy to do just not being done cuz of data... running hot means the comments are highly
+> engaging the bid pattern is outside typical ranges, the profile of bidders and commenters are highly weighed. thats why we
+> need to make sure the data behind the is actually there... otherwise we have a list of shitty autotrader tiny images and
+> blah text even if its accurate. the timers should be clicking the second. need to see some type of movement. the dead
+> space could be showing the bids or comments and their weighs weight being how far outside the average balance they
+> are... does this make sense does it lead you to a type of practice in data hygiene, data quantification etc the hot cold
+> should actually be a spectrum that is calibrated by the entire group of all data and breaks down as you drill in to
+> departments... a mustang bidding at 12k is cold compared to a single porsche bid of 175k but maybe the porsche deal ends
+> at that lets say the mustang is a crazy battle and comments and then bidding picks up and ends at 20-30k. its a vibrant
+> auction for its niveau. its just small hands at the black jack table. compared to the big table.. thats the issue im
+> seeing with the homepage its completely weighed out by the high end market. but all that means is we are prioritizing
+> certain weighs that make it boring and hard to connect to.. looking at a picture of a gold bar is a lot different
+> experience than holding one and in turn than owning one...
+
+**The practice it names (the lead's reading, stated back to him the same day):**
+1. **Temperature is relative to the lot's own table.** A lot is scored only against lots like it: same model (widening to
+   make, then department, only when too few), at the same hours to close. Price is one input. The others are bids,
+   distinct bidders, comment pace, and how heavy those bidders and commenters are (their own history on the platform).
+   A $20k Mustang battle and a quiet $175k Porsche are each scored inside their own table, so dollar size never sets the
+   heat.
+2. **One spectrum, calibrated on all the data, drillable.** The score is a percentile against the whole comparable set,
+   so it means the same thing on every table. The homepage ranks by it, not by dollars. Drilling into a department
+   re-ranks inside the department.
+3. **Every label prints its why.** "HOT" carries the measures that put it there, each as a count against typical
+   ("33 bids vs 23 typical at 5 h out · 14 bidders vs 11 · bid 23rd percentile"), plus the comparison set's size.
+4. **Hygiene before display.** Each measure states its coverage: how many comparables carry full bid and comment
+   history. Below the floor (8 comparables, as in `live_lot_temperature`, PR #482), the measure says so and draws
+   nothing. An accurate list of small photos and plain text is not the product.
+5. **Movement.** Timers tick by the second. The space beside a live lot shows its latest bids and comments, each
+   weighted by how far it sits from the lot's usual pace (a bid's jump against the typical increment, a comment burst
+   against the typical rate).
+
+**Built so far:** PR #482 (price and activity against same-model lots at the same hours to close, one read-only
+function). Next: comments and bidder weight in the score, the score precomputed for every live lot on the live pull's
+cadence (a schema decision, SCHEMA_LAW first), the ticking timers, and the weighted bid/comment stream.

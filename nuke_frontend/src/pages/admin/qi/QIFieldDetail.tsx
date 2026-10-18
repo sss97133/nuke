@@ -50,29 +50,22 @@ export default function QIFieldDetail({ field, allRows }: Props) {
       setLoading(true);
       setSqlError(null);
 
-      // Get fill rate for this field (field is whitelist-validated above)
-      const { data: fillData, error: fillErr } = await supabase.rpc('execute_sql', {
-        query: `SELECT count(*)::int as total, count(${field})::int as filled FROM vehicles`
-      });
+      // Fill rate for this field — admin-gated RPC (migration 20260927170400). The column is a CASE
+      // over the server's own whitelist, never interpolated; a name the server does not know comes
+      // back as an error and is shown as such.
+      const { data: fillData, error: fillErr } = await supabase.rpc('admin_qi_field_fill', { p_field: field });
 
       if (fillErr) setSqlError(fillErr.message);
       if (!cancelled && fillData?.[0]) {
         setFillRate({ filled: fillData[0].filled, total: fillData[0].total });
       }
 
-      // Get top vehicles missing this field but most asked about in related categories
-      const l2Values = referencingCategories.map(r => r.l2_subcategory.replace(/'/g, "''"));
+      // Top vehicles missing this field but most asked about in related categories
+      const l2Values = referencingCategories.map(r => r.l2_subcategory);
       if (l2Values.length > 0) {
-        const l2List = l2Values.map(v => `'${v}'`).join(',');
-        const { data: missingData } = await supabase.rpc('execute_sql', {
-          query: `SELECT v.id as vehicle_id, v.year, v.make, v.model, count(*)::int as q_count
-            FROM auction_comments ac
-            JOIN vehicles v ON v.id = ac.vehicle_id
-            WHERE ac.question_primary_l2 IN (${l2List})
-              AND ac.has_question = true AND ac.question_primary_l1 IS NOT NULL
-              AND v.${field} IS NULL
-            GROUP BY v.id, v.year, v.make, v.model
-            ORDER BY q_count DESC LIMIT 15`
+        const { data: missingData } = await supabase.rpc('admin_qi_field_missing_vehicles', {
+          p_field: field,
+          p_l2: l2Values,
         });
 
         if (!cancelled && missingData) {

@@ -14,6 +14,9 @@
  */
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { requireWriteAuth } from "../_shared/writeGuard.ts";
+import { projectSecretKey } from "../_shared/supabaseKeys.ts";
+import { mustWrite } from '../_shared/writeResult.ts';
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -172,6 +175,9 @@ interface TimelineEvent {
 }
 
 Deno.serve(async (req) => {
+  // Writes are never anonymous: service key, signed-in user, or nothing (P0.2, 2026-09-27).
+  const denied = await requireWriteAuth(req);
+  if (denied) return denied;
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
@@ -191,7 +197,7 @@ Deno.serve(async (req) => {
 
     const supabase = createClient(
       Deno.env.get("SUPABASE_URL")!,
-      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
+      projectSecretKey()!
     );
 
     // Determine builder from URL if not specified
@@ -662,7 +668,7 @@ function validateExtraction(extracted: ExtractedVehicle, config?: BuilderConfig)
 async function saveToQueue(queue_id: string, extracted: ExtractedVehicle, validation: any, supabase: any): Promise<void> {
   console.log(`[specialty-builder] Saving to queue: ${queue_id}`);
 
-  await supabase
+  mustWrite('import_queue update', await supabase
     .from("import_queue")
     .update({
       status: validation.is_valid ? "complete" : "pending",
@@ -679,7 +685,7 @@ async function saveToQueue(queue_id: string, extracted: ExtractedVehicle, valida
       processed_at: validation.is_valid ? new Date().toISOString() : null,
       error_message: validation.needs_rescrape ? `Missing fields: ${validation.missing_fields.join(", ")}` : null,
     })
-    .eq("id", queue_id);
+    .eq("id", queue_id));
 }
 
 /**

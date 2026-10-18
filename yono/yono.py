@@ -32,7 +32,17 @@ _MEAN = np.array([0.485, 0.456, 0.406], dtype=np.float32)
 _STD = np.array([0.229, 0.224, 0.225], dtype=np.float32)
 
 
-def _preprocess(image_path: str, size: int = 260) -> np.ndarray:
+def _session_image_size(session) -> tuple[int, int]:
+    """Return PIL (width, height) from the model's fixed NCHW input contract."""
+    shape = session.get_inputs()[0].shape
+    if (len(shape) != 4 or shape[1] != 3 or
+            any(not isinstance(dimension, int) or isinstance(dimension, bool) or dimension <= 0
+                for dimension in shape[2:])):
+        raise ValueError("YONO requires a fixed three-channel NCHW image input")
+    return (shape[3], shape[2])
+
+
+def _preprocess(image_path: str, size: Union[int, tuple[int, int]] = 260) -> np.ndarray:
     """Load, convert HEIC if needed, resize to size x size, normalize."""
     path = Path(image_path)
 
@@ -45,10 +55,11 @@ def _preprocess(image_path: str, size: int = 260) -> np.ndarray:
         )
         path = Path(tmp.name)
 
-    img = Image.open(path).convert("RGB").resize((size, size), Image.BILINEAR)
+    target_size = (size, size) if isinstance(size, int) else size
+    img = Image.open(path).convert("RGB").resize(target_size, Image.BILINEAR)
     arr = np.array(img, dtype=np.float32) / 255.0
     arr = (arr - _MEAN) / _STD
-    return arr.transpose(2, 0, 1)[np.newaxis]  # (1, 3, size, size)
+    return arr.transpose(2, 0, 1)[np.newaxis]  # (1, 3, height, width)
 
 
 def _softmax(x: np.ndarray) -> np.ndarray:
@@ -84,6 +95,7 @@ class YONOClassifier:
         # CPU is 4ms/image — fast enough. CoreML has path config issues with ONNX Runtime.
         self.session = ort.InferenceSession(str(onnx_path), providers=["CPUExecutionProvider"])
         self._input_name = self.session.get_inputs()[0].name
+        self._image_size = _session_image_size(self.session)
 
     def predict(self, image_path: str, top_k: int = 5) -> dict:
         """
@@ -101,7 +113,7 @@ class YONOClassifier:
                 "is_vehicle": True  # confidence > threshold
             }
         """
-        tensor = _preprocess(image_path)
+        tensor = _preprocess(image_path, size=self._image_size)
         logits = self.session.run(None, {self._input_name: tensor})[0]
         probs = _softmax(logits)[0]
 
@@ -211,13 +223,19 @@ class HierarchicalYONO:
         return list(self._tier2.keys())
 
     def predict(self, image_path: str, top_k: int = 5) -> dict:
-        tensor = _preprocess(image_path)
+        tensors = {}
+
+        def tensor_for(session):
+            size = _session_image_size(session)
+            if size not in tensors:
+                tensors[size] = _preprocess(image_path, size=size)
+            return tensors[size]
 
         # Tier 1: family
         family = None
         family_confidence = 0.0
         if self._tier1 is not None:
-            logits = self._tier1.run(None, {self._tier1_input: tensor})[0]
+            logits = self._tier1.run(None, {self._tier1_input: tensor_for(self._tier1)})[0]
             probs = _softmax(logits)[0]
             top_idx = int(probs.argmax())
             family = self._family_labels[top_idx]
@@ -227,7 +245,7 @@ class HierarchicalYONO:
         if family and family in self._tier2:
             sess = self._tier2[family]
             input_name = sess.get_inputs()[0].name
-            logits2 = sess.run(None, {input_name: tensor})[0]
+            logits2 = sess.run(None, {input_name: tensor_for(sess)})[0]
             probs2 = _softmax(logits2)[0]
             labels2 = self._tier2_labels[family]
             top_indices = probs2.argsort()[::-1][:top_k]

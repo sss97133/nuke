@@ -16,7 +16,8 @@ export interface ParsedQuery {
 // Patterns
 const YEAR_RANGE_RE = /(\d{4})\s*[-–]\s*(\d{4})/;
 const SINGLE_YEAR_RE = /\b(19[0-9]{2}|20[0-2][0-9])\b/;
-const PRICE_UNDER_RE = /(?:under|below|less than|max|<)\s*\$?([\d,]+)\s*(k)?/i;
+const PRICE_UNDER_RE = /(?:under|below|less than|max|up to|at most|budget(?:\s+of)?|<)\s*:?\s*\$?([\d,]+)\s*(k)?/i;
+const PRICE_BUDGET_RE = /\$?([\d,]+)\s*(k)?\s+(?:budget|to spend)\b/i;
 const PRICE_OVER_RE = /(?:over|above|more than|min|>)\s*\$?([\d,]+)\s*(k)?/i;
 const PRICE_RANGE_RE = /\$?([\d,]+)\s*(k)?\s*[-–]\s*\$?([\d,]+)\s*(k)?/i;
 const DOLLAR_RE = /\$[\d,]+(k)?/gi;
@@ -60,10 +61,10 @@ export function parseQuery(input: string): ParsedQuery {
     result.priceMax = parsePrice(priceRange[3], priceRange[4]);
     remaining = remaining.replace(PRICE_RANGE_RE, ' ');
   } else {
-    const under = remaining.match(PRICE_UNDER_RE);
+    const under = remaining.match(PRICE_UNDER_RE) || remaining.match(PRICE_BUDGET_RE);
     if (under) {
       result.priceMax = parsePrice(under[1], under[2]);
-      remaining = remaining.replace(PRICE_UNDER_RE, ' ');
+      remaining = remaining.replace(under[0], ' ');
     }
     const over = remaining.match(PRICE_OVER_RE);
     if (over) {

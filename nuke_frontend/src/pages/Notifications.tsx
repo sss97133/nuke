@@ -3,6 +3,7 @@ import { supabase } from '../lib/supabase';
 import '../styles/unified-design-system.css';
 
 interface NotifRow {
+  source: 'user_notifications' | 'notifications' | 'duplicate_notifications';
   id: string;
   type: string;
   title: string;
@@ -16,6 +17,7 @@ const Notifications: React.FC = () => {
   const [rows, setRows] = useState<NotifRow[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [userId, setUserId] = useState<string | null>(null);
 
   const load = async () => {
     try {
@@ -23,6 +25,7 @@ const Notifications: React.FC = () => {
       setError(null);
       
       const { data: { user } } = await supabase.auth.getUser();
+      setUserId(user?.id ?? null);
       if (!user) {
         setRows([]);
         setLoading(false);
@@ -40,7 +43,7 @@ const Notifications: React.FC = () => {
         
         supabase
           .from('notifications')
-          .select('id, type, title, message, created_at')
+          .select('id, type, title, message, read, created_at, action_url')
           .eq('user_id', user.id)
           .order('created_at', { ascending: false })
           .limit(100),
@@ -52,12 +55,14 @@ const Notifications: React.FC = () => {
         .order('created_at', { ascending: false })
           .limit(50)
       ]);
+      const failed = [userNotifs, generalNotifs, duplicateNotifs].find(result => result.error);
+      if (failed?.error) throw failed.error;
       
       // Combine all notifications
       const combined = [
         ...((userNotifs.data || []).map(n => ({ ...n, source: 'user_notifications' }))),
-        ...((generalNotifs.data || []).map(n => ({ ...n, is_read: false, source: 'notifications' }))),
-        ...((duplicateNotifs.data || []).map(n => ({ ...n, is_read: n.status === 'read', source: 'duplicate_notifications' })))
+        ...((generalNotifs.data || []).map(n => ({ ...n, is_read: n.read === true, source: 'notifications' }))),
+        ...((duplicateNotifs.data || []).map(n => ({ ...n, is_read: n.status !== 'unread', source: 'duplicate_notifications' })))
       ].sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
       
       setRows(combined as any);
@@ -72,9 +77,13 @@ const Notifications: React.FC = () => {
 
   useEffect(() => { load(); }, []);
 
-  const markRead = async (id: string) => {
+  const markRead = async (notification: NotifRow) => {
     try {
-      const { error } = await supabase.from('user_notifications').update({ is_read: true } as any).eq('id', id);
+      if (!userId) return;
+      const payload = notification.source === 'notifications' ? { read: true }
+        : notification.source === 'duplicate_notifications' ? { status: 'read', read_at: new Date().toISOString() }
+        : { is_read: true };
+      const { error } = await supabase.from(notification.source).update(payload).eq('id', notification.id).eq('user_id', userId);
       if (error) throw error;
       await load();
     } catch (e: any) {
@@ -94,7 +103,7 @@ const Notifications: React.FC = () => {
                   {rows.length === 0 ? (
                     <div className="text text-small text-muted">No notifications.</div>
                   ) : rows.map(n => (
-                    <div key={n.id} className="card">
+                    <div key={`${n.source}:${n.id}`} className="card">
                       <div className="card-body" style={{ display:'flex', justifyContent:'space-between', alignItems:'center', gap:8 }}>
                         <div>
                           <div className="text text-small" style={{ fontWeight: 600 }}>{n.title || n.type}</div>
@@ -107,7 +116,7 @@ const Notifications: React.FC = () => {
                           <div className="text text-small text-muted">{new Date(n.created_at).toLocaleString()}</div>
                         </div>
                         <div style={{ display:'flex', gap:6 }}>
-                          {!n.is_read && <button className="button button-small button-secondary" onClick={()=>markRead(n.id)}>Mark Read</button>}
+                          {!n.is_read && <button className="button button-small button-secondary" onClick={()=>markRead(n)}>Mark Read</button>}
                         </div>
                       </div>
                     </div>

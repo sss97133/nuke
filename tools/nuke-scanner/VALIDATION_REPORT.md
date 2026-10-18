@@ -17,7 +17,7 @@ The Nuke Scanner CLI tool has been thoroughly tested and validated. The tool bui
 - CLI entry point has proper shebang (`#!/usr/bin/env node`)
 
 ```bash
-cd /Users/skylar/nuke/tools/nuke-scanner
+cd ~/nuke/tools/nuke-scanner
 npm install  # 48 packages installed, 0 vulnerabilities
 npm run build  # Successful compilation
 ```

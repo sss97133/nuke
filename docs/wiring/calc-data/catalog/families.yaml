@@ -1,0 +1,208 @@
+# K5 harness — TERMINATION FAMILIES (curated input; reconcile_v5.py → kits_v5.py)
+#
+# One family = one way of finishing a wire end. Each has the parts it consumes per wire end and the
+# ordered steps, each naming the tool (tools.yaml id) in the builder's hand and the setting/value.
+# A value we do not hold is `UNKNOWN: <what closes it>` — never a guess.
+#
+# Deferred by design (owner 2026-09-26 + canon ch.18 §7/§8): cut lengths, twist/turns, and which
+# wires share a DR-25/SCL sleeve (sizes follow the measured bundle ODs off the formboard).
+
+ssc:
+  label: Superseal 1.0 solid contact — M130 A/B and PDM30 A/B
+  per_end: {contact: SSC-N}
+  wire_range_awg: [24, 16]
+  steps:
+    - {do: strip, tool: STRIP_26_16, value: "UNKNOWN: SSC-N strip length — ask ProWire or measure the barrel depth"}
+    - {do: crimp, tool: [AFM8, K1S], value: "selector 24→5, 22→6, 20→7, 18→8, 16→8", source: "prowire SSC-N tooling chart"}
+    - {do: pull test, tool: PULL_GAUGE, value: "22 AWG ≥ 8 lbf · 20 ≥ 13 · 16 ≥ 30", source: "ch.18 §7"}
+    - {do: insert, tool: hand, value: "push through the housing seal until the clip locks", source: "prowire SSC-N ('beryllium copper gold-plated clip just like OE')"}
+    - {do: plug empty cavities, part: 4-1437284-3, value: "one per empty cavity", source: "receipt 2026-09-25 (kits don't include cavity plugs)"}
+    - {do: backshell, part_by_endpoint: backshell, source: "prowire SuperSealSystem page"}
+    - {do: boot, value: "HELD on the M130 mount: SSB rubber boot (straight / 70° / 90° / 90° up-down) on the thermoplastic backshell, or billet backshell + Raychem 202K152-25-0 (straight) / 202K153-25-0 (90°)", source: "prowire M800-KIT-N + SuperSealSystem pages"}
+
+d38999_20:
+  label: D38999 size-20 crimp contact — firewall bulkhead 25-61
+  per_end: {contact_cabin: M39029/56-351, contact_engine: M39029/58-363}
+  sides:
+    cabin: "receptacle D38999/24WJ61SN (firewall, jam nut) — sockets M39029/56-351"
+    engine: "plug D38999/26WJ61PN (engine loom) — pins M39029/58-363"
+  wire_range_awg: [24, 20]
+  steps:
+    - {do: strip, tool: STRIP_26_16, value: "UNKNOWN: strip length — M39029/56 + /58 slash-sheet or Amphenol contact datasheet"}
+    - {do: crimp, tool: [AFM8, K43], value: "selector 24→4, 22→5, 20→6", source: "K43 plate (receipt 2026-09-25 addendum 2026-09-26)"}
+    - {do: pull test, tool: PULL_GAUGE, value: "24 AWG ≥ 8 lbf · 22 ≥ 13 · 20 ≥ 21", source: "Checkline wire pull test standards, size-20 M39029 contacts (receipt 2026-09-26 dave-sheet addendum)"}
+    - {do: insert, tool: M81969_14_10, value: "rear insertion until the contact seats", source: "Farnell 1992545 datasheet (receipt 2026-09-25)"}
+    - {do: seal empty cavities, part: MS27488-20-2, value: "one per empty cavity (the count comes from the 61-pin fill)", source: "K5_connector_FIREWALL_D38999.svg ('Seal plugs in spare cavities')"}
+    - {do: accessory adapter, part: M85049/69-25N, value: "one per shell (2)", source: "receipt 2026-09-25 night; Amphenol PCD datasheet 'C Ø max 1.44 in'"}
+    - {do: boot, part: 202K163-25-0, tool: [EPOXY_DISPENSER, HEAT_GUN], value: "RT125 epoxy under the boot (−55…+150 °C, IP68)", source: "prowire: 'It is necessary to use adhesive when attaching the shrink boot'; RT125 page"}
+    - {do: mount receptacle, tool: TORQUE_INLB, value: "jam nut 120–130 in-lb; couple hand-tight + 1/8 turn", source: "K5_connector_FIREWALL_D38999.svg (CONNECTOR_DATA_REPORT 1.1–1.8)"}
+
+gt150:
+  label: Delphi GT150 sealed terminal (coolant temp ECU, oil pressure ECU)
+  per_end: {terminal: "12191818", seal: "15366021"}
+  wire_range_awg: [22, 20]
+  steps:
+    - {do: strip, tool: STRIP_26_16, value: "UNKNOWN: strip length — Aptiv 12191818 drawing"}
+    - {do: seal on, part: "15366021", value: "slide the white seal on before crimping"}
+    - {do: crimp, tool: GT150_CRIMPER, value: "wire + seal in one stroke", source: "prowire p-1233 (15359996)"}
+    - {do: pull test, tool: PULL_GAUGE, value: "22 AWG ≥ 8 lbf · 20 ≥ 13", source: "ch.18 §7"}
+    - {do: insert, tool: hand, value: "push to seat until it locks", source: "prowire p-1233 ('Push To Seat terminals')"}
+
+kit_terminal:
+  label: GM sensor/actuator plug from a ProWire kit (terminal + seal + TPA inside the kit)
+  per_end: {from_kit: true}
+  steps:
+    - {do: check range, value: "kit terminal range vs the wire gauge — see the endpoint's range note"}
+    - {do: strip, tool: STRIP_26_16, value: "UNKNOWN: strip length per kit terminal"}
+    - {do: seal on, value: "kit cable seal"}
+    - {do: crimp, tool: by_endpoint, value: "UNKNOWN unless the endpoint names the crimper"}
+    - {do: pull test, tool: PULL_GAUGE, value: "22 AWG ≥ 8 lbf · 20 ≥ 13 · 16 ≥ 30", source: "ch.18 §7"}
+    - {do: insert + lock, tool: hand, value: "seat terminal, close TPA (and CPA where supplied)"}
+
+ev1:
+  label: Bosch EV1 injector plug (8CYLK-90 housings + 90° boots, ProWire 68102 Junior Power Timer terminals)
+  per_end: {terminal: "68102"}
+  steps:
+    - {do: boot on, value: "slide the 90° boot on the wire first (unsealed housing; the boot seals)", source: "prowire 8CYLK-90 page (Qty 8 rubber 90º boots)"}
+    - {do: strip, tool: STRIP_26_16, value: "UNKNOWN: strip length per terminal"}
+    - {do: double over, value: "the 22 AWG driver wire is stripped 2x and folded back = ~18 AWG (MoTeC C125 manual p.21); the 20 AWG power branch goes in single"}
+    - {do: crimp, tool: JPT_CRIMPER, value: "open-barrel crimp, die per TE application spec"}
+    - {do: pull test, tool: PULL_GAUGE, value: "22 AWG ≥ 8 lbf · 20 ≥ 13", source: "ch.18 §7"}
+    - {do: insert, tool: hand, value: "seat into housing; spring clip retains the plug on the injector"}
+    - {do: mark, part: 8CYLK-90, value: "kit's 1–8 markers under RT-375 clear shrink", source: "prowire 8CYLK-90 page"}
+
+lug:
+  label: tinned-copper lug, hex crimp, adhesive shrink (power spine)
+  per_end: {lug: by_endpoint, shrink: by_polarity}
+  steps:
+    - {do: cut, tool: CABLE_CUTTER}
+    - {do: strip, tool: STRIP_CABLE, value: "strip to the barrel depth (238LTP barrel length .525 in)", source: "prowire 238LTP technical information"}
+    - {do: shrink on, value: "CPA 3:1 red on positives, black on negatives, slid on before crimping", source: "ch.18 §7 layers 2 + 4; prowire 238LTP heat-shrink options"}
+    - {do: crimp, tool: HEX_CRIMPER, value: "die per lug (238LTP = GREY)", source: "prowire 238LTP page"}
+    - {do: pull + look, tool: hand, value: "crimp centred, no barrel cracks", source: "ch.18 §7"}
+    - {do: shrink, tool: HEAT_GUN, value: "adhesive beads visibly at both ends", source: "ch.18 §7 layer 2"}
+    - {do: land + torque, tool: TORQUE_INLB, value: "UNKNOWN: torque per stud datasheet (Blue Sea 2019, Littelfuse MEGA/MIDI, starter, alternator, PDM M6)"}
+    - {do: boot splash studs, part: MS25171-3S, value: "outermost cover on alternator B+ and the PDM stud (Dave's photos)", source: "state 0i; ch.18 §7 layer 5"}
+
+ring_small:
+  wire_range_awg: [22, 10]          # a ring exists for every gauge; the part number per stud and gauge is the open item below
+  label: small ring/spade terminal (sensor grounds, Dakota senders, starter S, isolator aux)
+  per_end: {ring: RING-SMALL}
+  steps:
+    - {do: pick part, value: "UNKNOWN: ring PN per stud size + gauge — none in any cart"}
+    - {do: strip, tool: STRIP_26_16}
+    - {do: crimp, value: "UNKNOWN: crimper follows the ring pick"}
+    - {do: seal, part: SCL, tool: HEAT_GUN, value: "SCL over barrel onto the wire", source: "build book: 'ProWire's SCL packs seal them'"}
+
+miniseal:
+  label: MiniSeal stub splice (rail branches, PDM pigtail joins, tee taps)
+  per_end: {splice_by_gauge: {26-20: D-609-03, 20-16: D-609-04, 16-12: D-609-05}}
+  wire_range_awg: [26, 12]          # the three splice sizes together (prowire 3137ct page: red 26–20 · blue 20–16 · yellow 16–12)
+  steps:
+    - {do: pull test, tool: PULL_GAUGE, value: "22 AWG ≥ 8 lbf · 20 ≥ 13 · 16 ≥ 30", source: "ch.18 §7"}
+    - {do: strip, tool: [STRIP_26_16, STRIP_14_10], value: "stripper by gauge (26–16 / 14–10); strip length UNKNOWN — Raychem D-609 datasheet"}
+    - {do: crimp, tool: MINISEAL_CRIMPER, value: "cavity by colour: red 26–20 · blue 20–16 · yellow 16–12", source: "prowire 3137ct page"}
+    - {do: cover, part: SCL, tool: HEAT_GUN, value: "stub splices need SCL, ATUM or W5DL over them", source: "prowire MiniSeal page (receipt 2026-09-25 night)"}
+
+solder_sleeve:
+  label: shield drain termination (CKP, CMP, knock cables — ECU end only)
+  per_end: {sleeve: S02-03-R}
+  steps:
+    - {do: prep, value: "remove jacket, expose shield window", tool: STRIP_26_16}
+    - {do: sleeve, part: S02-03-R, tool: HEAT_GUN, value: "reflector on the gun; solder ring flows, lead exits as the drain", source: "S02-03-R = M83519/2-3, 22 AWG lead (receipt 2026-09-25 night)"}
+    - {do: land drain, value: "drain to SEN_0V at the ECU end only; sensor end floats", source: "K5_connector_shopping_list.txt (shielded cable connectors)"}
+
+xlr_solder:
+  label: Neutrik 5-pin female XLR, solder cups (PDM30 UTC config port)
+  per_end: {connector: NC5FD-L-1}
+  steps:
+    - {do: strip + tin, tool: [STRIP_26_16, SOLDER_IRON]}
+    - {do: solder, tool: SOLDER_IRON, value: "pin 1 = 0V, 4 = CAN-LO, 5 = CAN-HI; H/L twisted", source: "MoTeC PDM user manual p.48"}
+    - {do: insulate, tool: HEAT_GUN, value: "small shrink over each cup"}
+
+mp150:
+  label: Metri-Pack 150 sealed terminal for 22 AWG (crank, cam, MAP, knock housings from the ProWire kits)
+  per_end: {terminal: "12110847", seal: "15324976"}
+  wire_range_awg: [22, 18]
+  steps:
+    - {do: strip, tool: STRIP_26_16, value: "UNKNOWN: strip length — Aptiv 12110847 drawing"}
+    - {do: seal on, part: "15324976", value: "20–22 AWG seal on before crimping (the kits' own seals are sized for 18–20 AWG insulation)"}
+    - {do: crimp, tool: MP150_CRIMPER, value: "wire + seal", source: "ProWire p-2104 (12155975)"}
+    - {do: pull test, tool: PULL_GAUGE, value: "22 AWG ≥ 8 lbf", source: "ch.18 §7"}
+    - {do: insert + lock, tool: hand, value: "seat, then close the kit's TPA"}
+
+te_amp_plug:
+  label: Gen V throttle-body plug (ICT WCTHB50, TE AMP terminals)
+  per_end: {from_kit: true}
+  steps:
+    - {do: strip, tool: STRIP_26_16, value: "UNKNOWN: strip length per the TE terminal drawing"}
+    - {do: double over, value: "22 AWG signal wires doubled (~18 AWG, MoTeC C125 manual p.21); 20 AWG motor wires single"}
+    - {do: seal on, value: "kit seal"}
+    - {do: crimp, tool: TE_AMP_CRIMPER}
+    - {do: pull test, tool: PULL_GAUGE, value: "22 AWG ≥ 8 lbf · 20 ≥ 13", source: "ch.18 §7"}
+    - {do: insert + lock, tool: hand, value: "pin 6 stays empty — plug it if the kit has a cavity plug"}
+
+# ---- families added 2026-09-28 (pin-table pass: the plugs existed, their families did not)
+dt:
+  label: Deutsch DT (door pass-throughs DOOR-L/R-PASS; body bulkheads A and B) — size 16 solid contacts
+  per_end: {pin: 0460-202-16141, socket: 0462-201-16141, wedge_pin: W12P, wedge_socket: W12S, cavity_plug: "114017"}   # Deutsch catalog sealing plugs: size 16-12 -> 114017, size 20 -> 0413-204-2005 (web_snapshots/www.farnell.com__628276.md (Deutsch catalog, Sealing Plugs: contact size 16-12 -> 114017; size 20 -> 0413-204-2005))
+  wire_range_awg: [20, 16]          # Deutsch size 16 solid contacts 0460-202-16141 / 0462-201-16141: 20–16 AWG — source: web_snapshots/www.customconnectorkits.com__0460-202-16141.md ("20-16 AWG", "13A", "4 way indent crimper")
+  steps:
+    - {do: strip, tool: STRIP_26_16, value: "OPEN: strip length — Deutsch DT contact datasheet (≈ 6 mm typical)"}
+    - {do: crimp, tool: HDT-48-00, value: "solid-barrel 4-indent; selector by contact size 16", source: "Deutsch HDT-48-00 hand crimp tool (size 16 selector)"}
+    - {do: pull test, tool: PULL_GAUGE, value: "20 AWG ≥ 13 lbf · 18 ≥ 20 · 16 ≥ 30", source: "ch.18 §7"}
+    - {do: insert, tool: hand, value: "push until the retention finger clicks; fit the wedge (W12P plug / W12S receptacle)", source: "Deutsch DT assembly instructions"}
+    - {do: plug empty cavities, part: "114017", value: "one per spare cavity in each half"}
+
+dtp:
+  label: Deutsch DTP (body bulkhead P) — size 12 contacts
+  per_end: {pin: 0460-204-12141, socket: 0462-203-12141, wedge_pin: WP-4P, wedge_socket: WP-4S}   # KSV "4-Way Mated Deutsch DTP Connector Kit" page: size 12 solid contacts 14–12 AWG, WP-4P / WP-4S wedgelocks (read 2026-09-28)
+  wire_range_awg: [14, 12]          # size 12 contacts, 14–12 AWG (endpoints.yaml FIREWALL-BODY-P source: ProWire DTP04-4P-L012)
+  steps:
+    - {do: strip, tool: STRIP_14_10, value: "OPEN: strip length — Deutsch DTP contact datasheet"}
+    - {do: crimp, tool: HDT-48-00, value: "solid-barrel 4-indent; selector by contact size 12", source: "Deutsch HDT-48-00 hand crimp tool (size 12 selector)"}
+    - {do: pull test, tool: PULL_GAUGE, value: "14 AWG ≥ 50 lbf · 12 ≥ 70", source: "ch.18 §7"}
+    - {do: insert, tool: hand, value: "push until it clicks; fit the wedge"}
+
+gm_blade:
+  label: GM factory blade connectors (Packard 56 series) at the ignition, light, dimmer, wiper, blower and column switches
+  per_end: {terminal: "OPEN: Packard 56-series terminal by gauge"}
+  wire_range_awg: [20, 10]          # 56-series female terminals are made 20–18, 16–14, 12, 10 AWG (CE Auto Electric Supply "Packard 56 Series Female Terminals" page, read 2026-09-28; .250 in tab)          # OPEN: range to be cited from the Packard 56 catalog; the factory wires are 18–14 AWG (1977 LTSM)
+  steps:
+    - {do: strip, tool: STRIP_26_16, value: "OPEN: strip length — Packard 56 terminal drawing"}
+    - {do: crimp, value: "OPEN: open-barrel 56-series crimper (Packard 12085271 or equivalent) — not yet in the special-tools list"}
+    - {do: pull test, tool: PULL_GAUGE, value: "20 AWG ≥ 13 lbf · 18 ≥ 20 · 16 ≥ 30 · 14 ≥ 50", source: "ch.18 §7"}
+    - {do: insert, tool: hand, value: "push in until the lance locks; check with a light pull"}
+
+screw_terminal:
+  label: screw terminals (Orion charger, amplifier block, radio/mirror harness blocks) — ring or spade per stud
+  per_end: {terminal: "OPEN: ring by stud size and gauge"}
+  wire_range_awg: [22, 6]           # the ring sets the range; the terminal part is the open item
+  steps:
+    - {do: strip, tool: [STRIP_26_16, STRIP_14_10]}
+    - {do: crimp, value: "OPEN: crimper follows the ring pick"}
+    - {do: pull test, tool: PULL_GAUGE, value: "22 AWG ≥ 8 lbf · 16 ≥ 30 · 10 ≥ 90", source: "ch.18 §7"}
+    - {do: land + torque, tool: TORQUE_INLB, value: "OPEN: torque per the device's manual"}
+
+contura:
+  label: Blue Sea 2145 Contura switch — 0.250 in quick-connect tabs (the 7700's dash switch)
+  per_end: {terminal: "OPEN: 0.250 in fully insulated female quick-connect, 16–14 AWG"}
+  wire_range_awg: [16, 14]          # "Use minimum 16 AWG wire for the Control Circuit" (Blue Sea 7700 instructions p.2)
+  steps:
+    - {do: strip, tool: STRIP_26_16}
+    - {do: crimp, value: "OPEN: quick-connect crimper — not yet in the special-tools list"}
+    - {do: pull test, tool: PULL_GAUGE, value: "16 AWG ≥ 30 lbf", source: "ch.18 §7"}
+    - {do: push on, tool: hand, value: "seat on the tab; heat-shrink over the barrel"}
+
+dtm:
+  label: Deutsch DTM (MoTeC LTC power/CAN plug #68054, DTM 4-pin female) — size 20 solid contacts
+  per_end: {socket: 0462-201-20141, pin: 0460-202-20141, wedge_socket: WM-4S, wedge_pin: WM-4P}
+  # plug: MoTeC LTC user manual V1.7 p.32 'Power/CAN Connector DTM 4pin (M) (#68055) Mating connector: DTM 4pin (F) (#68054)'
+  # contacts: web_snapshots/www.customconnectorkits.com__0462-201-20141.md and __0460-202-20141.md ('Size 20 ... Solid Socket/Pin
+  #   for 20 AWG', 'Max 7.5 amps', 'Crimps with a 4 way indent crimper'). Those pages name only 20 AWG, so no wire_range_awg is
+  #   written: R1 stays OPEN until the Deutsch contact drawing (0462-201-20141 range) is on file.
+  steps:
+    - {do: strip, tool: STRIP_26_16, value: "OPEN: strip length — Deutsch DTM contact drawing"}
+    - {do: crimp, tool: HDT-48-00, value: "solid-barrel 4-indent; selector by contact size 20", source: "tools.yaml HDT-48-00 ('Deutsch size 20/16/12 solid contacts'); vendor page '4 way indent crimper'"}
+    - {do: pull test, tool: PULL_GAUGE, value: "22 AWG ≥ 8 lbf · 20 ≥ 13 · 18 ≥ 20", source: "ch.18 §7"}
+    - {do: insert, tool: hand, value: "push until the retention finger clicks; fit the WM-4S wedge"}

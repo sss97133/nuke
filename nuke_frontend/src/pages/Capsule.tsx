@@ -1,3 +1,4 @@
+import { ProfileService } from '../services/profileService';
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
@@ -67,11 +68,7 @@ const Capsule: React.FC = () => {
       setSession(session);
       
       // Load user profile
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('id', session.user.id)
-        .single();
+      const { data: profile } = await ProfileService.getProfileRecord(session.user.id);
       
       setUserProfile(profile);
     } catch (error) {

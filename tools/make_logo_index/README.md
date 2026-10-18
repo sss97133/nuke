@@ -16,7 +16,7 @@ source .venv/bin/activate
 pip install -r tools/make_logo_index/requirements.txt
 
 python tools/make_logo_index/index_makes_logos.py \
-  --out /Users/skylar/nuke/tmp/make_logo_index \
+  --out ~/nuke/tmp/make_logo_index \
   --limit 2000
 ```
 
@@ -24,7 +24,7 @@ To also download logo files (recommended to keep downloads capped):
 
 ```bash
 python tools/make_logo_index/index_makes_logos.py \
-  --out /Users/skylar/nuke/tmp/make_logo_index \
+  --out ~/nuke/tmp/make_logo_index \
   --limit 2000 \
   --download \
   --max-downloads 500
@@ -34,7 +34,7 @@ Optional: request rasterized thumbnails (useful for consistent sizing in design 
 
 ```bash
 python tools/make_logo_index/index_makes_logos.py \
-  --out /Users/skylar/nuke/tmp/make_logo_index \
+  --out ~/nuke/tmp/make_logo_index \
   --limit 2000 \
   --download \
   --max-downloads 500 \

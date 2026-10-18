@@ -46,7 +46,7 @@ Wall-clock for the bulk: ~19K × 40s ÷ 6 workers ≈ **35 hours**, heavy on BYO
 
 ---
 
-## 3. Drain — commands (run on your Mac, `cd /Users/skylar/nuke`)
+## 3. Drain — commands (run on your Mac, `cd ~/nuke`)
 
 **Smoke test first** (confirm the pipe flows before the big burst):
 ```bash

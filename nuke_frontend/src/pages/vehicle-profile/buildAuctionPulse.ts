@@ -5,8 +5,53 @@
  *
  * This is a pure function -- no React state or side effects.
  */
+/** Changes that require the existing price, sequence and comment readers to refresh.
+ * Session/receipt clocks alone never turn a collector heartbeat into a data read.
+ */
+export function auctionReaderRevision(row: any): string {
+  return JSON.stringify([row.source_url, row.source_platform, row.event_type, row.event_status, row.ended_at, row.current_price, row.final_price, row.sold_at,
+    row.bid_count, row.view_count, row.watcher_count, row.metadata?.comment_count, row.metadata?.live_stream?.last_comment_id]);
+}
+
+const platformKey = (value: unknown) => String(value ?? '').toLowerCase().replace(/[_\-\s]+/g, '');
+const CLASSIFIED_PLATFORMS = new Set(['craigslist', 'facebookmarketplace', 'ksl', 'kslclassifieds', 'classiccars', 'autotrader', 'carscom', 'dealersite']);
+const AUCTION_PLATFORMS = new Set(['bat', 'bringatrailer', 'carsandbids', 'mecum', 'barrettjackson', 'rmsothebys', 'gooding', 'bonhams', 'pcarmarket', 'collectingcars', 'broadarrow', 'sbx', 'autohunter']);
+
+export function isClassifiedPresentation(row: any): boolean {
+  return CLASSIFIED_PLATFORMS.has(platformKey(row?.source_platform ?? row?.platform));
+}
+
+// An active presentation and a numeric price are not auction/bid evidence.
+// Mixed venues require their explicit auction path; an ambiguous item stays out
+// of auction controls while its typed asking-price reader remains available.
+export function isAuctionPresentation(row: any): boolean {
+  const platform = platformKey(row?.source_platform ?? row?.platform);
+  if (isClassifiedPresentation(row)) return false;
+  const type = String(row?.event_type ?? '').toLowerCase();
+  if (type && type !== 'auction') return false;
+  if (AUCTION_PLATFORMS.has(platform)) return true;
+  try {
+    const url = new URL(row?.source_url ?? row?.listing_url ?? '');
+    if (!['http:', 'https:'].includes(url.protocol) || url.username || url.password || url.port) return false;
+    const host = url.hostname.replace(/^www\./, '');
+    return (platform === 'hagerty' && host === 'hagerty.com' && /^\/marketplace\/auction\//.test(url.pathname))
+      || (platform === 'hemmings' && host === 'hemmings.com' && /^\/auctions?\//.test(url.pathname));
+  } catch { return false; }
+}
+
+// A successful empty/disqualified read clears a prior pulse. A failed read
+// cannot establish that an auction disappeared; callers retain their state.
+export function buildAuctionPulseFromReadResult(result: { data: any[] | null; error: unknown }, vehicleId: string): any | null {
+  if (result.error) throw result.error;
+  return buildAuctionPulseFromExternalListings(result.data ?? [], vehicleId);
+}
+
 export function buildAuctionPulseFromExternalListings(rows: any[], vehicleIdForRows: string): any | null {
-  const arr = Array.isArray(rows) ? rows.filter((r) => r && r.listing_url && r.platform) : [];
+  // vehicle_events is the canonical reader; its IDs must not enter the legacy listing sync writer.
+  const arr = (Array.isArray(rows) ? rows : []).filter(isAuctionPresentation).map((r) => r?.source_url ? {
+    ...r, id: null, platform: r.source_platform, listing_url: r.source_url,
+    listing_status: r.event_status, end_date: r.ended_at, current_bid: r.current_price,
+  } : r).filter((r) => r && r.listing_url && r.platform);
   if (arr.length === 0) return null;
   // NOTE: We intentionally do NOT globally drop active listings when a vehicle has a historical sale.
   // Relists exist (e.g. BaT "-2" URLs), and we want the pulse to reflect the current live auction when present.
@@ -150,9 +195,10 @@ export function buildAuctionPulseFromExternalListings(rows: any[], vehicleIdForR
     const horizonMs = maxAuctionHorizonMs(String(best.platform || ''), String(best.listing_url || ''));
     const futureEnd = endCandidates
       .filter((x) => x.t > now && (x.t - now) <= horizonMs)
-      .sort((a, b) => a.t - b.t)[0];
-    // If no reasonable future end date exists, don't render a countdown (avoid misleading UI).
-    const mergedEndDate = (futureEnd?.iso || null) as string | null;
+      .sort((a, b) => b.t - a.t)[0];
+    // Keep the recorded deadline after zero: elapsed time alone cannot confirm a soft close.
+    const pastEnd = endCandidates.filter((x) => x.t <= now).sort((a, b) => b.t - a.t)[0];
+    const mergedEndDate = (futureEnd?.iso || pastEnd?.iso || null) as string | null;
 
     const updatedAt = (() => {
       const ts = sorted
@@ -198,8 +244,8 @@ export function buildAuctionPulseFromExternalListings(rows: any[], vehicleIdForR
       comment_count: mergedCommentCount,
       final_price: maxNum(sorted.map((r) => r?.final_price)),
       sold_at: soldAt,
-      last_bid_at: null as string | null,
-      last_comment_at: null as string | null,
+      last_bid_at: best?.metadata?.live_stream?.last_bid_at || null,
+      last_comment_at: best?.metadata?.live_stream?.last_comment_at || null,
       updated_at: updatedAt,
       metadata: (best?.metadata && typeof best.metadata === 'object') ? best.metadata : null,
       _vehicle_id: vehicleIdForRows,

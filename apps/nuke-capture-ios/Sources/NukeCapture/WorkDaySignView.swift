@@ -8,6 +8,9 @@
 // Confirming a day sets work_sessions.owner_confirmed_at (Tier 4 / the $410
 // value gate) via confirm_work_session. The derived day is a CLAIM you confirm,
 // never an assignment (the 707-Yucca lesson). Value is real only after you sign.
+// At the owner's volume one card at a time is unrealistic (owner, 2026-10-17), so
+// the deck also signs every loaded day, or every day for the card's vehicle, in one
+// confirm_work_sessions_bulk call.
 
 import SwiftUI
 
@@ -27,6 +30,8 @@ final class WorkDaySignEngine: ObservableObject {
 
     @Published private(set) var days: [WorkDay] = []
     @Published private(set) var loaded = false
+    @Published private(set) var isLoading = false
+    @Published private(set) var loadError: String?
     @Published private(set) var signedCount = 0
     @Published var note: String?
 
@@ -44,32 +49,46 @@ final class WorkDaySignEngine: ObservableObject {
     }
     private struct ImageRow: Decodable { let image_url: String? }
     private struct SignParams: Encodable { let p_session_id: String; let p_confirm: Bool }
+    private struct BulkSignParams: Encodable { let p_session_ids: [String]; let p_confirm: Bool }
 
     /// Owner's unconfirmed work-days, newest first. Owner-scoped by construction.
     func load() async {
-        guard let userId = SupabaseService.currentUserId else { loaded = true; return }
-        let vehicles: [VehicleRow] = (try? await SupabaseService.client.from("vehicles")
-            .select("id, year, make, model")
-            .eq("user_id", value: userId)
-            .execute().value) ?? []
-        guard !vehicles.isEmpty else { days = []; loaded = true; return }
-        let byId = Dictionary(uniqueKeysWithValues: vehicles.map { ($0.id, $0) })
-
-        let rows: [SessionRow] = (try? await SupabaseService.client.from("work_sessions")
-            .select("id, vehicle_id, session_date, duration_minutes")
-            .in("vehicle_id", values: vehicles.map(\.id))
-            .is("owner_confirmed_at", value: nil)
-            .gt("duration_minutes", value: 0)
-            .order("session_date", ascending: false)
-            .limit(80)
-            .execute().value) ?? []
-
-        days = rows.map { r in
-            WorkDay(id: r.id, vehicleId: r.vehicle_id, sessionDate: r.session_date,
-                    durationMinutes: r.duration_minutes ?? 0,
-                    vehicleLabel: r.vehicle_id.flatMap { byId[$0]?.label } ?? "UNKNOWN VEHICLE")
+        guard !isLoading else { return }
+        guard let userId = SupabaseService.currentUserId else {
+            loadError = "Sign in to load your work days."
+            return
         }
-        loaded = true
+        isLoading = true
+        loadError = nil
+        defer { isLoading = false }
+        do {
+            let vehicles: [VehicleRow] = try await SupabaseService.client.from("vehicles")
+                .select("id, year, make, model")
+                .or("user_id.eq.\(userId),owner_id.eq.\(userId)")
+                .neq("make", value: "UNRESOLVED")
+                .execute().value
+            guard !vehicles.isEmpty else { days = []; loaded = true; return }
+            let byId = Dictionary(uniqueKeysWithValues: vehicles.map { ($0.id, $0) })
+
+            let rows: [SessionRow] = try await SupabaseService.client.from("work_sessions")
+                .select("id, vehicle_id, session_date, duration_minutes")
+                .in("vehicle_id", values: vehicles.map(\.id))
+                .is("owner_confirmed_at", value: nil)
+                .gt("duration_minutes", value: 0)
+                .order("session_date", ascending: false)
+                .limit(250)
+                .execute().value
+
+            days = rows.map { r in
+                WorkDay(id: r.id, vehicleId: r.vehicle_id, sessionDate: r.session_date,
+                        durationMinutes: r.duration_minutes ?? 0,
+                        vehicleLabel: r.vehicle_id.flatMap { byId[$0]?.label } ?? "UNKNOWN VEHICLE")
+            }
+            loaded = true
+        } catch {
+            loadError = "Couldn't load your work days. Retry."
+            NSLog("NukeCapture work days load failed: %@", String(describing: error))
+        }
     }
 
     /// The day's actual photos — the proof you confirm on (that vehicle, that day).
@@ -103,6 +122,29 @@ final class WorkDaySignEngine: ObservableObject {
         }
     }
 
+    /// Bulk-confirm all loaded days (or all loaded days for a specific vehicle) in a single RPC call.
+    @discardableResult
+    func signBulk(vehicleId: String? = nil) async -> Int {
+        let targets = vehicleId == nil ? days : days.filter { $0.vehicleId == vehicleId }
+        let ids = targets.map(\.id)
+        guard !ids.isEmpty else { return 0 }
+        do {
+            let count: Int = try await SupabaseService.client
+                .rpc("confirm_work_sessions_bulk", params: BulkSignParams(p_session_ids: ids, p_confirm: true))
+                .execute().value
+            let idSet = Set(ids)
+            days.removeAll { idSet.contains($0.id) }
+            signedCount += count
+            if days.isEmpty {
+                await load()
+            }
+            return count
+        } catch {
+            note = "Couldn't bulk confirm: \(ReadFailure.text(error))"
+            return 0
+        }
+    }
+
     /// Defer a day — sends it to the back of the deck, unsigned.
     func skip(_ day: WorkDay) {
         guard let i = days.firstIndex(of: day) else { return }
@@ -124,11 +166,21 @@ final class WorkDaySignEngine: ObservableObject {
 
 struct WorkDaySignView: View {
     @ObservedObject private var engine = WorkDaySignEngine.shared
+    @State private var isBulkSigning = false
 
     var body: some View {
         ZStack {
             Color.black.ignoresSafeArea()
-            if !engine.loaded {
+            if let error = engine.loadError {
+                VStack(spacing: 12) {
+                    Text(error).font(.callout).foregroundStyle(.white)
+                        .multilineTextAlignment(.center)
+                    Button("Retry") { Task { await engine.load() } }
+                        .buttonStyle(.borderedProminent)
+                        .disabled(engine.isLoading)
+                }
+                .padding()
+            } else if !engine.loaded || engine.isLoading {
                 ProgressView().tint(.white)
             } else if engine.days.isEmpty {
                 doneState
@@ -164,7 +216,7 @@ struct WorkDaySignView: View {
             ToolbarItem(placement: .principal) {
                 VStack(spacing: 1) {
                     Text("YOUR DAYS").font(.caption.weight(.bold)).kerning(1).foregroundStyle(.white)
-                    if engine.loaded {
+                    if engine.loaded && !engine.isLoading && engine.loadError == nil {
                         Text(engine.signedCount > 0
                              ? "\(engine.signedCount) signed · \(engine.days.count) left"
                              : "\(engine.days.count) to confirm")
@@ -172,11 +224,27 @@ struct WorkDaySignView: View {
                     }
                 }
             }
+            if !engine.days.isEmpty {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button {
+                        guard !isBulkSigning else { return }
+                        isBulkSigning = true
+                        Task {
+                            defer { isBulkSigning = false }
+                            await engine.signBulk()
+                        }
+                    } label: {
+                        Text(isBulkSigning ? "…" : "Confirm All (\(engine.days.count))")
+                            .font(.caption.weight(.semibold))
+                    }
+                    .disabled(isBulkSigning || engine.isLoading)
+                }
+            }
         }
         .toolbarBackground(.black, for: .navigationBar)
         .toolbarBackground(.visible, for: .navigationBar)
         .preferredColorScheme(.dark)
-        .task { if !engine.loaded { await engine.load() } }
+        .task { await engine.load() }
     }
 
     private var doneState: some View {
@@ -271,6 +339,28 @@ private struct DayCard: View {
                             Text("SKIP").fontWeight(.semibold)
                         }
                         .buttonStyle(.bordered).controlSize(.large).tint(.white)
+                    }
+
+                    if let vid = day.vehicleId {
+                        let sameVehicleDays = engine.days.filter { $0.vehicleId == vid }.count
+                        if sameVehicleDays > 1 {
+                            Button {
+                                busy = true
+                                Task {
+                                    await engine.signBulk(vehicleId: vid)
+                                    busy = false
+                                }
+                            } label: {
+                                Text("CONFIRM ALL \(sameVehicleDays) DAYS FOR \(day.vehicleLabel)")
+                                    .font(.caption.weight(.bold))
+                                    .kerning(0.4)
+                                    .frame(maxWidth: .infinity)
+                            }
+                            .buttonStyle(.bordered)
+                            .controlSize(.regular)
+                            .tint(.white)
+                            .disabled(busy)
+                        }
                     }
 
                     Text("Looks like this truck? Confirm if the photos match — value becomes real only when you sign. If it's the wrong vehicle, tap Skip.")

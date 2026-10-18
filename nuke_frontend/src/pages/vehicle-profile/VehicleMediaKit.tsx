@@ -287,7 +287,7 @@ const VehicleMediaKit: React.FC<VehicleMediaKitProps> = ({ vehicleId, onImageCli
         }}
       >
         {current.label}
-        {dateLabel ? ` · ${dateLabel}` : ''}
+        {dateLabel ? (current.taken_at ? ` · ${dateLabel}` : ` · RECORD DATE ${dateLabel} · CAPTURE DATE UNKNOWN`) : ''}
       </div>
 
       {/* Prev chevron */}

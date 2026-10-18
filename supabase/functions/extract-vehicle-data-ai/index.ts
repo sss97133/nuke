@@ -8,8 +8,11 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { ExtractionLogger, validateVin } from '../_shared/extractionHealth.ts'
 import { getLLMConfig, callLLM, type LLMProvider } from '../_shared/llmProvider.ts'
-import { normalizeVehicleFields } from '../_shared/normalizeVehicle.ts'
 import { writeObservation } from "../_shared/observationWriter.ts"
+import { requireWriteAuth } from '../_shared/writeGuard.ts';
+import { writeVehicle } from './vehicleWrite.ts'
+import { normalizeExtractedData } from './normalize.ts'
+import { projectSecretKey } from "../_shared/supabaseKeys.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -77,6 +80,9 @@ interface ExtractionRequest {
 }
 
 Deno.serve(async (req) => {
+  // Writes are never anonymous: service key, signed-in user, or nothing (P0.2, 2026-09-27).
+  const denied = await requireWriteAuth(req);
+  if (denied) return denied;
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders })
   }
@@ -123,7 +129,7 @@ Deno.serve(async (req) => {
       console.log(`[extract-vehicle-data-ai] Routing to dedicated extractor: ${dedicatedExtractor}`)
       try {
         const supabaseUrl = Deno.env.get('SUPABASE_URL')!
-        const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
+        const serviceKey = projectSecretKey()!
         const proxyRes = await fetch(`${supabaseUrl}/functions/v1/${dedicatedExtractor}`, {
           method: 'POST',
           headers: {
@@ -241,7 +247,7 @@ Deno.serve(async (req) => {
     // Initialize Supabase for LLM config
     const supabase = createClient(
       Deno.env.get('SUPABASE_URL')!,
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
+      projectSecretKey()!
     )
 
     // Get LLM config with automatic fallback chain
@@ -250,9 +256,9 @@ Deno.serve(async (req) => {
     let llmResponse;
     const providerModels: [LLMProvider, string][] = [
       // Google (lite) first — free tier, separate quota from 2.5-flash
-      ['google', 'gemini-2.5-flash-lite'],
+      ['google', 'gemini-flash-lite-latest'],
       // Google (full) — may hit 10K/day quota
-      ['google', 'gemini-2.5-flash'],
+      ['google', 'gemini-3.1-flash-lite'],
       // Anthropic fallback — $1/MTok input (may have no credits)
       ['anthropic', 'claude-haiku-4-5-20251001'],
       // OpenAI last resort — quota may be exhausted
@@ -491,103 +497,16 @@ Deno.serve(async (req) => {
 
     if (save_to_db && normalized.year && normalized.make && !looksLikeNonVehicle) {
       try {
-        // Check for existing vehicle by URL or VIN
-        let existing = null
-        if (normalized.vin && normalized.vin.length >= 11) {
-          const { data } = await supabase
-            .from('vehicles')
-            .select('id')
-            .eq('vin', normalized.vin)
-            .limit(1)
-            .maybeSingle()
-          existing = data
+        // Find the vehicle, then gap-fill it or create it (vehicleWrite.ts). A write that creates nothing is
+        // returned to the caller as an error response, never answered as success with no vehicle.
+        const written = await writeVehicle(supabase, { normalized, url, source, sourceSlug })
+        if (!written.ok) {
+          return new Response(JSON.stringify(written.body), {
+            status: written.status,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          })
         }
-        if (!existing && url) {
-          const { data } = await supabase
-            .from('vehicles')
-            .select('id')
-            .eq('discovery_url', url)
-            .limit(1)
-            .maybeSingle()
-          existing = data
-        }
-
-        // Normalize make/model/transmission/drivetrain/VIN via shared canonical layer
-        normalizeVehicleFields(normalized);
-
-        const vehiclePayload: Record<string, any> = {
-          year: normalized.year,
-          make: normalized.make,
-          model: normalized.model || null,
-          series: normalized.series || null,
-          trim: normalized.trim || null,
-          vin: normalized.vin || null,
-          mileage: normalized.mileage || null,
-          color: normalized.exterior_color || normalized.color || null,
-          interior_color: normalized.interior_color || null,
-          transmission: normalized.transmission || null,
-          drivetrain: normalized.drivetrain || null,
-          engine_type: normalized.engine || null,
-          body_style: normalized.body_style || null,
-          sale_price: normalized.sold_price || normalized.price || null,
-          asking_price: normalized.price || null,
-          description: normalized.description?.slice(0, 5000) || null,
-          discovery_url: url,
-          listing_url: url,
-          // Provenance: hostname-derived slug (e.g. 'craigslist', 'hemmings') — never 'unknown'
-          source: sourceSlug || source || 'ai_extraction',
-          discovery_source: source || sourceSlug || 'ai_extraction',
-          profile_origin: source || 'ai_extraction',
-          // Scraped page = third-party testimony, not an owner claim
-          // (matches scripts/import-fb-saved.mjs; vehicles_entry_type_check allows:
-          //  owner_claim | contributor_data | title_verified | disputed)
-          entry_type: 'contributor_data',
-          // 1.3 (2026-07-02): gap-fill-only updates, domain-derived observation
-          // platform, no-DELETE image dedupe (DNA audit §IV)
-          extractor_version: 'extract-vehicle-data-ai:1.3',
-          status: 'active',
-        }
-
-        if (existing) {
-          vehicleId = existing.id
-          // GAP-FILL ONLY (Tetris discipline — _shared/batUpsertWithProvenance.ts):
-          // fetch the existing row and fill only columns that are currently NULL.
-          // Re-extractions never overwrite existing values. (2026-07-02 DNA audit:
-          // the old loop checked only the NEW value for null, so it clobbered
-          // existing columns despite its own comment.)
-          // entry_type is set at record creation only — never downgrade an existing
-          // owner_claim/title_verified vehicle to contributor_data on re-extraction
-          const { data: existingRow } = await supabase
-            .from('vehicles')
-            .select('*')
-            .eq('id', vehicleId)
-            .maybeSingle()
-          const updates: Record<string, any> = {}
-          if (existingRow) {
-            for (const [key, val] of Object.entries(vehiclePayload)) {
-              if (val === null || key === 'discovery_url' || key === 'status' || key === 'entry_type') continue
-              if (existingRow[key] === null || existingRow[key] === undefined) {
-                updates[key] = val
-              }
-            }
-          }
-          if (Object.keys(updates).length > 0) {
-            await supabase.from('vehicles').update(updates).eq('id', vehicleId)
-          }
-          console.log(`[extract-vehicle-data-ai] Gap-filled ${Object.keys(updates).length} NULL fields on existing vehicle: ${vehicleId}`)
-        } else {
-          const { data: inserted, error: insertErr } = await supabase
-            .from('vehicles')
-            .insert(vehiclePayload)
-            .select('id')
-            .maybeSingle()
-          if (insertErr) {
-            console.error(`[extract-vehicle-data-ai] Vehicle insert failed: ${insertErr.message}`)
-          } else if (inserted?.id) {
-            vehicleId = inserted.id
-            console.log(`[extract-vehicle-data-ai] Created vehicle: ${vehicleId}`)
-          }
-        }
+        vehicleId = written.vehicleId
 
         // Fire-and-forget observation write
         if (vehicleId) {
@@ -709,7 +628,7 @@ Deno.serve(async (req) => {
     if (vehicleId) {
       try {
         const enrichUrl = Deno.env.get('SUPABASE_URL')!
-        const enrichKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
+        const enrichKey = projectSecretKey()!
         fetch(`${enrichUrl}/functions/v1/enrich-msrp`, {
           method: 'POST',
           headers: {
@@ -953,43 +872,3 @@ function extractVehicleFromUrl(url: string): Record<string, any> | null {
     return null
   }
 }
-
-/**
- * Normalize extracted data to standard format
- */
-function normalizeExtractedData(data: any, url: string): any {
-  return {
-    vin: data.vin || null,
-    year: data.year ? (parseInt(String(data.year), 10) || null) : null,
-    make: data.make || data.manufacturer || null,
-    model: data.model || null,
-    series: data.series || null,
-    trim: data.trim || null,
-    mileage: data.mileage ? (parseInt(String(data.mileage).replace(/[^0-9]/g, ''), 10) || null) : null,
-    price: (data.price || data.asking_price) ? (parseInt(String(data.price || data.asking_price).replace(/[^0-9]/g, ''), 10) || null) : null,
-    asking_price: data.asking_price ? (parseInt(String(data.asking_price).replace(/[^0-9]/g, ''), 10) || null) : null,
-    sold_price: data.sold_price ? (parseInt(String(data.sold_price).replace(/[^0-9]/g, ''), 10) || null) : null,
-    sold_date: data.sold_date || null,
-    color: data.color || data.exterior_color || null,
-    exterior_color: data.exterior_color || data.color || null,
-    interior_color: data.interior_color || null,
-    transmission: data.transmission || null,
-    drivetrain: data.drivetrain || null,
-    engine: data.engine || data.engine_type || null,
-    engine_size: data.engine_size || data.displacement || null,
-    body_style: data.body_style || data.body_type || null,
-    body_type: data.body_type || data.body_style || null,
-    title_status: data.title_status || null,
-    description: data.description || null,
-    images: data.images || data.image_urls || [],
-    image_urls: data.image_urls || data.images || [],
-    location: data.location || null,
-    seller: data.seller || null,
-    seller_phone: data.seller_phone || null,
-    seller_email: data.seller_email || null,
-    listing_title: data.listing_title || data.title || null,
-    listing_url: url,
-    confidence: data.confidence || 0.8
-  }
-}
-

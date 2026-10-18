@@ -7,21 +7,31 @@ import "jsr:@supabase/functions-js/edge-runtime.d.ts";
  *
  * Sources:
  *   - BaT: Scrapes auctionsCurrentInitialData from /auctions/ page (no API key needed)
- *   - Collecting Cars: Uses Typesense API (public API key)
+ *   - Collecting Cars: the site's public Typesense listing collection (production_listings)
+ *   - PCarMarket: its server-rendered live auction board (direct fetch); bids of lots that moved from the lot page
+ *   - Bonhams: its public Typesense lot index, open Cars sales
  *   - Cars & Bids: Uses Firecrawl (Cloudflare protected)
- *   - PCarMarket, Mecum, Barrett-Jackson, RM Sotheby's, Gooding, Bonhams: Firecrawl scrape + extract
+ *   - Mecum, Barrett-Jackson, RM Sotheby's, Gooding: Firecrawl scrape + extract
+ * Collecting Cars, PCarMarket and Bonhams boards are complete lists: after the vehicles upsert each is handed to
+ * live_auction_board_sync, the monitored_auctions schedule writer for those houses (BaT's is bat_live_pull_run).
  *
  * Deploy: supabase functions deploy sync-live-auctions --no-verify-jwt
  *
  * Usage:
  *   POST {"action": "sync"}                      - sync all platforms
  *   POST {"action": "sync", "platform": "bat"}   - sync specific platform (bat, cc, cab, pcarmarket, mecum, barrett-jackson, rm-sothebys, gooding, bonhams)
+ *   POST {"action": "sync", "platforms": ["collecting-cars", "pcarmarket", "bonhams"]} - sync several
  *   POST {"action": "status"}                    - get current live auction stats
  */
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { firecrawlScrape } from "../_shared/firecrawl.ts";
 import { archiveFetch } from "../_shared/archiveFetch.ts";
+import { requireWriteAuth } from "../_shared/writeGuard.ts";
+import { parseBatIdentityFromUrl, parseBatIdentityFromTitle } from "../_shared/batParser.ts";
+import { projectSecretKey } from "../_shared/supabaseKeys.ts";
+import { mustWrite } from '../_shared/writeResult.ts';
+import { type BonhamsLotDoc, bonhamsLot, type PcarBoardItem, parsePcarBids, parsePcarBoard } from "./boards.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -53,6 +63,7 @@ interface LiveAuction {
   model: string | null;
   thumbnail_url: string | null;
   external_id: string | null;
+  currency?: string | null;
   raw_data: Record<string, unknown>;
 }
 
@@ -63,6 +74,9 @@ interface SyncResult {
   new_count: number;
   updated_count: number;
   ended_count: number;
+  write_errors?: string[];
+  board?: Record<string, unknown> | null;
+  bid_snapshots?: number;
   error: string | null;
   duration_ms: number;
 }
@@ -128,33 +142,27 @@ async function syncBaT(): Promise<{ auctions: LiveAuction[]; error: string | nul
     const auctions: LiveAuction[] = data.items
       .filter(item => item.active)
       .map(item => {
-        // Parse year/make/model from BaT title
-        // Titles often have prefixes: "44k-Mile 2001 Chevrolet Suburban", "No Reserve: 2006 Porsche..."
-        // Strategy: find the 4-digit year anywhere in the title, then parse make/model after it
+        // Identity. BaT's feed carries the year as its own field; the lot slug is BaT's "year-make-model"
+        // (parseBatIdentityFromUrl — descriptors before the year skipped, multi-word makes joined); the title,
+        // once the make is known, gives the full model and covers a slug without a year
+        // ("coyote-powered-ford-mustang-gt-fastback-by-revology"). A title's first word is never the make: the
+        // old first-word split left 8 live rows reading "Coyote-Powered" / "LS3-Powered" / "Pair" (2026-09-27).
         const cleanTitle = item.title.replace(/&#\d+;/g, "'").replace(/&amp;/g, "&");
-        const yearMatch = cleanTitle.match(/\b(19\d{2}|20[0-2]\d)\s+/);
-        const year = yearMatch ? parseInt(yearMatch[1], 10) : (item.year ? parseInt(item.year, 10) : null);
-
-        // Everything after the year is "make model trim..."
-        let make: string | null = null;
-        let model: string | null = null;
-        if (yearMatch) {
-          const afterYear = cleanTitle.substring(yearMatch.index! + yearMatch[0].length).trim();
-          const parts = afterYear.split(/\s+/);
-          make = parts[0] || null;
-          model = parts.slice(1).join(" ") || null;
-        } else {
-          const parts = cleanTitle.split(/\s+/);
-          make = parts[0] || null;
-          model = parts.slice(1).join(" ") || null;
-        }
+        const ident = parseBatIdentityFromUrl(item.url);
+        const fromTitle = parseBatIdentityFromTitle(cleanTitle, ident.make);
+        const feedYear = /^\d{4}$/.test(String(item.year || "")) ? parseInt(item.year, 10) : null;
+        const year = feedYear ?? ident.year ?? fromTitle.year;
+        const make = ident.make ?? fromTitle.make;
+        const model = (ident.make && fromTitle.model) ? fromTitle.model : (ident.model ?? fromTitle.model);
 
         return {
           url: item.url.replace(/\/$/, ""),
           title: item.title,
           platform: "bringatrailer",
           auction_end_date: new Date(item.timestamp_end * 1000).toISOString(),
-          current_bid: item.current_bid,
+          // BaT sends current_bid: false for no-bid lots — that is "no bid yet",
+          // not a number. 'false'::int aborted whole upsert chunks (2026-07-11).
+          current_bid: typeof item.current_bid === "number" ? item.current_bid : null,
           bid_count: null, // Not available in initial data
           no_reserve: item.noreserve,
           reserve_met: null,
@@ -184,7 +192,10 @@ async function syncBaT(): Promise<{ auctions: LiveAuction[]; error: string | nul
 // Collecting Cars Sync (Typesense API)
 // ============================================
 
-const TYPESENSE_API_KEY = "pHuIUBo3XGxHk9Ll9g4q71qXbTYAM2w1";
+// The site's public search-only key and collection (collecting-cars-discovery reads the same). The old collection
+// "production_cars" was retired upstream: it answered 404 "Collection not found" from 2026-02 until this change.
+const TYPESENSE_API_KEY = "0I2WvLvRUeeHNaDV74u0KRlkLnhhgH9S";
+const TYPESENSE_COLLECTION = "production_listings";
 const TYPESENSE_ENDPOINT = "https://dora.production.collecting.com/multi_search";
 
 interface TypesenseDocument {
@@ -203,7 +214,7 @@ interface TypesenseDocument {
   countryCode?: string;
   regionCode?: string;
   currencyCode?: string;
-  noReserve?: string;
+  noReserve?: string | boolean;
   reserveMet?: boolean;
   mainImageUrl?: string;
   features?: {
@@ -226,19 +237,19 @@ async function syncCollectingCars(): Promise<{ auctions: LiveAuction[]; error: s
     let page = 1;
 
     while (page <= CC_MAX_PAGES) {
-      const response = await fetch(`${TYPESENSE_ENDPOINT}?x-typesense-api-key=${TYPESENSE_API_KEY}`, {
+      const response = await fetch(`${TYPESENSE_ENDPOINT}?x-typesense-api-key=${TYPESENSE_API_KEY}`, { // guardrail-allow: raw-fetch (house JSON API)
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
           searches: [{
-            collection: "production_cars",
+            collection: TYPESENSE_COLLECTION,
             q: "*",
-            filter_by: "listingStage:live",
+            filter_by: "stage:=live && lotType:=car",
             per_page: CC_PAGE_SIZE,
             page,
-            query_by: "title,productMake,vehicleMake,productYear",
+            query_by: "title",
           }],
         }),
       });
@@ -248,6 +259,9 @@ async function syncCollectingCars(): Promise<{ auctions: LiveAuction[]; error: s
       }
 
       const data = await response.json();
+      if (data.results?.[0]?.error) {
+        return { auctions: [], error: `Collecting Cars Typesense: ${data.results[0].error}` };
+      }
       const hits = data.results?.[0]?.hits ?? [];
       const pageDocs = hits.map((hit: { document: TypesenseDocument }) => hit.document);
       documents.push(...pageDocs);
@@ -262,15 +276,18 @@ async function syncCollectingCars(): Promise<{ auctions: LiveAuction[]; error: s
       .filter(doc => doc.lotType === "car") // Only cars, not plates/parts/bikes
       .map(doc => {
         const year = doc.productYear ? parseInt(doc.productYear, 10) : (doc.features?.modelYear ? parseInt(doc.features.modelYear, 10) : null);
+        // dtStageEndsUTC is "YYYY-MM-DD HH:MM:SS" in UTC with no zone mark
+        const ends = doc.dtStageEndsUTC ? new Date(`${doc.dtStageEndsUTC.replace(" ", "T")}Z`) : null;
 
         return {
           url: `https://collectingcars.com/for-sale/${doc.slug}`,
           title: doc.title,
           platform: "collecting-cars",
-          auction_end_date: doc.dtStageEndsUTC ? new Date(doc.dtStageEndsUTC).toISOString() : new Date().toISOString(),
-          current_bid: doc.currentBid,
+          auction_end_date: ends && Number.isFinite(ends.getTime()) ? ends.toISOString() : "",
+          current_bid: doc.currentBid > 0 ? doc.currentBid : null,
           bid_count: doc.noBids,
-          no_reserve: doc.noReserve === "true",
+          currency: doc.currencyCode ?? null,
+          no_reserve: doc.noReserve === true || doc.noReserve === "true",
           reserve_met: doc.reserveMet ?? null,
           year,
           make: doc.makeName || null,
@@ -278,7 +295,7 @@ async function syncCollectingCars(): Promise<{ auctions: LiveAuction[]; error: s
           thumbnail_url: doc.mainImageUrl || null,
           external_id: String(doc.auctionId),
           raw_data: {
-            source: "typesense_api",
+            source: "typesense_production_listings",
             slug: doc.slug,
             auction_id: doc.auctionId,
             location: doc.location,
@@ -419,16 +436,118 @@ async function syncViaFirecrawlExtract(
 }
 
 // ============================================
-// PCarMarket Sync (Firecrawl)
+// PCarMarket Sync (server-rendered live board, direct fetch)
 // ============================================
 
+const PCAR_MAX_PAGES = 8;
+
+/** Year / make / model from a lot slug (descriptor-safe, multi-word makes) and its title, as for BaT. */
+function identityFromSlugAndTitle(slug: string, title: string) {
+  const ident = parseBatIdentityFromUrl(`https://x.invalid/listing/${slug.replace(/-\d{10,}$/, "")}`);
+  const fromTitle = parseBatIdentityFromTitle(title, ident.make);
+  return {
+    year: ident.year ?? fromTitle.year,
+    make: ident.make ?? fromTitle.make,
+    model: (ident.make && fromTitle.model) ? fromTitle.model : (ident.model ?? fromTitle.model),
+  };
+}
+
 async function syncPCarMarket(): Promise<{ auctions: LiveAuction[]; error: string | null }> {
-  return syncViaFirecrawlExtract(
-    "pcarmarket",
-    "https://www.pcarmarket.com/listings/",
-    /pcarmarket\.com\/auction\//i,
-    { waitFor: 5000 }
-  );
+  try {
+    const items: PcarBoardItem[] = [];
+    let pages = 1;
+    for (let page = 1; page <= Math.min(pages, PCAR_MAX_PAGES); page++) {
+      // /auctions is the live board; ?page=1 and the old ?auctionType=live redirect, which the direct fetcher refuses
+      const { html, error } = await archiveFetch(page === 1 ? "https://www.pcarmarket.com/auctions" : `https://www.pcarmarket.com/auctions?page=${page}`, {
+        platform: "pcarmarket",
+        skipCache: true,
+        useFirecrawl: false, // the board is server-rendered; archiveFetch would otherwise route pcarmarket.com to Firecrawl
+        callerName: "sync-live-auctions",
+      });
+      if (error || !html) return { auctions: [], error: `PCarMarket board page ${page}: ${error ?? "no HTML"}` };
+      const board = parsePcarBoard(html);
+      if (page === 1 && board.items.length === 0) return { auctions: [], error: "PCarMarket board: no items parsed" };
+      items.push(...board.items);
+      pages = board.totalPages ?? 1;
+    }
+    console.log(`[sync-live-auctions] PCarMarket: ${items.length} open items on ${pages} board pages`);
+    const auctions: LiveAuction[] = items
+      .filter((it) => it.status === "ITEM_OPEN" && it.schema === "Vehicle")
+      .map((it) => {
+        const ident = identityFromSlugAndTitle(it.slug, it.title);
+        return {
+          url: it.url,
+          title: it.title,
+          platform: "pcarmarket",
+          auction_end_date: it.ends ?? "",
+          current_bid: it.current_bid,
+          bid_count: it.bid_count,
+          currency: it.currency,
+          no_reserve: false,
+          reserve_met: null,
+          year: ident.year,
+          make: ident.make,
+          model: ident.model,
+          thumbnail_url: null,
+          external_id: it.slug,
+          raw_data: { source: "pcarmarket_live_board", basta_item_id: it.id, image_count: it.image_count, synced_at: new Date().toISOString() },
+        };
+      });
+    return { auctions, error: null };
+  } catch (e: unknown) {
+    return { auctions: [], error: `PCarMarket sync failed: ${e instanceof Error ? e.message : String(e)}` };
+  }
+}
+
+/**
+ * Bids of PCarMarket lots whose bid count moved, from the lot page's own bid history (Basta id, time, amount,
+ * bidder), admitted through ingest-observation as kind 'bid' with observed_at = the bid's own time. A bid already
+ * held for the vehicle is not posted again.
+ */
+async function ingestPcarBids(
+  supabase: ReturnType<typeof createClient>,
+  moved: { url: string; vehicle_id: string | null }[],
+  maxLots: number,
+): Promise<{ lots: number; posted: number; errors: string[] }> {
+  const out = { lots: 0, posted: 0, errors: [] as string[] };
+  const base = Deno.env.get("SUPABASE_URL") ?? "";
+  const key = projectSecretKey() ?? "";
+  const linked = moved.flatMap((m) => (m.vehicle_id ? [{ url: m.url, vehicle_id: m.vehicle_id }] : []));
+  for (const lot of linked.slice(0, maxLots)) {
+    const { html, error } = await archiveFetch(lot.url.replace("https://pcarmarket.com/", "https://www.pcarmarket.com/"), {
+      platform: "pcarmarket", skipCache: true, useFirecrawl: false, callerName: "sync-live-auctions",
+    });
+    if (error || !html) { out.errors.push(`${lot.url}: ${error ?? "no HTML"}`); continue; }
+    out.lots++;
+    const bids = parsePcarBids(html);
+    if (!bids.length) continue;
+    const ids = bids.map((b) => `pcarmarket-bid:${b.id}`);
+    const { data: held } = await supabase.from("vehicle_observations").select("source_identifier")
+      .eq("vehicle_id", lot.vehicle_id).eq("kind", "bid").in("source_identifier", ids);
+    const have = new Set((held ?? []).map((r: { source_identifier: string }) => r.source_identifier));
+    for (const b of bids) {
+      const sid = `pcarmarket-bid:${b.id}`;
+      if (have.has(sid)) continue;
+      const res = await fetch(`${base}/functions/v1/ingest-observation`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
+        body: JSON.stringify({
+          source_slug: "pcarmarket",
+          kind: "bid",
+          observed_at: b.at,
+          source_url: lot.url,
+          source_identifier: sid,
+          content_text: `Bid $${b.amount.toLocaleString("en-US")}`,
+          structured_data: { bid_id: b.id, amount: b.amount, currency: "USD", bidder: b.bidder, bid_status: b.status, clock: "source_event_time" },
+          vehicle_id: lot.vehicle_id,
+          extraction_method: "pcarmarket_ssr_bids_v1",
+        }),
+      });
+      if (res.ok) out.posted++;
+      else out.errors.push(`${sid}: HTTP ${res.status} ${(await res.text()).slice(0, 120)}`);
+    }
+  }
+  return out;
 }
 
 // ============================================
@@ -484,17 +603,66 @@ async function syncGooding(): Promise<{ auctions: LiveAuction[]; error: string |
 }
 
 // ============================================
-// Bonhams Motoring Sync (Firecrawl)
+// Bonhams Motoring Sync (public Typesense lot index, open Cars sales)
 // ============================================
 
+const BONHAMS_TS_HOST = "https://api01.bonhams.com/search-proxy/collections";
+const BONHAMS_TS_KEY = "7YZqOyG0twgst4ACc2VuCyZxpGAYzM0weFTLCC20FQY"; // the site's public search-only key (extract-bonhams-typesense)
+
 async function syncBonhams(): Promise<{ auctions: LiveAuction[]; error: string | null }> {
-  return syncViaFirecrawlExtract(
-    "bonhams",
-    "https://www.bonhams.com/departments/mot/",
-    /bonhams\.com\//i,
-    { waitFor: 4000 }
-  );
+  try {
+    const get = async (collection: string, params: Record<string, string>) => {
+      const res = await fetch(`${BONHAMS_TS_HOST}/${collection}/documents/search?${new URLSearchParams(params)}`, { // guardrail-allow: raw-fetch (house JSON API)
+        headers: { "X-TYPESENSE-API-KEY": BONHAMS_TS_KEY, Accept: "application/json" },
+      });
+      if (!res.ok) throw new Error(`Bonhams Typesense ${collection} HTTP ${res.status}`);
+      return await res.json();
+    };
+    const today = new Date().toISOString().slice(0, 10);
+    const a = await get("auctions", { q: "*", query_by: "brand", per_page: "60", filter_by: "departments.code:=MOT-CAR", sort_by: "dates.end.timestamp:desc" });
+    // deno-lint-ignore no-explicit-any
+    const sales = (a.hits ?? []).map((h: any) => h.document).filter((d: any) => !d.flags?.isAuctionEnded && String(d.dates?.end?.datetime ?? "").slice(0, 10) >= today);
+    const auctions: LiveAuction[] = [];
+    for (const sale of sales) {
+      for (let page = 1; page <= 4; page++) {
+        const r = await get("lots", { q: "*", query_by: "title", per_page: "250", page: String(page), filter_by: `auctionId:=${sale.id} && department.code:=MOT-CAR` });
+        // deno-lint-ignore no-explicit-any
+        for (const doc of (r.hits ?? []).map((h: any) => h.document as BonhamsLotDoc)) {
+          if (!doc.lotId || doc.lotId === "0") continue; // not yet catalogued: no lot number, no lot page
+          const lot = bonhamsLot(doc);
+          if (!lot.title || !lot.url.includes("/lot/")) continue;
+          const ident = parseBatIdentityFromTitle(lot.title.replace(/\s+(Chassis|Registration|Frame|Engine) no\..*$/i, ""), null);
+          auctions.push({
+            url: lot.url,
+            title: lot.title,
+            platform: "bonhams",
+            auction_end_date: lot.ends ?? "",
+            current_bid: lot.hammer,
+            bid_count: null,
+            currency: lot.currency,
+            no_reserve: false,
+            reserve_met: null,
+            year: ident.year,
+            make: ident.make,
+            model: ident.model,
+            thumbnail_url: null,
+            external_id: lot.external_id,
+            raw_data: { source: "bonhams_typesense_lots", sale_id: sale.id, sale_title: sale.auctionTitle ?? null, status: lot.status,
+                        estimate_low: lot.estimate_low, estimate_high: lot.estimate_high, synced_at: new Date().toISOString() },
+          });
+        }
+        if ((r.hits ?? []).length < 250) break;
+      }
+    }
+    console.log(`[sync-live-auctions] Bonhams: ${sales.length} open Cars sales, ${auctions.length} lots`);
+    return { auctions, error: null };
+  } catch (e: unknown) {
+    return { auctions: [], error: `Bonhams sync failed: ${e instanceof Error ? e.message : String(e)}` };
+  }
 }
+
+/** The houses whose open board is read complete and scheduled by live_auction_board_sync (slug per platform). */
+const BOARD_SOURCES: Record<string, string> = { "collecting-cars": "collecting-cars", pcarmarket: "pcarmarket", bonhams: "bonhams" };
 
 // ============================================
 // Cars & Bids Sync (Firecrawl)
@@ -611,8 +779,8 @@ async function syncToDatabase(
   supabase: ReturnType<typeof createClient>,
   auctions: LiveAuction[],
   platform: string
-): Promise<{ new_count: number; updated_count: number; ended_count: number }> {
-  const stats = { new_count: 0, updated_count: 0, ended_count: 0 };
+): Promise<{ new_count: number; updated_count: number; ended_count: number; write_errors: string[] }> {
+  const stats = { new_count: 0, updated_count: 0, ended_count: 0, write_errors: [] as string[] };
 
   if (auctions.length === 0) {
     return stats;
@@ -624,7 +792,17 @@ async function syncToDatabase(
 
   console.log(`[sync-live-auctions] ${platform}: Upserting ${auctions.length} auctions to vehicles table`);
 
-  const upsertRows = auctions.map(auction => ({
+  // No auction we sync runs longer than 14 days (BaT 7, Collecting Cars 7–14, Cars & Bids 7): a later end date
+  // is a feed or parse fault, not a live lot, and must not become an auction_live placeholder nothing ever ends
+  // (a Collecting Cars row read 2027-02-25 for six months, 2026-09-27). Such lots are skipped and named, not capped.
+  const horizon = Date.now() + 14 * 86_400_000;
+  const impossible = auctions.filter(a => { const t = Date.parse(a.auction_end_date); return !Number.isFinite(t) || t > horizon; });
+  if (impossible.length > 0) {
+    console.warn(`[sync-live-auctions] ${platform}: ${impossible.length} lots skipped, auction_end_date unparseable or more than 14 days out: ${impossible.slice(0, 3).map(a => `${a.url} ${a.auction_end_date}`).join(", ")}`);
+  }
+  const writable = impossible.length > 0 ? auctions.filter(a => !impossible.includes(a)) : auctions;
+
+  const upsertRows = writable.map(auction => ({
       listing_url: auction.url,
       title: auction.title,
       year: auction.year,
@@ -642,6 +820,7 @@ async function syncToDatabase(
         no_reserve: auction.no_reserve,
         reserve_met: auction.reserve_met,
         bid_count: auction.bid_count,
+        currency: auction.currency ?? null,
         thumbnail_url: auction.thumbnail_url,
         last_sync: now,
         ...auction.raw_data,
@@ -649,177 +828,66 @@ async function syncToDatabase(
       updated_at: now,
     }));
 
-    // Upsert in chunks of 100 — ON CONFLICT updates auction-critical fields only
-    const UPSERT_BATCH = 100;
+    // Upsert via RPC in chunks of 500. supabase-js .upsert({onConflict:'listing_url'})
+    // CANNOT be used here: the unique index on vehicles.listing_url is PARTIAL
+    // (WHERE deleted_at IS NULL AND listing_url<>''), which a bare ON CONFLICT
+    // (listing_url) can't match — it silently errored and dropped every live auction.
+    // upsert_live_auction_vehicles() runs the ON CONFLICT ... WHERE <predicate> that
+    // matches the partial index, and marks new live auctions is_public for the floor.
+    const UPSERT_BATCH = 100; // 500 hit the 60 s statement limit under the vehicles trigger chain (2026-09-27)
     for (let i = 0; i < upsertRows.length; i += UPSERT_BATCH) {
       const chunk = upsertRows.slice(i, i + UPSERT_BATCH);
-      const { error, data } = await supabase
-        .from("vehicles")
-        .upsert(chunk, {
-          onConflict: "listing_url",
-          ignoreDuplicates: false,
-        })
-        .select("id");
-
+      const { data, error } = await supabase.rpc("upsert_live_auction_vehicles", {
+        p_rows: chunk,
+      });
       if (!error) {
-        stats.new_count += data?.length ?? chunk.length;
+        stats.new_count += typeof data === "number" ? data : chunk.length;
       } else {
-        // If upsert fails (e.g., no unique constraint on listing_url), fall back to insert-only
-        console.warn(`[sync-live-auctions] Upsert error: ${error.message}, trying insert with ignore`);
-        const { error: insErr, data: insData } = await supabase
-          .from("vehicles")
-          .upsert(chunk, {
-            onConflict: "listing_url",
-            ignoreDuplicates: true,
-          })
-          .select("id");
-        if (!insErr) {
-          stats.new_count += insData?.length ?? 0;
-        } else {
-          console.error(`[sync-live-auctions] Insert fallback also failed: ${insErr.message}`);
-        }
+        console.error(`[sync-live-auctions] upsert_live_auction_vehicles failed: ${error.message}`);
+        stats.write_errors.push(`upsert_live_auction_vehicles: ${error.message}`);
       }
     }
 
-  // Ensure vehicle_events rows exist for all live auctions (needed for bid snapshots + comments)
-  // Uses upsert on (vehicle_id, source_platform, source_url) to avoid duplicates
-  try {
-    const eventRows = auctions
-      .filter(a => a.url)
-      .map(a => ({
-        source_platform: platform === "bringatrailer" ? "bat" : platform,
-        source_url: a.url,
-        event_type: "auction",
-        event_status: "active",
-        current_price: a.current_bid ? String(a.current_bid) : null,
-        bid_count: a.bid_count,
-        ended_at: a.auction_end_date,
-        updated_at: now,
-      }));
+    // No mirror into vehicle_listings (removed 2026-09-27; homepage owner's decision, approved by Skylar):
+    // vehicle_listings is Nuke's native-listing table — its readers (CreateAuctionListing, AuctionListing,
+    // AuctionMarketplace, myAuctionsService, OrganizationProfile, LiveAuctionBanner) treat rows as Nuke's own
+    // auctions, so mirrored BaT lots would read as Nuke auctions. The mirror had written nothing since 2026-07-12
+    // (search_path failures, then 60 s timeouts) and cost ~2 min of DB time per run. Live BaT state lives on
+    // vehicles (sale_status 'auction_live', high_bid), which market_pulse_live() and the vehicle page read.
 
-    // Match against vehicles to get vehicle_ids
-    const urls = auctions.map(a => a.url).filter(Boolean);
-    const { data: vehRows } = await supabase
-      .from("vehicles")
-      .select("id, listing_url")
-      .in("listing_url", urls.slice(0, 200));
+  // vehicle_events rows for live lots were ensured inside upsert_live_auction_listings(), whose call is gone (see
+  // above; it had failed since 2026-07-12, so nothing that worked changes). The old supabase-js upsert here used a bare
+  // ON CONFLICT (vehicle_id,source_platform,source_url) which can NEVER match the
+  // PARTIAL unique index idx_vehicle_events_dedup_url (WHERE source_url IS NOT NULL
+  // AND source_listing_id IS NULL) — it errored on every run. Removed 2026-07-11.
 
-    const urlToVehicle = new Map((vehRows ?? []).map(v => [v.listing_url, v.id]));
-
-    const eventsToInsert = eventRows
-      .filter(e => urlToVehicle.has(e.source_url))
-      .map(e => ({ ...e, vehicle_id: urlToVehicle.get(e.source_url) }));
-
-    if (eventsToInsert.length > 0) {
-      // Batch upsert — only insert if no existing active event for this vehicle+platform
-      for (let i = 0; i < eventsToInsert.length; i += 100) {
-        await supabase.from("vehicle_events").upsert(
-          eventsToInsert.slice(i, i + 100),
-          { onConflict: "vehicle_id,source_platform,source_url", ignoreDuplicates: true }
-        );
-      }
+  // A lot that left the live list is no longer live (2026-09-27). BaT's /auctions/ page and Collecting
+  // Cars' feed are the complete live sets, so a row of this platform that is absent from them ends
+  // here — sale_status/auction_status 'ended', no sale claim; settlement records the result. The RPC
+  // ends nothing for a short (partial) list. Homepage-scraped platforms are not complete lists.
+  if (platform === "bringatrailer" || platform === "collecting-cars" || platform === "pcarmarket") {
+    const { data: ended, error: endErr } = await supabase.rpc("end_live_auctions_absent", {
+      p_platform: platform,
+      p_live_urls: auctions.map(a => a.url),
+    });
+    if (endErr) {
+      console.error(`[sync-live-auctions] end_live_auctions_absent failed: ${endErr.message}`);
+      stats.write_errors.push(`end_live_auctions_absent: ${endErr.message}`);
     }
-    console.log(`[sync-live-auctions] Ensured ${eventsToInsert.length} vehicle_events for ${platform}`);
-  } catch (e) {
-    console.error("[sync-live-auctions] vehicle_events creation error (non-fatal):", e);
+    else {
+      stats.ended_count = Number(ended) || 0;
+      if (stats.ended_count > 0) console.log(`[sync-live-auctions] ${platform}: ${stats.ended_count} live rows ended (absent from the live list)`);
+    }
   }
 
   return stats;
 }
 
-// ============================================
-// Bid Snapshot Recording (for backtesting)
-// ============================================
-
-/**
- * Records current bid snapshots for BaT auctions into bat_bids.
- * This provides the bid history needed for backtesting at all time windows.
- * Runs every 15 minutes when sync-live-auctions cron fires.
- */
-async function recordBidSnapshots(
-  supabase: ReturnType<typeof createClient>,
-  auctions: LiveAuction[]
-): Promise<number> {
-  // Only record bids for BaT auctions that have a current_bid
-  const biddable = auctions.filter(a => a.current_bid && a.current_bid > 0);
-  console.log(`[bid-debug] biddable: ${biddable.length}/${auctions.length} auctions have current_bid > 0`);
-  if (biddable.length === 0) return 0;
-
-  // Build URL-to-auction map
-  const auctionByUrl = new Map<string, LiveAuction>();
-  for (const a of biddable) auctionByUrl.set(a.url, a);
-  if (biddable.length > 0) {
-    console.log(`[bid-debug] sample auction URL: ${biddable[0].url} bid: ${biddable[0].current_bid}`);
-  }
-
-  // Query ALL active BaT vehicle_events (including id for direct use as bat_listing_id)
-  const { data: extListings, error: veErr } = await supabase
-    .from("vehicle_events")
-    .select("id, vehicle_id, source_url")
-    .eq("source_platform", "bat")
-    .eq("event_status", "active")
-    .limit(10000);
-
-  console.log(`[bid-debug] vehicle_events query: ${extListings?.length ?? 0} rows, error: ${veErr?.message ?? 'none'}`);
-  if (!extListings || extListings.length === 0) return 0;
-
-  if (extListings.length > 0) {
-    console.log(`[bid-debug] sample vehicle_event URL: ${extListings[0].source_url}`);
-  }
-
-  // Filter to only those with matching sync URLs
-  const matched = extListings.filter(el => el.source_url && auctionByUrl.has(el.source_url));
-  console.log(`[bid-debug] URL matched: ${matched.length} vehicle_events match scraped auction URLs`);
-  if (matched.length === 0) {
-    // Debug: check for near-misses (trailing slash differences)
-    const sampleVE = extListings.slice(0, 3).map(e => e.source_url);
-    const sampleAuction = [...auctionByUrl.keys()].slice(0, 3);
-    console.log(`[bid-debug] NO MATCH. Sample VE URLs: ${JSON.stringify(sampleVE)}`);
-    console.log(`[bid-debug] NO MATCH. Sample auction URLs: ${JSON.stringify(sampleAuction)}`);
-    return 0;
-  }
-
-  // Build batch of bid rows directly from matched results (id already selected)
-  const now = new Date().toISOString();
-  const bidRows: Array<{
-    bat_listing_id: string;
-    vehicle_id: string;
-    bat_username: string;
-    bid_amount: number;
-    bid_timestamp: string;
-    source: string;
-    metadata: Record<string, unknown>;
-  }> = [];
-
-  for (const el of matched) {
-    const auction = auctionByUrl.get(el.source_url || "");
-    if (!auction || !auction.current_bid) continue;
-
-    bidRows.push({
-      bat_listing_id: el.id, // vehicle_events.id directly (FK dropped)
-      vehicle_id: el.vehicle_id,
-      bat_username: "bid_snapshot",
-      bid_amount: auction.current_bid,
-      bid_timestamp: now,
-      source: "bid_history",
-      metadata: { source: "sync_live_auctions" },
-    });
-  }
-
-  if (bidRows.length === 0) return 0;
-
-  // Bulk insert — duplicates impossible since timestamp is unique per run
-  const { error } = await supabase.from("bat_bids").insert(bidRows);
-
-  if (error) {
-    console.error("[sync-live-auctions] Error recording bid snapshots:", JSON.stringify(error));
-    console.error(`[sync-live-auctions] Attempted to insert ${bidRows.length} rows. Sample:`, JSON.stringify(bidRows[0]));
-    return 0;
-  }
-
-  console.log(`[sync-live-auctions] Recorded ${bidRows.length} bid snapshots for BaT auctions`);
-  return bidRows.length;
-}
+// Bid snapshots (retired 2026-09-29). recordBidSnapshots matched the live list against vehicle_events rows with
+// event_status 'active', which live lots no longer get (upsert_live_auction_listings' call is gone, see above), so it
+// wrote 0 rows on every run since 2026-07-22 (86 of 86 runs on 2026-09-29) while reading up to 10,000 stale rows per
+// run. A lot's bid history comes from its comment thread: extract-bat-core writes every bid with its timestamp
+// (bat-data coverage audit, docs/ledger/2026-09-30_bat-data-coverage-audit.md).
 
 /**
  * Updates vehicle_events with fresh bid data from the BaT sync.
@@ -898,10 +966,10 @@ async function updateSourceRegistry(
     updateData.last_successful_at = new Date().toISOString();
   }
 
-  await supabase
+  mustWrite('source_registry update', await supabase
     .from("source_registry")
     .update(updateData)
-    .eq("slug", slug);
+    .eq("slug", slug));
 }
 
 // ============================================
@@ -916,13 +984,17 @@ function okJson(body: unknown, status = 200): Response {
 }
 
 Deno.serve(async (req) => {
+  // Writes are never anonymous: service key, signed-in user, or nothing (P0.2, 2026-09-27).
+  const denied = await requireWriteAuth(req);
+  if (denied) return denied;
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
 
   const supabase = createClient(
     Deno.env.get("SUPABASE_URL") ?? "",
-    Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? ""
+    projectSecretKey() ?? "",
+    { global: { headers: { "X-Nuke-Writer": "sync-live-auctions" } } },
   );
 
   try {
@@ -995,7 +1067,9 @@ Deno.serve(async (req) => {
         "gooding",
         "bonhams",
       ];
-      const platforms = targetPlatform ? [targetPlatform] : allPlatforms;
+      const platforms: string[] = Array.isArray(body.platforms) && body.platforms.length
+        ? body.platforms.map(String)
+        : targetPlatform ? [targetPlatform] : allPlatforms;
 
       const platformAliases: Record<string, string> = {
         bat: "bringatrailer",
@@ -1071,15 +1145,9 @@ Deno.serve(async (req) => {
 
         const normalizedPlatform = platformAliases[platform] || platform;
 
-        // Record bid snapshots + update vehicle_events FIRST (fast, critical for predictions)
-        let bidSnapshotCount = 0;
+        // Refresh the live lots' event rows first (fast, read by predictions). Bid snapshots are retired (see above).
+        const bidSnapshotCount = 0;
         if (normalizedPlatform === "bringatrailer" && !syncResult.error && syncResult.auctions.length > 0) {
-          try {
-            bidSnapshotCount = await recordBidSnapshots(supabase, syncResult.auctions);
-            console.log(`[sync-live-auctions] Recorded ${bidSnapshotCount} BaT bid snapshots`);
-          } catch (e) {
-            console.error("[sync-live-auctions] Bid snapshot error (non-fatal):", e);
-          }
           try {
             const veUpdated = await updateVehicleEvents(supabase, syncResult.auctions);
             console.log(`[sync-live-auctions] Updated ${veUpdated} vehicle_events rows`);
@@ -1092,7 +1160,7 @@ Deno.serve(async (req) => {
         if (normalizedPlatform === "bringatrailer" && !syncResult.error && syncResult.auctions.length > 0) {
           try {
             const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? "";
-            const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
+            const serviceKey = projectSecretKey() ?? "";
             const endingSoon = syncResult.auctions.filter(a => {
               const hoursLeft = (new Date(a.auction_end_date).getTime() - Date.now()) / (1000 * 60 * 60);
               return hoursLeft > 0 && hoursLeft <= 6 && a.current_bid && a.current_bid > 0;
@@ -1114,18 +1182,47 @@ Deno.serve(async (req) => {
         }
 
         // Sync to database (skip during cron to avoid timeout — 355k+ active vehicles make this slow)
-        let dbStats = { new_count: 0, updated_count: 0, ended_count: 0 };
+        let dbStats = { new_count: 0, updated_count: 0, ended_count: 0, write_errors: [] as string[] };
         if (!skipVehicleSync && !syncResult.error) {
           dbStats = await syncToDatabase(supabase, syncResult.auctions, normalizedPlatform);
+        }
+
+        // Board-synced houses: the same complete board goes to the monitored_auctions schedule writer; lots whose bid
+        // count moved have their bids read with their own clocks where the house publishes them (PCarMarket).
+        let board: Record<string, unknown> | null = null;
+        const boardSlug = BOARD_SOURCES[normalizedPlatform];
+        if (boardSlug) {
+          const { data: bs, error: bsErr } = await supabase.rpc("live_auction_board_sync", syncResult.error
+            ? { p_slug: boardSlug, p_lots: [], p_complete: false, p_error: syncResult.error }
+            : {
+              p_slug: boardSlug,
+              p_lots: syncResult.auctions.map((a) => ({
+                url: a.url, external_id: a.external_id, ends: a.auction_end_date || null,
+                current_bid: a.current_bid, bid_count: a.bid_count, currency: a.currency ?? null,
+              })),
+              p_complete: true,
+            });
+          if (bsErr) dbStats.write_errors.push(`live_auction_board_sync: ${bsErr.message}`);
+          board = (bs as Record<string, unknown>) ?? null;
+          const moved = Array.isArray(board?.moved) ? board!.moved as { url: string; vehicle_id: string | null }[] : [];
+          if (normalizedPlatform === "pcarmarket" && moved.length && Date.now() - functionStartTime < 30_000) {
+            const bids = await ingestPcarBids(supabase, moved, 8);
+            board = { ...board, moved: moved.length, bid_reads: bids };
+            if (bids.errors.length) console.warn(`[sync-live-auctions] PCarMarket bid reads: ${bids.errors.slice(0, 3).join("; ")}`);
+          } else if (board) {
+            board = { ...board, moved: moved.length };
+          }
         }
 
         // Update source registry
         await updateSourceRegistry(supabase, normalizedPlatform, !syncResult.error);
 
         results.push({
+          board,
           platform: normalizedPlatform,
-          success: !syncResult.error,
+          success: !syncResult.error && dbStats.write_errors.length === 0,
           live_count: syncResult.auctions.length,
+          write_errors: dbStats.write_errors,
           new_count: dbStats.new_count,
           updated_count: dbStats.updated_count,
           ended_count: dbStats.ended_count,
@@ -1141,6 +1238,7 @@ Deno.serve(async (req) => {
           .from("vehicles")
           .update({ auction_status: "ended", sale_status: "not_sold" })
           .eq("auction_status", "active")
+          .neq("platform_source", "bringatrailer") // BaT soft-close clocks require a native terminal record.
           .lt("auction_end_date", new Date().toISOString())
           .not("auction_end_date", "is", null)
           .select("id", { count: "exact", head: true });
@@ -1157,6 +1255,7 @@ Deno.serve(async (req) => {
       const totalUpdated = results.reduce((sum, r) => sum + r.updated_count, 0);
       const totalEnded = results.reduce((sum, r) => sum + r.ended_count, 0);
       const allSuccess = results.every(r => r.success);
+      const writeFailed = results.some(r => (r.write_errors?.length ?? 0) > 0);
 
       return okJson({
         success: allSuccess,
@@ -1168,7 +1267,7 @@ Deno.serve(async (req) => {
         },
         results,
         synced_at: new Date().toISOString(),
-      });
+      }, writeFailed ? 500 : 200);
     }
 
     return okJson({ error: "Invalid action. Use 'sync' or 'status'." }, 400);

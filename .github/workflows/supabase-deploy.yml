@@ -27,14 +27,18 @@ on:
       - 'supabase/functions/**'
   workflow_dispatch:
     inputs:
-      migrations_since:
-        description: 'Apply migrations with filename >= this prefix (blank = none)'
+      migration_file:
+        description: 'One tracked migration filename, overriding migrations_since (blank = use prefix)'
         required: false
-        default: '20260609'
+        default: ''
+      migrations_since:
+        description: 'Apply migrations with filename >= this prefix (blank = none). Default is blank on purpose: a dated default replayed every migration since June on a blank dispatch (2026-10-15 06:37Z).'
+        required: false
+        default: ''
       functions:
         description: 'Comma-separated edge functions to deploy (blank = none)'
         required: false
-        default: 'universal-search,photo-pipeline-orchestrator'
+        default: ''
 
 concurrency:
   group: supabase-deploy
@@ -43,7 +47,7 @@ concurrency:
 jobs:
   deploy:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 60
 
     steps:
       - name: Checkout (with previous commit for diff)
@@ -71,10 +75,14 @@ jobs:
 
       - name: Determine migrations + functions to deploy
         id: plan
+        env:
+          REQUESTED_MIGRATION_FILE: ${{ github.event.inputs.migration_file }}
         run: |
           if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
             SINCE="${{ github.event.inputs.migrations_since }}"
-            if [ -n "$SINCE" ]; then
+            if [ -n "$REQUESTED_MIGRATION_FILE" ]; then
+              bash scripts/ci/select-dispatch-migration.sh "$REQUESTED_MIGRATION_FILE" > /tmp/migrations.txt
+            elif [ -n "$SINCE" ]; then
               ls supabase/migrations/ | awk -v s="$SINCE" '$0 >= s' | sed 's|^|supabase/migrations/|' > /tmp/migrations.txt
             else
               : > /tmp/migrations.txt
@@ -156,18 +164,159 @@ jobs:
           done
           echo "✅ migrations applied"
 
+      - name: Every writing function refuses anonymous callers
+        # A function that writes to the database must call requireWriteAuth
+        # (supabase/functions/_shared/writeGuard.ts) or be allowlisted there with
+        # its own auth. Fails the deploy otherwise — see the script for the rules.
+        run: node scripts/guardrails/check-write-guard.mjs
+
       - name: Deploy edge functions
         env:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
         run: |
           if [ ! -s /tmp/functions.txt ]; then echo "no functions to deploy"; exit 0; fi
           npx -y supabase@latest --version
+          FNS=""
           while read -r fn; do
             [ -d "supabase/functions/$fn" ] || { echo "skip (no dir): $fn"; continue; }
-            echo "═══ deploying $fn"
-            npx -y supabase@latest functions deploy "$fn" --project-ref qkgaybvrernstplzjaam --no-verify-jwt
+            FNS="$FNS $fn"
           done < /tmp/functions.txt
+          [ -n "$FNS" ] || { echo "nothing to deploy"; exit 0; }
+          echo "═══ deploying:$FNS"
+          # One CLI call for the whole list: a per-function loop paid the CLI start-up and
+          # bundler image pull for every function and could not finish a wide change (the
+          # 155-function write-guard commit, 2026-09-27) inside the job timeout.
+          # --no-verify-jwt is deliberate (2026-09-27): the gateway check cannot tell the
+          # public anon JWT from a real caller and would break Stripe/API-key/webhook
+          # callers that carry no JWT at all. Caller identity is judged inside each
+          # function by _shared/writeGuard.ts (signature-verified), enforced by the
+          # guardrail step above.
+          # No --jobs: the CLI accepts it only with --use-api (server-side bundling), and every deploy so far
+          # bundled locally — keep the bundler that is known to work (run 36331008968 died on the flag).
+          npx -y supabase@latest functions deploy $FNS --project-ref qkgaybvrernstplzjaam --no-verify-jwt
           echo "✅ functions deployed"
+
+      - name: Activate installed retained VIN intake
+        env:
+          SUPABASE_DB_URL: ${{ steps.db.outputs.url }}
+          PGOPTIONS: -c statement_timeout=10s -c lock_timeout=1s
+        run: |
+          # Initial intake needs both owners; the batch increase needs its
+          # matching worker. These migrations pause the job until the exact
+          # changed owners deploy successfully. Partial rollouts stay paused.
+          if grep -Fxq 'supabase/migrations/20261008023725_retained_vin_reference_intake.sql' /tmp/migrations.txt; then
+            if ! grep -Fxq 'batch-vin-decode' /tmp/functions.txt || ! grep -Fxq 'ingest-observation' /tmp/functions.txt; then
+              echo 'Retained VIN intake remains paused: both edge owners must deploy.'
+              exit 1
+            fi
+          elif grep -Fxq 'supabase/migrations/20261008064630_tune_canonical_vin_bulk_throughput.sql' /tmp/migrations.txt; then
+            if ! grep -Fxq 'batch-vin-decode' /tmp/functions.txt || ! grep -Fxq 'ingest-observation' /tmp/functions.txt; then
+              echo 'Retained VIN intake remains paused: both120-record edge owners must deploy.'
+              exit 1
+            fi
+          elif grep -Fxq 'supabase/migrations/20261008054943_stage_canonical_vin_batch_transport.sql' /tmp/migrations.txt; then
+            if ! grep -Fxq 'batch-vin-decode' /tmp/functions.txt || ! grep -Fxq 'ingest-observation' /tmp/functions.txt; then
+              echo 'Retained VIN intake remains paused: canonical batch and worker must deploy.'
+              exit 1
+            fi
+          elif grep -Fxq 'supabase/migrations/20261008051404_tune_retained_vin_batch_throughput.sql' /tmp/migrations.txt; then
+            if ! grep -Fxq 'batch-vin-decode' /tmp/functions.txt; then
+              echo 'Retained VIN intake remains paused: matching batch worker must deploy.'
+              exit 1
+            fi
+          else
+            exit 0
+          fi
+          if [ -z "$SUPABASE_DB_URL" ]; then
+            echo 'Retained VIN intake remains paused: deployment DB unavailable.'
+            exit 1
+          fi
+          psql "$SUPABASE_DB_URL" -X -v ON_ERROR_STOP=1 -c 'SELECT public.activate_retained_vin_reference_intake();'
+
+      - name: Activate installed retained listing property intake
+        env:
+          SUPABASE_DB_URL: ${{ steps.db.outputs.url }}
+          PGOPTIONS: -c statement_timeout=10s -c lock_timeout=1s
+        run: |
+          if ! grep -Fxq 'supabase/migrations/20261008071324_retained_listing_property_intake.sql' /tmp/migrations.txt &&
+             ! grep -Fxq 'supabase/migrations/20261008104856_raise_retained_listing_batch_ceiling.sql' /tmp/migrations.txt &&
+             ! grep -Fxq 'supabase/migrations/20261010164331_expand_retained_listing_property_replay.sql' /tmp/migrations.txt &&
+             ! grep -Fxq 'supabase/migrations/20261010175046_retained_description_powertrain_projection.sql' /tmp/migrations.txt &&
+             ! grep -Fxq 'supabase/migrations/20261010182050_retained_odometer_description_projection.sql' /tmp/migrations.txt &&
+             ! grep -Fxq 'supabase/migrations/20261010223542_retained_listing_model_fields_projection.sql' /tmp/migrations.txt &&
+             ! grep -Fxq 'supabase/migrations/20261011002640_retained_listing_vin_label_projection.sql' /tmp/migrations.txt &&
+             ! grep -Fxq 'supabase/migrations/20261011021057_retained_craigslist_odometer_projection.sql' /tmp/migrations.txt &&
+             ! grep -Fxq 'supabase/migrations/20261011040007_retained_craigslist_year_projection.sql' /tmp/migrations.txt &&
+             ! grep -Fxq 'supabase/migrations/20261011050753_retained_native_description_year_projection.sql' /tmp/migrations.txt && \
+             ! grep -Fxq 'supabase/migrations/20261012013813_bulk_retained_native_identity_projection.sql' /tmp/migrations.txt; then
+            exit 0
+          fi
+          if ! grep -Fxq 'ingest-observation' /tmp/functions.txt || [ -z "$SUPABASE_DB_URL" ]; then
+            echo 'Retained listing intake remains paused: canonical owner or database unavailable.'
+            exit 1
+          fi
+          psql "$SUPABASE_DB_URL" -X -v ON_ERROR_STOP=1 -c 'SELECT public.activate_retained_listing_property_intake();'
+
+      - name: Activate installed direct protected sale drain
+        env:
+          SUPABASE_DB_URL: ${{ steps.db.outputs.url }}
+          PGOPTIONS: -c statement_timeout=10s -c lock_timeout=1s
+        run: |
+          if ! grep -Fxq 'supabase/migrations/20261008111928_stage_direct_bat_sale_queue_drain.sql' /tmp/migrations.txt &&
+             ! grep -Fxq 'supabase/migrations/20261008133638_tune_retained_sale_parallel_throughput.sql' /tmp/migrations.txt; then
+            exit 0
+          fi
+          if ! grep -Fxq 'ingest-observation' /tmp/functions.txt ||
+             ! grep -Fxq 'batch-extract-snapshots' /tmp/functions.txt || [ -z "$SUPABASE_DB_URL" ]; then
+            echo 'Protected sale intake remains paused: both existing owners or database unavailable.'
+            exit 1
+          fi
+          # Deployment-owner SQL only; no new API-role activation or raw writes.
+          psql "$SUPABASE_DB_URL" -X -v ON_ERROR_STOP=1 <<'SQL'
+          DO $activate$
+          DECLARE j bigint;cmd_hash text;claim_hash text;rate integer;
+          BEGIN
+            SELECT jobid,encode(sha256(convert_to(command,'UTF8')),'base64') INTO j,cmd_hash
+              FROM cron.job WHERE jobname='qualify-bat-archived-sales'
+              AND schedule='* * * * *'
+              AND encode(sha256(convert_to(command,'UTF8')),'base64') IN
+                ('C+rU5RmwHhyj8yqdJqMgDrj7EohcbKHP3aM4um8dlpA=','AWFMWVBSwPlq8ZF2/FpDJNe4z/bmRc5IHjyW5qha2XY=');
+            rate:=CASE WHEN cmd_hash='C+rU5RmwHhyj8yqdJqMgDrj7EohcbKHP3aM4um8dlpA=' THEN 2400 ELSE 7200 END;
+            claim_hash:=CASE WHEN rate=2400 THEN 'GA2BidAHRpM+bbXoaSgEninREgjbRoE39lsfs7VHEu4='
+              ELSE 'xXb1hN6EnQDCcuDEtG+SZJ0nwwYuI6Tfu4u3ocNdsPE=' END;
+            IF j IS NULL OR NOT EXISTS(SELECT 1 FROM public.observation_extractors e
+              JOIN public.observation_sources s ON s.id=e.source_id WHERE s.slug='bat'
+              AND e.slug='bat-archived-sale-v1' AND e.is_active AND e.extractor_type='edge_function'
+              AND e.edge_function_name='ingest-observation' AND e.schedule_type='cron'
+              AND e.rate_limit_per_hour=rate AND e.min_interval_seconds=60
+              AND e.extractor_config='{"mode":"source_sale_qualification","use_source_queue":true,"qualification_version":"v1","model_calls":0}'::jsonb
+              AND e.produces_kinds=ARRAY['sale_result']::public.observation_kind[]) OR
+              encode(sha256(convert_to(pg_get_functiondef('public.claim_bat_sale_snapshots(text,integer)'::regprocedure),'UTF8')),'base64')
+                IS DISTINCT FROM claim_hash THEN
+              RAISE EXCEPTION 'Protected sale activation contract changed; keep paused';
+            END IF;
+            PERFORM cron.alter_job(job_id:=j,active:=true);
+          END $activate$;
+          SQL
+
+      - name: Every source holding data declares its species with evidence
+        # observation_sources.species, refused without evidence (20261019050000_source_species.sql). Runs last so a gap
+        # never holds back a function deploy; it turns the run red until the source is labelled by a migration.
+        if: steps.db.outputs.url != ''
+        env:
+          SUPABASE_DB_URL: ${{ steps.db.outputs.url }}
+          PGOPTIONS: -c statement_timeout=30s
+        run: |
+          if [ "$(psql "$SUPABASE_DB_URL" -X -qAt -c "SELECT to_regprocedure('public.source_species_gaps()') IS NOT NULL")" != t ]; then
+            echo "source_species_gaps() not installed yet"; exit 0
+          fi
+          gaps="$(psql "$SUPABASE_DB_URL" -X -v ON_ERROR_STOP=1 -qAt -F ' | ' -c 'SELECT slug, category, holds FROM public.source_species_gaps()')"
+          if [ -n "$gaps" ]; then
+            echo "::error title=Source without species::these sources hold data but carry no species with evidence (see .claude/rules/extraction.md, Source species):"
+            echo "$gaps"
+            exit 1
+          fi
+          echo "every source holding data carries a species with evidence"
 
       - name: Summary
         if: always()

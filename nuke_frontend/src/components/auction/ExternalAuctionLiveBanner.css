@@ -1,0 +1,15 @@
+/* Each count owns one compact door into its evidence. */
+.external-auction-stack__metrics { display: flex; gap: 0; flex-wrap: wrap; position: relative; }
+.external-auction-stack__metric { min-width: 76px; flex: 1; display: grid; gap: 3px; text-align: left; padding: 6px 12px 6px 0; margin-right: 12px; border: 0; border-right: 1px solid var(--border); background: transparent; color: var(--text); cursor: pointer; }
+.external-auction-stack__metric > span { font: 9px Arial, sans-serif; text-transform: uppercase; color: var(--text-secondary); }
+.external-auction-stack__metric > strong { font: bold 18px 'Courier New', monospace; }
+.external-auction-stack__metric > small { font: 11px 'Courier New', monospace; }
+.external-auction-stack__metric > i { height: 3px; background: var(--border); position: relative; }
+.external-auction-stack__metric > i::after { content: ''; position: absolute; left: clamp(0%, var(--rank), 98%); top: -2px; width: 2px; height: 7px; background: var(--text); }
+.external-auction-stack__metric:focus-visible { outline: 2px solid var(--text); outline-offset: 2px; }
+.external-auction-stack__metric[aria-expanded='true'] { border-bottom: 2px solid var(--text); }
+.external-auction-stack__clock { margin-top: 8px; font: 10px Arial, sans-serif; color: var(--text-secondary); }
+.external-auction-stack__evidence { font: 11px Arial, sans-serif; line-height: 1.4; }
+.external-auction-stack__evidence p { margin: 0 0 8px; }
+.external-auction-stack__evidence summary { cursor: pointer; font-weight: bold; }
+.external-auction-stack__evidence a { display: inline-block; margin-top: 10px; }

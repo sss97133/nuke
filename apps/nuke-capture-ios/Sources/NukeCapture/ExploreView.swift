@@ -63,12 +63,21 @@ struct MarketMake: Decodable, Identifiable {
 }
 
 struct ExploreView: View {
-    @State private var query = ""
+    @State private var query: String = {
+        #if DEBUG
+        // Screenshot loop: NUKE_DEBUG_EXPLORE_QUERY="k5 blazer" lands on the search
+        // results deterministically (same NUKE_DEBUG_* convention; DEBUG only).
+        if let q = ProcessInfo.processInfo.environment["NUKE_DEBUG_EXPLORE_QUERY"], !q.isEmpty { return q }
+        #endif
+        return ""
+    }()
     @State private var metros: [MarketMetro] = []
     @State private var results: [VehicleHeaderRow] = []
     @State private var loadingFeed = false
     @State private var feedError = false
     @State private var searchError = false   // a failed search ≠ "no matches"
+    @State private var feedFailureText: String?
+    @State private var searchFailureText: String?
     @State private var searched = false
     @State private var feedRetried = false   // cold-launch first call self-heals once
     // The Worklight: report the stage, never a blank spinner; a stall reads as an
@@ -81,10 +90,15 @@ struct ExploreView: View {
         // Screenshot loop: NUKE_DEBUG_EXPLORE_MODE=pulse roots straight on the treemap
         // (matches the NUKE_DEBUG_* deep-link pattern; DEBUG only, never ships).
         if ProcessInfo.processInfo.environment["NUKE_DEBUG_EXPLORE_MODE"] == "pulse" { return .treemap }
+        if ProcessInfo.processInfo.environment["NUKE_DEBUG_EXPLORE_MODE"] == "live" { return .live }
+        if ProcessInfo.processInfo.environment["NUKE_DEBUG_EXPLORE_MODE"] == "listings" { return .listings }
+        if ProcessInfo.processInfo.environment["NUKE_DEBUG_EXPLORE_MODE"] == "map" { return .map }
         #endif
-        return .map
+        // Land where the web Market tab lands: the open board, the one population with a
+        // recorded clock (market_pulse_live). Map, Pulse and Listings stay one tap away.
+        return .live
     }()
-    enum LandingMode: Hashable { case metros, treemap, map }
+    enum LandingMode: Hashable { case metros, treemap, map, live, listings }
 
     // 3-column square grid, 2pt gutters — the SEARCH-results photo grid.
     private let columns = Array(repeating: GridItem(.flexible(), spacing: 2), count: 3)
@@ -92,7 +106,12 @@ struct ExploreView: View {
     /// Search is active once the user types ≥2 chars: the landing (market pulse)
     /// gives way to the search-into-individuals grid + cohort.
     private var isSearching: Bool {
-        query.trimmingCharacters(in: .whitespaces).count >= 2
+        let term = query.trimmingCharacters(in: .whitespaces)
+        // Keep ZIP entry on the map, including intermediate digits while typing.
+        // Vehicle searches still use the established result/cohort destinations.
+        if landingMode == .map && !term.isEmpty && term.count <= 10 &&
+            term.allSatisfy({ ($0 >= "0" && $0 <= "9") || $0 == "-" }) { return false }
+        return term.count >= 2
     }
 
     /// The cohort the query resolves to. FIRST the strict explicit parse (a leading
@@ -174,7 +193,7 @@ struct ExploreView: View {
             // and the Map/Pulse toggle is the real header. (Restored while searching so
             // the search field keeps its chrome.)
             .toolbar(isSearching ? .visible : .hidden, for: .navigationBar)
-            .searchable(text: $query, prompt: "Year, make, or model")
+            .searchable(text: $query, prompt: landingMode == .map ? "ZIP, or vehicle" : "Year, make, or model")
             .navigationDestination(for: VehicleHeaderRow.self) { v in
                 // PUSH (back chevron) — kills the Done-only dead-end.
                 VehicleDetailView(vehicleId: v.id.uuidString.lowercased(),
@@ -205,10 +224,10 @@ struct ExploreView: View {
                                   injectedNodes: page.nodes,
                                   injectedTitle: page.title)
             }
-            .task { await loadMetros() }
+            .task(id: landingMode) { if landingMode == .metros { await loadMetros() } }
             .task(id: query) {
                 let term = query.trimmingCharacters(in: .whitespaces)
-                guard term.count >= 2 else { results = []; searched = false; return }
+                guard isSearching else { results = []; searchMeta = nil; searched = false; return }
                 try? await Task.sleep(nanoseconds: 300_000_000)   // debounce
                 guard !Task.isCancelled else { return }
                 await search(term)
@@ -224,8 +243,12 @@ struct ExploreView: View {
             Group {
                 switch landingMode {
                 case .metros:  metroList
-                case .map:     MarketMapView()
+                case .map:     MarketMapView(query: $query)
                 case .treemap: MarketTreemapView()
+                // The open board from market_pulse_live, the reader the web Market tab stands on.
+                case .live:    LiveBoardView().padding(.top, 52)
+                // Retained classified listings, the web Market tab's captured-listings read (#994).
+                case .listings: CapturedListingsView().padding(.top, 52)
                 }
             }
             // Two lenses on one market: the Map (geography) and the Pulse (a treemap
@@ -234,6 +257,8 @@ struct ExploreView: View {
             Picker("View", selection: $landingMode) {
                 Text("Map").tag(LandingMode.map)
                 Text("Pulse").tag(LandingMode.treemap)
+                Text("Live").tag(LandingMode.live)
+                Text("Listings").tag(LandingMode.listings)
             }
             .pickerStyle(.segmented)
             .padding(.horizontal, 12).padding(.top, 4).padding(.bottom, 10)
@@ -267,9 +292,9 @@ struct ExploreView: View {
             .frame(maxWidth: .infinity, maxHeight: .infinity)
         } else if feedError && metros.isEmpty {
             ContentUnavailableView {
-                Label("Couldn't load the market", systemImage: "wifi.exclamationmark")
+                Label("Couldn't load the market", systemImage: "exclamationmark.triangle")
             } description: {
-                Text("Check your connection.")
+                Text(feedFailureText ?? "The read failed.")
             } actions: {
                 Button("Retry") { Task { await loadMetros(force: true) } }
                     .buttonStyle(.borderedProminent)
@@ -300,9 +325,9 @@ struct ExploreView: View {
     @ViewBuilder private var searchResults: some View {
         if searched && searchError && results.isEmpty {
             ContentUnavailableView {
-                Label("Couldn't search", systemImage: "wifi.exclamationmark")
+                Label("Couldn't search", systemImage: "exclamationmark.triangle")
             } description: {
-                Text("Check your connection.")
+                Text(searchFailureText ?? "The search failed.")
             } actions: {
                 Button("Retry") {
                     Task { await search(query.trimmingCharacters(in: .whitespaces)) }
@@ -325,19 +350,59 @@ struct ExploreView: View {
                 description: Text("Try a make, model, or year.")
             )
         } else {
-            ScrollView {
-                // COHORT entry leads the results — pushes CohortTerminalView.
-                if let c = cohort {
-                    NavigationLink(value: c) { cohortRow(c) }
-                        .buttonStyle(.plain)
-                    Divider()
-                }
-                LazyVGrid(columns: columns, spacing: 2) {
-                    ForEach(results) { v in
-                        NavigationLink(value: v) { cell(v) }
+            ScrollViewReader { proxy in
+                ScrollView {
+                    // COHORT entry leads the results — pushes CohortTerminalView.
+                    if let c = cohort {
+                        NavigationLink(value: c) { cohortRow(c) }
                             .buttonStyle(.plain)
+                        Divider()
+                    }
+                    // The denominator before the pictures: what this page is a window onto.
+                    if let m = searchMeta {
+                        Text(m.sentence)
+                            .font(.system(size: 9, design: .monospaced))
+                            .foregroundStyle(.tertiary)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .padding(.horizontal, 16).padding(.vertical, 6)
+                    }
+                    LazyVGrid(columns: columns, spacing: 2) {
+                        ForEach(results) { v in
+                            NavigationLink(value: v) { cell(v) }
+                                .buttonStyle(.plain)
+                        }
+                    }
+                    // The foot of the walk, as the web's search page ends it: the door's next page
+                    // when it says one exists, the refine line when the door capped the walk, and
+                    // the web's own failure sentence when a page did not come (never a silent stop;
+                    // the button stays as the retry).
+                    if let m = searchMeta {
+                        VStack(spacing: 8) {
+                            if m.nextOffset != nil {
+                                Button {
+                                    Task { await loadMoreResults() }
+                                } label: {
+                                    if loadingMore { ProgressView() } else { Text("More results") }
+                                }
+                                .buttonStyle(.bordered)
+                                .disabled(loadingMore)
+                            } else if m.limited {
+                                Text("Refine your search to see more results.")
+                                    .font(.system(size: 11, design: .monospaced))
+                                    .foregroundStyle(.secondary)
+                            }
+                            if let e = loadMoreError {
+                                Text(e)
+                                    .font(.system(size: 11, design: .monospaced))
+                                    .foregroundStyle(.secondary)
+                            }
+                        }
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 12)
+                        .id("more")
                     }
                 }
+                .onChange(of: scrollToFootTick) { _, _ in proxy.scrollTo("more", anchor: .bottom) }
             }
         }
     }
@@ -449,50 +514,115 @@ struct ExploreView: View {
                 return
             }
             feedError = true
+            feedFailureText = ReadFailure.text(error)
             NSLog("NukeCapture explore market pulse failed: %@", String(describing: error))
         }
     }
 
-    // ─── Search — tokenized: a 4-digit year token becomes an AND year.eq filter,
-    // the remaining words become an OR(make,model) text match. Order-independent.
+    // ─── Search — the web's door. universal-search owns public eligibility, the ranked
+    // full-text reader, the year and ILIKE fallbacks and VIN/URL detection; the phone
+    // asks it the same question the site does: 100 hits a page, hits without a photo kept
+    // and sorted last (useSearchPage.ts), later pages on the door's next_offset with the
+    // reader it chose on page one. The door counts no total for a text query, so none is shown.
     private func search(_ term: String) async {
-        let clean = term.replacingOccurrences(of: "*", with: "")
-            .replacingOccurrences(of: ",", with: "")
-            .replacingOccurrences(of: "(", with: "")
-            .replacingOccurrences(of: ")", with: "")
-        let tokens = clean.split(whereSeparator: { $0.isWhitespace }).map(String.init)
-        var year: Int? = nil
-        var textTokens: [String] = []
-        for tok in tokens {
-            if year == nil, tok.count == 4, let n = Int(tok), n > 1885, n < 2100 {
-                year = n
-            } else {
-                textTokens.append(tok)
-            }
-        }
-        let text = textTokens.joined(separator: " ")
         searchError = false
         do {
-            var q = SupabaseService.client
-                .from("vehicles")
-                .select("id,year,make,model,trim,primary_image_url")
-                .eq("is_public", value: true)
-                .neq("status", value: "pending")
-            if let yr = year { q = q.eq("year", value: yr) }
-            if !text.isEmpty { q = q.or("make.ilike.*\(text)*,model.ilike.*\(text)*") }
-            let raw: [VehicleHeaderRow] = try await q
-                .order("year", ascending: false)
-                .limit(60)
-                .execute()
-                .value
-            results = raw.filter { ($0.primary_image_url?.isEmpty == false) }
+            let res = try await UniversalSearch.vehicles(query: term)
+            guard res.success else { throw URLError(.badServerResponse) }
+            let rows = Self.photosFirst(res.results.compactMap(\.headerRow))
+            results = rows
+            loadMoreError = nil
+            searchMeta = SearchCoverage(query: term, rows: rows, meta: res.meta, milliseconds: res.search_time_ms)
             searched = true
+            #if DEBUG
+            // Screenshot loop: NUKE_DEBUG_EXPLORE_PAGES=1 walks that many more pages through the
+            // door, then NUKE_DEBUG_SCROLL_TO=more lands on the foot of the walk (DEBUG only).
+            if let n = Int(ProcessInfo.processInfo.environment["NUKE_DEBUG_EXPLORE_PAGES"] ?? ""), n > 0 {
+                for _ in 0..<n { await loadMoreResults() }
+                if ProcessInfo.processInfo.environment["NUKE_DEBUG_SCROLL_TO"] == "more" { scrollToFootTick += 1 }
+            }
+            #endif
         } catch {
             searchError = true
+            searchFailureText = ReadFailure.text(error)
             searched = true
             NSLog("NukeCapture explore search failed: %@", String(describing: error))
         }
     }
+
+    /// The next page from the door, appended, under the web's own guards (useSearchPage.ts
+    /// handleLoadMore): the walk needs the reader page one chose, the page must answer at the
+    /// offset asked and with that reader, a next offset must move forward, and a capped walk
+    /// ends with no offset. A page that fails a guard is reported in the web's sentence and the
+    /// button stays as the retry; a page that lands after the query moved on is dropped.
+    private func loadMoreResults() async {
+        guard let meta = searchMeta, let offset = meta.nextOffset, !loadingMore else { return }
+        guard let reader = meta.reader else { loadMoreError = Self.pageFailure; return }
+        loadingMore = true
+        loadMoreError = nil
+        defer { loadingMore = false }
+        do {
+            let res = try await UniversalSearch.vehicles(query: meta.query, offset: offset, source: reader)
+            guard res.success, let m = res.meta, m.offset == offset, m.vehicle_source == reader, let more = m.has_more,
+                  m.pagination_limited == true ? (more && m.next_offset == nil) : (more ? (m.next_offset ?? 0) > offset : m.next_offset == nil)
+            else { throw URLError(.badServerResponse) }
+            guard meta.query == searchMeta?.query else { return }
+            // The web sorts photos first within each page and appends later pages in the door's order
+            // (useSearchPage.ts); re-sorting the whole walk had moved page one's photo-less hits to the end.
+            let page = Self.photosFirst(res.results.compactMap(\.headerRow).filter { hit in !results.contains { $0.id == hit.id } })
+            results = results + page
+            searchMeta = SearchCoverage(query: meta.query, rows: results, meta: m, milliseconds: res.search_time_ms)
+        } catch {
+            NSLog("NukeCapture explore search page failed: %@", String(describing: error))
+            loadMoreError = Self.pageFailure
+        }
+    }
+    private static let pageFailure = "More results could not be loaded. Try again."
+
+    /// The web's order within a page: hits with a photo first, the rest after, each group in the door's order.
+    private static func photosFirst(_ rows: [VehicleHeaderRow]) -> [VehicleHeaderRow] {
+        rows.filter { $0.primary_image_url?.isEmpty == false } + rows.filter { $0.primary_image_url?.isEmpty != false }
+    }
+
+    /// What the grid is a window onto: how many public records the door returned so far, how
+    /// many lack a photo, whether a next page exists, which reader answered. The door does not
+    /// count the whole match set for a text query, so the total is stated as not counted
+    /// rather than guessed (fleet-relative reporting).
+    struct SearchCoverage {
+        let query: String
+        let returned: Int
+        let withoutPhoto: Int
+        /// The next page's offset, only when the door says more exist and did not cap the walk
+        /// (the web's hasMore = has_more && !pagination_limited).
+        let nextOffset: Int?
+        let limited: Bool
+        let reader: String?
+        let milliseconds: Int?
+
+        init(query: String, rows: [VehicleHeaderRow], meta: UniversalSearchMeta?, milliseconds: Int?) {
+            self.query = query
+            returned = rows.count
+            withoutPhoto = rows.filter { $0.primary_image_url?.isEmpty != false }.count
+            limited = meta?.pagination_limited == true
+            nextOffset = (meta?.has_more == true && !limited) ? meta?.next_offset : nil
+            reader = meta?.vehicle_source
+            self.milliseconds = milliseconds
+        }
+
+        var sentence: String {
+            var parts: [String] = ["\(returned) public records" + (withoutPhoto > 0 ? " · \(withoutPhoto) without a photo, shown last" : "")]
+            if nextOffset != nil { parts.append("more pages · total not counted") }
+            else if limited { parts.append("walk capped by the door · total not counted") }
+            else { parts.append("end of results") }
+            if let r = reader { parts.append("reader \(r)") }
+            if let ms = milliseconds { parts.append("door \(ms) ms") }
+            return parts.joined(separator: " · ")
+        }
+    }
+    @State private var searchMeta: SearchCoverage?
+    @State private var loadingMore = false
+    @State private var loadMoreError: String?
+    @State private var scrollToFootTick = 0
 }
 
 // ─── Metro detail — the make breakdown behind a metro's pulse ───────────────────
@@ -534,7 +664,7 @@ struct MetroDetailView: View {
             } else if loadError {
                 Section {
                     HStack {
-                        Label("Couldn't load", systemImage: "wifi.exclamationmark")
+                        Label("Couldn't load", systemImage: "exclamationmark.triangle")
                             .font(.caption2).foregroundStyle(.secondary)
                         Spacer()
                         Button("Retry") { Task { await load() } }.font(.caption2)

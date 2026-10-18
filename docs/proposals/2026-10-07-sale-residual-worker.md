@@ -1,0 +1,24 @@
+# S01: a bounded standing fold over retained source evidence
+
+Owner authorization: continue DATA MODEL and DATA automation, finish the handoff, then leave data flowing while the owner is away (2026-10-07). This extends `sale_residuals_by_ymm`; it introduces no alternative parser, cohort, county or estimate. Paid intake and model inference remain off.
+
+## Existing owners and the earned storage
+
+Live atlas/catalog inspection at 19:12–19:20Z found no persistent residual or baseline organ. `vein_runs` grades registered hypotheses; its grain is not a cohort-month measurement. Vehicle recompute queues own vehicle scalars; `agent_tasks` owns agent jobs. Neither owns this grain. The capability guard points to `sale_residuals_by_ymm`, which remains the calculation owner. `make_model_profiles.subject_id`, `vehicles.id` and `us_county_boundaries.fips` are the existing entities; location observations remain attributed testimony. `valuation_by_ymm` owns qualified capture/episode selection.
+
+Four related tables earn storage: a bounded cohort-month work queue; immutable calculation revisions including the complete source/baseline receipt; one source-episode residual per revision; and a bridge to its retained listing-location witnesses. Foreign keys preserve the existing cohort, vehicle, county and location owners. Capture IDs are polymorphic references inside the canonical receipt, not a fabricated universal capture FK.
+
+## Operating contract
+
+- One existing, unambiguous registered year cohort is the initial pilot: 1963 Chevrolet Corvette. Each five-minute SQL cron enqueues its rolling twelve closed UTC months and processes at most one due task. Initial key order starts with the runtime-assayed March 2026 month while it is in that rolling scope, then newest first. No fleet discovery or paid calls. At most 100 enabled tasks; historic queue keys/receipts remain retained when pilot months leave the rolling window.
+- A successful task becomes due in six hours. This bounded polling cadence invalidates source corrections/supersession, membership and county changes across every active pilot month without adding triggers to large testimony tables. Older months are archived, not continuously maintained. An operator may explicitly enqueue a registered cohort/month for replay. This is partial maintenance, not an event-driven, whole-market system.
+- One advisory lock, `FOR UPDATE SKIP LOCKED`, a lock/load governor, a finite cron statement budget and the existing reader's population caps bound work. Failed tasks back off fifteen minutes and pause after three consecutive failures. Other tasks continue; the assay exposes failures. Crash rollback leaves the task due rather than losing a dequeue.
+- The complete qualified input/output receipt is immutable. SHA256 input identity includes method, query, baseline, every qualified source receipt, geographic witnesses, coverage and exclusions; only calculation/cutoff clocks are removed from identity. Unchanged input reuses its existing revision and advances the verification clock. A correction appends a new revision; returning to earlier inputs may reuse that earlier receipt. Earlier evidence cutoffs stay attached to earlier receipts.
+- Only the definer writer appends derived rows. Service role can read and invoke the sanctioned queue/worker functions, but cannot directly mutate or truncate receipt tables. UPDATE/DELETE triggers enforce append-only revisions. No testimony is written. Queue state is mutable, and its latest-revision FK must refer to its own task.
+- The cached service reader returns the receipt, last verification time, failure state and explicit staleness. It performs no source scan. `assay_sale_residual_fold` and an extension of existing `v_job_health` measure due/failed/unassayed work and actual current episode/county yield; cron success alone is insufficient. The writer registers in `pipeline_registry` and appends bounded write receipts.
+
+## Acceptance and limits
+
+PG17 fixtures must prove source-to-persisted output, same-input replay, changed-evidence revisions, retained prior rows, relational witness edges, forbidden raw writes, task-pointer isolation, bounded one-task work, paused retries, honest cached freshness and job-assay integration. The actual parser/valuation integration must reach the persisted consumer. After normal checked PR deployment, observe natural cron runs, landed revisions/episodes/edges and the cached six-sale reader. No manual production worker invocation is needed.
+
+The pilot automates an already qualified retrospective calculation. It does not establish historical cohort membership or sale-time geography, sell-through, exposure clocks, predictions, or schema repair between agent shifts. Those gaps remain named work. Scaling means adding explicitly assayed cohorts and evidence relationships under this existing writer, not adding another fleet.

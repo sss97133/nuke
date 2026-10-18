@@ -2,7 +2,7 @@
 
 **Status:** structural foundation deployed, pilot scored (227 comments), pipeline EXISTS (operate, don't rebuild). Blocked on one index + two citation bugs before scale-out.
 **Owner subject for the pilot:** 1977 Chevrolet K5 Blazer cohort, subject prefix `6fd682a8…` (full id resolves via `make_model_profiles` / `cohort_members`).
-**Repo:** `/Users/skylar/nuke` · **Supabase:** `qkgaybvrernstplzjaam`
+**Repo:** `~/nuke` · **Supabase:** `qkgaybvrernstplzjaam`
 **Last structural session:** 2026-06-22.
 
 > Read the doorman `/CLAUDE.md` and `supabase/functions/CLAUDE.md` first. Universal invariants apply: facts are sacred, write only through `ingest-observation`, don't mint, testimony is never deleted (`.claude/rules/agent-trust-invariants.md`).

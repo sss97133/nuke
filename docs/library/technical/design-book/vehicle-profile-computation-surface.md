@@ -187,6 +187,28 @@ function BuildProgress({ vehicleId }) {
 
 ## The Profile as Data Attractor
 
+### Evidence routes must preserve the subject
+
+A route containing a vehicle ID and an observation ID does not establish that
+the observation belongs to that vehicle. Read the visible parent first, bind the
+child query to both IDs, and check the returned binding before rendering. Apply
+the same subject boundary to supersession and related-record links. A valid
+foreign key or two individually visible records cannot establish the relationship
+shown by the page.
+
+An image can have recorded witness links to observations on several vehicles.
+Each link must use the observation's own vehicle ID. The stored bridge grain is
+observation × image × witness role; different roles can refer to the same
+observation. Independent support requires separate qualification. Local fixtures
+cannot verify live witness coverage when the installed reader restricts access.
+
+When either route ID changes, withhold the previous subject's evidence immediately
+and cancel its outstanding reads. Missing, denied and failed reads must remain
+explicitly unavailable; they cannot become an empty evidence set or a zero score.
+Keep source posting, observation and ingestion clocks distinct. These reader
+checks preserve attribution without changing testimony, access policies or the
+existing privacy projection.
+
 The vehicle profile attracts data. As more observations arrive from more sources, the profile gets richer. Every new piece of data makes the computation more accurate.
 
 Data arrives from many directions:
@@ -315,6 +337,45 @@ Do not create alternative display systems. Do not create dashboards that recompu
 - **Extraction Handbook**: `docs/library/technical/extraction-playbook.md` — How data enters the pipeline.
 - **Entity Resolution Rules**: `docs/architecture/ENTITY_RESOLUTION_RULES.md` — How observations link to vehicles.
 - **Dictionary**: `docs/library/reference/dictionary/README.md` — Canonical definitions for Computation Surface, Day Card, Progressive Density, Seven-Level Analysis, Timeline Event, Materialization Layer.
+
+---
+
+## Owner notes, 2026-09-29
+
+Skylar's direction for the profile, relayed word for word from the pieces lane's window. It's captured here and not
+built yet. The wiring workspace moves into the profile once this design is set.
+
+| His note | What it asks of the profile |
+|---|---|
+| The north star is the vintage service manual: "information was so concise and finite ... if you had the service man you had everything" | Everything a technician needs, however many pages that takes, with every page pertinent and well made. His correction: "they provided all the information a technician needed ... [if] that affected the number of pages it didn't matter but it was pertinent and well created". There's no page budget. The profile has more data than a manual, so click-through carries the depth. Today the profile is inconsistent and confusing. The K5 build book already works this way: GM factory-manual pages generated from the registry (`docs/wiring/calc-data/manual_v5.py`). |
+| "Done" for a subject means every bit of its data | For each subject: what's installed and who installs it, its status, its financial relation or target, the history of how it got there, and the DB rows and columns that hold it. A section is complete when all five show, or say "unknown". |
+| Show the data flowing in | Make the incoming activity visible: observations, photos and records as they arrive. "People would find it interesting." |
+| Photos aren't always current or the ones you need | Pick photos per subject and date, and say when the photo a section needs is missing. |
+| The same records seen by role (his Uber analogy, client vs driver) | Client, owner and builder each see the same records their own way. Data often comes in from one side and is viewed from the other. The masking spectrum decides what each role sees. |
+| Financial, labour and means-of-production data | Show costs, labour and tools on the profile, with values that accumulate over time. |
+| Options as toggles with instant recalculation | A customer builds their harness in a live 3D view, and the counts and fits recalculate as each option toggles. The engine exists in Python today (`catalog/options.yaml` and `options_v5.py` capacity verdicts). Live means porting it to the frontend or an edge function. |
+
+### Owner notes, 2026-09-30: the wiring page is overwhelming
+
+Relayed word for word from the pieces lane's window. The owner, after using the live K5 wiring page: "the site nav is
+overwhelming. you need to run sims on it see what they think becasue its a rough ride". His picture is a workshop where all the
+tools and parts are already out, which doesn't help anyone get started: "you need to ease into it case by case". He says
+agent-made design crammed in useful-seeming things, left old conflicting pieces in place, and ended up with "a pdf page in the
+horizontally long frame".
+
+Three cold user simulations (visitor, harness builder, owner) confirmed it on the live page:
+- 40 controls on the first screen, with duplicate tab rows;
+- no answer to "how far along";
+- one wire with three different specs across tabs;
+- no crimp tool anywhere.
+
+The answer, adopted as the plan: `docs/wiring/research/2026-09-30_map-progressive-disclosure-brief.md`.
+- One status line and four doors: See the truck, Follow a wire, Read the manual, What's still missing.
+- Tools appear per task.
+- One source of truth for every number.
+- A portrait reader for the manual.
+- The legacy views are retired as each function moves.
+- Each step ships alone and is re-tested with the same sims.
 
 ---
 

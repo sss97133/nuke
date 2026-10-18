@@ -121,7 +121,7 @@ const VehicleOwnershipPanel: React.FC<VehicleOwnershipPanelProps> = ({
       // Load contributors
       const { data: contribData } = await supabase
         .from('vehicle_contributors')
-        .select('*, profiles(full_name, email)')
+        .select('*, profiles(full_name, username)')
         .eq('vehicle_id', vehicle.id)
         .order('created_at', { ascending: false });
 
@@ -334,7 +334,7 @@ const VehicleOwnershipPanel: React.FC<VehicleOwnershipPanelProps> = ({
           assigned_at,
           profiles!user_id (
             full_name,
-            email
+            username
           )
         `)
         .eq('vehicle_id', vehicle.id)
@@ -343,7 +343,7 @@ const VehicleOwnershipPanel: React.FC<VehicleOwnershipPanelProps> = ({
         .maybeSingle();
 
       if (moderatorData) {
-        const moderatorName = moderatorData.profiles?.full_name || moderatorData.profiles?.email || 'Unknown';
+        const moderatorName = moderatorData.profiles?.full_name || moderatorData.profiles?.username || 'Unknown';
         return `${moderatorName} (assigned ${new Date(moderatorData.assigned_at).toLocaleDateString()})`;
       }
 

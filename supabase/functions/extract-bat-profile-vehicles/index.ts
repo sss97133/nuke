@@ -3,11 +3,46 @@ import { createClient } from 'jsr:@supabase/supabase-js@2';
 import { extractBatListingWithFirecrawl } from '../_shared/batFirecrawlMapper.ts';
 import { normalizeListingLocation } from '../_shared/normalizeListingLocation.ts';
 import { writeObservation } from "../_shared/observationWriter.ts";
+import { requireWriteAuth } from '../_shared/writeGuard.ts';
+import { fetchBatPage } from '../_shared/batFetcher.ts';
+import { projectSecretKey } from "../_shared/supabaseKeys.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
+
+async function sha256Hex(s: string): Promise<string> {
+  const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(s));
+  return Array.from(new Uint8Array(buf)).map((b) => b.toString(16).padStart(2, '0')).join('');
+}
+
+// Parse a BaT member's home location from the rendered profile page. STATE + COUNTRY ONLY (masking); never a
+// city or finer. Returns null when not confidently found — a location is never guessed. Observed rendered shape
+// (2026-10-07): a "Location:" label followed by e.g. "IL, United States". Until validated against live pages,
+// the caller keeps write_location=false so the parsed value is returned for inspection but never written.
+// Anchored on a known-country list so the capture ends cleanly in single-spaced stripped text (a bare
+// comma-pair regex ran into the next section word). A 3-part "City, State, Country" drops the city (masking);
+// a 2-part "State, Country" keeps both. A country not in the list returns null — unknown, never guessed. The
+// list is provisional and must be validated/extended against real member pages before write_location is flipped.
+const MEMBER_LOCATION_COUNTRY =
+  "(United States|USA|U\\.S\\.A\\.|Canada|United Kingdom|UK|Australia|Germany|France|Italy|Spain|Netherlands|" +
+  "New Zealand|Mexico|Japan|Sweden|Switzerland|Belgium|Ireland|Norway|Denmark|Austria|Portugal|Brazil|Finland|" +
+  "Poland|Scotland|England)";
+const MEMBER_LOCATION_RE = new RegExp(
+  "Location:\\s*(?:[A-Za-z][A-Za-z .'-]{0,40}?,\\s*)?([A-Za-z][A-Za-z .'-]{0,40}?),\\s*" +
+  MEMBER_LOCATION_COUNTRY + "\\b",
+);
+function parseMemberLocation(html: string): { state: string; country: string } | null {
+  if (!html) return null;
+  const text = html.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ');
+  const m = text.match(MEMBER_LOCATION_RE);
+  if (!m) return null;
+  const state = m[1].trim();
+  const country = m[2].trim();
+  if (!state || !country) return null;
+  return { state, country };
+}
 
 interface BaTProfileListing {
   url: string;
@@ -15,12 +50,15 @@ interface BaTProfileListing {
 }
 
 Deno.serve(async (req: Request) => {
+  // Writes are never anonymous: service key, signed-in user, or nothing (P0.2, 2026-09-27).
+  const denied = await requireWriteAuth(req);
+  if (denied) return denied;
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders });
   }
 
   try {
-    const { profile_url, username, extract_vehicles = true, queue_only = false, include_wins = false } = await req.json();
+    const { profile_url, username, extract_vehicles = true, queue_only = false, include_wins = false, write_location = false } = await req.json();
 
     if (!profile_url && !username) {
       return new Response(
@@ -46,7 +84,7 @@ Deno.serve(async (req: Request) => {
 
     // Initialize Supabase client
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
-    const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+    const supabaseKey = projectSecretKey()!;
     const supabase = createClient(supabaseUrl, supabaseKey);
 
     console.log(`Extracting vehicles from BaT profile: ${profileUrl}`);
@@ -100,6 +138,17 @@ Deno.serve(async (req: Request) => {
       });
       profileHtml = await profileResponse.text();
     }
+
+    // Native server HTML (the lot-page fetch path): the member page's embedded JSON (with the home location) and
+    // the first listings are in the server response; Firecrawl can return a JS shell (seen 2026-10-07: thin page,
+    // one listing, no location). Prefer the native body for capture + location parse; keep profileHtml for listing
+    // extraction. Owner-directed: capture the raw blob, parse the JSON field, not rendered text.
+    let nativeHtml = '';
+    try {
+      const r = await fetchBatPage(profileUrl, { skipFirecrawlFallback: true });
+      if (r.html) nativeHtml = r.html;
+    } catch (_e) { /* keep '' */ }
+    const bodyHtml = nativeHtml || profileHtml;
 
     // Extract listing URLs from rendered HTML
     const listingUrls = new Set<string>();
@@ -289,7 +338,61 @@ Deno.serve(async (req: Request) => {
       vehicles_skipped: 0,
       errors: [] as string[],
       vehicle_ids: [] as string[],
+      identity_location: null as null | { state: string; country: string },
+      location_written: false,
     };
+
+    // --- identity-origin: member-page snapshot + home-location (docs/features/identity-origin/SPEC.md) -----------
+    // Capture the raw blob (fetch once, extract forever): the HTML and the parsed __INITIAL_STATE__, so the parser
+    // can be fixed/re-run against stored structure without re-fetching. Owner-directed 2026-10-07 (reverses the
+    // body-less receipt for member pages).
+    // Capture the raw body once (fetch once, extract forever), deduped by html_sha256 like the lot pages, so the
+    // parser can be written/re-run against stored structure — the member page embeds its data as JSON, so we keep
+    // the whole body and parse the location field from it at read time. RLS keeps the body service-role/admin only.
+    const bodySha = bodyHtml ? await sha256Hex(bodyHtml) : null;
+    if (bodySha) {
+      const { data: dupe } = await supabase.from('listing_page_snapshots')
+        .select('id').eq('platform', 'bat').eq('listing_url', profileUrl).eq('html_sha256', bodySha).maybeSingle();
+      if (!dupe) {
+        try {
+          await supabase.from('listing_page_snapshots').insert({
+            platform: 'bat',
+            listing_url: profileUrl,
+            fetched_at: new Date().toISOString(),
+            http_status: 200,
+            success: true,
+            content_length: bodyHtml.length,
+            html: bodyHtml,
+            html_sha256: bodySha,
+            fetch_method: nativeHtml ? 'fetch' : (FIRECRAWL_API_KEY ? 'firecrawl' : 'fetch'),
+            metadata: { page_type: 'bat_member', username: batUsername, location_label_present: /Location/i.test(bodyHtml) },
+          });
+        } catch (e: any) { console.warn(`[BAT-PROFILE] snapshot insert error: ${e?.message}`); }
+      }
+    }
+
+    // Home location: STATE/COUNTRY only (masking). Always parsed and RETURNED for validation; the observation is
+    // WRITTEN only when write_location=true, so an unvalidated parse pollutes nothing (facts are never guessed).
+    // The fold (fold_external_identity_location, migration 20261007070000) reads exactly these structured_data keys.
+    results.identity_location = parseMemberLocation(bodyHtml);
+    if (results.identity_location && write_location && externalIdentityId) {
+      try {
+        await writeObservation(supabase, {
+          subjectType: 'external_identity',
+          subjectId: externalIdentityId,
+          source: { platform: 'bat', url: profileUrl, trustScore: 0.9 },
+          fields: {
+            home_state: results.identity_location.state,
+            home_country: results.identity_location.country,
+            grain: 'state_country',
+            source: 'bat_member_page',
+          },
+          observationKind: 'specification',
+          extractionMethod: 'bat_member_page_parse',
+        });
+        results.location_written = true;
+      } catch (e: any) { console.warn(`[BAT-PROFILE] location observation error: ${e?.message}`); }
+    }
 
     // Queue-only mode: add listings to bat_extraction_queue for background processing
     if (queue_only && listingUrlsArray.length > 0) {

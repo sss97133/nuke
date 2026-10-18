@@ -20,7 +20,7 @@ interface PhotoSession {
   suggestedVehicle?: {
     id: string;
     name: string;
-    confidence: number;
+    reason: string;
   };
   manualVehicleId?: string;
 }
@@ -217,14 +217,14 @@ export function UniversalImageUpload({ onClose, session, vehicleId, prefillFiles
           session.suggestedVehicle = {
             id: nearbyVehicles[0].id,
             name: `${nearbyVehicles[0].year} ${nearbyVehicles[0].make} ${nearbyVehicles[0].model}`,
-            confidence: 95,
+            reason: 'Nearby location; select to assign',
           };
         } else if (nearbyVehicles && nearbyVehicles.length > 1) {
-          // Multiple matches, lower confidence
+          // Location cannot identify a vehicle in a multi-vehicle shop.
           session.suggestedVehicle = {
             id: nearbyVehicles[0].id,
             name: `${nearbyVehicles[0].year} ${nearbyVehicles[0].make} ${nearbyVehicles[0].model}`,
-            confidence: 60,
+            reason: `${nearbyVehicles.length} vehicles nearby; select to assign`,
           };
         }
       }
@@ -253,7 +253,7 @@ export function UniversalImageUpload({ onClose, session, vehicleId, prefillFiles
             session.suggestedVehicle = {
               id: vehicle.vehicle_id,
               name: `${vehicle.vehicles.year ?? ''} ${vehicle.vehicles.make ?? ''} ${vehicle.vehicles.model ?? ''}`.trim(),
-              confidence: 70,
+              reason: 'Recent work history; select to assign',
             };
           }
         }
@@ -301,15 +301,13 @@ export function UniversalImageUpload({ onClose, session, vehicleId, prefillFiles
       // 'vehicle-images' bucket and blocked the UI for the whole upload.
       let queued = 0;
       for (const photoSession of sessions) {
-        // No confident match → personal library (vehicle_id null). The server
-        // pipeline resolves the vehicle via VIN/GPS/rolling context, or the
-        // photos stay in the user's inbox for manual assignment — exactly the
-        // behavior the Capture page promises.
-        const sessionVehicleId = photoSession.manualVehicleId || photoSession.suggestedVehicle?.id || null;
+        // Only an explicit choice or vehicle-page context binds these files.
+        // Location/recent-work candidates remain unassigned in the photo inbox.
+        const sessionVehicleId = photoSession.manualVehicleId || null;
         const matched = sessionVehicleId ? vehicles.find((v) => v.id === sessionVehicleId) : null;
         const vehicleName = matched
           ? `${matched.year} ${matched.make} ${matched.model}`
-          : (photoSession.suggestedVehicle?.name || (sessionVehicleId ? 'Vehicle' : 'Photo Inbox'));
+          : (sessionVehicleId ? 'Vehicle' : 'Photo Inbox');
 
         uploadQueue.addFiles(sessionVehicleId, vehicleName, photoSession.photos.map((p) => p.file));
         queued += photoSession.photos.length;
@@ -411,11 +409,14 @@ export function UniversalImageUpload({ onClose, session, vehicleId, prefillFiles
                   <div className="vehicle-selector">
                     <label>Vehicle:</label>
                     <select
-                      value={session.manualVehicleId || session.suggestedVehicle?.id || ''}
+                      value={session.manualVehicleId || ''}
                       onChange={(e) => handleVehicleChange(session.id, e.target.value)}
                       className={session.suggestedVehicle ? 'has-suggestion' : ''}
                     >
-                      <option value="">Select vehicle...</option>
+                      <option value="">Photo Inbox — unassigned</option>
+                      {session.manualVehicleId && !vehicles.some((v) => v.id === session.manualVehicleId) && (
+                        <option value={session.manualVehicleId}>Selected vehicle</option>
+                      )}
                       {vehicles.map((v) => (
                         <option key={v.id} value={v.id}>
                           {v.year} {v.make} {v.model}
@@ -424,7 +425,7 @@ export function UniversalImageUpload({ onClose, session, vehicleId, prefillFiles
                     </select>
                     {session.suggestedVehicle && !session.manualVehicleId && (
                       <div className="confidence">
-                        {session.suggestedVehicle.confidence}% confident
+                        Suggested: {session.suggestedVehicle.name} — {session.suggestedVehicle.reason}
                       </div>
                     )}
                   </div>
@@ -433,8 +434,7 @@ export function UniversalImageUpload({ onClose, session, vehicleId, prefillFiles
             </div>
             
             <div className="actions">
-              {/* Sessions without a vehicle no longer block: they queue to the
-                  personal library and the server pipeline places them. */}
+              {/* Unassigned sessions queue to the personal photo inbox. */}
               <button
                 onClick={handleUploadAll}
                 disabled={uploading}
@@ -682,4 +682,3 @@ export function UniversalImageUpload({ onClose, session, vehicleId, prefillFiles
     </div>
   );
 }
-

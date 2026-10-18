@@ -26,6 +26,7 @@
 //  `.replace` (delete+reinsert nulls every other column). See docs/design/HARD_RULES.md.
 
 import Foundation
+import CryptoKit
 import GRDB
 
 // MARK: - Records (mirror the prod identity-first model)
@@ -115,6 +116,159 @@ struct LocalGarageVehicle: Codable, FetchableRecord, PersistableRecord {
     var imageCount: Int
     var relationship: String
     var cachedAt: Date              // when WE last pulled this row down
+    var vin: String?
+    var relationshipEvidenceJSON: String?
+
+    var projection: GarageVehicle {
+        if let json = relationshipEvidenceJSON,
+           let row = try? JSONDecoder().decode(GarageVehicle.self, from: Data(json.utf8)) { return row }
+        return GarageVehicle(vehicle_id: vehicleId, year: year, make: make, model: model,
+            trim_name: trimName, image_url: imageUrl, current_value: currentValue,
+            image_count: imageCount, relationship: relationship, vin: vin)
+    }
+}
+
+/// Shared transport and offline projection. An account statement is a separate
+/// dimension from physical identity, title verification and authorization.
+struct GarageRelationshipStatement: Codable, Hashable, Sendable {
+    let roles: [String]
+    let ownership_denied: Bool
+    let title_status: String
+    let disputed: Bool
+    let start_date: String?
+    let end_date: String?
+}
+
+struct GarageOwnerCorrection: Decodable, Sendable {
+    struct Correction: Decodable, Sendable {
+        let relationship: GarageRelationshipStatement?
+        let cover_image_id: String?
+        var unresolved_vehicle: UnresolvedSubject? = nil
+    }
+    struct UnresolvedSubject: Decodable, Sendable { let label: String; let stated_roles: [String] }
+    let id: String
+    let vehicle_id: String?
+    let correction: Correction
+    let observed_at: String
+    let cover_image_url: String?
+    var source_excerpt: String? = nil
+}
+
+/// Raw account testimony, outside canonical vehicles and asset totals.
+struct GarageUnresolvedSource: Codable, Identifiable, Sendable {
+    let id: String
+    let label: String
+    let statedRoles: [String]
+    let sourceExcerpt: String?
+    let observedAt: String
+
+    static func from(_ corrections: [GarageOwnerCorrection]) -> [GarageUnresolvedSource] {
+        corrections.compactMap { row in
+            guard row.vehicle_id == nil, let source = row.correction.unresolved_vehicle else { return nil }
+            return GarageUnresolvedSource(id: row.id, label: source.label, statedRoles: source.stated_roles,
+                sourceExcerpt: row.source_excerpt, observedAt: row.observed_at)
+        }
+    }
+}
+
+struct GarageVehicle: Codable, Identifiable, Hashable, Sendable {
+    let vehicle_id: String
+    let year: Int?
+    let make: String?
+    var model: String?
+    let trim_name: String?
+    var image_url: String?
+    let current_value: Double?
+    let image_count: Int
+    var relationship: String
+    var vin: String? = nil
+    var relationshipStatement: GarageRelationshipStatement? = nil
+    var statementConflict: Bool? = nil
+    var relationshipEvidenceIds: [String]? = nil
+    var relationshipObservedAt: String? = nil
+
+    var id: String { vehicle_id }
+    var title: String {
+        [year.map(String.init), make, model, trim_name].compactMap { $0 }
+            .filter { !$0.isEmpty }.joined(separator: " ")
+    }
+    var relationshipLabel: String {
+        switch relationship {
+        case "owner": return "Owned"
+        case "previously_owned": return "Previously owned"
+        case "consignment": return "Consignment"
+        case "business_handling": return "Business handling"
+        case "sales_representative": return "Sales representative"
+        case "claimed_interest": return "Claimed interest"
+        case "shared_interest": return "Shared interest"
+        case "transfer_pending": return "Transfer pending"
+        case "relationship_review": return "Relationship review"
+        default: return relationship.replacingOccurrences(of: "_", with: " ").capitalized
+        }
+    }
+    var relationshipDetail: String? {
+        if statementConflict == true { return "Conflicting account statements" }
+        guard let r = relationshipStatement else { return nil }
+        let pieces = [r.ownership_denied ? "Personal ownership rejected" : nil,
+            r.disputed ? "Disputed interest" : nil,
+            r.title_status == "not_in_name" ? "Title not in your name" : nil,
+            r.title_status == "transfer_pending" ? "Title transfer pending" : nil]
+            .compactMap { $0 }
+        let roles = r.roles.map { $0.replacingOccurrences(of: "_", with: " ") }.joined(separator: ", ")
+        return ([pieces.isEmpty ? "Account stated" : pieces.joined(separator: " · "),
+            roles.isEmpty ? nil : roles].compactMap { $0 }).joined(separator: " · ")
+    }
+    var relationshipPeriod: String? {
+        guard let r = relationshipStatement else { return nil }
+        let end = r.end_date ?? (r.roles.contains("owner_past") ? "End unknown" : "End unspecified")
+        return "\(r.start_date ?? "Start unknown") → \(end)"
+    }
+
+    var rejectedOnlyRelationship: Bool {
+        guard statementConflict != true, let statement = relationshipStatement else { return false }
+        return statement.ownership_denied && statement.roles.isEmpty
+    }
+
+    static func applying(_ corrections: [GarageOwnerCorrection], to vehicles: [GarageVehicle],
+                         today: String = String(ISO8601DateFormatter().string(from: Date()).prefix(10))) -> [GarageVehicle] {
+        var groups: [String: [GarageOwnerCorrection]] = [:]
+        for correction in corrections {
+            guard let id = correction.vehicle_id else { continue }
+            groups[id, default: []].append(correction)
+        }
+        return vehicles.compactMap { vehicle -> GarageVehicle? in
+            var result = vehicle
+            let rows = groups[vehicle.id] ?? []
+            if !rows.isEmpty { result.relationshipEvidenceIds = rows.map(\.id).sorted() }
+            let covers = rows.filter { $0.correction.cover_image_id != nil }
+            if !covers.isEmpty { result.image_url = covers.count == 1 ? covers[0].cover_image_url : nil }
+            let relationships = rows.compactMap { $0.correction.relationship }
+            if relationships.count > 1 {
+                result.relationship = "relationship_review"
+                result.relationshipStatement = nil; result.statementConflict = true
+                result.relationshipObservedAt = nil
+            } else if let r = relationships.first {
+                result.relationshipStatement = r; result.statementConflict = false
+                result.relationshipObservedAt = rows.first { $0.correction.relationship != nil }?.observed_at
+                let roles = r.roles.filter { ["owner_current", "owner_past", "shared_interest", "claimed_interest",
+                    "consignment", "business_handling", "sales_representative", "transfer_pending"].contains($0) }
+                switch roles.first {
+                case "owner_current": result.relationship = "owner"
+                case "owner_past": result.relationship = "previously_owned"
+                case let role?: result.relationship = role
+                default: result.relationship = "relationship_review"
+                }
+                if r.ownership_denied && roles.contains(where: { $0 == "owner_current" || $0 == "owner_past" }) {
+                    result.relationship = "relationship_review"
+                }
+                if result.relationship == "owner" && (r.disputed || r.title_status == "transfer_pending" ||
+                    (r.start_date.map { $0 > today } ?? false)) { result.relationship = "claimed_interest" }
+            }
+            // Rejection remains sourced testimony, not a vehicle in the garage.
+            // Also applies to mirrors written by older app versions.
+            return result.rejectedOnlyRelationship ? nil : result
+        }
+    }
 }
 
 /// The back-of-the-photo ledger for one image — what the local store knows about it.
@@ -142,7 +296,179 @@ struct ImageLedger {
     var cloudAnalyzedAt: Date? = nil
 }
 
+/// PhotoKit's grouping, retained independently of any vehicle assignment. IDs are
+/// local to this library; overlapping albums keep their own memberships and names.
+struct LocalAlbumPhoto: Codable, Equatable, Sendable {
+    let localIdentifier: String
+    let sourceVersion: String?
+}
+
+struct LocalPhotoAlbum: Codable, Equatable, Identifiable, Sendable {
+    let id: String
+    let name: String?
+    let folderPath: [String]
+    let sourceKind: String
+    let photos: [LocalAlbumPhoto]
+}
+
+struct LocalAlbumCatalog: Codable, Sendable {
+    let accessScope: String
+    let observedAt: Date
+    let albums: [LocalPhotoAlbum]
+    let photos: [LocalAlbumPhoto]?
+
+    init(accessScope: String, observedAt: Date, albums: [LocalPhotoAlbum], photos: [LocalAlbumPhoto]? = nil) {
+        self.accessScope = accessScope; self.observedAt = observedAt
+        self.albums = albums; self.photos = photos
+    }
+}
+
+/// An independent, versioned read of the original bytes. VIN-shaped OCR text is
+/// evidence to review, never a canonical vehicle, ownership or performed-work claim.
+struct LocalAlbumImageReview: Codable, FetchableRecord, PersistableRecord, Sendable {
+    static let databaseTableName = "photo_album_image_review"
+    let id: String
+    let localIdentifier: String
+    let sourceVersion: String?
+    let inputSHA256: String
+    let methodVersion: String
+    let analyzedAt: Date
+    let isVehicle: Bool
+    let hasPerson: Bool
+    let labelsJSON: String
+    let vinCandidatesJSON: String
+    let textLinesJSON: String
+
+    var vinCandidates: [String] {
+        (try? JSONDecoder().decode([String].self, from: Data(vinCandidatesJSON.utf8))) ?? []
+    }
+
+    var textLines: [String] {
+        (try? JSONDecoder().decode([String].self, from: Data(textLinesJSON.utf8))) ?? []
+    }
+}
+
+struct LocalAlbumCoverage: Sendable {
+    let total: Int
+    let reviewed: Int
+    let vehicleFrames: Int
+    let otherFrames: Int
+    let vinReadings: [String]
+    let cachedDeepReads: Int
+}
+
+/// Cloud intake transports the observed grouping separately from byte witnesses.
+/// The source JSON is stable across retries; no labels, OCR or pixels are exported.
+struct NativeAlbumCaptureRequest: Sendable {
+    let userId: String
+    let catalogRowId: Int64
+    let albumId: String
+    let requestId: String
+    let payloadJSON: String
+    let photos: [LocalAlbumPhoto]
+}
+
+struct NativeAlbumByteWitness: Encodable, Sendable {
+    let local_id: String
+    let source_version: String
+    let input_sha256: String
+    let method_version: String
+    let read_id: String
+}
+
+struct NativeAlbumLinkBatch: Sendable {
+    let capture: NativeAlbumCaptureRequest
+    let witnesses: [NativeAlbumByteWitness]
+    let lastReadRowId: Int64
+}
+
+/// Derived solely from the retained source snapshot and independent current
+/// reads. Serial matches are candidates; an album never binds all its members.
+struct LocalProfilePhotoEvidence: Sendable {
+    let photo: LocalAlbumPhoto
+    let review: LocalAlbumImageReview?
+    let candidateVehicleIds: [String]
+    let takenAt: Date?
+}
+
+struct LocalProfileEvidence: Sendable {
+    let catalog: LocalAlbumCatalog
+    let photos: [LocalProfilePhotoEvidence]
+    let vehicles: [GarageVehicle]
+    var reviewed: Int { photos.filter { $0.review != nil }.count }
+    var vehicleFrames: Int { photos.filter { $0.review?.isVehicle == true }.count }
+    var matched: Int { photos.filter { $0.candidateVehicleIds.count == 1 }.count }
+    var conflicted: Int { photos.filter { $0.candidateVehicleIds.count > 1 }.count }
+    var unresolved: Int { photos.filter { $0.review?.isVehicle == true && $0.candidateVehicleIds.isEmpty }.count }
+}
+
 // MARK: - The store
+
+/// Exact private projection of protected visual-subject reads. These are agent
+/// interpretations over photographs, separate from owner testimony and vehicles.
+struct ObservedCarCoverage: Codable, Equatable, Sendable {
+    let assessed: Int
+    let eligible: Int
+    let excluded: Int
+    let as_of: String
+    let truncated: Bool
+
+    var clock: Date? {
+        let formatter = ISO8601DateFormatter()
+        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        return formatter.date(from: as_of) ?? ISO8601DateFormatter().date(from: as_of)
+    }
+    var isQualified: Bool { assessed >= 0 && eligible >= 0 && excluded >= 0 && eligible <= assessed && clock != nil }
+}
+
+struct ObservedCarProfile: Codable, Identifiable, Equatable, Sendable {
+    struct Photo: Codable, Identifiable, Equatable, Sendable {
+        let id: UUID
+        let image_url: String
+        let taken_at: String?
+    }
+    struct VisualIdentity: Codable, Equatable, Sendable {
+        let make: String?
+        let model_family: String?
+        let badge_text: String?
+        var labels: [String] { [make, model_family, badge_text].compactMap { $0?.trimmingCharacters(in: .whitespacesAndNewlines) }.filter { !$0.isEmpty } }
+    }
+    let id: UUID
+    let label: String
+    let identity_status: String
+    let image_count: Int
+    let cover_image_url: String?
+    let observed_at: String
+    let images: [Photo]
+    let asserted_identity: VisualIdentity
+    let coverage: ObservedCarCoverage
+
+    var isQualified: Bool {
+        identity_status == "unresolved" && image_count >= 0 && images.count <= image_count && coverage.isQualified
+            && Set(images.map(\.id)).count == images.count && images.allSatisfy { !$0.image_url.isEmpty }
+    }
+}
+
+struct ObservedCarRead: Codable, Equatable, Sendable {
+    let subjects: [ObservedCarProfile]
+    let coverage: ObservedCarCoverage
+    let next_offset: Int?
+
+    var isQualified: Bool {
+        coverage.isQualified && subjects.allSatisfy(\.isQualified) && Set(subjects.map(\.id)).count == subjects.count
+            && (next_offset == nil || next_offset! > 0)
+    }
+    static func ownAccount(_ userId: String, activeUserId: String?) -> String? {
+        guard let requested = UUID(uuidString: userId), let activeUserId,
+              let active = UUID(uuidString: activeUserId), requested == active else { return nil }
+        return requested.uuidString.lowercased()
+    }
+}
+
+struct SavedObservedCarRead: Sendable {
+    let read: ObservedCarRead
+    let cachedAt: Date
+}
 
 final class LocalStore {
     static let shared = LocalStore()
@@ -165,6 +491,13 @@ final class LocalStore {
         dbQueue = queue
         do { try Self.migrator.migrate(queue) }
         catch { NSLog("LocalStore: migrate failed: %@", String(describing: error)) }
+    }
+
+    /// Isolated stores exercise the real migrations and readers without an account
+    /// or a network connection (also useful for a device-local recovery).
+    init(databaseQueue: DatabaseQueue) throws {
+        dbQueue = databaseQueue
+        try Self.migrator.migrate(databaseQueue)
     }
 
     // MARK: Schema
@@ -260,7 +593,414 @@ final class LocalStore {
                 t.primaryKey(["userId", "vehicleId"])
             }
         }
+        m.registerMigration("v6_photo_album_passes") { db in
+            // Human/source grouping and agent reads have different grains and writers.
+            // Both logs append; neither can overwrite a prior grouping or owner verdict.
+            try db.create(table: "photo_album_catalog") { t in
+                t.column("id", .text).primaryKey()
+                t.column("digest", .text).notNull()
+                t.column("payload", .text).notNull()
+                t.column("observedAt", .datetime).notNull()
+            }
+            try db.create(table: "photo_album_image_review") { t in
+                t.column("id", .text).primaryKey()
+                t.column("localIdentifier", .text).notNull()
+                t.column("sourceVersion", .text)
+                t.column("inputSHA256", .text).notNull()
+                t.column("methodVersion", .text).notNull()
+                t.column("analyzedAt", .datetime).notNull()
+                t.column("isVehicle", .boolean).notNull()
+                t.column("hasPerson", .boolean).notNull()
+                t.column("labelsJSON", .text).notNull()
+                t.column("vinCandidatesJSON", .text).notNull()
+                t.column("textLinesJSON", .text).notNull()
+            }
+            try db.create(index: "photo_album_image_review_source", on: "photo_album_image_review",
+                          columns: ["localIdentifier", "sourceVersion", "methodVersion"])
+        }
+        m.registerMigration("v7_profile_relationship_evidence") { db in
+            try db.alter(table: "garage_vehicle") { t in
+                t.add(column: "vin", .text)
+                t.add(column: "relationshipEvidenceJSON", .text)
+            }
+        }
+        m.registerMigration("v8_native_album_sync_receipts") { db in
+            try db.create(table: "native_album_installation") { t in t.column("id", .text).primaryKey() }
+            try db.execute(sql: "INSERT INTO native_album_installation(id) VALUES (?)", arguments: [UUID().uuidString])
+            try db.create(table: "native_album_account_cursor") { t in
+                t.column("userId", .text).primaryKey()
+                t.column("catalogRowId", .integer).notNull()
+            }
+            try db.create(table: "native_album_sync_receipt") { t in
+                t.column("userId", .text).notNull()
+                t.column("albumId", .text).notNull()
+                t.column("catalogRowId", .integer).notNull()
+                t.column("captureId", .text).notNull()
+                t.column("setId", .text).notNull()
+                t.column("payloadJSON", .text).notNull()
+                t.column("readAfterRowId", .integer).notNull().defaults(to: 0)
+                t.column("linkAttemptAt", .datetime)
+                t.primaryKey(["userId", "albumId"])
+            }
+        }
+        m.registerMigration("v9_unresolved_garage_source_cache") { db in
+            try db.create(table: "garage_unresolved_source_cache") { t in
+                t.column("userId", .text).primaryKey()
+                t.column("payloadJSON", .text).notNull()
+                t.column("cachedAt", .datetime).notNull()
+            }
+        }
+        m.registerMigration("v10_observed_subject_read_cache") { db in
+            // A bounded backend response page, not a second identity registry.
+            try db.create(table: "observed_subject_read_cache") { t in
+                t.column("userId", .text).notNull()
+                t.column("scopeKey", .text).notNull()
+                t.column("pageOffset", .integer).notNull()
+                t.column("payloadJSON", .text).notNull()
+                t.column("cachedAt", .datetime).notNull()
+                t.primaryKey(["userId", "scopeKey", "pageOffset"])
+            }
+        }
         return m
+    }
+
+    func cacheObservedCars(userId: String, activeUserId: String?, clusterId: UUID? = nil, offset: Int = 0,
+                           read: ObservedCarRead, now: Date = Date()) throws {
+        guard let owner = ObservedCarRead.ownAccount(userId, activeUserId: activeUserId), offset >= 0,
+              read.isQualified, read.next_offset.map({ $0 > offset }) ?? true,
+              clusterId == nil || read.subjects.allSatisfy({ $0.id == clusterId }) else {
+            throw CocoaError(.coderInvalidValue)
+        }
+        let payload = String(decoding: try JSONEncoder().encode(read), as: UTF8.self)
+        try dbQueue.write { db in
+            // A fresh first page invalidates older continuation pages: withdrawn
+            // sources cannot linger after a successful backend refresh.
+            if offset == 0 {
+                try db.execute(sql: "DELETE FROM observed_subject_read_cache WHERE userId=? AND scopeKey=?",
+                               arguments: [owner, clusterId?.uuidString.lowercased() ?? "list"])
+            }
+            try db.execute(sql: """
+                INSERT INTO observed_subject_read_cache(userId,scopeKey,pageOffset,payloadJSON,cachedAt) VALUES (?,?,?,?,?)
+                ON CONFLICT(userId,scopeKey,pageOffset) DO UPDATE SET payloadJSON=excluded.payloadJSON,cachedAt=excluded.cachedAt
+                """, arguments: [owner, clusterId?.uuidString.lowercased() ?? "list", offset, payload, now])
+        }
+    }
+
+    func cachedObservedCars(userId: String, activeUserId: String?, clusterId: UUID? = nil, offset: Int = 0) throws -> SavedObservedCarRead? {
+        guard let owner = ObservedCarRead.ownAccount(userId, activeUserId: activeUserId), offset >= 0 else { return nil }
+        return try dbQueue.read { db in
+            guard let row = try Row.fetchOne(db, sql: "SELECT payloadJSON,cachedAt FROM observed_subject_read_cache WHERE userId=? AND scopeKey=? AND pageOffset=?",
+                arguments: [owner, clusterId?.uuidString.lowercased() ?? "list", offset]) else { return nil }
+            let payload: String = row["payloadJSON"]
+            let read = try JSONDecoder().decode(ObservedCarRead.self, from: Data(payload.utf8))
+            guard read.isQualified else { return nil }
+            return SavedObservedCarRead(read: read, cachedAt: row["cachedAt"])
+        }
+    }
+
+    /// Reuse the bounded projection cache, under a distinct source-grain scope. This stores no
+    /// canonical membership and never enrolls cached source IDs in the analysis queue.
+    func cacheSourceInbox(userId: String, activeUserId: String?, imageId: UUID? = nil, page: Int = 0,
+                          read: SourceInboxRead, now: Date = Date()) throws {
+        guard let owner = ObservedCarRead.ownAccount(userId, activeUserId: activeUserId), page >= 0, read.isQualified,
+              imageId == nil || read.photos.allSatisfy({ $0.id == imageId }) else { throw CocoaError(.coderInvalidValue) }
+        let scope = imageId.map { "source_inbox:photo:\($0.uuidString.lowercased())" } ?? "source_inbox"
+        let payload = String(decoding: try JSONEncoder().encode(read), as: UTF8.self)
+        try dbQueue.write { db in
+            if imageId == nil && page == 0 {
+                // Successful live refresh invalidates detail/continuation snapshots too, so a
+                // known withdrawal cannot fall back to an older cached photo interpretation.
+                let prefix = "source_inbox:photo:"
+                try db.execute(sql: "DELETE FROM observed_subject_read_cache WHERE userId=? AND (scopeKey=? OR substr(scopeKey,1,?)=?)",
+                    arguments: [owner, "source_inbox", prefix.count, prefix])
+            }
+            try db.execute(sql: """
+                INSERT INTO observed_subject_read_cache(userId,scopeKey,pageOffset,payloadJSON,cachedAt) VALUES (?,?,?,?,?)
+                ON CONFLICT(userId,scopeKey,pageOffset) DO UPDATE SET payloadJSON=excluded.payloadJSON,cachedAt=excluded.cachedAt
+                """, arguments: [owner, scope, page, payload, now])
+        }
+    }
+
+    func cachedSourceInbox(userId: String, activeUserId: String?, imageId: UUID? = nil, page: Int = 0) throws -> SavedSourceInboxRead? {
+        guard let owner = ObservedCarRead.ownAccount(userId, activeUserId: activeUserId), page >= 0 else { return nil }
+        let scope = imageId.map { "source_inbox:photo:\($0.uuidString.lowercased())" } ?? "source_inbox"
+        return try dbQueue.read { db in
+            guard let row = try Row.fetchOne(db, sql: "SELECT payloadJSON,cachedAt FROM observed_subject_read_cache WHERE userId=? AND scopeKey=? AND pageOffset=?",
+                arguments: [owner, scope, page]) else { return nil }
+            let payload: String = row["payloadJSON"]
+            let read = try JSONDecoder().decode(SourceInboxRead.self, from: Data(payload.utf8))
+            guard read.isQualified, imageId == nil || read.photos.allSatisfy({ $0.id == imageId }) else { return nil }
+            return SavedSourceInboxRead(read: read, cachedAt: row["cachedAt"])
+        }
+    }
+
+    // MARK: Album human pass and independent on-device pass
+
+    func cacheUnresolvedGarageSources(userId: String, sources: [GarageUnresolvedSource]) throws {
+        let payload = String(decoding: try JSONEncoder().encode(sources), as: UTF8.self)
+        try dbQueue.write { db in
+            try db.execute(sql: "INSERT INTO garage_unresolved_source_cache(userId,payloadJSON,cachedAt) VALUES (?,?,?) ON CONFLICT(userId) DO UPDATE SET payloadJSON=excluded.payloadJSON,cachedAt=excluded.cachedAt",
+                           arguments: [userId, payload, Date()])
+        }
+    }
+
+    func cachedUnresolvedGarageSources(userId: String) throws -> [GarageUnresolvedSource] {
+        try dbQueue.read { db in
+            guard let payload = try String.fetchOne(db, sql: "SELECT payloadJSON FROM garage_unresolved_source_cache WHERE userId=?", arguments: [userId]) else { return [] }
+            return try JSONDecoder().decode([GarageUnresolvedSource].self, from: Data(payload.utf8))
+        }
+    }
+
+    /// Append only when the visible source state changes. Reappearing older states
+    /// get a new event, so A → B → A never leaves B as the current catalog.
+    func recordAlbumCatalog(_ catalog: LocalAlbumCatalog) throws {
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = [.sortedKeys]
+        struct State: Encodable { let accessScope: String; let albums: [LocalPhotoAlbum]; let photos: [LocalAlbumPhoto]? }
+        let state = try encoder.encode(State(accessScope: catalog.accessScope, albums: catalog.albums, photos: catalog.photos))
+        let digest = Self.albumDigest(state)
+        let payload = String(decoding: try encoder.encode(catalog), as: UTF8.self)
+        try dbQueue.write { db in
+            let last = try String.fetchOne(db, sql: "SELECT digest FROM photo_album_catalog ORDER BY rowid DESC LIMIT 1")
+            guard last != digest else { return }
+            try db.execute(sql: "INSERT INTO photo_album_catalog (id, digest, payload, observedAt) VALUES (?, ?, ?, ?)",
+                           arguments: [UUID().uuidString, digest, payload, catalog.observedAt])
+        }
+    }
+
+    func latestAlbumCatalog() throws -> LocalAlbumCatalog? {
+        try dbQueue.read { db in
+            guard let payload = try String.fetchOne(db, sql: "SELECT payload FROM photo_album_catalog ORDER BY rowid DESC LIMIT 1") else { return nil }
+            return try JSONDecoder().decode(LocalAlbumCatalog.self, from: Data(payload.utf8))
+        }
+    }
+
+    /// Begin a new account at the currently visible source state. Subsequent
+    /// offline catalog events drain in order; another account's old history is
+    /// not automatically exported. Limited access never deletes known albums.
+    func nextNativeAlbumCapture(userId: String) throws -> NativeAlbumCaptureRequest? {
+        try dbQueue.write { db in
+            guard let latest = try Int64.fetchOne(db, sql: "SELECT rowid FROM photo_album_catalog ORDER BY rowid DESC LIMIT 1"),
+                  let installation = try String.fetchOne(db, sql: "SELECT id FROM native_album_installation LIMIT 1") else { return nil }
+            try db.execute(sql: "INSERT OR IGNORE INTO native_album_account_cursor(userId,catalogRowId) VALUES (?,?)",
+                           arguments: [userId, latest - 1])
+            for _ in 0..<32 {
+                let after = try Int64.fetchOne(db, sql: "SELECT catalogRowId FROM native_album_account_cursor WHERE userId=?", arguments: [userId]) ?? 0
+                guard let row = try Row.fetchOne(db, sql: "SELECT rowid,id,payload FROM photo_album_catalog WHERE rowid>? ORDER BY rowid LIMIT 1", arguments: [after]) else { return nil }
+                let rowId: Int64 = row["rowid"], catalogId: String = row["id"], payload: String = row["payload"]
+                let catalog = try JSONDecoder().decode(LocalAlbumCatalog.self, from: Data(payload.utf8))
+                if catalog.accessScope == "full" {
+                    let albums = catalog.albums
+                    let known = try Row.fetchAll(db, sql: "SELECT * FROM native_album_sync_receipt WHERE userId=?", arguments: [userId])
+                    let byId = Dictionary(known.map { ($0["albumId"] as String, $0) }, uniquingKeysWith: { first, _ in first })
+                    let visible = Set(albums.map(\.id))
+                    var states: [(LocalPhotoAlbum, Bool)] = albums.map { ($0, true) }
+                    for old in known where !visible.contains(old["albumId"]) {
+                        let previous = try Self.nativeCapture(from: old, userId: userId)
+                        let source = try Self.nativeSourceJSON(previous.payloadJSON)
+                        states.append((LocalPhotoAlbum(id: previous.albumId, name: source["name"] as? String,
+                            folderPath: source["folder_path"] as? [String] ?? [], sourceKind: source["source_kind"] as? String ?? "unknown", photos: []), false))
+                    }
+                    for (album, present) in states.sorted(by: { $0.0.id < $1.0.id }) {
+                        let source: [String: Any] = ["local_id": album.id, "name": album.name as Any? ?? NSNull(),
+                            "folder_path": album.folderPath, "source_kind": album.sourceKind, "present": present,
+                            "photos": album.photos.map { ["local_id": $0.localIdentifier, "source_version": $0.sourceVersion as Any? ?? NSNull()] }]
+                        let prior = byId[album.id]
+                        if let prior {
+                            let oldJSON: String = prior["payloadJSON"]
+                            if try Self.nativeJSON(Self.nativeSourceJSON(oldJSON)) == Self.nativeJSON(source) { continue }
+                        }
+                        let requestId = Self.nativeRequestId(userId + ":" + catalogId + ":" + album.id)
+                        let previous: String? = prior?["captureId"]
+                        let date = ISO8601DateFormatter(); date.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+                        let json: [String: Any] = ["contract": "photokit_album_v1", "request_id": requestId,
+                            "previous_capture_id": previous as Any? ?? NSNull(), "installation_id": installation,
+                            "observed_at": date.string(from: catalog.observedAt), "access_scope": "full", "album": source]
+                        return NativeAlbumCaptureRequest(userId: userId, catalogRowId: rowId, albumId: album.id,
+                            requestId: requestId, payloadJSON: try Self.nativeJSON(json), photos: album.photos)
+                    }
+                }
+                try db.execute(sql: "UPDATE native_album_account_cursor SET catalogRowId=? WHERE userId=?", arguments: [rowId, userId])
+            }
+            return nil
+        }
+    }
+
+    func acknowledgeNativeAlbumCapture(_ request: NativeAlbumCaptureRequest, setId: String, captureId: String) throws {
+        guard captureId.lowercased() == request.requestId.lowercased() else { throw CocoaError(.coderInvalidValue) }
+        try dbQueue.write { db in
+            try db.execute(sql: """
+                INSERT INTO native_album_sync_receipt(userId,albumId,catalogRowId,captureId,setId,payloadJSON,readAfterRowId)
+                VALUES (?,?,?,?,?,?,0) ON CONFLICT(userId,albumId) DO UPDATE SET
+                catalogRowId=excluded.catalogRowId,captureId=excluded.captureId,setId=excluded.setId,
+                payloadJSON=excluded.payloadJSON,readAfterRowId=0,linkAttemptAt=NULL
+                """, arguments: [request.userId, request.albumId, request.catalogRowId, captureId, setId, request.payloadJSON])
+        }
+    }
+
+    /// Rotate source groups and current original reads in bounded batches. Pending
+    /// uploads are retried after the tail wraps; failed network calls never advance.
+    func nextNativeAlbumLinks(userId: String, methodVersion: String, limit: Int = 200) throws -> NativeAlbumLinkBatch? {
+        try dbQueue.write { db in
+            let receipts = try Row.fetchAll(db, sql: "SELECT * FROM native_album_sync_receipt WHERE userId=? ORDER BY linkAttemptAt,albumId", arguments: [userId])
+            for receipt in receipts {
+                let capture = try Self.nativeCapture(from: receipt, userId: userId)
+                let photos = Dictionary(capture.photos.map { ($0.localIdentifier, $0) }, uniquingKeysWith: { first, _ in first })
+                var after: Int64 = receipt["readAfterRowId"]
+                var witnesses: [NativeAlbumByteWitness] = []
+                var last = after
+                let rows = try Row.fetchAll(db, sql: "SELECT rowid,* FROM photo_album_image_review WHERE rowid>? AND methodVersion=? ORDER BY rowid LIMIT 1000", arguments: [after, methodVersion])
+                for row in rows {
+                    last = row["rowid"]
+                    let review = try LocalAlbumImageReview(row: row)
+                    guard review.isVehicle, !review.hasPerson, let version = review.sourceVersion,
+                          photos[review.localIdentifier]?.sourceVersion == version else { continue }
+                    let verdict = try String.fetchOne(db, sql: "SELECT ownerVerdict FROM appearance WHERE localIdentifier=?", arguments: [review.localIdentifier])
+                    guard verdict != "rejected", verdict != "personal" else { continue }
+                    witnesses.append(NativeAlbumByteWitness(local_id: review.localIdentifier, source_version: version,
+                        input_sha256: review.inputSHA256, method_version: review.methodVersion, read_id: review.id))
+                    if witnesses.count >= min(200, max(1, limit)) { break }
+                }
+                if !witnesses.isEmpty { return NativeAlbumLinkBatch(capture: capture, witnesses: witnesses, lastReadRowId: last) }
+                if rows.isEmpty { after = 0 } else { after = last }
+                try db.execute(sql: "UPDATE native_album_sync_receipt SET readAfterRowId=?,linkAttemptAt=? WHERE userId=? AND albumId=?",
+                               arguments: [after, Date(), userId, capture.albumId])
+            }
+            return nil
+        }
+    }
+
+    func acknowledgeNativeAlbumLinks(_ batch: NativeAlbumLinkBatch) throws {
+        try dbQueue.write { db in
+            try db.execute(sql: "UPDATE native_album_sync_receipt SET readAfterRowId=?,linkAttemptAt=? WHERE userId=? AND albumId=? AND captureId=?",
+                arguments: [batch.lastReadRowId, Date(), batch.capture.userId, batch.capture.albumId, batch.capture.requestId])
+        }
+    }
+
+    private static func nativeCapture(from row: Row, userId: String) throws -> NativeAlbumCaptureRequest {
+        let payload: String = row["payloadJSON"]
+        let source = try nativeSourceJSON(payload)
+        let photos = (source["photos"] as? [[String: Any]] ?? []).compactMap { p -> LocalAlbumPhoto? in
+            guard let id = p["local_id"] as? String else { return nil }
+            return LocalAlbumPhoto(localIdentifier: id, sourceVersion: p["source_version"] as? String)
+        }
+        return NativeAlbumCaptureRequest(userId: userId, catalogRowId: row["catalogRowId"], albumId: row["albumId"],
+            requestId: row["captureId"], payloadJSON: payload, photos: photos)
+    }
+
+    private static func nativeJSON(_ object: Any) throws -> String {
+        String(decoding: try JSONSerialization.data(withJSONObject: object, options: [.sortedKeys]), as: UTF8.self)
+    }
+
+    private static func nativeSourceJSON(_ payload: String) throws -> [String: Any] {
+        guard let json = try JSONSerialization.jsonObject(with: Data(payload.utf8)) as? [String: Any],
+              let source = json["album"] as? [String: Any] else { throw CocoaError(.coderReadCorrupt) }
+        return source
+    }
+
+    private static func nativeRequestId(_ seed: String) -> String {
+        let hex = albumDigest(Data(seed.utf8))
+        return "\(hex.prefix(8))-\(hex.dropFirst(8).prefix(4))-\(hex.dropFirst(12).prefix(4))-\(hex.dropFirst(16).prefix(4))-\(hex.dropFirst(20).prefix(12))"
+    }
+
+    func recordAlbumImageReview(_ review: LocalAlbumImageReview) throws {
+        try dbQueue.write { db in try review.insert(db, onConflict: .ignore) }
+    }
+
+    /// Unknown source versions must be reread; a previous result cannot establish
+    /// that the current bytes are unchanged. A method change also invalidates reuse.
+    func albumImageReview(for photo: LocalAlbumPhoto, methodVersion: String) throws -> LocalAlbumImageReview? {
+        guard let version = photo.sourceVersion else { return nil }
+        return try dbQueue.read { db in
+            try LocalAlbumImageReview.fetchOne(db, sql: """
+                SELECT * FROM photo_album_image_review
+                WHERE localIdentifier = ? AND sourceVersion = ? AND methodVersion = ?
+                ORDER BY rowid DESC LIMIT 1
+                """, arguments: [photo.localIdentifier, version, methodVersion])
+        }
+    }
+
+    func albumCoverage(_ album: LocalPhotoAlbum, methodVersion: String) throws -> LocalAlbumCoverage {
+        let photos = Dictionary(album.photos.map { ($0.localIdentifier, $0) }, uniquingKeysWith: { first, _ in first })
+        return try dbQueue.read { db in
+            var current: [String: LocalAlbumImageReview] = [:]
+            var deepReads = 0
+            for chunk in Array(photos.keys).chunked(400) where !chunk.isEmpty {
+                let rows = try LocalAlbumImageReview.fetchAll(db, sql: """
+                    SELECT * FROM photo_album_image_review
+                    WHERE methodVersion = ? AND localIdentifier IN (\(databaseQuestionMarks(count: chunk.count)))
+                    ORDER BY rowid
+                    """, arguments: StatementArguments([methodVersion] + chunk))
+                for row in rows where row.sourceVersion != nil && row.sourceVersion == photos[row.localIdentifier]?.sourceVersion {
+                    current[row.localIdentifier] = row
+                }
+                deepReads += try Int.fetchOne(db, sql: """
+                    SELECT COUNT(*) FROM appearance
+                    WHERE cloudNarrative IS NOT NULL AND localIdentifier IN (\(databaseQuestionMarks(count: chunk.count)))
+                    """, arguments: StatementArguments(chunk)) ?? 0
+            }
+            return LocalAlbumCoverage(total: photos.count, reviewed: current.count,
+                vehicleFrames: current.values.filter(\.isVehicle).count,
+                otherFrames: current.values.filter { !$0.isVehicle }.count,
+                vinReadings: Array(Set(current.values.flatMap(\.vinCandidates))).sorted(), cachedDeepReads: deepReads)
+        }
+    }
+
+    func profileEvidence(userId: String, methodVersion: String) throws -> LocalProfileEvidence? {
+        guard let catalog = try latestAlbumCatalog() else { return nil }
+        let source = catalog.photos ?? catalog.albums.flatMap(\.photos)
+        let photos = Dictionary(source.map { ($0.localIdentifier, $0) }, uniquingKeysWith: { first, _ in first })
+        let known = cachedGarage(userId: userId)?.vehicles.map(\.projection) ?? []
+        return try dbQueue.read { db in
+            var reviews: [String: LocalAlbumImageReview] = [:]
+            var clocks: [String: Date] = [:]
+            for chunk in Array(photos.keys).chunked(400) where !chunk.isEmpty {
+                for row in try LocalAlbumImageReview.fetchAll(db, sql: """
+                    SELECT * FROM photo_album_image_review
+                    WHERE methodVersion = ? AND localIdentifier IN (\(databaseQuestionMarks(count: chunk.count)))
+                    ORDER BY rowid
+                    """, arguments: StatementArguments([methodVersion] + chunk))
+                    where row.sourceVersion != nil && row.sourceVersion == photos[row.localIdentifier]?.sourceVersion {
+                    reviews[row.localIdentifier] = row
+                }
+                for row in try Row.fetchAll(db, sql: """
+                    SELECT localIdentifier, takenAt FROM appearance
+                    WHERE localIdentifier IN (\(databaseQuestionMarks(count: chunk.count))) AND takenAt IS NOT NULL
+                    """, arguments: StatementArguments(chunk)) {
+                    clocks[row["localIdentifier"] as String] = row["takenAt"] as Date
+                }
+            }
+            let evidence = photos.values.map { photo -> LocalProfilePhotoEvidence in
+                let review = reviews[photo.localIdentifier]
+                let tokens = review.map { Self.serialTokens($0.vinCandidates + $0.textLines) } ?? []
+                let matches = known.filter { v in
+                    guard let vin = v.vin?.uppercased(), vin.count >= 10, vin.count <= 17 else { return false }
+                    return tokens.contains(vin)
+                }.map(\.vehicle_id).sorted()
+                return LocalProfilePhotoEvidence(photo: photo, review: review,
+                    candidateVehicleIds: matches, takenAt: clocks[photo.localIdentifier])
+            }.sorted { $0.photo.localIdentifier < $1.photo.localIdentifier }
+            return LocalProfileEvidence(catalog: catalog, photos: evidence, vehicles: known)
+        }
+    }
+
+    /// Exact complete tokens only: no fuzzy recovery, album-title identity,
+    /// same-model grouping or inheritance from an image's assigned vehicle.
+    private static func serialTokens(_ lines: [String]) -> Set<String> {
+        var result = Set<String>()
+        for line in lines {
+            let words = line.uppercased().components(separatedBy: CharacterSet.alphanumerics.inverted)
+            for word in words where (10...17).contains(word.count) { result.insert(word) }
+            let compact = line.uppercased().filter { !$0.isWhitespace && $0 != "-" }
+            if (10...17).contains(compact.count), compact.allSatisfy({ $0.isASCII && ($0.isLetter || $0.isNumber) }) {
+                result.insert(compact)
+            }
+        }
+        return result
+    }
+
+    static func albumDigest(_ data: Data) -> String {
+        SHA256.hash(data: data).map { String(format: "%02x", $0) }.joined()
     }
 
     // MARK: Write — the local twin of prod ingest_image_identity_first()
@@ -743,19 +1483,18 @@ final class LocalStore {
     /// transaction (see the v5 migration note on why full-replace is correct here,
     /// unlike the disjoint-column pattern used elsewhere in this file).
     func cacheGarage(userId: String,
-                     vehicles: [(vehicleId: String, year: Int?, make: String?, model: String?,
-                                 trimName: String?, imageUrl: String?, currentValue: Double?,
-                                 imageCount: Int, relationship: String)],
+                     vehicles: [GarageVehicle],
                      now: Date = Date()) {
         do {
             try dbQueue.write { db in
                 try db.execute(sql: "DELETE FROM garage_vehicle WHERE userId = ?", arguments: [userId])
                 for v in vehicles {
-                    try LocalGarageVehicle(userId: userId, vehicleId: v.vehicleId, year: v.year,
-                                           make: v.make, model: v.model, trimName: v.trimName,
-                                           imageUrl: v.imageUrl, currentValue: v.currentValue,
-                                           imageCount: v.imageCount, relationship: v.relationship,
-                                           cachedAt: now)
+                    let payload = String(decoding: try JSONEncoder().encode(v), as: UTF8.self)
+                    try LocalGarageVehicle(userId: userId, vehicleId: v.vehicle_id, year: v.year,
+                                           make: v.make, model: v.model, trimName: v.trim_name,
+                                           imageUrl: v.image_url, currentValue: v.current_value,
+                                           imageCount: v.image_count, relationship: v.relationship,
+                                           cachedAt: now, vin: v.vin, relationshipEvidenceJSON: payload)
                         .insert(db)
                 }
             }
@@ -777,7 +1516,7 @@ final class LocalStore {
                 // as the live one did, not reshuffled.
                 let rows = try LocalGarageVehicle.fetchAll(db, sql: """
                     SELECT userId, vehicleId, year, make, model, trimName, imageUrl,
-                           currentValue, imageCount, relationship, cachedAt
+                           currentValue, imageCount, relationship, cachedAt, vin, relationshipEvidenceJSON
                     FROM garage_vehicle WHERE userId = ? ORDER BY rowid ASC
                     """, arguments: [userId])
                 guard !rows.isEmpty, let oldest = rows.map(\.cachedAt).min() else { return nil }

@@ -1,0 +1,21 @@
+WIDEBAND:
+  family: dtm
+  mate: 'DTM 4-pin female, MoTeC #68054 (mates the LTCD''s DTM 4-pin male #68055)'
+  note: 'LTCD manual p.31: 110 mA typical plus the heater current, heater 0.5–1 A typical (up to 2 A on startup); p.37: ''Each sensor can draw over 3 Amps when cold''
+    — two sensors > 6.1 A cold, past 22 AWG''s 6 A (80 °C) / 5 A (100 °C) in the PDM manual p.48 table · pins 1 Battery - (black), 2 CAN Lo (green), 3 CAN Hi (white),
+    4 Battery + (red) — LTC user manual p.32 · family dtm: #68054 is the DTM 4-pin FEMALE, so the harness takes size-20 sockets 0462-201-20141 and wedge WM-4S (families.yaml
+    dtm)'
+  open:
+  - '#68054 kit contents (housing, wedge, contacts): not in the LTC manual'
+  - '#68054 kit sockets: if the MoTeC kit ships only 0462-201-20141 (20 AWG), the two 16-18 AWG sockets 0462-005-20141 are bought apart'
+  sources:
+  - 'MoTeC LTC user manual V1.7 p.32 Appendix B (reference_documents/component_drawings/motec_ltcd_user_manual.pdf): ''Power/CAN Connector DTM 4pin (M) (#68055) Mating
+    connector: DTM 4pin (F) (#68054)'''
+  - web_snapshots/www.customconnectorkits.com__0462-201-20141.md ('Size 20 Nickel Plated Solid Socket for 20 AWG', 'Max 7.5 amps', '4 way indent crimper')
+  per_end:
+    part: 0462-201-20141
+  per_end_wire:
+    '64': {part: 0462-005-20141}
+    LTCD_GND: {part: 0462-005-20141}
+  contact_note: 'DEUTSCH Contacts Catalog p.125 (PDF p.7) ''Solid Contacts - Common Contact System'': 0462-201-20** = 20 AWG, 0462-005-20** = 16-18 AWG, both 7.5 A: the 16 AWG feed and ground take 0462-005-20141, the CAN pair (now 20 AWG) 0462-201-20141'
+

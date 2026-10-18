@@ -11,7 +11,7 @@ import { readCachedSession } from '../../utils/cachedSession';
 import { useAdminAccess } from '../../hooks/useAdminAccess';
 import { ProfileService } from '../../services/profileService';
 import { getUserProfileData, getPublicProfileByExternalIdentity } from '../../services/profileStatsService';
-import { PersonalPhotoLibraryService } from '../../services/personalPhotoLibraryService';
+import { PersonalPhotoLibraryService, type LibraryStats } from '../../services/personalPhotoLibraryService';
 import type { UserProfile, UserProfileStats, UserComprehensiveData, ContributionEvent, ActivityEvent, GalleryFilter } from './types';
 
 // ---------------------------------------------------------------------------
@@ -28,7 +28,8 @@ interface UserProfileContextValue {
   // Stats & data
   stats: UserProfileStats | null;
   comprehensiveData: UserComprehensiveData | null;
-  photoLibraryStats: any | null;
+  photoLibraryStats: LibraryStats | null;
+  photoLibraryError: string | null;
 
   // Events
   contributionEvents: ContributionEvent[];
@@ -105,7 +106,8 @@ export const UserProfileProvider: React.FC<{ children: React.ReactNode }> = ({ c
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [stats, setStats] = useState<UserProfileStats | null>(null);
   const [comprehensiveData, setComprehensiveData] = useState<UserComprehensiveData | null>(null);
-  const [photoLibraryStats, setPhotoLibraryStats] = useState<any>(null);
+  const [photoLibraryStats, setPhotoLibraryStats] = useState<LibraryStats | null>(null);
+  const [photoLibraryError, setPhotoLibraryError] = useState<string | null>(null);
   const [contributionEvents, setContributionEvents] = useState<ContributionEvent[]>([]);
   const [activityEvents, setActivityEvents] = useState<ActivityEvent[]>([]);
 
@@ -155,15 +157,21 @@ export const UserProfileProvider: React.FC<{ children: React.ReactNode }> = ({ c
   const loadProfile = useCallback(async () => {
     if (!authChecked) return;
 
-    const loadKey = externalIdentityId || resolvedUserId || '';
+    const loadKey = `${externalIdentityId || resolvedUserId || ''}:${currentUserId || 'anon'}`;
     if (loadingForUidRef.current === loadKey) return;
     loadingForUidRef.current = loadKey;
 
     setLoading(true);
+    setProfile(null);
+    setStats(null);
+    setComprehensiveData(null);
+    setPhotoLibraryStats(null);
+    setPhotoLibraryError(null);
     try {
       if (externalIdentityId) {
         // External identity (unclaimed BaT user)
         const data = await getPublicProfileByExternalIdentity(externalIdentityId);
+        if (loadingForUidRef.current !== loadKey) return;
         if (data) {
           setProfile(data.profile as any);
           setStats(data.stats);
@@ -181,11 +189,9 @@ export const UserProfileProvider: React.FC<{ children: React.ReactNode }> = ({ c
       }
 
       // Fast path: get profile record directly
-      const { data: profileRow } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('id', uid)
-        .single();
+      const { data: profileRow, error: profileError } = await ProfileService.getProfileRecord(uid);
+      if (loadingForUidRef.current !== loadKey) return;
+      if (profileError) throw profileError;
 
       if (profileRow) {
         setProfile(profileRow as any);
@@ -195,6 +201,13 @@ export const UserProfileProvider: React.FC<{ children: React.ReactNode }> = ({ c
         // comprehensive data stream into state below and every consumer
         // already null-handles them.
         setLoading(false);
+      }
+
+      // Start independent owner coverage before the slower profile statistics.
+      if (isOwnProfile) {
+        PersonalPhotoLibraryService.getLibraryStats()
+          .then((s) => { if (loadingForUidRef.current === loadKey) setPhotoLibraryStats(s); })
+          .catch(() => { if (loadingForUidRef.current === loadKey) setPhotoLibraryError('Photo coverage could not load. Reload to retry.'); });
       }
 
       // Background: comprehensive stats data + per-day contribution aggregates.
@@ -208,6 +221,7 @@ export const UserProfileProvider: React.FC<{ children: React.ReactNode }> = ({ c
         getUserProfileData(uid).catch(() => null),
         ProfileService.getContributionDays(uid).catch(() => null),
       ]);
+      if (loadingForUidRef.current !== loadKey) return;
 
       if (compData) {
         setStats(compData.stats);
@@ -219,18 +233,12 @@ export const UserProfileProvider: React.FC<{ children: React.ReactNode }> = ({ c
         buildContributionEvents(contributionDays);
       }
 
-      // Photo library stats (own profile only, uses auth session internally)
-      if (isOwnProfile) {
-        PersonalPhotoLibraryService.getLibraryStats()
-          .then((s) => setPhotoLibraryStats(s))
-          .catch(() => {});
-      }
     } catch (err) {
       console.error('[UserProfileContext] Error loading profile:', err);
     } finally {
-      setLoading(false);
+      if (loadingForUidRef.current === loadKey) setLoading(false);
     }
-  }, [resolvedUserId, externalIdentityId, authChecked, isOwnProfile]);
+  }, [resolvedUserId, externalIdentityId, authChecked, isOwnProfile, currentUserId]);
 
   const buildEventsFromComprehensive = useCallback((data: UserComprehensiveData) => {
     const events: ActivityEvent[] = [];
@@ -319,21 +327,21 @@ export const UserProfileProvider: React.FC<{ children: React.ReactNode }> = ({ c
   // ── Actions ──
 
   const saveProfileField = useCallback(async (field: string, value: any) => {
-    if (!resolvedUserId) return;
+    if (!resolvedUserId || !isOwnProfile) throw new Error('Profile editing requires its owner');
     await ProfileService.updateProfile(resolvedUserId, { [field]: value });
     // Reload to reflect changes
-    const { data } = await supabase.from('profiles').select('*').eq('id', resolvedUserId).single();
+    const { data } = await ProfileService.getProfileRecord(resolvedUserId);
     if (data) setProfile(data as any);
-  }, [resolvedUserId]);
+  }, [resolvedUserId, isOwnProfile]);
 
   const uploadAvatar = useCallback(async (file: File): Promise<string> => {
-    if (!resolvedUserId) throw new Error('No user ID');
+    if (!resolvedUserId || !isOwnProfile) throw new Error('Avatar editing requires its owner');
     const url = await ProfileService.uploadAvatar(resolvedUserId, file);
     // Reload profile with new avatar
-    const { data } = await supabase.from('profiles').select('*').eq('id', resolvedUserId).single();
+    const { data } = await ProfileService.getProfileRecord(resolvedUserId);
     if (data) setProfile(data as any);
     return url;
-  }, [resolvedUserId]);
+  }, [resolvedUserId, isOwnProfile]);
 
   // ── Effects ──
 
@@ -358,6 +366,7 @@ export const UserProfileProvider: React.FC<{ children: React.ReactNode }> = ({ c
     stats,
     comprehensiveData,
     photoLibraryStats,
+    photoLibraryError,
     contributionEvents,
     activityEvents,
     session,
@@ -372,7 +381,7 @@ export const UserProfileProvider: React.FC<{ children: React.ReactNode }> = ({ c
     uploadAvatar,
   }), [
     resolvedUserId, profile, isOwnProfile, isExternalIdentity,
-    stats, comprehensiveData, photoLibraryStats,
+    stats, comprehensiveData, photoLibraryStats, photoLibraryError,
     contributionEvents, activityEvents,
     session, isAdmin, currentUserId,
     loading, isMobile, galleryFilter,

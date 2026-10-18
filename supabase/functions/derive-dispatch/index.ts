@@ -23,6 +23,9 @@
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { corsHeaders } from "../_shared/cors.ts";
+import { isServiceCaller, requireWriteAuth } from "../_shared/writeGuard.ts";
+import { projectSecretKey } from "../_shared/supabaseKeys.ts";
+import { mustWrite } from '../_shared/writeResult.ts';
 
 const WORKER = `derive-dispatch-${crypto.randomUUID().slice(0, 8)}`;
 
@@ -36,19 +39,26 @@ const EVIDENCE_ARG: Record<string, string> = {
   imessage_conversation: "conversation_id",
   email: "email_id",
   artifact: "artifact_id",
+  auction_comment: "comment_id",
 };
 
 Deno.serve(async (req) => {
+  // Writes are never anonymous: service key, signed-in user, or nothing (P0.2, 2026-09-27).
+  const denied = await requireWriteAuth(req);
+  if (denied) return denied;
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
 
   try {
-    if (roleOf(req.headers.get("Authorization")) !== "service_role") {
+    // The service role as writeGuard judges it: a secret key, or the JWT the gateway mints for one
+    // (decoding the bearer's role claim misses a raw secret key; 2026-10-14).
+    if (!(await isServiceCaller(req))) {
       return json({ error: "service_role required" }, 403);
     }
 
     const admin = createClient(
       Deno.env.get("SUPABASE_URL")!,
-      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
+      projectSecretKey()!,
+      { auth: { autoRefreshToken: false, persistSession: false } },
     );
 
     const body = await req.json().catch(() => ({}));
@@ -67,9 +77,24 @@ Deno.serve(async (req) => {
 
     const results: unknown[] = [];
     let done = 0, failed = 0;
+    let publicComments = 0;
 
     for (const item of claimed) {
+      const publicComment = item.evidence_type === "auction_comment";
       try {
+        if (publicComment && (item.extractor_slug !== "comment-refinery-atoms-v1" || item.user_id !== null)) {
+          await finish(admin, item.id, "failed", { error: "invalid public comment route" });
+          failed++;
+          continue;
+        }
+        // Public research never changes the compute identity of owner evidence.
+        // Bound this new lane to two comments per existing dispatcher tick.
+        if (publicComment && publicComments >= 2) {
+          await requeue(admin, item.id, 60, "public comment invocation limit", Math.max(0, item.attempts - 1));
+          results.push({ id: item.id, status: "requeued", reason: "invocation_limit" });
+          continue;
+        }
+        if (publicComment) publicComments++;
         // The registry decides who reads this. Dispatch never hardcodes a reader.
         const { data: extractor } = await admin
           .from("observation_extractors")
@@ -92,12 +117,13 @@ Deno.serve(async (req) => {
 
         const res = await fetch(`${Deno.env.get("SUPABASE_URL")}/functions/v1/${extractor.edge_function_name}`, {
           method: "POST",
+          ...(publicComment ? { signal: AbortSignal.timeout(65000) } : {}),
           headers: {
             "Content-Type": "application/json",
-            Authorization: `Bearer ${Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")}`,
+            Authorization: `Bearer ${projectSecretKey()}`,
             // The gateway rewrites Authorization between functions; prove we are the
             // dispatcher with the shared secret, not with a claim we don't control.
-            "x-nuke-internal": Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
+            "x-nuke-internal": projectSecretKey()!,
           },
           body: JSON.stringify({
             user_id: item.user_id,
@@ -105,6 +131,8 @@ Deno.serve(async (req) => {
             limit: 1,
             dry_run: false,
             platform_credential: platformCredential,
+            ...(publicComment ? { mode: "derive_comment", derivation_queue_id: item.id,
+              platform_credential: true } : {}),
           }),
         });
         const out = await res.json().catch(() => null);
@@ -113,7 +141,9 @@ Deno.serve(async (req) => {
         // retry time and stop billing anyone for waiting.
         if (res.status === 429) {
           const retry = Number(out?.retry_after_seconds) || 900;
-          await requeue(admin, item.id, retry, "rate limited on the owner's plan");
+          await requeue(admin, item.id, retry,
+            publicComment ? "public comment budget deferred" : "rate limited on the owner's plan",
+            publicComment && out?.budget_not_admitted === true ? Math.max(0, item.attempts - 1) : undefined);
           results.push({ id: item.id, status: "requeued", retry_after_seconds: retry });
           continue;
         }
@@ -124,18 +154,34 @@ Deno.serve(async (req) => {
         }
 
         const derived = out?.derived ?? [];
-        if (!res.ok) {
+        const invalidPublicReceipt = publicComment && (out?.success !== true || out?.derivation_complete !== true ||
+          !Number.isFinite(out?.cost_cents) || out.cost_cents < 0 || out.cost_cents > 5 ||
+          out?.source_comment_id !== item.evidence_id || !Array.isArray(out?.derived) || derived.length > 16 ||
+          (derived.length === 0 && out?.empty_source_result !== true) ||
+          derived.some((d: any) => !d || typeof d.observation_id !== "string" ||
+            !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(d.observation_id) ||
+            d.comment_id !== item.evidence_id));
+        if (!res.ok || invalidPublicReceipt) {
           failed++;
-          await finish(admin, item.id, "failed", { error: `reader ${res.status}`, attempts: item.attempts + 1 });
-          results.push({ id: item.id, status: "failed", detail: out });
+          if (publicComment && out?.retryable === true && item.attempts < item.max_attempts) {
+            await requeue(admin, item.id, 60, "comment persistence retry from cached extraction");
+            results.push({ id: item.id, status: "requeued", reason: "persistence_incomplete" });
+          } else {
+            const readerError = publicComment && typeof out?.error === "string" &&
+              /^[a-z][a-z0-9_]{0,100}$/.test(out.error) ? out.error : `reader_${res.status}_or_incomplete_receipt`;
+            await finish(admin, item.id, "failed", { error: readerError,
+              ...(publicComment ? { credential_source: "system_api_key" } : {}) });
+            results.push({ id: item.id, status: "failed" });
+          }
           continue;
         }
 
-        done++;
         await finish(admin, item.id, "done", {
           observation_ids: derived.map((d: any) => d.observation_id).filter(Boolean),
-          credential_source: derived[0]?.credential ?? null,
+          credential_source: publicComment ? "system_api_key" : derived[0]?.credential ?? null,
+          ...(publicComment ? { cost_cents: out.cost_cents } : {}),
         });
+        done++;
         results.push({
           id: item.id, status: "done",
           observations: derived.length,
@@ -143,7 +189,11 @@ Deno.serve(async (req) => {
         });
       } catch (e) {
         failed++;
-        await finish(admin, item.id, "failed", { error: String(e instanceof Error ? e.message : e), attempts: item.attempts + 1 });
+        if (publicComment && item.attempts < item.max_attempts) {
+          await requeue(admin, item.id, 60, "comment reader interrupted; retry cached extraction");
+        } else {
+          await finish(admin, item.id, "failed", { error: "reader_execution_failed" });
+        }
         results.push({ id: item.id, status: "failed" });
       }
     }
@@ -152,9 +202,9 @@ Deno.serve(async (req) => {
     // since the table was created, because nothing ever drove it.
     const slugs = [...new Set(claimed.map((c: any) => c.extractor_slug))];
     for (const s of slugs) {
-      await admin.from("observation_extractors")
-        .update({ last_run_at: new Date().toISOString(), ...(failed === 0 ? { last_success_at: new Date().toISOString(), consecutive_failures: 0 } : {}) })
-        .eq("slug", s);
+      mustWrite('observation_extractors update', await admin.from("observation_extractors")
+        .update({ last_run_at: new Date().toISOString(), ...(failed === 0 && done > 0 ? { last_success_at: new Date().toISOString(), consecutive_failures: 0 } : {}) })
+        .eq("slug", s));
     }
 
     return json({ claimed: claimed.length, done, failed, results });
@@ -165,35 +215,29 @@ Deno.serve(async (req) => {
 });
 
 async function finish(admin: any, id: string, status: string, extra: Record<string, unknown>) {
-  await admin.from("derivation_queue").update({
+  const { data, error } = await admin.from("derivation_queue").update({
     status,
     completed_at: status === "done" || status === "skipped" ? new Date().toISOString() : null,
     locked_at: null, locked_by: null,
     error_message: (extra.error as string) ?? null,
     observation_ids: (extra.observation_ids as string[]) ?? null,
     credential_source: (extra.credential_source as string) ?? null,
+    ...(extra.cost_cents !== undefined ? { cost_cents: extra.cost_cents } : {}),
     ...(extra.attempts != null ? { attempts: extra.attempts } : {}),
-  }).eq("id", id);
+  }).eq("id", id).select("id,status").maybeSingle();
+  if (error || data?.id !== id || data?.status !== status) throw new Error("derivation completion was not persisted");
 }
 
 /** Back to pending with a delay. Retries are not failures. */
-async function requeue(admin: any, id: string, delaySeconds: number, reason: string) {
-  await admin.from("derivation_queue").update({
+async function requeue(admin: any, id: string, delaySeconds: number, reason: string, restoreAttempts?: number) {
+  const { data, error } = await admin.from("derivation_queue").update({
     status: "pending",
     locked_at: null, locked_by: null,
     next_attempt_at: new Date(Date.now() + delaySeconds * 1000).toISOString(),
     error_message: reason,
-  }).eq("id", id);
-}
-
-function roleOf(authHeader: string | null): string | null {
-  try {
-    const tok = (authHeader ?? "").replace(/^Bearer\s+/i, "");
-    const p = tok.split(".")[1];
-    if (!p) return null;
-    const pad = p + "=".repeat((4 - (p.length % 4)) % 4);
-    return JSON.parse(atob(pad.replace(/-/g, "+").replace(/_/g, "/")))?.role ?? null;
-  } catch { return null; }
+    ...(restoreAttempts !== undefined ? { attempts: restoreAttempts } : {}),
+  }).eq("id", id).select("id,status").maybeSingle();
+  if (error || data?.id !== id || data?.status !== "pending") throw new Error("derivation retry was not persisted");
 }
 
 function json(obj: unknown, status = 200) {

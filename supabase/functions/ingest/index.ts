@@ -22,11 +22,24 @@ import { qualityGate } from "../_shared/extractionQualityGate.ts";
 import { validateVINChecksum } from "../_shared/intelligence-layer.ts";
 import { decodeVin } from "../_shared/vin-decoder.ts";
 import { archiveFetch } from "../_shared/archiveFetch.ts";
-import { normalizeListingUrl, extractCraigslistCanonicalUrls } from "../_shared/urlNormalization.ts";
+import { normalizeListingUrl } from "../_shared/urlNormalization.ts";
+import { requireWriteAuth } from "../_shared/writeGuard.ts";
+import { writeObservation } from "../_shared/observationWriter.ts";
+import { insertMissingVehicleImages } from "../_shared/vehicleImageWrite.ts";
+import { applyCraigslistImagePlan, planCraigslistImages } from "../_shared/craigslistImages.ts";
+import { landCraigslistBlip, modelFromText, type ModelCitation } from "./craigslistBlip.ts";
+import { type CraigslistCapture, pickCapture } from "../_shared/craigslistAttributes.ts";
+import { type CaptureLanding, landCraigslistCapture, ledgerFields } from "./craigslistCapture.ts";
+import { vinMakeCheckApplies } from "./vinGate.ts";
+import { classifiedListingId, classifiedPlatform, landClassifiedListing } from "./classifiedEvent.ts";
+import { slugStubRejection } from "./slugStub.ts";
+import { extractFromHtml } from "../extract-craigslist/extract.ts";
+import { projectSecretKey } from "../_shared/supabaseKeys.ts";
 
 const supabaseAdmin = createClient(
   Deno.env.get("SUPABASE_URL")!,
-  Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
+  projectSecretKey()!,
+  { global: { headers: { "X-Nuke-Writer": "ingest" } } },
 );
 
 // ── Source Detection ────────────────────────────────────────────
@@ -68,11 +81,10 @@ const SOURCE_PATTERNS: Array<{
   },
   {
     // Craigslist share links: https://www.craigslist.org/view/d/{slug}/{token}
-    // The token is an opaque share id, not the listing id — resolve to the
-    // canonical regional URL via resolveCraigslistShareUrl() before use.
+    // The token is opaque. Only the fetched page can establish a native post id.
     platform: "craigslist",
     pattern: /(?:www\.)?craigslist\.org\/view\/d\/[\w-]+\/(\w+)/,
-    extractId: (m) => m[1],
+    extractId: () => null,
   },
   {
     platform: "ebay_motors",
@@ -244,23 +256,47 @@ function detectSource(url: string): SourceMatch {
 const CRAIGSLIST_SHARE_RE = /(?:www\.)?craigslist\.org\/view\/d\//;
 
 /**
- * A www.craigslist.org/view/d/... share link hides the real listing.
- * Fetch the page (archived to listing_page_snapshots) and pull the canonical
- * regional URL (e.g. lasvegas.craigslist.org/cto/d/.../7944399929.html) out
- * of the body/JSON. Returns null if it can't be resolved (expired/blocked).
+ * A share URL can itself be the canonical full detail page. Validate that
+ * declaration and read its native post id with the existing detail parser.
+ * Legacy redirect pages still resolve their observed regional listing URL.
+ * Never manufacture a regional URL or treat the share token as a post id.
  */
-async function resolveCraigslistShareUrl(shareUrl: string): Promise<string | null> {
+async function resolveCraigslistShareUrl(shareUrl: string): Promise<{ url: string | null; postId: string | null; error: string | null }> {
   try {
-    const { html } = await archiveFetch(shareUrl, {
+    const requested = new URL(shareUrl);
+    if (requested.protocol !== "https:" || !["www.craigslist.org", "craigslist.org"].includes(requested.hostname) || requested.username || requested.password || requested.port || !/^\/view\/d\/[^/]+\/[\w-]+\/?$/.test(requested.pathname)) {
+      return { url: null, postId: null, error: "Invalid Craigslist share URL" };
+    }
+    const result = await archiveFetch(shareUrl, {
       platform: "craigslist",
       callerName: "ingest",
+      useFirecrawl: false,
+      directFetchOptions: { publicOnly: true },
       maxAgeSec: 86400,
     });
-    if (!html) return null;
-    return extractCraigslistCanonicalUrls(html)[0]?.url ?? null;
+    const html = result.html ?? "";
+    const canonicalTag = html.match(/<link\b[^>]*\brel\s*=\s*["'][^"']*\bcanonical\b[^"']*["'][^>]*>/i)?.[0];
+    const canonical = canonicalTag?.match(/\bhref\s*=\s*(["'])([^"']+)\1/i)?.[2];
+    if (canonical === requested.href) {
+      // A post with no asking price has no JSON-LD name; extractFromHtml reads its title line (2026-10-15).
+      const detail = extractFromHtml(html, shareUrl);
+      if (detail.post_id && detail.title && detail.description) return { url: shareUrl, postId: detail.post_id, error: null };
+      // A self-canonical shell/expired page cannot borrow a recommendation's identity.
+      return { url: null, postId: null, error: "Craigslist canonical share page lacks full listing evidence" };
+    }
+    // A recommendation/body substring is not an authoritative redirect target.
+    if (canonical) {
+      const target = new URL(canonical);
+      const postId = target.pathname.match(/^\/[a-z]{2,4}\/d\/[^/]+\/(\d{6,})\.html$/i)?.[1];
+      if (target.protocol === "https:" && /^[a-z0-9-]+\.craigslist\.org$/i.test(target.hostname) && target.hostname !== "www.craigslist.org" && !target.username && !target.password && !target.port && target.href === canonical && postId) {
+        return { url: canonical, postId, error: null };
+      }
+    }
+    return { url: null, postId: null, error: result.error || "Craigslist share page has no canonical listing URL" };
   } catch (e) {
-    console.error(`Craigslist share resolution failed for ${shareUrl}:`, e instanceof Error ? e.message : String(e));
-    return null;
+    const error = e instanceof Error ? e.message : String(e);
+    console.error(`Craigslist share resolution failed for ${shareUrl}:`, error);
+    return { url: null, postId: null, error };
   }
 }
 
@@ -315,6 +351,8 @@ interface ParsedVehicle {
   year: number | null;
   make: string | null;
   model: string | null;
+  /** Set to "listing_text" when the model was read from the post's own text (craigslistBlip.modelFromText). */
+  modelSource?: string | null;
 }
 
 // Models/sub-brands that unambiguously identify a make when the title omits it.
@@ -490,6 +528,23 @@ interface VehicleEnrichment {
   sellerName?: string | null;
 }
 
+/**
+ * C7: vehicles.platform_source is the platform key: source_registry.slug where a row exists, else the value the
+ * column already uses for that platform. Never NULL for a detected platform; "unknown" stays NULL.
+ */
+const PLATFORM_SOURCE_SLUG: Record<string, string> = {
+  bring_a_trailer: "bringatrailer",
+  cars_and_bids: "cars-and-bids",
+  barrett_jackson: "barrett-jackson",
+  ebay_motors: "ebay-motors",
+  hagerty: "hagerty-marketplace",
+  vanguard_motors: "vanguard-motors",
+};
+function platformSourceFor(platform?: string | null): string | null {
+  if (!platform || platform === "unknown" || platform === "manual") return null;
+  return PLATFORM_SOURCE_SLUG[platform] ?? platform;
+}
+
 /** vehicle_images.source value for a given detected platform. */
 function imageSourceFor(platform?: string | null): string {
   return platform && platform !== "unknown" && platform !== "manual" ? platform : "ingest";
@@ -555,8 +610,12 @@ async function recordConditionObservation(
 async function matchOrCreateVehicle(
   parsed: ParsedVehicle & VehicleEnrichment,
   platform?: string | null,
-  opts?: { identityUncertain?: boolean },
+  opts?: { identityUncertain?: boolean; extractorVehicleId?: string },
 ): Promise<MatchResult> {
+  // Only tryAutoEnrich's successful database read-back supplies this id. The
+  // source writer has already resolved and written the entity; do not create
+  // another one or relabel its sold/high-bid amount as an asking price.
+  if (opts?.extractorVehicleId) return { vehicleId: opts.extractorVehicleId, isNew: false, matchTier: 2, matchConfidence: 0.99 };
   // Canonicalize the listing URL once for matching + storage. Per Entity
   // Resolution Rules ("Add URL normalization to entity resolution... extract
   // platform-specific listing IDs"): URL variants (trailing slash, www,
@@ -736,7 +795,13 @@ async function matchOrCreateVehicle(
     status: "discovered",
     primary_image_url: parsed.imageUrl || (parsed.imageUrls?.[0]) || null,
     source: platform && platform !== "unknown" ? platform : null,
+    platform_source: platformSourceFor(platform), // C7: the platform key
   };
+  // A Craigslist post is a live classified when we read it. The column defaulted to false for every one of them
+  // (1,053 of 1,053 created in two days, 2026-10-15) while sale_status said "available".
+  if (platform === "craigslist") vehicleData.is_for_sale = true;
+  // A model read from the post's own text (craigslistBlip.modelFromText) says so; the span is on the observation.
+  if (parsed.modelSource) vehicleData.model_source = parsed.modelSource;
 
   // Populate everything we have (real vehicles columns only — the table has
   // engine_type, not engine, and no condition_notes column)
@@ -783,12 +848,17 @@ async function matchOrCreateVehicle(
     const imageRows = allImages.map((url: string, i: number) => ({
       vehicle_id: newVehicle.id,
       image_url: url,
+      position: i,
+      display_order: i,
       is_primary: i === 0,
       source: imageSourceFor(platform),
       is_external: true,
+      ai_processing_status: "skipped", // not requested: see the matched path below
       source_url: parsed.url || null,
     }));
-    await supabaseAdmin.from("vehicle_images").insert(imageRows);
+    // (Deployed 2026-10-15 with #1531: #1528's deploy died on its migration before the functions step.)
+    const imgWrite = await insertMissingVehicleImages(supabaseAdmin, newVehicle.id, imageRows);
+    if (imgWrite.error) console.error(`[ingest] vehicle_images insert ${newVehicle.id}: ${imgWrite.error.message}`);
   }
 
   // ── Create merge proposals for Tier 3 candidates ──────────────
@@ -827,13 +897,14 @@ async function matchOrCreateVehicle(
 async function enrichVehicle(vehicleId: string, data: VehicleEnrichment, platform?: string | null) {
   const { data: existing } = await supabaseAdmin
     .from("vehicles")
-    .select("description, mileage, engine_type, transmission, color, body_style, title_status, seller_name, asking_price, primary_image_url, location, city, state, listing_url, listing_source, vin")
+    .select("description, mileage, engine_type, transmission, color, body_style, title_status, seller_name, asking_price, primary_image_url, location, city, state, listing_url, listing_source, vin, platform_source")
     .eq("id", vehicleId)
     .single();
 
   if (!existing) return;
 
   const updates: Record<string, any> = {};
+  if (!existing.platform_source && platformSourceFor(platform)) updates.platform_source = platformSourceFor(platform); // C7
 
   if (!existing.description && data.description) updates.description = data.description;
   if (!existing.mileage && data.mileage) updates.mileage = data.mileage;
@@ -875,8 +946,18 @@ async function enrichVehicle(vehicleId: string, data: VehicleEnrichment, platfor
     // Check which images already exist
     const { data: existingImages } = await supabaseAdmin
       .from("vehicle_images")
-      .select("image_url")
+      .select("id, image_url, is_primary, is_duplicate, vision_gate_status")
       .eq("vehicle_id", vehicleId);
+
+    if (platform === "craigslist") {
+      // The gallery at full size: add what is missing, supersede the 600x450 rows (never delete). See craigslistImages.ts.
+      const plan = planCraigslistImages(existingImages || [], allImages);
+      if (plan.insert.length > 0) {
+        const applied = await applyCraigslistImagePlan(supabaseAdmin, { vehicleId, sourceUrl: data.url || null, source: imageSourceFor(platform), plan });
+        if (applied.errors.length) console.error(`[ingest] craigslist images ${vehicleId}: ${applied.errors.slice(0, 3).join("; ")}`);
+      }
+      return;
+    }
 
     const existingUrls = new Set((existingImages || []).map((i: any) => i.image_url));
     const newImages = allImages.filter((url: string) => !existingUrls.has(url));
@@ -889,9 +970,12 @@ async function enrichVehicle(vehicleId: string, data: VehicleEnrichment, platfor
         is_primary: !hasPrimary && i === 0,
         source: imageSourceFor(platform),
         is_external: true,
+        ai_processing_status: "skipped", // listing photos are not analyzed unless someone asks; "pending" fires the photo pipeline per row
         source_url: data.url || null,
       }));
-      await supabaseAdmin.from("vehicle_images").insert(imageRows);
+      // A revisit never re-adds a photo the vehicle already holds (_shared/vehicleImageWrite.ts).
+      const imgWrite = await insertMissingVehicleImages(supabaseAdmin, vehicleId, imageRows);
+      if (imgWrite.error) console.error(`[ingest] vehicle_images insert ${vehicleId}: ${imgWrite.error.message}`);
 
       // Update primary_image_url if vehicle didn't have one
       if (!hasPrimary) {
@@ -906,6 +990,7 @@ async function enrichVehicle(vehicleId: string, data: VehicleEnrichment, platfor
 // ── Auto-Enrichment via Existing Extractors ──────────────────────
 
 interface EnrichedData {
+  vehicle_id?: string;
   year?: number | null;
   make?: string | null;
   model?: string | null;
@@ -925,6 +1010,12 @@ interface EnrichedData {
   seller_name?: string | null;
   /** Canonicalized listing URL the extractor actually wrote to `vehicles.listing_url`, if it differs from the input URL. */
   listing_url?: string | null;
+  /** When the listing went up, if the extractor read it (ClassicCars and KSL events; ISO). */
+  posted_at?: string | null;
+  /** The seller class the source states (KSL sellerType, ClassicCars Listed By), as written. */
+  seller_type_raw?: string | null;
+  /** Craigslist only: the post's attribute block, id and clocks, as extract-craigslist read them (see ./craigslistCapture.ts). */
+  capture?: CraigslistCapture | null;
 }
 
 type EnrichResult =
@@ -933,7 +1024,7 @@ type EnrichResult =
 
 async function tryAutoEnrich(url: string, platform: string): Promise<EnrichResult> {
   const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
-  const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+  const serviceKey = projectSecretKey()!;
 
   // BaT delegates to extract-bat-core, a self-contained writer (it creates or
   // conservatively updates the vehicle row itself, resolving by
@@ -1039,12 +1130,27 @@ async function tryAutoEnrich(url: string, platform: string): Promise<EnrichResul
 
   // Map platform to extractor edge function
   const extractors: Record<string, string> = {
+    craigslist: "extract-craigslist", // deterministic; no generic AI retry after an access denial
     cars_and_bids: "extract-cars-and-bids-core",
     hagerty: "extract-hagerty-listing",
+    pcarmarket: "import-pcarmarket-listing",
+    mecum: "extract-mecum",
+    barrett_jackson: "extract-barrett-jackson",
   };
 
   // Use dedicated extractor if available, otherwise fall back to generic AI extraction
-  const extractorName = extractors[platform] || "extract-vehicle-data-ai";
+  const hostExtractors: Record<string, string> = {
+    "goodingco.com": "extract-gooding",
+    "rmsothebys.com": "extract-rmsothebys",
+    "bonhams.com": "extract-bonhams",
+    "cars.bonhams.com": "extract-bonhams",
+    "broadarrowauctions.com": "extract-broad-arrow",
+    "cars.ksl.com": "extract-ksl", // deterministic (page payload); no LLM
+    "collectingcars.com": "extract-collecting-cars", // deterministic (page payload via Firecrawl); no LLM
+    "classiccars.com": "extract-classiccars", // deterministic (page JSON-LD + attribute panel); no LLM
+  };
+  const host = new URL(url).hostname.replace(/^www\./, "").toLowerCase();
+  const extractorName = extractors[platform] || hostExtractors[host] || "extract-vehicle-data-ai";
 
   try {
     const resp = await fetch(`${supabaseUrl}/functions/v1/${extractorName}`, {
@@ -1053,7 +1159,7 @@ async function tryAutoEnrich(url: string, platform: string): Promise<EnrichResul
         "Authorization": `Bearer ${serviceKey}`,
         "Content-Type": "application/json",
       },
-      body: JSON.stringify({ url }),
+      body: JSON.stringify({ url, save_to_db: platform !== "craigslist", ...(extractorName === "extract-rmsothebys" ? { action: "extract" } : {}) }),
       signal: AbortSignal.timeout(75_000),
     });
 
@@ -1077,7 +1183,19 @@ async function tryAutoEnrich(url: string, platform: string): Promise<EnrichResul
     //   extract-craigslist      → { success, extracted: {...} }
     //   complete-bat-import     → { success, listing: {...} }
     //   others                  → { vehicle: {...} } or flat
-    const vehicle = result.data || result.extracted || result.vehicle || result.listing || result;
+    let vehicle = result.data || result.extracted || result.vehicle || result.listing || result;
+    // Dedicated writers return summaries (Mecum's images is a count and its
+    // description is "N chars"). Read their persisted row, never ingest that
+    // summary as source testimony. Adopt the writer's URL to avoid a second
+    // entity when it canonicalized www/trailing slashes.
+    const writtenId = result.vehicle_id || result._db?.vehicle_id;
+    if (writtenId) {
+      const { data: row, error } = await supabaseAdmin.from("vehicles")
+        .select("year,make,model,vin,mileage,color,transmission,body_style,title_status,description,sale_price,high_bid,price,asking_price,listing_location,primary_image_url,listing_url")
+        .eq("id", writtenId).maybeSingle();
+      if (error || !row) return { ok: false, error: `${extractorName} vehicle read-back failed: ${error?.message || "no row"}` };
+      vehicle = row;
+    }
 
     // Extraction that produced no identity is a failure, not an enrichment
     if (!vehicle || (!vehicle.year && !vehicle.make && !vehicle.vin)) {
@@ -1093,7 +1211,7 @@ async function tryAutoEnrich(url: string, platform: string): Promise<EnrichResul
         price: vehicle.sale_price || vehicle.sold_price || vehicle.asking_price || vehicle.price || null,
         description: vehicle.description || vehicle.listing_description || null,
         image_url: vehicle.primary_image_url || vehicle.image_url || vehicle.images?.[0] || vehicle.image_urls?.[0] || null,
-        image_urls: vehicle.image_urls || vehicle.images || null,
+        image_urls: Array.isArray(vehicle.image_urls) ? vehicle.image_urls : Array.isArray(vehicle.images) ? vehicle.images : null,
         vin: vehicle.vin || null,
         mileage: vehicle.mileage || null,
         engine: vehicle.engine || vehicle.engine_type || null,
@@ -1102,8 +1220,13 @@ async function tryAutoEnrich(url: string, platform: string): Promise<EnrichResul
         body_style: vehicle.body_style || vehicle.body_type || null,
         title_status: vehicle.title_status || null,
         condition: vehicle.condition || null,
-        location: vehicle.location || null,
+        location: vehicle.location || vehicle.listing_location || null,
         seller_name: vehicle.seller || vehicle.seller_username || vehicle.seller_name || null,
+        listing_url: vehicle.listing_url || (typeof vehicle.url === "string" ? vehicle.url : null),
+        vehicle_id: writtenId || undefined,
+        posted_at: typeof vehicle.posted_at === "string" ? vehicle.posted_at : null,
+        seller_type_raw: typeof vehicle.seller_type === "string" ? vehicle.seller_type : null,
+        capture: platform === "craigslist" ? pickCapture(vehicle) : null,
       },
     };
   } catch (e) {
@@ -1147,7 +1270,7 @@ interface IngestInput {
 }
 
 interface IngestResult {
-  status: "created" | "matched" | "duplicate" | "rejected" | "error" | "preview";
+  status: "created" | "matched" | "duplicate" | "rejected" | "error" | "preview" | "unresolved";
   vehicle_id?: string | null;
   discovery_id?: string | null;
   is_new_vehicle?: boolean;
@@ -1167,6 +1290,11 @@ interface IngestResult {
   parsed?: { year: number | null; make: string | null; model: string | null };
   price?: number | null;
   location?: string | null;
+  // Craigslist only: the post's id, clocks and attribute block (and, once a vehicle exists, how the landing went).
+  // The poller copies it onto the import_queue ledger row, so the ledger carries what the page said.
+  listing_capture?: Record<string, unknown>;
+  // Craigslist only: the unresolved-listing observation written when the post names no model (status "unresolved").
+  blip?: { observation: string; observation_id?: string; errors: string[] };
 }
 
 /**
@@ -1209,39 +1337,25 @@ async function ingestOne(input: IngestInput, userId: string | null): Promise<Ing
     let parsed: ParsedVehicle = { year: null, make: null, model: null };
     let listingUrl: string | null = input.url || null;
 
-    // True when identity resolution can't rely on Tier 2 URL-matching at
-    // all — currently: an unresolved Craigslist share URL. Passed into
-    // matchOrCreateVehicle so Tier 3 uses its lower confidence floor and
-    // still queues a reviewable merge_proposal instead of a fully silent
-    // duplicate vehicle.
-    let identityUncertain = false;
+    // Unresolved Craigslist share URLs now stop before identity resolution.
+    const identityUncertain = false;
 
     if (input.url) {
       const source = detectSource(input.url);
       platform = source.platform;
       externalId = source.externalId;
 
-      // Craigslist share links hide the real listing — resolve to the
-      // canonical regional URL and use it everywhere (dedup, listing_url,
-      // enrichment). If resolution fails, keep the share URL; the platform
-      // is still recognized as craigslist. Retry once — Craigslist fetches
-      // are frequently transient-blocked (verified 2026-07-01/02), and a
-      // second attempt materially reduces how often we fall back to the
-      // uncertain-identity path below.
-      // Skipped in preview: resolution calls archiveFetch (external fetch +
-      // listing_page_snapshots insert) — preview must stay zero-fetch/zero-write.
-      // A CL share URL in preview simply yields no slug → caller falls back to
-      // manual entry.
+      // Resolve a Craigslist share link once. Failure returns to the intake
+      // ledger/backoff before detail enrichment; it must not retry the same
+      // denied page through another extractor. Preview stays zero-fetch/write.
       if (platform === "craigslist" && CRAIGSLIST_SHARE_RE.test(input.url) && !isPreview) {
-        let canonical = await resolveCraigslistShareUrl(input.url);
-        if (!canonical) canonical = await resolveCraigslistShareUrl(input.url);
-        if (canonical) {
-          listingUrl = canonical;
-          const canonicalSource = detectSource(canonical);
-          if (canonicalSource.externalId) externalId = canonicalSource.externalId;
-        } else {
-          identityUncertain = true;
+        const resolution = await resolveCraigslistShareUrl(input.url);
+        if (!resolution.url) {
+          return { status: "rejected", reason: `enrichment_failed: ${resolution.error}`,
+            enrichment_error: resolution.error || undefined, source: platform, external_id: externalId };
         }
+        listingUrl = resolution.url;
+        externalId = resolution.postId;
       }
     }
 
@@ -1323,15 +1437,30 @@ async function ingestOne(input: IngestInput, userId: string | null): Promise<Ing
     }
 
     // Auto-enrich: call the platform's extractor to get full listing data
+    let capture: CraigslistCapture | null = null;
+    // Keep source prose beside its capture, separately from caller notes or retained vehicle text.
+    let captureDescription: string | null = null;
+    const captureAnswer = (): { listing_capture?: Record<string, unknown> } =>
+      capture ? { listing_capture: ledgerFields(capture) } : {};
     let enrichmentSucceeded = false;
     let enrichmentSkipped = false;
     let enrichmentError: string | null = null;
+    let extractorVehicleId: string | undefined;
+    let enrichedPostedAt: string | null = null;
+    let enrichedSellerType: string | null = null;
 
     if (input.enrich !== false && listingUrl && !input.description) {
       const enrichResult = await tryAutoEnrich(listingUrl, platform);
       if (enrichResult.ok) {
         enrichmentSucceeded = true;
         const enriched = enrichResult.data;
+        if (platform === "craigslist" && CRAIGSLIST_SHARE_RE.test(listingUrl) && enriched.capture?.post_id !== externalId) {
+          return { status: "rejected", reason: "enrichment_failed: Craigslist share detail post identity mismatch",
+            enrichment_error: "Craigslist share detail post identity mismatch", source: platform, external_id: externalId };
+        }
+        extractorVehicleId = enriched.vehicle_id;
+        enrichedPostedAt = enriched.posted_at ?? null;
+        enrichedSellerType = enriched.seller_type_raw ?? null;
         // The extractor (e.g. extract-bat-core) may have written the vehicle
         // under its own canonicalized URL, which can differ from the URL we
         // were given (trailing slash, www, query params). Adopt it so the
@@ -1346,7 +1475,11 @@ async function ingestOne(input: IngestInput, userId: string | null): Promise<Ing
         if (!input.description && enriched.description) input.description = enriched.description;
         if (!input.image_url && enriched.image_url) input.image_url = enriched.image_url;
         if (!input.image_urls && enriched.image_urls) input.image_urls = enriched.image_urls;
-        if (!input.vin && enriched.vin) input.vin = enriched.vin;
+        // A Craigslist VIN is seller-typed. It lands through the observation writer once the vehicle exists
+        // (./craigslistCapture.ts), never as the creation identity: the make cross-check below would have rejected
+        // 9 of 46 real Craigslist VINs on 2026-10-06 and none of the 9 was a wrong VIN (6 decoder errors, 3 make
+        // fragments from the title), and the poller ledgers a reject for good.
+        if (platform !== "craigslist" && !input.vin && enriched.vin) input.vin = enriched.vin;
         if (!input.mileage && enriched.mileage) input.mileage = enriched.mileage;
         if (!input.engine && enriched.engine) input.engine = enriched.engine;
         if (!input.transmission && enriched.transmission) input.transmission = enriched.transmission;
@@ -1358,6 +1491,11 @@ async function ingestOne(input: IngestInput, userId: string | null): Promise<Ing
           input.location = normalizeLocation(enriched.location) ?? undefined;
         }
         if (!input.seller_name && enriched.seller_name) input.seller_name = enriched.seller_name;
+        if (enriched.capture) {
+          capture = enriched.capture;
+          captureDescription = typeof enriched.description === "string" && enriched.description.trim()
+            ? enriched.description : null;
+        }
         // Extracted identity beats slug-derived guesses (caller-explicit fields
         // were already merged into input above, so they still win)
         if (enriched.year && enriched.make) {
@@ -1374,6 +1512,14 @@ async function ingestOne(input: IngestInput, userId: string | null): Promise<Ing
       }
     }
 
+    // Automated Craigslist intake must ledger a failed public detail request,
+    // not mint a vehicle from its URL slug or fall through to generic inference.
+    if (platform === "craigslist" && enrichmentError &&
+      (identityIsSlugGuess || (!input.year && !input.make && !input.model))) {
+      return { status: "rejected", reason: `enrichment_failed: ${enrichmentError}`,
+        enrichment_error: enrichmentError, source: platform, external_id: externalId };
+    }
+
     // ── MINIMUM-VIABILITY GATE ──────────────────────────────────────
     // Never mint a stub from a URL slug guess. Creating a vehicle requires
     // full identity (year+make+model) AND a trusted origin (recognized
@@ -1387,6 +1533,28 @@ async function ingestOne(input: IngestInput, userId: string | null): Promise<Ing
         external_id: externalId,
       };
     }
+    // Craigslist: a blank model may be stated in the post's own text. Read it with its citation, or keep the post.
+    let modelCitation: ModelCitation | null = null;
+    if (platform === "craigslist" && capture && parsed.year && parsed.make && !parsed.model) {
+      modelCitation = modelFromText(input.description || input.notes, parsed.year, parsed.make);
+      if (modelCitation) { parsed.model = modelCitation.value; (parsed as any).modelSource = "listing_text"; }
+    }
+    if ((!parsed.year || !parsed.make || !parsed.model) && platform === "craigslist" && capture) {
+      // A blip: the post, its text, photos, place and clocks, retained with no vehicle (AGENTS.md).
+      const blip = await landCraigslistBlip(
+        { supabase: supabaseAdmin, writeObservation },
+        { listingUrl: listingUrl ?? input.url ?? "", capture, year: parsed.year ?? null, make: parsed.make ?? null,
+          description: input.description || input.notes, imageUrls: input.image_urls ?? (input.image_url ? [input.image_url] : null) },
+      );
+      return {
+        status: "unresolved",
+        reason: `insufficient identity: year=${parsed.year ?? "?"} make=${parsed.make ?? "?"} model=${parsed.model ?? "?"} — kept as an unresolved listing`,
+        blip,
+        source: platform,
+        external_id: externalId,
+        ...captureAnswer(),
+      };
+    }
     if (!parsed.year || !parsed.make || !parsed.model) {
       return {
         status: "rejected",
@@ -1394,6 +1562,7 @@ async function ingestOne(input: IngestInput, userId: string | null): Promise<Ing
         enrichment_error: enrichmentError || undefined,
         source: platform,
         external_id: externalId,
+        ...captureAnswer(),
       };
     }
     // A pure URL-slug guess is exactly the "stub" this gate exists to block
@@ -1417,6 +1586,20 @@ async function ingestOne(input: IngestInput, userId: string | null): Promise<Ing
           ? `unrecognized platform, unresolved URL-slug guess, and enrichment failed: ${enrichmentError}`
           : "unrecognized platform, identity derived only from a URL slug guess, with no successful enrichment — refusing to create from URL guesswork",
         enrichment_error: enrichmentError || undefined,
+        source: platform,
+        external_id: externalId,
+      };
+    }
+
+    // A venue's URL slug vouches for the identity, not for the page. When the page extractor ran and failed, the row
+    // would hold year, make and model and nothing else: a public husk nothing will fill in. Write nothing and say why;
+    // poll-listing-feeds records the rejection once and retries it on a schedule (slugStub.ts, poll-listing-feeds/ledger.ts).
+    const slugStub = slugStubRejection({ platform, identityIsSlugGuess, enrichmentSucceeded, enrichmentError });
+    if (slugStub) {
+      return {
+        status: "rejected",
+        reason: slugStub.reason,
+        enrichment_error: slugStub.enrichment_error,
         source: platform,
         external_id: externalId,
       };
@@ -1451,7 +1634,8 @@ async function ingestOne(input: IngestInput, userId: string | null): Promise<Ing
     const suggestions: Record<string, string> = {};
     if (candidateData.vin && typeof candidateData.vin === "string" && candidateData.vin.length >= 6) {
       const decoded = decodeVin(candidateData.vin);
-      if (decoded.make && candidateData.make) {
+      // Only a 17-character VIN with a valid check digit is decoded for make (./vinGate.ts); a chassis number is a claim.
+      if (vinMakeCheckApplies(candidateData.vin) && decoded.make && candidateData.make) {
         const vinMake = normalizeMake(decoded.make);
         const claimedMake = normalizeMake(candidateData.make);
         if (vinMake && claimedMake && vinMake !== claimedMake) {
@@ -1523,6 +1707,7 @@ async function ingestOne(input: IngestInput, userId: string | null): Promise<Ing
         suggestions: Object.keys(suggestions).length > 0 ? suggestions : undefined,
         source: platform,
         external_id: externalId,
+        ...captureAnswer(),
       };
     }
 
@@ -1531,7 +1716,8 @@ async function ingestOne(input: IngestInput, userId: string | null): Promise<Ing
       year: gateResult.cleaned.year ?? parsed.year,
       make: gateResult.cleaned.make ?? parsed.make,
       model: gateResult.cleaned.model ?? parsed.model,
-    };
+      ...((parsed as any).modelSource ? { modelSource: (parsed as any).modelSource } : {}),
+    } as typeof parsed;
     if (gateResult.cleaned.vin) input.vin = gateResult.cleaned.vin;
     if (gateResult.cleaned.transmission) input.transmission = gateResult.cleaned.transmission;
     if (gateResult.cleaned.color) input.color = gateResult.cleaned.color;
@@ -1557,13 +1743,57 @@ async function ingestOne(input: IngestInput, userId: string | null): Promise<Ing
       bodyStyle: input.body_style,
       titleStatus: input.title_status,
       sellerName: input.seller_name,
-    }, platform, { identityUncertain });
+    }, platform, { identityUncertain, extractorVehicleId });
 
     // Condition is free text with no home on the vehicles table — record it
     // as an observation so it's not silently discarded (see
     // recordConditionObservation for why).
-    if (input.condition && match.vehicleId) {
+    // Not for Craigslist: its one-word condition travels inside the listing observation (./craigslistCapture.ts),
+    // because a condition-kind observation marks a vehicle "description already read" for discover-description-data.
+    if (input.condition && match.vehicleId && platform !== "craigslist") {
       await recordConditionObservation(match.vehicleId, platform, input.condition, listingUrl);
+    }
+
+    // Craigslist: land the attribute block now that the vehicle exists. Bounded, never throws, outcome reported.
+    let landing: CaptureLanding | null = null;
+    if (capture && platform === "craigslist" && match.vehicleId) {
+      landing = await landCraigslistCapture(
+        { supabase: supabaseAdmin, writeObservation },
+        {
+          vehicleId: match.vehicleId,
+          listingUrl: listingUrl ?? input.url ?? "",
+          capture,
+          sourceDescription: captureDescription,
+          isNewVehicle: match.isNew,
+          modelCitation,
+          description: input.description || input.notes,
+          written: {
+            mileage: input.mileage,
+            title_status: input.title_status,
+            transmission: input.transmission,
+            color: input.color,
+            body_style: input.body_style,
+          },
+        },
+      );
+    }
+
+    // ClassicCars and KSL: the same listing projection Craigslist lands, so the classified board can read them.
+    const classified = classifiedPlatform(listingUrl);
+    if (classified && match.vehicleId && !isPreview) {
+      const listingId = classifiedListingId(listingUrl);
+      if (listingId) {
+        try {
+          const landed = await landClassifiedListing(supabaseAdmin, {
+            vehicleId: match.vehicleId, platform: classified, listingUrl: listingUrl ?? "", listingId,
+            price: typeof input.price === "number" ? input.price : null, postedAt: enrichedPostedAt,
+            observedAt: new Date().toISOString(), sellerTypeRaw: enrichedSellerType,
+          });
+          if (landed.event.action === "error") console.error(`[ingest] ${classified} listing event ${match.vehicleId}: ${landed.event.error}`);
+        } catch (e) {
+          console.error(`[ingest] ${classified} listing event ${match.vehicleId}: ${e instanceof Error ? e.message : String(e)}`);
+        }
+      }
     }
 
     // Facebook Saved: set status based on sold flag
@@ -1762,6 +1992,7 @@ async function ingestOne(input: IngestInput, userId: string | null): Promise<Ing
       quality_score: qualityScore,
       issues: gateResult.issues.length > 0 ? gateResult.issues : undefined,
       needs_review: needsReview || undefined,
+      ...(capture ? { listing_capture: ledgerFields(capture, landing) } : {}),
     };
   } catch (err: any) {
     return {
@@ -1774,6 +2005,9 @@ async function ingestOne(input: IngestInput, userId: string | null): Promise<Ing
 // ── Serve ───────────────────────────────────────────────────────
 
 Deno.serve(async (req: Request) => {
+  // Writes are never anonymous: service key, signed-in user, or nothing (P0.2, 2026-09-27).
+  const denied = await requireWriteAuth(req);
+  if (denied) return denied;
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
   }
@@ -1826,10 +2060,10 @@ Deno.serve(async (req: Request) => {
         ],
       },
       responses: {
-        created:  { description: "New vehicle created. If the source extractor failed, enrichment_error is set and quality_score is lowered — the row holds honest fields only.", fields: ["vehicle_id", "quality_score", "issues", "enrichment_error"] },
+        created:  { description: "New vehicle created. If the source extractor failed, enrichment_error is set and quality_score is lowered — the row holds honest fields only. Not for classiccars, mecum, barrett-jackson, hagerty, cars-and-bids, pcarmarket, vanguard-motors, allcollectorcars, autohunter or carandclassic URLs with no caller-supplied identity: there a failed extractor is a rejection (enrichment_failed).", fields: ["vehicle_id", "quality_score", "issues", "enrichment_error"] },
         matched:  { description: "Matched existing vehicle (enriched)", fields: ["vehicle_id", "quality_score"] },
         duplicate:{ description: "Same user+URL already ingested", fields: ["vehicle_id", "discovery_id"] },
-        rejected: { description: "Failed validation or minimum-viability gate (need year+make+model AND a recognized platform or successful extraction)", fields: ["reason", "quality_score", "issues", "suggestions"] },
+        rejected: { description: "Failed validation or minimum-viability gate (need year+make+model AND a recognized platform or successful extraction). reason starts enrichment_failed: when a slug-trusted venue's page extractor failed; nothing was written and enrichment_error carries the extractor's error.", fields: ["reason", "quality_score", "issues", "suggestions", "enrichment_error"] },
         preview:  { description: "preview:true — parsed identity only, nothing written", fields: ["parsed", "price", "location", "source", "external_id"] },
         error:    { description: "Server error", fields: ["error"] },
       },

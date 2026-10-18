@@ -1,0 +1,111 @@
+import { listingKey, type InventoryTaxonomy, type LiveAuction } from './useMarketPulse';
+import { squarify } from '../../lib/squarify';
+import { vehicleIdentity } from './useMarketRowDetails';
+
+export const MAP_GROUPS = [
+  { id: 'make', label: 'Brand' }, { id: 'model', label: 'Model' },
+  { id: 'type', label: 'Vehicle type' }, { id: 'body', label: 'Body style' },
+  { id: 'era', label: 'Era (decade)' }, { id: 'year', label: 'Year' },
+] as const;
+export type MapDimension = typeof MAP_GROUPS[number]['id'];
+export type MapSubdivision = 'none' | 'make' | 'model' | 'year' | 'era' | 'lot';
+export interface InventoryMapLens {
+  group: MapDimension;
+  inside: MapSubdivision;
+  focus: string | null;
+  child: string | null;
+}
+export const recordedModel = (a: LiveAuction) => a.model?.trim() || 'Model unrecorded';
+export const lotTitle = vehicleIdentity;
+
+export function mapLens(params: URLSearchParams, make: string | null): InventoryMapLens {
+  // A chosen brand opens on its decades: BaT's recorded models are too fine-grained to read as a map
+  // (100 models for 143 Porsche lots, most of them one lot). Models stay one choice away in the control.
+  const group = MAP_GROUPS.find(g => g.id === params.get('mapBy'))?.id ?? (make ? 'era' : 'make');
+  // A brand box shows its decades unless the viewer chooses otherwise: a readable cut of the brand's open lots
+  // (recorded models on BaT are too fine-grained to label inside a box: 104 models for 155 Porsche lots).
+  // A decade box inside a chosen brand shows the cars themselves, each a door to its record.
+  const inside = (['none', 'make', 'model', 'year', 'era', 'lot'] as const).find(s => s === params.get('mapInside')) ?? (group === 'make' ? 'era' : group === 'era' && make ? 'lot' : 'none');
+  return { group, inside, focus: params.get('mapFocus'), child: inside === 'none' ? null : params.get('mapChild') };
+}
+
+export function taxonomyByListing(rows: InventoryTaxonomy[] = []): Map<string, InventoryTaxonomy> {
+  return new Map(rows.flatMap(row => {
+    const key = listingKey({ id: row.id, listingUrl: row.listing_url });
+    return key ? [[key, row] as const] : [];
+  }));
+}
+
+export function mapValue(a: LiveAuction, dimension: MapDimension | 'lot', taxonomy: Map<string, InventoryTaxonomy>): string {
+  if (dimension === 'lot') return listingKey(a) ?? a.id;
+  if (dimension === 'make') return a.make;
+  // Include the make in model keys so identically named models from different brands never collapse.
+  if (dimension === 'model') return JSON.stringify([a.make, recordedModel(a)]);
+  if (dimension === 'year' || dimension === 'era') {
+    if (a.year == null || !Number.isInteger(a.year) || a.year <= 0 || a.year > 9999) return 'Year unrecorded';
+    return dimension === 'year' ? String(a.year) : `${Math.floor(a.year / 10) * 10}–${Math.floor(a.year / 10) * 10 + 9}`;
+  }
+  const row = taxonomy.get(listingKey(a) ?? '');
+  return (dimension === 'type' ? row?.canonical_vehicle_type : row?.canonical_body_style)?.trim() || 'Unrecorded';
+}
+
+export interface InventoryMapGroup { key: string; name: string; lots: LiveAuction[] }
+export interface ReadableMapGroup extends InventoryMapGroup { remainder?: InventoryMapGroup[] }
+
+// What a box's area stands for: its open lots, or the dollars currently bid on them (the board's headline figure,
+// opened into what it is made of). A lot without a recorded bid adds no dollars.
+export type MapMeasure = 'lots' | 'bids';
+export function groupArea(group: InventoryMapGroup, measure: MapMeasure = 'lots'): number {
+  return measure === 'bids' ? group.lots.reduce((n, a) => n + (a.currentBid != null && a.currentBid > 0 ? a.currentBid : 0), 0)
+    : group.lots.length;
+}
+
+/** Keep the area of every lot, but combine boxes too small to identify into a named list entry. */
+export function readableInventoryLayout(groups: InventoryMapGroup[], width: number, height: number, measure: MapMeasure = 'lots') {
+  const area = (g: InventoryMapGroup) => groupArea(g, measure);
+  // A box with no area cannot be drawn; in dollars that is a group whose lots have no recorded bid.
+  const drawable = groups.filter(g => area(g) > 0);
+  if (width <= 0 || height <= 0 || !drawable.length) return [];
+  const sorted = [...drawable].sort((a, b) => area(b) - area(a) || a.key.localeCompare(b.key));
+  const total = sorted.reduce((n, g) => n + area(g), 0);
+  // Keep the largest legible prefix. Reserve the combined entry at the edge so it
+  // cannot displace the largest named brand or trigger repeated layout collapse.
+  const max = Math.min(sorted.length, Math.floor(width * height / (88 * 60)));
+  for (let shown = max; shown >= 0; shown--) {
+    const remainder = sorted.slice(shown);
+    const remainderLots = remainder.flatMap(g => g.lots);
+    const share = remainder.reduce((n, g) => n + area(g), 0) / total;
+    const landscape = width >= height;
+    const mainWidth = landscape ? width * (1 - share) : width;
+    const mainHeight = landscape ? height : height * (1 - share);
+    const rects = squarify<ReadableMapGroup>(sorted.slice(0, shown).map(node => ({ node, area: area(node) })), 0, 0, mainWidth, mainHeight);
+    if (rects.some(r => r.w < 88 || r.h < 60)) continue;
+    if (remainder.length) {
+      const restWidth = landscape ? width - mainWidth : width;
+      const restHeight = landscape ? height : height - mainHeight;
+      if (shown > 0 && (restWidth < 88 || restHeight < 60)) continue;
+      rects.push({ node: { key: '__map_remainder__', name: `${remainder.length} more groups`, lots: remainderLots, remainder },
+        x: landscape ? mainWidth : 0, y: landscape ? 0 : mainHeight, w: restWidth, h: restHeight });
+    }
+    return rects;
+  }
+  return [];
+}
+export function inventoryGroups(auctions: LiveAuction[], dimension: MapDimension | 'lot', taxonomy: Map<string, InventoryTaxonomy>): InventoryMapGroup[] {
+  const groups = new Map<string, InventoryMapGroup>();
+  const singleMake = new Set(auctions.map(a => a.make)).size === 1;
+  // Stable order depends on identity, never bid, close extensions, API response order or board sorting.
+  for (const a of [...auctions].sort((a, b) => (listingKey(a) ?? a.id).localeCompare(listingKey(b) ?? b.id))) {
+    const key = mapValue(a, dimension, taxonomy);
+    const name = dimension === 'lot' ? lotTitle(a)
+      : dimension === 'model' ? `${singleMake ? '' : `${a.make} · `}${recordedModel(a)}` : key;
+    const group = groups.get(key) ?? { key, name, lots: [] };
+    group.lots.push(a); groups.set(key, group);
+  }
+  return [...groups.values()].sort((a, b) => a.key.localeCompare(b.key));
+}
+
+export function matchesMapLens(a: LiveAuction, lens: InventoryMapLens, taxonomy: Map<string, InventoryTaxonomy>): boolean {
+  return (lens.focus == null || mapValue(a, lens.group, taxonomy) === lens.focus)
+    && (lens.child == null || lens.inside === 'none' || mapValue(a, lens.inside, taxonomy) === lens.child);
+}

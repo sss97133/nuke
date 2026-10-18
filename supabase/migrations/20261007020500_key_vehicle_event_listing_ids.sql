@@ -1,0 +1,12 @@
+-- LEDGER NOTE (2026-10-07): this migration never applied, and nothing runs from this file now.
+--
+-- Merged as #722, it declared app.writer as a function-level SET on key_vehicle_event_listing_ids. Prod's deploy role
+-- is not a superuser, and CREATE FUNCTION with a SET of a custom parameter needs one: Supabase Deploy run 37557001434
+-- (2026-10-07 01:25Z) failed with "permission denied to set parameter app.writer". The transaction rolled back, so no
+-- function, registry row or comment from this file exists on prod.
+--
+-- The deploy workflow applies only the files a merge commit adds, so the whole migration was carried again, corrected,
+-- in 20261007031500_key_vehicle_event_listing_ids_v2.sql (app.writer set with set_config for the call and restored on
+-- return). The body that failed is in git history at commit 0c698a800. This file stays as a note (SCHEMA_LAW §7: a
+-- superseded-before-use migration is rewritten as a ledger note, never deleted), so a replay of the migrations in
+-- filename order runs nothing here and applies the corrected file after it.

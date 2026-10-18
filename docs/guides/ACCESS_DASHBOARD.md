@@ -47,7 +47,7 @@ import ProcessingMonitor from './pages/ProcessingMonitor';
 ### Option 3: Terminal Monitor (Current)
 
 ```bash
-cd /Users/skylar/nuke
+cd ~/nuke
 node scripts/image-analysis-monitor.js
 ```
 

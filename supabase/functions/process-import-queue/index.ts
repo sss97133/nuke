@@ -1,5 +1,9 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { normalizeListingUrlKey } from "../_shared/listingUrl.ts";
+import { requireWriteAuth } from "../_shared/writeGuard.ts";
+import { intakeThrottle, createIntakeBudget, readLandedBatch, readbackFor } from "../poll-listing-feeds/ledger.ts";
+import { projectSecretKey } from "../_shared/supabaseKeys.ts";
+import { mustWrite } from '../_shared/writeResult.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -7,23 +11,36 @@ const corsHeaders = {
 };
 
 Deno.serve(async (req) => {
+  // Writes are never anonymous: service key, signed-in user, or nothing (P0.2, 2026-09-27).
+  const denied = await requireWriteAuth(req);
+  if (denied) return denied;
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders });
   }
 
   try {
+    const startedAt = Date.now();
     const supabase = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+      projectSecretKey() ?? ''
     );
 
     const body = await req.json().catch(() => ({}));
     const { batch_size = 10, priority_only = false, source_id, use_intelligence = false } = body;
+    if (!Number.isInteger(batch_size) || batch_size < 0 || batch_size > 100) throw new Error('batch_size must be an integer from 0 to 100');
+    const { data: control, error: controlError } = await supabase.from('platform_config')
+      .select('config_value').eq('config_key', 'source_intake').maybeSingle();
+    if (controlError) throw new Error('Intake throttle unavailable; no work claimed');
+    const throttle = intakeThrottle(control?.config_value ?? {});
+    const budget = createIntakeBudget(throttle, startedAt);
+    if (!throttle.enabled || batch_size === 0 || throttle.max_ingests === 0) return new Response(
+      JSON.stringify({ success: true, processed: 0, status: 'throttled', throttle: budget.snapshot() }),
+      { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
     const workerId = 'process-import-queue:' + Date.now();
     const supabaseUrl = Deno.env.get('SUPABASE_URL');
 
     const { data: queueItems, error: queueError } = await supabase.rpc('claim_import_queue_batch', {
-      p_batch_size: batch_size,
+      p_batch_size: Math.min(batch_size, throttle.max_ingests),
       p_max_attempts: 8,
       p_priority_only: priority_only,
       p_source_id: source_id || null,
@@ -38,19 +55,41 @@ Deno.serve(async (req) => {
 
     const results = [];
     for (const item of queueItems) {
+      const sourceAliases: Record<string, string> = { 'bringatrailer.com': 'bat', 'carsandbids.com': 'carsandbids',
+        'barrett-jackson.com': 'barrettjackson', 'rmsothebys.com': 'rmsothebys', 'goodingco.com': 'gooding',
+        'broadarrowauctions.com': 'broadarrow', 'themarket.co.uk': 'bonhams', 'bonhams.com': 'bonhams',
+        'cars.bonhams.com': 'bonhams', 'cars.ksl.com': 'ksl',
+        'gatewayclassiccars.com': 'gateway_classics', 'grautogallery.com': 'gr_auto_gallery',
+        'streetsideclassics.com': 'streetside_classics', 'vanguardmotorsales.com': 'vanguard_motors' };
+      let host = 'unknown';
+      try { host = new URL(item.listing_url).hostname.replace(/^www\./, ''); } catch { /* handled below */ }
+      const source = sourceAliases[host] || (host.endsWith('.craigslist.org') ? 'craigslist' : host.split('.')[0]);
+      const grant = budget.reserve(source);
+      if (!grant) {
+        // claim_import_queue_batch increments attempts at claim time. A
+        // throttle deferral is not an extraction attempt: refund it and
+        // release only this worker's claim, retaining all source evidence.
+        const { error } = await supabase.from('import_queue').update({ status: 'pending',
+          attempts: Math.max(0, item.attempts - 1), locked_at: null, locked_by: null })
+          .eq('id', item.id).eq('status', 'processing').eq('locked_by', workerId);
+        if (error) throw error;
+        results.push({ id: item.id, status: 'deferred', reason: budget.refusal(source) });
+        continue;
+      }
+      const attemptStarted = Date.now();
       try {
         const url = item.listing_url;
         // Normalize URL for domain routing (strip protocol, www, trailing slash, query/hash)
         const normalizedUrl = normalizeListingUrlKey(url) || '';
         if (!url) {
-          await supabase.from('import_queue').update({
+          mustWrite('import_queue update', await supabase.from('import_queue').update({
             status: 'failed',
             error_message: 'listing_url is required',
             failure_category: 'bad_data',
-            attempts: (item.attempts || 0) + 1,
+            attempts: item.attempts || 0,
             locked_at: null,
             locked_by: null,
-          }).eq('id', item.id);
+          }).eq('id', item.id));
           results.push({ id: item.id, status: 'failed', url: null, error: 'listing_url is required' });
           continue;
         }
@@ -112,17 +151,18 @@ Deno.serve(async (req) => {
         const extractResponse = await fetch(extractorUrl, {
           method: 'POST',
           headers: {
-            'Authorization': 'Bearer ' + Deno.env.get('SUPABASE_SERVICE_ROLE_KEY'),
+            'Authorization': 'Bearer ' + projectSecretKey(),
             'Content-Type': 'application/json',
           },
-          body: JSON.stringify({ url, save_to_db: true }),
-          signal: AbortSignal.timeout(120_000),
+          body: JSON.stringify({ url, save_to_db: true, ...(host === 'rmsothebys.com' ? { action: 'extract' } : {}) }),
+          signal: AbortSignal.timeout(grant.timeout_ms),
         });
 
         const extractData = await extractResponse.json().catch(() => ({
           success: false,
           error: `HTTP ${extractResponse.status}: non-JSON response`,
         }));
+        budget.record(source, Date.now() - attemptStarted, { error: extractData.error });
 
         if (extractData.success) {
           const extractedVehicle = extractData.extracted || extractData;
@@ -131,20 +171,27 @@ Deno.serve(async (req) => {
           // successful BaT extraction through this path would silently
           // write vehicle_id: null to the queue row.
           let vehicleId = extractedVehicle.vehicle_id || extractedVehicle.vehicleId || extractData.vehicle_id || extractData.vehicleId
+            || extractData._db?.vehicle_id
             || extractData.created_vehicle_ids?.[0] || extractData.updated_vehicle_ids?.[0] || null;
+          if (!vehicleId) throw new Error('Extractor reported success without a persisted vehicle id');
+          const landed = readbackFor(vehicleId, await readLandedBatch(supabase, [vehicleId]));
+          if (landed.kind === 'error') throw new Error(`Vehicle read-back failed: ${landed.message}`);
           const qualityScore = extractData.quality_score ?? extractedVehicle.quality_score ?? null;
           // If extractor returned a quality score, use it to flag low-quality extractions
           const queueStatus = (qualityScore !== null && qualityScore < 0.3) ? 'pending_review' : 'complete';
 
-          // extract-bat-core does not chain comment extraction itself
-          // (see the comment at the isBat routing branch above) — trigger
-          // it here, fire-and-forget, mirroring continuous-queue-processor's
-          // established pattern for the same gap.
-          if (isBat && vehicleId) {
+          // extract-bat-core v4.1 (2026-09-27) writes every comment and bid itself, skipping comments the vehicle
+          // already holds by BaT's own comment id. Firing extract-auction-comments after it wrote the lot's comments
+          // wrote them a second time: its hash carries the thread position, which shifts as a thread grows, so
+          // 36.5% of the comment rows on the latest 150 settled lots were duplicates (bat-data coverage audit,
+          // 2026-09-29, docs/ledger/2026-09-30_bat-data-coverage-audit.md). Fall back to it only when the core
+          // wrote none, e.g. a page whose comments JSON didn't parse.
+          const coreComments = Number(extractData?.comments_written ?? 0);
+          if (isBat && vehicleId && !(coreComments > 0)) {
             fetch(supabaseUrl + '/functions/v1/extract-auction-comments', {
               method: 'POST',
               headers: {
-                'Authorization': 'Bearer ' + Deno.env.get('SUPABASE_SERVICE_ROLE_KEY'),
+                'Authorization': 'Bearer ' + projectSecretKey(),
                 'Content-Type': 'application/json',
               },
               body: JSON.stringify({ auction_url: url, vehicle_id: vehicleId }),
@@ -152,15 +199,15 @@ Deno.serve(async (req) => {
             }).catch((e: any) => console.warn(`[process-import-queue] Comment extraction trigger failed for ${item.id}:`, e instanceof Error ? e.message : String(e)));
           }
 
-          await supabase.from('import_queue').update({
+          mustWrite('import_queue update', await supabase.from('import_queue').update({
             status: queueStatus,
             processed_at: new Date().toISOString(),
-            attempts: item.attempts + 1,
+            attempts: item.attempts,
             vehicle_id: vehicleId,
             error_message: queueStatus === 'pending_review' ? `Low quality score: ${qualityScore}` : null,
             locked_at: null,
             locked_by: null,
-          }).eq('id', item.id);
+          }).eq('id', item.id));
           results.push({
             id: item.id,
             status: queueStatus,
@@ -177,14 +224,14 @@ Deno.serve(async (req) => {
             errorMsg.includes('Missing required fields');
 
           if (isNonVehicle) {
-            await supabase.from('import_queue').update({
+            mustWrite('import_queue update', await supabase.from('import_queue').update({
               status: 'skipped',
               error_message: `Non-vehicle page: ${errorMsg.slice(0, 200)}`,
-              attempts: item.attempts + 1,
+              attempts: item.attempts,
               failure_category: null,
               locked_at: null,
               locked_by: null,
-            }).eq('id', item.id);
+            }).eq('id', item.id));
             results.push({ id: item.id, status: 'skipped', url, error: errorMsg });
           } else {
             // Auto-categorize failures
@@ -209,10 +256,10 @@ Deno.serve(async (req) => {
             const maxAttempts = isTransient ? 8 : 5;
             const shouldFail = attempts >= maxAttempts;
 
-            await supabase.from('import_queue').update({
+            mustWrite('import_queue update', await supabase.from('import_queue').update({
               status: shouldFail ? 'failed' : 'pending',
               error_message: errorMsg,
-              attempts: item.attempts + 1,
+              attempts: item.attempts,
               failure_category: failureCategory,
               locked_at: null,
               locked_by: null,
@@ -221,11 +268,12 @@ Deno.serve(async (req) => {
                 : new Date(
                     Date.now() + Math.min(2 * 60 * 60 * 1000, (isTransient ? 10 : 5) * 60 * 1000 * Math.pow(2, attempts))
                   ).toISOString(),
-            }).eq('id', item.id);
+            }).eq('id', item.id));
             results.push({ id: item.id, status: shouldFail ? 'failed' : 'pending', url, error: errorMsg, retry_scheduled: !shouldFail });
           }
         }
       } catch (error: any) {
+        budget.record(source, Date.now() - attemptStarted, { error: error?.message || String(error) });
         const errMsg = error?.message || String(error);
         // Auto-categorize catch-level failures
         let failureCategory = 'extraction_failed';
@@ -241,10 +289,10 @@ Deno.serve(async (req) => {
         const maxAttempts = isTransient ? 8 : 5;
         const shouldFail = attempts >= maxAttempts;
 
-        await supabase.from('import_queue').update({
+        mustWrite('import_queue update', await supabase.from('import_queue').update({
           status: shouldFail ? 'failed' : 'pending',
           error_message: errMsg.slice(0, 500),
-          attempts: (item.attempts || 0) + 1,
+          attempts: item.attempts || 0,
           failure_category: failureCategory,
           locked_at: null,
           locked_by: null,
@@ -253,12 +301,13 @@ Deno.serve(async (req) => {
             : new Date(
                 Date.now() + Math.min(2 * 60 * 60 * 1000, (isTransient ? 10 : 5) * 60 * 1000 * Math.pow(2, attempts))
               ).toISOString(),
-        }).eq('id', item.id);
+        }).eq('id', item.id));
         results.push({ id: item.id, status: shouldFail ? 'failed' : 'pending', url: item.listing_url, error: errMsg, retry_scheduled: !shouldFail });
       }
     }
 
-    return new Response(JSON.stringify({ success: true, processed: results.length, results }), 
+    return new Response(JSON.stringify({ success: true, processed: results.filter(r => r.status !== 'deferred').length,
+      deferred: results.filter(r => r.status === 'deferred').length, throttle: budget.snapshot(), results }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
 
   } catch (error: any) {

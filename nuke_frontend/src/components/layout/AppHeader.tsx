@@ -5,10 +5,11 @@ import { useHeaderHeight } from './hooks/useHeaderHeight';
 import { useSession } from './hooks/useSession';
 import { useNotificationBadge } from './hooks/useNotificationBadge';
 import { useAdminAccess } from '../../hooks/useAdminAccess';
-import AIDataIngestionSearch from '../search/AIDataIngestionSearch';
+import HeaderSearch from '../HeaderSearch';
 import { UserArea } from './UserArea';
 import { UserDropdown } from './UserDropdown';
 import { useBranding } from '../../branding/BrandingContext';
+import { useOptionalTheme } from '../../contexts/ThemeContext';
 import GlobalUploadIndicator from '../GlobalUploadIndicator';
 import './AppHeader.css';
 
@@ -17,11 +18,12 @@ interface AppHeaderProps {
 }
 
 const NAV_LINKS = [
+  { label: 'MARKET', to: '/?tab=market' },
   { label: 'FEED', to: '/?tab=feed' },
   { label: 'SEARCH', to: '/search' },
   { label: 'GARAGE', to: '/?tab=garage' },
   { label: 'JOURNAL', to: '/journal' },
-  { label: 'MARKET', to: '/market/trends' },
+  { label: 'STACKS', to: '/stacks' },
 ];
 
 /**
@@ -40,6 +42,7 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
   const unreadCount = useNotificationBadge(userId);
   const { isAdmin } = useAdminAccess();
   const { brand } = useBranding();
+  const themeCtx = useOptionalTheme();
   const location = useLocation();
 
   const [showUserDropdown, setShowUserDropdown] = useState(false);
@@ -59,7 +62,8 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
   const isActive = (to: string) => {
     if (to.includes('?tab=')) {
       const tab = new URLSearchParams(to.split('?')[1]).get('tab');
-      const currentTab = new URLSearchParams(location.search).get('tab');
+      const requestedTab = new URLSearchParams(location.search).get('tab');
+      const currentTab = requestedTab === 'feed' || requestedTab === 'garage' ? requestedTab : 'market';
       return location.pathname === '/' && currentTab === tab;
     }
     return location.pathname.startsWith(to);
@@ -86,6 +90,7 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
               key={to}
               to={to}
               className={`header-nav-link${isActive(to) ? ' active' : ''}`}
+              aria-current={isActive(to) ? 'page' : undefined}
             >
               {label}
             </PrefetchLink>
@@ -94,11 +99,22 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
 
         {/* Zone 3: Command Input */}
         <div className="header-command">
-          <AIDataIngestionSearch />
+          <HeaderSearch />
         </div>
 
         {/* Zone 4: Session */}
         <div className="header-session">
+          {themeCtx && (
+            <button
+              type="button"
+              className="header-theme-btn"
+              onClick={themeCtx.toggleTheme}
+              title={`Theme: ${themeCtx.theme.toUpperCase()} (${themeCtx.preference === 'auto' ? 'Auto' : 'Manual'}) — click to switch to ${themeCtx.theme === 'dark' ? 'Day (Light)' : 'Night (Dark)'}`}
+              aria-label={`Switch to ${themeCtx.theme === 'dark' ? 'light' : 'dark'} theme`}
+            >
+              {themeCtx.theme === 'dark' ? 'DAY' : 'NIGHT'}
+            </button>
+          )}
           <GlobalUploadIndicator />
           {session ? (
             <UserArea

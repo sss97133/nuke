@@ -1,0 +1,6 @@
+/* Publisher-reported work on the vehicle Table page. */
+.tp-note { font-size: 10px; }
+.tp-report { margin-top: 4px; }
+.tp-report-quote { margin: 6px 0; white-space: pre-wrap; }
+.tp-report-detail { margin-top: 6px; }
+.tp-report-hash { overflow-wrap: anywhere; }

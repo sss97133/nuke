@@ -18,6 +18,8 @@ export interface FetchResult {
 export interface FetchOptions {
   timeout?: number;
   retries?: number;
+  /** One identified public request; source backoff handles subsequent attempts. */
+  publicOnly?: boolean;
 }
 
 const DEFAULT_TIMEOUT = 15000;
@@ -29,7 +31,11 @@ const USER_AGENTS = [
   'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
 ];
 
-function getHeaders(attempt: number): Record<string, string> {
+function getHeaders(attempt: number, publicOnly = false): Record<string, string> {
+  if (publicOnly) return {
+    "User-Agent": "NukeListingCollector/1.0 (+https://nuke.ag)",
+    "Accept": "text/html,application/xhtml+xml",
+  };
   const ua = USER_AGENTS[attempt % USER_AGENTS.length];
   return {
     'User-Agent': ua,
@@ -48,7 +54,7 @@ export async function fetchPage(
   options?: FetchOptions
 ): Promise<FetchResult> {
   const timeout = options?.timeout || DEFAULT_TIMEOUT;
-  const retries = options?.retries || DEFAULT_RETRIES;
+  const retries = options?.publicOnly ? 0 : (options?.retries || DEFAULT_RETRIES);
 
   let lastError: string | undefined;
   let lastStatus: number | undefined;
@@ -58,13 +64,16 @@ export async function fetchPage(
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), timeout);
 
-      const response = await fetch(url, {
-        headers: getHeaders(attempt),
-        signal: controller.signal,
-        redirect: 'manual',  // CRITICAL: detect login/auth redirects instead of silently following
-      });
-
-      clearTimeout(timeoutId);
+      let response: Response;
+      try {
+        response = await fetch(url, {
+          headers: getHeaders(attempt, options?.publicOnly),
+          signal: controller.signal,
+          redirect: 'manual',  // detect login/auth redirects before following
+        });
+      } finally {
+        clearTimeout(timeoutId);
+      }
       lastStatus = response.status;
 
       // Detect redirects — check for login/auth before following
@@ -83,8 +92,17 @@ export async function fetchPage(
         // Legitimate redirect — follow it manually (one hop)
         try {
           const redirectUrl = location.startsWith('http') ? location : new URL(location, url).href;
+          if (options?.publicOnly) {
+            const origin = new URL(url);
+            const target = new URL(redirectUrl);
+            const isCraigslist = (host: string) => host === 'craigslist.org' || host.endsWith('.craigslist.org');
+            if (target.protocol !== 'https:' || (target.hostname !== origin.hostname &&
+              !(isCraigslist(origin.hostname) && isCraigslist(target.hostname)))) {
+              return { html: null, source: 'direct', error: 'Blocked by site: redirect outside public source', statusCode: response.status };
+            }
+          }
           const redirectResp = await fetch(redirectUrl, {
-            headers: getHeaders(attempt),
+            headers: getHeaders(attempt, options?.publicOnly),
             signal: AbortSignal.timeout(timeout),
             redirect: 'manual',
           });

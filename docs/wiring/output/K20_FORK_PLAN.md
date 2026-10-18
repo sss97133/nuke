@@ -106,7 +106,7 @@ GM Performance **LSX454** crate (current PN 19417357): 454 ci / 7.4L, 4.185" bor
 
 ## 6. THE K20 DIGITAL TWIN IS ONE DOWNLOAD AWAY
 
-TurboSquid **order #6425842 (Dec 2024)** — the same order that bought the K5's Blazer twin — also included **"1978 Chevrolet Pickup K20 Silverado" (product 1799009), PAID and never downloaded** (`receipts/2026-06-09_3d-model-v2-digital-twin.md` §"New substrate conflicts" item 5). Recoverable from TurboSquid My Downloads. Precedent already set: the K5 uses a *1978* model for a *1977* truck (scale-verified Δ2 mm on wheelbase); same move works for a '74 K20 — 1973–80 share the cab/bed geometry, with year-specific front trim only. **This download is the unblocking action for every ADAPTS row in §3.**
+TurboSquid **order (Dec 2024)** — the same order that bought the K5's Blazer twin — also included **"1978 Chevrolet Pickup K20 Silverado" (product 1799009), PAID and never downloaded** (`receipts/2026-06-09_3d-model-v2-digital-twin.md` §"New substrate conflicts" item 5). Recoverable from TurboSquid My Downloads. Precedent already set: the K5 uses a *1978* model for a *1977* truck (scale-verified Δ2 mm on wheelbase); same move works for a '74 K20 — 1973–80 share the cab/bed geometry, with year-specific front trim only. **This download is the unblocking action for every ADAPTS row in §3.**
 
 ---
 

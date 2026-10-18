@@ -30,8 +30,8 @@ const ModeratorAssignmentWizard: React.FC<ModeratorAssignmentWizardProps> = ({
       // Search for users with moderator role or moderator_level
       const { data, error } = await supabase
         .from('profiles')
-        .select('id, full_name, email, role, moderator_level')
-        .or(`full_name.ilike.%${query}%,email.ilike.%${query}%`)
+        .select('id, full_name, username, role, moderator_level')
+        .or(`full_name.ilike.%${query}%,username.ilike.%${query}%`)
         .or('role.eq.moderator,moderator_level.gt.0')
         .limit(10);
 
@@ -129,7 +129,7 @@ const ModeratorAssignmentWizard: React.FC<ModeratorAssignmentWizardProps> = ({
           type="text"
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
-          placeholder="Search by name or email..."
+          placeholder="Search by name or username..."
           className="form-input"
           style={{ width: '100%', padding: '8px' }}
         />
@@ -157,10 +157,10 @@ const ModeratorAssignmentWizard: React.FC<ModeratorAssignmentWizardProps> = ({
               }}
             >
               <div style={{ fontWeight: 600 }}>
-                {user.full_name || user.email || 'Unknown User'}
+                {user.full_name || user.username || 'Unknown User'}
               </div>
               <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
-                {user.email}
+                {user.username}
                 {user.role === 'moderator' && ' • Moderator'}
                 {user.moderator_level > 0 && ` • Level ${user.moderator_level}`}
               </div>
@@ -172,8 +172,8 @@ const ModeratorAssignmentWizard: React.FC<ModeratorAssignmentWizardProps> = ({
       {selectedUser && (
         <div style={{ marginBottom: '16px', padding: '12px', background: 'var(--grey-50)'}}>
           <div style={{ fontWeight: 600, marginBottom: '4px' }}>Selected Moderator:</div>
-          <div>{selectedUser.full_name || selectedUser.email}</div>
-          <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>{selectedUser.email}</div>
+          <div>{selectedUser.full_name || selectedUser.username}</div>
+          <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>{selectedUser.username}</div>
         </div>
       )}
 
@@ -197,4 +197,3 @@ const ModeratorAssignmentWizard: React.FC<ModeratorAssignmentWizardProps> = ({
 };
 
 export default ModeratorAssignmentWizard;
-

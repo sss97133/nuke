@@ -13,6 +13,8 @@
  */
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { isServiceCaller, requireWriteAuth } from "../_shared/writeGuard.ts";
+import { projectSecretKey } from "../_shared/supabaseKeys.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -262,6 +264,7 @@ async function getBasePrice(supabase: any, vehicle: any): Promise<{
         .gte("year", year - 5)
         .lte("year", year + 5)
         .gt("best_price", 0)
+        .eq("is_sold", true) // comps are consummated sales; bids and asks are not (2026-09-27)
         .order("updated_at", { ascending: false })
         .limit(300);
 
@@ -282,6 +285,7 @@ async function getBasePrice(supabase: any, vehicle: any): Promise<{
       .gte("year", year - 5)
       .lte("year", year + 5)
       .gt("best_price", 0)
+      .eq("is_sold", true) // comps are consummated sales; bids and asks are not (2026-09-27)
       .order("updated_at", { ascending: false })
       .limit(300);
 
@@ -303,6 +307,7 @@ async function getBasePrice(supabase: any, vehicle: any): Promise<{
         .gte("year", year - 5)
         .lte("year", year + 5)
         .gt("best_price", 0)
+        .eq("is_sold", true) // comps are consummated sales; bids and asks are not (2026-09-27)
         .order("updated_at", { ascending: false })
         .limit(300);
 
@@ -325,6 +330,7 @@ async function getBasePrice(supabase: any, vehicle: any): Promise<{
         .gte("year", year - 5)
         .lte("year", year + 5)
         .gt("best_price", 0)
+        .eq("is_sold", true) // comps are consummated sales; bids and asks are not (2026-09-27)
         .order("updated_at", { ascending: false })
         .limit(300);
 
@@ -343,6 +349,7 @@ async function getBasePrice(supabase: any, vehicle: any): Promise<{
     .gte("year", year - 10)
     .lte("year", year + 10)
     .gt("best_price", 0)
+    .eq("is_sold", true) // comps are consummated sales; bids and asks are not (2026-09-27)
     .order("updated_at", { ascending: false })
     .limit(200);
 
@@ -1024,17 +1031,19 @@ async function computeValuation(supabase: any, vehicleId: string): Promise<any> 
 // SERVE
 // ============================================================================
 Deno.serve(async (req) => {
+  // Writes are never anonymous: service key, signed-in user, or nothing (P0.2, 2026-09-27).
+  const denied = await requireWriteAuth(req);
+  if (denied) return denied;
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
   }
 
   try {
-    // Require service role key authentication
+    // Require the service role, judged as writeGuard judges it (2026-10-14)
     const authHeader = req.headers.get("Authorization");
-    const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
-    const altServiceRoleKey = Deno.env.get("SERVICE_ROLE_KEY") ?? "";
+    const serviceRoleKey = projectSecretKey() ?? "";
     const token = authHeader?.replace("Bearer ", "") ?? "";
-    if (!authHeader?.startsWith("Bearer ") || (token !== serviceRoleKey && token !== altServiceRoleKey)) {
+    if (!(await isServiceCaller(req))) {
       return new Response(
         JSON.stringify({ error: "Authentication required" }),
         { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }

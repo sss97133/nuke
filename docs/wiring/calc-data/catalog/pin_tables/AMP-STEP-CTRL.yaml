@@ -1,0 +1,15 @@
+AMP-STEP-CTRL:
+  family: open
+  pins:
+    '3': RED power lead (kit harness)
+    STEP_GND: BLACK negative lead (kit harness)
+    STEP_DOOR_L: ''
+    STEP_DOOR_R: ''
+  note: 'maker''s document: AMP Research PowerStep kit harness: plugs into the motors; RED power lead and BLACK negative lead to the battery (fuse in the harness);
+    trigger leads spliced into door circuits with supplied Posi-Taps'
+  open:
+  - 'which kit trigger lead serves which door, and their colours: IM75146 (Silverado) names only crew-cab rear-door leads (light blue, green) — read the K5 kit harness
+    on arrival'
+  sources:
+  - 'AMP Research IM75146 install guide p.6 step 8 (reference_documents/component_drawings/amp_research_75146_install.pdf): ''Attach power lead (RED wire) to positive
+    pole ... Negative lead (BLACK wire) to negative pole''; p.7 steps 15-16 Posi-Tap trigger splice'

@@ -7,6 +7,9 @@ export default {
   ],
   theme: {
     extend: {},
+    // Preflight paints every border gray-200 (#e5e7eb) unless told otherwise. Measured 2026-10-12:
+    // about half of the visibly bordered boxes on the vehicle profile carried it. The token is the default.
+    borderColor: ({ theme }) => ({ ...theme('colors'), DEFAULT: 'var(--border)' }),
     fontSize: {
       'xs':  'var(--fs-8)',
       'sm':  'var(--fs-9)',

@@ -135,7 +135,7 @@ Created `scripts/backfill-image-exif-data.ts` to:
 
 **Usage:**
 ```bash
-cd /Users/skylar/nuke
+cd ~/nuke
 deno run --allow-net --allow-env scripts/backfill-image-exif-data.ts
 ```
 

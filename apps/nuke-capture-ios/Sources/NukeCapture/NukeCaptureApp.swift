@@ -22,8 +22,6 @@ import BackgroundTasks
 struct NukeCaptureApp: App {
     @Environment(\.scenePhase) private var scenePhase
     @StateObject private var session = SessionStore()
-    // Shared singleton — the BG task handler drives the same engine.
-    @ObservedObject private var engine = SyncEngine.shared
     /// Ignition phase drives the denied-grant detour (below).
     @ObservedObject private var ignition = IgnitionEngine.shared
     /// Flipped by IgnitionEngine when the first-run sequence completes.
@@ -64,6 +62,12 @@ struct NukeCaptureApp: App {
                     ExploreView()
                 } else if ProcessInfo.processInfo.environment["NUKE_DEBUG_SCREEN"] == "app" {
                     DebugAppDeepLink()
+                } else if let dbgDay = ProcessInfo.processInfo.environment["NUKE_DEBUG_DAY"], !dbgDay.isEmpty {
+                    // NUKE_DEBUG_DAY=yyyy-MM-dd roots on that day's receipt for the sample
+                    // profile (or NUKE_DEBUG_DAY_USER=<uuid>) as the current session: anon
+                    // unless one was injected. Verifies the viewer-dependent money rule.
+                    DayReceiptView(userId: ProcessInfo.processInfo.environment["NUKE_DEBUG_DAY_USER"] ?? Config.sampleProfileUserId,
+                                   date: dbgDay)
                 } else if ProcessInfo.processInfo.environment["NUKE_DEBUG_SCREEN"] == "profile" {
                     DebugProfileDeepLink()
                 } else if ProcessInfo.processInfo.environment["NUKE_DEBUG_SCREEN"] == "today" {
@@ -71,6 +75,9 @@ struct NukeCaptureApp: App {
                 } else if ProcessInfo.processInfo.environment["NUKE_DEBUG_SCREEN"] == "days" {
                     // Days + the day receipt are entirely LocalStore — anon, no session.
                     LibraryDaysView()
+                } else if ProcessInfo.processInfo.environment["NUKE_DEBUG_SCREEN"] == "library" {
+                    // Actual on-device sources and album passes; no injected account.
+                    LibraryView()
                 } else if ProcessInfo.processInfo.environment["NUKE_DEBUG_SCREEN"] == "signdays" {
                     DebugScreenDeepLink()
                 } else if let dbgVehicle = ProcessInfo.processInfo.environment["NUKE_DEBUG_VEHICLE_ID"],
@@ -110,6 +117,9 @@ struct NukeCaptureApp: App {
                     if SyncEngine.shared.backfillRemaining > 0 {
                         Self.scheduleBackgroundBackfill()
                     }
+                    // File what the owner's albums already say (no image reading, so it is cheap
+                    // enough for the foreground); serial reads wait for the charging job.
+                    await AttributionEngine.shared.run(limit: 500, ocrBudget: 0)
                 }
                 // Freshen the local store from the newest photos' true EXIF so the day
                 // receipt renders offline. DEFERRED + low-priority + small: the head pass
@@ -119,6 +129,16 @@ struct NukeCaptureApp: App {
                 // keep this a small freshen; the deep backlog is the BGProcessingTask's job.
                 Task(priority: .background) {
                     try? await Task.sleep(for: .seconds(3))
+                    // The source record starts at intake, before opening Profile.
+                    // A warm phone does none of it: the charging job carries the library.
+                    guard !SyncEngine.deviceWarm else { return }
+                    await LibraryStore.shared.refreshAlbums()
+                    // The album review reads originals with OCR (seconds per photo): only while
+                    // charging at a nominal temperature, never as a cost of opening the app.
+                    if LibraryIngest.mayReviewInForeground {
+                        await LibraryIngest.shared.runAlbumReview(budget: 24)
+                    }
+                    await LibraryIngest.shared.syncNativeAlbums()
                     await LibraryIngest.shared.runHeadPass(limit: 300)
                 }
                 if !LibraryIngest.shared.backlogComplete {
@@ -241,10 +261,11 @@ struct NukeCaptureApp: App {
             // Reverse of runCloudBackfill: push the on-device Apple Vision tags UP to
             // vehicle_images (exif-uuid bridge). Idempotent; resumes via its own cursor.
             await LocalTagPush.run()
+            await LibraryIngest.shared.syncNativeAlbums(budget: 32)
             // Then ATTRIBUTE: route the day's freshly-uploaded orphans home
             // on-device (VIN-match + session inheritance). This is the nightly
             // charging-window slot — upload, then send photos to their vehicle.
-            await AttributionEngine.shared.run()
+            await AttributionEngine.shared.run(limit: 500, ocrBudget: 200)
             // Reschedule when work remains — the upload queue still has assets, the
             // drain bailed early (metered link / paused / cancelled), or the
             // local-store backlog isn't fully indexed yet.

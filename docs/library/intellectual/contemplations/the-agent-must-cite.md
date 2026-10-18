@@ -10,7 +10,7 @@
 An agent looked at the 1932 Ford in the garage, saw `relationship: contributor`,
 and stated it was "dad's / Viva." The truth was fully logged, with provenance:
 a `kind=ownership` observation (nuke-vision, 2026-05-06) reads *"Vehicle was
-Howard Barton, NOT Skylar Williams. Skylar listed on BaT … as consignment
+the consignor, NOT Skylar Williams. Skylar listed on BaT … as consignment
 broker"*; a chain of `kind=provenance` rows records the ship-out (Tropical
 Shipping #18191839), the owner's return request, the settle-and-walk, the $5,675
 interior-work payment, and the project closed at a loss. None of it was missing.
@@ -46,7 +46,7 @@ evidence), else it is dead text. The doctrine here is the dual:
 The surface and the speaker are bound by one contract. A vehicle's owner, value,
 color, history — if the agent is going to say it, the saying must carry the same
 DNA the database demands of every number: `(value, source, method, observed_at,
-trust)`. "It's Howard Barton's" is allowed *because* it can append "per the
+trust)`. "It's the consignor's" is allowed *because* it can append "per the
 ownership observation, nuke-vision, 2026-05-06." "It's dad's" is not allowed,
 because nothing backs it — and "nothing backs it" is exactly the state the agent
 must be forced to notice before speaking, not after being caught.

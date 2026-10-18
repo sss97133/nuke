@@ -56,6 +56,11 @@ const supabase = createClient(SUPABASE_URL, SERVICE_KEY);
 
 const BUCKET = 'vehicle-photos';                                  // same as iphoto-intake
 const USER_ID = process.env.NUKE_USER_ID || '0b9f107a-d124-49de-9ded-94698f63c1c4';
+// The signed python.org 3.13 osxphotos: its Full Disk Access, Photos and Automation grants
+// persist (Developer ID: Python Software Foundation). /opt/homebrew/bin/osxphotos runs on an
+// ad-hoc-signed Homebrew python whose grants do not survive, which broke this job in June.
+const OSXPHOTOS = process.env.OSXPHOTOS_BIN
+  || '/Library/Frameworks/Python.framework/Versions/3.13/bin/osxphotos';
 const STATE_DIR = join(homedir(), '.nuke');
 const STATE_FILE = join(STATE_DIR, 'photo-sync-state.json');
 const LOG_FILE = join(STATE_DIR, 'photo-sync.log');
@@ -66,6 +71,14 @@ const args = process.argv.slice(2);
 const DRY_RUN = args.includes('--dry-run');
 const INCLUDE_UNLABELED = args.includes('--include-unlabeled');
 const sinceArg = (() => { const i = args.indexOf('--since'); return i >= 0 ? args[i + 1] : null; })();
+// Two-phase mode (2026-09-28): the runner reads the Photos library with the signed python.org osxphotos
+// itself, so dotenvx and node never touch Photos. macOS charges Photos access to the first unsigned
+// process in the chain; dotenvx is ad-hoc signed, so its Allow never sticks and it prompted every run.
+const argVal = (name) => { const a = args.find((x) => x.startsWith(`${name}=`)); return a ? a.slice(name.length + 1) : null; };
+const QUERY_JSON = argVal('--query-json');  // osxphotos query output written by the runner
+const PLAN_OUT = argVal('--plan-out');      // write the chosen uuids and stop (no Photos access)
+const PLAN_IN = argVal('--plan-in');        // upload the uuids of an earlier plan
+const EXPORT_DIR = argVal('--export-dir');  // files the runner exported, named <uuid>.<ext>
 
 // ─── On-device privacy gate ──────────────────────────────────────────────────
 // Per docs/architecture/IMAGE_OWNERSHIP_ONTOLOGY.md: a photo library contains
@@ -74,7 +87,34 @@ const sinceArg = (() => { const i = args.indexOf('--since'); return i >= 0 ? arg
 // (free, private); we sync only what its labels say is plausibly vehicle
 // evidence. Everything else never leaves this Mac. Server-side vision_gate /
 // classification remains as the second pass for what does get through.
-const VEHICLE_LABEL_RE = /vehicle|car|truck|automobile|motorcycle|van|jeep|tractor|trailer|wheel|tire|engine|machine|garage|workshop|tool|boat|text|document|receipt|paper/i;
+// Whole-label matching against Apple's own vocabulary. The old substring regex
+// (/car|tool|document|.../) let 59 Child, 161 People, 15 Bed/Bedroom and 242 Document
+// photos into the public bucket by 2026-09-28: "Document" matched itself, "car" matched
+// "Carton"/"Cardboard Box", "tool" matched "Stool". Labels below are the exact strings
+// measured on the owner's library (vehicle_images.apple_ml_labels), lower-cased.
+const norm = (s) => String(s).trim().toLowerCase();
+const VEHICLE_LABELS = new Set([
+  'vehicle', 'automobile', 'car', 'wheel', 'tire', 'vehicle engine', 'engine', 'muscle car',
+  'garage', 'sportscar', 'sports car', 'antique car', 'vintage car', 'classic car', 'truck',
+  'pickup truck', 'monster truck', 'off-road vehicle', 'compact sport utility vehicle',
+  'sport utility vehicle', 'supercar', 'performance car', 'city car', 'steering wheel',
+  'automobile grille', 'jeep', 'boat', 'motorcycle', 'van', 'tractor', 'trailer', 'bus',
+  'land vehicle', 'motor vehicle', 'hot rod', 'auto part', 'rim', 'hubcap', 'bumper',
+  'headlamp', 'workshop', 'machine', 'tool', 'toolbox', 'nascar',
+]);
+// Never leave the Mac, anywhere, with any other label present.
+const ALWAYS_PRIVATE = new Set([
+  'child', 'baby', 'toddler', 'teen', 'selfie', 'swimsuit', 'bikini', 'underwear', 'lingerie',
+  'bed', 'bedroom', 'bath', 'bathtub', 'nudity',
+]);
+// Documents and receipts are financial/identity material: they never go to the public
+// bucket. They reach Nuke through the receipts path, not this daemon.
+const DOCUMENT_LIKE = new Set([
+  'document', 'paper', 'newspaper', 'receipt', 'text', 'screenshot', 'handwriting', 'card',
+  'credit card', 'id card', 'passport', 'letter', 'envelope', 'menu',
+]);
+// People off a shop: private by default, even with a car in frame.
+const PEOPLE = new Set(['people', 'adult', 'portrait', 'face', 'crowd', 'family']);
 
 // Known shop coordinates — GPS at a work location is a STRONGER vehicle signal
 // than any Apple label. Apple frequently leaves work photos unlabeled (all 106
@@ -93,12 +133,21 @@ function isAtShop(photo) {
   return SHOP_LOCATIONS.some((s) => Math.abs(lat - s.lat) < SHOP_TOL && Math.abs(lon - s.lon) < SHOP_TOL);
 }
 
-function isVehicleish(photo) {
+// The on-device gate: Apple Photos has already labeled every photo on this Mac; the cloud
+// only ever sees what passes here. Returns the reason, so held-back decisions are auditable.
+function gateReason(photo) {
+  const labels = (photo.labels || photo.labels_normalized || []).map(norm);
+  const has = (set) => labels.some((l) => set.has(l));
+  if (has(ALWAYS_PRIVATE)) return 'hold:private';
+  if (has(DOCUMENT_LIKE)) return 'hold:document';
   // GPS-at-shop passes regardless of labels — work location beats Apple's tagging.
-  if (isAtShop(photo)) return true;
-  const labels = photo.labels || photo.labels_normalized || [];
-  if (labels.length === 0) return INCLUDE_UNLABELED; // unlabeled off-shop: private by default
-  return labels.some((l) => VEHICLE_LABEL_RE.test(String(l)));
+  if (isAtShop(photo)) return 'pass:shop';
+  if (labels.length === 0) return INCLUDE_UNLABELED ? 'pass:unlabeled' : 'hold:unlabeled';
+  if (has(PEOPLE)) return 'hold:people';
+  return has(VEHICLE_LABELS) ? 'pass:vehicle' : 'hold:not-vehicle';
+}
+function isVehicleish(photo) {
+  return gateReason(photo).startsWith('pass');
 }
 
 function log(msg) {
@@ -117,15 +166,18 @@ function writeState(state) {
 
 // ─── 1. What's new in the Photos library? ────────────────────────────────────
 function queryNewPhotos(sinceISO) {
+  // Exact instant (osxphotos accepts ISO datetimes with an offset); the retry below falls
+  // back to the date-only form for older osxphotos builds.
+  const sinceExact = sinceISO.replace(/\.\d+Z$/, 'Z').replace(/Z$/, '+00:00');
   const sinceDate = sinceISO.slice(0, 10);
-  const result = spawnSync('osxphotos', [
-    'query', '--added-after', sinceDate, '--json',
+  const result = spawnSync(OSXPHOTOS, [
+    'query', '--added-after', sinceExact, '--json',
     '--not-hidden', '--photos-library-last',
   ], { encoding: 'utf8', maxBuffer: 256 * 1024 * 1024 });
 
   if (result.status !== 0) {
     // --photos-library-last / --not-hidden may not exist on older osxphotos; retry minimal
-    const retry = spawnSync('osxphotos', ['query', '--added-after', sinceDate, '--json'],
+    const retry = spawnSync(OSXPHOTOS, ['query', '--added-after', sinceDate, '--json'],
       { encoding: 'utf8', maxBuffer: 256 * 1024 * 1024 });
     if (retry.status !== 0) {
       log(`FATAL osxphotos query failed: ${(retry.stderr || result.stderr || '').slice(0, 300)}`);
@@ -140,9 +192,18 @@ function queryNewPhotos(sinceISO) {
 function exportPhotos(uuids, destDir) {
   mkdirSync(destDir, { recursive: true });
   const uuidArgs = uuids.flatMap(u => ['--uuid', u]);
-  const result = spawnSync('osxphotos', [
+  const result = spawnSync(OSXPHOTOS, [
     'export', destDir, ...uuidArgs,
-    '--download-missing', '--overwrite', '--filename', '{original_name}',
+    // --download-missing drives Photos.app over Apple Events to fetch iCloud-only originals
+    // (2,674 of the 2,985 photos added Jun–Sep 2026 live only in iCloud). Those Automation
+    // grants persist ONLY for a Developer-ID-signed python: the python.org 3.13 framework
+    // (see OSXPHOTOS). Homebrew's ad-hoc python re-prompted every run (the 96-popups-a-day
+    // that paused this job 2026-06-10). PhotoKit (--use-photokit) hangs under launchd:
+    // 0 files, 0 network after 7 min on 2026-09-28.
+    // Files are named by Photos UUID so two photos with the same original name never collapse.
+    // Originals only: an edited render or a live-photo movie would export as an extra file
+    // with no matching metadata and count as "not exported" forever.
+    '--download-missing', '--skip-edited', '--skip-live', '--overwrite', '--filename', '{uuid}',
   ], { encoding: 'utf8', maxBuffer: 64 * 1024 * 1024, timeout: 20 * 60 * 1000 });
   if (result.status !== 0) log(`export warnings: ${(result.stderr || '').slice(0, 300)}`);
   return readdirSync(destDir).filter(f => IMAGE_EXT.has(extname(f).toLowerCase()));
@@ -238,7 +299,7 @@ async function uploadPhoto(filePath, filename, meta) {
 // per-photo decisions to ~/.nuke/label-audit.jsonl and prints the summary
 // that answers: how many photos have labels at all, what are the labels,
 // what would the gate sync vs hold back. This is the dataset for tuning
-// VEHICLE_LABEL_RE — measure, don't guess.
+// VEHICLE_LABELS / the private sets — measure, don't guess.
 async function auditLabels(days) {
   const since = new Date(Date.now() - days * 86400 * 1000).toISOString();
   const photos = queryNewPhotos(since).filter(p => !p.ismovie && !p.hidden);
@@ -256,7 +317,7 @@ async function auditLabels(days) {
     for (const l of labels) labelCounts.set(l, (labelCounts.get(l) || 0) + 1);
     appendFileSync(auditFile, JSON.stringify({
       file: p.original_filename, taken: p.date, gps: p.latitude != null,
-      labels, decision: sync ? 'sync' : 'hold',
+      labels, decision: sync ? 'sync' : 'hold', gate: gateReason(p),
     }) + '\n');
   }
 
@@ -267,9 +328,10 @@ async function auditLabels(days) {
   console.log(`would sync:    ${wouldSync}`);
   console.log(`held on-device:${photos.length - wouldSync}`);
   console.log(`top labels:`);
-  for (const [l, n] of top) console.log(`  ${String(n).padStart(5)}  ${l}${VEHICLE_LABEL_RE.test(l) ? '   ← gate matches' : ''}`);
+  const mark = (l) => { const k = norm(l); return ALWAYS_PRIVATE.has(k) ? '   ← private (never syncs)' : DOCUMENT_LIKE.has(k) ? '   ← document (never syncs)' : PEOPLE.has(k) ? '   ← people (off-shop hold)' : VEHICLE_LABELS.has(k) ? '   ← vehicle' : ''; };
+  for (const [l, n] of top) console.log(`  ${String(n).padStart(5)}  ${l}${mark(l)}`);
   console.log(`\nper-photo decisions: ${auditFile}`);
-  console.log(`If real vehicle photos show under "held", widen VEHICLE_LABEL_RE with the labels you see here.`);
+  console.log(`If real vehicle photos show under "held", add their exact labels to VEHICLE_LABELS.`);
 }
 
 // ─── Main ────────────────────────────────────────────────────────────────────
@@ -281,12 +343,38 @@ async function main() {
   }
   const state = readState();
   const since = sinceArg || state.last_sync || new Date(Date.now() - 24 * 3600 * 1000).toISOString();
-  const runStartedAt = new Date().toISOString();
+  let runStartedAt = new Date().toISOString();
   log(`sync start — photos added since ${since}${DRY_RUN ? ' (DRY RUN)' : ''}`);
 
-  const photos = queryNewPhotos(since);
+  const photos = QUERY_JSON ? JSON.parse(readFileSync(QUERY_JSON, 'utf8') || '[]') : queryNewPhotos(since);
+  // Oldest-added first, so a capped batch is a contiguous prefix of the backlog and the
+  // watermark can advance to the batch's last date_added (see the end of this function).
+  const addedMs = p => { const t = Date.parse(p.date_added || p.date || ''); return Number.isFinite(t) ? t : Infinity; };
+  const landed = { ...(state.landed || {}) };
+  const tries = { ...(state.unexportable || {}) };
+  const GIVE_UP = 3;
+  let images, capped;
+  if (PLAN_IN) {
+    const plan = JSON.parse(readFileSync(PLAN_IN, 'utf8'));
+    const byUuid = new Map(photos.map((p) => [p.uuid, p]));
+    images = (plan.uuids || []).map((u) => byUuid.get(u)).filter(Boolean);
+    capped = !!plan.capped;
+    if (plan.run_started_at) runStartedAt = plan.run_started_at;
+    log(`upload phase: ${images.length} planned photo(s)`);
+  } else {
   const candidates = photos.filter(p => !p.ismovie && !p.hidden);
-  const images = candidates.filter(isVehicleish).slice(0, MAX_PER_RUN);
+  const vehicleish = candidates.filter(isVehicleish).sort((a, b) => addedMs(a) - addedMs(b));
+  // Two small ledgers ride in the state file so a retry never re-exports what already landed
+  // and one unexportable photo cannot hold the watermark hostage:
+  //   landed:       uuid → date_added of photos already in Nuke but still ahead of the watermark
+  //   unexportable: uuid → {attempts, added, filename, last}; after GIVE_UP attempts the photo is
+  //                 written to ~/.nuke/unexported.jsonl (a recorded gap, never a silent skip)
+  const eligible = vehicleish.filter(p => !landed[p.uuid] && !((tries[p.uuid]?.attempts || 0) >= GIVE_UP));
+  images = eligible.slice(0, MAX_PER_RUN);
+  capped = eligible.length > images.length;
+  const alreadyLanded = vehicleish.length - eligible.length;
+  if (alreadyLanded > 0) log(`${alreadyLanded} photo(s) ahead of the watermark are already in Nuke or given up; not re-exported`);
+  if (capped) log(`batch capped at ${MAX_PER_RUN} of ${eligible.length} vehicle-ish photos; the rest follow in later runs`);
   const heldBack = candidates.filter(p => !isVehicleish(p));
   if (heldBack.length > 0) {
     log(`${heldBack.length} photo(s) held back on-device (no vehicle-ish labels — never uploaded)`);
@@ -294,10 +382,11 @@ async function main() {
     const heldFile = join(STATE_DIR, 'held-back.jsonl');
     for (const p of heldBack) {
       appendFileSync(heldFile, JSON.stringify({
-        at: runStartedAt, file: p.original_filename, taken: p.date,
+        at: runStartedAt, file: p.original_filename, taken: p.date, gate: gateReason(p),
         labels: p.labels || [], gps: p.latitude != null,
       }) + '\n');
     }
+  }
   }
 
   if (images.length === 0) {
@@ -311,31 +400,83 @@ async function main() {
     images.forEach(p => log(`  would sync: ${p.original_filename} taken=${p.date} gps=${p.latitude != null}`));
     return;
   }
-
-  const destDir = join(tmpdir(), `nuke-photo-sync-${Date.now()}`);
-  const exported = exportPhotos(images.map(p => p.uuid), destDir);
-  const metaByName = new Map();
-  for (const p of images) metaByName.set(p.original_filename, p);
-
-  let ok = 0, dup = 0, failed = 0;
-  for (const filename of exported) {
-    const meta = metaByName.get(filename) || {};
-    const res = await uploadPhoto(join(destDir, filename), filename, meta);
-    if (res.ok && res.dup) dup++;
-    else if (res.ok) ok++;
-    else { failed++; if (failed <= 3) log(`  upload failed [${filename}]: ${res.err}`); }
+  if (PLAN_OUT) {
+    writeFileSync(PLAN_OUT, JSON.stringify({ uuids: images.map((p) => p.uuid), capped, run_started_at: runStartedAt }));
+    writeFileSync(`${PLAN_OUT}.uuids`, images.map((p) => p.uuid).join('\n') + '\n');
+    log(`plan: ${images.length} photo(s) to export`);
+    return;
   }
 
-  try { rmSync(destDir, { recursive: true, force: true }); } catch { /* ignore */ }
+  const destDir = EXPORT_DIR || join(tmpdir(), `nuke-photo-sync-${Date.now()}`);
+  const exported = EXPORT_DIR                                          // files named <uuid>.<ext>
+    ? readdirSync(EXPORT_DIR).filter((f) => IMAGE_EXT.has(extname(f).toLowerCase()))
+    : exportPhotos(images.map(p => p.uuid), destDir);
+  const metaByUuid = new Map(images.map(p => [String(p.uuid).toLowerCase(), p]));
+
+  let ok = 0, dup = 0, failed = 0;
+  for (const file of exported) {
+    const meta = metaByUuid.get(file.replace(/\.[^.]+$/, '').toLowerCase());
+    if (!meta) { failed++; if (failed <= 3) log(`  no metadata for exported file ${file}`); continue; }
+    // Stored under the Photos UUID: two photos sharing one original name can never collide
+    // in the bucket (the old {original_name} path silently reused the first object's bytes).
+    const res = await uploadPhoto(join(destDir, file), file, meta);
+    if (res.ok) landed[meta.uuid] = meta.date_added || meta.date || runStartedAt;
+    if (res.ok && res.dup) dup++;
+    else if (res.ok) ok++;
+    else { failed++; if (failed <= 3) log(`  upload failed [${meta.original_filename || file}]: ${res.err}`); }
+  }
+
+  // Photos of the batch that produced no file: count an attempt; give up after GIVE_UP.
+  const exportedUuids = new Set(exported.map(f => f.replace(/\.[^.]+$/, '').toLowerCase()));
+  let stillOwed = 0, gaveUp = 0;
+  for (const p of images) {
+    if (exportedUuids.has(String(p.uuid).toLowerCase())) continue;
+    const t = tries[p.uuid] || { attempts: 0, added: p.date_added || p.date || null, filename: p.original_filename };
+    t.attempts += 1; t.last = runStartedAt; tries[p.uuid] = t;
+    if (t.attempts >= GIVE_UP) {
+      gaveUp++;
+      appendFileSync(join(STATE_DIR, 'unexported.jsonl'), JSON.stringify({
+        at: runStartedAt, uuid: p.uuid, file: p.original_filename, taken: p.date, added: t.added, attempts: t.attempts,
+      }) + '\n');
+      log(`  gave up on ${p.original_filename} (${p.uuid}) after ${t.attempts} export attempts; recorded in unexported.jsonl`);
+    } else {
+      stillOwed++;
+      if (stillOwed <= 3) log(`  not exported this run: ${p.original_filename} (${p.uuid}), attempt ${t.attempts} of ${GIVE_UP}`);
+    }
+  }
+
+  if (!EXPORT_DIR) { try { rmSync(destDir, { recursive: true, force: true }); } catch { /* ignore */ } }
 
   // Advance state ONLY past what succeeded: if anything failed, do not move
   // the watermark — next run retries. (Silent-failure law: the daemon must
   // never claim progress it didn't make.)
-  const newState = { ...state, last_run: runStartedAt, last_result: `${ok} uploaded, ${dup} dup, ${failed} failed` };
-  if (failed === 0) newState.last_sync = runStartedAt;
+  // ...and only when every photo of the batch was exported AND landed. A capped batch
+  // advances the watermark to its last date_added, never to "now": the photos behind the
+  // cap are still unsynced. (2026-09-28: the old rule would have skipped ~2,400 of them.)
+  const notExported = stillOwed;                       // given-up photos are recorded, not owed
+  const complete = failed === 0 && notExported === 0;
+  let advancedTo = null;
+  if (complete) {
+    if (capped) {
+      const last = Math.max(...images.map(addedMs).filter(Number.isFinite));
+      if (Number.isFinite(last)) advancedTo = new Date(last).toISOString();
+    } else {
+      advancedTo = runStartedAt;
+    }
+  }
+  if (advancedTo) {
+    // Everything at or behind the new watermark is out of the query window; drop its ledger rows.
+    const cut = Date.parse(advancedTo);
+    for (const [u, d] of Object.entries(landed)) { const t = Date.parse(d); if (Number.isFinite(t) && t <= cut) delete landed[u]; }
+    for (const [u, t] of Object.entries(tries)) { const a = Date.parse(t.added || ''); if (Number.isFinite(a) && a <= cut) delete tries[u]; }
+  }
+  const newState = { ...state, last_run: runStartedAt, landed, unexportable: tries,
+    last_result: `${ok} uploaded, ${dup} dup, ${failed} failed, ${notExported} not exported, ${gaveUp} given up` };
+  if (advancedTo) newState.last_sync = advancedTo;
   writeState(newState);
 
-  log(`sync done — ${ok} uploaded, ${dup} duplicates, ${failed} failed${failed > 0 ? ' (watermark NOT advanced — will retry)' : ''}`);
+  log(`sync done — ${ok} uploaded, ${dup} duplicates, ${failed} failed, ${notExported} not exported, ${gaveUp} given up`
+    + (advancedTo ? ` (watermark → ${advancedTo})` : ' (watermark NOT advanced — will retry)'));
 
   // Heartbeat into the mesh so the pulse board sees this organ
   try {

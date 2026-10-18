@@ -6,7 +6,7 @@
  * This function has side effects (state setters, supabase calls, navigation) but no React hooks.
  */
 import type React from 'react';
-import { buildAuctionPulseFromExternalListings } from './buildAuctionPulse';
+import { buildAuctionPulseFromExternalListings, buildAuctionPulseFromReadResult } from './buildAuctionPulse';
 import { isMismatchedVehicleImage, scoreMoneyShot } from './imageFilterUtils';
 
 // ----- Hero Image Auto-Selection -----
@@ -80,6 +80,12 @@ function scoreHeroCandidate(row: any, options: { frontExterior?: boolean } = {})
   return moneyShotScore + qualityScore + zoneScore + getHeroAspectScore(row);
 }
 
+/** The record a merged-away vehicle was folded into, or null: the vehicle's own id (a loop) is not a target. */
+export function mergedTargetOf(vehicle: { id?: unknown; merged_into_vehicle_id?: unknown } | null | undefined): string | null {
+  const to = vehicle?.merged_into_vehicle_id;
+  return typeof to === 'string' && to.length >= 20 && to !== vehicle?.id ? to : null;
+}
+
 // In-flight dedupe for the hero-candidate query. The identical vehicle_images
 // query was observed firing 2-4x per page load (StrictMode double-mount +
 // RPC-fallback path both selecting a hero). Key = vehicleId — the rest of the
@@ -94,11 +100,11 @@ const inflightProfileRpc = new Map<string, Promise<any>>();
  * Select the best hero image for a vehicle based on zone, quality, confidence,
  * and banner fit.
  *
- * Priority:
- *  1. Front-facing exterior zones with completed AI processing, ranked by a
- *     weighted hero score
- *  2. Fallback: best "money shot" candidate from any analyzed zone
- *  3. Fallback: existing primary_image_url from the vehicle record
+ * Priority: latest eligible owner photo, explicit primary, analyzed exterior,
+ * then other eligible candidates. A primary is fetched independently of the
+ * recent window so newer imports cannot erase an older explicit choice.
+ * The legacy URL argument remains positional for callers, but unchecked URLs
+ * cannot bypass row-level exclusions or viewer access.
  *
  * Returns the best image URL (large > medium > image_url) and metadata
  * extracted from exif_data and taken_at.
@@ -106,64 +112,63 @@ const inflightProfileRpc = new Map<string, Promise<any>>();
 export async function selectBestHeroImage(
   vehicleId: string,
   supabase: any,
-  primaryImageUrl?: string | null,
+  _primaryImageUrl?: string | null,
   prefetchedImages?: any[],
 ): Promise<HeroImageResult | null> {
   try {
-    // Coalesce the prior 4 sequential queries into one round-trip.
-    // Strategy: pull a generous candidate window ordered by (is_primary, quality, ai recency),
-    // then apply the same priority logic client-side. If the caller already has the image list,
-    // skip the network call entirely.
+    // Coalesce concurrent loads. Keep the recent window for owner-upload recency,
+    // but read explicit primaries separately: recency alone can omit the primary.
+    const projection = 'id, image_url, medium_url, large_url, photo_quality_score, zone_confidence, vehicle_zone, exif_data, taken_at, position, angle, ai_detected_angle, source, is_primary, is_document, is_duplicate, is_superseded, is_sensitive, image_vehicle_match_status, ai_processing_status, vision_gate_status, created_at, category, image_type';
+    const readRows = async (query: any): Promise<any[]> => {
+      const { data, error } = await query;
+      if (error) console.warn('[selectBestHeroImage] query error:', error);
+      return data || [];
+    };
     let candidates: any[] | null = null;
 
     if (prefetchedImages && prefetchedImages.length > 0) {
-      candidates = prefetchedImages;
+      const primaryRows = prefetchedImages.some((img) => img?.is_primary === true)
+        ? []
+        : await readRows(supabase.from('vehicle_images').select(projection)
+          .eq('vehicle_id', vehicleId).eq('is_primary', true)
+          .order('created_at', { ascending: false }).limit(10));
+      candidates = [...prefetchedImages, ...primaryRows];
     } else {
       let pending = inflightHeroCandidates.get(vehicleId);
       if (!pending) {
-        const query: Promise<any[] | null> = supabase
-          .from('vehicle_images')
-          .select(
-            'image_url, medium_url, large_url, photo_quality_score, zone_confidence, vehicle_zone, exif_data, taken_at, position, angle, ai_detected_angle, source, is_primary, is_document, is_duplicate, image_vehicle_match_status, ai_processing_status, vision_gate_status, created_at, category, image_type'
-          )
-          .eq('vehicle_id', vehicleId)
-          // Order by recency first — latest owner photo wins per restoration_lead_image_must_be_latest.
-          // is_primary remains a tiebreaker fallback further down.
-          .order('taken_at', { ascending: false, nullsFirst: false })
-          .order('created_at', { ascending: false, nullsFirst: false })
-          .order('is_primary', { ascending: false, nullsFirst: false })
-          .order('photo_quality_score', { ascending: false, nullsFirst: false })
-          .limit(60)
-          .then(({ data, error }: { data: any[] | null; error: any }) => {
-            if (error) {
-              console.warn('[selectBestHeroImage] query error:', error);
-            }
-            return data || null;
-          });
+        const query = Promise.all([
+          readRows(supabase.from('vehicle_images').select(projection)
+            .eq('vehicle_id', vehicleId)
+            .order('taken_at', { ascending: false, nullsFirst: false })
+            .order('created_at', { ascending: false, nullsFirst: false })
+            .order('is_primary', { ascending: false, nullsFirst: false })
+            .order('photo_quality_score', { ascending: false, nullsFirst: false })
+            .limit(60)),
+          readRows(supabase.from('vehicle_images').select(projection)
+            .eq('vehicle_id', vehicleId).eq('is_primary', true)
+            .order('created_at', { ascending: false }).limit(10)),
+        ]).then(([recent, primary]) => [...recent, ...primary]);
         pending = query.finally(() => inflightHeroCandidates.delete(vehicleId));
         inflightHeroCandidates.set(vehicleId, pending);
       }
       candidates = await pending;
     }
 
-    if (!candidates || candidates.length === 0) {
-      if (primaryImageUrl) return { url: primaryImageUrl, meta: {} };
-      return null;
-    }
+    if (!candidates || candidates.length === 0) return null;
 
     // Filter out documents/duplicates, mismatch-flagged rows, and vision-gate rejections.
     const usable = candidates.filter((img: any) => {
       if (img?.is_document === true) return false;
-      if (img?.is_duplicate === true) return false;
+      if (img?.is_duplicate === true || img?.is_superseded === true || img?.is_sensitive === true) return false;
+      if (!getHeroCandidateUrl(img)) return false;
       const mvms = img?.image_vehicle_match_status;
       if (mvms === 'mismatch' || mvms === 'unrelated') return false;
       const vgs = img?.vision_gate_status;
-      if (vgs === 'rejected_personal' || vgs === 'rejected_misattributed' || vgs === 'rejected') return false;
+      if (typeof vgs === 'string' && vgs.startsWith('rejected')) return false;
       return true;
     });
 
     if (usable.length === 0) {
-      if (primaryImageUrl) return { url: primaryImageUrl, meta: {} };
       return null;
     }
 
@@ -185,11 +190,12 @@ export async function selectBestHeroImage(
     // closeup, engine bay, undercarriage, interior, document, or transport/delivery
     // shot. Skylar 2026-05-30: "engine bay isn't a primary, post-delivery isn't a
     // primary — there should be flags that inhibit that image from being the hero."
-    const NON_HERO_ZONE = /^(detail_|int_|eng|under|trunk|doc|receipt|data_plate|transport|delivery|ship)/i;
+    const NON_HERO_ZONE = /^(detail_|int_|mech_|panel_|wheel_|ext_undercarriage|eng|under|trunk|doc|receipt|data_plate|transport|delivery|ship)/i;
     const EXT_ZONE = /(^ext_)|profile|three.?quarter|(^3q)/i;
     const NON_HERO_CAT = new Set([
       'engine_bay', 'engine', 'undercarriage', 'interior', 'vehicle_interior',
-      'documentation', 'receipt_document', 'data_plate', 'trunk_storage', 'transport', 'delivery',
+      'documentation', 'document', 'receipt_document', 'receipt', 'invoice', 'screenshot',
+      'data_plate', 'trunk_storage', 'transport', 'delivery', 'detail', 'detail_shot', 'parts',
     ]);
     const isHeroEligible = (img: any): boolean => {
       if (img?.is_document === true) return false;
@@ -198,6 +204,9 @@ export async function selectBestHeroImage(
       const t = (img?.image_type || '').toLowerCase();
       if (NON_HERO_ZONE.test(z)) return false;
       if (NON_HERO_CAT.has(c) || NON_HERO_CAT.has(t)) return false;
+      const angles = [img?.angle, img?.ai_detected_angle];
+      if (angles.some((angle) => typeof angle === 'string' &&
+        /interior|engine|under.?hood|undercarriage|detail|document|receipt|data.?plate|transport|delivery|trunk|wheel|sticker/i.test(angle))) return false;
       return true;
     };
     const isExterior = (img: any): boolean => {
@@ -206,9 +215,15 @@ export async function selectBestHeroImage(
       return EXT_ZONE.test(z) || c === 'exterior' || c === 'exterior_body' || c === 'vehicle_exterior';
     };
 
-    const ownerOwned = usable.filter((img: any) => isOwnerTrustSource(img?.source));
+    // Apply the same exclusions to primary, scored and last-resort branches.
+    // Unknown classification stays unknown, and remains eligible as a fallback.
+    const eligible = usable.filter(isHeroEligible);
+    if (eligible.length === 0) return null;
+    const ownerOwned = eligible.filter((img: any) => isOwnerTrustSource(img?.source));
+    ownerOwned.sort((a, b) =>
+      (Date.parse(b.taken_at || b.created_at) || 0) - (Date.parse(a.taken_at || a.created_at) || 0));
     if (ownerOwned.length > 0) {
-      // Candidates are ordered taken_at DESC. Latest owner EXTERIOR shot wins;
+      // Owner rows are ordered by capture time (ingest time if unknown). Latest EXTERIOR wins;
       // else latest owner hero-eligible shot (not a detail/engine/interior/transport).
       // Only if NEITHER exists do we fall through to the exterior/quality priorities below
       // — better to fall through than pin a closeup or shipping photo as the face of the truck.
@@ -219,14 +234,14 @@ export async function selectBestHeroImage(
     }
 
     // Priority 1: explicit is_primary (fallback for vehicles with no owner-trust uploads, e.g. BaT-only imports).
-    const primary = usable.find((img: any) => img?.is_primary === true);
+    const primary = eligible.find((img: any) => img?.is_primary === true);
     if (primary) return buildHeroResult(primary);
 
     const trustedSources = new Set(['bat_import_mirrored', 'bat_import', 'user_upload', 'manual']);
     const frontZones = new Set(['ext_front', 'ext_front_driver', 'ext_front_passenger']);
 
     // Priority 1: front-facing exterior, AI completed
-    const fronts = usable.filter(
+    const fronts = eligible.filter(
       (img: any) => img?.ai_processing_status === 'completed' && frontZones.has(img?.vehicle_zone)
     );
     if (fronts.length > 0) {
@@ -240,7 +255,7 @@ export async function selectBestHeroImage(
     }
 
     // Priority 2: any zone with a quality score
-    const scored2 = usable
+    const scored2 = eligible
       .filter((img: any) => img?.photo_quality_score != null)
       .map((img: any) => {
         const base = scoreHeroCandidate(img);
@@ -252,11 +267,10 @@ export async function selectBestHeroImage(
       return buildHeroResult(scored2[0].img);
     }
 
-    // Priority 3: any usable image (candidates are already ordered by is_primary, quality, created_at)
-    return buildHeroResult(usable[0]);
+    // Priority 3: an eligible image whose classification may still be unknown.
+    return buildHeroResult(eligible[0]);
   } catch (err) {
     console.warn('[selectBestHeroImage] error:', err);
-    if (primaryImageUrl) return { url: primaryImageUrl, meta: {} };
     return null;
   }
 }
@@ -296,6 +310,11 @@ function buildHeroResult(row: any): HeroImageResult {
   return { url, meta };
 }
 
+export interface TimelineReadState {
+  timeline: 'pending' | 'ready' | 'unavailable';
+  work: 'pending' | 'ready' | 'unavailable';
+}
+
 export interface RpcLoadResult {
   /** RPC provided non-truncated images — skip separate loadVehicleImages */
   images: boolean;
@@ -312,7 +331,7 @@ export interface LoadVehicleParams {
   session: any;
   leadImageUrl: string | null;
   supabase: any;
-  navigate: (path: string) => void;
+  navigate: (path: string, options?: { replace?: boolean }) => void;
   ranBatSyncRef: React.MutableRefObject<string | null>;
   setLoading: (v: boolean) => void;
   setVehicle: (v: any) => void;
@@ -320,7 +339,53 @@ export interface LoadVehicleParams {
   setLeadImageUrl: (url: string) => void;
   setVehicleImages: (images: string[]) => void;
   setTimelineEvents: React.Dispatch<React.SetStateAction<any[]>>;
+  onTimelineRead?: (state: TimelineReadState) => void;
   setAuctionPulse: (pulse: any) => void;
+}
+
+/**
+ * The observation total the profile shows ("N in the record"). The profile RPC carries it in stats; its timeout fallback
+ * and a VIN-keyed load read the vehicle row instead, which holds the same maintained total (vehicles.observation_count).
+ * Either is a number the page can use as it stands; only when neither exists does the page count the rows itself, and
+ * that exact count runs the row policy over every observation of the vehicle (measured 2026-10-14: K5 mean 6.2 s).
+ */
+export function observationTotal(fromRpc: number | null, row: unknown): number | null {
+  if (typeof fromRpc === 'number') return fromRpc;
+  const column = (row as { observation_count?: unknown } | null | undefined)?.observation_count;
+  return typeof column === 'number' && Number.isFinite(column) && column >= 0 ? column : null;
+}
+
+export function isVehicleVinAddress(value: unknown): value is string {
+  return typeof value === 'string' && /^[A-HJ-NPR-Z0-9]{17}$/i.test(value);
+}
+
+export type VinAddressResolution = { status: 'resolved'; id: string }
+  | { status: 'missing' | 'ambiguous' | 'unavailable' | 'malformed' };
+
+/** Qualify the existing indexed public reader's candidates; never choose the first of several. */
+export async function resolveVehicleVinAddress(vin: string, supabase: any): Promise<VinAddressResolution> {
+  if (!isVehicleVinAddress(vin)) return { status: 'malformed' };
+  const normalized = vin.toUpperCase();
+  try {
+    const key = `vin:${normalized}`;
+    let pending = inflightProfileRpc.get(key);
+    if (!pending) {
+      pending = Promise.resolve(supabase.rpc('vehicle_by_vin_public', { p_vin: normalized }))
+        .finally(() => inflightProfileRpc.delete(key));
+      inflightProfileRpc.set(key, pending);
+    }
+    const { data, error } = await pending;
+    if (error) return { status: 'unavailable' };
+    if (!Array.isArray(data)) return { status: 'malformed' };
+    if (data.length === 0) return { status: 'missing' };
+    if (data.length !== 1) return { status: 'ambiguous' };
+    const match = data[0];
+    if (typeof match?.id !== 'string' || !/^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i.test(match.id)
+      || typeof match.vin !== 'string' || match.vin.trim().toUpperCase() !== normalized) return { status: 'malformed' };
+    return { status: 'resolved', id: match.id };
+  } catch {
+    return { status: 'unavailable' };
+  }
 }
 
 export async function loadVehicleImpl({
@@ -336,6 +401,7 @@ export async function loadVehicleImpl({
   setLeadImageUrl,
   setVehicleImages,
   setTimelineEvents,
+  onTimelineRead,
   setAuctionPulse,
 }: LoadVehicleParams): Promise<RpcLoadResult> {
   const rpcLoaded: RpcLoadResult = { images: false, timeline: false, commentCount: null, observationCount: null };
@@ -344,11 +410,23 @@ export async function loadVehicleImpl({
 
     // Accept both UUID format (with hyphens) and VIN format (17 chars alphanumeric)
     const isUUID = vehicleId && vehicleId.length >= 20 && vehicleId.includes('-');
-    const isVIN = vehicleId && /^[A-HJ-NPR-Z0-9]{17}$/i.test(vehicleId);
+    const isVIN = isVehicleVinAddress(vehicleId);
 
     if (!vehicleId || (!isUUID && !isVIN)) {
       console.error('Invalid vehicleId format:', vehicleId);
       navigate('/vehicles');
+      return rpcLoaded;
+    }
+
+    if (isVIN) {
+      // Resolve with the existing indexed public owner, then let every profile reader use a UUID.
+      const resolution = await resolveVehicleVinAddress(vehicleId, supabase);
+      if (resolution.status === 'resolved') {
+        navigate(`/vehicle/${resolution.id}`, { replace: true });
+      } else {
+        console.warn('[VehicleProfile] VIN address unresolved:', resolution.status);
+        setVehicle(null);
+      }
       return rpcLoaded;
     }
 
@@ -398,7 +476,7 @@ export async function loadVehicleImpl({
       try {
         const { data, error } = await supabase
           .from('vehicles')
-          .select('id,year,make,model,normalized_model,series,trim,vin,primary_image_url,image_url,sale_price,nuke_estimate,nuke_estimate_confidence,status,is_public,sale_status,auction_outcome,auction_source,bat_auction_url,discovery_url,listing_url,listing_source,listing_location,uploaded_by,user_id,owner_id,color,interior_color,mileage,fuel_type,transmission,engine_size,engine_type,engine_displacement,horsepower,torque,drivetrain,body_style,doors,is_modified,modification_details,condition_rating,notes,created_at,updated_at,is_for_sale,is_draft,deleted_at,asking_price,current_value,purchase_price,msrp,completion_percentage,displacement,auction_end_date,bid_count,view_count,bat_sold_price,bat_sale_date,bat_listing_title,bat_location,bat_seller,bat_lot_number,sale_date,ownership_verified,ownership_verified_at,data_quality_score,platform_source,discovery_source,profile_origin,listing_kind,reserve_status,origin_organization_id,origin_metadata,description,description_source,highlights,equipment,modifications,known_flaws,recent_service_history,title_status,location,observation_count,image_count')
+          .select('id,merged_into_vehicle_id,year,make,model,normalized_model,series,trim,vin,primary_image_url,image_url,sale_price,nuke_estimate,nuke_estimate_confidence,status,is_public,sale_status,auction_outcome,auction_source,bat_auction_url,discovery_url,listing_url,listing_source,listing_location,uploaded_by,user_id,owner_id,color,interior_color,mileage,fuel_type,transmission,engine_size,engine_type,engine_displacement,horsepower,torque,drivetrain,body_style,doors,is_modified,modification_details,condition_rating,notes,created_at,updated_at,is_for_sale,is_draft,deleted_at,asking_price,current_value,msrp,msrp_source,completion_percentage,displacement,auction_end_date,bid_count,view_count,bat_sold_price,bat_sale_date,bat_listing_title,bat_location,bat_seller,bat_lot_number,sale_date,ownership_verified,ownership_verified_at,data_quality_score,platform_source,discovery_source,profile_origin,listing_kind,reserve_status,origin_organization_id,origin_metadata,import_metadata,provenance_metadata,description,description_source,highlights,equipment,modifications,known_flaws,recent_service_history,title_status,location,observation_count,image_count')
           .eq('id', vehicleId)
           .single();
 
@@ -444,7 +522,7 @@ export async function loadVehicleImpl({
         setVehicleImages(rpcData.images.map((img: any) => img.image_url));
         rpcLoaded.images = !rpcImagesTruncated;
       }
-      if (rpcData.timeline_events) {
+      if (Array.isArray(rpcData.timeline_events)) {
         // Merge work_sessions into timeline events (work_sessions table has RLS,
         // so the RPC returns them separately via SECURITY DEFINER)
         const events = [...rpcData.timeline_events];
@@ -457,7 +535,7 @@ export async function loadVehicleImpl({
               event_type: 'work_session',
               title: ws.title,
               category: ws.work_type,
-              cost_amount: (ws.total_job_cost || 0) + (ws.total_parts_cost || 0),
+              cost_amount: ws.total_job_cost ?? null,
               metadata: {
                 work_type: ws.work_type,
                 image_count: ws.image_count,
@@ -479,6 +557,10 @@ export async function loadVehicleImpl({
         });
         // Paint the timeline NOW — do not gate first paint on image_sets.
         sortByDateDesc(events);
+        onTimelineRead?.({
+          timeline: 'ready',
+          work: Array.isArray(rpcData.work_sessions) ? 'ready' : 'unavailable',
+        });
         setTimelineEvents(events);
         rpcLoaded.timeline = true;
         // RPC doesn't include image_sets — supplement asynchronously and merge
@@ -524,6 +606,17 @@ export async function loadVehicleImpl({
 
     }
 
+    rpcLoaded.observationCount = observationTotal(rpcLoaded.observationCount, vehicleData);
+
+    // A vehicle merged into another stays at its old address as a stub: no photos, no owner, only the specs it was
+    // created with (2026-10-16: an owner's old link opened a bare "NO IMAGES" page for a car with 1,800 photos under
+    // its merge target). Send the visitor to the record that holds the data; replace, so Back does not bounce again.
+    const mergedTarget = mergedTargetOf(vehicleData);
+    if (mergedTarget) {
+      navigate(`/vehicle/${mergedTarget}`, { replace: true });
+      return rpcLoaded;
+    }
+
     // For non-authenticated users, only show public vehicles
     if (!session && !vehicleData.is_public) {
       navigate('/login');
@@ -553,7 +646,7 @@ export async function loadVehicleImpl({
       try {
         const { data } = await supabase
           .from('vehicle_events')
-          .select('id, source_platform, source_url, event_status, ended_at, current_price, bid_count, watcher_count, view_count, final_price, sold_at, metadata, updated_at')
+          .select('id, source_platform, source_url, event_type, event_status, ended_at, current_price, bid_count, watcher_count, view_count, final_price, sold_at, metadata, updated_at')
           .eq('vehicle_id', vehicleData.id)
           .order('updated_at', { ascending: false })
           .limit(10);
@@ -577,16 +670,27 @@ export async function loadVehicleImpl({
 
       // Fallback: if we can't access vehicle_events due to RLS, still treat BaT-discovered vehicles as "auction mode"
       // so we hide Claim/Set-price and show a link to the listing.
+      const vd = (vehicleData ?? {}) as Record<string, unknown>;
       const fallbackListingUrl =
         (vehicleData as any)?.bat_auction_url ||
         (String((vehicleData as any)?.discovery_url || '').includes('bringatrailer.com/listing/')
           ? String((vehicleData as any)?.discovery_url)
+          : null) ||
+        // sync-live-auctions writes the live listing's URL to listing_url only
+        (String(vd.listing_url || '').includes('bringatrailer.com/listing/')
+          ? String(vd.listing_url)
           : null);
+
+      // Live-sync rows carry the auction on the vehicle: sale_status 'auction_live' + a future end.
+      const vEnd = Date.parse(String(vd.auction_end_date || ''));
+      const vehicleAuctionLive = vSaleStatus === 'auction_live' && Number.isFinite(vEnd) && vEnd > Date.now();
+      const num = (x: unknown) => (x == null || x === '' || !Number.isFinite(Number(x)) ? null : Number(x));
 
       // Determine listing_status from vehicle data (fallback). DO NOT infer sold from sale_price alone.
       const inferredStatus = (() => {
         if (vOutcome === 'reserve_not_met' || vOutcome === 'no_sale') return vOutcome;
         if (vSaleStatus === 'sold' || vOutcome === 'sold') return 'sold';
+        if (vehicleAuctionLive) return 'active';
         return vOutcome || 'unknown';
       })();
 
@@ -599,8 +703,13 @@ export async function loadVehicleImpl({
                 listing_url: fallbackListingUrl,
                 listing_status: inferredStatus,
                 end_date: (vehicleData as any)?.auction_end_date || null,
-                current_bid: typeof (vehicleData as any)?.current_bid === 'number' ? (vehicleData as any).current_bid : null,
-                bid_count: typeof (vehicleData as any)?.bid_count === 'number' ? (vehicleData as any).bid_count : null,
+                // The live sync writes the bid to high_bid (since 20260927195000); rows it has not
+                // rewritten yet still hold it in sale_price, which on a live row is a bid, not a sale.
+                current_bid:
+                  num(vd.high_bid) ??
+                  num(vd.current_bid) ??
+                  (vehicleAuctionLive ? num(vd.sale_price) : null),
+                bid_count: num(vd.bid_count) ?? num((vd.origin_metadata as Record<string, unknown> | null)?.bid_count),
                 watcher_count: null,
                 view_count: null,
                 comment_count: null,
@@ -690,6 +799,12 @@ export async function loadVehicleImpl({
 
           if (bidCount === null) bidCount = typeof (bidCountResult as any)?.count === 'number' ? (bidCountResult as any).count : null;
           commentCount = typeof (commentCountResult as any)?.count === 'number' ? (commentCountResult as any).count : null;
+          // A live-sync listing whose comments have not been extracted has no rows here: that is
+          // "not read yet", not zero bids, so show unknown rather than 0.
+          if (vehicleAuctionLive && !best) {
+            if (bidCount === 0) bidCount = null;
+            if (commentCount === 0) commentCount = null;
+          }
           lastBidAt = (lastBid as any)?.data?.posted_at || null;
           lastCommentAt = (lastComment as any)?.data?.posted_at || null;
           const winnerName = String((lastBid as any)?.data?.author_username || '').trim() || null;
@@ -737,16 +852,14 @@ export async function loadVehicleImpl({
               .invoke('sync-bat-listing', { body: { externalListingId: extId } })
               .then(async () => {
                 // Refresh latest listing rows and re-derive pulse.
-                const { data } = await supabase
+                const result = await supabase
                   .from('vehicle_events')
-                  .select('id, source_platform, source_url, event_status, ended_at, current_price, bid_count, watcher_count, view_count, final_price, sold_at, metadata, updated_at')
+                  .select('id, source_platform, source_url, event_type, event_status, ended_at, current_price, bid_count, watcher_count, view_count, final_price, sold_at, metadata, updated_at')
                   .eq('vehicle_id', vehicleData.id)
                   .order('updated_at', { ascending: false })
                   .limit(10);
-                const merged = buildAuctionPulseFromExternalListings(Array.isArray(data) ? data : [], vehicleData.id);
-                if (merged) {
-                  setAuctionPulse((prev: any) => ({ ...(prev || {}), ...merged }));
-                }
+                const merged = buildAuctionPulseFromReadResult(result, vehicleData.id);
+                setAuctionPulse((prev: any) => merged ? ({ ...(prev || {}), ...merged }) : null);
               })
               .catch(() => {});
           }

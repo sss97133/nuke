@@ -9,10 +9,12 @@
  */
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { requireWriteAuth } from "../_shared/writeGuard.ts";
+import { projectPublishableKey, projectSecretKey } from "../_shared/supabaseKeys.ts";
 
 const supabase = createClient(
   Deno.env.get("SUPABASE_URL")!,
-  Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
+  projectSecretKey()!
 );
 
 // Compute SHA-256 hash of image bytes — used for exact duplicate detection
@@ -240,6 +242,9 @@ async function sendClarificationSMS(
 }
 
 Deno.serve(async (req) => {
+  // Writes are never anonymous: service key, signed-in user, or nothing (P0.2, 2026-09-27).
+  const denied = await requireWriteAuth(req);
+  if (denied) return denied;
   if (req.method === "OPTIONS") {
     return new Response(null, {
       headers: {
@@ -263,7 +268,7 @@ Deno.serve(async (req) => {
       const { createClient: createAuthClient } = await import("https://esm.sh/@supabase/supabase-js@2");
       const authSupabase = createAuthClient(
         Deno.env.get("SUPABASE_URL")!,
-        Deno.env.get("SUPABASE_ANON_KEY") || Deno.env.get("ANON_KEY") || "",
+        projectPublishableKey() || "",
         { global: { headers: { Authorization: authHeader } } }
       );
       const { data: { user } } = await authSupabase.auth.getUser();
@@ -271,7 +276,7 @@ Deno.serve(async (req) => {
     }
 
     // Require auth - either JWT or service role key
-    const serviceKey = Deno.env.get("SERVICE_ROLE_KEY") || Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "NONE";
+    const serviceKey = projectSecretKey() || "NONE";
     const isServiceRole = authHeader?.includes(serviceKey);
     if (!authenticatedUserId && !isServiceRole) {
       return new Response(JSON.stringify({ error: "Authentication required" }), {
@@ -476,7 +481,8 @@ Deno.serve(async (req) => {
               (analysis as any)._insertedId = viData?.id;
             }
           } else {
-            await supabase.from("pending_image_assignments").upsert({
+            // pending_image_assignments does not exist in the schema; surface the failure in the per-image result.
+            const { error: paErr } = await supabase.from("pending_image_assignments").upsert({
               image_url: img.url,
               user_id: effectiveUserId,
               ai_hints: analysis.hints,
@@ -485,6 +491,10 @@ Deno.serve(async (req) => {
               status: "pending",
               created_at: new Date().toISOString(),
             }, { onConflict: "image_url" });
+            if (paErr) {
+              console.error(`pending_image_assignments upsert failed: ${paErr.message}`);
+              (analysis as any)._insertError = `pending_image_assignments: ${paErr.message}`;
+            }
           }
         }
 

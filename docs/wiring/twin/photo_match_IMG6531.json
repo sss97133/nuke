@@ -1,0 +1,202 @@
+{
+ "camera": {
+  "location": [
+   0.05101259745954723,
+   -2.357508365791211,
+   1.7774585016794293
+  ],
+  "rotation_euler": [
+   0.6674385869229627,
+   0.051578158617167524,
+   0.03726679509222525
+  ],
+  "lens_mm": 24,
+  "sensor_width_mm": 34.6,
+  "res": [
+   1200,
+   900
+  ]
+ },
+ "engine_root": {
+  "x": 5.780957650766474e-06,
+  "y": -1.400167527761208,
+  "z": 0.7195228672553703
+ },
+ "fitted_dims_mm": {
+  "rail_dr": -39.99999999999999,
+  "rail_ds": -5.0514933201717405,
+  "alt_x": 226.65186848203,
+  "alt_z": 279.9999999999992,
+  "tb_dz": 42.02582098628508
+ },
+ "features": [
+  {
+   "px": [
+    945.0,
+    275.0
+   ],
+   "name": "iBooster body centre (v2 atom position)",
+   "err_px": 35.614269188994676,
+   "acceptance": false
+  },
+  {
+   "px": [
+    170.0,
+    522.0
+   ],
+   "name": "pass tire top edge (far tangent)",
+   "err_px": 7.9688395821932785,
+   "acceptance": false
+  },
+  {
+   "px": [
+    1120.0,
+    585.0
+   ],
+   "name": "driver tire top edge (far tangent)",
+   "err_px": 68.88988366768244,
+   "acceptance": false
+  },
+  {
+   "px": [
+    605.0,
+    315.0
+   ],
+   "name": "TB bore centre",
+   "err_px": 2.078481598218491,
+   "acceptance": true
+  },
+  {
+   "px": [
+    605.0,
+    398.0
+   ],
+   "name": "carb pad / adapter",
+   "err_px": 11.196999517867116,
+   "acceptance": false
+  },
+  {
+   "px": [
+    734.0,
+    242.0
+   ],
+   "name": "driver rail rear end",
+   "err_px": 3.381444163944813,
+   "acceptance": true
+  },
+  {
+   "px": [
+    759.0,
+    630.0
+   ],
+   "name": "driver rail front end",
+   "err_px": 28.896988399215935,
+   "acceptance": true
+  },
+  {
+   "px": [
+    487.0,
+    242.0
+   ],
+   "name": "pass rail rear end",
+   "err_px": 9.988961390484304,
+   "acceptance": true
+  },
+  {
+   "px": [
+    459.0,
+    624.0
+   ],
+   "name": "pass rail front end",
+   "err_px": 52.016960056762365,
+   "acceptance": true
+  },
+  {
+   "px": [
+    866.0,
+    774.0
+   ],
+   "name": "alternator pulley cover",
+   "err_px": 26.615848521090534,
+   "acceptance": true
+  },
+  {
+   "px": [
+    790.0,
+    715.0
+   ],
+   "name": "alternator body centre",
+   "err_px": 54.73758121510324,
+   "acceptance": false
+  },
+  {
+   "px": [
+    434.0,
+    761.0
+   ],
+   "name": "tensioner pulley",
+   "err_px": 53.47228533900017,
+   "acceptance": false
+  },
+  {
+   "px": [
+    606.0,
+    817.0
+   ],
+   "name": "water pump pulley",
+   "err_px": 1.637090845316549,
+   "acceptance": false
+  },
+  {
+   "px": [
+    625.0,
+    545.0
+   ],
+   "name": "fuel pressure regulator (front centre)",
+   "err_px": 73.57945549024159,
+   "acceptance": false
+  },
+  {
+   "px": [
+    737.0,
+    305.0
+   ],
+   "name": "driver VC rear inner-top corner",
+   "err_px": 81.05506976285298,
+   "acceptance": false
+  },
+  {
+   "px": [
+    775.0,
+    592.0
+   ],
+   "name": "driver VC front inner-top corner",
+   "err_px": 89.20105132970146,
+   "acceptance": false
+  },
+  {
+   "px": [
+    500.0,
+    299.0
+   ],
+   "name": "pass VC rear inner-top corner",
+   "err_px": 82.01603467624027,
+   "acceptance": false
+  },
+  {
+   "px": [
+    475.0,
+    599.0
+   ],
+   "name": "pass VC front inner-top corner",
+   "err_px": 128.1420120473424,
+   "acceptance": false
+  }
+ ],
+ "acceptance": {
+  "max_px": 52.016960056762365,
+  "rms_px": 26.971395541194703,
+  "limit_px": 24
+ },
+ "method": "joint least-squares (soft_l1, f_scale 20 px) of camera pose, engine root and 5 photo-scaled model dims on 6 truck + 15 engine features; f=830 px at 1200x900 from the 24 mm-equivalent EXIF"
+}

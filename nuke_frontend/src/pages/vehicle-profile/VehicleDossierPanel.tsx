@@ -14,6 +14,8 @@ import { useVehicleProfile } from './VehicleProfileContext';
 import { usePopup } from '../../components/popups/usePopup';
 import { supabase } from '../../lib/supabase';
 import { useFieldEvidence, type FieldEvidenceMap, type FieldEvidenceGroup } from './hooks/useFieldEvidence';
+import { useVehiclePriceFacts, priceKindLabel } from './hooks/useVehiclePriceFacts';
+import { useFieldProvenance, formatProvenanceValue, provenanceCoverageUnavailable } from './hooks/useFieldProvenance';
 import FieldProvenanceDrawer, { SourceBadge } from './FieldProvenanceDrawer';
 
 const FieldEvidencePopup = React.lazy(() => import('./FieldEvidencePopup'));
@@ -30,7 +32,7 @@ const FIELD_ORDER = [
 
 const FIELD_GROUPS: { label: string; fields: readonly string[] }[] = [
   { label: 'IDENTITY', fields: ['vin', 'year', 'make', 'model', 'trim'] },
-  { label: 'POWERPLANT', fields: ['engine_type', 'engine_size', 'fuel_type', 'fuel_system_type'] },
+  { label: 'POWERPLANT', fields: ['engine_configuration', 'engine_displacement_l', 'engine_type', 'engine_size', 'fuel_type', 'fuel_system_type'] },
   { label: 'DRIVETRAIN', fields: ['transmission', 'drivetrain'] },
   { label: 'APPEARANCE', fields: ['color', 'interior_color', 'body_style'] },
   { label: 'METRICS', fields: ['mileage', 'sale_price'] },
@@ -39,6 +41,7 @@ const FIELD_GROUPS: { label: string; fields: readonly string[] }[] = [
 const FIELD_LABELS: Record<string, string> = {
   vin: 'VIN', year: 'YEAR', make: 'MAKE', model: 'MODEL',
   engine_type: 'ENGINE TYPE', engine_size: 'ENGINE SIZE',
+  engine_configuration: 'ENGINE CONFIGURATION', engine_displacement_l: 'DISPLACEMENT',
   transmission: 'TRANSMISSION', drivetrain: 'DRIVETRAIN',
   fuel_type: 'FUEL TYPE', fuel_system_type: 'FUEL SYSTEM',
   color: 'COLOR', interior_color: 'INTERIOR COLOR',
@@ -139,98 +142,13 @@ function fmtVal(field: string, val: any): string {
 }
 
 /* ------------------------------------------------------------------ */
-/*  Epistemological layer computation (P15)                             */
+/*  Retained claims: source categories do not establish verification    */
 /* ------------------------------------------------------------------ */
 
-type EpistemologicalLayer = 'claim' | 'consensus' | 'inspection' | 'bedrock';
-
-const LAYER_COLORS: Record<EpistemologicalLayer, string> = {
-  claim: 'transparent',
-  consensus: 'var(--info, #3b82f6)',
-  inspection: 'var(--success, #10b981)',
-  bedrock: 'var(--vp-brg, #006747)',
-};
-
-function computeEpistemologicalLayer(group: FieldEvidenceGroup | undefined): EpistemologicalLayer {
-  if (!group || group.sources.length === 0) return 'claim';
-
-  const sourceTypes = group.sources.map(s => s.source_type.toLowerCase());
-
-  // Scientific test: has physical measurement source
-  if (sourceTypes.some(s => s.includes('dyno') || s.includes('measurement') || s.includes('inspection_report'))) {
-    return 'bedrock';
-  }
-
-  // Inspection: has photo-verified evidence
-  if (sourceTypes.some(s => s.includes('photo_verified') || s.includes('vin_plate_photo'))) {
-    return 'inspection';
-  }
-
-  // Consensus: 2+ independent source TYPES agree on the value
-  const distinctSourceTypes = new Set(sourceTypes.map(s => {
-    if (s.includes('vin') || s.includes('nhtsa')) return 'vin';
-    if (s.includes('bat')) return 'bat';
-    if (s.includes('ai') || s.includes('vision')) return 'ai';
-    if (s.includes('user')) return 'user';
-    if (s.includes('enrich')) return 'enrich';
-    return s;
-  }));
-
-  // Check that distinct source types agree on value
-  if (distinctSourceTypes.size >= 2) {
-    const values = group.sources.map(s => (s.field_value || '').toLowerCase().trim());
-    const primaryVal = values[0];
-    const agreeing = values.filter(v => v === primaryVal || v.includes(primaryVal) || primaryVal.includes(v));
-    if (agreeing.length >= 2) return 'consensus';
-  }
-
-  return 'claim';
-}
-
-/** Build a human-readable tooltip explaining why a field has its epistemological layer */
-function buildLayerTooltip(layer: EpistemologicalLayer, group: FieldEvidenceGroup | undefined): string {
-  if (!group || group.sources.length === 0) return 'Claim: no evidence sources';
-  const sourceTypes = group.sources.map(s => s.source_type.toLowerCase());
-
-  if (layer === 'bedrock') {
-    const measurement = sourceTypes.find(s => s.includes('dyno') || s.includes('measurement') || s.includes('inspection_report'));
-    return `Scientific test: ${(measurement || 'measurement').replace(/_/g, ' ')} data`;
-  }
-
-  if (layer === 'inspection') {
-    return 'Inspection: photo-verified evidence on file';
-  }
-
-  if (layer === 'consensus') {
-    const typeLabels: Record<string, string> = {
-      vin: 'VIN decode', bat: 'BaT listing', ai: 'AI extraction',
-      user: 'user input', enrich: 'enrichment',
-    };
-    const mapped = new Set(sourceTypes.map(s => {
-      if (s.includes('vin') || s.includes('nhtsa')) return 'vin';
-      if (s.includes('bat')) return 'bat';
-      if (s.includes('ai') || s.includes('vision')) return 'ai';
-      if (s.includes('user')) return 'user';
-      if (s.includes('enrich')) return 'enrich';
-      return s;
-    }));
-    const labels = [...mapped].map(k => typeLabels[k] || k).slice(0, 3);
-    return `Consensus: ${labels.join(' + ')} agree`;
-  }
-
-  // claim — single source
-  const typeLabels: Record<string, string> = {
-    vin: 'VIN decode', bat: 'BaT listing', ai: 'AI extraction',
-    user: 'user input', enrich: 'enrichment',
-  };
-  const st = sourceTypes[0];
-  const label = st.includes('vin') || st.includes('nhtsa') ? typeLabels.vin :
-    st.includes('bat') ? typeLabels.bat :
-    st.includes('ai') || st.includes('vision') ? typeLabels.ai :
-    st.includes('user') ? typeLabels.user :
-    st.includes('enrich') ? typeLabels.enrich :
-    st.replace(/_/g, ' ');
-  return `Claim: ${label} (single source)`;
+function buildClaimTooltip(group: FieldEvidenceGroup | undefined): string {
+  const count = group?.sources.length ?? 0;
+  if (count === 0) return 'No retained claims loaded for this field. Verification unknown.';
+  return `${count} retained claim record${count === 1 ? '' : 's'}. Independent support and verification unknown.${group?.hasConflict ? ' Reported values differ; no resolution is established.' : ''}`;
 }
 
 /* ------------------------------------------------------------------ */
@@ -375,12 +293,11 @@ const FieldRow: React.FC<{
   isOpen: boolean;
   onToggle: () => void;
   onValueClick?: () => void;
-}> = ({ field, label, displayValue, group, isMod, isOpen, onToggle, onValueClick }) => {
+  retainedClaimTooltip?: string;
+}> = ({ field, label, displayValue, group, isMod, isOpen, onToggle, onValueClick, retainedClaimTooltip }) => {
   const [hovered, setHovered] = useState(false);
 
-  // Compute epistemological layer (P15)
-  const layer = useMemo(() => computeEpistemologicalLayer(group), [group]);
-  const layerTooltip = useMemo(() => buildLayerTooltip(layer, group), [layer, group]);
+  const claimTooltip = useMemo(() => buildClaimTooltip(group), [group]);
 
   // Deduplicated source badges
   const sourceBadges = useMemo(() => {
@@ -397,11 +314,9 @@ const FieldRow: React.FC<{
     <div
       style={{
         borderBottom: '1px solid var(--border)',
-        borderLeft: layer !== 'claim' ? `3px solid ${LAYER_COLORS[layer]}` : 'none',
-        paddingLeft: layer !== 'claim' ? '0px' : '0px',
       }}
       data-field={field}
-      title={layer !== 'claim' ? layerTooltip : undefined}
+      title={retainedClaimTooltip || claimTooltip}
     >
       <div
         onClick={group && group.sources.length > 0 ? onToggle : undefined}
@@ -412,7 +327,7 @@ const FieldRow: React.FC<{
           display: 'grid',
           gridTemplateColumns: '120px 1fr auto 20px',
           alignItems: 'center',
-          padding: layer !== 'claim' ? '4px 10px 4px 7px' : '4px 10px',
+          padding: '4px 10px',
           minHeight: '28px',
           cursor: group && group.sources.length > 0 ? 'pointer' : 'default',
           background: isOpen ? 'var(--surface-hover)' : (hovered && !isOpen ? 'var(--bg)' : 'transparent'),
@@ -434,6 +349,9 @@ const FieldRow: React.FC<{
 
         {/* Value */}
         <span
+          role={onValueClick ? 'button' : undefined}
+          tabIndex={onValueClick ? 0 : undefined}
+          aria-label={onValueClick ? `${label}: ${displayValue}. Inspect evidence` : undefined}
           style={{
             fontFamily: field === 'vin' ? "'Courier New', Courier, monospace" : 'Arial, sans-serif',
             fontSize: '10px',
@@ -444,6 +362,9 @@ const FieldRow: React.FC<{
             textDecoration: onValueClick ? 'underline dotted' : undefined,
           }}
           onClick={onValueClick ? (e) => { e.stopPropagation(); onValueClick(); } : undefined}
+          onKeyDown={onValueClick ? e => {
+            if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); e.stopPropagation(); onValueClick(); }
+          } : undefined}
         >
           {displayValue || '\u2014'}
         </span>
@@ -474,17 +395,24 @@ const FieldRow: React.FC<{
         </span>
 
         {/* Expand icon */}
-        <span style={{
+        <button type="button" aria-label={`${isOpen ? 'Hide' : 'Show'} ${label} source claims`}
+          aria-expanded={isOpen} aria-controls={`provenance-drawer-${field}`}
+          disabled={!group || group.sources.length === 0}
+          onClick={e => { e.stopPropagation(); onToggle(); }} style={{
           fontFamily: 'Arial, sans-serif',
           fontSize: '8px',
           color: 'var(--text-disabled)',
+          padding: 0,
+          border: 0,
+          background: 'transparent',
+          cursor: group && group.sources.length > 0 ? 'pointer' : 'default',
           textAlign: 'center',
           userSelect: 'none',
           transition: 'transform 180ms cubic-bezier(0.16, 1, 0.3, 1)',
           transform: isOpen ? 'rotate(90deg)' : 'none',
         }}>
           {group && group.sources.length > 0 ? '\u25B6' : ''}
-        </span>
+        </button>
       </div>
 
       {/* Provenance drawer */}
@@ -509,7 +437,20 @@ const VehicleDossierPanel: React.FC = () => {
   const { vehicle, vehicleId, canEdit, isVerifiedOwner, isMobile, setGalleryFilter } = useVehicleProfile();
   const navigate = useNavigate();
   const { openPopup } = usePopup();
-  const { evidence, loading } = useFieldEvidence(vehicle?.id);
+  const { evidence, loading, error: evidenceError } = useFieldEvidence(vehicle?.id);
+  const configuration = useFieldProvenance(vehicle?.id || '', 'engine_configuration');
+  const displacement = useFieldProvenance(vehicle?.id || '', 'engine_displacement_l');
+  const engineReads: Record<string, typeof configuration> = { engine_configuration: configuration, engine_displacement_l: displacement };
+  const engineValue = (field: string) => {
+    const read = engineReads[field];
+    if (!read || read.isLoading || read.error || !read.data || read.data.canonical?.status === 'unavailable') return '';
+    if (read.data.canonical?.status === 'resolved') return formatProvenanceValue(field, read.data.canonical.value!);
+    return read.data.observations.length > 0 ? 'Unknown' : '';
+  };
+  const engineReadFailed = [configuration, displacement].some(read => !!read.error || provenanceCoverageUnavailable(read.data) || read.data?.canonical?.status === 'unavailable');
+  // the SALE PRICE row is the typed price said as what it is (sold / bid / ask), never a raw sale_price
+  const { priceFacts, priceSettled, priceFailed } = useVehiclePriceFacts(vehicle?.id);
+  const priceKind = priceSettled && !priceFailed ? priceKindLabel(priceFacts) : null;
 
   // Auto-expand fields with multi-source evidence
   const autoExpandFields = useMemo(() => {
@@ -550,31 +491,8 @@ const VehicleDossierPanel: React.FC = () => {
   const withEvidence = useMemo(() => {
     return FIELD_ORDER.filter(f => evidence[f] && evidence[f].sources.length > 0).length;
   }, [evidence]);
-  const coverage = withEvidence / FIELD_ORDER.length;
-  // Count fields with 2+ distinct sources for "multi-source" label
-  const multiSourceCount = useMemo(() => {
-    return FIELD_ORDER.filter(f => evidence[f] && evidence[f].sources.length >= 2).length;
-  }, [evidence]);
-  const isMultiSource = multiSourceCount >= 5 && coverage >= 0.5;
-  const verificationLabel = isMultiSource ? 'MULTI-SOURCE VERIFIED' : coverage >= 0.5 ? 'PARTIAL VERIFICATION' : 'UNVERIFIED';
-  const verificationClass = isMultiSource ? 'verified' : 'partial';
-
-  // Epistemological layer distribution (P15)
-  const layerDistribution = useMemo(() => {
-    let bedrock = 0, inspection = 0, consensus = 0, claims = 0, empty = 0;
-    for (const f of FIELD_ORDER) {
-      const group = evidence[f];
-      if (!group || group.sources.length === 0) {
-        empty++;
-        continue;
-      }
-      const layer = computeEpistemologicalLayer(group);
-      if (layer === 'bedrock') bedrock++;
-      else if (layer === 'inspection') inspection++;
-      else if (layer === 'consensus') consensus++;
-      else claims++;
-    }
-    return { bedrock, inspection, consensus, claims, empty, total: FIELD_ORDER.length };
+  const differingValuesCount = useMemo(() => {
+    return FIELD_ORDER.filter(f => evidence[f]?.sources.length > 0 && evidence[f].hasConflict).length;
   }, [evidence]);
 
   // Identity badges
@@ -582,7 +500,7 @@ const VehicleDossierPanel: React.FC = () => {
     if (!vehicle) return [];
     const v = vehicle as any;
     const b: Array<{ text: string; cls: string }> = [];
-    if (v.sale_status === 'sold' || v.auction_outcome === 'sold' || (v.sale_price && Number(v.sale_price) > 0)) {
+    if (priceKind === 'Sold') {
       b.push({ text: 'SOLD', cls: 'badge-sold' });
     }
     const hasBat = Object.values(evidence).some(g =>
@@ -596,11 +514,12 @@ const VehicleDossierPanel: React.FC = () => {
     if (reserveStatus === 'no_reserve') b.push({ text: 'NO RESERVE', cls: 'badge-user' });
     else if (reserveStatus === 'reserve_not_met') b.push({ text: 'RNM', cls: 'badge-ai' });
     return b;
-  }, [vehicle, evidence, hasModification]);
+  }, [vehicle, evidence, hasModification, priceKind]);
 
   if (!vehicle) return null;
 
   const v = vehicle as any;
+
   const ymm = [v.year, v.make, v.model].filter(Boolean).join(' ').toUpperCase().trim();
 
   return (
@@ -608,7 +527,6 @@ const VehicleDossierPanel: React.FC = () => {
       {/* Identity stripped — YMM, VIN, owner, badges are in the sticky badge bar.
            Go straight to the spec table. */}
       <div style={{ display: 'none' }}>
-        <span data-verification={verificationLabel} data-class={verificationClass} />
         {canEdit && <span data-can-edit="true" data-vehicle-id={vehicle?.id} />}
         <span>{ymm}</span>
         {v.vin && (
@@ -719,6 +637,9 @@ const VehicleDossierPanel: React.FC = () => {
         {FIELD_GROUPS.map((fg, gi) => {
           // Collect visible fields for this group
           const visibleFields = fg.fields.filter(field => {
+            if (engineReads[field]) return !!engineValue(field);
+            if (field === 'vin') return true; // Unknown canonical identity still has a useful source drill.
+            if (field === 'sale_price') return !!priceKind;
             let pv = v[field];
             if ((pv == null || pv === '') && evidence[field]?.sources?.length > 0) {
               pv = evidence[field].primary.field_value;
@@ -739,6 +660,10 @@ const VehicleDossierPanel: React.FC = () => {
               return { field, value: fmtVal(field, pv) };
             });
             hiddenFields = deduplicatePowerplant(fieldEntries, evidence);
+            // Distinct resolved fields own the summary; preserve combined source text in the existing expansion.
+            if (configuration.data?.canonical?.status === 'resolved' && displacement.data?.canonical?.status === 'resolved') {
+              for (const field of ['engine_type', 'engine_size']) if (visibleFields.includes(field)) hiddenFields.add(field);
+            }
           }
           const shownFields = visibleFields.filter(f => !hiddenFields.has(f));
           const collapsedCount = hiddenFields.size;
@@ -763,12 +688,24 @@ const VehicleDossierPanel: React.FC = () => {
                 const normalized = field.replace(/[\s-]/g, '_').toLowerCase();
                 const group = evidence[field] || (normalized !== field ? evidence[normalized] : undefined);
                 let pv = v[field];
-                if ((pv == null || pv === '') && group && group.sources.length > 0) {
+                if (field !== 'vin' && (pv == null || pv === '') && group && group.sources.length > 0) {
                   pv = group.primary.field_value;
                 }
-                const displayValue = fmtVal(field, pv);
+                let displayValue = fmtVal(field, pv);
+                if (engineReads[field]) displayValue = engineValue(field);
+                if (field === 'vin' && !displayValue) displayValue = 'Unknown';
+                let fieldLabel = FIELD_LABELS[field] || field.toUpperCase().replace(/_/g, ' ');
+                if (field === 'sale_price') {
+                  const on = priceFacts?.price_as_of
+                    ? new Date(priceFacts.price_as_of).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', timeZone: 'UTC' })
+                    : null;
+                  displayValue = priceKind ? fmtVal(field, priceFacts?.price_amount) + (on ? ` · ${on}` : '') : '';
+                  fieldLabel = priceKind === 'Sold' ? 'SALE PRICE' : (priceKind || '').toUpperCase();
+                }
+                // the listing's own qualifier on the reading, e.g. BaT "10k Miles Shown, TMU" -> "10,000 mi · shown, TMU"
+                const mileageClaim = field === 'mileage' ? evidence['mileage_claim']?.primary?.field_value : null;
+                if (mileageClaim && displayValue) displayValue = `${displayValue} · ${mileageClaim}`;
                 if (!displayValue) return null;
-                const fieldLabel = FIELD_LABELS[field] || field.toUpperCase().replace(/_/g, ' ');
                 // Every field value opens its evidence popup — click-through chain
                 const handleValueClick = () => {
                   // Color fields also set gallery filter
@@ -783,12 +720,12 @@ const VehicleDossierPanel: React.FC = () => {
                         label={fieldLabel}
                         value={displayValue}
                         vehicleId={vehicle.id}
-                        evidence={group}
+                        evidence={engineReads[field] ? undefined : group}
                         vinDecode={vinDecode}
                       />
                     </React.Suspense>,
                     `${fieldLabel} — ${displayValue}`,
-                    480,
+                    Math.min(480, window.innerWidth - 24),
                     false,
                   );
                 };
@@ -803,12 +740,13 @@ const VehicleDossierPanel: React.FC = () => {
                     isOpen={openDrawers.has(field)}
                     onToggle={() => toggleDrawer(field)}
                     onValueClick={handleValueClick}
+                    retainedClaimTooltip={engineReads[field] ? 'Retained source claims. Vehicle identity, factory/current configuration and independent support are not established by these reports.' : undefined}
                   />
                 );
               })}
               {/* P12: Collapsed fields indicator for POWERPLANT */}
               {fg.label === 'POWERPLANT' && collapsedCount > 0 && (
-                <div
+                <button type="button"
                   onClick={() => setPowerplantExpanded(true)}
                   style={{
                     fontFamily: 'Arial, sans-serif',
@@ -817,15 +755,17 @@ const VehicleDossierPanel: React.FC = () => {
                     padding: '2px 10px 3px',
                     cursor: 'pointer',
                     letterSpacing: '0.3px',
+                    display: 'block', width: '100%', textAlign: 'left', background: 'transparent', border: 0,
                     borderBottom: '1px solid var(--border)',
                   }}
                 >
-                  {collapsedCount} related field{collapsedCount > 1 ? 's' : ''} collapsed
-                </div>
+                  {collapsedCount} original or overlapping field{collapsedCount > 1 ? 's' : ''} · expand
+                </button>
               )}
             </React.Fragment>
           );
         })}
+        {engineReadFailed && <p role="status">Engine source claims could not be read completely. Their absence has not been established.</p>}
 
         {/* Extended Specifications */}
         {(() => {
@@ -876,7 +816,7 @@ const VehicleDossierPanel: React.FC = () => {
                         />
                       </React.Suspense>,
                       `${label} — ${displayValue}`,
-                      480,
+                      Math.min(480, window.innerWidth - 24),
                       false,
                     )}
                   />
@@ -887,136 +827,27 @@ const VehicleDossierPanel: React.FC = () => {
         })()}
       </div>
 
-      {/* Provenance Coverage with epistemological layer distribution (P15) */}
-      <div style={{
+      {/* Claim presence uses a fixed core-field denominator, not a verification tier. */}
+      <div data-testid="source-claim-coverage" style={{
         background: 'var(--surface-elevated)',
-        border: '2px solid var(--accent)',
+        border: '2px solid var(--border)',
         padding: '8px 10px',
         marginBottom: '8px',
+        fontSize: '9px',
       }}>
-        <div style={{
-          fontFamily: 'Arial, sans-serif',
-          fontSize: '9px',
-          fontWeight: 700,
-          letterSpacing: '1px',
-          textTransform: 'uppercase',
-          marginBottom: '4px',
-        }}>
-          PROVENANCE COVERAGE
-        </div>
-        {/* Segmented layer distribution bar */}
-        <div style={{
-          width: '100%',
-          height: '6px',
-          background: 'var(--border)',
-          marginBottom: '4px',
-          display: 'flex',
-        }}>
-          {layerDistribution.bedrock > 0 && (
-            <div
-              title={`${layerDistribution.bedrock} scientifically tested`}
-              style={{
-                height: '100%',
-                width: `${Math.round((layerDistribution.bedrock / layerDistribution.total) * 100)}%`,
-                background: 'var(--vp-brg, #006747)',
-                transition: 'width 180ms cubic-bezier(0.16, 1, 0.3, 1)',
-              }}
-            />
-          )}
-          {layerDistribution.inspection > 0 && (
-            <div
-              title={`${layerDistribution.inspection} physically inspected`}
-              style={{
-                height: '100%',
-                width: `${Math.round((layerDistribution.inspection / layerDistribution.total) * 100)}%`,
-                background: 'var(--success, #10b981)',
-                transition: 'width 180ms cubic-bezier(0.16, 1, 0.3, 1)',
-              }}
-            />
-          )}
-          {layerDistribution.consensus > 0 && (
-            <div
-              title={`${layerDistribution.consensus} multi-source consensus`}
-              style={{
-                height: '100%',
-                width: `${Math.round((layerDistribution.consensus / layerDistribution.total) * 100)}%`,
-                background: 'var(--info, #3b82f6)',
-                transition: 'width 180ms cubic-bezier(0.16, 1, 0.3, 1)',
-              }}
-            />
-          )}
-          {layerDistribution.claims > 0 && (
-            <div
-              title={`${layerDistribution.claims} single-source claims`}
-              style={{
-                height: '100%',
-                width: `${Math.round((layerDistribution.claims / layerDistribution.total) * 100)}%`,
-                background: 'var(--text-disabled)',
-                transition: 'width 180ms cubic-bezier(0.16, 1, 0.3, 1)',
-              }}
-            />
-          )}
-        </div>
-        {/* Layer distribution summary text */}
-        <div style={{
-          fontFamily: 'Arial, sans-serif',
-          fontSize: '8px',
-          textTransform: 'uppercase',
-          letterSpacing: '0.5px',
-          color: 'var(--text-secondary)',
-        }}>
-          {[
-            layerDistribution.bedrock > 0 ? `${layerDistribution.bedrock} BEDROCK` : null,
-            layerDistribution.inspection > 0 ? `${layerDistribution.inspection} INSPECTED` : null,
-            layerDistribution.consensus > 0 ? `${layerDistribution.consensus} CONSENSUS` : null,
-            `${layerDistribution.claims} CLAIMS`,
-            `${layerDistribution.empty} EMPTY`,
-          ].filter(Boolean).join(' \u00B7 ')}
-        </div>
+        <div className="ev-label">SOURCE CLAIM COVERAGE</div>
+        {evidenceError ? <p role="status">Source claim coverage unavailable.</p>
+          : loading ? <p role="status">Loading source claim coverage…</p>
+          : <>
+            <div role="img" aria-label={`${withEvidence} of ${FIELD_ORDER.length} core fields have claim records`}
+              style={{ height: '6px', background: 'var(--border)', margin: '4px 0' }}>
+              <div style={{ height: '100%', width: `${withEvidence / FIELD_ORDER.length * 100}%`, background: 'var(--text-secondary)' }} />
+            </div>
+            <div>{withEvidence} of {FIELD_ORDER.length} core fields have claim records · {differingValuesCount} have differing reported values</div>
+          </>}
+        <p style={{ margin: '4px 0 0' }}>Claim record counts do not establish independent support or verification.</p>
       </div>
 
-      {/* Data Quality Score */}
-      {typeof (v as any).data_quality_score === 'number' && (
-        <div style={{
-          background: 'var(--surface-elevated)',
-          border: '2px solid var(--accent)',
-          padding: '8px 10px',
-          marginBottom: '8px',
-        }}>
-          <div style={{
-            fontFamily: 'Arial, sans-serif',
-            fontSize: '9px',
-            fontWeight: 700,
-            letterSpacing: '1px',
-            textTransform: 'uppercase',
-            marginBottom: '4px',
-          }}>
-            DATA QUALITY
-          </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <span style={{
-              fontFamily: "'Courier New', Courier, monospace",
-              fontSize: '12px',
-              fontWeight: 700,
-              color: (v as any).data_quality_score >= 70 ? 'var(--success)' : (v as any).data_quality_score >= 40 ? 'var(--warning)' : 'var(--error)',
-            }}>
-              {Math.round((v as any).data_quality_score)}/100
-            </span>
-            <div style={{
-              flex: 1,
-              height: '4px',
-              background: 'var(--border)',
-            }}>
-              <div style={{
-                height: '100%',
-                width: `${Math.min(100, Math.max(0, (v as any).data_quality_score))}%`,
-                background: (v as any).data_quality_score >= 70 ? 'var(--success)' : (v as any).data_quality_score >= 40 ? 'var(--warning)' : 'var(--error)',
-                transition: 'width 180ms cubic-bezier(0.16, 1, 0.3, 1)',
-              }} />
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* Condition Score (if available) */}
       <ConditionScoreSection vehicleId={vehicle.id} />
@@ -1025,10 +856,10 @@ const VehicleDossierPanel: React.FC = () => {
 };
 
 /* ------------------------------------------------------------------ */
-/*  Condition Score (Phase 5A)                                         */
+/*  Stored condition assessment — source/calibration not exposed        */
 /* ------------------------------------------------------------------ */
 
-const ConditionScoreSection: React.FC<{ vehicleId: string }> = ({ vehicleId }) => {
+export const ConditionScoreSection: React.FC<{ vehicleId: string }> = ({ vehicleId }) => {
   const [score, setScore] = React.useState<any>(null);
 
   React.useEffect(() => {
@@ -1047,18 +878,23 @@ const ConditionScoreSection: React.FC<{ vehicleId: string }> = ({ vehicleId }) =
 
   if (!score) return null;
 
+  const reportedScore = score.condition_score != null && Number.isFinite(Number(score.condition_score))
+    && Number(score.condition_score) >= 0 && Number(score.condition_score) <= 100
+    ? Number(score.condition_score) : null;
   const domains = [
     { label: 'EXTERIOR', value: score.exterior_score },
     { label: 'INTERIOR', value: score.interior_score },
     { label: 'MECHANICAL', value: score.mechanical_score },
     { label: 'PROVENANCE', value: score.provenance_score },
     { label: 'PRESENTATION', value: score.presentation_score },
-  ].filter(d => d.value != null);
+  ].filter(d => d.value != null && Number.isFinite(Number(d.value)) && Number(d.value) >= 0 && Number(d.value) <= 100);
+
+  if (reportedScore == null && domains.length === 0) return null;
 
   return (
     <div style={{
       background: 'var(--surface-elevated)',
-      border: '2px solid var(--accent)',
+      border: '2px solid var(--border)',
       padding: '8px 10px',
       marginBottom: '8px',
     }}>
@@ -1070,7 +906,7 @@ const ConditionScoreSection: React.FC<{ vehicleId: string }> = ({ vehicleId }) =
         textTransform: 'uppercase',
         marginBottom: '6px',
       }}>
-        CONDITION SPECTROMETER
+        STORED CONDITION ASSESSMENT
       </div>
       <div style={{ display: 'flex', alignItems: 'baseline', gap: '8px', marginBottom: '6px' }}>
         <span style={{
@@ -1078,7 +914,7 @@ const ConditionScoreSection: React.FC<{ vehicleId: string }> = ({ vehicleId }) =
           fontSize: '20px',
           fontWeight: 700,
         }}>
-          {Math.round(score.condition_score)}
+          {reportedScore != null ? Math.round(reportedScore) : 'Unknown'}
         </span>
         <span style={{
           fontFamily: 'Arial, sans-serif',
@@ -1087,10 +923,8 @@ const ConditionScoreSection: React.FC<{ vehicleId: string }> = ({ vehicleId }) =
           textTransform: 'uppercase',
           letterSpacing: '0.5px',
         }}>
-          / 100 &middot; {score.condition_tier}
-          {score.percentile_within_ymm != null && (
-            <> &middot; {Math.round(score.percentile_within_ymm)}th percentile</>
-          )}
+          {reportedScore != null && <>/ 100 &middot; reported score</>}
+          {score.condition_tier && <> &middot; reported tier: {score.condition_tier}</>}
         </span>
       </div>
       {domains.length > 0 && (
@@ -1110,7 +944,7 @@ const ConditionScoreSection: React.FC<{ vehicleId: string }> = ({ vehicleId }) =
                 <div style={{
                   height: '100%',
                   width: `${Math.min(100, Math.max(0, d.value))}%`,
-                  background: d.value >= 70 ? 'var(--success)' : d.value >= 40 ? 'var(--warning)' : 'var(--error)',
+                  background: 'var(--text-secondary)',
                 }} />
               </div>
               <span style={{
@@ -1124,6 +958,12 @@ const ConditionScoreSection: React.FC<{ vehicleId: string }> = ({ vehicleId }) =
           ))}
         </div>
       )}
+      <div style={{ fontSize: '9px', color: 'var(--text-secondary)', marginTop: '6px' }}>
+        Inputs, method and assessment time unavailable. Condition matching unverified.
+        {score.percentile_within_ymm != null && (
+          <div>Reported percentile: {score.percentile_within_ymm} &middot; comparison group, size and eligibility unavailable.</div>
+        )}
+      </div>
     </div>
   );
 };

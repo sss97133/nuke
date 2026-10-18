@@ -5,6 +5,9 @@
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { DOMParser } from 'https://deno.land/x/deno_dom@v0.1.38/deno-dom-wasm.ts'
+import { requireWriteAuth } from '../_shared/writeGuard.ts';
+import { projectSecretKey } from "../_shared/supabaseKeys.ts";
+import { softWrite } from '../_shared/writeResult.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -90,16 +93,21 @@ async function trySaveHtmlSnapshot(args: {
 }
 
 Deno.serve(async (req) => {
+  // Writes are never anonymous: service key, signed-in user, or nothing (P0.2, 2026-09-27).
+  const denied = await requireWriteAuth(req);
+  if (denied) return denied;
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders })
 
   try {
     const supabaseUrl = (Deno.env.get('SUPABASE_URL') ?? '').trim()
-    const serviceRoleKey = (Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? Deno.env.get('SERVICE_ROLE_KEY') ?? '').trim()
+    const serviceRoleKey = (projectSecretKey() ?? '').trim()
 
     if (!supabaseUrl) throw new Error('Missing SUPABASE_URL')
     if (!serviceRoleKey) throw new Error('Missing SUPABASE_SERVICE_ROLE_KEY')
 
-    const supabase = createClient(supabaseUrl, serviceRoleKey)
+    const supabase = createClient(supabaseUrl, serviceRoleKey, {
+      global: { headers: { 'X-Nuke-Writer': 'extract-auction-comments' } },
+    })
 
     const { auction_url, auction_event_id, vehicle_id } = await req.json()
     if (!auction_url) throw new Error('Missing auction_url')
@@ -165,6 +173,17 @@ Deno.serve(async (req) => {
         .limit(1)
         .maybeSingle()
       if (v2?.id) vehicleId = String(v2.id)
+    }
+    if (!vehicleId && platformGuess === 'bat') {
+      // live lots carry only listing_url (sync-live-auctions sets it; bat_auction_url and discovery_url are null), so
+      // the live-lot trigger failed here 368 times on 2026-09-29 (bat-data coverage audit). Indexed: idx_vehicles_listing_url.
+      const { data: v3 } = await supabase
+        .from('vehicles')
+        .select('id')
+        .in('listing_url', urlCandidates)
+        .limit(1)
+        .maybeSingle()
+      if (v3?.id) vehicleId = String(v3.id)
     }
     if (!vehicleId) throw new Error('Missing vehicle_id (and could not resolve by auction_event_id, vehicle_events, or vehicles URLs)')
 
@@ -573,6 +592,7 @@ Deno.serve(async (req) => {
     // Upsert external identities (platform + handle) with profile URLs so later humans can claim/merge them.
     // NOTE: This function runs with service role key, so it can write to external_identities.
     const handleToExternalIdentityId = new Map<string, string>()
+    let identityWriteError: string | null = null
     if (authorSet.size > 0) {
       const nowIso = new Date().toISOString()
       const rows = Array.from(authorSet).map((h) => {
@@ -601,6 +621,7 @@ Deno.serve(async (req) => {
 
       if (upsertErr) {
         console.warn('Failed to upsert external identities (non-fatal):', upsertErr)
+        identityWriteError = `external_identities upsert: ${upsertErr.message}`
       } else {
         ;(upserted || []).forEach((r: any) => {
           if (r?.handle && r?.id) handleToExternalIdentityId.set(String(r.handle), String(r.id))
@@ -617,11 +638,21 @@ Deno.serve(async (req) => {
     // Store comments (canonical)
     // Do this BEFORE any legacy BaT table writes so we never end up with partial state
     // (e.g. bat_bids written but auction_comments missing).
-    if (comments.length > 0) {
-      console.log(`Attempting to upsert ${comments.length} comments...`)
+    // A comment this vehicle already holds, by BaT's own comment id, is never written again. content_hash carries the
+    // thread position, which shifts as a thread grows, so a re-read wrote the same comments again (36.5% duplicate rows
+    // on the latest 150 settled lots, bat-data coverage audit 2026-09-29). Same rule as extract-bat-core v4.1.
+    const { data: haveRows } = await supabase
+      .from('auction_comments').select('bat_comment_id').eq('vehicle_id', vehicleId).not('bat_comment_id', 'is', null).limit(5000)
+    const haveIds = new Set((haveRows ?? []).map((x: any) => Number(x.bat_comment_id)).filter(Number.isFinite))
+    const freshComments = haveIds.size
+      ? commentsWithIdentities.filter((c: any) => c.bat_comment_id == null || !haveIds.has(Number(c.bat_comment_id)))
+      : commentsWithIdentities
+    if (haveIds.size) console.log(`${commentsWithIdentities.length - freshComments.length} comments already held by BaT id; writing ${freshComments.length}`)
+    if (freshComments.length > 0) {
+      console.log(`Attempting to upsert ${freshComments.length} comments...`)
       const { data: inserted, error } = await supabase
         .from('auction_comments')
-        .upsert(commentsWithIdentities, { onConflict: 'vehicle_id,content_hash' })
+        .upsert(freshComments, { onConflict: 'vehicle_id,content_hash' })
         .select('id')
       
       if (error) {
@@ -641,9 +672,11 @@ Deno.serve(async (req) => {
       }
       console.log(`Successfully saved ${inserted?.length || comments.length} comments`)
     } else {
-      console.warn('No comments to save (comments array is empty)')
+      console.warn(comments.length ? 'No new comments to save (all already held by BaT id)' : 'No comments to save (comments array is empty)')
     }
 
+    // Failed writes below are not fatal to the comment save, but they are counted and returned (non-2xx), not just warned.
+    const writeErrors: string[] = identityWriteError ? [identityWriteError] : []
     let batListingId: string | null = null
     try {
       const nowIso = new Date().toISOString()
@@ -664,9 +697,10 @@ Deno.serve(async (req) => {
       // Safety net: If the core extractor didn't set final_price, infer it from the SOLD system comment.
       // CRITICAL: Only use system-generated "sold" comments, NOT user comments that happen to contain
       // "sold for" text. User comments like "should have sold for $160k" pollute price extraction.
-      const soldCommentText =
-        commentsWithIdentities.find((c: any) => String(c?.comment_type || '').toLowerCase() === 'sold')?.comment_text ||
+      const soldComment =
+        commentsWithIdentities.find((c: any) => String(c?.comment_type || '').toLowerCase() === 'sold') ||
         null
+      const soldCommentText = soldComment?.comment_text || null
 
       const parseMoney = (raw: string | null): number | null => {
         const m = String(raw || '').match(/\$([0-9,]+)/)
@@ -695,7 +729,9 @@ Deno.serve(async (req) => {
           : (inferredSoldPriceFromComment || null)
 
       const inferredSaleDate = (() => {
-        const t = extListing?.sold_at || extListing?.ended_at || null
+        // Prefer an existing event date; else fall back to the SOLD system comment's
+        // timestamp — on BaT that comment is posted at the auction-end/sale moment.
+        const t = extListing?.sold_at || extListing?.ended_at || soldComment?.posted_at || null
         if (!t) return null
         const d = new Date(t)
         if (!Number.isFinite(d.getTime())) return null
@@ -746,13 +782,13 @@ Deno.serve(async (req) => {
           const reserveFromHtml =
             html.includes('no-reserve') || /\bNo Reserve\b/i.test(html) ? 'no_reserve' : null
 
-          await supabase
+          softWrite('vehicle_events update (sold sync)', await supabase
             .from('vehicle_events')
             .update({
               event_status: 'sold',
               final_price: inferredFinalPrice,
               current_price: inferredFinalPrice,
-              sold_at: extListing?.sold_at || extListing?.ended_at || nowIso,
+              sold_at: extListing?.sold_at || extListing?.ended_at || inferredSaleDate || nowIso,
               metadata: {
                 ...existingMeta,
                 ...(inferredBuyerFromComment ? { buyer_username: inferredBuyerFromComment } : {}),
@@ -761,7 +797,7 @@ Deno.serve(async (req) => {
               },
               updated_at: nowIso,
             })
-            .eq('id', extListing.id)
+            .eq('id', extListing.id), writeErrors)
         }
       }
 
@@ -787,13 +823,19 @@ Deno.serve(async (req) => {
         }
       }
 
-      const { data: upsertedEvent, error: upsertEventErr } = await supabase
-        .from('vehicle_events')
-        .upsert(vehicleEventPayload, { onConflict: 'source_url' })
-        .select('id')
-        .maybeSingle()
-      if (!upsertEventErr && upsertedEvent?.id) {
-        batListingId = String(upsertedEvent.id)
+      // vehicle_events has no unique key on source_url (its keys are partial indexes that include vehicle_id), so
+      // .upsert({ onConflict: 'source_url' }) failed with 42P10 on every run. The row for this vehicle is the one read above.
+      if (extListing?.id) {
+        batListingId = String(extListing.id)
+        softWrite('vehicle_events update', await supabase.from('vehicle_events').update(vehicleEventPayload).eq('id', extListing.id), writeErrors)
+      } else {
+        const { data: insertedEvent, error: insertEventErr } = await supabase
+          .from('vehicle_events')
+          .insert(vehicleEventPayload)
+          .select('id')
+          .maybeSingle()
+        if (insertEventErr) softWrite('vehicle_events insert', { error: insertEventErr }, writeErrors)
+        else if (insertedEvent?.id) batListingId = String(insertedEvent.id)
       }
 
       if (batListingId) {
@@ -824,9 +866,9 @@ Deno.serve(async (req) => {
           }))
 
         if (bidRows.length > 0) {
-          await supabase
+          softWrite('bat_bids upsert', await supabase
             .from('bat_bids')
-            .upsert(bidRows, { onConflict: 'bat_listing_id,bat_username,bid_amount,bid_timestamp' })
+            .upsert(bidRows, { onConflict: 'bat_listing_id,bat_username,bid_amount,bid_timestamp' }), writeErrors)
         }
 
         if (inferredStatus || inferredFinalPrice || inferredHighBid > 0) {
@@ -835,7 +877,7 @@ Deno.serve(async (req) => {
             .filter((n: any) => typeof n === 'number')
             .reduce((acc: number, n: number) => (n > acc ? n : acc), 0)
 
-          await supabase
+          softWrite('vehicle_events update (counts)', await supabase
             .from('vehicle_events')
             .update({
               comment_count: batCommentRows.length,
@@ -847,16 +889,17 @@ Deno.serve(async (req) => {
               extracted_at: nowIso,
               updated_at: nowIso,
             })
-            .eq('id', batListingId)
+            .eq('id', batListingId), writeErrors)
         }
       }
     } catch (e: any) {
       console.warn('BaT table upserts failed (non-fatal):', e?.message || String(e))
+      writeErrors.push(`BaT table upserts: ${e?.message || String(e)}`)
     }
 
     // Trigger AI analysis on comments (async, don't wait)
     if (comments.length > 0 && vehicleId) {
-      const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+      const serviceKey = projectSecretKey() ?? ''
       fetch(`${Deno.env.get('SUPABASE_URL')}/functions/v1/discover-from-observations`, {
         method: 'POST',
         headers: {
@@ -869,11 +912,13 @@ Deno.serve(async (req) => {
     }
 
     return new Response(JSON.stringify({
-      success: true,
+      success: writeErrors.length === 0,
       comments_extracted: comments.length,
       auction_event_id: eventId,
-      vehicle_id: vehicleId
+      vehicle_id: vehicleId,
+      write_errors: writeErrors,
     }), {
+      status: writeErrors.length === 0 ? 200 : 500,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' }
     })
 

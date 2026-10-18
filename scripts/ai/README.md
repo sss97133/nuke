@@ -32,7 +32,7 @@ Scan results are saved to `../data/` directory as JSON files.
 
 Run scripts from the project root:
 ```bash
-cd /Users/skylar/nuke
+cd ~/nuke
 python scripts/ai/blazer_image_database_scanner.py
 ```
 

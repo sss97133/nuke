@@ -5,7 +5,7 @@
 <text x="60" y="110" font-size="14" fill="#666">1977 Chevrolet K5 Blazer · VIN CKR187F127263 · LS3 6.2L · MoTeC M130 + PDM30</text>
 <line x1="60" y1="125" x2="790" y2="125" stroke="#000" stroke-width="2"/>
 <text x="60" y="165" font-size="11" fill="#000" font-weight="bold">CLIENT</text>
-<text x="60" y="185" font-size="11" fill="#000">Scott · scott@li3go.com</text>
+<text x="60" y="185" font-size="11" fill="#000">Scott · [client email, in the DB]</text>
 <text x="280" y="165" font-size="11" fill="#000" font-weight="bold">BUILDER</text>
 <text x="280" y="185" font-size="11" fill="#000">NUKE LTD · 676 Wells Rd, Boulder City NV 89005</text>
 <text x="280" y="200" font-size="11" fill="#000">Wiring sub: Desert Performance (same address)</text>

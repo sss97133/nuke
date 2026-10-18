@@ -1,0 +1,15 @@
+-- 20261007050000_allow_external_identity_observation_subject.sql
+--
+-- LEDGER NOTE ONLY — THIS MIGRATION NEVER APPLIED (SCHEMA_LAW §7).
+--
+-- It merged in #731 (dcf03cd46) but its deploy ROLLED BACK whole on 2026-10-07 (run 37562469887):
+-- the schema_proposal_evidence_check() trigger refused its schema_proposals INSERT because
+-- proposal_type 'modify_property' requires a non-empty evidence[] column (AX-024; workflow doc §2),
+-- and this file set only payload. The transaction rolled back, so the vehicle_observations
+-- subject_type CHECK was left unchanged (still vehicle|organization|user|asset).
+--
+-- The change is carried forward, corrected (evidence[] populated), in:
+--   20261007053000_allow_external_identity_observation_subject.sql
+--
+-- This file is intentionally a no-op comment so the ledger records that 050000 was attempted and
+-- did not land. Do not re-add SQL here.

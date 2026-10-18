@@ -15,12 +15,13 @@
 import React, { useState, useEffect } from 'react';
 import { useVehicleProfile } from './VehicleProfileContext';
 import { supabase } from '../../lib/supabase';
-import type { VehicleIntel, CommentIntel, Apparition, CompSale } from './hooks/useVehicleIntel';
+import SoldContext from './SoldContext';
+import type { VehicleIntel } from './hooks/useVehicleIntel';
+import { useVehiclePriceFacts, priceKindLabel, type PriceFacts } from './hooks/useVehiclePriceFacts';
 
 // ---------------------------------------------------------------------------
-// Eye read — the evidence-graded appraisal (vehicle_condition_scores).
-// When present it OWNS the value story; the model estimate is demoted.
-// A price we can't defend is never the headline (valuation-block doctrine).
+// Stored appraisal (vehicle_condition_scores). Its range is a reported output;
+// this reader does not expose contributing inputs or calibration evidence.
 // ---------------------------------------------------------------------------
 
 interface EyeRead {
@@ -28,40 +29,65 @@ interface EyeRead {
   conditionClass: string | null;
   tier: string;
   score: number;
-  frames: number | null;
+  reportedInputCount: number | null;
   method: string;
-  computedAt: string;
+  computedAt: string | null;
 }
 
 function useEyeRead(vehicleId: string | undefined): EyeRead | null {
-  const [read, setRead] = useState<EyeRead | null>(null);
+  const [read, setRead] = useState<{ vehicleId: string; value: EyeRead } | null>(null);
   useEffect(() => {
+    setRead(null);
     if (!vehicleId) return;
     let alive = true;
-    supabase
-      .from('vehicle_condition_scores')
-      .select('condition_score, condition_tier, descriptor_summary, observation_count, computed_at, computation_version')
-      .eq('vehicle_id', vehicleId)
-      .maybeSingle()
-      .then(({ data }) => {
-        if (!alive || !data) return;
+    const loadRead = async () => {
+      try {
+        const { data, error } = await supabase
+          .from('vehicle_condition_scores')
+          .select('condition_score, condition_tier, descriptor_summary, observation_count, computed_at, computation_version')
+          .eq('vehicle_id', vehicleId)
+          .maybeSingle();
+        if (!alive || error || !data) return;
         const ds: any = data.descriptor_summary || {};
-        const band = Array.isArray(ds.as_is_band_usd) && ds.as_is_band_usd[0] != null
-          ? [Number(ds.as_is_band_usd[0]), Number(ds.as_is_band_usd[1])] as [number, number]
+        const bounds = ds.as_is_band_usd;
+        const band = Array.isArray(bounds) && [bounds[0], bounds[1]].every(value =>
+          (typeof value === 'number' || (typeof value === 'string' && value.trim() !== '')) && Number.isFinite(Number(value)))
+          ? [Number(bounds[0]), Number(bounds[1])] as [number, number]
           : null;
-        setRead({
+        setRead({ vehicleId, value: {
           band,
           conditionClass: typeof ds.condition_class === 'string' ? ds.condition_class.split('(')[0].trim() : null,
           tier: data.condition_tier,
           score: Number(data.condition_score),
-          frames: data.observation_count,
+          reportedInputCount: data.observation_count,
           method: data.computation_version || 'appraisal',
           computedAt: data.computed_at,
-        });
-      });
+        } });
+      } catch {
+        if (alive) setRead(null);
+      }
+    };
+    void loadRead();
     return () => { alive = false; };
   }, [vehicleId]);
-  return read;
+  return read && read.vehicleId === vehicleId ? read.value : null;
+}
+
+// ---------------------------------------------------------------------------
+// Market event: what a model estimate or a deal verdict is defended against
+// (owner rule: never show a price you can't defend). The typed price says which exists:
+// - a price: a proven sale, a bid or a current ask (price_kind sold / bid / ask);
+// - a listing with no price yet: a live or upcoming auction, or a for-sale listing
+//   (outcome active / for_sale).
+// The estimate needs either one; the deal verdict needs a price. A car that isn't
+// listed, such as an owner's build, has neither, so it shows no estimate and no
+// verdict. sale_status alone can't tell: 'available' is also carried by unlisted cars.
+// ---------------------------------------------------------------------------
+
+function marketDefends(p: PriceFacts | null): { estimate: boolean; deal: boolean } {
+  const priced = priceKindLabel(p) !== null;
+  const listed = p?.outcome === 'active' || p?.outcome === 'for_sale';
+  return { estimate: priced || listed, deal: priced };
 }
 
 // ---------------------------------------------------------------------------
@@ -96,24 +122,14 @@ function generateHeadline(
   intel: VehicleIntel | null,
   observationCount: number,
   eyeRead: EyeRead | null = null,
+  priceFacts: PriceFacts | null = null,
 ): HeadlineResult | null {
-  // Priority 0: the Eye's evidence-graded read. When it exists, THE value story
-  // is the band vs the real price — never the undefended model estimate.
+  // Priority 0: preserve the stored range without making an unqualified deal verdict.
   if (eyeRead?.band) {
     const [lo, hi] = eyeRead.band;
     const fmt = (n: number) => '$' + Math.round(n / 100) / 10 + 'k';
-    const price = vehicle?.sale_price || vehicle?.sold_price || vehicle?.asking_price || vehicle?.price;
-    const cls = eyeRead.conditionClass ? ` · ${eyeRead.conditionClass}` : '';
-    if (price && price > 0) {
-      const pos = price < lo ? `${fmt(price)} is BELOW the band`
-        : price <= hi ? `${fmt(price)} is IN BAND`
-        : `${fmt(price)} is ${fmt(price - hi)} above what the evidence proves`;
-      return {
-        text: `Evidence read: ${fmt(lo)}–${fmt(hi)} as-is${cls} — ${pos}`,
-        severity: price <= hi ? 'ok' : 'warning',
-      };
-    }
-    return { text: `Evidence read: ${fmt(lo)}–${fmt(hi)} as-is${cls}`, severity: 'info' };
+    const cls = eyeRead.conditionClass ? ` · reported condition: ${eyeRead.conditionClass}` : '';
+    return { text: `Stored appraisal range: ${fmt(lo)}–${fmt(hi)} USD${cls}`, severity: 'info' };
   }
   // Priority 1: HIGH-severity red flags only (real warnings, not trivia)
   const flags = intel?.description_intel?.red_flags;
@@ -122,21 +138,20 @@ function generateHeadline(
     return { text: highFlags[0].f, severity: 'warning' };
   }
 
-  // Priority 2: Community concerns — only headline when overall sentiment is NOT positive
-  // (minor concerns in an otherwise positive discussion aren't the top-line story)
+  // Priority 2: Reported concerns. The stored summary does not verify source membership
+  // or establish that a positive overall label resolves an individual concern.
   const concerns = intel?.comment_intel?.community_concerns;
-  const overallSentiment = (intel?.comment_intel?.overall_sentiment || '').toLowerCase();
-  const sentimentIsPositive = overallSentiment.includes('positive') || overallSentiment.includes('enthusiastic');
-  if (concerns && concerns.length > 0 && !sentimentIsPositive) {
+  if (concerns && concerns.length > 0) {
     const concern = typeof concerns[0] === 'string' ? concerns[0] : (concerns[0] as any).concern || '';
-    if (concern) return { text: concern, severity: 'warning' };
+    if (concern) return { text: `Reported comment concern (source unverified): ${concern}`, severity: 'info' };
   }
 
   // Priority 3: Market position (estimate vs asking)
   // Only compare when both values are in the same ballpark (within 5x of each other)
   // to avoid nonsense like "$310 sale price vs $27K estimate" where $310 is a BaT bid, not asking
   const estimate = vehicle?.nuke_estimate;
-  const asking = vehicle?.asking_price || vehicle?.price;
+  // only a current ask is "priced at"; a sold car's old asking_price is not
+  const asking = priceFacts?.price_kind === 'ask' ? priceFacts.price_amount : null;
   if (estimate && asking && estimate > 0 && asking > 0) {
     const ratio = Math.max(estimate, asking) / Math.min(estimate, asking);
     if (ratio < 5) {
@@ -152,22 +167,13 @@ function generateHeadline(
     }
   }
 
-  // Priority 4: Community sentiment (positive or negative — both are signal)
+  // Priority 4: A reported interpretation; retrieved count is not prompt inclusion proof.
   const sentiment = intel?.comment_intel;
-  if (sentiment?.overall_sentiment && sentiment.comment_count && sentiment.comment_count > 10) {
-    const s = sentiment.overall_sentiment.toLowerCase();
-    if (s.includes('positive') || s.includes('enthusiastic')) {
-      return {
-        text: `${sentiment.comment_count} comments analyzed — community sentiment is ${sentiment.overall_sentiment.toLowerCase()}`,
-        severity: 'ok',
-      };
-    }
-    if (s.includes('negative') || s.includes('critical')) {
-      return {
-        text: `${sentiment.comment_count} comments analyzed — community sentiment is ${sentiment.overall_sentiment.toLowerCase()}`,
-        severity: 'warning',
-      };
-    }
+  if (sentiment?.overall_sentiment) {
+    return {
+      text: `Reported comment summary: ${sentiment.overall_sentiment.toLowerCase()} · input sample, method and analysis time unavailable`,
+      severity: 'info',
+    };
   }
 
   // Priority 5: Lower-severity red flags (informational, not alarming)
@@ -175,16 +181,8 @@ function generateHeadline(
     return { text: flags[0].f, severity: 'info' };
   }
 
-  // Priority 6: Strong documentation
-  if (observationCount >= 10) {
-    return {
-      text: `${observationCount} observations tracked across the system`,
-      severity: 'neutral',
-    };
-  }
-
-  // Priority 6: Estimate available
-  if (estimate && estimate > 0) {
+  // Priority 6: Estimate available, and a market event to defend it
+  if (estimate && estimate > 0 && marketDefends(priceFacts).estimate) {
     const fmt = (n: number) => '$' + Math.round(n).toLocaleString();
     return {
       text: `Estimated value: ${fmt(estimate)}`,
@@ -236,73 +234,41 @@ const StatPill: React.FC<StatPillProps> = ({ label, value, accent }) => (
 );
 
 // ---------------------------------------------------------------------------
-// Comp row — mini comparable sale
-// ---------------------------------------------------------------------------
-
-const CompRow: React.FC<{ comp: CompSale }> = ({ comp }) => {
-  const fmt = (n: number) => '$' + Math.round(n).toLocaleString();
-  return (
-    <div style={{
-      display: 'grid',
-      gridTemplateColumns: '32px 1fr auto auto',
-      gap: '6px',
-      alignItems: 'center',
-      padding: '3px 0',
-      borderBottom: '1px solid var(--border, #eee)',
-      ...MONO,
-    }}>
-      {comp.thumbnail ? (
-        <img src={comp.thumbnail} alt="" style={{ width: 32, height: 24, objectFit: 'cover' }} />
-      ) : (
-        <div style={{ width: 32, height: 24, background: 'var(--surface-elevated, #f5f5f5)' }} />
-      )}
-      <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-        {comp.year ? `'${String(comp.year).slice(2)} ` : ''}{comp.model || '—'}
-      </span>
-      <span style={{ fontWeight: 700, color: 'var(--vp-sold, #000)' }}>{fmt(comp.sale_price)}</span>
-      <span style={{ color: 'var(--text-secondary, #999)', fontSize: '8px' }}>
-        {comp.sale_date ? new Date(comp.sale_date).toLocaleDateString('en-US', { month: 'short', year: '2-digit' }) : ''}
-      </span>
-    </div>
-  );
-};
-
-// ---------------------------------------------------------------------------
 // Main component
 // ---------------------------------------------------------------------------
 
-const VehicleBriefing: React.FC = () => {
+const VehicleBriefing: React.FC<{ collapsed?: boolean }> = ({ collapsed = false }) => {
   const { vehicle, vehicleIntel, vehicleIntelLoading, observationCount } = useVehicleProfile();
-  const [showComps, setShowComps] = useState(false);
   const eyeRead = useEyeRead(vehicle?.id);
+  const { priceFacts, priceSettled } = useVehiclePriceFacts(vehicle?.id);
 
-  if (!vehicle || vehicleIntelLoading) return null;
+  if (!vehicle || vehicleIntelLoading || !priceSettled) return null;
 
-  const headline = generateHeadline(vehicle, vehicleIntel, observationCount, eyeRead);
+  const headline = generateHeadline(vehicle, vehicleIntel, observationCount, eyeRead, priceFacts);
   const estimate = vehicle.nuke_estimate;
-  const scores = vehicleIntel?.scores;
   const comps = vehicleIntel?.recent_comps;
-  const apparitions = vehicleIntel?.apparitions;
   const sentiment = vehicleIntel?.comment_intel;
+  const defended = marketDefends(priceFacts);
 
   // Compute stat pills
   const pills: StatPillProps[] = [];
 
   if (eyeRead?.band) {
-    // The Eye leads; carry the date so freshness is never a mystery.
+    // Computation time is distinct from source capture and sale time.
     const [lo, hi] = eyeRead.band;
     pills.push({
-      label: 'EYE READ',
+      label: 'APPRAISAL',
       value: `$${Math.round(lo / 100) / 10}k–$${Math.round(hi / 100) / 10}k`,
     });
+    const computed = eyeRead.computedAt ? new Date(eyeRead.computedAt) : null;
     pills.push({
-      label: 'READ ON',
-      value: new Date(eyeRead.computedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
+      label: 'COMPUTED (UTC)',
+      value: computed && Number.isFinite(computed.getTime())
+        ? computed.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', timeZone: 'UTC' })
+        : 'Unknown',
     });
-    if (eyeRead.frames) {
-      pills.push({ label: 'FRAMES', value: String(eyeRead.frames) });
-    }
-  } else if (estimate && estimate > 0) {
+    pills.push({ label: 'INPUT COUNT', value: eyeRead.reportedInputCount != null ? `${eyeRead.reportedInputCount} reported` : 'Unknown' });
+  } else if (estimate && estimate > 0 && defended.estimate) {
     // Legacy model estimate only when no evidence read exists — and labeled as such.
     pills.push({
       label: 'MODEL EST',
@@ -310,36 +276,14 @@ const VehicleBriefing: React.FC = () => {
     });
   }
 
-  if (scores?.deal_score != null && scores.deal_score !== 0) {
-    const ds = scores.deal_score;
-    const label = ds > 50 ? 'GOOD DEAL' : ds > 0 ? 'FAIR' : 'ABOVE MKT';
-    const accent = ds > 50 ? 'var(--vp-brg, #004225)' : ds > 0 ? 'var(--text)' : 'var(--vp-danger, #d13438)';
-    pills.push({ label: 'DEAL', value: label, accent });
-  }
-
-  if (scores?.heat_score != null && scores.heat_score > 0) {
-    pills.push({ label: 'HEAT', value: String(scores.heat_score) });
-  }
-
-  if (sentiment?.comment_count && sentiment.comment_count > 0) {
-    const sentLabel = sentiment.sentiment_score != null
-      ? `${sentiment.sentiment_score > 0.6 ? '+' : ''}${(sentiment.sentiment_score * 100).toFixed(0)}%`
-      : String(sentiment.comment_count);
-    pills.push({ label: 'COMMUNITY', value: `${sentiment.comment_count} comments` });
-  }
-
-  if (apparitions && apparitions.length > 1) {
-    pills.push({ label: 'HISTORY', value: `${apparitions.length} appearances` });
-  }
-
-  if (observationCount > 0) {
-    pills.push({ label: 'OBSERVATIONS', value: String(observationCount) });
+  if (sentiment?.comment_count != null) {
+    pills.push({ label: 'SUMMARY COUNT', value: `${sentiment.comment_count} reported` });
   }
 
   // Self-guard: nothing to show
-  if (!headline && pills.length === 0) return null;
+  if (!headline && pills.length === 0 && !comps?.length) return null;
 
-  return (
+  const content = (
     <div style={{ margin: '0 12px 8px' }}>
       {/* L0: Headline */}
       {headline && (
@@ -364,35 +308,19 @@ const VehicleBriefing: React.FC = () => {
         </div>
       )}
 
-      {/* Expandable comps preview */}
-      {comps && comps.length > 0 && (
-        <div>
-          <button
-            onClick={() => setShowComps(!showComps)}
-            style={{
-              background: 'none',
-              border: 'none',
-              cursor: 'pointer',
-              padding: '2px 0',
-              fontFamily: 'var(--vp-font-sans, Arial, sans-serif)',
-              fontSize: '8px',
-              color: 'var(--text-secondary, #666)',
-              letterSpacing: '0.05em',
-            }}
-          >
-            {showComps ? '▲ HIDE' : '▼ VIEW'} {comps.length} COMPARABLE SALE{comps.length !== 1 ? 'S' : ''}
-          </button>
-          {showComps && (
-            <div style={{ marginTop: '4px' }}>
-              {comps.slice(0, 5).map((comp, i) => (
-                <CompRow key={comp.id || i} comp={comp} />
-              ))}
-            </div>
-          )}
+      {eyeRead?.band && (
+        <div style={{ ...MONO, color: 'var(--text-secondary, #666)', marginTop: '4px', marginBottom: '4px' }}>
+          Input IDs, count meaning and calibration unavailable. Condition matching unverified.
         </div>
       )}
+
+
     </div>
   );
+  return <>
+    {comps && <SoldContext comps={comps} scope={vehicleIntel?.recent_comps_scope} subject={vehicle} recordedSale={priceFacts?.price_kind === 'sold' ? priceFacts.price_amount : null} />}
+    {(headline || pills.length > 0) && (collapsed ? <details className="vp-stored-interpretations"><summary>Stored model interpretations</summary>{content}</details> : content)}
+  </>;
 };
 
 export default VehicleBriefing;

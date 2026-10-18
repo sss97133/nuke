@@ -80,7 +80,7 @@ This interactive script will:
 
 ### Step 2: Configure API Keys
 
-You need these in `/Users/skylar/nuke/nuke_frontend/.env.local`:
+You need these in `~/nuke/nuke_frontend/.env.local`:
 
 ```bash
 # Supabase (get from dashboard)

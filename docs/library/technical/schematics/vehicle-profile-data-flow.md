@@ -3,6 +3,15 @@
 **Last updated:** 2026-03-29
 **Scope:** All data flows from database tables through RPCs/queries to React hooks to UI components in the vehicle profile page.
 
+**Scoped repair, 2026-10-04:** `TablePage.tsx` now joins the existing masked
+`vehicle_build_log_public(vehicleId)` output to directly readable observations by original observation ID.
+An owner-readable row wins on overlap. Visitors can search permitted work/supplier/stage text without
+receipts or amounts; masked copies have no private observation-detail link and explicitly lack an ingest
+clock. `TablePage.test.tsx` exercises this reader contract. The opening anonymous sample had six RPC
+rows and zero table work rows; the local corrected table has six. Production verification is tracked
+separately in data-machine case C22; the other four case readers remain open. This is a current read
+model over canonical testimony, not a new log or a historical financial aggregate.
+
 ---
 
 ## Master Data Flow Diagram

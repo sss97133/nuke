@@ -1,5 +1,6 @@
 import { DOMParser } from 'https://deno.land/x/deno_dom@v0.1.38/deno-dom-wasm.ts';
 import { normalizeListingLocation } from './normalizeListingLocation.ts';
+import { readOwnAuctionEnd } from './batAuctionRecord.ts';
 
 export type BatDomFieldKey =
   | 'title'
@@ -449,19 +450,14 @@ function extractAuctionDates(
   const warnings: string[] = [];
   const h = String(html || '');
 
-  const ends = h.match(/data-auction-ends=["'](\d{4}-\d{2}-\d{2}-\d{2}-\d{2}-\d{2})["']/);
-  if (ends?.[1]) {
-    const parts = ends[1].split('-').map((x) => Number(x));
-    if (parts.length === 6 && parts.every((x) => Number.isFinite(x))) {
-      const dt = new Date(parts[0], parts[1] - 1, parts[2], parts[3], parts[4], parts[5]);
-      if (Number.isFinite(dt.getTime())) {
-        const end = dt.toISOString().split('T')[0];
-        const startDt = new Date(dt);
-        startDt.setDate(startDt.getDate() - 7);
-        const start = startDt.toISOString().split('T')[0];
-        return { start, end, sale: null, method: 'attr:data-auction-ends', warnings };
-      }
-    }
+  // The lot's own countdown only: the page's "Current BaT Auctions" widget carries a data-auction-ends for every
+  // other running lot, and a closed page has none of its own (readOwnAuctionEnd, batAuctionRecord.ts).
+  const ownEnd = readOwnAuctionEnd(h);
+  if (ownEnd.endsFrom && ownEnd.endsDate) {
+    const startDt = new Date(`${ownEnd.endsDate}T00:00:00Z`);
+    startDt.setUTCDate(startDt.getUTCDate() - 7);
+    const start = startDt.toISOString().split('T')[0];
+    return { start, end: ownEnd.endsDate, sale: null, method: `attr:${ownEnd.endsFrom === 'countdown' ? 'data-auction-ends' : 'data-ends'}`, warnings };
   }
 
   const body = textContent(doc.body);

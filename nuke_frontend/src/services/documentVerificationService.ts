@@ -25,10 +25,11 @@ export class DocumentVerificationService {
     imageUrl: string,
     documentType: 'title' | 'drivers_license'
   ): Promise<{ text: string; extractedData: any }> {
-    const apiKey = import.meta.env?.VITE_OPENAI_API_KEY;
-    
+    // The browser holds no provider key: anything read from VITE_* ships in public JavaScript.
+    const apiKey: string = '';
+
     if (!apiKey) {
-      throw new Error('OpenAI API key not configured');
+      throw new Error('Document reading runs on the server and is not available in the browser.');
     }
 
     try {

@@ -11,7 +11,8 @@
 # Allowed:  - lines referencing archiveFetch
 #           - comment lines
 #           - clearly-internal targets on the same line (Supabase storage/REST/
-#             functions, signed/public URLs, localhost, sidecars)
+#             functions, signed/public URLs, localhost, sidecars), or a Supabase
+#             URL template immediately following a line ending in fetch(
 #           - service-API hosts that archiveFetch cannot and should not wrap
 #             (LLM providers, OAuth token endpoints, Telegram/Resend/Mux)
 #           - lines carrying an explicit escape hatch: // guardrail-allow: raw-fetch
@@ -39,9 +40,23 @@ INTERNAL_RE='SUPABASE_URL|supabaseUrl|\.supabase\.co|signedUrl|publicUrl|localho
 SERVICE_API_RE='api\.openai\.com|api\.anthropic\.com|api\.x\.ai|generativelanguage\.googleapis\.com|api\.moonshot\.ai|api\.deepseek\.com|openrouter\.ai|api\.telegram\.org|api\.resend\.com|api\.mux\.com|oauth2\.googleapis\.com'
 
 violations="$(
-  grep -rnE '\bfetch\(' "$FUNCS_DIR" \
-      --include='*.ts' \
-      --exclude-dir=_shared \
+  find "$FUNCS_DIR" -path "$FUNCS_DIR/_shared" -prune -o -type f -name '*.ts' -exec awk '
+    # Only inspect the immediate URL argument, never subsequent options/headers.
+    # These roots and fixed paths are already exempt for same-line calls.
+    FNR == 1 && pending { print pending; pending = "" }
+    pending {
+      if ($0 !~ /^[[:space:]]*`\$\{(SUPABASE_URL|supabaseUrl|Deno\.env\.get\(["\047]SUPABASE_URL["\047]\))\}\/(functions|rest|storage|auth)\/v1\/[^`]*`[[:space:]]*,[[:space:]]*$/)
+        print pending
+      pending = ""
+    }
+    /(^|[^[:alnum:]_])fetch\(/ {
+      hit = FILENAME ":" FNR ":" $0
+      fetches = $0
+      if (gsub(/fetch\(/, "", fetches) == 1 && $0 ~ /fetch\([[:space:]]*$/) pending = hit
+      else print hit
+    }
+    END { if (pending) print pending }
+  ' {} + \
     | grep -v  'archiveFetch' \
     | grep -v  'guardrail-allow: raw-fetch' \
     | grep -vE '^[^:]*:[0-9]+:[[:space:]]*(//|\*|/\*)' \

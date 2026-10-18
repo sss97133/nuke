@@ -21,6 +21,8 @@ import {
   ResponsiveContainer,
 } from 'recharts';
 import { supabase } from '../lib/supabase';
+import { SectionHeader, DarkBlock } from '../components/terminal/primitives';
+import { panelStyle } from '../components/terminal/styles';
 import '../styles/unified-design-system.css';
 
 // ─── Envelope types (mirror the RPC contract) ───────────────────────────
@@ -135,67 +137,7 @@ function useCohortTerminal(make: string, model: string, year: number | null) {
   });
 }
 
-// ─── Shared layout pieces ───────────────────────────────────────────────
-
-function SectionHeader({ label, meta }: { label: string; meta?: string }) {
-  return (
-    <div style={{
-      display: 'flex', alignItems: 'baseline', justifyContent: 'space-between',
-      marginBottom: '8px',
-    }}>
-      <div style={{
-        fontSize: '9px', fontWeight: 800, letterSpacing: '1px',
-        textTransform: 'uppercase', color: 'var(--text)',
-      }}>
-        {label}
-      </div>
-      {meta && (
-        <div style={{
-          fontFamily: "'Courier New', monospace", fontSize: '9px',
-          color: 'var(--text-muted)',
-        }}>
-          {meta}
-        </div>
-      )}
-    </div>
-  );
-}
-
-const panelStyle: React.CSSProperties = {
-  border: '2px solid var(--border)',
-  background: 'var(--surface)',
-  padding: '12px',
-};
-
-// Honest DARK state — an intake gap, NOT a market verdict, NOT a fake value.
-// Dashed 2px border + a quiet awaiting-intake glyph reads as "reserved slot,
-// not yet recorded" — deliberate, never broken or empty.
-function DarkBlock({ label, reason }: { label: string; reason: string }) {
-  return (
-    <div style={{
-      ...panelStyle,
-      borderStyle: 'dashed',
-      background: 'var(--bg)',
-    }}>
-      <SectionHeader label={label} meta="INTAKE GAP" />
-      <div style={{ display: 'flex', alignItems: 'flex-start', gap: '8px' }}>
-        {/* awaiting-intake glyph — a hollow square, the "no signal yet" mark */}
-        <div style={{
-          flexShrink: 0, width: '8px', height: '8px', marginTop: '2px',
-          border: '1px solid var(--text-muted)',
-        }} />
-        <div style={{
-          fontFamily: "'Courier New', monospace",
-          fontSize: '10px',
-          color: 'var(--text-muted)',
-          lineHeight: 1.5,
-        }}>
-          {reason}
-        </div>
-      </div>
-    </div>
-  );
-}
+// ─── Shared layout pieces — components/terminal/primitives (shared with the deal read) ─
 
 // ─── Price distribution range bar ───────────────────────────────────────
 

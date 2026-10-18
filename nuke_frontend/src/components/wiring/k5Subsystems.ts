@@ -89,7 +89,7 @@ export const K5_SUBSYSTEMS: Record<string, K5Subsystem> = {
     totalAmps: 40.2,
     pdmChannels: ['PDM30:unspecified (#95 iBooster relay)'],
     zones: ['engine_bay', 'firewall', 'dash'],
-    crossDependency: 'Brake Light Switch (#53) also feeds LIGHTING_EXTERIOR brake lamps and TRANS_6L80E TC unlock — keep #53 if either is on.',
+    crossDependency: 'Brake Light Switch (#53) also feeds LIGHTING_EXTERIOR brake lamps and TRANS_6L90 TC unlock — keep #53 if either is on.',
   },
   EPARKING_BRAKE: {
     toggleable: true,
@@ -100,7 +100,7 @@ export const K5_SUBSYSTEMS: Record<string, K5Subsystem> = {
     pdmChannels: ['OUT7'],
     zones: ['dash', 'rear', 'underbody'],
   },
-  TRANS_6L80E: {
+  TRANS_6L90: {
     toggleable: true,
     devices: ['Transmission Controller', 'Neutral Safety Switch', 'Reverse Light Switch', 'Transfer Case Indicator'],
     wireIds: ['55', '56', '57', '58'],
@@ -259,7 +259,7 @@ export const V4_WIRE_SUBSYSTEMS: Record<string, string> = {
   '117': 'DASH_CLUSTER_DAKOTA', '118': 'DASH_CLUSTER_DAKOTA', '119': 'DASH_CLUSTER_DAKOTA',
   '120': 'DASH_CLUSTER_DAKOTA', '121': 'DASH_CLUSTER_DAKOTA', '122': 'DASH_CLUSTER_DAKOTA',
   '123': 'DASH_CLUSTER_DAKOTA', '124': 'DASH_CLUSTER_DAKOTA',
-  '125': 'TRANS_6L80E',
+  '125': 'TRANS_6L90',
   '126': 'EPARKING_BRAKE',
   '85a': 'LIGHTING_EXTERIOR', '85b': 'LIGHTING_EXTERIOR',
   '86a': 'LIGHTING_EXTERIOR', '86b': 'LIGHTING_EXTERIOR',

@@ -136,7 +136,7 @@ export const MECHANICAL_GAUGES_ID = 'MECHANICAL_GAUGES';
 const SUBSYSTEM_LABELS: Record<string, string> = {
   CORE_ENGINE: 'Core Engine (LS3/M130)', FUEL: 'Fuel', COOLING: 'Cooling',
   CHARGING_STARTING: 'Charging / Starting', BRAKES_IBOOSTER: 'Brakes (iBooster)',
-  EPARKING_BRAKE: 'E-Parking Brake', TRANS_6L80E: 'Trans (6L80E/T43)',
+  EPARKING_BRAKE: 'E-Parking Brake', TRANS_6L90: 'Trans (6L90/T43)',
   LIGHTING_EXTERIOR: 'Lighting Exterior', LIGHTING_INTERIOR: 'Lighting Interior',
   DOME_COURTESY: 'Dome / Courtesy', POWER_WINDOWS: 'Power Windows',
   POWER_LOCKS: 'Power Locks', AUDIO: 'Audio', HVAC_AC: 'HVAC / A/C',
@@ -420,7 +420,7 @@ const specFamily = (gauge: number): string => (gauge >= 12 ? '/32' : '/16');
 // k5_harness_calc.py cross_keep): #53 brake switch feeds brake lamps + TC
 // unlock; #57 reverse switch feeds backup lights + camera trigger.
 function crossKeep(wireId: string, on: Record<string, boolean>): boolean {
-  if (wireId === '53' && (on.LIGHTING_EXTERIOR || on.TRANS_6L80E)) return true;
+  if (wireId === '53' && (on.LIGHTING_EXTERIOR || on.TRANS_6L90)) return true;
   if (wireId === '57' && (on.LIGHTING_EXTERIOR || on.CAMERA_REAR)) return true;
   return false;
 }

@@ -41,7 +41,7 @@ export interface VehicleContributor {
   created_at: string;
   profiles?: {
     full_name: string;
-    email: string;
+    username: string;
   };
 }
 
@@ -218,7 +218,7 @@ export class OwnershipService {
           try {
             return await supabase
               .from('vehicle_contributors')
-              .select('*, profiles(full_name, email)')
+              .select('*, profiles(full_name, username)')
               .eq('vehicle_id', vehicleId)
               .eq('user_id', session.user.id)
               .eq('status', 'active')
@@ -438,7 +438,7 @@ export class OwnershipService {
   static async getContributors(vehicleId: string): Promise<VehicleContributor[]> {
     const { data, error } = await supabase
       .from('vehicle_contributors')
-      .select('*, profiles(full_name, email)')
+      .select('*, profiles(full_name, username)')
       .eq('vehicle_id', vehicleId)
       .order('created_at', { ascending: false });
 
