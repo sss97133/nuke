@@ -74,6 +74,10 @@ Gallery and technical views use standard `<Link>` navigation (these are compact 
 
 ## Treemap Drill
 
+**Market tile inspection (2026-10-18):** Market tiles are native buttons. On brand and family overviews, keyboard focus has a visible inset border and opens the same measured card as pointer hover, with the card linked as the focused tile's accessible description. Blur or Escape dismisses it; Enter or Space retains the existing drill action and hands focus to the current breadcrumb while the old tile is replaced. Focus also uses the existing prefetch path. The card's placement uses its rendered height and clamps its width to the viewport. Browser acceptance follows focus → qualified card → Escape → next tile → drill → focused current breadcrumb at phone and desktop widths; data-reader and scope behavior remain governed by the existing market contracts.
+
+Focus markers on the tiles, breadcrumb and Sales by house summary use inset borders: the shared Tailwind overrides suppress outlines even when a component declares one. Verify the rendered marker rather than treating a local `outline` rule as proof of visible focus.
+
 The logged-out treemap homepage uses continuous zoom to navigate 4 levels of vehicle hierarchy. Each drill action replaces the entire treemap viewport with the next level's data, animated as a scale+fade transition from the click origin.
 
 ```
