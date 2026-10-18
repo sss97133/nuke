@@ -9,7 +9,7 @@ import {
   type VehicleFacetClassification,
   type VehicleIdentityMark,
 } from './familyFacetsAndEmblems';
-import { resolveVehicleMarketFamily } from './vehicle-profile/VehicleBadgeBar';
+import { resolveVehicleMarketFamily } from './vehicle-profile/vehicleMarketFamily';
 
 export {
   classifyVehicleFacets,
