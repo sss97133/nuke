@@ -92,6 +92,7 @@
   },
   {
     "brand": "Chevrolet",
+    "labelPresentation": "emblem-and-name",
     "file": "chevrolet-wordmark.svg",
     "upstream": "Chevrolet Wordmark.svg",
     "viewport": "48.764387 236.764387 414.342226 38.739226",
@@ -118,6 +119,7 @@
   },
   {
     "brand": "Dodge",
+    "labelPresentation": "name",
     "file": "dodge-wordmark.svg",
     "upstream": "Dodge Wordmark.svg",
     "viewport": "38.793113 235.596313 421.073573 32.914373",

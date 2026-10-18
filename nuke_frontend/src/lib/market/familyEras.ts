@@ -365,7 +365,7 @@ export function getDefinedFamilyEras(
   brand: string | null | undefined,
   familyName: string | null | undefined,
 ): FamilyEraCohort[] {
-  const lookupKey = `${(brand ?? '').trim().toLowerCase()}:${(familyName ?? '').trim().toLowerCase()}`;
+  const lookupKey = `${(brand ?? '').trim().toLowerCase()}:${(familyName ?? '').trim().toLowerCase().replace(/^truck$/, 'pickup')}`;
   return CURATED_FAMILY_ERAS[lookupKey] ?? [];
 }
 
@@ -394,7 +394,7 @@ export function getFamilyEraCohorts(
   const validYears = years.filter((y): y is number => typeof y === 'number' && y >= 1886 && y <= 2100);
   if (!validYears.length) return [];
 
-  const lookupKey = `${(brand ?? '').trim().toLowerCase()}:${(familyName ?? '').trim().toLowerCase()}`;
+  const lookupKey = `${(brand ?? '').trim().toLowerCase()}:${(familyName ?? '').trim().toLowerCase().replace(/^truck$/, 'pickup')}`;
   const curated = CURATED_FAMILY_ERAS[lookupKey];
   if (curated) {
     const withCounts = curated

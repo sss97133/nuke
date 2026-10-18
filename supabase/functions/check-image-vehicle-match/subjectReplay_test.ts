@@ -7,7 +7,7 @@ function equal(a: unknown, b: unknown) { if (JSON.stringify(a) !== JSON.stringif
 function fixture() {
   const sources = [1, 2, 3].map(n => ({ id: id(n), user_id: owner, image_url: `https://source.invalid/${n}.jpg`,
     file_hash: n.toString(16).padStart(64, "0"), created_at: "2025-01-01T00:00:00.000001Z", taken_at: null,
-    vision_gate_status: "approved", is_superseded: false, is_duplicate: false, is_document: false, is_sensitive: false }));
+    vision_gate_status: "approved", private_subject_privacy_complete: true, private_subject_privacy: [], is_superseded: false, is_duplicate: false, is_document: false, is_sensitive: false }));
   const envelope: any = { user_id: owner, method: "visual_subjects_v1", read_at,
     inputs: sources.map(s => ({ image_id: s.id, source_url: s.image_url, source_sha256: s.file_hash, input_sha256: s.file_hash,
       representation: "source", source_qualified: true, created_at: s.created_at, taken_at: null })),

@@ -1,5 +1,7 @@
 import { observationClockMicroseconds as clock } from "../_shared/observationContentHash.ts";
-import { qualifySubjectSource } from "./subjectReader.ts";
+import { qualifySubjectSource, qualifySubjectSourceCustody } from "./subjectReader.ts";
+import { loadSourceIdentities, sourceAliases, currentIdentitySource, inspectSourceIdentity } from "./sourceIdentity.ts";
+import { hydrateSubjectPrivacy, subjectSourceAvailable, subjectSourceCanEstablishPrivacy, subjectPrivacyLookupComplete } from "./subjectPrivacy.ts";
 
 // Private source projection in the existing read_subjects owner. The pure projector invokes
 // no query, model or writer. A source card is never a one-photo vehicle profile.
@@ -27,6 +29,7 @@ export interface SourceInboxState {
 
 export interface InboxReading {
   id: string;
+  receipt_image_id: string;
   input_key: string;
   provider: string;
   model: string;
@@ -46,8 +49,10 @@ function sourceVisibility(source: Record<string, any>, userId: string, asOf: big
   }
   const flags = ["is_superseded", "is_duplicate", "is_document", "is_sensitive"];
   if (flags.some(key => !Object.hasOwn(source, key))) return { state: "unqualified", reason: "source_flags_unassessed" } as const;
-  if (flags.some(key => source[key] === true)) return { state: "held", reason: "source_withdrawn_or_held" } as const;
-  if (source.vision_gate_status !== "approved") return { state: "held", reason: "source_not_ready" } as const;
+  if (!subjectPrivacyLookupComplete([source])) return { state: "held", reason: "source_scope_unassessed" } as const;
+  if (!subjectSourceAvailable(source, userId, new Date(Number(asOf / 1000n)).toISOString())) {
+    return { state: "held", reason: subjectSourceCanEstablishPrivacy(source, userId) ? "source_not_ready" : "source_withdrawn_or_held" } as const;
+  }
   const created = clock(source.created_at), taken = source.taken_at === null ? null : clock(source.taken_at);
   if (created === null || created > asOf + 300_000_000n || source.taken_at !== null && taken === null) {
     return { state: "unqualified", reason: "source_clocks_unqualified" } as const;
@@ -65,7 +70,7 @@ function sourceVisibility(source: Record<string, any>, userId: string, asOf: big
  * qualification in subjectCandidates is a context-retrieval rule, not an inbox visibility rule.
  * All peer dependencies qualify before presenting any contextual interpretation. */
 function currentRawReading(row: unknown, imageId: string, sources: Map<string, any>, userId: string, asOf: bigint): InboxReading | null {
-  if (!record(row) || row.image_id !== imageId || row.observed_by !== RAW || row.agent_version !== RAW ||
+  if (!record(row) || !sourceAliases(sources.get(imageId)).includes(row.image_id) || row.observed_by !== RAW || row.agent_version !== RAW ||
     row.vehicle_id !== null || row.cluster_id !== null || row.role !== "part" || row.is_active !== true || row.superseded_by !== null || !uuid(row.id)) return null;
   const wrapper = row.confidence_basis?.[RAW], envelope = wrapper?.envelope;
   const read = clock(envelope?.read_at), observed = clock(row.observed_at);
@@ -77,9 +82,9 @@ function currentRawReading(row: unknown, imageId: string, sources: Map<string, a
     !Array.isArray(envelope.frames) || envelope.frames.length > 3 || !Array.isArray(envelope.unresolved) || envelope.unresolved.length > 3 ||
     !Array.isArray(envelope.subjects) || envelope.subjects.length > 3) return null;
   const ids = envelope.inputs.map((input: any) => input?.image_id);
-  if (!ids.every(uuid) || new Set(ids).size !== ids.length || !ids.includes(imageId) ||
-    !envelope.inputs.every((input: any) => qualifySubjectSource(input, sources.get(input.image_id), userId, envelope.read_at))) return null;
-  const frames = envelope.frames.filter((frame: any) => record(frame) && frame.image_id === imageId);
+  if (!ids.every(uuid) || new Set(ids).size !== ids.length || !ids.includes(row.image_id) ||
+    !envelope.inputs.every((input: any) => qualifySubjectSource(input, sources.get(input.image_id), userId, envelope.read_at, new Date(Number(asOf / 1000n)).toISOString()))) return null;
+  const frames = envelope.frames.filter((frame: any) => record(frame) && frame.image_id === row.image_id);
   if (frames.length > 1) return null;
   const candidate = frames[0];
   let frame: InboxReading["frame"] = null;
@@ -91,12 +96,32 @@ function currentRawReading(row: unknown, imageId: string, sources: Map<string, a
       bbox[0] < 0 || bbox[1] < 0 || bbox[2] <= 0 || bbox[3] <= 0 || bbox[0] + bbox[2] > 1.001 || bbox[1] + bbox[3] > 1.001)) return null;
     frame = { medium: candidate.medium, primary_subject: candidate.primary_subject, view: candidate.view, bbox };
   }
-  const reasons = envelope.unresolved.filter((entry: any) => record(entry) && entry.image_id === imageId && text(entry.reason));
-  const input = envelope.inputs.find((value: any) => value.image_id === imageId);
-  return { id: row.id, input_key: wrapper.input_key, provider: envelope.provider, model: envelope.model,
+  const reasons = envelope.unresolved.filter((entry: any) => record(entry) && entry.image_id === row.image_id && text(entry.reason));
+  const input = envelope.inputs.find((value: any) => value.image_id === row.image_id);
+  return { id: row.id, receipt_image_id: row.image_id, input_key: wrapper.input_key, provider: envelope.provider, model: envelope.model,
     read_at: envelope.read_at, observed_at: row.observed_at,
     input: { source_sha256: input.source_sha256, input_sha256: input.input_sha256, representation: input.representation },
     frame, unresolved_reasons: reasons.map((entry: any) => entry.reason) };
+}
+
+function retainedContextMetadata(row: any, imageId: string, sources: Map<string, any>, userId: string, asOf: string) {
+  if (!record(row) || !sourceAliases(sources.get(imageId)).includes(row.image_id) || row.observed_by !== RAW ||
+    row.agent_version !== RAW || row.is_active !== true || row.superseded_by !== null || !uuid(row.id) ||
+    row.vehicle_id !== null || row.cluster_id !== null || row.role !== "part") return null;
+  const wrapper = row.confidence_basis?.[RAW], e = wrapper?.envelope;
+  if (!record(wrapper) || (wrapper.state ?? "active") !== "active" || !/^[a-f0-9]{32}$/.test(wrapper.input_key ?? "") ||
+    !record(e) || e.user_id !== userId || e.method !== SUBJECT || !text(e.provider) || !text(e.model) ||
+    clock(e.read_at) === null || clock(e.read_at)! > clock(asOf)! + 300_000_000n || clock(row.observed_at) === null ||
+    clock(row.observed_at)! > clock(asOf)! + 300_000_000n ||
+    !Array.isArray(e.inputs) || e.inputs.length < 2 || e.inputs.length > 3 ||
+    new Set(e.inputs.map((input: any) => input?.image_id)).size !== e.inputs.length ||
+    !e.inputs.some((input: any) => input?.image_id === row.image_id) ||
+    !e.inputs.every((input: any) => uuid(input?.image_id) &&
+      qualifySubjectSourceCustody(input, sources.get(input.image_id), userId, e.read_at) &&
+      (subjectSourceAvailable(sources.get(input.image_id), userId, asOf) || subjectSourceCanEstablishPrivacy(sources.get(input.image_id), userId)))) return null;
+  return { id: row.id, receipt_image_id: row.image_id, input_key: wrapper.input_key,
+    provider: e.provider, model: e.model, read_at: e.read_at, observed_at: row.observed_at,
+    qualification: "retained_context_not_current_interpretation" as const };
 }
 
 export function projectSourceInbox(userId: string, state: SourceInboxState) {
@@ -117,28 +142,31 @@ export function projectSourceInbox(userId: string, state: SourceInboxState) {
     const live = record(current) && current.user_id === userId ? current : null;
     const visibility = live ? sourceVisibility(live, userId, asOf)
       : { state: "unqualified", reason: "source_current_row_unavailable" } as const;
-    const heads = state.raw_heads.filter((row): row is Record<string, any> => record(row) && row.image_id === source.id &&
+    const heads = state.raw_heads.filter((row): row is Record<string, any> => record(row) && sourceAliases(live).includes(row.image_id) &&
       row.observed_by === RAW && row.superseded_by === null);
     const byContext = new Map<string, any[]>();
     for (const head of heads) {
-      const key = head.confidence_basis?.[RAW]?.input_key;
+      const key = `${head.image_id}|${head.confidence_basis?.[RAW]?.input_key ?? ""}`;
       if (typeof key === "string") byContext.set(key, [...(byContext.get(key) ?? []), head]);
     }
     const complete = state.raw_heads_complete && state.dependencies_complete;
     const readings = visibility.state === "ready" && complete ? [...byContext.values()]
       .filter(rows => rows.length === 1).map(rows => currentRawReading(rows[0], source.id, sources, userId, asOf))
       .filter((value): value is InboxReading => value !== null) : [];
+    const retained_contexts = complete ? [...byContext.values()].filter(rows => rows.length === 1)
+      .map(rows => retainedContextMetadata(rows[0], source.id, sources, userId, state.as_of)).filter(value => value !== null) : [];
     const withdrawn = heads.filter(row => row.is_active !== true || row.confidence_basis?.[RAW]?.state === "withdrawn").length;
-    const memberships = state.membership_heads.filter((row): row is Record<string, any> => record(row) && row.image_id === source.id &&
-      row.observed_by === SUBJECT && row.superseded_by === null);
+    const memberships = state.membership_heads.filter((row): row is Record<string, any> => record(row) && sourceAliases(live).includes(row.image_id) &&
+      row.observed_by === SUBJECT);
     const membership_state = !state.membership_heads_complete ? "not_assessed" : !memberships.length ? "none_recorded"
       : memberships.some(row => row.is_active !== true || row.confidence_basis?.[SUBJECT]?.state === "withdrawn") ? "withdrawn_or_conflicting" : "recorded_not_qualified_here";
     return { id: source.id, grain: "source_photo" as const, identity: null, grouping_asserted: false as const,
-      source_state: visibility.state, source_reason: visibility.reason, image_url: visibility.state === "ready" ? live!.image_url : null,
+      source_state: visibility.state, source_reason: visibility.reason, image_url: visibility.state === "ready" ? currentIdentitySource(live)!.image_url : null,
+      source_identity: inspectSourceIdentity(live), retained_contexts,
       source_sha256: sha(live?.file_hash) ? live!.file_hash : null,
       created_at: clock(live?.created_at) !== null ? live!.created_at : null,
       taken_at: clock(live?.taken_at) !== null ? live!.taken_at : null,
-      attached_vehicle_id_context: uuid(live?.vehicle_id) ? live!.vehicle_id : null,
+      attached_vehicle_id_context: uuid(currentIdentitySource(live)?.vehicle_id) ? currentIdentitySource(live)!.vehicle_id : null,
       subject_analysis_state: !complete ? "not_assessed" : readings.length ? "current_readings" : !heads.length ? "not_read"
         : withdrawn === heads.length ? "reading_withdrawn" : "reading_no_longer_qualified",
       readings, reading_context_coverage: { grain: "terminal_reading_heads", assessed: heads.length,
@@ -148,7 +176,7 @@ export function projectSourceInbox(userId: string, state: SourceInboxState) {
   const ready = photos.filter(photo => photo.source_state === "ready").length;
   return { photos, coverage: { grain: "owner_source_page", assessed: own.length, returned: photos.length, displayable: ready,
     without_displayable_pixels: photos.length - ready, ambiguous_source_rows: own.length - photos.length, as_of: state.as_of,
-    truncated: state.page_more || !state.raw_heads_complete || !state.membership_heads_complete || !state.dependencies_complete,
+    truncated: state.page_more || !state.raw_heads_complete || !state.membership_heads_complete || !state.dependencies_complete || !subjectPrivacyLookupComplete(state.sources.filter(record)),
     account_total: null, accessible_device_library_total: null, inference_started: false } };
 }
 
@@ -193,9 +221,10 @@ export async function readSourceInbox(supabase: any, userId: string, options: So
   }
   const page = carriers.slice(0, limit), pageMore = !options.image_id && carriers.length > limit;
   const ids = page.map(row => row.id), as_of = new Date().toISOString();
+  const pageLookup = await loadSourceIdentities(supabase, userId, ids);
   const heads = (method: string) => supabase.from("image_observations").select(HEAD_COLUMNS)
     .eq("observed_by", method).eq(`confidence_basis->${method}->envelope->>user_id`, userId)
-    .is("superseded_by", null).in("image_id", ids)
+    .or(`superseded_by.is.null,confidence_basis->${method}->>state.eq.withdrawn`).in("image_id", pageLookup.alias_image_ids)
     .order("observed_at", { ascending: false }).order("id", { ascending: false }).limit(97);
   const [{ data: raw, error: rawError }, { data: memberships, error: membershipError }] = ids.length
     ? await Promise.all([heads(RAW), heads(SUBJECT)]) : [{ data: [], error: null }, { data: [], error: null }];
@@ -205,19 +234,19 @@ export async function readSourceInbox(supabase: any, userId: string, options: So
     const inputs = row?.confidence_basis?.[RAW]?.envelope?.inputs;
     if (Array.isArray(inputs) && inputs.length <= 3) for (const input of inputs) if (uuid(input?.image_id)) dependencyIds.add(input.image_id);
   }
-  if (dependencyIds.size > 312) throw new Error("source_inbox_dependencies_exceed_budget");
-  const { data: sources, error: sourceError } = dependencyIds.size
-    ? await supabase.from("vehicle_images").select(SOURCE_COLUMNS).eq("user_id", userId).in("id", [...dependencyIds]).limit(312)
-    : { data: [], error: null };
-  if (sourceError || !Array.isArray(sources)) throw new Error("source_inbox_sources_read_failed");
+  if (dependencyIds.size > 256) throw new Error("source_inbox_dependencies_exceed_budget");
+  const lookup = await loadSourceIdentities(supabase, userId, [...dependencyIds]);
+  const sources = await hydrateSubjectPrivacy(supabase, userId, lookup.sources);
   const result = projectSourceInbox(userId, { page, sources, raw_heads: readings, membership_heads: memberships.slice(0, 96),
     raw_heads_complete: raw.length <= 96, membership_heads_complete: memberships.length <= 96,
-    dependencies_complete: true, page_more: pageMore, as_of });
+    dependencies_complete: pageLookup.complete && lookup.complete && subjectPrivacyLookupComplete(sources), page_more: pageMore, as_of });
+  const source_lookup = { page: pageLookup.coverage, dependencies: lookup.coverage, privacy_alias_limit: 256,
+    raw_head_limit: 96, membership_head_limit: 96 };
   let next_cursor: string | null = null;
   if (pageMore) {
     const last = page.at(-1)!;
     if (last.created_at !== null && clock(last.created_at) === null) throw new Error("source_inbox_carrier_clock_invalid");
     next_cursor = btoa(JSON.stringify({ created_at: last.created_at, id: last.id }));
   }
-  return { ...result, next_cursor };
+  return { ...result, source_lookup, next_cursor };
 }

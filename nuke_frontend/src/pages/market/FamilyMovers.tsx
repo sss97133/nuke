@@ -325,8 +325,11 @@ function rememberFamilyLabels(m: ShareMovers | null): ShareMovers | null {
   return m;
 }
 
+const isFamilyId = (key: string) => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(key);
+
 function formatFallbackFamilyName(familyKey: string): string {
   const clean = familyKey.trim();
+  if (isFamilyId(clean)) return 'Unknown model';
   if (!clean) return familyKey;
   if (clean.length <= 3 || /^[0-9a-z-]+$/i.test(clean) && /\d/.test(clean)) {
     return clean.toUpperCase();
@@ -335,6 +338,35 @@ function formatFallbackFamilyName(familyKey: string): string {
     .split(/[-_\s]+/)
     .map((w) => (w.length <= 2 ? w.toUpperCase() : w.charAt(0).toUpperCase() + w.slice(1)))
     .join(' ');
+}
+
+// Custom comparisons can rank families absent from either window's named top five.
+// Their overlay keys are canonical_models IDs, not model names. Resolve only the displayed rows.
+async function resolveMoverLabels(data: ShareMovers | null): Promise<ShareMovers | null> {
+  if (!data) return null;
+  const missing = [...data.gaining, ...data.losing].filter((m) =>
+    isFamilyId(m.family_key) && !knownFamilyLabels.has(`${m.brand}|${m.family_key}`));
+  if (!missing.length) return data;
+  try {
+    const { data: models, error } = await supabase.from('canonical_models')
+      .select('id, canonical_model').in('id', [...new Set(missing.map((m) => m.family_key))]);
+    if (error || !Array.isArray(models)) return data;
+    const names = new Map<string, string>();
+    for (const model of models) {
+      if (typeof model.id === 'string' && typeof model.canonical_model === 'string' && model.canonical_model.trim()) {
+        names.set(model.id, model.canonical_model.trim());
+      }
+    }
+    const label = (m: ShareMover): ShareMover => {
+      const family = names.get(m.family_key);
+      if (!family) return m;
+      knownFamilyLabels.set(`${m.brand}|${m.family_key}`, family);
+      return { ...m, family };
+    };
+    return { ...data, gaining: data.gaining.map(label), losing: data.losing.map(label) };
+  } catch {
+    return data;
+  }
 }
 
 /** Combine a recent/target window ShareMovers payload with an independently chosen baseline window ShareMovers payload
@@ -630,9 +662,10 @@ export default function FamilyMovers({
       });
     } else {
       const baseKey = baselineHorizon as Exclude<MoverHorizon, 'upcoming'>;
-      Promise.all([readShareMovers(horizon), readShareMovers(baseKey)]).then(([recentRes, baseRes]) => {
+      Promise.all([readShareMovers(horizon), readShareMovers(baseKey)]).then(async ([recentRes, baseRes]) => {
         if (!live) return;
-        const combined = recentRes && baseRes ? combineShareMovers(recentRes, baseRes, horizon, baseKey) : recentRes;
+        const combined = await resolveMoverLabels(recentRes && baseRes ? combineShareMovers(recentRes, baseRes, horizon, baseKey) : recentRes);
+        if (!live) return;
         setData(combined);
         onMoversData?.(combined, horizon, baselineHorizon);
         if (combined) setInitialReady(true);

@@ -6,6 +6,7 @@ import { LikeForLike, useFamilyIndex } from './FamilyPriceIndex';
 import { getFamilyEraCohorts, matchesEraRange } from '../../lib/market/familyEras';
 import {
   classifyVehicleFacets,
+  isGmTruckBrand,
   resolveTileBadgeSvg,
   resolveVettedIdentityMarks,
   type FamilyFacetAxis,
@@ -882,7 +883,9 @@ export default function FamilySalesChart({
   }[] | null;
 }) {
   const { sales: allSales, n: windowCount, truncated, failed } = useFamilySales(brand, familyKey);
-  const upcomingSupply = useFamilyUpcomingSupply(brand, familyKey);
+  // These readers still measure one underlying family; the Truck umbrella spans several.
+  const singleFamilyBrand = isGmTruckBrand(brand) && family === 'Truck' ? null : brand;
+  const upcomingSupply = useFamilyUpcomingSupply(singleFamilyBrand, familyKey);
   const [localSelectedFacet, setLocalSelectedFacet] = useState<string | null>(null);
   useEffect(() => {
     setLocalSelectedFacet(null);
@@ -957,7 +960,7 @@ export default function FamilySalesChart({
   const sales = yearFilteredSales && yearFilteredSales.length > 0 ? yearFilteredSales : eraFilteredSales;
   // Same car, same miles (family_price_index_read): when the family has a fitted index, the chart is one panel of every
   // sale with the like-for-like line over it, and the head answers with its 12-month change instead of a median.
-  const ix = useFamilyIndex(brand, familyKey);
+  const ix = useFamilyIndex(singleFamilyBrand, familyKey);
   const indexed = !selectedEra && !(yearFilteredSales && yearFilteredSales.length > 0) && !(modelSales && modelSales.length > 0) && !!ix && ix.series.length > 1;
   // The plain median's own 12-month change over every venue, for the sentence beside the answer when the reader has none.
   const plain = useMemo(() => (sales ? plainMedianChange(sales) : null), [sales]);
