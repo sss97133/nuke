@@ -69,7 +69,8 @@
 .map-callouts__item--gain .map-callouts__move { color: var(--success); }
 .map-callouts__item--loss .map-callouts__move { color: var(--error); }
 .map-callouts__n { font-size: 11px; color: var(--text-secondary); font-family: 'Courier New', monospace; }
-@media (max-width: 640px) { .map-callouts { gap: 2px 14px; padding: 4px 12px; } .map-callouts__n { display: none; } }
+.map-callouts__window { align-self: center; font-family: Arial, sans-serif; font-size: 9px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--text-secondary); }
+@media (max-width: 640px) { .map-callouts { gap: 2px 14px; padding: 4px 12px; } .map-callouts__n { display: none; } .map-callouts__window { flex-basis: 100%; } }
 
 /* Sales by house above the map: one 100% bar in the venue colors and the larger houses' shares. */
 .venue-mix { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 12px; padding: 6px 16px; border-bottom: 2px solid var(--border); background: var(--bg); flex-shrink: 0; font-family: Arial, sans-serif; }

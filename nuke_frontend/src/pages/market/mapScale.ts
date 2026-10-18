@@ -151,9 +151,16 @@ export function fitName(name: string, w: number, h: number, measure: (t: string)
   return size >= NAME_MIN[cls] ? size : null;
 }
 
+/** A gain or a loss must carry this share of the level's window dollars and twice the color's sales gate in each
+ *  window. Without it the clearest move was a small cell's (owner, 2026-10-17: "Biggest drop: Kawasaki ... who
+ *  cares"); on 2026-10-17 the share kept 28 of 84 gated brands, down to Lexus and Rolls-Royce. */
+export const CALLOUT_MIN_DOLLAR_SHARE = 0.005;
+export const CALLOUT_MIN_SALES_FACTOR = 2;
+
 /** The map's three counted callouts (annotation layer, map design study): the clearest gain against BaT, the clearest
  *  loss, and the largest tile's move. "Clear" is the movers' test: |ln(1 + move)| at least 2 standard errors
- *  (Poisson, sqrt(1/sold + 1/prior)). Each carries its counts; none is prose. */
+ *  (Poisson, sqrt(1/sold + 1/prior)); a gain or loss must also clear the dollar and sales floor above. Each carries
+ *  its counts; none is prose. */
 export interface Callout { kind: 'gain' | 'loss' | 'largest'; name: string; rel: number; sold: number; prior: number }
 export function callouts<T extends MarketCounts & { name: string; usd_12m?: number | null }>(
   nodes: readonly T[],
@@ -162,7 +169,12 @@ export function callouts<T extends MarketCounts & { name: string; usd_12m?: numb
 ): Callout[] {
   const moved = nodes.map((n) => ({ n, m: relativeMove(n, base, false, gateMin) }))
     .filter((x): x is { n: T; m: Extract<Move, { kind: 'move' }> } => x.m.kind === 'move');
-  const clear = moved.filter(({ m }) => Math.abs(Math.log(1 + m.rel)) >= 2 * Math.sqrt(1 / m.sold + 1 / m.prior));
+  const dollars = nodes.reduce((sum, n) => sum + Math.max(0, n.usd_12m ?? 0), 0);
+  const minSales = CALLOUT_MIN_SALES_FACTOR * gateMin;
+  const clear = moved
+    .filter(({ n, m }) => m.sold >= minSales && m.prior >= minSales
+      && (dollars <= 0 || (n.usd_12m ?? 0) >= CALLOUT_MIN_DOLLAR_SHARE * dollars))
+    .filter(({ m }) => Math.abs(Math.log(1 + m.rel)) >= 2 * Math.sqrt(1 / m.sold + 1 / m.prior));
   const out: Callout[] = [];
   const gain = clear.filter(({ m }) => m.rel > 0).sort((a, b) => b.m.rel - a.m.rel)[0];
   const loss = clear.filter(({ m }) => m.rel < 0).sort((a, b) => a.m.rel - b.m.rel)[0];

@@ -321,14 +321,22 @@ export function mapCaption(level: MapLevel, levelCount: number, refresh: MapRefr
   const count = level === 'vehicles'
     ? `${levelCount >= 200 ? 'largest 200' : fmt(levelCount)} confirmed sales`
     : `${fmt(receipt ? p!.mapped_sales! : levelCount)} vehicles with a confirmed sale`;
-  return `${count}${receipt ? ` of ${fmt(p!.public_records!)} public records` : ''}${clause}${ledgerViewsClock(refresh.refreshedAt, now)}`;
+  return `${count}${receipt ? ` of ${fmt(p!.public_records!)} public records` : ''}, all time${clause}${ledgerViewsClock(refresh.refreshedAt, now)}`;
 }
 
 /** The caption on a phone, where the full sentence does not fit: the count alone, the population still on the title. */
 export function mapCaptionShort(level: MapLevel, levelCount: number, refresh: MapRefresh): string {
   const p = refresh.populations;
   const n = level === 'brands' && p?.measure === 'confirmed_sale_v1' && Number.isFinite(p.mapped_sales) ? p.mapped_sales! : levelCount;
-  return `${n.toLocaleString('en-US')} ${level === 'vehicles' ? 'shown' : 'sold'}`;
+  return `${n.toLocaleString('en-US')} ${level === 'vehicles' ? 'shown' : 'sold, all time'}`;
+}
+
+/** The bridge from the all-time count to the window the map's color and callouts read: the drilled brand's or
+ *  family's measured sales in the window and the one before (owner, 2026-10-17: a "+38%" callout opened on an
+ *  all-time count with nothing connecting the two). Empty without both windows. */
+export function windowBridge(node: Pick<TreemapNode, 'sold_12m' | 'sold_prior_12m'> | null | undefined, recent = 'the last 12 months', prior = 'the 12 before'): string {
+  if (!node || node.sold_12m == null || node.sold_prior_12m == null || node.sold_12m + node.sold_prior_12m === 0) return '';
+  return ` · ${node.sold_12m.toLocaleString('en-US')} sold in ${recent} at the measured houses, ${node.sold_prior_12m.toLocaleString('en-US')} in ${prior}`;
 }
 
 /** How much of a brand's sales the family level names: the share of its sales in named families and how many there
@@ -1963,6 +1971,12 @@ export function TreemapHomePage({ onBrowse, embedded = false }: { onBrowse: () =
     return squarify(items, PAD, PAD, dims.w - PAD * 2, dims.h - PAD * 2);
   }, [activeData, dims, marketLevel, basis]);
   const bat12Totals = useMemo(() => (activeData ?? []).reduce((t, n) => ({ sold: t.sold + (n.sold_12m ?? 0), usd: t.usd + (n.usd_12m ?? 0) }), { sold: 0, usd: 0 }), [activeData]);
+  const captionBridge = useMemo(() => {
+    if (isCustomBase || horizon === 'upcoming') return '';
+    const node = levelType === 'families' ? brandsData?.find((n) => n.name === currentLevel.make)
+      : levelType === 'models' ? familiesData?.find((n) => n.familyKey === currentLevel.family) : null;
+    return horizon === '1y' ? windowBridge(node) : windowBridge(node, horizonMeta.recentUnit, horizonMeta.priorUnit);
+  }, [isCustomBase, horizon, horizonMeta, levelType, brandsData, familiesData, currentLevel.make, currentLevel.family]);
 
   const totalCount = useMemo(
     () => (activeData || []).reduce((s, n) => s + n.count, 0),
@@ -2289,8 +2303,8 @@ export function TreemapHomePage({ onBrowse, embedded = false }: { onBrowse: () =
           ) : activeData && (
             <Text role="caption" title={ledgerViewsStamp(refresh.refreshedAt)}>
               {isNarrow ? mapCaptionShort(levelType, totalCount, refresh)
-                : mapCaption(levelType, totalCount, refresh, Date.now(), levelType === 'families' ? familyCoverage(activeData)
-                  : levelType === 'models' ? familyNamesShown(
+                : mapCaption(levelType, totalCount, refresh, Date.now(), levelType === 'families' ? captionBridge + familyCoverage(activeData)
+                  : levelType === 'models' ? captionBridge + familyNamesShown(
                     activeData?.length ?? 0,
                     selectedEra
                       ? (eraFilteredFamilyModels?.length ?? activeData?.length)
@@ -2689,7 +2703,7 @@ export function TreemapHomePage({ onBrowse, embedded = false }: { onBrowse: () =
 
       {/* ─── CALLOUTS: the clearest gain and loss against BaT and the largest tile, each a way into its tile ─── */}
       {marketLevel && !(levelType === 'brands' && brandView === 'nested') && activeData && (
-        <MapCallouts items={callouts(activeData, baseline, gateMin)} onPick={(name) => {
+        <MapCallouts items={callouts(activeData, baseline, gateMin)} windowLabel={horizonWindowLabel} onPick={(name) => {
           const node = activeData.find((n) => n.name === name);
           if (node) { if (coarse) setSheet(node); else drillInto(node); }
         }} />
@@ -3200,7 +3214,12 @@ export default function HomePage() {
           <TreemapHomePage embedded onBrowse={() => (document.querySelector('.market-sources') ?? document.querySelector('.market-explorer'))
             ?.scrollIntoView({ behavior: 'smooth', block: 'start' })} />
           {/* Every source with the same row, ranked by the lots we hold (owner, 2026-10-15: "treat all sources the same") */}
-          <SourcesBoard scope={searchParams.get('make')} />
+          <SourcesBoard scope={{
+            make: searchParams.get('make'),
+            family: searchParams.get('family'),
+            familyName: searchParams.get('family_name'),
+            model: searchParams.get('model') ?? searchParams.get('facet'),
+          }} />
           <MarketPulse onUnavailable={user ? <FeedPage /> : <IntakePage variant="homepage" />} />
         </>}
         {activeTab === 'garage' && <GarageTab dashboard={garage} />}

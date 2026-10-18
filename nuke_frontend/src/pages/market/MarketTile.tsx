@@ -178,11 +178,13 @@ export function MapLegend({ base, clock, basis, windowLabel }: { base: Baseline 
 /** Where a 12-month move is measured: the auction houses held in full in both years (source_census.by_year). */
 export const MEASURED = 'measured at Bring a Trailer, Mecum and Bonhams, the houses held in full both years';
 const CALLOUT_LABEL: Record<Callout['kind'], string> = { gain: 'Biggest gain', loss: 'Biggest drop', largest: 'Biggest' };
-/** The map's counted callouts, one line above it: the clearest gain and loss against BaT and the largest tile's move. */
-export function MapCallouts({ items, onPick }: { items: Callout[]; onPick: (name: string) => void }) {
+/** The map's counted callouts, one line above it: the clearest gain and loss against BaT and the largest tile's move,
+ *  led by the window every one of them counts (the hover card's words). */
+export function MapCallouts({ items, onPick, windowLabel }: { items: Callout[]; onPick: (name: string) => void; windowLabel?: string }) {
   if (!items.length) return null;
   return (
     <div className="map-callouts" aria-label="What moved most">
+      <span className="map-callouts__window">{windowLabel ?? 'last 12 months against the 12 before'}</span>
       {items.map((c) => (
         <button key={c.kind} type="button" className={`map-callouts__item map-callouts__item--${c.kind}`} onClick={() => onPick(c.name)}>
           <span className="map-callouts__label">{CALLOUT_LABEL[c.kind]}</span>
