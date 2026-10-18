@@ -48,6 +48,7 @@ interface VehicleDayDrawerProps {
   date: string; // YYYY-MM-DD
   /** the BaT auction sequences, one per listing, when this vehicle was a lot — bids and comments land on their days */
   auctions?: AuctionSequence[];
+  hasWorkSummary?: boolean;
   onClose: () => void;
   onPrev?: () => void;
   onNext?: () => void;
@@ -98,7 +99,7 @@ const mono: React.CSSProperties = { fontFamily: "var(--vp-font-mono, 'Courier Ne
 // Session-scoped photo cache so re-opening a day never refetches.
 const dayPhotoCache = new Map<string, DayPhoto[]>();
 
-const VehicleDayDrawer: React.FC<VehicleDayDrawerProps> = ({ date, auctions = [], onClose, onPrev, onNext }) => {
+const VehicleDayDrawer: React.FC<VehicleDayDrawerProps> = ({ date, auctions = [], hasWorkSummary = false, onClose, onPrev, onNext }) => {
   const { vehicleId, timelineEvents } = useVehicleProfile();
   const [photoRead, setPhotoRead] = useState<{ key: string; rows: DayPhoto[]; failed: boolean } | null>(null);
   const drawerRef = useRef<HTMLDivElement>(null);
@@ -187,6 +188,7 @@ const VehicleDayDrawer: React.FC<VehicleDayDrawerProps> = ({ date, auctions = []
   const span = fmtSpan(first, last);
   const dayBids = auctionItems.filter(i => i.kind === 'bid').length;
   const dayComments = auctionItems.length - dayBids;
+  const missingWorkDetails = hasWorkSummary && workEvents.length === 0;
 
   const loading = photos === null;
   const isEmpty = !loading && !photosUnavailable && photos.length === 0 && workEvents.length === 0 && otherEvents.length === 0 && auctionItems.length === 0;
@@ -228,7 +230,8 @@ const VehicleDayDrawer: React.FC<VehicleDayDrawerProps> = ({ date, auctions = []
       </div>
 
       {(loading || photosUnavailable) && <div style={{ ...mono, fontSize: 9, color: 'var(--vp-pencil, #888)' }}>{photosUnavailable ? 'Photos unavailable' : 'LOADING…'}</div>}
-      {isEmpty && <div style={{ ...mono, fontSize: 9, color: 'var(--vp-pencil, #888)' }}>NO ACTIVITY</div>}
+      {isEmpty && !missingWorkDetails && <div style={{ ...mono, fontSize: 9, color: 'var(--vp-pencil, #888)' }}>NO ACTIVITY</div>}
+      {missingWorkDetails && <div style={{ ...mono, fontSize: 9, color: 'var(--vp-pencil, #888)' }}>Work-session details unavailable in this read.</div>}
 
       {/* Facet chips — only the facets this day touched */}
       {!loading && !isEmpty && (

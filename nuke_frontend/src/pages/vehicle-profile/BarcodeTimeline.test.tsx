@@ -203,3 +203,71 @@ it('keeps current B filtering, day click and journal navigation useful', async (
   const drawerRead = requests.find(r => r.url.pathname === '/rest/v1/vehicle_images' && r.url.searchParams.get('select') === 'id,image_url,taken_at,source,source_url');
   expect(drawerRead?.url.searchParams.get('vehicle_id')).toBe(`eq.${b}`);
 });
+
+const noDrawerPhotos = (request: Request) => request.url.pathname === '/rest/v1/vehicle_images' && request.url.searchParams.has('taken_at') ? json([]) : undefined;
+const drawerText = () => host.querySelector('[data-day-drawer]')?.textContent ?? '';
+const missingWork = 'Work-session details unavailable in this read.';
+async function openReceipt(day: string) {
+  await import('./VehicleDayDrawer');
+  await act(async () => cell(day)!.click());
+  await act(async () => { await vi.advanceTimersByTimeAsync(5); });
+}
+it('qualifies a current positive work-summary day instead of claiming no activity or inventing detail counts', async () => {
+  reply = noDrawerPhotos; await draw(); await openCalendar(); await openReceipt(workA);
+  expect({ text: drawerText(), summaryCalls: calls('get_vehicle_contribution_days', a).length }).toEqual({
+    text: expect.stringContaining(missingWork), summaryCalls: 1,
+  });
+  expect(drawerText()).not.toContain('NO ACTIVITY'); expect(drawerText()).not.toContain('WORK 3');
+});
+it('carries summary presence through actual next-day navigation only for its exact day', async () => {
+  reply = noDrawerPhotos; await draw(); await openCalendar(); await openReceipt(photoA);
+  expect(drawerText()).toContain('NO ACTIVITY'); expect(drawerText()).not.toContain(missingWork);
+  await act(async () => host.querySelector<HTMLButtonElement>('[aria-label="Next day"]')!.click());
+  await act(async () => { await vi.advanceTimersByTimeAsync(5); });
+  expect(drawerText()).toContain(missingWork); expect(drawerText()).not.toContain('NO ACTIVITY');
+  await act(async () => host.querySelector<HTMLButtonElement>('[aria-label="Next day"]')!.click());
+  await act(async () => { await vi.advanceTimersByTimeAsync(5); });
+  expect(drawerText()).not.toContain(missingWork); expect(drawerText()).toContain('inspection');
+  expect(calls('get_vehicle_contribution_days', a)).toHaveLength(1);
+});
+it.each([0, -1, null, 'not-a-count'])('does not turn nonpositive/unusable summary count %j into a missing-work assertion', async n => {
+  reply = request => request.url.pathname.endsWith('/rpc/get_vehicle_contribution_days') ? json([{ day: workA, kind: 'work', n }]) : noDrawerPhotos(request);
+  await draw(); await openCalendar(); await openReceipt(workA);
+  expect(drawerText()).toContain('NO ACTIVITY'); expect(drawerText()).not.toContain(missingWork);
+});
+it('withholds completed A work-summary presence from the B receipt while B summary is pending', async () => {
+  reply = noDrawerPhotos; await draw(); await openCalendar(); await openReceipt(workA);
+  const pending = deferred(); reply = request => request.url.pathname.endsWith('/rpc/get_vehicle_contribution_days') && request.body?.p_vehicle_id === b ? pending.promise : noDrawerPhotos(request);
+  await visit(b); expect(current.vehicleId).toBe(b);
+  expect(drawerText()).not.toContain(missingWork); expect(drawerText()).toContain('NO ACTIVITY');
+});
+it('refuses an obsolete A work-summary reply while the actual B day receipt is open', async () => {
+  const pending = deferred(); reply = request => request.url.pathname.endsWith('/rpc/get_vehicle_contribution_days') && request.body?.p_vehicle_id === a ? pending.promise : noDrawerPhotos(request);
+  await draw(); await openCalendar(); await openReceipt(common); await visit(b);
+  await act(async () => pending.resolve(json([{ day: common, kind: 'work', n: 1 }])));
+  expect(current.vehicleId).toBe(b); expect(drawerText()).not.toContain(missingWork); expect(drawerText()).toContain('inspection');
+  expect(calls('get_vehicle_contribution_days', b)).toHaveLength(1);
+});
+it('does not revive ended A work presence on a return visit before the new A summary completes', async () => {
+  reply = noDrawerPhotos; await draw(); await openCalendar(); await openReceipt(workA); await visit(b);
+  const pending = deferred(); reply = request => request.url.pathname.endsWith('/rpc/get_vehicle_contribution_days') && request.body?.p_vehicle_id === a ? pending.promise : noDrawerPhotos(request);
+  await visit(a); expect(drawerText()).not.toContain(missingWork);
+  await act(async () => pending.resolve(json([{ day: workA, kind: 'work', n: 1 }])));
+  expect(drawerText()).toContain(missingWork); expect(calls('get_vehicle_contribution_days', a)).toHaveLength(2);
+});
+it('preserves a useful pending unchanged-vehicle summary across primary reload without extra demand', async () => {
+  const pending = deferred(); reply = request => request.url.pathname.endsWith('/rpc/get_vehicle_contribution_days') ? pending.promise : noDrawerPhotos(request);
+  await draw(); await act(async () => current.reloadVehicle());
+  await act(async () => pending.resolve(json([{ day: workA, kind: 'work', n: 1 }])));
+  await openCalendar(); await openReceipt(workA); expect(drawerText()).toContain(missingWork);
+  expect(calls('get_vehicle_contribution_days', a)).toHaveLength(1);
+});
+it('retains actual work detail/story/amount/duration instead of showing a missing-detail warning', async () => {
+  reply = request => request.url.pathname.endsWith('/rpc/get_vehicle_profile_data') ? json({ ...profile(request.body.p_vehicle_id), timeline_events: [{
+    id: 'synthetic-known-work', event_date: workA, event_type: 'work_session', title: 'Retained work detail', cost_amount: 125,
+    metadata: { duration_minutes: 60, work_description: 'Retained work story' },
+  }] }) : noDrawerPhotos(request);
+  await draw(); await openCalendar(); await openReceipt(workA);
+  expect(drawerText()).toContain('Retained work story'); expect(drawerText()).toContain('125 (currency unknown)');
+  expect(drawerText()).toContain('WORK 1'); expect(drawerText()).toContain('1h 0m'); expect(drawerText()).not.toContain(missingWork);
+});
