@@ -98,7 +98,7 @@ const dayPhotoCache = new Map<string, DayPhoto[]>();
 
 const VehicleDayDrawer: React.FC<VehicleDayDrawerProps> = ({ date, auctions = [], onClose, onPrev, onNext }) => {
   const { vehicleId, timelineEvents } = useVehicleProfile();
-  const [photos, setPhotos] = useState<DayPhoto[] | null>(null);
+  const [photoRead, setPhotoRead] = useState<{ key: string; rows: DayPhoto[]; failed: boolean } | null>(null);
   const drawerRef = useRef<HTMLDivElement>(null);
 
   // The bids and comments that landed on this day, across the car's listings, in time order.
@@ -114,15 +114,22 @@ const VehicleDayDrawer: React.FC<VehicleDayDrawerProps> = ({ date, auctions = []
     [auctions, date],
   );
   const isListingDay = !!listingOfDay;
+  // Include the exact inputs used by listingForPhoto, preserving order and newest-listing fallback.
+  // Equivalent input arrays produce the same key and keep their cache/pending read.
+  const photoContextKey = JSON.stringify([vehicleId, date, isListingDay ? ['listing', listingOfDay.key,
+    auctions.map(a => [a.key, a.open?.at ?? a.items[0]?.at ?? a.close?.at ?? null, a.ordinal, a.listingCount]),
+  ] : ['capture']]);
+  const currentPhotoRead = photoRead?.key === photoContextKey ? photoRead : null;
+  const photos = currentPhotoRead?.rows ?? null;
+  const photosUnavailable = currentPhotoRead?.failed ?? false;
 
   // ── Photos of the day (one query, cached) ──
   useEffect(() => {
     if (!vehicleId || !date) return;
-    const key = `${vehicleId}|${date}`;
-    const cached = dayPhotoCache.get(key);
-    if (cached) { setPhotos(cached); return; }
+    const cached = dayPhotoCache.get(photoContextKey);
+    if (cached) { setPhotoRead({ key: photoContextKey, rows: cached, failed: false }); return; }
     let cancelled = false;
-    setPhotos(null);
+    setPhotoRead(null);
     const base = supabase
       .from('vehicle_images')
       .select('id, image_url, taken_at, source, source_url')
@@ -140,16 +147,22 @@ const VehicleDayDrawer: React.FC<VehicleDayDrawerProps> = ({ date, auctions = []
     query
       .then(({ data, error }) => {
         if (cancelled) return;
-        let rows = (!error && Array.isArray(data)) ? (data as DayPhoto[]).filter(p => p.image_url) : [];
+        if (error || !Array.isArray(data)) {
+          setPhotoRead({ key: photoContextKey, rows: [], failed: true });
+          return;
+        }
+        let rows = (data as DayPhoto[]).filter(p => p.image_url);
         if (isListingDay && listingOfDay) {
           rows = rows.filter(p => listingForPhoto({ id: p.id, taken_at: p.taken_at, source: p.source ?? null, source_url: p.source_url ?? null }, auctions)?.key === listingOfDay.key).slice(0, 120);
         }
-        dayPhotoCache.set(key, rows);
-        setPhotos(rows);
+        dayPhotoCache.set(photoContextKey, rows);
+        setPhotoRead({ key: photoContextKey, rows, failed: false });
+      }).catch(() => {
+        if (!cancelled) setPhotoRead({ key: photoContextKey, rows: [], failed: true });
       });
     return () => { cancelled = true; };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [vehicleId, date, isListingDay]);
+  }, [photoContextKey]);
 
   // ── Day events from the already-loaded timeline ──
   const dayEvents = useMemo(
@@ -173,7 +186,7 @@ const VehicleDayDrawer: React.FC<VehicleDayDrawerProps> = ({ date, auctions = []
   const dayTotal = workEvents.reduce((sum, ev) => sum + (Number(ev.cost_amount) || 0), 0);
 
   const loading = photos === null;
-  const isEmpty = !loading && photos.length === 0 && workEvents.length === 0 && otherEvents.length === 0 && auctionItems.length === 0;
+  const isEmpty = !loading && !photosUnavailable && photos.length === 0 && workEvents.length === 0 && otherEvents.length === 0 && auctionItems.length === 0;
 
   return (
     <div
@@ -211,7 +224,7 @@ const VehicleDayDrawer: React.FC<VehicleDayDrawerProps> = ({ date, auctions = []
         <button onClick={onClose} aria-label="Close day" style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 11, fontWeight: 700, padding: '0 2px' }}>✕</button>
       </div>
 
-      {loading && <div style={{ ...mono, fontSize: 9, color: 'var(--vp-pencil, #888)' }}>LOADING…</div>}
+      {(loading || photosUnavailable) && <div style={{ ...mono, fontSize: 9, color: 'var(--vp-pencil, #888)' }}>{photosUnavailable ? 'Photos unavailable' : 'LOADING…'}</div>}
       {isEmpty && <div style={{ ...mono, fontSize: 9, color: 'var(--vp-pencil, #888)' }}>NO ACTIVITY</div>}
 
       {/* Facet chips — only the facets this day touched */}
