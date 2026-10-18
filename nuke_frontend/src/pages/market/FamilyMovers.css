@@ -98,6 +98,7 @@
 }
 @media (max-width: 760px) {
   .map-movers2__head { flex-direction: column; align-items: flex-start; }
+  .map-movers2__popover-close { min-width: 44px; min-height: 44px; flex-shrink: 0; }
   .map-movers2__rel-scale { display: none; }
   .map-movers2__controls { width: 100%; }
   .map-movers2__dial, .map-movers2__vs-dial { width: 100%; overflow-x: auto; justify-content: flex-start; }
