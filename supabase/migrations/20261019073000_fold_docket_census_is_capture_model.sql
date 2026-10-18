@@ -8,8 +8,8 @@
 -- source's population is unknown until an exact census or a labelled reference exists. Nothing else changes (live md5
 -- 47e4de17 matched the 20261018213000 body 2026-10-18 07:22Z); source_census rows are left as they are.
 BEGIN;
-SET LOCAL statement_timeout = '60s';
-SET LOCAL lock_timeout = '10s';
+SET LOCAL statement_timeout = '10s';
+SET LOCAL lock_timeout = '5s';
 
 CREATE OR REPLACE FUNCTION public.record_market_source_day()
 RETURNS integer
