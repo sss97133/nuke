@@ -404,3 +404,24 @@ Every interaction must have a predictable outcome. The user should never be surp
 ### Tab Order
 
 Visual left-to-right, top-to-bottom. Interactive elements within a card are reachable via Tab. Badge portals within an expanded card are in the tab order after the card's main content.
+
+
+## Truck market partitions (owner, 2026-10-18)
+
+A grouping partitions the selected public priced-sale records into mutually exclusive tiles.
+Area remains sale dollars across every grouping. Clicking a tile adds an intersecting filter;
+changing Group by preserves the selection. Chips remove individual filters, Clear restores
+the full department, and URL history/reload preserves the combination. Unknown and conflicting
+attributes remain explicit tiles. A complete membership read is required before drawing totals;
+a failed/partial page never falls back to another scope.
+
+Series identity consolidates known name variants while preserving the recorded model on each
+vehicle. C/K designations do not establish current drivetrain. Current disclosed configuration
+can place a converted truck under 4WD while its original series remains 3100 or C10. Current
+configuration is not asserted for a historical sale. Nominal series class is not measured payload;
+wheelbase, bed length and cab/body are distinct axes. Overlapping year-era definitions remain
+unresolved rather than selecting one arbitrarily. El Camino/Caballero stay outside Truck.
+
+The existing five-year sales chart takes its members from the selected population. Its date
+window and price eligibility remain distinct from the all-time treemap. The first implementation
+covers Chevrolet/GMC Truck; other market departments retain their existing navigation.

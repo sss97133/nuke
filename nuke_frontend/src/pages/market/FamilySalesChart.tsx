@@ -862,7 +862,9 @@ export default function FamilySalesChart({
   facetAxis = null,
   onSelectFacet,
   familyModels = null,
+  scopedSales,
 }: {
+  scopedSales?: Sale[];
   brand: string;
   familyKey: string;
   family: string;
@@ -882,9 +884,13 @@ export default function FamilySalesChart({
     offered?: number | null;
   }[] | null;
 }) {
-  const { sales: allSales, n: windowCount, truncated, failed } = useFamilySales(brand, familyKey);
+  const familyRead = useFamilySales(scopedSales === undefined ? brand : null, familyKey);
+  const allSales = scopedSales ?? familyRead.sales;
+  const windowCount = scopedSales?.length ?? familyRead.n;
+  const truncated = scopedSales === undefined && familyRead.truncated;
+  const failed = scopedSales === undefined && familyRead.failed;
   // These readers still measure one underlying family; the Truck umbrella spans several.
-  const singleFamilyBrand = isGmTruckBrand(brand) && family === 'Truck' ? null : brand;
+  const singleFamilyBrand = scopedSales !== undefined || isGmTruckBrand(brand) && family === 'Truck' ? null : brand;
   const upcomingSupply = useFamilyUpcomingSupply(singleFamilyBrand, familyKey);
   const [localSelectedFacet, setLocalSelectedFacet] = useState<string | null>(null);
   useEffect(() => {

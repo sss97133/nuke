@@ -133,3 +133,40 @@ describe('map loading belongs to its current level', () => {
     expect(loadingMessages()).toHaveLength(0);
   });
 });
+
+describe('composable Truck map', () => {
+  function installTruckRead(fail = false) {
+    installTreemapReads();
+    const previous = fixture.client.rpc;
+    fixture.client.rpc = vi.fn((name: string, args: any) => args?.p_members
+      ? Promise.resolve({ error: fail ? { message: 'unavailable' } : null, data: {
+        n: args.p_partition === 0 ? 2 : 0, truncated: false, has_more: false, next_cursor: 'b', snapshot: 'fold', as_of: '2026-10-18',
+        rows: args.p_partition === 0 ? [ ['a','C10 Custom Pickup',1972,20000,'Mecum','2026-01-01','C10','4WD',null,null,null,null,null,null],
+          ['b','K10 Short Bed',1972,30000,'Mecum','2026-01-02','K10','RWD',null,null,null,null,null,null] ] : [],
+      } }) : previous(name,args));
+  }
+  it('preserves a selected drivetrain when changing grouping, with an exact count and removable chip', async () => {
+    installTruckRead();
+    await renderTreemap('tab=market&make=Chevrolet&family=pickup&family_name=Truck&truck_group=drive');
+    const tile = container.querySelector<HTMLElement>('[role="button"][aria-label="4WD"]');
+    expect(tile).not.toBeNull();
+    await act(async () => tile!.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true })));
+    expect(new URLSearchParams(window.location.search).get('truck_drive')).toBe('4WD');
+    const era = [...container.querySelectorAll<HTMLButtonElement>('.truck-facets button')].find(b => b.textContent === 'Era')!;
+    await act(async () => era.click());
+    expect(new URLSearchParams(window.location.search).get('truck_group')).toBe('era');
+    expect(new URLSearchParams(window.location.search).get('truck_drive')).toBe('4WD');
+    expect(container.querySelector('.truck-facets__selection')?.textContent).toContain('1 of 2');
+    const chip = container.querySelector<HTMLButtonElement>('button[aria-label="Remove Drivetrain filter: 4WD"]')!;
+    await act(async () => chip.click());
+    expect(new URLSearchParams(window.location.search).has('truck_drive')).toBe(false);
+    expect(container.querySelector('.truck-facets__selection')?.textContent).toContain('2 of 2');
+    expect(fixture.client.rpc.mock.calls.filter(([,a]: any[]) => a?.p_members)).toHaveLength(4);
+  });
+  it('shows a reader failure without substituting all-make tiles', async () => {
+    installTruckRead(true);
+    await renderTreemap('tab=market&make=Chevrolet&family=pickup&family_name=Truck');
+    expect(container.querySelector('[role="alert"]')?.textContent).toContain('Complete truck membership could not be read');
+    expect(container.querySelector('button.market-tile[aria-label="Porsche"]')).toBeNull();
+  });
+});

@@ -1,6 +1,5 @@
 import React, { useState, useEffect, useMemo, useCallback, useRef, useId, lazy, Suspense } from 'react';
 import { useSearchParams, Link, useNavigate } from 'react-router-dom';
-import { useQuery } from '@tanstack/react-query';
 import { useAuth } from '../hooks/useAuth';
 import { usePageTitle } from '../hooks/usePageTitle';
 import { supabase } from '../lib/supabase';
@@ -13,6 +12,8 @@ import { MapCallouts, MapLegend, MarketCard, MarketSheet, MarketTile, VenueMix, 
 import { batBaseline, callouts, gateMinForHorizon, relativeMove } from './market/mapScale';
 import { combineShareMovers, MOVER_HORIZONS, readShareMovers, type BaselineHorizon, type MoverHorizon, type ShareMovers } from './market/FamilyMovers';
 import IntakePage from './intake/IntakePage';
+import TruckFacetToolbar from './market/TruckFacetToolbar';
+import { filterTruckMembers, parseTruckMembers, partitionTruckMembers, readTruckNavigation, TRUCK_AXES, TRUCK_AXIS_LABELS, type TruckAxis, type TruckRead } from './market/truckFacets';
 import { Text } from '../kit';
 import FamilyMovers from './market/FamilyMovers';
 import BrandFamilyMap, { MapViewSwitch } from './market/BrandFamilyMap';
@@ -197,6 +198,9 @@ export function applyDrillStackToSearchParams(
   const next = new URLSearchParams(params);
   for (const k of SCOPE_PARAM_KEYS) next.delete(k);
   const leaf = stack[stack.length - 1];
+  if (params.get('make') !== leaf?.make || prevFamily !== leaf?.family) {
+    for (const key of [...next.keys()]) if (key.startsWith('truck_')) next.delete(key);
+  }
   if (!leaf?.make) {
     next.delete('era');
     next.delete('axis');
@@ -1021,6 +1025,8 @@ export function TreemapCell({ rect, onClick, totalCount, showValue, repImage, re
 
   return (
     <div
+      role="button" tabIndex={0} aria-label={node.name}
+      onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onClick(); } }}
       onClick={(e) => { e.stopPropagation(); onClick(e); }}
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
@@ -1593,6 +1599,87 @@ export function TreemapHomePage({ onBrowse, embedded = false }: { onBrowse: () =
     () => drillStack.find((d) => d.family && !d.model)?.label || searchParams.get('family_name') || currentLevel.model || currentLevel.label,
     [drillStack, searchParams, currentLevel.model, currentLevel.label],
   );
+  const truckMode = isGmTruckBrand(currentLevel.make) && activeFamilyLabel === 'Truck' && !!currentLevel.family && !currentLevel.model;
+  const truckNavigation = readTruckNavigation(searchParams);
+  const truckReadKey = truckMode ? `${currentLevel.make}|${currentLevel.family}` : '';
+  const [truckAttempt, setTruckAttempt] = useState(0);
+  const truckCache = useRef(new Map<string, { data: TruckRead; readAt: number }>());
+  const [truckState, setTruckState] = useState<{ key: string; data: TruckRead | null; isError: boolean }>({ key: '', data: null, isError: false });
+  useEffect(() => {
+    if (!truckReadKey) return;
+    const cached = truckCache.current.get(truckReadKey);
+    if (cached && Date.now() - cached.readAt < 60_000 && truckAttempt === 0) {
+      setTruckState({ key: truckReadKey, data: cached.data, isError: false }); return;
+    }
+    let live = true;
+    setTruckState({ key: truckReadKey, data: null, isError: false });
+    const load = async () => {
+      const members: TruckRead['members'] = [];
+      let snapshot: string | null = null, asOf = '', nextPartition = 0;
+      const seen = new Set<string>();
+      const readPartition = async (partition: number) => {
+        let cursor: string | null = null;
+        for (let page = 0; page < 100; page++) {
+          const { data, error }: { data: unknown; error: unknown } = await supabase.rpc('treemap_family_models', {
+            p_brand: currentLevel.make!, p_family_key: currentLevel.family!, p_members: true, p_after: cursor, p_partition: partition,
+          });
+          if (!live) return;
+          const parsed = error ? null : parseTruckMembers(data);
+          const meta = data as { has_more?: unknown; snapshot?: unknown; next_cursor?: unknown } | null;
+          if (!parsed || parsed.truncated || !meta || typeof meta.has_more !== 'boolean' || typeof meta.snapshot !== 'string' ||
+            (snapshot !== null && meta.snapshot !== snapshot)) throw new Error('Incomplete or changing truck membership');
+          snapshot = meta.snapshot; asOf = parsed.asOf;
+          for (const member of parsed.members) {
+            if (seen.has(member.id)) throw new Error('Repeated truck member');
+            seen.add(member.id); members.push(member);
+          }
+          if (!meta.has_more) return;
+          if (typeof meta.next_cursor !== 'string' || meta.next_cursor === cursor) throw new Error('Invalid page cursor');
+          cursor = meta.next_cursor;
+        }
+        throw new Error('Truck membership exceeds read bound');
+      };
+      // Disjoint UUID ranges bound every read; four requests at a time avoid
+      // serial page latency without an unbounded request fan-out.
+      await Promise.all(Array.from({ length: 4 }, async () => {
+        while (nextPartition < 4 && live) await readPartition(nextPartition++);
+      }));
+      if (!live) return;
+      const complete = { members, n: members.length, asOf, truncated: false };
+      truckCache.current.set(truckReadKey, { data: complete, readAt: Date.now() });
+      setTruckState({ key: truckReadKey, data: complete, isError: false });
+    };
+    load().catch(() => { if (live) { live = false; setTruckState({ key: truckReadKey, data: null, isError: true }); } });
+    return () => { live = false; };
+  }, [truckReadKey, truckAttempt]);
+  const truckRead = {
+    data: truckState.key === truckReadKey ? truckState.data : null,
+    isError: truckState.key === truckReadKey && truckState.isError,
+    isLoading: !!truckReadKey && (truckState.key !== truckReadKey || (!truckState.data && !truckState.isError)),
+  };
+  const truckMembers = useMemo(() => truckMode && truckRead.data
+    ? filterTruckMembers(truckRead.data.members, truckNavigation.filters, currentLevel.make!) : [],
+    [truckMode, truckRead.data, searchParams, currentLevel.make]);
+  const truckNodes = useMemo(() => partitionTruckMembers(truckMembers, truckNavigation.axis, currentLevel.make ?? ''),
+    [truckMembers, truckNavigation.axis, currentLevel.make]);
+  const updateTruckNavigation = useCallback((axis?: TruckAxis | 'vehicles', selection?: { axis: TruckAxis; value: string | null }, clear = false) => {
+    setSearchParams(curr => {
+      const next = new URLSearchParams(curr);
+      for (const key of ['model', 'year', 'axis', 'facet', 'era']) next.delete(key);
+      if (clear) for (const a of TRUCK_AXES) next.delete(`truck_${a}`);
+      if (axis) next.set('truck_group', axis);
+      if (selection) {
+        if (selection.value) next.set(`truck_${selection.axis}`, selection.value);
+        else next.delete(`truck_${selection.axis}`);
+      }
+      return next;
+    }, { preventScrollReset: true });
+  }, [setSearchParams]);
+  const truckSales = useMemo<Sale[]>(() => {
+    const now = Date.now(), from = now - 1826 * 86400000;
+    return truckMembers.filter(m => m.sale_date && Date.parse(m.sale_date) >= from && Date.parse(m.sale_date) <= now)
+      .map(m => ({ vehicle_id: m.id, sale_date: m.sale_date!, usd: m.usd, source: m.source, year: m.year, model: m.model }));
+  }, [truckMembers]);
   const activeFacetOrModelLabel = useMemo(
     () =>
       facetAxis !== 'raw' && currentLevel.model
@@ -1855,6 +1942,7 @@ export function TreemapHomePage({ onBrowse, embedded = false }: { onBrowse: () =
     currentLevel.make ? 'families' : 'brands';
 
   const activeData = useMemo(() => {
+    if (truckMode) return truckRead.data ? truckNodes : null;
     if (levelType === 'vehicles' && facetAxis !== 'raw' && familyYearVehiclesNodes && familyYearVehiclesNodes.length > 0) {
       return familyYearVehiclesNodes;
     }
@@ -1891,9 +1979,9 @@ export function TreemapHomePage({ onBrowse, embedded = false }: { onBrowse: () =
     if (brandsData) return brandsData;
     return null;
     // drillStack triggers recompute when navigating so ref cache is checked
-  }, [levelType, brandsData, familiesData, familiesFailed, modelsData, facetedFamilyModels, eraFilteredFamilyModels, yearsData, vehiclesData, familyYearVehiclesNodes, currentLevel, drillStack, selectedEra]);
+  }, [truckMode, truckRead.data, truckNodes, levelType, brandsData, familiesData, familiesFailed, modelsData, facetedFamilyModels, eraFilteredFamilyModels, yearsData, vehiclesData, familyYearVehiclesNodes, currentLevel, drillStack, selectedEra]);
 
-  const isLoading = levelType === 'brands' ? brandsLoading
+  const isLoading = truckMode ? truckRead.isLoading : levelType === 'brands' ? brandsLoading
     : levelType === 'families' ? familiesLoading || (familiesFailed && modelsLoading)
     : levelType === 'models' ? familyModelsLoading
     : levelType === 'years' ? yearsLoading
@@ -1917,6 +2005,7 @@ export function TreemapHomePage({ onBrowse, embedded = false }: { onBrowse: () =
   }, []);
 
   const handleCellMouseEnter = useCallback((node: TreemapNode) => {
+    if (truckMode) return;
     if (hoverTimerRef.current) clearTimeout(hoverTimerRef.current);
     hoverTimerRef.current = setTimeout(() => {
       if (currentLevel.make && !node.noModel && (levelType === 'models' || (levelType === 'families' && !node.familyKey))) {
@@ -1926,7 +2015,7 @@ export function TreemapHomePage({ onBrowse, embedded = false }: { onBrowse: () =
         if (Number.isFinite(year)) prefetchVehicles(currentLevel.make, currentLevel.model, year);
       }
     }, 200);
-  }, [levelType, currentLevel, prefetchYears, prefetchVehicles]);
+  }, [truckMode, levelType, currentLevel, prefetchYears, prefetchVehicles]);
 
   const handleCellMouseLeave = useCallback(() => {
     if (hoverTimerRef.current) {
@@ -2004,7 +2093,7 @@ export function TreemapHomePage({ onBrowse, embedded = false }: { onBrowse: () =
       focusAfterDrill.current = false;
       currentCrumb.current?.focus();
     }
-  }, [drillStack, brandView, familyView]);
+  }, [drillStack, brandView, familyView, searchParams]);
 
   // Drill down — continuous zoom: makes → models → years → vehicles → profile
   const [clickOrigin, setClickOrigin] = useState<{ x: number; y: number } | null>(null);
@@ -2015,6 +2104,15 @@ export function TreemapHomePage({ onBrowse, embedded = false }: { onBrowse: () =
         const cr = container.getBoundingClientRect();
         setClickOrigin({ x: e.clientX - cr.left, y: e.clientY - cr.top });
       }
+    }
+    if (truckMode) {
+      focusAfterDrill.current = true;
+      if (node.isVehicle && node.id) navigate(`/vehicle/${node.id}`);
+      else if (truckNavigation.axis !== 'vehicles') {
+        const remaining = TRUCK_AXES.filter(a => a !== truckNavigation.axis && !truckNavigation.filters[a] && a !== 'raw');
+        updateTruckNavigation(remaining[0] ?? 'vehicles', { axis: truckNavigation.axis, value: node.name });
+      }
+      return;
     }
     if (levelType === 'brands') {
       recordInterest('make', node.name);
@@ -2039,7 +2137,7 @@ export function TreemapHomePage({ onBrowse, embedded = false }: { onBrowse: () =
     } else if (levelType === 'vehicles' && node.id) {
       navigate(`/vehicle/${node.id}`);
     }
-  }, [levelType, currentLevel, navigate, recordInterest]);
+  }, [truckMode, truckNavigation.axis, searchParams, updateTruckNavigation, levelType, currentLevel, navigate, recordInterest]);
 
   // Navigate back
   const goBack = useCallback((toIndex: number) => {
@@ -2315,7 +2413,7 @@ export function TreemapHomePage({ onBrowse, embedded = false }: { onBrowse: () =
 
         {/* Level indicator + feed shortcut; wraps under itself on a phone rather than pushing the caption off screen */}
         <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap', justifyContent: 'flex-end', rowGap: 6, minWidth: 0 }}>
-          {activeData && marketLevel && basis === 'bat12' ? (
+          {truckMode ? <Text role="caption">{truckRead.isError ? 'Truck membership could not be read' : `${truckMembers.length.toLocaleString()} priced sale records · all years`}</Text> : activeData && marketLevel && basis === 'bat12' ? (
             <Text role="caption" title={ledgerViewsStamp(refresh.refreshedAt)}>
               {isNarrow ? `${bat12Totals.sold.toLocaleString('en-US')} BaT sold, 12 mo`
                 : `${bat12Totals.sold.toLocaleString('en-US')} Bring a Trailer sales, last 12 months · ${fmtMoneyMap(bat12Totals.usd)}${ledgerViewsClock(refresh.refreshedAt)}`}
@@ -2391,9 +2489,9 @@ export function TreemapHomePage({ onBrowse, embedded = false }: { onBrowse: () =
           )}
           {levelType === 'brands' && <MapViewSwitch label="Map view" value={brandView} onChange={setBrandView}
             options={[{ value: 'brands', label: 'Brands' }, { value: 'nested', label: 'Families inside' }]} />}
-          {levelType === 'models' && currentLevel.family && <FamilyViewSwitch value={familyView} onChange={setFamilyView} />}
+          {!truckMode && levelType === 'models' && currentLevel.family && <FamilyViewSwitch value={familyView} onChange={setFamilyView} />}
           <span style={{ fontSize: 8, fontWeight: 700, letterSpacing: '0.12em', textTransform: 'uppercase', color: 'var(--text-disabled)' }}>
-            {levelType === 'brands' ? 'MAKES' : levelType === 'families' ? (familiesData ? 'FAMILIES' : 'MODELS') : levelType === 'models' ? 'MODELS' : levelType === 'years' ? 'YEARS' : 'VEHICLES'}
+            {truckMode ? (truckNavigation.axis === 'vehicles' ? 'VEHICLES' : TRUCK_AXIS_LABELS[truckNavigation.axis].toUpperCase()) : levelType === 'brands' ? 'MAKES' : levelType === 'families' ? (familiesData ? 'FAMILIES' : 'MODELS') : levelType === 'models' ? 'MODELS' : levelType === 'years' ? 'YEARS' : 'VEHICLES'}
           </span>
         </div>
       </div>
@@ -2463,7 +2561,7 @@ export function TreemapHomePage({ onBrowse, embedded = false }: { onBrowse: () =
       })()}
 
       {/* ─── VETTED ERA EMBLEM & FENDER BADGE STRIP: period-accurate marque emblems, RPO fender plates & body scripts ─── */}
-      {activeIdentityMarks.length > 0 && currentLevel.make && (currentLevel.family || currentLevel.model) && (
+      {!truckMode && activeIdentityMarks.length > 0 && currentLevel.make && (currentLevel.family || currentLevel.model) && (
         <div
           className="home-family-submodels home-era-marks-bar"
           role="region"
@@ -2526,7 +2624,7 @@ export function TreemapHomePage({ onBrowse, embedded = false }: { onBrowse: () =
         const rawPool = eraFilteredFamilyModels ?? familyModelsData;
         const subModelPool = facetedFamilyModels ?? rawPool;
         if (
-          !currentLevel.family ||
+          truckMode || !currentLevel.family ||
           !currentLevel.make ||
           !subModelPool ||
           subModelPool.length === 0 ||
@@ -2628,7 +2726,7 @@ export function TreemapHomePage({ onBrowse, embedded = false }: { onBrowse: () =
 
       {/* ─── GENERATION / ERA QUICK-SWITCH BAR: 1-click generation filtering right above the treemap ─── */}
       {(() => {
-        if (!currentLevel.make || (!currentLevel.family && !currentLevel.model)) return null;
+        if (truckMode || !currentLevel.make || (!currentLevel.family && !currentLevel.model)) return null;
         const familyLabel = drillStack.find((d) => d.family && !d.model)?.label || searchParams.get('family_name') || currentLevel.model || currentLevel.label;
         const definedEras = getDefinedFamilyEras(currentLevel.make, familyLabel);
         const yearList = effectiveYearsData ? effectiveYearsData.flatMap((n) => {
@@ -2668,7 +2766,7 @@ export function TreemapHomePage({ onBrowse, embedded = false }: { onBrowse: () =
       })()}
 
       {/* ─── MODEL-YEAR QUICK-SWITCH BAR: 1-click year hopping across a family, sub-model or year ─── */}
-      {(levelType === 'models' || levelType === 'years' || levelType === 'vehicles') && currentLevel.make && (currentLevel.family || currentLevel.model) && effectiveYearsData && effectiveYearsData.length > 1 && (() => {
+      {!truckMode && (levelType === 'models' || levelType === 'years' || levelType === 'vehicles') && currentLevel.make && (currentLevel.family || currentLevel.model) && effectiveYearsData && effectiveYearsData.length > 1 && (() => {
         const eraFiltered = selectedEra
           ? effectiveYearsData.filter((n) => matchesEraRange(parseInt(n.name, 10), selectedEra))
           : effectiveYearsData;
@@ -2730,6 +2828,11 @@ export function TreemapHomePage({ onBrowse, embedded = false }: { onBrowse: () =
         }} />
       )}
 
+      {truckMode && <TruckFacetToolbar axis={truckNavigation.axis} filters={truckNavigation.filters}
+        pending={!truckRead.data} count={truckMembers.length} total={truckRead.data?.n ?? 0} usd={truckMembers.reduce((sum, m) => sum + m.usd, 0)}
+        onGroup={axis => updateTruckNavigation(axis)} onRemove={axis => updateTruckNavigation(undefined, { axis, value: null })}
+        onClear={() => updateTruckNavigation(undefined, undefined, true)} />}
+      {truckMode && truckRead.isError && <div role="alert">Complete truck membership could not be read. <button type="button" onClick={() => setTruckAttempt(n => n + 1)}>Retry</button></div>}
       {/* ─── TREEMAP VIEWPORT ─── */}
       <a className="market-map-skip" href="#market-map-exit" onClick={(e) => {
         e.preventDefault();
@@ -2793,13 +2896,13 @@ export function TreemapHomePage({ onBrowse, embedded = false }: { onBrowse: () =
               horizonShortLabel={horizon === '1y' && !isCustomBase ? '12 mo' : horizonMeta.label}
               onPickBrand={(brand, focusAfterPick) => { focusAfterDrill.current = !!focusAfterPick; recordInterest('make', brand); setDrillStack([{ label: 'ALL MAKES' }, { label: brand, make: brand }]); }}
               onPickFamily={(brand, key, family, focusAfterPick) => { focusAfterDrill.current = !!focusAfterPick; recordInterest('make', brand); setDrillStack([{ label: 'ALL MAKES' }, { label: brand, make: brand }, { label: family, make: brand, family: key }]); }} />
-          ) : levelType === 'models' && currentLevel.family && currentLevel.make && familyView === 'sales' && dims.w > 0 ? (
+          ) : !truckMode && levelType === 'models' && currentLevel.family && currentLevel.make && familyView === 'sales' && dims.w > 0 ? (
             <FamilySalesChart brand={currentLevel.make} familyKey={currentLevel.family} family={currentLevel.label}
               width={dims.w} height={dims.h} onOpen={(id) => navigate(`/vehicle/${id}`)}
               selectedEra={selectedEra} onSelectEra={setSelectedEra}
               facetAxis={facetAxis}
               familyModels={familyModelsData}
-              onSelectFacet={(nextFacet) => {
+              onSelectFacet={truckMode ? undefined : (nextFacet) => {
                 const famEntry = drillStack.find((d) => d.family && !d.model) ?? {
                   label: searchParams.get('family_name') || currentLevel.label,
                   make: currentLevel.make,
@@ -2911,17 +3014,18 @@ export function TreemapHomePage({ onBrowse, embedded = false }: { onBrowse: () =
             width={dims.w}
             height={420}
             onOpen={(id) => navigate(`/vehicle/${id}`)}
-            selectedEra={selectedEra}
-            onSelectEra={setSelectedEra}
-            selectedModel={
+            scopedSales={truckMode ? truckSales : undefined}
+            selectedEra={truckMode ? null : selectedEra}
+            onSelectEra={truckMode ? undefined : setSelectedEra}
+            selectedModel={truckMode ? null :
               facetAxis !== 'raw' && currentLevel.model
                 ? drillStack.find((d) => d.model && !d.year)?.label ?? currentLevel.model
                 : currentLevel.model ?? null
             }
-            selectedYear={currentLevel.year ?? null}
-            facetAxis={facetAxis}
-            familyModels={familyModelsData}
-            onSelectFacet={(nextFacet) => {
+            selectedYear={truckMode ? null : currentLevel.year ?? null}
+            facetAxis={truckMode ? null : facetAxis}
+            familyModels={truckMode ? null : familyModelsData}
+            onSelectFacet={truckMode ? undefined : (nextFacet) => {
               const famEntry = drillStack.find((d) => d.family && !d.model) ?? {
                 label: searchParams.get('family_name') || currentLevel.label,
                 make: currentLevel.make,
@@ -2975,7 +3079,7 @@ export function TreemapHomePage({ onBrowse, embedded = false }: { onBrowse: () =
           gap: 12,
         }}
       >
-        {(levelType === 'brands' || levelType === 'families')
+        {truckMode ? <Text role="caption">Box size = recorded sale dollars, all years · color = average recorded sale price · unknown attributes remain in the map · configuration groups use current records, not sale-time configuration</Text> : (levelType === 'brands' || levelType === 'families')
           && !!activeData?.length && activeData.filter((node) => node.count > 0).every((node) => node.usd != null && node.usd > 0)
           ? <MapLegend base={baseline} basis={basis} clock={ledgerViewsClock(refresh.refreshedAt)} windowLabel={horizonWindowLabel} />
           : <Text role="caption">
