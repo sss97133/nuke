@@ -13,13 +13,19 @@ import { isAuctionPresentation } from './buildAuctionPulse';
 import { useProfileDocument } from './profileDocument';
 
 type SaleLotProvenance = {
-  sourceUrl?: string | null;
   lotNumber?: string | null;
   auctionName?: string | null;
-  observedAt?: string | null;
   videoUrl?: string | null;
   startSeconds?: number | null;
   endSeconds?: number | null;
+};
+
+type LotProvenanceRead = {
+  vehicleId: string;
+  lotKey: string;
+  readAt: string;
+  status: 'matched' | 'unmatched' | 'failed';
+  candidates: SaleLotProvenance[];
 };
 
 /** Normalize a listing/lot URL into a comparable lot key so multi-event vehicles match the right sale episode. */
@@ -27,16 +33,15 @@ export function comparableLotKey(url: string | null | undefined): string | null 
   if (!url || typeof url !== 'string') return null;
   const trimmed = url.trim();
   if (!trimmed) return null;
-  const mecumMatch = trimmed.match(/mecum\.com\/lots\/([^/?#]+)/i);
+  let parsed: URL;
+  try { parsed = new URL(trimmed); } catch { return null; }
+  if (!['http:', 'https:'].includes(parsed.protocol) || parsed.username || parsed.password || parsed.port) return null;
+  const host = parsed.hostname.toLowerCase().replace(/^www\./, '');
+  const mecumMatch = host === 'mecum.com' ? parsed.pathname.match(/^\/lots\/(?:[A-Za-z]{2}\d{2}-)?(\d+)(?:\/|$)/) : null;
   if (mecumMatch?.[1]) {
-    const seg = mecumMatch[1].toLowerCase().replace(/^[a-z]{2}\d{2}-(?=\d)/, '');
-    return `mecum:${seg}`;
+    return `mecum:${mecumMatch[1]}${parsed.search}${parsed.hash}`;
   }
-  return trimmed
-    .toLowerCase()
-    .replace(/^https?:\/\/(www\.)?/, '')
-    .replace(/[?#].*$/, '')
-    .replace(/\/+$/, '');
+  return host + parsed.pathname.replace(/\/+$/, '') + parsed.search + parsed.hash;
 }
 
 /** Extract lot number and auction event name from vehicle metadata or enriched description text. */
@@ -96,7 +101,7 @@ export default function ProfileHeader({ priceLotId }: { priceLotId?: string }) {
   const sticky = useRef<HTMLDivElement>(null);
   const stripBoundary = useRef<HTMLDivElement>(null);
   const [activeFacet, setActiveFacet] = useState<ProfileFacet | null>(null);
-  const [lotProvenance, setLotProvenance] = useState<SaleLotProvenance | null>(null);
+  const [lotRead, setLotRead] = useState<LotProvenanceRead | null>(null);
 
   // The sticky stack below reads the masthead's measured height (vehicle-profile.css --vp-h-masthead).
   useLayoutEffect(() => {
@@ -116,27 +121,15 @@ export default function ProfileHeader({ priceLotId }: { priceLotId?: string }) {
   const title = vehicle ? getVehicleTitle(vehicle) : '';
   const classified = masthead?.price?.unit === '';
 
-  const targetLotKey = useMemo(() => {
-    const vAny = (vehicle ?? {}) as Record<string, any>;
-    const pAny = (auctionPulse ?? {}) as Record<string, any>;
-    return comparableLotKey(
-      masthead?.price?.source?.url ||
-      vAny.listing_url ||
-      vAny.discovery_url ||
-      vAny.bat_auction_url ||
-      vAny.platform_url ||
-      pAny.listing_url ||
-      null
-    );
-  }, [masthead?.price?.source?.url, vehicle, auctionPulse]);
+  const targetLotKey = comparableLotKey(masthead?.price?.source?.url);
+  const readAt = doc?.read_at ?? '';
+  const currentLotRead = lotRead?.vehicleId === vehicle?.id && lotRead?.lotKey === targetLotKey && lotRead?.readAt === readAt ? lotRead : null;
 
-  // Enrich the headline sale claim with lot number, auction event name, fallback source URL, and broadcast video timestamp when recorded.
+  // Supplement only the canonical price's addressed source, within this subject/read.
+  // Event, sale and ingest clocks never fill the price owner's observation clock.
   useEffect(() => {
     const vehicleId = vehicle?.id ? String(vehicle.id) : '';
-    if (!vehicleId || typeof (supabase as any)?.from !== 'function') {
-      setLotProvenance(null);
-      return;
-    }
+    if (!vehicleId || !targetLotKey) return;
     let cancelled = false;
     (async () => {
       try {
@@ -144,80 +137,71 @@ export default function ProfileHeader({ priceLotId }: { priceLotId?: string }) {
           Promise.resolve(
         supabase
           .from('auction_events')
-          .select('lot_number, source_url, auction_end_date, auction_start_date, broadcast_video_url, broadcast_video_id, broadcast_timestamp_start, broadcast_timestamp_end')
+          .select('lot_number, source_url, broadcast_video_url, broadcast_video_id, broadcast_timestamp_start, broadcast_timestamp_end')
           .eq('vehicle_id', vehicleId)
           .order('auction_end_date', { ascending: false, nullsFirst: false })
           .limit(10)
-      ).catch(() => ({ data: null })),
+      ).catch(() => ({ data: null, error: true })),
       Promise.resolve(
         supabase
           .from('vehicle_events')
-          .select('source_url, source_listing_id, sold_at, ended_at, extracted_at, metadata')
+          .select('source_url, metadata')
           .eq('vehicle_id', vehicleId)
           .order('extracted_at', { ascending: false, nullsFirst: false })
           .limit(10)
-      ).catch(() => ({ data: null })),
+      ).catch(() => ({ data: null, error: true })),
     ]);
     if (cancelled) return;
-    const pickMatchingRow = (rows: any[] | null | undefined): any => {
-      if (!Array.isArray(rows) || rows.length === 0) return null;
-      if (!targetLotKey) return rows[0];
-      const exact = rows.find((r) => comparableLotKey(r?.source_url) === targetLotKey);
-      if (exact) return exact;
-      const withoutUrl = rows.find((r) => !r?.source_url);
-      return withoutUrl ?? null;
+    const matchingRows = (rows: any[] | null | undefined): any[] => {
+      return Array.isArray(rows) ? rows.filter(r => comparableLotKey(r?.source_url) === targetLotKey) : [];
     };
-    const auctionRow = pickMatchingRow(auctionRes?.data as any[] | null);
-    const eventRow = pickMatchingRow(eventRes?.data as any[] | null);
-    const meta = (eventRow?.metadata && typeof eventRow.metadata === 'object' ? eventRow.metadata : {}) as Record<string, any>;
-    setLotProvenance({
-      sourceUrl: auctionRow?.source_url || eventRow?.source_url || null,
-      lotNumber: auctionRow?.lot_number || meta.lot_number || eventRow?.source_listing_id || null,
-      auctionName: meta.auction_name || meta.event_name || null,
-      observedAt: auctionRow?.auction_end_date || auctionRow?.auction_start_date || eventRow?.sold_at || eventRow?.ended_at || eventRow?.extracted_at || null,
-      videoUrl: auctionRow?.broadcast_video_url || auctionRow?.broadcast_video_id || meta.video_url || null,
-      startSeconds: typeof auctionRow?.broadcast_timestamp_start === 'number' ? auctionRow.broadcast_timestamp_start : null,
-      endSeconds: typeof auctionRow?.broadcast_timestamp_end === 'number' ? auctionRow.broadcast_timestamp_end : null,
-    });
+    const failed = !!auctionRes?.error || !!eventRes?.error || !Array.isArray(auctionRes?.data) || !Array.isArray(eventRes?.data);
+    const auctionRows = auctionRes?.error ? [] : matchingRows(auctionRes?.data as any[] | null);
+    const eventRows = eventRes?.error ? [] : matchingRows(eventRes?.data as any[] | null);
+    const candidates: SaleLotProvenance[] = [
+      ...auctionRows.map(row => ({ lotNumber: row.lot_number ?? null,
+        videoUrl: row.broadcast_video_url || row.broadcast_video_id || null,
+        startSeconds: typeof row.broadcast_timestamp_start === 'number' ? row.broadcast_timestamp_start : null,
+        endSeconds: typeof row.broadcast_timestamp_end === 'number' ? row.broadcast_timestamp_end : null })),
+      ...eventRows.map(row => { const meta = row.metadata && typeof row.metadata === 'object' ? row.metadata : {};
+        return { lotNumber: meta.lot_number ?? null, auctionName: meta.auction_name || meta.event_name || null, videoUrl: meta.video_url || null }; }),
+    ];
+    setLotRead({ vehicleId, lotKey: targetLotKey, readAt, status: failed ? 'failed' : candidates.length ? 'matched' : 'unmatched', candidates });
       } catch {
-        // Provenance enrichment is additive; never block the header.
+        if (!cancelled) setLotRead({ vehicleId, lotKey: targetLotKey, readAt, status: 'failed', candidates: [] });
       }
     })();
     return () => { cancelled = true; };
-  }, [vehicle?.id, targetLotKey]);
+  }, [vehicle?.id, targetLotKey, readAt]);
 
-  const enrichedPriceClaim: Claim<number> | null = useMemo(() => {
+  const priceProjection = useMemo<{ claim: Claim<number>; conflicted: boolean } | null>(() => {
     if (!masthead?.price || !vehicle) return null;
     const base = masthead.price;
     const vAny = vehicle as Record<string, any>;
     const pAny = (auctionPulse ?? {}) as Record<string, any>;
-    const inlineProv = extractInlineLotProvenance(vAny);
-    const fallbackUrl =
-      base.source.url ||
-      vAny.listing_url ||
-      vAny.discovery_url ||
-      vAny.bat_auction_url ||
-      vAny.platform_url ||
-      pAny.listing_url ||
-      lotProvenance?.sourceUrl ||
-      null;
-    const lotNumber =
-      base.source.lotNumber ||
-      pAny.lot_number ||
-      vAny.lot_number ||
-      lotProvenance?.lotNumber ||
-      inlineProv.lotNumber ||
-      null;
-    const auctionName =
-      base.source.auctionName ||
-      lotProvenance?.auctionName ||
-      inlineProv.auctionName ||
-      null;
-    const observedAt =
-      base.observed_at ||
-      (typeof vAny.sale_date === 'string' ? vAny.sale_date : null) ||
-      lotProvenance?.observedAt ||
-      null;
+    // The existing Mecum writer stores its native web ID beside these metadata fields.
+    // Free description mentions and other vehicle URLs do not bind a price episode.
+    const boundInline = [vAny.provenance_metadata, vAny.import_metadata].filter(meta =>
+      meta && /^\d+$/.test(String(meta.mec_web_id)) && `mecum:${meta.mec_web_id}` === targetLotKey);
+    const fallbackUrl = base.source.url ?? null;
+    const pulseLot = targetLotKey && comparableLotKey(pAny.listing_url) === targetLotKey ? pAny.lot_number : null;
+    const candidates = [...(currentLotRead?.candidates ?? []), { lotNumber: pulseLot },
+      ...boundInline.map(meta => extractInlineLotProvenance({ provenance_metadata: meta }))];
+    const texts = (values: unknown[]) => [...new Set(values.filter((v): v is string => typeof v === 'string' && !!v.trim()).map(v => v.trim()))];
+    const lots = texts([base.source.lotNumber, base.source.video?.lotNumber, ...candidates.map(c => c.lotNumber)]);
+    const names = texts([base.source.auctionName, base.source.video?.auctionName, ...candidates.map(c => c.auctionName)]);
+    // A disputed lot makes its attached event/recording context unsafe to combine.
+    // Recording-only disagreements do not erase an independently agreed lot/name.
+    const lotConflict = lots.length > 1;
+    const clips = candidates.filter(c => typeof c.videoUrl === 'string' && !!c.videoUrl.trim());
+    const urls = texts(clips.map(c => c.videoUrl));
+    const positions = (key: 'startSeconds' | 'endSeconds') => [...new Set(clips.map(c => c[key]).filter((v): v is number => typeof v === 'number' && Number.isFinite(v)))];
+    const starts = positions('startSeconds'), ends = positions('endSeconds');
+    const clipConflict = urls.length > 1 || starts.length > 1 || ends.length > 1;
+    const lotNumber = base.source.lotNumber || (!lotConflict ? lots[0] : null) || null;
+    const auctionName = base.source.auctionName || (!lotConflict && names.length === 1 ? names[0] : null) || null;
+    const recording = !lotConflict && !clipConflict ? { url: urls[0] ?? null, startSeconds: starts[0] ?? null, endSeconds: ends[0] ?? null }
+      : { url: null, startSeconds: null, endSeconds: null };
     const priceText = classified
       ? Number(base.value).toLocaleString('en-US')
       : formatMeasure(Number(base.value), 'USD');
@@ -231,18 +215,15 @@ export default function ProfileHeader({ priceLotId }: { priceLotId?: string }) {
       .filter(Boolean)
       .join(' ');
 
-    return {
+    return { conflicted: lotConflict || names.length > 1 || clipConflict, claim: {
       ...base,
-      observed_at: observedAt,
       source: {
         ...base.source,
         url: fallbackUrl,
         lotNumber,
         auctionName,
         video: base.source.video ?? {
-          url: lotProvenance?.videoUrl ?? null,
-          startSeconds: lotProvenance?.startSeconds ?? null,
-          endSeconds: lotProvenance?.endSeconds ?? null,
+          ...recording,
           lotNumber,
           auctionName,
           title,
@@ -252,8 +233,14 @@ export default function ProfileHeader({ priceLotId }: { priceLotId?: string }) {
           searchQuery,
         },
       },
-    };
-  }, [masthead?.price, vehicle, auctionPulse, lotProvenance, classified, title]);
+    } };
+  }, [masthead?.price, vehicle, auctionPulse, currentLotRead, classified, title, targetLotKey]);
+  const enrichedPriceClaim = priceProjection?.claim ?? null;
+  const provenanceNote = priceProjection?.conflicted ? `${currentLotRead?.status === 'failed' ? 'Additional lot provenance unavailable. ' : ''}Additional lot provenance conflicts; disputed context withheld.`
+    : !targetLotKey ? 'Headline source URL unavailable for lot matching; additional lot provenance unlinked.'
+      : !currentLotRead ? 'Additional lot provenance pending.'
+        : currentLotRead.status === 'failed' ? 'Additional lot provenance unavailable.'
+          : currentLotRead.status === 'unmatched' ? 'No additional matching lot provenance in this read.' : null;
 
   if (!vehicle || !doc || !masthead) return null;
   const asArtwork = !!masthead.model && vehicle.listing_kind !== 'non_vehicle_item';
@@ -266,7 +253,10 @@ export default function ProfileHeader({ priceLotId }: { priceLotId?: string }) {
         role="measure"
         claim={enrichedPriceClaim}
         format={value => classified ? Number(value).toLocaleString('en-US') : formatMeasure(Number(value), 'USD')}
-        extra={priceLotId ? <PrefetchLink className="k-body" to={`/stacks/order-book/${vehicle.id}?lot=${priceLotId}`}>Open auction stack →</PrefetchLink> : null}
+        extra={<>
+          {provenanceNote && <Text role="caption">{provenanceNote}</Text>}
+          {priceLotId && <PrefetchLink className="k-body" to={`/stacks/order-book/${vehicle.id}?lot=${priceLotId}`}>Open auction stack →</PrefetchLink>}
+        </>}
       />}>
         <Text role="entity" as="h1" aria-label={title}>
           {asArtwork
