@@ -8,6 +8,7 @@ import {
   type VehicleFacetClassification,
   type VehicleIdentityMark,
 } from './familyFacetsAndEmblems';
+import { resolveVehicleMarketFamily } from './vehicle-profile/VehicleBadgeBar';
 
 export {
   classifyVehicleFacets,
@@ -27,6 +28,8 @@ export interface VehicleTaxonomyInput {
   series?: string | null;
   trim?: string | null;
   body_style?: string | null;
+  title?: string | null;
+  rawTitle?: string | null;
   listing_title?: string | null;
   year?: number | null;
 }
@@ -76,7 +79,7 @@ export function classifyVehicleFacet(
   familyLabel?: string | null,
   rawModel?: string | null,
   year?: number | null,
-): VehicleFacetClassification {
+): VehicleFacetClassification & { family?: string | null } {
   if (typeof inputOrMake === 'object' && inputOrMake !== null) {
     const make = inputOrMake.make ?? null;
     const compositeModel = [
@@ -84,20 +87,40 @@ export function classifyVehicleFacet(
       inputOrMake.series,
       inputOrMake.trim,
       inputOrMake.body_style,
+      inputOrMake.title,
+      inputOrMake.rawTitle,
       inputOrMake.listing_title,
     ]
       .filter((part): part is string => typeof part === 'string' && part.trim().length > 0)
       .join(' ');
-    const family = inferVehicleFamilyLabel(make, compositeModel || inputOrMake.model, inputOrMake.family);
+    const family =
+      inputOrMake.family?.trim() ||
+      resolveVehicleMarketFamily({
+        make,
+        model: inputOrMake.model,
+        trim: inputOrMake.trim,
+        title: inputOrMake.title,
+        listing_title: inputOrMake.rawTitle ?? inputOrMake.listing_title,
+      }) ||
+      inferVehicleFamilyLabel(make, compositeModel || inputOrMake.model, inputOrMake.family);
     const classified = classifyVehicleFacets(make, family, compositeModel || inputOrMake.model, inputOrMake.year);
+    const rawTrim = inputOrMake.trim?.trim() || null;
+    const fallbackTrim =
+      rawTrim && (!classified.series || rawTrim.toLowerCase() !== classified.series.toLowerCase())
+        ? rawTrim
+        : null;
     return {
+      family,
       series: classified.series ?? (inputOrMake.series?.trim() || null),
-      trim: classified.trim ?? (inputOrMake.trim?.trim() || null),
+      trim: classified.trim ?? fallbackTrim,
       body: classified.body ?? (inputOrMake.body_style?.trim() || null),
     };
   }
   const inferredFamily = inferVehicleFamilyLabel(inputOrMake, rawModel, familyLabel);
-  return classifyVehicleFacets(inputOrMake, inferredFamily, rawModel, year);
+  return {
+    family: inferredFamily,
+    ...classifyVehicleFacets(inputOrMake, inferredFamily, rawModel, year),
+  };
 }
 
 /**
@@ -128,6 +151,8 @@ export function resolveVehicleIdentityMark(
         inputOrMake.series,
         inputOrMake.trim,
         inputOrMake.body_style,
+        inputOrMake.title,
+        inputOrMake.rawTitle,
         inputOrMake.listing_title,
       ]
         .filter((part): part is string => typeof part === 'string' && part.trim().length > 0)
