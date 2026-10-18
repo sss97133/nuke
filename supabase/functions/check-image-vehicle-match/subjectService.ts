@@ -178,16 +178,31 @@ export async function resolveSubjectBatch(store: SubjectStore, request: SubjectR
     envelope = { ...projection, user_id: request.user_id, method: SUBJECT_METHOD, run_key,
       provider: result.model_result.provider, model: result.model_result.model, read_at, inputs, candidate_scope };
   }
-  const admission = await store.admission(envelope);
-  const membershipHeld = !admission.admission_allowed;
   const failures: Array<{ image_id: string; reason: string }> = [], persisted: string[] = [], retained: string[] = [];
   if (!request.dry_run) {
     // Even an unresolved interpretation is useful retained evidence. Its own
     // protected producer family never replaces subject membership testimony.
+    // Retain before the separate admission read: a transient membership lookup
+    // must not discard a completed paid interpretation and force another read.
     for (const input of envelope.inputs) {
       try { await store.retainReading(input.image_id, envelope); retained.push(input.image_id); }
       catch { failures.push({ image_id: input.image_id, reason: "subject_reading_storage_failed" }); }
     }
+  }
+  let membershipHeld = true, admissionReason: string | null = null;
+  try {
+    const admission = await store.admission(envelope);
+    membershipHeld = !admission.admission_allowed;
+    admissionReason = admission.reason;
+  } catch {
+    // No membership authority was established. Keep the complete interpretation
+    // and return a storage retry; the phone must reuse it without paid inference.
+    admissionReason = "subject_admission_unavailable";
+    for (const image_id of consumedIds) if (!failures.some(failure => failure.image_id === image_id)) {
+      failures.push({ image_id, reason: admissionReason });
+    }
+  }
+  if (!request.dry_run) {
     // Each sanctioned call requalifies ALL supporting sources under locks. A
     // partial transport failure keeps its retained reading for a no-inference retry.
     for (const subject of membershipHeld ? [] : envelope.subjects) for (const id of subject.member_image_ids) {
@@ -200,7 +215,7 @@ export async function resolveSubjectBatch(store: SubjectStore, request: SubjectR
   }
   const supported = new Set((membershipHeld ? [] : envelope.subjects).flatMap(subject => subject.member_image_ids));
   const heldMembership = membershipHeld ? envelope.subjects.flatMap(subject => subject.member_image_ids)
-    .map(image_id => ({ image_id, reason: admission.reason ?? "subject_admission_held" })) : [];
+    .map(image_id => ({ image_id, reason: admissionReason ?? "subject_admission_held" })) : [];
   const failureById = new Map(failures.map(row => [row.image_id, row]));
   return { ...base, status: failures.length ? "partial" : membershipHeld ? "unresolved" : reused ? "cached" : envelope.subjects.length ? "resolved" : "unresolved",
     dry_run: request.dry_run ?? false, persisted_image_ids: persisted.filter(id => consumedIds.includes(id) && !failureById.has(id)), subjects: membershipHeld ? [] : envelope.subjects,

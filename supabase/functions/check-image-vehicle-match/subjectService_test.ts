@@ -90,6 +90,35 @@ Deno.test("partial storage retry reuses protected full-batch receipt without red
   equal((await resolveSubjectBatch(f.store, { ...f.request, reuse_only: true }, "https://example.test", f.dependencies)).status, "cached");
   equal(f.counts.models, 1);
 });
+Deno.test("an unavailable admission read retains the paid interpretation and retries without inference", async () => {
+  const f = fixture(), admission = f.store.admission;
+  f.store.admission = async () => { throw new Error("membership read unavailable"); };
+  const held = await f.run();
+  equal(held.status, "partial"); equal(held.persisted_image_ids, []);
+  equal("retained_reading_image_ids" in held && held.retained_reading_image_ids, ids.slice(0, 2));
+  equal(held.unresolved, ids.slice(0, 2).map(image_id => ({ image_id, reason: "subject_admission_unavailable" })));
+  equal(f.writes, []); equal(f.readings.length, 2);
+  f.store.admission = admission;
+  const retried = await resolveSubjectBatch(f.store, { ...f.request, reuse_only: true }, "https://example.test", f.dependencies);
+  equal(retried.status, "cached"); equal(retried.persisted_image_ids, ids.slice(0, 2));
+  equal(f.counts, { captures: 1, models: 1, candidates: 1 });
+});
+Deno.test("an admission outage keeps context separate from deferred fresh work", async () => {
+  const f = fixture(), admission = f.store.admission;
+  f.store.context = async () => ({ sources: [f.sources[2]], coverage: { assessed: 1, eligible: 1, truncated: false } });
+  f.store.admission = async () => { throw new Error("membership read unavailable"); };
+  const held = await f.run();
+  equal(held.status, "partial"); equal(held.persisted_image_ids, []);
+  equal(held.unresolved, [{ image_id: ids[0], reason: "subject_admission_unavailable" }]);
+  equal(held.deferred_image_ids, [ids[1]]);
+  equal("retained_reading_image_ids" in held && held.retained_reading_image_ids, [ids[0]]);
+  equal(f.readings.map(reading => reading.image_id), [ids[0], ids[2]]);
+  f.store.admission = admission;
+  const retried = await resolveSubjectBatch(f.store, { ...f.request, image_ids: [ids[0]], reuse_only: true }, "https://example.test", f.dependencies);
+  equal(retried.status, "cached"); equal(retried.deferred_image_ids, []);
+  equal(retried.unresolved.map(row => row.image_id), [ids[0]]);
+  equal(f.counts, { captures: 1, models: 1, candidates: 1 });
+});
 Deno.test("a partial retry with no surviving protected receipt refuses before inference", async () => {
   const f = fixture(); f.store.ingest = async () => { throw new Error("unavailable"); };
   f.store.retainReading = async () => { throw new Error("unavailable"); };
