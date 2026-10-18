@@ -12,7 +12,10 @@
 --   * refresh-source-target-landed runs once a day at 10:27Z, its command untouched;
 --   * auction houses, marketplaces, and dealers rank (auction houses first, then marketplaces, then dealers); capture
 --     channels and aggregators are counted in not_ranked; each source carries the records it landed in the last 24 hours
---     and 7 days and 14 daily counts.
+--     and 7 days and 14 daily counts;
+--   * 20261018213000: a source's total is the newest exact census covering its held lots, else the newest labelled
+--     reference covering them (as of the day, with its method and clock), else unknown; a census beats a reference,
+--     a model of our own capture is never a total, and a reference graded by a later census carries its error.
 \set ON_ERROR_STOP on
 DO $$ BEGIN
   IF current_database() NOT LIKE 'dm_refinement_%'
@@ -59,7 +62,7 @@ CREATE TABLE public.observation_sources (id uuid PRIMARY KEY DEFAULT gen_random_
   category text, created_at timestamptz DEFAULT now(), business_id uuid);
 CREATE TABLE public.organizations (id uuid PRIMARY KEY DEFAULT gen_random_uuid(), logo_url text, business_type text);
 CREATE TABLE public.source_census (source_id uuid, universe_total integer, universe_historical integer, census_method text,
-  census_confidence numeric(3,2), census_at timestamptz);
+  census_confidence numeric(3,2), census_at timestamptz, census_day date, UNIQUE (source_id, census_at));
 CREATE TABLE public.mv_source_target_landed (source_slug text, landed bigint, event_urls bigint, event_urls_without_target bigint,
   landed_lots bigint, measured_at timestamptz);
 CREATE TABLE public.mv_treemap_outcomes (id uuid, brand_name text, model text, year integer, source_name text, outcome text,
@@ -341,3 +344,83 @@ SELECT pg_temp.ok('every audited source appears on market_sources_read() and dri
        )
        FROM unnest(ARRAY['rm-sothebys', 'bonhams', 'gooding', 'collecting-cars', 'pcarmarket', 'hemmings', 'classic-com']) s));
 
+
+-- Labelled references (20261018213000). KSL has the owner's figure and no census; BaT and Mecum have exact censuses
+-- beside a reference; Facebook's reference is smaller than what we hold; Craigslist has only a model of our own capture.
+INSERT INTO public.observation_sources (slug, display_name, category, created_at) VALUES
+  ('ksl', 'KSL Cars', 'marketplace', '2025-01-01');
+INSERT INTO public.mv_source_target_landed VALUES ('ksl', 0, 0, 0, 3018, '2026-10-17 10:27Z');
+INSERT INTO public.source_census (source_id, universe_total, universe_historical, census_method, census_confidence, census_at)
+SELECT id, v.t, v.h, v.m, v.c, v.at::timestamptz FROM public.observation_sources o JOIN (VALUES
+  ('ksl', 90000, NULL, 'owner_reference', 0.40, (current_date + 2)::text),     -- after the day: not yet said
+  ('bat', 95000, 94700, 'estimate', 0.70, '2026-01-28'),                       -- graded by the later census
+  ('mecum', 400000, NULL, 'owner_reference', 0.40, current_date::text),        -- newer than the census, still loses
+  ('facebook_marketplace', 5000, NULL, 'catalogue_estimate', 0.30, '2026-10-01'), -- below what we hold: not a total
+  ('craigslist', 49639, 49639, 'capture_model', 0.30, '2026-10-17')            -- our own capture scaled up
+  ) v(slug, t, h, m, c, at) ON v.slug = o.slug;
+
+\ir ../migrations/20261018213000_source_population_reference_fold.sql
+\ir ../migrations/20261018213000_source_population_reference_fold.sql
+
+SELECT pg_temp.ok('the owner''s KSL reference is seeded once, labelled, with its clock and his words',
+  (SELECT count(*) = 1 AND bool_and(c.universe_total = 80000 AND c.census_confidence = 0.40
+          AND c.census_at = '2026-10-17 21:44Z' AND c.census_day = '2026-10-17'
+          AND (c.raw_response->'live_window'->>'low')::int = 1000 AND (c.raw_response->'live_window'->>'high')::int = 7000
+          AND c.census_notes LIKE 'Owner reference, not a count:%80,000%')
+   FROM public.source_census c JOIN public.observation_sources o ON o.id = c.source_id
+   WHERE o.slug = 'ksl' AND c.census_method = 'owner_reference' AND c.census_at < current_date + 1));
+-- The writer has two paths (with and without the dealer organization tables); both fold populations the same way.
+CREATE FUNCTION pg_temp.population_cases(path text) RETURNS void LANGUAGE plpgsql AS $f$ BEGIN
+  PERFORM pg_temp.ok(path || ': a source with only a reference: its total is the reference, with method, confidence and as-of',
+    (SELECT landed_lots = 3018 AND population = 80000 AND population_method = 'owner_reference'
+            AND population_confidence = 0.40 AND population_at = '2026-10-17 21:44Z'
+     FROM public.market_source_days WHERE day = current_date AND source_slug = 'ksl'));
+  PERFORM pg_temp.ok(path || ': a census beats a reference, older or newer',
+    (SELECT population = 264746 AND population_method = 'enumerated'
+     FROM public.market_source_days WHERE day = current_date AND source_slug = 'bat')
+    AND (SELECT population = 268979 AND population_method = 'enumerated'
+     FROM public.market_source_days WHERE day = current_date AND source_slug = 'mecum'));
+  PERFORM pg_temp.ok(path || ': a reference below the lots we hold is not a total: unknown stays unknown',
+    (SELECT population IS NULL AND population_method IS NULL AND population_at IS NULL
+     FROM public.market_source_days WHERE day = current_date AND source_slug = 'facebook_marketplace'));
+  PERFORM pg_temp.ok(path || ': no source gets a modelled total; every total is a dated source_census row for that source',
+    (SELECT population IS NULL FROM public.market_source_days WHERE day = current_date AND source_slug = 'craigslist')
+    AND NOT EXISTS (SELECT 1 FROM public.market_source_days
+                    WHERE population_method IN ('capture_model', 'turnover_model', 'window_extrapolated'))
+    AND NOT EXISTS (
+      SELECT 1 FROM public.market_source_days d
+      WHERE d.day = current_date AND d.population IS NOT NULL
+        AND (d.population_at IS NULL OR NOT EXISTS (
+          SELECT 1 FROM public.source_census c JOIN public.observation_sources o ON o.id = c.source_id
+          WHERE regexp_replace(lower(o.slug), '[^a-z0-9]', '', 'g') = regexp_replace(lower(d.source_slug), '[^a-z0-9]', '', 'g')
+            AND c.universe_total = d.population AND c.census_method = d.population_method
+            AND c.census_at = d.population_at))));
+END $f$;
+SELECT pg_temp.population_cases('without dealer tables');
+CREATE TABLE public.organization_vehicles (id uuid PRIMARY KEY DEFAULT gen_random_uuid(), organization_id uuid, vehicle_id uuid,
+  relationship_type text, status text, listing_status text, asking_price numeric, sale_price numeric, sale_date date,
+  created_at timestamptz DEFAULT now());
+SET ROLE service_role;
+SELECT pg_temp.ok('the writer takes the dealer path once the organization tables exist', public.record_market_source_day() > 0);
+RESET ROLE;
+SELECT pg_temp.population_cases('with dealer tables');
+
+SET ROLE anon;
+DO $$
+DECLARE b jsonb := public.market_sources_read();
+  r jsonb;
+BEGIN
+  PERFORM pg_temp.ok('the board names the grade column last', b->'columns'->>27 = 'population_grade'
+    AND jsonb_array_length(b->'columns') = 28);
+  SELECT x INTO r FROM jsonb_array_elements(b->'rows') x WHERE x->>0 = 'ksl';
+  PERFORM pg_temp.ok('the board carries KSL''s reference with its method and as-of, ungraded',
+    (r->>6)::int = 80000 AND r->>7 = 'owner_reference' AND (r->>9)::timestamptz = '2026-10-17 21:44Z' AND r->27 = 'null'::jsonb);
+  SELECT x INTO r FROM jsonb_array_elements(b->'rows') x WHERE x->>0 = 'bat';
+  PERFORM pg_temp.ok('a reference followed by an exact census is graded: its signed error against the census',
+    (r->27->>'reference')::int = 95000 AND r->27->>'reference_method' = 'estimate'
+    AND (r->27->>'census')::int = 264746 AND (r->27->>'error')::numeric = -0.6412
+    AND (r->27->>'reference_at')::timestamptz < (r->27->>'census_at')::timestamptz);
+  SELECT x INTO r FROM jsonb_array_elements(b->'rows') x WHERE x->>0 = 'mecum';
+  PERFORM pg_temp.ok('a reference newer than the census is not graded by it', r->27 = 'null'::jsonb);
+END $$;
+RESET ROLE;

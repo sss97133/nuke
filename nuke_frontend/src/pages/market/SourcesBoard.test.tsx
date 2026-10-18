@@ -10,6 +10,7 @@ import SourcesBoard, {
   describeDealerConsignment,
   describeRecordDate,
   formatDealerHqBadge,
+  gradeText,
   heldShare,
   landingState,
   monthBars,
@@ -171,6 +172,14 @@ it('says how much of its own total we hold, in the total\'s terms', () => {
   expect(heldShare({ held: 6081, population: 27166, populationMethod: 'bounded' }).text).toBe('22% of about 27,166');
   expect(heldShare({ held: 18659, population: null, populationMethod: 'unknown' })).toEqual({ share: null, text: 'their total unknown' });
   expect(heldShare({ held: 445, population: 56004, populationMethod: 'bounded' }).text).toBe('<1% of about 56,004');
+  // a labelled reference reads as an estimate with its kind and as-of day, never as a count
+  expect(heldShare({ held: 3018, population: 80000, populationMethod: 'owner_reference', populationAt: '2026-10-17T21:44:00Z' }))
+    .toEqual({ share: 3018 / 80000, text: '4% of ≈ 80,000', reference: 'owner reference · Oct 17' });
+  expect(heldShare({ held: 10, population: 900, populationMethod: 'catalogue_estimate', populationAt: null }).reference)
+    .toBe('catalogue estimate');
+  expect(gradeText({ reference: 95000, referenceMethod: 'estimate', referenceAt: '2026-01-28T01:09:27Z', census: 270391,
+    censusAt: '2026-10-17T21:30:00Z', error: -0.6487 })).toBe('earlier estimate 95,000 (Jan 28) was 65% low');
+  expect(gradeText(null)).toBe('');
   expect(money(8488000000)).toBe('$8.5B');
   expect(money(575000000)).toBe('$575M');
   expect(money(null)).toBe('');
@@ -998,4 +1007,36 @@ it('sorts filtered recent_vehicles in-memory (LATEST / HIGHEST PRICE / YEAR) wit
   expect(drill.querySelector('[data-testid="drill-cohort-filtered-count"]')?.textContent).toContain('2 of 4');
   expect(drill.querySelector('[data-testid="drill-cohort-sold-sellthrough"]')?.textContent).toContain('1 sold · 50%');
   expect(drill.querySelector('[data-testid="drill-cohort-median-sold-price"]')?.textContent).toContain('$168,000');
+});
+
+it('prints a labelled reference as an estimate, apart from a census, and grades an earlier reference against it', async () => {
+  const graded = [...columns, 'population_grade'];
+  const withGrade = {
+    ...value,
+    columns: graded,
+    rows: [
+      [...value.rows[0], { reference: 95000, reference_method: 'estimate', reference_at: '2026-01-28T01:09:27Z',
+        census: 264746, census_method: 'enumerated', census_at: '2026-09-27T00:00:00Z', error: -0.6412 }],
+      ['ksl', 'KSL Cars', 'marketplace', null, 3018, '2026-10-16T10:27:00Z', 80000, 'owner_reference', 0.4,
+        '2026-10-17T21:44:00Z', null, null, null, null, null, null, null, 0, null, null, null, 0, 0, null, days(0), null, null, null],
+      [...value.rows[3], null],
+    ],
+  };
+  fixture.rpc.mockImplementation((fn: string) => Promise.resolve(fn === 'market_sources_read'
+    ? { data: withGrade, error: null } : { data: null, error: { message: 'none' } }));
+  await act(async () => root.render(<SourcesBoard />));
+  const rows = [...container.querySelectorAll('li.market-sources__row')];
+  const ksl = rows.find((r) => r.querySelector('.market-sources__name-text')?.textContent === 'KSL Cars')!;
+  expect(ksl.querySelector('.market-sources__sharetext')?.textContent).toBe('4% of ≈ 80,000owner reference · Oct 17');
+  expect(ksl.querySelector('.market-sources__sharenote')?.textContent).toBe('owner reference · Oct 17');
+  expect(ksl.querySelector('.market-sources__fill--est')).not.toBeNull();
+  expect(ksl.querySelector('.market-sources__share')?.getAttribute('title'))
+    .toBe('≈ 80,000 · owner reference · Oct 17 · confidence 0.40 · an estimate, not a count of their listings');
+  const bat = rows[0];
+  expect(bat.querySelector('.market-sources__sharetext')?.textContent).toBe('95% of 264,746');
+  expect(bat.querySelector('.market-sources__fill--est')).toBeNull();
+  expect(bat.querySelector('.market-sources__share')?.getAttribute('title')).toContain('; earlier estimate 95,000 (Jan 28) was 64% low');
+  const craigslist = rows.find((r) => r.querySelector('.market-sources__name-text')?.textContent === 'Craigslist')!;
+  expect(craigslist.querySelector('.market-sources__sharetext')?.textContent).toBe('their total unknown');
+  expect(craigslist.querySelector('.market-sources__unknown')).not.toBeNull();
 });
