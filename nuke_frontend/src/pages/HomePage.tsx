@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useCallback, useRef, lazy, Suspense } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, useRef, useId, lazy, Suspense } from 'react';
 import { useSearchParams, Link, useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { useAuth } from '../hooks/useAuth';
@@ -1985,9 +1985,18 @@ export function TreemapHomePage({ onBrowse, embedded = false }: { onBrowse: () =
 
   // Tooltip
   const [tooltip, setTooltip] = useState<TooltipData | null>(null);
+  const tooltipId = useId();
+  const currentCrumb = useRef<HTMLButtonElement>(null);
+  const focusAfterDrill = useRef(false);
   // A drill or a view switch replaces the tiles under the pointer, and the tile a tooltip came from can no longer clear it:
   // over the sales chart the 911 tile's tooltip stayed on screen (2026-10-15).
-  useEffect(() => { setTooltip(null); setSheet(null); }, [drillStack, brandView, familyView]);
+  useEffect(() => {
+    setTooltip(null); setSheet(null);
+    if (focusAfterDrill.current) {
+      focusAfterDrill.current = false;
+      currentCrumb.current?.focus();
+    }
+  }, [drillStack, brandView, familyView]);
 
   // Drill down — continuous zoom: makes → models → years → vehicles → profile
   const [clickOrigin, setClickOrigin] = useState<{ x: number; y: number } | null>(null);
@@ -2265,6 +2274,9 @@ export function TreemapHomePage({ onBrowse, embedded = false }: { onBrowse: () =
                 <span style={{ fontSize: 9, color: 'var(--text-disabled)', margin: '0 2px' }}>/</span>
               )}
               <button
+                ref={isLast ? currentCrumb : undefined}
+                className="home-map-crumb"
+                aria-current={isLast ? 'location' : undefined}
                 onClick={() => !isLast && goBack(i)}
                 style={{
                   fontSize: 9,
@@ -2794,11 +2806,23 @@ export function TreemapHomePage({ onBrowse, embedded = false }: { onBrowse: () =
               const node = rect.node;
               return (
                 <div key={node.name + '-' + i}
+                  onFocus={(e) => {
+                    const bounds = e.target.getBoundingClientRect();
+                    setTooltip({ node, x: bounds.left, y: bounds.bottom, totalCount, level: levelType });
+                    handleCellMouseEnter(node);
+                  }}
+                  onBlur={() => { setTooltip(null); handleCellMouseLeave(); }}
+                  onKeyDown={(e) => { if (e.key === 'Escape') { e.stopPropagation(); setTooltip(null); } }}
                   onMouseMove={(e) => { if (!coarse) setTooltip({ node, x: e.clientX, y: e.clientY, totalCount, level: levelType }); }}
                   onMouseEnter={() => handleCellMouseEnter(node)}
                   onMouseLeave={() => { setTooltip(null); handleCellMouseLeave(); }}>
                   <MarketTile node={node} move={relativeMove(node, baseline, basis === 'ledger', gateMin)} basis={basis} x={rect.x} y={rect.y} w={rect.w} h={rect.h}
-                    onClick={(ev) => (coarse ? setSheet(node) : drillInto(node, 'clientX' in ev ? ev : undefined))} />
+                    describedBy={tooltip?.node === node ? tooltipId : undefined}
+                    onClick={(ev) => {
+                      if (coarse) { setTooltip(null); setSheet(node); return; }
+                      focusAfterDrill.current = ev.detail === 0 && (!node.noModel || !!node.familyKey);
+                      drillInto(node, 'clientX' in ev && ev.detail > 0 ? ev : undefined);
+                    }} />
                 </div>
               );
             }
@@ -2852,7 +2876,7 @@ export function TreemapHomePage({ onBrowse, embedded = false }: { onBrowse: () =
 
       {/* ─── TOOLTIP ─── */}
       {tooltip && (tooltip.level === 'brands' || tooltip.level === 'families') && tooltip.node.usd != null && !tooltip.node.isVehicle
-        ? <MarketCard node={tooltip.node} move={relativeMove(tooltip.node, baseline, basis === 'ledger', gateMin)} base={baseline} x={tooltip.x} y={tooltip.y} windowLabel={horizonWindowLabel} gateMin={gateMin} />
+        ? <MarketCard id={tooltipId} node={tooltip.node} move={relativeMove(tooltip.node, baseline, basis === 'ledger', gateMin)} base={baseline} x={tooltip.x} y={tooltip.y} windowLabel={horizonWindowLabel} gateMin={gateMin} />
         : tooltip && <TreemapTooltip {...tooltip} />}
       {sheet && <MarketSheet node={sheet} move={relativeMove(sheet, baseline, basis === 'ledger', gateMin)} base={baseline} windowLabel={horizonWindowLabel} gateMin={gateMin}
         onOpen={() => { const n = sheet; setSheet(null); drillInto(n); }} onClose={() => setSheet(null)} />}
