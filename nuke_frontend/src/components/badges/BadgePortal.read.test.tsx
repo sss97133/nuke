@@ -58,7 +58,7 @@ function unavailable(sourceMode = false) {
   expect(panel()!.textContent).not.toMatch(/\d[\d,.]* VEHICLES|NO PREVIEW AVAILABLE|YEARS|TOP MAKES|FILL RATE|Ford|Chevrolet|VIEW ALL/);
   expect(panel()!.querySelectorAll('a,img')).toHaveLength(0); expect(host.textContent).not.toContain(privateMessage);
 }
-const full = () => `${year}3 VEHICLESYEARS${year}Ford2Chevrolet1${year} Ford Coupe$10,000VIEW ALL 3 →`;
+const full = () => `${year}3 VEHICLESYEARS${year}Ford2Chevrolet1Stats use up to 500 returned records per read; year ranges use records with prices above zero. Previews show up to 6 records. The count is a separate read.${year} Ford Coupe$10,000VIEW ALL 3 →`;
 beforeEach(() => {
   (globalThis as any).IS_REACT_ACT_ENVIRONMENT = true; reads = []; year = 1990 + ++serial; source = `synthetic-badge-source-${serial}`;
   fixture.current = { vehicleId: 'synthetic-badge-hero', leadImageUrl: null, heroMeta: null, vehicle: Object.freeze({ id: 'synthetic-badge-hero', year, make: 'Synthetic', model: 'Specimen' }) };
@@ -120,7 +120,7 @@ it('does not poison a new mount with the prior explicit API-failed combined resu
 });
 it('preserves successful standalone source fill-rate/facet output and five-read demand', async () => {
   await draw(true); await click(true); await settle({ sourceMode: true });
-  expect(panel()!.textContent).toBe(`SYNTHETIC SOURCE3 VEHICLESFILL RATEPRICE67%BODY67%MILEAGE33%VIN33%PHOTO33%TOP MAKESFord2Chevrolet1${year} Ford Coupe$10,000VIEW ALL 3 →`); expect(reads).toHaveLength(5);
+  expect(panel()!.textContent).toBe(`SYNTHETIC SOURCE3 VEHICLESFILL RATEPRICE67%BODY67%MILEAGE33%VIN33%PHOTO33%TOP MAKESFord2Chevrolet1Stats use up to 500 returned records per read; year ranges use records with prices above zero. Previews show up to 6 records. The count is a separate read.${year} Ford Coupe$10,000VIEW ALL 3 →`); expect(reads).toHaveLength(5);
 });
 it('preserves view-all navigation and closing without another read', async () => {
   await draw(); await click(); await settle(); const anchor = [...panel()!.querySelectorAll('a')].find(a => a.textContent === 'VIEW ALL 3 →')!;
