@@ -619,3 +619,69 @@ describe('inline market row inspection', () => {
     expect(boardTitles()).toEqual(['m-1']);
   });
 });
+
+describe('headline movement inspection', () => {
+  async function update(auctions: LiveAuction[]) {
+    vi.setSystemTime(Date.now() + 15_000);
+    fixture.pulse = { ...fixture.pulse, data: { ...fixture.pulse.data, auctions }, dataUpdatedAt: Date.now() };
+    await render(window.location.search.slice(1));
+  }
+  it('retains a bid increase observed before opening the figure and opens the exact contributing lot inline', async () => {
+    const id = '46dd9cc6-20ec-47cb-a563-159a8005115c';
+    fixture.pulse.data.auctions = [lot(id, 'PORSCHE', 25_000, 2)];
+    await render();
+    await update([{ ...fixture.pulse.data.auctions[0], currentBid: 26_500 }]);
+    await click('$27K');
+    const panel = container.querySelector('[aria-label="Bid total movement"]')!;
+    expect(panel.textContent).toContain('+$1,500 since previous observation');
+    expect(panel.querySelector('.market-history__change')?.textContent).toContain('$25,000 → $26,500');
+    expect(panel.textContent).toContain('This visit');
+    await act(async () => (panel.querySelector('.market-history__change') as HTMLButtonElement).click());
+    expect(panel.querySelector('[aria-label="Listing activity evidence"]')?.textContent).toContain(id);
+    // A later unchanged read must not erase the latest raise.
+    await update([...fixture.pulse.data.auctions]);
+    expect(panel.textContent).toContain('+$1,500 since previous observation');
+    const select = panel.querySelector<HTMLSelectElement>('select')!;
+    await act(async () => { select.value = '0'; select.dispatchEvent(new Event('change', { bubbles: true })); });
+    expect(panel.textContent).toContain('Starting observation');
+    expect(panel.querySelector('.market-history__change')).toBeNull();
+  });
+  it('separates lot departures, arrivals, unknown bids and changed listing episodes from bid increases', async () => {
+    await render('map=bids');
+    const [later, first, unknown, ford] = fixture.pulse.data.auctions;
+    await update([{ ...later, currentBid: null }, first, { ...unknown, currentBid: 2000 }, { ...ford, listingUrl: 'https://bringatrailer.com/listing/different-episode/' }, lot('new', 'FORD', 3000, 1)]);
+    const panel = container.querySelector('[aria-label="Bid total movement"]')!;
+    expect(panel.textContent).toContain('−$20,000 since previous observation');
+    expect(panel.textContent).toContain('Bid now unrecorded');
+    expect(panel.textContent).toContain('Bid now recorded');
+    expect(panel.textContent).toContain('Entered board');
+    expect(panel.textContent).toContain('Left board');
+    expect(panel.textContent).not.toContain('+$100,000');
+    await click('5');
+    const lots = container.querySelector('[aria-label="Open lot movement"]')!;
+    expect(lots.textContent).toContain('+1 since previous observation');
+    expect(lots.textContent).not.toContain('Bid now recorded');
+    expect(lots.textContent).toContain('leaving does not establish a sale');
+  });
+  it('starts a new timeline on a cohort change and keeps the navigation sort in the existing URL', async () => {
+    await render('map=bids');
+    await update(fixture.pulse.data.auctions.map((a: LiveAuction) => ({ ...a, currentBid: (a.currentBid ?? 0) + 1000 })));
+    await click('Choose Ford cohort');
+    expect(container.querySelector('[aria-label="Bid total movement"]')?.textContent).toContain('Starting observation');
+    expect(container.querySelector('.market-history__change')).toBeNull();
+    expect(container.querySelector('.market-navigation > summary')?.textContent).toContain('Explore market');
+    const select = container.querySelector<HTMLSelectElement>('[aria-label="Market navigation sort"]')!;
+    await act(async () => { select.value = 'bid'; select.dispatchEvent(new Event('change', { bubbles: true })); });
+    expect(window.location.search).toContain('sort=bid');
+    expect(window.location.search).toContain('make=FORD');
+  });
+  it('does not turn a failed refresh or its cached board into a new observation', async () => {
+    await render('map=bids');
+    const select = () => container.querySelector<HTMLSelectElement>('[aria-label="Inspect market observation"]')!;
+    const initial = select().options.length;
+    fixture.pulse.isError = true;
+    await update(fixture.pulse.data.auctions.map((a: LiveAuction) => ({ ...a, currentBid: 999999 })));
+    expect(select().options.length).toBe(initial);
+    expect(container.querySelector('.market-history__change')).toBeNull();
+  });
+});
