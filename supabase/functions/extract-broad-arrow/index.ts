@@ -222,7 +222,7 @@ function extractVinAndChassis(text: string): { vin: string | null; chassis: stri
 // MARKDOWN PARSER (main extraction logic)
 // ============================================================================
 
-function parseFromMarkdown(markdown: string, html: string, url: string): BroadArrowExtracted {
+export function parseFromMarkdown(markdown: string, html: string, url: string): BroadArrowExtracted {
   const result: BroadArrowExtracted = {
     url,
     title: null,
@@ -252,7 +252,7 @@ function parseFromMarkdown(markdown: string, html: string, url: string): BroadAr
   };
 
   // Combine markdown and stripped HTML for searching
-  const combinedText = markdown + '\n' + (html || '').replace(/<[^>]+>/g, ' ');
+  const combinedText = markdown + '\n' + (html || '').replace(/<[^>]+>/g, ' ').replace(/&#39;|&#x27;|&apos;/gi, "'");
 
   // --- TITLE ---
   // Broad Arrow titles appear as h1 or prominent heading: "1955 Mercedes-Benz 300 SL Gullwing"
@@ -349,17 +349,18 @@ function parseFromMarkdown(markdown: string, html: string, url: string): BroadAr
 
   // --- ESTIMATE ---
   // "Estimate: $800,000 - $1,000,000" or "Est. $800,000-$1,000,000"
+  // Zurich lots read "Estimate: CHF 210'000 - CHF 255'000" (apostrophe thousands, currency before each amount).
   const estimatePatterns = [
-    /Estimate[:\s]*\$?([\d,]+)\s*[-–—]\s*\$?([\d,]+)/i,
-    /Est\.?\s*\$?([\d,]+)\s*[-–—]\s*\$?([\d,]+)/i,
-    /\$?([\d,]+)\s*[-–—]\s*\$?([\d,]+)\s*(?:USD\s+)?(?:Estimate|Est\.?)/i,
+    /Estimate[:\s]*(?:CHF\s*|[$€£])?([\d,'’]+)\s*[-–—]\s*(?:CHF\s*|[$€£])?([\d,'’]+)/i,
+    /Est\.?\s*(?:CHF\s*|[$€£])?([\d,'’]+)\s*[-–—]\s*(?:CHF\s*|[$€£])?([\d,'’]+)/i,
+    /\$?([\d,'’]+)\s*[-–—]\s*\$?([\d,'’]+)\s*(?:USD\s+)?(?:Estimate|Est\.?)/i,
   ];
 
   for (const pattern of estimatePatterns) {
     const match = combinedText.match(pattern);
     if (match) {
-      const low = parseInt(match[1].replace(/,/g, ''), 10);
-      const high = parseInt(match[2].replace(/,/g, ''), 10);
+      const low = parseInt(match[1].replace(/[,'’]/g, ''), 10);
+      const high = parseInt(match[2].replace(/[,'’]/g, ''), 10);
       if (low >= 100 && high >= low && high < 100_000_000) {
         result.estimate_low = low;
         result.estimate_high = high;
@@ -982,7 +983,7 @@ async function scrapeWithFirecrawl(url: string): Promise<{
 // HTTP HANDLER
 // ============================================================================
 
-Deno.serve(async (req) => {
+if (import.meta.main) Deno.serve(async (req) => {
   // Writes are never anonymous: service key, signed-in user, or nothing (P0.2, 2026-09-27).
   const denied = await requireWriteAuth(req);
   if (denied) return denied;

@@ -31,9 +31,10 @@ const decode = (s: string) =>
 
 const textOf = (html: string) => decode(html.replace(/<script[\s\S]*?<\/script[^>]*>|<style[\s\S]*?<\/style[^>]*>|<svg[\s\S]*?<\/svg[^>]*>/gi, " ").replace(/<[^>]*>/g, " ")).replace(/\s+/g, " ").trim();
 
-/** "123,200" | "51.750" | "1.380.000,50" -> a number; a lone dot followed by three digits is a thousands separator. */
+/** "123,200" | "51.750" | "1.380.000,50" | "210'000" -> a number; a lone dot followed by three digits is a thousands
+ * separator, and so is an apostrophe (Swiss grouping on the Zurich sale). */
 export function parseAmount(raw: string): number | null {
-  const s = raw.replace(/[^\d.,]/g, "");
+  const s = raw.replace(/['’]/g, "").replace(/[^\d.,]/g, "");
   if (!s) return null;
   let t = s;
   if (/^\d{1,3}([.,]\d{3})+$/.test(s)) t = s.replace(/[.,]/g, "");
@@ -53,7 +54,7 @@ export function parseLotPage(html: string): BroadArrowLot {
 
   const body = textOf(html);
   const lot = body.match(/\bLot\s+(\d{1,5}[A-Za-z]?)\b/)?.[1] ?? null;
-  const sold = body.match(/Sold Price:\s*([€£$]|CHF\s*)?\s*([\d.,]+)\s*(USD|EUR|GBP|CHF)?/i);
+  const sold = body.match(/Sold Price:\s*([€£$]|CHF\s*)?\s*([\d.,'’]+)\s*(USD|EUR|GBP|CHF)?/i);
   const currency = sold ? (sold[3]?.toUpperCase() ?? (sold[1] === "€" ? "EUR" : sold[1] === "£" ? "GBP" : sold[1]?.trim().toUpperCase() === "CHF" ? "CHF" : sold[1] === "$" ? "USD" : null)) : null;
   const soldPrice = sold ? parseAmount(sold[2]) : null;
 

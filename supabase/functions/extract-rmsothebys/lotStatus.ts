@@ -16,13 +16,18 @@ export interface LotFlags {
 }
 
 export interface LotStatus {
-  sale_status: 'sold' | 'available' | 'upcoming' | 'ended';
-  event_status: 'sold' | 'active' | 'pending' | 'ended';
+  sale_status: 'sold' | 'available' | 'upcoming' | 'not_sold' | 'ended';
+  event_status: 'sold' | 'active' | 'pending' | 'unsold' | 'ended';
 }
 
+// A lot RM says went through the sale (auctioned=true) that did not sell and is not offered after it was not sold:
+// 55 of the 577 lots of the seven held 2026 auctions in fixtures/lots_2026-10-14.json (e.g. MC26 r0040, a 330 GTS RM's
+// page marks "Not Sold"). Event 'unsold' is the value extract-gooding writes for the same outcome. Only a lot whose
+// auctioned flag is unknown (an HTML page) stays 'ended'.
 export function lotStatus(lot: LotFlags): LotStatus {
   if (lot.sold) return { sale_status: 'sold', event_status: 'sold' };
   if (lot.is_still_for_sale) return { sale_status: 'available', event_status: 'active' };
   if (lot.auctioned === false) return { sale_status: 'upcoming', event_status: 'pending' };
+  if (lot.auctioned === true) return { sale_status: 'not_sold', event_status: 'unsold' };
   return { sale_status: 'ended', event_status: 'ended' };
 }
