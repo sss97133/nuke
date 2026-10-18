@@ -347,11 +347,16 @@ export function extractSpecsFromContent(text: string): {
 
 // ─── Image Extraction ───────────────────────────────────────────────────────
 
+function isBonhamsJunkImageUrl(url: string): boolean {
+  return /web-assets|\/flags\/|width%3D230|width%3D650|[?&]w=(?:16|24|32|48|64)\b|\.svg(?:[?#]|$)/i.test(url);
+}
+
 function extractImages(html: string, markdown: string | null): string[] {
   const images: string[] = [];
   const seen = new Set<string>();
 
   function addImage(url: string) {
+    if (isBonhamsJunkImageUrl(url)) return;
     // Clean URL: remove resize params for full resolution
     let clean = url
       .replace(/[?&]width=\d+/gi, "")
@@ -835,6 +840,7 @@ function emptyResult(url: string, source: string, costCents: number): Extraction
 // ─── Build vehicle record (maps extraction to vehicles table columns) ───────
 
 export function buildVehicleRecord(extracted: ExtractionResult): Record<string, any> {
+  const primaryImageUrl = extracted.image_urls.find((u) => u && !isBonhamsJunkImageUrl(u)) || null;
   const facets = extractVehicleFacets({
     year: extracted.year,
     make: extracted.make,
@@ -862,6 +868,7 @@ export function buildVehicleRecord(extracted: ExtractionResult): Record<string, 
     model: extracted.model?.toLowerCase() || null,
     series: resolvedSeries,
     trim: resolvedTrim,
+    ...(primaryImageUrl ? { primary_image_url: primaryImageUrl } : {}),
     // Store chassis in VIN field for vintage vehicles if no modern VIN
     vin: extracted.vin
       ? extracted.vin.toUpperCase()
@@ -1039,13 +1046,33 @@ async function addVehicleImages(
   images: Array<{ url: string; primary?: boolean }>,
   context: { source_url: string; lot_number?: string | null },
 ): Promise<number> {
-  if (images.length === 0) return 0;
+  const validImages = images.filter((img) => img.url && !isBonhamsJunkImageUrl(img.url));
+  if (validImages.length === 0) return 0;
   const { data: have, error: readErr } = await supabase
-    .from("vehicle_images").select("image_url, is_primary").eq("vehicle_id", vehicleId).limit(500);
+    .from("vehicle_images").select("id, image_url, is_primary, is_superseded").eq("vehicle_id", vehicleId).limit(500);
   if (readErr) throw new Error(`images read: ${readErr.message}`);
+  const junkIds = (have ?? [])
+    .filter((r: { image_url: string; is_superseded?: boolean | null; is_primary?: boolean | null }) =>
+      isBonhamsJunkImageUrl(r.image_url) && (!r.is_superseded || r.is_primary))
+    .map((r: { id: string }) => r.id);
+  if (junkIds.length > 0) {
+    softWrite("vehicle_images supersede junk", await supabase
+      .from("vehicle_images")
+      .update({ is_superseded: true, is_primary: false, superseded_at: new Date().toISOString() })
+      .in("id", junkIds));
+  }
   const urls = new Set((have ?? []).map((r: { image_url: string }) => r.image_url));
-  let hasPrimary = (have ?? []).some((r: { is_primary: boolean | null }) => r.is_primary === true);
-  const fresh = images.slice(0, 100).filter((img) => !urls.has(img.url));
+  let hasPrimary = (have ?? []).some(
+    (r: { image_url: string; is_primary: boolean | null }) => r.is_primary === true && !isBonhamsJunkImageUrl(r.image_url),
+  );
+  const fresh = validImages.slice(0, 100).filter((img) => !urls.has(img.url));
+  const heroUrl = validImages.find((img) => img.primary)?.url || validImages[0]?.url || null;
+  if (heroUrl) {
+    const { data: vRow } = await supabase.from("vehicles").select("primary_image_url").eq("id", vehicleId).maybeSingle();
+    if (!vRow?.primary_image_url || isBonhamsJunkImageUrl(vRow.primary_image_url)) {
+      softWrite("vehicles primary_image_url", await supabase.from("vehicles").update({ primary_image_url: heroUrl }).eq("id", vehicleId));
+    }
+  }
   if (fresh.length === 0) return 0;
   const rows = fresh.map((img, i) => {
     const primary = !hasPrimary && (img.primary || i === 0);

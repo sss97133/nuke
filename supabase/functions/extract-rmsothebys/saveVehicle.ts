@@ -145,7 +145,7 @@ export async function saveVehicle(
     // revision item (identity_match / different_car / relink); nothing is written to that vehicle.
     const { data: idRow } = await supabase
       .from('vehicles')
-      .select('year,make,model,vin,series,trim,body_style')
+      .select('year,make,model,vin,series,trim,body_style,primary_image_url')
       .eq('id', resolvedId)
       .maybeSingle();
     const conflict = idRow ? identityConflict(idRow, { year: vehicle.year, make: vehicle.make, model: vehicle.model }) : null;
@@ -171,6 +171,7 @@ export async function saveVehicle(
     if (resolvedSeries && !idRow?.series) updatePayload.series = resolvedSeries;
     if (resolvedTrim && !idRow?.trim) updatePayload.trim = resolvedTrim;
     if (resolvedBodyStyle && !idRow?.body_style) updatePayload.body_style = resolvedBodyStyle;
+    if (vehicle.image_url && !idRow?.primary_image_url) updatePayload.primary_image_url = vehicle.image_url;
 
     mustWrite('vehicles update', await supabase
       .from('vehicles')
