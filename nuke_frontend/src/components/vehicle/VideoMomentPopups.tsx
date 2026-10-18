@@ -1,29 +1,21 @@
 import React, { useState, useEffect } from 'react';
 import ReactDOM from 'react-dom';
 import { supabase } from '../../lib/supabase';
+import { PrefetchLink } from '../PrefetchLink';
 
 // ============================================================================
 // PRICE BREAKDOWN POPUP
 // ============================================================================
 
 interface PriceBreakdownProps {
-  hammerPrice: number;
+  recordedAmount: number;
   estimateLow?: number | null;
   estimateHigh?: number | null;
   source?: string;
+  sourceUrl?: string | null;
+  lotNumber?: string | null;
   vehicleId?: string;
   onClose: () => void;
-}
-
-interface ComparableSale {
-  id: string;
-  year: number;
-  make: string;
-  model: string;
-  winning_bid: number;
-  auction_start_date: string;
-  source: string;
-  lot_number: string;
 }
 
 interface PriceLineItem {
@@ -34,97 +26,62 @@ interface PriceLineItem {
 }
 
 export const PriceBreakdownPopup: React.FC<PriceBreakdownProps> = ({
-  hammerPrice,
+  recordedAmount,
   estimateLow,
   estimateHigh,
+  source,
+  sourceUrl,
+  lotNumber,
   vehicleId,
   onClose
 }) => {
-  const [comparables, setComparables] = useState<ComparableSale[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [saleContext, setSaleContext] = useState<{ vehicleId: string; href: string } | null>(null);
   const [activeDefinition, setActiveDefinition] = useState<string | null>(null);
+  let sourceLink: string | null = null;
+  try {
+    const url = new URL(sourceUrl || '');
+    if (['http:', 'https:'].includes(url.protocol) && !url.username && !url.password) sourceLink = url.href;
+  } catch { /* An unresolved locator cannot become an outbound link. */ }
 
-  // Price vs estimate
-  let vsEstimate = '';
-  if (estimateLow && estimateHigh) {
-    const mid = (estimateLow + estimateHigh) / 2;
-    const diff = ((hammerPrice - mid) / mid) * 100;
-    if (diff > 5) vsEstimate = `+${Math.round(diff)}% over`;
-    else if (diff < -5) vsEstimate = `${Math.round(diff)}% under`;
-    else vsEstimate = 'Within range';
-  }
-
-  // Fetch comparables
+  // Reuse the qualified sale reader; a raw year/model match is not a comparable sale.
   useEffect(() => {
-    const fetchComparables = async () => {
-      if (!vehicleId) {
-        setLoading(false);
-        return;
-      }
-
-      // Get vehicle info first
-      const { data: vehicle } = await supabase
-        .from('vehicles')
-        .select('year, make, model')
-        .eq('id', vehicleId)
-        .single();
-
-      if (!vehicle) {
-        setLoading(false);
-        return;
-      }
-
-      // Find similar vehicles
-      const { data: comps } = await supabase
-        .from('auction_events')
-        .select(`
-          id, winning_bid, auction_start_date, source, lot_number,
-          vehicles!inner(id, year, make, model)
-        `)
-        .eq('vehicles.make', vehicle.make)
-        .eq('vehicles.model', vehicle.model)
-        .gte('vehicles.year', vehicle.year - 3)
-        .lte('vehicles.year', vehicle.year + 3)
-        .not('winning_bid', 'is', null)
-        .neq('vehicle_id', vehicleId)
-        .order('auction_start_date', { ascending: false })
-        .limit(5);
-
-      if (comps) {
-        setComparables(comps.map((c: any) => ({
-          id: c.vehicles.id,
-          year: c.vehicles.year,
-          make: c.vehicles.make,
-          model: c.vehicles.model,
-          winning_bid: c.winning_bid,
-          auction_start_date: c.auction_start_date,
-          source: c.source,
-          lot_number: c.lot_number
-        })));
-      }
-      setLoading(false);
-    };
-
-    fetchComparables();
+    let cancelled = false;
+    setSaleContext(null);
+    if (vehicleId) void (async () => {
+      try {
+        const { data: vehicle, error } = await supabase.from('vehicles')
+          .select('id, year, make, model').eq('id', vehicleId)
+          .eq('is_public', true).is('deleted_at', null)
+          .or('listing_kind.is.null,listing_kind.neq.non_vehicle_item').maybeSingle();
+        if (cancelled || error || vehicle?.id !== vehicleId || !Number.isInteger(vehicle.year) || vehicle.year <= 0
+          || !vehicle.make?.trim() || !vehicle.model?.trim()) return;
+        // Same identity/subject-exclusion contract as AuctionEvidence. Do not lend this amount units.
+        setSaleContext({ vehicleId, href: `/valuation?${new URLSearchParams({
+          year: String(vehicle.year), make: vehicle.make, model: vehicle.model, vehicle_id: vehicleId,
+        })}` });
+      } catch { /* Failed or denied metadata leaves the attributed amount intact. */ }
+    })();
+    return () => { cancelled = true; };
   }, [vehicleId]);
 
   const lineItems: PriceLineItem[] = [
-    ...(estimateLow && estimateHigh ? [{
-      label: 'Estimate Range',
-      value: `$${(estimateLow/1000).toFixed(0)}K - $${(estimateHigh/1000).toFixed(0)}K`,
-      definition: 'Pre-auction estimate set by the auction house based on market data, condition, and comparable sales.',
-      highlight: 'muted' as const
-    }] : []),
     {
-      label: 'Hammer Price',
-      value: hammerPrice,
-      definition: 'The final bid amount when the auctioneer\'s hammer falls. This is the base price before any fees.',
+      label: 'Recorded auction amount',
+      value: recordedAmount,
+      definition: 'Amount recorded for this auction lot. Currency and fee basis are unknown in this read; it does not establish a hammer price or buyer total.',
     },
-    ...(vsEstimate ? [{
-      label: 'vs Estimate',
-      value: vsEstimate,
-      definition: 'How the final price compared to the mid-point of the estimate range.',
-      highlight: (vsEstimate.startsWith('+') ? 'success' : vsEstimate.startsWith('-') ? 'warning' : 'muted') as 'success' | 'warning' | 'muted'
+    {
+      label: 'Currency and fee basis',
+      value: 'Unknown',
+      definition: 'This auction record does not supply attributed currency or fee terms. The source name alone cannot establish them.',
+      highlight: 'muted'
+    },
+    ...(typeof estimateLow === 'number' && Number.isFinite(estimateLow) && estimateLow > 0
+      && typeof estimateHigh === 'number' && Number.isFinite(estimateHigh) && estimateHigh >= estimateLow ? [{
+      label: 'Recorded estimate range',
+      value: `${estimateLow.toLocaleString()} – ${estimateHigh.toLocaleString()}`,
+      definition: 'Recorded source estimates; currency and comparability to the recorded auction amount are unestablished. No price-versus-estimate calculation is made.',
+      highlight: 'muted' as const
     }] : []),
     {
       label: 'Fees and proceeds',
@@ -171,11 +128,16 @@ export const PriceBreakdownPopup: React.FC<PriceBreakdownProps> = ({
           background: 'var(--surface)',
           zIndex: 1
         }}>
-          <span style={{ fontWeight: 700, fontSize: '13px' }}>PRICE BREAKDOWN</span>
+          <span style={{ fontWeight: 700, fontSize: '13px' }}>AUCTION AMOUNT</span>
           <button onClick={onClose} style={{
             background: 'none', border: 'none', cursor: 'pointer',
             fontSize: '18px', color: 'var(--text-muted)', lineHeight: 1
           }}>×</button>
+        </div>
+
+        <div style={{ padding: '8px 16px', fontSize: '11px', color: 'var(--text-muted)' }}>
+          {source?.toUpperCase() || 'Auction record'}{lotNumber ? ` · Lot ${lotNumber}` : ''}
+          {sourceLink && <> · <a href={sourceLink} target="_blank" rel="noopener noreferrer">Original listing ↗</a></>}
         </div>
 
         {/* Line Items */}
@@ -210,7 +172,7 @@ export const PriceBreakdownPopup: React.FC<PriceBreakdownProps> = ({
                          item.highlight === 'warning' ? 'var(--warning)' :
                          item.highlight === 'muted' ? 'var(--text-muted)' : 'var(--text)'
                 }}>
-                  {typeof item.value === 'number' ? `$${item.value.toLocaleString()}` : item.value}
+                  {typeof item.value === 'number' ? item.value.toLocaleString() : item.value}
                 </span>
               </div>
               {activeDefinition === item.label && (
@@ -230,57 +192,14 @@ export const PriceBreakdownPopup: React.FC<PriceBreakdownProps> = ({
           ))}
         </div>
 
-        {/* Comparables */}
-        {vehicleId && (
-          <div style={{ borderTop: '2px solid var(--border)' }}>
-            <div style={{
-              padding: '12px 16px',
-              fontWeight: 700,
-              fontSize: '11px',
-              color: 'var(--text-muted)'
-            }}>
-              COMPARABLE SALES
+        {saleContext && saleContext.vehicleId === vehicleId && (
+          <div style={{ borderTop: '2px solid var(--border)', padding: '12px 16px', fontSize: '11px' }}>
+            <PrefetchLink to={saleContext.href}
+              onMouseEnter={() => { void import('../../pages/Valuation').catch(() => {}); }}
+              onFocus={() => { void import('../../pages/Valuation').catch(() => {}); }}>Recorded sale context →</PrefetchLink>
+            <div style={{ marginTop: '4px', color: 'var(--text-muted)' }}>
+              Source-qualified sales use their own currency, dates and fee basis. Condition and equipment remain unmatched.
             </div>
-            {loading ? (
-              <div style={{ padding: '20px', textAlign: 'center', fontSize: '11px', color: 'var(--text-muted)' }}>
-                Loading...
-              </div>
-            ) : comparables.length === 0 ? (
-              <div style={{ padding: '20px', textAlign: 'center', fontSize: '11px', color: 'var(--text-muted)' }}>
-                No comparables found
-              </div>
-            ) : (
-              <div style={{ padding: '0 8px 12px' }}>
-                {comparables.map((comp) => (
-                  <a
-                    key={comp.id}
-                    href={`/vehicle/${comp.id}`}
-                    onClick={(e) => e.stopPropagation()}
-                    style={{
-                      display: 'block',
-                      padding: '8px',
-                      margin: '4px 0',
-                      background: 'var(--surface-raised)',
-                      borderRadius: 0,
-                      textDecoration: 'none',
-                      color: 'inherit'
-                    }}
-                  >
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <span style={{ fontSize: '11px' }}>
-                        {comp.year} {comp.make} {comp.model}
-                      </span>
-                      <span style={{ fontSize: '11px', fontWeight: 600, fontFamily: "'Courier New', monospace" }}>
-                        ${comp.winning_bid.toLocaleString()}
-                      </span>
-                    </div>
-                    <div style={{ fontSize: '9px', color: 'var(--text-muted)', marginTop: '2px' }}>
-                      {comp.source?.toUpperCase()} {comp.lot_number} • {new Date(comp.auction_start_date).toLocaleDateString()}
-                    </div>
-                  </a>
-                ))}
-              </div>
-            )}
           </div>
         )}
       </div>
