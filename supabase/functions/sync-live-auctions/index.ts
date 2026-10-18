@@ -626,6 +626,7 @@ async function syncBonhams(): Promise<{ auctions: LiveAuction[]; error: string |
         const r = await get("lots", { q: "*", query_by: "title", per_page: "250", page: String(page), filter_by: `auctionId:=${sale.id} && department.code:=MOT-CAR` });
         // deno-lint-ignore no-explicit-any
         for (const doc of (r.hits ?? []).map((h: any) => h.document as BonhamsLotDoc)) {
+          if (!doc.lotId || doc.lotId === "0") continue; // not yet catalogued: no lot number, no lot page
           const lot = bonhamsLot(doc);
           if (!lot.title || !lot.url.includes("/lot/")) continue;
           const ident = parseBatIdentityFromTitle(lot.title.replace(/\s+(Chassis|Registration|Frame|Engine) no\..*$/i, ""), null);
