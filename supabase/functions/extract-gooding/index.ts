@@ -1321,20 +1321,25 @@ if (import.meta.main) Deno.serve(async (req) => {
 
     // Stats
     if (action === 'stats') {
-      const { data: stats } = await supabase.rpc('count_vehicles_by_source', {
-        source_name: 'gooding',
-      }).maybeSingle();
-
-      const { count: listingCount } = await supabase
-        .from('vehicle_events')
-        .select('*', { count: 'exact', head: true })
-        .eq('source_platform', 'gooding');
+      const [vehicles, events] = await Promise.all([
+        supabase
+          .from('vehicles')
+          .select('id', { count: 'exact', head: true })
+          .eq('discovery_source', 'gooding')
+          .is('deleted_at', null),
+        supabase
+          .from('vehicle_events')
+          .select('*', { count: 'exact', head: true })
+          .eq('source_platform', 'gooding'),
+      ]);
+      const readError = vehicles.error || events.error;
+      if (readError) throw new Error(`stats count failed: ${readError.message}`);
 
       return new Response(
         JSON.stringify({
           success: true,
-          vehicles_in_db: (stats as { count?: number } | null)?.count || 0,
-          vehicle_events: listingCount || 0,
+          vehicles_in_db: vehicles.count ?? 0,
+          vehicle_events: events.count ?? 0,
         }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
