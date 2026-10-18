@@ -30,6 +30,17 @@ describe('momentFromPresentation', () => {
     expect(m.source_url).toBeNull();
   });
 
+  it('counts displayed bid changes and ignores malformed ladder steps', () => {
+    const withLadder = { ...presentation, structured_data: { ...presentation.structured_data,
+      value: { ...presentation.structured_data.value,
+        bid_ladder: [{ t: 6710, amount: 1000000 }, { t: 6720, amount: 1100000 }, { t: 'x', amount: 1 }, null, { t: 6730 }] } } };
+    expect(momentFromPresentation(withLadder)!.displayed_bid_changes).toBe(2);
+    expect(momentFromPresentation(presentation)!.displayed_bid_changes).toBeNull();
+    const empty = { ...presentation, structured_data: { ...presentation.structured_data,
+      value: { ...presentation.structured_data.value, bid_ladder: [] } } };
+    expect(momentFromPresentation(empty)!.displayed_bid_changes).toBeNull();
+  });
+
   it('drops rows without a video seek and an unknown displayed outcome', () => {
     expect(momentFromPresentation({ ...presentation, structured_data: { value: { lot: 'S1' } } })).toBeNull();
     const unknown = momentFromPresentation({ ...presentation,
