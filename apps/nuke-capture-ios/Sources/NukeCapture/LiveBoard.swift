@@ -991,6 +991,33 @@ enum LiveAuctionWindow: String, CaseIterable, Identifiable {
     }
 }
 
+/// The web's BID_BUCKETS/bidBucket: current USD bids, never sale prices or estimates.
+/// A recorded zero belongs under $10,000; absent, negative and nonfinite bids stay unrecorded.
+enum LiveBidRange: String, CaseIterable, Identifiable {
+    case all, under10k, from10kTo25k, from25kTo50k, from50kTo100k, over100k, unrecorded
+    var id: String { rawValue }
+    var label: String {
+        switch self {
+        case .all: return "Any current bid"
+        case .under10k: return "Under $10,000"
+        case .from10kTo25k: return "$10,000–24,999"
+        case .from25kTo50k: return "$25,000–49,999"
+        case .from50kTo100k: return "$50,000–99,999"
+        case .over100k: return "$100,000+"
+        case .unrecorded: return "Unrecorded"
+        }
+    }
+    static func bucket(_ bid: Double?) -> Self {
+        guard let bid, bid.isFinite, bid >= 0 else { return .unrecorded }
+        if bid < 10_000 { return .under10k }
+        if bid < 25_000 { return .from10kTo25k }
+        if bid < 50_000 { return .from25kTo50k }
+        if bid < 100_000 { return .from50kTo100k }
+        return .over100k
+    }
+    func includes(_ lot: LiveAuction) -> Bool { self == .all || Self.bucket(lot.currentBid) == self }
+}
+
 enum LiveAuctionOrder: String, CaseIterable, Identifiable {
     case ending = "Ending first", bid = "Highest bid", newest = "Newest"
     var id: String { rawValue }
@@ -1036,6 +1063,7 @@ struct LiveBoardView: View {
     @State private var filterDecade: String? = nil
     @State private var auctionWindow: LiveAuctionWindow = .all
     @State private var auctionOrder: LiveAuctionOrder = .ending
+    @State private var bidRange: LiveBidRange = .all
 
     /// The clock the board is read against; set when a read lands so one evaluation shares it.
     @State private var now = Date()
@@ -1049,13 +1077,17 @@ struct LiveBoardView: View {
             .filter { filterDecade == nil || LiveInventory.decade($0) == filterDecade }
     }
 
-    private var lots: [LiveAuction] {
-        auctionOrder.sorted(scopedLots.filter { auctionWindow.includes($0, at: now) })
+    private var windowedLots: [LiveAuction] { scopedLots.filter { auctionWindow.includes($0, at: now) } }
+    private var lots: [LiveAuction] { auctionOrder.sorted(windowedLots.filter(bidRange.includes)) }
+    // Map and supporting rows share the same window and bid range. Make/decade
+    // selection narrows the rows; the map keeps the other makes available to select.
+    private var mappedLots: [LiveAuction] {
+        openLots.filter { auctionWindow.includes($0, at: now) && bidRange.includes($0) }
     }
 
     private var filterLine: String? {
         guard let m = filterMake else { return nil }
-        return [m, filterDecade].compactMap { $0 }.joined(separator: " · ") + " · \(lots.count.formatted()) of \(openLots.count.formatted()) open lots"
+        return [m, filterDecade].compactMap { $0 }.joined(separator: " · ")
     }
 
     /// The web's head line: the board's current bids against the same hour a week ago, only on
@@ -1119,6 +1151,7 @@ struct LiveBoardView: View {
                                     }
                                 }
                                 .pickerStyle(.menu)
+                                .onChange(of: auctionWindow) { _, _ in bidRange = .all }
                                 Spacer(minLength: 4)
                                 Picker("Sort auctions", selection: $auctionOrder) {
                                     ForEach(LiveAuctionOrder.allCases) { order in
@@ -1128,12 +1161,24 @@ struct LiveBoardView: View {
                                 .pickerStyle(.menu)
                             }
                             .font(.caption)
-                            Text("\(lots.count.formatted()) of \(scopedLots.count.formatted()) open lots in this selection")
-                                .font(.caption2.monospaced()).foregroundStyle(.secondary)
+                            Picker("Current bid (USD)", selection: $bidRange) {
+                                ForEach(LiveBidRange.allCases) { range in
+                                    Text(range.label).tag(range)
+                                        .disabled(range != .all && range != bidRange && !windowedLots.contains(where: range.includes))
+                                }
+                            }
+                            .pickerStyle(.menu)
+                            RootedValueView(label: "Open lots in selection",
+                                value: "\(lots.count.formatted()) of \(windowedLots.count.formatted())",
+                                status: .recorded,
+                                decay: "Selection checked " + now.formatted(date: .abbreviated, time: .shortened))
+                            Text("Current bids in US dollars, not sold prices or valuations. Unrecorded bids stay separate from recorded zero.")
+                                .font(.caption2).foregroundStyle(.secondary)
                         }
                         // The board drawn as the web draws it: brands as boxes, decades inside.
                         Section {
-                            LiveInventoryMapView(lots: openLots) { make, decade in
+                            LiveInventoryMapView(lots: mappedLots) { make, decade in
+                                if filterMake != make { bidRange = .all } // the web clears the bid lens on a make change
                                 filterMake = make; filterDecade = decade
                             }
                             .listRowInsets(EdgeInsets(top: 4, leading: 8, bottom: 4, trailing: 8))
@@ -1142,7 +1187,7 @@ struct LiveBoardView: View {
                                 HStack(spacing: 8) {
                                     Text(f).font(.caption2.monospaced()).foregroundStyle(.secondary).lineLimit(1)
                                     Spacer(minLength: 0)
-                                    Button("All") { filterMake = nil; filterDecade = nil }.font(.caption2)
+                                    Button("All makes") { filterMake = nil; filterDecade = nil; bidRange = .all }.font(.caption2)
                                 }
                                 .listRowBackground(Color.clear)
                             }
@@ -1156,6 +1201,10 @@ struct LiveBoardView: View {
                                 .textCase(nil)
                         }
                         Section {
+                            if lots.isEmpty {
+                                Text("No open lots in this selection. Choose another current bid range or auction window.")
+                                    .font(.footnote).foregroundStyle(.secondary)
+                            }
                             ForEach(lots) { lot in
                                 if let uuid = lot.vehicleUUID {
                                     NavigationLink(value: VehicleHeaderRow(id: uuid, year: lot.year, make: lot.make,
