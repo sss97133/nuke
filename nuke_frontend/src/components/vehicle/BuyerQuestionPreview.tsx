@@ -8,6 +8,7 @@
  */
 import { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
+import { MakeIdentity } from '../common/MakeIdentity';
 
 interface QuestionRow {
   l1_category: string;
@@ -85,7 +86,7 @@ export default function BuyerQuestionPreview({ vehicleId, make }: { vehicleId: s
         textTransform: 'uppercase',
         letterSpacing: '0.05em',
       }}>
-        Top {rows.length} recorded question categories for {requestedMake}
+        Top {rows.length} recorded question categories for <MakeIdentity make={requestedMake} />
       </div>
 
       {rows.map(r => (

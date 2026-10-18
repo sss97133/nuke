@@ -39,6 +39,7 @@ describe('make-level buyer question context', () => {
     fixture.read.mockResolvedValue(ok([row(), row({ l1_category: 'provenance', l2_subcategory: 'ownership', display_name: 'Ownership history', question_count: 1 })]));
     await render();
     expect(container.textContent).toContain('Top 2 recorded question categories for Chevrolet');
+    expect(container.querySelector('.make-identity')?.textContent).toContain('Chevrolet');
     expect(container.textContent).toContain('Brake history'); expect(container.textContent).toContain('Ownership history');
     expect(container.textContent).toContain('3 questions'); expect(container.textContent).toContain('1 question');
     expect(container.textContent).toContain('75%'); expect(container.textContent).toContain('25%');
