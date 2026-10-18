@@ -94,7 +94,7 @@ it('offers touch inspection before drilling and keeps grouped rows on their exis
     expect(onPickFamily).toHaveBeenCalledWith('Porsche', 'f911', '911', true);
     await act(async () => container.querySelector<HTMLButtonElement>('[title^="Ferrari other models"]')!.click());
     expect(container.querySelector('dialog')?.getAttribute('aria-label')).toBe('Ferrari other models');
-    expect(container.querySelector('dialog')?.textContent).toContain('no measured sales');
+    expect(container.querySelector('dialog')?.textContent).toContain('no single-family comparison');
     expect(onPickBrand).not.toHaveBeenCalled();
     await act(async () => container.querySelector('dialog')!.dispatchEvent(new Event('cancel', { cancelable: true })));
     expect(container.querySelector('dialog')).toBeNull();
