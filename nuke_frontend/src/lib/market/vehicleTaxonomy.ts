@@ -675,7 +675,7 @@ export function resolveMarketCohortShortcuts(
         .filter(Boolean)
         .join(' ')
         .toLowerCase();
-      if (!haystack.includes(cleaned)) continue;
+      if (!containsWholeTerm(haystack, cleaned)) continue;
 
       const axis: Exclude<FamilyFacetAxis, 'raw'> = mark.trimPackage
         ? 'trim'
