@@ -177,7 +177,7 @@ function useBoardHistory(auctions: LiveAuction[], scope: string, enabled: boolea
 
 function BoardHistory({ samples, measure }: { samples: BoardSample[]; measure: 'bids' | 'lots' }) {
   const [selectedAt, setSelectedAt] = useState<number | null>(null);
-  const [lot, setLot] = useState<LiveAuction | null>(null);
+  const [lot, setLot] = useState<{ auction: LiveAuction; at: number } | null>(null);
   if (!samples.length) return null;
   const value = (s: BoardSample) => measure === 'bids' ? s.bids : s.lots;
   const fmt = measure === 'bids' ? bidNumber : count;
@@ -209,13 +209,13 @@ function BoardHistory({ samples, measure }: { samples: BoardSample[]; measure: '
     {delta != null && <Text role="measure" as="div">{delta >= 0 ? '+' : '−'}{fmt(Math.abs(delta))} since previous observation</Text>}
     <Text role="caption" as="p">History starts when you open this page. Updates can combine bids. Lots entering or leaving also change the total; leaving does not establish a sale.</Text>
     {changes.length > 0 ? <div className="market-history__changes">
-      {changes.map((c, i) => <button type="button" className="market-history__change" key={i} disabled={!listingKey(c.auction)} onClick={() => setLot(c.auction)}>
+      {changes.map((c, i) => <button type="button" className="market-history__change" key={i} disabled={!listingKey(c.auction)} onClick={() => setLot({ auction: c.auction, at: selected.at })}>
         <Text role="body">{title(c.auction)}</Text>
         <Text role="measure">{c.kind === 'entered' ? 'Entered board' : c.kind === 'left' ? 'Left board' : c.before == null ? 'Bid now recorded' : c.after == null ? 'Bid now unrecorded' : `${c.after >= c.before ? '+' : '−'}${bidNumber(Math.abs(c.after - c.before))}`}</Text>
         {measure === 'bids' && <Text role="caption">{c.kind === 'bid' ? `${bidNumber(c.before)} → ${bidNumber(c.after)}` : bidNumber(c.kind === 'entered' ? c.after : c.before)}</Text>}
       </button>)}
     </div> : <Text role="body" as="p">{prev ? 'No change in this observation.' : 'Starting observation. New changes will appear here as the board updates.'}</Text>}
-    {lot && <AuctionEvidence key={`${lot.id}:${lot.listingUrl}`} vehicleId={lot.id} sourceUrl={lot.listingUrl} compact onClose={() => setLot(null)} />}
+    {lot && lot.at === selected.at && <AuctionEvidence key={`${lot.auction.id}:${lot.auction.listingUrl}`} vehicleId={lot.auction.id} sourceUrl={lot.auction.listingUrl} compact onClose={() => setLot(null)} />}
   </section>;
 }
 

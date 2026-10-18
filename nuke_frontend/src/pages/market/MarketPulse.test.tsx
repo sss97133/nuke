@@ -641,6 +641,11 @@ describe('headline movement inspection', () => {
     // A later unchanged read must not erase the latest raise.
     await update([...fixture.pulse.data.auctions]);
     expect(panel.textContent).toContain('+$1,500 since previous observation');
+    expect(panel.querySelector('[aria-label="Listing activity evidence"]')).toBeTruthy();
+    // Following a different change closes evidence tied to the previous observation.
+    await update([{ ...fixture.pulse.data.auctions[0], currentBid: 27_000 }]);
+    expect(panel.textContent).toContain('+$500 since previous observation');
+    expect(panel.querySelector('[aria-label="Listing activity evidence"]')).toBeNull();
     const select = panel.querySelector<HTMLSelectElement>('select')!;
     await act(async () => { select.value = '0'; select.dispatchEvent(new Event('change', { bubbles: true })); });
     expect(panel.textContent).toContain('Starting observation');
