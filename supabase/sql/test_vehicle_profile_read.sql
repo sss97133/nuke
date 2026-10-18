@@ -92,6 +92,7 @@ GRANT SELECT ON ALL TABLES IN SCHEMA public TO anon, authenticated, service_role
 \ir ../migrations/20261018174500_land_cruiser_porsche_blazer_pontiac_jaguar_marks.sql
 \ir ../migrations/20261018170000_vehicle_profile_read_facets_and_provenance.sql
 \ir ../migrations/20261018190000_vehicle_profile_read_identity_marks.sql
+\ir ../migrations/20261018193000_profile_read_masthead_identity_marks.sql
 
 -- Seeds. v1: the documented case; v2: nothing recorded; v3: a sourceless odometer; v4: private;
 -- v5: a classified asking price; v6: competing evidence; v7: a live auction bid.
@@ -112,6 +113,8 @@ INSERT INTO public.vehicles (id, year, make, model, body_style, transmission) VA
  ('10000000-0000-0000-0000-000000000008', 1977, 'Chevrolet', 'K5 Blazer', 'SUV', 'AUTOMATIC 4WD');
 INSERT INTO public.vehicles (id, year, make, model, engine_type, listing_location, discovery_url) VALUES
  ('10000000-0000-0000-0000-000000000009', 1970, 'Plymouth', 'Hemi Road Runner', '426 Hemi V-8', 'Kissimmee, FL', 'https://www.mecum.com/lots/539536/1970-plymouth-hemi-road-runner/');
+INSERT INTO public.vehicles (id, year, make, model, normalized_model, series, trim, body_style) VALUES
+ ('10000000-0000-0000-0000-000000000010', 1973, 'Chevrolet', 'K10 Cheyenne Super Stepside', 'C/K', 'K10', 'Cheyenne Super', 'Stepside');
 
 INSERT INTO public.field_evidence (vehicle_id, field_name, proposed_value, source_type, source_confidence, extracted_at, status) VALUES
  ('10000000-0000-0000-0000-000000000001', 'engine_size',  '4.7L V8',   'user-submission_listing', 80, '2026-09-01T00:00:00Z', 'accepted'),
@@ -233,23 +236,30 @@ BEGIN
     = '426 Hemi V-8|Kissimmee, FL', format('engine_type and listing_location fallbacks populate strip facets; got %s', d->'sections'->1->'facets'));
   PERFORM public.t_assert(d->'sections'->0->'price'->'source'->>'url' = 'https://www.mecum.com/lots/539536/1970-plymouth-hemi-road-runner/',
     'price source url falls back to discovery_url when source_url is null');
-  PERFORM public.t_assert((SELECT string_agg(x->>'display_label', '|' ORDER BY o) FROM jsonb_array_elements(d->'identity_marks') WITH ORDINALITY AS t(x, o))
-    = 'ROAD RUNNER · HEMI', format('v9 (1970 Plymouth Hemi Road Runner) resolves Road Runner identity mark; got %s', d->'identity_marks'));
+  PERFORM public.t_assert((SELECT string_agg(x->>'display_label', '|' ORDER BY o) FROM jsonb_array_elements(d->'sections'->0->'identity_marks') WITH ORDINALITY AS t(x, o))
+    = 'ROAD RUNNER · HEMI', format('v9 (1970 Plymouth Hemi Road Runner) masthead resolves Road Runner identity mark; got %s', d->'sections'->0->'identity_marks'));
 
   d := public.vehicle_profile_read('10000000-0000-0000-0000-000000000001');
-  PERFORM public.t_assert((SELECT string_agg(x->>'display_label', '|' ORDER BY o) FROM jsonb_array_elements(d->'identity_marks') WITH ORDINALITY AS t(x, o))
-    = 'HARDTOP COUPE|MUSTANG|FORD', format('v1 (1966 Ford Mustang Coupe) resolves body silhouette, model wordmark, and marque emblem; got %s', d->'identity_marks'));
+  PERFORM public.t_assert((SELECT string_agg(x->>'display_label', '|' ORDER BY o) FROM jsonb_array_elements(d->'sections'->0->'identity_marks') WITH ORDINALITY AS t(x, o))
+    = 'HARDTOP COUPE|MUSTANG|FORD'
+    AND d->'sections'->0->'identity_marks' = d->'identity_marks',
+    format('v1 (1966 Ford Mustang Coupe) masthead resolves body silhouette, model wordmark, and marque emblem; got %s', d->'sections'->0->'identity_marks'));
 
   d := public.vehicle_profile_read('10000000-0000-0000-0000-000000000006');
-  PERFORM public.t_assert((SELECT string_agg(x->>'display_label', '|' ORDER BY o) FROM jsonb_array_elements(d->'identity_marks') WITH ORDINALITY AS t(x, o))
-    = 'MUSTANG|FORD', format('v6 (1966 Ford Mustang without body_style) resolves model wordmark and marque emblem without inventing body silhouette; got %s', d->'identity_marks'));
+  PERFORM public.t_assert((SELECT string_agg(x->>'display_label', '|' ORDER BY o) FROM jsonb_array_elements(d->'sections'->0->'identity_marks') WITH ORDINALITY AS t(x, o))
+    = 'MUSTANG|FORD', format('v6 (1966 Ford Mustang without body_style) masthead resolves model wordmark and marque emblem without inventing body silhouette; got %s', d->'sections'->0->'identity_marks'));
 
   d := public.vehicle_profile_read('10000000-0000-0000-0000-000000000008');
-  PERFORM public.t_assert((SELECT string_agg(x->>'display_label', '|' ORDER BY o) FROM jsonb_array_elements(d->'identity_marks') WITH ORDINALITY AS t(x, o))
-    = 'K/5 BLAZER · CHEYENNE|CHEVROLET', format('v8 (1977 Chevrolet K5 Blazer) resolves K5 Blazer series badge and Squarebody Chevrolet bowtie; got %s', d->'identity_marks'));
+  PERFORM public.t_assert((SELECT string_agg(x->>'display_label', '|' ORDER BY o) FROM jsonb_array_elements(d->'sections'->0->'identity_marks') WITH ORDINALITY AS t(x, o))
+    = 'K/5 BLAZER · CHEYENNE|CHEVROLET', format('v8 (1977 Chevrolet K5 Blazer) masthead resolves K5 Blazer series badge and Squarebody Chevrolet bowtie; got %s', d->'sections'->0->'identity_marks'));
+
+  d := public.vehicle_profile_read('10000000-0000-0000-0000-000000000010');
+  PERFORM public.t_assert((SELECT string_agg(x->>'display_label', '|' ORDER BY o) FROM jsonb_array_elements(d->'sections'->0->'identity_marks') WITH ORDINALITY AS t(x, o))
+    = 'CHEYENNE SUPER 10|CHEVROLET', format('v10 (1973 Chevrolet K10 Cheyenne Super Stepside with normalized_model C/K, series K10, trim Cheyenne Super) masthead resolves CHEYENNE SUPER 10 and Squarebody Chevrolet bowtie; got %s', d->'sections'->0->'identity_marks'));
 
   d := public.vehicle_profile_read('10000000-0000-0000-0000-000000000002');
-  PERFORM public.t_assert(d->'identity_marks' = '[]'::jsonb, 'v2 (1990 Acme Thing) resolves empty identity_marks array');
+  PERFORM public.t_assert(d->'sections'->0->'identity_marks' = '[]'::jsonb AND d->'identity_marks' = '[]'::jsonb,
+    'v2 (1990 Acme Thing) resolves empty identity_marks array on masthead and root');
 END $$;
 RESET ROLE;
 
