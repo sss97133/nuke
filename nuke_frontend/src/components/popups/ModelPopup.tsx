@@ -5,7 +5,7 @@
  * Shows actual vehicles, price scatter, sources. No garbage aggregates.
  */
 
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { supabase } from '../../lib/supabase';
 import { VEHICLE_POPUP_COLUMNS } from './vehiclePopupColumns';
 import { usePopup } from './usePopup';
@@ -55,6 +55,7 @@ export function ModelPopup({ make, model, searchQuery }: Props) {
   const [data, setData] = useState<ModelIntel | null>(null);
   const [loading, setLoading] = useState(true);
   const [unavailable, setUnavailable] = useState(false);
+  const continuationEpoch = useRef(0);
 
   useEffect(() => {
     let cancelled = false;
@@ -77,7 +78,7 @@ export function ModelPopup({ make, model, searchQuery }: Props) {
     }
 
     load();
-    return () => { cancelled = true; };
+    return () => { cancelled = true; continuationEpoch.current += 1; };
   }, [make, model]);
 
   if (loading || !data) {
@@ -102,8 +103,9 @@ export function ModelPopup({ make, model, searchQuery }: Props) {
     : data.live_now;
 
   const handleVehicleClick = (sale: SaleVehicle) => {
+    const epoch = continuationEpoch.current;
     supabase.from('vehicles').select(VEHICLE_POPUP_COLUMNS).eq('id', sale.id).single().then(({ data: fullVehicle }) => {
-      if (fullVehicle) {
+      if (fullVehicle && continuationEpoch.current === epoch) {
         openPopup(
           <VehiclePopup vehicle={fullVehicle as unknown as FeedVehicle} />,
           [sale.year, sale.make, sale.model].filter(Boolean).join(' '),
