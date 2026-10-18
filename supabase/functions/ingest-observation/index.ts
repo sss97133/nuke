@@ -935,6 +935,11 @@ Deno.serve(async function handleObservation(req, internal?: unknown) {
       confidenceFactors.retained_listing_source_cap = 0.4 - confidenceScore;
       confidenceScore = 0.4;
     }
+    // A label read from the record's own title has no retained capture or author behind it.
+    if (titleFacetVerified && confidenceScore > 0.3) {
+      confidenceFactors.record_title_label_cap = 0.3 - confidenceScore;
+      confidenceScore = 0.3;
+    }
 
     // Determine confidence level from score
     let confidenceLevel = "medium";
