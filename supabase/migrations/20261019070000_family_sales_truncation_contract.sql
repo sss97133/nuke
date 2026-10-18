@@ -6,7 +6,7 @@
 -- This keeps every step of the 20261018183000 body (live md5 d9e09ac4 matched it 2026-10-18 06:55Z) and changes only
 -- the final page: newest first, at most min(p_limit, 15000) rows, with the window count and truncation stated.
 BEGIN;
-SET LOCAL statement_timeout = '30s';
+SET LOCAL statement_timeout = '10s';
 SET LOCAL lock_timeout = '5s';
 
 CREATE OR REPLACE FUNCTION public.treemap_family_sales(p_brand text, p_family_key text, p_limit integer DEFAULT 12000)
