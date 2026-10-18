@@ -50,17 +50,22 @@ export interface IndexLot {
   description: string | null;
 }
 
+import { extractVehicleFacets } from "../_shared/vehicleFacets.ts";
+
 export const INDEX_VEHICLE_TYPES = new Set(["Auto", "Motorcycle", "Tractor", "Boat"]);
 
 /**
  * Extracts structured `series`, `trim`, and `body_style` facets from a Mecum lot's
- * make, model, title, and highlights/description text when the taxonomy leaves them blank or coarse.
+ * make, model, title, URL slug, and highlights/description text when the taxonomy leaves them blank or coarse.
+ * Delegates to the shared collector-marque facet extractor (`_shared/vehicleFacets.ts`) while preserving
+ * Mecum pickup body style labels ("Stepside Pickup", "Flareside Pickup", "Fleetside Pickup", "Styleside Pickup").
  */
 export function extractStructuredLotFacets(params: {
   year?: number | null;
   make?: string | null;
   model?: string | null;
   title?: string | null;
+  url?: string | null;
   highlights?: string | null;
   taxonomyTrim?: string | null;
   taxonomyBodyStyle?: string | null;
@@ -68,13 +73,26 @@ export function extractStructuredLotFacets(params: {
   const brand = (params.make ?? "").trim().toLowerCase();
   const modelRaw = (params.model ?? "").trim();
   const haystack = [params.title, modelRaw, params.highlights].filter(Boolean).join(" ").toUpperCase();
+  const taxonomyBody = params.taxonomyBodyStyle?.trim() || null;
+  const taxonomyTrim = params.taxonomyTrim?.trim() || null;
 
-  let series: string | null = null;
-  let trim: string | null = params.taxonomyTrim?.trim() || null;
-  let bodyStyle: string | null = params.taxonomyBodyStyle?.trim() || null;
+  const shared = extractVehicleFacets({
+    year: params.year ?? null,
+    make: params.make ?? null,
+    model: params.model ?? null,
+    title: params.title ?? null,
+    url: params.url ?? null,
+    description: params.highlights ?? null,
+    trimHint: taxonomyTrim,
+    bodyStyleHint: taxonomyBody,
+  });
 
-  // ── 1. SERIES EXTRACTION ───────────────────────────────────────────────────
-  if (brand === "chevrolet" || brand === "gmc" || /\b(PICKUP|TRUCK|SUBURBAN|BLAZER|JIMMY)\b/.test(haystack)) {
+  let series: string | null = shared.series_code;
+  let trim: string | null = taxonomyTrim || shared.trim_package;
+  let bodyStyle: string | null = taxonomyBody;
+
+  // ── 1. SERIES SUPPLEMENT (truck/muscle edge cases when make is generic or omitted) ──
+  if (!series && (brand === "chevrolet" || brand === "gmc" || /\b(PICKUP|TRUCK|SUBURBAN|BLAZER|JIMMY)\b/.test(haystack))) {
     if (/\bC[-\s]?10\b/.test(haystack)) series = "C10";
     else if (/\bK[-\s]?10\b/.test(haystack)) series = "K10";
     else if (/\bC[-\s]?20\b/.test(haystack)) series = "C20";
@@ -97,49 +115,7 @@ export function extractStructuredLotFacets(params: {
     else if (/\b3500\b/.test(haystack) && (brand === "chevrolet" || brand === "gmc")) series = "3500";
   }
 
-  if (!series && brand === "ford") {
-    if (/\bF[-\s]?100\b/.test(haystack)) series = "F-100";
-    else if (/\bF[-\s]?150\b/.test(haystack)) series = "F-150";
-    else if (/\bF[-\s]?250\b/.test(haystack)) series = "F-250";
-    else if (/\bF[-\s]?350\b/.test(haystack)) series = "F-350";
-    else if (/\bF[-\s]?1\b/.test(haystack)) series = "F-1";
-    else if (/\bSHELBY\s+GT500KR\b/.test(haystack)) series = "Shelby GT500KR";
-    else if (/\bSHELBY\s+GT500\b|\bGT500\b/.test(haystack)) series = "Shelby GT500";
-    else if (/\bSHELBY\s+GT350R\b|\bGT350R\b/.test(haystack)) series = "Shelby GT350R";
-    else if (/\bSHELBY\s+GT350\b|\bGT350\b/.test(haystack)) series = "Shelby GT350";
-    else if (/\bBOSS\s+429\b/.test(haystack)) series = "Boss 429";
-    else if (/\bBOSS\s+302\b/.test(haystack)) series = "Boss 302";
-    else if (/\bBOSS\s+351\b/.test(haystack)) series = "Boss 351";
-    else if (/\bMACH\s+1\b/.test(haystack)) series = "Mach 1";
-    else if (/\bU13\b/.test(haystack)) series = "U13 Roadster";
-    else if (/\bU14\b/.test(haystack)) series = "U14 Half-Cab";
-    else if (/\bU15\b/.test(haystack)) series = "U15 Wagon";
-  }
-
-  if (!series && (brand === "dodge" || brand === "plymouth")) {
-    if (/\bSUPERBIRD\b/.test(haystack)) series = "Superbird";
-    else if (/\bCHARGER\s+DAYTONA\b/.test(haystack)) series = "Daytona";
-    else if (/\bCHARGER\s+500\b/.test(haystack)) series = "Charger 500";
-    else if (/\bAAR\s+['\u2019]?CUDA\b/.test(haystack)) series = "AAR 'Cuda";
-    else if (/\bCHALLENGER\s+T\/A\b/.test(haystack)) series = "T/A";
-    else if (/\bPOWER\s+WAGON\b/.test(haystack)) series = "Power Wagon";
-    else if (/\bD[-\s]?100\b/.test(haystack)) series = "D100";
-    else if (/\bD[-\s]?150\b/.test(haystack)) series = "D150";
-    else if (/\bW[-\s]?100\b/.test(haystack)) series = "W100";
-    else if (/\bW[-\s]?150\b/.test(haystack)) series = "W150";
-  }
-
-  if (!series && brand === "porsche") {
-    if (/\bGT3\s+RS\b/.test(haystack)) series = "GT3 RS";
-    else if (/\bGT3\b/.test(haystack)) series = "GT3";
-    else if (/\bGT2\s+RS\b/.test(haystack)) series = "GT2 RS";
-    else if (/\bCARRERA\s+RS\b/.test(haystack)) series = "Carrera RS";
-    else if (/\bCARRERA\s+4S\b|\bC4S\b/.test(haystack)) series = "Carrera 4S";
-    else if (/\bCARRERA\s+S\b/.test(haystack)) series = "Carrera S";
-    else if (/\bCARRERA\b/.test(haystack)) series = "Carrera";
-  }
-
-  // ── 2. TRIM PACKAGE EXTRACTION ─────────────────────────────────────────────
+  // ── 2. TRIM PACKAGE SUPPLEMENT ─────────────────────────────────────────────
   if (!trim) {
     if (/\bCHEYENNE\s+SUPER\b/.test(haystack)) trim = "Cheyenne Super";
     else if (/\bCHEYENNE\b/.test(haystack)) trim = "Cheyenne";
@@ -180,7 +156,13 @@ export function extractStructuredLotFacets(params: {
   } else if (isGenericPickup && /\b(FLEETSIDE|STYLESIDE|SWEPTLINE|WIDELINE)\b/.test(haystack)) {
     bodyStyle = /\bSTYLESIDE\b/.test(haystack) ? "Styleside Pickup" : "Fleetside Pickup";
   } else if (!bodyStyle) {
-    if (/\bSPLIT[-\s]?WINDOW\b/.test(haystack)) bodyStyle = "Split-Window Coupe";
+    if (shared.body_style_facet) {
+      if (shared.body_style_facet === "Stepside") bodyStyle = "Stepside Pickup";
+      else if (shared.body_style_facet === "Flareside") bodyStyle = "Flareside Pickup";
+      else if (shared.body_style_facet === "Fleetside") bodyStyle = "Fleetside Pickup";
+      else if (shared.body_style_facet === "Styleside") bodyStyle = "Styleside Pickup";
+      else bodyStyle = shared.body_style_facet;
+    } else if (/\bSPLIT[-\s]?WINDOW\b/.test(haystack)) bodyStyle = "Split-Window Coupe";
     else if (/\bFASTBACK\b|\bSPORTSROOF\b/.test(haystack)) bodyStyle = "Fastback";
     else if (/\bCONVERTIBLE\b|\bCABRIOLET\b/.test(haystack)) bodyStyle = "Convertible";
     else if (/\bROADSTER\b|\bSPEEDSTER\b|\bSPYDER\b|\bSPIDER\b/.test(haystack)) bodyStyle = "Roadster";
@@ -191,6 +173,9 @@ export function extractStructuredLotFacets(params: {
     else if (/\bWAGON\b|\bNOMAD\b|\bSUBURBAN\b/.test(haystack)) bodyStyle = "Wagon";
     else if (/\bSUV\b|\bBLAZER\b|\bBRONCO\b|\bJIMMY\b|\bCOMMANDO\b/.test(haystack)) bodyStyle = "SUV";
     else if (/\bPICKUP\b|\bTRUCK\b/.test(haystack)) bodyStyle = "Pickup";
+  } else if (/^coup[eé]$/i.test(bodyStyle) && shared.body_style_facet && shared.body_style_facet !== "Coupe") {
+    // Refine generic taxonomy "Coupe" when collector rules identify "Gullwing Coupe", "Split-Window Coupe", "Convertible" (Drophead Coupé), or "Shooting Brake"
+    bodyStyle = shared.body_style_facet;
   }
 
   return { series, trim, body_style: bodyStyle };
@@ -253,6 +238,7 @@ export function indexLot(hit: any): { lot: IndexLot } | { skip: string; url?: st
     make,
     model,
     title,
+    url: `https://www.mecum.com${permalink}`,
     highlights: engine,
     taxonomyTrim,
     taxonomyBodyStyle,
