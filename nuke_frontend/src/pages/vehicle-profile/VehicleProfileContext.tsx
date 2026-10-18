@@ -404,14 +404,14 @@ export const VehicleProfileProvider: React.FC<{ children: React.ReactNode }> = (
     } catch { /* ignore */ }
   }, [vehicleId]);
 
-  const loadTotalCommentCount = useCallback(async () => {
+  const loadTotalCommentCount = useCallback(async (isCurrent: () => boolean) => {
     if (!vehicleId) return;
     try {
       const { count } = await supabase
         .from('vehicle_comments_unified')
         .select('comment_id', { count: 'exact', head: true })
         .eq('vehicle_id', vehicleId);
-      if (count !== null) setTotalCommentCount(count);
+      if (isCurrent() && rpcLoadedRef.current.commentCount === null && count !== null) setTotalCommentCount(count);
     } catch { /* ignore */ }
   }, [vehicleId]);
 
@@ -542,28 +542,33 @@ export const VehicleProfileProvider: React.FC<{ children: React.ReactNode }> = (
 
   useEffect(() => {
     if (!vehicle?.id) return;
+    let countReadCancelled = false;
+    const isCurrentCountRead = () => !countReadCancelled && activeVehicleIdRef.current === vehicleId &&
+      vehicleLoadedForRouteRef.current === vehicleId;
     // Only load images if RPC didn't already provide them (saves ~1 query + hero selection)
     if (!rpcLoadedRef.current.images) {
       loadVehicleImages();
     }
     // Only load comment count if RPC didn't provide it
     if (rpcLoadedRef.current.commentCount === null) {
-      loadTotalCommentCount();
+      loadTotalCommentCount(isCurrentCountRead);
     }
     loadResponsible();
     // Defer non-critical queries — these aren't needed for initial render
     const deferTimer = setTimeout(() => {
       loadLiveSession();
       loadLinkedOrgs();
-      if (rpcLoadedRef.current.observationCount === null) {
+      if (isCurrentCountRead() && rpcLoadedRef.current.observationCount === null) {
         supabase
           .from('vehicle_observations')
           .select('id', { count: 'exact', head: true })
           .eq('vehicle_id', vehicle!.id)
-          .then(({ count }: { count: number | null }) => { if (count !== null) setObservationCount(count); });
+          .then(({ count }: { count: number | null }) => {
+            if (isCurrentCountRead() && rpcLoadedRef.current.observationCount === null && count !== null) setObservationCount(count);
+          });
       }
     }, 500); // 500ms defer for non-critical data
-    return () => clearTimeout(deferTimer);
+    return () => { countReadCancelled = true; clearTimeout(deferTimer); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [vehicle?.id]);
 
