@@ -1267,6 +1267,40 @@ record availability must not be substituted for these evidence-coverage measures
 pages, type/qualification tests and delivery stages are retained under `~/nuke-logs/retained-bulk-*`.
 Merge, deployment, realized net gains and anonymous runtime remain separate until recorded.
 
+### Model-name separation and shared alias contamination, 2026-10-18
+
+The original Relativity example retained a source-labeled Bultaco Frontera 370 but assigned its
+listing to the Pursang key. Fixing a UUID display fallback exposed rather than corrected that
+interpretation. The same live alias owner assigned Cappuccino to Jimny and Hayabusa/RE-5 to GSX-R.
+The historical specialist-family test explicitly expected Hayabusa to bind to GSX-R: positive
+binding tests and healthy refresh jobs were not semantic identity acceptance.
+
+The full stored-vehicle reference was an atlas estimate of 1,248,544 rows on October 18; an exact
+public denominator and fleet-wide affected count were not measured. The reference-catalog assay
+read 4,470 rows/22,250 aliases. Its 515 cross-name candidates include legitimate hierarchy and are
+not an error count. The first repair cohort is all 1,310 retained Bultaco/Suzuki names representing
+5,216 dictionary record rows, not 5,216 verified physical vehicles or newly ready public answers.
+
+The prepared repair narrows eight existing rows and adds fourteen source-supported model names in
+the existing `canonical_models` owner. Its disposable replay rebinds 542 represented rows and names
+18 formerly unresolved rows; 1,899 formerly forced bindings become unresolved. All names and
+make-level sale counts/dollars survive. Those figures measure dictionary classification changes,
+not whole-fleet model completeness. Sources are the Barcelona Motorcycle Museum Bultaco catalogue
+and Suzuki's own digital archive/history. Unknown production ranges remain unknown.
+
+`test_model_identity_separation.sql` runs the actual matcher, market/sales folds, anonymous sales
+reader and fit writer. It covers twenty-three names, unrelated Porsche controls, source retention,
+generic/unassessed-name refusal, idempotence and withholding a price fit made from old membership.
+The existing `refresh-market-views.py` gains a bounded dependency-ordered selection with a dry run
+and stops before dependent folds after a failure. Refreshes remain concurrent; year prices use their
+existing owner/planner settings. No new queue, schedule or raw testimony writer is introduced.
+
+Delivery stages and before/after anonymous reader evidence belong in the operator receipt at
+`~/nuke-logs/model-identity-repair-20261018/`; this entry records local implementation and testing,
+not production completion. Remaining work includes other catalog candidate families, the differing
+normalizer year/null rules and the independent 1D sale/capture admission defect. Existing GM truck
+hierarchy decisions are outside this repair and remain intact.
+
 ## 13. Aspiration: twenty stacks the model must be able to carry (owner, 2026-10-06)
 
 **Owner direction, 2026-10-06 23:35Z.** "This scale is where we should be starting at every session: we are combing
