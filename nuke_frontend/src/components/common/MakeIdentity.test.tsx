@@ -2,7 +2,7 @@
 import React, { act } from 'react';
 import { createRoot } from 'react-dom/client';
 import { expect, it } from 'vitest';
-import { resolveVehicleArtwork, VehicleIdentity } from './MakeIdentity';
+import { MakeIdentity, resolveVehicleArtwork, VehicleIdentity } from './MakeIdentity';
 
 it('selects the documented script and nose emblem independently across model years', () => {
   const roles = (year: number) => resolveVehicleArtwork({ year, make: 'Chevrolet', model: 'Corvette' }).map(a => a.role);
@@ -52,5 +52,24 @@ it('keeps the recorded name readable when source artwork fails and when identity
     expect(host.querySelector('image')).toBeNull();
     expect(host.textContent).toContain('911Turbo');
     expect(host.querySelector('.sr-only')?.textContent).toBe('2006 Porsche 911 Turbo');
+  } finally { await act(async () => root.unmount()); }
+});
+
+
+it('uses catalogue label choices for Chevrolet and Dodge while retaining other wordmarks and accessible fallbacks', async () => {
+  (globalThis as any).IS_REACT_ACT_ENVIRONMENT = true;
+  const host = document.createElement('div'), root = createRoot(host);
+  try {
+    await act(async () => root.render(<MakeIdentity make="Chevrolet" inverse />));
+    expect(host.querySelector('img')?.getAttribute('src')).toBe('/stacks/makes/chevrolet.svg');
+    expect(host.querySelector('strong')?.textContent).toBe('Chevrolet');
+    await act(async () => host.querySelector('img')!.dispatchEvent(new Event('error')));
+    expect(host.textContent).toBe('Chevrolet');
+    await act(async () => root.render(<MakeIdentity make="Dodge" inverse />));
+    expect(host.querySelector('img')).toBeNull();
+    expect(host.querySelector('strong')?.textContent).toBe('Dodge');
+    await act(async () => root.render(<MakeIdentity make="Ferrari" inverse />));
+    expect(host.querySelector('img')?.getAttribute('src')).toBe('/stacks/makes/ferrari-wordmark.svg');
+    expect(host.querySelector('.sr-only')?.textContent).toBe('Ferrari');
   } finally { await act(async () => root.unmount()); }
 });

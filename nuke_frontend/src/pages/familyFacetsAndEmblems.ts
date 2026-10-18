@@ -1059,6 +1059,7 @@ export const VEHICLE_IDENTITY_MARKS = VETTED_IDENTITY_MARKS;
 
 const PICKUP_FAMILIES = new Set([
   'pickup',
+  'truck',
   'c10',
   'k10',
   'c20',
@@ -1071,6 +1072,13 @@ const PICKUP_FAMILIES = new Set([
   'apache',
   'cameo',
   'silverado',
+  'colorado',
+  'avalanche',
+  'ssr',
+  'luv',
+  'el camino',
+  'canyon',
+  'hummer ev pickup',
   'sierra',
   'c1500',
   'k1500',
@@ -1104,13 +1112,18 @@ const PICKUP_FAMILIES = new Set([
 
 export function isPickupFamilyLabel(familyLabel: string | null | undefined): boolean {
   if (!familyLabel) return false;
-  return PICKUP_FAMILIES.has(familyLabel.trim().toLowerCase());
+  const label = familyLabel.trim().toLowerCase();
+  return PICKUP_FAMILIES.has(label) || PICKUP_FAMILIES.has(label.replace(/[-\s]*(?:pickup|truck)$/, '').trim());
+}
+
+export function isGmTruckBrand(make: string | null | undefined): boolean {
+  return /^(chevrolet|gmc)$/i.test(make?.trim() ?? '');
 }
 
 /**
  * Consolidates a brand's fragmented pickup series family tiles (e.g. C10, K10, C20, K20, C30, 3100, Apache,
  * Cameo, Silverado, F-100, F-150, F-250, F-350, F-1, Sierra, C1500, K1500) into the canonical `Pickup` umbrella tile
- * when `groupPickups` is enabled so the user can view all trucks together at the brand level and then slice by
+ * permanently for Chevrolet/GMC (displayed as Truck), and when `groupPickups` is enabled for other brands. Slice by
  * Series / Trim / Body Style / Era inside the Pickup family.
  */
 export function consolidateBrandPickupFamilies(
@@ -1118,7 +1131,8 @@ export function consolidateBrandPickupFamilies(
   families: TreemapNode[] | null | undefined,
   groupPickups: boolean,
 ): TreemapNode[] | null {
-  if (!families || !groupPickups || !make) return families ?? null;
+  const gm = isGmTruckBrand(make);
+  if (!families || (!groupPickups && !gm) || !make) return families ?? null;
   const pickupNodes: TreemapNode[] = [];
   const otherNodes: TreemapNode[] = [];
 
@@ -1130,15 +1144,16 @@ export function consolidateBrandPickupFamilies(
     }
   }
 
-  if (pickupNodes.length <= 1) return families;
+  if (!pickupNodes.length || (!gm && pickupNodes.length === 1)) return families;
 
   // Prefer the canonical "Pickup" familyKey so treemap_family_models / treemap_family_sales umbrella logic triggers automatically
-  const canonicalPickup =
-    pickupNodes.find((n) => n.name.trim().toLowerCase() === 'pickup') ?? pickupNodes[0];
+  const canonicalPickup = pickupNodes.find((n) => /^(pickup|truck)$/i.test(n.name.trim()));
+  // An arbitrary C10 key cannot stand in for the whole truck family.
+  if (!canonicalPickup) return families;
 
   const merged: TreemapNode = {
     ...canonicalPickup,
-    name: 'Pickup',
+    name: gm ? 'Truck' : 'Pickup',
     familyKey: canonicalPickup.familyKey,
     count: pickupNodes.reduce((s, n) => s + (n.count ?? 0), 0),
     value: pickupNodes.reduce((s, n) => s + (n.usd ?? n.value ?? 0), 0),
@@ -1200,6 +1215,12 @@ export function classifyVehicleFacets(
     else if (/\bK[-\s]?2500\b|\bC[-\s]?2500\b|\b2500\b/.test(u)) series = '2500 (3/4-Ton)';
     else if (/\bK[-\s]?3500\b|\bC[-\s]?3500\b|\b3500\b/.test(u)) series = '3500 (1-Ton)';
     else if (/\b100\b/.test(u) && brand === 'gmc') series = 'GMC 100 (1/2-Ton)';
+    if (!series && isPickupFamilyLabel(fam)) {
+      const line = /\b(HUMMER\s+EV\s+PICKUP|SILVERADO|SIERRA|COLORADO|CANYON|AVALANCHE|SSR|LUV|EL\s+CAMINO|CABALLERO|S[-\s]?10|S[-\s]?15|SYCLONE|SONOMA)\b/.exec(u)?.[1];
+      if (line) series = line.toLowerCase().replace(/\b\w/g, (c) => c.toUpperCase())
+        .replace(/^S[-\s]?10$/i, 'S10').replace(/^S[-\s]?15$/i, 'S15').replace(/^Ssr$/, 'SSR').replace(/^Luv$/, 'LUV')
+        .replace(/^Hummer Ev Pickup$/, 'Hummer EV Pickup');
+    }
   }
 
   if (!series && (brand === 'ford' || isPickupFamilyLabel(fam))) {
@@ -1525,7 +1546,8 @@ export function buildFacetNodes(
     axis === 'series' ? c.series : axis === 'trim' ? c.trim : c.body;
 
   const fallbackLabel =
-    axis === 'series' ? 'Standard Series' : axis === 'trim' ? 'Base / Unbadged Trim' : 'Standard Body';
+    axis === 'series' ? (isGmTruckBrand(make) && familyLabel === 'Truck' ? 'Series not recorded' : 'Standard Series')
+      : axis === 'trim' ? 'Base / Unbadged Trim' : 'Standard Body';
 
   // When salesData is loaded (up to 12,000 dated sales enriched with vehicles.trim + body_style + listing_title),
   // compute the exact facet distribution from the enriched sales so records whose raw `vehicles.model` is just

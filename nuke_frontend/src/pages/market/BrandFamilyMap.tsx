@@ -7,6 +7,7 @@ import { MakeIdentity } from '../../components/common/MakeIdentity';
 import { relativeMove, textWidth, pct as signedPct, GATE_MIN, type Baseline, type Move } from './mapScale';
 import { MarketCard, MarketSheet, MarketTile, money as moneyShort, type MapBasis, type MarketNode } from './MarketTile';
 import type { HorizonMoveCounts } from './FamilyMovers';
+import { consolidateBrandPickupFamilies, isGmTruckBrand } from '../familyFacetsAndEmblems';
 import './BrandFamilyMap.css';
 
 // The brand map with each brand's families inside it, the way finviz maps a market: every brand a frame sized by its
@@ -24,11 +25,41 @@ export function readBrandFamilyMap(): Promise<MapRow[] | null> {
   if (typeof (supabase as { rpc?: unknown })?.rpc !== 'function') return Promise.resolve(null);
   if (!mapRead) {
     mapRead = Promise.resolve(supabase.rpc('treemap_brand_family_map', { p_brands: 60, p_families: 12 })).then(
-      ({ data, error }) => { if (error || !Array.isArray(data)) { mapRead = null; return null; } return data as MapRow[]; },
+      async ({ data, error }) => {
+        if (error || !Array.isArray(data)) { mapRead = null; return null; }
+        const rows = data as MapRow[];
+        // Read every GM family before grouping: the top-12 map puts smaller truck lines in "more".
+        const gm = [...new Set(rows.map((r) => r.brand).filter(isGmTruckBrand))];
+        const full = await Promise.all(gm.map(async (brand) => {
+          const { data: families, error: failure } = await supabase.rpc('treemap_brand_families', { p_brand: brand });
+          if (failure || !Array.isArray(families) || !families.length) throw new Error('GM families unavailable');
+          const frame = rows.find((r) => r.brand === brand)!;
+          return families.map((f) => ({ ...frame, ...f, brand, families: families.length })) as MapRow[];
+        }));
+        return [...rows.filter((r) => !isGmTruckBrand(r.brand)), ...full.flat()];
+      },
       () => { mapRead = null; return null; },
-    );
+    ).catch(() => { mapRead = null; return null; });
   }
   return mapRead;
+}
+
+export function groupGmMapFamilies(rows: MapRow[]): MapRow[] {
+  const groups = new Map<string, MapRow[]>();
+  for (const r of rows) groups.set(r.brand, [...(groups.get(r.brand) ?? []), r]);
+  return [...groups.values()].flatMap((brandRows) => {
+    const brand = brandRows[0].brand;
+    if (!isGmTruckBrand(brand)) return brandRows;
+    const nodes = brandRows.map((r) => ({ ...toNode(r), value: r.usd ?? 0, models: 1 }));
+    const grouped = consolidateBrandPickupFamilies(brand, nodes, true)!;
+    return grouped.map((n) => ({
+      ...brandRows.find((r) => r.family_key === n.familyKey)!,
+      family: n.name, family_key: n.familyKey!, sold: n.count, usd: n.usd ?? null,
+      sold_any: n.sold_any ?? null, offered: n.offered ?? null, dated: n.dated ?? null,
+      sold_12m: n.sold_12m ?? null, sold_prior_12m: n.sold_prior_12m ?? null,
+      usd_12m: n.usd_12m ?? null, usd_prior_12m: n.usd_prior_12m ?? null, families: grouped.length,
+    }));
+  });
 }
 
 // The move a tile is colored by: BaT sales, last 12 months against the 12 before, when BaT holds at least half the
@@ -83,14 +114,15 @@ export default function BrandFamilyMap({ width, height, onPickBrand, onPickFamil
   useEffect(() => { setTooltip(null); setSheet(null); }, [basis, familyMoves, gateMin, windowLabel, horizonShortLabel]);
   useEffect(() => { let live = true; readBrandFamilyMap().then((r) => { if (live) setRows(r); }); return () => { live = false; }; }, []);
   const effectiveRows = useMemo(() => {
-    if (!rows || !familyMoves) return rows;
-    return rows.map((r) => {
+    if (!rows) return rows;
+    const moved = !familyMoves ? rows : rows.map((r) => {
       if (r.family_key === 'more' || r.family_key === 'other') return r;
       const ov = familyMoves[`${r.brand}|${r.family_key}`];
       return ov
         ? { ...r, sold_12m: ov.sold_12m, sold_prior_12m: ov.sold_prior_12m, usd_12m: ov.usd_12m, usd_prior_12m: ov.usd_prior_12m }
         : { ...r, sold_12m: 0, sold_prior_12m: 0, usd_12m: 0, usd_prior_12m: 0 };
     });
+    return groupGmMapFamilies(moved);
   }, [rows, familyMoves]);
   const layout = useMemo(() => {
     if (!effectiveRows?.length || width < 100 || height < 100) return null;
