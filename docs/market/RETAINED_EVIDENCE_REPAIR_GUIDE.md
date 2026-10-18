@@ -246,6 +246,13 @@ parent stays a gap. Source capability and protected admission are asserted by th
 reader, not established by this route; capture authenticity, publisher truth and
 physical occurrence remain unmeasured.
 
+The source drill also preserves the v1/v2 witness's bounded source-wide refusal
+for negated completion and governing proposed/recommended-work context. A reader
+row that matches an isolated sentence in such a source fails as
+`reported_source_completion_context_withheld`; matching text alone cannot discard
+the surrounding qualification. This control does not establish semantic quality
+outside the existing witness's context rules.
+
 At 06:25:04–06:25:05 UTC on 2026-10-15 an anonymous control over the two first-admission
 vehicles made two requests and stopped as `reported_work_reader_absent`: the held
 overload is not deployed, so nothing agrees yet. Against a local PostgreSQL
