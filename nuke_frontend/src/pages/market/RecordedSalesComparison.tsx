@@ -1,13 +1,12 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { PrefetchLink } from '../../components/PrefetchLink';
+import { Text } from '../../kit';
 import { matchSalesMake, recordedSalesRequest, recordedSalesWindow, useRecordedSales, useSalesScopes,
   type SalesDrill, type SalesPoint, type SalesSeries } from './useRecordedSales';
 import './RecordedSalesComparison.css';
 
 const label: React.CSSProperties = { fontSize: 9, textTransform: 'uppercase', letterSpacing: '0.1em', fontWeight: 700 };
 const mono: React.CSSProperties = { fontFamily: "'Courier New', monospace" };
-const control: React.CSSProperties = { fontFamily: 'Arial, sans-serif', fontSize: 12, color: 'var(--text)',
-  background: 'var(--bg)', border: '2px solid var(--border)', padding: 5, maxWidth: '100%' };
 const number = (n: number | null | undefined) => n == null ? 'unknown' : n.toLocaleString('en-US');
 const day = (date: string) => date.slice(0, 10);
 const utc = (date: string) => new Date(date).toISOString().replace('T', ' ').replace(/\.\d{3}Z$/, ' UTC');
@@ -33,11 +32,47 @@ function CountBucket({ point, name, max, refused, active, onClick }: {
   </div>;
 }
 
+/** The cohort select and the view pair for the market strip. Driven by the URL through its props; no state of its own. */
+export function MarketScopeControls({ make, scopeKey, view, onMakeChange, onViewChange, children }: {
+  make: string | null; scopeKey: string | null; view: 'inventory' | 'sales';
+  onMakeChange: (make: string | null, scopeKey?: string | null) => void; onViewChange: (view: 'inventory' | 'sales') => void;
+  children?: React.ReactNode;
+}) {
+  const catalog = useSalesScopes();
+  const options = catalog.data ?? [];
+  const chosenOption = options.find(o => o.key === scopeKey);
+  const option = view === 'sales' && scopeKey != null
+    ? chosenOption?.make.toUpperCase() === make?.toUpperCase() ? chosenOption : undefined
+    : matchSalesMake(options, make);
+  // A stored inventory label may have no unique registry entry; preserve that scope in the control.
+  const unmatchedMake = make && !option ? make : null;
+  return <>
+    <div role="group" aria-label="Market view" className="market-scope__views">
+      {(['inventory', 'sales'] as const).map(mode => <button key={mode} type="button" className="market-control"
+        aria-pressed={view === mode} onClick={() => onViewChange(mode)}>
+        <Text role="label">{mode === 'inventory' ? 'Live now' : 'Sold'}</Text>
+      </button>)}
+      {children}
+    </div>
+    <label className="market-scope__cohort"><Text role="label">Make</Text>
+      <select aria-label={view === 'inventory' ? 'Live inventory make' : 'Recorded sales scope'} className="market-control k-body" value={option?.key ?? (unmatchedMake ? `stored:${unmatchedMake}` : '')}
+        onChange={e => onMakeChange(options.find(o => o.key === e.target.value)?.make ?? null, e.target.value || null)}>
+        <option value="">{view === 'inventory' ? 'All makes' : 'Choose a make or grouping'}</option>
+        {unmatchedMake && <option value={`stored:${unmatchedMake}`} disabled>{unmatchedMake} · {view === 'inventory' ? 'recorded inventory label' : 'no registered sales scope'}</option>}
+        <optgroup label="Make populations">{options.filter(o => o.scope.kind === 'canonical_make').map(o => <option key={o.key} value={o.key}>{o.label}</option>)}</optgroup>
+        {view === 'sales' && <optgroup label="Supported comparison groupings">{options.filter(o => o.scope.kind === 'supported_subject').map(o => <option key={o.key} value={o.key}>{o.label}</option>)}</optgroup>}
+      </select>
+    </label>
+  </>;
+}
+
 /** Public evidence from the existing count owner, with its missing comparisons kept visible. */
-export default function RecordedSalesComparison({ make, onMakeChange, view = 'sales', onViewChange, lens, onLensChange }: {
+export default function RecordedSalesComparison({ make, onMakeChange, view = 'sales', onViewChange, lens, onLensChange, controls = true }: {
   make: string | null; onMakeChange?: (make: string | null, scopeKey?: string | null) => void;
   view?: 'inventory' | 'sales'; onViewChange?: (view: 'inventory' | 'sales') => void;
   lens?: MarketSalesLens; onLensChange?: (change: Partial<MarketSalesLens>) => void;
+  /** False when the host page renders MarketScopeControls in its own strip. */
+  controls?: boolean;
 }) {
   const catalog = useSalesScopes();
   const [localChosen, setChosen] = useState<string | null>(null);
@@ -51,6 +86,8 @@ export default function RecordedSalesComparison({ make, onMakeChange, view = 'sa
   const showBenchmark = lens?.benchmark ?? localBenchmark;
   const window = useMemo(() => recordedSalesWindow(days, windowClock), [days, windowClock]);
   const evidenceRef = useRef<HTMLDivElement>(null);
+  const countsRef = useRef<HTMLDivElement>(null);
+  const eventWindowRef = useRef<HTMLSelectElement>(null);
   const focusEvidence = useRef(false);
   const options = catalog.data ?? [];
   // Porsche is the owner's initial comparison case; its ID still comes from the public registry.
@@ -84,28 +121,27 @@ export default function RecordedSalesComparison({ make, onMakeChange, view = 'sa
   };
 
   return <section className="market-sales-comparison" aria-label="Recorded sales comparison" style={{ border: '2px solid var(--border)', padding: 8, marginBottom: 12, minWidth: 0 }}>
-    <div style={{ display: 'flex', alignItems: 'baseline', gap: '8px 16px', flexWrap: 'wrap', marginBottom: 8 }}>
+    {controls && <div style={{ display: 'flex', alignItems: 'baseline', gap: '8px 16px', flexWrap: 'wrap', marginBottom: 8 }}>
       <h2 style={{ ...label, margin: 0 }}>{view === 'sales' ? 'Recorded sales over time' : 'Market explorer'}</h2>
       <span style={{ fontSize: 11, color: 'var(--text-secondary)' }}>Bring a Trailer · {view === 'sales' ? 'partial capture · daily UTC listing episodes' : 'captured open vehicle lots'}</span>
-    </div>
+    </div>}
     <div style={{ display: 'flex', gap: 8, alignItems: 'end', flexWrap: 'wrap', marginBottom: 8 }}>
-      <label style={{ ...label, minWidth: 0, maxWidth: '100%' }}>{onMakeChange ? 'Market cohort' : 'Recorded sales scope'}<br />
-        <select aria-label="Recorded sales scope" value={option?.key ?? (unmatchedMake ? `stored:${unmatchedMake}` : '')} style={control}
+      {controls && <label style={{ ...label, minWidth: 0, maxWidth: '100%' }}>{onMakeChange ? 'Market cohort' : 'Recorded sales scope'}<br />
+        <select aria-label={view === 'inventory' ? 'Live inventory make' : 'Recorded sales scope'} className="market-control k-body" value={option?.key ?? (unmatchedMake ? `stored:${unmatchedMake}` : '')}
           onChange={e => { setChosen(e.target.value || null); setDrill(null); onMakeChange?.(options.find(o => o.key === e.target.value)?.make ?? null, e.target.value || null); }}>
           <option value="">{onMakeChange ? 'All makes · live inventory' : 'Choose a registered make or supported grouping'}</option>
           {unmatchedMake && <option value={`stored:${unmatchedMake}`} disabled>{unmatchedMake} · {view === 'inventory' ? 'recorded inventory label' : 'no registered sales scope'}</option>}
           <optgroup label="Make populations">{options.filter(o => o.scope.kind === 'canonical_make').map(o => <option key={o.key} value={o.key}>{o.label}</option>)}</optgroup>
           {view === 'sales' && <optgroup label="Supported comparison groupings">{options.filter(o => o.scope.kind === 'supported_subject').map(o => <option key={o.key} value={o.key}>{o.label}</option>)}</optgroup>}
         </select>
-      </label>
-      {view === 'sales' && <label style={label}>Event window<br /><select aria-label="Recorded sales event window" value={days} style={control}
+      </label>}
+      {view === 'sales' && <label style={label}>Event window<br /><select ref={eventWindowRef} aria-label="Recorded sales event window" value={days} className="market-control k-body"
         onChange={e => { const n = Number(e.target.value) as 2 | 7; setDays(n); setWindowClock(Date.now()); setDrill(null); onLensChange?.({ days: n, drill: null }); }}>
         <option value={2}>Last 2 full UTC days</option><option value={7}>Last 7 full UTC days</option>
       </select></label>}
-      {view === 'sales' && <button style={control} disabled={!option || query.isFetching} onClick={refresh}>Refresh recorded evidence</button>}
-      {onViewChange && <div role="group" aria-label="Market view" style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
-        {(['inventory', 'sales'] as const).map(mode => <button key={mode} style={{ ...control,
-          background: view === mode ? 'var(--text)' : 'var(--bg)', color: view === mode ? 'var(--bg)' : 'var(--text)' }}
+      {view === 'sales' && <button className="market-control k-body" disabled={!option || query.isFetching} onClick={refresh}>Refresh recorded evidence</button>}
+      {controls && onViewChange && <div role="group" aria-label="Market view" style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
+        {(['inventory', 'sales'] as const).map(mode => <button key={mode} className="market-control k-body"
           aria-pressed={view === mode} onClick={() => { setDrill(null); onViewChange(mode); }}>
           {mode === 'inventory' ? 'Open inventory' : 'Recorded sales'}
         </button>)}
@@ -114,13 +150,16 @@ export default function RecordedSalesComparison({ make, onMakeChange, view = 'sa
     {onMakeChange && option?.scope.kind === 'supported_subject' && view === 'sales' && <div style={{ fontSize: 11, marginBottom: 8 }}>
       This supported grouping applies to recorded sales; live grouping membership is unavailable.
     </div>}
-    {catalog.isError ? <div role="status">The scope registry could not be read. <button style={control} onClick={() => void catalog.refetch()}>Retry scope registry</button></div>
+    {catalog.isError ? <div role="status">The scope registry could not be read. <button className="market-control k-body" onClick={() => void catalog.refetch()}>Retry scope registry</button></div>
       : catalog.isLoading ? <div role="status">Reading the public scope registry…</div>
       : !option && view === 'sales' ? <div role="status">{make ? `No unique registered make matches ${make}. ` : ''}Choose a registered make or grouping to compare its recorded sales with the rest of BaT.</div> : null}
     {option && view === 'sales' && query.isFetching && <div role="status">Reading recorded outcomes{drill ? ' and bucket contributors' : ''}…</div>}
-    {option && view === 'sales' && query.isError && <div role="status">Recorded outcomes could not be refreshed.{receipt ? ' The previous read remains below.' : ''} <button style={control} onClick={() => void query.refetch()}>Retry recorded outcomes</button></div>}
+    {option && view === 'sales' && query.isError && <div role="status">Recorded outcomes could not be refreshed.{receipt ? ' The previous read remains below.' : ''} <button className="market-control k-body" onClick={() => void query.refetch()}>Retry recorded outcomes</button></div>}
     {response?.state === 'unavailable' && <div role="status">This comparison is unavailable: {response.reason.replace(/_/g, ' ')}. Missing coverage is not zero demand.</div>}
-    {drill && <button style={control} onClick={() => { setDrill(null); onLensChange?.({ drill: null }); }}>Clear selected sales day</button>}
+    {drill && <button className="market-control k-body" onClick={() => {
+      (countsRef.current?.querySelector<HTMLButtonElement>('button[aria-pressed="true"]:not(:disabled)') ?? eventWindowRef.current)?.focus();
+      setDrill(null); onLensChange?.({ drill: null });
+    }}>Clear selected sales day</button>}
     {receipt && <>
       <p style={{ fontSize: 12, margin: '8px 0', overflowWrap: 'anywhere' }}>
         {day(receipt.event_from)} ≤ event time &lt; {day(receipt.event_to)} UTC.
@@ -132,7 +171,7 @@ export default function RecordedSalesComparison({ make, onMakeChange, view = 'sa
         <input type="checkbox" checked={showBenchmark} aria-label="Show rest of BaT absolute counts" onChange={e => { setShowBenchmark(e.target.checked); setDrill(null); onLensChange?.({ benchmark: e.target.checked, drill: null }); }} />
         Add rest of BaT · absolute counts from a larger population
       </label>}
-      <div aria-label="Daily recorded sales counts" style={{ display: 'grid', gap: 8 }}>
+      <div ref={countsRef} aria-label="Daily recorded sales counts" style={{ display: 'grid', gap: 8 }}>
         {!receipt.truncated && <span style={{ fontSize: 11 }}>Daily sales · shared count scale 0–{number(max)}. Select a day’s count for its sources.</span>}
         {(showBenchmark ? ['selected', 'benchmark'] as const : ['selected'] as const).map(series => <div key={series}>
           <div style={{ ...label, marginBottom: 4 }}>{seriesName(series, selectedName)}</div>

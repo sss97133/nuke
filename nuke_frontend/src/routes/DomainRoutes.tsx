@@ -5,6 +5,7 @@ import { ProtectedRoute } from '../components/auth/ProtectedRoute';
 
 // Static pages (footer/legal) — lazy-loaded since rarely visited
 const About = React.lazy(() => import('../pages/About'));
+const NotFound = React.lazy(() => import('../pages/NotFound'));
 const PrivacyPolicy = React.lazy(() => import('../pages/PrivacyPolicy'));
 const TermsOfService = React.lazy(() => import('../pages/TermsOfService'));
 const DataDeletion = React.lazy(() => import('../pages/DataDeletion'));
@@ -23,6 +24,7 @@ const DealRead = React.lazy(() => import('../pages/DealRead'));
 const BrandStudio = React.lazy(() => import('../pages/BrandStudio'));
 const PublicMap = React.lazy(() => import('../components/map/PublicMap'));
 const Valuation = React.lazy(() => import('../pages/Valuation'));
+const SourcesBoard = React.lazy(() => import('../pages/market/SourcesBoard'));
 // Stacks: a page per stack, a path through the nine layers (case ledger §13.2)
 const StacksIndex = React.lazy(() => import('../pages/stacks/StacksIndex'));
 const OrderBookStack = React.lazy(() => import('../pages/stacks/OrderBookStack'));
@@ -195,6 +197,8 @@ export const DomainRoutes = () => {
         <Route path="/browse" element={<BrowseVehicles />} />
         <Route path="/live" element={<LiveFloor />} />
         <Route path="/map" element={<MapPage />} />
+        <Route path="/sources" element={<SourcesBoard />} />
+        <Route path="/sources/:source" element={<SourcesBoard />} />
         <Route path="/valuation" element={<Valuation />} />
         <Route path="/stacks" element={<StacksIndex />} />
         <Route path="/stacks/order-book/:vehicleId" element={<OrderBookStack />} />
@@ -307,8 +311,8 @@ export const DomainRoutes = () => {
           </Route>
         </Route>
 
-        {/* ── Fallback ─────────────────────────────────────────────────── */}
-        <Route path="*" element={<Navigate to="/" replace />} />
+        {/* ── Fallback: a path with no page says so, instead of landing on the board unannounced ── */}
+        <Route path="*" element={<NotFound />} />
       </Routes>
     </Suspense>
   );

@@ -158,7 +158,7 @@ const Library: React.FC = () => {
         };
       } else {
         // Check if this doc is part of same book (within 2 minutes)
-        const timeDiff = new Date(doc.uploaded_at).getTime() - new Date(currentBook.uploaded_at).getTime();
+        const timeDiff = Math.abs(new Date(doc.uploaded_at).getTime() - new Date(currentBook.uploaded_at).getTime());
         const twoMinutes = 2 * 60 * 1000;
         
         if (timeDiff <= twoMinutes && doc.library_id === currentBook.library_id) {
@@ -198,7 +198,7 @@ const Library: React.FC = () => {
     try {
       const { data: docs } = await supabase
         .from('library_documents')
-        .select('id, download_count')
+        .select('id, library_id, download_count')
         .eq('uploaded_by', session.user.id);
 
       const { data: links } = await supabase
@@ -485,7 +485,7 @@ const Library: React.FC = () => {
                     background: book.extraction.status === 'pending_review' ? 'var(--warning-dim)' : 'var(--success-dim)', fontSize: '9px'
                   }}>
                     <div style={{ fontWeight: 600, marginBottom: '4px' }}>
-                      {book.extraction.status === 'pending_review' ? 'Processing...' : 
+                      {book.extraction.status === 'pending_review' ? 'Awaiting review' :
                        book.extraction.status === 'applied' ? '✓ Extracted' : 
                        book.extraction.status === 'rejected' ? '✗ Rejected' : 'Processing'}
                     </div>

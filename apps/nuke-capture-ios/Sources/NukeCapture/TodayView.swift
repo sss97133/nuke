@@ -34,6 +34,25 @@ struct TodayView: View {
                         .foregroundStyle(.orange)
                     }
                 }
+                if let problem = engine.authProblem {
+                    Section {
+                        Label(problem, systemImage: "person.crop.circle.badge.exclamationmark")
+                            .font(.footnote)
+                            .foregroundStyle(.orange)
+                    }
+                }
+                if let summary = engine.lastPassSummary {
+                    Section {
+                        Text("Last pass: \(summary).")
+                            .font(.footnote).foregroundStyle(.secondary)
+                    }
+                }
+                if engine.gaveUpCount > 0 {
+                    Section {
+                        Text("\(engine.gaveUpCount) photos failed three times and are no longer retried on open. The last error: \(engine.lastError ?? "not recorded").")
+                            .font(.footnote).foregroundStyle(.secondary)
+                    }
+                }
                 if let error = engine.backfillError, engine.backfillRemaining > 0 {
                     Section {
                         Text(error).font(.footnote).foregroundStyle(.secondary)
@@ -250,7 +269,7 @@ private struct UnderstandingPanel: View {
                 } else if loadError {
                     // The fetch failed — don't sit on "Reading the record…" forever.
                     HStack(spacing: 8) {
-                        Label("Couldn't load", systemImage: "wifi.exclamationmark")
+                        Label("Couldn't load", systemImage: "exclamationmark.triangle")
                             .font(.caption2).foregroundStyle(.secondary)
                         Spacer()
                         Button("Retry") { Task { await fetch() } }
@@ -327,7 +346,7 @@ private struct UnderstandingPanel: View {
     /// so the counters climb and new rows appear in front of the owner.
     private func poll() async {
         while !Task.isCancelled {
-            await fetch()
+            if UIApplication.shared.applicationState == .active { await fetch() }
             try? await Task.sleep(for: .seconds(30))
         }
     }
@@ -421,7 +440,7 @@ private struct LiveMetricsStrip: View {
             if engine.statsError && !engine.statsLoaded {
                 metricsFunnel
                 HStack {
-                    Label("Couldn't load your record", systemImage: "wifi.exclamationmark")
+                    Label("Couldn't load your record", systemImage: "exclamationmark.triangle")
                         .font(.caption).foregroundStyle(.secondary)
                     Spacer()
                     Button("Retry") { Task { await engine.refreshAnalyzedCount() } }
@@ -439,9 +458,13 @@ private struct LiveMetricsStrip: View {
             // from the measured rate (C4: "estimating…" until a real rate exists).
             if engine.backfillRemaining > 0 {
                 Text(engine.isPaused ? "Uploads paused · \(engine.backfillRemaining) photos queued"
+                     : engine.thermalHold
+                        ? "Uploads waiting · the phone is hot or in Low Power Mode · \(engine.backfillRemaining) photos queued, resumes when it cools"
                      : engine.isSyncing
                         ? Self.etaLine(remaining: engine.backfillRemaining,
                                        perMinute: engine.uploadsPerMinute)
+                     : engine.foregroundBudgetReached
+                        ? "\(engine.backfillRemaining) photos queued for the overnight job (power + Wi-Fi) · Sync Now pushes \(Config.foregroundBackfillBudget) more"
                         : "\(engine.backfillRemaining) photos queued · Sync Now to retry")
                     .font(.caption2)
                     .foregroundStyle(.secondary)
@@ -483,8 +506,8 @@ private struct LiveMetricsStrip: View {
             // refreshed on app-foreground / after sync — so opening Today showed
             // stale "…" with no poll. This loads them now + every 30s while open.
             while !Task.isCancelled {
-                await engine.refreshAnalyzedCount()
-                try? await Task.sleep(nanoseconds: 30_000_000_000)
+                if UIApplication.shared.applicationState == .active { await engine.refreshAnalyzedCount() }
+                try? await Task.sleep(nanoseconds: 60_000_000_000)   // the stats read can take 15 s server-side
             }
         }
     }
@@ -533,7 +556,7 @@ private struct GarageStrip: View {
                 // Failed to load — never the same dead-empty render as "no vehicles".
                 Section("Your garage") {
                     HStack {
-                        Label("Couldn't load", systemImage: "wifi.exclamationmark")
+                        Label("Couldn't load", systemImage: "exclamationmark.triangle")
                             .font(.footnote).foregroundStyle(.secondary)
                         Spacer()
                         Button("Retry") { Task { await load() } }

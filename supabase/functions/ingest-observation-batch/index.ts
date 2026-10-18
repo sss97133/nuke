@@ -36,6 +36,7 @@ import { writeObservation } from "../_shared/observationWriter.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { requireWriteAuth, authenticateWriter } from "../_shared/writeGuard.ts";
 import { BatchAdmissionError, CACHED_PROPERTY_MODE, readBatchBody, ingestCachedProperties } from "./cachedProperties.ts";
+import { projectSecretKey } from "../_shared/supabaseKeys.ts";
 
 const MAX_BATCH_SIZE = 200;
 
@@ -110,7 +111,7 @@ Deno.serve(async (req) => {
       if (!writer.ok || writer.caller.kind !== "service_role") {
         return new Response(JSON.stringify({ success: false, error: "cached_batch_requires_service_role" }), { status: 403, headers });
       }
-      const db = createClient(Deno.env.get("SUPABASE_URL") ?? "", Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "",
+      const db = createClient(Deno.env.get("SUPABASE_URL") ?? "", projectSecretKey() ?? "",
         { auth: { persistSession: false, autoRefreshToken: false } });
       return new Response(JSON.stringify(await ingestCachedProperties(db, body.observations)), { headers });
     }
@@ -142,7 +143,7 @@ Deno.serve(async (req) => {
 
     const opts = body.options || {};
     const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? "";
-    const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
+    const serviceKey = projectSecretKey() ?? "";
 
     // Create supabase client for gap-fill/evidence operations
     const supabase = (opts.gap_fill || opts.write_evidence)

@@ -1,0 +1,6 @@
+/* A path the ledger has no page for: kit roles for the type, this file for the spacing. */
+.not-found { max-width: 760px; margin: 0 auto; }
+.not-found__body { display: grid; gap: 6px; }
+.not-found__body p { margin: 0; }
+.not-found__path { overflow-wrap: anywhere; }
+.not-found a { color: var(--text); text-decoration: underline; }

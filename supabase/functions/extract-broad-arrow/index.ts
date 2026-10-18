@@ -36,6 +36,14 @@ import { normalizeListingUrlKey } from '../_shared/listingUrl.ts';
 import { resolveExistingVehicleId, discoveryUrlIlikePattern } from '../_shared/resolveVehicleForListing.ts';
 import { writeObservation } from "../_shared/observationWriter.ts";
 import { requireWriteAuth } from '../_shared/writeGuard.ts';
+import { projectSecretKey } from "../_shared/supabaseKeys.ts";
+import { mustWrite, softWrite } from '../_shared/writeResult.ts';
+import { writeVehicleEventByKey } from '../_shared/vehicleEventWrite.ts';
+import { archiveFetch } from '../_shared/archiveFetch.ts';
+import { fillOnlyIdentity, identityConflict } from '../_shared/identityMatch.ts';
+import { recordRevision } from '../_shared/revision.ts';
+import { parseEventPage, parseListingCards, type RosterCard } from './roster.ts';
+import { galleryImageId, isVinClash, parseLotPage } from './lotPage.ts';
 
 // ============================================================================
 // TYPES
@@ -80,6 +88,8 @@ interface BroadArrowExtracted {
   // Meta
   vehicle_id?: string;
   scrape_ms: number;
+  /** Calendar keys merged into the episode's metadata (the roster action). */
+  extra_metadata?: Record<string, unknown>;
 }
 
 // ============================================================================
@@ -212,7 +222,7 @@ function extractVinAndChassis(text: string): { vin: string | null; chassis: stri
 // MARKDOWN PARSER (main extraction logic)
 // ============================================================================
 
-function parseFromMarkdown(markdown: string, html: string, url: string): BroadArrowExtracted {
+export function parseFromMarkdown(markdown: string, html: string, url: string): BroadArrowExtracted {
   const result: BroadArrowExtracted = {
     url,
     title: null,
@@ -242,7 +252,7 @@ function parseFromMarkdown(markdown: string, html: string, url: string): BroadAr
   };
 
   // Combine markdown and stripped HTML for searching
-  const combinedText = markdown + '\n' + (html || '').replace(/<[^>]+>/g, ' ');
+  const combinedText = markdown + '\n' + (html || '').replace(/<[^>]+>/g, ' ').replace(/&#39;|&#x27;|&apos;/gi, "'");
 
   // --- TITLE ---
   // Broad Arrow titles appear as h1 or prominent heading: "1955 Mercedes-Benz 300 SL Gullwing"
@@ -339,17 +349,18 @@ function parseFromMarkdown(markdown: string, html: string, url: string): BroadAr
 
   // --- ESTIMATE ---
   // "Estimate: $800,000 - $1,000,000" or "Est. $800,000-$1,000,000"
+  // Zurich lots read "Estimate: CHF 210'000 - CHF 255'000" (apostrophe thousands, currency before each amount).
   const estimatePatterns = [
-    /Estimate[:\s]*\$?([\d,]+)\s*[-–—]\s*\$?([\d,]+)/i,
-    /Est\.?\s*\$?([\d,]+)\s*[-–—]\s*\$?([\d,]+)/i,
-    /\$?([\d,]+)\s*[-–—]\s*\$?([\d,]+)\s*(?:USD\s+)?(?:Estimate|Est\.?)/i,
+    /Estimate[:\s]*(?:CHF\s*|[$€£])?([\d,'’]+)\s*[-–—]\s*(?:CHF\s*|[$€£])?([\d,'’]+)/i,
+    /Est\.?\s*(?:CHF\s*|[$€£])?([\d,'’]+)\s*[-–—]\s*(?:CHF\s*|[$€£])?([\d,'’]+)/i,
+    /\$?([\d,'’]+)\s*[-–—]\s*\$?([\d,'’]+)\s*(?:USD\s+)?(?:Estimate|Est\.?)/i,
   ];
 
   for (const pattern of estimatePatterns) {
     const match = combinedText.match(pattern);
     if (match) {
-      const low = parseInt(match[1].replace(/,/g, ''), 10);
-      const high = parseInt(match[2].replace(/,/g, ''), 10);
+      const low = parseInt(match[1].replace(/[,'’]/g, ''), 10);
+      const high = parseInt(match[2].replace(/[,'’]/g, ''), 10);
       if (low >= 100 && high >= low && high < 100_000_000) {
         result.estimate_low = low;
         result.estimate_high = high;
@@ -771,10 +782,25 @@ async function saveToDatabase(
     },
   };
 
+  let identityRow: { year: number | null; make: string | null; model: string | null; vin: string | null; discovery_url: string | null } | null = null;
+  if (vehicleId) {
+    // A lot may update the vehicle it is (same listing key); on any other vehicle a different car is refused before anything is
+    // written (revision item identity_match / relink) and the identity fields stay fill-only.
+    const { data: idRow } = await supabase.from('vehicles').select('year,make,model,vin,discovery_url').eq('id', vehicleId).maybeSingle();
+    if (idRow && normalizeListingUrlKey(idRow.discovery_url) !== listingUrlKey) {
+      const conflict = identityConflict(idRow, { year: extracted.year, make: extracted.make, model: extracted.model, vin: extracted.vin });
+      if (conflict) {
+        await recordRevision(supabase, { url: extracted.url, missing: ['identity_match'], reason: 'bad_data', next_action: 'relink', raised_by: 'extract-broad-arrow', vehicle_id: vehicleId, detail: { reason: 'different_car', detail: conflict } });
+        throw new Error(`identity refused: different_car (${conflict})`);
+      }
+      identityRow = idRow;
+    }
+  }
+
   if (vehicleId) {
     // Update existing: only overwrite non-null fields, preserve existing data
     const updates: Record<string, unknown> = {};
-    for (const [key, val] of Object.entries(vehicleData)) {
+    for (const [key, val] of Object.entries(identityRow ? fillOnlyIdentity(vehicleData, identityRow) : vehicleData)) {
       if (val !== null && val !== undefined) {
         updates[key] = val;
       }
@@ -786,8 +812,15 @@ async function saveToDatabase(
       .update(updates)
       .eq('id', vehicleId);
 
+    // A VIN another vehicle already holds failed the whole lot, and three in a row stopped the targets run (09:08Z
+    // 2026-10-18: two E-Types and a Z8). Write everything but the VIN and raise the clash for relinking: two vehicles carry
+    // one chassis, which the merge owner decides, not this writer. Same handling as extract-gooding.
     if (updateError) {
-      console.error(`[broad-arrow] Failed to update vehicle ${vehicleId}: ${updateError.message}`);
+      if (!updates.vin || !isVinClash(updateError.message)) throw new Error(`vehicles update failed for ${vehicleId}: ${updateError.message}`);
+      const { vin: clashVin, ...withoutVin } = updates;
+      await recordRevision(supabase as any, { url: extracted.url, missing: ['identity_match'], reason: 'duplicate_key', next_action: 'relink', raised_by: 'extract-broad-arrow', vehicle_id: vehicleId, detail: { reason: 'vin_held_by_another_vehicle', vin: clashVin, message: updateError.message.slice(0, 160) } });
+      const { error: retryError } = await (supabase.from('vehicles') as any).update(withoutVin).eq('id', vehicleId);
+      if (retryError) throw new Error(`vehicles update without the clashing vin failed for ${vehicleId}: ${retryError.message}`);
     } else {
       console.log(`[broad-arrow] Updated vehicle: ${vehicleId}`);
     }
@@ -829,17 +862,22 @@ async function saveToDatabase(
     }).catch((e: any) => console.warn(`[BROAD-ARROW] observationWriter error for ${vehicleId}: ${e?.message}`));
   }
 
+  // roster_first_seen_at is the first read of the lot on the house's roster: keep the earlier one.
+  if (extracted.extra_metadata?.roster_first_seen_at && listingUrlKey) {
+    const { data: prior } = await supabase.from('vehicle_events').select('metadata').eq('source_platform', 'broad_arrow').eq('source_listing_id', listingUrlKey).limit(1);
+    const first = prior?.[0]?.metadata?.roster_first_seen_at;
+    if (first) extracted.extra_metadata = { ...extracted.extra_metadata, roster_first_seen_at: first };
+  }
+
   // Upsert vehicle_events record
-  const { error: listingError } = await supabase
-    .from('vehicle_events')
-    .upsert({
+  const eventWrite = await writeVehicleEventByKey(supabase, {
       vehicle_id: vehicleId,
       source_platform: 'broad_arrow',
       event_type: 'auction',
       source_url: extracted.url,
       source_listing_id: listingUrlKey || extracted.lot_number,
       event_status: extracted.auction_status === 'sold' ? 'sold' :
-                      extracted.auction_status === 'upcoming' ? 'active' :
+                      extracted.auction_status === 'upcoming' ? (extracted.extra_metadata ? 'upcoming' : 'active') :
                       extracted.auction_status === 'not_sold' ? 'unsold' : 'ended',
       ended_at: extracted.auction_date ? new Date(extracted.auction_date).toISOString() : null,
       final_price: extracted.sale_price,
@@ -852,27 +890,31 @@ async function saveToDatabase(
         estimate_low: extracted.estimate_low,
         estimate_high: extracted.estimate_high,
         chassis_number: extracted.chassis_number,
+        ...(extracted.extra_metadata ?? {}),
       },
-    }, { onConflict: 'source_platform,source_listing_id' });
+    });
 
-  if (listingError) {
-    console.error(`[broad-arrow] External listing upsert error: ${listingError.message}`);
+  if (eventWrite.action === 'error') {
+    throw new Error(`vehicle_events write failed: ${eventWrite.error}`);
   }
 
   // Save images
   let imagesSaved = 0;
   if (extracted.image_urls.length > 0 && vehicleId) {
-    // Delete existing broad_arrow images for this vehicle to avoid duplicates
-    const { error: deleteError } = await supabase
+    // Add only the photos the vehicle does not already hold. Delete-then-insert doubled a gallery whenever the delete did
+    // not take (its failure is swallowed); the same defect doubled a Gooding gallery on 2026-10-18.
+    const { data: have, error: haveErr } = await supabase
       .from('vehicle_images')
-      .delete()
+      .select('image_url')
       .eq('vehicle_id', vehicleId)
-      .eq('source', 'broad_arrow');
-    if (deleteError) {
-      console.error(`[broad-arrow] Image delete error: ${deleteError.message}`);
-    }
+      .limit(1000);
+    if (haveErr) throw new Error(`vehicle_images read failed: ${haveErr.message}`);
+    const haveUrls = new Set((have ?? []).map((r: { image_url: string }) => r.image_url));
+    // An older read stored the same photos at another URL spelling (".webp" suffix, 2026-02 rows), so a photo is held when
+    // its image id is.
+    const haveIds = new Set([...haveUrls].map(galleryImageId).filter((id): id is string => id !== null));
 
-    const imageRecords = extracted.image_urls.slice(0, 80).map((imgUrl, i) => ({
+    const imageRecords = extracted.image_urls.slice(0, 150).map((imgUrl, i) => ({
       vehicle_id: vehicleId,
       image_url: imgUrl,
       source: 'broad_arrow',
@@ -883,7 +925,7 @@ async function saveToDatabase(
       redaction_level: 'none',
       position: i,
       display_order: i,
-      is_primary: i === 0,
+      is_primary: i === 0 && haveUrls.size === 0,
       exif_data: {
         source_url: extracted.url,
         discovery_url: extracted.url,
@@ -891,18 +933,20 @@ async function saveToDatabase(
         auction_name: extracted.auction_name,
         lot_number: extracted.lot_number,
       },
-    }));
+    })).filter((row) => !haveUrls.has(row.image_url) && !haveIds.has(galleryImageId(row.image_url) ?? ''));
 
-    const { data: insertedImages, error: imgError } = await supabase
-      .from('vehicle_images')
-      .insert(imageRecords)
-      .select('id');
+    if (imageRecords.length > 0) {
+      const { data: insertedImages, error: imgError } = await supabase
+        .from('vehicle_images')
+        .insert(imageRecords)
+        .select('id');
 
-    if (imgError) {
-      console.error(`[broad-arrow] Image save error: ${imgError.message}`);
-    } else {
-      imagesSaved = insertedImages?.length || 0;
-      console.log(`[broad-arrow] Saved ${imagesSaved} images`);
+      if (imgError) {
+        throw new Error(`vehicle_images insert failed: ${imgError.message}`);
+      } else {
+        imagesSaved = insertedImages?.length || 0;
+        console.log(`[broad-arrow] Saved ${imagesSaved} images`);
+      }
     }
   }
 
@@ -954,7 +998,7 @@ async function scrapeWithFirecrawl(url: string): Promise<{
 // HTTP HANDLER
 // ============================================================================
 
-Deno.serve(async (req) => {
+if (import.meta.main) Deno.serve(async (req) => {
   // Writes are never anonymous: service key, signed-in user, or nothing (P0.2, 2026-09-27).
   const denied = await requireWriteAuth(req);
   if (denied) return denied;
@@ -965,7 +1009,7 @@ Deno.serve(async (req) => {
   try {
     const supabase = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
+      projectSecretKey() ?? '',
     );
 
     const body = req.method === 'POST' ? await req.json().catch(() => ({})) : {};
@@ -1029,7 +1073,7 @@ Deno.serve(async (req) => {
         extracted.vehicle_id = dbResult.vehicle_id;
 
         // Update import_queue if there's an entry for this URL
-        await supabase
+        mustWrite('import_queue update', await supabase
           .from('import_queue')
           .update({
             status: 'complete',
@@ -1037,7 +1081,7 @@ Deno.serve(async (req) => {
             error_message: null,
             processed_at: new Date().toISOString(),
           })
-          .eq('listing_url', url);
+          .eq('listing_url', url));
       }
 
       return okJson({
@@ -1090,10 +1134,10 @@ Deno.serve(async (req) => {
 
       // Mark as processing
       const ids = items.map((i: any) => i.id);
-      await supabase
+      mustWrite('import_queue update', await supabase
         .from('import_queue')
         .update({ status: 'processing', locked_at: new Date().toISOString() })
-        .in('id', ids);
+        .in('id', ids));
 
       const results = {
         total: items.length,
@@ -1114,33 +1158,33 @@ Deno.serve(async (req) => {
           const titleOrModel = `${extracted.title || ''} ${extracted.model || ''}`;
           const nonVehiclePatterns = /\b(porcelain|neon sign|gas pump|oil can|jukebox|globe|thermometer|memorabilia|poster|tin sign|scale model|diecast)\b/i;
           if (nonVehiclePatterns.test(titleOrModel) && !extracted.vin) {
-            await supabase.from('import_queue').update({
+            mustWrite('import_queue update', await supabase.from('import_queue').update({
               status: 'skipped',
               error_message: 'Non-vehicle lot (memorabilia/collectible)',
               attempts: (item.attempts || 0) + 1,
-            }).eq('id', item.id);
+            }).eq('id', item.id));
             continue;
           }
 
           if (!extracted.year && !extracted.make) {
-            await supabase.from('import_queue').update({
+            mustWrite('import_queue update', await supabase.from('import_queue').update({
               status: 'failed',
               error_message: 'Could not parse vehicle data from page',
               attempts: (item.attempts || 0) + 1,
-            }).eq('id', item.id);
+            }).eq('id', item.id));
             results.failed++;
             continue;
           }
 
           const dbResult = await saveToDatabase(supabase, extracted);
 
-          await supabase.from('import_queue').update({
+          mustWrite('import_queue update', await supabase.from('import_queue').update({
             status: 'complete',
             vehicle_id: dbResult.vehicle_id,
             error_message: null,
             processed_at: new Date().toISOString(),
             attempts: (item.attempts || 0) + 1,
-          }).eq('id', item.id);
+          }).eq('id', item.id));
 
           results.success++;
           if (dbResult.is_new) results.created++;
@@ -1159,18 +1203,196 @@ Deno.serve(async (req) => {
             results.errors.push(`${item.listing_url}: ${msg}`);
           }
 
-          await supabase.from('import_queue').update({
+          softWrite('import_queue update', await supabase.from('import_queue').update({
             status: 'failed',
             error_message: msg.slice(0, 500),
             attempts: (item.attempts || 0) + 1,
-          }).eq('id', item.id);
+          }).eq('id', item.id), results.errors);
         }
       }
 
       return okJson({ success: true, ...results });
     }
 
+    // --- Roster: upcoming sales for the auction calendar (0 credits: plain fetches of the site's own public pages) ---
+    // /vehicles (all pages, 10 s apart, the site's Crawl-delay) gives the lot cards; /events/event/<sale> the run day and place. Up to 20 lots not yet landed as
+    // upcoming are landed per run through saveToDatabase (event_status upcoming, ended_at the run day, calendar metadata), and a
+    // source_census row (house_roster_facet) states the lots listed per sale. A 403/429 or a page without cards ends the run.
+    if (action === 'roster') {
+      // robots.txt (read 2026-10-16) sets Crawl-delay: 10 for every agent and disallows no path used here (/vehicles?page=N, /events/event/...).
+      const CRAWL_DELAY_MS = 10_000;
+      const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+      const observedAt = new Date().toISOString();
+      const cards: RosterCard[] = [];
+      const seenUrls = new Set<string>();
+      let stoppedBy: string | null = null;
+      for (let pg = 1; pg <= 8; pg++) {
+        if (pg > 1) await sleep(CRAWL_DELAY_MS);
+        const r = await archiveFetch(`https://www.broadarrowauctions.com/vehicles${pg > 1 ? `?page=${pg}` : ''}`, {
+          platform: 'broad_arrow', callerName: 'extract-broad-arrow-roster', useFirecrawl: false, skipCache: true, metadata: { source: 'broad-arrow-roster', page: pg },
+        });
+        if (r.statusCode === 403 || r.statusCode === 429) { stoppedBy = `HTTP ${r.statusCode}`; break; }
+        if (!r.html) { stoppedBy = `no page ${pg} (${r.statusCode ?? r.error ?? 'unknown'})`; break; }
+        const got = parseListingCards(r.html).filter((c) => !seenUrls.has(c.url));
+        if (got.length === 0) break;
+        for (const c of got) { seenUrls.add(c.url); cards.push(c); }
+      }
+      const bySale = new Map<string, RosterCard[]>();
+      for (const c of cards) bySale.set(c.code, [...(bySale.get(c.code) ?? []), c]);
+      const salesMeta: Record<string, { name: string; starts_on: string | null; ends_on: string | null }> = {};
+      const events = new Map<string, ReturnType<typeof parseEventPage>>();
+      for (const [code, lots] of bySale) {
+        const name = lots[0].sale_name ?? code;
+        await sleep(CRAWL_DELAY_MS);
+        const ev = await archiveFetch(`https://www.broadarrowauctions.com/events/event/${encodeURIComponent(name.normalize('NFD').replace(/[\u0300-\u036f]/g, ''))}`, {
+          platform: 'broad_arrow', callerName: 'extract-broad-arrow-roster', useFirecrawl: false, skipCache: true, metadata: { source: 'broad-arrow-roster', sale: code },
+        });
+        const parsed = ev.html ? parseEventPage(ev.html, name) : { starts_on: null, ends_on: null, days: [], location: null };
+        events.set(code, parsed);
+        salesMeta[`broad-arrow-${code}`] = { name, starts_on: parsed.starts_on, ends_on: parsed.ends_on };
+      }
+      const landedUrls = new Set<string>();
+      const keyOf = (u: string) => normalizeListingUrlKey(u) ?? u;
+      for (let i = 0; i < cards.length; i += 100) {
+        const keys = cards.slice(i, i + 100).map((c) => keyOf(c.url));
+        const { data: have } = await supabase.from('vehicle_events').select('source_listing_id').eq('source_platform', 'broad_arrow').eq('event_status', 'upcoming').in('source_listing_id', keys);
+        for (const h of have ?? []) landedUrls.add(String(h.source_listing_id));
+      }
+      const todo = cards.filter((c) => !landedUrls.has(keyOf(c.url)) && events.get(c.code)?.starts_on).slice(0, 20);
+      const out = { landed: 0, created: 0, failed: 0, errors: [] as string[] };
+      for (const c of todo) {
+        const e = events.get(c.code)!;
+        const extracted: BroadArrowExtracted = {
+          url: c.url, title: [c.year, c.make, c.model].filter(Boolean).join(' ') || null, year: c.year, make: c.make, model: c.model, vin: null, chassis_number: null,
+          estimate_low: c.estimate_low, estimate_high: c.estimate_high, sale_price: null, sold_price_text: null,
+          lot_number: c.lot_number, auction_name: c.sale_name, auction_date: e.starts_on, auction_status: 'upcoming',
+          mileage: null, engine: null, transmission: null, drivetrain: null, exterior_color: null, interior_color: null, body_style: null,
+          description: null, image_urls: c.image_urls, scrape_ms: 0,
+          extra_metadata: {
+            sale_key: `broad-arrow-${c.code}`, auction_name: c.sale_name, auction_session_days: e.days, sale_starts_on: e.starts_on, sale_ends_on: e.ends_on,
+            sale_location: e.location, currency: c.currency, roster_first_seen_at: observedAt,
+          },
+        };
+        try {
+          const r = await saveToDatabase(supabase, extracted);
+          out.landed++;
+          if (r.is_new) out.created++;
+        } catch (err) {
+          out.failed++;
+          if (out.errors.length < 5) out.errors.push(`${c.url}: ${err instanceof Error ? err.message : String(err)}`.slice(0, 200));
+        }
+      }
+      const census: Record<string, number> = {};
+      for (const [code, lots] of bySale) census[`broad-arrow-${code}`] = lots.length;
+      let censusWritten = false;
+      if (Object.keys(census).length && !stoppedBy) {
+        const { data: src } = await supabase.from('observation_sources').select('id').eq('slug', 'broad-arrow').maybeSingle();
+        if (src?.id) {
+          const total = Object.values(census).reduce((a, b) => a + b, 0);
+          const cen = await supabase.from('source_census').insert({
+            source_id: src.id, universe_total: total, universe_active: total, census_method: 'house_roster_facet', census_confidence: 0.9,
+            census_at: observedAt, census_url: 'https://www.broadarrowauctions.com/vehicles',
+            census_notes: 'Broad Arrow /vehicles listing (all pages): vehicle cards per sale; by_category keys are the events\' metadata.sale_key (broad-arrow-<sale code>).',
+            by_category: census, raw_response: { sales: salesMeta },
+          });
+          censusWritten = !cen.error;
+          softWrite('source_census insert', cen);
+        }
+      }
+      return okJson({ success: !stoppedBy, action: 'roster', stopped_by: stoppedBy, cards: cards.length, sales: salesMeta, already_upcoming: landedUrls.size, ...out, census_written: censusWritten });
+    }
+
     // --- Stats ---
+    // --- Results: land the past lots in source_targets from their own server-rendered pages (0 credits, robots-allowed) ---
+    // Walks broad-arrow targets in id order; a target that already has a broad_arrow event or an import_queue row is skipped, and every
+    // target tried gets an import_queue row (extractor_version broad-arrow-targets:1, raw_data.target_id) that is also the cursor.
+    // Direct fetch only (useFirecrawl false, retained through archiveFetch), 1.5 s apart, stops on 403/429 or 3 failures in a row,
+    // and does not start while the database IO gate (firecrawl_io_gate) is closed. A price in a non-USD currency is kept as text:
+    // sale_price stays null rather than put euros in a dollar column.
+    if (action === 'batch_from_targets') {
+      const TAG = 'broad-arrow-targets:1';
+      const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+      const batchLimit = Math.min(Math.max(Math.floor(Number(body.limit)) || 12, 1), 20);
+      const delayMs = Math.max(Math.floor(Number(body.delay_ms)) || 1500, 1500);
+      const started = Date.now();
+      const { data: gate } = await supabase.rpc('firecrawl_io_gate');
+      if (gate && gate.open === false) return okJson({ success: true, skipped: 'io_gate_closed', gate });
+
+      const { data: last } = await supabase.from('import_queue').select('raw_data').eq('extractor_version', TAG).order('created_at', { ascending: false }).limit(1).maybeSingle();
+      let cursor = Number(body.after_id) || Number(last?.raw_data?.target_id) || 0;
+      const picked: { id: number; listing_url: string }[] = [];
+      for (let page = 0; page < 10 && picked.length < batchLimit; page++) {
+        const { data: targets, error: tErr } = await supabase.from('source_targets').select('id, listing_url').eq('source_slug', 'broad-arrow').gt('id', cursor).order('id', { ascending: true }).limit(200);
+        if (tErr) throw tErr;
+        if (!targets?.length) break;
+        cursor = targets[targets.length - 1].id;
+        const urls = targets.map((t: { listing_url: string }) => t.listing_url);
+        const keys = urls.map((u: string) => normalizeListingUrlKey(u) ?? u);
+        const [{ data: queued }, { data: landed }] = await Promise.all([
+          supabase.from('import_queue').select('listing_url').in('listing_url', urls),
+          supabase.from('vehicle_events').select('source_listing_id').eq('source_platform', 'broad_arrow').in('source_listing_id', keys),
+        ]);
+        const doneUrls = new Set((queued ?? []).map((r: { listing_url: string }) => r.listing_url));
+        const doneKeys = new Set((landed ?? []).map((r: { source_listing_id: string }) => r.source_listing_id));
+        for (const t of targets) if (picked.length < batchLimit && !doneUrls.has(t.listing_url) && !doneKeys.has(normalizeListingUrlKey(t.listing_url) ?? t.listing_url)) picked.push(t);
+      }
+
+      const res = { picked: picked.length, landed: 0, created: 0, updated: 0, sold: 0, not_sold: 0, unknown_result: 0, gone: 0, failed: 0, stopped: null as string | null, errors: [] as string[] };
+      const saleDays = new Map<string, { starts_on: string | null; ends_on: string | null }>();
+      let streak = 0;
+      for (const t of picked) {
+        if (Date.now() - started > 110_000) { res.stopped = 'time_budget'; break; }
+        const { data: row, error: claimErr } = await supabase.from('import_queue').insert({ listing_url: t.listing_url, status: 'processing', extractor_version: TAG, raw_data: { target_id: t.id }, locked_at: new Date().toISOString() }).select('id').single();
+        if (claimErr || !row) continue;
+        const finish = async (status: string, error?: string, vehicleId?: string) =>
+          softWrite('import_queue update', await supabase.from('import_queue').update({ status, error_message: error?.slice(0, 500) ?? null, vehicle_id: vehicleId ?? null, processed_at: new Date().toISOString() }).eq('id', row.id), res.errors);
+        try {
+          const page = await archiveFetch(t.listing_url, { platform: 'broad_arrow', useFirecrawl: false, callerName: 'extract-broad-arrow-targets', directFetchOptions: { publicOnly: true, timeout: 25_000 } });
+          const st = page.statusCode ?? 0;
+          if (st === 403 || st === 429) { await finish('failed', `HTTP ${st}`); res.failed++; res.stopped = 'blocked_by_source'; break; }
+          if (st === 404 || st === 410) { await finish('skipped', 'PAGE_NOT_FOUND'); res.gone++; streak = 0; await sleep(delayMs); continue; }
+          if (!page.html) throw new Error(page.error || `no html (status ${st})`);
+          const lot = parseLotPage(page.html);
+          if (!lot.year || !lot.make) { await finish('skipped', 'not_a_vehicle_page'); res.gone++; streak = 0; await sleep(delayMs); continue; }
+          // The sale's run days come from its event page, read once per sale per run (retained through archiveFetch).
+          let days = lot.saleName ? saleDays.get(lot.saleName) : undefined;
+          if (lot.saleName && !days) {
+            await sleep(3000);
+            const ev = await archiveFetch(`https://www.broadarrowauctions.com/events/event/${encodeURIComponent(lot.saleName.normalize('NFD').replace(/[\u0300-\u036f]/g, ''))}`, { platform: 'broad_arrow', callerName: 'extract-broad-arrow-targets', useFirecrawl: false, directFetchOptions: { publicOnly: true, timeout: 25_000 } });
+            const parsed = ev.html ? parseEventPage(ev.html, lot.saleName) : { starts_on: null, ends_on: null };
+            days = { starts_on: parsed.starts_on, ends_on: parsed.ends_on };
+            saleDays.set(lot.saleName, days);
+          }
+          const usd = lot.currency === 'USD' || lot.currency === null;
+          const extracted: BroadArrowExtracted = {
+            url: t.listing_url, title: lot.title, year: lot.year, make: lot.make, model: lot.model,
+            vin: lot.vin && lot.vin.length === 17 ? lot.vin : null, chassis_number: lot.vin && lot.vin.length !== 17 ? lot.vin : null,
+            estimate_low: null, estimate_high: null,
+            sale_price: lot.status === 'sold' && usd ? lot.soldPrice : null, sold_price_text: lot.soldPriceText,
+            lot_number: lot.lotNumber, auction_name: lot.saleName, auction_date: days?.starts_on ?? null,
+            auction_status: lot.status === 'unknown' ? null : lot.status,
+            mileage: lot.odometer ? (lot.odometer.unit === 'km' ? Math.round(lot.odometer.value * 0.621371) : lot.odometer.value) : null,
+            engine: null, transmission: null, drivetrain: null, exterior_color: null, interior_color: null, body_style: null,
+            description: lot.description, image_urls: lot.imageUrls, scrape_ms: 0,
+            extra_metadata: { sale_starts_on: days?.starts_on ?? null, sale_ends_on: days?.ends_on ?? null, currency: lot.currency, sold_amount: lot.status === 'sold' ? lot.soldPrice : null, odometer: lot.odometer, read_by: 'broad-arrow-targets' },
+          };
+          const saved = await saveToDatabase(supabase, extracted);
+          await finish('complete', undefined, saved.vehicle_id);
+          res.landed++; if (saved.is_new) res.created++; else res.updated++;
+          if (lot.status === 'sold') res.sold++; else if (lot.status === 'not_sold') res.not_sold++; else res.unknown_result++;
+          streak = 0;
+        } catch (err: unknown) {
+          const msg = err instanceof Error ? err.message : String(err);
+          await finish('failed', msg);
+          res.failed++; streak++;
+          if (res.errors.length < 5) res.errors.push(`${t.listing_url}: ${msg.slice(0, 200)}`);
+          if (streak >= 3) { res.stopped = '3_failures_in_a_row'; break; }
+        }
+        await sleep(delayMs);
+      }
+      return okJson({ success: true, cursor, ...res });
+    }
+
     if (action === 'stats') {
       const { count: pendingCount } = await supabase
         .from('import_queue')

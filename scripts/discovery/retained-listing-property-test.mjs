@@ -63,6 +63,78 @@ try {
  sql(priorView.slice(priorView.indexOf('CREATE OR REPLACE VIEW public.vehicle_canonical'),priorView.indexOf('COMMENT ON VIEW')));
  sql(readFileSync('supabase/migrations/20261005083255_retained_listing_interior_property.sql','utf8'));
  sql(readFileSync('supabase/migrations/20261005134051_retained_listing_exterior_property.sql','utf8'));
+ if(process.env.RETAINED_PROPERTY_TEST_POWERTRAIN==='1') {
+  // The fixture permits localhost/socket only and is dropped in finally.
+  sql(`DO $$ BEGIN IF NOT EXISTS(SELECT FROM pg_roles WHERE rolname='service_role') THEN CREATE ROLE service_role; END IF; END $$;
+  INSERT INTO observation_properties(id,property_key,namespace,applies_to_kinds) VALUES
+  ('c0f743ae-dc94-4dfd-98ef-514b76f74a9b','engine_configuration','core',ARRAY['specification']),
+  ('66b2f1f6-b714-4ac0-85b6-60ba89529c1a','engine_displacement_l','core',ARRAY['specification']),
+  ('235aed17-9bd3-4886-90be-9b1a8e2d1844','transmission_type','core',ARRAY['specification']),
+  ('32b51f19-e5cf-4f67-81d9-96c2d30885a1','drivetrain_layout','core',ARRAY['specification']);
+  UPDATE vehicle_observations SET structured_data=structured_data||'{"engine_size":"302ci V8","drivetrain":"4WD"}'::jsonb;`);
+  const garageOwner=readFileSync('supabase/migrations/20261008050000_garage_owner_corrections.sql','utf8');
+  sql(garageOwner.slice(garageOwner.indexOf('CREATE OR REPLACE VIEW public.vehicle_canonical'),garageOwner.indexOf('CREATE OR REPLACE FUNCTION public.notify_subscribers_on_observation')));
+  sql(readFileSync('supabase/migrations/20261010150757_retained_listing_powertrain_properties.sql','utf8'));
+  const cases=readFileSync('supabase/functions/ingest-observation/retainedPowertrain.test.ts','utf8')
+    .split('const cases:')[1].split('];')[0].matchAll(/\["([^"]+)","([^"]+)",(null|"[^"]+"|[\d.]+)\]/g);
+  let normalizationCases=0;
+  for(const [,key,raw,expected] of cases) {
+   normalizationCases++;
+   const want=JSON.parse(expected);
+   const actual=sql(`SELECT coalesce(retained_powertrain_value('${key}','${JSON.stringify(raw).replaceAll("'","''")}'::jsonb)::text,'null')`).trim();
+   const value=actual.split('\n').filter(line=>line.trim() && !/retained_powertrain|coalesce|^-|row\)/.test(line.trim())).map(line=>line.trim())[0];
+   if(JSON.stringify(JSON.parse(value))!==JSON.stringify(want))throw Error(`SQL normalization mismatch ${raw}: ${actual} expected ${expected}`);
+  }
+  if(normalizationCases!==25)throw Error('Normalization fixture case format/count changed');
+  const insert=`INSERT INTO vehicle_observations(id,vehicle_id,kind,source_id,source_url,property_id,source_identifier,raw_source_ref,
+   observed_at,extraction_method,confidence_score,structured_data,source_observation_id,content_hash,content_text)
+   SELECT gen_random_uuid(),p.vehicle_id,'specification',p.source_id,p.source_url,r.id,'retained_listing_'||r.property_key||'_v1:'||p.id,
+   'vehicle_observations:'||p.id,p.ingested_at,'retained_listing_property_projection_v1',.6,
+   jsonb_build_object(r.property_key,retained_powertrain_value(r.property_key,p.structured_data->f.field),
+    'source_observation_id',p.id,'claim_role','listing_claim','observed_at_basis','source_testimony_recorded_at',
+    'source_field',f.field,'property_key',r.property_key,'projection_version','retained_listing_'||r.property_key||'_v1',
+    'analysis_kind','retained_listing_property_projection','source_recorded_at',p.ingested_at,'source_observed_at',p.observed_at,
+    'source_confidence_score',p.confidence_score,'source_extraction_method',p.extraction_method,
+    'source_value',p.structured_data->f.field,'normalization_version','retained_powertrain_v1',
+    'factory_configuration_status','unknown','current_configuration_status','unknown','independent_source',false),
+   p.id,r.property_key,'Retained extractor powertrain claim. No factory/current verification.'
+   FROM vehicle_observations p CROSS JOIN observation_properties r
+   CROSS JOIN LATERAL (SELECT CASE r.property_key WHEN 'transmission_type' THEN 'transmission' WHEN 'drivetrain_layout' THEN 'drivetrain' ELSE 'engine_size' END field) f
+   WHERE p.id='11111111-1111-4111-8111-111111111111' AND r.property_key IN('engine_configuration','engine_displacement_l','transmission_type','drivetrain_layout')`;
+  sql(insert);
+  sql(`DO $$ BEGIN
+   IF (SELECT count(*) FROM vehicle_canonical)<>4 THEN RAISE EXCEPTION 'missing canonical powertrain properties'; END IF;
+   IF (SELECT count(*) FROM vehicle_observations WHERE source_observation_id IS NOT NULL)<>4 THEN RAISE EXCEPTION 'missing children'; END IF;
+   IF (SELECT structured_data->>'engine_size' FROM vehicle_observations WHERE source_observation_id IS NULL)<>'302ci V8' THEN RAISE EXCEPTION 'parent changed'; END IF;
+   IF NOT EXISTS(SELECT FROM jsonb_array_elements(get_field_provenance('22222222-2222-4222-8222-222222222222','engine_displacement_l')->'observations') x
+    WHERE x->>'source_observation_id'='11111111-1111-4111-8111-111111111111'
+      AND x->>'observed_at_basis'='source_testimony_recorded_at'
+      AND x->>'value'='4.948893' AND x->>'source_value'='302ci V8'
+      AND x->>'source_field'='engine_size' AND x->>'normalization_version'='retained_powertrain_v1'
+      AND x->>'factory_configuration_status'='unknown' AND x->'independent_source'='false'::jsonb) THEN RAISE EXCEPTION 'reader lost attribution or normalized/source value'; END IF;
+  END $$`);
+  sql('DELETE FROM vehicle_observations WHERE source_observation_id IS NOT NULL');
+  for(const bad of [insert.replace("'source_value',p.structured_data->f.field","'source_value','\"invented\"'::jsonb"),
+   insert.replace("'normalization_version','retained_powertrain_v1'","'normalization_version','forged'"),
+   insert.replace("'factory_configuration_status','unknown'","'factory_configuration_status','verified'"),
+   insert.replace('retained_powertrain_value(r.property_key,p.structured_data->f.field)',"'\"invented\"'::jsonb")]) {
+    try{sql(bad);throw Error('forged powertrain accepted');}catch(e){if(!String(e.stderr).includes('ERROR:'))throw e;}
+  }
+  sql(insert);
+  sql(`UPDATE vehicle_observations SET structured_data=structured_data||'{"engine_size":"302ci Small-Block V8"}'::jsonb WHERE source_observation_id IS NULL;
+   DO $$ BEGIN
+    IF (SELECT count(*) FROM vehicle_canonical)<>2 THEN RAISE EXCEPTION 'changed raw source still readable'; END IF;
+    IF EXISTS(SELECT FROM jsonb_array_elements(get_field_provenance('22222222-2222-4222-8222-222222222222','engine_displacement_l')->'observations') x
+     WHERE x->>'source_observation_id'='11111111-1111-4111-8111-111111111111') THEN RAISE EXCEPTION 'changed source visible in provenance'; END IF;
+   END $$;
+   UPDATE vehicle_observations SET structured_data=structured_data||'{"engine_size":"302ci V8"}'::jsonb WHERE source_observation_id IS NULL;`);
+  sql(`UPDATE vehicles SET is_public=false;
+   DO $$ BEGIN IF EXISTS(SELECT FROM vehicle_canonical) THEN RAISE EXCEPTION 'private parent readable'; END IF; END $$;
+   UPDATE vehicles SET is_public=true;
+   UPDATE vehicle_observations SET is_superseded=true WHERE source_observation_id IS NULL;
+   DO $$ BEGIN IF EXISTS(SELECT FROM vehicle_canonical) THEN RAISE EXCEPTION 'superseded parent readable'; END IF; END $$;`);
+  console.log('PASS four powertrain properties: SQL/edge normalization parity, source custody, actual readers, forgery/private/superseded refusals');
+ } else {
  projectionTests=true;
  sql(`DO $$ BEGIN IF NOT EXISTS(SELECT FROM observation_sources WHERE id='4cdc735c-f117-42f2-889f-ba33805639a5'
  AND supported_observations=ARRAY['listing','sale_result','comment','bid','condition','specification']::observation_kind[])
@@ -125,4 +197,5 @@ try {
  sql(`UPDATE vehicles SET is_public=false`);rejects(valid,'private parent');sql(`UPDATE vehicles SET is_public=true`);
  sql(`UPDATE vehicle_observations SET is_superseded=true`);rejects(valid,'superseded source');
  console.log('All retained listing SQL cases passed');
+ }
 }finally{if(created)run('dropdb',['-h',reuse||socket,'-p',port,database]);if(started)run('pg_ctl',['-D',data,'-m','fast','-w','stop']);rmSync(base,{recursive:true,force:true});}

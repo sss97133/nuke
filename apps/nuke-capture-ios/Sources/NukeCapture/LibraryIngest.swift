@@ -34,6 +34,7 @@
 import CoreGraphics
 import Photos
 import SwiftUI
+import UIKit
 import Vision
 
 @MainActor
@@ -108,7 +109,10 @@ final class LibraryIngest: ObservableObject {
         // Human groups are the first context for the independent local pass. The
         // existing power/Wi-Fi background job hosts it; no paid inference is added.
         await LibraryStore.shared.refreshAlbums()
-        await runAlbumReview(budget: min(budget, 256))
+        // The charging job may bring an optimized-away original down from iCloud; with the app
+        // open, only what is on the phone is read.
+        await runAlbumReview(budget: min(budget, 256),
+                             allowNetwork: UIApplication.shared.applicationState == .background)
         let total = LibraryStore.shared.count
         guard total > 0 else { return }
         // Deletions shift the frontier ABOVE the position cursor, so a shrunk library
@@ -132,16 +136,29 @@ final class LibraryIngest: ObservableObject {
         await walk(startIndex: start, positionEnd: total, workBudget: budget, advanceCursor: true, mode: .full)
     }
 
+    /// The album review reads originals with accurate OCR, seconds of Neural Engine per photo.
+    /// With the app open it runs only on a charger at a nominal temperature; otherwise the
+    /// charging background job (runBackfillBatch) carries it.
+    static var mayReviewInForeground: Bool {
+        UIDevice.current.isBatteryMonitoringEnabled = true
+        let state = UIDevice.current.batteryState
+        let p = ProcessInfo.processInfo
+        return (state == .charging || state == .full) && p.thermalState == .nominal && !p.isLowPowerModeEnabled
+    }
+
     static var albumMethodVersion: String {
+        // The Vision revisions name the models; the OS major version stays as a coarse guard. The
+        // minor and patch versions used to be in it too, so every iOS point update discarded every
+        // stored read and "read on-device" fell back to about zero.
         let os = ProcessInfo.processInfo.operatingSystemVersion
-        return "album-vision-v1:\(VNClassifyImageRequest.defaultRevision):\(VNRecognizeTextRequest.defaultRevision):\(os.majorVersion).\(os.minorVersion).\(os.patchVersion)"
+        return "album-vision-v2:\(VNClassifyImageRequest.defaultRevision):\(VNRecognizeTextRequest.defaultRevision):\(os.majorVersion)"
     }
 
     /// Read every selected source image, including already-bound photos. Album
     /// membership is context, never an inferred vehicle ID. A whole-library pass
     /// prioritizes albums, then visits the remaining visible photos exactly once.
     /// The cursor is only a resume hint; source/method versions govern cache reuse.
-    func runAlbumReview(albumId: String? = nil, budget: Int = 400) async {
+    func runAlbumReview(albumId: String? = nil, budget: Int = 400, allowNetwork: Bool = false) async {
         guard !running, budget > 0 else { return }
         guard let catalog = LibraryStore.shared.albumCatalog,
               catalog.accessScope == "full" || (catalog.accessScope == "limited" && albumId == nil) else {
@@ -167,19 +184,26 @@ final class LibraryIngest: ObservableObject {
         let method = Self.albumMethodVersion
         let key = "albumReviewCursor." + LocalStore.albumDigest(Data((albumId ?? "whole-library").utf8))
         let start = UserDefaults.standard.integer(forKey: key) % photos.count
-        var attempted = 0, cached = 0
+        var attempted = 0, cached = 0, unavailable = 0
         var pendingReasons: [String: Int] = [:]
         do {
             for step in 0..<photos.count {
-                guard !Task.isCancelled else { break }
+                guard !Task.isCancelled, !SyncEngine.deviceTooHotOrLow else { break }
                 let index = (start + step) % photos.count
                 let photo = photos[index]
                 let prior = try await Task.detached { try LocalStore.shared.albumImageReview(for: photo, methodVersion: method) }.value
-                if prior != nil { cached += 1; continue }
-                guard attempted < budget else { break }
-                attempted += 1
-                let result = await Task.detached(priority: .utility) { await Self.reviewAlbumPhoto(photo, method: method) }.value
+                if prior != nil {
+                    cached += 1
+                    // Step the resume point past read photos too, or each call re-walks them all.
+                    UserDefaults.standard.set((index + 1) % photos.count, forKey: key)
+                    continue
+                }
+                guard attempted < budget, unavailable < budget * 4 else { break }
+                let result = await Task.detached(priority: .utility) { await Self.reviewAlbumPhoto(photo, method: method, allowNetwork: allowNetwork) }.value
                 guard !Task.isCancelled else { break }
+                // A photo whose original is not on the phone costs a fast local check, not a read:
+                // it does not use the budget (bounded separately), so a pass reaches photos it can read.
+                if result.pendingReason == "originals unavailable" { unavailable += 1 } else { attempted += 1 }
                 if let review = result.review {
                     try await Task.detached { try LocalStore.shared.recordAlbumImageReview(review) }.value
                     albumReviewDone += 1
@@ -204,11 +228,11 @@ final class LibraryIngest: ObservableObject {
         static func pending(_ reason: String) -> Self { .init(review: nil, pendingReason: reason) }
     }
 
-    private nonisolated static func reviewAlbumPhoto(_ photo: LocalAlbumPhoto, method: String) async -> AlbumPhotoReviewResult {
+    private nonisolated static func reviewAlbumPhoto(_ photo: LocalAlbumPhoto, method: String, allowNetwork: Bool) async -> AlbumPhotoReviewResult {
         guard let asset = PHAsset.fetchAssets(withLocalIdentifiers: [photo.localIdentifier], options: nil).firstObject else { return .pending("sources inaccessible") }
         let version = asset.modificationDate.map { String($0.timeIntervalSince1970) }
         guard version == photo.sourceVersion else { return .pending("source versions changed") }
-        guard let data = try? await SyncEngine.requestOriginalData(for: asset, allowNetwork: false) else { return .pending("originals unavailable") }
+        guard let data = try? await SyncEngine.requestOriginalData(for: asset, allowNetwork: allowNetwork) else { return .pending("originals unavailable") }
         // Source measurements have their own writer. An unavailable classifier
         // must not prevent true capture facts from reaching the user's record.
         let (make, model) = CameraEXIF.cameraInfo(from: data)
@@ -297,7 +321,7 @@ final class LibraryIngest: ObservableObject {
         var i = startIndex
         var processed = 0   // assets we actually attempted to load (the budget unit)
 
-        while i < end && processed < workBudget && !Task.isCancelled {
+        while i < end && processed < workBudget && !Task.isCancelled && !SyncEngine.deviceTooHotOrLow {
             let batchEnd = min(i + batchSize, end)
 
             // Snapshot this batch off the live PHFetchResult (main-actor read).
@@ -363,7 +387,9 @@ final class LibraryIngest: ObservableObject {
     /// network. Returns whether the EXIF row was written. `nonisolated` so the
     /// task-group child runs off the main actor; LocalStore is thread-safe.
     private nonisolated static func processOne(_ item: Item, mode: Mode) async -> Bool {
-        guard let data = try? await SyncEngine.requestOriginalData(for: item.asset) else {
+        // The head pass (EXIF only, run with the app open) reads what is on the phone; only the
+        // deep pass, hosted by the charging job, may download an original from iCloud.
+        guard let data = try? await SyncEngine.requestOriginalData(for: item.asset, allowNetwork: mode == .full) else {
             return false   // iCloud unavailable / threw → stays out of the skip-set, retried later
         }
         let date = CameraEXIF.captureDate(from: data)

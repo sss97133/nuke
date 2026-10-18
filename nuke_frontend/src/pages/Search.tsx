@@ -209,6 +209,7 @@ export default function Search() {
     searchMeta,
     handleLoadMore,
     loadingMore,
+    loadMoreError,
     browseStats,
     detectedMake,
     urlExtraction,
@@ -292,9 +293,11 @@ export default function Search() {
               activeFilter={resultFilter}
               onFilterChange={setResultFilter}
               totalCount={searchMeta?.total_count}
-              hasMore={searchMeta?.has_more}
+              hasMore={searchMeta?.has_more && !searchMeta.pagination_limited}
+              paginationLimited={searchMeta?.pagination_limited}
               onLoadMore={handleLoadMore}
               loadingMore={loadingMore}
+              loadMoreError={loadMoreError}
             />
           </div>
 

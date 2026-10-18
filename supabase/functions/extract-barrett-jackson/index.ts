@@ -24,12 +24,32 @@
  */
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { archiveFetch } from "../_shared/archiveFetch.ts";
+import { readCatalogPages } from "./catalogProbe.ts";
+import { archiveFetch, readArchivedPage } from "../_shared/archiveFetch.ts";
 import { qualityGate } from "../_shared/extractionQualityGate.ts";
 import { cleanVehicleFields } from "../_shared/pollutionDetector.ts";
 import { normalizeVehicleFields } from "../_shared/normalizeVehicle.ts";
 import { writeObservation } from "../_shared/observationWriter.ts";
 import { requireWriteAuth } from "../_shared/writeGuard.ts";
+import { projectSecretKey } from "../_shared/supabaseKeys.ts";
+import { mustWrite, softWrite } from '../_shared/writeResult.ts';
+import { fillOnlyIdentity, identityConflict, REVISION_DIFFERENT_CAR } from '../_shared/identityMatch.ts';
+import { ForcedVehicleMissing, forcedVehicleId, pickVehicleTarget } from "./vehicleTarget.ts";
+import { lotEventDate } from "./eventDate.ts";
+import { originImageUrl } from "./imageUrl.ts";
+import { docketLotNumber, docketStatus, episodeSoldAt, episodeStatus, statesResult } from "./episode.ts";
+import { patchForLiveRow } from "../_shared/vehicleEventWrite.ts";
+import {
+  applyBarrettJacksonVehicleFacets,
+  parseBarrettJacksonHeadline,
+} from "./vehicleFacets.ts";
+
+/** The resolved vehicle is a different car than the lot: nothing is written, a revision item is returned (missing: identity_match,
+ *  reason: different_car, next action: relink). Photos and episodes for a different car never attach to that vehicle. */
+class IdentityRefused extends Error {
+  constructor(public vehicleId: string, public url: string, public detail: string) { super(`identity refused: different_car (${detail})`); }
+  get revision() { return { ...REVISION_DIFFERENT_CAR, vehicle_id: this.vehicleId, incoming_url: this.url, detail: this.detail }; }
+}
 
 const EXTRACTOR_VERSION = "2.0.0";
 
@@ -54,6 +74,9 @@ interface BJVehicle {
   year: number | null;
   make: string | null;
   model: string | null;
+  series_code: string | null;
+  trim_package: string | null;
+  body_style_facet: string | null;
   style: string | null;
   vin: string | null;
   transmission: string | null;
@@ -133,23 +156,26 @@ function parseRscVehicleData(html: string, url: string): BJVehicle | null {
     const titleField = searchBlock.match(/\\?"title\\?":\s*\\?"([^"\\]+)\\?"/);
     if (titleField) {
       vehicle.title = titleCase(titleField[1]);
-      const ymm = titleField[1].match(/^(\d{4})\s+(\S+)\s+(.+)$/);
-      if (ymm) {
-        vehicle.year = parseInt(ymm[1], 10);
-        vehicle.make = titleCase(ymm[2]);
-        vehicle.model = titleCase(ymm[3]);
-      }
     }
 
-    // Structured year/make/model fields
+    // Structured year/make/model fields (preferred over raw title tail)
     const yearField = searchBlock.match(/\\?"year\\?":\s*\\?"(\d{4})\\?"/);
-    if (yearField && !vehicle.year) vehicle.year = parseInt(yearField[1], 10);
+    if (yearField) vehicle.year = parseInt(yearField[1], 10);
 
     const makeField = searchBlock.match(/\\?"make\\?":\s*\\?"([^"\\]+)\\?"/);
-    if (makeField && !vehicle.make) vehicle.make = titleCase(makeField[1]);
+    if (makeField) vehicle.make = titleCase(makeField[1]);
 
     const modelField = searchBlock.match(/\\?"model\\?":\s*\\?"([^"\\]+)\\?"/);
-    if (modelField && !vehicle.model) vehicle.model = titleCase(modelField[1]);
+    if (modelField) vehicle.model = titleCase(modelField[1]);
+
+    if (titleField) {
+      const parsedHeadline = parseBarrettJacksonHeadline(titleField[1]);
+      if (!vehicle.year && parsedHeadline.year) vehicle.year = parsedHeadline.year;
+      if (!vehicle.make && parsedHeadline.make) vehicle.make = parsedHeadline.make;
+      if (!vehicle.model && parsedHeadline.modelRest) {
+        vehicle.model = titleCase(parsedHeadline.modelRest);
+      }
+    }
 
     // VIN
     const vinField = searchBlock.match(/\\?"vin\\?":\s*\\?"([A-Z0-9]+)\\?"/i);
@@ -230,21 +256,20 @@ function parseRscVehicleData(html: string, url: string): BJVehicle | null {
 
     // Lot number
     const lotField = searchBlock.match(/\\?"lot_number\\?":\s*\\?"([^"\\]+)\\?"/);
-    if (lotField) vehicle.lot_number = lotField[1];
+    if (lotField) vehicle.lot_number = docketLotNumber(lotField[1]);
 
     // Event slug -> auction name
     const eventField = searchBlock.match(/\\?"event_slug\\?":\s*\\?"([^"\\]+)\\?"/);
     if (eventField) vehicle.auction_name = titleCase(eventField[1].replace(/-/g, " "));
 
-    // Event start date = the sale date. It sits in the RSC payload but was never
-    // read — the cause of BJ's 0% dated events. Pull the first ISO date.
-    const startDateField = html.match(/\\?"start_date\\?":\s*\\?"(\d{4}-\d{2}-\d{2})/);
-    if (startDateField) vehicle.event_date = startDateField[1];
+    // Event start date = the sale date: the first start_date in the docket's own event year (eventDate.ts). The page
+    // also advertises upcoming events; the first ISO date dated a 2004 lot to 2026-04-16.
+    vehicle.event_date = lotEventDate(html, url);
 
     // Is sold
     const soldField = searchBlock.match(/\\?"is_sold\\?":\s*(true|false)/);
     if (soldField) {
-      vehicle.status = soldField[1] === "true" ? "Sold" : "Not Sold";
+      vehicle.status = docketStatus(soldField[1] === "true", lotField?.[1]);
     }
 
     // Is canceled
@@ -261,8 +286,15 @@ function parseRscVehicleData(html: string, url: string): BJVehicle | null {
     // Fallback: extract auction from URL
     extractAuctionFromUrl(vehicle, url);
 
+    // Deterministic facet extraction from headline + description + structured fields
+    applyBarrettJacksonVehicleFacets(vehicle);
+
     if (vehicle.year || vehicle.make) {
-      console.log(`[BJ] RSC extraction found: ${vehicle.year} ${vehicle.make} ${vehicle.model}, vin=${vehicle.vin}, price=$${vehicle.sale_price}`);
+      console.log(
+        `[BJ] RSC extraction found: ${vehicle.year} ${vehicle.make} ${vehicle.model} ` +
+          `(series=${vehicle.series_code}, trim=${vehicle.trim_package}, body=${vehicle.body_style_facet}), ` +
+          `vin=${vehicle.vin}, price=$${vehicle.sale_price}`,
+      );
       return vehicle;
     }
   }
@@ -305,22 +337,23 @@ function parseJsonLd(html: string, url: string): BJVehicle | null {
             if (price >= 100 && price < 100_000_000) vehicle.sale_price = price;
           }
 
-          // Parse year/make/model from name: "1966 CHEVROLET EL CAMINO"
+          // Structured fields first, then headline fallback
+          if (item.brand?.name) vehicle.make = titleCase(String(item.brand.name));
+          if (item.model) vehicle.model = titleCase(String(item.model));
+          if (item.vehicleModelDate) vehicle.year = parseInt(String(item.vehicleModelDate), 10) || null;
+
           if (item.name) {
-            const titleMatch = String(item.name).match(/^(\d{4})\s+(\S+)\s+(.+)$/);
-            if (titleMatch) {
-              vehicle.year = parseInt(titleMatch[1], 10);
-              vehicle.make = titleCase(titleMatch[2]);
-              vehicle.model = titleCase(titleMatch[3]);
+            const parsedHeadline = parseBarrettJacksonHeadline(String(item.name));
+            if (!vehicle.year && parsedHeadline.year) vehicle.year = parsedHeadline.year;
+            if (!vehicle.make && parsedHeadline.make) vehicle.make = parsedHeadline.make;
+            if (!vehicle.model && parsedHeadline.modelRest) {
+              vehicle.model = titleCase(parsedHeadline.modelRest);
             }
           }
-          // Or use structured fields
-          if (item.brand?.name && !vehicle.make) vehicle.make = titleCase(String(item.brand.name));
-          if (item.model && !vehicle.model) vehicle.model = titleCase(String(item.model));
-          if (item.vehicleModelDate && !vehicle.year) vehicle.year = parseInt(String(item.vehicleModelDate), 10) || null;
 
           // Extract auction info from URL
           extractAuctionFromUrl(vehicle, url);
+          applyBarrettJacksonVehicleFacets(vehicle);
 
           if (vehicle.year || vehicle.make) return vehicle;
         }
@@ -369,12 +402,10 @@ function parseEmbeddedJsonVehicle(embedded: Record<string, unknown>, url: string
 
   if (typeof embedded.title === "string") {
     vehicle.title = titleCase(embedded.title);
-    const titleMatch = embedded.title.match(/^(\d{4})\s+(\S+)\s+(.+)$/);
-    if (titleMatch) {
-      vehicle.year = parseInt(titleMatch[1], 10);
-      vehicle.make = titleCase(titleMatch[2]);
-      vehicle.model = titleCase(titleMatch[3]);
-    }
+    const parsedHeadline = parseBarrettJacksonHeadline(embedded.title);
+    if (parsedHeadline.year) vehicle.year = parsedHeadline.year;
+    if (parsedHeadline.make) vehicle.make = parsedHeadline.make;
+    if (parsedHeadline.modelRest) vehicle.model = titleCase(parsedHeadline.modelRest);
   }
 
   if (typeof embedded.full_description === "string" && embedded.full_description.length > 20) {
@@ -403,8 +434,12 @@ function parseEmbeddedJsonVehicle(embedded: Record<string, unknown>, url: string
   if (typeof embedded.year === "number") vehicle.year = embedded.year as number;
   if (typeof embedded.make === "string") vehicle.make = titleCase(String(embedded.make));
   if (typeof embedded.model === "string") vehicle.model = titleCase(String(embedded.model));
+  if (typeof embedded.style === "string" && embedded.style.trim()) {
+    vehicle.style = titleCase(String(embedded.style));
+  }
 
   extractAuctionFromUrl(vehicle, url);
+  applyBarrettJacksonVehicleFacets(vehicle);
 
   return (vehicle.year || vehicle.make) ? vehicle : null;
 }
@@ -418,25 +453,24 @@ function parseHtmlStructured(html: string, url: string): BJVehicle | null {
   // Try og:title meta tag for vehicle name
   const ogTitle = html.match(/<meta[^>]*property=["']og:title["'][^>]*content=["']([^"']+)["']/i);
   if (ogTitle) {
-    vehicle.title = titleCase(ogTitle[1].trim());
-    const titleMatch = ogTitle[1].match(/(\d{4})\s+(\S+)\s+(.+?)(?:\s*[-|]|$)/);
-    if (titleMatch) {
-      vehicle.year = parseInt(titleMatch[1], 10);
-      vehicle.make = titleCase(titleMatch[2]);
-      vehicle.model = titleCase(titleMatch[3].trim());
-    }
+    const cleanOg = ogTitle[1].replace(/\s*[-|].*$/, "").trim();
+    vehicle.title = titleCase(cleanOg);
+    const parsedHeadline = parseBarrettJacksonHeadline(cleanOg);
+    if (parsedHeadline.year) vehicle.year = parsedHeadline.year;
+    if (parsedHeadline.make) vehicle.make = parsedHeadline.make;
+    if (parsedHeadline.modelRest) vehicle.model = titleCase(parsedHeadline.modelRest);
   }
 
   // Try <title> tag
   if (!vehicle.year) {
     const htmlTitle = html.match(/<title[^>]*>([^<]+)<\/title>/i);
     if (htmlTitle) {
-      const titleMatch = htmlTitle[1].match(/(\d{4})\s+(\S+)\s+(.+?)(?:\s*[-|]|$)/);
-      if (titleMatch) {
-        vehicle.year = parseInt(titleMatch[1], 10);
-        vehicle.make = titleCase(titleMatch[2]);
-        vehicle.model = titleCase(titleMatch[3].trim());
-      }
+      const cleanHtmlTitle = htmlTitle[1].replace(/\s*[-|].*$/, "").trim();
+      if (!vehicle.title) vehicle.title = titleCase(cleanHtmlTitle);
+      const parsedHeadline = parseBarrettJacksonHeadline(cleanHtmlTitle);
+      if (parsedHeadline.year) vehicle.year = parsedHeadline.year;
+      if (parsedHeadline.make) vehicle.make = parsedHeadline.make;
+      if (parsedHeadline.modelRest) vehicle.model = titleCase(parsedHeadline.modelRest);
     }
   }
 
@@ -447,6 +481,7 @@ function parseHtmlStructured(html: string, url: string): BJVehicle | null {
   }
 
   extractAuctionFromUrl(vehicle, url);
+  applyBarrettJacksonVehicleFacets(vehicle);
 
   return (vehicle.year || vehicle.make) ? vehicle : null;
 }
@@ -499,12 +534,12 @@ function parseMarkdown(markdown: string, url: string): BJVehicle {
   }
 
   // Fallback: parse year/make/model from title text
-  if (!vehicle.year && vehicle.title) {
-    const titleYMM = vehicle.title.match(/^(\d{4})\s+(\S+)\s+(.+)$/);
-    if (titleYMM) {
-      vehicle.year = parseInt(titleYMM[1], 10);
-      if (!vehicle.make) vehicle.make = titleCase(titleYMM[2]);
-      if (!vehicle.model) vehicle.model = titleCase(titleYMM[3]);
+  if (vehicle.title) {
+    const parsedHeadline = parseBarrettJacksonHeadline(vehicle.title);
+    if (!vehicle.year && parsedHeadline.year) vehicle.year = parsedHeadline.year;
+    if (!vehicle.make && parsedHeadline.make) vehicle.make = parsedHeadline.make;
+    if (!vehicle.model && parsedHeadline.modelRest) {
+      vehicle.model = titleCase(parsedHeadline.modelRest);
     }
   }
 
@@ -584,6 +619,8 @@ function parseMarkdown(markdown: string, url: string): BJVehicle {
   // Mileage from text
   extractMileageFromText(vehicle, (vehicle.description || "") + " " + markdown);
 
+  applyBarrettJacksonVehicleFacets(vehicle);
+
   return vehicle;
 }
 
@@ -606,13 +643,13 @@ function extractImageUrls(html: string): string[] {
   const altCdnRegex =
     /https:\/\/[^"'\s)]*barrett[^"'\s)]*\.(?:azureedge\.net|cloudfront\.net|amazonaws\.com)[^"'\s)]+\.(jpg|jpeg|png|webp)/gi;
   while ((m = altCdnRegex.exec(html)) !== null) {
-    urls.add(m[0]);
+    urls.add(originImageUrl(m[0]).replace('/thumbnail/', '/fullsize/'));
   }
 
   // og:image
   const ogImage = html.match(/<meta[^>]*property=["']og:image["'][^>]*content=["']([^"']+)["']/i);
   if (ogImage && ogImage[1].includes("barrett")) {
-    urls.add(ogImage[1]);
+    urls.add(originImageUrl(ogImage[1]));
   }
 
   // Filter out non-vehicle images (venue maps, logos, site chrome)
@@ -661,6 +698,9 @@ function newEmptyVehicle(url: string): BJVehicle {
     year: null,
     make: null,
     model: null,
+    series_code: null,
+    trim_package: null,
+    body_style_facet: null,
     style: null,
     vin: null,
     transmission: null,
@@ -731,14 +771,28 @@ function isPageRemoved(html: string | null, markdown: string | null): boolean {
 
 // ─── Fetch + parse (tries direct first, falls back to Firecrawl) ────────────
 
-async function fetchAndParse(url: string): Promise<BJVehicle> {
+let lastCaptureSource = ""; // cache | direct | firecrawl: where the page behind the last parse came from (reported by action extract)
+
+async function fetchAndParse(url: string, opts?: { retainedFirst?: boolean; noFirecrawl?: boolean; noFetch?: boolean }): Promise<BJVehicle & { capture_source?: string }> {
   // Step 1: Try direct HTTP fetch (free, uses archiveFetch with cache)
   // BJ has Cloudflare but archiveFetch handles retries/proxies
-  const directResult = await archiveFetch(url, {
-    platform: "barrett-jackson",
-    useFirecrawl: false,
-    callerName: "extract-barrett-jackson",
-  });
+  // retainedFirst: use any retained capture however old (re-landing a lot whose vehicle was lost needs the capture, not a new fetch)
+  // noFetch: read the retained capture and nothing else. barrett-jackson.com/robots.txt disallows every crawler but Google's, so a
+  // re-land must never make a request; a lot with no capture is reported (NO_RETAINED_CAPTURE), not fetched.
+  let directResult: Awaited<ReturnType<typeof archiveFetch>>;
+  if (opts?.noFetch) {
+    const kept = await readArchivedPage(url, { platform: "barrett-jackson", maxAgeSec: 10 * 365 * 86400, htmlOnly: true });
+    if (!kept.html) throw new Error("NO_RETAINED_CAPTURE");
+    directResult = { html: kept.html, markdown: kept.markdown, source: "cache", cached: true, snapshotId: kept.snapshotId, url, platform: "barrett-jackson", statusCode: 200, error: null, costCents: 0 };
+  } else {
+    directResult = await archiveFetch(url, {
+      platform: "barrett-jackson",
+      useFirecrawl: false,
+      callerName: "extract-barrett-jackson",
+      ...(opts?.retainedFirst ? { maxAgeSec: 10 * 365 * 86400 } : {}),
+    });
+  }
+  lastCaptureSource = directResult.cached ? "cache" : directResult.source;
 
   const isBlocked = directResult.statusCode === 403 || directResult.statusCode === 503 ||
     (directResult.html && directResult.html.length < 50000 &&
@@ -786,6 +840,7 @@ async function fetchAndParse(url: string): Promise<BJVehicle> {
     }
   }
 
+  if (opts?.noFirecrawl) throw new Error("NO_USABLE_CAPTURE");
   // Step 2: Fallback to Firecrawl (BJ usually requires JS rendering)
   console.log(`[BJ] Direct fetch insufficient, falling back to Firecrawl for ${url}`);
   const fcResult = await archiveFetch(url, {
@@ -856,7 +911,10 @@ async function fetchAndParse(url: string): Promise<BJVehicle> {
             .replace(/&nbsp;/g, " ")
             .replace(/\s+/g, " ")
             .trim();
-          if (desc.length > 30) fromMd.description = desc.slice(0, 5000);
+          if (desc.length > 30) {
+            fromMd.description = desc.slice(0, 5000);
+            applyBarrettJacksonVehicleFacets(fromMd);
+          }
         }
       }
 
@@ -890,6 +948,9 @@ async function saveVehicle(
   vehicle: BJVehicle,
   forceVehicleId?: string,
 ): Promise<{ vehicleId: string; isNew: boolean; fieldsUpdated: string[]; qualityScore: number }> {
+  // Ensure deterministic facet extraction has run on the vehicle before identity check & write
+  applyBarrettJacksonVehicleFacets(vehicle);
+
   // Check if vehicle already exists by URL
   const { data: byUrl } = await supabase
     .from("vehicles")
@@ -907,7 +968,8 @@ async function saveVehicle(
     .limit(1)
     .maybeSingle();
 
-  let existingId = forceVehicleId || queueEntry?.vehicle_id || byUrl?.id;
+  const target = pickVehicleTarget({ forced: forceVehicleId, queue: queueEntry?.vehicle_id, url: byUrl?.id });
+  let existingId = target.kind === "new" ? undefined : target.id;
 
   // Also check by VIN (prevents duplicate key violations)
   if (!existingId && vehicle.vin && vehicle.vin.length >= 5) {
@@ -919,6 +981,18 @@ async function saveVehicle(
       .limit(1)
       .maybeSingle();
     if (byVin?.id) existingId = byVin.id;
+  }
+
+  // Identity guard: the lot must be the same car as the vehicle it resolved to (a VIN or URL match is not enough: the
+  // docket car overwrote a BaT sport truck's year, make, model, VIN, URL and photos, 2026-10-15). Fill-only below.
+  let existingIdentity: { year: number | null; make: string | null; model: string | null; vin: string | null; sale_price?: number | null } | null = null;
+  if (existingId) {
+    const { data: idRow } = await supabase.from("vehicles").select("year,make,model,vin,sale_price").eq("id", existingId).maybeSingle();
+    existingIdentity = (idRow as typeof existingIdentity) ?? null;
+    // A forced vehicle must exist: never write the lot to a new vehicle in its place.
+    if (target.kind === "forced" && !idRow) throw new ForcedVehicleMissing(existingId);
+    const conflict = existingIdentity ? identityConflict(existingIdentity, { year: vehicle.year, make: vehicle.make, model: vehicle.model, vin: vehicle.vin }) : null;
+    if (conflict) throw new IdentityRefused(existingId, vehicle.url, conflict);
   }
 
   // Build raw data payload
@@ -933,6 +1007,10 @@ async function saveVehicle(
     year: vehicle.year,
     make: vehicle.make,
     model: vehicle.model,
+    series: vehicle.series_code,
+    trim: vehicle.trim_package,
+    body_style: vehicle.body_style_facet || vehicle.style || null,
+    listing_title: vehicle.title,
     vin: vehicle.vin && vehicle.vin.length >= 5 ? vehicle.vin : null,
     transmission: vehicle.transmission,
     engine_type: vehicle.engine,
@@ -949,7 +1027,6 @@ async function saveVehicle(
     listing_source: "barrett-jackson",
     source: "barrett-jackson",
     extractor_version: EXTRACTOR_VERSION,
-    ...(vehicle.style ? { body_style: vehicle.style } : {}),
   };
 
   // Normalize fields (transmission, trim, model, colors)
@@ -987,19 +1064,27 @@ async function saveVehicle(
     // Track which fields we're adding
     const { data: existing } = await supabase
       .from("vehicles")
-      .select("vin,mileage,color,description,transmission,body_style,engine_type,sale_price,interior_color")
+      .select("vin,mileage,color,description,transmission,body_style,engine_type,sale_price,interior_color,series,trim,listing_title")
       .eq("id", existingId)
       .maybeSingle();
 
     if (existing) {
-      const trackFields = ["vin", "mileage", "color", "description", "transmission", "body_style", "engine_type", "sale_price", "interior_color"];
+      const trackFields = [
+        "vin", "mileage", "color", "description", "transmission",
+        "body_style", "engine_type", "sale_price", "interior_color",
+        "series", "trim", "listing_title",
+      ];
       for (const f of trackFields) {
         if (!(existing as any)[f] && cleanData[f]) fieldsUpdated.push(f);
       }
     }
 
     // Strip identity/source fields that should only be set on insert
-    const { discovery_url: _du, discovery_source: _ds, source: _src, listing_source: _ls, ...updateData } = cleanData;
+    const { discovery_url: _du, discovery_source: _ds, source: _src, listing_source: _ls, ...updateAll } = cleanData;
+    // Identity fields are fill-only on a vehicle that already has them.
+    // sale_price is fill-only too: a docket price must not replace the price a vehicle already carries.
+    const updateData = existingIdentity ? fillOnlyIdentity(updateAll, existingIdentity) : updateAll;
+    if (existingIdentity?.sale_price != null) delete (updateData as Record<string, unknown>).sale_price;
 
     const { error: updateErr } = await supabase.from("vehicles").update(updateData).eq("id", existingId);
     if (updateErr) {
@@ -1056,14 +1141,14 @@ async function saveVehicle(
           .limit(1)
           .maybeSingle();
         if (!existingImg) {
-          await supabase.from("vehicle_images").insert({
+          mustWrite('vehicle_images insert', await supabase.from("vehicle_images").insert({
             vehicle_id: vehicleId,
             image_url: imgUrl,
             source: "external_import",
             source_url: imgUrl,
             is_external: true,
             position: idx,
-          });
+          }));
         }
       } catch (e) {
         console.warn(`[BJ] Image insert failed (non-fatal): ${e instanceof Error ? e.message : String(e)}`);
@@ -1073,37 +1158,45 @@ async function saveVehicle(
 
   // Create vehicle_event record (non-fatal)
   try {
-    const { data: existingListing } = await supabase
+    const { data: liveRow } = await supabase
       .from("vehicle_events")
-      .select("id")
+      .select("id, metadata, sold_at, ended_at")
       .eq("vehicle_id", vehicleId)
       .eq("source_platform", "barrettjackson")
       .eq("source_url", vehicle.url)
       .limit(1)
       .maybeSingle();
+    const existingListing = liveRow as { id: string; metadata: Record<string, unknown> | null; sold_at: string | null; ended_at: string | null } | null;
+
+    const episode = {
+      vehicle_id: vehicleId,
+      source_platform: "barrettjackson",
+      source_listing_id: null,
+      event_type: "auction",
+      source_url: vehicle.url,
+      event_status: episodeStatus(vehicle.status),
+      final_price: vehicle.sale_price || null,
+      sold_at: episodeSoldAt(vehicle.status, vehicle.event_date),
+      metadata: {
+        lot_number: vehicle.lot_number,
+        auction_name: vehicle.auction_name,
+        event_date: vehicle.event_date,
+        extraction_method: vehicle.extraction_method,
+        extractor_version: EXTRACTOR_VERSION,
+      },
+    };
 
     if (!existingListing) {
-      await supabase.from("vehicle_events").insert({
-        vehicle_id: vehicleId,
-        source_platform: "barrettjackson",
-        event_type: "auction",
-        source_url: vehicle.url,
-        event_status: vehicle.status?.toLowerCase() === "sold" ? "sold" :
-                        vehicle.status?.toLowerCase() === "not sold" ? "unsold" :
-                        vehicle.status?.toLowerCase() === "withdrawn" ? "cancelled" :
-                        "ended",
-        final_price: vehicle.sale_price || null,
-        sold_at: vehicle.event_date && !isNaN(Date.parse(vehicle.event_date))
-          ? new Date(vehicle.event_date).toISOString()
-          : null,
-        metadata: {
-          lot_number: vehicle.lot_number,
-          auction_name: vehicle.auction_name,
-          event_date: vehicle.event_date,
-          extraction_method: vehicle.extraction_method,
-          extractor_version: EXTRACTOR_VERSION,
-        },
-      });
+      mustWrite('vehicle_events insert', await supabase.from("vehicle_events").insert(episode));
+    } else if (statesResult(vehicle.status)) {
+      // A lot first read before its sale kept that read for good: its episode was inserted once and never updated.
+      // A read that states the result now updates it (dates fill-only, metadata merged; see vehicleEventWrite.ts).
+      const { patch } = patchForLiveRow(existingListing, episode);
+      delete patch.vehicle_id; delete patch.source_platform; delete patch.source_listing_id; delete patch.source_url; delete patch.event_type;
+      (patch.metadata as Record<string, unknown>).lot_number =
+        vehicle.lot_number ?? docketLotNumber(existingListing.metadata?.lot_number as string | null | undefined);
+      if (!patch.final_price) delete patch.final_price;
+      mustWrite('vehicle_events update', await (supabase.from("vehicle_events") as any).update(patch).eq("id", existingListing.id));
     }
   } catch (e) {
     console.warn(`[BJ] External listing insert failed (non-fatal): ${e instanceof Error ? e.message : String(e)}`);
@@ -1121,14 +1214,14 @@ async function saveVehicle(
       .maybeSingle();
 
     if (!existingEvent) {
-      await supabase.from("auction_events").insert({
+      mustWrite('auction_events insert', await supabase.from("auction_events").insert({
         vehicle_id: vehicleId,
         source: "barrett-jackson",
         source_url: vehicle.url,
         outcome: vehicle.status?.toLowerCase() === "sold" ? "sold" : "listed",
         winning_bid: vehicle.sale_price || null,
         lot_number: vehicle.lot_number || null,
-      });
+      }));
     }
   } catch (e) {
     console.warn(`[BJ] Auction event insert failed (non-fatal): ${e instanceof Error ? e.message : String(e)}`);
@@ -1150,7 +1243,7 @@ Deno.serve(async (req) => {
   try {
     const supabase = createClient(
       Deno.env.get("SUPABASE_URL") ?? "",
-      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "",
+      projectSecretKey() ?? "",
     );
 
     const body = req.method === "POST" ? await req.json().catch(() => ({})) : {};
@@ -1167,11 +1260,13 @@ Deno.serve(async (req) => {
 
       let vehicle: BJVehicle;
       try {
-        vehicle = await fetchAndParse(url);
+        vehicle = await fetchAndParse(url, { retainedFirst: body.retained_first === true, noFirecrawl: body.no_firecrawl === true, noFetch: body.no_fetch === true });
       } catch (e: any) {
         if (e.message === "PAGE_NOT_FOUND") {
           return okJson({ success: false, error: "Page not found (removed by Barrett-Jackson)" }, 410);
         }
+        if (e.message === "NO_USABLE_CAPTURE") return okJson({ success: false, error: "no_usable_capture" }, 422);
+        if (e.message === "NO_RETAINED_CAPTURE") return okJson({ success: false, error: "no_retained_capture" }, 422);
         throw e;
       }
 
@@ -1185,14 +1280,24 @@ Deno.serve(async (req) => {
           `${vehicle.image_urls.length} images, method=${vehicle.extraction_method}`,
       );
 
-      const { vehicleId, isNew, fieldsUpdated, qualityScore } = await saveVehicle(supabase, vehicle);
+      let saved: Awaited<ReturnType<typeof saveVehicle>>;
+      try {
+        // body.vehicle_id: the vehicle this lot belongs to (a re-land of an auction result with no episode); it wins over
+        // the URL lookup and must exist.
+        saved = await saveVehicle(supabase, vehicle, forcedVehicleId(body));
+      } catch (e) {
+        if (e instanceof IdentityRefused) return okJson({ success: false, refused: "different_car", revision: e.revision }, 409);
+        if (e instanceof ForcedVehicleMissing) return okJson({ success: false, error: "forced_vehicle_missing", vehicle_id: e.vehicleId }, 404);
+        throw e;
+      }
+      const { vehicleId, isNew, fieldsUpdated, qualityScore } = saved;
 
       // Update queue entry if exists
       try {
-        await supabase
+        mustWrite('import_queue update', await supabase
           .from("import_queue")
           .update({ status: "complete", vehicle_id: vehicleId, error_message: null })
-          .eq("listing_url", url);
+          .eq("listing_url", url));
       } catch (e) {
         console.warn(`[BJ] Queue update failed (non-fatal): ${e instanceof Error ? e.message : String(e)}`);
       }
@@ -1201,6 +1306,7 @@ Deno.serve(async (req) => {
         success: true,
         vehicle_id: vehicleId,
         is_new: isNew,
+        capture_source: lastCaptureSource,
         quality_score: qualityScore,
         extraction_method: vehicle.extraction_method,
         fields_updated: fieldsUpdated,
@@ -1208,6 +1314,9 @@ Deno.serve(async (req) => {
           year: vehicle.year,
           make: vehicle.make,
           model: vehicle.model,
+          series_code: vehicle.series_code,
+          trim_package: vehicle.trim_package,
+          body_style_facet: vehicle.body_style_facet,
           vin: vehicle.vin,
           mileage: vehicle.mileage,
           sale_price: vehicle.sale_price,
@@ -1241,10 +1350,10 @@ Deno.serve(async (req) => {
       }
 
       const ids = items.map((i: { id: string }) => i.id);
-      await supabase
+      mustWrite('import_queue update', await supabase
         .from("import_queue")
         .update({ status: "processing", locked_at: new Date().toISOString() })
-        .in("id", ids);
+        .in("id", ids));
 
       const results = {
         total: items.length,
@@ -1261,20 +1370,20 @@ Deno.serve(async (req) => {
           const vehicle = await fetchAndParse(item.listing_url);
 
           if (!vehicle.year && !vehicle.make) {
-            await supabase
+            mustWrite('import_queue update', await supabase
               .from("import_queue")
               .update({ status: "failed", error_message: "Could not parse vehicle data", attempts: 1 })
-              .eq("id", item.id);
+              .eq("id", item.id));
             results.failed++;
             continue;
           }
 
           const { vehicleId, isNew } = await saveVehicle(supabase, vehicle);
 
-          await supabase
+          mustWrite('import_queue update', await supabase
             .from("import_queue")
             .update({ status: "complete", vehicle_id: vehicleId, error_message: null })
-            .eq("id", item.id);
+            .eq("id", item.id));
 
           results.success++;
           if (isNew) results.created++;
@@ -1284,6 +1393,7 @@ Deno.serve(async (req) => {
           await new Promise((r) => setTimeout(r, 1000));
         } catch (err: unknown) {
           const msg = err instanceof Error ? err.message : String(err);
+          const isRefused = err instanceof IdentityRefused;
           const isRejected = msg.includes("Quality gate rejected");
           const isRemoved = msg === "PAGE_NOT_FOUND";
 
@@ -1294,13 +1404,14 @@ Deno.serve(async (req) => {
             results.errors.push(`${item.listing_url}: ${msg.slice(0, 120)}`);
           }
 
-          await supabase
+          softWrite('import_queue update', await supabase
             .from("import_queue")
             .update({
-              status: isRemoved ? "skipped" : "failed",
-              error_message: (isRemoved ? "Page removed/404" : msg).slice(0, 500),
+              // A different-car refusal is a revision item (identity_match / different_car / relink), not a failure to retry.
+              status: isRemoved ? "skipped" : isRefused ? "pending_review" : "failed",
+              error_message: (isRemoved ? "Page removed/404" : isRefused ? `identity_match: ${msg}; next action: relink vehicle ${(err as IdentityRefused).vehicleId}` : msg).slice(0, 500),
             })
-            .eq("id", item.id);
+            .eq("id", item.id));
         }
       }
 
@@ -1374,6 +1485,14 @@ Deno.serve(async (req) => {
     }
 
     // ── Stats ─────────────────────────────────────────────────────────────
+    // ── Catalog enumeration, stage 1 (owner decision 2026-10-16): read the listed catalog pages, politely ──────────────────
+    // Our identified agent, one request every 3 s, each capture retained as a snapshot, stops on the first sign of blocking.
+    if (action === "catalog_probe") {
+      const urls: string[] = (Array.isArray(body.urls) ? body.urls : []).filter((u: unknown) => typeof u === "string").slice(0, 20);
+      const out = await readCatalogPages(urls);
+      return okJson({ success: true, requested: urls.length, ...out });
+    }
+
     if (action === "stats") {
       const { data: stats } = await supabase.rpc("execute_sql", {
         query: `

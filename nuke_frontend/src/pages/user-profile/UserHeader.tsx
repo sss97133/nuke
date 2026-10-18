@@ -23,14 +23,15 @@ const UserHeader: React.FC = () => {
     stats,
     isOwnProfile,
     comprehensiveData,
+    isExternalIdentity,
   } = useUserProfile();
 
   // EXPAND-DON'T-NAVIGATE (founder law: "everything is a button, everything
   // expands"). The header stats are doors: clicking VEHICLES / LISTINGS /
   // COMMENTS reveals its detail inline, right under the header, and clicking
   // again (or the ✕) closes it — reversible depth (C10), no page jump.
-  const [openDoor, setOpenDoor] = useState<null | 'worked' | 'listings' | 'comments'>(null);
-  const toggleDoor = (door: 'worked' | 'listings' | 'comments') =>
+  const [openDoor, setOpenDoor] = useState<null | 'worked' | 'listings' | 'comments' | 'bids'>(null);
+  const toggleDoor = (door: 'worked' | 'listings' | 'comments' | 'bids') =>
     setOpenDoor((cur) => (cur === door ? null : door));
 
   if (!profile) return null;
@@ -42,7 +43,7 @@ const UserHeader: React.FC = () => {
   const location =
     [profile.city, profile.state].filter(Boolean).join(', ') ||
     profile.location;
-  const memberSince = profile.member_since || profile.created_at;
+  const memberSince = isExternalIdentity ? profile.member_since : profile.member_since || profile.created_at;
   const memberYear = memberSince ? new Date(memberSince).getFullYear() : null;
 
   // Stats — every headline carries an honest denominator (number doctrine).
@@ -52,9 +53,8 @@ const UserHeader: React.FC = () => {
   const recordedVehicles = stats?.vehicles_count ?? null;
   const totalListings = stats?.total_listings ?? 0;
   const totalComments = stats?.total_comments ?? 0;
-  // BIDS is structurally blind (the bids table doesn't exist; only completed
-  // purchases materialize) — a "0" asserts an inactivity the data can't
-  // support, so it's suppressed. AUCTIONS WON is the real, observable figure.
+  // External bid events come from the canonical auction log. Claimed-account
+  // purchase records remain distinct and are not labeled as bid events.
   const auctionsWon = stats?.total_auction_wins ?? 0;
   // IMAGES is intentionally NOT shown here: profile_stats.total_images is a
   // stale cron snapshot (23,376 vs 22,728 live) and RECENT PHOTOS already shows
@@ -100,7 +100,7 @@ const UserHeader: React.FC = () => {
           <div className="up-header__name">{fullName || username}</div>
           <div className="up-header__username">@{username}</div>
           <div className="up-header__meta">
-            {[location, memberYear ? `SINCE ${memberYear}` : null]
+            {[location, memberYear ? `${isExternalIdentity ? 'OBSERVED ACTIVITY SINCE' : 'SINCE'} ${memberYear}` : null]
               .filter(Boolean)
               .join(' / ')}
           </div>
@@ -132,6 +132,11 @@ const UserHeader: React.FC = () => {
           >
             <span className="up-stat-pill__label">BAT LISTING RECORDS</span>
             {totalListings}
+          </button>
+        )}
+        {isExternalIdentity && (stats?.total_bids ?? 0) > 0 && (
+          <button type="button" className="up-stat-pill up-stat-pill--door" aria-expanded={openDoor === 'bids'} onClick={() => toggleDoor('bids')}>
+            <span className="up-stat-pill__label">CAPTURED BIDS</span>{stats?.total_bids}
           </button>
         )}
         {totalComments > 0 && (
@@ -175,6 +180,7 @@ const UserHeader: React.FC = () => {
           recordedVehicles={recordedVehicles}
           listings={comprehensiveData?.listings || []}
           comments={comprehensiveData?.comments || []}
+          bids={comprehensiveData?.bids || []}
           onClose={() => setOpenDoor(null)}
         />
       )}
@@ -193,16 +199,17 @@ const vehLabel = (v: any): string =>
   v ? [v.year, v.make, v.model].filter(Boolean).join(' ') || 'Vehicle' : 'Vehicle';
 
 const StatDoorPanel: React.FC<{
-  door: 'worked' | 'listings' | 'comments';
+  door: 'worked' | 'listings' | 'comments' | 'bids';
   recordedVehicles: number | null;
   listings: any[];
   comments: any[];
+  bids: any[];
   onClose: () => void;
-}> = ({ door, recordedVehicles, listings, comments, onClose }) => {
+}> = ({ door, recordedVehicles, listings, comments, bids, onClose }) => {
   const title =
     door === 'worked' ? `RECORDED VEHICLES · ${recordedVehicles ?? 0}`
       : door === 'listings' ? `BAT LISTING RECORDS · ${listings.length} LOADED`
-        : `COMMENTS · ${comments.length}`;
+        : door === 'bids' ? `CAPTURED BIDS · ${bids.length} LOADED` : `COMMENTS · ${comments.length}`;
 
   return (
     <div className="up-stat-door" role="region" aria-label={title}>
@@ -248,6 +255,17 @@ const StatDoorPanel: React.FC<{
         </div>
       )}
 
+      {door === 'bids' && (
+        <div className="up-stat-door__body">
+          <p>Latest 100 captured bid events. This is observed activity, not a lifetime record.</p>
+          {bids.map(bid => bid.vehicle_id && bid.auction_event_id ? (
+            <a key={bid.id} className="up-stat-door__row" href={`/stacks/order-book/${bid.vehicle_id}?${new URLSearchParams({ lot: bid.auction_event_id, at: bid.id })}`}>
+              <span className="up-stat-door__row-main">{vehLabel(bid.auction?.vehicle)}</span>
+              <span className="up-stat-door__row-meta">Source bid {Number(bid.bid_amount).toLocaleString()} · {bid.posted_at ? new Date(bid.posted_at).toLocaleString() : 'Event time unknown'}</span>
+            </a>
+          ) : <div key={bid.id} className="up-stat-door__row"><span className="up-stat-door__row-main">Lot link unresolved</span><span className="up-stat-door__row-meta">Source bid {Number(bid.bid_amount).toLocaleString()} · {bid.posted_at ? new Date(bid.posted_at).toLocaleString() : 'Event time unknown'}</span></div>)}
+        </div>
+      )}
       {door === 'comments' && (
         <div className="up-stat-door__body">
           {comments.length === 0 ? (

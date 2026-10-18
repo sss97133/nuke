@@ -13,6 +13,7 @@ vi.mock('../market/useLiveLotTemperature', () => ({ useLiveLotTemperature: () =>
 vi.mock('../../components/PrefetchLink', () => ({
   PrefetchLink: ({ to, ...p }: { to: string } & Record<string, unknown>) => <a href={to} {...p} />,
 }));
+vi.mock('./bidPopulationReader', () => ({useBidStudy:() => ({isPending:true})}));
 import OrderBookStack from './OrderBookStack';
 import type { CommentRow, OrderBookRead } from './orderBookReader';
 
@@ -159,8 +160,8 @@ it('says what was not read instead of drawing an empty page', async () => {
   expect(container.textContent).toContain('could not be read completely');
 });
 
-it('returns to the exact source exploration expression from a contributor drill', async () => {
+it.each(['query', 'internal address'])('returns to the exact source exploration expression from a %s contributor drill', async format => {
   const back = 'stack=SA&by=auction&measure=typical&make=Chevrolet&model=Corvette&from=2026&to=2026&group=lot';
-  await render(`/stacks/order-book/${VEHICLE}?lot=${LOT}&back=${encodeURIComponent(back)}`);
+  await render(`/stacks/order-book/${VEHICLE}?lot=${LOT}&back=${encodeURIComponent(format === 'query' ? back : `/stacks?${back}`)}`);
   expect(container.querySelector('.stack-eyebrow a')?.getAttribute('href')).toBe(`/stacks?${back}`);
 });

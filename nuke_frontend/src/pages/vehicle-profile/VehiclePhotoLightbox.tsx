@@ -16,6 +16,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom';
 import { supabase } from '../../lib/supabase';
 import { useVehicleProfile } from './VehicleProfileContext';
+import { isBatHosted } from './auctionSequence';
 
 const OPEN_EVENT = 'nuke:vehicle-photo-open';
 const DAY_EVENT = 'nuke:vehicle-day-open';
@@ -90,6 +91,7 @@ const VehiclePhotoLightbox: React.FC = () => {
   // target: how the viewer was opened — by id (normal) or by URL (hero slots).
   const [target, setTarget] = useState<{ id?: string; url?: string } | null>(null);
   const [rows, setRows] = useState<PhotoRow[] | null>(null);
+  const [readOutcome, setReadOutcome] = useState<{ target: { id?: string; url?: string }; vehicleId: string; outcome: 'unavailable' | 'empty' } | null>(null);
   const [atoms, setAtoms] = useState<Record<string, unknown> | null>(null);
   const [fullLoaded, setFullLoaded] = useState(false);
   const backdropRef = useRef<HTMLDivElement>(null);
@@ -143,9 +145,15 @@ const VehiclePhotoLightbox: React.FC = () => {
       .order('taken_at', { ascending: true, nullsFirst: false })
       .limit(3000)
       .then(({ data, error }) => {
-        if (cancelled || error || !Array.isArray(data)) return;
+        if (cancelled) return;
+        if (error || !Array.isArray(data)) {
+          setReadOutcome({ target, vehicleId, outcome: 'unavailable' });
+          return;
+        }
         photoIndexCache.set(vehicleId, data as PhotoRow[]);
         setRows(data as PhotoRow[]);
+      }).catch(() => {
+        if (!cancelled) setReadOutcome({ target, vehicleId, outcome: 'unavailable' });
       });
     return () => { cancelled = true; };
   }, [target, vehicleId, rows]);
@@ -160,13 +168,21 @@ const VehiclePhotoLightbox: React.FC = () => {
       .from('vehicle_images')
       .select('id, image_url, taken_at, source')
       .eq('id', target.id)
+      .eq('vehicle_id', vehicleId)
       .maybeSingle()
-      .then(({ data }: { data: PhotoRow | null }) => {
-        if (cancelled || !data?.image_url) return;
+      .then(({ data, error }: { data: PhotoRow | null; error: unknown }) => {
+        if (cancelled) return;
+        if (error || (data !== null && !data?.image_url)) {
+          setReadOutcome({ target, vehicleId, outcome: 'unavailable' });
+          return;
+        }
+        if (!data) { setReadOutcome({ target, vehicleId, outcome: 'empty' }); return; }
         const merged = [...rows, data as PhotoRow].sort((a, b) =>
           String(a.taken_at || '9999').localeCompare(String(b.taken_at || '9999')));
         photoIndexCache.set(vehicleId, merged);
         setRows(merged);
+      }).catch(() => {
+        if (!cancelled) setReadOutcome({ target, vehicleId, outcome: 'unavailable' });
       });
     return () => { cancelled = true; };
   }, [rows, target, vehicleId]);
@@ -227,7 +243,20 @@ const VehiclePhotoLightbox: React.FC = () => {
   // URL-opens that don't resolve to an index row still get a viewer on the
   // raw URL (minimal rail) — never a dead click.
   const stageUrl = (index >= 0 && rows ? rows[index].image_url : null) || target.url || null;
-  if (!stageUrl) return null;
+  if (!stageUrl) {
+    // A fresh open (including the same id) must not inherit an ended request's status.
+    const outcome = readOutcome?.target === target && readOutcome.vehicleId === vehicleId ? readOutcome.outcome : null;
+    const status = outcome === 'unavailable' ? 'Photo could not be read.' : outcome === 'empty' ? 'No photo available in this read.' : 'Reading photo…';
+    return createPortal(
+      <div ref={backdropRef} role="dialog" aria-modal="true" aria-label="Photo viewer"
+        onClick={(e) => { if (e.target === backdropRef.current) close(); }}
+        style={{ position: 'fixed', inset: 0, zIndex: 10050, background: 'rgba(0,0,0,0.92)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        <div role="status" style={railValue}>{status}</div>
+        <button onClick={close} aria-label="Close photo viewer"
+          style={{ position: 'absolute', top: 10, right: 10, width: 30, height: 30, background: 'rgba(0,0,0,0.55)', color: '#fff', border: '2px solid rgba(255,255,255,0.2)', fontSize: 13, fontWeight: 700, cursor: 'pointer' }}>✕</button>
+      </div>, document.body,
+    );
+  }
 
   // Day membership (for the "PART OF" link) from the cached index.
   const dayStr = current?.taken_at ? String(current.taken_at).slice(0, 10) : null;
@@ -235,6 +264,8 @@ const VehiclePhotoLightbox: React.FC = () => {
   const takenLabel = current?.taken_at
     ? new Date(current.taken_at).toLocaleString([], { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })
     : null;
+  // The existing index omits source_url; qualify only its retained source fact.
+  const isImportClock = !!current && isBatHosted({ ...current, source_url: null });
   const sourceLabel = current?.source ? (SOURCE_LABELS[current.source] || String(current.source).toUpperCase().replace(/_/g, ' ')) : null;
   const v = vehicle as { year?: number; make?: string; model?: string } | null;
   const vehicleLabel = [v?.year, v?.make, v?.model].filter(Boolean).join(' ');
@@ -309,8 +340,9 @@ const VehiclePhotoLightbox: React.FC = () => {
       }}>
         {takenLabel && (
           <div style={{ marginBottom: 10 }}>
-            <div style={railLabel}>TAKEN</div>
+            <div style={railLabel}>{isImportClock ? 'IMPORT CLOCK' : 'TAKEN'}</div>
             <div style={railValue}>{takenLabel}</div>
+            {isImportClock && <div style={railValue}>Capture time unknown.</div>}
           </div>
         )}
         {sourceLabel && (

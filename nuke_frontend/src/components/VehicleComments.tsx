@@ -157,12 +157,14 @@ const VehicleComments: React.FC<VehicleCommentsProps> = ({ vehicleId }) => {
   const checkExistingCommentsForBATUrls = async (comments: Comment[]) => {
     try {
       // Check if vehicle already has images (avoid redundant scraping)
-      const { count: imageCount } = await supabase
+      // One row answers "has any image"; an exact count would run the image row policy over every photo of the vehicle.
+      const { data: anyImage } = await supabase
         .from('vehicle_images')
-        .select('*', { count: 'exact', head: true })
-        .eq('vehicle_id', vehicleId);
+        .select('id')
+        .eq('vehicle_id', vehicleId)
+        .limit(1);
 
-      if (imageCount && imageCount > 0) return;
+      if (anyImage && anyImage.length > 0) return;
 
       // Find most recent comment with BAT URL from trusted user
       for (const comment of comments) {
@@ -569,12 +571,13 @@ const VehicleComments: React.FC<VehicleCommentsProps> = ({ vehicleId }) => {
         .eq('id', userId)
         .single();
 
-      // Check if user is linked to organizations
+      // Check if user is linked to organizations: a membership that has not ended. organization_contributors has
+      // no is_active column; filtering on it failed the read, so the boost below never applied.
       const { data: orgLinks } = await supabase
         .from('organization_contributors')
         .select('organization_id, role')
         .eq('user_id', userId)
-        .eq('is_active', true);
+        .neq('status', 'inactive');
 
       // Check if user has vehicle relationship (worked for entity that sold vehicle)
       const { data: vehicleOrgs } = await supabase

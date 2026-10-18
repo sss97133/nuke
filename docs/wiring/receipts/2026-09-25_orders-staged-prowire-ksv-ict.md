@@ -8,7 +8,7 @@ owner surface: Claude Doc "K5 Parts & Build Book" rev 26 — https://claude.ai/c
 
 | Vendor | State | Lines | Total | Evidence |
 |---|---|---|---|---|
-| ProWire, cart Q27156 | Loaded on the owner's account, not checked out | 29 | $2,126.63 | **Read back line by line 12:16** from the /cart page after the ban lifted (12:15): 29 items, quantities, and extended prices match. The add-by-add tally of $2,125.73 was $0.90 low on DR-25-1/4-0 ($36.90). |
+| ProWire, cart | Loaded on the owner's account, not checked out | 29 | $••• | **Read back line by line 12:16** from the /cart page after the ban lifted (12:15): 29 items, quantities, and extended prices match. The add-by-add tally of $••• was slightly low on DR-25-1/4-0 ($36.90). |
 | KSV Looms | Shopify cart permalink in the doc | 12 | $273.87 | Variant IDs, prices, and stock from KSV's own products.json (11:55). Permalink returned 302 → checkout with all 12 variant:qty pairs encoded. |
 | ICT Billet | Single product link in the doc | 1 | $23.00 | suggest.json: "LS Wire Connector - Oil Pressure for Gen 4", available. |
 
@@ -59,7 +59,7 @@ Lesson → memory `feedback_script_vendor_sites_throttled.md`: resolve from the 
   - BAT−→block: 41.7"
 - **Cranking loop:** 7.6 ft → 2 AWG drop 0.28 V at 200 A (0.35 V at 250 A) vs the 0.42 V ceiling → **2 AWG passes; the 1/0 question is closed.** Break-even 11.5 ft.
 - **Holley guide p.3:** the accessories ground through the water-pump manifold → the block → battery negative. So the block ground also carries alternator current.
-- **Cart change (verified by reload):** M22759/16-2-2 20→13 ft ($208.85), M22759/16-2-0 15→10 ft ($183.48). Q27156 total $2,126.63 → **$1,922.44** (29 lines).
+- **Cart change (verified by reload):** M22759/16-2-2 20→13 ft ($208.85), M22759/16-2-0 15→10 ft ($183.48). cart total $••• → **$•••** (29 lines).
 - **Still missing from the cut list:** block→frame strap, battery→body ground.
 
 ## Addendum — Chapter 1 pages landed; color order; missing grounds (agent k5-lego-book-ch1)
@@ -115,7 +115,7 @@ Lesson → memory `feedback_script_vendor_sites_throttled.md`: resolve from the 
 - **Rejected:** $169 DMC AF8 M22520/1-01 (eBay 137760728655). Wrong frame; the K43 fits the AFM8 only.
 
 ## Addendum 2026-09-26 PM — carts filled round 2 (owner: "do some more rnd and lets get some carts ready and filled"; "i dont want marine")
-- **ProWire Q27156** (read back: 77 lines, 0 dupes, **$3,186.90**, previously $3,165.45).
+- **the ProWire cart** (read back: 77 lines, 0 dupes, **$•••**).
   - Adds: M81969/14-10 ×3 ($1.08 each). This is the size-20 insertion/removal tool **for MIL-C-38999**; /14-11 is NOT for 38999 (Farnell "Installing and Removal Tools" datasheet 1992545.pdf).
   - Adds: 810TP ×5 (8 AWG to the MIDI M5 studs), 410LTP ×3 (4 AWG amp to MIDI M5), 2516LTP +4 (now 8; 2 AWG to the MEGA M8 studs).
   - ProWire carries no 1/2" lugs and no MEGA/MIDI holders. Its power studs are rated 60 °C max ("Max Operating Temp: 140ºF", c-210 page), so they're not for the battery corner.

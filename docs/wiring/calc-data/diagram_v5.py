@@ -321,7 +321,7 @@ def words(s):
 
 
 def load():
-    reg = json.load((CD / "k5_registry.json").open())
+    reg = kits_v5.pin_splices_at_pins(json.load((CD / "k5_registry.json").open()))
     wires = {str(w["id"]): w for w in reg["wires"] if not w.get("retired")}
     wires.update({str(w["id"]): w for w in reg["implied"]})
     ends = defaultdict(list)

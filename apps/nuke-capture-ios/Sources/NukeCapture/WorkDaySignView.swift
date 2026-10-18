@@ -8,6 +8,9 @@
 // Confirming a day sets work_sessions.owner_confirmed_at (Tier 4 / the $410
 // value gate) via confirm_work_session. The derived day is a CLAIM you confirm,
 // never an assignment (the 707-Yucca lesson). Value is real only after you sign.
+// At the owner's volume one card at a time is unrealistic (owner, 2026-10-17), so
+// the deck also signs every loaded day, or every day for the card's vehicle, in one
+// confirm_work_sessions_bulk call.
 
 import SwiftUI
 
@@ -46,6 +49,7 @@ final class WorkDaySignEngine: ObservableObject {
     }
     private struct ImageRow: Decodable { let image_url: String? }
     private struct SignParams: Encodable { let p_session_id: String; let p_confirm: Bool }
+    private struct BulkSignParams: Encodable { let p_session_ids: [String]; let p_confirm: Bool }
 
     /// Owner's unconfirmed work-days, newest first. Owner-scoped by construction.
     func load() async {
@@ -60,7 +64,8 @@ final class WorkDaySignEngine: ObservableObject {
         do {
             let vehicles: [VehicleRow] = try await SupabaseService.client.from("vehicles")
                 .select("id, year, make, model")
-                .eq("user_id", value: userId)
+                .or("user_id.eq.\(userId),owner_id.eq.\(userId)")
+                .neq("make", value: "UNRESOLVED")
                 .execute().value
             guard !vehicles.isEmpty else { days = []; loaded = true; return }
             let byId = Dictionary(uniqueKeysWithValues: vehicles.map { ($0.id, $0) })
@@ -71,7 +76,7 @@ final class WorkDaySignEngine: ObservableObject {
                 .is("owner_confirmed_at", value: nil)
                 .gt("duration_minutes", value: 0)
                 .order("session_date", ascending: false)
-                .limit(80)
+                .limit(250)
                 .execute().value
 
             days = rows.map { r in
@@ -81,7 +86,7 @@ final class WorkDaySignEngine: ObservableObject {
             }
             loaded = true
         } catch {
-            loadError = "Couldn't load your work days. Check your connection and try again."
+            loadError = "Couldn't load your work days. Retry."
             NSLog("NukeCapture work days load failed: %@", String(describing: error))
         }
     }
@@ -117,6 +122,29 @@ final class WorkDaySignEngine: ObservableObject {
         }
     }
 
+    /// Bulk-confirm all loaded days (or all loaded days for a specific vehicle) in a single RPC call.
+    @discardableResult
+    func signBulk(vehicleId: String? = nil) async -> Int {
+        let targets = vehicleId == nil ? days : days.filter { $0.vehicleId == vehicleId }
+        let ids = targets.map(\.id)
+        guard !ids.isEmpty else { return 0 }
+        do {
+            let count: Int = try await SupabaseService.client
+                .rpc("confirm_work_sessions_bulk", params: BulkSignParams(p_session_ids: ids, p_confirm: true))
+                .execute().value
+            let idSet = Set(ids)
+            days.removeAll { idSet.contains($0.id) }
+            signedCount += count
+            if days.isEmpty {
+                await load()
+            }
+            return count
+        } catch {
+            note = "Couldn't bulk confirm: \(ReadFailure.text(error))"
+            return 0
+        }
+    }
+
     /// Defer a day — sends it to the back of the deck, unsigned.
     func skip(_ day: WorkDay) {
         guard let i = days.firstIndex(of: day) else { return }
@@ -138,6 +166,7 @@ final class WorkDaySignEngine: ObservableObject {
 
 struct WorkDaySignView: View {
     @ObservedObject private var engine = WorkDaySignEngine.shared
+    @State private var isBulkSigning = false
 
     var body: some View {
         ZStack {
@@ -193,6 +222,22 @@ struct WorkDaySignView: View {
                              : "\(engine.days.count) to confirm")
                             .font(.caption2.monospacedDigit()).foregroundStyle(.white.opacity(0.6))
                     }
+                }
+            }
+            if !engine.days.isEmpty {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button {
+                        guard !isBulkSigning else { return }
+                        isBulkSigning = true
+                        Task {
+                            defer { isBulkSigning = false }
+                            await engine.signBulk()
+                        }
+                    } label: {
+                        Text(isBulkSigning ? "…" : "Confirm All (\(engine.days.count))")
+                            .font(.caption.weight(.semibold))
+                    }
+                    .disabled(isBulkSigning || engine.isLoading)
                 }
             }
         }
@@ -294,6 +339,28 @@ private struct DayCard: View {
                             Text("SKIP").fontWeight(.semibold)
                         }
                         .buttonStyle(.bordered).controlSize(.large).tint(.white)
+                    }
+
+                    if let vid = day.vehicleId {
+                        let sameVehicleDays = engine.days.filter { $0.vehicleId == vid }.count
+                        if sameVehicleDays > 1 {
+                            Button {
+                                busy = true
+                                Task {
+                                    await engine.signBulk(vehicleId: vid)
+                                    busy = false
+                                }
+                            } label: {
+                                Text("CONFIRM ALL \(sameVehicleDays) DAYS FOR \(day.vehicleLabel)")
+                                    .font(.caption.weight(.bold))
+                                    .kerning(0.4)
+                                    .frame(maxWidth: .infinity)
+                            }
+                            .buttonStyle(.bordered)
+                            .controlSize(.regular)
+                            .tint(.white)
+                            .disabled(busy)
+                        }
                     }
 
                     Text("Looks like this truck? Confirm if the photos match — value becomes real only when you sign. If it's the wrong vehicle, tap Skip.")

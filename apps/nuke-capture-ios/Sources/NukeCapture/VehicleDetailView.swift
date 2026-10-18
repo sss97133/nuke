@@ -33,6 +33,9 @@ struct VehicleHeaderRow: Decodable, Identifiable, Hashable {
     // fetch carries just the title parts, the hero, and the location.
     let city: String?
     let state: String?
+    /// The record's image count (denormalized on vehicles, kept by triggers): the population the
+    /// gallery's loaded rows are a window onto. Optional: the search door's rows do not carry it.
+    var image_count: Int? = nil
 
     /// "YEAR MAKE MODEL TRIM" — only the parts that exist, never a lone "—".
     var title: String {
@@ -66,9 +69,41 @@ struct VehicleGalleryImage: Decodable, Identifiable {
     let image_category: String?  // vision: exterior_body / interior / documentation / engine_mechanical…
     let created_at: String?      // upload time — recency fallback when EXIF taken_at is null
     let vision_gate_agent_reasoning: String?  // names the medium → photo vs rendering/receipt (hero pick)
+    var is_document: Bool? = nil
     var source: String? = nil
     var photo_imported_at: String? = nil
     var photo_listing_url: String? = nil
+
+    /// The web gallery's population, applied to a vehicle_images query: the shared database
+    /// predicate `vehicle_image_gallery_eligible` (gate null or approved, pending only with proven
+    /// publication, no mismatch) plus the same document, duplicate, superseded and null-url
+    /// exclusions as nuke_frontend/src/lib/fetchVehicleImages.ts. One function so every public
+    /// read agrees with the web and with itself. The row policy is the privacy gate; this is
+    /// display eligibility.
+    static func eligible(_ q: PostgrestFilterBuilder) -> PostgrestFilterBuilder {
+        q.eq("vehicle_image_gallery_eligible", value: true)
+         .not("is_document", operator: .is, value: "true")
+         .not("is_duplicate", operator: .is, value: "true")
+         .not("is_superseded", operator: .is, value: "true")
+         .not("image_url", operator: .is, value: "null")
+    }
+
+    var excludedFromHero: Bool {
+        if is_document == true || image_url?.isEmpty != false { return true }
+        let category = (image_category ?? "").lowercased()
+        let text = ([category, vision_gate_agent_reasoning ?? ""] + (labels ?? [])).joined(separator: " ").lowercased()
+        return ["document", "receipt", "invoice", "screenshot", "brochure", "spec sheet", "sketch", "drawing", "illustration", "rendering"].contains { text.contains($0) }
+    }
+
+    static func chooseHero(cover: Self?, candidates: [Self], gallery: [Self]) -> Self? {
+        if let cover, !cover.excludedFromHero { return cover }
+        let photographicCategories: Set<String> = ["exterior_body", "interior", "engine_mechanical", "undercarriage", "exterior_detail"]
+        func latest(_ rows: [Self]) -> Self? {
+            rows.filter { !$0.excludedFromHero && photographicCategories.contains(($0.image_category ?? "").lowercased()) }
+                .max { ($0.taken_at ?? $0.created_at ?? "") < ($1.taken_at ?? $1.created_at ?? "") }
+        }
+        return latest(candidates) ?? latest(gallery)
+    }
 
     // Legacy importers copied the import clock into taken_at. It is not a
     // camera date, even though the column's name suggests one.
@@ -165,7 +200,7 @@ struct CohortDrill: Identifiable, Hashable {
     var id: String { "\(year)|\(make)|\(model)" }
 }
 
-private extension View {
+extension View {
     /// Stock inset-grouped card: the data section floats as a rounded
     /// `secondarySystemGroupedBackground` panel on the grouped page — the native
     /// Settings / Photos-info idiom, replacing flat monospace-on-white. The values
@@ -271,7 +306,13 @@ struct VehicleDetailView: View {
     @State private var vehicle: VehicleHeaderRow?
     @State private var specs: [VehicleSpec] = []   // get_vehicle_specs: fact vs facade
     @State private var valuation: VehicleValuation?  // get_vehicle_valuation: comp-based estimate + basis
+    // The header's document (vehicle_profile_read): the headline price and the strip of
+    // recorded facts as Claims with coverage, viewer-scoped by the database. The same read
+    // the web header renders; the phone mirrors it, it does not rebuild it from columns.
+    @State private var profile: ProfileRead?
+    @State private var profileError = false
     @State private var images: [VehicleGalleryImage] = []
+    @State private var galleryTotal: Int? = nil    // exact count of the gallery predicate, from page 0
     @State private var loadingMore = false         // a gallery page is in flight
     @State private var reachedEnd = false          // last page returned < pageSize
     @State private var renderingShare = false      // share card is composing
@@ -301,6 +342,7 @@ struct VehicleDetailView: View {
     // get_vehicle_engagement): the visitor's job is to contribute, every action a
     // typed observation. v1 rungs: follow (signal) + comment (testimony).
     @State private var engagement: VehicleEngagement?
+    @State private var testimonySummary: VehicleTestimonySummary?
     @State private var engagementError = false
     @State private var commentDraft = ""
     @State private var posting = false
@@ -367,8 +409,10 @@ struct VehicleDetailView: View {
         }
         .task(id: vehicleId) { await load() }
         .task(id: vehicleId) { if mapContext == nil { await loadHero() } }
+        .task(id: vehicle?.primary_image_url) { if mapContext == nil { await loadCover() } }
         .task(id: vehicleId) { if mapContext != nil { await loadMapEvidence() } }
         .task(id: vehicleId) { await loadSpecs() }
+        .task(id: vehicleId) { if mapContext == nil { await loadProfileRead() } }
         .task(id: vehicleId) { if mapContext == nil { await loadValuation() } }
         .task(id: vehicleId) { if mapContext == nil { await loadVehicleDays() } }
         .task(id: vehicleId) { if mapContext == nil { await loadSaleHistory() } }
@@ -580,7 +624,7 @@ struct VehicleDetailView: View {
                     if mapContext != nil {
                         Color.clear.frame(height: condensedBarHeight)
                         loadState
-                        if let raw = vehicle?.primary_image_url, !raw.isEmpty {
+                        if let raw = heroImage?.image_url, !raw.isEmpty {
                             CachedAsyncImage(url: NukeImage.thumb(raw, width: 600)) { image in
                                 image.resizable().scaledToFill()
                             } placeholder: { Color(uiColor: .secondarySystemFill) }
@@ -603,14 +647,22 @@ struct VehicleDetailView: View {
                         heroLayer
                         loadState
                         liveAuctionBanner
+                        profileHeaderBlock
                         buildInstrument
+                        if let t = profile?.timeline { ProfileTimelineCard(timeline: t).id("events") }
                         heroActionRow
                         valuationSection.id("worth")
                         saleHistorySection.id("sales")
                         beforeAfterSection
-                        ValueTrajectoryView(vehicleId: vehicleId).id("trajectory")
-                        if vehicle != nil { InvestmentProofView(vehicleId: vehicleId).id("proof") }
-                        photoStrip
+                        // Money is never anonymous (owner rule; web #1001/#1007, source gate #1037:
+                        // owner, uploader or contributor read it). The viewer is the database's
+                        // verdict from vehicle_profile_read, never a client guess, and a missing
+                        // read fails closed: no document, no ledger.
+                        if let viewer = profile?.viewer, viewer != .anon {
+                            ValueTrajectoryView(vehicleId: vehicleId).id("trajectory")
+                            InvestmentProofView(vehicleId: vehicleId).id("proof")
+                        }
+                        photoStrip.id("photos")
                         assetWindow.id("asset")
                         specTable.id("specs")
                         webCTA
@@ -676,11 +728,17 @@ struct VehicleDetailView: View {
     // CLIPS from 300→0 (past that edge there's no hero pixel to show through), while
     // a slow parallax dissolves it into the bar plane. BuildStoryHero is unchanged —
     // we only transform its rendered output.
+    // The hero's last resort is the vehicle row's primary_image_url, which is what the web's
+    // A bare vehicle cover URL has no per-image qualification. Only a viewer-permitted
+    // gallery cover or a classified photographic fallback may lead.
     @ViewBuilder private var heroLayer: some View {
         BuildStoryHero(
-            imageURL: heroImage?.image_url ?? vehicle?.primary_image_url,
+            imageURL: heroImage?.image_url,
             year: vehicle?.year, make: vehicle?.make,
             model: vehicle?.model, trim: vehicle?.trim,
+            // The title from the document's identity tokens (normalized model, series, trim, a high-signal
+            // transmission), the web's getVehicleIdentityTokens; the row's fields only before the read lands.
+            identityTokens: profile?.masthead.map { VehicleIdentity.tokens($0.identity_source).all },
             takenAt: heroImage?.isImported == true ? nil : heroImage?.taken_at,
             loaded: loaded,
             onTap: { if let h = heroImage { selectedPhoto = h } else { galleryOpen = true } },
@@ -711,24 +769,7 @@ struct VehicleDetailView: View {
     /// (drop the `documentation` category); lead with the latest EXTERIOR_BODY shot (the
     /// build's current face); recency falls back to created_at so sparse EXIF can't skew it.
     private var heroImage: VehicleGalleryImage? {
-        func recency(_ i: VehicleGalleryImage) -> String { i.taken_at ?? i.created_at ?? "" }
-        func latest(_ xs: [VehicleGalleryImage]) -> VehicleGalleryImage? { xs.max { recency($0) < recency($1) } }
-        // A real PHOTO, not a rendering/receipt: vision reasoning names the medium
-        // ("Hand-drawn pencil sketch…", "eBay receipt…" vs "Maroon K5 Blazer in shop").
-        // Null reasoning → treat as a photo (the common, un-flagged case).
-        func realPhoto(_ i: VehicleGalleryImage) -> Bool {
-            guard let r = i.vision_gate_agent_reasoning?.lowercased(), !r.isEmpty else { return true }
-            return !["sketch","drawing","pencil","illustration","painting","render",
-                     "screenshot","receipt","invoice","brochure","spec sheet","scan"].contains { r.contains($0) }
-        }
-        // Prefer a real exterior PHOTO of the truck (from the dedicated heroCandidates
-        // fetch — the latest one can sit past the gallery's first page). Then a
-        // rendering of it (art fallback). Then the paged gallery for vehicles with no
-        // exterior set — always excluding documents (a plate never leads).
-        if let realExt = latest(heroCandidates.filter(realPhoto)) { return realExt }
-        if let anyExt  = latest(heroCandidates) { return anyExt }                 // art fallback
-        let nonDoc = images.filter { $0.image_category != "documentation" }
-        return latest(nonDoc.filter(realPhoto)) ?? latest(nonDoc) ?? images.first
+        VehicleGalleryImage.chooseHero(cover: coverRow, candidates: heroCandidates, gallery: images)
     }
 
     /// Dedicated lead-image candidates: the gallery is paged taken_at-DESC, and the
@@ -736,16 +777,45 @@ struct VehicleDetailView: View {
     /// miscategorized as exterior_body carry newer dates). Fetch the exterior_body set
     /// once, with its vision reasoning, and let `heroImage` choose photo-over-art.
     @State private var heroCandidates: [VehicleGalleryImage] = []
+    /// The record's cover as a gallery row this viewer may read (nil when it is gated, or when
+    /// no row carries that URL). Fetched on its own: it can sit past the gallery's first page.
+    @State private var coverRow: VehicleGalleryImage?
+    private func loadCover() async {
+        guard let cover = vehicle?.primary_image_url?.trimmingCharacters(in: .whitespaces), !cover.isEmpty else {
+            coverRow = nil; return
+        }
+        do {
+            let rows: [VehicleGalleryImage] = try await VehicleGalleryImage.eligible(SupabaseService.client
+                .from("vehicle_images")
+                .select("id,image_url,thumbnail_url,is_primary,taken_at,labels,ai_processing_status,is_document,image_category,created_at,vision_gate_agent_reasoning,source,photo_imported_at:exif_data->>imported_at,photo_listing_url:exif_data->>source_url")
+                .eq("vehicle_id", value: vehicleId)
+                .eq("image_url", value: cover))
+                .limit(1)
+                .execute().value
+            coverRow = rows.first { !$0.excludedFromHero }
+            if coverRow == nil {
+                // Imported listing covers need not share the scalar cover's thumbnail URL.
+                // An explicitly selected, viewer-permitted gallery row is distinct from
+                // taking an arbitrary unclassified frame from gallery pagination.
+                let selected: [VehicleGalleryImage] = try await VehicleGalleryImage.eligible(SupabaseService.client
+                    .from("vehicle_images")
+                    .select("id,image_url,thumbnail_url,is_primary,taken_at,labels,ai_processing_status,is_document,image_category,created_at,vision_gate_agent_reasoning,source,photo_imported_at:exif_data->>imported_at,photo_listing_url:exif_data->>source_url")
+                    .eq("vehicle_id", value: vehicleId).eq("is_primary", value: true))
+                    .limit(1).execute().value
+                coverRow = selected.first { !$0.excludedFromHero }
+            }
+        } catch {
+            NSLog("NukeCapture cover row fetch failed: %@", String(describing: error))
+        }
+    }
     private func loadHero() async {
         do {
-            heroCandidates = try await SupabaseService.client
+            heroCandidates = try await VehicleGalleryImage.eligible(SupabaseService.client
                 .from("vehicle_images")
-                .select("id,image_url,thumbnail_url,is_primary,taken_at,labels,ai_processing_status,image_category,created_at,vision_gate_agent_reasoning,source,photo_imported_at:exif_data->>imported_at,photo_listing_url:exif_data->>source_url")
+                .select("id,image_url,thumbnail_url,is_primary,taken_at,labels,ai_processing_status,is_document,image_category,created_at,vision_gate_agent_reasoning,source,photo_imported_at:exif_data->>imported_at,photo_listing_url:exif_data->>source_url")
                 .eq("vehicle_id", value: vehicleId)
-                .eq("image_category", value: "exterior_body")
-                .in("ai_processing_status", values: ["completed", "analyzed"])
-                .not("is_superseded", operator: .is, value: "true")
-                .order("taken_at", ascending: false)
+                .eq("image_category", value: "exterior_body"))
+                .order("taken_at", ascending: false, nullsFirst: false)
                 .limit(200)
                 .execute().value
         } catch {
@@ -762,7 +832,7 @@ struct VehicleDetailView: View {
                 if let loadError {
                     // The page spine failed — one Retry recovers header+gallery+ASSET.
                     VStack(alignment: .leading, spacing: 10) {
-                        Label(loadError, systemImage: "wifi.exclamationmark")
+                        Label(loadError, systemImage: "exclamationmark.triangle")
                             .font(.footnote).foregroundStyle(.secondary)
                         Button("Retry") { Task { await load() } }
                             .font(.footnote)
@@ -845,6 +915,47 @@ struct VehicleDetailView: View {
         }
     }
 
+    // ─── The header document — vehicle_profile_read rendered through the kit's shapes
+    // (ProfileDocument.swift / ProfileStripView.swift). The one headline price as a Claim
+    // (off while a live auction's banner owns the number, as on the web) and the strip of
+    // recorded facts, each with its source and clock, closed by its coverage sentence.
+    @ViewBuilder private var profileHeaderBlock: some View {
+        if let read = profile {
+            ProfileHeaderBlock(vehicleId: vehicleId, read: read,
+                               priceOwnedByLiveStack: pulse?.is_live == true)
+        } else if profileError {
+            sectionError("the record header") { Task { await loadProfileRead() } }
+        }
+    }
+
+    /// Fields the read evaluates, so the spec table states each datum once. The read decides them
+    /// all once it loads, including a refused odometer ("a reading without a source is a guess, and
+    /// a guess is not shown"), so none of them may come back through the older spec reader.
+    private var stripOwnedFields: Set<String> {
+        profile == nil ? [] : ["body_style", "engine_size", "transmission", "drivetrain", "mileage"]
+    }
+
+    private var stripOwnsLocation: Bool { profile != nil }
+
+    private var specsOutsideStrip: [VehicleSpec] {
+        specs.filter { !stripOwnedFields.contains($0.field) }
+    }
+
+    /// The header's document, one request, viewer-scoped by the read itself.
+    private func loadProfileRead() async {
+        profileError = false
+        do {
+            let read: ProfileRead? = try await SupabaseService.client
+                .rpc("vehicle_profile_read", params: ["p_vehicle_id": vehicleId])
+                .execute()
+                .value
+            profile = read
+        } catch {
+            profileError = true
+            NSLog("NukeCapture profile read failed: %@", String(describing: error))
+        }
+    }
+
     // ─── Spec table — driven by get_vehicle_specs, which marks each value a FACT
     // (rooted: a real atom — a source photo, a field-keyed observation, or real
     // extraction evidence backs it) or a FACADE (a bare column carrying only a
@@ -853,7 +964,7 @@ struct VehicleDetailView: View {
     // dimmed and "unverified" and never pretend to be fact. The root-system
     // contract, on the surface. Long-press any value to copy it.
     @ViewBuilder private var specTable: some View {
-        if !specs.isEmpty || locationRow != nil {
+        if !specsOutsideStrip.isEmpty || (locationRow != nil && !stripOwnsLocation) {
             VStack(alignment: .leading, spacing: 0) {
                 Text("SPECIFICATIONS")
                     .font(.system(.caption2, design: .monospaced))
@@ -861,8 +972,10 @@ struct VehicleDetailView: View {
                     .padding(.bottom, 4)
 
                 VStack(spacing: 0) {
-                    ForEach(specs) { specRow($0) }
-                    if let loc = locationRow { plainRow("Location", loc) }
+                    // Rows the strip already states (body, engine, transmission, drivetrain,
+                    // odometer, location) are its to show; the table carries the rest.
+                    ForEach(specsOutsideStrip) { specRow($0) }
+                    if let loc = locationRow, !stripOwnsLocation { plainRow("Location", loc) }
                 }
 
                 // WHAT THIS NEEDS — the unverified specs are the gaps; a signed-in
@@ -947,7 +1060,7 @@ struct VehicleDetailView: View {
     /// as a silently-absent one (Worklight).
     @ViewBuilder private func sectionError(_ what: String, retry: @escaping () -> Void) -> some View {
         HStack(spacing: 8) {
-            Label("Couldn't load \(what)", systemImage: "wifi.exclamationmark")
+            Label("Couldn't load \(what)", systemImage: "exclamationmark.triangle")
                 .font(.system(.caption2, design: .monospaced))
                 .foregroundStyle(.secondary)
             Spacer()
@@ -964,12 +1077,23 @@ struct VehicleDetailView: View {
     // when the asset was never modeled (honest blank, not a facade).
     // Worth as a BRACKET (low · mid · high) + basis, through the shared component —
     // never a bare scalar posing as a price. Renders nothing without a value.
+    /// The web's owner rule (VehicleBriefing.tsx marketDefends): an estimate is defended only
+    /// against a market event, a typed price (sold, bid or ask) or a live listing. A car that is
+    /// not listed, such as an owner's build, has neither, so it shows no estimate to anyone. The
+    /// typed price comes from the same read the header renders; the live listing from the pulse.
+    private var marketDefendsEstimate: Bool {
+        guard let read = profile else { return false }          // no document, nothing defended
+        let priced = read.masthead?.price != nil
+        let listed = pulse?.is_live == true
+        return priced || listed
+    }
+
     @ViewBuilder private var valuationSection: some View {
-        if let v = valuation, let val = v.value, val > 0 {
+        if marketDefendsEstimate, let v = valuation, let val = v.value, val > 0 {
             WorthBracketView(valuation: v, make: vehicle?.make, model: vehicle?.model,
                              year: vehicle?.year, excludeId: vehicleId)
                 .nukeCard()
-        } else if valuationError {
+        } else if marketDefendsEstimate, valuationError {
             sectionError("the estimate") { Task { await loadValuation() } }
         }
     }
@@ -1038,7 +1162,7 @@ struct VehicleDetailView: View {
     @MainActor private func buildShareCard() async -> UIImage? {
         // Match the on-screen hero (latest frame), not the drift-prone primary_image_url,
         // so the shared card shows the build's current state.
-        let heroURL = NukeImage.thumb(heroImage?.image_url ?? vehicle?.primary_image_url, width: 1200)
+        let heroURL = NukeImage.thumb(heroImage?.image_url, width: 1200)
         let hero = heroURL == nil ? nil : await RemoteImageCache.shared.image(heroURL!)
         var strip: [UIImage] = []
         for img in images where strip.count < 3 {
@@ -1046,7 +1170,8 @@ struct VehicleDetailView: View {
                let d = await RemoteImageCache.shared.image(u) { strip.append(d) }
         }
         guard hero != nil || !strip.isEmpty else { return nil }   // nothing to show → URL only
-        return renderShareCard(hero: hero, title: vehicle?.title ?? "", valuation: valuation,
+        // The card carries a worth line only when the screen would (the market defends it).
+        return renderShareCard(hero: hero, title: vehicle?.title ?? "", valuation: marketDefendsEstimate ? valuation : nil,
                                strip: strip, days: days, vehicleId: vehicleId)
     }
 
@@ -1067,7 +1192,7 @@ struct VehicleDetailView: View {
     private var galleryURLs: [String] {
         let urls = images.compactMap { $0.image_url }
         if !urls.isEmpty { return urls }
-        if let primary = vehicle?.primary_image_url { return [primary] }
+        if let primary = heroImage?.image_url { return [primary] }
         return []
     }
 
@@ -1370,7 +1495,10 @@ struct VehicleDetailView: View {
                     Text("PHOTOS")
                         .font(.system(.caption2, design: .monospaced)).foregroundStyle(.secondary)
                     Spacer()
-                    Text(images.count.formatted() + (reachedEnd ? "" : "+"))
+                    // Loaded against the record (web #1051: "n of N", never what loaded as the whole).
+                    // The record's count includes frames the gate or analysis has not admitted, so the
+                    // two numbers are named, not reconciled.
+                    Text(photosCountLine)
                         .font(.system(.caption2, design: .monospaced)).foregroundStyle(.secondary)
                 }
                 .padding(.horizontal, 16)
@@ -1401,6 +1529,16 @@ struct VehicleDetailView: View {
         } else if galleryError {
             sectionError("photos") { Task { await loadGalleryPage(reset: true) } }
         }
+    }
+
+    /// "n of N" only while a load is partial, against the same predicate the rows came from
+    /// (web #1051); the whole count alone once every eligible frame is loaded.
+    private var photosCountLine: String {
+        let loaded = images.count.formatted()
+        if let total = galleryTotal, total > images.count {
+            return "\(loaded) of \(total.formatted()) eligible" + (reachedEnd ? "" : " · more pages")
+        }
+        return loaded + (reachedEnd ? "" : "+")
     }
 
     /// `images` (taken_at DESC) grouped into ordered day-clusters — the Photos 'Days' shape.
@@ -1495,6 +1633,11 @@ struct VehicleDetailView: View {
                     Text(caption).font(.caption2).foregroundStyle(.secondary)
                 }
             }
+            if let ts = testimonySummary, ts.total > 0 {
+                Text(ts.sentence)
+                    .font(.system(size: 10, design: .monospaced))
+                    .foregroundStyle(.tertiary)
+            }
         }
         .padding(.horizontal, 16)
         .padding(.top, 10)
@@ -1512,10 +1655,17 @@ struct VehicleDetailView: View {
     private func loadEngagement() async {
         engagementError = false
         do {
-            engagement = try await SupabaseService.client
+            async let engTask: VehicleEngagement = SupabaseService.client
                 .rpc("get_vehicle_engagement", params: ["p_vehicle_id": vehicleId])
                 .execute()
                 .value
+            async let testTask: VehicleTestimonySummary? = try? SupabaseService.client
+                .rpc("vehicle_testimony_summary", params: ["p_vehicle_id": vehicleId])
+                .execute()
+                .value
+            let (eng, testSum) = try await (engTask, testTask)
+            engagement = eng
+            if let testSum { testimonySummary = testSum }
         } catch {
             engagementError = true
             NSLog("NukeCapture engagement load failed: %@", String(describing: error))
@@ -1579,7 +1729,7 @@ struct VehicleDetailView: View {
             // One select covers header + spec table.
             let rows: [VehicleHeaderRow] = try await SupabaseService.client
                 .from("vehicles")
-                .select("id,year,make,model,trim,city,state,primary_image_url")
+                .select("id,year,make,model,trim,city,state,primary_image_url,image_count")
                 .eq("id", value: vehicleId)
                 .limit(1)
                 .execute()
@@ -1681,11 +1831,12 @@ struct VehicleDetailView: View {
     /// WHERE taken_at IS NOT NULL) → backward index scan, ~1ms, no RLS full-sort
     /// timeout.
     ///
-    /// NO server count: an exact count over the ~2.6K matching rows under RLS
-    /// materializes the whole set and trips statement_timeout (measured: 500 @19s),
-    /// and the planner's estimate for this partial-index query is garbage (~65). So
-    /// the header shows the honest loaded count (`images.count`) — which becomes the
-    /// true total once the tail is reached.
+    /// The population is the web's: the shared predicate `vehicle_image_gallery_eligible`
+    /// (nuke_frontend/src/lib/fetchVehicleImages.ts), with the same document, duplicate,
+    /// superseded and null-url exclusions. Page 0 carries the exact count of that same
+    /// predicate, so the header's "n of N" divides one population (web #1051). The phone's
+    /// one difference is stated beside the count: it groups by capture day, so it orders by
+    /// taken_at and shows undated frames last.
     private func loadGalleryPage(reset: Bool = false) async {
         if loadingMore { return }
         if !reset && reachedEnd { return }
@@ -1695,21 +1846,22 @@ struct VehicleDetailView: View {
         let from = reset ? 0 : images.count
         let to = from + Self.galleryPageSize - 1
         do {
-            var request = SupabaseService.client
+            let request = VehicleGalleryImage.eligible(SupabaseService.client
                 .from("vehicle_images")
-                .select("id,image_url,thumbnail_url,is_primary,taken_at,labels,ai_processing_status,image_category,created_at,source,photo_imported_at:exif_data->>imported_at,photo_listing_url:exif_data->>source_url")
-                .eq("vehicle_id", value: vehicleId)
-                .in("ai_processing_status", values: ["completed", "analyzed"])
-                .not("is_superseded", operator: .is, value: "true")   // keep null/false, drop superseded dupes
-            if mapContext == nil {
-                request = request.not("taken_at", operator: .is, value: "null")
+                .select("id,image_url,thumbnail_url,is_primary,taken_at,labels,ai_processing_status,is_document,image_category,created_at,vision_gate_agent_reasoning,source,photo_imported_at:exif_data->>imported_at,photo_listing_url:exif_data->>source_url",
+                        count: reset ? .exact : nil)
+                .eq("vehicle_id", value: vehicleId))
+            // created_at is only an indexed paging order for a source listing's gallery, never a label.
+            let response = try await request
+                .order(mapContext == nil ? "taken_at" : "created_at", ascending: false, nullsFirst: false)
+                .order("id", ascending: false).range(from: from, to: to).execute() as PostgrestResponse<[VehicleGalleryImage]>
+            let page = response.value
+            if reset {
+                images = page; reachedEnd = false
+                galleryTotal = response.count      // the exact count of the predicate loaded, from page 0
+            } else {
+                images.append(contentsOf: page)
             }
-            // A source listing's gallery includes photos whose camera dates are
-            // unknown. created_at is only an indexed paging order, never a label.
-            let page: [VehicleGalleryImage] = try await request
-                .order(mapContext == nil ? "taken_at" : "created_at", ascending: false)
-                .order("id", ascending: false).range(from: from, to: to).execute().value
-            if reset { images = page; reachedEnd = false } else { images.append(contentsOf: page) }
             if page.count < Self.galleryPageSize { reachedEnd = true }
         } catch {
             // Only the FIRST page (empty strip) surfaces as an error; a tail-page
@@ -1830,6 +1982,9 @@ struct VehicleDetailView: View {
                                             table: "vehicle_pulse", filter: "vehicle_id=eq.\(vehicleId)")
         await channel.subscribe()
         for await _ in stream { await loadPulse() }   // already-arbitrated truth; refetch the row
+        // The view left (its task was cancelled): close the channel, or every vehicle ever opened
+        // keeps one subscribed on the socket.
+        await SupabaseService.client.removeChannel(channel)
     }
 
     @MainActor private func applyPulse(_ p: VehiclePulse?) {
@@ -1893,13 +2048,16 @@ struct VehicleDetailView: View {
         return nil
     }
 
-    /// Fetch one image row by id (for an owner-designated bookend).
+    /// Fetch one image row by id (for an owner-designated bookend), through the same gate as
+    /// every other frame on the page: a designation names a row, it does not admit one. A
+    /// bookend the gate has not approved, or that is a document, duplicate or superseded frame,
+    /// is read as absent and the section stays hidden (review 2026-10-13, finding 16).
     private func image(id: UUID) async -> VehicleGalleryImage? {
         do {
-            let rows: [VehicleGalleryImage] = try await SupabaseService.client
+            let rows: [VehicleGalleryImage] = try await VehicleGalleryImage.eligible(SupabaseService.client
                 .from("vehicle_images")
-                .select("id,image_url,thumbnail_url,is_primary,taken_at,labels,ai_processing_status,image_category,created_at,source,photo_imported_at:exif_data->>imported_at,photo_listing_url:exif_data->>source_url")
-                .eq("id", value: id.uuidString.lowercased())
+                .select("id,image_url,thumbnail_url,is_primary,taken_at,labels,ai_processing_status,is_document,image_category,created_at,vision_gate_agent_reasoning,source,photo_imported_at:exif_data->>imported_at,photo_listing_url:exif_data->>source_url")
+                .eq("id", value: id.uuidString.lowercased()))
                 .limit(1).execute().value
             return rows.first
         } catch {
@@ -2073,13 +2231,12 @@ private struct DayDrillSheet: View {
         guard let d = f.date(from: day.day),
               let next = Calendar.current.date(byAdding: .day, value: 1, to: d) else { return }
         do {
-            photos = try await SupabaseService.client
+            photos = try await VehicleGalleryImage.eligible(SupabaseService.client
                 .from("vehicle_images")
-                .select("id,image_url,thumbnail_url,is_primary,taken_at,labels,ai_processing_status,image_category,created_at,vision_gate_agent_reasoning,source,photo_imported_at:exif_data->>imported_at,photo_listing_url:exif_data->>source_url")
+                .select("id,image_url,thumbnail_url,is_primary,taken_at,labels,ai_processing_status,is_document,image_category,created_at,vision_gate_agent_reasoning,source,photo_imported_at:exif_data->>imported_at,photo_listing_url:exif_data->>source_url")
                 .eq("vehicle_id", value: vehicleId)
                 .gte("taken_at", value: day.day)
-                .lt("taken_at", value: f.string(from: next))
-                .not("is_superseded", operator: .is, value: "true")
+                .lt("taken_at", value: f.string(from: next)))
                 .order("taken_at", ascending: true)
                 .limit(200)
                 .execute().value
@@ -2201,8 +2358,9 @@ private struct FullScreenGalleryView: View {
     }
 }
 
-// Pinch-to-zoom + pan-while-zoomed + double-tap toggle, clamped 1…4×. Full-res raw
-// image (IMAGE RULE), cached. Resets on page change (each page is its own instance).
+// Pinch-to-zoom + pan-while-zoomed + double-tap toggle, clamped 1…4×. A 2048-pixel render
+// (enough for 2× zoom on a phone), not the raw original: a 3–10 MB HEIC decoded whole per page
+// was the "loads full res" heat (owner, 2026-10-15). Resets on page change.
 private struct ZoomableImage: View {
     let url: String?
     @State private var scale: CGFloat = 1
@@ -2212,7 +2370,7 @@ private struct ZoomableImage: View {
 
     var body: some View {
         GeometryReader { geo in
-            CachedAsyncImage(url: URL(string: url ?? "")) { image in
+            CachedAsyncImage(url: NukeImage.thumb(url, width: 2048)) { image in
                 image.resizable().scaledToFit()
             } placeholder: {
                 Color.black.overlay { ProgressView().tint(.white) }
@@ -3057,7 +3215,7 @@ struct FieldProvenance: Decodable {
         let at: String?
         var id: String { (source_type ?? "") + (at ?? "") + (value ?? "") }
     }
-    struct Observation: Decodable, Identifiable {
+    struct Observation: Decodable, Identifiable, Equatable {
         let id: UUID
         let content: String?
         let value: String?
@@ -3069,6 +3227,61 @@ struct FieldProvenance: Decodable {
         let source_slug: String?
         let trust: Double?
         let source_url: String?
+    }
+
+    struct GroupedObservation: Identifiable, Equatable {
+        let observation: Observation
+        let repeatCount: Int
+        let firstObservedAt: String?
+        let latestObservedAt: String?
+        var id: UUID { observation.id }
+    }
+
+    /// Mirrors `groupRepeatedReports` in `nuke_frontend/src/pages/vehicle-profile/useFieldProvenance.ts` (#1469):
+    /// collapses repeated captures of the same listing claim into one row with a repeat count.
+    static func groupRepeatedObservations(_ rows: [Observation]) -> [GroupedObservation] {
+        var groups: [GroupedObservation] = []
+        var byKey: [String: Int] = [:]
+        for row in rows {
+            let key = [
+                row.kind,
+                row.source_slug,
+                row.source_url,
+                row.value,
+                row.content,
+                row.extraction_method
+            ]
+            .map { ($0 ?? "").trimmingCharacters(in: .whitespacesAndNewlines) }
+            .joined(separator: "\u{001F}")
+
+            if let idx = byKey[key] {
+                let prev = groups[idx]
+                let obsAt = row.observed_at
+                let firstAt: String? = {
+                    guard let a = prev.firstObservedAt, let b = obsAt else { return prev.firstObservedAt ?? obsAt }
+                    return b < a ? b : a
+                }()
+                let latestAt: String? = {
+                    guard let a = prev.latestObservedAt, let b = obsAt else { return prev.latestObservedAt ?? obsAt }
+                    return b > a ? b : a
+                }()
+                groups[idx] = GroupedObservation(
+                    observation: prev.observation,
+                    repeatCount: prev.repeatCount + 1,
+                    firstObservedAt: firstAt,
+                    latestObservedAt: latestAt
+                )
+            } else {
+                byKey[key] = groups.count
+                groups.append(GroupedObservation(
+                    observation: row,
+                    repeatCount: 1,
+                    firstObservedAt: row.observed_at,
+                    latestObservedAt: row.observed_at
+                ))
+            }
+        }
+        return groups
     }
 }
 
@@ -3102,7 +3315,7 @@ struct FieldProvenanceSheet: View {
                     } else if loadFailed {
                         // The trace failed — don't claim "no source exists yet".
                         VStack(alignment: .leading, spacing: 10) {
-                            Label("Couldn't trace the source", systemImage: "wifi.exclamationmark")
+                            Label("Couldn't trace the source", systemImage: "exclamationmark.triangle")
                                 .font(.footnote).foregroundStyle(.secondary)
                             Button("Retry") { Task { await load() } }
                                 .font(.footnote)
@@ -3279,13 +3492,26 @@ struct FieldProvenanceSheet: View {
     }
 
     @ViewBuilder private func observationsSection(_ obs: [FieldProvenance.Observation]) -> some View {
+        let grouped = FieldProvenance.groupRepeatedObservations(obs)
         VStack(alignment: .leading, spacing: 10) {
             Text("OBSERVED")
                 .font(.system(.caption2, design: .monospaced)).foregroundStyle(.secondary)
-            ForEach(obs) { o in
+            ForEach(grouped) { g in
+                let o = g.observation
                 VStack(alignment: .leading, spacing: 5) {
-                    if let value = o.value, !value.isEmpty {
-                        Text("Reported: \(value)").font(.system(.footnote, design: .monospaced))
+                    HStack(alignment: .firstTextBaseline, spacing: 6) {
+                        if let value = o.value, !value.isEmpty {
+                            Text("Reported: \(value)").font(.system(.footnote, design: .monospaced))
+                        }
+                        Spacer(minLength: 0)
+                        if g.repeatCount > 1 {
+                            Text("Repeated \(g.repeatCount)×")
+                                .font(.system(size: 9, weight: .semibold, design: .monospaced))
+                                .padding(.horizontal, 6)
+                                .padding(.vertical, 2)
+                                .background(Capsule().fill(Color(.tertiarySystemFill)))
+                                .foregroundStyle(.secondary)
+                        }
                     }
                     if let c = o.content, !c.isEmpty {
                         Text(c).font(.footnote).foregroundStyle(.primary)
@@ -3297,7 +3523,12 @@ struct FieldProvenanceSheet: View {
                                 .foregroundStyle(.secondary)
                         }
                         Spacer()
-                        if let w = whenLabel(o.observed_at) {
+                        if g.repeatCount > 1,
+                           let first = whenLabel(g.firstObservedAt),
+                           let latest = whenLabel(g.latestObservedAt),
+                           first != latest {
+                            Text("\(first) – \(latest)").font(.system(.caption2, design: .monospaced)).foregroundStyle(.secondary)
+                        } else if let w = whenLabel(o.observed_at) {
                             Text(w).font(.system(.caption2, design: .monospaced)).foregroundStyle(.secondary)
                         }
                     }

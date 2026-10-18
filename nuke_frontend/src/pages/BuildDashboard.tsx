@@ -3,7 +3,8 @@
  * Route: /builds/:vehicleId
  *
  * First product surface for the build-coordinator. Dogfood: Skylar's K20.
- * No auth required — public reads via RLS on work_orders / work_order_line_items / work_order_payments.
+ * Reads go through RLS on work_orders / work_order_line_items / work_order_payments: the books reach the work
+ * order's customer and the shop's owners. A visitor who can read none of them is sent to /vehicle/:vehicleId.
  *
  * Sections:
  *   1. Header (vehicle + budget)
@@ -14,7 +15,7 @@
  */
 
 import React, { useEffect, useMemo, useState } from 'react';
-import { useParams } from 'react-router-dom';
+import { Navigate, useParams } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import './BuildDashboard.css';
 
@@ -26,7 +27,6 @@ interface Vehicle {
   make: string | null;
   model: string | null;
   vin: string | null;
-  current_value: number | null;
 }
 
 interface WorkOrder {
@@ -98,6 +98,7 @@ const BuildDashboard: React.FC = () => {
   const [vehicle, setVehicle] = useState<Vehicle | null>(null);
   const [workOrders, setWorkOrders] = useState<WorkOrder[]>([]);
   const [payments, setPayments] = useState<Payment[]>([]);
+  const [paymentsAvailable, setPaymentsAvailable] = useState(false);
   const [lineItemsByWO, setLineItemsByWO] = useState<Record<string, LineItem[]>>({});
   const [expandedWO, setExpandedWO] = useState<string | null>(null);
 
@@ -110,12 +111,20 @@ const BuildDashboard: React.FC = () => {
     }
 
     let cancelled = false;
+    setLoading(true);
+    setError(null);
+    setVehicle(null);
+    setWorkOrders([]);
+    setPayments([]);
+    setPaymentsAvailable(false);
+    setLineItemsByWO({});
+    setExpandedWO(null);
     const run = async () => {
       try {
         const [vehicleRes, woRes] = await Promise.all([
           supabase
             .from('vehicles')
-            .select('id, year, make, model, vin, current_value')
+            .select('id, year, make, model, vin')
             .eq('id', vehicleId)
             .maybeSingle(),
           supabase
@@ -152,9 +161,15 @@ const BuildDashboard: React.FC = () => {
             .in('work_order_id', woIds)
             .order('payment_date', { ascending: false });
 
-          if (!cancelled && !payRes.error) {
-            setPayments((payRes.data as Payment[]) || []);
+          if (!cancelled) {
+            if (payRes.error) setError('Payment records could not be read; paid total is unknown.');
+            else {
+              setPayments((payRes.data as Payment[]) || []);
+              setPaymentsAvailable(true);
+            }
           }
+        } else if (!cancelled) {
+          setPaymentsAvailable(true);
         }
 
         if (!cancelled) setLoading(false);
@@ -201,21 +216,20 @@ const BuildDashboard: React.FC = () => {
   );
 
   const totals = useMemo(() => {
-    const estimated = workOrders.reduce((s, w) => s + num(w.estimated_total), 0);
-    const actual = workOrders.reduce((s, w) => s + num(w.actual_total), 0);
-    const paid = payments.reduce((s, p) => s + num(p.amount), 0);
+    const estimated = workOrders.length && workOrders.every(w => w.estimated_total != null) ? workOrders.reduce((s, w) => s + num(w.estimated_total), 0) : null;
+    const actual = workOrders.length && workOrders.every(w => w.actual_total != null) ? workOrders.reduce((s, w) => s + num(w.actual_total), 0) : null;
+    const paid = paymentsAvailable ? payments.reduce((s, p) => s + num(p.amount), 0) : null;
     return { estimated, actual, paid };
-  }, [workOrders, payments]);
+  }, [workOrders, payments, paymentsAvailable]);
 
   const budget = useMemo(() => {
-    // Prefer explicit budget_total_usd in any work order metadata; fallback to vehicle.current_value
+    // Only an explicit work budget is a build budget; asset value is a different measure.
     const fromMeta = workOrders
       .map(w => num(w?.metadata?.budget_total_usd))
       .find(n => n > 0);
     if (fromMeta) return fromMeta;
-    if (vehicle?.current_value) return num(vehicle.current_value);
     return null;
-  }, [workOrders, vehicle]);
+  }, [workOrders]);
 
   const vehicleTitle = vehicle
     ? [vehicle.year, vehicle.make, vehicle.model].filter(Boolean).join(' ')
@@ -231,6 +245,13 @@ const BuildDashboard: React.FC = () => {
         </div>
       </div>
     );
+  }
+
+  // The books are the owner's: work orders are readable only by their customer and the shop's owners, so a visitor
+  // reads none and the meter could only show unknowns and a paid $0. With nothing readable, send the visitor to the
+  // vehicle's public page instead of drawing empty money widgets.
+  if (!error && workOrders.length === 0 && payments.length === 0) {
+    return <Navigate to={`/vehicle/${vehicleId}`} replace />;
   }
 
   return (
@@ -260,19 +281,19 @@ const BuildDashboard: React.FC = () => {
             <div className="bd-meter-numbers">
               <div>
                 <div className="bd-meter-num-label">Estimated</div>
-                <div className="bd-meter-num-value">{fmtMoney(totals.estimated)}</div>
+                <div className="bd-meter-num-value">{totals.estimated == null ? 'Unknown' : fmtMoney(totals.estimated)}</div>
               </div>
               <div>
                 <div className="bd-meter-num-label">Actual</div>
-                <div className="bd-meter-num-value">{fmtMoney(totals.actual)}</div>
+                <div className="bd-meter-num-value">{totals.actual == null ? 'Unknown' : fmtMoney(totals.actual)}</div>
               </div>
               <div>
                 <div className="bd-meter-num-label">Paid</div>
-                <div className="bd-meter-num-value">{fmtMoney(totals.paid)}</div>
+                <div className="bd-meter-num-value">{totals.paid == null ? 'Unknown' : fmtMoney(totals.paid)}</div>
               </div>
             </div>
             <div className="bd-meter-bar">
-              {totals.estimated > 0 && (
+              {totals.estimated != null && totals.estimated > 0 && totals.actual != null && totals.paid != null && (
                 <>
                   <div
                     className="bd-meter-bar-actual"

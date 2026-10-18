@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 // The reader's gate is tested against a recording supabase double; everything else is pure shaping over synthetic rows.
-const fixture = vi.hoisted(() => ({ reads: [] as Array<{ table: string; calls: Array<[string, unknown[]]> }>, parent: null as unknown }));
+const fixture = vi.hoisted(() => ({ reads: [] as Array<{ table: string; calls: Array<[string, unknown[]]> }>, parent: null as unknown, lots: [] as unknown[], bidPages: [] as unknown[][], bidError: false }));
 vi.mock('@tanstack/react-query', () => ({ useQuery: () => ({}) }));
 vi.mock('../../lib/supabase', () => ({
   supabase: {
@@ -9,7 +9,10 @@ vi.mock('../../lib/supabase', () => ({
       const read = { table, calls: [] as Array<[string, unknown[]]> };
       fixture.reads.push(read);
       const q: Record<string, (...args: unknown[]) => unknown> = {
-        then: (fn: unknown) => Promise.resolve(table === 'vehicles' ? { data: fixture.parent, error: null } : { data: [], error: null, count: 0 })
+        then: (fn: unknown) => Promise.resolve(table === 'vehicles' ? { data: fixture.parent, error: null }
+          : table === 'auction_events' ? { data: fixture.lots, error: null }
+          : table === 'auction_comments' ? { data: fixture.bidPages.shift() ?? [], error: fixture.bidError ? new Error('read failed') : null, count: 0 }
+          : { data: [], error: null, count: 0 })
           .then(fn as (v: unknown) => unknown),
       };
       for (const m of ['select', 'eq', 'is', 'or', 'in', 'order', 'limit', 'gt', 'abortSignal']) {
@@ -23,7 +26,7 @@ vi.mock('../../lib/supabase', () => ({
 
 import {
   LOT_WINDOW_DAYS, bidEvents, chooseLot, depthAt, foldOrderBook, frameCoverage, lotWindow, partitionWindow,
-  readOrderBook, shapeOrderBook, type CommentRow, type LotRow, type OrderBookRead,
+  readOrderBook, readBidBook, bidBookReading, shapeOrderBook, type CommentRow, type LotRow, type OrderBookRead,
 } from './orderBookReader';
 
 const VEHICLE = '00000000-0000-4000-8000-000000000001';
@@ -56,7 +59,7 @@ function lot(changes: Partial<LotRow> = {}): LotRow {
 }
 const identities = { [ID_A]: { id: ID_A, platform: 'bat', handle: 'bidder-a' }, [ID_B]: { id: ID_B, platform: 'bat', handle: 'bidder-b' } };
 
-beforeEach(() => { n = 0; fixture.reads = []; fixture.parent = null; });
+beforeEach(() => { n = 0; fixture.reads = []; fixture.parent = null; fixture.lots = []; fixture.bidPages = []; fixture.bidError = false; });
 
 describe('lot window', () => {
   it('leaves rows posted more than the window before close out of the lot, and keeps undated rows in it', () => {
@@ -176,6 +179,7 @@ describe('lot choice and the public gate', () => {
     const b = lot({ id: 'b', source_url: URL });
     expect(chooseLot([a, b], `${URL}/`, null)?.id).toBe('b');
     expect(chooseLot([a, b], `${URL}/`, 'a')?.id).toBe('a');
+    expect(chooseLot([a, b], `${URL}/`, 'latest')?.id).toBe('a');
     expect(chooseLot([a, b], null, 'missing')?.id).toBe('a');
     expect(chooseLot([], URL, null)).toBeNull();
   });
@@ -193,4 +197,71 @@ describe('lot choice and the public gate', () => {
     expect(await readOrderBook('not-a-uuid', null)).toBeNull();
     expect(fixture.reads).toEqual([]);
   });
+});
+
+
+describe('compact Stack A reading', () => {
+  const reading = (rows: CommentRow[], total = rows.length) => bidBookReading({
+    vehicle: { id: VEHICLE, year: 2000, make: 'Synthetic', model: 'Coupe', listing_url: URL, sale_status: 'auction_live' },
+    lot: lot({ total_bids: total }), bids: rows, readAt: at(1),
+  });
+  it('distinguishes a repeated leader raise from another competing bidder', () => {
+    const r = reading([bid(30, 800, ID_A), bid(20, 900, ID_B), bid(10, 950, ID_A), bid(5, 1000, ID_A)]);
+    expect(r).toMatchObject({ bidders: 2, near: 2, held: 4, reported: 4, exact: true, gap: 10 });
+    expect(r.lastRaise).toBeCloseTo(100 * 50 / 950);
+    expect(r.states[0].book).toHaveLength(1);
+    expect(r.states[1].price).toBe(900);
+  });
+  it('withholds separation and sequential raise when the source count exceeds retained bids', () => {
+    const r = reading([bid(20, 900, ID_B), bid(10, 1000, ID_A)], 5);
+    expect(r).toMatchObject({ bidders: 2, near: 2, exact: false, gap: null, lastRaise: null });
+  });
+  it('does not count repeated unknown handles as distinct bidders', () => {
+    const r = reading([bid(30, 800, null, 'same'), bid(20, 950, null, 'same'), bid(10, 1000, ID_A)]);
+    expect(r).toMatchObject({ bidders: 1, near: 1, allIdentified: false, gap: null, exact: false });
+  });
+  it('refuses another episode, undated bids, future events, post-close events and duplicate source events', () => {
+    const good = bid(10, 1000, ID_A);
+    const r = reading([good, { ...good, id: 'duplicate' }, bid(20, 900, ID_B, 'b', { source_url: URL + '-relisted' }),
+      bid(LOT_WINDOW_DAYS * 1440 + 1, 100, ID_B), bid(0, 1100, ID_B), bid(-1, 1200, ID_B),
+      bid(20, 500, ID_B, 'b', { posted_at: null })]);
+    expect(r).toMatchObject({ held: 1, rejected: 6, exact: false, gap: null, lastRaise: null });
+  });
+  it('requires a clock and increasing sequence for a last-raise reading', () => {
+    const r = reading([bid(30, 800, ID_A), bid(20, 700, ID_B), bid(10, 900, ID_A)]);
+    expect(r.lastRaise).toBeNull();
+    expect(bidBookReading({ vehicle: {} as any, lot: lot({ auction_end_date: null }),
+      bids: [bid(10, 1000, ID_A)], readAt: at(1) }).held).toBe(0);
+  });
+  it('refuses a relisting before reading any child relation', async () => {
+    fixture.parent = { id: VEHICLE, listing_url: URL + '-new' };
+    expect(await readBidBook(VEHICLE, URL)).toBeNull();
+    expect(fixture.reads.map(r => r.table)).toEqual(['vehicles']);
+  });
+});
+
+
+it('reads the compact projection to an empty page, with public gates and no prose/frame/identity reads', async () => {
+  fixture.parent = { id: VEHICLE, listing_url: URL };
+  fixture.lots = [lot()];
+  fixture.bidPages = [[bid(20, 900, ID_A)], [bid(10, 1000, ID_B)], []];
+  const read = await readBidBook(VEHICLE, URL);
+  expect(read?.bids).toHaveLength(2);
+  expect(fixture.reads.map(r => r.table)).toEqual(['vehicles', 'auction_events', 'auction_comments', 'auction_comments', 'auction_comments']);
+  const reads = fixture.reads.filter(r => r.table === 'auction_comments');
+  for (const r of reads) {
+    expect(r.calls).toContainEqual(['eq', ['comment_type', 'bid']]);
+    expect(r.calls).toContainEqual(['eq', ['auction_event_id', LOT]]);
+    expect(r.calls).toContainEqual(['eq', ['vehicles.is_public', true]]);
+    expect(String(r.calls.find(([m]) => m === 'select')?.[1][0])).not.toContain('comment_text');
+  }
+  expect(reads[1].calls.some(([m]) => m === 'gt')).toBe(true);
+});
+it('refuses duplicate episode ownership and failures instead of returning partial bid depth', async () => {
+  fixture.parent = { id: VEHICLE, listing_url: URL };
+  fixture.lots = [lot(), lot({ id: 'duplicate' })];
+  expect(await readBidBook(VEHICLE, URL)).toBeNull();
+  expect(fixture.reads.map(r => r.table)).toEqual(['vehicles', 'auction_events']);
+  fixture.lots = [lot()]; fixture.bidError = true;
+  await expect(readBidBook(VEHICLE, URL)).rejects.toThrow('could not be read completely');
 });

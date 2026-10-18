@@ -11,6 +11,7 @@
 
 import 'jsr:@supabase/functions-js/edge-runtime.d.ts'
 import Stripe from 'npm:stripe@14.11.0'
+import { projectPublishableKey } from "../_shared/supabaseKeys.ts";
 
 const corsHeaders: Record<string, string> = {
   'Access-Control-Allow-Origin': '*',
@@ -49,7 +50,7 @@ Deno.serve(async (req) => {
     const { createClient } = await import('jsr:@supabase/supabase-js@2')
 
     const supabaseUrl = Deno.env.get('SUPABASE_URL') || Deno.env.get('PROJECT_URL')
-    const supabaseAnon = Deno.env.get('SUPABASE_ANON_KEY') || Deno.env.get('ANON_KEY')
+    const supabaseAnon = projectPublishableKey()
     if (!supabaseUrl || !supabaseAnon) {
       throw new Error('SUPABASE_URL/ANON_KEY not configured')
     }

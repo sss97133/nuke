@@ -14,6 +14,14 @@ interface Affiliation {
   end_date?: string;
   contribution_count: number;
   logo_url?: string;
+  /** The relation's weight now, from user_org_relations: kept warm only by contributions, dormant a day after the last. */
+  relation?: Relation;
+}
+
+interface Relation {
+  state: 'live' | 'stalling' | 'dormant' | string;
+  weight: number;
+  last_contribution_at: string | null;
 }
 
 interface OrganizationAffiliationsProps {
@@ -36,6 +44,9 @@ const OrganizationAffiliations: React.FC<OrganizationAffiliationsProps> = ({ use
     try {
       setLoading(true);
 
+      // Membership rows, and the relation weights the server computes from contributions (owner, 2026-10-15:
+      // "active cant be a hard code like it is. its a weight."). A failed weight read leaves the badge at MEMBER.
+      const relationsRead = supabase.rpc('user_org_relations', { p_user_id: userId });
       const { data, error } = await supabase
         .from('organization_contributors')
         .select(`
@@ -57,6 +68,12 @@ const OrganizationAffiliations: React.FC<OrganizationAffiliationsProps> = ({ use
 
       if (error) throw error;
 
+      const { data: relationsData, error: relationsError } = await relationsRead;
+      if (relationsError) console.error('Error loading relation weights:', relationsError);
+      const relations = new Map<string, Relation>(
+        ((relationsData as any)?.relations || []).map((r: any) => [r.organization_id, r.relation as Relation])
+      );
+
       const mapped: Affiliation[] = (data || []).map((a: any) => ({
         id: a.id,
         organization_id: a.organization_id,
@@ -67,7 +84,8 @@ const OrganizationAffiliations: React.FC<OrganizationAffiliationsProps> = ({ use
         start_date: a.start_date,
         end_date: a.end_date,
         contribution_count: a.contribution_count || 0,
-        logo_url: a.businesses.logo_url
+        logo_url: a.businesses.logo_url,
+        relation: relations.get(a.organization_id)
       }));
 
       setAffiliations(mapped);
@@ -103,16 +121,27 @@ const OrganizationAffiliations: React.FC<OrganizationAffiliationsProps> = ({ use
     }
   };
 
-  const getStatusBadge = (status: string) => {
-    switch (status) {
-      case 'active':
-        return { text: 'ACTIVE', color: 'var(--success)' };
+  // An ended or pending membership says so; a current one shows its relation's weight, never a hard-coded ACTIVE.
+  const getStatusBadge = (affiliation: Affiliation) => {
+    switch (affiliation.status) {
       case 'inactive':
-        return { text: 'PAST', color: 'var(--text-secondary)' };
+        return { text: 'PAST', color: 'var(--text-secondary)', title: 'Membership ended' };
       case 'pending':
-        return { text: 'PENDING', color: 'var(--warning)' };
+        return { text: 'PENDING', color: 'var(--warning)', title: 'Membership pending' };
+    }
+    const r = affiliation.relation;
+    const last = r?.last_contribution_at
+      ? `Last contribution ${new Date(r.last_contribution_at).toLocaleString()}`
+      : 'Nothing in the last 2 days';
+    switch (r?.state) {
+      case 'live':
+        return { text: 'LIVE', color: 'var(--success)', title: last };
+      case 'stalling':
+        return { text: 'STALLING', color: 'var(--warning)', title: last };
+      case 'dormant':
+        return { text: 'DORMANT', color: 'var(--text-secondary)', title: last };
       default:
-        return { text: status.toUpperCase(), color: 'var(--text-secondary)' };
+        return { text: 'MEMBER', color: 'var(--text-secondary)', title: 'Relation weight unavailable' };
     }
   };
 
@@ -211,7 +240,7 @@ const OrganizationAffiliations: React.FC<OrganizationAffiliationsProps> = ({ use
         </thead>
         <tbody>
           {affiliations.map(affiliation => {
-            const statusBadge = getStatusBadge(affiliation.status);
+            const statusBadge = getStatusBadge(affiliation);
             const isEditing = editingId === affiliation.id;
             
             return (
@@ -285,12 +314,12 @@ const OrganizationAffiliations: React.FC<OrganizationAffiliationsProps> = ({ use
                         border: 'none', cursor: saving ? 'wait' : 'pointer'
                       }}
                     >
-                      <option value="active">ACTIVE</option>
+                      <option value="active">CURRENT</option>
                       <option value="inactive">PAST</option>
                       <option value="pending">PENDING</option>
                     </select>
                   ) : (
-                    <span style={{
+                    <span title={statusBadge.title} style={{
                       fontSize: '10px',
                       fontWeight: 'bold',
                       padding: '3px 6px',

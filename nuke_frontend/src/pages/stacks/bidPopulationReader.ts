@@ -52,14 +52,51 @@ function validateDataset(value: unknown): StudyDataset {
   if (!data || data.contract !== 1 || !Array.isArray(data.lots) || !Array.isArray(data.exclusions) || !data.readAt || !data.method) throw new Error('The retained bid study has an invalid contract.');
   return data;
 }
-export function useBidStudy() {
+export function useBidStudy(enabled = true) {
   return useQuery({ queryKey: ['stacks-bid-study', 1], queryFn: async ({ signal }) => {
     const response = await fetch('/stacks/bid-study-v1.json', { signal });
     if (!response.ok) throw new Error('The retained bid study could not be loaded.');
     return validateDataset(decodeStudy(await response.json()));
-  }, staleTime: Infinity, retry: 1 });
+  }, enabled, staleTime: Infinity, retry: 1 });
 }
 export function useBidPopulation(request: PopulationRequest | null) {
   return useQuery({ queryKey: ['stacks-bid-population', request?.make, request?.model, request?.year],
     queryFn: ({ signal }) => readBidPopulation(request!, signal), enabled: Boolean(request), staleTime: 300_000, retry: false });
+}
+
+export type ProfileFacet = 'body_style' | 'engine' | 'transmission' | 'drivetrain' | 'location';
+export interface StudyVehicleFacets {
+  id: string; canonical_body_style: string | null; body_style: string | null;
+  engine_size: string | null; transmission: string | null; drivetrain: string | null;
+  city: string | null; state: string | null; location: string | null;
+}
+export function profileFacetValue(vehicle: Partial<StudyVehicleFacets>, dimension: ProfileFacet): string | null {
+  if (dimension === 'body_style') return vehicle.canonical_body_style || vehicle.body_style || null;
+  if (dimension === 'engine') return vehicle.engine_size || null;
+  if (dimension === 'location') return [vehicle.city, vehicle.state].filter(Boolean).join(', ') || vehicle.location || null;
+  return vehicle[dimension] || null;
+}
+// Case/space normalization only: labels do not infer engines, generations or sale-time equipment.
+export function matchingFacetIds(rows: StudyVehicleFacets[], dimension: ProfileFacet, value: string) {
+  const key = (v: string) => v.trim().replace(/\s+/g, ' ').toLowerCase();
+  return new Set(rows.filter(row => { const held = profileFacetValue(row, dimension); return held && key(held) === key(value); }).map(row => row.id));
+}
+export async function readStudyFacets(ids: string[], signal?: AbortSignal): Promise<StudyVehicleFacets[]> {
+  if (ids.length > 1500) throw new Error('The configuration reference exceeds the retained-study boundary.');
+  const rows: StudyVehicleFacets[] = [];
+  for (let i = 0; i < ids.length; i += 200) {
+    const result = await supabase.from('vehicles')
+      .select('id,canonical_body_style,body_style,engine_size,transmission,drivetrain,city,state,location')
+      .in('id', ids.slice(i, i + 200)).eq('is_public', true).is('deleted_at', null)
+      .or('listing_kind.is.null,listing_kind.neq.non_vehicle_item').limit(200)
+      .abortSignal(signal ?? new AbortController().signal);
+    if (result.error || !Array.isArray(result.data)) throw new Error('The recorded configuration reference could not be read.');
+    rows.push(...result.data as StudyVehicleFacets[]);
+  }
+  return rows;
+}
+export function useStudyFacets(dataset: StudyDataset | undefined, make: string | null, enabled: boolean) {
+  return useQuery({ queryKey: ['stacks-study-facets', dataset?.readAt, make],
+    queryFn: ({ signal }) => readStudyFacets([...new Set(dataset!.lots.filter(l => !make || l.make.toLowerCase() === make.toLowerCase()).map(l => l.vehicleId))], signal),
+    enabled: enabled && Boolean(dataset), staleTime: 300_000, retry: false });
 }

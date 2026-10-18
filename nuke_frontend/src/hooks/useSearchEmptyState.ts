@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
-import { applyNonAutoFilters } from '../lib/nonAutoExclusion';
+import { fetchPulse } from '../pages/market/useMarketPulse';
 
 export interface FeaturedVehicle {
   id: string;
@@ -27,67 +27,40 @@ export function useSearchEmptyState(enabled: boolean) {
     if (!enabled) return;
     setLoading(true);
 
-    const fields = 'id,year,make,model,primary_image_url,sale_price';
-    const baseFilter = () =>
-      applyNonAutoFilters(
-        supabase
-          .from('vehicles')
-          .select(fields)
-          .eq('is_public', true)
-          .not('primary_image_url', 'is', null)
-          .not('year', 'is', null)
-          .not('make', 'is', null)
-      );
+    // Lots first seen on the live board in the last day, and the highest bids on it now: one reader the
+    // market page already uses, instead of ordered scans over every public vehicle (which timed out).
+    const DAY = 86_400_000;
+    const boardQuery = fetchPulse().then((pulse) => {
+      const now = Date.now();
+      const live = pulse.auctions.filter((a) => a.endsAt > now && a.imageUrl);
+      const toFeatured = (a: typeof live[number]): FeaturedVehicle => ({
+        id: a.id, year: a.year, make: a.make === 'NO MAKE' ? null : a.make, model: a.model, primary_image_url: a.imageUrl, sale_price: a.currentBid,
+      });
+      return {
+        recent: live.filter((a) => now - a.listedAt < DAY).sort((a, b) => b.listedAt - a.listedAt).slice(0, 12).map(toFeatured),
+        notable: live.filter((a) => a.currentBid != null).sort((a, b) => (b.currentBid ?? 0) - (a.currentBid ?? 0)).slice(0, 8).map(toFeatured),
+      };
+    });
 
-    // Recent vehicles with images
-    const recentQuery = baseFilter()
-      .order('created_at', { ascending: false })
-      .limit(12);
+    // Makes with their true counts, from the ledger's by-brand view (public vehicles with a confirmed sale), and the
+    // planner's estimate of the public total: neither walks the table, so neither can time out.
+    const makesQuery = supabase.rpc('treemap_by_brand');
 
-    // Notable sales — vehicles with highest prices
-    const notableQuery = baseFilter()
-      .not('sale_price', 'is', null)
-      .gt('sale_price', 10000)
-      .order('sale_price', { ascending: false })
-      .limit(8);
-
-    // Top makes by count (sample 5000 for speed)
-    const makesQuery = applyNonAutoFilters(
-      supabase
-        .from('vehicles')
-        .select('make')
-        .eq('is_public', true)
-        .not('make', 'is', null)
-        .not('primary_image_url', 'is', null)
-    ).limit(5000);
-
-    // Total count
-    const countQuery = applyNonAutoFilters(
-      supabase
-        .from('vehicles')
-        .select('id', { count: 'exact', head: true })
-        .eq('is_public', true)
-    );
-
-    Promise.all([recentQuery, notableQuery, makesQuery, countQuery]).then(
-      ([recentRes, notableRes, makesRes, countRes]) => {
-        if (recentRes.data) setRecentVehicles(recentRes.data as FeaturedVehicle[]);
-        if (notableRes.data) setNotableSales(notableRes.data as FeaturedVehicle[]);
-        if (countRes.count != null) setTotalCount(countRes.count);
-
-        if (makesRes.data) {
-          const counts = new Map<string, number>();
-          for (const row of makesRes.data as { make: string }[]) {
-            const m = row.make;
-            if (m) counts.set(m, (counts.get(m) || 0) + 1);
-          }
-          const sorted = [...counts.entries()]
-            .sort((a, b) => b[1] - a[1])
+    // One slow or failed reader must not blank the others.
+    Promise.allSettled([boardQuery, makesQuery]).then(
+      ([boardRes, makesRes]) => {
+        if (boardRes.status === 'fulfilled') { setRecentVehicles(boardRes.value.recent); setNotableSales(boardRes.value.notable); }
+        if (makesRes.status === 'fulfilled' && Array.isArray(makesRes.value.data)) {
+          const rows = makesRes.value.data as { name: string; count: number }[];
+          // The same total the ledger map states: vehicles with a confirmed sale, summed over makes.
+          setTotalCount(rows.reduce((sum, row) => sum + (row.count > 0 ? row.count : 0), 0));
+          const sorted = rows
+            .filter((row) => row.name && row.count > 0)
+            .sort((a, b) => b.count - a.count)
             .slice(0, 12)
-            .map(([make, count]) => ({ make, count }));
+            .map((row) => ({ make: row.name, count: row.count }));
           setTopMakes(sorted);
         }
-
         setLoading(false);
       }
     );

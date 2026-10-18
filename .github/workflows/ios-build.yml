@@ -1,0 +1,82 @@
+name: iOS build
+
+# Compiles the iOS app and runs its unit tests on every change under apps/nuke-capture-ios. Until
+# 2026-10-13 nothing in CI compiled the Swift: four iOS PRs merged "green" with only web and SQL jobs,
+# and a decoder regression (a non-optional field the server had started sending as null) reached
+# main unnoticed. Archive success on Xcode Cloud happens after merge; this job happens before.
+#
+# macOS 26 is required: the app targets the iOS 26 SDK, which ships only with Xcode 26.
+
+permissions:
+  contents: read
+
+on:
+  pull_request:
+    paths:
+      - apps/nuke-capture-ios/**
+      - .github/workflows/ios-build.yml
+      # Fixtures the phone's tests share with the web (the hot/cold contract).
+      - nuke_frontend/src/pages/market/__fixtures__/**
+  push:
+    branches: [main]
+    paths:
+      - apps/nuke-capture-ios/**
+      - nuke_frontend/src/pages/market/__fixtures__/**
+
+concurrency:
+  group: ios-build-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-and-test:
+    runs-on: macos-26
+    timeout-minutes: 45
+    defaults:
+      run:
+        working-directory: apps/nuke-capture-ios
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Select latest stable Xcode
+        uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: latest-stable
+
+      - name: Install XcodeGen
+        run: brew install xcodegen
+
+      # The .xcodeproj is generated and gitignored; the committed Package.resolved is seeded so the
+      # runner resolves nothing on its own (same as ci_scripts/ci_post_clone.sh on Xcode Cloud).
+      - name: Generate the project
+        run: |
+          set -euo pipefail
+          xcodegen generate
+          SWIFTPM_DIR="NukeCapture-iOS.xcodeproj/project.xcworkspace/xcshareddata/swiftpm"
+          mkdir -p "$SWIFTPM_DIR"
+          cp Package.resolved "$SWIFTPM_DIR/Package.resolved"
+
+      - name: Pick a simulator
+        id: sim
+        run: |
+          set -euo pipefail
+          name=$(xcrun simctl list devices available -j | python3 -c '
+          import json, sys
+          data = json.load(sys.stdin)["devices"]
+          names = [d["name"] for runtime, devs in data.items() if "iOS" in runtime for d in devs if d["name"].startswith("iPhone")]
+          pick = next((n for n in names if "Pro" in n and "Max" not in n), names[0] if names else "")
+          print(pick)')
+          [ -n "$name" ] || { echo "no iPhone simulator on this runner"; exit 1; }
+          echo "name=$name" >> "$GITHUB_OUTPUT"
+          echo "▸ simulator: $name"
+
+      - name: Build and test
+        run: |
+          set -euo pipefail
+          xcodebuild test \
+            -project NukeCapture-iOS.xcodeproj \
+            -scheme NukeCapture-iOS \
+            -destination "platform=iOS Simulator,name=${{ steps.sim.outputs.name }}" \
+            -derivedDataPath "$RUNNER_TEMP/dd" \
+            CODE_SIGNING_ALLOWED=NO \
+            2>&1 | tee "$RUNNER_TEMP/xcodebuild.log" | grep -E "error:|warning: unre|Test Case|Executed|BUILD|TEST" || true
+          grep -q "\*\* TEST SUCCEEDED \*\*" "$RUNNER_TEMP/xcodebuild.log"

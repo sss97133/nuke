@@ -2,7 +2,6 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
-import { SUPABASE_URL, SUPABASE_ANON_KEY } from '../lib/env';
 import { OrgLogo } from '../components/common/OrgLogo';
 import {
   TrendingUp,
@@ -17,17 +16,7 @@ import {
   Plus,
   SlidersHorizontal,
   ArrowUpDown,
-  Info,
 } from 'lucide-react';
-
-export interface OrgExtractionCoverage {
-  org_id: string;
-  label: string | null;
-  extracted: number | null;
-  queue_pending: number | null;
-  target: number | null;
-  metrics_note?: string;
-}
 
 interface Organization {
   id: string;
@@ -76,7 +65,6 @@ const SORT_OPTIONS: { key: SortKey; label: string }[] = [
   { key: 'signal', label: 'Data Signal' },
   { key: 'vehicles', label: 'Vehicles' },
   { key: 'gmv', label: 'GMV' },
-  { key: 'revenue', label: 'Revenue' },
   { key: 'recent', label: 'Recent' },
   { key: 'name', label: 'Name' },
 ];
@@ -168,15 +156,16 @@ export default function Organizations() {
 
   const [organizations, setOrganizations] = useState<Organization[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState(urlSearch);
   const [typeFilter, setTypeFilter] = useState(urlType);
   const [sortKey, setSortKey] = useState<SortKey>(urlSort);
   const [showFilters, setShowFilters] = useState(false);
-  const [coverageByOrg, setCoverageByOrg] = useState<Record<string, OrgExtractionCoverage>>({});
 
   const loadOrganizations = useCallback(async () => {
     try {
       setLoading(true);
+      setLoadError(null);
 
       const { data: orgs, error } = await supabase
         .from('businesses')
@@ -206,6 +195,7 @@ export default function Organizations() {
       setOrganizations(enriched);
     } catch {
       setOrganizations([]);
+      setLoadError('Organization records could not be read.');
     } finally {
       setLoading(false);
     }
@@ -215,42 +205,13 @@ export default function Organizations() {
     loadOrganizations();
   }, [loadOrganizations]);
 
-  // Fetch extraction coverage for all sources (BAT, C&B, Craigslist, etc.) – poll so we show live "loading in"
-  useEffect(() => {
-    const load = async () => {
-      try {
-        const res = await fetch(`${SUPABASE_URL}/functions/v1/org-extraction-coverage?all=1`, {
-          headers: { Authorization: `Bearer ${SUPABASE_ANON_KEY}` },
-        });
-        if (!res.ok) return;
-        const data = (await res.json()) as { sources?: OrgExtractionCoverage[] };
-        const list = data?.sources ?? [];
-        const byOrg: Record<string, OrgExtractionCoverage> = {};
-        list.forEach((c) => {
-          if (c?.org_id && (c.extracted != null || c.target != null)) {
-            byOrg[c.org_id] = c;
-          }
-        });
-        setCoverageByOrg(byOrg);
-      } catch {
-        // Optional: no coverage data
-      }
-    };
-    load();
-    const interval = setInterval(load, 45_000);
-    return () => clearInterval(interval);
-  }, []);
-
   // Extract available types from data
   const availableTypes = useMemo(() => {
     const types = new Set(organizations.map(o => o.business_type).filter(Boolean));
     return Array.from(types).sort();
   }, [organizations]);
 
-  // Canonical org ids we track for extraction coverage (one row per logical org in the list)
-  const coverageOrgIds = useMemo(() => new Set(Object.keys(coverageByOrg)), [coverageByOrg]);
-
-  // Filter + search + sort + dedupe by name (show single canonical org when we have coverage)
+  // Filter + search + sort + dedupe by name
   const displayOrgs = useMemo(() => {
     let filtered = organizations;
 
@@ -270,7 +231,7 @@ export default function Organizations() {
       );
     }
 
-    // Dedupe by business_name: when we have coverage for an org_id, show only that canonical row; else keep one with highest total_vehicles
+    // Dedupe by business_name: keep the one with the highest total_vehicles
     const byName = new Map<string, Organization[]>();
     for (const o of filtered) {
       const name = (o.business_name || '').trim() || '(unnamed)';
@@ -283,8 +244,7 @@ export default function Organizations() {
         filtered.push(group[0]);
         continue;
       }
-      const canonical = group.find(o => coverageOrgIds.has(o.id));
-      filtered.push(canonical ?? group.reduce((best, o) => (o.total_vehicles || 0) > (best.total_vehicles || 0) ? o : best));
+      filtered.push(group.reduce((best, o) => (o.total_vehicles || 0) > (best.total_vehicles || 0) ? o : best));
     }
 
     // Sort
@@ -312,7 +272,7 @@ export default function Organizations() {
     }
 
     return sorted;
-  }, [organizations, typeFilter, searchQuery, sortKey, coverageOrgIds]);
+  }, [organizations, typeFilter, searchQuery, sortKey]);
 
   // Aggregate stats (from display list so counts match what we show after dedupe)
   const stats = useMemo(() => {
@@ -339,6 +299,7 @@ export default function Organizations() {
 
   return (
     <div style={{ padding: '20px', maxWidth: '1400px', margin: '0 auto' }}>
+      {loadError && <div role="alert">{loadError} <button type="button" onClick={loadOrganizations}>Read again</button></div>}
       {/* Header */}
       <div style={{ marginBottom: '16px', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
         <div>
@@ -346,7 +307,7 @@ export default function Organizations() {
             Organizations
           </h1>
           <p style={{ fontSize: '11px', color: 'var(--text-muted)', margin: 0 }}>
-            Auction houses, dealerships, shops, and collections as investable commodities
+            Attributed activity from auction houses, dealerships, shops and collections
           </p>
         </div>
         <Link
@@ -372,7 +333,6 @@ export default function Organizations() {
           { label: 'With Vehicles', value: stats.withVehicles.toLocaleString() },
           { label: 'Total Vehicles', value: formatNum(stats.totalVehicles) },
           { label: 'Platform GMV', value: stats.totalGmv > 0 ? formatCompact(stats.totalGmv) : '—' },
-          { label: 'Revenue Tracked', value: stats.totalRevenue > 0 ? formatCompact(stats.totalRevenue) : '—' },
         ].map((stat, i) => (
           <div key={i} style={{
             background: 'var(--white)',
@@ -477,7 +437,7 @@ export default function Organizations() {
           gap: '12px',
         }}>
           {displayOrgs.map(org => (
-            <OrgCard key={org.id} org={org} coverage={coverageByOrg[org.id]} to={`/org/${org.id}`} />
+            <OrgCard key={org.id} org={org} to={`/org/${org.id}`} />
           ))}
         </div>
       )}
@@ -486,11 +446,10 @@ export default function Organizations() {
 }
 
 /** Individual org card - investment commodity style */
-function OrgCard({ org, coverage, to }: { org: Organization; coverage?: OrgExtractionCoverage | null; to: string }) {
+function OrgCard({ org, to }: { org: Organization; to: string }) {
   const signalScore = org.data_signal_score || 0;
   const signalTier = getSignalTier(signalScore);
-  // Prefer extraction coverage count when we have it (e.g. BAT from vehicle_events), else org total
-  const vehicles = (coverage?.extracted != null ? coverage.extracted : org.total_vehicles) || 0;
+  const vehicles = org.total_vehicles || 0;
   const gmv = org.gmv || 0;
   const revenue = org.total_revenue || 0;
   const margin = org.gross_margin_pct || 0;
@@ -656,31 +615,6 @@ function OrgCard({ org, coverage, to }: { org: Organization; coverage?: OrgExtra
             overflow: 'hidden',
           }}>
             {org.description}
-          </div>
-        )}
-
-        {/* Extraction coverage: what we have + what we're loading in (scraping in real time) */}
-        {coverage && (coverage.extracted != null || coverage.target != null) && (
-          <div style={{
-            fontSize: '6.5pt',
-            color: 'var(--text-muted)',
-            lineHeight: 1.35,
-            marginBottom: '6px',
-            padding: '4px 6px',
-            background: 'var(--gray-50)', borderLeft: '2px solid var(--blue-500)',
-          }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '4px', marginBottom: '2px' }}>
-              <Info size={9} style={{ flexShrink: 0 }} />
-              <span>
-                {coverage.extracted != null ? `${formatNum(coverage.extracted)} listings` : ''}
-                {coverage.queue_pending != null && coverage.queue_pending > 0 && (
-                  <span> · {formatNum(coverage.queue_pending)} in queue · <span style={{ color: 'var(--blue-600)', fontWeight: 600 }}>loading in…</span></span>
-                )}
-              </span>
-            </div>
-            {coverage.metrics_note && (
-              <div style={{ marginLeft: '13px' }}>{coverage.metrics_note}</div>
-            )}
           </div>
         )}
 

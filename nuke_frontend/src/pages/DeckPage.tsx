@@ -10,6 +10,7 @@ import { useDeckData } from '../components/deck/useDeckData';
 import DeckSlide from '../components/deck/DeckSlide';
 import SlideEditor from '../components/deck/SlideEditor';
 import { useAuth } from '../hooks/useAuth';
+import { useAdminAccess } from '../hooks/useAdminAccess';
 import { supabase } from '../lib/supabase';
 import '../styles/deck-style-guide.css';
 
@@ -65,7 +66,9 @@ export default function DeckPage() {
   const { deckId } = useParams<{ deckId: string }>();
   const { slides, orgs, loading, error, refetch } = useDeckData(deckId || '');
   const { user } = useAuth();
-  const canEdit = true; // deck editing always enabled — auth handled at route level
+  // The route is public; saving a slide needs an active admin (deck_slides_update_admin).
+  const { isAdmin } = useAdminAccess();
+  const canEdit = !!user && isAdmin;
   const [exporting, setExporting] = useState(false);
   const [brandSlug, setBrandSlug] = useState<string | null>(null);
   const [editingSlideIdx, setEditingSlideIdx] = useState<number | null>(null);

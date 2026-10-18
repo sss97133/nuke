@@ -20,6 +20,7 @@ export interface SearchState {
   compsData: CompsData | null;
   browseResults: BrowseResult[];
   browseLoading: boolean;
+  browseError: string | null;
   browseStats: BrowseStatsData | null;
   totalCount: number;
   executeBrowse: (params: BrowseParams) => Promise<void>;
@@ -102,6 +103,9 @@ export function useSearch(): SearchState {
   const [compsData, setCompsData] = useState<CompsData | null>(null);
   const [browseResults, setBrowseResults] = useState<BrowseResult[]>([]);
   const [browseLoading, setBrowseLoading] = useState(false);
+  const [browseError, setBrowseError] = useState<string | null>(null);
+  const browseRequestRef = useRef(0);
+  useEffect(() => () => { browseRequestRef.current += 1; }, []);
   const [browseStats, setBrowseStats] = useState<BrowseStatsData | null>(null);
   const [totalCount, setTotalCount] = useState(0);
 
@@ -167,7 +171,10 @@ export function useSearch(): SearchState {
   }, []);
 
   const executeBrowse = useCallback(async (params: BrowseParams) => {
+    const request = ++browseRequestRef.current;
     setBrowseLoading(true);
+    setBrowseError(null);
+    setBrowseStats(null);
     try {
       const rpcParams: Record<string, any> = {};
       if (params.make) rpcParams.p_make = params.make;
@@ -194,6 +201,8 @@ export function useSearch(): SearchState {
         params.make ? supabase.rpc('browse_stats', { p_make: params.make }) : Promise.resolve({ data: null, error: null }),
       ]);
 
+      if (request !== browseRequestRef.current) return;
+
       if (browseRes.error) throw browseRes.error;
       const rows = browseRes.data || [];
       setBrowseResults(rows);
@@ -203,11 +212,13 @@ export function useSearch(): SearchState {
         setBrowseStats(statsRes.data as BrowseStatsData);
       }
     } catch (err) {
+      if (request !== browseRequestRef.current) return;
       console.warn('Browse error:', err);
+      setBrowseError('Vehicle records could not be read. Try the search again.');
       setBrowseResults([]);
       setTotalCount(0);
     } finally {
-      setBrowseLoading(false);
+      if (request === browseRequestRef.current) setBrowseLoading(false);
     }
   }, []);
 
@@ -242,7 +253,7 @@ export function useSearch(): SearchState {
     isOpen, setIsOpen,
     isFocused, setIsFocused,
     autocompleteResults, autocompleteLoading, compsData,
-    browseResults, browseLoading, browseStats, totalCount,
+    browseResults, browseLoading, browseError, browseStats, totalCount,
     executeBrowse, executeAutocomplete, executeSmart,
     clear,
   };

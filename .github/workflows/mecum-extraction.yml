@@ -1,9 +1,9 @@
 name: Mecum Auction Extraction
 
 on:
-  schedule:
-    # Run every 2 hours during active extraction period
-    - cron: '0 */2 * * *'
+  # No schedule. It posted an auctions index page to extract-premium-auction, which routed it to extract-vehicle-data-ai;
+  # that returned non-2xx on every run (measured 2026-10-14, runs of 18:18, 20:14, 22:12Z) and `|| echo` kept the job green.
+  # Lots land through extract-mecum action batch_from_targets (pg_cron), which reads source_targets and never calls a paid service.
   workflow_dispatch:
     inputs:
       auction:

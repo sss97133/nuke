@@ -59,11 +59,12 @@ export function useBadgeHover(debounceMs = 150) {
   const [badgeRect, setBadgeRect] = useState<DOMRect | null>(null);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const onBadgeEnter = useCallback((badgeType: string, e: React.MouseEvent) => {
+  const onBadgeEnter = useCallback((badgeType: string, e: Pick<React.MouseEvent, 'currentTarget'>) => {
     if (timerRef.current) clearTimeout(timerRef.current);
+    const rect = e.currentTarget.getBoundingClientRect();
     timerRef.current = setTimeout(() => {
       setHoveredBadge(badgeType);
-      setBadgeRect((e.currentTarget as HTMLElement).getBoundingClientRect());
+      setBadgeRect(rect);
     }, debounceMs);
   }, [debounceMs]);
 

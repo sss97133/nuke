@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { decodeStudy, encodeStudy, evaluateBidExpression, foldSoldLot, makeStudy, measured, percentile, participantBehaviorMap, type BidExpression, type BidLot, type StudyBid } from './bidMeasurements';
+import { decodeStudy, encodeStudy, evaluateBidExpression, foldSoldLot, makeStudy, measured, emptySums, mergeSums, percentile, participantBehaviorMap, type BidExpression, type BidLot, type StudyBid } from './bidMeasurements';
 import { expressionFromParams } from './bidExpression';
 
 const expression: BidExpression = { measure:'increment', grouping:'make', from:2016, to:2026, make:null, model:null, weighting:'auction' };
@@ -15,6 +15,17 @@ function sequence(id: string, amounts: number[], options: { make?: string; model
   return {lot,bids};
 }
 const dataset = (...episodes: ReturnType<typeof sequence>[]) => makeStudy(episodes.map(e => e.lot),episodes.flatMap(e => e.bids),capture,'Synthetic unit population',false);
+function pairedReference(d: ReturnType<typeof dataset>, e: BidExpression) {
+  const entries=evaluateBidExpression(d,{...e,grouping:'participant',measure:'entry',weighting:'auction'});
+  const wins=evaluateBidExpression(d,{...e,grouping:'participant',measure:'winRate',weighting:'auction'});
+  const byIdentity=new Map(entries.groups.map(g=>[g.key,new Map(g.members.map(m=>[m.lotId,m.value]))]));
+  return wins.groups.flatMap(g=>{
+    const times=byIdentity.get(g.key),pairs=g.members.filter(m=>times?.has(m.lotId));
+    if(pairs.length<5)return [];
+    return [{identity:g.key,n:pairs.length,entryPct:pairs.reduce((n,m)=>n+times!.get(m.lotId)!,0)/pairs.length,
+      winRate:pairs.reduce((n,m)=>n+m.value,0)/pairs.length,lotIds:pairs.map(m=>m.lotId)}];
+  });
+}
 
 describe('complete sequence measurements', () => {
   it('forms increments inside an exact episode; the opening bid has no invented raise', () => {
@@ -52,6 +63,12 @@ describe('complete sequence measurements', () => {
 });
 
 describe('grouping and reference population', () => {
+  it('withholds unsupported participant ranks when no record meets the comparison minimum', () => {
+    const result = evaluateBidExpression(dataset(sequence('one',[100,200,300])),{...expression,measure:'winRate',grouping:'participant'});
+    expect(result.rankValues).toEqual([]);
+    expect(result.groups.length).toBeGreaterThan(0);
+    expect(result.groups.every(g => g.percentile === 0 && !g.supported)).toBe(true);
+  });
   it('reduces a tiny-opening jump with a record median while preserving the arithmetic mean as a separate measure', () => {
     const d = dataset(sequence('one',[1,10000,11000,12000]));
     const typical = evaluateBidExpression(d,{...expression,measure:'typical'});
@@ -110,6 +127,31 @@ describe('grouping and reference population', () => {
     expect(map.find(p => p.identity === 'b')).toMatchObject({n:5,entryPct:50,winRate:0});
     expect(map[0].lotIds).not.toContain('0');
   });
+  it('preserves the independent entry/outcome join across full-year, make, model, vehicle-year and empty scopes', () => {
+    const d=dataset(...Array.from({length:18},(_,i)=>sequence(String(i),[100,213,521],{make:i<9?'Chevrolet':'Porsche',year:i%2?2002:2003})),
+      sequence('cross',[100,213,521],{posted:['2025-12-31T23:59:00Z','2026-01-01T00:01:00Z','2026-01-01T00:03:00Z']}));
+    d.lots[0].winner=null;d.lots[1].winnerConflict=true;d.lots[1].winner=null;
+    d.lots[2].sums.gaps=[0,0];d.lots[3].model='Other model';
+    for(const lot of d.lots)for(const actor of lot.actors)actor.handle=actor.identity==='a'?'Zulu':'Alpha';
+    for(const patch of [{},{from:2026},{from:2016,to:2025},{make:'CHEVROLET'},{make:'porsche'},
+      {model:'Corvette'},{model:'Other model'},{vehicleYear:2002},{vehicleYear:2003},{make:'Absent'}]) {
+      const e={...expression,...patch};
+      expect(participantBehaviorMap(d,e)).toEqual(pairedReference(d,e));
+    }
+    expect(participantBehaviorMap(d,{...expression,from:2026}).every(p=>!p.lotIds.includes('cross'))).toBe(true);
+  });
+  it('keeps all known-outcome ordering while requiring five paired records and preserving repeated-projection joins', () => {
+    const d=dataset(...Array.from({length:5},(_,i)=>sequence(String(i),[100,200,300])),sequence('opening',[100]));
+    for(const lot of d.lots)for(const actor of lot.actors)actor.handle=actor.identity==='a'?'Zulu':'Alpha';
+    const points=participantBehaviorMap(d,expression);
+    expect(points.map(p=>p.identity)).toEqual(['a','b']);
+    expect(points.every(p=>p.n===5 && !p.lotIds.includes('opening'))).toBe(true);
+    expect(points).toEqual(pairedReference(d,expression));
+    expect(participantBehaviorMap({...d,lots:d.lots.slice(0,4)},expression)).toEqual([]);
+    // The legacy join keeps the final entry for an identity/episode while wins retain record order.
+    d.lots.push({...d.lots[0],actors:d.lots[0].actors.map(a=>({...a,entrySeconds:a.entrySeconds+13.25}))});
+    expect(participantBehaviorMap(d,expression)).toEqual(pairedReference(d,expression));
+  });
   it('uses midranks and preserves exact ties; one auction can have a supported population percentile', () => {
     expect(percentile([1,2,2,4],2)).toBe(50);
     const d = dataset(...[100,200,300,400,500].map((raise,i) => sequence(String(i),[100,100 + raise])));
@@ -129,5 +171,41 @@ describe('grouping and reference population', () => {
       .toMatchObject({measure:'amount',grouping:'model',from:2016,to:2026,make:'Chevrolet',model:'Corvette',vehicleYear:2002,weighting:'bid'});
     expect(expressionFromParams(new URLSearchParams('measure=participants&by=participant&from=1900&to=9999&vehicleYear=-1')))
       .toMatchObject({measure:'typical',grouping:'participant',from:2014,to:new Date().getUTCFullYear(),vehicleYear:null});
+  });
+});
+
+
+describe('scoped measurement vector reuse',()=>{
+  it('preserves canonical year merges, duplicate identities, unsupported records and input vectors across measures',()=>{
+    const cross=sequence('cross',[100,175,325],{posted:['2025-12-31T23:50:00Z','2026-01-01T00:01:00Z','2026-01-01T00:21:00Z']});
+    const d=dataset(cross,sequence('single',[100,170,280]),sequence('opening',[100]));
+    for(const lot of d.lots)for(const sums of Object.values(lot.years))sums.identityIds.push(...sums.identityIds);
+    // This encoding is admitted by the existing decoder; identity dedup remains required.
+    const held=decodeStudy(JSON.parse(JSON.stringify(encodeStudy(d)))),before=structuredClone(held);
+    for(const lot of held.lots)for(const sums of Object.values(lot.years)){
+      Object.freeze(sums.gaps);Object.freeze(sums.relativeValues);Object.freeze(sums.identityIds);
+    }
+    for(const [from,to] of [[2025,2025],[2026,2026],[2025,2026],[2024,2024]]){
+      const scoped=held.lots.map(l=>({lot:l,sums:Object.entries(l.years).filter(([year])=>Number(year)>=from && Number(year)<=to)
+        .reduce((a,[,b])=>mergeSums(a,b),emptySums())}));
+      for(const measure of ['amount','increment','relative','typical','spacing','participants','bids'] as const){
+        const r=evaluateBidExpression(held,{...expression,measure,grouping:'auction',from,to});
+        const eligible=scoped.filter(l=>l.sums.bids>0),supported=eligible.flatMap(l=>{const m=measured(l.sums,measure);return m?[{lot:l.lot,m}]:[];});
+        expect(r.eligibleLots).toBe(eligible.length);expect(r.contributingLots).toBe(supported.length);
+        expect(r.bidN).toBe(eligible.reduce((n,l)=>n+l.sums.bids,0));expect(r.raiseN).toBe(eligible.reduce((n,l)=>n+l.sums.raises,0));
+        expect(r.withheldRecordN).toBe(eligible.length-supported.length);
+        expect(r.groups.map(g=>[g.key,g.mean,g.observations]).sort()).toEqual(supported.map(l=>[l.lot.id,l.m.value,l.m.observations]).sort());
+      }
+      for(const grouping of ['make','model','year','participant'] as const)evaluateBidExpression(held,{...expression,grouping,from,to});
+    }
+    expect(held).toEqual(before);
+    expect(evaluateBidExpression(held,{...expression,measure:'participants',grouping:'auction',from:2026,to:2026}).groups.find(g=>g.key==='single')?.mean).toBe(2);
+  });
+  it('counts supported-window episodes independently of a withheld participant crossing-year record',()=>{
+    const cross=sequence('cross',[100,200,300],{posted:['2025-12-31T23:59:00Z','2026-01-01T00:01:00Z','2026-01-01T00:04:00Z']});
+    const d=dataset(cross,sequence('same-year',[100,200,300]));
+    const r=evaluateBidExpression(d,{...expression,grouping:'participant',measure:'winRate',from:2026,to:2026});
+    expect(r.eligibleLots).toBe(2);expect(r.contributingLots).toBe(1);expect(r.withheldRecordN).toBe(d.lots[0].actors.length);
+    expect(r.groups.flatMap(g=>g.lotIds)).toEqual(['same-year','same-year']);
   });
 });

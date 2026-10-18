@@ -1,3 +1,5 @@
+import { __setGuardDb, allowAllGuardDb } from '../_shared/geminiGuard.ts';
+__setGuardDb(allowAllGuardDb()); // these suites assert exact fetch counts; the guard's own tests are _shared/geminiGuard.test.ts
 import { runClassifierAssay } from "./classifierAssay.ts";
 
 const imageId = "eada407d-2206-46e4-89db-490743c723d1";
@@ -6,15 +8,17 @@ const eventId = "561c96be-3855-41cf-ae08-bf31ba3fcb4d";
 const sourceUrl = "https://bringatrailer.com/listing/2006-pontiac-solstice-92/";
 const imageUrl = "https://bringatrailer.com/wp-content/uploads/2026/09/0001-72395.jpg";
 const realFetch = globalThis.fetch;
-const envNames = ["SUPABASE_SERVICE_ROLE_KEY", "SUPABASE_JWT_SECRET", "GOOGLE_AI_API_KEY", "GEMINI_API_KEY", "GOOGLE_API_KEY", "free_api_key"];
+const envNames = ["SUPABASE_SERVICE_ROLE_KEY", "SUPABASE_JWKS", "GOOGLE_AI_API_KEY", "GEMINI_API_KEY", "GOOGLE_API_KEY", "free_api_key"];
 const oldEnv = new Map(envNames.map(name => [name, Deno.env.get(name)]));
+const userSigner = await crypto.subtle.generateKey({ name: "ECDSA", namedCurve: "P-256" }, true, ["sign", "verify"]);
+const userJwks = JSON.stringify({ keys: [{ ...(await crypto.subtle.exportKey("jwk", userSigner.publicKey)), kid: "assay", alg: "ES256" }] });
 const assert = (value: unknown) => { if (!value) throw new Error("assertion failed"); };
 let source: any, vehicle: any, event: any, queries: any[], generationStatus: number;
 let fetches: string[], generationBody: any, generationKey: string | null;
 let failTable: string | null;
 function reset() {
   Deno.env.set("SUPABASE_SERVICE_ROLE_KEY", "test-key");
-  Deno.env.set("SUPABASE_JWT_SECRET", "assay-signing-secret");
+  Deno.env.set("SUPABASE_JWKS", userJwks);
   Deno.env.set("GOOGLE_AI_API_KEY", "production-google-priority");
   Deno.env.set("GEMINI_API_KEY", "secondary-must-not-be-called");
   source = { id: imageId, vehicle_id: vehicleId, image_url: imageUrl, source: "bat_import",
@@ -48,13 +52,13 @@ const db = {
 globalThis.fetch = (async (input, init) => {
   const url = String(input); fetches.push(url);
   if (url === imageUrl) return new Response(new Uint8Array([0xff, 0xd8, 0xff, 0xd9]), { headers: { "Content-Type": "image/jpeg" } });
-  if (url === "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:countTokens") {
+  if (url === "https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:countTokens") {
     return Response.json({ totalTokens: 643 });
   }
-  if (url === "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent") {
+  if (url === "https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent") {
     generationBody = JSON.parse(String(init?.body)); generationKey = new Headers(init?.headers).get("x-goog-api-key");
     if (generationStatus !== 200) return Response.json({ error: { message: "private provider text" } }, { status: generationStatus });
-    return Response.json({ modelVersion: "gemini-2.5-flash", usageMetadata: { promptTokenCount: 643, candidatesTokenCount: 90, totalTokenCount: 733 },
+    return Response.json({ modelVersion: "gemini-flash-latest", usageMetadata: { promptTokenCount: 643, candidatesTokenCount: 90, totalTokenCount: 733 },
       candidates: [{ finishReason: "STOP", content: { parts: [{ text: JSON.stringify({ image_type: "vehicle_exterior", image_medium: "photograph",
         confidence: 0.8, is_automotive: true, description: "Black convertible, front three-quarter view" }) }] } }] });
   }
@@ -69,11 +73,11 @@ async function run(input: Record<string, unknown> = { action: "classifier_assay"
   const response = await runClassifierAssay(request(token, input), input, db);
   return { response, body: await response.json() };
 }
+// A user session as Auth signs it since 2026-10-14: ES256, verified against the project JWKS.
 async function userJwt() {
   const b64 = (v: unknown) => btoa(JSON.stringify(v)).replace(/=/g, "").replace(/\+/g, "-").replace(/\//g, "_");
-  const data = `${b64({ alg: "HS256" })}.${b64({ role: "authenticated", sub: vehicleId, exp: Math.floor(Date.now() / 1000) + 600 })}`;
-  const key = await crypto.subtle.importKey("raw", new TextEncoder().encode("assay-signing-secret"), { name: "HMAC", hash: "SHA-256" }, false, ["sign"]);
-  const signature = new Uint8Array(await crypto.subtle.sign("HMAC", key, new TextEncoder().encode(data)));
+  const data = `${b64({ alg: "ES256", kid: "assay" })}.${b64({ role: "authenticated", sub: vehicleId, exp: Math.floor(Date.now() / 1000) + 600 })}`;
+  const signature = new Uint8Array(await crypto.subtle.sign({ name: "ECDSA", hash: "SHA-256" }, userSigner.privateKey, new TextEncoder().encode(data)));
   return `${data}.${btoa(String.fromCharCode(...signature)).replace(/=/g, "").replace(/\+/g, "-").replace(/\//g, "_")}`;
 }
 
@@ -83,7 +87,7 @@ Deno.test("public source assay performs three bounded reads and one counted gene
   assert(body.image_id === imageId && body.vehicle_id === vehicleId && body.auction_event_id === eventId);
   assert(body.classification.image_type === "vehicle_exterior" && body.classifier_receipt.usage.total_tokens === 733);
   assert(/^[a-f0-9]{64}$/.test(body.classifier_receipt.image_sha256) && /^[a-f0-9]{64}$/.test(body.classifier_receipt.input_sha256));
-  assert(body.classifier_receipt.model_version === "gemini-2.5-flash" && body.classifier_receipt.attempts === 1);
+  assert(body.classifier_receipt.model_version === "gemini-flash-latest" && body.classifier_receipt.attempts === 1);
   assert(queries.length === 3 && queries.every(q => q.signal instanceof AbortSignal));
   assert(queries[0].filters.some(([key, value]: any[]) => key === "vehicle_image_gallery_eligible" && value === true));
   assert(queries[2].filters.some(([key, value]: any[]) => key === "vehicle_id" && value === vehicleId));

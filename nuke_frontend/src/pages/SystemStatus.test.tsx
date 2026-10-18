@@ -6,10 +6,19 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 
 const fixture = vi.hoisted(() => ({
   pulse: {} as any, pulseError: null as any, transportFailure: false,
+  pulseRequests: [] as number[], pulseHeld: null as Promise<any> | null,
   results: {} as Record<string, any>, requests: [] as any[], held: null as Promise<any> | null,
+  intake: null as any, intakeRequests: [] as string[],
 }));
 vi.mock('../lib/supabase', () => ({ supabase: {
-  rpc: vi.fn(() => ({ abortSignal: async () => ({ data: fixture.pulse, error: fixture.pulseError }) })),
+  functions: { invoke: async (name: string) => {
+    fixture.intakeRequests.push(name);
+    return { data: fixture.intake, error: fixture.intake ? null : { message: 'unavailable' } };
+  } },
+  rpc: vi.fn((_name: string, args: { p_days: number }) => {
+    fixture.pulseRequests.push(args.p_days);
+    return { abortSignal: async () => fixture.pulseHeld ?? { data: fixture.pulse, error: fixture.pulseError } };
+  }),
   from(table: string) {
     const request: any = { table, filter: '' };
     const builder: any = {
@@ -26,6 +35,7 @@ vi.mock('../lib/supabase', () => ({ supabase: {
     return builder;
   },
 } }));
+vi.mock('./stacks/orderBookReader', async importOriginal => ({ ...await importOriginal<typeof import('./stacks/orderBookReader')>(), useOrderBook: () => ({ isPending: true }) }));
 import SystemStatus from './SystemStatus';
 
 let root: Root, container: HTMLDivElement;
@@ -36,10 +46,12 @@ const row = (name: string) => [...container.querySelectorAll('tr')].find(r => r.
 beforeEach(() => {
   vi.useFakeTimers(); vi.setSystemTime(new Date('2026-10-05T12:00:00Z'));
   (globalThis as any).IS_REACT_ACT_ENVIRONMENT = true;
-  fixture.pulse = { days: 2, generated_at: '2026-10-05T12:00:00Z', degraded: null,
+  fixture.pulse = { days: 3, generated_at: '2026-10-05T12:00:00Z', degraded: null,
     organs: { vehicles: [{ d: '2026-10-05', n: 4 }], images: [], observations: [], auction_comments: [] },
     backlogs: { import_queue_pending: 0, images_analysis_pending_capped: 10001, images_analysis_failed_capped: 7, cap: 10001 } };
   fixture.pulseError = null; fixture.transportFailure = false; fixture.results = {}; fixture.requests = []; fixture.held = null;
+  fixture.pulseRequests = []; fixture.pulseHeld = null;
+  fixture.intake = null; fixture.intakeRequests = [];
   container = document.createElement('div'); document.body.appendChild(container); root = createRoot(container);
 });
 afterEach(async () => { await act(async () => root.unmount()); container.remove(); vi.useRealTimers(); });
@@ -99,7 +111,7 @@ it.each(['not-a-day', '2026-10-05T00:00:00Z', '2026-02-31', 'duplicate'])('withh
     : [{ d: day, n: 4 }];
   await render();
   const cells = [...row('VEHICLES')!.querySelectorAll('td')].slice(1);
-  expect(cells.map(cell => cell.textContent)).toEqual(['Unmeasured', 'Unmeasured']);
+  expect(cells.map(cell => cell.textContent)).toEqual(['Unmeasured', 'Unmeasured', 'Unmeasured']);
   expect(row('OBSERVATIONS')?.querySelectorAll('td')[1].textContent).toBe('0');
 });
 
@@ -122,7 +134,18 @@ it('reports a transport failure instead of leaving an endless loading message', 
   expect(container.textContent).toContain('System totals unavailable. Retrying each minute.');
   fixture.transportFailure = false;
   await tick(60_000);
-  expect(container.textContent).toContain('ADMIN SYSTEM STATUS');
+  expect(container.textContent).toContain('SYSTEM STATUS');
+});
+it('shows intake coverage through a failed totals read and does not re-fetch it when totals recover', async () => {
+  fixture.transportFailure = true;
+  fixture.intake = { contract: 'intake_status_v1', section: 'coverage', status: 'measured', measured_at: '2026-10-05T12:00:00Z', complete: true,
+    rows: [{ source_slug: 'synthetic-source', total_targets: 10, in_queue: 0, extracted: 0, gap: 10, failed: 0, skipped: 0 }] };
+  await render();
+  expect(container.textContent).toContain('System totals unavailable');
+  expect(container.textContent).toContain('0 completed queue matches / 10 known target URLs');
+  fixture.transportFailure = false; await tick(60_000);
+  expect(container.textContent).toContain('SYSTEM STATUS');
+  expect(fixture.intakeRequests).toHaveLength(5);
 });
 
 it('keeps exact capped and unavailable days separate within one degraded organ', async () => {
@@ -146,7 +169,7 @@ it('requires explicit day and backlog coverage under the capped contract', async
   fixture.pulse.organs.vehicles = [{ d: '2026-10-05', n: 4, status: 'exact', lower_bound: null }];
   await render();
   expect([...row('VEHICLES')!.querySelectorAll('td')].slice(1).map(cell => cell.textContent))
-    .toEqual(['Unmeasured', '4']);
+    .toEqual(['Unmeasured', 'Unmeasured', '4']);
   expect(container.textContent).toContain('import_queue pending: ≥10,001');
   expect(container.textContent).toContain('images analysis pending: Unmeasured');
 });
@@ -156,5 +179,91 @@ it('rejects a capped sentinel mislabeled as an exact number', async () => {
   fixture.pulse.organs.vehicles = [{ d: '2026-10-05', n: 10001, status: 'exact', lower_bound: null }];
   await render();
   expect([...row('VEHICLES')!.querySelectorAll('td')].slice(1).map(cell => cell.textContent))
-    .toEqual(['Unmeasured', 'Unmeasured']);
+    .toEqual(['Unmeasured', 'Unmeasured', 'Unmeasured']);
+});
+
+it('keeps pipeline flow available when totals fail and hides empty recent widgets', async () => {
+  fixture.transportFailure = true;
+  await render();
+  expect(row('VEHICLES')?.textContent).toContain('4');
+  expect(container.querySelector('h1')?.textContent).toBe('SYSTEM STATUS');
+  expect(container.textContent).not.toContain('RECENT TIER 1 ANALYSIS');
+  expect(container.textContent).not.toContain('RECENT CATALOG PARTS');
+});
+
+it('starts with recent UTC days and expands the full dated history', async () => {
+  await render();
+  expect(fixture.pulseRequests).toEqual([3]);
+  expect(row('VEHICLES')!.querySelectorAll('td')).toHaveLength(4);
+  const button = [...container.querySelectorAll('button')].find(b => b.textContent === 'Show 14-day history')!;
+  fixture.pulse = { ...fixture.pulse, days: 14 };
+  await act(async () => button.click());
+  expect(fixture.pulseRequests).toEqual([3, 14]);
+  expect(row('VEHICLES')!.querySelectorAll('td')).toHaveLength(15);
+  expect(button.getAttribute('aria-pressed')).toBe('true');
+  expect(container.textContent).toContain('Today is still in progress');
+});
+
+it('a late history reading cannot replace the recent scope after returning to it', async () => {
+  await render();
+  let finish!: (value: any) => void;
+  fixture.pulseHeld = new Promise(resolve => { finish = resolve; });
+  const button = [...container.querySelectorAll('button')].find(b => b.textContent === 'Show 14-day history')!;
+  await act(async () => button.click());
+  expect(container.textContent).toContain('Reading 14-day history');
+  fixture.pulseHeld = null;
+  await act(async () => button.click());
+  await act(async () => finish({ data: { ...fixture.pulse, days: 14,
+    organs: { ...fixture.pulse.organs, vehicles: [{ d: '2026-10-05', n: 999 }] } }, error: null }));
+  expect(fixture.pulseRequests).toEqual([3, 14, 3]);
+  expect(row('VEHICLES')!.querySelectorAll('td')).toHaveLength(4);
+  expect(row('VEHICLES')!.textContent).not.toContain('999');
+});
+
+it('a response for a different time scope is unavailable rather than silently relabeled', async () => {
+  fixture.pulse.days = 14;
+  await render();
+  expect(container.textContent).toContain('Pipeline measurements unavailable');
+  expect(container.textContent).not.toContain('PIPELINE PULSE');
+});
+
+it('names a missing timestamp index without treating unavailable arrivals as zero', async () => {
+  fixture.pulse.coverage = { contract: 'pipeline_pulse_capped_v1', timezone: 'UTC',
+    organs: { images: { supported_time_index: false } }, backlogs: {} };
+  await render();
+  expect(container.textContent).toContain('Arrival counts unavailable for IMAGES: no usable index');
+  expect(row('IMAGES')!.textContent).toContain('Unmeasured');
+});
+
+it('finishes empty or failed record drilldowns and offers a bounded retry', async () => {
+  await render();
+  const panel = [...container.querySelectorAll('[role="button"]')].find(b => b.textContent?.includes('TIER 1 ANALYSIS')) as HTMLElement;
+  await act(async () => panel.click());
+  expect(container.textContent).toContain('No records returned.');
+  expect(container.textContent).not.toContain('Reading recent records');
+  await act(async () => panel.click());
+  fixture.results.vehicle_images = { data: null, error: { message: 'private records error' } };
+  await act(async () => panel.click());
+  expect(container.textContent).toContain('Recent records unavailable.');
+  expect(container.textContent).not.toContain('private records error');
+  const retry = [...container.querySelectorAll('button')].find(b => b.textContent === 'Retry records')!;
+  fixture.results.vehicle_images = { data: [], error: null };
+  await act(async () => retry.click());
+  expect(container.textContent).toContain('No records returned.');
+  const request = fixture.requests.find(r => r.table === 'vehicle_images' && r.limit === 100);
+  expect(request.signal).toBeInstanceOf(AbortSignal);
+});
+
+it('does not let a slower record request replace a newer drilldown', async () => {
+  await render();
+  let release!: (value: any) => void;
+  fixture.held = new Promise(resolve => { release = resolve; });
+  const panels = [...container.querySelectorAll('[role="button"]')] as HTMLElement[];
+  await act(async () => panels.find(b => b.textContent?.includes('TIER 1 ANALYSIS'))!.click());
+  fixture.held = null;
+  fixture.results.catalog_parts = { data: [{ id: 'part', part_number: 'CURRENT-PART' }], error: null };
+  await act(async () => panels.find(b => b.textContent?.includes('LMC CATALOG'))!.click());
+  await act(async () => release({ data: [{ id: 'STALE-IMAGE' }], error: null }));
+  expect(container.textContent).toContain('CURRENT-PART');
+  expect(container.textContent).not.toContain('STALE-IMAGE');
 });

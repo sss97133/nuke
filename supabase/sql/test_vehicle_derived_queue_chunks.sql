@@ -596,3 +596,78 @@ UPDATE public.fixture_behavior SET fail=false WHERE vehicle_id=pg_temp.vid(1);
 CREATE TEMP TABLE recovered_result AS SELECT * FROM public.drain_vehicle_metric_queue(1);
 SELECT pg_temp.assert_true((SELECT processed=1 AND errored=0 FROM recovered_result)
  AND NOT EXISTS(SELECT 1 FROM public.vehicle_metric_recompute_queue), 'A successful retry clears only materialized work');
+
+-- Rebalance the existing controller after scaled intake, without changing the
+-- canonical metric body, source clocks, schedule, ACLs or failure contracts.
+CREATE TEMP TABLE flow_original AS SELECT pg_get_functiondef('public.drain_vehicle_derived_queues(boolean,integer)'::regprocedure) body;
+CREATE TEMP TABLE flow_contract AS SELECT oid,proowner,proacl,prosecdef,proconfig FROM pg_proc
+ WHERE oid IN('public.drain_vehicle_derived_queues(boolean,integer)'::regprocedure,
+              'public.drain_vehicle_metric_queue(integer)'::regprocedure);
+-- Measured old/new control uses identical source, row costs and budget.
+SELECT pg_temp.reset_fixture(500,300);
+UPDATE public.fixture_behavior SET sleep_ms=20;
+CREATE TEMP TABLE flow_before AS SELECT * FROM public.drain_vehicle_derived_queues(false,6);
+\ir ../migrations/20261009024034_rebalance_derived_metric_time_slice.sql
+CREATE TEMP TABLE flow_rebalanced AS SELECT pg_get_functiondef('public.drain_vehicle_derived_queues(boolean,integer)'::regprocedure) body;
+\ir ../migrations/20261009024034_rebalance_derived_metric_time_slice.sql
+SELECT pg_temp.assert_true((SELECT body FROM flow_rebalanced)=pg_get_functiondef('public.drain_vehicle_derived_queues(boolean,integer)'::regprocedure)
+ AND (SELECT count(*)=2 AND bool_and(p.proowner=c.proowner AND p.proacl IS NOT DISTINCT FROM c.proacl
+  AND p.prosecdef=c.prosecdef AND p.proconfig IS NOT DISTINCT FROM c.proconfig)
+ FROM flow_contract c JOIN pg_proc p USING(oid))
+ AND (SELECT active AND schedule='*/2 * * * *'
+  AND encode(sha256(convert_to(command,'UTF8')),'base64')='DyTDHVzhBBk4V6M507lB5RC/LsN7MqREJY1+qg0rTBI=' FROM cron.job),
+ 'Rebalance replays exactly and preserves owners, ACLs, invoker, metric configuration and value-OFF schedule');
+SELECT pg_temp.reset_fixture(500,300);
+UPDATE public.fixture_behavior SET sleep_ms=20;
+CREATE TEMP TABLE flow_started AS SELECT clock_timestamp() t;
+CREATE TEMP TABLE flow_after AS SELECT * FROM public.drain_vehicle_derived_queues(false,6);
+CREATE TEMP TABLE flow_elapsed AS SELECT clock_timestamp()-t elapsed FROM flow_started;
+SELECT pg_temp.assert_true((SELECT processed FROM flow_after WHERE queue='metric')>
+ (SELECT processed FROM flow_before WHERE queue='metric')
+ AND (SELECT processed>=25 AND NOT skipped FROM flow_after WHERE queue='completion')
+ AND (SELECT NOT skipped FROM flow_after WHERE queue='stats')
+ AND (SELECT skipped FROM flow_after WHERE queue='value')
+ AND (SELECT elapsed<interval '6 seconds' FROM flow_elapsed),
+ 'Identical burst folds more vehicles, preserves sibling progress and finishes inside the existing budget');
+SELECT jsonb_build_object('before_metric',(SELECT processed FROM flow_before WHERE queue='metric'),
+ 'after_metric',(SELECT processed FROM flow_after WHERE queue='metric'),
+ 'after_completion',(SELECT processed FROM flow_after WHERE queue='completion'),
+ 'elapsed',(SELECT elapsed FROM flow_elapsed)) AS flow_benchmark;
+SELECT pg_temp.reset_fixture(2500,800);
+CREATE TEMP TABLE flow_caps AS SELECT * FROM public.drain_vehicle_derived_queues();
+SELECT pg_temp.assert_true((SELECT processed=500 FROM flow_caps WHERE queue='metric')
+ AND (SELECT processed=1000 FROM flow_caps WHERE queue='completion')
+ AND (SELECT skipped FROM flow_caps WHERE queue='value'), 'Rebalanced controller keeps every per-run cap and value hold');
+SELECT pg_temp.reset_fixture(0,100);
+UPDATE public.fixture_behavior SET fail=true WHERE vehicle_id=pg_temp.vid(10);
+CREATE TEMP TABLE flow_retry AS SELECT * FROM public.drain_vehicle_derived_queues();
+SELECT pg_temp.assert_true((SELECT processed=99 AND errored=2 FROM flow_retry WHERE queue='metric')
+ AND (SELECT attempts=2 AND live_metrics_dirty AND observation_count_dirty FROM public.vehicle_metric_recompute_queue),
+ 'Rebalanced controller retains failed work and counts retries without counting it as landed');
+
+-- Explicit owner pause, changed value policy and body drift all fail closed.
+UPDATE cron.job SET active=false;
+\set ON_ERROR_STOP off
+\ir ../migrations/20261009024034_rebalance_derived_metric_time_slice.sql
+\set ON_ERROR_STOP on
+SELECT pg_temp.assert_true((SELECT NOT active FROM cron.job)
+ AND (SELECT body FROM flow_rebalanced)=pg_get_functiondef('public.drain_vehicle_derived_queues(boolean,integer)'::regprocedure),
+ 'Owner pause refuses the tuning and stays paused');
+UPDATE cron.job SET active=true,command='SET statement_timeout = ''55s''; SELECT public.drain_vehicle_derived_queues(true);';
+\set ON_ERROR_STOP off
+\ir ../migrations/20261009024034_rebalance_derived_metric_time_slice.sql
+\set ON_ERROR_STOP on
+SELECT pg_temp.assert_true((SELECT command LIKE '%true%' FROM cron.job)
+ AND (SELECT body FROM flow_rebalanced)=pg_get_functiondef('public.drain_vehicle_derived_queues(boolean,integer)'::regprocedure),
+ 'Changed value policy refuses tuning and is not overwritten');
+UPDATE cron.job SET command='SET statement_timeout = ''55s''; SELECT public.drain_vehicle_derived_queues(p_include_value := false);';
+DO $$ BEGIN EXECUTE replace((SELECT body FROM flow_rebalanced),'-- A NULL or absurd budget','-- Drifted: A NULL or absurd budget'); END $$;
+CREATE TEMP TABLE flow_drift AS SELECT pg_get_functiondef('public.drain_vehicle_derived_queues(boolean,integer)'::regprocedure) body;
+\set ON_ERROR_STOP off
+\ir ../migrations/20261009024034_rebalance_derived_metric_time_slice.sql
+\set ON_ERROR_STOP on
+SELECT pg_temp.assert_true((SELECT body FROM flow_drift)=pg_get_functiondef('public.drain_vehicle_derived_queues(boolean,integer)'::regprocedure),
+ 'Controller drift refuses the tuning without overwriting concurrent work');
+DO $$ BEGIN EXECUTE (SELECT body FROM flow_rebalanced); END $$;
+SELECT pg_temp.assert_true(encode(sha256(convert_to(pg_get_functiondef('public.drain_vehicle_metric_queue(integer)'::regprocedure),'UTF8')),'base64')
+ ='i/bVyc6ZROIvmHwIkdlQHzhGTOavHdmp7DfrM0B2QnA=', 'Canonical metric semantics, parent locking and materialization clock unchanged');

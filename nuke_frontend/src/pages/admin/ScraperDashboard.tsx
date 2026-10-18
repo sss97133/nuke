@@ -244,7 +244,8 @@ export default function ScraperDashboard() {
       
       const { count: totalCount } = await supabase
         .from('vehicles')
-        .select('*', { count: 'exact', head: true });
+        .select('id', { count: 'exact', head: true });
+
       
       // Get queue health
       const { data: importQueue } = await supabase

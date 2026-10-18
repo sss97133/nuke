@@ -396,11 +396,53 @@ FB rows, 14 re-seen/7d); `avg_hours_on_market` hardcoded NULL; `unique_sellers` 
 distinct `bat_seller` (BaT-only); pulse-vs-velocity make-rows under-sum ~12-20% (disclose,
 never silently sum); `pg_stat` n_live_tup is badly wrong here — always `count(*)`.
 
-**TWO FORKS FOR SKYLAR (unanswered — do not build past these):**
+**TWO FORKS FOR SKYLAR (answered 2026-10-13, below):**
 1. Ask-side scope: enrich all 441 feeds, or concentrate cohorts + top metros first?
    (recommendation: concentrate.)
 2. Explore's headline: the DEAL READ (ask × sold-comp band, per this doc), or the
    GEOGRAPHY MAP (what the built iOS surface currently leads with)?
+
+### Owner answer, 2026-10-13: the forks, and the morning board
+
+Two Facebook Marketplace finds that never reached him (a 2009 H3T in St George at $12,500 and a 1984 M1010 CUCV in
+Las Vegas at $13,500, both listed within hours) prompted this. In substance:
+
+- **When he sits down, he wants every good available buy:** the ones around him, and the national ones. The whole
+  country's arrivals, with **his band** first among them.
+- **Stacks vary by level of the economy.** He wants to see what is happening at each price level, and what is around
+  him.
+- **The system should say what to ask the seller.** On the H3T it should have asked: is it an Alpha, does it have the
+  lockers, the Adventure package? That is the AGENTS.md rule "ask for the next evidence needed for the current
+  decision", applied to a live ask: the unresolved fact that moves the cohort's price, and the cheapest evidence that
+  resolves it (a VIN character, a dash switch, the glovebox RPO label).
+
+**What this settles.** Fork 1: the ask side is national (every feed), and the band is a lens, not a scope limit.
+Fork 2: the headline is neither the map nor a reverse-chron list but the arrivals with lenses: near me, my band,
+price tier, each with its deal read and its next question. The build order above still holds: atoms first.
+
+**Measured the same day (2026-10-13 ~23:00Z).**
+- Arrivals: `poll-listing-feeds` polled all 441 enabled feeds in 24 h; ~740 vehicles landed, 469 from Craigslist,
+  all priced, 0 with a point. Classified `vehicle_events` begin 2026-10-13 (374 Craigslist; 0 Facebook, 0 KSL in
+  30 days).
+- Facebook: `fb_sweep_jobs` ran 36 times on 10-12 and once on 10-13. The rendered collector's native host is
+  installed (10-12 19:14) but its capture folder is empty: the extension was never loaded and started (an owner
+  action, scripts/fb-browser-capture/README.md). Neither find could have surfaced.
+- Place: every retained Craigslist page carries city, region, postal code and an approximate point (60 of 60 sampled);
+  ingest kept only the town. The last Craigslist row in `vehicle_location_observations` is 2026-02-26.
+- Band: `compute_taste_score` (applied in production, not in the repo) already scores his taste by make, model, year,
+  body and region; 67 of 374 asks scored 60 or more.
+
+**Built in response.** #1083 lands each Craigslist post's place (never the street line) in
+`vehicle_location_observations`. #1084 adds `classified_ask_board`, one read for the arrivals with the near-me, band
+and tier lenses and its populations. Still open: the deal read per ask (the comps join; see the H3T case below), the
+next-question read, cross-post collapse, expiry, and the surface on the Market tab.
+
+**The H3T case, as the next-question read should have produced it.** Sold H3Ts on BaT (local archive, 2026-09-27):
+13 Alphas (5.3 V8) sold, median $34,000; 2 five-cylinder trucks sold, $17,250 at 141k miles (2021) and $23,750 at
+50k (2024). The listing says "5 cylinder", which answers the Alpha question from the seller's text. The open value
+question was the ZM6 Off-Road Adventure package (4.03:1 low range, lockers, LT285/75R16 tires). It is resolved by the
+glovebox RPO label or the locker switches, neither of which was in the eight photos. A five-cylinder H3T's price
+cannot be defended from two sales; the read should say so.
 
 ## Owner notes, 2026-09-29: the auction temperature
 

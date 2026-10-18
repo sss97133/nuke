@@ -4,7 +4,11 @@ import { JSDOM } from 'jsdom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const fixture = vi.hoisted(() => ({ vehicle: {} as any, evidence: {} as any, loading: false, error: null as string | null,
-  priceFacts: null as any, priceSettled: true, priceFailed: false }));
+  priceFacts: null as any, priceSettled: true, priceFailed: false, engineReads: {} as Record<string, any> }));
+vi.mock('./hooks/useFieldProvenance', async importOriginal => ({
+  ...await importOriginal<typeof import('./hooks/useFieldProvenance')>(),
+  useFieldProvenance: (_vehicleId: string, field: string) => fixture.engineReads[field] || { data: null, isLoading: false },
+}));
 vi.mock('./VehicleProfileContext', () => ({ useVehicleProfile: () => ({
   vehicle: fixture.vehicle, vehicleId: fixture.vehicle.id, canEdit: false,
   isVerifiedOwner: false, isMobile: true, setGalleryFilter: vi.fn(), auctionPulse: null,
@@ -43,6 +47,7 @@ beforeEach(() => {
   fixture.priceFacts = null;
   fixture.priceSettled = true;
   fixture.priceFailed = false;
+  fixture.engineReads = {};
   fixture.vehicle = {
     id: 'local-public-profile', year: 1966, make: 'Ford', model: 'Mustang', mileage: 87,
     data_quality_score: 100, confidence_score: 100, updated_at: '2026-09-27T16:47:45.300576Z',
@@ -54,6 +59,27 @@ beforeEach(() => {
   const other = { ...primary, id: 'local-87000', field_value: '87000', confidence: 0.8, status: 'pending' };
   fixture.evidence = { mileage: { primary, sources: [primary, other, primary], agreementCount: 2,
     totalSources: 3, hasConflict: true, conflictType: 'genuine' } };
+});
+
+it('shows distinct engine claims with units, retaining the combined description in expansion', () => {
+  fixture.vehicle.engine_size = '2.5-Liter Inline-Six';
+  for (const [field, value] of [['engine_configuration', 'I6'], ['engine_displacement_l', '2.5']]) {
+    fixture.engineReads[field] = { data: { canonical: { status: 'resolved', value }, observations: [] }, isLoading: false };
+  }
+  const dom = new JSDOM(renderToStaticMarkup(<VehicleDossierPanel />));
+  expect(dom.window.document.querySelector('[data-field="engine_configuration"]')?.textContent).toContain('I6');
+  expect(dom.window.document.querySelector('[data-field="engine_displacement_l"]')?.textContent).toContain('2.5 L');
+  expect(dom.window.document.querySelector('[data-field="engine_size"]')).toBeNull();
+  expect(dom.window.document.body.textContent).toContain('original or overlapping field');
+});
+
+it('withholds failed engine values and states a read failure rather than absence', () => {
+  fixture.engineReads.engine_configuration = { data: { canonical: { status: 'unavailable' }, observations: [{ value: 'I6' }] }, isLoading: false };
+  const html = renderToStaticMarkup(<VehicleDossierPanel />);
+  expect(html).toContain('Engine source claims could not be read completely');
+  expect(html).not.toContain('ENGINE CONFIGURATION');
+  fixture.engineReads.engine_configuration.data = { observations: [], coverage: { status: 'refused_input_limit' } };
+  expect(renderToStaticMarkup(<VehicleDossierPanel />)).toContain('Their absence has not been established');
 });
 
 it('provides a named keyboard control with the actual field drawer and expanded state', () => {
@@ -77,32 +103,14 @@ function renderSurface(render: () => React.ReactElement) {
   return dom.window.document.querySelector('[data-testid="data-coverage-score"]');
 }
 
-describe.each(surfaces)('stored coverage display: %s', (_name, render) => {
-  it('keeps a 100 score qualified even beside conflicting accepted/pending mileage', () => {
+describe.each(surfaces)('unsupported coverage score: %s', (_name, render) => {
+  it.each([0, 80, 100, null, undefined, NaN, Infinity])('does not surface an unexplained score: %s', value => {
+    fixture.vehicle.data_quality_score = value;
     const before = JSON.stringify({ vehicle: fixture.vehicle, evidence: fixture.evidence });
-    const score = renderSurface(render)!;
-    expect(score.textContent).toContain('100/100');
-    expect(score.textContent?.toLowerCase()).toContain('stored coverage heuristic');
-    expect(score.textContent?.toLowerCase()).toContain('assessment time unknown');
-    expect(score.outerHTML).not.toMatch(/data quality|badge--dq-green|badge--dq-orange|var\(--success\)|var\(--warning\)|var\(--error\)/i);
-    // Mobile tooltips are hidden; the key qualification must remain outside one.
-    score.querySelector('.badge__tooltip')?.remove();
-    expect(score.textContent?.toLowerCase()).toContain('verification unknown');
+    expect(renderSurface(render)).toBeNull();
     expect(JSON.stringify({ vehicle: fixture.vehicle, evidence: fixture.evidence })).toBe(before);
     expect(supabase.from).not.toHaveBeenCalled();
     expect(supabase.rpc).not.toHaveBeenCalled();
-  });
-
-  it('preserves a genuine zero without a truth or failure color', () => {
-    fixture.vehicle.data_quality_score = 0;
-    const score = renderSurface(render)!;
-    expect(score.textContent).toContain('0/100');
-    expect(score.outerHTML).not.toMatch(/badge--dq-orange|var\(--error\)/);
-  });
-
-  it.each([null, undefined, NaN, Infinity, -1, 101, '100'])('does not invent a score for unknown or invalid input: %s', value => {
-    fixture.vehicle.data_quality_score = value;
-    expect(renderSurface(render)).toBeNull();
   });
 });
 

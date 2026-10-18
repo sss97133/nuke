@@ -85,21 +85,34 @@ export default function NukeMap() {
 
   useEffect(() => {
     async function loadOverlays() {
+      // organizations, not the businesses view: the view has neither name nor brand_design_language (both 400'd).
+      // PostgREST caps a response at 1,000 rows, so the old .limit(3000) got 1,000 of the located orgs: page by id.
+      const pagedBusinesses = async () => {
+        const rows: any[] = [];
+        for (let from = 0; from < 3000; from += 1000) {
+          const { data } = await supabase.from('organizations').select('id, name, latitude, longitude, business_type, brand_design_language')
+            .not('latitude', 'is', null).order('id').range(from, from + 999);
+          if (!data) break;
+          rows.push(...data);
+          if (data.length < 1000) break;
+        }
+        return { data: rows };
+      };
       const [bizRes, colRes] = await Promise.all([
-        supabase.from('businesses').select('id, name, latitude, longitude, type, brand_design_language').not('latitude', 'is', null).limit(3000),
-        supabase.from('businesses').select('id, name, slug, instagram_handle, country, city, latitude, longitude, total_inventory, brand_design_language').eq('type', 'collection').not('latitude', 'is', null).limit(1000),
+        pagedBusinesses(),
+        supabase.from('organizations').select('id, name, slug, ig:social_links->>instagram, country, city, latitude, longitude, total_inventory, brand_design_language').eq('business_type', 'collection').not('latitude', 'is', null).limit(1000),
       ]);
       if (bizRes.data) setBusinesses(bizRes.data.map((b: any) => {
         const bdl = b.brand_design_language;
         const hex = bdl?.colors?.primary;
         return {
-          id: b.id, name: b.name, lat: b.latitude, lng: b.longitude, type: b.type,
+          id: b.id, name: b.name, lat: b.latitude, lng: b.longitude, type: b.business_type,
           color: hex ? hexToRgb(hex) : null,
           logoUrl: bdl?.logos?.svg || bdl?.logos?.primary_dark || bdl?.logos?.primary_light || null,
         };
       }));
       if (colRes.data) setCollections(colRes.data.map((c: any) => ({
-        id: c.id, name: c.name, slug: c.slug || '', ig: c.instagram_handle,
+        id: c.id, name: c.name, slug: c.slug || '', ig: c.ig ?? null,
         country: c.country || '', city: c.city || '', lat: c.latitude, lng: c.longitude,
         totalInventory: c.total_inventory || 0,
       })));

@@ -14,6 +14,15 @@ set -uo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 GD="$ROOT/scripts/guardrails"
 BASE="$ROOT/scripts/ci/baseline.json"
+CI_TMP_DIR="$(mktemp -d "${TMPDIR:-/tmp}/nuke-ci.XXXXXX")" || {
+  echo "CI gate: cannot create private scratch directory" >&2
+  exit 1
+}
+[[ "$CI_TMP_DIR" = /* ]] || CI_TMP_DIR="$PWD/$CI_TMP_DIR"
+trap 'rm -rf -- "$CI_TMP_DIR"' EXIT
+trap 'exit 129' HUP
+trap 'exit 130' INT
+trap 'exit 143' TERM
 ENFORCE="${CI_ENFORCE:-0}"
 fail=0
 red(){ printf '\033[31m%s\033[0m\n' "$*"; }
@@ -21,15 +30,22 @@ grn(){ printf '\033[32m%s\033[0m\n' "$*"; }
 ylw(){ printf '\033[33m%s\033[0m\n' "$*"; }
 
 # --- count functions (used for BOTH baseline capture and checking, so they can't disagree) ---
-count_ghost()     { node "$GD/no-dead-asset-references.mjs" --json >/tmp/ci_ghost.json 2>/dev/null; python3 -c "import json;print(json.load(open('/tmp/ci_ghost.json'))['errors'])" 2>/dev/null || echo 0; }
+count_ghost()     { node "$GD/no-dead-asset-references.mjs" --json >"$CI_TMP_DIR/ci_ghost.json" 2>/dev/null; python3 -c "import json,sys;print(json.load(open(sys.argv[1]))['errors'])" "$CI_TMP_DIR/ci_ghost.json" 2>/dev/null || echo 0; }
 count_rawfetch()  { bash "$GD/no-raw-fetch.sh" 2>/dev/null | grep -cE ':[0-9]+:' || true; }
 count_testimony() { node "$GD/no-raw-testimony-insert.mjs" 2>/dev/null | grep -c '^VIOLATION' || true; }
+count_swallowed(){ node "$GD/no-swallowed-write-errors.mjs" --all 2>/dev/null | grep -cE ': (dropped|log-only): ' || true; }
 count_labels()    { node "$GD/no-schema-baked-labels.mjs" --all 2>/dev/null | grep -oE '[0-9]+ baked-label' | grep -oE '^[0-9]+' || echo 0; }
-secrets_ok()      { bash "$GD/no-committed-secrets.sh" >/tmp/ci_sec.out 2>&1; }
+secrets_ok()      { bash "$GD/no-committed-secrets.sh" >"$CI_TMP_DIR/ci_sec.out" 2>&1; }
+# design-system counts come from one eslint pass (scripts/guardrails/design-violations.mjs); read per rule
+DESIGN_RULES="no-inline-style no-font-props no-hardcoded-colors no-border-radius no-box-shadow no-gradient no-banned-fonts"
+design_prepare() { node "$GD/design-violations.mjs" --json >"$CI_TMP_DIR/ci_design.json" 2>/dev/null || echo '{}' >"$CI_TMP_DIR/ci_design.json"; }
+count_design()    { python3 -c "import json,sys;print(json.load(open(sys.argv[1])).get('$1',0))" "$CI_TMP_DIR/ci_design.json" 2>/dev/null || echo 0; }
 
 # --- baseline capture mode ---
 if [ "${CI_WRITE_BASELINE:-0}" = 1 ]; then
-  g=$(count_ghost); rf=$(count_rawfetch); ti=$(count_testimony); sl=$(count_labels)
+  g=$(count_ghost); rf=$(count_rawfetch); ti=$(count_testimony); sl=$(count_labels); sw=$(count_swallowed)
+  design_prepare
+  design_json=$(python3 -c "import json,sys;d=json.load(open(sys.argv[1]));print(', '.join('\"%s\": %d' % (k, d.get(k,0)) for k in '$DESIGN_RULES'.split()))" "$CI_TMP_DIR/ci_design.json")
   cat > "$BASE" <<JSON
 {
   "generated": "$(date -u +%F)",
@@ -38,8 +54,10 @@ if [ "${CI_WRITE_BASELINE:-0}" = 1 ]; then
     "no-dead-asset-references": { "errors": $g, "note": "ghost-table refs on live paths. 12 = webhooks (pending strip, NEEDS_SKYLAR #2); 6 = vehicle_transactions (guarded crash-safe, half-built)." },
     "no-raw-fetch":             { "violations": $rf, "note": "external fetches bypassing archiveFetch. Burn down opportunistically." },
     "no-raw-testimony-insert":  { "violations": $ti, "note": "raw writes to testimony tables. Should trend to 0." },
+    "no-swallowed-write-errors": { "violations": $sw, "note": "supabase-js writes in edge functions whose { error } is dropped or only logged. Burn down; never raise." },
     "no-committed-secrets":     { "violations": 0, "note": "HARD zero — any hit blocks regardless of mode." },
-    "no-schema-baked-labels":   { "violations": $sl, "advisory": true, "note": "label-as-projection doctrine. Advisory — never blocks." }
+    "no-schema-baked-labels":   { "violations": $sl, "advisory": true, "note": "label-as-projection doctrine. Advisory — never blocks." },
+    "design-system":            { $design_json, "note": "eslint design-system rules over nuke_frontend/src (src/kit exempt), counted by scripts/guardrails/design-violations.mjs. Each rule ratchets on its own." }
   }
 }
 JSON
@@ -57,27 +75,36 @@ ratchet(){ # name current baseline
 echo "── Nuke CI gate ($([ "$ENFORCE" = 1 ] && echo ENFORCE || echo warn) mode) ──"
 
 echo "• frontend typecheck…"
-if (cd "$ROOT/nuke_frontend" && npm run type-check >/tmp/ci_tc.out 2>&1); then grn "  ✓ typecheck clean"
-else red "  ✗ typecheck FAILED"; tail -15 /tmp/ci_tc.out; fail=1; fi
+if (cd "$ROOT/nuke_frontend" && npm run type-check >"$CI_TMP_DIR/ci_tc.out" 2>&1); then grn "  ✓ typecheck clean"
+else red "  ✗ typecheck FAILED"; tail -15 "$CI_TMP_DIR/ci_tc.out"; fail=1; fi
 
 if [ "${CI_BUILD:-0}" = 1 ]; then
   echo "• frontend build…"
-  if (cd "$ROOT/nuke_frontend" && npm run build >/tmp/ci_build.out 2>&1); then grn "  ✓ build clean"; else red "  ✗ build FAILED"; tail -20 /tmp/ci_build.out; fail=1; fi
+  if (cd "$ROOT/nuke_frontend" && npm run build >"$CI_TMP_DIR/ci_build.out" 2>&1); then grn "  ✓ build clean"; else red "  ✗ build FAILED"; tail -20 "$CI_TMP_DIR/ci_build.out"; fail=1; fi
 fi
 
 echo "• guardrails (ratchet)…"
-if node --test "$ROOT/scripts/check-image-observation-health.test.mjs" >/tmp/ci_image_health_tests.out 2>&1; then grn "  ✓ image-health failure assays"
-else red "  ✗ image-health failure assays FAILED"; cat /tmp/ci_image_health_tests.out; fail=1; fi
-if node --test "$GD/no-raw-fetch.test.mjs" >/tmp/ci_rawfetch_tests.out 2>&1; then grn "  ✓ raw-fetch regression tests"
-else red "  ✗ raw-fetch regression tests FAILED"; cat /tmp/ci_rawfetch_tests.out; fail=1; fi
-if node --test "$ROOT/scripts/data/declared-source-reader.test.mjs" >/tmp/ci_declared_reader_tests.out 2>&1; then grn "  ✓ declared-source reader mapping"
-else red "  ✗ declared-source reader mapping FAILED"; cat /tmp/ci_declared_reader_tests.out; fail=1; fi
-if node --test "$ROOT/scripts/discovery/buying-evidence.test.mjs" >/tmp/ci_buying_evidence_tests.out 2>&1; then grn "  ✓ buying-evidence source and refusal contracts"
-else red "  ✗ buying-evidence source and refusal contracts FAILED"; cat /tmp/ci_buying_evidence_tests.out; fail=1; fi
+if node --test "$GD/no-swallowed-write-errors.test.mjs" >"$CI_TMP_DIR/ci_swallowed_tests.out" 2>&1; then grn "  ✓ swallowed-write-error detector contract"
+else red "  ✗ swallowed-write-error detector contract FAILED"; cat "$CI_TMP_DIR/ci_swallowed_tests.out"; fail=1; fi
+if node --test "$ROOT/scripts/check-image-observation-health.test.mjs" >"$CI_TMP_DIR/ci_image_health_tests.out" 2>&1; then grn "  ✓ image-health failure assays"
+else red "  ✗ image-health failure assays FAILED"; cat "$CI_TMP_DIR/ci_image_health_tests.out"; fail=1; fi
+if node --test "$GD/no-raw-fetch.test.mjs" >"$CI_TMP_DIR/ci_rawfetch_tests.out" 2>&1; then grn "  ✓ raw-fetch regression tests"
+else red "  ✗ raw-fetch regression tests FAILED"; cat "$CI_TMP_DIR/ci_rawfetch_tests.out"; fail=1; fi
+if node --test "$ROOT/scripts/data/declared-source-reader.test.mjs" >"$CI_TMP_DIR/ci_declared_reader_tests.out" 2>&1; then grn "  ✓ declared-source reader mapping"
+else red "  ✗ declared-source reader mapping FAILED"; cat "$CI_TMP_DIR/ci_declared_reader_tests.out"; fail=1; fi
+if node --test "$ROOT/scripts/ci/invalid-indexes.test.mjs" >"$CI_TMP_DIR/ci_invalid_indexes_tests.out" 2>&1; then grn "  ✓ invalid-index detector contract"
+else red "  ✗ invalid-index detector contract FAILED"; cat "$CI_TMP_DIR/ci_invalid_indexes_tests.out"; fail=1; fi
+if node --test "$ROOT/scripts/ci/owner-writable-views.test.mjs" >"$CI_TMP_DIR/ci_owner_writable_views_tests.out" 2>&1; then grn "  ✓ owner-writable view detector contract"
+else red "  ✗ owner-writable view detector contract FAILED"; cat "$CI_TMP_DIR/ci_owner_writable_views_tests.out"; fail=1; fi
+if node --test "$ROOT/scripts/discovery/buying-evidence.test.mjs" "$ROOT/scripts/discovery/buying-evidence-matching.test.mjs" >"$CI_TMP_DIR/ci_buying_evidence_tests.out" 2>&1; then grn "  ✓ buying-evidence source, matching and refusal contracts"
+else red "  ✗ buying-evidence source and refusal contracts FAILED"; cat "$CI_TMP_DIR/ci_buying_evidence_tests.out"; fail=1; fi
 ratchet "ghost-refs"       "$(count_ghost)"     "$(b no-dead-asset-references errors)"
 ratchet "raw-fetch"        "$(count_rawfetch)"  "$(b no-raw-fetch violations)"
 ratchet "testimony-insert" "$(count_testimony)" "$(b no-raw-testimony-insert violations)"
-if secrets_ok; then grn "  ✓ secrets clean"; else red "  ✗ SECRET DETECTED"; cat /tmp/ci_sec.out; fail=1; fi
+ratchet "swallowed-write-errors" "$(count_swallowed)" "$(b no-swallowed-write-errors violations)"
+design_prepare
+for rule in $DESIGN_RULES; do ratchet "design/$rule" "$(count_design $rule)" "$(b design-system $rule)"; done
+if secrets_ok; then grn "  ✓ secrets clean"; else red "  ✗ SECRET DETECTED"; cat "$CI_TMP_DIR/ci_sec.out"; fail=1; fi
 ylw "  • schema-baked-labels $(count_labels) (advisory, non-blocking)"
 
 echo "──"

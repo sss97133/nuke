@@ -22,6 +22,8 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import Anthropic from "npm:@anthropic-ai/sdk@0.39.0";
 import { requireWriteAuth } from "../_shared/writeGuard.ts";
+import { projectSecretKey } from "../_shared/supabaseKeys.ts";
+import { mustWrite } from '../_shared/writeResult.ts';
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -96,7 +98,7 @@ Deno.serve(async (req) => {
 
   const supabase = createClient(
     Deno.env.get("SUPABASE_URL") ?? "",
-    Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? ""
+    projectSecretKey() ?? ""
   );
 
   const anthropic = new Anthropic({
@@ -264,10 +266,10 @@ Deno.serve(async (req) => {
     }
 
     // Mark observations as processed
-    await supabase
+    mustWrite('vehicle_observations update', await supabase
       .from("vehicle_observations")
       .update({ is_processed: true })
-      .in("id", observationIds);
+      .in("id", observationIds));
 
     return new Response(JSON.stringify({
       success: true,

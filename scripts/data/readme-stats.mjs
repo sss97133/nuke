@@ -2,20 +2,28 @@
 /**
  * scripts/data/readme-stats.mjs
  *
- * Measures the system and rewrites three generated blocks:
+ * Measures the system and rewrites four generated blocks:
  *   README.md               <!-- stats:start --> … <!-- stats:end -->          (the live database)
+ *   README.md               <!-- intake:start --> … <!-- intake:end -->        (rows landed per day, per layer)
  *   docs/library/README.md  <!-- library-stats:start --> … <!-- library-stats:end --> (the library's own files)
  *   docs/POSITIONING.md     <!-- evidence:start --> … <!-- evidence:end -->    (graded predictions, stack registry, vein V012)
+ *   nuke_frontend/public/evidence.md   the same evidence block, whole, served as /evidence.md for the About page
  *
  * Every database query runs inside `begin read only … commit` on the Supabase
  * Management API (the same path scripts/data/q.sh uses), so this script cannot
  * write to the database. It needs SUPABASE_ACCESS_TOKEN in the environment.
  *
- * All three blocks are measured before any file is written. When a query fails, the error is printed, the exit code
+ * All four blocks are measured before any file is written. When a query fails, the error is printed, the exit code
  * is 1 and no file changes, so the previous blocks stay in place; each block carries its own measured-at time, so a
- * stale one shows its age.
+ * stale one shows its age. The one exception is a statement timeout on an intake read: that cell prints "timed out".
  *
- *   dotenvx run -q -- node scripts/data/readme-stats.mjs            # rewrite the three blocks
+ * The database block also names every INVALID index in public (scripts/ci/invalid-indexes.mjs) and every owner-run view
+ * in public that anon or authenticated can write through (scripts/ci/owner-writable-views.mjs). When an index appears
+ * that the previous block did not list, or any such view exists outside the allowed one, the files are still written,
+ * so the next session reads the name, and the run then exits 1; update-stats.yml commits the block even after that
+ * failure.
+ *
+ *   dotenvx run -q -- node scripts/data/readme-stats.mjs            # rewrite the four blocks
  *   dotenvx run -q -- node scripts/data/readme-stats.mjs --dry-run  # print them only
  *
  * Scheduled daily by .github/workflows/update-stats.yml. Every number in those
@@ -25,6 +33,8 @@
 import { lstatSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { INVALID_INDEXES_SQL, invalidIndexesLine, riseReport } from '../ci/invalid-indexes.mjs';
+import { OWNER_WRITABLE_VIEWS_SQL, ownerWritableViewsLine, ownerWritableViewsReport } from '../ci/owner-writable-views.mjs';
 
 const PROJECT = 'qkgaybvrernstplzjaam';
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..');
@@ -32,6 +42,7 @@ const README = resolve(ROOT, 'README.md');
 const LIBRARY = resolve(ROOT, 'docs', 'library');
 const LIBRARY_README = resolve(LIBRARY, 'README.md');
 const POSITIONING = resolve(ROOT, 'docs', 'POSITIONING.md');
+const EVIDENCE_PUBLIC = resolve(ROOT, 'nuke_frontend', 'public', 'evidence.md');
 const DRY = process.argv.includes('--dry-run');
 
 const token = process.env.SUPABASE_ACCESS_TOKEN;
@@ -42,8 +53,10 @@ if (!token) {
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
-async function q(sql, attempt = 1, t0 = Date.now()) {
-  const query = `begin read only; set local statement_timeout = '45s'; ${sql}; commit;`;
+// timeout: this query's statement_timeout. 45 s by default; the intake reads of the two largest tables pass 55 s
+// (on 2026-10-13 the API returned a 55 s cancel at 56 s, inside its own limit).
+async function q(sql, { timeout = '45s', attempt = 1, t0 = Date.now() } = {}) {
+  const query = `begin read only; set local statement_timeout = '${timeout}'; ${sql}; commit;`;
   const res = await fetch(`https://api.supabase.com/v1/projects/${PROJECT}/database/query`, {
     method: 'POST',
     headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
@@ -56,7 +69,7 @@ async function q(sql, attempt = 1, t0 = Date.now()) {
     const wait = (Number(res.headers.get('retry-after')) || 15 * attempt) * 1000;
     console.error(`readme-stats: ${res.status} from the API, retrying in ${wait / 1000}s (${attempt}/5)`);
     await sleep(wait);
-    return q(sql, attempt + 1, t0);
+    return q(sql, { timeout, attempt: attempt + 1, t0 });
   }
   let rows = null;
   try { rows = JSON.parse(text); } catch { /* handled below */ }
@@ -99,16 +112,16 @@ const pct = (part, whole) => {
 };
 const stamp = () => `${new Date().toISOString().slice(0, 16).replace('T', ' ')} UTC`;
 
-// The file's text with the block between its two markers replaced. Throws when a marker is missing; writes nothing.
-function spliceBlock(file, start, end, block) {
-  const text = readFileSync(file, 'utf8');
+// The text with the block between its two markers replaced. Throws when a marker is missing; writes nothing.
+function splice(text, file, start, end, block) {
   const a = text.indexOf(start);
   const b = text.indexOf(end);
   if (a < 0 || b < 0 || b < a) throw new Error(`${relative(ROOT, file)} has no "${start} … ${end}" block`);
   return text.slice(0, a) + block + text.slice(b + end.length);
 }
+const spliceBlock = (file, start, end, block) => splice(readFileSync(file, 'utf8'), file, start, end, block);
 
-async function databaseBlock() {
+async function databaseBlock(invalid, writable) {
   // Sequential on purpose: eight light queries, one at a time, against production.
   const [pg] = await q(`select split_part(version(), ' ', 2) as pg`);
   const [atlas] = await q(`
@@ -172,6 +185,10 @@ async function databaseBlock() {
       `${num(atlas.undeclared)} tables with an undeclared writer in the last 30 days · ` +
       `${num(jobs.active)} scheduled jobs active, ${num(jobs.failing)} with a failure in the last 24 h · ` +
       `Postgres ${pg.pg}.`,
+    '',
+    invalidIndexesLine(invalid),
+    '',
+    ownerWritableViewsLine(writable),
     '<!-- stats:end -->',
   ].join('\n');
 }
@@ -368,22 +385,171 @@ async function evidenceBlock() {
   }
 }
 
+// ---- README.md: intake and processing rates ----------------------------------------------------------------------
+// Rows landed per UTC day at each layer over the last seven complete days, so a stalled layer shows the next morning.
+// Landed counts are exact index range scans. The vision and sentiment clocks have no index, so they are counted on a
+// page sample (tablesample system) and scaled up, with the sample's n beside them.
+
+const DAYS = 7;
+// A live lot is overdue when its next scheduled read is this many hours past (the bat-live-pull-check threshold).
+const OVERDUE_HOURS = 2;
+// Percent of pages sampled. On 2026-10-13 a 1% sample of vehicle_images (49 GB, 8 rows a page) passed 55 s, and 0.1%
+// read 54,695 rows in 7 s; 1% of auction_comments read 200,465 rows in 15 s.
+const SAMPLE = { auction_comments: 1, vehicle_images: 0.1 };
+// SYSTEM sampling keeps each page with probability p, so a day whose rows sit on P pages escapes the sample with
+// probability (1 - p)^P. This is the smallest P that the sample catches 95% of the time.
+const pages95 = (percent) => Math.ceil(Math.log(0.05) / Math.log(1 - percent / 100));
+
+// A statement timeout returns null, printed as "timed out" in its cells; any other error still stops the run.
+async function qOrTimeout(sql, opts) {
+  try {
+    return await q(sql, opts);
+  } catch (e) {
+    if (!/57014|statement timeout/.test(e.message)) throw e;
+    console.error(`readme-stats: timed out, printed as such: ${sql.replace(/\s+/g, ' ').trim().slice(0, 110)}`);
+    return null;
+  }
+}
+
+async function intakeBlock() {
+  try {
+    // The seven complete UTC days before today, newest first, fixed once so every query counts the same days.
+    const today = new Date().toISOString().slice(0, 10);
+    const days = Array.from({ length: DAYS }, (_, i) =>
+      new Date(Date.parse(`${today}T00:00:00Z`) - (i + 1) * 86400000).toISOString().slice(0, 10));
+    const at = (d) => `'${d}T00:00:00Z'::timestamptz`;
+    const from = at(days[DAYS - 1]);
+    const to = at(today);
+    const inDay = (col, d) => `${col} >= ${at(d)} and ${col} < ${at(d)} + interval '1 day'`;
+    const byDay = (rows) => Object.fromEntries(rows.map((r) => [r.day, r]));
+
+    // Sequential on purpose, like the blocks above.
+    const comments = byDay(await q(`
+      select (created_at at time zone 'utc')::date::text as day, count(*) as n
+        from auction_comments
+       where created_at >= ${from} and created_at < ${to}
+       group by 1`));
+    const vehicles = byDay(await q(`
+      select (created_at at time zone 'utc')::date::text as day, count(*) as n,
+             count(*) filter (where canonical_platform = 'bat')        as bat,
+             count(*) filter (where canonical_platform = 'craigslist') as craigslist
+        from vehicles
+       where created_at >= ${from} and created_at < ${to}
+       group by 1`));
+    // vehicle_images has no index led by created_at, but (user_id, created_at) is indexed and 99.9% of its rows have no
+    // user_id, so each day is two range scans: user_id is null, then user_id is not null. One day per statement: all
+    // seven days in one statement passed 55 s on 2026-10-13, while single days took 4 to 11 s.
+    const images = {};
+    for (const d of days) {
+      const r = await qOrTimeout(`
+        select (select count(*) from vehicle_images where user_id is null and ${inDay('created_at', d)})
+             + (select count(*) from vehicle_images where user_id is not null and ${inDay('created_at', d)}) as n`,
+        { timeout: '55s' });
+      images[d] = r ? r[0].n : null;
+    }
+    const sampleByDay = async (table, column) => {
+      const r = await qOrTimeout(`
+        select count(*) as sampled,
+               ${days.map((d, i) => `count(*) filter (where ${inDay(column, d)}) as d${i}`).join(',\n               ')}
+          from ${table} tablesample system (${SAMPLE[table]})`, { timeout: '55s' });
+      return r ? r[0] : null;
+    };
+    const sentiment = await sampleByDay('auction_comments', 'analyzed_at');
+    const vision = await sampleByDay('vehicle_images', 'vision_analyzed_at');
+    // monitored_auctions keeps one row per lot, holding only that lot's latest read.
+    const reads = byDay(await q(`
+      select (m.last_synced_at at time zone 'utc')::date::text as day, count(*) as n
+        from monitored_auctions m join live_auction_sources s on s.id = m.source_id
+       where s.slug = 'bat' and m.last_synced_at >= ${from} and m.last_synced_at < ${to}
+       group by 1`));
+    const [pull] = await q(`
+      select count(*) as lots,
+             count(*) filter (where m.is_live and m.auction_end_time > now()) as live,
+             count(*) filter (where m.is_live and m.auction_end_time > now()
+                                and m.next_poll_at < now() - interval '${OVERDUE_HOURS} hours') as overdue,
+             count(*) filter (where m.is_live and m.auction_end_time > now()
+                                and m.last_synced_at is null) as never_read
+        from monitored_auctions m join live_auction_sources s on s.id = m.source_id
+       where s.slug = 'bat'`);
+    const [cov] = await q(`
+      select sum(extracted) as extracted, sum(total_targets) as targets, count(*) as sources
+        from source_target_coverage`);
+    if (!Number(pull.lots)) throw new Error('monitored_auctions has no rows for the source with slug bat');
+    need(cov.extracted, 'source_target_coverage extracted');
+    need(cov.targets, 'source_target_coverage total_targets');
+
+    const cnt = (row, key = 'n') => num(row?.[key] ?? 0);
+    const exact = (v) => (v === null ? 'timed out' : num(v));
+    const est = (sample, i, table) => {
+      if (!sample) return 'timed out';
+      const k = Number(sample[`d${i}`]);
+      return k === 0 ? '0 sampled' : `≈${num(Math.round((k * 100) / SAMPLE[table]))} (${num(k)} sampled)`;
+    };
+    const about = (sample, table) => `${SAMPLE[table]}% page sample, ${sample ? `n=${num(sample.sampled)}` : 'timed out'}`;
+
+    return [
+      '<!-- intake:start -->',
+      `Measured ${stamp()} from the live database by [\`scripts/data/readme-stats.mjs\`](scripts/data/readme-stats.mjs), ` +
+        'run daily by [`update-stats.yml`](.github/workflows/update-stats.yml). ' +
+        'Rows landed per complete UTC day at each layer. Landed counts are exact; columns marked ≈ scale up a page sample ' +
+        'whose n is in the header. Read-only. Nothing here is typed by hand.',
+      '',
+      `| Day (UTC) | Comments landed | Comments sentiment-scored ≈ (${about(sentiment, 'auction_comments')}) ` +
+        `| Vehicles landed (BaT / Craigslist) | Images landed | Images vision-analyzed ≈ (${about(vision, 'vehicle_images')}) ` +
+        '| BaT lots read by the live pull (latest read per lot, so older days undercount) |',
+      '|---|---:|---:|---:|---:|---:|---:|',
+      ...days.map((d, i) =>
+        `| ${d} | ${cnt(comments[d])} | ${est(sentiment, i, 'auction_comments')} ` +
+        `| ${cnt(vehicles[d])} (${cnt(vehicles[d], 'bat')} / ${cnt(vehicles[d], 'craigslist')}) | ${exact(images[d])} ` +
+        `| ${est(vision, i, 'vehicle_images')} | ${cnt(reads[d])} |`),
+      '',
+      `- **Live pull at measurement:** ${num(pull.overdue)} of ${num(pull.live)} live BaT lots are more than ${OVERDUE_HOURS} h ` +
+        `past their next scheduled read, and ${num(pull.never_read)} live lots have never been read ` +
+        '(`monitored_auctions.next_poll_at`, `last_synced_at`).',
+      `- **Source coverage:** ${num(cov.extracted)} of ${num(cov.targets)} known listing targets extracted ` +
+        `(${pct(cov.extracted, cov.targets)}), across ${num(cov.sources)} sources (\`source_target_coverage\`).`,
+      '- **Clocks:** comments `auction_comments.created_at`, sentiment `auction_comments.analyzed_at`, vehicles ' +
+        '`vehicles.created_at` split by `canonical_platform`, images `vehicle_images.created_at`, vision ' +
+        "`vehicle_images.vision_analyzed_at`, live-pull reads `monitored_auctions.last_synced_at`, which keeps only each lot's latest read.",
+      "- **Sampled zeros:** `tablesample system` keeps whole pages at random, so a day's rows reach the sample 95% of the time " +
+        `only when they span at least ${num(pages95(SAMPLE.auction_comments))} comment pages or ` +
+        `${num(pages95(SAMPLE.vehicle_images))} image pages. "0 sampled" rules out steady processing, not a small run.`,
+      '<!-- intake:end -->',
+    ].join('\n');
+  } catch (e) {
+    throw new Error(`intake block for README.md failed, previous blocks left in place: ${e.message}`);
+  }
+}
+
 async function main() {
-  const db = await databaseBlock();
+  const invalid = await q(INVALID_INDEXES_SQL);
+  const writable = await q(OWNER_WRITABLE_VIEWS_SQL);
+  const db = await databaseBlock(invalid, writable);
+  const intake = await intakeBlock();
   const lib = libraryBlock();
   const evidence = await evidenceBlock();
   if (DRY) {
-    console.log(db, '\n', lib, '\n', evidence);
+    console.log(db, '\n', intake, '\n', lib, '\n', evidence);
     return;
   }
-  // Splice all three before writing any, so a missing marker in one file leaves every file as it was.
+  // The index check compares with what the block about to be replaced listed, so it reads before the overwrite.
+  const alarms = [riseReport(invalid, readFileSync(README, 'utf8')), ownerWritableViewsReport(writable)].filter(Boolean);
+  // Splice all before writing any, so a missing marker in one file leaves every file as it was.
+  const readme = spliceBlock(README, '<!-- stats:start -->', '<!-- stats:end -->', db);
   const writes = [
-    [README, spliceBlock(README, '<!-- stats:start -->', '<!-- stats:end -->', db)],
+    [README, splice(readme, README, '<!-- intake:start -->', '<!-- intake:end -->', intake)],
     [LIBRARY_README, spliceBlock(LIBRARY_README, '<!-- library-stats:start -->', '<!-- library-stats:end -->', lib)],
     [POSITIONING, spliceBlock(POSITIONING, '<!-- evidence:start -->', '<!-- evidence:end -->', evidence)],
+    // The About page (nuke_frontend/src/pages/About.tsx) fetches this file and renders the block with its date.
+    [EVIDENCE_PUBLIC, evidence + '\n'],
   ];
   for (const [file, text] of writes) writeFileSync(file, text);
-  console.log(db, '\n', lib, '\n', evidence);
+  console.log(db, '\n', intake, '\n', lib, '\n', evidence);
+  if (alarms.length) {
+    // After the write on purpose: the README now names the index or the view. Exit 1 turns the daily run red.
+    for (const alarm of alarms) console.error(`readme-stats: ${alarm}`);
+    process.exitCode = 1;
+  }
 }
 
 main().catch((e) => {

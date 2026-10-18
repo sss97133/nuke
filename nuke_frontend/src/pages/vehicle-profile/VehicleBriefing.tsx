@@ -15,7 +15,8 @@
 import React, { useState, useEffect } from 'react';
 import { useVehicleProfile } from './VehicleProfileContext';
 import { supabase } from '../../lib/supabase';
-import type { VehicleIntel, CommentIntel, Apparition, CompSale } from './hooks/useVehicleIntel';
+import SoldContext from './SoldContext';
+import type { VehicleIntel } from './hooks/useVehicleIntel';
 import { useVehiclePriceFacts, priceKindLabel, type PriceFacts } from './hooks/useVehiclePriceFacts';
 
 // ---------------------------------------------------------------------------
@@ -34,22 +35,26 @@ interface EyeRead {
 }
 
 function useEyeRead(vehicleId: string | undefined): EyeRead | null {
-  const [read, setRead] = useState<EyeRead | null>(null);
+  const [read, setRead] = useState<{ vehicleId: string; value: EyeRead } | null>(null);
   useEffect(() => {
+    setRead(null);
     if (!vehicleId) return;
     let alive = true;
-    supabase
-      .from('vehicle_condition_scores')
-      .select('condition_score, condition_tier, descriptor_summary, observation_count, computed_at, computation_version')
-      .eq('vehicle_id', vehicleId)
-      .maybeSingle()
-      .then(({ data }) => {
-        if (!alive || !data) return;
+    const loadRead = async () => {
+      try {
+        const { data, error } = await supabase
+          .from('vehicle_condition_scores')
+          .select('condition_score, condition_tier, descriptor_summary, observation_count, computed_at, computation_version')
+          .eq('vehicle_id', vehicleId)
+          .maybeSingle();
+        if (!alive || error || !data) return;
         const ds: any = data.descriptor_summary || {};
-        const band = Array.isArray(ds.as_is_band_usd) && ds.as_is_band_usd[0] != null
-          ? [Number(ds.as_is_band_usd[0]), Number(ds.as_is_band_usd[1])] as [number, number]
+        const bounds = ds.as_is_band_usd;
+        const band = Array.isArray(bounds) && [bounds[0], bounds[1]].every(value =>
+          (typeof value === 'number' || (typeof value === 'string' && value.trim() !== '')) && Number.isFinite(Number(value)))
+          ? [Number(bounds[0]), Number(bounds[1])] as [number, number]
           : null;
-        setRead({
+        setRead({ vehicleId, value: {
           band,
           conditionClass: typeof ds.condition_class === 'string' ? ds.condition_class.split('(')[0].trim() : null,
           tier: data.condition_tier,
@@ -57,11 +62,15 @@ function useEyeRead(vehicleId: string | undefined): EyeRead | null {
           reportedInputCount: data.observation_count,
           method: data.computation_version || 'appraisal',
           computedAt: data.computed_at,
-        });
-      });
+        } });
+      } catch {
+        if (alive) setRead(null);
+      }
+    };
+    void loadRead();
     return () => { alive = false; };
   }, [vehicleId]);
-  return read;
+  return read && read.vehicleId === vehicleId ? read.value : null;
 }
 
 // ---------------------------------------------------------------------------
@@ -172,14 +181,6 @@ function generateHeadline(
     return { text: flags[0].f, severity: 'info' };
   }
 
-  // Priority 6: Strong documentation
-  if (observationCount >= 10) {
-    return {
-      text: `${observationCount} observations tracked across the system`,
-      severity: 'neutral',
-    };
-  }
-
   // Priority 6: Estimate available, and a market event to defend it
   if (estimate && estimate > 0 && marketDefends(priceFacts).estimate) {
     const fmt = (n: number) => '$' + Math.round(n).toLocaleString();
@@ -233,44 +234,11 @@ const StatPill: React.FC<StatPillProps> = ({ label, value, accent }) => (
 );
 
 // ---------------------------------------------------------------------------
-// Comp row — mini comparable sale
-// ---------------------------------------------------------------------------
-
-const CompRow: React.FC<{ comp: CompSale }> = ({ comp }) => {
-  const fmt = (n: number) => '$' + Math.round(n).toLocaleString();
-  return (
-    <div style={{
-      display: 'grid',
-      gridTemplateColumns: '32px 1fr auto auto',
-      gap: '6px',
-      alignItems: 'center',
-      padding: '3px 0',
-      borderBottom: '1px solid var(--border, #eee)',
-      ...MONO,
-    }}>
-      {comp.thumbnail ? (
-        <img src={comp.thumbnail} alt="" style={{ width: 32, height: 24, objectFit: 'cover' }} />
-      ) : (
-        <div style={{ width: 32, height: 24, background: 'var(--surface-elevated, #f5f5f5)' }} />
-      )}
-      <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-        {comp.year ? `'${String(comp.year).slice(2)} ` : ''}{comp.model || '—'}
-      </span>
-      <span style={{ fontWeight: 700, color: 'var(--vp-sold, #000)' }}>{fmt(comp.sale_price)}</span>
-      <span style={{ color: 'var(--text-secondary, #999)', fontSize: '8px' }}>
-        {comp.sale_date ? new Date(comp.sale_date).toLocaleDateString('en-US', { month: 'short', year: '2-digit' }) : ''}
-      </span>
-    </div>
-  );
-};
-
-// ---------------------------------------------------------------------------
 // Main component
 // ---------------------------------------------------------------------------
 
-const VehicleBriefing: React.FC = () => {
+const VehicleBriefing: React.FC<{ collapsed?: boolean }> = ({ collapsed = false }) => {
   const { vehicle, vehicleIntel, vehicleIntelLoading, observationCount } = useVehicleProfile();
-  const [showComps, setShowComps] = useState(false);
   const eyeRead = useEyeRead(vehicle?.id);
   const { priceFacts, priceSettled } = useVehiclePriceFacts(vehicle?.id);
 
@@ -278,9 +246,7 @@ const VehicleBriefing: React.FC = () => {
 
   const headline = generateHeadline(vehicle, vehicleIntel, observationCount, eyeRead, priceFacts);
   const estimate = vehicle.nuke_estimate;
-  const scores = vehicleIntel?.scores;
   const comps = vehicleIntel?.recent_comps;
-  const apparitions = vehicleIntel?.apparitions;
   const sentiment = vehicleIntel?.comment_intel;
   const defended = marketDefends(priceFacts);
 
@@ -310,33 +276,14 @@ const VehicleBriefing: React.FC = () => {
     });
   }
 
-  if (defended.deal && scores?.deal_score != null && scores.deal_score !== 0) {
-    const ds = scores.deal_score;
-    const label = ds > 50 ? 'GOOD DEAL' : ds > 0 ? 'FAIR' : 'ABOVE MKT';
-    const accent = ds > 50 ? 'var(--vp-brg, #004225)' : ds > 0 ? 'var(--text)' : 'var(--vp-danger, #d13438)';
-    pills.push({ label: 'DEAL', value: label, accent });
-  }
-
-  if (scores?.heat_score != null && scores.heat_score > 0) {
-    pills.push({ label: 'HEAT', value: String(scores.heat_score) });
-  }
-
   if (sentiment?.comment_count != null) {
     pills.push({ label: 'SUMMARY COUNT', value: `${sentiment.comment_count} reported` });
   }
 
-  if (apparitions && apparitions.length > 1) {
-    pills.push({ label: 'HISTORY', value: `${apparitions.length} appearances` });
-  }
-
-  if (observationCount > 0) {
-    pills.push({ label: 'OBSERVATIONS', value: String(observationCount) });
-  }
-
   // Self-guard: nothing to show
-  if (!headline && pills.length === 0) return null;
+  if (!headline && pills.length === 0 && !comps?.length) return null;
 
-  return (
+  const content = (
     <div style={{ margin: '0 12px 8px' }}>
       {/* L0: Headline */}
       {headline && (
@@ -367,39 +314,13 @@ const VehicleBriefing: React.FC = () => {
         </div>
       )}
 
-      {/* Expandable comps preview */}
-      {comps && comps.length > 0 && (
-        <div>
-          <button
-            onClick={() => setShowComps(!showComps)}
-            style={{
-              background: 'none',
-              border: 'none',
-              cursor: 'pointer',
-              padding: '2px 0',
-              fontFamily: 'var(--vp-font-sans, Arial, sans-serif)',
-              fontSize: '8px',
-              color: 'var(--text-secondary, #666)',
-              letterSpacing: '0.05em',
-            }}
-          >
-            {showComps ? '▲ HIDE' : '▼ VIEW'} {comps.length} RECENT SOLD RECORD{comps.length !== 1 ? 'S' : ''}
-          </button>
-          {showComps && (
-            <div style={{ marginTop: '4px' }}>
-              <div title={vehicleIntel?.recent_comps_scope?.basis || undefined} style={{ fontSize: '9px', color: 'var(--text-secondary, #666)', marginBottom: '4px' }}>
-                {vehicleIntel?.recent_comps_scope?.label && <span>{vehicleIntel.recent_comps_scope.label} · </span>}
-                Condition not matched
-              </div>
-              {comps.slice(0, 5).map((comp, i) => (
-                <CompRow key={comp.id || i} comp={comp} />
-              ))}
-            </div>
-          )}
-        </div>
-      )}
+
     </div>
   );
+  return <>
+    {comps && <SoldContext comps={comps} scope={vehicleIntel?.recent_comps_scope} subject={vehicle} recordedSale={priceFacts?.price_kind === 'sold' ? priceFacts.price_amount : null} />}
+    {(headline || pills.length > 0) && (collapsed ? <details className="vp-stored-interpretations"><summary>Stored model interpretations</summary>{content}</details> : content)}
+  </>;
 };
 
 export default VehicleBriefing;

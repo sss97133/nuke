@@ -48,9 +48,6 @@ export interface SellerVehicleRecord {
 
 export interface SellerTrackRecord {
   vehicles_sold: SellerVehicleRecord[];
-  gmv_by_year: Record<string, number>;
-  volume_by_quarter: Array<{ quarter: string; count: number }>;
-  state_distribution: Record<string, number>;
 }
 
 export interface OrganizationProfileData {
@@ -69,6 +66,10 @@ export interface OrganizationProfileData {
 /**
  * Get comprehensive user profile data (BaT-style)
  */
+// The vehicle fields the profile tabs read from an embedded vehicle. A vehicles(*) embed fails since the
+// owner's purchase facts are not granted to readers (lib/privateMoney).
+const PROFILE_VEHICLE_COLUMNS = 'id, year, make, model, trim, vin, is_public, primary_image_url';
+
 export async function getUserProfileData(userId: string): Promise<UserProfileData> {
   // Profile + claimed identities are independent — fetch in parallel.
   const [profileRes, identitiesRes] = await Promise.all([
@@ -233,7 +234,8 @@ export async function getPublicProfileByExternalIdentity(externalIdentityId: str
     avatar_url: null,
     bio: null,
     location: null,
-    created_at: externalIdentity.first_seen_at || new Date().toISOString(),
+    created_at: externalIdentity.created_at ?? null,
+    member_since: null as string | null,
   };
 
   // Get listings where this identity is seller
@@ -241,21 +243,9 @@ export async function getPublicProfileByExternalIdentity(externalIdentityId: str
     .from('vehicle_events')
     .select(`
       *,
-      vehicle:vehicles(*)
+      vehicle:vehicles(${PROFILE_VEHICLE_COLUMNS})
     `)
     .eq('seller_external_identity_id', externalIdentity.id)
-    .eq('source_platform', 'bat')
-    .order('ended_at', { ascending: false })
-    .limit(100);
-
-  // Get listings where this identity is buyer
-  const { data: batBids } = await supabase
-    .from('vehicle_events')
-    .select(`
-      *,
-      vehicle:vehicles(*)
-    `)
-    .eq('buyer_external_identity_id', externalIdentity.id)
     .eq('source_platform', 'bat')
     .order('ended_at', { ascending: false })
     .limit(100);
@@ -266,13 +256,25 @@ export async function getPublicProfileByExternalIdentity(externalIdentityId: str
     .from('auction_comments')
     .select(`
       *,
-      auction:auction_events(*, vehicle:vehicles(*))
+      auction:auction_events(*, vehicle:vehicles(${PROFILE_VEHICLE_COLUMNS}))
     `)
     .eq('external_identity_id', externalIdentity.id)
     .is('bid_amount', null)
     .order('posted_at', { ascending: false })
     .limit(100);
   if (commentsError) throw commentsError;
+  const [bidRead, firstActivityRead] = await Promise.all([
+    supabase.from('auction_comments')
+      .select(`id, vehicle_id, auction_event_id, bid_amount, posted_at, auction:auction_events(*, vehicle:vehicles(${PROFILE_VEHICLE_COLUMNS}))`, { count: 'exact' })
+      .eq('external_identity_id', externalIdentity.id).not('bid_amount', 'is', null)
+      .order('posted_at', { ascending: false }).limit(100),
+    supabase.from('auction_comments').select('posted_at')
+      .eq('external_identity_id', externalIdentity.id).not('posted_at', 'is', null)
+      .order('posted_at', { ascending: true }).limit(1),
+  ]);
+  if (bidRead.error) throw bidRead.error;
+  if (firstActivityRead.error) throw firstActivityRead.error;
+  syntheticProfile.member_since = firstActivityRead.data?.[0]?.posted_at ?? null;
   // Preserve the existing BaT source-link shape without duplicating comments.
   const comments = (auctionComments || []).map(comment => comment.platform === 'bat'
     ? { ...comment, listing: comment.auction }
@@ -283,7 +285,7 @@ export async function getPublicProfileByExternalIdentity(externalIdentityId: str
     .from('vehicle_events')
     .select(`
       *,
-      vehicle:vehicles(*)
+      vehicle:vehicles(${PROFILE_VEHICLE_COLUMNS})
     `)
     .eq('buyer_external_identity_id', externalIdentity.id)
     .eq('event_status', 'sold')
@@ -294,18 +296,18 @@ export async function getPublicProfileByExternalIdentity(externalIdentityId: str
   // Calculate stats
   const stats: ProfileStats = {
     total_listings: listings?.length || 0,
-    total_bids: batBids?.length || 0,
+    total_bids: bidRead.count ?? bidRead.data?.length ?? 0,
     total_comments: comments.length,
     total_auction_wins: auctionWins?.length || 0,
     total_success_stories: 0,
-    member_since: externalIdentity.first_seen_at || externalIdentity.created_at,
+    member_since: syntheticProfile.member_since,
   };
 
   return {
     profile: syntheticProfile,
     stats,
     listings: listings || [],
-    bids: batBids || [],
+    bids: bidRead.data || [],
     comments,
     auction_wins: auctionWins || [],
     success_stories: [],
@@ -331,7 +333,7 @@ export async function getOrganizationProfileData(orgId: string): Promise<Organiz
     .from('vehicle_events')
     .select(`
       *,
-      vehicle:vehicles(*)
+      vehicle:vehicles(${PROFILE_VEHICLE_COLUMNS})
     `)
     .eq('source_organization_id', orgId)
     .eq('source_platform', 'bat')
@@ -366,7 +368,7 @@ export async function getOrganizationProfileData(orgId: string): Promise<Organiz
           .from('auction_events')
           .select(`
             *,
-            vehicle:vehicles(*)
+            vehicle:vehicles(${PROFILE_VEHICLE_COLUMNS})
           `)
           .in('vehicle_id', ids)
           .order('auction_end_date', { ascending: false })
@@ -419,7 +421,7 @@ export async function getOrganizationProfileData(orgId: string): Promise<Organiz
         .from('auction_comments')
         .select(`
           *,
-          listing:auction_events(*, vehicle:vehicles(*))
+          listing:auction_events(*, vehicle:vehicles(${PROFILE_VEHICLE_COLUMNS}))
         `)
         // Filter the canonical author key, external_identity_id: 99.9% filled
         // after the 2026-10-06 backfill (key_auction_comment_authors) and served
@@ -439,7 +441,7 @@ export async function getOrganizationProfileData(orgId: string): Promise<Organiz
     .from('vehicle_events')
     .select(`
       *,
-      vehicle:vehicles(*)
+      vehicle:vehicles(${PROFILE_VEHICLE_COLUMNS})
     `)
     .eq('source_organization_id', orgId)
     .eq('event_status', 'sold')
@@ -553,67 +555,12 @@ export async function getOrganizationProfileData(orgId: string): Promise<Organiz
       }
     }
 
-    // State name normalization (full name → 2-letter abbreviation)
-    const STATE_ABBR: Record<string, string> = {
-      alabama:'AL',alaska:'AK',arizona:'AZ',arkansas:'AR',california:'CA',colorado:'CO',
-      connecticut:'CT',delaware:'DE',florida:'FL',georgia:'GA',hawaii:'HI',idaho:'ID',
-      illinois:'IL',indiana:'IN',iowa:'IA',kansas:'KS',kentucky:'KY',louisiana:'LA',
-      maine:'ME',maryland:'MD',massachusetts:'MA',michigan:'MI',minnesota:'MN',
-      mississippi:'MS',missouri:'MO',montana:'MT',nebraska:'NE',nevada:'NV',
-      'new hampshire':'NH','new jersey':'NJ','new mexico':'NM','new york':'NY',
-      'north carolina':'NC','north dakota':'ND',ohio:'OH',oklahoma:'OK',oregon:'OR',
-      pennsylvania:'PA','rhode island':'RI','south carolina':'SC','south dakota':'SD',
-      tennessee:'TN',texas:'TX',utah:'UT',vermont:'VT',virginia:'VA',washington:'WA',
-      'west virginia':'WV',wisconsin:'WI',wyoming:'WY',
-    };
-    function normalizeState(s: string | null): string | null {
-      if (!s) return null;
-      const t = s.trim();
-      if (t.length === 2) return t.toUpperCase();
-      return STATE_ABBR[t.toLowerCase()] || t;
-    }
-
-    // Compute GMV by year, volume by quarter, state distribution from deduped vehicles
-    const gmvByYear: Record<string, number> = {};
-    const volumeMap: Record<string, number> = {};
-    const stateDistribution: Record<string, number> = {};
-
-    for (const row of bestByVehicle.values()) {
-      const v = row.vehicle;
-
-      // GMV by year
-      if (v.sale_price && v.sale_date) {
-        const yr = new Date(v.sale_date).getFullYear().toString();
-        gmvByYear[yr] = (gmvByYear[yr] || 0) + Number(v.sale_price);
-      }
-
-      // Volume by quarter
-      if (v.sale_date) {
-        const d = new Date(v.sale_date);
-        const q = `${d.getFullYear()} Q${Math.ceil((d.getMonth() + 1) / 3)}`;
-        volumeMap[q] = (volumeMap[q] || 0) + 1;
-      }
-
-      // State distribution (normalized)
-      const st = normalizeState(v.state);
-      if (st) {
-        stateDistribution[st] = (stateDistribution[st] || 0) + 1;
-      }
-    }
-
-    const volumeByQuarter = Object.entries(volumeMap)
-      .map(([quarter, count]) => ({ quarter, count }))
-      .sort((a, b) => a.quarter.localeCompare(b.quarter));
-
     sellerTrackRecord = {
       vehicles_sold: trackRecordVehicles.sort((a, b) => {
         const da = a.sale_date ? new Date(a.sale_date).getTime() : 0;
         const db = b.sale_date ? new Date(b.sale_date).getTime() : 0;
         return db - da;
       }),
-      gmv_by_year: gmvByYear,
-      volume_by_quarter: volumeByQuarter,
-      state_distribution: stateDistribution,
     };
   }
 
@@ -639,79 +586,6 @@ export async function getOrganizationProfileData(orgId: string): Promise<Organiz
     website_mapping: websiteMapping || null,
     seller_track_record: sellerTrackRecord,
   };
-}
-
-/**
- * Competitive context for an organization: state rank and volume peers
- */
-export interface CompetitiveContext {
-  state_rank: number | null;
-  state_total: number | null;
-  state: string | null;
-  volume_peers: Array<{ org_id: string; business_name: string; vehicle_count: number }>;
-}
-
-export async function getOrganizationCompetitiveContext(
-  orgId: string,
-  state: string | null
-): Promise<CompetitiveContext | null> {
-  if (!state) return null;
-
-  // Use SQL-based aggregation via RPC-style query for case-insensitive state matching
-  // Count vehicles per org in this state
-  const { data: stateOrgs, error } = await supabase
-    .from('organization_vehicles')
-    .select('organization_id, vehicle:vehicles!inner(state)')
-    .ilike('vehicle.state', state)
-    .eq('status', 'active');
-
-  if (error || !stateOrgs || stateOrgs.length === 0) {
-    // Fallback: try without inner join filter if PostgREST doesn't support ilike on joins
-    return null;
-  }
-
-  const orgCounts = new Map<string, number>();
-  for (const row of stateOrgs) {
-    const oid = (row as any).organization_id;
-    orgCounts.set(oid, (orgCounts.get(oid) || 0) + 1);
-  }
-
-  // Filter to orgs with 3+ vehicles
-  const qualifiedOrgs = [...orgCounts.entries()]
-    .filter(([, count]) => count >= 3)
-    .sort((a, b) => b[1] - a[1]);
-
-  const myCount = orgCounts.get(orgId) || 0;
-  if (myCount < 3) return null;
-
-  const stateRank = qualifiedOrgs.findIndex(([id]) => id === orgId) + 1;
-  const stateTotal = qualifiedOrgs.length;
-
-  // Find volume peers: orgs with similar total vehicle count (within +/-30%)
-  const peerCandidates = qualifiedOrgs
-    .filter(([id, count]) => id !== orgId && count >= myCount * 0.7 && count <= myCount * 1.3)
-    .slice(0, 5);
-
-  const volumePeers: CompetitiveContext['volume_peers'] = [];
-  if (peerCandidates.length > 0) {
-    const { data: peerOrgs } = await supabase
-      .from('businesses')
-      .select('id, business_name')
-      .in('id', peerCandidates.map(([id]) => id));
-
-    for (const [id, count] of peerCandidates) {
-      const org = peerOrgs?.find((o: any) => o.id === id);
-      if (org) {
-        volumePeers.push({
-          org_id: id,
-          business_name: (org as any).business_name,
-          vehicle_count: count,
-        });
-      }
-    }
-  }
-
-  return { state_rank: stateRank, state_total: stateTotal, state, volume_peers: volumePeers };
 }
 
 /**

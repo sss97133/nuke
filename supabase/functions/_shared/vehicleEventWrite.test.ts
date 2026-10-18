@@ -21,6 +21,7 @@ function stubClient(answers: Answer[]) {
   const chainFor = (call: Call) => {
     const chain = {
       eq(col: string, val: unknown) { call.filters.push([col, val]); return chain; },
+      is(col: string, val: unknown) { call.filters.push([col, val]); return chain; },
       select() { return chain; },
       limit() { return Promise.resolve(next()); },
     };
@@ -153,4 +154,37 @@ Deno.test('a row without its full key is skipped with the reason and touches not
     equal(await writeVehicleEventByKey(client, { ...ROW, ...patch }), { action: 'skipped', reason });
     equal(calls.length, 0);
   }
+});
+
+Deno.test('retained listing policy preserves availability, clock locks and prior metadata, with a version-checked update', async () => {
+  const metadata = { source_observed_at: '2026-01-03T00:00:00.000Z', clock_locked_by_supersession: true, keep: 1 };
+  const { client, calls } = stubClient([{ data: [{ id: 'e-cl', metadata }] }, { data: [{ id: 'e-cl' }] }]);
+  const observedAt = '2026-01-04T00:00:00.000Z';
+  const result = await writeVehicleEventByKey(client, { ...ROW, source_platform: 'craigslist', event_status: 'unknown',
+    metadata: { source_observed_at: observedAt } }, { preserveEventStatus: true, sourceObservedAt: observedAt });
+  equal(result, { action: 'updated_clock_locked', id: 'e-cl' });
+  const patch = calls[1].row as Record<string, unknown>;
+  equal('event_status' in patch, false);
+  equal('sold_at' in patch, false);
+  equal(patch.metadata, { ...metadata, source_observed_at: observedAt });
+  equal(calls[1].filters, [['id', 'e-cl'], ['metadata', JSON.stringify(metadata)]]);
+});
+
+Deno.test('a newer capture committing between read and update wins; zero affected rows is a retry conflict', async () => {
+  // The first answer is the old read. Before UPDATE, another writer stores a newer metadata version.
+  // PostgREST then returns no rows for the exact-version filter, instead of applying the old patch.
+  const metadata = { source_observed_at: '2026-01-03T00:00:00.000Z' };
+  const { client, calls } = stubClient([{ data: [{ id: 'e-cl', metadata }] }, { data: [] }]);
+  const observedAt = '2026-01-04T00:00:00.000Z';
+  equal(await writeVehicleEventByKey(client, { ...ROW, metadata: { source_observed_at: observedAt } },
+    { preserveEventStatus: true, sourceObservedAt: observedAt }), { action: 'skipped', reason: 'listing changed during projection; retry' });
+  equal(calls[1].filters, [['id', 'e-cl'], ['metadata', JSON.stringify(metadata)]]);
+});
+
+Deno.test('an insert race re-reads the winning newer capture and leaves its price and metadata intact', async () => {
+  const { client, calls } = stubClient([{ data: [] }, { error: { message: 'race', code: '23505' } },
+    { data: [{ id: 'e-cl', metadata: { source_observed_at: '2026-01-05T00:00:00.000Z' } }] }]);
+  equal(await writeVehicleEventByKey(client, ROW, { sourceObservedAt: '2026-01-04T00:00:00.000Z' }),
+    { action: 'skipped', reason: 'older source observation' });
+  equal(calls.map(c => c.op), ['select', 'insert', 'select']);
 });

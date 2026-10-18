@@ -2,29 +2,39 @@
  * writeGuard — no edge function that writes to the database runs for an anonymous caller.
  *
  * Who gets through:
- *   (a) the project's service_role key — cron (get_service_role_key_for_cron()), CI, scripts,
- *       function-to-function calls;
- *   (b) a signed-in user's JWT (role `authenticated`) — writes users trigger from nuke.ag;
+ *   (a) a project secret key (`sb_secret_…`): cron, CI, scripts, function-to-function calls. Any key in
+ *       SUPABASE_SECRET_KEYS (the guide puts every secret key there under its own name) and the platform's
+ *       SUPABASE_SERVICE_ROLE_KEY when it is a secret key.
+ *       A function receives the key as the caller sent it, so either header works:
+ *         `Authorization: Bearer sb_secret_…`, or `apikey: sb_secret_…` (the guide's choice), or both;
+ *   (b) a signed-in user's JWT (role `authenticated`), signed by the project's current asymmetric
+ *       key (ES256) — writes users trigger from nuke.ag;
  *   (c) with { apiKeys }: an `X-API-Key: nk_live_…` key, validated the same way apiKeyAuth.ts does;
  *   (d) with { allowAnonymous }: one narrow, function-argued exception (today only the public
  *       share-page verdict in ingest-observation). The function passes the predicate; the guard
  *       still records that the caller was anonymous.
- * Everything else — no token, the public anon key, a forged or expired JWT — is refused with 401.
+ * Everything else — no token, a publishable or legacy anon key, a legacy service_role key, any HS256
+ * token, a forged or expired JWT — is refused with 401.
  *
  * Why the anon key is refused: it ships in nuke.ag's JavaScript bundle, so it proves nothing.
  * Why signatures are checked here instead of trusting the gateway: CI deploys every function
  * with --no-verify-jwt, and even a gateway-verified anon JWT would still be anonymous.
  *
  * How a bearer token is judged, in order:
- *   1. exact match with SUPABASE_SERVICE_ROLE_KEY / SERVICE_ROLE_KEY env         → service_role
- *   2. decode: not a JWT, expired, role `anon`, or an unknown role               → refused
- *   3. signature: HS256 against the project JWT secret (JWT_SIGNING_SECRET env), or
- *      ES256/RS256 against the project JWKS (SUPABASE_JWKS env or /auth/v1/.well-known/jwks.json)
- *   4. if step 3 can't run or fails, the platform is the authority: GoTrue /auth/v1/user for a
- *      user token, a one-row PostgREST HEAD for a service token. Still failing → refused.
- *   The platform-injected SUPABASE_SERVICE_ROLE_KEY is NOT always byte-equal to the dashboard
- *   key that cron and CI send (measured 2026-09-27: different digests), which is why step 1
- *   alone would break every scheduled job and steps 3–4 exist.
+ *   1. exact match with a secret key this function holds (supabaseKeys.knownSecretKeys)   → service_role
+ *   2. any other `sb_secret_` key (created after this worker started, or deleted): a one-row
+ *      PostgREST HEAD with it as the apikey decides                                       → service_role or refused
+ *   3. any other `sb_` key (a publishable key)                                              → refused
+ *   4. decode: not a JWT, expired, role `anon`, an unknown role, or HS256                  → refused
+ *   5. signature: ES256/RS256 against the project JWKS (SUPABASE_JWKS env or
+ *      /auth/v1/.well-known/jwks.json)
+ *   6. no usable key or a failed check: the platform decides (GoTrue /auth/v1/user for a user token,
+ *      a one-row PostgREST HEAD for a service token). Still failing → refused.
+ *   HS256 is the legacy shared-secret scheme: the legacy anon and service_role keys and anything signed with
+ *   the legacy JWT secret, which is public (git history) and was revoked on 2026-10-14. Nothing here holds or
+ *   reads that secret or the legacy keys, and no HS256 token is accepted.
+ * When the bearer is refused and the `apikey` header holds a secret key, that key is judged too;
+ * nothing else on `apikey` counts.
  *
  * Usage — first statement of the handler; OPTIONS passes through untouched so the function's
  * own CORS preflight keeps working:
@@ -37,14 +47,13 @@
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { hashApiKey } from "./apiKeyAuth.ts";
+import { knownSecretKeys, projectPublishableKey, projectSecretKey } from "./supabaseKeys.ts";
 
-const SERVICE_KEY_ENV = ["SUPABASE_SERVICE_ROLE_KEY", "SERVICE_ROLE_KEY"];
-const JWT_SECRET_ENV = ["SUPABASE_JWT_SECRET", "JWT_SIGNING_SECRET", "VITE_SUPABASE_JWT_SECRET"];
 const REMOTE_TIMEOUT_MS = 6000;
 const JWKS_TTL_MS = 10 * 60 * 1000;
 
 export type WriteCaller =
-  | { kind: "service_role"; via: "env-match" | "jwt" | "remote" }
+  | { kind: "service_role"; via: "secret-key" | "jwt" | "remote" }
   | { kind: "user"; userId: string; via: "jwt" | "remote" }
   | { kind: "api_key"; userId: string | null; agentId: string | null; scopes: string[] }
   | { kind: "anonymous"; via: "exception" };
@@ -107,15 +116,12 @@ export function decodeJwt(token: string): DecodedJwt | null {
   }
 }
 
-async function verifyHs256(jwt: DecodedJwt, secret: string): Promise<boolean> {
-  const key = await crypto.subtle.importKey(
-    "raw",
-    new TextEncoder().encode(secret),
-    { name: "HMAC", hash: "SHA-256" },
-    false,
-    ["verify"],
-  );
-  return await crypto.subtle.verify("HMAC", key, jwt.signature, new TextEncoder().encode(jwt.signingInput));
+/** Constant-time comparison for opaque keys. */
+function sameKey(a: string, b: string): boolean {
+  if (a.length !== b.length) return false;
+  let diff = 0;
+  for (let i = 0; i < a.length; i++) diff |= a.charCodeAt(i) ^ b.charCodeAt(i);
+  return diff === 0;
 }
 
 interface Jwks {
@@ -172,16 +178,12 @@ async function verifyAsymmetric(jwt: DecodedJwt, jwks: Jwks): Promise<boolean | 
   return null;
 }
 
-/** true / false when a local check ran; null when nothing local could judge the token. */
+/**
+ * true / false when a local check ran; null when only the platform can judge the token.
+ * Only asymmetric tokens get here: judgeToken refuses HS256 before this check.
+ */
 async function verifySignatureLocally(jwt: DecodedJwt, deps: Required<WriteGuardDeps>): Promise<boolean | null> {
   const alg = String(jwt.header.alg ?? "");
-  if (alg === "HS256") {
-    for (const name of JWT_SECRET_ENV) {
-      const secret = deps.env(name);
-      if (secret) return await verifyHs256(jwt, secret);
-    }
-    return null;
-  }
   if (alg === "ES256" || alg === "RS256") {
     const jwks = await loadJwks(deps);
     return jwks ? await verifyAsymmetric(jwt, jwks) : null;
@@ -193,7 +195,7 @@ async function verifySignatureLocally(jwt: DecodedJwt, deps: Required<WriteGuard
 
 async function remoteUserId(token: string, deps: Required<WriteGuardDeps>): Promise<string | null> {
   const base = deps.env("SUPABASE_URL");
-  const apikey = deps.env("SUPABASE_ANON_KEY") ?? deps.env("SUPABASE_SERVICE_ROLE_KEY");
+  const apikey = projectPublishableKey(deps.env) ?? projectSecretKey(deps.env);
   if (!base || !apikey) return null;
   try {
     const res = await deps.fetch(`${base}/auth/v1/user`, {
@@ -227,10 +229,18 @@ async function remoteServiceCheck(token: string, deps: Required<WriteGuardDeps>)
 // ── Token judgement ────────────────────────────────────────────────────────────
 
 export async function judgeToken(token: string, deps: Required<WriteGuardDeps>): Promise<WriteAuthResult> {
-  for (const name of SERVICE_KEY_ENV) {
-    const known = deps.env(name);
-    if (known && token === known) return { ok: true, caller: { kind: "service_role", via: "env-match" } };
+  // A secret key is opaque, so matching one the platform injected is the whole check. A key deleted
+  // in the dashboard disappears from SUPABASE_SECRET_KEYS and stops matching.
+  for (const key of knownSecretKeys(deps.env)) {
+    if (sameKey(token, key)) return { ok: true, caller: { kind: "service_role", via: "secret-key" } };
   }
+  if (token.startsWith("sb_secret_")) {
+    // Not injected here: a key made after this worker started, a deleted key, or a guess.
+    return (await remoteServiceCheck(token, deps))
+      ? { ok: true, caller: { kind: "service_role", via: "remote" } }
+      : { ok: false, status: 401, reason: "secret key rejected by the platform" };
+  }
+  if (token.startsWith("sb_")) return { ok: false, status: 401, reason: "not a secret key" };
 
   const jwt = decodeJwt(token);
   if (!jwt) return { ok: false, status: 401, reason: "token is not a JWT" };
@@ -242,6 +252,9 @@ export async function judgeToken(token: string, deps: Required<WriteGuardDeps>):
   if (role === "anon") return { ok: false, status: 401, reason: "anon key" };
   if (role !== "service_role" && role !== "authenticated") {
     return { ok: false, status: 401, reason: `role '${role || "none"}' cannot write` };
+  }
+  if (String(jwt.header.alg ?? "") === "HS256") {
+    return { ok: false, status: 401, reason: "HS256 token: the legacy JWT secret is revoked" };
   }
 
   const local = await verifySignatureLocally(jwt, deps);
@@ -272,7 +285,7 @@ async function judgeApiKey(
 ): Promise<WriteAuthResult> {
   const rawKey = rawHeader.startsWith("nk_live_") ? rawHeader.slice(8) : rawHeader;
   const url = deps.env("SUPABASE_URL");
-  const serviceKey = deps.env("SUPABASE_SERVICE_ROLE_KEY") ?? deps.env("SERVICE_ROLE_KEY");
+  const serviceKey = projectSecretKey(deps.env);
   if (!url || !serviceKey) return { ok: false, status: 401, reason: "api key check unavailable" };
   const supabase = createClient(url, serviceKey);
   const { data, error } = await supabase.rpc("check_api_key_rate_limit", {
@@ -303,7 +316,10 @@ function withDefaults(deps?: WriteGuardDeps): Required<WriteGuardDeps> {
   };
 }
 
-/** Bearer token first; the `apikey` header second (cron and CI send the service key in both). */
+/**
+ * Bearer token first; the `apikey` header second. supabase-js copies its key into both; the new
+ * secret keys are meant to travel on `apikey` alone, which lands here.
+ */
 export function extractToken(req: Request): string | null {
   const auth = req.headers.get("authorization");
   if (auth && /^bearer\s+/i.test(auth)) {
@@ -332,6 +348,11 @@ export async function authenticateWriter(req: Request, opts: WriteGuardOptions =
       ? await judgeToken(token, deps)
       : { ok: false, status: 401, reason: "no token" };
     if (verdict.ok) return verdict;
+    const apikey = req.headers.get("apikey")?.trim();
+    if (apikey && apikey !== token && apikey.startsWith("sb_secret_")) {
+      const viaApikey = await judgeToken(apikey, deps);
+      if (viaApikey.ok) return viaApikey;
+    }
     if (opts.allowAnonymous && (await opts.allowAnonymous(req))) {
       return { ok: true, caller: { kind: "anonymous", via: "exception" } };
     }
@@ -371,6 +392,55 @@ export async function requireWriteAuth(req: Request, opts: WriteGuardOptions = {
 }
 
 /**
+ * For a function with a service-only path: true when the caller is the service role, judged exactly as
+ * requireWriteAuth judges it. Use it instead of comparing the bearer with an env key: the gateway hands
+ * functions a minted JWT, not the key the caller sent, and a legacy key in the env proves nothing.
+ */
+export async function isServiceCaller(req: Request, opts: WriteGuardOptions = {}): Promise<boolean> {
+  const verdict = await authenticateWriter(req, opts);
+  return verdict.ok && verdict.caller.kind === "service_role";
+}
+
+/**
+ * For functions an admin runs as Nuke (the admin inbox's replies): the service key, or a caller with an active
+ * admin_users row, the rule useAdminAccess and RequireAdmin apply in the web app. "Signed in" is not enough,
+ * because sign-up is open and auto-confirmed and anonymous sign-in is on. Call it after requireWriteAuth and before
+ * anything else. Returns null for the service key or an active admin, otherwise a 403 to send back. It fails closed:
+ * if admin_users can't be read, only the service key passes. OPTIONS is never judged. 2026-10-14.
+ */
+export async function requireAdminOrService(req: Request, opts: WriteGuardOptions = {}): Promise<Response | null> {
+  if (req.method === "OPTIONS") return null;
+  const verdict = await authenticateWriter(req, opts);
+  if (verdict.ok && verdict.caller.kind === "service_role") return null;
+  const callerId = verdict.ok && verdict.caller.kind === "user" ? verdict.caller.userId : null;
+  let isAdmin = false;
+  if (callerId && /^[0-9a-f-]{36}$/i.test(callerId)) {
+    const deps = withDefaults(opts.deps);
+    const url = deps.env("SUPABASE_URL");
+    const key = projectSecretKey(deps.env);
+    try {
+      const r = await deps.fetch(
+        `${url}/rest/v1/admin_users?user_id=eq.${callerId}&is_active=eq.true&select=user_id&limit=1`,
+        { headers: { apikey: key ?? "", Authorization: `Bearer ${key ?? ""}` } },
+      );
+      if (r.ok) {
+        const rows = await r.json();
+        isAdmin = Array.isArray(rows) && rows[0]?.user_id === callerId;
+      }
+    } catch {
+      isAdmin = false;
+    }
+  }
+  if (isAdmin) return null;
+  const path = (() => { try { return new URL(req.url).pathname; } catch { return "?"; } })();
+  console.warn(`[writeGuard] admin-only refused ${req.method} ${path}: ${callerId ? "not an active admin" : "no user"}`);
+  return new Response(JSON.stringify({ error: "forbidden", reason: "admins only" }), {
+    status: 403,
+    headers: { ...CORS, ...(opts.headers ?? {}), "Content-Type": "application/json" },
+  });
+}
+
+/**
  * For functions that act AS the platform owner: send mail as Nuke, read the owner's books.
  * "Signed in" is not enough there, because sign-up is open and auto-confirmed. Call it after
  * requireWriteAuth. Returns null for the service key or the company owner
@@ -388,7 +458,7 @@ export async function requireOwnerOrService(req: Request, opts: WriteGuardOption
   if (callerId) {
     const deps = withDefaults(opts.deps);
     const url = deps.env("SUPABASE_URL");
-    const key = deps.env("SUPABASE_SERVICE_ROLE_KEY") ?? deps.env("SERVICE_ROLE_KEY");
+    const key = projectSecretKey(deps.env);
     try {
       const r = await deps.fetch(`${url}/rest/v1/parent_company?legal_name=eq.NUKE%20LTD&select=owner_user_id&limit=1`, {
         headers: { apikey: key ?? "", Authorization: `Bearer ${key ?? ""}` },

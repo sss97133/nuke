@@ -1,12 +1,13 @@
 import React from 'react';
-import { useVehicleProfile } from './VehicleProfileContext';
+import { isAuctionPresentation } from './buildAuctionPulse';
 import { useAuctionCommentStats } from '../../hooks/useAuctionComments';
+import { useVehicleProfile } from './VehicleProfileContext';
 import OrphanedVehicleBanner from '../../components/vehicle/OrphanedVehicleBanner';
 
+const SellerStackButton = React.lazy(() => import('./SellerStackButton'));
 const LiveAuctionBanner = React.lazy(() => import('../../components/auction/LiveAuctionBanner'));
 const ExternalAuctionLiveBanner = React.lazy(() => import('../../components/auction/ExternalAuctionLiveBanner'));
 const MergeProposalsPanel = React.lazy(() => import('../../components/vehicle/MergeProposalsPanel'));
-const LiveLotStrips = React.lazy(() => import('../market/LiveLotStrips'));
 
 export interface VehicleBannersProps {
   onMergeComplete: () => void;
@@ -16,8 +17,8 @@ const VehicleBanners: React.FC<VehicleBannersProps> = ({
   onMergeComplete,
 }) => {
   const { vehicle, session, permissions, auctionPulse, auctionCurrency, isVerifiedOwner } = useVehicleProfile();
-  const { data: commentStats } = useAuctionCommentStats(vehicle?.id);
-  const liveCommentCount = commentStats?.commentCount ?? null;
+  const activeExternal = isAuctionPresentation(auctionPulse) && !!auctionPulse?.listing_url && ['active', 'live'].includes(auctionPulse.listing_status);
+  const { data: commentStats } = useAuctionCommentStats(activeExternal ? vehicle?.id : undefined, auctionPulse?.listing_url);
   if (!vehicle) return null;
 
   return (
@@ -62,34 +63,24 @@ const VehicleBanners: React.FC<VehicleBannersProps> = ({
       <React.Suspense fallback={null}><LiveAuctionBanner vehicleId={vehicle.id} /></React.Suspense>
 
       {/* External Auction Live Banner - Show if vehicle has active BaT/C&B/etc auction */}
-      {auctionPulse?.listing_url && ['active', 'live'].includes(String(auctionPulse?.listing_status || '').toLowerCase()) && (
+      {activeExternal && (
         <div style={{ padding: '0 var(--space-4)', maxWidth: '1600px', margin: 'var(--space-2) auto 0' }}>
           <React.Suspense fallback={null}><ExternalAuctionLiveBanner
+            sellerStack={<React.Suspense fallback={null}><SellerStackButton /></React.Suspense>}
+            vehicleId={vehicle.id}
             externalListingId={auctionPulse?.external_listing_id || null}
             platform={auctionPulse?.platform || 'bat'}
             listingUrl={auctionPulse?.listing_url || ''}
             currentBid={typeof auctionPulse?.current_bid === 'number' ? auctionPulse.current_bid : null}
             bidCount={typeof auctionPulse?.bid_count === 'number' ? auctionPulse.bid_count : null}
             watcherCount={typeof auctionPulse?.watcher_count === 'number' ? auctionPulse.watcher_count : null}
-            commentCount={liveCommentCount || (typeof auctionPulse?.comment_count === 'number' ? auctionPulse.comment_count : null)}
+            commentCount={commentStats?.commentCount ?? null}
             endDate={auctionPulse?.end_date || null}
             listingStatus={auctionPulse?.listing_status || null}
             lastUpdatedAt={auctionPulse?.updated_at || null}
             currencyCode={auctionCurrency}
           /></React.Suspense>
         </div>
-      )}
-
-      {/* A live BaT lot's price and activity against comparable lots at the same time to close
-          (live_lot_temperature). Renders nothing until the function returns a reading. */}
-      {vehicle.sale_status === 'auction_live' && (
-        <React.Suspense fallback={null}>
-          <LiveLotStrips
-            vehicleId={vehicle.id}
-            outer={{ padding: '0 var(--space-4)', maxWidth: '1600px', margin: 'var(--space-2) auto 0' }}
-            style={{ border: '2px solid var(--border)', padding: '6px 10px' }}
-          />
-        </React.Suspense>
       )}
 
       {/* Orphaned Vehicle Banner - Visible to all users */}
@@ -103,6 +94,7 @@ const VehicleBanners: React.FC<VehicleBannersProps> = ({
       {isVerifiedOwner && (
         <React.Suspense fallback={null}>
           <MergeProposalsPanel
+            sellerStack={<React.Suspense fallback={null}><SellerStackButton /></React.Suspense>}
             vehicleId={vehicle.id}
             onMergeComplete={onMergeComplete}
           />

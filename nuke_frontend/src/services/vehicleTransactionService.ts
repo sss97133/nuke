@@ -71,7 +71,7 @@ export async function getTransactionByToken(
     .from('vehicle_transactions')
     .select(`
       *,
-      vehicle:vehicles(*),
+      vehicle:vehicles(id, year, make, model, vin, primary_image_url),
       buyer:buyer_id(id, email, raw_user_meta_data),
       seller:seller_id(id, email, raw_user_meta_data)
     `)
@@ -211,8 +211,9 @@ export async function completeTransaction(
   const transaction = await supabase
     // TODO(ghost-ref 2026-07-12): vehicle_transactions does not exist (half-built) — guarded; see docs/ledger/FINISH_ROADMAP.md
     .from('vehicle_transactions')
-    .select('*, vehicle:vehicles(*)')
+    .select('*, vehicle:vehicles(id, year, make, model, vin, user_id, owner_id)')
     .eq('id', transactionId)
+
     .single();
 
   // Missing table means no data; no-op instead of throwing so the caller flow doesn't crash.
