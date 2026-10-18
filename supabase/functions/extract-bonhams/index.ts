@@ -1192,8 +1192,9 @@ async function landLotPage(
     // Vintage lots carry their chassis number in vin, as buildVehicleRecord does.
     if (page.chassis && !cur.vin) vUpdate.vin = page.chassis;
     if (page.highlights.length && !cur.highlights) vUpdate.highlights = page.highlights.join("; ");
-    // An identity line or a Seller's Assessment on the page is a vehicle the index had taken for an item.
-    if (cur.listing_kind === "non_vehicle_item" && (page.chassis || page.registration || page.seller_assessment)) vUpdate.listing_kind = "vehicle";
+    // A chassis number or a Seller's Assessment on the page is a vehicle the index had taken for an item. A registration line alone
+    // is not: Bonhams sells registration numbers as lots.
+    if (cur.listing_kind === "non_vehicle_item" && (page.chassis || page.seller_assessment)) vUpdate.listing_kind = "vehicle";
     const pageMeta = {
       ...(page.chassis ? { chassis_number: page.chassis } : {}),
       ...(page.engine_number ? { engine_number: page.engine_number } : {}),

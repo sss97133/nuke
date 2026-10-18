@@ -720,7 +720,7 @@ export function bonhamsLotPageUrl(url: string): string {
 // A model, a toy or a part, whatever year the title carries.
 const MODEL_OR_TOY = /\b(?:child'?s|children'?s|pedal\s+car|half[- ]scale|quarter[- ]scale|\d+:\d+\s+scale|scale\s+model|display\s+model|wind\s+tunnel\s+model)\b/i;
 // Automobilia: keeps a year-less lot an item even when its title names a body ("a bronze sculpture of a roadster").
-const AUTOMOBILIA = /\b(?:sculpture|bronze|mascot|badge|sign|poster|painting|artwork|lithograph|photograph|watch|chronograph|luggage|suitcase|helmet|overalls|race\s+suit|trophy|handbook|brochure|catalogue|tool\s?kit|set\s+of\s+(?:four\s+|five\s+)?wheels|registration\s+mark)\b/i;
+const AUTOMOBILIA = /\b(?:sculpture|bronze|mascot|badge|sign|poster|painting|artwork|lithograph|photograph|watch|chronograph|luggage|suitcase|helmet|overalls|race\s+suit|trophy|handbook|brochure|catalogue|tool\s?kit|set\s+of\s+(?:four\s+|five\s+)?wheels|(?:registration|number)\s+(?:mark|plate|number)s?)\b|^\s*(?:the\s+)?registration\b/i;
 // Lot-level evidence of a vehicle: an identity line or a Seller's Assessment in the text, or a body or project noun in the title.
 const VEHICLE_LINE = /(?:chassis|frame|registration)\s+no\.?|\bVIN[: .]|vendor\s+score\s+total|car\s+history\s+file/i;
 const BODY_NOUN = /\b(?:replica|project|roadster|coup[eé]|saloon|sedan|tourer|cabriolet|convertible|limousine|phaeton|berlinetta|spyder|spider|targa|shooting\s+brake|pick-?up|landaul?et|drophead|fixed[- ]head|buggy|cyclecar)\b/i;

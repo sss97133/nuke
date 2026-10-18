@@ -119,6 +119,9 @@ Deno.test('a year-less vehicle lot is a vehicle; models, toys and automobilia ar
   equal(item('An Austin J40 child\'s pedal car', 1950), true);
   equal(item('Ferrari 250 GTO half-scale model', 1962), true);
   equal(item('Jaguar XK engine block'), true);
+  equal(item('Registration no. HDB 6', null, 'Registration no. HDB 6'), true);
+  equal(item('Registration plate', null, 'Registration no. 1 OO'), true);
+  equal(item('The registration number "F 1"'), true);
 });
 
 Deno.test('the lot page is read on cars.bonhams.com, with a trailing slash', () => {
