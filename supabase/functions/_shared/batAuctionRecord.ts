@@ -260,10 +260,12 @@ export async function sha256Hex(text: string): Promise<string> {
   return Array.from(new Uint8Array(buf)).map((b) => b.toString(16).padStart(2, "0")).join("");
 }
 
+export type AuctionCommentPlatform = "bat" | "cars_and_bids";
+
 export interface AuctionCommentRow {
   auction_event_id: string | null;
   vehicle_id: string;
-  platform: "bat";
+  platform: AuctionCommentPlatform;
   source_url: string;
   content_hash: string;
   sequence_number: number;
@@ -284,23 +286,31 @@ export interface AuctionCommentRow {
   bat_comment_id: number | null;
   bat_author_likes: number | null;
   likers_count: number | null;
+  /** The platform's own comment id where it has a stable text one (Cars & Bids); BaT's stays in bat_comment_id. */
+  source_comment_id?: string | null;
 }
 
-export interface BatCommentIdentityStore {
-  /** Exact platform='bat', handle lookup; no case folding or fuzzy person matching. */
+export interface BatCommentIdentityStore<P extends AuctionCommentPlatform = "bat"> {
+  /** Exact (platform, handle) lookup for the rows' platform; no case folding or fuzzy person matching. */
   find(handles: string[]): Promise<Array<{ id: string; handle: string }>>;
   /** Insert only, on conflict (platform,handle) do nothing. Never reset an existing identity. */
-  insertMissing(rows: Array<{ platform: "bat"; handle: string; profile_url: string }>): Promise<void>;
+  insertMissing(rows: Array<{ platform: P; handle: string; profile_url: string }>): Promise<void>;
 }
+
+const PROFILE_URL: Record<AuctionCommentPlatform, (handle: string) => string> = {
+  bat: (handle) => `https://bringatrailer.com/member/${encodeURIComponent(handle)}`,
+  cars_and_bids: (handle) => `https://carsandbids.com/user/${encodeURIComponent(handle)}`,
+};
 
 /** Link fresh comments before INSERT, so the profile-queue trigger receives the identity too.
  * Repeated authors cost one lookup per batch, not one request per comment. Existing identity
  * claims/metadata/clocks are untouched. A read after insert resolves concurrent insert winners.
  * Failures propagate: the writer can retry instead of silently inserting disconnected comments.
  */
-export async function linkAuctionCommentIdentities(
-  rows: AuctionCommentRow[], store: BatCommentIdentityStore,
+export async function linkAuctionCommentIdentities<P extends AuctionCommentPlatform = "bat">(
+  rows: AuctionCommentRow[], store: BatCommentIdentityStore<P>, platform: P = "bat" as P,
 ): Promise<Array<AuctionCommentRow & { external_identity_id: string | null }>> {
+  if (rows.some((r) => r.platform !== platform)) throw new Error(`Comment identity link expects ${platform} rows only`);
   // Same rule as trg_key_auction_comment_author and key_auction_comment_authors (20261006090000):
   // an author named anonymous (any case) is never keyed, whatever its bat_author_id. Different anonymous
   // posters are not one (bat, 'anonymous') identity; NULL means unresolved.
@@ -315,13 +325,12 @@ export async function linkAuctionCommentIdentities(
     const missing = batch.filter((handle) => !ids.has(handle));
     if (missing.length) {
       await store.insertMissing(missing.map((handle) => ({
-        platform: "bat", handle,
-        profile_url: `https://bringatrailer.com/member/${encodeURIComponent(handle)}`,
+        platform, handle, profile_url: PROFILE_URL[platform](handle),
       })));
       for (const identity of await store.find(missing)) ids.set(identity.handle, identity.id);
     }
     if (batch.some((handle) => !ids.has(handle))) {
-      throw new Error("BaT comment identity lookup incomplete after insert; retry comments");
+      throw new Error(`${platform === "bat" ? "BaT" : "Cars & Bids"} comment identity lookup incomplete after insert; retry comments`);
     }
   }
   return rows.map((row) => ({
@@ -393,6 +402,80 @@ export async function buildAuctionCommentRows(args: {
       bat_comment_id: typeof c?.id === "number" ? c.id : null,
       bat_author_likes: typeof c?.authorLikes === "number" ? c.authorLikes : null,
       likers_count: Array.isArray(c?.likers) ? c.likers.length : null,
+    });
+  }
+  return rows;
+}
+
+// ─── Cars & Bids auction_comments rows ─────────────────────────────
+// Same row shape and rules as the BaT builder. A C&B comment carries a stable site-wide id, so its identity is the
+// id itself, as the BaT live stream keys native comments: content_hash = sha256('cars_and_bids|native-comment:' + id),
+// with the id kept in source_comment_id. trg_key_cab_auction_comment computes the same hash in the database for every
+// writer and keeps a comment held under the legacy 'cab_<vehicle>_<id>' key on that key, so a re-read never forks.
+export interface CabCommentInput {
+  id: string;
+  author: string;
+  postedAt: string | null;
+  text: string;
+  likes: number;
+  bidAmount: number | null;
+  isSeller: boolean;
+}
+
+export function cabCommentContentHash(commentId: string): Promise<string> {
+  return sha256Hex(`cars_and_bids|native-comment:${commentId}`);
+}
+
+/** The C&B comment id inside a legacy 'cab_<vehicle uuid>_<id>' content_hash; null for any other hash. */
+export function legacyCabCommentId(contentHash: string | null | undefined): string | null {
+  const m = /^cab_[0-9a-f-]{36}_(.+)$/i.exec(contentHash ?? "");
+  return m ? m[1] : null;
+}
+
+export async function buildCabAuctionCommentRows(args: {
+  comments: CabCommentInput[];
+  listingUrlNorm: string;
+  vehicleId: string;
+  auctionEventId: string | null;
+  endAt: Date | null;
+}): Promise<AuctionCommentRow[]> {
+  const { comments, listingUrlNorm, vehicleId, auctionEventId, endAt } = args;
+  const rows: AuctionCommentRow[] = [];
+  for (let i = 0; i < comments.length; i++) {
+    const c = comments[i];
+    const id = String(c.id ?? "").trim();
+    if (!id) throw new Error(`Cars & Bids comment ${i + 1} has no comment id; refusing an unkeyed row`);
+    const author = String(c.author ?? "").trim() || "Unknown";
+    const ts = c.postedAt ? new Date(c.postedAt) : null;
+    const postedAt = ts && !Number.isNaN(ts.getTime()) ? ts : endAt ?? new Date();
+    const text = String(c.text ?? "").replace(/\s+/g, " ").trim();
+    const bidAmount = Number(c.bidAmount) > 0 ? Number(c.bidAmount) : null;
+    const hoursUntilClose = endAt && ts ? (endAt.getTime() - postedAt.getTime()) / 3600000 : 0;
+    rows.push({
+      auction_event_id: auctionEventId,
+      vehicle_id: vehicleId,
+      platform: "cars_and_bids",
+      source_url: listingUrlNorm,
+      content_hash: await cabCommentContentHash(id),
+      sequence_number: i + 1,
+      posted_at: postedAt.toISOString(),
+      hours_until_close: Math.max(0, hoursUntilClose),
+      author_username: author,
+      is_seller: Boolean(c.isSeller),
+      author_total_likes: 0,
+      comment_type: bidAmount ? "bid" : c.isSeller ? "seller_response" : text.includes("?") ? "question" : "observation",
+      comment_text: text,
+      word_count: text ? text.split(/\s+/).length : 0,
+      has_question: text.includes("?"),
+      has_media: false,
+      media_urls: null,
+      bid_amount: bidAmount,
+      comment_likes: typeof c.likes === "number" ? c.likes : 0,
+      bat_author_id: null,
+      bat_comment_id: null,
+      bat_author_likes: null,
+      likers_count: null,
+      source_comment_id: id,
     });
   }
   return rows;
