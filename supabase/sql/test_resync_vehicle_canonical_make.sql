@@ -38,7 +38,7 @@ INSERT INTO public.vehicles VALUES
 \ir ../migrations/20261019063000_resync_vehicle_canonical_make.sql
 
 CREATE FUNCTION pg_temp.call(lo uuid, hi uuid, apply boolean) RETURNS jsonb LANGUAGE plpgsql AS $$
-BEGIN PERFORM set_config('statement_timeout', '30s', true); RETURN public.resync_vehicle_canonical_make(lo, hi, apply); END $$;
+BEGIN PERFORM set_config('statement_timeout', '10s', true); RETURN public.resync_vehicle_canonical_make(lo, hi, apply); END $$;
 CREATE FUNCTION pg_temp.check(ok boolean, label text) RETURNS void LANGUAGE plpgsql AS $$ BEGIN ASSERT ok IS TRUE, label; END $$;
 
 -- Refusals: a range over 1/64 of the space, and an inverted range.
@@ -71,4 +71,28 @@ CREATE TEMP TABLE r AS SELECT pg_temp.call('10000000-0000-0000-0000-000000000000
 SELECT pg_temp.check((SELECT (out->>'changed')::int FROM r) = 0, 'idempotent');
 
 SELECT pg_temp.check(NOT has_function_privilege('anon', 'public.resync_vehicle_canonical_make(uuid,uuid,boolean)', 'EXECUTE'), 'anon cannot execute');
+
+-- The caller keeps the 10 s budget: a longer statement_timeout is refused.
+DO $$ BEGIN
+  PERFORM set_config('statement_timeout', '30s', true);
+  BEGIN PERFORM public.resync_vehicle_canonical_make('10000000-0000-0000-0000-000000000000', '10100000-0000-0000-0000-000000000000', false);
+        RAISE EXCEPTION 'expected refusal'; EXCEPTION WHEN raise_exception THEN IF SQLERRM NOT LIKE '%10 s%' THEN RAISE; END IF; END;
+END $$;
+
+-- Stale candidate: the row is renamed after it is staged (as a concurrent writer would). The staging table is created
+-- here first, with a trigger that renames the vehicle as soon as the writer stages it; the writer must skip the row and
+-- record no correction for it.
+INSERT INTO public.vehicles VALUES ('30000000-0000-0000-0000-000000000001', 'Shelby', 'a0000000-0000-0000-0000-000000000003');
+CREATE TEMP TABLE make_resync (vehicle_id uuid, make text, was uuid, resolved uuid);
+CREATE FUNCTION pg_temp.rename_after_staging() RETURNS trigger LANGUAGE plpgsql AS $$
+BEGIN UPDATE public.vehicles SET make = 'Ford' WHERE id = '30000000-0000-0000-0000-000000000001'; RETURN NULL; END $$;
+CREATE TRIGGER rename_after_staging AFTER INSERT ON pg_temp.make_resync FOR EACH STATEMENT EXECUTE FUNCTION pg_temp.rename_after_staging();
+DELETE FROM writer_seen;
+CREATE TEMP TABLE s AS SELECT pg_temp.call('30000000-0000-0000-0000-000000000000', '30100000-0000-0000-0000-000000000000', true) AS out;
+SELECT pg_temp.check((SELECT (out->>'other_make')::int = 1 AND (out->>'changed')::int = 0 FROM s), 'staged as a candidate, changed nothing');
+SELECT pg_temp.check((SELECT make = 'Ford' AND canonical_make_id = 'a0000000-0000-0000-0000-000000000003' FROM public.vehicles
+                      WHERE id = '30000000-0000-0000-0000-000000000001'), 'the renamed row keeps the id that fits its new make');
+SELECT pg_temp.check(NOT EXISTS (SELECT 1 FROM public.superseded_rows WHERE row_id = '30000000-0000-0000-0000-000000000001'),
+  'no correction recorded for a row the update skipped');
+DROP TABLE pg_temp.make_resync;
 SELECT 'resync_vehicle_canonical_make contract passed' AS result;
