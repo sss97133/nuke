@@ -116,6 +116,16 @@ Standing rules the code carries:
   exactly-once inference guarantee. Retained-reference retrieval is bounded and reports unassessed scope; private
   subject profiles remain unresolved hypotheses, outside canonical vehicle and ownership totals. This code requires
   the held protected-writer migration and separate production activation; it does not unpause the photo pipeline.
+  Provider failures retain only allowlisted code, provider, HTTP status and credential-kind diagnostics. A 401 means
+  the credential was not accepted by the existing API-key route; it does not prove revocation or expiry. In-memory
+  sign-in/API-key shape classification never exports credential values or changes routes or provider order. A complete,
+  untruncated outcome for every existing provider can certify no reading began (401, no key or lookup failure only),
+  allowing the existing fresh-retry path within its same three-attempt cap and backoff. Ambiguous output/transport,
+  mixed failures and already reuse-only batches stay reuse-only; finished source hashes are never reset.
+  Own-account analysis status can open the existing Connected accounts screen; no key test, mutation or fallback is triggered.
+  An optional `allowed_source_hashes` request map pins at most 64 exact source IDs and hashes, including all requested
+  photos and any server-selected or replayed context. Outside or changed sources refuse before input capture/inference;
+  it only narrows input scope and never replaces current own-account, privacy or source qualification.
 - **A relation is a weight, not a status.** Owner direction, 2026-10-15: "active cant be a hard code like it is. its
   a weight. a relation goes dormant immediately after one day if not maintained by contribution. even within 24hr can
   stall." The app never shows a membership's `status` as ACTIVE. It shows the state the server cuts from
@@ -165,6 +175,11 @@ Standing rules the code carries:
   record of lots tagged this way is typed into the web page, not carried by a read, so the phone states that and
   waits (market lane plans a table + view, 2026-10-13). Prove a board change lot-for-lot against the live site as a
   stranger (Playwright pattern in memory `reference_logged_out_live_check_playwright.md`).
+- **Current-bid ranges use the loaded live board.** Live offers the web's six USD bid ranges, including
+  Unrecorded. Zero is recorded under $10,000; absent, negative and nonfinite bids are unrecorded. Map and
+  supporting rows share the auction window and bid range; the selection count states its make/decade/window
+  denominator and evaluation clock. A make or window change clears the bid range, and Any current bid restores
+  all eligible rows. Filtering starts no read or inference; these are current bids, not sold prices or valuations.
 - **Calendar rosters continue through the same read.** Live → Calendar uses `auction_calendar_read`, a 200-day
   horizon and explicit 100-lot pages, as the web does. More lots reads only on request. A changed read-model build,
   server day, total or repeated contributor refuses page stitching and offers refresh; a missing build clock or

@@ -17,6 +17,7 @@
 
 import { callLLM, type LLMConfig } from "./llmProvider.ts";
 import { getUserApiKey } from "./getUserApiKey.ts";
+import { ProviderHTTPError, VisionProviderUnavailable, type CredentialKind, type ProviderDiagnostic } from "./providerDiagnostic.ts";
 
 type Provider = "google" | "anthropic" | "openai";
 
@@ -27,24 +28,34 @@ const PROVIDER_PREFS: Array<{ provider: Provider; model: string; env: string }> 
   { provider: "openai", model: "gpt-4o-mini", env: "OPENAI_API_KEY" },
 ];
 
-interface ResolvedTier extends LLMConfig { keySource: "user" | "system"; }
+interface ResolvedTier extends LLMConfig { keySource: "user" | "system"; credentialKind?: CredentialKind; }
+interface VisionDependencies {
+  getKey?: typeof getUserApiKey;
+  call?: typeof callLLM;
+}
 
 // Resolve usable tiers for this caller: the caller's own connected providers (BYOK — caller pays),
 // cheapest first. Returns [] when the caller has none; callers then say "connect your AI subscription".
-async function resolveTiers(supabase: unknown, userId: string | null): Promise<ResolvedTier[]> {
+async function resolveTiers(supabase: unknown, userId: string | null, getKey = getUserApiKey) {
   const tiers: ResolvedTier[] = [];
+  const diagnostics: ProviderDiagnostic[] = [];
   for (const p of PROVIDER_PREFS) {
     try {
-      const r = await getUserApiKey(supabase, userId, p.provider, p.env);
+      const r = await getKey(supabase, userId, p.provider, p.env);
       // user keys only: the system pool is retired (header)
       if (r.apiKey && r.source === "user") {
-        tiers.push({ provider: p.provider, model: r.modelName || p.model, apiKey: r.apiKey, source: r.source, keySource: r.source });
+        tiers.push({ provider: p.provider, model: r.modelName || p.model, apiKey: r.apiKey, source: r.source, keySource: r.source,
+          credentialKind: r.credentialKind });
+      } else if (r.userKeyStatus === "lookup_failed") {
+        diagnostics.push({ code: "credential_lookup_failed", provider: p.provider, http_status: null, credential_kind: null });
+      } else {
+        diagnostics.push({ code: "no_connected_key", provider: p.provider, http_status: null, credential_kind: null });
       }
     } catch {
-      // provider unavailable for this caller; skip
+      diagnostics.push({ code: "credential_lookup_failed", provider: p.provider, http_status: null, credential_kind: null });
     }
   }
-  return tiers;
+  return { tiers, diagnostics };
 }
 
 async function toImagePart(imageUrl: string): Promise<{ type: "image_url"; image_url: { url: string } }> {
@@ -81,16 +92,21 @@ function parseJson(content: string): unknown | null {
 
 interface VisionResult { data: Record<string, unknown>; provider: string; model: string; keySource: "user" | "system"; ms: number; }
 
-async function runTiers(tiers: ResolvedTier[], messages: unknown[], maxTokens: number): Promise<VisionResult | null> {
+async function runTiers(tiers: ResolvedTier[], messages: unknown[], maxTokens: number, diagnostics: ProviderDiagnostic[],
+  call = callLLM): Promise<VisionResult | null> {
   for (const cfg of tiers) {
     try {
-      const r = await callLLM(cfg, messages as never[], { temperature: 0.2, maxTokens, vision: true });
+      const r = await call(cfg, messages as never[], { temperature: 0.2, maxTokens, vision: true });
       const data = parseJson(r.content || "");
       if (data && typeof data === "object") {
         return { data: data as Record<string, unknown>, provider: cfg.provider, model: cfg.model, keySource: cfg.keySource, ms: r.duration_ms ?? 0 };
       }
+      diagnostics.push({ code: "response_unreadable", provider: cfg.provider, http_status: null, credential_kind: cfg.credentialKind ?? null });
     } catch (e) {
-      console.warn(`[visionFallback] ${cfg.provider}/${cfg.model} (${cfg.keySource}) failed: ${e instanceof Error ? e.message : String(e)}`);
+      const diagnostic = e instanceof ProviderHTTPError ? { ...e.diagnostic, credential_kind: cfg.credentialKind ?? null }
+        : { code: "request_failed" as const, provider: cfg.provider, http_status: null, credential_kind: cfg.credentialKind ?? null };
+      diagnostics.push(diagnostic);
+      console.warn(`[visionFallback] ${cfg.provider} failed: ${diagnostic.code}`);
     }
   }
   return null;
@@ -102,22 +118,26 @@ export async function cloudVisionJSON(
   userId: string | null,
   opts: { systemPrompt?: string; userPrompt: string; imageUrl: string; maxTokens?: number },
 ): Promise<VisionResult | null> {
-  const tiers = await resolveTiers(supabase, userId);
+  const { tiers, diagnostics } = await resolveTiers(supabase, userId);
   if (tiers.length === 0) return null;
   const messages: unknown[] = [];
   if (opts.systemPrompt) messages.push({ role: "system", content: opts.systemPrompt });
   messages.push({ role: "user", content: [{ type: "text", text: opts.userPrompt }, await toImagePart(opts.imageUrl)] });
-  return runTiers(tiers, messages, opts.maxTokens ?? 800);
+  return runTiers(tiers, messages, opts.maxTokens ?? 800, diagnostics);
 }
 
 /** Multi-image (interleaved text + images) vision via the caller's BYOK provider. */
 export async function cloudVisionMultiJSON(
   supabase: unknown,
   userId: string | null,
-  opts: { systemPrompt?: string; parts: Array<{ text: string } | { imageUrl: string }>; maxTokens?: number },
+  opts: { systemPrompt?: string; parts: Array<{ text: string } | { imageUrl: string }>; maxTokens?: number; throwOnUnavailable?: boolean },
+  dependencies: VisionDependencies = {},
 ): Promise<VisionResult | null> {
-  const tiers = await resolveTiers(supabase, userId);
-  if (tiers.length === 0) return null;
+  const { tiers, diagnostics } = await resolveTiers(supabase, userId, dependencies.getKey);
+  if (tiers.length === 0) {
+    if (opts.throwOnUnavailable) throw new VisionProviderUnavailable(diagnostics);
+    return null;
+  }
   const content: unknown[] = [];
   for (const p of opts.parts) {
     if ("text" in p) content.push({ type: "text", text: p.text });
@@ -126,7 +146,9 @@ export async function cloudVisionMultiJSON(
   const messages: unknown[] = [];
   if (opts.systemPrompt) messages.push({ role: "system", content: opts.systemPrompt });
   messages.push({ role: "user", content });
-  return runTiers(tiers, messages, opts.maxTokens ?? 600);
+  const result = await runTiers(tiers, messages, opts.maxTokens ?? 600, diagnostics, dependencies.call);
+  if (!result && opts.throwOnUnavailable) throw new VisionProviderUnavailable(diagnostics);
+  return result;
 }
 
 export interface CloudAnalyzeResult {

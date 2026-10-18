@@ -325,7 +325,7 @@ Deno.serve(async (req: Request) => {
           return { sources: context.image_ids.length ? await store.sources(user, context.image_ids) : [], coverage: context.coverage };
         };
         result = await resolveSubjectBatch(store, { ...body, user_id: owner }, supabaseUrl, {
-          vision: options => cloudVisionMultiJSON(supabase, owner, options),
+          vision: options => cloudVisionMultiJSON(supabase, owner, { ...options, throwOnUnavailable: true }),
         });
       }
       return new Response(JSON.stringify(result), { headers: { ...corsHeaders, "Content-Type": "application/json" } });

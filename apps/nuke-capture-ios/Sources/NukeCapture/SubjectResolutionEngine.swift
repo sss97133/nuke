@@ -10,6 +10,7 @@ final class SubjectResolutionEngine: ObservableObject {
     static let didChange = Notification.Name("visualSubjectResolutionDidChange")
     @Published private(set) var lastSummary: String?
     @Published private(set) var lastSummaryUserId: String?
+    @Published private(set) var providerNeedsReview = false
     @Published private(set) var isRunning = false
     private let defaults = UserDefaults.standard
     private init() {}
@@ -73,6 +74,8 @@ final class SubjectResolutionEngine: ObservableObject {
         let deferred_image_ids: [String]
         let unresolved: [Unresolved]
         let refusal: String?
+        let provider_diagnostics: [SubjectProviderDiagnostic]?
+        let provider_attempt_coverage: SubjectProviderDiagnostic.AttemptCoverage?
     }
     private struct Request: Encodable {
         let mode = "resolve_subjects"
@@ -168,6 +171,10 @@ final class SubjectResolutionEngine: ObservableObject {
                 queue.finish(reason: "Visual analysis returned an unreadable source receipt.")
                 try save(queue, userId); state(queue.lastOutcome!, userId: userId); return
             }
+            let providerDiagnostic = response.status == "refused" &&
+                ["provider_unavailable", "provider_call_failed"].contains(response.refusal ?? "") &&
+                (response.provider_diagnostics?.count ?? 0) <= 3
+                ? SubjectProviderDiagnostic.primary(response.provider_diagnostics) : nil
             switch response.status {
             case "resolved", "cached", "unresolved":
                 guard SubjectResolutionQueue.completeReceipt(requested: requested, persisted: response.persisted_image_ids,
@@ -193,26 +200,33 @@ final class SubjectResolutionEngine: ObservableObject {
                     queue.awaitCorrespondingView(reason: "Visual analysis needs another corresponding photo; the upload remains saved.")
                 } else if ["source_not_ready", "provider_unavailable", "provider_call_failed", "required_input_unavailable"].contains(reason) {
                     let reuseOnly = SubjectResolutionQueue.retryRequiresRetainedReading(refusal: reason,
-                        alreadyReuseOnly: batch.reuseOnly)
-                    queue.retry(reason: "Visual analysis waiting: \(reason).", reuseOnly: reuseOnly,
+                        alreadyReuseOnly: batch.reuseOnly,
+                        providerReadNotStarted: SubjectProviderDiagnostic.provesNoReading(response.provider_diagnostics,
+                            coverage: response.provider_attempt_coverage))
+                    queue.retry(reason: providerDiagnostic?.message ?? "Visual analysis waiting: \(reason).", reuseOnly: reuseOnly,
                         readingWasNotStarted: !reuseOnly)
                 } else { queue.finish(reason: "Visual analysis refused: \(reason).") }
             default:
                 queue.finish(reason: "Visual analysis returned an unknown outcome.")
             }
             try save(queue, userId)
-            state(queue.lastOutcome ?? "Visual analysis is waiting.", userId: userId)
+            state(queue.lastOutcome ?? "Visual analysis is waiting.", userId: userId,
+                  providerNeedsReview: providerDiagnostic?.needsConnectionReview == true)
             if sourceReadChange == .changed {
                 NotificationCenter.default.post(name: Self.didChange, object: nil)
             }
         } catch { state("Visual analysis couldn't load its sources. \(ReadFailure.text(error))", userId: userId) }
     }
 
-    private func state(_ summary: String, userId: String) {
+    private func state(_ summary: String, userId: String, providerNeedsReview: Bool? = nil) {
         guard stillOwnAccount(userId) else { return }
+        let presented = SubjectResolutionCopy.summary(summary)
+        let review = SubjectProviderDiagnostic.reviewFlag(previousUser: lastSummaryUserId, user: userId.lowercased(),
+            previousSummary: lastSummary, summary: presented, previousValue: self.providerNeedsReview, explicitValue: providerNeedsReview)
         if lastSummaryUserId != userId.lowercased() { lastSummary = nil }
         lastSummaryUserId = userId.lowercased()
-        lastSummary = SubjectResolutionCopy.summary(summary)
+        self.providerNeedsReview = review
+        lastSummary = presented
         NSLog("NukeCapture visual subjects: %@", summary)
     }
 }
