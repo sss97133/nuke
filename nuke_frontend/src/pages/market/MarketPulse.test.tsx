@@ -216,6 +216,40 @@ describe('market answer -> supporting lots', () => {
     expect(boardTitles()).toHaveLength(24);
     expect(container.querySelector('[aria-label="Previous 24 lots"]')).toBeNull();
   });
+  it.each([
+    ['Next 24 lots', 1, 2], ['Previous 24 lots', 2, 1],
+  ])('moves keyboard focus from %s to the replacement page first title', async (pager, from, to) => {
+    fixture.pulse.data.auctions = Array.from({ length: 60 }, (_, i) => lot(`page-${i}`, 'PORSCHE', 1000 + i, i + 1));
+    await render(`make=PORSCHE&board=${from}&sort=ending`);
+    const opener = button(pager); opener.focus(); await act(async () => opener.click());
+    expect(window.location.search).toContain(`board=${to}`);
+    expect(window.location.search).toContain('make=PORSCHE');
+    expect(window.location.search).toContain('sort=ending');
+    expect(boardTitles()[0]).toBe(`page-${(to - 1) * 24}`);
+    expect(document.activeElement).toBe(container.querySelector('.market-lot-name'));
+    expect(HTMLElement.prototype.scrollIntoView).toHaveBeenLastCalledWith({ block: 'start' });
+  });
+  it('keeps an explicit paging action reachable if the board empties during that render', async () => {
+    fixture.pulse.data.auctions = Array.from({ length: 60 }, (_, i) => lot(`page-${i}`, 'PORSCHE', 1000, i + 1));
+    await render('board=1');
+    const opener = button('Next 24 lots'); opener.focus();
+    fixture.pulse.data = { ...fixture.pulse.data, auctions: [] };
+    await act(async () => opener.click());
+    expect(boardTitles()).toEqual([]);
+    expect(document.activeElement).toBe(container.querySelector('[aria-label="Live lots"]'));
+    expect(container.textContent).toContain('No open lots match these filters');
+  });
+  it('keeps current focus on deep-linked pages and background board refreshes', async () => {
+    fixture.pulse.data.auctions = Array.from({ length: 60 }, (_, i) => lot(`page-${i}`, 'PORSCHE', 1000, i + 1));
+    await render('board=1');
+    const control = button('Bid sounds off'); control.focus();
+    await render('board=2');
+    expect(boardTitles()[0]).toBe('page-24');
+    expect(document.activeElement).toBe(control);
+    fixture.pulse.data = { ...fixture.pulse.data, auctions: fixture.pulse.data.auctions.map((a: LiveAuction) => ({ ...a, currentBid: 2000 })) };
+    await render('board=2');
+    expect(document.activeElement).toBe(control);
+  });
   it('returns from a model sub-box to the whole model and recovers a group that disappeared', async () => {
     await render('map=lots&make=PORSCHE&mapBy=model&mapInside=year&mapFocus=' + encodeURIComponent(JSON.stringify(['PORSCHE', 'Local fixture'])) + '&mapChild=2000');
     await click('Local fixture: 3 captured lots');

@@ -365,6 +365,7 @@ export default function MarketPulse({ onUnavailable, collection }: { onUnavailab
   const finish = useFinishEstimates();
   const [params, setParams] = useSearchParams();
   const boardRef = useRef<HTMLDivElement>(null);
+  const focusBoardPage = useRef(false);
 
   const makeParam = params.get('make')?.toUpperCase();
   const view = params.get('view') === 'sales' ? 'sales' : 'inventory';
@@ -550,9 +551,15 @@ export default function MarketPulse({ onUnavailable, collection }: { onUnavailab
   const page = Number.isInteger(boardParam) && boardParam >= 1 ? Math.min(boardParam, pages)
     : selectedIndex >= 0 ? Math.floor(selectedIndex / PAGE) + 1 : 1;
   const pageRows = useMemo(() => board.slice((page - 1) * PAGE, page * PAGE), [board, page]);
+  useLayoutEffect(() => {
+    if (!focusBoardPage.current || isLoading || mapFilterPending) return;
+    focusBoardPage.current = false;
+    boardRef.current?.scrollIntoView({ block: 'start' });
+    (boardRef.current?.querySelector<HTMLButtonElement>('.market-lot-name') ?? boardRef.current)?.focus();
+  }, [page, pageRows, isLoading, mapFilterPending]);
   const goToPage = (n: number) => {
+    focusBoardPage.current = true;
     setParam('board', String(n));
-    requestAnimationFrame(() => boardRef.current?.scrollIntoView({ block: 'start' }));
   };
 
 
