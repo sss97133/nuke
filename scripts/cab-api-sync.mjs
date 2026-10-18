@@ -37,6 +37,34 @@ if (!SUPABASE_URL || !SUPABASE_KEY) {
   process.exit(1);
 }
 
+// Shared writer gate (.claude/LANES.md): hold while more than 3 client queries wait on IO. One shared Management API
+// rate limit serves every agent, so read it at most once a minute and back off a minute on a 429 or any failure.
+const IO_GATE_MAX_WAITERS = 3;
+let ioGateLastCheck = 0;
+async function waitForIoGate() {
+  const token = process.env.SUPABASE_ACCESS_TOKEN;
+  const ref = (SUPABASE_URL || "").match(/https:\/\/([a-z0-9]+)\.supabase\.co/)?.[1];
+  if (!token || !ref) return;
+  for (;;) {
+    const sinceLast = Date.now() - ioGateLastCheck;
+    if (sinceLast < 60_000) await new Promise((r) => setTimeout(r, 60_000 - sinceLast));
+    ioGateLastCheck = Date.now();
+    let waiters = null;
+    try {
+      const res = await fetch(`https://api.supabase.com/v1/projects/${ref}/database/query`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+        body: JSON.stringify({
+          query: "SELECT count(*)::int AS n FROM pg_stat_activity WHERE backend_type = 'client backend' AND state = 'active' AND wait_event_type = 'IO'",
+        }),
+      });
+      if (res.ok) waiters = (await res.json())?.[0]?.n ?? null;
+    } catch {}
+    if (waiters !== null && waiters <= IO_GATE_MAX_WAITERS) return;
+    console.log(`  [io-gate] ${waiters === null ? "gate read failed" : `${waiters} queries waiting on IO`}; holding 60 s`);
+  }
+}
+
 // PostgREST errors from a gateway timeout or an empty 5xx body carry code/details/hint but no message.
 function describePgError(err) {
   const parts = [err?.message, err?.code && `code=${err.code}`, err?.details && `details=${err.details}`, err?.hint && `hint=${err.hint}`]
@@ -1614,6 +1642,7 @@ async function runHistoricalBackfill(cab, startPage = 1, endPage = 853, concurre
   };
 
   for (let pageNum = startPage; pageNum <= endPage; pageNum++) {
+    await waitForIoGate();
     const offset = (pageNum - 1) * 50;
     const res = await cab.callApi("v2", "autos/auctions", {
       limit: "50",
