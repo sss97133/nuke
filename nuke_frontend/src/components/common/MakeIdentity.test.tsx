@@ -60,15 +60,17 @@ it('uses catalogue label choices for Chevrolet and Dodge while retaining other w
   (globalThis as any).IS_REACT_ACT_ENVIRONMENT = true;
   const host = document.createElement('div'), root = createRoot(host);
   try {
-    await act(async () => root.render(<MakeIdentity make="Chevrolet" inverse />));
+    await act(async () => root.render(<MakeIdentity make="Chevrolet" inverse compact />));
     expect(host.querySelector('img')?.getAttribute('src')).toBe('/stacks/makes/chevrolet.svg');
     expect(host.querySelector('strong')?.textContent).toBe('Chevrolet');
     await act(async () => host.querySelector('img')!.dispatchEvent(new Event('error')));
     expect(host.textContent).toBe('Chevrolet');
-    await act(async () => root.render(<MakeIdentity make="Dodge" inverse />));
+    await act(async () => root.render(<MakeIdentity make="Dodge" inverse compact />));
     expect(host.querySelector('img')).toBeNull();
     expect(host.querySelector('strong')?.textContent).toBe('Dodge');
-    await act(async () => root.render(<MakeIdentity make="Ferrari" inverse />));
+    await act(async () => root.render(<MakeIdentity make="Chevrolet" />));
+    expect(host.querySelector('img')?.getAttribute('src')).toBe('/stacks/makes/chevrolet-wordmark.svg');
+    await act(async () => root.render(<MakeIdentity make="Ferrari" inverse compact />));
     expect(host.querySelector('img')?.getAttribute('src')).toBe('/stacks/makes/ferrari-wordmark.svg');
     expect(host.querySelector('.sr-only')?.textContent).toBe('Ferrari');
   } finally { await act(async () => root.unmount()); }

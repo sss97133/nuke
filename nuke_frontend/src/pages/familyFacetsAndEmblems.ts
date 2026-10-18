@@ -1215,7 +1215,7 @@ export function classifyVehicleFacets(
     else if (/\bK[-\s]?2500\b|\bC[-\s]?2500\b|\b2500\b/.test(u)) series = '2500 (3/4-Ton)';
     else if (/\bK[-\s]?3500\b|\bC[-\s]?3500\b|\b3500\b/.test(u)) series = '3500 (1-Ton)';
     else if (/\b100\b/.test(u) && brand === 'gmc') series = 'GMC 100 (1/2-Ton)';
-    if (!series && isPickupFamilyLabel(fam)) {
+    if (!series && fam === 'truck') {
       const line = /\b(HUMMER\s+EV\s+PICKUP|SILVERADO|SIERRA|COLORADO|CANYON|AVALANCHE|SSR|LUV|EL\s+CAMINO|CABALLERO|S[-\s]?10|S[-\s]?15|SYCLONE|SONOMA)\b/.exec(u)?.[1];
       if (line) series = line.toLowerCase().replace(/\b\w/g, (c) => c.toUpperCase())
         .replace(/^S[-\s]?10$/i, 'S10').replace(/^S[-\s]?15$/i, 'S15').replace(/^Ssr$/, 'SSR').replace(/^Luv$/, 'LUV')

@@ -33,12 +33,12 @@ export function MakeLogo({ make }: { make: string }) {
 }
 
 /** Brand label artwork. Unknown or failed assets always leave a readable brand name. */
-export function MakeIdentity({ make, inverse = false }: { make: string; inverse?: boolean }) {
+export function MakeIdentity({ make, inverse = false, compact = false }: { make: string; inverse?: boolean; compact?: boolean }) {
   const key = keyFor(make);
   const [failed, setFailed] = useState<string | null>(null);
   const file = wordmarks.get(key);
   const darkFile = darkWordmarks.get(key);
-  const presentation = labelPresentations.get(key);
+  const presentation = compact ? labelPresentations.get(key) : null;
   if (presentation) return <span className="make-identity" data-inverse={inverse}>
     {presentation === 'emblem-and-name' && <MakeLogo make={make} />}<strong>{make}</strong>
   </span>;

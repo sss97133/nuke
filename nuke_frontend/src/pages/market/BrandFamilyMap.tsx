@@ -150,7 +150,7 @@ export default function BrandFamilyMap({ width, height, onPickBrand, onPickFamil
         aria-label={`${f.node.brand}: ${money(f.node.usd)}`}
         style={{ left: f.x, top: f.y, width: f.w, height: f.head }} title={`${f.node.brand}: ${money(f.node.usd)}`}>
         {f.text && <span className="brand-family-map__head">
-          <MakeIdentity make={f.node.brand} inverse />
+          <MakeIdentity make={f.node.brand} inverse compact />
           {f.text !== f.node.brand.toUpperCase() && <span className="brand-family-map__dollars">{moneyShort(f.node.usd)}</span>}
         </span>}
       </button>}
