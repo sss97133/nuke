@@ -39,6 +39,7 @@ import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { corsHeaders } from "../_shared/cors.ts";
 import { parseTitle } from "./titleParse.ts";
+import { extractBonhamsHighlights, isBonhamsNonVehicleLot, parseSellerAssessment } from "../extract-bonhams/lotPage.ts";
 import { archiveFetch } from "../_shared/archiveFetch.ts";
 import { requireWriteAuth } from "../_shared/writeGuard.ts";
 import { projectSecretKey } from "../_shared/supabaseKeys.ts";
@@ -283,11 +284,12 @@ function lotToExtraction(doc: BonhamsDoc, ctx: LandContext): Record<string, unkn
   const hammer = doc.price?.hammerPrice > 0 ? Math.round(doc.price.hammerPrice) : null;
   const ended = !!doc.flags?.isAuctionEnded;
   const runDay = String(doc.hammerTime?.datetime || doc.auctionEndDate?.datetime || "").slice(0, 10);
-  // Lot-level evidence that a lot is a vehicle (department is the sale's, so MOT-CAR also holds mascots, handbooks and helmets): a chassis,
-  // frame or VIN line in the title or catalog text, or a year the title parser found. Neither: an item, not a car (2026-10-16: 1,249 of the
-  // 2,422 Bonhams episodes with no year had neither, and every one sampled was memorabilia).
-  const hasMarker = /(chassis|frame)\s+no\.?|\bVIN[: .]/i.test(`${doc.title ?? ""} ${doc.catalogDesc ?? ""}`);
-  const nonVehicle = !hasMarker && m.listing_year == null;
+  // Lot-level evidence decides whether a lot is a vehicle (department is the sale's, so MOT-CAR also holds mascots, handbooks and helmets).
+  // 2026-10-16: 1,249 of the 2,422 Bonhams episodes with no year had no identity line, and every one sampled was memorabilia.
+  const nonVehicle = isBonhamsNonVehicleLot({ title: doc.title ?? null, catalogText: doc.catalogDesc, footnotes: doc.footnotes, year: m.listing_year ?? null });
+  const sellerAssessment = doc.footnotes ? parseSellerAssessment(doc.footnotes) : null;
+  const highlights = doc.catalogDesc ? extractBonhamsHighlights(doc.catalogDesc) : [];
+  const registration = (doc.catalogDesc || "").match(/Registration\s+no\.?\s*:?\s*([^<\n]{2,20})/i)?.[1]?.trim() ?? null;
   return {
     non_vehicle_item: nonVehicle,
     url: m.listing_url,
@@ -315,6 +317,8 @@ function lotToExtraction(doc: BonhamsDoc, ctx: LandContext): Record<string, unkn
     cost_cents: 0,
     event_key: doc.id,
     ...(pageNo ? { ts_page: pageNo } : {}),
+    ...(highlights.length ? { highlights } : {}),
+    ...(sellerAssessment ? { seller_assessment: sellerAssessment } : {}),
     extra_metadata: {
       ...(pageNo ? { ts_landed_at: observedAt, ts_sort: sortTag ?? "desc", ts_pass: pass ?? 0 } : {}),
       sale_key: `bonhams-${doc.auctionId}`,
@@ -331,7 +335,8 @@ function lotToExtraction(doc: BonhamsDoc, ctx: LandContext): Record<string, unkn
       currency: doc.currency?.iso_code ?? null,
       roster_first_seen_at: observedAt, // kept from the first read by extract-bonhams
       engine_number: (doc.catalogDesc || "").match(/Engine\s+no\.?\s*:?\s*([A-Z0-9*][A-Z0-9*./-]*)/i)?.[1]?.toUpperCase() ?? null,
-      registration: (doc.catalogDesc || "").match(/Registration\s+no\.?\s*:?\s*([^<\n]{2,20})/i)?.[1]?.trim() ?? null,
+      registration: registration && !/^(?:not\s+(?:uk\s+)?registered|unregistered|none|n\/a|tba|tbc)$/i.test(registration) ? registration : null,
+      ...(sellerAssessment ? { seller_assessment: sellerAssessment } : {}),
       without_reserve: !!doc.flags?.isWithoutReserve,
       bonhams_status: doc.status ?? null,
     },

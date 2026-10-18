@@ -1,6 +1,7 @@
 // A Bonhams lot page, read for what the search index does not carry: the whole photo gallery at full size, the sale's
-// name, venue and dates, the footnotes and the condition-report link. The page is a Next.js shell whose __NEXT_DATA__ holds
-// the lot and its auction; nothing is rendered. Pure functions, tested in lotPage.test.ts and vehicleFacets.test.ts.
+// name, venue and dates, the saleroom notices, the footnotes, the 100-point Seller's Assessment (Bonhams MPH) and the
+// condition-report / catalogue links. The page is a Next.js shell whose __NEXT_DATA__ holds the lot and its auction;
+// nothing is rendered. Pure functions, tested in lotPage.test.ts and vehicleFacets.test.ts.
 import { htmlToText } from '../_shared/htmlToText.ts';
 import { extractGeneralBodyStyle, extractVehicleFacets } from '../_shared/vehicleFacets.ts';
 import { normalizeVehicleFields } from '../_shared/normalizeVehicle.ts';
@@ -365,10 +366,36 @@ export function buildVehicleRecord(extracted: ExtractionResult): Record<string, 
   };
 }
 
+export interface SellerAssessmentCategory {
+  score: number;
+  max: number;
+  items: Record<string, number>;
+}
+
+export interface SellerAssessment {
+  vendor_score_total: number;
+  vendor_score_max: number;
+  summary_label?: string | null;
+  categories: {
+    exterior?: SellerAssessmentCategory;
+    running_gear?: SellerAssessmentCategory;
+    interior?: SellerAssessmentCategory;
+    electrical?: SellerAssessmentCategory;
+    engine?: SellerAssessmentCategory;
+  };
+  history_file?: {
+    score: number;
+    max: number;
+  };
+}
+
 export interface LotPage {
   images: Array<{ url: string; primary: boolean }>;
   catalog_text: string | null;
   footnotes: string | null;
+  saleroom_notices: string | null;
+  seller_assessment: SellerAssessment | null;
+  highlights: string[];
   chassis: string | null;
   engine_number: string | null;
   registration: string | null;
@@ -378,11 +405,229 @@ export interface LotPage {
   sale_ends_on: string | null;
   number_of_lots: number | null;
   condition_report_url: string | null;
+  catalogue_pdf_url: string | null;
   hammer_price: number | null;
   hammer_premium: number | null;
+  estimate_low: number | null;
+  estimate_high: number | null;
   currency: string | null;
   without_reserve: boolean | null;
+  lot_number: string | null;
+  sale_id: string | null;
+  lot_title: string | null;
   raw: Record<string, unknown>;
+}
+
+/**
+ * Parse Bonhams MPH 100-point Seller's Assessment from footnotes text or HTML.
+ * Example header: "Vendor Score Total: 20/100" (or "Vendor Score Total: 32/100 - Project").
+ * Categories: EXTERIOR TOTAL (x/25), RUNNING GEAR TOTAL (x/20), INTERIOR TOTAL (x/20),
+ * ELECTRICAL TOTAL (x/10), ENGINE TOTAL (x/20), Car History File: x (or x/5).
+ */
+export function parseSellerAssessment(rawText: string | null | undefined): SellerAssessment | null {
+  if (!rawText || typeof rawText !== 'string') return null;
+  const text = rawText.includes('<') ? htmlToText(rawText) : rawText;
+  const headerMatch = text.match(/Vendor\s+Score\s+Total\s*:\s*(\d{1,3})\s*\/\s*(\d{1,3})(?:\s*[-–—]\s*([^\n\r]+))?/i);
+  if (!headerMatch) return null;
+
+  const vendorScoreTotal = parseInt(headerMatch[1], 10);
+  const vendorScoreMax = parseInt(headerMatch[2], 10) || 100;
+  if (!Number.isFinite(vendorScoreTotal) || vendorScoreTotal < 0 || vendorScoreTotal > vendorScoreMax) return null;
+
+  const summaryLabel = headerMatch[3]?.trim() || null;
+
+  const categoryDefs: Array<{
+    key: keyof SellerAssessment['categories'];
+    headerRe: RegExp;
+    defaultMax: number;
+    itemPatterns: Array<[string, RegExp]>;
+  }> = [
+    {
+      key: 'exterior',
+      headerRe: /EXTERIOR\s+TOTAL\s*:\s*(\d{1,2})\s*\/\s*(\d{1,2})/i,
+      defaultMax: 25,
+      itemPatterns: [
+        ['body_work', /Body\s*Work\s*:\s*(\d)(?:\s*\/\s*5)?/i],
+        ['paint', /Paint\s*:\s*(\d)(?:\s*\/\s*5)?/i],
+        ['glass', /Glass\s*:\s*(\d)(?:\s*\/\s*5)?/i],
+        ['chrome_plastics_trim', /Chrome\s*\/\s*Plastics\s*\/\s*Trim\s*:\s*(\d)(?:\s*\/\s*5)?/i],
+        ['wheels_tyres', /Wheels\s*\/\s*Tyres\s*:\s*(\d)(?:\s*\/\s*5)?/i],
+      ],
+    },
+    {
+      key: 'running_gear',
+      headerRe: /RUNNING\s+GEAR\s+TOTAL\s*:\s*(\d{1,2})\s*\/\s*(\d{1,2})/i,
+      defaultMax: 20,
+      itemPatterns: [
+        ['gearbox_clutch', /Gearbox\s*\/\s*Clutch\s*:\s*(\d)(?:\s*\/\s*5)?/i],
+        ['axles', /Axles\s*:\s*(\d)(?:\s*\/\s*5)?/i],
+        ['suspension', /Suspension\s*:\s*(\d)(?:\s*\/\s*5)?/i],
+        ['brakes', /Brakes\s*:\s*(\d)(?:\s*\/\s*5)?/i],
+      ],
+    },
+    {
+      key: 'interior',
+      headerRe: /INTERIOR\s+TOTAL\s*:\s*(\d{1,2})\s*\/\s*(\d{1,2})/i,
+      defaultMax: 20,
+      itemPatterns: [
+        ['seats', /Seats\s*:\s*(\d)(?:\s*\/\s*5)?/i],
+        ['dashboard_door_cards_carpets', /Dashboard\s*\/\s*Door\s*cards\s*\/\s*Carpets\s*:\s*(\d)(?:\s*\/\s*5)?/i],
+        ['headlining', /Headlining\s*:\s*(\d)(?:\s*\/\s*5)?/i],
+        ['trim', /(?:^|\n)\s*Trim\s*:\s*(\d)(?:\s*\/\s*5)?/i],
+      ],
+    },
+    {
+      key: 'electrical',
+      headerRe: /ELECTRICAL\s+TOTAL\s*:\s*(\d{1,2})\s*\/\s*(\d{1,2})/i,
+      defaultMax: 10,
+      itemPatterns: [
+        ['main_components', /Main\s+components\s*:\s*(\d)(?:\s*\/\s*5)?/i],
+        ['ancillary_components', /Ancillary\s+components\s*:\s*(\d)(?:\s*\/\s*5)?/i],
+      ],
+    },
+    {
+      key: 'engine',
+      headerRe: /ENGINE\s+TOTAL\s*:\s*(\d{1,2})\s*\/\s*(\d{1,2})/i,
+      defaultMax: 20,
+      itemPatterns: [
+        ['starting', /Starting\s*:\s*(\d)(?:\s*\/\s*5)?/i],
+        ['running', /Running\s*:\s*(\d)(?:\s*\/\s*5)?/i],
+        ['under_bonnet', /Under\s+Bonnet\s*:\s*(\d)(?:\s*\/\s*5)?/i],
+        ['mechanical_components', /Mechanical\s+components\s*:\s*(\d)(?:\s*\/\s*5)?/i],
+      ],
+    },
+  ];
+
+  const categories: SellerAssessment['categories'] = {};
+  for (const def of categoryDefs) {
+    const m = text.match(def.headerRe);
+    const items: Record<string, number> = {};
+    for (const [itemKey, re] of def.itemPatterns) {
+      const im = text.match(re);
+      if (im) {
+        const val = parseInt(im[1], 10);
+        if (Number.isFinite(val)) items[itemKey] = val;
+      }
+    }
+    if (m || Object.keys(items).length > 0) {
+      const score = m ? parseInt(m[1], 10) : Object.values(items).reduce((a, b) => a + b, 0);
+      const max = m ? parseInt(m[2], 10) || def.defaultMax : def.defaultMax;
+      categories[def.key] = { score, max, items };
+    }
+  }
+
+  let historyFile: SellerAssessment['history_file'] | undefined;
+  const histMatch = text.match(/Car\s+History\s+File\s*:\s*(\d)(?:\s*\/\s*(\d))?/i);
+  if (histMatch) {
+    const score = parseInt(histMatch[1], 10);
+    const max = histMatch[2] ? parseInt(histMatch[2], 10) : 5;
+    if (Number.isFinite(score)) historyFile = { score, max };
+  }
+
+  return {
+    vendor_score_total: vendorScoreTotal,
+    vendor_score_max: vendorScoreMax,
+    ...(summaryLabel ? { summary_label: summaryLabel } : {}),
+    categories,
+    ...(historyFile ? { history_file: historyFile } : {}),
+  };
+}
+
+/**
+ * Extract bullet highlights from Bonhams catalogDesc HTML or plain text.
+ * Bonhams frequently starts LotDesc with `• Point 1<br />• Point 2` or `*Point 1<br />*Point 2`.
+ */
+export function extractBonhamsHighlights(catalogHtmlOrText: string | null | undefined): string[] {
+  if (!catalogHtmlOrText) return [];
+  const text = catalogHtmlOrText.includes('<') ? htmlToText(catalogHtmlOrText) : catalogHtmlOrText;
+  const highlights: string[] = [];
+  for (const rawLine of text.split(/\r?\n/)) {
+    const line = rawLine.trim();
+    const m = line.match(/^(?:[•●▪]\s*|\*(?=[A-Z0-9'"]))(.{4,160})$/);
+    if (m) {
+      const clean = m[1].trim().replace(/^[•*-\s]+/, '');
+      if (clean && !highlights.includes(clean)) highlights.push(clean);
+    }
+  }
+  return highlights;
+}
+
+/**
+ * Extract chassis number, engine number, and registration from catalog text + saleroom notices.
+ * Handles both formal header lines ("Chassis no. S818529", "Engine no. G7652-8S") and prose
+ * saleroom notices ("chassis number stamped on the ... which is 860286, and the engine block number stamping reads KJ2451-8").
+ */
+export function extractIdentifiersFromText(
+  catalogText: string | null | undefined,
+  noticesText?: string | null | undefined,
+): { chassis: string | null; engine_number: string | null; registration: string | null } {
+  const catalog = catalogText ?? '';
+  const notices = noticesText ?? '';
+  const combined = [catalog, notices].filter(Boolean).join('\n');
+
+  const rejectToken = /^(not|none|unknown|unrecorded|tba|n\/a|na|see|stamped|located|on|in|which|is|reads|the|a|an|and|to|with)$/i;
+  const cleanId = (raw: string | null | undefined): string | null => {
+    if (!raw) return null;
+    const token = raw.trim().replace(/^[#:'"“”‘’]+|[.,;:!?'"“”‘’)/-]+$/g, '').trim();
+    if (!token || token.length < 2 || token.length > 30) return null;
+    if (rejectToken.test(token)) return null;
+    if (!/\d/.test(token)) return null; // Vehicle chassis/engine numbers always contain at least one digit
+    return token.toUpperCase();
+  };
+
+  // 1. Formal "Chassis no. XXXXX" or "Frame no. XXXXX"
+  let chassis: string | null = null;
+  const formalChassis = combined.match(/(?:Chassis|Frame)\s+no\.?\s*:?\s*([A-Z0-9*][A-Za-z0-9*./-]*(?: [A-Z0-9][A-Za-z0-9*./-]*)?)/i);
+  if (formalChassis?.[1]) {
+    const firstWord = formalChassis[1].replace(/[./-]+$/, '').split(/\s+/)[0];
+    chassis = cleanId(firstWord);
+  }
+  // 2. Prose saleroom notice patterns: "chassis number ... which is 860286" / "chassis number is XXXXX" / "chassis number reads XXXXX"
+  if (!chassis) {
+    const proseChassisPatterns = [
+      /(?:chassis|frame)\s+(?:number|no\.?)\b[^.\n]{0,80}?\b(?:which\s+is|reads|is|:)\s*['"“”‘’]?([A-Z0-9][A-Z0-9*./-]{2,24})/i,
+      /(?:chassis|frame)\s+(?:number|no\.?)\s+(?:stamped\s+|reading\s+)?['"“”‘’]?([A-Z0-9][A-Z0-9*./-]{2,24})/i,
+    ];
+    for (const re of proseChassisPatterns) {
+      const m = combined.match(re);
+      const cand = cleanId(m?.[1]);
+      if (cand) {
+        chassis = cand;
+        break;
+      }
+    }
+  }
+
+  // 1. Formal "Engine no. XXXXX"
+  let engineNumber: string | null = null;
+  const formalEngine = combined.match(/Engine\s+no\.?\s*:?\s*([A-Z0-9*][A-Za-z0-9*./-]*(?: [A-Z0-9][A-Za-z0-9*./-]*)?)/i);
+  if (formalEngine?.[1]) {
+    const firstWord = formalEngine[1].replace(/[./-]+$/, '').split(/\s+/)[0];
+    engineNumber = cleanId(firstWord);
+  }
+  // 2. Prose saleroom notice patterns: "engine block number stamping reads KJ2451-8" / "engine number is XXXXX"
+  if (!engineNumber) {
+    const proseEnginePatterns = [
+      /engine\s+(?:block\s+)?(?:number|no\.?)\b[^.\n]{0,60}?\b(?:which\s+is|reads|is|:)\s*['"“”‘’]?([A-Z0-9][A-Z0-9*./-]{2,24})/i,
+      /engine\s+(?:block\s+)?(?:number|no\.?)\s+(?:stamped\s+|stamping\s+reads\s+|reading\s+)?['"“”‘’]?([A-Z0-9][A-Z0-9*./-]{2,24})/i,
+    ];
+    for (const re of proseEnginePatterns) {
+      const m = combined.match(re);
+      const cand = cleanId(m?.[1]);
+      if (cand) {
+        engineNumber = cand;
+        break;
+      }
+    }
+  }
+
+  // Registration no.
+  const regRaw = combined.match(/Registration\s+no\.?\s*:?\s*([^\n(]{2,25})/i)?.[1]?.trim() ?? null;
+  const registration = regRaw && !/^(not\s+(?:uk\s+)?registered|none|unregistered|n\/a|tba)$/i.test(regRaw)
+    ? regRaw
+    : null;
+
+  return { chassis, engine_number: engineNumber, registration };
 }
 
 /** A page that is not a lot page (a challenge, an error shell) comes back null; the caller must not treat it as data. */
@@ -408,32 +653,109 @@ export function parseLotPage(html: string): LotPage | null {
   }
 
   const catalog = typeof lot.sCatalogDesc === 'string' ? htmlToText(lot.sCatalogDesc) : '';
-  const grab = (label: string) => catalog.match(new RegExp(`${label}\\s*:?\\s*([A-Z0-9*][A-Za-z0-9*./-]*(?: [A-Z0-9][A-Za-z0-9*./-]*)?)`, 'i'))?.[1] ?? null;
-  const foot = [lot.footnote_sExtraDesc, lot.sExtraDesc].filter((x) => typeof x === 'string' && x.trim()).map((x: string) => htmlToText(x)).filter(Boolean);
+  const foot = [lot.footnote_sExtraDesc, lot.sExtraDesc]
+    .filter((x) => typeof x === 'string' && x.trim())
+    .map((x: string) => htmlToText(x))
+    .filter(Boolean);
+  const footnotesText = foot.length ? foot.join('\n\n') : null;
+
+  // Saleroom notices (lot.notices — e.g. chassis/engine stamping discovered at the venue)
+  const noticesRaw = Array.isArray(lot.notices)
+    ? lot.notices.map((n: unknown) => typeof n === 'string' ? htmlToText(n) : '').filter(Boolean).join('\n\n')
+    : (typeof lot.notices === 'string' && lot.notices.trim() ? htmlToText(lot.notices) : '');
+  const saleroomNotices = noticesRaw || null;
+
+  const ids = extractIdentifiersFromText(catalog, saleroomNotices);
+  const sellerAssessment = parseSellerAssessment(footnotesText);
+  const highlights = extractBonhamsHighlights(lot.sCatalogDesc || catalog);
 
   const starts: string[] = (auction?.dates?.start ?? []).map((s: any) => String(s?.date?.datetime ?? '').slice(0, 10)).filter(Boolean).sort();
-  const end = String(auction?.dates?.end?.datetime ?? '').slice(0, 10);
+  const end = String(auction?.dates?.end?.datetime ?? lot?.hammerTime?.datetime ?? '').slice(0, 10);
   const num = (v: unknown) => (typeof v === 'number' && v > 0 ? Math.round(v) : null);
   const cond = typeof lot.sCondition === 'string' && /^https:\/\//.test(lot.sCondition) ? lot.sCondition : null;
+  const catPdf = typeof auction?.catalogue?.download_path === 'string' && /^https:\/\//.test(auction.catalogue.download_path)
+    ? auction.catalogue.download_path
+    : null;
+
+  const lotNo = lot.iSaleLotNo != null ? `${lot.iSaleLotNo}${lot.sSaleLotNoA || ''}`.trim() : null;
+  const saleId = (auction?.iSaleNo ?? lot.iSaleNo?.iSaleNo) != null ? String(auction?.iSaleNo ?? lot.iSaleNo?.iSaleNo) : null;
+  const lotTitle = typeof lot.sDesc === 'string' && lot.sDesc.trim() ? htmlToText(lot.sDesc).trim() : null;
 
   return {
     images,
     catalog_text: catalog || null,
-    footnotes: foot.length ? foot.join('\n\n') : null,
-    chassis: grab('Chassis no\\.?')?.replace(/[./-]+$/, '').toUpperCase().split(' ')[0] ?? null,
-    engine_number: grab('Engine no\\.?')?.toUpperCase().split(' ')[0] ?? null,
-    registration: catalog.match(/Registration no\.?\s*:?\s*([^\n(]{2,20})/i)?.[1]?.trim() ?? null,
+    footnotes: footnotesText,
+    saleroom_notices: saleroomNotices,
+    seller_assessment: sellerAssessment,
+    highlights,
+    chassis: ids.chassis,
+    engine_number: ids.engine_number,
+    registration: ids.registration,
     sale_name: htmlToText(String(auction?.sSaleName ?? '')) || null,
     sale_venue: htmlToText(String(auction?.sVenue ?? '')) || null,
     sale_starts_on: starts[0] ?? null,
     sale_ends_on: end || starts[starts.length - 1] || null,
     number_of_lots: num(auction?.number_of_lots),
     condition_report_url: cond,
+    catalogue_pdf_url: catPdf,
     hammer_price: num(lot.dHammerPrice),
     hammer_premium: num(lot.dHammerPremium),
+    estimate_low: num(lot.dEstimateLow),
+    estimate_high: num(lot.dEstimateHigh),
     currency: lot.currency?.iso_code ?? null,
     without_reserve: typeof lot.lWithoutReserve === 'boolean' ? lot.lWithoutReserve : null,
+    lot_number: lotNo || null,
+    sale_id: saleId,
+    lot_title: lotTitle,
     // The retained capture: the lot and its auction, without the neighbouring-lot and related-lot lists.
     raw: { lot: { ...lot, prev_next_lot: undefined, relatedLots: undefined }, auction: { ...auction, highlights: undefined, groups: undefined, aggregated: undefined } },
   };
 }
+
+/** The lot page as cars.bonhams.com serves it: the same lot, with the whole lot in __NEXT_DATA__ (www.bonhams.com redirects there). */
+export function bonhamsLotPageUrl(url: string): string {
+  return url.replace(/^https?:\/\/(?:www\.)?bonhams\.com\/auction\//i, 'https://cars.bonhams.com/auction/').replace(/\/?$/, '/');
+}
+
+// A model, a toy or a part, whatever year the title carries.
+const MODEL_OR_TOY = /\b(?:child'?s|children'?s|pedal\s+car|half[- ]scale|quarter[- ]scale|\d+:\d+\s+scale|scale\s+model|display\s+model|wind\s+tunnel\s+model)\b/i;
+// Automobilia: keeps a year-less lot an item even when its title names a body ("a bronze sculpture of a roadster").
+const AUTOMOBILIA = /\b(?:sculpture|bronze|mascot|badge|sign|poster|painting|artwork|lithograph|photograph|watch|chronograph|luggage|suitcase|helmet|overalls|race\s+suit|trophy|handbook|brochure|catalogue|tool\s?kit|set\s+of\s+(?:four\s+|five\s+)?wheels|registration\s+mark)\b/i;
+// Lot-level evidence of a vehicle: an identity line or a Seller's Assessment in the text, or a body or project noun in the title.
+const VEHICLE_LINE = /(?:chassis|frame|registration)\s+no\.?|\bVIN[: .]|vendor\s+score\s+total|car\s+history\s+file/i;
+const BODY_NOUN = /\b(?:replica|project|roadster|coup[eé]|saloon|sedan|tourer|cabriolet|convertible|limousine|phaeton|berlinetta|spyder|spider|targa|shooting\s+brake|pick-?up|landaul?et|drophead|fixed[- ]head|buggy|cyclecar)\b/i;
+
+/**
+ * A Bonhams motor-car sale also sells mascots, handbooks and models; the department is the sale's, so the lot decides.
+ * A year-less lot with no identity line was an item (#1693), but "Zealia Engineering D-Type Replica Project" (no year,
+ * "Registration no. not registered", chassis in the saleroom notice) was landed as one, so a registration line, a
+ * Seller's Assessment or a body noun in the title now also mark a vehicle.
+ */
+export function isBonhamsNonVehicleLot(lot: { title: string | null; catalogText?: string | null; footnotes?: string | null; year: number | null }): boolean {
+  const title = lot.title ?? '';
+  if (MODEL_OR_TOY.test(title)) return true;
+  if (lot.year != null) return false;
+  if (AUTOMOBILIA.test(title)) return true;
+  const text = `${title} ${lot.catalogText ?? ''} ${lot.footnotes ?? ''}`;
+  return !(VEHICLE_LINE.test(text) || BODY_NOUN.test(title));
+}
+
+/** The seller's own 100-point assessment as a vehicle_condition_scores row (tiers on the v1 scale). Self-reported, not verified. */
+export function sellerAssessmentConditionScore(a: SellerAssessment): Record<string, unknown> {
+  const pct = (score: number, max: number) => (max > 0 ? Math.round((score / max) * 100) : null);
+  const total = Math.max(0, Math.min(100, pct(a.vendor_score_total, a.vendor_score_max) ?? 0));
+  const { exterior, interior, engine, running_gear, electrical } = a.categories;
+  const mech = [engine, running_gear, electrical].filter((c): c is SellerAssessmentCategory => !!c);
+  return {
+    condition_score: total,
+    condition_tier: total >= 80 ? 'excellent' : total >= 65 ? 'good' : total >= 45 ? 'driver' : 'project',
+    exterior_score: exterior ? pct(exterior.score, exterior.max) : null,
+    interior_score: interior ? pct(interior.score, interior.max) : null,
+    mechanical_score: mech.length ? pct(mech.reduce((s, c) => s + c.score, 0), mech.reduce((s, c) => s + c.max, 0)) : null,
+    provenance_score: a.history_file ? pct(a.history_file.score, a.history_file.max) : null,
+    computation_version: SELLER_ASSESSMENT_VERSION,
+    descriptor_summary: { source: 'bonhams_seller_assessment', self_reported: true, ...a },
+  };
+}
+
+export const SELLER_ASSESSMENT_VERSION = 'bonhams-mph-100pt-v1';
