@@ -423,6 +423,18 @@ capture identity, disagreement, withdrawal and anonymous-reader behavior must be
 adding a pointer alone does not close the case. Current stage: local implementation and focused tests;
 publication/deployment evidence belongs in the private lane receipt.
 
+The October 18 observation-load replay uses one retained C&B page and the live observation-index
+definition in disposable PostgreSQL 17. The old writer returns no observation ID and a contained
+error: its 6,808-byte index row exceeds the 2,704-byte limit. Compact fields occupy 1,380 bytes;
+full text stays in `content_text` and import metadata in `extraction_metadata.raw`. Opt-in raw-data
+hashing retains materially different evidence in dedup while existing callers keep their old hash.
+The source capture clock stays separate from database ingest time. A caller must await the writer,
+inspect its errors, and read back the same source, vehicle, clock and evidence on an unsuperseded
+row; a duplicate ID alone is insufficient. The local replay proves admission, identical-input dedup
+and supersession refusal, with registry/provenance branches isolated. Earlier vehicle writes are
+separate and are not rolled back by an observation failure. Production delivery, full intake/RLS,
+typed capture bindings and fleet coverage remain separate evidence in the private ETL receipt.
+
 ## 7. Hypotheses the owner wants tested as veins (in the vocabulary)
 
 - **The repair chain precedes the market event.** "How many thermostats had to sell before an AC system sold, before
