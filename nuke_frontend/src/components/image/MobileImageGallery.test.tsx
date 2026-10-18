@@ -232,3 +232,40 @@ it.each(['error', 'empty'])('gallery-record-clock: preserves the entire $name re
   expect(galleryView()).toEqual(pending(fixture.lead, kind === 'error' ? 'Gallery could not be read.' : 'No additional photos in this read.'));
   expect(reads).toHaveLength(1); await click('×'); expect(gallery()).toBeNull();
 });
+
+function navigationView() { return { counter: gallery()!.firstElementChild!.firstElementChild!.textContent,
+  images: galleryView()!.images, buttons: galleryView()!.buttons }; }
+async function prepareNavigation(matching: boolean) {
+  await render();
+  if (!matching) {
+    fixture.lead = 'https://photos.test/screened-lead-outside-current-result.jpg';
+    await act(async () => root.render(<React.Profiler id="mobile-subject" onRender={() => frames.push(galleryView())}><VehicleHeroImage /></React.Profiler>));
+  }
+  await open(); expect(reads).toHaveLength(1);
+}
+const navigationResult = (rows: Photo[], index: number) => ({ counter: `${index + 1} / ${rows.length}`,
+  images: [{ src: rows[index].image_url, alt: rows[index].caption }], buttons: rows.length > 1 ? ['×', '‹', '›'] : ['×'] });
+it.each([
+  { name: 'previous pending with unmatched lead', action: 'previous', times: 1, matching: false, count: 2, index: 0 },
+  { name: 'repeated previous pending with unmatched lead', action: 'previous', times: 2, matching: false, count: 2, index: 0 },
+  { name: 'previous pending with one unmatched row', action: 'previous', times: 1, matching: false, count: 1, index: 0 },
+  { name: 'previous pending retains matching lead selection', action: 'previous', times: 1, matching: true, count: 2, index: 1 },
+  { name: 'next pending preserves the first unmatched row', action: 'next', times: 1, matching: false, count: 2, index: 0 },
+  { name: 'no pending action preserves the first unmatched row', action: 'none', times: 0, matching: false, count: 2, index: 0 },
+])('pending-navigation: $name', async ({ action, times, matching, count, index }) => {
+  await prepareNavigation(matching); const before = navigationView();
+  expect(before).toEqual({ counter: 'Reading gallery…', images: [{ src: fixture.lead, alt: 'Vehicle image' }], buttons: ['×'] });
+  for (let i = 0; i < times; i++) await swipe(action === 'previous' ? [100, 100] : [200, 100], action === 'previous' ? [200, 100] : [100, 100]);
+  expect(navigationView()).toEqual(before); const rows = photos('synthetic-a').slice(0, count), raw = structuredClone(rows); await settle(0, rows);
+  expect(navigationView()).toEqual(navigationResult(rows, index)); expect(rows).toEqual(raw); expect(reads).toHaveLength(1);
+});
+it('pending-navigation: loaded previous wraps normally from the first retained row', async () => {
+  await prepareNavigation(false); const rows = photos('synthetic-a'); await settle(0, rows);
+  expect(navigationView()).toEqual(navigationResult(rows, 0)); await click('‹'); expect(navigationView()).toEqual(navigationResult(rows, 1));
+  await click('›'); expect(navigationView()).toEqual(navigationResult(rows, 0)); expect(reads).toHaveLength(1);
+});
+it('pending-navigation: a missing move endpoint leaves a useful pending selection intact', async () => {
+  await prepareNavigation(false); const before = navigationView(); await touch('touchstart', [100, 100]); await touch('touchend', [200, 100]);
+  expect(navigationView()).toEqual(before); const rows = photos('synthetic-a'); await settle(0, rows);
+  expect(navigationView()).toEqual(navigationResult(rows, 0)); expect(reads).toHaveLength(1);
+});

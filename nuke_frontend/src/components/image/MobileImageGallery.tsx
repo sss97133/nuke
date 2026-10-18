@@ -98,7 +98,7 @@ const MobileImageGallery: React.FC<MobileImageGalleryProps> = ({ vehicleId, lead
   };
 
   const handlePrevious = () => {
-    setCurrentIndex((prev) => (prev > 0 ? prev - 1 : images.length - 1));
+    setCurrentIndex((prev) => (images.length === 0 ? 0 : (prev > 0 ? prev - 1 : images.length - 1)));
   };
 
   const handleNext = () => {
