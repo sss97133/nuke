@@ -15,7 +15,7 @@ import {
 import {
   buildFacetDrilldownUrl,
   resolveVehicleMarketFamily,
-} from '../../pages/vehicle-profile/VehicleBadgeBar';
+} from '../../pages/vehicle-profile/vehicleMarketFamily';
 
 export type ClassifiedVehicleFacet = VehicleFacetClassification & {
   family: string | null;

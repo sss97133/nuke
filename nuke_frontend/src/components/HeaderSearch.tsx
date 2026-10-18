@@ -4,6 +4,11 @@ import {
   isPickupFamilyLabel,
   resolveTileBadgeSvg,
 } from '../pages/familyFacetsAndEmblems';
+import {
+  resolveVehicleIdentityMarks,
+  type MarketCohortShortcut,
+  type VehicleIdentityMark,
+} from '../lib/market/vehicleTaxonomy';
 import AIDataIngestionSearch from './search/AIDataIngestionSearch';
 
 export interface SearchFacetInput {
@@ -651,11 +656,16 @@ export function buildFacetExpandedOrFilter(
 export interface HeaderSearchFacetPillsProps extends SearchFacetInput {
   compact?: boolean;
   className?: string;
+  /** Vetted era mark for the row; shown in place of the derived tile emblem. */
+  eraMark?: VehicleIdentityMark | null;
+  eraMarkTestId?: string;
 }
 
 export const HeaderSearchFacetPills: React.FC<HeaderSearchFacetPillsProps> = ({
   compact = false,
   className = '',
+  eraMark = null,
+  eraMarkTestId,
   ...facetInput
 }) => {
   const summary = React.useMemo(
@@ -675,7 +685,8 @@ export const HeaderSearchFacetPills: React.FC<HeaderSearchFacetPillsProps> = ({
     ],
   );
 
-  if (summary.pills.length === 0 && !summary.badgeSvg) {
+  const badgeSvg = eraMark ? undefined : summary.badgeSvg;
+  if (summary.pills.length === 0 && !badgeSvg && !eraMark) {
     return null;
   }
 
@@ -689,14 +700,15 @@ export const HeaderSearchFacetPills: React.FC<HeaderSearchFacetPillsProps> = ({
 
   return (
     <div className={rootClassName} data-testid="header-search-facets">
-      {summary.badgeSvg && (
+      {eraMark && <HeaderSearchEraMark mark={eraMark} testId={eraMarkTestId} />}
+      {badgeSvg && (
         <span
           className="header-search-facet-emblem"
           data-testid="header-search-facet-emblem"
           title={[summary.year, summary.make, summary.trim ?? summary.series ?? summary.body]
             .filter(Boolean)
             .join(' ')}
-          dangerouslySetInnerHTML={{ __html: summary.badgeSvg }}
+          dangerouslySetInnerHTML={{ __html: badgeSvg }}
         />
       )}
       {summary.pills.map((pill) => (
@@ -711,6 +723,108 @@ export const HeaderSearchFacetPills: React.FC<HeaderSearchFacetPillsProps> = ({
           <span className="header-search-facet-sep">·</span>
           <span className="header-search-facet-value">{pill.value}</span>
         </span>
+      ))}
+    </div>
+  );
+};
+
+/**
+ * Resolves the vetted era mark for a header search vehicle row. A row without a recorded
+ * or titled model year gets no mark: the era is what the mark asserts.
+ */
+export function resolveSearchResultEraMark(input: SearchFacetInput): VehicleIdentityMark | null {
+  const compositeText = [input.title, input.label, input.subtitle, input.description]
+    .map((part) => (typeof part === 'string' ? part.trim() : ''))
+    .filter(Boolean)
+    .join(' ');
+  const make = parseMakeFromText(input.make, compositeText);
+  const year = parseYearFromText(input.year, compositeText);
+  if (!make || year == null) return null;
+
+  const model = input.model?.trim() || input.familyLabel?.trim() || compositeText || null;
+  const marks = resolveVehicleIdentityMarks({
+    brand: make,
+    family: model,
+    year,
+    seriesCode: input.series ?? null,
+    trimPackage: input.trim ?? null,
+    bodyStyle: input.bodyStyle ?? null,
+  });
+  return marks[0] ?? null;
+}
+
+export interface HeaderSearchEraMarkProps {
+  mark: VehicleIdentityMark;
+  testId?: string;
+}
+
+export const HeaderSearchEraMark: React.FC<HeaderSearchEraMarkProps> = ({ mark, testId }) => (
+  <span
+    className="header-search-era-mark"
+    data-testid={testId ?? 'header-search-era-mark'}
+    data-mark-id={mark.id}
+    title={`${mark.displayLabel} — ${mark.provenanceNote}`}
+    aria-label={`${mark.displayLabel}: ${mark.provenanceNote}`}
+    role="img"
+    dangerouslySetInnerHTML={{ __html: mark.svgMarkup }}
+  />
+);
+
+export interface HeaderSearchCohortShortcutsProps {
+  shortcuts: readonly MarketCohortShortcut[];
+  onSelect: (shortcut: MarketCohortShortcut) => void;
+  activeIndex?: number;
+  onActivate?: (index: number) => void;
+}
+
+/** Market Map cohort shortcuts (SERIES / TRIM / BODY drilldowns) shown above header search results. */
+export const HeaderSearchCohortShortcuts: React.FC<HeaderSearchCohortShortcutsProps> = ({
+  shortcuts,
+  onSelect,
+  activeIndex = -1,
+  onActivate,
+}) => {
+  if (shortcuts.length === 0) return null;
+
+  return (
+    <div className="header-search-cohorts" data-testid="market-cohort-shortcuts-section">
+      <div className="header-search-cohorts-head">
+        <span>MARKET COHORT SHORTCUTS</span>
+        <span>FACET DRILLDOWN</span>
+      </div>
+      {shortcuts.map((shortcut, index) => (
+        <button
+          key={shortcut.id}
+          type="button"
+          className={[
+            'header-search-cohort',
+            index === activeIndex ? 'header-search-cohort--active' : '',
+          ]
+            .filter(Boolean)
+            .join(' ')}
+          data-testid={`market-cohort-shortcut-${shortcut.id}`}
+          onMouseDown={(e) => e.preventDefault()}
+          onMouseEnter={() => onActivate?.(index)}
+          onClick={() => onSelect(shortcut)}
+        >
+          <span
+            className="header-search-cohort-mark"
+            aria-hidden="true"
+            dangerouslySetInnerHTML={{ __html: shortcut.svgMarkup }}
+          />
+          <span className="header-search-cohort-text">
+            <span className="header-search-cohort-label" data-testid="market-cohort-shortcut-label">
+              {shortcut.make} {shortcut.family} · {shortcut.axisDisplayLabel}: {shortcut.facet}
+            </span>
+            <span className="header-search-cohort-sub">{shortcut.subLabel}</span>
+          </span>
+          {shortcut.yearRangeLabel && (
+            <span className="header-search-cohort-era" data-testid="market-cohort-shortcut-era">
+              {shortcut.yearRangeLabel}
+            </span>
+          )}
+          <span className="header-search-cohort-pill">MARKET MAP</span>
+        </button>
       ))}
     </div>
   );
