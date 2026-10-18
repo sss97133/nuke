@@ -121,4 +121,15 @@ describe('the map\'s callouts', () => {
   it('does not repeat the largest tile when it is already the gain or the loss', () => {
     expect(callouts([node('Ferrari', 856, 588, 231e6), node('Kia', 25, 24, 1e6)], base).map((x) => x.kind)).toEqual(['gain']);
   });
+  it('leaves a clear move out when its tile holds under 0.5% of the window\'s dollars', () => {
+    // 2026-10-17: Ariel 21 -> 61 (+190%, $2.5M of $3.0B) cleared the noise test and outranked Ferrari's gain.
+    const c = callouts([node('Ferrari', 1061, 712, 450e6), node('Porsche', 4690, 4023, 510e6), node('BMW', 2700, 2967, 90e6),
+      node('Ariel', 61, 21, 2.5e6), node('Kawasaki', 60, 148, 1.4e6)], base);
+    expect(c.map((x) => `${x.kind} ${x.name}`)).toEqual(['gain Ferrari', 'loss BMW', 'largest Porsche']);
+  });
+  it('leaves a clear move out when either window holds under twice the color\'s sales gate', () => {
+    const c = callouts([node('Porsche', 4000, 4000, 510e6), node('Lotus', 100, 39, 60e6)], base);
+    expect(c.find((x) => x.kind === 'gain')).toBeUndefined();
+    expect(callouts([node('Porsche', 4000, 4000, 510e6), node('Lotus', 100, 40, 60e6)], base).find((x) => x.kind === 'gain')?.name).toBe('Lotus');
+  });
 });

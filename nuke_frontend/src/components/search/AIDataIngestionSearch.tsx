@@ -2,11 +2,14 @@ import React, { useMemo, useState, useRef, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { supabase, getCurrentUserId } from '../../lib/supabase';
 import {
+  HeaderSearchCohortShortcuts,
   HeaderSearchFacetPills,
   boostAndFilterVehicleSearchResults,
   buildFacetExpandedOrFilter,
   extractQueryFacets,
+  resolveSearchResultEraMark,
 } from '../HeaderSearch';
+import { resolveMarketCohortShortcuts, type MarketCohortShortcut } from '../../lib/market/vehicleTaxonomy';
 import { aiDataIngestion, type ExtractionResult, ingestVehicle } from '../../services/aiDataIngestion';
 import { dataRouter, type DatabaseOperationPlan } from '../../services/dataRouter';
 import { findPublicVehicleByVin } from '../../lib/vehicleByVin';
@@ -313,6 +316,37 @@ export default function AIDataIngestionSearch() {
     setSelectedAutocompleteIndex(-1);
   }, [location.pathname, location.search]);
 
+  const cohortShortcuts = useMemo(
+    () => (isProcessing || attachedImage || showPreview || normalizeUrlInput(input.trim())
+      ? []
+      : resolveMarketCohortShortcuts(input, 3)),
+    [input, isProcessing, attachedImage, showPreview],
+  );
+
+  const resultEraMarks = useMemo(() => {
+    const marks = new Map<string, ReturnType<typeof resolveSearchResultEraMark>>();
+    for (const result of autocompleteResults) {
+      if (result.type !== 'vehicle' && result.type !== 'vin_match') continue;
+      const mark = resolveSearchResultEraMark({
+        year: result.metadata?.year,
+        make: result.metadata?.make,
+        model: result.metadata?.model || result.metadata?.normalized_model,
+        series: result.metadata?.series,
+        trim: result.metadata?.trim,
+        bodyStyle: result.metadata?.body_style,
+        title: result.title,
+      });
+      if (mark) marks.set(`${result.type}-${result.id}`, mark);
+    }
+    return marks;
+  }, [autocompleteResults]);
+
+  const handleCohortShortcutSelect = (shortcut: MarketCohortShortcut) => {
+    dismissAutocomplete();
+    navigate(shortcut.url);
+    setInput('');
+  };
+
   const vehicleIdFromRoute = useMemo(() => {
     const m = location.pathname.match(/\/vehicle\/([a-f0-9-]{36})/);
     return m ? m[1] : null;
@@ -362,6 +396,11 @@ export default function AIDataIngestionSearch() {
 
     // VINs can be searched - universal search handles them
 
+    // Cohort shortcuts resolve locally, so they show before the debounced search returns.
+    if (cohortShortcuts.length > 0) {
+      setShowAutocomplete(true);
+    }
+
     autocompleteDebounceRef.current = setTimeout(async () => {
       try {
         const [response, resolvedScope] = await Promise.all([
@@ -377,6 +416,42 @@ export default function AIDataIngestionSearch() {
         let combinedResults = response.results;
         const canonicalFamilyOrModel = resolvedScope?.model || resolvedScope?.family_name || '';
         const queryFacetAnalysis = extractQueryFacets(trimmedInput);
+
+        const publishResults = (rawResults: UniversalSearchResult[], resetSelection: boolean) => {
+          let shown = rawResults;
+          if (queryFacetAnalysis.hasFacetIntent) {
+            shown = boostAndFilterVehicleSearchResults(trimmedInput, shown);
+          }
+
+          if (resolvedScope) {
+            const scopeUrl = buildMarketScopeUrl(resolvedScope, isOnMarketTab(location.pathname, location.search) ? location.search : '');
+            const scopeTitle = [resolvedScope.year, resolvedScope.make, resolvedScope.model || resolvedScope.family_name]
+              .filter(Boolean)
+              .join(' ');
+            const marketResult: UniversalSearchResult = {
+              id: `market_scope:${scopeUrl}`,
+              type: 'tag',
+              title: scopeTitle || trimmedInput,
+              subtitle: 'MARKET COHORT · CLICK TO VIEW IN MARKET',
+              relevance_score: 1,
+              metadata: {
+                marketUrl: scopeUrl,
+                tag: scopeTitle || trimmedInput,
+              },
+            };
+            shown = [marketResult, ...shown.slice(0, 23)];
+          }
+
+          setAutocompleteResults(shown);
+          setAutocompleteAISuggestion(response.ai_suggestion || null);
+          const totalCount = Math.max(response.total_count || 0, shown.length);
+          setAutocompleteTotalCount(totalCount > 0 ? totalCount : shown.length);
+          setShowAutocomplete(shown.length > 0 || !!response.ai_suggestion || cohortShortcuts.length > 0);
+          if (resetSelection) setSelectedAutocompleteIndex(-1);
+        };
+
+        // Edge results show at once; the local fallback below can only add to them.
+        publishResults(combinedResults, true);
 
         if (combinedResults.length < 8 || canonicalFamilyOrModel || queryFacetAnalysis.hasFacetIntent) {
           try {
@@ -396,7 +471,8 @@ export default function AIDataIngestionSearch() {
 
             const { data: vehicles } = await queryBuilder
               .order('sale_price', { ascending: false, nullsFirst: false })
-              .limit(16);
+              .limit(16)
+              .abortSignal(AbortSignal.timeout(4000));
 
             if (cancelled || reqId !== autocompleteRequestIdRef.current) return;
 
@@ -433,43 +509,12 @@ export default function AIDataIngestionSearch() {
                 return true;
               });
               combinedResults = merged.slice(0, 24);
+              publishResults(combinedResults, false);
             }
           } catch {
             // Ignore fallback errors; keep edge results.
           }
         }
-
-        if (queryFacetAnalysis.hasFacetIntent) {
-          combinedResults = boostAndFilterVehicleSearchResults(trimmedInput, combinedResults);
-        }
-
-        if (resolvedScope) {
-          const scopeUrl = buildMarketScopeUrl(resolvedScope, isOnMarketTab(location.pathname, location.search) ? location.search : '');
-          const scopeTitle = [resolvedScope.year, resolvedScope.make, resolvedScope.model || resolvedScope.family_name]
-            .filter(Boolean)
-            .join(' ');
-          const marketResult: UniversalSearchResult = {
-            id: `market_scope:${scopeUrl}`,
-            type: 'tag',
-            title: scopeTitle || trimmedInput,
-            subtitle: 'MARKET COHORT · CLICK TO VIEW IN MARKET',
-            relevance_score: 1,
-            metadata: {
-              marketUrl: scopeUrl,
-              tag: scopeTitle || trimmedInput,
-            },
-          };
-          combinedResults = [marketResult, ...combinedResults.slice(0, 23)];
-        }
-
-        if (cancelled || reqId !== autocompleteRequestIdRef.current) return;
-
-        setAutocompleteResults(combinedResults);
-        setAutocompleteAISuggestion(response.ai_suggestion || null);
-        const totalCount = Math.max(response.total_count || 0, combinedResults.length);
-        setAutocompleteTotalCount(totalCount > 0 ? totalCount : combinedResults.length);
-        setShowAutocomplete(combinedResults.length > 0 || !!response.ai_suggestion);
-        setSelectedAutocompleteIndex(-1);
 
       } catch (error) {
         if (cancelled || reqId !== autocompleteRequestIdRef.current) return;
@@ -477,7 +522,7 @@ export default function AIDataIngestionSearch() {
         setAutocompleteResults([]);
         setAutocompleteAISuggestion(null);
         setAutocompleteTotalCount(null);
-        setShowAutocomplete(false);
+        setShowAutocomplete(cohortShortcuts.length > 0);
       }
     }, 300); // 300ms debounce
 
@@ -488,7 +533,7 @@ export default function AIDataIngestionSearch() {
         autocompleteDebounceRef.current = null;
       }
     };
-  }, [input, isProcessing, attachedImage, showPreview]);
+  }, [input, isProcessing, attachedImage, showPreview, cohortShortcuts]);
 
   // ── Magic Box: Intent classification on every keystroke ──
   useEffect(() => {
@@ -1250,12 +1295,13 @@ export default function AIDataIngestionSearch() {
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
-    // Handle autocomplete navigation
-    if (showAutocomplete && autocompleteResults.length > 0) {
+    // Handle autocomplete navigation: cohort shortcuts first, then results
+    const navigableCount = cohortShortcuts.length + autocompleteResults.length;
+    if (showAutocomplete && navigableCount > 0) {
       if (e.key === 'ArrowDown') {
         e.preventDefault();
         setSelectedAutocompleteIndex(prev => 
-          prev < autocompleteResults.length - 1 ? prev + 1 : prev
+          prev < navigableCount - 1 ? prev + 1 : prev
         );
         return;
       }
@@ -1268,9 +1314,11 @@ export default function AIDataIngestionSearch() {
         e.preventDefault();
         e.stopPropagation();
         // If an item is selected, navigate to it
-        if (selectedAutocompleteIndex >= 0) {
-          const selected = autocompleteResults[selectedAutocompleteIndex];
-          handleAutocompleteSelect(selected);
+        if (selectedAutocompleteIndex >= 0 && selectedAutocompleteIndex < cohortShortcuts.length) {
+          handleCohortShortcutSelect(cohortShortcuts[selectedAutocompleteIndex]);
+        } else if (selectedAutocompleteIndex >= 0) {
+          const selected = autocompleteResults[selectedAutocompleteIndex - cohortShortcuts.length];
+          if (selected) handleAutocompleteSelect(selected);
         } else {
           // No item highlighted - close autocomplete and navigate to full search
           setShowAutocomplete(false);
@@ -1786,6 +1834,12 @@ export default function AIDataIngestionSearch() {
           background: 'var(--white)', border: '2px solid var(--border)', zIndex: 1203,
           fontSize: '11px', fontFamily: 'Arial, sans-serif',
         }}>
+          <HeaderSearchCohortShortcuts
+            shortcuts={cohortShortcuts}
+            onSelect={handleCohortShortcutSelect}
+            activeIndex={selectedAutocompleteIndex}
+            onActivate={setSelectedAutocompleteIndex}
+          />
           {makeStatsLoading ? (
             <div style={{ padding: '12px', display: 'flex', alignItems: 'center', gap: '10px' }}>
               <div style={{
@@ -1899,8 +1953,9 @@ export default function AIDataIngestionSearch() {
       )}
 
       {/* Standard autocomplete dropdown — for QUERY and other text intents */}
-      {input.trim().length >= 2 && showAutocomplete && autocompleteResults.length > 0 && currentIntent !== 'EXACT_URL' && currentIntent !== 'EXACT_VIN' && !(currentIntent === 'BROWSE' && (makeStats || makeStatsLoading)) && (
+      {input.trim().length >= 2 && showAutocomplete && (autocompleteResults.length > 0 || cohortShortcuts.length > 0) && currentIntent !== 'EXACT_URL' && currentIntent !== 'EXACT_VIN' && !(currentIntent === 'BROWSE' && (makeStats || makeStatsLoading)) && (
         <div
+          data-testid="header-search-dropdown"
           style={{
             position: 'absolute',
             top: '100%',
@@ -1929,8 +1984,17 @@ export default function AIDataIngestionSearch() {
             </div>
           )}
 
+          <HeaderSearchCohortShortcuts
+            shortcuts={cohortShortcuts}
+            onSelect={handleCohortShortcutSelect}
+            activeIndex={selectedAutocompleteIndex}
+            onActivate={setSelectedAutocompleteIndex}
+          />
+
           {/* Rich results with thumbnails */}
-          {autocompleteResults.map((result, index) => {
+          {autocompleteResults.map((result, resultIndex) => {
+            const index = cohortShortcuts.length + resultIndex;
+            const eraMark = resultEraMarks.get(`${result.type}-${result.id}`);
             const typeColors: Record<string, string> = {
               vehicle: 'var(--accent)',
               organization: 'var(--success)',
@@ -1943,6 +2007,7 @@ export default function AIDataIngestionSearch() {
             return (
               <div
                 key={`${result.type}-${result.id}`}
+                data-testid={`header-search-result-${result.id}`}
                 onClick={() => handleAutocompleteSelect(result as any)}
                 onMouseEnter={() => setSelectedAutocompleteIndex(index)}
                 style={{
@@ -2015,6 +2080,8 @@ export default function AIDataIngestionSearch() {
                       title={result.title}
                       subtitle={result.subtitle}
                       description={result.description}
+                      eraMark={eraMark}
+                      eraMarkTestId={`header-search-result-era-mark-${result.id}`}
                     />
                   )}
                 </div>

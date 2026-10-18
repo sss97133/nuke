@@ -86,17 +86,30 @@ export function batMove(sales: Sale[], now = Date.now()): { last: number; prior:
   return last.length >= 5 && prior.length >= 5 ? { last: med(last), prior: med(prior), nLast: last.length, nPrior: prior.length } : null;
 }
 
-/** The reader's one value: n sales in the window, the newest `returned` of them as [vehicle_id, sale_date, usd, source,
- *  year, model] rows, and whether it held back older ones. Anything else is not a read. */
-export function parseFamilySales(data: unknown): { sales: Sale[]; n: number; truncated: boolean } | null {
-  const v = data as { n?: unknown; truncated?: unknown; rows?: unknown } | null;
-  if (!v || typeof v !== 'object' || Array.isArray(v) || typeof v.n !== 'number' || !Array.isArray(v.rows)) return null;
+/** Rows asked of treemap_family_sales: its ceiling. Since 20261018183000 an absent p_limit caps the reader at 100. */
+export const FAMILY_SALES_LIMIT = 15000;
+
+function parseSaleRows(rows: unknown[]): Sale[] | null {
   const sales: Sale[] = [];
-  for (const r of v.rows) {
+  for (const r of rows) {
     if (!Array.isArray(r) || r.length !== 6 || typeof r[0] !== 'string' || typeof r[1] !== 'string' || typeof r[2] !== 'number') return null;
     sales.push({ vehicle_id: r[0], sale_date: r[1], usd: r[2], source: r[3] ?? null, year: r[4] ?? null, model: r[5] ?? null });
   }
-  return { sales, n: v.n, truncated: v.truncated === true };
+  return sales;
+}
+
+/** The reader's one value: n sales in the window, the newest `returned` of them as [vehicle_id, sale_date, usd, source,
+ *  year, model] rows, and whether it held back older ones. The reader of 20261018183000 returns the rows alone (no
+ *  count, no truncation flag), so a bare array of rows is read as every sale it holds. Anything else is not a read. */
+export function parseFamilySales(data: unknown): { sales: Sale[]; n: number; truncated: boolean } | null {
+  if (Array.isArray(data)) {
+    const sales = parseSaleRows(data);
+    return sales ? { sales, n: sales.length, truncated: false } : null;
+  }
+  const v = data as { n?: unknown; truncated?: unknown; rows?: unknown } | null;
+  if (!v || typeof v !== 'object' || typeof v.n !== 'number' || !Array.isArray(v.rows)) return null;
+  const sales = parseSaleRows(v.rows);
+  return sales ? { sales, n: v.n, truncated: v.truncated === true } : null;
 }
 
 export type UpcomingLiveLot = {
@@ -262,20 +275,37 @@ export function useFamilyUpcomingSupply(brand: string | null, familyKey: string 
   return supply;
 }
 
+// One read per family per page lifetime, shared by the map, the chart and the Sources board; a failed read is
+// forgotten so the next mount retries.
+const familySalesReads = new Map<string, Promise<{ sales: Sale[]; n: number; truncated: boolean } | null>>();
+export function clearFamilySalesReads() { familySalesReads.clear(); }
+export function readFamilySales(brand: string, familyKey: string): Promise<{ sales: Sale[]; n: number; truncated: boolean } | null> {
+  const key = `${brand}|${familyKey}`;
+  let read = familySalesReads.get(key);
+  if (!read) {
+    read = Promise.resolve(supabase.rpc('treemap_family_sales', { p_brand: brand, p_family_key: familyKey, p_limit: FAMILY_SALES_LIMIT })).then(
+      ({ data, error }) => {
+        const v = error ? null : parseFamilySales(data);
+        if (!v) familySalesReads.delete(key);
+        return v;
+      },
+      () => { familySalesReads.delete(key); return null; },
+    );
+    familySalesReads.set(key, read);
+  }
+  return read;
+}
+
 export function useFamilySales(brand: string | null, familyKey: string | null) {
   const [state, setState] = useState<{ sales: Sale[] | null; n: number; truncated: boolean; failed: boolean }>({ sales: null, n: 0, truncated: false, failed: false });
   useEffect(() => {
     setState({ sales: null, n: 0, truncated: false, failed: false });
     if (!brand || !familyKey || typeof (supabase as { rpc?: unknown })?.rpc !== 'function') return;
     let live = true;
-    Promise.resolve(supabase.rpc('treemap_family_sales', { p_brand: brand, p_family_key: familyKey })).then(
-      ({ data, error }) => {
-        if (!live) return;
-        const v = error ? null : parseFamilySales(data);
-        setState(v ? { ...v, failed: false } : { sales: null, n: 0, truncated: false, failed: true });
-      },
-      () => { if (live) setState({ sales: null, n: 0, truncated: false, failed: true }); },
-    );
+    readFamilySales(brand, familyKey).then((v) => {
+      if (!live) return;
+      setState(v ? { ...v, failed: false } : { sales: null, n: 0, truncated: false, failed: true });
+    });
     return () => { live = false; };
   }, [brand, familyKey]);
   return state;

@@ -427,6 +427,149 @@
   font-weight: 700;
 }
 
+/* Vetted era mark on a header search vehicle row (sits with the facet pills) */
+.header-search-era-mark {
+  display: inline-flex;
+  align-items: center;
+  height: 16px;
+  max-width: 74px;
+  flex-shrink: 0;
+}
+
+.header-search-era-mark svg {
+  height: 15px;
+  width: auto;
+  max-width: 74px;
+  display: block;
+}
+
+/* Market cohort shortcuts above header search results */
+.header-search-cohorts {
+  border-bottom: 2px solid var(--border);
+  background: var(--surface);
+}
+
+.header-search-cohorts-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 4px 10px;
+  border-bottom: 1px solid var(--border-light);
+  font-family: var(--font-family);
+  font-size: var(--fs-8);
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  color: var(--text-secondary);
+}
+
+.header-search-cohort {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 6px 10px;
+  border: none;
+  border-bottom: 1px solid var(--border-light);
+  background: transparent;
+  color: var(--text);
+  text-align: left;
+  font-family: var(--font-family);
+  cursor: pointer;
+  transition: background 180ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.header-search-cohort:last-child {
+  border-bottom: none;
+}
+
+.header-search-cohort:hover,
+.header-search-cohort:focus-visible,
+.header-search-cohort--active {
+  background: var(--grey-100);
+}
+
+.header-search-cohort-mark {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 78px;
+  height: 22px;
+  flex-shrink: 0;
+}
+
+.header-search-cohort-mark svg {
+  height: 20px;
+  width: auto;
+  max-width: 78px;
+  display: block;
+}
+
+.header-search-cohort-text {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-width: 0;
+}
+
+.header-search-cohort-label,
+.header-search-cohort-sub {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.header-search-cohort-label {
+  font-size: var(--fs-11);
+  font-weight: 700;
+}
+
+.header-search-cohort-sub {
+  font-size: var(--fs-9);
+  color: var(--text-secondary);
+}
+
+.header-search-cohort-era,
+.header-search-cohort-pill {
+  flex-shrink: 0;
+  padding: 1px 5px;
+  border: 1px solid var(--border);
+  font-size: var(--fs-8);
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.header-search-cohort-era {
+  font-family: var(--font-mono);
+  background: var(--white);
+  color: var(--text-secondary);
+}
+
+.header-search-cohort-pill {
+  letter-spacing: 0.04em;
+  background: var(--text);
+  color: var(--white);
+}
+
+@media (max-width: 767px) {
+  .header-search-cohorts-head span:last-child,
+  .header-search-cohort-pill {
+    display: none;
+  }
+
+  .header-search-cohort {
+    gap: 6px;
+    padding: 6px 8px;
+  }
+
+  .header-search-cohort-mark {
+    width: 52px;
+  }
+
+  .header-search-cohort-mark svg {
+    max-width: 52px;
+  }
+}
+
 .search-overlay-market-body {
   padding: 6px 12px;
 }

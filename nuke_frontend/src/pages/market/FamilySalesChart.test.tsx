@@ -7,6 +7,7 @@ const fixture = vi.hoisted(() => ({ rpc: vi.fn() }));
 vi.mock('../../lib/supabase', () => ({ supabase: { rpc: fixture.rpc } }));
 import FamilySalesChart, {
   batMove,
+  clearFamilySalesReads,
   computeFacetDistributionSummary,
   deriveSaleSubModel,
   deriveSaleTooltipFacets,
@@ -66,7 +67,7 @@ beforeEach(() => {
   (globalThis as any).IS_REACT_ACT_ENVIRONMENT = true;
   container = document.createElement('div'); document.body.append(container); root = createRoot(container);
 });
-afterEach(async () => { await act(async () => root.unmount()); container.remove(); fixture.rpc.mockReset(); });
+afterEach(async () => { await act(async () => root.unmount()); container.remove(); fixture.rpc.mockReset(); clearFamilySalesReads(); });
 
 it('draws one dot per sale, the venues with their counts, and BaT\'s 12-month median', async () => {
   const sales = [
@@ -76,7 +77,7 @@ it('draws one dot per sale, the venues with their counts, and BaT\'s 12-month me
   ];
   fixture.rpc.mockResolvedValue({ data: value(sales), error: null });
   await act(async () => root.render(<FamilySalesChart brand="Porsche" familyKey="f911" family="911" width={900} height={500} onOpen={() => {}} />));
-  expect(fixture.rpc).toHaveBeenCalledWith('treemap_family_sales', { p_brand: 'Porsche', p_family_key: 'f911' });
+  expect(fixture.rpc).toHaveBeenCalledWith('treemap_family_sales', { p_brand: 'Porsche', p_family_key: 'f911', p_limit: 15000 });
   expect(container.querySelectorAll('svg.family-sales__plot circle')).toHaveLength(12);
   expect([...container.querySelectorAll('.family-sales__venue')].map((n) => n.textContent)).toEqual(['BaT 11', 'Mecum 1']);
   expect(container.querySelector('.family-sales__move')?.textContent).toContain('BaT median, last 12 mo (6)');
@@ -96,6 +97,9 @@ it('reads the one value, says when it holds back older sales, and refuses any ot
   const sales = [1, 2, 3, 4, 5, 6].map((i) => sale(i, 20 * i, 100000 + i * 1000, 'Bring a Trailer'));
   expect(parseFamilySales(value(sales))?.sales).toEqual(sales);
   expect(parseFamilySales(sales)).toBeNull(); // the old set of objects
+  const bare = value(sales).rows;
+  expect(parseFamilySales(bare)).toEqual({ sales, n: sales.length, truncated: false });
+  expect(parseFamilySales([...bare, ['x', '2026-01-01']])).toBeNull();
   expect(parseFamilySales({ n: 1, rows: [{ vehicle_id: 'x' }] })).toBeNull();
   expect(parseFamilySales(null)).toBeNull();
   fixture.rpc.mockResolvedValue({ data: value(sales, 15000), error: null });

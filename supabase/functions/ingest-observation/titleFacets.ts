@@ -11,6 +11,12 @@ const UUID = /^[0-9a-f]{8}(-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i;
 // A title naming a copy, a part or a build describes something other than the factory badge it quotes.
 const NOT_THE_CAR = /\b(?:replica|tribute|clone|recreation|re-creation|continuation|kit\s+car|kit|evocation|homage|style|styled|conversion|body\s+only|shell|chassis\s+only|engine|motor|transmission|parts?|project\s+parts|sign|model\s+car|diecast|die-cast|scale|pedal\s+car)\b/i;
 
+// The shared parser also reports engine options as trim packages; an engine is not a trim.
+const ENGINE_NOT_TRIM = /^(?:\d{3,4}(?:\s*\/\s*\d{3})?(?:\s*(?:ci|cid|hp|v-?8))?|L\d{2}|LS\d|LT-?\d|LT\d|(?:super\s+)?cobra\s+jet|hemi|426\s+hemi|fuel\s+injected|fuelie)$/i;
+
+// Bed length and cab configuration are their own facets, not a body style.
+const BED_OR_CAB_NOT_BODY = /^(?:short|long)[\s-]?(?:bed|box)$|^(?:crew|extended|regular|single|standard|super|club|king|extra|double|quad)[\s-]?cab$/i;
+
 const fold = (text: string) => text.toLowerCase().replace(/[\s\-_/]+/g, " ").trim();
 
 export function titleFacetSelector(input: Record<string, unknown>): { vehicleId: string; key: TitleFacetKey } | null {
@@ -32,6 +38,8 @@ export function titleFacetWitness(
   const facets = extractVehicleFacets({ year: identity.year, make: identity.make, model: identity.model, title: text });
   const value = key === "trim" ? facets.trim_package : facets.body_style_facet;
   if (!value || value.length > 60) return null;
+  if (key === "trim" && ENGINE_NOT_TRIM.test(value.trim())) return null;
+  if (key === "body_style" && BED_OR_CAB_NOT_BODY.test(value.trim())) return null;
   return fold(text).includes(fold(value)) ? value : null;
 }
 
