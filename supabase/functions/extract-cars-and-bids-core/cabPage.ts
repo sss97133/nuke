@@ -63,6 +63,51 @@ export interface CabDepth {
 
 const num = (s?: string | null) => { const n = parseInt((s ?? "").replace(/[^0-9]/g, ""), 10); return Number.isFinite(n) ? n : null; };
 
+// Photo identity. A render is media.carsandbids.com/cdn-cgi/image/<options>/<hash>/photos/[<folder>/]<set>-<photo>...: the
+// 8-character set id is shared by one listing's gallery; the hash is not (other lots share it). Seller-named files have no set id.
+export const cabPhotoKey = (url: string) => url.replace(/^.*\/cdn-cgi\/image\/[^/]*\//, "").split("?")[0];
+export const cabPhotoSet = (url: string): string | null => url.match(/\/photos\/(?:[a-z]+\/)?([A-Za-z0-9_-]{8})-/)?.[1] ?? null;
+const MEDIA_URL = /https:\/\/media\.carsandbids\.com\/[^"'\s)>]+/gi;
+
+/** Photo keys inside links to another auction: the similar-auctions, ending-soon and new-listings cards. */
+export function cabOtherLotPhotoKeys(html: string, lotId: string | null): Set<string> {
+  const keys = new Set<string>();
+  for (const m of html.matchAll(/<a\b[^>]*\bhref="(?:https:\/\/(?:www\.)?carsandbids\.com)?\/auctions\/([A-Za-z0-9]+)[^"]*"[^>]*>/gi)) {
+    if (lotId && m[1].toLowerCase() === lotId.toLowerCase()) continue;
+    const inner = balanced(html, m.index!);
+    if (inner) for (const u of inner.matchAll(MEDIA_URL)) keys.add(cabPhotoKey(decode(u[0])));
+  }
+  return keys;
+}
+
+/** The photos inside the gallery element (div.gallery-preview), minus any card for another lot. */
+function galleryUrls(html: string, foreign: Set<string>): string[] {
+  const gAt = html.search(/<div class="gallery-preview\b[^"]*"/);
+  const block = gAt >= 0 ? balanced(html, gAt) : null;
+  if (!block) return [];
+  return [...block.matchAll(/<img[^>]+src="(https:\/\/media\.carsandbids\.com\/[^"]+)"/g)]
+    .map((m) => decode(m[1])).filter((u) => !foreign.has(cabPhotoKey(u)));
+}
+
+/** Every page photo of this lot: the gallery's, plus any other render of them or photo sharing their set id. Without a gallery, none. */
+export function cabLotPhotos(html: string, lotId: string | null): string[] {
+  const foreign = cabOtherLotPhotoKeys(html, lotId);
+  const gallery = galleryUrls(html, foreign);
+  const keys = new Set(gallery.map(cabPhotoKey));
+  const sets = new Set(gallery.map(cabPhotoSet).filter((s): s is string => !!s));
+  const out: string[] = [];
+  const seen = new Set<string>();
+  for (const m of html.matchAll(MEDIA_URL)) {
+    const url = decode(m[0]);
+    const key = cabPhotoKey(url);
+    const set = cabPhotoSet(url);
+    if (seen.has(key) || foreign.has(key) || !(keys.has(key) || (set && sets.has(set)))) continue;
+    seen.add(key);
+    out.push(url);
+  }
+  return out;
+}
+
 /** "October 13, 2026 @ 10:16 PM" is Eastern wall time (the capture's browser zone); returns UTC ISO. */
 export function easternToIso(label: string): string | null {
   const m = label.match(/([A-Za-z]+)\s+(\d{1,2}),\s+(\d{4})\s+@\s+(\d{1,2}):(\d{2})\s*(AM|PM)/i);
@@ -104,7 +149,7 @@ const SECTION_HEADINGS: Record<string, string> = {
   ownership_history: "Ownership History", seller_notes: "Seller Notes",
 };
 
-export function parseCabDepth(html: string, fetchedAt: Date): CabDepth {
+export function parseCabDepth(html: string, fetchedAt: Date, lotId: string | null = null): CabDepth {
   // Sections
   const sections: CabSection[] = [];
   for (const m of html.matchAll(/<div class="detail-section\s+([^"]*)"/g)) {
@@ -160,17 +205,13 @@ export function parseCabDepth(html: string, fetchedAt: Date): CabDepth {
   const phrase = html.match(/class="end-time">([^<]*)</)?.[1] ?? null;
   const shortDate = band.match(/class="time-ended">([^<]*)</)?.[1] ?? null;
 
-  // Gallery photos: only the gallery blocks (avatars and similar-auction thumbnails are elsewhere on the page)
-  const gAt = html.indexOf("gallery-preview");
-  const gEnd = html.indexOf("auction-bidbar");
+  // Gallery photos: only the gallery block (avatars and the cards for other lots are elsewhere on the page)
   const photos: string[] = [];
-  if (gAt >= 0 && gEnd > gAt) {
-    const seen = new Set<string>();
-    for (const m of html.slice(gAt, gEnd).matchAll(/<img[^>]+src="(https:\/\/media\.carsandbids\.com\/[^"]+)"/g)) {
-      const url = decode(m[1]).replace(/\?.*$/, "").replace(/\/cdn-cgi\/image\/[^/]*\//, "/cdn-cgi/image/width=2080,quality=70/");
-      const id = url.replace(/^.*\/cdn-cgi\/image\/[^/]*\//, "");
-      if (!seen.has(id)) { seen.add(id); photos.push(url); }
-    }
+  const seen = new Set<string>();
+  for (const u of galleryUrls(html, cabOtherLotPhotoKeys(html, lotId))) {
+    const url = u.replace(/\?.*$/, "").replace(/\/cdn-cgi\/image\/[^/]*\//, "/cdn-cgi/image/width=2080,quality=70/");
+    const id = cabPhotoKey(url);
+    if (!seen.has(id)) { seen.add(id); photos.push(url); }
   }
 
   const statLabel = (label: string) => num(html.match(new RegExp(`<div class="th">${label}</div><div class="td [a-z-]+">([\\d,]+)<`))?.[1]);
