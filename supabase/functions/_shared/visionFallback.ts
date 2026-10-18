@@ -127,7 +127,9 @@ export async function platformVisionMultiJSON(
   const digest = async (value: string) => [...new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(value)))]
     .map(byte => byte.toString(16).padStart(2, "0")).join("");
   const hashes = await Promise.all(images.map(image => digest(image.imageUrl)));
-  const ref = "photo:v1:" + await digest(JSON.stringify({ model, hashes: hashes.sort() }));
+  // A deliberately repaired output bound is a different request contract. The
+  // same images/settings remain deduplicated after an unreadable response.
+  const ref = "photo:v1:" + await digest(JSON.stringify({ model, output_tokens: opts.maxTokens, hashes: hashes.sort() }));
   let hold: Awaited<ReturnType<typeof reserveCredits>>;
   try { hold = await (deps.reserve ?? reserveCredits)(supabase, userId, reservation, ref, { model, source: "nuke_photo_analysis_v1" }); }
   catch { return fail("platform_unavailable"); }

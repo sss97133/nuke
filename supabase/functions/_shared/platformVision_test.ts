@@ -126,3 +126,30 @@ Deno.test("output ceiling stays bounded before reservation or inference", async 
   await failure(() => platformVisionMultiJSON({}, "owner", { ...opts, maxTokens: 4097 }, deps));
   equal(events, []);
 });
+
+Deno.test("a repaired output bound can recover a clipped job while unchanged requests stay deduplicated", async () => {
+  const { deps } = fixture();
+  const seen = new Set<string>();
+  let calls = 0;
+  const injected = { ...deps,
+    reserve: async (_db: unknown, _owner: string, _cents: number, ref: string) => {
+      if (seen.has(ref)) return { status: "duplicate" as const };
+      seen.add(ref);return { status: "reserved" as const, hold_id: "hold" };
+    },
+    call: async (_config: unknown, _messages: unknown, options: any) => {
+      calls++;
+      return options.maxTokens === 1600
+        ? { content: '{"subjects":[]}', finish_reason: "max_tokens", usage: { input_tokens: 8035, output_tokens: 1600 } }
+        : { content: '{"subjects":[]}', finish_reason: "end_turn", usage: { input_tokens: 8035, output_tokens: 2000 } };
+    },
+  };
+  await failure(() => platformVisionMultiJSON({}, "owner", opts, injected));
+  const duplicate = await failure(() => platformVisionMultiJSON({}, "owner", opts, injected));
+  equal(duplicate.diagnostics[0].code, "analysis_pending");
+  equal(calls, 1);
+  const recovered = await platformVisionMultiJSON({}, "owner", { ...opts, maxTokens: 4096 }, injected);
+  equal(recovered.data, { subjects: [] });
+  equal(calls, 2);
+  await failure(() => platformVisionMultiJSON({}, "owner", { ...opts, maxTokens: 4096 }, injected));
+  equal(calls, 2);
+});
