@@ -80,6 +80,8 @@ Focus markers on the tiles, breadcrumb and Sales by house summary use inset bord
 
 **Bypass dense maps:** A focus-visible Skip map tiles link precedes the viewport. It moves focus to Market comparisons and legend immediately after the map and centers that heading below the site header, preserving the URL scope. The next Tab continues into the following controls. Every tile remains available; a keyboard user can bypass the 594-stop overview observed on 2026-10-18 without entering it. The skip link and destination heading remain available to assistive technology and appear visually when focused.
 
+**Phone inspection sheet:** A tap opens the existing measured card in a native modal dialog. Close receives initial focus; the browser keeps background controls inert, contains keyboard focus and restores the opener on dismissal. Escape, Close or a tap on the scrim dismisses without changing market scope; a tap on the card content keeps it open. Both actions have inset focus markers. Open retains the existing drill action and moves focus to the current breadcrumb after the tile is replaced. Before this repair, the actual component left focus on the opener, Tab reached a background control and Escape left the sheet open (2026-10-18).
+
 The logged-out treemap homepage uses continuous zoom to navigate 4 levels of vehicle hierarchy. Each drill action replaces the entire treemap viewport with the next level's data, animated as a scale+fade transition from the click origin.
 
 ```
