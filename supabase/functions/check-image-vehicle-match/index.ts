@@ -12,6 +12,7 @@ import { runPinnedVision, type CustodiedVisionPart, type VisionInputSource,
 import { resolveSubjectBatch, subjectOwnerId, supabaseSubjectStore, type SubjectRequest } from './subjectService.ts';
 import { readSubjectProfiles } from './subjectReader.ts';
 import { selectResolutionContext } from './subjectCandidates.ts';
+import { readSourceInbox, type SourceInboxOptions } from './sourceInbox.ts';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -23,6 +24,7 @@ interface CheckRequest extends SubjectRequest {
   cluster_id?: string;
   limit?: number;
   offset?: number;
+  source_inbox?: SourceInboxOptions;
 
   // Common
   vehicle_id?: string;
@@ -314,7 +316,8 @@ Deno.serve(async (req: Request) => {
       }
       let result;
       if (mode === "read_subjects") {
-        result = await readSubjectProfiles(supabase, owner, body);
+        result = body.source_inbox === undefined ? await readSubjectProfiles(supabase, owner, body)
+          : await readSourceInbox(supabase, owner, body.source_inbox);
       } else {
         const store = supabaseSubjectStore(supabase);
         store.context = async (user, fresh) => {

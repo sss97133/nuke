@@ -698,6 +698,42 @@ final class LocalStore {
         }
     }
 
+    /// Reuse the bounded projection cache, under a distinct source-grain scope. This stores no
+    /// canonical membership and never enrolls cached source IDs in the analysis queue.
+    func cacheSourceInbox(userId: String, activeUserId: String?, imageId: UUID? = nil, page: Int = 0,
+                          read: SourceInboxRead, now: Date = Date()) throws {
+        guard let owner = ObservedCarRead.ownAccount(userId, activeUserId: activeUserId), page >= 0, read.isQualified,
+              imageId == nil || read.photos.allSatisfy({ $0.id == imageId }) else { throw CocoaError(.coderInvalidValue) }
+        let scope = imageId.map { "source_inbox:photo:\($0.uuidString.lowercased())" } ?? "source_inbox"
+        let payload = String(decoding: try JSONEncoder().encode(read), as: UTF8.self)
+        try dbQueue.write { db in
+            if imageId == nil && page == 0 {
+                // Successful live refresh invalidates detail/continuation snapshots too, so a
+                // known withdrawal cannot fall back to an older cached photo interpretation.
+                let prefix = "source_inbox:photo:"
+                try db.execute(sql: "DELETE FROM observed_subject_read_cache WHERE userId=? AND (scopeKey=? OR substr(scopeKey,1,?)=?)",
+                    arguments: [owner, "source_inbox", prefix.count, prefix])
+            }
+            try db.execute(sql: """
+                INSERT INTO observed_subject_read_cache(userId,scopeKey,pageOffset,payloadJSON,cachedAt) VALUES (?,?,?,?,?)
+                ON CONFLICT(userId,scopeKey,pageOffset) DO UPDATE SET payloadJSON=excluded.payloadJSON,cachedAt=excluded.cachedAt
+                """, arguments: [owner, scope, page, payload, now])
+        }
+    }
+
+    func cachedSourceInbox(userId: String, activeUserId: String?, imageId: UUID? = nil, page: Int = 0) throws -> SavedSourceInboxRead? {
+        guard let owner = ObservedCarRead.ownAccount(userId, activeUserId: activeUserId), page >= 0 else { return nil }
+        let scope = imageId.map { "source_inbox:photo:\($0.uuidString.lowercased())" } ?? "source_inbox"
+        return try dbQueue.read { db in
+            guard let row = try Row.fetchOne(db, sql: "SELECT payloadJSON,cachedAt FROM observed_subject_read_cache WHERE userId=? AND scopeKey=? AND pageOffset=?",
+                arguments: [owner, scope, page]) else { return nil }
+            let payload: String = row["payloadJSON"]
+            let read = try JSONDecoder().decode(SourceInboxRead.self, from: Data(payload.utf8))
+            guard read.isQualified, imageId == nil || read.photos.allSatisfy({ $0.id == imageId }) else { return nil }
+            return SavedSourceInboxRead(read: read, cachedAt: row["cachedAt"])
+        }
+    }
+
     // MARK: Album human pass and independent on-device pass
 
     func cacheUnresolvedGarageSources(userId: String, sources: [GarageUnresolvedSource]) throws {

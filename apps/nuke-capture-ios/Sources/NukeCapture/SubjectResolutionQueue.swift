@@ -44,6 +44,17 @@ struct SubjectResolutionQueue: Codable {
         alreadyReuseOnly || !["source_not_ready", "required_input_unavailable"].contains(refusal)
     }
 
+    enum SourceReadChange: Equatable { case invalid, unchanged, changed }
+    /// Raw retained interpretations also change the source inbox, even when no same-car profile
+    /// could be supported. Only acknowledged results within the exact fresh-source scope notify.
+    static func sourceReadChange(requested: Set<String>, persisted: [String], retained: [String], deferred: [String]) -> SourceReadChange {
+        let stored = persisted.map { $0.lowercased() }, readings = retained.map { $0.lowercased() }, unused = deferred.map { $0.lowercased() }
+        guard Set(stored).count == stored.count, Set(readings).count == readings.count, Set(unused).count == unused.count,
+              Set(stored + readings + unused).isSubset(of: requested),
+              Set(stored + readings).isDisjoint(with: unused) else { return .invalid }
+        return stored.isEmpty && readings.isEmpty ? .unchanged : .changed
+    }
+
     mutating func acknowledge(localIdentifier: String, sourceHash: String, now: Date) {
         guard !localIdentifier.isEmpty, Self.validHash(sourceHash),
               !finishedHashes.contains(sourceHash), !uploads.contains(where: { $0.sourceHash == sourceHash }) else { return }
