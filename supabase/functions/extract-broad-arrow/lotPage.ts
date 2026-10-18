@@ -24,6 +24,11 @@ export interface BroadArrowLot {
 const GALLERY_RE = /https:\/\/cdn\.dealeraccelerate\.com\/bagauction\/\d+\/\d+\/(\d+)\/([0-9]*x[0-9]*)\/[^"'\s,)<>]+/g;
 const sizeRank = (size: string) => (size === "1920x1440" ? 3 : size === "790x1024" ? 2 : size === "x" ? 0 : 1);
 
+/** The dealeraccelerate image id of a Broad Arrow photo URL (any size, with or without an extension), or null. */
+export function galleryImageId(url: string): string | null {
+  return url.match(/cdn\.dealeraccelerate\.com\/bagauction\/\d+\/\d+\/(\d+)\//)?.[1] ?? null;
+}
+
 /** The lot's photos: one URL per image id in page order, the largest size the page offers. A lot page lists each photo at
  * 790x1024, 1920x1440 and a bare size (110 ids, 775 URLs on am24_r158, 2026-10-18). */
 export function lotGallery(html: string): string[] {

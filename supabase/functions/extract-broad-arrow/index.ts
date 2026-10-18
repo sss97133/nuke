@@ -43,7 +43,7 @@ import { archiveFetch } from '../_shared/archiveFetch.ts';
 import { fillOnlyIdentity, identityConflict } from '../_shared/identityMatch.ts';
 import { recordRevision } from '../_shared/revision.ts';
 import { parseEventPage, parseListingCards, type RosterCard } from './roster.ts';
-import { parseLotPage } from './lotPage.ts';
+import { galleryImageId, parseLotPage } from './lotPage.ts';
 
 // ============================================================================
 // TYPES
@@ -903,6 +903,9 @@ async function saveToDatabase(
       .limit(1000);
     if (haveErr) throw new Error(`vehicle_images read failed: ${haveErr.message}`);
     const haveUrls = new Set((have ?? []).map((r: { image_url: string }) => r.image_url));
+    // An older read stored the same photos at another URL spelling (".webp" suffix, 2026-02 rows), so a photo is held when
+    // its image id is.
+    const haveIds = new Set([...haveUrls].map(galleryImageId).filter((id): id is string => id !== null));
 
     const imageRecords = extracted.image_urls.slice(0, 150).map((imgUrl, i) => ({
       vehicle_id: vehicleId,
@@ -923,7 +926,7 @@ async function saveToDatabase(
         auction_name: extracted.auction_name,
         lot_number: extracted.lot_number,
       },
-    })).filter((row) => !haveUrls.has(row.image_url));
+    })).filter((row) => !haveUrls.has(row.image_url) && !haveIds.has(galleryImageId(row.image_url) ?? ''));
 
     if (imageRecords.length > 0) {
       const { data: insertedImages, error: imgError } = await supabase
