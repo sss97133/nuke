@@ -72,7 +72,7 @@ async function main() {
         body: JSON.stringify({
           p_url: r.source_url, p_missing: [REVISION_DIFFERENT_CAR.missing], p_reason: REVISION_DIFFERENT_CAR.reason,
           p_next_action: REVISION_DIFFERENT_CAR.next_action, p_raised_by: "conceptcarz-binding-audit", p_snapshot_id: null,
-          p_detail: { event_id: r.id, vehicle_id: r.vehicle_id, detail: conflict, title, matched_by: "orphan-backfill-v1 year+make+price" },
+          p_detail: { different_car: true, event_id: r.id, vehicle_id: r.vehicle_id, detail: conflict, title, matched_by: "orphan-backfill-v1 year+make+price" },
           p_vehicle_id: r.vehicle_id,
         }),
       });
