@@ -44,6 +44,29 @@ export function comparableLotKey(url: string | null | undefined): string | null 
   return host + parsed.pathname.replace(/\/+$/, '') + parsed.search + parsed.hash;
 }
 
+const BROADCAST_SOURCE_ID = 'e980c7bd-404f-41f6-8a17-1c7cabd1d8a4';
+
+/** The broadcast presentation of the cited lot, read from the auction livestream overlay. Only an exact lot
+ * match on the same vehicle qualifies; the clip is evidence of the presentation, never of the cited price,
+ * and its offsets are positions in the recording, not auction clock times. */
+export function pickLotPresentation(rows: any[] | null | undefined, vehicleId: string, lotNumber: string | null):
+  { videoUrl: string; startSeconds: number; endSeconds: number | null } | null {
+  const lot = String(lotNumber ?? '').trim().toUpperCase();
+  if (!lot || !Array.isArray(rows)) return null;
+  const candidates = rows.filter(r => r?.vehicle_id === vehicleId
+    && String(r?.structured_data?.value?.lot ?? '').trim().toUpperCase() === lot
+    && /^[A-Za-z0-9_-]{11}$/.test(String(r?.structured_data?.media?.video_id ?? ''))
+    && typeof r?.structured_data?.media?.start_seconds === 'number' && r.structured_data.media.start_seconds >= 0);
+  const row = candidates.find(r => r.structured_data.value.displayed_outcome === 'sold') ?? candidates[0];
+  if (!row) return null;
+  const media = row.structured_data.media;
+  return {
+    videoUrl: `https://www.youtube.com/watch?v=${media.video_id}`,
+    startSeconds: media.start_seconds,
+    endSeconds: typeof media.end_seconds === 'number' ? media.end_seconds : null,
+  };
+}
+
 /** Extract lot number and auction event name from vehicle metadata or enriched description text. */
 export function extractInlineLotProvenance(vehicle: Record<string, any> | null | undefined): {
   lotNumber: string | null;
@@ -133,7 +156,7 @@ export default function ProfileHeader({ priceLotId }: { priceLotId?: string }) {
     let cancelled = false;
     (async () => {
       try {
-        const [auctionRes, eventRes] = await Promise.all([
+        const [auctionRes, eventRes, presentationRes] = await Promise.all([
           Promise.resolve(
         supabase
           .from('auction_events')
@@ -149,6 +172,16 @@ export default function ProfileHeader({ priceLotId }: { priceLotId?: string }) {
           .eq('vehicle_id', vehicleId)
           .order('extracted_at', { ascending: false, nullsFirst: false })
           .limit(10)
+      ).catch(() => ({ data: null, error: true })),
+      Promise.resolve(
+        supabase
+          .from('vehicle_observations')
+          .select('vehicle_id, structured_data')
+          .eq('vehicle_id', vehicleId)
+          .eq('source_id', BROADCAST_SOURCE_ID)
+          .eq('structured_data->>property', 'broadcast_lot_presentation')
+          .eq('is_superseded', false)
+          .limit(20)
       ).catch(() => ({ data: null, error: true })),
     ]);
     if (cancelled) return;
@@ -166,6 +199,12 @@ export default function ProfileHeader({ priceLotId }: { priceLotId?: string }) {
       ...eventRows.map(row => { const meta = row.metadata && typeof row.metadata === 'object' ? row.metadata : {};
         return { lotNumber: meta.lot_number ?? null, auctionName: meta.auction_name || meta.event_name || null, videoUrl: meta.video_url || null }; }),
     ];
+    // A broadcast presentation joins only the one lot the episode rows agree on, and only when they carry
+    // no recorded clip; a failed broadcast read adds nothing and does not fail the episode read.
+    const boundLots = [...new Set(candidates.map(c => String(c.lotNumber ?? '').trim()).filter(Boolean))];
+    const presentation = boundLots.length === 1 && !candidates.some(c => c.videoUrl) && !presentationRes?.error
+      ? pickLotPresentation(presentationRes?.data as any[] | null, vehicleId, boundLots[0]) : null;
+    if (presentation) candidates.push({ lotNumber: boundLots[0], ...presentation });
     setLotRead({ vehicleId, lotKey: targetLotKey, readAt, status: failed ? 'failed' : candidates.length ? 'matched' : 'unmatched', candidates });
       } catch {
         if (!cancelled) setLotRead({ vehicleId, lotKey: targetLotKey, readAt, status: 'failed', candidates: [] });
