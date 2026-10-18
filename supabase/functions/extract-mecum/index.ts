@@ -1934,10 +1934,12 @@ Deno.serve(async (req) => {
 
       let cursor = 0;
       if (work.length < limit && body.upcoming_only !== true) {
+        // Only walk rows carry target_id; rows queued by vehicle id (mecum-algolia-save-all --enqueue) must not reset the cursor.
         const { data: last } = await supabase
           .from("import_queue")
           .select("raw_data")
           .eq("extractor_version", TARGETS_TAG)
+          .not("raw_data->target_id", "is", null)
           .order("created_at", { ascending: false })
           .limit(1)
           .maybeSingle();
