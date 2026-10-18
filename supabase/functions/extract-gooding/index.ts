@@ -597,7 +597,7 @@ async function discoverLotsFromSitemap(): Promise<string[]> {
 // DATABASE OPERATIONS
 // ============================================================================
 
-async function saveToDatabase(
+export async function saveToDatabase(
   supabase: any,
   extracted: GoodingExtracted,
   opts: { skipImages?: boolean } = {},
@@ -605,11 +605,23 @@ async function saveToDatabase(
   const listingUrlKey = normalizeListingUrlKey(extracted.url);
 
   // Never equate Gooding lot slugs solely because one is a prefix of another.
-  const { vehicleId: resolvedId } = await resolveExistingVehicleId(supabase, {
-    url: extracted.url,
-    platform: 'gooding',
-    requireExactListingUrl: true,
-  });
+  let resolvedId: string | null;
+  try {
+    ({ vehicleId: resolvedId } = await resolveExistingVehicleId(supabase, {
+      url: extracted.url,
+      platform: 'gooding',
+      requireExactListingUrl: true,
+    }));
+  } catch (e: any) {
+    // PGRST116: the lot's episode key is on more than one row, i.e. the lot sits on two vehicles (one per host spelling,
+    // 637 of 6,992 Gooding lots on 2026-10-18). Writing to either would pick one at random, so the lot is refused and
+    // raised for relinking; the vehicle merge belongs to the identity owner, not this writer.
+    if (e?.code === 'PGRST116') {
+      await recordRevision(supabase, { url: extracted.url, missing: ['identity_match'], reason: 'duplicate_key', next_action: 'relink', raised_by: 'extract-gooding', detail: { reason: 'lot_on_multiple_vehicles', listing_key: listingUrlKey } });
+      throw new Error(`identity refused: lot ${listingUrlKey} is on more than one vehicle`);
+    }
+    throw e instanceof Error ? e : new Error(`vehicle lookup failed: ${e?.message ?? String(e)}${e?.code ? ` (${e.code})` : ''}`);
+  }
   let vehicleId: string | null = resolvedId;
 
   // The same lot under the other host spelling (or a trailing slash) is the same vehicle. Without this a writer that found nothing
@@ -1358,7 +1370,7 @@ if (import.meta.main) Deno.serve(async (req) => {
   } catch (error: any) {
     console.error('[gooding] Error:', error);
     return new Response(
-      JSON.stringify({ success: false, error: error instanceof Error ? error.message : String(error) }),
+      JSON.stringify({ success: false, error: error instanceof Error ? error.message : (error?.message ?? String(error)) }),
       { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   }
