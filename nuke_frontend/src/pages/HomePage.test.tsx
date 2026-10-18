@@ -169,4 +169,15 @@ describe('composable Truck map', () => {
     expect(container.querySelector('[role="alert"]')?.textContent).toContain('Complete truck membership could not be read');
     expect(container.querySelector('button.market-tile[aria-label="Porsche"]')).toBeNull();
   });
+  it('reads representative photos only from members of the selected drivetrain', async () => {
+    installTruckRead();
+    const previousFrom = fixture.client.from;
+    const query: any = Promise.resolve({ data: [], error: null });
+    for (const method of ['select', 'in', 'not', 'is', 'eq', 'order', 'limit', 'gt']) query[method] = vi.fn(() => query);
+    fixture.client.from = (table: string) => table === 'vehicles' ? query : previousFrom(table);
+    await renderTreemap('tab=market&make=Chevrolet&family=pickup&family_name=Truck&truck_group=series&truck_drive=4WD');
+    expect(query.in).toHaveBeenCalledWith('id', ['a']);
+    expect(query.eq).toHaveBeenCalledWith('is_public', true);
+    expect(query.eq).not.toHaveBeenCalledWith('make', 'Chevrolet');
+  });
 });

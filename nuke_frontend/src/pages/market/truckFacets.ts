@@ -80,7 +80,7 @@ export function truckFacet(member: TruckMember, axis: TruckAxis, make: string): 
 }
 export function readTruckNavigation(params: URLSearchParams): { axis: TruckAxis | 'vehicles'; filters: TruckFilters } {
   const group = params.get('truck_group');
-  const axis = group === 'vehicles' || TRUCK_AXES.includes(group as TruckAxis) ? group as TruckAxis | 'vehicles' : 'series';
+  const axis = group === 'vehicles' || TRUCK_AXES.includes(group as TruckAxis) ? group as TruckAxis | 'vehicles' : 'drive';
   const filters: TruckFilters = {};
   for (const a of TRUCK_AXES) { const value = params.get(`truck_${a}`); if (value) filters[a] = value; }
   return { axis, filters };

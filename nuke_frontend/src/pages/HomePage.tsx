@@ -557,7 +557,7 @@ export interface RepresentativeImageRow {
 
 export function selectFamilyRepresentativeVehicleIds(
   items: readonly TreemapNode[] | null | undefined,
-  familySales: readonly Sale[] | null | undefined,
+  familySales: readonly Pick<Sale, 'vehicle_id' | 'usd' | 'year' | 'model'>[] | null | undefined,
   model?: string | null,
   perTileLimit = 4,
   maxTotal = 200,
@@ -710,9 +710,12 @@ function useRepresentativeImages(
   items: TreemapNode[] | null,
   make?: string | null,
   model?: string | null,
-  familySales?: readonly Sale[] | null,
+  familySales?: readonly Pick<Sale, 'vehicle_id' | 'usd' | 'year' | 'model'>[] | null,
+  strictScope = false,
 ) {
   const [images, setImages] = useState<Map<string, string[]>>(new Map());
+  const imagesScope = useRef('');
+  const emptyImages = useMemo(() => new Map<string, string[]>(), []);
   const candidateIds = useMemo(
     () => selectFamilyRepresentativeVehicleIds(items, familySales, model),
     [items, familySales, model],
@@ -723,11 +726,13 @@ function useRepresentativeImages(
     [items],
   );
 
+  const imageScopeKey = `${make}|${model}|${itemsKey}|${candidateIdsKey}`;
   useEffect(() => {
-    if (!items || !make || items.length === 0) { setImages(new Map()); return; }
+    if (!items || !make || items.length === 0 || (strictScope && candidateIds.length === 0)) { setImages(emptyImages); return; }
     let cancelled = false;
-    const baseSelect = supabase.from('vehicles')?.select?.('id, model, year, primary_image_url');
+    let baseSelect = supabase.from('vehicles')?.select?.('id, model, year, primary_image_url');
     if (!baseSelect) return;
+    if (strictScope) baseSelect = baseSelect.eq('is_public', true);
 
     if (candidateIds.length > 0 && typeof (baseSelect as any).in === 'function') {
       (baseSelect as any)
@@ -736,6 +741,7 @@ function useRepresentativeImages(
         .is('deleted_at', null)
         .then(({ data: result, error }: { data: RepresentativeImageRow[] | null; error: unknown }) => {
           if (cancelled || !result || error) return;
+          imagesScope.current = imageScopeKey;
           setImages(buildRepresentativeImageCandidates(result, model, candidateIds));
         });
       return () => { cancelled = true; };
@@ -757,8 +763,8 @@ function useRepresentativeImages(
         });
     }
     return () => { cancelled = true; };
-  }, [itemsKey, make, model, candidateIdsKey]);
-  return images;
+  }, [itemsKey, make, model, candidateIdsKey, strictScope]);
+  return strictScope && imagesScope.current !== imageScopeKey ? emptyImages : images;
 }
 
 // ────────────────────────────────────────────────────────────
@@ -2026,13 +2032,15 @@ export function TreemapHomePage({ onBrowse, embedded = false }: { onBrowse: () =
 
   // Representative images for aggregate cells (models/years levels); none while a family shows its sales chart, which
   // has no tiles to put them on (the read ran under the chart on every family drill).
+  const truckImageMembers = useMemo(() => truckMembers.map(m => ({ vehicle_id: m.id, usd: m.usd, year: m.year, model: m.model })), [truckMembers]);
   const repImages = useRepresentativeImages(
-    levelType === 'models' ? (familyView === 'names' ? (facetedFamilyModels ?? eraFilteredFamilyModels ?? familyModelsData) : null) : levelType === 'years' ? effectiveYearsData
+    truckMode ? truckNodes : levelType === 'models' ? (familyView === 'names' ? (facetedFamilyModels ?? eraFilteredFamilyModels ?? familyModelsData) : null) : levelType === 'years' ? effectiveYearsData
       : levelType === 'vehicles' && !currentLevel.model ? familyYearVehiclesNodes
       : levelType === 'families' && familiesFailed ? modelsData : null,
     currentLevel.make,
     currentLevel.model,
-    familySalesData,
+    truckMode ? truckImageMembers : familySalesData,
+    truckMode,
   );
 
   // Container sizing
