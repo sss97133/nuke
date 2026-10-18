@@ -54,6 +54,7 @@ async function waitForIoGate() {
       const res = await fetch(`https://api.supabase.com/v1/projects/${ref}/database/query`, {
         method: "POST",
         headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+        signal: AbortSignal.timeout(20_000),
         body: JSON.stringify({
           query: "SELECT count(*)::int AS n FROM pg_stat_activity WHERE backend_type = 'client backend' AND state = 'active' AND wait_event_type = 'IO'",
         }),
