@@ -6,7 +6,14 @@
  *
  * POST { url: "https://barnfinds.com/bf-exclusive-1990-ford-f-150-lariat-4x4/" }
  * POST { action: "batch", limit?: number }  – land unlanded barnfinds source_targets under a polite throttle
- *   (>= 2 s between fetches, stops on 403/429, time-boxed); run by the barnfinds-intake-batch pg_cron job.
+ *   (>= 2 s between fetches, stops on 403/429, time-boxed); run by the barnfinds-intake-batch pg_cron job. Each run ends
+ *   with a bounded bind_pending sweep.
+ * POST { action: "cite_snapshots", after?: fetched_at, limit?: number, dry_run?: boolean } – backfill citations from the
+ *   kept pages (no fetch); returns next_after for the next call.
+ * POST { action: "bind_pending", limit?: number } – recent posts whose cited listing was not held: bind any now held.
+ *
+ * Barn Finds is a curator: a post cites the seller's listing (citations.ts). When that listing is held the post lands on the
+ * listing's vehicle (bind.ts); otherwise on a vehicle of its own, with the cited listing's blip, until the listing lands.
  */
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
@@ -19,7 +26,9 @@ import { writeObservation } from "../_shared/observationWriter.ts";
 import { requireWriteAuth } from "../_shared/writeGuard.ts";
 import { projectSecretKey } from "../_shared/supabaseKeys.ts";
 import { writeVehicleEventByKey } from "../_shared/vehicleEventWrite.ts";
-import { parseBarnFindsPost } from "./parseArticle.ts";
+import { articleAndComments, type BarnFindsPost, parseBarnFindsPost } from "./parseArticle.ts";
+import { bindableSubject, type CitedListing, citedListings, type ListingLink } from "./citations.ts";
+import { type Binding, bindToListing, citationMetadata, identityAgrees, mergePostVehicle, resolveCitedListing } from "./bind.ts";
 import { fetchHeldImageUrls, insertMissingVehicleImages } from "../_shared/vehicleImageWrite.ts";
 
 const USER_AGENT = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 Chrome/120.0.0.0 Safari/537.36";
@@ -63,7 +72,10 @@ async function extractOne(supabase: Supabase, url: string): Promise<Outcome> {
   if (!res.ok) return { status: 502, body: { success: false, error: `barnfinds.com answered ${res.status}` } };
   const html = await res.text();
   await archiveSnapshot(supabase, url, html, res.status);
+  return await landPost(supabase, url, html);
+}
 
+async function landPost(supabase: Supabase, url: string, html: string): Promise<Outcome> {
   const post = parseBarnFindsPost(html);
   const { year, make, model, vin, title } = post;
   // A post with no year in its headline is an article about cars (round-ups, news), not one car.
@@ -77,6 +89,32 @@ async function extractOne(supabase: Supabase, url: string): Promise<Outcome> {
 
   const listingUrlKey = normalizeListingUrlKey(url);
   const norm = normalizeVehicleFields({ make, model, year });
+
+  // The listing the post links to is the car's own record: when we hold it, the post lands on that vehicle.
+  const { article, comments: thread } = articleAndComments(html);
+  const cites = citedListings(article, thread);
+  const subject = bindableSubject(cites);
+  const binding = await bindToListing(supabase, { postUrl: url, postVehicleId: vehicleId, cites, subject, identity: { year: norm.year ?? year, make: norm.make ?? make } });
+  const listingVehicleId = binding.state === "bound" ? binding.target_vehicle_id : null;
+  const observedAt = new Date().toISOString();
+  const citation = citationMetadata(cites, subject, binding, observedAt);
+  const featuredBy = { curator: "barnfinds", post_url: url, author: post.author, published_at: post.publishedAt, comment_count: post.comments.length };
+
+  let finalVehicleId: string;
+  if (listingVehicleId) {
+    // The listing's vehicle keeps its own identity and description; the post's headline and prose stay on its observation.
+    finalVehicleId = listingVehicleId;
+  } else {
+    const landed = await upsertPostVehicle(supabase, { url, platform, vehicleId, post, norm });
+    if ("rejected" in landed) return landed.rejected;
+    finalVehicleId = landed.id;
+  }
+  return await writePost(supabase, { url, slug, platform, listingUrlKey, post, finalVehicleId, bound: !!listingVehicleId, cites, subject, binding, citation, featuredBy, observedAt });
+}
+
+async function upsertPostVehicle(supabase: Supabase, o: { url: string; platform: string; vehicleId: string | null; post: BarnFindsPost; norm: Record<string, any> }): Promise<{ id: string } | { rejected: Outcome }> {
+  const { url, platform, vehicleId, post, norm } = o;
+  const { year, make, model, vin, title } = post;
   const vehicleRow: Record<string, unknown> = {
     discovery_url: url,
     discovery_source: platform,
@@ -103,26 +141,37 @@ async function extractOne(supabase: Supabase, url: string): Promise<Outcome> {
   const gateResult = qualityGate(vehicleRow, { source: "barnfinds", sourceType: "marketplace" });
   if (gateResult.action === "reject") {
     console.warn(`[barnfinds] Quality gate rejected (score=${gateResult.score}): ${gateResult.issues.join(", ")}`);
-    return { status: 422, body: { success: false, error: "Quality gate rejected extraction", quality_score: gateResult.score, quality_issues: gateResult.issues } };
+    return { rejected: { status: 422, body: { success: false, error: "Quality gate rejected extraction", quality_score: gateResult.score, quality_issues: gateResult.issues } } };
   }
   Object.assign(vehicleRow, gateResult.cleaned);
 
-  let finalVehicleId: string;
   if (vehicleId) {
     await supabase.from("vehicles").update(vehicleRow).eq("id", vehicleId);
-    finalVehicleId = vehicleId;
-  } else {
-    const { data: inserted, error: insErr } = await supabase.from("vehicles").insert(vehicleRow).select("id").maybeSingle();
-    if (insErr) throw new Error(insErr?.message || String(insErr));
-    if (!inserted) throw new Error("Vehicle insert returned no data");
-    finalVehicleId = inserted.id;
+    return { id: vehicleId };
   }
+  const { data: inserted, error: insErr } = await supabase.from("vehicles").insert(vehicleRow).select("id").maybeSingle();
+  if (insErr) throw new Error(insErr?.message || String(insErr));
+  if (!inserted) throw new Error("Vehicle insert returned no data");
+  return { id: inserted.id };
+}
+
+interface PostWrite {
+  url: string; slug: string; platform: string; listingUrlKey: string | null; post: BarnFindsPost; finalVehicleId: string;
+  /** The post landed on the vehicle of the listing it cites (not a vehicle of its own). */
+  bound: boolean;
+  cites: CitedListing[]; subject: (CitedListing & ListingLink) | null; binding: Binding;
+  citation: Record<string, unknown>; featuredBy: Record<string, unknown>; observedAt: string;
+}
+
+async function writePost(supabase: Supabase, o: PostWrite): Promise<Outcome> {
+  const { url, slug, platform, listingUrlKey, post, finalVehicleId, bound, observedAt } = o;
+  const { year, make, model, vin, title } = post;
 
   // Testimony: the whole article is the observation's text; the identity fields are what the headline states.
   // An asking price is not a sale: it goes on the event (current_price), never as sale_price.
+  // On a listing's vehicle the headline identity stays on this row: the listing's own record names the car.
   const obsFields: Record<string, any> = { year, make, model };
   if (vin) obsFields.vin = vin;
-  const observedAt = new Date().toISOString();
   const obs = await writeObservation(supabase, {
     vehicleId: finalVehicleId,
     source: { platform: "barnfinds", url, trustScore: 0.55 },
@@ -131,9 +180,12 @@ async function extractOne(supabase: Supabase, url: string): Promise<Outcome> {
     extractionMethod: "html_parse",
     observedAt,
     contentText: post.articleText,
+    testimonyOnly: bound ? Object.keys(obsFields) : undefined,
     rawData: {
       title, asking_price: post.askingPrice, price_text: post.priceText, location: post.location, listing_platform: post.listingPlatform,
-      tipster: post.tipster, published_at: post.publishedAt, modified_at: post.modifiedAt, image_count: post.imageUrls.length, comment_count: post.comments.length,
+      tipster: post.tipster, author: post.author, published_at: post.publishedAt, modified_at: post.modifiedAt, image_count: post.imageUrls.length,
+      comment_count: post.comments.length, featured_by: o.featuredBy, ...o.citation,
+      ...(bound ? { image_urls: post.imageUrls.slice(0, 100) } : {}),
     },
   }).catch((e: any) => {
     console.warn(`[BARNFINDS] observationWriter error for ${finalVehicleId}: ${e?.message}`);
@@ -150,7 +202,9 @@ async function extractOne(supabase: Supabase, url: string): Promise<Outcome> {
     // The post is an article about a listing elsewhere; whether that listing is still open is not stated.
     event_status: "unknown",
     started_at: post.publishedAt ?? undefined,
-    current_price: post.askingPrice ?? null, // null on purpose: a reland must clear a price an older parse got wrong
+    // null on purpose: a reland must clear a price an older parse got wrong. On a listing's vehicle the listing's own episode
+    // carries its price; the post's mentions stay in price_mentions, attributed to the prose.
+    current_price: bound ? null : post.askingPrice ?? null,
     comment_count: post.comments.length,
     extracted_at: observedAt,
     extraction_method: "html_parse",
@@ -176,14 +230,42 @@ async function extractOne(supabase: Supabase, url: string): Promise<Outcome> {
       seller_listing_platform: post.listingPlatform,
       seller_location_claim: post.location,
       tipster: post.tipster,
+      author: post.author,
       photo_count: post.imageUrls.length,
+      // Barn Finds chose this car: an editorial feature of the cited listing, with the readers' comment count.
+      citation_role: "editorial_feature",
+      featured_by: o.featuredBy,
+      ...(bound ? { current_price_withheld: post.askingPrice != null ? "the cited listing's own episode carries its price" : null } : {}),
+      ...o.citation,
     },
   });
   if (event.action === "error") throw new Error(`vehicle_events write failed: ${event.error}`);
 
-  // Photos: external references to the post's own images.
+  // The cited listing we do not hold yet: its blip, through the shared observation writer. The link is the only thing read:
+  // no field is claimed for it. When that platform's intake later reads the listing, the pending-bind sweep folds this
+  // vehicle into the listing's and the listing's own observation supersedes this one.
+  let citedBlip: string | null = null;
+  if (o.binding.state === "target_not_held" && o.subject) {
+    const s = o.subject;
+    const blip = await writeObservation(supabase, {
+      vehicleId: finalVehicleId,
+      source: { platform: s.platform, url: s.url, sourceIdentifier: s.listing_key ?? s.url },
+      fields: {},
+      observationKind: "listing",
+      extractionMethod: "barnfinds_outbound_link",
+      observedAt,
+      rawData: {
+        listing_read: false, basis: "Barn Finds' article links to this listing for the car it features; the listing itself was not read",
+        cited_by: { curator: "barnfinds", post_url: url, published_at: post.publishedAt, anchor_text: s.anchor_text, raw_url: s.raw_url },
+      },
+    }).catch((e: any) => { console.warn(`[barnfinds] cited listing blip ${s.url}: ${e?.message}`); return null; });
+    citedBlip = blip?.observationId ?? null;
+  }
+
+  // Photos: external references to the post's own images. On a listing's vehicle they are copies of the listing's gallery,
+  // so they stay on the observation (image_urls) and the listing's own photos stand.
   let imagesSaved = 0;
-  if (post.imageUrls.length > 0) {
+  if (!bound && post.imageUrls.length > 0) {
     // Rows are never deleted: they carry the vision gate state, ids that analyses point at, and history. Insert the URLs the
     // vehicle does not hold; a photo that left the page is marked superseded.
     const wanted = post.imageUrls.slice(0, 100);
@@ -240,7 +322,10 @@ async function extractOne(supabase: Supabase, url: string): Promise<Outcome> {
     else commentsSaved = ins?.length ?? 0;
   }
 
-  return { status: 200, body: { success: true, vehicle_id: finalVehicleId, event: event.action, observation_id: obs?.observationId ?? null, images_saved: imagesSaved, comments_saved: commentsSaved } };
+  return { status: 200, body: {
+    success: true, vehicle_id: finalVehicleId, event: event.action, observation_id: obs?.observationId ?? null, images_saved: imagesSaved, comments_saved: commentsSaved,
+    bind_state: o.binding.state, cited_listing: o.citation.cited_listing, merge: o.binding.merge, cited_listing_blip: citedBlip,
+  } };
 }
 
 const json = (body: unknown, status = 200) =>
@@ -342,7 +427,105 @@ async function runBatch(supabase: Supabase, limit: number) {
       if (consecutiveFailures >= 3) { tally.stopped = "3_failures_in_a_row"; break; }
     }
   }
-  return { success: true, cursor, ...tally, elapsed_ms: Date.now() - started };
+  const pending = Date.now() - started < BATCH_BUDGET_MS ? await bindPending(supabase, 15) : null;
+  return { success: true, cursor, ...tally, pending_binds: pending, elapsed_ms: Date.now() - started };
+}
+
+const bump = (m: Record<string, number>, k: string | null | undefined) => { const key = k ?? "unknown"; m[key] = (m[key] ?? 0) + 1; };
+
+/**
+ * Recent posts whose cited listing was not held when they landed: look again, and when the listing's platform intake has
+ * since landed it, fold the post's vehicle into the listing's. Oldest check first; bounded per run.
+ */
+async function bindPending(supabase: Supabase, max: number) {
+  const since = new Date(Date.now() - 60 * 86400e3).toISOString();
+  const { data, error } = await supabase.from("vehicle_events").select("id, vehicle_id, source_url, metadata")
+    .eq("source_platform", "barnfinds").gte("created_at", since).eq("metadata->>bind_state", "target_not_held")
+    .order("metadata->>bind_checked_at", { ascending: true }).limit(max);
+  if (error) return { error: error.message };
+  const out = { checked: 0, bound: 0, merge_held: 0, errors: [] as string[] };
+  for (const ev of data ?? []) {
+    out.checked++;
+    const now = new Date().toISOString();
+    const link = ev.metadata?.cited_listing as ListingLink | null;
+    const patch: Record<string, unknown> = { ...ev.metadata, bind_checked_at: now };
+    if (link?.platform && link.url) {
+      const r = await resolveCitedListing(supabase, link);
+      if (r.error) out.errors.push(r.error);
+      if (r.held && r.held.id !== ev.vehicle_id) {
+        const { data: pv } = await supabase.from("vehicles").select("year, make").eq("id", ev.vehicle_id).maybeSingle();
+        if (pv && identityAgrees(pv, r.held)) {
+          const merge = await mergePostVehicle(supabase, { primaryId: r.held.id, dupId: ev.vehicle_id, postUrl: ev.source_url, subject: link, via: r.held.via });
+          if (merge.outcome === "merged") {
+            out.bound++;
+            Object.assign(patch, { bind_state: "bound", bound_vehicle_via: r.held.via, bind_merge: { outcome: "merged", proposal_id: (merge.detail as any)?.proposal_id ?? null } });
+          } else {
+            out.merge_held++;
+            Object.assign(patch, { bind_state: "merge_held", bind_detail: merge });
+          }
+        }
+      }
+    }
+    const upd = await supabase.from("vehicle_events").update({ metadata: patch, ...(patch.bind_state === "bound" ? { current_price: null } : {}) }).eq("id", ev.id);
+    if (upd.error) out.errors.push(upd.error.message);
+  }
+  return out;
+}
+
+/**
+ * Backfill from the pages already kept (listing_page_snapshots, no fetch): read each post's links, record them on its event,
+ * and fold the post's vehicle into the listing's vehicle where the listing is held. Walks snapshots by fetched_at.
+ */
+async function citeSnapshots(supabase: Supabase, o: { after?: string | null; limit?: number; dryRun?: boolean }) {
+  const limit = Math.min(Math.max(Number(o.limit) || 25, 1), 60);
+  const snaps = await supabase.from("listing_page_snapshots").select("id, listing_url, fetched_at, html")
+    .eq("platform", "barnfinds").eq("success", true).gt("fetched_at", o.after ?? "1970-01-01T00:00:00Z")
+    .order("fetched_at", { ascending: true }).limit(limit);
+  if (snaps.error) return { success: false, error: `snapshot read: ${snaps.error.message}` };
+  const t = {
+    snapshots: 0, no_html: 0, no_event: 0, posts: 0, subject_live: {} as Record<string, number>, subject_replaced: {} as Record<string, number>,
+    no_subject: 0, reference_links: {} as Record<string, number>, reader_links: {} as Record<string, number>,
+    bind: {} as Record<string, number>, held: {} as Record<string, number>, merged: 0, already_on_listing: 0, errors: [] as string[],
+  };
+  let next: string | null = o.after ?? null;
+  for (const s of snaps.data ?? []) {
+    t.snapshots++;
+    next = s.fetched_at;
+    if (!s.html) { t.no_html++; continue; }
+    const url = String(s.listing_url).replace(/\/+$/, "");
+    const ev = await supabase.from("vehicle_events").select("id, vehicle_id, metadata, current_price").eq("source_platform", "barnfinds").in("source_url", [url, `${url}/`]).limit(1);
+    if (ev.error) { t.errors.push(`event read ${url}: ${ev.error.message}`); continue; }
+    const row = ev.data?.[0];
+    if (!row?.vehicle_id) { t.no_event++; continue; }
+    t.posts++;
+    const post = parseBarnFindsPost(s.html);
+    const { article, comments: thread } = articleAndComments(s.html);
+    const cites = citedListings(article, thread);
+    const subject = bindableSubject(cites);
+    const replaced = cites.find((c) => c.role === "subject" && c.link_state !== "live");
+    if (subject) bump(t.subject_live, subject.platform);
+    else if (replaced) bump(t.subject_replaced, replaced.named_platform);
+    else t.no_subject++;
+    for (const c of cites) if (c.role === "reference" && c.platform) bump(t.reference_links, c.platform); else if (c.role === "reader") bump(t.reader_links, c.platform);
+    if (o.dryRun) continue;
+    const norm = normalizeVehicleFields({ make: post.make, year: post.year });
+    const binding = await bindToListing(supabase, { postUrl: url, postVehicleId: row.vehicle_id, cites, subject, identity: { year: norm.year ?? post.year, make: norm.make ?? post.make } });
+    bump(t.bind, binding.state);
+    if (subject && binding.target_vehicle_id) bump(t.held, subject.platform);
+    if (binding.merge?.outcome === "merged") t.merged++;
+    else if (binding.state === "bound") t.already_on_listing++;
+    if (binding.merge && binding.merge.outcome === "error") t.errors.push(`merge ${url}: ${JSON.stringify(binding.merge.detail).slice(0, 200)}`);
+    const bound = binding.state === "bound";
+    const metadata = {
+      ...(row.metadata ?? {}), ...citationMetadata(cites, subject, binding, new Date().toISOString()),
+      citation_role: "editorial_feature", author: post.author, citations_from_snapshot: s.id,
+      featured_by: { curator: "barnfinds", post_url: url, author: post.author, published_at: post.publishedAt, comment_count: post.comments.length },
+      ...(bound && row.current_price != null ? { current_price_withheld: "the cited listing's own episode carries its price" } : {}),
+    };
+    const upd = await supabase.from("vehicle_events").update({ metadata, ...(bound ? { current_price: null } : {}) }).eq("id", row.id);
+    if (upd.error) t.errors.push(`event update ${url}: ${upd.error.message}`);
+  }
+  return { success: true, next_after: next, done: (snaps.data ?? []).length < limit, ...t };
 }
 
 Deno.serve(async (req) => {
@@ -359,6 +542,8 @@ Deno.serve(async (req) => {
       const limit = Math.min(Math.max(parseInt(body.limit ?? BATCH_MAX, 10) || BATCH_MAX, 1), BATCH_MAX);
       return json(await runBatch(supabase, limit));
     }
+    if (body.action === "cite_snapshots") return json(await citeSnapshots(supabase, { after: body.after ?? null, limit: body.limit, dryRun: body.dry_run === true }));
+    if (body.action === "bind_pending") return json(await bindPending(supabase, Math.min(Math.max(Number(body.limit) || 15, 1), 50)));
 
     const url = (body.url || "").trim().replace(/\/$/, "");
     let host = "";
