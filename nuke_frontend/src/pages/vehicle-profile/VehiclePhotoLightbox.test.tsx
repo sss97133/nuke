@@ -13,6 +13,7 @@ import VehiclePhotoLightbox, { openVehicleDay, openVehiclePhoto, openVehiclePhot
 const at = '2026-09-12T10:25:00Z', date = '2026-09-12', clock = 'Sep 12, 2026, 10:25 AM';
 type Photo = { id: string; image_url: string; taken_at: string | null; source: string | null; source_url?: string | null };
 let root: Root, host: HTMLDivElement, serial = 0, rows: Photo[], calls: URL[];
+let fallbackRows: (Photo & { vehicle_id: string })[], deniedFallback: boolean;
 const json = (body: unknown) => new Response(JSON.stringify(body), { status: 200, headers: { 'Content-Type': 'application/json' } });
 const photo = (name: string, source: string | null = 'bat_import', taken_at: string | null = at): Photo => ({
   id: `synthetic-${serial}-${name}`, image_url: `https://images.test/${serial}-${name}.jpg`, source, taken_at,
@@ -22,7 +23,7 @@ beforeEach(() => {
   vi.stubEnv('TZ', 'UTC'); expect(new Date('2026-09-12T00:00:00Z').getHours()).toBe(0);
   fixture.vehicleId = `00000000-0000-4000-8000-${String(++serial).padStart(12, '0')}`;
   window.history.replaceState({}, '', `/vehicle/${fixture.vehicleId}`);
-  rows = [photo('native')]; calls = [];
+  rows = [photo('native')]; calls = []; fallbackRows = []; deniedFallback = false;
   vi.stubGlobal('fetch', vi.fn(() => { throw new Error('Real network forbidden'); }));
   fixture.client = createClient('https://lightbox-clock.test', 'synthetic-anon', {
     auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false, storageKey: `synthetic-lightbox-${serial}` },
@@ -31,6 +32,13 @@ beforeEach(() => {
       expect(init?.method ?? 'GET').toBe('GET'); expect(url.pathname).toBe('/rest/v1/vehicle_images'); calls.push(url);
       const fields = url.searchParams.get('select')!;
       if (fields === 'id,image_url,taken_at,source') {
+        if (url.searchParams.has('id')) {
+          expect([...url.searchParams.keys()].sort()).toEqual(url.searchParams.has('vehicle_id') ? ['id', 'select', 'vehicle_id'] : ['id', 'select']);
+          if (deniedFallback) return new Response(JSON.stringify({ code: '42501', message: 'Synthetic refused read' }), { status: 403, headers: { 'Content-Type': 'application/json' } });
+          const selected = fallbackRows.filter(row => `eq.${row.id}` === url.searchParams.get('id') &&
+            (!url.searchParams.has('vehicle_id') || `eq.${row.vehicle_id}` === url.searchParams.get('vehicle_id')));
+          return json(selected.map(row => Object.fromEntries(fields.split(',').map(field => [field, row[field as keyof Photo]]))));
+        }
         expect(Object.fromEntries(url.searchParams)).toEqual({ select: fields, vehicle_id: `eq.${fixture.vehicleId}`,
           is_duplicate: 'not.is.true', image_url: 'not.is.null', order: 'taken_at.asc.nullslast', limit: '3000' });
         // Return the existing projection only: source_url is intentionally unavailable to the viewer.
@@ -117,4 +125,40 @@ it('keeps the existing raw-day navigation and count for native and camera rows',
     await act(async () => button.click()); expect(received).toEqual([date]); expect(dialog()).toBeNull(); expect(calls).toHaveLength(2);
     await act(async () => openVehicleDay('2026-09-13')); expect(received).toEqual([date, '2026-09-13']);
   } finally { window.removeEventListener(VEHICLE_DAY_OPEN_EVENT, listener); }
+});
+
+
+const fallbackQuery = () => calls.find(url => url.searchParams.get('select') === 'id,image_url,taken_at,source' && url.searchParams.has('id'))!;
+const atomsFor = (id: string) => calls.filter(url => url.searchParams.get('select') === 'ai_scan_metadata' && url.searchParams.get('id') === `eq.${id}`);
+const foreignVehicle = '00000000-0000-4000-8000-999999999999';
+it('subject-binding retains an own missing-index fallback with the same entire result and three requests', async () => {
+  const own = { ...photo('own-fallback', 'user_upload'), vehicle_id: fixture.vehicleId }; rows = []; fallbackRows = [own];
+  const before = structuredClone(fallbackRows); await open(own.id);
+  expect(view()).toEqual(expectedView(own, `TAKEN${clock}`, 'OWNER UPLOAD')); expect(calls).toHaveLength(3);
+  expect(fallbackQuery().searchParams.get('id')).toBe(`eq.${own.id}`); expect(atomsFor(own.id)).toHaveLength(1);
+  expect(fallbackRows).toEqual(before);
+});
+it('subject-binding refuses an independently readable foreign fallback before portal, atoms or current index admission', async () => {
+  const foreign = { ...photo('foreign-fallback', 'user_upload'), vehicle_id: foreignVehicle }; rows = []; fallbackRows = [foreign];
+  await open(foreign.id);
+  expect(dialog()).toBeNull(); expect(atomsFor(foreign.id)).toHaveLength(0); expect(calls).toHaveLength(2);
+  expect(fallbackQuery().searchParams.get('vehicle_id')).toBe(`eq.${fixture.vehicleId}`);
+  expect(fallbackQuery().searchParams.get('id')).toBe(`eq.${foreign.id}`);
+});
+it('subject-binding keeps preexisting refused foreign fallback absent with two requests and no atoms', async () => {
+  const foreign = { ...photo('refused-foreign', 'user_upload'), vehicle_id: foreignVehicle }; rows = []; fallbackRows = [foreign]; deniedFallback = true;
+  await open(foreign.id); expect(dialog()).toBeNull(); expect(calls).toHaveLength(2); expect(atomsFor(foreign.id)).toHaveLength(0);
+});
+it('subject-binding preserves a successful missing fallback without fabricating a viewer or atoms', async () => {
+  rows = []; await open(`synthetic-${serial}-missing`); expect(dialog()).toBeNull(); expect(calls).toHaveLength(2);
+  expect(calls.some(url => url.searchParams.get('select') === 'ai_scan_metadata')).toBe(false);
+});
+it('subject-binding prevents foreign cache contamination from changing the later own-photo counter and day count', async () => {
+  const own = photo('own-index', 'user_upload'), foreign = { ...photo('foreign-cache', 'user_upload'), vehicle_id: foreignVehicle };
+  rows = [own]; fallbackRows = [foreign];
+  await open(foreign.id); await act(async () => document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })));
+  await open(own.id); expect(view()).toEqual(expectedView(own, `TAKEN${clock}`, 'OWNER UPLOAD'));
+  expect(atomsFor(foreign.id)).toHaveLength(0); expect(calls).toHaveLength(3);
+  await click('Close photo viewer'); await act(async () => root.render(null)); await mount();
+  await act(async () => openVehiclePhotoByUrl(own.image_url)); expect(view()).toEqual(expectedView(own, `TAKEN${clock}`, 'OWNER UPLOAD')); expect(calls).toHaveLength(3);
 });
