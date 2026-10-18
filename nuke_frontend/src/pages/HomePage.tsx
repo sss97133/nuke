@@ -3067,7 +3067,7 @@ export function TreemapHomePage({ onBrowse, embedded = false }: { onBrowse: () =
         .home-phone-browse { display: grid; gap: 8px; padding: 12px; border-bottom: 2px solid var(--border); }
         .home-phone-browse-actions, .home-phone-display { display: flex; gap: 4px; align-items: center; justify-content: space-between; }
         .home-phone-display { margin-left: auto; }
-        .home-phone-browse button, .home-phone-browse select, .home-phone-browse-list > button { min-height: 44px; border: 2px solid var(--border); background: var(--bg); color: var(--text); padding: 8px 12px; cursor: pointer; }
+        .home-phone-browse button, .home-phone-browse select, .home-phone-browse-list > button { min-height: 44px !important; border: 2px solid var(--border); background: var(--bg); color: var(--text); padding: 8px 12px; cursor: pointer; }
         .home-phone-display button[aria-pressed="true"] { background: var(--text); color: var(--bg); }
         .home-phone-browse-picker { display: grid; gap: 6px; }
         .home-phone-browse-picker select { min-width: 0; width: 100%; }
