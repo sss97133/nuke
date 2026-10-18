@@ -14,6 +14,7 @@ import { batBaseline, callouts, gateMinForHorizon, relativeMove } from './market
 import { combineShareMovers, MOVER_HORIZONS, readShareMovers, type BaselineHorizon, type MoverHorizon, type ShareMovers } from './market/FamilyMovers';
 import IntakePage from './intake/IntakePage';
 import { Text } from '../kit';
+import { MakeIdentity } from '../components/common/MakeIdentity';
 import FamilyMovers from './market/FamilyMovers';
 import BrandFamilyMap, { MapViewSwitch } from './market/BrandFamilyMap';
 import FamilySalesChart, { FamilyViewSwitch, matchesSaleSubModel, useFamilySales, type Sale } from './market/FamilySalesChart';
@@ -1450,6 +1451,8 @@ export function TreemapHomePage({ onBrowse, embedded = false }: { onBrowse: () =
   // matchMedia is absent in jsdom and some embedded webviews; without it the page is treated as wide.
   const canMatchMedia = typeof window !== 'undefined' && typeof window.matchMedia === 'function';
   const [isNarrow, setIsNarrow] = useState(() => canMatchMedia && window.matchMedia('(max-width: 640px)').matches);
+  const [phoneBrowseView, setPhoneBrowseView] = useState<'list' | 'map'>('list');
+  const phoneList = isNarrow && phoneBrowseView === 'list';
   useEffect(() => {
     if (!canMatchMedia) return;
     const mql = window.matchMedia('(max-width: 640px)');
@@ -2108,6 +2111,11 @@ export function TreemapHomePage({ onBrowse, embedded = false }: { onBrowse: () =
     }
   }, [levelType, drillStack.length]);
 
+  const browseKind = levelType === 'brands' ? 'make' : levelType === 'families' ? 'family'
+    : levelType === 'models' ? (facetAxis === 'series' ? 'series' : facetAxis === 'trim' ? 'trim' : facetAxis === 'body' ? 'body style' : 'model')
+    : levelType === 'years' ? 'year' : 'vehicle';
+  const browseOptions = (isLoading ? [] : activeData ?? []).filter(node => node.count > 0);
+
   return (
     <div
       style={{
@@ -2322,7 +2330,7 @@ export function TreemapHomePage({ onBrowse, embedded = false }: { onBrowse: () =
             </Text>
           ) : activeData && (
             <Text role="caption" title={ledgerViewsStamp(refresh.refreshedAt)}>
-              {isNarrow ? mapCaptionShort(levelType, totalCount, refresh)
+              {isNarrow ? (isLoading ? 'Reading sales…' : mapCaptionShort(levelType, totalCount, refresh))
                 : mapCaption(levelType, totalCount, refresh, Date.now(), levelType === 'families' ? captionBridge + familyCoverage(activeData)
                   : levelType === 'models' ? captionBridge + familyNamesShown(
                     facetAxis === 'series' && isGmTruckBrand(currentLevel.make) && activeFamilyLabel === 'Truck'
@@ -2389,14 +2397,41 @@ export function TreemapHomePage({ onBrowse, embedded = false }: { onBrowse: () =
               ENTER FEED
             </button>
           )}
-          {levelType === 'brands' && <MapViewSwitch label="Map view" value={brandView} onChange={setBrandView}
+          {!isNarrow && levelType === 'brands' && <MapViewSwitch label="Map view" value={brandView} onChange={setBrandView}
             options={[{ value: 'brands', label: 'Brands' }, { value: 'nested', label: 'Families inside' }]} />}
-          {levelType === 'models' && currentLevel.family && <FamilyViewSwitch value={familyView} onChange={setFamilyView} />}
+          {!isNarrow && levelType === 'models' && currentLevel.family && <FamilyViewSwitch value={familyView} onChange={setFamilyView} />}
           <span style={{ fontSize: 8, fontWeight: 700, letterSpacing: '0.12em', textTransform: 'uppercase', color: 'var(--text-disabled)' }}>
             {levelType === 'brands' ? 'MAKES' : levelType === 'families' ? (familiesData ? 'FAMILIES' : 'MODELS') : levelType === 'models' ? 'MODELS' : levelType === 'years' ? 'YEARS' : 'VEHICLES'}
           </span>
         </div>
       </div>
+
+      {isNarrow && <section className="home-phone-browse" aria-label="Browse vehicles">
+        <div className="home-phone-browse-actions">
+          {drillStack.length > 1 && <button type="button" onClick={() => { focusAfterDrill.current = true; goBack(drillStack.length - 2); }}>
+            <Text role="label">← Back to {drillStack[drillStack.length - 2].label}</Text>
+          </button>}
+          <div role="group" aria-label="Browse display" className="home-phone-display">
+            {(['list', 'map'] as const).map(view => <button type="button" key={view} aria-pressed={phoneBrowseView === view} onClick={() => { setPhoneBrowseView(view); if (view === 'list') setFamilyView('names'); }}>
+              <Text role="label">{view === 'list' ? 'List' : 'Map'}</Text>
+            </button>)}
+          </div>
+        </div>
+        <label className="home-phone-browse-picker"><Text role="label">Choose a {browseKind}</Text>
+          <select className="k-body" aria-label={`Choose a ${browseKind}`} value="" disabled={isLoading || !browseOptions.length} onChange={event => {
+            const node = browseOptions.find(option => (option.id ?? option.name) === event.target.value);
+            if (node) { focusAfterDrill.current = true; drillInto(node); }
+          }}>
+            <option value="">Choose a {browseKind}…</option>
+            {browseOptions.map(node => <option key={node.id ?? node.name} value={node.id ?? node.name} disabled={!!node.noModel && !node.familyKey}>{node.listingTitle ?? node.name}</option>)}
+          </select>
+        </label>
+      </section>}
+
+      <details className="home-map-refine" open={!isNarrow}>
+        <summary><Text role="label">Refine &amp; map options</Text></summary>
+        {isNarrow && levelType === 'brands' && <MapViewSwitch label="Map layout" value={brandView} onChange={value => { setBrandView(value); setPhoneBrowseView('map'); }} options={[{ value: 'brands', label: 'Makes' }, { value: 'nested', label: 'Families inside' }]} />}
+        {isNarrow && levelType === 'models' && currentLevel.family && <FamilyViewSwitch value={familyView} onChange={value => { setFamilyView(value); if (value === 'sales') setPhoneBrowseView('map'); }} />}
 
       {/* ─── BRAND FAMILY PILLS: 1-click navigation across a brand's factory model families at any depth ─── */}
       {(() => {
@@ -2719,11 +2754,13 @@ export function TreemapHomePage({ onBrowse, embedded = false }: { onBrowse: () =
         );
       })()}
 
+      </details>
+
       {/* ─── SALES BY HOUSE: what the all-venue map holds, house by house (the refresh's receipt) ─── */}
-      {levelType === 'brands' && basis === 'ledger' && <VenueMix rows={refresh.populations?.by_house} clock={ledgerViewsClock(refresh.refreshedAt)} />}
+      {!phoneList && levelType === 'brands' && basis === 'ledger' && <VenueMix rows={refresh.populations?.by_house} clock={ledgerViewsClock(refresh.refreshedAt)} />}
 
       {/* ─── CALLOUTS: the clearest gain and loss against BaT and the largest tile, each a way into its tile ─── */}
-      {marketLevel && !(levelType === 'brands' && brandView === 'nested') && activeData && (
+      {!phoneList && marketLevel && !(levelType === 'brands' && brandView === 'nested') && activeData && (
         <MapCallouts items={callouts(activeData, baseline, gateMin)} windowLabel={horizonWindowLabel} onPick={(name) => {
           const node = activeData.find((n) => n.name === name);
           if (node) { if (coarse) setSheet(node); else drillInto(node); }
@@ -2740,11 +2777,11 @@ export function TreemapHomePage({ onBrowse, embedded = false }: { onBrowse: () =
         ref={containerRef}
         style={{
           flex: embedded ? 'none' : 1,
-          height: embedded ? 'clamp(440px, 64vh, 820px)' : undefined,
+          height: phoneList ? 'auto' : embedded ? 'clamp(440px, 64vh, 820px)' : undefined,
           position: 'relative',
-          overflow: 'hidden',
+          overflow: phoneList ? 'auto' : 'hidden',
           background: 'var(--bg)',
-          minHeight: 0,
+          minHeight: phoneList ? 120 : 0,
         }}
         onMouseLeave={() => setTooltip(null)}
       >
@@ -2770,7 +2807,15 @@ export function TreemapHomePage({ onBrowse, embedded = false }: { onBrowse: () =
           </div>
         )}
 
-        <div
+        {phoneList ? <div className="home-phone-browse-list" role="group" aria-label={`Browse ${browseKind} choices`}>
+          {browseOptions.slice(0, 12).map(node => <button type="button" key={node.id ?? node.name} disabled={isLoading || (!!node.noModel && !node.familyKey)}
+            aria-label={`${node.isVehicle ? 'Open' : 'Browse'} ${node.listingTitle ?? node.name}`}
+            onClick={() => { focusAfterDrill.current = true; drillInto(node); }}>
+            {levelType === 'brands' ? <MakeIdentity make={node.name} /> : <Text role="body">{node.listingTitle ?? node.name}</Text>}
+            <span className="home-phone-browse-count">{!node.isVehicle && <Text role="measure" dense>{node.count.toLocaleString('en-US')} sales</Text>}<span aria-hidden="true">→</span></span>
+          </button>)}
+          {browseOptions.length > 12 && <Text role="caption" as="p">12 of {browseOptions.length.toLocaleString('en-US')} shown · choose any {browseKind} above</Text>}
+        </div> : <div
           style={{
             opacity: transitioning ? 0 : 1,
             transform: transitioning
@@ -2871,7 +2916,7 @@ export function TreemapHomePage({ onBrowse, embedded = false }: { onBrowse: () =
               </div>
             );
           })}
-        </div>
+        </div>}
 
         {/* Empty state */}
         {!isLoading && activeData && activeData.length === 0 && (
@@ -2898,8 +2943,9 @@ export function TreemapHomePage({ onBrowse, embedded = false }: { onBrowse: () =
       {sheet && <MarketSheet node={sheet} move={relativeMove(sheet, baseline, basis === 'ledger', gateMin)} base={baseline} windowLabel={horizonWindowLabel} gateMin={gateMin}
         onOpen={() => { const n = sheet; focusAfterDrill.current = !n.noModel || !!n.familyKey; setSheet(null); drillInto(n); }} onClose={() => setSheet(null)} />}
 
+      {embedded && (levelType === 'models' || levelType === 'years' || levelType === 'vehicles') && currentLevel.family && currentLevel.make && !(levelType === 'models' && familyView === 'sales') && dims.w > 0 && <details className="home-family-history" open={!isNarrow}>
+        <summary><Text role="label">Sales history and prices</Text></summary>
       {/* ─── FAMILY SALES CHART: when embedded on the Market page, keep the family's sales & like-for-like price index + era filter bar visible across models, years & vehicles inside the family ─── */}
-      {embedded && (levelType === 'models' || levelType === 'years' || levelType === 'vehicles') && currentLevel.family && currentLevel.make && !(levelType === 'models' && familyView === 'sales') && dims.w > 0 && (
         <div
           data-testid="embedded-family-sales-chart"
           className="home-embedded-family-chart"
@@ -2940,10 +2986,13 @@ export function TreemapHomePage({ onBrowse, embedded = false }: { onBrowse: () =
             }}
           />
         </div>
-      )}
+
+      </details>}
 
       {/* ─── WHAT MOVED: the families whose BaT market moved most, a pick drills the map to the family ─── */}
-      {levelType === 'brands' && <FamilyMovers
+      {levelType === 'brands' && <details className="home-family-comparisons" open={!isNarrow}>
+        <summary><Text role="label">Compare sales activity</Text></summary>
+        <FamilyMovers
         horizon={horizon}
         onHorizonChange={setHorizon}
         baselineHorizon={baselineHorizon}
@@ -2959,7 +3008,8 @@ export function TreemapHomePage({ onBrowse, embedded = false }: { onBrowse: () =
         onPick={(m) => {
           recordInterest('make', m.brand);
           setDrillStack([{ label: 'ALL MAKES' }, { label: m.brand, make: m.brand }, { label: m.family, make: m.brand, family: m.family_key }]);
-        }} />}
+        }} />
+      </details>}
 
       {/* ─── FOOTER ─── */}
       <div
@@ -2975,7 +3025,7 @@ export function TreemapHomePage({ onBrowse, embedded = false }: { onBrowse: () =
           gap: 12,
         }}
       >
-        {(levelType === 'brands' || levelType === 'families')
+        {phoneList ? <Text role="caption">Confirmed sales · {currentLevel.make ? drillStack.slice(1).map(level => level.label).join(' / ') : 'All makes'}</Text> : (levelType === 'brands' || levelType === 'families')
           && !!activeData?.length && activeData.filter((node) => node.count > 0).every((node) => node.usd != null && node.usd > 0)
           ? <MapLegend base={baseline} basis={basis} clock={ledgerViewsClock(refresh.refreshedAt)} windowLabel={horizonWindowLabel} />
           : <Text role="caption">
@@ -3012,6 +3062,28 @@ export function TreemapHomePage({ onBrowse, embedded = false }: { onBrowse: () =
 
       {/* ─── GLOBAL STYLES ─── */}
       <style>{`
+        .home-map-refine, .home-family-history, .home-family-comparisons { display: contents; }
+        .home-map-refine > summary, .home-family-history > summary, .home-family-comparisons > summary { display: none; }
+        .home-phone-browse { display: grid; gap: 8px; padding: 12px; border-bottom: 2px solid var(--border); }
+        .home-phone-browse-actions, .home-phone-display { display: flex; gap: 4px; align-items: center; justify-content: space-between; }
+        .home-phone-display { margin-left: auto; }
+        .home-phone-browse button, .home-phone-browse select, .home-phone-browse-list > button { min-height: 44px !important; border: 2px solid var(--border); background: var(--bg); color: var(--text); padding: 8px 12px; cursor: pointer; }
+        .home-phone-display button[aria-pressed="true"] { background: var(--text); color: var(--bg); }
+        .home-phone-browse-picker { display: grid; gap: 6px; }
+        .home-phone-browse-picker select { min-width: 0; width: 100%; }
+        .home-phone-browse-list { display: grid; gap: 2px; padding: 8px 12px; }
+        .home-phone-browse-list > button { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-width: 0; text-align: left; }
+        .home-phone-browse-list > button:disabled { cursor: default; color: var(--text-disabled); }
+        .home-phone-browse-count { display: inline-flex; align-items: center; gap: 12px; flex-shrink: 0; }
+        .home-phone-browse button, .home-phone-browse-list > button, .home-map-refine > summary, .home-family-history > summary, .home-family-comparisons > summary { position: relative; }
+        .home-phone-browse button:focus-visible::after, .home-phone-browse-list > button:focus-visible::after, .home-map-refine > summary:focus-visible::after, .home-family-history > summary:focus-visible::after, .home-family-comparisons > summary:focus-visible::after { content: ''; position: absolute; inset: 2px; border: 2px solid var(--text); pointer-events: none; }
+        .home-phone-display button[aria-pressed="true"]:focus-visible::after { border-color: var(--bg); }
+        .home-phone-browse select:focus-visible { border-color: var(--text); }
+        @media (max-width: 640px) {
+          .home-map-refine, .home-family-history, .home-family-comparisons { display: block; border-bottom: 2px solid var(--border); }
+          .home-map-refine > summary, .home-family-history > summary, .home-family-comparisons > summary { display: list-item; min-height: 44px; padding: 15px 12px; cursor: pointer; }
+          .home-map-crumb { min-height: 44px; }
+        }
         @keyframes livePulse {
           0%, 100% { opacity: 1; }
           50% { opacity: 0.4; }

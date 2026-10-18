@@ -28,7 +28,7 @@ import { writeObservation } from "../_shared/observationWriter.ts";
 import { requireWriteAuth } from "../_shared/writeGuard.ts";
 import { projectSecretKey } from "../_shared/supabaseKeys.ts";
 import { batchFromTargets, discoverTargets, reviseCab, recaptureCab } from "./targets.ts";
-import { cabLotPhotos, parseCabDepth } from "./cabPage.ts";
+import { cabCapturePredatesResult, cabLotPhotos, parseCabDepth } from "./cabPage.ts";
 import { cleanCabText, extractCabFacets } from "./cabFacets.ts";
 import { recordSellerTypes, sellerTypeRow } from "../_shared/sellerType.ts";
 import { insertMissingVehicleImages } from "../_shared/vehicleImageWrite.ts";
@@ -779,6 +779,12 @@ Deno.serve(async (req) => {
         null,
       // Rich description: all content sections combined
       description: [extracted.description, depth.fullDescription].filter(Boolean).join('\n\n') || null,
+      // The profile reader serves these root columns; metadata alone is not visible there.
+      highlights: extracted.highlights,
+      equipment: extracted.equipment,
+      modifications: extracted.modifications,
+      known_flaws: extracted.knownFlaws,
+      recent_service_history: extracted.recentServiceHistory,
       listing_location: parsedLoc.clean,
       listing_location_raw: parsedLoc.raw,
       listing_location_source: 'carsandbids',
@@ -903,10 +909,11 @@ Deno.serve(async (req) => {
 
     // Identity guard: a URL/VIN match is not proof it is the same car. A different car is refused and raised as a revision
     // item (identity_match / different_car / relink); for the same car, year/make/model/vin are fill-only.
-    let existingIdentity: { year: number | null; make: string | null; model: string | null; vin: string | null } | null = null;
+    type ExistingIdentity = { year: number | null; make: string | null; model: string | null; vin: string | null; auction_status: string | null; auction_end_date: string | null };
+    let existingIdentity: ExistingIdentity | null = null;
     if (vehicleId) {
-      const { data: idRow } = await supabase.from("vehicles").select("year,make,model,vin").eq("id", vehicleId).maybeSingle();
-      existingIdentity = (idRow as typeof existingIdentity) ?? null;
+      const { data: idRow } = await supabase.from("vehicles").select("year,make,model,vin,auction_status,auction_end_date").eq("id", vehicleId).maybeSingle();
+      existingIdentity = (idRow as ExistingIdentity | null) ?? null;
       const conflict = existingIdentity ? identityConflict(existingIdentity, { year: extracted.year, make: extracted.make, model: extracted.model, vin: extracted.vin }) : null;
       if (conflict) {
         await supabase.rpc("record_revision_item", {
@@ -918,8 +925,14 @@ Deno.serve(async (req) => {
           status: 409, headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
+      if (fromCache && existingIdentity && cabCapturePredatesResult(cachedSnapshot?.fetched_at, depth.outcome, existingIdentity)) {
+        return new Response(JSON.stringify({
+          success: false, refused: "cached_live_precedes_result", vehicle_id: vehicleId,
+          fetched_at: cachedSnapshot?.fetched_at, known_end_at: existingIdentity.auction_end_date,
+        }), { status: 409, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      }
     }
-    const fillOnly = <T extends Record<string, unknown>>(row: T, id: string | null, known: typeof existingIdentity) => (id && known ? fillOnlyIdentity(row, known) : row);
+    const fillOnly = <T extends Record<string, unknown>>(row: T, id: string | null, known: ExistingIdentity | null) => (id && known ? fillOnlyIdentity(row, known) : row);
 
     // Upsert vehicle
     let created = false;
@@ -989,7 +1002,10 @@ Deno.serve(async (req) => {
           url: listingUrlCanonical,
           trustScore: 0.8,
         },
-        fields: vehicleData,
+        // These texts already travel in import_metadata. Do not duplicate them in the
+        // indexed structured_data payload (idx_vobs_specs_covering has a btree row limit).
+        fields: Object.fromEntries(Object.entries(vehicleData).filter(([key]) =>
+          !["highlights", "equipment", "modifications", "known_flaws", "recent_service_history"].includes(key))),
         observationKind: "listing",
         extractionMethod: "dom_parse",
       }).catch((e: any) => console.warn(`[C&B] observationWriter error for ${vehicleId}: ${e?.message}`));

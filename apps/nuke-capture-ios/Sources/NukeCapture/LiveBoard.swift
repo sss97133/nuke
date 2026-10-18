@@ -626,8 +626,27 @@ struct SourcesBoardData: Equatable {
         var mins60: [Int] = []
         let logoUrl: String?
         let businessType: String?
+        var species: String? = nil
+        var speciesLabel: String? = nil
+        var countsAsHeld: Bool? = nil
 
         var id: String { source }
+
+        /// Use the reader's evidenced source kind; a source's name cannot establish its type.
+        var typeLabel: String? {
+            if let label = speciesLabel?.trimmingCharacters(in: .whitespacesAndNewlines), !label.isEmpty { return label }
+            switch species ?? category ?? businessType {
+            case "timed_auction": return "Timed auction"
+            case "block_house": return "Auction house"
+            case "online_auction": return "Online auction"
+            case "auction", "auction_house": return "Auction house"
+            case "dealer": return "Dealer / consignor"
+            case "classifieds": return "Classifieds"
+            case "marketplace", "auth_walled_marketplace": return "Marketplace"
+            case "aggregator": return "Aggregator"
+            default: return nil
+            }
+        }
 
         /// Labelled references in source_census: a figure someone supplied or a catalogue estimated, never a count of
         /// the source (data-machine.md, fleet-relative reporting). They print as estimates with their kind and as-of day.
@@ -840,7 +859,10 @@ struct SourcesBoardData: Equatable {
                 hours24: h24,
                 mins60: m60,
                 logoUrl: str(get("logo_url")),
-                businessType: str(get("business_type"))
+                businessType: str(get("business_type")),
+                species: str(get("species")),
+                speciesLabel: str(get("species_label")),
+                countsAsHeld: get("counts_as_held") as? Bool
             ))
         }
         var notRanked: [String: Int] = [:]
@@ -881,11 +903,34 @@ struct SourceLandingDetail: Equatable {
         let vehicleId: String?
         let sourceUrl: String?
         let createdAt: String
+        var year: Int? = nil
+        var make: String? = nil
+        var model: String? = nil
+        var trim: String? = nil
+        var recordDate: String? = nil
 
         var vehicleUUID: UUID? { vehicleId.flatMap(UUID.init(uuidString:)) }
+        var headline: String {
+            let identity = [year.map(String.init), make, model, trim].compactMap { $0?.isEmpty == false ? $0 : nil }.joined(separator: " ")
+            return identity.isEmpty ? (title ?? lot.map { "Lot \($0)" } ?? "Retained record") : identity
+        }
+        /// The reader's date may be a year, a listing date or an auction date. Keep its precision;
+        /// the dealer reader's intake-clock fallback does not establish a source event date.
+        var recordDateLabel: String {
+            guard let raw = recordDate?.trimmingCharacters(in: .whitespacesAndNewlines), !raw.isEmpty,
+                  raw.range(of: #"^\d{4}(-\d{2}(-\d{2})?)?([ T].*)?$"#, options: .regularExpression) != nil else { return "Undated" }
+            func clock(_ s: String) -> Date? {
+                let iso = s.replacingOccurrences(of: " ", with: "T")
+                    .replacingOccurrences(of: #"([+-]\d{2})$"#, with: "$1:00", options: .regularExpression)
+                return ProfileClock.date(iso)
+            }
+            if raw == createdAt || (clock(raw) != nil && clock(raw) == clock(createdAt)) { return "Undated" }
+            return "Record date " + String(raw.prefix(10))
+        }
         var openableURL: URL? {
-            guard let sourceUrl, sourceUrl.lowercased().hasPrefix("http") else { return nil }
-            return URL(string: sourceUrl)
+            guard let sourceUrl, let url = URL(string: sourceUrl),
+                  ["https", "http"].contains(url.scheme?.lowercased() ?? ""), url.host != nil else { return nil }
+            return url
         }
     }
 
@@ -939,7 +984,12 @@ struct SourceLandingDetail: Equatable {
                     lot: str(ev["lot"]),
                     vehicleId: str(ev["vehicle_id"]),
                     sourceUrl: str(ev["source_url"]),
-                    createdAt: createdAt
+                    createdAt: createdAt,
+                    year: num(ev["year"]).flatMap { abs($0) < 1e5 ? Int($0) : nil },
+                    make: str(ev["make"]),
+                    model: str(ev["model"]),
+                    trim: str(ev["trim"]),
+                    recordDate: str(ev["record_date"])
                 ))
             }
         }
@@ -1049,7 +1099,6 @@ struct LiveBoardView: View {
     @State private var sourcesBoard: SourcesBoardData?
     @State private var selectedSale: AuctionCalendar.CalendarSale?
     @State private var selectedSource: SourcesBoardData.SourceRow?
-    @State private var landingHorizon: LandingHorizon = .d14
     @State private var loadError = false
     @State private var loadErrorDetail: String?
     // The map's selection narrows the list to one brand, then one decade: one population, one
@@ -1129,6 +1178,10 @@ struct LiveBoardView: View {
                         LedgerMapView()
                             .listRowInsets(EdgeInsets(top: 8, leading: 12, bottom: 4, trailing: 12))
                             .listRowBackground(Color.clear)
+                    }
+                    Section {
+                        Text("Live auctions, calendar and sources across all makes.")
+                            .font(.subheadline).foregroundStyle(.secondary)
                         Picker("Board", selection: $subLens) {
                             ForEach(SubLens.allCases) { lens in
                                 Text(lens.rawValue).tag(lens)
@@ -1137,6 +1190,9 @@ struct LiveBoardView: View {
                         .pickerStyle(.segmented)
                         .listRowInsets(EdgeInsets(top: 4, leading: 12, bottom: 6, trailing: 12))
                         .listRowBackground(Color.clear)
+                    } header: {
+                        Text("ALL MAKES · MARKET")
+                            .font(.headline).textCase(nil)
                     }
 
                     switch subLens {
@@ -1177,9 +1233,11 @@ struct LiveBoardView: View {
                         }
                         // The board drawn as the web draws it: brands as boxes, decades inside.
                         Section {
-                            LiveInventoryMapView(lots: mappedLots) { make, decade in
-                                if filterMake != make { bidRange = .all } // the web clears the bid lens on a make change
-                                filterMake = make; filterDecade = decade
+                            DisclosureGroup("Browse live auctions by make") {
+                                LiveInventoryMapView(lots: mappedLots) { make, decade in
+                                    if filterMake != make { bidRange = .all } // the web clears the bid lens on a make change
+                                    filterMake = make; filterDecade = decade
+                                }
                             }
                             .listRowInsets(EdgeInsets(top: 4, leading: 8, bottom: 4, trailing: 8))
                             .listRowBackground(Color.clear)
@@ -1253,7 +1311,7 @@ struct LiveBoardView: View {
                     SaleRosterSheet(sale: sale)
                 }
                 .sheet(item: $selectedSource) { src in
-                    SourceLandingSheet(sourceRow: src)
+                    SourceLandingSheet(sourceRow: src, readAt: sourcesBoard?.asOf)
                 }
             } else if loadError {
                 ContentUnavailableView {
@@ -1387,25 +1445,7 @@ struct LiveBoardView: View {
 
     @ViewBuilder private var sourcesSection: some View {
         if let sb = sourcesBoard {
-            let totalHeld = sb.rows.reduce(0) { $0 + ($1.held ?? 0) }
-            let total24 = sb.landing.landed24 > 0 ? sb.landing.landed24 : sb.rows.reduce(0) { $0 + $1.landed24 }
-            let total1h = sb.landing.landed1h
-            let total15m = sb.landing.landed15m
             Section {
-                HStack(spacing: 8) {
-                    Text("LANDING WINDOW")
-                        .font(.system(size: 10, weight: .semibold, design: .monospaced))
-                        .foregroundStyle(.secondary)
-                    Spacer()
-                    Picker("Window", selection: $landingHorizon) {
-                        ForEach(LandingHorizon.allCases) { h in
-                            Text(h.rawValue).tag(h)
-                        }
-                    }
-                    .pickerStyle(.segmented)
-                    .frame(maxWidth: 160)
-                }
-                .padding(.vertical, 2)
                 ForEach(sb.rows) { src in
                     Button {
                         selectedSource = src
@@ -1416,20 +1456,22 @@ struct LiveBoardView: View {
                 }
             } header: {
                 VStack(alignment: .leading, spacing: 2) {
-                    let livePulse = total1h > 0 ? " · +\(total1h.formatted()) in 1h" + (total15m > 0 ? " (+\(total15m.formatted()) in 15m)" : "") : ""
-                    Text("\(sb.rows.count) ranked sources · \(totalHeld.formatted()) records held · +\(total24.formatted()) in 24h\(livePulse)")
+                    Text("Sources · all makes")
                         .font(.caption2.monospaced())
                         .textCase(nil)
-                    Text("as of \(ProfileClock.Absolute(sb.asOf)) · tap a source for hourly & live intake")
+                    Text("Open a source to explore its retained vehicle records and results.")
                         .font(.caption2.monospaced())
                         .foregroundStyle(.secondary)
                         .textCase(nil)
                 }
-            } footer: {
-                if !sb.notRanked.isEmpty {
-                    let nr = sb.notRanked.sorted { $0.value > $1.value }.map { "\($0.key): \($0.value.formatted())" }.joined(separator: " · ")
-                    Text("Additional sources not ranked: \(nr)")
-                        .font(.caption2)
+            }
+            if !sb.notRanked.isEmpty {
+                Section {
+                    DisclosureGroup("Data coverage") {
+                        let nr = sb.notRanked.sorted { $0.value > $1.value }.map { "\($0.key): \($0.value.formatted())" }.joined(separator: " · ")
+                        Text("Additional sources not ranked: \(nr)")
+                            .font(.caption2)
+                    }
                 }
             }
         } else {
@@ -1445,63 +1487,15 @@ struct LiveBoardView: View {
     }
 
     @ViewBuilder private func sourceRow(_ src: SourcesBoardData.SourceRow) -> some View {
-        let land = src.landingText(horizon: landingHorizon, now: now)
-        let bins = src.bins(for: landingHorizon)
-        let peak = max(bins.max() ?? 0, 1)
         VStack(alignment: .leading, spacing: 4) {
-            HStack(alignment: .firstTextBaseline) {
-                Text(src.shortName)
-                    .font(.subheadline.weight(.semibold))
-                if let cat = src.category {
-                    Text(cat.uppercased())
-                        .font(.system(size: 9, weight: .semibold, design: .monospaced))
-                        .foregroundStyle(.secondary)
-                }
+            HStack(spacing: 10) {
+                MarketSourceIdentity(source: src)
                 Spacer(minLength: 4)
-                if !bins.isEmpty, bins.contains(where: { $0 > 0 }) {
-                    HStack(alignment: .bottom, spacing: 1.5) {
-                        ForEach(Array(bins.enumerated()), id: \.offset) { idx, val in
-                            let h = max(val > 0 ? 3.0 : 1.0, (Double(val) / Double(peak)) * 14.0)
-                            RoundedRectangle(cornerRadius: 1)
-                                .fill(idx == bins.count - 1 && val > 0 ? Color.green : Color.secondary.opacity(val > 0 ? 0.65 : 0.2))
-                                .frame(width: 2.5, height: h)
-                        }
-                    }
-                    .frame(height: 14)
-                }
-                Text(land.text)
-                    .font(.caption2.monospaced().weight(land.active ? .semibold : .regular))
-                    .foregroundStyle(land.active ? Color.green : Color.secondary)
+                Image(systemName: "chevron.right").font(.caption).foregroundStyle(.secondary)
             }
-            HStack(spacing: 8) {
-                if let held = src.held {
-                    Text("\(held.formatted()) held")
-                        .font(.caption2.monospaced().weight(.semibold))
-                }
-                let share = src.heldShare
-                if !share.text.isEmpty {
-                    SourceShareBar(share: share)
-                        .frame(width: 40, height: 5)
-                        .accessibilityHidden(true)
-                    Text(share.text)
-                        .font(.caption2.monospaced())
-                        .foregroundStyle(.secondary)
-                }
-                Spacer(minLength: 0)
-                if let s12 = src.sales12, s12 > 0 {
-                    Text("\(s12.formatted()) 12m sales")
-                        .font(.caption2.monospaced())
-                        .foregroundStyle(.secondary)
-                }
-                if let u12 = src.usd12, u12 > 0 {
-                    Text(LedgerMap.money(u12))
-                        .font(.caption2.monospaced().weight(.semibold))
-                }
-            }
-            if let ref = src.heldShare.reference {
-                Text(ref.uppercased())
-                    .font(.system(size: 9, design: .monospaced))
-                    .foregroundStyle(.secondary)
+            if let held = src.held, src.countsAsHeld != false {
+                Text("\(held.formatted()) retained records · counted \(ProfileClock.Absolute(src.heldAt))")
+                    .font(.caption.monospaced()).foregroundStyle(.secondary)
             }
         }
         .padding(.vertical, 3)
@@ -1945,138 +1939,168 @@ struct SourceShareBar: View {
     }
 }
 
-/// Source hourly & live landing drill-down sheet (`market_source_landing_read` #1825).
+/// The source's recorded identity, retaining readable text if its existing artwork is absent or unreadable.
+private struct MarketSourceIdentity: View {
+    let source: SourcesBoardData.SourceRow
+
+    var body: some View {
+        HStack(spacing: 10) {
+            if let logo = source.logoUrl, let url = URL(string: logo) {
+                CachedAsyncImage(url: url, maxPixel: 160) { image in
+                    image.resizable().scaledToFit()
+                } placeholder: { Color.clear }
+                .frame(width: 64, height: 30)
+                .background(Color.white)
+                .accessibilityHidden(true)
+            }
+            VStack(alignment: .leading, spacing: 3) {
+                Text(source.shortName).font(.subheadline.weight(.semibold))
+                if let type = source.typeLabel {
+                    Text(type).font(.caption).foregroundStyle(.secondary)
+                }
+            }
+        }
+    }
+}
+
+/// Retained source records; technical census and record-intake details are an explicit disclosure.
 struct SourceLandingSheet: View {
     let sourceRow: SourcesBoardData.SourceRow
+    var readAt: String? = nil
     @State private var detail: SourceLandingDetail?
+    @State private var detailFailed = false
     @Environment(\.dismiss) private var dismiss
 
     var body: some View {
         NavigationStack {
             List {
-                Section("Census & coverage") {
-                    let share = sourceRow.heldShare
-                    VStack(alignment: .leading, spacing: 4) {
-                        HStack(spacing: 8) {
-                            if let held = sourceRow.held {
-                                Text("\(SourcesBoardData.SourceRow.count(held)) held")
-                                    .font(.system(.subheadline, design: .monospaced).weight(.semibold))
-                            }
-                            if !share.text.isEmpty {
-                                SourceShareBar(share: share).frame(width: 56, height: 6)
-                                Text(share.text).font(.caption.monospaced())
-                            }
-                        }
-                        if let ref = share.reference {
-                            Text(ref.uppercased())
-                                .font(.system(size: 9, design: .monospaced))
-                                .foregroundStyle(.secondary)
-                        }
-                        Text(sourceRow.totalSentence)
-                            .font(.caption2)
-                            .foregroundStyle(.secondary)
+                Section {
+                    MarketSourceIdentity(source: sourceRow)
+                    if let sales = sourceRow.sales12, sales > 0 {
+                        RootedValueView(label: "Measured sales · last 12 months", value: sales.formatted(), status: .recorded,
+                                        decay: "Read " + ProfileClock.Absolute(readAt))
                     }
-                    .padding(.vertical, 2)
+                } footer: {
+                    Text("All makes represented by this source. Open a linked record to explore its vehicle on Nuke.")
                 }
-                Section("Intake Velocity") {
-                    let l15 = detail?.landed15m ?? sourceRow.landed15m
-                    let l1h = detail?.landed1h ?? sourceRow.landed1h
-                    let l24 = detail?.landed24 ?? sourceRow.landed24
-                    let l7d = detail?.landed7 ?? sourceRow.landed7
-                    HStack {
-                        metricCell(label: "15m", value: "+\(l15.formatted())")
-                        Spacer()
-                        metricCell(label: "1h", value: "+\(l1h.formatted())")
-                        Spacer()
-                        metricCell(label: "24h", value: "+\(l24.formatted())")
-                        Spacer()
-                        metricCell(label: "7d", value: "+\(l7d.formatted())")
-                    }
-                    .padding(.vertical, 2)
-
-                    let h24 = detail?.hours24 ?? sourceRow.hours24
-                    if h24.contains(where: { $0 > 0 }) {
-                        VStack(alignment: .leading, spacing: 4) {
-                            Text("LAST 24 HOURS (HOURLY)")
-                                .font(.system(size: 9, weight: .semibold, design: .monospaced))
-                                .foregroundStyle(.secondary)
-                            barRow(bins: h24)
-                        }
-                        .padding(.vertical, 2)
-                    }
-
-                    let m60 = detail?.mins60 ?? sourceRow.mins60
-                    if m60.contains(where: { $0 > 0 }) {
-                        VStack(alignment: .leading, spacing: 4) {
-                            Text("LAST 60 MINUTES (5-MIN BINS)")
-                                .font(.system(size: 9, weight: .semibold, design: .monospaced))
-                                .foregroundStyle(.secondary)
-                            barRow(bins: m60)
-                        }
-                        .padding(.vertical, 2)
-                    }
-                }
-
                 if let detail {
-                    Section("Recent Landed Events (\(detail.recent.count))") {
+                    Section {
                         if detail.recent.isEmpty {
-                            Text("No recent events in this window.")
-                                .font(.caption.monospaced())
-                                .foregroundStyle(.secondary)
-                        } else {
-                            ForEach(detail.recent) { ev in
-                                VStack(alignment: .leading, spacing: 3) {
-                                    HStack(alignment: .firstTextBaseline) {
-                                        Text(ev.title ?? ev.lot.map { "Lot \($0)" } ?? "Event")
-                                            .font(.subheadline.weight(.semibold))
-                                            .lineLimit(1)
-                                        Spacer(minLength: 4)
-                                        if let p = ev.price, p > 0 {
-                                            Text(LiveBoardView.bidNumber(p, compact: true))
-                                                .font(.caption.monospaced().weight(.semibold))
-                                        }
-                                    }
-                                    HStack(spacing: 6) {
-                                        if let lot = ev.lot {
-                                            Text("Lot \(lot)")
-                                                .font(.caption2.monospaced())
-                                                .foregroundStyle(.secondary)
-                                        }
-                                        if let et = ev.eventType {
-                                            Text(et)
-                                                .font(.caption2.monospaced())
-                                                .foregroundStyle(.secondary)
-                                        }
-                                        Spacer()
-                                        Text(ProfileClock.Absolute(ev.createdAt))
-                                            .font(.system(size: 9, design: .monospaced))
-                                            .foregroundStyle(.tertiary)
-                                    }
-                                    if let url = ev.openableURL {
-                                        Link("Open source ↗", destination: url)
-                                            .font(.system(size: 10, design: .monospaced))
-                                    }
-                                }
-                                .padding(.vertical, 2)
-                            }
+                            Text("No retained records returned in this read.")
+                                .font(.footnote).foregroundStyle(.secondary)
                         }
+                        ForEach(detail.recent) { event in
+                            VStack(alignment: .leading, spacing: 6) {
+                                if let id = event.vehicleUUID {
+                                    NavigationLink {
+                                        VehicleDetailView(vehicleId: id.uuidString, embedInNavigationStack: false)
+                                    } label: {
+                                        recordIdentity(event)
+                                    }
+                                } else {
+                                    recordIdentity(event)
+                                    Text("Vehicle profile not linked")
+                                        .font(.caption2).foregroundStyle(.secondary)
+                                }
+                                if let url = event.openableURL {
+                                    DisclosureGroup("Source") {
+                                        if let title = event.title, !title.isEmpty, title != event.headline {
+                                            Text(title).font(.caption).foregroundStyle(.secondary)
+                                        }
+                                        Link("Original source record", destination: url).font(.caption)
+                                    }
+                                    .font(.caption)
+                                }
+                            }
+                            .padding(.vertical, 2)
+                        }
+                    } header: {
+                        Text("Vehicles and results")
+                    } footer: {
+                        Text("A sample of \(detail.recent.count) retained records across all makes. Record dates retain the source's precision; undated records have no established event date.")
                     }
                 } else {
                     Section {
-                        HStack(spacing: 8) {
-                            ProgressView()
-                            Text("Reading live intake…")
-                                .font(.caption.monospaced())
-                                .foregroundStyle(.secondary)
+                        if detailFailed {
+                            Text("Source records could not be read.").font(.footnote)
+                            Button("Retry source records") { Task { await loadDetail() } }
+                        } else {
+                            HStack(spacing: 8) {
+                                ProgressView()
+                                Text("Reading source records…").font(.caption).foregroundStyle(.secondary)
+                            }
                         }
+                    }
+                }
+                Section {
+                    DisclosureGroup("Data coverage") {
+                        coverageInfo
                     }
                 }
             }
             .navigationTitle(sourceRow.shortName)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar { ToolbarItem(placement: .confirmationAction) { Button("Done") { dismiss() } } }
-            .task {
-                detail = await SourceLandingDetail.fetch(source: sourceRow.source)
+            .task { await loadDetail() }
+        }
+    }
+
+    private func loadDetail() async {
+        detailFailed = false
+        detail = await SourceLandingDetail.fetch(source: sourceRow.source)
+        detailFailed = detail == nil
+    }
+
+    private func recordIdentity(_ event: SourceLandingDetail.RecentEvent) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text(event.headline).font(.subheadline.weight(.semibold))
+            Text(event.recordDateLabel).font(.caption).foregroundStyle(.secondary)
+            let kind = [event.eventType, event.eventStatus].compactMap { $0?.replacingOccurrences(of: "_", with: " ") }.joined(separator: " · ")
+            if !kind.isEmpty { Text(kind).font(.caption2).foregroundStyle(.secondary) }
+            if let lot = event.lot { Text("Lot \(lot)").font(.caption2.monospaced()).foregroundStyle(.secondary) }
+        }
+    }
+
+    @ViewBuilder private var coverageInfo: some View {
+        let share = sourceRow.heldShare
+        VStack(alignment: .leading, spacing: 6) {
+            Text("Retained population").font(.subheadline.weight(.semibold))
+            if let held = sourceRow.held {
+                Text("\(SourcesBoardData.SourceRow.count(held)) records held · counted \(ProfileClock.Absolute(sourceRow.heldAt))")
+                    .font(.caption)
+            }
+            if !share.text.isEmpty {
+                HStack {
+                    SourceShareBar(share: share).frame(width: 56, height: 6)
+                    Text(share.text).font(.caption.monospaced())
+                }
+            }
+            if let ref = share.reference { Text(ref).font(.caption2).foregroundStyle(.secondary) }
+            Text(sourceRow.totalSentence).font(.caption2).foregroundStyle(.secondary)
+        }
+        VStack(alignment: .leading, spacing: 6) {
+            Text("Records added to Nuke").font(.subheadline.weight(.semibold))
+            Text("Intake counts and clocks describe when records reached Nuke, including older auctions and listings.")
+                .font(.caption).foregroundStyle(.secondary)
+            Text("The record sample is ordered by arrival in Nuke.").font(.caption).foregroundStyle(.secondary)
+            HStack {
+                metricCell(label: "15m", value: (detail?.landed15m ?? sourceRow.landed15m).formatted())
+                Spacer()
+                metricCell(label: "1h", value: (detail?.landed1h ?? sourceRow.landed1h).formatted())
+                Spacer()
+                metricCell(label: "24h", value: (detail?.landed24 ?? sourceRow.landed24).formatted())
+                Spacer()
+                metricCell(label: "7d", value: (detail?.landed7 ?? sourceRow.landed7).formatted())
+            }
+            Text("Read \(ProfileClock.Absolute(detail?.asOf))").font(.caption2).foregroundStyle(.secondary)
+            if let detail {
+                ForEach(detail.recent) { event in
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(event.headline).font(.caption)
+                        Text("Added to Nuke \(ProfileClock.Absolute(event.createdAt))")
+                            .font(.caption2).foregroundStyle(.secondary)
+                    }
+                }
             }
         }
     }
@@ -2091,17 +2115,4 @@ struct SourceLandingSheet: View {
         }
     }
 
-    private func barRow(bins: [Int]) -> some View {
-        let peak = max(bins.max() ?? 0, 1)
-        return HStack(alignment: .bottom, spacing: 2) {
-            ForEach(Array(bins.enumerated()), id: \.offset) { idx, val in
-                let h = max(val > 0 ? 4.0 : 1.5, (Double(val) / Double(peak)) * 28.0)
-                RoundedRectangle(cornerRadius: 1.5)
-                    .fill(idx == bins.count - 1 && val > 0 ? Color.green : Color.primary.opacity(val > 0 ? 0.65 : 0.15))
-                    .frame(maxWidth: .infinity)
-                    .frame(height: h)
-            }
-        }
-        .frame(height: 28)
-    }
 }

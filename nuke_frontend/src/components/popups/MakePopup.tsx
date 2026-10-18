@@ -13,7 +13,7 @@
  * Single RPC call via popup_make_intel() — one round trip.
  */
 
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { supabase } from '../../lib/supabase';
 import { VEHICLE_POPUP_COLUMNS } from './vehiclePopupColumns';
 import { usePopup } from './usePopup';
@@ -85,6 +85,7 @@ export function MakePopup({ make, searchQuery }: Props) {
   const [data, setData] = useState<MakeIntel | null>(null);
   const [loading, setLoading] = useState(true);
   const [unavailable, setUnavailable] = useState(false);
+  const continuationEpoch = useRef(0);
 
   useEffect(() => {
     let cancelled = false;
@@ -104,7 +105,7 @@ export function MakePopup({ make, searchQuery }: Props) {
     }
 
     load();
-    return () => { cancelled = true; };
+    return () => { cancelled = true; continuationEpoch.current += 1; };
   }, [make]);
 
   if (loading || !data) {
@@ -136,8 +137,9 @@ export function MakePopup({ make, searchQuery }: Props) {
   };
 
   const handleVehicleClick = (id: string, title: string) => {
+    const epoch = continuationEpoch.current;
     supabase.from('vehicles').select(VEHICLE_POPUP_COLUMNS).eq('id', id).single().then(({ data: v }) => {
-      if (v) openPopup(<VehiclePopup vehicle={v as unknown as FeedVehicle} />, title, 480);
+      if (v && continuationEpoch.current === epoch) openPopup(<VehiclePopup vehicle={v as unknown as FeedVehicle} />, title, 480);
     });
   };
 

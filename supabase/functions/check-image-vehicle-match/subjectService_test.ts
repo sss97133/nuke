@@ -86,6 +86,20 @@ Deno.test("retained admitted reading replay performs no object, renderer, candid
   const f = fixture(); await f.run(); const result = await f.run();
   equal(result.status, "cached"); equal(f.counts, { captures: 1, models: 1, candidates: 1 });
 });
+
+Deno.test("fresh usage reaches the response while retained testimony and free replay keep separate clocks", async () => {
+  const f = fixture(), vision = f.dependencies.vision;
+  const usage = { input_tokens: 1200, output_tokens: 300, cache_creation_input_tokens: 0, cache_read_input_tokens: 0 };
+  f.dependencies.vision = async options => ({ ...(await vision(options))!, usage });
+  const first = await f.run();
+  equal("reading" in first && first.reading?.provider_usage, usage);
+  equal(f.writes.some(write => "provider_usage" in write.envelope || "usage" in write.envelope), false);
+  const retained = JSON.stringify(f.writes[0].envelope);
+  const second = await f.run();
+  equal(second.status, "cached"); equal(f.counts.models, 1);
+  equal("reading" in second && second.reading?.provider_usage, null);
+  equal(JSON.stringify(f.writes[0].envelope), retained);
+});
 Deno.test("partial storage retry reuses protected full-batch receipt without redoing inference", async () => {
   const f = fixture(), ingest = f.store.ingest;
   f.store.ingest = async (...args) => { if (args[0] === ids[1]) throw new Error("transport"); return ingest(...args); };

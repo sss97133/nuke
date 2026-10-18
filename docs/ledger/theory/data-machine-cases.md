@@ -395,6 +395,34 @@ event), described (COMMENT ON), owned (a registry row) and read. Not fewer table
 
 The species is a column (2026-10-18): `observation_sources.species`, with `species_set` and the evidence it was read from (`species_evidence`); a listing takes its own species where its URL or metadata shows it (`v_listing_species`). The extractor's builder declares it from the source itself (`.claude/rules/extraction.md`, Source species), and the Sources board groups by it with the names above. Barn Finds is an aggregator (a curator: its posts point at eBay, Craigslist and Facebook listings), with its own 'BF Exclusive' ads as classifieds.
 
+### Cars & Bids capture integrity — bounded repair, 2026-10-18
+
+The source question is whether a retained auction reading contains a usable keyed and clocked
+thread, before its current state is updated. `scripts/cab-api-sync.mjs` previously treated a failed
+comments request as an empty thread. The existing `inspect-cab-snapshot.mjs` now owns the deterministic
+`cab-capture-integrity-v1` assessment, called before the collector's first write. Failed/malformed
+responses, wrong listing identity, missing/duplicate thread IDs, missing source clocks, invalid bid
+amounts, source bid-count disagreement and a full limited page refuse the extraction. A disagreement
+between concurrently fetched detail and thread can cause refusal; it is not proof the source is wrong.
+No pagination protocol is invented. Unknown source bid counts remain unassessed; matching counts do
+not prove source enumeration or semantic accuracy. Comment-counter semantics, retained DB links and
+public delivery remain separate, unassessed gates.
+
+Offline replay: `node scripts/inspect-cab-snapshot.mjs --api-json <retained-json-file>`. Output contains
+counts and reasons, not comment bodies or handles. `scripts/inspect-cab-snapshot.test.mjs` exercises
+the actual collector's pre-write refusal and unknown/disagreement cases. The historical skip rule and
+dispatch population are unchanged, labelled previously processed rather than complete; legacy mixed
+row telemetry is explicitly not new-row or model coverage. No collection, replay or paused job is
+started by this repair. Three explicit retained captures passed the local capture assessment; their
+bid counts matched the stored totals. This is bounded validation, not fleet/public readiness.
+
+Next relationship to assay: the collector's listing observation uses source URL/identifier but does
+not pass typed snapshot or presentation pointers through `observationWriter`. Inspect canonical intake
+admission and existing binding owners before extending that path. Original source-ID reconciliation,
+capture identity, disagreement, withdrawal and anonymous-reader behavior must be proved together;
+adding a pointer alone does not close the case. Current stage: local implementation and focused tests;
+publication/deployment evidence belongs in the private lane receipt.
+
 ## 7. Hypotheses the owner wants tested as veins (in the vocabulary)
 
 - **The repair chain precedes the market event.** "How many thermostats had to sell before an AC system sold, before
@@ -1266,6 +1294,40 @@ not realized gains, complete cars or a fleet breakthrough. The full reference re
 record availability must not be substituted for these evidence-coverage measures. Private source
 pages, type/qualification tests and delivery stages are retained under `~/nuke-logs/retained-bulk-*`.
 Merge, deployment, realized net gains and anonymous runtime remain separate until recorded.
+
+### Model-name separation and shared alias contamination, 2026-10-18
+
+The original Relativity example retained a source-labeled Bultaco Frontera 370 but assigned its
+listing to the Pursang key. Fixing a UUID display fallback exposed rather than corrected that
+interpretation. The same live alias owner assigned Cappuccino to Jimny and Hayabusa/RE-5 to GSX-R.
+The historical specialist-family test explicitly expected Hayabusa to bind to GSX-R: positive
+binding tests and healthy refresh jobs were not semantic identity acceptance.
+
+The full stored-vehicle reference was an atlas estimate of 1,248,544 rows on October 18; an exact
+public denominator and fleet-wide affected count were not measured. The reference-catalog assay
+read 4,470 rows/22,250 aliases. Its 515 cross-name candidates include legitimate hierarchy and are
+not an error count. The first repair cohort is all 1,310 retained Bultaco/Suzuki names representing
+5,216 dictionary record rows, not 5,216 verified physical vehicles or newly ready public answers.
+
+The prepared repair narrows eight existing rows and adds fourteen source-supported model names in
+the existing `canonical_models` owner. Its disposable replay rebinds 542 represented rows and names
+18 formerly unresolved rows; 1,899 formerly forced bindings become unresolved. All names and
+make-level sale counts/dollars survive. Those figures measure dictionary classification changes,
+not whole-fleet model completeness. Sources are the Barcelona Motorcycle Museum Bultaco catalogue
+and Suzuki's own digital archive/history. Unknown production ranges remain unknown.
+
+`test_model_identity_separation.sql` runs the actual matcher, market/sales folds, anonymous sales
+reader and fit writer. It covers twenty-three names, unrelated Porsche controls, source retention,
+generic/unassessed-name refusal, idempotence and withholding a price fit made from old membership.
+The existing `refresh-market-views.py` gains a bounded dependency-ordered selection with a dry run
+and stops before dependent folds after a failure. Refreshes remain concurrent; year prices use their
+existing owner/planner settings. No new queue, schedule or raw testimony writer is introduced.
+
+Delivery stages and before/after anonymous reader evidence belong in the operator receipt at
+`~/nuke-logs/model-identity-repair-20261018/`; this entry records local implementation and testing,
+not production completion. Remaining work includes other catalog candidate families, the differing
+normalizer year/null rules and the independent 1D sale/capture admission defect. Existing GM truck
+hierarchy decisions are outside this repair and remain intact.
 
 ## 13. Aspiration: twenty stacks the model must be able to carry (owner, 2026-10-06)
 
