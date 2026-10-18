@@ -5,7 +5,7 @@
 -- Values are copied from production as they stand, including id, created_at and vetted (the trim-less K5 Blazer row was
 -- unvetted by 20261018200000). ON CONFLICT DO NOTHING: in production every row already exists, so this writes nothing;
 -- a rebuild gets the same 96 rows.
-SET statement_timeout = '30s';
+SET statement_timeout = '10s';
 SET lock_timeout = '5s';
 
 INSERT INTO public.vehicle_identity_marks (
