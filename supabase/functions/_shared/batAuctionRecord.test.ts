@@ -206,6 +206,31 @@ Deno.test("C&B rows: BaT's row shape, keyed on C&B's own comment id with the has
   await assertRejects(() => cabRows([cab("", "driver9", 100)]), Error, "no comment id");
 });
 
+Deno.test("C&B rows: thread order, result lines, attachments, reply targets and flags (comments API, 2026-10-18)", async () => {
+  // The comments API lists newest first; sequence_number is the position in the thread, 1 = first.
+  const at = (id: string, postedAt: string, extra: Partial<CabCommentInput> = {}): CabCommentInput =>
+    ({ id, author: "", postedAt, text: "", likes: 0, bidAmount: null, isSeller: false, ...extra });
+  const rows = await cabRows([
+    at("Result01", "2026-06-02T23:00:00Z", { text: "Sold to kryptowar for $26,500", isResult: true }),
+    at("Rnm00001", "2026-06-02T22:59:00Z", { text: "Reserve not met, bid to $9,500", isResult: true }),
+    at("Reply001", "2026-06-02T21:00:00Z", { author: "driver9", text: "Agreed, @lister4 and @driver9 know", replyTo: "Vapor_chamber" }),
+    at("Photo001", "2026-06-02T20:00:00Z", { author: "lister4", text: "Engine bay", isSeller: true, mediaUrls: ["https://media.carsandbids.com/a/1.jpg"] }),
+    at("Gone0001", "2026-06-02T19:00:00Z", { flagged: true }),
+    at("Bid00001", "2026-06-02T18:00:00Z", { author: "driver9", text: "Bid $20,000", bidAmount: 20000 }),
+  ]);
+  assertEquals(rows.map((r) => [r.source_comment_id, r.sequence_number]),
+    [["Bid00001", 1], ["Gone0001", 2], ["Photo001", 3], ["Reply001", 4], ["Rnm00001", 5], ["Result01", 6]]);
+  const by = Object.fromEntries(rows.map((r) => [r.source_comment_id, r]));
+  assertEquals([by.Result01.comment_type, by.Result01.author_username, by.Result01.bid_amount], ["sold", "Unknown", null]);
+  assertEquals(by.Rnm00001.comment_type, "observation");
+  assertEquals([by.Photo001.comment_type, by.Photo001.has_media, by.Photo001.media_urls],
+    ["seller_response", true, ["https://media.carsandbids.com/a/1.jpg"]]);
+  assertEquals(by.Reply001.mentions, ["Vapor_chamber", "lister4", "driver9"]);
+  assertEquals([by.Gone0001.comment_text, by.Gone0001.is_flagged, by.Gone0001.author_username], ["", true, "Unknown"]);
+  assertEquals([by.Bid00001.comment_type, by.Bid00001.mentions, by.Bid00001.is_flagged, by.Bid00001.has_media], ["bid", null, false, false]);
+  assertEquals(by.Bid00001.content_hash, await cabCommentContentHash("Bid00001"));
+});
+
 Deno.test("legacy C&B keys yield their comment id; other hashes do not", async () => {
   assertEquals(legacyCabCommentId("cab_10000000-0000-4000-8000-000000000002_Held0001"), "Held0001");
   assertEquals(legacyCabCommentId(await cabCommentContentHash("Held0001")), null);
