@@ -2413,7 +2413,7 @@ export function TreemapHomePage({ onBrowse, embedded = false }: { onBrowse: () =
 
         {/* Level indicator + feed shortcut; wraps under itself on a phone rather than pushing the caption off screen */}
         <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap', justifyContent: 'flex-end', rowGap: 6, minWidth: 0 }}>
-          {truckMode ? <Text role="caption">{truckRead.isError ? 'Truck membership could not be read' : `${truckMembers.length.toLocaleString()} priced sale records · all years`}</Text> : activeData && marketLevel && basis === 'bat12' ? (
+          {truckMode ? <Text role="caption">{truckRead.isError ? 'Truck membership could not be read' : truckRead.isLoading ? 'Reading Truck membership…' : `${truckMembers.length.toLocaleString()} priced sale records · all years`}</Text> : activeData && marketLevel && basis === 'bat12' ? (
             <Text role="caption" title={ledgerViewsStamp(refresh.refreshedAt)}>
               {isNarrow ? `${bat12Totals.sold.toLocaleString('en-US')} BaT sold, 12 mo`
                 : `${bat12Totals.sold.toLocaleString('en-US')} Bring a Trailer sales, last 12 months · ${fmtMoneyMap(bat12Totals.usd)}${ledgerViewsClock(refresh.refreshedAt)}`}
@@ -3002,7 +3002,7 @@ export function TreemapHomePage({ onBrowse, embedded = false }: { onBrowse: () =
         onOpen={() => { const n = sheet; focusAfterDrill.current = !n.noModel || !!n.familyKey; setSheet(null); drillInto(n); }} onClose={() => setSheet(null)} />}
 
       {/* ─── FAMILY SALES CHART: when embedded on the Market page, keep the family's sales & like-for-like price index + era filter bar visible across models, years & vehicles inside the family ─── */}
-      {embedded && (levelType === 'models' || levelType === 'years' || levelType === 'vehicles') && currentLevel.family && currentLevel.make && !(levelType === 'models' && familyView === 'sales') && dims.w > 0 && (
+      {embedded && (!truckMode || truckRead.data) && (levelType === 'models' || levelType === 'years' || levelType === 'vehicles') && currentLevel.family && currentLevel.make && !(levelType === 'models' && familyView === 'sales') && dims.w > 0 && (
         <div
           data-testid="embedded-family-sales-chart"
           className="home-embedded-family-chart"
