@@ -25,6 +25,7 @@ const day = '2025-01-10';
 type Read = { url: URL; method: string; body: any };
 let root: Root, host: HTMLDivElement, queryClient: QueryClient, serial = 0, vehicleId: string;
 let hint: string | null, timeline: any[], comments: any[], auctions: any[], events: any[], reads: Read[];
+let refusedTable: string | null;
 const json = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } });
 const auction = (sourceUrl: string, price = 100) => ({ id: 'synthetic-auction', source: 'external', source_url: sourceUrl,
   lot_number: '123', outcome: 'sold', winning_bid: price, total_bids: 1, winning_bidder: 'Synthetic buyer', seller_name: null,
@@ -49,6 +50,7 @@ beforeEach(() => {
   vehicleId = `00000000-0000-4000-8000-${String(++serial).padStart(12, '0')}`;
   hint = valid; timeline = [{ id: 'synthetic-added', event_date: '2025-01-01', event_type: 'vehicle_added' }];
   comments = [comment(valid)]; auctions = [auction(valid)]; events = [event(valid)]; reads = [];
+  refusedTable = null;
   fixture.client = createClient('https://auction-origin.test', 'synthetic-anon', {
     auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false, storageKey: `origin-${serial}` },
     global: { fetch: async (input, init) => {
@@ -66,6 +68,7 @@ beforeEach(() => {
       if (table === 'vehicles') { expect(read.url.searchParams.get('id')).toBe(`eq.${vehicleId}`); return json([{ id: vehicleId }]); }
       if (['auction_comments', 'auction_events', 'vehicle_events', 'vehicle_images'].includes(table!)) {
         expect(read.url.searchParams.get('vehicle_id')).toBe(`eq.${vehicleId}`);
+        if (table === refusedTable) return json({ message: 'Synthetic private error detail' }, 403);
         if (table === 'auction_comments') {
           expect(read.url.searchParams.get('order')).toBe('id.asc'); expect(read.url.searchParams.get('limit')).toBe('250');
           return json(read.url.searchParams.has('id') ? [] : comments);
@@ -121,6 +124,25 @@ it('keeps a listing hint with no qualified retained auction or raw events hidden
   await draw(false);
   expect(host.querySelector('[aria-label="Vehicle timeline"]')).toBeNull();
   expect(host.querySelector('.auction-band')).toBeNull();
+});
+it.each([true, false])('preserves the unreadable-auction status with an empty raw feed: %s', async emptyRaw => {
+  if (emptyRaw) timeline = [];
+  refusedTable = 'auction_comments';
+  await draw(!emptyRaw);
+  const message = 'Auction activity could not be fully read. Timeline activity counts are unavailable.';
+  expect([...host.querySelectorAll('[role="status"]')].filter(node => node.textContent === message)).toHaveLength(1);
+  expect(sourceLinks()).toEqual([]);
+  expect(host.textContent).not.toContain('Synthetic private error detail');
+});
+it.each([true, false])('preserves untimed retained-activity status with an empty raw feed: %s', async emptyRaw => {
+  if (emptyRaw) timeline = [];
+  comments = [{ ...comment(valid), posted_at: null }]; auctions = []; events = [];
+  await draw(!emptyRaw);
+  const message = 'Some retained auction interactions lack usable posting times and cannot be placed on this timeline.';
+  expect([...host.querySelectorAll('[role="status"]')].filter(node => node.textContent === message)).toHaveLength(1);
+  expect(host.querySelector('.auction-band')).toBeNull();
+  expect(host.querySelector('[data-day-drawer]')).toBeNull();
+  expect(nativeReads()).toHaveLength(2);
 });
 const sourceLinks = () => [...host.querySelectorAll<HTMLAnchorElement>('.auction-band a')].map(link => link.getAttribute('href'));
 const nativeReads = () => reads.filter(r => r.url.pathname === '/rest/v1/auction_comments'
