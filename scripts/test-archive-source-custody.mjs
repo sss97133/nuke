@@ -79,6 +79,8 @@ const sources = new Map([
   ['retainedVin',compile('../supabase/functions/ingest-observation/retainedVinReference.ts')],
   ['retainedVinBatch',compile('../supabase/functions/ingest-observation/retainedVinBatch.ts')],
   ['retainedListingDrain',compile('../supabase/functions/ingest-observation/retainedListingDrain.ts')],
+  ['titleFacets',compile('../supabase/functions/ingest-observation/titleFacets.ts')],
+  ['vehicleFacets',compile('../supabase/functions/_shared/vehicleFacets.ts')],
   ['hash',compile('../supabase/functions/_shared/observationContentHash.ts')],
   ['proxy',compile('../supabase/functions/ingest-observation-batch/index.ts')],
   ['cached',compile('../supabase/functions/ingest-observation-batch/cachedProperties.ts')],
@@ -276,6 +278,8 @@ function fixture(options = {}) {
         if(specifier==='./retainedVinReference.ts')return load('retainedVin');
         if(specifier==='./retainedVinBatch.ts')return load('retainedVinBatch');
         if(specifier==='./retainedListingDrain.ts')return load('retainedListingDrain');
+        if(specifier==='./titleFacets.ts')return load('titleFacets');
+        if(specifier==='../_shared/vehicleFacets.ts')return load('vehicleFacets');
         if(specifier==='./retainedIdentity.ts')return load('retainedIdentity');
         if(specifier==='./historicalAsks.ts')return load('historicalAsks');
         if(specifier==='./historicalAskIntake.ts')return load('historicalAskIntake');
