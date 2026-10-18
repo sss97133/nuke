@@ -192,6 +192,54 @@ Deno.test("a lone photo with no retained view waits before any object or provide
   equal("refusal" in result && result.refusal, "source_needs_corresponding_view");
   equal(f.counts, { captures: 0, models: 0, candidates: 0 });
 });
+Deno.test("an explicit source scope refuses outside selected context before capture or inference", async () => {
+  const f = fixture();
+  f.store.context = async () => ({ sources: [f.sources[2]], coverage: {} });
+  const pins = Object.fromEntries(f.sources.slice(0, 2).map(source => [source.id, source.file_hash]));
+  const result = await resolveSubjectBatch(f.store, { ...f.request, allowed_source_hashes: pins }, "https://example.test", f.dependencies);
+  equal("refusal" in result && result.refusal, "source_outside_allowed_scope");
+  equal(f.counts, { captures: 0, models: 0, candidates: 0 }); equal(f.readings, []); equal(f.writes, []);
+});
+Deno.test("an explicit source scope refuses context hash drift and fresh hash drift before input callbacks", async () => {
+  for (const changed of [0, 2]) {
+    const f = fixture(), pins = Object.fromEntries(f.sources.map(source => [source.id, source.file_hash]));
+    f.store.context = async () => ({ sources: [f.sources[2]], coverage: {} });
+    f.sources[changed].file_hash = "f".repeat(64);
+    f.sources[changed].storage_path = `users/${uid}/capture-relay/${f.sources[changed].file_hash}/frame.JPG`;
+    const result = await resolveSubjectBatch(f.store, { ...f.request, allowed_source_hashes: pins }, "https://example.test", f.dependencies);
+    equal("refusal" in result && result.refusal, "source_changed");
+    equal(f.counts, { captures: 0, models: 0, candidates: 0 }); equal(f.readings, []); equal(f.writes, []);
+  }
+});
+Deno.test("a complete pinned selected context passes once and replay cannot broaden its caller scope", async () => {
+  const f = fixture(), pins = Object.fromEntries(f.sources.map(source => [source.id, source.file_hash]));
+  f.store.context = async () => ({ sources: [f.sources[2]], coverage: {} });
+  const body = { ...f.request, allowed_source_hashes: pins,
+    expected_source_hashes: Object.fromEntries(f.sources.slice(0, 2).map(source => [source.id, source.file_hash])) };
+  const result = await resolveSubjectBatch(f.store, body, "https://example.test", f.dependencies);
+  equal(result.status, "unresolved");
+  equal("input_image_ids" in result && result.input_image_ids, [ids[0], ids[2]]);
+  equal(f.counts, { captures: 1, models: 1, candidates: 1 });
+  const stored = f.readings.length;
+  const narrowed = await resolveSubjectBatch(f.store, { ...body, reuse_only: true,
+    allowed_source_hashes: Object.fromEntries(f.sources.slice(0, 2).map(source => [source.id, source.file_hash])) }, "https://example.test", f.dependencies);
+  equal("refusal" in narrowed && narrowed.refusal, "source_outside_allowed_scope"); equal(f.readings.length, stored);
+  const replay = await resolveSubjectBatch(f.store, { ...body, reuse_only: true }, "https://example.test", f.dependencies);
+  equal(replay.status, "cached"); equal(f.counts, { captures: 1, models: 1, candidates: 1 });
+});
+Deno.test("invalid source allowlists refuse before source lookup or any input callbacks", async () => {
+  const f = fixture(); let sourceReads = 0;
+  f.store.sources = async () => { sourceReads++; return f.sources; };
+  for (const allowed of [null, [], {}, { [ids[0]]: f.sources[0].file_hash }, { [ids[0]]: "bad", [ids[1]]: f.sources[1].file_hash }]) {
+    const result = await resolveSubjectBatch(f.store, { ...f.request, allowed_source_hashes: allowed as any }, "https://example.test", f.dependencies);
+    equal("refusal" in result && result.refusal, "allowed_source_scope_invalid");
+  }
+  const pins = Object.fromEntries(f.sources.slice(0, 2).map(source => [source.id, source.file_hash]));
+  const disagreement = await resolveSubjectBatch(f.store, { ...f.request, allowed_source_hashes: pins,
+    expected_source_hashes: { ...pins, [ids[0]]: "f".repeat(64) } }, "https://example.test", f.dependencies);
+  equal("refusal" in disagreement && disagreement.refusal, "allowed_source_scope_invalid");
+  equal(sourceReads, 0); equal(f.counts, { captures: 0, models: 0, candidates: 0 });
+});
 Deno.test("protected data reuse cannot restore a later membership withdrawal", async () => {
   const f = fixture(); await f.run(); const before = f.writes.length;
   f.store.admission = async () => ({ data_reusable: true, admission_allowed: false, blocked_image_ids: [ids[0]], reason: "current_membership_conflict" });

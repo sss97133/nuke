@@ -123,6 +123,9 @@ Standing rules the code carries:
   allowing the existing fresh-retry path within its same three-attempt cap and backoff. Ambiguous output/transport,
   mixed failures and already reuse-only batches stay reuse-only; finished source hashes are never reset.
   Own-account analysis status can open the existing Connected accounts screen; no key test, mutation or fallback is triggered.
+  An optional `allowed_source_hashes` request map pins at most 64 exact source IDs and hashes, including all requested
+  photos and any server-selected or replayed context. Outside or changed sources refuse before input capture/inference;
+  it only narrows input scope and never replaces current own-account, privacy or source qualification.
 - **A relation is a weight, not a status.** Owner direction, 2026-10-15: "active cant be a hard code like it is. its
   a weight. a relation goes dormant immediately after one day if not maintained by contribution. even within 24hr can
   stall." The app never shows a membership's `status` as ACTIVE. It shows the state the server cuts from
