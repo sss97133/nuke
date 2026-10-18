@@ -784,12 +784,12 @@ const BarcodeTimeline: React.FC<BarcodeTimelineProps> = ({ selectedAuctionUrl, o
     [receiptDate, sortedDates, eventMap, setGalleryFilter]
   );
 
-  // If no timeline events at all, hide the section entirely
-  if (timelineEvents.length === 0) {
+  const availableAuctions = auctions.filter(a => a.activityExtracted || a.open || a.close);
+  // Native auction evidence can supply the timeline without raw event rows.
+  if (timelineEvents.length === 0 && availableAuctions.length === 0) {
     return null;
   }
 
-  const availableAuctions = auctions.filter(a => a.activityExtracted || a.open || a.close);
   const selectedAuction = availableAuctions.find(a => selectedAuctionUrl && a.lotUrl.replace(/\/+$/, '') === selectedAuctionUrl.replace(/\/+$/, ''))
     ?? availableAuctions.find(a => a.key === selectedAuctionKey) ?? availableAuctions[0];
 

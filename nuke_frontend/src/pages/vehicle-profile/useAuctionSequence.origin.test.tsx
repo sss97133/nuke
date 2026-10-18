@@ -90,16 +90,38 @@ afterEach(async () => {
   expect(globalThis.fetch).not.toHaveBeenCalled(); expect(reads.some(r => r.url.pathname.startsWith('/functions/'))).toBe(false);
   vi.useRealTimers(); vi.unstubAllGlobals(); vi.restoreAllMocks();
 });
-async function draw() {
+async function draw(expectTimeline = true) {
   await import('./AuctionSequenceBand'); // Resolve the actual lazy module before the first frame assertion.
   await act(async () => root.render(<QueryClientProvider client={queryClient}><MemoryRouter initialEntries={[`/vehicle/${vehicleId}`]}><Routes>
     <Route path="/vehicle/:vehicleId" element={<VehicleProfileProvider><BarcodeTimeline /></VehicleProfileProvider>} />
   </Routes></MemoryRouter></QueryClientProvider>));
   await act(async () => { await vi.advanceTimersByTimeAsync(10); });
   const button = host.querySelector<HTMLButtonElement>('[aria-label="Vehicle timeline"]')!;
+  if (!button) { expect(expectTimeline).toBe(false); return; }
   if (button.getAttribute('aria-expanded') === 'false') await act(async () => button.click());
   await act(async () => { await vi.advanceTimersByTimeAsync(10); });
 }
+it('shows readable native auction activity when the primary raw event feed is empty', async () => {
+  timeline = [];
+  await draw();
+  expect(sourceLinks()).toContain(valid);
+  expect(host.querySelector('.auction-band')).not.toBeNull();
+  await openReceipt();
+  expect(host.querySelector('[data-day-drawer]')?.textContent).toContain('BID $100');
+  expect(host.querySelector('.day-drawer__auction-list a')?.getAttribute('href')).toBe(`${valid}#comment-123`);
+});
+it('keeps a recorded auction window useful without comments or raw timeline rows', async () => {
+  timeline = []; comments = [];
+  await draw();
+  expect(sourceLinks()).toContain(valid);
+  expect(host.textContent).toContain('No timed interactions in this read.');
+});
+it('keeps a listing hint with no qualified retained auction or raw events hidden', async () => {
+  timeline = []; comments = []; auctions = []; events = [];
+  await draw(false);
+  expect(host.querySelector('[aria-label="Vehicle timeline"]')).toBeNull();
+  expect(host.querySelector('.auction-band')).toBeNull();
+});
 const sourceLinks = () => [...host.querySelectorAll<HTMLAnchorElement>('.auction-band a')].map(link => link.getAttribute('href'));
 const nativeReads = () => reads.filter(r => r.url.pathname === '/rest/v1/auction_comments'
   && r.url.searchParams.get('limit') === '250' && r.url.searchParams.get('order') === 'id.asc');
