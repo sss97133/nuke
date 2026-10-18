@@ -24,7 +24,7 @@ import { firecrawlScrape } from "../_shared/firecrawl.ts";
 import { normalizeVehicleFields } from "../_shared/normalizeVehicle.ts";
 import { qualityGate } from "../_shared/extractionQualityGate.ts";
 import { parseLocation } from "../_shared/parseLocation.ts";
-import { writeObservation } from "../_shared/observationWriter.ts";
+import { loadCabObservation } from "./cabObservation.ts";
 import { requireWriteAuth } from "../_shared/writeGuard.ts";
 import { projectSecretKey } from "../_shared/supabaseKeys.ts";
 import { batchFromTargets, discoverTargets, reviseCab, recaptureCab } from "./targets.ts";
@@ -993,22 +993,16 @@ Deno.serve(async (req) => {
       }
     }
 
-    // Write observation + field_evidence (fire-and-forget)
+    // A load succeeds only after the existing writer and its persisted receipt succeed.
+    let observationReceipt: Awaited<ReturnType<typeof loadCabObservation>> | null = null;
     if (vehicleId) {
-      writeObservation(supabase, {
+      observationReceipt = await loadCabObservation(supabase, {
         vehicleId,
-        source: {
-          platform: "cars-and-bids",
-          url: listingUrlCanonical,
-          trustScore: 0.8,
-        },
-        // These texts already travel in import_metadata. Do not duplicate them in the
-        // indexed structured_data payload (idx_vobs_specs_covering has a btree row limit).
-        fields: Object.fromEntries(Object.entries(vehicleData).filter(([key]) =>
-          !["highlights", "equipment", "modifications", "known_flaws", "recent_service_history"].includes(key))),
-        observationKind: "listing",
-        extractionMethod: "dom_parse",
-      }).catch((e: any) => console.warn(`[C&B] observationWriter error for ${vehicleId}: ${e?.message}`));
+        listingUrl: listingUrlCanonical,
+        listingId: extracted.lotNumber,
+        capturedAt: fromCache ? (cachedSnapshot?.fetched_at ?? "") : new Date().toISOString(),
+        vehicleData,
+      });
     }
 
     // Write location observation
@@ -1324,6 +1318,8 @@ Deno.serve(async (req) => {
       listing_url: listingUrlCanonical,
       vehicle_id: vehicleId,
       created,
+      observation_id: observationReceipt?.observationId ?? null,
+      observation_duplicate: observationReceipt?.duplicate ?? false,
       extracted: {
         year: extracted.year,
         make: extracted.make,
