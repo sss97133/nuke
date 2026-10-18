@@ -189,11 +189,13 @@ Standing rules the code carries:
 - **An estimate is defended or absent.** The web's `marketDefends` rule: an estimate shows only against a
   typed price (sold, bid, ask) or a live listing; an unlisted car, such as an owner's build, shows none, on
   screen and on the share card.
-- **Explore opens as the Market tab opens.** The ledger as a map first (`LedgerMap.swift`: `treemap_by_brand`,
-  `treemap_models_by_brand`, `treemap_years`, then the `vehicles` leaf, the web's readers column for column; area =
-  count, color = median, the web's captions; the unreadable tail folded into a box of its own cells with the list
-  behind its title, as the inventory map folds its tail), the open board below it (web #1061). A capped level
-  (200 models a brand, 200 records a model) states its denominator.
+- **Explore keeps the ledger cohort explicit.** `LedgerMapView` browses make → family → model → year → sale,
+  including a family with one model. Map/List preserves scope; Chart is deliberate, and Back returns one step.
+  The confirmed-sales header opens that cohort's contributors as a list. All-sales colors are neutral; Refine
+  and activity comparisons start closed. Optional comparison means sales activity share within its declared
+  source cohort, not appreciation; custom windows stay on the activity board with a neutral map. The all-time
+  ledger, five-year family chart ($500+; at most 600 plotted rows) and sale leaf (at most 200 rows) retain distinct
+  labels. Native make labels use the shared bundled `MakeIdentityView`, with readable missing-artwork text.
 - **The board is the web's board.** `market_pulse_live` is read once per 30 s and rendered as nuke.ag renders it:
   bids in dollars (BaT runs every auction in USD; web #1061), the heat tag per lot computed exactly as
   `MarketPulse.tsx heatOf` (curve share by tier at hours left, typical = band p50 × share, hot ≥ 1.25×, cold ≤ 0.8×,
