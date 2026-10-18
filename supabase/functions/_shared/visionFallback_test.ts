@@ -1,6 +1,6 @@
-import { cloudVisionMultiJSON, safeAnthropicUsage } from "./visionFallback.ts";
+import { cloudVisionMultiJSON } from "./visionFallback.ts";
 import { getUserApiKey } from "./getUserApiKey.ts";
-import { ProviderHTTPError, VisionProviderUnavailable } from "./providerDiagnostic.ts";
+import { ProviderHTTPError, VisionProviderUnavailable, safeAnthropicUsage } from "./providerDiagnostic.ts";
 const equal = (a: unknown, b: unknown) => { if (JSON.stringify(a) !== JSON.stringify(b)) throw new Error("vision diagnostic contract differs"); };
 const opts = { parts: [{ text: "offline fixture" }], throwOnUnavailable: true };
 const missing = async () => ({ apiKey: "SYS_CANARY", source: "system" as const, userKeyStatus: "missing" as const });

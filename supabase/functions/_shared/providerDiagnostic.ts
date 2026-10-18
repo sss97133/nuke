@@ -20,6 +20,25 @@ export interface ProviderAttemptCoverage {
   complete: boolean;
   no_reading_started: boolean;
 }
+export interface AnthropicTokenUsage {
+  input_tokens: number;
+  output_tokens: number;
+  cache_creation_input_tokens: number | null;
+  cache_read_input_tokens: number | null;
+}
+
+/** Provider-reported counters, not an invoice or a zero-cost claim when absent. */
+export function safeAnthropicUsage(value: unknown): AnthropicTokenUsage | null {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+  const raw = value as Record<string, unknown>;
+  const count = (key: string) => Number.isSafeInteger(raw[key]) && (raw[key] as number) >= 0 && (raw[key] as number) <= 1_000_000_000
+    ? raw[key] as number : null;
+  const input_tokens = count("input_tokens"), output_tokens = count("output_tokens");
+  if (input_tokens === null || output_tokens === null) return null;
+  return { input_tokens, output_tokens, cache_creation_input_tokens: count("cache_creation_input_tokens"),
+    cache_read_input_tokens: count("cache_read_input_tokens") };
+}
+
 const codes = new Set<unknown>(["no_connected_key", "credential_lookup_failed", "credential_not_accepted",
   "permission_denied", "billing_or_usage_limit", "rate_or_quota_limit", "provider_transient",
   "request_refused", "request_failed", "response_unreadable", "service_guard_held"]);

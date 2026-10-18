@@ -17,7 +17,7 @@
 
 import { callLLM, type LLMConfig } from "./llmProvider.ts";
 import { getUserApiKey } from "./getUserApiKey.ts";
-import { ProviderHTTPError, VisionProviderUnavailable, type CredentialKind, type ProviderDiagnostic } from "./providerDiagnostic.ts";
+import { ProviderHTTPError, VisionProviderUnavailable, safeAnthropicUsage, type AnthropicTokenUsage, type CredentialKind, type ProviderDiagnostic } from "./providerDiagnostic.ts";
 
 type Provider = "google" | "anthropic" | "openai";
 
@@ -88,25 +88,6 @@ function parseJson(content: string): unknown | null {
   } catch {
     return null;
   }
-}
-
-export interface AnthropicTokenUsage {
-  input_tokens: number;
-  output_tokens: number;
-  cache_creation_input_tokens: number | null;
-  cache_read_input_tokens: number | null;
-}
-
-/** Provider-reported counters, not an invoice or a zero-cost claim when absent. */
-export function safeAnthropicUsage(value: unknown): AnthropicTokenUsage | null {
-  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
-  const raw = value as Record<string, unknown>;
-  const count = (key: string) => Number.isSafeInteger(raw[key]) && (raw[key] as number) >= 0 && (raw[key] as number) <= 1_000_000_000
-    ? raw[key] as number : null;
-  const input_tokens = count("input_tokens"), output_tokens = count("output_tokens");
-  if (input_tokens === null || output_tokens === null) return null;
-  return { input_tokens, output_tokens, cache_creation_input_tokens: count("cache_creation_input_tokens"),
-    cache_read_input_tokens: count("cache_read_input_tokens") };
 }
 
 interface VisionResult { data: Record<string, unknown>; provider: string; model: string; keySource: "user" | "system"; ms: number; usage: AnthropicTokenUsage | null; }

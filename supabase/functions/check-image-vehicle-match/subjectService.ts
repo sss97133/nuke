@@ -10,7 +10,7 @@ import { subjectSourceAvailable, subjectSourceCanEstablishPrivacy, subjectSource
 import { currentIdentitySource, loadSourceIdentities, sourceAliases, sourceRoot, inspectSourceIdentity, type SourceIdentity } from "./sourceIdentity.ts";
 import { planSubjectReinspection } from "./subjectReinspection.ts";
 import { allowedSubjectSources, subjectInputScopeRefusal } from "./subjectInputScope.ts";
-import type { AnthropicTokenUsage } from "../_shared/visionFallback.ts";
+import type { AnthropicTokenUsage } from "../_shared/providerDiagnostic.ts";
 
 export const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
 export interface SubjectSource {
