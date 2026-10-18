@@ -779,6 +779,12 @@ Deno.serve(async (req) => {
         null,
       // Rich description: all content sections combined
       description: [extracted.description, depth.fullDescription].filter(Boolean).join('\n\n') || null,
+      // The profile reader serves these root columns; metadata alone is not visible there.
+      highlights: extracted.highlights,
+      equipment: extracted.equipment,
+      modifications: extracted.modifications,
+      known_flaws: extracted.knownFlaws,
+      recent_service_history: extracted.recentServiceHistory,
       listing_location: parsedLoc.clean,
       listing_location_raw: parsedLoc.raw,
       listing_location_source: 'carsandbids',
@@ -989,7 +995,10 @@ Deno.serve(async (req) => {
           url: listingUrlCanonical,
           trustScore: 0.8,
         },
-        fields: vehicleData,
+        // These texts already travel in import_metadata. Do not duplicate them in the
+        // indexed structured_data payload (idx_vobs_specs_covering has a btree row limit).
+        fields: Object.fromEntries(Object.entries(vehicleData).filter(([key]) =>
+          !["highlights", "equipment", "modifications", "known_flaws", "recent_service_history"].includes(key))),
         observationKind: "listing",
         extractionMethod: "dom_parse",
       }).catch((e: any) => console.warn(`[C&B] observationWriter error for ${vehicleId}: ${e?.message}`));
