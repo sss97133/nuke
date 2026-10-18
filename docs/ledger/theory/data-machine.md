@@ -47,6 +47,9 @@ broader browsing-family member are different relationships. Binding more names t
 does not establish identity accuracy; preserve unresolved names and the make-level market context.
 An alias correction must revisit its materialized groups, saved price fits, normalizers and cohorts,
 not merely replace the label printed by one consumer.
+A long corrective fold must also preserve reader availability and replication. Diagnose repeated
+blocking before retrying; compare identical source snapshots and output multiplicity when caching
+repeated expressions. Preparing a private copy is not a completed build or a reader cutover.
 
 Every claimed correction loop needs a plausible wrong interpretation, later discriminating evidence,
 the same source-to-consumer assay and an unaffected counterexample. Contradiction may correctly withhold
