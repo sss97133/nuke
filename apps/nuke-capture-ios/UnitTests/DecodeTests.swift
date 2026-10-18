@@ -346,9 +346,70 @@ final class DecodeTests: XCTestCase {
         let sb = try XCTUnwrap(SourcesBoardData.parse(Data(sourcesJSON.utf8)))
         XCTAssertEqual(sb.rows.count, 2)
         XCTAssertEqual(sb.rows[0].shortName, "Bring a Trailer")
-        XCTAssertEqual(sb.rows[0].heldShareText, "99% of 166,000")
-        XCTAssertEqual(sb.rows[1].heldShareText, "51% of ~37,783 · 56% conf")
+        XCTAssertEqual(sb.rows[0].heldShare.text, "99% of 166,000")
+        XCTAssertEqual(sb.rows[1].heldShare.text, "51% of about 37,783")
         XCTAssertEqual(sb.notRanked["pcarmarket"], 4200)
+    }
+
+    /// `market_sources_read()` after #1888: a total is an exact census, a labelled reference, or unknown (NULL), and an
+    /// earlier reference carries its grade against the later census. The phone prints them as SourcesBoard.tsx does and
+    /// never makes up a total of its own.
+    func testSourcesBoardPrintsCensusReferenceAndUnknownAsTheWebDoes() throws {
+        let json = """
+        {"as_of":"2026-10-18T02:40:00Z","day":"2026-10-17",
+         "columns":["source","name","category","house","held_lots","held_at","population","population_method",
+                    "population_confidence","population_at","map_sales","map_usd","sales_12m","usd_12m","sales_prior_12m",
+                    "usd_prior_12m","months","live_lots","live_at","held_lots_before","before_day","landed_24h","landed_7d",
+                    "last_landed","days14","logo_url","business_type","population_grade"],
+         "rows":[
+          ["bat","Bring a Trailer","auction","Bring a Trailer",256641,"2026-10-17T10:27:00Z",270391,"enumerated",0.99,
+           "2026-10-17T21:30:00+00:00",null,null,null,null,null,null,null,0,null,null,null,0,0,null,[],null,null,
+           {"reference":95000,"reference_method":"estimate","reference_at":"2026-01-28T01:09:27.638288+00:00",
+            "census":270391,"census_method":"enumerated","census_at":"2026-10-17T21:30:00+00:00","error":-0.6487}],
+          ["mecum","Mecum","auction","Mecum",225784,"2026-10-17T10:27:00Z",312587,"search_index",0.9,
+           "2026-10-17T21:30:01+00:00",null,null,null,null,null,null,null,0,null,null,null,0,0,null,[],null,null,null],
+          ["ksl","KSL Cars","marketplace",null,3018,"2026-10-16T10:27:00Z",80000,"owner_reference",0.4,
+           "2026-10-17T21:44:00+00:00",null,null,null,null,null,null,null,0,null,null,null,0,0,null,[],null,null,null],
+          ["craigslist","Craigslist","marketplace",null,11579,"2026-10-17T10:27:00Z",null,null,null,
+           null,null,null,null,null,null,null,null,0,null,null,null,0,0,null,[],null,null,null],
+          ["wob","WOB","dealer",null,2902,"2026-10-17T10:27:00Z",null,null,null,
+           null,null,null,null,null,null,null,null,0,null,null,null,0,0,null,[],null,null,"not a grade"]
+         ],
+         "not_ranked":{}}
+        """
+        let sb = try XCTUnwrap(SourcesBoardData.parse(Data(json.utf8)))
+        XCTAssertEqual(sb.rows.count, 5)
+        let bat = sb.rows[0], mecum = sb.rows[1], ksl = sb.rows[2], craigslist = sb.rows[3], wob = sb.rows[4]
+
+        // An exact census: its share, no reference label, a solid bar; the earlier estimate graded against it.
+        XCTAssertEqual(bat.populationAt, "2026-10-17T21:30:00+00:00")
+        XCTAssertEqual(bat.populationGrade?.reference, 95000)
+        XCTAssertEqual(bat.populationGrade?.census, 270391)
+        XCTAssertEqual(bat.heldShare, .init(share: 256641.0 / 270391.0, text: "95% of 270,391"))
+        XCTAssertEqual(SourcesBoardData.SourceRow.gradeText(bat.populationGrade), "earlier estimate 95,000 (Jan 28) was 65% low")
+        XCTAssertEqual(bat.totalSentence,
+                       "270,391 counted from their own listings, Oct 17, confidence 0.99; earlier estimate 95,000 (Jan 28) was 65% low")
+        XCTAssertEqual(mecum.heldShare.text, "72% of about 312,587")
+        XCTAssertNil(mecum.heldShare.reference)
+
+        // A labelled reference: "≈", its kind and as-of day, a lighter bar, never read as a count.
+        XCTAssertEqual(ksl.heldShare, .init(share: 3018.0 / 80000.0, text: "4% of ≈ 80,000", reference: "owner reference · Oct 17"))
+        XCTAssertEqual(ksl.totalSentence,
+                       "≈ 80,000 · owner reference · Oct 17 · confidence 0.40 · an estimate, not a count of their listings")
+
+        // Unknown stays unknown: no share, no invented total.
+        XCTAssertEqual(craigslist.heldShare, .init(share: nil, text: "their total unknown"))
+        XCTAssertEqual(craigslist.totalSentence, "their total is not counted yet")
+        XCTAssertNil(wob.populationGrade)
+        XCTAssertNil(wob.heldShare.share)
+
+        let catalogue = SourcesBoardData.SourceRow(source: "x", name: "X", category: nil, house: nil, held: 10, heldAt: nil,
+                                                   population: 900, populationMethod: "catalogue_estimate",
+                                                   populationConfidence: nil, mapSales: nil, mapUsd: nil, sales12: nil,
+                                                   usd12: nil, salesPrior12: nil, usdPrior12: nil, live: 0, landed24: 0,
+                                                   landed7: 0, lastLanded: nil, logoUrl: nil, businessType: nil)
+        XCTAssertEqual(catalogue.heldShare.reference, "catalogue estimate")
+        XCTAssertEqual(SourcesBoardData.SourceRow.gradeText(nil), "")
     }
 
     func testLiveProductionRPCDecodersAndParityFeatures() throws {
