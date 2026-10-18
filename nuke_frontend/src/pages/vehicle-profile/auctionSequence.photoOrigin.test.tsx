@@ -26,7 +26,7 @@ const foreignPhotos = [
 ];
 type Read = { url: URL; method: string; body: any };
 let root: Root, host: HTMLDivElement, queryClient: QueryClient, serial = 0, vehicleId: string;
-let timeline: any[], photos: any[], reads: Read[];
+let timeline: any[], photos: any[], reads: Read[], listingHint: string, auctionRows: any[], eventRows: any[];
 const json = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } });
 const photo = (sourceUrl: string | null, source = 'external_import', takenAt: string | null = `${captureDay}T12:00:00Z`) => ({
   id: 'synthetic-photo', image_url: 'https://images.test/synthetic-source-photo.jpg', source, source_url: sourceUrl, taken_at: takenAt, is_duplicate: false,
@@ -49,14 +49,14 @@ beforeEach(() => {
   vi.stubGlobal('localStorage', { getItem: (key: string) => cache.get(key) ?? null, setItem: (key: string, value: string) => cache.set(key, value), removeItem: (key: string) => cache.delete(key) });
   vehicleId = `00000000-0000-4000-8000-${String(++serial).padStart(12, '0')}`;
   timeline = [{ id: 'synthetic-added', event_date: '2026-01-01', event_type: 'vehicle_added' }];
-  photos = [photo(nativePhoto)]; reads = [];
+  photos = [photo(nativePhoto)]; reads = []; listingHint = newerUrl; auctionRows = [auction(olderUrl, 'OLD', 100), auction(newerUrl, 'NEW', 200)]; eventRows = [event(olderUrl, olderDay), event(newerUrl, newerDay)];
   fixture.client = createClient('https://auction-origin.test', 'synthetic-anon', {
     auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false, storageKey: `origin-${serial}` },
     global: { fetch: async (input, init) => {
       const read = { url: new URL(input instanceof Request ? input.url : String(input)), method: init?.method ?? 'GET', body: typeof init?.body === 'string' ? JSON.parse(init.body) : null };
       reads.push(read); const path = read.url.pathname;
       if (read.method === 'POST') {
-        if (path === '/rest/v1/rpc/get_vehicle_profile_data') return json({ vehicle: { id: vehicleId, is_public: true, make: 'Ford', model: 'Synthetic photo origin', listing_url: newerUrl },
+        if (path === '/rest/v1/rpc/get_vehicle_profile_data') return json({ vehicle: { id: vehicleId, is_public: true, make: 'Ford', model: 'Synthetic photo origin', listing_url: listingHint },
           images: [{ id: 'synthetic-image', image_url: 'https://images.test/own.jpg', source: 'owner_upload', is_primary: true }], timeline_events: timeline,
           stats: { comment_count: 0, observation_count: 0 } });
         if (path === '/rest/v1/rpc/get_vehicle_contribution_days') return json([{ day: captureDay, kind: 'photo', n: 1 }]);
@@ -72,8 +72,8 @@ beforeEach(() => {
           expect(read.url.searchParams.get('order')).toBe('id.asc'); expect(read.url.searchParams.get('limit')).toBe('250');
           return json([]);
         }
-        if (table === 'auction_events') { expect(read.url.searchParams.get('limit')).toBe('5'); return json([auction(olderUrl, 'OLD', 100), auction(newerUrl, 'NEW', 200)]); }
-        if (table === 'vehicle_events') { expect(read.url.searchParams.get('limit')).toBe('10'); return json([event(olderUrl, olderDay), event(newerUrl, newerDay)]); }
+        if (table === 'auction_events') { expect(read.url.searchParams.get('limit')).toBe('5'); return json(auctionRows); }
+        if (table === 'vehicle_events') { expect(read.url.searchParams.get('limit')).toBe('10'); return json(eventRows); }
         const fields = read.url.searchParams.get('select')!.split(',').map(v => v.trim());
         if (!read.url.searchParams.has('is_duplicate')) return json([]); // Separate Provider count/coverage reader.
         let selected = photos.filter(p => !p.is_duplicate);
@@ -102,7 +102,7 @@ beforeEach(() => {
 afterEach(async () => {
   await act(async () => root.unmount()); queryClient.clear(); host.remove();
   expect(globalThis.fetch).not.toHaveBeenCalled(); expect(reads.some(r => r.url.pathname.startsWith('/functions/'))).toBe(false);
-  vi.useRealTimers(); vi.unstubAllGlobals(); vi.restoreAllMocks();
+  vi.useRealTimers(); vi.unstubAllGlobals(); vi.unstubAllEnvs(); vi.restoreAllMocks();
 });
 async function draw() {
   await Promise.all([import('./AuctionSequenceBand'), import('./VehicleDayDrawer')]); // Resolve the actual lazy module before the first frame assertion.
@@ -170,4 +170,30 @@ it('retains an ordinary non-native captured photo and its useful cache', async (
   await act(async () => host.querySelector<HTMLButtonElement>('[aria-label="Close day"]')!.click());
   expect(await openDay(captureDay)).toEqual(first);
   expect(reads.filter(r => r.url.pathname.endsWith('/vehicle_images') && r.url.searchParams.has('taken_at'))).toHaveLength(1);
+});
+
+
+it.each([
+  { name: 'recorded day UTC', tz: 'UTC', start: '2026-09-10', day: '2026-09-10', mode: 'listing', count: 1 },
+  { name: 'recorded day Pacific', tz: 'America/Los_Angeles', start: '2026-09-10', day: '2026-09-10', mode: 'listing', count: 1 },
+  { name: 'previous day Pacific', tz: 'America/Los_Angeles', start: '2026-09-10', day: '2026-09-09', mode: 'capture', count: 0 },
+  { name: 'instant local day Pacific', tz: 'America/Los_Angeles', start: '2026-09-10T01:00:00Z', day: '2026-09-09', mode: 'listing', count: 1 },
+  { name: 'instant day UTC', tz: 'UTC', start: '2026-09-10T01:00:00Z', day: '2026-09-10', mode: 'listing', count: 1 },
+])('keeps the native inferred-photo group on its $name through actual calendar click', async control => {
+  vi.stubEnv('TZ', control.tz); expect(new Date('2026-09-10T00:00:00Z').getDate()).toBe(control.tz === 'UTC' ? 10 : 9);
+  listingHint = olderUrl; auctionRows = [auction(olderUrl, 'OLD', 100)];
+  eventRows = [{ ...event(olderUrl, '2026-09-10'), started_at: control.start, ended_at: '2026-09-17T20:00:00Z', sold_at: null }];
+  timeline = [{ id: 'synthetic-prior-inspection', event_date: '2026-09-09', event_type: 'inspection', title: 'Synthetic calendar navigation control' }];
+  photos = [photo(nativePhoto, 'bat_import', null)]; await draw();
+  const title = cellTitle(control.day);
+  if (control.mode === 'capture' || (control.tz === 'America/Los_Angeles' && control.start.length > 10)) expect(title).toContain('Inspection');
+  else expect(title).toContain(control.start.length === 10 ? 'Listing day recorded' : 'Auction Opened');
+  const displayed = await openDay(control.day); expect(displayed).toHaveLength(control.count);
+  if (control.count) { expect(displayed).toEqual([listingPhoto]); expect(host.querySelector('[data-day-drawer]')?.textContent).toContain('LISTING ASSOCIATION INFERRED'); }
+  const queries = reads.filter(r => r.url.pathname === '/rest/v1/vehicle_images' && r.url.searchParams.get('select') === 'id,image_url,taken_at,source,source_url');
+  expect(queries).toHaveLength(1); const params = queries[0].url.searchParams;
+  expect(params.get('vehicle_id')).toBe(`eq.${vehicleId}`); expect(params.get('is_duplicate')).toBe('not.is.true');
+  expect(params.has('or')).toBe(control.mode === 'listing');
+  if (control.mode === 'listing') { expect(params.get('or')).toBe('(source.ilike.%bat%,source_url.ilike.%bringatrailer.com%,taken_at.is.null)'); expect(params.get('limit')).toBe('600'); expect(params.has('taken_at')).toBe(false); }
+  else { expect(params.getAll('taken_at')).toEqual(['gte.2026-09-09T00:00:00Z', 'lt.2026-09-10T00:00:00.000Z']); expect(params.get('limit')).toBe('120'); expect(params.get('order')).toBe('taken_at.asc'); }
 });
