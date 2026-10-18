@@ -426,3 +426,31 @@ it('withholds prior qualified untimed metadata after the current parent is denie
   expect(nativeReads()).toHaveLength(before); expect(host.textContent).not.toContain(untimedStatus); expect(host.textContent).toContain(incomplete);
   expect(sourceLinks()).toEqual([]);
 });
+
+
+it.each([
+  { name: 'native only', source: undefined, at: `${day}T17:00:00Z`, only: false, amount: '$100', author: 'Synthetic bidder' },
+  { name: 'foreign earlier', source: 'https://example.invalid/other', at: `${day}T17:00:00Z`, only: false, amount: '$100', author: 'Synthetic bidder' },
+  { name: 'foreign missing clock', source: 'https://example.invalid/other', at: null, only: false, amount: '$100', author: 'Synthetic bidder' },
+  { name: 'foreign later', source: 'https://example.invalid/other', at: `${day}T19:00:00Z`, only: false, amount: '$100', author: 'Synthetic bidder' },
+  { name: 'native earlier', source: valid, at: `${day}T17:00:00Z`, only: false, amount: '$200', author: 'Duplicate witness' },
+  { name: 'blank earlier', source: '  ', at: `${day}T17:00:00Z`, only: false, amount: '$200', author: 'Duplicate witness' },
+  { name: 'foreign only', source: 'https://example.invalid/other', at: `${day}T17:00:00Z`, only: true, amount: null, author: null },
+])('admits source before native comment identity for $name in the actual consumer', async control => {
+  timeline = [];
+  const extra = { ...comment(control.source ?? null), id: '00000000-0000-4000-8000-000000000999', posted_at: control.at,
+    bid_amount: control.source?.includes('example.invalid') ? 900 : 200, author_username: 'Duplicate witness' };
+  comments = [...(control.only ? [] : [comment(valid)]), ...(control.source === undefined ? [] : [extra])];
+  const raw = structuredClone(comments); await draw();
+  expect(nativeReads()).toHaveLength(2); expect(queryState().status).toBe('success'); expect(queryState().data.comments).toEqual(raw); expect(comments).toEqual(raw);
+  const marks = [...host.querySelectorAll<HTMLAnchorElement>('.auction-band svg a')];
+  expect(marks).toHaveLength(control.amount ? 1 : 0);
+  if (control.amount) { expect(marks[0].getAttribute('href')).toBe(`${valid}#comment-123`); expect(marks[0].textContent).toContain(control.amount); expect(marks[0].textContent).toContain(control.author); }
+  expect(marks.some(mark => mark.textContent?.includes('$900'))).toBe(false);
+  expect(sourceLinks()).not.toContain('https://example.invalid/other');
+  const details = host.querySelector('.auction-band__source')!;
+  expect(details.textContent).toContain('listing start recorded by the extractor'); expect(details.textContent).toContain('auction end recorded by the extractor');
+  await openReceipt();
+  const links = [...host.querySelectorAll<HTMLAnchorElement>('.day-drawer__auction-list a')]; expect(links).toHaveLength(control.amount ? 1 : 0);
+  if (control.amount) expect(links[0].getAttribute('href')).toBe(`${valid}#comment-123`);
+});

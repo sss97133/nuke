@@ -261,7 +261,9 @@ export function dedupeComments(comments: AuctionCommentRow[]): AuctionCommentRow
 }
 
 export function buildAuctionSequences(rawInput: SequenceInput): SequencesResult {
-  const input: SequenceInput = { ...rawInput, comments: dedupeComments(rawInput.comments) };
+  // Only native URLs and the existing blank fallback compete in this projection's identity.
+  const eligibleComments = rawInput.comments.filter(c => lotKey(c.source_url) !== null || !c.source_url?.trim());
+  const input: SequenceInput = { ...rawInput, comments: dedupeComments(eligibleComments) };
   // every listing the rows know about
   const keys = new Set<string>();
   const hintKey = lotKey(input.lotUrlHint);
