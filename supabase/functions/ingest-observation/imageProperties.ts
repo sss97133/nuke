@@ -1,6 +1,7 @@
 import { RETAINED_PROPERTY_KEYS } from "./retainedInterior.ts";
 import { RETAINED_IDENTITY_KEYS, retainedListingIdentityValue } from "./retainedListingIdentity.ts";
 import { DESCRIPTION_ENGINE_FAMILY_LABEL_VERSION, ENGINE_FAMILY_LABEL_VERSION } from "./retainedDescriptionPowertrain.ts";
+import { TITLE_FACET_KEYS, TITLE_FACET_NORMALIZATION, type TitleFacetKey } from "./titleFacets.ts";
 /** Property admission only. Source lineage, clocks and replay belong to the writer. */
 export const IMAGE_PROPERTY_VALUES = {
   image_visible_rust_severity: ["none", "surface", "pitting", "perforation"],
@@ -47,12 +48,14 @@ export function validateObservationProperty(
   input: ObservationPropertyInput,
   property: ObservationPropertyRegistryRow | null,
   retainedPropertyVerified = false,
+  titleFacetVerified = false,
 ): ObservationPropertyValidation {
   if (input.property_key === undefined) return { ok: true, propertyId: null };
   if (typeof input.property_key !== "string" || !input.property_key.trim()) {
     return invalid("property_key must be a nonempty string");
   }
-  if (!isSupportedImagePropertyKey(input.property_key) &&
+  const titleFacet = titleFacetVerified && TITLE_FACET_KEYS.includes(input.property_key as TitleFacetKey);
+  if (!isSupportedImagePropertyKey(input.property_key) && !titleFacet &&
       !(retainedPropertyVerified && RETAINED_PROPERTY_KEYS.includes(input.property_key))) {
     return invalid("Unsupported property_key; only registered image properties are supported");
   }
@@ -83,6 +86,16 @@ export function validateObservationProperty(
   }
   if (value === undefined || value === null) {
     return invalid("Unknown property values must be omitted, not defaulted");
+  }
+  if (titleFacet && (input.kind !== "specification" || input.agent_inferred !== true ||
+      typeof value !== "string" || !value.trim() || value.length > 60 ||
+      typeof fields.source_value !== "string" || !fields.source_value.toLowerCase().replace(/[\s\-_/]+/g, " ")
+        .includes(value.toLowerCase().replace(/[\s\-_/]+/g, " ")) ||
+      fields.source_field !== "vehicles.listing_title" || fields.normalization_version !== TITLE_FACET_NORMALIZATION ||
+      fields.label_role !== "record_title_label" || fields.claim_role !== "record_label" ||
+      fields.factory_configuration_status !== "unknown" || fields.current_configuration_status !== "unknown" ||
+      fields.independent_source !== false || fields.source_event_time_status !== "unknown")) {
+    return invalid("Title trim and body labels require a literal record-title quote; factory configuration remains unknown");
   }
   if (input.property_key === "engine_family_label" && (input.kind !== "specification" ||
       input.agent_inferred !== true || typeof value !== "string" ||
