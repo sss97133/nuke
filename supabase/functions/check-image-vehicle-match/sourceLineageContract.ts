@@ -115,7 +115,8 @@ for (const leaf of leaves) {
   const result = await client.rpc("ingest_image_observation", { p_image_id: leaf, p_vehicle_id: null, p_role: "part", p_confidence: 0,
     p_observed_by: "device_privacy_v1", p_agent_version: "device_privacy_v1",
     p_confidence_basis: { device_privacy_v1: { envelope, state: "active" } }, p_is_high_confidence_subject: false, p_layer_version: {} });
-  assert(!result.error, `protected leaf-specific purpose proof: ${result.error}`); proofs.set(leaf, envelope);
+  if (result.error) throw new Error(`protected leaf-specific purpose proof failed: ${result.error}`);
+  proofs.set(leaf, envelope);
 }
 const result = await resolveSubjectBatch(store, { user_id: owner, image_ids: leaves, reuse_only: true }, "https://qkgaybvrernstplzjaam.supabase.co", dependencies);
 assert("subjects" in result && result.status === "cached", `old paid interpretation reused: ${JSON.stringify(result)}`);
@@ -137,7 +138,7 @@ assert(retained.every((row: any) => JSON.stringify(row.confidence_basis.visual_s
 const withdrawn = await client.rpc("ingest_image_observation", { p_image_id: leaves[0], p_vehicle_id: null, p_role: "part", p_confidence: 0,
   p_observed_by: "device_privacy_v1", p_agent_version: "device_privacy_v1", p_layer_version: {},
   p_confidence_basis: { device_privacy_v1: { state: "withdrawn", withdrawal_reason: "synthetic explicit privacy withdrawal", envelope: proofs.get(leaves[0]) } } });
-assert(!withdrawn.error, `protected privacy withdrawal: ${withdrawn.error}`);
+if (withdrawn.error) throw new Error(`protected privacy withdrawal failed: ${withdrawn.error}`);
 equal((await readSubjectProfiles(client, owner)).subjects, [], "alias privacy withdrawal prunes original anchored profile");
 const withdrawnInbox = await readSourceInbox(client, owner, { image_id: leaves[0] });
 assert(withdrawnInbox.photos[0].image_url === null && withdrawnInbox.photos[0].retained_contexts.length === 0 &&

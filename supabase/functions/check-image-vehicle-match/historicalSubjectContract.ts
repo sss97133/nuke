@@ -157,7 +157,7 @@ const proof = (await client.from("image_observations").select("*").eq("observed_
 const withdrawal = await client.rpc("ingest_image_observation", { p_image_id: leaves[0], p_vehicle_id: null, p_role: "part", p_confidence: 0,
   p_observed_by: "device_privacy_v1", p_agent_version: "device_privacy_v1", p_layer_version: {}, p_confidence_basis: { device_privacy_v1: {
     state: "withdrawn", withdrawal_reason: "synthetic explicit privacy withdrawal", envelope: proof.confidence_basis.device_privacy_v1.envelope } } });
-assert(!withdrawal.error, "actual protected privacy withdrawal");
+if (withdrawal.error) throw new Error(`actual protected privacy withdrawal failed: ${withdrawal.error}`);
 equal((await readSubjectProfiles(client, owner)).subjects, [], "withdrawal prunes actual source-backed profile");
 const after = [captureCalls, fetches, modelCalls];
 equal((await readSubjectReinspections(client, store, owner)).candidates, [], "withdrawn family supplies no native candidate metadata");
