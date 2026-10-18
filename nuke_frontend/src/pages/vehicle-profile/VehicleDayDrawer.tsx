@@ -18,7 +18,7 @@ import { Link } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
 import { useVehicleProfile } from './VehicleProfileContext';
 import { openVehiclePhoto } from './VehiclePhotoLightbox';
-import { fmtClock, fmtUsd, listingForPhoto, localDate, type AuctionSequence } from './auctionSequence';
+import { auctionMomentDayTitle, auctionOpenDayTitle, fmtClock, fmtMoment, fmtUsd, listingForPhoto, localDate, momentDay, type AuctionSequence } from './auctionSequence';
 
 interface DayPhoto {
   id: string;
@@ -109,6 +109,13 @@ const VehicleDayDrawer: React.FC<VehicleDayDrawerProps> = ({ date, auctions = []
     () => auctions.flatMap(a => a.items).filter(i => localDate(i.at) === date).sort((a, b) => (a.at < b.at ? -1 : 1)),
     [auctions, date],
   );
+  // Carry the owner's recorded role, date grain and source basis into the day document.
+  const auctionMoments = useMemo(() => auctions.flatMap(auction => [
+    ...(auction.open && momentDay(auction.open) === date
+      ? [{ auction, moment: auction.open, label: auctionOpenDayTitle(auction), kind: 'open' }] : []),
+    ...(auction.close && momentDay(auction.close) === date
+      ? [{ auction, moment: auction.close, label: auctionMomentDayTitle(auction), kind: 'close' }] : []),
+  ]), [auctions, date]);
   const lotOf = useMemo(() => new Map(auctions.map(a => [a.key, a.lotNumber ?? String(a.ordinal)])), [auctions]);
   // Display inferred listing groups on the opening day, without claiming a photo
   // capture/publication time or source-page membership. Import stamps stay excluded.
@@ -193,7 +200,7 @@ const VehicleDayDrawer: React.FC<VehicleDayDrawerProps> = ({ date, auctions = []
   const timelineUnavailable = timelineReadState?.timeline === 'unavailable' || timelineReadState?.work === 'unavailable';
 
   const loading = photos === null;
-  const isEmpty = !loading && !photosUnavailable && photos.length === 0 && workEvents.length === 0 && otherEvents.length === 0 && auctionItems.length === 0;
+  const isEmpty = !loading && !photosUnavailable && photos.length === 0 && workEvents.length === 0 && otherEvents.length === 0 && auctionItems.length === 0 && auctionMoments.length === 0;
 
   return (
     <div
@@ -274,6 +281,18 @@ const VehicleDayDrawer: React.FC<VehicleDayDrawerProps> = ({ date, auctions = []
         <div key={ev.id || `${ev.event_type}-${ev.title}`} style={{ display: 'flex', justifyContent: 'space-between', gap: 8, fontSize: 9, marginBottom: 3 }}>
           <span>{ev.title || String(ev.event_type || '').replace(/_/g, ' ')}</span>
           <span style={mono}>{fmtMoney(ev.cost_amount, ev.cost_currency) || ''}</span>
+        </div>
+      ))}
+
+      {auctionMoments.map(({ auction, moment, label, kind }) => (
+        <div key={`${auction.key}:${kind}`} className="day-drawer__auction-moment" style={{ marginBottom: 6 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, fontSize: 9 }}>
+            <a href={auction.lotUrl} target="_blank" rel="noreferrer">
+              {auctions.length > 1 ? `LOT ${auction.lotNumber ?? auction.ordinal} · ` : ''}{label}
+            </a>
+            <span style={mono}>{fmtMoment(moment)}</span>
+          </div>
+          <div style={{ fontSize: 8, color: 'var(--vp-pencil, #888)' }}>{moment.basis}</div>
         </div>
       ))}
 
