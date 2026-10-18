@@ -57,8 +57,8 @@ it('preserves the complete single-member result without a rank caption', async (
   expect(bars()).toEqual(['100%', '100%', '100%', '100%']); expect(rank()).toBeNull(); expect(reads).toHaveLength(1);
 });
 it('preserves the complete empty-read result and its existing demand', async () => {
-  await draw(); await settle([]); expect(main().textContent).toBe(`${hero}No comparable watcher data for this model`);
-  expect(spans()).toEqual(['No comparable watcher data for this model']); expect(bars()).toEqual([]); expect(rank()).toBeNull(); expect(reads).toHaveLength(1);
+  await draw(); await settle([]); expect(main().textContent).toBe(`${hero}No comparable watcher counts in this read.`);
+  expect(spans()).toEqual(['No comparable watcher counts in this read.']); expect(bars()).toEqual([]); expect(rank()).toBeNull(); expect(reads).toHaveLength(1);
 });
 it('preserves all held statistics, numeric bars, hero and verdict independently of rank', async () => {
   await draw(); await settle(); expect(main().firstElementChild!.textContent).toBe(hero);
@@ -66,7 +66,7 @@ it('preserves all held statistics, numeric bars, hero and verdict independently 
   expect(bars()).toEqual(['50%', '25%', '40%', '100%']); expect(reads).toHaveLength(1);
 });
 it('preserves the current API-error presentation and one-read boundary', async () => {
-  await draw(); await settle([], 403); expect(main().textContent).toBe(`${hero}No comparable watcher data for this model`);
+  await draw(); await settle([], 403); expect(main().textContent).toBe(`${hero}Watcher comparisons unavailable.`);
   expect(bars()).toEqual([]); expect(reads).toHaveLength(1);
 });
 it('preserves one pending current peer read when only the supplied watcher count rerenders', async () => {

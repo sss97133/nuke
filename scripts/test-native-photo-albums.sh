@@ -16,8 +16,11 @@ test_dir=$(mktemp -d "${TMPDIR:-/tmp}/nuke-album-tests.XXXXXX")
 trap 'rm -rf "$test_dir"' EXIT
 mkdir -p "$test_dir/Sources/NukeAlbumLedger" "$test_dir/Tests/NukeAlbumLedgerTests"
 cp "$repo_root/apps/nuke-capture-ios/Sources/NukeCapture/LocalStore.swift" "$test_dir/Sources/NukeAlbumLedger/"
+cp "$repo_root/apps/nuke-capture-ios/Sources/NukeCapture/SourceInbox.swift" "$test_dir/Sources/NukeAlbumLedger/"
+cp "$repo_root/apps/nuke-capture-ios/Sources/NukeCapture/ProfileClock.swift" "$test_dir/Sources/NukeAlbumLedger/"
 cp "$repo_root/apps/nuke-capture-ios/Tests/PhotoAlbumLedgerTests.swift" "$test_dir/Tests/NukeAlbumLedgerTests/"
 cp "$repo_root/apps/nuke-capture-ios/UnitTests/SubjectProfileTests.swift" "$test_dir/Tests/NukeAlbumLedgerTests/"
+cp "$repo_root/apps/nuke-capture-ios/UnitTests/SourceInboxTests.swift" "$test_dir/Tests/NukeAlbumLedgerTests/"
 # This display DTO is the only UIKit-side type referenced by the ledger. The
 # database, migrations and all album writers/readers are the production source.
 cat > "$test_dir/Sources/NukeAlbumLedger/DisplayDTO.swift" <<'SWIFT'
