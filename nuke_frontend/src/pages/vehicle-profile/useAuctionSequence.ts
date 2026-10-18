@@ -14,7 +14,7 @@ import { useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '../../lib/supabase';
 import {
-  buildAuctionSequences, type AuctionCommentRow, type AuctionEventRow, type AuctionSequence,
+  buildAuctionSequences, lotKey, type AuctionCommentRow, type AuctionEventRow, type AuctionSequence,
   type ImageStampRow, type TimelineEventLike, type VehicleEventRow,
 } from './auctionSequence';
 
@@ -25,7 +25,6 @@ interface RawRows {
   images: ImageStampRow[];
 }
 
-const BAT_LOT = /bringatrailer\.com\/listing\//i;
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 /** Complete the currently readable native collection; never publish a partial prefix. */
@@ -74,7 +73,7 @@ export async function fetchNativeAuctionComments(
 export function looksLikeBatLot(vehicle: Record<string, unknown> | null | undefined, timelineEvents: TimelineEventLike[]): string | null {
   for (const k of ['listing_url', 'bat_auction_url', 'discovery_url', 'platform_url']) {
     const u = vehicle?.[k];
-    if (typeof u === 'string' && BAT_LOT.test(u)) return u;
+    if (typeof u === 'string' && lotKey(u)) return u;
   }
   const ev = timelineEvents.find(t => /^auction_/.test(String(t.event_type ?? '')) && /bat|bring a trailer/i.test(`${t.source ?? ''} ${t.data_source ?? ''}`));
   return ev ? '' : null;

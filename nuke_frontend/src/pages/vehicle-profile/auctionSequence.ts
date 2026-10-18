@@ -167,13 +167,19 @@ const recordedGrain = (iso: string): { grain: 'instant' } | { grain: 'day'; day:
   ? { grain: 'instant' }
   : { grain: 'day', day: iso.slice(0, 10) };
 
-const BAT_LOT = /bringatrailer\.com\/listing\/([^/?#]+)/i;
+const BAT_LOT_PATH = /^\/listing\/([^/]+)/i;
 
-/** One key per BaT listing, whatever the URL's scheme, host prefix, query or trailing slash. */
+/** One key per native BaT listing; bare and protocol-relative URLs imply HTTPS. */
 export function lotKey(url: string | null | undefined): string | null {
   if (!url) return null;
-  const m = BAT_LOT.exec(url);
-  return m ? m[1].toLowerCase() : null;
+  const raw = url.trim();
+  try {
+    const parsed = new URL(raw.startsWith('//') ? `https:${raw}` : /^[a-z][a-z\d+.-]*:\/\//i.test(raw) ? raw : `https://${raw}`);
+    const host = parsed.hostname.toLowerCase();
+    if (!['http:', 'https:'].includes(parsed.protocol) || parsed.port || (host !== 'bringatrailer.com' && !host.endsWith('.bringatrailer.com'))) return null;
+    const m = BAT_LOT_PATH.exec(parsed.pathname);
+    return m ? m[1].toLowerCase() : null;
+  } catch { return null; }
 }
 
 export function lotUrlFor(key: string): string {
@@ -263,7 +269,7 @@ export function buildAuctionSequences(rawInput: SequenceInput): SequencesResult 
   const pending: AuctionCommentRow[] = [];
   for (const c of input.comments) {
     const k = lotKey(c.source_url);
-    if (k) pushItem(itemsByKey.get(k)!, c, k); else pending.push(c);
+    if (k) pushItem(itemsByKey.get(k)!, c, k); else if (!c.source_url?.trim()) pending.push(c);
   }
   for (const list of itemsByKey.values()) sortItems(list);
 
