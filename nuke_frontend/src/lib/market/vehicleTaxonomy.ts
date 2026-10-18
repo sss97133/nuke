@@ -38,6 +38,101 @@ export {
   type VehicleTaxonomyInput,
 };
 
+export interface ResolveVehicleIdentityMarksInput {
+  brand?: string | null;
+  make?: string | null;
+  family?: string | null;
+  model?: string | null;
+  year?: number | null;
+  seriesCode?: string | null;
+  trimPackage?: string | null;
+  bodyStyle?: string | null;
+}
+
+/**
+ * Resolves vetted period-accurate SVG identity marks for an individual vehicle record
+ * (e.g. `{ brand: v.make, family: v.model, year: v.year, seriesCode: v.series, trimPackage: v.trim, bodyStyle: v.body_style }`),
+ * prioritizing specific trim/series/model/body marks over generic marque emblems.
+ */
+export function resolveVehicleIdentityMarks(
+  input: ResolveVehicleIdentityMarksInput | null | undefined,
+): VehicleIdentityMark[] {
+  if (!input) return [];
+  const make = (input.brand ?? input.make ?? '').trim();
+  if (!make) return [];
+
+  const compositeModel = [
+    input.family,
+    input.model,
+    input.seriesCode,
+    input.trimPackage,
+    input.bodyStyle,
+  ]
+    .filter((part): part is string => typeof part === 'string' && part.trim().length > 0)
+    .join(' ');
+
+  const inferredFamily =
+    resolveVehicleMarketFamily({
+      make,
+      model: input.model ?? input.family,
+      series: input.seriesCode,
+      trim: input.trimPackage,
+      body_style: input.bodyStyle,
+    }) ?? inferVehicleFamilyLabel(make, compositeModel || input.family);
+
+  const classified = classifyVehicleFacet({
+    make,
+    family: inferredFamily,
+    model: input.model ?? input.family ?? null,
+    series: input.seriesCode ?? null,
+    trim: input.trimPackage ?? null,
+    body_style: input.bodyStyle ?? null,
+    year: input.year ?? null,
+  });
+
+  const vetted = resolveVettedIdentityMarks({
+    make,
+    familyLabel: inferredFamily,
+    model: compositeModel || input.family || null,
+    year: input.year,
+  });
+
+  const targetTrim = (input.trimPackage ?? classified.trim ?? '').trim().toLowerCase();
+  const targetSeries = (input.seriesCode ?? classified.series ?? '').trim().toLowerCase();
+  const targetBody = (input.bodyStyle ?? classified.body ?? '').trim().toLowerCase();
+
+  // Filter out trim/series/body badges that belong to a different trim/series when we know the vehicle's trim/series
+  const filteredVetted = vetted.filter((mark) => {
+    if (mark.trimPackage) {
+      if (!targetTrim) return false;
+      return mark.trimPackage.toLowerCase() === targetTrim;
+    }
+    if (mark.bodyStyle && targetBody) {
+      return targetBody.includes(mark.bodyStyle.toLowerCase());
+    }
+    return true;
+  });
+
+  const kindPriority: Record<VehicleIdentityMark['markKind'], number> = {
+    trim_badge: 1,
+    series_badge: 2,
+    model_wordmark: 3,
+    body_silhouette: 4,
+    marque_emblem: 5,
+  };
+
+  const scoreMark = (mark: VehicleIdentityMark): number => {
+    let score = (10 - (kindPriority[mark.markKind] ?? 9)) * 10;
+    if (targetTrim && mark.trimPackage?.toLowerCase() === targetTrim) score += 50;
+    if (targetSeries && mark.seriesCode && targetSeries.startsWith(mark.seriesCode.toLowerCase())) score += 30;
+    if (targetBody && mark.bodyStyle && targetBody.includes(mark.bodyStyle.toLowerCase())) score += 25;
+    return score;
+  };
+
+  const pool = filteredVetted.length > 0 ? filteredVetted : vetted;
+  return [...pool].sort((a, b) => scoreMark(b) - scoreMark(a));
+}
+
 export type VehicleCohortFilterKey = 'all' | 'series' | 'trim' | 'body';
 
 export interface MarketCohortShortcut {

@@ -4,7 +4,9 @@ import { supabase } from '../lib/supabase';
 import {
   buildFacetDrilldownUrl,
   resolveMarketCohortShortcuts,
+  resolveVehicleIdentityMarks,
   type MarketCohortShortcut,
+  type VehicleIdentityMark,
 } from '../lib/market/vehicleTaxonomy';
 import AIModelSelector from './search/AIModelSelector';
 import type { AIProvider } from './search/AIModelSelector';
@@ -15,12 +17,16 @@ interface SearchResult {
   year: number;
   make: string;
   model: string;
+  series?: string | null;
+  trim?: string | null;
+  body_style?: string | null;
   vin: string | null;
   color: string | null;
   mileage: number | null;
   asking_price: number | null;
   is_for_sale: boolean;
   image_url: string | null;
+  identityMark?: VehicleIdentityMark | null;
 }
 
 // Get fallback images from origin metadata
@@ -81,6 +87,9 @@ export default function VehicleSearch() {
           year,
           make,
           model,
+          series,
+          trim,
+          body_style,
           vin,
           color,
           mileage,
@@ -98,22 +107,35 @@ export default function VehicleSearch() {
       }
 
       // Process results with fallback to origin_metadata images
-      const processedResults = (data || []).map(vehicle => {
+      const processedResults = (data || []).map((vehicle: any) => {
         // Try origin_metadata images as fallback
         const originImages = getOriginImages(vehicle);
         const imageUrl = originImages[0] || null;
+        const matchedMarks = resolveVehicleIdentityMarks({
+          brand: vehicle.make,
+          family: vehicle.model,
+          year: vehicle.year,
+          seriesCode: vehicle.series ?? null,
+          trimPackage: vehicle.trim ?? null,
+          bodyStyle: vehicle.body_style ?? null,
+        });
+        const identityMark = matchedMarks[0] ?? null;
 
         return {
           id: vehicle.id,
           year: vehicle.year,
           make: vehicle.make,
           model: vehicle.model,
+          series: vehicle.series ?? null,
+          trim: vehicle.trim ?? null,
+          body_style: vehicle.body_style ?? null,
           vin: vehicle.vin,
           color: vehicle.color,
           mileage: vehicle.mileage,
           asking_price: vehicle.asking_price,
           is_for_sale: vehicle.is_for_sale,
-          image_url: imageUrl
+          image_url: imageUrl,
+          identityMark,
         };
       });
 
@@ -364,6 +386,7 @@ export default function VehicleSearch() {
           {results.map(result => (
             <div
               key={result.id}
+              data-testid={`vehicle-search-result-${result.id}`}
               onClick={() => handleResultClick(result.id)}
               onMouseEnter={(e) => e.currentTarget.style.background = 'var(--grey-100)'}
               onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
@@ -402,9 +425,26 @@ export default function VehicleSearch() {
               </div>
 
               {/* Vehicle Info */}
-              <div style={{ flex: 1 }}>
-                <div style={{ fontSize: '13px', fontWeight: 'bold', marginBottom: '4px' }}>
-                  {result.year} {result.make} {result.model}
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap', marginBottom: '4px' }}>
+                  <span style={{ fontSize: '13px', fontWeight: 'bold' }}>
+                    {result.year} {result.make} {result.model}
+                  </span>
+                  {result.identityMark && (
+                    <span
+                      data-testid={`vehicle-search-result-emblem-${result.id}`}
+                      title={`${result.identityMark.displayLabel} — ${result.identityMark.provenanceNote}`}
+                      aria-label={`${result.identityMark.displayLabel}: ${result.identityMark.provenanceNote}`}
+                      style={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        width: '74px',
+                        height: '20px',
+                        flexShrink: 0,
+                      }}
+                      dangerouslySetInnerHTML={{ __html: result.identityMark.svgMarkup }}
+                    />
+                  )}
                 </div>
                 <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
                   {result.color && <span>{result.color} · </span>}
@@ -415,7 +455,7 @@ export default function VehicleSearch() {
                   <div style={{
                     fontSize: '12px',
                     fontWeight: 'bold',
-                    color: '#008000',
+                    color: 'var(--success, #008000)',
                     marginTop: '4px'
                   }}>
                     ${result.asking_price.toLocaleString()} · FOR SALE
