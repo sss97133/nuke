@@ -120,7 +120,7 @@ const VehicleDayDrawer: React.FC<VehicleDayDrawerProps> = ({ date, auctions = []
   // Display inferred listing groups on the opening day, without claiming a photo
   // capture/publication time or source-page membership. Import stamps stay excluded.
   const listingOfDay = useMemo(
-    () => auctions.find(a => !!a.open && localDate(a.open.at) === date && a.photos.publishedWithListing > 0) ?? null,
+    () => auctions.find(a => !!a.open && momentDay(a.open) === date && a.photos.publishedWithListing > 0) ?? null,
     [auctions, date],
   );
   const isListingDay = !!listingOfDay;

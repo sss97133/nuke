@@ -32,7 +32,7 @@ const edgeDays = [
   { date: '2026-03-08', next: '2026-03-09' },
   { date: '2026-11-01', next: '2026-11-02' },
 ];
-const allowedDays = new Set([day, nextDay, ...edgeDays.flatMap(d => [d.date, d.next])]);
+const allowedDays = new Set(['2026-09-01', day, nextDay, ...edgeDays.flatMap(d => [d.date, d.next])]);
 // Generic UTC timestamp comparison for the local transport. Parse only whole seconds with Date;
 // retain all six fractional digits separately so fixture filtering never rounds microseconds.
 function utcMicros(timestamp: string): bigint {
@@ -107,7 +107,7 @@ beforeEach(() => {
   host = document.createElement('div'); document.body.appendChild(host); root = createRoot(host);
 });
 afterEach(async () => {
-  await act(async () => root.unmount()); host.remove(); expect(globalThis.fetch).not.toHaveBeenCalled(); vi.unstubAllGlobals();
+  await act(async () => root.unmount()); host.remove(); expect(globalThis.fetch).not.toHaveBeenCalled(); vi.unstubAllGlobals(); vi.unstubAllEnvs();
 });
 async function draw(auctions: AuctionSequence[] = [], date = day) {
   await act(async () => root.render(<MemoryRouter><VehicleDayDrawer date={date} auctions={auctions} onClose={() => {}} /></MemoryRouter>));
@@ -255,4 +255,21 @@ it('retains unavailable-photo handling for an invalid date instead of introducin
   reply = () => json({ code: '22007', message: 'Synthetic invalid date' }, 400);
   await draw([], 'invalid-date'); expect(host.textContent).toContain('Photos unavailable');
   expect(host.textContent).not.toContain('NO ACTIVITY');
+});
+
+
+it.each([
+  { name: 'recorded day in UTC', tz: 'UTC', grain: 'day', date: day, at: `${day}T00:00:00Z`, mode: 'listing', count: 2 },
+  { name: 'recorded day in Pacific', tz: 'America/Los_Angeles', grain: 'day', date: day, at: `${day}T00:00:00Z`, mode: 'listing', count: 2 },
+  { name: 'previous day in Pacific', tz: 'America/Los_Angeles', grain: 'day', date: '2026-09-01', at: `${day}T00:00:00Z`, mode: 'capture', count: 0 },
+  { name: 'instant local day in Pacific', tz: 'America/Los_Angeles', grain: 'instant', date: '2026-09-01', at: `${day}T01:00:00Z`, mode: 'listing', count: 2 },
+])('selects the existing photo branch for $name and keeps its same-input cache', async control => {
+  vi.stubEnv('TZ', control.tz); expect(new Date(`${day}T00:00:00Z`).getDate()).toBe(control.tz === 'UTC' ? 2 : 1);
+  const auction = listing('synthetic-recorded-day', control.at);
+  if (control.grain === 'day') auction.open = { ...auction.open!, grain: 'day', day, exact: false };
+  await draw([auction], control.date); expect(visible()).toHaveLength(control.count); expect(requests).toHaveLength(1);
+  const query = requests[0].searchParams; expect(query.has('or')).toBe(control.mode === 'listing');
+  if (control.mode === 'listing') { expect(query.get('limit')).toBe('600'); expect(visible().every(p => p.title === 'listing association inferred; capture and publication times unknown')).toBe(true); }
+  else { expect(query.get('limit')).toBe('120'); expect(query.getAll('taken_at')).toEqual(['gte.2026-09-01T00:00:00Z', 'lt.2026-09-02T00:00:00.000Z']); }
+  const first = visible(); await close(); await draw([auction], control.date); expect(visible()).toEqual(first); expect(requests).toHaveLength(1);
 });
