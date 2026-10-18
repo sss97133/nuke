@@ -216,4 +216,15 @@ final class SubjectResolutionQueueTests: XCTestCase {
         XCTAssertFalse(SubjectResolutionQueue.completeReceipt(requested: requested, persisted: [ids[0]], unresolved: [], deferred: [ids[0], ids[1]]))
         XCTAssertFalse(SubjectResolutionQueue.completeReceipt(requested: requested, persisted: [], unresolved: [], deferred: Array(requested)))
     }
+
+    func testRetainedUnknownReadingsRefreshSourcesWithoutRequiringAProfileOrAcceptingForeignReceipts() {
+        let requested = Set(ids.prefix(2))
+        XCTAssertEqual(SubjectResolutionQueue.sourceReadChange(requested: requested, persisted: [], retained: Array(requested), deferred: []), .changed)
+        XCTAssertEqual(SubjectResolutionQueue.sourceReadChange(requested: requested, persisted: [], retained: [ids[0]], deferred: [ids[1]]), .changed)
+        XCTAssertEqual(SubjectResolutionQueue.sourceReadChange(requested: requested, persisted: [ids[0]], retained: [], deferred: [ids[1]]), .changed)
+        XCTAssertEqual(SubjectResolutionQueue.sourceReadChange(requested: requested, persisted: [], retained: [], deferred: []), .unchanged)
+        XCTAssertEqual(SubjectResolutionQueue.sourceReadChange(requested: requested, persisted: [], retained: [ids[2]], deferred: []), .invalid)
+        XCTAssertEqual(SubjectResolutionQueue.sourceReadChange(requested: requested, persisted: [], retained: [ids[1]], deferred: [ids[1]]), .invalid)
+        XCTAssertEqual(SubjectResolutionQueue.sourceReadChange(requested: requested, persisted: [], retained: [ids[0], ids[0]], deferred: []), .invalid)
+    }
 }
