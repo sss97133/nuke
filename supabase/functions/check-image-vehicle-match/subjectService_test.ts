@@ -51,7 +51,7 @@ function fixture() {
     },
     vision: async options => {
       counts.models++;
-      equal(options.maxTokens, 1600);
+      equal(options.maxTokens, 4096);
       equal(options.parts.filter(part => "imageUrl" in part).every(part => "imageUrl" in part && part.imageUrl.startsWith("data:")), true);
       return { provider: "synthetic", model: "offline", data: {
         frames: ids.map(image_id => ({ image_id, medium: "photograph", view: "exterior", primary_subject: "vehicle", bbox: [0, 0, 1, 1] })),

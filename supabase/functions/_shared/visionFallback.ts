@@ -111,7 +111,7 @@ export async function platformVisionMultiJSON(
   };
   const images = opts.parts.filter((part): part is { imageUrl: string } => "imageUrl" in part);
   const textBytes = opts.parts.reduce((sum, part) => sum + ("text" in part ? new TextEncoder().encode(part.text).length : 0), 0);
-  if (!userId || !Number.isSafeInteger(opts.maxTokens) || opts.maxTokens < 1 || opts.maxTokens > 1600 ||
+  if (!userId || !Number.isSafeInteger(opts.maxTokens) || opts.maxTokens < 1 || opts.maxTokens > 4096 ||
       images.length < 2 || images.length > 14 || opts.parts.length > 29 || textBytes > 8000 ||
       images.some(part => !part.imageUrl.startsWith("data:image/jpeg;base64,"))) return fail("platform_unavailable");
   const env = deps.env ?? (name => Deno.env.get(name));
@@ -151,9 +151,13 @@ export async function platformVisionMultiJSON(
   }
   const usage = safeAnthropicUsage(response.usage);
   if (usage) console.log("[platformVision] anthropic_token_usage", JSON.stringify(usage));
-  const parsed = parseJson(response.content || "");
+  // A clipped response is not a complete interpretation, even if a JSON prefix
+  // happens to parse. Do not persist or charge it, and never retry inference here.
+  const outputLimitReached = response.finish_reason === "max_tokens";
+  const parsed = outputLimitReached ? null : parseJson(response.content || "");
   if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
-    try { await settle(supabase, userId, hold.hold_id, 0, { provider_read: "unreadable", model, usage }); }
+    try { await settle(supabase, userId, hold.hold_id, 0, { provider_read: "unreadable", model, usage,
+      output_limit_reached: outputLimitReached }); }
     catch { return fail("analysis_pending"); }
     return fail("platform_result_unreadable");
   }
