@@ -215,6 +215,7 @@ export const VehicleVideoSection: React.FC<VehicleVideoSectionProps> = ({
   const { data: videos = [], isLoading: loading } = useVehicleVideos(vehicleId);
   const [isCollapsed, setIsCollapsed] = useState(defaultCollapsed);
   const [activeModal, setActiveModal] = useState<VideoMoment | null>(null);
+  useEffect(() => { setActiveModal(null); }, [vehicleId]);
 
   if (loading) return null;
   if (videos.length === 0) return null;
@@ -350,7 +351,7 @@ export const VehicleVideoSection: React.FC<VehicleVideoSectionProps> = ({
       </div>
 
       {/* Modal */}
-      {activeModal && (
+      {activeModal && activeModal.vehicle_id === vehicleId && (
         <VideoModal
           video={activeModal}
           vehicleId={activeModal.vehicle_id || vehicleId}

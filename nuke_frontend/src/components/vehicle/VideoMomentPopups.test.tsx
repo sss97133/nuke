@@ -7,6 +7,7 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 
 const fixture = vi.hoisted(() => ({
   videos: [] as unknown[], vehicle: null as unknown, metadataError: null as unknown,
+  videoRead: null as null | ((vehicleId: unknown) => Promise<{ data: unknown[]; error: null }>),
   queries: [] as { table: string; columns: string; filters: unknown[][] }[],
 }));
 vi.mock('../../lib/supabase', () => ({ supabase: { from: vi.fn((table: string) => {
@@ -18,7 +19,9 @@ vi.mock('../../lib/supabase', () => ({ supabase: { from: vi.fn((table: string) =
     is: (...args: unknown[]) => { query.filters.push(['is', ...args]); return builder; },
     or: (...args: unknown[]) => { query.filters.push(['or', ...args]); return builder; },
     not: (...args: unknown[]) => { query.filters.push(['not', ...args]); return builder; },
-    order: () => Promise.resolve({ data: fixture.videos, error: null }),
+    order: () => fixture.videoRead
+      ? fixture.videoRead(query.filters.find(filter => filter[0] === 'eq' && filter[1] === 'vehicle_id')?.[2])
+      : Promise.resolve({ data: fixture.videos, error: null }),
     maybeSingle: () => Promise.resolve({ data: fixture.vehicle, error: fixture.metadataError }),
   };
   return builder;
@@ -41,6 +44,7 @@ let container: HTMLDivElement, root: Root, client: QueryClient;
 beforeEach(() => {
   (globalThis as any).IS_REACT_ACT_ENVIRONMENT = true;
   fixture.videos = [video];
+  fixture.videoRead = null;
   fixture.vehicle = { id: subject, year: 1967, make: 'Chevrolet', model: 'Corvette' };
   fixture.metadataError = null;
   fixture.queries = [];
@@ -144,6 +148,41 @@ it('refuses a returned clip bound to a different vehicle', async () => {
   await render(<VehicleVideoSection vehicleId={subject} defaultCollapsed={false} />);
   expect(container.textContent).not.toContain('VIDEO MOMENTS');
   expect(container.querySelector('img')).toBeNull();
+});
+
+it('clears an open clip and amount when the same component changes vehicle, including deferred and cached reads', async () => {
+  const otherSubject = '00000000-0000-4000-8000-000000000003';
+  const otherVideo = { ...video, id: 'episode-b', vehicle_id: otherSubject, winning_bid: 200000,
+    broadcast_video_url: 'https://www.youtube.com/watch?v=lmnopqrstuv' };
+  let releaseOther!: (value: { data: unknown[]; error: null }) => void;
+  const pendingOther = new Promise<{ data: unknown[]; error: null }>(resolve => { releaseOther = resolve; });
+  fixture.videoRead = id => id === otherSubject ? pendingOther : Promise.resolve({ data: [video], error: null });
+  await render(<VehicleVideoSection vehicleId={subject} defaultCollapsed={false} />);
+  await click(container.querySelector('img[alt="Video thumbnail"]'));
+  await click(document.querySelector('button[title="Inspect recorded auction amount"]'));
+  expect(document.body.textContent).toContain('Recorded auction amount100,000');
+
+  await render(<VehicleVideoSection vehicleId={otherSubject} defaultCollapsed={false} />);
+  expect(document.querySelector('iframe')).toBeNull();
+  await act(async () => releaseOther({ data: [otherVideo], error: null }));
+  await act(async () => { await new Promise(resolve => setTimeout(resolve, 0)); });
+  expect(container.textContent).toContain('200,000');
+  expect(document.querySelector('iframe')).toBeNull();
+  expect(document.body.textContent).not.toContain('Recorded auction amount100,000');
+  expect(document.querySelector('a[href^="/valuation?"]')).toBeNull();
+
+  // Returning to an already-cached subject still needs a new deliberate clip selection.
+  await render(<VehicleVideoSection vehicleId={subject} defaultCollapsed={false} />);
+  expect(container.textContent).toContain('100,000');
+  expect(document.querySelector('iframe')).toBeNull();
+  await render(<VehicleVideoSection vehicleId={otherSubject} defaultCollapsed={false} />);
+  fixture.vehicle = { id: otherSubject, year: 1968, make: 'Chevrolet', model: 'Camaro' };
+  await click(container.querySelector('img[alt="Video thumbnail"]'));
+  expect(document.querySelector('iframe')?.src).toContain('lmnopqrstuv');
+  await click(document.querySelector('button[title="Inspect recorded auction amount"]'));
+  expect(document.body.textContent).toContain('Recorded auction amount200,000');
+  const context = document.querySelector<HTMLAnchorElement>('a[href^="/valuation?"]')!;
+  expect(new URL(context.href).searchParams.get('vehicle_id')).toBe(otherSubject);
 });
 
 it.each(['denied', 'error', 'wrong-subject', 'missing-model'])(
