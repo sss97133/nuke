@@ -92,6 +92,9 @@ const OBSERVATION_EXCLUDED_KEYS = new Set([
   "description", "description_source", "import_metadata", "origin_metadata", "updated_at", "is_public", "status",
   "listing_source", "extractor_version", "discovery_source", "auction_source", "canonical_platform", "platform_source",
   "source", "listing_location_source", "listing_location_observed_at", "listing_location_confidence",
+  // Section texts travel in content_text (fullDescription, labelled); as fields they overflow the btree row limit of
+  // idx_vobs_specs_covering, which INCLUDEs structured_data.
+  "highlights", "equipment", "modifications", "known_flaws", "recent_service_history",
 ]);
 
 // PostgREST errors from a gateway timeout or an empty 5xx body carry code/details/hint but no message.
