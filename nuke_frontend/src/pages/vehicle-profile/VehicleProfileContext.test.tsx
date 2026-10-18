@@ -798,3 +798,81 @@ it.each<CountKind>(['comments', 'observations'])('does not publish unmounted %s 
     ? { stats: expect.stringContaining('7 comments'), popupVehicle: b, popupExpected: 7 }
     : { stats: expect.stringContaining('11 observations') });
 });
+
+it.each<CountKind>(['comments', 'observations'])('keeps %s superseded after an authoritative reload and a later count-less reload', async kind => {
+  const old = deferred(); let reads = 0;
+  const authority = kind === 'comments' ? { comment_count: 31 } : { observation_count: 31 };
+  reply = request => endpoint(request, 'rpc/get_vehicle_profile_data', a) ? json(++reads === 2
+    ? { ...profile(a), stats: authority } : { ...profile(a), stats: {} })
+    : countRead(request, kind, a) ? old.promise : undefined;
+  await render(false, true); await tickDeferredCounts();
+  await act(async () => current.reloadVehicle());
+  expect(kind === 'comments' ? current.totalCommentCount : current.observationCount).toBe(31);
+  await act(async () => current.reloadVehicle());
+  expect(kind === 'comments' ? current.totalCommentCount : current.observationCount).toBe(31);
+  await release(old, counted(87));
+  expect(await countDisplay(kind)).toMatchObject(kind === 'comments'
+    ? { stats: expect.stringContaining('31 comments'), popupVehicle: a, popupExpected: 31, popupIsComments: true }
+    : { stats: expect.stringContaining('31 observations') });
+  expect(requests.filter(request => countRead(request, kind, a))).toHaveLength(1);
+});
+
+it.each<CountKind>(['comments', 'observations'])('keeps %s superseded while a third profile reload is pending', async kind => {
+  const old = deferred(), pending = deferred(); let reads = 0;
+  const authority = kind === 'comments' ? { comment_count: 31 } : { observation_count: 31 };
+  reply = request => endpoint(request, 'rpc/get_vehicle_profile_data', a) ? ++reads === 3 ? pending.promise
+    : json(reads === 2 ? { ...profile(a), stats: authority } : { ...profile(a), stats: {} })
+    : countRead(request, kind, a) ? old.promise : undefined;
+  await render(false, true); await tickDeferredCounts();
+  await act(async () => current.reloadVehicle());
+  await act(async () => { current.reloadVehicle(); });
+  expect(current.loading).toBe(true);
+  await release(old, counted(87));
+  const during = await countDisplay(kind);
+  await release(pending, json({ ...profile(a), stats: {} }));
+  expect(during).toMatchObject(kind === 'comments'
+    ? { stats: expect.stringContaining('31 comments'), popupVehicle: a, popupExpected: 31 }
+    : { stats: expect.stringContaining('31 observations') });
+  expect(kind === 'comments' ? current.totalCommentCount : current.observationCount).toBe(31);
+});
+
+it.each<CountKind>(['comments', 'observations'])('keeps a valid %s fallback when only the other field gained authority', async kind => {
+  const pending = deferred(); let reads = 0;
+  const other = kind === 'comments' ? { observation_count: 31 } : { comment_count: 31 };
+  reply = request => endpoint(request, 'rpc/get_vehicle_profile_data', a) ? json({ ...profile(a), stats: ++reads === 2 ? other : {} })
+    : countRead(request, kind, a) ? pending.promise : undefined;
+  await render(false, true); await tickDeferredCounts();
+  await act(async () => current.reloadVehicle());
+  await act(async () => current.reloadVehicle());
+  await release(pending, counted(23));
+  expect(await countDisplay(kind)).toMatchObject(kind === 'comments'
+    ? { stats: expect.stringContaining('23 comments'), popupVehicle: a, popupExpected: 23 }
+    : { stats: expect.stringContaining('23 observations') });
+  expect(kind === 'comments' ? current.observationCount : current.totalCommentCount).toBe(31);
+  expect(requests.filter(request => countRead(request, kind, a))).toHaveLength(1);
+});
+
+it.each<CountKind>(['comments', 'observations'])('does not revive pre-zero %s HEADs after a later count-less reload', async kind => {
+  const old = deferred(); let reads = 0;
+  const authority = kind === 'comments' ? { comment_count: 0 } : { observation_count: 0 };
+  reply = request => endpoint(request, 'rpc/get_vehicle_profile_data', a) ? json({ ...profile(a), stats: ++reads === 2 ? authority : {} })
+    : countRead(request, kind, a) ? old.promise : undefined;
+  await render(false, true); await tickDeferredCounts();
+  await act(async () => current.reloadVehicle());
+  await act(async () => current.reloadVehicle());
+  await release(old, counted(87));
+  expect(kind === 'comments' ? current.totalCommentCount : current.observationCount).toBe(0);
+  expect(container.querySelector('[data-quick-stats]')!.textContent).not.toContain('87');
+});
+
+it('does not revive an observation HEAD after maintained-row authority and a later omission', async () => {
+  const old = deferred(); let reads = 0;
+  reply = request => endpoint(request, 'rpc/get_vehicle_profile_data', a) ? json({ ...profile(a), stats: {},
+    vehicle: { ...profile(a).vehicle, ...( ++reads === 2 ? { observation_count: 31 } : {}) } })
+    : countRead(request, 'observations', a) ? old.promise : undefined;
+  await render(false, true); await tickDeferredCounts();
+  await act(async () => current.reloadVehicle());
+  await act(async () => current.reloadVehicle());
+  await release(old, counted(87));
+  expect(await countDisplay('observations')).toMatchObject({ stats: expect.stringContaining('31 observations') });
+});

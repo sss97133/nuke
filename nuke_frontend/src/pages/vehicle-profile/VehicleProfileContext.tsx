@@ -175,6 +175,8 @@ export const VehicleProfileProvider: React.FC<{ children: React.ReactNode }> = (
   const ranBatSyncRef = useRef<string | null>(null);
   /** Tracks what the RPC provided to skip redundant queries */
   const rpcLoadedRef = useRef<RpcLoadResult>({ images: false, timeline: false, commentCount: null, observationCount: null });
+  // Later omissions cannot revive a HEAD superseded by a primary count.
+  const countAuthorityRevisionRef = useRef({ comments: 0, observations: 0 });
 
   // ── Permissions ──
   const {
@@ -258,8 +260,14 @@ export const VehicleProfileProvider: React.FC<{ children: React.ReactNode }> = (
     if (!isCurrent()) return;
     rpcLoadedRef.current = rpcResult;
     // Use RPC stats for counts if available
-    if (rpcResult.commentCount !== null) setTotalCommentCount(rpcResult.commentCount);
-    if (rpcResult.observationCount !== null) setObservationCount(rpcResult.observationCount);
+    if (rpcResult.commentCount !== null) {
+      countAuthorityRevisionRef.current.comments += 1;
+      setTotalCommentCount(rpcResult.commentCount);
+    }
+    if (rpcResult.observationCount !== null) {
+      countAuthorityRevisionRef.current.observations += 1;
+      setObservationCount(rpcResult.observationCount);
+    }
     // If RPC didn't provide timeline, load it separately
     if (!rpcResult.timeline) {
       loadTimelineEvents();
@@ -406,12 +414,14 @@ export const VehicleProfileProvider: React.FC<{ children: React.ReactNode }> = (
 
   const loadTotalCommentCount = useCallback(async (isCurrent: () => boolean) => {
     if (!vehicleId) return;
+    const authorityRevision = countAuthorityRevisionRef.current.comments;
     try {
       const { count } = await supabase
         .from('vehicle_comments_unified')
         .select('comment_id', { count: 'exact', head: true })
         .eq('vehicle_id', vehicleId);
-      if (isCurrent() && rpcLoadedRef.current.commentCount === null && count !== null) setTotalCommentCount(count);
+      if (isCurrent() && rpcLoadedRef.current.commentCount === null &&
+        countAuthorityRevisionRef.current.comments === authorityRevision && count !== null) setTotalCommentCount(count);
     } catch { /* ignore */ }
   }, [vehicleId]);
 
@@ -559,12 +569,14 @@ export const VehicleProfileProvider: React.FC<{ children: React.ReactNode }> = (
       loadLiveSession();
       loadLinkedOrgs();
       if (isCurrentCountRead() && rpcLoadedRef.current.observationCount === null) {
+        const authorityRevision = countAuthorityRevisionRef.current.observations;
         supabase
           .from('vehicle_observations')
           .select('id', { count: 'exact', head: true })
           .eq('vehicle_id', vehicle!.id)
           .then(({ count }: { count: number | null }) => {
-            if (isCurrentCountRead() && rpcLoadedRef.current.observationCount === null && count !== null) setObservationCount(count);
+            if (isCurrentCountRead() && rpcLoadedRef.current.observationCount === null &&
+              countAuthorityRevisionRef.current.observations === authorityRevision && count !== null) setObservationCount(count);
           });
       }
     }, 500); // 500ms defer for non-critical data
