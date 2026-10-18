@@ -7,7 +7,7 @@ const clone = <T>(v: T): T => JSON.parse(JSON.stringify(v));
 function equal(a: unknown, b: unknown) { if (JSON.stringify(a) !== JSON.stringify(b)) throw new Error(`Expected ${JSON.stringify(b)}, got ${JSON.stringify(a)}`); }
 const source = (n: number): any => ({ id: id(n), user_id: owner, image_url: `https://source.invalid/${n}.jpg`,
   file_hash: n.toString(16).padStart(64, "0"), created_at: "2025-01-01T00:00:00.000001Z", taken_at: null,
-  vision_gate_status: "approved", is_superseded: false, is_duplicate: false, is_document: false, is_sensitive: false });
+  vision_gate_status: "approved", private_subject_privacy_complete: true, private_subject_privacy: [], is_superseded: false, is_duplicate: false, is_document: false, is_sensitive: false });
 const input = (s: any): SubjectInput => ({ image_id: s.id, source_url: s.image_url, source_sha256: s.file_hash, input_sha256: s.file_hash,
   representation: "source", source_qualified: true, created_at: s.created_at, taken_at: null });
 const frame = (image_id: string) => ({ image_id, medium: "photograph", primary_subject: "vehicle", view: "exterior", bbox: [0, 0, 1, 1] });
@@ -121,12 +121,14 @@ class Query {
   constructor(private db: DB, private table: string) {}
   select(_s: string) { return this; } eq(k: string, v: any) { this.filters.push(["eq", k, v]); return this; }
   is(k: string, v: any) { this.filters.push(["is", k, v]); return this; } in(k: string, v: any) { this.filters.push(["in", k, v]); return this; }
+  or(k: string) { this.filters.push(["or", k, null]); return this; }
   order(k: string, o: any) { this.orders.push([k, o.ascending]); return this; } limit(n: number) { this.end = n - 1; return this; }
   range(a: number, b: number) { this.start = a; this.end = b; return this; }
   then(resolve: (value: any) => any, reject: (reason: any) => any) {
     const data = this.table === "image_observations" ? this.db.observations : this.table === "vehicle_images" ? this.db.sources : [];
     const rows = data.filter(row => this.filters.every(([op, k, v]) => {
       const got = k.split(/->>?/).reduce((value, key) => value?.[key], row);
+      if (op === "or") return row.superseded_by == null || row.confidence_basis?.device_privacy_v1?.state === "withdrawn" || row.confidence_basis?.visual_subjects_v1?.state === "withdrawn";
       return op === "in" ? v.includes(got) : op === "is" ? got === null || got === undefined : got === v;
     })).sort((a, b) => {
       for (const [k, asc] of this.orders) if (a[k] !== b[k]) return (a[k] < b[k] ? -1 : 1) * (asc ? 1 : -1);

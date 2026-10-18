@@ -99,6 +99,14 @@ Standing rules the code carries:
   successful analysis. Counters describe source records in the bounded page, not distinct photographs,
   account totals or accessible Photos coverage. Cached fallback is dated and requires a live visibility
   check before showing remote pixels. This does not lift privacy, source-restoration or paid-intake holds.
+  The held audited-source continuation keeps immutable reading and anchor IDs separate from a current
+  attribution record. A complete exact source family can represent one photograph across several records;
+  the inbox still counts records in its page. A replacement needs its own current approval or a protected
+  purpose receipt bound to that leaf and family. It inherits no ancestor approval. Pending replacements
+  keep pixels and current interpretations hidden while retaining inspectable earlier-reading provenance;
+  alias-wide rejection, privacy withdrawal or incomplete lookup keeps that provenance opaque too.
+  Attribution history proves source continuity, not the current canonical vehicle attachment. Detail and
+  refresh remain read-only. This proposed policy and its correction writer require separate activation.
   The own-user profile also opens **Observed cars**, private photo-backed subject profiles from the existing
   `check-image-vehicle-match` reader's `read_subjects` mode. They retain visual interpretations and unresolved physical
   identity separately from Garage vehicles, owner statements and fleet value. The profile and gallery carry source-photo
@@ -115,7 +123,9 @@ Standing rules the code carries:
   retries request retained results only. These operational leases bound one device's work; they are not a cross-device
   exactly-once inference guarantee. Retained-reference retrieval is bounded and reports unassessed scope; private
   subject profiles remain unresolved hypotheses, outside canonical vehicle and ownership totals. This code requires
-  the held protected-writer migration and separate production activation; it does not unpause the photo pipeline.
+  the protected writer deployed with the approved baseline. The additional private qualification, NULL attribution
+  correction and historical reinspection proposal below remains held for separate activation; the global photo
+  pipeline remains paused.
   Provider failures retain only allowlisted code, provider, HTTP status and credential-kind diagnostics. A 401 means
   the credential was not accepted by the existing API-key route; it does not prove revocation or expiry. In-memory
   sign-in/API-key shape classification never exports credential values or changes routes or provider order. A complete,
@@ -146,6 +156,22 @@ Standing rules the code carries:
   (`VisionEngine.contributorVerdict`) holds by the same rule.
   A failed decode, classifier or required face read stays in the existing bounded retry path and does not mark the
   source synced; historical photos already settled as metadata only are not automatically replayed.
+  The held private-subject qualification path retains an account/hash-bound receipt from that same completed
+  native pass, including original and decoded-input digests, detector completion and pinned revisions. Its protected
+  intake qualifies only the owner's private subject analysis; global vision approval and processing status stay
+  unchanged. Unknown or withdrawn privacy evidence stays held, including across audited copies of the same photo.
+  Its held historical bridge reads bounded metadata for retained paid readings, then reinspects at most two exact
+  PhotoKit originals per cool, active sync pass with network downloads disabled. A three-source reading can retain
+  two leaf-specific proofs and finish the third on a later pass; replay preserves its old inputs, anchor and reading
+  clock without new inference or resetting upload settlement. Missing local originals, old readings or current
+  permission remain held. This separate private qualification policy requires activation approval.
+  Unread historical photos are not enrolled by this replay bridge. They require a separate bounded source-enrollment
+  path and approval for new paid analysis; preserving a source or correcting its filing does not create a reading.
+  A finite approved repair can instead retain and verify protected readings while its original sources still qualify,
+  before any separately approved NULL correction. After the audited correction, each pending leaf needs its own
+  current privacy proof; the bridge then reuses the original reading and anchor. Provider authentication, an explicit
+  cumulative paid-attempt budget and source/correction approval are prerequisites. An expanded cohort never resets
+  the existing pilot's attempts or activates general historical enrollment.
 - **Heat is a budget.** Nothing reads originals in bulk while the app is open: iCloud originals download only in
   the background job on Wi-Fi; the album review (originals + accurate OCR) runs in the foreground only on a
   charger at a nominal temperature (`LibraryIngest.mayReviewInForeground`); a foreground backfill slice waits

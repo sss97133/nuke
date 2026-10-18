@@ -12,6 +12,7 @@ struct SubjectResolutionQueue: Codable {
         let acknowledgedAt: Date
         var nextReadAt: Date
         var waitingForCorrespondingView: Bool?
+        var privacyReceipt: DevicePrivacyReceipt? = nil
     }
     struct Input: Codable, Equatable {
         let imageId: String
@@ -58,14 +59,24 @@ struct SubjectResolutionQueue: Codable {
         return stored.isEmpty && readings.isEmpty ? .unchanged : .changed
     }
 
-    mutating func acknowledge(localIdentifier: String, sourceHash: String, now: Date) {
-        guard !localIdentifier.isEmpty, Self.validHash(sourceHash),
-              !finishedHashes.contains(sourceHash), !uploads.contains(where: { $0.sourceHash == sourceHash }) else { return }
+    mutating func acknowledge(localIdentifier: String, sourceHash: String, now: Date, privacyReceipt: DevicePrivacyReceipt? = nil) {
+        guard !localIdentifier.isEmpty, Self.validHash(sourceHash), !finishedHashes.contains(sourceHash) else { return }
+        if let index = uploads.firstIndex(where: { $0.sourceHash == sourceHash }) {
+            if uploads[index].privacyReceipt == nil, privacyReceipt?.source_sha256 == sourceHash {
+                uploads[index].privacyReceipt = privacyReceipt
+            }
+            return
+        }
         uploads.append(Upload(localIdentifier: localIdentifier, sourceHash: sourceHash, acknowledgedAt: now,
-            nextReadAt: now, waitingForCorrespondingView: nil))
+            nextReadAt: now, waitingForCorrespondingView: nil,
+            privacyReceipt: privacyReceipt?.source_sha256 == sourceHash ? privacyReceipt : nil))
     }
 
     mutating func preserveAcknowledgements(from newer: SubjectResolutionQueue) {
+        for index in uploads.indices where uploads[index].privacyReceipt == nil {
+            if let receipt = newer.uploads.first(where: { $0.sourceHash == uploads[index].sourceHash })?.privacyReceipt,
+               receipt.source_sha256 == uploads[index].sourceHash { uploads[index].privacyReceipt = receipt }
+        }
         for upload in newer.uploads where !finishedHashes.contains(upload.sourceHash)
             && !uploads.contains(where: { $0.sourceHash == upload.sourceHash }) {
             uploads.append(upload)

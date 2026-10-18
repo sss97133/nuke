@@ -99,4 +99,65 @@ final class SourceInboxTests: XCTestCase {
         XCTAssertNil(try store.cachedSourceInbox(userId: owner, activeUserId: owner, imageId: imageId))
         XCTAssertThrowsError(try store.cacheSourceInbox(userId: owner, activeUserId: owner, imageId: UUID(), read: read))
     }
+    private func lineageWire() throws -> [String: Any] {
+        var value = wire(state: "held")
+        var photos = try XCTUnwrap(value["photos"] as? [[String: Any]])
+        let root = "cccccccc-cccc-4ccc-8ccc-cccccccccccc"
+        photos[0]["source_reason"] = "source_not_ready"
+        photos[0]["source_identity"] = ["contract": "audited_image_source_identity_v1", "receipt_image_id": photoId,
+            "root_image_id": root, "current_image_id": photoId, "alias_image_ids": [root, photoId],
+            "audit_ids": ["dddddddd-dddd-4ddd-8ddd-dddddddddddd"], "state": "held", "reason": "source_gate_not_approved",
+            "complete": true, "source_photo_count": 1, "current_vehicle_attribution_proven": false]
+        photos[0]["retained_contexts"] = [["id": "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb", "receipt_image_id": root,
+            "input_key": String(repeating: "b", count: 32), "provider": "offline-fixture", "model": "offline-fixture",
+            "read_at": clock, "observed_at": clock, "qualification": "retained_context_not_current_interpretation"]]
+        photos[0]["subject_analysis_state"] = "reading_no_longer_qualified"
+        photos[0]["reading_context_coverage"] = ["grain": "terminal_reading_heads", "assessed": 1,
+            "qualified": 0, "withdrawn": 0, "unqualified_or_conflicting": 1, "complete": true]
+        value["photos"] = photos
+        return value
+    }
+
+    func testPendingAuditedReplacementDecodesOriginalReceiptProvenanceWithoutPixelsOrIdentity() throws {
+        let read = try decode(lineageWire()), photo = read.photos[0]
+        XCTAssertTrue(read.isQualified)
+        XCTAssertNil(photo.image_url); XCTAssertTrue(photo.readings.isEmpty); XCTAssertNil(photo.identity)
+        XCTAssertEqual(photo.source_identity?.source_photo_count, 1)
+        XCTAssertEqual(photo.source_identity?.current_image_id, photo.id)
+        XCTAssertEqual(photo.retained_contexts?.first?.receipt_image_id, photo.source_identity?.root_image_id)
+        XCTAssertEqual(read.coverage.assessed, 1)
+        XCTAssertFalse(read.coverage.inference_started)
+    }
+
+    func testAuditedSourceCannotAssertVehicleAttachmentOrBorrowUnrelatedReadingReceipt() throws {
+        var value = try lineageWire(), photos = try XCTUnwrap(value["photos"] as? [[String: Any]])
+        var identity = try XCTUnwrap(photos[0]["source_identity"] as? [String: Any])
+        identity["current_vehicle_attribution_proven"] = true
+        photos[0]["source_identity"] = identity; value["photos"] = photos
+        XCTAssertFalse(try decode(value).isQualified)
+        value = try lineageWire(); photos = try XCTUnwrap(value["photos"] as? [[String: Any]])
+        var contexts = try XCTUnwrap(photos[0]["retained_contexts"] as? [[String: Any]])
+        contexts[0]["receipt_image_id"] = other
+        photos[0]["retained_contexts"] = contexts; value["photos"] = photos
+        XCTAssertFalse(try decode(value).isQualified)
+    }
+
+    func testWithdrawnOrUnassessedSourceCannotCarryPendingReadingMetadata() throws {
+        for reason in ["source_withdrawn_or_held", "source_scope_unassessed"] {
+            var value = try lineageWire(), photos = try XCTUnwrap(value["photos"] as? [[String: Any]])
+            photos[0]["source_reason"] = reason; value["photos"] = photos
+            XCTAssertFalse(try decode(value).isQualified)
+        }
+    }
+
+    func testLineageAndHeldReadingCacheKeepsExactBackendProjectionAndOwnerScope() throws {
+        let store = try LocalStore(databaseQueue: DatabaseQueue()), read = try decode(lineageWire())
+        let cachedAt = Date(timeIntervalSince1970: 1000)
+        try store.cacheSourceInbox(userId: owner, activeUserId: owner, read: read, now: cachedAt)
+        let saved = try XCTUnwrap(store.cachedSourceInbox(userId: owner, activeUserId: owner))
+        XCTAssertEqual(saved.read, read); XCTAssertEqual(saved.cachedAt, cachedAt)
+        XCTAssertNil(saved.read.photos[0].image_url)
+        XCTAssertNil(try store.cachedSourceInbox(userId: owner, activeUserId: other))
+    }
+
 }

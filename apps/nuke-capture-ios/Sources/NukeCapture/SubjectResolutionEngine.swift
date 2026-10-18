@@ -1,6 +1,7 @@
 import Foundation
 import Supabase
 import UIKit
+import Photos
 
 /// One bounded cloud comparison per foreground sync pass, over already uploaded own sources.
 /// No PhotoKit reads, local classification, canonical filing or owner assertion occurs here.
@@ -32,11 +33,12 @@ final class SubjectResolutionEngine: ObservableObject {
         return UUID(uuidString: current) == UUID(uuidString: userId) && UUID(uuidString: userId) != nil
     }
 
-    func acknowledge(localIdentifier: String, sourceHash: String, userId: String) {
+    func acknowledge(localIdentifier: String, sourceHash: String, userId: String, privacyReceipt: DevicePrivacyReceipt? = nil) {
         guard stillOwnAccount(userId) else { return }
         do {
             var queue = try load(userId)
-            queue.acknowledge(localIdentifier: localIdentifier, sourceHash: sourceHash, now: Date())
+            queue.acknowledge(localIdentifier: localIdentifier, sourceHash: sourceHash, now: Date(),
+                privacyReceipt: privacyReceipt?.owner_user_id == userId.lowercased() ? privacyReceipt : nil)
             try save(queue, userId)
         } catch { state("Visual analysis couldn't retain its upload queue. \(ReadFailure.text(error))", userId: userId) }
     }
@@ -54,9 +56,10 @@ final class SubjectResolutionEngine: ObservableObject {
         let is_sensitive: Bool?
         let exif_data: Exif?
 
-        func approved(for userId: String, hash: String) -> Bool {
+        func approved(for userId: String, hash: String, privacyReceipt: DevicePrivacyReceipt? = nil) -> Bool {
             user_id?.lowercased() == userId.lowercased() && file_hash == hash
-                && !(image_url ?? "").isEmpty && vision_gate_status == "approved"
+                && !(image_url ?? "").isEmpty && (vision_gate_status == "approved" ||
+                    vision_gate_status == "pending" && privacyReceipt?.source_sha256 == hash && privacyReceipt?.owner_user_id == userId.lowercased())
                 && is_superseded != true && is_duplicate != true && is_document != true && is_sensitive != true
                 && UUID(uuidString: id) != nil
         }
@@ -74,6 +77,7 @@ final class SubjectResolutionEngine: ObservableObject {
         let deferred_image_ids: [String]
         let unresolved: [Unresolved]
         let refusal: String?
+        let reinspection_candidate: SubjectReinspectionQueue.Candidate?
         let provider_diagnostics: [SubjectProviderDiagnostic]?
         let provider_attempt_coverage: SubjectProviderDiagnostic.AttemptCoverage?
     }
@@ -84,6 +88,124 @@ final class SubjectResolutionEngine: ObservableObject {
         let expected_source_hashes: [String: String]
         let dry_run = false
         let reuse_only: Bool
+        let device_privacy_receipts: [String: DevicePrivacyReceipt]
+    }
+
+    private struct ReinspectionReadRequest: Encodable {
+        let mode = "read_subject_reinspections"
+        let user_id: String
+        let offset: Int
+    }
+    private struct ReinspectionReadResponse: Decodable {
+        let method: String
+        let candidates: [SubjectReinspectionQueue.Candidate]
+        let next_offset: Int?
+    }
+    private func historicalKey(_ userId: String) -> String {
+        "subjectResolution.\(SubjectReinspectionQueue.method).\(userId.lowercased())"
+    }
+    private func loadHistorical(_ userId: String) throws -> SubjectReinspectionQueue {
+        guard let data = defaults.data(forKey: historicalKey(userId)) else { return SubjectReinspectionQueue(userId: userId) }
+        let queue = try JSONDecoder().decode(SubjectReinspectionQueue.self, from: data)
+        guard queue.userId == userId.lowercased() else { throw SubjectReinspectionFailure.scope }
+        return queue
+    }
+    private func saveHistorical(_ queue: SubjectReinspectionQueue, _ userId: String) throws {
+        guard stillOwnAccount(userId), queue.userId == userId.lowercased() else { throw SubjectReinspectionFailure.scope }
+        defaults.set(try JSONEncoder().encode(queue), forKey: historicalKey(userId))
+    }
+    private func mayReinspect(_ userId: String) -> Bool {
+        stillOwnAccount(userId) && !Task.isCancelled && UIApplication.shared.applicationState == .active
+            && !SyncEngine.deviceWarm && !SyncEngine.shared.isPaused
+    }
+
+    /// A separate operational lease repairs historical pending sources without
+    /// touching upload settlement. List/detail readers never call this method.
+    /// The server supplies only qualified metadata for an existing paid reading.
+    func runHistoricalAfterSync(userId: String) async {
+        guard !isRunning, mayReinspect(userId) else { return }
+        isRunning = true
+        defer { isRunning = false }
+        var historicalLeaseKey: String?
+        do {
+            var queue = try loadHistorical(userId)
+            if queue.hasCapacity {
+                let response: ReinspectionReadResponse = try await SupabaseService.client.functions.invoke("check-image-vehicle-match",
+                    options: FunctionInvokeOptions(body: ReinspectionReadRequest(user_id: userId, offset: queue.nextOffset ?? 0)))
+                guard mayReinspect(userId) else { return }
+                guard response.method == SubjectReinspectionQueue.method, response.candidates.count <= 1,
+                      response.candidates.allSatisfy(\.valid), response.next_offset == nil || (0...1_000_000).contains(response.next_offset!) else {
+                    throw SubjectReinspectionFailure.scope
+                }
+                queue.nextOffset = response.next_offset
+                for candidate in response.candidates { queue.offer(candidate, now: Date()) }
+                try saveHistorical(queue, userId) // Advance even if Photos later cannot access this candidate.
+            }
+            guard mayReinspect(userId), let lease = queue.beginAttempt(now: Date()) else { return }
+            historicalLeaseKey = lease.candidate.key
+            try saveHistorical(queue, userId) // Persist the lease before opening an original.
+            let receipts: [String: DevicePrivacyReceipt]
+            do {
+                receipts = try await SubjectReinspectionWork.inspect(lease, userId: userId,
+                    mayContinue: { self.mayReinspect(userId) }, original: { localIdentifier in
+                        let assets = PHAsset.fetchAssets(withLocalIdentifiers: [localIdentifier], options: nil)
+                        guard let asset = assets.firstObject, asset.localIdentifier == localIdentifier,
+                              asset.mediaType == .image else { throw SubjectReinspectionFailure.unavailable }
+                        return try await SyncEngine.requestOriginalData(for: asset, allowNetwork: false)
+                    }, didInspect: { receipt, witness in
+                        queue.retain(receipt, witness: witness, key: lease.candidate.key)
+                        try self.saveHistorical(queue, userId)
+                    })
+            } catch {
+                guard stillOwnAccount(userId) else { return }
+                switch error as? SubjectReinspectionFailure {
+                case .privacyHeld: queue.finish(lease.candidate.key, reason: "completed_privacy_hold")
+                case .changedBytes: queue.finish(lease.candidate.key, reason: "original_hash_changed")
+                case .scope: queue.finish(lease.candidate.key, reason: "invalid_scope")
+                default: queue.noteFailure(lease.candidate.key, reason: error is VisionEngine.TriageFailure ? "privacy_read_unavailable" : "original_unavailable")
+                }
+                try saveHistorical(queue, userId)
+                state("Historical visual reading waits for its exact local original or a completed privacy read.", userId: userId)
+                return // Bounded lease/backoff remains; later carrier pages can still proceed.
+            }
+            guard mayReinspect(userId) else { return }
+            let candidate = lease.candidate
+            let response: Response = try await SupabaseService.client.functions.invoke("check-image-vehicle-match",
+                options: FunctionInvokeOptions(body: Request(user_id: userId, image_ids: candidate.image_ids,
+                    expected_source_hashes: candidate.expected_source_hashes, reuse_only: true, device_privacy_receipts: receipts)))
+            guard stillOwnAccount(userId) else { return }
+            guard response.method == SubjectResolutionQueue.method else {
+                queue.noteFailure(candidate.key, reason: "unreadable_response_method")
+                try saveHistorical(queue, userId)
+                return
+            }
+            let requested = Set(candidate.image_ids.map { $0.lowercased() })
+            if ["resolved", "cached", "unresolved"].contains(response.status), response.method == SubjectResolutionQueue.method,
+               SubjectResolutionQueue.completeReceipt(requested: requested, persisted: response.persisted_image_ids,
+                 unresolved: response.unresolved.map(\.image_id), deferred: response.deferred_image_ids) {
+                queue.finish(candidate.key)
+                if !response.persisted_image_ids.isEmpty { NotificationCenter.default.post(name: Self.didChange, object: nil) }
+            } else if response.method == SubjectResolutionQueue.method, response.status == "refused", response.refusal == "source_privacy_partial",
+                      let remaining = response.reinspection_candidate, remaining.valid,
+                      remaining.reading_id == candidate.reading_id, remaining.run_key == candidate.run_key,
+                      remaining.expected_source_hashes == candidate.expected_source_hashes,
+                      Set(remaining.image_ids) == Set(candidate.image_ids) {
+                queue.finish(candidate.key, reason: "privacy_progress")
+                queue.offer(remaining, now: Date()) // The third pending original is a later bounded pass.
+            } else if response.status == "refused", !["source_not_ready", "required_input_unavailable"].contains(response.refusal ?? "") {
+                queue.finish(candidate.key, reason: response.refusal ?? "hard_refusal") // Operational refusal is not an analyzed-photo flag.
+            } else {
+                queue.noteFailure(candidate.key, reason: response.refusal ?? "incomplete_reconciliation")
+            }
+            try saveHistorical(queue, userId)
+        } catch {
+            guard stillOwnAccount(userId) else { return }
+            if let key = historicalLeaseKey, var queue = try? loadHistorical(userId) {
+                queue.noteFailure(key, reason: "transport_or_source_read_unavailable")
+                try? saveHistorical(queue, userId)
+            }
+            state("Historical visual reading couldn't finish. \(ReadFailure.text(error))", userId: userId)
+        }
     }
 
     func runAfterSync(userId: String) async {
@@ -115,7 +237,7 @@ final class SubjectResolutionEngine: ObservableObject {
                 var gated = Set<String>(), withdrawn = Set<String>()
                 for upload in waiting {
                     let matching = rows.filter { $0.file_hash == upload.sourceHash }
-                    let qualified = matching.filter { $0.approved(for: userId, hash: upload.sourceHash) }
+                    let qualified = matching.filter { $0.approved(for: userId, hash: upload.sourceHash, privacyReceipt: upload.privacyReceipt) }
                     // Duplicate acknowledgements may resolve to an older same-byte row. Prefer the
                     // exact source witness; a hash alone still names the exact acknowledged bytes.
                     let exact = qualified.filter { $0.exif_data?.uuid == upload.localIdentifier }
@@ -148,7 +270,11 @@ final class SubjectResolutionEngine: ObservableObject {
                     options: FunctionInvokeOptions(body: Request(user_id: userId,
                         image_ids: batch.inputs.map(\.imageId),
                         expected_source_hashes: Dictionary(uniqueKeysWithValues: batch.inputs.map { ($0.imageId, $0.sourceHash) }),
-                        reuse_only: batch.reuseOnly)))
+                        reuse_only: batch.reuseOnly,
+                        device_privacy_receipts: Dictionary(uniqueKeysWithValues: batch.inputs.compactMap { input in
+                            guard let receipt = queue.uploads.first(where: { $0.sourceHash == input.sourceHash })?.privacyReceipt else { return nil }
+                            return (input.imageId, receipt)
+                        }))))
             } catch {
                 guard stillOwnAccount(userId) else { return }
                 queue.retry(reason: "Visual analysis couldn't finish. \(ReadFailure.text(error))", reuseOnly: true)
