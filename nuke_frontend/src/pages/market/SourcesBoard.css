@@ -36,6 +36,14 @@
 .market-sources__badge--dealer { border-color: var(--text); color: var(--text); }
 .market-sources__badge--auction { border-color: var(--border); color: var(--text-secondary); }
 .market-sources__badge--marketplace { border-color: var(--border); color: var(--text-secondary); }
+.market-sources__badge--aggregator { border-style: dashed; color: var(--text-secondary); }
+
+.market-sources__species-evidence { display: flex; flex-direction: column; gap: 4px; padding: 7px 10px; margin-top: 8px;
+  border: 1px solid var(--border); background: var(--bg); }
+.market-sources__species-seen { font: 11px Arial, sans-serif; color: var(--text); }
+.market-sources__species-examined { margin: 0; padding-left: 14px; font: 10px 'Courier New', monospace;
+  color: var(--text-secondary); overflow-wrap: anywhere; }
+.market-sources__species-doc { font: 10px Arial, sans-serif; color: var(--text-secondary); }
 .market-sources__org-link { flex: none; padding: 1px 5px; border: 1px solid var(--border); background: var(--bg);
   color: var(--text-secondary); font: 700 8px 'Courier New', monospace; letter-spacing: 0.04em; text-transform: uppercase;
   text-decoration: none; line-height: 1.3; }
