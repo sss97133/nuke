@@ -138,7 +138,8 @@ CREATE TEMP TABLE vin_trim_undo ON COMMIT DROP AS
 SELECT e.id AS evidence_id, v.id AS vehicle_id, v.trim AS filled_trim, e.raw_extraction_data ->> 'decoded_trim' AS decoded_trim
 FROM public.field_evidence e
 JOIN public.vehicles v ON v.id = e.vehicle_id
-WHERE e.assigned_by = 'record_vin_trim_evidence'
+WHERE e.source_type = 'nhtsa_vin_decode'
+  AND e.assigned_by = 'record_vin_trim_evidence'
   AND e.field_name = 'trim'
   AND e.status = 'accepted'
   AND e.raw_extraction_data ->> 'live_trim' IS NULL
