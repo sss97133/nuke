@@ -42,6 +42,12 @@ When an interpretation is superseded, trace its affected relationships, measures
 verify their revised results. Preserve the original testimony and the inputs/method needed to replay
 the earlier evaluation. A changed current answer and a reproducible earlier answer are separate proofs.
 
+Model canonicalization needs a source-supported negative separation case. A spelling alias and a
+broader browsing-family member are different relationships. Binding more names to one named model
+does not establish identity accuracy; preserve unresolved names and the make-level market context.
+An alias correction must revisit its materialized groups, saved price fits, normalizers and cohorts,
+not merely replace the label printed by one consumer.
+
 Every claimed correction loop needs a plausible wrong interpretation, later discriminating evidence,
 the same source-to-consumer assay and an unaffected counterexample. Contradiction may correctly withhold
 an answer; withholding is not resolution. Repeated improvement needs separately selected held-out

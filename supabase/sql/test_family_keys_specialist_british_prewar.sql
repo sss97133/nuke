@@ -96,6 +96,9 @@ SELECT pg_temp.ok('after: GMC Suburban, BMW M Coupe, Lincoln Zephyr, and Mercury
   AND (SELECT year_end FROM public.canonical_models WHERE id = '10000000-0000-4000-a000-000000000003') IS NULL
   AND (SELECT year_start FROM public.canonical_models WHERE id = '10000000-0000-4000-a000-000000000004') = 1938);
 
+-- This historical migration fixture includes coarse buckets that were wrongly called models.
+-- Its binding count is not identity accuracy. test_model_identity_separation.sql applies the
+-- correction and requires Hayabusa, RE-5, Cappuccino and Bultaco models to remain distinct.
 SELECT pg_temp.ok('after: newly inserted and expanded specialist/classic/moto families key cleanly',
   (SELECT family FROM public.mv_model_family_names WHERE make_l = 'locomobile' AND model_l = 'model 48 sportif') = 'Model 48'
   AND (SELECT family FROM public.mv_model_family_names WHERE make_l = 'crane-simplex' AND model_l = 'model 5') = 'Model 5'

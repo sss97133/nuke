@@ -561,6 +561,10 @@ jobs:
         run: |
           deno test supabase/functions/extract-mecum/
           deno test --node-modules-dir=none supabase/functions/extract-gooding/
+      - name: Verify Cars and Bids retained result protection, sections, facets and cache targets
+        run: |
+          deno test --no-check --node-modules-dir=none supabase/functions/extract-cars-and-bids-core/
+          deno check --node-modules-dir=none supabase/functions/extract-cars-and-bids-core/index.ts
       - name: Verify a model's reported-work proposal is kept only where the stored listing text literally carries it
         run: deno test --no-check supabase/functions/discover-description-data/reportedWorkProposals.test.ts
       - name: Verify JamesEdition title and detail identity agree before intake
