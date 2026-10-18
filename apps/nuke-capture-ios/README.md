@@ -107,6 +107,8 @@ Standing rules the code carries:
   (`VisionEngine.triage`, the same rule `scripts/ios-vision-triage` applies to stored frames): clutter and personal stay
   on the phone as metadata only; everything else, a part close-up included, uploads. The contributor firewall
   (`VisionEngine.contributorVerdict`) holds by the same rule.
+  A failed decode, classifier or required face read stays in the existing bounded retry path and does not mark the
+  source synced; historical photos already settled as metadata only are not automatically replayed.
 - **Heat is a budget.** Nothing reads originals in bulk while the app is open: iCloud originals download only in
   the background job on Wi-Fi; the album review (originals + accurate OCR) runs in the foreground only on a
   charger at a nominal temperature (`LibraryIngest.mayReviewInForeground`); a foreground backfill slice waits
