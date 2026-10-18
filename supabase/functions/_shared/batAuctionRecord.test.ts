@@ -1,6 +1,6 @@
 // deno test supabase/functions/_shared/batAuctionRecord.test.ts
 import { assertEquals, assertRejects } from "https://deno.land/std@0.224.0/assert/mod.ts";
-import { countdownEndDate, readCommentsJson, readOwnAuctionEnd, summarizeAuction, vinCheckDigitOk, buildAuctionCommentRows, linkAuctionCommentIdentities, type BatCommentIdentityStore } from "./batAuctionRecord.ts";
+import { countdownEndDate, readCommentsJson, readOwnAuctionEnd, summarizeAuction, vinCheckDigitOk, buildAuctionCommentRows, linkAuctionCommentIdentities, buildCabAuctionCommentRows, cabCommentContentHash, legacyCabCommentId, sha256Hex, type CabCommentInput, type BatCommentIdentityStore } from "./batAuctionRecord.ts";
 
 // Shapes copied from real lot pages (2026-09-27): each comment carries nested channels/likers/images
 // arrays, which is what defeats a lazy "comments":[...] regex.
@@ -182,6 +182,49 @@ Deno.test("anonymous authors are never keyed, even with an author id; Unknown st
   assertEquals(linked.map((r) => r.external_identity_id), ["driver-id", null, null, null]);
   assertEquals(looked, ["driver"]);   // anonymous and Unknown are never looked up
   assertEquals(minted, []);           // and never minted
+});
+
+const cabRows = (comments: CabCommentInput[]) => buildCabAuctionCommentRows({
+  comments, vehicleId: "vehicle", auctionEventId: "event",
+  listingUrlNorm: "https://carsandbids.com/auctions/AbCd1234/test-car", endAt: new Date("2026-06-03T00:00:00Z"),
+});
+const cab = (id: string, author: string, bidAmount: number | null, text = bidAmount ? `Bid $${bidAmount}` : "Nice car"): CabCommentInput =>
+  ({ id, author, postedAt: "2026-06-02T18:00:00.000Z", text, likes: 2, bidAmount, isSeller: false });
+
+Deno.test("C&B rows: BaT's row shape, keyed on C&B's own comment id with the hash trg_key_cab_auction_comment computes", async () => {
+  const [bidRow, comment] = await cabRows([cab("3vQXROVO", "driver9", 20000), cab("Held0001", "lister4", null)]);
+  // the prefix supabase/sql/test_external_auction_bids_cross_platform.sql pins for the database's sha256 of this id
+  assertEquals(bidRow.content_hash.slice(0, 12), "46980fa4fc50");
+  assertEquals(bidRow.content_hash, await sha256Hex("cars_and_bids|native-comment:3vQXROVO"));
+  assertEquals(await cabCommentContentHash("3vQXROVO"), bidRow.content_hash);
+  assertEquals([bidRow.platform, bidRow.source_comment_id, bidRow.comment_type, bidRow.bid_amount, bidRow.sequence_number],
+    ["cars_and_bids", "3vQXROVO", "bid", 20000, 1]);
+  assertEquals([comment.comment_type, comment.bid_amount, comment.comment_likes, comment.hours_until_close], ["observation", null, 2, 6]);
+  // a re-read in another order keeps every comment's key
+  const [again] = await cabRows([cab("Held0001", "lister4", null), cab("3vQXROVO", "driver9", 20000)]).then((r) => r.slice(1));
+  assertEquals(again.content_hash, bidRow.content_hash);
+  await assertRejects(() => cabRows([cab("", "driver9", 100)]), Error, "no comment id");
+});
+
+Deno.test("legacy C&B keys yield their comment id; other hashes do not", async () => {
+  assertEquals(legacyCabCommentId("cab_10000000-0000-4000-8000-000000000002_Held0001"), "Held0001");
+  assertEquals(legacyCabCommentId(await cabCommentContentHash("Held0001")), null);
+  assertEquals(legacyCabCommentId(null), null);
+});
+
+Deno.test("C&B identities are minted on the cars_and_bids platform with C&B profile URLs; mixed rows are refused", async () => {
+  const rows = await cabRows([cab("a1b2c3d4", "driver 9", 100), cab("a1b2c3d5", "Anonymous", 200)]);
+  const minted: Array<{ platform: string; handle: string; profile_url: string }> = [];
+  let inserted = false;
+  const linked = await linkAuctionCommentIdentities(rows, {
+    find: async (handles) => inserted ? handles.map((handle) => ({ handle, id: `cab:${handle}` })) : [],
+    insertMissing: async (identities) => { minted.push(...identities); inserted = true; },
+  }, "cars_and_bids");
+  assertEquals(minted, [{ platform: "cars_and_bids", handle: "driver 9", profile_url: "https://carsandbids.com/user/driver%209" }]);
+  assertEquals(linked.map((r) => r.external_identity_id), ["cab:driver 9", null]);
+  const batRows = await commentRows([bid("driver9", 100, 1)]);
+  await assertRejects(() => linkAuctionCommentIdentities(batRows, { find: async () => [], insertMissing: async () => {} }, "cars_and_bids"),
+    Error, "cars_and_bids rows only");
 });
 
 Deno.test("replay with no fresh rows never touches the identity store", async () => {
