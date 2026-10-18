@@ -9,6 +9,6 @@ INSERT INTO public.observation_properties
    cardinality, expected_source_categories, verification_scope, description, ratified_at)
 VALUES
   ('body_style', 'Body style', 'string', 'core', 'identity',
-   ARRAY['specification']::public.observation_kind[], 'single', ARRAY['registry', 'auction'], 'both',
+   ARRAY['specification']::public.observation_kind[], 'single', ARRAY['registry', 'auction']::public.source_category[], 'both',
    'A stated body configuration label (e.g. Fastback, Stepside, Split-Window Coupe). Each claim keeps its quote, source field and normalization version; factory configuration and current configuration remain unknown unless a build record or image witness establishes them.', now())
 ON CONFLICT (property_key) DO NOTHING;
