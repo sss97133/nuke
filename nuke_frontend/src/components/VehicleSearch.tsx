@@ -1,6 +1,11 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
+import {
+  buildFacetDrilldownUrl,
+  resolveMarketCohortShortcuts,
+  type MarketCohortShortcut,
+} from '../lib/market/vehicleTaxonomy';
 import AIModelSelector from './search/AIModelSelector';
 import type { AIProvider } from './search/AIModelSelector';
 import '../styles/unified-design-system.css';
@@ -40,7 +45,15 @@ export default function VehicleSearch() {
   const [selectedAIProvider, setSelectedAIProvider] = useState<AIProvider | undefined>();
   const navigate = useNavigate();
 
+  const cohortShortcuts = useMemo(
+    () => resolveMarketCohortShortcuts(searchTerm, 3),
+    [searchTerm],
+  );
+
   useEffect(() => {
+    if (searchTerm.trim().length >= 2 && cohortShortcuts.length > 0) {
+      setShowResults(true);
+    }
     const delayDebounceFn = setTimeout(() => {
       if (searchTerm.trim().length > 0) {
         performSearch();
@@ -51,7 +64,7 @@ export default function VehicleSearch() {
     }, 300);
 
     return () => clearTimeout(delayDebounceFn);
-  }, [searchTerm]);
+  }, [searchTerm, cohortShortcuts.length]);
 
   const performSearch = async () => {
     try {
@@ -119,6 +132,20 @@ export default function VehicleSearch() {
     setShowResults(false);
   };
 
+  const handleCohortShortcutClick = (shortcut: MarketCohortShortcut) => {
+    const targetUrl =
+      shortcut.url ||
+      buildFacetDrilldownUrl({
+        make: shortcut.make,
+        family: shortcut.family,
+        axis: shortcut.axis,
+        facet: shortcut.facet,
+      });
+    navigate(targetUrl);
+    setSearchTerm('');
+    setShowResults(false);
+  };
+
   const handleAIModelSelect = (provider: AIProvider, modelName: string, enabled: boolean) => {
     if (enabled) {
       setSelectedAIProvider(provider);
@@ -156,7 +183,7 @@ export default function VehicleSearch() {
           value={searchTerm}
           onChange={(e) => setSearchTerm(e.target.value)}
           onFocus={() => {
-            if (results.length > 0) setShowResults(true);
+            if (results.length > 0 || cohortShortcuts.length > 0) setShowResults(true);
           }}
           style={{
             flex: 1,
@@ -179,8 +206,9 @@ export default function VehicleSearch() {
       </div>
 
       {/* Search Results Dropdown */}
-      {showResults && results.length > 0 && (
+      {showResults && (cohortShortcuts.length > 0 || results.length > 0) && (
         <div
+          data-testid="vehicle-search-dropdown"
           style={{
             position: 'absolute',
             top: '100%',
@@ -189,10 +217,150 @@ export default function VehicleSearch() {
             background: 'var(--white)',
             border: '2px solid var(--border)',
             borderTop: 'none',
-            maxHeight: '400px',
+            maxHeight: '420px',
             overflowY: 'auto',
-            zIndex: 1000}}
+            zIndex: 1000,
+          }}
         >
+          {/* Market Cohort Shortcuts Section */}
+          {cohortShortcuts.length > 0 && (
+            <div
+              data-testid="market-cohort-shortcuts-section"
+              style={{
+                borderBottom: results.length > 0 ? '2px solid var(--border)' : 'none',
+                background: 'var(--surface, #FAFAFA)',
+              }}
+            >
+              <div
+                style={{
+                  padding: '6px 12px',
+                  fontSize: '9px',
+                  fontWeight: 700,
+                  letterSpacing: '0.08em',
+                  color: 'var(--text-muted)',
+                  borderBottom: '1px solid var(--border-light)',
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                }}
+              >
+                <span>MARKET COHORT SHORTCUTS</span>
+                <span>FACET DRILLDOWN</span>
+              </div>
+              {cohortShortcuts.map((shortcut) => (
+                <div
+                  key={shortcut.id}
+                  data-testid={`market-cohort-shortcut-${shortcut.id}`}
+                  role="button"
+                  tabIndex={0}
+                  onClick={() => handleCohortShortcutClick(shortcut)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                      e.preventDefault();
+                      handleCohortShortcutClick(shortcut);
+                    }
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.background = 'var(--grey-100)';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.background = 'transparent';
+                  }}
+                  style={{
+                    padding: '8px 12px',
+                    borderBottom: '1px solid var(--border-light)',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '10px',
+                  }}
+                >
+                  {/* Inline Era-Accurate Vetted Identity Mark SVG */}
+                  <div
+                    data-testid="market-cohort-shortcut-svg"
+                    style={{
+                      width: '78px',
+                      height: '22px',
+                      flexShrink: 0,
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                    }}
+                    dangerouslySetInnerHTML={{ __html: shortcut.svgMarkup }}
+                  />
+
+                  {/* Cohort Title & Sublabel */}
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div
+                      data-testid="market-cohort-shortcut-label"
+                      style={{
+                        fontSize: '11px',
+                        fontWeight: 700,
+                        color: 'var(--text, #111)',
+                        whiteSpace: 'nowrap',
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                      }}
+                    >
+                      {shortcut.make} {shortcut.family} · {shortcut.axisDisplayLabel}: {shortcut.facet}
+                    </div>
+                    <div
+                      style={{
+                        fontSize: '9px',
+                        color: 'var(--text-muted)',
+                        whiteSpace: 'nowrap',
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                      }}
+                    >
+                      {shortcut.subLabel}
+                    </div>
+                  </div>
+
+                  {/* Era Range Badge + MARKET MAP ↗ Pill */}
+                  <div
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '6px',
+                      flexShrink: 0,
+                    }}
+                  >
+                    {shortcut.yearRangeLabel && (
+                      <span
+                        data-testid="market-cohort-shortcut-era"
+                        style={{
+                          fontSize: '9px',
+                          fontWeight: 700,
+                          padding: '2px 5px',
+                          border: '1px solid var(--border)',
+                          background: 'var(--white)',
+                          color: 'var(--text-secondary)',
+                        }}
+                      >
+                        {shortcut.yearRangeLabel}
+                      </span>
+                    )}
+                    <span
+                      data-testid="market-cohort-shortcut-pill"
+                      style={{
+                        fontSize: '9px',
+                        fontWeight: 700,
+                        padding: '2px 6px',
+                        border: '1px solid var(--border)',
+                        background: 'var(--text, #111)',
+                        color: 'var(--white, #FFF)',
+                        letterSpacing: '0.04em',
+                      }}
+                    >
+                      MARKET MAP ↗
+                    </span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+
           {results.map(result => (
             <div
               key={result.id}
@@ -260,7 +428,7 @@ export default function VehicleSearch() {
       )}
 
       {/* No Results */}
-      {showResults && results.length === 0 && searchTerm.length > 0 && !loading && (
+      {showResults && results.length === 0 && cohortShortcuts.length === 0 && searchTerm.length > 0 && !loading && (
         <div style={{
           position: 'absolute',
           top: '100%',
