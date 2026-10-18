@@ -108,7 +108,7 @@ export function WatchersPopup({ vehicleId, watcherCount, viewCount, make, model 
           textTransform: 'uppercase' as const, letterSpacing: '0.5px',
           color: '#999', marginTop: 4,
         }}>
-          PEOPLE WATCHED THIS AUCTION
+          RECORDED WATCHERS
         </div>
         {viewCount != null && viewCount > 0 && (
           <div style={{
@@ -135,7 +135,7 @@ export function WatchersPopup({ vehicleId, watcherCount, viewCount, make, model 
             textTransform: 'uppercase' as const, letterSpacing: '0.5px',
             color: '#999', marginBottom: 8,
           }}>
-            VS {make?.toUpperCase()} {model?.toUpperCase()} ({stats.count} AUCTIONS)
+            VS {make?.toUpperCase()} {model?.toUpperCase()} (RECORDS IN THIS READ: {stats.count})
           </div>
 
           {/* Visual comparison */}
@@ -189,6 +189,9 @@ export function WatchersPopup({ vehicleId, watcherCount, viewCount, make, model 
             </div>
           )}
 
+          <div style={{ marginTop: 8, fontFamily: SANS, fontSize: 8, color: '#999', lineHeight: 1.4 }}>
+            Comparisons use up to 500 returned vehicle records with positive watcher counts and matching stored make and model.
+          </div>
         </div>
       )}
 
