@@ -617,7 +617,7 @@ async function upsertSellerAssessmentScore(supabase: ReturnType<typeof createCli
 async function extractBonhamsLot(url: string): Promise<ExtractionResult> {
   console.log(`[Bonhams] Extracting: ${url}`);
 
-  // cars.bonhams.com serves the whole lot in __NEXT_DATA__ (gallery, notices, footnotes) to a plain request: no Firecrawl needed.
+  // cars.bonhams.com serves the whole lot in __NEXT_DATA__ (gallery, notices, footnotes); a saved copy or a direct read that has it needs no Firecrawl.
   const pageUrl = /\/auction\/\d+\/lot\//i.test(url) ? bonhamsLotPageUrl(url) : url;
   let fetchResult = await archiveFetch(pageUrl, {
     platform: "bonhams",
@@ -643,14 +643,25 @@ async function extractBonhamsLot(url: string): Promise<ExtractionResult> {
   if (needsFirecrawl) {
     console.log(`[Bonhams] No lot data or rendered content (html=${html.length}b, md=${markdown?.length || 0}b) — trying Firecrawl`);
     try {
+      // Both Bonhams hosts answer 403 to the edge's address; Firecrawl's rawHtml keeps the __NEXT_DATA__ script its "html" strips.
       fetchResult = await archiveFetch(pageUrl, {
         platform: "bonhams",
         callerName: "extract-bonhams",
-        useFirecrawl: true,
-        includeMarkdown: true,
-        waitForJs: 4000,
-        skipCache: true, // Force fresh Firecrawl render (not cached direct-fetch HTML)
+        useFirecrawl: false,
+        firecrawlOnBlock: true,
+        waitForJs: 0,
+        skipCache: true,
       });
+      if (!fetchResult.html) {
+        fetchResult = await archiveFetch(pageUrl, {
+          platform: "bonhams",
+          callerName: "extract-bonhams",
+          useFirecrawl: true,
+          includeMarkdown: true,
+          waitForJs: 4000,
+          skipCache: true, // Force fresh Firecrawl render (not cached direct-fetch HTML)
+        });
+      }
       if (fetchResult.html && fetchResult.html.length > 500) {
         html = fetchResult.html;
         markdown = fetchResult.markdown || null;
@@ -1681,8 +1692,8 @@ if (import.meta.main) Deno.serve(async (req) => {
             if (h && parseLotPage(h)) { savedHtml = h; break; }
           }
         }
-        // www.bonhams.com answers 403 to this function's address; cars.bonhams.com is asked first, free. A refusal there ends
-        // direct reads for the run and the page is read through Firecrawl (rawHtml, 1 credit a page) under the allowance.
+        // Both Bonhams hosts answered 403 to this function's address (2026-10-18); a direct read is still tried once a run, free, and
+        // a refusal ends direct reads for the run. The page is then read through Firecrawl (rawHtml, 1 credit a page) under the allowance.
         let directHtml: string | null = null;
         let directStatus = 0;
         if (!savedHtml && !directBlocked) {

@@ -169,9 +169,10 @@ Example:
 ## Cost Tracking
 
 `cars.bonhams.com` serves the whole lot (gallery, saleroom notices, footnotes, Seller's Assessment) in the page's
-`__NEXT_DATA__` to a plain request, so the lot page is read directly first at no cost (`www.bonhams.com` answers 403
-to the edge function's address). Firecrawl is used only when that read has no lot data, and `deep_lots` stops asking
-directly for the rest of a run after the first refusal:
+`__NEXT_DATA__` to a plain request from a residential address, but both Bonhams hosts answer 403 to the edge
+function's address (checked 2026-10-18). The lot page is still read directly first; on a refusal it is read through
+Firecrawl as `rawHtml` (the rendered `html` format strips `__NEXT_DATA__`), and `deep_lots` stops asking directly for
+the rest of a run after the first refusal:
 - **Cost per Firecrawl extraction**: ~$0.01 (1 cent)
 - All costs logged to `api_usage_logs` table
 - Provider: `'firecrawl'`
