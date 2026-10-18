@@ -57,6 +57,8 @@ const VideoModal: React.FC<{
 }> = ({ video, vehicleId, onClose }) => {
   const [showPricePopup, setShowPricePopup] = useState(false);
   const [showLotPopup, setShowLotPopup] = useState(false);
+  const recordedAmount = typeof video.winning_bid === 'number' && Number.isFinite(video.winning_bid)
+    && video.winning_bid > 0 && video.outcome === 'sold' ? video.winning_bid : null;
   const duration = (video.broadcast_timestamp_end || video.broadcast_timestamp_start + 60) - video.broadcast_timestamp_start;
 
   // Close on escape key
@@ -144,20 +146,20 @@ const VideoModal: React.FC<{
               <span style={{ fontSize: '11px', fontFamily: "'Courier New', monospace", color: 'var(--text-muted)' }}>
                 {formatTimestamp(video.broadcast_timestamp_start)} ({formatDuration(duration)})
               </span>
-              {video.winning_bid && video.outcome === 'sold' && (
+              {recordedAmount !== null && (
                 <button
                   onClick={() => setShowPricePopup(true)}
                   style={{
-                    background: 'var(--success-dim)',
-                    border: '1px solid var(--success)', padding: '4px 10px',
+                    background: 'var(--surface)',
+                    border: '1px solid var(--border)', padding: '4px 10px',
                     cursor: 'pointer',
                     fontWeight: 700,
-                    color: 'var(--success)',
+                    color: 'var(--text)',
                     fontSize: '13px'
                   }}
-                  title="View price breakdown"
+                  title="Inspect recorded auction amount"
                 >
-                  ${video.winning_bid.toLocaleString()}
+                  Recorded amount {recordedAmount.toLocaleString()}
                 </button>
               )}
               <button
@@ -177,12 +179,14 @@ const VideoModal: React.FC<{
       </div>
 
       {/* Price Breakdown Popup */}
-      {showPricePopup && video.winning_bid && (
+      {showPricePopup && recordedAmount !== null && (
         <PriceBreakdownPopup
-          hammerPrice={video.winning_bid}
+          recordedAmount={recordedAmount}
           estimateLow={video.estimate_low}
           estimateHigh={video.estimate_high}
           source={video.source}
+          sourceUrl={video.source_url}
+          lotNumber={video.lot_number}
           vehicleId={vehicleId}
           onClose={() => setShowPricePopup(false)}
         />
@@ -211,6 +215,7 @@ export const VehicleVideoSection: React.FC<VehicleVideoSectionProps> = ({
   const { data: videos = [], isLoading: loading } = useVehicleVideos(vehicleId);
   const [isCollapsed, setIsCollapsed] = useState(defaultCollapsed);
   const [activeModal, setActiveModal] = useState<VideoMoment | null>(null);
+  useEffect(() => { setActiveModal(null); }, [vehicleId]);
 
   if (loading) return null;
   if (videos.length === 0) return null;
@@ -248,6 +253,8 @@ export const VehicleVideoSection: React.FC<VehicleVideoSectionProps> = ({
             }}>
               {videos.map((video) => {
                 const duration = (video.broadcast_timestamp_end || video.broadcast_timestamp_start + 60) - video.broadcast_timestamp_start;
+                const recordedAmount = typeof video.winning_bid === 'number' && Number.isFinite(video.winning_bid)
+                  && video.winning_bid > 0 && video.outcome === 'sold' ? video.winning_bid : null;
 
                 return (
                   <div
@@ -325,9 +332,9 @@ export const VehicleVideoSection: React.FC<VehicleVideoSectionProps> = ({
                         alignItems: 'center'
                       }}>
                         <span>{video.lot_number || video.source?.toUpperCase()}</span>
-                        {video.winning_bid && video.outcome === 'sold' && (
-                          <span style={{ color: 'var(--success)' }}>
-                            ${(video.winning_bid / 1000).toFixed(0)}K
+                        {recordedAmount !== null && (
+                          <span title="Recorded auction amount; currency and fee basis unknown">
+                            {recordedAmount.toLocaleString()}
                           </span>
                         )}
                       </div>
@@ -344,7 +351,7 @@ export const VehicleVideoSection: React.FC<VehicleVideoSectionProps> = ({
       </div>
 
       {/* Modal */}
-      {activeModal && (
+      {activeModal && activeModal.vehicle_id === vehicleId && (
         <VideoModal
           video={activeModal}
           vehicleId={activeModal.vehicle_id || vehicleId}

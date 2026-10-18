@@ -5,6 +5,7 @@ interface VideoMoment {
   id: string;
   lot_number: string;
   source: string;
+  source_url: string | null;
   auction_name: string | null;
   auction_start_date: string | null;
   winning_bid: number | null;
@@ -27,7 +28,7 @@ export function useVehicleVideos(vehicleId: string) {
       const { data, error } = await supabase
         .from('auction_events')
         .select(`
-          id, lot_number, source, auction_start_date,
+          id, lot_number, source, source_url, auction_start_date,
           winning_bid, outcome, estimate_low, estimate_high, vehicle_id,
           broadcast_video_url, broadcast_timestamp_start, broadcast_timestamp_end
         `)
@@ -37,7 +38,7 @@ export function useVehicleVideos(vehicleId: string) {
         .order('auction_start_date', { ascending: false });
 
       if (error) throw error;
-      return (data || []) as VideoMoment[];
+      return (data || []).filter(video => video.vehicle_id === vehicleId) as VideoMoment[];
     },
     enabled: !!vehicleId,
     staleTime: 5 * 60 * 1000,
