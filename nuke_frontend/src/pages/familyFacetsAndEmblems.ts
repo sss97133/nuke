@@ -746,7 +746,316 @@ export const VETTED_IDENTITY_MARKS: readonly VehicleIdentityMark[] = [
       '<svg viewBox="0 0 190 40" xmlns="http://www.w3.org/2000/svg"><rect x="2" y="5" width="186" height="30" rx="2" fill="#064e3b" stroke="#e5e7eb" stroke-width="2"/><text x="95" y="26" text-anchor="middle" fill="#f9fafb" font-family="Georgia,serif" font-size="14" font-weight="800" letter-spacing="3.2">JAGUAR E-TYPE</text></svg>',
     provenanceNote: 'Jaguar Cars Ltd. Coventry bonnet badge and XK120/140/150 & E-Type Series 1/2/3 script.',
   },
+  // ── Wave 3 Era / Series / Trim Vector Marks (viewBox="0 0 120 36") ─────────
+  {
+    id: 'bronco-1st-gen-script-66-77',
+    brand: 'Ford',
+    family: 'Bronco',
+    seriesCode: 'U15',
+    trimPackage: 'Sport',
+    yearStart: 1966,
+    yearEnd: 1977,
+    markKind: 'model_wordmark',
+    displayLabel: 'EARLY BRONCO (U13·U14·U15)',
+    subLabel: "'66–'77 1st Gen Chrome Fender Script & Bucking Horse",
+    rpoCode: 'U13 / U14 / U15',
+    fenderPlacement: 'Front Fender Above Side Marker',
+    svgMarkup:
+      '<svg viewBox="0 0 120 36" xmlns="http://www.w3.org/2000/svg"><rect x="1.5" y="3" width="117" height="30" rx="2" fill="#141619" stroke="#e5e7eb" stroke-width="1.8"/><path d="M12 25 L16 16 L20 12 L24 15 L22 20 L27 24 L19 23 Z" fill="#facc15"/><text x="72" y="23" text-anchor="middle" fill="#f9fafb" font-family="Georgia,serif" font-style="italic" font-size="13.5" font-weight="700" letter-spacing="1.2">Bronco</text></svg>',
+    provenanceNote: '1966–1977 1st Gen Ford Bronco (U13 Roadster, U14 Half-Cab, U15 Wagon) cursive fender script and bucking horse.',
+  },
+  {
+    id: 'bronco-xlt-eddie-bauer-78-96',
+    brand: 'Ford',
+    family: 'Bronco',
+    seriesCode: 'FSB',
+    trimPackage: 'Eddie Bauer',
+    yearStart: 1978,
+    yearEnd: 1996,
+    markKind: 'trim_badge',
+    displayLabel: 'BRONCO XLT · EDDIE BAUER',
+    subLabel: "'78–'96 2nd–5th Gen Full-Size XLT & Eddie Bauer Fender Plate",
+    rpoCode: 'XLT / Eddie Bauer',
+    fenderPlacement: 'Front Fender & B-Pillar',
+    svgMarkup:
+      '<svg viewBox="0 0 120 36" xmlns="http://www.w3.org/2000/svg"><rect x="1.5" y="3" width="117" height="30" rx="2" fill="#1b2e22" stroke="#d4af37" stroke-width="1.8"/><rect x="86" y="6" width="29" height="24" fill="#92400e"/><text x="44" y="16" text-anchor="middle" fill="#f9fafb" font-family="Arial,sans-serif" font-size="8.5" font-weight="800" letter-spacing="1.6">BRONCO</text><text x="44" y="27" text-anchor="middle" fill="#fde68a" font-family="Georgia,serif" font-style="italic" font-size="8.5" font-weight="700">Eddie Bauer</text><text x="100.5" y="22" text-anchor="middle" fill="#ffffff" font-family="Arial Black,sans-serif" font-size="9.5" font-weight="900">XLT</text></svg>',
+    provenanceNote: '1978–1996 2nd–5th Gen Ford Bronco Ranger XLT, Nite, and Eddie Bauer two-tone outdoorsman fender plate.',
+  },
+  {
+    id: 'bronco-6th-gen-raptor-21-26',
+    brand: 'Ford',
+    family: 'Bronco',
+    seriesCode: 'U725',
+    trimPackage: 'Raptor',
+    yearStart: 2021,
+    yearEnd: 2035,
+    markKind: 'trim_badge',
+    displayLabel: 'BRONCO · RAPTOR (6TH GEN)',
+    subLabel: "'21–'26 Bucking Horse Silhouette & Code Orange Raptor Callout",
+    rpoCode: 'U725 / Braptor',
+    fenderPlacement: 'Front Fender Vent & Rear Tailgate',
+    svgMarkup:
+      '<svg viewBox="0 0 120 36" xmlns="http://www.w3.org/2000/svg"><rect x="1.5" y="3" width="117" height="30" rx="2" fill="#111317" stroke="#f97316" stroke-width="1.8"/><path d="M11 26 L15 17 L19 10 L25 13 L22 19 L28 23 L19 23 Z" fill="#f97316"/><text x="72" y="16" text-anchor="middle" fill="#f9fafb" font-family="Arial Black,sans-serif" font-size="8.5" font-weight="900" letter-spacing="2">BRONCO</text><text x="72" y="27" text-anchor="middle" fill="#fb923c" font-family="Arial Black,Impact,sans-serif" font-size="9.5" font-weight="900" letter-spacing="2.2">RAPTOR</text></svg>',
+    provenanceNote: '2021–2026 6th Gen Ford Bronco U725 bucking horse silhouette and Ford Performance Code Orange Raptor badge.',
+  },
+  {
+    id: 'camaro-1st-gen-z28-rsss-67-69',
+    brand: 'Chevrolet',
+    family: 'Camaro',
+    seriesCode: '1st Gen',
+    trimPackage: 'Z/28',
+    yearStart: 1967,
+    yearEnd: 1969,
+    markKind: 'trim_badge',
+    displayLabel: 'CAMARO Z/28 · RS/SS',
+    subLabel: "'67–'69 1st Gen Trans-Am 302 Z/28 & RS/SS 396 Grille Emblem",
+    rpoCode: 'Z28 / Z22 / L78',
+    fenderPlacement: 'Grille & Front Fender Behind Wheel Opening',
+    svgMarkup:
+      '<svg viewBox="0 0 120 36" xmlns="http://www.w3.org/2000/svg"><rect x="1.5" y="3" width="117" height="30" rx="2" fill="#111827" stroke="#e5e7eb" stroke-width="1.8"/><rect x="76" y="6" width="38" height="24" fill="#991b1b"/><text x="40" y="24" text-anchor="middle" fill="#ef4444" stroke="#f9fafb" stroke-width="0.6" font-family="Arial Black,Impact,sans-serif" font-size="15" font-weight="900" letter-spacing="1.5">Z/28</text><text x="95" y="17" text-anchor="middle" fill="#ffffff" font-family="Arial Black,sans-serif" font-size="8.5" font-weight="900">RS/SS</text><text x="95" y="27" text-anchor="middle" fill="#fde047" font-family="Arial,sans-serif" font-size="8" font-weight="800">396</text></svg>',
+    provenanceNote: '1967–1969 1st Gen Chevrolet Camaro RPO Z28 302ci homologation emblem and RS/SS 396 big-block badge.',
+  },
+  {
+    id: 'camaro-2nd-gen-z28-70-81',
+    brand: 'Chevrolet',
+    family: 'Camaro',
+    seriesCode: '2nd Gen',
+    trimPackage: 'Z28',
+    yearStart: 1970,
+    yearEnd: 1981,
+    markKind: 'trim_badge',
+    displayLabel: 'CAMARO Z28 (2ND GEN)',
+    subLabel: "'70–'81 Split-Bumper LT-1 & Tri-Tone Z28 Fender Callout",
+    rpoCode: 'RPO Z28',
+    fenderPlacement: 'Grille, Fender & Rear Tailpan',
+    svgMarkup:
+      '<svg viewBox="0 0 120 36" xmlns="http://www.w3.org/2000/svg"><rect x="1.5" y="3" width="117" height="30" rx="2" fill="#18181b" stroke="#f97316" stroke-width="1.8"/><polygon points="8,28 18,8 30,8 20,28" fill="#dc2626"/><polygon points="20,28 30,8 40,8 30,28" fill="#f97316"/><text x="76" y="24" text-anchor="middle" fill="#facc15" font-family="Arial Black,Impact,sans-serif" font-size="16" font-weight="900" letter-spacing="2.2">Z28</text></svg>',
+    provenanceNote: '1970–1981 2nd Gen Chevrolet Camaro Z28 LT-1 split-bumper & late-70s tri-color strobe callout.',
+  },
+  {
+    id: 'camaro-3rd-gen-iroc-z-82-92',
+    brand: 'Chevrolet',
+    family: 'Camaro',
+    seriesCode: 'IROC-Z',
+    trimPackage: 'IROC-Z',
+    yearStart: 1982,
+    yearEnd: 1992,
+    markKind: 'series_badge',
+    displayLabel: 'CAMARO IROC-Z',
+    subLabel: "'82–'92 3rd Gen F-Body TPI IROC-Z Door & Rocker Callout",
+    rpoCode: 'B4Z / 1LE',
+    fenderPlacement: 'Lower Door Slab & Rear Bumper Fascia',
+    svgMarkup:
+      '<svg viewBox="0 0 120 36" xmlns="http://www.w3.org/2000/svg"><rect x="1.5" y="3" width="117" height="30" rx="2" fill="#0f172a" stroke="#d4af37" stroke-width="1.8"/><line x1="6" y1="29" x2="114" y2="29" stroke="#ef4444" stroke-width="1.6"/><text x="60" y="23" text-anchor="middle" fill="#facc15" font-family="Arial Black,Impact,sans-serif" font-style="italic" font-size="14.5" font-weight="900" letter-spacing="2.4">IROC-Z</text></svg>',
+    provenanceNote: '1985–1990 (3rd Gen 1982–1992) Chevrolet Camaro IROC-Z International Race of Champions door decal.',
+  },
+  {
+    id: 'camaro-4th-6th-gen-ss-zl1-1le-93-24',
+    brand: 'Chevrolet',
+    family: 'Camaro',
+    seriesCode: 'ZL1 1LE',
+    trimPackage: 'ZL1 1LE',
+    yearStart: 1993,
+    yearEnd: 2035,
+    markKind: 'trim_badge',
+    displayLabel: 'CAMARO SS · ZL1 1LE',
+    subLabel: "'93–'24 4th–6th Gen Supercharged LT4 ZL1 & 1LE Track Badge",
+    rpoCode: 'ZL1 / A1Z 1LE',
+    fenderPlacement: 'Cowl Hood Extractor & Upper Grille',
+    svgMarkup:
+      '<svg viewBox="0 0 120 36" xmlns="http://www.w3.org/2000/svg"><rect x="1.5" y="3" width="117" height="30" rx="2" fill="#09090b" stroke="#dc2626" stroke-width="1.8"/><rect x="80" y="6" width="34" height="24" fill="#dc2626"/><text x="42" y="24" text-anchor="middle" fill="#f9fafb" font-family="Arial Black,Impact,sans-serif" font-size="14.5" font-weight="900" letter-spacing="1.8">ZL1</text><text x="97" y="22" text-anchor="middle" fill="#ffffff" font-family="Arial Black,sans-serif" font-size="10.5" font-weight="900" letter-spacing="1">1LE</text></svg>',
+    provenanceNote: '4th–6th Gen Chevrolet Camaro SS & supercharged ZL1 1LE Extreme Track Performance emblem.',
+  },
+  {
+    id: 'pontiac-gto-goat-judge-64-74',
+    brand: 'Pontiac',
+    family: 'GTO',
+    seriesCode: 'GTO',
+    trimPackage: 'The Judge',
+    yearStart: 1964,
+    yearEnd: 1974,
+    markKind: 'trim_badge',
+    displayLabel: 'GTO · THE JUDGE',
+    subLabel: "'64–'74 PMD Goat Crest & '69–'71 Ram Air WT1 'The Judge'",
+    rpoCode: 'W62 / WT1',
+    fenderPlacement: 'Front Fender & Grille Split',
+    svgMarkup:
+      '<svg viewBox="0 0 120 36" xmlns="http://www.w3.org/2000/svg"><rect x="1.5" y="3" width="117" height="30" rx="2" fill="#111827" stroke="#f97316" stroke-width="1.8"/><polygon points="14,6 20,18 14,30 8,18" fill="#dc2626" stroke="#e5e7eb" stroke-width="1"/><text x="46" y="23" text-anchor="middle" fill="#f9fafb" font-family="Arial Black,sans-serif" font-size="12.5" font-weight="900" letter-spacing="1.6">GTO</text><text x="92" y="22" text-anchor="middle" fill="#fb923c" font-family="Georgia,serif" font-style="italic" font-size="9.5" font-weight="700">The Judge</text></svg>',
+    provenanceNote: '1964–1974 Pontiac GTO (Gran Turismo Omologato) crest and 1969–1971 Ram Air III/IV "The Judge" script.',
+  },
+  {
+    id: 'pontiac-firebird-trans-am-ws6-70-81',
+    brand: 'Pontiac',
+    family: 'Firebird',
+    seriesCode: 'Trans Am',
+    trimPackage: 'Trans Am WS6',
+    yearStart: 1970,
+    yearEnd: 1981,
+    markKind: 'trim_badge',
+    displayLabel: 'TRANS AM · WS6',
+    subLabel: "'70–'81 Screaming Chicken Hood Bird & WS6 Shaker Callout",
+    rpoCode: 'WS4 / WS6 / W72',
+    fenderPlacement: 'Hood Decal & Shaker Scoop',
+    svgMarkup:
+      '<svg viewBox="0 0 120 36" xmlns="http://www.w3.org/2000/svg"><rect x="1.5" y="3" width="117" height="30" rx="2" fill="#09090b" stroke="#d4af37" stroke-width="1.8"/><path d="M8 14 L18 18 L22 9 L26 18 L36 14 L28 24 L22 30 L16 24 Z" fill="#eab308"/><text x="76" y="16" text-anchor="middle" fill="#fde047" font-family="Georgia,serif" font-size="8.5" font-weight="800" letter-spacing="1.4">TRANS AM</text><text x="76" y="27" text-anchor="middle" fill="#f97316" font-family="Arial Black,sans-serif" font-size="9.5" font-weight="900" letter-spacing="2">WS6 · 6.6L</text></svg>',
+    provenanceNote: '1970–1981 2nd Gen Pontiac Firebird Trans Am gold Screaming Chicken hood bird and WS6 Special Performance badge.',
+  },
+  {
+    id: 'buick-grand-national-gnx-82-87',
+    brand: 'Buick',
+    family: 'Grand National',
+    seriesCode: 'GNX',
+    trimPackage: 'Grand National',
+    yearStart: 1982,
+    yearEnd: 1987,
+    markKind: 'series_badge',
+    displayLabel: 'GRAND NATIONAL · GNX',
+    subLabel: "'82–'87 Turbo 3.8 SFI Intercooled V6 & McLaren GNX Emblem",
+    rpoCode: 'WE2 / GNX',
+    fenderPlacement: 'Front Fender & Grille',
+    svgMarkup:
+      '<svg viewBox="0 0 120 36" xmlns="http://www.w3.org/2000/svg"><rect x="1.5" y="3" width="117" height="30" rx="2" fill="#09090b" stroke="#ef4444" stroke-width="1.8"/><path d="M10 25 A8 8 0 1 1 24 15 L28 15" fill="none" stroke="#f97316" stroke-width="2.2"/><text x="58" y="16" text-anchor="middle" fill="#ef4444" font-family="Arial Black,Impact,sans-serif" font-size="11" font-weight="900" letter-spacing="2">GNX</text><text x="68" y="27" text-anchor="middle" fill="#e5e7eb" font-family="Arial,sans-serif" font-size="7.5" font-weight="800" letter-spacing="1.2">3.8 SFI TURBO</text></svg>',
+    provenanceNote: '1982–1987 Buick Regal Grand National (WE2) orange/red Turbo 6 emblem and 1987 ASC/McLaren GNX badge.',
+  },
+  {
+    id: 'oldsmobile-442-w30-64-72',
+    brand: 'Oldsmobile',
+    family: '442',
+    seriesCode: '442',
+    trimPackage: 'W-30',
+    yearStart: 1964,
+    yearEnd: 1972,
+    markKind: 'series_badge',
+    displayLabel: 'OLDSMOBILE 4-4-2 · W-30',
+    subLabel: "'64–'72 Staggered 4-4-2 Numerals & Ram Air W-30 Fender Plate",
+    rpoCode: 'W29 / W30',
+    fenderPlacement: 'Front Fender & Trunk Lid',
+    svgMarkup:
+      '<svg viewBox="0 0 120 36" xmlns="http://www.w3.org/2000/svg"><rect x="1.5" y="3" width="117" height="30" rx="2" fill="#18181b" stroke="#d4af37" stroke-width="1.8"/><rect x="78" y="7" width="36" height="22" fill="#991b1b"/><text x="40" y="24" text-anchor="middle" fill="#facc15" font-family="Arial Black,Impact,sans-serif" font-size="16" font-weight="900" letter-spacing="2.5">442</text><text x="96" y="22" text-anchor="middle" fill="#ffffff" font-family="Arial Black,sans-serif" font-size="9.5" font-weight="900" letter-spacing="1">W-30</text></svg>',
+    provenanceNote: '1964–1972 Oldsmobile 4-4-2 staggered brass/red numerals and W-30 Force-Air fiberglass-hood badge.',
+  },
+  {
+    id: 'jeep-cj5-cj7-scrambler-55-86',
+    brand: 'Jeep',
+    family: 'CJ',
+    seriesCode: 'CJ-7',
+    trimPackage: 'Renegade',
+    yearStart: 1955,
+    yearEnd: 1986,
+    markKind: 'series_badge',
+    displayLabel: 'JEEP CJ-5 · CJ-7 · SCRAMBLER',
+    subLabel: "'55–'86 Stamped Cowl Logo, Renegade & CJ-8 Scrambler Callout",
+    rpoCode: 'CJ-5 / CJ-7 / CJ-8',
+    fenderPlacement: 'Cowl Side & Hood',
+    svgMarkup:
+      '<svg viewBox="0 0 120 36" xmlns="http://www.w3.org/2000/svg"><rect x="1.5" y="3" width="117" height="30" rx="2" fill="#1c1917" stroke="#f59e0b" stroke-width="1.8"/><text x="40" y="23" text-anchor="middle" fill="#f9fafb" font-family="Arial Black,sans-serif" font-size="12.5" font-weight="900" letter-spacing="1.8">CJ-7</text><text x="88" y="16" text-anchor="middle" fill="#fbbf24" font-family="Arial,sans-serif" font-size="7.5" font-weight="800" letter-spacing="1">RENEGADE</text><text x="88" y="26" text-anchor="middle" fill="#f97316" font-family="Arial,sans-serif" font-size="7" font-weight="800" letter-spacing="0.8">SCRAMBLER</text></svg>',
+    provenanceNote: '1955–1986 Jeep CJ-5, CJ-7 Renegade / Laredo / Golden Eagle, and CJ-8 Scrambler stamped cowl emblem.',
+  },
+  {
+    id: 'jeep-grand-wagoneer-woodgrain-84-91',
+    brand: 'Jeep',
+    family: 'Grand Wagoneer',
+    seriesCode: 'SJ',
+    trimPackage: 'Grand Wagoneer',
+    yearStart: 1984,
+    yearEnd: 1991,
+    markKind: 'model_wordmark',
+    displayLabel: 'GRAND WAGONEER (SJ)',
+    subLabel: "'84–'91 Marine Teak Woodgrain & Gold Hood/Tailgate Crest",
+    rpoCode: 'SJ Body',
+    fenderPlacement: 'Front Fender Woodgrain Trim & Tailgate',
+    svgMarkup:
+      '<svg viewBox="0 0 120 36" xmlns="http://www.w3.org/2000/svg"><rect x="1.5" y="3" width="117" height="30" rx="2" fill="#451a03" stroke="#d4af37" stroke-width="2"/><rect x="5" y="6.5" width="110" height="23" fill="#78350f" stroke="#fde68a" stroke-width="0.9"/><text x="60" y="16" text-anchor="middle" fill="#fef08a" font-family="Georgia,serif" font-size="7.5" font-weight="700" letter-spacing="2.2">GRAND</text><text x="60" y="26" text-anchor="middle" fill="#ffffff" font-family="Georgia,serif" font-size="9.5" font-weight="800" letter-spacing="1.6">WAGONEER</text></svg>',
+    provenanceNote: '1984–1991 Jeep SJ Grand Wagoneer Dinoc marine-teak woodgrain surround and gold crest.',
+  },
+  {
+    id: 'jeep-wrangler-rubicon-392-87-26',
+    brand: 'Jeep',
+    family: 'Wrangler',
+    seriesCode: 'JL',
+    trimPackage: 'Rubicon 392',
+    yearStart: 1987,
+    yearEnd: 2035,
+    markKind: 'trim_badge',
+    displayLabel: 'WRANGLER RUBICON 392',
+    subLabel: 'YJ · TJ · JK · JL & Bronze-Edge 6.4L Hemi V8 Rubicon 392 Callout',
+    rpoCode: 'JL / Rubicon 392',
+    fenderPlacement: 'Hood Side & Trail Rated Fender',
+    svgMarkup:
+      '<svg viewBox="0 0 120 36" xmlns="http://www.w3.org/2000/svg"><rect x="1.5" y="3" width="117" height="30" rx="2" fill="#18181b" stroke="#b45309" stroke-width="1.8"/><text x="60" y="16" text-anchor="middle" fill="#f9fafb" font-family="Arial Black,sans-serif" font-size="9.5" font-weight="900" letter-spacing="2.2">RUBICON</text><text x="60" y="28" text-anchor="middle" fill="#f59e0b" font-family="Arial Black,Impact,sans-serif" font-size="10.5" font-weight="900" letter-spacing="2.6">392 HEMI</text></svg>',
+    provenanceNote: 'Jeep Wrangler Rubicon & JL Rubicon 392 bronze-traced hood side stencil.',
+  },
+  {
+    id: 'international-scout-800-scout-ii-61-80',
+    brand: 'International',
+    family: 'Scout',
+    seriesCode: 'Scout II',
+    trimPackage: 'Rallye',
+    yearStart: 1961,
+    yearEnd: 1980,
+    markKind: 'series_badge',
+    displayLabel: 'INTERNATIONAL SCOUT 800 · II',
+    subLabel: "'61–'80 IH Triple-Diamond & Scout 800 / Scout II Fender Plate",
+    rpoCode: 'Scout 800 / Scout II',
+    fenderPlacement: 'Front Fender & Tailgate',
+    svgMarkup:
+      '<svg viewBox="0 0 120 36" xmlns="http://www.w3.org/2000/svg"><rect x="1.5" y="3" width="117" height="30" rx="2" fill="#1c1917" stroke="#e5e7eb" stroke-width="1.8"/><rect x="8" y="8" width="22" height="20" fill="#dc2626"/><text x="19" y="22" text-anchor="middle" fill="#ffffff" font-family="Arial Black,sans-serif" font-size="11" font-weight="900">IH</text><text x="74" y="23" text-anchor="middle" fill="#f9fafb" font-family="Georgia,serif" font-weight="800" font-size="11.5" letter-spacing="1.6">SCOUT II</text></svg>',
+    provenanceNote: '1961–1980 International Harvester Scout 80, Scout 800, and Scout II / Terra / Traveler badge.',
+  },
+  {
+    id: 'datsun-s30-240z-260z-280z-69-78',
+    brand: 'Datsun',
+    family: '240Z',
+    seriesCode: 'S30',
+    trimPackage: 'Fairlady Z',
+    yearStart: 1969,
+    yearEnd: 1978,
+    markKind: 'series_badge',
+    displayLabel: 'DATSUN 240Z · 260Z · 280Z (S30)',
+    subLabel: "'69–'78 S30 Fairlady Z Fender Script & C-Pillar Vent Emblem",
+    rpoCode: 'HLS30 / HS30',
+    fenderPlacement: 'Front Fender, C-Pillar & Decklid',
+    svgMarkup:
+      '<svg viewBox="0 0 120 36" xmlns="http://www.w3.org/2000/svg"><rect x="1.5" y="3" width="117" height="30" rx="2" fill="#111827" stroke="#e5e7eb" stroke-width="1.8"/><circle cx="20" cy="18" r="10" fill="#991b1b" stroke="#f9fafb" stroke-width="1.4"/><text x="20" y="22" text-anchor="middle" fill="#ffffff" font-family="Georgia,serif" font-style="italic" font-size="12" font-weight="900">Z</text><text x="74" y="16" text-anchor="middle" fill="#f9fafb" font-family="Arial Black,sans-serif" font-size="10.5" font-weight="900" letter-spacing="1.8">240Z · S30</text><text x="74" y="27" text-anchor="middle" fill="#fca5a5" font-family="Georgia,serif" font-style="italic" font-size="8.5" font-weight="700">Fairlady Z</text></svg>',
+    provenanceNote: '1969–1978 Datsun S30 (240Z, 260Z, 280Z & Fairlady Z432) C-pillar Z roundel and fender emblem.',
+  },
+  {
+    id: 'nissan-skyline-gtr-r32-r33-r34-r35-89-26',
+    brand: 'Nissan',
+    family: 'Skyline',
+    seriesCode: 'BNR34',
+    trimPackage: 'V-Spec',
+    yearStart: 1989,
+    yearEnd: 2035,
+    markKind: 'series_badge',
+    displayLabel: 'SKYLINE GT-R (R32·R33·R34·R35)',
+    subLabel: 'Stepped Silver GT + Red R Trunk & Grille Emblem (RB26DETT / VR38)',
+    rpoCode: 'BNR32 / BCNR33 / BNR34 / R35',
+    fenderPlacement: 'Front Grille Mesh & Rear Trunk Lid',
+    svgMarkup:
+      '<svg viewBox="0 0 120 36" xmlns="http://www.w3.org/2000/svg"><rect x="1.5" y="3" width="117" height="30" rx="2" fill="#0f172a" stroke="#cbd5e1" stroke-width="1.8"/><text x="40" y="18" text-anchor="middle" fill="#e2e8f0" font-family="Arial Black,sans-serif" font-size="11.5" font-weight="900" letter-spacing="2">GT</text><text x="45" y="29" text-anchor="middle" fill="#ef4444" font-family="Arial Black,Impact,sans-serif" font-size="13.5" font-weight="900">R</text><text x="88" y="17" text-anchor="middle" fill="#f8fafc" font-family="Arial,sans-serif" font-size="8" font-weight="800" letter-spacing="1.2">SKYLINE</text><text x="88" y="27" text-anchor="middle" fill="#38bdf8" font-family="Arial,sans-serif" font-size="8" font-weight="800" letter-spacing="1">V-SPEC</text></svg>',
+    provenanceNote: 'Nissan Skyline GT-R (BNR32, BCNR33, BNR34 V-Spec / M-Spec / Z-Tune, and R35) silver-and-red GT-R emblem.',
+  },
+  {
+    id: 'toyota-supra-a70-a80-a90-79-26',
+    brand: 'Toyota',
+    family: 'Supra',
+    seriesCode: 'JZA80',
+    trimPackage: 'Twin Turbo',
+    yearStart: 1979,
+    yearEnd: 2035,
+    markKind: 'model_wordmark',
+    displayLabel: 'TOYOTA SUPRA (A70·A80·A90)',
+    subLabel: 'Celica Supra Dragon Crest & JZA80 2JZ-GTE Twin Turbo Script',
+    rpoCode: 'MA70 / JZA70 / JZA80 / A90',
+    fenderPlacement: 'Nose Emblem & Rear Decklid',
+    svgMarkup:
+      '<svg viewBox="0 0 120 36" xmlns="http://www.w3.org/2000/svg"><rect x="1.5" y="3" width="117" height="30" rx="2" fill="#111827" stroke="#ef4444" stroke-width="1.8"/><path d="M10 26 L14 12 L22 9 L19 17 L25 20 L16 26 Z" fill="#dc2626"/><text x="70" y="18" text-anchor="middle" fill="#f9fafb" font-family="Georgia,serif" font-style="italic" font-size="13.5" font-weight="800" letter-spacing="1">Supra</text><text x="70" y="28" text-anchor="middle" fill="#f87171" font-family="Arial,sans-serif" font-size="7.5" font-weight="800" letter-spacing="1.4">TWIN TURBO · JZA80</text></svg>',
+    provenanceNote: 'Toyota Celica Supra dragon crest, A70 3.0GT Turbo, JZA80 MkIV 2JZ-GTE Twin Turbo script, and A90 GR Supra.',
+  },
 ];
+
+export const VEHICLE_IDENTITY_MARKS = VETTED_IDENTITY_MARKS;
 
 const PICKUP_FAMILIES = new Set([
   'pickup',
@@ -1072,6 +1381,48 @@ export function classifyVehicleFacets(
     else if (/\bXK\s*150\b/.test(u)) series = 'XK150';
   }
 
+  // Wave 3: Buick Grand National / GNX & Oldsmobile 442
+  if (!series && (brand === 'buick' || fam.includes('grand national') || fam.includes('gnx'))) {
+    if (/\bGNX\b/.test(u)) series = 'GNX';
+    else if (/\bGRAND\s+NATIONAL\b|\bWE2\b/.test(u)) series = 'Grand National (G-Body)';
+  }
+  if (!series && (brand === 'oldsmobile' || fam.includes('442'))) {
+    if (/\b4[-\s]?4[-\s]?2\b|\b442\b/.test(u)) series = '442';
+  }
+
+  // Wave 3: Jeep CJ / Grand Wagoneer / Wrangler & International Scout
+  if (!series && (brand === 'jeep' || fam === 'cj' || fam.includes('wagoneer') || fam.includes('wrangler'))) {
+    if (/\bCJ[-\s]?8\b|\bSCRAMBLER\b/.test(u)) series = 'CJ-8 Scrambler';
+    else if (/\bCJ[-\s]?7\b/.test(u)) series = 'CJ-7';
+    else if (/\bCJ[-\s]?5\b/.test(u)) series = 'CJ-5';
+    else if (/\bGRAND\s+WAGONEER\b|\bSJ\b/.test(u)) series = 'SJ';
+    else if (/\bRUBICON\s+392\b|\bJL\b/.test(u)) series = 'JL';
+    else if (/\bTJ\b/.test(u)) series = 'TJ';
+    else if (/\bYJ\b/.test(u)) series = 'YJ';
+    else if (/\bJK\b/.test(u)) series = 'JK';
+  }
+  if (!series && (brand === 'international' || fam.includes('scout'))) {
+    if (/\bSCOUT\s+II\b/.test(u)) series = 'Scout II';
+    else if (/\bSCOUT\s+800[AB]?\b/.test(u)) series = 'Scout 800';
+    else if (/\bSCOUT\s+80\b/.test(u)) series = 'Scout 80';
+  }
+
+  // Wave 3: JDM Icons — Datsun S30 Z, Nissan Skyline GT-R, Toyota Supra
+  if (!series && (brand === 'datsun' || /\b2[468]0Z\b|\bFAIRLADY\s*Z\b|\bS30\b/.test(u))) {
+    if (/\b240Z\b|\b260Z\b|\b280Z\b|\bHLS30\b|\bHS30\b|\bS30\b|\bFAIRLADY\s*Z\b/.test(u)) series = 'S30';
+  }
+  if (!series && (brand === 'nissan' || fam.includes('skyline') || fam.includes('gt-r'))) {
+    if (/\bBNR34\b|\bR34\b/.test(u)) series = 'BNR34';
+    else if (/\bBCNR33\b|\bR33\b/.test(u)) series = 'BCNR33';
+    else if (/\bBNR32\b|\bR32\b/.test(u)) series = 'BNR32';
+    else if (/\bR35\b/.test(u)) series = 'R35';
+  }
+  if (!series && (brand === 'toyota' || fam.includes('supra'))) {
+    if (/\bJZA80\b|\bA80\b|\bMK\s*IV\b|\bMK4\b/.test(u)) series = 'JZA80';
+    else if (/\bMA70\b|\bJZA70\b|\bA70\b|\bMK\s*III\b|\bMK3\b/.test(u)) series = 'A70';
+    else if (/\bA90\b|\bA91\b|\bJ29\b|\bDB\d{2}\b|\bMK\s*V\b|\bMK5\b/.test(u)) series = 'A90';
+  }
+
   // ── 2. TRIM PACKAGE EXTRACTION (Year-aware for Squarebody & Marque Trims) ─
   if (/\bCHEYENNE\s+SUPER\b/.test(u)) trim = 'Cheyenne Super';
   else if (/\bCHEYENNE\b/.test(u)) trim = 'Cheyenne';
@@ -1105,6 +1456,15 @@ export function classifyVehicleFacets(
   else if (/\bR\/T\b|\bROAD\s*\/?\s*TRACK\b/.test(u)) trim = 'R/T (Road/Track)';
   else if (/\bCSL\b|\bCOMPETITION\b|\bM3\b|\bM5\b/.test(u) && brand === 'bmw') trim = 'M-Power';
   else if (/\bAMG\b/.test(u)) trim = 'AMG';
+  else if (/\bEDDIE\s+BAUER\b/.test(u)) trim = 'Eddie Bauer';
+  else if (/\bTRANS\s+AM\s+WS6\b|\bWS6\b/.test(u)) trim = 'Trans Am WS6';
+  else if (/\bRUBICON\s+392\b/.test(u)) trim = 'Rubicon 392';
+  else if (/\bTWIN\s+TURBO\b|\b2JZ[-\s]?GTE\b/.test(u)) trim = 'Twin Turbo';
+  else if (/\bV[-\s]?SPEC(?:\s+II)?(?:\s+N[UÜ]R)?\b/.test(u)) trim = 'V-Spec';
+  else if (/\bW[-\s]?30\b/.test(u)) trim = 'W-30';
+  else if (/\bGRAND\s+NATIONAL\b/.test(u)) trim = 'Grand National';
+  else if (/\bRENEGADE\b/.test(u)) trim = 'Renegade';
+  else if (/\bRALLYE\b/.test(u) && (brand === 'international' || fam.includes('scout'))) trim = 'Rallye';
 
   // ── 3. BODY STYLE / DOOR CONFIGURATION EXTRACTION ─────────────────────────
   if (/\bSPLIT[-\s]?WINDOW\b/.test(u) || (fam === 'corvette' && year === 1963 && /\bCOUPE\b/.test(u))) {
