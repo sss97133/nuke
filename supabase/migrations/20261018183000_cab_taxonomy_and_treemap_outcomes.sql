@@ -68,6 +68,7 @@ WITH event_prices AS (
         SELECT ae.winning_bid
         FROM public.auction_events ae
         WHERE ae.vehicle_id = v.id
+          AND ae.outcome = 'sold'
           AND ae.winning_bid > 0
         ORDER BY ae.auction_end_date DESC NULLS LAST, ae.created_at DESC NULLS LAST
         LIMIT 1
@@ -79,11 +80,16 @@ WITH event_prices AS (
     AND v.status IS DISTINCT FROM 'merged'
     AND (v.sale_price IS NULL OR v.sale_price = 0)
     AND v.auction_status = 'sold'
+    AND COALESCE(v.auction_outcome, '') NOT IN ('reserve_not_met', 'no_sale', 'unsold', 'cancelled', 'withdrawn')
+    AND COALESCE(v.sale_status, '') NOT IN ('not_sold', 'unsold', 'bid_to')
+    AND COALESCE(v.reserve_status, '') <> 'reserve_not_met'
 )
 UPDATE public.vehicles v
 SET sale_price = ep.event_price,
     sold_price = COALESCE(v.sold_price, ep.event_price),
-    winning_bid = COALESCE(v.winning_bid, ep.event_price)
+    winning_bid = COALESCE(v.winning_bid, ep.event_price),
+    sale_status = 'sold',
+    auction_outcome = 'sold'
 FROM event_prices ep
 WHERE v.id = ep.vehicle_id
   AND ep.event_price > 0;
@@ -114,8 +120,12 @@ SET
     ELSE v.platform_source
   END,
   sale_status = CASE
-    WHEN (v.sale_price > 0 AND COALESCE(v.auction_outcome, '') NOT IN ('reserve_not_met', 'no_sale', 'unsold', 'cancelled', 'withdrawn'))
-      OR v.auction_status = 'sold'
+    WHEN (
+      (v.sale_price > 0 OR v.auction_status = 'sold')
+      AND COALESCE(v.auction_outcome, '') NOT IN ('reserve_not_met', 'no_sale', 'unsold', 'cancelled', 'withdrawn')
+      AND COALESCE(v.sale_status, '') NOT IN ('not_sold', 'unsold', 'bid_to')
+      AND COALESCE(v.reserve_status, '') <> 'reserve_not_met'
+    )
     THEN 'sold'
     WHEN (v.sale_price IS NULL OR v.sale_price = 0)
       AND v.auction_status = 'ended'
@@ -124,8 +134,12 @@ SET
     ELSE v.sale_status
   END,
   auction_outcome = CASE
-    WHEN (v.sale_price > 0 AND COALESCE(v.auction_outcome, '') NOT IN ('reserve_not_met', 'no_sale', 'unsold', 'cancelled', 'withdrawn'))
-      OR v.auction_status = 'sold'
+    WHEN (
+      (v.sale_price > 0 OR v.auction_status = 'sold')
+      AND COALESCE(v.auction_outcome, '') NOT IN ('reserve_not_met', 'no_sale', 'unsold', 'cancelled', 'withdrawn')
+      AND COALESCE(v.sale_status, '') NOT IN ('not_sold', 'unsold', 'bid_to')
+      AND COALESCE(v.reserve_status, '') <> 'reserve_not_met'
+    )
     THEN 'sold'
     WHEN (v.sale_price IS NULL OR v.sale_price = 0)
       AND v.auction_status = 'ended'
@@ -134,12 +148,22 @@ SET
     ELSE v.auction_outcome
   END,
   sold_price = CASE
-    WHEN (v.sale_price > 0 AND COALESCE(v.auction_outcome, '') NOT IN ('reserve_not_met', 'no_sale', 'unsold', 'cancelled', 'withdrawn'))
+    WHEN (
+      v.sale_price > 0
+      AND COALESCE(v.auction_outcome, '') NOT IN ('reserve_not_met', 'no_sale', 'unsold', 'cancelled', 'withdrawn')
+      AND COALESCE(v.sale_status, '') NOT IN ('not_sold', 'unsold', 'bid_to')
+      AND COALESCE(v.reserve_status, '') <> 'reserve_not_met'
+    )
     THEN COALESCE(v.sold_price, v.sale_price)
     ELSE v.sold_price
   END,
   winning_bid = CASE
-    WHEN (v.sale_price > 0 AND COALESCE(v.auction_outcome, '') NOT IN ('reserve_not_met', 'no_sale', 'unsold', 'cancelled', 'withdrawn'))
+    WHEN (
+      v.sale_price > 0
+      AND COALESCE(v.auction_outcome, '') NOT IN ('reserve_not_met', 'no_sale', 'unsold', 'cancelled', 'withdrawn')
+      AND COALESCE(v.sale_status, '') NOT IN ('not_sold', 'unsold', 'bid_to')
+      AND COALESCE(v.reserve_status, '') <> 'reserve_not_met'
+    )
     THEN COALESCE(v.winning_bid, v.sale_price)
     ELSE v.winning_bid
   END
@@ -155,7 +179,10 @@ WHERE v.discovery_source = 'carsandbids'
     OR v.canonical_platform IS DISTINCT FROM 'cars-and-bids'
     OR v.platform_source IS DISTINCT FROM 'cars-and-bids'
     OR (
-      ((v.sale_price > 0 AND COALESCE(v.auction_outcome, '') NOT IN ('reserve_not_met', 'no_sale', 'unsold', 'cancelled', 'withdrawn')) OR v.auction_status = 'sold')
+      (v.sale_price > 0 OR v.auction_status = 'sold')
+      AND COALESCE(v.auction_outcome, '') NOT IN ('reserve_not_met', 'no_sale', 'unsold', 'cancelled', 'withdrawn')
+      AND COALESCE(v.sale_status, '') NOT IN ('not_sold', 'unsold', 'bid_to')
+      AND COALESCE(v.reserve_status, '') <> 'reserve_not_met'
       AND (v.sale_status IS DISTINCT FROM 'sold' OR v.auction_outcome IS DISTINCT FROM 'sold')
     )
     OR (
