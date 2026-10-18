@@ -5,7 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const fixture = vi.hoisted(() => {
   const anything = (): any => new Proxy(function () {}, { get: () => anything(), apply: () => Promise.resolve({ results: [], total: 0 }) });
-  return { navigate: vi.fn(), search: vi.fn(), hangVehicleReads: false, anything };
+  return { navigate: vi.fn(), search: vi.fn(), vehicleOps: [] as string[], anything };
 });
 vi.mock('react-router-dom', () => ({
   useNavigate: () => fixture.navigate,
@@ -18,9 +18,11 @@ vi.mock('../../lib/supabase', () => ({
     from: (table: string) => {
       const q: any = new Proxy({}, {
         get: (_t, prop: string) => {
-          if (prop === 'then' && table === 'vehicles' && fixture.hangVehicleReads) return () => undefined;
           if (prop === 'then') return (resolve: any, reject: any) => Promise.resolve({ data: [], error: null, count: 0 }).then(resolve, reject);
-          return () => q;
+          return (...args: unknown[]) => {
+            if (table === 'vehicles') fixture.vehicleOps.push(`${prop}(${args.map(String).join(',')})`);
+            return q;
+          };
         },
       });
       return q;
@@ -71,7 +73,7 @@ beforeEach(() => {
   (globalThis as any).IS_REACT_ACT_ENVIRONMENT = true;
   fixture.navigate.mockReset();
   fixture.search.mockReset();
-  fixture.hangVehicleReads = false;
+  fixture.vehicleOps = [];
   fixture.search.mockResolvedValue({ success: true, results: VEHICLE_RESULTS, total_count: 3, query_type: 'text', search_time_ms: 1 });
   container = document.createElement('div'); document.body.appendChild(container); root = createRoot(container);
 });
@@ -130,10 +132,10 @@ describe('header search market cohort shortcuts', () => {
     expect(container.querySelector('[data-testid="header-search-result-veh-1978-c10"]')).not.toBeNull();
   });
 
-  it('shows the search results while the local fallback read is still pending', async () => {
-    fixture.hangVehicleReads = true;
-    await type('1978 chevrolet c10', 400);
+  it('shows the edge results without an ilike read of vehicles, even for a facet query', async () => {
+    await type('1978 chevrolet c10 stepside', 400);
     expect(container.querySelector('[data-testid="header-search-result-veh-1978-c10"]')).not.toBeNull();
+    expect(fixture.vehicleOps.filter((op) => /^(ilike|or)\(/.test(op))).toEqual([]);
   });
 
   it('shows no shortcuts for a pasted URL', async () => {

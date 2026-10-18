@@ -5,7 +5,6 @@ import {
   HeaderSearchCohortShortcuts,
   HeaderSearchFacetPills,
   boostAndFilterVehicleSearchResults,
-  buildFacetExpandedOrFilter,
   extractQueryFacets,
   resolveSearchResultEraMark,
 } from '../HeaderSearch';
@@ -53,6 +52,8 @@ function detectPlatform(url: string): { label: string; short: string } | null {
 interface MakeStats {
   make: string;
   total: number;
+  /** True when `total` is the planner's row estimate rather than a count. */
+  totalIsEstimate: boolean;
   topModels: Array<{ model: string; count: number }>;
   avgPrice: number | null;
   yearRange: { min: number; max: number } | null;
@@ -66,10 +67,13 @@ async function fetchMakeStats(make: string): Promise<MakeStats | null> {
     // normalizedMake is the canonical spelling from KNOWN_MAKES, so an equality match finds the make through
     // idx_vehicles_make_year. `make ilike` is not leakproof, cannot be an index qual under the row policies, and
     // scans the whole heap (measured 2026-10-14: Lotus count 1.5 s with eq, over 10 s with ilike).
+    // An exact count still visits every row of the make for the row policy: Porsche ran into the 15 s anon timeout
+    // (HTTP 500) on 2026-10-17. `estimated` counts exactly up to PostgREST's max-rows and returns the planner's
+    // estimate above it, in under 0.3 s.
     const [countRes, modelsRes, priceRes] = await Promise.all([
       supabase
         .from('vehicles')
-        .select('id', { count: 'exact', head: true })
+        .select('id', { count: 'estimated', head: true })
         .eq('make', normalizedMake),
       supabase
         .from('vehicles')
@@ -111,10 +115,18 @@ async function fetchMakeStats(make: string): Promise<MakeStats | null> {
       ? { min: Math.min(...years), max: Math.max(...years) }
       : null;
 
-    return { make: normalizedMake, total, topModels, avgPrice, yearRange };
+    return { make: normalizedMake, total, totalIsEstimate: total > POSTGREST_MAX_ROWS, topModels, avgPrice, yearRange };
   } catch {
     return null;
   }
+}
+
+/** The project's PostgREST max-rows; `count: 'estimated'` is exact at or below it. */
+const POSTGREST_MAX_ROWS = 1000;
+
+function formatMakeTotal(stats: MakeStats): string {
+  if (!stats.totalIsEstimate) return stats.total.toLocaleString();
+  return `≈${Number(stats.total.toPrecision(2)).toLocaleString()}`;
 }
 
 function normalizeUrlInput(value: string): string | null {
@@ -413,109 +425,38 @@ export default function AIDataIngestionSearch() {
 
         if (cancelled || reqId !== autocompleteRequestIdRef.current) return;
 
-        let combinedResults = response.results;
-        const canonicalFamilyOrModel = resolvedScope?.model || resolvedScope?.family_name || '';
-        const queryFacetAnalysis = extractQueryFacets(trimmedInput);
-
-        const publishResults = (rawResults: UniversalSearchResult[], resetSelection: boolean) => {
-          let shown = rawResults;
-          if (queryFacetAnalysis.hasFacetIntent) {
-            shown = boostAndFilterVehicleSearchResults(trimmedInput, shown);
-          }
-
-          if (resolvedScope) {
-            const scopeUrl = buildMarketScopeUrl(resolvedScope, isOnMarketTab(location.pathname, location.search) ? location.search : '');
-            const scopeTitle = [resolvedScope.year, resolvedScope.make, resolvedScope.model || resolvedScope.family_name]
-              .filter(Boolean)
-              .join(' ');
-            const marketResult: UniversalSearchResult = {
-              id: `market_scope:${scopeUrl}`,
-              type: 'tag',
-              title: scopeTitle || trimmedInput,
-              subtitle: 'MARKET COHORT · CLICK TO VIEW IN MARKET',
-              relevance_score: 1,
-              metadata: {
-                marketUrl: scopeUrl,
-                tag: scopeTitle || trimmedInput,
-              },
-            };
-            shown = [marketResult, ...shown.slice(0, 23)];
-          }
-
-          setAutocompleteResults(shown);
-          setAutocompleteAISuggestion(response.ai_suggestion || null);
-          const totalCount = Math.max(response.total_count || 0, shown.length);
-          setAutocompleteTotalCount(totalCount > 0 ? totalCount : shown.length);
-          setShowAutocomplete(shown.length > 0 || !!response.ai_suggestion || cohortShortcuts.length > 0);
-          if (resetSelection) setSelectedAutocompleteIndex(-1);
-        };
-
-        // Edge results show at once; the local fallback below can only add to them.
-        publishResults(combinedResults, true);
-
-        if (combinedResults.length < 8 || canonicalFamilyOrModel || queryFacetAnalysis.hasFacetIntent) {
-          try {
-            const safeQuery = trimmedInput.replace(/([%_\\])/g, '\\$1');
-            const canonicalSafe = canonicalFamilyOrModel.replace(/([%_\\])/g, '\\$1');
-            const orFilter = buildFacetExpandedOrFilter(trimmedInput, canonicalFamilyOrModel);
-
-            let queryBuilder = supabase
-              .from('vehicles')
-              .select('id, year, make, model, normalized_model, series, trim, body_style, title, sale_price, current_value, primary_image_url')
-              .eq('is_public', true)
-              .or(orFilter);
-
-            if (resolvedScope?.make && canonicalSafe) {
-              queryBuilder = queryBuilder.ilike('make', resolvedScope.make);
-            }
-
-            const { data: vehicles } = await queryBuilder
-              .order('sale_price', { ascending: false, nullsFirst: false })
-              .limit(16)
-              .abortSignal(AbortSignal.timeout(4000));
-
-            if (cancelled || reqId !== autocompleteRequestIdRef.current) return;
-
-            if (vehicles && vehicles.length > 0) {
-              const fallbackResults: UniversalSearchResult[] = vehicles.map((v: any) => ({
-                id: v.id,
-                type: 'vehicle',
-                title: `${v.year || ''} ${v.make || ''} ${v.model || ''}`.trim() || v.title || 'Vehicle',
-                subtitle: v.trim || v.series || v.normalized_model || undefined,
-                description: v.title || undefined,
-                image_url: v.primary_image_url || undefined,
-                relevance_score: resolvedScope?.make && String(v.make || '').toLowerCase() === resolvedScope.make.toLowerCase() ? 0.95 : 0.3,
-                metadata: {
-                  year: v.year,
-                  make: v.make,
-                  model: v.model,
-                  normalized_model: v.normalized_model,
-                  series: v.series,
-                  trim: v.trim,
-                  body_style: v.body_style,
-                  price: v.sale_price || v.current_value
-                }
-              }));
-
-              const seen = new Set<string>();
-              // Put canonical family/make vehicle matches ahead of unnormalized literal matches (e.g. Plymouth Road Runner ahead of RV trailers)
-              const ordered = canonicalSafe && canonicalSafe.toLowerCase() !== safeQuery.toLowerCase()
-                ? [...fallbackResults, ...combinedResults]
-                : [...combinedResults, ...fallbackResults];
-              const merged = ordered.filter((r) => {
-                const key = `${r.type}:${r.id}`;
-                if (seen.has(key)) return false;
-                seen.add(key);
-                return true;
-              });
-              combinedResults = merged.slice(0, 24);
-              publishResults(combinedResults, false);
-            }
-          } catch {
-            // Ignore fallback errors; keep edge results.
-          }
+        // No direct `vehicles` ilike read here: under the row policies ilike is not leakproof, so no trigram index can
+        // serve it, and as anon it ran into the 15 s statement timeout (HTTP 500) on every query measured 2026-10-17.
+        let shown = response.results;
+        if (extractQueryFacets(trimmedInput).hasFacetIntent) {
+          shown = boostAndFilterVehicleSearchResults(trimmedInput, shown);
         }
 
+        if (resolvedScope) {
+          const scopeUrl = buildMarketScopeUrl(resolvedScope, isOnMarketTab(location.pathname, location.search) ? location.search : '');
+          const scopeTitle = [resolvedScope.year, resolvedScope.make, resolvedScope.model || resolvedScope.family_name]
+            .filter(Boolean)
+            .join(' ');
+          const marketResult: UniversalSearchResult = {
+            id: `market_scope:${scopeUrl}`,
+            type: 'tag',
+            title: scopeTitle || trimmedInput,
+            subtitle: 'MARKET COHORT · CLICK TO VIEW IN MARKET',
+            relevance_score: 1,
+            metadata: {
+              marketUrl: scopeUrl,
+              tag: scopeTitle || trimmedInput,
+            },
+          };
+          shown = [marketResult, ...shown.slice(0, 23)];
+        }
+
+        setAutocompleteResults(shown);
+        setAutocompleteAISuggestion(response.ai_suggestion || null);
+        const totalCount = Math.max(response.total_count || 0, shown.length);
+        setAutocompleteTotalCount(totalCount > 0 ? totalCount : shown.length);
+        setShowAutocomplete(shown.length > 0 || !!response.ai_suggestion || cohortShortcuts.length > 0);
+        setSelectedAutocompleteIndex(-1);
       } catch (error) {
         if (cancelled || reqId !== autocompleteRequestIdRef.current) return;
         // Autocomplete error - fail silently
@@ -1863,8 +1804,8 @@ export default function AIDataIngestionSearch() {
                 <div style={{
                   fontFamily: '"Courier New", monospace', fontSize: '11px',
                   color: 'var(--text-secondary)',
-                }}>
-                  {makeStats.total.toLocaleString()} VEHICLES
+                }} title={makeStats.totalIsEstimate ? 'Estimated count' : undefined}>
+                  {formatMakeTotal(makeStats)} VEHICLES
                 </div>
               </div>
 
@@ -1945,7 +1886,7 @@ export default function AIDataIngestionSearch() {
                   fontFamily: 'Arial, sans-serif',
                 }}
               >
-                BROWSE ALL {makeStats.make.toUpperCase()} ({makeStats.total.toLocaleString()})
+                BROWSE ALL {makeStats.make.toUpperCase()} ({formatMakeTotal(makeStats)})
               </button>
             </div>
           ) : null}

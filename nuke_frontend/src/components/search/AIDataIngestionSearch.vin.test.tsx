@@ -5,7 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const fixture = vi.hoisted(() => {
   const anything = (): any => new Proxy(function () {}, { get: () => anything(), apply: () => Promise.resolve({ results: [], total: 0 }) });
-  return { rpc: vi.fn(), ops: [] as { op: string; args: unknown[] }[], rows: [] as any[], anything };
+  return { rpc: vi.fn(), ops: [] as { op: string; args: unknown[] }[], rows: [] as any[], count: 0, anything };
 });
 const anything = fixture.anything;
 vi.mock('react-router-dom', () => ({ useNavigate: () => vi.fn(), useLocation: () => ({ pathname: '/', search: '', state: null }) }));
@@ -17,7 +17,7 @@ vi.mock('../../lib/supabase', () => ({
       fixture.ops.push({ op: 'from', args: [table] });
       const q: any = new Proxy({}, {
         get: (_t, prop: string) => {
-          if (prop === 'then') return (resolve: any, reject: any) => Promise.resolve({ data: fixture.rows, error: null, count: 0 }).then(resolve, reject);
+          if (prop === 'then') return (resolve: any, reject: any) => Promise.resolve({ data: fixture.rows, error: null, count: fixture.count }).then(resolve, reject);
           return (...args: unknown[]) => { fixture.ops.push({ op: prop, args }); return q; };
         },
       });
@@ -38,7 +38,7 @@ import AIDataIngestionSearch from './AIDataIngestionSearch';
 let container: HTMLDivElement, root: Root;
 beforeEach(() => {
   (globalThis as any).IS_REACT_ACT_ENVIRONMENT = true;
-  fixture.rpc.mockReset(); fixture.ops.length = 0; fixture.rows = [];
+  fixture.rpc.mockReset(); fixture.ops.length = 0; fixture.rows = []; fixture.count = 0;
   container = document.createElement('div'); document.body.appendChild(container); root = createRoot(container);
 });
 afterEach(async () => { await act(async () => root.unmount()); container.remove(); });
@@ -74,5 +74,23 @@ describe('AIDataIngestionSearch make browse card', () => {
     const makeFilters = fixture.ops.filter((o) => o.op === 'eq' && o.args[0] === 'make').map((o) => o.args[1]);
     expect(makeFilters).toEqual(['Ford', 'Ford', 'Ford']);
     expect(fixture.ops.some((o) => o.op === 'ilike')).toBe(false);
+  });
+
+  it('asks for an estimated count and labels a planner estimate as approximate', async () => {
+    fixture.rows = [{ model: '911' }];
+    fixture.count = 50809;
+    await type('porsche', 450);
+    const countSelect = fixture.ops.find((o) => o.op === 'select' && o.args[0] === 'id');
+    expect(countSelect?.args[1]).toEqual({ count: 'estimated', head: true });
+    expect(container.textContent).toContain('≈51,000 VEHICLES');
+    expect(container.textContent).not.toContain('50,809');
+  });
+
+  it('shows a count at or below max-rows as exact', async () => {
+    fixture.rows = [{ model: 'Pantera' }];
+    fixture.count = 11;
+    await type('lotus', 450);
+    expect(container.textContent).toContain('11 VEHICLES');
+    expect(container.textContent).not.toContain('≈');
   });
 });
