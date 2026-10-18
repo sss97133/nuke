@@ -6,7 +6,7 @@ import path from 'node:path';
 import { validateCapture } from '../../../supabase/functions/extract-facebook-marketplace/capture.ts';
 
 process.env.NUKE_FB_HOME = fs.mkdtempSync(path.join(os.tmpdir(), 'nukefb-'));
-const { buildPackets, BASE, VARIANTS } = await import('./runner.mjs');
+const { buildPackets, listingPagePackets, BASE, VARIANTS } = await import('./runner.mjs');
 const { checkAck } = await import('./pull-spool.mjs');
 const classify = new Function('globalThis', `${fs.readFileSync(new URL('../extension/classify.js', import.meta.url), 'utf8')}; return globalThis.NukeClassify.classify;`)({});
 const card = (id, title, year, price) => ({ facebook_id: id, url: `https://www.facebook.com/marketplace/item/${id}/`, title, parsed_year: year, price, content_text: '{}', status: 'active' });
@@ -51,6 +51,25 @@ test('removed page becomes removal evidence; Sold label is attributed, not a con
   const sold = detail.readListingPage({ text: ['Sold', '1970 GMC C10', '$3,500'].join('\n'), title: '1970 GMC C10' }, '2026-10-14T08:00:00Z');
   assert.equal(detail.revisitCard('8', sold, { text: 'Sold' }).removal.reason, 'displayed_sold');
   validateCapture({ capture_id: '00000000-0000-4000-a000-000000000009', observed_at: '2026-10-14T08:00:00Z', target_url: 'https://www.facebook.com/marketplace/item/9/', actual_url: 'https://www.facebook.com/marketplace/item/9/', actual_region: 'listing page', retrieval_surface: 'playwright_rendered_listing_page', complete: false, access_state: 'available' }, [c]);
+});
+
+test('listing pages: one packet per item, named by its URL as the history reader requires; redirects claim nothing', async () => {
+  const sql = (await import('../../../supabase/functions/db-stats/listingHistory.ts')).LISTING_HISTORY_SQL;
+  const itemRe = new RegExp(sql.match(/substring\(j\.capture->>'actual_url' FROM '([^']+)'\)/)[1]);
+  const at = '2026-10-18T05:32:58.184Z';
+  const packets = listingPagePackets([
+    { card: card('1575513783791705', '1973 Volkswagen beetle', 1973, 9000), finalUrl: 'https://www.facebook.com/marketplace/item/1575513783791705/?ref=search', observedAt: at },
+    { card: card('42', 'gone', 1970, null), finalUrl: 'https://www.facebook.com/marketplace/', observedAt: at },
+    { card: card('77', 'no final url', 1972, 5000), observedAt: at },
+    { card: card('78', 'left marketplace', 1972, 5000), finalUrl: 'https://www.facebook.com/', observedAt: at },
+  ]);
+  assert.equal(packets.length, 4);
+  assert.equal(new Set(packets.map(p => p.capture.source_cycle_id)).size, 1);
+  for (const p of packets) { assert.equal(p.batch.length, 1); assert.equal(p.capture.observed_at, at); validateCapture(p.capture, p.batch); }
+  assert.equal(packets[0].capture.actual_url.match(itemRe)?.[1], '1575513783791705');
+  assert.equal(packets[1].capture.actual_url.match(itemRe), null);
+  assert.equal(packets[2].capture.actual_url.match(itemRe), null);
+  assert.equal(packets[3].capture.actual_url.match(itemRe), null);
 });
 
 const { due } = await import('./make-revisit-list.mjs');
