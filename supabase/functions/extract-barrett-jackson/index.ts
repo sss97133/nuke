@@ -36,6 +36,7 @@ import { mustWrite, softWrite } from '../_shared/writeResult.ts';
 import { fillOnlyIdentity, identityConflict, REVISION_DIFFERENT_CAR } from '../_shared/identityMatch.ts';
 import { ForcedVehicleMissing, forcedVehicleId, pickVehicleTarget } from "./vehicleTarget.ts";
 import { lotEventDate } from "./eventDate.ts";
+import { originImageUrl } from "./imageUrl.ts";
 import { docketLotNumber, docketStatus, episodeSoldAt, episodeStatus, statesResult } from "./episode.ts";
 import { patchForLiveRow } from "../_shared/vehicleEventWrite.ts";
 import {
@@ -642,13 +643,13 @@ function extractImageUrls(html: string): string[] {
   const altCdnRegex =
     /https:\/\/[^"'\s)]*barrett[^"'\s)]*\.(?:azureedge\.net|cloudfront\.net|amazonaws\.com)[^"'\s)]+\.(jpg|jpeg|png|webp)/gi;
   while ((m = altCdnRegex.exec(html)) !== null) {
-    urls.add(m[0]);
+    urls.add(originImageUrl(m[0]).replace('/thumbnail/', '/fullsize/'));
   }
 
   // og:image
   const ogImage = html.match(/<meta[^>]*property=["']og:image["'][^>]*content=["']([^"']+)["']/i);
   if (ogImage && ogImage[1].includes("barrett")) {
-    urls.add(ogImage[1]);
+    urls.add(originImageUrl(ogImage[1]));
   }
 
   // Filter out non-vehicle images (venue maps, logos, site chrome)

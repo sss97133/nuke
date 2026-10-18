@@ -70,14 +70,15 @@ interface TileProps {
   onClick: (e: React.MouseEvent | React.KeyboardEvent) => void;
   title?: string;
   describedBy?: string;
+  ariaLabel?: string;
 }
 
-export function MarketTile({ node, move, basis, x, y, w, h, onClick, title, describedBy }: TileProps) {
+export function MarketTile({ node, move, basis, x, y, w, h, onClick, title, describedBy, ariaLabel }: TileProps) {
   const t = tileLines(node, move, w, h, basis);
   const style = { left: x, top: y, width: w, height: h, backgroundColor: tileFill(move),
     '--name-size': `${t.nameSize ?? 0}px`, '--move-size': `${t.moveSize}px` } as React.CSSProperties;
   return (
-    <button type="button" className={`market-tile market-tile--${move.kind}`} style={style} aria-label={node.name} title={title}
+    <button type="button" className={`market-tile market-tile--${move.kind}`} style={style} aria-label={ariaLabel ?? node.name} title={title}
       aria-describedby={describedBy}
       onClick={(e) => { e.stopPropagation(); onClick(e); }}>
       {t.nameSize != null && <span className="market-tile__name">{t.name}</span>}
@@ -88,7 +89,8 @@ export function MarketTile({ node, move, basis, x, y, w, h, onClick, title, desc
 }
 
 function CardBody({ node, move, base, windowLabel, gateMin = GATE_MIN }: { node: MarketNode; move: Move; base: Baseline | null; windowLabel?: string; gateMin?: number }) {
-  const dollars = node.usd_12m != null && node.usd_prior_12m != null && node.usd_prior_12m > 0
+  const aggregate = node.familyKey === 'more' || node.familyKey === 'other';
+  const dollars = !(aggregate && windowLabel) && node.usd_12m != null && node.usd_prior_12m != null && node.usd_prior_12m > 0
     ? `${money(node.usd_12m)} vs ${money(node.usd_prior_12m)} (${pct(node.usd_12m / node.usd_prior_12m - 1)})` : null;
   return (
     <>
@@ -108,7 +110,7 @@ function CardBody({ node, move, base, windowLabel, gateMin = GATE_MIN }: { node:
             : `mostly sold at houses we cannot yet measure a year apart: under half of its ${num(node.count)} confirmed sales are measured`}</span>
         </div>
       )}
-      {move.kind === 'none' && <div className="market-card__move"><span className="market-card__big">no measured sales</span></div>}
+      {move.kind === 'none' && <div className="market-card__move"><span className="market-card__big">{aggregate ? 'no single-family comparison' : 'no measured sales'}</span></div>}
       <dl className="market-card__rows">
         {dollars && <><dt>measured dollars</dt><dd>{dollars}</dd></>}
         {node.offered && node.offered >= 20 && node.sold_any != null
@@ -147,16 +149,27 @@ export function MarketCard({ node, move, base, x, y, windowLabel, gateMin, id }:
 
 /** On a phone a tap opens the card; Open drills, the close button or a tap outside dismisses it. */
 export function MarketSheet({ node, move, base, onOpen, onClose, windowLabel, gateMin }: { node: MarketNode; move: Move; base: Baseline | null; onOpen: () => void; onClose: () => void; windowLabel?: string; gateMin?: number }) {
+  const dialog = useRef<HTMLDialogElement>(null);
+  const closeButton = useRef<HTMLButtonElement>(null);
+  useLayoutEffect(() => {
+    const element = dialog.current;
+    if (!element) return;
+    element.showModal();
+    closeButton.current?.focus();
+    return () => element.close();
+  }, []);
   return (
-    <div className="market-sheet__scrim" onClick={onClose}>
-      <div className="market-sheet" role="dialog" aria-label={node.name} onClick={(e) => e.stopPropagation()}>
+    <dialog ref={dialog} className="market-sheet__scrim" aria-label={node.name}
+      onCancel={(e) => { e.preventDefault(); onClose(); }}
+      onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
+      <div className="market-sheet">
         <CardBody node={node} move={move} base={base} windowLabel={windowLabel} gateMin={gateMin} />
         <div className="market-sheet__actions">
           <button type="button" className="market-sheet__open" onClick={onOpen}>Open {node.name} →</button>
-          <button type="button" className="market-sheet__close" onClick={onClose}>Close</button>
+          <button ref={closeButton} type="button" className="market-sheet__close" onClick={onClose}>Close</button>
         </div>
       </div>
-    </div>
+    </dialog>
   );
 }
 

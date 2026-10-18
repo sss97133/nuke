@@ -46,25 +46,24 @@ export function comparableLotKey(url: string | null | undefined): string | null 
 
 const BROADCAST_SOURCE_ID = 'e980c7bd-404f-41f6-8a17-1c7cabd1d8a4';
 
-/** The broadcast presentation of the cited lot, read from the auction livestream overlay. Only an exact lot
- * match on the same vehicle qualifies; the clip is evidence of the presentation, never of the cited price,
- * and its offsets are positions in the recording, not auction clock times. */
-export function pickLotPresentation(rows: any[] | null | undefined, vehicleId: string, lotNumber: string | null):
-  { videoUrl: string; startSeconds: number; endSeconds: number | null } | null {
+/** Keep only presentations explicitly bound to the cited source episode. Recording consensus is handled
+ * with the other exact-source candidates below; screen outcome never chooses the canonical price's clip.
+ * Offsets are recording positions, never auction wall time or evidence of the cited price. */
+export function pickLotPresentations(rows: any[] | null | undefined, vehicleId: string, lotNumber: string | null,
+  episodeKeys: ReadonlySet<string>): { videoUrl: string; startSeconds: number; endSeconds: number | null }[] {
   const lot = String(lotNumber ?? '').trim().toUpperCase();
-  if (!lot || !Array.isArray(rows)) return null;
-  const candidates = rows.filter(r => r?.vehicle_id === vehicleId
+  if (!lot || !Array.isArray(rows)) return [];
+  return rows.filter(r => r?.vehicle_id === vehicleId
     && String(r?.structured_data?.value?.lot ?? '').trim().toUpperCase() === lot
+    && r?.structured_data?.event_context?.resolution_status === 'scoped_event_match'
+    && episodeKeys.has(`${r?.structured_data?.event_context?.matched_event?.table}:${r?.structured_data?.event_context?.matched_event?.id}`)
     && /^[A-Za-z0-9_-]{11}$/.test(String(r?.structured_data?.media?.video_id ?? ''))
-    && typeof r?.structured_data?.media?.start_seconds === 'number' && r.structured_data.media.start_seconds >= 0);
-  const row = candidates.find(r => r.structured_data.value.displayed_outcome === 'sold') ?? candidates[0];
-  if (!row) return null;
-  const media = row.structured_data.media;
-  return {
-    videoUrl: `https://www.youtube.com/watch?v=${media.video_id}`,
-    startSeconds: media.start_seconds,
-    endSeconds: typeof media.end_seconds === 'number' ? media.end_seconds : null,
-  };
+    && Number.isFinite(r?.structured_data?.media?.start_seconds) && r.structured_data.media.start_seconds >= 0)
+    .map(r => ({
+      videoUrl: `https://www.youtube.com/watch?v=${r.structured_data.media.video_id}`,
+      startSeconds: r.structured_data.media.start_seconds,
+      endSeconds: typeof r.structured_data.media.end_seconds === 'number' ? r.structured_data.media.end_seconds : null,
+    }));
 }
 
 /** Extract lot number and auction event name from vehicle metadata or enriched description text. */
@@ -160,7 +159,7 @@ export default function ProfileHeader({ priceLotId }: { priceLotId?: string }) {
           Promise.resolve(
         supabase
           .from('auction_events')
-          .select('lot_number, source_url, broadcast_video_url, broadcast_video_id, broadcast_timestamp_start, broadcast_timestamp_end')
+          .select('id, lot_number, source_url, broadcast_video_url, broadcast_video_id, broadcast_timestamp_start, broadcast_timestamp_end')
           .eq('vehicle_id', vehicleId)
           .order('auction_end_date', { ascending: false, nullsFirst: false })
           .limit(10)
@@ -168,7 +167,7 @@ export default function ProfileHeader({ priceLotId }: { priceLotId?: string }) {
       Promise.resolve(
         supabase
           .from('vehicle_events')
-          .select('source_url, metadata')
+          .select('id, source_url, metadata')
           .eq('vehicle_id', vehicleId)
           .order('extracted_at', { ascending: false, nullsFirst: false })
           .limit(10)
@@ -202,9 +201,13 @@ export default function ProfileHeader({ priceLotId }: { priceLotId?: string }) {
     // A broadcast presentation joins only the one lot the episode rows agree on, and only when they carry
     // no recorded clip; a failed broadcast read adds nothing and does not fail the episode read.
     const boundLots = [...new Set(candidates.map(c => String(c.lotNumber ?? '').trim()).filter(Boolean))];
-    const presentation = boundLots.length === 1 && !candidates.some(c => c.videoUrl) && !presentationRes?.error
-      ? pickLotPresentation(presentationRes?.data as any[] | null, vehicleId, boundLots[0]) : null;
-    if (presentation) candidates.push({ lotNumber: boundLots[0], ...presentation });
+    const episodeKeys = new Set([
+      ...auctionRows.filter(row => typeof row.id === 'string' && row.id).map(row => `auction_events:${row.id}`),
+      ...eventRows.filter(row => typeof row.id === 'string' && row.id).map(row => `vehicle_events:${row.id}`),
+    ]);
+    const presentations = boundLots.length === 1 && !candidates.some(c => c.videoUrl) && !presentationRes?.error
+      ? pickLotPresentations(presentationRes?.data as any[] | null, vehicleId, boundLots[0], episodeKeys) : [];
+    candidates.push(...presentations.map(presentation => ({ lotNumber: boundLots[0], ...presentation })));
     setLotRead({ vehicleId, lotKey: targetLotKey, readAt, status: failed ? 'failed' : candidates.length ? 'matched' : 'unmatched', candidates });
       } catch {
         if (!cancelled) setLotRead({ vehicleId, lotKey: targetLotKey, readAt, status: 'failed', candidates: [] });

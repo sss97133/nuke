@@ -43,7 +43,7 @@ import { archiveFetch } from '../_shared/archiveFetch.ts';
 import { fillOnlyIdentity, identityConflict } from '../_shared/identityMatch.ts';
 import { recordRevision } from '../_shared/revision.ts';
 import { parseEventPage, parseListingCards, type RosterCard } from './roster.ts';
-import { parseLotPage } from './lotPage.ts';
+import { galleryImageId, isVinClash, parseLotPage } from './lotPage.ts';
 
 // ============================================================================
 // TYPES
@@ -812,8 +812,15 @@ async function saveToDatabase(
       .update(updates)
       .eq('id', vehicleId);
 
+    // A VIN another vehicle already holds failed the whole lot, and three in a row stopped the targets run (09:08Z
+    // 2026-10-18: two E-Types and a Z8). Write everything but the VIN and raise the clash for relinking: two vehicles carry
+    // one chassis, which the merge owner decides, not this writer. Same handling as extract-gooding.
     if (updateError) {
-      throw new Error(`vehicles update failed for ${vehicleId}: ${updateError.message}`);
+      if (!updates.vin || !isVinClash(updateError.message)) throw new Error(`vehicles update failed for ${vehicleId}: ${updateError.message}`);
+      const { vin: clashVin, ...withoutVin } = updates;
+      await recordRevision(supabase as any, { url: extracted.url, missing: ['identity_match'], reason: 'duplicate_key', next_action: 'relink', raised_by: 'extract-broad-arrow', vehicle_id: vehicleId, detail: { reason: 'vin_held_by_another_vehicle', vin: clashVin, message: updateError.message.slice(0, 160) } });
+      const { error: retryError } = await (supabase.from('vehicles') as any).update(withoutVin).eq('id', vehicleId);
+      if (retryError) throw new Error(`vehicles update without the clashing vin failed for ${vehicleId}: ${retryError.message}`);
     } else {
       console.log(`[broad-arrow] Updated vehicle: ${vehicleId}`);
     }
@@ -894,14 +901,20 @@ async function saveToDatabase(
   // Save images
   let imagesSaved = 0;
   if (extracted.image_urls.length > 0 && vehicleId) {
-    // Delete existing broad_arrow images for this vehicle to avoid duplicates
-    softWrite('vehicle_images replace', await supabase
+    // Add only the photos the vehicle does not already hold. Delete-then-insert doubled a gallery whenever the delete did
+    // not take (its failure is swallowed); the same defect doubled a Gooding gallery on 2026-10-18.
+    const { data: have, error: haveErr } = await supabase
       .from('vehicle_images')
-      .delete()
+      .select('image_url')
       .eq('vehicle_id', vehicleId)
-      .eq('source', 'broad_arrow'));
+      .limit(1000);
+    if (haveErr) throw new Error(`vehicle_images read failed: ${haveErr.message}`);
+    const haveUrls = new Set((have ?? []).map((r: { image_url: string }) => r.image_url));
+    // An older read stored the same photos at another URL spelling (".webp" suffix, 2026-02 rows), so a photo is held when
+    // its image id is.
+    const haveIds = new Set([...haveUrls].map(galleryImageId).filter((id): id is string => id !== null));
 
-    const imageRecords = extracted.image_urls.slice(0, 80).map((imgUrl, i) => ({
+    const imageRecords = extracted.image_urls.slice(0, 150).map((imgUrl, i) => ({
       vehicle_id: vehicleId,
       image_url: imgUrl,
       source: 'broad_arrow',
@@ -912,7 +925,7 @@ async function saveToDatabase(
       redaction_level: 'none',
       position: i,
       display_order: i,
-      is_primary: i === 0,
+      is_primary: i === 0 && haveUrls.size === 0,
       exif_data: {
         source_url: extracted.url,
         discovery_url: extracted.url,
@@ -920,18 +933,20 @@ async function saveToDatabase(
         auction_name: extracted.auction_name,
         lot_number: extracted.lot_number,
       },
-    }));
+    })).filter((row) => !haveUrls.has(row.image_url) && !haveIds.has(galleryImageId(row.image_url) ?? ''));
 
-    const { data: insertedImages, error: imgError } = await supabase
-      .from('vehicle_images')
-      .insert(imageRecords)
-      .select('id');
+    if (imageRecords.length > 0) {
+      const { data: insertedImages, error: imgError } = await supabase
+        .from('vehicle_images')
+        .insert(imageRecords)
+        .select('id');
 
-    if (imgError) {
-      throw new Error(`vehicle_images insert failed: ${imgError.message}`);
-    } else {
-      imagesSaved = insertedImages?.length || 0;
-      console.log(`[broad-arrow] Saved ${imagesSaved} images`);
+      if (imgError) {
+        throw new Error(`vehicle_images insert failed: ${imgError.message}`);
+      } else {
+        imagesSaved = insertedImages?.length || 0;
+        console.log(`[broad-arrow] Saved ${imagesSaved} images`);
+      }
     }
   }
 
@@ -1358,7 +1373,7 @@ if (import.meta.main) Deno.serve(async (req) => {
             auction_status: lot.status === 'unknown' ? null : lot.status,
             mileage: lot.odometer ? (lot.odometer.unit === 'km' ? Math.round(lot.odometer.value * 0.621371) : lot.odometer.value) : null,
             engine: null, transmission: null, drivetrain: null, exterior_color: null, interior_color: null, body_style: null,
-            description: lot.description, image_urls: [], scrape_ms: 0,
+            description: lot.description, image_urls: lot.imageUrls, scrape_ms: 0,
             extra_metadata: { sale_starts_on: days?.starts_on ?? null, sale_ends_on: days?.ends_on ?? null, currency: lot.currency, sold_amount: lot.status === 'sold' ? lot.soldPrice : null, odometer: lot.odometer, read_by: 'broad-arrow-targets' },
           };
           const saved = await saveToDatabase(supabase, extracted);

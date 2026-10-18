@@ -1890,7 +1890,11 @@ export function TreemapHomePage({ onBrowse, embedded = false }: { onBrowse: () =
     // drillStack triggers recompute when navigating so ref cache is checked
   }, [levelType, brandsData, familiesData, familiesFailed, modelsData, facetedFamilyModels, eraFilteredFamilyModels, yearsData, vehiclesData, familyYearVehiclesNodes, currentLevel, drillStack, selectedEra]);
 
-  const isLoading = brandsLoading || (atFamilies && familiesLoading) || modelsLoading || (levelType === 'models' && familyModelsLoading) || yearsLoading || vehiclesLoading;
+  const isLoading = levelType === 'brands' ? brandsLoading
+    : levelType === 'families' ? familiesLoading || (familiesFailed && modelsLoading)
+    : levelType === 'models' ? familyModelsLoading
+    : levelType === 'years' ? yearsLoading
+    : vehiclesLoading;
 
   // ── Prefetch: fire supabase queries on 200ms hover debounce ──
   const prefetchYears = useCallback((make: string, model: string) => {
@@ -1987,6 +1991,7 @@ export function TreemapHomePage({ onBrowse, embedded = false }: { onBrowse: () =
   const [tooltip, setTooltip] = useState<TooltipData | null>(null);
   const tooltipId = useId();
   const currentCrumb = useRef<HTMLButtonElement>(null);
+  const mapExit = useRef<HTMLHeadingElement>(null);
   const focusAfterDrill = useRef(false);
   // A drill or a view switch replaces the tiles under the pointer, and the tile a tooltip came from can no longer clear it:
   // over the sales chart the 911 tile's tooltip stayed on screen (2026-10-15).
@@ -2722,6 +2727,11 @@ export function TreemapHomePage({ onBrowse, embedded = false }: { onBrowse: () =
       )}
 
       {/* ─── TREEMAP VIEWPORT ─── */}
+      <a className="market-map-skip" href="#market-map-exit" onClick={(e) => {
+        e.preventDefault();
+        mapExit.current?.focus({ preventScroll: true });
+        mapExit.current?.scrollIntoView({ block: 'center' });
+      }}>Skip map tiles</a>
       <div
         ref={containerRef}
         style={{
@@ -2775,9 +2785,10 @@ export function TreemapHomePage({ onBrowse, embedded = false }: { onBrowse: () =
             <BrandFamilyMap width={dims.w} height={dims.h} baseline={baseline} basis={basis}
               familyMoves={horizon === '1y' && !isCustomBase ? undefined : moversData?.family_moves}
               gateMin={gateMin}
+              windowLabel={horizonWindowLabel}
               horizonShortLabel={horizon === '1y' && !isCustomBase ? '12 mo' : horizonMeta.label}
-              onPickBrand={(brand) => { recordInterest('make', brand); setDrillStack([{ label: 'ALL MAKES' }, { label: brand, make: brand }]); }}
-              onPickFamily={(brand, key, family) => { recordInterest('make', brand); setDrillStack([{ label: 'ALL MAKES' }, { label: brand, make: brand }, { label: family, make: brand, family: key }]); }} />
+              onPickBrand={(brand, focusAfterPick) => { focusAfterDrill.current = !!focusAfterPick; recordInterest('make', brand); setDrillStack([{ label: 'ALL MAKES' }, { label: brand, make: brand }]); }}
+              onPickFamily={(brand, key, family, focusAfterPick) => { focusAfterDrill.current = !!focusAfterPick; recordInterest('make', brand); setDrillStack([{ label: 'ALL MAKES' }, { label: brand, make: brand }, { label: family, make: brand, family: key }]); }} />
           ) : levelType === 'models' && currentLevel.family && currentLevel.make && familyView === 'sales' && dims.w > 0 ? (
             <FamilySalesChart brand={currentLevel.make} familyKey={currentLevel.family} family={currentLevel.label}
               width={dims.w} height={dims.h} onOpen={(id) => navigate(`/vehicle/${id}`)}
@@ -2874,12 +2885,14 @@ export function TreemapHomePage({ onBrowse, embedded = false }: { onBrowse: () =
         )}
       </div>
 
+      <h2 ref={mapExit} id="market-map-exit" tabIndex={-1} className="market-map-exit">Market comparisons and legend</h2>
+
       {/* ─── TOOLTIP ─── */}
       {tooltip && (tooltip.level === 'brands' || tooltip.level === 'families') && tooltip.node.usd != null && !tooltip.node.isVehicle
         ? <MarketCard id={tooltipId} node={tooltip.node} move={relativeMove(tooltip.node, baseline, basis === 'ledger', gateMin)} base={baseline} x={tooltip.x} y={tooltip.y} windowLabel={horizonWindowLabel} gateMin={gateMin} />
         : tooltip && <TreemapTooltip {...tooltip} />}
       {sheet && <MarketSheet node={sheet} move={relativeMove(sheet, baseline, basis === 'ledger', gateMin)} base={baseline} windowLabel={horizonWindowLabel} gateMin={gateMin}
-        onOpen={() => { const n = sheet; setSheet(null); drillInto(n); }} onClose={() => setSheet(null)} />}
+        onOpen={() => { const n = sheet; focusAfterDrill.current = !n.noModel || !!n.familyKey; setSheet(null); drillInto(n); }} onClose={() => setSheet(null)} />}
 
       {/* ─── FAMILY SALES CHART: when embedded on the Market page, keep the family's sales & like-for-like price index + era filter bar visible across models, years & vehicles inside the family ─── */}
       {embedded && (levelType === 'models' || levelType === 'years' || levelType === 'vehicles') && currentLevel.family && currentLevel.make && !(levelType === 'models' && familyView === 'sales') && dims.w > 0 && (

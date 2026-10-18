@@ -15,7 +15,7 @@ import { useVehiclePermissions } from '../../hooks/useVehiclePermissions';
 import { useAdminAccess } from '../../hooks/useAdminAccess';
 import { useViewHistory } from '../../hooks/useViewHistory';
 import { auctionReaderRevision, buildAuctionPulseFromExternalListings, buildAuctionPulseFromReadResult } from './buildAuctionPulse';
-import { loadVehicleImpl, selectBestHeroImage, type RpcLoadResult } from './loadVehicleData';
+import { loadVehicleImpl, selectBestHeroImage, type RpcLoadResult, type TimelineReadState } from './loadVehicleData';
 import { resolveVehicleImages } from './resolveVehicleImages';
 import { isVerifiedOwnerOf } from './ownerStatus';
 import { withTimeout } from '../../lib/withTimeout';
@@ -36,6 +36,8 @@ export interface GalleryFilter {
   dateRange?: [string, string];
 }
 
+const pendingTimelineRead: TimelineReadState = { timeline: 'pending', work: 'pending' };
+
 interface VehicleProfileContextValue {
   // Core data
   vehicleId: string | undefined;
@@ -43,6 +45,7 @@ interface VehicleProfileContextValue {
   vehicleImages: string[];
   fallbackListingImageUrls: string[];
   timelineEvents: any[];
+  timelineReadState: TimelineReadState;
   totalCommentCount: number;
   observationCount: number;
 
@@ -119,6 +122,7 @@ export const VehicleProfileProvider: React.FC<{ children: React.ReactNode }> = (
   const [vehicleImages, setVehicleImages] = useState<string[]>([]);
   const [fallbackListingImageUrls, setFallbackListingImageUrls] = useState<string[]>([]);
   const [timelineEvents, setTimelineEvents] = useState<any[]>([]);
+  const [timelineRead, setTimelineRead] = useState<{ vehicleId: string; primaryRequest: number; state: TimelineReadState } | null>(null);
   const [totalCommentCount, setTotalCommentCount] = useState(0);
   const [observationCount, setObservationCount] = useState(0);
 
@@ -131,6 +135,7 @@ export const VehicleProfileProvider: React.FC<{ children: React.ReactNode }> = (
   const activeVehicleIdRef = React.useRef(vehicleId);
   const vehicleLoadedForRouteRef = React.useRef<string | undefined>(undefined);
   const primaryLoadRequestRef = React.useRef(0);
+  const timelineLoadRequestRef = React.useRef(0);
   const primaryLoadMountedRef = React.useRef(false);
   // Invalidate before children commit the next route, including A → B → A.
   if (activeVehicleIdRef.current !== vehicleId) {
@@ -148,6 +153,8 @@ export const VehicleProfileProvider: React.FC<{ children: React.ReactNode }> = (
   const primaryRouteLoaded = vehicleLoadedForRouteRef.current === vehicleId;
   // Existing effects and permission inputs must also see the current subject.
   const vehicle = primaryRouteLoaded ? loadedVehicle : null;
+  const timelineReadState = timelineRead && timelineRead.vehicleId === vehicleId && timelineRead.primaryRequest === primaryLoadRequestRef.current
+    ? timelineRead.state : pendingTimelineRead;
 
   // ── Auction ──
   const [auctionPulse, setAuctionPulse] = useState<AuctionPulse | null>(null);
@@ -212,7 +219,10 @@ export const VehicleProfileProvider: React.FC<{ children: React.ReactNode }> = (
   const loadVehicle = useCallback(async () => {
     if (!vehicleId || !primaryLoadMountedRef.current || activeVehicleIdRef.current !== vehicleId) return;
     const request = ++primaryLoadRequestRef.current;
+    let timelineRequest = ++timelineLoadRequestRef.current;
     const isCurrent = () => activeVehicleIdRef.current === vehicleId && primaryLoadRequestRef.current === request;
+    const isCurrentTimeline = () => isCurrent() && timelineLoadRequestRef.current === timelineRequest;
+    setTimelineRead({ vehicleId, primaryRequest: request, state: pendingTimelineRead });
     const resetPrimaryState = () => {
       setVehicle(null);
       setVehicleImages([]);
@@ -251,7 +261,13 @@ export const VehicleProfileProvider: React.FC<{ children: React.ReactNode }> = (
         if (isCurrent()) setVehicleImages(urls);
       },
       setTimelineEvents: (next) => {
-        if (isCurrent()) setTimelineEvents(prev => !isCurrent() ? prev : typeof next === 'function' ? next(prev) : next);
+        if (isCurrentTimeline()) setTimelineEvents(prev => !isCurrentTimeline() ? prev : typeof next === 'function' ? next(prev) : next);
+      },
+      onTimelineRead: (state) => {
+        if (!isCurrent()) return;
+        // A completed primary batch supersedes supplementary reads started while it was pending.
+        timelineRequest = ++timelineLoadRequestRef.current;
+        setTimelineRead(prev => isCurrentTimeline() ? { vehicleId, primaryRequest: request, state } : prev);
       },
       setAuctionPulse: (next) => {
         if (isCurrent()) setAuctionPulse(prev => !isCurrent() ? prev : typeof next === 'function' ? next(prev) : next);
@@ -316,9 +332,12 @@ export const VehicleProfileProvider: React.FC<{ children: React.ReactNode }> = (
   }, [vehicle?.id, vehicleId]);
 
   const loadTimelineEvents = useCallback(async () => {
-    if (!vehicleId) return;
+    if (!vehicleId || !primaryLoadMountedRef.current || activeVehicleIdRef.current !== vehicleId) return;
     const request = primaryLoadRequestRef.current;
-    const isCurrent = () => activeVehicleIdRef.current === vehicleId && primaryLoadRequestRef.current === request;
+    const timelineRequest = ++timelineLoadRequestRef.current;
+    const isCurrent = () => activeVehicleIdRef.current === vehicleId && primaryLoadRequestRef.current === request &&
+      timelineLoadRequestRef.current === timelineRequest;
+    if (isCurrent()) setTimelineRead({ vehicleId, primaryRequest: request, state: pendingTimelineRead });
     try {
       // Load timeline_events + work_sessions in parallel. image_sets is
       // supplementary and slow for anon (measured 15s/500 against the anon
@@ -348,10 +367,12 @@ export const VehicleProfileProvider: React.FC<{ children: React.ReactNode }> = (
       ]), 10000, 'loadTimelineEvents');
 
       const events: any[] = [];
-      if (!tlResult.error && tlResult.data) events.push(...tlResult.data);
+      const timelineReady = !tlResult.error && Array.isArray(tlResult.data);
+      const workReady = !wsResult.error && Array.isArray(wsResult.data);
+      if (timelineReady) events.push(...tlResult.data);
 
       // Convert work_sessions to timeline event shape and merge
-      if (!wsResult.error && wsResult.data) {
+      if (workReady) {
         for (const ws of wsResult.data) {
           // Add as a work_session event type so BarcodeTimeline can render it
           events.push({
@@ -361,7 +382,7 @@ export const VehicleProfileProvider: React.FC<{ children: React.ReactNode }> = (
             event_type: 'work_session',
             title: ws.title,
             category: ws.work_type,
-            cost_amount: (ws.total_job_cost || 0) + (ws.total_parts_cost || 0),
+            cost_amount: ws.total_job_cost ?? null,
             metadata: {
               work_type: ws.work_type,
               image_count: ws.image_count,
@@ -384,7 +405,10 @@ export const VehicleProfileProvider: React.FC<{ children: React.ReactNode }> = (
         return db.localeCompare(da);
       });
       if (!isCurrent()) return;
-      setTimelineEvents(sortByDateDesc(events));
+      setTimelineEvents(prev => isCurrent() ? sortByDateDesc(events) : prev);
+      setTimelineRead(prev => isCurrent() ? { vehicleId, primaryRequest: request, state: {
+        timeline: timelineReady ? 'ready' : 'unavailable', work: workReady ? 'ready' : 'unavailable',
+      } } : prev);
 
       // Convert image_sets to timeline event shape and merge when it lands.
       void imageSetsPromise.then((isResult: any) => {
@@ -409,7 +433,10 @@ export const VehicleProfileProvider: React.FC<{ children: React.ReactNode }> = (
           return sortByDateDesc([...(prev || []), ...sessionEvents.filter((e: any) => !have.has(e.id))]);
         });
       }).catch(() => { /* supplementary */ });
-    } catch { /* ignore */ }
+    } catch {
+      if (isCurrent()) setTimelineRead(prev => isCurrent() ? { vehicleId, primaryRequest: request,
+        state: { timeline: 'unavailable', work: 'unavailable' } } : prev);
+    }
   }, [vehicleId]);
 
   const loadTotalCommentCount = useCallback(async (isCurrent: () => boolean) => {
@@ -1005,6 +1032,7 @@ export const VehicleProfileProvider: React.FC<{ children: React.ReactNode }> = (
     vehicleImages: primaryRouteLoaded ? vehicleImages : [],
     fallbackListingImageUrls: primaryRouteLoaded ? fallbackListingImageUrls : [],
     timelineEvents: primaryRouteLoaded ? timelineEvents : [],
+    timelineReadState,
     totalCommentCount: primaryRouteLoaded ? totalCommentCount : 0,
     observationCount: primaryRouteLoaded ? observationCount : 0,
     vehicleIntel,
@@ -1040,7 +1068,7 @@ export const VehicleProfileProvider: React.FC<{ children: React.ReactNode }> = (
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }), [
     vehicleId, primaryRouteLoaded, vehicle, vehicleImages, fallbackListingImageUrls,
-    timelineEvents, totalCommentCount, observationCount,
+    timelineEvents, timelineReadState, totalCommentCount, observationCount,
     vehicleIntel, vehicleIntelLoading,
     leadImageUrl, heroMeta, auctionPulse, liveSession,
     session, isRowOwner, isVerifiedOwner, hasContributorAccess,

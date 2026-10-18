@@ -310,6 +310,11 @@ function buildHeroResult(row: any): HeroImageResult {
   return { url, meta };
 }
 
+export interface TimelineReadState {
+  timeline: 'pending' | 'ready' | 'unavailable';
+  work: 'pending' | 'ready' | 'unavailable';
+}
+
 export interface RpcLoadResult {
   /** RPC provided non-truncated images — skip separate loadVehicleImages */
   images: boolean;
@@ -334,6 +339,7 @@ export interface LoadVehicleParams {
   setLeadImageUrl: (url: string) => void;
   setVehicleImages: (images: string[]) => void;
   setTimelineEvents: React.Dispatch<React.SetStateAction<any[]>>;
+  onTimelineRead?: (state: TimelineReadState) => void;
   setAuctionPulse: (pulse: any) => void;
 }
 
@@ -395,6 +401,7 @@ export async function loadVehicleImpl({
   setLeadImageUrl,
   setVehicleImages,
   setTimelineEvents,
+  onTimelineRead,
   setAuctionPulse,
 }: LoadVehicleParams): Promise<RpcLoadResult> {
   const rpcLoaded: RpcLoadResult = { images: false, timeline: false, commentCount: null, observationCount: null };
@@ -515,7 +522,7 @@ export async function loadVehicleImpl({
         setVehicleImages(rpcData.images.map((img: any) => img.image_url));
         rpcLoaded.images = !rpcImagesTruncated;
       }
-      if (rpcData.timeline_events) {
+      if (Array.isArray(rpcData.timeline_events)) {
         // Merge work_sessions into timeline events (work_sessions table has RLS,
         // so the RPC returns them separately via SECURITY DEFINER)
         const events = [...rpcData.timeline_events];
@@ -528,7 +535,7 @@ export async function loadVehicleImpl({
               event_type: 'work_session',
               title: ws.title,
               category: ws.work_type,
-              cost_amount: (ws.total_job_cost || 0) + (ws.total_parts_cost || 0),
+              cost_amount: ws.total_job_cost ?? null,
               metadata: {
                 work_type: ws.work_type,
                 image_count: ws.image_count,
@@ -550,6 +557,10 @@ export async function loadVehicleImpl({
         });
         // Paint the timeline NOW — do not gate first paint on image_sets.
         sortByDateDesc(events);
+        onTimelineRead?.({
+          timeline: 'ready',
+          work: Array.isArray(rpcData.work_sessions) ? 'ready' : 'unavailable',
+        });
         setTimelineEvents(events);
         rpcLoaded.timeline = true;
         // RPC doesn't include image_sets — supplement asynchronously and merge

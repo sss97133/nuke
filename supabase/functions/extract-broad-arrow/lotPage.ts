@@ -18,6 +18,32 @@ export interface BroadArrowLot {
   status: "sold" | "not_sold" | "withdrawn" | "unknown";
   odometer: { value: number; unit: "mi" | "km" } | null;
   description: string | null;
+  imageUrls: string[];
+}
+
+const GALLERY_RE = /https:\/\/cdn\.dealeraccelerate\.com\/bagauction\/\d+\/\d+\/(\d+)\/([0-9]*x[0-9]*)\/[^"'\s,)<>]+/g;
+const sizeRank = (size: string) => (size === "1920x1440" ? 3 : size === "790x1024" ? 2 : size === "x" ? 0 : 1);
+
+/** A vehicles write refused because another vehicle already holds the VIN (the unique index, or the VIN trigger's message). */
+export function isVinClash(message: string | null | undefined): boolean {
+  return /vehicles_vin_unique|VIN \S+ already exists on vehicle|duplicate key value violates unique constraint "vehicles_vin/i.test(message ?? "");
+}
+
+/** The dealeraccelerate image id of a Broad Arrow photo URL (any size, with or without an extension), or null. */
+export function galleryImageId(url: string): string | null {
+  return url.match(/cdn\.dealeraccelerate\.com\/bagauction\/\d+\/\d+\/(\d+)\//)?.[1] ?? null;
+}
+
+/** The lot's photos: one URL per image id in page order, the largest size the page offers. A lot page lists each photo at
+ * 790x1024, 1920x1440 and a bare size (110 ids, 775 URLs on am24_r158, 2026-10-18). */
+export function lotGallery(html: string): string[] {
+  const best = new Map<string, { url: string; rank: number }>();
+  for (const m of html.matchAll(GALLERY_RE)) {
+    const rank = sizeRank(m[2]);
+    const have = best.get(m[1]);
+    if (!have || rank > have.rank) best.set(m[1], { url: m[0], rank });
+  }
+  return [...best.values()].map((v) => v.url);
 }
 
 const decode = (s: string) =>
@@ -85,5 +111,6 @@ export function parseLotPage(html: string): BroadArrowLot {
     status,
     odometer: Number.isFinite(odoValue) && odoValue > 0 ? { value: Math.round(odoValue), unit: odo?.unitCode === "KMT" ? "km" : "mi" } : null,
     description: desc ? decode(desc).replace(/&#x000A;/g, "\n").trim() || null : (meta || null),
+    imageUrls: lotGallery(html),
   };
 }

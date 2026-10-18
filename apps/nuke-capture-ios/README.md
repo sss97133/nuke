@@ -83,6 +83,12 @@ Standing rules the code carries:
   Every pixel-uploading sync pass also runs metadata-only album filing, after the album catalog finishes loading.
   Album-name fallback collapses whitespace and preserves competing mappings. A failed evidence read stops filing;
   a profile request counts only photos acknowledged as filed or already filed in the server's receipt.
+  **Identity investigation belongs to the machine** (owner, 2026-10-18): manual filing is a correction tool.
+  Inspect retained photos and historical references before asking which car they show. Distinguish a depicted
+  subject from its year/VIN, existing record and ownership; an unknown specification does not justify losing a
+  supported new subject. The [autonomous subject-resolution contract](../../docs/ledger/theory/data-machine-cases.md)
+  records the required flow and missing admission. Current VIN/album routing does not implement visual subject
+  discovery, and a time group, dirty cover or model confidence cannot substitute for that missing mechanism.
 - **A relation is a weight, not a status.** Owner direction, 2026-10-15: "active cant be a hard code like it is. its
   a weight. a relation goes dormant immediately after one day if not maintained by contribution. even within 24hr can
   stall." The app never shows a membership's `status` as ACTIVE. It shows the state the server cuts from
@@ -101,6 +107,8 @@ Standing rules the code carries:
   (`VisionEngine.triage`, the same rule `scripts/ios-vision-triage` applies to stored frames): clutter and personal stay
   on the phone as metadata only; everything else, a part close-up included, uploads. The contributor firewall
   (`VisionEngine.contributorVerdict`) holds by the same rule.
+  A failed decode, classifier or required face read stays in the existing bounded retry path and does not mark the
+  source synced; historical photos already settled as metadata only are not automatically replayed.
 - **Heat is a budget.** Nothing reads originals in bulk while the app is open: iCloud originals download only in
   the background job on Wi-Fi; the album review (originals + accurate OCR) runs in the foreground only on a
   charger at a nominal temperature (`LibraryIngest.mayReviewInForeground`); a foreground backfill slice waits

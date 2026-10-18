@@ -219,3 +219,55 @@ it('toggles the Relativity methodology popover when clicking the RELATIVITY butt
   expect(rows[1].querySelector('.map-movers2__name')?.textContent).toBe('BMW M3');
   expect(rows[1].querySelector('.map-movers2__counts')?.textContent).toBe('45 (1M) → 4 (1W)');
 });
+
+
+it('hands focus into the explanation and restores its trigger on Escape and Close', async () => {
+  const { default: Fresh } = await import('./FamilyMovers');
+  fixture.rpc.mockImplementation((fn: string) => Promise.resolve(fn === 'treemap_family_share_movers'
+    ? { data: value, error: null } : { data: null, error: { message: 'none' } }));
+  await act(async () => root.render(<Fresh onPick={() => {}} />));
+  const trigger = container.querySelector<HTMLButtonElement>('.map-movers2__rel-badge')!;
+  const close = container.querySelector<HTMLButtonElement>('.map-movers2__popover-close')!;
+  trigger.focus();
+  await act(async () => trigger.click());
+  expect(document.activeElement).toBe(close);
+  await act(async () => close.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })));
+  expect(trigger.getAttribute('aria-expanded')).toBe('false');
+  expect(document.activeElement).toBe(trigger);
+  await act(async () => trigger.click());
+  await act(async () => close.click());
+  expect(trigger.getAttribute('aria-expanded')).toBe('false');
+  expect(document.activeElement).toBe(trigger);
+  await act(async () => trigger.click());
+  const next = container.querySelector<HTMLButtonElement>('.map-movers2__dial-btn')!;
+  await act(async () => {
+    next.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }));
+    next.focus();
+  });
+  expect(trigger.getAttribute('aria-expanded')).toBe('false');
+  expect(document.activeElement).toBe(next);
+});
+
+it('exposes both independent window filters as named button groups with their selected states', async () => {
+  const { default: Fresh } = await import('./FamilyMovers');
+  fixture.rpc.mockImplementation((fn: string) => Promise.resolve(fn === 'treemap_family_share_movers'
+    ? { data: value, error: null } : { data: null, error: { message: 'none' } }));
+  const onHorizonChange = vi.fn();
+  const onBaselineHorizonChange = vi.fn();
+  await act(async () => root.render(<Fresh onPick={() => {}} onHorizonChange={onHorizonChange}
+    onBaselineHorizonChange={onBaselineHorizonChange} />));
+  const windows = container.querySelector('[aria-label="Relativity time horizon"]')!;
+  expect(windows.getAttribute('role')).toBe('group');
+  expect(windows.querySelectorAll('[role="tab"]')).toHaveLength(0);
+  expect(windows.querySelectorAll('button[aria-pressed="true"]')).toHaveLength(1);
+  expect(windows.querySelector('button[aria-pressed="true"]')?.textContent).toBe('1Y');
+  const day = [...windows.querySelectorAll('button')].find((b) => b.textContent === '1D')!;
+  await act(async () => day.click());
+  expect(onHorizonChange).toHaveBeenCalledExactlyOnceWith('1d');
+  expect(day.getAttribute('aria-pressed')).toBe('true');
+  const baseline = container.querySelector('[aria-label="Relativity baseline window"]')!;
+  const month = [...baseline.querySelectorAll('button')].find((b) => b.textContent === '1M')!;
+  await act(async () => month.click());
+  expect(onBaselineHorizonChange).toHaveBeenCalledExactlyOnceWith('1m');
+  expect(month.getAttribute('aria-pressed')).toBe('true');
+});

@@ -34,8 +34,8 @@
   border-color: var(--text); background: var(--bg); }
 .map-movers2__rel-badge-icon { font-size: 10px; color: var(--text-secondary); font-weight: 400; }
 .map-movers2__popover { display: none; position: absolute; top: calc(100% + 6px); left: 0; z-index: 40;
-  width: min(560px, calc(100vw - 32px)); padding: 10px 12px; border: 1px solid var(--text);
-  background: var(--surface); color: var(--text); box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
+  width: min(560px, calc(100vw - 32px)); padding: 10px 12px; border: 2px solid var(--text);
+  background: var(--surface); color: var(--text);
   font-family: Arial, sans-serif; }
 .map-movers2__popover--open { display: block; }
 .map-movers2__popover-head { display: flex; align-items: center; justify-content: space-between; gap: 8px;
@@ -65,6 +65,9 @@
 .map-movers2__dial-btn--upcoming { color: var(--success); }
 .map-movers2__dial-btn--active, .map-movers2__vs-btn--active { background: var(--bg); color: var(--text); border-color: var(--text); }
 .map-movers2__vs-btn:disabled { opacity: 0.35; cursor: not-allowed; }
+.map-movers2 :is(.map-movers2__rel-badge, .map-movers2__popover-close, .map-movers2__dial-btn, .map-movers2__vs-btn, .map-movers2__row) { position: relative; }
+.map-movers2 :is(.map-movers2__rel-badge, .map-movers2__popover-close, .map-movers2__dial-btn, .map-movers2__vs-btn, .map-movers2__row):focus-visible::after {
+  content: ''; position: absolute; inset: 0; border: 2px solid var(--text); pointer-events: none; }
 
 .map-movers2__sides { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px 24px; }
 .map-movers2__title { font-size: 11px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; margin-bottom: 4px; }
@@ -95,9 +98,12 @@
 }
 @media (max-width: 760px) {
   .map-movers2__head { flex-direction: column; align-items: flex-start; }
+  .map-movers2__rel-badge { min-height: 44px; flex-shrink: 0; }
+  .map-movers2__popover-close { min-width: 44px; min-height: 44px; flex-shrink: 0; }
   .map-movers2__rel-scale { display: none; }
   .map-movers2__controls { width: 100%; }
   .map-movers2__dial, .map-movers2__vs-dial { width: 100%; overflow-x: auto; justify-content: flex-start; }
+  .map-movers2__dial-btn, .map-movers2__vs-btn { min-width: 44px; min-height: 44px; flex-shrink: 0; }
   .map-movers2__sides { grid-template-columns: minmax(0, 1fr); }
   .map-movers2__row { grid-template-columns: minmax(0, 1fr) 96px 52px; grid-template-rows: auto auto; row-gap: 2px; }
   .map-movers2__row .map-movers2__dot { width: 96px; }

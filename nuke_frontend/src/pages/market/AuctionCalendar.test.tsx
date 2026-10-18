@@ -153,6 +153,43 @@ it('opens a roster in place by run day, with earlier records in the source terms
   expect(container.querySelector('.auction-roster')).toBeNull();
 });
 
+it('keeps keyboard position at the first added lot when the final page removes More lots', async () => {
+  const route = 'tab=market&collection=calendar&sale=gooding:fixture-winter-2027';
+  await render(route);
+  const more = [...container.querySelectorAll('button')].find(b => b.textContent === 'More lots')!;
+  more.focus(); await act(async () => more.click());
+  expect(fixture.more).toHaveBeenCalledOnce();
+  fixture.roster = { ...fixture.roster, hasNextPage: false, data: { pages: [...fixture.roster.data.pages,
+    { roster: { rows: [{ ...ROWS[1], event_id: 'e3', vehicle_id: 'v3', model: 'Gamma' }] } }] } };
+  await render(route);
+  expect([...container.querySelectorAll('button')].find(b => b.textContent === 'More lots')).toBeUndefined();
+  expect(document.activeElement).toBe(container.querySelector('a[href="/vehicle/v3"]'));
+  expect(new URLSearchParams(window.location.search).get('sale')).toBe('gooding:fixture-winter-2027');
+});
+
+it('keeps a final page with no added lot keyboard-reachable at its roster', async () => {
+  const route = 'tab=market&collection=calendar&sale=gooding:fixture-winter-2027';
+  await render(route);
+  const more = [...container.querySelectorAll('button')].find(b => b.textContent === 'More lots')!;
+  more.focus(); await act(async () => more.click());
+  fixture.roster = { ...fixture.roster, hasNextPage: false };
+  await render(route);
+  expect(document.activeElement).toBe(container.querySelector('.auction-roster'));
+});
+
+it('preserves focus moved elsewhere while the final roster page was reading', async () => {
+  const route = 'tab=market&collection=calendar&sale=gooding:fixture-winter-2027';
+  await render(route);
+  const more = [...container.querySelectorAll('button')].find(b => b.textContent === 'More lots')!;
+  more.focus(); await act(async () => more.click());
+  const previousLot = container.querySelector<HTMLAnchorElement>('a[href="/vehicle/v1"]')!;
+  previousLot.focus();
+  fixture.roster = { ...fixture.roster, hasNextPage: false, data: { pages: [...fixture.roster.data.pages,
+    { roster: { rows: [{ ...ROWS[1], event_id: 'e3', vehicle_id: 'v3', model: 'Gamma' }] } }] } };
+  await render(route);
+  expect(document.activeElement).toBe(previousLot);
+});
+
 it('shows only the house count for a listed sale with no lot landed', async () => {
   fixture.calendar.data = { ...fixture.calendar.data, sales: [...SALES, { house: 'mecum', sale_key: 'fixture-empty-2027', sale_name: 'Fixture Empty 2027',
     location: null, starts_on: '2027-01-05', ends_on: '2027-01-17', lots: 0, seen_before: 0, no_reserve: 0, first_seen_at: null,

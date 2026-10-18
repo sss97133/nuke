@@ -55,7 +55,7 @@ export function MarketScopeControls({ make, scopeKey, view, onMakeChange, onView
       {children}
     </div>
     <label className="market-scope__cohort"><Text role="label">Make</Text>
-      <select aria-label="Recorded sales scope" className="market-control k-body" value={option?.key ?? (unmatchedMake ? `stored:${unmatchedMake}` : '')}
+      <select aria-label={view === 'inventory' ? 'Live inventory make' : 'Recorded sales scope'} className="market-control k-body" value={option?.key ?? (unmatchedMake ? `stored:${unmatchedMake}` : '')}
         onChange={e => onMakeChange(options.find(o => o.key === e.target.value)?.make ?? null, e.target.value || null)}>
         <option value="">{view === 'inventory' ? 'All makes' : 'Choose a make or grouping'}</option>
         {unmatchedMake && <option value={`stored:${unmatchedMake}`} disabled>{unmatchedMake} · {view === 'inventory' ? 'recorded inventory label' : 'no registered sales scope'}</option>}
@@ -86,6 +86,8 @@ export default function RecordedSalesComparison({ make, onMakeChange, view = 'sa
   const showBenchmark = lens?.benchmark ?? localBenchmark;
   const window = useMemo(() => recordedSalesWindow(days, windowClock), [days, windowClock]);
   const evidenceRef = useRef<HTMLDivElement>(null);
+  const countsRef = useRef<HTMLDivElement>(null);
+  const eventWindowRef = useRef<HTMLSelectElement>(null);
   const focusEvidence = useRef(false);
   const options = catalog.data ?? [];
   // Porsche is the owner's initial comparison case; its ID still comes from the public registry.
@@ -125,7 +127,7 @@ export default function RecordedSalesComparison({ make, onMakeChange, view = 'sa
     </div>}
     <div style={{ display: 'flex', gap: 8, alignItems: 'end', flexWrap: 'wrap', marginBottom: 8 }}>
       {controls && <label style={{ ...label, minWidth: 0, maxWidth: '100%' }}>{onMakeChange ? 'Market cohort' : 'Recorded sales scope'}<br />
-        <select aria-label="Recorded sales scope" className="market-control k-body" value={option?.key ?? (unmatchedMake ? `stored:${unmatchedMake}` : '')}
+        <select aria-label={view === 'inventory' ? 'Live inventory make' : 'Recorded sales scope'} className="market-control k-body" value={option?.key ?? (unmatchedMake ? `stored:${unmatchedMake}` : '')}
           onChange={e => { setChosen(e.target.value || null); setDrill(null); onMakeChange?.(options.find(o => o.key === e.target.value)?.make ?? null, e.target.value || null); }}>
           <option value="">{onMakeChange ? 'All makes · live inventory' : 'Choose a registered make or supported grouping'}</option>
           {unmatchedMake && <option value={`stored:${unmatchedMake}`} disabled>{unmatchedMake} · {view === 'inventory' ? 'recorded inventory label' : 'no registered sales scope'}</option>}
@@ -133,7 +135,7 @@ export default function RecordedSalesComparison({ make, onMakeChange, view = 'sa
           {view === 'sales' && <optgroup label="Supported comparison groupings">{options.filter(o => o.scope.kind === 'supported_subject').map(o => <option key={o.key} value={o.key}>{o.label}</option>)}</optgroup>}
         </select>
       </label>}
-      {view === 'sales' && <label style={label}>Event window<br /><select aria-label="Recorded sales event window" value={days} className="market-control k-body"
+      {view === 'sales' && <label style={label}>Event window<br /><select ref={eventWindowRef} aria-label="Recorded sales event window" value={days} className="market-control k-body"
         onChange={e => { const n = Number(e.target.value) as 2 | 7; setDays(n); setWindowClock(Date.now()); setDrill(null); onLensChange?.({ days: n, drill: null }); }}>
         <option value={2}>Last 2 full UTC days</option><option value={7}>Last 7 full UTC days</option>
       </select></label>}
@@ -154,7 +156,10 @@ export default function RecordedSalesComparison({ make, onMakeChange, view = 'sa
     {option && view === 'sales' && query.isFetching && <div role="status">Reading recorded outcomes{drill ? ' and bucket contributors' : ''}…</div>}
     {option && view === 'sales' && query.isError && <div role="status">Recorded outcomes could not be refreshed.{receipt ? ' The previous read remains below.' : ''} <button className="market-control k-body" onClick={() => void query.refetch()}>Retry recorded outcomes</button></div>}
     {response?.state === 'unavailable' && <div role="status">This comparison is unavailable: {response.reason.replace(/_/g, ' ')}. Missing coverage is not zero demand.</div>}
-    {drill && <button className="market-control k-body" onClick={() => { setDrill(null); onLensChange?.({ drill: null }); }}>Clear selected sales day</button>}
+    {drill && <button className="market-control k-body" onClick={() => {
+      (countsRef.current?.querySelector<HTMLButtonElement>('button[aria-pressed="true"]:not(:disabled)') ?? eventWindowRef.current)?.focus();
+      setDrill(null); onLensChange?.({ drill: null });
+    }}>Clear selected sales day</button>}
     {receipt && <>
       <p style={{ fontSize: 12, margin: '8px 0', overflowWrap: 'anywhere' }}>
         {day(receipt.event_from)} ≤ event time &lt; {day(receipt.event_to)} UTC.
@@ -166,7 +171,7 @@ export default function RecordedSalesComparison({ make, onMakeChange, view = 'sa
         <input type="checkbox" checked={showBenchmark} aria-label="Show rest of BaT absolute counts" onChange={e => { setShowBenchmark(e.target.checked); setDrill(null); onLensChange?.({ benchmark: e.target.checked, drill: null }); }} />
         Add rest of BaT · absolute counts from a larger population
       </label>}
-      <div aria-label="Daily recorded sales counts" style={{ display: 'grid', gap: 8 }}>
+      <div ref={countsRef} aria-label="Daily recorded sales counts" style={{ display: 'grid', gap: 8 }}>
         {!receipt.truncated && <span style={{ fontSize: 11 }}>Daily sales · shared count scale 0–{number(max)}. Select a day’s count for its sources.</span>}
         {(showBenchmark ? ['selected', 'benchmark'] as const : ['selected'] as const).map(series => <div key={series}>
           <div style={{ ...label, marginBottom: 4 }}>{seriesName(series, selectedName)}</div>
