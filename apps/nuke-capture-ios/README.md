@@ -155,6 +155,8 @@ Standing rules the code carries:
   two leaf-specific proofs and finish the third on a later pass; replay preserves its old inputs, anchor and reading
   clock without new inference or resetting upload settlement. Missing local originals, old readings or current
   permission remain held. This separate private qualification policy requires activation approval.
+  Unread historical photos are not enrolled by this replay bridge. They require a separate bounded source-enrollment
+  path and approval for new paid analysis; preserving a source or correcting its filing does not create a reading.
 - **Heat is a budget.** Nothing reads originals in bulk while the app is open: iCloud originals download only in
   the background job on Wi-Fi; the album review (originals + accurate OCR) runs in the foreground only on a
   charger at a nominal temperature (`LibraryIngest.mayReviewInForeground`); a foreground backfill slice waits
