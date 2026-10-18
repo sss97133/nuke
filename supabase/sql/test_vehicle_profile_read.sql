@@ -87,7 +87,11 @@ GRANT SELECT ON ALL TABLES IN SCHEMA public TO anon, authenticated, service_role
 \ir ../migrations/20261013144500_vehicle_profile_read_acronyms.sql
 \ir ../migrations/20261013161500_vehicle_profile_read_timeline.sql
 \ir ../migrations/20261015070000_vehicle_profile_read_description.sql
+\ir ../migrations/20261018153000_era_emblems_and_family_facets.sql
+\ir ../migrations/20261018171500_mopar_european_identity_marks.sql
+\ir ../migrations/20261018174500_land_cruiser_porsche_blazer_pontiac_jaguar_marks.sql
 \ir ../migrations/20261018170000_vehicle_profile_read_facets_and_provenance.sql
+\ir ../migrations/20261018190000_vehicle_profile_read_identity_marks.sql
 
 -- Seeds. v1: the documented case; v2: nothing recorded; v3: a sourceless odometer; v4: private;
 -- v5: a classified asking price; v6: competing evidence; v7: a live auction bid.
@@ -229,6 +233,23 @@ BEGIN
     = '426 Hemi V-8|Kissimmee, FL', format('engine_type and listing_location fallbacks populate strip facets; got %s', d->'sections'->1->'facets'));
   PERFORM public.t_assert(d->'sections'->0->'price'->'source'->>'url' = 'https://www.mecum.com/lots/539536/1970-plymouth-hemi-road-runner/',
     'price source url falls back to discovery_url when source_url is null');
+  PERFORM public.t_assert((SELECT string_agg(x->>'display_label', '|' ORDER BY o) FROM jsonb_array_elements(d->'identity_marks') WITH ORDINALITY AS t(x, o))
+    = 'ROAD RUNNER · HEMI', format('v9 (1970 Plymouth Hemi Road Runner) resolves Road Runner identity mark; got %s', d->'identity_marks'));
+
+  d := public.vehicle_profile_read('10000000-0000-0000-0000-000000000001');
+  PERFORM public.t_assert((SELECT string_agg(x->>'display_label', '|' ORDER BY o) FROM jsonb_array_elements(d->'identity_marks') WITH ORDINALITY AS t(x, o))
+    = 'HARDTOP COUPE|MUSTANG|FORD', format('v1 (1966 Ford Mustang Coupe) resolves body silhouette, model wordmark, and marque emblem; got %s', d->'identity_marks'));
+
+  d := public.vehicle_profile_read('10000000-0000-0000-0000-000000000006');
+  PERFORM public.t_assert((SELECT string_agg(x->>'display_label', '|' ORDER BY o) FROM jsonb_array_elements(d->'identity_marks') WITH ORDINALITY AS t(x, o))
+    = 'MUSTANG|FORD', format('v6 (1966 Ford Mustang without body_style) resolves model wordmark and marque emblem without inventing body silhouette; got %s', d->'identity_marks'));
+
+  d := public.vehicle_profile_read('10000000-0000-0000-0000-000000000008');
+  PERFORM public.t_assert((SELECT string_agg(x->>'display_label', '|' ORDER BY o) FROM jsonb_array_elements(d->'identity_marks') WITH ORDINALITY AS t(x, o))
+    = 'K/5 BLAZER · CHEYENNE|CHEVROLET', format('v8 (1977 Chevrolet K5 Blazer) resolves K5 Blazer series badge and Squarebody Chevrolet bowtie; got %s', d->'identity_marks'));
+
+  d := public.vehicle_profile_read('10000000-0000-0000-0000-000000000002');
+  PERFORM public.t_assert(d->'identity_marks' = '[]'::jsonb, 'v2 (1990 Acme Thing) resolves empty identity_marks array');
 END $$;
 RESET ROLE;
 
