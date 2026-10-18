@@ -71,7 +71,7 @@ export type IdentityTokens = { primary: VehicleIdentityToken[]; differentiators:
 export type GalleryImage = { id: string; url: string; taken_at?: string | null; gate: 'approved' };
 
 export type Section =
-  | { kind: 'masthead'; identity: IdentityTokens; year: number | null; make: string | null; model: string | null; price?: Claim<number> | null; priceLabel?: string | null }
+  | { kind: 'masthead'; identity: IdentityTokens; year: number | null; make: string | null; model: string | null; price?: Claim<number> | null; priceLabel?: string | null; identity_marks?: Record<string, unknown>[] }
   | { kind: 'strip'; coverage: Coverage; facets: Array<{ dimension: string; label: string; member: Claim<string> }>; odometer?: Claim<number> | null }
   | { kind: 'measures'; stack: string; title: string; coverage: Coverage; items: Measure[] }
   | { kind: 'timeline'; coverage: Coverage; days: Array<{ day: string; kinds: Record<string, number> }> }
