@@ -141,6 +141,10 @@ export function isGonePage(html: string): boolean {
   return html.length > 0 && !html.includes("bid-stats") && !html.includes("cnb-details");
 }
 
+function isCabThumbUrl(u: string): boolean {
+  return /\/cdn-cgi\/image\/[^/]*(?:width=(?:80|148|160|320)[,/]|height=126[,/])/i.test(u);
+}
+
 function parseCabHtml(html: string, sourceUrl?: string): CabExtractedData {
   const result: CabExtractedData = {
     vin: null, mileage: null, title: null, year: null, make: null, model: null,
@@ -371,12 +375,12 @@ function parseCabHtml(html: string, sourceUrl?: string): CabExtractedData {
     }
     if (result.bidHistory.length > 0) console.log(`✅ C&B [bids]: ${result.bidHistory.length} bids extracted`);
 
-    // 11. Gallery images — CDN URLs (skip small thumbnails width=80/160/320)
+    // 11. Gallery images — CDN URLs (skip small thumbnails width=80/148/160/320 and 148x126 sidebar cards)
     const seenImages = new Set<string>();
     for (const m of html.matchAll(/https:\/\/media\.carsandbids\.com\/[^"'\s)>]+/gi)) {
       const url = m[0];
       const cleanUrl = url.split('?')[0];
-      if (/\/cdn-cgi\/image\/[^/]*width=(?:80|160|320)[,/]/.test(url)) continue;
+      if (isCabThumbUrl(url)) continue;
       if (!seenImages.has(cleanUrl)) {
         seenImages.add(cleanUrl);
         result.images.push(url);
@@ -775,7 +779,10 @@ Deno.serve(async (req) => {
       body_style: facets.body_style ?? extracted.bodyStyle,
       title_status: extracted.titleStatus,
       // Set primary image from extracted gallery
-      primary_image_url: extracted.images.length > 0 ? extracted.images[0] : null,
+      primary_image_url:
+        extracted.images.find((u) => /width=2080[,/]/i.test(u)) ||
+        extracted.images.find((u) => !isCabThumbUrl(u)) ||
+        null,
       // Rich description: all content sections combined
       description: [extracted.description, depth.fullDescription].filter(Boolean).join('\n\n') || null,
       listing_location: parsedLoc.clean,
