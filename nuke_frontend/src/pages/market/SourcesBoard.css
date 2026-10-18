@@ -55,6 +55,9 @@
 .market-sources__defs { position: absolute; }
 .market-sources__hatch { stroke: var(--border); stroke-width: 1.5; }
 .market-sources__sharetext { font-size: 11px; color: var(--text-secondary); white-space: nowrap; font-family: 'Courier New', monospace; }
+/* A labelled reference's kind and as-of day, under its share: an estimate, never read as a census. */
+.market-sources__sharenote { display: block; font-size: 9px; letter-spacing: 0.04em; text-transform: uppercase;
+  color: var(--text-secondary); opacity: 0.85; font-weight: 400; }
 .market-sources__map { font-size: 11px; color: var(--text-secondary); }
 .market-sources__recent { display: flex; align-items: center; justify-content: flex-end; gap: 8px; }
 .market-sources__spark { display: block; flex-shrink: 0; }

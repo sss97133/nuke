@@ -16,7 +16,7 @@ import './SourcesBoard.css';
 const COLUMNS = ['source', 'name', 'category', 'house', 'held_lots', 'held_at', 'population', 'population_method',
   'population_confidence', 'population_at', 'map_sales', 'map_usd', 'sales_12m', 'usd_12m', 'sales_prior_12m',
   'usd_prior_12m', 'months', 'live_lots', 'live_at', 'held_lots_before', 'before_day', 'landed_24h', 'landed_7d',
-  'last_landed', 'days14', 'logo_url', 'business_type'] as const;
+  'last_landed', 'days14', 'logo_url', 'business_type', 'population_grade'] as const;
 type Column = typeof COLUMNS[number];
 const SHOWN = 10;
 
@@ -117,10 +117,17 @@ export type SourceLandingDetail = {
   recent: LandingRecentEvent[];
 };
 
+/** An earlier labelled reference graded by the exact census that followed it; error is (reference − census) / census. */
+export type PopulationGrade = {
+  reference: number; referenceMethod: string; referenceAt: string | null;
+  census: number; censusAt: string | null; error: number;
+};
+
 export type SourceRow = {
   source: string; name: string; category: string | null; house: string | null;
   held: number | null; heldAt: string | null;
   population: number | null; populationMethod: string | null; populationConfidence: number | null; populationAt: string | null;
+  populationGrade?: PopulationGrade | null;
   mapSales: number | null; mapUsd: number | null;
   sales12: number | null; usd12: number | null; salesPrior12: number | null; usdPrior12: number | null;
   /** [YYYY-MM, sales, dollars], oldest first, the last 24 months. */
@@ -168,6 +175,13 @@ const numArray = (x: unknown, len?: number): number[] => {
   return parsed;
 };
 const normKey = (s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, '');
+function parseGrade(x: unknown): PopulationGrade | null {
+  if (!x || typeof x !== 'object' || Array.isArray(x)) return null;
+  const g = x as Record<string, unknown>;
+  const reference = num(g.reference), census = num(g.census), error = num(g.error), referenceMethod = str(g.reference_method);
+  if (reference == null || census == null || error == null || !referenceMethod) return null;
+  return { reference, referenceMethod, referenceAt: str(g.reference_at), census, censusAt: str(g.census_at), error };
+}
 
 /** The reader's value as typed rows, decoded by column name; anything else is null. */
 export function parseSources(value: unknown): SourcesBoardData | null {
@@ -241,6 +255,7 @@ export function parseSources(value: unknown): SourcesBoardData | null {
       held: num(get('held_lots')), heldAt: str(get('held_at')),
       population: num(get('population')), populationMethod: str(get('population_method')),
       populationConfidence: num(get('population_confidence')), populationAt: str(get('population_at')),
+      populationGrade: parseGrade(get('population_grade')),
       mapSales: num(get('map_sales')), mapUsd: num(get('map_usd')),
       sales12: num(get('sales_12m')), usd12: num(get('usd_12m')), salesPrior12: num(get('sales_prior_12m')),
       usdPrior12: num(get('usd_prior_12m')), months,
@@ -432,16 +447,41 @@ export function money(n: number | null): string {
   if (n >= 1e3) return `$${Math.round(n / 1e3)}K`;
   return `$${Math.round(n)}`;
 }
-/** What share of the source's own total we hold, in words that keep the total's method. */
-export function heldShare(row: Pick<SourceRow, 'held' | 'population' | 'populationMethod'>): { share: number | null; text: string } {
+/** Labelled references in source_census: a figure someone supplied or a catalogue estimated, never a count of the source
+ * (data-machine.md, fleet-relative reporting). The board prints them as estimates with their kind and as-of day. */
+const REFERENCE: Record<string, string> = {
+  owner_reference: 'owner reference',
+  catalogue_estimate: 'catalogue estimate',
+  estimate: 'earlier estimate',
+};
+/** What share of the source's own total we hold, in words that keep the total's method. A reference also returns its
+ * label and as-of day, so it reads as an estimate rather than a census. */
+export function heldShare(row: Pick<SourceRow, 'held' | 'population' | 'populationMethod'> & Partial<Pick<SourceRow, 'populationAt'>>):
+  { share: number | null; text: string; reference?: string } {
   if (row.held == null) return { share: null, text: '' };
   if (!(row.population != null && row.population > 0)) return { share: null, text: 'their total unknown' };
   const share = row.held / row.population;
   const pct = share >= 0.995 ? '100%' : share < 0.01 ? '<1%' : `${Math.round(share * 100)}%`;
+  const kind = REFERENCE[row.populationMethod ?? ''];
+  if (kind) {
+    const day = shortDay(row.populationAt ?? null);
+    return { share: Math.min(1, share), text: `${pct} of ≈ ${count(row.population)}`, reference: day ? `${kind} · ${day}` : kind };
+  }
   const of = row.populationMethod === 'enumerated' ? 'of' : 'of about';
   return { share: Math.min(1, share), text: `${pct} ${of} ${count(row.population)}` };
 }
+/** An earlier reference against the census that followed it, e.g. "earlier estimate 95,000 (Jan 28) was 65% low". */
+export function gradeText(g: PopulationGrade | null | undefined): string {
+  if (!g || g.census <= 0) return '';
+  const off = Math.round(Math.abs(g.error) * 100);
+  const kind = REFERENCE[g.referenceMethod] ?? g.referenceMethod;
+  const day = shortDay(g.referenceAt);
+  return `${kind} ${count(g.reference)}${day ? ` (${day})` : ''} was ${off === 0 ? 'within 1%' : `${off}% ${g.error < 0 ? 'low' : 'high'}`}`;
+}
 const METHOD: Record<string, string> = {
+  owner_reference: 'owner reference, an estimate, not a count',
+  catalogue_estimate: 'catalogue estimate, not a count',
+  estimate: 'earlier estimate, not a count',
   enumerated: 'counted from their own listings',
   bounded: 'estimated within a range',
   search_index: 'from their search index',
@@ -1337,6 +1377,7 @@ function SourceLandingInspector({
   const statsPop = detail?.stats?.population ?? row?.population ?? null;
   const statsMethod = detail?.stats?.populationMethod ?? row?.populationMethod ?? null;
   const statsConf = detail?.stats?.populationConfidence ?? row?.populationConfidence ?? null;
+  const statsPopAt = detail?.stats?.populationAt ?? row?.populationAt ?? null;
   const statsMapSales = detail?.stats?.mapSales ?? row?.mapSales ?? null;
   const statsMapUsd = detail?.stats?.mapUsd ?? row?.mapUsd ?? null;
   const statsSales12 = detail?.stats?.sales12 ?? row?.sales12 ?? null;
@@ -1346,6 +1387,7 @@ function SourceLandingInspector({
         held: statsHeld,
         population: statsPop,
         populationMethod: statsMethod,
+        populationAt: statsPopAt,
       })
     : null;
   const statsMethodNote = statsMethod
@@ -1460,6 +1502,7 @@ function SourceLandingInspector({
             <span className="market-sources__kpi-label">Census &amp; coverage</span>
             <strong title={statsMethodNote}>
               {statsShare?.text || '—'}
+              {statsShare?.reference ? <small className="market-sources__sharenote">{statsShare.reference}</small> : null}
             </strong>
           </div>
           <div className="market-sources__kpi">
@@ -2194,11 +2237,17 @@ export function SourcesBoardView({
               const cat = resolveSourceCategory(r);
               const badge = categoryBadgeLabel(r);
               const dealerProfileHref = resolveDealerProfileHref(r);
-              const total = r.population != null
-                ? `${count(r.population)} ${METHOD[r.populationMethod ?? ''] ?? `(${r.populationMethod ?? 'method unrecorded'})`}`
-                  + `${r.populationAt ? `, ${shortDay(r.populationAt)}` : ''}`
-                  + `${r.populationConfidence != null ? `, confidence ${r.populationConfidence.toFixed(2)}` : ''}`
-                : 'their total is not counted yet';
+              const graded = gradeText(r.populationGrade);
+              const total = r.population == null
+                ? 'their total is not counted yet'
+                : s.reference
+                  ? `≈ ${count(r.population)} · ${s.reference}`
+                    + `${r.populationConfidence != null ? ` · confidence ${r.populationConfidence.toFixed(2)}` : ''}`
+                    + ' · an estimate, not a count of their listings'
+                  : `${count(r.population)} ${METHOD[r.populationMethod ?? ''] ?? `(${r.populationMethod ?? 'method unrecorded'})`}`
+                    + `${r.populationAt ? `, ${shortDay(r.populationAt)}` : ''}`
+                    + `${r.populationConfidence != null ? `, confidence ${r.populationConfidence.toFixed(2)}` : ''}`
+                    + `${graded ? `; ${graded}` : ''}`;
               return (
                 <Fragment key={r.source}>
                   <li
@@ -2247,10 +2296,14 @@ export function SourcesBoardView({
                     <span className="market-sources__share" title={total}>
                       <svg className="market-sources__track" viewBox="0 0 100 8" preserveAspectRatio="none" aria-hidden="true">
                         {s.share != null
-                          ? <rect className="market-sources__fill" x="0" y="0" height="8" width={Math.max(1.5, s.share * 100)} />
+                          ? <rect className={`market-sources__fill${s.reference ? ' market-sources__fill--est' : ''}`}
+                              x="0" y="0" height="8" width={Math.max(1.5, s.share * 100)} />
                           : <rect className="market-sources__unknown" x="0" y="0" height="8" width="100" fill="url(#market-sources-hatch)" />}
                       </svg>
-                      <span className="market-sources__sharetext">{s.text}</span>
+                      <span className="market-sources__sharetext">
+                        {s.text}
+                        {s.reference ? <small className="market-sources__sharenote">{s.reference}</small> : null}
+                      </span>
                     </span>
                     <button
                       type="button"
