@@ -39,6 +39,29 @@ export function comparableLotKey(url: string | null | undefined): string | null 
     .replace(/\/+$/, '');
 }
 
+const BROADCAST_SOURCE_ID = 'e980c7bd-404f-41f6-8a17-1c7cabd1d8a4';
+
+/** The broadcast presentation of the cited lot, read from the auction livestream overlay. Only an exact lot
+ * match on the same vehicle qualifies; the clip is evidence of the presentation, never of the cited price,
+ * and its offsets are positions in the recording, not auction clock times. */
+export function pickLotPresentation(rows: any[] | null | undefined, vehicleId: string, lotNumber: string | null):
+  { videoUrl: string; startSeconds: number; endSeconds: number | null } | null {
+  const lot = String(lotNumber ?? '').trim().toUpperCase();
+  if (!lot || !Array.isArray(rows)) return null;
+  const candidates = rows.filter(r => r?.vehicle_id === vehicleId
+    && String(r?.structured_data?.value?.lot ?? '').trim().toUpperCase() === lot
+    && /^[A-Za-z0-9_-]{11}$/.test(String(r?.structured_data?.media?.video_id ?? ''))
+    && typeof r?.structured_data?.media?.start_seconds === 'number' && r.structured_data.media.start_seconds >= 0);
+  const row = candidates.find(r => r.structured_data.value.displayed_outcome === 'sold') ?? candidates[0];
+  if (!row) return null;
+  const media = row.structured_data.media;
+  return {
+    videoUrl: `https://www.youtube.com/watch?v=${media.video_id}`,
+    startSeconds: media.start_seconds,
+    endSeconds: typeof media.end_seconds === 'number' ? media.end_seconds : null,
+  };
+}
+
 /** Extract lot number and auction event name from vehicle metadata or enriched description text. */
 export function extractInlineLotProvenance(vehicle: Record<string, any> | null | undefined): {
   lotNumber: string | null;
@@ -140,7 +163,7 @@ export default function ProfileHeader({ priceLotId }: { priceLotId?: string }) {
     let cancelled = false;
     (async () => {
       try {
-        const [auctionRes, eventRes] = await Promise.all([
+        const [auctionRes, eventRes, presentationRes] = await Promise.all([
           Promise.resolve(
         supabase
           .from('auction_events')
@@ -157,6 +180,16 @@ export default function ProfileHeader({ priceLotId }: { priceLotId?: string }) {
           .order('extracted_at', { ascending: false, nullsFirst: false })
           .limit(10)
       ).catch(() => ({ data: null })),
+      Promise.resolve(
+        supabase
+          .from('vehicle_observations')
+          .select('vehicle_id, structured_data')
+          .eq('vehicle_id', vehicleId)
+          .eq('source_id', BROADCAST_SOURCE_ID)
+          .eq('structured_data->>property', 'broadcast_lot_presentation')
+          .eq('is_superseded', false)
+          .limit(20)
+      ).catch(() => ({ data: null })),
     ]);
     if (cancelled) return;
     const pickMatchingRow = (rows: any[] | null | undefined): any => {
@@ -170,14 +203,18 @@ export default function ProfileHeader({ priceLotId }: { priceLotId?: string }) {
     const auctionRow = pickMatchingRow(auctionRes?.data as any[] | null);
     const eventRow = pickMatchingRow(eventRes?.data as any[] | null);
     const meta = (eventRow?.metadata && typeof eventRow.metadata === 'object' ? eventRow.metadata : {}) as Record<string, any>;
+    const lotNumber = auctionRow?.lot_number || meta.lot_number || eventRow?.source_listing_id || null;
+    const recordedVideo = auctionRow?.broadcast_video_url || auctionRow?.broadcast_video_id || meta.video_url || null;
+    const presentation = recordedVideo ? null
+      : pickLotPresentation(presentationRes?.data as any[] | null, vehicleId, lotNumber);
     setLotProvenance({
       sourceUrl: auctionRow?.source_url || eventRow?.source_url || null,
-      lotNumber: auctionRow?.lot_number || meta.lot_number || eventRow?.source_listing_id || null,
+      lotNumber,
       auctionName: meta.auction_name || meta.event_name || null,
       observedAt: auctionRow?.auction_end_date || auctionRow?.auction_start_date || eventRow?.sold_at || eventRow?.ended_at || eventRow?.extracted_at || null,
-      videoUrl: auctionRow?.broadcast_video_url || auctionRow?.broadcast_video_id || meta.video_url || null,
-      startSeconds: typeof auctionRow?.broadcast_timestamp_start === 'number' ? auctionRow.broadcast_timestamp_start : null,
-      endSeconds: typeof auctionRow?.broadcast_timestamp_end === 'number' ? auctionRow.broadcast_timestamp_end : null,
+      videoUrl: recordedVideo || presentation?.videoUrl || null,
+      startSeconds: typeof auctionRow?.broadcast_timestamp_start === 'number' ? auctionRow.broadcast_timestamp_start : presentation?.startSeconds ?? null,
+      endSeconds: typeof auctionRow?.broadcast_timestamp_end === 'number' ? auctionRow.broadcast_timestamp_end : presentation?.endSeconds ?? null,
     });
       } catch {
         // Provenance enrichment is additive; never block the header.
