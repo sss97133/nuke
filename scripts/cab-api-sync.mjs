@@ -1166,7 +1166,8 @@ async function extractSingleAuctionGoldStandard(cab, auctionId) {
     let q = supabase
       .from("vehicles")
       .select("id")
-      .ilike("vin", vin.trim())
+      // Case variants as an exact IN, so idx_vehicles_vin serves it (an ILIKE seq-scans vehicles).
+      .in("vin", [...new Set([vin.trim(), vin.trim().toUpperCase(), vin.trim().toLowerCase()])])
       .or("status.is.null,status.neq.merged")
       .is("deleted_at", null);
     if (vin.length < 11 && (l.make || parseTitleYmm(l.title).make)) {
