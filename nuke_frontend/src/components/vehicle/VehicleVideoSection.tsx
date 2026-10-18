@@ -151,6 +151,7 @@ const VideoModal: React.FC<{
             <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
               <span style={{ fontSize: '11px', fontFamily: "'Courier New', monospace", color: 'var(--text-muted)' }}>
                 Video offset {formatTimestamp(video.broadcast_timestamp_start)} · recorded video span {span}
+                {video.displayed_bid_changes ? ` · screen showed ${video.displayed_bid_changes} bid changes` : ''}
               </span>
               {recordedAmount !== null && (
                 <button

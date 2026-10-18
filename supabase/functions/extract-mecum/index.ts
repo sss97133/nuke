@@ -34,7 +34,7 @@ import { projectSecretKey } from "../_shared/supabaseKeys.ts";
 import { postFromFlight } from "./rscPost.ts";
 import { mustWrite, softWrite } from "../_shared/writeResult.ts";
 import { extractStructuredLotFacets, indexLot, parseSaleFacet, priorSaleFacet, saleDay, summarizePriorSale, type IndexLot } from "./indexLot.ts";
-import { fillOnlyIdentity } from "./identityFill.ts";
+import { fillOnlyIdentity, vinConflictHolder } from "./identityFill.ts";
 import { patchForLiveRow, writeVehicleEventByKey } from "../_shared/vehicleEventWrite.ts";
 
 const EXTRACTOR_VERSION = "2.0.0";
@@ -1138,10 +1138,17 @@ async function saveVehicle(
     const updateRes = await supabase.from("vehicles").update(updateData).eq("id", existingId);
     const updateErr = updateRes.error;
     if (updateErr) {
-      // VIN unique constraint violation: another vehicle already has this VIN.
-      // Retry without VIN to still update other fields.
-      if (updateErr.code === "23505" && updateErr.message?.includes("vin")) {
-        console.warn(`[MECUM] VIN conflict for ${existingId} (vin=${cleanData.vin}), retrying without VIN`);
+      // The lot's VIN is already on another vehicle (usually the same car consigned under an earlier lot). The VIN is not
+      // written and nothing is merged: the pair goes to the revision queue to be relinked, and the rest of the lot lands.
+      const vinHolder = vinConflictHolder(updateErr);
+      if (vinHolder !== null && "vin" in updateData) {
+        console.warn(`[MECUM] VIN conflict for ${existingId} (vin=${cleanData.vin}, holder=${vinHolder || "unnamed"}), retrying without VIN`);
+        await raiseRevision(supabase, vehicle.url, ["vin"], "duplicate_key", "relink", {
+          vehicle_id: existingId,
+          lot_states: { vin: cleanData.vin },
+          vin_held_by_vehicle_id: vinHolder || null,
+          raised_in: "extract-mecum saveVehicle",
+        });
         const { vin: _skipVin, ...dataWithoutVin } = updateData;
         const { error: retryErr } = await supabase.from("vehicles").update(dataWithoutVin).eq("id", existingId);
         if (retryErr) {

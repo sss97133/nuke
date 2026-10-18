@@ -393,6 +393,8 @@ event), described (COMMENT ON), owned (a registry row) and read. Not fewer table
 | Media, forums, video | slow, unstructured, high provenance value; vision costs per minute | none yet | documents keyed to vehicles | cost per clip; claims extracted per clip |
 | Owner's private data (Photos, receipts, K5 registry) | private; Mac-bound | `photo-sync-daemon`, receipts reconcile | observations, masked | classifier success rate (today 0%) |
 
+The species is a column (2026-10-18): `observation_sources.species`, with `species_set` and the evidence it was read from (`species_evidence`); a listing takes its own species where its URL or metadata shows it (`v_listing_species`). The extractor's builder declares it from the source itself (`.claude/rules/extraction.md`, Source species), and the Sources board groups by it with the names above. Barn Finds is an aggregator (a curator: its posts point at eBay, Craigslist and Facebook listings), with its own 'BF Exclusive' ads as classifieds.
+
 ## 7. Hypotheses the owner wants tested as veins (in the vocabulary)
 
 - **The repair chain precedes the market event.** "How many thermostats had to sell before an AC system sold, before

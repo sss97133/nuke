@@ -1,12 +1,16 @@
 -- Empty disposable PG17 only: psql -X -v ON_ERROR_STOP=1 -d dm_refinement_supersede_junk_listing_images -f this-file.sql
--- Contract for 20261018210000_supersede_junk_listing_images.sql. Synthetic rows only; never production.
+-- Contract for 20261018210000_supersede_junk_listing_images.sql and 20261019001500_supersede_other_lot_listing_images.sql.
+-- Synthetic rows only; never production.
 -- Starting from recompute_vehicle_primary_image, ensure_single_primary_image and sync_vehicle_primary_image as
 -- production held them on 2026-10-18, this proves that is_junk_listing_image_url names the page furniture #1878 filters
 -- and no real photo, that a dry run changes nothing, that an apply supersedes every junk row (never deletes, never edits
 -- image_url) and gives a junk cover the vehicle's own best photo through the recompute (the Cars & Bids 2080 hero, not
 -- another auction's 768 or 356x260 card; the Bonhams lot photo, not a flag), that a vehicle with no usable photo keeps
 -- its cover and is listed, that a clean cover is left alone, that a rerun is a no-op, that the batch bound holds and
--- that only service_role may call it.
+-- that only service_role may call it. For other lots' cards it proves that a Cars & Bids row is judged against the
+-- gallery of its own capture (the lot page, else the insert batch) by photo and set id, not by width: the lot's own 768
+-- renders and an index card with no capture stay, other lots' cards (set ids or seller-named files) are superseded,
+-- and a cover that is one of them is repaired.
 \set ON_ERROR_STOP on
 DO $$ BEGIN
   IF current_database() NOT LIKE 'dm_refinement_%'
@@ -36,7 +40,8 @@ CREATE TABLE public.vehicle_images (id uuid PRIMARY KEY DEFAULT gen_random_uuid(
   taken_at timestamptz, created_at timestamptz NOT NULL DEFAULT now(), is_primary boolean DEFAULT false,
   is_superseded boolean, superseded_at timestamptz, is_duplicate boolean, duplicate_of uuid, is_sensitive boolean,
   vision_gate_status public.vision_gate_status, vision_gate_agent_reasoning text, vision_gate_processed_at timestamptz,
-  apple_ml_labels text[], image_vehicle_match_status text, ai_scan_metadata jsonb, file_size bigint, vehicle_zone text);
+  apple_ml_labels text[], image_vehicle_match_status text, ai_scan_metadata jsonb, file_size bigint, vehicle_zone text,
+  exif_data jsonb);
 CREATE FUNCTION public.image_hero_score(meta jsonb, fsize bigint) RETURNS numeric LANGUAGE sql IMMUTABLE AS
 $$ SELECT coalesce((meta->>'score')::numeric, 0) $$;
 \ir helpers/recompute_vehicle_primary_image_live_20261015.sql
@@ -76,6 +81,8 @@ CREATE TRIGGER trg_sync_vehicle_primary_image AFTER DELETE OR UPDATE OF is_prima
 
 \ir ../migrations/20261018210000_supersede_junk_listing_images.sql
 \ir ../migrations/20261018210000_supersede_junk_listing_images.sql
+\ir ../migrations/20261019001500_supersede_other_lot_listing_images.sql
+\ir ../migrations/20261019001500_supersede_other_lot_listing_images.sql
 
 SELECT pg_temp.ok('junk: Cars & Bids sidebar thumbnails', bool_and(public.is_junk_listing_image_url(u))) FROM unnest(ARRAY[
   'https://media.carsandbids.com/cdn-cgi/image/width=148,height=126,quality=70/abc/photos/x.jpg',
@@ -96,7 +103,8 @@ SELECT pg_temp.ok('not junk: the car''s own photos', NOT bool_or(public.is_junk_
   'https://d2niwqq19lf86s.cloudfront.net/photos/1.jpg']) u;
 
 -- V1 Cars & Bids: cover is a sidebar thumbnail; the 2080 hero is the car, 768 and 356x260 are other auctions' cards
--- written later. V2 Bonhams: cover is a flag; position 1 is the lot photo. V3 Bonhams: nothing but furniture.
+-- captured later from the same lot page. V2 Bonhams: cover is a flag; position 1 is the lot photo. V3 Bonhams: nothing
+-- but furniture.
 -- V4: clean cover, one stray junk row.
 INSERT INTO public.vehicles VALUES
   ('00000000-0000-4000-8000-000000000001', true, 'https://media.carsandbids.com/cdn-cgi/image/width=148,height=126,quality=70/c5/photos/thumb.jpg'),
@@ -118,6 +126,9 @@ INSERT INTO public.vehicle_images (id, vehicle_id, image_url, source, position, 
   ('00000000-0000-4000-9000-000000000302', '00000000-0000-4000-8000-000000000003', 'https://cars.bonhams.com/_next/image.jpg?url=https%3A%2F%2Fimg1.bonhams.com%2Fimage%3Fsrc%3DY%26width%3D230&w=2400&q=75', 'bonhams_import', 1, false, '2026-03-01'),
   ('00000000-0000-4000-9000-000000000401', '00000000-0000-4000-8000-000000000004', 'https://images1.bonhams.com/image?src=Images/live/own.jpg', 'bonhams_import', 0, true, '2026-03-01'),
   ('00000000-0000-4000-9000-000000000402', '00000000-0000-4000-8000-000000000004', 'https://www.bonhams.com/web-assets/logo.svg', 'bonhams_import', 1, false, '2026-03-01');
+UPDATE public.vehicle_images SET exif_data = '{"source_url": "https://carsandbids.com/auctions/AbCd1234/v1", "imported_from": "cars_and_bids"}'
+ WHERE id IN ('00000000-0000-4000-9000-000000000102', '00000000-0000-4000-9000-000000000103',
+              '00000000-0000-4000-9000-000000000104', '00000000-0000-4000-9000-000000000105');
 TRUNCATE public.recompute_calls;
 CREATE TEMP TABLE before_images AS SELECT * FROM public.vehicle_images;
 CREATE TEMP TABLE before_vehicles AS SELECT * FROM public.vehicles;
@@ -125,8 +136,8 @@ CREATE TEMP TABLE ids AS SELECT ARRAY(SELECT id FROM public.vehicles ORDER BY id
 
 -- Dry run.
 CREATE TEMP TABLE dry AS SELECT public.supersede_junk_listing_images((SELECT a FROM ids), false) AS r;
-SELECT pg_temp.ok('dry run reports the junk rows, junk covers, nominees and the vehicle with none',
-  (r->'tally') = '{"junk_rows": 7, "superseded": 0, "junk_primary": 3, "nominated": 2, "no_usable_image": 1, "junk_primary_after": 3}'::jsonb
+SELECT pg_temp.ok('dry run reports the junk rows, other-lot cards, junk covers, nominees and the vehicle with none',
+  (r->'tally') = '{"junk_rows": 7, "other_lot_rows": 2, "superseded": 0, "junk_primary": 3, "nominated": 2, "no_usable_image": 1, "junk_primary_after": 3}'::jsonb
   AND r->'no_usable_image' = '["00000000-0000-4000-8000-000000000003"]'::jsonb) FROM dry;
 SELECT pg_temp.ok('dry run changes nothing',
   NOT EXISTS (SELECT * FROM public.vehicle_images EXCEPT SELECT * FROM before_images)
@@ -134,12 +145,13 @@ SELECT pg_temp.ok('dry run changes nothing',
 
 -- Apply.
 CREATE TEMP TABLE applied AS SELECT public.supersede_junk_listing_images((SELECT a FROM ids), true) AS r;
-SELECT pg_temp.ok('apply supersedes the 7 junk rows and repairs both covers it can',
-  (r->'tally') = '{"junk_rows": 7, "superseded": 7, "junk_primary": 3, "nominated": 2, "no_usable_image": 1, "junk_primary_after": 1}'::jsonb)
+SELECT pg_temp.ok('apply supersedes the 7 junk rows and 2 other-lot cards and repairs both covers it can',
+  (r->'tally') = '{"junk_rows": 7, "other_lot_rows": 2, "superseded": 9, "junk_primary": 3, "nominated": 2, "no_usable_image": 1, "junk_primary_after": 1}'::jsonb)
   FROM applied;
-SELECT pg_temp.ok('every junk row is superseded, unflagged and timestamped; no other row is',
-  bool_and((is_superseded IS TRUE) = public.is_junk_listing_image_url(image_url))
-  AND bool_and(NOT public.is_junk_listing_image_url(image_url) OR (is_primary IS FALSE AND superseded_at IS NOT NULL)))
+SELECT pg_temp.ok('every junk row and other-lot card is superseded, unflagged and timestamped; no other row is',
+  bool_and((is_superseded IS TRUE) = (public.is_junk_listing_image_url(image_url)
+    OR id IN ('00000000-0000-4000-9000-000000000104', '00000000-0000-4000-9000-000000000105')))
+  AND bool_and(is_superseded IS NOT TRUE OR (is_primary IS FALSE AND superseded_at IS NOT NULL)))
   FROM public.vehicle_images;
 SELECT pg_temp.ok('no row deleted and no image_url edited',
   (SELECT count(*) FROM public.vehicle_images) = (SELECT count(*) FROM before_images)
@@ -150,8 +162,8 @@ SELECT pg_temp.ok('Cars & Bids cover is the 2080 hero, not another auction''s ca
 SELECT pg_temp.ok('Cars & Bids hero is the one primary row',
   array_agg(id) = ARRAY['00000000-0000-4000-9000-000000000102'::uuid])
   FROM public.vehicle_images WHERE vehicle_id = '00000000-0000-4000-8000-000000000001' AND is_primary;
-SELECT pg_temp.ok('other auctions'' 768 and 356x260 cards are not superseded by this writer',
-  bool_and(COALESCE(is_superseded, false) = false))
+SELECT pg_temp.ok('other auctions'' 768 and 356x260 cards from the same lot page are superseded',
+  bool_and(is_superseded IS TRUE))
   FROM public.vehicle_images WHERE id IN ('00000000-0000-4000-9000-000000000104', '00000000-0000-4000-9000-000000000105');
 SELECT pg_temp.ok('Bonhams cover is the lot photo at gallery position 1',
   primary_image_url = 'https://cars.bonhams.com/_next/image.jpg?url=https%3A%2F%2Fimg1.bonhams.com%2Fimage%3Fsrc%3DImages%2Flive%2F2022-02%2F25%2F25160832-7-35.jpg&w=2400&q=75')
@@ -169,8 +181,82 @@ SELECT pg_temp.ok('the skip setting is restored after the call',
 -- Rerun.
 CREATE TEMP TABLE rerun AS SELECT public.supersede_junk_listing_images((SELECT a FROM ids), true) AS r;
 SELECT pg_temp.ok('a rerun is a no-op',
-  (r->'tally') = '{"junk_rows": 0, "superseded": 0, "junk_primary": 1, "nominated": 0, "no_usable_image": 1, "junk_primary_after": 1}'::jsonb)
+  (r->'tally') = '{"junk_rows": 0, "other_lot_rows": 0, "superseded": 0, "junk_primary": 1, "nominated": 0, "no_usable_image": 1, "junk_primary_after": 1}'::jsonb)
   FROM rerun;
+
+-- Other lots' cards, judged against the gallery of the same capture.
+SELECT pg_temp.ok('photo key drops the render, set id is the 8-character gallery prefix, seller-named files have none',
+  public.cab_photo_key('https://media.carsandbids.com/cdn-cgi/image/width=768,quality=70/9004/photos/3yvlj0Do-EpLCSxj/edit/a.jpg?t=1')
+    = '9004/photos/3yvlj0Do-EpLCSxj/edit/a.jpg'
+  AND public.cab_photo_set('https://media.carsandbids.com/cdn-cgi/image/width=542,quality=70/9004/photos/exterior/3yvlj0Do--qXdYyQ/edit/b.jpg') = '3yvlj0Do'
+  AND public.cab_photo_set('https://media.carsandbids.com/cdn-cgi/image/width=768,quality=70/30ea/photos/SubaruBaja2006008/edit/c.jpg') IS NULL
+  AND public.cab_photo_set('https://media.carsandbids.com/cdn-cgi/image/width=768,quality=70/9004/photos/application/s-na2z0u9/edit/d.jpg') IS NULL);
+SELECT pg_temp.ok('without a gallery nothing is another lot''s',
+  NOT public.is_other_lot_listing_image('https://media.carsandbids.com/cdn-cgi/image/width=768,quality=70/ee7f/photos/30xvA242-TnXslZ7/edit/x.jpg', '{}')
+  AND NOT public.is_other_lot_listing_image('https://media.carsandbids.com/cdn-cgi/image/width=768,quality=70/ee7f/photos/30xvA242-TnXslZ7/edit/x.jpg', NULL));
+SELECT pg_temp.ok('the new predicates are immutable', bool_and(provolatile = 'i'))
+  FROM pg_proc WHERE proname IN ('cab_photo_key', 'cab_photo_set', 'is_other_lot_listing_image');
+
+-- V5: found on the auction index; its only photo and cover is its own 768 card, no page capture.
+-- V6: lot page 92xXv4Oa captured with exif_data: gallery set 3yvlj0Do (2080 hero, 542s), its own photos also at 768,
+--     a comment attachment, the ending-soon, similar and new-listings cards (other set ids, a seller-named file, a
+--     148x126 thumbnail), and an older index card. Its cover is another lot's 768 card.
+-- V7: a page scan written without exif_data: gallery and cards share one insert batch; the index card is a batch apart.
+INSERT INTO public.vehicles VALUES
+  ('00000000-0000-4000-8000-000000000005', true, 'https://media.carsandbids.com/cdn-cgi/image/width=768,quality=70/30ea/photos/rGz2YjDg-uf1hNVABNG-(edit).jpg?t=1'),
+  ('00000000-0000-4000-8000-000000000006', true, 'https://media.carsandbids.com/cdn-cgi/image/width=768,quality=70/ee7f/photos/30xvA242-TnXslZ7/edit/oaDat.jpg?t=1'),
+  ('00000000-0000-4000-8000-000000000007', true, 'https://media.carsandbids.com/cdn-cgi/image/width=2080,quality=70/4822/photos/rGaRl5mo-OjsCw0Q/edit/Opp-l.jpg?t=1');
+INSERT INTO public.vehicle_images (id, vehicle_id, image_url, source, position, is_primary, created_at, exif_data) VALUES
+  ('00000000-0000-4000-9000-000000000501', '00000000-0000-4000-8000-000000000005', 'https://media.carsandbids.com/cdn-cgi/image/width=768,quality=70/30ea/photos/rGz2YjDg-uf1hNVABNG-(edit).jpg?t=1', 'external_import', 0, true, '2026-01-25 03:09:38', NULL),
+  ('00000000-0000-4000-9000-000000000601', '00000000-0000-4000-8000-000000000006', 'https://media.carsandbids.com/cdn-cgi/image/width=2080,quality=70/9004/photos/3yvlj0Do-EpLCSxj/edit/jAdnL.jpg?t=1', 'external_import', 0, false, '2026-07-27 18:03:57', '{"source_url": "https://carsandbids.com/auctions/92xXv4Oa/1997-bmw-m3-coupe"}'),
+  ('00000000-0000-4000-9000-000000000602', '00000000-0000-4000-8000-000000000006', 'https://media.carsandbids.com/cdn-cgi/image/width=542,quality=70/9004/photos/3yvlj0Do-MIQ9Hac/edit/wgwPO.jpg?t=1', 'external_import', 1, false, '2026-07-27 18:03:57', '{"source_url": "https://carsandbids.com/auctions/92xXv4Oa/1997-bmw-m3-coupe"}'),
+  ('00000000-0000-4000-9000-000000000603', '00000000-0000-4000-8000-000000000006', 'https://media.carsandbids.com/cdn-cgi/image/width=768,quality=70/9004/photos/3yvlj0Do-EpLCSxj/edit/jAdnL.jpg?t=1', 'external_import', 2, false, '2026-07-27 18:18:32', '{"source_url": "https://carsandbids.com/auctions/92xXv4Oa/1997-bmw-m3-coupe/"}'),
+  ('00000000-0000-4000-9000-000000000604', '00000000-0000-4000-8000-000000000006', 'https://media.carsandbids.com/cdn-cgi/image/width=768,quality=70/9004/photos/exterior/3yvlj0Do-QKCtjld/edit/E289G.jpg?t=1', 'external_import', 3, false, '2026-07-27 18:03:57', '{"source_url": "https://carsandbids.com/auctions/92xXv4Oa/1997-bmw-m3-coupe"}'),
+  ('00000000-0000-4000-9000-000000000605', '00000000-0000-4000-8000-000000000006', 'https://media.carsandbids.com/cdn-cgi/image/width=180,quality=70/e0b9/attachments/92xXv4Oa-yp5UNAF.jpeg?t=1', 'external_import', 4, false, '2026-07-27 18:03:57', '{"source_url": "https://carsandbids.com/auctions/92xXv4Oa/1997-bmw-m3-coupe"}'),
+  ('00000000-0000-4000-9000-000000000606', '00000000-0000-4000-8000-000000000006', 'https://media.carsandbids.com/cdn-cgi/image/width=768,quality=70/ee7f/photos/30xvA242-TnXslZ7/edit/oaDat.jpg?t=1', 'external_import', 5, true, '2026-07-27 18:03:57', '{"source_url": "https://carsandbids.com/auctions/92xXv4Oa/1997-bmw-m3-coupe"}'),
+  ('00000000-0000-4000-9000-000000000607', '00000000-0000-4000-8000-000000000006', 'https://media.carsandbids.com/cdn-cgi/image/width=768,quality=70/30ea/photos/SubaruBaja2006008/edit/te_Gl.jpg?t=1', 'external_import', 6, false, '2026-07-27 18:03:57', '{"source_url": "https://carsandbids.com/auctions/92xXv4Oa/1997-bmw-m3-coupe"}'),
+  ('00000000-0000-4000-9000-000000000608', '00000000-0000-4000-8000-000000000006', 'https://media.carsandbids.com/cdn-cgi/image/width=356,height=260,quality=70/1477/photos/exterior/KmmMMmlY-vPv9eC8/edit/yPjdT.jpg?t=1', 'external_import', 7, false, '2026-07-27 18:03:57', '{"source_url": "https://carsandbids.com/auctions/92xXv4Oa/1997-bmw-m3-coupe"}'),
+  ('00000000-0000-4000-9000-000000000609', '00000000-0000-4000-8000-000000000006', 'https://media.carsandbids.com/cdn-cgi/image/width=148,height=126,quality=70/1477/photos/interior/KmmMMmlY-u-GbNEF/edit/s7ovF.jpg?t=1', 'external_import', 8, false, '2026-07-27 18:03:57', '{"source_url": "https://carsandbids.com/auctions/92xXv4Oa/1997-bmw-m3-coupe"}'),
+  ('00000000-0000-4000-9000-000000000610', '00000000-0000-4000-8000-000000000006', 'https://media.carsandbids.com/cdn-cgi/image/width=768,quality=70/9004/photos/KdZxZWV5-8yfwuzwDcN-(edit).jpg?t=1', 'external_import', 9, false, '2026-01-25 03:28:24', NULL),
+  ('00000000-0000-4000-9000-000000000701', '00000000-0000-4000-8000-000000000007', 'https://media.carsandbids.com/cdn-cgi/image/width=2080,quality=70/4822/photos/rGaRl5mo-OjsCw0Q/edit/Opp-l.jpg?t=1', 'external_import', 0, true, '2026-01-25 01:16:11', NULL),
+  ('00000000-0000-4000-9000-000000000702', '00000000-0000-4000-8000-000000000007', 'https://media.carsandbids.com/cdn-cgi/image/width=542,quality=70/4822/photos/rGaRl5mo-MVBMX2R/edit/io4xr.jpg?t=1', 'external_import', 1, false, '2026-01-25 01:16:11', NULL),
+  ('00000000-0000-4000-9000-000000000703', '00000000-0000-4000-8000-000000000007', 'https://media.carsandbids.com/cdn-cgi/image/width=768,quality=70/9004/photos/KPeOeYAV-cbPIbnnR0c/edit/0BMej.jpg?t=1', 'external_import', 2, false, '2026-01-25 01:16:11', NULL),
+  ('00000000-0000-4000-9000-000000000704', '00000000-0000-4000-8000-000000000007', 'https://media.carsandbids.com/cdn-cgi/image/width=356,height=260,quality=70/f042/photos/9QWygz2Y-eZGP8U8EVr.jpg?t=1', 'external_import', 3, false, '2026-01-25 01:16:11', NULL),
+  ('00000000-0000-4000-9000-000000000705', '00000000-0000-4000-8000-000000000007', 'https://media.carsandbids.com/cdn-cgi/image/width=768,quality=70/9004/photos/Q1w2E3r4-zzz/edit/i.jpg?t=1', 'external_import', 4, false, '2026-01-26 09:00:00', NULL);
+TRUNCATE public.recompute_calls;
+CREATE TEMP TABLE before_images2 AS SELECT * FROM public.vehicle_images;
+CREATE TEMP TABLE ids2 AS SELECT ARRAY['00000000-0000-4000-8000-000000000005', '00000000-0000-4000-8000-000000000006',
+  '00000000-0000-4000-8000-000000000007']::uuid[] AS a;
+
+CREATE TEMP TABLE dry2 AS SELECT public.supersede_junk_listing_images((SELECT a FROM ids2), false) AS r;
+SELECT pg_temp.ok('dry run counts the other-lot cards once (the 148x126 card is junk) and the other-lot cover',
+  (r->'tally') = '{"junk_rows": 1, "other_lot_rows": 5, "superseded": 0, "junk_primary": 1, "nominated": 1, "no_usable_image": 0, "junk_primary_after": 1}'::jsonb)
+  FROM dry2;
+SELECT pg_temp.ok('dry run changes nothing', NOT EXISTS (SELECT * FROM public.vehicle_images EXCEPT SELECT * FROM before_images2));
+
+CREATE TEMP TABLE applied2 AS SELECT public.supersede_junk_listing_images((SELECT a FROM ids2), true) AS r;
+SELECT pg_temp.ok('apply supersedes the 6 cards and repairs the other-lot cover',
+  (r->'tally') = '{"junk_rows": 1, "other_lot_rows": 5, "superseded": 6, "junk_primary": 1, "nominated": 1, "no_usable_image": 0, "junk_primary_after": 0}'::jsonb)
+  FROM applied2;
+SELECT pg_temp.ok('exactly the other lots'' cards are superseded',
+  array_agg(id ORDER BY id) FILTER (WHERE is_superseded IS TRUE) = ARRAY['00000000-0000-4000-9000-000000000606',
+    '00000000-0000-4000-9000-000000000607', '00000000-0000-4000-9000-000000000608', '00000000-0000-4000-9000-000000000609',
+    '00000000-0000-4000-9000-000000000703', '00000000-0000-4000-9000-000000000704']::uuid[])
+  FROM public.vehicle_images WHERE vehicle_id = ANY(ARRAY(SELECT unnest(a) FROM ids2));
+SELECT pg_temp.ok('the index card cover with no capture is untouched',
+  v.primary_image_url = 'https://media.carsandbids.com/cdn-cgi/image/width=768,quality=70/30ea/photos/rGz2YjDg-uf1hNVABNG-(edit).jpg?t=1'
+  AND i.is_superseded IS NULL AND i.is_primary)
+  FROM public.vehicles v JOIN public.vehicle_images i ON i.vehicle_id = v.id WHERE v.id = '00000000-0000-4000-8000-000000000005';
+SELECT pg_temp.ok('the other-lot cover gives way to the lot''s 2080 hero',
+  primary_image_url = 'https://media.carsandbids.com/cdn-cgi/image/width=2080,quality=70/9004/photos/3yvlj0Do-EpLCSxj/edit/jAdnL.jpg?t=1')
+  FROM public.vehicles WHERE id = '00000000-0000-4000-8000-000000000006';
+SELECT pg_temp.ok('no row deleted and no image_url edited',
+  (SELECT count(*) FROM public.vehicle_images) = (SELECT count(*) FROM before_images2)
+  AND NOT EXISTS (SELECT b.id FROM before_images2 b JOIN public.vehicle_images v USING (id) WHERE v.image_url IS DISTINCT FROM b.image_url));
+CREATE TEMP TABLE rerun2 AS SELECT public.supersede_junk_listing_images((SELECT a FROM ids2), true) AS r;
+SELECT pg_temp.ok('a rerun is a no-op',
+  (r->'tally') = '{"junk_rows": 0, "other_lot_rows": 0, "superseded": 0, "junk_primary": 0, "nominated": 0, "no_usable_image": 0, "junk_primary_after": 0}'::jsonb)
+  FROM rerun2;
 
 -- Bounds and grants.
 SELECT pg_temp.ok('an empty list is refused', pg_temp.raises($q$SELECT public.supersede_junk_listing_images('{}'::uuid[], false)$q$));

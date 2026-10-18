@@ -349,6 +349,39 @@ export function observationTotal(fromRpc: number | null, row: unknown): number |
   return typeof column === 'number' && Number.isFinite(column) && column >= 0 ? column : null;
 }
 
+export function isVehicleVinAddress(value: unknown): value is string {
+  return typeof value === 'string' && /^[A-HJ-NPR-Z0-9]{17}$/i.test(value);
+}
+
+export type VinAddressResolution = { status: 'resolved'; id: string }
+  | { status: 'missing' | 'ambiguous' | 'unavailable' | 'malformed' };
+
+/** Qualify the existing indexed public reader's candidates; never choose the first of several. */
+export async function resolveVehicleVinAddress(vin: string, supabase: any): Promise<VinAddressResolution> {
+  if (!isVehicleVinAddress(vin)) return { status: 'malformed' };
+  const normalized = vin.toUpperCase();
+  try {
+    const key = `vin:${normalized}`;
+    let pending = inflightProfileRpc.get(key);
+    if (!pending) {
+      pending = Promise.resolve(supabase.rpc('vehicle_by_vin_public', { p_vin: normalized }))
+        .finally(() => inflightProfileRpc.delete(key));
+      inflightProfileRpc.set(key, pending);
+    }
+    const { data, error } = await pending;
+    if (error) return { status: 'unavailable' };
+    if (!Array.isArray(data)) return { status: 'malformed' };
+    if (data.length === 0) return { status: 'missing' };
+    if (data.length !== 1) return { status: 'ambiguous' };
+    const match = data[0];
+    if (typeof match?.id !== 'string' || !/^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i.test(match.id)
+      || typeof match.vin !== 'string' || match.vin.trim().toUpperCase() !== normalized) return { status: 'malformed' };
+    return { status: 'resolved', id: match.id };
+  } catch {
+    return { status: 'unavailable' };
+  }
+}
+
 export async function loadVehicleImpl({
   vehicleId,
   session,
@@ -370,11 +403,23 @@ export async function loadVehicleImpl({
 
     // Accept both UUID format (with hyphens) and VIN format (17 chars alphanumeric)
     const isUUID = vehicleId && vehicleId.length >= 20 && vehicleId.includes('-');
-    const isVIN = vehicleId && /^[A-HJ-NPR-Z0-9]{17}$/i.test(vehicleId);
+    const isVIN = isVehicleVinAddress(vehicleId);
 
     if (!vehicleId || (!isUUID && !isVIN)) {
       console.error('Invalid vehicleId format:', vehicleId);
       navigate('/vehicles');
+      return rpcLoaded;
+    }
+
+    if (isVIN) {
+      // Resolve with the existing indexed public owner, then let every profile reader use a UUID.
+      const resolution = await resolveVehicleVinAddress(vehicleId, supabase);
+      if (resolution.status === 'resolved') {
+        navigate(`/vehicle/${resolution.id}`, { replace: true });
+      } else {
+        console.warn('[VehicleProfile] VIN address unresolved:', resolution.status);
+        setVehicle(null);
+      }
       return rpcLoaded;
     }
 
@@ -423,8 +468,8 @@ export async function loadVehicleImpl({
       // Fallback to direct query — use explicit columns (not select(*)) for speed
       try {
         const { data, error } = await supabase
-          .from('vehicles,merged_into_vehicle_id')
-          .select('id,year,make,model,normalized_model,series,trim,vin,primary_image_url,image_url,sale_price,nuke_estimate,nuke_estimate_confidence,status,is_public,sale_status,auction_outcome,auction_source,bat_auction_url,discovery_url,listing_url,listing_source,listing_location,uploaded_by,user_id,owner_id,color,interior_color,mileage,fuel_type,transmission,engine_size,engine_type,engine_displacement,horsepower,torque,drivetrain,body_style,doors,is_modified,modification_details,condition_rating,notes,created_at,updated_at,is_for_sale,is_draft,deleted_at,asking_price,current_value,msrp,msrp_source,completion_percentage,displacement,auction_end_date,bid_count,view_count,bat_sold_price,bat_sale_date,bat_listing_title,bat_location,bat_seller,bat_lot_number,sale_date,ownership_verified,ownership_verified_at,data_quality_score,platform_source,discovery_source,profile_origin,listing_kind,reserve_status,origin_organization_id,origin_metadata,import_metadata,provenance_metadata,description,description_source,highlights,equipment,modifications,known_flaws,recent_service_history,title_status,location,observation_count,image_count')
+          .from('vehicles')
+          .select('id,merged_into_vehicle_id,year,make,model,normalized_model,series,trim,vin,primary_image_url,image_url,sale_price,nuke_estimate,nuke_estimate_confidence,status,is_public,sale_status,auction_outcome,auction_source,bat_auction_url,discovery_url,listing_url,listing_source,listing_location,uploaded_by,user_id,owner_id,color,interior_color,mileage,fuel_type,transmission,engine_size,engine_type,engine_displacement,horsepower,torque,drivetrain,body_style,doors,is_modified,modification_details,condition_rating,notes,created_at,updated_at,is_for_sale,is_draft,deleted_at,asking_price,current_value,msrp,msrp_source,completion_percentage,displacement,auction_end_date,bid_count,view_count,bat_sold_price,bat_sale_date,bat_listing_title,bat_location,bat_seller,bat_lot_number,sale_date,ownership_verified,ownership_verified_at,data_quality_score,platform_source,discovery_source,profile_origin,listing_kind,reserve_status,origin_organization_id,origin_metadata,import_metadata,provenance_metadata,description,description_source,highlights,equipment,modifications,known_flaws,recent_service_history,title_status,location,observation_count,image_count')
           .eq('id', vehicleId)
           .single();
 

@@ -28,7 +28,7 @@ import { writeObservation } from "../_shared/observationWriter.ts";
 import { requireWriteAuth } from "../_shared/writeGuard.ts";
 import { projectSecretKey } from "../_shared/supabaseKeys.ts";
 import { batchFromTargets, discoverTargets, reviseCab, recaptureCab } from "./targets.ts";
-import { parseCabDepth } from "./cabPage.ts";
+import { cabLotPhotos, parseCabDepth } from "./cabPage.ts";
 import { cleanCabText, extractCabFacets } from "./cabFacets.ts";
 import { recordSellerTypes, sellerTypeRow } from "../_shared/sellerType.ts";
 import { insertMissingVehicleImages } from "../_shared/vehicleImageWrite.ts";
@@ -376,17 +376,10 @@ function parseCabHtml(html: string, sourceUrl?: string): CabExtractedData {
     }
     if (result.bidHistory.length > 0) console.log(`✅ C&B [bids]: ${result.bidHistory.length} bids extracted`);
 
-    // 11. Gallery images — CDN URLs (skip small thumbnails width=80/148/160/320 and 148x126 sidebar cards)
-    const seenImages = new Set<string>();
-    for (const m of html.matchAll(/https:\/\/media\.carsandbids\.com\/[^"'\s)>]+/gi)) {
-      const url = m[0];
-      const cleanUrl = url.split('?')[0];
-      if (isCabThumbUrl(url)) continue;
-      if (!seenImages.has(cleanUrl)) {
-        seenImages.add(cleanUrl);
-        result.images.push(url);
-      }
-    }
+    // 11. Gallery images — the lot's own only: its gallery and photos sharing the gallery's photo-set id. The 768 and
+    // 356x260 renders elsewhere on the page are cards linking to other auctions; small thumbnails are skipped too.
+    const pageLotId = (sourceUrl || '').match(/\/auctions\/([A-Za-z0-9]+)/i)?.[1] ?? null;
+    result.images = cabLotPhotos(html, pageLotId).filter((u) => !isCabThumbUrl(u));
     // og:image as primary if gallery is empty
     if (result.images.length === 0) {
       const ogImg = html.match(/<meta[^>]*property=["']og:image["'][^>]*content=["']([^"']+)["']/i) ||
@@ -670,7 +663,7 @@ Deno.serve(async (req) => {
     // Parse HTML directly — no LLM, no markdown, no API cost
     const extracted = parseCabHtml(html, listingUrlCanonical);
     // Depth pass over the same retained capture: full description, comment/bid stream, seller/buyer, end moment, outcome, gallery.
-    const depth = parseCabDepth(html, cachedSnapshot?.fetched_at ? new Date(cachedSnapshot.fetched_at) : new Date());
+    const depth = parseCabDepth(html, cachedSnapshot?.fetched_at ? new Date(cachedSnapshot.fetched_at) : new Date(), extracted.lotNumber);
     if (depth.seller) { extracted.sellerName = depth.seller.name; extracted.sellerProfileUrl = depth.seller.profileUrl; }
     if (depth.endedAt) extracted.endDate = depth.endedAt;
     extracted.auctionStatus = depth.outcome;
@@ -1039,7 +1032,9 @@ Deno.serve(async (req) => {
       const mine = (heldImgs ?? []).filter((r: { exif_data: any }) => r.exif_data?.imported_from === "cars_and_bids");
       // Earlier runs stored every media URL on the page (similar-auction thumbnails, avatars) and gallery copies at 542 px.
       // Supersede those (the original stays, flagged) when this page's gallery is known; keep a full-resolution copy of each.
-      const stale = mine.filter((r: { image_url: string }) => !current.has(photoKey(r.image_url)) || !fullRes(r.image_url)).map((r: { id: string }) => r.id);
+      const stale = depth.photos.length
+        ? mine.filter((r: { image_url: string }) => !current.has(photoKey(r.image_url)) || !fullRes(r.image_url)).map((r: { id: string }) => r.id)
+        : [];
       if (stale.length) {
         const { error: supErr } = await supabase.from("vehicle_images").update({ is_superseded: true, superseded_at: nowIso }).in("id", stale);
         if (supErr) console.warn(`⚠️ C&B: supersede images failed: ${supErr.message}`);

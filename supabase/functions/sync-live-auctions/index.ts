@@ -457,9 +457,11 @@ async function syncPCarMarket(): Promise<{ auctions: LiveAuction[]; error: strin
     const items: PcarBoardItem[] = [];
     let pages = 1;
     for (let page = 1; page <= Math.min(pages, PCAR_MAX_PAGES); page++) {
-      const { html, error } = await archiveFetch(`https://www.pcarmarket.com/auctions?auctionType=live&page=${page}`, {
+      // /auctions is the live board; ?page=1 and the old ?auctionType=live redirect, which the direct fetcher refuses
+      const { html, error } = await archiveFetch(page === 1 ? "https://www.pcarmarket.com/auctions" : `https://www.pcarmarket.com/auctions?page=${page}`, {
         platform: "pcarmarket",
         skipCache: true,
+        useFirecrawl: false, // the board is server-rendered; archiveFetch would otherwise route pcarmarket.com to Firecrawl
         callerName: "sync-live-auctions",
       });
       if (error || !html) return { auctions: [], error: `PCarMarket board page ${page}: ${error ?? "no HTML"}` };
@@ -513,7 +515,7 @@ async function ingestPcarBids(
   const linked = moved.flatMap((m) => (m.vehicle_id ? [{ url: m.url, vehicle_id: m.vehicle_id }] : []));
   for (const lot of linked.slice(0, maxLots)) {
     const { html, error } = await archiveFetch(lot.url.replace("https://pcarmarket.com/", "https://www.pcarmarket.com/"), {
-      platform: "pcarmarket", skipCache: true, callerName: "sync-live-auctions",
+      platform: "pcarmarket", skipCache: true, useFirecrawl: false, callerName: "sync-live-auctions",
     });
     if (error || !html) { out.errors.push(`${lot.url}: ${error ?? "no HTML"}`); continue; }
     out.lots++;

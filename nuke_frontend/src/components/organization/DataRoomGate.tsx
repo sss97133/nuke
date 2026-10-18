@@ -5,6 +5,7 @@
 
 import { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
+import { friendlyAuthError, isSmsProviderUnavailable, normalizePhone } from '../auth/friendlyAuthError';
 import '../../styles/unified-design-system.css';
 
 const NDA_AND_TERMS = `
@@ -26,22 +27,6 @@ This Agreement is governed by the laws of the State of Delaware.
 
 By signing below, you acknowledge that you have read, understood, and agree to be bound by this Agreement and the platform Terms of Service and Privacy Policy.
 `;
-
-function toFriendlyError(raw: string | undefined): string {
-  if (!raw) return 'Something went wrong. Please try again or use your email instead.';
-  const lower = raw.toLowerCase();
-  if (lower.includes('database') || lower.includes('saving new user') || lower.includes('duplicate') || lower.includes('constraint') || lower.includes('row-level')) {
-    return 'Something went wrong on our side. Please try again or use your email instead to continue.';
-  }
-  if (lower.includes('invalid') && lower.includes('code')) return 'That code isn’t valid. Please try again or request a new code.';
-  if (lower.includes('phone') && (lower.includes('invalid') || lower.includes('not supported'))) {
-    return 'We couldn’t send a code to that number. Please try your email instead.';
-  }
-  if (lower.includes('otp') && (lower.includes('provider') || lower.includes('twilio') || lower.includes('authenticate') || lower.includes('20003'))) {
-    return 'We can’t send text codes right now. Please use your email instead to continue.';
-  }
-  return 'Something went wrong. Please try again or use your email instead.';
-}
 
 export interface DataRoomGateProps {
   organizationId: string;
@@ -153,14 +138,18 @@ export default function DataRoomGate({ organizationId, organizationName, onAcces
     }
     setLoading(true);
     try {
-      const normalized = phone.replace(/\D/g, '');
-      const toSend = normalized.length === 10 ? `+1${normalized}` : phone.startsWith('+') ? phone : `+${normalized}`;
-      const { error: err } = await supabase.auth.signInWithOtp({ phone: toSend });
+      const { error: err } = await supabase.auth.signInWithOtp({ phone: normalizePhone(phone) });
       if (err) throw err;
       setShowOtpInput(true);
       setMessage('We sent a code to your phone. Enter it below.');
     } catch (err: any) {
-      setError(toFriendlyError(err?.message));
+      if (isSmsProviderUnavailable(err?.message)) {
+        setIdentifyMethod('email');
+        setMessage(null);
+        setError('We can’t send text codes right now. Enter your email below to continue.');
+      } else {
+        setError(friendlyAuthError(err?.message));
+      }
     } finally {
       setLoading(false);
     }
@@ -175,8 +164,7 @@ export default function DataRoomGate({ organizationId, organizationName, onAcces
     }
     setLoading(true);
     try {
-      const normalized = phone.replace(/\D/g, '');
-      const toVerify = normalized.length === 10 ? `+1${normalized}` : phone.startsWith('+') ? phone : `+${normalized}`;
+      const toVerify = normalizePhone(phone);
       const { data: { user: u }, error: err } = await supabase.auth.verifyOtp({
         phone: toVerify,
         token: otpCode.trim(),
@@ -193,7 +181,7 @@ export default function DataRoomGate({ organizationId, organizationName, onAcces
         setMessage(null);
       }
     } catch (err: any) {
-      setError(toFriendlyError(err?.message));
+      setError(friendlyAuthError(err?.message));
     } finally {
       setLoading(false);
     }
