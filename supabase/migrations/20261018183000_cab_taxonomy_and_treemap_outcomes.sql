@@ -68,7 +68,6 @@ WITH event_prices AS (
         SELECT ae.winning_bid
         FROM public.auction_events ae
         WHERE ae.vehicle_id = v.id
-          AND ae.outcome = 'sold'
           AND ae.winning_bid > 0
         ORDER BY ae.auction_end_date DESC NULLS LAST, ae.created_at DESC NULLS LAST
         LIMIT 1
