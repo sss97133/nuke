@@ -152,3 +152,31 @@ it('keeps unknown brand names and fitted dollars whole, with complete identity w
   expect(header().getAttribute('aria-label')).toBe('Nimbus Co: $124M');
   expect(header().style.height).toBe('16px');
 });
+
+it('reads every GM family before grouping and drills Truck through the complete umbrella key', async () => {
+  vi.resetModules();
+  const { default: GmMap } = await import('./BrandFamilyMap');
+  const full = [row('Chevrolet', 1, 1000, 'corvette', 'Corvette', 600),
+    row('Chevrolet', 1, 1000, 'pickup', 'Pickup', 100), row('Chevrolet', 1, 1000, 'c10', 'C10', 200),
+    row('Chevrolet', 1, 1000, 'colorado', 'Colorado', 50), row('Chevrolet', 1, 1000, 'other', null, 50)];
+  fixture.rpc.mockImplementation(async (name: string) => ({ data: name === 'treemap_brand_families' ? full : [
+    full[0], full[1], full[2], row('Chevrolet', 1, 1000, 'more', null, 50), full[4],
+  ], error: null }));
+  const pick = vi.fn();
+  await act(async () => root.render(<GmMap width={1000} height={600} onPickBrand={vi.fn()} onPickFamily={pick}
+    familyMoves={{
+      'Chevrolet|pickup': { sold_12m: 10, sold_prior_12m: 20, usd_12m: 100, usd_prior_12m: 200 },
+      'Chevrolet|c10': { sold_12m: 30, sold_prior_12m: 40, usd_12m: 300, usd_prior_12m: 400 },
+      'Chevrolet|colorado': { sold_12m: 50, sold_prior_12m: 60, usd_12m: 500, usd_prior_12m: 600 },
+    }} />));
+  expect(fixture.rpc).toHaveBeenCalledWith('treemap_brand_families', { p_brand: 'Chevrolet' });
+  const truck = container.querySelector<HTMLButtonElement>('[aria-label="Chevrolet Truck"]')!;
+  expect(truck).not.toBeNull();
+  expect(container.querySelector('[aria-label="Chevrolet C10"]')).toBeNull();
+  expect(container.querySelector('[aria-label="Chevrolet more families"]')).toBeNull();
+  await act(async () => truck.focus());
+  expect(document.querySelector('[role="tooltip"]')?.textContent).toContain('120 → 90');
+  expect(document.querySelector('[role="tooltip"]')?.textContent).toContain('300 confirmed sales');
+  await act(async () => truck.click());
+  expect(pick).toHaveBeenCalledWith('Chevrolet', 'pickup', 'Truck', true);
+});

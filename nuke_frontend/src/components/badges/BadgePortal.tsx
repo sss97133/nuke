@@ -174,6 +174,9 @@ function BadgeRichTooltip({
           {segments.join(' \u00B7 ')}
         </div>
       ))}
+      <div style={{ marginTop: '4px', maxWidth: 280, fontFamily: 'Arial, sans-serif', fontSize: '8px', lineHeight: 1.4, color: 'rgba(255,255,255,0.7)', whiteSpace: 'normal', textTransform: 'none' }}>
+        Stats use up to 500 returned records per read; year ranges use records with prices above zero. Previews show up to 6 records. The count is a separate read.
+      </div>
       {/* Arrow */}
       <div
         style={{

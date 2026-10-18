@@ -402,6 +402,12 @@ export function BadgeClusterPanel({
       {/* Dimension-specific stats */}
       {!loading && !unavailable && renderStats()}
 
+      {!loading && !unavailable && count > 0 && stats && (
+        <div style={{ padding: '6px 10px', fontFamily: 'Arial, sans-serif', fontSize: '8px', lineHeight: 1.4, color: 'var(--text-disabled)', whiteSpace: 'normal', textTransform: 'none' }}>
+          Stats use up to 500 returned records per read; year ranges use records with prices above zero. Previews show up to 6 records. The count is a separate read.
+        </div>
+      )}
+
       {/* Preview grid */}
       {loading ? (
         <div style={{

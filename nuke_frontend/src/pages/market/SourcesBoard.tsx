@@ -1,4 +1,4 @@
-import { Fragment, useEffect, useMemo, useState } from 'react';
+import { Fragment, useEffect, useMemo, useRef, useState } from 'react';
 import { supabase } from '../../lib/supabase';
 import { OrgLogo } from '../../components/common/OrgLogo';
 import { sourceLogoInk } from './sourceLogoInk';
@@ -128,6 +128,7 @@ export type PopulationGrade = {
 export type SourceRow = {
   source: string; name: string; category: string | null; house: string | null;
   held: number | null; heldAt: string | null;
+  currentInventory?: { count: number; observedAt: string | null; url: string | null };
   population: number | null; populationMethod: string | null; populationConfidence: number | null; populationAt: string | null;
   populationGrade?: PopulationGrade | null;
   mapSales: number | null; mapUsd: number | null;
@@ -225,6 +226,7 @@ export function parseSources(value: unknown): SourcesBoardData | null {
     not_ranked?: unknown;
     landing?: unknown;
     species_groups?: unknown;
+    current_inventory?: Record<string, { count?: unknown; observed_at?: unknown; url?: unknown; method?: unknown }>;
   };
   if (typeof v.as_of !== 'string' || !Array.isArray(v.columns) || !Array.isArray(v.rows)) return null;
   const columns = v.columns as unknown[];
@@ -282,7 +284,12 @@ export function parseSources(value: unknown): SourcesBoardData | null {
     const hqState = str(getOptional('hq_state', 'state'));
     const hqLocation = str(getOptional('hq_location', 'location'));
 
+    const inventory = v.current_inventory?.[source];
+    const inventoryCount = inventory?.method === 'search_result_count' ? num(inventory.count) : null;
+    const currentInventory = inventoryCount != null && Number.isInteger(inventoryCount) && inventoryCount >= 0
+      ? { count: inventoryCount, observedAt: str(inventory?.observed_at), url: str(inventory?.url) } : undefined;
     rows.push({
+      currentInventory,
       source, name, category: str(get('category')), house: str(get('house')),
       held: num(get('held_lots')), heldAt: str(get('held_at')),
       population: num(get('population')), populationMethod: str(get('population_method')),
@@ -491,8 +498,9 @@ const REFERENCE: Record<string, string> = {
 };
 /** What share of the source's own total we hold, in words that keep the total's method. A reference also returns its
  * label and as-of day, so it reads as an estimate rather than a census. */
-export function heldShare(row: Pick<SourceRow, 'held' | 'population' | 'populationMethod'> & Partial<Pick<SourceRow, 'populationAt'>>):
+export function heldShare(row: Pick<SourceRow, 'held' | 'population' | 'populationMethod'> & Partial<Pick<SourceRow, 'populationAt' | 'currentInventory'>>):
   { share: number | null; text: string; reference?: string } {
+  if (row.currentInventory) return { share: null, text: `${count(row.currentInventory.count)} current listings` };
   if (row.held == null) return { share: null, text: '' };
   if (!(row.population != null && row.population > 0)) return { share: null, text: 'their total unknown' };
   const share = row.held / row.population;
@@ -1499,6 +1507,7 @@ function SourceLandingInspector({
   const statsShare = row
     ? heldShare({
         held: statsHeld,
+        currentInventory: row.currentInventory,
         population: statsPop,
         populationMethod: statsMethod,
         populationAt: statsPopAt,
@@ -1541,7 +1550,7 @@ function SourceLandingInspector({
               className="market-sources__drill-btn market-sources__org-link"
               title={`Open ${displayName} organization profile`}
             >
-              Organization Profile →
+              Full profile
             </a>
           ) : null}
           {row ? (
@@ -1549,7 +1558,7 @@ function SourceLandingInspector({
               href={`/browse?source=${encodeURIComponent(row.source)}`}
               className="market-sources__drill-btn"
             >
-              Browse vehicles →
+              Browse vehicles
             </a>
           ) : null}
           <button
@@ -1631,9 +1640,12 @@ function SourceLandingInspector({
             <strong>{statsHeld != null ? count(statsHeld) : '—'}</strong>
           </div>
           <div className="market-sources__kpi">
-            <span className="market-sources__kpi-label">Census &amp; coverage</span>
-            <strong title={statsMethodNote}>
+            <span className="market-sources__kpi-label">{row.currentInventory ? 'Source inventory' : 'Census & coverage'}</span>
+            <strong title={row.currentInventory ? 'Published search count; held includes historical captures' : statsMethodNote}>
               {statsShare?.text || '—'}
+              {row.currentInventory ? <small className="market-sources__sharenote">
+                {shortDay(row.currentInventory.observedAt)} · from their search results
+              </small> : null}
               {statsShare?.reference ? <small className="market-sources__sharenote">{statsShare.reference}</small> : null}
             </strong>
           </div>
@@ -2246,6 +2258,14 @@ export function SourcesBoardView({
   const [horizon, setHorizon] = useState<LandingHorizon>('14d');
   const [openSource, setOpenSource] = useState<string | null>(() => resolveInitialSource(data.rows, initialSource));
   const [categoryFilter, setCategoryFilter] = useState<string>('all');
+  const dialogRef = useRef<HTMLDialogElement>(null);
+  const closeInspector = () => {
+    dialogRef.current?.close?.();
+    setOpenSource(null);
+  };
+  useEffect(() => {
+    if (openSource) dialogRef.current?.showModal?.();
+  }, [openSource]);
 
   const heldAt = data.rows.map((r) => r.heldAt).filter((x): x is string => !!x).sort().at(-1) ?? null;
   const scopeTotal = (r: SourceRow) => scoped?.bySource.get(r.source)?.total ?? 0;
@@ -2332,21 +2352,11 @@ export function SourcesBoardView({
           </button>
         ) : null}
       </div>
-      {openSource === '__ALL__' ? (
-        <SourceLandingInspector
-          row={null}
-          boardLanding={data.landing}
-          boardDay={data.day}
-          sourceNames={sourceNames}
-          onClose={() => setOpenSource(null)}
-          asBlock
-        />
-      ) : null}
       {groups.map((g) => (
         <div key={g.key} className="market-sources__group">
           <div className="market-sources__cols">
             <span>#</span><span className="market-sources__group-title">{g.title}</span><span className="n">{g.unit}</span>
-            <span>of their total</span>
+            <span>source inventory</span>
             <span className="market-sources__col-landing">
               <button
                 type="button"
@@ -2379,10 +2389,10 @@ export function SourcesBoardView({
               const land = landingState(r, horizon);
               const isOpen = openSource === r.source;
               const cat = resolveSourceCategory(r);
-              const badge = sourceBadge(r);
-              const dealerProfileHref = resolveDealerProfileHref(r);
               const graded = gradeText(r.populationGrade);
-              const total = r.population == null
+              const total = r.currentInventory
+                ? `${count(r.currentInventory.count)} current listings reported by their search, ${shortDay(r.currentInventory.observedAt)}; held includes historical captures`
+                : r.population == null
                 ? 'their total is not counted yet'
                 : s.reference
                   ? `≈ ${count(r.population)} · ${s.reference}`
@@ -2405,49 +2415,37 @@ export function SourcesBoardView({
                         setOpenSource((cur) => (cur === r.source ? null : r.source));
                       }
                     }}
-                    tabIndex={0}
-                    aria-expanded={isOpen}
                   >
                     <span className="market-sources__rank">{i + 1}</span>
-                    <span className="market-sources__name" title={r.name}>
+                    <button type="button" className="market-sources__name" title={r.name}
+                      aria-haspopup="dialog" aria-expanded={isOpen}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setOpenSource(r.source);
+                      }}>
                       {/* Identity through the shared renderer (frontend rule 2026-10-08): the organization's recorded logo,
                           else its type icon. */}
                       <OrgLogo logoUrl={r.logoUrl} businessType={r.businessType ?? (cat === 'auction' ? 'auction_house' : cat === 'dealer' ? 'dealer' : null)}
                         businessName={r.name} size={13} maxWidth={42} variant="logo"
                         className={`market-sources__icon${sourceLogoInk(r.logoUrl) ? ` market-sources__icon--${sourceLogoInk(r.logoUrl)}` : ''}`} />
                       <span className="market-sources__name-text">{shortName(r.name)}</span>
-                      {badge ? (
-                        <span className={`market-sources__badge market-sources__badge--${badge.key}`}
-                          title={r.speciesEvidence?.seen ?? undefined}>
-                          {badge.label}
-                        </span>
-                      ) : null}
-                      {dealerProfileHref ? (
-                        <a
-                          href={dealerProfileHref}
-                          className="market-sources__org-link"
-                          onClick={(e) => e.stopPropagation()}
-                          title={`Open ${shortName(r.name)} organization profile`}
-                        >
-                          Organization Profile →
-                        </a>
-                      ) : null}
-                    </span>
+                    </button>
                     <span className="market-sources__held n" title={r.heldAt ? `held as of ${heldWhen(r.heldAt)}` : undefined}>
                       {r.held != null ? count(r.held) : '—'}
                       {week != null && week !== 0
                         ? <small className={week > 0 ? 'up' : 'down'}> {week > 0 ? '+' : '−'}{count(Math.abs(week))} since {shortDay(r.beforeDay)}</small>
                         : null}
                     </span>
-                    <span className="market-sources__share" title={total}>
-                      <svg className="market-sources__track" viewBox="0 0 100 8" preserveAspectRatio="none" aria-hidden="true">
+                    <span className={`market-sources__share${r.currentInventory ? ' market-sources__share--current' : ''}`} title={total}>
+                      {!r.currentInventory ? <svg className="market-sources__track" viewBox="0 0 100 8" preserveAspectRatio="none" aria-hidden="true">
                         {s.share != null
                           ? <rect className={`market-sources__fill${s.reference ? ' market-sources__fill--est' : ''}`}
                               x="0" y="0" height="8" width={Math.max(1.5, s.share * 100)} />
                           : <rect className="market-sources__unknown" x="0" y="0" height="8" width="100" fill="url(#market-sources-hatch)" />}
-                      </svg>
+                      </svg> : null}
                       <span className="market-sources__sharetext">
                         {s.text}
+                        {r.currentInventory ? <small className="market-sources__sharenote">{shortDay(r.currentInventory.observedAt)} · search results</small> : null}
                         {s.reference ? <small className="market-sources__sharenote">{s.reference}</small> : null}
                       </span>
                     </span>
@@ -2483,21 +2481,23 @@ export function SourcesBoardView({
                       {r.live > 0 ? <><i aria-hidden="true" />{count(r.live)} live</> : '—'}
                     </span>
                   </li>
-                  {isOpen ? (
-                    <SourceLandingInspector
-                      row={r}
-                      boardLanding={data.landing}
-                      boardDay={data.day}
-                      sourceNames={sourceNames}
-                      onClose={() => setOpenSource(null)}
-                    />
-                  ) : null}
                 </Fragment>
               );
             })}
           </ol>
         </div>
       ))}
+      {openSource ? (
+        <dialog ref={dialogRef} className="market-sources__dialog" aria-label={openSource === '__ALL__'
+          ? 'All sources' : shortName(data.rows.find((r) => r.source === openSource)?.name ?? openSource)}
+          onCancel={(e) => { e.preventDefault(); closeInspector(); }} onClose={() => setOpenSource(null)}
+          onClick={(e) => { if (e.target === e.currentTarget) closeInspector(); }}>
+          <SourceLandingInspector key={openSource}
+            row={data.rows.find((r) => r.source === openSource) ?? null}
+            boardLanding={data.landing} boardDay={data.day} sourceNames={sourceNames}
+            onClose={closeInspector} asBlock />
+        </dialog>
+      ) : null}
       <div className="market-sources__foot">
         {hidden > 0
           ? <button type="button" className="market-sources__more" onClick={() => setAll((x) => !x)}>

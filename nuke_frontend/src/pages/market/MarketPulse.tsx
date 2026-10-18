@@ -6,7 +6,7 @@ import { timeLeft, useSecondClock } from '../../hooks/useSecondClock';
 import MarketInventoryMap from './MarketInventoryMap';
 import { mapLens, mapValue, matchesMapLens, recordedModel, taxonomyByListing, type InventoryMapLens, type InventoryMapGroup, type MapDimension } from './inventoryMap';
 import AuctionEvidence, { AuctionCompetition } from './AuctionEvidence';
-import { BID_BUCKETS, bidBucket, currentBidDistribution, NO_MAKE, useMarketPulse, useInventoryTaxonomy, useSameHourReadings, type BidBucket, type BidCurve, type LiveAuction } from './useMarketPulse';
+import { BID_BUCKETS, bidBucket, currentBidDistribution, listingKey, NO_MAKE, useMarketPulse, useInventoryTaxonomy, useSameHourReadings, type BidBucket, type BidCurve, type LiveAuction } from './useMarketPulse';
 import RecordedSalesComparison, { MarketScopeControls, type MarketSalesLens } from './RecordedSalesComparison';
 import { MakeLogo } from '../../components/common/MakeIdentity';
 import { selectRowFacts, useMarketRowDetails, useMarketRowSpecs, vehicleIdentity, type LotInspection, type MarketRowDetails } from './useMarketRowDetails';
@@ -138,11 +138,85 @@ function Figure({ value, label, open, onToggle, relative, bar, title }: {
   return <div className="market-figure__item">
     <button type="button" className="market-figure__value" aria-expanded={open} aria-controls="market-composition" onClick={onToggle} title={title}>
       <Text role="figure">{value}</Text>
-      <Text role="label">{label} · by brand {open ? '▴' : '▾'}</Text>
+      <Text role="label">{label} · inspect {open ? '▴' : '▾'}</Text>
     </button>
     {said.length > 0 && <Text role="body" as="div">{said.join(' · ')}</Text>}
     {bar}
   </div>;
+}
+
+interface BoardChange { auction: LiveAuction; before: number | null; after: number | null; kind: 'bid' | 'entered' | 'left' }
+interface BoardSample { at: number; bids: number; lots: number; changes: BoardChange[] }
+
+// A browser-observed path of the headline, not reconstructed bid-event history. Keep exact episode keys and
+// separate membership changes from bid changes: a closing lot can lower the total without a bid falling.
+function useBoardHistory(auctions: LiveAuction[], scope: string, enabled: boolean) {
+  const previous = useRef<{ scope: string; rows: LiveAuction[] } | null>(null);
+  const [history, setHistory] = useState<{ scope: string; samples: BoardSample[] }>({ scope, samples: [] });
+  useEffect(() => {
+    if (!enabled) return;
+    const prior = previous.current?.scope === scope ? previous.current.rows : null;
+    const keyOf = (a: LiveAuction) => listingKey(a) ?? `${a.id}:${a.listingUrl ?? 'unrecorded'}`;
+    const before = new Map(prior?.map(a => [keyOf(a), a] as const));
+    const after = new Set(auctions.map(keyOf));
+    const changes: BoardChange[] = [];
+    if (prior) {
+      for (const a of auctions) {
+        const b = before.get(keyOf(a));
+        if (!b) changes.push({ auction: a, before: null, after: a.currentBid, kind: 'entered' });
+        else if (b.currentBid !== a.currentBid) changes.push({ auction: a, before: b.currentBid, after: a.currentBid, kind: 'bid' });
+      }
+      for (const a of prior) if (!after.has(keyOf(a))) changes.push({ auction: a, before: a.currentBid, after: null, kind: 'left' });
+    }
+    previous.current = { scope, rows: auctions };
+    const sample = { at: Date.now(), bids: auctions.reduce((sum, a) => sum + (a.currentBid ?? 0), 0), lots: auctions.length, changes };
+    setHistory(h => ({ scope, samples: [...(h.scope === scope ? h.samples : []), sample].slice(-180) }));
+  }, [auctions, scope, enabled]);
+  return history.scope === scope ? history.samples : [];
+}
+
+function BoardHistory({ samples, measure }: { samples: BoardSample[]; measure: 'bids' | 'lots' }) {
+  const [selectedAt, setSelectedAt] = useState<number | null>(null);
+  const [lot, setLot] = useState<{ auction: LiveAuction; at: number } | null>(null);
+  if (!samples.length) return null;
+  const value = (s: BoardSample) => measure === 'bids' ? s.bids : s.lots;
+  const fmt = measure === 'bids' ? bidNumber : count;
+  const selected = samples.find(s => s.at === selectedAt) ?? [...samples].reverse().find(s => s.changes.some(c => measure === 'bids' || c.kind !== 'bid')) ?? samples[samples.length - 1];
+  const index = samples.indexOf(selected), prev = samples[index - 1];
+  const lo = Math.min(...samples.map(value)), hi = Math.max(...samples.map(value));
+  const x = (s: BoardSample) => 8 + (s.at - samples[0].at) / Math.max(1, samples[samples.length - 1].at - samples[0].at) * 624;
+  const y = (s: BoardSample) => hi === lo ? 60 : 108 - (value(s) - lo) / (hi - lo) * 96;
+  const path = samples.map((s, i) => `${i ? `H ${x(s)} V` : `M ${x(s)}`} ${y(s)}`).join(' ');
+  const changes = measure === 'lots' ? selected.changes.filter(c => c.kind !== 'bid') : selected.changes;
+  const delta = prev ? value(selected) - value(prev) : null;
+  return <section className="market-history" aria-label={measure === 'bids' ? 'Bid total movement' : 'Open lot movement'}>
+    <div className="market-history__head">
+      <Text role="label">This visit · {measure === 'bids' ? 'standing bids, USD' : 'open lots'}</Text>
+      <button type="button" className="market-control" onClick={() => { setSelectedAt(null); setLot(null); }} aria-pressed={selectedAt == null}><Text role="label">Latest change</Text></button>
+    </div>
+    <svg className="market-history__chart" viewBox="0 0 640 120" preserveAspectRatio="none" role="img" aria-label={`${fmt(lo)} to ${fmt(hi)} since ${clock(samples[0].at)}. Choose an observation below to inspect its changes.`}
+      onClick={e => { const rect = e.currentTarget.getBoundingClientRect(); const atX = (e.clientX - rect.left) / rect.width * 640;
+        setSelectedAt(samples.reduce((best, s) => Math.abs(x(s) - atX) < Math.abs(x(best) - atX) ? s : best).at); setLot(null); }}>
+      <path d={path} fill="none" stroke="currentColor" strokeWidth="2" />
+      <circle cx={x(selected)} cy={y(selected)} r="4" fill="currentColor" />
+    </svg>
+    <div className="market-history__head"><Text role="caption">{fmt(lo)}–{fmt(hi)}</Text><Text role="caption">{clock(samples[0].at)} → {clock(samples[samples.length - 1].at)}</Text></div>
+    <label className="market-history__head"><Text role="label">Observation</Text>
+      <select className="market-control" aria-label="Inspect market observation" value={index} onChange={e => { setSelectedAt(samples[Number(e.target.value)].at); setLot(null); }}>
+        {samples.map((s, i) => <option key={i} value={i}>{new Date(s.at).toLocaleTimeString()} · {fmt(value(s))}</option>)}
+      </select>
+    </label>
+    {delta != null && <Text role="measure" as="div">{delta >= 0 ? '+' : '−'}{fmt(Math.abs(delta))} since previous observation</Text>}
+    <Text role="caption" as="p">History starts when you open this page. Updates can combine bids. Lots entering or leaving also change the total; leaving does not establish a sale.</Text>
+    {changes.length > 0 ? <div className="market-history__changes">
+      {changes.map((c, i) => <button type="button" className="market-history__change" key={i} disabled={!listingKey(c.auction)} onClick={() => setLot({ auction: c.auction, at: selected.at })}>
+        <Text role="body">{title(c.auction)}</Text>
+        <Text role="measure">{c.kind === 'entered' ? 'Entered board' : c.kind === 'left' ? 'Left board' : c.before == null ? 'Bid now recorded' : c.after == null ? 'Bid now unrecorded' : `${c.after >= c.before ? '+' : '−'}${bidNumber(Math.abs(c.after - c.before))}`}</Text>
+        {measure === 'bids' && <Text role="caption">{c.kind === 'bid' ? `${bidNumber(c.before)} → ${bidNumber(c.after)}` : bidNumber(c.kind === 'entered' ? c.after : c.before)}</Text>}
+      </button>)}
+    </div> : <Text role="body" as="p">{prev ? 'No change in this observation.' : 'Starting observation. New changes will appear here as the board updates.'}</Text>}
+    {lot && lot.at === selected.at && <AuctionEvidence key={`${lot.auction.id}:${lot.auction.listingUrl}`} vehicleId={lot.auction.id} sourceUrl={lot.auction.listingUrl} compact onClose={() => setLot(null)} />}
+  </section>;
 }
 
 // ---- Hot / cold: the bid against where comparable sales usually sit at this point in the auction --------------
@@ -495,6 +569,7 @@ export default function MarketPulse({ onUnavailable, collection }: { onUnavailab
   const cohort = useMemo(() => live.filter(a => (make == null || a.make === make)
     && (model != null || matchesFamilyScope(a, familyName))
     && matchesEraRange(a.year, era)), [live, make, model, familyName, era]);
+  const history = useBoardHistory(cohort, JSON.stringify([make, familyName, era, model != null]), !!data && !isLoading && !isError);
   const todayUtc = new Date(now).toISOString().slice(0, 10);
   const sameHour = useSameHourReadings(data?.sameHour?.hourUtc ?? '', todayUtc);
   const liveBids = useMemo(() => live.reduce((s, a) => s + (a.currentBid ?? 0), 0), [live]);
@@ -609,9 +684,18 @@ export default function MarketPulse({ onUnavailable, collection }: { onUnavailab
     </section>
   ) : null;
   const scope = (
+    <details className="market-navigation">
+    <summary><Text role="label">Explore market · {view === 'inventory' ? 'BaT live auctions' : 'Recorded sales'}</Text></summary>
     <div className="k-section k-strip market-scope" role="group" aria-label="Market scope">
       <MarketScopeControls make={make} scopeKey={salesLens.scopeKey} view={view} onMakeChange={setCohort} onViewChange={v => setParam('view', v)}>{collection}</MarketScopeControls>
     </div>
+    {view === 'inventory' && <div className="market-navigation__tools">
+      <label><Text role="label">Sort lots </Text><select className="market-control" aria-label="Market navigation sort" value={sort} onChange={e => setParam('sort', e.target.value === 'ending' ? null : e.target.value)}>
+        {SORTS.map(s => <option key={s.id} value={s.id}>{s.label}</option>)}
+      </select></label>
+      <button type="button" className="market-control" onClick={() => document.querySelector<HTMLButtonElement>('.market-figure__value')?.scrollIntoView({ block: 'center' })}><Text role="label">Headline numbers ↑</Text></button>
+    </div>}
+    </details>
   );
 
   if (!data && isError && view === 'inventory' && !activityId) return <>
@@ -628,18 +712,19 @@ export default function MarketPulse({ onUnavailable, collection }: { onUnavailab
       {masthead}
       {figure}
 
+      {activityId && (view !== 'inventory' || !pageRows.some(a => a.id === activityId)) &&
+        <AuctionEvidence key={activityId} vehicleId={activityId} compact inspection={inspection} onInspectionChange={setInspection} onClose={closeActivity} />}
+
+      {scope}
+
       {view === 'inventory' && mapMeasure && <section id="market-composition" className="market-map" aria-label={mapMeasure === 'bids' ? 'What the bids are made of' : 'What the open lots are'}>
+        <BoardHistory key={`${make}:${familyName}:${era}:${mapMeasure}`} samples={history} measure={mapMeasure} />
         {mapAuctions.length > 0 && <MarketInventoryMap auctions={mapAuctions} lens={inventoryLens} taxonomy={taxonomy} measure={mapMeasure}
           taxonomyLoading={taxonomyQuery.isLoading} taxonomyError={taxonomyQuery.isError} onRetryTaxonomy={() => { void taxonomyQuery.refetch(); }}
           risenIds={risenIds} selectedModel={model} onLensChange={setInventoryLens} onSelect={selectMapGroup} />}
       </section>}
 
       {view === 'inventory' && isError && data && <div role="status" className="market-status">Refresh failed. Showing the last fetched board. <button className="market-control" onClick={() => refetch()}><Text role="label">Retry</Text></button></div>}
-
-      {activityId && (view !== 'inventory' || !pageRows.some(a => a.id === activityId)) &&
-        <AuctionEvidence key={activityId} vehicleId={activityId} compact inspection={inspection} onInspectionChange={setInspection} onClose={closeActivity} />}
-
-      {scope}
 
       {view === 'sales' && <RecordedSalesComparison make={make} onMakeChange={setCohort} view={view} onViewChange={v => setParam('view', v)} lens={salesLens} onLensChange={setSalesLens} controls={false} />}
 

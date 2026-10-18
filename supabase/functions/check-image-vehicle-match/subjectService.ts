@@ -1,16 +1,24 @@
 import { observationClockMicroseconds } from "../_shared/observationContentHash.ts";
-import { captureTrustedJPEGInputs, runCapturedVision, type VisionInputCapture, type VisionInputSource } from "./inputCustody.ts";
+import { captureTrustedJPEGInputs, captureVisionInputs, runCapturedVision, type VisionInputCapture, type VisionInputSource } from "./inputCustody.ts";
 import { projectDepictedSubjects, SUBJECT_BATCH_LIMIT, SUBJECT_METHOD, SUBJECT_PROMPT,
   type SubjectInput, type SubjectProjection } from "./subjects.ts";
 import { qualifySubjectSource, readSubjectProfiles } from "./subjectReader.ts";
 import { assessSubjectAdmission } from "./subjectReplay.ts";
+import { DEVICE_PRIVACY_METHOD, PRIVATE_SUBJECT_PURPOSE, hydrateSubjectPrivacy, privateSubjectPrivacyQualified,
+  subjectPrivacyWithdrawn, validDevicePrivacyReceipt } from "./subjectPrivacy.ts";
+import { subjectSourceAvailable, subjectSourceCanEstablishPrivacy, subjectSourceFamily, subjectPrivacyLookupComplete } from "./subjectPrivacy.ts";
+import { currentIdentitySource, loadSourceIdentities, sourceAliases, sourceRoot, inspectSourceIdentity, type SourceIdentity } from "./sourceIdentity.ts";
+import { planSubjectReinspection } from "./subjectReinspection.ts";
 import { allowedSubjectSources, subjectInputScopeRefusal } from "./subjectInputScope.ts";
+import type { AnthropicTokenUsage } from "../_shared/providerDiagnostic.ts";
 
 export const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
 export interface SubjectSource {
+  source_identity?: SourceIdentity;
   id: string; user_id: string; image_url: string; file_hash: string; storage_path: string | null;
   taken_at: string | null; created_at: string; is_superseded: boolean | null; is_duplicate: boolean | null;
   is_document: boolean | null; is_sensitive: boolean | null; vision_gate_status: string | null;
+  source?: string; private_subject_privacy?: any[]; private_subject_privacy_complete?: boolean;
 }
 export interface SubjectReading {
   id: string; image_id: string; cluster_id: string | null; is_active: boolean;
@@ -35,18 +43,21 @@ export interface SubjectStore {
   candidates(userId: string): Promise<CandidateScope>;
   context?(userId: string, fresh: SubjectSource): Promise<{ sources: SubjectSource[]; coverage: Record<string, unknown> }>;
   retainReading(imageId: string, envelope: SubjectEnvelope): Promise<string>;
+  retainPrivacy?(imageId: string, envelope: Record<string, unknown>): Promise<string>;
   admission(envelope: SubjectEnvelope): Promise<ReturnType<typeof assessSubjectAdmission>>;
   ingest(imageId: string, anchorId: string, envelope: SubjectEnvelope): Promise<{ id: string; cluster_id: string | null }>;
 }
 export interface SubjectDependencies {
   capture?: (sources: VisionInputSource[], projectURL: string) => Promise<VisionInputCapture>;
+  capturePrivacy?: (sources: VisionInputSource[]) => Promise<VisionInputCapture>;
   vision: (options: { parts: Array<{ text: string } | { imageUrl: string }>; maxTokens: number }) =>
-    Promise<{ provider: string; model: string; data: unknown } | null>;
+    Promise<{ provider: string; model: string; data: unknown; usage?: AnthropicTokenUsage | null } | null>;
   now?: () => Date;
 }
 export interface SubjectRequest {
   user_id?: string; image_ids?: string[]; dry_run?: boolean; reuse_only?: boolean;
   expected_source_hashes?: Record<string, string>;
+  device_privacy_receipts?: Record<string, unknown>;
   allowed_source_hashes?: Record<string, string>;
 }
 
@@ -61,18 +72,24 @@ export function subjectOwnerId(caller: { kind: string; userId?: string | null },
 }
 const sameClock = (a: unknown, b: unknown) => a === null && b === null ||
   observationClockMicroseconds(a) !== null && observationClockMicroseconds(a) === observationClockMicroseconds(b);
-function sourceRefusal(row: SubjectSource, user: string): string | null {
-  if (row.user_id !== user || row.is_superseded || row.is_duplicate || row.is_document || row.is_sensitive ||
+function sourceRefusal(row: SubjectSource, user: string, readAt: string = new Date().toISOString(), native?: unknown): string | null {
+  if (row.user_id !== user ||
     !row.image_url || !/^[a-f0-9]{64}$/.test(row.file_hash) || observationClockMicroseconds(row.created_at) === null ||
-    row.taken_at !== null && observationClockMicroseconds(row.taken_at) === null) return "source_unavailable";
+    row.taken_at !== null && observationClockMicroseconds(row.taken_at) === null || row.private_subject_privacy_complete === false || subjectPrivacyWithdrawn(row)) return "source_unavailable";
   if (typeof row.storage_path !== "string" ||
     !new RegExp(`^users/${user}/capture-relay/${row.file_hash}/[A-Za-z0-9._-]+$`).test(row.storage_path) ||
     [".", ".."].includes(row.storage_path.split("/").at(-1)!)) return "source_unavailable";
-  return row.vision_gate_status === "approved" ? null :
-    row.vision_gate_status?.startsWith("rejected") ? "source_unavailable" : "source_not_ready";
+  if (subjectSourceAvailable(row, user, readAt)) return null;
+  if (!subjectSourceCanEstablishPrivacy(row, user)) {
+    const current = currentIdentitySource(row), binding = row.source_identity;
+    const onlyPending = !subjectPrivacyWithdrawn(row) && (binding ? binding.result.status === "held" && binding.result.reason === "source_gate_not_approved" :
+      !row.is_superseded && !row.is_duplicate && !row.is_sensitive && !row.is_document);
+    return onlyPending && current && !current.vision_gate_status?.startsWith("rejected") ? "source_not_ready" : "source_unavailable";
+  }
+  return validDevicePrivacyReceipt(native, currentIdentitySource(row), readAt) ? null : "source_not_ready";
 }
 
-function replayEnvelope(readings: SubjectReading[], sources: SubjectSource[], user: string): SubjectEnvelope | null {
+function replayEnvelope(readings: SubjectReading[], sources: SubjectSource[], user: string, asOf: string): SubjectEnvelope | null {
   for (const reading of readings) {
     const wrapper = reading.confidence_basis?.visual_subjects_v1;
     const envelope = reading.confidence_basis?.visual_subject_reading_v1?.envelope ?? wrapper?.envelope;
@@ -83,9 +100,39 @@ function replayEnvelope(readings: SubjectReading[], sources: SubjectSource[], us
     if (sources.every(source => envelope.inputs.filter(input => input.image_id === source.id && input.source_qualified === true &&
       input.source_sha256 === source.file_hash && input.source_url === source.image_url &&
       sameClock(input.created_at, source.created_at) && sameClock(input.taken_at, source.taken_at) &&
-      qualifySubjectSource(input, source, user, envelope.read_at)).length === 1)) return envelope;
+      qualifySubjectSource(input, source, user, envelope.read_at, asOf)).length === 1)) return envelope;
   }
   return null;
+}
+
+/** Uses the already captured originals. No privacy model, new upload, global
+ * source-state mutation or ancestor permission inheritance is involved. */
+async function retainCapturedPrivacy(store: SubjectStore, user: string, sources: SubjectSource[], privacy: Record<string, unknown>,
+  capture: VisionInputCapture, readAt: string, allowPending = false): Promise<SubjectSource[]> {
+  if (!store.retainPrivacy || !capture.required_available) throw new Error("subject_privacy_not_ready");
+  const pending = sources.filter(row => !subjectSourceAvailable(row, user, readAt) && Object.hasOwn(privacy, row.id));
+  if (pending.length > 2) throw new Error("subject_privacy_scope_invalid");
+  for (const row of pending) {
+    if (!subjectSourceCanEstablishPrivacy(row, user)) throw new Error("subject_privacy_source_held");
+    const current = currentIdentitySource(row)!;
+    const native: any = privacy[row.id], pinned = capture.inputs.find(input => input.key === row.id)?.receipt;
+    const length = pinned?.representation === "source" ? pinned.byte_length : pinned?.derivation?.source_byte_length;
+    if (!pinned?.source_qualified || pinned.source_sha256 !== row.file_hash || length !== native?.source_byte_length ||
+      !validDevicePrivacyReceipt(native, current, readAt)) throw new Error("subject_privacy_bytes_invalid");
+    const family = subjectSourceFamily(row);
+    await store.retainPrivacy(current.id, { method: DEVICE_PRIVACY_METHOD, purpose: PRIVATE_SUBJECT_PURPOSE,
+      user_id: user, read_at: readAt, native, subjects: [], ...(family ? { source_family: family } : {}),
+      inputs: [{ ...pinned, image_id: current.id, storage_path: current.storage_path, created_at: current.created_at, taken_at: current.taken_at }] });
+  }
+  const current = await store.sources(user, sources.map(s => s.id));
+  if (current.length !== sources.length || new Set(current.map(row => row.id)).size !== sources.length || current.some(row => {
+    const old = sources.find(source => source.id === row.id), pinned = capture.inputs.find(input => input.key === row.id)?.receipt;
+    return !old || (!allowPending || pinned ? !!sourceRefusal(row, user, readAt) :
+      !subjectSourceAvailable(row, user, readAt) && !subjectSourceCanEstablishPrivacy(row, user)) || old.file_hash !== row.file_hash || old.image_url !== row.image_url ||
+      !sameClock(old.created_at, row.created_at) || !sameClock(old.taken_at, row.taken_at) || pinned &&
+      !qualifySubjectSource({ ...pinned, image_id: row.id, created_at: old.created_at, taken_at: old.taken_at }, row, user, readAt, readAt);
+  })) throw new Error("subject_privacy_not_qualified");
+  return sources.map(source => current.find(row => row.id === source.id)!);
 }
 
 /** One explicitly bounded reading; no session inheritance or canonical vehicle writes.
@@ -94,7 +141,7 @@ function replayEnvelope(readings: SubjectReading[], sources: SubjectSource[], us
  */
 export async function resolveSubjectBatch(store: SubjectStore, request: SubjectRequest & { user_id: string },
   projectURL: string, dependencies: SubjectDependencies) {
-  const ids = request.image_ids, now = dependencies.now ?? (() => new Date());
+  const ids = request.image_ids, now = dependencies.now ?? (() => new Date()), asOf = now().toISOString();
   if (!Array.isArray(ids) || ids.length < 1 || ids.length > SUBJECT_BATCH_LIMIT || new Set(ids).size !== ids.length || ids.some(id => typeof id !== "string" || !UUID.test(id)) ||
     request.dry_run !== undefined && typeof request.dry_run !== "boolean" || request.reuse_only !== undefined && typeof request.reuse_only !== "boolean") {
     throw new Error("subject_input_scope_invalid");
@@ -103,25 +150,37 @@ export async function resolveSubjectBatch(store: SubjectStore, request: SubjectR
   if (expected && (typeof expected !== "object" || Array.isArray(expected) || Object.keys(expected).length !== ids.length || ids.some(id => !/^[a-f0-9]{64}$/.test(expected[id] ?? "")))) {
     throw new Error("subject_expected_sources_invalid");
   }
+  const privacy = request.device_privacy_receipts ?? {};
+  if (!privacy || typeof privacy !== "object" || Array.isArray(privacy) || Object.keys(privacy).length > 2 ||
+    Object.keys(privacy).some(id => !ids.includes(id)) || JSON.stringify(privacy).length > 16384) throw new Error("subject_privacy_scope_invalid");
   const base = { method: SUBJECT_METHOD, persisted_image_ids: [] as string[], deferred_image_ids: [] as string[],
     unresolved: [] as Array<{ image_id: string; reason: string }> };
   const allowed = allowedSubjectSources(request.allowed_source_hashes, ids, expected);
   if (!allowed.valid) return { ...base, status: "refused", refusal: "allowed_source_scope_invalid" };
+  // An audited alias does not widen the caller's pixel/proof scope. Keep the
+  // immutable reading ID and its independently qualified current leaf explicit.
+  const scopeRefusal = (rows: SubjectSource[]) => subjectInputScopeRefusal(allowed.hashes, rows.flatMap(row => {
+    const current = currentIdentitySource(row);
+    return current && current.id !== row.id ? [row, { id: current.id, file_hash: current.file_hash }] : [row];
+  }));
   let sources = await store.sources(request.user_id, ids);
   if (sources.length !== ids.length || new Set(sources.map(row => row.id)).size !== ids.length ||
     sources.some(row => !ids.includes(row.id))) return { ...base, status: "refused", refusal: "source_unavailable" };
   if (expected && sources.some(source => expected[source.id] !== source.file_hash)) {
     return { ...base, status: "refused", refusal: "source_changed" };
   }
-  const freshScopeRefusal = subjectInputScopeRefusal(allowed.hashes, sources);
+  const freshScopeRefusal = scopeRefusal(sources);
   if (freshScopeRefusal) return { ...base, status: "refused", refusal: freshScopeRefusal };
-  const held = sources.map(row => ({ image_id: row.id, reason: sourceRefusal(row, request.user_id) })).filter(row => row.reason);
+  const held = sources.map(row => ({ image_id: row.id, reason: request.reuse_only && subjectSourceCanEstablishPrivacy(row, request.user_id)
+    ? null : sourceRefusal(row, request.user_id, asOf, privacy[row.id]) })).filter(row => row.reason);
   if (held.length) return { ...base, status: "refused", refusal: held.some(row => row.reason === "source_unavailable") ? "source_unavailable" : "source_not_ready", unresolved: held };
 
   const fresh = new Map(sources.map(source => [source.id, source]));
+  const nativeFor = (source: SubjectSource) => privacy[source.id] ?? privacy[ids.find(id => sourceRoot(fresh.get(id)) === sourceRoot(source)) ?? ""];
   let consumedIds = [...ids], contextCoverage: Record<string, unknown> = {};
   let readings = await store.readings(ids);
   let envelope: SubjectEnvelope | null = null;
+  let providerUsage: AnthropicTokenUsage | null = null;
   // A retained reading may include server-selected context and consume only the
   // first requested fresh photo. Requalify that exact scope before selecting new
   // context; the deferred photo remains new work on the phone.
@@ -129,38 +188,93 @@ export async function resolveSubjectBatch(store: SubjectStore, request: SubjectR
     const prior = reading.confidence_basis?.visual_subject_reading_v1?.envelope ?? reading.confidence_basis?.visual_subjects_v1?.envelope;
     if (!reading.is_active || !prior || prior.user_id !== request.user_id || prior.method !== SUBJECT_METHOD ||
       !Array.isArray(prior.inputs) || prior.inputs.length < 2 || prior.inputs.length > SUBJECT_BATCH_LIMIT ||
-      !prior.inputs.some(input => input.image_id === ids[0]) || !prior.inputs.every(input => UUID.test(input.image_id)) ||
-      ids.length === 3 && !ids.every(id => prior.inputs.some(input => input.image_id === id))) continue;
+      !prior.inputs.some(input => sourceAliases(fresh.get(ids[0])).includes(input.image_id)) || !prior.inputs.every(input => UUID.test(input.image_id)) ||
+      ids.length === 3 && !ids.every(id => prior.inputs.some(input => sourceAliases(fresh.get(id)).includes(input.image_id)))) continue;
     const retainedSources = await store.sources(request.user_id, prior.inputs.map(input => input.image_id));
-    if (retainedSources.length !== prior.inputs.length || retainedSources.some(row => sourceRefusal(row, request.user_id) ||
+    if (retainedSources.length !== prior.inputs.length) continue;
+    const retainedScopeRefusal = scopeRefusal(retainedSources);
+    if (retainedScopeRefusal) return { ...base, status: "refused", refusal: retainedScopeRefusal };
+    if (retainedSources.some(row => sourceRefusal(row, request.user_id, asOf) ||
       expected && Object.hasOwn(expected, row.id) && expected[row.id] !== row.file_hash)) continue;
-    const reusable = replayEnvelope([reading], retainedSources, request.user_id);
+    const reusable = replayEnvelope([reading], retainedSources, request.user_id, asOf);
     if (reusable) {
       envelope = reusable; sources = retainedSources;
-      consumedIds = ids.filter(id => prior.inputs.some(input => input.image_id === id));
+      consumedIds = ids.filter(id => prior.inputs.some(input => sourceAliases(fresh.get(id)).includes(input.image_id)));
+      break;
+    }
+  }
+  // Historical native reinspection is reuse-only. First prove that an exact old
+  // paid reading and current correction scope exist; only then verify at most two
+  // purpose-pending originals. Never reach the model path, even after a race.
+  if (!envelope && request.reuse_only && !request.dry_run) {
+    for (const reading of readings) {
+      const plan = await planSubjectReinspection(store, request.user_id, reading, asOf);
+      if (!plan || plan.candidate.image_ids.length !== ids.length || !ids.every(id => plan.candidate.image_ids.includes(id)) ||
+        expected && plan.sources.some(source => expected[source.id] !== source.file_hash)) continue;
+      const privacyScopeRefusal = scopeRefusal(plan.sources);
+      if (privacyScopeRefusal) return { ...base, status: "refused", refusal: privacyScopeRefusal };
+      const pending = plan.sources.filter(row => !subjectSourceAvailable(row, request.user_id, asOf) && Object.hasOwn(privacy, row.id));
+      if (pending.some(row => !validDevicePrivacyReceipt(privacy[row.id], currentIdentitySource(row), asOf)))
+        return { ...base, status: "refused", refusal: "source_not_ready" };
+      if (!pending.length) return { ...base, status: "refused", refusal: "source_privacy_partial", reinspection_candidate: plan.candidate };
+      const visionSources: VisionInputSource[] = pending.map(row => ({ key: row.id, image_id: row.id, source_url: row.image_url,
+        storage_path: row.storage_path, expected_source_sha256: row.file_hash, representation: "source", required: true }));
+      try {
+        const capture = await (dependencies.capturePrivacy ?? captureVisionInputs)(visionSources);
+        sources = await retainCapturedPrivacy(store, request.user_id, plan.sources, privacy, capture, now().toISOString(), true);
+        const currentReadings = await store.readings(ids);
+        const stillCurrent = currentReadings.filter(row => row.id === reading.id);
+        if (stillCurrent.length === 1) {
+          const remaining = await planSubjectReinspection(store, request.user_id, stillCurrent[0], now().toISOString());
+          if (remaining) return { ...base, status: "refused", refusal: "source_privacy_partial", reinspection_candidate: remaining.candidate };
+        }
+        envelope = replayEnvelope(stillCurrent, sources, request.user_id, now().toISOString());
+        if (envelope) consumedIds = [...ids];
+      } catch { return { ...base, status: "refused", refusal: "source_not_ready" }; }
       break;
     }
   }
   const reused = !!envelope;
   // Replayed context is subject to the same explicit caller scope, even when
   // reuse would make no provider call. Refuse before retained/membership writes.
-  const replayScopeRefusal = subjectInputScopeRefusal(allowed.hashes, sources);
+  const replayScopeRefusal = scopeRefusal(sources);
   if (replayScopeRefusal) return { ...base, status: "refused", refusal: replayScopeRefusal };
-  if (!envelope && request.reuse_only) return { ...base, status: "refused", refusal: "retained_reading_unavailable" };
+  if (!envelope && request.reuse_only) return { ...base, status: "refused", refusal:
+    sources.some(source => !subjectSourceAvailable(source, request.user_id, asOf) && subjectSourceCanEstablishPrivacy(source, request.user_id))
+      ? "source_not_ready" : "retained_reading_unavailable" };
   if (!envelope) {
     if (ids.length <= 2 && store.context) {
       const context = await store.context(request.user_id, fresh.get(ids[0])!);
-      const qualified = context.sources.filter(source => source.id !== ids[0] && !sourceRefusal(source, request.user_id));
+      const qualified = context.sources.filter(source => sourceRoot(source) !== sourceRoot(fresh.get(ids[0])) && !sourceRefusal(source, request.user_id, asOf));
       if (qualified.length && qualified.length <= 2 && new Set(qualified.map(source => source.id)).size === qualified.length) {
         sources = [fresh.get(ids[0])!, ...qualified];
-        consumedIds = ids.filter(id => sources.some(source => source.id === id));
+        consumedIds = ids.filter(id => sources.some(source => sourceRoot(source) === sourceRoot(fresh.get(id))));
         contextCoverage = context.coverage;
       }
     }
+    // Attribution aliases are one source. Preserve any existing exact anchor;
+    // otherwise use its immutable root receipt ID for future continuity.
+    readings = await store.readings(sources.map(source => source.id));
+    const selected: string[] = [], roots = new Set<string>();
+    for (const source of sources) {
+      const root = sourceRoot(source) ?? source.id;
+      if (roots.has(root)) continue;
+      roots.add(root);
+      const aliases = sourceAliases(source);
+      const anchors = new Set(readings.filter(row => row.is_active && aliases.includes(row.image_id) &&
+        row.confidence_basis?.visual_subjects_v1?.state !== "withdrawn")
+        .map(row => row.confidence_basis?.visual_subjects_v1?.anchor_image_id).filter((id): id is string => !!id && aliases.includes(id)));
+      if (anchors.size > 1) return { ...base, status: "refused", refusal: "source_membership_conflict" };
+      selected.push([...anchors][0] ?? root);
+    }
+    sources = await store.sources(request.user_id, selected);
+    if (sources.length !== selected.length || sources.some(source => sourceRefusal(source, request.user_id, asOf, nativeFor(source))))
+      return { ...base, status: "refused", refusal: "source_unavailable" };
+    consumedIds = ids.filter(id => sources.some(source => sourceRoot(source) === sourceRoot(fresh.get(id))));
     if (sources.length < 2) return { ...base, status: "refused", refusal: "source_needs_corresponding_view" };
     // Server-selected context must be pinned as explicitly as requested fresh
     // sources. No object, renderer or provider callback has run at this point.
-    const actualScopeRefusal = subjectInputScopeRefusal(allowed.hashes, sources);
+    const actualScopeRefusal = scopeRefusal(sources);
     if (actualScopeRefusal) return { ...base, status: "refused", refusal: actualScopeRefusal };
     readings = await store.readings(sources.map(source => source.id));
     const candidate_scope = await store.candidates(request.user_id);
@@ -170,6 +284,15 @@ export async function resolveSubjectBatch(store: SubjectStore, request: SubjectR
       source_url: row.image_url, storage_path: row.storage_path, expected_source_sha256: row.file_hash,
       representation: "source", required: true }));
     const capture = await (dependencies.capture ?? captureTrustedJPEGInputs)(visionSources, projectURL);
+    // Qualification uses these same already-captured originals. It has no model
+    // callback, no second image fetch and changes no global gate/processing state.
+    const pending = sources.filter(row => !subjectSourceAvailable(row, request.user_id, now().toISOString()));
+    if (pending.length) {
+      if (request.dry_run || !store.retainPrivacy || !capture.required_available) return { ...base, status: "refused", refusal: "source_not_ready" };
+      try { sources = await retainCapturedPrivacy(store, request.user_id, sources,
+        Object.fromEntries(sources.map(source => [source.id, nativeFor(source)])), capture, now().toISOString()); }
+      catch { return { ...base, status: "refused", refusal: "source_not_ready" }; }
+    }
     const result = await runCapturedVision(visionSources, capture, () => [
       { text: SUBJECT_PROMPT }, ...sources.flatMap(source => [{ text: `Photo image_id=${source.id}` }, { image_key: source.id }]),
     ], dependencies.vision, { limits: { output_tokens: 1600 } });
@@ -177,6 +300,7 @@ export async function resolveSubjectBatch(store: SubjectStore, request: SubjectR
       unavailable_inputs: capture.unavailable, candidate_scope,
       ...(result.provider_diagnostics?.length ? { provider_diagnostics: result.provider_diagnostics } : {}),
       ...(result.provider_attempt_coverage ? { provider_attempt_coverage: result.provider_attempt_coverage } : {}) };
+    providerUsage = result.model_result.usage ?? null;
     const inputs: SubjectInput[] = sources.map(source => {
       const receipt = capture.inputs.find(input => input.key === source.id)!.receipt;
       const prior = readings.filter(reading => reading.image_id === source.id && reading.is_active && reading.cluster_id &&
@@ -194,6 +318,8 @@ export async function resolveSubjectBatch(store: SubjectStore, request: SubjectR
     envelope = { ...projection, user_id: request.user_id, method: SUBJECT_METHOD, run_key,
       provider: result.model_result.provider, model: result.model_result.model, read_at, inputs, candidate_scope };
   }
+  const writeScopeRefusal = scopeRefusal(sources);
+  if (writeScopeRefusal) return { ...base, status: "refused", refusal: writeScopeRefusal };
   const failures: Array<{ image_id: string; reason: string }> = [], persisted: string[] = [], retained: string[] = [];
   if (!request.dry_run) {
     // Even an unresolved interpretation is useful retained evidence. Its own
@@ -232,55 +358,83 @@ export async function resolveSubjectBatch(store: SubjectStore, request: SubjectR
   const supported = new Set((membershipHeld ? [] : envelope.subjects).flatMap(subject => subject.member_image_ids));
   const heldMembership = membershipHeld ? envelope.subjects.flatMap(subject => subject.member_image_ids)
     .map(image_id => ({ image_id, reason: admissionReason ?? "subject_admission_held" })) : [];
-  const failureById = new Map(failures.map(row => [row.image_id, row]));
+  const inputForFresh = (id: string) => envelope!.inputs.find(input => sourceAliases(fresh.get(id)).includes(input.image_id))?.image_id;
+  const forFresh = (values: string[]) => consumedIds.filter(id => { const input = inputForFresh(id); return !!input && values.includes(input); });
+  const mappedFailures = failures.flatMap(failure => consumedIds.filter(id => id === failure.image_id || inputForFresh(id) === failure.image_id)
+    .map(image_id => ({ ...failure, image_id })));
+  const failureById = new Map(mappedFailures.map(row => [row.image_id, row]));
+  const mappedUnresolved = [...envelope.unresolved, ...heldMembership].flatMap(row => consumedIds.filter(id => inputForFresh(id) === row.image_id)
+    .map(image_id => ({ ...row, image_id })));
   return { ...base, status: failures.length ? "partial" : membershipHeld ? "unresolved" : reused ? "cached" : envelope.subjects.length ? "resolved" : "unresolved",
-    dry_run: request.dry_run ?? false, persisted_image_ids: persisted.filter(id => consumedIds.includes(id) && !failureById.has(id)), subjects: membershipHeld ? [] : envelope.subjects,
+    dry_run: request.dry_run ?? false, persisted_image_ids: forFresh(persisted).filter(id => !failureById.has(id)), subjects: membershipHeld ? [] : envelope.subjects,
     deferred_image_ids: ids.filter(id => !consumedIds.includes(id)),
+    source_lineage: consumedIds.map(image_id => ({ requested_image_id: image_id, input_image_id: inputForFresh(image_id), identity: inspectSourceIdentity(fresh.get(image_id)) })),
     admitted_image_ids: persisted, input_image_ids: envelope.inputs.map(input => input.image_id),
-    retained_reading_image_ids: retained.filter(id => consumedIds.includes(id)), retry_without_inference: retained.length + persisted.length > 0,
-    unresolved: [...[...envelope.unresolved, ...heldMembership].filter(row => consumedIds.includes(row.image_id) && !failures.some(f => f.image_id === row.image_id)),
+    retained_reading_image_ids: forFresh(retained), retry_without_inference: retained.length + persisted.length > 0,
+    unresolved: [...mappedUnresolved.filter(row => !failureById.has(row.image_id)),
       ...[...failureById.values()].filter(row => consumedIds.includes(row.image_id))], candidate_scope: envelope.candidate_scope,
     coverage: { grain: "source_photos", assessed: sources.length, eligible: supported.size,
       excluded: sources.length - supported.size, as_of: envelope.read_at, truncated: false },
-    reading: { provider: envelope.provider, model: envelope.model, read_at: envelope.read_at, run_key: envelope.run_key, reused },
+    reading: { provider: envelope.provider, model: envelope.model, read_at: envelope.read_at, run_key: envelope.run_key, reused,
+      provider_usage: providerUsage },
   };
 }
 
 export function supabaseSubjectStore(client: any): SubjectStore {
+  const loaded = new Map<string, SubjectSource>();
+  let owner: string | null = null;
+  const aliasScope = (ids: string[]) => [...new Set(ids.flatMap(id => sourceAliases(loaded.get(id))))];
+  const columns = "id,image_id,cluster_id,observed_by,observed_at,is_active,superseded_by,confidence_basis";
+  async function memberships(ids: string[]) {
+    if (!owner) throw new Error("subject_reading_scope_missing");
+    const scope = aliasScope(ids);
+    const result = await client.from("image_observations").select(columns).eq("observed_by", SUBJECT_METHOD)
+      .eq("confidence_basis->visual_subjects_v1->envelope->>user_id", owner)
+      .or("superseded_by.is.null,confidence_basis->visual_subjects_v1->>state.eq.withdrawn")
+      .in("image_id", scope).limit(129);
+    if (result.error || !Array.isArray(result.data)) throw new Error("subject_reading_read_failed");
+    return result.data;
+  }
   return {
     async sources(user, ids) {
-      const { data, error } = await client.from("vehicle_images").select(
-        "id,user_id,image_url,file_hash,storage_path,taken_at,created_at,is_superseded,is_duplicate,is_document,is_sensitive,vision_gate_status",
-      ).eq("user_id", user).in("id", ids).limit(SUBJECT_BATCH_LIMIT);
-      if (error || !Array.isArray(data)) throw new Error("subject_source_read_failed");
+      if (owner !== null && owner !== user) loaded.clear();
+      owner = user;
+      const lookup = await loadSourceIdentities(client, user, ids);
+      const data = await hydrateSubjectPrivacy(client, user, lookup.sources) as SubjectSource[];
+      for (const source of data) loaded.set(source.id, source);
+      return data;
+    },
+    async retainPrivacy(imageId, envelope) {
+      const { data, error } = await client.rpc("ingest_image_observation", {
+        p_image_id: imageId, p_vehicle_id: null, p_role: "part", p_confidence: 0,
+        p_observed_by: DEVICE_PRIVACY_METHOD, p_agent_version: DEVICE_PRIVACY_METHOD,
+        p_confidence_basis: { [DEVICE_PRIVACY_METHOD]: { state: "active", envelope } },
+        p_is_high_confidence_subject: false, p_layer_version: { method: DEVICE_PRIVACY_METHOD, policy_version: 1 },
+      });
+      if (error || typeof data !== "string" || !UUID.test(data)) throw new Error("subject_privacy_storage_failed");
       return data;
     },
     async readings(ids) {
-      const columns = "id,image_id,cluster_id,observed_by,is_active,superseded_by,confidence_basis";
-      const [memberships, paid] = await Promise.all([
-        client.from("image_observations").select(columns).eq("observed_by", SUBJECT_METHOD)
-          .is("superseded_by", null).in("image_id", ids).limit(43),
+      if (!owner) throw new Error("subject_reading_scope_missing");
+      const [heads, paid] = await Promise.all([
+        memberships(ids),
         client.from("image_observations").select(columns).eq("observed_by", "visual_subject_reading_v1")
-          .eq("is_active", true).is("superseded_by", null).in("image_id", ids)
-          .contains("confidence_basis", { visual_subject_reading_v1: { envelope: { inputs: [{ image_id: ids[0] }] } } })
-          .order("observed_at", { ascending: false }).order("id", { ascending: false }).limit(33),
+          .eq("confidence_basis->visual_subject_reading_v1->envelope->>user_id", owner)
+          .eq("is_active", true).is("superseded_by", null).in("image_id", aliasScope(ids))
+          .order("observed_at", { ascending: false }).order("id", { ascending: false }).limit(101),
       ]);
-      if (memberships.error || paid.error || !Array.isArray(memberships.data) || !Array.isArray(paid.data)) throw new Error("subject_reading_read_failed");
-      if (memberships.data.length > 42) throw new Error("subject_membership_scope_unassessed");
-      return [...memberships.data, ...paid.data];
+      if (paid.error || !Array.isArray(paid.data)) throw new Error("subject_reading_read_failed");
+      if (heads.length > 128 || paid.data.length > 100) throw new Error("subject_membership_scope_unassessed");
+      return [...heads, ...paid.data];
     },
     async admission(envelope) {
-      const ids = envelope.inputs.map(input => input.image_id), [sources, heads] = await Promise.all([
-        this.sources(envelope.user_id, ids),
-        client.from("image_observations").select("id,image_id,cluster_id,observed_by,is_active,superseded_by,confidence_basis")
-          .eq("observed_by", SUBJECT_METHOD).is("superseded_by", null).in("image_id", ids).limit(43),
-      ]);
-      if (heads.error || !Array.isArray(heads.data)) throw new Error("subject_admission_read_failed");
+      const ids = envelope.inputs.map(input => input.image_id);
+      const sources = await this.sources(envelope.user_id, ids), heads = await memberships(ids);
       const clusterIds = [...new Set(envelope.subjects.map(subject => subject.existing_cluster_id).filter((id): id is string => !!id))];
       const profiles = [];
       for (const id of clusterIds) profiles.push(...(await readSubjectProfiles(client, envelope.user_id, { cluster_id: id })).subjects);
-      return assessSubjectAdmission(envelope, envelope.user_id, { sources, readings: heads.data.slice(0, 42),
-        readings_complete: heads.data.length <= 42, profiles, as_of: new Date().toISOString() });
+      return assessSubjectAdmission(envelope, envelope.user_id, { sources, readings: heads.slice(0, 128),
+        readings_complete: heads.length <= 128 && subjectPrivacyLookupComplete(sources), profiles, as_of: new Date().toISOString() });
     },
     async retainReading(imageId, envelope) {
       const { data, error } = await client.rpc("ingest_image_observation", {

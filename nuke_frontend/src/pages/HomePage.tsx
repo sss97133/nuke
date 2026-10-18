@@ -24,6 +24,7 @@ import {
   buildFacetNodes,
   classifyVehicleFacets,
   consolidateBrandPickupFamilies,
+  isGmTruckBrand,
   isPickupFamilyLabel,
   resolveTileBadgeSvg,
   resolveVettedIdentityMarks,
@@ -149,7 +150,7 @@ export function drillStackFromSearchParams(
         (f.familyKey != null && f.familyKey.toLowerCase() === rawFamily.toLowerCase()) ||
         f.name.toLowerCase() === rawFamily.toLowerCase() ||
         (rawFamilyName != null && f.name.toLowerCase() === rawFamilyName.toLowerCase()) ||
-        (isPickupFamilyLabel(rawFamily) && f.name.toLowerCase() === 'pickup'),
+        (isPickupFamilyLabel(rawFamily) && /^(pickup|truck)$/i.test(f.name)),
     );
     resolvedFamilyKey = matched?.familyKey ?? rawFamily;
     familyLabel = matched?.name ?? rawFamilyName ?? (isPickupFamilyLabel(rawFamily) ? 'Pickup' : rawFamily);
@@ -218,7 +219,8 @@ export function applyDrillStackToSearchParams(
     } else if (effectiveAxis && effectiveAxis !== 'raw') {
       next.set('axis', effectiveAxis);
     } else {
-      next.delete('axis');
+      if (effectiveAxis === 'raw' && prevFamily === leaf.family && isGmTruckBrand(leaf.make) && familyLevel?.label === 'Truck') next.set('axis', 'raw');
+      else next.delete('axis');
       next.delete('facet');
     }
   } else {
@@ -1578,10 +1580,11 @@ export function TreemapHomePage({ onBrowse, embedded = false }: { onBrowse: () =
   }, [setSearchParams]);
   useEffect(() => {
     setFamilyView('names');
-    const resolvedAxis = urlAxis ?? 'raw';
+    const truck = isGmTruckBrand(currentLevel.make) && drillStack.find((d) => d.family && !d.model)?.label === 'Truck';
+    const resolvedAxis = urlAxis ?? (truck && !currentLevel.model ? 'series' : 'raw');
     facetAxisRef.current = resolvedAxis;
     setFacetAxisState(resolvedAxis);
-  }, [currentLevel.make, currentLevel.family, urlAxis]);
+  }, [currentLevel.make, currentLevel.family, urlAxis, drillStack.find((d) => d.family && !d.model)?.label]);
 
   // Family-wide sales (5-year dated window via treemap_family_sales): enables direct Family -> Years -> Vehicles navigation
   // and Era filtering without requiring a fragmented raw model string first.
@@ -1814,7 +1817,7 @@ export function TreemapHomePage({ onBrowse, embedded = false }: { onBrowse: () =
         currentLevel.make,
         activeFamilyLabel,
         base,
-        familySalesData,
+        isGmTruckBrand(currentLevel.make) && activeFamilyLabel === 'Truck' && facetAxis === 'series' ? null : familySalesData,
         selectedEra ? (yr) => matchesEraRange(yr, selectedEra) : undefined,
       ) ?? [];
     if (
@@ -2330,7 +2333,8 @@ export function TreemapHomePage({ onBrowse, embedded = false }: { onBrowse: () =
               {isNarrow ? (isLoading ? 'Reading sales…' : mapCaptionShort(levelType, totalCount, refresh))
                 : mapCaption(levelType, totalCount, refresh, Date.now(), levelType === 'families' ? captionBridge + familyCoverage(activeData)
                   : levelType === 'models' ? captionBridge + familyNamesShown(
-                    activeData?.length ?? 0,
+                    facetAxis === 'series' && isGmTruckBrand(currentLevel.make) && activeFamilyLabel === 'Truck'
+                      ? familyModelsData?.length ?? 0 : activeData?.length ?? 0,
                     selectedEra
                       ? (eraFilteredFamilyModels?.length ?? activeData?.length)
                       : Math.max(currentLevel.names ?? 0, familyModelsData?.length ?? 0) || undefined,
@@ -2437,7 +2441,7 @@ export function TreemapHomePage({ onBrowse, embedded = false }: { onBrowse: () =
         return (
           <div className="home-family-submodels" role="navigation" aria-label="Brand families" data-testid="brand-family-pills">
             <span className="home-family-submodels-label">FAMILIES</span>
-            {hasMultipleBrandPickups && (
+            {hasMultipleBrandPickups && !isGmTruckBrand(currentLevel.make) && (
               <button
                 type="button"
                 data-testid="toggle-brand-pickup-umbrella"

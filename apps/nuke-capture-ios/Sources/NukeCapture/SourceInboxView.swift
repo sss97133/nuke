@@ -183,6 +183,31 @@ private struct SourcePhotoDetail: View {
                             }.font(.caption2).textSelection(.enabled)
                         }
                     }
+                    if let identity = photo.source_identity {
+                        DisclosureGroup("Attribution history") {
+                            RootedValueView(label: "Source identity", value: identity.source_photo_count == 1 ? "One audited photograph" : "Source identity unresolved", status: .recorded)
+                            Text("Source records preserve attribution history. This read does not establish the current vehicle attachment.")
+                                .font(.caption).foregroundStyle(.secondary)
+                            if let root = identity.root_image_id { Text("Original receipt \(root.uuidString.lowercased())") }
+                            if let current = identity.current_image_id { Text("Current source record \(current.uuidString.lowercased())") }
+                            ForEach(identity.audit_ids, id: \.self) { audit in Text("Attribution audit \(audit.uuidString.lowercased())") }
+                        }.font(.caption2).textSelection(.enabled)
+                    }
+                    if photo.readings.isEmpty, let contexts = photo.retained_contexts, !contexts.isEmpty {
+                        ForEach(contexts) { context in
+                            VStack(alignment: .leading, spacing: 5) {
+                                RootedValueView(label: "Retained analysis", value: photo.source_state == "held" ? "Held pending current source qualification" : "Earlier reading metadata retained", status: .recorded,
+                                    decay: ProfileClock.date(context.read_at).map { "Read " + $0.formatted(date: .abbreviated, time: .shortened) })
+                                Text("Earlier analysis remains recorded; it is not a current identity or permission to show this photograph.")
+                                    .font(.caption).foregroundStyle(.secondary)
+                                DisclosureGroup("Reading evidence") {
+                                    Text("Observation \(context.id.uuidString.lowercased())")
+                                    Text("Original input receipt \(context.receipt_image_id.uuidString.lowercased())")
+                                    Text("\(context.provider) · \(context.model)")
+                                }.font(.caption2).textSelection(.enabled)
+                            }
+                        }
+                    }
                     if photo.attached_vehicle_id_context != nil {
                         Text("An existing filing is recorded. This source read does not qualify that vehicle identity.")
                             .font(.caption).foregroundStyle(.secondary)

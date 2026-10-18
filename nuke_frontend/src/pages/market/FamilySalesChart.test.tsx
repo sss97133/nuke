@@ -632,3 +632,11 @@ describe('facet distribution summary strip in FamilySalesChart header bar', () =
     expect(onSelectFacet).toHaveBeenLastCalledWith(null);
   });
 });
+
+
+it('keeps single-family forecasts and indices out of the GM Truck umbrella', async () => {
+  fixture.rpc.mockResolvedValue({ data: value([]), error: null });
+  await act(async () => root.render(<FamilySalesChart brand="Chevrolet" familyKey="pickup" family="Truck" width={900} height={500} onOpen={() => {}} />));
+  expect(fixture.rpc).toHaveBeenCalledWith('treemap_family_sales', { p_brand: 'Chevrolet', p_family_key: 'pickup', p_limit: 15000 });
+  expect(fixture.rpc.mock.calls.some(([name]) => name === 'treemap_family_upcoming_supply' || name === 'family_price_index_read')).toBe(false);
+});

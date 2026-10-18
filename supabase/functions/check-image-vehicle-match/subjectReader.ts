@@ -1,4 +1,7 @@
 import { observationClockMicroseconds as clock } from "../_shared/observationContentHash.ts";
+import { loadSourceIdentities, sourceAliases, sourceRoot, currentIdentitySource, inspectSourceIdentity } from "./sourceIdentity.ts";
+import { hydrateSubjectPrivacy, subjectSourceAvailable, subjectPrivacyLookupComplete } from "./subjectPrivacy.ts";
+import { lineageReadingAfterWithdrawals } from "./sourceLineage.ts";
 import { qualifiedSubjectInput, SUBJECT_METHOD, type SubjectInput } from "./subjects.ts";
 
 const ORIGIN = "https://qkgaybvrernstplzjaam.supabase.co";
@@ -29,10 +32,15 @@ export interface SubjectProfile {
 /** Source qualification for private reads and service replay. Clock comparisons
  * retain PostgreSQL microseconds. Profile membership never qualifies its source.
  */
-export function qualifySubjectSource(input: unknown, live: unknown, userId: string, readAt: unknown): boolean {
+export function qualifySubjectSource(input: unknown, live: unknown, userId: string, readAt: unknown,
+  qualificationAsOf: unknown = new Date().toISOString()): boolean {
+  return subjectSourceAvailable(live, userId, qualificationAsOf) && qualifySubjectSourceCustody(input, live, userId, readAt);
+}
+
+/** Immutable consumed-byte custody is not present privacy authority. */
+export function qualifySubjectSourceCustody(input: unknown, live: unknown, userId: string, readAt: unknown): boolean {
   if (!uuid(userId) || !record(input) || !record(live) || live.user_id !== userId || input.image_id !== live.id ||
-    live.vision_gate_status !== "approved" || live.is_superseded === true || live.is_duplicate === true ||
-    live.is_document === true || live.is_sensitive === true || !text(live.image_url, 8192) ||
+    !text(live.image_url, 8192) ||
     !["is_superseded", "is_duplicate", "is_document", "is_sensitive"].every(key => Object.hasOwn(live, key)) ||
     !/^https?:\/\//.test(live.image_url) || !sha(live.file_hash) || input.source_sha256 !== live.file_hash ||
     !equalClock(input.created_at, live.created_at) || !equalClock(input.taken_at, live.taken_at)) return false;
@@ -91,7 +99,7 @@ export function qualifyCurrentSubjectReading(
     !Array.isArray(envelope.frames) || envelope.frames.length > 14) return null;
   const subjects = envelope.subjects.filter((s: unknown) => record(s) && s.anchor_image_id === wrapper.anchor_image_id);
   const inputs = envelope.inputs.filter((i: unknown) => record(i) && i.image_id === row.image_id);
-  if (subjects.length !== 1 || inputs.length !== 1 || !qualifySubjectSource(inputs[0], live, userId, envelope.read_at)) return null;
+  if (subjects.length !== 1 || inputs.length !== 1 || !qualifySubjectSource(inputs[0], live, userId, envelope.read_at, asOf)) return null;
   const subject = subjects[0], members = subject.member_image_ids;
   if (subject.physical_identity !== "unresolved" || !Array.isArray(members) || members.length < 2 || members.length > 14 ||
     !members.every(uuid) || new Set(members).size !== members.length || !members.includes(row.image_id) ||
@@ -105,7 +113,6 @@ export function qualifyCurrentSubjectReading(
 }
 
 const OBSERVATION_COLUMNS = "id,image_id,cluster_id,vehicle_id,role,observed_by,agent_version,observed_at,is_active,superseded_by,confidence_basis";
-const SOURCE_COLUMNS = "id,user_id,image_url,file_hash,storage_path,taken_at,created_at,is_superseded,is_duplicate,is_document,is_sensitive,vision_gate_status";
 
 /** Caller supplies an already authorized account. No cache is used: privacy,
  * withdrawals, byte changes and supporting graph changes are checked every read.
@@ -140,35 +147,41 @@ export async function readSubjectProfiles(
   if (!imageIds.length) return empty();
   // Include inactive terminal heads: a withdrawal cannot resurrect an older
   // active interpretation from another producer version or cluster.
-  const { data: currentRows, error: currentError } = await headsQuery(supabase.from("image_observations")
-    .select(OBSERVATION_COLUMNS).in("image_id", imageIds));
-  if (currentError || !Array.isArray(currentRows)) throw new Error("subject_current_read_failed");
-  // A capped terminal-head read cannot establish absence of a withdrawal or a
-  // competing producer head for any selected image. Coverage is still bounded,
-  // but no profile is qualified from that incomplete correction scope.
-  if (currentRows.length > HEAD_LIMIT) return { subjects: [] as SubjectProfile[],
+  const sourceLookup = await loadSourceIdentities(supabase, userId, imageIds);
+  const sourceRows = await hydrateSubjectPrivacy(supabase, userId, sourceLookup.sources);
+  const aliasIds = sourceLookup.alias_image_ids;
+  const [{ data: terminalRows, error: currentError }, { data: withdrawals, error: withdrawalError }] = await Promise.all([
+    headsQuery(supabase.from("image_observations").select(OBSERVATION_COLUMNS).in("image_id", aliasIds)),
+    supabase.from("image_observations").select(OBSERVATION_COLUMNS).eq("observed_by", SUBJECT_METHOD)
+      .eq("confidence_basis->visual_subjects_v1->envelope->>user_id", userId)
+      .eq("confidence_basis->visual_subjects_v1->>state", "withdrawn").in("image_id", aliasIds).limit(HEAD_LIMIT + 1),
+  ]);
+  if (currentError || withdrawalError || !Array.isArray(terminalRows) || !Array.isArray(withdrawals)) throw new Error("subject_current_read_failed");
+  const currentRows = [...terminalRows, ...withdrawals].filter((row, n, rows) => !row.id || rows.findIndex(x => x.id === row.id) === n);
+  if (!sourceLookup.complete || !subjectPrivacyLookupComplete(sourceRows) || currentRows.length > HEAD_LIMIT) return { subjects: [] as SubjectProfile[],
     coverage: countCoverage(imageIds.length, 0, asOf, true), next_offset };
   const current = currentRows.slice(0, HEAD_LIMIT);
-  const { data: sourceRows, error: sourceError } = await supabase.from("vehicle_images")
-    .select(SOURCE_COLUMNS).eq("user_id", userId).in("id", imageIds).limit(HEAD_LIMIT);
-  if (sourceError || !Array.isArray(sourceRows)) throw new Error("subject_sources_read_failed");
   const sources = new Map<string, any>(sourceRows.map((row: any) => [row.id, row]));
-  const headByImage = new Map<string, any[]>();
-  for (const row of current) headByImage.set(row.image_id, [...(headByImage.get(row.image_id) ?? []), row]);
   const qualified = new Map<string, QualifiedSubjectReading>();
   for (const id of imageIds) {
-    const heads = headByImage.get(id) ?? [];
+    const aliases = sourceAliases(sources.get(id));
+    const heads = current.filter(row => aliases.includes(row.image_id) && row.superseded_by === null);
     const activeClusters = new Set(heads.filter(row => row.is_active).map(row => row.cluster_id));
     if (!heads.length || heads.some(row => row.is_active !== true || row.confidence_basis?.[SUBJECT_METHOD]?.state === "withdrawn") ||
       activeClusters.size !== 1) continue;
-    const reading = qualifyCurrentSubjectReading(heads[0], sources.get(id), userId, asOf);
+    const ownHeads = heads.filter(row => row.image_id === id);
+    const reading = ownHeads.length ? qualifyCurrentSubjectReading(ownHeads[0], sources.get(id), userId, asOf) : null;
+    const lineage = sources.get(id)?.source_identity?.result?.lineage;
+    if (reading && lineage && !lineageReadingAfterWithdrawals(lineage, reading.read_at,
+      withdrawals.map((row: any) => ({ source_image_id: row.image_id, observed_at: row.observed_at })), true)) continue;
     if (reading) qualified.set(id, reading);
   }
   const headTruncated = candidateRows.length > HEAD_LIMIT || currentRows.length > HEAD_LIMIT;
   const subjects: SubjectProfile[] = [];
   for (const carrier of carriers) {
-    const assessed = new Set(candidates.filter((row: any) => row.cluster_id === carrier.id).map((row: any) => row.image_id));
-    const readings = [...qualified.values()].filter(reading => reading.row.cluster_id === carrier.id && assessed.has(reading.row.image_id));
+    const assessedIds = new Set(candidates.filter((row: any) => row.cluster_id === carrier.id).map((row: any) => row.image_id));
+    const assessed = new Set([...assessedIds].map(id => sourceRoot(sources.get(id)) ?? id));
+    const readings = [...qualified.values()].filter(reading => reading.row.cluster_id === carrier.id && assessedIds.has(reading.row.image_id));
     const anchors = new Set(readings.map(reading => reading.anchor));
     if (anchors.size !== 1) continue;
     const anchor = [...anchors][0], anchorReading = qualified.get(anchor);
@@ -190,7 +203,7 @@ export async function readSubjectProfiles(
         if (![a, b].every(id => {
           const inputs = reading.envelope.inputs.filter((input: any) => input.image_id === id);
           const frames = reading.envelope.frames.filter((frame: any) => frame.image_id === id);
-          return inputs.length === 1 && qualifySubjectSource(inputs[0], sources.get(id), userId, reading.read_at) &&
+          return inputs.length === 1 && qualifySubjectSource(inputs[0], sources.get(id), userId, reading.read_at, asOf) &&
             frames.length === 1 && primaryFrame(frames[0], id === anchor);
         })) continue;
         edges.set(pair(a, b), [a, b]);
@@ -211,8 +224,8 @@ export async function readSubjectProfiles(
     }
     if (contradictions.some(([a, b]) => connected.has(a) && connected.has(b))) continue;
     const ids = [anchor, ...[...connected].filter(id => id !== anchor).sort()];
-    const distinct = new Set<string>();
-    const eligible = ids.filter(id => { const hash = sources.get(id).file_hash; if (distinct.has(hash)) return false; distinct.add(hash); return true; });
+    const distinct = new Set<string>(), familyRoots = new Set<string>();
+    const eligible = ids.filter(id => { const hash = sources.get(id).file_hash, root = sourceRoot(sources.get(id))!; if (distinct.has(hash) || familyRoots.has(root)) return false; distinct.add(hash); familyRoots.add(root); return true; });
     if (eligible.length < 2) continue;
     const asserted_identity: SubjectProfile["asserted_identity"] = {};
     if (record(anchorReading.subject.asserted_identity)) for (const key of ["make", "model_family", "badge_text"] as const) {
@@ -221,11 +234,11 @@ export async function readSubjectProfiles(
     const observed_at = eligible.map(id => qualified.get(id)!.read_at).sort((a, b) => clock(a)! < clock(b)! ? -1 : 1).at(-1)!;
     subjects.push({ id: carrier.id, anchor_image_id: anchor,
       label: [asserted_identity.make, asserted_identity.model_family].filter(Boolean).join(" ") || "Unidentified vehicle",
-      identity_status: "unresolved", image_count: eligible.length, cover_image_url: sources.get(anchor).image_url, observed_at,
-      images: eligible.slice(0, DETAIL_LIMIT).map(id => ({ id, image_url: sources.get(id).image_url, taken_at: sources.get(id).taken_at })),
+      identity_status: "unresolved", image_count: eligible.length, cover_image_url: currentIdentitySource(sources.get(anchor))!.image_url, observed_at,
+      images: eligible.slice(0, DETAIL_LIMIT).map(id => ({ id, image_url: currentIdentitySource(sources.get(id))!.image_url, taken_at: sources.get(id).taken_at, source_identity: inspectSourceIdentity(sources.get(id)) })),
       coverage: countCoverage(assessed.size, eligible.length, asOf, headTruncated || eligible.length > DETAIL_LIMIT), asserted_identity });
   }
   const eligibleCount = subjects.reduce((sum, subject) => sum + subject.image_count, 0);
-  return { subjects, coverage: countCoverage(imageIds.length, eligibleCount, asOf,
+  return { subjects, coverage: countCoverage(new Set(imageIds.map(id => sourceRoot(sources.get(id)) ?? id)).size, eligibleCount, asOf,
     carrierMore || headTruncated || subjects.some(subject => subject.coverage.truncated)), next_offset };
 }

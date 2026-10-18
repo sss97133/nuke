@@ -1,6 +1,9 @@
 import { resolveSubjectBatch, subjectOwnerId, type CandidateScope, type SubjectEnvelope, type SubjectReading,
   type SubjectSource, type SubjectStore, type SubjectDependencies } from "./subjectService.ts";
 import type { VisionInputCapture } from "./inputCustody.ts";
+import { projectSourceIdentities, sourceAliases, sourceIdentityRecords, attachSourceIdentityRecords } from "./sourceIdentity.ts";
+import { attachSubjectPrivacy } from "./subjectPrivacy.ts";
+import { assessSubjectAdmission } from "./subjectReplay.ts";
 import { VisionProviderUnavailable } from "../_shared/providerDiagnostic.ts";
 const uid = "00000000-0000-4000-8000-000000000001", other = "00000000-0000-4000-8000-000000000002";
 const ids = ["10000000-0000-4000-8000-000000000001", "10000000-0000-4000-8000-000000000002", "10000000-0000-4000-8000-000000000003"];
@@ -10,7 +13,7 @@ const scope: CandidateScope = { kind: "account_associated_terminal_vehicles", ve
   exhausted: true, truncated: false, reference_photos_assessed: 0, unavailable_references: [cluster], global_novelty_asserted: false };
 const source = (id: string, n: number): SubjectSource => ({ id, user_id: uid, file_hash: `${n}`.repeat(64),
   image_url: `https://example.test/${id}`, storage_path: `users/${uid}/capture-relay/${`${n}`.repeat(64)}/frame.JPG`, taken_at: null, created_at: "2026-10-01T00:00:00.000001Z",
-  is_superseded: false, is_duplicate: false, is_document: false, is_sensitive: false, vision_gate_status: "approved" });
+  is_superseded: false, is_duplicate: false, is_document: false, is_sensitive: false, vision_gate_status: "approved", private_subject_privacy_complete: true, private_subject_privacy: [] });
 function fixture() {
   const sources = ids.map(source), readings: SubjectReading[] = [], writes: Array<{ image_id: string; envelope: SubjectEnvelope }> = [];
   const counts = { captures: 0, models: 0, candidates: 0 };
@@ -82,6 +85,20 @@ Deno.test("source to projection to sanctioned storage retains per-photo evidence
 Deno.test("retained admitted reading replay performs no object, renderer, candidate or paid inference calls", async () => {
   const f = fixture(); await f.run(); const result = await f.run();
   equal(result.status, "cached"); equal(f.counts, { captures: 1, models: 1, candidates: 1 });
+});
+
+Deno.test("fresh usage reaches the response while retained testimony and free replay keep separate clocks", async () => {
+  const f = fixture(), vision = f.dependencies.vision;
+  const usage = { input_tokens: 1200, output_tokens: 300, cache_creation_input_tokens: 0, cache_read_input_tokens: 0 };
+  f.dependencies.vision = async options => ({ ...(await vision(options))!, usage });
+  const first = await f.run();
+  equal("reading" in first && first.reading?.provider_usage, usage);
+  equal(f.writes.some(write => "provider_usage" in write.envelope || "usage" in write.envelope), false);
+  const retained = JSON.stringify(f.writes[0].envelope);
+  const second = await f.run();
+  equal(second.status, "cached"); equal(f.counts.models, 1);
+  equal("reading" in second && second.reading?.provider_usage, null);
+  equal(JSON.stringify(f.writes[0].envelope), retained);
 });
 Deno.test("partial storage retry reuses protected full-batch receipt without redoing inference", async () => {
   const f = fixture(), ingest = f.store.ingest;
@@ -247,6 +264,69 @@ Deno.test("protected data reuse cannot restore a later membership withdrawal", a
   equal(result.status, "unresolved"); equal(result.persisted_image_ids, []);
   equal(result.unresolved.map(row => row.image_id), ids.slice(0, 2));
   equal(f.writes.length, before); equal(f.counts.models, 1);
+});
+
+function lineageStore(f: ReturnType<typeof fixture>, gates = ["approved", "approved"]) {
+  const originals = f.sources.slice(0, 2) as any[], audits: any[] = [], leaves: string[] = [];
+  const at = "2026-10-02T01:00:00.123456Z";
+  for (const [index, original] of originals.entries()) {
+    const leafId = `30000000-0000-4000-8000-00000000000${index + 1}`;
+    const leaf = { ...original, id: leafId, vehicle_id: null, is_duplicate: true, duplicate_of: original.id,
+      is_superseded: false, superseded_by: null, superseded_at: null, vision_gate_status: gates[index] };
+    original.is_superseded = true; original.superseded_by = leafId; original.superseded_at = at;
+    f.sources.push(leaf); leaves.push(leafId);
+    audits.push({ id: `40000000-0000-4000-8000-00000000000${index + 1}`, observation_type: "image",
+      old_observation_id: original.id, new_observation_id: leafId, old_vehicle_id: original.vehicle_id,
+      new_vehicle_id: null, created_at: at });
+  }
+  const load = async (selected: string[]) => {
+    const lookup = projectSourceIdentities(uid, selected, f.sources as any[], audits, true);
+    return attachSourceIdentityRecords(lookup.sources, attachSubjectPrivacy(sourceIdentityRecords(lookup.sources) as any[], [], true)) as SubjectSource[];
+  };
+  f.store.sources = async (_user, selected) => load(selected);
+  f.store.readings = async selected => {
+    const sources = await load(selected), aliases = sources.flatMap(sourceAliases);
+    return f.readings.filter(row => aliases.includes(row.image_id));
+  };
+  f.store.admission = async envelope => assessSubjectAdmission(envelope, uid, {
+    sources: await load(envelope.inputs.map(input => input.image_id)), readings: f.readings.filter((row: any) => row.observed_by === "visual_subjects_v1"),
+    readings_complete: true, as_of: "2026-10-03T00:00:00Z",
+  });
+  f.dependencies.now = () => new Date("2026-10-03T00:00:00Z");
+  return { leaves, load };
+}
+function cameraWitnesses(f: ReturnType<typeof fixture>) {
+  for (const [index, source] of f.sources.entries()) Object.assign(source, {
+    vehicle_id: cluster, taken_at: "2026-10-01T00:00:00.000000Z", exif_data: { uuid: `fixture-${index}`, camera_model: "Synthetic" },
+  });
+}
+Deno.test("alias replay preserves original paid envelope and acknowledges only requested current leaf IDs without inference", async () => {
+  const f = fixture(); cameraWitnesses(f); await f.run(); const originalEnvelope = JSON.stringify(f.readings[0].confidence_basis.visual_subject_reading_v1!.envelope);
+  const { leaves } = lineageStore(f);
+  const result = await resolveSubjectBatch(f.store, { ...f.request, image_ids: leaves, reuse_only: true }, "https://example.test", f.dependencies);
+  if (!("subjects" in result)) throw new Error("expected cached result");
+  equal(result.status, "cached"); equal(result.persisted_image_ids, leaves); equal(result.retained_reading_image_ids, leaves);
+  equal(result.input_image_ids, ids.slice(0, 2)); equal(result.subjects[0].anchor_image_id, ids[0]);
+  equal(result.source_lineage.map(row => row.requested_image_id), leaves);
+  equal(f.counts, { captures: 1, models: 1, candidates: 1 });
+  equal(JSON.stringify(f.readings[0].confidence_basis.visual_subject_reading_v1!.envelope), originalEnvelope);
+  equal(f.sources[0].is_superseded, true); equal(f.sources.at(-1)!.is_duplicate, true);
+});
+Deno.test("pending replacement refuses before paid reuse and never inherits its original approved gate", async () => {
+  const f = fixture(); cameraWitnesses(f); await f.run(); const { leaves } = lineageStore(f, ["pending", "approved"]);
+  const result = await resolveSubjectBatch(f.store, { ...f.request, image_ids: leaves, reuse_only: true }, "https://example.test", f.dependencies);
+  equal(result.status, "refused"); equal("refusal" in result && result.refusal, "source_not_ready"); equal(result.persisted_image_ids, []);
+  equal(f.counts.models, 1);
+});
+Deno.test("historical alias withdrawal cannot restore membership from cached original model evidence", async () => {
+  const f = fixture(); cameraWitnesses(f); await f.run(); const { leaves } = lineageStore(f);
+  f.readings.push({ id: other, image_id: leaves[0], cluster_id: cluster, is_active: false, observed_by: "visual_subjects_v1",
+    observed_at: "2026-10-02T02:00:00Z", superseded_by: other,
+    confidence_basis: { visual_subjects_v1: { anchor_image_id: ids[0], state: "withdrawn", envelope: f.readings[0].confidence_basis.visual_subject_reading_v1!.envelope } } } as any);
+  const before = f.writes.length;
+  const result = await resolveSubjectBatch(f.store, { ...f.request, image_ids: leaves, reuse_only: true }, "https://example.test", f.dependencies);
+  equal(result.persisted_image_ids, []); equal(f.writes.length, before); equal(f.counts.models, 1);
+  equal(result.unresolved.some(row => row.image_id === leaves[0] && row.reason === "current_membership_conflict"), true);
 });
 Deno.test("typed provider failure reaches the owner receipt without saving readings or permitting a paid replay", async () => {
   const f = fixture();

@@ -12,7 +12,7 @@ function source(n: number): any {
   const file_hash = n.toString(16).padStart(64, "0"), storage_path = `users/${owner}/capture-relay/${file_hash}/IMG_${n}.HEIC`;
   return { id: id(n), user_id: owner, storage_path, file_hash, image_url: `${origin}/storage/v1/object/public/vehicle-photos/${storage_path}`,
     created_at: "2026-10-01T00:00:00.000001Z", taken_at: null, vehicle_id: null,
-    is_superseded: false, is_duplicate: false, is_document: false, is_sensitive: false, vision_gate_status: "approved" };
+    is_superseded: false, is_duplicate: false, is_document: false, is_sensitive: false, vision_gate_status: "approved", private_subject_privacy_complete: true, private_subject_privacy: [] };
 }
 function readings(sources: any[]): any[] {
   const envelope = { user_id: owner, method: "visual_subjects_v1", provider: "offline-fixture", model: "offline-fixture",
@@ -219,9 +219,10 @@ class FixtureQuery {
   limit(count: number) { this.bound = count; return this; }
   then(resolve: (v: any) => unknown, reject: (v: any) => unknown) {
     const value = (row: any, field: string) => field.split(/->>?/).reduce((current, key) => current?.[key], row);
-    const data = this.table === "vehicle_images" ? this.db.state.sources : [...this.db.state.raw_heads, ...this.db.state.membership_heads];
+    const data = this.table === "vehicle_images" ? this.db.state.sources : this.table === "reattribution_audit" ? ((this.db.state as any).audits ?? []) : [...this.db.state.raw_heads, ...this.db.state.membership_heads];
     const found = data.filter((row: any) => this.filters.every(([op, field, expected]) => {
       const got = value(row, field);
+      if (op === "or" && expected.startsWith("superseded_by")) return row.superseded_by === null || ["device_privacy_v1", "visual_subjects_v1", "visual_subject_reading_v1"].some(method => row.confidence_basis?.[method]?.state === "withdrawn");
       if (op === "or") {
         const match = /created_at\.lt\."([^"]+)".*id\.lt\.([^),]+)/.exec(expected)!;
         return row.created_at === null || clock(row.created_at)! < clock(match[1])! ||
@@ -252,7 +253,8 @@ Deno.test("owner source reader pages historical and filed rows without inference
   equal(first.photos[1].attached_vehicle_id_context, id(8000));
   const last = await readSourceInbox(db, owner, { limit: 2, cursor: first.next_cursor! });
   equal(last.photos.map(photo => photo.id), [id(1)]); equal(last.next_cursor, null);
-  equal(db.calls.every(call => ["vehicle_images", "image_observations"].includes(call.table)), true);
+  equal(db.calls.every(call => ["vehicle_images", "image_observations", "reattribution_audit"].includes(call.table)), true);
+  equal(db.calls.filter(call => call.table === "reattribution_audit").every(call => call.limit <= 2049), true);
   equal(db.calls.filter(call => call.table === "vehicle_images").every(call => call.filters.some(([op, field, v]) => op === "eq" && field === "user_id" && v === owner)), true);
   equal(db.calls.some(call => call.filters.some(([, field]) => field === "vehicle_id")), false);
   equal(first.coverage.inference_started, false);
@@ -310,4 +312,56 @@ Deno.test("capped terminal-head lookup cannot masquerade as no retained reading 
   equal(result.coverage.truncated, true);
   equal(result.photos.map(photo => photo.subject_analysis_state), ["not_assessed", "not_assessed"]);
   equal(result.photos.flatMap(photo => photo.readings), []);
+});
+
+function lineageFixture(gate = "pending") {
+  const state = fixture(2), originals = state.sources as any[];
+  for (const [index, original] of originals.entries()) Object.assign(original, {
+    source: "capture_relay_ios", exif_data: { uuid: `native-${index}`, camera_model: "Synthetic" },
+    taken_at: "2026-10-01T00:00:00.000000Z",
+  });
+  state.raw_heads = readings(originals);
+  const leaves: any[] = [], audits: any[] = [];
+  for (const [index, original] of [...originals].entries()) {
+    const leaf = { ...clone(original), id: id(700 + index), is_duplicate: true, duplicate_of: original.id, vision_gate_status: gate,
+      superseded_by: null, superseded_at: null };
+    original.is_superseded = true; original.superseded_by = leaf.id; original.superseded_at = "2026-10-02T01:00:00.123456Z";
+    leaves.push(leaf); audits.push({ id: id(800 + index), observation_type: "image", old_observation_id: original.id,
+      new_observation_id: leaf.id, old_vehicle_id: null, new_vehicle_id: null, created_at: original.superseded_at });
+  }
+  state.sources = [...originals, ...leaves]; state.page = leaves; (state as any).audits = audits;
+  return { state, leaves, originals };
+}
+Deno.test("actual inbox loader retains pending leaf source history and old paid context without pixels or new inference", async () => {
+  const f = lineageFixture(), result = await readSourceInbox(new FixtureDB(f.state), owner, { image_id: f.leaves[0].id });
+  const photo = result.photos[0]; equal(photo.id, f.leaves[0].id); equal(photo.source_state, "held"); equal(photo.image_url, null);
+  equal(photo.readings, []); equal(photo.retained_contexts.length, 1);
+  equal(photo.retained_contexts[0]?.receipt_image_id, f.originals[0].id);
+  equal(photo.retained_contexts[0]?.qualification, "retained_context_not_current_interpretation");
+  equal(photo.source_identity?.root_image_id, f.originals[0].id); equal(photo.source_identity?.current_image_id, photo.id);
+  equal(photo.source_identity?.source_photo_count, 1); equal(photo.source_identity?.current_vehicle_attribution_proven, false);
+  equal(result.coverage.assessed, 1); equal(result.coverage.displayable, 0); equal(result.coverage.inference_started, false);
+});
+Deno.test("independently qualified alias records share original interpretation without turning record count into photo count", async () => {
+  const f = lineageFixture("approved"), result = await readSourceInbox(new FixtureDB(f.state), owner, { limit: 4 });
+  equal(result.photos.length, 4); equal(result.coverage.assessed, 4); equal(result.coverage.grain, "owner_source_page");
+  equal(new Set(result.photos.map(photo => photo.source_identity?.root_image_id)).size, 2);
+  equal(result.photos.every(photo => photo.readings.length === 1 && photo.source_identity?.source_photo_count === 1), true);
+});
+Deno.test("source-wide rejection or privacy withdrawal hides retained context provenance as well as pixels", async () => {
+  for (const negative of ["rejected", "rejected_sensitive", "privacy_withdrawn"]) {
+    const f = lineageFixture();
+    if (negative.startsWith("rejected")) f.originals[0].vision_gate_status = negative;
+    else f.state.membership_heads.push({ id: id(990), image_id: f.leaves[0].id, observed_by: "device_privacy_v1",
+      superseded_by: id(991), is_active: false, confidence_basis: { device_privacy_v1: { state: "withdrawn", envelope: { user_id: owner } } } });
+    const result = await readSourceInbox(new FixtureDB(f.state), owner, { image_id: f.leaves[0].id });
+    equal(result.photos[0].image_url, null); equal(result.photos[0].retained_contexts, []); equal(result.photos[0].readings, []);
+  }
+});
+Deno.test("an incomplete audited family cannot supply a complete-empty inbox interpretation", async () => {
+  const f = lineageFixture(); const audit = (f.state as any).audits[0];
+  (f.state as any).audits.push(...Array.from({ length: 2049 }, (_, index) => ({ ...audit, id: id(10000 + index) })));
+  const result = await readSourceInbox(new FixtureDB(f.state), owner, { image_id: f.leaves[0].id });
+  equal(result.coverage.truncated, true); equal(result.source_lookup.page.truncated, true);
+  equal(result.photos[0].image_url, null); equal(result.photos[0].retained_contexts, []);
 });

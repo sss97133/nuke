@@ -62,6 +62,9 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+      - uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.x
       - name: Run each database contract in its own fresh database
         run: scripts/ci/run-db-contracts.sh --ci-service
 

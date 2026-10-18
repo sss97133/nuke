@@ -1,6 +1,9 @@
 import { observationClockMicroseconds as clock } from "../_shared/observationContentHash.ts";
 import { qualifySubjectSource, type SubjectProfile } from "./subjectReader.ts";
 import { SUBJECT_METHOD } from "./subjects.ts";
+import { sourceAliases, sourceRoot, sourceIdentityLineage } from "./sourceIdentity.ts";
+import { subjectPrivacyLookupComplete } from "./subjectPrivacy.ts";
+import { lineageReadingAfterWithdrawals } from "./sourceLineage.ts";
 
 const record = (v: unknown): v is Record<string, any> => !!v && typeof v === "object" && !Array.isArray(v);
 const uuid = (v: unknown): v is string => typeof v === "string" && /^[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$/.test(v);
@@ -33,11 +36,13 @@ export function assessSubjectAdmission(envelope: unknown, userId: string, state:
     return result(false, blocked, "retained_reading_invalid");
   }
   const inputs = new Map<string, any>();
+  const sources = new Map<string, any>();
   for (const input of envelope.inputs) {
     if (!record(input) || !uuid(input.image_id) || inputs.has(input.image_id)) return result(false, blocked, "retained_reading_invalid");
     inputs.set(input.image_id, input);
     const live = state.sources.filter(s => record(s) && s.id === input.image_id);
-    if (live.length !== 1 || !qualifySubjectSource(input, live[0], userId, envelope.read_at)) blocked.add(input.image_id);
+    if (live.length !== 1 || !qualifySubjectSource(input, live[0], userId, envelope.read_at, state.as_of)) blocked.add(input.image_id);
+    else sources.set(input.image_id, live[0]);
   }
   if (blocked.size) return result(false, blocked, "source_changed");
   const members = new Set<string>();
@@ -52,16 +57,32 @@ export function assessSubjectAdmission(envelope: unknown, userId: string, state:
       members.add(id);
     }
   }
-  if (!state.readings_complete) return result(true, members, "current_membership_unassessed");
+  if (!state.readings_complete || !subjectPrivacyLookupComplete([...sources.values()])) return result(true, members, "current_membership_unassessed");
+  const roots = new Set<string>();
+  for (const id of members) {
+    const root = sourceRoot(sources.get(id)) ?? id;
+    if (roots.has(root)) return result(false, members, "source_alias_not_independent");
+    roots.add(root);
+    const lineage = sourceIdentityLineage(sources.get(id));
+    const withdrawals = state.readings.filter(row => record(row) && row.observed_by === SUBJECT_METHOD &&
+      row.confidence_basis?.[SUBJECT_METHOD]?.state === "withdrawn" &&
+      row.confidence_basis?.[SUBJECT_METHOD]?.envelope?.user_id === userId)
+      .map((row: any) => ({ source_image_id: row.image_id, observed_at: row.observed_at }));
+    if (lineage && !lineageReadingAfterWithdrawals(lineage, envelope.read_at, withdrawals, true)) blocked.add(id);
+  }
   for (const row of state.readings) {
-    if (!record(row) || row.observed_by !== SUBJECT_METHOD || row.superseded_by !== null || !members.has(row.image_id)) continue;
+    if (!record(row) || row.observed_by !== SUBJECT_METHOD || row.superseded_by !== null) continue;
+    const affected = [...members].filter(id => sourceAliases(sources.get(id)).includes(row.image_id));
+    if (!affected.length) continue;
     const wrapper = row.confidence_basis?.[SUBJECT_METHOD];
     // A malformed terminal membership is not evidence that this image is free.
     if (!record(wrapper) || !record(wrapper.envelope) || wrapper.envelope.user_id !== userId ||
-      row.is_active !== true || wrapper.state === "withdrawn") { blocked.add(row.image_id); continue; }
-    const proposed = envelope.subjects.find((s: any) => s.member_image_ids.includes(row.image_id));
-    if (wrapper.anchor_image_id !== proposed.anchor_image_id ||
-      proposed.existing_cluster_id && row.cluster_id !== proposed.existing_cluster_id) blocked.add(row.image_id);
+      row.is_active !== true || wrapper.state === "withdrawn") { for (const id of affected) blocked.add(id); continue; }
+    for (const id of affected) {
+      const proposed = envelope.subjects.find((s: any) => s.member_image_ids.includes(id));
+      if (wrapper.anchor_image_id !== proposed.anchor_image_id ||
+        proposed.existing_cluster_id && row.cluster_id !== proposed.existing_cluster_id) blocked.add(id);
+    }
   }
   if (blocked.size) return result(true, blocked, "current_membership_conflict");
   for (const subject of envelope.subjects) {

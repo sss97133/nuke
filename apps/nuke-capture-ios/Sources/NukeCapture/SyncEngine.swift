@@ -477,6 +477,7 @@ final class SyncEngine: ObservableObject {
         guard !ordered.isEmpty else {
             advanceWatermark(to: runStarted, failures: 0)
             await SubjectResolutionEngine.shared.runAfterSync(userId: userId)
+            await SubjectResolutionEngine.shared.runHistoricalAfterSync(userId: userId)
             return true
         }
 
@@ -611,6 +612,7 @@ final class SyncEngine: ObservableObject {
         // One bounded comparison of already acknowledged sources, including retries from an
         // earlier pass. Visual analysis availability never changes upload or filing success.
         await SubjectResolutionEngine.shared.runAfterSync(userId: userId)
+        await SubjectResolutionEngine.shared.runHistoricalAfterSync(userId: userId)
         return failed == 0
     }
 
@@ -941,9 +943,10 @@ final class SyncEngine: ObservableObject {
         let exifCaptureDate: Date?
         let pixelsEligible: Bool
         let labels: [String]
+        var privacyReceipt: DevicePrivacyReceipt? = nil
     }
 
-    nonisolated static func prepare(_ data: Data,
+    nonisolated static func prepare(_ data: Data, userId: String? = nil,
         cameraInfo: (Data) -> (String?, String?) = { CameraEXIF.cameraInfo(from: $0) },
         decode: (Data) -> CGImage? = { downsampledCGImage(from: $0) },
         triage: (CGImage) -> VisionEngine.TriageResult = { VisionEngine.triage($0) }
@@ -951,6 +954,7 @@ final class SyncEngine: ObservableObject {
         let (make, model) = cameraInfo(data)
         var eligible = false
         var labels: [String] = []
+        var privacyReceipt: DevicePrivacyReceipt?
         // Owner triage only matters for our own camera's frames; skip the decode otherwise.
         if make == "Apple" {
             guard let cg = decode(data) else { throw VisionEngine.TriageFailure.imageUndecodable }
@@ -958,10 +962,13 @@ final class SyncEngine: ObservableObject {
             if let failure = t.failure { throw failure }
             labels = t.labels
             eligible = t.pixelsEligible
+            if eligible, let evidence = t.privacyEvidence, let userId {
+                privacyReceipt = DevicePrivacyReceipt.make(original: data, image: cg, evidence: evidence, userId: userId)
+            }
         }
         return PreparedOriginal(cameraMake: make, cameraModel: model,
                                 exifCaptureDate: CameraEXIF.captureDate(from: data),
-                                pixelsEligible: eligible, labels: labels)
+                                pixelsEligible: eligible, labels: labels, privacyReceipt: privacyReceipt)
     }
 
     /// Gates first on metadata alone (no bytes read), then the original, then the upload.
@@ -1008,7 +1015,7 @@ final class SyncEngine: ObservableObject {
         }
 
         let prep: PreparedOriginal
-        do { prep = try await Self.prepare(data) }
+        do { prep = try await Self.prepare(data, userId: userId) }
         catch { return noteFailure(id, message: "\(filename): \(error.localizedDescription)") }
         // ── Gate 2 (ownership): require Apple camera EXIF ──
         // iMessage-received photos have EXIF stripped → make == nil.
@@ -1040,7 +1047,8 @@ final class SyncEngine: ObservableObject {
                 uploadPixels: prep.pixelsEligible, appleMLLabels: prep.labels
             )
             if let acknowledgedHash {
-                SubjectResolutionEngine.shared.acknowledge(localIdentifier: id, sourceHash: acknowledgedHash, userId: userId)
+                SubjectResolutionEngine.shared.acknowledge(localIdentifier: id, sourceHash: acknowledgedHash, userId: userId,
+                    privacyReceipt: prep.privacyReceipt)
             }
         } catch {
             if SupabaseService.isAuthFailure(error) {
