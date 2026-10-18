@@ -64,6 +64,16 @@ export type StreamFacetDistributionPill = {
   count: number;
 };
 
+export type DrillStreamSortMode = 'latest' | 'price' | 'year';
+
+export type DrillCohortSummary = {
+  totalStreamCount: number;
+  filteredCount: number;
+  soldCount: number;
+  sellThroughPct: number | null;
+  medianSoldPrice: number | null;
+};
+
 export type SourceDrillStats = {
   source: string | null;
   name: string | null;
@@ -1080,6 +1090,87 @@ export function computeStreamFacetDistribution(
   ];
 }
 
+function isSoldDrillEvent(ev: Pick<LandingRecentEvent, 'eventStatus' | 'eventType'>): boolean {
+  const status = (ev.eventStatus ?? '').trim().toLowerCase();
+  if (status === 'sold') return true;
+  if (status === 'active' || status === 'live' || status === 'reserve_not_met' || status === 'unsold' || status === 'withdrawn') {
+    return false;
+  }
+  const et = (ev.eventType ?? '').trim().toLowerCase();
+  return et === 'sold' || et === 'sale';
+}
+
+export function sortDrillStreamEvents(
+  events: ReadonlyArray<LandingRecentEvent>,
+  sortMode: DrillStreamSortMode,
+): LandingRecentEvent[] {
+  const copy = [...events];
+  if (sortMode === 'price') {
+    return copy.sort((a, b) => {
+      const pa = a.price != null && a.price > 0 ? a.price : -1;
+      const pb = b.price != null && b.price > 0 ? b.price : -1;
+      if (pb !== pa) return pb - pa;
+      const ya = a.year ?? -1;
+      const yb = b.year ?? -1;
+      if (yb !== ya) return yb - ya;
+      return b.createdAt.localeCompare(a.createdAt);
+    });
+  }
+  if (sortMode === 'year') {
+    return copy.sort((a, b) => {
+      const ya = a.year ?? -1;
+      const yb = b.year ?? -1;
+      if (yb !== ya) return yb - ya;
+      const pa = a.price != null && a.price > 0 ? a.price : -1;
+      const pb = b.price != null && b.price > 0 ? b.price : -1;
+      if (pb !== pa) return pb - pa;
+      return b.createdAt.localeCompare(a.createdAt);
+    });
+  }
+  // 'latest' — preserve arrival / createdAt DESC order
+  return copy.sort((a, b) => {
+    const ta = Date.parse(a.createdAt);
+    const tb = Date.parse(b.createdAt);
+    if (!Number.isNaN(ta) && !Number.isNaN(tb) && tb !== ta) return tb - ta;
+    return 0;
+  });
+}
+
+export function computeDrillCohortSummary(
+  filtered: ReadonlyArray<LandingRecentEvent>,
+  totalStreamCount = filtered.length,
+): DrillCohortSummary {
+  const filteredCount = filtered.length;
+  let soldCount = 0;
+  const soldPrices: number[] = [];
+  for (const ev of filtered) {
+    if (isSoldDrillEvent(ev)) {
+      soldCount += 1;
+      if (ev.price != null && Number.isFinite(ev.price) && ev.price > 0) {
+        soldPrices.push(ev.price);
+      }
+    }
+  }
+  const sellThroughPct =
+    filteredCount > 0 ? Math.round((soldCount / filteredCount) * 100) : null;
+  let medianSoldPrice: number | null = null;
+  if (soldPrices.length > 0) {
+    const sorted = [...soldPrices].sort((a, b) => a - b);
+    const mid = Math.floor(sorted.length / 2);
+    medianSoldPrice =
+      sorted.length % 2 === 1
+        ? Math.round(sorted[mid])
+        : Math.round((sorted[mid - 1] + sorted[mid]) / 2);
+  }
+  return {
+    totalStreamCount,
+    filteredCount,
+    soldCount,
+    sellThroughPct,
+    medianSoldPrice,
+  };
+}
+
 function SourceLandingInspector({
   row,
   boardLanding,
@@ -1102,6 +1193,7 @@ function SourceLandingInspector({
     axis: 'series' | 'trim' | 'body';
     value: string;
   } | null>(null);
+  const [sortMode, setSortMode] = useState<DrillStreamSortMode>('latest');
   const [detail, setDetail] = useState<SourceLandingDetail | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
   const [refreshTick, setRefreshTick] = useState(0);
@@ -1112,6 +1204,7 @@ function SourceLandingInspector({
     setSelectedDrillMake(null);
     setSelectedDrillModel(null);
     setSelectedDrillFacet(null);
+    setSortMode('latest');
   }, [sourceKey]);
 
   useEffect(() => {
@@ -1221,6 +1314,23 @@ function SourceLandingInspector({
     }
     return true;
   });
+
+  const sortedRecent = sortDrillStreamEvents(filteredRecent, sortMode);
+  const cohortSummary = computeDrillCohortSummary(filteredRecent, totalRecent);
+  const activeFilterParts: string[] = [];
+  if (selectedDrillMake) activeFilterParts.push(selectedDrillMake);
+  if (selectedDrillModel) activeFilterParts.push(selectedDrillModel);
+  if (selectedDrillFacet) {
+    const pfx =
+      selectedDrillFacet.axis === 'series'
+        ? 'SER'
+        : selectedDrillFacet.axis === 'trim'
+          ? 'TRM'
+          : 'BDY';
+    activeFilterParts.push(`${pfx} ${selectedDrillFacet.value}`);
+  }
+  const activeFilterLabel =
+    activeFilterParts.length > 0 ? activeFilterParts.join(' · ') : 'All in stream';
 
   const statsHeld = detail?.stats?.held ?? row?.held ?? null;
   const statsPop = detail?.stats?.population ?? row?.population ?? null;
@@ -1693,6 +1803,67 @@ function SourceLandingInspector({
           </div>
         ) : null}
         {totalRecent > 0 ? (
+          <div className="market-sources__cohort-bar" data-testid="drill-cohort-summary-bar" aria-label="Cohort summary KPI bar">
+            <div className="market-sources__cohort-kpis" data-testid="drill-cohort-kpis">
+              <div className="market-sources__cohort-kpi" data-testid="drill-cohort-filtered-count">
+                <span className="market-sources__kpi-label">Filtered Count</span>
+                <strong>
+                  {hasActiveDrillFilter
+                    ? `${count(cohortSummary.filteredCount)} of ${count(cohortSummary.totalStreamCount)}`
+                    : count(cohortSummary.filteredCount)}
+                </strong>
+                <small className="market-sources__cohort-scope">{activeFilterLabel}</small>
+              </div>
+              <div className="market-sources__cohort-kpi" data-testid="drill-cohort-sold-sellthrough">
+                <span className="market-sources__kpi-label">Sold Count &amp; Sell-Through %</span>
+                <strong>
+                  {cohortSummary.filteredCount > 0 && cohortSummary.sellThroughPct != null
+                    ? `${count(cohortSummary.soldCount)} sold · ${cohortSummary.sellThroughPct}%`
+                    : '0 sold · —'}
+                </strong>
+              </div>
+              <div className="market-sources__cohort-kpi" data-testid="drill-cohort-median-sold-price">
+                <span className="market-sources__kpi-label">Median Sold Price</span>
+                <strong>
+                  {cohortSummary.medianSoldPrice != null && cohortSummary.medianSoldPrice > 0
+                    ? `$${count(cohortSummary.medianSoldPrice)}`
+                    : '—'}
+                </strong>
+              </div>
+            </div>
+            <div
+              className="market-sources__sort-pills"
+              data-testid="drill-sort-selector"
+              role="group"
+              aria-label="Sort recent vehicles stream"
+            >
+              <span className="market-sources__drill-bar-label">SORT</span>
+              {(
+                [
+                  ['latest', 'LATEST'],
+                  ['price', 'HIGHEST PRICE'],
+                  ['year', 'YEAR'],
+                ] as const
+              ).map(([mode, label]) => {
+                const isSortActive = sortMode === mode;
+                return (
+                  <button
+                    key={mode}
+                    type="button"
+                    className={`market-sources__sort-pill${isSortActive ? ' is-active' : ''}`}
+                    data-testid={`drill-sort-${mode}`}
+                    data-sort={mode}
+                    aria-pressed={isSortActive}
+                    onClick={() => setSortMode(mode)}
+                  >
+                    {label}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        ) : null}
+        {totalRecent > 0 ? (
           <div className="market-sources__events-wrap">
             <div className="market-sources__events-cols" aria-hidden="true">
               <span>Landed</span>
@@ -1707,7 +1878,7 @@ function SourceLandingInspector({
               <span className="n">Source</span>
             </div>
             <ul className="market-sources__events">
-              {filteredRecent.map((ev) => {
+              {sortedRecent.map((ev) => {
                 const recDate = describeRecordDate(ev.recordDate, refNow);
                 const vinLot = formatVinOrLot(ev);
                 const st = formatStatusCell(ev);
