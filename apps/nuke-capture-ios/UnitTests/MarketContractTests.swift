@@ -12,6 +12,50 @@ import XCTest
 @testable import NukeCapture
 
 final class MarketContractTests: XCTestCase {
+    func testCurrentBidRangesMatchTheWebBoundariesAndKeepZeroRecorded() {
+        // The exact values in MarketPulse.test.tsx's bid distribution contract, plus nonfinite inputs.
+        let examples: [(Double?, LiveBidRange)] = [
+            (nil, .unrecorded), (0, .under10k), (9_999, .under10k),
+            (10_000, .from10kTo25k), (24_999, .from10kTo25k),
+            (25_000, .from25kTo50k), (49_999, .from25kTo50k),
+            (50_000, .from50kTo100k), (99_999, .from50kTo100k), (100_000, .over100k),
+            (.nan, .unrecorded), (-1, .unrecorded), (.infinity, .unrecorded), (-.infinity, .unrecorded)
+        ]
+        for (bid, expected) in examples {
+            XCTAssertEqual(LiveBidRange.bucket(bid), expected, "bid: \(String(describing: bid))")
+        }
+        XCTAssertEqual(LiveBidRange.allCases.map(\.label), ["Any current bid", "Under $10,000", "$10,000–24,999",
+            "$25,000–49,999", "$50,000–99,999", "$100,000+", "Unrecorded"])
+    }
+
+    func testBidSelectionUsesDecodedBoardRowsWithoutLosingWindowOrMakeScope() throws {
+        // Includes numeric strings, malformed/missing bids, closed lots and a second make. The denominator
+        // is the chosen make/window before the bid lens, not all loaded rows or only recorded bids.
+        let board = try JSONDecoder().decode(LiveBoard.self, from: Data(#"{"synced_at":null,"source":"test","auctions":[["zero",1966,"FORD","Mustang",0,"2026-10-18T12:30:00Z"],["nine",1966,"FORD","Mustang",9999,"2026-10-18T12:30:00Z"],["ten",1966,"FORD","Mustang","10000","2026-10-18T12:30:00Z"],["quarter",1966,"FORD","Mustang",25000,"2026-10-18T12:30:00Z"],["fifty",1966,"FORD","Mustang",50000,"2026-10-18T12:30:00Z"],["hundred",1966,"FORD","Mustang",100000,"2026-10-18T12:30:00Z"],["missing",1966,"FORD","Mustang",null,"2026-10-18T12:30:00Z"],["negative",1966,"FORD","Mustang",-1,"2026-10-18T12:30:00Z"],["nonfinite",1966,"FORD","Mustang","NaN","2026-10-18T12:30:00Z"],["later",1966,"FORD","Mustang",100,"2026-10-18T13:00:00Z"],["closed",1966,"FORD","Mustang",200,"2026-10-18T11:59:59Z"],["other-make",1972,"PORSCHE","911",500,"2026-10-18T12:30:00Z"]]}"#.utf8))
+        let now = try XCTUnwrap(ProfileClock.date("2026-10-18T12:00:00Z"))
+        let open = board.open(at: now)
+        let windowed = open.filter { $0.make == "FORD" && LiveAuctionWindow.hour.includes($0, at: now) }
+        XCTAssertEqual(board.auctions.count, 12)
+        XCTAssertEqual(open.count, 11)
+        XCTAssertEqual(windowed.count, 9)
+        func ids(_ range: LiveBidRange) -> [String] { windowed.filter(range.includes).map(\.id) }
+        XCTAssertEqual(ids(.all), ["zero", "nine", "ten", "quarter", "fifty", "hundred", "missing", "negative", "nonfinite"])
+        XCTAssertEqual(ids(.under10k), ["zero", "nine"])
+        XCTAssertEqual(ids(.from10kTo25k), ["ten"])
+        XCTAssertEqual(ids(.from25kTo50k), ["quarter"])
+        XCTAssertEqual(ids(.from50kTo100k), ["fifty"])
+        XCTAssertEqual(ids(.over100k), ["hundred"])
+        XCTAssertEqual(ids(.unrecorded), ["missing", "negative", "nonfinite"])
+        XCTAssertEqual(LiveAuctionOrder.bid.sorted(windowed.filter(LiveBidRange.under10k.includes)).map(\.id), ["nine", "zero"])
+        XCTAssertEqual(LiveBidRange.allCases.filter { $0 != .all }.reduce(0) { $0 + ids($1).count }, windowed.count)
+        // The map keeps other makes selectable but applies the identical clock and bid lens.
+        XCTAssertEqual(open.filter { LiveAuctionWindow.hour.includes($0, at: now) && LiveBidRange.under10k.includes($0) }.map(\.id),
+                       ["zero", "nine", "other-make"])
+        let unknownOnly = windowed.filter(LiveBidRange.unrecorded.includes)
+        XCTAssertTrue(unknownOnly.filter(LiveBidRange.under10k.includes).isEmpty, "an empty selection is not a zero bid")
+        XCTAssertEqual(unknownOnly.filter(LiveBidRange.all.includes).count, 3, "Any current bid restores unrecorded rows too")
+    }
+
     func testLiveWindowsAndSortsUseTheWebClockAndPopulation() throws {
         let board = try JSONDecoder().decode(LiveBoard.self, from: Data(#"{"synced_at":null,"source":"test","auctions":[["a",1966,"FORD","Mustang",100,"2026-10-18T12:30:00Z",null,"2026-10-18T11:00:00Z",null,true],["b",1967,"FORD","Mustang",300,"2026-10-18T13:00:00Z",null,"2026-10-17T12:00:00Z",null,false],["c",1968,"FORD","Mustang",null,"2026-10-19T12:00:00Z",null,null,null,false],["closed",1969,"FORD","Mustang",900,"2026-10-18T11:59:59Z",null,"2026-10-18T11:59:00Z",null,true]]}"#.utf8))
         let now = try XCTUnwrap(ProfileClock.date("2026-10-18T12:00:00Z"))
