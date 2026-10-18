@@ -22,7 +22,8 @@
  * --dedup-only     merge duplicate Mecum lot pairs, skip enrichment
  * --phase3-only    run only the year+make+price match (Phase 3)
  * --lot-urls-only  set listing_url from a canonical Mecum lot discovery_url (Phase 4); merge vehicles that share the lot
- * --enqueue=N      with --lot-urls-only: queue up to N promoted lots for extract-mecum's targets lane
+ * --enqueue=N      with --lot-urls-only: queue up to N promoted lots (this run's, then earlier runs' not yet landed) for
+ *                  extract-mecum's targets lane
  * --dry-run        count what dedup / Phase 3 / Phase 4 would write, write nothing
  */
 
@@ -1069,6 +1070,22 @@ async function promoteLotUrls() {
   const toQueue = [];
   if (limit > 0) {
     const pool = promote.filter(c => DRY_RUN || promotedIds.has(c.v.id));
+    // Lots an earlier run promoted that never landed: listing_url is the canonical form of the discovery lot and the vehicle
+    // carries no Mecum event yet.
+    if (pool.length < limit) {
+      const inPool = new Set(pool.map(c => c.v.id));
+      const unlanded = await loadMecumVehicles(VEHICLE_COLS, `listing_url LIKE 'https://www.mecum.com/lots/%' AND discovery_url IS NOT NULL
+        AND status IS DISTINCT FROM 'merged'
+        AND NOT EXISTS (SELECT 1 FROM vehicle_events e WHERE e.vehicle_id = vehicles.id AND e.source_platform = 'mecum')`);
+      let earlier = 0;
+      for (const v of unlanded) {
+        const url = canonicalLotUrl(v.discovery_url);
+        if (!url || url !== v.listing_url || inPool.has(v.id)) continue;
+        pool.push({ v, url, key: lotKey(url) });
+        earlier++;
+      }
+      console.log(`  Promoted earlier and not landed yet: ${earlier.toLocaleString()}`);
+    }
     pool.sort((a, b) => (Number(!!a.v.primary_image_url) - Number(!!b.v.primary_image_url)) || (new Date(b.v.created_at) - new Date(a.v.created_at)));
     for (let i = 0; i < pool.length && toQueue.length < limit; i += 200) {
       const chunk = pool.slice(i, i + 200);
