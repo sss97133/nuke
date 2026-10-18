@@ -1,4 +1,4 @@
-import { balanced, decode, easternToIso, parseCabDepth, parseEnd } from "./cabPage.ts";
+import { balanced, cabLotPhotos, cabOtherLotPhotoKeys, cabPhotoSet, decode, easternToIso, parseCabDepth, parseEnd } from "./cabPage.ts";
 
 const eq = (a: unknown, b: unknown) => { if (JSON.stringify(a) !== JSON.stringify(b)) throw new Error(`${JSON.stringify(a)} != ${JSON.stringify(b)}`); };
 
@@ -36,4 +36,57 @@ Deno.test("sold page: outcome, price, description, seller, comment and photo", (
 Deno.test("ended without Sold for is not a sale", () => {
   const d = parseCabDepth(page('<li class="ended"><span class="value">High Bid <span class="bid-value">$9,000</span></span></li><li>Reserve Not Met</li>'), new Date("2026-10-15T00:00:00Z"));
   eq([d.outcome, d.amount], ["reserve_not_met", 9000]);
+});
+
+// Shaped like the retained 92xXv4Oa capture (2026-07-27): the lot's gallery shares set 3yvlj0Do; the rails below the comments
+// are links to other auctions with their own 768, 356x260 and 148x126 renders, some with seller-named files and no set id.
+const M = "https://media.carsandbids.com/cdn-cgi/image";
+const img = (opts: string, path: string) => `<img src="${M}/${opts}/9004/photos/${path}?t=1">`;
+const card = (lot: string, ...imgs: string[]) =>
+  `<li class="auction-item"><div class="LazyLoad"><a class="hero" title="Other" href="https://carsandbids.com/auctions/${lot}/other-car"><div class="preload-wrap">${imgs.join("")}</div></a></div></li>`;
+const lotPage = (rails: string, bidbarAfterRails = false) =>
+  `<div class="row auction-photos"><div class="gallery-preview"><div class="preload-wrap main">${img("width=2080,quality=70", "3yvlj0Do-EpLCSxj/edit/jAdnL.jpg")}</div>` +
+  `<div class="images">${img("width=542,quality=70", "3yvlj0Do-MIQ9Hac/edit/wgwPO.jpg")}${img("width=542,quality=70", "exterior/3yvlj0Do--qXdYyQ/edit/6hJFo.jpg")}</div></div>` +
+  (bidbarAfterRails ? "" : `<div class="auction-bidbar"></div>`) +
+  `<a class="share" href="https://carsandbids.com/auctions/92xXv4Oa/1997-bmw-m3-coupe">${img("width=768,quality=70", "3yvlj0Do-EpLCSxj/edit/jAdnL.jpg")}</a>` +
+  `<div class="cnb-details-comments"><img src="${M}/width=80,height=80,quality=70,fit=cover/abc/photos/3yE6VOR3-UVVWTo8ijAT.jpg">` +
+  `<img src="${M}/width=180,quality=70/e0b9/attachments/92xXv4Oa-yp5UNAF.jpeg"></div>` +
+  `<div class="sidebar"><h5>Ending soon</h5><ul class="side-auctions-list">${rails}</ul></div>` +
+  (bidbarAfterRails ? `<div class="auction-bidbar"></div>` : "");
+const rails =
+  card("9eeZzWwg", img("width=768,quality=70", "30xvA242-TnXslZ7/edit/oaDat.jpg")) +
+  card("9lZk64MG", img("width=768,quality=70", "SubaruBaja2006008/edit/te_Gl.jpg")) +
+  card("r4D1dzGL", img("width=356,height=260,quality=70", "exterior/KmmMMmlY-vPv9eC8/edit/yPjdT.jpg"),
+    img("width=148,height=126,quality=70", "interior/KmmMMmlY-u-GbNEF/edit/s7ovF.jpg")) +
+  card("3Blv7vAE", img("width=356,height=260,quality=70", "application/s-na2z0u9/edit/d3_Rb.jpg"));
+const keyOf = (u: string) => u.replace(/^.*\/photos\//, "").split("?")[0];
+
+Deno.test("photo set id is the listing's gallery prefix; seller-named files have none", () => {
+  eq(cabPhotoSet(`${M}/width=542,quality=70/h/photos/exterior/3yvlj0Do--qXdYyQ/edit/6hJFo.jpg`), "3yvlj0Do");
+  eq(cabPhotoSet(`${M}/width=768,quality=70/h/photos/30xvA242-TnXslZ7/edit/oaDat.jpg`), "30xvA242");
+  eq([cabPhotoSet(`${M}/width=768/h/photos/SubaruBaja2006008/edit/x.jpg`), cabPhotoSet(`${M}/width=768/h/photos/application/s-na2z0u9/edit/x.jpg`)], [null, null]);
+});
+
+Deno.test("cards linking to other auctions are other lots; a link to this lot is not", () => {
+  const html = lotPage(rails);
+  eq([...cabOtherLotPhotoKeys(html, "92xXv4Oa")].map((k) => k.replace(/^.*\/photos\//, "")).sort(),
+    ["30xvA242-TnXslZ7/edit/oaDat.jpg", "SubaruBaja2006008/edit/te_Gl.jpg", "application/s-na2z0u9/edit/d3_Rb.jpg",
+      "exterior/KmmMMmlY-vPv9eC8/edit/yPjdT.jpg", "interior/KmmMMmlY-u-GbNEF/edit/s7ovF.jpg"]);
+});
+
+Deno.test("page photos are the lot's own: gallery and its set, never the other lots' cards", () => {
+  const got = cabLotPhotos(lotPage(rails), "92xXv4Oa").map(keyOf);
+  eq(got, ["3yvlj0Do-EpLCSxj/edit/jAdnL.jpg", "3yvlj0Do-MIQ9Hac/edit/wgwPO.jpg", "exterior/3yvlj0Do--qXdYyQ/edit/6hJFo.jpg"]);
+});
+
+Deno.test("without a gallery no page photo is taken as the lot's", () => {
+  eq(cabLotPhotos(lotPage(rails).replace("gallery-preview", "gallery-gone"), "92xXv4Oa"), []);
+});
+
+Deno.test("gallery reader drops cards even when the bid bar comes after the rails", () => {
+  for (const late of [false, true]) {
+    const d = parseCabDepth(lotPage(rails, late), new Date("2026-10-15T00:00:00Z"), "92xXv4Oa");
+    eq(d.photos.map(keyOf), ["3yvlj0Do-EpLCSxj/edit/jAdnL.jpg", "3yvlj0Do-MIQ9Hac/edit/wgwPO.jpg", "exterior/3yvlj0Do--qXdYyQ/edit/6hJFo.jpg"]);
+    eq(d.photos.every((u) => u.includes("/cdn-cgi/image/width=2080,quality=70/")), true);
+  }
 });

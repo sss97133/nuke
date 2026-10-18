@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 // Feed a list of vehicles to supersede_junk_listing_images: supersede listing page furniture (sidebar thumbnails,
-// flags, web-assets, SVGs) and give each junk cover the vehicle's own best photo through the cover recompute.
+// flags, web-assets, SVGs) and Cars & Bids cards for other lots captured from the same page, and give each such cover
+// the vehicle's own best photo through the cover recompute.
 //
 //   dotenvx run -- node scripts/photos/supersede-junk-listing-images.mjs <list.json> [--apply] [--batch N] [--limit N] [--log <file>]
 //

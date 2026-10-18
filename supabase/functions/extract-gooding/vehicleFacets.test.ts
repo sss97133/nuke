@@ -78,3 +78,16 @@ Deno.test('extractFromPageData reads coachwork and highlights for body style whe
   );
   equal([x.series, x.body_style], ['DB5', 'Shooting Brake']);
 });
+
+Deno.test('extractFromPageData reads lotNumber 0 (not yet numbered) as no lot, and keeps a real lot number', () => {
+  const url = 'https://www.goodingco.com/lot/1962-mercedes-benz-300-sl-roadster-rn26';
+  const unnumbered = page({ title: '1962 Mercedes-Benz 300 SL Roadster', year: 1962, make: 'Mercedes-Benz', model: '300 SL Roadster' }, '1962-mercedes-benz-300-sl-roadster-rn26');
+  unnumbered.result.data.contentfulLot!.lotNumber = 0;
+  const x = extractFromPageData(unnumbered, url);
+  equal([x.lot_number, x.auction_calendar_position], [null, null], 'lot 0:');
+
+  const numbered = page({ title: '1952 Cunningham C-3 Coupe', year: 1952, make: 'Cunningham', model: 'C-3 Coupe' }, '1952-cunningham-c-3-coupe');
+  numbered.result.data.contentfulLot!.lotNumber = 160;
+  const y = extractFromPageData(numbered, 'https://www.goodingco.com/lot/1952-cunningham-c-3-coupe');
+  equal([y.lot_number, y.auction_calendar_position], [160, '2025 Pebble Beach Auctions (Lot 160)'], 'lot 160:');
+});

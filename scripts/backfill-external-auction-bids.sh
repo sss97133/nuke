@@ -5,6 +5,7 @@
 #   cab-comments  Cars & Bids bid comments, by C&B lot id slice (256 slices)
 #   cab-history   Cars & Bids auction_events.bid_history, by lot id slice (256 slices)
 #   cab-legacy    legacy external_auction_bids rows with no lot key: keyed to their lot or superseded (16 slices)
+#   cab-lot-moves C&B bid comments whose lot row changed after their bid was recorded (256 slices; any time)
 #   bat-bids      bat_bids, by heap page range (60 pages, ~1,100 rows a slice)
 #   bat-comments  BaT bid comments in auction_comments, by heap page range (150 pages, ~2,000 comments a slice)
 # The two BaT phases slice by physical page (TID range scan) because their ids are random UUIDs: an id slice of
@@ -20,7 +21,7 @@
 #   PGHOST/PGPORT/PGUSER/PGDATABASE default to the production pooler; LOG defaults to ./external-auction-bids-backfill.log;
 #   PAUSE is the seconds between slices
 set -euo pipefail
-phase="${1:?usage: $0 <cab-comments|cab-history|cab-legacy|bat-bids|bat-comments> [first-slice] [last-slice]}"
+phase="${1:?usage: $0 <cab-comments|cab-history|cab-legacy|cab-lot-moves|bat-bids|bat-comments> [first-slice] [last-slice]}"
 : "${PGHOST:=aws-0-us-west-1.pooler.supabase.com}" "${PGPORT:=6543}" "${PGUSER:=postgres.qkgaybvrernstplzjaam}" "${PGDATABASE:=postgres}"
 export PGHOST PGPORT PGUSER PGDATABASE
 LOG="${LOG:-./external-auction-bids-backfill.log}"
@@ -30,7 +31,7 @@ psql_at() { psql -X -q -At -F $'\t' -v ON_ERROR_STOP=1 "$@"; }
 
 pages=0
 case "$phase" in
-  cab-comments|cab-history) digits=2 ;;
+  cab-comments|cab-history|cab-lot-moves) digits=2 ;;
   cab-legacy) digits=1 ;;
   bat-bids) pages=60; table=bat_bids ;;
   bat-comments) pages=150; table=auction_comments ;;
@@ -61,7 +62,7 @@ range_for() { # slice index -> predicate on COL (id slices) or on ctid (page sli
 ids_for() { # phase, predicate -> the array expression the writer receives
   local p="$1" range="$2"
   case "$p" in
-    cab-comments) echo "ARRAY(SELECT c.id FROM public.auction_events e JOIN public.auction_comments c ON c.auction_event_id = e.id
+    cab-comments|cab-lot-moves) echo "ARRAY(SELECT c.id FROM public.auction_events e JOIN public.auction_comments c ON c.auction_event_id = e.id
       WHERE e.source = 'cars_and_bids' AND ${range//COL/e.id} AND c.comment_type = 'bid' AND c.bid_amount > 0)" ;;
     cab-history) echo "ARRAY(SELECT e.id FROM public.auction_events e
       WHERE e.source = 'cars_and_bids' AND ${range//COL/e.id} AND jsonb_typeof(e.bid_history) = 'array')" ;;
@@ -78,6 +79,7 @@ source_of() {
     cab-comments|bat-comments) echo auction_comments ;;
     cab-history) echo bid_history ;;
     cab-legacy) echo legacy ;;
+    cab-lot-moves) echo comment_lot_moves ;;
     bat-bids) echo bat_bids ;;
   esac
 }

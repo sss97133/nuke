@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { Link, useNavigate, useLocation } from 'react-router-dom';
+import { Link, useNavigate, useLocation, useParams } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
+import { PrefetchLink } from '../components/PrefetchLink';
 import { useValuationIntel } from '../hooks/useValuationIntel';
 import { useVehicleMemeDrops } from '../hooks/useVehicleMemeDrops';
 import { TimelineEventService } from '../services/timelineEventService';
@@ -18,6 +19,7 @@ const ValidationPopupV2 = React.lazy(() => import('../components/vehicle/Validat
 import VehicleMemeOverlay from '../components/vehicle/VehicleMemeOverlay';
 const VehicleOwnershipPanel = React.lazy(() => import('../components/ownership/VehicleOwnershipPanel'));
 import { VehicleProfileProvider, useVehicleProfile } from './vehicle-profile/VehicleProfileContext';
+import { isVehicleVinAddress, resolveVehicleVinAddress, type VinAddressResolution } from './vehicle-profile/loadVehicleData';
 const WorkspaceContent = React.lazy(() => import('./vehicle-profile/WorkspaceContent'));
 const VehicleBanners = React.lazy(() => import('./vehicle-profile/VehicleBanners'));
 const VehicleBadgeBar = React.lazy(() => import('./vehicle-profile/VehicleBadgeBar'));
@@ -375,11 +377,37 @@ const VehicleProfileInner: React.FC = () => {
   );
 };
 
-/** Wraps VehicleProfileInner with the shared context provider. */
-const VehicleProfile: React.FC = () => (
-  <VehicleProfileProvider>
-    <VehicleProfileInner />
-  </VehicleProfileProvider>
-);
+const VehicleVinAddress: React.FC<{ vin: string }> = ({ vin }) => {
+  const navigate = useNavigate();
+  const location = useLocation();
+  const [status, setStatus] = useState<VinAddressResolution['status'] | null>(null);
+  useEffect(() => {
+    let cancelled = false;
+    setStatus(null);
+    void resolveVehicleVinAddress(vin, supabase).then(resolution => {
+      if (cancelled) return;
+      if (resolution.status === 'resolved') {
+        navigate(`/vehicle/${resolution.id}${location.search}${location.hash}`, { replace: true });
+      } else {
+        setStatus(resolution.status);
+      }
+    });
+    return () => { cancelled = true; };
+  }, [vin, navigate, location.search, location.hash]);
+
+  return <main className="vehicle-profile" role="status"><p>{status === 'missing' ? 'No public vehicle matches this VIN.'
+      : status === 'ambiguous' ? 'More than one public vehicle matches this VIN.'
+      : status === 'unavailable' ? 'The VIN record could not be read.'
+      : status === 'malformed' ? 'The VIN record could not be resolved.' : 'Resolving VIN…'}</p>
+      {status && <PrefetchLink to="/search">Search vehicles</PrefetchLink>}
+  </main>;
+};
+
+/** Resolve VIN addresses before mounting any UUID-dependent profile readers. */
+const VehicleProfile: React.FC = () => {
+  const { vehicleId } = useParams<{ vehicleId: string }>();
+  if (isVehicleVinAddress(vehicleId)) return <VehicleVinAddress key={vehicleId} vin={vehicleId} />;
+  return <VehicleProfileProvider><VehicleProfileInner /></VehicleProfileProvider>;
+};
 
 export default VehicleProfile;

@@ -84,6 +84,9 @@ test('scorecard and candidates: tallies per house; comment counts read the lot t
   const c = candidates({ v: {}, comments: { bid: 14, non_bid: 20 } });
   assert.equal(c.comment_count[0].value, 20);
   assert.equal(c.bid_count[0].value, 14);
+  const live = candidates({ v: { origin_metadata: { currency: 'EUR' } }, ma: { bid_count: 36, stream_state: { currency: 'EUR' } } });
+  assert.equal(gradeField('bid_count', 36, live.bid_count).at, 'monitored_auctions.bid_count');
+  assert.equal(gradeField('currency', 'EUR', live.currency).verdict, 'pass');
   const s = scorecard([{ house: 'bat', resolved: true, fields: { year: { verdict: 'pass' }, vin: { verdict: 'wrong' } } }]);
   assert.deepEqual(s.bat.totals, { pass: 1, wrong: 1, missing: 0, stale: 0 });
 });
@@ -94,4 +97,18 @@ test('lotSql: read-only shape, every url spelling, no unbounded scans', () => {
   assert.match(sql, /www\.bringatrailer\.com/);
   assert.doesNotMatch(sql, /\b(insert|update|delete)\b/i);
   assert.doesNotMatch(sql, /case when/i);
+});
+
+test('sale_date: a stored session window passes only when every day in it is a day the truth allows', () => {
+  const truth = { one_of: ['2026-08-14', '2026-08-15'] };
+  assert.equal(matches('sale_date', truth, ['2026-08-14', '2026-08-15']), true);
+  assert.equal(matches('sale_date', truth, ['2026-08-14', '2026-08-22']), false);
+  assert.equal(matches('sale_date', { value: '2022-08-19' }, ['2022-08-19']), true);
+  assert.equal(matches('sale_date', truth, []), null);
+  const c = candidates({ v: {}, ve: { sold_at: null, ended_at: null, metadata: { auction_session_days: ['2026-11-20', '2026-11-21'] } } });
+  const g = gradeField('sale_date', { one_of: ['2026-11-20', '2026-11-21'] }, c.sale_date);
+  assert.equal(g.verdict, 'pass');
+  assert.equal(g.at, 'vehicle_events.metadata.auction_session_days');
+  const real = candidates({ v: {}, ve: { sold_at: '2022-08-19T12:00:00Z', metadata: { auction_session_days: ['2022-08-19', '2022-08-20'] } } });
+  assert.equal(gradeField('sale_date', { one_of: ['2022-08-19', '2022-08-20'] }, real.sale_date).at, 'vehicle_events.sold_at');
 });

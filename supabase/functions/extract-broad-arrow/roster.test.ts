@@ -30,3 +30,15 @@ Deno.test('a multi-day sale lists each run day', () => {
   const e = parseEventPage(html, 'The Monterey Auction 2026');
   equal([e.starts_on, e.ends_on, e.days], ['2026-08-13', '2026-08-15', ['2026-08-13', '2026-08-14', '2026-08-15']]);
 });
+
+Deno.test('a Zurich card groups thousands with an apostrophe; the estimate keeps every digit', () => {
+  const zurich = `<div class='ft-vehicle-item grid-block' id='ft-item-0-0'> <a href="/vehicles/dg26_r0033/2015-ferrari-laferrari"><div class='top'> <div class='auto' data-images=''></div></div> <div class='bottom'> <div class='name-auto'> <span>2015</span> <span>Ferrari</span> <span>LaFerrari</span> </div> <div class='price'> <div class='top'> <span>The Zurich Auction 2026</span> </div> <div class='mid'> </div> <div class='bot'>
+<span>Estimate: CHF 5&#39;500&#39;000</span>
+<span>- CHF 7&#39;500&#39;000</span>
+<span class='new-line upcase'>
+Offered Without Reserve
+</span>
+</div> </div> </div> </a></div>`;
+  const [c] = parseListingCards(zurich);
+  equal([c.estimate_low, c.estimate_high, c.currency], [5500000, 7500000, 'CHF']);
+});

@@ -1,4 +1,5 @@
--- Isolated PostgreSQL 17 contract for 20261018234500_external_auction_bids_cross_platform.sql.
+-- Isolated PostgreSQL 17 contract for 20261018234500_external_auction_bids_cross_platform.sql and its follow-up
+-- 20261019013000_external_auction_bids_follow_comment_lot.sql.
 -- Synthetic rows and placeholder handles only; never production. Run in an empty disposable dm_refinement_* database:
 --   scripts/ci/run-db-contracts.sh test_external_auction_bids_cross_platform.sql
 -- Stub tables carry the columns, keys and foreign keys the migration reads, as read from the live catalog 2026-10-17:
@@ -92,6 +93,7 @@ INSERT INTO public.external_auction_bids (id, vehicle_id, platform, bid_amount, 
    'extract-cab-bids-pw', '{"auction_url":"https://carsandbids.com/auctions/AbCd1234/test-car"}');
 
 \ir ../migrations/20261018234500_external_auction_bids_cross_platform.sql
+\ir ../migrations/20261019013000_external_auction_bids_follow_comment_lot.sql
 
 -- 1. C&B comment keys: every writer converges on C&B's own id
 INSERT INTO public.auction_comments (auction_event_id, vehicle_id, platform, source_url, content_hash, posted_at, author_username, comment_type, comment_text, bid_amount)
@@ -230,3 +232,28 @@ SELECT pg_temp.ok('the writer is not callable by anon or authenticated',
   AND NOT has_function_privilege('authenticated', 'public.record_external_auction_bids(text, uuid[])', 'EXECUTE'));
 SELECT pg_temp.ok('the record is registered with its writer',
   EXISTS (SELECT 1 FROM public.pipeline_registry WHERE table_name = 'external_auction_bids' AND owned_by = 'record_external_auction_bids'));
+
+-- 8. A bid comment re-pointed to a second lot row of the same auction takes its bid along, never counting it twice
+INSERT INTO public.auction_events (id, vehicle_id, source, source_url, source_listing_id, bid_history) VALUES
+  ('30000000-0000-4000-8000-000000000003', '10000000-0000-4000-8000-000000000002', 'cars_and_bids',
+   'https://carsandbids.com/auctions/AbCd1234/test-car-2', 'AbCd1234', '[{"amount":22000,"bidder":"lister4"}]');
+SELECT pg_temp.ok('the second lot row''s list records its copy of a bid the first lot holds',
+  (public.record_external_auction_bids('bid_history', ARRAY['30000000-0000-4000-8000-000000000003']::uuid[]))->>'inserted' = '1');
+UPDATE public.auction_comments SET auction_event_id = '30000000-0000-4000-8000-000000000003'
+WHERE source_comment_id IN ('3vQXROVO', 'Kq9xZ2aB');
+SELECT pg_temp.ok('a moved bid comment''s bid row moves to the new lot',
+  (SELECT count(*) = 1 AND bool_and(auction_event_id = '30000000-0000-4000-8000-000000000003'
+     AND source_url = 'https://carsandbids.com/auctions/AbCd1234/test-car-2' AND vehicle_id = '10000000-0000-4000-8000-000000000002')
+   FROM public.external_auction_bids WHERE bid_amount = 20000 AND superseded_by IS NULL));
+SELECT pg_temp.ok('where the new lot already holds the bid, the old row is superseded and the holder gains the comment',
+  (SELECT count(*) = 1 FROM public.external_auction_bids WHERE bid_amount = 22000 AND bidder_username = 'lister4' AND superseded_by IS NULL)
+  AND (SELECT superseded_by IS NOT NULL FROM public.external_auction_bids WHERE id = '60000000-0000-4000-8000-000000000002')
+  AND (SELECT auction_comment_id = (SELECT id FROM public.auction_comments WHERE source_comment_id = 'Kq9xZ2aB')
+       AND auction_event_id = '30000000-0000-4000-8000-000000000003'
+       FROM public.external_auction_bids WHERE bid_amount = 22000 AND bidder_username = 'lister4' AND superseded_by IS NULL));
+SELECT pg_temp.ok('the repair source finds nothing left to move',
+  (public.record_external_auction_bids('comment_lot_moves', ARRAY(SELECT id FROM public.auction_comments WHERE platform = 'cars_and_bids')))
+    @> '{"moved":0,"superseded":0,"inserted":0,"merged":0}'::jsonb);
+SELECT pg_temp.ok('after the moves every comment still backs at most one current bid row',
+  NOT EXISTS (SELECT auction_comment_id FROM public.external_auction_bids WHERE auction_comment_id IS NOT NULL AND superseded_by IS NULL
+              GROUP BY auction_comment_id HAVING count(*) > 1));
