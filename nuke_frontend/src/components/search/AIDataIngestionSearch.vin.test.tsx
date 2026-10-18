@@ -76,21 +76,21 @@ describe('AIDataIngestionSearch make browse card', () => {
     expect(fixture.ops.some((o) => o.op === 'ilike')).toBe(false);
   });
 
-  it('asks for an estimated count and labels a planner estimate as approximate', async () => {
+  it('asks for the planned count of one row and labels it as an estimate', async () => {
     fixture.rows = [{ model: '911' }];
     fixture.count = 50809;
     await type('porsche', 450);
-    const countSelect = fixture.ops.find((o) => o.op === 'select' && o.args[0] === 'id');
-    expect(countSelect?.args[1]).toEqual({ count: 'estimated', head: true });
+    const countSelect = fixture.ops.findIndex((o) => o.op === 'select' && o.args[0] === 'id');
+    expect(fixture.ops[countSelect]?.args[1]).toEqual({ count: 'planned', head: true });
+    expect(fixture.ops.slice(countSelect).find((o) => o.op === 'limit')?.args[0]).toBe(1);
     expect(container.textContent).toContain('≈51,000 VEHICLES');
     expect(container.textContent).not.toContain('50,809');
   });
 
-  it('shows a count at or below max-rows as exact', async () => {
-    fixture.rows = [{ model: 'Pantera' }];
-    fixture.count = 11;
+  it('shows no make card when the make has no public models, whatever the estimate', async () => {
+    fixture.rows = [];
+    fixture.count = 58;
     await type('lotus', 450);
-    expect(container.textContent).toContain('11 VEHICLES');
-    expect(container.textContent).not.toContain('≈');
+    expect(container.textContent).not.toContain('VEHICLES');
   });
 });
