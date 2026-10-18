@@ -67,7 +67,7 @@ BEGIN
     UPDATE live_auction_sources
     SET consecutive_failures = coalesce(consecutive_failures, 0) + 1,
         last_sync_error      = left(p_error, 500),
-        health_status        = CASE WHEN coalesce(consecutive_failures, 0) + 1 >= 3 THEN 'failing' ELSE 'degraded' END,
+        health_status        = CASE WHEN coalesce(consecutive_failures, 0) + 1 >= 3 THEN 'unhealthy' ELSE 'degraded' END,
         updated_at           = v_now
     WHERE id = v_src;
     RETURN jsonb_build_object('slug', p_slug, 'error', left(p_error, 500));
@@ -163,7 +163,7 @@ GRANT EXECUTE ON FUNCTION public.live_auction_board_sync(text, jsonb, boolean, t
 
 -- SBX Cars stopped running auctions (sbxcars.com serves a private-sales enquiry form on every URL, 2026-10-18).
 UPDATE live_auction_sources
-SET is_active = false, health_status = 'retired', updated_at = now(),
+SET is_active = false, health_status = 'unknown', updated_at = now(),
     notes = coalesce(notes || ' ', '') || '2026-10-18: no auctions; sbxcars.com serves a private-sales enquiry form on every URL.'
 WHERE slug = 'sbx-cars' AND is_active;
 UPDATE monitored_auctions SET is_live = false

@@ -1,5 +1,5 @@
 -- Isolated PostgreSQL regression for live_auction_board_sync: synthetic rows only, never production.
--- Loads the actual migration 20261019020000 and proves: refuses bat; one row per open lot linked to its vehicle by
+-- Loads the actual migrations 20261019020000 and 20261019021000 (which completes it) and proves: refuses bat; one row per open lot linked to its vehicle by
 -- listing_url; bid in cents with the house currency; bid-count moves returned (and not on an unchanged re-read);
 -- absent lots leave the schedule only on a complete board; past-end lots leave it; a failed read counts failures;
 -- SBX retired; the 5-minute job posts the three houses.
@@ -20,7 +20,8 @@ DO $$ BEGIN CREATE ROLE authenticated; EXCEPTION WHEN duplicate_object THEN NULL
 DO $$ BEGIN CREATE ROLE service_role; EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 CREATE TABLE public.live_auction_sources(id uuid PRIMARY KEY,slug text UNIQUE,scraping_config jsonb DEFAULT '{}',
  default_poll_interval_ms integer,last_successful_sync timestamptz,consecutive_failures integer DEFAULT 0,health_status text,
- last_sync_error text,is_active boolean DEFAULT true,notes text,updated_at timestamptz);
+ last_sync_error text,is_active boolean DEFAULT true,notes text,updated_at timestamptz,
+ CHECK (health_status = ANY (ARRAY['healthy','degraded','unhealthy','unknown'])));
 CREATE TABLE public.monitored_auctions(id uuid PRIMARY KEY DEFAULT gen_random_uuid(),source_id uuid,external_auction_id text,
  external_auction_url text,vehicle_id uuid,auction_end_time timestamptz,is_live boolean,current_bid_cents bigint,bid_count integer,
  priority integer,last_synced_at timestamptz,next_poll_at timestamptz,poll_interval_ms integer,stream_state jsonb DEFAULT '{}',
@@ -46,6 +47,7 @@ INSERT INTO public.monitored_auctions(source_id,external_auction_id,external_auc
        ('00000000-0000-0000-0000-0000000000d1','sbx-1','https://sbxcars.com/listing/1/x',true,NULL);
 
 \ir ../migrations/20261019020000_live_auction_board_sync.sql
+\ir ../migrations/20261019021000_live_auction_board_sync_health.sql
 
 DO $$ BEGIN
   PERFORM public.live_auction_board_sync('bat','[]'::jsonb);
@@ -93,12 +95,12 @@ SELECT pg_temp.ok('a partial board ends no absent lot', (SELECT is_live FROM mon
 SELECT public.live_auction_board_sync('collecting-cars', NULL, true, 'HTTP 404 Collection not found');
 SELECT public.live_auction_board_sync('collecting-cars', NULL, true, 'HTTP 404 Collection not found');
 SELECT public.live_auction_board_sync('collecting-cars', NULL, true, 'HTTP 404 Collection not found');
-SELECT pg_temp.ok('failed reads count and turn the source failing without touching lots',
-  (SELECT consecutive_failures = 3 AND health_status = 'failing' AND last_sync_error LIKE 'HTTP 404%' FROM live_auction_sources WHERE slug = 'collecting-cars')
+SELECT pg_temp.ok('failed reads count and turn the source unhealthy without touching lots',
+  (SELECT consecutive_failures = 3 AND health_status = 'unhealthy' AND last_sync_error LIKE 'HTTP 404%' FROM live_auction_sources WHERE slug = 'collecting-cars')
   AND (SELECT is_live FROM monitored_auctions WHERE external_auction_id = 'lot-a'));
 
 SELECT pg_temp.ok('SBX retired and off the schedule',
-  (SELECT NOT is_active AND health_status = 'retired' FROM live_auction_sources WHERE slug = 'sbx-cars')
+  (SELECT NOT is_active AND health_status = 'unknown' FROM live_auction_sources WHERE slug = 'sbx-cars')
   AND NOT (SELECT is_live FROM monitored_auctions WHERE external_auction_id = 'sbx-1'));
 SELECT pg_temp.ok('5-minute job posts the three houses',
   (SELECT schedule = '*/5 * * * *' AND command LIKE '%"platforms":["collecting-cars","pcarmarket","bonhams"]%' FROM cron.job WHERE jobname = 'sync-live-auctions-houses'));
