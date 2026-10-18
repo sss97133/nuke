@@ -441,7 +441,7 @@ observation, retained snapshot and native presentation selector, with explicit d
 database qualifier independently checks inline UTF8 SHA, case-sensitive source auction ID,
 same attributed parent/source, exact reconstructed listing narrative and microsecond clocks.
 Both existing source guards must admit the exact derived tuple under locks. A separate sparse
-listing receipt keys the original observation, capture and presentation; the original remains
+`provenance` receipt keys the original observation, capture and presentation; the original remains
 unchanged. It asserts narrative provenance only: no copied specification, sale, independent
 corroboration or physical identity verification. Receipt ingestion establishes when that
 binding was recorded; it does not reconstruct historical native identity availability.
@@ -451,11 +451,14 @@ The existing inspector's `--lineage <original> <snapshot> <presentation>` previe
 privacy or changed source evidence withholds verification. No public grants, collection, queue,
 source activation or historical replay are added. Local tests combine the actual canonical handler,
 PostgreSQL admission, current receipt reader and two-session mutation controls. Three explicitly
-selected retained tuples qualify offline under the synthetic fixture's privacy boundary; this is
+selected retained tuples are rehearsed offline; this is
 not production admission, actual anonymous privacy acceptance or a fleet readiness numerator.
 Full retained/eligible populations and net public supported-answer gain remain unassessed.
 The production schema/admission change remains a held draft until separately authorized; do not
-treat implementation, local tests or source-selector previews as a deployed repair.
+treat implementation, local tests or source-selector previews as a deployed repair. The existing
+observation visibility predicate withholds `provenance`; this internal receipt must not become a
+second public listing. The source's existing listing capability qualifies its retained parent;
+this guarded derivation does not declare a new publisher-provided provenance capability.
 
 ## 7. Hypotheses the owner wants tested as veins (in the vocabulary)
 

@@ -20,10 +20,9 @@ ALTER TYPE public.observation_kind ADD VALUE 'activity';
 ALTER TYPE public.observation_kind ADD VALUE 'specification';
 ALTER TYPE public.observation_kind ADD VALUE 'bid';
 ALTER TYPE public.observation_kind ADD VALUE 'condition';
--- Synthetic policy boundary: verify the qualifier calls the owning privacy predicate.
-CREATE FUNCTION public.observation_is_public(public.observation_kind,jsonb) RETURNS boolean LANGUAGE sql AS $$
- SELECT NOT ($2 ? 'private_marker')
-$$;
+ALTER TYPE public.observation_kind ADD VALUE 'provenance';
+ALTER TYPE public.observation_kind ADD VALUE 'media';
+ALTER TYPE public.observation_kind ADD VALUE 'splice';
 \ir cab-retained-guard.fixture.sql
 CREATE TRIGGER trg_retained_listing_property_source_insert BEFORE INSERT ON public.vehicle_observations FOR EACH ROW
 WHEN (NEW.source_observation_id IS NOT NULL) EXECUTE FUNCTION public.validate_retained_listing_property_source();
@@ -71,6 +70,9 @@ SELECT public.synthetic_insert_cab_receipt(public.synthetic_cab_qualification()-
 RESET ROLE;
 SELECT pg_temp.ok('current reader verifies the actual stored receipt',
  public.synthetic_cab_qualification((SELECT id FROM public.vehicle_observations WHERE extraction_method='protected_cab_listing_capture_v1'))->>'result_verified'='true');
+SELECT pg_temp.ok('actual visibility predicate keeps internal provenance off the public listing surface',
+ (SELECT kind='provenance' AND NOT public.observation_is_public(kind,structured_data)
+ FROM public.vehicle_observations WHERE extraction_method='protected_cab_listing_capture_v1'));
 SELECT pg_temp.ok('original testimony remains unchanged and active',
  (SELECT NOT is_superseded AND source_snapshot_id IS NULL AND source_vehicle_event_id IS NULL
  AND structured_data->>'engine_type'='UNVERIFIED_INTERPRETATION' FROM public.vehicle_observations WHERE id=md5('cab-original')::uuid));
@@ -106,9 +108,9 @@ UPDATE public.vehicle_observations SET observed_at=observed_at-interval '1 micro
 UPDATE public.observation_sources SET supported_observations='{}' WHERE id=md5('source-cab')::uuid;
 SELECT pg_temp.ok('withdrawn source capability invalidates the receipt',public.synthetic_cab_qualification()->>'reason'='source_not_supported');
 UPDATE public.observation_sources SET supported_observations=ARRAY['listing']::public.observation_kind[] WHERE id=md5('source-cab')::uuid;
-UPDATE public.vehicle_observations SET structured_data=structured_data||'{"private_marker":true}' WHERE id=md5('cab-original')::uuid;
+UPDATE public.vehicle_observations SET structured_data=structured_data||'{"email":"synthetic@example.invalid"}' WHERE id=md5('cab-original')::uuid;
 SELECT pg_temp.ok('owning observation privacy predicate withholds original',public.synthetic_cab_qualification()->>'reason'='original_listing_ineligible');
-UPDATE public.vehicle_observations SET structured_data=structured_data-'private_marker' WHERE id=md5('cab-original')::uuid;
+UPDATE public.vehicle_observations SET structured_data=structured_data-'email' WHERE id=md5('cab-original')::uuid;
 SET ROLE anon;
 SELECT pg_temp.refuses('anonymous selector cannot read protected source','SELECT public.qualify_cab_listing_capture(md5(''cab-original'')::uuid,md5(''cab-snapshot'')::uuid,md5(''cab-episode'')::uuid)','42501');
 RESET ROLE;

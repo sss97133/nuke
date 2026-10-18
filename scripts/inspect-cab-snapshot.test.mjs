@@ -19,7 +19,7 @@ test('lineage consumer previews only explicit selectors and never emits original
     assert.equal(Object.keys(body).length, 5);
     return new Response(JSON.stringify({ success: true, dry_run: true, writes: 0,
       qualification: { ok: true, source_known_at: '2026-01-01T00:00:02.123456+00:00',
-        input: { content_text: 'SOURCE_PROSE_MUST_NOT_ESCAPE', structured_data: {
+        input: { kind: 'provenance', content_text: 'SOURCE_PROSE_MUST_NOT_ESCAPE', structured_data: {
           listing_capture_receipt: { scope: 'attributed_listing_narrative_only' } } } } }));
   } });
   assert.equal(result.status, 'qualified_not_admitted');

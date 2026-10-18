@@ -84,7 +84,8 @@ export async function inspectCabLineage({ sourceId, snapshotId, episodeId, resul
   if (!response.ok) throw new Error(`Listing custody reader unavailable or refused (${response.status})`);
   const data = await response.json();
   const qualified = resultId ? data : data.qualification;
-  if (qualified?.ok !== true || qualified.input?.structured_data?.listing_capture_receipt?.scope !== 'attributed_listing_narrative_only'
+  if (qualified?.ok !== true || qualified.input?.kind !== 'provenance'
+    || qualified.input?.structured_data?.listing_capture_receipt?.scope !== 'attributed_listing_narrative_only'
     || (resultId ? qualified.result_verified !== true
     : data.success !== true || data.dry_run !== true || data.writes !== 0)) {
     return { status: 'blocked', reason: qualified?.reason ?? 'qualification_unavailable', public_readiness: 'not_assessed' };
@@ -92,6 +93,7 @@ export async function inspectCabLineage({ sourceId, snapshotId, episodeId, resul
   return { status: resultId ? 'stored_receipt_verified' : 'qualified_not_admitted',
     source_observation_id: sourceId, snapshot_id: snapshotId, vehicle_event_id: episodeId,
     scope: qualified.input?.structured_data?.listing_capture_receipt?.scope,
+    receipt_kind: qualified.input.kind,
     source_known_at: qualified.source_known_at, writes: 0, model_calls: 0, public_readiness: 'not_assessed' };
 }
 

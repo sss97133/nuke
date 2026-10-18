@@ -90,6 +90,14 @@ Deno.test("selector authentication and caller-value injection fail before transp
   assert((await intake({ ...selectors, structured_data: { specification_truth: "verified" } })).status === 400);
   assert((await intake({ ...selectors, dry_run: undefined })).status === 400);
   assert((await intake({ extraction_method: "protected_cab_listing_capture_v1" })).status === 400);
+  const pair = await crypto.subtle.generateKey({ name: "ECDSA", namedCurve: "P-256" }, true, ["sign", "verify"]);
+  Deno.env.set("SUPABASE_JWKS", JSON.stringify({ keys: [{ ...(await crypto.subtle.exportKey("jwk", pair.publicKey)), kid: "fixture", alg: "ES256" }] }));
+  const encode = (value: unknown) => btoa(JSON.stringify(value)).replace(/=/g, "").replace(/\+/g, "-").replace(/\//g, "_");
+  const unsigned = `${encode({ alg: "ES256", typ: "JWT", kid: "fixture" })}.${encode({ role: "authenticated",
+    sub: selectors.source_observation_id, exp: Math.floor(Date.now() / 1000) + 60 })}`;
+  const signature = new Uint8Array(await crypto.subtle.sign({ name: "ECDSA", hash: "SHA-256" }, pair.privateKey, new TextEncoder().encode(unsigned)));
+  const token = `${unsigned}.${btoa(String.fromCharCode(...signature)).replace(/=/g, "").replace(/\+/g, "-").replace(/\//g, "_")}`;
+  assert((await intake(selectors, token)).status === 403, "signed-in users cannot invoke service-only custody");
   assert(calls === before);
 });
 Deno.test("withdrawal, private parent and source-body mutation invalidate actual handler and current receipt", async () => {
