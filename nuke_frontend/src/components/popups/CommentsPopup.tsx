@@ -101,10 +101,10 @@ export function CommentsPopup({ vehicleId, expectedCount, searchQuery }: Props) 
       }}>
         <div>
           <span style={{ fontFamily: SANS, fontSize: 7, fontWeight: 800, textTransform: 'uppercase' as const, letterSpacing: '0.5px', color: '#999' }}>
-            TOTAL
+            IN THIS READ
           </span>
           <span style={{ fontFamily: MONO, fontSize: 13, fontWeight: 700, color: '#1a1a1a', marginLeft: 6 }}>
-            {loading ? '...' : filtered.length}
+            {loading ? '...' : error ? '?' : filtered.length}
           </span>
           {sq && !loading && (
             <span style={{ fontFamily: MONO, fontSize: 9, color: '#999', marginLeft: 4 }}>
@@ -160,7 +160,7 @@ export function CommentsPopup({ vehicleId, expectedCount, searchQuery }: Props) 
         {!loading && !error && filtered.length === 0 && (
           <div style={{ padding: '20px 12px', textAlign: 'center' }}>
             <span style={{ fontFamily: MONO, fontSize: 9, color: '#999', textTransform: 'uppercase' as const, letterSpacing: '0.08em' }}>
-              {sq ? 'No matching comments' : 'No comments extracted yet'}
+              {sq ? 'No matching comments in this read.' : 'No comments in this read.'}
             </span>
           </div>
         )}
