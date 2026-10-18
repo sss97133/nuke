@@ -107,6 +107,47 @@ const reportedWork = (extra = {}) => ({
 });
 
 describe('publisher-reported work in the existing table', () => {
+  it('shows a v2 whole-sentence report with its month, source and uncertainty, then respects its withdrawal', async () => {
+    const sentence = 'The carburetor was rebuilt in September 2026.';
+    fixture.publicRows = [];
+    fixture.reportedRows = [reportedWork({ source_witness_version: 'retained_description_reported_work_v2', performed_clause: sentence, source_value: sentence })];
+    await renderPage();
+    const row = container.querySelector('[data-observation-id="10000000-0000-4000-8000-000000000001"]')!;
+    expect(row).not.toBeNull();
+    expect(row.textContent).toContain('September 2026Reported month');
+    expect(row.textContent).toContain('Performer unknown');
+    expect(row.textContent).toContain('Completion reportedOccurrence unverified');
+    expect(row.querySelector('blockquote')?.textContent).toBe(sentence);
+    expect(row.querySelector('a')?.getAttribute('href')).toBe(reportedWork().source_url);
+    expect(row.textContent).toContain('Publisher intent: unknown. Independent confirmation is not established.');
+    expect(container.textContent).not.toContain('TOTAL $');
+    expect(container.querySelector('[role="status"]')).toBeNull();
+    // A fresh reader response after parent withdrawal has no report; never synthesize one from the old source.
+    fixture.reportedRows = [];
+    await act(async () => root.unmount()); root = createRoot(container);
+    await renderPage();
+    expect(container.querySelector('[data-observation-id]')).toBeNull();
+    expect(container.querySelector('details')).toBeNull();
+    expect(container.textContent).toContain('SHOWING 0 OF 0');
+  });
+
+  it.each([
+    { source_witness_version: 'retained_description_reported_work_v3' },
+    { source_witness_version: null },
+    { performed_clause: 'The carburetor' },
+    { occurrence_status: 'confirmed' },
+    { performer_status: 'known' },
+    { independent_source: true },
+    { intent_status: 'confirmed' },
+  ])('withholds unknown witnesses, partial v2 sentences and stronger claims (%j)', async change => {
+    const sentence = 'The carburetor was rebuilt in September 2026.';
+    fixture.reportedRows = [reportedWork({ source_witness_version: 'retained_description_reported_work_v2', performed_clause: sentence, source_value: sentence, ...change })];
+    await renderPage();
+    expect(container.querySelector('[data-observation-id="10000000-0000-4000-8000-000000000001"]')).toBeNull();
+    expect(container.querySelector('[data-observation-id="synthetic-work"]')).not.toBeNull();
+    expect(container.querySelector('[role="status"]')?.textContent).toContain('history may be incomplete');
+  });
+
   it('shows month precision, unknown performer and unverified occurrence beside confirmed work without invented money or labor', async () => {
     fixture.reportedRows = [reportedWork({ vendor: 'UNSUPPORTED VENDOR', labor_minutes: 120, total: 999, lifecycle_status: 'installed' })];
     fixture.direct = [{ id: 'synthetic-paid-work', kind: 'work_record', observed_at: '2025-01-02', structured_data: { total: 12 }, content_text: 'Confirmed synthetic receipt' }];

@@ -54,7 +54,7 @@ interface ReportedWork {
   source_recorded_at: string;
   source_capture_sha256: string;
   source_capture_basis: 'direct_fetch' | 'protected_snapshot';
-  source_witness_version: 'retained_description_reported_work_v1';
+  source_witness_version: 'retained_description_reported_work_v1' | 'retained_description_reported_work_v2';
   observed_at: string;
   ingested_at: string;
   confidence_score: number;
@@ -94,7 +94,8 @@ function isReportedWork(value: unknown): value is ReportedWork {
     !['source_captured_at', 'source_recorded_at', 'observed_at', 'ingested_at'].every(key => clock(value[key])) ||
     typeof value.source_capture_sha256 !== 'string' || !/^[a-f0-9]{64}$/.test(value.source_capture_sha256) ||
     !['direct_fetch', 'protected_snapshot'].includes(String(value.source_capture_basis)) ||
-    value.source_witness_version !== 'retained_description_reported_work_v1' ||
+    (value.source_witness_version !== 'retained_description_reported_work_v1' && value.source_witness_version !== 'retained_description_reported_work_v2') ||
+    (value.source_witness_version === 'retained_description_reported_work_v2' && value.performed_clause !== value.source_value) ||
     typeof value.confidence_score !== 'number' || !Number.isFinite(value.confidence_score) || value.confidence_score < 0 || value.confidence_score > 0.6 ||
     typeof value.source_url !== 'string') return false;
   try {
