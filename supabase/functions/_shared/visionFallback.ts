@@ -17,7 +17,7 @@
 
 import { callLLM, type LLMConfig } from "./llmProvider.ts";
 import { getUserApiKey } from "./getUserApiKey.ts";
-import { ProviderHTTPError, VisionProviderUnavailable, type CredentialKind, type ProviderDiagnostic } from "./providerDiagnostic.ts";
+import { ProviderHTTPError, VisionProviderUnavailable, safeAnthropicUsage, type AnthropicTokenUsage, type CredentialKind, type ProviderDiagnostic } from "./providerDiagnostic.ts";
 
 type Provider = "google" | "anthropic" | "openai";
 
@@ -90,16 +90,20 @@ function parseJson(content: string): unknown | null {
   }
 }
 
-interface VisionResult { data: Record<string, unknown>; provider: string; model: string; keySource: "user" | "system"; ms: number; }
+interface VisionResult { data: Record<string, unknown>; provider: string; model: string; keySource: "user" | "system"; ms: number; usage: AnthropicTokenUsage | null; }
 
 async function runTiers(tiers: ResolvedTier[], messages: unknown[], maxTokens: number, diagnostics: ProviderDiagnostic[],
   call = callLLM): Promise<VisionResult | null> {
   for (const cfg of tiers) {
     try {
       const r = await call(cfg, messages as never[], { temperature: 0.2, maxTokens, vision: true });
+      const usage = cfg.provider === "anthropic" ? safeAnthropicUsage(r.usage) : null;
+      // Completed-but-unreadable responses can consume tokens too. Only log
+      // numeric counters; never provider prose, keys, prompts or image data.
+      if (usage) console.log("[visionFallback] anthropic_token_usage", JSON.stringify(usage));
       const data = parseJson(r.content || "");
       if (data && typeof data === "object") {
-        return { data: data as Record<string, unknown>, provider: cfg.provider, model: cfg.model, keySource: cfg.keySource, ms: r.duration_ms ?? 0 };
+        return { data: data as Record<string, unknown>, provider: cfg.provider, model: cfg.model, keySource: cfg.keySource, ms: r.duration_ms ?? 0, usage };
       }
       diagnostics.push({ code: "response_unreadable", provider: cfg.provider, http_status: null, credential_kind: cfg.credentialKind ?? null });
     } catch (e) {
