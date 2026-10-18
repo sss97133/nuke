@@ -13,8 +13,8 @@
  * Sources: auction_comments (bids are comments with comment_type 'bid'),
  * auction_events (lot, outcome, counts), vehicle_events (start / end when the
  * extractor recorded them), timeline_events (auction_listed / auction_sold),
- * vehicle_images (capture time, or its absence; the BaT upload path carries the
- * month the photos were published).
+ * vehicle_images (capture time, or its absence; the BaT upload path carries an
+ * upload-month hint, not proof of listing membership or publication time).
  */
 
 export interface AuctionCommentRow {
@@ -72,7 +72,7 @@ export interface ImageStampRow {
   id: string;
   taken_at: string | null;
   source: string | null;
-  /** where the file came from — a BaT upload path carries the month it was published */
+  /** where the file came from — a BaT upload path can carry an upload-month hint */
   source_url?: string | null;
 }
 
@@ -137,9 +137,9 @@ export interface AuctionSequence {
   /** true when auction_comments holds nothing for the listing — the sequence is not extracted, not empty */
   activityExtracted: boolean;
   photos: {
-    /** photos published with this listing (no capture time in Nuke) */
+    /** legacy field name: image records grouped with this listing by inference, not proven publication */
     publishedWithListing: number;
-    /** true when the photos could not be tied to a listing and sit here as the car's current listing */
+    /** true for missing-month fallback across multiple listings; false does not prove listing membership */
     attributionUncertain: boolean;
   };
 }
@@ -197,7 +197,7 @@ export function commentPermalink(lotUrl: string, batCommentId: number | null): s
   return batCommentId ? `${base}/#comment-${batCommentId}` : `${base}/`;
 }
 
-/** The month a BaT-hosted photo was published, from its upload path (…/uploads/2018/07/…). */
+/** Upload-month hint in a native BaT path (…/uploads/2018/07/…), not a publication clock. */
 export function uploadMonth(sourceUrl: string | null | undefined): string | null {
   const parsed = nativeBatUrl(sourceUrl);
   const m = parsed && /^\/wp-content\/uploads\/(\d{4})\/(\d{2})\//i.exec(parsed.pathname);
@@ -305,7 +305,7 @@ export function buildAuctionSequences(rawInput: SequenceInput): SequencesResult 
   drafts.sort((a, b) => (when(a) < when(b) ? 1 : when(a) > when(b) ? -1 : 0));
   drafts.forEach((s, i) => { s.ordinal = drafts.length - i; s.listingCount = drafts.length; });
 
-  // photos: a BaT-hosted photo has no capture time in Nuke; its upload month names its listing
+  // Group native image records by upload-month hint/fallback; neither proves listing membership.
   const stamped = new Set<string>();
   for (const im of input.images) {
     if (!isBatHosted(im)) continue;
@@ -320,7 +320,7 @@ export function buildAuctionSequences(rawInput: SequenceInput): SequencesResult 
   return { sequences: drafts, importStampedDays: Array.from(stamped).sort() };
 }
 
-/** The month a listing's photos were published: the month it opened, or the one before. */
+/** Heuristic upload-month window: the listing's opening month, or the one before. */
 function publishMonths(s: AuctionSequence): string[] {
   const at = s.open?.at ?? s.items[0]?.at ?? s.close?.at;
   if (!at) return [];
@@ -331,9 +331,9 @@ function publishMonths(s: AuctionSequence): string[] {
 }
 
 /**
- * Which listing a BaT-hosted photo was published with: the listing whose opening month
- * matches the photo's upload path; a photo with no path sits on the car's own (newest)
- * listing. Null for a photo that is not BaT-hosted (it has its own capture time).
+ * Infer a native photo's listing group from the first compatible upload-month window,
+ * otherwise the newest listing. Windows can overlap; this is not source-page membership
+ * or a publication clock. Null for a photo outside the existing native-source predicate.
  */
 export function listingForPhoto(im: ImageStampRow, sequences: AuctionSequence[]): AuctionSequence | null {
   if (!isBatHosted(im) || sequences.length === 0) return null;

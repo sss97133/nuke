@@ -370,7 +370,7 @@ const BarcodeTimeline: React.FC<BarcodeTimelineProps> = ({ selectedAuctionUrl, o
       if (openDay) {
         auctionDays.push({ event_date: openDay, event_type: 'auction_started', title: `${lot}${auctionOpenDayTitle(auction)}`, metadata: { auction: true, basis: auction.open!.basis, moment_role: auction.open!.role, time_known: auction.open!.grain === 'instant' } });
         if (auction.photos.publishedWithListing > 0) {
-          auctionDays.push({ event_date: openDay, event_type: 'photo_session', title: `${lot}${auction.photos.publishedWithListing} photos published with the listing`, metadata: { image_count: auction.photos.publishedWithListing, published_with_listing: true, auction: true } });
+          auctionDays.push({ event_date: openDay, event_type: 'photo_session', title: `${lot}${auction.photos.publishedWithListing} images grouped with listing (association inferred)`, metadata: { image_count: auction.photos.publishedWithListing, published_with_listing: true, auction: true } });
         }
       }
       for (const d of auction.days) {

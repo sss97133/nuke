@@ -139,7 +139,7 @@ const AuctionSequenceBand: React.FC<Props> = ({ auction, activeDay, onOpenDay, o
             {onOpenBidReports && retainedBids.length > 0 ? <button type="button" aria-label="Open recorded vehicle bid amounts" onClick={onOpenBidReports}>{retainedBids.length} bid reports</button> : `${retainedBids.length} bid reports`}
             {' · '}{items.length - retainedBids.length} comments{auction.watchers != null ? ` · ${auction.watchers.toLocaleString()} watchers` : ''}{auction.views != null ? ` · ${auction.views.toLocaleString()} views` : ''}
           </p> : <p>No timed interactions in this read.</p>}
-          {auction.photos.publishedWithListing > 0 && <p>{auction.photos.publishedWithListing} listing photos · capture time unknown{auction.photos.attributionUncertain ? ' · listing attribution incomplete' : ''}</p>}
+          {auction.photos.publishedWithListing > 0 && <p>Grouped image records: {auction.photos.publishedWithListing} · listing association inferred · capture and publication times unknown{auction.photos.attributionUncertain ? ' · listing attribution incomplete' : ''}</p>}
           <p>○ bid · ● last observed bid · line: running high bid · | comment · ▍ seller</p>
           <p>{recordedEnd ? 'Shading follows the recorded end.' : 'End clock unknown; after-close activity unclassified.'} Select a day to open its record; marks link to source comments.</p>
         </details>

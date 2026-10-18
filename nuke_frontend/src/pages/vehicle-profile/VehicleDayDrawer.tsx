@@ -110,8 +110,8 @@ const VehicleDayDrawer: React.FC<VehicleDayDrawerProps> = ({ date, auctions = []
     [auctions, date],
   );
   const lotOf = useMemo(() => new Map(auctions.map(a => [a.key, a.lotNumber ?? String(a.ordinal)])), [auctions]);
-  // Listing photos have no capture time (or an import stamp): they belong to the day
-  // the listing opened, labelled as such — never to the day Nuke copied them.
+  // Display inferred listing groups on the opening day, without claiming a photo
+  // capture/publication time or source-page membership. Import stamps stay excluded.
   const listingOfDay = useMemo(
     () => auctions.find(a => !!a.open && localDate(a.open.at) === date && a.photos.publishedWithListing > 0) ?? null,
     [auctions, date],
@@ -141,8 +141,8 @@ const VehicleDayDrawer: React.FC<VehicleDayDrawerProps> = ({ date, auctions = []
     const captureStart = Date.parse(`${date}T00:00:00Z`);
     const captureEnd = Number.isFinite(captureStart) ? new Date(captureStart + 86_400_000).toISOString() : `${date}T23:59:59.999Z`;
     const query = isListingDay
-      // published with the listing: BaT-hosted photos carry no capture time; each one's
-      // upload path names its listing (the same rule the timeline uses)
+      // Candidate records for the same inferred upload-month/fallback group as the timeline;
+      // the path does not identify an exact listing or publication time.
       ? base.or('source.ilike.%bat%,source_url.ilike.%bringatrailer.com%,taken_at.is.null').limit(600)
       : base
           .gte('taken_at', `${date}T00:00:00Z`)
@@ -236,7 +236,7 @@ const VehicleDayDrawer: React.FC<VehicleDayDrawerProps> = ({ date, auctions = []
       {/* Facet chips — only the facets this day touched */}
       {!loading && !isEmpty && (
         <div style={{ display: 'flex', gap: 6, marginBottom: 6, flexWrap: 'wrap' }}>
-          {photos.length > 0 && <span style={{ ...mono, fontSize: 8, border: '1px solid var(--vp-ghost, #ddd)', padding: '1px 5px' }}>{isListingDay ? `PHOTOS ${photos.length}${(listingOfDay?.photos.publishedWithListing ?? 0) > photos.length ? ` OF ${listingOfDay!.photos.publishedWithListing}` : ''} · PUBLISHED WITH THE LISTING${auctions.length > 1 && listingOfDay?.lotNumber ? ` (LOT ${listingOfDay.lotNumber})` : ''}` : `PHOTOS ${photos.length}`}</span>}
+          {photos.length > 0 && <span style={{ ...mono, fontSize: 8, border: '1px solid var(--vp-ghost, #ddd)', padding: '1px 5px' }}>{isListingDay ? `PHOTOS ${photos.length}${(listingOfDay?.photos.publishedWithListing ?? 0) > photos.length ? ` OF ${listingOfDay!.photos.publishedWithListing} GROUPED IN TIMELINE READ` : ''} · LISTING ASSOCIATION INFERRED${auctions.length > 1 && listingOfDay?.lotNumber ? ` (LOT ${listingOfDay.lotNumber})` : ''}` : `PHOTOS ${photos.length}`}</span>}
           {dayBids > 0 && <span style={{ ...mono, fontSize: 8, border: '1px solid var(--vp-ghost, #ddd)', padding: '1px 5px' }}>BIDS {dayBids}</span>}
           {dayComments > 0 && <span style={{ ...mono, fontSize: 8, border: '1px solid var(--vp-ghost, #ddd)', padding: '1px 5px' }}>COMMENTS {dayComments}</span>}
           {workEvents.length > 0 && <span style={{ ...mono, fontSize: 8, border: '1px solid var(--vp-ghost, #ddd)', padding: '1px 5px' }}>WORK {workEvents.length}</span>}
@@ -295,7 +295,7 @@ const VehicleDayDrawer: React.FC<VehicleDayDrawerProps> = ({ date, auctions = []
             <button
               key={p.id}
               onClick={() => openVehiclePhoto(p.id)}
-              title={isListingDay ? 'published with the listing — no capture time' : fmtTime(p.taken_at)}
+              title={isListingDay ? 'listing association inferred; capture and publication times unknown' : fmtTime(p.taken_at)}
               style={{ display: 'block', padding: 0, border: '1px solid var(--vp-ghost, #ddd)', background: 'var(--vp-row-alt, #f9f9f9)', cursor: 'pointer', aspectRatio: '1 / 1', overflow: 'hidden' }}
             >
               <img

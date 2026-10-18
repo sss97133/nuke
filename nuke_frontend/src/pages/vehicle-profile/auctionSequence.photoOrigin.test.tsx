@@ -126,7 +126,7 @@ async function chooseLot(key: string) {
   await act(async () => { select.value = key; select.dispatchEvent(new Event('change', { bubbles: true })); });
   await act(async () => { await vi.advanceTimersByTimeAsync(10); });
 }
-const listingPhoto = { src: 'https://images.test/synthetic-source-photo.jpg', title: 'published with the listing — no capture time' };
+const listingPhoto = { src: 'https://images.test/synthetic-source-photo.jpg', title: 'listing association inferred; capture and publication times unknown' };
 
 it.each(foreignPhotos)('keeps actual external capture %s on its capture day instead of publishing it with a BaT lot', async url => {
   photos = [photo(url)]; await draw();
@@ -134,7 +134,7 @@ it.each(foreignPhotos)('keeps actual external capture %s on its capture day inst
   const olderPhotos = await openDay(olderDay);
   const capturedPhotos = host.querySelector(`.hm-c[data-date="${captureDay}"]`) ? await openDay(captureDay) : null;
   expect({ captureTitle, olderTitle, olderPhotos, capturedPhotos }).toEqual({ captureTitle: expect.stringContaining('1 photos'),
-    olderTitle: expect.not.stringContaining('photos published'), olderPhotos: [], capturedPhotos: [{ src: listingPhoto.src, title: expect.not.stringContaining('published with the listing') }] });
+    olderTitle: expect.not.stringContaining('images grouped with listing'), olderPhotos: [], capturedPhotos: [{ src: listingPhoto.src, title: expect.not.stringContaining('listing association inferred') }] });
 });
 it.each([
   ...foreignPhotos.map(url => ({ url, source: 'bat_import' })),
@@ -145,14 +145,14 @@ it.each([
   await chooseLot('synthetic-independent-september'); const olderCaption = host.querySelector('.auction-band')!.textContent;
   const olderPhotos = await openDay(olderDay); await chooseLot('synthetic-independent-december'); const newerPhotos = await openDay(newerDay);
   expect({ newerCaption, olderCaption, olderPhotos, newerPhotos }).toEqual({ newerCaption: expect.stringContaining('listing attribution incomplete'),
-    olderCaption: expect.not.stringContaining('listing photos'), olderPhotos: [], newerPhotos: [listingPhoto] });
+    olderCaption: expect.not.stringContaining('Grouped image records:'), olderPhotos: [], newerPhotos: [listingPhoto] });
 });
 it.each([nativePhoto, 'http://www.bringatrailer.com/wp-content/uploads/2026/09/synthetic.jpg?x=1#image',
   'bringatrailer.com/wp-content/uploads/2026/09/synthetic.jpg', '//bringatrailer.com/wp-content/uploads/2026/09/synthetic.jpg',
   'https://photos.bringatrailer.com/wp-content/uploads/2026/09/synthetic.jpg',
 ])('keeps native photo URL %s with its trusted month and hides its import stamp', async url => {
   photos = [photo(url)]; await draw(); expect(cellTitle(captureDay) ?? '').not.toContain('1 photos');
-  await chooseLot('synthetic-independent-september'); expect(host.querySelector('.auction-band')!.textContent).toContain('1 listing photos');
+  await chooseLot('synthetic-independent-september'); expect(host.querySelector('.auction-band')!.textContent).toContain('Grouped image records: 1 · listing association inferred · capture and publication times unknown');
   expect(host.querySelector('.auction-band')!.textContent).not.toContain('listing attribution incomplete');
   expect(await openDay(olderDay)).toEqual([listingPhoto]);
 });
@@ -166,7 +166,7 @@ it('keeps native known-source handling when its recorded stamp is an import time
 });
 it('retains an ordinary non-native captured photo and its useful cache', async () => {
   photos = [photo('https://images.test/owner-photo.jpg')]; await draw(); expect(cellTitle(captureDay)).toContain('1 photos');
-  const first = await openDay(captureDay); expect(first).toHaveLength(1); expect(first[0].title).not.toContain('published with the listing');
+  const first = await openDay(captureDay); expect(first).toHaveLength(1); expect(first[0].title).not.toContain('listing association inferred');
   await act(async () => host.querySelector<HTMLButtonElement>('[aria-label="Close day"]')!.click());
   expect(await openDay(captureDay)).toEqual(first);
   expect(reads.filter(r => r.url.pathname.endsWith('/vehicle_images') && r.url.searchParams.has('taken_at'))).toHaveLength(1);
