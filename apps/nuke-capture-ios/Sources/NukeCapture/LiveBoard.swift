@@ -29,6 +29,7 @@ struct LiveAuction: Decodable, Identifiable {
     /// Parsed once at decode time: the list sorts on it, and parsing an ISO string per
     /// comparison cost about 100 ms of main thread per evaluation over 1,100 lots.
     let endsAtDate: Date?
+    let listedAtDate: Date?
     /// The expected-price band (positions 12 to 16) from comparable BaT sales on the lot's model
     /// page (scripts/market/live-bands.mjs), present only when p10, p50 and p90 all came, as
     /// useMarketPulse.ts maps it. The web renders it inside the heat reading, not as a graded
@@ -83,6 +84,7 @@ struct LiveAuction: Decodable, Identifiable {
         let p10 = num(), p50 = num(), p90 = num(), tier = str(), comps = int()
         if let p10, let p50, let p90 { band = Band(p10: p10, p50: p50, p90: p90, tier: tier ?? "", comps: comps ?? 0) } else { band = nil }
         endsAtDate = ProfileClock.date(endsAt)
+        listedAtDate = ProfileClock.date(listedAt)
     }
 
     // ─── Hot / cold: the bid against where comparable sales usually sit at this point in the
@@ -969,6 +971,36 @@ struct SourceLandingDetail: Equatable {
     }
 }
 
+/// The web Market's windows and ordering, evaluated against the same open-lot population.
+enum LiveAuctionWindow: String, CaseIterable, Identifiable {
+    case all = "Live lots", noReserve = "No reserve", hour = "Ending in 1 h"
+    case day = "Ending in 24 h", new = "New in 24 h"
+    var id: String { rawValue }
+
+    func includes(_ lot: LiveAuction, at now: Date) -> Bool {
+        switch self {
+        case .all: return true
+        case .noReserve: return lot.noReserve
+        case .hour: return lot.endsAtDate.map { $0.timeIntervalSince(now) < 3600 } ?? false
+        case .day: return lot.endsAtDate.map { $0.timeIntervalSince(now) < 86400 } ?? false
+        case .new: return lot.listedAtDate.map { now.timeIntervalSince($0) < 86400 } ?? false
+        }
+    }
+}
+
+enum LiveAuctionOrder: String, CaseIterable, Identifiable {
+    case ending = "Ending first", bid = "Highest bid", newest = "Newest"
+    var id: String { rawValue }
+
+    func sorted(_ lots: [LiveAuction]) -> [LiveAuction] {
+        switch self {
+        case .ending: return lots.sorted { ($0.endsAtDate ?? .distantFuture) < ($1.endsAtDate ?? .distantFuture) }
+        case .bid: return lots.sorted { ($0.currentBid ?? 0) > ($1.currentBid ?? 0) }
+        case .newest: return lots.sorted { ($0.listedAtDate ?? .distantPast) > ($1.listedAtDate ?? .distantPast) }
+        }
+    }
+}
+
 /// The board as a list ending soonest first, refetched every minute as on the web.
 struct LiveBoardView: View {
     enum SubLens: String, CaseIterable, Identifiable {
@@ -997,6 +1029,8 @@ struct LiveBoardView: View {
         return nil
     }()
     @State private var filterDecade: String? = nil
+    @State private var auctionWindow: LiveAuctionWindow = .all
+    @State private var auctionOrder: LiveAuctionOrder = .ending
 
     /// The clock the board is read against; set when a read lands so one evaluation shares it.
     @State private var now = Date()
@@ -1004,11 +1038,14 @@ struct LiveBoardView: View {
     /// The web's population: lots still open now (`endsAt > now`), ending soonest first.
     private var openLots: [LiveAuction] { board?.open(at: now) ?? [] }
 
-    private var lots: [LiveAuction] {
+    private var scopedLots: [LiveAuction] {
         openLots
             .filter { filterMake == nil || LiveInventory.make($0) == filterMake }
             .filter { filterDecade == nil || LiveInventory.decade($0) == filterDecade }
-            .sorted { ($0.endsAtDate ?? .distantFuture) < ($1.endsAtDate ?? .distantFuture) }
+    }
+
+    private var lots: [LiveAuction] {
+        auctionOrder.sorted(scopedLots.filter { auctionWindow.includes($0, at: now) })
     }
 
     private var filterLine: String? {
@@ -1067,6 +1104,28 @@ struct LiveBoardView: View {
 
                     switch subLens {
                     case .live:
+                        Section {
+                            HStack {
+                                Picker("Auction window", selection: $auctionWindow) {
+                                    ForEach(LiveAuctionWindow.allCases.filter { window in
+                                        window == .all || window == auctionWindow || scopedLots.contains(where: { window.includes($0, at: now) })
+                                    }) { window in
+                                        Text("\(window.rawValue) (\(scopedLots.filter { window.includes($0, at: now) }.count))").tag(window)
+                                    }
+                                }
+                                .pickerStyle(.menu)
+                                Spacer(minLength: 4)
+                                Picker("Sort auctions", selection: $auctionOrder) {
+                                    ForEach(LiveAuctionOrder.allCases) { order in
+                                        Text(order.rawValue).tag(order)
+                                    }
+                                }
+                                .pickerStyle(.menu)
+                            }
+                            .font(.caption)
+                            Text("\(lots.count.formatted()) of \(scopedLots.count.formatted()) open lots in this selection")
+                                .font(.caption2.monospaced()).foregroundStyle(.secondary)
+                        }
                         // The board drawn as the web draws it: brands as boxes, decades inside.
                         Section {
                             LiveInventoryMapView(lots: openLots) { make, decade in
@@ -1105,7 +1164,7 @@ struct LiveBoardView: View {
                             }
                         } header: {
                             HStack {
-                                Text(filterMake == nil ? "Ending soonest" : "Ending soonest in the selection")
+                                Text(auctionOrder.rawValue)
                                     .font(.caption2.monospaced())
                                     .textCase(nil)
                                 Spacer(minLength: 4)

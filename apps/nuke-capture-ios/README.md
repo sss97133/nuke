@@ -74,9 +74,15 @@ Standing rules the code carries:
   `device_create_vehicle_profile`, which resolves an existing vehicle first and creates a private profile, with the
   owner as photographer and not as owner, only when the server's thresholds hold. A session inheritance (same day,
   same ~100 m cell) stays a suggestion: a dealer lot holds many cars. Nothing in the app writes `vehicle_id` directly.
-  Confirming one at a time is unrealistic at the owner's volume (owner, 2026-10-17): `SessionConfirmView` files a
-  session to its server suggestion (`get_orphan_sessions.suggested_vehicle_id`) with one tap, or all suggested at once,
-  and `WorkDaySignView` signs every loaded day, or every day for one vehicle, in one `confirm_work_sessions_bulk` call.
+  Confirming one at a time is unrealistic at the owner's volume (owner, 2026-10-17): `SessionConfirmView` files
+  photo-backed serial matches to its server suggestion (`get_orphan_sessions.suggested_vehicle_id`) with one tap, or
+  across all suggested sessions at once. A session is a day/place review group and can contain several vehicles;
+  quick/bulk filing never treats its day-level fallback as evidence for every photo. Remaining photos stay in review,
+  and manual filing requires selecting the source photos before choosing a vehicle (60 owner-scoped references per page).
+  `WorkDaySignView` signs every loaded day, or every day for one vehicle, in one `confirm_work_sessions_bulk` call.
+  Every pixel-uploading sync pass also runs metadata-only album filing, after the album catalog finishes loading.
+  Album-name fallback collapses whitespace and preserves competing mappings. A failed evidence read stops filing;
+  a profile request counts only photos acknowledged as filed or already filed in the server's receipt.
 - **A relation is a weight, not a status.** Owner direction, 2026-10-15: "active cant be a hard code like it is. its
   a weight. a relation goes dormant immediately after one day if not maintained by contribution. even within 24hr can
   stall." The app never shows a membership's `status` as ACTIVE. It shows the state the server cuts from
