@@ -84,6 +84,9 @@ test('scorecard and candidates: tallies per house; comment counts read the lot t
   const c = candidates({ v: {}, comments: { bid: 14, non_bid: 20 } });
   assert.equal(c.comment_count[0].value, 20);
   assert.equal(c.bid_count[0].value, 14);
+  const live = candidates({ v: { origin_metadata: { currency: 'EUR' } }, ma: { bid_count: 36, stream_state: { currency: 'EUR' } } });
+  assert.equal(gradeField('bid_count', 36, live.bid_count).at, 'monitored_auctions.bid_count');
+  assert.equal(gradeField('currency', 'EUR', live.currency).verdict, 'pass');
   const s = scorecard([{ house: 'bat', resolved: true, fields: { year: { verdict: 'pass' }, vin: { verdict: 'wrong' } } }]);
   assert.deepEqual(s.bat.totals, { pass: 1, wrong: 1, missing: 0, stale: 0 });
 });
