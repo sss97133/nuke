@@ -22,7 +22,7 @@ describe('the ledger map legend measure', () => {
     const legend = mapLegend('brands');
     expect(legend).toContain('box size = dollars from confirmed sales');
     expect(legend).toContain('of offered sold = share of cars offered at auction that sold');
-    expect(legend).toContain('12 mo = sales and dollars in the last 12 months against the 12 before, measured at auction houses held in full both years (today Bring a Trailer)');
+    expect(legend).toContain('12 mo = sales and dollars in the last 12 months against the 12 before, measured at auction houses held in full both years (today Bring a Trailer, Mecum and Bonhams)');
     expect(legend).toContain('prices not adjusted for inflation');
     expect(legend).not.toMatch(/nominal|area =/);
     expect(legend).toContain('gray: the measured houses hold under half the sales, or too few a year earlier');

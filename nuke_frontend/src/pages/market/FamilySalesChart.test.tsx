@@ -5,7 +5,25 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const fixture = vi.hoisted(() => ({ rpc: vi.fn() }));
 vi.mock('../../lib/supabase', () => ({ supabase: { rpc: fixture.rpc } }));
-import FamilySalesChart, { batMove, eraMoves, eraOf, logTicks, mixFixed, parseFamilySales, quantile, rollingBand, rollingMedian, venueOf, type Sale } from './FamilySalesChart';
+import FamilySalesChart, {
+  batMove,
+  computeFacetDistributionSummary,
+  deriveSaleSubModel,
+  deriveSaleTooltipFacets,
+  eraMoves,
+  eraOf,
+  filterSalesBySubModel,
+  inferActiveFacetAxis,
+  logTicks,
+  mixFixed,
+  parseFamilySales,
+  quantile,
+  resolveSaleIdentityMark,
+  rollingBand,
+  rollingMedian,
+  venueOf,
+  type Sale,
+} from './FamilySalesChart';
 
 const DAY = 86_400_000;
 const now = Date.now();
@@ -220,4 +238,393 @@ it('keeps the segment chips when at least two carry a number, and says what the 
   await act(async () => root.render(<FamilySalesChart brand="Chevrolet" familyKey="vette" family="Corvette" width={900} height={500} onOpen={() => {}} />));
   expect([...container.querySelectorAll('.family-index__chip')].map((c) => c.textContent)).toEqual(['C2 1963–67 ▲5%', 'C8 2020+ ▼11%', 'C5 1997–2004 too few']);
   expect(container.querySelector('.family-index__evidence')?.textContent).toMatch(/plain median said ▼\d+%/);
+});
+
+it('renders automotive generation cohort pills and scopes plotted sales when an era is selected', async () => {
+  const mk = (i: number, ago: number, usd: number, year: number): Sale =>
+    ({ vehicle_id: `00000000-0000-4000-8000-${String(i).padStart(12, '0')}`, sale_date: day(ago), usd, source: 'Bring a Trailer', year, model: 'Mustang' });
+  const sales: Sale[] = [
+    ...Array.from({ length: 10 }, (_, k) => mk(k + 1, 15 + k * 10, 45_000 + k * 500, 1967)),
+    ...Array.from({ length: 8 }, (_, k) => mk(k + 20, 20 + k * 10, 22_000 + k * 500, 1989)),
+  ];
+  const onSelectEra = vi.fn();
+  fixture.rpc.mockResolvedValue({ data: value(sales), error: null });
+  await act(async () => root.render(
+    <FamilySalesChart brand="Ford" familyKey="mustang" family="Mustang" width={900} height={500} onOpen={() => {}} selectedEra={null} onSelectEra={onSelectEra} />,
+  ));
+  const eraBtns = [...container.querySelectorAll('button.family-sales__era')];
+  expect(eraBtns.map((b) => b.textContent)).toEqual([
+    'All eras',
+    "1st Gen '64–'73 (10)",
+    "Fox Body '79–'93 (8)",
+  ]);
+  expect(container.querySelectorAll('svg.family-sales__plot circle')).toHaveLength(18);
+  await act(async () => (eraBtns[2] as HTMLButtonElement).click());
+  expect(onSelectEra).toHaveBeenCalledWith('1979-1993');
+
+  await act(async () => root.render(
+    <FamilySalesChart brand="Ford" familyKey="mustang" family="Mustang" width={900} height={500} onOpen={() => {}} selectedEra="1979-1993" onSelectEra={onSelectEra} />,
+  ));
+  expect(container.querySelectorAll('svg.family-sales__plot circle')).toHaveLength(8);
+});
+
+it('reserves vertical headroom for multi-row index chips and generation pills so panels never overlap the header or legend', async () => {
+  const mk = (i: number, ago: number, usd: number, year: number): Sale =>
+    ({ vehicle_id: `00000000-0000-4000-8000-${String(i).padStart(12, '0')}`, sale_date: day(ago), usd, source: 'Bring a Trailer', year, model: 'Mustang' });
+  const sales: Sale[] = [
+    ...Array.from({ length: 10 }, (_, k) => mk(k + 1, 15 + k * 10, 45_000 + k * 500, 1967)),
+    ...Array.from({ length: 10 }, (_, k) => mk(k + 20, 20 + k * 10, 32_000 + k * 500, 1972)),
+    ...Array.from({ length: 10 }, (_, k) => mk(k + 40, 25 + k * 10, 22_000 + k * 500, 1989)),
+    ...Array.from({ length: 10 }, (_, k) => mk(k + 60, 30 + k * 10, 25_000 + k * 500, 1998)),
+    ...Array.from({ length: 10 }, (_, k) => mk(k + 80, 35 + k * 10, 30_000 + k * 500, 2008)),
+  ];
+  const index = {
+    period_kind: 'month',
+    fitted_at: '2026-10-16T11:20:00Z',
+    stale: false,
+    counts: { n_last12: 1820, n_prior12: 1626, n_total: 7157 },
+    change: {
+      verdict: 'up',
+      change_12m: 0.0388,
+      lo: 0.0129,
+      hi: 0.0654,
+      n_last12: 1820,
+      n_prior12: 1626,
+      chips: [
+        { key: 's197', label: 'S197 2005–14', change: 0.0257, lo: -0.0212, hi: 0.0747, n_last12: 362, n_prior12: 337, verdict: 'flat' },
+        { key: 'g1-64-66', label: '1964½–66', change: 0.0139, lo: -0.0333, hi: 0.0635, n_last12: 329, n_prior12: 299, verdict: 'flat' },
+        { key: 'sn95', label: 'SN95 1994–2004', change: 0.087, lo: 0.0177, hi: 0.161, n_last12: 171, n_prior12: 172, verdict: 'up' },
+        { key: 's550', label: 'S550 2015–23', change: null, lo: null, hi: null, n_last12: 255, n_prior12: 212, verdict: 'too few to tell' },
+        { key: 'fox', label: 'Fox 1979–93', change: null, lo: null, hi: null, n_last12: 239, n_prior12: 202, verdict: 'too few to tell' },
+        { key: 's650', label: 'S650 2024+', change: null, lo: null, hi: null, n_last12: 19, n_prior12: 12, verdict: 'too few to tell' },
+      ],
+    },
+    series: [],
+  };
+  fixture.rpc.mockImplementation((fn: string) =>
+    Promise.resolve(fn === 'treemap_family_sales' ? { data: value(sales), error: null }
+      : fn === 'family_price_index_read' ? { data: index, error: null }
+      : { data: null, error: { message: 'none' } }),
+  );
+  await act(async () => root.render(
+    <FamilySalesChart brand="Ford" familyKey="mustang" family="Mustang" width={1000} height={420} onOpen={() => {}} selectedEra={null} onSelectEra={() => {}} />,
+  ));
+  const rootEl = container.querySelector('.family-sales')!;
+  expect([...rootEl.children].map((el) => el.className)).toEqual([
+    'family-sales__head',
+    'family-sales__legend',
+    'family-sales__panels',
+  ]);
+  const plotEl = container.querySelector('svg.family-sales__plot')!;
+  // With 2 rows of panels in a 420px container and extra headroom for chips + eras (92 + 44 + 28 = 164),
+  // each panel height is floor((420 - 164 - 6) / 2) = 125 (< 161 without headroom).
+  expect(Number(plotEl.getAttribute('height'))).toBe(125);
+});
+
+it('renders upcoming supply strip and right-edge Model 33 finish-estimate bands when treemap_family_upcoming_supply returns live lots', async () => {
+  const sales = [1, 2, 3, 4, 5, 6].map((i) => sale(i, 20 * i, 100000 + i * 1000, 'Bring a Trailer'));
+  const supply = {
+    as_of: '2026-10-17T18:00:00Z',
+    brand: 'Porsche',
+    family_key: 'f911',
+    finish_model: 33,
+    finish_fresh: true,
+    counts: { bat_live: 2, auction_calendar: 3, facebook_marketplace: 1, total: 6 },
+    live_lots: [
+      {
+        vehicle_id: 'live-911-1',
+        year: 1995,
+        make: 'Porsche',
+        model: '911 Carrera',
+        title: '1995 Porsche 911 Carrera',
+        current_bid: 82000,
+        ends_at: '2026-10-19T20:00:00Z',
+        source_url: 'https://bringatrailer.com/listing/1995-porsche-911-carrera/',
+        no_reserve: true,
+        band_p10: 90000,
+        band_p50: 112000,
+        band_p90: 138000,
+        finish_estimate: 118000,
+        finish_low: 96000,
+        finish_high: 142000,
+        finish_grade: 'A',
+        finish_model: 33,
+      },
+    ],
+    calendar_lots: [],
+    classified_lots: [],
+  };
+  const onOpen = vi.fn();
+  fixture.rpc.mockImplementation((fn: string) => {
+    if (fn === 'treemap_family_sales') return Promise.resolve({ data: value(sales), error: null });
+    if (fn === 'treemap_family_upcoming_supply') return Promise.resolve({ data: supply, error: null });
+    return Promise.resolve({ data: null, error: { message: 'none' } });
+  });
+  await act(async () => root.render(<FamilySalesChart brand="Porsche" familyKey="f911" family="911" width={900} height={500} onOpen={onOpen} />));
+  const supplyStrip = container.querySelector('.family-sales__supply');
+  expect(supplyStrip).not.toBeNull();
+  expect(supplyStrip?.textContent).toContain('UPCOMING 1');
+  expect(supplyStrip?.textContent).toContain('1 BaT live · M33');
+  expect(supplyStrip?.textContent).toContain('→ est $118K ($96K–$142K)');
+  expect(container.querySelectorAll('g.family-sales__live-whisker')).toHaveLength(1);
+  expect(container.querySelector('line.family-sales__live-band')).not.toBeNull();
+  expect(container.querySelector('path.family-sales__live-diamond')).not.toBeNull();
+  const chip = container.querySelector('button.family-sales__supply-chip') as HTMLButtonElement;
+  await act(async () => chip.click());
+  expect(onOpen).toHaveBeenCalledWith('live-911-1');
+});
+
+it('filters to exact sub-model sales when selecting the base sub-model ("Mustang") rather than matching every "Mustang *" variant', () => {
+  const rows = [
+    { model: 'Mustang', id: 1 },
+    { model: 'Mustang', id: 2 },
+    { model: 'Mustang Mach 1', id: 3 },
+    { model: 'Mustang Boss 429', id: 4 },
+    { model: 'Shelby GT500', id: 5 },
+  ];
+  expect(filterSalesBySubModel(rows, 'Mustang').map((r) => r.id)).toEqual([1, 2]);
+  // Prefix fallback still works when a query string has no exact sub-model match
+  expect(filterSalesBySubModel(rows, 'Mustang Boss').map((r) => r.id)).toEqual([4]);
+});
+
+describe('sale dot tooltip facets and period SVG identity marks', () => {
+  it('derives raw, series, trim, and body sub-models via deriveSaleSubModel and keeps only facets distinct from raw', () => {
+    const c10Sale: Sale = {
+      vehicle_id: 'veh-c10-cheyenne-76',
+      sale_date: day(15),
+      usd: 46500,
+      source: 'Bring a Trailer',
+      year: 1976,
+      model: 'C10 · 1976 Chevrolet C10 Cheyenne Fleetside Short Bed',
+    };
+    const ctx = { brand: 'Chevrolet', family: 'Pickup' };
+
+    expect(deriveSaleSubModel(c10Sale, 'raw', ctx)).toBe('C10');
+    expect(deriveSaleSubModel(c10Sale, 'series', ctx)).toBe('C10 (1/2-Ton 2WD)');
+    expect(deriveSaleSubModel(c10Sale, 'trim', ctx)).toBe('Cheyenne');
+    expect(deriveSaleSubModel(c10Sale, 'body', ctx)).toBe('Fleetside / Styleside');
+
+    const tipFacets = deriveSaleTooltipFacets(c10Sale, ctx);
+    expect(tipFacets.rawSubModel).toBe('C10');
+    expect(tipFacets.pills).toEqual([
+      { axis: 'series', axisLabel: 'SERIES', value: 'C10 (1/2-Ton 2WD)' },
+      { axis: 'trim', axisLabel: 'TRIM', value: 'Cheyenne' },
+      { axis: 'body', axisLabel: 'BODY', value: 'Fleetside / Styleside' },
+    ]);
+    expect(tipFacets.identityMark?.id).toBe('chevy-cheyenne-10-73-81');
+    expect(tipFacets.badgeSvg).toContain('CHEYENNE');
+
+    // When a sale's derived facet on an axis equals raw (e.g. "911 Carrera"), it is omitted from pills
+    const carreraSale: Sale = {
+      vehicle_id: 'veh-911-carrera-90',
+      sale_date: day(20),
+      usd: 98000,
+      source: 'Bring a Trailer',
+      year: 1990,
+      model: '911 Carrera',
+    };
+    const carreraFacets = deriveSaleTooltipFacets(carreraSale, { brand: 'Porsche', family: '911' });
+    expect(carreraFacets.rawSubModel).toBe('911 Carrera');
+    expect(carreraFacets.pills).toEqual([]);
+    expect(resolveSaleIdentityMark(carreraSale, { brand: 'Porsche', family: '911' })?.id).toBe(
+      'porsche-stuttgart-crest',
+    );
+  });
+
+  it('enriches the hovered sale dot tooltip card with SERIES, TRIM, and BODY facet pills and period SVG identity mark', async () => {
+    const sales: Sale[] = [
+      {
+        vehicle_id: 'veh-k10-cheyenne-super-74',
+        sale_date: day(12),
+        usd: 68500,
+        source: 'Bring a Trailer',
+        year: 1974,
+        model: 'K10 · 1974 Chevrolet K10 Cheyenne Super Stepside',
+      },
+      ...[1, 2, 3, 4, 5, 6, 7].map((i) => ({
+        vehicle_id: `veh-c10-${i}`,
+        sale_date: day(30 * i),
+        usd: 32000 + i * 1500,
+        source: 'Bring a Trailer',
+        year: 1976,
+        model: 'C10 Silverado Fleetside',
+      })),
+    ];
+
+    fixture.rpc.mockResolvedValue({ data: value(sales), error: null });
+    await act(async () =>
+      root.render(
+        <FamilySalesChart
+          brand="Chevrolet"
+          familyKey="Pickup"
+          family="Pickup"
+          width={900}
+          height={500}
+          onOpen={() => {}}
+        />,
+      ),
+    );
+
+    const targetCircle = container.querySelector<SVGCircleElement>(
+      'circle[data-vehicle-id="veh-k10-cheyenne-super-74"]',
+    );
+    expect(targetCircle).not.toBeNull();
+
+    const cx = Number(targetCircle!.getAttribute('cx'));
+    const cy = Number(targetCircle!.getAttribute('cy'));
+    const plotSvg = container.querySelector<SVGSVGElement>('svg.family-sales__plot')!;
+
+    await act(async () => {
+      plotSvg.dispatchEvent(
+        new MouseEvent('mousemove', { bubbles: true, clientX: cx, clientY: cy }),
+      );
+    });
+
+    const tooltip = container.querySelector('[data-testid="family-sales-tooltip"]');
+    expect(tooltip).not.toBeNull();
+    expect(tooltip?.textContent).toContain('1974 K10');
+    expect(tooltip?.textContent).toContain('$68,500');
+
+    const markEl = container.querySelector('[data-testid="family-sales-tip-mark"]');
+    expect(markEl).not.toBeNull();
+    expect(markEl?.getAttribute('data-mark-id')).toBe('chevy-cheyenne-super-10-73-74');
+    expect(markEl?.innerHTML).toContain('CHEYENNE');
+    expect(markEl?.innerHTML).toContain('SUPER');
+
+    const seriesPill = container.querySelector('[data-testid="family-sales-tip-facet-series"]');
+    const trimPill = container.querySelector('[data-testid="family-sales-tip-facet-trim"]');
+    const bodyPill = container.querySelector('[data-testid="family-sales-tip-facet-body"]');
+
+    expect(seriesPill?.textContent).toBe('SERIES · K10 (1/2-Ton 4x4)');
+    expect(trimPill?.textContent).toBe('TRIM · Cheyenne Super');
+    expect(bodyPill?.textContent).toBe('BODY · Stepside / Flareside');
+  });
+});
+
+describe('facet distribution summary strip in FamilySalesChart header bar', () => {
+  it('computes matched dot count, median sold price, and sold-through rate for the active facet cohort vs. the overall family cohort', () => {
+    const sales: Sale[] = [
+      { vehicle_id: 's1', sale_date: day(10), usd: 58000, source: 'Bring a Trailer', year: 1977, model: 'C10 Silverado Fleetside' },
+      { vehicle_id: 's2', sale_date: day(20), usd: 62000, source: 'Bring a Trailer', year: 1978, model: 'C10 Silverado Stepside' },
+      { vehicle_id: 's3', sale_date: day(30), usd: 66000, source: 'Mecum', year: 1979, model: 'K10 Silverado Short Bed' },
+      { vehicle_id: 'c1', sale_date: day(40), usd: 42000, source: 'Bring a Trailer', year: 1975, model: 'C10 Cheyenne Fleetside' },
+      { vehicle_id: 'c2', sale_date: day(50), usd: 44000, source: 'Bring a Trailer', year: 1976, model: 'C10 Cheyenne Stepside' },
+      { vehicle_id: 'd1', sale_date: day(60), usd: 28000, source: 'Mecum', year: 1974, model: 'C10 Custom Deluxe Long Bed' },
+      { vehicle_id: 'd2', sale_date: day(70), usd: 30000, source: 'Mecum', year: 1978, model: 'C20 Custom Deluxe Fleetside' },
+      { vehicle_id: 'd3', sale_date: day(80), usd: 32000, source: 'Bring a Trailer', year: 1980, model: 'C10 Scottsdale Fleetside' },
+    ];
+    const familyModels = [
+      { name: 'C10 Silverado', count: 30, sold_any: 27, offered: 30 }, // 90% sold-through
+      { name: 'C10 Cheyenne', count: 20, sold_any: 16, offered: 20 },  // 80% sold-through
+      { name: 'C10 Custom Deluxe', count: 30, sold_any: 21, offered: 30 }, // 70% sold-through
+      { name: 'C10 Scottsdale', count: 20, sold_any: 16, offered: 20 }, // 80% sold-through
+    ];
+
+    expect(inferActiveFacetAxis('Silverado', null, { brand: 'Chevrolet', family: 'Pickup' })).toBe('trim');
+    expect(inferActiveFacetAxis('C10 (1/2-Ton 2WD)', null, { brand: 'Chevrolet', family: 'Pickup' })).toBe('series');
+    expect(inferActiveFacetAxis('Stepside / Flareside', null, { brand: 'Chevrolet', family: 'Pickup' })).toBe('body');
+
+    const summary = computeFacetDistributionSummary({
+      allSales: sales,
+      brand: 'Chevrolet',
+      family: 'Pickup',
+      facetAxis: 'trim',
+      selectedFacet: 'Silverado',
+      familyModels,
+    });
+
+    expect(summary).not.toBeNull();
+    expect(summary?.axis).toBe('trim');
+    expect(summary?.axisLabel).toBe('TRIM');
+    expect(summary?.activeFacet).toBe('Silverado');
+    expect(summary?.matchedCount).toBe(3);
+    expect(summary?.familyCount).toBe(8);
+    expect(summary?.matchedMedianUsd).toBe(62000);
+    // Overall family sorted: [28k, 30k, 32k, 42k, 44k, 58k, 62k, 66k] -> p50 = 43000
+    expect(summary?.familyMedianUsd).toBe(43000);
+    expect(summary?.matchedSellThroughRate).toBeCloseTo(0.9, 5);
+    // Overall family outcomes: (27+16+21+16) / (30+20+30+20) = 80 / 100 = 0.80
+    expect(summary?.familySellThroughRate).toBeCloseTo(0.8, 5);
+  });
+
+  it('renders interactive facet cohort pills and compares active facet vs. family metrics in FamilySalesChart', async () => {
+    const sales: Sale[] = [
+      { vehicle_id: 's1', sale_date: day(10), usd: 58000, source: 'Bring a Trailer', year: 1977, model: 'C10 Silverado Fleetside' },
+      { vehicle_id: 's2', sale_date: day(20), usd: 62000, source: 'Bring a Trailer', year: 1978, model: 'C10 Silverado Stepside' },
+      { vehicle_id: 's3', sale_date: day(30), usd: 66000, source: 'Mecum', year: 1979, model: 'K10 Silverado Short Bed' },
+      { vehicle_id: 'c1', sale_date: day(40), usd: 42000, source: 'Bring a Trailer', year: 1975, model: 'C10 Cheyenne Fleetside' },
+      { vehicle_id: 'c2', sale_date: day(50), usd: 44000, source: 'Bring a Trailer', year: 1976, model: 'C10 Cheyenne Stepside' },
+      { vehicle_id: 'd1', sale_date: day(60), usd: 28000, source: 'Mecum', year: 1974, model: 'C10 Custom Deluxe Long Bed' },
+      { vehicle_id: 'd2', sale_date: day(70), usd: 30000, source: 'Mecum', year: 1978, model: 'C20 Custom Deluxe Fleetside' },
+      { vehicle_id: 'd3', sale_date: day(80), usd: 32000, source: 'Bring a Trailer', year: 1980, model: 'C10 Scottsdale Fleetside' },
+    ];
+    const familyModels = [
+      { name: 'C10 Silverado', count: 30, sold_any: 27, offered: 30 },
+      { name: 'C10 Cheyenne', count: 20, sold_any: 16, offered: 20 },
+      { name: 'C10 Custom Deluxe', count: 30, sold_any: 21, offered: 30 },
+      { name: 'C10 Scottsdale', count: 20, sold_any: 16, offered: 20 },
+    ];
+    const onSelectFacet = vi.fn();
+
+    fixture.rpc.mockResolvedValue({ data: value(sales), error: null });
+    await act(async () =>
+      root.render(
+        <FamilySalesChart
+          brand="Chevrolet"
+          familyKey="Pickup"
+          family="Pickup"
+          width={960}
+          height={520}
+          onOpen={() => {}}
+          facetAxis="trim"
+          selectedModel="Silverado"
+          familyModels={familyModels}
+          onSelectFacet={onSelectFacet}
+        />,
+      ),
+    );
+
+    const summaryEl = container.querySelector('[data-testid="family-sales-facet-summary"]');
+    expect(summaryEl).not.toBeNull();
+    expect(summaryEl?.getAttribute('data-facet-axis')).toBe('trim');
+
+    const badgeEl = container.querySelector('[data-testid="family-sales-facet-badge"]');
+    expect(badgeEl?.textContent).toBe('TRIM');
+
+    const activeEl = container.querySelector('[data-testid="family-sales-facet-active"]');
+    expect(activeEl?.textContent).toBe('Silverado');
+
+    const countsEl = container.querySelector('[data-testid="family-sales-facet-counts"]');
+    expect(countsEl?.textContent).toBe('3 of 8 dots (38%)');
+
+    const mediansEl = container.querySelector('[data-testid="family-sales-facet-medians"]');
+    expect(mediansEl?.textContent).toContain('median $62K vs $43K Pickup (▲44%)');
+
+    const sellThroughEl = container.querySelector('[data-testid="family-sales-facet-sellthrough"]');
+    expect(sellThroughEl?.textContent).toBe('90% vs 80% sold');
+
+    // Plotted dots are scoped to the 3 Silverado sales
+    expect(container.querySelectorAll('svg.family-sales__plot circle')).toHaveLength(3);
+
+    const silveradoPill = container.querySelector<HTMLButtonElement>(
+      '[data-testid="family-sales-facet-pill-Silverado"]',
+    );
+    const cheyennePill = container.querySelector<HTMLButtonElement>(
+      '[data-testid="family-sales-facet-pill-Cheyenne"]',
+    );
+    expect(silveradoPill?.getAttribute('aria-pressed')).toBe('true');
+    expect(cheyennePill?.getAttribute('aria-pressed')).toBe('false');
+
+    // Clicking another facet pill invokes onSelectFacet with that cohort
+    await act(async () => {
+      cheyennePill!.click();
+    });
+    expect(onSelectFacet).toHaveBeenLastCalledWith('Cheyenne');
+
+    // Clicking the active facet pill toggles back to null (all cohorts)
+    await act(async () => {
+      silveradoPill!.click();
+    });
+    expect(onSelectFacet).toHaveBeenLastCalledWith(null);
+  });
 });

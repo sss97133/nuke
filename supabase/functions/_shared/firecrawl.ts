@@ -281,6 +281,10 @@ async function firecrawlScrapeRaw(
  * firecrawl_spend_log, failures included, under the URL's source with the caller as its lane. A caller's own check (the
  * firecrawlAllowed hook of archiveFetch) may narrow this, never widen it.
  */
+export function scrapeCredits(request: FirecrawlScrapeRequest): number {
+  return request.extract || request.formats.some((f) => f === 'extract' || f === 'json') ? 5 : 1;
+}
+
 export async function firecrawlScrape(
   request: FirecrawlScrapeRequest,
   options: FirecrawlClientOptions = {}
@@ -304,10 +308,10 @@ export async function firecrawlScrape(
     result = await firecrawlScrapeRaw(request, options);
     return result;
   } finally {
-    // Success or failure, a scrape that was sent costs a credit.
+    // Success or failure, a scrape that was sent costs its credits: 1, or 5 with an LLM extract (extract or json format).
     await meterRecord(
       request.url,
-      1,
+      scrapeCredits(request),
       options.caller ?? 'firecrawlScrape',
       result ? `http=${result.httpStatus};attempts=${result.attempts};${result.success ? 'ok' : (result.error ?? 'failed').slice(0, 80)}` : 'threw',
       options.meterClient,

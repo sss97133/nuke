@@ -26,6 +26,20 @@ export interface Baseline { sold: number; prior: number; move: number }
 export const GATE_MIN = 20;
 export const STOPS = [-0.5, -1 / 3, -1 / 6, 0, 1 / 6, 1 / 3, 0.5] as const;
 
+export function gateMinForHorizon(horizon = '1y'): number {
+  switch (horizon) {
+    case 'upcoming': return 4;
+    case '1d': return 1;
+    case '1w': return 2;
+    case '1m': return 5;
+    case '3m': return 10;
+    case '6m': return 15;
+    case '1y': return GATE_MIN;
+    case '5y': return 30;
+    default: return GATE_MIN;
+  }
+}
+
 /** BaT's own move over the two years, summed over the tiles of one partition (the brands). */
 export function batBaseline(nodes: readonly MarketCounts[] | null | undefined): Baseline | null {
   let sold = 0;
@@ -40,12 +54,12 @@ export function batBaseline(nodes: readonly MarketCounts[] | null | undefined): 
 
 /** `allVenues`: the tile is sized by all venues' sales, so its BaT move stands for it only when BaT holds at least
  *  half of them; sized by BaT's own 12 months, the tile is BaT's and that test does not apply. */
-export function relativeMove(n: MarketCounts, base: Baseline | null, allVenues = false): Move {
+export function relativeMove(n: MarketCounts, base: Baseline | null, allVenues = false, gateMin = GATE_MIN): Move {
   if (n.sold_12m == null || n.sold_prior_12m == null || n.sold_12m + n.sold_prior_12m === 0) return { kind: 'none' };
   const sold = n.sold_12m;
   const prior = n.sold_prior_12m;
-  if (sold < GATE_MIN || prior < GATE_MIN) return { kind: 'few', sold, prior, why: 'count' };
-  if (allVenues && (!n.dated || n.dated < 0.5 * n.count)) return { kind: 'few', sold, prior, why: 'share' };
+  if (sold < gateMin || prior < gateMin) return { kind: 'few', sold, prior, why: 'count' };
+  if (allVenues && gateMin >= GATE_MIN && (!n.dated || n.dated < 0.5 * n.count)) return { kind: 'few', sold, prior, why: 'share' };
   const raw = sold / prior - 1;
   return { kind: 'move', raw, rel: base ? (1 + raw) / (1 + base.move) - 1 : raw, sold, prior };
 }
@@ -141,8 +155,12 @@ export function fitName(name: string, w: number, h: number, measure: (t: string)
  *  loss, and the largest tile's move. "Clear" is the movers' test: |ln(1 + move)| at least 2 standard errors
  *  (Poisson, sqrt(1/sold + 1/prior)). Each carries its counts; none is prose. */
 export interface Callout { kind: 'gain' | 'loss' | 'largest'; name: string; rel: number; sold: number; prior: number }
-export function callouts<T extends MarketCounts & { name: string; usd_12m?: number | null }>(nodes: readonly T[], base: Baseline | null): Callout[] {
-  const moved = nodes.map((n) => ({ n, m: relativeMove(n, base) }))
+export function callouts<T extends MarketCounts & { name: string; usd_12m?: number | null }>(
+  nodes: readonly T[],
+  base: Baseline | null,
+  gateMin = GATE_MIN,
+): Callout[] {
+  const moved = nodes.map((n) => ({ n, m: relativeMove(n, base, false, gateMin) }))
     .filter((x): x is { n: T; m: Extract<Move, { kind: 'move' }> } => x.m.kind === 'move');
   const clear = moved.filter(({ m }) => Math.abs(Math.log(1 + m.rel)) >= 2 * Math.sqrt(1 / m.sold + 1 / m.prior));
   const out: Callout[] = [];

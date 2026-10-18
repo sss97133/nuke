@@ -28,8 +28,8 @@ CREATE TABLE public.vehicles (
   is_public boolean NOT NULL DEFAULT true, deleted_at timestamptz,
   year integer, make text, model text, normalized_model text, series text, trim text,
   transmission text, transmission_model text, mileage integer, mileage_source text,
-  canonical_body_style text, body_style text, engine_size text, drivetrain text,
-  city text, state text, location text);
+  canonical_body_style text, body_style text, engine_size text, engine_type text, drivetrain text,
+  city text, state text, location text, listing_location text, bat_location text, discovery_url text);
 CREATE TABLE public.field_evidence (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(), vehicle_id uuid, field_name text, proposed_value text,
   source_type text, source_confidence integer, extracted_at timestamptz, status text);
@@ -87,6 +87,12 @@ GRANT SELECT ON ALL TABLES IN SCHEMA public TO anon, authenticated, service_role
 \ir ../migrations/20261013144500_vehicle_profile_read_acronyms.sql
 \ir ../migrations/20261013161500_vehicle_profile_read_timeline.sql
 \ir ../migrations/20261015070000_vehicle_profile_read_description.sql
+\ir ../migrations/20261018153000_era_emblems_and_family_facets.sql
+\ir ../migrations/20261018171500_mopar_european_identity_marks.sql
+\ir ../migrations/20261018174500_land_cruiser_porsche_blazer_pontiac_jaguar_marks.sql
+\ir ../migrations/20261018170000_vehicle_profile_read_facets_and_provenance.sql
+\ir ../migrations/20261018190000_vehicle_profile_read_identity_marks.sql
+\ir ../migrations/20261018193000_profile_read_masthead_identity_marks.sql
 
 -- Seeds. v1: the documented case; v2: nothing recorded; v3: a sourceless odometer; v4: private;
 -- v5: a classified asking price; v6: competing evidence; v7: a live auction bid.
@@ -105,6 +111,10 @@ INSERT INTO public.vehicles (id, year, make, model, engine_size) VALUES
 INSERT INTO public.vehicles (id, year, make, model) VALUES ('10000000-0000-0000-0000-000000000007', 1998, 'Acura', 'NSX');
 INSERT INTO public.vehicles (id, year, make, model, body_style, transmission) VALUES
  ('10000000-0000-0000-0000-000000000008', 1977, 'Chevrolet', 'K5 Blazer', 'SUV', 'AUTOMATIC 4WD');
+INSERT INTO public.vehicles (id, year, make, model, engine_type, listing_location, discovery_url) VALUES
+ ('10000000-0000-0000-0000-000000000009', 1970, 'Plymouth', 'Hemi Road Runner', '426 Hemi V-8', 'Kissimmee, FL', 'https://www.mecum.com/lots/539536/1970-plymouth-hemi-road-runner/');
+INSERT INTO public.vehicles (id, year, make, model, normalized_model, series, trim, body_style) VALUES
+ ('10000000-0000-0000-0000-000000000010', 1973, 'Chevrolet', 'K10 Cheyenne Super Stepside', 'C/K', 'K10', 'Cheyenne Super', 'Stepside');
 
 INSERT INTO public.field_evidence (vehicle_id, field_name, proposed_value, source_type, source_confidence, extracted_at, status) VALUES
  ('10000000-0000-0000-0000-000000000001', 'engine_size',  '4.7L V8',   'user-submission_listing', 80, '2026-09-01T00:00:00Z', 'accepted'),
@@ -128,7 +138,8 @@ INSERT INTO public.test_price_facts VALUES
  ('10000000-0000-0000-0000-000000000001', 'sold', 24000, '2026-09-21T00:00:00Z', false, 'bring-a-trailer', 'https://bringatrailer.com/listing/x'),
  ('10000000-0000-0000-0000-000000000003', 'estimate', 112200, '2026-09-21T00:00:00Z', false, 'user-submission', NULL),
  ('10000000-0000-0000-0000-000000000005', 'ask', 5000, '2026-10-01T00:00:00Z', false, 'ksl', 'https://classifieds.ksl.com/listing/1'),
- ('10000000-0000-0000-0000-000000000007', 'bid', 127777, NULL, true, 'bat', 'https://bringatrailer.com/listing/nsx');
+ ('10000000-0000-0000-0000-000000000007', 'bid', 127777, NULL, true, 'bat', 'https://bringatrailer.com/listing/nsx'),
+ ('10000000-0000-0000-0000-000000000009', 'sold', 313500, '2023-01-13T00:00:00Z', false, 'mecum', NULL);
 INSERT INTO public.ownership_verifications VALUES
  ('10000000-0000-0000-0000-000000000001', '20000000-0000-0000-0000-000000000003', 'approved', 'https://x/title.pdf', 'https://x/id.pdf'),
  ('10000000-0000-0000-0000-000000000001', '20000000-0000-0000-0000-000000000005', 'approved', 'pending', 'https://x/id.pdf');
@@ -219,6 +230,36 @@ BEGIN
   d := public.vehicle_profile_read('10000000-0000-0000-0000-000000000008');
   PERFORM public.t_assert((SELECT string_agg(x->>'label', '|' ORDER BY o) FROM jsonb_array_elements(d->'sections'->1->'facets') WITH ORDINALITY AS t(x, o))
     = 'SUV|Automatic 4WD', format('acronyms keep their capitals in title-cased labels; got %s', d->'sections'->1->'facets'));
+
+  d := public.vehicle_profile_read('10000000-0000-0000-0000-000000000009');
+  PERFORM public.t_assert((SELECT string_agg(x->>'label', '|' ORDER BY o) FROM jsonb_array_elements(d->'sections'->1->'facets') WITH ORDINALITY AS t(x, o))
+    = '426 Hemi V-8|Kissimmee, FL', format('engine_type and listing_location fallbacks populate strip facets; got %s', d->'sections'->1->'facets'));
+  PERFORM public.t_assert(d->'sections'->0->'price'->'source'->>'url' = 'https://www.mecum.com/lots/539536/1970-plymouth-hemi-road-runner/',
+    'price source url falls back to discovery_url when source_url is null');
+  PERFORM public.t_assert((SELECT string_agg(x->>'display_label', '|' ORDER BY o) FROM jsonb_array_elements(d->'sections'->0->'identity_marks') WITH ORDINALITY AS t(x, o))
+    = 'ROAD RUNNER · HEMI', format('v9 (1970 Plymouth Hemi Road Runner) masthead resolves Road Runner identity mark; got %s', d->'sections'->0->'identity_marks'));
+
+  d := public.vehicle_profile_read('10000000-0000-0000-0000-000000000001');
+  PERFORM public.t_assert((SELECT string_agg(x->>'display_label', '|' ORDER BY o) FROM jsonb_array_elements(d->'sections'->0->'identity_marks') WITH ORDINALITY AS t(x, o))
+    = 'HARDTOP COUPE|MUSTANG|FORD'
+    AND d->'sections'->0->'identity_marks' = d->'identity_marks',
+    format('v1 (1966 Ford Mustang Coupe) masthead resolves body silhouette, model wordmark, and marque emblem; got %s', d->'sections'->0->'identity_marks'));
+
+  d := public.vehicle_profile_read('10000000-0000-0000-0000-000000000006');
+  PERFORM public.t_assert((SELECT string_agg(x->>'display_label', '|' ORDER BY o) FROM jsonb_array_elements(d->'sections'->0->'identity_marks') WITH ORDINALITY AS t(x, o))
+    = 'MUSTANG|FORD', format('v6 (1966 Ford Mustang without body_style) masthead resolves model wordmark and marque emblem without inventing body silhouette; got %s', d->'sections'->0->'identity_marks'));
+
+  d := public.vehicle_profile_read('10000000-0000-0000-0000-000000000008');
+  PERFORM public.t_assert((SELECT string_agg(x->>'display_label', '|' ORDER BY o) FROM jsonb_array_elements(d->'sections'->0->'identity_marks') WITH ORDINALITY AS t(x, o))
+    = 'K/5 BLAZER · CHEYENNE|CHEVROLET', format('v8 (1977 Chevrolet K5 Blazer) masthead resolves K5 Blazer series badge and Squarebody Chevrolet bowtie; got %s', d->'sections'->0->'identity_marks'));
+
+  d := public.vehicle_profile_read('10000000-0000-0000-0000-000000000010');
+  PERFORM public.t_assert((SELECT string_agg(x->>'display_label', '|' ORDER BY o) FROM jsonb_array_elements(d->'sections'->0->'identity_marks') WITH ORDINALITY AS t(x, o))
+    = 'CHEYENNE SUPER 10|CHEVROLET', format('v10 (1973 Chevrolet K10 Cheyenne Super Stepside with normalized_model C/K, series K10, trim Cheyenne Super) masthead resolves CHEYENNE SUPER 10 and Squarebody Chevrolet bowtie; got %s', d->'sections'->0->'identity_marks'));
+
+  d := public.vehicle_profile_read('10000000-0000-0000-0000-000000000002');
+  PERFORM public.t_assert(d->'sections'->0->'identity_marks' = '[]'::jsonb AND d->'identity_marks' = '[]'::jsonb,
+    'v2 (1990 Acme Thing) resolves empty identity_marks array on masthead and root');
 END $$;
 RESET ROLE;
 

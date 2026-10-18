@@ -68,6 +68,11 @@ describe('isProfileRead', () => {
     const description = { text: 'Full prose.', length: 11, source: { kind: 'listing', url: 'https://bringatrailer.com/listing/x', method: 'html_description_capture' }, observed_at: '2026-10-01T00:00:00+00:00' };
     expect(isProfileRead({ ...read, description })).toBe(true);
     expect(isProfileRead({ ...read, description: null })).toBe(true);
+    expect(isProfileRead({ ...read, identity_marks: [{ brand: 'Ford', display_label: 'MUSTANG', mark_kind: 'model_wordmark' }] })).toBe(true);
+    expect(isProfileRead({
+      ...read,
+      sections: [{ ...read.sections[0], identity_marks: [{ brand: 'Ford', display_label: 'MUSTANG', mark_kind: 'model_wordmark' }] } as ProfileRead['sections'][number]],
+    })).toBe(true);
   });
   it('rejects anything the renderer could not trust', () => {
     expect(isProfileRead(null)).toBe(false);

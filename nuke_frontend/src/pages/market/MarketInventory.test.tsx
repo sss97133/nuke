@@ -94,7 +94,7 @@ it('opens the auction calendar as a third collection and clears a chosen sale wh
   expect(new URLSearchParams(window.location.search).get('sale')).toBeNull();
   expect(container.textContent).toContain('Existing BaT bid board');
 });
-it('carries no lens from one collection into another: only the page params and the new collection survive a switch', async () => {
+it('carries no lens from one collection into another: only the page params, vehicle scope, and the new collection survive a switch', async () => {
   const kept = () => [...new URLSearchParams(window.location.search).keys()].sort();
   await render('tab=market&force_treemap=1&collection=listings&source=ksl&near=1&sort=newest&radius=250');
   await act(async () => [...container.querySelectorAll('button')].find(b => b.textContent === 'BaT live auctions')!.click());
@@ -102,12 +102,13 @@ it('carries no lens from one collection into another: only the page params and t
   expect(new URLSearchParams(window.location.search).get('collection')).toBe('auctions');
   expect(container.textContent).toContain('Existing BaT bid board');
   await act(async () => root.unmount()); root = createRoot(container);
-  await render('tab=market&collection=auctions&live=1&bidRange=under10k&lot=retained-lot&sort=ending');
+  await render('tab=market&collection=auctions&make=Ford&family=8a8271f8-d299-4b55-837a-35ca919f8937&family_name=Mustang&era=1964-1973&live=1&bidRange=under10k&lot=retained-lot&sort=ending');
   await act(async () => [...container.querySelectorAll('button')].find(b => b.textContent === 'Calendar')!.click());
-  expect(kept()).toEqual(['collection', 'tab']);
+  expect(kept()).toEqual(['collection', 'era', 'family', 'family_name', 'make', 'tab']);
   await act(async () => [...container.querySelectorAll('button')].find(b => b.textContent === 'Classifieds')!.click());
-  expect(kept()).toEqual(['collection', 'tab']);
+  expect(kept()).toEqual(['collection', 'era', 'family', 'family_name', 'make', 'tab']);
   expect(new URLSearchParams(window.location.search).get('collection')).toBe('listings');
+  expect(container.textContent).toContain('Ford · Mustang · 1964–1973');
 });
 it('shows the retained source observation separately from admission and update clocks', async () => {
   const row = fixture.query.data.pages[0].items[0];

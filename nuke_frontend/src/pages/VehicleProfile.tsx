@@ -20,6 +20,7 @@ const VehicleOwnershipPanel = React.lazy(() => import('../components/ownership/V
 import { VehicleProfileProvider, useVehicleProfile } from './vehicle-profile/VehicleProfileContext';
 const WorkspaceContent = React.lazy(() => import('./vehicle-profile/WorkspaceContent'));
 const VehicleBanners = React.lazy(() => import('./vehicle-profile/VehicleBanners'));
+const VehicleBadgeBar = React.lazy(() => import('./vehicle-profile/VehicleBadgeBar'));
 const BarcodeTimeline = React.lazy(() => import('./vehicle-profile/BarcodeTimeline'));
 const VehicleBriefing = React.lazy(() => import('./vehicle-profile/VehicleBriefing'));
 const VehiclePerformance = React.lazy(() => import('./stacks/VehicleCohort').then(module => ({ default: module.VehiclePerformance })));
@@ -203,6 +204,7 @@ const VehicleProfileInner: React.FC = () => {
         )?.id} />
 
         <React.Suspense fallback={null}>
+          <VehicleBadgeBar />
           <VehiclePerformance key={vehicleId} vehicleId={vehicleId!} />
           <VehicleBriefing collapsed />
         </React.Suspense>

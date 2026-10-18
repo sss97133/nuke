@@ -24,11 +24,117 @@ enum ProfileViewer: String, Decodable {
     }
 }
 
+/// Optional broadcast / auction video moment for a sale claim (`kit/types.ts` #1823).
+struct SaleVideoMoment: Decodable, Equatable {
+    var url: String? = nil
+    var startSeconds: Int? = nil
+    var endSeconds: Int? = nil
+    var lotNumber: String? = nil
+    var auctionName: String? = nil
+    var searchQuery: String? = nil
+    var lotUrl: String? = nil
+    var title: String? = nil
+    var priceText: String? = nil
+    var imageUrl: String? = nil
+
+    private enum CodingKeys: String, CodingKey {
+        case url
+        case startSeconds, start_seconds
+        case endSeconds, end_seconds
+        case lotNumber, lot_number
+        case auctionName, auction_name
+        case searchQuery, search_query
+        case lotUrl, lot_url
+        case title
+        case priceText, price_text
+        case imageUrl, image_url
+    }
+
+    init(
+        url: String? = nil,
+        startSeconds: Int? = nil,
+        endSeconds: Int? = nil,
+        lotNumber: String? = nil,
+        auctionName: String? = nil,
+        searchQuery: String? = nil,
+        lotUrl: String? = nil,
+        title: String? = nil,
+        priceText: String? = nil,
+        imageUrl: String? = nil
+    ) {
+        self.url = url
+        self.startSeconds = startSeconds
+        self.endSeconds = endSeconds
+        self.lotNumber = lotNumber
+        self.auctionName = auctionName
+        self.searchQuery = searchQuery
+        self.lotUrl = lotUrl
+        self.title = title
+        self.priceText = priceText
+        self.imageUrl = imageUrl
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        self.url = try? c.decodeIfPresent(String.self, forKey: .url)
+        self.startSeconds = (try? c.decodeIfPresent(Int.self, forKey: .startSeconds))
+            ?? (try? c.decodeIfPresent(Int.self, forKey: .start_seconds))
+        self.endSeconds = (try? c.decodeIfPresent(Int.self, forKey: .endSeconds))
+            ?? (try? c.decodeIfPresent(Int.self, forKey: .end_seconds))
+        self.lotNumber = (try? c.decodeIfPresent(String.self, forKey: .lotNumber))
+            ?? (try? c.decodeIfPresent(String.self, forKey: .lot_number))
+        self.auctionName = (try? c.decodeIfPresent(String.self, forKey: .auctionName))
+            ?? (try? c.decodeIfPresent(String.self, forKey: .auction_name))
+        self.searchQuery = (try? c.decodeIfPresent(String.self, forKey: .searchQuery))
+            ?? (try? c.decodeIfPresent(String.self, forKey: .search_query))
+        self.lotUrl = (try? c.decodeIfPresent(String.self, forKey: .lotUrl))
+            ?? (try? c.decodeIfPresent(String.self, forKey: .lot_url))
+        self.title = try? c.decodeIfPresent(String.self, forKey: .title)
+        self.priceText = (try? c.decodeIfPresent(String.self, forKey: .priceText))
+            ?? (try? c.decodeIfPresent(String.self, forKey: .price_text))
+        self.imageUrl = (try? c.decodeIfPresent(String.self, forKey: .imageUrl))
+            ?? (try? c.decodeIfPresent(String.self, forKey: .image_url))
+    }
+
+    /// Formats `startSeconds` as `m:ss` or `h:mm:ss` (`Claim.tsx`).
+    var startLabel: String? {
+        guard let s = startSeconds, s >= 0 else { return nil }
+        let h = s / 3600
+        let m = (s % 3600) / 60
+        let sec = s % 60
+        if h > 0 { return String(format: "%d:%02d:%02d", h, m, sec) }
+        return String(format: "%d:%02d", m, sec)
+    }
+
+    /// Resolves a direct or YouTube watch URL (`https://www.youtube.com/watch?v=...&t=...`) when `url` is a URL or 11-char YouTube ID.
+    var watchableURL: URL? {
+        guard let raw = url?.trimmingCharacters(in: .whitespacesAndNewlines), !raw.isEmpty else { return nil }
+        if raw.lowercased().hasPrefix("http"), var comps = URLComponents(string: raw) {
+            if let s = startSeconds, s > 0, comps.host?.contains("youtube.com") == true || comps.host?.contains("youtu.be") == true {
+                var items = comps.queryItems ?? []
+                if !items.contains(where: { $0.name == "t" || $0.name == "start" }) {
+                    items.append(URLQueryItem(name: "t", value: "\(s)s"))
+                    comps.queryItems = items
+                }
+            }
+            return comps.url
+        }
+        // Bare 11-char YouTube video ID
+        let idChars = CharacterSet(charactersIn: "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789_-")
+        if raw.count == 11, raw.unicodeScalars.allSatisfy({ idChars.contains($0) }) {
+            var s = "https://www.youtube.com/watch?v=\(raw)"
+            if let start = startSeconds, start > 0 { s += "&t=\(start)s" }
+            return URL(string: s)
+        }
+        return nil
+    }
+}
+
 /// Where a claim came from: the evidence class, and a pointer at the evidence.
-struct ClaimSource: Decodable {
+struct ClaimSource: Decodable, Equatable {
     /// An evidence class the app does not know is read as the record (legacy), dim and open,
     /// never as a reason to drop the whole document.
-    enum Kind: String, Decodable {
+    enum Kind: String, Decodable, Equatable {
         case listing, owner, image, document, agent, model, legacy
         init(from decoder: Decoder) throws {
             let raw = try decoder.singleValueContainer().decode(String.self)
@@ -48,15 +154,85 @@ struct ClaimSource: Decodable {
         }
     }
     let kind: Kind
-    let url: String?
+    var url: String?
     let id: String?
     let method: String?
     let label: String?
+    var logoUrl: String? = nil
+    var lotNumber: String? = nil
+    var auctionName: String? = nil
+    var video: SaleVideoMoment? = nil
+
+    private enum CodingKeys: String, CodingKey {
+        case kind, url, id, method, label, name, video
+        case logoUrl, logo_url
+        case lotNumber, lot_number
+        case auctionName, auction_name
+    }
+
+    init(
+        kind: Kind,
+        url: String? = nil,
+        id: String? = nil,
+        method: String? = nil,
+        label: String? = nil,
+        logoUrl: String? = nil,
+        lotNumber: String? = nil,
+        auctionName: String? = nil,
+        video: SaleVideoMoment? = nil
+    ) {
+        self.kind = kind
+        self.url = url
+        self.id = id
+        self.method = method
+        self.label = label
+        self.logoUrl = logoUrl
+        self.lotNumber = lotNumber
+        self.auctionName = auctionName
+        self.video = video
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        self.kind = (try? c.decode(Kind.self, forKey: .kind)) ?? .legacy
+        self.url = try? c.decodeIfPresent(String.self, forKey: .url)
+        self.id = try? c.decodeIfPresent(String.self, forKey: .id)
+        self.method = try? c.decodeIfPresent(String.self, forKey: .method)
+        self.label = (try? c.decodeIfPresent(String.self, forKey: .label))
+            ?? (try? c.decodeIfPresent(String.self, forKey: .name))
+        self.logoUrl = (try? c.decodeIfPresent(String.self, forKey: .logoUrl))
+            ?? (try? c.decodeIfPresent(String.self, forKey: .logo_url))
+        self.lotNumber = (try? c.decodeIfPresent(String.self, forKey: .lotNumber))
+            ?? (try? c.decodeIfPresent(String.self, forKey: .lot_number))
+        self.auctionName = (try? c.decodeIfPresent(String.self, forKey: .auctionName))
+            ?? (try? c.decodeIfPresent(String.self, forKey: .auction_name))
+        self.video = try? c.decodeIfPresent(SaleVideoMoment.self, forKey: .video)
+    }
 
     /// A URL only when it is one the phone can open; the read ships listing URLs, never storage keys.
     var openableURL: URL? {
         guard let url, url.lowercased().hasPrefix("http") else { return nil }
         return URL(string: url)
+    }
+
+    var effectiveLotNumber: String? {
+        if let lotNumber, !lotNumber.isEmpty { return lotNumber }
+        if let vLot = video?.lotNumber, !vLot.isEmpty { return vLot }
+        return nil
+    }
+
+    var effectiveAuctionName: String? {
+        if let auctionName, !auctionName.isEmpty { return auctionName }
+        if let vName = video?.auctionName, !vName.isEmpty { return vName }
+        return nil
+    }
+
+    var lotLine: String? {
+        let parts = [
+            effectiveLotNumber.map { "Lot \($0)" },
+            effectiveAuctionName
+        ].compactMap { $0 }.filter { !$0.isEmpty }
+        return parts.isEmpty ? nil : parts.joined(separator: " · ")
     }
 }
 
@@ -89,8 +265,8 @@ enum ClaimValue: Decodable {
 struct Claim: Decodable {
     let value: ClaimValue
     let unit: String?
-    let source: ClaimSource
-    let observed_at: String?
+    var source: ClaimSource
+    var observed_at: String?
     let trust: Double
 
     /// Trust as the web shows it: a whole percentage, clamped.
@@ -123,6 +299,39 @@ struct Claim: Decodable {
         let base = source.label?.isEmpty == false ? source.label! : source.kind.displayName
         if let m = source.method, !m.isEmpty, m != source.label { return "\(base) · \(m)" }
         return base
+    }
+
+    /// True when this claim represents an auction sale or carries a broadcast video moment (`Claim.tsx`).
+    var isAuctionSaleClaim: Bool {
+        if source.video != nil { return true }
+        if source.method == "sold" || unit == "USD" {
+            let combined = "\(source.label ?? "") \(source.url ?? "")".lowercased()
+            let knownHouses = ["mecum", "bring a trailer", "bringatrailer", "bat", "cars & bids", "cars and bids", "carsandbids", "rm sotheby", "rmsothebys", "gooding", "bonhams", "broad arrow", "broadarrow", "sbx", "barrett"]
+            if knownHouses.contains(where: { combined.contains($0) }) || source.effectiveLotNumber != nil {
+                return true
+            }
+        }
+        return false
+    }
+
+    /// Fallback YouTube search URL for finding the auction sale broadcast moment (`Claim.tsx`).
+    func youtubeSearchURL(vehicleTitle: String? = nil) -> URL? {
+        let sourceName = source.label?.isEmpty == false ? source.label! : source.kind.displayName
+        let q: String
+        if let sq = source.video?.searchQuery, !sq.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            q = sq
+        } else {
+            q = [
+                sourceName,
+                source.effectiveAuctionName,
+                source.effectiveLotNumber.map { "Lot \($0)" },
+                source.video?.title ?? vehicleTitle,
+                "auction sold"
+            ].compactMap { $0 }.filter { !$0.isEmpty }.joined(separator: " ")
+        }
+        var comps = URLComponents(string: "https://www.youtube.com/results")
+        comps?.queryItems = [URLQueryItem(name: "search_query", value: q)]
+        return comps?.url
     }
 }
 
@@ -169,6 +378,59 @@ struct GalleryImageDoc: Decodable {
     var isApproved: Bool { gate == "approved" }
 }
 
+/// Orthogonal vehicle configuration facets (`series`, `trim_facet`, `body_facet`) decoded from
+/// `vehicle_profile_read` or classified from the record's masthead/strip fields, matching web `VehicleBadgeBar`.
+struct ProfileVehicleFacets: Decodable, Equatable {
+    let series: String?
+    let trim_facet: String?
+    let body_facet: String?
+
+    var trimFacet: String? { trim_facet }
+    var bodyFacet: String? { body_facet }
+    var trim: String? { trim_facet }
+    var body: String? { body_facet }
+
+    var isEmpty: Bool {
+        series == nil && trim_facet == nil && body_facet == nil
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case series, series_facet, seriesFacet
+        case trim_facet, trimFacet, trim
+        case body_facet, bodyFacet, body_style_facet, bodyStyleFacet, body, body_style
+    }
+
+    init(series: String? = nil, trim_facet: String? = nil, body_facet: String? = nil) {
+        self.series = Self.clean(series)
+        self.trim_facet = Self.clean(trim_facet)
+        self.body_facet = Self.clean(body_facet)
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        func firstString(_ keys: [CodingKeys]) -> String? {
+            for k in keys {
+                if let val = try? c.decodeIfPresent(String.self, forKey: k),
+                   let cleaned = Self.clean(val) {
+                    return cleaned
+                }
+            }
+            return nil
+        }
+        let s = firstString([.series, .series_facet, .seriesFacet])
+        let t = firstString([.trim_facet, .trimFacet, .trim])
+        let b = firstString([.body_facet, .bodyFacet, .body_style_facet, .bodyStyleFacet, .body, .body_style])
+        self.init(series: s, trim_facet: t, body_facet: b)
+    }
+
+    static func clean(_ raw: String?) -> String? {
+        guard let trimmed = raw?.trimmingCharacters(in: .whitespacesAndNewlines), !trimmed.isEmpty else {
+            return nil
+        }
+        return trimmed
+    }
+}
+
 /// The masthead as the read ships it: raw identity columns for the client's display hygiene.
 struct IdentitySource: Decodable {
     let year: Int?
@@ -176,9 +438,44 @@ struct IdentitySource: Decodable {
     let model: String?
     let normalized_model: String?
     let series: String?
+    let series_facet: String?
     let trim: String?
+    let trim_facet: String?
+    let body_style: String?
+    let canonical_body_style: String?
+    let body_facet: String?
     let transmission: String?
     let transmission_model: String?
+
+    init(
+        year: Int? = nil,
+        make: String? = nil,
+        model: String? = nil,
+        normalized_model: String? = nil,
+        series: String? = nil,
+        series_facet: String? = nil,
+        trim: String? = nil,
+        trim_facet: String? = nil,
+        body_style: String? = nil,
+        canonical_body_style: String? = nil,
+        body_facet: String? = nil,
+        transmission: String? = nil,
+        transmission_model: String? = nil
+    ) {
+        self.year = year
+        self.make = make
+        self.model = model
+        self.normalized_model = normalized_model
+        self.series = series
+        self.series_facet = series_facet
+        self.trim = trim
+        self.trim_facet = trim_facet
+        self.body_style = body_style
+        self.canonical_body_style = canonical_body_style
+        self.body_facet = body_facet
+        self.transmission = transmission
+        self.transmission_model = transmission_model
+    }
 }
 
 /// One section of the document. Unknown kinds decode to `.unknown` and render nothing: a newer
@@ -191,6 +488,28 @@ enum ProfileSection: Decodable {
         let model: String?
         let price: Claim?
         let priceLabel: String?
+        let identityMarks: [VehicleIdentityMark]?
+        let facets: ProfileVehicleFacets?
+
+        private enum CodingKeys: String, CodingKey {
+            case identity_source, year, make, model, price, priceLabel
+            case identityMarks, identity_marks
+            case facets, vehicle_facets
+        }
+
+        init(from decoder: Decoder) throws {
+            let c = try decoder.container(keyedBy: CodingKeys.self)
+            self.identity_source = try c.decode(IdentitySource.self, forKey: .identity_source)
+            self.year = try c.decodeIfPresent(Int.self, forKey: .year)
+            self.make = try c.decodeIfPresent(String.self, forKey: .make)
+            self.model = try c.decodeIfPresent(String.self, forKey: .model)
+            self.price = try c.decodeIfPresent(Claim.self, forKey: .price)
+            self.priceLabel = try c.decodeIfPresent(String.self, forKey: .priceLabel)
+            self.identityMarks = (try? c.decodeIfPresent([VehicleIdentityMark].self, forKey: .identityMarks))
+                ?? (try? c.decodeIfPresent([VehicleIdentityMark].self, forKey: .identity_marks))
+            self.facets = (try? c.decodeIfPresent(ProfileVehicleFacets.self, forKey: .facets))
+                ?? (try? c.decodeIfPresent(ProfileVehicleFacets.self, forKey: .vehicle_facets))
+        }
     }
     struct Facet: Decodable {
         let dimension: String
@@ -252,12 +571,93 @@ enum ProfileSection: Decodable {
     }
 }
 
+/// The seller or auction description carried by `vehicle_profile_read` (`profileDocument.ts`).
+struct ProfileDescription: Decodable, Equatable {
+    let text: String
+    let length: Int
+    let source: ClaimSource
+    let observed_at: String?
+}
+
+/// Full-record testimony counts returned by `vehicle_testimony_summary(p_vehicle_id)`.
+struct VehicleTestimonySummary: Decodable, Equatable {
+    let total: Int
+    let events: Int
+    let images: Int
+    let observations: Int
+    let documents: Int
+    let service: Int
+
+    var sentence: String {
+        var parts: [String] = []
+        if events > 0 { parts.append("\(events.formatted()) \(events == 1 ? "event" : "events")") }
+        if images > 0 { parts.append("\(images.formatted()) \(images == 1 ? "photo" : "photos")") }
+        if observations > 0 { parts.append("\(observations.formatted()) \(observations == 1 ? "observation" : "observations")") }
+        if documents > 0 { parts.append("\(documents.formatted()) \(documents == 1 ? "document" : "documents")") }
+        if service > 0 { parts.append("\(service.formatted()) service") }
+        let breakdown = parts.isEmpty ? "" : " (\(parts.joined(separator: " · ")))"
+        return "\(total.formatted()) testimony items\(breakdown)"
+    }
+}
+
 /// One page, as a document: sections in the order the data supports, for one viewer, at one clock.
 struct ProfileRead: Decodable {
     let vehicle_id: String
     let viewer: ProfileViewer
     let read_at: String
     let sections: [ProfileSection]
+    let description: ProfileDescription?
+    let identityMarks: [VehicleIdentityMark]?
+    let facets: ProfileVehicleFacets?
+
+    private enum CodingKeys: String, CodingKey {
+        case vehicle_id, viewer, read_at, sections, description
+        case identityMarks, identity_marks
+        case facets, vehicle_facets
+        case series, series_facet, trim_facet, body_facet
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        self.vehicle_id = try c.decode(String.self, forKey: .vehicle_id)
+        self.viewer = try c.decode(ProfileViewer.self, forKey: .viewer)
+        self.read_at = try c.decode(String.self, forKey: .read_at)
+        self.sections = try c.decode([ProfileSection].self, forKey: .sections)
+        self.description = try c.decodeIfPresent(ProfileDescription.self, forKey: .description)
+
+        let topMarks = (try? c.decodeIfPresent([VehicleIdentityMark].self, forKey: .identityMarks))
+            ?? (try? c.decodeIfPresent([VehicleIdentityMark].self, forKey: .identity_marks))
+        var mastheadSection: ProfileSection.Masthead?
+        for s in self.sections {
+            if case .masthead(let m) = s {
+                mastheadSection = m
+                break
+            }
+        }
+        self.identityMarks = topMarks ?? mastheadSection?.identityMarks
+
+        if let explicitFacets = (try? c.decodeIfPresent(ProfileVehicleFacets.self, forKey: .facets))
+            ?? (try? c.decodeIfPresent(ProfileVehicleFacets.self, forKey: .vehicle_facets))
+            ?? mastheadSection?.facets {
+            self.facets = explicitFacets
+        } else {
+            let topSeries = (try? c.decodeIfPresent(String.self, forKey: .series_facet))
+                ?? (try? c.decodeIfPresent(String.self, forKey: .series))
+            let topTrim = try? c.decodeIfPresent(String.self, forKey: .trim_facet)
+            let topBody = try? c.decodeIfPresent(String.self, forKey: .body_facet)
+            let idSrc = mastheadSection?.identity_source
+            let hasExplicitIdSrcFacet = idSrc?.series_facet != nil || idSrc?.trim_facet != nil || idSrc?.body_facet != nil
+            if topSeries != nil || topTrim != nil || topBody != nil || hasExplicitIdSrcFacet {
+                self.facets = ProfileVehicleFacets(
+                    series: topSeries ?? idSrc?.series_facet ?? idSrc?.series,
+                    trim_facet: topTrim ?? idSrc?.trim_facet ?? idSrc?.trim,
+                    body_facet: topBody ?? idSrc?.body_facet ?? idSrc?.canonical_body_style ?? idSrc?.body_style
+                )
+            } else {
+                self.facets = nil
+            }
+        }
+    }
 
     var masthead: ProfileSection.Masthead? {
         for s in sections { if case .masthead(let m) = s { return m } }
@@ -270,6 +670,70 @@ struct ProfileRead: Decodable {
     var timeline: ProfileSection.Timeline? {
         for s in sections { if case .timeline(let t) = s { return t } }
         return nil
+    }
+
+    /// Decoded identity marks carried directly by `vehicle_profile_read` (root or `masthead`).
+    var resolvedIdentityMarks: [VehicleIdentityMark] {
+        identityMarks ?? masthead?.identityMarks ?? []
+    }
+
+    /// Orthogonal `series`, `trim_facet`, and `body_facet` resolved from decoded `facets`,
+    /// `strip.facets`, `masthead.identity_source`, and `VehicleFacetClassifier` (matching web `VehicleBadgeBar.tsx`).
+    var resolvedFacets: ProfileVehicleFacets {
+        let m = masthead
+        let idSrc = m?.identity_source
+        let brand = ProfileVehicleFacets.clean(m?.make ?? idSrc?.make)
+        let family = ProfileVehicleFacets.clean(idSrc?.normalized_model ?? m?.model ?? idSrc?.model)
+        let year = m?.year ?? idSrc?.year
+
+        let stripSeries = strip?.facets.first(where: { $0.dimension == "series" || $0.dimension == "series_facet" })?.label
+        let stripTrim = strip?.facets.first(where: { $0.dimension == "trim_facet" || $0.dimension == "trim" })?.label
+        let stripBodyFacet = strip?.facets.first(where: { $0.dimension == "body_facet" || $0.dimension == "body_style_facet" })?.label
+        let stripBodyStyle = strip?.facets.first(where: { $0.dimension == "body_style" })?.label
+
+        let descriptor = [
+            m?.model ?? idSrc?.model,
+            idSrc?.series,
+            idSrc?.trim,
+            idSrc?.canonical_body_style ?? idSrc?.body_style ?? stripBodyStyle
+        ]
+            .compactMap { ProfileVehicleFacets.clean($0) }
+            .joined(separator: " · ")
+
+        let classified: VehicleFacetClassification? = {
+            guard let brand, !descriptor.isEmpty else { return nil }
+            return VehicleFacetClassifier.classify(
+                make: brand,
+                familyLabel: family,
+                rawModel: descriptor,
+                year: year
+            )
+        }()
+
+        let resolvedSeries = facets?.series
+            ?? ProfileVehicleFacets.clean(idSrc?.series_facet)
+            ?? ProfileVehicleFacets.clean(stripSeries)
+            ?? classified?.series
+            ?? ProfileVehicleFacets.clean(idSrc?.series)
+
+        let resolvedTrim = facets?.trim_facet
+            ?? ProfileVehicleFacets.clean(idSrc?.trim_facet)
+            ?? ProfileVehicleFacets.clean(stripTrim)
+            ?? classified?.trim
+            ?? ProfileVehicleFacets.clean(idSrc?.trim)
+
+        let resolvedBody = facets?.body_facet
+            ?? ProfileVehicleFacets.clean(idSrc?.body_facet)
+            ?? ProfileVehicleFacets.clean(stripBodyFacet)
+            ?? classified?.body
+            ?? ProfileVehicleFacets.clean(stripBodyStyle)
+            ?? ProfileVehicleFacets.clean(idSrc?.canonical_body_style ?? idSrc?.body_style)
+
+        return ProfileVehicleFacets(
+            series: resolvedSeries,
+            trim_facet: resolvedTrim,
+            body_facet: resolvedBody
+        )
     }
 }
 
@@ -296,5 +760,9 @@ enum ProfileClock {
 
     static func day(_ iso: String?) -> String? {
         date(iso).map { out.string(from: $0) }
+    }
+
+    static func Absolute(_ iso: String?) -> String {
+        day(iso) ?? iso ?? "unknown date"
     }
 }

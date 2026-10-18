@@ -152,4 +152,583 @@ final class DecodeTests: XCTestCase {
         XCTAssertEqual(receipt.is_owner_view, false)
         XCTAssertNil(receipt.work_sessions.first?.total_job_cost)
     }
+
+    func testProfileReadDecodesDescriptionAndTestimonySummary() throws {
+        let json = """
+        {"vehicle_id":"e08bf694-970f-4cbe-8a74-8715158a0f2e","viewer":"owner","read_at":"2026-10-17T12:00:00+00:00",
+         "sections":[],
+         "description":{"text":"One-owner 911 Carrera 4S finished in Arctic Silver.","length":51,
+                        "source":{"kind":"listing","url":"https://bringatrailer.com/listing/2003-porsche-911","method":"bat_description","label":"Bring a Trailer"},
+                        "observed_at":"2026-10-16T00:00:00+00:00"}}
+        """
+        let read = try decode(ProfileRead.self, json)
+        XCTAssertEqual(read.viewer, .owner)
+        XCTAssertEqual(read.description?.length, 51)
+        XCTAssertEqual(read.description?.source.kind, .listing)
+        XCTAssertEqual(read.description?.source.openableURL?.absoluteString, "https://bringatrailer.com/listing/2003-porsche-911")
+
+        let testimony = try decode(VehicleTestimonySummary.self, #"{"total":42,"events":3,"images":28,"observations":8,"documents":2,"service":1}"#)
+        XCTAssertEqual(testimony.total, 42)
+        XCTAssertTrue(testimony.sentence.contains("42 testimony items"))
+        XCTAssertTrue(testimony.sentence.contains("28 photos"))
+    }
+
+    func testGroupRepeatedObservationsCollapsesIdenticalListingClaims() throws {
+        let obs1 = FieldProvenance.Observation(
+            id: UUID(uuidString: "11111111-1111-1111-1111-111111111111")!,
+            content: "6-speed manual transmission",
+            value: "6-Speed Manual",
+            confidence: 0.95,
+            observed_at: "2026-10-01T12:00:00Z",
+            ingested_at: "2026-10-01T12:05:00Z",
+            extraction_method: "bat_listing_scrape",
+            kind: "specification",
+            source_slug: "bat",
+            trust: 0.9,
+            source_url: "https://bringatrailer.com/listing/test"
+        )
+        let obs2 = FieldProvenance.Observation(
+            id: UUID(uuidString: "22222222-2222-2222-2222-222222222222")!,
+            content: "6-speed manual transmission",
+            value: "6-Speed Manual",
+            confidence: 0.95,
+            observed_at: "2026-10-05T12:00:00Z",
+            ingested_at: "2026-10-05T12:05:00Z",
+            extraction_method: "bat_listing_scrape",
+            kind: "specification",
+            source_slug: "bat",
+            trust: 0.9,
+            source_url: "https://bringatrailer.com/listing/test"
+        )
+        let obs3 = FieldProvenance.Observation(
+            id: UUID(uuidString: "33333333-3333-3333-3333-333333333333")!,
+            content: "Confirmed on build sheet",
+            value: "6-Speed Manual",
+            confidence: 1.0,
+            observed_at: "2026-10-06T12:00:00Z",
+            ingested_at: "2026-10-06T12:05:00Z",
+            extraction_method: "owner_document",
+            kind: "specification",
+            source_slug: "owner",
+            trust: 1.0,
+            source_url: nil
+        )
+        let grouped = FieldProvenance.groupRepeatedObservations([obs1, obs2, obs3])
+        XCTAssertEqual(grouped.count, 2)
+        XCTAssertEqual(grouped[0].repeatCount, 2)
+        XCTAssertEqual(grouped[0].firstObservedAt, "2026-10-01T12:00:00Z")
+        XCTAssertEqual(grouped[0].latestObservedAt, "2026-10-05T12:00:00Z")
+        XCTAssertEqual(grouped[1].repeatCount, 1)
+    }
+
+    func testLedgerMapCanonicalHierarchyAndScaleMath() throws {
+        let refreshJSON = """
+        {"refreshed_at":"2026-10-17T08:00:00Z",
+         "populations":{
+           "measure":"confirmed_sale_v1",
+           "public_records":615420,
+           "mapped_sales":412300,
+           "by_house":[
+             {"house":"bat","sales":152000,"amount":12500000000},
+             {"house":"mecum","sales":128000,"amount":4800000000},
+             {"house":"cars_and_bids","sales":42000,"amount":1400000000}
+           ]
+         }}
+        """
+        let receipt = try decode(LedgerRefreshReceipt.self, refreshJSON)
+        XCTAssertTrue(receipt.isConfirmedSaleMeasure)
+        XCTAssertEqual(receipt.populations?.mapped_sales, 412300)
+        XCTAssertEqual(receipt.populations?.by_house?.first?.house, "bat")
+
+        let brandJSON = """
+        [{"brand":"PORSCHE","sales":45000,"usd":4200000000,"sold_any":45000,"offered":56000,
+          "dated":44000,"sold_12m":4200,"sold_prior_12m":3500,"usd_12m":386400000,"usd_prior_12m":294000000}]
+        """
+        let brands = try decode([BrandMarketRow].self, brandJSON)
+        let p = try XCTUnwrap(brands.first)
+        XCTAssertEqual(p.brand, "PORSCHE")
+        XCTAssertEqual(p.sales, 45000)
+        XCTAssertEqual(p.sold_12m, 4200)
+
+        let famJSON = """
+        [{"family_key":"911-997","family_name":"911 (997)","models":4,"sales":3200,"usd":290000000,
+          "median_price":82000,"min_price":28000,"max_price":450000,"sold_any":3200,"offered":4100,
+          "dated":3100,"sold_12m":310,"sold_prior_12m":260,"usd_12m":27900000,"usd_prior_12m":21320000}]
+        """
+        let fams = try decode([FamilyMarketRow].self, famJSON)
+        let famNode = try XCTUnwrap(fams.first?.toLedgerNode())
+        XCTAssertEqual(famNode.familyKey, "911-997")
+        XCTAssertEqual(famNode.count, 3200)
+        XCTAssertEqual(famNode.area(basis: .ledger, isBrandOrFamily: true), 290_000_000)
+        XCTAssertEqual(famNode.area(basis: .bat12, isBrandOrFamily: true), 27_900_000)
+
+        let moversJSON = """
+        {"market":{"sold":4000,"prior":4000,"move":0.0},"candidates":120,
+         "gaining":[{"brand":"PORSCHE","family_key":"911-997","family":"911 (997)","sold":50,"prior":25,"usd":4400000,"usd_prior":2050000,"ratio":2.0,"lo":1.35,"hi":2.96,"move":1.0,"se":0.2,"z":2.5}],
+         "losing":[]}
+        """
+        let movers = try XCTUnwrap(ShareMoversRead.parse(Data(moversJSON.utf8)))
+        XCTAssertEqual(movers.gaining.count, 1)
+        XCTAssertEqual(movers.gaining[0].familyKey, "911-997")
+        XCTAssertEqual(movers.gaining[0].ratio, 2.0)
+
+        let idxJSON = """
+        {"fitted_at":"2026-10-17T06:00:00Z","period_kind":"quarter","stale":false,
+         "counts":{"n_last12":90,"n_prior12":85,"n_total":420},
+         "change":{"verdict":"up","change_12m":0.064,"lo":0.012,"hi":0.118,"n_last12":90,"n_prior12":85,"raw_change":0.081,"pairs":14,"rs_change":0.059,
+                   "chips":[{"key":"carrera-s-manual","label":"Carrera S · Manual","change_12m":0.092,"lo":0.03,"hi":0.15,"n_last12":35,"n_prior12":32,"verdict":"up"}]},
+         "series":[{"period_start":"2026-07-01","index_usd":86000,"lo_usd":81000,"hi_usd":91000,"n":45,"raw_median_usd":88000}]}
+        """
+        let idx = try XCTUnwrap(FamilyIndex.parse(Data(idxJSON.utf8)))
+        XCTAssertEqual(idx.verdict, "up")
+        XCTAssertEqual(idx.change, 0.064)
+        XCTAssertEqual(idx.segments.first?.label, "Carrera S · Manual")
+        XCTAssertEqual(idx.series.count, 1)
+    }
+
+    func testFinishBoardAskBoardCalendarAndSourcesDecode() throws {
+        let finishJSON = """
+        {"fresh":true,"writer_at":"2026-10-17T12:00:00Z",
+         "columns":["vehicle_id","estimate","low","high","grade","coverage","sentence","estimated_at","bid_at_estimate","comps_through"],
+         "rows":[["69c01291-6232-4df8-ad9e-82eaac792462",115000,98000,136000,"A",0.82,"82% of comparable lots landed inside this band","2026-10-17T11:58:00Z",84000,"2026-10-16"]],
+         "analogs":{"69c01291-6232-4df8-ad9e-82eaac792462":[{"url":"https://bringatrailer.com/listing/analog-1","title":"1996 Porsche 911 Turbo","closed":"2026-09-12","bid":82000,"final":118000,"outcome":"sold"}]}}
+        """
+        let finishData = Data(finishJSON.utf8)
+        let finishBoard = FinishBoard.decode(finishData)
+        XCTAssertTrue(finishBoard.fresh)
+        let est = try XCTUnwrap(finishBoard.byId["69c01291-6232-4df8-ad9e-82eaac792462"])
+        XCTAssertEqual(est.estimate, 115000)
+        XCTAssertEqual(est.grade, "A")
+        let analogs = FinishBoard.decodeAnalogs(finishData, vehicleId: "69c01291-6232-4df8-ad9e-82eaac792462")
+        XCTAssertEqual(analogs.count, 1)
+        XCTAssertEqual(analogs[0].finalPrice, 118000)
+
+        let askJSON = """
+        {"as_of":"2026-10-17T12:00:00Z","window_hours":72,"tier":null,"sort":"newest",
+         "population":{"listings":120,"filtered":120,"with_position":85,"below_p25":22,"by_source":{"craigslist":80,"facebook_marketplace":40},"by_tier":{"15k_40k":50},"median_ask":24500,"newest_seen_at":"2026-10-17T11:55:00Z"},
+         "price_population":{"measure":"confirmed_sale_v1","refreshed_at":"2026-10-17T08:00:00Z","sales":412300,"families":1850},
+         "rows":[
+           {"event_id":"ev-1","vehicle_id":"69c01291-6232-4df8-ad9e-82eaac792462","source":"craigslist","url":"https://sfbay.craigslist.org/sfc/cto/d/san-francisco-1999-porsche-911/7777777777.html","seen_at":"2026-10-17T11:50:00Z","year":1999,"make":"PORSCHE","model":"911","title":"1999 Porsche 911 Carrera","ask":22000,"miles":88000,"odometer":"broken","condition":"good","title_status":"salvage","image":null,"location":"San Francisco, CA",
+            "position":{"family":"911","cohort":"1999","match":"year","sales":140,"p25":25000,"p50":32000,"p75":41000,"ratio":0.6875,"rank":"below_p25","median_miles":64000,"share_36m":0.45,"houses":{"bat":95,"cars_and_bids":45}}}
+         ]}
+        """
+        let askBoard = try decode(AskBoard.self, askJSON)
+        XCTAssertEqual(askBoard.rows.count, 1)
+        let askRow = askBoard.rows[0]
+        // Broken odometer says "odometer broken" instead of printing 88,000 mi
+        XCTAssertEqual(askRow.listingFacts, "odometer broken · salvage title · good")
+        let placement = try XCTUnwrap(AskPlacement.placement(pos: askRow.position, ask: askRow.ask))
+        XCTAssertEqual(placement.tone, .below)
+        XCTAssertEqual(placement.headline, "31% below the 1999 911 median ($32,000)")
+        XCTAssertEqual(placement.milesLine, "Sold median 64,000 mi")
+        XCTAssertEqual(placement.venuesLine, "Recorded on BaT (95), Cars & Bids (45)")
+
+        let calJSON = """
+        {"as_of":"2026-10-17T12:00:00Z","horizon_days":200,
+         "population":{"lots":1450,"sales":6,"houses":3,"seen_before":210,"no_reserve":680,"first_seen_7d":190,"updated_at":"2026-10-17T11:00:00Z","listed":1800},
+         "sales":[{"house":"mecum","sale_key":"kissimmee-2027","sale_name":"Kissimmee 2027","location":"Kissimmee, FL","starts_on":"2027-01-05","ends_on":"2027-01-17","lots":850,"seen_before":120,"no_reserve":400,"first_seen_at":"2026-09-01T00:00:00Z","first_seen_7d":90,"updated_at":"2026-10-17T11:00:00Z","run_days":[{"day":"2027-01-05","lots":100}],"lots_listed":1000,"listed_at":"2026-10-17T06:00:00Z","prior_sale":{"sale_key":"kissimmee-2026","lots":3200,"vehicle_lots":2800,"sold":2100,"bid_goes_on":700,"median_price":48000,"ends_on":"2026-01-18"}}],
+         "unplaced":[],"roster":null}
+        """
+        let cal = try decode(AuctionCalendar.self, calJSON)
+        XCTAssertEqual(cal.sales.count, 1)
+        XCTAssertEqual(AuctionCalendar.priorSaleLine(house: "mecum", prior: cal.sales[0].prior_sale),
+                       "Mecum ran 3,200 lots at Kissimmee 2026 · 75% of its vehicles sold")
+
+        let sourcesJSON = """
+        {"as_of":"2026-10-17T12:00:00Z","day":"2026-10-17",
+         "columns":["source","name","category","house","held_lots","held_at","population","population_method","population_confidence","map_sales","map_usd","sales_12m","usd_12m","sales_prior_12m","usd_prior_12m","live_lots","landed_24h","landed_7d","last_landed","logo_url","business_type"],
+         "rows":[
+           ["bat","Bring a Trailer (BaT)","online_auction","bat",165000,"2026-10-17T12:00:00Z",166000,"enumerated",0.98,152000,12500000000,32000,2800000000,29000,2500000000,980,145,980,"2026-10-17T11:58:00Z",null,"online_auction"],
+           ["cars-and-bids","Cars & Bids","online_auction","cars-and-bids",19305,"2026-10-17T12:00:00Z",37783,"window_extrapolated",0.56,1,50000,1,50000,0,0,0,0,0,"2026-10-17T11:58:00Z",null,"online_auction"]
+         ],
+         "not_ranked":{"pcarmarket":4200}}
+        """
+        let sb = try XCTUnwrap(SourcesBoardData.parse(Data(sourcesJSON.utf8)))
+        XCTAssertEqual(sb.rows.count, 2)
+        XCTAssertEqual(sb.rows[0].shortName, "Bring a Trailer")
+        XCTAssertEqual(sb.rows[0].heldShareText, "99% of 166,000")
+        XCTAssertEqual(sb.rows[1].heldShareText, "51% of ~37,783 · 56% conf")
+        XCTAssertEqual(sb.notRanked["pcarmarket"], 4200)
+    }
+
+    func testLiveProductionRPCDecodersAndParityFeatures() throws {
+        // 1. Live `treemap_brand_market`, `treemap_brand_families`, `treemap_family_models`, `treemap_sales`
+        let liveBrandsJSON = """
+        [{"name":"PORSCHE","models":337,"sold":28459,"usd":3055568623,"p10":24250,"p50":81000,"p90":240000,"year_p50":1999,"sold_any":29157,"offered":37412,"dated":29112,"sold_12m":2781,"sold_prior_12m":3170,"usd_12m":286942254,"usd_prior_12m":297270687}]
+        """
+        let liveBrands = try decode([BrandMarketRow].self, liveBrandsJSON)
+        XCTAssertEqual(liveBrands.first?.brand, "PORSCHE")
+        XCTAssertEqual(liveBrands.first?.sales, 28459)
+        XCTAssertEqual(liveBrands.first?.p50, 81000)
+
+        let liveFamsJSON = """
+        [{"family_key":"911","family":"911","models":213,"sold":16299,"usd":2205917324,"p10":43250,"p50":106911,"p90":276000,"year_p50":1996,"sold_any":16686,"offered":21647,"dated":16667,"sold_12m":1618,"sold_prior_12m":1841,"usd_12m":206366473,"usd_prior_12m":215153864}]
+        """
+        let liveFams = try decode([FamilyMarketRow].self, liveFamsJSON)
+        XCTAssertEqual(liveFams.first?.family_name, "911")
+        XCTAssertEqual(liveFams.first?.sales, 16299)
+        XCTAssertEqual(liveFams.first?.median_price, 106911)
+
+        let liveModelsJSON = """
+        [{"model":"911 Carrera","sold":2558,"usd":236869619,"p10":44000,"p50":81500,"p90":152000,"year_p50":1987,"sold_any":2598,"offered":3298,"dated":2595,"sold_12m":220,"sold_prior_12m":260,"usd_12m":20500000,"usd_prior_12m":23100000},
+         {"model":null,"sold":12,"usd":980000,"p50":78000}]
+        """
+        let liveModels = try decode([FamilyModelRow].self, liveModelsJSON)
+        XCTAssertEqual(liveModels[0].model, "911 Carrera")
+        XCTAssertEqual(liveModels[0].toLedgerNode().sold_12m, 220)
+        XCTAssertEqual(liveModels[1].model, "Model not given")
+
+        let liveSalesJSON = """
+        [{"id":"69c01291-6232-4df8-ad9e-82eaac792462","year":1997,"make":"PORSCHE","model":"911 Turbo","title":"1997 Porsche 911 Turbo","sold_amount":285000,"sale_basis":"hammer","sale_date":"2026-09-14","url":"https://bringatrailer.com/listing/1997-porsche-911-turbo"}]
+        """
+        let liveSales = try decode([LedgerVehicle].self, liveSalesJSON)
+        XCTAssertEqual(liveSales.first?.price, 285000)
+        XCTAssertEqual(liveSales.first?.source, "hammer")
+
+        // 2. Live `treemap_family_share_movers` + `ShareMoversRead.combine`
+        let liveMovers1YJSON = """
+        {"bat":{"move":-0.0882,"sold_12m":28629,"sold_prior_12m":31398,"usd_12m":1200000000,"usd_prior_12m":1300000000},
+         "families":419,"eligible":337,"significant":41,"horizon":"1y","horizon_days":365,
+         "brand_moves":{"FERRARI":[520,410,150000000,115000000]},
+         "family_moves":{"FERRARI|360":[95,58,12500000,7300000]},
+         "gaining":[{"brand":"FERRARI","family_key":"360","family":"360","sold_12m":95,"sold_prior_12m":58,"usd_12m":12500000,"usd_prior_12m":7300000,"share_move":0.796,"share_lo":0.30,"share_hi":1.48,"se":0.165,"avg_price_move":0.038,"bins":[2,3,4,5,6,7],"sources":{"Bring a Trailer":80,"RM Sotheby's":15}}],
+         "losing":[]}
+        """
+        let m1y = try XCTUnwrap(ShareMoversRead.parse(Data(liveMovers1YJSON.utf8)))
+        XCTAssertEqual(m1y.marketSold, 28629)
+        XCTAssertEqual(m1y.marketPrior, 31398)
+        XCTAssertEqual(m1y.gaining.first?.sold, 95)
+        XCTAssertEqual(m1y.gaining.first?.prior, 58)
+        XCTAssertEqual(m1y.gaining.first?.bins, [2, 3, 4, 5, 6, 7])
+        XCTAssertEqual(m1y.brandMoves["FERRARI"]?.sold12m, 520)
+        XCTAssertEqual(m1y.familyMoves["FERRARI|360"]?.sold12m, 95)
+
+        let liveMovers5YJSON = """
+        {"bat":{"move":0.12,"sold_12m":140000,"sold_prior_12m":125000},
+         "horizon":"5y","horizon_days":1825,
+         "brand_moves":{"FERRARI":[1800,1500,500000000,400000000]},
+         "family_moves":{"FERRARI|360":[260,220,33000000,28000000]},
+         "gaining":[],"losing":[]}
+        """
+        let m5y = try XCTUnwrap(ShareMoversRead.parse(Data(liveMovers5YJSON.utf8)))
+        let combined = ShareMoversRead.combine(target: m1y, baseline: m5y, targetHorizon: .y1)
+        XCTAssertEqual(combined.marketSold, 28629)
+        XCTAssertEqual(combined.marketPrior, 140000)
+        XCTAssertEqual(combined.gaining.first?.familyKey, "360")
+
+        // 3. `treemap_family_upcoming_supply`
+        let upcomingJSON = """
+        {"counts":{"total":14,"bat_live":6,"auction_calendar":5,"facebook_marketplace":3},
+         "finish_fresh":true,"finish_model":3,
+         "live_lots":[{"vehicle_id":"69c01291-6232-4df8-ad9e-82eaac792462","year":1997,"model":"911 Turbo","title":"1997 Porsche 911 Turbo","source_url":"https://bringatrailer.com/listing/993-turbo","current_bid":210000,"ends_at":"2026-10-18T19:30:00Z","finish_estimate":275000,"finish_low":250000,"finish_high":305000,"finish_grade":"A"}],
+         "calendar_lots":[{"vehicle_id":null,"year":1996,"model":"911 Turbo","title":"1996 Porsche 911 Turbo","house":"gooding","sale_name":"Pebble Beach","run_on":"2026-11-02","estimate_low":260000,"estimate_high":320000,"no_reserve":false}],
+         "classified_lots":[{"vehicle_id":null,"year":1999,"model":"911 Carrera","title":"1999 Porsche 911 Carrera","price":34500,"location":"Los Angeles, CA","listed_at":"2026-10-17T08:00:00Z"}]}
+        """
+        let upcoming = try XCTUnwrap(FamilyUpcomingSupply.parse(Data(upcomingJSON.utf8)))
+        XCTAssertEqual(upcoming.counts.total, 14)
+        XCTAssertEqual(upcoming.counts.batLive, 6)
+        XCTAssertEqual(upcoming.finishModel, 3)
+        XCTAssertEqual(upcoming.liveLots.first?.finishEstimate, 275000)
+        XCTAssertEqual(upcoming.calendarLots.first?.house, "gooding")
+        XCTAssertEqual(upcoming.classifiedLots.first?.price, 34500)
+
+        // 4. Live `classified_ask_board` (`asks` + nested `position.sold`/`asked`)
+        let liveAskJSON = """
+        {"as_of":"2026-10-17T12:00:00Z","window_hours":72,"tier":"all","sort":"newest",
+         "population":{"listings":3010,"priced":2890,"in_band":2400,"positioned_sold":1820,"positioned_asked":2100,"below_p25":380,"by_source":{"facebook_marketplace":3010},"by_tier":{"15k_40k":1100},"median_ask":26500,"newest_seen_at":"2026-10-17T11:59:00Z"},
+         "price_population":{"measure":"confirmed_sale_v1","refreshed_at":"2026-10-17T08:00:00Z","sales":240898,"families":876},
+         "asks":[
+           {"event_id":"ev-live-1","vehicle_id":"69c01291-6232-4df8-ad9e-82eaac792462","source":"facebook_marketplace","url":"https://www.facebook.com/marketplace/item/123456","first_seen_at":"2026-10-17T11:45:00Z","listed_at":"2026-10-17T10:00:00Z","year":2004,"make":"PORSCHE","model":"911","title":"2004 Porsche 911 Carrera 4S","asking_price":38500,"listing_mileage":72000,"read_miles":72000,"odometer":"72,000 miles","condition":"excellent","title_status":"clean","image":null,"city":"Austin","region":"TX",
+            "position":{"family":"911","cohort":"1999–2004","match":"era","rank":"below_p25","ratio":0.77,
+                        "sold":{"n":420,"p25":42000,"p50":50000,"p75":62000,"ratio":0.77,"rank":"below_p25","median_miles":58000,"share_36m":0.52,"houses":{"bat":310,"cars_and_bids":110}},
+                        "asked":{"n":38,"p25":39000,"p50":46000,"p75":55000,"ratio":0.837,"rank":"below_p25"}}}
+         ]}
+        """
+        let liveAskBoard = try decode(AskBoard.self, liveAskJSON)
+        XCTAssertEqual(liveAskBoard.population.with_position, 1820)
+        XCTAssertEqual(liveAskBoard.rows.count, 1)
+        let liveRow = liveAskBoard.rows[0]
+        XCTAssertEqual(liveRow.ask, 38500)
+        XCTAssertEqual(liveRow.miles, 72000)
+        XCTAssertEqual(liveRow.location, "Austin, TX")
+        XCTAssertEqual(liveRow.position?.p50, 50000)
+        XCTAssertEqual(liveRow.position?.asked?.p50, 46000)
+
+        // 5. `SourcesBoardData` with `landing` + `SourceLandingDetail.parse`
+        let sourcesWithLandingJSON = """
+        {"as_of":"2026-10-17T12:00:00Z","day":"2026-10-17",
+         "columns":["source","name","category","house","held_lots","held_at","population","population_method","map_sales","map_usd","sales_12m","usd_12m","sales_prior_12m","usd_prior_12m","live_lots","landed_24h","landed_7d","last_landed","logo_url","business_type"],
+         "rows":[["bat","Bring a Trailer (BaT)","online_auction","bat",165000,"2026-10-17T12:00:00Z",166000,"enumerated",152000,12500000000,32000,2800000000,29000,2500000000,980,145,980,"2026-10-17T11:58:00Z",null,"online_auction"]],
+         "not_ranked":{},
+         "landing":{"hour":"2026-10-17T12:00:00Z","bucket_5m":"2026-10-17T11:55:00Z",
+                    "totals":{"landed_15m":42,"landed_1h":180,"landed_24h":3400,"landed_7d":21500,"hours24":[120,140,160],"mins60":[12,15,18]},
+                    "sources":{"bat":{"landed_15m":12,"landed_1h":48,"hours24":[8,10,12],"mins60":[3,4,5],"days14":[140,150,145]}}}}
+        """
+        let sbLanding = try XCTUnwrap(SourcesBoardData.parse(Data(sourcesWithLandingJSON.utf8)))
+        XCTAssertEqual(sbLanding.landing.landed15m, 42)
+        XCTAssertEqual(sbLanding.rows.first?.landed1h, 48)
+        XCTAssertEqual(sbLanding.rows.first?.bins(for: .h1), [0, 0, 0, 0, 0, 0, 0, 0, 0, 3, 4, 5])
+
+        let detailJSON = """
+        {"source":"bat","as_of":"2026-10-17T12:00:00Z",
+         "landed_15m":12,"landed_1h":48,"landed_24h":310,"landed_7d":2140,
+         "hours24":[40,44,48],
+         "mins60":[4,5,6],
+         "recent":[{"id":"ev-1","source":"bat","vehicle_id":"69c01291-6232-4df8-ad9e-82eaac792462","event_type":"auction_result","created_at":"2026-10-17T11:58:00Z","title":"1997 Porsche 911 Turbo","price":285000,"source_url":"https://bringatrailer.com/listing/993"}]}
+        """
+        let detail = try XCTUnwrap(SourceLandingDetail.parse(Data(detailJSON.utf8)))
+        XCTAssertEqual(detail.landed1h, 48)
+        XCTAssertEqual(detail.recent.first?.price, 285000)
+
+        // 6. `SaleVideoMoment` & `ClaimSource` (#1823)
+        let saleClaimJSON = """
+        {"value":285000,"unit":"usd","trust":0.95,"observed_at":"2026-01-15T18:00:00Z","source":{"kind":"listing","name":"Mecum","url":"https://mecum.com/lot/1","lot_number":"S142","auction_name":"Kissimmee 2026","video":{"url":"https://www.youtube.com/watch?v=abc123xyz","start_seconds":754}}}
+        """
+        let saleClaim = try decode(Claim.self, saleClaimJSON)
+        XCTAssertTrue(saleClaim.isAuctionSaleClaim)
+        XCTAssertEqual(saleClaim.source.lotLine, "Lot S142 · Kissimmee 2026")
+        XCTAssertEqual(saleClaim.source.video?.startLabel, "12:34")
+        XCTAssertEqual(saleClaim.source.video?.watchableURL?.absoluteString, "https://www.youtube.com/watch?v=abc123xyz&t=754s")
+        XCTAssertNotNil(saleClaim.youtubeSearchURL(vehicleTitle: "1997 Porsche 911 Turbo"))
+
+        // 7. `VehicleIdentityMark` decoding from `public.resolve_vehicle_identity_marks`
+        let identityMarksJSON = """
+        [
+          {"id":"cfa05e17-8074-48da-9336-cbf61e96c89c","brand":"Chevrolet","family":"Pickup","series_code":"C10","trim_package":"Custom Deluxe","body_style":null,"year_start":1973,"year_end":1980,"mark_kind":"trim_badge","display_label":"CUSTOM DELUXE 10","sub_label":"1973–1980 Rectangular Stacked Fender Plate","rpo_code":"YE8/YF5","fender_placement":"Front Fender (behind wheel arch)","typography_style":"square_block","border_treatment":"chrome_bezel","primary_color":"#111111","secondary_color":"#e5e7eb","accent_color":"#dc2626","svg_markup":"<svg></svg>","provenance_note":"1973–1980 Chevrolet C10/K10 Custom Deluxe front fender nameplate.","vetted":true},
+          {"id":"2c61ca9e-2850-48ce-8d6c-f1c9fbc70cf8","brand":"Chevrolet","family":null,"series_code":null,"trim_package":null,"body_style":null,"year_start":1960,"year_end":1972,"mark_kind":"marque_emblem","display_label":"CHEVROLET","sub_label":"Classic chrome-bordered blue/gold bowtie (1960–1972)","svg_markup":"<svg></svg>","provenance_note":"1960–1972 C/K 1st Gen bowtie.","vetted":true}
+        ]
+        """
+        let marks = try decode([VehicleIdentityMark].self, identityMarksJSON)
+        XCTAssertEqual(marks.count, 2)
+        XCTAssertEqual(marks[0].displayLabel, "CUSTOM DELUXE 10")
+        XCTAssertEqual(marks[0].targetModel, "Custom Deluxe")
+        XCTAssertEqual(marks[0].eraShortLabel, "'73–'80")
+        XCTAssertEqual(marks[0].kindLabel, "Trim Badge")
+        XCTAssertNil(marks[1].targetModel)
+        XCTAssertEqual(marks[1].kindLabel, "Marque Emblem")
+        let filteredSquarebody = VehicleIdentityMark.filterByEra(marks, year: nil, eraId: "1973-1987")
+        XCTAssertEqual(filteredSquarebody.map(\.displayLabel), ["CUSTOM DELUXE 10"])
+
+        // 8. `FamilyFacetAxis` & `VehicleFacetClassifier` (`TRUCKS UNIFIED` + 4-way facet axis selector)
+        XCTAssertEqual(FamilyFacetAxis.allCases.map(\.label), ["SUB-MODELS", "SERIES", "TRIM", "BODY STYLE"])
+        XCTAssertTrue(VehicleFacetClassifier.isPickupFamilyLabel("C10"))
+        XCTAssertTrue(VehicleFacetClassifier.isPickupFamilyLabel("K10"))
+        XCTAssertTrue(VehicleFacetClassifier.isPickupFamilyLabel("F-150"))
+        XCTAssertFalse(VehicleFacetClassifier.isPickupFamilyLabel("Corvette"))
+
+        let chevyFamilies: [LedgerNode] = [
+            LedgerNode(name: "Corvette", count: 800, value: 40_000_000, median_price: 50_000, min_price: 10_000, max_price: 500_000, sold_count: 800, auction_count: 900, avg_bids: nil, avg_watchers: nil, usd: 40_000_000, familyKey: "corvette", models: 8),
+            LedgerNode(name: "C10", count: 500, value: 17_500_000, median_price: 35_000, min_price: 8_000, max_price: 180_000, sold_count: 500, auction_count: 550, avg_bids: nil, avg_watchers: nil, usd: 17_500_000, familyKey: "c10", models: 4),
+            LedgerNode(name: "K10", count: 350, value: 14_000_000, median_price: 40_000, min_price: 12_000, max_price: 160_000, sold_count: 350, auction_count: 380, avg_bids: nil, avg_watchers: nil, usd: 14_000_000, familyKey: "k10", models: 3)
+        ]
+        let unifiedChevy = VehicleFacetClassifier.consolidateBrandPickupFamilies(make: "Chevrolet", families: chevyFamilies, groupPickups: true)
+        XCTAssertEqual(unifiedChevy.count, 2)
+        XCTAssertEqual(unifiedChevy.first?.name, "C/K & Pickup Trucks")
+        XCTAssertEqual(unifiedChevy.first?.count, 850)
+        XCTAssertEqual(unifiedChevy.first?.familyKey, "c10")
+        let splitChevy = VehicleFacetClassifier.consolidateBrandPickupFamilies(make: "Chevrolet", families: chevyFamilies, groupPickups: false)
+        XCTAssertEqual(splitChevy.count, 3)
+
+        let c10Facets = VehicleFacetClassifier.classify(
+            make: "Chevrolet",
+            familyLabel: "C10",
+            rawModel: "C10 · 1978 Chevrolet C10 Silverado Stepside",
+            year: 1978
+        )
+        XCTAssertEqual(c10Facets.series, "C10 / C1500 (1/2-Ton 2WD)")
+        XCTAssertEqual(c10Facets.trim, "Silverado")
+        XCTAssertEqual(c10Facets.body, "Stepside / Flareside")
+
+        let mustangFacets = VehicleFacetClassifier.classify(
+            make: "Ford",
+            familyLabel: "Mustang",
+            rawModel: "Mustang · 1969 Ford Mustang Boss 302 Fastback",
+            year: 1969
+        )
+        XCTAssertEqual(mustangFacets.series, "1st Gen ('64½–'73)")
+        XCTAssertEqual(mustangFacets.trim, "Boss 302")
+        XCTAssertEqual(mustangFacets.body, "Fastback / SportsRoof")
+
+        let baseSubModels: [LedgerNode] = [
+            LedgerNode(name: "C10 Silverado Stepside", count: 60, value: 2_400_000, median_price: 40_000, min_price: 20_000, max_price: 80_000, sold_count: 60, auction_count: 60, avg_bids: nil, avg_watchers: nil, usd: 2_400_000),
+            LedgerNode(name: "K10 Cheyenne Fleetside", count: 40, value: 1_800_000, median_price: 45_000, min_price: 22_000, max_price: 90_000, sold_count: 40, auction_count: 40, avg_bids: nil, avg_watchers: nil, usd: 1_800_000)
+        ]
+        let trimNodes = VehicleFacetClassifier.buildFacetNodes(
+            axis: .trim,
+            make: "Chevrolet",
+            familyLabel: "C/K & Pickup Trucks",
+            baseModels: baseSubModels,
+            salesData: nil
+        )
+        XCTAssertEqual(trimNodes.map(\.name), ["Silverado", "Cheyenne"])
+        XCTAssertEqual(trimNodes.first?.facetRepresentativeModel, "C10 Silverado Stepside")
+
+        let bodyNodes = VehicleFacetClassifier.buildFacetNodes(
+            axis: .body,
+            make: "Chevrolet",
+            familyLabel: "C/K & Pickup Trucks",
+            baseModels: baseSubModels,
+            salesData: nil
+        )
+        XCTAssertEqual(bodyNodes.map(\.name), ["Stepside / Flareside", "Fleetside / Styleside"])
+
+        XCTAssertTrue(VehicleFacetClassifier.matchesSaleSubModel(
+            saleModel: "C10 · 1978 Chevrolet C10 Silverado Stepside",
+            selectedModel: "Silverado",
+            brand: "Chevrolet",
+            family: "C10",
+            year: 1978
+        ))
+        XCTAssertTrue(VehicleFacetClassifier.matchesSaleSubModel(
+            saleModel: "C10 · 1978 Chevrolet C10 Silverado Stepside",
+            selectedModel: "Stepside / Flareside",
+            brand: "Chevrolet",
+            family: "C10",
+            year: 1978
+        ))
+        XCTAssertFalse(VehicleFacetClassifier.matchesSaleSubModel(
+            saleModel: "C10 · 1978 Chevrolet C10 Silverado Stepside",
+            selectedModel: "Cheyenne",
+            brand: "Chevrolet",
+            family: "C10",
+            year: 1978
+        ))
+
+        // 9. `ProfileRead` (`vehicle_profile_read`) decoding of `identityMarks` and `facets` (`series`, `trim_facet`, `body_facet`)
+        //    and `ProfileHeaderBlock.hudChips` compact HUD chip generation (matching web `VehicleBadgeBar`).
+        let profileWithExplicitMarksAndFacetsJSON = """
+        {
+          "vehicle_id": "10000000-0000-0000-0000-000000000010",
+          "viewer": "anon",
+          "read_at": "2026-10-17T22:00:00Z",
+          "identity_marks": [
+            {
+              "id": "cfa05e17-8074-48da-9336-cbf61e96c89c",
+              "brand": "Chevrolet",
+              "family": "Pickup",
+              "series_code": "K10",
+              "trim_package": "Cheyenne Super",
+              "body_style": "Stepside",
+              "year_start": 1973,
+              "year_end": 1974,
+              "mark_kind": "trim_badge",
+              "display_label": "CHEYENNE SUPER 10",
+              "sub_label": "1973–1974 Woodgrain-Inlaid Fender Plate",
+              "rpo_code": "YE9",
+              "fender_placement": "Rear Quarter / Bedside",
+              "svg_markup": "<svg></svg>",
+              "provenance_note": "1973–1974 Chevrolet K10 Cheyenne Super badge.",
+              "vetted": true
+            }
+          ],
+          "facets": {
+            "series": "K10 (1/2-Ton 4x4)",
+            "trim_facet": "Cheyenne Super",
+            "body_facet": "Stepside / Flareside"
+          },
+          "sections": [
+            {
+              "kind": "masthead",
+              "identity_source": {
+                "year": 1973,
+                "make": "Chevrolet",
+                "model": "K10 Cheyenne Super Stepside",
+                "normalized_model": "C/K",
+                "series": "K10",
+                "trim": "Cheyenne Super",
+                "transmission": "Manual",
+                "transmission_model": "SM465 4-Speed"
+              },
+              "year": 1973,
+              "make": "Chevrolet",
+              "model": "K10 Cheyenne Super Stepside",
+              "price": {
+                "value": 68500,
+                "unit": "USD",
+                "source": {"kind": "listing", "label": "BRING A TRAILER", "method": "sold"},
+                "observed_at": "2026-09-10T00:00:00Z",
+                "trust": 0.9
+              },
+              "priceLabel": "Last recorded sale"
+            }
+          ]
+        }
+        """
+        let profileWithFacets = try decode(ProfileRead.self, profileWithExplicitMarksAndFacetsJSON)
+        XCTAssertEqual(profileWithFacets.resolvedIdentityMarks.count, 1)
+        XCTAssertEqual(profileWithFacets.resolvedIdentityMarks.first?.displayLabel, "CHEYENNE SUPER 10")
+        XCTAssertEqual(profileWithFacets.facets?.series, "K10 (1/2-Ton 4x4)")
+        XCTAssertEqual(profileWithFacets.facets?.trim_facet, "Cheyenne Super")
+        XCTAssertEqual(profileWithFacets.facets?.body_facet, "Stepside / Flareside")
+
+        let hudChips = ProfileHeaderBlock.hudChips(read: profileWithFacets)
+        XCTAssertEqual(hudChips.count, 4)
+        XCTAssertEqual(hudChips.map(\.kind), [.identityMark, .series, .trimFacet, .bodyFacet])
+        XCTAssertEqual(hudChips.map(\.displayText), [
+            "CHEYENNE SUPER 10",
+            "SERIES · K10 (1/2-Ton 4x4)",
+            "TRIM · Cheyenne Super",
+            "BODY · Stepside / Flareside"
+        ])
+        XCTAssertEqual(hudChips.first?.subLabel, "'73–'74")
+        XCTAssertEqual(hudChips.first?.rpoCode, "YE9")
+
+        // Fallback derivation when `vehicle_profile_read` carries `masthead.identity_source` + `strip.facets`
+        let profileDerivedFacetsJSON = """
+        {
+          "vehicle_id": "10000000-0000-0000-0000-000000000011",
+          "viewer": "anon",
+          "read_at": "2026-10-17T22:00:00Z",
+          "sections": [
+            {
+              "kind": "masthead",
+              "identity_source": {
+                "year": 1978,
+                "make": "Chevrolet",
+                "model": "C10 Silverado",
+                "normalized_model": "C10",
+                "series": "C10",
+                "trim": "Silverado",
+                "transmission": "Automatic",
+                "transmission_model": null
+              },
+              "year": 1978,
+              "make": "Chevrolet",
+              "model": "C10 Silverado",
+              "price": null,
+              "priceLabel": null
+            },
+            {
+              "kind": "strip",
+              "coverage": {"n": 1, "of": 1, "grain": "facts attributed", "as_of": "2026-10-01T00:00:00Z"},
+              "facets": [
+                {
+                  "dimension": "body_style",
+                  "label": "Stepside",
+                  "member": {
+                    "value": "Stepside",
+                    "unit": null,
+                    "source": {"kind": "listing", "label": "MECUM"},
+                    "observed_at": "2026-10-01T00:00:00Z",
+                    "trust": 0.8
+                  }
+                }
+              ],
+              "odometer": null
+            }
+          ]
+        }
+        """
+        let profileDerived = try decode(ProfileRead.self, profileDerivedFacetsJSON)
+        XCTAssertEqual(profileDerived.resolvedFacets.series, "C10 / C1500 (1/2-Ton 2WD)")
+        XCTAssertEqual(profileDerived.resolvedFacets.trim_facet, "Silverado")
+        XCTAssertEqual(profileDerived.resolvedFacets.body_facet, "Stepside / Flareside")
+        let derivedChips = ProfileHeaderBlock.hudChips(read: profileDerived, runtimeMarks: [marks[0]])
+        XCTAssertEqual(derivedChips.map(\.displayText), [
+            "CUSTOM DELUXE 10",
+            "SERIES · C10 / C1500 (1/2-Ton 2WD)",
+            "TRIM · Silverado",
+            "BODY · Stepside / Flareside"
+        ])
+    }
 }

@@ -48,25 +48,34 @@ BEGIN
      'schema.org Organization logo (JSON-LD) on the home page; it reads Gooding & Company while the header now draws Gooding Christie''s as inline SVG with no hosted file', 'any', 2.25, NULL),
     ('rm-sothebys', '3f8d4e4f-d9cb-41b5-9b3b-58ec2325ea37'::uuid, 'RM Sotheby''s', 'rmsothebys.com', NULL,
      'https://rmsothebys.com/images/logo.svg', 'https://rmsothebys.com/',
-     'print logo image on the home page', 'light', 5.08, NULL),
+     'print logo image on the home page', 'dark', 5.68, 'https://nuke.ag/source-logos/rm-sothebys.svg'),
     ('barnfinds', '0daa5b15-5105-48f0-b6d5-68c71be8dcfb'::uuid, 'Barn Finds', 'barnfinds.com', NULL,
      'https://barnfinds.com/wp-content/uploads/2020/03/FB-Logo.gif', 'https://barnfinds.com/',
-     'schema.org Organization logo (JSON-LD) on the home page', 'light', 1.10, NULL),
+     'schema.org Organization logo (JSON-LD) on the home page', 'any', 1.15, NULL),
     ('facebook_marketplace', '6694c750-b216-47c8-a337-d36b4fb8e26b'::uuid, 'Facebook Marketplace', 'facebook.com/marketplace', NULL,
      'https://www.facebook.com/images/fb_icon_325x325.png', 'https://www.facebook.com/marketplace/',
      'Facebook''s own icon at its standard path on facebook.com; Marketplace has no logo file of its own and its page serves only a favicon', 'any', 1.00, NULL),
     ('cars-and-bids', '822cae29-f80e-4859-9c48-a1485a543152'::uuid, 'Cars & Bids', 'carsandbids.com', NULL,
      'https://carsandbids.com/carsandbids.png', 'https://carsandbids.com/',
-     'og:image on the home page: the wordmark on a black card; the header draws it from an image embedded in the stylesheet, so no hosted file', 'any', 1.92, NULL),
+     'og:image on the home page: the wordmark on a black card; the header draws it from an image embedded in the stylesheet, so no hosted file', 'dark', 5.16, NULL),
     ('craigslist', '624b7f80-c4c7-455d-8f0a-f7ae7ff67a42'::uuid, 'Craigslist', 'craigslist.org', NULL,
-     NULL, NULL,
-     NULL, NULL, NULL, NULL),
+     'https://www.craigslist.org/favicon.ico', 'https://www.craigslist.org/',
+     'the site''s own purple peace-symbol icon at /favicon.ico on craigslist.org', 'any', 1.00, NULL),
+    ('pcarmarket', 'f7c80592-6725-448d-9b32-2abf3e011cf8'::uuid, 'PCarMarket', 'pcarmarket.com', NULL,
+     'https://www.pcarmarket.com/favicon.svg', 'https://www.pcarmarket.com/',
+     'the site''s own wheel emblem and header wordmark on pcarmarket.com', 'dark', 3.84, NULL),
+    ('barrett-jackson', '7a3d0d2a-c738-4d8a-a199-1a687aa6cdf4'::uuid, 'Barrett-Jackson', 'barrett-jackson.com', NULL,
+     'https://www.barrett-jackson.com/_next/static/media/186BJ_Logo_Tag.46033550.svg', 'https://www.barrett-jackson.com/',
+     'header logo image on the home page', 'any', 3.98, NULL),
+    ('collecting-cars', '0d435048-f2c5-47ba-bba0-4c18c6d58686'::uuid, 'Collecting Cars', 'collectingcars.com', NULL,
+     'https://collectingcars.com/images/logos/collecting-cars-logo.svg', 'https://collectingcars.com/',
+     'header logo image on the home page', 'any', 1.13, NULL),
     ('ebay_motors', '78ec3d7e-6365-48e3-8294-cee2c1e5b7f5'::uuid, 'eBay Motors', 'ebay.com/motors', NULL,
      'https://ir.ebaystatic.com/cr/v/c1/ebay-logo-1-1200x630-margin.png', 'https://www.ebay.com/motors',
-     'og:image on the eBay Motors page; eBay Motors has no logo of its own and its header draws the eBay logo', 'any', 2.23, NULL),
+     'og:image on the eBay Motors page; eBay Motors has no logo of its own and its header draws the eBay logo', 'any', 2.46, NULL),
     ('sbx-cars', '37b84b5e-ee28-410a-bea5-8d4851e39525'::uuid, 'SBX Cars', 'sbxcars.com', NULL,
      'https://sbxcars.com/assets/images/logos/sbx-cars-sb-2024.svg', 'https://sbxcars.com/',
-     'header logo image on the home page', 'light', 5.46, NULL),
+     'header logo image on the home page', 'dark', 2.75, 'https://nuke.ag/source-logos/sbx-cars.svg'),
     ('beverlyhillscarclub', 'bb6253c0-cb83-4d1c-b95c-09c811064af7'::uuid, 'Beverly Hills Car Club', 'beverlyhillscarclub.com', NULL,
      'https://www.beverlyhillscarclub.com/template/images/logo.png', 'https://www.beverlyhillscarclub.com/',
      'header logo image on the home page', 'light', 0.85, NULL),
@@ -132,9 +141,9 @@ BEGIN
     UPDATE public.observation_sources SET business_id = v_org WHERE slug = t.slug AND business_id IS NULL;
 
     IF t.logo IS NOT NULL THEN
-      -- The logo is a copy of the house's own asset kept at nuke.ag (nuke_frontend/public/source-logos), so no visitor's
+      -- The logo is a high-res transparent PNG copy kept at nuke.ag (nuke_frontend/public/source-logos), so no visitor's
       -- browser calls the house's site and a house that refuses outside use (Bonhams and Broad Arrow do) still shows.
-      v_hosted := 'https://nuke.ag/source-logos/' || t.slug || CASE WHEN t.logo ~* '[.]svg($|[?])' THEN '.svg' ELSE '.png' END;
+      v_hosted := 'https://nuke.ag/source-logos/' || t.slug || '.png';
       -- A logo already recorded is replaced only when it is the house's own address, this hosted copy, or the wrong image
       -- this migration names; anything else is not ours to replace.
       IF EXISTS (SELECT 1 FROM public.organizations o WHERE o.id = v_org
@@ -147,7 +156,8 @@ BEGIN
           'observed_at', '2026-10-15', 'method', 'official-site-asset', 'surface', t.surface, 'aspect', t.aspect)
           || CASE WHEN t.replaces IS NOT NULL THEN jsonb_build_object('replaced', t.replaces) ELSE '{}'::jsonb END),
         updated_at = now()
-      WHERE o.id = v_org AND (o.logo_url IS DISTINCT FROM v_hosted OR NOT (coalesce(o.metadata, '{}'::jsonb) ? 'logo'));
+      WHERE o.id = v_org AND (o.logo_url IS DISTINCT FROM v_hosted OR NOT (coalesce(o.metadata, '{}'::jsonb) ? 'logo')
+        OR (o.metadata->'logo'->>'aspect')::numeric IS DISTINCT FROM t.aspect);
     END IF;
   END LOOP;
 

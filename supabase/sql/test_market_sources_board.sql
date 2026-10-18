@@ -10,8 +10,9 @@
 --     monitor was read within 24 hours;
 --   * anon reads the board only through the reader; only service_role runs the writer;
 --   * refresh-source-target-landed runs once a day at 10:27Z, its command untouched;
---   * only markets rank (auction houses first, then marketplaces); capture channels, aggregators and dealers are counted
---     in not_ranked; each market carries the records it landed in the last 24 hours and 7 days and 14 daily counts.
+--   * auction houses, marketplaces, and dealers rank (auction houses first, then marketplaces, then dealers); capture
+--     channels and aggregators are counted in not_ranked; each source carries the records it landed in the last 24 hours
+--     and 7 days and 14 daily counts.
 \set ON_ERROR_STOP on
 DO $$ BEGIN
   IF current_database() NOT LIKE 'dm_refinement_%'
@@ -132,6 +133,14 @@ SELECT s.id, v.e, v.l, v.u FROM public.live_auction_sources s JOIN (VALUES
 \ir ../migrations/20261018032000_market_sources_rules_and_landing.sql
 \ir ../migrations/20261018033000_market_sources_org_identity.sql
 \ir ../migrations/20261018033000_market_sources_org_identity.sql
+\ir ../migrations/20261018034000_market_sources_hourly_live_landing.sql
+\ir ../migrations/20261018034000_market_sources_hourly_live_landing.sql
+\ir ../migrations/20261018150000_source_pool_depth_estimator.sql
+\ir ../migrations/20261018150000_source_pool_depth_estimator.sql
+\ir ../migrations/20261018153000_market_sources_dealers_and_consignors.sql
+\ir ../migrations/20261018153000_market_sources_dealers_and_consignors.sql
+\ir ../migrations/20261018183000_source_census_audit_and_drill.sql
+\ir ../migrations/20261018183000_source_census_audit_and_drill.sql
 
 -- BaT's organization has a recorded logo; Craigslist has no organization
 WITH org AS (INSERT INTO public.organizations (logo_url, business_type) VALUES ('https://example.test/bat-logo.png', 'auction_house') RETURNING id)
@@ -174,7 +183,19 @@ SELECT pg_temp.ok('two spellings of one source make one row, under the first dec
   (SELECT display_name = 'Cars & Bids' AND landed_lots = 18659 AND map_sales = 1 AND population IS NULL
    FROM public.market_source_days WHERE source_slug = 'cars-and-bids'));
 SELECT pg_temp.ok('a marketplace with held lots and no sales is on the board',
-  (SELECT landed_lots = 8411 AND house IS NULL AND map_sales IS NULL FROM public.market_source_days WHERE source_slug = 'craigslist'));
+  (SELECT landed_lots = 8411 AND house IS NULL AND map_sales IS NULL AND population IS NULL
+   FROM public.market_source_days WHERE source_slug = 'craigslist'));
+SELECT pg_temp.ok('estimate_source_population supports windowed extrapolation and turnover flow regimes',
+  (SELECT population = 37783 AND population_method = 'window_extrapolated' AND population_confidence BETWEEN 0.50 AND 0.78
+   FROM public.estimate_source_population(
+     19305, now(), 'auction', 180, NULL, NULL, NULL, NULL,
+     11279, NULL, NULL, NULL, '{"missing": 8496}'::jsonb, now()
+   ))
+  AND (SELECT population = 37000 AND population_method = 'turnover_model' AND population_confidence BETWEEN 0.40 AND 0.72
+   FROM public.estimate_source_population(
+     3018, now(), 'marketplace', 30, NULL, NULL, NULL, NULL,
+     NULL, 500, 100, NULL, '{"horizon_days": 365}'::jsonb, now()
+   )));
 SELECT pg_temp.ok('24 months of points, oldest first, each [month, sales, dollars]; nothing older, nothing unpriced',
   (SELECT sum((x->>1)::int) = 3 AND sum((x->>2)::numeric) = 180000
           AND bool_and(x->>0 >= to_char(date_trunc('month', current_date) - interval '23 months', 'YYYY-MM'))
@@ -209,11 +230,11 @@ BEGIN
     r->>25 = 'https://example.test/bat-logo.png' AND r->>26 = 'auction_house');
   SELECT x INTO r FROM jsonb_array_elements(b->'rows') x WHERE x->>0 = 'craigslist';
   PERFORM pg_temp.ok('a market without an organization carries none', r->25 = 'null'::jsonb AND r->26 = 'null'::jsonb);
-  PERFORM pg_temp.ok('markets only: auction houses by held lots, then marketplaces by held listings',
+  PERFORM pg_temp.ok('markets and dealers: auction houses by held lots, marketplaces by held listings, dealers by held vehicles',
     (b->>'day')::date = current_date AND (SELECT array_agg(x->>0 ORDER BY ord) FROM jsonb_array_elements(b->'rows') WITH ORDINALITY e(x, ord))
-      = ARRAY['bat', 'mecum', 'cars-and-bids', 'facebook_marketplace', 'craigslist']);
-  PERFORM pg_temp.ok('the capture channel, the aggregator and the dealer are counted, not ranked',
-    b->'not_ranked' = '{"capture channels": 1, "aggregator": 1, "dealer": 1}'::jsonb);
+      = ARRAY['bat', 'mecum', 'cars-and-bids', 'facebook_marketplace', 'craigslist', 'streetside-classics']);
+  PERFORM pg_temp.ok('the capture channel and the aggregator are counted, not ranked',
+    b->'not_ranked' = '{"capture channels": 1, "aggregator": 1}'::jsonb);
   SELECT x INTO r FROM jsonb_array_elements(b->'rows') x WHERE x->>0 = 'mecum';
   PERFORM pg_temp.ok('landing: three records in the last day, four in the week, 14 daily counts, the last landing hour',
     (r->>21)::int = 3 AND (r->>22)::int = 4 AND jsonb_array_length(r->24) = 14
@@ -231,18 +252,92 @@ BEGIN
     (r->>19)::bigint = 48934 AND (r->>20)::date = current_date - 8 AND (r->>4)::bigint = 70000);
   SELECT x INTO r FROM jsonb_array_elements(b->'rows') x WHERE x->>0 = 'craigslist';
   PERFORM pg_temp.ok('no week-earlier reading: null, not zero', r->19 = 'null'::jsonb);
+  PERFORM pg_temp.ok('the board carries 24 hourly counts and 12 five-minute counts per source under landing',
+    jsonb_array_length(b->'landing'->'sources'->'mecum'->'hours24') = 24
+    AND jsonb_array_length(b->'landing'->'sources'->'mecum'->'mins60') = 12
+    AND (b->'landing'->'sources'->'mecum'->>'landed_24h')::int = 3);
+  PERFORM pg_temp.ok('market_source_landing_read drills into a single source down to the hour and recent events',
+    (public.market_source_landing_read('mecum')->>'landed_24h')::int = 3
+    AND jsonb_array_length(public.market_source_landing_read('mecum')->'hours24') = 24
+    AND jsonb_array_length(public.market_source_landing_read('mecum')->'recent') >= 3);
 END $$;
 SELECT pg_temp.fails('anon cannot read the table', $s$SELECT count(*) FROM public.market_source_days$s$);
 SELECT pg_temp.fails('anon cannot write the board', $s$SELECT public.record_market_source_day()$s$);
 RESET ROLE;
 SET ROLE authenticated;
-SELECT pg_temp.ok('authenticated reads the board', jsonb_array_length(public.market_sources_read()->'rows') = 5);
+SELECT pg_temp.ok('authenticated reads the board', jsonb_array_length(public.market_sources_read()->'rows') = 6);
 SELECT pg_temp.fails('authenticated cannot write the landing log', $s$SELECT public.record_market_source_hours(3)$s$);
 SELECT pg_temp.fails('authenticated cannot write the board', $s$SELECT public.record_market_source_day()$s$);
 RESET ROLE;
-SELECT pg_temp.ok('both functions are definers with a pinned search_path',
+SELECT pg_temp.ok('all three functions are definers with a pinned search_path',
   (SELECT bool_and(p.prosecdef AND p.proconfig @> ARRAY['search_path=public, pg_temp']) FROM pg_proc p
-   WHERE p.proname IN ('record_market_source_day', 'market_sources_read')));
-SELECT pg_temp.ok('PUBLIC executes neither',
+   WHERE p.proname IN ('record_market_source_day', 'market_sources_read', 'market_source_landing_read')));
+SELECT pg_temp.ok('PUBLIC executes none of them',
   NOT has_function_privilege('public', 'public.record_market_source_day()', 'execute')
-  AND NOT has_function_privilege('public', 'public.market_sources_read()', 'execute'));
+  AND NOT has_function_privilege('public', 'public.market_sources_read()', 'execute')
+  AND NOT has_function_privilege('public', 'public.market_source_landing_read(text, timestamptz)', 'execute'));
+
+-- Audit contract across RM Sotheby's, Bonhams, Gooding, Collecting Cars, PCarMarket, Hemmings, Classic.com (+ SBX & GAA)
+INSERT INTO public.observation_sources (slug, display_name, category, created_at) VALUES
+  ('rm-sothebys', 'RM Sotheby''s', 'auction', '2025-01-01'),
+  ('bonhams', 'Bonhams', 'auction', '2025-01-01'),
+  ('gooding', 'Gooding & Company', 'auction', '2025-01-01'),
+  ('collecting-cars', 'Collecting Cars', 'auction', '2025-01-01'),
+  ('pcarmarket', 'PCarMarket', 'auction', '2025-01-01'),
+  ('hemmings', 'Hemmings', 'marketplace', '2025-01-01'),
+  ('classic-com', 'Classic.com', 'aggregator', '2025-01-01'),
+  ('sbx-cars', 'SBX Cars', 'auction', '2025-01-01'),
+  ('gaa-classic-cars', 'GAA Classic Cars', 'auction', '2025-01-01');
+INSERT INTO public.source_census (source_id, universe_total, universe_historical, census_method, census_confidence, census_at)
+SELECT id, NULL, NULL, 'unknown', NULL, '2026-10-15 03:00:00+00'::timestamptz
+FROM public.observation_sources WHERE slug IN ('rm-sothebys', 'hemmings');
+INSERT INTO public.mv_source_target_landed VALUES
+  ('rmsothebys', 0, 0, 0, 1404, '2026-10-17 10:27Z'),
+  ('bonhams', 0, 0, 0, 32174, '2026-10-17 10:27Z'),
+  ('gooding', 0, 0, 0, 6993, '2026-10-17 10:27Z'),
+  ('collecting-cars', 0, 0, 0, 651, '2026-10-17 10:27Z'),
+  ('pcarmarket', 0, 0, 0, 6857, '2026-10-17 10:27Z'),
+  ('hemmings', 0, 0, 0, 70, '2026-10-17 10:27Z'),
+  ('classiccom', 0, 0, 0, 82, '2026-10-17 10:27Z'),
+  ('sbxcars', 0, 0, 0, 102, '2026-10-17 10:27Z'),
+  ('sbx', 0, 0, 0, 38, '2026-10-17 10:27Z'),
+  ('gaaclassiccars', 0, 0, 0, 510, '2026-10-17 10:27Z');
+INSERT INTO public.vehicle_events (source_platform, created_at) VALUES
+  ('rmsothebys', now() - interval '5 minutes'),
+  ('bonhams', now() - interval '10 minutes'),
+  ('gooding', now() - interval '15 minutes'),
+  ('collecting_cars', now() - interval '20 minutes'),
+  ('pcarmarket', now() - interval '25 minutes'),
+  ('hemmings', now() - interval '30 minutes'),
+  ('classic-com', now() - interval '35 minutes');
+
+\ir ../migrations/20261018183000_source_census_audit_and_drill.sql
+
+SELECT pg_temp.ok('Classic.com is promoted to marketplace and all 9 audited venues carry high-confidence Regime 1/2 census rows',
+  (SELECT category = 'marketplace' FROM public.observation_sources WHERE slug = 'classic-com')
+  AND (SELECT count(*) = 9
+              AND bool_and(population IS NOT NULL AND population >= landed_lots)
+              AND bool_and(population_method IN ('search_index', 'sitemap', 'bounded'))
+              AND bool_and(population_confidence >= 0.80)
+       FROM public.market_source_days
+       WHERE source_slug IN ('rm-sothebys', 'bonhams', 'gooding', 'collecting-cars', 'pcarmarket', 'hemmings', 'classic-com', 'sbx-cars', 'gaa-classic-cars'))
+  AND (SELECT population = 55740 AND population_method = 'search_index' FROM public.market_source_days WHERE source_slug = 'rm-sothebys')
+  AND (SELECT population = 34101 AND population_method = 'search_index' FROM public.market_source_days WHERE source_slug = 'bonhams')
+  AND (SELECT population = 9600 AND population_method = 'sitemap' FROM public.market_source_days WHERE source_slug = 'gooding')
+  AND (SELECT population = 20578 AND population_method = 'search_index' FROM public.market_source_days WHERE source_slug = 'collecting-cars')
+  AND (SELECT population = 19446 AND population_method = 'sitemap' FROM public.market_source_days WHERE source_slug = 'pcarmarket')
+  AND (SELECT population = 36496 AND population_method = 'search_index' FROM public.market_source_days WHERE source_slug = 'hemmings')
+  AND (SELECT population = 1054187 AND population_method = 'search_index' FROM public.market_source_days WHERE source_slug = 'classic-com')
+  AND (SELECT landed_lots = 140 AND population = 655 AND population_method = 'bounded' FROM public.market_source_days WHERE source_slug = 'sbx-cars'));
+
+SELECT pg_temp.ok('every audited source appears on market_sources_read() and drills cleanly into vehicles and stats via market_source_landing_read()',
+  (SELECT count(*) = 7
+   FROM jsonb_array_elements(public.market_sources_read()->'rows') x
+   WHERE x->>0 IN ('rm-sothebys', 'bonhams', 'gooding', 'collecting-cars', 'pcarmarket', 'hemmings', 'classic-com'))
+  AND (SELECT bool_and(
+         jsonb_array_length(public.market_source_landing_read(s)->'recent') >= 1
+         AND (public.market_source_landing_read(s)->'stats'->>'population')::int > 0
+         AND (public.market_source_landing_read(s)->'stats'->>'held_lots')::int > 0
+       )
+       FROM unnest(ARRAY['rm-sothebys', 'bonhams', 'gooding', 'collecting-cars', 'pcarmarket', 'hemmings', 'classic-com']) s));
+

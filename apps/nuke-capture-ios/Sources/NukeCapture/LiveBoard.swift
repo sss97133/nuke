@@ -246,9 +246,665 @@ struct LiveBoard: Decodable {
     }
 }
 
+// MARK: - Model 32/33 Live Finish Estimates (useFinishEstimates.ts twin)
+
+struct FinishEstimate: Equatable {
+    let vehicleId: String
+    let estimate: Double
+    let low: Double
+    let high: Double
+    let grade: String? // "A", "B", "C"
+    let coverage: Double?
+    let sentence: String?
+    let estimatedAt: Date
+    let bidAtEstimate: Double?
+    let compsThrough: String?
+}
+
+struct FinishAnalog: Equatable, Identifiable {
+    let url: String?
+    let title: String
+    let closed: String?
+    let bid: Double?
+    let finalPrice: Double?
+    let outcome: String?
+    var id: String { "\(title)|\(closed ?? "")|\(url ?? "")" }
+}
+
+struct FinishBoard: Equatable {
+    let fresh: Bool
+    let writerAt: Date?
+    let byId: [String: FinishEstimate]
+
+    static func decode(_ data: Data) -> FinishBoard {
+        guard let obj = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+            return FinishBoard(fresh: false, writerAt: nil, byId: [:])
+        }
+        let fresh = (obj["fresh"] as? Bool) == true
+        let writerAt = (obj["writer_at"] as? String).flatMap(ProfileClock.date)
+        let cols = (obj["columns"] as? [Any])?.map { String(describing: $0) } ?? []
+        func at(_ name: String) -> Int? { cols.firstIndex(of: name) }
+        func num(_ x: Any?) -> Double? {
+            if let d = x as? Double, d.isFinite { return d }
+            if let i = x as? Int { return Double(i) }
+            if let s = x as? String, !s.trimmingCharacters(in: .whitespaces).isEmpty, let d = Double(s), d.isFinite { return d }
+            return nil
+        }
+        func str(_ x: Any?) -> String? {
+            guard let s = x as? String else { return nil }
+            let t = s.trimmingCharacters(in: .whitespacesAndNewlines)
+            return t.isEmpty ? nil : t
+        }
+        var byId: [String: FinishEstimate] = [:]
+        if fresh, let rows = obj["rows"] as? [[Any]] {
+            for row in rows {
+                func get(_ name: String) -> Any? {
+                    guard let idx = at(name), idx < row.count else { return nil }
+                    return row[idx]
+                }
+                guard let id = str(get("vehicle_id")),
+                      let est = num(get("estimate")),
+                      let lo = num(get("low")),
+                      let hi = num(get("high")),
+                      let estAtStr = str(get("estimated_at")),
+                      let estAt = ProfileClock.date(estAtStr),
+                      lo <= est, est <= hi else { continue }
+                let gRaw = str(get("grade"))
+                let grade = (gRaw == "A" || gRaw == "B" || gRaw == "C") ? gRaw : nil
+                byId[id] = FinishEstimate(
+                    vehicleId: id,
+                    estimate: est,
+                    low: lo,
+                    high: hi,
+                    grade: grade,
+                    coverage: num(get("coverage")),
+                    sentence: str(get("sentence")),
+                    estimatedAt: estAt,
+                    bidAtEstimate: num(get("bid_at_estimate")),
+                    compsThrough: str(get("comps_through"))
+                )
+            }
+        }
+        return FinishBoard(fresh: fresh, writerAt: writerAt, byId: byId)
+    }
+
+    static func decodeAnalogs(_ data: Data, vehicleId: String) -> [FinishAnalog] {
+        guard let obj = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let analogsMap = obj["analogs"] as? [String: Any],
+              let list = analogsMap[vehicleId] as? [[String: Any]] else { return [] }
+        func num(_ x: Any?) -> Double? {
+            if let d = x as? Double, d.isFinite { return d }
+            if let i = x as? Int { return Double(i) }
+            if let s = x as? String, !s.trimmingCharacters(in: .whitespaces).isEmpty, let d = Double(s), d.isFinite { return d }
+            return nil
+        }
+        func str(_ x: Any?) -> String? {
+            guard let s = x as? String else { return nil }
+            let t = s.trimmingCharacters(in: .whitespacesAndNewlines)
+            return t.isEmpty ? nil : t
+        }
+        return list.compactMap { o in
+            guard let title = str(o["title"]) else { return nil }
+            let rawUrl = str(o["url"])
+            let validUrl = (rawUrl?.hasPrefix("https://bringatrailer.com/listing/") == true) ? rawUrl : nil
+            return FinishAnalog(
+                url: validUrl,
+                title: title,
+                closed: str(o["closed"]),
+                bid: num(o["bid"]),
+                finalPrice: num(o["final"]),
+                outcome: str(o["outcome"])
+            )
+        }
+    }
+
+    static func fetch() async -> FinishBoard? {
+        guard let res = try? await SupabaseService.client.rpc("live_finish_estimates").execute() else { return nil }
+        return decode(res.data)
+    }
+
+    private struct AnalogParams: Encodable { let p_vehicle_ids: [String] }
+    static func fetchAnalogs(vehicleId: String) async -> [FinishAnalog] {
+        guard let res = try? await SupabaseService.client
+            .rpc("live_finish_estimates", params: AnalogParams(p_vehicle_ids: [vehicleId]))
+            .execute() else { return [] }
+        return decodeAnalogs(res.data, vehicleId: vehicleId)
+    }
+}
+
+// MARK: - Auction Calendar (useAuctionCalendar.ts twin)
+
+struct AuctionCalendar: Decodable, Equatable {
+    struct RunDay: Decodable, Equatable, Identifiable {
+        let day: String
+        let lots: Int
+        var id: String { day }
+    }
+    struct PriorSale: Decodable, Equatable {
+        let sale_key: String
+        let lots: Int
+        let vehicle_lots: Int?
+        let sold: Int?
+        let bid_goes_on: Int?
+        let median_price: Double?
+        let ends_on: String?
+    }
+    struct CalendarSale: Decodable, Equatable, Identifiable {
+        let house: String
+        let sale_key: String
+        let sale_name: String
+        let location: String?
+        let starts_on: String
+        let ends_on: String
+        let lots: Int
+        let seen_before: Int
+        let no_reserve: Int
+        let first_seen_at: String?
+        let first_seen_7d: Int
+        let updated_at: String?
+        let run_days: [RunDay]
+        let lots_listed: Int?
+        let listed_at: String?
+        let prior_sale: PriorSale?
+
+        var id: String { "\(house)|\(sale_key)" }
+    }
+    struct UnplacedSale: Decodable, Equatable, Identifiable {
+        let house: String
+        let sale_key: String
+        let sale_name: String
+        let lots_listed: Int
+        let listed_at: String?
+        var id: String { "\(house)|\(sale_key)" }
+    }
+    struct PriorResult: Decodable, Equatable, Identifiable {
+        let house: String
+        let on: String?
+        let outcome: String
+        let amount: Double?
+        let currency: String?
+        let basis: String?
+        let url: String?
+        var id: String { "\(house)|\(on ?? "")|\(outcome)|\(amount ?? 0)" }
+    }
+    struct RosterLot: Decodable, Equatable, Identifiable {
+        let event_id: String
+        let vehicle_id: String
+        let source_url: String?
+        let lot_number: String?
+        let run_on: String
+        let year: Int?
+        let make: String?
+        let model: String?
+        let image: String?
+        let vin_present: Bool?
+        let has_reserve: Bool?
+        let estimate_low: Double?
+        let estimate_high: Double?
+        let currency: String?
+        let first_seen_at: String?
+        let prior: [PriorResult]?
+
+        var id: String { event_id }
+        var vehicleUUID: UUID? { UUID(uuidString: vehicle_id) }
+        var title: String {
+            let ym = [year.map(String.init), make, model].compactMap { $0 }.joined(separator: " ")
+            return ym.isEmpty ? "Consigned lot" : ym
+        }
+    }
+    struct Roster: Decodable, Equatable {
+        let house: String
+        let sale_key: String
+        let lots: Int
+        let offset: Int
+        let rows: [RosterLot]
+    }
+    struct Population: Decodable, Equatable {
+        let lots: Int
+        let sales: Int
+        let houses: Int
+        let seen_before: Int
+        let no_reserve: Int
+        let first_seen_7d: Int
+        let updated_at: String?
+        let listed: Int?
+    }
+
+    let as_of: String
+    let horizon_days: Int
+    let population: Population
+    let sales: [CalendarSale]
+    let unplaced: [UnplacedSale]?
+    let roster: Roster?
+
+    static let houseNames: [String: String] = [
+        "mecum": "Mecum",
+        "gooding": "Gooding & Co",
+        "barrett-jackson": "Barrett-Jackson",
+        "barrettjackson": "Barrett-Jackson",
+        "rm-sothebys": "RM Sotheby's",
+        "bonhams": "Bonhams",
+        "broad_arrow": "Broad Arrow",
+        "broad-arrow": "Broad Arrow",
+        "bat": "Bring a Trailer",
+        "cars_and_bids": "Cars & Bids",
+        "pcarmarket": "PCarMarket",
+        "collecting_cars": "Collecting Cars"
+    ]
+
+    static func houseName(_ house: String) -> String {
+        houseNames[house] ?? house
+    }
+
+    static func daysUntil(_ day: String, now: Date = Date()) -> Int {
+        let parts = day.split(separator: "-").compactMap { Int($0) }
+        guard parts.count == 3 else { return 0 }
+        var cal = Calendar(identifier: .gregorian)
+        cal.timeZone = TimeZone(secondsFromGMT: 0)!
+        let compsNow = Calendar.current.dateComponents([.year, .month, .day], from: now)
+        guard let targetUTC = cal.date(from: DateComponents(year: parts[0], month: parts[1], day: parts[2])),
+              let todayUTC = cal.date(from: DateComponents(year: compsNow.year, month: compsNow.month, day: compsNow.day)) else {
+            return 0
+        }
+        return Int((targetUTC.timeIntervalSince(todayUTC) / 86_400.0).rounded())
+    }
+
+    static func saleTimer(startsOn: String, endsOn: String, now: Date = Date()) -> String {
+        let toStart = daysUntil(startsOn, now: now)
+        let toEnd = daysUntil(endsOn, now: now)
+        if toEnd < 0 { return "ended" }
+        if toStart <= 0 {
+            let total = toEnd - toStart + 1
+            let today = 1 - toStart
+            return total > 1 ? "running · day \(today) of \(total)" : "running today"
+        }
+        return toStart == 1 ? "tomorrow" : "in \(toStart) days"
+    }
+
+    static func priorSaleLine(house: String, prior: PriorSale?) -> String? {
+        guard let prior, prior.lots > 0 else { return nil }
+        let name = prior.sale_key.split(separator: "-").map { w -> String in
+            let s = String(w)
+            if Int(s) != nil { return s }
+            return s.prefix(1).uppercased() + s.dropFirst()
+        }.joined(separator: " ")
+        let base = "\(houseName(house)) ran \(prior.lots.formatted()) lots at \(name)"
+        if let vLots = prior.vehicle_lots, vLots > 0, let sold = prior.sold {
+            let pct = Int((Double(sold) * 100.0 / Double(vLots)).rounded())
+            return "\(base) · \(pct)% of its vehicles sold"
+        }
+        return base
+    }
+
+    private struct Params: Encodable {
+        let p_days: Int
+        let p_house: String?
+        let p_sale_key: String?
+        let p_limit: Int
+        let p_offset: Int
+    }
+
+    static func fetch(house: String? = nil, saleKey: String? = nil, offset: Int = 0) async throws -> AuctionCalendar {
+        try await SupabaseService.client
+            .rpc("auction_calendar_read", params: Params(p_days: 200, p_house: house, p_sale_key: saleKey, p_limit: 100, p_offset: offset))
+            .execute()
+            .value
+    }
+}
+
+// MARK: - Sources Board (SourcesBoard.tsx twin)
+
+enum LandingHorizon: String, CaseIterable, Identifiable {
+    case d14 = "14d"
+    case h24 = "24h"
+    case h1 = "1h"
+    var id: String { rawValue }
+}
+
+struct SourcesBoardData: Equatable {
+    struct BoardLandingMeta: Equatable {
+        let hour: String?
+        let bucket5m: String?
+        let landed15m: Int
+        let landed1h: Int
+        let landed24: Int
+        let landed7: Int
+        let hours24: [Int]
+        let mins60: [Int]
+    }
+
+    struct SourceRow: Equatable, Identifiable {
+        let source: String
+        let name: String
+        let category: String?
+        let house: String?
+        let held: Int?
+        let heldAt: String?
+        let population: Int?
+        let populationMethod: String?
+        let populationConfidence: Double?
+        let mapSales: Int?
+        let mapUsd: Double?
+        let sales12: Int?
+        let usd12: Double?
+        let salesPrior12: Int?
+        let usdPrior12: Double?
+        let live: Int
+        var landed15m: Int = 0
+        var landed1h: Int = 0
+        let landed24: Int
+        let landed7: Int
+        let lastLanded: String?
+        var days14: [Int] = []
+        var hours24: [Int] = []
+        var mins60: [Int] = []
+        let logoUrl: String?
+        let businessType: String?
+
+        var id: String { source }
+
+        private static let estimatedMethods: Set<String> = [
+            "window_extrapolated",
+            "turnover_model",
+            "capture_model",
+        ]
+
+        var shortName: String {
+            guard let range = name.range(of: #"\s*\([^)]*\)\s*$"#, options: .regularExpression) else { return name }
+            let trimmed = String(name[..<range.lowerBound])
+            return trimmed.isEmpty ? name : trimmed
+        }
+
+        var heldShareText: String {
+            guard let held else { return "" }
+            if let pop = population, pop > 0 {
+                let share = Double(held) / Double(pop)
+                let pct = share >= 0.995 ? "100%" : (share < 0.01 ? "<1%" : "\(Int((share * 100.0).rounded()))%")
+                let method = populationMethod ?? "enumerated"
+                if Self.estimatedMethods.contains(method) {
+                    let conf = Int(((populationConfidence ?? 0.35) * 100.0).rounded())
+                    return "\(pct) of ~\(pop.formatted()) · \(conf)% conf"
+                }
+                let ofWord = method == "enumerated" ? "of" : "of about"
+                return "\(pct) \(ofWord) \(pop.formatted())"
+            }
+            let h = Double(max(1, held))
+            let unseenRatio = max(0.28, 1.65 / log(M_E + h / 300.0))
+            let estPop = max(held + 1, Int((h * (1.0 + unseenRatio)).rounded()))
+            let share = Double(held) / Double(estPop)
+            let pct = share >= 0.995 ? "100%" : (share < 0.01 ? "<1%" : "\(Int((share * 100.0).rounded()))%")
+            let confRaw = min(0.58, max(0.15, 0.14 + 0.08 * min(1.0, log(1.0 + h) / log(100001.0)) + 0.25 * (h / Double(estPop))))
+            let conf = Int((confRaw * 100.0).rounded())
+            return "\(pct) of ~\(estPop.formatted()) · \(conf)% conf"
+        }
+
+        func bins(for horizon: LandingHorizon) -> [Int] {
+            switch horizon {
+            case .d14: return days14
+            case .h24: return hours24
+            case .h1: return mins60
+            }
+        }
+
+        func landingText(horizon: LandingHorizon = .d14, now: Date = Date()) -> (active: Bool, text: String) {
+            switch horizon {
+            case .h1:
+                if landed1h > 0 {
+                    let sub = landed15m > 0 ? " (+\(landed15m.formatted()) in 15m)" : ""
+                    return (true, "+\(landed1h.formatted()) in 1h\(sub)")
+                }
+            case .h24:
+                if landed24 > 0 {
+                    let sub = landed1h > 0 ? " (+\(landed1h.formatted()) in 1h)" : ""
+                    return (true, "+\(landed24.formatted()) in 24h\(sub)")
+                }
+            case .d14:
+                if landed24 > 0 {
+                    return (true, "+\(landed24.formatted()) today")
+                }
+            }
+            guard let lastLanded else { return (false, "idle 14+ days") }
+            guard let d = ProfileClock.date(lastLanded) else { return (false, "idle") }
+            let f = DateFormatter()
+            f.locale = Locale(identifier: "en_US_POSIX")
+            f.timeZone = TimeZone(secondsFromGMT: 0)
+            f.dateFormat = "MMM d"
+            return (false, "idle since \(f.string(from: d))")
+        }
+    }
+
+    let asOf: String
+    let day: String?
+    let rows: [SourceRow]
+    let notRanked: [String: Int]
+    var landing: BoardLandingMeta = BoardLandingMeta(hour: nil, bucket5m: nil, landed15m: 0, landed1h: 0, landed24: 0, landed7: 0, hours24: Array(repeating: 0, count: 24), mins60: Array(repeating: 0, count: 12))
+
+    static func parse(_ data: Data) -> SourcesBoardData? {
+        guard let v = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let asOf = v["as_of"] as? String,
+              let cols = (v["columns"] as? [Any])?.map({ String(describing: $0) }),
+              let rawRows = v["rows"] as? [[Any]] else { return nil }
+        func at(_ name: String) -> Int? { cols.firstIndex(of: name) }
+        guard at("source") != nil, at("name") != nil, at("held_lots") != nil else { return nil }
+        func num(_ x: Any?) -> Double? {
+            if let d = x as? Double, d.isFinite { return d }
+            if let i = x as? Int { return Double(i) }
+            if let s = x as? String, !s.trimmingCharacters(in: .whitespaces).isEmpty, let d = Double(s), d.isFinite { return d }
+            return nil
+        }
+        func str(_ x: Any?) -> String? {
+            guard let s = x as? String, !s.isEmpty else { return nil }
+            return s
+        }
+        func intArray(_ x: Any?, len: Int? = nil) -> [Int] {
+            guard let arr = x as? [Any] else {
+                return len.map { Array(repeating: 0, count: $0) } ?? []
+            }
+            let parsed = arr.map { Int((num($0) ?? 0).rounded()) }
+            if let len, parsed.count < len {
+                return Array(repeating: 0, count: len - parsed.count) + parsed
+            }
+            return parsed
+        }
+
+        let rawLanding = v["landing"] as? [String: Any]
+        let rawSourcesLanding = (rawLanding?["sources"] as? [String: Any]) ?? [:]
+        let rawTotals = (rawLanding?["totals"] as? [String: Any]) ?? [:]
+
+        var out: [SourceRow] = []
+        for r in rawRows {
+            func get(_ c: String) -> Any? {
+                guard let idx = at(c), idx < r.count else { return nil }
+                return r[idx]
+            }
+            guard let source = str(get("source")), let name = str(get("name")) else { continue }
+            let srcLand = rawSourcesLanding[source] as? [String: Any]
+            let l24 = Int((num(srcLand?["landed_24h"]) ?? num(get("landed_24h")) ?? 0).rounded())
+            let l7 = Int((num(srcLand?["landed_7d"]) ?? num(get("landed_7d")) ?? 0).rounded())
+            let l15m = Int((num(srcLand?["landed_15m"]) ?? 0).rounded())
+            let l1h = Int((num(srcLand?["landed_1h"]) ?? 0).rounded())
+            let lastAt = str(srcLand?["last_at"]) ?? str(get("last_landed"))
+            let d14 = intArray(get("days14"))
+            let h24 = (srcLand?["hours24"] != nil) ? intArray(srcLand?["hours24"], len: 24) : (Array(repeating: 0, count: 23) + [l24])
+            let m60 = (srcLand?["mins60"] != nil) ? intArray(srcLand?["mins60"], len: 12) : (Array(repeating: 0, count: 11) + [l1h])
+
+            out.append(SourceRow(
+                source: source,
+                name: name,
+                category: str(get("category")),
+                house: str(get("house")),
+                held: num(get("held_lots")).map { Int($0.rounded()) },
+                heldAt: str(get("held_at")),
+                population: num(get("population")).map { Int($0.rounded()) },
+                populationMethod: str(get("population_method")),
+                populationConfidence: num(get("population_confidence")),
+                mapSales: num(get("map_sales")).map { Int($0.rounded()) },
+                mapUsd: num(get("map_usd")),
+                sales12: num(get("sales_12m")).map { Int($0.rounded()) },
+                usd12: num(get("usd_12m")),
+                salesPrior12: num(get("sales_prior_12m")).map { Int($0.rounded()) },
+                usdPrior12: num(get("usd_prior_12m")),
+                live: Int((num(get("live_lots")) ?? 0).rounded()),
+                landed15m: l15m,
+                landed1h: l1h,
+                landed24: l24,
+                landed7: l7,
+                lastLanded: lastAt,
+                days14: d14,
+                hours24: h24,
+                mins60: m60,
+                logoUrl: str(get("logo_url")),
+                businessType: str(get("business_type"))
+            ))
+        }
+        var notRanked: [String: Int] = [:]
+        if let nr = v["not_ranked"] as? [String: Any] {
+            for (k, val) in nr {
+                if let c = num(val), c > 0 { notRanked[k] = Int(c.rounded()) }
+            }
+        }
+        let landingMeta = BoardLandingMeta(
+            hour: str(rawLanding?["hour"]) ?? asOf,
+            bucket5m: str(rawLanding?["bucket_5m"]) ?? asOf,
+            landed15m: Int((num(rawTotals["landed_15m"]) ?? Double(out.reduce(0) { $0 + $1.landed15m })).rounded()),
+            landed1h: Int((num(rawTotals["landed_1h"]) ?? Double(out.reduce(0) { $0 + $1.landed1h })).rounded()),
+            landed24: Int((num(rawTotals["landed_24h"]) ?? Double(out.reduce(0) { $0 + $1.landed24 })).rounded()),
+            landed7: Int((num(rawTotals["landed_7d"]) ?? Double(out.reduce(0) { $0 + $1.landed7 })).rounded()),
+            hours24: intArray(rawTotals["hours24"], len: 24),
+            mins60: intArray(rawTotals["mins60"], len: 12)
+        )
+        return SourcesBoardData(asOf: asOf, day: str(v["day"]), rows: out, notRanked: notRanked, landing: landingMeta)
+    }
+
+    static func fetch() async -> SourcesBoardData? {
+        guard let res = try? await SupabaseService.client.rpc("market_sources_read").execute() else { return nil }
+        return parse(res.data)
+    }
+}
+
+/// Hourly & live landing drill-down for a source (`market_source_landing_read` #1825).
+struct SourceLandingDetail: Equatable {
+    struct RecentEvent: Equatable, Identifiable {
+        let id: String
+        let source: String
+        let eventType: String?
+        let eventStatus: String?
+        let price: Double?
+        let title: String?
+        let lot: String?
+        let vehicleId: String?
+        let sourceUrl: String?
+        let createdAt: String
+
+        var vehicleUUID: UUID? { vehicleId.flatMap(UUID.init(uuidString:)) }
+        var openableURL: URL? {
+            guard let sourceUrl, sourceUrl.lowercased().hasPrefix("http") else { return nil }
+            return URL(string: sourceUrl)
+        }
+    }
+
+    let asOf: String
+    let source: String?
+    let hour: String?
+    let selectedHour: String?
+    let bucket5m: String?
+    let landed15m: Int
+    let landed1h: Int
+    let landed24: Int
+    let landed7: Int
+    let lastLanded: String?
+    let hours24: [Int]
+    let mins60: [Int]
+    let days14: [Int]
+    let recent: [RecentEvent]
+
+    static func parse(_ data: Data) -> SourceLandingDetail? {
+        guard let v = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let asOf = v["as_of"] as? String else { return nil }
+        func num(_ x: Any?) -> Double? {
+            if let d = x as? Double, d.isFinite { return d }
+            if let i = x as? Int { return Double(i) }
+            if let s = x as? String, !s.trimmingCharacters(in: .whitespaces).isEmpty, let d = Double(s), d.isFinite { return d }
+            return nil
+        }
+        func str(_ x: Any?) -> String? {
+            guard let s = x as? String, !s.isEmpty else { return nil }
+            return s
+        }
+        func intArray(_ x: Any?, len: Int) -> [Int] {
+            guard let arr = x as? [Any] else { return Array(repeating: 0, count: len) }
+            let parsed = arr.map { Int((num($0) ?? 0).rounded()) }
+            if parsed.count < len { return Array(repeating: 0, count: len - parsed.count) + parsed }
+            return parsed
+        }
+        var recent: [RecentEvent] = []
+        if let rawRecent = v["recent"] as? [[String: Any]] {
+            for ev in rawRecent {
+                guard let id = str(ev["id"]),
+                      let source = str(ev["source"]),
+                      let createdAt = str(ev["created_at"]) else { continue }
+                recent.append(RecentEvent(
+                    id: id,
+                    source: source,
+                    eventType: str(ev["event_type"]),
+                    eventStatus: str(ev["event_status"]),
+                    price: num(ev["price"]),
+                    title: str(ev["title"]),
+                    lot: str(ev["lot"]),
+                    vehicleId: str(ev["vehicle_id"]),
+                    sourceUrl: str(ev["source_url"]),
+                    createdAt: createdAt
+                ))
+            }
+        }
+        return SourceLandingDetail(
+            asOf: asOf,
+            source: str(v["source"]),
+            hour: str(v["hour"]),
+            selectedHour: str(v["selected_hour"]),
+            bucket5m: str(v["bucket_5m"]),
+            landed15m: Int((num(v["landed_15m"]) ?? 0).rounded()),
+            landed1h: Int((num(v["landed_1h"]) ?? 0).rounded()),
+            landed24: Int((num(v["landed_24h"]) ?? 0).rounded()),
+            landed7: Int((num(v["landed_7d"]) ?? 0).rounded()),
+            lastLanded: str(v["last_landed"]),
+            hours24: intArray(v["hours24"], len: 24),
+            mins60: intArray(v["mins60"], len: 12),
+            days14: intArray(v["days14"], len: 14),
+            recent: recent
+        )
+    }
+
+    private struct Params: Encodable {
+        let p_source: String?
+        let p_hour: String?
+    }
+
+    static func fetch(source: String, hour: String? = nil) async -> SourceLandingDetail? {
+        guard let res = try? await SupabaseService.client
+            .rpc("market_source_landing_read", params: Params(p_source: source, p_hour: hour))
+            .execute() else { return nil }
+        return parse(res.data)
+    }
+}
+
 /// The board as a list ending soonest first, refetched every minute as on the web.
 struct LiveBoardView: View {
+    enum SubLens: String, CaseIterable, Identifiable {
+        case live = "Live Auctions"
+        case calendar = "Calendar"
+        case sources = "Sources"
+        var id: String { rawValue }
+    }
+
+    @State private var subLens: SubLens = .live
     @State private var board: LiveBoard?
+    @State private var finishBoard: FinishBoard?
+    @State private var calendar: AuctionCalendar?
+    @State private var sourcesBoard: SourcesBoardData?
+    @State private var selectedSale: AuctionCalendar.CalendarSale?
+    @State private var selectedSource: SourcesBoardData.SourceRow?
+    @State private var landingHorizon: LandingHorizon = .d14
     @State private var loadError = false
     @State private var loadErrorDetail: String?
     // The map's selection narrows the list to one brand, then one decade: one population, one
@@ -318,54 +974,92 @@ struct LiveBoardView: View {
                         LedgerMapView()
                             .listRowInsets(EdgeInsets(top: 8, leading: 12, bottom: 4, trailing: 12))
                             .listRowBackground(Color.clear)
-                    }
-                    // The board drawn as the web draws it: brands as boxes, decades inside.
-                    Section {
-                        LiveInventoryMapView(lots: openLots) { make, decade in
-                            filterMake = make; filterDecade = decade
+                        Picker("Board", selection: $subLens) {
+                            ForEach(SubLens.allCases) { lens in
+                                Text(lens.rawValue).tag(lens)
+                            }
                         }
-                        .listRowInsets(EdgeInsets(top: 4, leading: 8, bottom: 4, trailing: 8))
+                        .pickerStyle(.segmented)
+                        .listRowInsets(EdgeInsets(top: 4, leading: 12, bottom: 6, trailing: 12))
                         .listRowBackground(Color.clear)
-                        if let f = filterLine {
-                            HStack(spacing: 8) {
-                                Text(f).font(.caption2.monospaced()).foregroundStyle(.secondary).lineLimit(1)
-                                Spacer(minLength: 0)
-                                Button("All") { filterMake = nil; filterDecade = nil }.font(.caption2)
-                            }
-                            .listRowBackground(Color.clear)
-                        }
-                        if let w = weekAgoLine {
-                            Text(w).font(.caption2.monospaced()).foregroundStyle(.secondary)
-                                .listRowBackground(Color.clear)
-                        }
-                    } header: {
-                        Text(board.coverageSentence(at: now))
-                            .font(.caption2.monospaced())
-                            .textCase(nil)
                     }
-                    Section {
-                        ForEach(lots) { lot in
-                            if let uuid = lot.vehicleUUID {
-                                NavigationLink(value: VehicleHeaderRow(id: uuid, year: lot.year, make: lot.make,
-                                                                       model: lot.model, trim: nil, primary_image_url: lot.imageUrl,
-                                                                       city: nil, state: nil)) {
-                                    row(lot)
-                                }
-                            } else {
-                                row(lot)   // a row without a readable vehicle id opens nothing, never a random record
+
+                    switch subLens {
+                    case .live:
+                        // The board drawn as the web draws it: brands as boxes, decades inside.
+                        Section {
+                            LiveInventoryMapView(lots: openLots) { make, decade in
+                                filterMake = make; filterDecade = decade
                             }
+                            .listRowInsets(EdgeInsets(top: 4, leading: 8, bottom: 4, trailing: 8))
+                            .listRowBackground(Color.clear)
+                            if let f = filterLine {
+                                HStack(spacing: 8) {
+                                    Text(f).font(.caption2.monospaced()).foregroundStyle(.secondary).lineLimit(1)
+                                    Spacer(minLength: 0)
+                                    Button("All") { filterMake = nil; filterDecade = nil }.font(.caption2)
+                                }
+                                .listRowBackground(Color.clear)
+                            }
+                            if let w = weekAgoLine {
+                                Text(w).font(.caption2.monospaced()).foregroundStyle(.secondary)
+                                    .listRowBackground(Color.clear)
+                            }
+                        } header: {
+                            Text(board.coverageSentence(at: now))
+                                .font(.caption2.monospaced())
+                                .textCase(nil)
                         }
-                    } header: {
-                        Text(filterMake == nil ? "Ending soonest" : "Ending soonest in the selection")
-                            .font(.caption2.monospaced())
-                            .textCase(nil)
-                    } footer: {
-                        Text("Bring a Trailer runs every auction in US dollars; bids are as the board recorded them. Running hot or cold compares the bid with the typical bid at this point in the auction for cars priced like its comparable sales; tap the tag for the reading. The record clock is the last write to the row, not the source read time.")
+                        Section {
+                            ForEach(lots) { lot in
+                                if let uuid = lot.vehicleUUID {
+                                    NavigationLink(value: VehicleHeaderRow(id: uuid, year: lot.year, make: lot.make,
+                                                                           model: lot.model, trim: nil, primary_image_url: lot.imageUrl,
+                                                                           city: nil, state: nil)) {
+                                        row(lot)
+                                    }
+                                } else {
+                                    row(lot)   // a row without a readable vehicle id opens nothing, never a random record
+                                }
+                            }
+                        } header: {
+                            HStack {
+                                Text(filterMake == nil ? "Ending soonest" : "Ending soonest in the selection")
+                                    .font(.caption2.monospaced())
+                                    .textCase(nil)
+                                Spacer(minLength: 4)
+                                if let fb = finishBoard, fb.fresh, !fb.byId.isEmpty {
+                                    Text("\(fb.byId.count.formatted()) finish est.")
+                                        .font(.caption2.monospaced())
+                                        .foregroundStyle(.secondary)
+                                        .textCase(nil)
+                                }
+                            }
+                        } footer: {
+                            Text("Bring a Trailer runs every auction in US dollars; bids are as the board recorded them. Running hot or cold compares the bid with the typical bid at this point in the auction for cars priced like its comparable sales; Est. is the Model 33 live finish estimate with its 80% interval (low–high). Tap the tag for the reading and comparable sales.")
+                        }
+
+                    case .calendar:
+                        calendarSection
+
+                    case .sources:
+                        sourcesSection
                     }
                 }
                 .listStyle(.plain)
                 .sheet(item: $reading) { lot in
-                    if let heat = lot.heat(curve: board.curve, at: now) { HeatReadingSheet(lot: lot, heat: heat, now: now) }
+                    HeatReadingSheet(
+                        lot: lot,
+                        heat: lot.heat(curve: board.curve, at: now),
+                        finishEstimate: finishBoard?.byId[lot.id],
+                        now: now
+                    )
+                }
+                .sheet(item: $selectedSale) { sale in
+                    SaleRosterSheet(sale: sale)
+                }
+                .sheet(item: $selectedSource) { src in
+                    SourceLandingSheet(sourceRow: src)
                 }
             } else if loadError {
                 ContentUnavailableView {
@@ -390,12 +1084,237 @@ struct LiveBoardView: View {
                 try? await Task.sleep(for: .seconds(60))
             }
         }
+        .onChange(of: subLens) {
+            Task { await loadSubLensIfNeeded() }
+        }
+    }
+
+    @ViewBuilder private var calendarSection: some View {
+        if let cal = calendar {
+            Section {
+                ForEach(cal.sales) { sale in
+                    Button {
+                        selectedSale = sale
+                    } label: {
+                        calendarSaleRow(sale)
+                    }
+                    .buttonStyle(.plain)
+                }
+            } header: {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("\(cal.population.lots.formatted()) consigned lots across \(cal.population.sales) sales (\(cal.population.houses) houses · next \(cal.horizon_days)d)")
+                        .font(.caption2.monospaced())
+                        .textCase(nil)
+                    Text("\(cal.population.seen_before.formatted()) seen in Nuke before · \(cal.population.no_reserve.formatted()) no reserve · +\(cal.population.first_seen_7d.formatted()) in 7d")
+                        .font(.caption2.monospaced())
+                        .foregroundStyle(.secondary)
+                        .textCase(nil)
+                }
+            } footer: {
+                if let unplaced = cal.unplaced, !unplaced.isEmpty {
+                    let line = unplaced.map { "\(AuctionCalendar.houseName($0.house)) \($0.sale_name) (\($0.lots_listed.formatted()) listed on site)" }.joined(separator: " · ")
+                    Text("Listed on house site without run dates yet: \(line)")
+                        .font(.caption2)
+                }
+            }
+        } else {
+            Section {
+                HStack(spacing: 8) {
+                    ProgressView()
+                    Text("Reading auction calendar…")
+                        .font(.caption.monospaced())
+                        .foregroundStyle(.secondary)
+                }
+            }
+        }
+    }
+
+    @ViewBuilder private func calendarSaleRow(_ sale: AuctionCalendar.CalendarSale) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            HStack(alignment: .firstTextBaseline) {
+                Text("\(AuctionCalendar.houseName(sale.house)) · \(sale.sale_name)")
+                    .font(.subheadline.weight(.semibold))
+                Spacer(minLength: 4)
+                Text(AuctionCalendar.saleTimer(startsOn: sale.starts_on, endsOn: sale.ends_on, now: now))
+                    .font(.caption2.monospaced().weight(.semibold))
+                    .foregroundStyle(.secondary)
+            }
+            HStack(spacing: 8) {
+                Text("\(sale.starts_on) → \(sale.ends_on)")
+                    .font(.caption2.monospaced())
+                    .foregroundStyle(.secondary)
+                if let loc = sale.location, !loc.isEmpty {
+                    Text("· \(loc)")
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                }
+            }
+            HStack(spacing: 8) {
+                Text("\(sale.lots.formatted()) lots in Nuke")
+                    .font(.caption2.monospaced().weight(.semibold))
+                if let listed = sale.lots_listed, listed > 0 {
+                    Text("of \(listed.formatted()) on site")
+                        .font(.caption2.monospaced())
+                        .foregroundStyle(.secondary)
+                }
+                if sale.no_reserve > 0 {
+                    Text("· \(sale.no_reserve.formatted()) NR")
+                        .font(.caption2.monospaced())
+                        .foregroundStyle(.secondary)
+                }
+                if sale.seen_before > 0 {
+                    Text("· \(sale.seen_before.formatted()) repeat")
+                        .font(.caption2.monospaced())
+                        .foregroundStyle(.secondary)
+                }
+            }
+            if let priorLine = AuctionCalendar.priorSaleLine(house: sale.house, prior: sale.prior_sale) {
+                Text(priorLine)
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+            }
+        }
+        .padding(.vertical, 4)
+    }
+
+    @ViewBuilder private var sourcesSection: some View {
+        if let sb = sourcesBoard {
+            let totalHeld = sb.rows.reduce(0) { $0 + ($1.held ?? 0) }
+            let total24 = sb.landing.landed24 > 0 ? sb.landing.landed24 : sb.rows.reduce(0) { $0 + $1.landed24 }
+            let total1h = sb.landing.landed1h
+            let total15m = sb.landing.landed15m
+            Section {
+                HStack(spacing: 8) {
+                    Text("LANDING WINDOW")
+                        .font(.system(size: 10, weight: .semibold, design: .monospaced))
+                        .foregroundStyle(.secondary)
+                    Spacer()
+                    Picker("Window", selection: $landingHorizon) {
+                        ForEach(LandingHorizon.allCases) { h in
+                            Text(h.rawValue).tag(h)
+                        }
+                    }
+                    .pickerStyle(.segmented)
+                    .frame(maxWidth: 160)
+                }
+                .padding(.vertical, 2)
+                ForEach(sb.rows) { src in
+                    Button {
+                        selectedSource = src
+                    } label: {
+                        sourceRow(src)
+                    }
+                    .buttonStyle(.plain)
+                }
+            } header: {
+                VStack(alignment: .leading, spacing: 2) {
+                    let livePulse = total1h > 0 ? " · +\(total1h.formatted()) in 1h" + (total15m > 0 ? " (+\(total15m.formatted()) in 15m)" : "") : ""
+                    Text("\(sb.rows.count) ranked sources · \(totalHeld.formatted()) records held · +\(total24.formatted()) in 24h\(livePulse)")
+                        .font(.caption2.monospaced())
+                        .textCase(nil)
+                    Text("as of \(ProfileClock.Absolute(sb.asOf)) · tap a source for hourly & live intake")
+                        .font(.caption2.monospaced())
+                        .foregroundStyle(.secondary)
+                        .textCase(nil)
+                }
+            } footer: {
+                if !sb.notRanked.isEmpty {
+                    let nr = sb.notRanked.sorted { $0.value > $1.value }.map { "\($0.key): \($0.value.formatted())" }.joined(separator: " · ")
+                    Text("Additional sources not ranked: \(nr)")
+                        .font(.caption2)
+                }
+            }
+        } else {
+            Section {
+                HStack(spacing: 8) {
+                    ProgressView()
+                    Text("Reading sources board…")
+                        .font(.caption.monospaced())
+                        .foregroundStyle(.secondary)
+                }
+            }
+        }
+    }
+
+    @ViewBuilder private func sourceRow(_ src: SourcesBoardData.SourceRow) -> some View {
+        let land = src.landingText(horizon: landingHorizon, now: now)
+        let bins = src.bins(for: landingHorizon)
+        let peak = max(bins.max() ?? 0, 1)
+        VStack(alignment: .leading, spacing: 4) {
+            HStack(alignment: .firstTextBaseline) {
+                Text(src.shortName)
+                    .font(.subheadline.weight(.semibold))
+                if let cat = src.category {
+                    Text(cat.uppercased())
+                        .font(.system(size: 9, weight: .semibold, design: .monospaced))
+                        .foregroundStyle(.secondary)
+                }
+                Spacer(minLength: 4)
+                if !bins.isEmpty, bins.contains(where: { $0 > 0 }) {
+                    HStack(alignment: .bottom, spacing: 1.5) {
+                        ForEach(Array(bins.enumerated()), id: \.offset) { idx, val in
+                            let h = max(val > 0 ? 3.0 : 1.0, (Double(val) / Double(peak)) * 14.0)
+                            RoundedRectangle(cornerRadius: 1)
+                                .fill(idx == bins.count - 1 && val > 0 ? Color.green : Color.secondary.opacity(val > 0 ? 0.65 : 0.2))
+                                .frame(width: 2.5, height: h)
+                        }
+                    }
+                    .frame(height: 14)
+                }
+                Text(land.text)
+                    .font(.caption2.monospaced().weight(land.active ? .semibold : .regular))
+                    .foregroundStyle(land.active ? Color.green : Color.secondary)
+            }
+            HStack(spacing: 8) {
+                if let held = src.held {
+                    Text("\(held.formatted()) held")
+                        .font(.caption2.monospaced().weight(.semibold))
+                }
+                let share = src.heldShareText
+                if !share.isEmpty {
+                    Text("(\(share))")
+                        .font(.caption2.monospaced())
+                        .foregroundStyle(.secondary)
+                }
+                Spacer(minLength: 0)
+                if let s12 = src.sales12, s12 > 0 {
+                    Text("\(s12.formatted()) 12m sales")
+                        .font(.caption2.monospaced())
+                        .foregroundStyle(.secondary)
+                }
+                if let u12 = src.usd12, u12 > 0 {
+                    Text(LedgerMap.money(u12))
+                        .font(.caption2.monospaced().weight(.semibold))
+                }
+            }
+        }
+        .padding(.vertical, 3)
+    }
+
+    private func loadSubLensIfNeeded() async {
+        switch subLens {
+        case .live:
+            break
+        case .calendar:
+            if calendar == nil {
+                calendar = try? await AuctionCalendar.fetch()
+            }
+        case .sources:
+            if sourcesBoard == nil {
+                sourcesBoard = await SourcesBoardData.fetch()
+            }
+        }
     }
 
     /// One read of the board. A failed refresh never wipes a board already on screen.
     private func load() async {
         do {
-            board = try await LiveBoard.fetch()
+            async let bTask = LiveBoard.fetch()
+            async let fTask = FinishBoard.fetch()
+            let (b, fb) = try await (bTask, fTask)
+            board = b
+            if let fb { finishBoard = fb }
             now = Date()
             loadError = false
             #if DEBUG
@@ -413,6 +1332,8 @@ struct LiveBoardView: View {
     }
 
     @ViewBuilder private func row(_ lot: LiveAuction) -> some View {
+        let est = finishBoard?.byId[lot.id]
+        let heat = lot.heat(curve: board?.curve, at: now)
         HStack(alignment: .top, spacing: 12) {
             Color(.secondarySystemFill)
                 .frame(width: 64, height: 48)
@@ -445,17 +1366,36 @@ struct LiveBoardView: View {
                         }
                     }
                 }
-                // The web's HeatTag: shown only when the reading is hot or cold, the reasoning one tap away.
-                if let heat = lot.heat(curve: board?.curve, at: now), heat.state != .inLine {
-                    Button {
-                        reading = lot
-                    } label: {
-                        Text((heat.state == .hot ? "Running hot" : "Running cold") + " · " + Self.multiple(heat.ratio))
-                            .font(.caption2.monospaced().weight(.semibold))
-                            .foregroundStyle(heat.state == .hot ? Color.orange : Color.teal)
+                // Model 33 live finish estimate + HeatTag reading, one tap away.
+                if est != nil || (heat != nil && heat?.state != .inLine) {
+                    HStack(spacing: 8) {
+                        if let heat, heat.state != .inLine {
+                            Button {
+                                reading = lot
+                            } label: {
+                                Text((heat.state == .hot ? "Running hot" : "Running cold") + " · " + Self.multiple(heat.ratio))
+                                    .font(.caption2.monospaced().weight(.semibold))
+                                    .foregroundStyle(heat.state == .hot ? Color.orange : Color.teal)
+                            }
+                            .buttonStyle(.borderless)
+                            .accessibilityLabel("Why \(lot.headline) is running \(heat.state == .hot ? "hot" : "cold")")
+                        }
+                        if let est {
+                            Button {
+                                reading = lot
+                            } label: {
+                                HStack(spacing: 4) {
+                                    Text("Est. \(Self.bidNumber(est.estimate, compact: true))")
+                                        .font(.caption2.monospaced().weight(.semibold))
+                                    Text("(\(Self.bidNumber(est.low, compact: true))–\(Self.bidNumber(est.high, compact: true))\(est.grade.map { " · \($0)" } ?? ""))")
+                                        .font(.caption2.monospaced())
+                                        .foregroundStyle(.secondary)
+                                }
+                            }
+                            .buttonStyle(.borderless)
+                            .accessibilityLabel("Model 33 finish estimate for \(lot.headline)")
+                        }
                     }
-                    .buttonStyle(.borderless)
-                    .accessibilityLabel("Why \(lot.headline) is running \(heat.state == .hot ? "hot" : "cold")")
                 }
             }
         }
@@ -471,13 +1411,14 @@ struct LiveBoardView: View {
     }
 }
 
-/// The reasoning behind a heat tag, the rows the web's HeatTag popover shows: the bid, the comps,
-/// their middle, the typical bid at this point in the auction, the multiple. The track record
-/// sentence waits for a read that carries it.
+/// The reasoning behind a heat tag and/or Model 33 live finish estimate, plus comparable finish analogs.
 struct HeatReadingSheet: View {
     let lot: LiveAuction
-    let heat: LiveAuction.Heat
+    let heat: LiveAuction.Heat?
+    var finishEstimate: FinishEstimate? = nil
     let now: Date
+    @State private var analogs: [FinishAnalog] = []
+    @State private var loadedAnalogs = false
     @Environment(\.dismiss) private var dismiss
 
     var body: some View {
@@ -485,12 +1426,50 @@ struct HeatReadingSheet: View {
             List {
                 Section("The reading") {
                     line("Current bid", "\(LiveBoardView.bidNumber(lot.currentBid)) · \(lot.endsAtDate.map { LiveBoardView.remaining($0, now: now) } ?? "close unknown")")
+                    if let est = finishEstimate {
+                        line("Expected finish (Model 33)", "\(LiveBoardView.bidNumber(est.estimate)) (80% interval \(LiveBoardView.bidNumber(est.low))–\(LiveBoardView.bidNumber(est.high))\(est.grade.map { " · grade \($0)" } ?? ""))")
+                        if let sentence = est.sentence {
+                            line("Calibration", sentence)
+                        }
+                        if let through = est.compsThrough {
+                            line("Comps through", through)
+                        }
+                    }
                     if let b = lot.band {
                         line("Comparable sales", "\(b.comps.formatted()) on its BaT model page, weighted toward the same version, year, mileage and gearbox")
                         line("Their middle", "\(LiveBoardView.bidNumber(b.p50)) (80% range \(LiveBoardView.bidNumber(b.p10))–\(LiveBoardView.bidNumber(b.p90)))")
                     }
-                    line("Typical bid now", "about \(LiveBoardView.bidNumber(LiveBoardView.about(heat.typicalNow))): with this much time left, cars at this price are usually bid to about \(Int((heat.share * 100).rounded()))% of their final")
-                    line("This bid", "\(LiveBoardView.multiple(heat.ratio)) typical")
+                    if let heat {
+                        line("Typical bid now", "about \(LiveBoardView.bidNumber(LiveBoardView.about(heat.typicalNow))): with this much time left, cars at this price are usually bid to about \(Int((heat.share * 100).rounded()))% of their final")
+                        line("This bid", "\(LiveBoardView.multiple(heat.ratio)) typical")
+                    }
+                }
+                if !analogs.isEmpty {
+                    Section("Comparable finish analogs") {
+                        ForEach(analogs) { a in
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(a.title)
+                                    .font(.footnote.weight(.medium))
+                                HStack(spacing: 8) {
+                                    if let bid = a.bid {
+                                        Text("Bid at same mark: \(LiveBoardView.bidNumber(bid))")
+                                            .font(.caption2.monospaced())
+                                            .foregroundStyle(.secondary)
+                                    }
+                                    if let fin = a.finalPrice {
+                                        Text("Final: \(LiveBoardView.bidNumber(fin))")
+                                            .font(.caption2.monospaced().weight(.semibold))
+                                    }
+                                    if let closed = a.closed {
+                                        Text(closed)
+                                            .font(.caption2.monospaced())
+                                            .foregroundStyle(.secondary)
+                                    }
+                                }
+                            }
+                            .padding(.vertical, 2)
+                        }
+                    }
                 }
                 if let b = lot.band, let bid = lot.currentBid, bid > b.p90 {
                     Section {
@@ -499,13 +1478,18 @@ struct HeatReadingSheet: View {
                     }
                 }
                 Section {
-                    Text("Hot is \(LiveBoardView.multiple(LiveAuction.hotAt)) the typical bid or more; cold is \(LiveBoardView.multiple(LiveAuction.coldAt)) or less. The curve is the median share of the final price bid at each hours-left mark, per price tier, from sold BaT lots (the payload carries the curve, not its sample or window); past \(Int(LiveAuction.heatMaxHours)) hours left there is no verdict. How lots tagged this way finished is shown on nuke.ag from a table typed into its page; it joins here when a read carries it.")
+                    Text("Hot is \(LiveBoardView.multiple(LiveAuction.hotAt)) the typical bid or more; cold is \(LiveBoardView.multiple(LiveAuction.coldAt)) or less. The curve is the median share of the final price bid at each hours-left mark, per price tier, from sold BaT lots; past \(Int(LiveAuction.heatMaxHours)) hours left there is no verdict.")
                         .font(.caption).foregroundStyle(.secondary)
                 }
             }
-            .navigationTitle((heat.state == .hot ? "Running hot · " : "Running cold · ") + lot.headline)
+            .navigationTitle(lot.headline)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar { ToolbarItem(placement: .confirmationAction) { Button("Done") { dismiss() } } }
+            .task {
+                guard !loadedAnalogs else { return }
+                loadedAnalogs = true
+                analogs = await FinishBoard.fetchAnalogs(vehicleId: lot.id)
+            }
         }
     }
 
@@ -515,5 +1499,233 @@ struct HeatReadingSheet: View {
             Text(value).font(.footnote)
         }
         .padding(.vertical, 2)
+    }
+}
+
+/// Scheduled auction sale roster sheet (`auction_calendar_read` with `p_house` and `p_sale_key`).
+struct SaleRosterSheet: View {
+    let sale: AuctionCalendar.CalendarSale
+    @State private var detail: AuctionCalendar?
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        NavigationStack {
+            List {
+                Section {
+                    HStack {
+                        Text("\(sale.starts_on) → \(sale.ends_on)")
+                            .font(.caption.monospaced())
+                        Spacer()
+                        Text("\(sale.lots.formatted()) lots")
+                            .font(.caption.monospaced().weight(.semibold))
+                    }
+                    if !sale.run_days.isEmpty {
+                        ScrollView(.horizontal, showsIndicators: false) {
+                            HStack(spacing: 8) {
+                                ForEach(sale.run_days) { rd in
+                                    Text("\(rd.day): \(rd.lots)")
+                                        .font(.caption2.monospaced())
+                                        .padding(.horizontal, 8)
+                                        .padding(.vertical, 4)
+                                        .background(Color(.secondarySystemFill), in: Capsule())
+                                }
+                            }
+                        }
+                    }
+                }
+                if let roster = detail?.roster {
+                    Section("Consigned roster (\(roster.rows.count) of \(roster.lots.formatted()))") {
+                        ForEach(roster.rows) { lot in
+                            VStack(alignment: .leading, spacing: 3) {
+                                HStack(alignment: .firstTextBaseline) {
+                                    if let num = lot.lot_number {
+                                        Text("Lot \(num)")
+                                            .font(.caption2.monospaced().weight(.semibold))
+                                            .foregroundStyle(.secondary)
+                                    }
+                                    Text(lot.title)
+                                        .font(.subheadline.weight(.semibold))
+                                    Spacer(minLength: 4)
+                                    if lot.has_reserve == false {
+                                        Text("NO RESERVE")
+                                            .font(.caption2.monospaced().weight(.semibold))
+                                            .foregroundStyle(.secondary)
+                                    }
+                                }
+                                HStack(spacing: 8) {
+                                    Text("Runs \(lot.run_on)")
+                                        .font(.caption2.monospaced())
+                                        .foregroundStyle(.secondary)
+                                    if let lo = lot.estimate_low, let hi = lot.estimate_high {
+                                        Text("Est. \(LiveBoardView.bidNumber(lo, compact: true))–\(LiveBoardView.bidNumber(hi, compact: true))")
+                                            .font(.caption2.monospaced().weight(.semibold))
+                                    }
+                                }
+                                if let priors = lot.prior, !priors.isEmpty {
+                                    ForEach(priors) { p in
+                                        Text("Prior: \(AuctionCalendar.houseName(p.house)) \(p.on ?? "") · \(p.outcome)\(p.amount.map { " \(LiveBoardView.bidNumber($0, compact: true))" } ?? "")")
+                                            .font(.caption2.monospaced())
+                                            .foregroundStyle(.secondary)
+                                    }
+                                }
+                            }
+                            .padding(.vertical, 3)
+                        }
+                    }
+                } else {
+                    Section {
+                        HStack(spacing: 8) {
+                            ProgressView()
+                            Text("Reading sale roster…")
+                                .font(.caption.monospaced())
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                }
+            }
+            .navigationTitle("\(AuctionCalendar.houseName(sale.house)) · \(sale.sale_name)")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar { ToolbarItem(placement: .confirmationAction) { Button("Done") { dismiss() } } }
+            .task {
+                detail = try? await AuctionCalendar.fetch(house: sale.house, saleKey: sale.sale_key)
+            }
+        }
+    }
+}
+
+/// Source hourly & live landing drill-down sheet (`market_source_landing_read` #1825).
+struct SourceLandingSheet: View {
+    let sourceRow: SourcesBoardData.SourceRow
+    @State private var detail: SourceLandingDetail?
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        NavigationStack {
+            List {
+                Section("Intake Velocity") {
+                    let l15 = detail?.landed15m ?? sourceRow.landed15m
+                    let l1h = detail?.landed1h ?? sourceRow.landed1h
+                    let l24 = detail?.landed24 ?? sourceRow.landed24
+                    let l7d = detail?.landed7 ?? sourceRow.landed7
+                    HStack {
+                        metricCell(label: "15m", value: "+\(l15.formatted())")
+                        Spacer()
+                        metricCell(label: "1h", value: "+\(l1h.formatted())")
+                        Spacer()
+                        metricCell(label: "24h", value: "+\(l24.formatted())")
+                        Spacer()
+                        metricCell(label: "7d", value: "+\(l7d.formatted())")
+                    }
+                    .padding(.vertical, 2)
+
+                    let h24 = detail?.hours24 ?? sourceRow.hours24
+                    if h24.contains(where: { $0 > 0 }) {
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text("LAST 24 HOURS (HOURLY)")
+                                .font(.system(size: 9, weight: .semibold, design: .monospaced))
+                                .foregroundStyle(.secondary)
+                            barRow(bins: h24)
+                        }
+                        .padding(.vertical, 2)
+                    }
+
+                    let m60 = detail?.mins60 ?? sourceRow.mins60
+                    if m60.contains(where: { $0 > 0 }) {
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text("LAST 60 MINUTES (5-MIN BINS)")
+                                .font(.system(size: 9, weight: .semibold, design: .monospaced))
+                                .foregroundStyle(.secondary)
+                            barRow(bins: m60)
+                        }
+                        .padding(.vertical, 2)
+                    }
+                }
+
+                if let detail {
+                    Section("Recent Landed Events (\(detail.recent.count))") {
+                        if detail.recent.isEmpty {
+                            Text("No recent events in this window.")
+                                .font(.caption.monospaced())
+                                .foregroundStyle(.secondary)
+                        } else {
+                            ForEach(detail.recent) { ev in
+                                VStack(alignment: .leading, spacing: 3) {
+                                    HStack(alignment: .firstTextBaseline) {
+                                        Text(ev.title ?? ev.lot.map { "Lot \($0)" } ?? "Event")
+                                            .font(.subheadline.weight(.semibold))
+                                            .lineLimit(1)
+                                        Spacer(minLength: 4)
+                                        if let p = ev.price, p > 0 {
+                                            Text(LiveBoardView.bidNumber(p, compact: true))
+                                                .font(.caption.monospaced().weight(.semibold))
+                                        }
+                                    }
+                                    HStack(spacing: 6) {
+                                        if let lot = ev.lot {
+                                            Text("Lot \(lot)")
+                                                .font(.caption2.monospaced())
+                                                .foregroundStyle(.secondary)
+                                        }
+                                        if let et = ev.eventType {
+                                            Text(et)
+                                                .font(.caption2.monospaced())
+                                                .foregroundStyle(.secondary)
+                                        }
+                                        Spacer()
+                                        Text(ProfileClock.Absolute(ev.createdAt))
+                                            .font(.system(size: 9, design: .monospaced))
+                                            .foregroundStyle(.tertiary)
+                                    }
+                                    if let url = ev.openableURL {
+                                        Link("Open source ↗", destination: url)
+                                            .font(.system(size: 10, design: .monospaced))
+                                    }
+                                }
+                                .padding(.vertical, 2)
+                            }
+                        }
+                    }
+                } else {
+                    Section {
+                        HStack(spacing: 8) {
+                            ProgressView()
+                            Text("Reading live intake…")
+                                .font(.caption.monospaced())
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                }
+            }
+            .navigationTitle(sourceRow.shortName)
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar { ToolbarItem(placement: .confirmationAction) { Button("Done") { dismiss() } } }
+            .task {
+                detail = await SourceLandingDetail.fetch(source: sourceRow.source)
+            }
+        }
+    }
+
+    private func metricCell(label: String, value: String) -> some View {
+        VStack(alignment: .leading, spacing: 2) {
+            Text(label.uppercased())
+                .font(.system(size: 9, weight: .semibold, design: .monospaced))
+                .foregroundStyle(.secondary)
+            Text(value)
+                .font(.system(.subheadline, design: .monospaced).weight(.semibold))
+        }
+    }
+
+    private func barRow(bins: [Int]) -> some View {
+        let peak = max(bins.max() ?? 0, 1)
+        return HStack(alignment: .bottom, spacing: 2) {
+            ForEach(Array(bins.enumerated()), id: \.offset) { idx, val in
+                let h = max(val > 0 ? 4.0 : 1.5, (Double(val) / Double(peak)) * 28.0)
+                RoundedRectangle(cornerRadius: 1.5)
+                    .fill(idx == bins.count - 1 && val > 0 ? Color.green : Color.primary.opacity(val > 0 ? 0.65 : 0.15))
+                    .frame(maxWidth: .infinity)
+                    .frame(height: h)
+            }
+        }
+        .frame(height: 28)
     }
 }
