@@ -256,7 +256,7 @@ const MobileImageGallery: React.FC<MobileImageGalleryProps> = ({ vehicleId, lead
             </div>
           )}
           <div style={{ fontSize: '9px', color: 'var(--text-muted)', marginTop: 'var(--space-2)' }}>
-            {new Date(currentImage.created_at).toLocaleDateString()}
+            RECORD DATE {new Date(currentImage.created_at).toLocaleDateString()} · CAPTURE DATE UNKNOWN
           </div>
           <div
             style={{

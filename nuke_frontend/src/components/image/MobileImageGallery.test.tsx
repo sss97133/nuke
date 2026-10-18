@@ -33,7 +33,7 @@ function galleryView() { const current = gallery(); return current ? { text: cur
   buttons: [...current.querySelectorAll('button')].map(button => button.textContent) } : null; }
 const pending = (url = fixture.lead, status = 'Reading gallery…') => ({ text: `${status}×`, images: [{ src: url, alt: 'Vehicle image' }], buttons: ['×'] });
 const loaded = (vehicle: string, index = 1) => { const photo = photos(vehicle)[index]; return {
-  text: `${index + 1} / 2×‹›${photo.angle_tag}${photo.caption}${new Date(photo.created_at).toLocaleDateString()}Swipe down to close • Swipe left/right to navigate`,
+  text: `${index + 1} / 2×‹›${photo.angle_tag}${photo.caption}RECORD DATE ${new Date(photo.created_at).toLocaleDateString()} · CAPTURE DATE UNKNOWNSwipe down to close • Swipe left/right to navigate`,
   images: [{ src: photo.image_url, alt: photo.caption }], buttons: ['×', '‹', '›'],
 }; };
 async function render(vehicle: string | null = fixture.vehicleId ?? null, path = `/vehicles/${vehicle ?? 'synthetic-b'}`) {
@@ -153,7 +153,7 @@ it('read-status: preserves the entire known two-row result and count', async () 
 });
 it('read-status: preserves the entire known one-row result and count', async () => {
   await render(); await open(); const row = photos('synthetic-a')[1]; await settle(0, [row]);
-  expect(galleryView()).toEqual({ ...loaded('synthetic-a'), text: `1 / 1×${row.angle_tag}${row.caption}${new Date(row.created_at).toLocaleDateString()}Swipe down to close • Swipe left/right to navigate`, buttons: ['×'] });
+  expect(galleryView()).toEqual({ ...loaded('synthetic-a'), text: `1 / 1×${row.angle_tag}${row.caption}RECORD DATE ${new Date(row.created_at).toLocaleDateString()} · CAPTURE DATE UNKNOWNSwipe down to close • Swipe left/right to navigate`, buttons: ['×'] });
   expect(reads).toHaveLength(1);
 });
 it('read-status: missing current ID is unavailable on its first commit with no pathname query', async () => {
@@ -210,4 +210,25 @@ it('zero-swipe: preserves touch-start reset instead of reusing a prior endpoint'
   await render(); await open(); await settle(0); await swipe([200, 100], [100, 100]); expect(galleryView()).toEqual(loaded('synthetic-a', 0));
   await touch('touchstart', [0, 0]); await touch('touchend', [100, 100]);
   expect(galleryView()).toEqual(loaded('synthetic-a', 0)); expect(reads).toHaveLength(1);
+});
+
+it.each([
+  { name: 'timestamp', created: '2026-10-18T12:34:56Z' },
+  { name: 'offset timestamp', created: '2026-09-13T00:15:00+02:00' },
+  { name: 'day-grain record', created: '2026-09-12' },
+])('gallery-record-clock: qualifies the retained $name without changing its formatted date', async ({ created }) => {
+  await render(); await open(); expect(galleryView()).toEqual(pending()); const row = { ...photos('synthetic-a')[1], created_at: created };
+  const raw = structuredClone(row); await settle(0, [row]);
+  expect(galleryView()).toEqual({ text: `1 / 1×${row.angle_tag}${row.caption}RECORD DATE ${new Date(created).toLocaleDateString()} · CAPTURE DATE UNKNOWNSwipe down to close • Swipe left/right to navigate`,
+    images: [{ src: row.image_url, alt: row.caption }], buttons: ['×'] });
+  expect(row).toEqual(raw); expect(reads).toHaveLength(1); expect(reads[0].url.searchParams.get('select')!.split(',')).not.toContain('taken_at');
+  await click('×'); expect(gallery()).toBeNull();
+});
+it('gallery-record-clock: preserves the entire pending read without a fabricated footer date', async () => {
+  await render(); await open(); expect(galleryView()).toEqual(pending()); expect(reads).toHaveLength(1);
+});
+it.each(['error', 'empty'])('gallery-record-clock: preserves the entire $name read without a fabricated footer date', async kind => {
+  await render(); await open(); await settle(0, [], kind === 'error' ? 403 : 200);
+  expect(galleryView()).toEqual(pending(fixture.lead, kind === 'error' ? 'Gallery could not be read.' : 'No additional photos in this read.'));
+  expect(reads).toHaveLength(1); await click('×'); expect(gallery()).toBeNull();
 });
