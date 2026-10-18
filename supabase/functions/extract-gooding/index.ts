@@ -597,7 +597,7 @@ async function discoverLotsFromSitemap(): Promise<string[]> {
 // DATABASE OPERATIONS
 // ============================================================================
 
-async function saveToDatabase(
+export async function saveToDatabase(
   supabase: any,
   extracted: GoodingExtracted,
   opts: { skipImages?: boolean } = {},
@@ -919,12 +919,16 @@ async function saveToDatabase(
   // Save images
   let imagesSaved = 0;
   if (extracted.image_urls.length > 0 && !opts.skipImages) {
-    // Delete existing gooding images for this vehicle
-    softWrite('vehicle_images replace', await supabase
+    // Add only the photos this vehicle does not already hold. The old delete-then-insert doubled the gallery whenever
+    // the delete did not take (its failure was swallowed): the 300 SL gold lot went from 55 to 110 rows on one re-read
+    // (2026-10-18). Existing rows are kept, with whatever analysis already points at them.
+    const { data: have, error: haveErr } = await supabase
       .from('vehicle_images')
-      .delete()
+      .select('image_url')
       .eq('vehicle_id', vehicleId)
-      .eq('source', 'gooding'));
+      .limit(1000);
+    if (haveErr) throw new Error(`vehicle_images read failed: ${haveErr.message}`);
+    const haveUrls = new Set((have ?? []).map((r: { image_url: string }) => r.image_url));
 
     const imageRecords = extracted.image_urls.slice(0, 100).map((imgUrl, i) => ({
       vehicle_id: vehicleId,
@@ -937,7 +941,7 @@ async function saveToDatabase(
       redaction_level: 'none',
       position: i,
       display_order: i,
-      is_primary: i === 0,
+      is_primary: i === 0 && haveUrls.size === 0,
       exif_data: {
         source_url: extracted.url,
         discovery_url: extracted.url,
@@ -945,14 +949,16 @@ async function saveToDatabase(
         auction_name: extracted.auction_name,
         lot_number: extracted.lot_number,
       },
-    }));
+    })).filter((row) => !haveUrls.has(row.image_url));
 
-    const imgRes = await supabase
-      .from('vehicle_images')
-      .insert(imageRecords)
-      .select('id');
-    softWrite('vehicle_images insert', imgRes);
-    if (!imgRes.error) imagesSaved = imgRes.data?.length || 0;
+    if (imageRecords.length > 0) {
+      const imgRes = await supabase
+        .from('vehicle_images')
+        .insert(imageRecords)
+        .select('id');
+      softWrite('vehicle_images insert', imgRes);
+      if (!imgRes.error) imagesSaved = imgRes.data?.length || 0;
+    }
   }
 
   return { vehicle_id: vehicleId, images_saved: imagesSaved, is_new: isNew };
