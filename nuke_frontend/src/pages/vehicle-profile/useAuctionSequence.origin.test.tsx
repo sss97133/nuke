@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import React, { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
-import { MemoryRouter, Route, Routes } from 'react-router-dom';
+import { MemoryRouter, Route, Routes, useNavigate } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { createClient } from '@supabase/supabase-js';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
@@ -12,7 +12,7 @@ vi.mock('../../hooks/useVehiclePermissions', () => ({ useVehiclePermissions: () 
 vi.mock('../../hooks/useAdminAccess', () => ({ useAdminAccess: () => ({ isAdmin: false }) }));
 vi.mock('../../hooks/useViewHistory', () => ({ useViewHistory: () => ({ recordView() {}, endView() {} }) }));
 vi.mock('./hooks/useVehicleIntel', () => ({ useVehicleIntel: () => ({ vehicleIntel: null, vehicleIntelLoading: false }) }));
-import { VehicleProfileProvider } from './VehicleProfileContext';
+import { VehicleProfileProvider, useVehicleProfile } from './VehicleProfileContext';
 import BarcodeTimeline from './BarcodeTimeline';
 
 const lot = 'synthetic-origin-lot', valid = `https://bringatrailer.com/listing/${lot}/`;
@@ -25,7 +25,10 @@ const day = '2025-01-10';
 type Read = { url: URL; method: string; body: any };
 let root: Root, host: HTMLDivElement, queryClient: QueryClient, serial = 0, vehicleId: string;
 let hint: string | null, timeline: any[], comments: any[], auctions: any[], events: any[], reads: Read[];
-let refusedTable: string | null;
+let refusedTable: string | null, contextBodies: Map<string, unknown>, parentDenied: boolean, failCommentContinuation: boolean;
+let current: ReturnType<typeof useVehicleProfile>, go: ReturnType<typeof useNavigate>;
+let holdNativeComments: Promise<Response> | null;
+function Probe() { current = useVehicleProfile(); go = useNavigate(); return <BarcodeTimeline />; }
 const json = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } });
 const auction = (sourceUrl: string, price = 100) => ({ id: 'synthetic-auction', source: 'external', source_url: sourceUrl,
   lot_number: '123', outcome: 'sold', winning_bid: price, total_bids: 1, winning_bidder: 'Synthetic buyer', seller_name: null,
@@ -50,7 +53,7 @@ beforeEach(() => {
   vehicleId = `00000000-0000-4000-8000-${String(++serial).padStart(12, '0')}`;
   hint = valid; timeline = [{ id: 'synthetic-added', event_date: '2025-01-01', event_type: 'vehicle_added' }];
   comments = [comment(valid)]; auctions = [auction(valid)]; events = [event(valid)]; reads = [];
-  refusedTable = null;
+  refusedTable = null; contextBodies = new Map(); parentDenied = false; failCommentContinuation = false; holdNativeComments = null;
   fixture.client = createClient('https://auction-origin.test', 'synthetic-anon', {
     auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false, storageKey: `origin-${serial}` },
     global: { fetch: async (input, init) => {
@@ -65,12 +68,15 @@ beforeEach(() => {
       }
       if (!['GET', 'HEAD'].includes(read.method) || !path.startsWith('/rest/v1/')) throw new Error('Synthetic transport denies non-read requests');
       const table = path.split('/').pop();
-      if (table === 'vehicles') { expect(read.url.searchParams.get('id')).toBe(`eq.${vehicleId}`); return json([{ id: vehicleId }]); }
+      if (table === 'vehicles') { expect(read.url.searchParams.get('id')).toBe(`eq.${vehicleId}`); return json(parentDenied ? [] : [{ id: vehicleId }]); }
       if (['auction_comments', 'auction_events', 'vehicle_events', 'vehicle_images'].includes(table!)) {
         expect(read.url.searchParams.get('vehicle_id')).toBe(`eq.${vehicleId}`);
         if (table === refusedTable) return json({ message: 'Synthetic private error detail' }, 403);
+        if (contextBodies.has(table!)) return json(contextBodies.get(table!));
         if (table === 'auction_comments') {
           expect(read.url.searchParams.get('order')).toBe('id.asc'); expect(read.url.searchParams.get('limit')).toBe('250');
+          if (holdNativeComments && !read.url.searchParams.has('id')) return (await holdNativeComments).clone();
+          if (failCommentContinuation && read.url.searchParams.has('id')) return json({ message: 'Synthetic private error detail' }, 403);
           return json(read.url.searchParams.has('id') ? [] : comments);
         }
         if (table === 'auction_events') { expect(read.url.searchParams.get('limit')).toBe('5'); return json(auctions); }
@@ -89,6 +95,7 @@ beforeEach(() => {
   queryClient = new QueryClient({ defaultOptions: { queries: { retry: false, gcTime: Infinity } } });
 });
 afterEach(async () => {
+  expect(host.textContent).not.toContain('Synthetic private error detail');
   await act(async () => root.unmount()); queryClient.clear(); host.remove();
   expect(globalThis.fetch).not.toHaveBeenCalled(); expect(reads.some(r => r.url.pathname.startsWith('/functions/'))).toBe(false);
   vi.useRealTimers(); vi.unstubAllGlobals(); vi.restoreAllMocks();
@@ -96,7 +103,7 @@ afterEach(async () => {
 async function draw(expectTimeline = true) {
   await import('./AuctionSequenceBand'); // Resolve the actual lazy module before the first frame assertion.
   await act(async () => root.render(<QueryClientProvider client={queryClient}><MemoryRouter initialEntries={[`/vehicle/${vehicleId}`]}><Routes>
-    <Route path="/vehicle/:vehicleId" element={<VehicleProfileProvider><BarcodeTimeline /></VehicleProfileProvider>} />
+    <Route path="/vehicle/:vehicleId" element={<VehicleProfileProvider><Probe /></VehicleProfileProvider>} />
   </Routes></MemoryRouter></QueryClientProvider>));
   await act(async () => { await vi.advanceTimersByTimeAsync(10); });
   const button = host.querySelector<HTMLButtonElement>('[aria-label="Vehicle timeline"]')!;
@@ -247,4 +254,103 @@ it.each([null, '', '   '])('keeps the existing missing/blank comment URL %s fall
   await draw(); expect(sourceLinks()).toContain(`${valid}#comment-123`);
   await openReceipt();
   expect(host.querySelector('.day-drawer__auction-list a')?.textContent).toBe('Synthetic bidder');
+});
+
+
+// Non-comment failures must retain independently readable native testimony without
+// changing the query's error/cache/refetch lifecycle or admitting a partial comment page.
+const incomplete = 'Auction activity could not be fully read. Timeline activity counts are unavailable.';
+const sequenceKey = () => ['auction-sequence', vehicleId];
+const queryState = () => queryClient.getQueryState<any>(sequenceKey())!;
+const contextReads = (table: string) => reads.filter(r => r.url.pathname === `/rest/v1/${table}` &&
+  r.url.searchParams.get('select') === ({ auction_events: 'id,source,source_url,lot_number,outcome,winning_bid,total_bids,winning_bidder,seller_name,page_views,watchers,comments_count',
+    vehicle_events: 'id,source_platform,source_url,started_at,ended_at,sold_at,final_price,event_status', vehicle_images: 'id,taken_at,source,source_url' } as Record<string, string>)[table]);
+async function refetchSequence() {
+  await act(async () => { await queryClient.refetchQueries({ queryKey: sequenceKey(), exact: true }); });
+  await act(async () => { await vi.advanceTimersByTimeAsync(10); });
+}
+async function remount() { await act(async () => root.unmount()); root = createRoot(host); await draw(false); }
+function assertRetainedBid(amount = '$100') {
+  expect(host.querySelector('[aria-label="Vehicle timeline"]')).not.toBeNull();
+  expect(host.querySelector('.auction-band')).not.toBeNull(); expect(sourceLinks()).toContain(`${valid}#comment-123`);
+  expect(host.querySelector('.auction-band__svg')?.getAttribute('aria-label')).toBe('auction sequence: 1 bids, 0 comments shown');
+  expect([...host.querySelectorAll<HTMLAnchorElement>(`.auction-band a[href="${valid}#comment-123"]`)].some(link => link.textContent?.includes(amount))).toBe(true);
+}
+it.each(['vehicle_images', 'auction_events', 'vehicle_events'])('retains complete native bids and independently readable context when %s refuses', async table => {
+  timeline = []; refusedTable = table; await draw(false); assertRetainedBid();
+  expect(host.textContent).toContain(incomplete); expect(queryState().status).toBe('error'); expect(queryState().data).toBeUndefined();
+  expect(nativeReads()).toHaveLength(2); for (const name of ['vehicle_images', 'auction_events', 'vehicle_events']) expect(contextReads(name)).toHaveLength(1);
+  const band = host.querySelector('.auction-band')!;
+  if (table !== 'vehicle_events') expect(band.textContent).toContain('auction end recorded by the extractor');
+  else expect(band.textContent).toContain('End clock unknown');
+  await openReceipt(); expect(host.querySelector('.day-drawer__auction-list a')?.getAttribute('href')).toBe(`${valid}#comment-123`);
+  expect(host.querySelector('[data-day-drawer]')?.textContent).toContain('BID $100');
+});
+it.each(['vehicle_images', 'auction_events', 'vehicle_events'])('does not certify null %s as a successful empty context read', async table => {
+  timeline = []; contextBodies.set(table, null); await draw(false); assertRetainedBid();
+  expect(host.textContent).toContain(incomplete); expect(queryState().status).toBe('error'); expect(queryState().data).toBeUndefined();
+});
+it.each(['vehicle_images', 'auction_events', 'vehicle_events'])('refuses malformed %s context shape while preserving the readable native interaction', async table => {
+  timeline = []; contextBodies.set(table, { invalid: 'Synthetic shape' }); await draw(false); assertRetainedBid();
+  expect(host.textContent).toContain(incomplete); expect(queryState().status).toBe('error');
+});
+it('keeps complete current native activity and its existing fresh-success cache useful across a real remount', async () => {
+  timeline = []; await draw(); assertRetainedBid(); const before = queryState().dataUpdatedAt;
+  expect(queryState().status).toBe('success'); expect(host.textContent).not.toContain(incomplete);
+  await remount(); assertRetainedBid(); expect(nativeReads()).toHaveLength(2); expect(queryState().dataUpdatedAt).toBe(before);
+});
+it('preserves initial-error remount refetch behavior rather than caching partial success', async () => {
+  timeline = []; refusedTable = 'vehicle_images'; await draw(false); assertRetainedBid();
+  expect(queryState().status).toBe('error'); expect(queryState().dataUpdatedAt).toBe(0);
+  await remount(); assertRetainedBid(); expect(nativeReads()).toHaveLength(4); expect(queryState().status).toBe('error');
+  const query = queryClient.getQueryCache().find({ queryKey: sequenceKey(), exact: true })!;
+  expect(query.options.staleTime).toBe(60000); expect(query.options.retry).toBe(false); expect(query.queryKey).toEqual(sequenceKey());
+});
+it('retains the latest qualified error rows without replacing old successful cache data or its timestamp', async () => {
+  timeline = []; await draw(); const cached = queryState().data, updated = queryState().dataUpdatedAt;
+  refusedTable = 'vehicle_images'; comments = [{ ...comment(valid), bid_amount: 200 }]; await refetchSequence();
+  expect(queryState().status).toBe('error'); expect(queryState().data).toBe(cached); expect(queryState().dataUpdatedAt).toBe(updated);
+  expect(queryState().isInvalidated).toBe(true); const before = nativeReads().length;
+  await remount(); expect(nativeReads()).toHaveLength(before + 2); assertRetainedBid('$200');
+});
+it('recovers through the existing explicit refetch without an automatic retry or extra reader', async () => {
+  timeline = []; refusedTable = 'vehicle_images'; await draw(false); const first = nativeReads().length;
+  expect(queryState().status).toBe('error'); expect(first).toBe(2);
+  refusedTable = null; await refetchSequence(); assertRetainedBid();
+  expect(queryState().status).toBe('success'); expect(host.textContent).not.toContain(incomplete); expect(nativeReads()).toHaveLength(4);
+});
+it.each(['success', 'partial'] as const)('denies the parent fail-closed after a cached %s without reviving rows or making child reads', async previous => {
+  timeline = []; if (previous === 'partial') refusedTable = 'vehicle_images'; await draw(false);
+  const before = nativeReads().length; parentDenied = true; await refetchSequence();
+  expect(queryState().status).toBe('error'); expect(host.querySelector('.auction-band')).toBeNull(); expect(sourceLinks()).toEqual([]);
+  expect(host.textContent).toContain(incomplete); expect(nativeReads()).toHaveLength(before);
+});
+it.each(['success', 'partial'] as const)('withholds the entire comment collection after a failed continuation with previous %s', async previous => {
+  timeline = []; if (previous === 'partial') refusedTable = 'vehicle_images'; await draw(false);
+  const before = nativeReads().length; failCommentContinuation = true; await refetchSequence();
+  expect(nativeReads()).toHaveLength(before + 2); expect(queryState().status).toBe('error');
+  expect(host.querySelector('.auction-band')).toBeNull(); expect(sourceLinks()).toEqual([]); expect(host.textContent).toContain(incomplete);
+});
+it('does not turn a fully read empty comment collection plus failed context into a certified complete empty read', async () => {
+  timeline = []; comments = []; auctions = []; events = []; refusedTable = 'vehicle_images'; await draw(false);
+  expect(nativeReads()).toHaveLength(1); expect(queryState().status).toBe('error'); expect(host.textContent).toContain(incomplete);
+  expect(host.querySelector('.auction-band')).toBeNull(); expect(host.querySelector('[aria-label="Vehicle timeline"]')).toBeNull();
+});
+it('withholds a previous partial payload when the current vehicle no longer has a native lot hint', async () => {
+  timeline = []; refusedTable = 'vehicle_images'; await draw(false); const before = nativeReads().length;
+  hint = null; await act(async () => { await current.reloadVehicle(); });
+  expect(host.querySelector('.auction-band')).toBeNull(); expect(sourceLinks()).toEqual([]); expect(host.textContent).not.toContain(incomplete);
+  expect(nativeReads()).toHaveLength(before);
+});
+it('does not associate a departed vehicle partial payload with the next pending vehicle key', async () => {
+  timeline = []; refusedTable = 'vehicle_images'; await draw(false);
+  let release!: (response: Response) => void; holdNativeComments = new Promise<Response>(resolve => { release = resolve; });
+  vehicleId = `00000000-0000-4000-8000-${String(++serial).padStart(12, '0')}`; refusedTable = null;
+  await act(async () => go(`/vehicle/${vehicleId}`)); await act(async () => { await vi.advanceTimersByTimeAsync(10); });
+  expect(current.vehicleId).toBe(vehicleId); expect(host.querySelector('.auction-band')).toBeNull(); expect(sourceLinks()).toEqual([]);
+  expect(host.textContent).not.toContain(incomplete); expect(queryState().status).toBe('pending');
+  await act(async () => release(json([{ ...comment(valid), bid_amount: 200 }]))); await act(async () => { await vi.advanceTimersByTimeAsync(10); });
+  const button = host.querySelector<HTMLButtonElement>('[aria-label="Vehicle timeline"]');
+  if (button?.getAttribute('aria-expanded') === 'false') await act(async () => button.click());
+  await act(async () => { await vi.advanceTimersByTimeAsync(10); }); assertRetainedBid('$200'); expect(queryState().status).toBe('success');
 });

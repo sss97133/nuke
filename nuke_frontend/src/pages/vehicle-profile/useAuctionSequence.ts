@@ -25,6 +25,13 @@ interface RawRows {
   images: ImageStampRow[];
 }
 
+/** Keep useful rows qualified as an error, preserving query-cache/refetch behavior. */
+class AuctionContextUnavailable extends Error {
+  constructor(readonly rows: RawRows) {
+    super('auction_context_unavailable');
+  }
+}
+
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 /** Complete the currently readable native collection; never publish a partial prefix. */
@@ -106,13 +113,15 @@ async function fetchRows(vehicleId: string, signal?: AbortSignal): Promise<RawRo
       .not('is_duplicate', 'is', true)
       .limit(2000),
   ]);
-  for (const r of [auctionEvents, vehicleEvents, images]) if (r.error) throw new Error('auction_context_unavailable');
-  return {
+  const readable = (result: { error: unknown; data: unknown }) => !result.error && Array.isArray(result.data);
+  const rows: RawRows = {
     comments,
-    auctionEvents: (auctionEvents.data ?? []) as unknown as AuctionEventRow[],
-    vehicleEvents: (vehicleEvents.data ?? []) as unknown as VehicleEventRow[],
-    images: (images.data ?? []) as unknown as ImageStampRow[],
+    auctionEvents: readable(auctionEvents) ? auctionEvents.data as unknown as AuctionEventRow[] : [],
+    vehicleEvents: readable(vehicleEvents) ? vehicleEvents.data as unknown as VehicleEventRow[] : [],
+    images: readable(images) ? images.data as unknown as ImageStampRow[] : [],
   };
+  if (![auctionEvents, vehicleEvents, images].every(readable)) throw new AuctionContextUnavailable(rows);
+  return rows;
 }
 
 export function useAuctionSequence(
@@ -121,18 +130,21 @@ export function useAuctionSequence(
   timelineEvents: TimelineEventLike[],
 ): { auctions: AuctionSequence[]; importStampedDays: string[]; loading: boolean; activityUnavailable: boolean; hasUnpositionedActivity: boolean } {
   const lotHint = useMemo(() => looksLikeBatLot(vehicle, timelineEvents), [vehicle, timelineEvents]);
-  const { data: rows, isLoading: loading, isError } = useQuery({
+  const { data, error, isLoading: loading, isError } = useQuery({
     queryKey: ['auction-sequence', vehicleId],
     queryFn: ({ signal }) => fetchRows(vehicleId!, signal),
     enabled: !!vehicleId && lotHint !== null,
     staleTime: 60_000,
     retry: false,
   });
+  // Ordinary errors (including parent denial and any incomplete comment page)
+  // never fall back to prior cached success or a prior partial error payload.
+  const rows = isError ? error instanceof AuctionContextUnavailable ? error.rows : undefined : data;
 
   const built = useMemo(() => {
-    if (!rows || lotHint === null || isError) return null;
+    if (!rows || lotHint === null) return null;
     return buildAuctionSequences({ ...rows, timelineEvents, lotUrlHint: lotHint || null });
-  }, [rows, lotHint, timelineEvents, isError]);
+  }, [rows, lotHint, timelineEvents]);
 
   const hasUnpositionedActivity = !!built && !!rows?.comments.some(c => !c.posted_at || !Number.isFinite(Date.parse(c.posted_at)));
   return { auctions: built?.sequences ?? [], importStampedDays: built?.importStampedDays ?? [], loading,
