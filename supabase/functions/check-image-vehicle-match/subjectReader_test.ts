@@ -17,7 +17,7 @@ function source(n: number): any {
   const storage_path = `users/${owner}/capture-relay/${file_hash}/IMG_${n}.JPG`;
   return { id: id(n), user_id: owner, image_url: `${origin}/storage/v1/object/public/vehicle-photos/${storage_path}`,
     file_hash, storage_path, taken_at: "2024-12-31T00:00:00.222333Z", created_at: "2025-01-01T00:00:00.000001Z",
-    is_superseded: false, is_duplicate: false, is_document: false, is_sensitive: false, vision_gate_status: "approved" };
+    is_superseded: false, is_duplicate: false, is_document: false, is_sensitive: false, vision_gate_status: "approved", private_subject_privacy_complete: true, private_subject_privacy: [] };
 }
 function envelope(sources: any[], anchor: string, edges?: Array<[string, string]>): any {
   return { method: "visual_subjects_v1", user_id: owner, provider: "fixture", model: "fixture", read_at: readAt,
@@ -45,6 +45,7 @@ class FixtureDB {
   calls: Array<{ table: string; returned: number; filters: Array<[string, string, unknown]> }> = [];
   failTable: string | null = null;
   omitSources = new Set<string>();
+  audits: any[] = [];
   constructor(public data: ReturnType<typeof fixture>) {}
   from(table: string) { return new FixtureQuery(this, table); }
 }
@@ -57,15 +58,17 @@ class FixtureQuery {
   eq(field: string, value: unknown) { this.filters.push(["eq", field, value]); return this; }
   is(field: string, value: null) { this.filters.push(["is", field, value]); return this; }
   in(field: string, value: string[]) { this.filters.push(["in", field, value]); return this; }
+  or(expression: string) { this.filters.push(["or", expression, null]); return this; }
   order(field: string, options: { ascending: boolean }) { this.orders.push([field, options.ascending]); return this; }
   limit(n: number) { this.end = this.start + n - 1; return this; }
   range(start: number, end: number) { this.start = start; this.end = end; return this; }
   then(resolve: (v: any) => unknown, reject: (e: unknown) => unknown) {
     const rows = this.table === "vehicle_images" ? this.db.data.sources : this.table === "image_observations"
-      ? this.db.data.observations : this.db.data.carriers;
+      ? this.db.data.observations : this.table === "reattribution_audit" ? this.db.audits : this.db.data.carriers;
     const found = rows.filter((row: any) => (this.table !== "vehicle_images" || !this.db.omitSources.has(row.id)) &&
       this.filters.every(([op, field, value]) => {
         const got = namespaceValue(row, field);
+        if (op === "or") return row.superseded_by == null || row.confidence_basis?.device_privacy_v1?.state === "withdrawn";
         return op === "in" ? value.includes(got) : op === "is" ? got === null || got === undefined : got === value;
       })).sort((a: any, b: any) => {
       for (const [field, ascending] of this.orders) {
@@ -223,7 +226,7 @@ Deno.test("terminal-head truncation cannot hide an older withdrawal behind newer
   data.observations.push(withdrawal);
   const db = new FixtureDB(data), result = await readSubjectProfiles(db, owner);
   equal(result.subjects, []); equal(result.coverage.eligible, 0); equal(result.coverage.truncated, true);
-  equal(db.calls.some(call => call.table === "vehicle_images"), false);
+  equal(db.calls.filter(call => call.table === "vehicle_images").every(call => call.returned <= 128), true);
 });
 
 Deno.test("backend failures do not become zero coverage or return a stale cached profile", async () => {
@@ -231,7 +234,7 @@ Deno.test("backend failures do not become zero coverage or return a stale cached
   db.failTable = "vehicle_images";
   let message = "";
   try { await readSubjectProfiles(db, owner); } catch (error) { message = (error as Error).message; }
-  equal(message, "subject_sources_read_failed"); equal(message.includes("PRIVATE"), false);
+  equal(message, "source_identity_read_failed"); equal(message.includes("PRIVATE"), false);
 });
 
 Deno.test("exported replay qualification preserves exact clocks and rejects malformed derivative custody", () => {
@@ -251,4 +254,53 @@ Deno.test("exported replay qualification preserves exact clocks and rejects malf
       parameters: { width: 1600, height: 1600, resize: "contain", quality: 85 } } };
   equal(qualifySubjectSource(derivative, live, owner, readAt), true);
   equal(qualifySubjectSource({ ...derivative, derivation: { ...derivative.derivation, trusted_origin: "https://other.invalid" } }, live, owner, readAt), false);
+});
+
+function auditClone(db: FixtureDB, index: number, gate = "approved") {
+  const original = db.data.sources[index], nextId = id(700000 + index), at = "2025-02-02T00:00:00.000001Z";
+  original.exif_data = { uuid: `native-original-${index}`, camera_model: "Synthetic" };
+  original.vehicle_id = id(400000);
+  const replacement = { ...clone(original), id: nextId, vehicle_id: null, is_duplicate: true,
+    duplicate_of: original.id, vision_gate_status: gate, superseded_by: null, superseded_at: null };
+  original.is_superseded = true; original.superseded_by = nextId; original.superseded_at = at;
+  db.data.sources.push(replacement);
+  db.audits.push({ id: id(710000 + index), observation_type: "image", old_observation_id: original.id,
+    new_observation_id: nextId, old_vehicle_id: id(400000), new_vehicle_id: null, created_at: at });
+  return replacement;
+}
+Deno.test("audited independently approved leaves keep original profile anchor and count each source once", async () => {
+  const db = new FixtureDB(fixture(2)); const before = await readSubjectProfiles(db, owner);
+  const first = auditClone(db, 0), second = auditClone(db, 1);
+  const after = await readSubjectProfiles(db, owner);
+  equal(after.subjects.length, 1); equal(after.subjects[0].id, before.subjects[0].id);
+  equal(after.subjects[0].anchor_image_id, id(1)); equal(after.subjects[0].images.map(row => row.id), [id(1), id(2)]);
+  equal(after.subjects[0].image_count, 2); equal(after.coverage.assessed, 2);
+  equal(first.is_duplicate && second.is_duplicate && db.data.sources[0].is_superseded, true);
+  equal((after.subjects[0].images[0] as any).source_identity.current_image_id, first.id);
+  equal((after.subjects[0].images[0] as any).source_identity.current_vehicle_attribution_proven, false);
+});
+Deno.test("pending clone never inherits approved parent; no gallery or cover leaks through retained model reading", async () => {
+  const db = new FixtureDB(fixture(2)); auditClone(db, 0, "pending"); auditClone(db, 1);
+  const result = await readSubjectProfiles(db, owner);
+  equal(result.subjects, []); equal(JSON.stringify(result).includes("storage/v1/object"), false);
+});
+Deno.test("withdrawal or rejection on any audited alias prunes the retained original profile", async () => {
+  for (const negative of ["subject_withdrawal", "rejected", "rejected_sensitive", "privacy_withdrawal"]) {
+    const db = new FixtureDB(fixture(2)), replacement = auditClone(db, 0); auditClone(db, 1);
+    if (negative.startsWith("rejected")) replacement.vision_gate_status = negative;
+    if (negative === "subject_withdrawal") db.data.observations.push({ ...clone(db.data.observations[0]),
+      id: id(720000), image_id: replacement.id, observed_at: "2025-02-03T00:00:00Z", superseded_by: id(720001),
+      is_active: false, confidence_basis: { visual_subjects_v1: { state: "withdrawn", envelope: { user_id: owner } } } } as any);
+    if (negative === "privacy_withdrawal") db.data.observations.push({ id: id(720002), image_id: replacement.id,
+      observed_by: "device_privacy_v1", superseded_by: id(720003), is_active: false,
+      confidence_basis: { device_privacy_v1: { state: "withdrawn", envelope: { user_id: owner } } } } as any);
+    equal((await readSubjectProfiles(db, owner)).subjects, []);
+  }
+});
+Deno.test("alias privacy overflow remains opaque and explicitly truncated even when every gate is approved", async () => {
+  const db = new FixtureDB(fixture(2)); const replacement = auditClone(db, 0); auditClone(db, 1);
+  for (let i = 0; i < 9; i++) db.data.observations.push({ id: id(730000 + i), image_id: replacement.id,
+    observed_by: "device_privacy_v1", superseded_by: null, is_active: true,
+    confidence_basis: { device_privacy_v1: { state: "active", envelope: { user_id: owner } } } } as any);
+  const result = await readSubjectProfiles(db, owner); equal(result.subjects, []); equal(result.coverage.truncated, true);
 });

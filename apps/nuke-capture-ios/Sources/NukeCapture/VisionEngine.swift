@@ -189,6 +189,7 @@ enum VisionEngine {
 
     static func classify(_ cg: CGImage) -> Classification? {
         let request = VNClassifyImageRequest()
+        request.revision = VNClassifyImageRequestRevision2
         let handler = VNImageRequestHandler(cgImage: cg, options: [:])
         do { try handler.perform([request]) } catch { return nil }
         guard let observations = request.results else { return nil }
@@ -232,6 +233,7 @@ enum VisionEngine {
     /// under it, a selfie/portrait trips it. A failed detector is unknown.
     static func detectProminentFace(_ cg: CGImage, minAreaFraction: CGFloat = 0.045) throws -> Bool {
         let request = VNDetectFaceRectanglesRequest()
+        request.revision = VNDetectFaceRectanglesRequestRevision3
         let handler = VNImageRequestHandler(cgImage: cg, options: [:])
         try handler.perform([request])
         guard let faces = request.results else { throw TriageFailure.faceDetectorUnavailable }
@@ -305,6 +307,7 @@ enum VisionEngine {
         let classified: Bool
         /// Operational failure, never a personal/clutter verdict or upload permission.
         let failure: TriageFailure?
+        var privacyEvidence: DevicePrivacyReceipt.Evidence? = nil
     }
 
     static func triage(_ cg: CGImage, labelCap: Int = 12,
@@ -333,7 +336,10 @@ enum VisionEngine {
         }
         let personal = face && !cls.isVehicle
         return TriageResult(pixelsEligible: !clutter && !personal, labels: labels,
-                            isVehicle: cls.isVehicle, classified: true, failure: nil)
+                            isVehicle: cls.isVehicle, classified: true, failure: nil,
+                            privacyEvidence: .init(labels: cls.labels, prominentFace: face, isVehicle: cls.isVehicle,
+                                maxCoreConfidence: cls.maxCoreConfidence,
+                                totalVehicleConfidence: cls.labels.filter { allVehicleLabels.contains($0.0) }.reduce(0) { $0 + $1.1 }))
     }
 
     /// Classify one library photo by its PHAsset id — the cheap, on-device

@@ -13,6 +13,7 @@ import { resolveSubjectBatch, subjectOwnerId, supabaseSubjectStore, type Subject
 import { readSubjectProfiles } from './subjectReader.ts';
 import { selectResolutionContext } from './subjectCandidates.ts';
 import { readSourceInbox, type SourceInboxOptions } from './sourceInbox.ts';
+import { readSubjectReinspections } from './subjectReinspection.ts';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -20,7 +21,7 @@ import { readSourceInbox, type SourceInboxOptions } from './sourceInbox.ts';
 
 interface CheckRequest extends SubjectRequest {
   // Mode: "check" (default/legacy), "build_signatures", "disambiguate"
-  mode?: "check" | "build_signatures" | "disambiguate" | "resolve_subjects" | "read_subjects";
+  mode?: "check" | "build_signatures" | "disambiguate" | "resolve_subjects" | "read_subjects" | "read_subject_reinspections";
   cluster_id?: string;
   limit?: number;
   offset?: number;
@@ -304,7 +305,7 @@ Deno.serve(async (req: Request) => {
     const batchSize = Math.min(body.batch_size || 10, 50);
     const dryRun = body.dry_run ?? false;
 
-    if (mode === "resolve_subjects" || mode === "read_subjects") {
+    if (mode === "resolve_subjects" || mode === "read_subjects" || mode === "read_subject_reinspections") {
       const caller = await authenticateWriter(req);
       if (!caller.ok) return writeAuthResponse(caller, corsHeaders);
       let owner: string;
@@ -318,6 +319,8 @@ Deno.serve(async (req: Request) => {
       if (mode === "read_subjects") {
         result = body.source_inbox === undefined ? await readSubjectProfiles(supabase, owner, body)
           : await readSourceInbox(supabase, owner, body.source_inbox);
+      } else if (mode === "read_subject_reinspections") {
+        result = await readSubjectReinspections(supabase, supabaseSubjectStore(supabase), owner, body);
       } else {
         const store = supabaseSubjectStore(supabase);
         store.context = async (user, fresh) => {
