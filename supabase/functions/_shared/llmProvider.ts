@@ -217,7 +217,7 @@ async function callAnthropic(config: LLMConfig, messages: any[], options?: any):
     .filter(m => m.role !== 'system')
     .map(m => ({
       role: m.role === 'assistant' ? 'assistant' : 'user',
-      content: m.content,
+      content: anthropicContent(m.content),
     }));
   
   const response = await fetch('https://api.anthropic.com/v1/messages', {
@@ -243,10 +243,45 @@ async function callAnthropic(config: LLMConfig, messages: any[], options?: any):
   
   const data = await response.json();
   return {
-    content: data.content[0]?.text || '',
+    content: (data.content ?? []).filter((block: any) => block.type === 'text').map((block: any) => block.text).join('\n'),
     usage: data.usage,
     finish_reason: data.stop_reason,
   };
+}
+
+/** Preserve image bytes and their actual type at the provider boundary. Claude's
+ * Messages API uses image/source blocks, not OpenAI image_url blocks.
+ * https://platform.claude.com/docs/en/build-with-claude/vision
+ */
+function inlineImage(url: unknown, supported: Set<string>): { mime: string; data: string } {
+  const match = typeof url === 'string' ? /^data:(image\/[a-z0-9.+-]+);base64,([A-Za-z0-9+/]+={0,2})$/i.exec(url) : null;
+  if (!match || !supported.has(match[1].toLowerCase()) || match[2].length % 4 !== 0) {
+    throw new Error('vision_image_inline_format_unsupported');
+  }
+  return { mime: match[1].toLowerCase(), data: match[2] };
+}
+const CLAUDE_IMAGES = new Set(['image/jpeg', 'image/png', 'image/gif', 'image/webp']);
+const GEMINI_IMAGES = new Set(['image/jpeg', 'image/png', 'image/webp', 'image/heic', 'image/heif']);
+export function anthropicContent(content: unknown): unknown {
+  if (!Array.isArray(content)) return content;
+  return content.map(block => {
+    if (block?.type !== 'image_url') return block;
+    const url = block.image_url?.url;
+    if (typeof url === 'string' && /^https?:\/\//i.test(url)) {
+      return { type: 'image', source: { type: 'url', url } };
+    }
+    const image = inlineImage(url, CLAUDE_IMAGES);
+    return { type: 'image', source: { type: 'base64', media_type: image.mime, data: image.data } };
+  });
+}
+
+/** Google inline_data requires the MIME of the actual bytes, rather than a
+ * blanket JPEG label. Unpinned URL text is not base64 image data.
+ * https://ai.google.dev/gemini-api/docs/image-understanding
+ */
+export function googleImagePart(url: unknown) {
+  const image = inlineImage(url, GEMINI_IMAGES);
+  return { inline_data: { mime_type: image.mime, data: image.data } };
 }
 
 async function callGoogle(config: LLMConfig, messages: any[], options?: any): Promise<any> {
@@ -265,12 +300,7 @@ async function callGoogle(config: LLMConfig, messages: any[], options?: any): Pr
         parts = m.content.map((c: any) => {
           if (c.type === 'text') return { text: c.text };
           if (c.type === 'image_url') {
-            return {
-              inline_data: {
-                mime_type: 'image/jpeg',
-                data: c.image_url.url.split(',')[1] || c.image_url.url,
-              },
-            };
+            return googleImagePart(c.image_url?.url);
           }
           return { text: JSON.stringify(c) };
         });

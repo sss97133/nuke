@@ -375,6 +375,8 @@ struct ProfileView: View {
                 emptyGarageSection
             }
 
+            if isOwn { ObservedCarsSection(userId: userId) }
+
             // SYNC — owner-only ledger that proves the phone↔record link.
             if isOwn { syncSection }
 
