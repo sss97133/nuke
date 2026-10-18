@@ -22,6 +22,7 @@ import { resolveExistingVehicleId } from '../_shared/resolveVehicleForListing.ts
 import { qualityGate } from '../_shared/extractionQualityGate.ts';
 import { cleanVehicleFields, stripHtmlTags } from '../_shared/pollutionDetector.ts';
 import { normalizeVehicleFields } from '../_shared/normalizeVehicle.ts';
+import { extractVehicleFacets } from '../_shared/vehicleFacets.ts';
 import { writeObservation } from "../_shared/observationWriter.ts";
 import { buildFullDescription, DESCRIPTION_LIMIT, htmlToText, lotProse } from "./goodingText.ts";
 import { goodingUrlVariants } from "./lotUrl.ts";
@@ -33,13 +34,13 @@ import { writeVehicleEventByKey } from '../_shared/vehicleEventWrite.ts';
 import { goodingEventDates, type GoodingEventDates } from './eventDates.ts';
 import { projectSecretKey } from "../_shared/supabaseKeys.ts";
 
-const EXTRACTOR_VERSION = '2.1.0';
+const EXTRACTOR_VERSION = '2.2.0';
 
 // ============================================================================
 // TYPES
 // ============================================================================
 
-interface GoodingExtracted {
+export interface GoodingExtracted {
   // Source
   url: string;
   slug: string;
@@ -51,6 +52,9 @@ interface GoodingExtracted {
   year: number | null;
   make: string | null;
   model: string | null;
+  series: string | null;
+  trim: string | null;
+  body_style: string | null;
   vin: string | null;
   chassis: string | null;       // Classic car chassis (used as VIN when no 17-char VIN)
   coachwork: string | null;     // e.g. "Scaglietti"
@@ -95,7 +99,7 @@ interface GoodingExtracted {
   auction_mobility_id: string | null;
 }
 
-interface GoodingPageData {
+export interface GoodingPageData {
   result: {
     data: {
       contentfulLot: {
@@ -304,7 +308,7 @@ function buildCloudinaryUrl(publicId: string, width: number = 1800): string {
 // EXTRACT FROM PAGE DATA
 // ============================================================================
 
-function extractFromPageData(pageData: GoodingPageData, url: string): GoodingExtracted {
+export function extractFromPageData(pageData: GoodingPageData, url: string): GoodingExtracted {
   const lot = pageData.result?.data?.contentfulLot;
   if (!lot) {
     throw new Error('No lot data found in page-data.json');
@@ -418,8 +422,18 @@ function extractFromPageData(pageData: GoodingPageData, url: string): GoodingExt
       : `${auction.name} (Lot ${lot.lotNumber})`;
   }
 
+  const canonicalUrl = `https://www.goodingco.com/lot/${slug}`;
+  const facets = extractVehicleFacets({
+    year: item?.modelYear || null,
+    make: item?.make?.name || null,
+    model: item?.model || null,
+    title: item?.title || null,
+    url: canonicalUrl,
+    description: [coachwork ? `Coachwork by ${coachwork}` : '', ...cleanHighlights.slice(0, 4)].filter(Boolean).join(' ') || null,
+  });
+
   return {
-    url: `https://www.goodingco.com/lot/${slug}`,
+    url: canonicalUrl,
     slug,
     contentful_id: auction?.contentful_id,
     salesforce_id: item?.salesForceId || undefined,
@@ -428,6 +442,9 @@ function extractFromPageData(pageData: GoodingPageData, url: string): GoodingExt
     year: item?.modelYear || null,
     make: item?.make?.name || null,
     model: item?.model || null,
+    series: facets.series_code,
+    trim: facets.trim_package,
+    body_style: facets.body_style_facet,
     vin,
     chassis,
     coachwork,
@@ -641,7 +658,11 @@ async function saveToDatabase(
     description,
     color: null, // Gooding doesn't provide color directly
     transmission: extracted.transmission,
+    body_style: extracted.body_style,
   });
+  const resolvedSeries = extracted.series ?? null;
+  const resolvedTrim = extracted.trim ?? null;
+  const resolvedBodyStyle: string | null = rawVehicleData.body_style ?? extracted.body_style ?? null;
   const cleanedData = cleanVehicleFields(rawVehicleData, { platform: 'gooding' });
   const gate = qualityGate(cleanedData, { source: 'gooding', sourceType: 'auction' });
 
@@ -701,12 +722,20 @@ async function saveToDatabase(
     if (extracted.engine_size) vehicleUpdate.engine_size = extracted.engine_size;
     if (extracted.transmission) vehicleUpdate.transmission = extracted.transmission;
     if (extracted.mileage) vehicleUpdate.mileage = extracted.mileage;
-    if (extracted.coachwork || extracted.saleroom_addendum || extracted.auction_calendar_position) {
-      const { data: existingVehicle } = await supabase
+    const needsFacets = !!(resolvedSeries || resolvedTrim || resolvedBodyStyle);
+    const needsMeta = !!(extracted.coachwork || extracted.saleroom_addendum || extracted.auction_calendar_position);
+    const { data: existingVehicle } = needsFacets || needsMeta
+      ? await supabase
         .from('vehicles')
-        .select('origin_metadata')
+        .select('origin_metadata,series,trim,body_style')
         .eq('id', vehicleId)
-        .maybeSingle();
+        .maybeSingle()
+      : { data: null };
+    // Facets are fill-only: a vehicle keeps the series, trim and body style it already has.
+    if (resolvedSeries && !existingVehicle?.series) vehicleUpdate.series = resolvedSeries;
+    if (resolvedTrim && !existingVehicle?.trim) vehicleUpdate.trim = resolvedTrim;
+    if (resolvedBodyStyle && !existingVehicle?.body_style) vehicleUpdate.body_style = resolvedBodyStyle;
+    if (needsMeta) {
       const existingMeta = (existingVehicle?.origin_metadata as Record<string, unknown>) || {};
       vehicleUpdate.origin_metadata = {
         ...existingMeta,
@@ -764,6 +793,9 @@ async function saveToDatabase(
       engine_size: extracted.engine_size || undefined,
       transmission: extracted.transmission || undefined,
       mileage: extracted.mileage || undefined,
+      series: resolvedSeries || undefined,
+      trim: resolvedTrim || undefined,
+      body_style: resolvedBodyStyle || undefined,
     };
     if (extracted.coachwork || extracted.saleroom_addendum || extracted.auction_calendar_position) {
       insertPayload.origin_metadata = {
@@ -817,6 +849,9 @@ async function saveToDatabase(
     if (extracted.mileage) obsFields.mileage = extracted.mileage;
     if (extracted.engine_size) obsFields.engine_size = extracted.engine_size;
     if (extracted.transmission) obsFields.transmission = extracted.transmission;
+    if (resolvedSeries) obsFields.series = resolvedSeries;
+    if (resolvedTrim) obsFields.trim = resolvedTrim;
+    if (resolvedBodyStyle) obsFields.body_style = resolvedBodyStyle;
     await writeObservation(supabase, {
       vehicleId,
       source: { platform: "gooding", url: extracted.url, trustScore: 0.9 },
@@ -858,6 +893,9 @@ async function saveToDatabase(
         specifications: extracted.specifications,
         coachwork: extracted.coachwork,
         chassis: extracted.chassis,
+        ...(resolvedSeries ? { series: resolvedSeries } : {}),
+        ...(resolvedTrim ? { trim: resolvedTrim } : {}),
+        ...(resolvedBodyStyle ? { body_style: resolvedBodyStyle } : {}),
         engine_number: extracted.engine_number,
         description_sections: extracted.description_sections,
         saleroom_addendum: extracted.saleroom_addendum,
@@ -979,7 +1017,7 @@ async function processBatch(
 // HTTP HANDLER
 // ============================================================================
 
-Deno.serve(async (req) => {
+if (import.meta.main) Deno.serve(async (req) => {
   // Writes are never anonymous: service key, signed-in user, or nothing (P0.2, 2026-09-27).
   const denied = await requireWriteAuth(req);
   if (denied) return denied;

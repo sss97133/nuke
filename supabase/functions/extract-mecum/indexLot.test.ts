@@ -118,7 +118,7 @@ Deno.test("indexLot and extractStructuredLotFacets extract Squarebody C10/K10/C2
   const mach1Res: any = indexLot(mach1Hit);
   if (
     mach1Res.lot.series !== "Mach 1" ||
-    mach1Res.lot.trim !== "Mach 1" ||
+    mach1Res.lot.trim !== "Mach 1 Cobra Jet" ||
     mach1Res.lot.body_style !== "Fastback"
   ) {
     throw new Error(`unexpected Mach 1 facets: ${JSON.stringify(mach1Res.lot)}`);
@@ -133,6 +133,29 @@ Deno.test("indexLot and extractStructuredLotFacets extract Squarebody C10/K10/C2
   if (bossFacets.series !== "Boss 302" || bossFacets.trim !== "Boss 302" || bossFacets.body_style !== "Fastback") {
     throw new Error(`unexpected Boss 302 facets: ${JSON.stringify(bossFacets)}`);
   }
+});
+
+Deno.test("extractStructuredLotFacets carries the shared collector-marque taxonomy (300 SL, XK140 DHC, 250 GT SWB, Shelby, Bronco, Squarebody)", () => {
+  const cases: Array<[Parameters<typeof extractStructuredLotFacets>[0], [string | null, string | null, string | null]]> = [
+    [{ year: 1955, make: "Mercedes-Benz", model: "300 SL", title: "1955 Mercedes-Benz 300 SL Gullwing", taxonomyBodyStyle: "Coupe" }, ["300 SL", "Gullwing", "Gullwing Coupe"]],
+    [{ year: 1956, make: "Jaguar", model: "XK140", title: "1956 Jaguar XK140 SE Drophead Coupe" }, ["XK140", "SE", "Convertible"]],
+    [{ year: 1961, make: "Ferrari", model: "250 GT", title: "1961 Ferrari 250 GT SWB Berlinetta" }, ["250 GT SWB", "SWB", "Coupe"]],
+    [{ year: 1967, make: "Shelby", model: "GT500", title: "1967 Shelby GT500 Fastback" }, ["Shelby GT500", "GT500", "Fastback"]],
+    [{ year: 1966, make: "Ford", model: "Bronco", title: "1966 Ford Bronco U13 Roadster" }, ["U13 Roadster", null, "Roadster"]],
+    [{ year: 1967, make: "Ford", model: "Bronco", title: "1967 Ford Bronco U14 Half-Cab" }, ["U14 Half-Cab", null, "Half-Cab"]],
+    [{ year: 1976, make: "Ford", model: "Bronco", title: "1976 Ford Bronco Ranger", taxonomyBodyStyle: "SUV" }, ["U15 Wagon", "Ranger", "SUV"]],
+    [{ year: 1978, make: "Chevrolet", model: "K10", title: "1978 Chevrolet K10 Cheyenne Super Stepside Pickup", taxonomyBodyStyle: "Pickup" }, ["K10", "Cheyenne Super", "Stepside Pickup"]],
+  ];
+  for (const [input, want] of cases) {
+    const f = extractStructuredLotFacets(input);
+    const got = [f.series, f.trim, f.body_style];
+    if (JSON.stringify(got) !== JSON.stringify(want)) throw new Error(`${input.title}: expected ${JSON.stringify(want)}, got ${JSON.stringify(got)}`);
+  }
+});
+
+Deno.test("a taxonomy trim and a specific taxonomy body style are kept over extracted ones", () => {
+  const f = extractStructuredLotFacets({ year: 1970, make: "Plymouth", model: "Road Runner", title: "1970 Plymouth Road Runner Superbird", taxonomyTrim: "Hemi", taxonomyBodyStyle: "Hardtop" });
+  if (f.series !== "Superbird" || f.trim !== "Hemi" || f.body_style !== "Hardtop") throw new Error(JSON.stringify(f));
 });
 
 Deno.test("Road Art is not a vehicle", () => {

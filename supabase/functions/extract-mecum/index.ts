@@ -652,6 +652,7 @@ function applyStructuredVehicleFacets(vehicle: MecumVehicle): MecumVehicle {
     make: vehicle.make,
     model: vehicle.model,
     title: vehicle.title,
+    url: vehicle.url,
     highlights: [vehicle.engine, vehicle.highlights, vehicle.description].filter(Boolean).join(" "),
     taxonomyTrim: vehicle.trim,
     taxonomyBodyStyle: vehicle.body_style,
@@ -941,6 +942,9 @@ async function writeMecumEpisode(supabase: any, vehicleId: string, vehicle: Mecu
     currency: "USD",
     estimate_low: vehicle.low_estimate,
     estimate_high: vehicle.high_estimate,
+    ...(vehicle.series ? { series: vehicle.series } : {}),
+    ...(vehicle.trim ? { trim: vehicle.trim } : {}),
+    ...(vehicle.body_style ? { body_style: vehicle.body_style } : {}),
   };
   if (lotStatuses.length) metadata.has_reserve = !lotStatuses.some((x) => /no-?reserve/i.test(x));
   if (sale) {
@@ -1100,12 +1104,12 @@ async function saveVehicle(
   if (existingId) {
     const { data: existing } = await supabase
       .from("vehicles")
-      .select("year,make,model,vin,mileage,color,description,transmission,body_style,engine_type,sale_price,interior_color")
+      .select("year,make,model,vin,series,trim,mileage,color,description,transmission,body_style,engine_type,sale_price,interior_color")
       .eq("id", existingId)
       .maybeSingle();
 
     if (existing) {
-      const trackFields = ["vin", "mileage", "color", "description", "transmission", "body_style", "engine_type", "sale_price", "interior_color"];
+      const trackFields = ["vin", "series", "trim", "mileage", "color", "description", "transmission", "body_style", "engine_type", "sale_price", "interior_color"];
       for (const f of trackFields) {
         if (!(existing as any)[f] && cleanData[f]) fieldsUpdated.push(f);
       }
@@ -1644,7 +1648,8 @@ Deno.serve(async (req) => {
             }
             html = html ?? snap?.html ?? null;
           }
-          const vehicle = html ? parseNextData(html, it.listing_url, postFromFlight(html)) : null;
+          const parsed = html ? parseNextData(html, it.listing_url, postFromFlight(html)) : null;
+          const vehicle = parsed ? applyStructuredVehicleFacets(parsed) : null;
           if (!vehicle || !(vehicle.year && vehicle.make)) {
             // reparse_retained, then refetch, then classify_non_vehicle: a page that parses with no year and make is next classified.
             mustWrite("release_revision_item", await supabase.rpc("release_revision_item", { p_id: it.id, p_next_action: vehicle ? "classify_non_vehicle" : "refetch", p_detail: { reparsed_by: worker, found: vehicle ? "no year or make" : (html ? "no lot object" : "no snapshot body") } }));
@@ -1713,7 +1718,8 @@ Deno.serve(async (req) => {
             html = inline?.html ?? null;
           }
           if (!html) { out.unreadable++; await supabase.from("import_queue").update({ status: "failed", error_message: "snapshot body unreadable" }).eq("id", row.id); continue; }
-          const vehicle = parseNextData(html, snap.listing_url, postFromFlight(html));
+          const parsedVehicle = parseNextData(html, snap.listing_url, postFromFlight(html));
+          const vehicle = parsedVehicle ? applyStructuredVehicleFacets(parsedVehicle) : null;
           if (!vehicle) { out.unreadable++; await supabase.from("import_queue").update({ status: "failed", error_message: "snapshot has no lot object" }).eq("id", row.id); await raiseRevision(supabase, snap.listing_url, ["lot_object"], "parser_gap", "refetch", {}, snap.id); continue; }
           if (!(vehicle.year && vehicle.make)) { out.not_a_vehicle++; await supabase.from("import_queue").update({ status: "skipped", error_message: "NOT_A_VEHICLE" }).eq("id", row.id); await raiseRevision(supabase, snap.listing_url, ["year", "make"], "quality_gate", "classify_non_vehicle", {}, snap.id); continue; }
           const { vehicleId, isNew } = await saveVehicle(supabase, vehicle);
