@@ -224,6 +224,8 @@ export interface SequencesResult {
   sequences: AuctionSequence[];
   /** local days whose photo stamps are import times, not capture times */
   importStampedDays: string[];
+  /** Eligible native comments, after dedupe/assignment, with no usable posting clock. */
+  hasUnpositionedActivity: boolean;
 }
 
 const DAY = 86400e3;
@@ -267,15 +269,18 @@ export function buildAuctionSequences(rawInput: SequenceInput): SequencesResult 
   for (const c of input.comments) { const k = lotKey(c.source_url); if (k) keys.add(k); }
   for (const e of input.auctionEvents) { const k = lotKey(e.source_url); if (k) keys.add(k); }
   for (const v of input.vehicleEvents) { const k = lotKey(v.source_url); if (k) keys.add(k); }
-  if (keys.size === 0) return { sequences: [], importStampedDays: [] };
+  if (keys.size === 0) return { sequences: [], importStampedDays: [], hasUnpositionedActivity: false };
 
   // items per listing; rows with no listing URL of their own go to the car's own listing
   const itemsByKey = new Map<string, AuctionItem[]>();
   for (const k of keys) itemsByKey.set(k, []);
   const pending: AuctionCommentRow[] = [];
+  let hasUnpositionedActivity = false;
   for (const c of input.comments) {
     const k = lotKey(c.source_url);
-    if (k) pushItem(itemsByKey.get(k)!, c, k); else if (!c.source_url?.trim()) pending.push(c);
+    if (k) {
+      if (!pushItem(itemsByKey.get(k)!, c, k)) hasUnpositionedActivity = true;
+    } else if (!c.source_url?.trim()) pending.push(c);
   }
   for (const list of itemsByKey.values()) sortItems(list);
 
@@ -289,7 +294,9 @@ export function buildAuctionSequences(rawInput: SequenceInput): SequencesResult 
     }
     if (!defaultKey) defaultKey = Array.from(keys)[0];
   }
-  for (const c of pending) pushItem(itemsByKey.get(defaultKey)!, c, defaultKey);
+  for (const c of pending) {
+    if (!pushItem(itemsByKey.get(defaultKey)!, c, defaultKey)) hasUnpositionedActivity = true;
+  }
   sortItems(itemsByKey.get(defaultKey)!);
 
   // one sequence per listing
@@ -317,7 +324,7 @@ export function buildAuctionSequences(rawInput: SequenceInput): SequencesResult 
     target.photos.publishedWithListing += 1;
   }
 
-  return { sequences: drafts, importStampedDays: Array.from(stamped).sort() };
+  return { sequences: drafts, importStampedDays: Array.from(stamped).sort(), hasUnpositionedActivity };
 }
 
 /** Heuristic upload-month window: the listing's opening month, or the one before. */
@@ -345,9 +352,9 @@ export function listingForPhoto(im: ImageStampRow, sequences: AuctionSequence[])
   return sequences.find(s => s.ordinal === s.listingCount) ?? sequences[0];
 }
 
-function pushItem(list: AuctionItem[], c: AuctionCommentRow, key: string): void {
+function pushItem(list: AuctionItem[], c: AuctionCommentRow, key: string): boolean {
   const at = isoOrNull(c.posted_at);
-  if (!at) return;
+  if (!at) return false;
   const isBid = c.comment_type === 'bid';
   const isSeller = c.is_seller === true || c.comment_type === 'seller_response';
   list.push({
@@ -363,6 +370,7 @@ function pushItem(list: AuctionItem[], c: AuctionCommentRow, key: string): void 
     postClose: null,
     listingKey: key,
   });
+  return true;
 }
 
 function sortItems(list: AuctionItem[]): void {

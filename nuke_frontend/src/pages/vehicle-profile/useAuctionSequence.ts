@@ -146,7 +146,7 @@ export function useAuctionSequence(
     return buildAuctionSequences({ ...rows, timelineEvents, lotUrlHint: lotHint || null });
   }, [rows, lotHint, timelineEvents]);
 
-  const hasUnpositionedActivity = !!built && !!rows?.comments.some(c => !c.posted_at || !Number.isFinite(Date.parse(c.posted_at)));
+  const hasUnpositionedActivity = built?.hasUnpositionedActivity ?? false;
   return { auctions: built?.sequences ?? [], importStampedDays: built?.importStampedDays ?? [], loading,
     activityUnavailable: isError && lotHint !== null, hasUnpositionedActivity };
 }

@@ -384,3 +384,45 @@ it.each([
   if (control.grain === 'day') { expect(firstDetail.textContent).toContain('Sep 10, 2026'); expect(firstDetail.textContent).not.toMatch(/\d{1,2}:\d{2}|AM|PM/); }
   else expect(firstDetail.textContent).toMatch(/\d{1,2}:\d{2}/);
 });
+
+
+const untimedStatus = 'Some retained auction interactions lack usable posting times and cannot be placed on this timeline.';
+const untimedRow = (source_url: string | null, posted_at: string | null = null, bat_comment_id = 999) => ({ ...comment(source_url),
+  id: '00000000-0000-4000-8000-000000000999', posted_at, bat_comment_id });
+it.each([
+  { name: 'eligible native missing clock', source: valid, keepTimed: true, noKey: false, expected: true },
+  { name: 'explicit foreign beside native', source: 'https://example.invalid/other', keepTimed: true, noKey: false, expected: false },
+  { name: 'blank fallback to known native key', source: '  ', keepTimed: true, noKey: false, expected: true },
+  { name: 'explicit foreign alone', source: 'https://example.invalid/other', keepTimed: false, noKey: false, expected: false },
+  { name: 'blank without native key', source: null, keepTimed: false, noKey: true, expected: false },
+])('qualifies actual untimed native warning for $name', async control => {
+  timeline = []; comments = [...(control.keepTimed ? [comment(valid)] : []), untimedRow(control.source)];
+  if (control.noKey) { hint = null; auctions = []; events = []; timeline = [{ event_type: 'auction_listed', event_date: day, source: 'bat' }]; }
+  await draw(false); expect(nativeReads()).toHaveLength(2); expect(queryState().status).toBe('success');
+  expect(host.textContent?.includes(untimedStatus)).toBe(control.expected); expect(host.textContent).not.toContain(incomplete);
+  const retained = [...host.querySelectorAll<HTMLAnchorElement>('.auction-band svg a')].map(a => a.getAttribute('href'));
+  expect(retained).toEqual(control.keepTimed ? [`${valid}#comment-123`] : []);
+  expect(sourceLinks()).not.toContain(`${valid}#comment-999`);
+  if (!control.noKey) expect(sourceLinks()).toContain(valid);
+});
+it('keeps the warning for an eligible invalid native clock without positioning or reinterpreting it', async () => {
+  timeline = []; comments.push(untimedRow(valid, 'not-a-time')); await draw();
+  expect(nativeReads()).toHaveLength(2); expect(host.textContent).toContain(untimedStatus);
+  expect([...host.querySelectorAll('.auction-band svg a')].map(a => a.getAttribute('href'))).toEqual([`${valid}#comment-123`]);
+});
+it('does not revive an invalid native duplicate discarded by canonical dedupe as untimed activity', async () => {
+  timeline = []; comments.push(untimedRow(valid, 'not-a-time', 123)); await draw();
+  expect(nativeReads()).toHaveLength(2); expect(host.textContent).not.toContain(untimedStatus);
+  expect([...host.querySelectorAll('.auction-band svg a')].map(a => a.getAttribute('href'))).toEqual([`${valid}#comment-123`]);
+});
+it('retains qualified untimed metadata alongside existing partial-context availability', async () => {
+  timeline = []; comments.push(untimedRow(valid)); refusedTable = 'vehicle_images'; await draw();
+  expect(queryState().status).toBe('error'); expect(nativeReads()).toHaveLength(2);
+  expect(host.textContent).toContain(untimedStatus); expect(host.textContent).toContain(incomplete); expect(sourceLinks()).toContain(`${valid}#comment-123`);
+});
+it('withholds prior qualified untimed metadata after the current parent is denied', async () => {
+  timeline = []; comments.push(untimedRow(valid)); await draw(); expect(host.textContent).toContain(untimedStatus);
+  const before = nativeReads().length; parentDenied = true; await refetchSequence();
+  expect(nativeReads()).toHaveLength(before); expect(host.textContent).not.toContain(untimedStatus); expect(host.textContent).toContain(incomplete);
+  expect(sourceLinks()).toEqual([]);
+});

@@ -254,3 +254,30 @@ describe('recorded end clocks and categorical outcomes', () => {
     expect(seq.outcome).toBe('unknown'); expect(seq.outcomeConflict).toBe(true);
   });
 });
+
+
+describe('unpositioned activity follows canonical native assignment', () => {
+  const native = (id: string, posted_at: string | null, source_url: string | null = LOT, bat_comment_id: number | null = 1): AuctionCommentRow =>
+    ({ ...comment({ id, posted_at: '2026-09-17T18:00:00Z' }), posted_at, source_url, bat_comment_id });
+  const timed = native('synthetic-timed', '2026-09-17T18:00:00Z');
+  it.each([
+    { name: 'native missing clock', rows: [timed, native('synthetic-null', null, LOT, 2)], hint: LOT, expected: true, items: ['synthetic-timed'], keys: ['1985-pontiac-fiero-gt-3'] },
+    { name: 'native invalid clock', rows: [timed, native('synthetic-invalid', 'not-a-time', LOT, 2)], hint: LOT, expected: true, items: ['synthetic-timed'], keys: ['1985-pontiac-fiero-gt-3'] },
+    { name: 'blank native fallback', rows: [timed, native('synthetic-blank', null, '  ', 2)], hint: LOT, expected: true, items: ['synthetic-timed'], keys: ['1985-pontiac-fiero-gt-3'] },
+    { name: 'foreign alongside native', rows: [timed, native('synthetic-foreign', null, 'https://example.invalid/other', 2)], hint: LOT, expected: false, items: ['synthetic-timed'], keys: ['1985-pontiac-fiero-gt-3'] },
+    { name: 'foreign only under known key', rows: [native('synthetic-foreign', null, 'https://example.invalid/other', 2)], hint: LOT, expected: false, items: [], keys: ['1985-pontiac-fiero-gt-3'] },
+    { name: 'blank without a native key', rows: [native('synthetic-blank', null, null, 2)], hint: null, expected: false, items: [], keys: [] },
+    { name: 'fully positioned native', rows: [timed], hint: LOT, expected: false, items: ['synthetic-timed'], keys: ['1985-pontiac-fiero-gt-3'] },
+    { name: 'invalid duplicate discarded by current earliest policy', rows: [timed, native('synthetic-invalid', 'not-a-time')], hint: LOT, expected: false, items: ['synthetic-timed'], keys: ['1985-pontiac-fiero-gt-3'] },
+    { name: 'null duplicate retained by current earliest policy', rows: [timed, native('synthetic-null', null)], hint: LOT, expected: true, items: [], keys: ['1985-pontiac-fiero-gt-3'] },
+    { name: 'foreign duplicate retained then refused by assignment', rows: [timed, native('synthetic-foreign', null, 'https://example.invalid/other')], hint: LOT, expected: false, items: [], keys: ['1985-pontiac-fiero-gt-3'] },
+  ])('qualifies $name without changing sequence membership or source clocks', control => {
+    const result = buildAuctionSequences({ comments: control.rows, auctionEvents: [], vehicleEvents: [], timelineEvents: [], images: [], lotUrlHint: control.hint });
+    expect(result.sequences.map(s => s.key)).toEqual(control.keys);
+    expect(result.sequences.flatMap(s => s.items.map(i => i.id))).toEqual(control.items);
+    expect(result.sequences.flatMap(s => s.items.map(i => i.at))).toEqual(control.items.map(() => '2026-09-17T18:00:00.000Z'));
+    expect(result.sequences.flatMap(s => s.items.map(i => i.url))).toEqual(control.items.map(() => `${LOT}#comment-1`));
+    expect(result.importStampedDays).toEqual([]);
+    expect((result as any).hasUnpositionedActivity).toBe(control.expected);
+  });
+});
