@@ -38,7 +38,7 @@ it('frames each brand with its families inside; a family drills to it, a brand o
   const onPickBrand = vi.fn(), onPickFamily = vi.fn();
   await act(async () => root.render(<BrandFamilyMap width={1000} height={600} onPickBrand={onPickBrand} onPickFamily={onPickFamily} />));
   expect(fixture.rpc).toHaveBeenCalledWith('treemap_brand_family_map', { p_brands: 60, p_families: 12 });
-  expect([...container.querySelectorAll('.brand-family-map__brand')].map((b) => b.textContent)).toEqual(['PORSCHE $3K', 'FERRARI $2K']);
+  expect([...container.querySelectorAll('.brand-family-map__brand')].map((b) => b.getAttribute('aria-label'))).toEqual(['Porsche: $3K', 'Ferrari: $2K']);
   const tiles = [...container.querySelectorAll<HTMLButtonElement>('.brand-family-map .market-tile')];
   expect(tiles).toHaveLength(6);
   await act(async () => tiles.find((t) => t.title.startsWith('Porsche 911'))!.click());
@@ -118,4 +118,37 @@ it('keeps the selected window and count gate on family inspection', async () => 
   expect(document.querySelector('[role="tooltip"]')?.textContent).toContain('last 3 months against the 3 before');
   expect(document.querySelector('[role="tooltip"]')?.textContent).toContain('40 → 8 measured sales; the color needs 20 in each window');
   expect(tile.className).toContain('market-tile--few');
+});
+
+it('uses shared brand artwork without changing header geometry or dropping failed-image names', async () => {
+  await act(async () => root.render(<BrandFamilyMap width={1000} height={600} onPickBrand={vi.fn()} onPickFamily={vi.fn()} />));
+  const header = container.querySelector<HTMLButtonElement>('.brand-family-map__brand')!;
+  expect(header.querySelector('.make-identity')?.getAttribute('data-inverse')).toBe('true');
+  expect(header.querySelector('img')?.getAttribute('src')).toBe('/stacks/makes/porsche-wordmark.svg');
+  const dimensions = [header.style.left, header.style.top, header.style.width, header.style.height];
+  expect(header.style.height).toBe('16px');
+  expect(header.querySelector('.brand-family-map__dollars')?.textContent).toBe('$3K');
+  await act(async () => header.querySelector('img')!.dispatchEvent(new Event('error')));
+  expect(header.querySelector('.make-identity strong')?.textContent).toBe('Porsche');
+  expect(header.getAttribute('aria-label')).toBe('Porsche: $3K');
+  expect([header.style.left, header.style.top, header.style.width, header.style.height]).toEqual(dimensions);
+  expect(header.querySelector('.brand-family-map__dollars')?.textContent).toBe('$3K');
+});
+
+it('keeps unknown brand names and fitted dollars whole, with complete identity when a header cannot fit', async () => {
+  vi.resetModules();
+  const { default: UnknownBrandMap } = await import('./BrandFamilyMap');
+  fixture.rpc.mockResolvedValue({ data: [row('Nimbus Co', 1, 124e6, 'n1', 'One', 124e6), row('Zed', 2, 124e6, 'z1', 'One', 124e6)], error: null });
+  await act(async () => root.render(<UnknownBrandMap width={1000} height={600} onPickBrand={vi.fn()} onPickFamily={vi.fn()} />));
+  const header = () => container.querySelector<HTMLButtonElement>('.brand-family-map__brand')!;
+  expect(header().querySelector('.make-identity strong')?.textContent).toBe('Nimbus Co');
+  expect(header().querySelector('img')).toBeNull();
+  expect(header().querySelector('.brand-family-map__dollars')?.textContent).toBe('$124M');
+  await act(async () => root.render(<UnknownBrandMap width={100} height={600} onPickBrand={vi.fn()} onPickFamily={vi.fn()} />));
+  expect(header().querySelector('.make-identity strong')?.textContent).toBe('Nimbus Co');
+  expect(header().querySelector('.brand-family-map__dollars')).toBeNull();
+  await act(async () => root.render(<UnknownBrandMap width={130} height={100} onPickBrand={vi.fn()} onPickFamily={vi.fn()} />));
+  expect(header().querySelector('.brand-family-map__head')).toBeNull();
+  expect(header().getAttribute('aria-label')).toBe('Nimbus Co: $124M');
+  expect(header().style.height).toBe('16px');
 });

@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom';
 import { supabase } from '../../lib/supabase';
 import { squarify } from '../../lib/squarify';
 import { Text } from '../../kit';
+import { MakeIdentity } from '../../components/common/MakeIdentity';
 import { relativeMove, textWidth, pct as signedPct, GATE_MIN, type Baseline, type Move } from './mapScale';
 import { MarketCard, MarketSheet, MarketTile, money as moneyShort, type MapBasis, type MarketNode } from './MarketTile';
 import type { HorizonMoveCounts } from './FamilyMovers';
@@ -116,7 +117,10 @@ export default function BrandFamilyMap({ width, height, onPickBrand, onPickFamil
       {f.head > 0 && <button type="button" className="brand-family-map__brand" onClick={(e) => onPickBrand(f.node.brand, e.detail === 0)}
         aria-label={`${f.node.brand}: ${money(f.node.usd)}`}
         style={{ left: f.x, top: f.y, width: f.w, height: f.head }} title={`${f.node.brand}: ${money(f.node.usd)}`}>
-        <span className="brand-family-map__head">{f.text}</span>
+        {f.text && <span className="brand-family-map__head">
+          <MakeIdentity make={f.node.brand} inverse />
+          {f.text !== f.node.brand.toUpperCase() && <span className="brand-family-map__dollars">{moneyShort(f.node.usd)}</span>}
+        </span>}
       </button>}
       {f.tiles.map((t) => {
         const r = t.node;
