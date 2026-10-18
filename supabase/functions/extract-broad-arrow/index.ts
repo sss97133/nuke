@@ -222,7 +222,7 @@ function extractVinAndChassis(text: string): { vin: string | null; chassis: stri
 // MARKDOWN PARSER (main extraction logic)
 // ============================================================================
 
-function parseFromMarkdown(markdown: string, html: string, url: string): BroadArrowExtracted {
+export function parseFromMarkdown(markdown: string, html: string, url: string): BroadArrowExtracted {
   const result: BroadArrowExtracted = {
     url,
     title: null,
@@ -252,7 +252,7 @@ function parseFromMarkdown(markdown: string, html: string, url: string): BroadAr
   };
 
   // Combine markdown and stripped HTML for searching
-  const combinedText = markdown + '\n' + (html || '').replace(/<[^>]+>/g, ' ');
+  const combinedText = markdown + '\n' + (html || '').replace(/<[^>]+>/g, ' ').replace(/&#39;|&#x27;|&apos;/gi, "'");
 
   // --- TITLE ---
   // Broad Arrow titles appear as h1 or prominent heading: "1955 Mercedes-Benz 300 SL Gullwing"
@@ -983,7 +983,7 @@ async function scrapeWithFirecrawl(url: string): Promise<{
 // HTTP HANDLER
 // ============================================================================
 
-Deno.serve(async (req) => {
+if (import.meta.main) Deno.serve(async (req) => {
   // Writes are never anonymous: service key, signed-in user, or nothing (P0.2, 2026-09-27).
   const denied = await requireWriteAuth(req);
   if (denied) return denied;
