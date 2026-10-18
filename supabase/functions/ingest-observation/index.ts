@@ -134,6 +134,8 @@ interface ObservationInput {
 const SHARE_VERDICTS_PER_HOUR = 20;
 const ARCHIVED_SALE_METHOD = "protected_archived_sale_observation_v1";
 const ARCHIVED_EPISODE_PREVIEW_METHOD = "protected_archived_sale_episode_preview_v2";
+const CAB_LISTING_CAPTURE_MODE = "cab_listing_capture_v1";
+const CAB_LISTING_CAPTURE_METHOD = "protected_cab_listing_capture_v1";
 
 /** Derive protected sale testimony here, never from caller-supplied values.
  * This is the canonical intake; database ingested_at is deliberately omitted.
@@ -288,6 +290,70 @@ Deno.serve(async function handleObservation(req, internal?: unknown) {
 
   try {
     let input: ObservationInput = await req.json();
+    if (input.mode === CAB_LISTING_CAPTURE_MODE) {
+      const denied = await requireWriteAuth(req);
+      if (denied) return denied;
+      const writer = await authenticateWriter(req);
+      if (!writer.ok || writer.caller.kind !== "service_role") {
+        return new Response(JSON.stringify({ error: "Listing capture custody requires service role" }),
+          { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      }
+      const selectors = input as unknown as Record<string, unknown>;
+      const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+      if (Object.keys(selectors).some(key => !["mode", "source_observation_id", "snapshot_id", "source_vehicle_event_id", "dry_run"].includes(key))
+        || typeof selectors.dry_run !== "boolean" ||
+        [selectors.source_observation_id, selectors.snapshot_id, selectors.source_vehicle_event_id]
+          .some(value => typeof value !== "string" || !uuid.test(value))) {
+        return new Response(JSON.stringify({ error: "Expected only three source selectors and explicit dry_run", writes: 0, model_calls: 0 }),
+          { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      }
+      const parameters = { p_source: selectors.source_observation_id, p_snapshot: selectors.snapshot_id,
+        p_episode: selectors.source_vehicle_event_id };
+      const reply = (data: unknown, status = 200) => new Response(JSON.stringify(data),
+        { status, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      const qualified = await supabase.rpc("qualify_cab_listing_capture", parameters).abortSignal(AbortSignal.timeout(5000));
+      if (qualified.error) return reply({ error: "Listing capture qualifier unavailable", writes: 0, model_calls: 0 }, 503);
+      if (qualified.data?.ok !== true) return reply({ error: "Listing capture custody refused",
+        reason: qualified.data?.reason ?? "unqualified", writes: 0, model_calls: 0 }, 409);
+      if (selectors.dry_run) return reply({ success: true, dry_run: true, qualification: qualified.data,
+        writes: 0, model_calls: 0, database_admission: "not_attempted", public_readiness: "not_assessed" });
+      // Values come exclusively from the database's independently verified source
+      // tuple. This receipt preserves the original; it copies no specifications.
+      const { source_slug: _slug, defer_analysis: _defer, ...receipt } = qualified.data.input;
+      const lookup = () => supabase.from("vehicle_observations").select("id")
+        .eq("source_id", receipt.source_id).eq("source_identifier", receipt.source_identifier)
+        .eq("kind", receipt.kind).eq("content_hash", receipt.content_hash)
+        .abortSignal(AbortSignal.timeout(5000)).maybeSingle();
+      const prior = await lookup();
+      if (prior.error) return reply({ error: "Listing capture replay unavailable", model_calls: 0 }, 503);
+      let result = prior.data;
+      let duplicate = Boolean(result);
+      if (!result) {
+        const inserted = await supabase.from("vehicle_observations").insert(receipt).select("id")
+          .abortSignal(AbortSignal.timeout(5000)).single();
+        if (inserted.error?.code === "23505") {
+          const winner = await lookup();
+          if (winner.error || !winner.data) return reply({ error: "Listing capture replay unavailable", model_calls: 0 }, 503);
+          result = winner.data; duplicate = true;
+        } else if (inserted.error || !inserted.data) {
+          return reply({ error: "Listing capture admission refused", model_calls: 0 }, 409);
+        } else result = inserted.data;
+      }
+      // Replay is a fresh custody proof, not a successful hash lookup. This also
+      // detects source withdrawal between qualification and the committed write.
+      const current = await supabase.rpc("qualify_cab_listing_capture", { ...parameters, p_result: result.id })
+        .abortSignal(AbortSignal.timeout(5000));
+      if (current.error) return reply({ error: "Listing capture receipt verification unavailable", model_calls: 0 }, 503);
+      if (current.data?.ok !== true || current.data?.result_verified !== true) return reply({
+        error: "Listing capture receipt no longer qualified", reason: current.data?.reason ?? "unqualified", model_calls: 0,
+      }, 409);
+      return reply({ success: true, observation_id: result.id, duplicate, model_calls: 0,
+        scope: "attributed_listing_narrative_only", public_readiness: "not_assessed" });
+    }
+    if (input.extraction_method === CAB_LISTING_CAPTURE_METHOD || input.structured_data?.listing_capture_receipt !== undefined) {
+      return new Response(JSON.stringify({ error: "Listing capture receipt requires protected source selectors", writes: 0, model_calls: 0 }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
     historicalAskBudget = input.mode === HISTORICAL_ASK_MODE;
     if (input.mode === HISTORICAL_ASK_MODE) {
       const denied = await requireWriteAuth(req);
