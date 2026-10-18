@@ -197,3 +197,46 @@ it.each([
   if (control.mode === 'listing') { expect(params.get('or')).toBe('(source.ilike.%bat%,source_url.ilike.%bringatrailer.com%,taken_at.is.null)'); expect(params.get('limit')).toBe('600'); expect(params.has('taken_at')).toBe(false); }
   else { expect(params.getAll('taken_at')).toEqual(['gte.2026-09-09T00:00:00Z', 'lt.2026-09-10T00:00:00.000Z']); expect(params.get('limit')).toBe('120'); expect(params.get('order')).toBe('taken_at.asc'); }
 });
+
+
+it.each([
+  { kind: 'native importer stamp', imported: true, camera: false, listing: false, takenAt: '2026-09-02T12:10:00Z', source: 'bat_import', sourceUrl: null },
+  { kind: 'native host stamp', imported: true, camera: false, listing: false, takenAt: '2026-09-02T12:10:00Z', source: 'external_import', sourceUrl: nativePhoto },
+  { kind: 'mixed import and camera clocks', imported: true, camera: true, listing: false, takenAt: '2026-09-02T12:10:00Z', source: 'bat_import', sourceUrl: null },
+  { kind: 'ordinary camera', imported: false, camera: true, listing: false, takenAt: null, source: 'owner_upload', sourceUrl: null },
+  { kind: 'foreign camera', imported: false, camera: false, listing: false, takenAt: '2026-09-02T12:10:00Z', source: 'owner_upload', sourceUrl: foreignPhotos[0] },
+  { kind: 'native listing unknown capture', imported: true, camera: false, listing: true, takenAt: null, source: 'bat_import', sourceUrl: nativePhoto },
+  { kind: 'native listing import stamp', imported: true, camera: false, listing: true, takenAt: '2026-09-03T12:10:00Z', source: 'bat_import', sourceUrl: nativePhoto },
+])('carries $kind clock authority through the actual Provider/Barcode/Drawer without changing rows', async control => {
+  vi.stubEnv('TZ', 'UTC'); expect(new Date('2026-09-02T00:00:00Z').getHours()).toBe(0);
+  listingHint = olderUrl; auctionRows = [auction(olderUrl, 'CLOCK', 100)]; eventRows = [event(olderUrl, olderDay)];
+  timeline.push({ id: 'synthetic-clock-navigation', event_date: '2026-09-02', event_type: 'inspection', title: 'Synthetic clock navigation' });
+  photos = [];
+  if (control.kind !== 'ordinary camera') photos.push({ ...photo(control.sourceUrl, control.source, control.takenAt), id: 'synthetic-clock-row' });
+  if (control.camera) photos.push({ ...photo(null, 'owner_upload', '2026-09-02T12:40:00Z'), id: 'synthetic-camera-row', image_url: 'https://images.test/clock-camera.jpg' });
+  const before = structuredClone(photos), selectedDay = control.listing ? olderDay : '2026-09-02';
+  await draw();
+  if (control.imported && !control.listing) expect(cellTitle('2026-09-02') ?? '').not.toContain('1 photos');
+  const result = await openDay(selectedDay);
+  const expected = photos.map(p => ({ src: p.image_url, title: control.listing ? listingPhoto.title : p.source === 'owner_upload' ? (p.id === 'synthetic-camera-row' ? '12:40 PM' : '12:10 PM') : 'import clock 12:10 PM; capture time unknown' }));
+  // URL-qualified native rows use the same existing owner authority as source-qualified rows.
+  if (control.kind === 'native host stamp') expected[0].title = 'import clock 12:10 PM; capture time unknown';
+  expect(result).toEqual(expected); expect(photos).toEqual(before);
+  const drawer = host.querySelector('[data-day-drawer]')!, header = drawer.firstElementChild!.textContent;
+  expect(drawer.textContent).toContain(`PHOTOS ${photos.length}`);
+  if (control.imported && !control.listing) {
+    expect(header).toContain('IMPORTED PHOTO CAPTURE TIMES UNKNOWN'); expect(header).not.toMatch(/12:10|12:40|SPAN/);
+  } else if (!control.listing) {
+    expect(header).toContain(control.camera ? '12:40 PM–12:40 PM' : '12:10 PM–12:10 PM');
+    expect(header).not.toContain('IMPORTED PHOTO CAPTURE TIMES UNKNOWN');
+  } else {
+    expect(drawer.textContent).toContain('LISTING ASSOCIATION INFERRED'); expect(header).not.toMatch(/12:10|SPAN|IMPORTED PHOTO/);
+  }
+  const drawerReads = () => reads.filter(r => r.url.pathname.endsWith('/vehicle_images') && r.url.searchParams.get('select') === 'id,image_url,taken_at,source,source_url');
+  expect(drawerReads()).toHaveLength(1); const query = drawerReads()[0].url.searchParams;
+  expect(query.get('vehicle_id')).toBe(`eq.${vehicleId}`); expect(query.get('is_duplicate')).toBe('not.is.true');
+  expect(query.get('limit')).toBe(control.listing ? '600' : '120');
+  expect(query.getAll('taken_at')).toEqual(control.listing ? [] : ['gte.2026-09-02T00:00:00Z', 'lt.2026-09-03T00:00:00.000Z']);
+  await act(async () => host.querySelector<HTMLButtonElement>('[aria-label="Close day"]')!.click());
+  expect(await openDay(selectedDay)).toEqual(expected); expect(drawerReads()).toHaveLength(1);
+});

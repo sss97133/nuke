@@ -18,7 +18,7 @@ import { Link } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
 import { useVehicleProfile } from './VehicleProfileContext';
 import { openVehiclePhoto } from './VehiclePhotoLightbox';
-import { auctionMomentDayTitle, auctionOpenDayTitle, fmtClock, fmtMoment, fmtUsd, listingForPhoto, localDate, momentDay, type AuctionSequence } from './auctionSequence';
+import { auctionMomentDayTitle, auctionOpenDayTitle, fmtClock, fmtMoment, fmtUsd, isBatHosted, listingForPhoto, localDate, momentDay, type AuctionSequence } from './auctionSequence';
 
 interface DayPhoto {
   id: string;
@@ -190,8 +190,10 @@ const VehicleDayDrawer: React.FC<VehicleDayDrawerProps> = ({ date, auctions = []
     [dayEvents],
   );
 
-  const first = photos && photos.length > 0 && !isListingDay ? photos[0].taken_at : null;
-  const last = photos && photos.length > 0 && !isListingDay ? photos[photos.length - 1].taken_at : null;
+  // Native taken_at is an importer clock, so it cannot join a photo capture span.
+  const hasImportedPhotos = !isListingDay && photos?.some(p => isBatHosted({ ...p, source: p.source ?? null, source_url: p.source_url ?? null }));
+  const first = photos && photos.length > 0 && !isListingDay && !hasImportedPhotos ? photos[0].taken_at : null;
+  const last = photos && photos.length > 0 && !isListingDay && !hasImportedPhotos ? photos[photos.length - 1].taken_at : null;
   const span = fmtSpan(first, last);
   const dayBids = auctionItems.filter(i => i.kind === 'bid').length;
   const dayComments = auctionItems.length - dayBids;
@@ -219,7 +221,7 @@ const VehicleDayDrawer: React.FC<VehicleDayDrawerProps> = ({ date, auctions = []
         <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.08em' }}>{fmtDayHeader(date)}</span>
         {photos && photos.length > 0 && (
           <span style={{ ...mono, fontSize: 8, color: 'var(--vp-pencil, #888)' }}>
-            {fmtTime(first)}–{fmtTime(last)}{span ? ` · ${span}` : ''}
+            {hasImportedPhotos ? 'IMPORTED PHOTO CAPTURE TIMES UNKNOWN' : <>{fmtTime(first)}–{fmtTime(last)}{span ? ` · ${span}` : ''}</>}
           </span>
         )}
         <span style={{ flex: 1 }} />
@@ -319,7 +321,7 @@ const VehicleDayDrawer: React.FC<VehicleDayDrawerProps> = ({ date, auctions = []
             <button
               key={p.id}
               onClick={() => openVehiclePhoto(p.id)}
-              title={isListingDay ? 'listing association inferred; capture and publication times unknown' : fmtTime(p.taken_at)}
+              title={isListingDay ? 'listing association inferred; capture and publication times unknown' : isBatHosted({ ...p, source: p.source ?? null, source_url: p.source_url ?? null }) ? `import clock ${fmtTime(p.taken_at) || 'unknown'}; capture time unknown` : fmtTime(p.taken_at)}
               style={{ display: 'block', padding: 0, border: '1px solid var(--vp-ghost, #ddd)', background: 'var(--vp-row-alt, #f9f9f9)', cursor: 'pointer', aspectRatio: '1 / 1', overflow: 'hidden' }}
             >
               <img

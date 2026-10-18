@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { auctionMomentDayTitle, buildAuctionSequence, buildAuctionSequences, commentPermalink, dedupeComments, fmtMoment, hasRecordedAuctionEnd, lotKey, momentDay, uploadMonth, type AuctionCommentRow } from './auctionSequence';
+import { auctionMomentDayTitle, buildAuctionSequence, buildAuctionSequences, commentPermalink, dedupeComments, fmtMoment, hasRecordedAuctionEnd, isBatHosted, lotKey, momentDay, uploadMonth, type AuctionCommentRow } from './auctionSequence';
 
 const LOT = 'https://bringatrailer.com/listing/1985-pontiac-fiero-gt-3/';
 
@@ -316,5 +316,25 @@ describe('native source eligibility precedes projection identity', () => {
     const result = buildAuctionSequences({ comments: rows, auctionEvents: [], vehicleEvents: [], timelineEvents: [], images: [], lotUrlHint: LOT });
     expect(result.sequences[0].items.map(i => i.id)).toEqual(['none-1', 'none-2', 'a']);
     expect(dedupeComments(rows).map(c => c.id)).toEqual(['none-1', 'none-2', 'a']);
+  });
+});
+
+
+describe('native photo timestamp authority', () => {
+  it.each([
+    { source: 'bat_import', url: null, imported: true },
+    { source: 'owner_upload', url: 'https://photos.bringatrailer.com/wp-content/uploads/2026/09/synthetic.jpg', imported: true },
+    { source: 'external_import', url: '//bringatrailer.com/wp-content/uploads/2026/09/synthetic.jpg', imported: true },
+    { source: 'combat_archive', url: null, imported: true }, // Preserve the existing /bat/i vocabulary.
+    { source: 'owner_upload', url: 'https://notbringatrailer.com/wp-content/uploads/2026/09/synthetic.jpg', imported: false },
+    { source: 'owner_upload', url: null, imported: false },
+  ])('retains $source/$url clock classification and raw inputs', ({ source, url, imported }) => {
+    const image = { id: 'synthetic-clock-authority', source, source_url: url, taken_at: '2026-09-02T12:10:00Z' };
+    const before = structuredClone(image);
+    const result = buildAuctionSequences({ comments: [], auctionEvents: [], vehicleEvents: [], timelineEvents: [], images: [image], lotUrlHint: LOT });
+    expect(isBatHosted(image)).toBe(imported);
+    expect(result.importStampedDays).toEqual(imported ? [new Date(image.taken_at).toLocaleDateString('en-CA')] : []);
+    expect(result.sequences[0].photos.publishedWithListing).toBe(imported ? 1 : 0);
+    expect(image).toEqual(before);
   });
 });

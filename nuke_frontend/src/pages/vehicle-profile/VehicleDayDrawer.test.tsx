@@ -273,3 +273,38 @@ it.each([
   else { expect(query.get('limit')).toBe('120'); expect(query.getAll('taken_at')).toEqual(['gte.2026-09-01T00:00:00Z', 'lt.2026-09-02T00:00:00.000Z']); }
   const first = visible(); await close(); await draw([auction], control.date); expect(visible()).toEqual(first); expect(requests).toHaveLength(1);
 });
+
+
+it.each([
+  { kind: 'known source', source: 'bat_import', url: null },
+  { kind: 'native URL', source: 'owner_upload', url: 'https://bringatrailer.com/wp-content/uploads/2026/09/synthetic-clock.jpg' },
+  { kind: 'existing source vocabulary', source: 'combat_archive', url: null },
+])('qualifies the $kind import clock without dropping its photo or useful cache', async ({ source, url }) => {
+  vi.stubEnv('TZ', 'UTC'); expect(new Date(`${day}T00:00:00Z`).getHours()).toBe(0);
+  rows = [image('native-clock', { source, source_url: url, taken_at: `${day}T12:10:00Z` })];
+  const before = structuredClone(rows);
+  await draw();
+  expect(visible()).toEqual([{ src: 'https://photos.test/native-clock.jpg', title: 'import clock 12:10 PM; capture time unknown' }]);
+  expect(host.querySelector('[data-day-drawer] > div')!.textContent).toContain('IMPORTED PHOTO CAPTURE TIMES UNKNOWN');
+  expect(host.querySelector('[data-day-drawer] > div')!.textContent).not.toContain('12:10');
+  expect(host.textContent).toContain('PHOTOS 1'); expect(rows).toEqual(before);
+  await close(); await draw(); expect(visible()[0].title).toBe('import clock 12:10 PM; capture time unknown'); expect(requests).toHaveLength(1);
+});
+it('does not combine an import clock and camera clock into a capture span', async () => {
+  vi.stubEnv('TZ', 'UTC'); expect(new Date(`${day}T00:00:00Z`).getHours()).toBe(0);
+  rows = [image('native-clock', { taken_at: `${day}T12:10:00Z` }), image('camera-clock', { source: 'owner_upload', taken_at: `${day}T12:40:00Z` })];
+  await draw();
+  expect(visible()).toEqual([{ src: 'https://photos.test/native-clock.jpg', title: 'import clock 12:10 PM; capture time unknown' },
+    { src: 'https://photos.test/camera-clock.jpg', title: '12:40 PM' }]);
+  const header = host.querySelector('[data-day-drawer] > div')!.textContent;
+  expect(header).toContain('IMPORTED PHOTO CAPTURE TIMES UNKNOWN'); expect(header).not.toContain('SPAN');
+  expect(header).not.toMatch(/12:10|12:40/); expect(host.textContent).toContain('PHOTOS 2'); expect(requests).toHaveLength(1);
+});
+it('keeps ordinary and explicitly foreign camera clocks and their capture span', async () => {
+  vi.stubEnv('TZ', 'UTC'); expect(new Date(`${day}T00:00:00Z`).getHours()).toBe(0);
+  rows = [image('foreign-camera', { source: 'owner_upload', source_url: 'https://notbringatrailer.com/wp-content/uploads/2026/09/synthetic.jpg', taken_at: `${day}T12:10:00Z` }),
+    image('camera-clock', { source: 'owner_upload', taken_at: `${day}T12:40:00Z` })];
+  await draw(); expect(visible().map(p => p.title)).toEqual(['12:10 PM', '12:40 PM']);
+  expect(host.querySelector('[data-day-drawer] > div')!.textContent).toContain('12:10 PM–12:40 PM · 30M SPAN');
+  expect(host.textContent).not.toContain('IMPORTED PHOTO CAPTURE TIMES UNKNOWN'); expect(requests).toHaveLength(1);
+});
