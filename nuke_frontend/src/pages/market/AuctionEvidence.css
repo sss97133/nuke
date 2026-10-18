@@ -217,6 +217,7 @@
 @media (max-width: 760px) {
   .market-figure { gap: 8px 16px; }
   .market-board__head { align-items: flex-start; }
+  .market-chips > button, .market-sorts > button, .market-board-page { min-height: 44px; }
 }
 /* Where it should finish: the estimate first in the drawer, then the past lots it rests on. */
 .market-finish { display: grid; gap: 6px; margin: 4px 0 14px; padding: 10px 12px; border: 2px solid var(--border); background: var(--bg); max-width: 72ch; }
