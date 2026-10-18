@@ -94,18 +94,21 @@ export function SourcePopup({ source, searchQuery }: Props) {
   const { openPopup } = usePopup();
   const [data, setData] = useState<SourceIntel | null>(null);
   const [loading, setLoading] = useState(true);
+  const [unavailable, setUnavailable] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
 
     async function load() {
+      setUnavailable(false);
       try {
         const { data: result, error } = await supabase.rpc('popup_source_intel', { p_source: source });
+        if (error) throw error;
         if (!cancelled && !error && result) {
           setData(result as SourceIntel);
         }
       } catch {
-        // silently
+        if (!cancelled) setUnavailable(true);
       }
       if (!cancelled) setLoading(false);
     }
@@ -118,7 +121,7 @@ export function SourcePopup({ source, searchQuery }: Props) {
     return (
       <div style={{ padding: 20, textAlign: 'center' }}>
         <span style={{ fontFamily: SANS, fontSize: 8, fontWeight: 700, textTransform: 'uppercase', color: '#999', letterSpacing: '0.5px' }}>
-          LOADING...
+          {unavailable ? 'Source details unavailable.' : 'LOADING...'}
         </span>
       </div>
     );
