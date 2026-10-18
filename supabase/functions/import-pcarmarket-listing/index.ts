@@ -3,6 +3,7 @@ import { createClient } from 'jsr:@supabase/supabase-js@2';
 import { normalizeMake, normalizeVehicleFields } from '../_shared/normalizeVehicle.ts';
 import { writeObservation } from '../_shared/observationWriter.ts';
 import { requireWriteAuth } from '../_shared/writeGuard.ts';
+import { insertMissingVehicleImages } from '../_shared/vehicleImageWrite.ts';
 import { projectSecretKey } from "../_shared/supabaseKeys.ts";
 import { parseSsrPage } from "./ssrPage.ts";
 import { fillOnlyIdentity, identityConflict, REVISION_DIFFERENT_CAR } from '../_shared/identityMatch.ts';
@@ -1163,11 +1164,14 @@ Deno.serve(async (req: Request) => {
         display_order: have.size + index,
         filename: `pcarmarket_${have.size + index}.jpg`,
       }));
+      let insertedImages = 0;
       for (let i = 0; i < imageInserts.length; i += 50) {
-        const { error: imgErr } = await supabase.from('vehicle_images').insert(imageInserts.slice(i, i + 50));
+        const batch = imageInserts.slice(i, i + 50);
+        const { error: imgErr, skipped } = await insertMissingVehicleImages(supabase, vehicleId, batch);
         if (imgErr) { console.error('[pcarmarket] image insert failed:', imgErr.message); break; }
+        insertedImages += batch.length - skipped;
       }
-      console.log(`Imported ${imageInserts.length} of ${listing.images.length} images`);
+      console.log(`Imported ${insertedImages} new images from ${listing.images.length} gallery URLs`);
     }
 
     // Step 7: Create external_identities for seller and buyer (claimable profiles)
