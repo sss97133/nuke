@@ -43,7 +43,7 @@ import { archiveFetch } from '../_shared/archiveFetch.ts';
 import { fillOnlyIdentity, identityConflict } from '../_shared/identityMatch.ts';
 import { recordRevision } from '../_shared/revision.ts';
 import { parseEventPage, parseListingCards, type RosterCard } from './roster.ts';
-import { galleryImageId, parseLotPage } from './lotPage.ts';
+import { galleryImageId, isVinClash, parseLotPage } from './lotPage.ts';
 
 // ============================================================================
 // TYPES
@@ -812,8 +812,15 @@ async function saveToDatabase(
       .update(updates)
       .eq('id', vehicleId);
 
+    // A VIN another vehicle already holds failed the whole lot, and three in a row stopped the targets run (09:08Z
+    // 2026-10-18: two E-Types and a Z8). Write everything but the VIN and raise the clash for relinking: two vehicles carry
+    // one chassis, which the merge owner decides, not this writer. Same handling as extract-gooding.
     if (updateError) {
-      throw new Error(`vehicles update failed for ${vehicleId}: ${updateError.message}`);
+      if (!updates.vin || !isVinClash(updateError.message)) throw new Error(`vehicles update failed for ${vehicleId}: ${updateError.message}`);
+      const { vin: clashVin, ...withoutVin } = updates;
+      await recordRevision(supabase as any, { url: extracted.url, missing: ['identity_match'], reason: 'duplicate_key', next_action: 'relink', raised_by: 'extract-broad-arrow', vehicle_id: vehicleId, detail: { reason: 'vin_held_by_another_vehicle', vin: clashVin, message: updateError.message.slice(0, 160) } });
+      const { error: retryError } = await (supabase.from('vehicles') as any).update(withoutVin).eq('id', vehicleId);
+      if (retryError) throw new Error(`vehicles update without the clashing vin failed for ${vehicleId}: ${retryError.message}`);
     } else {
       console.log(`[broad-arrow] Updated vehicle: ${vehicleId}`);
     }

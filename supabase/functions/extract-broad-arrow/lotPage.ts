@@ -24,6 +24,11 @@ export interface BroadArrowLot {
 const GALLERY_RE = /https:\/\/cdn\.dealeraccelerate\.com\/bagauction\/\d+\/\d+\/(\d+)\/([0-9]*x[0-9]*)\/[^"'\s,)<>]+/g;
 const sizeRank = (size: string) => (size === "1920x1440" ? 3 : size === "790x1024" ? 2 : size === "x" ? 0 : 1);
 
+/** A vehicles write refused because another vehicle already holds the VIN (the unique index, or the VIN trigger's message). */
+export function isVinClash(message: string | null | undefined): boolean {
+  return /vehicles_vin_unique|VIN \S+ already exists on vehicle|duplicate key value violates unique constraint "vehicles_vin/i.test(message ?? "");
+}
+
 /** The dealeraccelerate image id of a Broad Arrow photo URL (any size, with or without an extension), or null. */
 export function galleryImageId(url: string): string | null {
   return url.match(/cdn\.dealeraccelerate\.com\/bagauction\/\d+\/\d+\/(\d+)\//)?.[1] ?? null;
