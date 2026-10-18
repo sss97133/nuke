@@ -78,6 +78,11 @@ describe('resolveMarketCohortShortcuts', () => {
 
     expect(resolveMarketCohortShortcuts('Stingray', 3).some((s) => s.facet === 'Sting Ray (C2)')).toBe(false);
   });
+
+  it('does not match a chassis code inside a vetted mark year range', () => {
+    expect(resolveMarketCohortShortcuts('964', 3).some((s) => s.make === 'Ford')).toBe(false);
+    expect(resolveMarketCohortShortcuts('Stingray', 3).some((s) => s.facet.toLowerCase().includes('stingray') || s.subLabel.includes('Stingray'))).toBe(true);
+  });
 });
 
 describe('resolveVehicleIdentityMarks', () => {
