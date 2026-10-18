@@ -178,6 +178,31 @@ describe('recorded sales evidence comparison', () => {
     fixture.query.isFetching = false; await render();
     expect(document.activeElement).toBe(container.querySelector('[aria-label="Recorded sales contributors"]'));
   });
+  it.each(['selected', 'benchmark'] as const)('returns keyboard focus to the exact %s day when clearing its evidence', async series => {
+    await render();
+    if (series === 'benchmark') await act(async () => (container.querySelector('input[aria-label="Show rest of BaT absolute counts"]') as HTMLInputElement).click());
+    const trigger = countButton(series === 'selected' ? 'FIXTURE MAKE: 2 recorded' : 'Rest of BaT: 10 recorded');
+    await act(async () => trigger.click());
+    expect(document.activeElement).toBe(container.querySelector('[aria-label="Recorded sales contributors"]'));
+    const clear = [...container.querySelectorAll('button')].find(b => b.textContent === 'Clear selected sales day')!;
+    clear.focus();
+    await act(async () => clear.click());
+    expect(document.activeElement).toBe(trigger);
+    expect(trigger.getAttribute('aria-pressed')).toBe('false');
+    expect(container.querySelector('[aria-label="Recorded sales contributors"]')).toBeNull();
+    expect(fixture.request).not.toHaveProperty('evidence_bucket');
+    expect(fixture.request).not.toHaveProperty('evidence_series');
+  });
+  it('returns to the event window when the selected count is refused by a later read', async () => {
+    await render(); await act(async () => countButton('FIXTURE MAKE: 2 recorded').click());
+    const data = receipt(); data.truncated = true;
+    data.series.forEach(p => { p.value = null; p.denominator = null; }); fixture.query.data = data; await render();
+    const clear = [...container.querySelectorAll('button')].find(b => b.textContent === 'Clear selected sales day')!;
+    clear.focus(); await act(async () => clear.click());
+    expect(document.activeElement).toBe(container.querySelector('[aria-label="Recorded sales event window"]'));
+    expect(container.textContent).toContain('Counts, denominators, ratios and changes are refused');
+    expect(container.querySelector('[aria-label="Recorded sales contributors"]')).toBeNull();
+  });
   it('shares the make with live inventory while preserving the narrower grouping qualification', async () => {
     const onMakeChange = vi.fn();
     await act(async () => root.render(<RecordedSalesComparison make="FIXTURE MAKE" onMakeChange={onMakeChange} />));
