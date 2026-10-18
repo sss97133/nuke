@@ -35,6 +35,7 @@ interface DayEvent {
   event_type?: string | null;
   title?: string | null;
   cost_amount?: number | null;
+  cost_currency?: unknown;
   metadata?: {
     duration_minutes?: number | null;
     work_type?: string | null;
@@ -79,10 +80,11 @@ function fmtSpan(first: string | null, last: string | null): string {
   return h > 0 ? `${h}H ${m}M SPAN` : `${m}M SPAN`;
 }
 
-function fmtMoney(n: number | null | undefined): string {
+function fmtMoney(n: number | null | undefined, currency: unknown): string {
   const v = Number(n || 0);
   if (!v) return '';
-  return `$${Math.round(v).toLocaleString()}`;
+  const code = typeof currency === 'string' && /^[A-Za-z]{3}$/.test(currency.trim()) ? currency.trim().toUpperCase() : null;
+  return `${Math.round(v).toLocaleString()} ${code ?? '(currency unknown)'}`;
 }
 
 function fmtDayHeader(date: string): string {
@@ -185,7 +187,6 @@ const VehicleDayDrawer: React.FC<VehicleDayDrawerProps> = ({ date, auctions = []
   const span = fmtSpan(first, last);
   const dayBids = auctionItems.filter(i => i.kind === 'bid').length;
   const dayComments = auctionItems.length - dayBids;
-  const dayTotal = workEvents.reduce((sum, ev) => sum + (Number(ev.cost_amount) || 0), 0);
 
   const loading = photos === null;
   const isEmpty = !loading && !photosUnavailable && photos.length === 0 && workEvents.length === 0 && otherEvents.length === 0 && auctionItems.length === 0;
@@ -236,7 +237,6 @@ const VehicleDayDrawer: React.FC<VehicleDayDrawerProps> = ({ date, auctions = []
           {dayBids > 0 && <span style={{ ...mono, fontSize: 8, border: '1px solid var(--vp-ghost, #ddd)', padding: '1px 5px' }}>BIDS {dayBids}</span>}
           {dayComments > 0 && <span style={{ ...mono, fontSize: 8, border: '1px solid var(--vp-ghost, #ddd)', padding: '1px 5px' }}>COMMENTS {dayComments}</span>}
           {workEvents.length > 0 && <span style={{ ...mono, fontSize: 8, border: '1px solid var(--vp-ghost, #ddd)', padding: '1px 5px' }}>WORK {workEvents.length}</span>}
-          {dayTotal > 0 && <span style={{ ...mono, fontSize: 8, border: '1px solid var(--vp-ghost, #ddd)', padding: '1px 5px' }}>{fmtMoney(dayTotal)}</span>}
         </div>
       )}
 
@@ -245,7 +245,7 @@ const VehicleDayDrawer: React.FC<VehicleDayDrawerProps> = ({ date, auctions = []
         const meta = ev.metadata || {};
         const mins = Number(meta.duration_minutes) || 0;
         const hrs = mins > 0 ? `${Math.floor(mins / 60)}h ${mins % 60}m` : '';
-        const cost = fmtMoney(ev.cost_amount);
+        const cost = fmtMoney(ev.cost_amount, ev.cost_currency);
         return (
           <div key={ev.id || ev.title} style={{ marginBottom: 6 }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, fontSize: 9 }}>
@@ -265,7 +265,7 @@ const VehicleDayDrawer: React.FC<VehicleDayDrawerProps> = ({ date, auctions = []
       {otherEvents.map((ev) => (
         <div key={ev.id || `${ev.event_type}-${ev.title}`} style={{ display: 'flex', justifyContent: 'space-between', gap: 8, fontSize: 9, marginBottom: 3 }}>
           <span>{ev.title || String(ev.event_type || '').replace(/_/g, ' ')}</span>
-          <span style={mono}>{fmtMoney(ev.cost_amount) || ''}</span>
+          <span style={mono}>{fmtMoney(ev.cost_amount, ev.cost_currency) || ''}</span>
         </div>
       ))}
 

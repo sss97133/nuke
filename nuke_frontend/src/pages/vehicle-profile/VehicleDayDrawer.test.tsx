@@ -179,7 +179,7 @@ it('retains known work and auction content when photos are unavailable', async (
     text: 'Known synthetic comment', url: 'https://bringatrailer.com/listing/episode-a/#comment-1', likes: 0, seq: null, postClose: null, listingKey: 'episode-a' }];
   reply = () => json({ code: '42501' }, 403); await draw(auctions);
   expect(host.textContent).toContain('Photos unavailable'); expect(host.textContent).toContain('Known synthetic work');
-  expect(host.textContent).toContain('Known synthetic story'); expect(host.textContent).toContain('$125');
+  expect(host.textContent).toContain('Known synthetic story'); expect(host.textContent).toContain('125 (currency unknown)');
   expect(host.textContent).toContain('Known synthetic comment'); expect(host.textContent).not.toContain('NO ACTIVITY');
 });
 it('masks the previous photo in the first committed frame of a direct date change', async () => {
