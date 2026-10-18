@@ -26,8 +26,11 @@ function text(s: string): string {
   return htmlToText(s).replace(/\s+/g, ' ').trim();
 }
 
+// Zurich lots group thousands with an apostrophe ("CHF 210'000"), the others with a comma.
+const THOUSANDS = /[,'’]/g;
+
 function money(s: string): number | null {
-  const m = s.replace(/,/g, '').match(/\d+(?:\.\d+)?/);
+  const m = s.replace(THOUSANDS, '').match(/\d+(?:\.\d+)?/);
   return m ? Math.round(Number(m[0])) : null;
 }
 
@@ -43,7 +46,7 @@ export function parseListingCards(html: string): RosterCard[] {
     const year = /^\d{4}$/.test(spans[0] ?? '') ? Number(spans[0]) : null;
     const sale = text(chunk.match(/<div class='top'>\s*<span>([\s\S]*?)<\/span>\s*<\/div>\s*<div class='mid'>/)?.[1] ?? '') || null;
     const est = text(chunk.match(/<div class='bot'>([\s\S]*?)<\/div>/)?.[1] ?? '');
-    const nums = [...est.replace(/,/g, '').matchAll(/\d+(?:\.\d+)?/g)].map((m) => Math.round(Number(m[0])));
+    const nums = [...est.replace(THOUSANDS, '').matchAll(/\d+(?:\.\d+)?/g)].map((m) => Math.round(Number(m[0])));
     const images = (chunk.match(/data-images='([^']*)'/)?.[1] ?? '').split(',').filter((u) => /^https:\/\//.test(u));
     out.push({
       url: `https://www.broadarrowauctions.com${href[1]}`,

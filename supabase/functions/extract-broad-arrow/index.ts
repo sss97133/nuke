@@ -349,17 +349,18 @@ function parseFromMarkdown(markdown: string, html: string, url: string): BroadAr
 
   // --- ESTIMATE ---
   // "Estimate: $800,000 - $1,000,000" or "Est. $800,000-$1,000,000"
+  // Zurich lots read "Estimate: CHF 210'000 - CHF 255'000" (apostrophe thousands, currency before each amount).
   const estimatePatterns = [
-    /Estimate[:\s]*\$?([\d,]+)\s*[-–—]\s*\$?([\d,]+)/i,
-    /Est\.?\s*\$?([\d,]+)\s*[-–—]\s*\$?([\d,]+)/i,
-    /\$?([\d,]+)\s*[-–—]\s*\$?([\d,]+)\s*(?:USD\s+)?(?:Estimate|Est\.?)/i,
+    /Estimate[:\s]*(?:CHF\s*|[$€£])?([\d,'’]+)\s*[-–—]\s*(?:CHF\s*|[$€£])?([\d,'’]+)/i,
+    /Est\.?\s*(?:CHF\s*|[$€£])?([\d,'’]+)\s*[-–—]\s*(?:CHF\s*|[$€£])?([\d,'’]+)/i,
+    /\$?([\d,'’]+)\s*[-–—]\s*\$?([\d,'’]+)\s*(?:USD\s+)?(?:Estimate|Est\.?)/i,
   ];
 
   for (const pattern of estimatePatterns) {
     const match = combinedText.match(pattern);
     if (match) {
-      const low = parseInt(match[1].replace(/,/g, ''), 10);
-      const high = parseInt(match[2].replace(/,/g, ''), 10);
+      const low = parseInt(match[1].replace(/[,'’]/g, ''), 10);
+      const high = parseInt(match[2].replace(/[,'’]/g, ''), 10);
       if (low >= 100 && high >= low && high < 100_000_000) {
         result.estimate_low = low;
         result.estimate_high = high;

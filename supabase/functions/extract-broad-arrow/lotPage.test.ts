@@ -26,3 +26,9 @@ Deno.test("a lot with no sold price and no wording is unknown, never sold", () =
   const l = parseLotPage(page("<div>Estimate $100,000 - $150,000</div>"));
   eq([l.status, l.soldPrice], ["unknown", null]);
 });
+
+Deno.test("parseAmount reads Swiss apostrophe grouping, and a Zurich sold price keeps every digit", () => {
+  if (parseAmount("210'000") !== 210000 || parseAmount("5’500’000") !== 5500000) throw new Error("apostrophe grouping");
+  const l = parseLotPage("<html><head><title>1991 De Tomaso Pantera SI | The Zurich Auction 2026 | Broad Arrow</title></head><body><div>Sold Price: CHF 231&#39;250</div></body></html>");
+  if (l.soldPrice !== 231250 || l.currency !== "CHF") throw new Error(JSON.stringify({ soldPrice: l.soldPrice, currency: l.currency }));
+});
