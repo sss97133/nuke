@@ -1,9 +1,10 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useId, useMemo, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { supabase } from '../../lib/supabase';
 import { squarify } from '../../lib/squarify';
 import { Text } from '../../kit';
 import { relativeMove, textWidth, pct as signedPct, GATE_MIN, type Baseline, type Move } from './mapScale';
-import { MarketTile, money as moneyShort, type MapBasis, type MarketNode } from './MarketTile';
+import { MarketCard, MarketSheet, MarketTile, money as moneyShort, type MapBasis, type MarketNode } from './MarketTile';
 import type { HorizonMoveCounts } from './FamilyMovers';
 import './BrandFamilyMap.css';
 
@@ -64,11 +65,21 @@ export function headerText(brand: string, dollars: string, width: number, size =
   return textWidth(brand) * size <= room ? brand : '';
 }
 
-export default function BrandFamilyMap({ width, height, onPickBrand, onPickFamily, baseline = null, basis = 'ledger', familyMoves, gateMin = GATE_MIN, horizonShortLabel = '12 mo' }: {
-  width: number; height: number; onPickBrand: (brand: string) => void; onPickFamily: (brand: string, familyKey: string, family: string) => void;
-  baseline?: Baseline | null; basis?: MapBasis; familyMoves?: Record<string, HorizonMoveCounts>; gateMin?: number; horizonShortLabel?: string;
+export default function BrandFamilyMap({ width, height, onPickBrand, onPickFamily, baseline = null, basis = 'ledger', familyMoves, gateMin = GATE_MIN, horizonShortLabel = '12 mo', windowLabel }: {
+  width: number; height: number; onPickBrand: (brand: string, focusAfterPick?: boolean) => void; onPickFamily: (brand: string, familyKey: string, family: string, focusAfterPick?: boolean) => void;
+  baseline?: Baseline | null; basis?: MapBasis; familyMoves?: Record<string, HorizonMoveCounts>; gateMin?: number; horizonShortLabel?: string; windowLabel?: string;
 }) {
   const [rows, setRows] = useState<MapRow[] | null | undefined>(undefined);
+  const [tooltip, setTooltip] = useState<{ row: MapRow; x: number; y: number } | null>(null);
+  const [sheet, setSheet] = useState<MapRow | null>(null);
+  const [coarse] = useState(() => typeof window !== 'undefined' && typeof window.matchMedia === 'function' && window.matchMedia('(hover: none)').matches);
+  const tooltipId = useId();
+  const pick = (r: MapRow, focus: boolean) => r.family_key === 'more' || r.family_key === 'other'
+    ? onPickBrand(r.brand, focus) : onPickFamily(r.brand, r.family_key, r.family ?? '', focus);
+  const moveFor = (r: MapRow): Move => r.family_key === 'more' || r.family_key === 'other'
+    ? { kind: 'none' } : relativeMove(toNode(r), baseline, basis === 'ledger', gateMin);
+  const inspected = (r: MapRow) => ({ ...toNode(r), name: `${r.brand} ${label(r)}` });
+  useEffect(() => { setTooltip(null); setSheet(null); }, [basis, familyMoves, gateMin]);
   useEffect(() => { let live = true; readBrandFamilyMap().then((r) => { if (live) setRows(r); }); return () => { live = false; }; }, []);
   const effectiveRows = useMemo(() => {
     if (!rows || !familyMoves) return rows;
@@ -100,9 +111,10 @@ export default function BrandFamilyMap({ width, height, onPickBrand, onPickFamil
 
   if (rows === undefined) return <div className="brand-family-map__empty"><Text role="caption">Reading the map…</Text></div>;
   if (!layout) return <div className="brand-family-map__empty"><Text role="caption">The map with families inside could not be read.</Text></div>;
-  return <div className="brand-family-map">
+  return <div className="brand-family-map" onMouseLeave={() => setTooltip(null)}>
     {layout.map((f) => <div key={f.node.brand}>
-      {f.head > 0 && <button type="button" className="brand-family-map__brand" onClick={() => onPickBrand(f.node.brand)}
+      {f.head > 0 && <button type="button" className="brand-family-map__brand" onClick={(e) => onPickBrand(f.node.brand, e.detail === 0)}
+        aria-label={`${f.node.brand}: ${money(f.node.usd)}`}
         style={{ left: f.x, top: f.y, width: f.w, height: f.head }} title={`${f.node.brand}: ${money(f.node.usd)}`}>
         <span className="brand-family-map__head">{f.text}</span>
       </button>}
@@ -110,12 +122,24 @@ export default function BrandFamilyMap({ width, height, onPickBrand, onPickFamil
         const r = t.node;
         const node = toNode(r);
         // "more families" and "other models" are not a family: never colored.
-        const move: Move = r.family_key === 'more' || r.family_key === 'other' ? { kind: 'none' } : relativeMove(node, baseline, basis === 'ledger', gateMin);
-        return <MarketTile key={`${r.brand}-${r.family_key}`} node={node} move={move} basis={basis} x={t.x} y={t.y} w={t.w} h={t.h}
-          onClick={() => (r.family_key === 'more' || r.family_key === 'other' ? onPickBrand(r.brand) : onPickFamily(r.brand, r.family_key, r.family ?? ''))}
-          title={`${r.brand} ${label(r)}: ${money(r.usd ?? 0)} · ${(r.sold ?? 0).toLocaleString('en-US')} sold${move.kind === 'move' ? ` · ${horizonShortLabel}: ${signedPct(move.rel)} against the market (sales ${signedPct(move.raw)})` : ''}`} />;
+        const move = moveFor(r);
+        return <div key={`${r.brand}-${r.family_key}`}
+          onFocus={(e) => { const bounds = e.target.getBoundingClientRect(); setTooltip({ row: r, x: bounds.left, y: bounds.bottom }); }}
+          onBlur={() => setTooltip(null)}
+          onMouseLeave={() => setTooltip(null)}
+          onKeyDown={(e) => { if (e.key === 'Escape') { e.stopPropagation(); setTooltip(null); } }}
+          onMouseMove={(e) => { if (!coarse) setTooltip({ row: r, x: e.clientX, y: e.clientY }); }}>
+          <MarketTile node={node} move={move} basis={basis} x={t.x} y={t.y} w={t.w} h={t.h}
+            ariaLabel={`${r.brand} ${label(r)}`} describedBy={tooltip?.row === r ? tooltipId : undefined}
+            onClick={(e) => { setTooltip(null); if (coarse) setSheet(r); else pick(r, e.detail === 0); }}
+            title={`${r.brand} ${label(r)}: ${money(r.usd ?? 0)} · ${(r.sold ?? 0).toLocaleString('en-US')} sold${move.kind === 'move' ? ` · ${horizonShortLabel}: ${signedPct(move.rel)} against the market (sales ${signedPct(move.raw)})` : ''}`} />
+        </div>;
       })}
     </div>)}
+    {tooltip && createPortal(<MarketCard id={tooltipId} node={inspected(tooltip.row)} move={moveFor(tooltip.row)} base={baseline}
+      x={tooltip.x} y={tooltip.y} windowLabel={windowLabel} gateMin={gateMin} />, document.body)}
+    {sheet && <MarketSheet node={inspected(sheet)} move={moveFor(sheet)} base={baseline} windowLabel={windowLabel} gateMin={gateMin}
+      onClose={() => setSheet(null)} onOpen={() => { const r = sheet; setSheet(null); pick(r, true); }} />}
   </div>;
 }
 

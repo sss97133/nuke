@@ -18,3 +18,4 @@
    header prints its name and dollars whole, or the name alone, or nothing. */
 .brand-family-map .market-tile { border-width: 1px; border-color: var(--bg); }
 .brand-family-map__head { font: 700 11px Arial, sans-serif; letter-spacing: 0.02em; color: var(--bg); white-space: nowrap; }
+.brand-family-map__brand:focus-visible::after { content: ''; position: absolute; inset: 0; border: 2px solid var(--bg); pointer-events: none; }
