@@ -1329,6 +1329,28 @@ not production completion. Remaining work includes other catalog candidate famil
 normalizer year/null rules and the independent 1D sale/capture admission defect. Existing GM truck
 hierarchy decisions are outside this repair and remain intact.
 
+### Year-price correction rebuild follow-up prepared, 2026-10-18
+
+PR2074's catalog correction deployed; names, market, sales and movers rebuilt, with anonymous
+Frontera/Pursang separation and unchanged source rows and two-brand count/dollar totals. The
+existing year-price refresh was canceled twice when Realtime slot creation waited on its long
+transaction. A later wait belonged to a separate pg_net worker; unrelated sessions were preserved.
+This is an operational failure of the rebuild, not a completed year-price correction.
+
+A read-only, one-snapshot Bultaco/Suzuki replay of the year-price query returned 716 rows on both
+sides, with zero differences under EXCEPT ALL in both directions. Materializing the existing named
+and conflict stages reduced cohort execution from 4,893.630ms to 1,569.982ms. The original conflict
+subplan ran 825 times for each of ten aggregates; the candidate evaluates it once per eligible row.
+This fixed cohort is a performance/equality assay, not full-build timing or fleet readiness.
+
+The prepared migration creates only a private, unpopulated beside copy from the live definition,
+adding those two evaluation fences and the same indexes. The populated view, public grants and
+cron remain unchanged. The PG17 contract reuses the existing sold/ask, privacy, conflict, year-window,
+platform-pooling, odometer and percentile fixtures and checks exact output multiplicity (excluding
+only the rebuild clock). Build and reviewed rename cutover remain separate delivery stages.
+Receipts: `~/nuke-logs/model-year-refresh-20261018/`. No third unchanged refresh, Realtime access
+change, capacity increase, raw testimony mutation or new recurring job is part of this repair.
+
 ## 13. Aspiration: twenty stacks the model must be able to carry (owner, 2026-10-06)
 
 **Owner direction, 2026-10-06 23:35Z.** "This scale is where we should be starting at every session: we are combing
