@@ -209,11 +209,78 @@ it('does not bind Mecum inline metadata to a false-host source with a matching n
   expect(document.body.textContent).not.toContain('UNBOUND-INLINE'); expect(document.body.textContent).not.toContain('Unbound auction');
 });
 
+it('does not treat a decorated metadata key as a numeric Mecum native ID', async () => {
+  priceSource('v-1', 'https://mecum.com/lots/123/example?episode=A');
+  fixture.vehicle.provenance_metadata = { mec_web_id: '123?episode=A', mec_lot_number: 'UNBOUND-INLINE' };
+  await renderLoaded(); openPrice();
+  expect(document.body.textContent).not.toContain('UNBOUND-INLINE');
+});
+
 it('does not collapse distinct generic source pages whose native identity is in the query', async () => {
   priceSource('v-1', 'https://source.test/listing?id=current');
   fixture.auctionRows = [auction('https://source.test/listing?id=other', { lot_number: 'FOREIGN-QUERY-LOT' })];
   await renderLoaded(); openPrice();
   expect(document.body.textContent).not.toContain('FOREIGN-QUERY-LOT');
+});
+
+it.each([false, true])('withholds contradictory normalized-lot contexts independently of row order (reverse=%s)', async reverse => {
+  priceSource('v-1', 'https://mecum.com/lots/1234/example');
+  const rows = [auction('https://www.mecum.com/lots/FL23-1234/old-title', { lot_number: 'DISPUTED-A', broadcast_video_url: 'https://youtu.be/AAAAAAAAAAA' }),
+    auction('https://mecum.com/lots/1234/new-title', { lot_number: 'DISPUTED-B', broadcast_video_url: 'https://youtu.be/BBBBBBBBBBB', broadcast_timestamp_start: 250 })];
+  fixture.auctionRows = reverse ? rows.reverse() : rows;
+  await renderLoaded(); openPrice();
+  expect(document.body.textContent).not.toContain('DISPUTED-A'); expect(document.body.textContent).not.toContain('DISPUTED-B');
+  expect(document.body.textContent).not.toContain('(2:05)'); expect(document.body.textContent).not.toContain('(4:10)');
+  expect(document.body.textContent).toContain('Additional lot provenance conflicts; disputed context withheld.');
+  expect(host.querySelector('.k-masthead__result button.k-claim__value')?.textContent).toBe('$24,000');
+});
+
+it('does not join one exact row lot to a different exact row event name', async () => {
+  fixture.auctionRows = [auction(undefined, { lot_number: 'AUCTION-A' })];
+  fixture.eventRows = [{ source_url: 'https://bringatrailer.com/listing/x', metadata: { lot_number: 'EVENT-B', auction_name: 'EVENT-B-NAME' } }];
+  await renderLoaded(); openPrice();
+  expect(document.body.textContent).not.toContain('EVENT-B-NAME'); expect(document.body.textContent).not.toContain('AUCTION-A');
+  expect(document.body.textContent).toContain('Additional lot provenance conflicts; disputed context withheld.');
+});
+
+it('preserves an agreed lot and name while withholding conflicting recording bundles', async () => {
+  fixture.auctionRows = [auction(undefined, { broadcast_video_url: 'https://youtu.be/AAAAAAAAAAA' }),
+    auction(undefined, { broadcast_video_url: 'https://youtu.be/BBBBBBBBBBB', broadcast_timestamp_start: 250 })];
+  fixture.eventRows = [{ source_url: 'https://bringatrailer.com/listing/x', metadata: { lot_number: 'EXACT-LOT', auction_name: 'AGREED-NAME' } }];
+  await renderLoaded(); openPrice();
+  expect(document.body.textContent).toContain('Lot EXACT-LOT'); expect(document.body.textContent).toContain('AGREED-NAME');
+  expect(document.body.textContent).not.toContain('(2:05)'); expect(document.body.textContent).not.toContain('(4:10)');
+  expect(document.body.textContent).toContain('Additional lot provenance conflicts; disputed context withheld.');
+});
+
+it('merges compatible duplicate source contexts and preserves an explicitly recorded zero offset', async () => {
+  fixture.auctionRows = [auction(undefined, { broadcast_timestamp_start: 0 }), auction(undefined, { broadcast_timestamp_start: null })];
+  fixture.eventRows = [{ source_url: 'https://bringatrailer.com/listing/x', metadata: { lot_number: 'EXACT-LOT', auction_name: 'AGREED-NAME' } }];
+  await renderLoaded(); openPrice();
+  expect(document.body.textContent).toContain('Lot EXACT-LOT'); expect(document.body.textContent).toContain('AGREED-NAME');
+  expect(document.body.textContent).toContain('Watch sale moment (0:00)'); expect(document.body.textContent).not.toContain('provenance conflicts');
+});
+
+it('keeps canonical lot and event fields when optional exact-source rows contradict them', async () => {
+  const masthead = fixture.read!.sections[0];
+  if (masthead.kind === 'masthead' && masthead.price) masthead.price.source = { ...masthead.price.source, lotNumber: 'CANONICAL-LOT', auctionName: 'CANONICAL-NAME' };
+  fixture.auctionRows = [auction(undefined, { lot_number: 'OPTIONAL-OTHER-LOT' })];
+  fixture.eventRows = [{ source_url: 'https://bringatrailer.com/listing/x', metadata: { lot_number: 'OPTIONAL-OTHER-LOT', auction_name: 'OPTIONAL-NAME' } }];
+  await renderLoaded(); openPrice();
+  expect(document.body.textContent).toContain('Lot CANONICAL-LOT'); expect(document.body.textContent).toContain('CANONICAL-NAME');
+  expect(document.body.textContent).not.toContain('OPTIONAL-OTHER-LOT'); expect(document.body.textContent).not.toContain('OPTIONAL-NAME');
+  expect(document.body.textContent).not.toContain('(2:05)'); expect(document.body.textContent).toContain('Sep 21, 2026');
+});
+
+it.each([
+  ['https://mecum.com/lots/CaseSensitive/example', 'https://mecum.com/lots/casesensitive/example'],
+  ['https://mecum.com/lots/123/example?episode=A', 'https://mecum.com/lots/123/example?episode=B'],
+  ['https://mecum.com/lots/123/example#/listing/A', 'https://mecum.com/lots/123/example#/listing/B'],
+  ['https://source.test/#/listing/A', 'https://source.test/#/listing/B'],
+])('preserves unknown case-sensitive or fragment episode identity (%s)', async (target, returned) => {
+  priceSource('v-1', target); fixture.auctionRows = [auction(returned, { lot_number: 'FOREIGN-IDENTITY' })];
+  await renderLoaded(); openPrice();
+  expect(document.body.textContent).not.toContain('FOREIGN-IDENTITY');
 });
 
 it('renders identity, the typed price and the strip with its coverage, with no inline style', async () => {
