@@ -100,11 +100,11 @@ try {
     // one transaction below rather than relying on session state across calls.
     const load=["BEGIN; DELETE FROM public.vehicle_observations WHERE id=md5('cab-original')::uuid; DELETE FROM public.observation_sources WHERE id=md5('source-cab')::uuid;"];
     for(const {context:c} of contexts) {
-      for(const [table,row] of [['vehicles',c.vehicle],['observation_sources',c.source],['vehicle_events',c.episode],['listing_page_snapshots',c.snapshot],['vehicle_observations',c.original]]) {
+      for(const [table,row] of [['vehicles',c.vehicle],['observation_sources',c.source],['vehicle_events',c.episode],['auction_events',c.auction],['listing_page_snapshots',c.snapshot],['vehicle_observations',c.original]]) {
         assert(row&&typeof row.id==='string'&&/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(row.id),'Retained tuple must preserve original UUIDs');
         load.push(`INSERT INTO public.${table} SELECT (jsonb_populate_record(NULL::public.${table},${quote(row)})).* ON CONFLICT DO NOTHING;`);
       }
-      load.push(`SELECT public.qualify_cab_listing_capture('${c.original.id}'::uuid,'${c.snapshot.id}'::uuid,'${c.episode.id}'::uuid);`);
+      load.push(`SELECT public.qualify_cab_listing_capture('${c.original.id}'::uuid,'${c.snapshot.id}'::uuid,'${c.auction.id}'::uuid);`);
     }
     load.push('ROLLBACK;');
     const output=query(load.join('\n')).split('\n').filter(line=>line.startsWith('{'));
@@ -124,7 +124,7 @@ try {
   for(const [label,update] of [
     ['original',"UPDATE public.vehicle_observations SET is_superseded=true WHERE id=md5('cab-original')::uuid;"],
     ['capture',"UPDATE public.listing_page_snapshots SET success=false WHERE id=md5('cab-snapshot')::uuid;"],
-    ['presentation',"UPDATE public.vehicle_events SET source_listing_id='other' WHERE id=md5('cab-episode')::uuid;"]
+    ['presentation',"UPDATE public.auction_events SET source_listing_id='other' WHERE id=md5('cab-auction')::uuid;"]
   ]) {
     await actorA.send('BEGIN; SET LOCAL ROLE service_role; SELECT public.synthetic_insert_cab_receipt(public.synthetic_cab_qualification()->\'input\');');
     await actorB.send("BEGIN; SET LOCAL lock_timeout='150ms';");

@@ -17,7 +17,7 @@ async function sql(statement: string, service = false) {
 assert(await sql("SELECT current_database()") === args[args.indexOf("-d") + 1]);
 const selectors = JSON.parse(await sql(`SELECT jsonb_build_object('mode','cab_listing_capture_v1',
  'source_observation_id',md5('cab-original')::uuid,'snapshot_id',md5('cab-snapshot')::uuid,
- 'source_vehicle_event_id',md5('cab-episode')::uuid,'dry_run',true)`));
+ 'auction_event_id',md5('cab-auction')::uuid,'dry_run',true)`));
 Deno.env.set("SUPABASE_URL", "https://db.test");
 Deno.env.set("SUPABASE_SERVICE_ROLE_KEY", "test-key");
 let handler: (req: Request) => Promise<Response>;
@@ -39,7 +39,7 @@ globalThis.fetch = async (request, options) => {
   try {
     if (url.pathname === "/rest/v1/rpc/qualify_cab_listing_capture") {
       return response(JSON.parse(await sql(`SELECT public.qualify_cab_listing_capture(
-        ${literal(body.p_source)}::uuid,${literal(body.p_snapshot)}::uuid,${literal(body.p_episode)}::uuid,
+        ${literal(body.p_source)}::uuid,${literal(body.p_snapshot)}::uuid,${literal(body.p_lot)}::uuid,
         ${body.p_result ? literal(body.p_result) + "::uuid" : "NULL"})`, true)));
     }
     assert(url.pathname === "/rest/v1/vehicle_observations", "only canonical observation transport");

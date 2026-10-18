@@ -300,15 +300,15 @@ Deno.serve(async function handleObservation(req, internal?: unknown) {
       }
       const selectors = input as unknown as Record<string, unknown>;
       const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-      if (Object.keys(selectors).some(key => !["mode", "source_observation_id", "snapshot_id", "source_vehicle_event_id", "dry_run"].includes(key))
+      if (Object.keys(selectors).some(key => !["mode", "source_observation_id", "snapshot_id", "auction_event_id", "dry_run"].includes(key))
         || typeof selectors.dry_run !== "boolean" ||
-        [selectors.source_observation_id, selectors.snapshot_id, selectors.source_vehicle_event_id]
+        [selectors.source_observation_id, selectors.snapshot_id, selectors.auction_event_id]
           .some(value => typeof value !== "string" || !uuid.test(value))) {
         return new Response(JSON.stringify({ error: "Expected only three source selectors and explicit dry_run", writes: 0, model_calls: 0 }),
           { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
       }
       const parameters = { p_source: selectors.source_observation_id, p_snapshot: selectors.snapshot_id,
-        p_episode: selectors.source_vehicle_event_id };
+        p_lot: selectors.auction_event_id };
       const reply = (data: unknown, status = 200) => new Response(JSON.stringify(data),
         { status, headers: { ...corsHeaders, "Content-Type": "application/json" } });
       const qualified = await supabase.rpc("qualify_cab_listing_capture", parameters).abortSignal(AbortSignal.timeout(5000));
