@@ -129,8 +129,8 @@ final class SyncEngine: ObservableObject {
     /// firewall (VisionEngine.contributorVerdict) BEFORE it leaves the phone, so
     /// a private photo shot at the shop never reaches the pool.
     @Published private(set) var contributorMode: Bool
-    /// Frames the contributor gate held back (not a vehicle, or a prominent
-    /// face). Honest counter — the held photos stayed on the device, never sent.
+    /// Frames the contributor gate held back (clutter, or a prominent face and
+    /// no vehicle). Honest counter — the held photos stayed on the device, never sent.
     @Published private(set) var totalHeldPrivate: Int
 
     // ─── Persistence (UserDefaults) ──────────────────────────────────────────
@@ -322,14 +322,15 @@ final class SyncEngine: ObservableObject {
     }
 
     /// The contributor firewall. True ⇒ HOLD this frame (do not upload to the
-    /// pool). Loads the LOCAL downscaled frame (no network) and runs the
-    /// default-exclude verdict: an affirmative vehicle label AND no prominent
-    /// face are both required to pass. On image-load failure it HOLDS — a frame
-    /// we cannot classify must never auto-cross into a shared pool (fail-safe).
-    /// Only ever consulted when contributorMode is true.
+    /// pool). Loads the LOCAL downscaled frame (no network) and runs
+    /// `VisionEngine.contributorVerdict`, the device rule of record (hold clutter
+    /// and personal). Only ever consulted when contributorMode is true.
     private func contributorGateHolds(assetID: String) async -> Bool {
         guard let cg = await VisionEngine.loadCGImage(assetID: assetID, allowNetwork: false) else {
-            return true
+            // No local frame (an iCloud-only original): requestOriginalData defers it, and once the
+            // bytes are local `prepare` runs the same triage, so clutter and personal frames upload
+            // as metadata only.
+            return false
         }
         if case .allow = VisionEngine.contributorVerdict(cg) { return false }
         return true
@@ -970,8 +971,8 @@ final class SyncEngine: ObservableObject {
         // ── Gate 1b (contributor firewall): default-exclude before upload ──
         // Contributor mode only. A private photo shot AT the shop (selfie,
         // paycheck, a person) clears the GPS gate but must NEVER reach the
-        // shared pool — hold anything without an affirmative vehicle label
-        // or with a prominent face. Owner mode skips this entirely.
+        // shared pool — hold clutter and personal frames (the triage rule).
+        // Owner mode skips this entirely.
         if contributorMode, await contributorGateHolds(assetID: id) { return .heldPrivate }
 
         let filename = Self.originalFilename(for: asset)

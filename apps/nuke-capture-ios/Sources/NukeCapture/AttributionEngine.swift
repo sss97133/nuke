@@ -147,7 +147,15 @@ final class AttributionEngine: ObservableObject {
         var albumGroups: [String: (name: String, ids: [String])] = [:]
         for row in orphans where !filedIDs.contains(row.id) {
             guard let uuid = row.exif_data?.uuid, let albums = albumsByAsset[uuid], !albums.isEmpty else { continue }
-            let mapped = Set(albums.compactMap { albumMap[$0.id] })
+            let mapped = Set(albums.compactMap { album -> String? in
+                if let vid = albumMap[album.id] { return vid }
+                if let name = album.name?.trimmingCharacters(in: .whitespacesAndNewlines).lowercased(),
+                   !name.isEmpty,
+                   let vid = albumMap["name:\(name)"] {
+                    return vid
+                }
+                return nil
+            })
             if mapped.count == 1, let vid = mapped.first {
                 let names = albums.compactMap(\.name).prefix(2).joined(separator: " | ")
                 fileItems.append(DeviceFileItem(image_id: row.id, vehicle_id: vid, method: "album_map", confidence: 0.9,
@@ -313,15 +321,33 @@ final class AttributionEngine: ObservableObject {
         }
     }
 
-    private struct AlbumMapRow: Decodable { let apple_album_id: String; let vehicle_id: String? }
+    private struct AlbumMapRow: Decodable {
+        let apple_album_id: String
+        let apple_album_name: String?
+        let vehicle_id: String?
+    }
     /// The owner's album → vehicle map (album_sync_map; row security limits it to the owner).
+    /// Indexes by full apple_album_id, stripped PhotoKit localIdentifier (without "ios-source:<uid>:"),
+    /// and normalized album name ("name:<lowercased>") so local albums always resolve.
     private func fetchAlbumMap(userId: String) async -> [String: String] {
         do {
             let rows: [AlbumMapRow] = try await SupabaseService.client.from("album_sync_map")
-                .select("apple_album_id,vehicle_id").eq("user_id", value: userId)
+                .select("apple_album_id,apple_album_name,vehicle_id").eq("user_id", value: userId)
                 .not("vehicle_id", operator: .is, value: "null").execute().value
-            return Dictionary(rows.compactMap { r in r.vehicle_id.map { (r.apple_album_id, $0) } },
-                              uniquingKeysWith: { first, _ in first })
+            var out: [String: String] = [:]
+            for r in rows {
+                guard let vid = r.vehicle_id, !vid.isEmpty else { continue }
+                out[r.apple_album_id] = vid
+                let parts = r.apple_album_id.split(separator: ":", maxSplits: 2, omittingEmptySubsequences: false)
+                if parts.count == 3, parts[0] == "ios-source" {
+                    out[String(parts[2])] = vid
+                }
+                if let name = r.apple_album_name?.trimmingCharacters(in: .whitespacesAndNewlines).lowercased(),
+                   !name.isEmpty {
+                    out["name:\(name)"] = vid
+                }
+            }
+            return out
         } catch {
             NSLog("NukeCapture album map read failed: %@", String(describing: error))
             return [:]
@@ -390,6 +416,8 @@ final class AttributionEngine: ObservableObject {
         let photo_count: Int
         let image_ids: [String]
         let sample_url: String?
+        let suggested_vehicle_id: String?
+        let suggested_vehicle_label: String?
         var id: String { session_day + "|" + gps_cell }
     }
     struct OwnerVehicle: Decodable, Identifiable, Sendable {
@@ -429,6 +457,7 @@ final class AttributionEngine: ObservableObject {
             let vehicles: [OwnerVehicle] = try await SupabaseService.client.from("vehicles")
                 .select("id, year, make, model, primary_image_url")
                 .or("user_id.eq.\(userId),owner_id.eq.\(userId)")
+                .neq("make", value: "UNRESOLVED")
                 .order("updated_at", ascending: false)
                 .execute().value
             orphanSessions = sessions
@@ -451,6 +480,37 @@ final class AttributionEngine: ObservableObject {
         guard routed > 0 else { throw SessionConfirmationError.noPhotosRouted }
         orphanSessions.removeAll { $0.id == session.id }
         return routed
+    }
+
+    /// Confirm all sessions that already have a suggested vehicle, grouped by vehicle_id
+    /// so each vehicle is routed in a single batched RPC call.
+    @discardableResult
+    func confirmAllSuggested(limit: Int? = nil) async throws -> (sessions: Int, photos: Int) {
+        let candidates = orphanSessions.filter { $0.suggested_vehicle_id != nil }
+        let slice = limit.map { Array(candidates.prefix($0)) } ?? candidates
+        guard !slice.isEmpty else { return (0, 0) }
+
+        let byVehicle = Dictionary(grouping: slice, by: { $0.suggested_vehicle_id ?? "" })
+        var totalSessions = 0
+        var totalPhotos = 0
+
+        for (vehicleId, group) in byVehicle {
+            let allImageIDs = group.flatMap(\.image_ids)
+            for chunkStart in stride(from: 0, to: allImageIDs.count, by: 250) {
+                let chunk = Array(allImageIDs[chunkStart..<min(chunkStart + 250, allImageIDs.count)])
+                let routed: Int = try await SupabaseService.client
+                    .rpc("attribute_image_session",
+                         params: ConfirmParams(p_image_ids: chunk, p_vehicle_id: vehicleId))
+                    .execute().value
+                totalPhotos += routed
+            }
+            // Drop each vehicle's sessions as soon as they are filed, so a later failure
+            // leaves only the unfiled ones on screen.
+            let filed = Set(group.map(\.id))
+            orphanSessions.removeAll { filed.contains($0.id) }
+            totalSessions += group.count
+        }
+        return (totalSessions, totalPhotos)
     }
 
     enum SessionConfirmationError: LocalizedError {

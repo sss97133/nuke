@@ -74,6 +74,9 @@ Standing rules the code carries:
   `device_create_vehicle_profile`, which resolves an existing vehicle first and creates a private profile, with the
   owner as photographer and not as owner, only when the server's thresholds hold. A session inheritance (same day,
   same ~100 m cell) stays a suggestion: a dealer lot holds many cars. Nothing in the app writes `vehicle_id` directly.
+  Confirming one at a time is unrealistic at the owner's volume (owner, 2026-10-17): `SessionConfirmView` files a
+  session to its server suggestion (`get_orphan_sessions.suggested_vehicle_id`) with one tap, or all suggested at once,
+  and `WorkDaySignView` signs every loaded day, or every day for one vehicle, in one `confirm_work_sessions_bulk` call.
 - **A relation is a weight, not a status.** Owner direction, 2026-10-15: "active cant be a hard code like it is. its
   a weight. a relation goes dormant immediately after one day if not maintained by contribution. even within 24hr can
   stall." The app never shows a membership's `status` as ACTIVE. It shows the state the server cuts from
@@ -90,7 +93,8 @@ Standing rules the code carries:
   holding the watermark. On 2026-10-15 the owner's window sat in June; every open re-read the same 200 iCloud-only June
   photos and the morning's measurement shots never uploaded. Pixels follow the device rule of record
   (`VisionEngine.triage`, the same rule `scripts/ios-vision-triage` applies to stored frames): clutter and personal stay
-  on the phone as metadata only; everything else, a part close-up included, uploads.
+  on the phone as metadata only; everything else, a part close-up included, uploads. The contributor firewall
+  (`VisionEngine.contributorVerdict`) holds by the same rule.
 - **Heat is a budget.** Nothing reads originals in bulk while the app is open: iCloud originals download only in
   the background job on Wi-Fi; the album review (originals + accurate OCR) runs in the foreground only on a
   charger at a nominal temperature (`LibraryIngest.mayReviewInForeground`); a foreground backfill slice waits

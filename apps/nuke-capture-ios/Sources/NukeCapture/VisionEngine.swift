@@ -217,9 +217,7 @@ enum VisionEngine {
     /// True when a human face occupies a meaningful share of the frame — a
     /// person-centric photo, not a worker incidentally in a wide garage shot.
     /// `minAreaFraction` is the bbox area fraction: a distant bystander stays
-    /// under it, a selfie/portrait trips it. Returns false on detector failure
-    /// — safe because `contributorVerdict` ALSO requires an affirmative vehicle
-    /// label, so a failed face pass alone can never let a private photo through.
+    /// under it, a selfie/portrait trips it. Returns false on detector failure.
     static func hasProminentFace(_ cg: CGImage, minAreaFraction: CGFloat = 0.045) -> Bool {
         let request = VNDetectFaceRectanglesRequest()
         let handler = VNImageRequestHandler(cgImage: cg, options: [:])
@@ -235,13 +233,13 @@ enum VisionEngine {
     // MARK: - 1c. Contributor upload verdict (default-exclude firewall)
 
     /// Whether a CONTRIBUTOR's at-site photo may cross into the shared org
-    /// record. Two affirmative conditions, BOTH required (swiss-cheese):
-    ///   • the frame classifies as vehicle/work (`isVehicle`) — an affirmative
-    ///     positive, not merely "absence of something bad"
-    ///   • no prominent human face
-    /// Anything else → `.hold` (quarantined for the contributor's OWN review,
-    /// never auto-uploaded). Ambiguity loses. Multi-user path ONLY; the owner's
-    /// own-device flow stays deliberately ungated.
+    /// record. The device rule of record, the same as `triage`: hold clutter (a
+    /// document, receipt, web or product label in the top three) and personal (a
+    /// prominent face and no vehicle); a part close-up or a measurement shot that
+    /// Apple does not label "vehicle" is work and passes. An unclassifiable frame
+    /// holds. A held frame stays for the contributor's OWN review, never
+    /// auto-uploaded. Multi-user path ONLY; the owner's own-device flow stays
+    /// deliberately ungated.
     enum ContributorVerdict: Equatable {
         case allow
         case hold(reason: String)
@@ -249,8 +247,13 @@ enum VisionEngine {
 
     static func contributorVerdict(_ cg: CGImage) -> ContributorVerdict {
         guard let cls = classify(cg) else { return .hold(reason: "unclassifiable") }
-        if hasProminentFace(cg) { return .hold(reason: "prominent_face") }
-        guard cls.isVehicle else { return .hold(reason: "not_vehicle_work") }
+        let top3 = Array(cls.labels.prefix(3).map { $0.0 })
+        if isUnnecessary(labels: top3, isScreenshot: false) {
+            return .hold(reason: "clutter")
+        }
+        if hasProminentFace(cg) && !cls.isVehicle {
+            return .hold(reason: "prominent_face")
+        }
         return .allow
     }
 
