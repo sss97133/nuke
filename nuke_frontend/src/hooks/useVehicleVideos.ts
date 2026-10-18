@@ -16,6 +16,8 @@ interface VideoMoment {
   estimate_low: number | null;
   estimate_high: number | null;
   vehicle_id: string | null;
+  /** Broadcast overlay only: how many times the displayed bid changed on screen during the presentation. */
+  displayed_bid_changes?: number | null;
 }
 
 const YOUTUBE_SOURCE_ID = 'e980c7bd-404f-41f6-8a17-1c7cabd1d8a4';
@@ -25,7 +27,7 @@ interface BroadcastPresentation {
   vehicle_id: string | null;
   structured_data?: {
     media?: { video_id?: string; start_seconds?: number; end_seconds?: number };
-    value?: { lot?: string; sale_displayed?: string | null; displayed_outcome?: string };
+    value?: { lot?: string; sale_displayed?: string | null; displayed_outcome?: string; bid_ladder?: unknown };
     event_context?: { auction_house?: string; auction?: string | null };
   };
 }
@@ -37,6 +39,9 @@ export function momentFromPresentation(o: BroadcastPresentation): VideoMoment | 
   const value = o.structured_data?.value;
   if (!media?.video_id || typeof media.start_seconds !== 'number') return null;
   const outcome = value?.displayed_outcome;
+  const ladder = Array.isArray(value?.bid_ladder) ? value.bid_ladder : null;
+  const changes = ladder?.filter(step => typeof (step as { amount?: unknown })?.amount === 'number'
+    && typeof (step as { t?: unknown })?.t === 'number').length;
   return {
     id: o.id,
     lot_number: value?.lot ?? '',
@@ -52,6 +57,7 @@ export function momentFromPresentation(o: BroadcastPresentation): VideoMoment | 
     estimate_low: null,
     estimate_high: null,
     vehicle_id: o.vehicle_id,
+    displayed_bid_changes: changes ? changes : null,
   };
 }
 

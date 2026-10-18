@@ -39,6 +39,13 @@ export const normOutcome = (v) => (v == null || v === '' ? null : OUTCOME[String
 export function matches(field, truth, value) {
   if (value === null || value === undefined || value === '') return null;
   const t = truth && typeof truth === 'object' && !Array.isArray(truth) ? truth : { value: truth };
+  // A stored session window (the lot ran on one of these days, which the house does not say) is right when every day in
+  // it is a day the truth allows.
+  if (field === 'sale_date' && Array.isArray(value)) {
+    if (!value.length) return null;
+    const days = t.one_of ?? [t.value];
+    return value.every((d) => days.some((x) => matches('sale_date', x, d)));
+  }
   if (t.one_of) return t.one_of.some((v) => matches(field, v, value));
   const tv = t.value;
   switch (field) {
@@ -118,7 +125,8 @@ export function candidates(m) {
     hammer_price: c([['vehicle_events.final_price', ve.final_price], ['auction_events.winning_bid', ae.winning_bid], ['vehicles.sale_price', v.sale_price], ['vehicles.sold_price', v.sold_price], ['vehicles.bat_sold_price', v.bat_sold_price]]),
     price_with_premium: c([['vehicle_events.final_price', ve.final_price], ['auction_events.winning_bid', ae.winning_bid], ['vehicles.sale_price', v.sale_price], ['vehicles.sold_price', v.sold_price]]),
     high_bid: c([['auction_events.high_bid', ae.high_bid], ['vehicle_events.current_price', ve.current_price], ['vehicle_events.final_price', ve.final_price], ['vehicles.high_bid', v.high_bid], ['monitored_auctions.current_bid', m?.ma?.current_bid_cents != null ? m.ma.current_bid_cents / 100 : null]]),
-    sale_date: c([['vehicle_events.sold_at', ve.sold_at], ['vehicle_events.ended_at', ve.ended_at], ['auction_events.auction_end_date', ae.auction_end_date], ['vehicles.sale_date', v.sale_date], ['vehicles.auction_end_date', v.auction_end_date]]),
+    sale_date: c([['vehicle_events.sold_at', ve.sold_at], ['vehicle_events.ended_at', ve.ended_at], ['auction_events.auction_end_date', ae.auction_end_date], ['vehicles.sale_date', v.sale_date], ['vehicles.auction_end_date', v.auction_end_date],
+      ['vehicle_events.metadata.auction_session_days', Array.isArray(md.auction_session_days) && md.auction_session_days.length ? md.auction_session_days : null]]),
     auction_end: c([['monitored_auctions.auction_end_time', m?.ma?.auction_end_time], ['auction_events.auction_end_date', ae.auction_end_date], ['vehicle_events.ended_at', ve.ended_at], ['vehicles.auction_end_date', v.auction_end_date]]),
     lot_number: c([['auction_events.lot_number', ae.lot_number], ['vehicle_events.metadata.lot_number', md.lot_number], ['vehicles.bat_lot_number', v.bat_lot_number]]),
     gallery_count: c([['vehicle_images(count)', m?.images], ['vehicles.image_count', v.image_count]]),

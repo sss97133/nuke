@@ -48,4 +48,6 @@ export function fillOnlyIdentity<T extends Record<string, unknown>>(update: T, e
   return out as T;
 }
 
-export const REVISION_DIFFERENT_CAR = { missing: 'identity_match', reason: 'different_car', next_action: 'relink' } as const;
+// revision_reason must be in import_queue_revision_vocab; a different car is bad_data on identity_match (as the Bonhams,
+// Broad Arrow, Gooding and eBay writers file it). 'different_car' was refused by that constraint on every insert.
+export const REVISION_DIFFERENT_CAR = { missing: 'identity_match', reason: 'bad_data', next_action: 'relink' } as const;
