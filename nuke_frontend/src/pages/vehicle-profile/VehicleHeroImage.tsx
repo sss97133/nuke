@@ -171,7 +171,7 @@ const VehicleHeroImage: React.FC<VehicleHeroImageProps> = ({ overlayNode }) => {
             textTransform: 'uppercase' as const,
             marginTop: '4px',
           }}>
-            NO PHOTO · EXPLORE BY BADGE
+            {candidates.length > 0 ? 'PHOTO UNAVAILABLE' : 'NO PHOTO'} · EXPLORE BY BADGE
           </span>
         </div>
       </div>
