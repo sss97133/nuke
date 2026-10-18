@@ -123,16 +123,23 @@ const fmtMoney = (n: number | null): string => {
 
 const TablePage: React.FC = () => {
   const { vehicleId } = useParams<{ vehicleId: string }>();
-  const [vehicle, setVehicle] = useState<VehicleSummary | null>(null);
-  const [rows, setRows] = useState<ObsRow[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const [loadedVehicleId, setLoadedVehicleId] = useState<string | null>(null);
+  const [loadedVehicle, setVehicle] = useState<VehicleSummary | null>(null);
+  const [loadedRows, setRows] = useState<ObsRow[]>([]);
+  const [requestLoading, setLoading] = useState(true);
+  const [requestError, setError] = useState<string | null>(null);
   const [publicLogUnavailable, setPublicLogUnavailable] = useState(false);
   const [reportedWorkUnavailable, setReportedWorkUnavailable] = useState(false);
   const [sortKey, setSortKey] = useState<SortKey>('observed_at');
   const [sortDir, setSortDir] = useState<SortDir>('desc');
   const [filter, setFilter] = useState('');
   const [kindFilter, setKindFilter] = useState<string | null>(null);
+  // A route change must not lend the previous subject's testimony to the new one.
+  const sameSubject = loadedVehicleId === vehicleId;
+  const vehicle = sameSubject ? loadedVehicle : null;
+  const rows = sameSubject ? loadedRows : [];
+  const loading = !sameSubject || requestLoading;
+  const error = sameSubject ? requestError : null;
 
   useEffect(() => {
     if (!vehicleId) return;
@@ -203,10 +210,14 @@ const TablePage: React.FC = () => {
       if (cancelled) return;
 
       if (vehRes.error) {
+        setLoadedVehicleId(vehicleId);
+        setVehicle(null);
+        setRows([]);
         setError(`Vehicle load failed: ${vehRes.error.message}`);
         setLoading(false);
         return;
       }
+      setLoadedVehicleId(vehicleId);
       setVehicle(vehRes.data as VehicleSummary | null);
       let publicLogIncomplete = true;
       let publicWork: unknown[] = [], reportedWork: unknown[] = [];
@@ -516,10 +527,10 @@ const TablePage: React.FC = () => {
           Reported work rows are publisher reports. Repeated captures may describe the same repair and do not provide independent confirmation.
         </p>
       )}
-      {publicLogUnavailable && (
+      {sameSubject && publicLogUnavailable && (
         <p role="status" style={{ fontSize: 10 }}>Public build log unavailable; work history may be incomplete.</p>
       )}
-      {reportedWorkUnavailable && (
+      {sameSubject && reportedWorkUnavailable && (
         <p role="status" className="tp-note">Publisher-reported work unavailable; confirmed public work is shown where available.</p>
       )}
 

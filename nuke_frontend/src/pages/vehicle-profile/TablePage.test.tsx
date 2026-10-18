@@ -1,19 +1,19 @@
 // @vitest-environment jsdom
 import React, { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
-import { MemoryRouter, Route, Routes } from 'react-router-dom';
+import { Link, MemoryRouter, Route, Routes } from 'react-router-dom';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 const fixture = vi.hoisted(() => ({ direct: [] as any[], publicRows: [] as any[], reportedRows: [] as any[], envelope: undefined as unknown,
-  directResponse: undefined as any[] | undefined, publicError: null as any, legacyError: null as any, rpc: vi.fn() }));
+  directResponse: undefined as any[] | undefined, publicError: null as any, legacyError: null as any, vehicleError: null as any, rpc: vi.fn() }));
 vi.mock('../../lib/supabase', () => ({ supabase: {
   rpc: fixture.rpc,
   from: (table: string) => {
-    let kind: string | undefined;
+    let kind: string | undefined, vehicleId = 'synthetic-vehicle';
     const query: any = {
       select: () => query,
-      eq: (key: string, value: string) => { if (key === 'kind') kind = value; return query; },
+      eq: (key: string, value: string) => { if (key === 'kind') kind = value; if (table === 'vehicles' && key === 'id') vehicleId = value; return query; },
       not: () => query, order: () => query, limit: () => query,
-      maybeSingle: () => Promise.resolve({ data: { id: 'synthetic-vehicle', year: 1983, make: 'GMC', model: 'Synthetic' }, error: null }),
+      maybeSingle: () => Promise.resolve({ data: { id: vehicleId, year: 1983, make: 'GMC', model: vehicleId === 'synthetic-vehicle' ? 'Synthetic' : 'Other' }, error: vehicleId === 'other-vehicle' ? fixture.vehicleError : null }),
       then: (resolve: any, reject: any) => Promise.resolve({ data: table === 'observation_sources' ? [{ id: 'synthetic-source', slug: 'synthetic-owner-source' }]
         : kind === 'work_record' && fixture.directResponse ? fixture.directResponse : fixture.direct.filter(r => r.kind === kind), error: null }).then(resolve, reject),
     };
@@ -24,7 +24,7 @@ import TablePage from './TablePage';
 let container: HTMLDivElement, root: Root;
 beforeEach(() => {
   (globalThis as any).IS_REACT_ACT_ENVIRONMENT = true;
-  fixture.direct = []; fixture.reportedRows = []; fixture.envelope = undefined; fixture.directResponse = undefined; fixture.publicError = null; fixture.legacyError = null;
+  fixture.direct = []; fixture.reportedRows = []; fixture.envelope = undefined; fixture.directResponse = undefined; fixture.publicError = null; fixture.legacyError = null; fixture.vehicleError = null;
   fixture.publicRows = [{ observation_id: 'synthetic-work', done_on: '2025-02-03', item: 'Installed bracket', category: 'Fabrication', supplier: 'Synthetic supplier', labor_minutes: 0, build_stage: 'Mock-up' }];
   fixture.rpc.mockReset();
   fixture.rpc.mockImplementation((_name, args) => Promise.resolve(args.p_include_reported
@@ -35,6 +35,15 @@ beforeEach(() => {
 afterEach(async () => { await act(async () => root.unmount()); container.remove(); });
 async function renderPage() {
   await act(async () => root.render(<MemoryRouter initialEntries={['/vehicle/synthetic-vehicle/table']}><Routes><Route path="/vehicle/:vehicleId/table" element={<TablePage />} /></Routes></MemoryRouter>));
+}
+async function renderNavigablePage() {
+  await act(async () => root.render(<MemoryRouter initialEntries={['/vehicle/synthetic-vehicle/table']}>
+    <Link data-switch="other" to="/vehicle/other-vehicle/table">Other vehicle</Link>
+    <Routes><Route path="/vehicle/:vehicleId/table" element={<TablePage />} /></Routes>
+  </MemoryRouter>));
+}
+async function switchVehicle() {
+  await act(async () => container.querySelector('[data-switch="other"]')!.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, button: 0 })));
 }
 async function filter(value: string) {
   const input = container.querySelector('input')!;
@@ -107,6 +116,50 @@ const reportedWork = (extra = {}) => ({
 });
 
 describe('publisher-reported work in the existing table', () => {
+  it.each([
+    ['retained_description_reported_work_v1', 'rpc'], ['retained_description_reported_work_v2', 'rpc'],
+    ['retained_description_reported_work_v2', 'vehicle'],
+  ])('withholds the previous subject during navigation and a failed new read (%s, %s)', async (source_witness_version, failure) => {
+      const sentence = 'The carburetor was rebuilt in September 2026.';
+      const report = reportedWork({ source_witness_version, performed_clause: sentence, source_value: sentence });
+      let resolveOther!: (value: unknown) => void;
+      const other = new Promise(resolve => { resolveOther = resolve; });
+      fixture.rpc.mockImplementation((_name, args) => args.p_vehicle_id === 'other-vehicle' ? other
+        : Promise.resolve({ data: { work_records: [], reported_work: [report] }, error: null }));
+      await renderNavigablePage();
+      expect(container.querySelector('blockquote')?.textContent).toBe(sentence);
+      if (failure === 'vehicle') fixture.vehicleError = { message: 'Synthetic vehicle read failure' };
+      await switchVehicle();
+      expect(container.querySelector('a[href="/vehicle/other-vehicle"]')).not.toBeNull();
+      expect(container.querySelector('[data-observation-id]')).toBeNull();
+      expect(container.textContent).not.toContain(sentence);
+      expect(container.textContent).not.toContain('GMC Synthetic');
+      await act(async () => resolveOther(failure === 'rpc' ? { data: null, error: { code: '42501', message: 'Synthetic denied reader' } }
+        : { data: { work_records: [], reported_work: [] }, error: null }));
+      expect(container.querySelector('[data-observation-id]')).toBeNull();
+      expect(container.textContent).not.toContain(sentence);
+      if (failure === 'rpc') expect(container.querySelector('[role="status"]')?.textContent).toContain('history may be incomplete');
+      else expect(container.textContent).toContain('Vehicle load failed');
+    });
+
+  it('ignores a late previous-subject response after the new subject has loaded', async () => {
+    const oldSentence = 'The carburetor was rebuilt in September 2026.';
+    const newSentence = 'The radiator was replaced in September 2026.';
+    const oldReport = reportedWork({ source_witness_version: 'retained_description_reported_work_v2', performed_clause: oldSentence, source_value: oldSentence });
+    const newReport = reportedWork({ source_witness_version: 'retained_description_reported_work_v2', observation_id: '10000000-0000-4000-8000-000000000002', performed_clause: newSentence, source_value: newSentence });
+    let resolveOld!: (value: unknown) => void;
+    const old = new Promise(resolve => { resolveOld = resolve; });
+    fixture.rpc.mockImplementation((_name, args) => args.p_vehicle_id === 'synthetic-vehicle' ? old
+      : Promise.resolve({ data: { work_records: [], reported_work: [newReport] }, error: null }));
+    await renderNavigablePage();
+    await switchVehicle();
+    expect(container.querySelector('blockquote')?.textContent).toBe(newSentence);
+    await act(async () => resolveOld({ data: { work_records: [], reported_work: [oldReport] }, error: null }));
+    expect(container.querySelectorAll('[data-observation-id]')).toHaveLength(1);
+    expect(container.querySelector('blockquote')?.textContent).toBe(newSentence);
+    expect(container.textContent).not.toContain(oldSentence);
+  });
+
   it('shows a v2 whole-sentence report with its month, source and uncertainty, then respects its withdrawal', async () => {
     const sentence = 'The carburetor was rebuilt in September 2026.';
     fixture.publicRows = [];
