@@ -412,14 +412,18 @@ export function extractFromPageData(pageData: GoodingPageData, url: string): Goo
     saleroom_addendum = htmlToText(sraHtml.replace(/>/g, '> ')).replace(/\s+/g, ' ').trim();
   }
 
+  // Gooding sends lotNumber 0 for a consigned lot not yet given a number (measured 2026-10-18 on the upcoming
+  // Retromobile New York 300 SL); 0 is never a lot, so it is unknown.
+  const lotNumber = typeof lot.lotNumber === 'number' && lot.lotNumber > 0 ? lot.lotNumber : null;
+
   // Auction calendar position: "2025 Pebble Beach Auctions (Lot 38)"
   let auction_calendar_position: string | null = null;
   const auctionSlug = auction?.webpage__auction?.[0]?.slug;
   const yearFromSlug = auctionSlug ? auctionSlug.match(/(\d{4})$/)?.[1] : null;
-  if (auction?.name && lot.lotNumber != null) {
+  if (auction?.name && lotNumber != null) {
     auction_calendar_position = yearFromSlug
-      ? `${yearFromSlug} ${auction.name} (Lot ${lot.lotNumber})`
-      : `${auction.name} (Lot ${lot.lotNumber})`;
+      ? `${yearFromSlug} ${auction.name} (Lot ${lotNumber})`
+      : `${auction.name} (Lot ${lotNumber})`;
   }
 
   const canonicalUrl = `https://www.goodingco.com/lot/${slug}`;
@@ -449,7 +453,7 @@ export function extractFromPageData(pageData: GoodingPageData, url: string): Goo
     chassis,
     coachwork,
 
-    lot_number: lot.lotNumber,
+    lot_number: lotNumber,
     auction_name: auction?.name || null,
     auction_date: auctionDate,
     auction_location: auction?.location?.address?.addressCountry || null,
