@@ -695,3 +695,156 @@ it('renders SERIES, TRIM, and BODY facet pills linked to /?make=...&family=...&a
     '/?make=Ford&family=Mustang&axis=body&facet=Fastback',
   ]);
 });
+
+it('filters Recent Vehicles Stream by Top Makes, Top Models (with CLEAR chip and ↗ treemap links), and FACET BREAKDOWN pills', async () => {
+  const drillFilterDetail = {
+    ...batLandingDetail,
+    recent_vehicles: [
+      {
+        id: 'ev-991-gt3',
+        source: 'bat',
+        event_type: 'auction',
+        event_status: 'sold',
+        price: 168000,
+        year: 2018,
+        make: 'Porsche',
+        model: '911 GT3',
+        series: '991',
+        trim: 'GT3',
+        body_style: 'Coupe',
+        vin: 'WP0AC2A98JS175001',
+        mileage: 11200,
+        record_date: '2026-10-16T18:00:00Z',
+        title: '2018 Porsche 911 (991) GT3 Coupe',
+        raw_title: '2018 Porsche 911 (991) GT3 Coupe',
+        created_at: '2026-10-16T10:46:12Z',
+      },
+      {
+        id: 'ev-991-carrera',
+        source: 'bat',
+        event_type: 'auction',
+        event_status: 'active',
+        price: 94000,
+        year: 2016,
+        make: 'Porsche',
+        model: '911 Carrera',
+        series: '991',
+        trim: 'Carrera S',
+        body_style: 'Coupe',
+        vin: 'WP0AB2A96GS122002',
+        mileage: 24500,
+        record_date: '2026-10-18T19:00:00Z',
+        title: '2016 Porsche 911 (991) Carrera S Coupe',
+        raw_title: '2016 Porsche 911 (991) Carrera S Coupe',
+        created_at: '2026-10-16T10:45:00Z',
+      },
+      {
+        id: 'ev-vette-z06',
+        source: 'bat',
+        event_type: 'auction',
+        event_status: 'sold',
+        price: 82500,
+        year: 2017,
+        make: 'Chevrolet',
+        model: 'Corvette Z06',
+        series: 'C7',
+        trim: 'Z06',
+        body_style: 'Coupe',
+        vin: '1G1YU2D68H5600003',
+        mileage: 8900,
+        record_date: '2026-10-15T20:00:00Z',
+        title: '2017 Chevrolet Corvette Z06 Coupe',
+        raw_title: '2017 Chevrolet Corvette Z06 Coupe',
+        created_at: '2026-10-16T10:44:00Z',
+      },
+      {
+        id: 'ev-c10-stepside',
+        source: 'bat',
+        event_type: 'auction',
+        event_status: 'sold',
+        price: 46000,
+        year: 1978,
+        make: 'Chevrolet',
+        model: 'C10 Silverado Stepside',
+        trim: 'Silverado',
+        vin: 'CCL148F300004',
+        mileage: 52000,
+        record_date: '2026-10-14T20:00:00Z',
+        title: '1978 Chevrolet C10 Silverado Stepside Pickup',
+        raw_title: '1978 Chevrolet C10 Silverado Stepside Pickup',
+        created_at: '2026-10-16T10:43:00Z',
+      },
+    ],
+  };
+
+  fixture.rpc.mockImplementation((fn: string) => {
+    if (fn === 'market_sources_read') return Promise.resolve({ data: value, error: null });
+    if (fn === 'market_source_landing_read') return Promise.resolve({ data: drillFilterDetail, error: null });
+    return Promise.resolve({ data: null, error: { message: 'none' } });
+  });
+
+  await act(async () => root.render(<SourcesBoard />));
+  const firstRow = container.querySelector('li.market-sources__row') as HTMLLIElement;
+  await act(async () => { firstRow.click(); });
+
+  const drill = container.querySelector('.market-sources__drill')!;
+  expect(drill).not.toBeNull();
+  expect(drill.querySelectorAll('li.market-sources__event')).toHaveLength(4);
+
+  // Verify Top Makes and Top Models secondary ↗ links point to /?make=<Make> and /?make=<Make>&model=<Model>
+  const porscheJump = drill.querySelector('[data-testid="drill-make-jump-Porsche"]') as HTMLAnchorElement;
+  expect(porscheJump).not.toBeNull();
+  expect(porscheJump.getAttribute('href')).toBe('/?make=Porsche');
+
+  const gt3Jump = drill.querySelector('[data-testid="drill-model-jump-911 GT3"]') as HTMLAnchorElement;
+  expect(gt3Jump).not.toBeNull();
+  expect(gt3Jump.getAttribute('href')).toBe('/?make=Porsche&model=911%20GT3');
+
+  // Clicking a Top Make pill filters the Recent Vehicles Stream to Porsche (2 rows) and shows CLEAR chip
+  const porschePill = drill.querySelector('[data-testid="drill-make-pill-Porsche"]') as HTMLButtonElement;
+  await act(async () => { porschePill.click(); });
+  expect(porschePill.getAttribute('aria-pressed')).toBe('true');
+  expect(drill.querySelectorAll('li.market-sources__event')).toHaveLength(2);
+  expect(drill.querySelector('[data-testid="drill-filter-clear"]')).not.toBeNull();
+
+  // Clicking a Top Model pill further narrows to 911 GT3 (1 row)
+  const gt3ModelPill = drill.querySelector('[data-testid="drill-model-pill-911 GT3"]') as HTMLButtonElement;
+  await act(async () => { gt3ModelPill.click(); });
+  expect(gt3ModelPill.getAttribute('aria-pressed')).toBe('true');
+  expect(drill.querySelectorAll('li.market-sources__event')).toHaveLength(1);
+  expect(drill.querySelector('li.market-sources__event')?.textContent).toContain('911 GT3');
+
+  // Clicking CLEAR chip resets Make & Model filters back to all 4 vehicles
+  const clearBtn = drill.querySelector('[data-testid="drill-filter-clear"]') as HTMLButtonElement;
+  await act(async () => { clearBtn.click(); });
+  expect(drill.querySelectorAll('li.market-sources__event')).toHaveLength(4);
+
+  // Verify FACET BREAKDOWN bar renders live Series, Trim, and Body Style tags with counts
+  const facetBar = drill.querySelector('[data-testid="drill-facet-breakdown"]')!;
+  expect(facetBar).not.toBeNull();
+  expect(facetBar.textContent).toContain('FACET BREAKDOWN');
+  expect(facetBar.textContent).toContain('SER 991 (2)');
+  expect(facetBar.textContent).toContain('TRM Z06 (1)');
+  expect(facetBar.textContent).toContain('BDY Coupe (3)');
+
+  // Clicking SER 991 (2) filters stream to the 2 Porsche 991 rows
+  const ser991Pill = drill.querySelector('[data-testid="drill-facet-pill-SER-991"]') as HTMLButtonElement;
+  expect(ser991Pill).not.toBeNull();
+  await act(async () => { ser991Pill.click(); });
+  expect(ser991Pill.getAttribute('aria-pressed')).toBe('true');
+  expect(drill.querySelectorAll('li.market-sources__event')).toHaveLength(2);
+
+  // Clicking TRM Z06 (1) switches facet filter to the 1 Corvette Z06 row
+  const trmZ06Pill = drill.querySelector('[data-testid="drill-facet-pill-TRM-Z06"]') as HTMLButtonElement;
+  expect(trmZ06Pill).not.toBeNull();
+  await act(async () => { trmZ06Pill.click(); });
+  expect(trmZ06Pill.getAttribute('aria-pressed')).toBe('true');
+  expect(drill.querySelectorAll('li.market-sources__event')).toHaveLength(1);
+  expect(drill.querySelector('li.market-sources__event')?.textContent).toContain('Corvette Z06');
+
+  // Clicking BDY Coupe (3) switches facet filter to the 3 Coupe rows
+  const bdyCoupePill = drill.querySelector('[data-testid="drill-facet-pill-BDY-Coupe"]') as HTMLButtonElement;
+  expect(bdyCoupePill).not.toBeNull();
+  await act(async () => { bdyCoupePill.click(); });
+  expect(drill.querySelectorAll('li.market-sources__event')).toHaveLength(3);
+});

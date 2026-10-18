@@ -32,7 +32,9 @@ export type LandingRecentEvent = {
   year: number | null;
   make: string | null;
   model: string | null;
+  series?: string | null;
   trim: string | null;
+  bodyStyle?: string | null;
   vin: string | null;
   mileage: number | null;
   recordDate: string | null;
@@ -42,6 +44,24 @@ export type LandingRecentEvent = {
   vehicleId: string | null;
   sourceUrl: string | null;
   createdAt: string;
+};
+
+export type SourceTopMakeEntry = {
+  make: string;
+  count: number;
+};
+
+export type SourceTopModelEntry = {
+  make: string | null;
+  model: string;
+  count: number;
+};
+
+export type StreamFacetDistributionPill = {
+  axis: 'series' | 'trim' | 'body';
+  prefix: 'SER' | 'TRM' | 'BDY';
+  value: string;
+  count: number;
 };
 
 export type SourceDrillStats = {
@@ -62,6 +82,8 @@ export type SourceDrillStats = {
   usd12: number | null;
   salesPrior12: number | null;
   usdPrior12: number | null;
+  topMakes?: SourceTopMakeEntry[];
+  topModels?: SourceTopModelEntry[];
 };
 
 export type SourceLandingDetail = {
@@ -79,6 +101,8 @@ export type SourceLandingDetail = {
   mins60: number[];
   days14: number[];
   stats: SourceDrillStats | null;
+  topMakes?: SourceTopMakeEntry[];
+  topModels?: SourceTopModelEntry[];
   recent: LandingRecentEvent[];
 };
 
@@ -236,47 +260,110 @@ export function parseSources(value: unknown): SourcesBoardData | null {
   return { asOf: v.as_of, day: str(v.day), rows, notRanked, landing };
 }
 
+function parseTopMakesList(raw: unknown): SourceTopMakeEntry[] {
+  if (!Array.isArray(raw)) return [];
+  const out: SourceTopMakeEntry[] = [];
+  for (const item of raw) {
+    if (Array.isArray(item)) {
+      const mk = str(item[0]);
+      const cnt = num(item[1]) ?? 1;
+      if (mk) out.push({ make: mk, count: cnt });
+    } else if (item && typeof item === 'object') {
+      const obj = item as Record<string, unknown>;
+      const mk = str(obj.make) ?? str(obj.name) ?? str(obj.label);
+      const cnt = num(obj.count) ?? num(obj.lots) ?? num(obj.vehicles) ?? num(obj.total) ?? 1;
+      if (mk) out.push({ make: mk, count: cnt });
+    } else if (typeof item === 'string' && item.trim()) {
+      out.push({ make: item.trim(), count: 1 });
+    }
+  }
+  return out;
+}
+
+function parseTopModelsList(raw: unknown): SourceTopModelEntry[] {
+  if (!Array.isArray(raw)) return [];
+  const out: SourceTopModelEntry[] = [];
+  for (const item of raw) {
+    if (Array.isArray(item)) {
+      if (item.length >= 3) {
+        const mk = str(item[0]);
+        const md = str(item[1]);
+        const cnt = num(item[2]) ?? 1;
+        if (md) out.push({ make: mk, model: md, count: cnt });
+      } else {
+        const md = str(item[0]);
+        const cnt = num(item[1]) ?? 1;
+        if (md) out.push({ make: null, model: md, count: cnt });
+      }
+    } else if (item && typeof item === 'object') {
+      const obj = item as Record<string, unknown>;
+      const mk = str(obj.make) ?? str(obj.brand) ?? null;
+      const md = str(obj.model) ?? str(obj.name) ?? str(obj.label);
+      const cnt = num(obj.count) ?? num(obj.lots) ?? num(obj.vehicles) ?? num(obj.total) ?? 1;
+      if (md) out.push({ make: mk, model: md, count: cnt });
+    } else if (typeof item === 'string' && item.trim()) {
+      out.push({ make: null, model: item.trim(), count: 1 });
+    }
+  }
+  return out;
+}
+
 /** Decodes public.market_source_landing_read(p_source, p_hour). */
 export function parseSourceLanding(value: unknown): SourceLandingDetail | null {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
   const v = value as Record<string, unknown>;
   if (typeof v.as_of !== 'string') return null;
   const recent: LandingRecentEvent[] = [];
-  if (Array.isArray(v.recent)) {
-    for (const item of v.recent) {
-      if (!item || typeof item !== 'object' || Array.isArray(item)) continue;
-      const ev = item as Record<string, unknown>;
-      const id = str(ev.id);
-      const source = str(ev.source);
-      const createdAt = str(ev.created_at);
-      if (!id || !source || !createdAt) continue;
-      recent.push({
-        id,
-        source,
-        eventType: str(ev.event_type),
-        eventStatus: str(ev.event_status),
-        reserve: str(ev.reserve),
-        price: num(ev.price),
-        bidCount: num(ev.bid_count),
-        year: num(ev.year),
-        make: str(ev.make),
-        model: str(ev.model),
-        trim: str(ev.trim),
-        vin: str(ev.vin),
-        mileage: num(ev.mileage),
-        recordDate: str(ev.record_date),
-        title: str(ev.title),
-        rawTitle: str(ev.raw_title),
-        lot: str(ev.lot),
-        vehicleId: str(ev.vehicle_id),
-        sourceUrl: str(ev.source_url),
-        createdAt,
-      });
-    }
+  const rawRecentList =
+    Array.isArray(v.recent_vehicles) && v.recent_vehicles.length > 0
+      ? v.recent_vehicles
+      : Array.isArray(v.recent)
+        ? v.recent
+        : Array.isArray(v.recent_vehicles)
+          ? v.recent_vehicles
+          : [];
+  for (let idx = 0; idx < rawRecentList.length; idx += 1) {
+    const item = rawRecentList[idx];
+    if (!item || typeof item !== 'object' || Array.isArray(item)) continue;
+    const ev = item as Record<string, unknown>;
+    const id = str(ev.id) ?? str(ev.vehicle_id) ?? `ev-${idx}`;
+    const source = str(ev.source) ?? str(v.source) ?? 'unknown';
+    const createdAt = str(ev.created_at) ?? str(ev.createdAt) ?? v.as_of;
+    if (!id || !source || !createdAt) continue;
+    recent.push({
+      id,
+      source,
+      eventType: str(ev.event_type) ?? str(ev.eventType),
+      eventStatus: str(ev.event_status) ?? str(ev.eventStatus),
+      reserve: str(ev.reserve),
+      price: num(ev.price),
+      bidCount: num(ev.bid_count) ?? num(ev.bidCount),
+      year: num(ev.year),
+      make: str(ev.make),
+      model: str(ev.model),
+      series: str(ev.series),
+      trim: str(ev.trim),
+      bodyStyle: str(ev.body_style) ?? str(ev.bodyStyle),
+      vin: str(ev.vin),
+      mileage: num(ev.mileage),
+      recordDate: str(ev.record_date) ?? str(ev.recordDate),
+      title: str(ev.title),
+      rawTitle: str(ev.raw_title) ?? str(ev.rawTitle),
+      lot: str(ev.lot),
+      vehicleId: str(ev.vehicle_id) ?? str(ev.vehicleId),
+      sourceUrl: str(ev.source_url) ?? str(ev.sourceUrl),
+      createdAt,
+    });
   }
   const rawStats = v.stats && typeof v.stats === 'object' && !Array.isArray(v.stats)
     ? (v.stats as Record<string, unknown>)
     : null;
+  const parsedTopMakes = parseTopMakesList(
+    v.top_makes ?? v.topMakes ?? rawStats?.top_makes ?? rawStats?.topMakes,
+  );
+  const parsedTopModels = parseTopModelsList(
+    v.top_models ?? v.topModels ?? rawStats?.top_models ?? rawStats?.topModels,
+  );
   const stats: SourceDrillStats | null = rawStats
     ? {
         source: str(rawStats.source),
@@ -296,6 +383,8 @@ export function parseSourceLanding(value: unknown): SourceLandingDetail | null {
         usd12: num(rawStats.usd_12m),
         salesPrior12: num(rawStats.sales_prior_12m),
         usdPrior12: num(rawStats.usd_prior_12m),
+        topMakes: parsedTopMakes.length > 0 ? parsedTopMakes : undefined,
+        topModels: parsedTopModels.length > 0 ? parsedTopModels : undefined,
       }
     : null;
   return {
@@ -313,6 +402,8 @@ export function parseSourceLanding(value: unknown): SourceLandingDetail | null {
     mins60: numArray(v.mins60, 12),
     days14: numArray(v.days14, 14),
     stats,
+    topMakes: parsedTopMakes.length > 0 ? parsedTopMakes : undefined,
+    topModels: parsedTopModels.length > 0 ? parsedTopModels : undefined,
     recent,
   };
 }
@@ -874,6 +965,121 @@ function formatStatusCell(ev: LandingRecentEvent): { primary: string; meta: stri
   return { primary, meta: parts.join(' · '), statusClass };
 }
 
+export function resolveDrillTopMakes(
+  detail: SourceLandingDetail | null,
+  recent: ReadonlyArray<LandingRecentEvent>,
+): SourceTopMakeEntry[] {
+  const explicit = detail?.topMakes ?? detail?.stats?.topMakes ?? [];
+  if (explicit.length > 0) return explicit.slice(0, 10);
+  const counts = new Map<string, { make: string; count: number }>();
+  for (const ev of recent) {
+    const mk = ev.make?.trim();
+    if (!mk) continue;
+    const key = mk.toLowerCase();
+    const cur = counts.get(key);
+    if (cur) cur.count += 1;
+    else counts.set(key, { make: mk, count: 1 });
+  }
+  return [...counts.values()]
+    .sort((a, b) => b.count - a.count || a.make.localeCompare(b.make))
+    .slice(0, 10);
+}
+
+export function resolveDrillTopModels(
+  detail: SourceLandingDetail | null,
+  recent: ReadonlyArray<LandingRecentEvent>,
+): SourceTopModelEntry[] {
+  const explicit = detail?.topModels ?? detail?.stats?.topModels ?? [];
+  if (explicit.length > 0) {
+    return explicit.slice(0, 10).map((entry) => {
+      if (entry.make) return entry;
+      const matched = recent.find(
+        (ev) =>
+          ev.make &&
+          ev.model &&
+          (ev.model.toLowerCase() === entry.model.toLowerCase() ||
+            ev.model.toLowerCase().startsWith(`${entry.model.toLowerCase()} `)),
+      );
+      return {
+        ...entry,
+        make: matched?.make ?? null,
+      };
+    });
+  }
+  const counts = new Map<string, { make: string | null; model: string; count: number }>();
+  for (const ev of recent) {
+    const md = ev.model?.trim();
+    if (!md) continue;
+    const mk = ev.make?.trim() || null;
+    const key = `${(mk ?? '').toLowerCase()}::${md.toLowerCase()}`;
+    const cur = counts.get(key);
+    if (cur) cur.count += 1;
+    else counts.set(key, { make: mk, model: md, count: 1 });
+  }
+  return [...counts.values()]
+    .sort((a, b) => b.count - a.count || a.model.localeCompare(b.model))
+    .slice(0, 10);
+}
+
+export function computeStreamFacetDistribution(
+  recent: ReadonlyArray<LandingRecentEvent>,
+): StreamFacetDistributionPill[] {
+  const byAxis: Record<
+    'series' | 'trim' | 'body',
+    Map<string, { value: string; count: number }>
+  > = {
+    series: new Map(),
+    trim: new Map(),
+    body: new Map(),
+  };
+
+  for (const ev of recent) {
+    const facet = classifyVehicleFacet({
+      make: ev.make,
+      model: ev.model,
+      series: ev.series,
+      trim: ev.trim,
+      bodyStyle: ev.bodyStyle,
+      title: ev.title,
+      rawTitle: ev.rawTitle,
+      year: ev.year,
+    });
+    const axes: Array<['series' | 'trim' | 'body', string | null]> = [
+      ['series', facet.series],
+      ['trim', facet.trim],
+      ['body', facet.body],
+    ];
+    for (const [axis, rawVal] of axes) {
+      const val = rawVal?.trim();
+      if (!val) continue;
+      const key = val.toLowerCase();
+      const cur = byAxis[axis].get(key);
+      if (cur) cur.count += 1;
+      else byAxis[axis].set(key, { value: val, count: 1 });
+    }
+  }
+
+  const toSortedPills = (
+    axis: 'series' | 'trim' | 'body',
+    prefix: 'SER' | 'TRM' | 'BDY',
+  ): StreamFacetDistributionPill[] =>
+    [...byAxis[axis].values()]
+      .sort((a, b) => b.count - a.count || a.value.localeCompare(b.value))
+      .slice(0, 5)
+      .map((entry) => ({
+        axis,
+        prefix,
+        value: entry.value,
+        count: entry.count,
+      }));
+
+  return [
+    ...toSortedPills('series', 'SER'),
+    ...toSortedPills('trim', 'TRM'),
+    ...toSortedPills('body', 'BDY'),
+  ];
+}
+
 function SourceLandingInspector({
   row,
   boardLanding,
@@ -890,11 +1096,23 @@ function SourceLandingInspector({
   asBlock?: boolean;
 }) {
   const [selectedHour, setSelectedHour] = useState<string | null>(null);
+  const [selectedDrillMake, setSelectedDrillMake] = useState<string | null>(null);
+  const [selectedDrillModel, setSelectedDrillModel] = useState<string | null>(null);
+  const [selectedDrillFacet, setSelectedDrillFacet] = useState<{
+    axis: 'series' | 'trim' | 'body';
+    value: string;
+  } | null>(null);
   const [detail, setDetail] = useState<SourceLandingDetail | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
   const [refreshTick, setRefreshTick] = useState(0);
   const sourceKey = row?.source ?? null;
   const displayName = row ? shortName(row.name) : 'All sources';
+
+  useEffect(() => {
+    setSelectedDrillMake(null);
+    setSelectedDrillModel(null);
+    setSelectedDrillFacet(null);
+  }, [sourceKey]);
 
   useEffect(() => {
     let active = true;
@@ -963,6 +1181,46 @@ function SourceLandingInspector({
   const rowBadge = row ? categoryBadgeLabel(row) : null;
   const dealerBreakdown = row && rowCategory === 'dealer' ? describeDealerConsignment(row, recent) : null;
   const dealerProfileHref = row ? resolveDealerProfileHref(row) : null;
+  const topMakes = resolveDrillTopMakes(detail, recent);
+  const topModels = resolveDrillTopModels(detail, recent);
+  const facetDistribution = computeStreamFacetDistribution(recent);
+  const hasActiveDrillFilter = Boolean(selectedDrillMake || selectedDrillModel || selectedDrillFacet);
+
+  const filteredRecent = recent.filter((ev) => {
+    if (selectedDrillMake) {
+      const evMake = (ev.make ?? '').trim().toLowerCase();
+      if (evMake !== selectedDrillMake.trim().toLowerCase()) return false;
+    }
+    if (selectedDrillModel) {
+      const targetModel = selectedDrillModel.trim().toLowerCase();
+      const evModel = (ev.model ?? '').trim().toLowerCase();
+      const evTitle = (ev.title ?? ev.rawTitle ?? '').trim().toLowerCase();
+      if (
+        evModel !== targetModel &&
+        !evModel.startsWith(`${targetModel} `) &&
+        !evTitle.includes(targetModel)
+      ) {
+        return false;
+      }
+    }
+    if (selectedDrillFacet) {
+      const f = classifyVehicleFacet({
+        make: ev.make,
+        model: ev.model,
+        series: ev.series,
+        trim: ev.trim,
+        bodyStyle: ev.bodyStyle,
+        title: ev.title,
+        rawTitle: ev.rawTitle,
+        year: ev.year,
+      });
+      const picked = f[selectedDrillFacet.axis];
+      if (!picked || picked.toLowerCase() !== selectedDrillFacet.value.toLowerCase()) {
+        return false;
+      }
+    }
+    return true;
+  });
 
   const statsHeld = detail?.stats?.held ?? row?.held ?? null;
   const statsPop = detail?.stats?.population ?? row?.population ?? null;
@@ -1230,11 +1488,27 @@ function SourceLandingInspector({
             </span>
             <small>
               {totalRecent
-                ? `showing ${totalRecent} arriving records`
+                ? hasActiveDrillFilter
+                  ? `showing ${filteredRecent.length} of ${totalRecent} arriving records`
+                  : `showing ${totalRecent} arriving records`
                 : loading
                   ? 'loading…'
                   : 'no recent records in window'}
             </small>
+            {hasActiveDrillFilter ? (
+              <button
+                type="button"
+                className="market-sources__drill-clear"
+                data-testid="drill-filter-clear"
+                onClick={() => {
+                  setSelectedDrillMake(null);
+                  setSelectedDrillModel(null);
+                  setSelectedDrillFacet(null);
+                }}
+              >
+                CLEAR
+              </button>
+            ) : null}
           </div>
           {totalRecent > 0 ? (
             <div className="market-sources__schema-pills" aria-label="Ingestion structuring quality">
@@ -1271,6 +1545,153 @@ function SourceLandingInspector({
             </div>
           ) : null}
         </div>
+        {topMakes.length > 0 || topModels.length > 0 ? (
+          <div className="market-sources__drill-taxonomy-bars" data-testid="drill-make-model-bars">
+            {topMakes.length > 0 ? (
+              <div
+                className="market-sources__drill-top-makes"
+                data-testid="drill-top-makes"
+                role="group"
+                aria-label="Top Makes"
+              >
+                <span className="market-sources__drill-bar-label">Top Makes</span>
+                <div className="market-sources__drill-pill-list">
+                  {topMakes.map((item) => {
+                    const isMakeActive =
+                      selectedDrillMake != null &&
+                      selectedDrillMake.toLowerCase() === item.make.toLowerCase();
+                    const makeHref = `/?make=${encodeURIComponent(item.make)}`;
+                    return (
+                      <span
+                        key={item.make}
+                        className={`market-sources__drill-pill-wrap${isMakeActive ? ' is-active' : ''}`}
+                      >
+                        <button
+                          type="button"
+                          className={`market-sources__drill-pill market-sources__top-make-pill${isMakeActive ? ' is-active' : ''}`}
+                          data-testid={`drill-make-pill-${item.make}`}
+                          data-make={item.make}
+                          aria-pressed={isMakeActive}
+                          onClick={() =>
+                            setSelectedDrillMake((cur) =>
+                              cur && cur.toLowerCase() === item.make.toLowerCase() ? null : item.make,
+                            )
+                          }
+                        >
+                          {item.make} <span className="market-sources__drill-pill-count">({count(item.count)})</span>
+                        </button>
+                        <a
+                          href={makeHref}
+                          className="market-sources__pill-jump"
+                          data-testid={`drill-make-jump-${item.make}`}
+                          title={`Open ${item.make} on Market Treemap`}
+                          aria-label={`Open ${item.make} on Market Treemap`}
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          ↗
+                        </a>
+                      </span>
+                    );
+                  })}
+                </div>
+              </div>
+            ) : null}
+            {topModels.length > 0 ? (
+              <div
+                className="market-sources__drill-top-models"
+                data-testid="drill-top-models"
+                role="group"
+                aria-label="Top Models"
+              >
+                <span className="market-sources__drill-bar-label">Top Models</span>
+                <div className="market-sources__drill-pill-list">
+                  {topModels.map((item) => {
+                    const isModelActive =
+                      selectedDrillModel != null &&
+                      selectedDrillModel.toLowerCase() === item.model.toLowerCase();
+                    const effectiveMake = item.make ?? selectedDrillMake;
+                    const modelHref = effectiveMake
+                      ? `/?make=${encodeURIComponent(effectiveMake)}&model=${encodeURIComponent(item.model)}`
+                      : `/?model=${encodeURIComponent(item.model)}`;
+                    return (
+                      <span
+                        key={`${item.make ?? ''}:${item.model}`}
+                        className={`market-sources__drill-pill-wrap${isModelActive ? ' is-active' : ''}`}
+                      >
+                        <button
+                          type="button"
+                          className={`market-sources__drill-pill market-sources__top-model-pill${isModelActive ? ' is-active' : ''}`}
+                          data-testid={`drill-model-pill-${item.model}`}
+                          data-model={item.model}
+                          data-make={effectiveMake ?? undefined}
+                          aria-pressed={isModelActive}
+                          onClick={() =>
+                            setSelectedDrillModel((cur) =>
+                              cur && cur.toLowerCase() === item.model.toLowerCase() ? null : item.model,
+                            )
+                          }
+                        >
+                          {item.model} <span className="market-sources__drill-pill-count">({count(item.count)})</span>
+                        </button>
+                        <a
+                          href={modelHref}
+                          className="market-sources__pill-jump"
+                          data-testid={`drill-model-jump-${item.model}`}
+                          title={`Open ${effectiveMake ? `${effectiveMake} ` : ''}${item.model} on Market Treemap`}
+                          aria-label={`Open ${effectiveMake ? `${effectiveMake} ` : ''}${item.model} on Market Treemap`}
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          ↗
+                        </a>
+                      </span>
+                    );
+                  })}
+                </div>
+              </div>
+            ) : null}
+          </div>
+        ) : null}
+        {facetDistribution.length > 0 ? (
+          <div
+            className="market-sources__facet-breakdown"
+            data-testid="drill-facet-breakdown"
+            role="group"
+            aria-label="Facet breakdown"
+          >
+            <span className="market-sources__drill-bar-label">FACET BREAKDOWN</span>
+            <div className="market-sources__facet-breakdown-pills">
+              {facetDistribution.map((fp) => {
+                const isFacetActive =
+                  selectedDrillFacet != null &&
+                  selectedDrillFacet.axis === fp.axis &&
+                  selectedDrillFacet.value.toLowerCase() === fp.value.toLowerCase();
+                return (
+                  <button
+                    key={`${fp.axis}:${fp.value}`}
+                    type="button"
+                    className={`market-sources__facet-breakdown-pill market-sources__facet-breakdown-pill--${fp.axis}${isFacetActive ? ' is-active' : ''}`}
+                    data-testid={`drill-facet-pill-${fp.prefix}-${fp.value}`}
+                    data-axis={fp.axis}
+                    data-prefix={fp.prefix}
+                    data-facet={fp.value}
+                    aria-pressed={isFacetActive}
+                    onClick={() =>
+                      setSelectedDrillFacet((cur) =>
+                        cur &&
+                        cur.axis === fp.axis &&
+                        cur.value.toLowerCase() === fp.value.toLowerCase()
+                          ? null
+                          : { axis: fp.axis, value: fp.value },
+                      )
+                    }
+                  >
+                    <em className="market-sources__facet-prefix">{fp.prefix}</em> {fp.value} ({count(fp.count)})
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        ) : null}
         {totalRecent > 0 ? (
           <div className="market-sources__events-wrap">
             <div className="market-sources__events-cols" aria-hidden="true">
@@ -1286,8 +1707,8 @@ function SourceLandingInspector({
               <span className="n">Source</span>
             </div>
             <ul className="market-sources__events">
-              {recent.map((ev, idx) => {
-                const recDate = dateSummaries[idx] ?? describeRecordDate(ev.recordDate);
+              {filteredRecent.map((ev) => {
+                const recDate = describeRecordDate(ev.recordDate, refNow);
                 const vinLot = formatVinOrLot(ev);
                 const st = formatStatusCell(ev);
                 const srcDisplay = resolveSourceName(ev.source);
@@ -1298,7 +1719,9 @@ function SourceLandingInspector({
                 const facetInfo = classifyVehicleFacet({
                   make: ev.make,
                   model: ev.model,
+                  series: ev.series,
                   trim: ev.trim,
+                  bodyStyle: ev.bodyStyle,
                   title: ev.title,
                   rawTitle: ev.rawTitle,
                   year: ev.year,

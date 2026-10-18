@@ -222,6 +222,30 @@
 .market-sources__facet-pill:hover, .market-sources__facet-pill:focus-visible { border-color: var(--text); text-decoration: none; }
 .market-sources__facet-axis { font-style: normal; font-size: 7px; letter-spacing: 0.06em; text-transform: uppercase;
   color: var(--text-secondary); }
+.market-sources__drill-taxonomy-bars { display: flex; flex-direction: column; gap: 4px; padding: 6px 10px;
+  border-bottom: 1px solid var(--border); background: var(--surface); }
+.market-sources__drill-top-makes, .market-sources__drill-top-models, .market-sources__facet-breakdown {
+  display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.market-sources__facet-breakdown { padding: 6px 10px; border-bottom: 1px solid var(--border); background: var(--bg); }
+.market-sources__drill-bar-label { font: 700 8px 'Courier New', monospace; letter-spacing: 0.08em; text-transform: uppercase;
+  color: var(--text-secondary); min-width: 74px; }
+.market-sources__drill-pill-list, .market-sources__facet-breakdown-pills { display: inline-flex; flex-wrap: wrap; gap: 4px; align-items: center; }
+.market-sources__drill-pill-wrap { display: inline-flex; align-items: stretch; border: 1px solid var(--border); background: var(--bg); }
+.market-sources__drill-pill-wrap.is-active { border-color: var(--text); }
+.market-sources__drill-pill { padding: 1px 6px; border: 0; background: transparent; color: var(--text);
+  font: 700 9px Arial, sans-serif; cursor: pointer; line-height: 1.3; }
+.market-sources__drill-pill.is-active { background: var(--text); color: var(--bg); }
+.market-sources__drill-pill-count { font: 400 8px 'Courier New', monospace; opacity: 0.8; }
+.market-sources__pill-jump { display: inline-flex; align-items: center; padding: 1px 4px; border-left: 1px solid var(--border);
+  font: 700 8px 'Courier New', monospace; color: var(--text-secondary); text-decoration: none; }
+.market-sources__pill-jump:hover, .market-sources__pill-jump:focus-visible { color: var(--text); background: var(--surface); }
+.market-sources__drill-clear { padding: 1px 6px; border: 1px solid var(--text); background: var(--bg); color: var(--text);
+  font: 700 8px 'Courier New', monospace; letter-spacing: 0.06em; text-transform: uppercase; cursor: pointer; }
+.market-sources__facet-breakdown-pill { display: inline-flex; align-items: baseline; gap: 3px; padding: 1px 6px;
+  border: 1px solid var(--border); background: var(--surface); color: var(--text);
+  font: 700 9px 'Courier New', monospace; cursor: pointer; line-height: 1.3; }
+.market-sources__facet-breakdown-pill.is-active { background: var(--text); color: var(--bg); border-color: var(--text); }
+.market-sources__facet-prefix { font-style: normal; font-size: 8px; letter-spacing: 0.05em; opacity: 0.78; }
 .market-sources__event-model a, .market-sources__event-link a { color: inherit; text-decoration: none; }
 .market-sources__event-model a:hover, .market-sources__event-link a:hover { text-decoration: underline; }
 
