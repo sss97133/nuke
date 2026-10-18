@@ -10,7 +10,7 @@
  */
 
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { auctionMomentLabel, hasRecordedAuctionEnd, fmtClock, fmtDayShort, fmtMoment, fmtUsd, localDate, type AuctionItem, type AuctionSequence } from './auctionSequence';
+import { auctionMomentLabel, auctionOpenDayTitle, hasRecordedAuctionEnd, fmtClock, fmtDayShort, fmtMoment, fmtUsd, localDate, type AuctionItem, type AuctionSequence } from './auctionSequence';
 
 interface Props {
   auction: AuctionSequence;
@@ -56,6 +56,10 @@ const AuctionSequenceBand: React.FC<Props> = ({ auction, activeDay, onOpenDay, o
   const ref = useRef<HTMLDivElement | null>(null);
   const width = useWidth(ref);
   const { items, open, close } = auction;
+  const recordedOpen = open?.role === 'listing_start' && open.grain === 'instant' && open.exact;
+  const openingTitle = auctionOpenDayTitle(auction);
+  const openingLabel = recordedOpen ? 'OPEN' : open?.role === 'first_activity' ? 'FIRST OBSERVED'
+    : open?.role === 'listing_start' ? 'LISTING DAY' : 'OPENING UNKNOWN';
   const recordedEnd = hasRecordedAuctionEnd(auction);
   const retainedBids = items.filter(i => i.kind === 'bid' && i.amount != null);
 
@@ -130,7 +134,7 @@ const AuctionSequenceBand: React.FC<Props> = ({ auction, activeDay, onOpenDay, o
         {showResult && <span>{({ sold: 'SOLD', reserve_not_met: 'RESERVE NOT MET', no_sale: 'NOT SOLD', withdrawn: 'WITHDRAWN', live: 'RECORDED LIVE', unknown: 'RESULT UNKNOWN' })[auction.outcome]}{auction.price != null ? ` ${fmtUsd(auction.price)}` : ''}</span>}
         <details className="auction-band__source"><summary>Source & capture</summary>
           <dl>
-            <div><dt>Opened</dt><dd>{fmtMoment(open)}{open && <small>{open.basis}</small>}</dd></div>
+            <div><dt>{recordedOpen ? 'Opened' : openingTitle}</dt><dd>{fmtMoment(open)}{open && <small>{open.basis}</small>}</dd></div>
             <div><dt>{auctionMomentLabel(auction)}</dt><dd>{fmtMoment(close)}{close && <small>{close.basis}</small>}</dd></div>
             {auction.lastObservedBid && <div><dt>Last observed bid</dt><dd><a href={auction.lastObservedBid.url} target="_blank" rel="noreferrer">{fmtDayShort(auction.lastObservedBid.at)} {fmtClock(auction.lastObservedBid.at)}</a></dd></div>}
           </dl>
@@ -180,7 +184,7 @@ const AuctionSequenceBand: React.FC<Props> = ({ auction, activeDay, onOpenDay, o
 
           {/* open */}
           <line x1={x(geom.openT)} y1={4} x2={x(geom.openT)} y2={axisY} stroke="var(--vp-pencil, #888)" strokeWidth={1} strokeDasharray="2 2" pointerEvents="none" />
-          <text x={x(geom.openT) + 3} y={12} fill="var(--vp-pencil, #888)" fontSize={8} fontWeight={700} letterSpacing="0.08em">OPEN</text>
+          <text x={x(geom.openT) + 3} y={12} fill="var(--vp-pencil, #888)" fontSize={8} fontWeight={700} letterSpacing="0.08em" aria-label={openingTitle}>{openingLabel}</text>
 
           {/* running high bid + every bid */}
           {stepPath && <path d={stepPath} fill="none" stroke="var(--vp-ink, #1a1a1a)" strokeWidth={1} pointerEvents="none" />}

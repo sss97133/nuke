@@ -14,6 +14,7 @@ vi.mock('../../hooks/useViewHistory', () => ({ useViewHistory: () => ({ recordVi
 vi.mock('./hooks/useVehicleIntel', () => ({ useVehicleIntel: () => ({ vehicleIntel: null, vehicleIntelLoading: false }) }));
 import { VehicleProfileProvider, useVehicleProfile } from './VehicleProfileContext';
 import BarcodeTimeline from './BarcodeTimeline';
+import { buildAuctionSequences } from './auctionSequence';
 
 const lot = 'synthetic-origin-lot', valid = `https://bringatrailer.com/listing/${lot}/`;
 const foreign = [
@@ -353,4 +354,33 @@ it('does not associate a departed vehicle partial payload with the next pending 
   const button = host.querySelector<HTMLButtonElement>('[aria-label="Vehicle timeline"]');
   if (button?.getAttribute('aria-expanded') === 'false') await act(async () => button.click());
   await act(async () => { await vi.advanceTimersByTimeAsync(10); }); assertRetainedBid('$200'); expect(queryState().status).toBe('success');
+});
+
+
+it.each([
+  { kind: 'recorded instant', start: '2026-09-10T15:00:00Z', interaction: 'bid', role: 'listing_start', grain: 'instant', exact: true, svgLabel: 'OPEN', detailLabel: 'Opened' },
+  { kind: 'first observed bid', start: null, interaction: 'bid', role: 'first_activity', grain: 'instant', exact: false, svgLabel: 'FIRST OBSERVED', detailLabel: 'First observed auction activity · opening time unknown' },
+  { kind: 'first observed comment', start: null, interaction: 'comment', role: 'first_activity', grain: 'instant', exact: false, svgLabel: 'FIRST OBSERVED', detailLabel: 'First observed auction activity · opening time unknown' },
+  { kind: 'recorded listing day', start: '2026-09-10T00:00:00Z', interaction: 'bid', role: 'listing_start', grain: 'day', exact: false, svgLabel: 'LISTING DAY', detailLabel: 'Listing day recorded · time unknown' },
+])('qualifies the native band opening label for $kind without changing retained clocks or interactions', async control => {
+  timeline = []; comments = [{ ...comment(valid), posted_at: '2026-09-17T18:00:00Z', comment_type: control.interaction,
+    bid_amount: control.interaction === 'bid' ? 100 : null }];
+  events = [{ ...event(valid), started_at: control.start, ended_at: control.start ? '2026-09-17T20:00:00Z' : null, sold_at: null }];
+  await draw();
+  const model = buildAuctionSequences({ comments, auctionEvents: auctions, vehicleEvents: events, images: [], timelineEvents: timeline, lotUrlHint: hint }).sequences[0];
+  expect(model.open).toMatchObject({ role: control.role, grain: control.grain, exact: control.exact });
+  expect(model.open?.at).toBe(control.start ? new Date(control.start).toISOString() : '2026-09-17T18:00:00.000Z');
+  expect(model.items).toHaveLength(1); expect(model.items[0]).toMatchObject({ kind: control.interaction, at: '2026-09-17T18:00:00.000Z', url: `${valid}#comment-123` });
+  expect(nativeReads()).toHaveLength(2); expect(sourceLinks()).toContain(valid); expect(sourceLinks()).toContain(`${valid}#comment-123`);
+  const band = host.querySelector('.auction-band')!;
+  expect(band.querySelector('svg')?.getAttribute('viewBox')).toBe('0 0 800 96');
+  expect(band.querySelectorAll('svg a')).toHaveLength(1);
+  const labels = [...band.querySelectorAll('svg text')].map(node => node.textContent);
+  const detailLabels = [...band.querySelectorAll('dt')].map(node => node.textContent);
+  expect(labels).toContain(control.svgLabel); expect(detailLabels).toContain(control.detailLabel);
+  if (!control.exact) expect([...band.querySelectorAll('svg text')].find(node => node.textContent === control.svgLabel)?.getAttribute('aria-label')).toBe(control.detailLabel);
+  if (!control.exact) { expect(labels).not.toContain('OPEN'); expect(detailLabels).not.toContain('Opened'); }
+  const firstDetail = band.querySelector('dd')!;
+  if (control.grain === 'day') { expect(firstDetail.textContent).toContain('Sep 10, 2026'); expect(firstDetail.textContent).not.toMatch(/\d{1,2}:\d{2}|AM|PM/); }
+  else expect(firstDetail.textContent).toMatch(/\d{1,2}:\d{2}/);
 });
