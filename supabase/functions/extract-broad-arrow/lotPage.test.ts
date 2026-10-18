@@ -1,4 +1,4 @@
-import { parseAmount, parseLotPage } from "./lotPage.ts";
+import { lotGallery, parseAmount, parseLotPage } from "./lotPage.ts";
 
 const eq = (a: unknown, b: unknown) => { if (JSON.stringify(a) !== JSON.stringify(b)) throw new Error(`${JSON.stringify(a)} != ${JSON.stringify(b)}`); };
 
@@ -31,4 +31,16 @@ Deno.test("parseAmount reads Swiss apostrophe grouping, and a Zurich sold price 
   if (parseAmount("210'000") !== 210000 || parseAmount("5’500’000") !== 5500000) throw new Error("apostrophe grouping");
   const l = parseLotPage("<html><head><title>1991 De Tomaso Pantera SI | The Zurich Auction 2026 | Broad Arrow</title></head><body><div>Sold Price: CHF 231&#39;250</div></body></html>");
   if (l.soldPrice !== 231250 || l.currency !== "CHF") throw new Error(JSON.stringify({ soldPrice: l.soldPrice, currency: l.currency }));
+});
+
+Deno.test("lotGallery keeps one photo per image id, the largest size, in page order", () => {
+  const img = (id: number, size: string) => `https://cdn.dealeraccelerate.com/bagauction/10/1780/${id}/${size}/1958-chevrolet-corvette-283-290-fuelie`;
+  const html = `<meta content='${img(91920, "790x1024")}' property='og:image'>
+<img data-src="${img(91920, "790x1024")}"><a href="${img(91920, "1920x1440")}"></a><img src="${img(91920, "x")}">
+<img data-src="${img(91921, "790x1024")}"><a href="${img(91921, "1920x1440")}"></a>
+<img data-src="${img(91922, "790x1024")}">`;
+  const g = lotGallery(html);
+  if (g.join() !== [img(91920, "1920x1440"), img(91921, "1920x1440"), img(91922, "790x1024")].join()) throw new Error(JSON.stringify(g));
+  if (lotGallery("<html><body>no photos</body></html>").length !== 0) throw new Error("expected none");
+  if (parseLotPage(`<html><head><title>1958 Chevrolet Corvette | The Amelia Auction 2024 | Broad Arrow</title></head><body>${html}</body></html>`).imageUrls.length !== 3) throw new Error("parseLotPage imageUrls");
 });
