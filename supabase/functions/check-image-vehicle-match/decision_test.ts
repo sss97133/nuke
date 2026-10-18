@@ -1,5 +1,5 @@
 import { assertComparisonReceiptCapacity, comparisonReceiptPatch, parseReferenceDecision,
-  referenceDecisionProjection } from "./decision.ts";
+  referenceDecisionProjection, scopeComparisonImages } from "./decision.ts";
 
 function equal(actual: unknown, expected: unknown) {
   if (JSON.stringify(actual) !== JSON.stringify(expected)) throw new Error(`Expected ${JSON.stringify(expected)}, got ${JSON.stringify(actual)}`);
@@ -152,4 +152,81 @@ Deno.test("first comparison initializes an absent namespace and a full history r
   try { comparisonReceiptPatch(metadata, { method: "comparison" }); } catch { refused = true; }
   equal(refused, true);
   equal(metadata.image_vehicle_identity.readings.length, 32);
+});
+
+// Stateful selection adapter: SQL NULL differs from a present JSON null at a
+// JSON path. The deployed PostgreSQL expression is separately assayed with VALUES.
+class FixtureImageQuery {
+  private filters: Array<(row: Record<string, unknown>) => boolean> = [];
+  constructor(private rows: Array<Record<string, unknown>>, private limit: number) {}
+  eq(column: string, value: string): this {
+    this.filters.push(row => row[column] === value); return this;
+  }
+  in(column: string, values: string[]): this {
+    this.filters.push(row => values.includes(String(row[column]))); return this;
+  }
+  is(column: string, _value: null): this {
+    this.filters.push(row => {
+      const [field, ...path] = column.split("->");
+      let value = row[field];
+      if (value === null || value === undefined) return true;
+      if (!path.length) return false;
+      for (const key of path) {
+        if (!value || typeof value !== "object" || !Object.hasOwn(value, key)) return true;
+        value = (value as Record<string, unknown>)[key];
+      }
+      return false; // Present JSON null remains a value, unlike SQL NULL.
+    }); return this;
+  }
+  read() { return this.rows.filter(row => this.filters.every(filter => filter(row))).slice(0, this.limit); }
+}
+
+Deno.test("successive default batches advance after receipts without changing legacy status or repeating inference", () => {
+  const rows: Array<Record<string, unknown>> = [
+    { id: "first", vehicle_id: "target", image_vehicle_match_status: null, ai_scan_metadata: null },
+    { id: "second", vehicle_id: "target", image_vehicle_match_status: null, ai_scan_metadata: { classification: { ok: true } } },
+    { id: "already-read", vehicle_id: "target", image_vehicle_match_status: null,
+      ai_scan_metadata: { image_vehicle_identity: { readings: [{ method: "earlier-read" }] } } },
+    { id: "malformed", vehicle_id: "target", image_vehicle_match_status: null, ai_scan_metadata: { image_vehicle_identity: null } },
+    { id: "elsewhere", vehicle_id: "other", image_vehicle_match_status: null, ai_scan_metadata: null },
+    { id: "rejected", vehicle_id: "target", image_vehicle_match_status: "mismatch", ai_scan_metadata: null },
+    { id: "third", vehicle_id: "target", image_vehicle_match_status: null, ai_scan_metadata: {} },
+    { id: "fourth", vehicle_id: "target", image_vehicle_match_status: null, ai_scan_metadata: {} },
+  ];
+  const inferenceIds: string[] = [];
+  const batches: string[][] = [];
+  for (let pass = 0; pass < 4; pass++) {
+    const batch = scopeComparisonImages(new FixtureImageQuery(rows, 2), "target").read();
+    batches.push(batch.map(row => String(row.id)));
+    if (!batch.length) break;
+    for (const row of batch) {
+      assertComparisonReceiptCapacity(row.ai_scan_metadata);
+      inferenceIds.push(String(row.id));
+      Object.assign(row, comparisonReceiptPatch(row.ai_scan_metadata, { method: "comparison" }));
+      equal(row.image_vehicle_match_status, null);
+    }
+  }
+  equal(batches, [["first", "second"], ["third", "fourth"], []]);
+  equal(inferenceIds.length, new Set(inferenceIds).size);
+  equal(inferenceIds, ["first", "second", "third", "fourth"]);
+});
+
+Deno.test("explicit image IDs intentionally reread receipts but malformed history refuses before inference", () => {
+  const rows = [
+    { id: "reread", vehicle_id: "target", image_vehicle_match_status: null,
+      ai_scan_metadata: { image_vehicle_identity: { readings: [{ method: "earlier-read" }] } } },
+    { id: "malformed", vehicle_id: "target", image_vehicle_match_status: null,
+      ai_scan_metadata: { image_vehicle_identity: null } },
+  ];
+  const batch = scopeComparisonImages(new FixtureImageQuery(rows, 2), "target", ["reread", "malformed"]).read();
+  equal(batch.map(row => row.id), ["reread", "malformed"]);
+  const inferenceIds: string[] = [];
+  for (const row of batch) {
+    try { assertComparisonReceiptCapacity(row.ai_scan_metadata); } catch { continue; }
+    inferenceIds.push(String(row.id));
+    const patch = comparisonReceiptPatch(row.ai_scan_metadata, { method: "intentional-reread" });
+    equal(patch.ai_scan_metadata.image_vehicle_identity.readings, [
+      { method: "earlier-read" }, { method: "intentional-reread" }]);
+  }
+  equal(inferenceIds, ["reread"]);
 });

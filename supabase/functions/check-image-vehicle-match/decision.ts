@@ -127,3 +127,21 @@ export function comparisonReceiptPatch(metadata: unknown, reading: Record<string
   return { ai_scan_metadata: { ...previous,
     image_vehicle_identity: { ...namespace, readings: [...readings, reading] } } };
 }
+
+interface ComparisonQuery<Query> {
+  eq(column: string, value: string): Query;
+  is(column: string, value: null): Query;
+  in(column: string, values: string[]): Query;
+}
+
+/** A successful comparison leaves legacy match status unchanged, so the default
+ * drain must advance using its own receipt namespace. Explicit IDs intentionally
+ * reread photos and still go through the malformed-history/capacity preflight.
+ */
+export function scopeComparisonImages<Query extends ComparisonQuery<Query>>(
+  query: Query, vehicleId: string, imageIds?: string[],
+): Query {
+  if (imageIds?.length) return query.in("id", imageIds);
+  return query.eq("vehicle_id", vehicleId).is("image_vehicle_match_status", null)
+    .is("ai_scan_metadata->image_vehicle_identity", null);
+}

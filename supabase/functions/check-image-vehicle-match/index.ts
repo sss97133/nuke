@@ -6,7 +6,7 @@ import { requireWriteAuth } from "../_shared/writeGuard.ts";
 import { projectSecretKey } from "../_shared/supabaseKeys.ts";
 import { mustWrite } from '../_shared/writeResult.ts';
 import { assertComparisonReceiptCapacity, comparisonReceiptPatch, parseReferenceDecision,
-  referenceDecisionProjection, type ReferenceDecision } from './decision.ts';
+  referenceDecisionProjection, scopeComparisonImages, type ReferenceDecision } from './decision.ts';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -422,13 +422,11 @@ Deno.serve(async (req: Request) => {
 
       // Every row is read independently. Day/place/session grouping can retrieve
       // candidates but never supplies membership evidence for another photograph.
-      let query = supabase.from("vehicle_images")
+      const query = supabase.from("vehicle_images")
         .select("id, image_url, vehicle_id, file_hash, ai_scan_metadata, updated_at")
         .not("image_url", "like", "file://%")
         .limit(batchSize);
-      if (body.image_ids?.length) query = query.in("id", body.image_ids);
-      else query = query.eq("vehicle_id", body.vehicle_id).is("image_vehicle_match_status", null);
-      const { data: imageRows, error: imageReadError } = await query;
+      const { data: imageRows, error: imageReadError } = await scopeComparisonImages(query, body.vehicle_id, body.image_ids);
       if (imageReadError) throw new Error("image_comparison_read_failed");
       const imagesToCheck = (imageRows || []).filter((i: any) =>
         i.image_url && !isNoiseUrl(i.image_url) && !isUnfetchableUrl(i.image_url));
