@@ -848,3 +848,154 @@ it('filters Recent Vehicles Stream by Top Makes, Top Models (with CLEAR chip and
   await act(async () => { bdyCoupePill.click(); });
   expect(drill.querySelectorAll('li.market-sources__event')).toHaveLength(3);
 });
+
+it('sorts filtered recent_vehicles in-memory (LATEST / HIGHEST PRICE / YEAR) without extra RPC calls and updates the Cohort Summary KPI bar', async () => {
+  const sortAndCohortDetail = {
+    ...batLandingDetail,
+    recent_vehicles: [
+      {
+        id: 'ev-vette-z06',
+        source: 'bat',
+        event_type: 'auction',
+        event_status: 'sold',
+        price: 82500,
+        year: 2017,
+        make: 'Chevrolet',
+        model: 'Corvette Z06',
+        series: 'C7',
+        trim: 'Z06',
+        body_style: 'Coupe',
+        vin: '1G1YU2D68H5600003',
+        mileage: 8900,
+        record_date: '2026-10-15T20:00:00Z',
+        title: '2017 Chevrolet Corvette Z06 Coupe',
+        raw_title: '2017 Chevrolet Corvette Z06 Coupe',
+        created_at: '2026-10-16T10:48:00Z',
+      },
+      {
+        id: 'ev-991-gt3',
+        source: 'bat',
+        event_type: 'auction',
+        event_status: 'sold',
+        price: 168000,
+        year: 2018,
+        make: 'Porsche',
+        model: '911 GT3',
+        series: '991',
+        trim: 'GT3',
+        body_style: 'Coupe',
+        vin: 'WP0AC2A98JS175001',
+        mileage: 11200,
+        record_date: '2026-10-16T18:00:00Z',
+        title: '2018 Porsche 911 (991) GT3 Coupe',
+        raw_title: '2018 Porsche 911 (991) GT3 Coupe',
+        created_at: '2026-10-16T10:46:12Z',
+      },
+      {
+        id: 'ev-992-carrera',
+        source: 'bat',
+        event_type: 'auction',
+        event_status: 'active',
+        price: 195000,
+        year: 2022,
+        make: 'Porsche',
+        model: '911 Carrera GTS',
+        series: '992',
+        trim: 'Carrera GTS',
+        body_style: 'Coupe',
+        vin: 'WP0AB2A96NS220002',
+        mileage: 4500,
+        record_date: '2026-10-18T19:00:00Z',
+        title: '2022 Porsche 911 (992) Carrera GTS Coupe',
+        raw_title: '2022 Porsche 911 (992) Carrera GTS Coupe',
+        created_at: '2026-10-16T10:45:00Z',
+      },
+      {
+        id: 'ev-c10-stepside',
+        source: 'bat',
+        event_type: 'auction',
+        event_status: 'sold',
+        price: 46000,
+        year: 1978,
+        make: 'Chevrolet',
+        model: 'C10 Silverado Stepside',
+        trim: 'Silverado',
+        vin: 'CCL148F300004',
+        mileage: 52000,
+        record_date: '2026-10-14T20:00:00Z',
+        title: '1978 Chevrolet C10 Silverado Stepside Pickup',
+        raw_title: '1978 Chevrolet C10 Silverado Stepside Pickup',
+        created_at: '2026-10-16T10:43:00Z',
+      },
+    ],
+  };
+
+  fixture.rpc.mockImplementation((fn: string) => {
+    if (fn === 'market_sources_read') return Promise.resolve({ data: value, error: null });
+    if (fn === 'market_source_landing_read') return Promise.resolve({ data: sortAndCohortDetail, error: null });
+    return Promise.resolve({ data: null, error: { message: 'none' } });
+  });
+
+  await act(async () => root.render(<SourcesBoard />));
+  const firstRow = container.querySelector('li.market-sources__row') as HTMLLIElement;
+  await act(async () => { firstRow.click(); });
+
+  const drill = container.querySelector('.market-sources__drill')!;
+  expect(drill).not.toBeNull();
+  const rpcCallsBefore = fixture.rpc.mock.calls.filter((c) => c[0] === 'market_source_landing_read').length;
+  expect(rpcCallsBefore).toBe(1);
+
+  // Verify initial Cohort Summary KPI bar for all 4 vehicles:
+  // 4 total, 3 sold (75%), sold prices = [46000, 82500, 168000] -> median $82,500
+  const cohortBar = drill.querySelector('[data-testid="drill-cohort-summary-bar"]')!;
+  expect(cohortBar).not.toBeNull();
+  expect(drill.querySelector('[data-testid="drill-cohort-filtered-count"]')?.textContent).toContain('4');
+  expect(drill.querySelector('[data-testid="drill-cohort-sold-sellthrough"]')?.textContent).toContain('3 sold · 75%');
+  expect(drill.querySelector('[data-testid="drill-cohort-median-sold-price"]')?.textContent).toContain('$82,500');
+
+  const getRowPrices = () =>
+    [...drill.querySelectorAll('li.market-sources__event .market-sources__event-price')].map((el) =>
+      el.textContent?.trim(),
+    );
+
+  // Default sort is LATEST (created_at DESC)
+  expect(getRowPrices()).toEqual(['$82,500', '$168,000', '$195,000', '$46,000']);
+
+  // Sort by HIGHEST PRICE in-memory
+  const sortPriceBtn = drill.querySelector('[data-testid="drill-sort-price"]') as HTMLButtonElement;
+  await act(async () => { sortPriceBtn.click(); });
+  expect(sortPriceBtn.getAttribute('aria-pressed')).toBe('true');
+  expect(getRowPrices()).toEqual(['$195,000', '$168,000', '$82,500', '$46,000']);
+
+  // Sort by YEAR in-memory: 2022 -> 2018 -> 2017 -> 1978
+  const sortYearBtn = drill.querySelector('[data-testid="drill-sort-year"]') as HTMLButtonElement;
+  await act(async () => { sortYearBtn.click(); });
+  expect(sortYearBtn.getAttribute('aria-pressed')).toBe('true');
+  expect(
+    [...drill.querySelectorAll('li.market-sources__event .market-sources__event-year')].map((el) => el.textContent?.trim()),
+  ).toEqual(['2022', '2018', '2017', '1978']);
+
+  // Switch back to LATEST
+  const sortLatestBtn = drill.querySelector('[data-testid="drill-sort-latest"]') as HTMLButtonElement;
+  await act(async () => { sortLatestBtn.click(); });
+  expect(sortLatestBtn.getAttribute('aria-pressed')).toBe('true');
+  expect(getRowPrices()).toEqual(['$82,500', '$168,000', '$195,000', '$46,000']);
+
+  // Ensure zero extra RPC round-trips occurred during sorting
+  const rpcCallsAfterSort = fixture.rpc.mock.calls.filter((c) => c[0] === 'market_source_landing_read').length;
+  expect(rpcCallsAfterSort).toBe(rpcCallsBefore);
+
+  // Filter by Chevrolet (2 vehicles: both sold at $82,500 and $46,000 -> 2 of 4, 2 sold · 100%, median $64,250)
+  const chevyPill = drill.querySelector('[data-testid="drill-make-pill-Chevrolet"]') as HTMLButtonElement;
+  await act(async () => { chevyPill.click(); });
+  expect(drill.querySelector('[data-testid="drill-cohort-filtered-count"]')?.textContent).toContain('2 of 4');
+  expect(drill.querySelector('[data-testid="drill-cohort-sold-sellthrough"]')?.textContent).toContain('2 sold · 100%');
+  expect(drill.querySelector('[data-testid="drill-cohort-median-sold-price"]')?.textContent).toContain('$64,250');
+
+  // Filter by Porsche (2 vehicles: 1 sold at $168,000, 1 active at $195,000 -> 2 of 4, 1 sold · 50%, median $168,000)
+  const porschePill = drill.querySelector('[data-testid="drill-make-pill-Porsche"]') as HTMLButtonElement;
+  await act(async () => { porschePill.click(); });
+  expect(drill.querySelector('[data-testid="drill-cohort-filtered-count"]')?.textContent).toContain('2 of 4');
+  expect(drill.querySelector('[data-testid="drill-cohort-sold-sellthrough"]')?.textContent).toContain('1 sold · 50%');
+  expect(drill.querySelector('[data-testid="drill-cohort-median-sold-price"]')?.textContent).toContain('$168,000');
+});

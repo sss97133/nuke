@@ -264,4 +264,56 @@ describe('SourcesBoard Venue Drill-down interactive Make/Model and Facet filteri
     expect(bdyCoupe.getAttribute('aria-pressed')).toBe('false');
     expect(drill.querySelectorAll('li.market-sources__event')).toHaveLength(4);
   });
+
+  it('sorts filtered recent_vehicles in-memory (LATEST / HIGHEST PRICE / YEAR) without extra RPC calls and updates the Cohort Summary KPI bar', async () => {
+    fixture.rpc.mockImplementation((fn: string) => {
+      if (fn === 'market_sources_read') return Promise.resolve({ data: boardPayload, error: null });
+      if (fn === 'market_source_landing_read') return Promise.resolve({ data: landingPayload, error: null });
+      return Promise.resolve({ data: null, error: { message: 'none' } });
+    });
+
+    await act(async () => root.render(<SourcesBoard />));
+    const row = container.querySelector('li.market-sources__row') as HTMLLIElement;
+    await act(async () => { row.click(); });
+
+    const drill = container.querySelector('.market-sources__drill')!;
+    const rpcCallsBefore = fixture.rpc.mock.calls.filter((c) => c[0] === 'market_source_landing_read').length;
+    expect(rpcCallsBefore).toBe(1);
+
+    // Cohort Summary KPI bar for all 4 vehicles: 3 sold (75%), sold prices = [46000, 82500, 168000] -> median $82,500
+    expect(drill.querySelector('[data-testid="drill-cohort-filtered-count"]')?.textContent).toContain('4');
+    expect(drill.querySelector('[data-testid="drill-cohort-sold-sellthrough"]')?.textContent).toContain('3 sold · 75%');
+    expect(drill.querySelector('[data-testid="drill-cohort-median-sold-price"]')?.textContent).toContain('$82,500');
+
+    const getRowYears = () =>
+      [...drill.querySelectorAll('li.market-sources__event .market-sources__event-year')].map((el) =>
+        el.textContent?.trim(),
+      );
+
+    // Default LATEST order: 2018 -> 2016 -> 2017 -> 1978
+    expect(getRowYears()).toEqual(['2018', '2016', '2017', '1978']);
+
+    // Sort by YEAR in-memory: 2018 -> 2017 -> 2016 -> 1978
+    const sortYearBtn = drill.querySelector('[data-testid="drill-sort-year"]') as HTMLButtonElement;
+    await act(async () => { sortYearBtn.click(); });
+    expect(sortYearBtn.getAttribute('aria-pressed')).toBe('true');
+    expect(getRowYears()).toEqual(['2018', '2017', '2016', '1978']);
+
+    // Sort by HIGHEST PRICE in-memory: $168k (2018) -> $94k (2016) -> $82.5k (2017) -> $46k (1978)
+    const sortPriceBtn = drill.querySelector('[data-testid="drill-sort-price"]') as HTMLButtonElement;
+    await act(async () => { sortPriceBtn.click(); });
+    expect(sortPriceBtn.getAttribute('aria-pressed')).toBe('true');
+    expect(getRowYears()).toEqual(['2018', '2016', '2017', '1978']);
+
+    // Zero extra RPC calls
+    const rpcCallsAfter = fixture.rpc.mock.calls.filter((c) => c[0] === 'market_source_landing_read').length;
+    expect(rpcCallsAfter).toBe(rpcCallsBefore);
+
+    // Filter to Chevrolet (2 sold: $82,500 and $46,000 -> median $64,250, 100% sell-through)
+    const chevyBtn = drill.querySelector('[data-testid="drill-make-pill-Chevrolet"]') as HTMLButtonElement;
+    await act(async () => { chevyBtn.click(); });
+    expect(drill.querySelector('[data-testid="drill-cohort-filtered-count"]')?.textContent).toContain('2 of 4');
+    expect(drill.querySelector('[data-testid="drill-cohort-sold-sellthrough"]')?.textContent).toContain('2 sold · 100%');
+    expect(drill.querySelector('[data-testid="drill-cohort-median-sold-price"]')?.textContent).toContain('$64,250');
+  });
 });
