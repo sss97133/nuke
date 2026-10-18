@@ -573,6 +573,25 @@ struct SourcesBoardData: Equatable {
         let mins60: [Int]
     }
 
+    /// An earlier labelled reference graded by the exact census that followed it; error is (reference − census) / census.
+    struct PopulationGrade: Equatable {
+        let reference: Int
+        let referenceMethod: String
+        let referenceAt: String?
+        let census: Int
+        let censusAt: String?
+        let error: Double
+    }
+
+    /// What share of the source's own total we hold, in words that keep the total's method (SourcesBoard.tsx heldShare).
+    struct HeldShare: Equatable {
+        /// nil when the source's total is unknown: the bar is drawn hatched, never filled from a guess.
+        let share: Double?
+        let text: String
+        /// A labelled reference's kind and as-of day ("owner reference · Oct 17"); nil for a census.
+        var reference: String? = nil
+    }
+
     struct SourceRow: Equatable, Identifiable {
         let source: String
         let name: String
@@ -583,6 +602,8 @@ struct SourcesBoardData: Equatable {
         let population: Int?
         let populationMethod: String?
         let populationConfidence: Double?
+        var populationAt: String? = nil
+        var populationGrade: PopulationGrade? = nil
         let mapSales: Int?
         let mapUsd: Double?
         let sales12: Int?
@@ -603,10 +624,26 @@ struct SourcesBoardData: Equatable {
 
         var id: String { source }
 
-        private static let estimatedMethods: Set<String> = [
-            "window_extrapolated",
-            "turnover_model",
-            "capture_model",
+        /// Labelled references in source_census: a figure someone supplied or a catalogue estimated, never a count of
+        /// the source (data-machine.md, fleet-relative reporting). They print as estimates with their kind and as-of day.
+        static let referenceKinds: [String: String] = [
+            "owner_reference": "owner reference",
+            "catalogue_estimate": "catalogue estimate",
+            "estimate": "earlier estimate",
+        ]
+        static let methodNotes: [String: String] = [
+            "owner_reference": "owner reference, an estimate, not a count",
+            "catalogue_estimate": "catalogue estimate, not a count",
+            "estimate": "earlier estimate, not a count",
+            "enumerated": "counted from their own listings",
+            "bounded": "estimated within a range",
+            "search_index": "from their search index",
+            "api_count": "from their API total",
+            "sitemap": "from their sitemap index",
+            "docket_and_broadcast_census": "from docket & broadcast census",
+            "window_extrapolated": "extrapolated from cohort window & gap density",
+            "turnover_model": "modeled from active inventory & daily turnover",
+            "capture_model": "modeled from capture velocity & unseen-mass prior",
         ]
 
         var shortName: String {
@@ -615,27 +652,61 @@ struct SourcesBoardData: Equatable {
             return trimmed.isEmpty ? name : trimmed
         }
 
-        var heldShareText: String {
-            guard let held else { return "" }
-            if let pop = population, pop > 0 {
-                let share = Double(held) / Double(pop)
-                let pct = share >= 0.995 ? "100%" : (share < 0.01 ? "<1%" : "\(Int((share * 100.0).rounded()))%")
-                let method = populationMethod ?? "enumerated"
-                if Self.estimatedMethods.contains(method) {
-                    let conf = Int(((populationConfidence ?? 0.35) * 100.0).rounded())
-                    return "\(pct) of ~\(pop.formatted()) · \(conf)% conf"
-                }
-                let ofWord = method == "enumerated" ? "of" : "of about"
-                return "\(pct) \(ofWord) \(pop.formatted())"
-            }
-            let h = Double(max(1, held))
-            let unseenRatio = max(0.28, 1.65 / log(M_E + h / 300.0))
-            let estPop = max(held + 1, Int((h * (1.0 + unseenRatio)).rounded()))
-            let share = Double(held) / Double(estPop)
+        /// The share comes only from the total the read carries; an unknown total stays unknown.
+        var heldShare: HeldShare {
+            guard let held else { return HeldShare(share: nil, text: "") }
+            guard let pop = population, pop > 0 else { return HeldShare(share: nil, text: "their total unknown") }
+            let share = Double(held) / Double(pop)
             let pct = share >= 0.995 ? "100%" : (share < 0.01 ? "<1%" : "\(Int((share * 100.0).rounded()))%")
-            let confRaw = min(0.58, max(0.15, 0.14 + 0.08 * min(1.0, log(1.0 + h) / log(100001.0)) + 0.25 * (h / Double(estPop))))
-            let conf = Int((confRaw * 100.0).rounded())
-            return "\(pct) of ~\(estPop.formatted()) · \(conf)% conf"
+            if let kind = Self.referenceKinds[populationMethod ?? ""] {
+                let day = Self.shortDay(populationAt)
+                return HeldShare(share: min(1, share), text: "\(pct) of ≈ \(Self.count(pop))",
+                                 reference: day.map { "\(kind) · \($0)" } ?? kind)
+            }
+            let ofWord = populationMethod == "enumerated" ? "of" : "of about"
+            return HeldShare(share: min(1, share), text: "\(pct) \(ofWord) \(Self.count(pop))")
+        }
+
+        /// The web row's title: the total with its method, clock and confidence, and an earlier reference's grade.
+        var totalSentence: String {
+            guard let pop = population else { return "their total is not counted yet" }
+            let conf = populationConfidence.map { String(format: "%.2f", $0) }
+            if let ref = heldShare.reference {
+                return "≈ \(Self.count(pop)) · \(ref)" + (conf.map { " · confidence \($0)" } ?? "")
+                    + " · an estimate, not a count of their listings"
+            }
+            let graded = Self.gradeText(populationGrade)
+            return "\(Self.count(pop)) \(Self.methodNotes[populationMethod ?? ""] ?? "(\(populationMethod ?? "method unrecorded"))")"
+                + (Self.shortDay(populationAt).map { ", \($0)" } ?? "")
+                + (conf.map { ", confidence \($0)" } ?? "")
+                + (graded.isEmpty ? "" : "; \(graded)")
+        }
+
+        /// An earlier reference against the census that followed it, e.g. "earlier estimate 95,000 (Jan 28) was 65% low".
+        static func gradeText(_ g: PopulationGrade?) -> String {
+            guard let g, g.census > 0 else { return "" }
+            let off = Int((abs(g.error) * 100).rounded())
+            let kind = referenceKinds[g.referenceMethod] ?? g.referenceMethod
+            let day = shortDay(g.referenceAt).map { " (\($0))" } ?? ""
+            return "\(kind) \(count(g.reference))\(day) was \(off == 0 ? "within 1%" : "\(off)% \(g.error < 0 ? "low" : "high")")"
+        }
+
+        static func count(_ n: Int) -> String {
+            let f = NumberFormatter()
+            f.locale = Locale(identifier: "en_US")
+            f.numberStyle = .decimal
+            return f.string(from: NSNumber(value: n)) ?? String(n)
+        }
+
+        /// "Oct 17", in UTC, from a timestamp or a bare day; nil when missing or unparseable.
+        static func shortDay(_ iso: String?) -> String? {
+            guard let iso, !iso.isEmpty else { return nil }
+            guard let d = ProfileClock.date(iso.count <= 10 ? "\(iso)T00:00:00Z" : iso) else { return nil }
+            let f = DateFormatter()
+            f.locale = Locale(identifier: "en_US_POSIX")
+            f.timeZone = TimeZone(identifier: "UTC")
+            f.dateFormat = "MMM d"
+            return f.string(from: d)
         }
 
         func bins(for horizon: LandingHorizon) -> [Int] {
@@ -706,6 +777,14 @@ struct SourcesBoardData: Equatable {
             }
             return parsed
         }
+        func grade(_ x: Any?) -> PopulationGrade? {
+            guard let g = x as? [String: Any],
+                  let reference = num(g["reference"]), let census = num(g["census"]), let error = num(g["error"]),
+                  let referenceMethod = str(g["reference_method"]) else { return nil }
+            return PopulationGrade(reference: Int(reference.rounded()), referenceMethod: referenceMethod,
+                                   referenceAt: str(g["reference_at"]), census: Int(census.rounded()),
+                                   censusAt: str(g["census_at"]), error: error)
+        }
 
         let rawLanding = v["landing"] as? [String: Any]
         let rawSourcesLanding = (rawLanding?["sources"] as? [String: Any]) ?? [:]
@@ -738,6 +817,8 @@ struct SourcesBoardData: Equatable {
                 population: num(get("population")).map { Int($0.rounded()) },
                 populationMethod: str(get("population_method")),
                 populationConfidence: num(get("population_confidence")),
+                populationAt: str(get("population_at")),
+                populationGrade: grade(get("population_grade")),
                 mapSales: num(get("map_sales")).map { Int($0.rounded()) },
                 mapUsd: num(get("map_usd")),
                 sales12: num(get("sales_12m")).map { Int($0.rounded()) },
@@ -1271,9 +1352,12 @@ struct LiveBoardView: View {
                     Text("\(held.formatted()) held")
                         .font(.caption2.monospaced().weight(.semibold))
                 }
-                let share = src.heldShareText
-                if !share.isEmpty {
-                    Text("(\(share))")
+                let share = src.heldShare
+                if !share.text.isEmpty {
+                    SourceShareBar(share: share)
+                        .frame(width: 40, height: 5)
+                        .accessibilityHidden(true)
+                    Text(share.text)
                         .font(.caption2.monospaced())
                         .foregroundStyle(.secondary)
                 }
@@ -1287,6 +1371,11 @@ struct LiveBoardView: View {
                     Text(LedgerMap.money(u12))
                         .font(.caption2.monospaced().weight(.semibold))
                 }
+            }
+            if let ref = src.heldShare.reference {
+                Text(ref.uppercased())
+                    .font(.system(size: 9, design: .monospaced))
+                    .foregroundStyle(.secondary)
             }
         }
         .padding(.vertical, 3)
@@ -1593,6 +1682,36 @@ struct SaleRosterSheet: View {
     }
 }
 
+/// The web row's share track: filled for a census, lighter for a labelled reference, hatched when the total is unknown.
+struct SourceShareBar: View {
+    let share: SourcesBoardData.HeldShare
+
+    var body: some View {
+        GeometryReader { geo in
+            ZStack(alignment: .leading) {
+                Rectangle().fill(Color.secondary.opacity(0.15))
+                if let s = share.share {
+                    Rectangle()
+                        .fill(share.reference == nil ? Color.primary : Color.secondary.opacity(0.72))
+                        .frame(width: max(1, geo.size.width * s))
+                } else {
+                    Canvas { ctx, size in
+                        var p = Path()
+                        var x = -size.height
+                        while x < size.width {
+                            p.move(to: CGPoint(x: x, y: size.height))
+                            p.addLine(to: CGPoint(x: x + size.height, y: 0))
+                            x += 4
+                        }
+                        ctx.stroke(p, with: .color(.secondary.opacity(0.5)), lineWidth: 1)
+                    }
+                }
+            }
+        }
+        .clipShape(RoundedRectangle(cornerRadius: 1))
+    }
+}
+
 /// Source hourly & live landing drill-down sheet (`market_source_landing_read` #1825).
 struct SourceLandingSheet: View {
     let sourceRow: SourcesBoardData.SourceRow
@@ -1602,6 +1721,30 @@ struct SourceLandingSheet: View {
     var body: some View {
         NavigationStack {
             List {
+                Section("Census & coverage") {
+                    let share = sourceRow.heldShare
+                    VStack(alignment: .leading, spacing: 4) {
+                        HStack(spacing: 8) {
+                            if let held = sourceRow.held {
+                                Text("\(SourcesBoardData.SourceRow.count(held)) held")
+                                    .font(.system(.subheadline, design: .monospaced).weight(.semibold))
+                            }
+                            if !share.text.isEmpty {
+                                SourceShareBar(share: share).frame(width: 56, height: 6)
+                                Text(share.text).font(.caption.monospaced())
+                            }
+                        }
+                        if let ref = share.reference {
+                            Text(ref.uppercased())
+                                .font(.system(size: 9, design: .monospaced))
+                                .foregroundStyle(.secondary)
+                        }
+                        Text(sourceRow.totalSentence)
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+                    }
+                    .padding(.vertical, 2)
+                }
                 Section("Intake Velocity") {
                     let l15 = detail?.landed15m ?? sourceRow.landed15m
                     let l1h = detail?.landed1h ?? sourceRow.landed1h
