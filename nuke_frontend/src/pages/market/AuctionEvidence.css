@@ -140,14 +140,14 @@
 .market-distribution > summary { cursor: pointer; padding: 4px 0; list-style-position: inside; }
 .market-distribution__body { border: 2px solid var(--border); padding: 8px; margin-top: 6px; }
 .market-distribution__head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 12px; margin-bottom: 6px; }
-.market-distribution__bars { display: grid; gap: 2px; }
+.market-distribution__bars { display: grid; grid-template-columns: minmax(0, 1fr); gap: 2px; }
 .market-distribution__note { margin-top: 6px; }
 .market-bucket { display: flex; align-items: center; gap: 8px; min-height: 24px; padding: 2px 4px; border: 2px solid transparent; border-radius: 0; text-align: left; background: var(--bg); color: var(--text); cursor: pointer; }
 .market-bucket:disabled { cursor: default; }
 .market-bucket[aria-pressed="true"] { background: var(--text); color: var(--bg); }
 .market-bucket[aria-pressed="true"] .k-body, .market-bucket[aria-pressed="true"] .k-measure { color: inherit; }
 .market-bucket__label { width: 100px; flex-shrink: 0; }
-.market-bucket__track { flex: 1; height: 8px; display: block; background: var(--surface); }
+.market-bucket__track { flex: 1; min-width: 0; height: 8px; display: block; background: var(--surface); }
 .market-bucket__track rect { fill: var(--text-secondary); }
 .market-bucket[aria-pressed="true"] .market-bucket__track rect { fill: var(--bg); }
 .market-bucket__count { width: 76px; text-align: right; flex-shrink: 0; }
@@ -217,6 +217,8 @@
 @media (max-width: 760px) {
   .market-figure { gap: 8px 16px; }
   .market-board__head { align-items: flex-start; }
+  .market-chips > button, .market-sorts > button, .market-board-page, .market-bucket, .market-scope .market-scope__cohort > select { min-height: 44px; }
+  .market-distribution > summary, .market-notes > summary { min-height: 44px; padding-block: 15px; }
 }
 /* Where it should finish: the estimate first in the drawer, then the past lots it rests on. */
 .market-finish { display: grid; gap: 6px; margin: 4px 0 14px; padding: 10px 12px; border: 2px solid var(--border); background: var(--bg); max-width: 72ch; }
