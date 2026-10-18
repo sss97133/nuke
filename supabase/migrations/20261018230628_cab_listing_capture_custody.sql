@@ -89,7 +89,9 @@ BEGIN
     'captured_at',s.fetched_at,'capture_ingested_at',s.created_at,'original_ingested_at',o.ingested_at,
     'source_known_at',known_at,'binding_knowledge_basis','receipt_database_ingested_at_not_historical_native_identity',
     'independent_source',false,'physical_identity_verified',false,'specification_truth','not_assessed');
-  wanted:=jsonb_build_object('vehicle_id',o.vehicle_id,'source_id',o.source_id,'kind','listing',
+  -- The publisher supplies listing evidence; Nuke's guarded derivation records
+  -- provenance, not a second listing or a new publisher-provided capability.
+  wanted:=jsonb_build_object('vehicle_id',o.vehicle_id,'source_id',o.source_id,'kind','provenance',
     'source_snapshot_id',s.id,'source_vehicle_event_id',e.id,'source_observation_id',o.id,'source_comment_id',NULL,'property_id',NULL,
     'source_url',o.source_url,'source_identifier','cab-listing-custody:'||o.id||':'||s.id||':'||e.id,
     'observed_at',s.fetched_at,'content_text',NULL,'extraction_method','protected_cab_listing_capture_v1',

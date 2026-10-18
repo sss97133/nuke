@@ -145,3 +145,23 @@ BEGIN
 END
 $function$
 ;
+
+-- Existing observation privacy owner, same live 2026-10-18 snapshot.
+CREATE OR REPLACE FUNCTION public.observation_is_public(p_kind observation_kind, p_data jsonb)
+ RETURNS boolean
+ LANGUAGE sql
+ IMMUTABLE PARALLEL SAFE
+ SET search_path TO 'public', 'pg_temp'
+AS $function$
+  SELECT p_kind IN ('listing', 'sale_result', 'comment', 'bid', 'specification', 'condition', 'media', 'splice')
+     AND COALESCE(p_data::text, '') !~* ('"(invoice_number|line_items|subtotal|tax|total_amount|receipt_id|file_url'
+                                         '|receipt_type|vendor_address|client_billing|billing|billed_usd|paid_usd|cost_usd'
+                                         '|price_usd|amount_usd|payment_method|payment|payments|amount_paid|balance_due'
+                                         '|order_number|order_contents|order|client|correct_owner|prior_owner_id'
+                                         '|correct_owner_discovered_person_id|customer_name|client_name|email|phone'
+                                         '|total_?paid|balance_?remaining|full_?name|first_?name|last_?name'
+                                         '|given_?name|family_?name|legal_?name|buyer_?name|seller_?name'
+                                         '|owner_?name|person_?name|technician_?name|participant_?name|contact_?name)"\s*:')
+     AND NOT (p_kind IN ('condition', 'media') AND COALESCE(p_data::text, '') ~* '(invoice|receipt|\$\s?[0-9])');
+$function$
+;

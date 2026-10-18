@@ -113,7 +113,7 @@ try {
       const q=JSON.parse(output[i]);
       results.push({source_observation_id:contexts[i].context.original.id,qualified:q.ok===true,reason:q.reason??null,
         scope:q.input?.structured_data?.listing_capture_receipt?.scope??null,
-        database_admission:'not_attempted',privacy_policy:'synthetic_boundary_only',public_readiness:'not_assessed'});
+        database_admission:'not_attempted',privacy_policy:'actual_observation_predicate_offline',public_readiness:'not_assessed'});
     }
     writeFileSync(process.env.CAB_LINEAGE_RETAINED_REPORT||join(base,'retained-rehearsal.json'),JSON.stringify(results,null,2));
     log+=`Retained selected tuples: ${results.filter(r=>r.qualified).length}/${results.length} qualify under fixture boundaries; no production admission/public readiness.\n`;

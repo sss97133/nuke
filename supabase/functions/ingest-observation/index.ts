@@ -315,6 +315,8 @@ Deno.serve(async function handleObservation(req, internal?: unknown) {
       if (qualified.error) return reply({ error: "Listing capture qualifier unavailable", writes: 0, model_calls: 0 }, 503);
       if (qualified.data?.ok !== true) return reply({ error: "Listing capture custody refused",
         reason: qualified.data?.reason ?? "unqualified", writes: 0, model_calls: 0 }, 409);
+      if (qualified.data.input?.kind !== "provenance") return reply({ error: "Listing capture recipe unavailable",
+        writes: 0, model_calls: 0 }, 503);
       if (selectors.dry_run) return reply({ success: true, dry_run: true, qualification: qualified.data,
         writes: 0, model_calls: 0, database_admission: "not_attempted", public_readiness: "not_assessed" });
       // Values come exclusively from the database's independently verified source
