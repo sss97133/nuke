@@ -5,18 +5,30 @@ import { loadVehicleImpl, mergedTargetOf, selectBestHeroImage } from './loadVehi
 describe('profile fallback transport', () => {
   const id = '00000000-0000-0000-0000-0000000000a1';
   const target = '00000000-0000-0000-0000-0000000000b2';
-  async function load(row: Row | null, emptyRpc = false) {
+  const vin = '1GCEK14K8EJ123456';
+  async function load(row: Row | null, emptyRpc = false, options: {
+    address?: string; vinRows?: unknown; vinStatus?: number; vinNetworkError?: boolean;
+  } = {}) {
     const requests: URL[] = [];
+    const bodies: unknown[] = [];
     const json = (body: unknown, status = 200) => new Response(JSON.stringify(body), {
       status, headers: { 'Content-Type': 'application/json' },
     });
-    const fetcher = vi.fn(async (input: RequestInfo | URL) => {
+    const fetcher = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
       const url = new URL(input instanceof Request ? input.url : String(input));
       requests.push(url);
+      bodies.push(typeof init?.body === 'string' ? JSON.parse(init.body) : null);
+      if (url.pathname === '/rest/v1/rpc/vehicle_by_vin_public') {
+        if (options.vinNetworkError) throw new TypeError('fixture connection failed');
+        return json(options.vinRows === undefined ? [] : options.vinRows, options.vinStatus ?? 200);
+      }
       if (url.pathname === '/rest/v1/rpc/get_vehicle_profile_data') {
         return emptyRpc ? json({ vehicle: null }) : json({ code: '57014', message: 'statement timeout' }, 500);
       }
       if (url.pathname === '/rest/v1/vehicles') {
+        if (url.searchParams.get('id') !== `eq.${id}`) {
+          return json({ code: '22P02', message: 'invalid input syntax for type uuid' }, 400);
+        }
         if (!row) return json({ code: 'PGRST116', message: 'No visible row' }, 406);
         // Return only the requested columns, as PostgREST does: merge routing must carry its field.
         const columns = new Set(url.searchParams.get('select')?.split(','));
@@ -31,11 +43,11 @@ describe('profile fallback transport', () => {
     });
     const navigate = vi.fn(), setVehicle = vi.fn(), setLoading = vi.fn();
     const result = await loadVehicleImpl({
-      vehicleId: id, session: null, supabase, navigate, setVehicle, setLoading,
+      vehicleId: options.address ?? id, session: null, supabase, navigate, setVehicle, setLoading,
       leadImageUrl: null, ranBatSyncRef: { current: null }, setIsPublic: vi.fn(),
       setLeadImageUrl: vi.fn(), setVehicleImages: vi.fn(), setTimelineEvents: vi.fn(), setAuctionPulse: vi.fn(),
     });
-    return { result, requests, navigate, setVehicle, setLoading };
+    return { result, requests, bodies, navigate, setVehicle, setLoading };
   }
 
   it.each([false, true])('loads the public record after an unusable RPC (empty=%s)', async empty => {
@@ -69,6 +81,61 @@ describe('profile fallback transport', () => {
     expect(out.setVehicle).toHaveBeenCalledWith(null);
     expect(out.navigate).not.toHaveBeenCalled();
     expect(out.setLoading).toHaveBeenLastCalledWith(false);
+  });
+
+  it('resolves a VIN address through the existing normalized indexed reader and routes all profile reads to its UUID', async () => {
+    const row = { id, vin, is_public: true, year: 1984, make: 'Chevrolet', model: 'K5 Blazer', observation_count: 12 };
+    const out = await load(row, false, { address: vin.toLowerCase(), vinRows: [{ id, vin: ` ${vin.toLowerCase()} ` }] });
+    expect(out.requests.map(url => url.pathname)).toEqual(['/rest/v1/rpc/vehicle_by_vin_public']);
+    expect(out.bodies).toEqual([{ p_vin: vin }]);
+    expect(out.navigate).toHaveBeenCalledWith(`/vehicle/${id}`, { replace: true });
+    expect(out.setVehicle).not.toHaveBeenCalled();
+    expect(out.setLoading).toHaveBeenLastCalledWith(false);
+    // Follow the address replacement through the unchanged actual UUID transport/fallback.
+    const profile = await load(row);
+    expect(profile.requests[0].pathname).toBe('/rest/v1/rpc/get_vehicle_profile_data');
+    expect(profile.bodies[0]).toEqual({ p_vehicle_id: id });
+    expect(profile.requests[1].searchParams.get('id')).toBe(`eq.${id}`);
+    expect(profile.requests.every(url => !url.searchParams.has('vin'))).toBe(true);
+    expect(profile.setVehicle).toHaveBeenCalledWith(expect.objectContaining(row));
+  });
+
+  it.each([
+    [], [{ id, vin }, { id: target, vin }], null, { id, vin },
+    [{ id: 'not-a-uuid', vin }], [{ id, vin: 'WP0ZZZ91ZES123456' }], [{ id }],
+  ].map(vinRows => ({ vinRows })))('refuses missing, ambiguous or malformed VIN resolution without choosing a record: $vinRows', async ({ vinRows }) => {
+    const out = await load(null, false, { address: vin, vinRows });
+    expect(out.requests.map(url => url.pathname)).toEqual(['/rest/v1/rpc/vehicle_by_vin_public']);
+    expect(out.setVehicle).toHaveBeenCalledWith(null);
+    expect(out.navigate).not.toHaveBeenCalled();
+    expect(out.setLoading).toHaveBeenLastCalledWith(false);
+  });
+
+  it('refuses a denied VIN reader without falling back to a broader VIN or UUID query', async () => {
+    const out = await load(null, false, { address: vin,
+      vinRows: { code: '42501', message: 'permission denied' }, vinStatus: 403 });
+    expect(out.requests.map(url => url.pathname)).toEqual(['/rest/v1/rpc/vehicle_by_vin_public']);
+    expect(out.setVehicle).toHaveBeenCalledWith(null);
+    expect(out.navigate).not.toHaveBeenCalled();
+  });
+
+  it('refuses a VIN transport failure without querying another identity path', async () => {
+    const out = await load(null, false, { address: vin, vinNetworkError: true });
+    expect(out.requests.map(url => url.pathname)).toEqual(['/rest/v1/rpc/vehicle_by_vin_public']);
+    expect(out.setVehicle).toHaveBeenCalledWith(null);
+    expect(out.navigate).not.toHaveBeenCalled();
+    expect(out.setLoading).toHaveBeenLastCalledWith(false);
+  });
+
+  it('retains private-record refusal and merged-target routing after the VIN address resolves', async () => {
+    const resolved = await load(null, false, { address: vin, vinRows: [{ id, vin }] });
+    expect(resolved.navigate).toHaveBeenCalledWith(`/vehicle/${id}`, { replace: true });
+    const hidden = await load({ id, is_public: false });
+    expect(hidden.navigate).toHaveBeenCalledWith('/login');
+    expect(hidden.setVehicle).not.toHaveBeenCalled();
+    const merged = await load({ id, is_public: true, merged_into_vehicle_id: target });
+    expect(merged.navigate).toHaveBeenCalledWith(`/vehicle/${target}`, { replace: true });
+    expect(merged.setVehicle).not.toHaveBeenCalled();
   });
 });
 
