@@ -528,7 +528,7 @@ export async function loadVehicleImpl({
               event_type: 'work_session',
               title: ws.title,
               category: ws.work_type,
-              cost_amount: (ws.total_job_cost || 0) + (ws.total_parts_cost || 0),
+              cost_amount: ws.total_job_cost ?? null,
               metadata: {
                 work_type: ws.work_type,
                 image_count: ws.image_count,
