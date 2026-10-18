@@ -300,6 +300,8 @@ const REFETCH_MS = 60_000;
 // behind the source), read every 15 s. A tape bid lifts its lot's recorded bid while the board's 15-minute sync is
 // behind it, so every reader of the board keeps one bid per lot, the newest Nuke holds.
 const TAPE_MS = 15_000;
+// A bid read more than this long after it was placed (a backgrounded tab, a stalled stream) shows at once.
+const PLAYBACK_MAX_LAG_MS = 150_000;
 export interface TapeBid { id: string; vehicleId: string; amount: number; bidAt: number; endAt: number | null }
 
 export function parseTape(data: unknown): TapeBid[] {
@@ -349,30 +351,56 @@ export function useMarketPulse() {
   });
 
   // The newest tape bid per lot; bids already read are not replayed. The first read sets the baseline quietly.
+  // Later bids are played back at their own moments, one steady delay behind the source, instead of all at once
+  // when the 15 s read lands: each shows at bid_at + lag, where lag is the slowest arrival seen recently.
   const best = useRef(new Map<string, TapeBid>());
   const seen = useRef<Set<string> | null>(null);
+  const lag = useRef(0);
+  const timers = useRef(new Set<number>());
+  const shown = useRef(new Map<string, { amount: number; at: number }>());
   const [tapeTick, setTapeTick] = useState(0);
   const [tapeRisen, setTapeRisen] = useState<Set<string>>(new Set());
   const [newBids, setNewBids] = useState<TapeBid[]>([]);
+  useEffect(() => () => { timers.current.forEach((t) => window.clearTimeout(t)); timers.current.clear(); }, []);
   useEffect(() => {
     const bids = tape.data;
     if (!bids) return;
     const first = seen.current == null;
     const known = seen.current ?? new Set<string>();
-    const fresh = bids.filter((b) => !known.has(b.id));
+    const fresh = bids.filter((b) => !known.has(b.id)).sort((a, b) => a.bidAt - b.bidAt);
     seen.current = known.size > 5000 ? new Set(bids.map((b) => b.id)) : known;
-    for (const b of fresh) {
-      seen.current.add(b.id);
+    for (const b of fresh) seen.current.add(b.id);
+    if (!fresh.length) return;
+    const land = (b: TapeBid) => {
       const cur = best.current.get(b.vehicleId);
       if (!cur || b.amount > cur.amount) best.current.set(b.vehicleId, b);
+    };
+    if (first) {
+      fresh.forEach(land);
+      setTapeTick((t) => t + 1);
+      return;
     }
-    if (!fresh.length) return;
-    setTapeTick((t) => t + 1);
-    if (first) return;
-    setNewBids(fresh);
-    setTapeRisen(new Set(fresh.map((b) => b.vehicleId)));
-    const timer = window.setTimeout(() => setTapeRisen(new Set()), 1800);
-    return () => window.clearTimeout(timer);
+    const now = Date.now();
+    const arrival = Math.max(...fresh.map((b) => now - b.bidAt));
+    lag.current = arrival > PLAYBACK_MAX_LAG_MS ? lag.current : Math.max(lag.current * 0.9, arrival);
+    for (const b of fresh) {
+      const play = () => {
+        land(b);
+        shown.current.set(b.vehicleId, { amount: b.amount, at: Date.now() });
+        setTapeTick((t) => t + 1);
+        setNewBids([b]);
+        setTapeRisen((prev) => new Set(prev).add(b.vehicleId));
+        const off = window.setTimeout(() => {
+          timers.current.delete(off);
+          setTapeRisen((prev) => { const next = new Set(prev); next.delete(b.vehicleId); return next; });
+        }, 1800);
+        timers.current.add(off);
+      };
+      const wait = b.bidAt + lag.current - now;
+      if (wait <= 0 || now - b.bidAt > PLAYBACK_MAX_LAG_MS) { play(); continue; }
+      const t = window.setTimeout(() => { timers.current.delete(t); play(); }, wait);
+      timers.current.add(t);
+    }
   }, [tape.data]);
   const data = useMemo(() => {
     const d = query.data;
@@ -393,7 +421,15 @@ export function useMarketPulse() {
     const auctions = query.data?.auctions;
     if (!auctions) return;
     const prev = prevBids.current;
-    setRisenIds(prev ? increasedBids(prev, auctions) : new Set());
+    // A lot the tape already moved to this bid in the last two minutes is not flashed again when the board catches up.
+    const cutoff = Date.now() - 120_000;
+    const byId = new Map(auctions.map((a) => [a.id, a.currentBid ?? 0]));
+    const rose = prev ? increasedBids(prev, auctions) : new Set<string>();
+    for (const id of rose) {
+      const s = shown.current.get(id);
+      if (s && s.at >= cutoff && s.amount >= (byId.get(id) ?? 0)) rose.delete(id);
+    }
+    setRisenIds(rose);
     prevBids.current = auctions;
     const timer = window.setTimeout(() => setRisenIds(new Set()), 1800);
     return () => window.clearTimeout(timer);
