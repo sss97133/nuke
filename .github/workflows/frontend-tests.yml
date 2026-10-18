@@ -28,6 +28,18 @@ jobs:
       - name: Verify immutable assets, retry receipts and revision discovery
         run: node --test scripts/ingest-autotrader-history.test.mjs
 
+  broadcast-overlay-contract:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      - name: Setup Node.js for the broadcast overlay readers
+        uses: actions/setup-node@v4
+        with:
+          node-version: '25'
+      - name: Verify overlay parsing, lot segmentation and displayed-outcome refusals
+        run: node --test scripts/broadcast/broadcast-overlay.test.mjs scripts/broadcast/overlay-barrett-jackson.test.mjs
+
   db-contracts:
     # Every supabase/sql/test_*.sql runs here, each in its own fresh database on this one service, unless a job in a
     # workflow names it or scripts/ci/db-contracts-skip.txt lists it. A new contract needs only its file, not a job.
