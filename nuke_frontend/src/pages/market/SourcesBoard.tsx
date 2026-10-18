@@ -1,6 +1,7 @@
 import { Fragment, useEffect, useState } from 'react';
 import { supabase } from '../../lib/supabase';
 import { OrgLogo } from '../../components/common/OrgLogo';
+import { sourceLogoInk } from './sourceLogoInk';
 import {
   buildFacetDrilldownUrl,
   classifyVehicleFacet,
@@ -2218,7 +2219,8 @@ export function SourcesBoardView({
                       {/* Identity through the shared renderer (frontend rule 2026-10-08): the organization's recorded logo,
                           else its type icon. */}
                       <OrgLogo logoUrl={r.logoUrl} businessType={r.businessType ?? (cat === 'auction' ? 'auction_house' : cat === 'dealer' ? 'dealer' : null)}
-                        businessName={r.name} size={13} maxWidth={42} variant="logo" className="market-sources__icon" />
+                        businessName={r.name} size={13} maxWidth={42} variant="logo"
+                        className={`market-sources__icon${sourceLogoInk(r.logoUrl) ? ` market-sources__icon--${sourceLogoInk(r.logoUrl)}` : ''}`} />
                       <span className="market-sources__name-text">{shortName(r.name)}</span>
                       {badge && cat ? (
                         <span className={`market-sources__badge market-sources__badge--${cat}`}>
