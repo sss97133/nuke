@@ -613,6 +613,24 @@ test('a repeated listing sentence is inflation, not corroboration', () => {
   assert.equal(inspectReportedWork(buildLog([report(), report()])).failures.reported_work_observation_duplicated, 1);
 });
 
+test('v2 passive-sentence witnesses are accepted beside v1 only when the performed clause is the whole sentence', async () => {
+  const PASSIVE = 'The SYNTHETIC PRIVATE FLUID was flushed in September 2026.';
+  const v2 = report(3, { source_witness_version: 'retained_description_reported_work_v2', performed_clause: PASSIVE, source_value: PASSIVE });
+  const inspected = inspectReportedWork(buildLog([report(), v2]));
+  assert.deepEqual(inspected.failures, {}); assert.equal(inspected.reports.length, 2);
+  const rows = [reportSource({ content_text: `SYNTHETIC PRIVATE SOURCE BODY opens here. ${WORK} ${PASSIVE} It closes here.` })];
+  const client = reportClient({ log: { ok: true, status: 200, value: buildLog([report(), v2]) }, rows });
+  const r = await runReportedWorkLineage(client, scope(), lineageSubjects(manifest([id(1)])));
+  assert.equal(r.status, 'matched_current_reported_work_in_manifest'); assert.equal(r.matchingReports, 2); assert.deepEqual(r.failures, {});
+  const PREFIX = 'The SYNTHETIC PRIVATE FLUID was flushed in September 2026';
+  const partial = report(3, { source_witness_version: 'retained_description_reported_work_v2', performed_clause: PREFIX, source_value: `${PREFIX}, and SYNTHETIC PRIVATE MORE.` });
+  assert.equal(inspectReportedWork(buildLog([partial])).failures.reported_work_v2_clause_not_whole_sentence, 1);
+  for (const version of ['retained_description_reported_work_v3', 'retained_description_engine_family_label_v1', null]) {
+    const refused = inspectReportedWork(buildLog([report(1, { source_witness_version: version })]));
+    assert.equal(refused.failures.reported_work_source_witness_version_invalid, 1, String(version)); assert.equal(refused.reports.length, 0);
+  }
+});
+
 test('reader rows cannot add a performer, confirm occurrence, invent a day or blur the clocks', () => {
   for (const [extra, reason] of [
     [{ performer_id: id(9) }, 'reported_work_performer_id_invalid'], [{ performer_status: 'known' }, 'reported_work_performer_status_invalid'],
