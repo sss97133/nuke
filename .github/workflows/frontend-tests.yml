@@ -632,9 +632,9 @@ jobs:
       - name: Verify image comparisons retain per-photo evidence without forced identity or eligibility changes
         run: deno test --no-config --no-remote --no-npm --no-lock supabase/functions/check-image-vehicle-match/decision_test.ts
       - name: Verify private subject custody, admission projections, replay and current-source readers
-        run: deno test --no-config --no-remote --no-npm --no-lock supabase/functions/check-image-vehicle-match/inputCustody_test.ts supabase/functions/check-image-vehicle-match/subjects_test.ts supabase/functions/check-image-vehicle-match/subjectService_test.ts supabase/functions/check-image-vehicle-match/subjectReader_test.ts supabase/functions/check-image-vehicle-match/subjectReplay_test.ts supabase/functions/check-image-vehicle-match/subjectCandidates_test.ts supabase/functions/check-image-vehicle-match/sourceInbox_test.ts
+        run: deno test --no-config --no-remote --no-npm --no-lock supabase/functions/check-image-vehicle-match/inputCustody_test.ts supabase/functions/check-image-vehicle-match/subjects_test.ts supabase/functions/check-image-vehicle-match/subjectService_test.ts supabase/functions/check-image-vehicle-match/subjectInputScope_test.ts supabase/functions/check-image-vehicle-match/subjectReader_test.ts supabase/functions/check-image-vehicle-match/subjectReplay_test.ts supabase/functions/check-image-vehicle-match/subjectCandidates_test.ts supabase/functions/check-image-vehicle-match/sourceInbox_test.ts
       - name: Verify native provider image blocks without making provider calls
-        run: deno test --node-modules-dir=none supabase/functions/_shared/llmProvider.test.ts
+        run: deno test --node-modules-dir=none supabase/functions/_shared/llmProvider.test.ts supabase/functions/_shared/providerDiagnostic_test.ts supabase/functions/_shared/visionFallback_test.ts
 
   sold-context-contract:
     runs-on: ubuntu-latest

@@ -109,7 +109,19 @@ const native = (w: any) => ({ method: "device_privacy_v1", policy_version: 1, pu
   face_threshold: 0.045, labels: [{ identifier: "car", confidence: 0.8 }], decode: { contract: "imageio_thumbnail_512_v1", max_pixel: 512,
     orientation_applied: true, input_sha256: "b".repeat(64), width: 1, height: 1, byte_length: 4 } });
 const request = (c: typeof candidate) => ({ user_id: owner, image_ids: c.image_ids, expected_source_hashes: c.expected_source_hashes,
+  allowed_source_hashes: { ...c.expected_source_hashes,
+    ...Object.fromEntries(originals.map((original, index) => [leaves[index], c.expected_source_hashes[original]])) },
   reuse_only: true, device_privacy_receipts: Object.fromEntries(c.inspect.map(w => [w.receipt_image_id, native(w)])) });
+for (const changedLeaf of [false, true]) {
+  const body = request(candidate);
+  body.allowed_source_hashes = changedLeaf ? { ...body.allowed_source_hashes, [leaves[0]]: "f".repeat(64) } : candidate.expected_source_hashes;
+  const refused = await resolveSubjectBatch(store, body, origin, dependencies);
+  assert(refused.status === "refused" && "refusal" in refused && refused.refusal ===
+    (changedLeaf ? "source_changed" : "source_outside_allowed_scope"), "current leaf proof requires its own explicit caller byte scope");
+  equal([captureCalls, fetches, modelCalls], [0, 0, 0], "scope refuses before historical original/proof/provider callbacks");
+  equal((await client.from("image_observations").select("*").eq("observed_by", "device_privacy_v1")).data.length, 0,
+    "scope refusal retains no privacy proof");
+}
 for (const mode of ["missing", "changed_input", "withdrawn", "malformed"]) {
   const guarded = { ...store, readings: async (ids: string[]) => {
     if (mode === "missing") return [];
@@ -147,6 +159,12 @@ const profiles = await readSubjectProfiles(client, owner);
 assert(profiles.subjects.length === 1 && profiles.subjects[0].id === cluster && profiles.subjects[0].anchor_image_id === anchor,
   "actual consumer keeps the original supported cluster and anchor");
 equal(profiles.subjects[0].image_count, 3, "three original photographs remain three, not six aliases");
+const observationCount = (await client.from("image_observations").select("*")).data.length;
+const narrowReplay = await resolveSubjectBatch(store, { ...request(candidate), allowed_source_hashes: candidate.expected_source_hashes }, origin, dependencies);
+assert(narrowReplay.status === "refused" && "refusal" in narrowReplay && narrowReplay.refusal === "source_outside_allowed_scope",
+  "cached reading does not expand caller scope through current aliases");
+equal((await client.from("image_observations").select("*")).data.length, observationCount, "scope refuses before cached reading or membership writes");
+equal([captureCalls, fetches, modelCalls], [2, 3, 0], "cached refusal has no capture or inference");
 const current = (await client.from("vehicle_images").select("*").in("id", leaves)).data;
 assert(current.every((row: any) => row.vision_gate_status === "pending" && row.is_duplicate && row.ai_processing_status === "skipped" && row.vehicle_id === null),
   "global gate, duplicate flag, processing state and canonical filing unchanged");

@@ -41,8 +41,11 @@ struct SubjectResolutionQueue: Codable {
 
     /// A missing/invalid provider answer does not establish that no paid work occurred.
     /// Only refusals before the model callback can permit a fresh automatic reading.
-    static func retryRequiresRetainedReading(refusal: String, alreadyReuseOnly: Bool) -> Bool {
-        alreadyReuseOnly || !["source_not_ready", "required_input_unavailable"].contains(refusal)
+    static func retryRequiresRetainedReading(refusal: String, alreadyReuseOnly: Bool, providerReadNotStarted: Bool = false) -> Bool {
+        if alreadyReuseOnly { return true }
+        if ["source_not_ready", "required_input_unavailable"].contains(refusal) { return false }
+        if ["provider_unavailable", "provider_call_failed"].contains(refusal), providerReadNotStarted { return false }
+        return true
     }
 
     enum SourceReadChange: Equatable { case invalid, unchanged, changed }

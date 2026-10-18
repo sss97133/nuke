@@ -9,6 +9,7 @@ import { DEVICE_PRIVACY_METHOD, PRIVATE_SUBJECT_PURPOSE, hydrateSubjectPrivacy, 
 import { subjectSourceAvailable, subjectSourceCanEstablishPrivacy, subjectSourceFamily, subjectPrivacyLookupComplete } from "./subjectPrivacy.ts";
 import { currentIdentitySource, loadSourceIdentities, sourceAliases, sourceRoot, inspectSourceIdentity, type SourceIdentity } from "./sourceIdentity.ts";
 import { planSubjectReinspection } from "./subjectReinspection.ts";
+import { allowedSubjectSources, subjectInputScopeRefusal } from "./subjectInputScope.ts";
 
 export const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
 export interface SubjectSource {
@@ -56,6 +57,7 @@ export interface SubjectRequest {
   user_id?: string; image_ids?: string[]; dry_run?: boolean; reuse_only?: boolean;
   expected_source_hashes?: Record<string, string>;
   device_privacy_receipts?: Record<string, unknown>;
+  allowed_source_hashes?: Record<string, string>;
 }
 
 /** Authentication alone is insufficient when a privileged client supplies user_id. */
@@ -152,12 +154,22 @@ export async function resolveSubjectBatch(store: SubjectStore, request: SubjectR
     Object.keys(privacy).some(id => !ids.includes(id)) || JSON.stringify(privacy).length > 16384) throw new Error("subject_privacy_scope_invalid");
   const base = { method: SUBJECT_METHOD, persisted_image_ids: [] as string[], deferred_image_ids: [] as string[],
     unresolved: [] as Array<{ image_id: string; reason: string }> };
+  const allowed = allowedSubjectSources(request.allowed_source_hashes, ids, expected);
+  if (!allowed.valid) return { ...base, status: "refused", refusal: "allowed_source_scope_invalid" };
+  // An audited alias does not widen the caller's pixel/proof scope. Keep the
+  // immutable reading ID and its independently qualified current leaf explicit.
+  const scopeRefusal = (rows: SubjectSource[]) => subjectInputScopeRefusal(allowed.hashes, rows.flatMap(row => {
+    const current = currentIdentitySource(row);
+    return current && current.id !== row.id ? [row, { id: current.id, file_hash: current.file_hash }] : [row];
+  }));
   let sources = await store.sources(request.user_id, ids);
   if (sources.length !== ids.length || new Set(sources.map(row => row.id)).size !== ids.length ||
     sources.some(row => !ids.includes(row.id))) return { ...base, status: "refused", refusal: "source_unavailable" };
   if (expected && sources.some(source => expected[source.id] !== source.file_hash)) {
     return { ...base, status: "refused", refusal: "source_changed" };
   }
+  const freshScopeRefusal = scopeRefusal(sources);
+  if (freshScopeRefusal) return { ...base, status: "refused", refusal: freshScopeRefusal };
   const held = sources.map(row => ({ image_id: row.id, reason: request.reuse_only && subjectSourceCanEstablishPrivacy(row, request.user_id)
     ? null : sourceRefusal(row, request.user_id, asOf, privacy[row.id]) })).filter(row => row.reason);
   if (held.length) return { ...base, status: "refused", refusal: held.some(row => row.reason === "source_unavailable") ? "source_unavailable" : "source_not_ready", unresolved: held };
@@ -177,7 +189,10 @@ export async function resolveSubjectBatch(store: SubjectStore, request: SubjectR
       !prior.inputs.some(input => sourceAliases(fresh.get(ids[0])).includes(input.image_id)) || !prior.inputs.every(input => UUID.test(input.image_id)) ||
       ids.length === 3 && !ids.every(id => prior.inputs.some(input => sourceAliases(fresh.get(id)).includes(input.image_id)))) continue;
     const retainedSources = await store.sources(request.user_id, prior.inputs.map(input => input.image_id));
-    if (retainedSources.length !== prior.inputs.length || retainedSources.some(row => sourceRefusal(row, request.user_id, asOf) ||
+    if (retainedSources.length !== prior.inputs.length) continue;
+    const retainedScopeRefusal = scopeRefusal(retainedSources);
+    if (retainedScopeRefusal) return { ...base, status: "refused", refusal: retainedScopeRefusal };
+    if (retainedSources.some(row => sourceRefusal(row, request.user_id, asOf) ||
       expected && Object.hasOwn(expected, row.id) && expected[row.id] !== row.file_hash)) continue;
     const reusable = replayEnvelope([reading], retainedSources, request.user_id, asOf);
     if (reusable) {
@@ -194,6 +209,8 @@ export async function resolveSubjectBatch(store: SubjectStore, request: SubjectR
       const plan = await planSubjectReinspection(store, request.user_id, reading, asOf);
       if (!plan || plan.candidate.image_ids.length !== ids.length || !ids.every(id => plan.candidate.image_ids.includes(id)) ||
         expected && plan.sources.some(source => expected[source.id] !== source.file_hash)) continue;
+      const privacyScopeRefusal = scopeRefusal(plan.sources);
+      if (privacyScopeRefusal) return { ...base, status: "refused", refusal: privacyScopeRefusal };
       const pending = plan.sources.filter(row => !subjectSourceAvailable(row, request.user_id, asOf) && Object.hasOwn(privacy, row.id));
       if (pending.some(row => !validDevicePrivacyReceipt(privacy[row.id], currentIdentitySource(row), asOf)))
         return { ...base, status: "refused", refusal: "source_not_ready" };
@@ -216,6 +233,10 @@ export async function resolveSubjectBatch(store: SubjectStore, request: SubjectR
     }
   }
   const reused = !!envelope;
+  // Replayed context is subject to the same explicit caller scope, even when
+  // reuse would make no provider call. Refuse before retained/membership writes.
+  const replayScopeRefusal = scopeRefusal(sources);
+  if (replayScopeRefusal) return { ...base, status: "refused", refusal: replayScopeRefusal };
   if (!envelope && request.reuse_only) return { ...base, status: "refused", refusal:
     sources.some(source => !subjectSourceAvailable(source, request.user_id, asOf) && subjectSourceCanEstablishPrivacy(source, request.user_id))
       ? "source_not_ready" : "retained_reading_unavailable" };
@@ -249,6 +270,10 @@ export async function resolveSubjectBatch(store: SubjectStore, request: SubjectR
       return { ...base, status: "refused", refusal: "source_unavailable" };
     consumedIds = ids.filter(id => sources.some(source => sourceRoot(source) === sourceRoot(fresh.get(id))));
     if (sources.length < 2) return { ...base, status: "refused", refusal: "source_needs_corresponding_view" };
+    // Server-selected context must be pinned as explicitly as requested fresh
+    // sources. No object, renderer or provider callback has run at this point.
+    const actualScopeRefusal = scopeRefusal(sources);
+    if (actualScopeRefusal) return { ...base, status: "refused", refusal: actualScopeRefusal };
     readings = await store.readings(sources.map(source => source.id));
     const candidate_scope = await store.candidates(request.user_id);
     const contextIds = sources.filter(source => !ids.includes(source.id)).map(source => source.id);
@@ -270,7 +295,9 @@ export async function resolveSubjectBatch(store: SubjectStore, request: SubjectR
       { text: SUBJECT_PROMPT }, ...sources.flatMap(source => [{ text: `Photo image_id=${source.id}` }, { image_key: source.id }]),
     ], dependencies.vision, { limits: { output_tokens: 1600 } });
     if (!result.model_result) return { ...base, status: "refused", refusal: result.refusal,
-      unavailable_inputs: capture.unavailable, candidate_scope };
+      unavailable_inputs: capture.unavailable, candidate_scope,
+      ...(result.provider_diagnostics?.length ? { provider_diagnostics: result.provider_diagnostics } : {}),
+      ...(result.provider_attempt_coverage ? { provider_attempt_coverage: result.provider_attempt_coverage } : {}) };
     const inputs: SubjectInput[] = sources.map(source => {
       const receipt = capture.inputs.find(input => input.key === source.id)!.receipt;
       const prior = readings.filter(reading => reading.image_id === source.id && reading.is_active && reading.cluster_id &&
@@ -288,6 +315,8 @@ export async function resolveSubjectBatch(store: SubjectStore, request: SubjectR
     envelope = { ...projection, user_id: request.user_id, method: SUBJECT_METHOD, run_key,
       provider: result.model_result.provider, model: result.model_result.model, read_at, inputs, candidate_scope };
   }
+  const writeScopeRefusal = scopeRefusal(sources);
+  if (writeScopeRefusal) return { ...base, status: "refused", refusal: writeScopeRefusal };
   const failures: Array<{ image_id: string; reason: string }> = [], persisted: string[] = [], retained: string[] = [];
   if (!request.dry_run) {
     // Even an unresolved interpretation is useful retained evidence. Its own

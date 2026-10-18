@@ -4,6 +4,7 @@ import type { VisionInputCapture } from "./inputCustody.ts";
 import { projectSourceIdentities, sourceAliases, sourceIdentityRecords, attachSourceIdentityRecords } from "./sourceIdentity.ts";
 import { attachSubjectPrivacy } from "./subjectPrivacy.ts";
 import { assessSubjectAdmission } from "./subjectReplay.ts";
+import { VisionProviderUnavailable } from "../_shared/providerDiagnostic.ts";
 const uid = "00000000-0000-4000-8000-000000000001", other = "00000000-0000-4000-8000-000000000002";
 const ids = ["10000000-0000-4000-8000-000000000001", "10000000-0000-4000-8000-000000000002", "10000000-0000-4000-8000-000000000003"];
 const cluster = "20000000-0000-4000-8000-000000000001";
@@ -194,6 +195,54 @@ Deno.test("a lone photo with no retained view waits before any object or provide
   equal("refusal" in result && result.refusal, "source_needs_corresponding_view");
   equal(f.counts, { captures: 0, models: 0, candidates: 0 });
 });
+Deno.test("an explicit source scope refuses outside selected context before capture or inference", async () => {
+  const f = fixture();
+  f.store.context = async () => ({ sources: [f.sources[2]], coverage: {} });
+  const pins = Object.fromEntries(f.sources.slice(0, 2).map(source => [source.id, source.file_hash]));
+  const result = await resolveSubjectBatch(f.store, { ...f.request, allowed_source_hashes: pins }, "https://example.test", f.dependencies);
+  equal("refusal" in result && result.refusal, "source_outside_allowed_scope");
+  equal(f.counts, { captures: 0, models: 0, candidates: 0 }); equal(f.readings, []); equal(f.writes, []);
+});
+Deno.test("an explicit source scope refuses context hash drift and fresh hash drift before input callbacks", async () => {
+  for (const changed of [0, 2]) {
+    const f = fixture(), pins = Object.fromEntries(f.sources.map(source => [source.id, source.file_hash]));
+    f.store.context = async () => ({ sources: [f.sources[2]], coverage: {} });
+    f.sources[changed].file_hash = "f".repeat(64);
+    f.sources[changed].storage_path = `users/${uid}/capture-relay/${f.sources[changed].file_hash}/frame.JPG`;
+    const result = await resolveSubjectBatch(f.store, { ...f.request, allowed_source_hashes: pins }, "https://example.test", f.dependencies);
+    equal("refusal" in result && result.refusal, "source_changed");
+    equal(f.counts, { captures: 0, models: 0, candidates: 0 }); equal(f.readings, []); equal(f.writes, []);
+  }
+});
+Deno.test("a complete pinned selected context passes once and replay cannot broaden its caller scope", async () => {
+  const f = fixture(), pins = Object.fromEntries(f.sources.map(source => [source.id, source.file_hash]));
+  f.store.context = async () => ({ sources: [f.sources[2]], coverage: {} });
+  const body = { ...f.request, allowed_source_hashes: pins,
+    expected_source_hashes: Object.fromEntries(f.sources.slice(0, 2).map(source => [source.id, source.file_hash])) };
+  const result = await resolveSubjectBatch(f.store, body, "https://example.test", f.dependencies);
+  equal(result.status, "unresolved");
+  equal("input_image_ids" in result && result.input_image_ids, [ids[0], ids[2]]);
+  equal(f.counts, { captures: 1, models: 1, candidates: 1 });
+  const stored = f.readings.length;
+  const narrowed = await resolveSubjectBatch(f.store, { ...body, reuse_only: true,
+    allowed_source_hashes: Object.fromEntries(f.sources.slice(0, 2).map(source => [source.id, source.file_hash])) }, "https://example.test", f.dependencies);
+  equal("refusal" in narrowed && narrowed.refusal, "source_outside_allowed_scope"); equal(f.readings.length, stored);
+  const replay = await resolveSubjectBatch(f.store, { ...body, reuse_only: true }, "https://example.test", f.dependencies);
+  equal(replay.status, "cached"); equal(f.counts, { captures: 1, models: 1, candidates: 1 });
+});
+Deno.test("invalid source allowlists refuse before source lookup or any input callbacks", async () => {
+  const f = fixture(); let sourceReads = 0;
+  f.store.sources = async () => { sourceReads++; return f.sources; };
+  for (const allowed of [null, [], {}, { [ids[0]]: f.sources[0].file_hash }, { [ids[0]]: "bad", [ids[1]]: f.sources[1].file_hash }]) {
+    const result = await resolveSubjectBatch(f.store, { ...f.request, allowed_source_hashes: allowed as any }, "https://example.test", f.dependencies);
+    equal("refusal" in result && result.refusal, "allowed_source_scope_invalid");
+  }
+  const pins = Object.fromEntries(f.sources.slice(0, 2).map(source => [source.id, source.file_hash]));
+  const disagreement = await resolveSubjectBatch(f.store, { ...f.request, allowed_source_hashes: pins,
+    expected_source_hashes: { ...pins, [ids[0]]: "f".repeat(64) } }, "https://example.test", f.dependencies);
+  equal("refusal" in disagreement && disagreement.refusal, "allowed_source_scope_invalid");
+  equal(sourceReads, 0); equal(f.counts, { captures: 0, models: 0, candidates: 0 });
+});
 Deno.test("protected data reuse cannot restore a later membership withdrawal", async () => {
   const f = fixture(); await f.run(); const before = f.writes.length;
   f.store.admission = async () => ({ data_reusable: true, admission_allowed: false, blocked_image_ids: [ids[0]], reason: "current_membership_conflict" });
@@ -264,4 +313,24 @@ Deno.test("historical alias withdrawal cannot restore membership from cached ori
   const result = await resolveSubjectBatch(f.store, { ...f.request, image_ids: leaves, reuse_only: true }, "https://example.test", f.dependencies);
   equal(result.persisted_image_ids, []); equal(f.writes.length, before); equal(f.counts.models, 1);
   equal(result.unresolved.some(row => row.image_id === leaves[0] && row.reason === "current_membership_conflict"), true);
+});
+Deno.test("typed provider failure reaches the owner receipt without saving readings or permitting a paid replay", async () => {
+  const f = fixture();
+  f.dependencies.vision = async () => {
+    f.counts.models++;
+    throw new VisionProviderUnavailable([
+      { code: "credential_not_accepted", provider: "anthropic", http_status: 401, credential_kind: "oauth" },
+      { code: "no_connected_key", provider: "google", http_status: null, credential_kind: null },
+      { code: "credential_lookup_failed", provider: "openai", http_status: null, credential_kind: null },
+    ]);
+  };
+  const result = await f.run();
+  equal(result.status, "refused");
+  equal("refusal" in result && result.refusal, "provider_unavailable");
+  equal("provider_diagnostics" in result && result.provider_diagnostics?.length, 3);
+  equal("provider_attempt_coverage" in result && result.provider_attempt_coverage?.no_reading_started, true);
+  equal(f.readings.length, 0); equal(f.writes.length, 0); equal(f.counts.models, 1);
+  const replay = await resolveSubjectBatch(f.store, { ...f.request, reuse_only: true }, "https://example.test", f.dependencies);
+  equal("refusal" in replay && replay.refusal, "retained_reading_unavailable");
+  equal(f.counts.models, 1); equal(f.counts.captures, 1);
 });

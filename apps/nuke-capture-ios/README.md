@@ -126,6 +126,16 @@ Standing rules the code carries:
   the protected writer deployed with the approved baseline. The additional private qualification, NULL attribution
   correction and historical reinspection proposal below remains held for separate activation; the global photo
   pipeline remains paused.
+  Provider failures retain only allowlisted code, provider, HTTP status and credential-kind diagnostics. A 401 means
+  the credential was not accepted by the existing API-key route; it does not prove revocation or expiry. In-memory
+  sign-in/API-key shape classification never exports credential values or changes routes or provider order. A complete,
+  untruncated outcome for every existing provider can certify no reading began (401, no key or lookup failure only),
+  allowing the existing fresh-retry path within its same three-attempt cap and backoff. Ambiguous output/transport,
+  mixed failures and already reuse-only batches stay reuse-only; finished source hashes are never reset.
+  Own-account analysis status can open the existing Connected accounts screen; no key test, mutation or fallback is triggered.
+  An optional `allowed_source_hashes` request map pins at most 64 exact source IDs and hashes, including all requested
+  photos and any server-selected or replayed context. Outside or changed sources refuse before input capture/inference;
+  it only narrows input scope and never replaces current own-account, privacy or source qualification.
 - **A relation is a weight, not a status.** Owner direction, 2026-10-15: "active cant be a hard code like it is. its
   a weight. a relation goes dormant immediately after one day if not maintained by contribution. even within 24hr can
   stall." The app never shows a membership's `status` as ACTIVE. It shows the state the server cuts from

@@ -63,6 +63,29 @@ Deno.test("one existing source capture qualifies native privacy with zero extra 
   equal(qualifySubjectSource(f.retained[0].inputs[0], own[0], user, at), true);
 });
 
+Deno.test("pending native proof cannot capture an outside or changed automatic context", async () => {
+  for (const drift of [false, true]) {
+    const f = await fixture(), [fresh, context] = f.sources;
+    context.vision_gate_status = "approved";
+    f.store.context = async () => ({ sources: await f.store.sources(user, [context.id]), coverage: {} });
+    const req = f.request();
+    const result = await resolveSubjectBatch(f.store, { ...req, image_ids: [fresh.id],
+      expected_source_hashes: { [fresh.id]: fresh.file_hash },
+      device_privacy_receipts: { [fresh.id]: req.device_privacy_receipts[fresh.id] },
+      allowed_source_hashes: { [fresh.id]: fresh.file_hash, ...(drift ? { [context.id]: "f".repeat(64) } : {}) } }, origin,
+      { capture: f.capture, vision: f.vision, now: () => new Date(at) });
+    equal("refusal" in result && result.refusal, drift ? "source_changed" : "source_outside_allowed_scope");
+    equal(f.counts(), { fetches: 0, modelCalls: 0 }); equal(f.heads.length, 0); equal(f.retained.length, 0);
+  }
+});
+
+Deno.test("an explicit complete scope still admits its own pending privacy proofs before one subject read", async () => {
+  const f = await fixture(), req = f.request();
+  const result = await resolveSubjectBatch(f.store, { ...req, allowed_source_hashes: req.expected_source_hashes }, origin,
+    { capture: f.capture, vision: f.vision, now: () => new Date(at) });
+  equal(result.status, "resolved"); equal(f.counts(), { fetches: 4, modelCalls: 1 }); equal(f.heads.length, 2);
+});
+
 Deno.test("unsupported native revisions, unavailable detectors, junk and clocks refuse before any fetch or provider", async () => {
   for (const change of [{ classifier_revision: 99 }, { face_revision: 99 }, { policy_version: 2 }, { os_major: 27 },
     { face_completed: false }, { classifier_completed: false }, { source_sha256: "f".repeat(64) }, { source_byte_length: 0 },
