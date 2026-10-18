@@ -82,8 +82,8 @@ try {
     {cwd:root,env:childEnv,encoding:'utf8',maxBuffer:8*1024*1024});
   log+=`${cabFixture.stdout||''}\n${cabFixture.stderr||''}`;
   assert.equal(cabFixture.status,0,log.split('\n').slice(-20).join('\n'));
-  const cabHandler=spawnSync('deno',['test',...(ci?[]:['--cached-only']),'--allow-env',`--allow-run=${executable('psql')}`,
-    'supabase/functions/ingest-observation/cabListingCapture.test.ts'],
+  const cabHandler=spawnSync('deno',['test',...(ci?[]:['--cached-only']),'--node-modules-dir=none','--allow-env',`--allow-run=${executable('psql')}`,
+    'supabase/functions/ingest-observation/cabListingCapture.contract.ts'],
     {cwd:root,env:{...childEnv,CAB_LINEAGE_PSQL:executable('psql'),CAB_LINEAGE_PSQL_ARGS:JSON.stringify(psql)},encoding:'utf8',maxBuffer:8*1024*1024});
   log+=`${cabHandler.stdout||''}\n${cabHandler.stderr||''}`;
   assert.equal(cabHandler.status,0,log.split('\n').slice(-35).join('\n'));
