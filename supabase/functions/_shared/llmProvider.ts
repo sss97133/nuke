@@ -1,4 +1,5 @@
 import { geminiFetch } from './geminiGuard.ts';
+import { ProviderHTTPError } from './providerDiagnostic.ts';
 /**
  * Unified LLM Provider System
  * Supports OpenAI, Anthropic, and Google Gemini
@@ -177,7 +178,8 @@ export async function callLLM(
     };
   } catch (error: any) {
     const duration = Date.now() - startTime;
-    console.error(`${logPrefix} ❌ Failed (${duration}ms):`, error.message);
+    console.error(`${logPrefix} ❌ Failed (${duration}ms):`,
+      error instanceof ProviderHTTPError ? error.diagnostic.code : 'provider_call_failed');
     throw error;
   }
 }
@@ -198,8 +200,7 @@ async function callOpenAI(config: LLMConfig, messages: any[], options?: any): Pr
   });
   
   if (!response.ok) {
-    const error = await response.text();
-    throw new Error(`OpenAI API error: ${response.status} - ${error}`);
+    throw new ProviderHTTPError('openai', response.status, await response.json().catch(() => null));
   }
   
   const data = await response.json();
@@ -237,8 +238,7 @@ async function callAnthropic(config: LLMConfig, messages: any[], options?: any):
   });
   
   if (!response.ok) {
-    const error = await response.text();
-    throw new Error(`Anthropic API error: ${response.status} - ${error}`);
+    throw new ProviderHTTPError('anthropic', response.status, await response.json().catch(() => null));
   }
   
   const data = await response.json();
@@ -333,8 +333,7 @@ async function callGoogle(config: LLMConfig, messages: any[], options?: any): Pr
   , 'llmProvider');
   
   if (!response.ok) {
-    const error = await response.text();
-    throw new Error(`Google API error: ${response.status} - ${error}`);
+    throw new ProviderHTTPError('google', response.status, await response.json().catch(() => null), response.headers.has('x-gemini-guard'));
   }
   
   const data = await response.json();

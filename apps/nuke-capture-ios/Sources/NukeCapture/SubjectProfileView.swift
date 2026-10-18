@@ -45,6 +45,9 @@ struct ObservedCarsSection: View {
                     if ObservedCarRead.ownAccount(userId, activeUserId: resolution.lastSummaryUserId) != nil,
                        let summary = resolution.lastSummary {
                         Text(summary).font(.caption).foregroundStyle(.secondary)
+                        if resolution.providerNeedsReview {
+                            NavigationLink("Review Connected accounts") { ConnectedAccountsView() }
+                        }
                     }
                     if let savedAt { savedNotice(savedAt) }
                     ForEach(Array(pages.enumerated()), id: \.offset) { _, page in

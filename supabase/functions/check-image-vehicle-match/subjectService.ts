@@ -160,7 +160,9 @@ export async function resolveSubjectBatch(store: SubjectStore, request: SubjectR
       { text: SUBJECT_PROMPT }, ...sources.flatMap(source => [{ text: `Photo image_id=${source.id}` }, { image_key: source.id }]),
     ], dependencies.vision, { limits: { output_tokens: 1600 } });
     if (!result.model_result) return { ...base, status: "refused", refusal: result.refusal,
-      unavailable_inputs: capture.unavailable, candidate_scope };
+      unavailable_inputs: capture.unavailable, candidate_scope,
+      ...(result.provider_diagnostics?.length ? { provider_diagnostics: result.provider_diagnostics } : {}),
+      ...(result.provider_attempt_coverage ? { provider_attempt_coverage: result.provider_attempt_coverage } : {}) };
     const inputs: SubjectInput[] = sources.map(source => {
       const receipt = capture.inputs.find(input => input.key === source.id)!.receipt;
       const prior = readings.filter(reading => reading.image_id === source.id && reading.is_active && reading.cluster_id &&

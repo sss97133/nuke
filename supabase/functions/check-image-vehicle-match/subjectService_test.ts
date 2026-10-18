@@ -1,6 +1,7 @@
 import { resolveSubjectBatch, subjectOwnerId, type CandidateScope, type SubjectEnvelope, type SubjectReading,
   type SubjectSource, type SubjectStore, type SubjectDependencies } from "./subjectService.ts";
 import type { VisionInputCapture } from "./inputCustody.ts";
+import { VisionProviderUnavailable } from "../_shared/providerDiagnostic.ts";
 const uid = "00000000-0000-4000-8000-000000000001", other = "00000000-0000-4000-8000-000000000002";
 const ids = ["10000000-0000-4000-8000-000000000001", "10000000-0000-4000-8000-000000000002", "10000000-0000-4000-8000-000000000003"];
 const cluster = "20000000-0000-4000-8000-000000000001";
@@ -198,4 +199,24 @@ Deno.test("protected data reuse cannot restore a later membership withdrawal", a
   equal(result.status, "unresolved"); equal(result.persisted_image_ids, []);
   equal(result.unresolved.map(row => row.image_id), ids.slice(0, 2));
   equal(f.writes.length, before); equal(f.counts.models, 1);
+});
+Deno.test("typed provider failure reaches the owner receipt without saving readings or permitting a paid replay", async () => {
+  const f = fixture();
+  f.dependencies.vision = async () => {
+    f.counts.models++;
+    throw new VisionProviderUnavailable([
+      { code: "credential_not_accepted", provider: "anthropic", http_status: 401, credential_kind: "oauth" },
+      { code: "no_connected_key", provider: "google", http_status: null, credential_kind: null },
+      { code: "credential_lookup_failed", provider: "openai", http_status: null, credential_kind: null },
+    ]);
+  };
+  const result = await f.run();
+  equal(result.status, "refused");
+  equal("refusal" in result && result.refusal, "provider_unavailable");
+  equal("provider_diagnostics" in result && result.provider_diagnostics?.length, 3);
+  equal("provider_attempt_coverage" in result && result.provider_attempt_coverage?.no_reading_started, true);
+  equal(f.readings.length, 0); equal(f.writes.length, 0); equal(f.counts.models, 1);
+  const replay = await resolveSubjectBatch(f.store, { ...f.request, reuse_only: true }, "https://example.test", f.dependencies);
+  equal("refusal" in replay && replay.refusal, "retained_reading_unavailable");
+  equal(f.counts.models, 1); equal(f.counts.captures, 1);
 });

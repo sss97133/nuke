@@ -1,3 +1,5 @@
+import { VisionProviderUnavailable, safeProviderDiagnostics, type ProviderDiagnostic, type ProviderAttemptCoverage } from "../_shared/providerDiagnostic.ts";
+
 /** Binary image custody for this owner's comparison and grouping reads. This
  * fetches image objects, not HTML pages. No thumbnail is chosen automatically.
  * Provider selection, credentials and billing remain in visionFallback.ts.
@@ -254,8 +256,10 @@ export async function runCapturedVision<Result extends PinnedModelResult>(
   options: InputCustodyOptions = {},
 ) {
   const limits = limitsFor(options);
-  const result = (model_result: Result | null, refusal: string | null, submitted_keys: string[] = []) =>
-    ({ capture, model_result, refusal, submitted_keys });
+  const result = (model_result: Result | null, refusal: string | null, submitted_keys: string[] = [],
+    provider_diagnostics: ProviderDiagnostic[] = [], provider_attempt_coverage?: ProviderAttemptCoverage) =>
+    ({ capture, model_result, refusal, submitted_keys, ...(provider_diagnostics.length ? { provider_diagnostics } : {}),
+      ...(provider_attempt_coverage ? { provider_attempt_coverage } : {}) });
   if (!capture.required_available || !capture.inputs.length) return result(null, "required_input_unavailable");
   const inputs = new Map(capture.inputs.map(input => [input.key, input]));
   const parts: Array<{ text: string } | { imageUrl: string }> = [];
@@ -278,7 +282,11 @@ export async function runCapturedVision<Result extends PinnedModelResult>(
   try {
     const response = await model({ parts, maxTokens: limits.output_tokens });
     return result(response, response ? null : "provider_unavailable", submitted);
-  } catch { return result(null, "provider_call_failed", submitted); }
+  } catch (error) {
+    return error instanceof VisionProviderUnavailable
+      ? result(null, "provider_unavailable", submitted, safeProviderDiagnostics(error.diagnostics), error.coverage)
+      : result(null, "provider_call_failed", submitted);
+  }
 }
 
 export const TRUSTED_RENDER_PARAMETERS = Object.freeze({ width: 1600, height: 1600, resize: "contain", quality: 85 });
