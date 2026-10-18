@@ -161,6 +161,7 @@ const VehiclePhotoLightbox: React.FC = () => {
       .from('vehicle_images')
       .select('id, image_url, taken_at, source')
       .eq('id', target.id)
+      .eq('vehicle_id', vehicleId)
       .maybeSingle()
       .then(({ data }: { data: PhotoRow | null }) => {
         if (cancelled || !data?.image_url) return;
