@@ -14,7 +14,7 @@
 -- Output shape and the presentations subquery are unchanged; CREATE OR REPLACE keeps the existing grants.
 --
 -- Revert: re-run the read_broadcast_entity_profile definition from 20261018183000.
-SET statement_timeout = '30s';
+SET statement_timeout = '10s';
 SET lock_timeout = '5s';
 
 CREATE OR REPLACE FUNCTION public.read_broadcast_entity_profile(p_organization_id uuid, p_limit integer DEFAULT 20)
