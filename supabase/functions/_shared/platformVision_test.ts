@@ -9,11 +9,13 @@ const opts = { parts: [{ text: "offline fixture" }, { imageUrl: "data:image/jpeg
 function fixture() {
   const events: string[] = [];
   const deps = {
-    env: (name: string) => name === "NUKE_PHOTO_ANTHROPIC_API_KEY" ? "fixture" : undefined,
+    env: (name: string) => name === "NUKE_PHOTO_ANTHROPIC_API_KEY" ? "fixture"
+      : name === "NUKE_PHOTO_ANTHROPIC_WORKSPACE_ID" ? "workspace-fixture" : undefined,
     reserve: async () => { events.push("reserve"); return { status: "reserved" as const, hold_id: "hold" }; },
     settle: async (_db: unknown, _user: string, _hold: string, cents: number) => { events.push(`settle:${cents}`); },
     call: async (config: any) => {
       equal([config.provider, config.source, config.model], ["anthropic", "system", "claude-haiku-5-5"]);
+      equal(config.workspaceId, "workspace-fixture");
       events.push("inference");
       return { content: '{"subjects":[]}', usage: { input_tokens: 5000, output_tokens: 300 }, duration_ms: 1 } as any;
     },

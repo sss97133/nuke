@@ -135,7 +135,8 @@ export async function platformVisionMultiJSON(
   const settle = deps.settle ?? settleHold;
   let response: any;
   try {
-    response = await (deps.call ?? callLLM)({ provider: "anthropic", model, apiKey, source: "system" },
+    response = await (deps.call ?? callLLM)({ provider: "anthropic", model, apiKey, source: "system",
+      workspaceId: env("NUKE_PHOTO_ANTHROPIC_WORKSPACE_ID") },
       [{ role: "user", content: opts.parts.map(part => "text" in part ? { type: "text", text: part.text }
         : { type: "image_url", image_url: { url: part.imageUrl } }) }], { maxTokens: opts.maxTokens, vision: true });
   } catch (error) {

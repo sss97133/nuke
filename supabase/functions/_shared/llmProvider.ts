@@ -14,6 +14,7 @@ export interface LLMConfig {
   model: string;
   apiKey: string;
   source: 'user' | 'system';
+  workspaceId?: string;
 }
 
 export interface ProviderModel {
@@ -226,6 +227,7 @@ async function callAnthropic(config: LLMConfig, messages: any[], options?: any):
     headers: {
       'x-api-key': config.apiKey,
       'anthropic-version': '2023-06-01',
+      ...(config.workspaceId ? { 'anthropic-workspace-id': config.workspaceId } : {}),
       'Content-Type': 'application/json',
     },
     body: JSON.stringify({
