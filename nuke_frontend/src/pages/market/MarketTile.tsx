@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useLayoutEffect, useRef, useState } from 'react';
 import { moveFill, moveText, moveTextShort, pct, textWidth, tileClass, tileName, GATE_MIN, type Baseline, type Callout, type Move } from './mapScale';
 import { venueOf } from './FamilySalesChart';
 import './MarketMap.css';
@@ -69,21 +69,21 @@ interface TileProps {
   h: number;
   onClick: (e: React.MouseEvent | React.KeyboardEvent) => void;
   title?: string;
+  describedBy?: string;
 }
 
-export function MarketTile({ node, move, basis, x, y, w, h, onClick, title }: TileProps) {
+export function MarketTile({ node, move, basis, x, y, w, h, onClick, title, describedBy }: TileProps) {
   const t = tileLines(node, move, w, h, basis);
   const style = { left: x, top: y, width: w, height: h, backgroundColor: tileFill(move),
     '--name-size': `${t.nameSize ?? 0}px`, '--move-size': `${t.moveSize}px` } as React.CSSProperties;
   return (
-    <div className={`market-tile market-tile--${move.kind}`} style={style} aria-label={node.name} title={title}
-      role="button" tabIndex={0}
-      onClick={(e) => { e.stopPropagation(); onClick(e); }}
-      onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onClick(e); } }}>
-      {t.nameSize != null && <div className="market-tile__name">{t.name}</div>}
-      {t.move && <div className="market-tile__move">{t.move}</div>}
-      {t.stat && <div className={`market-tile__stat${t.cls === 'L' ? ' market-tile__stat--small' : ''}`}>{t.stat}</div>}
-    </div>
+    <button type="button" className={`market-tile market-tile--${move.kind}`} style={style} aria-label={node.name} title={title}
+      aria-describedby={describedBy}
+      onClick={(e) => { e.stopPropagation(); onClick(e); }}>
+      {t.nameSize != null && <span className="market-tile__name">{t.name}</span>}
+      {t.move && <span className="market-tile__move">{t.move}</span>}
+      {t.stat && <span className={`market-tile__stat${t.cls === 'L' ? ' market-tile__stat--small' : ''}`}>{t.stat}</span>}
+    </button>
   );
 }
 
@@ -121,14 +121,26 @@ function CardBody({ node, move, base, windowLabel, gateMin = GATE_MIN }: { node:
   );
 }
 
-/** The hover card on a desktop, kept on screen. */
-export function MarketCard({ node, move, base, x, y, windowLabel, gateMin }: { node: MarketNode; move: Move; base: Baseline | null; x: number; y: number; windowLabel?: string; gateMin?: number }) {
-  const left = typeof window !== 'undefined' && x > window.innerWidth - 320 ? x - 316 : x + 14;
-  const top = typeof window !== 'undefined' && y > window.innerHeight - 240 ? Math.max(8, y - 220) : y + 14;
+/** The hover/focus card, positioned using its rendered height rather than an assumed text length. */
+export function MarketCard({ node, move, base, x, y, windowLabel, gateMin, id }: { node: MarketNode; move: Move; base: Baseline | null; x: number; y: number; windowLabel?: string; gateMin?: number; id?: string }) {
+  const card = useRef<HTMLDivElement>(null);
+  const [height, setHeight] = useState(240);
+  useLayoutEffect(() => {
+    const element = card.current;
+    if (!element) return;
+    const measure = () => setHeight(element.getBoundingClientRect().height);
+    measure();
+    if (typeof ResizeObserver === 'undefined') return;
+    const observer = new ResizeObserver(measure);
+    observer.observe(element);
+    return () => observer.disconnect();
+  }, []);
+  const left = typeof window === 'undefined' ? x + 14 : Math.max(8, Math.min(x + 14, window.innerWidth - 308));
+  const top = typeof window !== 'undefined' && y + 14 + height > window.innerHeight - 8 ? Math.max(8, y - height - 14) : y + 14;
   return (
-    <div className="market-card" style={{ left, top }} role="tooltip">
+    <div ref={card} id={id} className="market-card" style={{ left, top }} role="tooltip">
       <CardBody node={node} move={move} base={base} windowLabel={windowLabel} gateMin={gateMin} />
-      <div className="market-card__foot">click to open</div>
+      <div className="market-card__foot">Enter or click to open</div>
     </div>
   );
 }

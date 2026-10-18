@@ -15,6 +15,9 @@ vi.mock('../../hooks/useAdminAccess', () => ({ useAdminAccess: () => ({ isAdmin:
 vi.mock('../../hooks/useViewHistory', () => ({ useViewHistory: () => ({ recordView() {}, endView() {} }) }));
 vi.mock('./hooks/useVehicleIntel', () => ({ useVehicleIntel: () => ({ vehicleIntel: null, vehicleIntelLoading: false }) }));
 import { VehicleProfileProvider, useVehicleProfile } from './VehicleProfileContext';
+import QuickStatsBar from './QuickStatsBar';
+import { PopupStackContext } from '../../components/popups/PopupStack';
+import { CommentsPopup } from '../../components/popups/CommentsPopup';
 
 const json = (body: unknown, status = 200) => new Response(JSON.stringify(body), {
   status, headers: { 'Content-Type': 'application/json', 'Content-Range': '0-0/0' },
@@ -24,12 +27,13 @@ function deferred() {
   const promise = new Promise<Response>(done => { resolve = done; });
   return { promise, resolve };
 }
-type RequestRecord = { url: URL; method: string; body: any };
+type RequestRecord = { url: URL; method: string; body: any; headers: Headers };
 let root: Root, container: HTMLDivElement, go: ReturnType<typeof useNavigate>;
 let current: ReturnType<typeof useVehicleProfile>, a: string, b: string, merged: string;
 let serial = 0;
 let frames: any[], requests: RequestRecord[], functions: ReturnType<typeof vi.fn>;
 let allowedSyntheticScrapes: Set<string>;
+let popupCalls: { content: React.ReactElement<any>; title: string }[];
 let reply: (request: RequestRecord) => Response | Promise<Response> | undefined;
 
 function Probe() {
@@ -45,6 +49,15 @@ function Probe() {
   };
   useLayoutEffect(() => { frames.push(frame); });
   return <output>{JSON.stringify(frame)}</output>;
+}
+
+function CountConsumer() {
+  const [popup, setPopup] = React.useState<React.ReactNode>(null);
+  return <PopupStackContext.Provider value={{ push: (content: React.ReactElement<any>, title: string) => {
+    popupCalls.push({ content, title }); setPopup(content); return 'count-popup';
+  } } as any}>
+    <Probe /><div data-quick-stats><QuickStatsBar /></div><div data-count-popup>{popup}</div>
+  </PopupStackContext.Provider>;
 }
 
 const photo = (id: string) => ({ id: `${id}-photo`, image_url: `https://images.example/${id}.jpg`,
@@ -66,7 +79,7 @@ beforeEach(() => {
   vi.useFakeTimers();
   const id = (tail: string) => `00000000-0000-${String(++serial).padStart(4, '0')}-0000-${tail.padStart(12, '0')}`;
   a = id('1'); b = id('2'); merged = id('3');
-  frames = []; requests = []; reply = () => undefined; allowedSyntheticScrapes = new Set();
+  frames = []; requests = []; reply = () => undefined; allowedSyntheticScrapes = new Set(); popupCalls = [];
   const cache = new Map<string, string>();
   vi.stubGlobal('localStorage', {
     getItem: (key: string) => cache.get(key) ?? null,
@@ -80,7 +93,9 @@ beforeEach(() => {
     auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false, storageKey: `lifecycle-${serial}` },
     global: { fetch: async (input, init) => {
       const request = { url: new URL(input instanceof Request ? input.url : String(input)),
-        method: init?.method ?? 'GET', body: typeof init?.body === 'string' ? JSON.parse(init.body) : null };
+        method: init?.method ?? (input instanceof Request ? input.method : 'GET'),
+        headers: new Headers(init?.headers ?? (input instanceof Request ? input.headers : undefined)),
+        body: typeof init?.body === 'string' ? JSON.parse(init.body) : null };
       requests.push(request);
       const path = request.url.pathname;
       if (path.startsWith('/functions/v1/')) {
@@ -120,10 +135,10 @@ afterEach(async () => {
   expect(globalThis.fetch).not.toHaveBeenCalled();
   container.remove(); vi.useRealTimers(); vi.unstubAllGlobals(); vi.restoreAllMocks();
 });
-async function render(strict = false) {
+async function render(strict = false, counts = false) {
   const app = <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
     <MemoryRouter initialEntries={[`/vehicle/${a}`]}><Routes>
-      <Route path="/vehicle/:vehicleId" element={<VehicleProfileProvider><Probe /></VehicleProfileProvider>} />
+      <Route path="/vehicle/:vehicleId" element={<VehicleProfileProvider>{counts ? <CountConsumer /> : <Probe />}</VehicleProfileProvider>} />
       <Route path="/away" element={<div>Away</div>} />
       <Route path="*" element={<div>Redirected</div>} />
     </Routes></MemoryRouter>
@@ -563,4 +578,301 @@ it('does not publish synthetic BaT scraper photos from the prior vehicle under B
   await visit(b);
   await release(old, json({ success: true, data: { images: [fallbackPhoto('obsolete-bat')] } }));
   expect(current.fallbackListingImageUrls).toEqual([fallbackPhoto(b)]);
+});
+
+type CountKind = 'comments' | 'observations';
+const countTable = (kind: CountKind) => kind === 'comments' ? 'vehicle_comments_unified' : 'vehicle_observations';
+const countRead = (request: RequestRecord, kind: CountKind, id: string) => request.method === 'HEAD'
+  && endpoint(request, countTable(kind), id);
+const counted = (count: number, status = 200) => new Response(null, {
+  status, headers: { 'Content-Range': `0-0/${count}`, 'Content-Type': 'application/json' },
+});
+const withoutCount = (id: string, kind: CountKind) => ({ ...profile(id), stats:
+  kind === 'comments' ? { observation_count: 11 } : { comment_count: 7 } });
+const tickDeferredCounts = async () => { await act(async () => vi.advanceTimersByTimeAsync(500)); };
+async function countDisplay(kind: CountKind) {
+  const stats = container.querySelector('[data-quick-stats]')!;
+  if (kind === 'observations') return { stats: stats.textContent };
+  await act(async () => stats.querySelector('[role="button"]')!.dispatchEvent(new MouseEvent('click', { bubbles: true })));
+  const popup = popupCalls.at(-1)!;
+  return { stats: stats.textContent, popupVehicle: popup.content.props.vehicleId,
+    popupExpected: popup.content.props.expectedCount, popupIsComments: popup.content.type === CommentsPopup,
+    popupTitle: popup.title, popupText: container.querySelector('[data-count-popup]')!.textContent };
+}
+
+it.each<CountKind>(['comments', 'observations'])('keeps obsolete A fallback %s out of B quick stats and popup', async kind => {
+  const old = deferred();
+  reply = request => endpoint(request, 'rpc/get_vehicle_profile_data', a) ? json(withoutCount(a, kind))
+    : countRead(request, kind, a) ? old.promise : undefined;
+  await render(false, true);
+  if (kind === 'observations') await tickDeferredCounts();
+  const read = requests.find(request => countRead(request, kind, a))!;
+  expect(read.headers.get('prefer')).toContain('count=exact');
+  expect(read.url.searchParams.get('select')).toBe(kind === 'comments' ? 'comment_id' : 'id');
+  await visit(b);
+  await release(old, counted(83));
+  const result = await countDisplay(kind);
+  expect(result).toMatchObject(kind === 'comments' ? { stats: expect.stringContaining('7 comments'),
+    popupVehicle: b, popupExpected: 7, popupIsComments: true, popupText: expect.stringContaining('/ 7 expected') }
+    : { stats: expect.stringContaining('11 observations') });
+});
+
+it.each<CountKind>(['comments', 'observations'])('distinguishes A fallback %s from a later A visit', async kind => {
+  const old = deferred(); let reads = 0;
+  reply = request => endpoint(request, 'rpc/get_vehicle_profile_data', a) ? json(withoutCount(a, kind))
+    : countRead(request, kind, a) ? ++reads === 1 ? old.promise : counted(23) : undefined;
+  await render(false, true);
+  if (kind === 'observations') await tickDeferredCounts();
+  await visit(b); await visit(a);
+  if (kind === 'observations') await tickDeferredCounts();
+  expect(kind === 'comments' ? current.totalCommentCount : current.observationCount).toBe(23);
+  await release(old, counted(83));
+  const result = await countDisplay(kind);
+  expect(result).toMatchObject(kind === 'comments' ? { stats: expect.stringContaining('23 comments'),
+    popupVehicle: a, popupExpected: 23, popupIsComments: true }
+    : { stats: expect.stringContaining('23 observations') });
+  expect(reads).toBe(2);
+});
+
+it('preserves a newer same-ID RPC comment count against a previously started fallback', async () => {
+  const old = deferred(); let reads = 0;
+  reply = request => endpoint(request, 'rpc/get_vehicle_profile_data', a) ? json(++reads === 1
+    ? withoutCount(a, 'comments') : { ...profile(a), stats: { comment_count: 29, observation_count: 11 } })
+    : countRead(request, 'comments', a) ? old.promise : undefined;
+  await render(false, true);
+  await act(async () => current.reloadVehicle());
+  expect(current.totalCommentCount).toBe(29);
+  expect(requests.filter(request => countRead(request, 'comments', a))).toHaveLength(1);
+  await release(old, counted(83));
+  expect(await countDisplay('comments')).toMatchObject({ stats: expect.stringContaining('29 comments'),
+    popupVehicle: a, popupExpected: 29, popupIsComments: true });
+});
+
+it('keeps known RPC counts useful without fallback HEADs after the deferred boundary', async () => {
+  await render(false, true); await tickDeferredCounts();
+  expect(requests.filter(request => countRead(request, 'comments', a) || countRead(request, 'observations', a))).toEqual([]);
+  expect(await countDisplay('comments')).toMatchObject({ stats: expect.stringContaining('7 comments'),
+    popupVehicle: a, popupExpected: 7, popupIsComments: true });
+  expect(container.querySelector('[data-quick-stats]')!.textContent).toContain('11 observations');
+});
+
+it.each(['rpc', 'row'])('preserves newer same-ID %s observation authority against an older fallback', async authority => {
+  const old = deferred(); let reads = 0;
+  reply = request => endpoint(request, 'rpc/get_vehicle_profile_data', a) ? ++reads === 1
+    ? json(withoutCount(a, 'observations'))
+    : json(authority === 'rpc' ? { ...profile(a), stats: { comment_count: 7, observation_count: 29 } }
+      : { ...withoutCount(a, 'observations'), vehicle: { ...profile(a).vehicle, observation_count: 29 } })
+    : countRead(request, 'observations', a) ? old.promise : undefined;
+  await render(false, true); await tickDeferredCounts();
+  await act(async () => current.reloadVehicle());
+  expect(current.observationCount).toBe(29);
+  await release(old, counted(83));
+  expect(await countDisplay('observations')).toMatchObject({ stats: expect.stringContaining('29 observations') });
+});
+
+it.each<CountKind>(['comments', 'observations'])('preserves a valid pending %s fallback across unchanged-input reload without newer authority', async kind => {
+  const pending = deferred();
+  reply = request => endpoint(request, 'rpc/get_vehicle_profile_data', a) ? json(withoutCount(a, kind))
+    : countRead(request, kind, a) ? pending.promise : undefined;
+  await render(false, true);
+  if (kind === 'observations') await tickDeferredCounts();
+  await act(async () => current.reloadVehicle());
+  await release(pending, counted(23));
+  const result = await countDisplay(kind);
+  expect(result).toMatchObject(kind === 'comments' ? { stats: expect.stringContaining('23 comments'),
+    popupVehicle: a, popupExpected: 23, popupIsComments: true }
+    : { stats: expect.stringContaining('23 observations') });
+  expect(requests.filter(request => countRead(request, kind, a))).toHaveLength(1);
+});
+
+it.each<CountKind>(['comments', 'observations'])('preserves current fallback %s zero and error behavior', async kind => {
+  reply = request => endpoint(request, 'rpc/get_vehicle_profile_data', a) ? json(withoutCount(a, kind))
+    : countRead(request, kind, a) ? counted(0) : undefined;
+  await render(false, true);
+  if (kind === 'observations') await tickDeferredCounts();
+  expect(kind === 'comments' ? current.totalCommentCount : current.observationCount).toBe(0);
+  expect(container.querySelector('[data-quick-stats]')!.textContent).not.toContain(`0 ${kind}`);
+  // A new subject with a denied HEAD cannot revive the earlier subject's total.
+  reply = request => endpoint(request, 'rpc/get_vehicle_profile_data', b) ? json(withoutCount(b, kind))
+    : countRead(request, kind, b) ? counted(999, 403) : undefined;
+  await visit(b);
+  if (kind === 'observations') await tickDeferredCounts();
+  expect(kind === 'comments' ? current.totalCommentCount : current.observationCount).toBe(0);
+  expect(container.querySelector('[data-quick-stats]')!.textContent).not.toContain('999');
+});
+
+it.each<CountKind>(['comments', 'observations'])('withholds A %s arriving during pending B after B loads without its own count', async kind => {
+  const old = deferred(), nextProfile = deferred(), nextCount = deferred();
+  reply = request => endpoint(request, 'rpc/get_vehicle_profile_data', a) ? json(withoutCount(a, kind))
+    : endpoint(request, 'rpc/get_vehicle_profile_data', b) ? nextProfile.promise
+    : countRead(request, kind, a) ? old.promise : countRead(request, kind, b) ? nextCount.promise : undefined;
+  await render(false, true);
+  if (kind === 'observations') await tickDeferredCounts();
+  await visit(b);
+  await release(old, counted(83));
+  expect(current.vehicle).toBeNull();
+  expect(container.querySelector('[data-quick-stats]')!.textContent).not.toContain('83');
+  await release(nextProfile, json(withoutCount(b, kind)));
+  if (kind === 'observations') await tickDeferredCounts();
+  expect(kind === 'comments' ? current.totalCommentCount : current.observationCount).toBe(0);
+  await release(nextCount, counted(23));
+  expect(await countDisplay(kind)).toMatchObject(kind === 'comments'
+    ? { stats: expect.stringContaining('23 comments'), popupVehicle: b, popupExpected: 23 }
+    : { stats: expect.stringContaining('23 observations') });
+});
+
+it.each<CountKind>(['comments', 'observations'])('preserves newer authoritative %s zero against an old HEAD', async kind => {
+  const old = deferred(); let reads = 0;
+  reply = request => endpoint(request, 'rpc/get_vehicle_profile_data', a) ? json(++reads === 1
+    ? withoutCount(a, kind) : { ...profile(a), stats: { comment_count: 0, observation_count: 0 } })
+    : countRead(request, kind, a) ? old.promise : undefined;
+  await render(false, true);
+  if (kind === 'observations') await tickDeferredCounts();
+  await act(async () => current.reloadVehicle());
+  await release(old, counted(83));
+  expect(kind === 'comments' ? current.totalCommentCount : current.observationCount).toBe(0);
+  expect(container.querySelector('[data-quick-stats]')!.textContent).not.toContain('83');
+  expect(requests.filter(request => countRead(request, kind, a))).toHaveLength(1);
+});
+
+it('keeps the 500 ms observation defer and cancels before a departed subject starts a HEAD', async () => {
+  reply = request => endpoint(request, 'rpc/get_vehicle_profile_data', a) ? json(withoutCount(a, 'observations')) : undefined;
+  await render(false, true);
+  await act(async () => vi.advanceTimersByTimeAsync(499));
+  expect(requests.filter(request => countRead(request, 'observations', a))).toEqual([]);
+  await visit(b); await tickDeferredCounts();
+  expect(requests.filter(request => countRead(request, 'observations', a) || countRead(request, 'observations', b))).toEqual([]);
+  expect(current.observationCount).toBe(11);
+});
+
+it.each([0, 19])('keeps maintained row observation_count=%s useful without a fallback HEAD', async count => {
+  reply = request => endpoint(request, 'rpc/get_vehicle_profile_data', a) ? json({ ...withoutCount(a, 'observations'),
+    vehicle: { ...profile(a).vehicle, observation_count: count } }) : undefined;
+  await render(false, true); await tickDeferredCounts();
+  expect(current.observationCount).toBe(count);
+  expect(requests.filter(request => countRead(request, 'observations', a))).toEqual([]);
+});
+
+it('keeps RPC zero counts authoritative without fallback requests', async () => {
+  reply = request => endpoint(request, 'rpc/get_vehicle_profile_data', a) ? json({ ...profile(a),
+    stats: { comment_count: 0, observation_count: 0 } }) : undefined;
+  await render(false, true); await tickDeferredCounts();
+  expect(current.totalCommentCount).toBe(0); expect(current.observationCount).toBe(0);
+  expect(requests.filter(request => countRead(request, 'comments', a) || countRead(request, 'observations', a))).toEqual([]);
+});
+
+it('keeps current fallback counts and the actual popup query useful through StrictMode and harmless render', async () => {
+  reply = request => endpoint(request, 'rpc/get_vehicle_profile_data', a) ? json({ ...profile(a), stats: {} })
+    : countRead(request, 'comments', a) ? counted(37) : countRead(request, 'observations', a) ? counted(41) : undefined;
+  await render(true, true); await tickDeferredCounts();
+  await act(async () => current.setVehicleHeaderHeight(92));
+  expect(await countDisplay('comments')).toMatchObject({ stats: expect.stringContaining('37 comments'),
+    popupVehicle: a, popupExpected: 37, popupIsComments: true, popupTitle: 'COMMENTS (37)' });
+  expect(container.querySelector('[data-quick-stats]')!.textContent).toContain('41 observations');
+  expect(requests.filter(request => countRead(request, 'comments', a))).toHaveLength(1);
+  expect(requests.filter(request => countRead(request, 'observations', a))).toHaveLength(1);
+  const popupRead = requests.find(request => request.method === 'GET' && endpoint(request, 'vehicle_comments_unified', a))!;
+  expect(popupRead.url.searchParams.get('limit')).toBe('200');
+  expect(popupRead.url.searchParams.get('order')).toBe('observed_at.desc');
+  expect(popupRead.url.searchParams.get('select')).toBe('comment_id,comment_text,observed_at,author_username,comment_type,bid_amount,is_seller,platform');
+});
+
+it.each<CountKind>(['comments', 'observations'])('keeps current %s unavailable when the HEAD has no count header', async kind => {
+  reply = request => endpoint(request, 'rpc/get_vehicle_profile_data', a) ? json(withoutCount(a, kind))
+    : countRead(request, kind, a) ? new Response(null, { status: 200 }) : undefined;
+  await render(false, true);
+  if (kind === 'observations') await tickDeferredCounts();
+  expect(kind === 'comments' ? current.totalCommentCount : current.observationCount).toBe(0);
+  expect(requests.filter(request => countRead(request, kind, a))).toHaveLength(1);
+});
+
+it.each<CountKind>(['comments', 'observations'])('does not publish unmounted %s into a later provider', async kind => {
+  const old = deferred();
+  reply = request => endpoint(request, 'rpc/get_vehicle_profile_data', a) ? json(withoutCount(a, kind))
+    : countRead(request, kind, a) ? old.promise : undefined;
+  await render(false, true);
+  if (kind === 'observations') await tickDeferredCounts();
+  await act(async () => go('/away'));
+  await visit(b); await release(old, counted(83));
+  expect(await countDisplay(kind)).toMatchObject(kind === 'comments'
+    ? { stats: expect.stringContaining('7 comments'), popupVehicle: b, popupExpected: 7 }
+    : { stats: expect.stringContaining('11 observations') });
+});
+
+it.each<CountKind>(['comments', 'observations'])('keeps %s superseded after an authoritative reload and a later count-less reload', async kind => {
+  const old = deferred(); let reads = 0;
+  const authority = kind === 'comments' ? { comment_count: 31 } : { observation_count: 31 };
+  reply = request => endpoint(request, 'rpc/get_vehicle_profile_data', a) ? json(++reads === 2
+    ? { ...profile(a), stats: authority } : { ...profile(a), stats: {} })
+    : countRead(request, kind, a) ? old.promise : undefined;
+  await render(false, true); await tickDeferredCounts();
+  await act(async () => current.reloadVehicle());
+  expect(kind === 'comments' ? current.totalCommentCount : current.observationCount).toBe(31);
+  await act(async () => current.reloadVehicle());
+  expect(kind === 'comments' ? current.totalCommentCount : current.observationCount).toBe(31);
+  await release(old, counted(87));
+  expect(await countDisplay(kind)).toMatchObject(kind === 'comments'
+    ? { stats: expect.stringContaining('31 comments'), popupVehicle: a, popupExpected: 31, popupIsComments: true }
+    : { stats: expect.stringContaining('31 observations') });
+  expect(requests.filter(request => countRead(request, kind, a))).toHaveLength(1);
+});
+
+it.each<CountKind>(['comments', 'observations'])('keeps %s superseded while a third profile reload is pending', async kind => {
+  const old = deferred(), pending = deferred(); let reads = 0;
+  const authority = kind === 'comments' ? { comment_count: 31 } : { observation_count: 31 };
+  reply = request => endpoint(request, 'rpc/get_vehicle_profile_data', a) ? ++reads === 3 ? pending.promise
+    : json(reads === 2 ? { ...profile(a), stats: authority } : { ...profile(a), stats: {} })
+    : countRead(request, kind, a) ? old.promise : undefined;
+  await render(false, true); await tickDeferredCounts();
+  await act(async () => current.reloadVehicle());
+  await act(async () => { current.reloadVehicle(); });
+  expect(current.loading).toBe(true);
+  await release(old, counted(87));
+  const during = await countDisplay(kind);
+  await release(pending, json({ ...profile(a), stats: {} }));
+  expect(during).toMatchObject(kind === 'comments'
+    ? { stats: expect.stringContaining('31 comments'), popupVehicle: a, popupExpected: 31 }
+    : { stats: expect.stringContaining('31 observations') });
+  expect(kind === 'comments' ? current.totalCommentCount : current.observationCount).toBe(31);
+});
+
+it.each<CountKind>(['comments', 'observations'])('keeps a valid %s fallback when only the other field gained authority', async kind => {
+  const pending = deferred(); let reads = 0;
+  const other = kind === 'comments' ? { observation_count: 31 } : { comment_count: 31 };
+  reply = request => endpoint(request, 'rpc/get_vehicle_profile_data', a) ? json({ ...profile(a), stats: ++reads === 2 ? other : {} })
+    : countRead(request, kind, a) ? pending.promise : undefined;
+  await render(false, true); await tickDeferredCounts();
+  await act(async () => current.reloadVehicle());
+  await act(async () => current.reloadVehicle());
+  await release(pending, counted(23));
+  expect(await countDisplay(kind)).toMatchObject(kind === 'comments'
+    ? { stats: expect.stringContaining('23 comments'), popupVehicle: a, popupExpected: 23 }
+    : { stats: expect.stringContaining('23 observations') });
+  expect(kind === 'comments' ? current.observationCount : current.totalCommentCount).toBe(31);
+  expect(requests.filter(request => countRead(request, kind, a))).toHaveLength(1);
+});
+
+it.each<CountKind>(['comments', 'observations'])('does not revive pre-zero %s HEADs after a later count-less reload', async kind => {
+  const old = deferred(); let reads = 0;
+  const authority = kind === 'comments' ? { comment_count: 0 } : { observation_count: 0 };
+  reply = request => endpoint(request, 'rpc/get_vehicle_profile_data', a) ? json({ ...profile(a), stats: ++reads === 2 ? authority : {} })
+    : countRead(request, kind, a) ? old.promise : undefined;
+  await render(false, true); await tickDeferredCounts();
+  await act(async () => current.reloadVehicle());
+  await act(async () => current.reloadVehicle());
+  await release(old, counted(87));
+  expect(kind === 'comments' ? current.totalCommentCount : current.observationCount).toBe(0);
+  expect(container.querySelector('[data-quick-stats]')!.textContent).not.toContain('87');
+});
+
+it('does not revive an observation HEAD after maintained-row authority and a later omission', async () => {
+  const old = deferred(); let reads = 0;
+  reply = request => endpoint(request, 'rpc/get_vehicle_profile_data', a) ? json({ ...profile(a), stats: {},
+    vehicle: { ...profile(a).vehicle, ...( ++reads === 2 ? { observation_count: 31 } : {}) } })
+    : countRead(request, 'observations', a) ? old.promise : undefined;
+  await render(false, true); await tickDeferredCounts();
+  await act(async () => current.reloadVehicle());
+  await act(async () => current.reloadVehicle());
+  await release(old, counted(87));
+  expect(await countDisplay('observations')).toMatchObject({ stats: expect.stringContaining('31 observations') });
 });
