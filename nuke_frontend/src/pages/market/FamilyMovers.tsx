@@ -583,16 +583,20 @@ export default function FamilyMovers({
 
   const [infoOpen, setInfoOpen] = useState(false);
   const popoverRef = useRef<HTMLDivElement | null>(null);
+  const infoTriggerRef = useRef<HTMLButtonElement | null>(null);
+  const infoCloseRef = useRef<HTMLButtonElement | null>(null);
+  const closeInfo = () => { setInfoOpen(false); infoTriggerRef.current?.focus(); };
 
   useEffect(() => {
     if (!infoOpen) return;
+    infoCloseRef.current?.focus();
     const onDocDown = (e: MouseEvent) => {
       if (popoverRef.current && !popoverRef.current.contains(e.target as Node)) {
         setInfoOpen(false);
       }
     };
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') setInfoOpen(false);
+      if (e.key === 'Escape') closeInfo();
     };
     document.addEventListener('mousedown', onDocDown);
     document.addEventListener('keydown', onKey);
@@ -700,6 +704,7 @@ export default function FamilyMovers({
       <div className="map-movers2__relativity" aria-label="Relativity indicator">
         <div className="map-movers2__rel-wrap" ref={popoverRef}>
           <button
+            ref={infoTriggerRef}
             type="button"
             className={`map-movers2__rel-badge${infoOpen ? ' map-movers2__rel-badge--open' : ''}`}
             aria-expanded={infoOpen}
@@ -718,10 +723,11 @@ export default function FamilyMovers({
             <div className="map-movers2__popover-head">
               <span className="map-movers2__popover-title">RELATIVITY · {activeRelativityLabel}</span>
               <button
+                ref={infoCloseRef}
                 type="button"
                 className="map-movers2__popover-close"
                 aria-label="Close Relativity explanation"
-                onClick={() => setInfoOpen(false)}
+                onClick={closeInfo}
               >
                 ×
               </button>
@@ -763,7 +769,7 @@ export default function FamilyMovers({
         </span>
       </div>
       <div className="map-movers2__controls">
-        <div className="map-movers2__dial" role="tablist" aria-label="Relativity time horizon">
+        <div className="map-movers2__dial" role="group" aria-label="Relativity time horizon">
           <span className="map-movers2__dial-tag" aria-hidden="true">WINDOW</span>
           {MOVER_HORIZONS.map((h) => {
             const active = h.key === horizon;
@@ -771,8 +777,7 @@ export default function FamilyMovers({
               <button
                 key={h.key}
                 type="button"
-                role="tab"
-                aria-selected={active}
+                aria-pressed={active}
                 className={`map-movers2__dial-btn${active ? ' map-movers2__dial-btn--active' : ''}${h.key === 'upcoming' ? ' map-movers2__dial-btn--upcoming' : ''}`}
                 title={h.title}
                 onClick={() => setHorizon(h.key)}

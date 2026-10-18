@@ -17,4 +17,11 @@
 /* 2026-10-15: family tiles are market tiles (MarketTile: the brand map's colors, hatch and fitted names); the brand
    header prints its name and dollars whole, or the name alone, or nothing. */
 .brand-family-map .market-tile { border-width: 1px; border-color: var(--bg); }
-.brand-family-map__head { font: 700 11px Arial, sans-serif; letter-spacing: 0.02em; color: var(--bg); white-space: nowrap; }
+.brand-family-map__head { display: flex; align-items: center; gap: 4px; width: 100%; min-width: 0;
+  font: 700 11px/12px Arial, sans-serif; letter-spacing: 0.02em; color: var(--bg); white-space: nowrap; }
+.brand-family-map__head .make-identity { flex: 0 1 104px; min-width: 0; height: 12px; gap: 0; }
+.brand-family-map__head .sx-make-wordmark { flex: 0 1 auto; min-width: 0; height: 12px; }
+.brand-family-map__head .sx-make-logo { flex: 0 1 12px; min-width: 0; width: 12px; height: 12px; }
+.brand-family-map__head .make-identity strong { flex-shrink: 0; font: inherit; letter-spacing: 0; text-transform: uppercase; overflow-wrap: normal; }
+.brand-family-map__dollars { flex-shrink: 0; letter-spacing: 0; }
+.brand-family-map__brand:focus-visible::after { content: ''; position: absolute; inset: 0; border: 2px solid var(--bg); pointer-events: none; }
