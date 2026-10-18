@@ -96,6 +96,7 @@ GRANT SELECT ON ALL TABLES IN SCHEMA public TO anon, authenticated, service_role
 \ir ../migrations/20261018193000_profile_read_masthead_identity_marks.sql
 \ir ../migrations/20261018200000_identity_marks_require_recorded_trim.sql
 \ir ../migrations/20261018220000_profile_read_title_claims.sql
+\ir ../migrations/20261018230000_identity_marks_series_label_fallback.sql
 
 -- Seeds. v1: the documented case; v2: nothing recorded; v3: a sourceless odometer; v4: private;
 -- v5: a classified asking price; v6: competing evidence; v7: a live auction bid.
@@ -328,6 +329,9 @@ RESET ROLE;
 INSERT INTO public.vehicles (id, year, make, model, listing_title, trim) VALUES
  ('10000000-0000-0000-0000-000000000013', 1984, 'Chevrolet', 'C10', '1984 Chevrolet C10 Silverado Stepside', NULL),
  ('10000000-0000-0000-0000-000000000014', 1984, 'Chevrolet', 'C10', '1984 Chevrolet C10 Silverado', 'Scottsdale');
+INSERT INTO public.vehicles (id, year, make, model, normalized_model, series, trim) VALUES
+ ('10000000-0000-0000-0000-000000000015', 1984, 'Chevrolet', 'C10', 'C10', '1/2 Ton', 'Silverado'),
+ ('10000000-0000-0000-0000-000000000016', 1984, 'Chevrolet', 'Pickup', 'Pickup', '1/2 Ton', 'Silverado');
 -- ALLOW_RAW_TESTIMONY_WRITE: synthetic fixture rows in a disposable contract database, never production.
 INSERT INTO public.vehicle_observations (vehicle_id, kind, source_url, extraction_method, observed_at, is_superseded, structured_data, confidence_score, ingested_at) VALUES
  ('10000000-0000-0000-0000-000000000013', 'specification', 'https://example.test/c10', 'vehicle_title_facet_projection_v1', '2026-10-18', false,
@@ -365,6 +369,13 @@ BEGIN
     format('a recorded trim is not replaced or duplicated by a claim; got %s', d->'sections'->1));
   PERFORM public.t_assert(NOT EXISTS (SELECT 1 FROM jsonb_array_elements(d->'sections'->0->'identity_marks') m WHERE m->>'trim_package' = 'Silverado'),
     format('marks use the recorded trim, not the claim; got %s', d->'sections'->0->'identity_marks'));
+
+  d := public.vehicle_profile_read('10000000-0000-0000-0000-000000000015');
+  PERFORM public.t_assert(EXISTS (SELECT 1 FROM jsonb_array_elements(d->'sections'->0->'identity_marks') m WHERE m->>'series_code' = 'C10' AND m->>'trim_package' = 'Silverado'),
+    format('a tonnage series label does not hide the C10 Silverado plate; got %s', d->'sections'->0->'identity_marks'));
+  d := public.vehicle_profile_read('10000000-0000-0000-0000-000000000016');
+  PERFORM public.t_assert(NOT EXISTS (SELECT 1 FROM jsonb_array_elements(d->'sections'->0->'identity_marks') m WHERE m->>'series_code' IS NOT NULL),
+    format('a Pickup whose record names no series code gets no series plate; got %s', d->'sections'->0->'identity_marks'));
 END $$;
 RESET ROLE;
 
