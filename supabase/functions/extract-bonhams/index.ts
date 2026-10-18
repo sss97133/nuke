@@ -30,7 +30,10 @@ import { writeVehicleEventByKey } from "../_shared/vehicleEventWrite.ts";
 import { fillOnlyIdentity, identityConflict } from "../_shared/identityMatch.ts";
 import { recordRevision } from "../_shared/revision.ts";
 import { mustWrite, softWrite } from "../_shared/writeResult.ts";
-import { type LotPage, parseLotPage } from "./lotPage.ts";
+import {
+  bonhamsLotPageUrl, type LotPage, parseLotPage, type SellerAssessment, SELLER_ASSESSMENT_VERSION, sellerAssessmentConditionScore,
+} from "./lotPage.ts";
+import { fetchPage } from "../_shared/hybridFetcher.ts";
 import { requireWriteAuth } from "../_shared/writeGuard.ts";
 import { projectSecretKey } from "../_shared/supabaseKeys.ts";
 import { extractGeneralBodyStyle, extractVehicleFacets } from "../_shared/vehicleFacets.ts";
@@ -583,6 +586,11 @@ export interface ExtractionResult {
   non_vehicle_item?: boolean;
   /** Calendar and depth keys merged into the event metadata (session days, sale key, engine/registration numbers). */
   extra_metadata?: Record<string, unknown>;
+  /** Bullet highlights from the catalog description. */
+  highlights?: string[];
+  saleroom_notices?: string | null;
+  /** The seller's own 100-point assessment (Bonhams MPH), from the footnotes. */
+  seller_assessment?: SellerAssessment | null;
 }
 
 interface SaveOptions {
@@ -593,11 +601,25 @@ interface SaveOptions {
   onObservationIssue?: (msg: string) => void;
 }
 
+/** One condition score per vehicle (uq_vcs_vehicle): the seller's assessment fills it, or replaces its own earlier reading, never an appraisal. */
+async function upsertSellerAssessmentScore(supabase: ReturnType<typeof createClient>, vehicleId: string, assessment: SellerAssessment): Promise<void> {
+  const { data: cur, error: readErr } = await supabase.from("vehicle_condition_scores").select("computation_version").eq("vehicle_id", vehicleId).maybeSingle();
+  if (readErr) throw new Error(`condition score read: ${readErr.message}`);
+  if (cur && cur.computation_version !== SELLER_ASSESSMENT_VERSION) return;
+  const { data: v } = await supabase.from("vehicles").select("year, make, model").eq("id", vehicleId).maybeSingle();
+  const ymmKey = [v?.year ?? "", v?.make ?? "", v?.model ?? ""].map((s) => String(s).toLowerCase().trim()).join("|");
+  softWrite("vehicle_condition_scores seller assessment", await supabase.from("vehicle_condition_scores").upsert(
+    { vehicle_id: vehicleId, ymm_key: ymmKey, ...sellerAssessmentConditionScore(assessment), computed_at: new Date().toISOString() },
+    { onConflict: "vehicle_id" },
+  ));
+}
+
 async function extractBonhamsLot(url: string): Promise<ExtractionResult> {
   console.log(`[Bonhams] Extracting: ${url}`);
 
-  // Try direct fetch first (free), fall back to Firecrawl if blocked
-  let fetchResult = await archiveFetch(url, {
+  // cars.bonhams.com serves the whole lot in __NEXT_DATA__ (gallery, notices, footnotes) to a plain request: no Firecrawl needed.
+  const pageUrl = /\/auction\/\d+\/lot\//i.test(url) ? bonhamsLotPageUrl(url) : url;
+  let fetchResult = await archiveFetch(pageUrl, {
     platform: "bonhams",
     callerName: "extract-bonhams",
     useFirecrawl: false,
@@ -607,27 +629,21 @@ async function extractBonhamsLot(url: string): Promise<ExtractionResult> {
 
   let html = fetchResult.html || "";
   let markdown = fetchResult.markdown || null;
+  let lotPage = html.length > 500 ? parseLotPage(html) : null;
 
-  // The direct fetch returns a React shell (~120KB) with JSON-LD metadata but
-  // no lot descriptions. Extract JSON-LD now as a baseline (year/make/model/price).
-  // We'll try Firecrawl for the rich content (description, specs, images).
   const directJsonLd = html.length > 500 ? extractJsonLd(html) : null;
   if (directJsonLd) {
     console.log(`[Bonhams] JSON-LD from direct fetch: ${directJsonLd.name?.slice(0, 80)}`);
   }
 
-  // Check if we got meaningful content.
-  // Bonhams uses client-side React rendering — the direct fetch returns a bare
-  // React shell (~120KB) with NO lot data visible in the HTML. We need Firecrawl
-  // (JS rendering) to extract lot descriptions and specs.
-  // Skip Firecrawl only when we already have rich markdown (from a prior Firecrawl run).
-  const hasLotContent = markdown && markdown.length > 5000; // Rich markdown means we already have JS-rendered content
-  const needsFirecrawl = !hasLotContent; // Always Firecrawl unless we already have good markdown
+  // Firecrawl only when the direct read held neither the lot data nor rich markdown from an earlier render.
+  const hasLotContent = !!lotPage || !!(markdown && markdown.length > 5000);
+  const needsFirecrawl = !hasLotContent;
 
   if (needsFirecrawl) {
-    console.log(`[Bonhams] No cached/JS-rendered content (html=${html.length}b, md=${markdown?.length || 0}b) — trying Firecrawl`);
+    console.log(`[Bonhams] No lot data or rendered content (html=${html.length}b, md=${markdown?.length || 0}b) — trying Firecrawl`);
     try {
-      fetchResult = await archiveFetch(url, {
+      fetchResult = await archiveFetch(pageUrl, {
         platform: "bonhams",
         callerName: "extract-bonhams",
         useFirecrawl: true,
@@ -638,6 +654,7 @@ async function extractBonhamsLot(url: string): Promise<ExtractionResult> {
       if (fetchResult.html && fetchResult.html.length > 500) {
         html = fetchResult.html;
         markdown = fetchResult.markdown || null;
+        lotPage = parseLotPage(html);
       } else if (directJsonLd) {
         // Firecrawl returned nothing useful but we have JSON-LD from direct fetch
         console.log(`[Bonhams] Firecrawl returned insufficient HTML, using JSON-LD from direct fetch`);
@@ -648,15 +665,15 @@ async function extractBonhamsLot(url: string): Promise<ExtractionResult> {
     }
   }
 
-  if ((!html || html.length < 500) && !directJsonLd) {
+  if ((!html || html.length < 500) && !directJsonLd && !lotPage) {
     console.warn(`[Bonhams] Insufficient HTML (${html.length} bytes) and no JSON-LD for ${url}`);
     return emptyResult(url, fetchResult.source, fetchResult.costCents);
   }
 
-  console.log(`[Bonhams] Fetched ${html.length} bytes (source: ${fetchResult.source}, cached: ${fetchResult.cached})`);
+  console.log(`[Bonhams] Fetched ${html.length} bytes (source: ${fetchResult.source}, lot data: ${!!lotPage}, cached: ${fetchResult.cached})`);
 
   // 1. Parse JSON-LD (primary data source)
-  const jsonLd = extractJsonLd(html);
+  const jsonLd = extractJsonLd(html) || directJsonLd;
   if (jsonLd) {
     console.log(`[Bonhams] JSON-LD found: ${jsonLd.name?.slice(0, 80)}`);
   } else {
@@ -664,7 +681,7 @@ async function extractBonhamsLot(url: string): Promise<ExtractionResult> {
   }
 
   // 2. Parse title/name into year/make/model/vin/chassis
-  const nameStr = jsonLd?.name || "";
+  const nameStr = lotPage?.lot_title || jsonLd?.name || "";
   const titleData = parseBonhamsName(nameStr);
 
   // If JSON-LD didn't have name, try HTML <title> or og:title
@@ -697,8 +714,15 @@ async function extractBonhamsLot(url: string): Promise<ExtractionResult> {
 
   let description: string | null = null;
 
+  // The lot data itself: catalog text, footnotes and saleroom notice, whole.
+  if (lotPage) {
+    const pageText = [lotPage.catalog_text, lotPage.footnotes, lotPage.saleroom_notices ? `Saleroom notice: ${lotPage.saleroom_notices}` : null]
+      .filter(Boolean).join("\n\n").trim();
+    if (pageText) description = pageText.slice(0, 30000);
+  }
+
   // A. Markdown Footnotes section (richest source — Bonhams stores lot description here)
-  if (markdown) {
+  if (!description && markdown) {
     const footnotesMatch = markdown.match(/###?\s*Footnotes?\s*\n+([\s\S]+?)(?=\n#{1,3}\s|\n---|\n\*{3}|$)/i);
     if (footnotesMatch?.[1]) {
       const text = footnotesMatch[1]
@@ -772,18 +796,21 @@ async function extractBonhamsLot(url: string): Promise<ExtractionResult> {
     bodyStyleHint: titleData.body_style ?? specs.body_style,
   });
 
-  // 5. Extract VIN/chassis from full text (supplement what's in the title)
+  // 5. VIN/chassis: the title, then the lot data (catalog header lines and saleroom notices), then the full text
   const textVin = extractVinFromText(markdown || stripHtmlTags(html.slice(0, 50000)));
-  const vin = titleData.vin || textVin.vin;
-  const chassis = titleData.chassis || textVin.chassis;
+  const pageChassis = lotPage?.chassis ?? null;
+  const vin = titleData.vin || (pageChassis && /^[A-HJ-NPR-Z0-9]{17}$/.test(pageChassis) ? pageChassis : null) || textVin.vin;
+  const chassis = titleData.chassis || pageChassis || textVin.chassis;
 
   // 6. Auction metadata
   const auctionMeta = extractAuctionMeta(html, markdown, url, jsonLd);
 
-  // 7. Images
-  const images = extractImages(html, markdown);
+  // 7. Images: the lot's whole gallery at full size when the lot data is there
+  const images = lotPage?.images.length
+    ? [...lotPage.images].sort((a, b) => Number(b.primary) - Number(a.primary)).map((i) => i.url)
+    : extractImages(html, markdown);
   // Add JSON-LD image if not already present
-  if (jsonLd?.image && !images.includes(jsonLd.image)) {
+  if (!lotPage?.images.length && jsonLd?.image && !images.includes(jsonLd.image)) {
     images.unshift(jsonLd.image);
   }
 
@@ -804,20 +831,40 @@ async function extractBonhamsLot(url: string): Promise<ExtractionResult> {
     interior_color: specs.interior_color,
     body_style: facets.body_style_facet ?? specs.body_style,
     description,
-    sale_price: auctionMeta.total_price,
-    price_currency: auctionMeta.price_currency,
-    auction_status: auctionMeta.auction_status,
-    lot_number: auctionMeta.lot_number,
-    sale_id: auctionMeta.sale_id,
-    sale_name: auctionMeta.sale_name,
-    sale_date: auctionMeta.sale_date,
-    sale_location: auctionMeta.sale_location,
-    estimate_low: auctionMeta.estimate_low,
-    estimate_high: auctionMeta.estimate_high,
-    estimate_currency: auctionMeta.estimate_currency,
+    sale_price: lotPage?.hammer_price ?? auctionMeta.total_price,
+    price_currency: lotPage?.currency ?? auctionMeta.price_currency,
+    auction_status: lotPage?.hammer_price ? "sold" : auctionMeta.auction_status,
+    lot_number: lotPage?.lot_number ?? auctionMeta.lot_number,
+    sale_id: lotPage?.sale_id ?? auctionMeta.sale_id,
+    sale_name: lotPage?.sale_name ?? auctionMeta.sale_name,
+    sale_date: lotPage?.sale_ends_on ?? lotPage?.sale_starts_on ?? auctionMeta.sale_date,
+    sale_location: lotPage?.sale_venue ?? auctionMeta.sale_location,
+    estimate_low: lotPage?.estimate_low ?? auctionMeta.estimate_low,
+    estimate_high: lotPage?.estimate_high ?? auctionMeta.estimate_high,
+    estimate_currency: lotPage?.currency ?? auctionMeta.estimate_currency,
     image_urls: images,
     fetch_source: fetchResult.source,
     cost_cents: fetchResult.costCents,
+    ...(lotPage ? {
+      hammer_price: lotPage.hammer_price,
+      hammer_premium: lotPage.hammer_premium,
+      highlights: lotPage.highlights,
+      saleroom_notices: lotPage.saleroom_notices,
+      seller_assessment: lotPage.seller_assessment,
+      extra_metadata: {
+        ...(lotPage.engine_number ? { engine_number: lotPage.engine_number } : {}),
+        ...(lotPage.registration ? { registration: lotPage.registration } : {}),
+        ...(lotPage.saleroom_notices ? { saleroom_notices: lotPage.saleroom_notices } : {}),
+        ...(lotPage.seller_assessment ? { seller_assessment: lotPage.seller_assessment } : {}),
+        ...(lotPage.footnotes ? { footnotes: lotPage.footnotes } : {}),
+        ...(lotPage.condition_report_url ? { condition_report_url: lotPage.condition_report_url } : {}),
+        ...(lotPage.catalogue_pdf_url ? { catalogue_pdf_url: lotPage.catalogue_pdf_url } : {}),
+        ...(lotPage.sale_starts_on ? { sale_starts_on: lotPage.sale_starts_on } : {}),
+        ...(lotPage.sale_ends_on ? { sale_ends_on: lotPage.sale_ends_on } : {}),
+        ...(lotPage.number_of_lots ? { number_of_lots: lotPage.number_of_lots } : {}),
+        image_count: lotPage.images.length,
+      },
+    } : {}),
   };
 
   console.log(`[Bonhams] Parsed: ${result.year} ${result.make} ${result.model} | VIN: ${vin || "N/A"} | Chassis: ${chassis || "N/A"} | Price: ${result.price_currency}${result.sale_price?.toLocaleString() || "N/A"} | Images: ${images.length}`);
@@ -898,6 +945,7 @@ export function buildVehicleRecord(extracted: ExtractionResult): Record<string, 
     is_public: true,
     status: "active",
     extractor_version: EXTRACTOR_VERSION,
+    ...(extracted.highlights?.length ? { highlights: extracted.highlights.join("; ") } : {}),
     origin_metadata: {
       source: "bonhams_import",
       lot_number: extracted.lot_number,
@@ -909,6 +957,8 @@ export function buildVehicleRecord(extracted: ExtractionResult): Record<string, 
       estimate_high: extracted.estimate_high,
       estimate_currency: extracted.estimate_currency,
       price_currency: extracted.price_currency,
+      ...(extracted.saleroom_notices ? { saleroom_notices: extracted.saleroom_notices } : {}),
+      ...(extracted.seller_assessment ? { seller_assessment: extracted.seller_assessment } : {}),
       ...(resolvedSeries ? { series: resolvedSeries } : {}),
       ...(resolvedTrim ? { trim: resolvedTrim } : {}),
       ...(resolvedBodyStyle ? { body_style: resolvedBodyStyle } : {}),
@@ -1097,8 +1147,9 @@ async function landLotPage(
   observedAt: string,
 ): Promise<number> {
   let imagesWritten = 0;
-  imagesWritten += await addVehicleImages(supabase, ev.vehicle_id, page.images, { source_url: ev.source_url });
-  const fullText = [page.catalog_text, page.footnotes].filter(Boolean).join("\n\n").slice(0, 30000);
+  imagesWritten += await addVehicleImages(supabase, ev.vehicle_id, page.images, { source_url: ev.source_url, lot_number: page.lot_number });
+  const fullText = [page.catalog_text, page.footnotes, page.saleroom_notices ? `Saleroom notice: ${page.saleroom_notices}` : null]
+    .filter(Boolean).join("\n\n").slice(0, 30000);
   const rawLotTitle = typeof (page.raw?.lot as any)?.sDesc === "string" ? String((page.raw?.lot as any).sDesc) : "";
   const parsedPageTitle = rawLotTitle ? parseBonhamsName(rawLotTitle) : null;
   const pageFacets = extractVehicleFacets({
@@ -1116,6 +1167,8 @@ async function landLotPage(
   if (pageFacets.series_code) obsFields.series = pageFacets.series_code;
   if (pageFacets.trim_package) obsFields.trim = pageFacets.trim_package;
   if (pageFacets.body_style_facet) obsFields.body_style = pageFacets.body_style_facet;
+  if (page.chassis) obsFields.chassis_number = page.chassis;
+  if (page.engine_number) obsFields.engine_number = page.engine_number;
 
   await writeObservation(supabase, {
     vehicleId: ev.vehicle_id,
@@ -1127,21 +1180,42 @@ async function landLotPage(
     contentText: fullText || undefined,
     rawData: page.raw,
   }).then((r) => { if (r.errors.length) throw new Error(`observation: ${r.errors.join("; ").slice(0, 160)}`); });
-  // The index landed the description cut at 8,000 characters; the page's text is whole. Never shortened.
-  if (fullText || pageFacets.series_code || pageFacets.trim_package || pageFacets.body_style_facet) {
-    const { data: cur } = await supabase.from("vehicles").select("description, series, trim, body_style").eq("id", ev.vehicle_id).maybeSingle();
-    if (cur) {
-      const vUpdate: Record<string, unknown> = {};
-      if (fullText && fullText.length > (cur.description?.length ?? 0)) vUpdate.description = fullText;
-      if (pageFacets.series_code && !cur.series) vUpdate.series = pageFacets.series_code;
-      if (pageFacets.trim_package && !cur.trim) vUpdate.trim = pageFacets.trim_package;
-      if (pageFacets.body_style_facet && !cur.body_style) vUpdate.body_style = pageFacets.body_style_facet;
-      if (Object.keys(vUpdate).length > 0) {
-        const { error: dErr } = await supabase.from("vehicles").update(vUpdate).eq("id", ev.vehicle_id);
-        if (dErr) throw new Error(`description: ${dErr.message}`);
+  // The index landed the description cut at 8,000 characters; the page's text is whole. Never shortened. Every other field is gap-filled.
+  const { data: cur } = await supabase.from("vehicles")
+    .select("description, series, trim, body_style, vin, highlights, listing_kind, origin_metadata").eq("id", ev.vehicle_id).maybeSingle();
+  if (cur) {
+    const vUpdate: Record<string, unknown> = {};
+    if (fullText && fullText.length > (cur.description?.length ?? 0)) vUpdate.description = fullText;
+    if (pageFacets.series_code && !cur.series) vUpdate.series = pageFacets.series_code;
+    if (pageFacets.trim_package && !cur.trim) vUpdate.trim = pageFacets.trim_package;
+    if (pageFacets.body_style_facet && !cur.body_style) vUpdate.body_style = pageFacets.body_style_facet;
+    // Vintage lots carry their chassis number in vin, as buildVehicleRecord does.
+    if (page.chassis && !cur.vin) vUpdate.vin = page.chassis;
+    if (page.highlights.length && !cur.highlights) vUpdate.highlights = page.highlights.join("; ");
+    // A chassis number or a Seller's Assessment on the page is a vehicle the index had taken for an item. A registration line alone
+    // is not: Bonhams sells registration numbers as lots.
+    if (cur.listing_kind === "non_vehicle_item" && (page.chassis || page.seller_assessment)) vUpdate.listing_kind = "vehicle";
+    const pageMeta = {
+      ...(page.chassis ? { chassis_number: page.chassis } : {}),
+      ...(page.engine_number ? { engine_number: page.engine_number } : {}),
+      ...(page.registration ? { registration: page.registration } : {}),
+      ...(page.saleroom_notices ? { saleroom_notices: page.saleroom_notices } : {}),
+      ...(page.seller_assessment ? { seller_assessment: page.seller_assessment } : {}),
+      ...(page.condition_report_url ? { condition_report_url: page.condition_report_url } : {}),
+      ...(page.catalogue_pdf_url ? { catalogue_pdf_url: page.catalogue_pdf_url } : {}),
+    };
+    if (Object.keys(pageMeta).length) vUpdate.origin_metadata = { ...(cur.origin_metadata ?? {}), ...pageMeta };
+    if (Object.keys(vUpdate).length > 0) {
+      let { error: dErr } = await supabase.from("vehicles").update(vUpdate).eq("id", ev.vehicle_id);
+      // A chassis number is not unique across makes: another vehicle holding it keeps it, this one keeps it in origin_metadata.
+      if (dErr && vUpdate.vin && /already exists on vehicle/i.test(dErr.message)) {
+        delete vUpdate.vin;
+        ({ error: dErr } = await supabase.from("vehicles").update(vUpdate).eq("id", ev.vehicle_id));
       }
+      if (dErr) throw new Error(`vehicles: ${dErr.message}`);
     }
   }
+  if (page.seller_assessment) await upsertSellerAssessmentScore(supabase, ev.vehicle_id, page.seller_assessment);
   const w = await writeVehicleEventByKey(supabase, {
     vehicle_id: ev.vehicle_id, source_platform: "bonhams", source_listing_id: ev.source_listing_id, event_type: "auction",
     source_url: ev.source_url,
@@ -1150,6 +1224,12 @@ async function landLotPage(
       auction_name: page.sale_name, sale_venue: page.sale_venue, sale_starts_on: page.sale_starts_on, sale_ends_on: page.sale_ends_on,
       number_of_lots: page.number_of_lots, footnotes: page.footnotes, condition_report_url: page.condition_report_url,
       ...(page.engine_number ? { engine_number: page.engine_number } : {}), ...(page.registration ? { registration: page.registration } : {}),
+      ...(page.chassis ? { chassis_number: page.chassis } : {}),
+      ...(page.saleroom_notices ? { saleroom_notices: page.saleroom_notices } : {}),
+      ...(page.seller_assessment ? { seller_assessment: page.seller_assessment } : {}),
+      ...(page.catalogue_pdf_url ? { catalogue_pdf_url: page.catalogue_pdf_url } : {}),
+      ...(page.estimate_low != null ? { estimate_low: page.estimate_low, estimate_high: page.estimate_high } : {}),
+      ...(page.hammer_premium != null ? { hammer_premium: page.hammer_premium } : {}),
     },
   });
   if (w.action === "error") throw new Error(`event: ${w.error}`);
@@ -1325,7 +1405,7 @@ async function saveVehicle(
   // Save images (non-fatal)
   try {
     if (extracted.image_urls.length > 0) {
-      const n = await addVehicleImages(supabase, targetId, extracted.image_urls.slice(0, 50).map((url) => ({ url })), { source_url: extracted.url, lot_number: extracted.lot_number });
+      const n = await addVehicleImages(supabase, targetId, extracted.image_urls.map((url) => ({ url })), { source_url: extracted.url, lot_number: extracted.lot_number });
       console.log(`[Bonhams] Saved ${n} images`);
     }
   } catch (e: any) {
@@ -1381,6 +1461,14 @@ async function saveVehicle(
     else console.log(`[Bonhams] vehicle_events ${res.action}`);
   } catch (e: any) {
     console.warn(`[Bonhams] Vehicle event creation failed (non-fatal): ${e.message}`);
+  }
+
+  if (extracted.seller_assessment) {
+    try {
+      await upsertSellerAssessmentScore(supabase, targetId, extracted.seller_assessment);
+    } catch (e: any) {
+      console.warn(`[Bonhams] Seller assessment score failed (non-fatal): ${e.message}`);
+    }
   }
 
   return { vehicleId: targetId, action, qualityScore: gateResult.score, issues: gateResult.issues };
@@ -1544,10 +1632,29 @@ if (import.meta.main) Deno.serve(async (req) => {
         q = q.gte("vehicles.year", 1964).lte("vehicles.year", 1973)
           .or("make.ilike.chevrolet*,make.ilike.ford*,make.ilike.plymouth*,make.ilike.dodge*,make.ilike.pontiac*,make.ilike.buick*,make.ilike.lincoln*,make.ilike.oldsmobile*,make.ilike.amc*,make.ilike.mercury*,make.ilike.shelby*", { foreignTable: "vehicles" });
       }
-      const { data: todo, error: todoErr } = await q.order("ended_at", { ascending: false, nullsFirst: false }).limit(limit);
+      const { data: tierTodo, error: todoErr } = await q.order("ended_at", { ascending: false, nullsFirst: false }).limit(limit);
       if (todoErr) throw new Error(`deep_lots queue read failed: ${todoErr.message}`);
-      const out = { picked: todo?.length ?? 0, done: 0, gone: 0, images: 0, credits_used: 0, backoff: null as string | null, failed: 0, errors: [] as string[] };
+      // Tier one goes first, but never alone: a run it does not fill takes the rest from every landed lot, newest sales first.
+      const todo: Array<{ id: string; vehicle_id: string; source_url: string; source_listing_id: string }> = [...(tierTodo ?? [])] as any;
+      if (tierOne && todo.length < limit) {
+        const { data: rest, error: restErr } = await supabase.from("vehicle_events")
+          .select("id, vehicle_id, source_url, source_listing_id")
+          .eq("source_platform", "bonhams")
+          .eq("extraction_source", "bonhams-typesense")
+          .is("metadata->>deep_at", null)
+          .order("ended_at", { ascending: false, nullsFirst: false })
+          .limit(limit);
+        if (restErr) throw new Error(`deep_lots queue read failed: ${restErr.message}`);
+        const picked = new Set(todo.map((r) => r.id));
+        for (const r of rest ?? []) if (todo.length < limit && !picked.has(r.id)) todo.push(r);
+      }
+      const out = {
+        picked: todo.length, done: 0, direct: 0, gone: 0, images: 0, credits_used: 0, backoff: null as string | null,
+        direct_refused: null as string | null, failed: 0, errors: [] as string[],
+      };
       let credits = 0;
+      let paidDone = 0;
+      let directBlocked = false;
       if (!Number.isFinite(allowance) || allowance <= 0) {
         // Saved pages can still be read for nothing, but with no allowance nothing is bought.
         out.backoff = "no_allowance";
@@ -1558,11 +1665,12 @@ if (import.meta.main) Deno.serve(async (req) => {
         if (!first) await new Promise((r) => setTimeout(r, spacing));
         first = false;
         const url = String(ev.source_url).replace(/\/?$/, "/");
+        const pageUrl = bonhamsLotPageUrl(url);
         // A page saved before is read from the saved copy, free.
         let savedHtml: string | null = null;
         {
           const { data: saved } = await supabase.from("listing_page_snapshots").select("html, html_storage_path")
-            .eq("platform", "bonhams").eq("success", true).in("listing_url", [url, String(ev.source_url)]).order("fetched_at", { ascending: false }).limit(1);
+            .eq("platform", "bonhams").eq("success", true).in("listing_url", [url, pageUrl, String(ev.source_url)]).order("fetched_at", { ascending: false }).limit(1);
           const sv = saved?.[0];
           savedHtml = sv?.html ?? null;
           if (!savedHtml && sv?.html_storage_path) {
@@ -1570,14 +1678,30 @@ if (import.meta.main) Deno.serve(async (req) => {
             savedHtml = blob ? await blob.text() : null;
           }
         }
-        if (!savedHtml && (credits >= allowance || !Number.isFinite(allowance))) { out.backoff = out.backoff ?? "allowance_spent"; break; }
-        // Bonhams answers 403 to this function's address, so the page is read through Firecrawl (rawHtml, 1 credit a page).
+        // www.bonhams.com answers 403 to this function's address; cars.bonhams.com is asked first, free. A refusal there ends
+        // direct reads for the run and the page is read through Firecrawl (rawHtml, 1 credit a page) under the allowance.
+        let directHtml: string | null = null;
+        let directStatus = 0;
+        if (!savedHtml && !directBlocked) {
+          const d = await fetchPage(pageUrl, { retries: 0 });
+          directStatus = d.statusCode ?? 0;
+          if (d.html && parseLotPage(d.html)) directHtml = d.html;
+          else if ([401, 403, 429].includes(directStatus) || /blocked|challenge/i.test(d.error ?? "")) {
+            directBlocked = true;
+            out.direct_refused = `HTTP ${directStatus} ${d.error ?? ""}`.trim();
+          }
+        }
+        const freeHtml = savedHtml ?? directHtml;
+        const directGone = !freeHtml && (directStatus === 404 || directStatus === 410);
+        const paid = !freeHtml && !directGone;
+        if (paid && (credits >= allowance || !Number.isFinite(allowance))) { out.backoff = out.backoff ?? "allowance_spent"; break; }
         // Every response is retained first: the body goes to the listing-snapshots bucket and a listing_page_snapshots row
         // points at it (the table's own convention for large pages), then the page is parsed and landed.
-        const fc = savedHtml
-          ? { httpStatus: 200, raw: { data: { metadata: { statusCode: 200 }, rawHtml: savedHtml } }, data: { html: savedHtml }, error: null }
+        const fc = !paid
+          ? { httpStatus: freeHtml ? 200 : directStatus, raw: { data: { metadata: { statusCode: freeHtml ? 200 : directStatus }, rawHtml: freeHtml } }, data: { html: freeHtml }, error: null }
           : await firecrawlScrape({ url, formats: ["rawHtml"], onlyMainContent: false, waitFor: 0 }, { caller: "extract-bonhams-deep" });
-        if (!savedHtml) credits++;
+        if (paid) credits++;
+        if (directHtml) out.direct++;
         const status = Number(fc.raw?.data?.metadata?.statusCode ?? fc.httpStatus ?? 0);
         const rawHtml: string | null = typeof fc.raw?.data?.rawHtml === "string" ? fc.raw.data.rawHtml : fc.data.html;
         if (fc.httpStatus === 402 || fc.httpStatus === 429) { out.backoff = `Firecrawl HTTP ${fc.httpStatus}`; break; }
@@ -1588,9 +1712,9 @@ if (import.meta.main) Deno.serve(async (req) => {
             const path = `bonhams/lot-pages/${sha}.html`;
             await supabase.storage.from("listing-snapshots").upload(path, bytes, { contentType: "text/html", upsert: true });
             const snapRes = await supabase.from("listing_page_snapshots").insert({
-              platform: "bonhams", listing_url: url, fetched_at: new Date().toISOString(), fetch_method: "firecrawl", http_status: status || null,
+              platform: "bonhams", listing_url: url, fetched_at: new Date().toISOString(), fetch_method: paid ? "firecrawl" : "direct", http_status: status || null,
               success: status === 200, html: null, html_storage_path: path, html_sha256: sha, content_length: bytes.length,
-              metadata: { caller: "extract-bonhams-deep", listing_key: ev.source_listing_id, credits: 1 },
+              metadata: { caller: "extract-bonhams-deep", listing_key: ev.source_listing_id, credits: paid ? 1 : 0, ...(paid ? {} : { fetched_url: pageUrl }) },
             });
             if (snapRes.error && snapRes.error.code !== "23505") softWrite("listing_page_snapshots insert", snapRes); // 23505: same page already retained
           } catch (_) { /* a duplicate or a storage hiccup must not lose the parse; the page is parsed below */ }
@@ -1613,6 +1737,7 @@ if (import.meta.main) Deno.serve(async (req) => {
         try {
           out.images += await landLotPage(supabase, ev, page, observedAt);
           out.done++;
+          if (paid) paidDone++;
         } catch (e: any) {
           out.failed++; if (out.errors.length < 5) out.errors.push(`${ev.source_listing_id}: ${String(e?.message ?? e).slice(0, 160)}`);
         }
@@ -1620,7 +1745,7 @@ if (import.meta.main) Deno.serve(async (req) => {
       // Record what was spent (failed fetches included) against the allowance.
       if (credits > 0) {
         // Credits are metered where the scrape is sent (firecrawlScrape, since 2026-10-15); only the lots landed are written here.
-        await supabase.rpc("firecrawl_record_spend", { p_source: "bonhams", p_credits: 0, p_lots: out.done, p_lane: "lane-bonhams", p_note: `deep_lots tier_one=${tierOne}, allowance ${allowance}, credits ${credits} metered` });
+        await supabase.rpc("firecrawl_record_spend", { p_source: "bonhams", p_credits: 0, p_lots: paidDone, p_lane: "lane-bonhams", p_note: `deep_lots tier_one=${tierOne}, allowance ${allowance}, credits ${credits} metered` });
       }
       return new Response(JSON.stringify({ success: true, ...out, credits_used: credits, allowance, elapsed_ms: Date.now() - started }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
