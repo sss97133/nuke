@@ -90,16 +90,39 @@ function parseJson(content: string): unknown | null {
   }
 }
 
-interface VisionResult { data: Record<string, unknown>; provider: string; model: string; keySource: "user" | "system"; ms: number; }
+export interface AnthropicTokenUsage {
+  input_tokens: number;
+  output_tokens: number;
+  cache_creation_input_tokens: number | null;
+  cache_read_input_tokens: number | null;
+}
+
+/** Provider-reported counters, not an invoice or a zero-cost claim when absent. */
+export function safeAnthropicUsage(value: unknown): AnthropicTokenUsage | null {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+  const raw = value as Record<string, unknown>;
+  const count = (key: string) => Number.isSafeInteger(raw[key]) && (raw[key] as number) >= 0 && (raw[key] as number) <= 1_000_000_000
+    ? raw[key] as number : null;
+  const input_tokens = count("input_tokens"), output_tokens = count("output_tokens");
+  if (input_tokens === null || output_tokens === null) return null;
+  return { input_tokens, output_tokens, cache_creation_input_tokens: count("cache_creation_input_tokens"),
+    cache_read_input_tokens: count("cache_read_input_tokens") };
+}
+
+interface VisionResult { data: Record<string, unknown>; provider: string; model: string; keySource: "user" | "system"; ms: number; usage: AnthropicTokenUsage | null; }
 
 async function runTiers(tiers: ResolvedTier[], messages: unknown[], maxTokens: number, diagnostics: ProviderDiagnostic[],
   call = callLLM): Promise<VisionResult | null> {
   for (const cfg of tiers) {
     try {
       const r = await call(cfg, messages as never[], { temperature: 0.2, maxTokens, vision: true });
+      const usage = cfg.provider === "anthropic" ? safeAnthropicUsage(r.usage) : null;
+      // Completed-but-unreadable responses can consume tokens too. Only log
+      // numeric counters; never provider prose, keys, prompts or image data.
+      if (usage) console.log("[visionFallback] anthropic_token_usage", JSON.stringify(usage));
       const data = parseJson(r.content || "");
       if (data && typeof data === "object") {
-        return { data: data as Record<string, unknown>, provider: cfg.provider, model: cfg.model, keySource: cfg.keySource, ms: r.duration_ms ?? 0 };
+        return { data: data as Record<string, unknown>, provider: cfg.provider, model: cfg.model, keySource: cfg.keySource, ms: r.duration_ms ?? 0, usage };
       }
       diagnostics.push({ code: "response_unreadable", provider: cfg.provider, http_status: null, credential_kind: cfg.credentialKind ?? null });
     } catch (e) {

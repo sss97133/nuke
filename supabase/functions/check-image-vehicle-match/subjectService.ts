@@ -10,6 +10,7 @@ import { subjectSourceAvailable, subjectSourceCanEstablishPrivacy, subjectSource
 import { currentIdentitySource, loadSourceIdentities, sourceAliases, sourceRoot, inspectSourceIdentity, type SourceIdentity } from "./sourceIdentity.ts";
 import { planSubjectReinspection } from "./subjectReinspection.ts";
 import { allowedSubjectSources, subjectInputScopeRefusal } from "./subjectInputScope.ts";
+import type { AnthropicTokenUsage } from "../_shared/visionFallback.ts";
 
 export const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
 export interface SubjectSource {
@@ -50,7 +51,7 @@ export interface SubjectDependencies {
   capture?: (sources: VisionInputSource[], projectURL: string) => Promise<VisionInputCapture>;
   capturePrivacy?: (sources: VisionInputSource[]) => Promise<VisionInputCapture>;
   vision: (options: { parts: Array<{ text: string } | { imageUrl: string }>; maxTokens: number }) =>
-    Promise<{ provider: string; model: string; data: unknown } | null>;
+    Promise<{ provider: string; model: string; data: unknown; usage?: AnthropicTokenUsage | null } | null>;
   now?: () => Date;
 }
 export interface SubjectRequest {
@@ -179,6 +180,7 @@ export async function resolveSubjectBatch(store: SubjectStore, request: SubjectR
   let consumedIds = [...ids], contextCoverage: Record<string, unknown> = {};
   let readings = await store.readings(ids);
   let envelope: SubjectEnvelope | null = null;
+  let providerUsage: AnthropicTokenUsage | null = null;
   // A retained reading may include server-selected context and consume only the
   // first requested fresh photo. Requalify that exact scope before selecting new
   // context; the deferred photo remains new work on the phone.
@@ -298,6 +300,7 @@ export async function resolveSubjectBatch(store: SubjectStore, request: SubjectR
       unavailable_inputs: capture.unavailable, candidate_scope,
       ...(result.provider_diagnostics?.length ? { provider_diagnostics: result.provider_diagnostics } : {}),
       ...(result.provider_attempt_coverage ? { provider_attempt_coverage: result.provider_attempt_coverage } : {}) };
+    providerUsage = result.model_result.usage ?? null;
     const inputs: SubjectInput[] = sources.map(source => {
       const receipt = capture.inputs.find(input => input.key === source.id)!.receipt;
       const prior = readings.filter(reading => reading.image_id === source.id && reading.is_active && reading.cluster_id &&
@@ -372,7 +375,8 @@ export async function resolveSubjectBatch(store: SubjectStore, request: SubjectR
       ...[...failureById.values()].filter(row => consumedIds.includes(row.image_id))], candidate_scope: envelope.candidate_scope,
     coverage: { grain: "source_photos", assessed: sources.length, eligible: supported.size,
       excluded: sources.length - supported.size, as_of: envelope.read_at, truncated: false },
-    reading: { provider: envelope.provider, model: envelope.model, read_at: envelope.read_at, run_key: envelope.run_key, reused },
+    reading: { provider: envelope.provider, model: envelope.model, read_at: envelope.read_at, run_key: envelope.run_key, reused,
+      provider_usage: providerUsage },
   };
 }
 
