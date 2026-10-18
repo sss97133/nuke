@@ -2887,7 +2887,7 @@ export function TreemapHomePage({ onBrowse, embedded = false }: { onBrowse: () =
         ? <MarketCard id={tooltipId} node={tooltip.node} move={relativeMove(tooltip.node, baseline, basis === 'ledger', gateMin)} base={baseline} x={tooltip.x} y={tooltip.y} windowLabel={horizonWindowLabel} gateMin={gateMin} />
         : tooltip && <TreemapTooltip {...tooltip} />}
       {sheet && <MarketSheet node={sheet} move={relativeMove(sheet, baseline, basis === 'ledger', gateMin)} base={baseline} windowLabel={horizonWindowLabel} gateMin={gateMin}
-        onOpen={() => { const n = sheet; setSheet(null); drillInto(n); }} onClose={() => setSheet(null)} />}
+        onOpen={() => { const n = sheet; focusAfterDrill.current = !n.noModel || !!n.familyKey; setSheet(null); drillInto(n); }} onClose={() => setSheet(null)} />}
 
       {/* ─── FAMILY SALES CHART: when embedded on the Market page, keep the family's sales & like-for-like price index + era filter bar visible across models, years & vehicles inside the family ─── */}
       {embedded && (levelType === 'models' || levelType === 'years' || levelType === 'vehicles') && currentLevel.family && currentLevel.make && !(levelType === 'models' && familyView === 'sales') && dims.w > 0 && (

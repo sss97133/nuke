@@ -147,16 +147,27 @@ export function MarketCard({ node, move, base, x, y, windowLabel, gateMin, id }:
 
 /** On a phone a tap opens the card; Open drills, the close button or a tap outside dismisses it. */
 export function MarketSheet({ node, move, base, onOpen, onClose, windowLabel, gateMin }: { node: MarketNode; move: Move; base: Baseline | null; onOpen: () => void; onClose: () => void; windowLabel?: string; gateMin?: number }) {
+  const dialog = useRef<HTMLDialogElement>(null);
+  const closeButton = useRef<HTMLButtonElement>(null);
+  useLayoutEffect(() => {
+    const element = dialog.current;
+    if (!element) return;
+    element.showModal();
+    closeButton.current?.focus();
+    return () => element.close();
+  }, []);
   return (
-    <div className="market-sheet__scrim" onClick={onClose}>
-      <div className="market-sheet" role="dialog" aria-label={node.name} onClick={(e) => e.stopPropagation()}>
+    <dialog ref={dialog} className="market-sheet__scrim" aria-label={node.name}
+      onCancel={(e) => { e.preventDefault(); onClose(); }}
+      onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
+      <div className="market-sheet">
         <CardBody node={node} move={move} base={base} windowLabel={windowLabel} gateMin={gateMin} />
         <div className="market-sheet__actions">
           <button type="button" className="market-sheet__open" onClick={onOpen}>Open {node.name} →</button>
-          <button type="button" className="market-sheet__close" onClick={onClose}>Close</button>
+          <button ref={closeButton} type="button" className="market-sheet__close" onClick={onClose}>Close</button>
         </div>
       </div>
-    </div>
+    </dialog>
   );
 }
 
