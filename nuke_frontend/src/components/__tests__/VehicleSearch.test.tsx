@@ -166,6 +166,29 @@ describe('VehicleSearch — Market Cohort Shortcuts & Vehicle Result Emblem Prev
     }
   });
 
+  it('keeps 911 and Corvette generations distinct and ignores chassis codes inside model years', () => {
+    const generationYears: Array<[string, string]> = [
+      ['964', '1989–1994'],
+      ['993', '1995–1998'],
+      ['997', '2005–2012'],
+      ['991', '2012–2019'],
+      ['992', '2019–2025'],
+    ];
+    for (const [query, years] of generationYears) {
+      const top = resolveMarketCohortShortcuts(query, 3)[0];
+      expect(top.make).toBe('Porsche');
+      expect(top.yearRangeLabel).toBe(years);
+    }
+
+    expect(resolveMarketCohortShortcuts('Porsche 997 GT3', 3)[0].yearRangeLabel).toBe('2005–2012');
+
+    for (const query of ['1991 corvette', '1964 mustang', '1997 f-150']) {
+      expect(resolveMarketCohortShortcuts(query, 3).some((s) => s.make === 'Porsche')).toBe(false);
+    }
+
+    expect(resolveMarketCohortShortcuts('Stingray', 3).some((s) => s.facet === 'Sting Ray (C2)')).toBe(false);
+  });
+
   it('resolves vetted era/trim SVG identity marks via resolveVehicleIdentityMarks for individual vehicles', () => {
     const squarebodyMarks = resolveVehicleIdentityMarks({
       brand: 'Chevrolet',
