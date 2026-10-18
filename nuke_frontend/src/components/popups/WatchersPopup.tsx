@@ -135,7 +135,7 @@ export function WatchersPopup({ vehicleId, watcherCount, viewCount, make, model 
             textTransform: 'uppercase' as const, letterSpacing: '0.5px',
             color: '#999', marginBottom: 8,
           }}>
-            VS {make?.toUpperCase()} {model?.toUpperCase()} ({stats.count} RECORDS IN THIS READ)
+            VS {make?.toUpperCase()} {model?.toUpperCase()} (RECORDS IN THIS READ: {stats.count})
           </div>
 
           {/* Visual comparison */}
