@@ -35,8 +35,9 @@ interface EyeRead {
 }
 
 function useEyeRead(vehicleId: string | undefined): EyeRead | null {
-  const [read, setRead] = useState<EyeRead | null>(null);
+  const [read, setRead] = useState<{ vehicleId: string; value: EyeRead } | null>(null);
   useEffect(() => {
+    setRead(null);
     if (!vehicleId) return;
     let alive = true;
     supabase
@@ -44,13 +45,13 @@ function useEyeRead(vehicleId: string | undefined): EyeRead | null {
       .select('condition_score, condition_tier, descriptor_summary, observation_count, computed_at, computation_version')
       .eq('vehicle_id', vehicleId)
       .maybeSingle()
-      .then(({ data }) => {
-        if (!alive || !data) return;
+      .then(({ data, error }) => {
+        if (!alive || error || !data) return;
         const ds: any = data.descriptor_summary || {};
         const band = Array.isArray(ds.as_is_band_usd) && ds.as_is_band_usd[0] != null
           ? [Number(ds.as_is_band_usd[0]), Number(ds.as_is_band_usd[1])] as [number, number]
           : null;
-        setRead({
+        setRead({ vehicleId, value: {
           band,
           conditionClass: typeof ds.condition_class === 'string' ? ds.condition_class.split('(')[0].trim() : null,
           tier: data.condition_tier,
@@ -58,11 +59,11 @@ function useEyeRead(vehicleId: string | undefined): EyeRead | null {
           reportedInputCount: data.observation_count,
           method: data.computation_version || 'appraisal',
           computedAt: data.computed_at,
-        });
+        } });
       });
     return () => { alive = false; };
   }, [vehicleId]);
-  return read;
+  return read && read.vehicleId === vehicleId ? read.value : null;
 }
 
 // ---------------------------------------------------------------------------
