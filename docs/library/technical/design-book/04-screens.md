@@ -72,6 +72,8 @@ Every screen in the application. What it shows, how it behaves in every state, w
 - **Treemap viewport:** Fills all remaining vertical space (`flex: 1, minHeight: 0`). Absolutely positioned cells from `squarify()` algorithm. Background `var(--bg)`.
 - **Footer bar:** 28px. Left: legend text in Courier New describing what area/color encode at the current level. Right: "BROWSE ALL" inverted button + "nuke.ag" link. Background `var(--surface)`, top border `2px solid var(--border)`.
 
+**Market coverage disclosure (2026-10-18):** `VenueMix` keeps Sales by house as a compact, initially closed native disclosure above the map. The summary shows its composition bar and all-time scope; opening it reveals the existing house shares, confirmed-sale population and refresh clock. Closing it restores the compact row without changing drill or time scope. The population and clock stay readable on phones, with a 44px summary target. Missing refresh data renders no disclosure. Verify data retention with the existing `MarketTile.test.tsx`; browser acceptance checks opening/closing by pointer and keyboard, visible focus and narrow-screen wrapping before claiming visual verification.
+
 ### Screen States
 
 **Loading State — Initial:**

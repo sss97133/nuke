@@ -72,11 +72,17 @@
 .map-callouts__window { align-self: center; font-family: Arial, sans-serif; font-size: 9px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--text-secondary); }
 @media (max-width: 640px) { .map-callouts { gap: 2px 14px; padding: 4px 12px; } .map-callouts__n { display: none; } .map-callouts__window { flex-basis: 100%; } }
 
-/* Sales by house above the map: one 100% bar in the venue colors and the larger houses' shares. */
-.venue-mix { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 12px; padding: 6px 16px; border-bottom: 2px solid var(--border); background: var(--bg); flex-shrink: 0; font-family: Arial, sans-serif; }
-.venue-mix__label { font-size: 10px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: var(--text-secondary); }
-.venue-mix__bar { display: flex; width: 240px; height: 10px; border: 1px solid var(--border); }
+/* Sales by house supports the map: a compact bar opens the shares and snapshot receipt in place. */
+.venue-mix { padding: 0 12px; border-bottom: 2px solid var(--border); background: var(--bg); flex-shrink: 0; font-family: Arial, sans-serif; }
+.venue-mix__summary { display: flex; align-items: center; gap: 8px; min-height: 32px; cursor: pointer; list-style: none; }
+.venue-mix__summary::-webkit-details-marker { display: none; }
+.venue-mix__summary:focus-visible { outline: 2px solid var(--border-focus); outline-offset: -2px; }
+.venue-mix__chevron { color: var(--text-secondary); }
+.venue-mix[open] .venue-mix__chevron { transform: rotate(90deg); }
+.venue-mix__label, .venue-mix__hint { font-size: 9px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: var(--text-secondary); white-space: nowrap; }
+.venue-mix__hint { margin-left: auto; }
+.venue-mix__bar { display: flex; flex: 0 1 160px; min-width: 48px; height: 10px; border: 2px solid var(--border); }
 .venue-mix__seg { display: block; min-width: 1px; height: 100%; }
-.venue-mix__names { display: inline-flex; flex-wrap: wrap; gap: 2px 10px; font-size: 12px; color: var(--text); font-variant-numeric: tabular-nums; }
-.venue-mix__n { color: var(--text-secondary); font-size: 11px; font-family: 'Courier New', monospace; }
-@media (max-width: 640px) { .venue-mix { padding: 4px 12px; } .venue-mix__bar { width: 100%; } .venue-mix__n { display: none; } }
+.venue-mix__names { display: flex; flex-wrap: wrap; gap: 4px 12px; padding-bottom: 8px; font-size: 12px; color: var(--text); font-variant-numeric: tabular-nums; }
+.venue-mix__n { flex-basis: 100%; color: var(--text-secondary); font-size: 11px; font-family: 'Courier New', monospace; }
+@media (max-width: 640px) { .venue-mix__summary { min-height: 44px; } }
