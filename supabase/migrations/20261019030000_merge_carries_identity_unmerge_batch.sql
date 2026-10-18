@@ -1,4 +1,4 @@
--- Merges keep identity, merged-away rows stop owning VINs, batch merges become reversible, and a URL write keeps a sale.
+-- Merges keep identity, merged-away rows stop owning VINs, and batch merges become reversible.
 -- Found by the 2026-10-17/18 Mecum dedup (19,180 merge_into_primary_batch merges, detected_by 'dedup-worker'):
 --  1. merge_into_primary_batch did not carry vin: 832 survivors have no VIN while their merged-away duplicate holds one, and
 --     correct_vehicle_vin then answered held_by the merged duplicate. A merged-away row is not a live owner (the VIN unique
@@ -12,14 +12,12 @@
 --     supersession it recorded has superseded_at = merged_at, one transaction), clears the survivor columns a journal says the
 --     merge filled (still holding that value), refuses a pair whose survivor holds the duplicate's VIN otherwise, and parks the
 --     duplicate's listing_url (kept in the journal) when a live vehicle already holds it.
---  3. trg_resolve_canonical_columns recomputes on any listing_url write; promoting listing_url on 7,440 Mecum lots turned 5 legacy
---     'sold' rows into 'unknown' though no sale column changed. On UPDATE a 'sold' outcome now stays when the old inputs and the
---     new inputs resolve to the same answer and the row states no no-sale: only a write that changes what the rule sees, or
---     brings contradicting testimony, can drop a recorded sale.
+--  3. Canonical sale outcomes continue to use their existing evidence-based resolver. Historical sale corrections
+--     require their retained source witness and the sanctioned provenance writer; a stored derived label is not new testimony.
 --  4. propose_listing_vin_merge stamped every proposal proposed_by 'extract-ebay-motors'; it now takes app.writer when set.
 BEGIN;
-SET LOCAL statement_timeout = '60s';
-SET LOCAL lock_timeout = '10s';
+SET LOCAL statement_timeout = '10s';
+SET LOCAL lock_timeout = '5s';
 
 -- 1. correct_vehicle_vin: held_by only by a live vehicle.
 CREATE OR REPLACE FUNCTION public.correct_vehicle_vin(p_vehicle_id uuid, p_expected text, p_value text, p_source jsonb, p_reason text)
@@ -620,123 +618,7 @@ BEGIN
 END;
 $function$;
 
--- 4. trg_resolve_canonical_columns: only a write that changes what the rule sees can drop a recorded sale.
-CREATE OR REPLACE FUNCTION public.trg_resolve_canonical_columns()
- RETURNS trigger
- LANGUAGE plpgsql
- SET search_path TO 'public', 'pg_temp'
-AS $function$
-DECLARE
-  raw_source TEXT;
-  best_price NUMERIC;
-  price_type TEXT;
-  sale_basis TEXT;
-  old_basis TEXT;
-  old_outcome TEXT;
-BEGIN
-  -- 1. canonical_platform: resolve from first non-null source column
-  raw_source := COALESCE(NEW.source, NEW.listing_source, NEW.discovery_source, NEW.auction_source);
-  IF raw_source IS NOT NULL THEN
-    NEW.canonical_platform := resolve_platform_slug(raw_source);
-  ELSE
-    NEW.canonical_platform := 'unknown';
-  END IF;
-
-  -- 2. canonical_outcome: a consummated sale is a STATUS, or (pre-2026-09-27 rows only) the
-  --    platform's own sale marker. A price alone is a bid, an ask or an estimate
-  --    (2026-09-27: 30,612 unsold BaT lots, 4,612 Mecum bid-goes-on lots, 6,155 Cars & Bids
-  --    reserve-not-met lots and 82 RM Sotheby's low estimates were all sitting in sale_price).
-  sale_basis := vehicle_sale_basis(NEW.sale_status, NEW.auction_outcome, NEW.canonical_platform,
-                                   NEW.listing_url, NEW.discovery_url, NEW.sale_price::numeric,
-                                   NEW.notes, NEW.import_metadata, NEW.created_at);
-  IF sale_basis IS NOT NULL THEN
-    NEW.canonical_outcome := 'sold';
-  ELSIF NEW.sale_status IN ('not_sold', 'unsold', 'bid_to') OR NEW.reserve_status = 'reserve_not_met'
-        OR NEW.auction_outcome IN ('reserve_not_met', 'no_sale') THEN
-    NEW.canonical_outcome := 'reserve_not_met';
-  ELSIF NEW.sale_status IN ('auction_live', 'upcoming') THEN
-    NEW.canonical_outcome := 'active';
-  ELSIF NEW.sale_status = 'for_sale' OR (COALESCE(NEW.asking_price, 0) > 0 AND COALESCE(NEW.sale_status, 'available') NOT IN ('ended')) THEN
-    NEW.canonical_outcome := 'for_sale';
-  ELSIF NEW.sale_status = 'ended' THEN
-    NEW.canonical_outcome := 'ended';
-  ELSIF NEW.sale_status = 'available' AND (COALESCE(NEW.high_bid, 0) > 0 OR COALESCE(NEW.winning_bid, 0) > 0) THEN
-    -- Has bids but no sale price → auction ended without clear outcome
-    NEW.canonical_outcome := 'ended';
-  ELSE
-    NEW.canonical_outcome := 'unknown';
-  END IF;
-
-  -- 2b. A recorded 'sold' is dropped only by a write the rule can see: when the old inputs resolve to the same answer as the new
-  --     ones and the row states no no-sale, the write brought no sale evidence (2026-10-18: a listing_url write turned 5 legacy
-  --     Mecum sales into 'unknown').
-  IF TG_OP = 'UPDATE' AND OLD.canonical_outcome = 'sold' AND NEW.canonical_outcome IS DISTINCT FROM 'sold'
-     AND NOT coalesce(NEW.auction_outcome IN ('reserve_not_met', 'no_sale') OR NEW.sale_status IN ('not_sold', 'unsold', 'bid_to')
-              OR NEW.reserve_status = 'reserve_not_met' OR NEW.notes ~ 'Result: bid-goes-on', false) THEN
-    old_basis := vehicle_sale_basis(OLD.sale_status, OLD.auction_outcome, OLD.canonical_platform,
-                                    OLD.listing_url, OLD.discovery_url, OLD.sale_price::numeric,
-                                    OLD.notes, OLD.import_metadata, OLD.created_at);
-    old_outcome := CASE
-      WHEN old_basis IS NOT NULL THEN 'sold'
-      WHEN OLD.sale_status IN ('not_sold', 'unsold', 'bid_to') OR OLD.reserve_status = 'reserve_not_met'
-        OR OLD.auction_outcome IN ('reserve_not_met', 'no_sale') THEN 'reserve_not_met'
-      WHEN OLD.sale_status IN ('auction_live', 'upcoming') THEN 'active'
-      WHEN OLD.sale_status = 'for_sale' OR (COALESCE(OLD.asking_price, 0) > 0 AND COALESCE(OLD.sale_status, 'available') NOT IN ('ended')) THEN 'for_sale'
-      WHEN OLD.sale_status = 'ended' THEN 'ended'
-      WHEN OLD.sale_status = 'available' AND (COALESCE(OLD.high_bid, 0) > 0 OR COALESCE(OLD.winning_bid, 0) > 0) THEN 'ended'
-      ELSE 'unknown'
-    END;
-    IF old_outcome = NEW.canonical_outcome THEN
-      NEW.canonical_outcome := 'sold';
-    END IF;
-  END IF;
-
-  -- 3. canonical_sold_price: context-aware price resolution
-  CASE NEW.canonical_outcome
-    WHEN 'sold' THEN
-      -- Transaction price priority: sale_price > winning_bid > bat_sold_price > sold_price > high_bid > price
-      best_price := COALESCE(
-        NULLIF(NEW.sale_price, 0)::NUMERIC,
-        NULLIF(NEW.winning_bid, 0)::NUMERIC,
-        NULLIF(NEW.bat_sold_price, 0),
-        NULLIF(NEW.sold_price, 0)::NUMERIC,
-        NULLIF(NEW.high_bid, 0)::NUMERIC,
-        NULLIF(NEW.price, 0)::NUMERIC
-      );
-    WHEN 'for_sale' THEN
-      -- Asking price priority
-      best_price := COALESCE(
-        NULLIF(NEW.asking_price, 0),
-        NULLIF(NEW.price, 0)::NUMERIC
-      );
-    WHEN 'reserve_not_met' THEN
-      -- Highest bid reached
-      best_price := COALESCE(
-        NULLIF(NEW.high_bid, 0)::NUMERIC,
-        NULLIF(NEW.winning_bid, 0)::NUMERIC,
-        NULLIF(NEW.bat_sold_price, 0),
-        NULLIF(NEW.price, 0)::NUMERIC
-      );
-    ELSE
-      -- Best available
-      best_price := COALESCE(
-        NULLIF(NEW.sale_price, 0)::NUMERIC,
-        NULLIF(NEW.bat_sold_price, 0),
-        NULLIF(NEW.sold_price, 0)::NUMERIC,
-        NULLIF(NEW.winning_bid, 0)::NUMERIC,
-        NULLIF(NEW.high_bid, 0)::NUMERIC,
-        NULLIF(NEW.asking_price, 0),
-        NULLIF(NEW.price, 0)::NUMERIC
-      );
-  END CASE;
-
-  NEW.canonical_sold_price := best_price;
-
-  RETURN NEW;
-END;
-$function$;
-
--- 5. propose_listing_vin_merge: proposed_by is the calling writer when it says so.
+-- 4. propose_listing_vin_merge: attribute the proposal to the declared writer.
 CREATE OR REPLACE FUNCTION public.propose_listing_vin_merge(p_holder uuid, p_listed uuid, p_vin text, p_note text DEFAULT NULL)
 RETURNS uuid
 LANGUAGE plpgsql
