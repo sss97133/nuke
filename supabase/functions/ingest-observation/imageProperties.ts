@@ -9,6 +9,11 @@ export const IMAGE_PROPERTY_VALUES = {
   image_visible_assembly_state: ["stripped", "partial", "assembled"],
 } as const;
 
+/** Text a model read off one image: a badge's printed words, or a GM SPID label's RPO codes. A reading, not a build record. */
+export const IMAGE_READING_KEYS = ["image_visible_badge_text", "image_spid_rpo_codes"] as const;
+const BADGE_TEXT = /^[A-Z0-9][A-Z0-9 .\/&'+-]{0,39}$/;
+const RPO_CODE = /^[A-Z0-9]{3}$/;
+
 export interface ObservationPropertyInput {
   property_key?: unknown;
   kind?: unknown;
@@ -39,6 +44,11 @@ export function isSupportedImagePropertyKey(value: unknown): value is keyof type
   return typeof value === "string" && Object.prototype.hasOwnProperty.call(IMAGE_PROPERTY_VALUES, value);
 }
 
+/** Single-claim intake only; the cached batch path admits the enum keys above and nothing else. */
+export function isImageReadingKey(value: unknown): value is typeof IMAGE_READING_KEYS[number] {
+  return typeof value === "string" && (IMAGE_READING_KEYS as readonly string[]).includes(value);
+}
+
 /**
  * The caller looks up the exact property_key and handles lookup failures as 503.
  * Unregistered/pending/deprecated keys fail closed. Values are never inferred or
@@ -55,7 +65,7 @@ export function validateObservationProperty(
     return invalid("property_key must be a nonempty string");
   }
   const titleFacet = titleFacetVerified && TITLE_FACET_KEYS.includes(input.property_key as TitleFacetKey);
-  if (!isSupportedImagePropertyKey(input.property_key) && !titleFacet &&
+  if (!isSupportedImagePropertyKey(input.property_key) && !isImageReadingKey(input.property_key) && !titleFacet &&
       !(retainedPropertyVerified && RETAINED_PROPERTY_KEYS.includes(input.property_key))) {
     return invalid("Unsupported property_key; only registered image properties are supported");
   }
@@ -133,6 +143,28 @@ export function validateObservationProperty(
     ];
     if (typeof value !== "string" || !allowed.includes(value)) {
       return invalid("Invalid image property value; unknown values must be omitted");
+    }
+  }
+  if (isImageReadingKey(input.property_key)) {
+    if (input.kind !== "specification" || input.agent_inferred !== true) {
+      return invalid("Image readings require specification observations with agent_inferred=true");
+    }
+    if (typeof fields.image_id !== "string" || !UUID.test(fields.image_id)) {
+      return invalid("Image readings require a canonical image_id UUID");
+    }
+    if (typeof fields.model_name !== "string" || !fields.model_name.trim() ||
+        fields.originality_status !== "unknown" || fields.factory_configuration_status !== "unknown") {
+      return invalid("Image readings name their model and leave originality and factory configuration unknown");
+    }
+    if (input.property_key === "image_visible_badge_text" &&
+        (typeof value !== "string" || !BADGE_TEXT.test(value) || fields.reading_role !== "visible_badge_text")) {
+      return invalid("A badge reading is the printed text in capitals, at most 40 characters");
+    }
+    if (input.property_key === "image_spid_rpo_codes" &&
+        (!Array.isArray(value) || value.length < 1 || value.length > 120 ||
+         !value.every(code => typeof code === "string" && RPO_CODE.test(code)) || new Set(value).size !== value.length ||
+         fields.reading_role !== "spid_label_rpo_codes" || fields.vin_match_status !== "not_evaluated")) {
+      return invalid("A SPID reading is a list of distinct three-character RPO codes; the label's VIN match is not evaluated here");
     }
   }
   return { ok: true, propertyId: property.id };
