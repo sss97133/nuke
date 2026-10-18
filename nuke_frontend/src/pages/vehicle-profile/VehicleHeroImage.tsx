@@ -157,7 +157,7 @@ const VehicleHeroImage: React.FC<VehicleHeroImageProps> = ({ overlayNode }) => {
               <BadgePortal
                 dimension="transmission"
                 value={v.transmission}
-                label={String(v.transmission).toLowerCase().includes('manual') ? 'MANUAL' : 'AUTO'}
+                label={String(v.transmission).toUpperCase()}
                 variant="status"
               />
             )}
