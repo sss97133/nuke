@@ -31,11 +31,13 @@ const SANS = 'Arial, Helvetica, sans-serif';
 export function WatchersPopup({ vehicleId, watcherCount, viewCount, make, model }: Props) {
   const [stats, setStats] = useState<ModelStats | null>(null);
   const [loading, setLoading] = useState(true);
+  const [unavailable, setUnavailable] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
 
     async function load() {
+      setUnavailable(false);
       if (!make || !model) {
         setLoading(false);
         return;
@@ -44,7 +46,7 @@ export function WatchersPopup({ vehicleId, watcherCount, viewCount, make, model 
         // make and model are this vehicle's own stored spellings, so equality finds its peers through
         // idx_vehicles_make_model; `ilike` is not leakproof, cannot be an index qual under the row policies, and
         // timed out at 10 s as anon (Ford Mustang, 2026-10-14) where equality answers in 70 ms warm.
-        const { data } = await supabase
+        const { data, error } = await supabase
           .from('vehicles')
           .select('bat_watchers')
           .eq('make', make)
@@ -52,6 +54,8 @@ export function WatchersPopup({ vehicleId, watcherCount, viewCount, make, model 
           .not('bat_watchers', 'is', null)
           .gt('bat_watchers', 0)
           .limit(500);
+
+        if (error) throw error;
 
         if (!cancelled && data && data.length > 0) {
           const watchers = data
@@ -74,7 +78,7 @@ export function WatchersPopup({ vehicleId, watcherCount, viewCount, make, model 
           }
         }
       } catch {
-        // ignore
+        if (!cancelled) setUnavailable(true);
       }
       if (!cancelled) setLoading(false);
     }
@@ -191,7 +195,7 @@ export function WatchersPopup({ vehicleId, watcherCount, viewCount, make, model 
       {!loading && !stats && (make && model) && (
         <div style={{ padding: '12px', textAlign: 'center' }}>
           <span style={{ fontFamily: MONO, fontSize: 9, color: '#999', textTransform: 'uppercase' as const, letterSpacing: '0.08em' }}>
-            No comparable watcher data for this model
+            {unavailable ? 'Watcher comparisons unavailable.' : 'No comparable watcher counts in this read.'}
           </span>
         </div>
       )}
