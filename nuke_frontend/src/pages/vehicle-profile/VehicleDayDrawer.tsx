@@ -100,7 +100,7 @@ const mono: React.CSSProperties = { fontFamily: "var(--vp-font-mono, 'Courier Ne
 const dayPhotoCache = new Map<string, DayPhoto[]>();
 
 const VehicleDayDrawer: React.FC<VehicleDayDrawerProps> = ({ date, auctions = [], hasWorkSummary = false, onClose, onPrev, onNext }) => {
-  const { vehicleId, timelineEvents } = useVehicleProfile();
+  const { vehicleId, timelineEvents, timelineReadState } = useVehicleProfile();
   const [photoRead, setPhotoRead] = useState<{ key: string; rows: DayPhoto[]; failed: boolean } | null>(null);
   const drawerRef = useRef<HTMLDivElement>(null);
 
@@ -189,6 +189,8 @@ const VehicleDayDrawer: React.FC<VehicleDayDrawerProps> = ({ date, auctions = []
   const dayBids = auctionItems.filter(i => i.kind === 'bid').length;
   const dayComments = auctionItems.length - dayBids;
   const missingWorkDetails = hasWorkSummary && workEvents.length === 0;
+  const timelinePending = timelineReadState?.timeline === 'pending' || timelineReadState?.work === 'pending';
+  const timelineUnavailable = timelineReadState?.timeline === 'unavailable' || timelineReadState?.work === 'unavailable';
 
   const loading = photos === null;
   const isEmpty = !loading && !photosUnavailable && photos.length === 0 && workEvents.length === 0 && otherEvents.length === 0 && auctionItems.length === 0;
@@ -230,7 +232,10 @@ const VehicleDayDrawer: React.FC<VehicleDayDrawerProps> = ({ date, auctions = []
       </div>
 
       {(loading || photosUnavailable) && <div style={{ ...mono, fontSize: 9, color: 'var(--vp-pencil, #888)' }}>{photosUnavailable ? 'Photos unavailable' : 'LOADING…'}</div>}
-      {isEmpty && !missingWorkDetails && <div style={{ ...mono, fontSize: 9, color: 'var(--vp-pencil, #888)' }}>NO ACTIVITY</div>}
+      {isEmpty && !missingWorkDetails && !timelinePending && !timelineUnavailable && <div style={{ ...mono, fontSize: 9, color: 'var(--vp-pencil, #888)' }}>NO ACTIVITY</div>}
+      {timelinePending && <div role="status" style={{ ...mono, fontSize: 9, color: 'var(--vp-pencil, #888)' }}>Timeline details are still being read.</div>}
+      {timelineReadState?.timeline === 'unavailable' && <div role="status" style={{ ...mono, fontSize: 9, color: 'var(--vp-pencil, #888)' }}>Timeline events could not be fully read.</div>}
+      {timelineReadState?.work === 'unavailable' && <div role="status" style={{ ...mono, fontSize: 9, color: 'var(--vp-pencil, #888)' }}>Work-session details could not be fully read.</div>}
       {missingWorkDetails && <div style={{ ...mono, fontSize: 9, color: 'var(--vp-pencil, #888)' }}>Work-session details unavailable in this read.</div>}
 
       {/* Facet chips — only the facets this day touched */}

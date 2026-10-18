@@ -293,7 +293,7 @@ const TIMELINE_FILTERS: { key: string; label: string; match: (ev: any) => boolea
 ];
 
 const BarcodeTimeline: React.FC<BarcodeTimelineProps> = ({ selectedAuctionUrl, onSelectAuction, selectionPending = false }) => {
-  const { vehicle, vehicleId, timelineEvents, setGalleryFilter } = useVehicleProfile();
+  const { vehicle, vehicleId, timelineEvents, timelineReadState, setGalleryFilter } = useVehicleProfile();
   const popup = useContext(PopupStackContext);
 
   // A BaT lot's real sequence — bids and comments at their times, the open and the
@@ -786,6 +786,8 @@ const BarcodeTimeline: React.FC<BarcodeTimelineProps> = ({ selectedAuctionUrl, o
 
   const availableAuctions = auctions.filter(a => a.activityExtracted || a.open || a.close);
   const auctionStatus = <>
+    {timelineReadState?.timeline === 'unavailable' && <p role="status">Timeline events could not be fully read.</p>}
+    {timelineReadState?.work === 'unavailable' && <p role="status">Work-session details could not be fully read.</p>}
     {activityUnavailable && <p role="status">Auction activity could not be fully read. Timeline activity counts are unavailable.</p>}
     {hasUnpositionedActivity && <p role="status">Some retained auction interactions lack usable posting times and cannot be placed on this timeline.</p>}
   </>;
