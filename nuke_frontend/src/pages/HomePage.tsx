@@ -2781,9 +2781,10 @@ export function TreemapHomePage({ onBrowse, embedded = false }: { onBrowse: () =
             <BrandFamilyMap width={dims.w} height={dims.h} baseline={baseline} basis={basis}
               familyMoves={horizon === '1y' && !isCustomBase ? undefined : moversData?.family_moves}
               gateMin={gateMin}
+              windowLabel={horizonWindowLabel}
               horizonShortLabel={horizon === '1y' && !isCustomBase ? '12 mo' : horizonMeta.label}
-              onPickBrand={(brand) => { recordInterest('make', brand); setDrillStack([{ label: 'ALL MAKES' }, { label: brand, make: brand }]); }}
-              onPickFamily={(brand, key, family) => { recordInterest('make', brand); setDrillStack([{ label: 'ALL MAKES' }, { label: brand, make: brand }, { label: family, make: brand, family: key }]); }} />
+              onPickBrand={(brand, focusAfterPick) => { focusAfterDrill.current = !!focusAfterPick; recordInterest('make', brand); setDrillStack([{ label: 'ALL MAKES' }, { label: brand, make: brand }]); }}
+              onPickFamily={(brand, key, family, focusAfterPick) => { focusAfterDrill.current = !!focusAfterPick; recordInterest('make', brand); setDrillStack([{ label: 'ALL MAKES' }, { label: brand, make: brand }, { label: family, make: brand, family: key }]); }} />
           ) : levelType === 'models' && currentLevel.family && currentLevel.make && familyView === 'sales' && dims.w > 0 ? (
             <FamilySalesChart brand={currentLevel.make} familyKey={currentLevel.family} family={currentLevel.label}
               width={dims.w} height={dims.h} onOpen={(id) => navigate(`/vehicle/${id}`)}

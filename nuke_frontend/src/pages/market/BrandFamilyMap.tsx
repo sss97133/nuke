@@ -79,7 +79,7 @@ export default function BrandFamilyMap({ width, height, onPickBrand, onPickFamil
   const moveFor = (r: MapRow): Move => r.family_key === 'more' || r.family_key === 'other'
     ? { kind: 'none' } : relativeMove(toNode(r), baseline, basis === 'ledger', gateMin);
   const inspected = (r: MapRow) => ({ ...toNode(r), name: `${r.brand} ${label(r)}` });
-  useEffect(() => { setTooltip(null); setSheet(null); }, [basis, familyMoves, gateMin]);
+  useEffect(() => { setTooltip(null); setSheet(null); }, [basis, familyMoves, gateMin, windowLabel, horizonShortLabel]);
   useEffect(() => { let live = true; readBrandFamilyMap().then((r) => { if (live) setRows(r); }); return () => { live = false; }; }, []);
   const effectiveRows = useMemo(() => {
     if (!rows || !familyMoves) return rows;
