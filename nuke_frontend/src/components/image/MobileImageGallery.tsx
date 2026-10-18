@@ -75,7 +75,7 @@ const MobileImageGallery: React.FC<MobileImageGalleryProps> = ({ vehicleId, lead
   };
 
   const onTouchEnd = () => {
-    if (!touchStartX || !touchStartY || !touchEndX || !touchEndY) return;
+    if (touchStartX === null || touchStartY === null || touchEndX === null || touchEndY === null) return;
     
     const distanceX = touchStartX - touchEndX;
     const distanceY = touchStartY - touchEndY;
