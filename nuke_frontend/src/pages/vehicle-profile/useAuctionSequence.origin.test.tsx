@@ -58,7 +58,7 @@ beforeEach(() => {
       reads.push(read); const path = read.url.pathname;
       if (read.method === 'POST') {
         if (path === '/rest/v1/rpc/get_vehicle_profile_data') return json({ vehicle: { id: vehicleId, is_public: true, make: 'Ford', model: 'Synthetic origin', listing_url: hint },
-          images: [{ id: 'synthetic-image', image_url: 'https://images.test/own.jpg', source: 'owner_upload', is_primary: true }], timeline_events: timeline,
+          images: [{ id: 'synthetic-image', image_url: 'https://images.test/own.jpg', source: 'owner_upload', is_primary: true }], timeline_events: timeline, work_sessions: [],
           stats: { comment_count: 0, observation_count: 0 } });
         if (['/rest/v1/rpc/get_vehicle_day_depth', '/rest/v1/rpc/get_vehicle_contribution_days'].includes(path)) return json([]);
         throw new Error('Synthetic transport denies writes and other functions');
@@ -147,11 +147,53 @@ it.each([true, false])('preserves untimed retained-activity status with an empty
 const sourceLinks = () => [...host.querySelectorAll<HTMLAnchorElement>('.auction-band a')].map(link => link.getAttribute('href'));
 const nativeReads = () => reads.filter(r => r.url.pathname === '/rest/v1/auction_comments'
   && r.url.searchParams.get('limit') === '250' && r.url.searchParams.get('order') === 'id.asc');
-async function openReceipt() {
+async function openReceipt(selectedDay = day) {
   await import('./VehicleDayDrawer'); // Wait for the actual lazy child before asserting its DOM.
-  await act(async () => host.querySelector<HTMLElement>(`.hm-c[data-date="${day}"]`)!.click());
+  await act(async () => host.querySelector<HTMLElement>(`.hm-c[data-date="${selectedDay}"]`)!.click());
   await act(async () => { await vi.advanceTimersByTimeAsync(10); });
 }
+
+it.each([
+  { date: '2025-01-03', label: 'Auction Opened', basis: 'listing start recorded by the extractor' },
+  { date: day, label: 'Auction Closed', basis: 'auction end recorded by the extractor' },
+])('keeps a retained native moment visible in its otherwise empty day drawer: $label', async ({ date, label, basis }) => {
+  timeline = []; comments = [];
+  await draw(); await openReceipt(date);
+  const drawer = host.querySelector<HTMLElement>('[data-day-drawer]')!;
+  const moments = drawer.querySelectorAll('.day-drawer__auction-moment');
+  expect(moments).toHaveLength(1);
+  expect(moments[0].textContent).toContain(label); expect(moments[0].textContent).toContain(basis);
+  expect(moments[0].querySelector('a')?.getAttribute('href')).toBe(valid);
+  expect(drawer.textContent).not.toContain('NO ACTIVITY'); expect(drawer.textContent).not.toContain('$');
+  expect(reads.filter(r => r.url.pathname === '/rest/v1/vehicle_images' && r.url.searchParams.get('select') === 'id,image_url,taken_at,source,source_url')).toHaveLength(1);
+});
+it('keeps a date-only native end on its recorded day without inventing a closing time', async () => {
+  timeline = []; comments = []; events = [{ ...event(valid), started_at: null, ended_at: `${day}T00:00:00Z`, sold_at: null }];
+  await draw(); await openReceipt();
+  const moment = host.querySelector('.day-drawer__auction-moment')!;
+  expect(moment?.textContent).toContain('Auction end day recorded · time unknown');
+  expect(moment?.textContent).toContain('auction end day; time not recorded');
+  expect(moment?.textContent).toContain('Jan 10, 2025'); expect(moment?.textContent).not.toMatch(/\d{1,2}:\d{2}|AM|PM/);
+  expect(host.querySelector('[data-day-drawer]')?.textContent).not.toContain('NO ACTIVITY');
+});
+it('keeps a retained sale moment distinct from a recorded auction close', async () => {
+  timeline = []; comments = []; events = [{ ...event(valid), ended_at: null }];
+  await draw(); await openReceipt();
+  const moment = host.querySelector('.day-drawer__auction-moment')!;
+  expect(moment?.textContent).toContain('Sale recorded · auction end unknown');
+  expect(moment?.textContent).toContain('sale recorded by the extractor; auction end unknown');
+  expect(moment?.textContent).not.toContain('Auction Closed'); expect(moment?.querySelector('a')?.getAttribute('href')).toBe(valid);
+});
+it('keeps a first-activity record distinct from a known opening time while retaining its source interaction', async () => {
+  timeline = []; events = [{ ...event(valid), started_at: null }];
+  await draw(); await openReceipt();
+  const drawer = host.querySelector('[data-day-drawer]')!;
+  const moment = [...drawer.querySelectorAll('.day-drawer__auction-moment')].find(node => node.textContent?.includes('First observed'));
+  expect(moment?.textContent).toContain('First observed auction activity · opening time unknown');
+  expect(moment?.textContent).toContain('first activity — first bid; opening time not recorded');
+  expect(moment?.textContent).not.toContain('Auction Opened');
+  expect(drawer.querySelector('.day-drawer__auction-list a')?.getAttribute('href')).toBe(`${valid}#comment-123`);
+});
 
 it.each([valid, 'http://www.bringatrailer.com/listing/SYNTHETIC-ORIGIN-LOT?x=1#comment-1',
   `bringatrailer.com/listing/${lot}/`, `//bringatrailer.com/listing/${lot}/`, `https://auctions.bringatrailer.com/listing/${lot}/`,
