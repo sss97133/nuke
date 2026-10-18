@@ -69,6 +69,7 @@ struct VehicleGalleryImage: Decodable, Identifiable {
     let image_category: String?  // vision: exterior_body / interior / documentation / engine_mechanical…
     let created_at: String?      // upload time — recency fallback when EXIF taken_at is null
     let vision_gate_agent_reasoning: String?  // names the medium → photo vs rendering/receipt (hero pick)
+    var is_document: Bool? = nil
     var source: String? = nil
     var photo_imported_at: String? = nil
     var photo_listing_url: String? = nil
@@ -85,6 +86,23 @@ struct VehicleGalleryImage: Decodable, Identifiable {
          .not("is_duplicate", operator: .is, value: "true")
          .not("is_superseded", operator: .is, value: "true")
          .not("image_url", operator: .is, value: "null")
+    }
+
+    var excludedFromHero: Bool {
+        if is_document == true || image_url?.isEmpty != false { return true }
+        let category = (image_category ?? "").lowercased()
+        let text = ([category, vision_gate_agent_reasoning ?? ""] + (labels ?? [])).joined(separator: " ").lowercased()
+        return ["document", "receipt", "invoice", "screenshot", "brochure", "spec sheet", "sketch", "drawing", "illustration", "rendering"].contains { text.contains($0) }
+    }
+
+    static func chooseHero(cover: Self?, candidates: [Self], gallery: [Self]) -> Self? {
+        if let cover, !cover.excludedFromHero { return cover }
+        let photographicCategories: Set<String> = ["exterior_body", "interior", "engine_mechanical", "undercarriage", "exterior_detail"]
+        func latest(_ rows: [Self]) -> Self? {
+            rows.filter { !$0.excludedFromHero && photographicCategories.contains(($0.image_category ?? "").lowercased()) }
+                .max { ($0.taken_at ?? $0.created_at ?? "") < ($1.taken_at ?? $1.created_at ?? "") }
+        }
+        return latest(candidates) ?? latest(gallery)
     }
 
     // Legacy importers copied the import clock into taken_at. It is not a
@@ -606,7 +624,7 @@ struct VehicleDetailView: View {
                     if mapContext != nil {
                         Color.clear.frame(height: condensedBarHeight)
                         loadState
-                        if let raw = firstPaintURL, !raw.isEmpty {
+                        if let raw = heroImage?.image_url, !raw.isEmpty {
                             CachedAsyncImage(url: NukeImage.thumb(raw, width: 600)) { image in
                                 image.resizable().scaledToFill()
                             } placeholder: { Color(uiColor: .secondarySystemFill) }
@@ -711,35 +729,11 @@ struct VehicleDetailView: View {
     // a slow parallax dissolves it into the bar plane. BuildStoryHero is unchanged —
     // we only transform its rendered output.
     // The hero's last resort is the vehicle row's primary_image_url, which is what the web's
-    // profile paints first (loadVehicleData.ts, "Initialize leadImageUrl from primary_image_url")
-    // before selectBestHeroImage replaces it with a screened frame, under the web's two guards:
-    // not an import-queue or organization-logo path, and not a storage path that names another
-    // vehicle (imageFilterUtils.ts isMismatchedVehicleImage). It is reached only when no admitted
-    // frame exists. Measured 2026-10-13 on 300 public vehicles with a primary_image_url: 36 had no
-    // admitted frame at all, and 69 had a primary_image_url with no vehicle_images row behind it.
-    // Move both onto a lead in the document when the read grows its gallery section.
-    private var firstPaintURL: String? {
-        guard let raw = vehicle?.primary_image_url?.trimmingCharacters(in: .whitespaces), !raw.isEmpty else { return nil }
-        let lower = raw.lowercased()
-        if lower.contains("import_queue") || lower.contains("organization-logos/") || lower.contains("organization_logos/") { return nil }
-        if Self.namesAnotherVehicle(raw, expected: vehicleId) { return nil }
-        return raw
-    }
-    /// The web's isMismatchedVehicleImage: a storage path under vehicle-images/vehicles/<uuid>/ or
-    /// vehicle-images/<uuid>/ that names a different vehicle is not this vehicle's picture.
-    static func namesAnotherVehicle(_ url: String, expected: String) -> Bool {
-        let target = expected.lowercased()
-        guard !target.isEmpty else { return false }
-        let path = url.range(of: "/vehicle-images/").map { String(url[$0.upperBound...]) } ?? url
-        let parts = path.split(separator: "?")[0].split(separator: "/").map(String.init).filter { !$0.isEmpty }
-        guard let first = parts.first else { return false }
-        let candidate: String? = (first == "vehicles" && parts.count > 1 && UUID(uuidString: parts[1]) != nil) ? parts[1]
-            : (UUID(uuidString: first) != nil ? first : nil)
-        return candidate.map { $0.lowercased() != target } ?? false
-    }
+    // A bare vehicle cover URL has no per-image qualification. Only a viewer-permitted
+    // gallery cover or a classified photographic fallback may lead.
     @ViewBuilder private var heroLayer: some View {
         BuildStoryHero(
-            imageURL: heroImage?.image_url ?? firstPaintURL,
+            imageURL: heroImage?.image_url,
             year: vehicle?.year, make: vehicle?.make,
             model: vehicle?.model, trim: vehicle?.trim,
             // The title from the document's identity tokens (normalized model, series, trim, a high-signal
@@ -775,29 +769,7 @@ struct VehicleDetailView: View {
     /// (drop the `documentation` category); lead with the latest EXTERIOR_BODY shot (the
     /// build's current face); recency falls back to created_at so sparse EXIF can't skew it.
     private var heroImage: VehicleGalleryImage? {
-        func recency(_ i: VehicleGalleryImage) -> String { i.taken_at ?? i.created_at ?? "" }
-        func latest(_ xs: [VehicleGalleryImage]) -> VehicleGalleryImage? { xs.max { recency($0) < recency($1) } }
-        // A real PHOTO, not a rendering/receipt: vision reasoning names the medium
-        // ("Hand-drawn pencil sketch…", "eBay receipt…" vs "Maroon K5 Blazer in shop").
-        // Null reasoning → treat as a photo (the common, un-flagged case).
-        func realPhoto(_ i: VehicleGalleryImage) -> Bool {
-            guard let r = i.vision_gate_agent_reasoning?.lowercased(), !r.isEmpty else { return true }
-            return !["sketch","drawing","pencil","illustration","painting","render",
-                     "screenshot","receipt","invoice","brochure","spec sheet","scan"].contains { r.contains($0) }
-        }
-        // Prefer a real exterior PHOTO of the truck (from the dedicated heroCandidates
-        // fetch — the latest one can sit past the gallery's first page). Then a
-        // rendering of it (art fallback). Then the paged gallery for vehicles with no
-        // exterior set — always excluding documents (a plate never leads).
-        // The web leads with the record's cover (primary_image_url, kept from the rows the public
-        // may read by recompute_vehicle_primary_image). Mirror it when that cover is one of the gated
-        // rows this viewer read: a listing's cover is the seller's chosen photo, where "latest
-        // exterior" picked a paint-gauge close-up on a 911 (2026-10-15).
-        if let coverRow { return coverRow }
-        if let realExt = latest(heroCandidates.filter(realPhoto)) { return realExt }
-        if let anyExt  = latest(heroCandidates) { return anyExt }                 // art fallback
-        let nonDoc = images.filter { $0.image_category != "documentation" }
-        return latest(nonDoc.filter(realPhoto)) ?? latest(nonDoc) ?? images.first
+        VehicleGalleryImage.chooseHero(cover: coverRow, candidates: heroCandidates, gallery: images)
     }
 
     /// Dedicated lead-image candidates: the gallery is paged taken_at-DESC, and the
@@ -815,13 +787,22 @@ struct VehicleDetailView: View {
         do {
             let rows: [VehicleGalleryImage] = try await VehicleGalleryImage.eligible(SupabaseService.client
                 .from("vehicle_images")
-                .select("id,image_url,thumbnail_url,is_primary,taken_at,labels,ai_processing_status,image_category,created_at,vision_gate_agent_reasoning,source,photo_imported_at:exif_data->>imported_at,photo_listing_url:exif_data->>source_url")
+                .select("id,image_url,thumbnail_url,is_primary,taken_at,labels,ai_processing_status,is_document,image_category,created_at,vision_gate_agent_reasoning,source,photo_imported_at:exif_data->>imported_at,photo_listing_url:exif_data->>source_url")
                 .eq("vehicle_id", value: vehicleId)
                 .eq("image_url", value: cover))
                 .limit(1)
                 .execute().value
-            coverRow = rows.first.flatMap { row in
-                row.image_category == "documentation" ? nil : row   // a plate or document never leads
+            coverRow = rows.first { !$0.excludedFromHero }
+            if coverRow == nil {
+                // Imported listing covers need not share the scalar cover's thumbnail URL.
+                // An explicitly selected, viewer-permitted gallery row is distinct from
+                // taking an arbitrary unclassified frame from gallery pagination.
+                let selected: [VehicleGalleryImage] = try await VehicleGalleryImage.eligible(SupabaseService.client
+                    .from("vehicle_images")
+                    .select("id,image_url,thumbnail_url,is_primary,taken_at,labels,ai_processing_status,is_document,image_category,created_at,vision_gate_agent_reasoning,source,photo_imported_at:exif_data->>imported_at,photo_listing_url:exif_data->>source_url")
+                    .eq("vehicle_id", value: vehicleId).eq("is_primary", value: true))
+                    .limit(1).execute().value
+                coverRow = selected.first { !$0.excludedFromHero }
             }
         } catch {
             NSLog("NukeCapture cover row fetch failed: %@", String(describing: error))
@@ -831,7 +812,7 @@ struct VehicleDetailView: View {
         do {
             heroCandidates = try await VehicleGalleryImage.eligible(SupabaseService.client
                 .from("vehicle_images")
-                .select("id,image_url,thumbnail_url,is_primary,taken_at,labels,ai_processing_status,image_category,created_at,vision_gate_agent_reasoning,source,photo_imported_at:exif_data->>imported_at,photo_listing_url:exif_data->>source_url")
+                .select("id,image_url,thumbnail_url,is_primary,taken_at,labels,ai_processing_status,is_document,image_category,created_at,vision_gate_agent_reasoning,source,photo_imported_at:exif_data->>imported_at,photo_listing_url:exif_data->>source_url")
                 .eq("vehicle_id", value: vehicleId)
                 .eq("image_category", value: "exterior_body"))
                 .order("taken_at", ascending: false, nullsFirst: false)
@@ -1181,7 +1162,7 @@ struct VehicleDetailView: View {
     @MainActor private func buildShareCard() async -> UIImage? {
         // Match the on-screen hero (latest frame), not the drift-prone primary_image_url,
         // so the shared card shows the build's current state.
-        let heroURL = NukeImage.thumb(heroImage?.image_url ?? firstPaintURL, width: 1200)
+        let heroURL = NukeImage.thumb(heroImage?.image_url, width: 1200)
         let hero = heroURL == nil ? nil : await RemoteImageCache.shared.image(heroURL!)
         var strip: [UIImage] = []
         for img in images where strip.count < 3 {
@@ -1211,7 +1192,7 @@ struct VehicleDetailView: View {
     private var galleryURLs: [String] {
         let urls = images.compactMap { $0.image_url }
         if !urls.isEmpty { return urls }
-        if let primary = firstPaintURL { return [primary] }
+        if let primary = heroImage?.image_url { return [primary] }
         return []
     }
 
@@ -1867,7 +1848,7 @@ struct VehicleDetailView: View {
         do {
             let request = VehicleGalleryImage.eligible(SupabaseService.client
                 .from("vehicle_images")
-                .select("id,image_url,thumbnail_url,is_primary,taken_at,labels,ai_processing_status,image_category,created_at,source,photo_imported_at:exif_data->>imported_at,photo_listing_url:exif_data->>source_url",
+                .select("id,image_url,thumbnail_url,is_primary,taken_at,labels,ai_processing_status,is_document,image_category,created_at,vision_gate_agent_reasoning,source,photo_imported_at:exif_data->>imported_at,photo_listing_url:exif_data->>source_url",
                         count: reset ? .exact : nil)
                 .eq("vehicle_id", value: vehicleId))
             // created_at is only an indexed paging order for a source listing's gallery, never a label.
@@ -2075,7 +2056,7 @@ struct VehicleDetailView: View {
         do {
             let rows: [VehicleGalleryImage] = try await VehicleGalleryImage.eligible(SupabaseService.client
                 .from("vehicle_images")
-                .select("id,image_url,thumbnail_url,is_primary,taken_at,labels,ai_processing_status,image_category,created_at,source,photo_imported_at:exif_data->>imported_at,photo_listing_url:exif_data->>source_url")
+                .select("id,image_url,thumbnail_url,is_primary,taken_at,labels,ai_processing_status,is_document,image_category,created_at,vision_gate_agent_reasoning,source,photo_imported_at:exif_data->>imported_at,photo_listing_url:exif_data->>source_url")
                 .eq("id", value: id.uuidString.lowercased()))
                 .limit(1).execute().value
             return rows.first
@@ -2252,7 +2233,7 @@ private struct DayDrillSheet: View {
         do {
             photos = try await VehicleGalleryImage.eligible(SupabaseService.client
                 .from("vehicle_images")
-                .select("id,image_url,thumbnail_url,is_primary,taken_at,labels,ai_processing_status,image_category,created_at,vision_gate_agent_reasoning,source,photo_imported_at:exif_data->>imported_at,photo_listing_url:exif_data->>source_url")
+                .select("id,image_url,thumbnail_url,is_primary,taken_at,labels,ai_processing_status,is_document,image_category,created_at,vision_gate_agent_reasoning,source,photo_imported_at:exif_data->>imported_at,photo_listing_url:exif_data->>source_url")
                 .eq("vehicle_id", value: vehicleId)
                 .gte("taken_at", value: day.day)
                 .lt("taken_at", value: f.string(from: next)))

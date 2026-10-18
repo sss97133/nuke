@@ -1969,56 +1969,20 @@ struct SourceLandingSheet: View {
     var readAt: String? = nil
     @State private var detail: SourceLandingDetail?
     @State private var detailFailed = false
-    @State private var liveBoard: LiveBoard?
-    @State private var liveFailed = false
-    @State private var showRecords = false
-    @State private var selectedMake: String?
     @Environment(\.dismiss) private var dismiss
 
     var body: some View {
         NavigationStack {
             List {
-                if sourceRow.source == "bat" {
-                    Section {
-                        Picker("Browse", selection: $showRecords) {
-                            Text("Live auctions").tag(false)
-                            Text("Source records").tag(true)
-                        }.pickerStyle(.segmented)
-                        if !showRecords {
-                            Picker("Make", selection: $selectedMake) {
-                                Text("All makes").tag(String?.none)
-                                ForEach(liveMakes, id: \.self) { Text($0).tag(Optional($0)) }
-                            }
-                        }
-                    }.listRowBackground(Color.clear)
-                }
-                if sourceRow.source == "bat" && !showRecords {
-                    Section {
-                        if let liveBoard {
-                            if liveLots.isEmpty {
-                                Text("No open auctions returned for this selection.").foregroundStyle(.secondary)
-                            }
-                            ForEach(liveLots) { lot in
-                                if let id = lot.vehicleUUID {
-                                    NavigationLink {
-                                        VehicleDetailView(vehicleId: id.uuidString, embedInNavigationStack: false)
-                                    } label: { auctionRow(lot) }
-                                } else { auctionRow(lot) }
-                            }
-                            Text("Last record update " + ProfileClock.Absolute(liveBoard.synced_at))
-                                .font(.caption).foregroundStyle(.secondary)
-                        } else if liveFailed {
-                            Text("Live auctions could not be read.")
-                            Button("Retry") { Task { await loadLive() } }
-                        } else {
-                            ProgressView("Reading auctions…")
-                        }
-                    } header: {
-                        Text("Ending soon · \(liveLots.count) in this read")
-                    } footer: {
-                        Text("Recorded bids and deadlines from Bring a Trailer. A passed deadline does not establish a sale.")
+                Section {
+                    MarketSourceIdentity(source: sourceRow)
+                    if let sales = sourceRow.sales12, sales > 0 {
+                        RootedValueView(label: "Measured sales · last 12 months", value: sales.formatted(), status: .recorded,
+                                        decay: "Read " + ProfileClock.Absolute(readAt))
                     }
-                } else {
+                } footer: {
+                    Text("All makes represented by this source. Open a linked record to explore its vehicle on Nuke.")
+                }
                 if let detail {
                     Section {
                         if detail.recent.isEmpty {
@@ -2038,16 +2002,22 @@ struct SourceLandingSheet: View {
                                     Text("Vehicle profile not linked")
                                         .font(.caption2).foregroundStyle(.secondary)
                                 }
-                                if event.vehicleUUID == nil, let url = event.openableURL {
-                                    Link("View original listing", destination: url).font(.caption)
+                                if let url = event.openableURL {
+                                    DisclosureGroup("Source") {
+                                        if let title = event.title, !title.isEmpty, title != event.headline {
+                                            Text(title).font(.caption).foregroundStyle(.secondary)
+                                        }
+                                        Link("Original source record", destination: url).font(.caption)
+                                    }
+                                    .font(.caption)
                                 }
                             }
                             .padding(.vertical, 2)
                         }
                     } header: {
-                        Text("Recently added records")
+                        Text("Vehicles and results")
                     } footer: {
-                        Text("\(detail.recent.count) recently retained records across all makes. This sample is not the source's full inventory or a list of confirmed sales.")
+                        Text("A sample of \(detail.recent.count) retained records across all makes. Record dates retain the source's precision; undated records have no established event date.")
                     }
                 } else {
                     Section {
@@ -2062,13 +2032,8 @@ struct SourceLandingSheet: View {
                         }
                     }
                 }
-                }
                 Section {
                     DisclosureGroup("Data coverage") {
-                        if let sales = sourceRow.sales12, sales > 0 {
-                            RootedValueView(label: "Measured sales · last 12 months", value: sales.formatted(), status: .recorded,
-                                            decay: "Read " + ProfileClock.Absolute(readAt))
-                        }
                         coverageInfo
                     }
                 }
@@ -2076,51 +2041,8 @@ struct SourceLandingSheet: View {
             .navigationTitle(sourceRow.shortName)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar { ToolbarItem(placement: .confirmationAction) { Button("Done") { dismiss() } } }
-            .task {
-                if sourceRow.source == "bat" { await loadLive() }
-                else { await loadDetail() }
-            }
-            .task(id: showRecords) { if showRecords && detail == nil { await loadDetail() } }
+            .task { await loadDetail() }
         }
-    }
-
-    private var liveMakes: [String] {
-        Array(Set(liveBoard?.open(at: Date()).compactMap(\.make) ?? [])).sorted()
-    }
-
-    private var liveLots: [LiveAuction] {
-        (liveBoard?.open(at: Date()) ?? []).filter { selectedMake == nil || $0.make == selectedMake }
-            .sorted { ($0.endsAtDate ?? .distantFuture) < ($1.endsAtDate ?? .distantFuture) }
-    }
-
-    private func loadLive() async {
-        liveFailed = false
-        do { liveBoard = try await LiveBoard.fetch() }
-        catch { liveFailed = true }
-    }
-
-    private func auctionRow(_ lot: LiveAuction) -> some View {
-        HStack(alignment: .top, spacing: 12) {
-            CachedAsyncImage(url: NukeImage.thumb(lot.imageUrl, width: 240)) { image in
-                image.resizable().scaledToFill()
-            } placeholder: {
-                Image(systemName: "car.side").foregroundStyle(.secondary)
-            }
-            .frame(width: 88, height: 66).clipped()
-            .clipShape(RoundedRectangle(cornerRadius: 6))
-            VStack(alignment: .leading, spacing: 5) {
-                Text(lot.headline).font(.subheadline.weight(.semibold)).lineLimit(3)
-                HStack {
-                    Text(lot.currentBid.map { LiveBoardView.bidNumber($0) + " bid" } ?? "No bid recorded")
-                        .font(.footnote.weight(.semibold)).monospacedDigit()
-                    if lot.noReserve { Text("No reserve").font(.caption).foregroundStyle(.secondary) }
-                }
-                if let end = lot.endsAtDate {
-                    Text("Ends " + LiveBoardView.remaining(end, now: Date()))
-                        .font(.caption).foregroundStyle(.secondary)
-                }
-            }
-        }.padding(.vertical, 4)
     }
 
     private func loadDetail() async {
