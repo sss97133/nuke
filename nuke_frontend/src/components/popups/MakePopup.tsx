@@ -84,18 +84,21 @@ export function MakePopup({ make, searchQuery }: Props) {
   const { openPopup } = usePopup();
   const [data, setData] = useState<MakeIntel | null>(null);
   const [loading, setLoading] = useState(true);
+  const [unavailable, setUnavailable] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
 
     async function load() {
+      setUnavailable(false);
       try {
         const { data: result, error } = await supabase.rpc('popup_make_intel', { p_make: make });
+        if (error) throw error;
         if (!cancelled && !error && result) {
           setData(result as MakeIntel);
         }
       } catch {
-        // fallback: nothing
+        if (!cancelled) setUnavailable(true);
       }
       if (!cancelled) setLoading(false);
     }
@@ -108,7 +111,7 @@ export function MakePopup({ make, searchQuery }: Props) {
     return (
       <div style={{ padding: 20, textAlign: 'center' }}>
         <span style={{ fontFamily: SANS, fontSize: 8, fontWeight: 700, textTransform: 'uppercase', color: '#999', letterSpacing: '0.5px' }}>
-          LOADING...
+          {unavailable ? 'Make details unavailable.' : 'LOADING...'}
         </span>
       </div>
     );

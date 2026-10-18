@@ -201,6 +201,11 @@ Standing rules the code carries:
   record of lots tagged this way is typed into the web page, not carried by a read, so the phone states that and
   waits (market lane plans a table + view, 2026-10-13). Prove a board change lot-for-lot against the live site as a
   stranger (Playwright pattern in memory `reference_logged_out_live_check_playwright.md`).
+- **Current-bid ranges use the loaded live board.** Live offers the web's six USD bid ranges, including
+  Unrecorded. Zero is recorded under $10,000; absent, negative and nonfinite bids are unrecorded. Map and
+  supporting rows share the auction window and bid range; the selection count states its make/decade/window
+  denominator and evaluation clock. A make or window change clears the bid range, and Any current bid restores
+  all eligible rows. Filtering starts no read or inference; these are current bids, not sold prices or valuations.
 - **Calendar rosters continue through the same read.** Live → Calendar uses `auction_calendar_read`, a 200-day
   horizon and explicit 100-lot pages, as the web does. More lots reads only on request. A changed read-model build,
   server day, total or repeated contributor refuses page stitching and offers refresh; a missing build clock or
