@@ -785,9 +785,13 @@ const BarcodeTimeline: React.FC<BarcodeTimelineProps> = ({ selectedAuctionUrl, o
   );
 
   const availableAuctions = auctions.filter(a => a.activityExtracted || a.open || a.close);
+  const auctionStatus = <>
+    {activityUnavailable && <p role="status">Auction activity could not be fully read. Timeline activity counts are unavailable.</p>}
+    {hasUnpositionedActivity && <p role="status">Some retained auction interactions lack usable posting times and cannot be placed on this timeline.</p>}
+  </>;
   // Native auction evidence can supply the timeline without raw event rows.
   if (timelineEvents.length === 0 && availableAuctions.length === 0) {
-    return null;
+    return auctionStatus;
   }
 
   const selectedAuction = availableAuctions.find(a => selectedAuctionUrl && a.lotUrl.replace(/\/+$/, '') === selectedAuctionUrl.replace(/\/+$/, ''))
@@ -906,8 +910,7 @@ const BarcodeTimeline: React.FC<BarcodeTimelineProps> = ({ selectedAuctionUrl, o
           </select></label>}
           {/* Each BaT listing's week, newest first: open, every bid and comment at its
               time, the close and result, post-close comments. Each mark opens its source. */}
-          {activityUnavailable && <p role="status">Auction activity could not be fully read. Timeline activity counts are unavailable.</p>}
-          {hasUnpositionedActivity && <p role="status">Some retained auction interactions lack usable posting times and cannot be placed on this timeline.</p>}
+          {auctionStatus}
           {selectionPending && <p role="status">Reading selected auction…</p>}
           {(!selectionPending && selectedAuction ? [selectedAuction] : []).map(a => (
             <React.Suspense key={a.key} fallback={null}>
