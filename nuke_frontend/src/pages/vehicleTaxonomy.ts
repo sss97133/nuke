@@ -29,6 +29,7 @@ export interface VehicleTaxonomyInput {
   model?: string | null;
   series?: string | null;
   trim?: string | null;
+  bodyStyle?: string | null;
   body_style?: string | null;
   title?: string | null;
   rawTitle?: string | null;
@@ -90,14 +91,17 @@ export function classifyVehicleFacet(
   familyLabel?: string | null,
   rawModel?: string | null,
   year?: number | null,
-): VehicleFacetClassification & { family?: string | null } {
+): VehicleFacetClassification & { family: string | null } {
   if (typeof inputOrMake === 'object' && inputOrMake !== null) {
-    const make = inputOrMake.make ?? null;
+    const make = inputOrMake.make?.trim() || null;
+    const explicitSeries = inputOrMake.series?.trim() || null;
+    const explicitTrim = inputOrMake.trim?.trim() || null;
+    const explicitBody = inputOrMake.bodyStyle?.trim() || inputOrMake.body_style?.trim() || null;
     const compositeModel = [
       inputOrMake.model,
-      inputOrMake.series,
-      inputOrMake.trim,
-      inputOrMake.body_style,
+      explicitSeries,
+      explicitTrim,
+      explicitBody,
       inputOrMake.title,
       inputOrMake.rawTitle,
       inputOrMake.listing_title,
@@ -113,18 +117,92 @@ export function classifyVehicleFacet(
         title: inputOrMake.title,
         listing_title: inputOrMake.rawTitle ?? inputOrMake.listing_title,
       }) ||
-      inferVehicleFamilyLabel(make, compositeModel || inputOrMake.model, inputOrMake.family);
+      inferVehicleFamilyLabel(make, compositeModel || inputOrMake.model, inputOrMake.family) ||
+      null;
+
     const classified = classifyVehicleFacets(make, family, compositeModel || inputOrMake.model, inputOrMake.year);
-    const rawTrim = inputOrMake.trim?.trim() || null;
-    const fallbackTrim =
-      rawTrim && (!classified.series || rawTrim.toLowerCase() !== classified.series.toLowerCase())
-        ? rawTrim
-        : null;
+    let series =
+      explicitSeries &&
+      classified.series &&
+      classified.series.toUpperCase().startsWith(explicitSeries.toUpperCase())
+        ? classified.series
+        : (explicitSeries ?? classified.series);
+    let trim = classified.trim;
+    let body =
+      explicitBody &&
+      !inputOrMake.bodyStyle &&
+      classified.body &&
+      classified.body.toUpperCase().startsWith(explicitBody.toUpperCase())
+        ? classified.body
+        : (explicitBody ?? classified.body);
+
+    // Only apply short generation/trim overrides when called from stream/event records without listing_title
+    if (!inputOrMake.listing_title) {
+      const isPorsche911 =
+        family?.toLowerCase() === '911' ||
+        (make?.toLowerCase() === 'porsche' && /\b(911|992|991|997|996|993|964|930)\b/i.test(compositeModel));
+      if (isPorsche911) {
+        const genMatch = compositeModel.match(/\b(992|991|997|996|993|964|930)\b/i);
+        if (!explicitSeries && genMatch) {
+          const prevSeries = series;
+          series = genMatch[1].toUpperCase();
+          if (!trim && prevSeries && prevSeries.toUpperCase() !== series) {
+            trim = prevSeries === '911 Carrera' ? 'Carrera' : prevSeries;
+          }
+        }
+      }
+
+      const isCorvette =
+        family?.toLowerCase() === 'corvette' || /\bCORVETTE\b/i.test(compositeModel);
+      if (isCorvette) {
+        const cGenMatch = compositeModel.match(/\b(C[1-8])\b/i);
+        const vetteTrimMatch = compositeModel.match(/\b(Z06|ZR-?1|GRAND\s+SPORT)\b/i);
+        if (vetteTrimMatch && !trim) {
+          const rawVetteTrim = vetteTrimMatch[1].toUpperCase();
+          trim =
+            rawVetteTrim === 'Z06'
+              ? 'Z06'
+              : rawVetteTrim.startsWith('ZR')
+                ? 'ZR1'
+                : 'Grand Sport';
+        }
+        if (!explicitSeries) {
+          if (cGenMatch) {
+            series = cGenMatch[1].toUpperCase();
+          } else if (series && trim && series.toLowerCase() === trim.toLowerCase()) {
+            series = null;
+          }
+        }
+      }
+
+      if (!explicitBody) {
+        if (body === 'Coupe / Hardtop' && /\bCOUPE\b/i.test(compositeModel) && !/\bHARDTOP\b/i.test(compositeModel)) {
+          body = 'Coupe';
+        } else if (
+          body === 'Convertible / Cabriolet' &&
+          /\bCONVERTIBLE\b/i.test(compositeModel) &&
+          !/\bCABRIOLET\b/i.test(compositeModel)
+        ) {
+          body = 'Convertible';
+        }
+      }
+    }
+
+    if (
+      !trim &&
+      explicitTrim &&
+      explicitTrim.toLowerCase() !== 'base' &&
+      explicitTrim.toLowerCase() !== series?.toLowerCase() &&
+      explicitTrim.toLowerCase() !== body?.toLowerCase()
+    ) {
+      trim = explicitTrim;
+    }
+
     return {
       family,
-      series: classified.series ?? (inputOrMake.series?.trim() || null),
-      trim: classified.trim ?? fallbackTrim,
-      body: classified.body ?? (inputOrMake.body_style?.trim() || null),
+      series,
+      trim,
+      body,
     };
   }
   const inferredFamily = inferVehicleFamilyLabel(inputOrMake, rawModel, familyLabel);
@@ -161,6 +239,7 @@ export function resolveVehicleIdentityMark(
         inputOrMake.model,
         inputOrMake.series,
         inputOrMake.trim,
+        inputOrMake.bodyStyle,
         inputOrMake.body_style,
         inputOrMake.title,
         inputOrMake.rawTitle,
@@ -177,7 +256,6 @@ export function resolveVehicleIdentityMark(
   }
 
   if (!make && modelText) {
-    // Allow resolving a facet badge directly by facetLabel when a vetted mark uniquely matches the trim/series/body
     const tLower = modelText.trim().toLowerCase();
     const direct = VETTED_IDENTITY_MARKS.find(
       (mark) =>
@@ -218,8 +296,6 @@ export function resolveVehicleIdentityMark(
       marks.find((m) => m.markKind === 'model_wordmark');
     if (nonMarque) return nonMarque;
 
-    // If resolveVettedIdentityMarks only matched the marque emblem because family was not 'Pickup',
-    // check whether VETTED_IDENTITY_MARKS has a specific badge for this make + facet label
     const tLower = modelText.trim().toLowerCase();
     const specific = VETTED_IDENTITY_MARKS.find(
       (mark) =>

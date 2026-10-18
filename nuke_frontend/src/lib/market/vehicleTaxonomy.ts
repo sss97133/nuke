@@ -18,7 +18,7 @@ import {
 } from '../../pages/vehicle-profile/VehicleBadgeBar';
 
 export type ClassifiedVehicleFacet = VehicleFacetClassification & {
-  family?: string | null;
+  family: string | null;
 };
 
 export {
