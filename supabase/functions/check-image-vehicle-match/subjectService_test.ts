@@ -108,6 +108,35 @@ Deno.test("partial storage retry reuses protected full-batch receipt without red
   equal((await resolveSubjectBatch(f.store, { ...f.request, reuse_only: true }, "https://example.test", f.dependencies)).status, "cached");
   equal(f.counts.models, 1);
 });
+Deno.test("wallet settlement follows protected retention and cached replay does not settle again", async () => {
+  const f = fixture(), vision = f.dependencies.vision;
+  let settlements = 0;
+  f.dependencies.vision = async options => ({ ...(await vision(options))!,
+    settleBilling: async retained => {
+      equal(retained, true);
+      equal(f.readings.some(row => !!row.confidence_basis.visual_subject_reading_v1), true);
+      settlements++;
+      return { source: "nuke_wallet", status: "settled", hold_id: "fixture", charged_cents: 1 };
+    } });
+  const result = await f.run();
+  equal("reading" in result && result.reading?.billing?.status, "settled");
+  await f.run();
+  equal(settlements, 1);
+});
+Deno.test("complete storage failure never settles a customer charge", async () => {
+  const f = fixture(), vision = f.dependencies.vision;
+  let charged = false;
+  f.store.retainReading = async () => { throw new Error("storage unavailable"); };
+  f.store.ingest = async () => { throw new Error("storage unavailable"); };
+  f.dependencies.vision = async options => ({ ...(await vision(options))!,
+    settleBilling: async retained => {
+      charged = retained;
+      return { source: "nuke_wallet", status: "pending", hold_id: "fixture", charged_cents: null };
+    } });
+  await f.run();
+  equal(charged, false);
+  equal(f.writes.length, 0);
+});
 Deno.test("an unavailable admission read retains the paid interpretation and retries without inference", async () => {
   const f = fixture(), admission = f.store.admission;
   f.store.admission = async () => { throw new Error("membership read unavailable"); };

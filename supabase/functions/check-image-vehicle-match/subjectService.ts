@@ -10,7 +10,7 @@ import { subjectSourceAvailable, subjectSourceCanEstablishPrivacy, subjectSource
 import { currentIdentitySource, loadSourceIdentities, sourceAliases, sourceRoot, inspectSourceIdentity, type SourceIdentity } from "./sourceIdentity.ts";
 import { planSubjectReinspection } from "./subjectReinspection.ts";
 import { allowedSubjectSources, subjectInputScopeRefusal } from "./subjectInputScope.ts";
-import type { AnthropicTokenUsage } from "../_shared/providerDiagnostic.ts";
+import type { AnthropicTokenUsage, PlatformAnalysisBilling } from "../_shared/providerDiagnostic.ts";
 
 export const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
 export interface SubjectSource {
@@ -51,7 +51,8 @@ export interface SubjectDependencies {
   capture?: (sources: VisionInputSource[], projectURL: string) => Promise<VisionInputCapture>;
   capturePrivacy?: (sources: VisionInputSource[]) => Promise<VisionInputCapture>;
   vision: (options: { parts: Array<{ text: string } | { imageUrl: string }>; maxTokens: number }) =>
-    Promise<{ provider: string; model: string; data: unknown; usage?: AnthropicTokenUsage | null } | null>;
+    Promise<{ provider: string; model: string; data: unknown; usage?: AnthropicTokenUsage | null; billing?: PlatformAnalysisBilling;
+      settleBilling?: (readingRetained: boolean) => Promise<PlatformAnalysisBilling> } | null>;
   now?: () => Date;
 }
 export interface SubjectRequest {
@@ -181,6 +182,8 @@ export async function resolveSubjectBatch(store: SubjectStore, request: SubjectR
   let readings = await store.readings(ids);
   let envelope: SubjectEnvelope | null = null;
   let providerUsage: AnthropicTokenUsage | null = null;
+  let providerBilling: PlatformAnalysisBilling | null = null;
+  let settleBilling: ((readingRetained: boolean) => Promise<PlatformAnalysisBilling>) | undefined;
   // A retained reading may include server-selected context and consume only the
   // first requested fresh photo. Requalify that exact scope before selecting new
   // context; the deferred photo remains new work on the phone.
@@ -301,6 +304,8 @@ export async function resolveSubjectBatch(store: SubjectStore, request: SubjectR
       ...(result.provider_diagnostics?.length ? { provider_diagnostics: result.provider_diagnostics } : {}),
       ...(result.provider_attempt_coverage ? { provider_attempt_coverage: result.provider_attempt_coverage } : {}) };
     providerUsage = result.model_result.usage ?? null;
+    providerBilling = result.model_result.billing ?? null;
+    settleBilling = result.model_result.settleBilling;
     const inputs: SubjectInput[] = sources.map(source => {
       const receipt = capture.inputs.find(input => input.key === source.id)!.receipt;
       const prior = readings.filter(reading => reading.image_id === source.id && reading.is_active && reading.cluster_id &&
@@ -332,6 +337,7 @@ export async function resolveSubjectBatch(store: SubjectStore, request: SubjectR
     }
   }
   let membershipHeld = true, admissionReason: string | null = null;
+  if (settleBilling) providerBilling = await settleBilling(retained.length > 0);
   try {
     const admission = await store.admission(envelope);
     membershipHeld = !admission.admission_allowed;
@@ -376,7 +382,7 @@ export async function resolveSubjectBatch(store: SubjectStore, request: SubjectR
     coverage: { grain: "source_photos", assessed: sources.length, eligible: supported.size,
       excluded: sources.length - supported.size, as_of: envelope.read_at, truncated: false },
     reading: { provider: envelope.provider, model: envelope.model, read_at: envelope.read_at, run_key: envelope.run_key, reused,
-      provider_usage: providerUsage },
+      provider_usage: providerUsage, billing: providerBilling },
   };
 }
 

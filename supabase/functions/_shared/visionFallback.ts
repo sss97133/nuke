@@ -1,6 +1,7 @@
-// Cloud vision fallback — BYOK-native. Used ONLY when the free YONO sidecar is unavailable.
+// Legacy cloud fallback remains BYOK. Customer subject resolution uses the
+// separate wallet-reserved platformVisionMultiJSON path below (owner, 2026-10-18).
 //
-// ECONOMICS (per Skylar, 2026-06-16): Nuke does NOT fund cloud inference. The caller brings the
+// LEGACY FALLBACK ECONOMICS (2026-06-16; not the customer subject-resolution path): the caller brings the
 // compute — their connected Claude / ChatGPT / Gemini subscription or key (stored in
 // `user_ai_providers`, resolved by getUserApiKey). They pay. Nuke owns the harness (YONO free
 // tier + the consensus engine); the caller owns the inference. The path is: YONO (free) → the
@@ -10,14 +11,16 @@
 // The `system` env-key pool (Nuke's temporary bootstrap) is RETIRED (Skylar, 2026-09-28): every tier
 // in it had died — gemini-flash-lite-latest 404 (model gone), claude-haiku-4-5 400, gpt-4o-mini 429 "no
 // credits remaining", ~5,900 failed attempts each 2026-09-27 21:00–23:17Z, $0 billed, nothing analyzed.
-// getUserApiKey still falls back to env keys for other callers; this module takes only user keys.
+// getUserApiKey still falls back to env keys for other callers; resolveTiers takes only user keys.
 //
-// When neither YONO nor a user key is available, callers should surface
+// When neither YONO nor a user key is available, legacy fallback callers surface
 // "connect your AI subscription to enable analysis" rather than silently spending Nuke's money.
 
 import { callLLM, type LLMConfig } from "./llmProvider.ts";
 import { getUserApiKey } from "./getUserApiKey.ts";
 import { ProviderHTTPError, VisionProviderUnavailable, safeAnthropicUsage, type AnthropicTokenUsage, type CredentialKind, type ProviderDiagnostic } from "./providerDiagnostic.ts";
+import { reserveCredits, settleHold, estimateCents, usageToCents } from "./aiCredits.ts";
+import type { PlatformAnalysisBilling } from "./providerDiagnostic.ts";
 
 type Provider = "google" | "anthropic" | "openai";
 
@@ -90,7 +93,84 @@ function parseJson(content: string): unknown | null {
   }
 }
 
-interface VisionResult { data: Record<string, unknown>; provider: string; model: string; keySource: "user" | "system"; ms: number; usage: AnthropicTokenUsage | null; }
+interface VisionResult { data: Record<string, unknown>; provider: string; model: string; keySource: "user" | "system"; ms: number; usage: AnthropicTokenUsage | null; billing?: PlatformAnalysisBilling;
+  settleBilling?: (readingRetained: boolean) => Promise<PlatformAnalysisBilling>; }
+
+/** Customer photo analysis uses Nuke's server key, never a customer's provider row.
+ * No automatic provider/model fallback may spend beyond this reservation.
+ * Image custody/permission is established by the existing subject service first.
+ */
+export async function platformVisionMultiJSON(
+  supabase: unknown, userId: string,
+  opts: { parts: Array<{ text: string } | { imageUrl: string }>; maxTokens: number },
+  deps: { call?: typeof callLLM; env?: (name: string) => string | undefined;
+    reserve?: typeof reserveCredits; settle?: typeof settleHold } = {},
+): Promise<VisionResult> {
+  const fail = (code: ProviderDiagnostic["code"], status: number | null = null): never => {
+    throw new VisionProviderUnavailable([{ code, provider: "anthropic", http_status: status, credential_kind: null }], "platform");
+  };
+  const images = opts.parts.filter((part): part is { imageUrl: string } => "imageUrl" in part);
+  const textBytes = opts.parts.reduce((sum, part) => sum + ("text" in part ? new TextEncoder().encode(part.text).length : 0), 0);
+  if (!userId || !Number.isSafeInteger(opts.maxTokens) || opts.maxTokens < 1 || opts.maxTokens > 1600 ||
+      images.length < 2 || images.length > 14 || opts.parts.length > 29 || textBytes > 8000 ||
+      images.some(part => !part.imageUrl.startsWith("data:image/jpeg;base64,"))) return fail("platform_unavailable");
+  const env = deps.env ?? (name => Deno.env.get(name));
+  const apiKey = env("NUKE_PHOTO_ANTHROPIC_API_KEY");
+  if (!apiKey) return fail("platform_not_configured");
+  const model = "claude-haiku-5-5";
+  const margin = Number(env("AI_CREDIT_MARGIN") ?? "1.2");
+  if (!Number.isFinite(margin) || margin < 1 || margin > 10) return fail("platform_unavailable");
+  // Each high-resolution image is capped at4,784 visual tokens. Pinned subject
+  // inputs plus bounded text fit below80k, retaining the <=100k pricing tier.
+  const inputCeiling = 80_000;
+  const reservation = estimateCents(model, inputCeiling, opts.maxTokens, margin);
+  const digest = async (value: string) => [...new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(value)))]
+    .map(byte => byte.toString(16).padStart(2, "0")).join("");
+  const hashes = await Promise.all(images.map(image => digest(image.imageUrl)));
+  const ref = "photo:v1:" + await digest(JSON.stringify({ model, hashes: hashes.sort() }));
+  let hold: Awaited<ReturnType<typeof reserveCredits>>;
+  try { hold = await (deps.reserve ?? reserveCredits)(supabase, userId, reservation, ref, { model, source: "nuke_photo_analysis_v1" }); }
+  catch { return fail("platform_unavailable"); }
+  if (hold.status !== "reserved") return fail(hold.status === "insufficient_funds" ? "analysis_balance_required" : "analysis_pending");
+  const settle = deps.settle ?? settleHold;
+  let response: any;
+  try {
+    response = await (deps.call ?? callLLM)({ provider: "anthropic", model, apiKey, source: "system",
+      workspaceId: env("NUKE_PHOTO_ANTHROPIC_WORKSPACE_ID") },
+      [{ role: "user", content: opts.parts.map(part => "text" in part ? { type: "text", text: part.text }
+        : { type: "image_url", image_url: { url: part.imageUrl } }) }], { maxTokens: opts.maxTokens, vision: true });
+  } catch (error) {
+    const status = error instanceof ProviderHTTPError ? error.diagnostic.http_status : null;
+    // Transport/server ambiguity retains the reservation. Never free it then
+    // silently make another paid call whose first result may already exist.
+    if (status !== null && status >= 400 && status < 500) {
+      try { await settle(supabase, userId, hold.hold_id, 0, { provider_read: "not_started", http_status: status, model }); }
+      catch { return fail("analysis_pending"); }
+    }
+    return fail("platform_unavailable", status);
+  }
+  const usage = safeAnthropicUsage(response.usage);
+  if (usage) console.log("[platformVision] anthropic_token_usage", JSON.stringify(usage));
+  const parsed = parseJson(response.content || "");
+  if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+    try { await settle(supabase, userId, hold.hold_id, 0, { provider_read: "unreadable", model, usage }); }
+    catch { return fail("analysis_pending"); }
+    return fail("platform_result_unreadable");
+  }
+  const billing: PlatformAnalysisBilling = { source: "nuke_wallet", status: "pending", hold_id: hold.hold_id, charged_cents: null };
+  // Settle only after protected storage acknowledges the complete interpretation.
+  // Storage/usage ambiguity keeps a reservation, never a second paid inference.
+  const settleBilling = async (readingRetained: boolean): Promise<PlatformAnalysisBilling> => {
+    if (!readingRetained || !usage || usage.input_tokens > inputCeiling || usage.output_tokens > opts.maxTokens ||
+        (usage.cache_creation_input_tokens ?? 0) !== 0 || (usage.cache_read_input_tokens ?? 0) !== 0) return billing;
+    const actual = usageToCents(model, usage, margin);
+    try { await settle(supabase, userId, hold.hold_id, actual, { provider_read: "completed", model, usage });
+      return { ...billing, status: "settled", charged_cents: actual }; }
+    catch { console.warn("[platformVision] settlement_pending"); return billing; }
+  };
+  return { data: parsed as Record<string, unknown>, provider: "anthropic", model, keySource: "system", ms: response.duration_ms ?? 0,
+    usage, billing, settleBilling };
+}
 
 async function runTiers(tiers: ResolvedTier[], messages: unknown[], maxTokens: number, diagnostics: ProviderDiagnostic[],
   call = callLLM): Promise<VisionResult | null> {

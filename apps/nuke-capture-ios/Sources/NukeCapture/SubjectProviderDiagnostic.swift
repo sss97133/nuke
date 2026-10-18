@@ -27,6 +27,14 @@ struct SubjectProviderDiagnostic: Decodable, Equatable {
 
     var message: String? {
         switch code {
+        case "platform_not_configured", "platform_unavailable":
+            return "Nuke photo analysis is temporarily unavailable. Your photos are saved; try again later."
+        case "analysis_balance_required":
+            return "Your Nuke analysis balance needs funding to continue. Your photos are saved."
+        case "analysis_pending":
+            return "Nuke is checking an earlier analysis request. Your photos are saved; no second analysis was started."
+        case "platform_result_unreadable":
+            return "Nuke couldn't read the analysis result. Your photos are saved; your analysis balance wasn't charged."
         case "no_connected_key":
             return "Photo analysis needs a connected API key. Review Connected accounts."
         case "credential_lookup_failed":
@@ -68,6 +76,14 @@ struct SubjectProviderDiagnostic: Decodable, Equatable {
     /// Verify the complete provider boundary, not merely the displayed first diagnostic.
     /// An absent, truncated, mixed or legacy receipt cannot authorize a fresh model retry.
     static func provesNoReading(_ diagnostics: [Self]?, coverage: AttemptCoverage?) -> Bool {
+        if let diagnostics, let coverage, coverage.method == "platform_vision_attempt_v1" {
+            guard coverage.complete, coverage.no_reading_started, coverage.expected_providers == 1,
+                  coverage.assessed_providers == 1, coverage.outcomes_observed == 1, diagnostics.count == 1,
+                  diagnostics[0].provider == "anthropic" else { return false }
+            let d = diagnostics[0]
+            return (["platform_not_configured", "analysis_balance_required"].contains(d.code) && d.http_status == nil)
+                || (d.code == "platform_unavailable" && d.http_status == 401)
+        }
         guard let diagnostics, let coverage, coverage.method == "byok_vision_attempts_v1",
               coverage.complete, coverage.no_reading_started, coverage.expected_providers == 3,
               coverage.assessed_providers == 3, coverage.outcomes_observed == 3, diagnostics.count == 3,
