@@ -3,6 +3,10 @@
 -- Base fixture helper returns the old composite type; the production guard correctly refuses it.
 -- Remove this test-only consumer before exercising the accepted production-shaped case.
 DROP FUNCTION pg_temp.r(text,integer,text);
+-- Match the production service ACL, and exercise a retained grant option too.
+GRANT SELECT,INSERT,UPDATE,DELETE,TRUNCATE,REFERENCES,TRIGGER
+ ON public.mv_family_year_prices TO service_role;
+GRANT SELECT ON public.mv_family_year_prices TO authenticated WITH GRANT OPTION;
 CREATE TEMP TABLE cached_acl_before AS
 SELECT a.grantee,a.privilege_type,a.is_grantable FROM pg_class c,aclexplode(c.relacl) a
 WHERE c.oid='public.mv_family_year_prices'::regclass AND a.grantee<>c.relowner;
