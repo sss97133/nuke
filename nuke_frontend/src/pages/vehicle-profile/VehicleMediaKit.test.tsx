@@ -157,3 +157,16 @@ it('preserves mobile gallery activation instead of desktop image callbacks', asy
   expect(host.querySelector('[data-mobile-gallery]')).not.toBeNull(); expect(fixture.opens).toEqual([]); expect(fixture.urlOpens).toEqual([]);
   expect(requests).toHaveLength(1);
 });
+
+it('keeps A2 static while B remains unresolved and admits only the fresh A2 curation', async () => {
+  await render(); await settle(0); expect(region()).not.toBeNull();
+  await render('synthetic-b'); frames = [];
+  await render('synthetic-a');
+  expect(requests.map(request => request.vehicle)).toEqual(['synthetic-a', 'synthetic-b', 'synthetic-a']);
+  expect(frames[0]).toEqual(expectedStatic('synthetic-a')); expect(view()).toEqual(frames[0]);
+  await settle(1); expect(view()).toEqual(expectedStatic('synthetic-a')); expect(requests).toHaveLength(3);
+  await settle(2, deck('synthetic-a2'));
+  expect(view().images).toEqual(['https://images.test/synthetic-a2-exterior.jpg']); expect(region()).not.toBeNull();
+  await act(async () => region()!.click()); expect(fixture.opens).toEqual(['synthetic-a2-exterior']);
+  expect(requests).toHaveLength(3);
+});
