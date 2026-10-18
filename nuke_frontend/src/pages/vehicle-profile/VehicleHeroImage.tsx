@@ -23,12 +23,17 @@ const VehicleHeroImage: React.FC<VehicleHeroImageProps> = ({ overlayNode }) => {
   // the request flood. Measured 2026-06-10: heroImgs=0 at t+30s, first paint t+40s.)
   // VehicleMediaKit stays mounted regardless and upgrades the slot via
   // onCurationResolved when curation lands.
-  const [mediaKitActive, setMediaKitActive] = useState<boolean>(false);
+  const [mediaKitState, setMediaKitState] = useState({ vehicleId, active: false });
+  // A new vehicle entry starts with its static lead, including A → B → A.
+  if (mediaKitState.vehicleId !== vehicleId) {
+    setMediaKitState({ vehicleId, active: false });
+  }
+  const mediaKitActive = mediaKitState.vehicleId === vehicleId && mediaKitState.active;
   const isMobile = useIsMobile();
 
   const handleCurationResolved = useCallback((count: number) => {
-    setMediaKitActive(count >= 3);
-  }, []);
+    setMediaKitState(current => current.vehicleId === vehicleId ? { ...current, active: count >= 3 } : current);
+  }, [vehicleId]);
 
   const getSupabaseRenderUrl = (publicObjectUrl: string, width: number, quality = 90): string | null => {
     try {
@@ -224,6 +229,7 @@ const VehicleHeroImage: React.FC<VehicleHeroImageProps> = ({ overlayNode }) => {
                   upgrade the static hero to the slideshow when ready. */}
               {vehicleId && (
                 <VehicleMediaKit
+                  key={vehicleId}
                   vehicleId={vehicleId}
                   onCurationResolved={handleCurationResolved}
                   onImageClick={isMobile ? () => setShowGallery(true) : (imageId) => openVehiclePhoto(imageId)}
