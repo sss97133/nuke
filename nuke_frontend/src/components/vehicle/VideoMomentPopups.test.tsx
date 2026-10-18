@@ -239,7 +239,8 @@ it('keeps the witnessed 7960-to-8043 video markers without turning F308 into wal
   expect(document.body.textContent).not.toContain('HOUR 2 PERFORMANCE');
   expect(document.body.textContent).not.toContain('High-value consignments');
   expect(button('Time Slots')).toBeNull();
-  expect(fixture.queries).toHaveLength(1); // No unsupported hourly RPC/fallback or eager history read.
+  // No unsupported hourly RPC/fallback or eager history read; the broadcast-overlay clip read is separate.
+  expect(fixture.queries.filter(query => query.table !== 'vehicle_observations')).toHaveLength(1);
 });
 
 it.each([null, undefined, -1, 7959, Number.NaN, Number.POSITIVE_INFINITY])(
