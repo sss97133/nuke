@@ -349,6 +349,39 @@ export function observationTotal(fromRpc: number | null, row: unknown): number |
   return typeof column === 'number' && Number.isFinite(column) && column >= 0 ? column : null;
 }
 
+export function isVehicleVinAddress(value: unknown): value is string {
+  return typeof value === 'string' && /^[A-HJ-NPR-Z0-9]{17}$/i.test(value);
+}
+
+export type VinAddressResolution = { status: 'resolved'; id: string }
+  | { status: 'missing' | 'ambiguous' | 'unavailable' | 'malformed' };
+
+/** Qualify the existing indexed public reader's candidates; never choose the first of several. */
+export async function resolveVehicleVinAddress(vin: string, supabase: any): Promise<VinAddressResolution> {
+  if (!isVehicleVinAddress(vin)) return { status: 'malformed' };
+  const normalized = vin.toUpperCase();
+  try {
+    const key = `vin:${normalized}`;
+    let pending = inflightProfileRpc.get(key);
+    if (!pending) {
+      pending = Promise.resolve(supabase.rpc('vehicle_by_vin_public', { p_vin: normalized }))
+        .finally(() => inflightProfileRpc.delete(key));
+      inflightProfileRpc.set(key, pending);
+    }
+    const { data, error } = await pending;
+    if (error) return { status: 'unavailable' };
+    if (!Array.isArray(data)) return { status: 'malformed' };
+    if (data.length === 0) return { status: 'missing' };
+    if (data.length !== 1) return { status: 'ambiguous' };
+    const match = data[0];
+    if (typeof match?.id !== 'string' || !/^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i.test(match.id)
+      || typeof match.vin !== 'string' || match.vin.trim().toUpperCase() !== normalized) return { status: 'malformed' };
+    return { status: 'resolved', id: match.id };
+  } catch {
+    return { status: 'unavailable' };
+  }
+}
+
 export async function loadVehicleImpl({
   vehicleId,
   session,
@@ -370,7 +403,7 @@ export async function loadVehicleImpl({
 
     // Accept both UUID format (with hyphens) and VIN format (17 chars alphanumeric)
     const isUUID = vehicleId && vehicleId.length >= 20 && vehicleId.includes('-');
-    const isVIN = vehicleId && /^[A-HJ-NPR-Z0-9]{17}$/i.test(vehicleId);
+    const isVIN = isVehicleVinAddress(vehicleId);
 
     if (!vehicleId || (!isUUID && !isVIN)) {
       console.error('Invalid vehicleId format:', vehicleId);
@@ -380,21 +413,11 @@ export async function loadVehicleImpl({
 
     if (isVIN) {
       // Resolve with the existing indexed public owner, then let every profile reader use a UUID.
-      // Its bounded candidate list is not permission to choose the first of several records.
-      try {
-        const { data, error } = await supabase.rpc('vehicle_by_vin_public', { p_vin: vehicleId.toUpperCase() });
-        const match = !error && Array.isArray(data) && data.length === 1 ? data[0] : null;
-        if (typeof match?.id === 'string' && /^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i.test(match.id)
-          && typeof match.vin === 'string' && match.vin.trim().toUpperCase() === vehicleId.toUpperCase()) {
-          navigate(`/vehicle/${match.id}`, { replace: true });
-        } else {
-          console.warn('[VehicleProfile] VIN address unresolved:', error ? 'reader_error'
-            : !Array.isArray(data) ? 'malformed_response' : data.length === 0 ? 'no_public_match'
-            : data.length > 1 ? 'ambiguous_public_match' : 'invalid_candidate');
-          setVehicle(null);
-        }
-      } catch {
-        console.warn('[VehicleProfile] VIN address unresolved:', 'reader_error');
+      const resolution = await resolveVehicleVinAddress(vehicleId, supabase);
+      if (resolution.status === 'resolved') {
+        navigate(`/vehicle/${resolution.id}`, { replace: true });
+      } else {
+        console.warn('[VehicleProfile] VIN address unresolved:', resolution.status);
         setVehicle(null);
       }
       return rpcLoaded;
