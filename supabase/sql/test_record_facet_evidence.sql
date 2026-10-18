@@ -49,6 +49,14 @@ INSERT INTO public.vehicles (id, series, trim, body_style, listing_title) VALUES
 \ir ../migrations/20261018220000_record_facet_evidence.sql
 \ir ../migrations/20261019000000_facet_evidence_stored_title.sql
 \ir ../migrations/20261019000000_facet_evidence_stored_title.sql
+\ir ../migrations/20261019010000_facet_evidence_safeupdate.sql
+
+-- PostgREST sessions preload safeupdate: every UPDATE in the writer must carry a WHERE clause.
+DO $$ BEGIN
+  ASSERT NOT EXISTS (
+    SELECT 1 FROM regexp_split_to_table((SELECT prosrc FROM pg_proc WHERE oid = 'public.record_facet_evidence(jsonb)'::regprocedure), ';') s
+    WHERE s ~* '\mUPDATE\M' AND s !~* '\mWHERE\M'), 'an UPDATE without WHERE fails under safeupdate';
+END $$;
 
 CREATE FUNCTION pg_temp.check(ok boolean, label text) RETURNS void LANGUAGE plpgsql AS $$
 BEGIN ASSERT ok IS TRUE, label; END $$;
