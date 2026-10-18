@@ -17,6 +17,8 @@
  *   7. `external_identities`    (every unique seller, buyer, bidder, and commenter handle)
  *   8. `vehicle_images`         (all full-res width=2080 gallery photos with category metadata)
  *   9. `auction_comments`       (every individual comment + timestamped bid linked to identity)
+ *  10. `vehicle_observations`   (one sourced `listing` observation per lot + field_evidence, through the shared
+ *                                _shared/observationWriter.ts the edge extractor uses)
  *
  * Modes:
  *   node scripts/cab-api-sync.mjs --mode=live
@@ -28,6 +30,7 @@ import { chromium } from "playwright";
 import crypto from "crypto";
 import fs from "fs";
 import { createClient } from "@supabase/supabase-js";
+import { writeObservation } from "../supabase/functions/_shared/observationWriter.ts";
 
 const SUPABASE_URL = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL;
 const SUPABASE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -71,6 +74,23 @@ async function waitForIoGate() {
     console.log(`  [io-gate] ${waiters === null ? "gate read failed" : `${waiters} queries waiting on IO`}; holding 60 s`);
   }
 }
+
+// observation_sources rows for Cars & Bids: `cars-and-bids` (the extractors) and the older `cars_and_bids`.
+let cabSourceIds = null;
+async function cabObservationSourceIds() {
+  if (cabSourceIds) return cabSourceIds;
+  const { data, error } = await supabase.from("observation_sources").select("id").in("slug", ["cars-and-bids", "cars_and_bids"]);
+  if (error || !data?.length) throw new Error(`observation_sources lookup failed: ${error ? describePgError(error) : "no rows"}`);
+  cabSourceIds = data.map((r) => r.id);
+  return cabSourceIds;
+}
+
+// Row bookkeeping, not testimony from the listing; description goes in as the observation's content_text.
+const OBSERVATION_EXCLUDED_KEYS = new Set([
+  "description", "description_source", "import_metadata", "origin_metadata", "updated_at", "is_public", "status",
+  "listing_source", "extractor_version", "discovery_source", "auction_source", "canonical_platform", "platform_source",
+  "source", "listing_location_source", "listing_location_observed_at", "listing_location_confidence",
+]);
 
 // PostgREST errors from a gateway timeout or an empty 5xx body carry code/details/hint but no message.
 function describePgError(err) {
@@ -1093,7 +1113,7 @@ async function extractSingleAuctionGoldStandard(cab, auctionId) {
     : [];
 
   // 1. Archive JSON snapshot in listing_page_snapshots (exact schema columns)
-  const jsonSnapshotText = JSON.stringify({ detail: d, comments_count: commentsAndBids.length });
+  const jsonSnapshotText = JSON.stringify({ detail: d, comments_count: commentsAndBids.length, comments_and_bids: commentsAndBids });
   const htmlBody = `<!-- cab-v2-api-json:${d.id} class="bid-bar ${isEnded ? "ended" : "live"}" -->\n<script id="cab-v2-json" type="application/json">${jsonSnapshotText}</script>`;
   const htmlSha256 = crypto.createHash("sha256").update(htmlBody).digest("hex");
 
@@ -1330,6 +1350,36 @@ async function extractSingleAuctionGoldStandard(cab, auctionId) {
     if (iErr) throw new Error(`Vehicle insert failed for ${d.id}: ${describePgError(iErr)}`);
     vehicleId = insV.id;
   }
+
+  // 2b. The lot's sourced listing observation: every field this read produced, with source, clock and trust.
+  const observationFields = Object.fromEntries(
+    Object.entries(vehiclePayload).filter(([k]) => !OBSERVATION_EXCLUDED_KEYS.has(k))
+  );
+  Object.assign(observationFields, {
+    cab_auction_id: d.id,
+    transmission_details: l.transmission_details || null,
+    is_not_car: l.is_not_car ?? null,
+    make_slug: l.make_slug || null,
+    model_slug: l.model_slug || null,
+    seller_type_details: l.seller_type_details || null,
+    seller_is_certified: d.seller?.is_certified_seller ?? null,
+    history_report_vendor: l.history_report?.vendor || null,
+    questions_count: stats.questions ?? null,
+  });
+  for (const k of Object.keys(observationFields)) if (observationFields[k] === null) delete observationFields[k];
+  const obsResult = await writeObservation(supabase, {
+    vehicleId,
+    source: { platform: "cars-and-bids", url: canonicalUrl, trustScore: 0.8, sourceIdentifier: d.id },
+    fields: observationFields,
+    observationKind: "listing",
+    extractionMethod: "cab_v2_api",
+    observedAt: nowIso,
+    contentText: fullDescription || undefined,
+  });
+  if (!obsResult.observationId) {
+    throw new Error(`Listing observation failed for ${d.id}: ${obsResult.errors.join("; ") || "no observation id"}`);
+  }
+  const observationWritten = obsResult.duplicate ? 0 : 1;
 
   // 3. Upsert external_identities for seller, buyer, and commenters/bidders
   const handles = new Map();
@@ -1585,6 +1635,7 @@ async function extractSingleAuctionGoldStandard(cab, auctionId) {
   const totalDataModelRows =
     1 + // vehicles
     snapshotSaved + // listing_page_snapshots
+    observationWritten + // vehicle_observations
     1 + // vehicle_events
     (auctionRow?.id ? 1 : 0) + // auction_events
     orgLinked + // organization_vehicles
@@ -1609,6 +1660,7 @@ async function extractSingleAuctionGoldStandard(cab, auctionId) {
     comments_upserted: commentsUpserted,
     identities_upserted: identityIds.size,
     snapshot_saved: snapshotSaved,
+    observation_written: observationWritten,
     org_linked: orgLinked,
     total_data_model_rows: totalDataModelRows,
     seller: d.seller?.username || null,
@@ -1687,9 +1739,17 @@ async function runHistoricalBackfill(cab, startPage = 1, endPage = 853, concurre
         .select("id, vin")
         .in("id", vids);
       const vinMap = new Map((vRows || []).map((v) => [v.id, v.vin]));
+      const { data: obsRows, error: obsErr } = await supabase
+        .from("vehicle_observations")
+        .select("vehicle_id")
+        .in("vehicle_id", vids)
+        .in("source_id", await cabObservationSourceIds())
+        .eq("kind", "listing");
+      if (obsErr) throw new Error(`Listing observation check failed on page ${pageNum}: ${describePgError(obsErr)}`);
+      const observed = new Set((obsRows || []).map((r) => r.vehicle_id));
       for (const ae of existingAe) {
         const vVin = vinMap.get(ae.vehicle_id);
-        if (vVin && vVin.length >= 5 && ae.comments_count !== null) {
+        if (vVin && vVin.length >= 5 && ae.comments_count !== null && observed.has(ae.vehicle_id)) {
           completeSet.add(ae.source_listing_id);
         }
       }
