@@ -731,4 +731,22 @@ final class DecodeTests: XCTestCase {
             "BODY · Stepside / Flareside"
         ])
     }
+
+    // get_orphan_sessions (migration 20261018201500): the suggestion columns are null when the server has no match.
+    func testOrphanSessionsDecodeWithAndWithoutASuggestion() throws {
+        let json = """
+        [{"session_day":"2026-10-17","gps_cell":"Shop · 35.000,-115.000","photo_count":12,
+          "image_ids":["00000000-0000-4000-8000-000000000001","00000000-0000-4000-8000-000000000002"],
+          "sample_url":"https://example.invalid/a.jpg",
+          "suggested_vehicle_id":"00000000-0000-4000-8000-0000000000aa","suggested_vehicle_label":"1972 CHEVROLET K10"},
+         {"session_day":"2026-10-16","gps_cell":"no-gps","photo_count":3,"image_ids":[],
+          "sample_url":null,"suggested_vehicle_id":null,"suggested_vehicle_label":null}]
+        """
+        let sessions = try decode([AttributionEngine.OrphanSession].self, json)
+        XCTAssertEqual(sessions.count, 2)
+        XCTAssertEqual(sessions[0].suggested_vehicle_label, "1972 CHEVROLET K10")
+        XCTAssertEqual(sessions[0].id, "2026-10-17|Shop · 35.000,-115.000")
+        XCTAssertNil(sessions[1].suggested_vehicle_id)
+        XCTAssertEqual(sessions.filter { $0.suggested_vehicle_id != nil }.count, 1)
+    }
 }
