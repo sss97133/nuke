@@ -404,6 +404,72 @@ struct LocalProfileEvidence: Sendable {
 
 // MARK: - The store
 
+/// Exact private projection of protected visual-subject reads. These are agent
+/// interpretations over photographs, separate from owner testimony and vehicles.
+struct ObservedCarCoverage: Codable, Equatable, Sendable {
+    let assessed: Int
+    let eligible: Int
+    let excluded: Int
+    let as_of: String
+    let truncated: Bool
+
+    var clock: Date? {
+        let formatter = ISO8601DateFormatter()
+        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        return formatter.date(from: as_of) ?? ISO8601DateFormatter().date(from: as_of)
+    }
+    var isQualified: Bool { assessed >= 0 && eligible >= 0 && excluded >= 0 && eligible <= assessed && clock != nil }
+}
+
+struct ObservedCarProfile: Codable, Identifiable, Equatable, Sendable {
+    struct Photo: Codable, Identifiable, Equatable, Sendable {
+        let id: UUID
+        let image_url: String
+        let taken_at: String?
+    }
+    struct VisualIdentity: Codable, Equatable, Sendable {
+        let make: String?
+        let model_family: String?
+        let badge_text: String?
+        var labels: [String] { [make, model_family, badge_text].compactMap { $0?.trimmingCharacters(in: .whitespacesAndNewlines) }.filter { !$0.isEmpty } }
+    }
+    let id: UUID
+    let label: String
+    let identity_status: String
+    let image_count: Int
+    let cover_image_url: String?
+    let observed_at: String
+    let images: [Photo]
+    let asserted_identity: VisualIdentity
+    let coverage: ObservedCarCoverage
+
+    var isQualified: Bool {
+        identity_status == "unresolved" && image_count >= 0 && images.count <= image_count && coverage.isQualified
+            && Set(images.map(\.id)).count == images.count && images.allSatisfy { !$0.image_url.isEmpty }
+    }
+}
+
+struct ObservedCarRead: Codable, Equatable, Sendable {
+    let subjects: [ObservedCarProfile]
+    let coverage: ObservedCarCoverage
+    let next_offset: Int?
+
+    var isQualified: Bool {
+        coverage.isQualified && subjects.allSatisfy(\.isQualified) && Set(subjects.map(\.id)).count == subjects.count
+            && (next_offset == nil || next_offset! > 0)
+    }
+    static func ownAccount(_ userId: String, activeUserId: String?) -> String? {
+        guard let requested = UUID(uuidString: userId), let activeUserId,
+              let active = UUID(uuidString: activeUserId), requested == active else { return nil }
+        return requested.uuidString.lowercased()
+    }
+}
+
+struct SavedObservedCarRead: Sendable {
+    let read: ObservedCarRead
+    let cachedAt: Date
+}
+
 final class LocalStore {
     static let shared = LocalStore()
     private let dbQueue: DatabaseQueue
@@ -584,7 +650,52 @@ final class LocalStore {
                 t.column("cachedAt", .datetime).notNull()
             }
         }
+        m.registerMigration("v10_observed_subject_read_cache") { db in
+            // A bounded backend response page, not a second identity registry.
+            try db.create(table: "observed_subject_read_cache") { t in
+                t.column("userId", .text).notNull()
+                t.column("scopeKey", .text).notNull()
+                t.column("pageOffset", .integer).notNull()
+                t.column("payloadJSON", .text).notNull()
+                t.column("cachedAt", .datetime).notNull()
+                t.primaryKey(["userId", "scopeKey", "pageOffset"])
+            }
+        }
         return m
+    }
+
+    func cacheObservedCars(userId: String, activeUserId: String?, clusterId: UUID? = nil, offset: Int = 0,
+                           read: ObservedCarRead, now: Date = Date()) throws {
+        guard let owner = ObservedCarRead.ownAccount(userId, activeUserId: activeUserId), offset >= 0,
+              read.isQualified, read.next_offset.map({ $0 > offset }) ?? true,
+              clusterId == nil || read.subjects.allSatisfy({ $0.id == clusterId }) else {
+            throw CocoaError(.coderInvalidValue)
+        }
+        let payload = String(decoding: try JSONEncoder().encode(read), as: UTF8.self)
+        try dbQueue.write { db in
+            // A fresh first page invalidates older continuation pages: withdrawn
+            // sources cannot linger after a successful backend refresh.
+            if offset == 0 {
+                try db.execute(sql: "DELETE FROM observed_subject_read_cache WHERE userId=? AND scopeKey=?",
+                               arguments: [owner, clusterId?.uuidString.lowercased() ?? "list"])
+            }
+            try db.execute(sql: """
+                INSERT INTO observed_subject_read_cache(userId,scopeKey,pageOffset,payloadJSON,cachedAt) VALUES (?,?,?,?,?)
+                ON CONFLICT(userId,scopeKey,pageOffset) DO UPDATE SET payloadJSON=excluded.payloadJSON,cachedAt=excluded.cachedAt
+                """, arguments: [owner, clusterId?.uuidString.lowercased() ?? "list", offset, payload, now])
+        }
+    }
+
+    func cachedObservedCars(userId: String, activeUserId: String?, clusterId: UUID? = nil, offset: Int = 0) throws -> SavedObservedCarRead? {
+        guard let owner = ObservedCarRead.ownAccount(userId, activeUserId: activeUserId), offset >= 0 else { return nil }
+        return try dbQueue.read { db in
+            guard let row = try Row.fetchOne(db, sql: "SELECT payloadJSON,cachedAt FROM observed_subject_read_cache WHERE userId=? AND scopeKey=? AND pageOffset=?",
+                arguments: [owner, clusterId?.uuidString.lowercased() ?? "list", offset]) else { return nil }
+            let payload: String = row["payloadJSON"]
+            let read = try JSONDecoder().decode(ObservedCarRead.self, from: Data(payload.utf8))
+            guard read.isQualified else { return nil }
+            return SavedObservedCarRead(read: read, cachedAt: row["cachedAt"])
+        }
     }
 
     // MARK: Album human pass and independent on-device pass

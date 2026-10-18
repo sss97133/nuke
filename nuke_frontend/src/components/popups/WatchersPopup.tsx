@@ -84,21 +84,6 @@ export function WatchersPopup({ vehicleId, watcherCount, viewCount, make, model 
   }, [vehicleId, make, model]);
 
   // Comparison
-  const percentile = stats && stats.count > 1
-    ? (() => {
-        // Estimate where this watcherCount falls
-        // Simple: (count below) / total * 100
-        const below = stats.count > 0 && stats.medianWatchers > 0
-          ? Math.min(100, Math.max(0, Math.round(
-              (watcherCount <= stats.minWatchers ? 0 :
-               watcherCount >= stats.maxWatchers ? 100 :
-               ((watcherCount - stats.minWatchers) / (stats.maxWatchers - stats.minWatchers)) * 100)
-            )))
-          : null;
-        return below;
-      })()
-    : null;
-
   const vsMedian = stats?.medianWatchers
     ? Math.round(((watcherCount - stats.medianWatchers) / stats.medianWatchers) * 100)
     : null;
@@ -200,16 +185,6 @@ export function WatchersPopup({ vehicleId, watcherCount, viewCount, make, model 
             </div>
           )}
 
-          {percentile != null && (
-            <div style={{
-              fontFamily: MONO, fontSize: 9, color: '#999', marginTop: 6,
-            }}>
-              {percentile >= 90 ? `Top ${100 - percentile}% most-watched` :
-               percentile >= 75 ? `Top ${100 - percentile}% most-watched` :
-               percentile <= 10 ? `Bottom ${percentile}% in attention` :
-               `${percentile}th percentile`}
-            </div>
-          )}
         </div>
       )}
 

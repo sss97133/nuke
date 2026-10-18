@@ -505,7 +505,7 @@ enum SupabaseService {
     }
 
     static func uploadPhoto(data: Data, meta: PhotoMeta, userId: String,
-                            uploadPixels: Bool, appleMLLabels: [String]) async throws {
+                            uploadPixels: Bool, appleMLLabels: [String]) async throws -> String? {
         let mime = mimeType(forFilename: meta.filename)
 
         // Metadata-only defaults: no object, empty-string URL sentinel (the
@@ -575,6 +575,9 @@ enum SupabaseService {
             let msg = String(describing: error).lowercased()
             guard msg.contains("duplicate") || msg.contains("unique") else { throw error }
         }
+        // Operational byte acknowledgement only. The subject reader still resolves an exact,
+        // current own image row and its privacy gate before requesting any visual analysis.
+        return fileHash
     }
 }
 

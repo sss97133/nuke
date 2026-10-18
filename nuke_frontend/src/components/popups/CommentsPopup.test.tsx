@@ -130,3 +130,24 @@ it.each([
   expect(rows()[0].lastElementChild!.textContent).toBe(retained[0].comment_text);
   expect(summary().value).toBe('1'); expect(summary().qualifier).toBeNull(); expect(row).toEqual(raw); expect(reads).toHaveLength(1);
 });
+
+it.each([
+  { name: 'permitted null first-party clock', value: null, display: 'Time unavailable' },
+  { name: 'reported literal epoch', value: '1970-01-01T00:00:00Z', display: 'date' },
+  { name: 'reported old timestamp', value: '2019-09-12T12:00:00Z', display: 'date' },
+  { name: 'reported day-grain timestamp', value: '2019-09-12', display: 'date' },
+  { name: 'existing future-clock omission', value: '2099-09-12T12:00:00Z', display: '' },
+  { name: 'existing invalid-clock omission', value: 'invalid-clock', display: '' },
+])('null-clock: preserves the source contract for $name', async ({ value, display }) => {
+  const row = { comment_id: 'synthetic-first-party-note', comment_text: 'Synthetic first-party note.', observed_at: value,
+    author_username: null, comment_type: 'vehicle', bid_amount: null, is_seller: false, platform: null };
+  const raw = structuredClone(row); await draw(undefined, 1); expect(body().textContent).toBe('Loading comments...'); await settle([row]);
+  expect(rows()).toHaveLength(1); const header = rows()[0].firstElementChild!;
+  // The actual first-party row has only author and timestamp spans, with no native bid/platform clock witness.
+  expect(header.querySelectorAll('span')).toHaveLength(2);
+  const expected = display === 'date' ? new Date(value!).toLocaleDateString() : display;
+  expect(header.lastElementChild!.textContent).toBe(expected);
+  expect(rows()[0].lastElementChild!.textContent).toBe(row.comment_text);
+  expect([...main().children[0].children].slice(1)).toHaveLength(0);
+  expect(summary().value).toBe('1'); expect(summary().qualifier).toBeNull(); expect(row).toEqual(raw); expect(reads).toHaveLength(1);
+});
