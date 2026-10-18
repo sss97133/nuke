@@ -38,12 +38,13 @@ const headers = { apikey: key, Authorization: `Bearer ${key}`, "Content-Type": "
 
 type Vehicle = { id: string; year: number | null; make: string | null; model: string | null; listing_title: string | null; trim: string | null; body_style: string | null; canonical_body_style: string | null };
 
-async function page(c: Cohort, after: string | null): Promise<Vehicle[]> {
+// One make-year at a time so the read stays on idx_vehicles_make_year instead of walking the primary key.
+async function page(c: Cohort, year: number, after: string | null): Promise<Vehicle[]> {
   const q = new URLSearchParams({
     select: "id,year,make,model,listing_title,trim,body_style,canonical_body_style",
-    make: `eq.${c.make}`, model: `ilike.*${c.model}*`, is_public: "eq.true", deleted_at: "is.null",
+    make: `eq.${c.make}`, year: `eq.${year}`, model: `ilike.*${c.model}*`, is_public: "eq.true", deleted_at: "is.null",
     listing_title: "not.is.null", order: "id.asc", limit: "500",
-    and: `(year.gte.${c.years[0]},year.lte.${c.years[1]}${after ? `,id.gt.${after}` : ""})`,
+    ...(after ? { id: `gt.${after}` } : {}),
   });
   for (let attempt = 0; attempt < 3; attempt++) {
     const res = await fetch(`${base}/rest/v1/vehicles?${q}`, { headers });
@@ -69,11 +70,13 @@ let sent = 0;
 
 for (const c of COHORTS.filter(c => !only || c.name === only)) {
   const tally = receipt[c.name] = { candidates: 0, missing_trim: 0, missing_body: 0, witnessed_trim: 0, witnessed_body: 0, written: 0, duplicate: 0, refused: 0, error: 0 };
+  for (let year = c.years[0]; year <= c.years[1] && sent < limit; year++) {
   let after: string | null = null;
   while (sent < limit) {
-    const rows = await page(c, after);
+    const rows = await page(c, year, after);
     if (rows.length === 0) break;
     after = rows[rows.length - 1].id;
+    await new Promise(r => setTimeout(r, 250));
     const jobs: Array<{ id: string; key: TitleFacetKey }> = [];
     for (const v of rows) {
       tally.candidates++;
@@ -100,6 +103,7 @@ for (const c of COHORTS.filter(c => !only || c.name === only)) {
       }
       if (tally.error > 25) throw new Error(`stopping: ${tally.error} errors in ${c.name}; first: ${JSON.stringify(errors[0])}`);
     }
+  }
   }
   console.log(c.name, JSON.stringify(tally));
 }
