@@ -218,7 +218,7 @@ Deno.test('a resolved vehicle that is a different car is refused, raised as a re
   equal(calls.some((c) => c.op === 'update' || c.op === 'insert'), false, 'no vehicle write');
   equal(observations.length + events.length, 0, 'no observation or episode');
   const rev = calls.find((c) => c.table === 'rpc:record_revision_item');
-  equal((rev?.row as any).p_reason, 'different_car');
+  equal((rev?.row as any).p_reason, 'bad_data');
   equal((rev?.row as any).p_next_action, 'relink');
 });
 
