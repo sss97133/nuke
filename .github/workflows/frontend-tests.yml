@@ -626,6 +626,8 @@ jobs:
         run: deno test --allow-read=supabase/functions/batch-extract-snapshots supabase/functions/batch-extract-snapshots/aiGate.test.ts supabase/functions/batch-extract-snapshots/writeRules.test.ts
       - name: Verify photo-pipeline-orchestrator files a photo only through attribute_testimony and writes no upload-clock suggestion
         run: deno test --node-modules-dir=none --allow-env supabase/functions/photo-pipeline-orchestrator/orchestrator_test.ts supabase/functions/photo-pipeline-orchestrator/persistence_test.ts
+      - name: Verify image comparisons retain per-photo evidence without forced identity or eligibility changes
+        run: deno test --no-config --no-remote --no-npm --no-lock supabase/functions/check-image-vehicle-match/decision_test.ts
 
   sold-context-contract:
     runs-on: ubuntu-latest

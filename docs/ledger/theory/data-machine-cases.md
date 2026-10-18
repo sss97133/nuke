@@ -1493,6 +1493,43 @@ unread images, source/method versions and unresolved vehicle/role matches. Cache
 and method still qualify. An image's existing `vehicle_id` is context, not an independent confirmation of itself.
 This direction authorizes the app-first workflow; it does not lift separate canonical-write, privacy or paid-intake holds.
 
+**Owner correction, 2026-10-18: resolving the subject is the machine's job.** Asking the photographer
+which existing profile a car belongs to, or whether it is new, hands back the operation's central task.
+The machine must investigate retained evidence before asking for facts it can derive. Manual selection
+is a correction tool, not the default identity engine. Apply this contract to the existing image,
+album, observation and profile owners:
+
+1. Separate photo bytes, a depicted physical subject, its possible record matches, its attributed
+   specifications and the photographer's relationship. An unknown year or VIN does not make a
+   well-supported subject disappear. Photographing a car does not establish ownership.
+2. Read each photo independently, including already-filed photos. Use albums, time, place, labels
+   and visual similarity for retrieval. Establish membership with visible correspondences across
+   views; keep generic parts unresolved when there is no supported chain to an identifying view.
+   A day at a shop can contain several cars. An existing attachment cannot confirm itself.
+3. Compare to retained historical evidence, following merge terminals and source lineage. Search
+   beyond the make on a possibly wrong current profile. Keep candidate population, truncation,
+   exclusions and absent references with the decision. A profile cover can itself be misfiled.
+   An unrecognized model response must never silently choose the first candidate.
+4. Carry a supported but unmatched subject forward through the existing unresolved cluster owner
+   (`emergent_vehicle_clusters`, linked observations), then the existing private profile writer when
+   admission is supported. Keep unknown specifications unknown. "No match among these references"
+   does not prove global novelty; do not mint duplicate chassis records to conceal incomplete search.
+   Current `device_create_vehicle_profile` admits VIN/serial/album evidence only: visual-subject
+   admission, qualified byte custody and its consumer are still missing, not delivered by this contract.
+5. Select the next discriminating evidence from accessible retained images before asking the user:
+   identifier views, body/part correspondences, historical states and contradictory candidates.
+   Retain source IDs/hashes, source and reading clocks, method/model, agreements and contradictions.
+   Numeric model confidence alone is not calibrated physical identity. Revise earlier interpretations
+   through the sanctioned supersession/attribution path and recheck the actual gallery/profile reader.
+
+Acceptance must include a mixed-car day, a new subject without a VIN, competing same-model cars,
+a contaminated reference cover, a generic part close-up and a later discriminating observation.
+Measure subject grouping, existing-record retrieval, admitted attribution and actual consumer delivery
+separately; an honest unresolved result passes refusal but does not count as resolved. Versioned
+comparison receipts and parser tests are a bounded repair, not proof of autonomous filing accuracy.
+Live atlas inspection on 2026-10-18 found the existing cluster store idle (1,597 estimated rows,
+last inspected samples dated May); its existence is not an operating subject-resolution pipeline.
+
 ### 13.4 The owner on the API, the name and the calculations (2026-10-07)
 
 **Owner direction (substance kept):** an API is "a definitive opportunity" and "the standard we need".
