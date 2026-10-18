@@ -98,3 +98,17 @@ test('lotSql: read-only shape, every url spelling, no unbounded scans', () => {
   assert.doesNotMatch(sql, /\b(insert|update|delete)\b/i);
   assert.doesNotMatch(sql, /case when/i);
 });
+
+test('sale_date: a stored session window passes only when every day in it is a day the truth allows', () => {
+  const truth = { one_of: ['2026-08-14', '2026-08-15'] };
+  assert.equal(matches('sale_date', truth, ['2026-08-14', '2026-08-15']), true);
+  assert.equal(matches('sale_date', truth, ['2026-08-14', '2026-08-22']), false);
+  assert.equal(matches('sale_date', { value: '2022-08-19' }, ['2022-08-19']), true);
+  assert.equal(matches('sale_date', truth, []), null);
+  const c = candidates({ v: {}, ve: { sold_at: null, ended_at: null, metadata: { auction_session_days: ['2026-11-20', '2026-11-21'] } } });
+  const g = gradeField('sale_date', { one_of: ['2026-11-20', '2026-11-21'] }, c.sale_date);
+  assert.equal(g.verdict, 'pass');
+  assert.equal(g.at, 'vehicle_events.metadata.auction_session_days');
+  const real = candidates({ v: {}, ve: { sold_at: '2022-08-19T12:00:00Z', metadata: { auction_session_days: ['2022-08-19', '2022-08-20'] } } });
+  assert.equal(gradeField('sale_date', { one_of: ['2022-08-19', '2022-08-20'] }, real.sale_date).at, 'vehicle_events.sold_at');
+});
