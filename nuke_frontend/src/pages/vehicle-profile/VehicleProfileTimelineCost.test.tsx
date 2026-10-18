@@ -107,15 +107,15 @@ async function showDay() {
 it.each(['rpc', 'fallback'] as const)('uses the stored inclusive job total once in actual %s timeline/day consumer', async mode => {
   path = mode; const actual = await showDay();
   expect(actual.text).toContain('Synthetic recorded work');
-  expect(actual).toMatchObject({ projected: 125, text: expect.stringContaining('$125') });
+  expect(actual).toMatchObject({ projected: 125, text: expect.stringContaining('125 (currency unknown)') });
 });
 it.each(['rpc', 'fallback'] as const)('preserves useful %s cost when no additional parts are recorded', async mode => {
   path = mode; row.total_parts_cost = 0;
-  const actual = await showDay(); expect(actual.projected).toBe(125); expect(actual.text).toContain('$125');
+  const actual = await showDay(); expect(actual.projected).toBe(125); expect(actual.text).toContain('125 (currency unknown)');
 });
 it.each(['rpc', 'fallback'] as const)('retains a synthetic recorded authoritative %s total without re-adding parts', async mode => {
   path = mode; row.total_job_cost = 410;
-  const actual = await showDay(); expect(actual).toMatchObject({ projected: 410, text: expect.stringContaining('$410') });
+  const actual = await showDay(); expect(actual).toMatchObject({ projected: 410, text: expect.stringContaining('410 (currency unknown)') });
 });
 it.each(['rpc', 'fallback'] as const)('keeps a missing %s total unknown without reconstructing from parts', async mode => {
   path = mode; row.total_job_cost = null; row.total_parts_cost = 25;
@@ -138,13 +138,13 @@ it.each(['rpc', 'fallback'] as const)('keeps an absent %s total unknown without 
 });
 it.each(['rpc', 'fallback'] as const)('preserves a fractional %s total and the existing rounded display', async mode => {
   path = mode; row.total_job_cost = 125.5; row.total_parts_cost = 25.25;
-  const actual = await showDay(); expect(actual.projected).toBe(125.5); expect(actual.text).toContain('$126');
+  const actual = await showDay(); expect(actual.projected).toBe(125.5); expect(actual.text).toContain('126 (currency unknown)');
 });
 it.each(['rpc', 'fallback'] as const)('preserves a present %s total when components are unknown', async mode => {
   path = mode; row.total_parts_cost = null; row.total_labor_cost = null;
-  const actual = await showDay(); expect(actual.projected).toBe(125); expect(actual.text).toContain('$125');
+  const actual = await showDay(); expect(actual.projected).toBe(125); expect(actual.text).toContain('125 (currency unknown)');
 });
-it.each(['rpc', 'fallback'] as const)('retains %s known-value work sums without changing native sale events', async mode => {
+it.each(['rpc', 'fallback'] as const)('retains individual %s work values without claiming a day aggregate', async mode => {
   path = mode;
   extraSessions = [
     { ...row, id: 'second-synthetic-session', title: 'Second synthetic work', total_job_cost: 75, total_parts_cost: 15 },
@@ -152,8 +152,9 @@ it.each(['rpc', 'fallback'] as const)('retains %s known-value work sums without 
   ];
   nativeEvents = [{ id: 'synthetic-sale', event_date: day, event_type: 'sale', title: 'Synthetic separate sale', cost_amount: 800 }];
   const actual = await showDay();
-  expect(actual.text).toContain('WORK 3$200'); expect(actual.text).toContain('$125'); expect(actual.text).toContain('$75');
-  expect(actual.text).toContain('Unknown synthetic work'); expect(actual.text).toContain('Synthetic separate sale$800');
+  const facets = [...host.querySelectorAll('[data-day-drawer] span')].find(node => node.textContent === 'WORK 3')?.parentElement?.textContent;
+  expect(facets).toBe('WORK 3'); expect(actual.text).toContain('125 (currency unknown)'); expect(actual.text).toContain('75 (currency unknown)');
+  expect(actual.text).toContain('Unknown synthetic work'); expect(actual.text).toContain('Synthetic separate sale800 (currency unknown)');
   expect(current.timelineEvents.find(event => event.id === nativeEvents[0].id)).toEqual(nativeEvents[0]);
   expect(current.timelineEvents.find(event => event.id === 'unknown-synthetic-session')?.cost_amount).toBeNull();
 });
