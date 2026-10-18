@@ -74,6 +74,8 @@ Gallery and technical views use standard `<Link>` navigation (these are compact 
 
 ## Treemap Drill
 
+**Phone browsing (owner correction, 2026-10-18):** The primary phone path is a labelled make → family → model or series → year → vehicle list, with a visible parent action and the same URL scope as the map. The native selector offers every loaded choice; the compact list states how many are shown. Shared make artwork identifies the choices. List and Map are explicit alternatives; opening a family must not silently switch to a price chart. Extra facet ribbons, map layouts, sales history and sales-activity comparisons belong behind named disclosures. An explicit List choice restores model choices after a chart view. Map inspection retains its existing sheet behavior when Map is selected. Counts retain their reader's population, window and cap; a narrow source comparison must not be presented as whole-market appreciation.
+
 **Market tile inspection (2026-10-18):** Market tiles are native buttons. On brand and family overviews, keyboard focus has a visible inset border and opens the same measured card as pointer hover, with the card linked as the focused tile's accessible description. Blur or Escape dismisses it; Enter or Space retains the existing drill action and hands focus to the current breadcrumb while the old tile is replaced. Focus also uses the existing prefetch path. The card's placement uses its rendered height and clamps its width to the viewport. Browser acceptance follows focus → qualified card → Escape → next tile → drill → focused current breadcrumb at phone and desktop widths; data-reader and scope behavior remain governed by the existing market contracts.
 
 Focus markers on the tiles, breadcrumb and Sales by house summary use inset borders: the shared Tailwind overrides suppress outlines even when a component declares one. Verify the rendered marker rather than treating a local `outline` rule as proof of visible focus.
@@ -419,7 +421,7 @@ Series identity consolidates known name variants while preserving the recorded m
 vehicle. C/K designations do not establish current drivetrain. Current disclosed configuration
 can place a converted truck under 4WD while its original series remains 3100 or C10. Current
 configuration is not asserted for a historical sale. Nominal series class is not measured payload;
-wheelbase, bed length and cab/body are distinct axes. Overlapping year-era definitions remain
+wheelbase, bed length and cab/body are distinct axes. A different independently rooted but undated claim cannot be ordered behind a dated disclosure; retain that conflict. Overlapping year-era definitions remain
 unresolved rather than selecting one arbitrarily. El Camino/Caballero stay outside Truck.
 
 The existing five-year sales chart takes its members from the selected population. Its date

@@ -250,6 +250,8 @@ can supersede it without editing the original or guessing from model/year.
 
 ## P
 
+**Partition (market)** — Mutually exclusive groups of one declared population under one attribute. Every member belongs to one group, including an unknown/conflicting group where needed; group counts and dollars reconcile to that population. Changing grouping rearranges membership without changing filters or units. A configuration partition of current records does not establish the configuration of those assets at a historical sale.
+
 **Palimpsest** — A manuscript that has been written on, scraped off, and rewritten, with earlier layers still partially visible. In Nuke, the palimpsest model describes how a user's expertise evolves over time: each era (e.g., 5 years of Porsche, then a switch to trucks) is a layer that remains visible in their writing style even after the topical shift. Style is permanent; topic is temporal. The palimpsest is one of 7 novel ontological contributions identified in the applied ontology research.
 
 **Permanent Interface** — An interface element that solves a problem which hasn't changed and won't change. The scroll bar (content exceeds container), the menu bar (applications have actions), the address bar (users need location awareness), the search box (information exceeds browsability). The test: remove the element; if the user is stuck within seconds, it's permanent. If they adjust within minutes, it was trend. The header is permanent because its function (identity + command + session) hasn't changed. See Contemplation: The Permanent Interface.

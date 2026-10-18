@@ -16,12 +16,16 @@ WITH scope AS MATERIALIZED (
  GROUP BY m.model_key
 ), brand_outcomes AS MATERIALIZED (
  SELECT id,model,year,sold_amount,source_name FROM public.mv_treemap_outcomes
- WHERE lower(brand_name)=lower(p_brand) AND sold_amount>0 AND (p_after IS NULL OR id>p_after)
+ WHERE lower(brand_name)=lower(p_brand) AND sold_amount>0
  AND (p_partition IS NULL OR (p_partition BETWEEN 0 AND 3
    AND id BETWEEN (to_hex(p_partition*4)||repeat('0',31))::uuid AND (to_hex(p_partition*4+3)||repeat('f',31))::uuid))
+), cursor_position AS MATERIALIZED (
+ -- Opaque, non-authorizing cursor: do not expose an excluded/private candidate ID.
+ SELECT id FROM brand_outcomes WHERE p_after IS NOT NULL AND md5(id::text)::uuid=p_after
 ), priced AS MATERIALIZED (
  SELECT o.*,s.family FROM brand_outcomes o
  JOIN scope s ON s.model_key=lower(btrim(coalesce(o.model,'')))
+ WHERE p_after IS NULL OR o.id>(SELECT id FROM cursor_position LIMIT 1)
  ORDER BY o.id LIMIT 1001
 ), candidates AS MATERIALIZED (
  SELECT * FROM priced ORDER BY id LIMIT 1000
@@ -45,23 +49,35 @@ WITH scope AS MATERIALIZED (
  AND public.observation_is_public(o.kind,o.structured_data)
  AND o.observed_at<=c.as_of_at AND o.ingested_at<=c.as_of_at
  AND o.observed_at<=statement_timestamp() AND o.ingested_at<=statement_timestamp()
-), configured AS (
- SELECT m.*,r.observed_at,r.observation_id,
- CASE WHEN r.resolution_method='unresolved' THEN 'conflict'
- WHEN r.observation_id IS NOT NULL THEN public.classify_drivetrain(r.consensus_value)
- -- An undated rooted scalar is retained as recorded configuration, not given a
- -- fabricated disclosure date. A withdrawn/stale consensus cannot resurrect it.
- WHEN c.vehicle_id IS NULL AND (
+), config_inputs AS MATERIALIZED (
+ SELECT m.*,r.observed_at,r.observation_id,r.resolution_method,
+ c.vehicle_id IS NOT NULL AS has_consensus,
+ CASE public.classify_drivetrain(m.drivetrain) WHEN 'RWD' THEN '2WD' WHEN 'FWD' THEN '2WD'
+   ELSE public.classify_drivetrain(m.drivetrain) END AS scalar_drive,
+ CASE public.classify_drivetrain(r.consensus_value) WHEN 'RWD' THEN '2WD' WHEN 'FWD' THEN '2WD'
+   ELSE public.classify_drivetrain(r.consensus_value) END AS reported_drive
+ FROM page m LEFT JOIN reports r ON r.vehicle_id=m.id
+ LEFT JOIN public.vehicle_field_consensus c ON c.vehicle_id=m.id AND c.field_name='drivetrain'
+), rooted AS (
+ SELECT m.*,scalar_drive IS NOT NULL AND (
  EXISTS (SELECT 1 FROM public.vehicle_field_sources fs WHERE fs.vehicle_id=m.id AND fs.field_name='drivetrain'
  AND lower(btrim(fs.field_value))=lower(btrim(m.drivetrain)) AND coalesce(fs.source_type,'') NOT IN ('computed',''))
  OR EXISTS (SELECT 1 FROM public.field_evidence fe WHERE fe.vehicle_id=m.id AND fe.field_name='drivetrain'
- AND lower(btrim(fe.proposed_value))=lower(btrim(m.drivetrain)) AND fe.status IN ('pending','accepted')))
- THEN public.classify_drivetrain(m.drivetrain) END AS drive
- FROM page m LEFT JOIN reports r ON r.vehicle_id=m.id
- LEFT JOIN public.vehicle_field_consensus c ON c.vehicle_id=m.id AND c.field_name='drivetrain'
+ AND lower(btrim(fe.proposed_value))=lower(btrim(m.drivetrain)) AND fe.status IN ('pending','accepted'))) AS scalar_rooted
+ FROM config_inputs m
+), configured AS (
+ SELECT m.*,
+ CASE WHEN resolution_method='unresolved' THEN 'conflict'
+ -- Independent rooted scalar testimony has no ordering clock here. A dated
+ -- listing does not prove it is newer than that undated claim.
+ WHEN reported_drive IS NOT NULL AND scalar_rooted AND scalar_drive<>reported_drive THEN 'conflict'
+ WHEN observation_id IS NOT NULL THEN reported_drive
+ -- Withdrawn/stale consensus cannot resurrect an older scalar.
+ WHEN NOT has_consensus AND scalar_rooted THEN scalar_drive END AS drive
+ FROM rooted m
 )
 SELECT jsonb_build_object('n',(SELECT count(*) FROM members),'truncated',false,'has_more',(SELECT count(*) FROM priced)>1000,
- 'next_cursor',(SELECT id FROM candidates ORDER BY id DESC LIMIT 1),
+ 'next_cursor',(SELECT md5(id::text)::uuid FROM candidates ORDER BY id DESC LIMIT 1),
  'snapshot',(SELECT max(as_of) FROM public.mv_family_market WHERE brand=p_brand),
  'as_of',statement_timestamp(),'population','public_all_time_priced_sale_records',
  'configuration_basis','current_record_not_sale_time','rows',coalesce((SELECT jsonb_agg(jsonb_build_array(
@@ -71,7 +87,7 @@ $fn$;
 REVOKE ALL ON FUNCTION public.treemap_family_models(text,text,boolean,uuid,integer) FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION public.treemap_family_models(text,text,boolean,uuid,integer) TO anon,authenticated,service_role;
 COMMENT ON FUNCTION public.treemap_family_models(text,text,boolean,uuid,integer) IS
-'Complete public GM Truck priced-sale membership for orthogonal treemap partitions; 1000-record keyset pages with has_more and stable fold snapshot. Current configuration, never sale-time configuration. Raw identity retained; El Camino/Caballero remain outside Truck.';
+'Complete public GM Truck priced-sale membership for orthogonal treemap partitions; 1000-record pages with opaque non-authorizing cursor, has_more and stable fold snapshot. Current configuration, never sale-time configuration. Raw identity retained; El Camino/Caballero remain outside Truck.';
 CREATE OR REPLACE FUNCTION public.treemap_family_models(p_brand text, p_family_key text)
  RETURNS TABLE(model text, sold bigint, sold_any bigint, offered bigint, usd bigint, dated bigint, sold_12m bigint, sold_prior_12m bigint, usd_12m bigint, usd_prior_12m bigint, as_of timestamp with time zone)
  LANGUAGE sql

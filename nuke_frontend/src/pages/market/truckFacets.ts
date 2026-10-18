@@ -37,7 +37,7 @@ export function parseTruckMembers(value: unknown): TruckRead | null {
 export function truckFacet(member: TruckMember, axis: TruckAxis, make: string): string {
   if (axis === 'raw') return member.model || 'Unknown recorded name';
   if (axis === 'year') return member.year == null ? 'Unknown year' : String(member.year);
-  if (axis === 'drive') return ({ RWD: '2WD', FWD: '2WD', '4WD': '4WD', AWD: 'AWD', conflict: 'Conflicting drivetrain' } as Record<string, string>)[member.drive ?? ''] ?? 'Unknown drivetrain';
+  if (axis === 'drive') return ({ '2WD': '2WD', RWD: '2WD', FWD: '2WD', '4WD': '4WD', AWD: 'AWD', conflict: 'Conflicting drivetrain' } as Record<string, string>)[member.drive ?? ''] ?? 'Unknown drivetrain';
   const raw = [member.model, member.series].filter(Boolean).join(' ');
   if (axis === 'trim') {
     const trim = classifyVehicleFacets(make, 'Truck', [raw, member.trim].filter(Boolean).join(' '), member.year).trim;

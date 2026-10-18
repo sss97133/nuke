@@ -6,6 +6,7 @@ it('consolidates naming aliases while retaining disclosed conversions and unknow
   expect(truckFacet(records[0],'series','Chevrolet')).toBe('C10');
   expect(truckFacet(records[1],'series','Chevrolet')).toBe('C10');
   expect(truckFacet(records[0],'drive','Chevrolet')).toBe('4WD');
+  expect(truckFacet({...records[0],drive:'2WD'},'drive','Chevrolet')).toBe('2WD');
   expect(truckFacet(records[3],'drive','Chevrolet')).toBe('2WD');
   expect(truckFacet(records[2],'drive','Chevrolet')).toBe('Unknown drivetrain');
   expect(truckFacet(records[4],'drive','Chevrolet')).toBe('Conflicting drivetrain');

@@ -427,7 +427,7 @@ enum LedgerMapScale {
         var label: String {
             switch self {
             case .ledger: return "All sales"
-            case .bat12: return "BaT 12 mo"
+            case .bat12: return "Measured 12 mo"
             }
         }
     }
@@ -1955,7 +1955,21 @@ enum LedgerMap {
     private struct MakeParams: Encodable { let p_make: String }
     private struct BrandParams: Encodable { let p_brand: String }
     private struct FamilyParams: Encodable { let p_brand: String; let p_family_key: String }
-    private struct YearParams: Encodable { let p_source: String?; let p_make: String?; let p_model: String? }
+    struct YearParams: Encodable {
+        let p_source: String?
+        let p_make: String
+        let p_model: String
+
+        private enum CodingKeys: String, CodingKey { case p_source, p_make, p_model }
+        func encode(to encoder: Encoder) throws {
+            var values = encoder.container(keyedBy: CodingKeys.self)
+            // The RPC requires this key even when all sources are selected.
+            // Synthesized optional encoding omits nil and selects no matching function.
+            try values.encode(p_source, forKey: .p_source)
+            try values.encode(p_make, forKey: .p_make)
+            try values.encode(p_model, forKey: .p_model)
+        }
+    }
     private struct SalesParams: Encodable { let p_make: String; let p_model: String; let p_year: Int? }
     private struct MapParams: Encodable { let p_brands: Int; let p_families: Int }
     private struct ShareMoverParams: Encodable { let p_limit: Int; let p_min_sales: Int; let p_horizon: String }
@@ -2095,16 +2109,79 @@ enum LedgerMap {
 
 // MARK: - LedgerMapView
 
+/// The current browse cohort. Presentation changes never change this path.
+struct LedgerBrowsePath: Equatable {
+    enum Level: Equatable { case brands, families, models, years, vehicles }
+    var make: String?
+    var familyKey: String?
+    var familyName: String?
+    var model: String?
+    var facetLabel: String?
+    var year: Int?
+    var era: String?
+
+    var level: Level {
+        if make == nil { return .brands }
+        if familyKey == nil && model == nil { return .families }
+        if model == nil && year == nil { return .models }
+        if year == nil { return .years }
+        return .vehicles
+    }
+
+    var prompt: String {
+        switch level {
+        case .brands: return "Choose a make to explore its confirmed sales."
+        case .families: return "Choose a family to explore its confirmed sales."
+        case .models: return "Choose a model to explore its years and sales."
+        case .years: return "Choose a year to open its confirmed sales."
+        case .vehicles: return "Confirmed sale records for this selection."
+        }
+    }
+
+    var scopeLabel: String {
+        switch level {
+        case .brands: return "Market"
+        case .families: return "Make"
+        case .models: return "Family"
+        case .years: return "Model"
+        case .vehicles: return "Year"
+        }
+    }
+
+    func opening(_ node: LedgerNode) -> Self {
+        var next = self
+        switch level {
+        case .brands: next.make = node.name; next.facetLabel = nil
+        case .families:
+            next.facetLabel = nil
+            if let key = node.familyKey { next.familyKey = key; next.familyName = node.name }
+            else { next.model = node.name }
+        case .models: next.facetLabel = node.name; next.model = node.facetRepresentativeModel ?? node.name
+        case .years: next.year = Int(node.name)
+        case .vehicles: break
+        }
+        return next
+    }
+
+    func steppingBack() -> Self {
+        var next = self
+        if year != nil { next.year = nil }
+        else if model != nil { next.model = nil; next.facetLabel = nil }
+        else if familyKey != nil { next.familyKey = nil; next.familyName = nil; next.era = nil }
+        else { next = Self() }
+        return next
+    }
+}
+
+enum LedgerBrowsePresentation: String, CaseIterable {
+    case map = "Map", list = "List", chart = "Chart"
+    func afterDrill() -> Self { self == .chart ? .map : self }
+}
+
 struct LedgerMapView: View {
     var onSelectVehicle: ((UUID) -> Void)? = nil
 
-    enum Level: Equatable {
-        case brands
-        case families
-        case models
-        case years
-        case vehicles
-    }
+    typealias Level = LedgerBrowsePath.Level
 
     @State private var selectedMake: String?
     @State private var selectedFamilyKey: String?
@@ -2119,6 +2196,8 @@ struct LedgerMapView: View {
 
     @State private var basis: LedgerMapScale.MapBasis = .ledger
     @State private var brandViewMode: LedgerMapScale.BrandViewMode = .brands
+    @State private var presentation: LedgerBrowsePresentation = .map
+    @State private var comparisonEnabled = false
 
     @State private var nodes: [LedgerNode] = []
     @State private var brandNodesCache: [LedgerNode] = []
@@ -2147,13 +2226,13 @@ struct LedgerMapView: View {
 
     @State private var inspectedNode: LedgerNode?
 
-    private var level: Level {
-        if selectedMake == nil { return .brands }
-        if selectedFamilyKey == nil && selectedModel == nil { return .families }
-        if selectedModel == nil && selectedYear == nil { return .models }
-        if selectedYear == nil { return .years }
-        return .vehicles
+    private var browsePath: LedgerBrowsePath {
+        LedgerBrowsePath(make: selectedMake, familyKey: selectedFamilyKey, familyName: selectedFamilyName,
+                         model: selectedModel, facetLabel: selectedFacetLabel, year: selectedYear, era: selectedEra)
     }
+    private var level: Level { browsePath.level }
+    private var mapComparisonEnabled: Bool { comparisonEnabled && moverHorizon == .y1 && baselineHorizon == .prior }
+    private var mapBasis: LedgerMapScale.MapBasis { mapComparisonEnabled ? basis : .ledger }
 
     private var pathKey: String {
         [selectedMake ?? "", selectedFamilyKey ?? "", selectedModel ?? "", selectedYear.map(String.init) ?? ""].joined(separator: "/")
@@ -2164,7 +2243,7 @@ struct LedgerMapView: View {
     }
 
     private var moverTaskKey: String {
-        "\(moverHorizon.rawValue)|\(baselineHorizon.rawValue)"
+        "\(comparisonEnabled)|\(moverHorizon.rawValue)|\(baselineHorizon.rawValue)"
     }
 
     private var activeMovers: ShareMoversRead? {
@@ -2182,7 +2261,7 @@ struct LedgerMapView: View {
 
     /// Overlays active `moverHorizon` / `baselineHorizon` counts onto a node (`applyMoverHorizon` in `HomePage.tsx`).
     private func applyHorizonOverlay(_ node: LedgerNode) -> LedgerNode {
-        guard isCustomHorizonOverlay, let am = activeMovers else { return node }
+        guard comparisonEnabled, isCustomHorizonOverlay, let am = activeMovers else { return node }
         var copy = node
         if level == .brands {
             if let tuple = am.brandMoves[node.name] {
@@ -2217,38 +2296,91 @@ struct LedgerMapView: View {
         VStack(alignment: .leading, spacing: 14) {
             headerSection
             breadcrumbsBar
-            quickSwitchPills
-            if level == .brands {
+            Picker("Browse this cohort", selection: $presentation) {
+                Text("Map").tag(LedgerBrowsePresentation.map)
+                Text("List").tag(LedgerBrowsePresentation.list)
+                if selectedFamilyKey != nil, selectedFamilyKey != "other" {
+                    Text("Chart").tag(LedgerBrowsePresentation.chart)
+                }
+            }
+            .pickerStyle(.segmented)
+            Text(level == .families && !loading && familyNodesCache.isEmpty && !nodes.isEmpty
+                 ? "Family grouping is unavailable. Choose a recorded model to explore its sales."
+                 : browsePath.prompt)
+                .font(.footnote)
+                .foregroundStyle(.secondary)
+            if mapComparisonEnabled, level == .brands {
                 mapCalloutsBar
             }
-            if selectedMake != nil, let fk = selectedFamilyKey, fk != "other" {
-                familyChartAndIndexCard
+            if presentation == .chart {
+                if loading {
+                    ProgressView().frame(maxWidth: .infinity, minHeight: 130)
+                } else if let sales = familySalesData, !sales.sales.isEmpty {
+                    familyChartAndIndexCard
+                } else {
+                    Text("The five-year family sales chart could not be read for this selection.")
+                        .font(.footnote).foregroundStyle(.secondary)
+                }
+            } else if presentation == .list && level != .vehicles && !loading && !failed && !filteredNodes.isEmpty {
+                nodeList
+            } else {
+                canvas.frame(height: level == .vehicles ? nil : 430)
             }
-            canvas
-                .frame(height: level == .vehicles ? nil : 430)
             if level == .brands || level == .families {
                 legendFooter
             }
-            if level == .brands, let houses = receipt?.populations?.by_house, !houses.isEmpty {
-                venueMixBar(houses)
+            DisclosureGroup("Refine selection") {
+                quickSwitchPills
+                if level == .brands {
+                    segmentedPill(options: LedgerMapScale.BrandViewMode.allCases, selection: $brandViewMode, label: \.label)
+                }
             }
-            if level == .brands {
-                relativityMoversCard
+            .disabled(loading)
+            if level == .brands || level == .families {
+                DisclosureGroup("Compare sales activity", isExpanded: $comparisonEnabled) {
+                    Text("Activity share, not price change or appreciation. The comparison covers the reader’s measured cohort, not every sale in the ledger.")
+                        .font(.footnote).foregroundStyle(.secondary)
+                    Text(comparisonScopeText).font(.caption).foregroundStyle(.secondary)
+                    segmentedPill(options: LedgerMapScale.MapBasis.allCases, selection: $basis, label: \.label)
+                        .disabled(!mapComparisonEnabled)
+                    if !mapComparisonEnabled {
+                        Text("Custom windows are shown in the activity board below. The map stays neutral on the all-sales ledger because these windows can use different source cohorts.")
+                            .font(.caption).foregroundStyle(.secondary)
+                    }
+                    relativityMoversCard
+                }
+            }
+            if level == .brands, let houses = receipt?.populations?.by_house, !houses.isEmpty {
+                DisclosureGroup("Sales by house") { venueMixBar(houses) }
             }
         }
         .padding(16)
         .task(id: pathKey) { await load() }
+        .task(id: pathKey) {
+            let requestedPath = pathKey
+            guard level == .brands, brandFamilyRows.isEmpty else { return }
+            let rows = await LedgerMap.brandFamilyMap()
+            guard requestedPath == pathKey, !Task.isCancelled else { return }
+            if let rows { brandFamilyRows = rows }
+        }
+        .onChange(of: pathKey) { _, _ in
+            presentation = presentation.afterDrill()
+            nodes = []; vehicles = []; loading = true
+        }
         .task(id: identityMarksTaskKey) {
+            let requestedIdentity = identityMarksTaskKey
             guard let make = selectedMake, (selectedFamilyKey != nil || selectedModel != nil) else {
                 identityMarks = []
                 return
             }
-            identityMarks = await LedgerMap.identityMarks(
+            let marks = await LedgerMap.identityMarks(
                 brand: make,
                 family: selectedFamilyName ?? selectedFamilyKey ?? selectedModel,
                 year: selectedYear,
                 eraId: selectedEra
             )
+            guard requestedIdentity == identityMarksTaskKey, !Task.isCancelled else { return }
+            identityMarks = marks
         }
         .task {
             if receipt == nil {
@@ -2256,16 +2388,21 @@ struct LedgerMapView: View {
             }
         }
         .task(id: moverTaskKey) {
+            let requestedTask = moverTaskKey
+            guard comparisonEnabled else { moversLoading = false; return }
             moversLoading = true
+            movers = nil
+            baselineMovers = nil
+            defer { if requestedTask == moverTaskKey && !Task.isCancelled { moversLoading = false } }
             async let targetTask = LedgerMap.shareMovers(horizon: moverHorizon)
             let baseH = baselineHorizon.moverHorizon
             async let baseTask: ShareMoversRead? = (baseH != nil && baseH != moverHorizon)
                 ? LedgerMap.shareMovers(horizon: baseH!)
                 : nil
             let (tRes, bRes) = await (targetTask, baseTask)
+            guard requestedTask == moverTaskKey, !Task.isCancelled else { return }
             movers = tRes
             baselineMovers = bRes
-            moversLoading = false
         }
         .sheet(item: $inspectedNode) { node in
             nodeSheet(node)
@@ -2282,32 +2419,40 @@ struct LedgerMapView: View {
 
     private var headerSection: some View {
         VStack(alignment: .leading, spacing: 6) {
-            HStack(alignment: .firstTextBaseline) {
-                Text(headerTitle)
-                    .font(.system(.title3, design: .monospaced).weight(.semibold))
-                Spacer()
-                Text(headerMeasureLine)
-                    .font(.system(.caption2, design: .monospaced))
-                    .foregroundStyle(.secondary)
-                    .multilineTextAlignment(.trailing)
-            }
-            if level == .brands || level == .families {
-                HStack(spacing: 8) {
-                    if level == .brands {
-                        segmentedPill(
-                            options: LedgerMapScale.BrandViewMode.allCases,
-                            selection: $brandViewMode,
-                            label: \.label
-                        )
-                    }
-                    Spacer()
-                    segmentedPill(
-                        options: LedgerMapScale.MapBasis.allCases,
-                        selection: $basis,
-                        label: \.label
-                    )
+            HStack(alignment: .top) {
+                if selectedMake != nil {
+                    Button { stepBack() } label: { Label("Back", systemImage: "chevron.left") }
+                        .buttonStyle(.plain).frame(minHeight: 44)
                 }
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(browsePath.scopeLabel).font(.caption2).foregroundStyle(.secondary)
+                    if let make = selectedMake {
+                        MakeIdentityView(make: make, height: 20, maxWidth: 140)
+                            .font(.title3.weight(.semibold))
+                        if selectedFamilyName != nil || selectedModel != nil || selectedYear != nil {
+                            Text([selectedYear.map(String.init), selectedFacetLabel ?? selectedModel ?? selectedFamilyName]
+                                .compactMap { $0 }.joined(separator: " "))
+                                .font(.title3.weight(.semibold))
+                        }
+                    } else { Text(headerTitle).font(.title3.weight(.semibold)) }
+                }
+                Spacer()
             }
+            Button { presentation = .list } label: {
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(headerMeasureLine)
+                        .font(.system(.caption2, design: .monospaced))
+                        .multilineTextAlignment(.leading)
+                        .fixedSize(horizontal: false, vertical: true)
+                    Text("Explore sales")
+                        .font(.caption.weight(.semibold)).foregroundStyle(.tint)
+                }
+                .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
+            }
+            .buttonStyle(.plain)
+            .disabled(loading || failed)
+            .accessibilityLabel("Explore \(headerMeasureLine)")
+            .accessibilityHint("Shows the groups in the current cohort as a list")
         }
     }
 
@@ -2324,13 +2469,16 @@ struct LedgerMapView: View {
         if let make = selectedMake {
             return make
         }
-        return "Market Map"
+        return "Confirmed sales"
     }
 
     private var headerMeasureLine: String {
+        if loading { return "Reading confirmed sales…" }
+        if failed { return "Confirmed sales could not be read" }
         let clock = receipt?.refreshClock() ?? ""
         if level == .vehicles {
-            return "\(vehicles.count.formatted()) confirmed sales\(clock)"
+            let cap = selectedModel != nil && vehicles.count >= 200 ? " · reader limit 200" : ""
+            return "\(vehicles.count.formatted()) loaded confirmed sales\(cap)\(clock)"
         }
         let total = filteredNodes.reduce(0) { $0 + $1.count }
         guard total > 0 else { return loading ? "reading…" : "0 confirmed sales" }
@@ -2744,7 +2892,7 @@ struct LedgerMapView: View {
                 }
 
                 HStack {
-                    Text("\(scopedSales.count.formatted()) CONFIRMED SALES (5Y)")
+                    Text("\(scopedSales.count.formatted()) LOADED SALES (5Y, $500+)")
                         .font(.system(size: 10, weight: .semibold, design: .monospaced))
                         .foregroundStyle(.secondary)
                     Spacer()
@@ -2771,6 +2919,8 @@ struct LedgerMapView: View {
                     }
                     .chartYScale(type: .log)
                     .frame(height: 130)
+                    Text("Plot: \(min(scopedSales.count, 600).formatted()) of \(scopedSales.count.formatted()) matching loaded sales. Family reader loaded \(salesData.sales.count.formatted()) of \(salesData.n.formatted()) records\(salesData.truncated ? " · truncated" : ""). This five-year cohort differs from the all-time ledger.")
+                        .font(.caption).foregroundStyle(.secondary)
                 }
 
                 // Upcoming supply & live finish estimates (`FamilySalesChart.tsx` #1819)
@@ -2958,7 +3108,7 @@ struct LedgerMapView: View {
             GeometryReader { geo in
                 let isBrandOrFamily = (level == .brands || level == .families)
                 let items = filteredNodes.map { node in
-                    (item: node, area: node.area(basis: basis, isBrandOrFamily: isBrandOrFamily))
+                    (item: node, area: node.area(basis: mapBasis, isBrandOrFamily: isBrandOrFamily))
                 }
                 let rects = LiveInventory.squarify(items, in: CGRect(origin: .zero, size: geo.size))
                 ZStack(alignment: .topLeading) {
@@ -2975,7 +3125,7 @@ struct LedgerMapView: View {
     private var brandFamilyNestedCanvas: some View {
         GeometryReader { geo in
             let areaFn: (BrandFamilyMapRow) -> Double = { r in
-                basis == .bat12 ? (r.usd_12m ?? 0) : (r.usd ?? 0)
+                mapBasis == .bat12 ? (r.usd_12m ?? 0) : (r.usd ?? 0)
             }
             let grouped = Dictionary(grouping: brandFamilyRows, by: \.brand)
             let brandGroups: [(brand: String, usd: Double, rows: [BrandFamilyMapRow])] = grouped.compactMap { brand, rows in
@@ -3007,9 +3157,8 @@ struct LedgerMapView: View {
                             selectedMake = b.brand
                         } label: {
                             HStack(spacing: 4) {
-                                Text(b.brand.uppercased())
-                                    .font(.system(size: 9, weight: .bold, design: .monospaced))
-                                    .lineLimit(1)
+                                MakeIdentityView(make: b.brand, height: 10, maxWidth: max(24, r.width - 56))
+                                    .font(.system(size: 9, weight: .bold)).lineLimit(1)
                                 Text(LedgerMap.money(b.usd))
                                     .font(.system(size: 9, design: .monospaced))
                                     .foregroundStyle(.secondary)
@@ -3028,7 +3177,7 @@ struct LedgerMapView: View {
                         let row = famTile.item
                         let rawNode = row.toLedgerNode()
                         let node: LedgerNode = {
-                            guard isCustomHorizonOverlay,
+                            guard comparisonEnabled, isCustomHorizonOverlay,
                                   let m = activeMovers,
                                   let mv = m.familyMoves["\(row.brand)|\(row.family_key)"] ?? m.familyMoves["\(row.brand)::\(row.family_key)"] else {
                                 return rawNode
@@ -3038,9 +3187,9 @@ struct LedgerMapView: View {
                             copy.sold_prior_12m = mv.soldPrior12m
                             return copy
                         }()
-                        let move: LedgerMapScale.Move = (row.family_key == "more" || row.family_key == "other")
+                        let move: LedgerMapScale.Move = !mapComparisonEnabled || (row.family_key == "more" || row.family_key == "other")
                             ? .none
-                            : LedgerMapScale.relativeMove(node, base: baseline, allVenues: basis == .ledger)
+                            : LedgerMapScale.relativeMove(node, base: baseline, allVenues: mapBasis == .ledger)
                         Button {
                             selectedMake = row.brand
                             if row.family_key != "more" && row.family_key != "other" {
@@ -3050,14 +3199,14 @@ struct LedgerMapView: View {
                         } label: {
                             ZStack(alignment: .topLeading) {
                                 RoundedRectangle(cornerRadius: 2)
-                                    .fill(LedgerMapScale.tileColor(move))
+                                    .fill(mapComparisonEnabled ? LedgerMapScale.tileColor(move) : Color(.secondarySystemBackground))
                                 if famTile.rect.width >= 38 && famTile.rect.height >= 22 {
                                     VStack(alignment: .leading, spacing: 1) {
                                         Text(row.displayLabel)
                                             .font(.system(size: 10, weight: .semibold))
                                             .lineLimit(1)
                                         if famTile.rect.height >= 36 {
-                                            let mText = LedgerMapScale.moveTextShort(move)
+                                            let mText = mapComparisonEnabled ? LedgerMapScale.moveTextShort(move) : "\(node.count.formatted()) sales"
                                             if !mText.isEmpty {
                                                 Text(mText)
                                                     .font(.system(size: 8, design: .monospaced))
@@ -3081,12 +3230,12 @@ struct LedgerMapView: View {
 
     private func cell(_ node: LedgerNode, rect: CGRect) -> some View {
         let isBrandOrFamily = (level == .brands || level == .families)
-        let move: LedgerMapScale.Move = isBrandOrFamily && node.familyKey != "other"
-            ? LedgerMapScale.relativeMove(node, base: baseline, allVenues: basis == .ledger)
+        let move: LedgerMapScale.Move = mapComparisonEnabled && isBrandOrFamily && node.familyKey != "other"
+            ? LedgerMapScale.relativeMove(node, base: baseline, allVenues: mapBasis == .ledger)
             : .none
-        let bg: Color = isBrandOrFamily
+        let bg: Color = mapComparisonEnabled && isBrandOrFamily
             ? LedgerMapScale.tileColor(move)
-            : warmthFill(node.median_price)
+            : Color(.secondarySystemBackground)
 
         return Button {
             drill(node)
@@ -3098,11 +3247,16 @@ struct LedgerMapView: View {
                     .strokeBorder(Color.primary.opacity(0.12), lineWidth: 0.5)
                 if rect.width >= 44 && rect.height >= 28 {
                     VStack(alignment: .leading, spacing: 2) {
-                        Text(node.name)
-                            .font(.system(size: rect.width > 95 ? 12 : 10, weight: .semibold))
-                            .lineLimit(1)
+                        if level == .brands && rect.width > 95 {
+                            MakeIdentityView(make: node.name, height: 14, maxWidth: max(44, rect.width - 12))
+                                .font(.system(size: 12, weight: .semibold)).lineLimit(1)
+                        } else {
+                            Text(node.name)
+                                .font(.system(size: rect.width > 95 ? 12 : 10, weight: .semibold))
+                                .lineLimit(1)
+                        }
                         if rect.height >= 44 {
-                            if isBrandOrFamily {
+                            if mapComparisonEnabled && isBrandOrFamily {
                                 let mLine = rect.width > 110 ? LedgerMapScale.moveText(move) : LedgerMapScale.moveTextShort(move)
                                 if !mLine.isEmpty {
                                     Text(mLine)
@@ -3110,22 +3264,22 @@ struct LedgerMapView: View {
                                         .foregroundStyle(.primary.opacity(0.85))
                                         .lineLimit(1)
                                 }
-                            } else if let med = node.median_price, med > 0 {
-                                Text(LedgerMap.money(med))
+                            } else {
+                                Text("\(node.count.formatted()) sales")
                                     .font(.system(size: 10, design: .monospaced))
                                     .foregroundStyle(.secondary)
                                     .lineLimit(1)
                             }
                         }
                         if rect.height >= 62 && rect.width >= 78 {
-                            let usdVal = basis == .bat12 ? (node.usd_12m ?? node.usd) : (node.usd ?? node.value)
-                            let soldVal = basis == .bat12 ? (node.sold_12m ?? node.count) : node.count
+                            let usdVal = mapBasis == .bat12 ? (node.usd_12m ?? node.usd) : (node.usd ?? node.value)
+                            let soldVal = mapBasis == .bat12 ? (node.sold_12m ?? node.count) : node.count
                             if let u = usdVal, u > 0 {
-                                Text("\(LedgerMap.money(u)) · \(soldVal.formatted())")
+                                Text(mapComparisonEnabled ? "\(LedgerMap.money(u)) · \(soldVal.formatted())" : LedgerMap.money(u))
                                     .font(.system(size: 9, design: .monospaced))
                                     .foregroundStyle(.secondary)
                                     .lineLimit(1)
-                            } else {
+                            } else if mapComparisonEnabled {
                                 Text("\(soldVal.formatted()) sold")
                                     .font(.system(size: 9, design: .monospaced))
                                     .foregroundStyle(.secondary)
@@ -3153,8 +3307,38 @@ struct LedgerMapView: View {
 
     // MARK: - Leaf Vehicle List
 
+    private var nodeList: some View {
+        LazyVStack(alignment: .leading, spacing: 0) {
+            ForEach(filteredNodes) { node in
+                Button { drill(node) } label: {
+                    HStack(spacing: 12) {
+                        if level == .brands { MakeIdentityView(make: node.name) }
+                        else { Text(node.name).font(.body.weight(.medium)).multilineTextAlignment(.leading) }
+                        Spacer(minLength: 8)
+                        VStack(alignment: .trailing, spacing: 2) {
+                            Text("\(node.count.formatted()) sales")
+                            if let usd = node.usd ?? node.value, usd > 0 { Text(LedgerMap.money(usd)) }
+                        }
+                        .font(.system(.caption, design: .monospaced))
+                        Image(systemName: "chevron.right").font(.caption).foregroundStyle(.secondary)
+                    }
+                    .frame(minHeight: 48).contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                Divider()
+            }
+        }
+    }
+
     private var vehicleList: some View {
         LazyVStack(alignment: .leading, spacing: 0) {
+            if selectedModel != nil, vehicles.count >= 200 {
+                Text("This reader returns at most 200 confirmed sale records. The loaded list is not a complete count of this cohort.")
+                    .font(.caption).foregroundStyle(.secondary)
+            } else if selectedModel == nil, let family = familySalesData {
+                Text("Five-year family sale reader: \(family.sales.count.formatted()) of \(family.n.formatted()) records loaded\(family.truncated ? " · truncated" : ""). Year and era filters apply to these rows.")
+                    .font(.caption).foregroundStyle(.secondary)
+            }
             ForEach(vehicles) { v in
                 Group {
                     if let onSelectVehicle {
@@ -3224,18 +3408,33 @@ struct LedgerMapView: View {
         }()
         let clock = receipt?.refreshClock() ?? ""
         return VStack(alignment: .leading, spacing: 6) {
-            HStack(spacing: 4) {
+            if mapComparisonEnabled { HStack(spacing: 4) {
                 ForEach(["−50%", "−33%", "−17%", "0", "+17%", "+33%", "+50%"], id: \.self) { lbl in
                     Text(lbl)
                         .font(.system(size: 9, design: .monospaced))
                         .foregroundStyle(.secondary)
                         .frame(maxWidth: .infinity)
                 }
-            }
-            Text("Color: 12-month Bring a Trailer sales move against the market\(baseText). Size: \(basis == .bat12 ? "measured BaT dollars, last 12 months" : "dollars of confirmed sales across all venues and years"). Prices not adjusted for inflation\(clock).")
+            } }
+            Text(presentation == .list
+                 ? "Confirmed sales grouped within this selection · all held venues and years\(clock)."
+                 : mapComparisonEnabled
+                 ? "Color: sales activity share against the measured cohort\(baseText), not price or appreciation. Size: \(mapBasis == .bat12 ? "measured dollars, selected comparison window" : "confirmed-sale dollars across all held venues and years")\(clock)."
+                 : "Neutral color. Size: confirmed-sale dollars across all held venues and years; labels show recorded sales. \(clock)")
                 .font(.system(.caption2, design: .monospaced))
                 .foregroundStyle(.secondary)
         }
+    }
+
+    private var comparisonScopeText: String {
+        let scope: String
+        switch moverHorizon {
+        case .y1: scope = "The 12-month comparison uses Bring a Trailer, Mecum and Bonhams, the houses held in full in both years. Other houses remain in the all-sales ledger."
+        case .upcoming: scope = "Upcoming mixes live Bring a Trailer lots, scheduled auctions and captured classifieds against prior sales. It measures supply activity, not completed sales alone."
+        case .d1: scope = "The 24-hour reader may combine completed auction outcomes and active classified captures, or fall back to dated family sale records. It is not a pure completed-sales measure."
+        default: scope = "This horizon uses dated confirmed family sale records retained across sources. Capture coverage and sale-date availability differ by source."
+        }
+        return scope + (baselineHorizon == .prior ? "" : " A custom baseline can use a different source cohort; compare the declared windows as activity rates.")
     }
 
     private func venueMixBar(_ rows: [LedgerRefreshReceipt.HouseRow]) -> some View {
@@ -3390,9 +3589,10 @@ struct LedgerMapView: View {
                 VStack(alignment: .leading, spacing: 12) {
                     Text("How Relativity Is Measured")
                         .font(.headline)
-                    Text("Every tile and mover row compares a brand or family's sales against the whole market over the selected horizon:")
+                    Text("Activity share compares a brand or family against the reader’s declared cohort over the selected horizon. It is not a change in vehicle price or appreciation.")
                         .font(.footnote)
                         .foregroundStyle(.secondary)
+                    Text(comparisonScopeText).font(.footnote).foregroundStyle(.secondary)
                     Text("move = (family_now / family_base) ÷ (market_now / market_base) − 1")
                         .font(.system(.caption, design: .monospaced))
                         .padding(8)
@@ -3520,13 +3720,14 @@ struct LedgerMapView: View {
     // MARK: - Node Inspection Sheet
 
     private func nodeSheet(_ node: LedgerNode) -> some View {
-        let move = LedgerMapScale.relativeMove(node, base: baseline, allVenues: basis == .ledger)
+        let move: LedgerMapScale.Move = mapComparisonEnabled
+            ? LedgerMapScale.relativeMove(node, base: baseline, allVenues: mapBasis == .ledger) : .none
         return NavigationStack {
             List {
                 Section(node.name) {
                     if case .move(let rel, let raw, let sold, let prior) = move {
-                        LabeledContent("12m vs Market", value: LedgerMapScale.pct(rel))
-                        LabeledContent("BaT Sales (12m)", value: "\(prior.formatted()) → \(sold.formatted()) (\(LedgerMapScale.pct(raw)))")
+                        LabeledContent("Activity share vs measured cohort", value: LedgerMapScale.pct(rel))
+                        LabeledContent(moverHorizon.windowText, value: "\(prior.formatted()) → \(sold.formatted()) (\(LedgerMapScale.pct(raw)))")
                     }
                     if let u = node.usd, u > 0 {
                         LabeledContent("Confirmed Sales", value: "\(node.count.formatted()) · \(LedgerMap.money(u))")
@@ -3566,38 +3767,33 @@ struct LedgerMapView: View {
     // MARK: - Drill & Data Loading
 
     private func drill(_ node: LedgerNode) {
-        switch level {
-        case .brands:
-            selectedMake = node.name
+        if level == .brands || level == .families {
             facetAxis = .raw
-            selectedFacetLabel = nil
-        case .families:
-            facetAxis = .raw
-            selectedFacetLabel = nil
-            if let fk = node.familyKey {
-                selectedFamilyKey = fk
-                selectedFamilyName = node.name
-            } else {
-                selectedModel = node.name
-            }
-        case .models:
-            selectedFacetLabel = node.name
-            selectedModel = node.facetRepresentativeModel ?? node.name
-        case .years:
-            selectedYear = Int(node.name)
-        case .vehicles:
-            break
         }
+        applyBrowsePath(browsePath.opening(node))
+    }
+
+    private func stepBack() {
+        if presentation == .chart { presentation = .map; return }
+        applyBrowsePath(browsePath.steppingBack())
+        facetAxis = .raw
+    }
+
+    private func applyBrowsePath(_ path: LedgerBrowsePath) {
+        selectedMake = path.make; selectedFamilyKey = path.familyKey; selectedFamilyName = path.familyName
+        selectedModel = path.model; selectedFacetLabel = path.facetLabel; selectedYear = path.year; selectedEra = path.era
     }
 
     private func load() async {
+        let requestedPath = pathKey
         loading = true
         failed = false
-        defer { loading = false }
+        defer { if requestedPath == pathKey && !Task.isCancelled { loading = false } }
         do {
             switch level {
             case .brands:
                 let list = try await LedgerMap.brands()
+                guard requestedPath == pathKey, !Task.isCancelled else { return }
                 brandNodesCache = list
                 nodes = list
                 vehicles = []
@@ -3607,17 +3803,11 @@ struct LedgerMapView: View {
                 familySalesData = nil
                 familyIndex = nil
                 familyUpcomingSupply = nil
-                if brandFamilyRows.isEmpty {
-                    Task {
-                        if let bf = await LedgerMap.brandFamilyMap() {
-                            brandFamilyRows = bf
-                        }
-                    }
-                }
 
             case .families:
                 guard let make = selectedMake else { return }
                 let (fams, isCanonical) = try await LedgerMap.families(brand: make)
+                guard requestedPath == pathKey, !Task.isCancelled else { return }
                 if isCanonical {
                     familyNodesCache = fams
                 } else {
@@ -3638,33 +3828,33 @@ struct LedgerMapView: View {
                 async let indexTask = LedgerMap.familyPriceIndex(brand: make, familyKey: fk)
                 async let upcomingTask = LedgerMap.familyUpcomingSupply(brand: make, familyKey: fk)
                 let subModels = try await modelsTask
+                let (sales, index, upcoming) = await (salesTask, indexTask, upcomingTask)
+                guard requestedPath == pathKey, !Task.isCancelled else { return }
                 modelNodesCache = subModels
-                familySalesData = await salesTask
-                familyIndex = await indexTask
-                familyUpcomingSupply = await upcomingTask
+                familySalesData = sales
+                familyIndex = index
+                familyUpcomingSupply = upcoming
 
-                if subModels.count == 1, let only = subModels.first {
-                    selectedModel = only.name
-                    let yrs = try await LedgerMap.years(make: make, model: only.name)
-                    yearNodesCache = yrs
-                    nodes = yrs
-                } else {
-                    nodes = subModels
-                }
+                nodes = subModels
                 vehicles = []
 
             case .years:
                 guard let make = selectedMake else { return }
                 if let model = selectedModel {
                     let yrs = try await LedgerMap.years(make: make, model: model)
+                    guard requestedPath == pathKey, !Task.isCancelled else { return }
                     yearNodesCache = yrs
                     nodes = yrs
                 } else if let fk = selectedFamilyKey {
                     if familySalesData == nil {
-                        familySalesData = await LedgerMap.familySales(brand: make, familyKey: fk)
+                        let sales = await LedgerMap.familySales(brand: make, familyKey: fk)
+                        guard requestedPath == pathKey, !Task.isCancelled else { return }
+                        familySalesData = sales
                     }
                     if familyUpcomingSupply == nil {
-                        familyUpcomingSupply = await LedgerMap.familyUpcomingSupply(brand: make, familyKey: fk)
+                        let supply = await LedgerMap.familyUpcomingSupply(brand: make, familyKey: fk)
+                        guard requestedPath == pathKey, !Task.isCancelled else { return }
+                        familyUpcomingSupply = supply
                     }
                     let derived = deriveYearsFromFamilySales(familySalesData?.sales ?? [])
                     yearNodesCache = derived
@@ -3675,10 +3865,14 @@ struct LedgerMapView: View {
             case .vehicles:
                 guard let make = selectedMake, let year = selectedYear else { return }
                 if let model = selectedModel {
-                    vehicles = try await LedgerMap.sales(make: make, model: model, year: year)
+                    let sales = try await LedgerMap.sales(make: make, model: model, year: year)
+                    guard requestedPath == pathKey, !Task.isCancelled else { return }
+                    vehicles = sales
                 } else if let fk = selectedFamilyKey {
                     if familySalesData == nil {
-                        familySalesData = await LedgerMap.familySales(brand: make, familyKey: fk)
+                        let sales = await LedgerMap.familySales(brand: make, familyKey: fk)
+                        guard requestedPath == pathKey, !Task.isCancelled else { return }
+                        familySalesData = sales
                     }
                     let fromFamily = (familySalesData?.sales ?? []).filter { $0.year == year }
                     vehicles = fromFamily.compactMap { s in
@@ -3703,7 +3897,7 @@ struct LedgerMapView: View {
                 nodes = []
             }
         } catch {
-            failed = true
+            if requestedPath == pathKey && !Task.isCancelled { failed = true }
         }
     }
 

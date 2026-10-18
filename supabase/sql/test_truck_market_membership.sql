@@ -9,13 +9,13 @@ CREATE TABLE public.test_scenario AS SELECT 0 AS phase;
 CREATE VIEW public.vehicles AS
 SELECT x.id::uuid,x.model,'Chevrolet'::text make,current_date-x.n AS sale_date,NULL::date bat_sale_date,
  '2wd'::text drivetrain,NULL::text body_style,NULL::text cab_config,NULL::text series,NULL::text trim,
- NOT (x.n=1 AND t.phase=3) is_public,NULL::timestamptz deleted_at,'vehicle'::text listing_kind,
+ NOT ((x.n=1 AND t.phase=3) OR (x.n=1097 AND t.phase=5)) is_public,NULL::timestamptz deleted_at,'vehicle'::text listing_kind,
  NULL::text listing_title,NULL::text title,NULL::text vin,NULL::text primary_image_url
 FROM (VALUES (1,'00000000-0000-4000-8000-000000000001','3100 Custom Pickup'),
  (2,'00000000-0000-4000-8000-000000000002','C10 Pickup'),
  (3,'00000000-0000-4000-8000-000000000003','El Camino')
  UNION ALL SELECT n,'00000000-0000-4000-8000-'||lpad(n::text,12,'0'),'C10 Pickup' FROM generate_series(100,1100) n
- ) x(n,id,model) CROSS JOIN public.test_scenario t WHERE x.n<=3 OR t.phase=4;
+ ) x(n,id,model) CROSS JOIN public.test_scenario t WHERE x.n<=3 OR t.phase IN (4,5);
 CREATE VIEW public.mv_treemap_outcomes AS SELECT id,'Chevrolet'::text brand_name,model,
  1957 AS year,'sold'::text outcome,50000::numeric sold_amount,'Mecum'::text source_name FROM public.vehicles;
 CREATE VIEW public.mv_family_market AS
@@ -33,7 +33,8 @@ CREATE VIEW public.vehicle_observations AS SELECT '00000000-0000-4000-9000-00000
 CREATE VIEW public.vehicle_field_consensus AS SELECT vehicle_id,'drivetrain'::text field_name,id AS source_observation_id,
  '4wd'::text consensus_value,CASE WHEN t.phase=1 THEN 'unresolved' ELSE 'most_recent' END resolution_method,
  0.9::numeric consensus_confidence,now() as_of_at FROM public.vehicle_observations CROSS JOIN public.test_scenario t;
-CREATE VIEW public.vehicle_field_sources AS SELECT id AS vehicle_id,'drivetrain'::text field_name,'2wd'::text field_value,'listing'::text source_type FROM public.vehicles;
+CREATE VIEW public.vehicle_field_sources AS SELECT id AS vehicle_id,'drivetrain'::text field_name,'2wd'::text field_value,'listing'::text source_type FROM public.vehicles CROSS JOIN public.test_scenario t
+WHERE id<>'00000000-0000-4000-8000-000000000001'::uuid OR t.phase IN (2,6);
 CREATE VIEW public.field_evidence AS SELECT NULL::uuid vehicle_id,NULL::text field_name,NULL::text proposed_value,NULL::text status WHERE false;
 CREATE FUNCTION public.observation_is_public(text,jsonb) RETURNS boolean LANGUAGE sql IMMUTABLE AS $$ SELECT coalesce(($2->>'public')::boolean,true) $$;
 CREATE FUNCTION public.classify_drivetrain(text) RETURNS text LANGUAGE sql IMMUTABLE AS $$ SELECT CASE lower($1) WHEN '4wd' THEN '4WD' WHEN '2wd' THEN 'RWD' END $$;
@@ -42,7 +43,7 @@ CREATE FUNCTION public.classify_drivetrain(text) RETURNS text LANGUAGE sql IMMUT
 SELECT pg_temp.ok('complete all-time membership excludes El Camino and preserves raw identity',
  (SELECT (j->>'n')::int=2 AND jsonb_array_length(j->'rows')=2 AND NOT (j->>'truncated')::boolean
  AND j->'rows'->0->>1='3100 Custom Pickup' FROM (SELECT public.treemap_family_models('Chevrolet','truck',true) j) s));
-SELECT pg_temp.ok('latest disclosure overrides older scalar and retains source clock',
+SELECT pg_temp.ok('eligible disclosed configuration overrides an unrooted scalar and retains source clock',
  (SELECT j->'rows'->0->>7='4WD' AND j->'rows'->0->>12 IS NOT NULL FROM (SELECT public.treemap_family_models('Chevrolet','truck',true) j) s));
 SELECT pg_temp.ok('legacy readers also reposition El Camino but retain standalone family',
  NOT EXISTS (SELECT 1 FROM public.treemap_family_models('Chevrolet','truck') WHERE model='El Camino')
@@ -57,6 +58,9 @@ SET ROLE anon;
 SELECT pg_temp.ok('anonymous reader rechecks current parent privacy',public.treemap_family_models('Chevrolet','truck',true)->>'n'='1');
 SELECT pg_temp.ok('unsupported make and unknown family disclose no members',public.treemap_family_models('Porsche','truck',true)->>'n'='0' AND public.treemap_family_models('Chevrolet','missing',true)->>'n'='0');
 RESET ROLE;
+UPDATE public.test_scenario SET phase=6;
+SELECT pg_temp.ok('independent undated rooted claim cannot be ordered behind a dated disclosure',
+ public.treemap_family_models('Chevrolet','truck',true)->'rows'->0->>7='conflict');
 UPDATE public.test_scenario SET phase=4;
 SELECT pg_temp.ok('keyset pages reconcile beyond the first thousand',
  (SELECT (first->>'n')::int=1000 AND (first->>'has_more')::boolean
@@ -66,3 +70,13 @@ SELECT pg_temp.ok('keyset pages reconcile beyond the first thousand',
 SELECT pg_temp.ok('disjoint UUID partitions cannot repeat the same records',
  public.treemap_family_models('Chevrolet','truck',true,NULL,0)->>'n'='1000'
  AND public.treemap_family_models('Chevrolet','truck',true,NULL,1)->>'n'='0');
+
+UPDATE public.test_scenario SET phase=5;
+SET ROLE anon;
+SELECT pg_temp.ok('a private boundary record is absent from rows and cursor metadata',
+ (SELECT (first->>'n')::int=999 AND (first->>'has_more')::boolean
+ AND first->>'next_cursor'<>'00000000-0000-4000-8000-000000001097'
+ AND NOT EXISTS (SELECT 1 FROM jsonb_array_elements(first->'rows') r WHERE r->>0='00000000-0000-4000-8000-000000001097')
+ AND (public.treemap_family_models('Chevrolet','truck',true,(first->>'next_cursor')::uuid)->>'n')::int=3
+ FROM (SELECT public.treemap_family_models('Chevrolet','truck',true) first) s));
+RESET ROLE;

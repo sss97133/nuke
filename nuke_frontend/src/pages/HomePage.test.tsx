@@ -142,7 +142,7 @@ describe('composable Truck map', () => {
       ? Promise.resolve({ error: fail ? { message: 'unavailable' } : null, data: {
         n: args.p_partition === 0 ? 2 : 0, truncated: false, has_more: false, next_cursor: 'b', snapshot: 'fold', as_of: '2026-10-18',
         rows: args.p_partition === 0 ? [ ['a','C10 Custom Pickup',1972,20000,'Mecum','2026-01-01','C10','4WD',null,null,null,null,null,null],
-          ['b','K10 Short Bed',1972,30000,'Mecum','2026-01-02','K10','RWD',null,null,null,null,null,null] ] : [],
+          ['b','K10 Short Bed',1972,30000,'Mecum','2026-01-02','K10','2WD',null,null,null,null,null,null] ] : [],
       } }) : previous(name,args));
   }
   it('preserves a selected drivetrain when changing grouping, with an exact count and removable chip', async () => {
@@ -150,6 +150,7 @@ describe('composable Truck map', () => {
     await renderTreemap('tab=market&make=Chevrolet&family=pickup&family_name=Truck&truck_group=drive');
     const tile = container.querySelector<HTMLElement>('[role="button"][aria-label="4WD"]');
     expect(tile).not.toBeNull();
+    expect(container.querySelector('[role="button"][aria-label="2WD"]')).not.toBeNull();
     await act(async () => tile!.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true })));
     expect(new URLSearchParams(window.location.search).get('truck_drive')).toBe('4WD');
     const era = [...container.querySelectorAll<HTMLButtonElement>('.truck-facets button')].find(b => b.textContent === 'Era')!;
@@ -179,5 +180,120 @@ describe('composable Truck map', () => {
     expect(query.in).toHaveBeenCalledWith('id', ['a']);
     expect(query.eq).toHaveBeenCalledWith('is_public', true);
     expect(query.eq).not.toHaveBeenCalledWith('make', 'Chevrolet');
+  });
+  it('keeps truck partition filters when a phone uses the direct choice picker and switches to the map', async () => {
+    vi.stubGlobal('matchMedia', vi.fn((query: string) => ({
+      matches: query === '(max-width: 640px)' || query === '(hover: none)', media: query,
+      addEventListener() {}, removeEventListener() {},
+    })));
+    installTruckRead();
+    await renderTreemap('tab=market&make=Chevrolet&family=pickup&family_name=Truck');
+    const picker = container.querySelector<HTMLSelectElement>('select[aria-label="Choose a drivetrain"]')!;
+    expect(picker).not.toBeNull();
+    await act(async () => { picker.value = '4WD'; picker.dispatchEvent(new Event('change', { bubbles: true })); });
+    expect(new URLSearchParams(window.location.search).get('truck_drive')).toBe('4WD');
+    expect(new URLSearchParams(window.location.search).has('model')).toBe(false);
+    expect(container.querySelector('[aria-label="Browse wheelbase choices"]')).not.toBeNull();
+    const map = [...container.querySelectorAll<HTMLButtonElement>('button')].find(b => b.textContent === 'Map')!;
+    await act(async () => map.click());
+    expect(container.querySelector('.home-phone-browse-list')).toBeNull();
+    expect(container.querySelector('.truck-facets__selection')?.textContent).toContain('1 of 2');
+    expect(container.querySelector<HTMLDetailsElement>('.home-family-history')?.open).toBe(false);
+  });
+});
+
+describe('phone vehicle browsing', () => {
+  beforeEach(() => {
+    vi.stubGlobal('matchMedia', vi.fn((query: string) => ({
+      matches: query === '(max-width: 640px)' || query === '(hover: none)', media: query,
+      addEventListener() {}, removeEventListener() {},
+    })));
+    installTreemapReads({
+      treemap_family_models: Promise.resolve({ error: null, data: [
+        { model: '911', sold: 12, usd: 1_200_000 }, { model: '911S', sold: 8, usd: 800_000 },
+      ] }),
+      treemap_years: Promise.resolve({ error: null, data: [{ name: '1974', count: 12, value: 1_200_000 }] }),
+      treemap_sales: Promise.resolve({ error: null, data: [{
+        id: '1974-sale', year: 1974, make: 'Porsche', model: '911', sold_amount: 100_000,
+      }] }),
+    });
+  });
+  function list() { return container.querySelector('[aria-label^="Browse "][aria-label$=" choices"]')!; }
+  async function choose(kind: string, value: string) {
+    const picker = container.querySelector<HTMLSelectElement>(`select[aria-label="Choose a ${kind}"]`)!;
+    expect(picker.disabled).toBe(false);
+    await act(async () => { picker.value = value; picker.dispatchEvent(new Event('change', { bubbles: true })); });
+  }
+  async function click(text: string) {
+    const button = [...container.querySelectorAll<HTMLButtonElement>('button')].find(el => el.textContent === text)!;
+    expect(button).toBeTruthy();
+    await act(async () => button.click());
+  }
+
+  it('starts with direct choices and leaves the map and refinements optional', async () => {
+    await renderTreemap();
+    expect(list().getAttribute('aria-label')).toBe('Browse make choices');
+    expect(list().textContent).toContain('20 sales');
+    expect(container.querySelector('button[aria-label="Browse Porsche"]')).not.toBeNull();
+    expect(container.querySelector<HTMLDetailsElement>('.home-map-refine')!.open).toBe(false);
+    expect(container.querySelector<HTMLDetailsElement>('.home-family-comparisons')!.open).toBe(false);
+    expect(container.querySelector('button.market-tile')).toBeNull();
+    expect(container.querySelector('button[aria-pressed="true"]')?.textContent).toBe('List');
+  });
+
+  it('does not offer the previous cohort while the chosen make is loading', async () => {
+    const pending = deferredRead();
+    installTreemapReads({ treemap_brand_families: pending.promise });
+    await renderTreemap();
+    await choose('make', 'Porsche');
+    expect(container.querySelector<HTMLSelectElement>('select[aria-label="Choose a family"]')!.disabled).toBe(true);
+    expect(container.querySelectorAll('.home-phone-browse-list > button')).toHaveLength(0);
+    expect(container.textContent).toContain('Reading sales…');
+    await act(async () => pending.resolve({ data: families, error: null }));
+    expect(container.querySelector('button[aria-label="Browse 911"]')).not.toBeNull();
+    expect(container.querySelector('button[aria-label="Browse Porsche"]')).toBeNull();
+  });
+
+  it('keeps the same cohort through make, family, model, year and vehicle choices on a coarse pointer', async () => {
+    await renderTreemap();
+    await choose('make', 'Porsche');
+    expect(new URLSearchParams(window.location.search).get('make')).toBe('Porsche');
+    await choose('family', '911');
+    expect(new URLSearchParams(window.location.search).get('family')).toBe('911');
+    expect(list().getAttribute('aria-label')).toBe('Browse model choices');
+    expect(container.querySelector<HTMLDetailsElement>('.home-family-history')!.open).toBe(false);
+    expect(container.querySelector('[role="dialog"]')).toBeNull();
+    await choose('model', '911');
+    expect(fixture.client.rpc).toHaveBeenCalledWith('treemap_years', { p_source: null, p_make: 'Porsche', p_model: '911' });
+    await choose('year', '1974');
+    expect(fixture.client.rpc).toHaveBeenCalledWith('treemap_sales', { p_make: 'Porsche', p_model: '911', p_year: 1974 });
+    const sale = container.querySelector<HTMLButtonElement>('button[aria-label="Open 1974 Porsche 911"]')!;
+    expect(sale).not.toBeNull();
+    await act(async () => sale.click());
+    expect(window.location.pathname).toBe('/vehicle/1974-sale');
+  });
+
+  it('offers a visible parent action and follows browser history without losing the list', async () => {
+    await renderTreemap('tab=market&make=Porsche&family=911&model=911&year=1974');
+    await click('← Back to 911');
+    expect(new URLSearchParams(window.location.search).has('year')).toBe(false);
+    expect(list().getAttribute('aria-label')).toBe('Browse year choices');
+    expect(document.activeElement?.textContent).toBe('911');
+    await navigate('/?tab=market&make=Porsche');
+    expect(list().getAttribute('aria-label')).toBe('Browse family choices');
+  });
+
+  it('shows the map only when requested and restores direct model choices after an explicit chart view', async () => {
+    await renderTreemap('tab=market&make=Porsche&family=911');
+    await click('Map');
+    expect(container.querySelector('.home-phone-browse-list')).toBeNull();
+    // The existing chart control remains an explicit action inside Refine.
+    const sales = [...container.querySelectorAll<HTMLButtonElement>('button')].find(el => el.textContent === 'Sales')!;
+    await act(async () => sales.click());
+    expect(container.querySelector('.home-family-history')).toBeNull();
+    await click('List');
+    expect(list().getAttribute('aria-label')).toBe('Browse model choices');
+    expect(container.querySelector('select[aria-label="Choose a model"]')).not.toBeNull();
+
   });
 });

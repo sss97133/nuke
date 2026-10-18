@@ -35,6 +35,15 @@ The existing `valuation_by_ymm` extension follows current public cohort members 
 
 ---
 
+## Truck market membership (2026-10-18 implementation)
+
+`mv_family_market` name scope + `mv_treemap_outcomes` priced records → current public
+`vehicles` gate + eligible selected drivetrain testimony/rooted record → bounded existing
+`treemap_family_models` overload → complete membership read → intersecting filters → one
+partition → map/phone choices. The same selected IDs feed chart eligibility and photos.
+No new testimony store or canonical identity rewrite is introduced; missing/conflicting
+configuration remains unresolved. The function migration ships only through existing CI.
+
 ## How to Read These Documents
 
 These schematics describe the system as it exists in code, not as an aspirational design. Where the current implementation diverges from the encyclopedia specification, both states are documented and the gap is called out.
