@@ -1360,6 +1360,14 @@ adding those two evaluation fences and the same indexes. The populated view, pub
 cron remain unchanged. The PG17 contract reuses the existing sold/ask, privacy, conflict, year-window,
 platform-pooling, odometer and percentile fixtures and checks exact output multiplicity (excluding
 only the rebuild clock). Build and reviewed rename cutover remain separate delivery stages.
+The private-copy preparation subsequently deployed through PR2082. Its first full build completed
+in 79.5s under the operator's 120s ceiling, producing 101,347 rows. The 716-row corrected cohort
+matched the independently evaluated reference digest exactly. Frontera contributes 22 sold-year
+rows with at most eight pooled prices; every row remains thin and withholds percentiles. These are
+model-year aggregate rows, not physical vehicles. A separate guarded activation migration is prepared;
+it preserves role privileges, retains the old populated fold privately, refuses new tracked consumers
+or semantic drift, and leaves the existing refresh owner and schedule intact. Activation is not yet
+claimed here; exact checked/deployed/runtime stages remain in the private receipt.
 Receipts: `~/nuke-logs/model-year-refresh-20261018/`. No third unchanged refresh, Realtime access
 change, capacity increase, raw testimony mutation or new recurring job is part of this repair.
 
