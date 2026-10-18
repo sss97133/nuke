@@ -27,10 +27,11 @@ export function balanced(html: string, start: number): string | null {
   const open = html.slice(start).match(/^<([a-z0-9]+)\b[^>]*>/i);
   if (!open) return null;
   const name = open[1].toLowerCase();
-  const re = new RegExp(`<(/?)${name}\\b[^>]*>`, "gi");
+  const re = /<(\/?)([a-z0-9]+)\b[^>]*>/gi;
   re.lastIndex = start + open[0].length;
   let depth = 1;
   for (let m = re.exec(html); m; m = re.exec(html)) {
+    if (m[2].toLowerCase() !== name) continue;
     depth += m[1] ? -1 : 1;
     if (depth === 0) return html.slice(start + open[0].length, m.index);
   }
