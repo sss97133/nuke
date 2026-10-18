@@ -765,6 +765,9 @@ jobs:
       - name: Verify the wrong-byte runner's row test, canonical choice and dry-run default (offline)
         run: node --test scripts/photos/hold-wrong-byte-rows.test.mjs
 
+      - name: Verify the junk listing image runner's list reading, batching and dry-run default (offline)
+        run: node --test scripts/photos/supersede-junk-listing-images.test.mjs
+
       - name: Verify complete Stacks population capture and resumable reads (offline)
         run: node --test nuke_frontend/scripts/test-stacks-population-capture.mjs
 
