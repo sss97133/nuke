@@ -476,6 +476,7 @@ final class SyncEngine: ObservableObject {
 
         guard !ordered.isEmpty else {
             advanceWatermark(to: runStarted, failures: 0)
+            await SubjectResolutionEngine.shared.runAfterSync(userId: userId)
             return true
         }
 
@@ -607,6 +608,9 @@ final class SyncEngine: ObservableObject {
         if uploaded > metadataOnly, !Task.isCancelled {
             await AttributionEngine.shared.run(limit: 500, ocrBudget: 0)
         }
+        // One bounded comparison of already acknowledged sources, including retries from an
+        // earlier pass. Visual analysis availability never changes upload or filing success.
+        await SubjectResolutionEngine.shared.runAfterSync(userId: userId)
         return failed == 0
     }
 
@@ -1031,10 +1035,13 @@ final class SyncEngine: ObservableObject {
             sourceType: Self.sourceTypeLabel(for: asset)
         )
         do {
-            try await SupabaseService.uploadPhoto(
+            let acknowledgedHash = try await SupabaseService.uploadPhoto(
                 data: data, meta: meta, userId: userId,
                 uploadPixels: prep.pixelsEligible, appleMLLabels: prep.labels
             )
+            if let acknowledgedHash {
+                SubjectResolutionEngine.shared.acknowledge(localIdentifier: id, sourceHash: acknowledgedHash, userId: userId)
+            }
         } catch {
             if SupabaseService.isAuthFailure(error) {
                 authProblem = "The server refused this sign-in, so nothing is uploading. Sign out and sign in again."
