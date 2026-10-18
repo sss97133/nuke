@@ -1,4 +1,4 @@
-import { Fragment, type ReactNode, useEffect, useState } from 'react';
+import { Fragment, type ReactNode, useEffect, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { PrefetchLink } from '../../components/PrefetchLink';
 import { MakeIdentity, VehicleIdentity } from '../../components/common/MakeIdentity';
@@ -133,6 +133,8 @@ function Roster({ sale, now, scopeMake, scopeFamilyName, scopeModel, scopeYear, 
   scopeMake?: string | null; scopeFamilyName?: string | null; scopeModel?: string | null; scopeYear?: number | null; scopeEra?: string | null;
 }) {
   const query = useSaleRoster({ house: sale.house, key: sale.sale_key });
+  const rosterRef = useRef<HTMLDivElement>(null);
+  const moreFocus = useRef<{ button: HTMLButtonElement; previousLots: Set<Element> } | null>(null);
   const pages = query.data?.pages ?? [];
   const roster = pages[0]?.roster;
   const allRows = pages.flatMap(page => page.roster?.rows ?? []);
@@ -155,11 +157,20 @@ function Roster({ sale, now, scopeMake, scopeFamilyName, scopeModel, scopeYear, 
   const rows = hasMarketScope && scopedRows.length > 0 ? scopedRows : allRows;
   const days = rows.reduce<Map<string, RosterLot[]>>((m, lot) => m.set(lot.run_on, [...(m.get(lot.run_on) ?? []), lot]), new Map());
   const byDay = new Map(sale.run_days.map(r => [r.day, r.lots]));
+  useEffect(() => {
+    if (!moreFocus.current || query.isFetchingNextPage) return;
+    const { button, previousLots } = moreFocus.current;
+    if (!query.isError && (document.activeElement === button || document.activeElement === document.body)) {
+      const addedLot = Array.from(rosterRef.current?.querySelectorAll('.auction-lot') ?? []).find(lot => !previousLots.has(lot));
+      (query.hasNextPage ? button : addedLot?.querySelector<HTMLAnchorElement>('a[href^="/vehicle/"]') ?? rosterRef.current)?.focus();
+    }
+    moreFocus.current = null;
+  }, [query.hasNextPage, query.isFetchingNextPage, query.isError, rows.length]);
   if (query.isPending) return <p role="status" className="k-body">Reading the roster…</p>;
   if (!query.isError && allRows.length === 0) return <p role="status" className="k-body">No lot of this sale has landed yet{sale.lots_listed != null ? `; ${houseName(sale.house)} lists ${count(sale.lots_listed)}` : ''}.</p>;
   if (query.isError) return <p role="status" className="k-body">The roster could not be read. <button type="button" className="market-control"
     onClick={() => void query.refetch()}><Text role="label">Retry</Text></button></p>;
-  return <div className="auction-roster" aria-label={`${sale.sale_name} roster`}>
+  return <div ref={rosterRef} tabIndex={-1} className="auction-roster" aria-label={`${sale.sale_name} roster`}>
     <CoverageView c={{ n: rows.length, of: roster?.lots ?? sale.lots, grain: 'lots landed for this sale', as_of: sale.updated_at }} />
     {[...days.entries()].map(([day, lots]) => <Fragment key={day}>
       <div className="auction-roster__day">
@@ -169,7 +180,7 @@ function Roster({ sale, now, scopeMake, scopeFamilyName, scopeModel, scopeYear, 
       <ul className="auction-roster__lots">{lots.map(lot => <LotRow key={lot.event_id} lot={lot} house={sale.house} />)}</ul>
     </Fragment>)}
     {query.hasNextPage && <button type="button" className="market-control" disabled={query.isFetchingNextPage}
-      onClick={() => void query.fetchNextPage()}><Text role="label">{query.isFetchingNextPage ? 'Reading…' : 'More lots'}</Text></button>}
+      onClick={e => { moreFocus.current = { button: e.currentTarget, previousLots: new Set(rosterRef.current?.querySelectorAll('.auction-lot')) }; void query.fetchNextPage(); }}><Text role="label">{query.isFetchingNextPage ? 'Reading…' : 'More lots'}</Text></button>}
   </div>;
 }
 
