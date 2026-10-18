@@ -26,7 +26,7 @@ const contributions = (id: string) => id === a ? [{ day: photoA, kind: 'photo', 
   : [{ day: photoB, kind: 'photo', n: 5 }];
 const photo = (id: string) => ({ id: `${id}-photo`, image_url: `https://images.test/${id}.jpg`, source: 'owner_upload', is_primary: true, vehicle_zone: 'ext_front' });
 const profile = (id: string) => ({ vehicle: { id, is_public: true, make: 'Ford', model: `Synthetic-${id}` }, images: [photo(id)],
-  timeline_events: emptyPrimary.has(id) ? [] : [{ id: `${id}-native`, event_date: common, event_type: 'inspection' }], stats: { comment_count: 0, observation_count: 0 } });
+  timeline_events: emptyPrimary.has(id) ? [] : [{ id: `${id}-native`, event_date: common, event_type: 'inspection' }], work_sessions: [], stats: { comment_count: 0, observation_count: 0 } });
 function snapshot() {
   return { route: current?.vehicleId, vehicle: current?.vehicle?.id, rendered: !!host.querySelector('[aria-label="Vehicle timeline"]'),
     cells: [...host.querySelectorAll<HTMLElement>('.hm-c[data-date]')].map(cell => ({ day: cell.dataset.date, title: cell.title, heat: cell.className })),
