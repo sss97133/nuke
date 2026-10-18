@@ -52,6 +52,8 @@ function detectPlatform(url: string): { label: string; short: string } | null {
 interface MakeStats {
   make: string;
   total: number;
+  /** True when `total` is the planner's row estimate rather than a count. */
+  totalIsEstimate: boolean;
   topModels: Array<{ model: string; count: number }>;
   avgPrice: number | null;
   yearRange: { min: number; max: number } | null;
@@ -65,10 +67,13 @@ async function fetchMakeStats(make: string): Promise<MakeStats | null> {
     // normalizedMake is the canonical spelling from KNOWN_MAKES, so an equality match finds the make through
     // idx_vehicles_make_year. `make ilike` is not leakproof, cannot be an index qual under the row policies, and
     // scans the whole heap (measured 2026-10-14: Lotus count 1.5 s with eq, over 10 s with ilike).
+    // An exact count still visits every row of the make for the row policy: Porsche ran into the 15 s anon timeout
+    // (HTTP 500) on 2026-10-17. `estimated` counts exactly up to PostgREST's max-rows and returns the planner's
+    // estimate above it, in under 0.3 s.
     const [countRes, modelsRes, priceRes] = await Promise.all([
       supabase
         .from('vehicles')
-        .select('id', { count: 'exact', head: true })
+        .select('id', { count: 'estimated', head: true })
         .eq('make', normalizedMake),
       supabase
         .from('vehicles')
@@ -110,10 +115,18 @@ async function fetchMakeStats(make: string): Promise<MakeStats | null> {
       ? { min: Math.min(...years), max: Math.max(...years) }
       : null;
 
-    return { make: normalizedMake, total, topModels, avgPrice, yearRange };
+    return { make: normalizedMake, total, totalIsEstimate: total > POSTGREST_MAX_ROWS, topModels, avgPrice, yearRange };
   } catch {
     return null;
   }
+}
+
+/** The project's PostgREST max-rows; `count: 'estimated'` is exact at or below it. */
+const POSTGREST_MAX_ROWS = 1000;
+
+function formatMakeTotal(stats: MakeStats): string {
+  if (!stats.totalIsEstimate) return stats.total.toLocaleString();
+  return `≈${Number(stats.total.toPrecision(2)).toLocaleString()}`;
 }
 
 function normalizeUrlInput(value: string): string | null {
@@ -1791,8 +1804,8 @@ export default function AIDataIngestionSearch() {
                 <div style={{
                   fontFamily: '"Courier New", monospace', fontSize: '11px',
                   color: 'var(--text-secondary)',
-                }}>
-                  {makeStats.total.toLocaleString()} VEHICLES
+                }} title={makeStats.totalIsEstimate ? 'Estimated count' : undefined}>
+                  {formatMakeTotal(makeStats)} VEHICLES
                 </div>
               </div>
 
@@ -1873,7 +1886,7 @@ export default function AIDataIngestionSearch() {
                   fontFamily: 'Arial, sans-serif',
                 }}
               >
-                BROWSE ALL {makeStats.make.toUpperCase()} ({makeStats.total.toLocaleString()})
+                BROWSE ALL {makeStats.make.toUpperCase()} ({formatMakeTotal(makeStats)})
               </button>
             </div>
           ) : null}
