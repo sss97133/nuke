@@ -50,7 +50,7 @@ import {
 } from "./ledger.ts";
 import { projectSecretKey } from "../_shared/supabaseKeys.ts";
 import { noticeFrom, sweepCraigslistRemovals } from "./removal.ts";
-import { parseKslSearchCards } from "./kslCards.ts";
+import { parseKslSearchCards, parseKslSearchCount } from "./kslCards.ts";
 import { splitByYear } from "./yearFilter.ts";
 import { nextYield } from "./schedule.ts";
 
@@ -250,6 +250,7 @@ interface FeedResult {
   new_ingested?: number; // firecrawl_html path
   matched_existing?: number; // firecrawl_html path
   rejected?: number; // firecrawl_html path
+  census?: { count: number; scope: string; recorded: boolean; error: string | null };
   discovery?: { cards: number; written: number; error: string | null }; // KSL search cards written to source_targets
   landed_no_data?: number; // firecrawl_html path: ingest created or matched a vehicle that holds no price, images or description
   retries_due?: number; // firecrawl_html path: failed URLs whose retry came due this poll
@@ -750,6 +751,20 @@ async function pollFirecrawlHtmlFeed(
   // KSL: the search cards state year, seller class and created time. Record them as discovered-not-fetched source_targets
   // rows (no fetch, no ledger row, no attempt), so supply and tier share stay measurable while paid fetching is paused.
   if (feed.source_slug === "ksl" && htmlForCards) {
+    const publishedCount = parseKslSearchCount(htmlForCards);
+    if (publishedCount != null) {
+      const searchUrl = new URL(feed.feed_url);
+      const scope = /^(\/|\/search\/?)$/.test(searchUrl.pathname) && !searchUrl.search ? "all_current" : "filtered";
+      // write-error-ok: the run receipt returns census.recorded=false and census.error; discovery can still proceed.
+      const { error: censusError } = await supabase.rpc("record_census", {
+        p_source_slug: "ksl", p_universe_total: null, p_universe_active: publishedCount,
+        p_census_method: "search_result_count", p_census_confidence: 1,
+        p_census_url: feed.feed_url,
+        p_raw_response: { scope, observed_at: new Date().toISOString(), feed_id: feed.id,
+          witness: `${publishedCount} results`, method: "poll-listing-feeds/kslCards" },
+      });
+      result.census = { count: publishedCount, scope, recorded: !censusError, error: censusError?.message ?? null };
+    }
     const cards = parseKslSearchCards(htmlForCards).slice(0, 200);
     if (cards.length > 0) {
       const now = new Date().toISOString();
