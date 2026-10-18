@@ -50,6 +50,7 @@ CREATE TABLE public.vehicles (
   sale_status text,
   auction_status text,
   auction_outcome text,
+  reserve_status text,
   sale_date date,
   auction_end_date timestamptz,
   is_public boolean DEFAULT false,
@@ -118,6 +119,20 @@ INSERT INTO public.vehicles (
   '2026-06-01T18:00:00Z'::timestamptz, false
 );
 
+-- A lot the platform marked sold with no price but an event price: Step 2 fills the price and the sold status together
+INSERT INTO public.vehicles (id, year, make, model, title, listing_url, discovery_source, sale_price, sale_status, auction_status, auction_outcome)
+VALUES ('00000000-0000-4000-b000-000000000002', 2004, 'BMW', 'M3', '2004 BMW M3', 'https://carsandbids.com/auctions/x2/2004-bmw-m3',
+        'carsandbids', NULL, 'available', 'sold', NULL);
+INSERT INTO public.vehicle_events (vehicle_id, final_price, ended_at)
+VALUES ('00000000-0000-4000-b000-000000000002', 40000, '2026-05-01T18:00:00Z');
+
+-- A reserve-not-met lot that still says auction_status = 'sold' (prod 18c826e1, 2026-10-17): its high bid is not a sale
+INSERT INTO public.vehicles (id, year, make, model, title, listing_url, discovery_source, sale_price, sale_status, auction_status, auction_outcome)
+VALUES ('00000000-0000-4000-b000-000000000003', 1997, 'Porsche', '911', '1997 Porsche 911 Turbo', 'https://carsandbids.com/auctions/x3/1997-porsche-911-turbo',
+        'carsandbids', NULL, 'available', 'sold', 'reserve_not_met');
+INSERT INTO public.vehicle_events (vehicle_id, final_price, ended_at)
+VALUES ('00000000-0000-4000-b000-000000000003', 99500, '2026-05-02T18:00:00Z');
+
 INSERT INTO public.mv_family_market (brand, family_key, family) VALUES
   ('Porsche', '911', '911');
 
@@ -154,6 +169,20 @@ BEGIN
 
   IF v_rec.canonical_make_id IS DISTINCT FROM '00000000-0000-4000-a000-000000000001'::uuid THEN
     RAISE EXCEPTION 'Expected canonical_make_id backfilled for Porsche, got %', v_rec.canonical_make_id;
+  END IF;
+
+  SELECT sale_price, sale_status, auction_outcome INTO v_rec
+  FROM public.vehicles WHERE id = '00000000-0000-4000-b000-000000000002';
+  IF v_rec.sale_price IS DISTINCT FROM 40000 OR v_rec.sale_status <> 'sold' OR v_rec.auction_outcome <> 'sold' THEN
+    RAISE EXCEPTION 'Expected event price 40000 written with sold status, got sale_price=% sale_status=% auction_outcome=%',
+      v_rec.sale_price, v_rec.sale_status, v_rec.auction_outcome;
+  END IF;
+
+  SELECT sale_price, sale_status, auction_outcome INTO v_rec
+  FROM public.vehicles WHERE id = '00000000-0000-4000-b000-000000000003';
+  IF v_rec.sale_price IS NOT NULL OR v_rec.sale_status = 'sold' OR v_rec.auction_outcome <> 'reserve_not_met' THEN
+    RAISE EXCEPTION 'Expected reserve-not-met lot left unsold, got sale_price=% sale_status=% auction_outcome=%',
+      v_rec.sale_price, v_rec.sale_status, v_rec.auction_outcome;
   END IF;
 
   -- Check canonical_models aliases

@@ -1189,7 +1189,39 @@ def main():
     print("mv_family_sales (before):", cur.fetchone(), flush=True)
 
     if not args.dry_run:
-        print("=== 2. APPLYING SQL MIGRATION STEPS ===", flush=True)
+        print("=== 2. APPLYING CANONICAL MODEL ALIASES & TREEMAP_FAMILY_SALES FUNCTION ===", flush=True)
+        cur.execute("""
+            DO $cab_aliases$
+            DECLARE
+              r record;
+            BEGIN
+              FOR r IN
+                SELECT * FROM (VALUES
+                  ('Ford',          'F-250',      ARRAY['super duty', 'f-250 super duty']),
+                  ('Ford',          'F-350',      ARRAY['f-350 super duty']),
+                  ('Ford',          'F-450',      ARRAY['f-450 super duty']),
+                  ('BMW',           '2002',       ARRAY['02 series', '2002tii', '2002 turbo', '1600-2', '1602']),
+                  ('BMW',           '328i',       ARRAY['3 series']),
+                  ('BMW',           '228i',       ARRAY['2 series']),
+                  ('BMW',           '435i',       ARRAY['4 series']),
+                  ('Mercedes-Benz', 'GLK-Class',  ARRAY['glk- class', 'glk class'])
+                ) AS v(make_name, model_name, new_aliases)
+              LOOP
+                UPDATE public.canonical_models m
+                SET aliases = (
+                  SELECT array_agg(a ORDER BY ord)
+                  FROM (
+                    SELECT a, min(ord) AS ord
+                    FROM unnest(coalesce(m.aliases, '{}'::text[]) || r.new_aliases) WITH ORDINALITY AS t(a, ord)
+                    GROUP BY a
+                  ) s
+                )
+                WHERE lower(m.make) = lower(r.make_name)
+                  AND lower(m.canonical_model) = lower(r.model_name)
+                  AND NOT (coalesce(m.aliases, '{}'::text[]) @> r.new_aliases);
+              END LOOP;
+            END $cab_aliases$;
+        """)
         migration_path = os.path.join(
             os.path.dirname(os.path.abspath(__file__)),
             "..",
@@ -1199,27 +1231,172 @@ def main():
         )
         with open(migration_path, "r") as f:
             sql_text = f.read()
-        cur.execute(sql_text)
-        print("Migration SQL executed successfully.", flush=True)
+        fn_start = sql_text.index("CREATE OR REPLACE FUNCTION public.treemap_family_sales")
+        fn_end = sql_text.index("COMMIT;", fn_start)
+        cur.execute(sql_text[fn_start:fn_end])
+        print("Canonical aliases & treemap_family_sales function applied.", flush=True)
 
-    print("=== 3. EXTRACTING MULTI-AXIS FACETS ACROSS ALL CARS & BIDS VEHICLES ===", flush=True)
+    print("=== 3. FETCHING ALL CARS & BIDS VEHICLES IN ONE PASS ===", flush=True)
     cur.execute("""
-        SELECT id, year, make, model, title, listing_title, series, trim, body_style
-        FROM public.vehicles
-        WHERE discovery_source = 'carsandbids'
-          AND deleted_at IS NULL
-          AND status IS DISTINCT FROM 'merged';
+        SELECT
+          v.id::text,
+          v.year,
+          v.make,
+          v.model,
+          v.title,
+          v.listing_title,
+          v.series,
+          v.trim,
+          v.body_style,
+          v.sale_price,
+          v.sold_price,
+          v.winning_bid,
+          v.sale_status,
+          v.auction_outcome,
+          v.auction_status,
+          v.reserve_status,
+          v.sale_date,
+          v.auction_end_date::date AS derived_sale_date,
+          v.auction_source,
+          v.canonical_platform,
+          v.platform_source,
+          v.is_public
+        FROM public.vehicles v
+        WHERE v.discovery_source = 'carsandbids'
+          AND v.deleted_at IS NULL
+          AND v.status IS DISTINCT FROM 'merged';
     """)
     rows = cur.fetchall()
     print(f"Fetched {len(rows)} Cars & Bids vehicles from public.vehicles.", flush=True)
 
-    updates = []
+    missing_date_ids = [
+        r[0] for r in rows if r[16] is None and r[17] is None and ((r[9] or 0) > 0 or r[14] == "sold")
+    ]
+    fallback_dates = {}
+    if missing_date_ids:
+        cur.execute(
+            """
+            SELECT vehicle_id::text, max(COALESCE(sold_at::date, ended_at::date))
+            FROM public.vehicle_events
+            WHERE vehicle_id = ANY(%s::uuid[])
+              AND COALESCE(sold_at, ended_at) IS NOT NULL
+            GROUP BY vehicle_id;
+            """,
+            (missing_date_ids,),
+        )
+        for vid, dt in cur.fetchall():
+            if dt:
+                fallback_dates[vid] = dt
+        still_missing = [vid for vid in missing_date_ids if vid not in fallback_dates]
+        if still_missing:
+            cur.execute(
+                """
+                SELECT vehicle_id::text, max(auction_end_date::date)
+                FROM public.auction_events
+                WHERE vehicle_id = ANY(%s::uuid[])
+                  AND auction_end_date IS NOT NULL
+                GROUP BY vehicle_id;
+                """,
+                (still_missing,),
+            )
+            for vid, dt in cur.fetchall():
+                if dt:
+                    fallback_dates[vid] = dt
+        print(f"Resolved {len(fallback_dates)} fallback event dates for {len(missing_date_ids)} rows without auction_end_date.", flush=True)
+
+    outcome_updates = []
+    date_updates = []
+    series_trim_updates = []
+    model_body_updates = []
     generic_vin_series = {
         "3-series", "5-series", "6-series", "7-series", "1-series", "2-series", "4-series", "8-series",
         "x3", "x5", "x6", "z3", "z4", "m3", "m5", "m6",
     }
+    non_sold_outcomes = {"reserve_not_met", "no_sale", "unsold", "cancelled", "withdrawn"}
+    non_sold_statuses = {"not_sold", "unsold", "bid_to"}
 
-    for r_id, year, make, model, title, listing_title, cur_series, cur_trim, cur_body in rows:
+    import datetime as _dt
+    min_valid_date = _dt.date(2020, 1, 1)
+    max_valid_date = _dt.date.today() + _dt.timedelta(days=1)
+
+    for (
+        r_id, year, make, model, title, listing_title,
+        cur_series, cur_trim, cur_body,
+        sale_price, sold_price, winning_bid,
+        sale_status, auction_outcome, auction_status, reserve_status,
+        sale_date, derived_sale_date,
+        auction_source, canonical_platform, platform_source, is_public
+    ) in rows:
+        # A. Outcome & platform normalization
+        sp = float(sale_price) if sale_price is not None else 0.0
+        is_explicit_non_sale = (
+            (auction_outcome or "") in non_sold_outcomes
+            or (sale_status or "") in non_sold_statuses
+            or (reserve_status or "") == "reserve_not_met"
+        )
+        is_sold_lot = (not is_explicit_non_sale) and (sp > 0 or auction_status == "sold")
+        is_ended_unsold = (sp <= 0) and auction_status == "ended"
+
+        new_sale_status = sale_status
+        new_auction_outcome = auction_outcome
+        new_sold_price = sold_price
+        new_winning_bid = winning_bid
+
+        if is_sold_lot:
+            new_sale_status = "sold"
+            new_auction_outcome = "sold"
+            if sp > 0:
+                if new_sold_price is None or float(new_sold_price) == 0:
+                    new_sold_price = sale_price
+                if new_winning_bid is None or float(new_winning_bid) == 0:
+                    new_winning_bid = sale_price
+        elif is_ended_unsold:
+            if (sale_status or "available") == "available":
+                new_sale_status = "not_sold"
+            if auction_outcome is None:
+                new_auction_outcome = "reserve_not_met"
+
+        new_auction_source = auction_source or "cars_and_bids"
+        if new_auction_source != "cars_and_bids":
+            new_auction_source = "cars_and_bids"
+        new_canonical_platform = canonical_platform or "cars-and-bids"
+        if new_canonical_platform != "cars-and-bids":
+            new_canonical_platform = "cars-and-bids"
+        new_platform_source = platform_source
+        if not new_platform_source or new_platform_source.lower().startswith("http") or new_platform_source == "carsandbids":
+            new_platform_source = "cars-and-bids"
+
+        if (
+            new_sale_status != sale_status
+            or new_auction_outcome != auction_outcome
+            or new_sold_price != sold_price
+            or new_winning_bid != winning_bid
+            or new_auction_source != auction_source
+            or new_canonical_platform != canonical_platform
+            or new_platform_source != platform_source
+        ):
+            outcome_updates.append((
+                r_id,
+                new_sale_status,
+                new_auction_outcome,
+                new_sold_price,
+                new_winning_bid,
+                new_auction_source,
+                new_canonical_platform,
+                new_platform_source,
+            ))
+
+        # B. Sale date normalization
+        eff_derived_date = derived_sale_date or fallback_dates.get(r_id)
+        if (
+            sale_date is None
+            and eff_derived_date is not None
+            and min_valid_date <= eff_derived_date <= max_valid_date
+            and (is_sold_lot or new_sale_status == "sold" or new_auction_outcome == "sold" or sp > 0)
+        ):
+            date_updates.append((r_id, eff_derived_date))
+
+        # C. Multi-axis taxonomy & title normalization
         sub_title = None
         if listing_title and "—" in listing_title:
             parts = listing_title.split("—", 1)
@@ -1244,41 +1421,156 @@ def main():
         new_body = facets["body_style"] or (cur_body.strip() if cur_body else None)
         new_model = facets["normalized_model"] or (model.strip() if model else None)
         new_title = clean_cab_text(title) if title else None
-        new_listing_title = clean_cab_text(listing_title) if listing_title else new_title
+        new_listing_title = clean_cab_text(listing_title) if listing_title else None
 
         if (
             new_series != cur_series
             or new_trim != cur_trim
-            or new_body != cur_body
-            or new_model != model
-            or new_title != title
-            or new_listing_title != listing_title
+            or (title is not None and new_title != title)
+            or (listing_title is not None and new_listing_title != listing_title)
         ):
-            updates.append((r_id, new_series, new_trim, new_body, new_model, new_title, new_listing_title))
+            series_trim_updates.append((r_id, new_series, new_trim, new_title, new_listing_title))
 
-    print(f"Computed {len(updates)} vehicle facet/title updates.", flush=True)
+        if new_body != cur_body or new_model != model:
+            model_body_updates.append((r_id, new_body, new_model))
 
-    if not args.dry_run and updates:
-        chunk_size = 2000
-        for i in range(0, len(updates), chunk_size):
-            chunk = updates[i : i + chunk_size]
-            execute_values(
-                cur,
-                """
-                UPDATE public.vehicles AS v
-                SET
-                  series = COALESCE(u.series, v.series),
-                  trim = COALESCE(u.trim, v.trim),
-                  body_style = COALESCE(u.body_style, v.body_style),
-                  model = COALESCE(u.model, v.model),
-                  title = COALESCE(u.title, v.title),
-                  listing_title = COALESCE(u.listing_title, v.listing_title)
-                FROM (VALUES %s) AS u(id, series, trim, body_style, model, title, listing_title)
-                WHERE v.id = u.id::uuid;
-                """,
-                chunk,
-            )
-            print(f"  Updated chunk {i // chunk_size + 1} ({min(i + chunk_size, len(updates))}/{len(updates)})", flush=True)
+    outcome_updates.sort(key=lambda x: x[0])
+    date_updates.sort(key=lambda x: x[0])
+    series_trim_updates.sort(key=lambda x: x[0])
+    model_body_updates.sort(key=lambda x: x[0])
+
+    print(
+        f"Computed updates: {len(outcome_updates)} outcome/platform rows, "
+        f"{len(date_updates)} sale_date rows, {len(series_trim_updates)} series/trim/title rows, "
+        f"{len(model_body_updates)} model/body_style rows.",
+        flush=True,
+    )
+
+    def run_chunk_with_retry(sql_query, chunk_data):
+        nonlocal conn, cur
+        for attempt in range(6):
+            try:
+                cur.execute("SET LOCAL statement_timeout = '5min';")
+                cur.execute("SET LOCAL lock_timeout = '30s';")
+                cur.execute("SET LOCAL app.skip_completion_enqueue = '1';")
+                execute_values(cur, sql_query, chunk_data)
+                conn.commit()
+                return
+            except Exception as err:
+                print(f"    [chunk retry {attempt + 1}/6] {err}", flush=True)
+                try:
+                    conn.rollback()
+                except Exception:
+                    pass
+                time.sleep(2 + attempt * 2)
+                try:
+                    conn.close()
+                except Exception:
+                    pass
+                conn = connect_db()
+                conn.autocommit = False
+                cur = conn.cursor()
+        raise RuntimeError("Chunk failed after 6 retries")
+
+    if not args.dry_run:
+        conn.autocommit = False
+        chunk_size = 500
+
+        if outcome_updates:
+            print(f"Applying {len(outcome_updates)} outcome/platform updates in chunks of {chunk_size}...", flush=True)
+            for i in range(0, len(outcome_updates), chunk_size):
+                chunk = outcome_updates[i : i + chunk_size]
+                t0 = time.time()
+                run_chunk_with_retry(
+                    """
+                    UPDATE public.vehicles AS v
+                    SET
+                      sale_status = u.sale_status,
+                      auction_outcome = u.auction_outcome,
+                      sold_price = u.sold_price::numeric,
+                      winning_bid = u.winning_bid::numeric,
+                      auction_source = u.auction_source,
+                      canonical_platform = u.canonical_platform,
+                      platform_source = u.platform_source
+                    FROM (VALUES %s) AS u(
+                      id, sale_status, auction_outcome, sold_price, winning_bid,
+                      auction_source, canonical_platform, platform_source
+                    )
+                    WHERE v.id = u.id::uuid;
+                    """,
+                    chunk,
+                )
+                print(
+                    f"  Outcome chunk {i // chunk_size + 1} ({min(i + chunk_size, len(outcome_updates))}/{len(outcome_updates)}) in {time.time() - t0:.2f}s",
+                    flush=True,
+                )
+
+        if date_updates:
+            print(f"Applying {len(date_updates)} sale_date updates in chunks of {chunk_size}...", flush=True)
+            for i in range(0, len(date_updates), chunk_size):
+                chunk = date_updates[i : i + chunk_size]
+                t0 = time.time()
+                run_chunk_with_retry(
+                    """
+                    UPDATE public.vehicles AS v
+                    SET sale_date = u.sale_date::date
+                    FROM (VALUES %s) AS u(id, sale_date)
+                    WHERE v.id = u.id::uuid;
+                    """,
+                    chunk,
+                )
+                print(
+                    f"  Date chunk {i // chunk_size + 1} ({min(i + chunk_size, len(date_updates))}/{len(date_updates)}) in {time.time() - t0:.2f}s",
+                    flush=True,
+                )
+
+        if series_trim_updates:
+            st_chunk_size = 500
+            print(f"Applying {len(series_trim_updates)} series/trim/title updates in chunks of {st_chunk_size}...", flush=True)
+            for i in range(0, len(series_trim_updates), st_chunk_size):
+                chunk = series_trim_updates[i : i + st_chunk_size]
+                t0 = time.time()
+                run_chunk_with_retry(
+                    """
+                    UPDATE public.vehicles AS v
+                    SET
+                      series = COALESCE(u.series, v.series),
+                      trim = COALESCE(u.trim, v.trim),
+                      title = COALESCE(u.title, v.title),
+                      listing_title = COALESCE(u.listing_title, v.listing_title)
+                    FROM (VALUES %s) AS u(id, series, trim, title, listing_title)
+                    WHERE v.id = u.id::uuid;
+                    """,
+                    chunk,
+                )
+                print(
+                    f"  Series/trim chunk {i // st_chunk_size + 1} ({min(i + st_chunk_size, len(series_trim_updates))}/{len(series_trim_updates)}) in {time.time() - t0:.2f}s",
+                    flush=True,
+                )
+
+        if model_body_updates:
+            print(f"Applying {len(model_body_updates)} model/body_style updates in chunks of {chunk_size}...", flush=True)
+            for i in range(0, len(model_body_updates), chunk_size):
+                chunk = model_body_updates[i : i + chunk_size]
+                t0 = time.time()
+                run_chunk_with_retry(
+                    """
+                    UPDATE public.vehicles AS v
+                    SET
+                      body_style = COALESCE(u.body_style, v.body_style),
+                      model = COALESCE(u.model, v.model)
+                    FROM (VALUES %s) AS u(id, body_style, model)
+                    WHERE v.id = u.id::uuid;
+                    """,
+                    chunk,
+                )
+                print(
+                    f"  Model/body chunk {i // chunk_size + 1} ({min(i + chunk_size, len(model_body_updates))}/{len(model_body_updates)}) in {time.time() - t0:.2f}s",
+                    flush=True,
+                )
+
+        conn.autocommit = True
+        cur.execute("SET statement_timeout = '15min';")
 
     if not args.dry_run and not args.skip_mv_refresh:
         print("=== 4. REFRESHING MATERIALIZED VIEWS ===", flush=True)
