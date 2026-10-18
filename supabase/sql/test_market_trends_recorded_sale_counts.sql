@@ -363,4 +363,5 @@ SELECT assert_count((SELECT bool_and(s->>'value' IS NULL AND s->>'numerator' IS 
 SELECT assert_count(get_market_trends(count_request())->>'reason'='candidate_cap_exceeded','truncated sample reason is explicit');
 RESET ROLE;
 SELECT assert_count(now()=(SELECT at FROM fixture_clock),'fixture clock survives all case rollbacks');
-ROLLBACK;
+-- The source-label contract includes this file to reuse its tested fixtures.
+COMMIT;
