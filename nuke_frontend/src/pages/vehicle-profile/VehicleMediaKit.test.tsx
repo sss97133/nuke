@@ -170,3 +170,21 @@ it('keeps A2 static while B remains unresolved and admits only the fresh A2 cura
   await act(async () => region()!.click()); expect(fixture.opens).toEqual(['synthetic-a2-exterior']);
   expect(requests).toHaveLength(3);
 });
+
+it.each([
+  { name: 'null taken with a retained record date', taken: null, created: '2026-10-18T11:20:00Z', suffix: ' · RECORD DATE 2026-10-18 · CAPTURE DATE UNKNOWN' },
+  { name: 'omitted taken with a retained record date', taken: undefined, created: '2026-10-18T11:20:00Z', suffix: ' · RECORD DATE 2026-10-18 · CAPTURE DATE UNKNOWN' },
+  { name: 'blank taken with a retained record date', taken: '', created: '2026-10-18T11:20:00Z', suffix: ' · RECORD DATE 2026-10-18 · CAPTURE DATE UNKNOWN' },
+  { name: 'valid taken preserves existing date', taken: '2026-09-12T13:00:00Z', created: '2026-10-18T11:20:00Z', suffix: ' · 2026-09-12' },
+  { name: 'both dates absent preserves omission', taken: null, created: null, suffix: '' },
+  { name: 'truthy invalid taken still masks record date', taken: 'invalid-taken', created: '2026-10-18T11:20:00Z', suffix: '' },
+  { name: 'invalid record date preserves omission', taken: null, created: 'invalid-record', suffix: '' },
+  { name: 'day-grain taken preserves existing date', taken: '2026-09-12', created: '2026-10-18T11:20:00Z', suffix: ' · 2026-09-12' },
+])('record-clock: $name', async ({ taken, created, suffix }) => {
+  const rows = deck('synthetic-a'); Object.assign(rows[4], { taken_at: taken, created_at: created });
+  const raw = structuredClone(rows); await render(); await settle(0, rows);
+  expect(view()).toEqual({ vehicle: 'synthetic-a', text: `EXTERIOR${suffix}<>`,
+    images: ['https://images.test/synthetic-a-exterior.jpg'], region: true });
+  expect(rows).toEqual(raw); expect(requests).toHaveLength(1);
+  await act(async () => region()!.click()); expect(fixture.opens).toEqual(['synthetic-a-exterior']); expect(fixture.urlOpens).toEqual([]);
+});
