@@ -197,6 +197,7 @@ export interface BadgePortalProps {
   dimension: BadgeDimension;
   /** The value to filter by */
   value: string | number | null;
+  modelMake?: string | null;
   /** Display text */
   label: string;
   /** Visual variant — affects colors */
@@ -249,6 +250,7 @@ const VARIANT_STYLES: Record<string, { bg: string; color: string; borderColor: s
 export function BadgePortal({
   dimension,
   value,
+  modelMake,
   label,
   variant = 'default',
   bg,
@@ -295,7 +297,7 @@ export function BadgePortal({
         return;
       }
       if (dimension === 'model') {
-        popupCtx.push(<ModelPopup make="" model={strVal} />, strVal, 360);
+        popupCtx.push(<ModelPopup make={modelMake ?? ''} model={strVal} />, strVal, 360);
         return;
       }
       if (dimension === 'source') {
@@ -309,7 +311,7 @@ export function BadgePortal({
       load(); // Ensure data is loaded
     }
     setIsOpen((prev) => !prev);
-  }, [isStatic, isOpen, load, popupCtx, dimension, value]);
+  }, [isStatic, isOpen, load, popupCtx, dimension, value, modelMake]);
 
   const handleClose = useCallback(() => {
     setIsOpen(false);
