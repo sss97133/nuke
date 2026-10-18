@@ -28,7 +28,7 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2.117.3";
 import { normalizeListingUrl, normalizeVin } from "../_shared/urlNormalization.ts";
 import { requireWriteAuth, authenticateWriter } from "../_shared/writeGuard.ts";
 import { checkRateLimit, getClientIp } from "../_shared/rateLimit.ts";
-import { validateObservationProperty, isSupportedImagePropertyKey } from "./imageProperties.ts";
+import { validateObservationProperty, isSupportedImagePropertyKey, isImageReadingKey } from "./imageProperties.ts";
 import { observationContentHash, observationClockMicroseconds } from "../_shared/observationContentHash.ts";
 import { readPinnedArchivedPage } from "../_shared/archiveFetch.ts";
 import { parseQualifiedBaTSale } from "../_shared/batParser.ts";
@@ -732,7 +732,7 @@ Deno.serve(async function handleObservation(req, internal?: unknown) {
 
     let propertyRow = null;
     if (input.property_key !== undefined) {
-      if (!isSupportedImagePropertyKey(input.property_key) &&
+      if (!isSupportedImagePropertyKey(input.property_key) && !isImageReadingKey(input.property_key) &&
           !(titleFacetVerified && (TITLE_FACET_KEYS as readonly string[]).includes(input.property_key)) &&
           !(retainedSourceId && RETAINED_PROPERTY_KEYS.includes(input.property_key))) {
         return new Response(JSON.stringify({ error: "Unsupported property_key for this intake" }),
