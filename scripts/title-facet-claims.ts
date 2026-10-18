@@ -60,11 +60,25 @@ function listingSource(v: Vehicle): string | null {
   return null;
 }
 
-async function recordFacetEvidence(proposals: unknown[]) {
+// Each column fill fires the vehicles row triggers, so a call stays small; a timeout rolls the whole call back and is
+// retried as two halves.
+type FillResult = { evidence_accepted: number; evidence_pending: number; filled: number };
+async function recordFacetEvidence(proposals: unknown[]): Promise<FillResult> {
+  const total: FillResult = { evidence_accepted: 0, evidence_pending: 0, filled: 0 };
+  const add = (r: FillResult) => { total.evidence_accepted += r.evidence_accepted; total.evidence_pending += r.evidence_pending; total.filled += r.filled; };
+  for (let i = 0; i < proposals.length; i += 50) add(await fillChunk(proposals.slice(i, i + 50)));
+  return total;
+}
+async function fillChunk(proposals: unknown[]): Promise<FillResult> {
   const res = await fetch(`${base}/rest/v1/rpc/record_facet_evidence`, { method: "POST", headers, body: JSON.stringify({ p_proposals: proposals }) });
   const body = await res.json().catch(() => ({}));
-  if (!res.ok) throw new Error(`record_facet_evidence ${res.status}: ${JSON.stringify(body).slice(0, 200)}`);
-  return body as { evidence_accepted: number; evidence_pending: number; filled: number };
+  if (res.ok) return body as FillResult;
+  if (body?.code === "57014" && proposals.length > 5) {
+    const half = Math.ceil(proposals.length / 2);
+    const a = await fillChunk(proposals.slice(0, half)), b = await fillChunk(proposals.slice(half));
+    return { evidence_accepted: a.evidence_accepted + b.evidence_accepted, evidence_pending: a.evidence_pending + b.evidence_pending, filled: a.filled + b.filled };
+  }
+  throw new Error(`record_facet_evidence ${res.status}: ${JSON.stringify(body).slice(0, 200)}`);
 }
 
 // One make-year at a time so the read stays on idx_vehicles_make_year instead of walking the primary key.
