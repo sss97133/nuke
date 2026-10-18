@@ -62,6 +62,18 @@ export interface CabDepth {
   photoCountClaimed: number | null;
 }
 
+/** A cached live frame cannot replace a known result recorded after that frame. */
+export function cabCapturePredatesResult(
+  fetchedAt: string | null | undefined,
+  incoming: CabDepth["outcome"],
+  existing: { auction_status?: string | null; auction_end_date?: string | null },
+): boolean {
+  if (incoming !== "active" || !["sold", "ended", "reserve_not_met"].includes(existing.auction_status ?? "")) return false;
+  const captured = Date.parse(fetchedAt ?? "");
+  const ended = Date.parse(existing.auction_end_date ?? "");
+  return Number.isFinite(captured) && Number.isFinite(ended) && captured <= ended;
+}
+
 const num = (s?: string | null) => { const n = parseInt((s ?? "").replace(/[^0-9]/g, ""), 10); return Number.isFinite(n) ? n : null; };
 
 // Photo identity. A render is media.carsandbids.com/cdn-cgi/image/<options>/<hash>/photos/[<folder>/]<set>-<photo>...: the

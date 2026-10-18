@@ -1,4 +1,4 @@
-import { balanced, cabLotPhotos, cabOtherLotPhotoKeys, cabPhotoSet, decode, easternToIso, parseCabDepth, parseEnd } from "./cabPage.ts";
+import { balanced, cabCapturePredatesResult, cabLotPhotos, cabOtherLotPhotoKeys, cabPhotoSet, decode, easternToIso, parseCabDepth, parseEnd } from "./cabPage.ts";
 
 const eq = (a: unknown, b: unknown) => { if (JSON.stringify(a) !== JSON.stringify(b)) throw new Error(`${JSON.stringify(a)} != ${JSON.stringify(b)}`); };
 
@@ -36,6 +36,34 @@ Deno.test("sold page: outcome, price, description, seller, comment and photo", (
 Deno.test("ended without Sold for is not a sale", () => {
   const d = parseCabDepth(page('<li class="ended"><span class="value">High Bid <span class="bid-value">$9,000</span></span></li><li>Reserve Not Met</li>'), new Date("2026-10-15T00:00:00Z"));
   eq([d.outcome, d.amount], ["reserve_not_met", 9000]);
+});
+
+Deno.test("a retained pre-close live frame cannot replace a known ended result", () => {
+  const captured = "2026-07-27T18:02:54.148Z";
+  const end = "2026-07-29T18:41:02.745Z";
+  const live = parseCabDepth(page('<li><span class="bid-value">$9,000</span></li>').replace('bid-bar  ended', 'bid-bar active'), new Date(captured));
+  eq(live.outcome, "active");
+  for (const auction_status of ["sold", "ended", "reserve_not_met"]) {
+    eq(cabCapturePredatesResult(captured, live.outcome, { auction_status, auction_end_date: end }), true);
+  }
+  eq(cabCapturePredatesResult(end, live.outcome, { auction_status: "sold", auction_end_date: end }), true);
+});
+
+Deno.test("final captures, current live lots and newer contradictory captures keep their existing path", () => {
+  const end = "2026-07-29T18:41:02.745Z";
+  const prior = { auction_status: "sold", auction_end_date: end };
+  const sold = parseCabDepth(page('<li class="ended">Sold for <span class="bid-value">$16,250</span></li>'), new Date("2026-07-30T00:00:00Z"));
+  eq(cabCapturePredatesResult("2026-07-30T00:00:00Z", sold.outcome, prior), false);
+  eq(cabCapturePredatesResult("2026-07-27T00:00:00Z", "active", { ...prior, auction_status: "active" }), false);
+  eq(cabCapturePredatesResult("2026-07-30T00:00:00Z", "active", prior), false);
+  eq(cabCapturePredatesResult("2026-07-27T00:00:00Z", "active", {}), false);
+});
+
+Deno.test("unknown capture/end clocks do not invent a chronological conflict", () => {
+  for (const clock of [null, undefined, "invalid"]) {
+    eq(cabCapturePredatesResult(clock, "active", { auction_status: "sold", auction_end_date: "2026-07-29T00:00:00Z" }), false);
+    eq(cabCapturePredatesResult("2026-07-27T00:00:00Z", "active", { auction_status: "sold", auction_end_date: clock }), false);
+  }
 });
 
 // Shaped like the retained 92xXv4Oa capture (2026-07-27): the lot's gallery shares set 3yvlj0Do; the rails below the comments
