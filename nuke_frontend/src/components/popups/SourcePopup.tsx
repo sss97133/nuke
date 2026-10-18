@@ -16,7 +16,7 @@
  * Single RPC call via popup_source_intel().
  */
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { supabase } from '../../lib/supabase';
 import { VEHICLE_POPUP_COLUMNS } from './vehiclePopupColumns';
 import { usePopup } from './usePopup';
@@ -95,6 +95,7 @@ export function SourcePopup({ source, searchQuery }: Props) {
   const [data, setData] = useState<SourceIntel | null>(null);
   const [loading, setLoading] = useState(true);
   const [unavailable, setUnavailable] = useState(false);
+  const continuationEpoch = useRef(0);
 
   useEffect(() => {
     let cancelled = false;
@@ -114,7 +115,7 @@ export function SourcePopup({ source, searchQuery }: Props) {
     }
 
     load();
-    return () => { cancelled = true; };
+    return () => { cancelled = true; continuationEpoch.current += 1; };
   }, [source]);
 
   if (loading || !data) {
@@ -139,8 +140,9 @@ export function SourcePopup({ source, searchQuery }: Props) {
   };
 
   const handleVehicleClick = (id: string, title: string) => {
+    const epoch = continuationEpoch.current;
     supabase.from('vehicles').select(VEHICLE_POPUP_COLUMNS).eq('id', id).single().then(({ data: v }) => {
-      if (v) openPopup(<VehiclePopup vehicle={v as unknown as FeedVehicle} />, title, 480);
+      if (v && continuationEpoch.current === epoch) openPopup(<VehiclePopup vehicle={v as unknown as FeedVehicle} />, title, 480);
     });
   };
 
