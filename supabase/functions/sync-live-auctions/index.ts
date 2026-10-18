@@ -457,7 +457,8 @@ async function syncPCarMarket(): Promise<{ auctions: LiveAuction[]; error: strin
     const items: PcarBoardItem[] = [];
     let pages = 1;
     for (let page = 1; page <= Math.min(pages, PCAR_MAX_PAGES); page++) {
-      const { html, error } = await archiveFetch(`https://www.pcarmarket.com/auctions?auctionType=live&page=${page}`, {
+      // /auctions is the live board; ?page=1 and the old ?auctionType=live redirect, which the direct fetcher refuses
+      const { html, error } = await archiveFetch(page === 1 ? "https://www.pcarmarket.com/auctions" : `https://www.pcarmarket.com/auctions?page=${page}`, {
         platform: "pcarmarket",
         skipCache: true,
         useFirecrawl: false, // the board is server-rendered; archiveFetch would otherwise route pcarmarket.com to Firecrawl
