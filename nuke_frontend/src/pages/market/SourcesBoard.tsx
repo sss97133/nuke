@@ -1,7 +1,8 @@
-import { Fragment, useEffect, useState } from 'react';
+import { Fragment, useEffect, useMemo, useState } from 'react';
 import { supabase } from '../../lib/supabase';
 import { OrgLogo } from '../../components/common/OrgLogo';
 import { sourceLogoInk } from './sourceLogoInk';
+import { matchesSaleSubModel, readFamilySales, type Sale } from './FamilySalesChart';
 import {
   buildFacetDrilldownUrl,
   classifyVehicleFacet,
@@ -528,6 +529,54 @@ export function monthBars(months: SourceRow['months'], day: string | null): numb
   const by = new Map(months.map(([m, n]) => [m, n]));
   return keys.map((k) => by.get(k) ?? 0);
 }
+/** The map's drill scope as the URL carries it (make, family key and name, model or facet name). */
+export type SourcesScope = { make: string | null; family?: string | null; familyName?: string | null; model?: string | null };
+export type ScopeSourceSales = { sales12: number; salesPrior12: number; total: number; usd: number; months: SourceRow['months'] };
+/** A drilled family's (or model's) dated sales of the last five years, tallied onto the board's rows by house. */
+export type BoardScope = { label: string; short: string; total: number; unattributed: number; bySource: Map<string, ScopeSourceSales> };
+
+export function scopeSourceSales(
+  rows: Pick<SourceRow, 'source' | 'name' | 'house'>[],
+  sales: Pick<Sale, 'sale_date' | 'usd' | 'source'>[],
+  day: string | null,
+  label: string,
+  short = label,
+): BoardScope {
+  const index = new Map<string, string>();
+  for (const r of rows) {
+    for (const k of [r.house, shortName(r.name), r.name, r.source]) {
+      if (k && !index.has(normKey(k))) index.set(normKey(k), r.source);
+    }
+  }
+  const end = day ? Date.parse(`${day}T23:59:59Z`) : Date.now();
+  const bySource = new Map<string, ScopeSourceSales>();
+  const months = new Map<string, Map<string, [number, number]>>();
+  let total = 0;
+  let unattributed = 0;
+  for (const s of sales) {
+    const t = Date.parse(s.sale_date);
+    if (!Number.isFinite(t) || t > end) continue;
+    total += 1;
+    const source = s.source ? index.get(normKey(s.source)) : undefined;
+    if (!source) { unattributed += 1; continue; }
+    const row = bySource.get(source) ?? { sales12: 0, salesPrior12: 0, total: 0, usd: 0, months: [] };
+    row.total += 1;
+    row.usd += s.usd > 0 ? s.usd : 0;
+    if (t > end - 365 * 86_400_000) row.sales12 += 1;
+    else if (t > end - 730 * 86_400_000) row.salesPrior12 += 1;
+    bySource.set(source, row);
+    const m = months.get(source) ?? new Map<string, [number, number]>();
+    const key = s.sale_date.slice(0, 7);
+    const cur = m.get(key) ?? [0, 0];
+    m.set(key, [cur[0] + 1, cur[1] + (s.usd > 0 ? s.usd : 0)]);
+    months.set(source, m);
+  }
+  for (const [source, row] of bySource) {
+    row.months = [...(months.get(source) ?? new Map()).entries()].sort(([a], [b]) => a.localeCompare(b)).map(([k, [n, usd]]) => [k, n, usd]);
+  }
+  return { label, short, total, unattributed, bySource };
+}
+
 function Spark({ bars }: { bars: number[] }) {
   const max = Math.max(...bars);
   if (!(max > 0)) return null;
@@ -2101,10 +2150,13 @@ function resolveInitialSource(rows: SourceRow[], explicit?: string | null): stri
 export function SourcesBoardView({
   data,
   scope,
+  scoped = null,
   initialSource,
 }: {
   data: SourcesBoardData;
   scope?: string | null;
+  /** The drilled family's or model's sales by source: the board ranks and counts that scope instead of every make. */
+  scoped?: BoardScope | null;
   initialSource?: string | null;
 }) {
   const [all, setAll] = useState(() => !!resolveInitialSource(data.rows, initialSource));
@@ -2113,18 +2165,18 @@ export function SourcesBoardView({
   const [categoryFilter, setCategoryFilter] = useState<'all' | SourceCategory>('all');
 
   const heldAt = data.rows.map((r) => r.heldAt).filter((x): x is string => !!x).sort().at(-1) ?? null;
-  const allGroups = GROUPS.map(([key, title, unit]) => ({
-    key,
-    title,
-    unit,
-    rows: data.rows.filter((r) => resolveSourceCategory(r) === key),
-  })).filter((g) => g.rows.length);
+  const scopeTotal = (r: SourceRow) => scoped?.bySource.get(r.source)?.total ?? 0;
+  const allGroups = GROUPS.map(([key, title, unit]) => {
+    const rows = data.rows.filter((r) => resolveSourceCategory(r) === key && (!scoped || all || scopeTotal(r) > 0));
+    return { key, title, unit, rows: scoped ? [...rows].sort((a, b) => scopeTotal(b) - scopeTotal(a)) : rows };
+  }).filter((g) => g.rows.length);
   const groups = categoryFilter === 'all' ? allGroups : allGroups.filter((g) => g.key === categoryFilter);
-  const shownPer = all || categoryFilter !== 'all' ? Infinity : SHOWN;
-  const hidden = categoryFilter === 'all' ? allGroups.reduce((n, g) => n + Math.max(0, g.rows.length - SHOWN), 0) : 0;
+  const shownPer = scoped || all || categoryFilter !== 'all' ? Infinity : SHOWN;
+  const hidden = scoped ? data.rows.filter((r) => resolveSourceCategory(r) && scopeTotal(r) === 0).length
+    : categoryFilter === 'all' ? allGroups.reduce((n, g) => n + Math.max(0, g.rows.length - SHOWN), 0) : 0;
   const notRanked = Object.entries(data.notRanked).sort((x, y) => y[1] - x[1])
     .map(([k, n]) => `${n} ${NOT_RANKED_WORDS[k] ?? k}${n > 1 ? 's' : ''}`);
-  const scopedLabel = scope?.trim() ? 'Sources · all makes' : 'Sources';
+  const scopedLabel = scoped ? `Sources · ${scoped.label}` : scope?.trim() ? 'Sources · all makes' : 'Sources';
   const sourceNames = new Map<string, string>();
   for (const r of data.rows) {
     const clean = shortName(r.name);
@@ -2152,7 +2204,9 @@ export function SourcesBoardView({
       <div className="market-sources__head">
         <span className="market-sources__title">{scopedLabel}</span>
         <span className="market-sources__note">
-          ranked by what we hold · a source moves up as more of it lands{heldAt ? ` · held counts as of ${heldWhen(heldAt)}` : ''}
+          {scoped
+            ? `ranked by ${count(scoped.total)} ${scoped.label} sales with a date, last 5 years${scoped.unattributed ? ` (${count(scoped.unattributed)} at houses not listed)` : ''} · held, landing and live count each source’s whole catalogue`
+            : 'ranked by what we hold · a source moves up as more of it lands'}{heldAt ? ` · held counts as of ${heldWhen(heldAt)}` : ''}
         </span>
         <div className="market-sources__cat-filters" role="group" aria-label="Filter sources by category">
           <button
@@ -2226,7 +2280,7 @@ export function SourcesBoardView({
                 ))}
               </span>
             </span>
-            <span>sales, last 12 months</span><span className="n">live now</span>
+            <span>{scoped ? `${scoped.short} sales, last 12 months` : 'sales, last 12 months'}</span><span className="n">live now</span>
           </div>
           <ol className="market-sources__rows">
             {g.rows.slice(0, shownPer).map((r, i) => {
@@ -2319,10 +2373,20 @@ export function SourcesBoardView({
                       <span className={`market-sources__landtext${land.active ? '' : ' idle'}`}>{land.text}</span>
                       <DayBars days={binsForHorizon(r)} mode={horizon} />
                     </button>
-                    <span className="market-sources__recent"
-                      title={r.mapSales ? `on the map: ${count(r.mapSales)} confirmed sales${r.mapUsd ? `, ${money(r.mapUsd)}` : ''}` : undefined}>
-                      {r.sales12 ? <><span className="n">{count(r.sales12)}</span><Spark bars={monthBars(r.months, data.day)} /></> : <span className="n">—</span>}
-                    </span>
+                    {scoped ? (() => {
+                      const sc = scoped.bySource.get(r.source);
+                      return (
+                        <span className="market-sources__recent"
+                          title={sc ? `${scoped.label}: ${count(sc.total)} sales in the last 5 years${sc.usd ? `, ${money(sc.usd)}` : ''}` : undefined}>
+                          {sc?.total ? <><span className="n">{sc.sales12 ? count(sc.sales12) : '—'}</span><Spark bars={monthBars(sc.months, data.day)} /></> : <span className="n">—</span>}
+                        </span>
+                      );
+                    })() : (
+                      <span className="market-sources__recent"
+                        title={r.mapSales ? `on the map: ${count(r.mapSales)} confirmed sales${r.mapUsd ? `, ${money(r.mapUsd)}` : ''}` : undefined}>
+                        {r.sales12 ? <><span className="n">{count(r.sales12)}</span><Spark bars={monthBars(r.months, data.day)} /></> : <span className="n">—</span>}
+                      </span>
+                    )}
                     <span className="market-sources__live n">
                       {r.live > 0 ? <><i aria-hidden="true" />{count(r.live)} live</> : '—'}
                     </span>
@@ -2345,7 +2409,7 @@ export function SourcesBoardView({
       <div className="market-sources__foot">
         {hidden > 0
           ? <button type="button" className="market-sources__more" onClick={() => setAll((x) => !x)}>
-            {all ? 'Show the top of each group' : `Show all ${data.rows.length} sources`}
+            {all ? (scoped ? `Show only sources with ${scoped.label} sales` : 'Show the top of each group') : `Show all ${data.rows.length} sources`}
           </button>
           : null}
         {notRanked.length ? <span className="market-sources__note">not ranked: {notRanked.join(', ')}</span> : null}
@@ -2359,10 +2423,34 @@ export default function SourcesBoard({
   scope,
   initialSource,
 }: {
-  scope?: string | null;
+  /** A make alone, or the map's drill scope. A family (or a model inside it) scopes the board through its sales
+   *  (treemap_family_sales); a make alone has no per-house reader yet and keeps the all-makes board, labeled so. */
+  scope?: string | SourcesScope | null;
   initialSource?: string | null;
 } = {}) {
   const [data, setData] = useState<SourcesBoardData | null>(null);
+  const s: SourcesScope | null = typeof scope === 'string' ? { make: scope } : scope ?? null;
+  const make = s?.make?.trim() || null;
+  const family = s?.family?.trim() || null;
+  const familyName = s?.familyName?.trim() || null;
+  const model = s?.model?.trim() || null;
+  const [familySales, setFamilySales] = useState<{ key: string; sales: Sale[] } | null>(null);
+  useEffect(() => {
+    if (!make || !family || typeof (supabase as { rpc?: unknown })?.rpc !== 'function') return;
+    let live = true;
+    readFamilySales(make, family).then((v) => { if (live) setFamilySales(v ? { key: `${make}|${family}`, sales: v.sales } : null); });
+    return () => { live = false; };
+  }, [make, family]);
+  const scoped = useMemo(() => {
+    if (!data || !make || !family || familySales?.key !== `${make}|${family}`) return null;
+    const sales = model
+      ? familySales.sales.filter((x) => matchesSaleSubModel(x.model, model, { brand: make, family: familyName, year: x.year }))
+      : familySales.sales;
+    const short = model ?? familyName ?? make;
+    const label = [make, familyName, model].filter(Boolean).join(' ');
+    const out = scopeSourceSales(data.rows, sales, data.day, label, short);
+    return out.total > 0 ? out : null;
+  }, [data, make, family, familyName, model, familySales]);
   useEffect(() => {
     let live = true;
     const load = () => {
@@ -2382,5 +2470,5 @@ export default function SourcesBoard({
     };
   }, []);
   if (!data || !data.rows.length) return null;
-  return <SourcesBoardView data={data} scope={scope} initialSource={initialSource} />;
+  return <SourcesBoardView data={data} scope={make} scoped={scoped} initialSource={initialSource} />;
 }

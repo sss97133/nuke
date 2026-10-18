@@ -19,8 +19,10 @@ import SourcesBoard, {
   parseSources,
   resolveDealerProfileHref,
   resolveSourceCategory,
+  scopeSourceSales,
   shortName,
 } from './SourcesBoard';
+import { clearFamilySalesReads } from './FamilySalesChart';
 
 // market_sources_read (20261018034000), shaped as production answers: columns, then one array per source by held lots, plus landing.
 const columns = ['source', 'name', 'category', 'house', 'held_lots', 'held_at', 'population', 'population_method',
@@ -130,7 +132,7 @@ beforeEach(() => {
   (globalThis as any).IS_REACT_ACT_ENVIRONMENT = true;
   container = document.createElement('div'); document.body.append(container); root = createRoot(container);
 });
-afterEach(async () => { await act(async () => root.unmount()); container.remove(); fixture.rpc.mockReset(); });
+afterEach(async () => { await act(async () => root.unmount()); container.remove(); fixture.rpc.mockReset(); clearFamilySalesReads(); });
 
 it('decodes the reader by column name and refuses anything else', () => {
   const d = parseSources(value)!;
@@ -1039,4 +1041,54 @@ it('prints a labelled reference as an estimate, apart from a census, and grades 
   const craigslist = rows.find((r) => r.querySelector('.market-sources__name-text')?.textContent === 'Craigslist')!;
   expect(craigslist.querySelector('.market-sources__sharetext')?.textContent).toBe('their total unknown');
   expect(craigslist.querySelector('.market-sources__unknown')).not.toBeNull();
+});
+
+it('tallies a drilled family\'s sales onto the rows by house, the last 12 months apart from the 12 before', () => {
+  const d = parseSources(value)!;
+  const s = scopeSourceSales(d.rows, [
+    { sale_date: '2026-09-01', usd: 100000, source: 'Bring a Trailer' },
+    { sale_date: '2025-06-01', usd: 90000, source: 'Bring a Trailer' },
+    { sale_date: '2023-06-01', usd: 80000, source: 'Bring a Trailer' },
+    { sale_date: '2026-08-14', usd: 172500, source: 'Cars & Bids' },
+    { sale_date: '2026-02-01', usd: 60000, source: 'Mecum' },
+    { sale_date: '2026-03-01', usd: 70000, source: 'Somewhere Else' },
+    { sale_date: '2027-01-01', usd: 1, source: 'Mecum' },
+  ], d.day, 'Lexus LC', 'LC');
+  expect(s).toMatchObject({ label: 'Lexus LC', short: 'LC', total: 6, unattributed: 1 });
+  expect(s.bySource.get('bat')).toMatchObject({ total: 3, sales12: 1, salesPrior12: 1, usd: 270000 });
+  expect(s.bySource.get('cars-and-bids')).toMatchObject({ total: 1, sales12: 1, months: [['2026-08', 1, 172500]] });
+  expect(s.bySource.get('mecum')).toMatchObject({ total: 1, sales12: 1 });
+  expect(s.bySource.has('craigslist')).toBe(false);
+});
+
+it('scopes the board to a drilled family: ranked by its sales, the rest behind a toggle', async () => {
+  const lc = [
+    ['v1', '2026-09-01', 100000, 'Bring a Trailer', 2021, 'LC500'],
+    ['v2', '2026-08-01', 95000, 'Bring a Trailer', 2020, 'LC500'],
+    ['v3', '2026-08-14', 172500, 'Cars & Bids', 2026, 'LC 500 Convertible'],
+    ['v4', '2026-07-14', 160000, 'Cars & Bids', 2025, 'LC 500 Convertible'],
+    ['v5', '2026-06-14', 150000, 'Cars & Bids', 2024, 'LC 500h'],
+  ];
+  fixture.rpc.mockImplementation((fn: string) => Promise.resolve(fn === 'market_sources_read' ? { data: value, error: null }
+    : fn === 'treemap_family_sales' ? { data: lc, error: null } : { data: null, error: { message: 'none' } }));
+  await act(async () => root.render(<SourcesBoard scope={{ make: 'Lexus', family: 'fam-lc', familyName: 'LC' }} />));
+  expect(fixture.rpc).toHaveBeenCalledWith('treemap_family_sales', { p_brand: 'Lexus', p_family_key: 'fam-lc', p_limit: 15000 });
+  expect(container.querySelector('.market-sources__title')?.textContent).toBe('Sources · Lexus LC');
+  expect(container.querySelector('.market-sources__note')?.textContent).toContain('ranked by 5 Lexus LC sales with a date, last 5 years');
+  expect(container.textContent).toContain('LC sales, last 12 months');
+  const names = [...container.querySelectorAll('.market-sources__name-text')].map((n) => n.textContent);
+  expect(names).toEqual(['Cars & Bids', 'Bring a Trailer']);
+  const more = container.querySelector('.market-sources__more') as HTMLButtonElement;
+  expect(more.textContent).toBe('Show all 6 sources');
+  await act(async () => more.click());
+  expect(container.querySelectorAll('.market-sources__name-text').length).toBe(6);
+  expect((container.querySelector('.market-sources__more') as HTMLButtonElement).textContent).toBe('Show only sources with Lexus LC sales');
+});
+
+it('keeps the all-makes board, labeled so, for a make alone', async () => {
+  fixture.rpc.mockImplementation((fn: string) => Promise.resolve(fn === 'market_sources_read'
+    ? { data: value, error: null } : { data: null, error: { message: 'none' } }));
+  await act(async () => root.render(<SourcesBoard scope={{ make: 'Lexus' }} />));
+  expect(container.querySelector('.market-sources__title')?.textContent).toBe('Sources · all makes');
+  expect(fixture.rpc).not.toHaveBeenCalledWith('treemap_family_sales', expect.anything());
 });

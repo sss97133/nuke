@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 vi.mock('../lib/supabase', () => ({ supabase: {} }));
-import { familyCoverage, familyNamesShown, legendFor, mapCaptionShort, ledgerViewsClock, ledgerViewsStamp, mapCaption, mapLegend, SALES_CHART_LEGEND } from './HomePage';
+import { familyCoverage, familyNamesShown, legendFor, mapCaptionShort, ledgerViewsClock, ledgerViewsStamp, mapCaption, mapLegend, SALES_CHART_LEGEND, windowBridge } from './HomePage';
 
 describe('the ledger map legend clock', () => {
   it('says how long ago the views were refreshed, and keeps the exact time for the title', () => {
@@ -47,16 +47,16 @@ describe('the ledger map legend measure', () => {
   it('puts the population and the date beside the count, from the refresh receipt', () => {
     const refresh = { refreshedAt: '2026-10-14T09:10:41+00:00', populations: { measure: 'confirmed_sale_v1', public_records: 633581, mapped_sales: 241919 } };
     const now = Date.parse('2026-10-15T02:10:00Z');
-    expect(mapCaption('brands', 241000, refresh, now)).toBe('241,919 vehicles with a confirmed sale of 633,581 public records · updated 16 h ago');
-    expect(mapCaption('models', 27878, refresh, now)).toBe('27,878 vehicles with a confirmed sale · updated 16 h ago');
-    expect(mapCaption('vehicles', 37, refresh, now)).toBe('37 confirmed sales · updated 16 h ago');
-    expect(mapCaption('vehicles', 200, refresh, now)).toBe('largest 200 confirmed sales · updated 16 h ago');
+    expect(mapCaption('brands', 241000, refresh, now)).toBe('241,919 vehicles with a confirmed sale of 633,581 public records, all time · updated 16 h ago');
+    expect(mapCaption('models', 27878, refresh, now)).toBe('27,878 vehicles with a confirmed sale, all time · updated 16 h ago');
+    expect(mapCaption('vehicles', 37, refresh, now)).toBe('37 confirmed sales, all time · updated 16 h ago');
+    expect(mapCaption('vehicles', 200, refresh, now)).toBe('largest 200 confirmed sales, all time · updated 16 h ago');
   });
   it('names no population without a confirmed-sale receipt', () => {
     const old = { refreshedAt: '2026-10-14T05:04:00+00:00', populations: null };
-    expect(mapCaption('brands', 386375, old, Date.parse('2026-10-15T02:10:00Z'))).toBe('386,375 vehicles with a confirmed sale · updated 21 h ago');
+    expect(mapCaption('brands', 386375, old, Date.parse('2026-10-15T02:10:00Z'))).toBe('386,375 vehicles with a confirmed sale, all time · updated 21 h ago');
     const other = { refreshedAt: null, populations: { measure: 'something_else', public_records: 1, mapped_sales: 1 } };
-    expect(mapCaption('brands', 5, other)).toBe('5 vehicles with a confirmed sale · as of the last refresh of the ledger\u2019s views');
+    expect(mapCaption('brands', 5, other)).toBe('5 vehicles with a confirmed sale, all time · as of the last refresh of the ledger\u2019s views');
   });
 });
 
@@ -73,7 +73,21 @@ describe('how much of a brand the family level names', () => {
     expect(familyCoverage(null)).toBe('');
     const refresh = { refreshedAt: '2026-10-14T09:10:00Z', populations: null };
     expect(mapCaption('families', 1000, refresh, Date.parse('2026-10-15T01:10:00Z'), familyCoverage(nodes)))
-      .toBe('1,000 vehicles with a confirmed sale · 90% in 2 model families · updated 16 h ago');
+      .toBe('1,000 vehicles with a confirmed sale, all time · 90% in 2 model families · updated 16 h ago');
+  });
+});
+
+describe('the bridge from the all-time count to the window', () => {
+  it('gives the drilled brand\'s measured sales in the window and the one before, before the clock', () => {
+    const lexus = { sold_12m: 628, sold_prior_12m: 408 };
+    expect(windowBridge(lexus)).toBe(' · 628 sold in the last 12 months at the measured houses, 408 in the 12 before');
+    expect(windowBridge(lexus, 'the last 30 days', 'the month before')).toBe(' · 628 sold in the last 30 days at the measured houses, 408 in the month before');
+    expect(windowBridge({ sold_12m: null, sold_prior_12m: 3 })).toBe('');
+    expect(windowBridge({ sold_12m: 0, sold_prior_12m: 0 })).toBe('');
+    expect(windowBridge(undefined)).toBe('');
+    const refresh = { refreshedAt: '2026-10-14T09:10:00Z', populations: null };
+    expect(mapCaption('families', 2679, refresh, Date.parse('2026-10-15T01:10:00Z'), windowBridge(lexus)))
+      .toBe('2,679 vehicles with a confirmed sale, all time · 628 sold in the last 12 months at the measured houses, 408 in the 12 before · updated 16 h ago');
   });
 });
 
@@ -89,8 +103,8 @@ describe('what a family level shows', () => {
 describe('the caption on a phone', () => {
   it('keeps the count and drops the sentence', () => {
     const refresh = { refreshedAt: '2026-10-14T09:10:00Z', populations: { measure: 'confirmed_sale_v1', mapped_sales: 241959, public_records: 633678 } };
-    expect(mapCaptionShort('brands', 5, refresh)).toBe('241,959 sold');
-    expect(mapCaptionShort('families', 27510, refresh)).toBe('27,510 sold');
+    expect(mapCaptionShort('brands', 5, refresh)).toBe('241,959 sold, all time');
+    expect(mapCaptionShort('families', 27510, refresh)).toBe('27,510 sold, all time');
     expect(mapCaptionShort('vehicles', 200, refresh)).toBe('200 shown');
   });
 });
