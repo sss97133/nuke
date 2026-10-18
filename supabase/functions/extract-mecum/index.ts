@@ -1143,12 +1143,20 @@ async function saveVehicle(
       // written and nothing is merged: the pair goes to the revision queue to be relinked, and the rest of the lot lands.
       const vinHolder = vinConflictHolder(updateErr);
       if (vinHolder !== null && "vin" in updateData) {
-        console.warn(`[MECUM] VIN conflict for ${existingId} (vin=${cleanData.vin}, holder=${vinHolder || "unnamed"}), retrying without VIN`);
+        // A unique-index refusal does not name the holder; read it by the exact VIN (indexed). An unnamed holder is left
+        // out of the detail rather than written as null, so a re-landing never erases a holder recorded earlier.
+        let holderId = vinHolder;
+        if (!holderId) {
+          const { data: holder } = await supabase.from("vehicles").select("id").eq("vin", (updateData as any).vin)
+            .is("merged_into_vehicle_id", null).neq("id", existingId).limit(1).maybeSingle();
+          holderId = (holder as { id?: string } | null)?.id ?? "";
+        }
+        console.warn(`[MECUM] VIN conflict for ${existingId} (vin=${cleanData.vin}, holder=${holderId || "unnamed"}), retrying without VIN`);
         relinkVin = true;
         await raiseRevision(supabase, vehicle.url, ["vin"], "duplicate_key", "relink", {
           vehicle_id: existingId,
           lot_states: { vin: cleanData.vin },
-          vin_held_by_vehicle_id: vinHolder || null,
+          ...(holderId ? { vin_held_by_vehicle_id: holderId } : {}),
           raised_in: "extract-mecum saveVehicle",
         });
         const { vin: _skipVin, ...dataWithoutVin } = updateData;
