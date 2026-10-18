@@ -378,6 +378,28 @@ export async function loadVehicleImpl({
       return rpcLoaded;
     }
 
+    if (isVIN) {
+      // Resolve with the existing indexed public owner, then let every profile reader use a UUID.
+      // Its bounded candidate list is not permission to choose the first of several records.
+      try {
+        const { data, error } = await supabase.rpc('vehicle_by_vin_public', { p_vin: vehicleId.toUpperCase() });
+        const match = !error && Array.isArray(data) && data.length === 1 ? data[0] : null;
+        if (typeof match?.id === 'string' && /^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i.test(match.id)
+          && typeof match.vin === 'string' && match.vin.trim().toUpperCase() === vehicleId.toUpperCase()) {
+          navigate(`/vehicle/${match.id}`, { replace: true });
+        } else {
+          console.warn('[VehicleProfile] VIN address unresolved:', error ? 'reader_error'
+            : !Array.isArray(data) ? 'malformed_response' : data.length === 0 ? 'no_public_match'
+            : data.length > 1 ? 'ambiguous_public_match' : 'invalid_candidate');
+          setVehicle(null);
+        }
+      } catch {
+        console.warn('[VehicleProfile] VIN address unresolved:', 'reader_error');
+        setVehicle(null);
+      }
+      return rpcLoaded;
+    }
+
     // OPTIMIZED: Try RPC first for fast loading, fallback to direct query if RPC fails
     let rpcData = null;
     let rpcError = null;
