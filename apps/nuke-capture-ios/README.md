@@ -138,6 +138,13 @@ Standing rules the code carries:
   record of lots tagged this way is typed into the web page, not carried by a read, so the phone states that and
   waits (market lane plans a table + view, 2026-10-13). Prove a board change lot-for-lot against the live site as a
   stranger (Playwright pattern in memory `reference_logged_out_live_check_playwright.md`).
+- **Calendar rosters continue through the same read.** Live → Calendar uses `auction_calendar_read`, a 200-day
+  horizon and explicit 100-lot pages, as the web does. More lots reads only on request. A changed read-model build,
+  server day, total or repeated contributor refuses page stitching and offers refresh; a missing build clock or
+  prematurely empty page leaves coverage incomplete. Retained lots are distinct from the house's listed roster.
+  A lot opens its vehicle and the house's HTTPS source; earlier records retain their occurrence day, currency,
+  source outcome and unconfirmed basis. Public source amounts are distinct from private ledger/value-curve money.
+  Calendar and roster failures retain prior results and offer retry; no read triggers intake or inference.
 - **Coverage on every counter.** A count without its population and clock is not shown; say "unknown"
   instead of guessing (fleet-relative reporting, `docs/ledger/theory/data-machine.md`).
 - **No fabricated data anywhere,** including DEBUG builds and screenshots (`docs/design/CONSTRAINTS.md` C0).
