@@ -603,6 +603,11 @@ final class SyncEngine: ObservableObject {
         NSLog("NukeCapture sync: %d uploaded (%d metadata-only), %d off-shop skipped, %d held(private), %d deduped, %d failed",
               uploaded, metadataOnly, skipped, heldPrivate, deduped, failed)
         await refreshAnalyzedCount()
+        // A PhotoKit-triggered pass or refresh wake can upload without reopening the app.
+        // File mapped albums after that pass too; this path reads metadata, never originals.
+        if uploaded > metadataOnly, !Task.isCancelled {
+            await AttributionEngine.shared.run(limit: 500, ocrBudget: 0)
+        }
         return failed == 0
     }
 
