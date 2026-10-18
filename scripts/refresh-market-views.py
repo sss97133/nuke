@@ -2,7 +2,7 @@
 """
 Refresh the market materialized views that read vehicles' series / trim / body_style.
 
-Each view is refreshed CONCURRENTLY so readers are never blocked. A failure (dropped connection, database restart)
+Live views refresh CONCURRENTLY. Only an explicitly selected private, unpopulated beside copy builds plainly. A failure (dropped connection, database restart)
 is retried on a fresh connection; a view that still fails is reported and the script exits non-zero rather than
 falling back to a blocking refresh.
 
@@ -35,7 +35,7 @@ VIEWS = [
     "public.mv_family_market",
     "public.mv_family_sales",
 ]
-EXTRA_VIEWS = ["public.mv_family_year_prices", "public.mv_family_share_movers"]
+EXTRA_VIEWS = ["public.mv_family_year_prices", "public.mv_family_share_movers", "public.mv_family_year_prices_v2"]
 
 
 def refresh(mv):
@@ -45,7 +45,25 @@ def refresh(mv):
     try:
         conn.autocommit = True
         cur = conn.cursor()
-        if mv == "public.mv_family_year_prices":
+        if mv == "public.mv_family_year_prices_v2":
+            # This is an explicit first build, never a blocking fallback for a public view.
+            cur.execute("""SELECT c.relispopulated,
+                has_table_privilege('anon',c.oid,'SELECT') OR
+                has_table_privilege('authenticated',c.oid,'SELECT') OR
+                has_table_privilege('service_role',c.oid,'SELECT'),
+                EXISTS(SELECT 1 FROM pg_depend d JOIN pg_rewrite r ON r.oid=d.objid
+                       WHERE d.refobjid=c.oid AND d.classid='pg_rewrite'::regclass AND r.ev_class<>c.oid),
+                pg_get_viewdef(c.oid) LIKE '%named AS MATERIALIZED%'
+                  AND pg_get_viewdef(c.oid) LIKE '%p AS MATERIALIZED%'
+                FROM pg_class c WHERE c.oid=to_regclass('public.mv_family_year_prices_v2')""")
+            state = cur.fetchone()
+            if not state or any(state[:3]) or not state[3]:
+                raise RuntimeError("Beside copy must be unpopulated, private, unread and cache its expressions")
+            # Same planner recipe as its existing owner, with a stricter two-minute build ceiling.
+            cur.execute("SET statement_timeout = '120s'; SET lock_timeout = '1s'; "
+                        "SET enable_nestloop = off; SET random_page_cost = 4; SET work_mem = '32MB';")
+            cur.execute("REFRESH MATERIALIZED VIEW public.mv_family_year_prices_v2;")
+        elif mv == "public.mv_family_year_prices":
             # The existing owner sets planner options; retain its cron's 20-minute budget.
             cur.execute("SET statement_timeout = '20min';")
             cur.execute("SELECT public.refresh_family_year_prices();")

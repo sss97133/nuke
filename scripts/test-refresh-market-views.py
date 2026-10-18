@@ -51,6 +51,27 @@ class RefreshMarketContracts(unittest.TestCase):
                          ["SET statement_timeout = '20min';", "SELECT public.refresh_family_year_prices();"])
         conn.close.assert_called_once()
 
+    def test_private_empty_cached_copy_has_explicit_bounded_first_build(self):
+        conn = MagicMock()
+        conn.cursor.return_value.fetchone.return_value = (False, False, False, True)
+        with patch.object(refresh_market, "connect_db", return_value=conn):
+            refresh_market.refresh("public.mv_family_year_prices_v2")
+        calls = [c.args[0] for c in conn.cursor.return_value.execute.call_args_list]
+        self.assertIn("statement_timeout = '120s'", calls[-2])
+        self.assertEqual(calls[-1], "REFRESH MATERIALIZED VIEW public.mv_family_year_prices_v2;")
+        conn.close.assert_called_once()
+
+    def test_beside_build_refuses_populated_public_read_or_unpatched_copy(self):
+        for state in [None, (True, False, False, True), (False, True, False, True),
+                      (False, False, True, True), (False, False, False, False)]:
+            with self.subTest(state=state):
+                conn = MagicMock()
+                conn.cursor.return_value.fetchone.return_value = state
+                with patch.object(refresh_market, "connect_db", return_value=conn), self.assertRaises(RuntimeError):
+                    refresh_market.refresh("public.mv_family_year_prices_v2")
+                self.assertEqual(conn.cursor.return_value.execute.call_count, 1)
+                conn.close.assert_called_once()
+
     def test_single_attempt_failure_stops_before_dependent_folds(self):
         with patch.object(refresh_market, "refresh", side_effect=RuntimeError("failed")) as run, \
                 patch.object(refresh_market.time, "sleep") as sleep, redirect_stdout(io.StringIO()):
