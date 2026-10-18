@@ -1250,6 +1250,12 @@ async function extractSingleAuctionGoldStandard(cab, auctionId) {
     drivetrain,
     body_style: facets.body_style || bodyStyle,
     title_status: l.title_status || null,
+    // The listing's own sections on the root columns the profile reader shows (also kept in import_metadata).
+    highlights: sections.highlights || null,
+    equipment: sections.equipment || null,
+    modifications: sections.modifications || null,
+    known_flaws: sections.known_flaws || null,
+    recent_service_history: sections.recent_service_history || null,
     primary_image_url: allPhotos[0]?.url || null,
     description: fullDescription || null,
     description_source: "source_imported",
