@@ -12,6 +12,22 @@ import XCTest
 @testable import NukeCapture
 
 final class MarketContractTests: XCTestCase {
+    func testLiveWindowsAndSortsUseTheWebClockAndPopulation() throws {
+        let board = try JSONDecoder().decode(LiveBoard.self, from: Data(#"{"synced_at":null,"source":"test","auctions":[["a",1966,"FORD","Mustang",100,"2026-10-18T12:30:00Z",null,"2026-10-18T11:00:00Z",null,true],["b",1967,"FORD","Mustang",300,"2026-10-18T13:00:00Z",null,"2026-10-17T12:00:00Z",null,false],["c",1968,"FORD","Mustang",null,"2026-10-19T12:00:00Z",null,null,null,false],["closed",1969,"FORD","Mustang",900,"2026-10-18T11:59:59Z",null,"2026-10-18T11:59:00Z",null,true]]}"#.utf8))
+        let now = try XCTUnwrap(ProfileClock.date("2026-10-18T12:00:00Z"))
+        let open = board.open(at: now)
+        XCTAssertEqual(open.count, 3)
+        func ids(_ window: LiveAuctionWindow) -> [String] { open.filter { window.includes($0, at: now) }.map(\.id) }
+        XCTAssertEqual(ids(.all), ["a", "b", "c"])
+        XCTAssertEqual(ids(.noReserve), ["a"])
+        XCTAssertEqual(ids(.hour), ["a"])       // the web uses <, not <=
+        XCTAssertEqual(ids(.day), ["a", "b"])
+        XCTAssertEqual(ids(.new), ["a"])        // absent listing clocks are unknown
+        XCTAssertEqual(LiveAuctionOrder.ending.sorted(open).map(\.id), ["a", "b", "c"])
+        XCTAssertEqual(LiveAuctionOrder.bid.sorted(open).map(\.id), ["b", "a", "c"])
+        XCTAssertEqual(LiveAuctionOrder.newest.sorted(open).map(\.id), ["a", "b", "c"])
+    }
+
     private struct Fixture: Decodable {
         struct Lot: Decodable {
             struct Band: Decodable { let p10: Double; let p50: Double; let p90: Double; let tier: String; let comps: Double }
