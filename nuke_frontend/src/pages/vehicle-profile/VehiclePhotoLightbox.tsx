@@ -16,6 +16,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom';
 import { supabase } from '../../lib/supabase';
 import { useVehicleProfile } from './VehicleProfileContext';
+import { isBatHosted } from './auctionSequence';
 
 const OPEN_EVENT = 'nuke:vehicle-photo-open';
 const DAY_EVENT = 'nuke:vehicle-day-open';
@@ -235,6 +236,8 @@ const VehiclePhotoLightbox: React.FC = () => {
   const takenLabel = current?.taken_at
     ? new Date(current.taken_at).toLocaleString([], { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })
     : null;
+  // The existing index omits source_url; qualify only its retained source fact.
+  const isImportClock = !!current && isBatHosted({ ...current, source_url: null });
   const sourceLabel = current?.source ? (SOURCE_LABELS[current.source] || String(current.source).toUpperCase().replace(/_/g, ' ')) : null;
   const v = vehicle as { year?: number; make?: string; model?: string } | null;
   const vehicleLabel = [v?.year, v?.make, v?.model].filter(Boolean).join(' ');
@@ -309,8 +312,9 @@ const VehiclePhotoLightbox: React.FC = () => {
       }}>
         {takenLabel && (
           <div style={{ marginBottom: 10 }}>
-            <div style={railLabel}>TAKEN</div>
+            <div style={railLabel}>{isImportClock ? 'IMPORT CLOCK' : 'TAKEN'}</div>
             <div style={railValue}>{takenLabel}</div>
+            {isImportClock && <div style={railValue}>Capture time unknown.</div>}
           </div>
         )}
         {sourceLabel && (
