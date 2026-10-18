@@ -35,6 +35,7 @@ export interface BarnFindsPost {
   location: string | null;
   listingPlatform: string | null;
   tipster: string | null;
+  author: string | null;
   publishedAt: string | null;
   modifiedAt: string | null;
   imageUrls: string[];
@@ -175,7 +176,7 @@ function jsonLd(html: string): Record<string, any>[] {
   return out;
 }
 
-function entryContent(html: string): string {
+export function entryContent(html: string): string {
   const start = html.search(/<div[^>]*class="[^"]*entry-content[^"]*"[^>]*>/i);
   if (start < 0) return "";
   const rest = html.slice(start);
@@ -233,6 +234,13 @@ export function parseComments(html: string): BarnFindsComment[] {
   return out;
 }
 
+/** The article body and the comment thread, the two places a post's links live (an absent thread is empty). */
+export function articleAndComments(html: string): { article: string; comments: string } {
+  const clean = stripScripts(html);
+  const at = clean.indexOf('<div id="comments"');
+  return { article: entryContent(clean), comments: at >= 0 ? clean.slice(at) : "" };
+}
+
 export function parseBarnFindsPost(htmlRaw: string): BarnFindsPost {
   const html = htmlRaw;
   const ld = jsonLd(html);
@@ -247,8 +255,10 @@ export function parseBarnFindsPost(htmlRaw: string): BarnFindsPost {
   const { platform, location } = listingFromText(articleText);
   const vin = articleText.match(/\b(?:VIN|chassis|serial)(?:\s*(?:#|number|no\.?))?\s*[:#]?\s*([A-HJ-NPR-Z0-9]{17})\b/i)?.[1]?.toUpperCase() ?? null;
   const tipster = articleText.match(/Barn Finder\s+([A-Z][\w.'-]+)/)?.[1] ?? null;
+  const author = clean(String(article.author?.name ?? (Array.isArray(article.author) ? article.author[0]?.name : "") ?? ""))
+    || clean(html.match(/<meta name="author" content="([^"]+)"/i)?.[1] ?? "") || null;
   return {
-    title, ...id, vin, articleText, askingPrice: price, priceText, priceSentence, foreignPrice, priceMentions: priceMentions(articleText).slice(0, 8), obo, location, listingPlatform: platform, tipster,
+    title, ...id, vin, articleText, askingPrice: price, priceText, priceSentence, foreignPrice, priceMentions: priceMentions(articleText).slice(0, 8), obo, location, listingPlatform: platform, tipster, author,
     publishedAt: article.datePublished ?? html.match(/article:published_time" content="([^"]+)"/)?.[1] ?? null,
     modifiedAt: article.dateModified ?? html.match(/article:modified_time" content="([^"]+)"/)?.[1] ?? null,
     imageUrls: imageUrls(content),
