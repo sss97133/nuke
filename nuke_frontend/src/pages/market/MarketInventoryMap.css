@@ -52,6 +52,7 @@
   .inventory-map-controls { gap: 8px; }
   .inventory-map-controls label { flex: 1 1 150px; flex-direction: column; align-items: stretch; gap: 4px; }
   .inventory-map-controls select, .inventory-map-pulse-control { min-height: 44px; }
+  .inventory-map-notes > summary { min-height: 44px; padding-block: 15px; }
   .inventory-map-roomy > .inventory-map-whole { padding: 12px; }
   .inventory-map-list, .inventory-map-list-grid { grid-template-columns: 1fr; }
 }
