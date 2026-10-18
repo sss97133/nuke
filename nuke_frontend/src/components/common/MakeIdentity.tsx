@@ -21,6 +21,7 @@ const keyFor = (make: string) => {
 const wordmarks = new Map(artwork.filter(a => (a.role === 'wordmark' || a.role === 'lettered lockup') && !a.file.endsWith('-dark.svg')).map(a => [keyFor(a.brand), a.file]));
 const darkWordmarks = new Map(artwork.filter(a => a.role === 'wordmark' && a.file.endsWith('-dark.svg')).map(a => [keyFor(a.brand), a.file]));
 const emblems = new Map([...Object.entries(legacyEmblems), ...artwork.filter(a => a.role === 'emblem').map(a => [keyFor(a.brand), a.file] as [string, string])]);
+const labelPresentations = new Map(artwork.filter(a => a.labelPresentation).map(a => [keyFor(a.brand), a.labelPresentation]));
 
 /** Decorative emblem only; its adjacent descriptive label names the vehicle. */
 export function MakeLogo({ make }: { make: string }) {
@@ -32,11 +33,15 @@ export function MakeLogo({ make }: { make: string }) {
 }
 
 /** Brand label artwork. Unknown or failed assets always leave a readable brand name. */
-export function MakeIdentity({ make, inverse = false }: { make: string; inverse?: boolean }) {
+export function MakeIdentity({ make, inverse = false, compact = false }: { make: string; inverse?: boolean; compact?: boolean }) {
   const key = keyFor(make);
   const [failed, setFailed] = useState<string | null>(null);
   const file = wordmarks.get(key);
   const darkFile = darkWordmarks.get(key);
+  const presentation = compact ? labelPresentations.get(key) : null;
+  if (presentation) return <span className="make-identity" data-inverse={inverse}>
+    {presentation === 'emblem-and-name' && <MakeLogo make={make} />}<strong>{make}</strong>
+  </span>;
   if (!file || failed === key) return <span className="make-identity" data-inverse={inverse}><MakeLogo make={make} /><strong>{make}</strong></span>;
   return <span className="make-identity" data-inverse={inverse}>
     <img className={`sx-make-wordmark${darkFile ? ' sx-make-wordmark-light' : ' sx-make-wordmark-monochrome'}`}

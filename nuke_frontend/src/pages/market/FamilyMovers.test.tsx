@@ -3,8 +3,8 @@ import React, { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 
-const fixture = vi.hoisted(() => ({ rpc: vi.fn() }));
-vi.mock('../../lib/supabase', () => ({ supabase: { rpc: fixture.rpc } }));
+const fixture = vi.hoisted(() => ({ rpc: vi.fn(), from: vi.fn() }));
+vi.mock('../../lib/supabase', () => ({ supabase: { rpc: fixture.rpc, from: fixture.from } }));
 import FamilyMovers, { axisX, move, parseShareMovers } from './FamilyMovers';
 
 // The share reader's value (treemap_family_share_movers), shaped as production answers.
@@ -21,7 +21,7 @@ beforeEach(() => {
   (globalThis as any).IS_REACT_ACT_ENVIRONMENT = true;
   container = document.createElement('div'); document.body.append(container); root = createRoot(container);
 });
-afterEach(async () => { await act(async () => root.unmount()); container.remove(); vi.resetModules(); fixture.rpc.mockReset(); });
+afterEach(async () => { await act(async () => root.unmount()); container.remove(); vi.resetModules(); fixture.rpc.mockReset(); fixture.from.mockReset(); });
 
 it('says a move the way the map does: up or down and how much', () => {
   expect(move(92, 46)).toBe('▲100%');
@@ -54,6 +54,7 @@ it('lists families gaining and losing share of BaT, volume apart from the averag
   const rows = [...container.querySelectorAll('button.map-movers2__row')];
   expect(rows).toHaveLength(2);
   expect(rows[0].querySelector('.map-movers2__name')?.textContent).toBe('Lexus GX');
+  expect(fixture.from).not.toHaveBeenCalled();
   expect(rows[0].querySelector('.map-movers2__move')?.textContent).toBe('▲155%');
   expect(rows[0].querySelector('.map-movers2__counts')?.textContent).toBe('38 → 109 sold');
   expect(rows[0].querySelector('.map-movers2__price')?.textContent).toBe('avg sale ▼12%');
@@ -270,4 +271,79 @@ it('exposes both independent window filters as named button groups with their se
   await act(async () => month.click());
   expect(onBaselineHorizonChange).toHaveBeenCalledExactlyOnceWith('1m');
   expect(month.getAttribute('aria-pressed')).toBe('true');
+});
+
+// Live keys/counts behind the owner's 1D-vs-5Y screenshot. Neither window's top five names these four families.
+const overlayModels = [
+  { brand: 'Triumph', id: '41b4448c-be9b-40d3-b1d7-7067f0f8ab41', canonical_model: 'TR250', count: 55 },
+  { brand: 'Suzuki', id: '00000000-0000-4000-f000-000000000217', canonical_model: 'Jimny', count: 81 },
+  { brand: 'Hummer', id: 'e3f67fc7-8ac8-4567-ab3f-2dc5afe6a362', canonical_model: 'H1', count: 133 },
+  { brand: 'Bultaco', id: '00000000-0000-4000-f000-000000000314', canonical_model: 'Pursang', count: 139 },
+];
+
+async function renderOverlayComparison() {
+  const { default: Fresh } = await import('./FamilyMovers');
+  const payload = (isDay: boolean) => ({
+    ...value, min_sales: 1,
+    bat: { sold_12m: isDay ? 34 : 229699, sold_prior_12m: 112, usd_12m: 1_000_000, usd_prior_12m: 1_000_000 },
+    family_moves: Object.fromEntries(overlayModels.map((m) => [
+      `${m.brand}|${m.id}`, [isDay ? 1 : m.count, 1, isDay ? 5000 : 500000, 5000],
+    ])),
+    gaining: [], losing: [],
+  });
+  fixture.rpc.mockImplementation((_fn: string, args: Record<string, unknown>) => Promise.resolve({
+    data: payload(args.p_horizon === '1d'), error: null,
+  }));
+  const onPick = vi.fn();
+  await act(async () => root.render(<Fresh onPick={onPick} horizon="1d" baselineHorizon="5y" />));
+  return { Fresh, onPick };
+}
+
+it('resolves custom-comparison UUIDs to recorded model names while retaining drill keys and counts', async () => {
+  const inIds = vi.fn().mockResolvedValue({ data: overlayModels, error: null });
+  const select = vi.fn().mockReturnValue({ in: inIds });
+  fixture.from.mockReturnValue({ select });
+  const { Fresh, onPick } = await renderOverlayComparison();
+  const rows = [...container.querySelectorAll<HTMLButtonElement>('button.map-movers2__row')];
+  expect(rows.map((r) => r.querySelector('.map-movers2__name')?.textContent)).toEqual([
+    'Triumph TR250', 'Suzuki Jimny', 'Hummer H1', 'Bultaco Pursang',
+  ]);
+  expect(rows[1].querySelector('.map-movers2__counts')?.textContent).toBe('81 (5Y) → 1 (1D)');
+  expect(fixture.from).toHaveBeenCalledExactlyOnceWith('canonical_models');
+  expect(select).toHaveBeenCalledWith('id, canonical_model');
+  expect(inIds).toHaveBeenCalledWith('id', overlayModels.map((m) => m.id));
+  await act(async () => rows[1].click());
+  expect(onPick).toHaveBeenCalledWith(expect.objectContaining({
+    brand: 'Suzuki', family_key: overlayModels[1].id, family: 'Jimny', sold_prior_12m: 81, sold_12m: 1,
+  }));
+  await act(async () => root.render(<Fresh onPick={onPick} horizon="1d" baselineHorizon="1w" />));
+  await act(async () => root.render(<Fresh onPick={onPick} horizon="1d" baselineHorizon="5y" />));
+  expect(fixture.from).toHaveBeenCalledTimes(1);
+});
+
+it.each(['error', 'rejection', 'missing'] as const)('keeps custom-comparison rows without exposing UUID names on a label %s', async (failure) => {
+  fixture.from.mockReturnValue({ select: () => ({ in: () => failure === 'rejection'
+    ? Promise.reject(new Error('offline'))
+    : Promise.resolve({ data: failure === 'missing' ? [] : overlayModels, error: failure === 'error' ? { message: 'unavailable' } : null }) }) });
+  const { onPick } = await renderOverlayComparison();
+  const rows = [...container.querySelectorAll<HTMLButtonElement>('button.map-movers2__row')];
+  expect(rows.map((r) => r.querySelector('.map-movers2__name')?.textContent)).toEqual([
+    'Triumph Unknown model', 'Suzuki Unknown model', 'Hummer Unknown model', 'Bultaco Unknown model',
+  ]);
+  expect(rows[3].querySelector('.map-movers2__counts')?.textContent).toBe('139 (5Y) → 1 (1D)');
+  expect(container.textContent).not.toContain('00000000');
+  await act(async () => rows[3].click());
+  expect(onPick).toHaveBeenCalledWith(expect.objectContaining({ brand: 'Bultaco', family_key: overlayModels[3].id }));
+});
+
+it('does not replace a newer window when an earlier model-label lookup finishes', async () => {
+  let finish!: (value: unknown) => void;
+  const pending = new Promise((resolve) => { finish = resolve; });
+  fixture.from.mockReturnValue({ select: () => ({ in: () => pending }) });
+  const { Fresh, onPick } = await renderOverlayComparison();
+  expect(fixture.from).toHaveBeenCalledTimes(1);
+  await act(async () => root.render(<Fresh onPick={onPick} horizon="1y" baselineHorizon="prior" />));
+  await act(async () => finish({ data: overlayModels, error: null }));
+  expect(container.querySelector('.map-movers2__rel-window')?.textContent).toBe('LAST 1Y VS PRIOR 1Y');
+  expect(container.textContent).not.toContain('Jimny');
 });

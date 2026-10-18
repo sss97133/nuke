@@ -132,7 +132,17 @@
 .market-board-page:hover { border-color: var(--text); }
 
 /* The market page frame and the controls outside the rows. Type comes from the kit roles; these set only layout, borders and state. */
-.market-explorer { font-family: Arial, sans-serif; color: var(--text); background: var(--bg); padding: 12px 12px 32px; }
+.market-explorer { --vp-stick-market-navigation: var(--header-height, 40px); font-family: Arial, sans-serif; color: var(--text); background: var(--bg); padding: 12px 12px 32px; }
+.market-navigation { position: sticky; top: var(--vp-stick-market-navigation); z-index: 901; background: var(--bg); border-block: 2px solid var(--border); margin-bottom: 12px; }
+.market-navigation > summary { cursor: pointer; padding: 10px 8px; }
+.market-navigation__tools { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; padding: 8px; }
+.market-history { border: 2px solid var(--border); padding: 12px; margin-bottom: 12px; }
+.market-history__head { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px; }
+.market-history__chart { display: block; width: 100%; height: 120px; cursor: crosshair; }
+.market-history__changes { max-height: 240px; overflow-y: auto; }
+.market-history__change { display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px 12px; width: 100%; padding: 8px; border: 0; border-top: 2px solid var(--border); background: var(--bg); color: var(--text); text-align: left; cursor: pointer; }
+.market-history__change:hover { background: var(--surface); }
+.market-history__change > :first-child { flex: 1 1 200px; }
 .market-status { padding: 12px; }
 .market-drill { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 8px 0; }
 .market-control--make { display: inline-flex; align-items: center; gap: 6px; }

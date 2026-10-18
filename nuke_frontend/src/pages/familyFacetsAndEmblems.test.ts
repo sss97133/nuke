@@ -13,6 +13,9 @@ import type { TreemapNode } from './HomePage';
 describe('familyFacetsAndEmblems', () => {
   it('detects pickup umbrella families across Chevrolet, GMC, and Ford series labels', () => {
     expect(isPickupFamilyLabel('Pickup')).toBe(true);
+    expect(isPickupFamilyLabel('Truck')).toBe(true);
+    expect(isPickupFamilyLabel('C10 Truck')).toBe(true);
+    expect(isPickupFamilyLabel('C10 Pickup')).toBe(true);
     expect(isPickupFamilyLabel('C10')).toBe(true);
     expect(isPickupFamilyLabel('K20')).toBe(true);
     expect(isPickupFamilyLabel('3100')).toBe(true);
@@ -154,7 +157,7 @@ describe('familyFacetsAndEmblems', () => {
     expect(gmc1979.map((m) => m.id)).not.toContain('gmc-sierra-15-73-74');
   });
 
-  it('consolidates fragmented brand pickup series into one unified Pickup tile when groupPickups is true', () => {
+  it('keeps Chevrolet trucks unified under the Pickup reader key even when splitting is requested', () => {
     const chevyFamilies: TreemapNode[] = [
       { name: 'Corvette', familyKey: 'corvette-id', count: 17002, value: 1_306_368_917, usd: 1_306_368_917, sold_12m: 2100, sold_prior_12m: 1950 },
       { name: 'C10', familyKey: 'c10-id', count: 2705, value: 107_725_999, usd: 107_725_999, sold_12m: 410, sold_prior_12m: 380 },
@@ -165,7 +168,7 @@ describe('familyFacetsAndEmblems', () => {
 
     const unified = consolidateBrandPickupFamilies('Chevrolet', chevyFamilies, true);
     expect(unified).toHaveLength(2);
-    const pickupTile = unified!.find((f) => f.name === 'Pickup');
+    const pickupTile = unified!.find((f) => f.name === 'Truck');
     expect(pickupTile).toBeDefined();
     expect(pickupTile!.familyKey).toBe('00000000-0000-4000-b000-000000001928');
     expect(pickupTile!.count).toBe(2705 + 1088 + 1191 + 725);
@@ -173,7 +176,26 @@ describe('familyFacetsAndEmblems', () => {
     expect(pickupTile!.sold_12m).toBe(410 + 160 + 190 + 115);
 
     const split = consolidateBrandPickupFamilies('Chevrolet', chevyFamilies, false);
-    expect(split).toHaveLength(5);
+    expect(split).toEqual(unified);
+  });
+
+
+  it('includes modern and car-based pickups, keeps SUVs separate, and refuses an arbitrary umbrella key', () => {
+    const nodes = ['Pickup', 'C10', 'Colorado', 'Avalanche', 'SSR', 'LUV', 'El Camino', 'Corvette', 'Suburban', 'Blazer']
+      .map((name) => ({ name, familyKey: name, count: 1, value: 10, usd: 10 }));
+    const grouped = consolidateBrandPickupFamilies('Chevrolet', nodes, false)!;
+    expect(grouped.map((n) => n.name).sort()).toEqual(['Truck', 'Corvette', 'Suburban', 'Blazer'].sort());
+    expect(grouped.find((n) => n.name === 'Truck')).toMatchObject({ familyKey: 'Pickup', count: 7, usd: 70 });
+    const synonyms = buildFacetNodes('series', 'Chevrolet', 'Truck', [
+      { name: 'C10 Truck', count: 2, value: 20 }, { name: 'C10 Pickup', count: 3, value: 30 },
+    ], null)!;
+    expect(synonyms).toHaveLength(1);
+    expect(synonyms[0]).toMatchObject({ name: 'C10 (1/2-Ton 2WD)', count: 5, usd: 50 });
+    expect(classifyVehicleFacets('Chevrolet', 'Truck', 'Colorado Pickup').series).toBe('Colorado');
+    const noAnchor = nodes.filter((n) => n.name !== 'Pickup');
+    expect(consolidateBrandPickupFamilies('Chevrolet', noAnchor, true)).toBe(noAnchor);
+    expect(consolidateBrandPickupFamilies('GMC', ['Pickup', 'Canyon', 'Hummer EV Pickup', 'Yukon']
+      .map((name) => ({ name, familyKey: name, count: 1, value: 10 })), true)?.map((n) => n.name)).toEqual(['Truck', 'Yukon']);
   });
 
   it('partitions enriched salesData (with trim/body/title suffix) into Series, Trim, and Body Style buckets and attaches vetted SVG badges', () => {

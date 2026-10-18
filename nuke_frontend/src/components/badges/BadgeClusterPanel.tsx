@@ -24,6 +24,7 @@ export interface BadgeClusterPanelProps {
   preview: BadgePreviewItem[];
   stats: BadgeDimensionStats | null;
   loading?: boolean;
+  unavailable?: boolean;
   onClose: () => void;
 }
 
@@ -291,6 +292,7 @@ export function BadgeClusterPanel({
   preview,
   stats,
   loading = false,
+  unavailable = false,
   onClose,
 }: BadgeClusterPanelProps) {
   const panelRef = useRef<HTMLDivElement>(null);
@@ -393,12 +395,12 @@ export function BadgeClusterPanel({
           fontWeight: 700,
           color: 'var(--text-secondary)',
         }}>
-          {formatCompact(count)} VEHICLES
+          {unavailable ? 'UNAVAILABLE' : `${formatCompact(count)} VEHICLES`}
         </span>
       </div>
 
       {/* Dimension-specific stats */}
-      {!loading && renderStats()}
+      {!loading && !unavailable && renderStats()}
 
       {/* Preview grid */}
       {loading ? (
@@ -414,7 +416,7 @@ export function BadgeClusterPanel({
         }}>
           LOADING...
         </div>
-      ) : preview.length === 0 ? (
+      ) : unavailable || preview.length === 0 ? (
         <div style={{
           padding: '16px 10px',
           fontFamily: 'Arial, sans-serif',
@@ -425,7 +427,7 @@ export function BadgeClusterPanel({
           color: 'var(--text-disabled)',
           textAlign: 'center',
         }}>
-          NO PREVIEW AVAILABLE
+          {unavailable ? 'Badge details unavailable.' : 'NO PREVIEW AVAILABLE'}
         </div>
       ) : (
         <div style={{
