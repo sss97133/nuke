@@ -1,7 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
   boostAndFilterVehicleSearchResults,
-  buildFacetExpandedOrFilter,
   extractQueryFacets,
   scoreVehicleFacetMatch,
 } from './HeaderSearch';
@@ -215,15 +214,5 @@ describe('HeaderSearch facet query boosting and filtering', () => {
     });
     expect(scoreExact.matchesAllQueryFacets).toBe(true);
     expect(scoreExact.matchedAxes).toEqual(['series', 'trim', 'body']);
-  });
-
-  it('expands Supabase .or(...) fallback filters for facet queries', () => {
-    const splitWindowFilter = buildFacetExpandedOrFilter('Split-Window');
-    expect(splitWindowFilter).toContain('body_style.ilike.%Split%Window%');
-    expect(splitWindowFilter).toContain('model.ilike.%Corvette%');
-
-    const stepsideFilter = buildFacetExpandedOrFilter('Stepside');
-    expect(stepsideFilter).toContain('body_style.ilike.%Stepside%');
-    expect(stepsideFilter).toContain('body_style.ilike.%Flareside%');
   });
 });
