@@ -13,7 +13,7 @@
  * Single RPC call via popup_vehicle_intel() — one round trip for all intelligence.
  */
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import type { FeedVehicle } from '../../feed/types/feed';
 import { resolveVehiclePrice } from '../../feed/utils/feedPriceResolution';
 import { supabase } from '../../lib/supabase';
@@ -112,6 +112,7 @@ export function VehiclePopup({ vehicle, searchQuery }: Props) {
   const [intel, setIntel] = useState<VehicleIntel | null>(null);
   const [loading, setLoading] = useState(true);
   const [unavailable, setUnavailable] = useState(false);
+  const continuationEpoch = useRef(0);
 
   // Track view
   useEffect(() => {
@@ -142,7 +143,7 @@ export function VehiclePopup({ vehicle, searchQuery }: Props) {
     }
 
     fetchIntel();
-    return () => { cancelled = true; };
+    return () => { cancelled = true; continuationEpoch.current += 1; };
   }, [vehicle.id]);
 
   const title = [vehicle.year, vehicle.make, vehicle.model].filter(Boolean).join(' ') || 'Vehicle';
@@ -158,8 +159,9 @@ export function VehiclePopup({ vehicle, searchQuery }: Props) {
     if (src) openPopup(<SourcePopup source={src} />, src.toUpperCase(), 420);
   };
   const handleCompClick = (comp: CompSale) => {
+    const epoch = continuationEpoch.current;
     supabase.from('vehicles').select(VEHICLE_POPUP_COLUMNS).eq('id', comp.id).single().then(({ data }) => {
-      if (data) openPopup(<VehiclePopup vehicle={data as unknown as FeedVehicle} />, [comp.year, comp.model].filter(Boolean).join(' '), 480);
+      if (data && continuationEpoch.current === epoch) openPopup(<VehiclePopup vehicle={data as unknown as FeedVehicle} />, [comp.year, comp.model].filter(Boolean).join(' '), 480);
     });
   };
 
