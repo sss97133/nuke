@@ -1987,6 +1987,7 @@ export function TreemapHomePage({ onBrowse, embedded = false }: { onBrowse: () =
   const [tooltip, setTooltip] = useState<TooltipData | null>(null);
   const tooltipId = useId();
   const currentCrumb = useRef<HTMLButtonElement>(null);
+  const mapExit = useRef<HTMLHeadingElement>(null);
   const focusAfterDrill = useRef(false);
   // A drill or a view switch replaces the tiles under the pointer, and the tile a tooltip came from can no longer clear it:
   // over the sales chart the 911 tile's tooltip stayed on screen (2026-10-15).
@@ -2722,6 +2723,11 @@ export function TreemapHomePage({ onBrowse, embedded = false }: { onBrowse: () =
       )}
 
       {/* ─── TREEMAP VIEWPORT ─── */}
+      <a className="market-map-skip" href="#market-map-exit" onClick={(e) => {
+        e.preventDefault();
+        mapExit.current?.focus({ preventScroll: true });
+        mapExit.current?.scrollIntoView({ block: 'center' });
+      }}>Skip map tiles</a>
       <div
         ref={containerRef}
         style={{
@@ -2873,6 +2879,8 @@ export function TreemapHomePage({ onBrowse, embedded = false }: { onBrowse: () =
           </div>
         )}
       </div>
+
+      <h2 ref={mapExit} id="market-map-exit" tabIndex={-1} className="market-map-exit">Market comparisons and legend</h2>
 
       {/* ─── TOOLTIP ─── */}
       {tooltip && (tooltip.level === 'brands' || tooltip.level === 'families') && tooltip.node.usd != null && !tooltip.node.isVehicle
