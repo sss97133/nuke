@@ -15,6 +15,8 @@ BEGIN
 END $$;
 ALTER TABLE public.vehicle_observations ADD COLUMN source_observation_id uuid REFERENCES public.vehicle_observations;
 ALTER TABLE public.vehicle_observations ADD COLUMN property_id uuid;
+ALTER TABLE public.vehicle_observations ADD COLUMN auction_event_id uuid REFERENCES public.auction_events;
+ALTER TABLE public.auction_events ADD COLUMN source text, ADD COLUMN source_url text, ADD COLUMN source_listing_id text;
 ALTER TABLE public.listing_page_snapshots ADD COLUMN markdown text;
 ALTER TYPE public.observation_kind ADD VALUE 'activity';
 ALTER TYPE public.observation_kind ADD VALUE 'specification';
@@ -30,12 +32,14 @@ CREATE TRIGGER trg_retained_listing_property_source_update BEFORE UPDATE ON publ
 WHEN (OLD.source_observation_id IS NOT NULL OR NEW.source_observation_id IS NOT NULL)
 EXECUTE FUNCTION public.validate_retained_listing_property_source();
 \ir ../../supabase/migrations/20261018230628_cab_listing_capture_custody.sql
-GRANT SELECT ON public.vehicles,public.observation_sources,public.vehicle_events,public.listing_page_snapshots TO service_role;
+GRANT SELECT ON public.vehicles,public.observation_sources,public.vehicle_events,public.auction_events,public.listing_page_snapshots TO service_role;
 -- FOR SHARE requires UPDATE privilege; mirror the existing service role, not public access.
-GRANT UPDATE ON public.vehicles,public.observation_sources,public.vehicle_events,public.listing_page_snapshots TO service_role;
+GRANT UPDATE ON public.vehicles,public.observation_sources,public.vehicle_events,public.auction_events,public.listing_page_snapshots TO service_role;
 INSERT INTO public.observation_sources VALUES(md5('source-cab')::uuid,'cars-and-bids',ARRAY['listing']::public.observation_kind[]);
 INSERT INTO public.vehicle_events(id,vehicle_id,source_platform,source_url,source_listing_id)
 VALUES(md5('cab-episode')::uuid,md5('vehicle-1')::uuid,'cars_and_bids','https://carsandbids.com/auctions/AbC123/synthetic-lot','AbC123');
+INSERT INTO public.auction_events VALUES(md5('cab-auction')::uuid,md5('vehicle-1')::uuid,'cars_and_bids',
+ 'https://carsandbids.com/auctions/AbC123/synthetic-lot','AbC123');
 INSERT INTO public.listing_page_snapshots(id,platform,listing_url,success,http_status,html,html_sha256,fetched_at,created_at,metadata)
 VALUES(md5('cab-snapshot')::uuid,'carsandbids','https://carsandbids.com/auctions/AbC123/synthetic-lot',true,200,
  E'<!-- cab-v2-api-json:AbC123 class="bid-bar ended" -->\n<script id="cab-v2-json" type="application/json">{"detail":{"id":"AbC123","listing":{"sub_title":"Synthetic retained narrative","sections":{"highlights":"Publisher claim, not physical truth","known_flaws":"A source-reported flaw"}}}}</script>',
@@ -47,7 +51,7 @@ VALUES(md5('cab-original')::uuid,md5('vehicle-1')::uuid,md5('source-cab')::uuid,
  E'Synthetic retained narrative\n\n**Highlights:**\nPublisher claim, not physical truth\n\n**Known Flaws:**\nA source-reported flaw',
  '{"cab_auction_id":"AbC123","engine_type":"UNVERIFIED_INTERPRETATION"}','cab_v2_api',0.8);
 CREATE FUNCTION public.synthetic_cab_qualification(p_result uuid DEFAULT NULL) RETURNS jsonb LANGUAGE sql AS $$
- SELECT public.qualify_cab_listing_capture(md5('cab-original')::uuid,md5('cab-snapshot')::uuid,md5('cab-episode')::uuid,p_result)
+ SELECT public.qualify_cab_listing_capture(md5('cab-original')::uuid,md5('cab-snapshot')::uuid,md5('cab-auction')::uuid,p_result)
 $$;
 CREATE FUNCTION public.synthetic_insert_cab_receipt(payload jsonb) RETURNS uuid LANGUAGE plpgsql AS $$
 DECLARE o public.vehicle_observations%ROWTYPE;
@@ -76,6 +80,14 @@ SELECT pg_temp.ok('actual visibility predicate keeps internal provenance off the
 SELECT pg_temp.ok('original testimony remains unchanged and active',
  (SELECT NOT is_superseded AND source_snapshot_id IS NULL AND source_vehicle_event_id IS NULL
  AND structured_data->>'engine_type'='UNVERIFIED_INTERPRETATION' FROM public.vehicle_observations WHERE id=md5('cab-original')::uuid));
+-- A provenance link to the stable auction lot must not freeze the replaceable
+-- native vehicle_events state row used by sanctioned episode correction.
+DELETE FROM public.vehicle_events WHERE id=md5('cab-episode')::uuid;
+SELECT pg_temp.ok('native state replacement remains possible without breaking auction-lot provenance',
+ public.synthetic_cab_qualification((SELECT id FROM public.vehicle_observations WHERE extraction_method='protected_cab_listing_capture_v1'))->>'result_verified'='true');
+SELECT pg_temp.ok('provenance uses the existing auction FK and leaves native source ancestry NULL',
+ (SELECT auction_event_id=md5('cab-auction')::uuid AND source_vehicle_event_id IS NULL
+ FROM public.vehicle_observations WHERE extraction_method='protected_cab_listing_capture_v1'));
 SELECT pg_temp.refuses('duplicate receipt yields one replay tuple',
  'SET ROLE service_role; SELECT public.synthetic_insert_cab_receipt(public.synthetic_cab_qualification()->''input'')','23505'); RESET ROLE;
 SELECT pg_temp.refuses('caller cannot change independently derived scope',
@@ -83,7 +95,7 @@ SELECT pg_temp.refuses('caller cannot change independently derived scope',
 SELECT pg_temp.refuses('generic source link cannot mint a C&B sale',
  'SET ROLE service_role; SELECT public.synthetic_insert_cab_receipt((public.synthetic_cab_qualification()->''input'')||''{"kind":"sale_result"}''::jsonb)'); RESET ROLE;
 SELECT pg_temp.refuses('C&B protected method cannot drop typed ancestry',
- 'SET ROLE service_role; SELECT public.synthetic_insert_cab_receipt((public.synthetic_cab_qualification()->''input'')||''{"source_vehicle_event_id":null}''::jsonb)'); RESET ROLE;
+ 'SET ROLE service_role; SELECT public.synthetic_insert_cab_receipt((public.synthetic_cab_qualification()->''input'')||''{"auction_event_id":null}''::jsonb)'); RESET ROLE;
 SELECT pg_temp.refuses('receipt cannot be changed in place',
  'UPDATE public.vehicle_observations SET structured_data=''{}'' WHERE extraction_method=''protected_cab_listing_capture_v1''');
 UPDATE public.vehicle_observations SET is_superseded=true WHERE extraction_method='protected_cab_listing_capture_v1';
@@ -96,9 +108,9 @@ UPDATE public.vehicle_observations SET is_superseded=false WHERE id=md5('cab-ori
 UPDATE public.vehicles SET is_public=false WHERE id=md5('vehicle-1')::uuid;
 SELECT pg_temp.ok('private parent withholds the receipt without source output',public.synthetic_cab_qualification()=jsonb_build_object('ok',false,'reason','parent_not_public_real_vehicle'));
 UPDATE public.vehicles SET is_public=true WHERE id=md5('vehicle-1')::uuid;
-UPDATE public.vehicle_events SET source_listing_id='abc123' WHERE id=md5('cab-episode')::uuid;
+UPDATE public.auction_events SET source_listing_id='abc123' WHERE id=md5('cab-auction')::uuid;
 SELECT pg_temp.ok('base62 case mismatch is not normalized into a match',public.synthetic_cab_qualification()->>'reason'='source_listing_identity_mismatch');
-UPDATE public.vehicle_events SET source_listing_id='AbC123' WHERE id=md5('cab-episode')::uuid;
+UPDATE public.auction_events SET source_listing_id='AbC123' WHERE id=md5('cab-auction')::uuid;
 UPDATE public.listing_page_snapshots SET html=html||'changed' WHERE id=md5('cab-snapshot')::uuid;
 SELECT pg_temp.ok('changed retained bytes invalidate header badge',public.synthetic_cab_qualification()->>'reason'='inline_capture_unverified');
 UPDATE public.listing_page_snapshots SET html=left(html,length(html)-7) WHERE id=md5('cab-snapshot')::uuid;
@@ -112,7 +124,7 @@ UPDATE public.vehicle_observations SET structured_data=structured_data||'{"email
 SELECT pg_temp.ok('owning observation privacy predicate withholds original',public.synthetic_cab_qualification()->>'reason'='original_listing_ineligible');
 UPDATE public.vehicle_observations SET structured_data=structured_data-'email' WHERE id=md5('cab-original')::uuid;
 SET ROLE anon;
-SELECT pg_temp.refuses('anonymous selector cannot read protected source','SELECT public.qualify_cab_listing_capture(md5(''cab-original'')::uuid,md5(''cab-snapshot'')::uuid,md5(''cab-episode'')::uuid)','42501');
+SELECT pg_temp.refuses('anonymous selector cannot read protected source','SELECT public.qualify_cab_listing_capture(md5(''cab-original'')::uuid,md5(''cab-snapshot'')::uuid,md5(''cab-auction'')::uuid)','42501');
 RESET ROLE;
 -- Retain source inputs for actual-handler and two-session tests; remove only synthetic derived receipts.
 DELETE FROM public.vehicle_observations WHERE extraction_method='protected_cab_listing_capture_v1';

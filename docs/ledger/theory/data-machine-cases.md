@@ -425,7 +425,7 @@ publication/deployment evidence belongs in the private lane receipt.
 
 **Next loop, staged 2026-10-18: explicit listing-capture custody.** The prospective
 `cab_listing_capture_v1` mode in the existing `ingest-observation` accepts only an original
-observation, retained snapshot and native presentation selector, with explicit dry-run. Its
+observation, retained snapshot and canonical auction-lot selector, with explicit dry-run. Its
 database qualifier independently checks inline UTF8 SHA, case-sensitive source auction ID,
 same attributed parent/source, exact reconstructed listing narrative and microsecond clocks.
 Both existing source guards must admit the exact derived tuple under locks. A separate sparse
@@ -447,6 +447,12 @@ treat implementation, local tests or source-selector previews as a deployed repa
 observation visibility predicate withholds `provenance`; this internal receipt must not become a
 second public listing. The source's existing listing capability qualifies its retained parent;
 this guarded derivation does not declare a new publisher-provided provenance capability.
+
+The typed relationship uses the existing `auction_event_id` FK, shared with the lot interaction
+log. It leaves `source_vehicle_event_id` NULL: that pointer would make native-state replacement
+refuse under existing sanctioned episode supersession. The local counterexample replaces the
+native state while the auction-lot/capture receipt remains verifiable; no correction owner or
+public policy is weakened.
 
 ## 7. Hypotheses the owner wants tested as veins (in the vocabulary)
 

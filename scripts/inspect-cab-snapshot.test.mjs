@@ -8,7 +8,7 @@ import { assessCabCapture, requireCabCapture, inspectCabLineage } from './inspec
 
 const row = (id, extra = {}) => ({ id, type: 1, timestamp: '2026-10-18T12:00:00Z', ...extra });
 const lineage = { sourceId: '00000000-0000-4000-8000-000000000001', snapshotId: '00000000-0000-4000-8000-000000000002',
-  episodeId: '00000000-0000-4000-8000-000000000003', url: 'https://db.test', key: 'synthetic' };
+  auctionId: '00000000-0000-4000-8000-000000000003', url: 'https://db.test', key: 'synthetic' };
 
 test('lineage consumer previews only explicit selectors and never emits original prose', async () => {
   const result = await inspectCabLineage({ ...lineage, request: async (url, options) => {

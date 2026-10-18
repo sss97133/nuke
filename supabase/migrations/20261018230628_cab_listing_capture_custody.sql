@@ -4,12 +4,12 @@ SET LOCAL lock_timeout='2s';
 SET LOCAL statement_timeout='10s';
 
 CREATE OR REPLACE FUNCTION public.qualify_cab_listing_capture(
-  p_source uuid, p_snapshot uuid, p_episode uuid, p_result uuid DEFAULT NULL
+  p_source uuid, p_snapshot uuid, p_lot uuid, p_result uuid DEFAULT NULL
 ) RETURNS jsonb LANGUAGE plpgsql SECURITY INVOKER SET search_path='' SET timezone='UTC' AS $fn$
 DECLARE
   o public.vehicle_observations%ROWTYPE;
   s public.listing_page_snapshots%ROWTYPE;
-  e public.vehicle_events%ROWTYPE;
+  e public.auction_events%ROWTYPE;
   src public.observation_sources%ROWTYPE;
   x public.vehicle_observations%ROWTYPE;
   raw_text text; body jsonb; listing jsonb; sections jsonb; narrative text;
@@ -21,6 +21,7 @@ BEGIN
     OR o.vehicle_id IS NULL OR o.extraction_method IS DISTINCT FROM 'cab_v2_api'
     OR o.source_observation_id IS NOT NULL OR o.subject_type IS DISTINCT FROM 'vehicle' OR o.subject_id IS NOT NULL
     OR o.source_snapshot_id IS NOT NULL OR o.source_vehicle_event_id IS NOT NULL
+    OR (o.auction_event_id IS NOT NULL AND o.auction_event_id IS DISTINCT FROM p_lot)
     OR public.observation_is_public(o.kind,o.structured_data) IS NOT TRUE THEN
     RETURN jsonb_build_object('ok',false,'reason','original_listing_ineligible');
   END IF;
@@ -33,9 +34,9 @@ BEGIN
     OR ('listing'::public.observation_kind=ANY(src.supported_observations)) IS NOT TRUE THEN
     RETURN jsonb_build_object('ok',false,'reason','source_not_supported');
   END IF;
-  SELECT * INTO e FROM public.vehicle_events WHERE id=p_episode;
-  IF NOT FOUND OR e.vehicle_id IS DISTINCT FROM o.vehicle_id OR e.source_platform IS DISTINCT FROM 'cars_and_bids'
-    OR e.event_type IS DISTINCT FROM 'auction' OR e.source_listing_id IS NULL
+  SELECT * INTO e FROM public.auction_events WHERE id=p_lot;
+  IF NOT FOUND OR e.vehicle_id IS DISTINCT FROM o.vehicle_id OR e.source IS DISTINCT FROM 'cars_and_bids'
+    OR e.source_listing_id IS NULL
     OR e.source_listing_id !~ '^[A-Za-z0-9]+$' THEN
     RETURN jsonb_build_object('ok',false,'reason','presentation_identity_mismatch');
   END IF;
@@ -83,7 +84,7 @@ BEGIN
   END IF;
   known_at:=greatest(o.ingested_at,s.created_at);
   receipt:=jsonb_build_object('method','protected_cab_listing_capture_v1','scope','attributed_listing_narrative_only',
-    'source_observation_id',o.id,'snapshot_id',s.id,'vehicle_event_id',e.id,'source_listing_id',source_key,
+    'source_observation_id',o.id,'snapshot_id',s.id,'auction_event_id',e.id,'source_listing_id',source_key,
     'vehicle_id',o.vehicle_id,'source_id',o.source_id,'source_sha256',s.html_sha256,
     'narrative_sha256',encode(sha256(convert_to(narrative,'UTF8')),'hex'),
     'captured_at',s.fetched_at,'capture_ingested_at',s.created_at,'original_ingested_at',o.ingested_at,
@@ -92,7 +93,7 @@ BEGIN
   -- The publisher supplies listing evidence; Nuke's guarded derivation records
   -- provenance, not a second listing or a new publisher-provided capability.
   wanted:=jsonb_build_object('vehicle_id',o.vehicle_id,'source_id',o.source_id,'kind','provenance',
-    'source_snapshot_id',s.id,'source_vehicle_event_id',e.id,'source_observation_id',o.id,'source_comment_id',NULL,'property_id',NULL,
+    'source_snapshot_id',s.id,'auction_event_id',e.id,'source_observation_id',o.id,'source_comment_id',NULL,'property_id',NULL,
     'source_url',o.source_url,'source_identifier','cab-listing-custody:'||o.id||':'||s.id||':'||e.id,
     'observed_at',s.fetched_at,'content_text',NULL,'extraction_method','protected_cab_listing_capture_v1',
     'structured_data',jsonb_build_object('listing_capture_receipt',receipt),'extractor_id',NULL,
@@ -113,9 +114,7 @@ END $fn$;
 REVOKE ALL ON FUNCTION public.qualify_cab_listing_capture(uuid,uuid,uuid,uuid) FROM PUBLIC,anon,authenticated;
 GRANT EXECUTE ON FUNCTION public.qualify_cab_listing_capture(uuid,uuid,uuid,uuid) TO service_role;
 COMMENT ON FUNCTION public.qualify_cab_listing_capture(uuid,uuid,uuid,uuid) IS
-'Canonical ingest-observation qualifier/current receipt reader for one explicit Cars & Bids original listing x retained inline API capture x native presentation. PK lookups, independent UTF8 SHA and narrative reconstruction, exact base62 identity/source/parent/clocks. Returns only provenance metadata, never source text, images, handles, claims or source bytes. Optional result requalifies immutable typed receipt against current custody; withdrawal/source mutation withholds it. No inference, state/scalar promotion, history reconstruction, source enumeration or physical truth. No writes or offload fetch; original testimony is preserved. Service only; no public grant or schedule.';
-COMMENT ON COLUMN public.vehicle_observations.source_vehicle_event_id IS
-'Nullable typed ancestry to one native vehicle_events presentation. Existing protected BaT sale admission retains its contract; protected_cab_listing_capture_v1 admits only independently qualified attributed narrative custody through the original observation, retained capture and presentation. Legacy/unrelated observations remain NULL, generic caller ancestry is ignored and episode_preview_v2 stays inadmissible. Neither relation establishes physical identity, historical native identity availability, paid transfer or ownership. Prospective typed tuples are immutable; consumers requalify current custody after mutable source changes. No backfill, historical validation or public grant is implied.';
+'Canonical ingest-observation qualifier/current receipt reader for one explicit Cars & Bids original listing x retained inline API capture x canonical auction lot. Uses existing auction_event_id, not the replaceable native vehicle_events head, so sanctioned native-state correction is not obstructed. PK lookups, independent UTF8 SHA/narrative reconstruction and exact base62 identity/source/parent/clocks. Returns only provenance metadata, never source text, images, handles, claims or bytes. Optional result requalifies immutable internal provenance against current custody; withdrawal/source mutation withholds it. No inference, scalar promotion, history reconstruction, source enumeration or physical truth. No writes/offload fetch; original testimony preserved. Service only; no public grant or schedule.';
 
 -- Extend the existing source guard, never bypass it. Assert exact anchors rather than silently replace drift.
 DO $patch$
@@ -137,11 +136,11 @@ BEGIN
     PERFORM 1 FROM public.vehicles WHERE id=NEW.vehicle_id FOR SHARE NOWAIT;
     PERFORM 1 FROM public.observation_sources WHERE id=NEW.source_id FOR SHARE NOWAIT;
     PERFORM 1 FROM public.vehicle_observations WHERE id=NEW.source_observation_id FOR SHARE NOWAIT;
-    PERFORM 1 FROM public.vehicle_events WHERE id=NEW.source_vehicle_event_id FOR SHARE NOWAIT;
+    PERFORM 1 FROM public.auction_events WHERE id=NEW.auction_event_id FOR SHARE NOWAIT;
     PERFORM 1 FROM public.listing_page_snapshots WHERE id=NEW.source_snapshot_id FOR SHARE NOWAIT;
     DECLARE q jsonb; expected public.vehicle_observations%ROWTYPE; expected_fields jsonb;
     BEGIN
-      q:=public.qualify_cab_listing_capture(NEW.source_observation_id,NEW.source_snapshot_id,NEW.source_vehicle_event_id);
+      q:=public.qualify_cab_listing_capture(NEW.source_observation_id,NEW.source_snapshot_id,NEW.auction_event_id);
       IF q->'ok' IS DISTINCT FROM 'true'::jsonb THEN
         RAISE EXCEPTION 'listing capture custody refused: %',q->>'reason' USING ERRCODE='23514';
       END IF;
@@ -151,7 +150,7 @@ BEGIN
       SELECT jsonb_object_agg(k,to_jsonb(expected)->k) INTO expected_fields
       FROM jsonb_object_keys((q->'input')-'source_slug'-'defer_analysis') AS keys(k);
       IF NOT (to_jsonb(NEW) @> expected_fields)
-        OR NEW.source_comment_id IS NOT NULL OR NEW.ingested_at IS DISTINCT FROM transaction_timestamp()
+        OR NEW.source_comment_id IS NOT NULL OR NEW.source_vehicle_event_id IS NOT NULL OR NEW.ingested_at IS DISTINCT FROM transaction_timestamp()
         OR NEW.is_superseded IS DISTINCT FROM false THEN
         RAISE EXCEPTION 'listing capture input differs from independently qualified receipt' USING ERRCODE='23514';
       END IF;
@@ -192,7 +191,7 @@ EXECUTE FUNCTION public.validate_comment_observation_source();
 DROP TRIGGER trg_validate_comment_observation_source_update ON public.vehicle_observations;
 CREATE TRIGGER trg_validate_comment_observation_source_update
 BEFORE UPDATE OF source_comment_id,vehicle_id,kind,content_text,observed_at,confidence_score,structured_data,
-  source_vehicle_event_id,source_snapshot_id,source_observation_id,source_id,source_identifier,source_url,content_hash,raw_source_ref,
+  source_vehicle_event_id,auction_event_id,source_snapshot_id,source_observation_id,source_id,source_identifier,source_url,content_hash,raw_source_ref,
   extraction_method,extractor_id,extraction_metadata,ingested_at,id,subject_type,subject_id,is_superseded,superseded_by
 ON public.vehicle_observations FOR EACH ROW
 WHEN (OLD.source_comment_id IS NOT NULL OR NEW.source_comment_id IS NOT NULL

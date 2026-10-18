@@ -66,17 +66,17 @@ export function requireCabCapture(input) {
 }
 
 /** Explicit selectors only. Preview or requalify an existing receipt; never admit. */
-export async function inspectCabLineage({ sourceId, snapshotId, episodeId, resultId,
+export async function inspectCabLineage({ sourceId, snapshotId, auctionId, resultId,
   url, key, request = fetch }) {
   const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-  if (![sourceId, snapshotId, episodeId, ...(resultId ? [resultId] : [])].every(id => typeof id === 'string' && uuid.test(id))) {
+  if (![sourceId, snapshotId, auctionId, ...(resultId ? [resultId] : [])].every(id => typeof id === 'string' && uuid.test(id))) {
     throw new Error('Expected explicit source observation, snapshot and presentation UUIDs');
   }
   if (!url || !key) throw new Error('Supabase connection unavailable');
   const target = resultId ? '/rest/v1/rpc/qualify_cab_listing_capture' : '/functions/v1/ingest-observation';
-  const body = resultId ? { p_source: sourceId, p_snapshot: snapshotId, p_episode: episodeId, p_result: resultId }
+  const body = resultId ? { p_source: sourceId, p_snapshot: snapshotId, p_lot: auctionId, p_result: resultId }
     : { mode: 'cab_listing_capture_v1', source_observation_id: sourceId, snapshot_id: snapshotId,
-      source_vehicle_event_id: episodeId, dry_run: true };
+      auction_event_id: auctionId, dry_run: true };
   const response = await request(`${url.replace(/\/$/, '')}${target}`, {
     method: 'POST', headers: { Authorization: `Bearer ${key}`, apikey: key, 'Content-Type': 'application/json' },
     body: JSON.stringify(body), signal: AbortSignal.timeout(10000),
@@ -91,7 +91,7 @@ export async function inspectCabLineage({ sourceId, snapshotId, episodeId, resul
     return { status: 'blocked', reason: qualified?.reason ?? 'qualification_unavailable', public_readiness: 'not_assessed' };
   }
   return { status: resultId ? 'stored_receipt_verified' : 'qualified_not_admitted',
-    source_observation_id: sourceId, snapshot_id: snapshotId, vehicle_event_id: episodeId,
+    source_observation_id: sourceId, snapshot_id: snapshotId, auction_event_id: auctionId,
     scope: qualified.input?.structured_data?.listing_capture_receipt?.scope,
     receipt_kind: qualified.input.kind,
     source_known_at: qualified.source_known_at, writes: 0, model_calls: 0, public_readiness: 'not_assessed' };
@@ -103,10 +103,10 @@ const KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
 async function main() {
   const lineageIndex = process.argv.indexOf('--lineage');
   if (lineageIndex !== -1) {
-    const [sourceId, snapshotId, episodeId] = process.argv.slice(lineageIndex + 1, lineageIndex + 4);
+    const [sourceId, snapshotId, auctionId] = process.argv.slice(lineageIndex + 1, lineageIndex + 4);
     const resultIndex = process.argv.indexOf('--result');
     if (resultIndex !== -1 && !process.argv[resultIndex + 1]) throw new Error('--result requires an existing receipt UUID');
-    const result = await inspectCabLineage({ sourceId, snapshotId, episodeId,
+    const result = await inspectCabLineage({ sourceId, snapshotId, auctionId,
       resultId: resultIndex === -1 ? undefined : process.argv[resultIndex + 1],
       url: SUPABASE_URL, key: KEY });
     console.log(JSON.stringify(result, null, 2));
