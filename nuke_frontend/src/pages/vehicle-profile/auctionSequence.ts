@@ -169,17 +169,23 @@ const recordedGrain = (iso: string): { grain: 'instant' } | { grain: 'day'; day:
 
 const BAT_LOT_PATH = /^\/listing\/([^/]+)/i;
 
-/** One key per native BaT listing; bare and protocol-relative URLs imply HTTPS. */
-export function lotKey(url: string | null | undefined): string | null {
+/** Native BaT URL forms share host ownership; callers qualify their own path. */
+function nativeBatUrl(url: string | null | undefined): URL | null {
   if (!url) return null;
   const raw = url.trim();
   try {
     const parsed = new URL(raw.startsWith('//') ? `https:${raw}` : /^[a-z][a-z\d+.-]*:\/\//i.test(raw) ? raw : `https://${raw}`);
     const host = parsed.hostname.toLowerCase();
     if (!['http:', 'https:'].includes(parsed.protocol) || parsed.port || (host !== 'bringatrailer.com' && !host.endsWith('.bringatrailer.com'))) return null;
-    const m = BAT_LOT_PATH.exec(parsed.pathname);
-    return m ? m[1].toLowerCase() : null;
+    return parsed;
   } catch { return null; }
+}
+
+/** One key per native BaT listing; bare and protocol-relative URLs imply HTTPS. */
+export function lotKey(url: string | null | undefined): string | null {
+  const parsed = nativeBatUrl(url);
+  const m = parsed && BAT_LOT_PATH.exec(parsed.pathname);
+  return m ? m[1].toLowerCase() : null;
 }
 
 export function lotUrlFor(key: string): string {
@@ -193,14 +199,14 @@ export function commentPermalink(lotUrl: string, batCommentId: number | null): s
 
 /** The month a BaT-hosted photo was published, from its upload path (…/uploads/2018/07/…). */
 export function uploadMonth(sourceUrl: string | null | undefined): string | null {
-  if (!sourceUrl) return null;
-  const m = /bringatrailer\.com\/wp-content\/uploads\/(\d{4})\/(\d{2})\//i.exec(sourceUrl);
+  const parsed = nativeBatUrl(sourceUrl);
+  const m = parsed && /^\/wp-content\/uploads\/(\d{4})\/(\d{2})\//i.exec(parsed.pathname);
   return m ? `${m[1]}-${m[2]}` : null;
 }
 
 /** A BaT-imported photo carries no capture time: the importer stamped its own run time. */
 export function isBatHosted(im: ImageStampRow): boolean {
-  return /bat/i.test(im.source ?? '') || /bringatrailer\.com/i.test(im.source_url ?? '');
+  return /bat/i.test(im.source ?? '') || nativeBatUrl(im.source_url) !== null;
 }
 
 export interface SequenceInput {
