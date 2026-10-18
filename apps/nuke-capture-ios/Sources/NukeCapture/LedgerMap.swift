@@ -2179,6 +2179,7 @@ enum LedgerBrowsePresentation: String, CaseIterable {
 }
 
 struct LedgerMapView: View {
+    @GestureState private var backSwipeTranslation: CGFloat = 0
     var onSelectVehicle: ((UUID) -> Void)? = nil
 
     typealias Level = LedgerBrowsePath.Level
@@ -2355,6 +2356,26 @@ struct LedgerMapView: View {
             }
         }
         .padding(16)
+        .offset(x: min(backSwipeTranslation, 100) * 0.3)
+        .animation(.easeOut(duration: 0.15), value: backSwipeTranslation == 0)
+        .overlay(alignment: .leading) {
+            if selectedMake != nil || presentation == .chart {
+                Color.clear.frame(width: 24).contentShape(Rectangle())
+                    .gesture(DragGesture(minimumDistance: 14)
+                        .updating($backSwipeTranslation) { value, state, _ in
+                            if value.translation.width > 0 && abs(value.translation.height) < value.translation.width * 0.6 {
+                                state = value.translation.width
+                            }
+                        }
+                        .onEnded { value in
+                            let width = value.translation.width
+                            guard width > 24, abs(value.translation.height) < width * 0.6,
+                                  width > 72 || value.predictedEndTranslation.width > 150 else { return }
+                            stepBack()
+                        })
+                    .accessibilityHidden(true)
+            }
+        }
         .task(id: pathKey) { await load() }
         .task(id: pathKey) {
             let requestedPath = pathKey
@@ -2421,8 +2442,10 @@ struct LedgerMapView: View {
         VStack(alignment: .leading, spacing: 6) {
             HStack(alignment: .top) {
                 if selectedMake != nil {
-                    Button { stepBack() } label: { Label("Back", systemImage: "chevron.left") }
-                        .buttonStyle(.plain).frame(minHeight: 44)
+                    Button { stepBack() } label: { Image(systemName: "chevron.left") }
+                        .buttonStyle(.plain).frame(minWidth: 44, minHeight: 44)
+                        .accessibilityLabel("Back")
+                        .accessibilityHint("Returns one step in the current market selection")
                 }
                 VStack(alignment: .leading, spacing: 2) {
                     Text(browsePath.scopeLabel).font(.caption2).foregroundStyle(.secondary)
