@@ -296,9 +296,12 @@ export async function resolveSubjectBatch(store: SubjectStore, request: SubjectR
         Object.fromEntries(sources.map(source => [source.id, nativeFor(source)])), capture, now().toISOString()); }
       catch { return { ...base, status: "refused", refusal: "source_not_ready" }; }
     }
+    // Three frames include per-frame witnesses and pairwise contradictions. The
+    // live three-frame pilot exhausted 1,600 tokens with an unreadable result.
+    // 4096 remains inside the same two-cent default preflight reservation.
     const result = await runCapturedVision(visionSources, capture, () => [
       { text: SUBJECT_PROMPT }, ...sources.flatMap(source => [{ text: `Photo image_id=${source.id}` }, { image_key: source.id }]),
-    ], dependencies.vision, { limits: { output_tokens: 1600 } });
+    ], dependencies.vision, { limits: { output_tokens: 4096 } });
     if (!result.model_result) return { ...base, status: "refused", refusal: result.refusal,
       unavailable_inputs: capture.unavailable, candidate_scope,
       ...(result.provider_diagnostics?.length ? { provider_diagnostics: result.provider_diagnostics } : {}),

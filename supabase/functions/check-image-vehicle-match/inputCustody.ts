@@ -19,7 +19,7 @@ export interface VisionInputSource {
 
 export const VISION_INPUT_LIMITS = Object.freeze({
   image_bytes: 4 * 1024 * 1024, total_bytes: 16 * 1024 * 1024,
-  inputs: 14, image_ms: 10_000, total_ms: 30_000, output_tokens: 1600,
+  inputs: 14, image_ms: 10_000, total_ms: 30_000, output_tokens: 4096,
 });
 type Limits = { [Key in keyof typeof VISION_INPUT_LIMITS]: number };
 export interface InputCustodyOptions {
