@@ -64,6 +64,12 @@ the allocatable credits (the monthly credits less `reserve_fraction`, 0.15). Wit
 20 groups in proportion to group score. `firecrawl_allowance` spreads a source's period allocation over the days left in the
 billing period (it resets on `period_start_day`, now the 4th) and subtracts today's spend, so an unspent day rolls forward.
 
+**Owner grants.** An owner decision outside the ranking is a `firecrawl_source_params.owner_grant` (credits, `daily_credits`,
+`reserve_floor`, from, until, his words and date). While it is in force `firecrawl_allowance` returns the least of the grant left,
+the daily pace left today and the latest hourly balance (`firecrawl_balance_log`) above the reserve floor; with no balance read in
+3 h the ranked allowance applies. Bonhams carries one from 2026-10-18: 3,720 credits (80% of the 4,650 left), 532 a day, floor
+930, until the period ends 2026-11-04, for the lot pages of lots landed with one photo (`extract-bonhams` `deep_lots`).
+
 ### best_v1: what a landed lot is worth, and the loop that improves it (owner, 2026-10-15)
 
 The owner: "best is a metric we have yet to fully develop." So the ranking is a metric that is measured, tested on real spend and
