@@ -34,7 +34,7 @@ import { projectSecretKey } from "../_shared/supabaseKeys.ts";
 import { postFromFlight } from "./rscPost.ts";
 import { mustWrite, softWrite } from "../_shared/writeResult.ts";
 import { extractStructuredLotFacets, indexLot, parseSaleFacet, priorSaleFacet, saleDay, summarizePriorSale, type IndexLot } from "./indexLot.ts";
-import { fillOnlyIdentity, vinConflictHolder } from "./identityFill.ts";
+import { fillOnlyIdentity, landedStatus, vinConflictHolder } from "./identityFill.ts";
 import { patchForLiveRow, writeVehicleEventByKey } from "../_shared/vehicleEventWrite.ts";
 
 const EXTRACTOR_VERSION = "2.0.0";
@@ -1009,7 +1009,7 @@ async function saveVehicle(
   vehicle: MecumVehicle,
   forceVehicleId?: string,
   sale?: UpcomingSale,
-): Promise<{ vehicleId: string; isNew: boolean; fieldsUpdated: string[]; qualityScore: number }> {
+): Promise<{ vehicleId: string; isNew: boolean; fieldsUpdated: string[]; qualityScore: number; relinkVin: boolean }> {
   // Check if vehicle already exists (by discovery_url, listing_url, queue, or VIN)
   const spellings = mecumUrlSpellings(vehicle.url);
   const [{ data: byDiscoveryUrl }, { data: byListingUrl }, { data: queueEntry }] = await Promise.all([
@@ -1099,6 +1099,7 @@ async function saveVehicle(
 
   let vehicleId: string;
   let isNew = false;
+  let relinkVin = false;
   const fieldsUpdated: string[] = [];
 
   if (existingId) {
@@ -1143,6 +1144,7 @@ async function saveVehicle(
       const vinHolder = vinConflictHolder(updateErr);
       if (vinHolder !== null && "vin" in updateData) {
         console.warn(`[MECUM] VIN conflict for ${existingId} (vin=${cleanData.vin}, holder=${vinHolder || "unnamed"}), retrying without VIN`);
+        relinkVin = true;
         await raiseRevision(supabase, vehicle.url, ["vin"], "duplicate_key", "relink", {
           vehicle_id: existingId,
           lot_states: { vin: cleanData.vin },
@@ -1235,7 +1237,7 @@ async function saveVehicle(
     }
   }
 
-  return { vehicleId, isNew, fieldsUpdated, qualityScore: gate.score };
+  return { vehicleId, isNew, fieldsUpdated, qualityScore: gate.score, relinkVin };
 }
 
 // Existing mecum rows spell one lot several ways (measured 2026-10-15: with and without www, with and without the trailing
@@ -1305,12 +1307,12 @@ Deno.serve(async (req) => {
           `${vehicle.image_urls.length} images, method=${vehicle.extraction_method}`,
       );
 
-      const { vehicleId, isNew, fieldsUpdated, qualityScore } = await saveVehicle(supabase, vehicle);
+      const { vehicleId, isNew, fieldsUpdated, qualityScore, relinkVin } = await saveVehicle(supabase, vehicle);
 
       // Update queue entry if exists
       softWrite("import_queue complete", await supabase
         .from("import_queue")
-        .update({ status: "complete", vehicle_id: vehicleId, error_message: null })
+        .update({ status: landedStatus(relinkVin), vehicle_id: vehicleId, error_message: null })
         .eq("listing_url", url), writeErrors);
 
       return okJson({
@@ -1729,8 +1731,8 @@ Deno.serve(async (req) => {
           const vehicle = parsedVehicle ? applyStructuredVehicleFacets(parsedVehicle) : null;
           if (!vehicle) { out.unreadable++; await supabase.from("import_queue").update({ status: "failed", error_message: "snapshot has no lot object" }).eq("id", row.id); await raiseRevision(supabase, snap.listing_url, ["lot_object"], "parser_gap", "refetch", {}, snap.id); continue; }
           if (!(vehicle.year && vehicle.make)) { out.not_a_vehicle++; await supabase.from("import_queue").update({ status: "skipped", error_message: "NOT_A_VEHICLE" }).eq("id", row.id); await raiseRevision(supabase, snap.listing_url, ["year", "make"], "quality_gate", "classify_non_vehicle", {}, snap.id); continue; }
-          const { vehicleId, isNew } = await saveVehicle(supabase, vehicle);
-          softWrite("import_queue complete", await supabase.from("import_queue").update({ status: "complete", vehicle_id: vehicleId, processed_at: new Date().toISOString() }).eq("id", row.id), writeErrors);
+          const { vehicleId, isNew, relinkVin } = await saveVehicle(supabase, vehicle);
+          softWrite("import_queue complete", await supabase.from("import_queue").update({ status: landedStatus(relinkVin), vehicle_id: vehicleId, processed_at: new Date().toISOString() }).eq("id", row.id), writeErrors);
           out.folded++;
           if (isNew) out.created++; else out.updated++;
         } catch (err: any) {
@@ -2012,7 +2014,7 @@ Deno.serve(async (req) => {
               mustWrite("vehicle_events orphan_claim", await supabase.from("vehicle_events").update({ metadata: { ...(ev.metadata ?? {}), orphan_claim: { event_status: "sold", ...w.reverify.claim } } }).eq("id", w.reverify.event_id));
             }
           }
-          const { vehicleId, isNew } = await saveVehicle(supabase, vehicle, undefined, w.sale);
+          const { vehicleId, isNew, relinkVin } = await saveVehicle(supabase, vehicle, undefined, w.sale);
           if (w.reverify?.event_id) {
             const confirmed = vehicle.status === "sold" && !!vehicle.sale_price;
             const { data: ev } = await supabase.from("vehicle_events").select("metadata").eq("id", w.reverify.event_id).maybeSingle();
@@ -2022,7 +2024,7 @@ Deno.serve(async (req) => {
             results.reverified++;
             if (confirmed) results.confirmed++;
           }
-          const done: Record<string, unknown> = { status: "complete", vehicle_id: vehicleId, processed_at: new Date().toISOString(), error_message: null };
+          const done: Record<string, unknown> = { status: landedStatus(relinkVin), vehicle_id: vehicleId, processed_at: new Date().toISOString(), error_message: null };
           if (w.sale) {
             const resultRead = !!vehicle.status && !["upcoming", "listed"].includes(vehicle.status);
             done.raw_data = { sale: w.sale, ...(resultRead ? { result_read: true } : {}) };
@@ -2103,11 +2105,11 @@ Deno.serve(async (req) => {
             continue;
           }
 
-          const { vehicleId, isNew } = await saveVehicle(supabase, vehicle);
+          const { vehicleId, isNew, relinkVin } = await saveVehicle(supabase, vehicle);
 
           softWrite("import_queue complete", await supabase
             .from("import_queue")
-            .update({ status: "complete", vehicle_id: vehicleId, error_message: null })
+            .update({ status: landedStatus(relinkVin), vehicle_id: vehicleId, error_message: null })
             .eq("id", item.id), writeErrors);
 
           results.success++;
