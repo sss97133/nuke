@@ -1,0 +1,1152 @@
+{
+  "aliasSource": "nuke_frontend/src/components/common/MakeIdentity.tsx",
+  "aliasSourceSha256Base64": "8ewdIdeQYHQrmyfMCIHN9d20IFkzGrLTA20aLaAowQ4=",
+  "aliases": {
+    "landrover": "land-rover",
+    "mercedes": "mercedes-benz",
+    "mercedes-benz": "mercedes-benz"
+  },
+  "converter": "rsvg-convert version 2.62.1\n\nlibraries used:\n  cairo 1.18.4\n  pango 1.57.0\n  harfbuzz 14.0.0\n  fontconfig 2.17.1",
+  "makes": [
+    {
+      "aspectRatio": 6.583114085497979,
+      "asset": "MakeWordmark-acura",
+      "brand": "Acura",
+      "key": "acura",
+      "rendering": "template",
+      "sources": [
+        {
+          "appearance": "light",
+          "brand": "Acura",
+          "era": null,
+          "file": "acura-wordmark.svg",
+          "license": "CARDOG-LICENSE.txt",
+          "localSha256Base64": "oxSD7EDjFAEswrU1rRqVO+SGC/SaxympsgcFhSuxtWA=",
+          "palette": [
+            "black"
+          ],
+          "pdfSha256Base64": "l9b/jz8/SKybQbY+vDIQb3lY6ioCqvYdgEFq6UZneJA=",
+          "role": "wordmark",
+          "source": "https://github.com/cardog-ai/icons/blob/05c4001e83a0/core/optimized/Acura%20Wordmark.svg",
+          "sourceSha256Base64": "LB35XB/m/fX+1lWGvKHmcAmR/SS3uK9QGUJH+AeD4vc=",
+          "upstream": "Acura Wordmark.svg",
+          "upstreamCommitSha1Base64": "BcQAHoOgmhiXIaCFFUYpH3H34xw=",
+          "viewport": "27.638000 221.638046 456.724000 69.378108"
+        }
+      ]
+    },
+    {
+      "aspectRatio": 4.793148311633322,
+      "asset": "MakeWordmark-alfa-romeo",
+      "brand": "Alfa Romeo",
+      "key": "alfa-romeo",
+      "rendering": "template",
+      "sources": [
+        {
+          "appearance": "light",
+          "brand": "Alfa Romeo",
+          "era": null,
+          "file": "alfa-romeo-wordmark.svg",
+          "license": "CARDOG-LICENSE.txt",
+          "localSha256Base64": "pfy0brKxSFePHChJCzsM4VKRe3RQgxziSJYZCw2xgyM=",
+          "palette": [
+            "#221f20"
+          ],
+          "pdfSha256Base64": "XnNznoY9JN6vVx6gS9/jecmt9ZoXBLjHwz3BrGL+ptY=",
+          "role": "wordmark",
+          "source": "https://github.com/cardog-ai/icons/blob/05c4001e83a0/core/optimized/Alfa%20Romeo%20Wordmark.svg",
+          "sourceSha256Base64": "SMVsEVqLHJhCPi3Cpk0Ns0IPaydkX3YytluEs1fZEqs=",
+          "upstream": "Alfa Romeo Wordmark.svg",
+          "upstreamCommitSha1Base64": "BcQAHoOgmhiXIaCFFUYpH3H34xw=",
+          "viewport": "48.763996 212.764239 414.472004 86.471767"
+        }
+      ]
+    },
+    {
+      "aspectRatio": 9.53422892896577,
+      "asset": "MakeWordmark-aston-martin",
+      "brand": "Aston Martin",
+      "key": "aston-martin",
+      "rendering": "template",
+      "sources": [
+        {
+          "appearance": "light",
+          "brand": "Aston Martin",
+          "era": null,
+          "file": "aston-martin-wordmark.svg",
+          "license": "CARDOG-LICENSE.txt",
+          "localSha256Base64": "vW9dVTjlwu5MMp0cedTF8jNfFusomhVSm6INm8Qh9dI=",
+          "palette": [
+            "black"
+          ],
+          "pdfSha256Base64": "4rwpAkt3ssba5u4V/UXAECHzIzS3zI4T9PfpmGlw6Tg=",
+          "role": "wordmark",
+          "source": "https://github.com/cardog-ai/icons/blob/05c4001e83a0/core/optimized/Aston%20Martin%20Wordmark.svg",
+          "sourceSha256Base64": "xc8hCgcpZCCVv+EsHp8LXwijb75mAy26nMCy6Gu9dLM=",
+          "upstream": "Aston Martin Wordmark.svg",
+          "upstreamCommitSha1Base64": "BcQAHoOgmhiXIaCFFUYpH3H34xw=",
+          "viewport": "48.764000 234.764000 414.472000 43.472000"
+        }
+      ]
+    },
+    {
+      "aspectRatio": 3.6665897071432854,
+      "asset": "MakeWordmark-audi",
+      "brand": "Audi",
+      "key": "audi",
+      "rendering": "original",
+      "sources": [
+        {
+          "appearance": "dark",
+          "brand": "Audi",
+          "era": null,
+          "file": "audi-wordmark-dark.svg",
+          "license": "CARDOG-LICENSE.txt",
+          "localSha256Base64": "2I4ennToYFTsaznZmL7x06CMMFYpCQcc3HG4CciN/0Q=",
+          "palette": [
+            "white"
+          ],
+          "pdfSha256Base64": "45zlVJko+GCxCsesO650epSJsNiY5zGE6TCmv6ZySOo=",
+          "role": "wordmark",
+          "source": "https://github.com/cardog-ai/icons/blob/05c4001e83a0/core/optimized/Audi%20Wordmark%20Dark.svg",
+          "sourceSha256Base64": "jF68yasy7OqNHzbjamwFJuT8j9A8Kcn9tkdnNbpIbFM=",
+          "upstream": "Audi Wordmark Dark.svg",
+          "upstreamCommitSha1Base64": "BcQAHoOgmhiXIaCFFUYpH3H34xw=",
+          "viewport": "99.000257 212.999617 313.999743 85.637097"
+        },
+        {
+          "appearance": "light",
+          "brand": "Audi",
+          "era": null,
+          "file": "audi-wordmark.svg",
+          "license": "CARDOG-LICENSE.txt",
+          "localSha256Base64": "EKYlKvBjEXVhF73PONxPGy/8CXLrTBn2zh1oMgcuJr8=",
+          "palette": [
+            "#c20f2f",
+            "#e18797",
+            "white"
+          ],
+          "pdfSha256Base64": "9jD0LUtZMTRso9bmtoQYYMPOVzkQS8xHkNWXVl6dDN4=",
+          "role": "wordmark",
+          "source": "https://github.com/cardog-ai/icons/blob/05c4001e83a0/core/optimized/Audi%20Wordmark.svg",
+          "sourceSha256Base64": "2qWGjP18Wz2r465S/46BoIuvTTIaup/jn/ywvp7nHrU=",
+          "upstream": "Audi Wordmark.svg",
+          "upstreamCommitSha1Base64": "BcQAHoOgmhiXIaCFFUYpH3H34xw=",
+          "viewport": "99.000257 212.999617 313.999743 85.638091"
+        }
+      ]
+    },
+    {
+      "aspectRatio": 7.643688122984152,
+      "asset": "MakeWordmark-bentley",
+      "brand": "Bentley",
+      "key": "bentley",
+      "rendering": "template",
+      "sources": [
+        {
+          "appearance": "light",
+          "brand": "Bentley",
+          "era": null,
+          "file": "bentley-wordmark.svg",
+          "license": "CARDOG-LICENSE.txt",
+          "localSha256Base64": "wdLfKzUD1cle9GMnNbwrJZDZVkFzAurH+BNksjVZFJs=",
+          "palette": [
+            "black"
+          ],
+          "pdfSha256Base64": "IJMAB0XaiOfzl3Ow/R/yuaialeTFYERUWy7XX2lcq5U=",
+          "role": "wordmark",
+          "source": "https://github.com/cardog-ai/icons/blob/05c4001e83a0/core/optimized/Bentley%20Wordmark.svg",
+          "sourceSha256Base64": "dVgh62A04Lv3s0vN2kg2HXtQ5F9Rhizsm3fz6hKCAms=",
+          "upstream": "Bentley Wordmark.svg",
+          "upstreamCommitSha1Base64": "BcQAHoOgmhiXIaCFFUYpH3H34xw=",
+          "viewport": "48.763952 228.763778 414.472048 54.224092"
+        }
+      ]
+    },
+    {
+      "aspectRatio": 6.5116691196347585,
+      "asset": "MakeWordmark-buick",
+      "brand": "Buick",
+      "key": "buick",
+      "rendering": "template",
+      "sources": [
+        {
+          "appearance": "light",
+          "brand": "Buick",
+          "era": null,
+          "file": "buick-wordmark.svg",
+          "license": "CARDOG-LICENSE.txt",
+          "localSha256Base64": "xLjPt/H8URhsr4xZnmjmQ0NdRs/21S13Wc0IrPgg9tk=",
+          "palette": [
+            "black"
+          ],
+          "pdfSha256Base64": "8kbsdQ2GGIE/AEPNqbKVZOS9YuEAlUQ3BhUzu3v4x9A=",
+          "role": "wordmark",
+          "source": "https://github.com/cardog-ai/icons/blob/05c4001e83a0/core/optimized/Buick%20Wordmark.svg",
+          "sourceSha256Base64": "4i2qFf1IYyEJCSR9TfPx4FZ+JOpx+BP1KzDCSTOdbvs=",
+          "upstream": "Buick Wordmark.svg",
+          "upstreamCommitSha1Base64": "BcQAHoOgmhiXIaCFFUYpH3H34xw=",
+          "viewport": "39.707000 222.707000 433.586000 66.586000"
+        }
+      ]
+    },
+    {
+      "aspectRatio": 10.791433838806082,
+      "asset": "MakeWordmark-cadillac",
+      "brand": "Cadillac",
+      "key": "cadillac",
+      "rendering": "template",
+      "sources": [
+        {
+          "appearance": "light",
+          "brand": "Cadillac",
+          "era": null,
+          "file": "cadillac-wordmark.svg",
+          "license": "CARDOG-LICENSE.txt",
+          "localSha256Base64": "Syy5G14iK29hK3yig+NbaFo4sT0xWgE5cb6eISm3UFo=",
+          "palette": [
+            "black"
+          ],
+          "pdfSha256Base64": "vy1lLeweqsimmvp5gr8svUgJ2YECKDBHAgQKusy2ITk=",
+          "role": "wordmark",
+          "source": "https://github.com/cardog-ai/icons/blob/05c4001e83a0/core/optimized/Cadillac%20Wordmark.svg",
+          "sourceSha256Base64": "AQV4BPgwsM+L6hZf99gjSwS9+C6oGX75aC1sbDzFauQ=",
+          "upstream": "Cadillac Wordmark.svg",
+          "upstreamCommitSha1Base64": "BcQAHoOgmhiXIaCFFUYpH3H34xw=",
+          "viewport": "7.517199 232.517199 497.232602 46.076602"
+        }
+      ]
+    },
+    {
+      "aspectRatio": 10.695676418522146,
+      "asset": "MakeWordmark-chevrolet",
+      "brand": "Chevrolet",
+      "key": "chevrolet",
+      "rendering": "template",
+      "sources": [
+        {
+          "appearance": "light",
+          "brand": "Chevrolet",
+          "era": null,
+          "file": "chevrolet-wordmark.svg",
+          "license": "CARDOG-LICENSE.txt",
+          "localSha256Base64": "0oiog1vw8yetYBitfsTV1yL5x+23enAhV2HTLhTfEYM=",
+          "palette": [
+            "#141414"
+          ],
+          "pdfSha256Base64": "0X0VfJEiSkUoFDiTn6Tba+n0fMtAz97gVH+hDx9yxs4=",
+          "role": "wordmark",
+          "source": "https://github.com/cardog-ai/icons/blob/05c4001e83a0/core/optimized/Chevrolet%20Wordmark.svg",
+          "sourceSha256Base64": "XiGlLIj3cRxe/EQoBGEDBrr6MOF/jZ298XfzN8ffIUg=",
+          "upstream": "Chevrolet Wordmark.svg",
+          "upstreamCommitSha1Base64": "BcQAHoOgmhiXIaCFFUYpH3H34xw=",
+          "viewport": "48.764387 236.764387 414.342226 38.739226"
+        }
+      ]
+    },
+    {
+      "aspectRatio": 16.308699644127607,
+      "asset": "MakeWordmark-chrysler",
+      "brand": "Chrysler",
+      "key": "chrysler",
+      "rendering": "template",
+      "sources": [
+        {
+          "appearance": "light",
+          "brand": "Chrysler",
+          "era": null,
+          "file": "chrysler-wordmark.svg",
+          "license": "CARDOG-LICENSE.txt",
+          "localSha256Base64": "RXDegsgusy0UTFUQO5Irr8R0QRViZzjKs5oDLkwFZ7M=",
+          "palette": [
+            "black"
+          ],
+          "pdfSha256Base64": "+C5QxWV9UhAyjNqYhoGJUm3d4QvfABQUM2gLk6GcF2k=",
+          "role": "wordmark",
+          "source": "https://github.com/cardog-ai/icons/blob/05c4001e83a0/core/optimized/Chrysler%20Wordmark.svg",
+          "sourceSha256Base64": "SLitzNASCQ96R5hOD7mbGpZZtqgf3qTm9GFFH6GPL+Q=",
+          "upstream": "Chrysler Wordmark.svg",
+          "upstreamCommitSha1Base64": "BcQAHoOgmhiXIaCFFUYpH3H34xw=",
+          "viewport": "48.764000 243.763862 414.472000 25.414166"
+        }
+      ]
+    },
+    {
+      "aspectRatio": 12.79299997602871,
+      "asset": "MakeWordmark-dodge",
+      "brand": "Dodge",
+      "key": "dodge",
+      "rendering": "template",
+      "sources": [
+        {
+          "appearance": "light",
+          "brand": "Dodge",
+          "era": null,
+          "file": "dodge-wordmark.svg",
+          "license": "CARDOG-LICENSE.txt",
+          "localSha256Base64": "FF2JsLyYyY7D8UQ8J+9eH8WT+lM4A+ApC1RoAsgnRdA=",
+          "palette": [
+            "black"
+          ],
+          "pdfSha256Base64": "nNaxMgt89Ux0ZIlapKb5rMD2CcG0frimGb7ZVeinPBE=",
+          "role": "wordmark",
+          "source": "https://github.com/cardog-ai/icons/blob/05c4001e83a0/core/optimized/Dodge%20Wordmark.svg",
+          "sourceSha256Base64": "o2pItYpA/jwHVge965m5kobyjw1neikOAWsPP9/jY44=",
+          "upstream": "Dodge Wordmark.svg",
+          "upstreamCommitSha1Base64": "BcQAHoOgmhiXIaCFFUYpH3H34xw=",
+          "viewport": "38.793113 235.596313 421.073573 32.914373"
+        }
+      ]
+    },
+    {
+      "aspectRatio": 4.444130930995807,
+      "asset": "MakeWordmark-ferrari",
+      "brand": "Ferrari",
+      "key": "ferrari",
+      "rendering": "template",
+      "sources": [
+        {
+          "appearance": "light",
+          "brand": "Ferrari",
+          "era": null,
+          "file": "ferrari-wordmark.svg",
+          "license": "CARDOG-LICENSE.txt",
+          "localSha256Base64": "mFjBJElUHNF+9W4nCyONP/5CshoxzQBkjeGh3D3oRv0=",
+          "palette": [
+            "black"
+          ],
+          "pdfSha256Base64": "TaGSKWTbiyUy5OwK8rQZbua/hheqXDZgDvWtYdZOcKM=",
+          "role": "wordmark",
+          "source": "https://github.com/cardog-ai/icons/blob/05c4001e83a0/core/optimized/Ferrari%20Wordmark.svg",
+          "sourceSha256Base64": "/sv52gLSsFBIGtkZhHrmZetvNJVp5E3y1SGZSBvKoLU=",
+          "upstream": "Ferrari Wordmark.svg",
+          "upstreamCommitSha1Base64": "BcQAHoOgmhiXIaCFFUYpH3H34xw=",
+          "viewport": "77.936997 215.936791 356.460240 80.209212"
+        }
+      ]
+    },
+    {
+      "aspectRatio": 2.5132795226664664,
+      "asset": "MakeWordmark-ford",
+      "brand": "Ford",
+      "key": "ford",
+      "rendering": "original",
+      "sources": [
+        {
+          "appearance": "dark",
+          "brand": "Ford",
+          "era": null,
+          "file": "ford-wordmark-dark.svg",
+          "license": "CARDOG-LICENSE.txt",
+          "localSha256Base64": "JDkinrJeXOLPjrwrIkiZn3mLjgOc8I4s9awxTC1r0pI=",
+          "palette": [
+            "white"
+          ],
+          "pdfSha256Base64": "ZMMaiJdhFxUezyBxLgaV8bNOgeopwJPvYkz+lGkD7uY=",
+          "role": "wordmark",
+          "source": "https://github.com/cardog-ai/icons/blob/05c4001e83a0/core/optimized/Ford%20Wordmark%20Dark.svg",
+          "sourceSha256Base64": "U32GIqJV2+A45XaZavWsCG+hnz1XoPr96h+SftZoKgI=",
+          "upstream": "Ford Wordmark Dark.svg",
+          "upstreamCommitSha1Base64": "BcQAHoOgmhiXIaCFFUYpH3H34xw=",
+          "viewport": "48.763972 173.763553 414.471913 164.912780"
+        },
+        {
+          "appearance": "light",
+          "brand": "Ford",
+          "era": null,
+          "file": "ford-wordmark.svg",
+          "license": "CARDOG-LICENSE.txt",
+          "localSha256Base64": "fw7JSWiUiXJa9IlwPh4vzhiclZP2P4yCLxR5twmTOqE=",
+          "palette": [
+            "#00095b"
+          ],
+          "pdfSha256Base64": "gFiuV0rsTnMPBKIqCe9/3+CX2zydM3WpgPO9lAq6vz4=",
+          "role": "wordmark",
+          "source": "https://github.com/cardog-ai/icons/blob/05c4001e83a0/core/optimized/Ford%20Wordmark.svg",
+          "sourceSha256Base64": "4Ek2lzROD/JganQx8AK9/SpDnlroHycL39yitpXUOWM=",
+          "upstream": "Ford Wordmark.svg",
+          "upstreamCommitSha1Base64": "BcQAHoOgmhiXIaCFFUYpH3H34xw=",
+          "viewport": "48.763972 173.763553 414.471913 164.912780"
+        }
+      ]
+    },
+    {
+      "aspectRatio": 4.830056752630781,
+      "asset": "MakeWordmark-gmc",
+      "brand": "GMC",
+      "key": "gmc",
+      "rendering": "template",
+      "sources": [
+        {
+          "appearance": "light",
+          "brand": "GMC",
+          "era": null,
+          "file": "gmc-wordmark.svg",
+          "license": "CARDOG-LICENSE.txt",
+          "localSha256Base64": "8U36BPsMALu4T6GImyAsz8coGe+jvS86txEqdVStAVA=",
+          "palette": [
+            "black"
+          ],
+          "pdfSha256Base64": "p7IwnWkD4MvSv6eQGhCXz/7CtWehSuKPIpiHLYQs6mM=",
+          "role": "wordmark",
+          "source": "https://github.com/cardog-ai/icons/blob/05c4001e83a0/core/optimized/GMC%20Wordmark.svg",
+          "sourceSha256Base64": "Itk7/TGcJR+qqwxLKq4VHCvy1o2rT3PE+xVK6RTw1tg=",
+          "upstream": "GMC Wordmark.svg",
+          "upstreamCommitSha1Base64": "BcQAHoOgmhiXIaCFFUYpH3H34xw=",
+          "viewport": "48.764000 212.764000 414.472000 85.811000"
+        }
+      ]
+    },
+    {
+      "aspectRatio": 7.922596437154656,
+      "asset": "MakeWordmark-honda",
+      "brand": "Honda",
+      "key": "honda",
+      "rendering": "original",
+      "sources": [
+        {
+          "appearance": "dark",
+          "brand": "Honda",
+          "era": null,
+          "file": "honda-wordmark-dark.svg",
+          "license": "CARDOG-LICENSE.txt",
+          "localSha256Base64": "zkqIWWVh7TfI/jGLmtT/1sQHZFMrgQjsdGAIQV3m5a4=",
+          "palette": [
+            "white"
+          ],
+          "pdfSha256Base64": "FQTv1W54cKU0NknYlsMFgFFoaBYFl113v8B7yACPW9g=",
+          "role": "wordmark",
+          "source": "https://github.com/cardog-ai/icons/blob/05c4001e83a0/core/optimized/Honda%20Wordmark%20Dark.svg",
+          "sourceSha256Base64": "LVZAZN28orOIdsvzRfaIkoxlMbTbIK4cUcBHZrSS0p4=",
+          "upstream": "Honda Wordmark Dark.svg",
+          "upstreamCommitSha1Base64": "BcQAHoOgmhiXIaCFFUYpH3H34xw=",
+          "viewport": "48.764897 229.764897 414.171206 52.277206"
+        },
+        {
+          "appearance": "light",
+          "brand": "Honda",
+          "era": null,
+          "file": "honda-wordmark.svg",
+          "license": "CARDOG-LICENSE.txt",
+          "localSha256Base64": "4Rcobfut5+AH281VVOAQcqFt3YiFFbcpHaDIlu2YcE8=",
+          "palette": [
+            "#cc0000"
+          ],
+          "pdfSha256Base64": "keyjOqDhiOAgb4YGcpnQ8uGgtxTjUWSJe0urLgam50c=",
+          "role": "wordmark",
+          "source": "https://github.com/cardog-ai/icons/blob/05c4001e83a0/core/optimized/Honda%20Wordmark.svg",
+          "sourceSha256Base64": "SESAQF6TxCs1QwBJpe/I2z5bKbJunmbepoXflosNVto=",
+          "upstream": "Honda Wordmark.svg",
+          "upstreamCommitSha1Base64": "BcQAHoOgmhiXIaCFFUYpH3H34xw=",
+          "viewport": "48.764897 229.764897 414.171206 52.277206"
+        }
+      ]
+    },
+    {
+      "aspectRatio": 4.906593516194125,
+      "asset": "MakeWordmark-hummer",
+      "brand": "Hummer",
+      "key": "hummer",
+      "rendering": "template",
+      "sources": [
+        {
+          "appearance": "light",
+          "brand": "Hummer",
+          "era": null,
+          "file": "hummer-wordmark.svg",
+          "license": "CARDOG-LICENSE.txt",
+          "localSha256Base64": "+KfNkw1KHjyJ1+1AzNe1QYyWDQVUJ7KAESilIRMDaeM=",
+          "palette": [
+            "black"
+          ],
+          "pdfSha256Base64": "Wlv8RrbF6jjOXLVSlS08yB4FrNh9ax00hfrehmCKN6s=",
+          "role": "wordmark",
+          "source": "https://github.com/cardog-ai/icons/blob/05c4001e83a0/core/optimized/Hummer%20Wordmark.svg",
+          "sourceSha256Base64": "gG50SEeoJh1P9pCajQH46ybnCBMTLuovvNnGPolxZ1Y=",
+          "upstream": "Hummer Wordmark.svg",
+          "upstreamCommitSha1Base64": "BcQAHoOgmhiXIaCFFUYpH3H34xw=",
+          "viewport": "48.764000 213.763550 414.472000 84.472455"
+        }
+      ]
+    },
+    {
+      "aspectRatio": 7.73439969308566,
+      "asset": "MakeWordmark-jaguar",
+      "brand": "Jaguar",
+      "key": "jaguar",
+      "rendering": "original",
+      "sources": [
+        {
+          "appearance": "dark",
+          "brand": "Jaguar",
+          "era": null,
+          "file": "jaguar-wordmark-dark.svg",
+          "license": "CARDOG-LICENSE.txt",
+          "localSha256Base64": "r5TW2zgfG2Vcp+SrsPZ2IMRzj7Iae6NpdIgfKB8uS0U=",
+          "palette": [
+            "white"
+          ],
+          "pdfSha256Base64": "IjdsOxf5KtH3mKfUpvLdl8cAZPFbg6vIfM5c8b5q+yw=",
+          "role": "wordmark",
+          "source": "https://github.com/cardog-ai/icons/blob/05c4001e83a0/core/optimized/Jaguar%20Wordmark%20Dark.svg",
+          "sourceSha256Base64": "uBJVPZAt1y3tH91slZaN5S2vNPfDLYxZsllkN/amVxw=",
+          "upstream": "Jaguar Wordmark Dark.svg",
+          "upstreamCommitSha1Base64": "BcQAHoOgmhiXIaCFFUYpH3H34xw=",
+          "viewport": "48.766808 254.766808 413.530384 53.466384"
+        },
+        {
+          "appearance": "light",
+          "brand": "Jaguar",
+          "era": null,
+          "file": "jaguar-wordmark.svg",
+          "license": "CARDOG-LICENSE.txt",
+          "localSha256Base64": "Y2CUnUPoAqWTH9lUnHNZcckxIm0+wtzdck3hRgah2pg=",
+          "palette": [
+            "#4c4a4d"
+          ],
+          "pdfSha256Base64": "SAIb5l49x1LvvxZi+GgpAP2J1lKUdgr/B/Wk9sz9gvo=",
+          "role": "wordmark",
+          "source": "https://github.com/cardog-ai/icons/blob/05c4001e83a0/core/optimized/Jaguar%20Wordmark.svg",
+          "sourceSha256Base64": "ykEEK20H1cHCakOwprKQAeBa4poTpBfKysdlCrVwRao=",
+          "upstream": "Jaguar Wordmark.svg",
+          "upstreamCommitSha1Base64": "BcQAHoOgmhiXIaCFFUYpH3H34xw=",
+          "viewport": "48.766808 254.766808 413.530384 53.466384"
+        }
+      ]
+    },
+    {
+      "aspectRatio": 2.480887792848335,
+      "asset": "MakeWordmark-jeep",
+      "brand": "Jeep",
+      "key": "jeep",
+      "rendering": "original",
+      "sources": [
+        {
+          "appearance": "dark",
+          "brand": "Jeep",
+          "era": null,
+          "file": "jeep-wordmark-dark.svg",
+          "license": "CARDOG-LICENSE.txt",
+          "localSha256Base64": "a3/KCLuO1jMmJ7PC3rUikNNvk+f0SKhYP4Jmde9YU3Q=",
+          "palette": [
+            "white"
+          ],
+          "pdfSha256Base64": "YFPPkRLjZlseqDoMHzUOxMhywl1Lp15BeRPvZUS99es=",
+          "role": "wordmark",
+          "source": "https://github.com/cardog-ai/icons/blob/05c4001e83a0/core/optimized/Jeep%20Wordmark%20Dark.svg",
+          "sourceSha256Base64": "XR1H3KVKLvBnO9BxypAoU27b28DopmW9svpG+nhenbo=",
+          "upstream": "Jeep Wordmark Dark.svg",
+          "upstreamCommitSha1Base64": "BcQAHoOgmhiXIaCFFUYpH3H34xw=",
+          "viewport": "48.764000 172.967000 414.472000 167.066000"
+        },
+        {
+          "appearance": "light",
+          "brand": "Jeep",
+          "era": null,
+          "file": "jeep-wordmark.svg",
+          "license": "CARDOG-LICENSE.txt",
+          "localSha256Base64": "d9U/89WXfTl1b46UsnrAulH3AVSxWpWYTSUetPlEAHM=",
+          "palette": [
+            "#424d07"
+          ],
+          "pdfSha256Base64": "IhoM9R8w0jSKu3BSenUVO+scLvuE8QRDdY9WuwN+fIg=",
+          "role": "wordmark",
+          "source": "https://github.com/cardog-ai/icons/blob/05c4001e83a0/core/optimized/Jeep%20Wordmark.svg",
+          "sourceSha256Base64": "kDLH2ohEenYe1yDCK52OCRTS5ondUx9H4TNyBLSDXOU=",
+          "upstream": "Jeep Wordmark.svg",
+          "upstreamCommitSha1Base64": "BcQAHoOgmhiXIaCFFUYpH3H34xw=",
+          "viewport": "48.764000 172.967000 414.472000 167.066000"
+        }
+      ]
+    },
+    {
+      "aspectRatio": 1.8884960268280235,
+      "asset": "MakeWordmark-land-rover",
+      "brand": "Landrover",
+      "key": "land-rover",
+      "rendering": "template",
+      "sources": [
+        {
+          "appearance": "light",
+          "brand": "Landrover",
+          "era": null,
+          "file": "land-rover-wordmark.svg",
+          "license": "CARDOG-LICENSE.txt",
+          "localSha256Base64": "2Fe8B3wRCzCc2vb2/vA2lmZr5y83wAxG0BJoXNhxxQs=",
+          "palette": [
+            "black"
+          ],
+          "pdfSha256Base64": "APPBuSuQTOAW+e5BoZ3YWG6sdxwrUFXp6EmfqeUACb8=",
+          "role": "lettered lockup",
+          "source": "https://github.com/cardog-ai/icons/blob/05c4001e83a0/core/optimized/Landrover%20Wordmark.svg",
+          "sourceSha256Base64": "45nMcHap8tM2b8t79t1BknOh8xDTIGHz33ezWE36xpM=",
+          "upstream": "Landrover Wordmark.svg",
+          "upstreamCommitSha1Base64": "BcQAHoOgmhiXIaCFFUYpH3H34xw=",
+          "viewport": "48.764000 146.764000 414.472000 219.472000"
+        }
+      ]
+    },
+    {
+      "aspectRatio": 7.670294340809829,
+      "asset": "MakeWordmark-lexus",
+      "brand": "Lexus",
+      "key": "lexus",
+      "rendering": "template",
+      "sources": [
+        {
+          "appearance": "light",
+          "brand": "Lexus",
+          "era": null,
+          "file": "lexus-wordmark.svg",
+          "license": "CARDOG-LICENSE.txt",
+          "localSha256Base64": "bhP9+bkrM2BrVgqj/sqmIFWRchx6nePcEbj1Ow+CypQ=",
+          "palette": [
+            "black"
+          ],
+          "pdfSha256Base64": "ozEhgyq3F3WAsvIL9R5gDgDSJeOATQy7S5or+uh94M8=",
+          "role": "wordmark",
+          "source": "https://github.com/cardog-ai/icons/blob/05c4001e83a0/core/optimized/Lexus%20Wordmark.svg",
+          "sourceSha256Base64": "32NAZaAgGzyIJVGZ2AAyi9aTS1wWkyF9u8K390UaLys=",
+          "upstream": "Lexus Wordmark.svg",
+          "upstreamCommitSha1Base64": "BcQAHoOgmhiXIaCFFUYpH3H34xw=",
+          "viewport": "48.763975 228.982000 414.472025 54.036000"
+        }
+      ]
+    },
+    {
+      "aspectRatio": 10.63563625853019,
+      "asset": "MakeWordmark-lincoln",
+      "brand": "Lincoln",
+      "key": "lincoln",
+      "rendering": "template",
+      "sources": [
+        {
+          "appearance": "light",
+          "brand": "Lincoln",
+          "era": null,
+          "file": "lincoln-wordmark.svg",
+          "license": "CARDOG-LICENSE.txt",
+          "localSha256Base64": "lMBu5N9TWLWwc8zO0wQLY7017ZjVGdHiyE/E/b5dPNg=",
+          "palette": [
+            "#040404"
+          ],
+          "pdfSha256Base64": "P7fX2yh0l4ieq0XuAd7cE+KkyclJjjZQPF/w+HYNU6s=",
+          "role": "wordmark",
+          "source": "https://github.com/cardog-ai/icons/blob/05c4001e83a0/core/optimized/Lincoln%20Wordmark.svg",
+          "sourceSha256Base64": "eR+z/+V0UihWO0zteJyxrsUxBTdErPJEwjBklPTVkXg=",
+          "upstream": "Lincoln Wordmark.svg",
+          "upstreamCommitSha1Base64": "BcQAHoOgmhiXIaCFFUYpH3H34xw=",
+          "viewport": "48.764000 236.514786 414.472000 38.970118"
+        }
+      ]
+    },
+    {
+      "aspectRatio": 5.352955588371564,
+      "asset": "MakeWordmark-lotus",
+      "brand": "Lotus",
+      "key": "lotus",
+      "rendering": "template",
+      "sources": [
+        {
+          "appearance": "light",
+          "brand": "Lotus",
+          "era": null,
+          "file": "lotus-wordmark.svg",
+          "license": "CARDOG-LICENSE.txt",
+          "localSha256Base64": "LA8T+3rUxp82JMSFwvFIrJkid1X0cS9iDDR1MNR5BMM=",
+          "palette": [
+            "black"
+          ],
+          "pdfSha256Base64": "QF+a488GSh9JlchVBT8xq2xTaYatqpZdKdUmyq+6xJc=",
+          "role": "wordmark",
+          "source": "https://github.com/cardog-ai/icons/blob/05c4001e83a0/core/optimized/Lotus%20Wordmark.svg",
+          "sourceSha256Base64": "53fnWbv5GQDNGr2mHnl+Uozy5xI+COH7iZhyKyhaKi0=",
+          "upstream": "Lotus Wordmark.svg",
+          "upstreamCommitSha1Base64": "BcQAHoOgmhiXIaCFFUYpH3H34xw=",
+          "viewport": "59.066315 220.105806 394.301535 73.660528"
+        }
+      ]
+    },
+    {
+      "aspectRatio": 10.254291845493563,
+      "asset": "MakeWordmark-maserati",
+      "brand": "Maserati",
+      "key": "maserati",
+      "rendering": "template",
+      "sources": [
+        {
+          "appearance": "light",
+          "brand": "Maserati",
+          "era": null,
+          "file": "maserati-wordmark.svg",
+          "license": "CARDOG-LICENSE.txt",
+          "localSha256Base64": "FBdf/7cYheCEf1RRFkMM1hTR/tx5sjcopk1Qx66uNho=",
+          "palette": [
+            "black"
+          ],
+          "pdfSha256Base64": "sF7ost8DNmSBuRxGkz/KyoDfC9+thCtA1pDHEzJ1MUM=",
+          "role": "wordmark",
+          "source": "https://github.com/cardog-ai/icons/blob/05c4001e83a0/core/optimized/Maserati%20Wordmark.svg",
+          "sourceSha256Base64": "kiDIkcsbsCdZkx42WEvT1XH/YqA0Cc/4oqCqy6FhaF8=",
+          "upstream": "Maserati Wordmark.svg",
+          "upstreamCommitSha1Base64": "BcQAHoOgmhiXIaCFFUYpH3H34xw=",
+          "viewport": "26.632000 233.632000 458.736000 44.736000"
+        }
+      ]
+    },
+    {
+      "aspectRatio": 5.718923544211591,
+      "asset": "MakeWordmark-mazda",
+      "brand": "Mazda",
+      "key": "mazda",
+      "rendering": "original",
+      "sources": [
+        {
+          "appearance": "dark",
+          "brand": "Mazda",
+          "era": null,
+          "file": "mazda-wordmark-dark.svg",
+          "license": "CARDOG-LICENSE.txt",
+          "localSha256Base64": "3Tery2v4pQNLTfIapDlkNs0syWHTY26nyYOYnwOaTkQ=",
+          "palette": [
+            "white"
+          ],
+          "pdfSha256Base64": "opF7c/81JYqST6GGvceNSyhqS9NsHBXzUVn8APCk0fI=",
+          "role": "wordmark",
+          "source": "https://github.com/cardog-ai/icons/blob/05c4001e83a0/core/optimized/Mazda%20Wordmark%20Dark.svg",
+          "sourceSha256Base64": "9XruY8qRD6vo1mauYBSwp6fbmSU4AV5NlrV+vtMpDjY=",
+          "upstream": "Mazda Wordmark Dark.svg",
+          "upstreamCommitSha1Base64": "BcQAHoOgmhiXIaCFFUYpH3H34xw=",
+          "viewport": "48.765006 219.762006 414.469988 72.473427"
+        },
+        {
+          "appearance": "light",
+          "brand": "Mazda",
+          "era": null,
+          "file": "mazda-wordmark.svg",
+          "license": "CARDOG-LICENSE.txt",
+          "localSha256Base64": "laX6dfzsu335v4FHDm/CZyatHFbgqU9K4Cko4/B7rDI=",
+          "palette": [
+            "#0080c5"
+          ],
+          "pdfSha256Base64": "cwruEcGQjvNOYsOULjk4AuC5t/KbJJvzTJEMPEgqpD4=",
+          "role": "wordmark",
+          "source": "https://github.com/cardog-ai/icons/blob/05c4001e83a0/core/optimized/Mazda%20Wordmark.svg",
+          "sourceSha256Base64": "+Fyyrk4a9Tjp5PbZjZ5oMneUcQqX9AJ2/xiTrGxbXLE=",
+          "upstream": "Mazda Wordmark.svg",
+          "upstreamCommitSha1Base64": "BcQAHoOgmhiXIaCFFUYpH3H34xw=",
+          "viewport": "48.765006 219.762006 414.469988 72.473427"
+        }
+      ]
+    },
+    {
+      "aspectRatio": 8.321590538040127,
+      "asset": "MakeWordmark-mercedes-benz",
+      "brand": "Mercedes-Benz",
+      "key": "mercedes-benz",
+      "rendering": "template",
+      "sources": [
+        {
+          "appearance": "light",
+          "brand": "Mercedes-Benz",
+          "era": null,
+          "file": "mercedes-benz-wordmark.svg",
+          "license": "CARDOG-LICENSE.txt",
+          "localSha256Base64": "qPU7O1xBI9ZnmLX4sCrVjhcstTeTI4kAgAFQdaXo/t8=",
+          "palette": [
+            "#231f20"
+          ],
+          "pdfSha256Base64": "NUlzhtysnHeqthAkOxuZgUsmAIGSwF335UVRiBqZN1Y=",
+          "role": "wordmark",
+          "source": "https://github.com/cardog-ai/icons/blob/05c4001e83a0/core/optimized/MB%20Wordmark.svg",
+          "sourceSha256Base64": "qvhb5pKYsyxlgJJ82BClBbS7ZIJlyUipXj/5mb2VC80=",
+          "upstream": "MB Wordmark.svg",
+          "upstreamCommitSha1Base64": "BcQAHoOgmhiXIaCFFUYpH3H34xw=",
+          "viewport": "26.632000 228.632000 458.736000 55.126000"
+        }
+      ]
+    },
+    {
+      "aspectRatio": 3.021628203912037,
+      "asset": "MakeWordmark-mini",
+      "brand": "Mini",
+      "key": "mini",
+      "rendering": "template",
+      "sources": [
+        {
+          "appearance": "light",
+          "brand": "Mini",
+          "era": null,
+          "file": "mini-wordmark.svg",
+          "license": "CARDOG-LICENSE.txt",
+          "localSha256Base64": "TODyraeWc9fXP52Ch+OuRLoPFtRL96XQmj8x9OTcijE=",
+          "palette": [
+            "#120a08"
+          ],
+          "pdfSha256Base64": "sYwLtVLB98lRHK+T91KzH3chcX3Alr/HEmxt/EyG2ws=",
+          "role": "wordmark",
+          "source": "https://github.com/cardog-ai/icons/blob/05c4001e83a0/core/optimized/Mini%20Wordmark.svg",
+          "sourceSha256Base64": "G86qPn43/31m1GwUmfOmEM1QzV8H8kRF06JONFhVCUs=",
+          "upstream": "Mini Wordmark.svg",
+          "upstreamCommitSha1Base64": "BcQAHoOgmhiXIaCFFUYpH3H34xw=",
+          "viewport": "50.436069 186.945969 411.128961 136.062061"
+        }
+      ]
+    },
+    {
+      "aspectRatio": 2.5473422460383732,
+      "asset": "MakeWordmark-mitsubishi",
+      "brand": "Mitsubishi",
+      "key": "mitsubishi",
+      "rendering": "template",
+      "sources": [
+        {
+          "appearance": "light",
+          "brand": "Mitsubishi",
+          "era": null,
+          "file": "mitsubishi-wordmark.svg",
+          "license": "CARDOG-LICENSE.txt",
+          "localSha256Base64": "qQ5Sug1s1rvfB7dnXsZTTtn4cvzJWTecRG1gFqpIF5o=",
+          "palette": [
+            "black"
+          ],
+          "pdfSha256Base64": "nC6MCetevVO2WjAERp+R0/FIKAQHAPgPQvBF3GnlTOA=",
+          "role": "wordmark",
+          "source": "https://github.com/cardog-ai/icons/blob/05c4001e83a0/core/optimized/Mitsubishi%20Wordmark.svg",
+          "sourceSha256Base64": "eRzHw6aabcc3mki8kpLrLG7x0bdmSqPxEenuFZUX9DQ=",
+          "upstream": "Mitsubishi Wordmark.svg",
+          "upstreamCommitSha1Base64": "BcQAHoOgmhiXIaCFFUYpH3H34xw=",
+          "viewport": "117.000000 202.000000 277.617000 108.983000"
+        }
+      ]
+    },
+    {
+      "aspectRatio": 6.783325109593661,
+      "asset": "MakeWordmark-nissan",
+      "brand": "Nissan",
+      "key": "nissan",
+      "rendering": "original",
+      "sources": [
+        {
+          "appearance": "dark",
+          "brand": "Nissan",
+          "era": null,
+          "file": "nissan-wordmark-dark.svg",
+          "license": "CARDOG-LICENSE.txt",
+          "localSha256Base64": "PCy9aI5xEa8HqYEbhZ/xo30dW6LFU5RmJgEhx6IoNVE=",
+          "palette": [
+            "white"
+          ],
+          "pdfSha256Base64": "E5rqPs5k3jXeQe1HfXapweZzk2FUv4mvdQ7bIXNrS2k=",
+          "role": "wordmark",
+          "source": "https://github.com/cardog-ai/icons/blob/05c4001e83a0/core/optimized/Nissan%20Wordmark%20Dark.svg",
+          "sourceSha256Base64": "g1NJx6WToSjaD3cjj/Ixy4mQDI+6RNCOaoFLucpbiHY=",
+          "upstream": "Nissan Wordmark Dark.svg",
+          "upstreamCommitSha1Base64": "BcQAHoOgmhiXIaCFFUYpH3H34xw=",
+          "viewport": "50.145241 226.152555 411.708518 60.693204"
+        },
+        {
+          "appearance": "light",
+          "brand": "Nissan",
+          "era": null,
+          "file": "nissan-wordmark.svg",
+          "license": "CARDOG-LICENSE.txt",
+          "localSha256Base64": "FoFdrXtrI+a9a4wjOMytDgqnDH3JSqBJU3iKQmv4Hrg=",
+          "palette": [
+            "#c90c41"
+          ],
+          "pdfSha256Base64": "peUtKJZb7I65/SFr2IbzREYE+PtqjC1HdnYV+gnzRgU=",
+          "role": "wordmark",
+          "source": "https://github.com/cardog-ai/icons/blob/05c4001e83a0/core/optimized/Nissan%20Wordmark.svg",
+          "sourceSha256Base64": "KZ2t7Jm4CYiFq80UHwsp2DP33aJzRIOwyfaFIaOyz+A=",
+          "upstream": "Nissan Wordmark.svg",
+          "upstreamCommitSha1Base64": "BcQAHoOgmhiXIaCFFUYpH3H34xw=",
+          "viewport": "50.145241 226.152555 411.708518 60.694204"
+        }
+      ]
+    },
+    {
+      "aspectRatio": 13.800118533030565,
+      "asset": "MakeWordmark-porsche",
+      "brand": "Porsche",
+      "key": "porsche",
+      "rendering": "template",
+      "sources": [
+        {
+          "appearance": "light",
+          "brand": "Porsche",
+          "era": null,
+          "file": "porsche-wordmark.svg",
+          "license": "CARDOG-LICENSE.txt",
+          "localSha256Base64": "6pfK/bRMUvFf850slRASva3JGWosljHc1hicCqW0Qdc=",
+          "palette": [
+            "black"
+          ],
+          "pdfSha256Base64": "8zSh5XU5mcWuloI+jM+9nNwKqkI4DfP9nqyN6pUZWMM=",
+          "role": "wordmark",
+          "source": "https://github.com/cardog-ai/icons/blob/05c4001e83a0/core/optimized/Porsche%20Wordmark.svg",
+          "sourceSha256Base64": "5a6uVnAx+oKzxKEWH42TJ2I+xHAZWyu6Sk4Tny5N5OA=",
+          "upstream": "Porsche Wordmark.svg",
+          "upstreamCommitSha1Base64": "BcQAHoOgmhiXIaCFFUYpH3H34xw=",
+          "viewport": "58.623799 242.211999 394.352201 28.576001"
+        }
+      ]
+    },
+    {
+      "aspectRatio": 3.9589543172362607,
+      "asset": "MakeWordmark-rolls-royce",
+      "brand": "Rolls Royce",
+      "key": "rolls-royce",
+      "rendering": "template",
+      "sources": [
+        {
+          "appearance": "light",
+          "brand": "Rolls Royce",
+          "era": null,
+          "file": "rolls-royce-wordmark.svg",
+          "license": "CARDOG-LICENSE.txt",
+          "localSha256Base64": "4eIm6nJR7jMhxEVqCa8/OdzzNzx5IERQizexd/T9hJY=",
+          "palette": [
+            "black"
+          ],
+          "pdfSha256Base64": "1u7aV/k0fNqLS93CcNzfoQyBCuTXq/aG5vjd1rrlpvg=",
+          "role": "wordmark",
+          "source": "https://github.com/cardog-ai/icons/blob/05c4001e83a0/core/optimized/Rolls%20Royce%20Wordmark.svg",
+          "sourceSha256Base64": "+yudeAHOqvXa6cJHdXdzzJxg/dRcuREMa1nqGDBuskc=",
+          "upstream": "Rolls Royce Wordmark.svg",
+          "upstreamCommitSha1Base64": "BcQAHoOgmhiXIaCFFUYpH3H34xw=",
+          "viewport": "48.766897 203.767897 413.165206 104.362206"
+        }
+      ]
+    },
+    {
+      "aspectRatio": 7.669868058254223,
+      "asset": "MakeWordmark-subaru",
+      "brand": "Subaru",
+      "key": "subaru",
+      "rendering": "original",
+      "sources": [
+        {
+          "appearance": "dark",
+          "brand": "Subaru",
+          "era": null,
+          "file": "subaru-wordmark-dark.svg",
+          "license": "CARDOG-LICENSE.txt",
+          "localSha256Base64": "SnvA6QEno8nfUZLMgP40lvvlzXCC+0FpBGWa1Aelzh8=",
+          "palette": [
+            "white"
+          ],
+          "pdfSha256Base64": "NSgDNdFNYmVD+HUkXNt9eGmfaqP4KZKciABYuJJIA78=",
+          "role": "wordmark",
+          "source": "https://github.com/cardog-ai/icons/blob/05c4001e83a0/core/optimized/Subaru%20Wordmark%20Dark.svg",
+          "sourceSha256Base64": "fGkuNpDmdM3Nffccm4kXZFGA7ma05u96d3PQ3kC3OQw=",
+          "upstream": "Subaru Wordmark Dark.svg",
+          "upstreamCommitSha1Base64": "BcQAHoOgmhiXIaCFFUYpH3H34xw=",
+          "viewport": "48.764000 228.764000 414.472000 54.039000"
+        },
+        {
+          "appearance": "light",
+          "brand": "Subaru",
+          "era": null,
+          "file": "subaru-wordmark.svg",
+          "license": "CARDOG-LICENSE.txt",
+          "localSha256Base64": "3sEm/UKv8la6q8JVhbzHp7W/kKLWHNiPNJ3ui5vKrco=",
+          "palette": [
+            "#14478a"
+          ],
+          "pdfSha256Base64": "NgdLjAUfWJV1y+v6yYN9Iu2CmbZfeHUWVVornhmSRmM=",
+          "role": "wordmark",
+          "source": "https://github.com/cardog-ai/icons/blob/05c4001e83a0/core/optimized/Subaru%20Wordmark.svg",
+          "sourceSha256Base64": "RFFDvTdHfsBmN7DntZN1q0ymZh/cXgYiHr+640qaUKk=",
+          "upstream": "Subaru Wordmark.svg",
+          "upstreamCommitSha1Base64": "BcQAHoOgmhiXIaCFFUYpH3H34xw=",
+          "viewport": "48.764000 228.764000 414.472000 54.039000"
+        }
+      ]
+    },
+    {
+      "aspectRatio": 7.37573406413496,
+      "asset": "MakeWordmark-tesla",
+      "brand": "Tesla",
+      "key": "tesla",
+      "rendering": "original",
+      "sources": [
+        {
+          "appearance": "dark",
+          "brand": "Tesla",
+          "era": null,
+          "file": "tesla-wordmark-dark.svg",
+          "license": "CARDOG-LICENSE.txt",
+          "localSha256Base64": "F/WXlDfUdqKw78UpkpUaqWNC0PjPwsggXYzXgrpcfKA=",
+          "palette": [
+            "white"
+          ],
+          "pdfSha256Base64": "WDIdt6ET5vcgH4ha4NIhkRcNkMAQGup8dSvkgC65Gpw=",
+          "role": "wordmark",
+          "source": "https://github.com/cardog-ai/icons/blob/05c4001e83a0/core/optimized/Tesla%20Wordmark%20Dark.svg",
+          "sourceSha256Base64": "kzSjI5ISY+AQGWYixC9t3SOtX8hbiWKfMQPmy7MyAHw=",
+          "upstream": "Tesla Wordmark Dark.svg",
+          "upstreamCommitSha1Base64": "BcQAHoOgmhiXIaCFFUYpH3H34xw=",
+          "viewport": "48.764000 227.764000 414.472000 56.194000"
+        },
+        {
+          "appearance": "light",
+          "brand": "Tesla",
+          "era": null,
+          "file": "tesla-wordmark.svg",
+          "license": "CARDOG-LICENSE.txt",
+          "localSha256Base64": "4vExIsZ7FJ1Ia5KMKHDnlvKfwaATW9OW/XS1nwtLJnY=",
+          "palette": [
+            "#e82127"
+          ],
+          "pdfSha256Base64": "ySWMk5AOCMT9CHGq9q3E9qnmg/3F/XQL99bjKBhqykI=",
+          "role": "wordmark",
+          "source": "https://github.com/cardog-ai/icons/blob/05c4001e83a0/core/optimized/Tesla%20Wordmark.svg",
+          "sourceSha256Base64": "4au8ztlxzfJY6xSEf8H5g7ZAaOPcid3tdnIw8XB9YKs=",
+          "upstream": "Tesla Wordmark.svg",
+          "upstreamCommitSha1Base64": "BcQAHoOgmhiXIaCFFUYpH3H34xw=",
+          "viewport": "48.764000 227.764000 414.472000 56.194000"
+        }
+      ]
+    },
+    {
+      "aspectRatio": 5.491732033071868,
+      "asset": "MakeWordmark-toyota",
+      "brand": "Toyota",
+      "key": "toyota",
+      "rendering": "original",
+      "sources": [
+        {
+          "appearance": "dark",
+          "brand": "Toyota",
+          "era": null,
+          "file": "toyota-wordmark-dark.svg",
+          "license": "CARDOG-LICENSE.txt",
+          "localSha256Base64": "5AWy5VfOmC5fQA1L/Bdh/v5ecGLKxzvYO97t/V4p2zE=",
+          "palette": [
+            "white"
+          ],
+          "pdfSha256Base64": "CygGc+y8XnfN5XwG4Ck6axH/FT3ulq4sHoGK2gKOA9M=",
+          "role": "wordmark",
+          "source": "https://github.com/cardog-ai/icons/blob/05c4001e83a0/core/optimized/Toyota%20Wordmark%20Dark.svg",
+          "sourceSha256Base64": "vg7JXqi659rccEhLMKSgf5/p3hmoWfrVnHqSZ6S7ieE=",
+          "upstream": "Toyota Wordmark Dark.svg",
+          "upstreamCommitSha1Base64": "BcQAHoOgmhiXIaCFFUYpH3H34xw=",
+          "viewport": "48.764000 218.764000 414.472000 75.472000"
+        },
+        {
+          "appearance": "light",
+          "brand": "Toyota",
+          "era": null,
+          "file": "toyota-wordmark.svg",
+          "license": "CARDOG-LICENSE.txt",
+          "localSha256Base64": "AMxhl7CkWQBr9kJHl+dXidDE6D5iVM2339zhEkv7yQ0=",
+          "palette": [
+            "#d71920"
+          ],
+          "pdfSha256Base64": "9glrdmeFNyz1MNq5oTzOZx9KWDIrEHbF22mVti7QGB8=",
+          "role": "wordmark",
+          "source": "https://github.com/cardog-ai/icons/blob/05c4001e83a0/core/optimized/Toyota%20Wordmark.svg",
+          "sourceSha256Base64": "qy3WQBe5UjWuke4f0B/ANjkWC4s0Ui86VjlD90qzkTo=",
+          "upstream": "Toyota Wordmark.svg",
+          "upstreamCommitSha1Base64": "BcQAHoOgmhiXIaCFFUYpH3H34xw=",
+          "viewport": "48.764000 218.764000 414.472000 75.472000"
+        }
+      ]
+    },
+    {
+      "aspectRatio": 9.03092086051763,
+      "asset": "MakeWordmark-volkswagen",
+      "brand": "Volkswagen",
+      "key": "volkswagen",
+      "rendering": "original",
+      "sources": [
+        {
+          "appearance": "dark",
+          "brand": "Volkswagen",
+          "era": null,
+          "file": "volkswagen-wordmark-dark.svg",
+          "license": "CARDOG-LICENSE.txt",
+          "localSha256Base64": "+h1zTlcgq2kkpzjT9UjLXZo2exvdAqsvX7TY1M8QsPw=",
+          "palette": [
+            "white"
+          ],
+          "pdfSha256Base64": "PtLNS7wayxH34qbUwrbW0bDaFF4p7f29dWYqcP5xfBs=",
+          "role": "wordmark",
+          "source": "https://github.com/cardog-ai/icons/blob/05c4001e83a0/core/optimized/Volkswagen%20Wordmark%20Dark.svg",
+          "sourceSha256Base64": "bv7cmHDmpy9WOmzvbE1ls7PF05jYpNdUsBAlCHcFGO0=",
+          "upstream": "Volkswagen Wordmark Dark.svg",
+          "upstreamCommitSha1Base64": "BcQAHoOgmhiXIaCFFUYpH3H34xw=",
+          "viewport": "61.841274 234.841274 388.559452 43.025452"
+        },
+        {
+          "appearance": "light",
+          "brand": "Volkswagen",
+          "era": null,
+          "file": "volkswagen-wordmark.svg",
+          "license": "CARDOG-LICENSE.txt",
+          "localSha256Base64": "ADFgHdJxGBZLHpX4vlZgS+aWkKwMbIODfw4MRIxDFkI=",
+          "palette": [
+            "#48535a"
+          ],
+          "pdfSha256Base64": "9cXwgqSsh2RHugGOKAnDOw5kw7Zea8Swlle3uwOXOF8=",
+          "role": "wordmark",
+          "source": "https://github.com/cardog-ai/icons/blob/05c4001e83a0/core/optimized/Volkswagen%20Wordmark.svg",
+          "sourceSha256Base64": "LDdU+ddYQ2QLKm0O7QGwi4uYhuSHzQfhVE9HsrwW3Qg=",
+          "upstream": "Volkswagen Wordmark.svg",
+          "upstreamCommitSha1Base64": "BcQAHoOgmhiXIaCFFUYpH3H34xw=",
+          "viewport": "61.841274 234.841274 388.559452 43.025452"
+        }
+      ]
+    },
+    {
+      "aspectRatio": 6.969195587839655,
+      "asset": "MakeWordmark-volvo",
+      "brand": "Volvo",
+      "key": "volvo",
+      "rendering": "original",
+      "sources": [
+        {
+          "appearance": "dark",
+          "brand": "Volvo",
+          "era": null,
+          "file": "volvo-wordmark-dark.svg",
+          "license": "CARDOG-LICENSE.txt",
+          "localSha256Base64": "b6mpsy8vfE5k7nDGPgejmmhq4JyLZqGE7NRrTgr6vDo=",
+          "palette": [
+            "white"
+          ],
+          "pdfSha256Base64": "H8z1CRo7jeXZWpqL4Cq0/vOWIFVFq8+Pf7i7lj7Imzs=",
+          "role": "wordmark",
+          "source": "https://github.com/cardog-ai/icons/blob/05c4001e83a0/core/optimized/Volvo%20Wordmark%20Dark.svg",
+          "sourceSha256Base64": "xjuxw/JHpQFaleeiU/dZIzuY8kdzsirEDzE/4sW45bM=",
+          "upstream": "Volvo Wordmark Dark.svg",
+          "upstreamCommitSha1Base64": "BcQAHoOgmhiXIaCFFUYpH3H34xw=",
+          "viewport": "48.764000 225.764000 414.472000 59.472000"
+        },
+        {
+          "appearance": "light",
+          "brand": "Volvo",
+          "era": null,
+          "file": "volvo-wordmark.svg",
+          "license": "CARDOG-LICENSE.txt",
+          "localSha256Base64": "SjO91aU5stHpr6RqQrx0qEa0PQAN3bWekeSts2EY8is=",
+          "palette": [
+            "#0d3896"
+          ],
+          "pdfSha256Base64": "ivt0NQ/1snvMoNx0Wqxt+5gVT9GvQyvucVZ3Ik/zbd0=",
+          "role": "wordmark",
+          "source": "https://github.com/cardog-ai/icons/blob/05c4001e83a0/core/optimized/Volvo%20Wordmark.svg",
+          "sourceSha256Base64": "J+oyMnkKbBQjBSQ6SIJghzItmTcpf9X9PP2brVQMHdE=",
+          "upstream": "Volvo Wordmark.svg",
+          "upstreamCommitSha1Base64": "BcQAHoOgmhiXIaCFFUYpH3H34xw=",
+          "viewport": "48.764000 225.764000 414.472000 59.472000"
+        }
+      ]
+    }
+  ],
+  "schemaVersion": 1,
+  "sourceCatalogue": "nuke_frontend/public/stacks/makes/wordmarks.json",
+  "sourceCatalogueSha256Base64": "V25JiNlo3T9XVfnf8bp6vE8tKI1pxZhKkuawvMB8tLY=",
+  "sourceDateEpoch": 0
+}
