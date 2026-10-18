@@ -755,6 +755,7 @@ export const VehicleProfileProvider: React.FC<{ children: React.ReactNode }> = (
   // ── Fallback listing images (BaT/C&B vehicles with no DB images) ──
 
   useEffect(() => {
+    let cancelled = false;
     (async () => {
       try {
         if (!vehicle?.id) return;
@@ -838,6 +839,7 @@ export const VehicleProfileProvider: React.FC<{ children: React.ReactNode }> = (
               .eq('source_url', listingUrl)
               .order('updated_at', { ascending: false })
               .limit(5);
+            if (cancelled) return;
             const meta = Array.isArray(listings) && listings.length > 0 ? (listings[0] as any)?.metadata : null;
             const images: string[] =
               (Array.isArray(meta?.image_urls) ? meta.image_urls : null) ||
@@ -856,6 +858,7 @@ export const VehicleProfileProvider: React.FC<{ children: React.ReactNode }> = (
         const { data, error } = await supabase.functions.invoke('simple-scraper', {
           body: { url: listingUrl },
         });
+        if (cancelled) return;
         if (error) throw error;
         const images: string[] =
           (data?.success && Array.isArray(data?.data?.images) ? data.data.images : null) ||
@@ -868,8 +871,10 @@ export const VehicleProfileProvider: React.FC<{ children: React.ReactNode }> = (
         }
       } catch { /* ignore */ }
     })();
+    return () => { cancelled = true; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [vehicle?.id, (vehicle as any)?.profile_origin, (vehicle as any)?.discovery_url, auctionPulse?.listing_url, vehicleImages.length]);
+  }, [vehicle?.id, (vehicle as any)?.profile_origin, (vehicle as any)?.discovery_url,
+    (vehicle as any)?.bat_auction_url, (vehicle as any)?.listing_url, auctionPulse?.listing_url, vehicleImages.length]);
 
   // ── Event listeners ──
 

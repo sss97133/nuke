@@ -29,6 +29,7 @@ let root: Root, container: HTMLDivElement, go: ReturnType<typeof useNavigate>;
 let current: ReturnType<typeof useVehicleProfile>, a: string, b: string, merged: string;
 let serial = 0;
 let frames: any[], requests: RequestRecord[], functions: ReturnType<typeof vi.fn>;
+let allowedSyntheticScrapes: Set<string>;
 let reply: (request: RequestRecord) => Response | Promise<Response> | undefined;
 
 function Probe() {
@@ -38,7 +39,7 @@ function Probe() {
   const frame = {
     path: location.pathname, route: current.vehicleId, vehicle: current.vehicle?.id ?? null,
     model: current.vehicle?.model ?? null, loading: current.loading, public: current.isPublic,
-    images: current.vehicleImages, lead: current.leadImageUrl, hero: current.heroMeta,
+    images: current.vehicleImages, fallback: current.fallbackListingImageUrls, lead: current.leadImageUrl, hero: current.heroMeta,
     timeline: current.timelineEvents.map(event => event.id), pulse: current.auctionPulse?.listing_url ?? null,
     comments: current.totalCommentCount, observations: current.observationCount,
   };
@@ -65,9 +66,16 @@ beforeEach(() => {
   vi.useFakeTimers();
   const id = (tail: string) => `00000000-0000-${String(++serial).padStart(4, '0')}-0000-${tail.padStart(12, '0')}`;
   a = id('1'); b = id('2'); merged = id('3');
-  frames = []; requests = []; reply = () => undefined;
+  frames = []; requests = []; reply = () => undefined; allowedSyntheticScrapes = new Set();
+  const cache = new Map<string, string>();
+  vi.stubGlobal('localStorage', {
+    getItem: (key: string) => cache.get(key) ?? null,
+    setItem: (key: string, value: string) => { cache.set(key, value); },
+    removeItem: (key: string) => { cache.delete(key); },
+  });
   // No global network can escape the installed client's explicit test transport.
   vi.stubGlobal('fetch', vi.fn(() => { throw new Error('Real network is forbidden'); }));
+  functions = vi.fn();
   fixture.client = createClient('https://profile-lifecycle.test', 'anonymous-fixture', {
     auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false, storageKey: `lifecycle-${serial}` },
     global: { fetch: async (input, init) => {
@@ -75,6 +83,14 @@ beforeEach(() => {
         method: init?.method ?? 'GET', body: typeof init?.body === 'string' ? JSON.parse(init.body) : null };
       requests.push(request);
       const path = request.url.pathname;
+      if (path.startsWith('/functions/v1/')) {
+        const name = path.slice('/functions/v1/'.length);
+        functions(name, { body: request.body });
+        if (name === 'simple-scraper' && allowedSyntheticScrapes.has(request.body?.url)) {
+          return reply(request) ?? json({ message: 'Missing synthetic scraper response' }, 403);
+        }
+        return json({ message: 'Fixture refuses live functions' }, 403);
+      }
       if (request.method !== 'GET' && request.method !== 'HEAD'
         && !(request.method === 'POST' && path === '/rest/v1/rpc/get_vehicle_profile_data')) {
         return json({ code: '42501', message: 'Fixture refuses all writes and functions' }, 403);
@@ -93,12 +109,14 @@ beforeEach(() => {
   const channel: any = { on: () => channel, subscribe: () => channel, unsubscribe: () => Promise.resolve() };
   vi.spyOn(fixture.client, 'channel').mockReturnValue(channel);
   vi.spyOn(fixture.client, 'removeChannel').mockResolvedValue('ok');
-  functions = vi.spyOn(fixture.client.functions, 'invoke').mockRejectedValue(new Error('Functions forbidden'));
   container = document.createElement('div'); document.body.appendChild(container); root = createRoot(container);
 });
 afterEach(async () => {
   await act(async () => root.unmount());
-  expect(functions).not.toHaveBeenCalled();
+  for (const [name, options] of functions.mock.calls) {
+    expect(name).toBe('simple-scraper');
+    expect(allowedSyntheticScrapes.has((options as any)?.body?.url)).toBe(true);
+  }
   expect(globalThis.fetch).not.toHaveBeenCalled();
   container.remove(); vi.useRealTimers(); vi.unstubAllGlobals(); vi.restoreAllMocks();
 });
@@ -329,4 +347,220 @@ it('keeps a current StrictMode profile useful with one coalesced canonical RPC',
   expect(current.isPublic).toBe(true);
   expect(current.observationCount).toBe(11);
   expect(requests.filter(request => endpoint(request, 'rpc/get_vehicle_profile_data', a))).toHaveLength(1);
+});
+
+const fallbackUrl = (id: string) => `https://carsandbids.com/auctions/${id}/synthetic-car`;
+const fallbackPhoto = (label: string) => `https://images.example/fallback-${label}.jpg`;
+const metadataRead = (request: RequestRecord, id: string, url = fallbackUrl(id)) =>
+  endpoint(request, 'vehicle_events', id) && request.url.searchParams.get('select') === 'metadata'
+    && request.url.searchParams.get('source_url') === `eq.${url}`;
+function fallbackReply(request: RequestRecord) {
+  const id = subject(request);
+  if (id !== a && id !== b) return undefined;
+  if (endpoint(request, 'rpc/get_vehicle_profile_data', id)) return json({ ...profile(id,
+    { discovery_url: fallbackUrl(id), profile_origin: 'url_scraper' }), images: [] });
+  if (endpoint(request, 'vehicle_images', id)) return json([]);
+  if (metadataRead(request, id)) return json([{ metadata: { image_urls: [fallbackPhoto(id)] } }]);
+  if (endpoint(request, 'vehicle_events', id)) return json([]);
+  return undefined;
+}
+
+it.each(['image_urls', 'images'])('keeps current C&B metadata.%s useful through the exact existing bounded query', async field => {
+  reply = request => metadataRead(request, a) ? json([{ metadata: { [field]: [fallbackPhoto(a)] } }]) : fallbackReply(request);
+  await render();
+  expect(current.vehicleImages).toEqual([]);
+  expect(current.fallbackListingImageUrls).toEqual([fallbackPhoto(a)]);
+  const reads = requests.filter(request => metadataRead(request, a));
+  expect(reads).toHaveLength(1);
+  expect(reads[0].url.searchParams.get('limit')).toBe('5');
+  expect(current.vehicle?.id).toBe(a);
+});
+
+it('preserves existing mixed-photo filtering and the 250 URL cache cap', async () => {
+  const photos = Array.from({ length: 260 }, (_, i) => fallbackPhoto(`current-${i}`));
+  reply = request => metadataRead(request, a) ? json([{ metadata: { image_urls: [
+    'https://gstatic.com/faviconv2?site=example', 'https://images.example/tiny.jpg?width=32', ...photos,
+  ] } }]) : fallbackReply(request);
+  await render();
+  expect(current.fallbackListingImageUrls).toEqual(photos);
+  expect(JSON.parse(window.localStorage.getItem(`carsandbids_fallback_images_${a}`)!)).toEqual(photos.slice(0, 250));
+});
+
+it('keeps the existing current-vehicle cache format useful without another metadata read', async () => {
+  window.localStorage.setItem(`carsandbids_fallback_images_${a}`, JSON.stringify([fallbackPhoto('cached-current')]));
+  reply = fallbackReply;
+  await render();
+  expect(current.fallbackListingImageUrls).toEqual([fallbackPhoto('cached-current')]);
+  expect(requests.filter(request => metadataRead(request, a))).toEqual([]);
+});
+
+it.each(['[]', '{broken-json'])('keeps the existing uncached path useful after unusable cache %s', async cached => {
+  window.localStorage.setItem(`carsandbids_fallback_images_${a}`, cached);
+  reply = fallbackReply;
+  await render();
+  expect(current.fallbackListingImageUrls).toEqual([fallbackPhoto(a)]);
+  expect(requests.filter(request => metadataRead(request, a))).toHaveLength(1);
+});
+
+it('keeps a current fallback useful through StrictMode and repeated render', async () => {
+  reply = fallbackReply;
+  await render(true);
+  await act(async () => current.setVehicleHeaderHeight(91));
+  expect(current.fallbackListingImageUrls).toEqual([fallbackPhoto(a)]);
+  expect(requests.filter(request => metadataRead(request, a))).toHaveLength(1);
+});
+
+it('keeps a completed no-hero decision authoritative when current fallback photos arrive', async () => {
+  const pending = deferred();
+  reply = request => metadataRead(request, a) ? pending.promise : fallbackReply(request);
+  await render();
+  expect(current.leadImageUrl).toBeNull();
+  await release(pending, json([{ metadata: { image_urls: [fallbackPhoto('current-no-hero')] } }]));
+  expect(current.fallbackListingImageUrls).toEqual([fallbackPhoto('current-no-hero')]);
+  expect(current.leadImageUrl).toBeNull();
+});
+
+it('keeps a current DB gallery preferred without starting a fallback metadata read', async () => {
+  reply = request => endpoint(request, 'rpc/get_vehicle_profile_data', a) ? json(profile(a,
+    { discovery_url: fallbackUrl(a), profile_origin: 'url_scraper' }))
+    : endpoint(request, 'vehicle_images', a) ? json([photo(a)]) : fallbackReply(request);
+  await render();
+  expect(current.vehicleImages).toEqual([photo(a).image_url]);
+  expect(current.leadImageUrl).toBe(photo(a).image_url);
+  expect(current.fallbackListingImageUrls).toEqual([]);
+  expect(requests.filter(request => metadataRead(request, a))).toEqual([]);
+});
+
+it.each(['empty', 'denied'])('keeps a current %s C&B metadata read from inventing fallback photos', async state => {
+  reply = request => metadataRead(request, a) ? state === 'empty' ? json([])
+    : json({ message: 'fixture denied' }, 403) : fallbackReply(request);
+  await render();
+  expect(current.vehicle?.id).toBe(a);
+  expect(current.loading).toBe(false);
+  expect(current.fallbackListingImageUrls).toEqual([]);
+});
+
+it('refuses A fallback photos after B has loaded its own fallback', async () => {
+  const old = deferred();
+  reply = request => metadataRead(request, a) ? old.promise : fallbackReply(request);
+  await render(); await visit(b);
+  expect(current.fallbackListingImageUrls).toEqual([fallbackPhoto(b)]);
+  await release(old, json([{ metadata: { image_urls: [fallbackPhoto('obsolete-A')] } }]));
+  expect(current.vehicle?.id).toBe(b);
+  expect(current.fallbackListingImageUrls).toEqual([fallbackPhoto(b)]);
+});
+
+it('refuses pending fallback photos after the current vehicle receives a DB gallery and hero', async () => {
+  const old = deferred(); let hasDbPhotos = false;
+  reply = request => metadataRead(request, a) ? old.promise
+    : endpoint(request, 'vehicle_images', a) && hasDbPhotos ? json([photo(a)]) : fallbackReply(request);
+  await render();
+  hasDbPhotos = true;
+  await act(async () => current.reloadImages());
+  expect(current.vehicleImages).toEqual([photo(a).image_url]);
+  expect(current.leadImageUrl).toBe(photo(a).image_url);
+  frames = [];
+  await release(old, json([{ metadata: { image_urls: [fallbackPhoto('obsolete-no-gallery')] } }]));
+  expect(current.fallbackListingImageUrls).toEqual([]);
+  expect(current.vehicleImages).toEqual([photo(a).image_url]);
+  expect(current.leadImageUrl).toBe(photo(a).image_url);
+  expect(frames.every(frame => frame.fallback.length === 0)).toBe(true);
+});
+
+it.each(['discovery_url', 'listing_url'])('refuses prior-source fallback after the same vehicle changes %s', async field => {
+  const old = deferred(); const nextUrl = 'https://carsandbids.com/auctions/current-episode/synthetic-car';
+  let changed = false;
+  reply = request => metadataRead(request, a) ? old.promise
+    : metadataRead(request, a, nextUrl) ? json([{ metadata: { image_urls: [fallbackPhoto('current-episode')] } }])
+    : endpoint(request, 'rpc/get_vehicle_profile_data', a) ? json({ ...profile(a,
+      { discovery_url: null, [field]: changed ? nextUrl : fallbackUrl(a), profile_origin: 'url_scraper' }), images: [] }) : fallbackReply(request);
+  await render();
+  changed = true;
+  await act(async () => current.reloadVehicle());
+  expect(current.fallbackListingImageUrls).toEqual([fallbackPhoto('current-episode')]);
+  await release(old, json([{ metadata: { image_urls: [fallbackPhoto('obsolete-episode')] } }]));
+  expect(current.fallbackListingImageUrls).toEqual([fallbackPhoto('current-episode')]);
+});
+
+it('distinguishes pending fallback reads across A to B to A', async () => {
+  const old = deferred(), latest = deferred(); let reads = 0;
+  reply = request => metadataRead(request, a) ? ++reads === 1 ? old.promise : latest.promise : fallbackReply(request);
+  await render(); await visit(b); await visit(a);
+  expect(current.fallbackListingImageUrls).toEqual([]);
+  await release(old, json([{ metadata: { image_urls: [fallbackPhoto('obsolete-visit')] } }]));
+  expect(current.fallbackListingImageUrls).toEqual([]);
+  await release(latest, json([{ metadata: { image_urls: [fallbackPhoto('current-visit')] } }]));
+  expect(current.fallbackListingImageUrls).toEqual([fallbackPhoto('current-visit')]);
+});
+
+it('keeps a later mounted route useful when an unmounted fallback read settles', async () => {
+  const old = deferred();
+  reply = request => metadataRead(request, a) ? old.promise : fallbackReply(request);
+  await render();
+  await act(async () => go('/away'));
+  await visit(b);
+  await release(old, json([{ metadata: { image_urls: [fallbackPhoto('unmounted-A')] } }]));
+  expect(current.vehicle?.id).toBe(b);
+  expect(current.fallbackListingImageUrls).toEqual([fallbackPhoto(b)]);
+});
+
+it('preserves a valid pending fallback across an unchanged-subject unchanged-source primary reload', async () => {
+  const old = deferred(); let reads = 0;
+  reply = request => metadataRead(request, a) ? ++reads === 1 ? old.promise
+    : json([{ metadata: { image_urls: [fallbackPhoto('current-reload')] } }]) : fallbackReply(request);
+  await render();
+  await act(async () => current.reloadVehicle());
+  await release(old, json([{ metadata: { image_urls: [fallbackPhoto('unchanged-valid-source')] } }]));
+  expect(current.fallbackListingImageUrls).toEqual([fallbackPhoto('unchanged-valid-source')]);
+  expect(reads).toBe(1);
+});
+
+it.each(['nested', 'direct'])('keeps explicitly synthetic current BaT %s scraper photos useful', async shape => {
+  const url = 'https://bringatrailer.com/listing/synthetic-current-vehicle/';
+  allowedSyntheticScrapes.add(url);
+  reply = request => request.url.pathname === '/functions/v1/simple-scraper'
+    ? json(shape === 'nested' ? { success: true, data: { images: [fallbackPhoto('current-bat')] } }
+      : { images: [fallbackPhoto('current-bat')] })
+    : endpoint(request, 'rpc/get_vehicle_profile_data', a) ? json({ ...profile(a,
+      { discovery_url: url, profile_origin: 'bat_import' }), images: [] }) : fallbackReply(request);
+  await render();
+  expect(current.vehicle?.id).toBe(a);
+  expect(current.fallbackListingImageUrls).toEqual([fallbackPhoto('current-bat')]);
+  expect(JSON.parse(window.localStorage.getItem(`bat_fallback_images_${a}`)!)).toEqual([fallbackPhoto('current-bat')]);
+});
+
+it('preserves the existing BaT cache hit without invoking a scraper', async () => {
+  const url = 'https://bringatrailer.com/listing/synthetic-cached-vehicle/';
+  window.localStorage.setItem(`bat_fallback_images_${a}`, JSON.stringify([fallbackPhoto('cached-bat')]));
+  reply = request => endpoint(request, 'rpc/get_vehicle_profile_data', a) ? json({ ...profile(a,
+    { discovery_url: url, profile_origin: 'bat_import' }), images: [] }) : fallbackReply(request);
+  await render();
+  expect(current.fallbackListingImageUrls).toEqual([fallbackPhoto('cached-bat')]);
+  expect(functions).not.toHaveBeenCalled();
+});
+
+it('preserves synthetic BaT function-error refusal', async () => {
+  const url = 'https://bringatrailer.com/listing/synthetic-denied-vehicle/';
+  allowedSyntheticScrapes.add(url);
+  reply = request => request.url.pathname === '/functions/v1/simple-scraper' ? json({ message: 'fixture denied' }, 403)
+    : endpoint(request, 'rpc/get_vehicle_profile_data', a) ? json({ ...profile(a,
+      { discovery_url: url, profile_origin: 'bat_import' }), images: [] }) : fallbackReply(request);
+  await render();
+  expect(current.vehicle?.id).toBe(a);
+  expect(current.loading).toBe(false);
+  expect(current.fallbackListingImageUrls).toEqual([]);
+});
+
+it('does not publish synthetic BaT scraper photos from the prior vehicle under B', async () => {
+  const url = 'https://bringatrailer.com/listing/synthetic-prior-vehicle/';
+  const old = deferred();
+  allowedSyntheticScrapes.add(url);
+  reply = request => request.url.pathname === '/functions/v1/simple-scraper' ? old.promise
+    : endpoint(request, 'rpc/get_vehicle_profile_data', a) ? json({ ...profile(a,
+    { discovery_url: url, profile_origin: 'bat_import' }), images: [] }) : fallbackReply(request);
+  await render();
+  expect(functions).toHaveBeenCalledWith('simple-scraper', { body: { url } });
+  await visit(b);
+  await release(old, json({ success: true, data: { images: [fallbackPhoto('obsolete-bat')] } }));
+  expect(current.fallbackListingImageUrls).toEqual([fallbackPhoto(b)]);
 });
