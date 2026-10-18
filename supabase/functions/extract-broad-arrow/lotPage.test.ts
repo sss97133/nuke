@@ -1,4 +1,4 @@
-import { galleryImageId, lotGallery, parseAmount, parseLotPage } from "./lotPage.ts";
+import { galleryImageId, isVinClash, lotGallery, parseAmount, parseLotPage } from "./lotPage.ts";
 
 const eq = (a: unknown, b: unknown) => { if (JSON.stringify(a) !== JSON.stringify(b)) throw new Error(`${JSON.stringify(a)} != ${JSON.stringify(b)}`); };
 
@@ -51,4 +51,15 @@ Deno.test("galleryImageId names the same photo across sizes and the older .webp 
   const c = "https://cdn.dealeraccelerate.com/bagauction/10/1744/95182/790x1024/1958-bmw-507-series-ii-roadster";
   if (galleryImageId(a) !== "95182" || galleryImageId(b) !== "95182" || galleryImageId(c) !== "95182") throw new Error("same photo");
   if (galleryImageId("https://www.broadarrowauctions.com/vehicles/am24_r123/%3CBase64-Image-Removed%3E") !== null) throw new Error("junk url");
+});
+
+Deno.test("isVinClash recognises the two refusals a held VIN produces, and nothing else", () => {
+  const seen = [
+    'duplicate key value violates unique constraint "vehicles_vin_unique_short_v2"',
+    "VIN WBAEJ13462AH61832 already exists on vehicle 6940c8a0-77f2-4acd-8305-f1182e44b8e4",
+  ];
+  for (const m of seen) if (!isVinClash(m)) throw new Error(`missed: ${m}`);
+  for (const m of ["canceling statement due to statement timeout", 'duplicate key value violates unique constraint "vehicles_discovery_url_key"', null]) {
+    if (isVinClash(m)) throw new Error(`false clash: ${m}`);
+  }
 });
