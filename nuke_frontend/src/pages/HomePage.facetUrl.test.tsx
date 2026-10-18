@@ -45,6 +45,9 @@ describe('HomePage facet axis & selected facet URL synchronization', () => {
       { label: 'Pickup', make: 'Chevrolet', family: 'Pickup', names: 48 },
     ];
 
+    const truckStack = [...familyStack.slice(0, 2), { label: 'Truck', make: 'Chevrolet', family: 'pickup-key' }];
+    expect(applyDrillStackToSearchParams(new URLSearchParams('make=Chevrolet'), truckStack, 'raw').get('axis')).toBeNull();
+
     // Selecting TRIM axis at family level sets ?axis=trim without ?facet
     const atTrimAxis = applyDrillStackToSearchParams(new URLSearchParams('make=Chevrolet&family=Pickup'), familyStack, 'trim');
     expect(atTrimAxis.get('make')).toBe('Chevrolet');
@@ -116,7 +119,7 @@ describe('HomePage facet axis & selected facet URL synchronization', () => {
       }
       if (fnName === 'treemap_brand_families') {
         return {
-          data: [{ family_key: 'Pickup', family_name: 'Pickup', models: 12, sold: 1580, usd: 72_000_000, sold_any: 1580, offered: 1900, dated: 1400, sold_12m: 310, sold_prior_12m: 275 }],
+          data: [{ family_key: 'Pickup', family: 'Pickup', models: 12, sold: 1580, usd: 72_000_000, sold_any: 1580, offered: 1900, dated: 1400, sold_12m: 310, sold_prior_12m: 275 }],
           error: null,
         };
       }
@@ -155,6 +158,8 @@ describe('HomePage facet axis & selected facet URL synchronization', () => {
       await new Promise((r) => setTimeout(r, 20));
     });
 
+    expect(host.querySelector('[data-testid="facet-axis-series"]')?.getAttribute('aria-selected')).toBe('true');
+    expect(host.querySelector('[data-testid="toggle-brand-pickup-umbrella"]')).toBeNull();
     const trimTab = host.querySelector('[data-testid="facet-axis-trim"]') as HTMLButtonElement | null;
     expect(trimTab).not.toBeNull();
 
@@ -206,7 +211,8 @@ describe('HomePage facet axis & selected facet URL synchronization', () => {
       rawTab!.click();
     });
     const paramsAfterRaw = new URLSearchParams(latestSearch);
-    expect(paramsAfterRaw.get('axis')).toBeNull();
+    expect(paramsAfterRaw.get('axis')).toBe('raw');
+    expect(host.querySelector('[data-testid="facet-axis-raw"]')?.getAttribute('aria-selected')).toBe('true');
     expect(paramsAfterRaw.get('facet')).toBeNull();
 
     act(() => root.unmount());

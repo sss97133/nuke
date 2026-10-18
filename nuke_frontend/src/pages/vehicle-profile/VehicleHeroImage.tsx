@@ -156,7 +156,7 @@ const VehicleHeroImage: React.FC<VehicleHeroImageProps> = ({ overlayNode }) => {
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', justifyContent: 'center' }}>
             {v?.year && <BadgePortal dimension="year" value={v.year} label={String(v.year)} variant="source" />}
             {v?.make && <BadgePortal dimension="make" value={v.make} label={String(v.make).toUpperCase()} variant="source" />}
-            {v?.model && <BadgePortal dimension="model" value={v.model} label={String(v.model).toUpperCase()} variant="source" />}
+            {v?.model && <BadgePortal dimension="model" value={v.model} modelMake={v.make} label={String(v.model).toUpperCase()} variant="source" />}
             {v?.body_style && <BadgePortal dimension="body_style" value={v.body_style} label={String(v.body_style).toUpperCase()} variant="status" />}
             {v?.transmission && (
               <BadgePortal
