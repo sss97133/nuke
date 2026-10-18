@@ -102,6 +102,7 @@
   .map-movers2__rel-scale { display: none; }
   .map-movers2__controls { width: 100%; }
   .map-movers2__dial, .map-movers2__vs-dial { width: 100%; overflow-x: auto; justify-content: flex-start; }
+  .map-movers2__dial-btn, .map-movers2__vs-btn { min-width: 44px; min-height: 44px; flex-shrink: 0; }
   .map-movers2__sides { grid-template-columns: minmax(0, 1fr); }
   .map-movers2__row { grid-template-columns: minmax(0, 1fr) 96px 52px; grid-template-rows: auto auto; row-gap: 2px; }
   .map-movers2__row .map-movers2__dot { width: 96px; }
