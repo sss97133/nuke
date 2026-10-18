@@ -65,6 +65,12 @@ CREATE TEMP TABLE legacy_contract AS SELECT pg_get_functiondef(oid) AS definitio
 CREATE TEMP TABLE membership_contract AS SELECT pg_get_functiondef(oid) AS definition,proacl
  FROM pg_proc WHERE oid='public.cohort_members(uuid)'::regprocedure;
 
+-- Replays manage their own transactions. Install both before freezing the fixture
+-- clock so a UTC-midnight boundary cannot separate fixtures from their requests.
+\ir ../migrations/20261004073500_market_trends_recorded_sale_counts.sql
+BEGIN;
+CREATE TEMP TABLE fixture_clock AS SELECT now() AS at;
+
 INSERT INTO vehicles(id,canonical_make_id)
  SELECT ('00000000-0000-0000-0000-'||lpad(i::text,12,'0'))::uuid,'10000000-0000-0000-0000-000000000001'
  FROM generate_series(1,30) i;
@@ -119,7 +125,6 @@ UPDATE auction_events SET scraped_at=now()-interval '1 day',raw_data=jsonb_build
  'basis','cached_snapshot','at',to_char((now()-interval '1 day') AT TIME ZONE 'UTC','YYYY-MM-DD"T"HH24:MI:SS.MS"Z"')))
  WHERE id::text LIKE '%000100';
 
-\ir ../migrations/20261004073500_market_trends_recorded_sale_counts.sql
 CREATE FUNCTION assert_count(ok boolean,label text) RETURNS void LANGUAGE plpgsql AS $$
  BEGIN IF ok IS DISTINCT FROM true THEN RAISE EXCEPTION 'FAILED: %',label; END IF;
  RAISE NOTICE 'PASS: %',label; END $$;
@@ -132,6 +137,10 @@ RETURNS jsonb LANGUAGE sql AS $$
 $$;
 CREATE FUNCTION sum_count(receipt jsonb,which_series text,field_name text DEFAULT 'value') RETURNS numeric LANGUAGE sql AS $$
  SELECT sum((s->>field_name)::numeric) FROM jsonb_array_elements(receipt->'series') s WHERE s->>'series'=which_series
+$$;
+CREATE FUNCTION partial_day_request(at_time timestamptz DEFAULT statement_timestamp())
+RETURNS jsonb LANGUAGE sql AS $$
+ SELECT count_request()||jsonb_build_object('event_from',date_trunc('day',at_time),'event_to',at_time)
 $$;
 CREATE FUNCTION rejects_count(request jsonb,label text) RETURNS void LANGUAGE plpgsql AS $$
  BEGIN
@@ -250,8 +259,8 @@ SET ROLE service_role;
 SELECT assert_count(members_equivalent(),'service bounded resolver equals original membership under bypass while aggregate gates remain public');
 SELECT assert_count(sum_count(get_market_trends(count_request()),'selected')=6,'service bypass cannot alter public totals');
 RESET ROLE;
--- Source aliases are one episode; conflicting aliases are unassigned and never become a chosen sale.
-BEGIN;
+-- Keep case mutations reversible without resetting the shared fixture clock.
+SAVEPOINT year_alias_case;
 INSERT INTO make_model_profiles VALUES
  ('30000000-0000-0000-0000-000000000004','SYNTHETIC','MODEL','year',1977,NULL,NULL,
   '20000000-0000-0000-0000-000000000001','supported','Synthetic year receipt');
@@ -268,8 +277,9 @@ SELECT assert_count((WITH ids AS (SELECT array_agg(id) AS values FROM vehicles),
 SELECT assert_count((SELECT count(*)=1 FROM cohort_members('30000000-0000-0000-0000-000000000004',
  ARRAY['00000000-0000-0000-0000-000000000030'::uuid])), 'punctuated registry alias is escaped exactly as original');
 RESET ROLE;
-ROLLBACK;
-BEGIN;
+ROLLBACK TO SAVEPOINT year_alias_case;
+RELEASE SAVEPOINT year_alias_case;
+SAVEPOINT conflicting_alias_case;
 INSERT INTO auction_events SELECT '50000000-0000-0000-0000-000000000102',vehicle_id,source,source_url||'/',
  auction_end_date,outcome,999,created_at,updated_at,scraped_at,raw_data FROM auction_events WHERE id::text LIKE '%000006';
 SET ROLE anon;
@@ -282,16 +292,18 @@ SELECT assert_count((SELECT bool_and((s#>>'{coverage,conflicting_aliases}')::int
  WHERE (s->>'bucket_start')::timestamptz=date_trunc('day',now())-interval '1 day'),
  'unassigned alias conflict remains visible in shared bucket coverage for both series');
 RESET ROLE;
-ROLLBACK;
+ROLLBACK TO SAVEPOINT conflicting_alias_case;
+RELEASE SAVEPOINT conflicting_alias_case;
 
-BEGIN;
+SAVEPOINT mismatched_clock_case;
 UPDATE auction_events SET raw_data=jsonb_set(raw_data,'{source_read,at}','"wrong"') WHERE id::text LIKE '%000001';
 SET ROLE anon;
 SELECT assert_count((SELECT count(*)=0 FROM jsonb_array_elements(get_market_trends(count_request())#>'{evidence,contributors}') e
  WHERE e->>'source_read_basis'='direct_fetch'),'mismatched marker clock cannot become observed source time');
 RESET ROLE;
-ROLLBACK;
-BEGIN;
+ROLLBACK TO SAVEPOINT mismatched_clock_case;
+RELEASE SAVEPOINT mismatched_clock_case;
+SAVEPOINT future_clock_case;
 UPDATE auction_events SET scraped_at=now()+interval '1 day',raw_data=jsonb_set(raw_data,'{source_read,at}',
  to_jsonb(to_char((now()+interval '1 day') AT TIME ZONE 'UTC','YYYY-MM-DD"T"HH24:MI:SS.MS"Z"')))
  WHERE id::text LIKE '%000001';
@@ -299,12 +311,19 @@ SET ROLE anon;
 SELECT assert_count((SELECT count(*)=0 FROM jsonb_array_elements(get_market_trends(count_request())#>'{evidence,contributors}') e
  WHERE e->>'source_read_basis'='direct_fetch'),'future source clock stays unknown');
 RESET ROLE;
-ROLLBACK;
+ROLLBACK TO SAVEPOINT future_clock_case;
+RELEASE SAVEPOINT future_clock_case;
 SET ROLE anon;
 SELECT assert_count((SELECT bool_and((s#>>'{coverage,incomplete_bucket}')::boolean)
- FROM jsonb_array_elements(get_market_trends(count_request()||jsonb_build_object(
- 'event_from',date_trunc('day',now()),'event_to',now()-interval '1 minute'))->'series') s),
+ FROM jsonb_array_elements(get_market_trends(partial_day_request())->'series') s),
  'current partial UTC day carries elapsed fraction instead of pretending a full period');
+-- Deterministic first-minute regression: subtracting a minute made the old
+-- request end precede its start. Exercise the real reader, not a clock mock.
+SELECT rejects_count(partial_day_request('2000-01-02T00:00:30Z')||
+ jsonb_build_object('event_to','2000-01-01T23:59:30Z'), 'reversed first-minute window');
+SELECT assert_count((SELECT bool_and((s#>>'{coverage,incomplete_bucket}')::boolean)
+ FROM jsonb_array_elements(get_market_trends(partial_day_request('2000-01-02T00:00:30Z'))->'series') s),
+ 'first UTC minute has a valid nonempty partial-day window');
 SELECT assert_count(sum_count(get_market_trends(count_request()||jsonb_build_object(
  'event_from',date_trunc('day',now())-interval '7 days','event_to',date_trunc('day',now())-interval '6 days')),'selected')=0
  AND get_market_trends(count_request())->>'state'='partial','empty captured window zero is explicitly incomplete market coverage');
@@ -343,3 +362,6 @@ SELECT assert_count((SELECT bool_and(s->>'value' IS NULL AND s->>'numerator' IS 
  FROM jsonb_array_elements(get_market_trends(count_request())->'series') s),'truncation refuses all series totals and ratios');
 SELECT assert_count(get_market_trends(count_request())->>'reason'='candidate_cap_exceeded','truncated sample reason is explicit');
 RESET ROLE;
+SELECT assert_count(now()=(SELECT at FROM fixture_clock),'fixture clock survives all case rollbacks');
+-- The source-label contract includes this file to reuse its tested fixtures.
+COMMIT;
