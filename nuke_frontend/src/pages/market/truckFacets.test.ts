@@ -9,6 +9,8 @@ it('consolidates naming aliases while retaining disclosed conversions and unknow
   expect(truckFacet(records[3],'drive','Chevrolet')).toBe('2WD');
   expect(truckFacet(records[2],'drive','Chevrolet')).toBe('Unknown drivetrain');
   expect(truckFacet(records[4],'drive','Chevrolet')).toBe('Conflicting drivetrain');
+  expect(truckFacet(records[1],'trim','Chevrolet')).toBe('Custom (unspecified)');
+  expect(truckFacet({...records[0],trim:'Silverado'},'trim','Chevrolet')).toBe('Silverado');
 });
 it.each(TRUCK_AXES)('partitions every record exactly once and preserves dollars by %s', axis => {
   const nodes = partitionTruckMembers(records,axis,'Chevrolet');

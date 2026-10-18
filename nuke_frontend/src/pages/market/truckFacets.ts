@@ -2,11 +2,11 @@ import type { TreemapNode } from '../HomePage';
 import { classifyVehicleFacets } from '../familyFacetsAndEmblems';
 import { getDefinedFamilyEras } from '../../lib/market/familyEras';
 
-export const TRUCK_AXES = ['drive', 'wheelbase', 'bed', 'body', 'tonnage', 'era', 'series', 'year', 'raw'] as const;
+export const TRUCK_AXES = ['drive', 'wheelbase', 'bed', 'body', 'tonnage', 'era', 'series', 'trim', 'year', 'raw'] as const;
 export type TruckAxis = typeof TRUCK_AXES[number];
 export type TruckFilters = Partial<Record<TruckAxis, string>>;
 export const TRUCK_AXIS_LABELS: Record<TruckAxis, string> = {
-  drive: 'Drivetrain', wheelbase: 'Wheelbase', bed: 'Bed length', body: 'Cab / body', tonnage: 'Nominal class', era: 'Era', series: 'Series', year: 'Year', raw: 'Recorded names',
+  drive: 'Drivetrain', wheelbase: 'Wheelbase', bed: 'Bed length', body: 'Cab / body', tonnage: 'Nominal class', era: 'Era', series: 'Series', trim: 'Trim', year: 'Year', raw: 'Recorded names',
 };
 export type TruckMember = {
   id: string; model: string | null; year: number | null; usd: number; source: string | null;
@@ -39,6 +39,10 @@ export function truckFacet(member: TruckMember, axis: TruckAxis, make: string): 
   if (axis === 'year') return member.year == null ? 'Unknown year' : String(member.year);
   if (axis === 'drive') return ({ RWD: '2WD', FWD: '2WD', '4WD': '4WD', AWD: 'AWD', conflict: 'Conflicting drivetrain' } as Record<string, string>)[member.drive ?? ''] ?? 'Unknown drivetrain';
   const raw = [member.model, member.series].filter(Boolean).join(' ');
+  if (axis === 'trim') {
+    const trim = classifyVehicleFacets(make, 'Truck', [raw, member.trim].filter(Boolean).join(' '), member.year).trim;
+    return trim === 'Custom / Restomod' ? 'Custom (unspecified)' : trim ?? 'Unknown trim';
+  }
   const series = classifyVehicleFacets(make, 'Truck', raw, member.year).series?.replace(/\s*\([^)]*\)$/, '') ??
     (member.family && member.family !== 'Pickup' ? member.family : null);
   if (axis === 'series') return series ?? 'Unresolved series';
