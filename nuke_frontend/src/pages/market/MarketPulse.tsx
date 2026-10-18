@@ -555,7 +555,7 @@ export default function MarketPulse({ onUnavailable, collection }: { onUnavailab
     if (!focusBoardPage.current || isLoading || mapFilterPending) return;
     focusBoardPage.current = false;
     boardRef.current?.scrollIntoView({ block: 'start' });
-    (boardRef.current?.querySelector<HTMLButtonElement>('.market-lot-name') ?? boardRef.current)?.focus({ preventScroll: true });
+    (boardRef.current?.querySelector<HTMLButtonElement>('.market-lot-name') ?? boardRef.current)?.focus();
   }, [page, pageRows, isLoading, mapFilterPending]);
   const goToPage = (n: number) => {
     focusBoardPage.current = true;

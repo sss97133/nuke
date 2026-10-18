@@ -3,11 +3,14 @@
  */
 
 import { decryptSecret } from "./secretBox.ts";
+import { credentialKind, type CredentialKind } from "./providerDiagnostic.ts";
 
 interface ApiKeyResult {
   apiKey: string | null;
   source: 'user' | 'system';
   modelName?: string;
+  credentialKind?: CredentialKind;
+  userKeyStatus?: 'available' | 'missing' | 'lookup_failed';
 }
 
 export async function getUserApiKey(
@@ -60,7 +63,9 @@ export async function getUserApiKey(
     return {
       apiKey: decryptedKey,
       source: 'user',
-      modelName: userKeyInfo.model_name
+      modelName: userKeyInfo.model_name,
+      credentialKind: credentialKind(decryptedKey, provider),
+      userKeyStatus: 'available'
     };
   }
 
@@ -72,7 +77,8 @@ export async function getUserApiKey(
   }
   return {
     apiKey: systemKey || null,
-    source: 'system'
+    source: 'system',
+    userKeyStatus: keyError ? 'lookup_failed' : 'missing'
   };
 }
 

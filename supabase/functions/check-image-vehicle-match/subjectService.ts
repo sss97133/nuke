@@ -4,6 +4,7 @@ import { projectDepictedSubjects, SUBJECT_BATCH_LIMIT, SUBJECT_METHOD, SUBJECT_P
   type SubjectInput, type SubjectProjection } from "./subjects.ts";
 import { qualifySubjectSource, readSubjectProfiles } from "./subjectReader.ts";
 import { assessSubjectAdmission } from "./subjectReplay.ts";
+import { allowedSubjectSources, subjectInputScopeRefusal } from "./subjectInputScope.ts";
 
 export const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
 export interface SubjectSource {
@@ -46,6 +47,7 @@ export interface SubjectDependencies {
 export interface SubjectRequest {
   user_id?: string; image_ids?: string[]; dry_run?: boolean; reuse_only?: boolean;
   expected_source_hashes?: Record<string, string>;
+  allowed_source_hashes?: Record<string, string>;
 }
 
 /** Authentication alone is insufficient when a privileged client supplies user_id. */
@@ -103,12 +105,16 @@ export async function resolveSubjectBatch(store: SubjectStore, request: SubjectR
   }
   const base = { method: SUBJECT_METHOD, persisted_image_ids: [] as string[], deferred_image_ids: [] as string[],
     unresolved: [] as Array<{ image_id: string; reason: string }> };
+  const allowed = allowedSubjectSources(request.allowed_source_hashes, ids, expected);
+  if (!allowed.valid) return { ...base, status: "refused", refusal: "allowed_source_scope_invalid" };
   let sources = await store.sources(request.user_id, ids);
   if (sources.length !== ids.length || new Set(sources.map(row => row.id)).size !== ids.length ||
     sources.some(row => !ids.includes(row.id))) return { ...base, status: "refused", refusal: "source_unavailable" };
   if (expected && sources.some(source => expected[source.id] !== source.file_hash)) {
     return { ...base, status: "refused", refusal: "source_changed" };
   }
+  const freshScopeRefusal = subjectInputScopeRefusal(allowed.hashes, sources);
+  if (freshScopeRefusal) return { ...base, status: "refused", refusal: freshScopeRefusal };
   const held = sources.map(row => ({ image_id: row.id, reason: sourceRefusal(row, request.user_id) })).filter(row => row.reason);
   if (held.length) return { ...base, status: "refused", refusal: held.some(row => row.reason === "source_unavailable") ? "source_unavailable" : "source_not_ready", unresolved: held };
 
@@ -136,6 +142,10 @@ export async function resolveSubjectBatch(store: SubjectStore, request: SubjectR
     }
   }
   const reused = !!envelope;
+  // Replayed context is subject to the same explicit caller scope, even when
+  // reuse would make no provider call. Refuse before retained/membership writes.
+  const replayScopeRefusal = subjectInputScopeRefusal(allowed.hashes, sources);
+  if (replayScopeRefusal) return { ...base, status: "refused", refusal: replayScopeRefusal };
   if (!envelope && request.reuse_only) return { ...base, status: "refused", refusal: "retained_reading_unavailable" };
   if (!envelope) {
     if (ids.length <= 2 && store.context) {
@@ -148,6 +158,10 @@ export async function resolveSubjectBatch(store: SubjectStore, request: SubjectR
       }
     }
     if (sources.length < 2) return { ...base, status: "refused", refusal: "source_needs_corresponding_view" };
+    // Server-selected context must be pinned as explicitly as requested fresh
+    // sources. No object, renderer or provider callback has run at this point.
+    const actualScopeRefusal = subjectInputScopeRefusal(allowed.hashes, sources);
+    if (actualScopeRefusal) return { ...base, status: "refused", refusal: actualScopeRefusal };
     readings = await store.readings(sources.map(source => source.id));
     const candidate_scope = await store.candidates(request.user_id);
     const contextIds = sources.filter(source => !ids.includes(source.id)).map(source => source.id);
@@ -160,7 +174,9 @@ export async function resolveSubjectBatch(store: SubjectStore, request: SubjectR
       { text: SUBJECT_PROMPT }, ...sources.flatMap(source => [{ text: `Photo image_id=${source.id}` }, { image_key: source.id }]),
     ], dependencies.vision, { limits: { output_tokens: 1600 } });
     if (!result.model_result) return { ...base, status: "refused", refusal: result.refusal,
-      unavailable_inputs: capture.unavailable, candidate_scope };
+      unavailable_inputs: capture.unavailable, candidate_scope,
+      ...(result.provider_diagnostics?.length ? { provider_diagnostics: result.provider_diagnostics } : {}),
+      ...(result.provider_attempt_coverage ? { provider_attempt_coverage: result.provider_attempt_coverage } : {}) };
     const inputs: SubjectInput[] = sources.map(source => {
       const receipt = capture.inputs.find(input => input.key === source.id)!.receipt;
       const prior = readings.filter(reading => reading.image_id === source.id && reading.is_active && reading.cluster_id &&
