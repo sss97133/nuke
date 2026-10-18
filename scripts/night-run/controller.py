@@ -250,7 +250,7 @@ class Controller:
         if not isinstance(envelope, dict):
             return self.fail(f"CLI exit {result.returncode}; JSON result is not an object. See {out_path.name}.")
         if envelope.get("is_error") and re.search(
-                r"rate.?limit|usage.?limit|hit your limit|quota exceeded", json.dumps(envelope), re.I):
+                r"rate.?limit|usage.?limit|hit your (?:weekly )?limit|quota exceeded", json.dumps(envelope), re.I):
             self.state.update(next_check=time.time() + 21600, reason="Subscription limit; retry in six hours with the same objective/session.")
             self.save()
             self.note(self.state["reason"])
