@@ -36,6 +36,8 @@ import { mustWrite, softWrite } from '../_shared/writeResult.ts';
 import { fillOnlyIdentity, identityConflict, REVISION_DIFFERENT_CAR } from '../_shared/identityMatch.ts';
 import { ForcedVehicleMissing, forcedVehicleId, pickVehicleTarget } from "./vehicleTarget.ts";
 import { lotEventDate } from "./eventDate.ts";
+import { docketLotNumber, docketStatus, episodeSoldAt, episodeStatus, statesResult } from "./episode.ts";
+import { patchForLiveRow } from "../_shared/vehicleEventWrite.ts";
 import {
   applyBarrettJacksonVehicleFacets,
   parseBarrettJacksonHeadline,
@@ -253,7 +255,7 @@ function parseRscVehicleData(html: string, url: string): BJVehicle | null {
 
     // Lot number
     const lotField = searchBlock.match(/\\?"lot_number\\?":\s*\\?"([^"\\]+)\\?"/);
-    if (lotField) vehicle.lot_number = lotField[1];
+    if (lotField) vehicle.lot_number = docketLotNumber(lotField[1]);
 
     // Event slug -> auction name
     const eventField = searchBlock.match(/\\?"event_slug\\?":\s*\\?"([^"\\]+)\\?"/);
@@ -266,7 +268,7 @@ function parseRscVehicleData(html: string, url: string): BJVehicle | null {
     // Is sold
     const soldField = searchBlock.match(/\\?"is_sold\\?":\s*(true|false)/);
     if (soldField) {
-      vehicle.status = soldField[1] === "true" ? "Sold" : "Not Sold";
+      vehicle.status = docketStatus(soldField[1] === "true", lotField?.[1]);
     }
 
     // Is canceled
@@ -1155,37 +1157,45 @@ async function saveVehicle(
 
   // Create vehicle_event record (non-fatal)
   try {
-    const { data: existingListing } = await supabase
+    const { data: liveRow } = await supabase
       .from("vehicle_events")
-      .select("id")
+      .select("id, metadata, sold_at, ended_at")
       .eq("vehicle_id", vehicleId)
       .eq("source_platform", "barrettjackson")
       .eq("source_url", vehicle.url)
       .limit(1)
       .maybeSingle();
+    const existingListing = liveRow as { id: string; metadata: Record<string, unknown> | null; sold_at: string | null; ended_at: string | null } | null;
+
+    const episode = {
+      vehicle_id: vehicleId,
+      source_platform: "barrettjackson",
+      source_listing_id: null,
+      event_type: "auction",
+      source_url: vehicle.url,
+      event_status: episodeStatus(vehicle.status),
+      final_price: vehicle.sale_price || null,
+      sold_at: episodeSoldAt(vehicle.status, vehicle.event_date),
+      metadata: {
+        lot_number: vehicle.lot_number,
+        auction_name: vehicle.auction_name,
+        event_date: vehicle.event_date,
+        extraction_method: vehicle.extraction_method,
+        extractor_version: EXTRACTOR_VERSION,
+      },
+    };
 
     if (!existingListing) {
-      mustWrite('vehicle_events insert', await supabase.from("vehicle_events").insert({
-        vehicle_id: vehicleId,
-        source_platform: "barrettjackson",
-        event_type: "auction",
-        source_url: vehicle.url,
-        event_status: vehicle.status?.toLowerCase() === "sold" ? "sold" :
-                        vehicle.status?.toLowerCase() === "not sold" ? "unsold" :
-                        vehicle.status?.toLowerCase() === "withdrawn" ? "cancelled" :
-                        "ended",
-        final_price: vehicle.sale_price || null,
-        sold_at: vehicle.event_date && !isNaN(Date.parse(vehicle.event_date))
-          ? new Date(vehicle.event_date).toISOString()
-          : null,
-        metadata: {
-          lot_number: vehicle.lot_number,
-          auction_name: vehicle.auction_name,
-          event_date: vehicle.event_date,
-          extraction_method: vehicle.extraction_method,
-          extractor_version: EXTRACTOR_VERSION,
-        },
-      }));
+      mustWrite('vehicle_events insert', await supabase.from("vehicle_events").insert(episode));
+    } else if (statesResult(vehicle.status)) {
+      // A lot first read before its sale kept that read for good: its episode was inserted once and never updated.
+      // A read that states the result now updates it (dates fill-only, metadata merged; see vehicleEventWrite.ts).
+      const { patch } = patchForLiveRow(existingListing, episode);
+      delete patch.vehicle_id; delete patch.source_platform; delete patch.source_listing_id; delete patch.source_url; delete patch.event_type;
+      (patch.metadata as Record<string, unknown>).lot_number =
+        vehicle.lot_number ?? docketLotNumber(existingListing.metadata?.lot_number as string | null | undefined);
+      if (!patch.final_price) delete patch.final_price;
+      mustWrite('vehicle_events update', await (supabase.from("vehicle_events") as any).update(patch).eq("id", existingListing.id));
     }
   } catch (e) {
     console.warn(`[BJ] External listing insert failed (non-fatal): ${e instanceof Error ? e.message : String(e)}`);
