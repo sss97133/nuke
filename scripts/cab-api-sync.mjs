@@ -33,6 +33,7 @@ import fs from "fs";
 import { createClient } from "@supabase/supabase-js";
 import { writeObservation } from "../supabase/functions/_shared/observationWriter.ts";
 import { buildCabAuctionCommentRows } from "../supabase/functions/_shared/batAuctionRecord.ts";
+import { requireCabCapture } from "./inspect-cab-snapshot.mjs";
 
 const SUPABASE_URL = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL;
 const SUPABASE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -976,11 +977,14 @@ async function extractSingleAuctionGoldStandard(cab, auctionId) {
     );
   }
 
+  // Validate before the first write: a failed thread request is not an empty
+  // auction, and missing source clocks must not turn into auction-close times.
+  const captureAssessment = requireCabCapture({ auctionId, detailRes, commentsRes });
   const d = detailRes.data;
   const l = d.listing;
   const stats = d.stats || {};
   const sections = l.sections || {};
-  const commentsAndBids = commentsRes.data?.comments_and_bids || [];
+  const commentsAndBids = commentsRes.data.comments_and_bids;
 
   const canonicalUrl = buildCanonicalUrl(d.id, l.title);
   const nowIso = new Date().toISOString();
@@ -1670,6 +1674,8 @@ async function extractSingleAuctionGoldStandard(cab, auctionId) {
     observation_written: observationWritten,
     org_linked: orgLinked,
     total_data_model_rows: totalDataModelRows,
+    data_model_rows_basis: "legacy mixed existing/attempted rows; not new rows or model coverage",
+    capture_assessment: captureAssessment,
     seller: d.seller?.username || null,
     buyer: stats.buyer?.username || null,
     elapsed_ms: Date.now() - t0,
@@ -1679,7 +1685,7 @@ async function extractSingleAuctionGoldStandard(cab, auctionId) {
 /**
  * Continuous historical backfill mode:
  * Walks `/v2/autos/auctions?limit=50&status=closed&offset=...` across pages,
- * checks which auctions are missing full extraction (`auction_events` or 17-char `vin`),
+ * uses the existing processing skip (`auction_events`, VIN-like value, listing observation),
  * extracts each one via `extractSingleAuctionGoldStandard`, and writes real-time
  * propagation telemetry (`total_data_model_rows` per listing) to console + JSONL log.
  */
@@ -1696,7 +1702,8 @@ async function runHistoricalBackfill(cab, startPage = 1, endPage = 853, concurre
     started_at: new Date().toISOString(),
     pages_scanned: 0,
     auctions_seen: 0,
-    already_complete: 0,
+    previously_processed: 0,
+    completeness: "not_assessed",
     listings_extracted: 0,
     errors: 0,
     propagated_rows: {
@@ -1731,14 +1738,15 @@ async function runHistoricalBackfill(cab, startPage = 1, endPage = 853, concurre
 
     const pageIds = pageAuctions.map((a) => a.id);
 
-    // Check which IDs on this page already have a complete auction_events row AND a 17-char VIN on vehicles
+    // Legacy processing skip only; this does not reconcile capture, relationships
+    // or public answers. Preserve dispatch volume until a replay is authorized.
     const { data: existingAe } = await supabase
       .from("auction_events")
       .select("source_listing_id, vehicle_id, total_bids, comments_count")
       .eq("source", "cars_and_bids")
       .in("source_listing_id", pageIds);
 
-    const completeSet = new Set();
+    const processedSet = new Set();
     // --refresh re-reads every lot on the page (the upserts rewrite what changed), skipping nothing as complete.
     if (!refresh && existingAe?.length) {
       const vids = existingAe.map((r) => r.vehicle_id).filter(Boolean);
@@ -1758,16 +1766,16 @@ async function runHistoricalBackfill(cab, startPage = 1, endPage = 853, concurre
       for (const ae of existingAe) {
         const vVin = vinMap.get(ae.vehicle_id);
         if (vVin && vVin.length >= 5 && ae.comments_count !== null && observed.has(ae.vehicle_id)) {
-          completeSet.add(ae.source_listing_id);
+          processedSet.add(ae.source_listing_id);
         }
       }
     }
 
-    const todo = pageAuctions.filter((a) => !completeSet.has(a.id));
-    cumulative.already_complete += pageAuctions.length - todo.length;
+    const todo = pageAuctions.filter((a) => !processedSet.has(a.id));
+    cumulative.previously_processed += pageAuctions.length - todo.length;
 
     console.log(
-      `\n[Page ${pageNum}/${endPage} | offset=${offset}] ${pageAuctions.length} auctions (${completeSet.size} already complete, ${todo.length} to extract)`
+      `\n[Page ${pageNum}/${endPage} | offset=${offset}] ${pageAuctions.length} auctions (${processedSet.size} previously processed; completeness not assessed, ${todo.length} to extract)`
     );
 
     // Process `todo` in batches of `concurrency`
@@ -1807,7 +1815,7 @@ async function runHistoricalBackfill(cab, startPage = 1, endPage = 853, concurre
           ).toFixed(1);
 
           console.log(
-            `  ✅ [${cumulative.listings_extracted}] ${val.title} (${val.auction_id}) | VIN=${val.vin || "NONE"} | +${val.total_data_model_rows} rows (imgs=${val.images_in_db}, cmts/bids=${val.comments_upserted}, ids=${val.identities_upserted}) | Cumul: ${cumulative.propagated_rows.total_rows.toLocaleString()} rows (${avgFanout} rows/listing) | ${val.elapsed_ms}ms`
+            `  [${cumulative.listings_extracted}] ${val.auction_id} | capture=${val.capture_assessment.status}, database/public readiness=not_assessed | legacy row references=${val.total_data_model_rows} (not new rows; ${avgFanout}/listing) | ${val.elapsed_ms}ms`
           );
 
           fs.appendFileSync(logPath, JSON.stringify({ ts: new Date().toISOString(), page: pageNum, ...val }) + "\n");
