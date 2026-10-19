@@ -37,6 +37,8 @@ const CHUNK_MAP: { test: (href: string) => boolean; load: () => Promise<unknown>
     load: () => import('../pages/stacks/StacksIndex') },
   { test: (h) => h === '/jobs' || h === '/jobs/',
     load: () => import('../pages/jobs/JobsBoard') },
+  { test: (h) => h === '/messages' || h.startsWith('/messages/'),
+    load: () => import('../pages/messages/MessagesPage') },
   { test: (h) => h === '/work' || h === '/work/',
     load: () => import('../pages/jobs/WorkPage') },
 ];

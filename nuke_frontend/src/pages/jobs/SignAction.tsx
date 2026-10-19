@@ -2,6 +2,8 @@ import React, { useState } from 'react';
 import { supabase } from '../../lib/supabase';
 import { Text } from '../../kit';
 import { actionTitle, isWebSign, signFailure, signTerms, type JobAction } from './jobRead';
+import { ActionSheetLauncher } from './ActionSheets';
+import { JobSheetContext, hasSheet } from './jobSheetContext';
 
 type Phase = { step: 'idle' } | { step: 'confirming' } | { step: 'working' } | { step: 'done' } | { step: 'failed'; reason: string };
 
@@ -11,8 +13,10 @@ type Phase = { step: 'idle' } | { step: 'confirming' } | { step: 'working' } | {
  */
 export function SignAction({ action, onSigned }: { action: JobAction; onSigned?: () => void }) {
   const [phase, setPhase] = useState<Phase>({ step: 'idle' });
+  const sheets = React.useContext(JobSheetContext);
   const title = actionTitle(action);
 
+  if (!isWebSign(action) && hasSheet(action) && (sheets || action.kind === 'pay_invoice')) return <ActionSheetLauncher action={action} />;
   if (!isWebSign(action)) {
     return <div className="job-sign" role="group" aria-label={title}>
       <Text role="label">{title}</Text>
