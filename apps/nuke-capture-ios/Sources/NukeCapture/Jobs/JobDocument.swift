@@ -268,6 +268,10 @@ struct JobAction: Decodable, Equatable, Identifiable {
     let asFields: [String: JobJSON]
     /// The same, when the reader sends a single word (e.g. record_payment as "payer" / "payee").
     var asText: String? = nil
+    /// What the step binds and does not, and the terms it is pinned to, when the server states them.
+    var binds: [String] = []
+    var doesNotBind: [String] = []
+    var termsBasis: String? = nil
     var id: String { kind + (stage ?? "") + (args.keys.sorted().compactMap { args[$0]?.stringValue }.joined()) }
 
     init(kind: String, label: String? = nil, stage: String? = nil, rpc: String? = nil, args: [String: JobJSON] = [:],
@@ -293,6 +297,9 @@ struct JobAction: Decodable, Equatable, Identifiable {
                   args: (try? c.decode([String: JobJSON].self, forKey: JobCodingKey("args"))) ?? [:],
                   asFields: (try? c.decode([String: JobJSON].self, forKey: JobCodingKey("as"))) ?? [:])
         asText = try? c.decode(String.self, forKey: JobCodingKey("as"))
+        binds = (try? c.decode([String].self, forKey: JobCodingKey("binds"))) ?? []
+        doesNotBind = (try? c.decode([String].self, forKey: JobCodingKey("does_not_bind"))) ?? []
+        termsBasis = try? c.decode(String.self, forKey: JobCodingKey("terms_basis"))
     }
 
     var title: String { label ?? JobCopy.action(kind) }

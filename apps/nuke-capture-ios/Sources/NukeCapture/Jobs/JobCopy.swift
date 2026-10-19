@@ -213,6 +213,8 @@ enum JobCopy {
     /// Fact values that need their own words before the generic ones.
     static func factValue(_ key: String, _ v: JobJSON) -> String? {
         switch key {
+        case "start_sign":
+            return PostJobCopy.started(v)
         case "approval_signer":
             guard case .object(let o) = v else { return v == .null ? "Not accepted yet" : nil }
             let role = o["role"]?.stringValue.map(slot) ?? "customer"
@@ -228,7 +230,15 @@ enum JobCopy {
         }
     }
 
-    static func fact(_ key: String) -> String { facts[key] ?? sentence(key) }
+    static func fact(_ key: String) -> String { key == "start_sign" ? "Work started" : (facts[key] ?? sentence(key)) }
+
+    static func termsBasis(_ b: String?) -> String {
+        switch b {
+        case "accepted_quote"?: return "The accepted quote"
+        case "accepted_offer"?: return "Your accepted offer"
+        default: return "The accepted terms"
+        }
+    }
 
     /// A reader value in plain words: yes/no, "Not on record", "Not assessed yet".
     static func value(_ v: JobJSON) -> String {
@@ -528,6 +538,7 @@ enum JobCopy {
         "inspection_access_request": "Let an inspector see your car",
         "invoice_payment_to_confirm": "Confirm a payment you received",
         "cosign_request": "Co-sign a technician",
+        "start_work": "Start work",
         "facility_reservation_to_confirm": "Confirm a booking",
         "work_session": "Confirm work day",
         "session": "Confirm photo session",

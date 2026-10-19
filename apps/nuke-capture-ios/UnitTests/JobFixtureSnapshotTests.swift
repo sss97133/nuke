@@ -282,6 +282,32 @@ final class JobFixtureSnapshotTests: XCTestCase {
         } }, name: "fixture-job-facility")
     }
 
+    func testRenderPostJobAndStartWork() throws {
+        let photos = try decode([PostJobPhoto].self, PostJobFixtures.photos)
+        try snapshot(NavigationStack {
+            PostJobView(vehicleId: PostJobFixtures.vehicleId, vehicleTitle: "1977 Chevrolet Blazer Cheyenne", photos: photos,
+                        description: "Replace the front brake pads and rotors. Bleed the brake lines. Look at the squeak from the rear.",
+                        chosen: ["i1"])
+        }, name: "fixture-post-job", pages: 3)
+        let posted = try decode(PostedJob.self, PostJobFixtures.posted)
+        try snapshot(NavigationStack {
+            PostJobView(vehicleId: PostJobFixtures.vehicleId, vehicleTitle: "1977 Chevrolet Blazer Cheyenne", photos: [], posted: posted)
+        }, name: "fixture-job-posted", pages: 2)
+        let before = try decode(JobPath.self, PostJobFixtures.beforeStart)
+        try snapshot(NavigationStack { JobPathContent(workOrderId: JobFixtures.workOrderId, path: .loaded(before), resources: .loading) },
+                     name: "fixture-start-work-entry")
+        let action = try XCTUnwrap(before.viewer?.actions.first { $0.kind == "start_work" })
+        try snapshot(StartWorkSheet(action: action, workOrderId: JobFixtures.workOrderId, jobTitle: "Front brake service"),
+                     name: "fixture-start-work-sheet")
+        let after = try decode(JobPath.self, PostJobFixtures.afterStart)
+        try snapshot(NavigationStack { JobPathContent(workOrderId: JobFixtures.workOrderId, path: .loaded(after), resources: .loading) },
+                     name: "fixture-work-started", pages: 6)
+        try snapshot(NavigationStack { ScrollView {
+            VehicleWorkCard(vehicleId: PostJobFixtures.vehicleId, jobs: .loading, postEntry: .post, vehicleTitle: "1977 Chevrolet Blazer Cheyenne")
+            VehicleWorkCard(vehicleId: PostJobFixtures.vehicleId, jobs: .loading, postEntry: .inspect)
+        } }, name: "fixture-vehicle-post-entry")
+    }
+
     func testRenderWorkSessionSignSheet() throws {
         let item = try decode(SignatureQueue.self, JobFixtures.signatureQueue).items[0]
         try snapshot(WorkSessionSignSheet(item: item), name: "fixture-sign-work-day")

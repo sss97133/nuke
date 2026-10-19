@@ -9,12 +9,17 @@ import SwiftUI
 
 struct VehicleWorkSection: View {
     let vehicleId: String
+    /// The vehicle page knows the viewer owns it; uploaders and access holders post from their profile.
+    var ownerContext = false
+    var vehicleTitle: String? = nil
 
     @Environment(\.vehicleListingContext) private var listingContext
     @State private var jobs: JobLoad<MyWorkOrders> = .loading
 
     var body: some View {
-        VehicleWorkCard(vehicleId: vehicleId, jobs: jobs, planEntry: listingContext)
+        VehicleWorkCard(vehicleId: vehicleId, jobs: jobs, planEntry: listingContext,
+                        postEntry: SupabaseService.currentUserId == nil ? .none : (ownerContext ? .post : .inspect),
+                        vehicleTitle: vehicleTitle)
             .task(id: vehicleId) { jobs = await JobReaders.vehicleWorkOrders(vehicleId: vehicleId) }
     }
 }
@@ -25,18 +30,22 @@ struct VehicleWorkCard: View {
     let jobs: JobLoad<MyWorkOrders>
     /// Opened from a listing: offer "Plan the work" (listing_work_plan_read) whatever the job list holds.
     var planEntry = false
+    enum PostEntry { case none, post, inspect }
+    /// Signed in: "Post a job" for your own vehicle, else "Order an inspection instead".
+    var postEntry: PostEntry = .none
+    var vehicleTitle: String? = nil
 
     var body: some View {
         switch jobs {
         case .loading:
-            if planEntry { card { planLink } } else { EmptyView() }
+            if planEntry || postEntry != .none { card { entries } } else { EmptyView() }
         case .refused(let refusal) where refusal.kind == .unavailable:
-            if planEntry { card { planLink } } else { EmptyView() }
+            if planEntry || postEntry != .none { card { entries } } else { EmptyView() }
         case .refused(let refusal):
             card { JobRefusalRow(refusal: refusal) }
         case .loaded(let page):
             card {
-                if planEntry { planLink.padding(.bottom, 6) }
+                if planEntry || postEntry != .none { entries.padding(.bottom, 6) }
                 if page.rows.isEmpty {
                     Text("No jobs on this vehicle yet.").font(.footnote).foregroundStyle(.secondary)
                         .padding(.vertical, 5)
@@ -68,6 +77,28 @@ struct VehicleWorkCard: View {
                     }
                     .padding(.top, 10)
                 }
+            }
+        }
+    }
+
+    @ViewBuilder private var entries: some View {
+        if postEntry == .post {
+            NavigationLink { PostJobView(vehicleId: vehicleId, vehicleTitle: vehicleTitle) } label: {
+                Label("Post a job", systemImage: "square.and.pencil")
+                    .font(.footnote.weight(.medium))
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            }
+            .padding(.bottom, 6)
+        }
+        if planEntry || postEntry == .inspect {
+            if postEntry == .inspect && !planEntry {
+                NavigationLink { WorkPlanEstimateView(vehicleId: vehicleId) } label: {
+                    Label("Not yours? Order an inspection instead", systemImage: "magnifyingglass")
+                        .font(.footnote.weight(.medium))
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                }
+            } else {
+                planLink
             }
         }
     }

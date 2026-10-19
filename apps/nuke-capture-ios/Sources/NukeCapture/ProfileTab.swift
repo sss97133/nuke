@@ -357,6 +357,7 @@ struct ProfileView: View {
                 }
             }
 
+            ClientFaceSection(isOwn: isOwn)
             ProviderFaceSection(userId: userId, isOwn: isOwn)
 
             // ORGANIZATIONS — the person's memberships with each relation's weight (user_org_relations), on their

@@ -89,6 +89,7 @@ struct JobPathContent: View {
 
     @State private var accepting: QuoteBox?
     @State private var changing: ChangeBox?
+    @State private var starting: JobAction?
 
     var body: some View {
         List {
@@ -108,6 +109,18 @@ struct JobPathContent: View {
             case .loaded(let p):
                 header(p)
                 railSection(p)
+                if let start = p.viewer?.actions.first(where: { $0.kind == "start_work" }) {
+                    Section {
+                        Button { starting = start } label: { Label("Start work", systemImage: "play.circle") }
+                    } header: {
+                        Text("Your next step")
+                            .sheet(item: $starting) { a in
+                                StartWorkSheet(action: a, workOrderId: workOrderId, jobTitle: navigationTitle) { onChanged?() }
+                            }
+                    } footer: {
+                        Text("You were accepted for this job. Starting records the time, under exactly what was accepted.")
+                    }
+                }
                 quoteSection.id("job-quote")
                 if let offers { JobOffersSection(offers: offers, onChanged: onChanged).id("job-offers") }
                 if let facility {
@@ -408,7 +421,11 @@ struct JobPathContent: View {
 
     /// Facts a person may see: never personal contact fields, never reader bookkeeping.
     static func visibleFacts(_ facts: [JobStage.Fact]) -> [JobStage.Fact] {
-        facts.filter { !JobWords.isContactKey($0.key) && !JobCopy.hiddenFacts.contains($0.key) }
+        let signedStart = facts.contains { if $0.key == "start_sign", case .object = $0.value { return true } else { return false } }
+        return facts.filter {
+            !JobWords.isContactKey($0.key) && !JobCopy.hiddenFacts.contains($0.key)
+                && !(signedStart && $0.key == "start_clock" && $0.value == .null)
+        }
     }
 
     /// Prices, rates and costs are open; a payment or balance amount needs the server's money_visible.
