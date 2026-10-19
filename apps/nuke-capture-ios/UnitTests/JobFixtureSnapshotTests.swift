@@ -26,7 +26,7 @@ final class JobFixtureSnapshotTests: XCTestCase {
     }
 
     func testRenderJobView() throws {
-        let path = try decode(JobPath.self, JobFixtures.jobPath)
+        let path = try decode(JobPath.self, JobFixtures.jobPathWithLabels)
         let resources = try decode(JobResources.self, JobFixtures.resources)
         let view = NavigationStack {
             JobPathContent(workOrderId: JobFixtures.workOrderId, path: .loaded(path), resources: .loaded(resources))
@@ -34,10 +34,42 @@ final class JobFixtureSnapshotTests: XCTestCase {
         try snapshot(view, name: "fixture-jobview", pages: 6)
     }
 
+    func testRenderJobViewWithoutDisplayFields() throws {
+        let path = try decode(JobPath.self, JobFixtures.jobPath)
+        let view = NavigationStack {
+            JobPathContent(workOrderId: JobFixtures.workOrderId, path: .loaded(path), resources: .loading,
+                           titleHint: "Brake service", vehicleHint: nil)
+        }
+        try snapshot(view, name: "fixture-jobview-no-display-fields")
+    }
+
+    func testRenderJobViewUnavailable() throws {
+        let gone = JobRefusal(reader: JobReaders.jobPathName, kind: .unavailable, title: "Job not available",
+                              detail: "It doesn't exist, or it isn't shared with you.")
+        let view = NavigationStack {
+            JobPathContent(workOrderId: JobFixtures.workOrderId, path: .refused(gone), resources: .loading, titleHint: "Brake service")
+        }
+        try snapshot(view, name: "fixture-jobview-unavailable")
+    }
+
+    func testRenderProviderLink() throws {
+        let me = try decode(MyIdentity.self, JobFixtures.identity)
+        let hits = try JSONDecoder().decode([JobReaders.ActorHit].self, from: Data(JobFixtures.actorHits.utf8))
+        let view = NavigationStack {
+            ProviderLinkView(identity: .loaded(me), query: "Fixture Mechanic", hits: hits, loadOnAppear: false)
+        }
+        try snapshot(view, name: "fixture-provider-link")
+    }
+
+    func testRenderWorkSessionSignSheet() throws {
+        let item = try decode(SignatureQueue.self, JobFixtures.signatureQueue).items[0]
+        try snapshot(WorkSessionSignSheet(item: item), name: "fixture-sign-work-day")
+    }
+
     func testRenderWorkConsole() throws {
         let queue = try decode(SignatureQueue.self, JobFixtures.signatureQueue)
         let jobs = try decode(MyWorkOrders.self, JobFixtures.myWorkOrders)
-        let me = try decode(MyIdentity.self, #"{"provider_link":{"state":"claimed"},"viewer":{"context":"self","decided_from":"auth.uid()"}}"#)
+        let me = try decode(MyIdentity.self, JobFixtures.identity)
         let view = NavigationStack {
             WorkConsoleContent(signatures: .loaded(queue), jobs: .loaded(jobs), identity: .loaded(me), showCapture: false)
                 .navigationTitle("Work")

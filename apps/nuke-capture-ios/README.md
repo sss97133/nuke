@@ -363,6 +363,8 @@ Sources/NukeCapture/
   SignInView.swift                 sign in / sign out / account deletion (5.1.1(v))
   TodayView.swift                  native value screen: counters, thumbs, Sync Now (CaptureSections)
   Work/WorkConsoleView.swift       the Work tab: signature queue, jobs in motion, Capture
+  Work/WorkSessionSignSheet.swift  confirm one work day (confirm_work_session), explicit button
+  Account/ProviderLinkView.swift   technician-profile link: my_identity_read claims + self-claim filing
   Jobs/                            JobView over work_order_job_path_read; DTOs, readers, stage rail
   SyncEngine.swift                 PhotoKit watch + watermark + dedupe + GPS gate
   SupabaseService.swift            auth, storage upload, vehicle_images insert

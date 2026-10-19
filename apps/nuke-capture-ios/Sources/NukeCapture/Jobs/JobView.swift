@@ -12,12 +12,16 @@ import SwiftUI
 
 struct JobView: View {
     let workOrderId: String
+    /// What the pushing row already showed, used until the reader sends its own display fields.
+    var titleHint: String? = nil
+    var vehicleHint: String? = nil
 
     @State private var path: JobLoad<JobPath> = .loading
     @State private var resources: JobLoad<JobResources> = .loading
 
     var body: some View {
-        JobPathContent(workOrderId: workOrderId, path: path, resources: resources)
+        JobPathContent(workOrderId: workOrderId, path: path, resources: resources,
+                       titleHint: titleHint, vehicleHint: vehicleHint)
             .task(id: workOrderId) { await load() }
             .refreshable { await load() }
     }
@@ -46,6 +50,8 @@ struct JobPathContent: View {
     let workOrderId: String
     let path: JobLoad<JobPath>
     let resources: JobLoad<JobResources>
+    var titleHint: String? = nil
+    var vehicleHint: String? = nil
 
     var body: some View {
         List {
@@ -59,8 +65,8 @@ struct JobPathContent: View {
                 }
             case .refused(let refusal):
                 Section {
-                    RootedValueView(label: "Work order", value: Self.shortId(workOrderId), status: .recorded)
                     JobRefusalRow(refusal: refusal)
+                    debugId
                 }
             case .loaded(let p):
                 header(p)
@@ -78,20 +84,26 @@ struct JobPathContent: View {
                 actionsSection(p.viewer)
             }
         }
-        .navigationTitle("Job")
+        .navigationTitle(navigationTitle)
         .navigationBarTitleDisplayMode(.inline)
+    }
+
+    /// The job's own title when anyone has it; never an id.
+    private var navigationTitle: String {
+        if case .loaded(let p) = path, let title = p.displayTitle { return title }
+        return titleHint ?? "Job"
     }
 
     // MARK: Header
 
     @ViewBuilder private func header(_ p: JobPath) -> some View {
         Section {
-            RootedValueView(label: "Work order", value: Self.shortId(p.workOrderId), status: .recorded)
             if let v = p.vehicleId, !v.isEmpty {
                 NavigationLink {
                     VehicleDetailView(vehicleId: v, embedInNavigationStack: false)
                 } label: {
-                    RootedValueView(label: "Vehicle", value: Self.shortId(v), status: .attributed)
+                    RootedValueView(label: "Vehicle", value: p.vehicleLabel?.text ?? vehicleHint ?? "View vehicle",
+                                    status: .attributed)
                 }
             } else {
                 RootedValueView(label: "Vehicle", value: "No vehicle attached", status: .facade)
@@ -99,6 +111,7 @@ struct JobPathContent: View {
             if let viewer = p.viewer {
                 RootedValueView(label: "You're viewing as", value: JobCopy.viewingAs(viewer), status: .attributed)
             }
+            debugId
         } footer: {
             Text([JobCopy.updated(p.asOf), JobCopy.notVerifiedNote].compactMap { $0 }.joined(separator: " · "))
         }
@@ -124,7 +137,9 @@ struct JobPathContent: View {
                     RootedValueView(label: "Status", value: JobCopy.stateLine(stage.state), status: rung)
                     ForEach(Self.visibleFacts(stage.facts)) { fact in
                         RootedValueView(label: JobCopy.fact(fact.key),
-                                        value: Self.factText(fact, moneyVisible: p.viewer?.moneyVisible == true),
+                                        value: fact.key == "request_source"
+                                            ? (p.requestSourceLabel ?? fact.value.stringValue.map(JobCopy.requestSource) ?? JobCopy.value(fact.value))
+                                            : Self.factText(fact, moneyVisible: p.viewer?.moneyVisible == true),
                                         status: Self.factStatus(fact, stageRung: JobRung.status(stage.state, hasInconsistency: false) ?? .recorded))
                     }
                 }
@@ -223,8 +238,10 @@ struct JobPathContent: View {
 
     // MARK: Helpers
 
-    static func shortId(_ id: String) -> String {
-        id.count > 8 ? String(id.prefix(8)) + "…" : id
+    @ViewBuilder private var debugId: some View {
+        if JobDebug.showCodes {
+            Text(workOrderId).font(.system(size: 9, design: .monospaced)).foregroundStyle(.tertiary)
+        }
     }
 
     /// Facts a person may see: never personal contact fields, never reader bookkeeping.
@@ -274,6 +291,8 @@ struct JobRefusalRow: View {
     private var icon: String {
         switch refusal.kind {
         case .readerPending: return "clock"
+        case .signInNeeded: return "person.crop.circle"
+        case .unavailable: return "eye.slash"
         case .notPermitted: return "lock"
         case .signInRefused: return "person.crop.circle.badge.exclamationmark"
         case .failed: return "exclamationmark.triangle"

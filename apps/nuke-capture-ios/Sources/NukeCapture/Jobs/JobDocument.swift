@@ -182,7 +182,7 @@ struct JobStage: Decodable, Equatable {
 
 struct JobViewer: Decodable, Equatable {
     enum Context: Equatable {
-        case visitor, selfView, client, provider, orgMember
+        case visitor, selfView, client, provider, orgMember, admin
         case unknown(String)
 
         init(raw: String) {
@@ -192,6 +192,7 @@ struct JobViewer: Decodable, Equatable {
             case "client": self = .client
             case "provider": self = .provider
             case "org_member": self = .orgMember
+            case "admin": self = .admin
             default: self = .unknown(raw)
             }
         }
@@ -203,6 +204,7 @@ struct JobViewer: Decodable, Equatable {
             case .client: return "client"
             case .provider: return "provider"
             case .orgMember: return "org_member"
+            case .admin: return "admin"
             case .unknown(let s): return s
             }
         }
@@ -279,6 +281,41 @@ struct JobAction: Decodable, Equatable, Identifiable {
     var title: String { label ?? JobCopy.action(kind) }
 }
 
+// MARK: - Vehicle label ({year, make, model, trim?}); never an id
+
+struct JobVehicleLabel: Decodable, Equatable {
+    let vehicleId: String?
+    let year: Int?
+    let make: String?
+    let model: String?
+    let trim: String?
+
+    enum CodingKeys: String, CodingKey {
+        case year, make, model, trim
+        case vehicleId = "vehicle_id"
+    }
+
+    init(vehicleId: String? = nil, year: Int? = nil, make: String? = nil, model: String? = nil, trim: String? = nil) {
+        self.vehicleId = vehicleId; self.year = year; self.make = make; self.model = model; self.trim = trim
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        vehicleId = try? c.decode(String.self, forKey: .vehicleId)
+        year = (try? c.decode(Int.self, forKey: .year)) ?? (try? c.decode(String.self, forKey: .year)).flatMap { Int($0) }
+        make = try? c.decode(String.self, forKey: .make)
+        model = try? c.decode(String.self, forKey: .model)
+        trim = try? c.decode(String.self, forKey: .trim)
+    }
+
+    /// "1977 Chevrolet Blazer Cheyenne"; nil when nothing names the vehicle.
+    var text: String? {
+        let parts = [year.map(String.init), make, model, trim].compactMap { $0 }
+            .map { $0.trimmingCharacters(in: .whitespaces) }.filter { !$0.isEmpty && $0 != "UNRESOLVED" }
+        return parts.isEmpty ? nil : parts.joined(separator: " ")
+    }
+}
+
 // MARK: - work_order_job_path_read
 
 struct JobPath: Decodable, Equatable {
@@ -293,9 +330,16 @@ struct JobPath: Decodable, Equatable {
     let permissionAuthority: JobJSON?
     let paymentAuthorized: JobJSON?
     let viewer: JobViewer?
+    /// Display fields a later reader adds so ids never lead; nil until it sends them.
+    let displayTitle: String?
+    let vehicleLabel: JobVehicleLabel?
+    let requestSourceLabel: String?
 
     enum CodingKeys: String, CodingKey {
         case stages, viewer
+        case displayTitle = "display_title"
+        case vehicleLabel = "vehicle_label"
+        case requestSourceLabel = "request_source_label"
         case workOrderId = "work_order_id"
         case vehicleId = "vehicle_id"
         case asOf = "as_of"
@@ -315,6 +359,9 @@ struct JobPath: Decodable, Equatable {
         permissionAuthority = try? c.decode(JobJSON.self, forKey: .permissionAuthority)
         paymentAuthorized = try? c.decode(JobJSON.self, forKey: .paymentAuthorized)
         viewer = try? c.decode(JobViewer.self, forKey: .viewer)
+        displayTitle = (try? c.decode(String.self, forKey: .displayTitle)).flatMap { $0.isEmpty ? nil : $0 }
+        vehicleLabel = (try? c.decode(JobVehicleLabel.self, forKey: .vehicleLabel)).flatMap { $0.text == nil ? nil : $0 }
+        requestSourceLabel = (try? c.decode(String.self, forKey: .requestSourceLabel)).flatMap { $0.isEmpty ? nil : $0 }
         var stages: [JobStageKey: JobStage] = [:]
         var unknown: [String] = []
         if let s = try? c.nestedContainer(keyedBy: JobCodingKey.self, forKey: .stages) {
@@ -336,10 +383,16 @@ struct JobPath: Decodable, Equatable {
 struct JobCoverage: Decodable, Equatable {
     let returned: Int?
     let totalForViewer: Int?
+    let slotFilter: String?
 
     enum CodingKeys: String, CodingKey {
         case returned
         case totalForViewer = "total_for_viewer"
+        case slotFilter = "slot_filter"
+    }
+
+    init(returned: Int?, totalForViewer: Int?, slotFilter: String? = nil) {
+        self.returned = returned; self.totalForViewer = totalForViewer; self.slotFilter = slotFilter
     }
 
     /// "Showing 3 of 7 work orders", or the honest unknown.
@@ -352,34 +405,61 @@ struct JobCoverage: Decodable, Equatable {
     }
 }
 
+/// The first gap on a job's path: `{stage, gap}` from the shipped reader, or a bare code.
+struct JobGapRef: Decodable, Equatable {
+    let stage: String?
+    let gap: String
+
+    init(stage: String?, gap: String) { self.stage = stage; self.gap = gap }
+
+    init(from decoder: Decoder) throws {
+        if let code = try? decoder.singleValueContainer().decode(String.self) {
+            self.init(stage: nil, gap: code)
+            return
+        }
+        let c = try decoder.container(keyedBy: JobCodingKey.self)
+        self.init(stage: try? c.decode(String.self, forKey: JobCodingKey("stage")),
+                  gap: try c.decode(String.self, forKey: JobCodingKey("gap")))
+    }
+}
+
 struct JobRow: Decodable, Equatable, Identifiable {
     let workOrderId: String
     let vehicleId: String?
     let title: String?
     let slots: [String]
     let stageStates: [JobStageKey: JobStageState]
-    let firstGap: String?
+    let firstGap: JobGapRef?
+    let inconsistencyCount: Int
     let asOf: String?
+    let displayTitle: String?
+    let vehicleLabel: JobVehicleLabel?
 
     var id: String { workOrderId }
 
     enum CodingKeys: String, CodingKey {
-        case title, slots
+        case title, slots, inconsistencies
         case workOrderId = "work_order_id"
         case vehicleId = "vehicle_id"
         case stageStates = "stage_states"
         case firstGap = "first_gap"
         case asOf = "as_of"
+        case displayTitle = "display_title"
+        case vehicleLabel = "vehicle_label"
     }
 
     init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         workOrderId = try c.decode(String.self, forKey: .workOrderId)
         vehicleId = try? c.decode(String.self, forKey: .vehicleId)
-        title = try? c.decode(String.self, forKey: .title)
+        title = (try? c.decode(String.self, forKey: .title)).flatMap { $0.isEmpty ? nil : $0 }
         slots = (try? c.decode([String].self, forKey: .slots)) ?? []
-        firstGap = try? c.decode(String.self, forKey: .firstGap)
+        firstGap = try? c.decode(JobGapRef.self, forKey: .firstGap)
+        inconsistencyCount = (try? c.decode(Int.self, forKey: .inconsistencies))
+            ?? (try? c.decode([JobJSON].self, forKey: .inconsistencies))?.count ?? 0
         asOf = try? c.decode(String.self, forKey: .asOf)
+        displayTitle = (try? c.decode(String.self, forKey: .displayTitle)).flatMap { $0.isEmpty ? nil : $0 }
+        vehicleLabel = (try? c.decode(JobVehicleLabel.self, forKey: .vehicleLabel)).flatMap { $0.text == nil ? nil : $0 }
         var states: [JobStageKey: JobStageState] = [:]
         if let s = try? c.nestedContainer(keyedBy: JobCodingKey.self, forKey: .stageStates) {
             for key in s.allKeys {
@@ -389,16 +469,25 @@ struct JobRow: Decodable, Equatable, Identifiable {
         }
         stageStates = states
     }
+
+    /// The line a person reads first: never an id.
+    var headline: String { displayTitle ?? title ?? vehicleLabel?.text ?? "Untitled job" }
 }
 
 struct MyWorkOrders: Decodable, Equatable {
-    let rows: [JobRow]
+    var rows: [JobRow]
     let coverage: JobCoverage?
     let viewer: JobViewer?
+    let nextAfter: String?
+    let asOf: String?
     /// Rows the reader sent in a shape this build cannot read; counted, never dropped silently.
-    let unreadableRows: Int
+    var unreadableRows: Int
 
-    enum CodingKeys: String, CodingKey { case rows, work_orders, coverage, viewer }
+    enum CodingKeys: String, CodingKey {
+        case rows, work_orders, coverage, viewer
+        case nextAfter = "next_after"
+        case asOf = "as_of"
+    }
 
     init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
@@ -408,6 +497,17 @@ struct MyWorkOrders: Decodable, Equatable {
         unreadableRows = raw.count - rows.count
         coverage = try? c.decode(JobCoverage.self, forKey: .coverage)
         viewer = try? c.decode(JobViewer.self, forKey: .viewer)
+        nextAfter = try? c.decode(String.self, forKey: .nextAfter)
+        asOf = try? c.decode(String.self, forKey: .asOf)
+    }
+
+    /// The next page appended to this one; the newer page's cursor and coverage win.
+    func appending(_ next: MyWorkOrders) -> MyWorkOrders {
+        var merged = next
+        let seen = Set(rows.map(\.workOrderId))
+        merged.rows = rows + next.rows.filter { !seen.contains($0.workOrderId) }
+        merged.unreadableRows = unreadableRows + next.unreadableRows
+        return merged
     }
 }
 
@@ -419,18 +519,68 @@ private struct JobRowSlot: Decodable {
 // MARK: - my_signature_queue
 
 struct SignatureItem: Decodable, Equatable, Identifiable {
+    struct Clock: Decodable, Equatable {
+        let sessionDate: String?
+        let startTime: String?
+        let endTime: String?
+
+        enum CodingKeys: String, CodingKey {
+            case sessionDate = "session_date"
+            case startTime = "start_time"
+            case endTime = "end_time"
+        }
+
+        init(sessionDate: String?, startTime: String? = nil, endTime: String? = nil) {
+            self.sessionDate = sessionDate; self.startTime = startTime; self.endTime = endTime
+        }
+
+        init(from decoder: Decoder) throws {
+            if let s = try? decoder.singleValueContainer().decode(String.self) {
+                self.init(sessionDate: s)
+                return
+            }
+            let c = try decoder.container(keyedBy: CodingKeys.self)
+            self.init(sessionDate: try? c.decode(String.self, forKey: .sessionDate),
+                      startTime: try? c.decode(String.self, forKey: .startTime),
+                      endTime: try? c.decode(String.self, forKey: .endTime))
+        }
+    }
+
+    /// What signing binds and what it does not, as the server states it.
+    struct Sign: Decodable, Equatable {
+        let rpc: String?
+        let binds: String?
+        let doesNotBind: [String]
+
+        enum CodingKeys: String, CodingKey {
+            case rpc, binds
+            case doesNotBind = "does_not_bind"
+        }
+
+        init(from decoder: Decoder) throws {
+            let c = try decoder.container(keyedBy: CodingKeys.self)
+            rpc = try? c.decode(String.self, forKey: .rpc)
+            binds = try? c.decode(String.self, forKey: .binds)
+            doesNotBind = (try? c.decode([String].self, forKey: .doesNotBind)) ?? []
+        }
+    }
+
     let kind: String
     let refId: String
     let workOrderId: String?
-    let clock: String?
+    let vehicle: JobVehicleLabel?
+    let clock: Clock?
+    let captureSpanMinutes: Int?
     let evidenceCounts: [String: JobJSON]
+    let sign: Sign?
 
     var id: String { kind + refId }
 
     enum CodingKeys: String, CodingKey {
-        case kind, clock
+        case kind, clock, vehicle, sign
         case refId = "ref_id"
         case workOrderId = "work_order_id"
+        case captureSpanMinutes = "capture_span_minutes"
         case evidenceCounts = "evidence_counts"
     }
 
@@ -439,17 +589,47 @@ struct SignatureItem: Decodable, Equatable, Identifiable {
         kind = try c.decode(String.self, forKey: .kind)
         refId = try c.decode(String.self, forKey: .refId)
         workOrderId = try? c.decode(String.self, forKey: .workOrderId)
-        clock = try? c.decode(String.self, forKey: .clock)
+        vehicle = try? c.decode(JobVehicleLabel.self, forKey: .vehicle)
+        clock = try? c.decode(Clock.self, forKey: .clock)
+        captureSpanMinutes = try? c.decode(Int.self, forKey: .captureSpanMinutes)
         evidenceCounts = (try? c.decode([String: JobJSON].self, forKey: .evidenceCounts)) ?? [:]
+        sign = try? c.decode(Sign.self, forKey: .sign)
     }
 }
 
 struct SignatureQueue: Decodable, Equatable {
-    let items: [SignatureItem]
+    struct Coverage: Decodable, Equatable {
+        let returned: Int?
+        let total: Int?
+        let limit: Int?
+        let kinds: [String]
+        let kindsNotYetAvailable: [String]
+
+        enum CodingKeys: String, CodingKey {
+            case returned, total, limit, kinds
+            case kindsNotYetAvailable = "kinds_not_yet_available"
+        }
+
+        init(from decoder: Decoder) throws {
+            let c = try decoder.container(keyedBy: CodingKeys.self)
+            returned = try? c.decode(Int.self, forKey: .returned)
+            total = try? c.decode(Int.self, forKey: .total)
+            limit = try? c.decode(Int.self, forKey: .limit)
+            kinds = (try? c.decode([String].self, forKey: .kinds)) ?? []
+            kindsNotYetAvailable = (try? c.decode([String].self, forKey: .kindsNotYetAvailable)) ?? []
+        }
+    }
+
+    var items: [SignatureItem]
     let viewer: JobViewer?
+    let asOf: String?
+    let coverage: Coverage?
     let unreadableItems: Int
 
-    enum CodingKeys: String, CodingKey { case items, viewer }
+    enum CodingKeys: String, CodingKey {
+        case items, viewer, coverage
+        case asOf = "as_of"
+    }
 
     init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
@@ -457,6 +637,8 @@ struct SignatureQueue: Decodable, Equatable {
         items = raw.compactMap(\.item)
         unreadableItems = raw.count - items.count
         viewer = try? c.decode(JobViewer.self, forKey: .viewer)
+        asOf = try? c.decode(String.self, forKey: .asOf)
+        coverage = try? c.decode(Coverage.self, forKey: .coverage)
     }
 }
 
@@ -498,23 +680,87 @@ struct JobResources: Decodable, Equatable {
     }
 }
 
-// MARK: - my_identity_read (the console reads only the provider-link rung from it)
+// MARK: - my_identity_read
 
-struct MyIdentity: Decodable, Equatable {
-    let providerLinkState: String?
-    let viewer: JobViewer?
+struct ProviderClaim: Decodable, Equatable, Identifiable {
+    let claimId: String
+    let actorId: String?
+    let actorName: String?
+    let actorType: String?
+    let rung: String?
+    let status: String?
+    let filedAt: String?
+    let reviewedAt: String?
+    let evidenceEntries: Int
 
-    enum CodingKeys: String, CodingKey { case provider_link, viewer }
-    private struct Link: Decodable { let state: String? }
+    var id: String { claimId }
+
+    enum CodingKeys: String, CodingKey {
+        case actor, rung, status
+        case claimId = "claim_id"
+        case actorId = "actor_id"
+        case filedAt = "filed_at"
+        case reviewedAt = "reviewed_at"
+        case evidenceEntries = "evidence_entries"
+    }
+    private struct Actor: Decodable { let name: String?; let actor_type: String? }
 
     init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
-        providerLinkState = (try? c.decode(Link.self, forKey: .provider_link))?.state
+        claimId = try c.decode(String.self, forKey: .claimId)
+        actorId = try? c.decode(String.self, forKey: .actorId)
+        let actor = try? c.decode(Actor.self, forKey: .actor)
+        actorName = actor?.name
+        actorType = actor?.actor_type
+        rung = try? c.decode(String.self, forKey: .rung)
+        status = try? c.decode(String.self, forKey: .status)
+        filedAt = try? c.decode(String.self, forKey: .filedAt)
+        reviewedAt = try? c.decode(String.self, forKey: .reviewedAt)
+        evidenceEntries = (try? c.decode(Int.self, forKey: .evidenceEntries)) ?? 0
+    }
+}
+
+struct MyIdentity: Decodable, Equatable {
+    let providerLinkState: String?
+    let providerActorId: String?
+    let claims: [ProviderClaim]
+    let username: String?
+    let viewer: JobViewer?
+    let asOf: String?
+
+    enum CodingKeys: String, CodingKey {
+        case provider_link, viewer, profile
+        case asOf = "as_of"
+    }
+    private struct Link: Decodable {
+        let state: String?
+        let actor_id: String?
+        let claims: [ClaimSlot]?
+    }
+    private struct ClaimSlot: Decodable {
+        let claim: ProviderClaim?
+        init(from decoder: Decoder) throws { claim = try? ProviderClaim(from: decoder) }
+    }
+    private struct Profile: Decodable { let username: String? }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        let link = try? c.decode(Link.self, forKey: .provider_link)
+        providerLinkState = link?.state
+        providerActorId = link?.actor_id
+        claims = (link?.claims ?? []).compactMap(\.claim)
+        username = (try? c.decode(Profile.self, forKey: .profile))?.username
         viewer = try? c.decode(JobViewer.self, forKey: .viewer)
+        asOf = try? c.decode(String.self, forKey: .asOf)
     }
 
     /// The identity-bridge rung, from the viewer block first, then the provider link.
     var bridge: String? { viewer?.identityBridge ?? providerLinkState }
+
+    /// Actors this account already has an open or confirmed claim on.
+    var claimedActorIds: Set<String> {
+        Set(claims.filter { $0.status == "pending" || $0.status == "approved" }.compactMap(\.actorId))
+    }
 }
 
 // MARK: - Clocks

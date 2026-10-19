@@ -194,27 +194,74 @@ final class JobPathDecodeTests: XCTestCase {
 
     // MARK: Lists
 
-    func testMyWorkOrdersKeepsReadableRowsAndCountsTheRest() throws {
+    func testMyWorkOrdersDecodesTheShippedShape() throws {
         let page = try decode(MyWorkOrders.self, JobFixtures.myWorkOrders)
         XCTAssertEqual(page.rows.count, 2)
         XCTAssertEqual(page.unreadableRows, 1)
-        XCTAssertEqual(page.coverage?.sentence, "Showing 2 of 2 work orders")
+        XCTAssertEqual(page.coverage?.sentence, "Showing 2 of 5 work orders")
+        XCTAssertNil(page.coverage?.slotFilter)
+        XCTAssertEqual(page.nextAfter, "00000000-0000-4000-8000-000000000002")
         XCTAssertEqual(page.rows[0].stageStates[.completion], .statusOnly)
-        XCTAssertEqual(page.rows[0].firstGap, "no_inspection_requirement")
+        XCTAssertEqual(page.rows[0].firstGap, JobGapRef(stage: "inspection", gap: "no_inspection_requirement"))
+        XCTAssertEqual(page.rows[0].inconsistencyCount, 2)
+        XCTAssertEqual(page.rows[0].headline, "Brake service")
         XCTAssertNil(page.rows[1].title)
-        XCTAssertEqual(page.rows[1].stageStates.count, 7)           // an unknown stage key is not a column
-        XCTAssertEqual(page.viewer?.slots.count, 3)
+        XCTAssertEqual(page.rows[1].headline, "Untitled job")             // never the id
+        XCTAssertEqual(page.rows[1].slots.map(JobCopy.slot), ["shop owner", "has access to this vehicle"])
+        XCTAssertEqual(page.rows[1].stageStates.count, 7)                 // an unknown stage key is not a column
+        XCTAssertEqual(page.viewer?.context, .selfView)
+        XCTAssertEqual(page.viewer?.identityBridge, "claimed")
         XCTAssertEqual(JobCoverage(returned: nil, totalForViewer: nil).sentence, "Total not available")
     }
 
-    func testSignatureQueueDecodes() throws {
+    func testMyWorkOrdersPagesAppendAndTakeTheNewerCursor() throws {
+        let first = try decode(MyWorkOrders.self, JobFixtures.myWorkOrders)
+        let merged = first.appending(try decode(MyWorkOrders.self, JobFixtures.myWorkOrdersPage2))
+        XCTAssertEqual(merged.rows.count, 3)
+        XCTAssertNil(merged.nextAfter)
+        XCTAssertEqual(merged.unreadableRows, 1)
+        XCTAssertEqual(merged.rows[2].vehicleLabel?.text, "1969 Ford Mustang")   // a string year is read
+        XCTAssertEqual(merged.rows[2].headline, "Paint correction")
+        XCTAssertNil(merged.rows[2].firstGap)
+    }
+
+    func testFirstGapAsABareCodeStillDecodes() throws {
+        let row = try decode(JobRow.self, #"{"work_order_id":"w","first_gap":"no_vehicle","inconsistencies":["a","b"]}"#)
+        XCTAssertEqual(row.firstGap, JobGapRef(stage: nil, gap: "no_vehicle"))
+        XCTAssertEqual(row.inconsistencyCount, 2)
+    }
+
+    func testSignatureQueueDecodesTheShippedShape() throws {
         let q = try decode(SignatureQueue.self, JobFixtures.signatureQueue)
-        XCTAssertEqual(q.items.map(\.kind), ["accept_terms", "work_day"])
+        XCTAssertEqual(q.items.count, 2)
         XCTAssertEqual(q.unreadableItems, 1)
-        XCTAssertEqual(q.items[0].workOrderId, JobFixtures.workOrderId)
-        XCTAssertEqual(WorkConsoleContent.evidenceLine(q.items[0].evidenceCounts), "3 operations · 12 photos")
-        XCTAssertEqual(JobCopy.action(q.items[0].kind), "Accept quote")
+        let item = q.items[0]
+        XCTAssertEqual(item.kind, "work_session")
+        XCTAssertNil(item.workOrderId)
+        XCTAssertEqual(item.vehicle?.text, "1977 Chevrolet Blazer")
+        XCTAssertEqual(item.clock?.sessionDate, "2026-10-17")
+        XCTAssertEqual(item.captureSpanMinutes, 190)
+        XCTAssertEqual(item.sign?.rpc, "confirm_work_session")
+        XCTAssertEqual(item.sign?.doesNotBind, ["counterparty acceptance", "labor value", "payment"])
+        XCTAssertEqual(q.coverage?.total, 7)
+        XCTAssertEqual(q.coverage?.limit, 250)
+        XCTAssertEqual(q.coverage?.kindsNotYetAvailable.count, 4)
         XCTAssertEqual(q.viewer?.context, .selfView)
+        let legacy = try decode(SignatureItem.self, #"{"kind":"work_session","ref_id":"x","clock":"2026-10-17"}"#)
+        XCTAssertEqual(legacy.clock?.sessionDate, "2026-10-17")
+    }
+
+    func testSignatureItemsReadInPlainWords() throws {
+        let item = try decode(SignatureQueue.self, JobFixtures.signatureQueue).items[0]
+        XCTAssertEqual(JobCopy.action(item.kind), "Confirm work day")
+        XCTAssertEqual(JobCopy.day(item.clock?.sessionDate), "Oct 17, 2026")
+        XCTAssertEqual(JobCopy.span(item.captureSpanMinutes), "3h 10m of photos")
+        XCTAssertEqual(JobCopy.evidenceLine(item.evidenceCounts), "12 photos in this session · 41 photos of this vehicle that day")
+        XCTAssertEqual(JobCopy.signBinds(item.sign?.binds), "You worked on this vehicle that day, as your photos show.")
+        XCTAssertEqual(item.sign?.doesNotBind.map(JobCopy.signDoesNotBind), ["That the customer agreed", "A price for the labor", "Any payment"])
+        XCTAssertEqual(JobCopy.comingKinds(["terms", "offer", "completion_attestation", "co_sign_request"]),
+                       "Quotes, offers, completion sign-offs and co-sign requests will appear here as they become available.")
+        XCTAssertNil(JobCopy.comingKinds([]))
     }
 
     func testResourcesReadAsCountsWithTheReadersCoverage() throws {
@@ -222,7 +269,25 @@ final class JobPathDecodeTests: XCTestCase {
         XCTAssertEqual(r.requirements, 1)
         XCTAssertEqual(r.fulfillments, 0)
         XCTAssertEqual(r.specifications, 1)
-        XCTAssertEqual(r.coverage.map(\.key), ["recorded_requirements", "recorded_specifications", "requirement_population", "requirements_with_candidates"])
+        XCTAssertEqual(JobPathContent.visibleFacts(r.coverage).map(\.key),
+                       ["recorded_requirements", "recorded_specifications", "requirement_population", "requirements_with_candidates"])
+        XCTAssertEqual(r.viewer?.slots, ["customer"])
+    }
+
+    func testIdentityDecodesTheShippedShape() throws {
+        let me = try decode(MyIdentity.self, JobFixtures.identity)
+        XCTAssertEqual(me.bridge, "claimed")
+        XCTAssertEqual(me.username, "fixture_tech")
+        XCTAssertEqual(me.claims.count, 2)
+        XCTAssertEqual(me.claims[0].actorName, "Fixture Mechanic")
+        XCTAssertEqual(me.claims[0].rung, "self_claim")
+        XCTAssertEqual(me.claims[1].evidenceEntries, 2)
+        XCTAssertEqual(me.claimedActorIds, ["00000000-0000-4000-8000-0000000000d1", "00000000-0000-4000-8000-0000000000d2"])
+        XCTAssertEqual(JobCopy.claimStatus(me.claims[0].status), "Waiting for your work to back it up")
+        XCTAssertEqual(JobCopy.claimRung(me.claims[1].rung), "Backed by your work")
+        XCTAssertEqual(ProviderLinkView.claimLine(me.claims[1]), "Backed by your work · filed Sep 1, 2026 · 2 pieces of evidence")
+        XCTAssertEqual(ProviderLinkView.rung("approved"), .attributed)
+        XCTAssertEqual(ProviderLinkView.rung("rejected"), .refuted)
     }
 
     func testIdentityBridgePrefersTheViewerBlock() throws {
@@ -231,6 +296,52 @@ final class JobPathDecodeTests: XCTestCase {
         let linkOnly = try decode(MyIdentity.self, #"{"provider_link":{"state":"claimed"}}"#)
         XCTAssertEqual(linkOnly.bridge, "claimed")
         XCTAssertNil(try decode(MyIdentity.self, "{}").bridge)
+    }
+
+    // MARK: Display fields and contexts
+
+    func testJobPathUsesDisplayFieldsWhenTheReaderSendsThem() throws {
+        let p = try decode(JobPath.self, JobFixtures.jobPathWithLabels)
+        XCTAssertEqual(p.displayTitle, "Front brake service")
+        XCTAssertEqual(p.vehicleLabel?.text, "1977 Chevrolet Blazer Cheyenne")
+        XCTAssertEqual(p.requestSourceLabel, "Requested in the Nuke app")
+        let bare = try decode(JobPath.self, JobFixtures.jobPath)
+        XCTAssertNil(bare.displayTitle)
+        XCTAssertNil(bare.vehicleLabel)
+        XCTAssertEqual(JobCopy.requestSource("ios"), "Nuke app")
+        XCTAssertNil(try decode(JobPath.self, #"{"work_order_id":"w","vehicle_label":{"make":"UNRESOLVED"}}"#).vehicleLabel)
+    }
+
+    func testNewContextsAndSlotsReadInPlainWords() throws {
+        let admin = try decode(JobViewer.self, #"{"context":"admin","slots":["admin"]}"#)
+        XCTAssertEqual(admin.context, .admin)
+        XCTAssertEqual(JobCopy.viewingAs(admin), "Nuke admin")
+        XCTAssertEqual(JobCopy.viewingAs(JobViewer(context: .admin)), "Nuke admin")
+        XCTAssertEqual(JobCopy.slot("performer"), "technician")
+        XCTAssertEqual(JobCopy.slot("org_owner"), "shop owner")
+        XCTAssertEqual(JobCopy.slot("vehicle_access"), "has access to this vehicle")
+        let party = try decode(JobViewer.self, #"{"context":"org_member","slots":["org_owner","performer"]}"#)
+        XCTAssertEqual(JobCopy.viewingAs(party), "shop owner · technician")
+    }
+
+    // MARK: Technician profile link (Sign step)
+
+    func testActorSearchTermStripsPatternCharacters() {
+        XCTAssertEqual(JobReaders.actorSearchTerm("  Fixture%_ Mechanic* "), "Fixture Mechanic")
+        XCTAssertNil(JobReaders.actorSearchTerm("a"))
+        XCTAssertNil(JobReaders.actorSearchTerm("%%"))
+    }
+
+    func testActorClaimInsertIsAPendingSelfClaimOnTheActor() throws {
+        let row = JobReaders.ActorClaimInsert(userId: "u1", actorId: "a1")
+        let json = try JSONSerialization.jsonObject(with: JSONEncoder().encode(row)) as? [String: String]
+        XCTAssertEqual(json, ["user_id": "u1", "platform": "nuke_actor", "handle": "a1", "actor_id": "a1",
+                              "verification_method": "self_claim"])
+    }
+
+    func testActorHitsDecodeOnlyOpenColumns() throws {
+        let hits = try JSONDecoder().decode([JobReaders.ActorHit].self, from: Data(JobFixtures.actorHits.utf8))
+        XCTAssertEqual(hits.map(\.name), ["Fixture Mechanic", "Fixture Mechanic Shop"])
     }
 
     // MARK: Refusals
@@ -244,10 +355,23 @@ final class JobPathDecodeTests: XCTestCase {
         XCTAssertEqual(r.reader, "my_work_orders")
     }
 
+    func testUnavailableWorkOrderAndSignInRequiredReadPlainly() {
+        let gone = PostgrestError(code: "P0001", message: "Work order unavailable")
+        let r = JobReaders.refusal(JobReaders.jobPathName, gone)
+        XCTAssertEqual(r.kind, .unavailable)
+        XCTAssertEqual(r.title, "Job not available")
+        XCTAssertEqual(r.detail, "It doesn't exist, or it isn't shared with you.")
+        let anon = PostgrestError(code: "42501", message: "Sign-in required")
+        let s = JobReaders.refusal(JobReaders.workOrdersName, anon)
+        XCTAssertEqual(s.kind, .signInNeeded)
+        XCTAssertEqual(s.title, "Sign in to see this")
+    }
+
     func testARefusedGrantSaysSo() {
         let denied = PostgrestError(code: "42501", message: "permission denied for function work_order_job_path_read")
-        let r = JobReaders.refusal(JobReaders.jobPathName, denied)
+        let r = JobReaders.refusal(JobReaders.jobPathName, denied, signedIn: true)
         XCTAssertEqual(r.kind, .notPermitted)
+        XCTAssertEqual(JobReaders.refusal(JobReaders.jobPathName, denied, signedIn: false).kind, .signInNeeded)
         XCTAssertEqual(r.title, "Not available to your account")
     }
 

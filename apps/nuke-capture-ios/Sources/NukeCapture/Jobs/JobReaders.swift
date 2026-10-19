@@ -13,7 +13,9 @@ import Supabase
 struct JobRefusal: Error, Equatable {
     enum Kind: Equatable {
         case readerPending   // the RPC is not deployed (PostgREST PGRST202 / 42883 / HTTP 404)
-        case notPermitted    // EXECUTE denied or the row is not this account's (42501)
+        case signInNeeded    // the reader answers signed-in accounts only ('Sign-in required', 42501)
+        case unavailable     // 'Work order unavailable': unknown, or not shared with this account
+        case notPermitted    // EXECUTE denied (42501)
         case signInRefused   // the session was refused (expired or bad JWT)
         case failed          // any other failure, in ReadFailure's words
     }
@@ -68,6 +70,86 @@ enum JobReaders {
         await call(signatureQueueName) { try await SupabaseService.client.rpc(signatureQueueName).execute().data }
     }
 
+    // MARK: Sign steps (explicit; called only from a confirm button)
+
+    /// Confirms one photo-derived work day through the server's own writer. Returns nil on
+    /// success, or the reason in plain words.
+    static func confirmWorkSession(_ item: SignatureItem) async -> String? {
+        guard item.kind == "work_session", (item.sign?.rpc ?? "confirm_work_session") == "confirm_work_session" else {
+            return "This step needs a newer version of the app."
+        }
+        struct P: Encodable { let p_session_id: String; let p_confirm: Bool }
+        do {
+            try await SupabaseService.client.rpc("confirm_work_session", params: P(p_session_id: item.refId, p_confirm: true)).execute()
+            return nil
+        } catch {
+            NSLog("NukeCapture confirm_work_session failed: %@", String(describing: error))
+            return ReadFailure.text(error)
+        }
+    }
+
+    struct ActorHit: Decodable, Equatable, Identifiable {
+        let id: String
+        let name: String?
+        let actor_type: String?
+    }
+
+    /// The name search term with the PostgREST pattern characters removed; nil when too short.
+    static func actorSearchTerm(_ raw: String) -> String? {
+        let cleaned = raw.unicodeScalars.filter { !"%_*,()\\".unicodeScalars.contains($0) }
+        let term = String(String.UnicodeScalarView(cleaned)).trimmingCharacters(in: .whitespacesAndNewlines)
+        return term.count >= 2 ? term : nil
+    }
+
+    /// Technician profiles by name: only the open columns (id, name, type), never contact.
+    static func searchActors(_ raw: String) async -> Result<[ActorHit], JobRefusal> {
+        guard let term = actorSearchTerm(raw) else { return .success([]) }
+        do {
+            let hits: [ActorHit] = try await SupabaseService.client.from("actors")
+                .select("id,name,actor_type")
+                .ilike("name", pattern: "%\(term)%")
+                .order("name")
+                .limit(25)
+                .execute().value
+            return .success(hits)
+        } catch {
+            return .failure(refusal("actors", error))
+        }
+    }
+
+    struct ActorClaimInsert: Encodable, Equatable {
+        let user_id: String
+        let platform: String
+        let handle: String
+        let actor_id: String
+        let verification_method: String
+
+        init(userId: String, actorId: String) {
+            user_id = userId
+            platform = "nuke_actor"
+            handle = actorId
+            actor_id = actorId
+            verification_method = "self_claim"
+        }
+    }
+
+    /// Files "this technician profile is me" as a pending self-claim. Never automatic: the
+    /// caller is a confirm button. Returns nil on success, or the reason in plain words.
+    static func fileActorClaim(actorId: String) async -> String? {
+        guard let uid = SupabaseService.currentUserId else { return "Sign in to link a technician profile." }
+        do {
+            try await SupabaseService.client.from("account_link_claims")
+                .insert(ActorClaimInsert(userId: uid, actorId: actorId))
+                .execute()
+            return nil
+        } catch let pg as PostgrestError where pg.code == "23505" {
+            return "You've already linked this profile."
+        } catch {
+            NSLog("NukeCapture actor claim failed: %@", String(describing: error))
+            return ReadFailure.text(error)
+        }
+    }
+
     private static func call<T: Decodable>(_ reader: String, _ fetch: () async throws -> Data) async -> JobLoad<T> {
         do {
             return .loaded(try decode(T.self, from: try await fetch()))
@@ -90,8 +172,17 @@ enum JobReaders {
         }
     }
 
-    static func refusal(_ reader: String, _ error: Error) -> JobRefusal {
+    static func refusal(_ reader: String, _ error: Error,
+                        signedIn: Bool = SupabaseService.currentUserId != nil) -> JobRefusal {
         if let pg = error as? PostgrestError {
+            if pg.message.contains("Work order unavailable") {
+                return JobRefusal(reader: reader, kind: .unavailable, title: "Job not available",
+                                  detail: "It doesn't exist, or it isn't shared with you.")
+            }
+            if pg.message.contains("Sign-in required") || (pg.code == "42501" && !signedIn) {
+                return JobRefusal(reader: reader, kind: .signInNeeded, title: "Sign in to see this",
+                                  detail: "This is shown to signed-in accounts for now.")
+            }
             switch pg.code {
             case "PGRST202", "42883":
                 return pending(reader)

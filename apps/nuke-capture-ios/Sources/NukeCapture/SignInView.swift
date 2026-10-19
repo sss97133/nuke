@@ -320,6 +320,11 @@ struct AccountView: View {
                     } label: {
                         Label("Connected accounts", systemImage: "link")
                     }
+                    NavigationLink {
+                        ProviderLinkView()
+                    } label: {
+                        Label("Technician profile", systemImage: "wrench.and.screwdriver")
+                    }
                 }
 
                 // Contributor mode — the crew safety gate. ON when this device

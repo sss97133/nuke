@@ -189,6 +189,9 @@ enum JobCopy {
 
     private static let slots: [String: String] = [
         "customer": "customer",
+        "org_owner": "shop owner",
+        "vehicle_access": "has access to this vehicle",
+        "admin": "Nuke admin",
         "performer": "technician",
         "inspector": "inspector",
         "tool_supplier": "tool supplier",
@@ -207,6 +210,7 @@ enum JobCopy {
         case .client: return "customer"
         case .provider: return "provider"
         case .orgMember: return "shop member"
+        case .admin: return "Nuke admin"
         case .unknown: return "visitor"
         }
     }
@@ -221,6 +225,104 @@ enum JobCopy {
         case "co_sign"?: return "Linked and vouched for"
         case "authenticated_sign"?: return "Linked and signed"
         case let other?: return sentence(other)
+        }
+    }
+
+    // MARK: Technician profile claims
+
+    static func claimStatus(_ status: String?) -> String {
+        switch status {
+        case "pending"?: return "Waiting for your work to back it up"
+        case "approved"?: return "Confirmed"
+        case "rejected"?: return "Not confirmed"
+        case "expired"?: return "Expired"
+        default: return "Status not available"
+        }
+    }
+
+    static func claimRung(_ rung: String?) -> String {
+        switch rung {
+        case "self_claim"?, "unknown"?, nil: return "Linked by you"
+        case "work_evidence"?: return "Backed by your work"
+        case "co_sign"?: return "Vouched for by someone you worked with"
+        case "authenticated_sign"?: return "Signed"
+        case let other?: return sentence(other)
+        }
+    }
+
+    static let linkExplainer = "Linked by you — Nuke confirms the link when your work backs it up."
+
+    // MARK: Signing a work day
+
+    private static let binds: [String: String] = [
+        "self-confirmation of a photo-derived work day": "You worked on this vehicle that day, as your photos show.",
+    ]
+    private static let doesNotBind: [String: String] = [
+        "counterparty acceptance": "That the customer agreed",
+        "labor value": "A price for the labor",
+        "payment": "Any payment",
+    ]
+
+    static func signBinds(_ s: String?) -> String {
+        guard let s else { return "You worked on this vehicle that day." }
+        return binds[s] ?? s.prefix(1).uppercased() + s.dropFirst()
+    }
+
+    static func signDoesNotBind(_ s: String) -> String { doesNotBind[s] ?? s.prefix(1).uppercased() + s.dropFirst() }
+
+    /// Kinds the queue does not carry yet, in words: "quotes, offers, completion sign-offs".
+    static func comingKinds(_ kinds: [String]) -> String? {
+        let words: [String: String] = ["terms": "quotes", "offer": "offers",
+                                       "completion_attestation": "completion sign-offs", "co_sign_request": "co-sign requests"]
+        let list = kinds.map { words[$0] ?? sentence($0).lowercased() }
+        guard !list.isEmpty else { return nil }
+        let joined = list.count > 1 ? list.dropLast().joined(separator: ", ") + " and " + list.last! : list[0]
+        return joined.prefix(1).uppercased() + joined.dropFirst() + " will appear here as they become available."
+    }
+
+    /// "3h 10m of photos" for a capture span.
+    static func span(_ minutes: Int?) -> String? {
+        guard let m = minutes, m > 0 else { return nil }
+        return (m >= 60 ? "\(m / 60)h \(m % 60)m" : "\(m) min") + " of photos"
+    }
+
+    /// "Oct 17, 2026" for a yyyy-MM-dd day; the input when it does not parse.
+    static func day(_ ymd: String?) -> String? {
+        guard let ymd, !ymd.isEmpty else { return nil }
+        let inF = DateFormatter()
+        inF.locale = Locale(identifier: "en_US_POSIX")
+        inF.timeZone = TimeZone(identifier: "UTC")
+        inF.dateFormat = "yyyy-MM-dd"
+        guard let d = inF.date(from: String(ymd.prefix(10))) else { return ymd }
+        let out = DateFormatter()
+        out.locale = Locale(identifier: "en_US_POSIX")
+        out.timeZone = TimeZone(identifier: "UTC")
+        out.dateFormat = "MMM d, yyyy"
+        return out.string(from: d)
+    }
+
+    private static let evidence: [String: String] = [
+        "session_images": "in this session",
+        "vehicle_photos_that_day": "of this vehicle that day",
+    ]
+
+    /// "12 photos in this session · 41 photos of this vehicle that day".
+    static func evidenceLine(_ counts: [String: JobJSON]) -> String? {
+        guard !counts.isEmpty else { return nil }
+        return counts.keys.sorted().map { key in
+            let n = counts[key]!.text
+            if let words = evidence[key] { return "\(n) photos \(words)" }
+            return "\(n) \(sentence(key).lowercased())"
+        }.joined(separator: " · ")
+    }
+
+    // MARK: Request source
+
+    static func requestSource(_ code: String) -> String {
+        switch code {
+        case "ios": return "Nuke app"
+        case "web": return "Nuke website"
+        default: return code.contains("_") ? sentence(code) : code
         }
     }
 
