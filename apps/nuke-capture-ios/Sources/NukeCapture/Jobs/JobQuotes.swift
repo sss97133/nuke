@@ -394,6 +394,8 @@ struct JobQuotes: Decodable, Equatable {
     }
 
     var changeOrderAction: JobAction? { issuerActions.first { $0.kind == "issue_change_order" } }
+    /// issue_quote: a first quote, or a revision superseding the current one (never once it is accepted).
+    var issueQuoteAction: JobAction? { issuerActions.first { $0.kind == "issue_quote" } }
 
     /// The accept_quote step the server offers this viewer, if any.
     var acceptAction: JobAction? { viewer?.actions.first { $0.kind == "accept_quote" } }
