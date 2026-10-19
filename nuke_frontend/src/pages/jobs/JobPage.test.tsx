@@ -141,11 +141,11 @@ describe('Sign actions', () => {
     expect(fixture.rpc).toHaveBeenCalledWith('accept_work_order_quote', { p_quote_id: 'q-1', p_quote_hash: 'h'.repeat(64) });
   });
 
-  it('sends steps that need the signer’s own input to the app', async () => {
-    const provider = { ...visitor, context: 'provider', slots: ['performer'], party: true,
-      actions: [{ action: 'record_payment', rpc: 'record_work_order_payment', args: { p_invoice_id: 'inv-1' } }] };
-    fixture.readers.work_order_job_path_read = path(provider);
-    fixture.readers.work_order_invoices_read = invoices(provider, []);
+  it('sends steps the web has no sheet for to the app', async () => {
+    const inspector = { ...visitor, context: 'provider', slots: ['inspector'], party: true,
+      actions: [{ action: 'record_findings', rpc: 'record_inspection_findings', args: { p_work_order_id: WO } }] };
+    fixture.readers.work_order_job_path_read = path(inspector);
+    fixture.readers.work_order_inspection_read = { ...header, viewer: inspector, inspections: [{ work_order_id: WO, inspection_type: 'pre_purchase', checklist: [] }] };
     await render();
     expect(host.textContent).toContain('Open the Nuke app to do this');
     expect([...host.querySelectorAll('.job-sign button')]).toHaveLength(0);
