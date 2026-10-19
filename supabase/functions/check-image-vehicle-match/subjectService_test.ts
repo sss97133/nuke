@@ -474,3 +474,13 @@ Deno.test("typed provider failure reaches the owner receipt without saving readi
   equal("refusal" in replay && replay.refusal, "retained_reading_unavailable");
   equal(f.counts.models, 1); equal(f.counts.captures, 1);
 });
+
+Deno.test("retain unprojected provider proposals so a projection repair needs no new inference", async () => {
+  const f = fixture(), vision = f.dependencies.vision;
+  const raw = { frames: [], correspondences: [], contradictions: [], labels: [],
+    capture_sessions: [{ anchor_image_id: ids[0], identifier: { text: "unreadable" } }] };
+  f.dependencies.vision = async options => ({ ...(await vision(options))!, data: raw });
+  await f.run();
+  equal(f.readings[0].confidence_basis.visual_subject_reading_v1?.envelope.raw_model_reading, raw);
+  equal(f.counts.models, 1);
+});

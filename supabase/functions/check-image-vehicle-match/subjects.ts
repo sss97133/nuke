@@ -135,9 +135,39 @@ function projectCaptureSessions(value: Record<string, unknown>, inputs: SubjectI
       identifier: { kind: raw.identifier.kind as "vin" | "chassis", text: identifier, legibility: legibility as "clear" | "partial" },
       basis, asserted_identity });
   }
-  // Competing assignments retain ambiguity; array order never selects a winner.
-  return candidates.filter((candidate, index) => !candidates.some((other, j) => j !== index &&
-    other.member_image_ids.some(id => candidate.member_image_ids.includes(id))));
+  // Overlap may corroborate an identifier. Resolve the entire connected component:
+  // conflicting literals or taxonomy hold every member, independent of array order.
+  const remaining = new Set(candidates), sessions: CaptureSession[] = [];
+  while (remaining.size) {
+    const component = [remaining.values().next().value!];
+    remaining.delete(component[0]);
+    for (let index = 0; index < component.length; index++) for (const other of remaining) {
+      if (other.member_image_ids.some(id => component[index].member_image_ids.includes(id))) {
+        component.push(other); remaining.delete(other);
+      }
+    }
+    const members = [...new Set(component.flatMap(c => c.member_image_ids))].sort();
+    const identity: CaptureSession["asserted_identity"] = {};
+    let conflict = component.some(c => c.identifier.text !== component[0].identifier.text ||
+      c.identifier.kind !== component[0].identifier.kind);
+    for (const key of ["make", "model_family"] as const) {
+      const values = component.map(c => c.asserted_identity[key]).filter((v): v is string => !!v).sort();
+      if (new Set(values.map(v => v.toLowerCase())).size > 1) conflict = true;
+      if (values.length) identity[key] = values[0];
+    }
+    if (conflict || members.length > SUBJECT_BATCH_LIMIT || contradictions.some(c =>
+      members.includes(c.left_image_id) && members.includes(c.right_image_id))) continue;
+    const times = members.map(id => Date.parse(source.get(id)!.taken_at!));
+    if (Math.max(...times) - Math.min(...times) > 900_000) continue;
+    // Prefer an explicitly clear reading; duplicate proposals never create clarity.
+    component.sort((a, b) => Number(b.identifier.legibility === "clear") - Number(a.identifier.legibility === "clear") ||
+      a.anchor_image_id.localeCompare(b.anchor_image_id) || a.basis.localeCompare(b.basis));
+    const chosen = component.find(c => members.every(id => id === c.anchor_image_id ||
+      captureNeighbors(source.get(c.anchor_image_id)!, source.get(id)!)));
+    if (!chosen) continue;
+    sessions.push({ ...chosen, member_image_ids: members, asserted_identity: identity });
+  }
+  return sessions.sort((a, b) => a.anchor_image_id.localeCompare(b.anchor_image_id));
 }
 
 /** Model confidence is deliberately not an admission input. Visible correspondences
