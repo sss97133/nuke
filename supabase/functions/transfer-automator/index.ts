@@ -16,9 +16,10 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { corsHeaders } from '../_shared/cors.ts';
 import { requireWriteAuth } from '../_shared/writeGuard.ts';
+import { projectSecretKey } from "../_shared/supabaseKeys.ts";
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
-const SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+const SERVICE_ROLE_KEY = projectSecretKey()!;
 
 // Default milestones seeded for every auction-triggered transfer.
 // Sequences are intentional gaps (10-step) so we can insert between them later.
@@ -419,12 +420,26 @@ async function resolveIdentity(
 ): Promise<string | null> {
   if (!handle || !platform) return null;
 
-  // Try to find existing external_identity for this platform/handle
+  const platformKey = platform.toLowerCase();
+  const handleKey = handle.trim();
+
+  // Exact match first: it is served by the unique (platform, handle) index. The case-insensitive
+  // lookup below plans as a sequential scan of the whole table (22,891 calls at 3.7 s mean,
+  // pg_stat_statements 2026-09-29 to 2026-10-13), so it runs only when the exact lookup misses.
+  const { data: exact } = await supabase
+    .from('external_identities')
+    .select('id')
+    .eq('platform', platformKey)
+    .eq('handle', handleKey)
+    .maybeSingle();
+
+  if (exact) return exact.id;
+
   const { data } = await supabase
     .from('external_identities')
     .select('id')
-    .eq('platform', platform.toLowerCase())
-    .ilike('handle', handle.trim())
+    .eq('platform', platformKey)
+    .ilike('handle', handleKey)
     .maybeSingle();
 
   if (data) return data.id;

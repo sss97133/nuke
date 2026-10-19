@@ -3,12 +3,65 @@ import { readFileSync } from 'node:fs';
 import vm from 'node:vm';
 import * as intakeLedger from '../supabase/functions/poll-listing-feeds/ledger.ts';
 import { test } from 'node:test';
+import { SOURCE_OPERATING_QUERIES, SOURCE_OPERATING_OWNERS, sourceOperatingState, shapeSourceInventory }
+  from '../supabase/functions/db-stats/sourceOperating.ts';
 import ts from '../nuke_frontend/node_modules/typescript/lib/typescript.js';
 import { boundedRead, readIntakeSection, COVERAGE_SQL, MODEL_SQL, CONFIG_SQL, HEALTH_SQL,
   INTAKE_TABLES, INTAKE_JOBS, HEALTH_JOBS, FEEDS_SQL, SOURCE_PROFILES_SQL,
   ORG_TARGETS_SQL, ORG_ACTIVITY_SQL, readOrganizationTargets, EXECUTION_SQL, CONSUMERS_SQL, ACTIVITY_SQL } from '../supabase/functions/db-stats/intakeStatus.ts';
 
 const clock = '2026-10-10T12:00:00Z';
+const operatingRow = { id: 'synthetic-feed', label: 'Synthetic feed', enabled: true, cadence_minutes: 60,
+  last_activity_at: '2026-10-10T11:30:00Z', activity_basis: 'last_polled_at', has_error: false };
+
+test('source activity states respect each configured cadence and do not treat a fresh claim as successful capture', () => {
+  assert.equal(sourceOperatingState(operatingRow, clock), 'recent_activity');
+  assert.equal(sourceOperatingState({ ...operatingRow, has_error: true }, clock), 'recent_activity');
+  assert.equal(sourceOperatingState({ ...operatingRow, last_activity_at: '2026-10-10T11:00:00Z' }, clock), 'overdue');
+  assert.equal(sourceOperatingState({ ...operatingRow, last_activity_at: null }, clock), 'never_reported');
+  for (const cadence_minutes of [null, 0, -1])
+    assert.equal(sourceOperatingState({ ...operatingRow, cadence_minutes }, clock), 'cadence_missing');
+  assert.equal(sourceOperatingState({ ...operatingRow, enabled: false, last_activity_at: null }, clock), 'inactive');
+  assert.equal(sourceOperatingState({ ...operatingRow, enabled: null }, clock), 'configuration_unknown');
+  assert.equal(sourceOperatingState({ ...operatingRow, last_activity_at: '2026-10-10T12:01:00Z' }, clock), 'invalid_clock');
+});
+
+test('inventories preserve their own scope and failure; no summed source denominator or unbounded catalog scan', async () => {
+  const db = connection({
+    [SOURCE_OPERATING_QUERIES.listing_feeds]: [{ measured_at: clock, rows: [operatingRow] }],
+    [SOURCE_OPERATING_QUERIES.scrape_sources]: new Error('PRIVATE_SOURCE_BODY'),
+    [SOURCE_OPERATING_QUERIES.source_registry]: [{ measured_at: clock, rows: [] }],
+    [SOURCE_OPERATING_QUERIES.forum_sources]: [{ measured_at: clock, rows: [{ ...operatingRow,
+      enabled: null, cadence_minutes: null, activity_basis: 'last_crawled_at', has_error: null }] }],
+  });
+  const result = await readIntakeSection(db, 'reporting');
+  assert.deepEqual(result.inventories.map(r => r.owner), SOURCE_OPERATING_OWNERS);
+  assert.equal(result.inventories[0].complete, true);
+  assert.equal(result.inventories[1].status, 'unavailable');
+  assert.equal(result.inventories[1].complete, false);
+  assert.equal(result.inventories[2].rows[0].state, 'recent_activity');
+  assert.equal(result.inventories[3].rows[0].state, 'configuration_unknown');
+  assert(!('total_sources' in result)); assert(!JSON.stringify(result).includes('PRIVATE'));
+  assert.equal(db.calls.filter(c => c.sql === 'BEGIN READ ONLY').length, 4);
+  assert.equal(db.calls.filter(c => c.sql === 'ROLLBACK').length, 4);
+  assert.equal(db.calls.filter(c => c.sql === "SET LOCAL statement_timeout = '3s'").length, 4);
+  for (const sql of Object.values(SOURCE_OPERATING_QUERIES)) {
+    assert(sql.includes('LIMIT 1001')); assert(!sql.includes('SELECT *')); assert(!sql.includes('count(*)'));
+  }
+});
+
+test('overflow is an explicit inventory slice; invalid rows cannot become zero or healthy', () => {
+  const reading = { status: 'measured', measured_at: clock, rows: Array.from({ length: 1001 }, (_, i) =>
+    ({ ...operatingRow, id: String(i), private_body: 'PRIVATE_PAYLOAD' })) };
+  const result = shapeSourceInventory('listing_feeds', reading);
+  assert.equal(result.complete, false); assert.equal(result.rows.length, 1000);
+  assert(!JSON.stringify(result).includes('PRIVATE'));
+  assert.equal(shapeSourceInventory('listing_feeds', { ...reading, rows: [operatingRow, operatingRow] }).status, 'unavailable');
+  assert.equal(shapeSourceInventory('listing_feeds', { ...reading, rows: [null] }).status, 'unavailable');
+  assert.equal(shapeSourceInventory('listing_feeds', { ...reading, rows: [{ ...operatingRow, enabled: 'true' }] }).status, 'unavailable');
+  assert.equal(shapeSourceInventory('listing_feeds', { ...reading, rows: [{ ...operatingRow, last_activity_at: 'invalid' }] }).status, 'unavailable');
+  assert.equal(shapeSourceInventory('listing_feeds', { ...reading, measured_at: null }).status, 'unavailable');
+});
 function connection(results = {}) {
   const calls = [];
   return { calls, async queryObject(sql, args) {
@@ -170,6 +223,21 @@ test('anonymous/forged callers are refused before opening a database pool', asyn
   const h = handler(); const response = await h.request();
   assert.equal(response.status, 401); assert.deepEqual(h.counts(), { pools: 0, queries: 0, reads: 0 });
 });
+test('source reporting remains restricted to verified service callers or active admins', async () => {
+  const anonymous = handler();
+  assert.equal((await anonymous.request('reporting')).status, 401);
+  assert.equal(anonymous.counts().pools, 0);
+  const user = { ok: true, caller: { kind: 'user', userId: 'synthetic-user' } };
+  const nonAdmin = handler({ verdict: user });
+  assert.equal((await nonAdmin.request('reporting')).status, 403);
+  assert.equal(nonAdmin.counts().reads, 0);
+  const admin = handler({ verdict: user, admin: true });
+  assert.equal((await admin.request('reporting')).status, 200);
+  assert.equal(admin.counts().reads, 1);
+  const service = handler({ verdict: { ok: true, caller: { kind: 'service_role' } } });
+  assert.equal((await service.request('reporting')).status, 200);
+  assert.equal(service.counts().queries, 0);
+});
 
 test('public organization targets reject arbitrary scopes before opening a pool', async () => {
   const h = handler();
@@ -285,6 +353,8 @@ function queueHandler({ controls = {}, items = [], result = {}, landed = [] } = 
       if (name.includes('supabase-js')) return { createClient: () => db };
       if (name.endsWith('/listingUrl.ts')) return { normalizeListingUrlKey: url => url };
       if (name.endsWith('/writeGuard.ts')) return { requireWriteAuth: async () => null };
+      if (name.endsWith('/supabaseKeys.ts')) return { projectSecretKey: () => 'configured' };
+      if (name.endsWith('/writeResult.ts')) return { mustWrite: (_label, result) => result, softWrite: () => null };
       if (name.endsWith('/ledger.ts')) return intakeLedger;
       throw new Error(`Unexpected queue import: ${name}`);
     },

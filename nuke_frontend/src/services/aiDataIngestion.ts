@@ -619,9 +619,10 @@ class AIDataIngestionService {
     try {
       const { data: vehicle, error } = await supabase
         .from('vehicles')
-        .select('*')
+        .select('id, vin, year, make, model, trim, mileage, asking_price, current_value, color, transmission, drivetrain, engine_size, body_style, location, notes')
         .eq('id', vehicleId.trim())
         .single();
+
 
       if (error) {
         console.error('Vehicle lookup error:', error);
@@ -649,10 +650,11 @@ class AIDataIngestionService {
         trim: vehicle.trim,
         mileage: vehicle.mileage,
         price: vehicle.asking_price || vehicle.current_value,
-        color: vehicle.exterior_color,
+        color: vehicle.color,
         transmission: vehicle.transmission,
         drivetrain: vehicle.drivetrain,
-        engine: vehicle.engine,
+        engine: vehicle.engine_size,
+
         body_type: vehicle.body_style,
         location: vehicle.location,
         description: vehicle.notes,

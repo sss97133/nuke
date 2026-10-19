@@ -7,17 +7,23 @@ and `scripts/ci/verify.sh` fails a PR that adds one.
 
 ## Roles
 
-Five text roles, in `kit.css`. The entity name is always the largest text on a page.
+Six text roles, in `kit.css`. The entity name is the largest name on a page; a page may set its headline numbers (one,
+or two side by side) as `figure`, which may be larger (2026-10-15: the live board's total, set as a sentence, "doesn't look real").
 
 | Role | Face | Use |
 |---|---|---|
 | `entity` | Arial 700 20px | the thing the page is about |
+| `figure` | Courier New 700 34px (28px under 480px), tabular | a page's headline number (at most two) |
 | `measure` | Courier New 700 14px, tabular | a number or a recorded value |
 | `body` | Arial 400 10px | prose |
 | `caption` | Courier New 400 9px | clocks, coverage, provenance |
 | `label` | Arial 700 8px, tracked caps | the name of a field |
 
-These five numbers are the whole typographic argument. Change them here or not at all.
+These six numbers are the whole typographic argument. Change them here or not at all.
+
+A list row keeps the same roles at list density: `<Text role="entity" dense>` (13 px) names the row
+and `<Text role="measure" dense>` (12 px) carries its number. `dense` does nothing to body, caption or
+label, whose sizes are already list sizes. Seven numbers in all, still only in `kit.css`.
 
 ## Inputs
 

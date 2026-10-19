@@ -19,3 +19,15 @@ export function rmLotLinkMatchesUrl(link: string, url: string): boolean {
   const b = normalizeListingUrlKey(url);
   return a !== null && a === b;
 }
+
+/**
+ * The stored forms of a lot URL: as given, and with its trailing slash toggled. RM's API links end in a slash
+ * ("…/r0007-1954-buick-skylark/"); the vehicles a listing feed wrote have none. vehicles.listing_url is unique on the exact
+ * string, so a lookup by listing_url has to try both.
+ */
+export function rmListingUrlVariants(url: string): string[] {
+  const given = String(url ?? '').trim();
+  if (!given) return [];
+  const bare = given.replace(/\/+$/, '');
+  return [...new Set([given, bare, `${bare}/`])];
+}

@@ -17,6 +17,7 @@
  * Actions:
  *   POST { "url": "..." }                            — Extract single URL
  *   POST { "action": "batch_from_queue", "limit": 10 }  — Process queue items
+ *   POST { "action": "batch_from_targets", "limit": 20 } — Land unlanded sitemap targets, direct fetch only, throttled
  *   POST { "action": "re_enrich", "limit": 50 }     — Re-enrich existing vehicles
  *   POST { "action": "source_result_preview", "snapshot_id": "UUID" }
  *      — Service-only, hash-verified retained-source preview; never writes
@@ -29,8 +30,40 @@ import { qualityGate } from "../_shared/extractionQualityGate.ts";
 import { cleanVehicleFields } from "../_shared/pollutionDetector.ts";
 import { writeObservation } from "../_shared/observationWriter.ts";
 import { authenticateWriter, requireWriteAuth } from "../_shared/writeGuard.ts";
+import { projectSecretKey } from "../_shared/supabaseKeys.ts";
+import { postFromFlight } from "./rscPost.ts";
+import { mustWrite, softWrite } from "../_shared/writeResult.ts";
+import { extractStructuredLotFacets, indexLot, parseSaleFacet, priorSaleFacet, saleDay, summarizePriorSale, type IndexLot } from "./indexLot.ts";
+import { fillOnlyIdentity, landedStatus, vinConflictHolder } from "./identityFill.ts";
+import { patchForLiveRow, writeVehicleEventByKey } from "../_shared/vehicleEventWrite.ts";
 
 const EXTRACTOR_VERSION = "2.0.0";
+const TARGETS_TAG = "mecum-targets:1";
+const UPCOMING_TAG = "mecum-upcoming:1";
+const REVERIFY_TAG = "mecum-reverify:1";
+const REFOLD_TAG = "mecum-refold:1";
+const INDEX_METHOD = "mecum-index-v1";
+const INDEX_OBSERVATION_METHOD = "public_lot_index";
+const INDEX_TRUST = 0.7;
+const ALGOLIA_APP = "U6CFCQ7V52";
+const ALGOLIA_INDEX = "wp_posts_lot";
+// The search-only key Mecum's own site ships (also in scripts/mecum-algolia-discovery.mjs); it can read, not write.
+const ALGOLIA_SEARCH_KEY = "0291c46cde807bcb428a021a96138fcb";
+
+/** One query against Mecum's public search index; throws on a refusal so a permission check is never read as "no lots". */
+async function algolia(params: string): Promise<any> {
+  const resp = await fetch(`https://${ALGOLIA_APP}-dsn.algolia.net/1/indexes/*/queries`, { // guardrail-allow: raw-fetch (JSON search API, not a page)
+    method: "POST",
+    headers: { "x-algolia-application-id": ALGOLIA_APP, "x-algolia-api-key": ALGOLIA_SEARCH_KEY, "Content-Type": "application/json" },
+    body: JSON.stringify({ requests: [{ indexName: ALGOLIA_INDEX, params }] }),
+  });
+  if (!resp.ok) throw new Error(`algolia ${resp.status}: ${(await resp.text()).slice(0, 200)}`);
+  const body = await resp.json();
+  const result = body?.results?.[0];
+  if (!result) throw new Error("algolia: no result");
+  if (result.message) throw new Error(`algolia: ${result.message}`);
+  return result;
+}
 export const MECUM_SOURCE_RESULT_PARSER_VERSION = "extract-mecum:2.0.0:source_result_candidate_v2";
 
 type MecumTaxonomyClaim = { index: number; name: string | null; slug: string | null; incomplete: boolean };
@@ -183,7 +216,34 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type",
 };
 
+/**
+ * A lot that did not land whole goes to the revision queue (record_revision_item) with what is missing, a reason and the next
+ * action, instead of staying a counter. Reason and next_action are the closed vocabularies of import_queue_revision_vocab
+ * (migration 20261015120000_revision_queue.sql); a free-text reason is refused by the table's check.
+ */
+async function raiseRevision(
+  supabase: any,
+  url: string,
+  missing: string[],
+  reason: "parser_gap" | "blocked" | "rate_limited" | "billing" | "timeout" | "lock_timeout" | "duplicate_key" | "quality_gate" | "bad_data" | "not_found" | "thin_landing" | "unlinked_capture" | "other",
+  nextAction: "reparse_retained" | "refetch" | "relink" | "classify_non_vehicle" | "retry" | "wait" | "none",
+  detail: Record<string, unknown> = {},
+  snapshotId?: string,
+) {
+  const { error } = await supabase.rpc("record_revision_item", {
+    p_url: url, p_missing: missing, p_reason: reason, p_next_action: nextAction, p_raised_by: "extract-mecum",
+    p_snapshot_id: snapshotId ?? null, p_detail: detail, p_vehicle_id: null,
+  });
+  if (error) softWrite("record_revision_item", { error }, writeErrors);
+}
+
+/** Bookkeeping and optional-enrichment writes that failed during this request (softWrite); reported in the response. */
+let writeErrors: string[] = [];
+
 function okJson(data: unknown, status = 200) {
+  if (writeErrors.length && data && typeof data === "object" && !Array.isArray(data)) {
+    data = { ...(data as Record<string, unknown>), write_error_count: writeErrors.length, write_errors: writeErrors.slice(0, 10) };
+  }
   return new Response(JSON.stringify(data, null, 2), {
     status,
     headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -251,8 +311,11 @@ interface MecumVehicle {
   year: number | null;
   make: string | null;
   model: string | null;
+  series: string | null;
+  trim: string | null;
   vin: string | null;
   engine: string | null;
+  engine_configuration: string | null;
   transmission: string | null;
   exterior_color: string | null;
   interior_color: string | null;
@@ -264,6 +327,9 @@ interface MecumVehicle {
   lot_number: string | null;
   auction_name: string | null;
   auction_date: string | null;
+  auction_day_start: string | null; // source auctionDayStart, "YYYY-MM-DD HH:MM:SS" (UTC)
+  lot_statuses: string[]; // source lot status slugs, e.g. "no-reserve"
+  collection_name: string | null;
   sale_price: number | null;
   high_estimate: number | null;
   low_estimate: number | null;
@@ -401,18 +467,20 @@ function getEdgeName(obj: any, taxonomyKey: string): string | null {
 
 // ─── Parse __NEXT_DATA__ JSON (preferred, zero-cost) ────────────────────
 
-function parseNextData(html: string, url: string): MecumVehicle | null {
+function parseNextData(html: string, url: string, flightPost: any = null): MecumVehicle | null {
   const nextDataMatch = html.match(/<script[^>]*id="__NEXT_DATA__"[^>]*>([\s\S]*?)<\/script>/);
-  if (!nextDataMatch?.[1]) return null;
-
-  let parsed: any;
-  try {
-    parsed = JSON.parse(nextDataMatch[1]);
-  } catch {
-    return null;
+  let post: any = null;
+  if (nextDataMatch?.[1]) {
+    try {
+      post = JSON.parse(nextDataMatch[1])?.props?.pageProps?.post;
+    } catch {
+      return null;
+    }
+  } else {
+    // App-router pages (measured 2026-10-15) carry the same lot object in flight chunks; callers read it with
+    // postFromFlight (rscPost.ts) and pass it in, which keeps this function free of imports.
+    post = flightPost;
   }
-
-  const post = parsed?.props?.pageProps?.post;
   if (!post) return null;
 
   const vehicle: MecumVehicle = {
@@ -421,8 +489,11 @@ function parseNextData(html: string, url: string): MecumVehicle | null {
     year: null,
     make: null,
     model: null,
+    series: null,
+    trim: null,
     vin: post.vinSerial || null,
-    engine: post.lotSeries || null, // lotSeries contains engine/features like "348 CI, Air Ride"
+    engine: post.lotSeries || post.engineConfiguration || null, // lotSeries contains engine/features like "348 CI, Air Ride"
+    engine_configuration: typeof post.engineConfiguration === "string" && post.engineConfiguration.trim() ? post.engineConfiguration.trim() : null,
     transmission: post.transmission || null,
     exterior_color: post.color || null,
     interior_color: post.interior || null,
@@ -434,6 +505,9 @@ function parseNextData(html: string, url: string): MecumVehicle | null {
     lot_number: post.lotNumber || null,
     auction_name: null,
     auction_date: null,
+    auction_day_start: null,
+    lot_statuses: [],
+    collection_name: null,
     sale_price: null,
     high_estimate: null,
     low_estimate: null,
@@ -450,9 +524,11 @@ function parseNextData(html: string, url: string): MecumVehicle | null {
   const makeStr = getEdgeName(post, "makes");
   if (makeStr) vehicle.make = makeStr;
 
-  // Model from taxonomy
+  // Model and trim from taxonomy
   const modelStr = getEdgeName(post, "models");
   if (modelStr) vehicle.model = modelStr;
+  const trimStr = getEdgeName(post, "trimSubModels");
+  if (trimStr) vehicle.trim = trimStr;
 
   // Fallback: parse year/make/model from title "1960 Chevrolet Parkwood Wagon"
   if ((!vehicle.year || !vehicle.make) && post.title) {
@@ -502,13 +578,27 @@ function parseNextData(html: string, url: string): MecumVehicle | null {
     vehicle.auction_name = auctionNode?.name || null;
   }
 
-  // Run date
+  // Run date (WordPress taxonomy often serializes "YYYY-MM-DD 00:00:00")
   const runDate = getEdgeName(post, "runDates");
-  if (runDate) vehicle.auction_date = runDate;
+  if (runDate) {
+    vehicle.auction_date = /^\d{4}-\d{2}-\d{2}/.test(runDate) ? runDate.slice(0, 10) : runDate;
+  }
+  if (typeof post.auctionDayStart === "string") vehicle.auction_day_start = post.auctionDayStart;
+  const statusEdges = post?.lotStatuses?.edges;
+  if (Array.isArray(statusEdges)) {
+    vehicle.lot_statuses = statusEdges.map((e: any) => e?.node?.slug).filter((x: unknown) => typeof x === "string");
+  }
+  const collectionRaw = getEdgeName(post, "collectionsTax");
+  if (collectionRaw) {
+    vehicle.collection_name = collectionRaw.split("|")[0].replace(/&amp;/g, "&").trim() || null;
+  }
 
-  // Division as body_style hint
+  // Body style from bodyTypes taxonomy first, falling back to non-car division
+  const bodyType = getEdgeName(post, "bodyTypes");
   const division = getEdgeName(post, "divisionsTax");
-  if (division && division !== "Collector Cars") {
+  if (bodyType) {
+    vehicle.body_style = bodyType;
+  } else if (division && division !== "Collector Cars") {
     vehicle.body_style = division; // e.g., "Motorcycles", "Road Art", etc.
   }
 
@@ -556,6 +646,23 @@ function parseNextData(html: string, url: string): MecumVehicle | null {
   return vehicle;
 }
 
+function applyStructuredVehicleFacets(vehicle: MecumVehicle): MecumVehicle {
+  const structuredFacets = extractStructuredLotFacets({
+    year: vehicle.year,
+    make: vehicle.make,
+    model: vehicle.model,
+    title: vehicle.title,
+    url: vehicle.url,
+    highlights: [vehicle.engine, vehicle.highlights, vehicle.description].filter(Boolean).join(" "),
+    taxonomyTrim: vehicle.trim,
+    taxonomyBodyStyle: vehicle.body_style,
+  });
+  vehicle.series = structuredFacets.series;
+  vehicle.trim = structuredFacets.trim;
+  vehicle.body_style = structuredFacets.body_style;
+  return vehicle;
+}
+
 // ─── Parse markdown (fallback when __NEXT_DATA__ not available) ─────────
 
 function parseMarkdown(markdown: string, url: string): MecumVehicle {
@@ -565,8 +672,11 @@ function parseMarkdown(markdown: string, url: string): MecumVehicle {
     year: null,
     make: null,
     model: null,
+    series: null,
+    trim: null,
     vin: null,
     engine: null,
+    engine_configuration: null,
     transmission: null,
     exterior_color: null,
     interior_color: null,
@@ -578,6 +688,9 @@ function parseMarkdown(markdown: string, url: string): MecumVehicle {
     lot_number: null,
     auction_name: null,
     auction_date: null,
+    auction_day_start: null,
+    lot_statuses: [],
+    collection_name: null,
     sale_price: null,
     high_estimate: null,
     low_estimate: null,
@@ -686,7 +799,7 @@ async function fetchAndParse(url: string, opts?: { skipFirecrawl?: boolean }): P
   // Query for the largest direct snapshot (most likely to have __NEXT_DATA__ with post data)
   const supabaseInner = (() => {
     const u = Deno.env.get("SUPABASE_URL") ?? "";
-    const k = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? Deno.env.get("SERVICE_ROLE_KEY") ?? "";
+    const k = projectSecretKey() ?? "";
     return createClient(u, k, { auth: { persistSession: false } });
   })();
   const { data: bestSnapshot } = await supabaseInner
@@ -710,11 +823,11 @@ async function fetchAndParse(url: string, opts?: { skipFirecrawl?: boolean }): P
       } catch (_) {}
     }
     if (archiveHtml) {
-      if (archiveHtml.includes("404 - PAGE NOT FOUND")) throw new Error("PAGE_NOT_FOUND");
-      const fromArchive = parseNextData(archiveHtml, url);
+      const fromArchive = parseNextData(archiveHtml, url, postFromFlight(archiveHtml));
+      if (!fromArchive && archiveHtml.includes("404 - PAGE NOT FOUND")) throw new Error("PAGE_NOT_FOUND");
       if (fromArchive && fromArchive.year && fromArchive.make) {
         console.log(`[MECUM] Parsed via archived __NEXT_DATA__ (snapshot ${bestSnapshot.id}): ${fromArchive.year} ${fromArchive.make} ${fromArchive.model}`);
-        return fromArchive;
+        return applyStructuredVehicleFacets(fromArchive);
       }
     }
   }
@@ -727,15 +840,17 @@ async function fetchAndParse(url: string, opts?: { skipFirecrawl?: boolean }): P
   });
 
   if (directResult.html) {
-    // Check for 404
-    if (directResult.html.includes("404 - PAGE NOT FOUND") || directResult.statusCode === 404) {
-      throw new Error("PAGE_NOT_FOUND");
-    }
+    // A 404 is the status code, or a page with no lot in it that shows the 404 template. Live lot pages (measured
+    // 2026-10-15, /lots/1181445/) embed that template's text in their payload, so the text alone is not a 404.
+    if (directResult.statusCode === 404) throw new Error("PAGE_NOT_FOUND");
 
-    const fromJson = parseNextData(directResult.html, url);
+    const fromJson = parseNextData(directResult.html, url, postFromFlight(directResult.html));
+    if (!fromJson && directResult.html.includes("404 - PAGE NOT FOUND")) throw new Error("PAGE_NOT_FOUND");
+    // A lot with no year and make in its title or taxonomy (neon signs, traffic lights, other automobilia) is not a vehicle.
+    if (fromJson && !(fromJson.year && fromJson.make) && opts?.skipFirecrawl) throw new Error("NOT_A_VEHICLE");
     if (fromJson && fromJson.year && fromJson.make) {
       console.log(`[MECUM] Parsed via __NEXT_DATA__ (free): ${fromJson.year} ${fromJson.make} ${fromJson.model}`);
-      return fromJson;
+      return applyStructuredVehicleFacets(fromJson);
     }
   }
 
@@ -762,7 +877,7 @@ async function fetchAndParse(url: string, opts?: { skipFirecrawl?: boolean }): P
     const fromJson = parseNextData(fcResult.html, url);
     if (fromJson && fromJson.year && fromJson.make) {
       console.log(`[MECUM] Parsed via __NEXT_DATA__ (Firecrawl HTML): ${fromJson.year} ${fromJson.make} ${fromJson.model}`);
-      return fromJson;
+      return applyStructuredVehicleFacets(fromJson);
     }
   }
 
@@ -775,11 +890,116 @@ async function fetchAndParse(url: string, opts?: { skipFirecrawl?: boolean }): P
     const fromMd = parseMarkdown(fcResult.markdown, url);
     if (fromMd.year || fromMd.make) {
       console.log(`[MECUM] Parsed via markdown fallback: ${fromMd.year} ${fromMd.make} ${fromMd.model}`);
-      return fromMd;
+      return applyStructuredVehicleFacets(fromMd);
     }
   }
 
   throw new Error("Could not parse vehicle data from page");
+}
+
+/** auction_events.outcome is checked against a fixed list (sold, reserve_not_met, no_sale, bid_to, cancelled, relisted, pending, live). */
+function auctionOutcome(status: string | null): string {
+  const x = (status ?? "").toLowerCase();
+  if (x === "sold") return "sold";
+  if (x === "not sold" || x === "no sale") return "no_sale";
+  if (x === "bid-goes-on") return "bid_to";
+  return "pending";
+}
+
+// ─── Listing episode ────────────────────────────────────────────────────
+
+/** One lot of a sale on Mecum's calendar, from its Algolia roster (enumerate_upcoming). */
+interface UpcomingSale {
+  sale_key: string; // auction_tax slug, e.g. "kissimmee-2027"; census by_category keys use the same string
+  auction_name: string; // "Kissimmee 2027"
+  sale_starts_on: string; // YYYY-MM-DD
+  sale_ends_on: string;
+  run_day: string | null; // YYYY-MM-DD
+  lot_number: string | null;
+  lot_statuses: string[];
+  roster_first_seen_at: string;
+}
+
+const todayUtc = () => new Date().toISOString().slice(0, 10);
+
+async function writeMecumEpisode(supabase: any, vehicleId: string, vehicle: MecumVehicle, sale?: UpcomingSale) {
+  const runDay = /^\d{4}-\d{2}-\d{2}/.test(vehicle.auction_date ?? "") ? vehicle.auction_date!.slice(0, 10) : (sale?.run_day ?? null);
+  const hasResult = !!vehicle.status && !["upcoming", "listed"].includes(vehicle.status);
+  // No result yet and the run day not past: the lot is upcoming. A past run day with no result stays "listed".
+  const eventStatus = hasResult ? vehicle.status! : (runDay && runDay >= todayUtc() ? "upcoming" : (vehicle.status || "listed"));
+  const dayStart = vehicle.auction_day_start && !isNaN(Date.parse(vehicle.auction_day_start.replace(" ", "T") + "Z"))
+    ? new Date(vehicle.auction_day_start.replace(" ", "T") + "Z").toISOString() : null;
+  // Run date is the sale date of an auction lot (ended_at); the result time is not published, so sold_at stays the run day.
+  const runDayIso = runDay ? new Date(runDay + "T00:00:00Z").toISOString() : null;
+  const lotStatuses = sale?.lot_statuses?.length ? sale.lot_statuses : vehicle.lot_statuses;
+  const metadata: Record<string, unknown> = {
+    source: "extract-mecum",
+    title: vehicle.title,
+    auction_date: vehicle.auction_date,
+    auction_name: sale?.auction_name ?? vehicle.auction_name,
+    auction_session_days: runDay ? [runDay] : [],
+    lot_number: vehicle.lot_number ?? sale?.lot_number ?? null,
+    currency: "USD",
+    estimate_low: vehicle.low_estimate,
+    estimate_high: vehicle.high_estimate,
+    ...(vehicle.series ? { series: vehicle.series } : {}),
+    ...(vehicle.trim ? { trim: vehicle.trim } : {}),
+    ...(vehicle.body_style ? { body_style: vehicle.body_style } : {}),
+  };
+  if (lotStatuses.length) metadata.has_reserve = !lotStatuses.some((x) => /no-?reserve/i.test(x));
+  if (sale) {
+    Object.assign(metadata, {
+      sale_key: sale.sale_key,
+      sale_starts_on: sale.sale_starts_on,
+      sale_ends_on: sale.sale_ends_on,
+      roster_first_seen_at: sale.roster_first_seen_at,
+    });
+  }
+  const listingId = vehicle.lot_number ?? sale?.lot_number ?? vehicle.url.match(/\/lots\/(\d+)/)?.[1] ?? null;
+  const row = {
+    vehicle_id: vehicleId,
+    source_platform: "mecum",
+    event_type: "auction",
+    source_url: vehicle.url,
+    source_listing_id: listingId,
+    final_price: vehicle.sale_price,
+    event_status: eventStatus,
+    ended_at: dayStart ?? runDayIso,
+    sold_at: hasResult ? runDayIso : null,
+    metadata,
+  };
+
+  const { data: lives } = await supabase
+    .from("vehicle_events")
+    .select("id, metadata, sold_at, ended_at")
+    .eq("vehicle_id", vehicleId)
+    .eq("source_platform", "mecum")
+    .in("source_url", mecumUrlSpellings(vehicle.url))
+    .limit(1);
+  const live = lives?.[0];
+  if (live) {
+    // The first roster sighting is kept across re-reads.
+    if (live.metadata?.roster_first_seen_at) metadata.roster_first_seen_at = live.metadata.roster_first_seen_at;
+    if (!row.final_price) delete (row as Record<string, unknown>).final_price;
+    const { patch } = patchForLiveRow(live, row as any);
+    delete patch.vehicle_id; delete patch.source_platform; delete patch.source_listing_id; delete patch.source_url;
+    const { error } = await supabase.from("vehicle_events").update(patch).eq("id", live.id);
+    if (error) console.warn(`[MECUM] event update failed for ${vehicle.url}: ${error.message}`);
+    return;
+  }
+  const res = await writeVehicleEventByKey(supabase, row as any);
+  if (res.action === "error" || res.action === "skipped") {
+    console.warn(`[MECUM] vehicle_event not written for ${vehicle.url} (${res.action}): ${"error" in res ? res.error : res.reason}`);
+  }
+}
+
+/** A VIN or serial as the source states it, or null for a placeholder (measured 2026-10-15: "BLLFSALE" is on a Scat Cat and a
+ *  Sayers and Scovill hearse, two different vehicles). */
+function realVin(vin: string | null): string | null {
+  const v = (vin ?? "").trim();
+  if (v.length < 5) return null;
+  if (/^(bll?f?sale|bill\s*of\s*sale|none|n\/?a|no\s*vin|tbd|unknown|not\s*available|see\s*title)$/i.test(v)) return null;
+  return v;
 }
 
 // ─── Save vehicle ───────────────────────────────────────────────────────
@@ -788,31 +1008,34 @@ async function saveVehicle(
   supabase: ReturnType<typeof createClient>,
   vehicle: MecumVehicle,
   forceVehicleId?: string,
-): Promise<{ vehicleId: string; isNew: boolean; fieldsUpdated: string[]; qualityScore: number }> {
-  // Check if vehicle already exists (by URL, queue, or VIN)
-  const { data: byUrl } = await supabase
-    .from("vehicles")
-    .select("id")
-    .eq("discovery_url", vehicle.url)
-    .limit(1)
-    .maybeSingle();
+  sale?: UpcomingSale,
+): Promise<{ vehicleId: string; isNew: boolean; fieldsUpdated: string[]; qualityScore: number; relinkVin: boolean }> {
+  // Check if vehicle already exists (by discovery_url, listing_url, queue, or VIN)
+  const spellings = mecumUrlSpellings(vehicle.url);
+  const [{ data: byDiscoveryUrl }, { data: byListingUrl }, { data: queueEntry }] = await Promise.all([
+    supabase.from("vehicles").select("id, created_at").is("deleted_at", null).in("discovery_url", spellings).order("created_at", { ascending: true }).limit(2),
+    supabase.from("vehicles").select("id, created_at").is("deleted_at", null).in("listing_url", spellings).order("created_at", { ascending: true }).limit(2),
+    supabase.from("import_queue").select("vehicle_id").eq("listing_url", vehicle.url).not("vehicle_id", "is", null).limit(1).maybeSingle(),
+  ]);
 
-  const { data: queueEntry } = await supabase
-    .from("import_queue")
-    .select("vehicle_id")
-    .eq("listing_url", vehicle.url)
-    .not("vehicle_id", "is", null)
-    .limit(1)
-    .maybeSingle();
+  const urlMatchIds = Array.from(new Set([...(byDiscoveryUrl ?? []).map((r: any) => r.id), ...(byListingUrl ?? []).map((r: any) => r.id)]));
+  if (urlMatchIds.length > 1) {
+    // If a split duplicate pair exists (e.g. one row with listing_url and another with discovery_url), merge into primary
+    const primaryCandidate = urlMatchIds[0];
+    for (let i = 1; i < urlMatchIds.length; i++) {
+      await supabase.rpc("merge_into_primary", { primary_id: primaryCandidate, dup_id: urlMatchIds[i] }).catch(() => {});
+    }
+  }
 
-  let existingId = forceVehicleId || queueEntry?.vehicle_id || byUrl?.id;
+  let existingId = forceVehicleId || queueEntry?.vehicle_id || urlMatchIds[0];
 
   // Also check by VIN if we have one (prevents duplicate key violation)
-  if (!existingId && vehicle.vin && vehicle.vin.length >= 5) {
+  if (!existingId && realVin(vehicle.vin)) {
     const { data: byVin } = await supabase
       .from("vehicles")
       .select("id")
-      .eq("vin", vehicle.vin)
+      .eq("vin", realVin(vehicle.vin)!)
+      .is("deleted_at", null)
       .limit(1)
       .maybeSingle();
     if (byVin?.id) existingId = byVin.id;
@@ -822,14 +1045,18 @@ async function saveVehicle(
     year: vehicle.year,
     make: vehicle.make,
     model: vehicle.model,
-    vin: vehicle.vin && vehicle.vin.length >= 5 ? vehicle.vin : null,
-    engine_type: vehicle.engine,
+    series: vehicle.series,
+    trim: vehicle.trim,
+    vin: realVin(vehicle.vin) ? vehicle.vin : null,
+    engine_type: vehicle.engine || vehicle.engine_configuration,
+    engine_size: vehicle.engine || vehicle.engine_configuration,
     transmission: vehicle.transmission,
     color: vehicle.exterior_color,
     interior_color: vehicle.interior_color,
     body_style: vehicle.body_style,
     mileage: vehicle.mileage,
     description: vehicle.description,
+    primary_image_url: vehicle.image_urls[0] ?? null,
     // Sale rule (lock 1, 2026-09-27): Mecum's hammer price is the sale only when the result says
     // sold; on a "not sold" / "bid goes on" lot it is the high bid. The status travels with it
     // (nulls are stripped below, so an unknown result writes neither).
@@ -837,6 +1064,8 @@ async function saveVehicle(
     high_bid: vehicle.status !== "sold" ? vehicle.sale_price : null,
     sale_status: vehicle.status === "sold" ? "sold" : (vehicle.status === "not sold" ? "not_sold" : null),
     auction_outcome: vehicle.status === "sold" ? "sold" : null,
+    sale_date: vehicle.status === "sold" && vehicle.auction_date && /^\d{4}-\d{2}-\d{2}/.test(vehicle.auction_date) ? vehicle.auction_date.slice(0, 10) : null,
+    listing_url: vehicle.url,
     discovery_url: vehicle.url,
     discovery_source: "mecum",
     listing_source: "mecum",
@@ -870,17 +1099,18 @@ async function saveVehicle(
 
   let vehicleId: string;
   let isNew = false;
+  let relinkVin = false;
   const fieldsUpdated: string[] = [];
 
   if (existingId) {
     const { data: existing } = await supabase
       .from("vehicles")
-      .select("vin,mileage,color,description,transmission,body_style,engine_type,sale_price,interior_color")
+      .select("year,make,model,vin,series,trim,mileage,color,description,transmission,body_style,engine_type,sale_price,interior_color")
       .eq("id", existingId)
       .maybeSingle();
 
     if (existing) {
-      const trackFields = ["vin", "mileage", "color", "description", "transmission", "body_style", "engine_type", "sale_price", "interior_color"];
+      const trackFields = ["vin", "series", "trim", "mileage", "color", "description", "transmission", "body_style", "engine_type", "sale_price", "interior_color"];
       for (const f of trackFields) {
         if (!(existing as any)[f] && cleanData[f]) fieldsUpdated.push(f);
       }
@@ -889,12 +1119,46 @@ async function saveVehicle(
     // Strip identity/source fields that should only be set on insert
     const { discovery_url: _du, discovery_source: _ds, source: _src, listing_source: _ls, ...updateData } = cleanData;
 
-    const { error: updateErr } = await supabase.from("vehicles").update(updateData).eq("id", existingId);
+    // Identity is fill-only: a resolved vehicle keeps its own year, make, model and VIN. A lot that states a different year,
+    // make or VIN is another vehicle (or a wrong link), never an overwrite: it goes to the revision queue to be relinked, and
+    // nothing of it (vehicle fields, event, observation) is written against this vehicle. This update used to write the lot's
+    // whole payload, the defect that made vehicles carrying one platform's truck and another's VIN.
+    const filled = fillOnlyIdentity(existing as any, updateData as any);
+    const disagree = filled.disagree;
+    for (const k of ["year", "make", "model", "vin"]) if (!(k in filled.update)) delete (updateData as any)[k];
+    if (disagree.length) {
+      await raiseRevision(supabase, vehicle.url, disagree, "quality_gate", "relink", {
+        vehicle_id: existingId,
+        vehicle_has: Object.fromEntries(disagree.map((k) => [k, (existing as any)[k]])),
+        lot_states: Object.fromEntries(disagree.map((k) => [k, (updateData as any)[k] ?? (cleanData as any)[k]])),
+        raised_in: "extract-mecum saveVehicle",
+      });
+      throw new Error(`IDENTITY_MISMATCH: lot states a different ${disagree.join(", ")} than vehicle ${existingId}`);
+    }
+
+    const updateRes = await supabase.from("vehicles").update(updateData).eq("id", existingId);
+    const updateErr = updateRes.error;
     if (updateErr) {
-      // VIN unique constraint violation: another vehicle already has this VIN.
-      // Retry without VIN to still update other fields.
-      if (updateErr.code === "23505" && updateErr.message?.includes("vin")) {
-        console.warn(`[MECUM] VIN conflict for ${existingId} (vin=${cleanData.vin}), retrying without VIN`);
+      // The lot's VIN is already on another vehicle (usually the same car consigned under an earlier lot). The VIN is not
+      // written and nothing is merged: the pair goes to the revision queue to be relinked, and the rest of the lot lands.
+      const vinHolder = vinConflictHolder(updateErr);
+      if (vinHolder !== null && "vin" in updateData) {
+        // A unique-index refusal does not name the holder; read it by the exact VIN (indexed). An unnamed holder is left
+        // out of the detail rather than written as null, so a re-landing never erases a holder recorded earlier.
+        let holderId = vinHolder;
+        if (!holderId) {
+          const { data: holder } = await supabase.from("vehicles").select("id").eq("vin", (updateData as any).vin)
+            .is("merged_into_vehicle_id", null).neq("id", existingId).limit(1).maybeSingle();
+          holderId = (holder as { id?: string } | null)?.id ?? "";
+        }
+        console.warn(`[MECUM] VIN conflict for ${existingId} (vin=${cleanData.vin}, holder=${holderId || "unnamed"}), retrying without VIN`);
+        relinkVin = true;
+        await raiseRevision(supabase, vehicle.url, ["vin"], "duplicate_key", "relink", {
+          vehicle_id: existingId,
+          lot_states: { vin: cleanData.vin },
+          ...(holderId ? { vin_held_by_vehicle_id: holderId } : {}),
+          raised_in: "extract-mecum saveVehicle",
+        });
         const { vin: _skipVin, ...dataWithoutVin } = updateData;
         const { error: retryErr } = await supabase.from("vehicles").update(dataWithoutVin).eq("id", existingId);
         if (retryErr) {
@@ -938,59 +1202,20 @@ async function saveVehicle(
   // Save images (batch insert, skip existing)
   if (vehicle.image_urls.length > 0) {
     const imageLimit = Math.min(vehicle.image_urls.length, 80);
-    for (let idx = 0; idx < imageLimit; idx++) {
-      const imgUrl = vehicle.image_urls[idx];
-      const { data: existingImg } = await supabase
-        .from("vehicle_images")
-        .select("id")
-        .eq("vehicle_id", vehicleId)
-        .eq("image_url", imgUrl)
-        .limit(1)
-        .maybeSingle();
-      if (!existingImg) {
-        await supabase.from("vehicle_images").insert({
-          vehicle_id: vehicleId,
-          image_url: imgUrl,
-          source: "external_import",
-          source_url: imgUrl,
-          is_external: true,
-          position: idx,
-        });
-      }
+    // One read and one insert for the lot (this was a select and an insert per image: about 150 requests a lot).
+    const { data: have } = await supabase.from("vehicle_images").select("image_url").eq("vehicle_id", vehicleId).limit(500);
+    const haveUrls = new Set((have ?? []).map((r: { image_url: string }) => r.image_url));
+    const fresh = vehicle.image_urls.slice(0, imageLimit)
+      .map((imgUrl, idx) => ({ vehicle_id: vehicleId, image_url: imgUrl, source: "external_import", source_url: imgUrl, is_external: true, position: idx }))
+      .filter((row) => !haveUrls.has(row.image_url));
+    if (fresh.length) {
+      softWrite("vehicle_images insert", await supabase.from("vehicle_images").insert(fresh), writeErrors);
     }
   }
 
-  // Create vehicle_event (for tracking)
-  const { data: existingListing } = await supabase
-    .from("vehicle_events")
-    .select("id")
-    .eq("vehicle_id", vehicleId)
-    .eq("source_platform", "mecum")
-    .eq("source_url", vehicle.url)
-    .limit(1)
-    .maybeSingle();
-
-  if (!existingListing) {
-    try {
-      // Run date IS the sale date for an auction lot. It was parsed above
-      // (vehicle.auction_date) but never persisted — the cause of the empty
-      // price-over-time charts. Persist it to sold_at.
-      const mecumSoldAt = vehicle.auction_date && !isNaN(Date.parse(vehicle.auction_date))
-        ? new Date(vehicle.auction_date).toISOString()
-        : null;
-      await supabase.from("vehicle_events").insert({
-        vehicle_id: vehicleId,
-        source_platform: "mecum",
-        event_type: "auction",
-        source_url: vehicle.url,
-        source_listing_id: vehicle.lot_number || null,
-        final_price: vehicle.sale_price,
-        event_status: vehicle.status || "listed",
-        sold_at: mecumSoldAt,
-        metadata: { title: vehicle.title, auction_date: vehicle.auction_date || null },
-      });
-    } catch { /* non-fatal */ }
-  }
+  // The listing episode (vehicle_events is a state table, rows are updated in place; see vehicleEventWrite.ts). An
+  // episode already stored under another spelling of the URL is updated, not duplicated.
+  await writeMecumEpisode(supabase, vehicleId, vehicle, sale);
 
   // Create auction event
   const { data: existingEvent } = await supabase
@@ -1003,24 +1228,47 @@ async function saveVehicle(
     .maybeSingle();
 
   if (!existingEvent) {
-    try {
-      await supabase.from("auction_events").insert({
+    {
+      // The insert result is read: a missing column here went unseen for months (this insert named sale_price, which the
+      // table does not have, inside a try that cannot catch a PostgREST error).
+      const { error: aeErr } = await supabase.from("auction_events").insert({
         vehicle_id: vehicleId,
         source: "mecum",
         source_url: vehicle.url,
-        outcome: vehicle.status || "listed",
+        outcome: auctionOutcome(vehicle.status),
         lot_number: vehicle.lot_number || null,
-        sale_price: vehicle.sale_price || null,
+        source_listing_id: vehicle.lot_number || null,
+        winning_bid: vehicle.status === "sold" ? vehicle.sale_price || null : null,
+        high_bid: vehicle.status !== "sold" ? vehicle.sale_price || null : null,
       });
-    } catch { /* non-fatal */ }
+      if (aeErr) console.warn(`[MECUM] auction_events insert failed for ${vehicle.url}: ${aeErr.message}`);
+    }
   }
 
-  return { vehicleId, isNew, fieldsUpdated, qualityScore: gate.score };
+  return { vehicleId, isNew, fieldsUpdated, qualityScore: gate.score, relinkVin };
+}
+
+// Existing mecum rows spell one lot several ways (measured 2026-10-15: with and without www, with and without the trailing
+// slash, a /sitemap.xml suffix, and, on vehicles.discovery_url, a lowercased path because canonicalize_vehicle_url lowercases
+// it: "FL15-204118" is stored as "fl15-204118"), so a lot is landed if any spelling has a row. The key ignores case.
+function mecumLotKey(url: string): string {
+  return url
+    .replace(/^https?:\/\/(www\.)?/, "")
+    .replace(/\/(sitemap\.xml)?\/?$/, "")
+    .replace(/^(mecum\.com\/lots\/)[a-z]{2}\d{2}-(\d+\/)/i, "$1$2")
+    .toLowerCase();
+}
+function mecumUrlSpellings(url: string): string[] {
+  const bare = url.replace(/^https?:\/\/(www\.)?/, "").replace(/\/(sitemap\.xml)?\/?$/, "");
+  const lower = bare.toLowerCase();
+  const out = [`https://www.${bare}`, `https://www.${bare}/`, `https://${bare}`, `https://${bare}/`, `https://www.${bare}/sitemap.xml`];
+  return lower === bare ? out : [...out, `https://${lower}`, `https://www.${lower}`, `https://${lower}/`];
 }
 
 // ─── Main handler ───────────────────────────────────────────────────────
 
 Deno.serve(async (req) => {
+  writeErrors = [];
   // Writes are never anonymous: service key, signed-in user, or nothing (P0.2, 2026-09-27).
   const denied = await requireWriteAuth(req);
   if (denied) return denied;
@@ -1031,7 +1279,7 @@ Deno.serve(async (req) => {
   try {
     const supabase = createClient(
       Deno.env.get("SUPABASE_URL") ?? "",
-      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "",
+      projectSecretKey() ?? "",
     );
 
     const body = req.method === "POST" ? await req.json().catch(() => ({})) : {};
@@ -1067,13 +1315,13 @@ Deno.serve(async (req) => {
           `${vehicle.image_urls.length} images, method=${vehicle.extraction_method}`,
       );
 
-      const { vehicleId, isNew, fieldsUpdated, qualityScore } = await saveVehicle(supabase, vehicle);
+      const { vehicleId, isNew, fieldsUpdated, qualityScore, relinkVin } = await saveVehicle(supabase, vehicle);
 
       // Update queue entry if exists
-      await supabase
+      softWrite("import_queue complete", await supabase
         .from("import_queue")
-        .update({ status: "complete", vehicle_id: vehicleId, error_message: null })
-        .eq("listing_url", url);
+        .update({ status: landedStatus(relinkVin), vehicle_id: vehicleId, error_message: null })
+        .eq("listing_url", url), writeErrors);
 
       return okJson({
         success: true,
@@ -1095,6 +1343,725 @@ Deno.serve(async (req) => {
           status: vehicle.status,
         },
       });
+    }
+
+    // ── Queue re-reads of sales claimed by the orphan backfill ──────────────────────────────────
+    // vehicle_events rows with extraction_method orphan-backfill-v1 and event_status sold were written from snapshot run
+    // dates (Dec-Feb), not from a read of the lot's result. Each is queued (REVERIFY_TAG, priority 50, after the upcoming
+    // roster) so batch_from_targets re-reads the lot page and proves or refuses the sale. Cursor: the last queued event id.
+    if (action === "enqueue_reverify") {
+      const n = Math.min(Math.max(Math.floor(Number(body.limit)) || 300, 1), 500);
+      const { data: last } = await supabase.from("import_queue").select("raw_data").eq("extractor_version", REVERIFY_TAG).order("created_at", { ascending: false }).limit(1).maybeSingle();
+      const after = String(body.after_id || last?.raw_data?.event_id || "00000000-0000-0000-0000-000000000000");
+      const { data: evs, error: evErr } = await supabase
+        .from("vehicle_events")
+        .select("id, source_url, final_price, sold_at")
+        .eq("source_platform", "mecum")
+        .eq("extraction_method", "orphan-backfill-v1")
+        .eq("event_status", "sold")
+        .gt("id", after)
+        .order("id", { ascending: true })
+        .limit(n);
+      if (evErr) throw evErr;
+      let queued = 0, requeued = 0, lastId = after;
+      for (const ev of evs ?? []) {
+        lastId = ev.id;
+        const url = `https://www.${mecumLotKey(ev.source_url)}/`;
+        const raw = { event_id: ev.id, claim: { final_price: ev.final_price, sold_at: ev.sold_at } };
+        const { data: row } = await supabase.from("import_queue").select("id, status").eq("listing_url", url).maybeSingle();
+        if (row) {
+          if (row.status === "processing") continue;
+          softWrite("import_queue requeue", await supabase.from("import_queue").update({ status: "pending", priority: 50, extractor_version: REVERIFY_TAG, locked_by: "extract-mecum:reverify", raw_data: raw, error_message: null }).eq("id", row.id), writeErrors);
+          requeued++;
+        } else {
+          const { error } = await supabase.from("import_queue").insert({ listing_url: url, status: "pending", priority: 50, extractor_version: REVERIFY_TAG, locked_by: "extract-mecum:reverify", raw_data: raw });
+          if (!error) queued++;
+        }
+      }
+      return okJson({ success: true, examined: evs?.length ?? 0, queued, requeued, last_event_id: lastId });
+    }
+
+    // ── Land lots straight from Mecum's public lot index (sale facts only, no page fetch) ───────
+    // body: { lots: [index records, max 100], pulled_at: ISO, dry_run?: boolean }. Each record is one hit of Algolia
+    // wp_posts_lot (app U6CFCQ7V52). A lot is landed only if it is a vehicle type (Auto, Motorcycle, Tractor, Boat), states a
+    // year and make, and has no vehicle_event under any URL spelling. The vehicle holds year, make, model, the result and its
+    // price; there is no VIN, color, description or photo, which a page walk or re-fold adds later (saveVehicle fills what is
+    // missing). The event carries extraction_method mecum-index-v1; the observation goes through writeObservation as
+    // public_lot_index at trust 0.7. Round trips are per batch, not per lot: one landed lookup, one vehicle lookup, one
+    // vehicle insert, one event insert and one auction_events insert for up to 100 lots, then the observations five at a time.
+    if (action === "land_index_lots") {
+      const lotsIn: any[] = Array.isArray(body.lots) ? body.lots.slice(0, 100) : [];
+      const pulledAt = Date.parse(String(body.pulled_at ?? ""));
+      if (!Number.isFinite(pulledAt)) return okJson({ success: false, error: "pulled_at (ISO time of the index pull) is required" }, 400);
+      const pulledIso = new Date(pulledAt).toISOString();
+      const dryRun = body.dry_run === true;
+      const out = { received: lotsIn.length, revisions_raised: 0, skipped: {} as Record<string, number>, already_landed: 0, linked_to_existing_vehicle: 0, vehicles_created: 0, events_created: 0, auction_events_created: 0, observations: 0, observation_errors: 0, rejected_by_gate: 0, errors: [] as string[], dry_run: dryRun };
+      const bump = (k: string) => { out.skipped[k] = (out.skipped[k] ?? 0) + 1; };
+
+      const lots: IndexLot[] = [];
+      const seenIds = new Set<string>();
+      for (const hit of lotsIn) {
+        const r = indexLot(hit);
+        if ("skip" in r) {
+          bump(r.skip);
+          if (r.skip === "no_year_make" && r.url && !dryRun) {
+            await raiseRevision(supabase, r.url, ["year", "make"], "bad_data", "reparse_retained", { title: r.title ?? null, index_pulled_at: pulledIso });
+            out.revisions_raised++;
+          }
+          continue;
+        }
+        if (seenIds.has(r.lot.lot_id)) { bump("duplicate_in_batch"); continue; }
+        seenIds.add(r.lot.lot_id);
+        lots.push(r.lot);
+      }
+
+      // Landed lookup: events and vehicles under any spelling of each lot URL, 10 lots per request (up to 8 spellings each, about 7 KB of URL; 25 lots reached 16.4 KB on LV23 lots and the gateway refused it, batches 365-367).
+      const eventKeys = new Set<string>();
+      const vehicleByKey = new Map<string, string>();
+      const chunks: IndexLot[][] = [];
+      for (let i = 0; i < lots.length; i += 10) chunks.push(lots.slice(i, i + 10));
+      await Promise.all(chunks.map(async (chunk) => {
+        const spellings = chunk.flatMap((l) => mecumUrlSpellings(l.url));
+        const [ev, veDisc, veList] = await Promise.all([
+          supabase.from("vehicle_events").select("source_url").eq("source_platform", "mecum").in("source_url", spellings),
+          supabase.from("vehicles").select("id, discovery_url").is("deleted_at", null).in("discovery_url", spellings),
+          supabase.from("vehicles").select("id, listing_url").is("deleted_at", null).in("listing_url", spellings),
+        ]);
+        if (ev.error || veDisc.error || veList.error) throw new Error(`landed lookup failed: ${(ev.error || veDisc.error || veList.error)?.message}`);
+        for (const r of ev.data ?? []) eventKeys.add(mecumLotKey(r.source_url));
+        for (const r of veList.data ?? []) vehicleByKey.set(mecumLotKey(r.listing_url), r.id);
+        for (const r of veDisc.data ?? []) {
+          const k = mecumLotKey(r.discovery_url);
+          const existing = vehicleByKey.get(k);
+          if (existing && existing !== r.id) {
+            await supabase.rpc("merge_into_primary", { primary_id: existing, dup_id: r.id }).catch(() => {});
+          } else {
+            vehicleByKey.set(k, r.id);
+          }
+        }
+      }));
+
+      const todo: IndexLot[] = [];
+      for (const l of lots) {
+        if (eventKeys.has(mecumLotKey(l.url))) { out.already_landed++; continue; }
+        todo.push(l);
+      }
+
+      // Vehicle rows for lots with no vehicle yet; cleaned and gated like the page path.
+      const newRows: { lot: IndexLot; row: Record<string, unknown> }[] = [];
+      for (const l of todo) {
+        if (vehicleByKey.has(mecumLotKey(l.url))) { out.linked_to_existing_vehicle++; continue; }
+        const raw: Record<string, unknown> = {
+          year: l.year,
+          make: l.make,
+          model: l.model,
+          series: l.series,
+          trim: l.trim,
+          body_style: l.body_style,
+          color: l.exterior_color,
+          interior_color: l.interior_color,
+          transmission: l.transmission,
+          engine_type: l.engine,
+          engine_size: l.engine,
+          description: l.description,
+          primary_image_url: l.image_urls[0] ?? null,
+          sale_price: l.result === "sold" ? l.price : null,
+          high_bid: l.result === "bid-goes-on" ? l.price : null,
+          sale_status: l.result === "sold" ? "sold" : null,
+          auction_outcome: l.result === "sold" ? "sold" : null,
+          sale_date: l.result === "sold" ? l.run_day : null,
+          provenance_metadata: Object.fromEntries(
+            Object.entries({
+              mec_lot_number: l.lot_number,
+              mec_auction_name: l.sale_name,
+              mec_sale_key: l.sale_key,
+              mec_web_id: l.lot_id,
+              mec_series: l.engine,
+              mec_collection: l.collection_name,
+              mec_estimate_low: l.estimate_low,
+              mec_estimate_high: l.estimate_high,
+              ...(l.lot_statuses.length ? { mec_has_reserve: !l.lot_statuses.some((x) => /no-?reserve/i.test(x)) } : {}),
+            }).filter(([, v]) => v !== null && v !== undefined),
+          ),
+          listing_url: l.url,
+          discovery_url: l.url,
+          discovery_source: "mecum",
+          listing_source: "mecum",
+          source: "mecum",
+          extractor_version: INDEX_METHOD,
+        };
+        const cleaned = cleanVehicleFields(raw, { platform: "mecum" });
+        const gate = qualityGate(cleaned as Record<string, any>, { source: "mecum", sourceType: "auction" });
+        if (gate.action === "reject") { out.rejected_by_gate++; continue; }
+        const row: Record<string, unknown> = { status: "active" };
+        for (const [k, v] of Object.entries(gate.cleaned)) if (v !== null && v !== undefined) row[k] = v;
+        newRows.push({ lot: l, row });
+      }
+
+      if (dryRun) {
+        return okJson({ ...out, success: true, would_land: todo.length - out.linked_to_existing_vehicle - out.rejected_by_gate, would_link: out.linked_to_existing_vehicle });
+      }
+
+      const vehicleIdFor = new Map<string, string>();
+      for (const l of todo) { const id = vehicleByKey.get(mecumLotKey(l.url)); if (id) vehicleIdFor.set(l.lot_id, id); }
+      if (newRows.length) {
+        const ins = await supabase.from("vehicles").insert(newRows.map((x) => x.row)).select("id, discovery_url");
+        if (!ins.error) {
+          const byKey = new Map((ins.data ?? []).map((r: any) => [mecumLotKey(r.discovery_url), r.id]));
+          for (const x of newRows) { const id = byKey.get(mecumLotKey(x.lot.url)); if (id) { vehicleIdFor.set(x.lot.lot_id, id); out.vehicles_created++; } }
+        } else {
+          // One bad row (a duplicate key, a trigger refusal) fails the batch insert; land the rest row by row.
+          if (out.errors.length < 5) out.errors.push(`batch vehicle insert: ${ins.error.message}`);
+          for (const x of newRows) {
+            const one = await supabase.from("vehicles").insert(x.row).select("id").maybeSingle();
+            if (one.error || !one.data) { if (out.errors.length < 5) out.errors.push(`${x.lot.url}: ${one.error?.message ?? "no row"}`); continue; }
+            vehicleIdFor.set(x.lot.lot_id, one.data.id); out.vehicles_created++;
+          }
+        }
+      }
+
+      const landed = todo.filter((l) => vehicleIdFor.has(l.lot_id));
+      const eventRows = landed.map((l) => ({
+        vehicle_id: vehicleIdFor.get(l.lot_id)!,
+        source_platform: "mecum",
+        event_type: "auction",
+        source_url: l.url,
+        source_listing_id: l.lot_number ?? l.lot_id,
+        final_price: l.price,
+        event_status: l.result ?? "listed",
+        ended_at: l.day_start ?? (l.run_day ? new Date(l.run_day + "T00:00:00Z").toISOString() : null),
+        sold_at: l.result && l.run_day ? new Date(l.run_day + "T00:00:00Z").toISOString() : null,
+        extraction_method: INDEX_METHOD,
+        extraction_source: "algolia U6CFCQ7V52/wp_posts_lot",
+        extracted_at: pulledIso,
+        metadata: {
+          source: "extract-mecum",
+          index_sourced: true,
+          index_pulled_at: pulledIso,
+          index_object_id: l.object_id,
+          title: l.title,
+          auction_date: l.run_day,
+          auction_name: l.sale_name,
+          auction_session_days: l.run_day ? [l.run_day] : [],
+          sale_key: l.sale_key,
+          sale_starts_on: l.sale_starts_on,
+          sale_ends_on: l.sale_ends_on,
+          lot_number: l.lot_number,
+          currency: "USD",
+          estimate_low: l.estimate_low,
+          estimate_high: l.estimate_high,
+          collection_name: l.collection_name,
+          series: l.series,
+          body_style: l.body_style,
+          trim: l.trim,
+          ...(l.lot_statuses.length ? { has_reserve: !l.lot_statuses.some((x) => /no-?reserve/i.test(x)) } : {}),
+        },
+      }));
+      if (eventRows.length) {
+        const ev = await supabase.from("vehicle_events").insert(eventRows).select("id");
+        if (!ev.error) out.events_created += ev.data?.length ?? 0;
+        else {
+          if (out.errors.length < 5) out.errors.push(`batch event insert: ${ev.error.message}`);
+          for (const row of eventRows) {
+            const r = await writeVehicleEventByKey(supabase, row as any);
+            if (r.action === "inserted") out.events_created++;
+            else if (r.action === "error" && out.errors.length < 5) out.errors.push(`${row.source_url}: ${r.error}`);
+          }
+        }
+        const ae = await supabase.from("auction_events").insert(landed.map((l) => ({
+          vehicle_id: vehicleIdFor.get(l.lot_id)!, source: "mecum", source_url: l.url, source_listing_id: l.lot_number ?? l.lot_id, outcome: auctionOutcome(l.result), lot_number: l.lot_number,
+          winning_bid: l.result === "sold" ? l.price : null, high_bid: l.result === "bid-goes-on" ? l.price : null,
+          estimate_low: l.estimate_low, estimate_high: l.estimate_high,
+          auction_end_date: l.day_start ?? (l.run_day ? new Date(l.run_day + "T00:00:00Z").toISOString() : null),
+        }))).select("id");
+        if (!ae.error) out.auction_events_created += ae.data?.length ?? 0;
+        else if (out.errors.length < 5) out.errors.push(`auction_events insert: ${ae.error.message}`);
+
+        // Insert gallery photos from Algolia images_meta for newly landed lots
+        const lotsWithImages = landed.filter((l) => l.image_urls?.length > 0);
+        if (lotsWithImages.length) {
+          const vIds = lotsWithImages.map((l) => vehicleIdFor.get(l.lot_id)!);
+          const { data: existingImgs } = await supabase.from("vehicle_images").select("vehicle_id, image_url").in("vehicle_id", vIds).limit(2000);
+          const haveByVeh = new Set((existingImgs ?? []).map((r: any) => `${r.vehicle_id}|${r.image_url}`));
+          const imgRows = lotsWithImages.flatMap((l) => {
+            const vid = vehicleIdFor.get(l.lot_id)!;
+            return l.image_urls.slice(0, 60)
+              .filter((imgUrl) => !haveByVeh.has(`${vid}|${imgUrl}`))
+              .map((imgUrl, idx) => ({
+                vehicle_id: vid,
+                image_url: imgUrl,
+                source: "external_import",
+                source_url: imgUrl,
+                is_external: true,
+                position: idx,
+              }));
+          });
+          for (let i = 0; i < imgRows.length; i += 200) {
+            const { error: imgErr } = await supabase.from("vehicle_images").insert(imgRows.slice(i, i + 200));
+            if (imgErr && out.errors.length < 5) out.errors.push(`vehicle_images insert: ${imgErr.message}`);
+          }
+        }
+      }
+
+      // Observations: the testimony row. Every field is already on the vehicle, so none is gap-filled or given a receipt.
+      for (let i = 0; i < landed.length; i += 5) {
+        await Promise.all(landed.slice(i, i + 5).map(async (l) => {
+          const fields: Record<string, unknown> = {
+            year: l.year,
+            make: l.make,
+            model: l.model,
+            series: l.series,
+            trim: l.trim,
+            body_style: l.body_style,
+            color: l.exterior_color,
+            interior_color: l.interior_color,
+            transmission: l.transmission,
+            engine_type: l.engine,
+            engine_size: l.engine,
+            description: l.description,
+            lot_number: l.lot_number,
+            run_day: l.run_day,
+            sale_key: l.sale_key,
+            estimate_low: l.estimate_low,
+            estimate_high: l.estimate_high,
+          };
+          if (l.result === "sold") fields.sale_price = l.price; else if (l.result === "bid-goes-on") fields.high_bid = l.price;
+          const clean = Object.fromEntries(Object.entries(fields).filter(([, v]) => v !== null && v !== undefined));
+          const r = await writeObservation(supabase, {
+            vehicleId: vehicleIdFor.get(l.lot_id)!,
+            source: { platform: "mecum", url: l.url, trustScore: INDEX_TRUST },
+            fields: clean,
+            observationKind: l.result === "sold" ? "sale_result" : "listing",
+            extractionMethod: INDEX_OBSERVATION_METHOD,
+            observedAt: pulledIso,
+            rawData: { index: "algolia U6CFCQ7V52/wp_posts_lot", object_id: l.object_id, pulled_at: pulledIso },
+            testimonyOnly: Object.keys(clean),
+          });
+          if (r.observationId) out.observations++;
+          if (r.errors.length) { out.observation_errors++; if (out.errors.length < 5) out.errors.push(`${l.url}: ${r.errors[0]}`); }
+        }));
+      }
+      return okJson({ ...out, success: true });
+    }
+
+    // ── Revision worker: reparse retained pages for Mecum items that did not land whole ──────────
+    // claim_revision_items('mecum', ..., actions [reparse_retained]) hands back import_queue rows with a retained snapshot.
+    // Each is parsed from the stored page and saved through saveVehicle (no request to Mecum); resolved when the lot has a
+    // year and make, released with next_action refetch when the snapshot is missing or holds no lot.
+    if (action === "work_revision_items") {
+      const n = Math.min(Math.max(Math.floor(Number(body.limit)) || 10, 1), 50);
+      const worker = "extract-mecum:reparse";
+      const { data: items, error: cErr } = await supabase.rpc("claim_revision_items", { p_source_slug: "mecum", p_worker: worker, p_limit: n, p_actions: ["reparse_retained"] });
+      if (cErr) throw new Error(`claim_revision_items failed: ${cErr.message}`);
+      const out = { claimed: items?.length ?? 0, resolved: 0, released: 0, failed: 0, errors: [] as string[] };
+      for (const it of items ?? []) {
+        try {
+          let html: string | null = null;
+          if (it.snapshot_id) {
+            const { data: snap } = await supabase.from("listing_page_snapshots").select("html, html_storage_path").eq("id", it.snapshot_id).maybeSingle();
+            if (snap?.html_storage_path) {
+              const { data: blob } = await supabase.storage.from("listing-snapshots").download(snap.html_storage_path);
+              if (blob) html = await blob.text();
+            }
+            html = html ?? snap?.html ?? null;
+          }
+          const parsed = html ? parseNextData(html, it.listing_url, postFromFlight(html)) : null;
+          const vehicle = parsed ? applyStructuredVehicleFacets(parsed) : null;
+          if (!vehicle || !(vehicle.year && vehicle.make)) {
+            // reparse_retained, then refetch, then classify_non_vehicle: a page that parses with no year and make is next classified.
+            mustWrite("release_revision_item", await supabase.rpc("release_revision_item", { p_id: it.id, p_next_action: vehicle ? "classify_non_vehicle" : "refetch", p_detail: { reparsed_by: worker, found: vehicle ? "no year or make" : (html ? "no lot object" : "no snapshot body") } }));
+            out.released++;
+            continue;
+          }
+          const { vehicleId } = await saveVehicle(supabase, vehicle);
+          mustWrite("resolve_revision_item", await supabase.rpc("resolve_revision_item", { p_id: it.id, p_outcome: "landed_whole", p_detail: { vehicle_id: vehicleId, reparsed_by: worker } }));
+          out.resolved++;
+        } catch (err: any) {
+          out.failed++;
+          if (out.errors.length < 5) out.errors.push(`${it.listing_url}: ${String(err?.message || err).slice(0, 200)}`);
+        }
+      }
+      return okJson({ ...out, success: true });
+    }
+
+    // ── Re-fold retained page snapshots into vehicles (zero requests to Mecum) ──────────────────
+    // listing_page_snapshots holds Mecum lot pages from older writers (platform mecum, success). This reads up to `limit`
+    // (max 100) of them in id order from the last folded one, skips a lot that already has an event under any URL spelling
+    // or an import_queue row, parses the stored page with the same parser the live path uses, and saves it through
+    // saveVehicle (vehicle, observation, photos, event). Each snapshot folded gets an import_queue row (REFOLD_TAG,
+    // raw_data.snapshot_id), which is also the cursor. Not scheduled; run by hand or by a cron someone adds.
+    if (action === "refold_snapshots") {
+      const n = Math.min(Math.max(Math.floor(Number(body.limit)) || 50, 1), 100);
+      const budgetMs = 100_000;
+      const started = Date.now();
+      const { data: last } = await supabase.from("import_queue").select("raw_data").eq("extractor_version", REFOLD_TAG).order("created_at", { ascending: false }).limit(1).maybeSingle();
+      const after = String(body.after_id || last?.raw_data?.snapshot_id || "00000000-0000-0000-0000-000000000000");
+      const { data: snaps, error: sErr } = await supabase
+        .from("listing_page_snapshots")
+        .select("id, listing_url, html_storage_path")
+        .eq("platform", "mecum")
+        .eq("success", true)
+        .gt("id", after)
+        .order("id", { ascending: true })
+        .limit(n);
+      if (sErr) throw sErr;
+      const out = { examined: snaps?.length ?? 0, already_landed: 0, folded: 0, created: 0, updated: 0, not_a_vehicle: 0, unreadable: 0, failed: 0, last_snapshot_id: after, stopped: null as string | null, errors: [] as string[] };
+      const urls = (snaps ?? []).map((x: any) => x.listing_url);
+      const landedKeys = new Set<string>();
+      for (let i = 0; i < urls.length; i += 10) {
+        const chunk = urls.slice(i, i + 10);
+        const { data: ev, error: eErr } = await supabase.from("vehicle_events").select("source_url").eq("source_platform", "mecum").in("source_url", chunk.flatMap(mecumUrlSpellings));
+        if (eErr) throw new Error(`landed lookup failed: ${eErr.message}`);
+        for (const r of ev ?? []) landedKeys.add(mecumLotKey(r.source_url));
+      }
+      for (const snap of snaps ?? []) {
+        if (Date.now() - started > budgetMs) { out.stopped = "time_budget"; break; }
+        out.last_snapshot_id = snap.id;
+        if (landedKeys.has(mecumLotKey(snap.listing_url))) { out.already_landed++; continue; }
+        const { data: row, error: claimErr } = await supabase
+          .from("import_queue")
+          .insert({ listing_url: snap.listing_url, status: "processing", extractor_version: REFOLD_TAG, locked_by: "extract-mecum:refold", raw_data: { snapshot_id: snap.id } })
+          .select("id")
+          .single();
+        if (claimErr || !row) continue; // the URL already has a queue row (another path owns it)
+        try {
+          let html: string | null = null;
+          if (snap.html_storage_path) {
+            const { data: blob } = await supabase.storage.from("listing-snapshots").download(snap.html_storage_path);
+            if (blob) html = await blob.text();
+          }
+          if (!html) {
+            const { data: inline } = await supabase.from("listing_page_snapshots").select("html").eq("id", snap.id).maybeSingle();
+            html = inline?.html ?? null;
+          }
+          if (!html) { out.unreadable++; await supabase.from("import_queue").update({ status: "failed", error_message: "snapshot body unreadable" }).eq("id", row.id); continue; }
+          const parsedVehicle = parseNextData(html, snap.listing_url, postFromFlight(html));
+          const vehicle = parsedVehicle ? applyStructuredVehicleFacets(parsedVehicle) : null;
+          if (!vehicle) { out.unreadable++; await supabase.from("import_queue").update({ status: "failed", error_message: "snapshot has no lot object" }).eq("id", row.id); await raiseRevision(supabase, snap.listing_url, ["lot_object"], "parser_gap", "refetch", {}, snap.id); continue; }
+          if (!(vehicle.year && vehicle.make)) { out.not_a_vehicle++; await supabase.from("import_queue").update({ status: "skipped", error_message: "NOT_A_VEHICLE" }).eq("id", row.id); await raiseRevision(supabase, snap.listing_url, ["year", "make"], "quality_gate", "classify_non_vehicle", {}, snap.id); continue; }
+          const { vehicleId, isNew, relinkVin } = await saveVehicle(supabase, vehicle);
+          softWrite("import_queue complete", await supabase.from("import_queue").update({ status: landedStatus(relinkVin), vehicle_id: vehicleId, processed_at: new Date().toISOString() }).eq("id", row.id), writeErrors);
+          out.folded++;
+          if (isNew) out.created++; else out.updated++;
+        } catch (err: any) {
+          out.failed++;
+          if (out.errors.length < 5) out.errors.push(`${snap.listing_url}: ${String(err?.message || err).slice(0, 200)}`);
+          softWrite("import_queue failed", await supabase.from("import_queue").update({ status: "failed", error_message: String(err?.message || err).slice(0, 500) }).eq("id", row.id), writeErrors);
+        }
+      }
+      return okJson({ ...out, success: true });
+    }
+
+    // ── Enumerate the calendar: upcoming lots from Mecum's public search index ──────────────────
+    // Reads the index Mecum's own site search uses (Algolia app U6CFCQ7V52, index wp_posts_lot; the search-only key is the
+    // one the site ships and scripts/mecum-algolia-discovery.mjs already carries). Sales are the facet values
+    // "Name|startEpoch|endEpoch" of taxonomies.auction_tax.name with end >= now. Each lot becomes an import_queue row
+    // tagged UPCOMING_TAG (priority 100, so batch_from_targets lands it before the sitemap walk) carrying its sale.
+    // Re-reads are scheduled here: weekly inside 30 days of the run day, daily inside 7, and once the day after.
+    // A lot that leaves the roster before its run day gets metadata.withdrawn_at on its event. One source_census row per
+    // run records the stated size of every sale, keyed by the same sale_key the events carry.
+    if (action === "enumerate_upcoming") {
+      const startedAt = new Date();
+      const nowEpoch = Math.floor(startedAt.getTime() / 1000);
+      const facetRes = await algolia("hitsPerPage=0&facets=" + encodeURIComponent('["taxonomies.auction_tax.name"]') + "&maxValuesPerFacet=1000");
+      const facet: Record<string, number> = facetRes.facets?.["taxonomies.auction_tax.name"] ?? {};
+      const sales = Object.entries(facet)
+        .map(([value, count]) => ({ value, count, end: Number(value.split("|")[2]) }))
+        .filter((x) => Number.isFinite(x.end) && x.end >= nowEpoch);
+      const census: Record<string, number> = {};
+      const salesMeta: Record<string, { name: string; starts_on: string; ends_on: string; prior_sale?: unknown }> = {};
+      const saleValueByKey: Record<string, string> = {};
+      const seen = new Set<string>();
+      const report: Record<string, { stated: number; read: number; queued: number; requeued: number }> = {};
+
+      for (const sale of sales) {
+        const runDays = Object.keys(
+          (await algolia(`hitsPerPage=0&filters=${encodeURIComponent(`taxonomies.auction_tax.name:"${sale.value}"`)}&facets=${encodeURIComponent('["taxonomies.run_date.name"]')}`))
+            .facets?.["taxonomies.run_date.name"] ?? {},
+        );
+        let key: string | null = null;
+        const stat = { stated: sale.count, read: 0, queued: 0, requeued: 0 };
+        for (const day of runDays.length ? runDays : [null]) {
+          const filters = `taxonomies.auction_tax.name:"${sale.value}"` + (day ? ` AND taxonomies.run_date.name:"${day}"` : "");
+          const res = await algolia(`hitsPerPage=1000&filters=${encodeURIComponent(filters)}&attributesToRetrieve=${encodeURIComponent('["permalink","lot_number_meta","auction_day_start_meta","taxonomies"]')}&attributesToHighlight=[]&attributesToSnippet=[]`);
+          if ((res.nbHits ?? 0) > 1000) console.warn(`[MECUM] ${sale.value} ${day}: ${res.nbHits} lots, only 1000 readable`);
+          const infos: { url: string; roadArt: boolean; info: UpcomingSale }[] = [];
+          for (const hit of res.hits ?? []) {
+            const term = hit.taxonomies?.auction_tax?.[0];
+            const parsed = term ? parseSaleFacet(sale.value, term.slug) : null;
+            if (!parsed || !hit.permalink) continue;
+            key = parsed.sale_key;
+            salesMeta[key] = { name: parsed.auction_name, starts_on: parsed.sale_starts_on, ends_on: parsed.sale_ends_on };
+            const url = `https://www.mecum.com${hit.permalink}`;
+            seen.add(url);
+            stat.read++;
+            infos.push({
+              url,
+              roadArt: (hit.taxonomies?.division_tax ?? []).some((x: any) => x.name === "Road Art"),
+              info: {
+                sale_key: parsed.sale_key,
+                auction_name: parsed.auction_name,
+                sale_starts_on: parsed.sale_starts_on,
+                sale_ends_on: parsed.sale_ends_on,
+                run_day: hit.taxonomies?.run_date?.[0]?.name ?? day,
+                lot_number: hit.lot_number_meta ?? null,
+                lot_statuses: (hit.taxonomies?.lot_status ?? []).map((x: any) => x.slug).filter(Boolean),
+                roster_first_seen_at: startedAt.toISOString(),
+              },
+            });
+          }
+          // locked_by is set on every row this writes: the table's insert trigger posts any pending, unlocked row to
+          // continuous-queue-processor (which would run extract-mecum without the free-path limit), and this job lands
+          // its own lots. The pool query below reads status, not locked_by.
+          for (let i = 0; i < infos.length; i += 100) {
+            const chunk = infos.slice(i, i + 100);
+            const { data: existing, error: exErr } = await supabase.from("import_queue").select("id, listing_url, status, processed_at, raw_data, locked_by").in("listing_url", chunk.map((c) => c.url));
+            if (exErr) throw new Error(`roster lookup failed: ${exErr.message}`);
+            const byUrl = new Map((existing ?? []).map((r: any) => [r.listing_url, r]));
+            // Road Art is Mecum's automobilia division (signs, pumps, clocks): not vehicles, so not landed or fetched.
+            const fresh = chunk.filter((c) => !byUrl.has(c.url)).map((c) => ({
+              listing_url: c.url, status: c.roadArt ? "skipped" : "pending", error_message: c.roadArt ? "NOT_A_VEHICLE" : null, priority: 100, extractor_version: UPCOMING_TAG, locked_by: "extract-mecum:upcoming", raw_data: { sale: c.info, road_art: c.roadArt },
+            }));
+            if (fresh.length) {
+              const { error } = await supabase.from("import_queue").insert(fresh);
+              if (error) throw new Error(`roster insert failed: ${error.message}`);
+              stat.queued += fresh.length;
+            }
+            for (const c of chunk) {
+              const row: any = byUrl.get(c.url);
+              if (!row) continue;
+              const first = row.raw_data?.sale?.roster_first_seen_at ?? c.info.roster_first_seen_at;
+              const daysToRun = c.info.run_day ? (Date.parse(c.info.run_day) - Date.parse(todayUtc())) / 86400000 : 99;
+              const ageH = row.processed_at ? (Date.now() - Date.parse(row.processed_at)) / 3600000 : 1e9;
+              if (c.roadArt) {
+                if (row.status === "pending" || row.status === "failed") await supabase.from("import_queue").update({ status: "skipped", error_message: "NOT_A_VEHICLE", locked_by: "extract-mecum:upcoming", raw_data: { ...(row.raw_data ?? {}), sale: c.info, road_art: true } }).eq("id", row.id);
+                continue;
+              }
+              const due = !row.raw_data?.sale || (daysToRun <= 7 && ageH >= 24) || (daysToRun <= 30 && ageH >= 168);
+              const was = row.raw_data?.sale;
+              const same = was && row.locked_by === "extract-mecum:upcoming" && row.status !== "skipped"
+                && was.sale_key === c.info.sale_key && was.run_day === c.info.run_day && was.lot_number === c.info.lot_number
+                && JSON.stringify(was.lot_statuses) === JSON.stringify(c.info.lot_statuses);
+              if (same && !due) continue; // nothing to write; one update per lot made the roster read outrun the function limit
+              const patch: Record<string, unknown> = { priority: 100, extractor_version: UPCOMING_TAG, locked_by: "extract-mecum:upcoming", raw_data: { ...(row.raw_data ?? {}), sale: { ...c.info, roster_first_seen_at: first } } };
+              if (due && row.status !== "processing") { patch.status = "pending"; stat.requeued++; }
+              softWrite("import_queue roster update", await supabase.from("import_queue").update(patch).eq("id", row.id), writeErrors);
+            }
+          }
+        }
+        if (key) { census[key] = sale.count; report[key] = stat; saleValueByKey[key] = sale.value; }
+      }
+
+      // Each series' previous sale (matched by series, not slug: Dallas became Dallas/Fort Worth), read from the same index:
+      // vehicle lots (everything but Road Art), sold, bid-goes-on and the median of sold lots with a stated price.
+      for (const [saleKey, value] of Object.entries(saleValueByKey)) {
+        try {
+          const priorValue = priorSaleFacet(value, Object.keys(facet));
+          if (!priorValue) continue;
+          const days = Object.keys((await algolia(`hitsPerPage=0&filters=${encodeURIComponent(`taxonomies.auction_tax.name:"${priorValue}"`)}&facets=${encodeURIComponent('["taxonomies.run_date.name"]')}`)).facets?.["taxonomies.run_date.name"] ?? {});
+          const hits: any[] = [];
+          for (const day of days.length ? days : [null]) {
+            const filters = `taxonomies.auction_tax.name:"${priorValue}"` + (day ? ` AND taxonomies.run_date.name:"${day}"` : "");
+            const r = await algolia(`hitsPerPage=1000&filters=${encodeURIComponent(filters)}&attributesToRetrieve=${encodeURIComponent('["sold","bid_goes_on","highest_bid_or_price","taxonomies.lot_type","taxonomies.auction_tax"]')}&attributesToHighlight=[]&attributesToSnippet=[]`);
+            hits.push(...(r.hits ?? []));
+          }
+          const [, , priorEnd] = priorValue.split("|");
+          const priorSlug = hits[0]?.taxonomies?.auction_tax?.[0]?.slug ?? null;
+          salesMeta[saleKey].prior_sale = summarizePriorSale(hits, priorSlug, saleDay(Number(priorEnd)));
+        } catch (e: any) {
+          console.warn(`[MECUM] prior sale of ${saleKey} not read: ${e?.message}`);
+        }
+      }
+
+      // Withdrawn: queued for a sale in this read, run day not yet past, absent from the roster now.
+      let withdrawn = 0;
+      const saleKeys = Object.keys(census);
+      if (saleKeys.length) {
+        const { data: queued } = await supabase.from("import_queue").select("listing_url, vehicle_id, raw_data").eq("extractor_version", UPCOMING_TAG).not("vehicle_id", "is", null).limit(5000);
+        for (const r of queued ?? []) {
+          const sale = r.raw_data?.sale;
+          if (!sale || !saleKeys.includes(sale.sale_key) || seen.has(r.listing_url)) continue;
+          if (!sale.run_day || sale.run_day < todayUtc()) continue;
+          const { data: ev } = await supabase.from("vehicle_events").select("id, metadata").eq("vehicle_id", r.vehicle_id).eq("source_platform", "mecum").in("source_url", mecumUrlSpellings(r.listing_url)).limit(1);
+          if (ev?.[0] && !ev[0].metadata?.withdrawn_at) {
+            mustWrite("vehicle_events withdrawn_at", await supabase.from("vehicle_events").update({ metadata: { ...ev[0].metadata, withdrawn_at: startedAt.toISOString() } }).eq("id", ev[0].id));
+            withdrawn++;
+          }
+        }
+      }
+
+      // The day after a run day: read the result once.
+      const { data: pastRows } = await supabase.from("import_queue").select("id, raw_data").eq("extractor_version", UPCOMING_TAG).eq("status", "complete").limit(5000);
+      let resultsDue = 0;
+      for (const r of pastRows ?? []) {
+        const sale = r.raw_data?.sale;
+        if (sale?.run_day && sale.run_day < todayUtc() && !r.raw_data?.result_read) {
+          softWrite("import_queue result re-read", await supabase.from("import_queue").update({ status: "pending" }).eq("id", r.id), writeErrors);
+          resultsDue++;
+        }
+      }
+
+      let censusWritten = false;
+      if (Object.keys(census).length) {
+        const { data: src } = await supabase.from("observation_sources").select("id").eq("slug", "mecum").maybeSingle();
+        if (src?.id) {
+          const { error } = await supabase.from("source_census").insert({
+            source_id: src.id,
+            universe_total: Object.values(census).reduce((a, b) => a + b, 0),
+            universe_active: Object.values(census).reduce((a, b) => a + b, 0),
+            census_method: "house_roster_facet",
+            census_confidence: 0.9,
+            census_at: startedAt.toISOString(),
+            census_url: `https://${ALGOLIA_APP}-dsn.algolia.net/1/indexes/${ALGOLIA_INDEX}/query`,
+            census_notes: `Algolia index ${ALGOLIA_INDEX}, facet taxonomies.auction_tax.name, sales with end >= read time; by_category keys are the auction_tax slug (events' metadata.sale_key).`,
+            by_category: census,
+            raw_response: { sales: Object.fromEntries(Object.keys(census).map((k) => [k, salesMeta[k]])) },
+          });
+          censusWritten = !error;
+          if (error) console.warn(`[MECUM] census not written: ${error.message}`);
+        }
+      }
+      return okJson({ success: true, sales: report, census, withdrawn, results_due: resultsDue, census_written: censusWritten });
+    }
+
+    // ── Land lots: upcoming roster first, then the sitemap targets (free path: direct fetch only, throttled) ──
+    // Pool 1 is the import_queue rows tagged UPCOMING_TAG and pending (priority 100). Pool 2 walks source_targets for
+    // mecum in id order; a target is skipped if it already has a vehicle_event (under any URL spelling) or an
+    // import_queue row. Each target tried gets an import_queue row (TARGETS_TAG, raw_data.target_id), which is also the
+    // cursor. Never calls Firecrawl. Stops at `limit` lots, at the time budget, after 3 failures in a row, and at once on a
+    // 403/429. delay_ms floors at 2000 (one request per 2 s at most; robots.txt asks for 1).
+    if (action === "batch_from_targets") {
+      const limit = Math.min(Math.max(Math.floor(Number(body.limit)) || 20, 1), 40);
+      const delayMs = Math.max(Math.floor(Number(body.delay_ms)) || 2000, 2000);
+      const budgetMs = 100_000;
+      const started = Date.now();
+
+      type Work = { url: string; rowId?: string; targetId?: number; sale?: UpcomingSale; reverify?: { event_id: string; claim: Record<string, unknown> } };
+      const work: Work[] = [];
+
+      const { data: up } = await supabase
+        .from("import_queue")
+        .select("id, listing_url, raw_data, extractor_version")
+        .in("extractor_version", [UPCOMING_TAG, REVERIFY_TAG, TARGETS_TAG]) // pending TARGETS_TAG rows are re-reads of lots wrongly marked 404
+        .eq("status", "pending")
+        .order("priority", { ascending: false })
+        .order("created_at", { ascending: true })
+        .limit(limit);
+      for (const r of up ?? []) work.push({ url: r.listing_url, rowId: r.id, sale: r.raw_data?.sale, reverify: r.extractor_version === REVERIFY_TAG ? r.raw_data : undefined });
+
+      let cursor = 0;
+      if (work.length < limit && body.upcoming_only !== true) {
+        // Only walk rows carry target_id; rows queued by vehicle id (mecum-algolia-save-all --enqueue) must not reset the cursor.
+        const { data: last } = await supabase
+          .from("import_queue")
+          .select("raw_data")
+          .eq("extractor_version", TARGETS_TAG)
+          .not("raw_data->target_id", "is", null)
+          .order("created_at", { ascending: false })
+          .limit(1)
+          .maybeSingle();
+        cursor = Number(body.after_id) || Number(last?.raw_data?.target_id) || 0;
+        const want = limit - work.length;
+        const picked: { id: number; listing_url: string }[] = [];
+        for (let page = 0; page < 20 && picked.length < want; page++) {
+          const { data: targets, error: tErr } = await supabase
+            .from("source_targets")
+            .select("id, listing_url")
+            .eq("source_slug", "mecum")
+            .gt("id", cursor)
+            .order("id", { ascending: true })
+            .limit(200);
+          if (tErr) throw tErr;
+          if (!targets?.length) break;
+          cursor = targets[targets.length - 1].id;
+          const urls = targets.map((t: { listing_url: string }) => t.listing_url);
+          // 10 targets x up to 8 spellings keeps each request line under 8 KB; a longer line is refused, and an unread answer must
+          // never count as "nothing landed" (the first scheduled runs added second events that way).
+          const queuedUrls = new Set<string>();
+          const landedKeys = new Set<string>();
+          for (let i = 0; i < urls.length; i += 10) {
+            const chunk = urls.slice(i, i + 10);
+            const [q, e] = await Promise.all([
+              supabase.from("import_queue").select("listing_url").in("listing_url", chunk),
+              supabase.from("vehicle_events").select("source_url").eq("source_platform", "mecum").in("source_url", chunk.flatMap(mecumUrlSpellings)),
+            ]);
+            if (q.error || e.error) throw new Error(`landed lookup failed: ${(q.error || e.error)?.message}`);
+            for (const r of q.data ?? []) queuedUrls.add(r.listing_url);
+            for (const r of e.data ?? []) landedKeys.add(mecumLotKey(r.source_url));
+          }
+          for (const t of targets) {
+            if (!queuedUrls.has(t.listing_url) && !landedKeys.has(mecumLotKey(t.listing_url)) && picked.length < want) picked.push(t);
+          }
+        }
+        for (const t of picked) work.push({ url: t.listing_url, targetId: t.id });
+      }
+
+      const results = { picked: work.length, upcoming: 0, reverified: 0, confirmed: 0, landed: 0, created: 0, updated: 0, gone: 0, failed: 0, stopped: null as string | null, errors: [] as string[] };
+      let consecutiveFailures = 0;
+      for (const w of work) {
+        if (Date.now() - started > budgetMs) { results.stopped = "time_budget"; break; }
+        let rowId = w.rowId;
+        if (rowId) {
+          const claim = await supabase.from("import_queue").update({ status: "processing", locked_at: new Date().toISOString() }).eq("id", rowId).eq("status", "pending").select("id");
+          if (claim.error) { softWrite("import_queue claim", claim, writeErrors); continue; }
+          if (!claim.data?.length) continue; // another run holds this lot
+        } else {
+          const { data: row, error: claimErr } = await supabase
+            .from("import_queue")
+            .insert({ listing_url: w.url, status: "processing", extractor_version: TARGETS_TAG, raw_data: { target_id: w.targetId }, locked_at: new Date().toISOString() })
+            .select("id")
+            .single();
+          if (claimErr || !row) continue; // another run holds this target
+          rowId = row.id;
+        }
+        try {
+          const vehicle = await fetchAndParse(w.url, { skipFirecrawl: true });
+          if (!vehicle.year && !vehicle.make) throw new Error("Could not parse vehicle data");
+          if (w.reverify?.event_id) {
+            // Keep the backfill's claim on the event before the page's result replaces its state.
+            const { data: ev } = await supabase.from("vehicle_events").select("metadata").eq("id", w.reverify.event_id).maybeSingle();
+            if (ev && !ev.metadata?.orphan_claim) {
+              mustWrite("vehicle_events orphan_claim", await supabase.from("vehicle_events").update({ metadata: { ...(ev.metadata ?? {}), orphan_claim: { event_status: "sold", ...w.reverify.claim } } }).eq("id", w.reverify.event_id));
+            }
+          }
+          const { vehicleId, isNew, relinkVin } = await saveVehicle(supabase, vehicle, undefined, w.sale);
+          if (w.reverify?.event_id) {
+            const confirmed = vehicle.status === "sold" && !!vehicle.sale_price;
+            const { data: ev } = await supabase.from("vehicle_events").select("metadata").eq("id", w.reverify.event_id).maybeSingle();
+            mustWrite("vehicle_events sale_reverified", await supabase.from("vehicle_events").update({
+              metadata: { ...(ev?.metadata ?? {}), sale_reverified: confirmed ? "confirmed" : "refused", reverified_at: new Date().toISOString(), reverified_result: vehicle.status ?? null },
+            }).eq("id", w.reverify.event_id));
+            results.reverified++;
+            if (confirmed) results.confirmed++;
+          }
+          const done: Record<string, unknown> = { status: landedStatus(relinkVin), vehicle_id: vehicleId, processed_at: new Date().toISOString(), error_message: null };
+          if (w.sale) {
+            const resultRead = !!vehicle.status && !["upcoming", "listed"].includes(vehicle.status);
+            done.raw_data = { sale: w.sale, ...(resultRead ? { result_read: true } : {}) };
+            results.upcoming++;
+          }
+          softWrite("import_queue complete", await supabase.from("import_queue").update(done).eq("id", rowId), writeErrors);
+          results.landed++;
+          if (isNew) results.created++; else results.updated++;
+          consecutiveFailures = 0;
+        } catch (err: any) {
+          const msg = String(err?.message || err);
+          const gone = msg === "PAGE_NOT_FOUND" || msg === "NOT_A_VEHICLE";
+          if (msg === "NOT_A_VEHICLE") await raiseRevision(supabase, w.url, ["year", "make"], "quality_gate", "classify_non_vehicle");
+          else if (msg === "SKIP_NO_NEXT_DATA") await raiseRevision(supabase, w.url, ["lot_object"], "parser_gap", "refetch");
+          softWrite("import_queue outcome", await supabase.from("import_queue").update({ status: gone ? "skipped" : "failed", error_message: msg.slice(0, 500), processed_at: new Date().toISOString() }).eq("id", rowId), writeErrors);
+          if (gone) { results.gone++; consecutiveFailures = 0; }
+          else {
+            results.failed++;
+            consecutiveFailures++;
+            if (results.errors.length < 5) results.errors.push(`${w.url}: ${msg.slice(0, 200)}`);
+            if (/\b(403|429)\b/.test(msg)) { results.stopped = "blocked_by_source"; break; }
+            if (consecutiveFailures >= 3) { results.stopped = "3_failures_in_a_row"; break; }
+          }
+        }
+        await new Promise((r) => setTimeout(r, delayMs));
+      }
+      return okJson({ ...results, success: true, cursor });
     }
 
     // ── Batch from queue ──────────────────────────────────────────────
@@ -1119,10 +2086,10 @@ Deno.serve(async (req) => {
       }
 
       const ids = items.map((i: { id: string }) => i.id);
-      await supabase
+      mustWrite("import_queue claim", await supabase
         .from("import_queue")
         .update({ status: "processing", locked_at: new Date().toISOString() })
-        .in("id", ids);
+        .in("id", ids));
 
       const results = {
         total: items.length,
@@ -1140,20 +2107,20 @@ Deno.serve(async (req) => {
           const vehicle = await fetchAndParse(item.listing_url);
 
           if (!vehicle.year && !vehicle.make) {
-            await supabase
+            softWrite("import_queue failed", await supabase
               .from("import_queue")
               .update({ status: "failed", error_message: "Could not parse vehicle data", attempts: 1 })
-              .eq("id", item.id);
+              .eq("id", item.id), writeErrors);
             results.failed++;
             continue;
           }
 
-          const { vehicleId, isNew } = await saveVehicle(supabase, vehicle);
+          const { vehicleId, isNew, relinkVin } = await saveVehicle(supabase, vehicle);
 
-          await supabase
+          softWrite("import_queue complete", await supabase
             .from("import_queue")
-            .update({ status: "complete", vehicle_id: vehicleId, error_message: null })
-            .eq("id", item.id);
+            .update({ status: landedStatus(relinkVin), vehicle_id: vehicleId, error_message: null })
+            .eq("id", item.id), writeErrors);
 
           results.success++;
           if (isNew) results.created++;
@@ -1167,10 +2134,10 @@ Deno.serve(async (req) => {
           const msg = err.message === "PAGE_NOT_FOUND" ? "Page removed/404" : (err.message || String(err));
           results.failed++;
           if (results.errors.length < 5) results.errors.push(`${item.listing_url}: ${msg}`);
-          await supabase
+          softWrite("import_queue failed", await supabase
             .from("import_queue")
             .update({ status: "failed", error_message: msg.slice(0, 500) })
-            .eq("id", item.id);
+            .eq("id", item.id), writeErrors);
         }
       }
 
@@ -1242,7 +2209,7 @@ Deno.serve(async (req) => {
           const msg = err.message || String(err);
           // SKIP_NO_NEXT_DATA means this page needs Firecrawl — bump updated_at so it rotates out
           if (msg === "SKIP_NO_NEXT_DATA" || msg === "PAGE_NOT_FOUND") {
-            await supabase.from("vehicles").update({ updated_at: new Date().toISOString() }).eq("id", cand.id);
+            softWrite("vehicles rotation bump", await supabase.from("vehicles").update({ updated_at: new Date().toISOString() }).eq("id", cand.id), writeErrors);
             results.failed++;
             return;
           }

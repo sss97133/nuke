@@ -1,13 +1,14 @@
 import React, { useEffect, useState } from 'react';
 import { supabase } from '../../lib/supabase';
+import { formatCurrencyAmount } from '../../utils/currency';
 
 interface VehicleEvent {
   id: string;
   source_platform: string;
   source_url: string;
   event_status: string;
-  current_price?: number;
-  final_price?: number;
+  current_price?: number | string | null;
+  final_price?: number | string | null;
   bid_count?: number;
   view_count?: number;
   watcher_count?: number;
@@ -39,6 +40,24 @@ const platformColors: Record<string, string> = {
   autotrader: '#7c3aed',
   facebook_marketplace: '#1877f2'
 };
+
+// Only an explicitly recorded, recognized currency may reach the formatter's USD-defaulting API.
+const supportedCurrencies = new Set((Intl as typeof Intl & {
+  supportedValuesOf?: (key: 'currency') => string[];
+}).supportedValuesOf?.('currency') ?? []);
+function recordedAmount(value: number | string | null | undefined, currency: string | null) {
+  const amount = value == null || value === '' ? NaN : Number(value);
+  if (!Number.isFinite(amount)) return 'Unrecorded';
+  return currency ? formatCurrencyAmount(amount, { currency, maximumFractionDigits: 2 })
+    : `${amount.toLocaleString('en-US')} (currency unrecorded)`;
+}
+// The auction calendar's session-day contract: a civil day must not become a local-time close.
+function calendarDay(value: unknown): string | null {
+  if (typeof value !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return null;
+  const date = new Date(`${value}T00:00:00Z`);
+  return Number.isFinite(date.getTime()) && date.toISOString().slice(0, 10) === value
+    ? date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', timeZone: 'UTC' }) : null;
+}
 
 const ExternalListingCard: React.FC<Props> = ({ vehicleId }) => {
   const [listings, setListings] = useState<VehicleEvent[]>([]);
@@ -164,7 +183,10 @@ const ExternalListingCard: React.FC<Props> = ({ vehicleId }) => {
           const platformColor = platformColors[listing.source_platform] || 'var(--accent)';
           const statusStr = String(listing.event_status || '').toLowerCase();
           const isActive = statusStr === 'active' || statusStr === 'live';
+          const isScheduled = ['pending', 'upcoming', 'scheduled'].includes(statusStr);
           const isSold = statusStr === 'sold';
+          const currencyCode = typeof listing.metadata?.currency === 'string' ? listing.metadata.currency.trim().toUpperCase() : '';
+          const currency = supportedCurrencies.has(currencyCode) ? currencyCode : null;
           const reserveStatus = String(listing.metadata?.reserve_status || '').toLowerCase();
           const reserveNotMet =
             statusStr === 'reserve_not_met' ||
@@ -176,7 +198,13 @@ const ExternalListingCard: React.FC<Props> = ({ vehicleId }) => {
           const buyer =
             String(listing.metadata?.buyer_username || listing.metadata?.buyer || '').trim() || null;
           const endIso = (listing.sold_at || listing.ended_at || null) as string | null;
-          const endLabel = isSold ? 'Sold' : (isActive ? 'Ends' : 'Ended');
+          const endLabel = isScheduled ? 'Scheduled' : isSold ? 'Sold' : (isActive ? 'Ends' : 'Ended');
+          const endDate = endIso ? new Date(endIso) : null;
+          const endText = isScheduled
+            ? calendarDay(listing.metadata?.auction_session_days?.[0]) ?? calendarDay(endIso?.slice(0, 10))
+            : endDate && Number.isFinite(endDate.getTime()) ? endDate.toLocaleDateString('en-US', {
+                month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit',
+              }) : null;
 
           return (
             <div
@@ -249,20 +277,20 @@ const ExternalListingCard: React.FC<Props> = ({ vehicleId }) => {
                 {listing.current_price !== null && listing.current_price !== undefined && (
                   <div>
                     <div style={{ fontSize: '11px', color: 'var(--text-secondary)', marginBottom: '2px' }}>
-                      {reserveNotMet ? 'High Bid' : 'Current Bid'}
+                      {currency ? (reserveNotMet ? 'High Bid' : 'Current Bid') : 'Recorded amount'}
                     </div>
                     <div style={{ fontSize: '15px', fontWeight: 700 }}>
-                      ${listing.current_price.toLocaleString()}
+                      {recordedAmount(listing.current_price, currency)}
                     </div>
                   </div>
                 )}
                 {listing.final_price && (
                   <div>
                     <div style={{ fontSize: '11px', color: 'var(--text-secondary)', marginBottom: '2px' }}>
-                      Sold For
+                      {currency && isSold ? 'Sold For' : 'Recorded amount'}
                     </div>
                     <div style={{ fontSize: '15px', fontWeight: 700, color: 'var(--success)' }}>
-                      ${listing.final_price.toLocaleString()}
+                      {recordedAmount(listing.final_price, currency)}
                     </div>
                   </div>
                 )}
@@ -309,15 +337,9 @@ const ExternalListingCard: React.FC<Props> = ({ vehicleId }) => {
               </div>
 
               {/* End Date */}
-              {endIso && (
+              {endText && (
                 <div style={{ fontSize: '11px', color: 'var(--text-secondary)', marginTop: '8px' }}>
-                  {endLabel}: {new Date(endIso).toLocaleDateString('en-US', { 
-                    month: 'short', 
-                    day: 'numeric', 
-                    year: 'numeric',
-                    hour: 'numeric',
-                    minute: '2-digit'
-                  })}
+                  {endLabel}: {endText}
                 </div>
               )}
 

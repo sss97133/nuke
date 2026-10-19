@@ -18,22 +18,29 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { corsHeaders } from '../_shared/cors.ts';
 import { normalizeListingUrlKey } from '../_shared/listingUrl.ts';
-import { resolveExistingVehicleId, discoveryUrlIlikePattern } from '../_shared/resolveVehicleForListing.ts';
+import { resolveExistingVehicleId } from '../_shared/resolveVehicleForListing.ts';
 import { qualityGate } from '../_shared/extractionQualityGate.ts';
 import { cleanVehicleFields, stripHtmlTags } from '../_shared/pollutionDetector.ts';
 import { normalizeVehicleFields } from '../_shared/normalizeVehicle.ts';
+import { extractVehicleFacets } from '../_shared/vehicleFacets.ts';
 import { writeObservation } from "../_shared/observationWriter.ts";
+import { buildFullDescription, DESCRIPTION_LIMIT, htmlToText, lotProse } from "./goodingText.ts";
+import { goodingUrlVariants } from "./lotUrl.ts";
+import { fillOnlyIdentity, identityConflict } from "../_shared/identityMatch.ts";
+import { mustWrite, softWrite } from "../_shared/writeResult.ts";
+import { recordRevision } from "../_shared/revision.ts";
 import { requireWriteAuth } from '../_shared/writeGuard.ts';
 import { writeVehicleEventByKey } from '../_shared/vehicleEventWrite.ts';
 import { goodingEventDates, type GoodingEventDates } from './eventDates.ts';
+import { projectSecretKey } from "../_shared/supabaseKeys.ts";
 
-const EXTRACTOR_VERSION = '2.1.0';
+const EXTRACTOR_VERSION = '2.2.0';
 
 // ============================================================================
 // TYPES
 // ============================================================================
 
-interface GoodingExtracted {
+export interface GoodingExtracted {
   // Source
   url: string;
   slug: string;
@@ -45,6 +52,9 @@ interface GoodingExtracted {
   year: number | null;
   make: string | null;
   model: string | null;
+  series: string | null;
+  trim: string | null;
+  body_style: string | null;
   vin: string | null;
   chassis: string | null;       // Classic car chassis (used as VIN when no 17-char VIN)
   coachwork: string | null;     // e.g. "Scaglietti"
@@ -73,6 +83,8 @@ interface GoodingExtracted {
   description: string | null;
   vehicle_type: string | null;
   saleroom_addendum: string | null;  // SRA note HTML or plain text
+  engine_number: string | null;      // item.engine, the engine's own number
+  description_sections: string[];    // which prose fields the description was built from
 
   // Parsed structured fields
   engine_size: string | null;
@@ -87,7 +99,7 @@ interface GoodingExtracted {
   auction_mobility_id: string | null;
 }
 
-interface GoodingPageData {
+export interface GoodingPageData {
   result: {
     data: {
       contentfulLot: {
@@ -135,6 +147,12 @@ interface GoodingPageData {
           modelYear: number | null;
           model: string | null;
           note: string | null;
+          engine?: string | null;
+          description?: unknown;
+          provenance?: unknown;
+          exhibitionHighlights?: unknown;
+          raceHighlights?: unknown;
+          documentation?: unknown;
           cloudinaryImagesCombined: Array<{
             public_id: string;
             height: number;
@@ -183,7 +201,7 @@ function parseEngineFromSpecs(specs: string[]): string | null {
     if (!trimmed) continue;
     if (excludeKeywords.some(p => p.test(trimmed))) continue;
     if (engineKeywords.some(p => p.test(trimmed))) {
-      return trimmed.replace(/<[^>]+>/g, '').replace(/\s+/g, ' ').trim().slice(0, 100);
+      return htmlToText(trimmed).replace(/\s+/g, ' ').trim().slice(0, 100);
     }
   }
   return null;
@@ -198,7 +216,7 @@ function parseTransmissionFromSpecs(specs: string[]): string | null {
     const trimmed = spec.trim();
     if (!trimmed) continue;
     if (/\b(Transmission|Gearbox|Transaxle)\b/i.test(trimmed)) {
-      return trimmed.replace(/<[^>]+>/g, '').replace(/\s+/g, ' ').trim().slice(0, 100);
+      return htmlToText(trimmed).replace(/\s+/g, ' ').trim().slice(0, 100);
     }
   }
   return null;
@@ -287,46 +305,10 @@ function buildCloudinaryUrl(publicId: string, width: number = 1800): string {
 }
 
 // ============================================================================
-// DESCRIPTION BUILDER
-// ============================================================================
-
-/**
- * Build a rich description from Gooding's two content sources:
- *   - item.note: typically a short collection credit ("From the John Doe Collection")
- *                or a 1-2 sentence provenance note. Sometimes null.
- *   - highlights: array of 3-8 bullet-point facts about the car (the primary content).
- *
- * Strategy:
- *   - Join highlights as the main body (they carry the substantive content).
- *   - Prepend the note if it's a meaningful provenance statement (> 20 chars).
- *   - Return null only if both are empty.
- */
-function buildGoodingDescription(note: string | null, highlights: string[]): string | null {
-  const parts: string[] = [];
-
-  // Add note if it has meaningful content (not just whitespace or single word)
-  const cleanNote = (note || '').replace(/<[^>]+>/g, '').trim();
-  if (cleanNote.length > 20) {
-    parts.push(cleanNote);
-  }
-
-  // Add highlights as the main description body
-  const cleanHighlights = highlights
-    .map(h => h.replace(/<[^>]+>/g, '').trim())
-    .filter(h => h.length > 5);
-  if (cleanHighlights.length > 0) {
-    parts.push(cleanHighlights.join('\n'));
-  }
-
-  if (parts.length === 0) return null;
-  return parts.join('\n\n').slice(0, 5000);
-}
-
-// ============================================================================
 // EXTRACT FROM PAGE DATA
 // ============================================================================
 
-function extractFromPageData(pageData: GoodingPageData, url: string): GoodingExtracted {
+export function extractFromPageData(pageData: GoodingPageData, url: string): GoodingExtracted {
   const lot = pageData.result?.data?.contentfulLot;
   if (!lot) {
     throw new Error('No lot data found in page-data.json');
@@ -387,9 +369,12 @@ function extractFromPageData(pageData: GoodingPageData, url: string): GoodingExt
     auctionDate = auctionEvent.startDate.split('T')[0];
   }
 
+  // The lot's prose: narrative (item.description), provenance, exhibition and race history, documentation
+  const prose = lotProse(item as Record<string, unknown> | null);
+
   // Strip HTML from highlights
   const cleanHighlights = (item?.highlights || []).map(h =>
-    h.replace(/<[^>]+>/g, '').trim()
+    htmlToText(h)
   ).filter(Boolean);
 
   // Chassis (classic car ID) and coachwork from Contentful
@@ -424,21 +409,35 @@ function extractFromPageData(pageData: GoodingPageData, url: string): GoodingExt
   let saleroom_addendum: string | null = null;
   const sraHtml = lot.sraNote?.childMarkdownRemark?.html;
   if (sraHtml && sraHtml.trim()) {
-    saleroom_addendum = sraHtml.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
+    saleroom_addendum = htmlToText(sraHtml.replace(/>/g, '> ')).replace(/\s+/g, ' ').trim();
   }
+
+  // Gooding sends lotNumber 0 for a consigned lot not yet given a number (measured 2026-10-18 on the upcoming
+  // Retromobile New York 300 SL); 0 is never a lot, so it is unknown.
+  const lotNumber = typeof lot.lotNumber === 'number' && lot.lotNumber > 0 ? lot.lotNumber : null;
 
   // Auction calendar position: "2025 Pebble Beach Auctions (Lot 38)"
   let auction_calendar_position: string | null = null;
   const auctionSlug = auction?.webpage__auction?.[0]?.slug;
   const yearFromSlug = auctionSlug ? auctionSlug.match(/(\d{4})$/)?.[1] : null;
-  if (auction?.name && lot.lotNumber != null) {
+  if (auction?.name && lotNumber != null) {
     auction_calendar_position = yearFromSlug
-      ? `${yearFromSlug} ${auction.name} (Lot ${lot.lotNumber})`
-      : `${auction.name} (Lot ${lot.lotNumber})`;
+      ? `${yearFromSlug} ${auction.name} (Lot ${lotNumber})`
+      : `${auction.name} (Lot ${lotNumber})`;
   }
 
+  const canonicalUrl = `https://www.goodingco.com/lot/${slug}`;
+  const facets = extractVehicleFacets({
+    year: item?.modelYear || null,
+    make: item?.make?.name || null,
+    model: item?.model || null,
+    title: item?.title || null,
+    url: canonicalUrl,
+    description: [coachwork ? `Coachwork by ${coachwork}` : '', ...cleanHighlights.slice(0, 4)].filter(Boolean).join(' ') || null,
+  });
+
   return {
-    url: `https://www.goodingco.com/lot/${slug}`,
+    url: canonicalUrl,
     slug,
     contentful_id: auction?.contentful_id,
     salesforce_id: item?.salesForceId || undefined,
@@ -447,11 +446,14 @@ function extractFromPageData(pageData: GoodingPageData, url: string): GoodingExt
     year: item?.modelYear || null,
     make: item?.make?.name || null,
     model: item?.model || null,
+    series: facets.series_code,
+    trim: facets.trim_package,
+    body_style: facets.body_style_facet,
     vin,
     chassis,
     coachwork,
 
-    lot_number: lot.lotNumber,
+    lot_number: lotNumber,
     auction_name: auction?.name || null,
     auction_date: auctionDate,
     auction_location: auction?.location?.address?.addressCountry || null,
@@ -469,9 +471,11 @@ function extractFromPageData(pageData: GoodingPageData, url: string): GoodingExt
 
     highlights: cleanHighlights,
     specifications: item?.specifications || [],
-    description: buildGoodingDescription(item?.note || null, cleanHighlights),
+    description: buildFullDescription(prose, item?.note || null, cleanHighlights),
     vehicle_type: item?.type || null,
     saleroom_addendum,
+    engine_number: typeof item?.engine === 'string' && item.engine.trim() ? item.engine.trim() : null,
+    description_sections: (['narrative', 'provenance', 'exhibition', 'racing', 'documentation'] as const).filter((k) => prose[k]),
 
     engine_size: engineSize,
     transmission: transmissionStr,
@@ -528,7 +532,7 @@ async function fetchGoodingPageData(url: string, supabase?: any): Promise<Goodin
       const hashBuffer = await crypto.subtle.digest('SHA-256', hashData);
       const sha256 = Array.from(new Uint8Array(hashBuffer)).map(b => b.toString(16).padStart(2, '0')).join('');
 
-      await supabase.from('listing_page_snapshots').insert({
+      const snapRes = await supabase.from('listing_page_snapshots').insert({
         platform: 'gooding',
         listing_url: url,
         fetched_at: new Date().toISOString(),
@@ -540,6 +544,7 @@ async function fetchGoodingPageData(url: string, supabase?: any): Promise<Goodin
         content_length: text.length,
         metadata: { caller: 'extract-gooding', format: 'json', page_data_url: pageDataUrl },
       });
+      if (snapRes.error && snapRes.error.code !== '23505') softWrite('listing_page_snapshots insert', snapRes); // 23505: same content already archived
       console.log(`[gooding] Archived JSON snapshot (${text.length} bytes)`);
     } catch (e: any) {
       // 23505 = duplicate content hash — fine
@@ -592,23 +597,46 @@ async function discoverLotsFromSitemap(): Promise<string[]> {
 // DATABASE OPERATIONS
 // ============================================================================
 
-async function saveToDatabase(
+export async function saveToDatabase(
   supabase: any,
-  extracted: GoodingExtracted
+  extracted: GoodingExtracted,
+  opts: { skipImages?: boolean } = {},
 ): Promise<{ vehicle_id: string; images_saved: number; is_new: boolean }> {
   const listingUrlKey = normalizeListingUrlKey(extracted.url);
 
-  // Resolve existing vehicle (listing key, discovery_url exact, or URL pattern) to avoid duplicate
-  const { vehicleId: resolvedId } = await resolveExistingVehicleId(supabase, {
-    url: extracted.url,
-    platform: 'gooding',
-    discoveryUrlIlikePattern: extracted.slug
-      ? `%goodingco.com/lot/${extracted.slug}%`
-      : discoveryUrlIlikePattern(extracted.url),
-  });
+  // Never equate Gooding lot slugs solely because one is a prefix of another.
+  let resolvedId: string | null;
+  try {
+    ({ vehicleId: resolvedId } = await resolveExistingVehicleId(supabase, {
+      url: extracted.url,
+      platform: 'gooding',
+      requireExactListingUrl: true,
+    }));
+  } catch (e: any) {
+    // PGRST116: the lot's episode key is on more than one row, i.e. the lot sits on two vehicles (one per host spelling,
+    // 637 of 6,992 Gooding lots on 2026-10-18). Writing to either would pick one at random, so the lot is refused and
+    // raised for relinking; the vehicle merge belongs to the identity owner, not this writer.
+    if (e?.code === 'PGRST116') {
+      await recordRevision(supabase, { url: extracted.url, missing: ['identity_match'], reason: 'duplicate_key', next_action: 'relink', raised_by: 'extract-gooding', detail: { reason: 'lot_on_multiple_vehicles', listing_key: listingUrlKey } });
+      throw new Error(`identity refused: lot ${listingUrlKey} is on more than one vehicle`);
+    }
+    throw e instanceof Error ? e : new Error(`vehicle lookup failed: ${e?.message ?? String(e)}${e?.code ? ` (${e.code})` : ''}`);
+  }
   let vehicleId: string | null = resolvedId;
 
-  // Also check by VIN (ILIKE pattern may timeout on 1M+ row table)
+  // The same lot under the other host spelling (or a trailing slash) is the same vehicle. Without this a writer that found nothing
+  // under its own spelling inserted a second vehicle: 638 Gooding lots sit on two vehicles, one per host.
+  if (!vehicleId) {
+    const { data: byVariant } = await supabase
+      .from('vehicles')
+      .select('id')
+      .in('discovery_url', goodingUrlVariants(extracted.url))
+      .limit(1)
+      .maybeSingle();
+    if (byVariant?.id) vehicleId = byVariant.id;
+  }
+
+  // Only a successful unmatched listing lookup may continue to VIN resolution.
   if (!vehicleId && extracted.vin && extracted.vin.length >= 5) {
     const { data: byVin } = await supabase
       .from('vehicles')
@@ -621,19 +649,19 @@ async function saveToDatabase(
 
   let isNew = false;
 
-  // Description is already built by buildGoodingDescription() in extractFromPageData
+  // Description is already built by buildFullDescription() in extractFromPageData
   // (note + highlights merged). Strip any residual HTML and truncate.
   let description: string | null = extracted.description;
   if (description) {
-    description = stripHtmlTags(description).trim().slice(0, 5000) || null;
+    description = stripHtmlTags(description).trim().slice(0, DESCRIPTION_LIMIT) || null;
   }
   // Final fallback: if extractFromPageData returned null (pre-2.1 callers), use highlights
   if (!description && extracted.highlights.length > 0) {
     description = extracted.highlights
-      .map(h => h.replace(/<[^>]+>/g, '').trim())
+      .map(h => htmlToText(h))
       .filter(h => h.length > 5)
       .join('\n')
-      .slice(0, 5000) || null;
+      .slice(0, DESCRIPTION_LIMIT) || null;
   }
 
   // Normalize fields before quality gate
@@ -646,7 +674,11 @@ async function saveToDatabase(
     description,
     color: null, // Gooding doesn't provide color directly
     transmission: extracted.transmission,
+    body_style: extracted.body_style,
   });
+  const resolvedSeries = extracted.series ?? null;
+  const resolvedTrim = extracted.trim ?? null;
+  const resolvedBodyStyle: string | null = rawVehicleData.body_style ?? extracted.body_style ?? null;
   const cleanedData = cleanVehicleFields(rawVehicleData, { platform: 'gooding' });
   const gate = qualityGate(cleanedData, { source: 'gooding', sourceType: 'auction' });
 
@@ -656,6 +688,27 @@ async function saveToDatabase(
   }
   if (gate.action === 'flag_for_review') {
     console.warn(`[gooding] Quality gate FLAGGED ${extracted.url} (score=${gate.score}): ${gate.issues.join(', ')}`);
+  }
+
+  // Identity guard: the lot may update the vehicle it is (same slug) or one that does not contradict it; a different car is
+  // refused before anything is written (revision item: identity_match / relink), and identity fields stay fill-only on
+  // another lot's vehicle.
+  let identityKeep: Record<string, unknown> | null = null;
+  if (vehicleId) {
+    const { data: idRow } = await supabase.from('vehicles').select('year,make,model,vin,discovery_url,primary_image_url').eq('id', vehicleId).maybeSingle();
+    const slugOf = (u: unknown) => String(u ?? '').split('/lot/')[1]?.split(/[/?#]/)[0] || null;
+    const same = idRow && slugOf(idRow.discovery_url) !== null && slugOf(idRow.discovery_url) === slugOf(extracted.url);
+    if (idRow && !same) {
+      const conflict = identityConflict(idRow, { year: extracted.year, make: extracted.make, model: extracted.model, vin: extracted.vin });
+      if (conflict) {
+        await recordRevision(supabase, { url: extracted.url, missing: ['identity_match'], reason: 'bad_data', next_action: 'relink', raised_by: 'extract-gooding', vehicle_id: vehicleId, detail: { reason: 'different_car', detail: conflict } });
+        throw new Error(`identity refused: different_car (${conflict})`);
+      }
+      identityKeep = idRow as Record<string, unknown>;
+    }
+    if (idRow && !idRow.primary_image_url && extracted.image_urls.length > 0) {
+      identityKeep = { ...(identityKeep ?? {}), _fill_primary_image_url: extracted.image_urls[0] };
+    }
   }
 
   if (vehicleId) {
@@ -673,16 +726,32 @@ async function saveToDatabase(
       updated_at: new Date().toISOString(),
       extractor_version: EXTRACTOR_VERSION,
     };
+    if (identityKeep?._fill_primary_image_url) {
+      vehicleUpdate.primary_image_url = identityKeep._fill_primary_image_url;
+      delete identityKeep._fill_primary_image_url;
+    }
+    if (identityKeep && Object.keys(identityKeep).length > 0) {
+      const kept = fillOnlyIdentity(vehicleUpdate, identityKeep);
+      for (const f of ['year', 'make', 'model', 'vin']) if (!(f in kept)) delete vehicleUpdate[f];
+    }
     // Only fill engine/transmission/mileage if extracted and currently empty
     if (extracted.engine_size) vehicleUpdate.engine_size = extracted.engine_size;
     if (extracted.transmission) vehicleUpdate.transmission = extracted.transmission;
     if (extracted.mileage) vehicleUpdate.mileage = extracted.mileage;
-    if (extracted.coachwork || extracted.saleroom_addendum || extracted.auction_calendar_position) {
-      const { data: existingVehicle } = await supabase
+    const needsFacets = !!(resolvedSeries || resolvedTrim || resolvedBodyStyle);
+    const needsMeta = !!(extracted.coachwork || extracted.saleroom_addendum || extracted.auction_calendar_position);
+    const { data: existingVehicle } = needsFacets || needsMeta
+      ? await supabase
         .from('vehicles')
-        .select('origin_metadata')
+        .select('origin_metadata,series,trim,body_style')
         .eq('id', vehicleId)
-        .maybeSingle();
+        .maybeSingle()
+      : { data: null };
+    // Facets are fill-only: a vehicle keeps the series, trim and body style it already has.
+    if (resolvedSeries && !existingVehicle?.series) vehicleUpdate.series = resolvedSeries;
+    if (resolvedTrim && !existingVehicle?.trim) vehicleUpdate.trim = resolvedTrim;
+    if (resolvedBodyStyle && !existingVehicle?.body_style) vehicleUpdate.body_style = resolvedBodyStyle;
+    if (needsMeta) {
       const existingMeta = (existingVehicle?.origin_metadata as Record<string, unknown>) || {};
       vehicleUpdate.origin_metadata = {
         ...existingMeta,
@@ -691,13 +760,25 @@ async function saveToDatabase(
         gooding_auction_calendar: extracted.auction_calendar_position,
       };
     }
-    const { error: updateError } = await supabase
+    const updateRes = await supabase
       .from('vehicles')
       .update(vehicleUpdate)
       .eq('id', vehicleId);
+    const updateError = updateRes.error;
 
     if (updateError) {
       console.error(`[gooding] Failed to update vehicle: ${updateError.message}`);
+      // A VIN another vehicle already holds fails the WHOLE update, so the year, description and status of the lot were never
+      // written (34 Gooding vehicles kept a sale year as their model year, 2026-10-15). Write everything but the VIN, and raise
+      // the clash as a revision item: two vehicles carry one chassis (merge_proposals decides, not this writer).
+      if (vehicleUpdate.vin && /VIN .* already exists|vehicles_vin_unique|duplicate key/i.test(updateError.message)) {
+        const { vin: clashVin, ...withoutVin } = vehicleUpdate;
+        await recordRevision(supabase, { url: extracted.url, missing: ['identity_match'], reason: 'duplicate_key', next_action: 'relink', raised_by: 'extract-gooding', vehicle_id: vehicleId, detail: { reason: 'vin_held_by_another_vehicle', vin: clashVin, message: updateError.message.slice(0, 160) } });
+        mustWrite('vehicles update without the clashing vin', await supabase.from('vehicles').update(withoutVin).eq('id', vehicleId));
+      } else {
+        // Any other failed update means the lot did not land: the run fails (a counted failure), it is not swallowed.
+        mustWrite('vehicles update', updateRes);
+      }
     }
   } else {
     // Insert new vehicle
@@ -718,6 +799,7 @@ async function saveToDatabase(
       profile_origin: 'gooding_import',
       discovery_url: extracted.url,
       discovery_source: 'gooding',
+      primary_image_url: extracted.image_urls[0] || undefined,
       is_public: true,
       auction_source: 'gooding',
       description: description || undefined,
@@ -727,6 +809,9 @@ async function saveToDatabase(
       engine_size: extracted.engine_size || undefined,
       transmission: extracted.transmission || undefined,
       mileage: extracted.mileage || undefined,
+      series: resolvedSeries || undefined,
+      trim: resolvedTrim || undefined,
+      body_style: resolvedBodyStyle || undefined,
     };
     if (extracted.coachwork || extracted.saleroom_addendum || extracted.auction_calendar_position) {
       insertPayload.origin_metadata = {
@@ -735,11 +820,13 @@ async function saveToDatabase(
         gooding_auction_calendar: extracted.auction_calendar_position,
       };
     }
-    const { data: newVehicle, error: insertError } = await supabase
+    const insertRes = await supabase
       .from('vehicles')
       .insert(insertPayload)
       .select('id')
       .maybeSingle();
+    const newVehicle = insertRes.data;
+    const insertError = insertRes.error;
 
     if (insertError) {
       // Handle unique constraint violation (e.g. www vs non-www URL)
@@ -755,19 +842,21 @@ async function saveToDatabase(
           vehicleId = byUrl.id;
           isNew = false;
           // Update instead
-          await supabase.from('vehicles').update(insertPayload).eq('id', vehicleId);
+          mustWrite('vehicles update (duplicate-url fallback)', await supabase.from('vehicles').update(insertPayload).eq('id', vehicleId));
         } else {
           throw new Error(`Failed to insert vehicle: ${insertError.message}`);
         }
       } else {
-        throw new Error(`Failed to insert vehicle: ${insertError?.message || insertError}`);
+        mustWrite('vehicles insert', insertRes);
       }
     } else {
-      vehicleId = newVehicle?.id;
+      vehicleId = newVehicle?.id ?? null;
     }
   }
+  // An insert that returns no row (a trigger or policy dropped it) must not go on to write an episode with no vehicle.
+  if (!vehicleId) throw new Error(`No vehicle row for ${extracted.url}`);
 
-  // Fire-and-forget observation write
+  // Observation write (awaited: a refold run ends right after its response)
   if (vehicleId) {
     const obsFields: Record<string, any> = {};
     if (extracted.year) obsFields.year = extracted.year;
@@ -778,12 +867,17 @@ async function saveToDatabase(
     if (extracted.mileage) obsFields.mileage = extracted.mileage;
     if (extracted.engine_size) obsFields.engine_size = extracted.engine_size;
     if (extracted.transmission) obsFields.transmission = extracted.transmission;
-    writeObservation(supabase, {
+    if (resolvedSeries) obsFields.series = resolvedSeries;
+    if (resolvedTrim) obsFields.trim = resolvedTrim;
+    if (resolvedBodyStyle) obsFields.body_style = resolvedBodyStyle;
+    await writeObservation(supabase, {
       vehicleId,
       source: { platform: "gooding", url: extracted.url, trustScore: 0.9 },
       fields: obsFields,
       observationKind: extracted.sale_price ? "sale_result" : "listing",
       extractionMethod: "gatsby_json_parse",
+      // The full text rides as content_text; structured_data feeds an index that refuses entries over 2.7 KB.
+      contentText: description || undefined,
     }).catch((e: any) => console.warn(`[GOODING] observationWriter error for ${vehicleId}: ${e?.message}`));
   }
 
@@ -817,6 +911,11 @@ async function saveToDatabase(
         specifications: extracted.specifications,
         coachwork: extracted.coachwork,
         chassis: extracted.chassis,
+        ...(resolvedSeries ? { series: resolvedSeries } : {}),
+        ...(resolvedTrim ? { trim: resolvedTrim } : {}),
+        ...(resolvedBodyStyle ? { body_style: resolvedBodyStyle } : {}),
+        engine_number: extracted.engine_number,
+        description_sections: extracted.description_sections,
         saleroom_addendum: extracted.saleroom_addendum,
         online_bidding: extracted.online_bidding_available,
         auction_mobility_id: extracted.auction_mobility_id,
@@ -831,14 +930,17 @@ async function saveToDatabase(
 
   // Save images
   let imagesSaved = 0;
-  if (extracted.image_urls.length > 0) {
-    // Delete existing gooding images for this vehicle
-    const { error: deleteError } = await supabase
+  if (extracted.image_urls.length > 0 && !opts.skipImages) {
+    // Add only the photos this vehicle does not already hold. The old delete-then-insert doubled the gallery whenever
+    // the delete did not take (its failure was swallowed): the 300 SL gold lot went from 55 to 110 rows on one re-read
+    // (2026-10-18). Existing rows are kept, with whatever analysis already points at them.
+    const { data: have, error: haveErr } = await supabase
       .from('vehicle_images')
-      .delete()
+      .select('image_url')
       .eq('vehicle_id', vehicleId)
-      .eq('source', 'gooding');
-    if (deleteError) console.error('Failed to delete from vehicle_images:', deleteError.message);
+      .limit(1000);
+    if (haveErr) throw new Error(`vehicle_images read failed: ${haveErr.message}`);
+    const haveUrls = new Set((have ?? []).map((r: { image_url: string }) => r.image_url));
 
     const imageRecords = extracted.image_urls.slice(0, 100).map((imgUrl, i) => ({
       vehicle_id: vehicleId,
@@ -851,7 +953,7 @@ async function saveToDatabase(
       redaction_level: 'none',
       position: i,
       display_order: i,
-      is_primary: i === 0,
+      is_primary: i === 0 && haveUrls.size === 0,
       exif_data: {
         source_url: extracted.url,
         discovery_url: extracted.url,
@@ -859,17 +961,15 @@ async function saveToDatabase(
         auction_name: extracted.auction_name,
         lot_number: extracted.lot_number,
       },
-    }));
+    })).filter((row) => !haveUrls.has(row.image_url));
 
-    const { data: insertedImages, error: imgError } = await supabase
-      .from('vehicle_images')
-      .insert(imageRecords)
-      .select('id');
-
-    if (imgError) {
-      console.error(`[gooding] Image save error: ${imgError.message}`);
-    } else {
-      imagesSaved = insertedImages?.length || 0;
+    if (imageRecords.length > 0) {
+      const imgRes = await supabase
+        .from('vehicle_images')
+        .insert(imageRecords)
+        .select('id');
+      softWrite('vehicle_images insert', imgRes);
+      if (!imgRes.error) imagesSaved = imgRes.data?.length || 0;
     }
   }
 
@@ -941,7 +1041,7 @@ async function processBatch(
 // HTTP HANDLER
 // ============================================================================
 
-Deno.serve(async (req) => {
+if (import.meta.main) Deno.serve(async (req) => {
   // Writes are never anonymous: service key, signed-in user, or nothing (P0.2, 2026-09-27).
   const denied = await requireWriteAuth(req);
   if (denied) return denied;
@@ -951,7 +1051,7 @@ Deno.serve(async (req) => {
 
   const supabase = createClient(
     Deno.env.get('SUPABASE_URL')!,
-    Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!,
+    projectSecretKey()!,
     { global: { headers: { 'X-Nuke-Writer': 'extract-gooding' } } },
   );
 
@@ -1044,14 +1144,12 @@ Deno.serve(async (req) => {
           priority: 0,
         }));
 
-        const { data, error } = await supabase
+        const enq = await supabase
           .from('import_queue')
           .upsert(batch, { onConflict: 'listing_url', ignoreDuplicates: true })
           .select('id');
-
-        if (error) {
-          console.error(`[gooding] Enqueue error: ${error.message}`);
-        }
+        const data = enq.data;
+        softWrite('import_queue enqueue', enq);
         enqueued += data?.length || 0;
       }
 
@@ -1095,11 +1193,11 @@ Deno.serve(async (req) => {
         !item.listing_url?.includes('goodingco.com')
       );
       if (otherItems.length > 0) {
-        await supabase.from('import_queue').update({
+        softWrite('import_queue release', await supabase.from('import_queue').update({
           status: 'pending',
           locked_at: null,
           locked_by: null,
-        }).in('id', otherItems.map((i: any) => i.id));
+        }).in('id', otherItems.map((i: any) => i.id)));
       }
 
       const urls = goodingItems.map((item: any) => item.listing_url);
@@ -1108,13 +1206,13 @@ Deno.serve(async (req) => {
       // Mark queue items
       for (const item of goodingItems) {
         const succeeded = !results.errors.find(e => e.url === item.listing_url);
-        await supabase.from('import_queue').update({
+        softWrite('import_queue mark', await supabase.from('import_queue').update({
           status: succeeded ? 'complete' : 'failed',
           processed_at: new Date().toISOString(),
           locked_at: null,
           locked_by: null,
           error_message: results.errors.find(e => e.url === item.listing_url)?.error || null,
-        }).eq('id', item.id);
+        }).eq('id', item.id));
       }
 
       return new Response(
@@ -1148,22 +1246,122 @@ Deno.serve(async (req) => {
       );
     }
 
+    // Re-fold retained captures: read the stored page-data JSON of Gooding lots (no request to goodingco.com) and run it
+    // through the current extractor, so the full description reaches the vehicle, the episode and the observation.
+    // Keyset by snapshot id; a capture with a newer capture of the same URL is skipped (the newer one is the lot's state).
+    if (action === 'refold_snapshots') {
+      const n = Math.min(Number(body.limit) || 20, 25);
+      const { data: snaps, error: snapErr } = await supabase
+        .from('listing_page_snapshots')
+        .select('id, listing_url, fetched_at, html, html_storage_path')
+        .eq('platform', 'gooding')
+        .eq('success', true)
+        .gt('id', body.after_id || '00000000-0000-0000-0000-000000000000')
+        .order('id', { ascending: true })
+        .limit(n);
+      if (snapErr) throw new Error(`snapshot read failed: ${snapErr.message}`);
+      const out = { read: snaps?.length ?? 0, refolded: 0, skipped_newer: 0, skipped_unparsed: 0, skipped_not_vehicle: 0, failed: 0, with_narrative: 0, errors: [] as string[], last_id: null as string | null };
+      for (const snap of snaps ?? []) {
+        out.last_id = snap.id;
+        try {
+          const { data: newer } = await supabase
+            .from('listing_page_snapshots').select('id').eq('listing_url', snap.listing_url).gt('fetched_at', snap.fetched_at).limit(1);
+          if (newer && newer.length > 0) { out.skipped_newer++; continue; }
+          let pageData: GoodingPageData;
+          // Captures moved out of Postgres keep their body in the listing-snapshots bucket.
+          let body: string | null = snap.html ?? null;
+          if (!body && snap.html_storage_path) {
+            const { data: blob } = await supabase.storage.from('listing-snapshots').download(snap.html_storage_path);
+            body = blob ? await blob.text() : null;
+          }
+          if (!body) { out.skipped_unparsed++; continue; }
+          try { pageData = JSON.parse(body); } catch { out.skipped_unparsed++; continue; }
+          if (!pageData?.result?.data?.contentfulLot) { out.skipped_unparsed++; continue; }
+          const extracted = extractFromPageData(pageData, snap.listing_url);
+          if (!extracted.year && !extracted.make) { out.skipped_not_vehicle++; continue; }
+          await saveToDatabase(supabase, extracted, { skipImages: true });
+          out.refolded++;
+          if (extracted.description_sections.includes('narrative')) out.with_narrative++;
+        } catch (e: any) {
+          out.failed++;
+          if (out.errors.length < 5) out.errors.push(`${snap.listing_url}: ${String(e?.message ?? e).slice(0, 160)}`);
+          // A lot whose identity cannot be resolved (two vehicle records for it, or a different car) is a revision item.
+          const msg = String(e?.message ?? e);
+          if (/multiple \(or no\) rows|Ambiguous listing URL|identity unresolved/i.test(msg)) {
+            await recordRevision(supabase, { url: snap.listing_url, missing: ['vehicle_link'], reason: 'duplicate_key', next_action: 'relink', raised_by: 'extract-gooding', snapshot_id: snap.id, detail: { message: msg.slice(0, 200) } });
+          }
+        }
+      }
+      return new Response(JSON.stringify({ success: true, action, ...out }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+    }
+
+    // Revision worker: claim reparse_retained items for Gooding, run the current parser on the retained capture, land it and
+    // resolve the item landed_whole; a capture that will not parse is released for refetch, an ambiguous identity for relink.
+    if (action === 'revise_retained') {
+      const n = Math.min(Number(body.limit) || 10, 25);
+      // The queue matches a source by its scrape_sources name; Gooding is registered as 'Gooding Auctions' and 'Gooding & Company'.
+      const items: any[] = [];
+      for (const name of ['Gooding Auctions', 'Gooding & Company']) {
+        if (items.length >= n) break;
+        const { data: got, error: cErr } = await supabase.rpc('claim_revision_items', { p_source_slug: name, p_worker: 'extract-gooding', p_limit: n - items.length, p_actions: ['reparse_retained'] });
+        if (cErr) throw new Error(`claim failed: ${cErr.message}`);
+        items.push(...(got ?? []));
+      }
+      const out = { claimed: items?.length ?? 0, resolved: 0, released_refetch: 0, released_relink: 0, errors: [] as string[] };
+      for (const it of items ?? []) {
+        try {
+          let q = supabase.from('listing_page_snapshots').select('id, html, html_storage_path').eq('platform', 'gooding').eq('success', true);
+          q = it.snapshot_id ? q.eq('id', it.snapshot_id) : q.eq('listing_url', it.listing_url);
+          const { data: snaps } = await q.order('fetched_at', { ascending: false }).limit(1);
+          const snap = snaps?.[0];
+          let text: string | null = snap?.html ?? null;
+          if (!text && snap?.html_storage_path) {
+            const { data: blob } = await supabase.storage.from('listing-snapshots').download(snap.html_storage_path);
+            text = blob ? await blob.text() : null;
+          }
+          let pageData: GoodingPageData | null = null;
+          try { pageData = text ? JSON.parse(text) : null; } catch { pageData = null; }
+          if (!pageData?.result?.data?.contentfulLot) {
+            await supabase.rpc('release_revision_item', { p_id: it.id, p_next_action: 'refetch', p_detail: { why: 'no parsable retained capture' } });
+            out.released_refetch++;
+            continue;
+          }
+          const extracted = extractFromPageData(pageData, it.listing_url);
+          await saveToDatabase(supabase, extracted, { skipImages: true });
+          await supabase.rpc('resolve_revision_item', { p_id: it.id, p_outcome: 'landed_whole', p_detail: { by: 'extract-gooding revise_retained', snapshot_id: snap?.id } });
+          out.resolved++;
+        } catch (e: any) {
+          const msg = String(e?.message ?? e);
+          const relink = /identity refused|multiple \(or no\) rows|Ambiguous/i.test(msg);
+          await supabase.rpc('release_revision_item', { p_id: it.id, p_next_action: relink ? 'relink' : 'refetch', p_detail: { message: msg.slice(0, 200) } });
+          if (relink) out.released_relink++; else out.released_refetch++;
+          if (out.errors.length < 5) out.errors.push(`${it.listing_url}: ${msg.slice(0, 120)}`);
+        }
+      }
+      return new Response(JSON.stringify({ success: true, action, ...out }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+    }
+
     // Stats
     if (action === 'stats') {
-      const { data: stats } = await supabase.rpc('count_vehicles_by_source', {
-        source_name: 'gooding',
-      }).maybeSingle();
-
-      const { count: listingCount } = await supabase
-        .from('vehicle_events')
-        .select('*', { count: 'exact', head: true })
-        .eq('source_platform', 'gooding');
+      const [vehicles, events] = await Promise.all([
+        supabase
+          .from('vehicles')
+          .select('id', { count: 'exact', head: true })
+          .eq('discovery_source', 'gooding')
+          .is('deleted_at', null),
+        supabase
+          .from('vehicle_events')
+          .select('*', { count: 'exact', head: true })
+          .eq('source_platform', 'gooding'),
+      ]);
+      const readError = vehicles.error || events.error;
+      if (readError) throw new Error(`stats count failed: ${readError.message}`);
 
       return new Response(
         JSON.stringify({
           success: true,
-          vehicles_in_db: stats?.count || 0,
-          vehicle_events: listingCount || 0,
+          vehicles_in_db: vehicles.count ?? 0,
+          vehicle_events: events.count ?? 0,
         }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
@@ -1178,7 +1376,7 @@ Deno.serve(async (req) => {
   } catch (error: any) {
     console.error('[gooding] Error:', error);
     return new Response(
-      JSON.stringify({ success: false, error: error instanceof Error ? error.message : String(error) }),
+      JSON.stringify({ success: false, error: error instanceof Error ? error.message : (error?.message ?? String(error)) }),
       { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   }

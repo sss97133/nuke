@@ -13,6 +13,7 @@ import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "jsr:@supabase/supabase-js@2";
 import { corsHeaders } from "../_shared/cors.ts";
 import { requireWriteAuth } from "../_shared/writeGuard.ts";
+import { projectSecretKey } from "../_shared/supabaseKeys.ts";
 
 const URL_PATTERNS: Record<string, { regex: RegExp; extractUsername: (m: RegExpMatchArray) => string }> = {
   bat: {
@@ -72,7 +73,7 @@ Deno.serve(async (req) => {
     // --- DB operations ---
     const supabase = createClient(
       Deno.env.get("SUPABASE_URL") ?? "",
-      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "",
+      projectSecretKey() ?? "",
     );
 
     // Upsert external_identities (trigger auto-queues at priority 40)

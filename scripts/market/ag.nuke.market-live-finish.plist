@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <!-- Where each live BaT lot should finish on nuke.ag (hammer_predictions), estimated from the local BaT archive by
+       main's current writers, without touching the /Users/skylar/nuke working tree, which may sit on another branch.
+       Model 32 (scripts/market/live-finish.mjs + live-finish.py) first; then model 33 (scripts/market/live-finish-33.py,
+       its fitted artifacts in ~/Library/Caches/nuke-finish-33). A model 33 failure is logged and never stops model 32;
+       the job's exit status is model 32's. Minute 45, clear of model 31 at :40 and the daily archive append at 23:10 UTC.
+       Installed copy: ~/Library/LaunchAgents/ag.nuke.market-live-finish.plist (launchctl bootout + bootstrap after an
+       edit). Model 32 added 2026-10-15; model 33 2026-10-15. PATH carries /usr/sbin and /sbin: scikit-learn's joblib
+       (loky) calls sysctl to count cores, and without it every model 33 run logged a traceback (2026-10-16). -->
+  <key>Label</key><string>ag.nuke.market-live-finish</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>/bin/bash</string>
+    <string>-c</string>
+    <string>set -uo pipefail; D="$HOME/Library/Caches/nuke-market-live-finish-runner"; mkdir -p "$D"; git fetch -q origin main || exit 1; git show origin/main:scripts/market/live-finish.mjs &gt; "$D/live-finish.mjs" &amp;&amp; git show origin/main:scripts/market/live-finish.py &gt; "$D/live-finish.py" &amp;&amp; git show origin/main:scripts/market/live-finish-coverage.json &gt; "$D/live-finish-coverage.json" || exit 1; echo "$(date -u +%FT%TZ) $(git rev-parse --short origin/main)"; dotenvx run -q -- node "$D/live-finish.mjs"; s32=$?; if git show origin/main:scripts/market/live-finish-33.py &gt; "$D/live-finish-33.py"; then dotenvx run -q -- python3 "$D/live-finish-33.py"; s33=$?; [ "$s33" -eq 0 ] || echo "$(date -u +%FT%TZ) model 33 exited $s33 (model 32 exited $s32)"; else echo "$(date -u +%FT%TZ) model 33 runner not on main; skipped"; fi; exit $s32</string>
+  </array>
+  <key>WorkingDirectory</key><string>/Users/skylar/nuke</string>
+  <key>EnvironmentVariables</key>
+  <dict><key>PATH</key><string>/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin</string></dict>
+  <key>StartCalendarInterval</key><dict><key>Minute</key><integer>45</integer></dict>
+  <key>RunAtLoad</key><false/>
+  <key>StandardOutPath</key><string>/tmp/market-live-finish.log</string>
+  <key>StandardErrorPath</key><string>/tmp/market-live-finish.log</string>
+</dict>
+</plist>

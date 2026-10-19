@@ -293,7 +293,7 @@ const TIMELINE_FILTERS: { key: string; label: string; match: (ev: any) => boolea
 ];
 
 const BarcodeTimeline: React.FC<BarcodeTimelineProps> = ({ selectedAuctionUrl, onSelectAuction, selectionPending = false }) => {
-  const { vehicle, vehicleId, timelineEvents, setGalleryFilter } = useVehicleProfile();
+  const { vehicle, vehicleId, timelineEvents, timelineReadState, setGalleryFilter } = useVehicleProfile();
   const popup = useContext(PopupStackContext);
 
   // A BaT lot's real sequence — bids and comments at their times, the open and the
@@ -305,7 +305,10 @@ const BarcodeTimeline: React.FC<BarcodeTimelineProps> = ({ selectedAuctionUrl, o
   // Per-day image-analysis depth (Tier 0-4) → illuminates the timeline as deep analysis
   // fills in. A day with raw photos and no verdicts stays dim; as T1/T2 land it warms,
   // an owner-confirmed T4 day glows brightest. One RPC per vehicle (get_vehicle_day_depth).
-  const [depthByDay, setDepthByDay] = useState<Record<string, number>>({});
+  const [depthRead, setDepthRead] = useState<{ vehicleId: typeof vehicleId; values: Record<string, number> }>(() => ({ vehicleId, values: {} }));
+  // A changed route starts a fresh optional-read lifetime, including a return to a prior vehicle.
+  if (depthRead.vehicleId !== vehicleId) setDepthRead({ vehicleId, values: {} });
+  const depthByDay = depthRead.vehicleId === vehicleId ? depthRead.values : {};
   useEffect(() => {
     if (!vehicleId) return;
     let cancelled = false;
@@ -316,7 +319,7 @@ const BarcodeTimeline: React.FC<BarcodeTimelineProps> = ({ selectedAuctionUrl, o
         const dp = Number(r.depth) || 0;
         m[r.day] = dp >= 0.5 ? 4 : dp >= 0.35 ? 3 : dp >= 0.18 ? 2 : dp > 0 ? 1 : 0;
       }
-      if (!cancelled) setDepthByDay(m);
+      if (!cancelled) setDepthRead(current => current.vehicleId === vehicleId ? { vehicleId, values: m } : current);
     }).catch(() => { /* coverage is best-effort; timeline still renders from events */ });
     return () => { cancelled = true; };
   }, [vehicleId]);
@@ -336,7 +339,9 @@ const BarcodeTimeline: React.FC<BarcodeTimelineProps> = ({ selectedAuctionUrl, o
   // the activity record — get_vehicle_contribution_days returns
   // (day, kind photo|work|event, n); 'event' kind is skipped here because
   // timelineEvents already carries the real events.
-  const [dayRows, setDayRows] = useState<{ day: string; kind: string; n: number }[]>([]);
+  const [contributionRead, setContributionRead] = useState<{ vehicleId: typeof vehicleId; values: { day: string; kind: string; n: number }[] }>(() => ({ vehicleId, values: [] }));
+  if (contributionRead.vehicleId !== vehicleId) setContributionRead({ vehicleId, values: [] });
+  const dayRows = contributionRead.vehicleId === vehicleId ? contributionRead.values : [];
   useEffect(() => {
     if (!vehicleId) return;
     let cancelled = false;
@@ -344,7 +349,7 @@ const BarcodeTimeline: React.FC<BarcodeTimelineProps> = ({ selectedAuctionUrl, o
       .rpc('get_vehicle_contribution_days', { p_vehicle_id: vehicleId })
       .then(({ data, error }) => {
         if (error) console.warn('[BarcodeTimeline] contribution days:', error.message);
-        if (!cancelled && data) setDayRows(data as any[]);
+        if (!cancelled && data) setContributionRead(current => current.vehicleId === vehicleId ? { vehicleId, values: data as any[] } : current);
       });
     return () => { cancelled = true; };
   }, [vehicleId]);
@@ -365,7 +370,7 @@ const BarcodeTimeline: React.FC<BarcodeTimelineProps> = ({ selectedAuctionUrl, o
       if (openDay) {
         auctionDays.push({ event_date: openDay, event_type: 'auction_started', title: `${lot}${auctionOpenDayTitle(auction)}`, metadata: { auction: true, basis: auction.open!.basis, moment_role: auction.open!.role, time_known: auction.open!.grain === 'instant' } });
         if (auction.photos.publishedWithListing > 0) {
-          auctionDays.push({ event_date: openDay, event_type: 'photo_session', title: `${lot}${auction.photos.publishedWithListing} photos published with the listing`, metadata: { image_count: auction.photos.publishedWithListing, published_with_listing: true, auction: true } });
+          auctionDays.push({ event_date: openDay, event_type: 'photo_session', title: `${lot}${auction.photos.publishedWithListing} images grouped with listing (association inferred)`, metadata: { image_count: auction.photos.publishedWithListing, published_with_listing: true, auction: true } });
         }
       }
       for (const d of auction.days) {
@@ -779,12 +784,18 @@ const BarcodeTimeline: React.FC<BarcodeTimelineProps> = ({ selectedAuctionUrl, o
     [receiptDate, sortedDates, eventMap, setGalleryFilter]
   );
 
-  // If no timeline events at all, hide the section entirely
-  if (timelineEvents.length === 0) {
-    return null;
+  const availableAuctions = auctions.filter(a => a.activityExtracted || a.open || a.close);
+  const auctionStatus = <>
+    {timelineReadState?.timeline === 'unavailable' && <p role="status">Timeline events could not be fully read.</p>}
+    {timelineReadState?.work === 'unavailable' && <p role="status">Work-session details could not be fully read.</p>}
+    {activityUnavailable && <p role="status">Auction activity could not be fully read. Timeline activity counts are unavailable.</p>}
+    {hasUnpositionedActivity && <p role="status">Some retained auction interactions lack usable posting times and cannot be placed on this timeline.</p>}
+  </>;
+  // Native auction evidence can supply the timeline without raw event rows.
+  if (timelineEvents.length === 0 && availableAuctions.length === 0) {
+    return auctionStatus;
   }
 
-  const availableAuctions = auctions.filter(a => a.activityExtracted || a.open || a.close);
   const selectedAuction = availableAuctions.find(a => selectedAuctionUrl && a.lotUrl.replace(/\/+$/, '') === selectedAuctionUrl.replace(/\/+$/, ''))
     ?? availableAuctions.find(a => a.key === selectedAuctionKey) ?? availableAuctions[0];
 
@@ -901,8 +912,7 @@ const BarcodeTimeline: React.FC<BarcodeTimelineProps> = ({ selectedAuctionUrl, o
           </select></label>}
           {/* Each BaT listing's week, newest first: open, every bid and comment at its
               time, the close and result, post-close comments. Each mark opens its source. */}
-          {activityUnavailable && <p role="status">Auction activity could not be fully read. Timeline activity counts are unavailable.</p>}
-          {hasUnpositionedActivity && <p role="status">Some retained auction interactions lack usable posting times and cannot be placed on this timeline.</p>}
+          {auctionStatus}
           {selectionPending && <p role="status">Reading selected auction…</p>}
           {(!selectionPending && selectedAuction ? [selectedAuction] : []).map(a => (
             <React.Suspense key={a.key} fallback={null}>
@@ -918,6 +928,7 @@ const BarcodeTimeline: React.FC<BarcodeTimelineProps> = ({ selectedAuctionUrl, o
               <VehicleDayDrawer
                 date={receiptDate}
                 auctions={auctions}
+                hasWorkSummary={dayRows.some(row => row.day === receiptDate && row.kind === 'work' && Number.isFinite(row.n) && row.n > 0)}
                 onClose={closeDay}
                 onPrev={() => navigateReceipt(-1)}
                 onNext={() => navigateReceipt(1)}

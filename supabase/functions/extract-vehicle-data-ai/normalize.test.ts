@@ -37,9 +37,18 @@ Deno.test("a Craigslist capture comes out of the funnel whole: attributes, post 
   equal([out.attributes.vin, out.attributes.condition, out.attributes.fuel], ["1B7KF23D3WJ123456", "like new", "diesel"]);
 });
 
-Deno.test("a Craigslist answer is the legacy keys plus the four capture keys, nothing else", () => {
+Deno.test("a Craigslist answer is the legacy keys plus the capture keys, nothing else", () => {
   const out = normalizeExtractedData(viaHttp(extractFromHtml(page("classic-vin-manual-truck.html"), URL1)), URL1);
-  equal(Object.keys(out), [...LEGACY_KEYS, "post_id", "posted_at", "updated_at", "attributes"]);
+  equal(Object.keys(out), [...LEGACY_KEYS, "post_id", "posted_at", "updated_at", "attributes", "place"]);
+});
+
+Deno.test("a Craigslist post's place comes out of the funnel, without a street line", () => {
+  const html = page("classic-vin-manual-truck.html")
+    .replace('"latitude":"0.000000","longitude":"0.000000"', '"latitude":"36.114600","longitude":"-115.172800"')
+    .replace('"addressRegion":"ZZ"', '"addressRegion":"NV"').replace('"streetAddress":""', '"streetAddress":"1 Sample Way"');
+  const out = normalizeExtractedData(viaHttp(extractFromHtml(html, URL1)), URL1);
+  equal(out.place, { locality: "Sampletown", region: "NV", postal_code: null, country: "US", latitude: 36.1146, longitude: -115.1728 });
+  equal(JSON.stringify(out).includes("Sample Way"), false);
 });
 
 Deno.test("any other source comes out exactly as before: same keys, no capture", () => {

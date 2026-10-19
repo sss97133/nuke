@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { OWNERSHIP_TRANSFER_PUBLIC_COLUMNS } from '../../lib/ownershipTransferColumns';
 import { supabase } from '../../lib/supabase';
 import { handleExpectedError, shouldLogError, getErrorKey } from '../../utils/errorCache';
 
@@ -55,7 +56,7 @@ const TitleTransferApproval: React.FC<TitleTransferApprovalProps> = ({
       const query = supabase
         .from('ownership_transfers')
         .select(`
-          *,
+          ${OWNERSHIP_TRANSFER_PUBLIC_COLUMNS},
           vehicle:vehicles(id, year, make, model, vin),
           buyer:profiles!ownership_transfers_to_user_id_fkey(id, full_name, username)
         `)
@@ -63,14 +64,16 @@ const TitleTransferApproval: React.FC<TitleTransferApprovalProps> = ({
         .eq('status', 'pending')
         .order('created_at', { ascending: false });
 
-      let { data, error } = await query;
+      // The narrowed column list is a dynamic string, so supabase-js returns a loosely-typed row; this component
+      // maps it to TitleTransfer itself.
+      let { data, error }: { data: any; error: any } = await query;
 
       // Gracefully handle schema mismatch - table or relationship might not exist
       if (error && (error.code === 'PGRST200' || error.message?.includes('relationship'))) {
         // Try without relationship join
         const simpleQuery = supabase
           .from('ownership_transfers')
-          .select('*')
+          .select(OWNERSHIP_TRANSFER_PUBLIC_COLUMNS)
           .eq('from_user_id', userId)
           .eq('status', 'pending')
           .order('created_at', { ascending: false });

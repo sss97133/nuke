@@ -7,6 +7,7 @@
  *   README.md               <!-- intake:start --> … <!-- intake:end -->        (rows landed per day, per layer)
  *   docs/library/README.md  <!-- library-stats:start --> … <!-- library-stats:end --> (the library's own files)
  *   docs/POSITIONING.md     <!-- evidence:start --> … <!-- evidence:end -->    (graded predictions, stack registry, vein V012)
+ *   nuke_frontend/public/evidence.md   the same evidence block, whole, served as /evidence.md for the About page
  *
  * Every database query runs inside `begin read only … commit` on the Supabase
  * Management API (the same path scripts/data/q.sh uses), so this script cannot
@@ -15,6 +16,12 @@
  * All four blocks are measured before any file is written. When a query fails, the error is printed, the exit code
  * is 1 and no file changes, so the previous blocks stay in place; each block carries its own measured-at time, so a
  * stale one shows its age. The one exception is a statement timeout on an intake read: that cell prints "timed out".
+ *
+ * The database block also names every INVALID index in public (scripts/ci/invalid-indexes.mjs) and every owner-run view
+ * in public that anon or authenticated can write through (scripts/ci/owner-writable-views.mjs). When an index appears
+ * that the previous block did not list, or any such view exists outside the allowed one, the files are still written,
+ * so the next session reads the name, and the run then exits 1; update-stats.yml commits the block even after that
+ * failure.
  *
  *   dotenvx run -q -- node scripts/data/readme-stats.mjs            # rewrite the four blocks
  *   dotenvx run -q -- node scripts/data/readme-stats.mjs --dry-run  # print them only
@@ -26,6 +33,8 @@
 import { lstatSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { INVALID_INDEXES_SQL, invalidIndexesLine, riseReport } from '../ci/invalid-indexes.mjs';
+import { OWNER_WRITABLE_VIEWS_SQL, ownerWritableViewsLine, ownerWritableViewsReport } from '../ci/owner-writable-views.mjs';
 
 const PROJECT = 'qkgaybvrernstplzjaam';
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..');
@@ -33,6 +42,7 @@ const README = resolve(ROOT, 'README.md');
 const LIBRARY = resolve(ROOT, 'docs', 'library');
 const LIBRARY_README = resolve(LIBRARY, 'README.md');
 const POSITIONING = resolve(ROOT, 'docs', 'POSITIONING.md');
+const EVIDENCE_PUBLIC = resolve(ROOT, 'nuke_frontend', 'public', 'evidence.md');
 const DRY = process.argv.includes('--dry-run');
 
 const token = process.env.SUPABASE_ACCESS_TOKEN;
@@ -111,7 +121,7 @@ function splice(text, file, start, end, block) {
 }
 const spliceBlock = (file, start, end, block) => splice(readFileSync(file, 'utf8'), file, start, end, block);
 
-async function databaseBlock() {
+async function databaseBlock(invalid, writable) {
   // Sequential on purpose: eight light queries, one at a time, against production.
   const [pg] = await q(`select split_part(version(), ' ', 2) as pg`);
   const [atlas] = await q(`
@@ -175,6 +185,10 @@ async function databaseBlock() {
       `${num(atlas.undeclared)} tables with an undeclared writer in the last 30 days · ` +
       `${num(jobs.active)} scheduled jobs active, ${num(jobs.failing)} with a failure in the last 24 h · ` +
       `Postgres ${pg.pg}.`,
+    '',
+    invalidIndexesLine(invalid),
+    '',
+    ownerWritableViewsLine(writable),
     '<!-- stats:end -->',
   ].join('\n');
 }
@@ -508,7 +522,9 @@ async function intakeBlock() {
 }
 
 async function main() {
-  const db = await databaseBlock();
+  const invalid = await q(INVALID_INDEXES_SQL);
+  const writable = await q(OWNER_WRITABLE_VIEWS_SQL);
+  const db = await databaseBlock(invalid, writable);
   const intake = await intakeBlock();
   const lib = libraryBlock();
   const evidence = await evidenceBlock();
@@ -516,15 +532,24 @@ async function main() {
     console.log(db, '\n', intake, '\n', lib, '\n', evidence);
     return;
   }
-  // Splice all four before writing any, so a missing marker in one file leaves every file as it was.
+  // The index check compares with what the block about to be replaced listed, so it reads before the overwrite.
+  const alarms = [riseReport(invalid, readFileSync(README, 'utf8')), ownerWritableViewsReport(writable)].filter(Boolean);
+  // Splice all before writing any, so a missing marker in one file leaves every file as it was.
   const readme = spliceBlock(README, '<!-- stats:start -->', '<!-- stats:end -->', db);
   const writes = [
     [README, splice(readme, README, '<!-- intake:start -->', '<!-- intake:end -->', intake)],
     [LIBRARY_README, spliceBlock(LIBRARY_README, '<!-- library-stats:start -->', '<!-- library-stats:end -->', lib)],
     [POSITIONING, spliceBlock(POSITIONING, '<!-- evidence:start -->', '<!-- evidence:end -->', evidence)],
+    // The About page (nuke_frontend/src/pages/About.tsx) fetches this file and renders the block with its date.
+    [EVIDENCE_PUBLIC, evidence + '\n'],
   ];
   for (const [file, text] of writes) writeFileSync(file, text);
   console.log(db, '\n', intake, '\n', lib, '\n', evidence);
+  if (alarms.length) {
+    // After the write on purpose: the README now names the index or the view. Exit 1 turns the daily run red.
+    for (const alarm of alarms) console.error(`readme-stats: ${alarm}`);
+    process.exitCode = 1;
+  }
 }
 
 main().catch((e) => {

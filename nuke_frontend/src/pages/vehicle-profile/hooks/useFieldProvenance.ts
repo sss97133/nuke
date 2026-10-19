@@ -55,6 +55,8 @@ export interface FieldProvenance {
     /** Existing reader returns at most 400 characters of observation content, not the complete source. */
     content?: string | null;
     source_observation_id?: string | null;
+    /** Original quotation, returned by the typed retained reader. */
+    source_value?: string | null;
     source_observed_at?: string | null;
     source_recorded_at?: string | null;
     source_event_time_status?: string | null;
@@ -63,6 +65,26 @@ export interface FieldProvenance {
     factory_configuration_status?: string | null;
     current_configuration_status?: string | null;
   }[];
+}
+
+type ProvenanceObservation = FieldProvenance['observations'][number];
+
+/** Repeated captures of one listing page that report the same value and quotation are
+ * one source claim, not corroboration (2026-10-15: one displacement claim drilled to 16
+ * identical rows). Every row stays reachable; the preferred (resolved) row represents. */
+export function groupRepeatedReports<T extends ProvenanceObservation>(observations: T[], preferredId?: string | null): { report: T; repeats: T[] }[] {
+  const groups = new Map<string, { report: T; repeats: T[] }>(), out: { report: T; repeats: T[] }[] = [];
+  for (const observation of observations) {
+    const key = observation.source_url
+      ? JSON.stringify([observation.source_url, observation.source_slug, observation.value, observation.source_value ?? null,
+        observation.source_value == null ? observation.content ?? null : null, observation.extraction_method ?? null])
+      : `observation:${observation.id}`;
+    const group = groups.get(key);
+    if (!group) { const created = { report: observation, repeats: [] as T[] }; groups.set(key, created); out.push(created); }
+    else if (observation.id === preferredId) { group.repeats.unshift(group.report); group.report = observation; }
+    else group.repeats.push(observation);
+  }
+  return out;
 }
 
 export function provenanceCoverageUnavailable(provenance: FieldProvenance | null | undefined) {

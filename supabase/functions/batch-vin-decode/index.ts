@@ -23,6 +23,7 @@ const corsHeaders = {
 };
 
 import { NHTSA_FIELD_MAP, decodeVinsBatch } from "../_shared/nhtsa-vin.ts";
+import { projectSecretKey } from "../_shared/supabaseKeys.ts";
 
 interface VinDecodeResult {
   vin: string;
@@ -45,7 +46,7 @@ Deno.serve(async (req) => {
   try {
     const supabase = createClient(
       Deno.env.get("SUPABASE_URL") ?? "",
-      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "",
+      projectSecretKey() ?? "",
     );
 
     const body = req.method === "POST" ? await req.json().catch(() => ({})) : {};

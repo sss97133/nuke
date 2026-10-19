@@ -95,6 +95,8 @@ interface VehicleCardDenseProps {
   showPriceChange?: boolean;
   /** Controls whether price badges/overlays are shown on cards */
   showPriceOverlay?: boolean;
+  /** The coverage grade (A–F) earns its place only when the card is fed the whole record; a six-field card would grade every vehicle E. */
+  showGrade?: boolean;
   /** Controls whether the semi-transparent detail overlay is shown on image */
   showDetailOverlay?: boolean;
   /** Home feed: compact vs info-dense card details */
@@ -184,6 +186,7 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
   showSocial = false,
   showPriceChange = false,
   showPriceOverlay = true,
+  showGrade = true,
   showDetailOverlay = true,
   infoDense = false,
   sourceStampUrl,
@@ -393,7 +396,7 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
 
   // PERF: Never do per-card network calls on the feed.
   // Use the already-available vehicle fields (or precomputed display_price) to render pricing synchronously.
-  const { displayPrice } = React.useMemo(() => {
+  const { displayPrice, priceKind } = React.useMemo(() => {
     const v: any = vehicle as any;
     
     // Extract all price fields with proper validation
@@ -450,7 +453,19 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
 
     const formatted = formatCurrencyValue(priceValue);
 
-    return { displayPrice: formatted };
+    // The kind of money that number is, in the same order. A number without its kind is not a price.
+    const priceKind =
+      salePrice != null ? 'SOLD' :
+      liveBid != null ? 'BID' :
+      winningBid != null ? 'SOLD' :
+      highBid != null ? 'HIGH BID' :
+      currentBid != null ? 'BID' :
+      asking != null ? 'ASKING' :
+      currentValue != null ? 'EST' :
+      purchasePrice != null ? 'PAID' :
+      msrp != null ? 'MSRP' : null;
+
+    return { displayPrice: formatted, priceKind };
   }, [vehicle]);
 
   const identity = React.useMemo(() => getVehicleIdentityTokens(vehicle as any), [vehicle]);
@@ -1133,10 +1148,10 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
     // If auction ended > 1 day ago, show asset value instead of auction status
     if (shouldShowAssetValue) {
       if (marketValue) {
-        return formatCurrencyValue(marketValue);
+        return `${v.current_value ? 'EST' : v.asking_price ? 'ASKING' : 'PAID'} ${formatCurrencyValue(marketValue)}`;
       }
       if (ownerCost) {
-        return formatCurrencyValue(ownerCost);
+        return `PAID ${formatCurrencyValue(ownerCost)}`;
       }
     }
     
@@ -1144,17 +1159,17 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
     // For non-auction vehicles, use displayPrice which handles: sale_price > asking_price > etc.
     // But also check marketValue/ownerCost as fallback if displayPrice is "—"
     if (displayPrice && displayPrice !== '—') {
-      return displayPrice;
+      return priceKind ? `${priceKind} ${displayPrice}` : displayPrice;
     }
     // Fallback to market value if displayPrice is empty
     if (marketValue) {
-      return formatCurrencyValue(marketValue);
+      return `${v.current_value ? 'EST' : v.asking_price ? 'ASKING' : 'PAID'} ${formatCurrencyValue(marketValue)}`;
     }
     if (ownerCost) {
-      return formatCurrencyValue(ownerCost);
+      return `PAID ${formatCurrencyValue(ownerCost)}`;
     }
     return displayPrice; // Will be "—" if nothing found
-  }, [isActiveAuction, displayPrice, vehicle, auctionHighBidText, shouldShowAssetValue, marketValue, ownerCost, isSold, shouldShowSoldBadge]);
+  }, [isActiveAuction, displayPrice, priceKind, vehicle, auctionHighBidText, shouldShowAssetValue, marketValue, ownerCost, isSold, shouldShowSoldBadge]);
 
   const closeSpecPopover = React.useCallback(() => setSpecPopover(null), []);
 
@@ -1410,6 +1425,9 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
     const up = raw.toUpperCase();
     if (up.startsWith('SOLD ')) return { label: 'SOLD', value: raw.slice(5).trim() || null };
     if (up.startsWith('RESULT ')) return { label: 'RESULT', value: raw.slice(7).trim() || null };
+    // The kind of money, from the price memo: a bid, a high bid, an ask, an estimate, what was paid, the MSRP.
+    const kind = /^(HIGH BID|BID|ASKING|EST|PAID|MSRP) (.+)$/.exec(up);
+    if (kind) return { label: kind[1], value: raw.slice(kind[1].length + 1).trim() || null };
     if (up === 'ENDED') return { label: 'ENDED', value: null as string | null };
     return { label: null as string | null, value: raw || null };
   }, [badgeMainText]);
@@ -1644,7 +1662,7 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
                     <div
                       style={{
                         background: 'var(--error)',
-                        color: 'var(--surface-elevated)',
+                        color: 'var(--on-dark-overlay)',
                         padding: '4px 10px',
                         fontSize: '9px',
                         fontWeight: 700,
@@ -1660,7 +1678,7 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
                       style={{
                         background: 'rgba(0, 0, 0, 0.75)',
                         backdropFilter: 'blur(6px)',
-                        color: 'var(--surface-elevated)',
+                        color: 'var(--on-dark-overlay)',
                         padding: '4px 8px',
                         fontSize: '9px',
                         fontWeight: 700,
@@ -1820,7 +1838,7 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
                 bottom: 0,
                 padding: '10px 12px',
                 background: 'rgba(0,0,0,0.75)',
-                color: 'var(--surface-elevated)',
+                color: 'var(--on-dark-overlay)',
               }}
             >
               {/* Vehicle name */}
@@ -1856,7 +1874,7 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
                     />
                   ) : null}
                 {/* Vehicle Data Profile Grade (F, E, D, C, B, A, S, SSS) */}
-                {(() => {
+                {showGrade && (() => {
                   const tierLabel = normalizeTierLabel(vehicle.tier_label) || normalizeTierLabel(calculateVehicleTier(vehicle));
                   if (!tierLabel) return null;
                   const imgCount = vehicle.all_images?.length || vehicle.image_count || 0;
@@ -2007,7 +2025,7 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
                 bottom: '8px',
                 left: '8px',
                 background: 'rgba(0, 0, 0, 0.75)',
-                color: 'var(--surface-elevated)',
+                color: 'var(--on-dark-overlay)',
                 padding: '3px 8px',
                 fontSize: '9px',
                 fontWeight: 600,
@@ -2319,7 +2337,7 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
                   <div
                     style={{
                       background: 'var(--error)',
-                      color: 'var(--surface-elevated)',
+                      color: 'var(--on-dark-overlay)',
                       padding: '3px 8px',
                       fontSize: '9px',
                       fontWeight: 700,
@@ -2336,7 +2354,7 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
                     style={{
                       background: 'rgba(0, 0, 0, 0.75)',
                       backdropFilter: 'blur(6px)',
-                      color: 'var(--surface-elevated)',
+                      color: 'var(--on-dark-overlay)',
                       padding: '4px 8px',
                       fontSize: '6.5pt',
                       fontWeight: 700,
@@ -2507,7 +2525,7 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
                       background: DEAL_SCORE_CONFIG[vehicle.deal_score_label as DealScoreLabel].colorRgba,
                       backdropFilter: 'blur(4px)',
                       border: '1px solid rgba(255,255,255,0.2)',
-                      color: 'var(--surface-elevated)',
+                      color: 'var(--on-dark-overlay)',
                       padding: '2px 6px',
                       fontSize: '11px',
                       fontFamily: 'Courier New, monospace',
@@ -2533,7 +2551,7 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
                         : 'rgba(234,179,8,0.92)',
                       backdropFilter: 'blur(4px)',
                       border: '1px solid rgba(255,255,255,0.2)',
-                      color: 'var(--surface-elevated)',
+                      color: 'var(--on-dark-overlay)',
                       padding: '2px 5px',
                       fontSize: '9px',
                       fontWeight: 800,
@@ -2553,7 +2571,7 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
                       background: 'rgba(234,179,8,0.92)',
                       backdropFilter: 'blur(4px)',
                       border: '1px solid rgba(255,255,255,0.2)',
-                      color: 'var(--surface-elevated)',
+                      color: 'var(--on-dark-overlay)',
                       padding: '2px 5px',
                       fontSize: '9px',
                       fontWeight: 800,
@@ -2652,7 +2670,7 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
                       border: isFollowing
                         ? '1px solid rgba(59, 130, 246, 0.5)'
                         : '1px solid rgba(255,255,255,0.2)',
-                      color: 'var(--surface-elevated)',
+                      color: 'var(--on-dark-overlay)',
                       padding: isCompactCard ? '0' : '4px 8px',
                       width: isCompactCard ? '22px' : undefined,
                       height: isCompactCard ? '22px' : undefined,
@@ -2719,7 +2737,7 @@ const VehicleCardDense: React.FC<VehicleCardDenseProps> = ({
             bottom: 0,
             padding: '8px',
             background: 'rgba(0,0,0,0.75)',
-            color: 'var(--surface-elevated)',
+            color: 'var(--on-dark-overlay)',
           }}
         >
           {/* Vehicle name - with truncation */}

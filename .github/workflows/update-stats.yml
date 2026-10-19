@@ -2,9 +2,12 @@ name: Update Stats
 
 # Measures the live database and rewrites the numbers block in README.md,
 # the library counts in docs/library/README.md and the evidence block in
-# docs/POSITIONING.md (scripts/data/readme-stats.mjs).
+# docs/POSITIONING.md, and the same evidence block as nuke_frontend/public/evidence.md
+# for the About page (scripts/data/readme-stats.mjs).
 # Read-only queries; at most one commit a day,
 # marked [skip ci] so it triggers no build or deploy.
+# The README block also names every INVALID index in public. When one appears that the previous block did not list,
+# the measuring step writes the block and then exits 1, so the run turns red and the commit step below still publishes it.
 
 on:
   schedule:
@@ -37,10 +40,13 @@ jobs:
         run: node scripts/data/readme-stats.mjs
 
       - name: Commit if the block changed, rebase onto a moving main, push
+        # Not skipped when the measuring step failed after writing: a new invalid index fails the run on purpose and the
+        # block that names it must still reach main. When nothing was written there is no diff and this exits 0.
+        if: ${{ !cancelled() }}
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add README.md docs/library/README.md docs/POSITIONING.md
+          git add README.md docs/library/README.md docs/POSITIONING.md nuke_frontend/public/evidence.md
           if git diff --staged --quiet; then echo "README block unchanged"; exit 0; fi
           git commit -m "stats: $(date -u +%F) measured from the live database [skip ci]"
           # main moves while we measure; rebase our one README commit onto it, three tries.

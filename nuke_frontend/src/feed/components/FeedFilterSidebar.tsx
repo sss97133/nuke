@@ -7,6 +7,7 @@
 
 import { useCallback, useEffect, useMemo, useState, type CSSProperties, type ReactNode } from 'react';
 import type { FilterState } from '../../types/feedTypes';
+import { useFeedSources } from '../hooks/useFeedSources';
 
 export interface FeedFilterSidebarProps {
   filters: FilterState;
@@ -123,6 +124,43 @@ export function FeedFilterSidebar({
     },
     [filters, onFiltersChange],
   );
+
+  const feedSources = useFeedSources().data ?? [];
+  // bat, craigslist and ksl keep their original flags (URLs and saved filters already carry them); the rest ride on hiddenSources.
+  const LEGACY_FLAG: Record<string, keyof FilterState> = { bat: 'hideBat', craigslist: 'hideCraigslist', ksl: 'hideKsl' };
+  const FIXED_SOURCES: Array<{ key: keyof FilterState; label: string }> = [
+    { key: 'hideBat', label: 'BRING A TRAILER' },
+    { key: 'hideCraigslist', label: 'CRAIGSLIST' },
+    { key: 'hideKsl', label: 'KSL' },
+    { key: 'hideClassic', label: 'CLASSIC.COM' },
+    { key: 'hideDealerListings', label: 'DEALER LISTINGS' },
+    { key: 'hideDealerSites', label: 'DEALER SITES' },
+  ];
+  const flagRow = (key: keyof FilterState, label: string, count: number | null = null) => ({
+    key: String(key), label, count,
+    checked: !filters[key],
+    toggle: () => update({ [key]: !filters[key] } as unknown as Partial<FilterState>),
+  });
+  const sourceRows = feedSources.length === 0
+    ? FIXED_SOURCES.map(({ key, label }) => flagRow(key, label))
+    : [
+        ...feedSources.map((src) => {
+          const legacy = LEGACY_FLAG[src.source_platform];
+          if (legacy) return flagRow(legacy, src.label.toUpperCase(), src.n_1h);
+          const hidden = filters.hiddenSources ?? [];
+          const isHidden = src.discovery_sources.some((d) => hidden.includes(d));
+          return {
+            key: src.source_platform, label: src.label.toUpperCase(), count: src.n_1h, checked: !isHidden,
+            toggle: () => update({
+              hiddenSources: isHidden
+                ? hidden.filter((d) => !src.discovery_sources.includes(d))
+                : [...new Set([...hidden, ...src.discovery_sources])],
+            }),
+          };
+        }),
+        flagRow('hideDealerListings', 'DEALER LISTINGS'),
+        flagRow('hideDealerSites', 'DEALER SITES'),
+      ];
 
   // Make toggle
   const toggleMake = useCallback(
@@ -479,17 +517,10 @@ export function FeedFilterSidebar({
         </div>
       </FilterSection>
 
-      {/* SOURCES */}
+      {/* SOURCES: every source seen in the last 24 h (feed_source_rollup); the fixed list only when that is unavailable */}
       <FilterSection title="SOURCES" defaultOpen={false}>
         <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-          {[
-            { key: 'hideBat', label: 'BRING A TRAILER' },
-            { key: 'hideCraigslist', label: 'CRAIGSLIST' },
-            { key: 'hideKsl', label: 'KSL' },
-            { key: 'hideClassic', label: 'CLASSIC.COM' },
-            { key: 'hideDealerListings', label: 'DEALER LISTINGS' },
-            { key: 'hideDealerSites', label: 'DEALER SITES' },
-          ].map(({ key, label }) => (
+          {sourceRows.map(({ key, label, checked, count, toggle }) => (
             <label
               key={key}
               style={{
@@ -500,11 +531,11 @@ export function FeedFilterSidebar({
             >
               <input
                 type="checkbox"
-                checked={!filters[key as keyof FilterState]}
-                onChange={() => update({ [key]: !filters[key as keyof FilterState] } as unknown as Partial<FilterState>)}
+                checked={checked}
+                onChange={toggle}
                 style={{ accentColor: 'var(--text)' }}
               />
-              {label}
+              {label}{count != null ? ` · ${count} / HR` : ''}
             </label>
           ))}
         </div>

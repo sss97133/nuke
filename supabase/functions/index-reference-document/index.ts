@@ -6,6 +6,8 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { getUserApiKey } from '../_shared/getUserApiKey.ts'
 import { requireWriteAuth } from '../_shared/writeGuard.ts';
+import { projectSecretKey } from "../_shared/supabaseKeys.ts";
+import { geminiFetch } from '../_shared/geminiGuard.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -22,7 +24,7 @@ Deno.serve(async (req) => {
     const supabase = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       // Support both env var names (some functions use SUPABASE_SERVICE_ROLE_KEY)
-      Deno.env.get('SERVICE_ROLE_KEY') ?? Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
+      projectSecretKey() ?? '',
       { auth: { persistSession: false, detectSessionInUrl: false } }
     )
 
@@ -133,7 +135,7 @@ Deno.serve(async (req) => {
 })
 
 async function uploadToGeminiFileAPI(data: ArrayBuffer, mimeType: string, apiKey: string) {
-  const initResp = await fetch(`https://generativelanguage.googleapis.com/upload/v1beta/files?key=${apiKey}`, {
+  const initResp = await geminiFetch(`https://generativelanguage.googleapis.com/upload/v1beta/files?key=${apiKey}`, {
     method: 'POST',
     headers: {
       'X-Goog-Upload-Protocol': 'resumable',
@@ -143,7 +145,7 @@ async function uploadToGeminiFileAPI(data: ArrayBuffer, mimeType: string, apiKey
       'Content-Type': 'application/json'
     },
     body: JSON.stringify({ file: { display_name: 'catalog' } })
-  })
+  }, 'index-reference-document')
   
   const uploadUrl = initResp.headers.get('x-goog-upload-url')
   if (!uploadUrl) throw new Error('No upload URL from Gemini')
@@ -184,7 +186,7 @@ Return JSON:
   ]
 }`
 
-  const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-pro:generateContent?key=${apiKey}`, {
+  const response = await geminiFetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-pro-latest:generateContent?key=${apiKey}`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
@@ -197,7 +199,7 @@ Return JSON:
       }],
       generationConfig: { response_mime_type: "application/json" }
     })
-  })
+  }, 'index-reference-document')
 
   if (!response.ok) throw new Error(`Gemini error: ${response.status}`)
   const data = await response.json()
@@ -232,7 +234,7 @@ Return JSON array:
   ]
 }`
 
-  const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-pro:generateContent?key=${apiKey}`, {
+  const response = await geminiFetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-pro-latest:generateContent?key=${apiKey}`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
@@ -245,7 +247,7 @@ Return JSON array:
       }],
       generationConfig: { response_mime_type: "application/json", temperature: 0 }
     })
-  })
+  }, 'index-reference-document')
 
   if (!response.ok) throw new Error(`Gemini error: ${response.status}`)
   const data = await response.json()

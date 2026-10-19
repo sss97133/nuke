@@ -11,6 +11,7 @@ import { corsHeaders } from "../_shared/cors.ts";
 import { computeWiringOverlay } from "../_shared/wiringCompute.ts";
 import { renderPlanViewSvg, renderZoneDetailSvg } from "../_shared/vehicleLayout.ts";
 import { requireWriteAuth } from "../_shared/writeGuard.ts";
+import { projectSecretKey } from "../_shared/supabaseKeys.ts";
 
 Deno.serve(async (req) => {
   // Writes are never anonymous: service key, signed-in user, or nothing (P0.2, 2026-09-27).
@@ -21,7 +22,7 @@ Deno.serve(async (req) => {
   try {
     const supabase = createClient(
       Deno.env.get("SUPABASE_URL")!,
-      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
+      projectSecretKey()!,
     );
 
     const body = await req.json();

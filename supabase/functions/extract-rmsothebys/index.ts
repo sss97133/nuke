@@ -14,109 +14,68 @@
  *   POST {"action": "process", "auction": "PA26", "save_to_db": true} - Process all lots from auction
  *   POST {"action": "auctions"} - List available auctions
  *
+ * Only vehicles are written (see lotKind.ts): RM's lot search also lists automobilia, boats and other lots, and
+ * those are skipped. Every action that lists lots reports how many it skipped and why (skipped_by_reason), and
+ * how many lots RM reported against how many it read (api_reported_total, duplicates_dropped; see lotPaging.ts).
+ *
  * Deploy: supabase functions deploy extract-rmsothebys --no-verify-jwt
  */
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
-import { normalizeListingUrlKey } from '../_shared/listingUrl.ts';
-import { resolveExistingVehicleId, discoveryUrlIlikePattern } from '../_shared/resolveVehicleForListing.ts';
-import { normalizeVehicleFields } from '../_shared/normalizeVehicle.ts';
+import { resolveExistingVehicleId } from '../_shared/resolveVehicleForListing.ts';
 import { writeObservation } from '../_shared/observationWriter.ts';
 import { requireWriteAuth } from '../_shared/writeGuard.ts';
 import { getKnownAuctions } from './knownAuctions.ts';
 import { writeVehicleEventByKey } from '../_shared/vehicleEventWrite.ts';
 import { rmLotLinkMatchesUrl, rmLotUrl } from './lotUrl.ts';
+import { projectSecretKey } from "../_shared/supabaseKeys.ts";
+import { classifyLot, partitionLots, type LotPartition } from './lotKind.ts';
+import { collectLots, type CollectedLots } from './lotPaging.ts';
+import { parseTitle } from './lotTitle.ts';
+import { forEachConcurrent, readConcurrency } from './concurrency.ts';
+import { saveVehicle as saveVehicleWith, type ExtractedVehicle, type SaveDeps } from './saveVehicle.ts';
+import { extractVehicleFacets } from '../_shared/vehicleFacets.ts';
+import { normalizeVehicleFields } from '../_shared/normalizeVehicle.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-// RM Sotheby's - we'll store metadata in origin_metadata instead of linking to org table
-const RM_SOTHEBYS_NAME = "RM Sotheby's";
 const RM_SOTHEBYS_WEBSITE = 'https://rmsothebys.com';
 
-interface RMSLotItem {
+export interface RMSLotItem {
   id: string;
-  auctionId: string;
+  auctionId?: string;
   header: string;
   publicName: string;
   lot: string;
-  collection: string;
+  collection?: string | null;
   value: string;
   valueType: string;
-  preSaleEstimate: string;
-  canViewLotDetails: boolean;
+  preSaleEstimate?: string | null;
+  canViewLotDetails?: boolean;
   link: string;
-  styleClass: string;
-  auctionStyleName: string;
-  isRecentlyPosted: boolean;
-  auctioned: boolean;
-  canDisplayCurrentBid: boolean;
+  styleClass?: string;
+  auctionStyleName?: string;
+  isRecentlyPosted?: boolean;
+  auctioned?: boolean | null;
+  canDisplayCurrentBid?: boolean;
   sold: boolean;
-  crop: string;
-  alt: string;
+  crop?: string | null;
+  alt?: string;
   isStillForSale: boolean;
-  locationFlag: string;
+  locationFlag?: string;
   biddingLotId: string;
   biddingAuctionId: string;
   biddingType: string;
-  newWindow: boolean;
-  specialist: string;
-  referenceId: string;
-  isFavourite: boolean;
-  won: boolean | null;
-}
-
-interface ExtractedVehicle {
-  url: string;
-  title: string;
-  year: number | null;
-  make: string | null;
-  model: string | null;
-  lot_number: string;
-  auction_name: string;
-  auction_code: string;
-  estimate_text: string | null;
-  sold_price: number | null;
-  sold_price_text: string | null;
-  currency: string | null;
-  sold: boolean;
-  is_still_for_sale: boolean;
-  image_url: string | null;
-  rms_lot_id: string;
-  rms_auction_id: string;
-  bidding_type: string;
-  collection: string | null;
-}
-
-// Parse title like "1997 Ferrari F310 B" into year/make/model
-function parseTitle(title: string): { year: number | null; make: string | null; model: string | null } {
-  const yearMatch = title.match(/^(\d{4})\s+/);
-  const year = yearMatch ? parseInt(yearMatch[1], 10) : null;
-
-  if (!year) {
-    // Try to find year anywhere
-    const anyYear = title.match(/\b(19|20)\d{2}\b/);
-    if (anyYear) {
-      const y = parseInt(anyYear[0], 10);
-      const afterYear = title.slice(title.indexOf(anyYear[0]) + 4).trim();
-      const parts = afterYear.split(/\s+/);
-      return {
-        year: y,
-        make: parts[0]?.toLowerCase() || null,
-        model: parts.slice(1).join(' ')?.toLowerCase() || null,
-      };
-    }
-    return { year: null, make: null, model: null };
-  }
-
-  const afterYear = title.slice(4).trim();
-  const parts = afterYear.split(/\s+/);
-  const make = parts[0]?.toLowerCase() || null;
-  const model = parts.slice(1).join(' ')?.toLowerCase() || null;
-
-  return { year, make, model };
+  newWindow?: boolean;
+  specialist?: string;
+  referenceId?: string;
+  /** RM's category: 1 automobile, 2 automobilia, 3 motorcycle, 4 watercraft (see lotKind.ts). */
+  categoryId?: number;
+  isFavourite?: boolean;
+  won?: boolean | null;
 }
 
 // Parse value like "EUR 5,500,000" or "Sold For EUR 1,200,000"
@@ -142,15 +101,20 @@ function parseValue(value: string, valueType: string): {
   return { amount, currency, text };
 }
 
-// Fetch lots from RM Sotheby's API
-async function fetchAuctionLots(auctionCode: string, pageSize = 200): Promise<RMSLotItem[]> {
-  const allItems: RMSLotItem[] = [];
-  let page = 0;
-  let hasMore = true;
+// Fetch lots from RM Sotheby's API.
+// The search pages from 1 (page 0 repeats page 1), caps pageSize at 200 (a larger value falls back to 40), and states
+// pager.totalItems / pager.totalPages; lotPaging.ts reads those and returns each lot once. See that file for the
+// measurements. 200 is the largest page size the API honors.
+const RMS_PAGE_SIZE = 200;
 
-  while (hasMore) {
+function pagerNumber(v: unknown): number | null {
+  return typeof v === 'number' && Number.isFinite(v) && v >= 0 ? v : null;
+}
+
+async function fetchAuctionLots(auctionCode: string): Promise<CollectedLots<RMSLotItem>> {
+  return await collectLots<RMSLotItem>(async (page) => {
     const response = await fetch(
-      `https://rmsothebys.com/api/search/SearchLots?page=${page}&pageSize=${pageSize}`,
+      `https://rmsothebys.com/api/search/SearchLots?page=${page}&pageSize=${RMS_PAGE_SIZE}`,
       {
         method: 'POST',
         headers: {
@@ -171,48 +135,34 @@ async function fetchAuctionLots(auctionCode: string, pageSize = 200): Promise<RM
     }
 
     const data = await response.json();
-    const items: RMSLotItem[] = data.items || [];
-    const totalCount: number | undefined = data.totalCount ?? data.total;
-
-    allItems.push(...items);
-
-    // Check if there are more pages
-    // Use totalCount when available; otherwise require TWO consecutive short pages
-    // (single short page can happen mid-stream due to API quirks)
-    if (totalCount !== undefined) {
-      hasMore = allItems.length < totalCount;
-    } else if (items.length < pageSize) {
-      // Allow one short page — only stop if we got 0 items
-      if (items.length === 0) {
-        hasMore = false;
-      } else {
-        // Fetch one more page to confirm we're really done
-        page++;
-        if (page > 20) {
-          console.warn('[RMS] Reached page limit, stopping pagination');
-          break;
-        }
-        continue;
-      }
-    }
-
-    if (hasMore) {
-      page++;
-      // Safety limit
-      if (page > 20) {
-        console.warn('[RMS] Reached page limit, stopping pagination');
-        break;
-      }
-    }
-  }
-
-  return allItems;
+    const pager = data?.pager ?? {};
+    return {
+      items: Array.isArray(data?.items) ? (data.items as RMSLotItem[]) : [],
+      // The old response shape put the total at the top level; keep reading it if it returns.
+      totalItems: pagerNumber(pager.totalItems) ?? pagerNumber(data?.totalCount) ?? pagerNumber(data?.total),
+      totalPages: pagerNumber(pager.totalPages),
+    };
+  });
 }
 
 // Transform API item to extracted vehicle
-function transformLotItem(item: RMSLotItem, auctionCode: string): ExtractedVehicle {
+export function transformLotItem(item: RMSLotItem, auctionCode: string): ExtractedVehicle {
   const { year, make, model } = parseTitle(item.publicName);
   const { amount, currency, text: valueText } = parseValue(item.value, item.valueType);
+  const lotUrl = rmLotUrl(item.link);
+  const facets = extractVehicleFacets({
+    year,
+    make,
+    model,
+    title: item.publicName,
+    url: lotUrl,
+  });
+  const normalized = normalizeVehicleFields({
+    year,
+    make,
+    model,
+    body_style: facets.body_style_facet,
+  });
 
   // Determine if this is a sold price or estimate. "Not Sold" contains "sold": the old includes()
   // test turned unsold lots' low estimates into sale prices (82 rows measured 2026-09-27; lock 1
@@ -223,11 +173,14 @@ function transformLotItem(item: RMSLotItem, auctionCode: string): ExtractedVehic
   const estimateText = !isSold ? valueText : item.preSaleEstimate || null;
 
   return {
-    url: rmLotUrl(item.link), // the API returns absolute links since 2026-10; site-relative ones still get the origin
+    url: lotUrl, // the API returns absolute links since 2026-10; site-relative ones still get the origin
     title: item.publicName,
     year,
     make,
     model,
+    series: facets.series_code,
+    trim: facets.trim_package,
+    body_style: normalized.body_style ?? facets.body_style_facet,
     lot_number: item.lot,
     auction_name: item.header,
     auction_code: auctionCode.toUpperCase(),
@@ -242,176 +195,19 @@ function transformLotItem(item: RMSLotItem, auctionCode: string): ExtractedVehic
     rms_auction_id: item.biddingAuctionId,
     bidding_type: item.biddingType,
     collection: item.collection || null,
+    category_id: typeof item.categoryId === 'number' ? item.categoryId : null,
+    auctioned: typeof item.auctioned === 'boolean' ? item.auctioned : null,
   };
 }
 
 
-// Save extracted vehicle to database
-async function saveVehicle(
-  supabase: any,
-  vehicle: ExtractedVehicle
-): Promise<{ vehicleId: string; isNew: boolean }> {
-  const listingUrlKey = normalizeListingUrlKey(vehicle.url);
-
-  // Resolve existing vehicle (listing key, discovery_url exact, or URL pattern) to avoid duplicate
-  const { vehicleId: resolvedId } = await resolveExistingVehicleId(supabase, {
-    url: vehicle.url,
-    platform: 'rmsothebys',
-    discoveryUrlIlikePattern: discoveryUrlIlikePattern(vehicle.url),
-  });
-
-  if (resolvedId) {
-    await supabase
-      .from('vehicles')
-      .update({
-        sale_price: vehicle.sold_price,
-        sale_status: vehicle.sold ? 'sold' : (vehicle.is_still_for_sale ? 'available' : 'ended'),
-        status: 'active',
-        updated_at: new Date().toISOString(),
-      })
-      .eq('id', resolvedId);
-
-    // Fire-and-forget observation write
-    const obsFields: Record<string, any> = {};
-    if (vehicle.year) obsFields.year = vehicle.year;
-    if (vehicle.make) obsFields.make = vehicle.make;
-    if (vehicle.model) obsFields.model = vehicle.model;
-    if (vehicle.sold_price) obsFields.sale_price = vehicle.sold_price;
-    writeObservation(supabase, {
-      vehicleId: resolvedId,
-      source: { platform: "rmsothebys", url: vehicle.url, trustScore: 0.85 },
-      fields: obsFields,
-      observationKind: "sale_result",
-      extractionMethod: "rmsothebys_api",
-    }).catch((e: any) => console.warn(`[RMS] observationWriter error for ${resolvedId}: ${e?.message}`));
-
-    return { vehicleId: resolvedId, isNew: false };
-  }
-
-  // Normalize before insert
-  const normalized = normalizeVehicleFields({ make: vehicle.make, model: vehicle.model, year: vehicle.year });
-
-  // Create new vehicle
-  const { data: newVehicle, error: vehicleError } = await supabase
-    .from('vehicles')
-    .insert({
-      year: normalized.year ?? vehicle.year,
-      make: normalized.make ?? vehicle.make,
-      model: normalized.model ?? vehicle.model,
-      sale_price: vehicle.sold_price,
-      sale_status: vehicle.sold ? 'sold' : (vehicle.is_still_for_sale ? 'available' : 'ended'),
-      listing_url: vehicle.url,
-      discovery_url: vehicle.url,
-      discovery_source: 'rmsothebys',
-      profile_origin: 'rmsothebys_import',
-      is_public: true,
-      status: 'active',
-      origin_metadata: {
-        source: 'rmsothebys',
-        auction_house: RM_SOTHEBYS_NAME,
-        lot_number: vehicle.lot_number,
-        auction_name: vehicle.auction_name,
-        auction_code: vehicle.auction_code,
-        estimate_text: vehicle.estimate_text,
-        sold_price_text: vehicle.sold_price_text,
-        currency: vehicle.currency,
-        collection: vehicle.collection,
-        rms_lot_id: vehicle.rms_lot_id,
-        rms_auction_id: vehicle.rms_auction_id,
-        bidding_type: vehicle.bidding_type,
-        imported_at: new Date().toISOString(),
-      },
-    })
-    .select('id')
-    .maybeSingle();
-
-  if (vehicleError) {
-    throw new Error(`Failed to create vehicle: ${vehicleError.message}`);
-  }
-
-  const vehicleId = newVehicle.id;
-
-  // Fire-and-forget observation write for new vehicle
-  {
-    const obsFields: Record<string, any> = {};
-    if (vehicle.year) obsFields.year = vehicle.year;
-    if (vehicle.make) obsFields.make = vehicle.make;
-    if (vehicle.model) obsFields.model = vehicle.model;
-    if (vehicle.sold_price) obsFields.sale_price = vehicle.sold_price;
-    if (vehicle.lot_number) obsFields.lot_number = vehicle.lot_number;
-    writeObservation(supabase, {
-      vehicleId,
-      source: { platform: "rmsothebys", url: vehicle.url, trustScore: 0.85 },
-      fields: obsFields,
-      observationKind: vehicle.sold ? "sale_result" : "listing",
-      extractionMethod: "rmsothebys_api",
-    }).catch((e: any) => console.warn(`[RMS] observationWriter error for ${vehicleId}: ${e?.message}`));
-  }
-
-  // Save image
-  if (vehicle.image_url) {
-    await supabase
-      .from('vehicle_images')
-      .insert({
-        vehicle_id: vehicleId,
-        image_url: vehicle.image_url,
-        position: 0,
-        source: 'rmsothebys_import',
-        is_external: true,
-      });
-  }
-
-  // Resolve the real auction (sale) date from the auction code, not extraction time.
-  const knownAuctionDate = getKnownAuctions()
-    .find(a => a.code === vehicle.auction_code)?.date || null;
-  const soldAtIso = vehicle.sold
-    ? (knownAuctionDate ? new Date(`${knownAuctionDate}T12:00:00Z`).toISOString() : null)
-    : null;
-
-  // Create vehicle_events record by its listing key (see _shared/vehicleEventWrite.ts for why not upsert)
-  const episode = await writeVehicleEventByKey(supabase, {
-    vehicle_id: vehicleId,
-    source_platform: 'rmsothebys',
-    event_type: 'auction',
-    source_url: vehicle.url,
-    source_listing_id: listingUrlKey || vehicle.lot_number,
-    event_status: vehicle.sold ? 'sold' : (vehicle.is_still_for_sale ? 'active' : 'ended'),
-    final_price: vehicle.sold_price,
-    sold_at: soldAtIso,
-    metadata: {
-      lot_number: vehicle.lot_number,
-      auction_name: vehicle.auction_name,
-      auction_code: vehicle.auction_code,
-      estimate_text: vehicle.estimate_text,
-      currency: vehicle.currency,
-      collection: vehicle.collection,
-      bidding_type: vehicle.bidding_type,
-    },
-  });
-  if (episode.action === 'error' || episode.action === 'skipped') {
-    console.error(`[RMS] vehicle_event not written (${episode.action}): ${'error' in episode ? episode.error : episode.reason}`);
-  }
-
-  // Create timeline event
-  if (vehicle.sold && vehicle.sold_price) {
-    await supabase.from('timeline_events').insert({
-      vehicle_id: vehicleId,
-      event_type: 'auction_sold',
-      event_date: knownAuctionDate || new Date().toISOString().split('T')[0],
-      title: `Sold at ${vehicle.auction_name} (Lot ${vehicle.lot_number})`,
-      description: `Sold for ${vehicle.sold_price_text || vehicle.sold_price.toLocaleString()} at RM Sotheby's ${vehicle.auction_name}`,
-      source: 'rmsothebys_import',
-      metadata: {
-        lot_number: vehicle.lot_number,
-        auction_code: vehicle.auction_code,
-        sold_price: vehicle.sold_price,
-        currency: vehicle.currency,
-      },
-    });
-  }
-
-  return { vehicleId, isNew: true };
-}
+// The real writers saveVehicle uses; saveVehicle.test.ts passes stand-ins.
+const SAVE_DEPS: SaveDeps = {
+  resolveExisting: resolveExistingVehicleId,
+  writeObservation,
+  writeEvent: writeVehicleEventByKey,
+};
+const saveVehicle = (supabase: any, vehicle: ExtractedVehicle) => saveVehicleWith(supabase, vehicle, SAVE_DEPS);
 
 function okJson(body: unknown, status = 200): Response {
   return new Response(JSON.stringify(body, null, 2), {
@@ -420,7 +216,26 @@ function okJson(body: unknown, status = 200): Response {
   });
 }
 
-Deno.serve(async (req) => {
+// What a run read and what it will (or did not) write, in the response of every action that lists lots:
+//   total_lots           lots read, each once (the old count was double: page 0 and page 1 were the same page)
+//   api_reported_total   the total RM's pager reported; a difference from total_lots means a short read
+//   duplicates_dropped   repeats the paging returned; 0 when the paging is right
+//   vehicle_lots         lots the vehicles-only rule writes
+//   skipped              lots it does not write, with skipped_by_reason (automobilia, watercraft, no_leading_year,
+//                        no_plausible_year, no_make, category_<n>, category_missing) and the first ten as skipped_sample
+function lotReport(collected: CollectedLots<RMSLotItem>, part: LotPartition<ExtractedVehicle>) {
+  return {
+    total_lots: collected.items.length,
+    api_reported_total: collected.reported_total,
+    duplicates_dropped: collected.duplicates_dropped,
+    vehicle_lots: part.writable.length,
+    skipped: part.skipped.length,
+    skipped_by_reason: part.skipped_by_reason,
+    skipped_sample: part.skipped.slice(0, 10),
+  };
+}
+
+if (import.meta.main) Deno.serve(async (req) => {
   // Writes are never anonymous: service key, signed-in user, or nothing (P0.2, 2026-09-27).
   const denied = await requireWriteAuth(req);
   if (denied) return denied;
@@ -431,10 +246,13 @@ Deno.serve(async (req) => {
   try {
     const body = await req.json().catch(() => ({}));
     const { action = 'auctions', auction, url, save_to_db = false, limit, offset = 0 } = body;
+    // Lots written at once by `process`. A first pass over a large auction took 127 s one lot at a time (see concurrency.ts).
+    const concurrency = readConcurrency(body.concurrency, 4);
 
     const supabase = createClient(
       Deno.env.get('SUPABASE_URL')!,
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
+      projectSecretKey()!,
+      { global: { headers: { 'X-Nuke-Writer': 'extract-rmsothebys' } } },
     );
 
     console.log(`[RMS] Action: ${action}, Auction: ${auction || 'N/A'}`);
@@ -460,15 +278,21 @@ Deno.serve(async (req) => {
       }
 
       console.log(`[RMS] Fetching lots for auction: ${auction}`);
-      const items = await fetchAuctionLots(auction);
-      const vehicles = items.map((item) => transformLotItem(item, auction));
+      const collected = await fetchAuctionLots(auction);
+      const vehicles = collected.items.map((item) => transformLotItem(item, auction));
+      const part = partitionLots(vehicles);
 
-      const applied = limit ? vehicles.slice(offset, offset + limit) : vehicles.slice(offset);
+      // A read-only listing shows every lot, each marked with what a process run would do with it.
+      const applied = (limit ? vehicles.slice(offset, offset + limit) : vehicles.slice(offset)).map((v) => {
+        const verdict = classifyLot({ categoryId: v.category_id, title: v.title });
+        return { ...v, will_write: verdict.write, skip_reason: verdict.write ? null : verdict.reason };
+      });
 
       return okJson({
         success: true,
         auction,
         total: vehicles.length,
+        ...lotReport(collected, part),
         returned: applied.length,
         sold_count: vehicles.filter((v) => v.sold).length,
         still_for_sale_count: vehicles.filter((v) => v.is_still_for_sale).length,
@@ -483,10 +307,16 @@ Deno.serve(async (req) => {
       }
 
       console.log(`[RMS] Processing auction: ${auction}`);
-      const items = await fetchAuctionLots(auction);
-      const vehicles = items.map((item) => transformLotItem(item, auction));
+      const collected = await fetchAuctionLots(auction);
+      const vehicles = collected.items.map((item) => transformLotItem(item, auction));
 
-      const applied = limit ? vehicles.slice(offset, offset + limit) : vehicles.slice(offset);
+      // Vehicles only. offset and limit bound the lots written, not the lots read, so limit is a write bound.
+      const part = partitionLots(vehicles);
+      const report = lotReport(collected, part);
+      const applied = limit ? part.writable.slice(offset, offset + limit) : part.writable.slice(offset);
+      if (part.skipped.length > 0) {
+        console.log(`[RMS] ${auction}: skipping ${part.skipped.length} non-vehicle lots ${JSON.stringify(part.skipped_by_reason)}`);
+      }
 
       if (!save_to_db) {
         return okJson({
@@ -494,6 +324,7 @@ Deno.serve(async (req) => {
           auction,
           message: 'Dry run - no data saved. Set save_to_db: true to save.',
           total: vehicles.length,
+          ...report,
           would_process: applied.length,
           sample: applied.slice(0, 5),
         });
@@ -506,9 +337,15 @@ Deno.serve(async (req) => {
         errors: [] as string[],
       };
 
-      for (const vehicle of applied) {
+      await forEachConcurrent(applied, concurrency, async (vehicle) => {
         try {
-          const { vehicleId, isNew } = await saveVehicle(supabase, vehicle);
+          const saved = await saveVehicle(supabase, vehicle);
+          if ('skipped' in saved) {
+            // Not reachable for a lot the partition let through; if it happens the two rules disagree, so say so.
+            results.errors.push(`${vehicle.title}: refused at write (${saved.skipped})`);
+            return;
+          }
+          const { vehicleId, isNew } = saved;
           if (isNew) {
             results.created++;
           } else {
@@ -519,12 +356,13 @@ Deno.serve(async (req) => {
           results.errors.push(`${vehicle.title}: ${err.message}`);
           console.error(`[RMS] Error processing ${vehicle.title}:`, err);
         }
-      }
+      });
 
       return okJson({
         success: true,
         auction,
-        total_lots: vehicles.length,
+        ...report,
+        concurrency,
         processed: applied.length,
         created: results.created,
         updated: results.updated,
@@ -541,24 +379,31 @@ Deno.serve(async (req) => {
 
       console.log(`[RMS] Process with fallback for: ${auction}`);
 
-      // Step 1: Normal API extraction
-      const items = await fetchAuctionLots(auction);
-      const vehicles = items.map((item) => transformLotItem(item, auction));
+      // Step 1: Normal API extraction (vehicles only)
+      const collected = await fetchAuctionLots(auction);
+      const vehicles = collected.items.map((item) => transformLotItem(item, auction));
+      const part = partitionLots(vehicles);
       const apiUrls = new Set(vehicles.map(v => v.url));
 
       const results = {
         api_lots: vehicles.length,
         html_extra: 0,
+        // HTML-only lots carry no RM category, so the vehicles-only rule cannot clear them: they are not written.
+        html_skipped: 0,
         created: 0,
         updated: 0,
         errors: [] as string[],
       };
 
       // Save API results
-      for (const vehicle of vehicles) {
+      for (const vehicle of part.writable) {
         try {
-          const { vehicleId, isNew } = await saveVehicle(supabase, vehicle);
-          if (isNew) results.created++;
+          const saved = await saveVehicle(supabase, vehicle);
+          if ('skipped' in saved) {
+            results.errors.push(`${vehicle.title}: refused at write (${saved.skipped})`);
+            continue;
+          }
+          if (saved.isNew) results.created++;
           else results.updated++;
         } catch (err: any) {
           results.errors.push(`${vehicle.title}: ${err.message}`);
@@ -646,14 +491,20 @@ Deno.serve(async (req) => {
                 rms_auction_id: '',
                 bidding_type: '',
                 collection: null,
+                category_id: null,
+                auctioned: null,
               };
 
-              const { isNew } = await saveVehicle(supabase, fallbackVehicle);
-              results.html_extra++;
-              if (isNew) results.created++;
-              else results.updated++;
-
-              console.log(`[RMS] HTML fallback: ${title}`);
+              const saved = await saveVehicle(supabase, fallbackVehicle);
+              if ('skipped' in saved) {
+                results.html_skipped++;
+                console.log(`[RMS] HTML fallback skipped (${saved.skipped}): ${title}`);
+              } else {
+                results.html_extra++;
+                if (saved.isNew) results.created++;
+                else results.updated++;
+                console.log(`[RMS] HTML fallback: ${title}`);
+              }
             } catch (err: any) {
               results.errors.push(`HTML fallback ${lotUrl}: ${err.message}`);
             }
@@ -669,9 +520,11 @@ Deno.serve(async (req) => {
       return okJson({
         success: true,
         auction,
+        ...lotReport(collected, part),
         api_lots: results.api_lots,
         html_extra_lots: results.html_extra,
-        total_processed: results.api_lots + results.html_extra,
+        html_skipped_lots: results.html_skipped,
+        total_processed: part.writable.length + results.html_extra,
         created: results.created,
         updated: results.updated,
         errors: results.errors.length,
@@ -687,7 +540,7 @@ Deno.serve(async (req) => {
       for (const auc of auctions.slice(0, 5)) {
         // Limit to recent auctions
         try {
-          const items = await fetchAuctionLots(auc.code);
+          const { items } = await fetchAuctionLots(auc.code);
           results.push({
             code: auc.code,
             name: auc.name,
@@ -724,7 +577,7 @@ Deno.serve(async (req) => {
       }
 
       const auctionCode = auctionMatch[1].toUpperCase();
-      const items = await fetchAuctionLots(auctionCode);
+      const { items } = await fetchAuctionLots(auctionCode);
 
       // Find the specific lot
       const item = items.find((i) => rmLotLinkMatchesUrl(i.link, url));
@@ -735,13 +588,32 @@ Deno.serve(async (req) => {
 
       const vehicle = transformLotItem(item, auctionCode);
 
+      // A lot that is not a vehicle is reported the way the callers already read it: ingest takes skipped:true as
+      // "not a vehicle listing", and process-import-queue files an error that says "No vehicle data found" as skipped.
+      const verdict = classifyLot({ categoryId: vehicle.category_id, title: vehicle.title });
+      if (!verdict.write) {
+        return okJson({
+          success: false,
+          skipped: true,
+          skip_reason: verdict.reason,
+          error: `No vehicle data found: RM Sotheby's lists this lot as ${verdict.reason} (categoryId ${vehicle.category_id ?? 'missing'}), not a vehicle`,
+          vehicle,
+        });
+      }
+
       if (save_to_db) {
-        const { vehicleId, isNew } = await saveVehicle(supabase, vehicle);
+        const saved = await saveVehicle(supabase, vehicle);
+        if ('skipped' in saved && saved.skipped === 'different_car') {
+          return okJson({ success: false, refused: 'different_car', vehicle_id: saved.vehicleId, detail: saved.detail, vehicle }, 409);
+        }
+        if ('skipped' in saved) {
+          return okJson({ success: false, skipped: true, skip_reason: saved.skipped, error: `No vehicle data found: ${saved.skipped}`, vehicle });
+        }
         return okJson({
           success: true,
           vehicle,
-          vehicle_id: vehicleId,
-          is_new: isNew,
+          vehicle_id: saved.vehicleId,
+          is_new: saved.isNew,
         });
       }
 

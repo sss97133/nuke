@@ -67,6 +67,35 @@ export interface CraigslistAttributes {
   raw: Record<string, string>;
 }
 
+/**
+ * Where the post says the vehicle is: JSON-LD offers.availableAtOrFrom, else the map element's point. The street line
+ * is never read. Craigslist's map point is approximate (it moves the pin), so it is a city-grain place, not an address.
+ */
+export interface CraigslistPlace {
+  locality: string | null;
+  /** Two-letter US state, DC, PR or Canadian province. */
+  region: string | null;
+  postal_code: string | null;
+  /** Two-letter country. */
+  country: string | null;
+  latitude: number | null;
+  longitude: number | null;
+}
+
+/** The seller class the page states: its breadcrumb links back to the search it belongs to, with purveyor=owner or dealer. */
+export interface CraigslistSellerClass {
+  value: "owner" | "dealer";
+  field: "purveyor";
+  /** The search link the page carries, a short quote. */
+  text: string;
+}
+
+export function parseSellerClass(html: string): CraigslistSellerClass | null {
+  const m = /search\/[^"'<>\s]*?[?&]purveyor=(owner|dealer)\b[^"'<>\s]*/i.exec(html);
+  if (!m) return null;
+  return { value: m[1].toLowerCase() as "owner" | "dealer", field: "purveyor", text: m[0].replace(/&amp;/g, "&").slice(0, 120) };
+}
+
 export interface CraigslistCapture {
   /** Craigslist's own post id (digits), read from the page. Not the share token. */
   post_id: string | null;
@@ -74,9 +103,11 @@ export interface CraigslistCapture {
   posted_at: string | null;
   updated_at: string | null;
   attributes: CraigslistAttributes;
+  place?: CraigslistPlace;
   /** Archive receipt, carried only by the fetching extractor. Not the processing clock. */
   source_capture?: { snapshot_id: string; observed_at: string };
   asking_price?: number | null;
+  seller_class?: CraigslistSellerClass;
 }
 
 // ─── text helpers ────────────────────────────────────────────────────────
@@ -327,8 +358,71 @@ export function parseAttributes(html: string): CraigslistAttributes {
   };
 }
 
+// ─── the post's place ────────────────────────────────────────────────────
+
+const REGIONS = new Set([
+  "AL", "AK", "AZ", "AR", "CA", "CO", "CT", "DE", "DC", "FL", "GA", "HI", "ID", "IL", "IN", "IA", "KS", "KY", "LA", "ME",
+  "MD", "MA", "MI", "MN", "MS", "MO", "MT", "NE", "NV", "NH", "NJ", "NM", "NY", "NC", "ND", "OH", "OK", "OR", "PA", "RI",
+  "SC", "SD", "TN", "TX", "UT", "VT", "VA", "WA", "WV", "WI", "WY", "PR",
+  "AB", "BC", "MB", "NB", "NL", "NS", "NT", "NU", "ON", "PE", "QC", "SK", "YT",
+]);
+
+function placeText(v: unknown, re: RegExp): string | null {
+  return typeof v === "string" && re.test(v.trim()) ? v.trim() : null;
+}
+
+function placeCoord(v: unknown, max: number): number | null {
+  const n = typeof v === "number" ? v : typeof v === "string" && /^-?\d{1,3}(\.\d{1,8})?$/.test(v.trim()) ? parseFloat(v) : NaN;
+  return Number.isFinite(n) && Math.abs(n) <= max ? n : null;
+}
+
+/** Validate a place field by field, wherever it came from. Null when nothing usable is left. */
+export function cleanPlace(src: Record<string, unknown> | null | undefined): CraigslistPlace | null {
+  if (!src) return null;
+  const region = placeText(src.region, /^[A-Z]{2}$/);
+  const postal = placeText(src.postal_code, /^(\d{5}(-\d{4})?|[A-Z]\d[A-Z] ?\d[A-Z]\d)$/i);
+  let latitude = placeCoord(src.latitude, 90);
+  let longitude = placeCoord(src.longitude, 180);
+  // 0,0 is a placeholder, not a place; a point needs both halves.
+  if (latitude === null || longitude === null || (latitude === 0 && longitude === 0)) latitude = longitude = null;
+  const place: CraigslistPlace = {
+    locality: placeText(src.locality, /^[\p{L}\p{N} .,'&()\/-]{1,80}$/u),
+    region: region && REGIONS.has(region) ? region : null,
+    postal_code: postal && !/^0{5}/.test(postal) ? postal.toUpperCase() : null,
+    country: placeText(src.country, /^[A-Z]{2}$/),
+    latitude,
+    longitude,
+  };
+  return place.locality || place.region || place.postal_code || place.latitude !== null ? place : null;
+}
+
+/** JSON-LD offers.availableAtOrFrom (address and geo), else the map element. The street line is never read. */
+export function parsePlace(html: string): CraigslistPlace | null {
+  let at: Record<string, any> | null = null;
+  const ld = html.match(/<script type="application\/ld\+json" id="ld_posting_data"\s*>([\s\S]*?)<\/script>/);
+  if (ld) {
+    try {
+      const v = JSON.parse(ld[1])?.offers?.availableAtOrFrom;
+      at = v && typeof v === "object" ? v : null;
+    } catch { at = null; }
+  }
+  const address = at?.address && typeof at.address === "object" ? at.address : {};
+  const map = html.match(/<div\b[^>]*\bid="map"[^>]*>/)?.[0] ?? "";
+  const mapAttr = (name: string) => map.match(new RegExp(`\\b${name}="([^"]*)"`))?.[1];
+  return cleanPlace({
+    locality: address.addressLocality,
+    region: address.addressRegion,
+    postal_code: address.postalCode,
+    country: address.addressCountry,
+    latitude: at?.geo?.latitude ?? mapAttr("data-latitude"),
+    longitude: at?.geo?.longitude ?? mapAttr("data-longitude"),
+  });
+}
+
 export function parseCapture(html: string, url?: string | null): CraigslistCapture {
-  return { ...parsePostInfo(html, url), attributes: parseAttributes(html) };
+  const place = parsePlace(html);
+  const sellerClass = parseSellerClass(html);
+  return { ...parsePostInfo(html, url), attributes: parseAttributes(html), ...(place ? { place } : {}), ...(sellerClass ? { seller_class: sellerClass } : {}) };
 }
 
 /** A page that is not a post (blocked, expired, search results) parses to nothing; nothing is then recorded. */
@@ -390,6 +484,8 @@ export function pickCapture(obj: unknown): CraigslistCapture | null {
   }
   const price = o.asking_price ?? o.price;
   if (typeof price === "number" && Number.isFinite(price) && price >= 0) capture.asking_price = price;
+  const place = o.place && typeof o.place === "object" ? cleanPlace(o.place as Record<string, unknown>) : null;
+  if (place) capture.place = place;
   return captureHasContent(capture) ? capture : null;
 }
 
@@ -401,5 +497,6 @@ export function captureFields(obj: unknown): Record<string, unknown> {
   const c = pickCapture(obj);
   return c ? { post_id: c.post_id, posted_at: c.posted_at, updated_at: c.updated_at, attributes: c.attributes,
     ...(c.source_capture ? { source_capture: c.source_capture } : {}),
-    ...(c.asking_price !== undefined ? { asking_price: c.asking_price } : {}) } : {};
+    ...(c.asking_price !== undefined ? { asking_price: c.asking_price } : {}),
+    ...(c.place ? { place: c.place } : {}) } : {};
 }

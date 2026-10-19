@@ -1,10 +1,12 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { Text } from '../../kit';
 import { PrefetchLink as Link } from '../../components/PrefetchLink';
 import { listingDescriptionsFromSpecs } from '../../components/vehicle/listingDescriptions';
 import { EPISODE_READ_LIMIT, useAuctionEpisode, type EpisodeInteraction } from '../../hooks/useAuctionComments';
 import { useLotMovement } from './useLotMovement';
 import { selectRowFacts, vehicleIdentity, type LotInspection, type MarketRowDetails } from './useMarketRowDetails';
-import { bidBookReading, depthAt, useBidBook } from '../stacks/orderBookReader';
+import { bidBookReading, useBidBook } from '../stacks/orderBookReader';
+import { useFinishAnalogs } from './useFinishEstimates';
 import './AuctionEvidence.css';
 
 function stamp(value: string | null | undefined) {
@@ -13,6 +15,16 @@ function stamp(value: string | null | undefined) {
     year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit',
     timeZone: 'America/Los_Angeles', timeZoneName: 'short',
   }) : 'Time unknown';
+}
+function short(value: string | null | undefined) {
+  const at = Date.parse(value ?? '');
+  return Number.isFinite(at) ? new Date(at).toLocaleString('en-US', {
+    month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit', timeZone: 'America/Los_Angeles',
+  }) : 'time unknown';
+}
+function ago(at: number, now = Date.now()) {
+  const m = Math.max(0, Math.floor((now - at) / 60_000));
+  return m < 1 ? 'just now' : m < 60 ? `${m} min ago` : m < 1440 ? `${Math.floor(m / 60)} h ago` : `${Math.floor(m / 1440)} d ago`;
 }
 function safeUrl(value: string | null | undefined) {
   try { const url = new URL(value ?? ''); return ['https:', 'http:'].includes(url.protocol) ? url.href : null; } catch { return null; }
@@ -28,7 +40,9 @@ function kind(row: EpisodeInteraction) {
   return row.comment_type === 'bid' ? 'Bid' : row.is_seller || row.comment_type === 'seller_response'
     ? 'Seller statement' : row.comment_type === 'question' ? 'Question' : 'Comment';
 }
-function amount(n: number) { return n.toLocaleString('en-US', { maximumFractionDigits: 2 }); }
+function amount(n: number) { return '$' + n.toLocaleString('en-US', { maximumFractionDigits: 2 }); }
+// Axis ends: short enough to fit the chart's margin on a phone ($467K, $1.2M).
+function axis(n: number) { return n >= 1_000_000 ? `$${(n / 1_000_000).toFixed(1)}M` : n >= 10_000 ? `$${Math.round(n / 1_000)}K` : amount(n); }
 function closeStamp(value: string) {
   const at = Date.parse(value);
   return Number.isFinite(at) ? new Date(at).toLocaleString('en-US', {
@@ -37,76 +51,30 @@ function closeStamp(value: string) {
   }) : 'Time unknown';
 }
 
-/** The row and its inspection share Stack A's exact-episode query and fold. */
-export function AuctionCompetition({ vehicleId, sourceUrl, row = false, enabled = true, fallback }: {
+/** A row's bid and its pace: how long since the last bid, and how much it raised. The bid number is the board's
+ *  (the fallback), so the row agrees with the board's total; the pace comes from Stack A's exact-episode fold. */
+export function AuctionCompetition({ vehicleId, sourceUrl, row = true, enabled = true, fallback, bid }: {
   vehicleId: string; sourceUrl?: string | null; row?: boolean; enabled?: boolean; fallback?: ReactNode;
+  /** The board's bid. The pace is said only when the bid rows have caught up to it; rows trail by hours. */
+  bid?: number | null;
 }) {
   const query = useBidBook(vehicleId, sourceUrl, enabled);
   const reading = useMemo(() => query.data ? bidBookReading(query.data) : null, [query.data]);
-  const [replay, setReplay] = useState<number | null>(null);
-  const pct = (n: number) => `${n.toFixed(1)}%`;
-  if (!reading || !query.data || !reading.states.length) {
-    const message = query.isFetching ? 'Reading bidding…' : query.isError ? 'Bidding read unavailable'
-      : 'Bid depth not established';
-    return row ? <>{fallback}<span className="market-lot-last-bid">{message}</span></>
-      : <p role="status">{message}{query.isError && <>. <button type="button" onClick={() => void query.refetch()}>Retry</button></>}</p>;
-  }
-  const r = reading;
-  const last = r.states[r.states.length - 1];
-  const coverage = `${r.held}/${r.reported ?? '?'} reported bids held`;
-  if (row) return <>
-    <span><span className="market-lot-label">Retained high</span><strong>{amount(r.high!)}</strong></span>
-    <span className="market-lot-depth" title="Identified bidders whose highest retained bid is at least 90% of the retained high; includes the leader.">
-      {r.near! > 0 ? <><strong>{r.exact ? '' : '≥'}{r.near}</strong> within 10% of high</> : 'Near-high identities unresolved'}
-    </span>
-    <span className="market-lot-last-bid">{r.exact ? '' : '≥'}{r.bidders} bidders · {coverage}</span>
-    {r.lastRaise != null && <span className="market-lot-last-bid">Last raise +{pct(r.lastRaise)}</span>}
-    <time className="market-lot-last-bid" dateTime={new Date(last.bid.at).toISOString()}
-      title={stamp(new Date(last.bid.at).toISOString())}>Bid {Math.max(0, Math.floor((Date.now() - last.bid.at) / 3_600_000)) >= 1
-        ? `${Math.floor((Date.now() - last.bid.at) / 3_600_000)}h ago` : `${Math.max(0, Math.floor((Date.now() - last.bid.at) / 60_000))}m ago`}</time>
-  </>;
-  const state = replay == null ? last : r.states[Math.min(replay, r.states.length - 1)];
-  const book = state.book.filter(e => e.identityId);
-  const depth = depthAt(book, state.price * .9);
-  return <div className="market-competition">
-    <h3>How much bidding sits near the high?</h3>
-    <p className="market-competition-answer">{r.near! > 0
-      ? <><strong>{r.exact ? '' : 'At least '}{r.near} of {r.bidders} identified bidders</strong> have bid within 10% of the retained high.</>
-      : 'The bidders near the retained high are not identified; competition depth is unresolved.'}</p>
-    <p className="market-inspection-caption">Retained high {amount(r.high!)} · source bid units, currency unverified · includes the leading bidder.</p>
-    <div className="market-competition-measures">
-      {r.gap != null && <div><span>Leader’s margin</span><strong>{pct(r.gap)}</strong><small>below the high to the next bidder</small></div>}
-      {r.lastRaise != null && <div><span>Last raise</span><strong>+{pct(r.lastRaise)}</strong><small>over the preceding bid</small></div>}
-      <div><span>Bid coverage</span><strong>{r.held} / {r.reported ?? '?'}</strong><small>held / source-reported bids</small></div>
-    </div>
-    <p className="market-inspection-caption">Latest retained bid {stamp(new Date(last.bid.at).toISOString())}.
-      {' '}{r.exact ? 'All held bids are attributed; the count matches the reported total.' : 'Partial evidence: bidder counts are lower bounds.'}
-      {r.rejected > 0 && <> {r.rejected} conflicting, duplicate or undated bid rows withheld.</>}
-      {' '}Lot record updated {stamp(query.data.lot.updated_at)}.</p>
-    <p>{r.near === 1 ? 'Only one identified bidder has demonstrated an amount at this level in the retained bids.'
-      : `${r.near} identified bidders have demonstrated amounts near the high in the retained bids.`}
-      {' '}This measures expressed competition. It does not establish how much more anyone will pay.</p>
-    <details className="market-inspection-more">
-      <summary>Inspect contributors & how depth changed</summary>
-      <label className="market-competition-replay">Retained bid {state.index + 1} of {r.states.length}
-        <input type="range" min="0" max={r.states.length - 1} value={state.index}
-          aria-label="Replay retained bidding" onChange={e => setReplay(Number(e.target.value))} />
-      </label>
-      <p>{stamp(new Date(state.bid.at).toISOString())} · high {amount(state.price)} · {depth} identified {depth === 1 ? 'bidder' : 'bidders'} within 10%.</p>
-      <table><thead><tr><th>Bidder</th><th>Highest demonstrated bid</th><th>Below high</th></tr></thead>
-        <tbody>{book.slice(0, 5).map(e => <tr key={e.key}><td>{e.handle}</td><td>{amount(e.max)}</td><td>{pct(100 * (state.price - e.max) / state.price)}</td></tr>)}</tbody>
-      </table>
-      <p className="market-inspection-caption">Top five identified bidders at the selected event. Amounts retain source units; currency unverified.
-        Depth counts each canonical identity once; matching handle text does not merge bidders.</p>
-      <Link to={`/stacks/order-book/${vehicleId}?lot=${query.data.lot.id}`}>Explore this lot in Stack A →</Link>
-    </details>
-  </div>;
+  const latest = reading?.states.length ? reading.states[reading.states.length - 1] : null;
+  const inStep = bid == null || (reading?.high != null && Math.abs(reading.high - bid) < 1);
+  const last = inStep ? latest : null;
+  const pace = last ? <Text role="caption" className="market-lot-last-bid">
+    <time dateTime={new Date(last.bid.at).toISOString()} title={stamp(new Date(last.bid.at).toISOString())}>bid {ago(last.bid.at)}</time>
+    {reading?.lastRaise != null && <> · +{reading.lastRaise.toFixed(1)}%</>}
+  </Text> : null;
+  return row ? <>{fallback}{pace}</> : <>{pace}</>;
 }
 
 // Draw only the reader's posted bids at their actual time offsets. No peer ranking, interpolation,
 // inferred opening time, rate, price forecast or green/red performance classification.
+type BidPoint = Pick<EpisodeInteraction, 'id' | 'comment_type' | 'posted_at'> & { bid_amount: number | string | null };
 function BidPath({ rows, selected, onSelect }: {
-  rows: EpisodeInteraction[]; selected: string | null; onSelect: (id: string) => void;
+  rows: BidPoint[]; selected: string | null; onSelect: (id: string) => void;
 }) {
   const points = rows.filter(r => r.comment_type === 'bid' && r.bid_amount != null
     && Number.isFinite(Number(r.bid_amount)) && Number(r.bid_amount) >= 0 && Number.isFinite(Date.parse(r.posted_at ?? '')))
@@ -115,18 +83,18 @@ function BidPath({ rows, selected, onSelect }: {
   const lo = Math.min(...points.map(r => Number(r.bid_amount)));
   const hi = Math.max(...points.map(r => Number(r.bid_amount)));
   const from = Date.parse(points[0].posted_at!), to = Date.parse(points[points.length - 1].posted_at!);
-  const x = (r: EpisodeInteraction) => 76 + (to === from ? .5 : (Date.parse(r.posted_at!) - from) / (to - from)) * 614;
-  const y = (r: EpisodeInteraction) => 176 - (hi === lo ? .5 : (Number(r.bid_amount) - lo) / (hi - lo)) * 138;
+  const x = (r: BidPoint) => 76 + (to === from ? .5 : (Date.parse(r.posted_at!) - from) / (to - from)) * 614;
+  const y = (r: BidPoint) => 176 - (hi === lo ? .5 : (Number(r.bid_amount) - lo) / (hi - lo)) * 138;
   return <>
-    <div className="auction-evidence-chart-heading"><h4>Recorded bid path</h4><span>{points.length} dated bids in this read</span></div>
-    <svg className="auction-evidence-chart" viewBox="0 0 720 190" role="group" aria-label="Recorded bid amounts over posted time, currency unverified">
+    <div className="auction-evidence-chart-heading"><h4>Bids</h4><span>{points.length} · Pacific time</span></div>
+    <svg className="auction-evidence-chart" viewBox="0 0 720 190" role="group" aria-label="Recorded bid amounts over posted time, in US dollars">
       <line x1="76" x2="690" y1="176" y2="176" className="auction-evidence-grid" />
       <line x1="76" x2="690" y1="38" y2="38" className="auction-evidence-grid" />
-      <text x="66" y="42" textAnchor="end">{amount(hi)}</text>
-      {hi !== lo && <text x="66" y="180" textAnchor="end">{amount(lo)}</text>}
+      <text x="66" y="42" textAnchor="end">{axis(hi)}</text>
+      {hi !== lo && <text x="66" y="180" textAnchor="end">{axis(lo)}</text>}
       {points.map((r, i) => i > 0 && <path key={`line-${r.id}`} d={`M ${x(points[i - 1])} ${y(points[i - 1])} H ${x(r)} V ${y(r)}`} className="auction-evidence-path" />)}
       {points.map((r, i) => <g key={r.id} role="button" tabIndex={selected === r.id || (selected == null && i === points.length - 1) ? 0 : -1}
-        aria-label={`Bid ${amount(Number(r.bid_amount))}, ${stamp(r.posted_at)}. Inspect source event`}
+        aria-label={`Bid ${amount(Number(r.bid_amount))}, ${short(r.posted_at)}. Inspect source event`}
         aria-pressed={selected === r.id} onClick={() => onSelect(r.id)}
         onKeyDown={e => {
           if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onSelect(r.id); }
@@ -139,34 +107,56 @@ function BidPath({ rows, selected, onSelect }: {
         }}>
         <circle cx={x(r)} cy={y(r)} r="12" fill="transparent" />
         <circle cx={x(r)} cy={y(r)} r={selected === r.id ? 5 : 3} className="auction-evidence-point" />
-        <title>{amount(Number(r.bid_amount))} · {stamp(r.posted_at)}</title>
+        <title>{amount(Number(r.bid_amount))} · {short(r.posted_at)}</title>
       </g>)}
     </svg>
-    <div className="auction-evidence-chart-dates"><time dateTime={points[0].posted_at!}>{stamp(points[0].posted_at)}</time><time dateTime={points[points.length - 1].posted_at!}>{stamp(points[points.length - 1].posted_at)}</time></div>
-    <p className="auction-evidence-note">Venue time · America/Los_Angeles. Recorded bid numbers; currency unverified. Dashed steps connect retained bids, with missing events possible. This is the observed path, not a forecast or peer comparison.</p>
-    <details className="auction-evidence-bid-table"><summary>Read bid events as a table</summary>
-      <table><thead><tr><th scope="col">Posted time · PT</th><th scope="col">Recorded number</th></tr></thead>
-        <tbody>{points.map(r => <tr key={r.id}><td><time dateTime={r.posted_at!}>{stamp(r.posted_at)}</time></td>
-          <td><button onClick={() => onSelect(r.id)} aria-pressed={selected === r.id}
-            aria-label={`Inspect recorded bid ${amount(Number(r.bid_amount))} at ${stamp(r.posted_at)}`}>{amount(Number(r.bid_amount))} →</button></td></tr>)}</tbody>
-      </table>
-    </details>
+    <div className="auction-evidence-chart-dates"><time dateTime={points[0].posted_at!}>{short(points[0].posted_at)}</time><time dateTime={points[points.length - 1].posted_at!}>{short(points[points.length - 1].posted_at)}</time></div>
   </>;
 }
 
-export default function AuctionEvidence({ vehicleId, onClose, compact = false, inspection = 'auction', summary, onInspectionChange, sourceUrl }: {
+function money(n: number | null) {
+  if (n == null) return '—';
+  return n >= 1_000_000 ? `$${(n / 1_000_000).toFixed(1)}M` : `$${Math.round(n).toLocaleString('en-US')}`;
+}
+function day(value: string | null) {
+  const t = Date.parse(value ?? '');
+  return Number.isFinite(t) ? new Date(t).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', timeZone: 'UTC' }) : null;
+}
+// Where it should finish, said once, at the top of the drawer: the estimate, its 80% range, how often that range has
+// held for lots like this, and the past lots it rests on with their bid at this point and their finish.
+function FinishBlock({ vehicleId }: { vehicleId: string }) {
+  const q = useFinishAnalogs(vehicleId);
+  const e = q.data?.board.byId.get(vehicleId);
+  if (!e) return null;
+  const analogs = q.data?.analogs ?? [];
+  return <section className="market-finish" aria-label="Where it should finish">
+    <Text role="label">Likely finish</Text>
+    <div className="market-finish__value"><Text role="measure">{money(e.estimate)}</Text>
+      <Text role="body">80% range {money(e.low)}–{money(e.high)}</Text></div>
+    {e.sentence && <Text role="body" as="p">{e.sentence}</Text>}
+    {analogs.length > 0 && <ol className="market-finish__analogs" aria-label="Past lots it rests on">{analogs.map((a, i) =>
+      <li key={`${a.url ?? a.title}-${i}`}>
+        {a.url ? <a href={a.url} target="_blank" rel="noopener noreferrer">{a.title}</a> : <span>{a.title}</span>}
+        <Text role="caption">{[day(a.closed), a.bid != null ? `bid ${money(a.bid)} at this point` : null,
+          a.final != null ? `${a.outcome === 'reserve_not_met' ? 'high bid' : 'finished'} ${money(a.final)}` : null].filter(Boolean).join(' · ')}</Text>
+      </li>)}</ol>}
+    <Text role="caption" as="div">{[e.compsThrough ? `Comparable sales through ${day(e.compsThrough)}` : null,
+      `estimated ${ago(e.estimatedAt)}${e.bidAtEstimate != null ? ` at a ${money(e.bidAtEstimate)} bid` : ''}`].filter(Boolean).join(' · ')}</Text>
+  </section>;
+}
+
+export default function AuctionEvidence({ vehicleId, onClose, compact = false, summary, sourceUrl }: {
   vehicleId: string; onClose: () => void; compact?: boolean; inspection?: LotInspection; summary?: MarketRowDetails;
   onInspectionChange?: (view: LotInspection) => void; sourceUrl?: string | null;
 }) {
   const query = useAuctionEpisode(vehicleId, sourceUrl);
+  const book = useBidBook(vehicleId, sourceUrl ?? query.data?.sourceUrl, compact);
   const ids = useMemo(() => query.data ? [vehicleId] : [], [query.data, vehicleId]);
   const activity = useLotMovement(ids);
   const receipt = activity.coverage?.lots.find(l => l.vehicle_id === vehicleId
     && l.source_url?.replace(/\/$/, '') === query.data?.sourceUrl.replace(/\/$/, ''));
   const [selected, setSelected] = useState<string | null>(null);
   const [allDiscussion, setAllDiscussion] = useState(false);
-  const [view, setView] = useState<LotInspection>(inspection);
-  useEffect(() => setView(inspection), [inspection]);
   const ref = useRef<HTMLElement>(null);
   useEffect(() => {
     setSelected(null); setAllDiscussion(false);
@@ -188,79 +178,59 @@ export default function AuctionEvidence({ vehicleId, onClose, compact = false, i
   const specs = evidence?.specs.filter(s => s.field !== 'description' && (s.value != null || s.reported_value != null)) ?? [];
   const name = evidence ? vehicleIdentity(evidence.vehicle) : 'Auction';
   if (compact) {
-    const facts = selectRowFacts(specs, name);
-    const bids = rows.filter(r => r.comment_type === 'bid' && r.bid_amount != null && Number.isFinite(Number(r.bid_amount))
-      && Number(r.bid_amount) >= 0 && Number.isFinite(Date.parse(r.posted_at ?? '')))
-      .sort((a, b) => Date.parse(b.posted_at!) - Date.parse(a.posted_at!) || a.id.localeCompare(b.id));
-    const recent = bids.slice(0, 3);
-    const change = bids.length > 1 ? Number(bids[0].bid_amount) - Number(bids[1].bid_amount) : null;
+    // One panel, each datum once. The row above already says the name, the bid, its pace and the row facts; this
+    // says what it cannot: how the bidding went, what buyers are asking and the seller is saying, and the rest of
+    // the car. The venue link sits where a reader looks for it.
+    const rowFacts = new Set(selectRowFacts(specs, name).map(f => f.field));
+    const more = ([['mileage', 'Miles'], ['color', 'Exterior'], ['interior_color', 'Interior'], ['vin', 'VIN']] as const)
+      .map(([field, label]) => ({ field, label, spec: specs.find(sp => sp.field === field) }))
+      .filter(({ field, spec }) => !rowFacts.has(field) && spec && (spec.reported_value ?? spec.value) != null)
+      .map(({ field, label, spec }) => {
+        const raw = spec!.reported_value ?? spec!.value;
+        const value = field === 'mileage' && Number.isFinite(Number(raw)) ? Number(raw).toLocaleString('en-US') : String(raw);
+        return { field, label, value };
+      });
+    // The chart draws every bid the lot's bid book holds (the row's Stack A read, shared through the query cache); the
+    // episode read keeps only the newest 100 interactions, so on a busy lot it would drop the early bids.
+    const pathRows: BidPoint[] = book.data?.bids?.length ? book.data.bids : rows;
+    const bids = pathRows.filter(r => r.comment_type === 'bid' && r.bid_amount != null && Number.isFinite(Number(r.bid_amount))
+      && Number(r.bid_amount) >= 0 && Number.isFinite(Date.parse(r.posted_at ?? '')));
+    const latestBid = bids.reduce<BidPoint | null>((best, r) => !best || Date.parse(r.posted_at!) > Date.parse(best.posted_at!) ? r : best, null);
     const seller = rows.find(r => r.is_seller || r.comment_type === 'seller_response');
     const question = rows.find(r => r.comment_type === 'question');
     return <section className="market-lot-inspection" id={`lot-inspection-${vehicleId}`} ref={ref}
       aria-label={`Inspect ${name}`} onKeyDown={e => { if (e.key === 'Escape') { e.stopPropagation(); onClose(); } }}>
       <header className="market-inspection-header">
-        <nav aria-label="Inspect this lot">{(['auction', 'vehicle', 'sources'] as const).map(v =>
-          <button type="button" key={v} aria-pressed={view === v} onClick={() => { setView(v); onInspectionChange?.(v); }}>{v === 'auction' ? 'Auction' : v === 'vehicle' ? 'Vehicle' : 'Sources'}</button>)}</nav>
+        <span className="market-inspection-counts">
+          {summary?.bidCount != null && <span><strong>{summary.bidCount.toLocaleString('en-US')}</strong> bids</span>}
+          {summary?.watchers != null && <span><strong>{summary.watchers.toLocaleString('en-US')}</strong> watching</span>}
+        </span>
+        <nav aria-label="This lot elsewhere">
+          {evidence && <a href={evidence.sourceUrl} target="_blank" rel="noopener noreferrer">Bring a Trailer ↗</a>}
+          <Link to={`/vehicle/${vehicleId}`}>Vehicle record →</Link>
+          <Link to={`/stacks/order-book/${vehicleId}`}>Stack A →</Link>
+        </nav>
         <button type="button" onClick={onClose} aria-label="Close lot inspection">Close ×</button>
       </header>
       {query.isPending && <p role="status">Reading this auction…</p>}
       {query.isError && <p role="status">This auction could not be read. <button type="button" onClick={() => void query.refetch()}>Retry</button></p>}
       {!query.isPending && !query.isError && !evidence && <p role="status">This listing has changed or is no longer publicly available.</p>}
-      {evidence && view === 'auction' && <>
-        <AuctionCompetition vehicleId={vehicleId} sourceUrl={sourceUrl ?? evidence.sourceUrl} />
-        <details className="market-inspection-more"><summary>Recorded price, counts & recent events</summary><div className="market-inspection-reading">
-          {recent.length ? <p><strong>Latest recorded bid {amount(Number(recent[0].bid_amount))}</strong>
-            {change != null && <> · {change >= 0 ? '+' : ''}{amount(change)} from the previous retained bid</>}
-            <span className="market-inspection-caption">Posted <time dateTime={recent[0].posted_at!}>{stamp(recent[0].posted_at)}</time> · currency unverified</span></p>
-            : <p>No dated bid records are available for this listing.</p>}
-          {(summary?.bidCount != null || summary?.watchers != null) && <p className="market-inspection-counts">
-            {summary.bidCount != null && <span><strong>{summary.bidCount.toLocaleString('en-US')}</strong> bids recorded</span>}
-            {summary.watchers != null && <span><strong>{summary.watchers.toLocaleString('en-US')}</strong> watching</span>}
-            <span className="market-inspection-caption">Listing counts; latest record write {stamp(summary.recordedAt)}. Source freshness is separate.</span>
-          </p>}
-        </div>
-        {recent.length > 1 && <div className="market-inspection-bids" aria-label="Recent retained bids">
-          {recent.slice().reverse().map(r => <div key={r.id}><strong>{amount(Number(r.bid_amount))}</strong>
-            <time dateTime={r.posted_at!}>{new Date(r.posted_at!).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', second: '2-digit' })}</time></div>)}
-        </div>}</details>
-        <p className="market-inspection-caption">{receipt?.source_read_at && receipt.source_read_basis !== 'unknown'
-          ? <>Source {receipt.source_read_basis === 'cached_snapshot' ? 'snapshot' : 'read'}: <time dateTime={receipt.source_read_at}>{stamp(receipt.source_read_at)}</time>.</>
-          : 'Source read time unavailable.'} {evidence.truncated ? 'Earlier records are outside this read.' : 'Capture completeness is unknown.'}</p>
-        {(question || seller) && <details className="market-inspection-more"><summary>Latest question & seller update</summary>
+      {evidence && <>
+        <FinishBlock vehicleId={vehicleId} />
+        <BidPath rows={pathRows} selected={selected ?? latestBid?.id ?? null} onSelect={setSelected} />
+        {!book.data?.bids?.length && evidence.truncated && <p className="auction-evidence-note">Earlier interactions omitted by the limit.</p>}
+        {(question || seller) && <div className="market-inspection-talk">
           {[question, seller].filter((r): r is EpisodeInteraction => !!r).map(r => <div key={r.id}>
-            <strong>{kind(r)}</strong><p>{r.comment_text?.trim() || 'Media statement; text not recorded.'}</p>
-            <time dateTime={r.posted_at || undefined}>{stamp(r.posted_at)}</time></div>)}
-          <p className="market-inspection-caption">Separate source statements; a reply relationship is not established.</p>
-        </details>}
-        {bids.length > 0 && <details className="market-inspection-more"><summary>Inspect the recorded bid sequence</summary>
-          <BidPath rows={rows} selected={event?.id ?? null} onSelect={setSelected} />
-          {event && <p className="market-inspection-caption">Selected: {amount(Number(event.bid_amount))} · {stamp(event.posted_at)}</p>}
-        </details>}
+            <Text role="label">{r.comment_type === 'question' ? 'Latest question' : 'Seller'}</Text>{' '}
+            <Text role="caption"><time dateTime={r.posted_at || undefined} title={stamp(r.posted_at)}>{Number.isFinite(Date.parse(r.posted_at ?? '')) ? ago(Date.parse(r.posted_at!)) : ''}</time></Text>
+            <p>{r.comment_text?.trim() || 'Posted photos or video.'}</p>
+          </div>)}
+        </div>}
+        {(more.length > 0 || summary?.location) && <dl className="market-inspection-facts">
+          {more.map(f => <div key={f.field}><dt>{f.label}</dt><dd>{f.value}</dd></div>)}
+          {summary?.location && <div><dt>Located</dt><dd>{summary.location}</dd></div>}
+        </dl>}
       </>}
-      {evidence && view === 'vehicle' && <>
-        <strong>{name}</strong>
-        {summary?.location && <p>Listing location: {summary.location}</p>}
-        {facts.length ? <dl className="market-inspection-facts">{facts.map(f => <div key={f.field}>
-          <dt>{f.label}</dt><dd><strong>{f.value}</strong>
-            {f.conflict && <span className="market-inspection-caption">Reports differ; compare the supporting evidence.</span>}
-            {f.observationId && <Link to={`/vehicle/${vehicleId}/observation/${f.observationId}`}>Evidence →</Link>}</dd>
-        </div>)}</dl> : <p>No attributed distinguishing specifications are available in this read.</p>}
-        {facts.length > 0 && <details className="market-inspection-more"><summary>Why these facts?</summary>
-          <p>These are configuration reports, selected as context: listed engine, transmission, drive, body and appearance.
-            Differing wording is flagged without treating it as a critical disagreement. Repeated identity is omitted.
-            Rarity, price impact and current installed configuration have not been established.</p>
-        </details>}
-        <Link to={`/vehicle/${vehicleId}`}>Explore the vehicle record →</Link>
-      </>}
-      {evidence && view === 'sources' && <div className="market-inspection-sources">
-        <p><strong>Bring a Trailer</strong>{evidence.vehicle.title && <span className="market-inspection-caption">Published headline: {evidence.vehicle.title}</span>}</p>
-        <a href={evidence.sourceUrl} target="_blank" rel="noopener noreferrer">Open original listing ↗</a>
-        <p>{rows.length} retained interactions in this read{evidence.truncated ? '; earlier records omitted' : '; capture completeness unknown'}.</p>
-        <p>Source read: {receipt?.source_read_at && receipt.source_read_basis !== 'unknown' ? stamp(receipt.source_read_at) : 'unavailable'}.
-          Browser read: {stamp(evidence.fetchedAt)}.</p>
-        {summary?.location && <p>Listing location: {summary.location} · {summary.locationSource}.</p>}
-        <p>Amounts retain their source numbers; currency is unverified. Record-write time does not establish source freshness.</p>
-      </div>}
     </section>;
   }
   return <section className="auction-evidence" ref={ref} tabIndex={-1} aria-label="Listing activity evidence"

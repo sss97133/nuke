@@ -85,12 +85,19 @@ export default function EventPinDetail({ event, onBack, onViewVehicle }: Props) 
           </div>
         )}
 
-        {/* Price */}
-        {event.price && (
+        {/* Price: a recorded sale, else a listing's asking price, labelled as such */}
+        {event.price ? (
           <div style={{ fontSize: 16, fontFamily: 'Courier New, monospace', fontWeight: 700, color: 'var(--success, #16825d)', marginBottom: 8 }}>
             ${event.price.toLocaleString()}
           </div>
-        )}
+        ) : event.event_type === 'listing' && event.asking_price ? (
+          <div style={{ marginBottom: 8 }}>
+            <div style={{ fontSize: 8, color: 'var(--text-disabled)', letterSpacing: '0.5px' }}>ASKING</div>
+            <div style={{ fontSize: 16, fontFamily: 'Courier New, monospace', fontWeight: 700, color: 'var(--text)' }}>
+              ${event.asking_price.toLocaleString()}
+            </div>
+          </div>
+        ) : null}
 
         {/* Source */}
         {event.source && (
@@ -100,9 +107,23 @@ export default function EventPinDetail({ event, onBack, onViewVehicle }: Props) 
         )}
 
         {/* Coordinates */}
-        <div style={{ fontSize: 8, fontFamily: 'Courier New, monospace', color: 'var(--text-disabled)', marginBottom: 12 }}>
-          {event.lat.toFixed(4)}, {event.lng.toFixed(4)}
-        </div>
+        {Number.isFinite(event.lat) && Number.isFinite(event.lng) && (
+          <div style={{ fontSize: 8, fontFamily: 'Courier New, monospace', color: 'var(--text-disabled)', marginBottom: 12 }}>
+            {event.lat.toFixed(4)}, {event.lng.toFixed(4)}
+          </div>
+        )}
+
+        {/* The source page itself */}
+        {event.source_url && /^https:\/\//.test(event.source_url) && (
+          <a href={event.source_url} target="_blank" rel="noopener noreferrer"
+            style={{
+              display: 'block', textAlign: 'center', padding: '10px', marginBottom: 8,
+              color: 'var(--text)', fontWeight: 700, fontSize: 10, fontFamily: MAP_FONT, textDecoration: 'none',
+              border: '2px solid var(--border)', textTransform: 'uppercase', letterSpacing: '0.5px',
+            }}>
+            VIEW LISTING ↗
+          </a>
+        )}
 
         {/* View Vehicle button */}
         <button

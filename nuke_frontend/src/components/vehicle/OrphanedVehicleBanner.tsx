@@ -19,30 +19,32 @@ const OrphanedVehicleBanner: React.FC<OrphanedVehicleBannerProps> = ({
   const [dismissed, setDismissed] = useState(false);
   const [isClaiming, setIsClaiming] = useState(false);
 
-  // Check image count
-  const [imageCount, setImageCount] = useState<number>(0);
-  useEffect(() => {
-    if (vehicle?.id) {
-      supabase
-        .from('vehicle_images')
-        .select('id', { count: 'exact', head: true })
-        .eq('vehicle_id', vehicle.id)
-        .then(({ count }) => setImageCount(count || 0));
-    }
-  }, [vehicle?.id]);
-  
   const hasVIN = vehicle?.vin && vehicle.vin.trim() !== '' && !vehicle.vin.startsWith('VIVA-');
-  const hasImages = imageCount > 0;
-  
+
   // Check if vehicle is orphaned or requires attention
   const isOrphaned = vehicle?.origin_metadata?.orphaned_vehicle === true ||
                      (!vehicle?.uploaded_by && !vehicle?.origin_organization_id && vehicle?.profile_origin === 'dropbox_import');
-  
+
   const requiresAttention = vehicle?.origin_metadata?.requires_attention === true;
-  
+
   // Also show if vehicle is pending with missing critical data (no VIN)
   const isPending = vehicle && ((vehicle as any).status === 'pending' || !hasVIN);
   const showBanner = isOrphaned || requiresAttention || (isPending && !hasVIN && vehicle?.origin_metadata?.orphaned_vehicle !== false);
+
+  // Only a banner that renders needs to know whether the vehicle has any image, and only whether it has one: ask for
+  // one row, not an exact count (which runs the image row policy over every photo of the vehicle for every visitor).
+  const [hasImages, setHasImages] = useState(false);
+  useEffect(() => {
+    if (!showBanner || !vehicle?.id) return;
+    let cancelled = false;
+    supabase
+      .from('vehicle_images')
+      .select('id')
+      .eq('vehicle_id', vehicle.id)
+      .limit(1)
+      .then(({ data }) => { if (!cancelled) setHasImages((data?.length ?? 0) > 0); });
+    return () => { cancelled = true; };
+  }, [showBanner, vehicle?.id]);
 
   if (!showBanner) return null;
   if (dismissed) return null;

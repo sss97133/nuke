@@ -35,6 +35,11 @@ export const SearchStatsBar: React.FC<Props> = ({ stats, make }) => {
         {stats.with_price > 0 && (
           <StatCell label="WITH PRICE" value={stats.with_price.toLocaleString()} />
         )}
+        {stats.as_of && (
+          <span title={stats.population || undefined} style={{ fontSize: '9px', color: 'var(--text-muted)' }}>
+            AS OF {new Date(stats.as_of).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', timeZone: 'UTC' }).toUpperCase()}
+          </span>
+        )}
         <div style={{ marginLeft: 'auto', fontSize: '9px', color: 'var(--text-muted)' }}>
           {expanded ? 'COLLAPSE' : 'EXPAND'}
         </div>

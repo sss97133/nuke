@@ -10,7 +10,7 @@ import React from 'react';
 import PrefetchLink from '../../components/PrefetchLink';
 import { usePopup } from '../../components/popups/usePopup';
 import { useVehicleImageEvidence, relatedFieldImages, hasImageAnalysis, webSourceUrl } from './hooks/useVehicleImageEvidence';
-import { useFieldProvenance, citedFieldImages, evidenceRelationLabel, provenanceCoverageUnavailable, formatProvenanceValue, ENGINE_PROPERTY_IDS } from './hooks/useFieldProvenance';
+import { useFieldProvenance, citedFieldImages, evidenceRelationLabel, provenanceCoverageUnavailable, formatProvenanceValue, groupRepeatedReports, ENGINE_PROPERTY_IDS } from './hooks/useFieldProvenance';
 import type { FieldEvidenceGroup } from './hooks/useFieldEvidence';
 import { optimizeImageUrl } from '../../lib/imageOptimizer';
 import './vehicle-evidence.css';
@@ -203,12 +203,23 @@ const FieldEvidencePopup: React.FC<FieldEvidencePopupProps> = ({
           {imageObservations.length > 1 && imageObservations.every(obs => obs.source_family && obs.source_family === imageObservations[0].source_family) && <p className="ev-footnote">These photographs come from the same source family. Multiple views are not independent source confirmations.</p>}
         </div>
       )}
-      {(provenance.data?.observations || []).filter(obs => !imageObservations.some(imageObs => imageObs.observation_id === obs.id)).map(obs => (
+      {groupRepeatedReports((provenance.data?.observations || []).filter(obs => !imageObservations.some(imageObs => imageObs.observation_id === obs.id)),
+        provenance.data?.canonical?.observation_id).map(({ report: obs, repeats }) => (
         <div key={obs.id} style={{ padding: '6px 0', overflowWrap: 'anywhere' }}>
           <div className="ev-label">SOURCE REPORT · <PrefetchLink to={`/vehicle/${vehicleId}/observation/${obs.id}`} onClick={closeTop}>Inspect observation {obs.id}</PrefetchLink></div>
           {isEngineProperty && provenance.data?.canonical?.observation_id === obs.id && <div className="ev-label">RESOLVED REPORT</div>}
           {webSourceUrl(obs.source_url) ? <a href={webSourceUrl(obs.source_url)!} target="_blank" rel="noopener noreferrer">{obs.source_slug || 'Source observation'} ↗</a> : <span>{obs.source_slug || 'Source observation'} · Link unavailable</span>}
           <span> · {obs.value ? formatProvenanceValue(field, obs.value) : 'Value not recorded'}</span>
+          {repeats.length > 0 && <details>
+            <summary>Same claim captured {repeats.length + 1} times from this page</summary>
+            <p>Repeated captures of one listing page are one source claim, not corroboration.</p>
+            {repeats.map(repeat => (
+              <div key={repeat.id}>
+                <PrefetchLink to={`/vehicle/${vehicleId}/observation/${repeat.id}`} onClick={closeTop}>Inspect observation {repeat.id}</PrefetchLink>
+                <span> · Observation time: {repeat.observed_at ? new Date(repeat.observed_at).toLocaleString() : 'Unknown'}</span>
+              </div>
+            ))}
+          </details>}
           {(obs.content || obs.source_observation_id) && <details>
             <summary>Read retained evidence</summary>
             {obs.content && <div className="ev-proof-limitation" style={{ whiteSpace: 'pre-wrap' }}>

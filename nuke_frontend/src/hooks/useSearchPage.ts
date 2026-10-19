@@ -5,6 +5,10 @@ import { track } from '../lib/track';
 import { ingestVehicle } from '../services/aiDataIngestion';
 import type { SearchResult, SearchResultType } from '../types/search';
 import { parseQuery } from '../lib/search/queryParser';
+import { buildMarketScopeUrl, resolveMarketScopeQuery, resolveSynchronousMarketAlias } from '../lib/search/marketScopeResolver';
+
+/* ─── A VIN: 17 characters, no I, O or Q ─── */
+const VIN_RE = /^[A-HJ-NPR-Z0-9]{17}$/i;
 
 /* ─── URL detection ─── */
 const URL_RE = /^https?:\/\//i;
@@ -51,11 +55,18 @@ export interface UrlExtraction {
 }
 
 export interface SearchMeta {
-  total_count: number;
+  total_count: number | null;
+  returned_count: number;
   offset: number;
   limit: number;
   has_more: boolean;
+  pagination_limited: boolean;
+  next_offset: number | null;
+  vehicle_source: 'ranked' | 'direct' | 'ilike' | 'year' | null;
 }
+
+const loadedSummary = (count: number, query: string, limited = false) =>
+  `Loaded ${count.toLocaleString()} results for "${query}".${limited ? ' Refine your search to see more results.' : ''}`;
 
 export interface VehicleFilters {
   make: string;
@@ -77,6 +88,9 @@ export interface BrowseStats {
   by_source: { source: string; count: number }[];
   by_era: { era: string; count: number }[];
   by_model: { model: string; count: number; avg_price: number }[];
+  /** When the counts were folded (mv_market_position), and over which vehicles; absent on the live aggregate. */
+  as_of?: string | null;
+  population?: string | null;
 }
 
 const DEFAULT_FILTERS: VehicleFilters = {
@@ -111,20 +125,35 @@ export interface CohortTarget {
 function parseCohort(q: string): CohortTarget | null {
   const t = q.trim();
   const m = t.match(/^(1[89]\d{2}|20\d{2})\s+([A-Za-z][A-Za-z-]*)\s+(.+?)\s*$/);
-  if (!m) return null;
-  const year = parseInt(m[1], 10);
-  if (year < 1885 || year > new Date().getFullYear() + 1) return null;
-  const make = m[2];
-  const model = m[3].trim();
-  if (!model) return null;
-  const slug = (s: string) => encodeURIComponent(s.toLowerCase());
-  return {
-    year,
-    make,
-    model,
-    label: `${year} ${make} ${model}`,
-    path: `/cohort/${slug(make)}/${slug(model)}/${year}`,
-  };
+  if (m) {
+    const year = parseInt(m[1], 10);
+    if (year >= 1885 && year <= new Date().getFullYear() + 1) {
+      const make = m[2];
+      const model = m[3].trim();
+      if (model) {
+        const slug = (s: string) => encodeURIComponent(s.toLowerCase());
+        return {
+          year,
+          make,
+          model,
+          label: `${year} ${make} ${model}`,
+          path: `/cohort/${slug(make)}/${slug(model)}/${year}`,
+        };
+      }
+    }
+  }
+  const alias = resolveSynchronousMarketAlias(t);
+  if (alias) {
+    const modelLabel = alias.model || alias.family_name || '';
+    return {
+      year: alias.year ?? 0,
+      make: alias.make,
+      model: modelLabel,
+      label: [alias.year, alias.make, modelLabel].filter(Boolean).join(' '),
+      path: buildMarketScopeUrl(alias),
+    };
+  }
+  return null;
 }
 
 function mapRawResult(r: any): SearchResult {
@@ -159,8 +188,10 @@ export function useSearchPage() {
   const [loading, setLoading] = useState(() => Boolean(query));
   const [searchMeta, setSearchMeta] = useState<SearchMeta | null>(null);
   const [loadingMore, setLoadingMore] = useState(false);
+  const [loadMoreError, setLoadMoreError] = useState<string | null>(null);
   const [resultFilter, setResultFilter] = useState<SearchFilter>('all');
   const lastQueryRef = useRef('');
+  const loadMoreRequestRef = useRef<string | null>(null);
 
   // Initialize filters from URL params
   const [filters, setFilters] = useState<VehicleFilters>(() => ({
@@ -191,6 +222,8 @@ export function useSearchPage() {
   // Detect make from query or URL params for browse_stats
   const detectedMake = useMemo(() => {
     if (urlMake) return urlMake;
+    const syncAlias = resolveSynchronousMarketAlias(query);
+    if (syncAlias?.make) return syncAlias.make;
     // Simple detection: if first word of query matches a known pattern
     const q = query.trim();
     if (!q) return '';
@@ -205,9 +238,11 @@ export function useSearchPage() {
   useEffect(() => {
     const q = query.trim();
     if (!q) {
+      lastQueryRef.current = '';
       setResults([]);
       setSearchSummary('');
       setSearchMeta(null);
+      setLoadMoreError(null);
       setBrowseStats(null);
       setLoading(false);
       setUrlExtraction(null);
@@ -217,6 +252,10 @@ export function useSearchPage() {
 
     if (q === lastQueryRef.current) return;
     lastQueryRef.current = q;
+    loadMoreRequestRef.current = null;
+    setLoadingMore(false);
+    setLoadMoreError(null);
+    setSearchMeta(null);
 
     // UUID detection — redirect to vehicle page
     if (UUID_RE.test(q)) {
@@ -281,7 +320,53 @@ export function useSearchPage() {
       return;
     }
 
-    // Not a URL — clear extraction state and do normal search
+    // A VIN: one indexed read through vehicle_by_vin_public (public rows only, the columns a card shows).
+    // universal-search filters vehicles with ilike on vin, which no index serves under the row policies:
+    // the page's own suggested VIN answered "Search failed." after 60 s (2026-10-13).
+    if (VIN_RE.test(q)) {
+      const vin = q.toUpperCase();
+      setUrlExtraction(null);
+      urlExtractionRef.current = null;
+      setLoading(true);
+      setResultFilter('all');
+      setBrowseStats(null);
+      setSearchMeta(null);
+      Promise.resolve(supabase.rpc('vehicle_by_vin_public', { p_vin: vin })).then(({ data, error }: { data: unknown; error: unknown }) => {
+        if (lastQueryRef.current !== q) return;
+        if (error || !Array.isArray(data)) {
+          setSearchSummary('Search failed.');
+          setResults([]);
+          setLoading(false);
+          return;
+        }
+        const mapped: SearchResult[] = (data as any[]).map((v) => mapRawResult({
+          id: v.id,
+          type: 'vin_match',
+          title: [v.year, v.make, v.model].filter(Boolean).join(' '),
+          subtitle: v.vin,
+          image_url: v.image_url || undefined,
+          relevance_score: 1,
+          metadata: {
+            year: v.year, make: v.make, model: v.model, vin: v.vin, image_url: v.image_url,
+            sale_price: v.sale_price, asking_price: v.asking_price, is_for_sale: v.is_for_sale, sale_status: v.sale_status,
+          },
+        }));
+        setResults(mapped);
+        setSearchSummary(mapped.length
+          ? `${mapped.length} public vehicle${mapped.length === 1 ? '' : 's'} in the ledger with VIN ${vin}.`
+          : `No public vehicle with VIN ${vin} in the ledger.`);
+        track('search_results', { q, loaded_count: mapped.length, total: mapped.length });
+        setLoading(false);
+      }, () => {
+        if (lastQueryRef.current !== q) return;
+        setSearchSummary('Search failed.');
+        setResults([]);
+        setLoading(false);
+      });
+      return;
+    }
+
+    // Not a URL or a VIN — clear extraction state and do normal search
     setUrlExtraction(null);
     urlExtractionRef.current = null;
     setLoading(true);
@@ -303,56 +388,133 @@ export function useSearchPage() {
         }, () => { /* stats are decoration — never surface their failures */ });
     }
 
-    searchPromise.then((searchRes) => {
+    searchPromise.then(async (searchRes) => {
       if (lastQueryRef.current !== q) return;
       const { data, error } = searchRes;
 
-      if (error || !data) {
+      if (error || !data || data.success === false || !Array.isArray(data.results)) {
         setSearchSummary('Search failed.');
         setResults([]);
         setLoading(false);
         return;
       }
 
-      const mapped = (data.results || []).map(mapRawResult);
+      let mapped: SearchResult[] = data.results.map(mapRawResult);
+      const syncAlias = resolveSynchronousMarketAlias(q);
+      const canonicalModel = syncAlias?.model || syncAlias?.family_name || '';
+      if (
+        syncAlias?.make &&
+        canonicalModel &&
+        canonicalModel.toLowerCase() !== q.toLowerCase() &&
+        typeof (supabase as any).from === 'function'
+      ) {
+        try {
+          const { data: canonicalVehicles } = await supabase
+            .from('vehicles')
+            .select('id, year, make, model, trim, title, vin, primary_image_url, sale_price, asking_price, current_value, is_for_sale, sale_status, mileage, transmission, updated_at')
+            .eq('is_public', true)
+            .ilike('make', syncAlias.make)
+            .ilike('model', `%${canonicalModel}%`)
+            .order('sale_price', { ascending: false, nullsFirst: false })
+            .limit(60);
+          if (lastQueryRef.current !== q) return;
+          if (Array.isArray(canonicalVehicles) && canonicalVehicles.length > 0) {
+            const expanded: SearchResult[] = canonicalVehicles.map((v: any) => mapRawResult({
+              id: v.id,
+              type: 'vehicle',
+              title: [v.year, v.make, v.model].filter(Boolean).join(' ') || v.title || 'Vehicle',
+              subtitle: v.trim || v.title || '',
+              image_url: v.primary_image_url || undefined,
+              relevance_score: 1,
+              metadata: {
+                year: v.year,
+                make: v.make,
+                model: v.model,
+                vin: v.vin,
+                image_url: v.primary_image_url,
+                sale_price: v.sale_price,
+                asking_price: v.asking_price,
+                current_value: v.current_value,
+                is_for_sale: v.is_for_sale,
+                sale_status: v.sale_status,
+                mileage: v.mileage,
+                transmission: v.transmission,
+                updated_at: v.updated_at,
+              },
+            }));
+            const seenIds = new Set<string>();
+            mapped = [...expanded, ...mapped].filter((r) => {
+              if (seenIds.has(r.id)) return false;
+              seenIds.add(r.id);
+              return true;
+            });
+          }
+        } catch {
+          // Keep base results if canonical expansion fails
+        }
+      }
       // Prioritize results with images — users see photos, not placeholders
       mapped.sort((a, b) => (b.image_url ? 1 : 0) - (a.image_url ? 1 : 0));
       setResults(mapped);
 
-      const total = data.meta?.total_count ?? mapped.length;
-      setSearchSummary(`Found ${total.toLocaleString()} results for "${q}".`);
+      setSearchSummary(loadedSummary(mapped.length, q, data.meta?.pagination_limited === true));
       setSearchMeta(data.meta || null);
       // Funnel: the first-query moment. Zero-result queries are the gap list.
-      track('search_results', { q, total });
+      track('search_results', { q, loaded_count: mapped.length, total: data.meta?.total_count ?? null });
 
       setLoading(false);
+    }).catch(() => {
+      if (lastQueryRef.current !== q) return;
+      setSearchSummary('Search failed.');
+      setResults([]); setSearchMeta(null); setLoading(false);
     });
   }, [query, navigate, detectedMake, parsedQuery.priceMin, parsedQuery.priceMax]);
 
   // Load more results
   const handleLoadMore = useCallback(async () => {
-    if (!searchMeta || !searchMeta.has_more || loadingMore) return;
+    if (!searchMeta || !searchMeta.has_more || loadingMore || loadMoreRequestRef.current) return;
+    const q = query.trim(), nextOffset = searchMeta.next_offset;
+    if (searchMeta.pagination_limited) {
+      setSearchSummary(loadedSummary(results.length, q, true));
+      return;
+    }
+    if (!Number.isSafeInteger(nextOffset) || nextOffset == null || nextOffset <= searchMeta.offset || !searchMeta.vehicle_source) {
+      setLoadMoreError('More results could not be loaded. Try again.');
+      setSearchSummary(`${loadedSummary(results.length, q)} More results could not be loaded. Try again.`);
+      return;
+    }
+    const requestKey = `${q}/${nextOffset}`;
+    loadMoreRequestRef.current = requestKey;
     setLoadingMore(true);
+    setLoadMoreError(null);
 
     try {
       const { data, error } = await supabase.functions.invoke('universal-search', {
-        body: { query: query.trim(), limit: 100, offset: searchMeta.offset + searchMeta.limit,
+        body: { query: q, limit: 100, offset: nextOffset, vehicle_source: searchMeta.vehicle_source,
           ...(parsedQuery.priceMin != null || parsedQuery.priceMax != null ? { includeAI: false } : {}) },
       });
 
-      if (!error && data?.results) {
-        const newResults = (data.results as any[]).map(mapRawResult);
-        const existingIds = new Set(results.map(r => r.id));
-        const unique = newResults.filter(r => !existingIds.has(r.id));
-        setResults(prev => [...prev, ...unique]);
-        if (data.meta) setSearchMeta(data.meta);
-        const total = data.meta?.total_count ?? searchMeta.total_count;
-        setSearchSummary(`Found ${total.toLocaleString()} results for "${query.trim()}".`);
+      if (lastQueryRef.current !== q) return;
+      if (error || data?.success === false || !Array.isArray(data?.results) || !data.meta || data.meta.offset !== nextOffset ||
+        data.meta.vehicle_source !== searchMeta.vehicle_source || typeof data.meta.has_more !== 'boolean' ||
+        (data.meta.pagination_limited === true
+          ? !data.meta.has_more || data.meta.next_offset !== null
+          : data.meta.has_more ? !Number.isSafeInteger(data.meta.next_offset) || data.meta.next_offset <= nextOffset : data.meta.next_offset !== null)) {
+        throw new Error('Search page failed');
       }
+      const newResults = (data.results as any[]).map(mapRawResult);
+      const existingIds = new Set(results.map(r => r.id));
+      const unique = newResults.filter(r => !existingIds.has(r.id));
+      setResults(prev => [...prev, ...unique]);
+      setSearchMeta(data.meta);
+      setSearchSummary(loadedSummary(results.length + unique.length, q, data.meta.pagination_limited === true));
     } catch {
-      // ignore
+      if (lastQueryRef.current === q) {
+        setLoadMoreError('More results could not be loaded. Try again.');
+        setSearchSummary(`${loadedSummary(results.length, q)} More results could not be loaded. Try again.`);
+      }
     } finally {
-      setLoadingMore(false);
+      if (loadMoreRequestRef.current === requestKey) { loadMoreRequestRef.current = null; setLoadingMore(false); }
     }
   }, [searchMeta, loadingMore, query, results, parsedQuery.priceMin, parsedQuery.priceMax]);
 
@@ -413,6 +575,7 @@ export function useSearchPage() {
     searchMeta,
     handleLoadMore,
     loadingMore,
+    loadMoreError,
     browseStats,
     detectedMake,
     urlExtraction,

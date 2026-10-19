@@ -57,7 +57,12 @@ export async function prepareBatLiveFrame(frame: BatLiveFrame, target: BatLiveTa
   const identity = comment && positive(comment.id) ? `comment:${comment.id}` : `receipt-window:${Math.floor(Date.parse(frame.received_at) / 5000)}`;
   const rawJson = JSON.stringify({ event: frame.event, data: d });
   if (new TextEncoder().encode(rawJson).byteLength > 262144) throw new Error("bat_live_frame_too_large");
-  const hash = await sha256Hex([target.id, sourceUrl, identity, rawJson].join("|"));
+  // A native comment (every bid is one) is keyed on its BaT comment id alone: the same bid arrives by public_pusher,
+  // missed_comments and direct_html with differently shaped frames, and hashing the frame body made three rows of one
+  // bid (110 of 172 vehicle+amount pairs in a 20-minute read, 2026-10-15). Frames without a native id keep the body hash.
+  const hash = await sha256Hex(comment && positive(comment.id)
+    ? [target.id, sourceUrl, identity, frame.event].join("|")
+    : [target.id, sourceUrl, identity, rawJson].join("|"));
   const auction = summarizeAuction(qualifiedComment ? [comment] : []);
   const outcome = auction.sold ? "sold" : auction.reserveNotMet ? "reserve_not_met" : null;
   const endAt = unix(d.end_timestamp ?? comment?.end_timestamp ?? d.listing_card_data?.timestamp_end);

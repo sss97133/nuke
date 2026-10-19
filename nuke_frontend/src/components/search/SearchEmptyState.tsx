@@ -72,7 +72,7 @@ export const SearchEmptyState: React.FC<Props> = ({
               fontSize: '8px', fontWeight: 800, letterSpacing: '1px',
               color: 'var(--text-disabled)', textTransform: 'uppercase',
             }}>
-              VEHICLES INDEXED
+              VEHICLES WITH A CONFIRMED SALE
             </div>
           </div>
         )}
@@ -149,12 +149,12 @@ export const SearchEmptyState: React.FC<Props> = ({
 
       {/* Notable Sales */}
       {notableSales.length > 0 && (
-        <VehicleGrid title="NOTABLE SALES" vehicles={notableSales} />
+        <VehicleGrid title="HIGHEST BIDS ON THE BOARD NOW" vehicles={notableSales} />
       )}
 
       {/* Recently Added */}
       {recentVehicles.length > 0 && (
-        <VehicleGrid title="RECENTLY ADDED" vehicles={recentVehicles} />
+        <VehicleGrid title="FIRST SEEN IN THE LAST DAY" vehicles={recentVehicles} />
       )}
     </div>
   );
@@ -217,6 +217,7 @@ function VehicleGrid({ title, vehicles }: {
             showPriceChange={false}
             showPriceOverlay={true}
             showDetailOverlay={true}
+            showGrade={false}
             infoDense={true}
             thumbnailFit="contain"
           />

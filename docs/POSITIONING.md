@@ -40,6 +40,17 @@ evidence is generated rather than typed: the hand-written table of 2026-10-07 wa
 within an hour. The block below is written by the daily `readme-stats.mjs` run, and its queries fix the unit and print
 the denominators.
 
+Against the comparison a reviewer raises most, Scale AI: the same loop with the ownership reversed. Scale labels
+other people's data for other people's models, with about 240,000 contractors through Remotasks and Outlier (Turing
+Post, Contrary Research) and services revenue just under $1B in 2025 (Forbes 2026-05-14), and keeps none of the
+output; its ground truth is annotator consensus, which is why it needs a workforce and a QA department. Nuke keeps
+its own ledger of observations about assets and grades its own predictions against outcomes the market settles, a
+hammer, a title transfer, a receipt, which nobody labels. The week Meta bought 49% of Scale for $14.3B (June 2025,
+CNBC) its largest model customers left, because a service holds no asset that stays; Nuke's asset is the ledger and
+the error table. The one Scale idea kept here is the data-engine rule, collect more of what the model fails on: the
+lots with the largest graded error name the next photos and comments to process (`v_graded_lot_vision_backlog`,
+2026-10-13).
+
 ## What is measured
 
 Units are lots, not rows, and every rate names its denominator. The block below is generated from the live database
@@ -47,7 +58,7 @@ and moves with it. The figures quoted in prose further down (objective 0, the sc
 2026-10-07 09:00Z and match the block at that date.
 
 <!-- evidence:start -->
-Measured 2026-10-13 07:56 UTC from the live database by [`scripts/data/readme-stats.mjs`](../scripts/data/readme-stats.mjs), run daily by [`update-stats.yml`](../.github/workflows/update-stats.yml). Read-only. The unit is the lot, never a prediction row: a model's grade for a lot is its last prediction before the lot's close, against the lot's winning bid in `auction_events`. The close is the scheduled one where live frames hold it, else the final one, else the one the predictor believed (`predicted`). Models with no graded lot are not listed.
+Measured 2026-10-16 06:50 UTC from the live database by [`scripts/data/readme-stats.mjs`](../scripts/data/readme-stats.mjs), run daily by [`update-stats.yml`](../.github/workflows/update-stats.yml). Read-only. The unit is the lot, never a prediction row: a model's grade for a lot is its last prediction before the lot's close, against the lot's winning bid in `auction_events`. The close is the scheduled one where live frames hold it, else the final one, else the one the predictor believed (`predicted`). Models with no graded lot are not listed.
 
 | Model | Sold lots graded, of lots ended | Median absolute error | Bias (mean signed error) | Hammer inside its stated band | Close: scheduled / final / predicted |
 |---|---|---|---|---|---|
@@ -56,9 +67,9 @@ Measured 2026-10-13 07:56 UTC from the live database by [`scripts/data/readme-st
 | 24 | 747 of 995 | 24.3% | −13.2% | 193 of 747 = 25.8% (50% band) | 0 / 244 / 503 |
 | 13 | 10 of 13 | 12.0% | −15.4% | 2 of 10 = 20.0% (band width unknown) | 0 / 0 / 10 |
 
-- **Lots predicted:** 2,290 distinct lots, in 46,094 of 54,702 prediction rows; 8,608 rows are not keyed to a lot yet (`hammer_predictions`, distinct `auction_event_id`).
+- **Lots predicted:** 2,290 distinct lots, in 46,094 of 60,670 prediction rows; 14,576 rows are not keyed to a lot yet (`hammer_predictions`, distinct `auction_event_id`).
 - **Lots graded:** 1,482 distinct sold lots, and 1,997 model-lot grades in all, because a lot priced by more than one model is graded once for each (`v_prediction_lot_grades`, horizon `last`, with a hammer; the table is `prediction_accuracy`).
-- **Stacks:** 65 registered, 64 at status measured; 6 at coverage 0.9 or above; mean coverage 0.19 (`v_stacks`). Order book SA v3: coverage 0.50, 9 of 18 needs present, 3 partial, 6 missing; status showable.
+- **Stacks:** 66 registered, 65 at status measured; 6 at coverage 0.9 or above; mean coverage 0.19 (`v_stacks`). Order book SA v3: coverage 0.50, 9 of 18 needs present, 3 partial, 6 missing; status showable.
 - **Thesis vein V012 v1** (cited by S03; `vein_ledger`, status active): 68,957 distinct buyers, the top 1% took 14% of lots, 39 won 50 or more (discovery run, as of 2026-09-30). Runs that can grade it: 0 of 1 (`vein_runs`).
 - **Live-lot reader replay** (cited from PR #771, 2026-10-07; a replay, not a view, so not recomputed here): 2 minutes before the scheduled close the hammer sat inside its 80% band on 257 of 311 lots the live collector followed (closes 2026-10-05 to 06) = 82.6%. Not out-of-sample: the band's shape was chosen after seeing these lots.
 <!-- evidence:end -->

@@ -16,6 +16,10 @@ export interface MapEventPoint {
   make: string | null;
   model: string | null;
   price: number | null;
+  /** The seller's asking price on the vehicle record (a listing event's price; `price` is a recorded sale). */
+  asking_price?: number | null;
+  /** The source page this location was read from. */
+  source_url?: string | null;
   thumbnail: string | null;
   vehicle_status: string | null;
 }

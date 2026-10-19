@@ -23,7 +23,9 @@
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { corsHeaders } from "../_shared/cors.ts";
-import { requireWriteAuth } from "../_shared/writeGuard.ts";
+import { isServiceCaller, requireWriteAuth } from "../_shared/writeGuard.ts";
+import { projectSecretKey } from "../_shared/supabaseKeys.ts";
+import { mustWrite } from '../_shared/writeResult.ts';
 
 const WORKER = `derive-dispatch-${crypto.randomUUID().slice(0, 8)}`;
 
@@ -47,13 +49,15 @@ Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
 
   try {
-    if (roleOf(req.headers.get("Authorization")) !== "service_role") {
+    // The service role as writeGuard judges it: a secret key, or the JWT the gateway mints for one
+    // (decoding the bearer's role claim misses a raw secret key; 2026-10-14).
+    if (!(await isServiceCaller(req))) {
       return json({ error: "service_role required" }, 403);
     }
 
     const admin = createClient(
       Deno.env.get("SUPABASE_URL")!,
-      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
+      projectSecretKey()!,
       { auth: { autoRefreshToken: false, persistSession: false } },
     );
 
@@ -116,10 +120,10 @@ Deno.serve(async (req) => {
           ...(publicComment ? { signal: AbortSignal.timeout(65000) } : {}),
           headers: {
             "Content-Type": "application/json",
-            Authorization: `Bearer ${Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")}`,
+            Authorization: `Bearer ${projectSecretKey()}`,
             // The gateway rewrites Authorization between functions; prove we are the
             // dispatcher with the shared secret, not with a claim we don't control.
-            "x-nuke-internal": Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
+            "x-nuke-internal": projectSecretKey()!,
           },
           body: JSON.stringify({
             user_id: item.user_id,
@@ -198,9 +202,9 @@ Deno.serve(async (req) => {
     // since the table was created, because nothing ever drove it.
     const slugs = [...new Set(claimed.map((c: any) => c.extractor_slug))];
     for (const s of slugs) {
-      await admin.from("observation_extractors")
+      mustWrite('observation_extractors update', await admin.from("observation_extractors")
         .update({ last_run_at: new Date().toISOString(), ...(failed === 0 && done > 0 ? { last_success_at: new Date().toISOString(), consecutive_failures: 0 } : {}) })
-        .eq("slug", s);
+        .eq("slug", s));
     }
 
     return json({ claimed: claimed.length, done, failed, results });
@@ -234,16 +238,6 @@ async function requeue(admin: any, id: string, delaySeconds: number, reason: str
     ...(restoreAttempts !== undefined ? { attempts: restoreAttempts } : {}),
   }).eq("id", id).select("id,status").maybeSingle();
   if (error || data?.id !== id || data?.status !== "pending") throw new Error("derivation retry was not persisted");
-}
-
-function roleOf(authHeader: string | null): string | null {
-  try {
-    const tok = (authHeader ?? "").replace(/^Bearer\s+/i, "");
-    const p = tok.split(".")[1];
-    if (!p) return null;
-    const pad = p + "=".repeat((4 - (p.length % 4)) % 4);
-    return JSON.parse(atob(pad.replace(/-/g, "+").replace(/_/g, "/")))?.role ?? null;
-  } catch { return null; }
 }
 
 function json(obj: unknown, status = 200) {

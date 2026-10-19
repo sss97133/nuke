@@ -90,6 +90,13 @@ recognize relationships from retained evidence, find the existing owner, impleme
 repair and prove its consumer. Configuration is one application; a diagnostic report alone does
 not close the work. The bounded discovery assays are operator tools, not autonomous write authority.
 
+Recursive work must return to its original failed question after each repair. Test the actual intake,
+PostgreSQL admission and consumer together; a registered property or a successful duplicate lookup is
+insufficient. Recheck withdrawal, supersession and source visibility through every affected reader.
+Carry the next observed gap into code and the methodology together, preserving deployment holds.
+Roles such as artist, buyer and researcher describe evidenced behavior in context; do not turn them
+into permanent identity types or mandatory arrival choices without a separate model decision.
+
 ## Invariants
 1. **Facts are never invented.** Every datum carries its source, method, observed_at and trust.
    "Unknown" is an answer; a guess is not.
@@ -109,6 +116,10 @@ not close the work. The bounded discovery assays are operator tools, not autonom
   - One migration per commit per push: CI applies only the last commit's new files.
   - Set `statement_timeout` and `lock_timeout` in any migration that can wait on a lock (the pooler
     default is 10 s).
+  - Create a simple view in `public` (one table, no aggregate) `WITH (security_invoker = true)`. The
+    `view_write_guard` event trigger fails a statement that leaves a view there running as its owner
+    while anon or authenticated can write through it; its migration,
+    `supabase/migrations/20261014214500_view_write_guard.sql`, lists the cases.
   - Verify it live after the run.
 - **Edge functions.** Same path; CI deploys the function folders the commit changed. A function that
   writes calls `requireWriteAuth` (`supabase/functions/_shared/writeGuard.ts`), and
@@ -142,14 +153,20 @@ permanent record. Write both as `type(scope): summary`, at most 72 characters. T
 
 ## Working alongside other agents
 - Work in your own worktree:
-  `git worktree add ~/.worktrees/<task> -b <branch> origin/main`.
+  `git worktree add ~/.worktrees/<task> -b <branch> origin/main`, then
+  `ln -s ~/nuke/nuke_frontend/node_modules ~/.worktrees/<task>/nuke_frontend/node_modules` so the
+  pre-commit type check finds `tsc` (a fresh worktree has no dependencies installed). When the PR is
+  merged, `git worktree remove ~/.worktrees/<task>`; the branch may stay. A worktree is about 500 MB,
+  and on 2026-10-13 the laptop held 404 of them (382 GB) with 14 GB of disk left.
 - When several sessions run, one lane list says who owns what: `.claude/LANES.md` in the shared checkout
   (local, not committed). Codex threads register there too, with the path of their pickup file. Tell the
   others before you push. Handoffs go in `.claude/handoffs/`; finished work is logged to `DONE.md` with
   `claude-log-done` (both local). Codex lanes keep their working receipts under `~/nuke-logs/<lane>/`.
 - Merge your own PR once every check is green (owner, 2026-10-12), one at a time when it carries a
   migration or a function so the deploy run applies each; then verify the live surface and say which
-  stage was reached: implemented, tested, merged, deployed or runtime-verified.
+  stage was reached: implemented, tested, merged, deployed or runtime-verified. Green means every job
+  the workflows define ran and passed: "nothing pending" with jobs missing is a broken workflow, not a
+  pass (2026-10-13, four PRs merged while `frontend-tests` ran zero jobs).
 - Read a file before changing it, and keep changes surgical. A fix is a few lines, not a rewrite.
 
 ## Rules by area
@@ -159,4 +176,6 @@ open them by path:
 - `db-safety.md`, `edge-functions.md` and `extraction.md` for `supabase/`.
 - `library.md` and `supply-side.md`.
 - `wiring-receipt.md` and `wiring-wire-closure-protocol.md` for `docs/wiring/`.
-- `production-engineering.md`, which applies everywhere.
+- `apps/nuke-capture-ios/README.md`, section "The room", for the iOS app (sub-folder `CLAUDE.md` files are
+  gitignored, so the README is the tracked home).
+- `production-engineering.md` and `liveness-and-intent.md`, which apply everywhere.
