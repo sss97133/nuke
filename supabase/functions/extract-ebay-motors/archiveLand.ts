@@ -65,5 +65,26 @@ export async function landArchived(supabase: any, cap: Capture, rep: Report, dry
     metadata: { end_state: outcome, ...archive, snapshot_id: snapshotId, source_observed_at: observedAt },
   }, { sourceObservedAt: observedAt });
   if (w.action === "error") rep.errors.push(`end state ${p.itemId}: ${w.error}`);
-  return { capture: cap, item_id: p.itemId, landed, outcome: p.outcome, price: p.priceShown, ended_at: p.endedAt, event: w.action };
+  const sale = sold && p.priceShown != null && p.endedAt ? await fillVehicleSale(supabase, ev.data.vehicle_id, p.itemId, p.priceShown, p.endedAt, p.priceLabel, archive.archive_url, url) : null;
+  if (sale?.error) rep.errors.push(`vehicle sale ${p.itemId}: ${sale.error}`);
+  return { capture: cap, item_id: p.itemId, landed, outcome: p.outcome, price: p.priceShown, ended_at: p.endedAt, event: w.action, vehicle_sale: sale?.result ?? null };
+}
+
+/** Market readers count a sale from the vehicle row (vehicle_sale_basis: sale_status 'sold'). Fill it through the sanctioned
+ *  correction writer only when this archived sale is the vehicle's only sold episode and the row still reads 'available'
+ *  with no sale price: every field is compare-and-set, so a later or contradicting sale is never overwritten. */
+async function fillVehicleSale(supabase: any, vehicleId: string, itemId: string, price: number, endedAt: string, label: string | null, archiveUrl: string, url: string) {
+  const other = await supabase.from("vehicle_events").select("id").eq("vehicle_id", vehicleId).neq("source_listing_id", itemId)
+    .or("event_status.eq.sold,final_price.not.is.null").limit(1);
+  if (other.error) return { error: other.error.message };
+  if (other.data?.length) return { result: "skipped_other_sale" };
+  const v = await supabase.from("vehicles").select("sale_status,sale_price").eq("id", vehicleId).maybeSingle();
+  if (v.error || !v.data) return { error: v.error?.message ?? "vehicle not found" };
+  if (v.data.sale_price != null || v.data.sale_status !== "available") return { result: "skipped_vehicle_state" };
+  const rows = [{ vehicle_id: vehicleId,
+    source: { type: "listing_url", ref: archiveUrl, basis: `archived eBay Motors item page (Wayback Machine capture) states '${label}: US $${price}' and the end time; listing episode ${url}` },
+    corrections: { sale_price: { value: Math.round(price), expected: null }, sale_date: { value: endedAt.slice(0, 10), expected: null }, sale_status: { value: "sold", expected: "available" } } }];
+  const r = await supabase.rpc("correct_vehicle_sale_provenance_batch", { p_rows: rows, p_asserted_by: "extract-ebay-motors archive",
+    p_reason: "eBay archived item page outcome (Winning bid / Sold For); fill-only sale fields, whole-dollar sale_price (exact amount on the episode), status available->sold" });
+  return r.error ? { error: r.error.message } : { result: r.data };
 }
