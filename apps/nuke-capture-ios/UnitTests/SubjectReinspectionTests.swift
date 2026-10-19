@@ -25,6 +25,25 @@ final class SubjectReinspectionTests: XCTestCase {
         })
     }
 
+    func testRetainedCaptureFilingContinuationNeedsNoOriginalOrNewPrivacyPass() async throws {
+        var continuation = candidate([], pending: 0)
+        XCTAssertFalse(continuation.valid)
+        continuation.capture_filing_pending = true
+        XCTAssertTrue(continuation.valid)
+        var queue = SubjectReinspectionQueue(userId: user)
+        queue.offer(continuation, now: Date())
+        let lease = try XCTUnwrap(queue.beginAttempt(now: Date()))
+        let receipts = try await SubjectReinspectionWork.inspect(lease, userId: user, mayContinue: { true }, original: { _ in
+            XCTFail("qualified retained capture needs no original read"); throw SubjectReinspectionFailure.unavailable
+        }, prepare: { _, _ in
+            XCTFail("qualified retained capture needs no classifier pass"); throw SubjectReinspectionFailure.unavailable
+        }, didInspect: { _, _ in XCTFail("no privacy proof is fabricated") })
+        XCTAssertTrue(receipts.isEmpty)
+        queue.finish(continuation.key)
+        queue.offer(continuation, now: Date())
+        XCTAssertTrue(queue.leases.isEmpty)
+    }
+
     func testThreePendingOriginalsProgressTwoThenOneAndColdRetryReusesActualByteReceipts() async throws {
         let now = Date(); var queue = SubjectReinspectionQueue(userId: user)
         queue.offer(candidate(), now: now); let first = try XCTUnwrap(queue.beginAttempt(now: now))

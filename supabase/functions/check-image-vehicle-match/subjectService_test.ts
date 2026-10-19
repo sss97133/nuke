@@ -5,6 +5,7 @@ import { projectSourceIdentities, sourceAliases, sourceIdentityRecords, attachSo
 import { attachSubjectPrivacy } from "./subjectPrivacy.ts";
 import { assessSubjectAdmission } from "./subjectReplay.ts";
 import { VisionProviderUnavailable } from "../_shared/providerDiagnostic.ts";
+import { planSubjectReinspection } from "./subjectReinspection.ts";
 const uid = "00000000-0000-4000-8000-000000000001", other = "00000000-0000-4000-8000-000000000002";
 const ids = ["10000000-0000-4000-8000-000000000001", "10000000-0000-4000-8000-000000000002", "10000000-0000-4000-8000-000000000003"];
 const cluster = "20000000-0000-4000-8000-000000000001";
@@ -110,6 +111,24 @@ Deno.test("a capture filing transport failure retries its retained reading witho
   f.store.admitCapture = writer;
   const retry = await resolveSubjectBatch(f.store, { ...f.request, reuse_only: true }, "https://example.test", f.dependencies);
   equal(retry.status, "cached"); equal(f.counts.models, 1); equal(f.requests.length, 1);
+});
+Deno.test("operator-retained capture readings resume authenticated filing after privacy is already complete", async () => {
+  const f = captureFixture(), writer = f.store.admitCapture!;
+  delete f.store.admitCapture;
+  await f.run(); equal(f.requests.length, 0);
+  const reading = f.readings[0], at = "2026-10-02T00:00:00Z";
+  const plan = await planSubjectReinspection(f.store, uid, reading, at);
+  equal(plan?.candidate.capture_filing_pending, true);
+  equal(plan?.candidate.inspect, []); equal(plan?.candidate.pending_source_count, 0);
+  f.store.admitCapture = writer;
+  const retry = await resolveSubjectBatch(f.store, { user_id: uid, image_ids: plan!.candidate.image_ids,
+    expected_source_hashes: plan!.candidate.expected_source_hashes, reuse_only: true }, "https://example.test", f.dependencies);
+  equal(retry.status, "cached"); equal(f.counts.models, 1); equal(f.counts.captures, 1); equal(f.requests.length, 1);
+  f.sources.forEach(source => Object.assign(source, { vehicle_id: cluster }));
+  equal(await planSubjectReinspection(f.store, uid, reading, at), null);
+  f.sources.forEach(source => Object.assign(source, { vehicle_id: null }));
+  f.sources[1].longitude = -114;
+  equal(await planSubjectReinspection(f.store, uid, reading, at), null);
 });
 Deno.test("one nearby capture reference preserves both fresh inputs in the three-frame budget", async () => {
   const f = captureFixture();

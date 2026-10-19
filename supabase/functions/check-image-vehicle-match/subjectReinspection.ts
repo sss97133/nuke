@@ -1,5 +1,5 @@
 import { observationClockMicroseconds as clock } from "../_shared/observationContentHash.ts";
-import { qualifySubjectSourceCustody } from "./subjectReader.ts";
+import { qualifySubjectSource, qualifySubjectSourceCustody } from "./subjectReader.ts";
 import { currentIdentitySource, sourceAliases, sourceRoot } from "./sourceIdentity.ts";
 import { subjectPrivacyLookupComplete, subjectSourceAvailable, subjectSourceCanEstablishPrivacy } from "./subjectPrivacy.ts";
 import type { SubjectEnvelope, SubjectReading, SubjectSource, SubjectStore } from "./subjectService.ts";
@@ -17,6 +17,7 @@ export interface SubjectReinspectionCandidate {
   image_ids: string[]; expected_source_hashes: Record<string, string>;
   pending_source_count: number;
   inspect: SubjectReinspectionWitness[];
+  capture_filing_pending?: boolean;
 }
 
 /** This is a fetch/replay plan, never privacy or membership admission. A protected
@@ -45,7 +46,14 @@ export async function planSubjectReinspection(store: SubjectStore, userId: strin
     inspect.push({ receipt_image_id: source.id, current_image_id: current.id, root_image_id: root,
       local_identifier: local, source_sha256: current.file_hash });
   }
-  if (inspect.length < 1) return null;
+  // A completed privacy pass must not strand a retained VIN interpretation.
+  // Offer metadata-only authenticated replay; the resolver rechecks admission
+  // and the existing profile writer before filing. No new inference is allowed.
+  const captureFiling = inspect.length === 0 && Array.isArray(e.capture_sessions) && e.capture_sessions.some(session =>
+    Array.isArray(session.member_image_ids) && session.member_image_ids.some(id =>
+      sources.some(source => source.id === id && currentIdentitySource(source)?.vehicle_id == null))) &&
+    e.inputs.every(input => qualifySubjectSource(input, sources.find(source => source.id === input.image_id), userId, e.read_at, asOf));
+  if (inspect.length < 1 && !captureFiling) return null;
   // The store must read all current/historical withdrawn memberships across aliases
   // or refuse its bounded lookup. A raw paid reading never overrides a correction.
   const aliases = new Set(sources.flatMap(source => sourceAliases(source)));
@@ -62,7 +70,8 @@ export async function planSubjectReinspection(store: SubjectStore, userId: strin
   }
   return { envelope: e, sources, candidate: { method: REINSPECTION_METHOD, reading_id: reading.id, run_key: e.run_key,
     image_ids: ids, expected_source_hashes: Object.fromEntries(e.inputs.map(i => [i.image_id, i.source_sha256])),
-    pending_source_count: inspect.length, inspect: inspect.slice(0, 2) } };
+    pending_source_count: inspect.length, inspect: inspect.slice(0, 2),
+    ...(captureFiling ? { capture_filing_pending: true } : {}) } };
 }
 
 /** Read-only bounded carrier pagination. No URL/pixels, new analysis, filing or
