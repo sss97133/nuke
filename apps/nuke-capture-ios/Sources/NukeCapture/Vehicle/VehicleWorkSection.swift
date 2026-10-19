@@ -10,10 +10,11 @@ import SwiftUI
 struct VehicleWorkSection: View {
     let vehicleId: String
 
+    @Environment(\.vehicleListingContext) private var listingContext
     @State private var jobs: JobLoad<MyWorkOrders> = .loading
 
     var body: some View {
-        VehicleWorkCard(vehicleId: vehicleId, jobs: jobs)
+        VehicleWorkCard(vehicleId: vehicleId, jobs: jobs, planEntry: listingContext)
             .task(id: vehicleId) { jobs = await JobReaders.vehicleWorkOrders(vehicleId: vehicleId) }
     }
 }
@@ -22,17 +23,20 @@ struct VehicleWorkSection: View {
 struct VehicleWorkCard: View {
     let vehicleId: String
     let jobs: JobLoad<MyWorkOrders>
+    /// Opened from a listing: offer "Plan the work" (listing_work_plan_read) whatever the job list holds.
+    var planEntry = false
 
     var body: some View {
         switch jobs {
         case .loading:
-            EmptyView()
+            if planEntry { card { planLink } } else { EmptyView() }
         case .refused(let refusal) where refusal.kind == .unavailable:
-            EmptyView()
+            if planEntry { card { planLink } } else { EmptyView() }
         case .refused(let refusal):
             card { JobRefusalRow(refusal: refusal) }
         case .loaded(let page):
             card {
+                if planEntry { planLink.padding(.bottom, 6) }
                 if page.rows.isEmpty {
                     Text("No jobs on this vehicle yet.").font(.footnote).foregroundStyle(.secondary)
                         .padding(.vertical, 5)
@@ -65,6 +69,16 @@ struct VehicleWorkCard: View {
                     .padding(.top, 10)
                 }
             }
+        }
+    }
+
+    private var planLink: some View {
+        NavigationLink {
+            WorkPlanEstimateView(vehicleId: vehicleId)
+        } label: {
+            Label("Plan the work", systemImage: "list.bullet.clipboard")
+                .font(.footnote.weight(.medium))
+                .frame(maxWidth: .infinity, alignment: .leading)
         }
     }
 

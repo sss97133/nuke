@@ -79,6 +79,18 @@ struct NukeCaptureApp: App {
                     NavigationStack { JobView(workOrderId: dbgJob) }
                 } else if let dbgStatement = ProcessInfo.processInfo.environment["NUKE_DEBUG_STATEMENT_VEHICLE"], !dbgStatement.isEmpty {
                     NavigationStack { VehicleStatementView(vehicleId: dbgStatement) }
+                } else if let dbgPlan = ProcessInfo.processInfo.environment["NUKE_DEBUG_WORK_PLAN"], !dbgPlan.isEmpty {
+                    // "Plan the work" for one listed vehicle, over the live reader (no photos).
+                    NavigationStack {
+                        ScrollViewReader { proxy in
+                            WorkPlanEstimateView(vehicleId: dbgPlan)
+                                .task {
+                                    guard let target = ProcessInfo.processInfo.environment["NUKE_DEBUG_SCROLL_TO"] else { return }
+                                    try? await Task.sleep(for: .seconds(6))
+                                    proxy.scrollTo(target, anchor: .top)
+                                }
+                        }
+                    }
                 } else if ProcessInfo.processInfo.environment["NUKE_DEBUG_JOBS_LOOKING"] == "1" {
                     // Work's "Jobs looking for someone" alone, over the live reader (no capture photos).
                     DebugJobsLookingHost()

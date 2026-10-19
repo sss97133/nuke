@@ -168,6 +168,26 @@ final class JobFixtureSnapshotTests: XCTestCase {
         try snapshot(view, name: "fixture-job-offers")
     }
 
+    func testRenderOrderInspectionSheet() throws {
+        let plan = try decode(WorkPlan.self, PlanFixtures.plan)
+        let params = try XCTUnwrap(PlanReaders.orderParams(vehicleId: PlanFixtures.vehicleId, plan: plan))
+        try snapshot(OrderInspectionSheet(params: params, plan: plan), name: "fixture-order-inspection", pages: 2)
+    }
+
+    func testRenderInspectionFindings() throws {
+        let read = try decode(InspectionRead.self, PlanFixtures.inspection)
+        let view = NavigationStack {
+            List { JobInspectionSection(read: .loaded(read)) }.navigationTitle("Pre-purchase inspection").navigationBarTitleDisplayMode(.inline)
+        }
+        try snapshot(view, name: "fixture-inspection-findings", pages: 2)
+    }
+
+    func testRenderWorkPlanFixture() throws {
+        let plan = try decode(WorkPlan.self, PlanFixtures.plan)
+        let view = NavigationStack { WorkPlanEstimateView(vehicleId: PlanFixtures.vehicleId, plan: .loaded(plan), loadOnAppear: false) }
+        try snapshot(view, name: "fixture-work-plan", pages: 3)
+    }
+
     func testRenderWorkSessionSignSheet() throws {
         let item = try decode(SignatureQueue.self, JobFixtures.signatureQueue).items[0]
         try snapshot(WorkSessionSignSheet(item: item), name: "fixture-sign-work-day")
