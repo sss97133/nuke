@@ -1371,6 +1371,43 @@ claimed here; exact checked/deployed/runtime stages remain in the private receip
 Receipts: `~/nuke-logs/model-year-refresh-20261018/`. No third unchanged refresh, Realtime access
 change, capacity increase, raw testimony mutation or new recurring job is part of this repair.
 
+### Fiat model identity and intake matching prepared, 2026-10-19 UTC
+
+The earlier full stored-vehicle reference remains the October18 atlas estimate of1,248,544 rows;
+current exact public/eligible and affected-fleet denominators are not measured. This next validation
+cohort is all973 retained Fiat name rows representing4,133 dictionary record rows, not verified
+physical vehicles or newly ready answers.94 name rows/367 represented records explicitly naming
+nine other models were in500;850 source examples were inX1/9. Retained Panda/850 native headlines
+agree with those model claims. Original source rows and physical identity uncertainty remain intact.
+
+Two catalog rows are narrowed and ten source-supported names use the existing canonical_models
+owner. References are Fiat's official history, Stellantis Heritage's1100/128/130/131/barchetta
+accounts and Giugiaro's850 Spider portfolio. Fiat's history explicitly identifies Topolino as500,
+so that alias is retained. Unassessed coachbuilder/generic tokens remain unresolved. In the complete
+retained-name replay,594 represented records rebind, none become newly bound, and370 formerly forced
+bindings become unresolved; all973 names/4,133 represented records survive. These are classification
+changes, not a fleet-readiness gain. New production ranges remain unknown.
+
+The native normalize_vehicle_model owner also ranked generic Spider above the specific850 alias
+because it sorted display-name length. It treated NULL year starts as exclusion and could match130
+inside1300. The prepared fix ranks the actual literal alias, preserves numeric boundaries, admits
+unknown bounds while respecting explicit limits, and leaves exact-match confidence semantics intact.
+GM truck, unqualified and wildcard-make lookup paths retain their prior rules. An initial generic
+candidate changed K1500 Silverado toSilverado; the final scoped candidate preserves all19 controls
+from the current273-row GM catalog. No GM catalog or market-family rule changes are included.
+The same-corrected-catalog Fiat name-only diagnostic changes45 names/116 represented records under
+the new normalizer; that diagnostic has no independent correctness or fleet-readiness interpretation.
+
+The actual PostgreSQL contract has33 assertions, including source/count/dollar preservation,
+Topolino/X1/9 controls, public Panda sales, old-fit withholding, explicit-year refusal, earlier
+Bultaco/Suzuki cases, literal wildcard/numeric negatives and unchanged functionOID/owner/grants.
+A real concurrent owner edit is refused before catalog writes and remains preserved. No Fiat
+make_model_profiles rows were present. The prior500 fit/series is retained privately and withheld
+through record_family_price_index; qualified new fitting remains separate. The legacy normalize_model
+location/casing path and physical scalar backfills remain outside this patch. Delivery is prepared
+and locally tested here; checked merge, CI deployment, dependent folds and anonymous runtime evidence
+belong in ~/nuke-logs/model-identity-fiat-20261018/.
+
 ## 13. Aspiration: twenty stacks the model must be able to carry (owner, 2026-10-06)
 
 **Owner direction, 2026-10-06 23:35Z.** "This scale is where we should be starting at every session: we are combing
