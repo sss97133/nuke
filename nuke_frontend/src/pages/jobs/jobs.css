@@ -50,3 +50,6 @@ textarea.jb-input { resize: vertical; min-height: 96px; }
 .jb-steps { padding: 8px 0; border-bottom: 2px solid var(--border); }
 .jb-steps .jb-ol { gap: 4px; }
 .jb-input--time { width: 112px; }
+
+/* Inspection call-to-action on a public vehicle page. */
+.jb-cta { border: 2px solid var(--text); display: grid; gap: 6px; }

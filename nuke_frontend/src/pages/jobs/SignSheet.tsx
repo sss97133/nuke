@@ -15,7 +15,7 @@ export function SignSheet({ title, says, doesNotSay, confirmLabel, onConfirm, on
   onClose: () => void;
   busy?: boolean;
   failure?: string | null;
-  /** Replaces the confirm step once the server answered. */
+  /** Replaces the confirm step once the server answered; any falsy value keeps the confirm step. */
   done?: React.ReactNode;
   children?: React.ReactNode;
 }) {
@@ -33,7 +33,7 @@ export function SignSheet({ title, says, doesNotSay, confirmLabel, onConfirm, on
       </div>
       <div className="jb-sheet__body">
         {children}
-        {done ?? <>
+        {done ? done : <>
           <div className="jb-says">
             <Text role="label">Signing says</Text>
             <ul>{says.map(s => <li key={s}><Text role="body">{s}</Text></li>)}</ul>

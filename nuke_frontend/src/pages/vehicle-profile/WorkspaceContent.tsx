@@ -16,6 +16,7 @@ const WorthEngineCard = React.lazy(() => import('./WorthEngineCard'));
 const PhotoAuthenticationCard = React.lazy(() => import('./PhotoAuthenticationCard'));
 const VehicleFindingsCard = React.lazy(() => import('./VehicleFindingsCard'));
 const VehicleWorkCard = React.lazy(() => import('../jobs/VehicleWorkCard'));
+const InspectionCallout = React.lazy(() => import('../jobs/InspectionCallout'));
 const BuyerQuestionPreview = React.lazy(() => import('../../components/vehicle/BuyerQuestionPreview'));
 const ExternalListingCard = React.lazy(() => import('../../components/vehicle/ExternalListingCard'));
 const VehicleReferenceLibrary = React.lazy(() => import('../../components/vehicle/VehicleReferenceLibrary'));
@@ -171,6 +172,13 @@ const WorkspaceContent: React.FC<WorkspaceContentProps> = ({
           className="vp-col-left vehicle-profile-left-column"
           style={{ width: `${leftPct}%` }}
         >
+          {/* Buyers: inspect before you buy, when the listing plan has checklist items */}
+          {isPublic && !(isRowOwner || isVerifiedOwner) && (
+            <React.Suspense fallback={null}>
+              <InspectionCallout vehicleId={vehicle.id} signedIn={!!session?.user?.id} />
+            </React.Suspense>
+          )}
+
           {/* Work Memory */}
           {(isRowOwner || isVerifiedOwner || hasContributorAccess) && (
             <React.Suspense fallback={null}>
