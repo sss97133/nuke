@@ -116,6 +116,7 @@ INSERT INTO work_order_labor(id,work_order_id,task_name,task_category,hours,hour
 \ir ../migrations/20261019180000_work_order_offers.sql
 \ir ../migrations/20261019181500_work_order_offer_acceptance.sql
 \ir ../migrations/20261019183000_work_order_offers_read.sql
+\ir ../migrations/20261019184500_inspection_access.sql
 
 -- Synthetic sources in the guarded disposable database only.
 CREATE FUNCTION public.src(p_envelope jsonb,p_vehicle uuid DEFAULT '40000000-0000-0000-0000-000000000001',

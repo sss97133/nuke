@@ -522,6 +522,27 @@ accept clock only while it is current, and adds `accepted_providers`,
 `provider_acceptance_clock` and `provider_acceptances_withheld`, plus the gap
 `provider_acceptance_withheld`. Contract: `supabase/sql/test_work_order_offers_read.sql`.
 
+Seller permission for an inspection is its own Sign. It is never implied by ordering or
+accepting an inspection.
+
+`grant_inspection_access(p_inspection_work_order_id, p_scope, p_window)` may be signed only by
+a verified owner of the vehicle (`vehicle_verified_owner`: approved, unexpired
+`ownership_verifications`). It records a `permission` attestation (verdict `supports`, the
+stated scope) on the current accepted inspector's offer, through the existing projector, with
+the signer as attestor. `p_window` (`{from, until}`) stays on the source record, and no vehicle
+access rows change.
+
+`inspection_seller_permission` reports the state:
+
+- `established` while the attestation, the inspector's offer and the inspection requirement
+  are current, and the attestor is still a verified owner;
+- `expired` after the window;
+- otherwise `not_established`.
+
+The open inspection reader and the job path's inspection stage read it. On 2026-10-19 the 4
+approved live owner verifications had all expired, so no live account could sign yet.
+Contract: `supabase/sql/test_inspection_access.sql`.
+
 ## Job path self-measurement
 
 `read_work_order_job_path(work_order_id)` reports one work order's evidence across seven
