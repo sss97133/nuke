@@ -88,7 +88,7 @@ const WorkPage: React.FC = () => {
     void loadJobs(null);
   }, [loadJobs]);
 
-  return <main className="jb-page">
+  return <main className="jb-page jb-scope">
     <div className="jb-intro">
       <Text role="entity" as="h1">Work</Text>
       <Text role="body">What is waiting for your signature, and the jobs you are on. <PrefetchLink to="/jobs">Jobs looking for someone</PrefetchLink></Text>

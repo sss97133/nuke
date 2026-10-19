@@ -478,6 +478,11 @@ function sourceWord(s: string): string {
   }
 }
 
+export function vinDecodeLine(state: string): string {
+  if (state.startsWith('not_applicable')) return "The VIN wasn't decoded: it is missing or not 17 characters.";
+  return `The VIN couldn't be decoded (${sentence(state).toLowerCase()}).`;
+}
+
 export function claimKindWord(k: string): string {
   switch (k) {
     case 'listing_statement': return 'Listing statement';

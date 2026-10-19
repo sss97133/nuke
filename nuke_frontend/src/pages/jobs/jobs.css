@@ -5,6 +5,12 @@
 .jb-page > .k-section { padding-left: 0; padding-right: 0; }
 .jb-intro { display: grid; gap: 4px; padding: 10px 0 8px; border-bottom: 2px solid var(--border); }
 
+/* Text roles render as spans; a standalone line inside a job section is its own block. */
+.jb-scope .k-section > .k-body,
+.jb-scope .k-section > .k-caption,
+.jb-scope .k-section > a { display: block; margin-top: 4px; }
+.jb-scope .k-section .k-section { padding-left: 0; padding-right: 0; }
+
 .jb-list { list-style: none; margin: 0; padding: 0; }
 .jb-row { display: grid; gap: 3px; padding: 8px 0; border-bottom: 1px solid var(--border); }
 .jb-row:last-child { border-bottom: 0; }

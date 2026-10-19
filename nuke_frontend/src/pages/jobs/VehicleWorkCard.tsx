@@ -28,7 +28,7 @@ export default function VehicleWorkCard({ vehicleId, vehicleTitle, signedIn }: {
   const access = read.viewer.vehicle_access;
   const postAction = access?.can_post_work_request ? (read.viewer.actions ?? []).find(a => a.action === 'post_work_request') ?? null : null;
 
-  return <Section title="Work" coverage={{ n: read.rows.length, of: read.coverage.total_for_vehicle, grain: 'jobs on this vehicle', as_of: read.as_of }} ariaLabel="Work on this vehicle">
+  return <div className="jb-scope"><Section title="Work" coverage={{ n: read.rows.length, of: read.coverage.total_for_vehicle, grain: 'jobs on this vehicle', as_of: read.as_of }} ariaLabel="Work on this vehicle">
     {read.rows.length > 0 && <ul className="jb-list">{read.rows.map(r => <li key={r.work_order_id} className="jb-row">
       <PrefetchLink to={jobHref(r.work_order_id)}><Text role="entity" dense>{r.display_title || r.title || 'Untitled job'}</Text></PrefetchLink>
       {(r.slots ?? []).length > 0 && <Text role="caption">{(r.slots ?? []).map(slotWords).join(' · ')}</Text>}
@@ -43,5 +43,5 @@ export default function VehicleWorkCard({ vehicleId, vehicleTitle, signedIn }: {
     {posting && postAction && <React.Suspense fallback={null}>
       <PostJobSheet action={postAction} vehicleTitle={vehicleText(read.vehicle_label) ?? vehicleTitle} onClose={() => setPosting(false)} />
     </React.Suspense>}
-  </Section>;
+  </Section></div>;
 }

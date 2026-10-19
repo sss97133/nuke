@@ -14,7 +14,7 @@ import { PrefetchLink } from '../../components/PrefetchLink';
 import { SignSheet } from './SignSheet';
 import {
   IDENTITY_FIELDS, JobReaders, JobSigns, NO_SHOP_RATE, PLAN_HEADLINE, ROUGH_GUIDE, claimKindWord, claimSourceLine, hostOf, identityFieldLabel,
-  identityStatusWord, identityValues, isExactQuote, jobHref, sentence, systemWord, targetHours, vehicleText, type WorkPlan,
+  identityStatusWord, identityValues, isExactQuote, jobHref, sentence, systemWord, targetHours, vehicleText, vinDecodeLine, type WorkPlan,
 } from './jobsReaders';
 import './jobs.css';
 
@@ -69,7 +69,7 @@ export function WorkPlanView({ vehicleId, plan, signedIn }: { vehicleId: string;
       {flagged.length === 0
         ? <Text role="body">The details agree across sources ({agreeing} checked).</Text>
         : <Rows title="Differences">{flagged.map(f => <Row key={f} label={`${identityFieldLabel(f)} · ${identityStatusWord(fields[f]?.status)}`}>{identityValues(fields[f])}</Row>)}</Rows>}
-      {vinState && vinState !== 'usable' && <Text role="caption">The VIN couldn't be decoded ({sentence(vinState).toLowerCase()}).</Text>}
+      {vinState && vinState !== 'usable' && <Text role="caption">{vinDecodeLine(vinState)}</Text>}
       <Text role="caption">A difference doesn't say which source is right. The inspection does.</Text>
     </Section>
 

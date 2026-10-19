@@ -94,7 +94,7 @@ const JobsBoard: React.FC = () => {
   useEffect(() => { void load(null); }, [load]);
 
   const total = page?.coverage.total_open ?? 0;
-  return <main className="jb-page">
+  return <main className="jb-page jb-scope">
     <div className="jb-intro">
       <Text role="entity" as="h1">Jobs looking for someone</Text>
       {page && <Text role="body">{openRequestsSentence(total)}.</Text>}
