@@ -7,12 +7,14 @@ import { PrefetchLink } from '../../components/PrefetchLink';
 import { Masthead, Row, Rows, Section, Text, type Coverage } from '../../kit';
 import { JobStageRail } from '../jobs/JobStageRail';
 import { readJob, type Load } from '../jobs/readJob';
-import { arr, day, num, obj, sentence, slotWord, str, strings, vehicleText, type JsonObject, type StageKey } from '../jobs/jobRead';
+import { arr, day, num, obj, parseActions, personLabel, sentence, slotWord, str, strings, vehicleText, type JsonObject, type StageKey } from '../jobs/jobRead';
 import {
   capabilities, capabilityLabel, claimRows, evidenceLine, place, seenCoverage, showsShops, strengthWord, subjectName,
   technicianLinkOf, toolCategories,
 } from './providerRead';
 import { ContactViaNuke } from './ContactViaNuke';
+import { SignActions } from '../jobs/SignAction';
+import { VouchSheet } from '../jobs/PeopleSheets';
 import { setupIncomplete } from '../provider-setup/setupReaders';
 import '../jobs/job-page.css';
 
@@ -74,22 +76,45 @@ function ToolsSection({ p, isSelf }: { p: JsonObject; isSelf: boolean }) {
   </Section>;
 }
 
-function VouchSection({ p }: { p: JsonObject }) {
+function vouchLine(v: JsonObject): string {
+  return [strings(v.kinds).map(k => sentence(k).toLowerCase()).join(', '), str(v.scope), day(str(v.vouched_at ?? v.signed_at)) ? `vouched ${day(str(v.vouched_at ?? v.signed_at))}` : null,
+    day(str(v.expires_at)) ? `until ${day(str(v.expires_at))}` : null].filter(Boolean).join(' · ');
+}
+
+function VouchSection({ p, canVouch, name, onChanged }: { p: JsonObject; canVouch: boolean; name: string; onChanged: () => void }) {
+  const [vouching, setVouching] = useState(false);
   const items = arr(obj(p.vouched_for_by)?.items).map(obj).filter((o): o is JsonObject => !!o);
-  if (!items.length) return null;
+  const s = obj(p.subject);
+  const subject = s?.kind === 'actor' ? { userId: null, actorId: str(s.actor_id) } : { userId: str(s?.profile_id), actorId: null };
+  if (!items.length && !canVouch) return null;
   return <Section title="Vouched for by" coverage={cov(items.length, items.length, 'standing vouches', p.as_of)}>
     <Rows title="Vouches">
       {items.map((v, i) => {
         const voucher = obj(v.voucher);
         const handle = str(voucher?.handle);
         const who = handle ? '@' + handle : voucher?.kind === 'organization' && str(voucher?.name) ? str(voucher?.name)! : 'Unnamed party';
-        return <Row key={str(v.vouch_id) ?? i} label={who}>
-          {[strings(v.kinds).map(k => sentence(k).toLowerCase()).join(', '), str(v.scope), day(str(v.vouched_at)) ? `vouched ${day(str(v.vouched_at))}` : null,
-            day(str(v.expires_at)) ? `until ${day(str(v.expires_at))}` : null].filter(Boolean).join(' · ')}
-        </Row>;
+        return <Row key={str(v.vouch_id) ?? i} label={who + (v.is_mine === true ? ' · yours' : '')}>{vouchLine(v)}</Row>;
       })}
     </Rows>
+    <SignActions actions={items.flatMap(v => parseActions(v.actions))} onSigned={onChanged} />
     <Text role="caption" as="p">A vouch is someone's signed word about this person. It isn't counted as skill.</Text>
+    {canVouch && <button type="button" className="job-button" onClick={() => setVouching(true)}><Text role="label">Vouch for this person</Text></button>}
+    {vouching && <VouchSheet subject={subject} name={name} onClose={() => setVouching(false)} onDone={onChanged} />}
+  </Section>;
+}
+
+/** The person's own vouches (my_vouches_read), each withdrawable while active. Self face only. */
+function MyVouchesSection({ onChanged }: { onChanged: () => void }) {
+  const [read, setRead] = useState<Load>({ status: 'loading' });
+  useEffect(() => { readJob('my_vouches_read', {}).then(setRead); }, []);
+  if (read.status !== 'loaded') return read.status === 'failed' ? <section className="k-section job-block"><Text role="body" as="p">{`Your vouches: ${read.reason}`}</Text></section> : null;
+  const items = arr(read.data.items).map(obj).filter((o): o is JsonObject => !!o);
+  if (!items.length) return null;
+  return <Section title="Your vouches" coverage={cov(items.length, items.length, 'vouches you manage', read.data.as_of)}>
+    <Rows title="Vouches you signed">
+      {items.map((v, i) => <Row key={str(v.vouch_id) ?? i} label={`${personLabel(v.subject)} · ${sentence(str(v.status) ?? 'active').toLowerCase()}`}>{vouchLine(v)}</Row>)}
+    </Rows>
+    <SignActions actions={items.flatMap(v => parseActions(v.actions))} onSigned={() => { readJob('my_vouches_read', {}).then(setRead); onChanged(); }} />
   </Section>;
 }
 
@@ -284,7 +309,9 @@ export default function ProviderProfilePage() {
     <SaysSection p={data} isSelf={isSelf} />
     <RecordSection p={data} />
     <ToolsSection p={data} isSelf={isSelf} />
-    <VouchSection p={data} />
+    <VouchSection p={data} name={name} onChanged={() => setNonce(n => n + 1)}
+      canVouch={!!user && !isSelf && (s?.kind === 'actor' ? !!str(s.actor_id) : !!str(s?.profile_id))} />
+    {isSelf && <MyVouchesSection onChanged={() => setNonce(n => n + 1)} />}
     {showsShops(viewerContext) && <ShopsSection p={data} />}
     <WorkRecordSection p={data} isSelf={isSelf} />
     {jobs.status === 'loaded' && <JobsSection page={jobs.data} onMore={loadMore} loadingMore={loadingMore} />}

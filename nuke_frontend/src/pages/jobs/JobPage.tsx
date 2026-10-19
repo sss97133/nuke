@@ -12,6 +12,8 @@ import {
   type JobAction, type JsonObject, type Stage, type Viewer,
 } from './jobRead';
 import { readJob, type Load } from './readJob';
+import { JobSheetContext } from './jobSheetContext';
+import { completionActions, completionState } from './signDrafts';
 import './job-page.css';
 
 const READERS = {
@@ -192,7 +194,9 @@ function QuoteSection({ d, onSigned }: { d: JsonObject; onSigned: () => void }) 
   const viewer = parseViewer(d.viewer);
   const q = obj(d.current_quote);
   const history = arr(d.history).map(obj).filter((o): o is JsonObject => !!o);
-  const actions: JobAction[] = [...(viewer?.actions ?? []), ...(viewer?.issuerActions ?? [])];
+  const isChange = !!q && (!!obj(q.change_order) || q.is_change_order === true);
+  const actions: JobAction[] = [...(viewer?.actions ?? []).map(a => (a.kind === 'accept_quote' && isChange ? { ...a, label: 'Accept change order' } : a)),
+    ...(viewer?.issuerActions ?? [])];
   if (!q && !history.length && !actions.length) return null;
   const c = obj(d.coverage);
   const release = obj(d.release_conditions);
@@ -406,8 +410,13 @@ export default function JobPage() {
   const failures = READER_KEYS.filter(k => reads[k]?.status === 'failed');
   const pending = READER_KEYS.filter(k => !reads[k] || reads[k]?.status === 'loading');
   const r = (k: ReaderKey) => loaded(reads[k]);
+  const completionStage = stages.find(s => s.key === 'completion')?.raw ?? null;
+  const pathActions = [...(viewer?.actions ?? []),
+    ...completionActions(workOrderId, completionStage, parseViewer(r('invoices')?.viewer)?.actions ?? [], viewer?.slots ?? [])];
+  const sheetData = { workOrderId, quotes: r('quotes'), operations: r('operations'), offers: r('offers'), invoices: r('invoices'),
+    completionSignedAt: completionState(completionStage).signedAt, reload };
 
-  return <article className="job-page" aria-label={title}>
+  return <JobSheetContext.Provider value={sheetData}><article className="job-page" aria-label={title}>
     <Masthead result={<Text role="caption">{str(data.request_source_label) ?? ''}</Text>}>
       <div className="job-masthead">
         <Text role="entity" as="h1">{title}</Text>
@@ -422,7 +431,7 @@ export default function JobPage() {
         conflicts={Object.fromEntries(stages.map(s => [s.key, s.inconsistencies.length > 0]))} />
       <Text role="caption" as="p">Viewing as {viewingAs(viewer)}. Stages show what's on record, not yet verified; "proven" is kept for signatures made through Nuke.</Text>
       <JobStageRailLegend />
-      {viewer && viewer.actions.length > 0 && <SignActions actions={viewer.actions} onSigned={reload} />}
+      {pathActions.length > 0 && <SignActions actions={pathActions} onSigned={reload} />}
     </Section>
 
     <Section title="Stages" coverage={cov(stages.filter(s => s.state !== null).length, STAGES.length, 'stages reported', data.as_of)}>
@@ -451,5 +460,5 @@ export default function JobPage() {
         {' '}— parts and labor for every work order on this vehicle; payments only for the people on each job.
       </Text>
     </section>
-  </article>;
+  </article></JobSheetContext.Provider>;
 }

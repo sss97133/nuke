@@ -26,7 +26,7 @@ const NAV_LINKS = [
   { label: 'STACKS', to: '/stacks' },
 ];
 // Signed-in only: the work console (signature queue and the viewer's jobs).
-const SIGNED_IN_NAV_LINKS = [{ label: 'WORK', to: '/work' }];
+const SIGNED_IN_NAV_LINKS = [{ label: 'WORK', to: '/work' }, { label: 'MESSAGES', to: '/messages' }];
 
 /**
  * AppHeader — One row, four zones, 40px.
