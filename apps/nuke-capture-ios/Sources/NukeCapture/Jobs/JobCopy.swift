@@ -54,6 +54,7 @@ enum JobCopy {
         case .partial: return "In progress"
         case .statusOnly: return "Marked only"
         case .absent: return "Not started"
+        case .withheld: return "People on this job only"
         case .unknown: return "Needs a newer app version"
         }
     }
@@ -65,9 +66,12 @@ enum JobCopy {
         case .partial: return "In progress"
         case .statusOnly: return "Marked, but no record behind it"
         case .absent: return "Not started"
+        case .withheld: return withheldPayments
         case .unknown: return "Needs a newer app version"
         }
     }
+
+    static let withheldPayments = "Payments are shown to the people on this job"
 
     static let notVerifiedNote = "Stages show what's on record — not yet verified."
 
@@ -100,7 +104,24 @@ enum JobCopy {
         "payments_without_vehicle": "Payments recorded without a vehicle",
     ]
 
-    static func gap(_ code: String) -> String { gaps[code] ?? sentence(code) }
+    private static let withheldReasons: [String: String] = [
+        "acceptance_source_withdrawn": "the acceptance was withdrawn",
+        "quote_source_withdrawn": "the quote was withdrawn",
+        "quote_superseded": "a newer quote replaced the accepted one",
+        "signer_no_longer_customer": "the person who accepted is no longer the customer",
+        "scope_changed_since_quote": "the work changed since the quote",
+    ]
+
+    /// "Acceptance on hold: the work changed since the quote".
+    static func acceptanceOnHold(_ reason: String?) -> String {
+        guard let reason else { return "Acceptance on hold" }
+        return "Acceptance on hold: " + (withheldReasons[reason] ?? sentence(reason).lowercased())
+    }
+
+    static func gap(_ code: String) -> String {
+        if code.hasPrefix("acceptance_withheld_") { return acceptanceOnHold(String(code.dropFirst("acceptance_withheld_".count))) }
+        return gaps[code] ?? sentence(code)
+    }
     static func conflict(_ code: String) -> String { conflicts[code] ?? sentence(code) }
 
     // MARK: Facts
@@ -128,6 +149,8 @@ enum JobCopy {
         "quote_clock": "Quoted",
         "estimate_recorded": "Estimate on record",
         "approval_clock": "Quote accepted",
+        "quote_versions": "Quote versions",
+        "approval_signer": "Accepted by",
         "schedule_window_recorded": "Schedule set",
         "assignments": "Technicians assigned",
         "assignments_by_status": "Assignments by status",
@@ -158,8 +181,34 @@ enum JobCopy {
         "specification_population": "Specification list complete",
     ]
 
-    /// Reader bookkeeping that means nothing to a person; never shown.
-    static let hiddenFacts: Set<String> = ["source_scope"]
+    /// Reader bookkeeping that means nothing to a person (or that carries ids); never shown.
+    static let hiddenFacts: Set<String> = ["source_scope", "current_quote", "quote_clock_basis", "approval_clock_basis",
+                                           "stored_approval_clock", "visibility", "basis"]
+
+    /// A value that is an id or a content hash: never primary text.
+    static func isIdentifier(_ s: String) -> Bool {
+        let uuid = #"^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$"#
+        let hash = #"^[0-9a-f]{40,64}$"#
+        return s.range(of: uuid, options: .regularExpression) != nil || s.range(of: hash, options: .regularExpression) != nil
+    }
+
+    /// Fact values that need their own words before the generic ones.
+    static func factValue(_ key: String, _ v: JobJSON) -> String? {
+        switch key {
+        case "approval_signer":
+            guard case .object(let o) = v else { return v == .null ? "Not accepted yet" : nil }
+            let role = o["role"]?.stringValue.map(slot) ?? "customer"
+            return o["basis"]?.stringValue == "authenticated_sign" ? "The \(role), signed through Nuke" : "The \(role)"
+        case "customer_acceptance":
+            switch v.stringValue {
+            case "signed"?: return "Signed"
+            case "withheld"?: return "On hold"
+            default: return nil
+            }
+        default:
+            return nil
+        }
+    }
 
     static func fact(_ key: String) -> String { facts[key] ?? sentence(key) }
 
@@ -174,12 +223,14 @@ enum JobCopy {
             case "not_established": return "Not established yet"
             case "not_performed": return "Not yet"
             default:
+                if isIdentifier(s) { return "On record" }
                 if JobClock.date(s) != nil { return JobClock.text(s) ?? s }
                 return s.contains("_") ? sentence(s) : s
             }
         case .object(let o):
-            if o.isEmpty { return "None" }
-            return o.keys.sorted().map { "\(sentence($0).lowercased()) \(o[$0]!.text)" }.joined(separator: " · ")
+            let keys = o.keys.sorted().filter { !$0.hasSuffix("_id") && !$0.hasSuffix("_hash") && $0 != "basis" }
+            if keys.isEmpty { return "None" }
+            return keys.map { "\(sentence($0).lowercased()) \(value(o[$0]!))" }.joined(separator: " · ")
         case .array(let a): return a.isEmpty ? "None" : a.map(value).joined(separator: ", ")
         case .number: return v.text
         }
@@ -326,10 +377,71 @@ enum JobCopy {
         }
     }
 
+    // MARK: Quotes
+
+    /// "$160.00 / hour × 3", "$450.00", "Not priced".
+    static func linePrice(_ line: QuoteLine) -> String {
+        guard let amount = line.amount else { return "Not priced" }
+        let money = JobMoney.format(amount, line.currency)
+        let per: String? = {
+            switch line.pricingBasis {
+            case "hourly"?: return "hour"
+            case "day_rate"?: return "day"
+            case "per_operation"?: return "operation"
+            default: return line.unit
+            }
+        }()
+        guard let per, line.pricingBasis != "flat" else { return money }
+        if let q = line.quantity {
+            let qty = q == q.rounded() ? String(Int(q)) : String(q)
+            return "\(money) / \(per) × \(qty)"
+        }
+        return "\(money) / \(per)"
+    }
+
+    static func lineLabel(_ line: QuoteLine) -> String {
+        if let d = line.description { return d }
+        if line.descriptionVisibility == "withheld_personal_info" { return "Line (details hidden to protect a name)" }
+        return line.refKind.map(sentence) ?? "Line"
+    }
+
+    /// "$1,230.00", or the floor with a note when a rate line has no quantity.
+    static func total(_ t: QuoteTotal) -> (value: String, note: String?) {
+        let money = t.total.map { JobMoney.format($0, t.currency) } ?? "Not priced"
+        return (money, t.complete ? nil : "At least — some lines are priced by rate without a quantity")
+    }
+
+    static func acceptance(_ a: QuoteAcceptance?) -> String {
+        switch a?.state {
+        case "accepted"?:
+            let who = a?.acceptedByViewer == true ? "you" : "the customer"
+            let when = JobCopy.day(a?.signedAt).map { " · \($0)" } ?? ""
+            return "Accepted by \(who)\(when)"
+        case "withheld"?: return acceptanceOnHold(a?.withheldReason)
+        default: return "Not accepted yet"
+        }
+    }
+
+    // MARK: Statement
+
+    static func workStatus(_ s: String?) -> String {
+        switch s {
+        case "completed"?: return "Completed"
+        case "paid"?: return "Paid"
+        case "in_progress"?: return "In progress"
+        case "pending"?, "draft"?: return "Not started"
+        case "approved"?: return "Quote accepted"
+        case "cancelled"?: return "Cancelled"
+        case let other?: return sentence(other)
+        case nil: return "Status not recorded"
+        }
+    }
+
     // MARK: Actions
 
     private static let actions: [String: String] = [
         "accept_terms": "Accept quote",
+        "contact_request": "Contact via Nuke",
         "accept_quote": "Accept quote",
         "accept_offer": "Accept offer",
         "offer_on_requirement": "Make an offer",
@@ -338,7 +450,6 @@ enum JobCopy {
         "accept_change_order": "Accept change order",
         "pay_deposit": "Pay deposit",
         "contact_via_nuke": "Contact via Nuke",
-        "contact_request": "Contact via Nuke",
         "work_day": "Confirm work day",
         "work_session": "Confirm work day",
         "session": "Confirm photo session",

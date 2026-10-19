@@ -77,6 +77,16 @@ struct NukeCaptureApp: App {
                     WorkConsoleView(showCapture: MainTabView.currentPhotoGrant())
                 } else if let dbgJob = ProcessInfo.processInfo.environment["NUKE_DEBUG_JOB_ID"], !dbgJob.isEmpty {
                     NavigationStack { JobView(workOrderId: dbgJob) }
+                } else if let dbgStatement = ProcessInfo.processInfo.environment["NUKE_DEBUG_STATEMENT_VEHICLE"], !dbgStatement.isEmpty {
+                    NavigationStack { VehicleStatementView(vehicleId: dbgStatement) }
+                } else if let dbgWork = ProcessInfo.processInfo.environment["NUKE_DEBUG_VEHICLE_WORK"], !dbgWork.isEmpty {
+                    // The vehicle page's Work card alone, over the live reader, without the page's photos.
+                    NavigationStack {
+                        ScrollView { VehicleWorkSection(vehicleId: dbgWork).padding(.top, 12) }
+                            .background(Color(.systemGroupedBackground))
+                            .navigationTitle("Vehicle work")
+                            .navigationBarTitleDisplayMode(.inline)
+                    }
                 } else if ProcessInfo.processInfo.environment["NUKE_DEBUG_SCREEN"] == "days" {
                     // Days + the day receipt are entirely LocalStore — anon, no session.
                     LibraryDaysView()

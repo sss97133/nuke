@@ -250,6 +250,7 @@ struct WorkConsoleContent: View {
 /// One job in motion: its headline, this viewer's part, the mini rail and the first gap.
 struct JobRowView: View {
     let row: JobRow
+    var showVehicle = true
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
@@ -259,7 +260,7 @@ struct JobRowView: View {
                         .font(.subheadline.weight(.medium))
                         .foregroundStyle((row.displayTitle ?? row.title) == nil ? .secondary : .primary)
                         .lineLimit(2)
-                    if (row.displayTitle ?? row.title) != nil, let vehicle = row.vehicleLabel?.text {
+                    if showVehicle, (row.displayTitle ?? row.title) != nil, let vehicle = row.vehicleLabel?.text {
                         Text(vehicle).font(.caption).foregroundStyle(.secondary).lineLimit(1)
                     }
                 }
@@ -271,7 +272,7 @@ struct JobRowView: View {
                     Text("You: " + row.slots.map(JobCopy.slot).joined(separator: " · "))
                 }
                 if let gap = row.firstGap {
-                    Text("·")
+                    if !row.slots.isEmpty { Text("·") }
                     Text(JobCopy.gap(gap.gap))
                 }
                 Spacer(minLength: 0)

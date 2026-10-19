@@ -61,6 +61,36 @@ final class JobFixtureSnapshotTests: XCTestCase {
         try snapshot(view, name: "fixture-provider-link")
     }
 
+    func testRenderAcceptQuoteSheet() throws {
+        let q = try decode(JobQuotes.self, JobFixtures.quotesForCustomer)
+        let quote = try XCTUnwrap(q.currentQuote)
+        let action = try XCTUnwrap(q.acceptAction)
+        try snapshot(AcceptQuoteSheet(quote: quote, action: action), name: "fixture-accept-quote", pages: 2)
+    }
+
+    func testRenderJobViewWithQuote() throws {
+        let path = try decode(JobPath.self, JobFixtures.anonJobPath)
+        let quotes = try decode(JobQuotes.self, JobFixtures.quotesForCustomer)
+        let view = NavigationStack {
+            JobPathContent(workOrderId: JobFixtures.workOrderId, path: .loaded(path), resources: .loading, quotes: .loaded(quotes))
+        }
+        try snapshot(view, name: "fixture-jobview-quote", pages: 2)
+    }
+
+    func testRenderStatementForAParty() throws {
+        let s = try decode(JobStatement.self, JobFixtures.statementParty)
+        try snapshot(NavigationStack { VehicleStatementContent(statement: .loaded(s)) }, name: "fixture-statement-party")
+    }
+
+    func testRenderVehicleWorkCard() throws {
+        let page = try decode(MyWorkOrders.self, JobFixtures.vehicleWorkOrders)
+        let view = NavigationStack {
+            ScrollView { VehicleWorkCard(vehicleId: JobFixtures.vehicleId, jobs: .loaded(page)).padding(.top, 12) }
+                .background(Color(.systemGroupedBackground))
+        }
+        try snapshot(view, name: "fixture-vehicle-work-card")
+    }
+
     func testRenderWorkSessionSignSheet() throws {
         let item = try decode(SignatureQueue.self, JobFixtures.signatureQueue).items[0]
         try snapshot(WorkSessionSignSheet(item: item), name: "fixture-sign-work-day")

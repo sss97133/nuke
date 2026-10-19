@@ -114,6 +114,8 @@ enum JobStageState: Equatable, Decodable {
     case partial
     case statusOnly
     case absent
+    /// Shown only to the job's parties (accounting for a non-party viewer).
+    case withheld
     case unknown(String)
 
     init(raw: String) {
@@ -122,6 +124,7 @@ enum JobStageState: Equatable, Decodable {
         case "partial": self = .partial
         case "status_only": self = .statusOnly
         case "absent": self = .absent
+        case "withheld": self = .withheld
         default: self = .unknown(raw)
         }
     }
@@ -138,6 +141,7 @@ enum JobStageState: Equatable, Decodable {
         case .partial: return "partial"
         case .statusOnly: return "status_only"
         case .absent: return "absent"
+        case .withheld: return "withheld"
         case .unknown(let s): return s
         }
     }
@@ -256,10 +260,14 @@ struct JobAction: Decodable, Equatable, Identifiable {
     let kind: String
     let label: String?
     let stage: String?
+    /// The writer the server names for this step and its arguments (e.g. accept_work_order_quote
+    /// with p_quote_id and p_quote_hash). The phone passes them back; it never composes them.
+    let rpc: String?
+    let args: [String: JobJSON]
     var id: String { kind + (stage ?? "") }
 
-    init(kind: String, label: String? = nil, stage: String? = nil) {
-        self.kind = kind; self.label = label; self.stage = stage
+    init(kind: String, label: String? = nil, stage: String? = nil, rpc: String? = nil, args: [String: JobJSON] = [:]) {
+        self.kind = kind; self.label = label; self.stage = stage; self.rpc = rpc; self.args = args
     }
 
     init(from decoder: Decoder) throws {
@@ -275,7 +283,9 @@ struct JobAction: Decodable, Equatable, Identifiable {
         }
         self.init(kind: kind,
                   label: try? c.decode(String.self, forKey: JobCodingKey("label")),
-                  stage: try? c.decode(String.self, forKey: JobCodingKey("stage")))
+                  stage: try? c.decode(String.self, forKey: JobCodingKey("stage")),
+                  rpc: try? c.decode(String.self, forKey: JobCodingKey("rpc")),
+                  args: (try? c.decode([String: JobJSON].self, forKey: JobCodingKey("args"))) ?? [:])
     }
 
     var title: String { label ?? JobCopy.action(kind) }
@@ -289,14 +299,19 @@ struct JobVehicleLabel: Decodable, Equatable {
     let make: String?
     let model: String?
     let trim: String?
+    /// The reader's own composed label, preferred when present.
+    let serverText: String?
 
     enum CodingKeys: String, CodingKey {
         case year, make, model, trim
         case vehicleId = "vehicle_id"
+        case serverText = "text"
     }
 
-    init(vehicleId: String? = nil, year: Int? = nil, make: String? = nil, model: String? = nil, trim: String? = nil) {
+    init(vehicleId: String? = nil, year: Int? = nil, make: String? = nil, model: String? = nil, trim: String? = nil,
+         serverText: String? = nil) {
         self.vehicleId = vehicleId; self.year = year; self.make = make; self.model = model; self.trim = trim
+        self.serverText = serverText
     }
 
     init(from decoder: Decoder) throws {
@@ -306,10 +321,12 @@ struct JobVehicleLabel: Decodable, Equatable {
         make = try? c.decode(String.self, forKey: .make)
         model = try? c.decode(String.self, forKey: .model)
         trim = try? c.decode(String.self, forKey: .trim)
+        serverText = (try? c.decode(String.self, forKey: .serverText)).flatMap { $0.isEmpty ? nil : $0 }
     }
 
     /// "1977 Chevrolet Blazer Cheyenne"; nil when nothing names the vehicle.
     var text: String? {
+        if let serverText, !serverText.contains("UNRESOLVED") { return serverText }
         let parts = [year.map(String.init), make, model, trim].compactMap { $0 }
             .map { $0.trimmingCharacters(in: .whitespaces) }.filter { !$0.isEmpty && $0 != "UNRESOLVED" }
         return parts.isEmpty ? nil : parts.joined(separator: " ")
@@ -334,9 +351,11 @@ struct JobPath: Decodable, Equatable {
     let displayTitle: String?
     let vehicleLabel: JobVehicleLabel?
     let requestSourceLabel: String?
+    let displayTitleBasis: String?
 
     enum CodingKeys: String, CodingKey {
         case stages, viewer
+        case displayTitleBasis = "display_title_basis"
         case displayTitle = "display_title"
         case vehicleLabel = "vehicle_label"
         case requestSourceLabel = "request_source_label"
@@ -362,6 +381,7 @@ struct JobPath: Decodable, Equatable {
         displayTitle = (try? c.decode(String.self, forKey: .displayTitle)).flatMap { $0.isEmpty ? nil : $0 }
         vehicleLabel = (try? c.decode(JobVehicleLabel.self, forKey: .vehicleLabel)).flatMap { $0.text == nil ? nil : $0 }
         requestSourceLabel = (try? c.decode(String.self, forKey: .requestSourceLabel)).flatMap { $0.isEmpty ? nil : $0 }
+        displayTitleBasis = try? c.decode(String.self, forKey: .displayTitleBasis)
         var stages: [JobStageKey: JobStage] = [:]
         var unknown: [String] = []
         if let s = try? c.nestedContainer(keyedBy: JobCodingKey.self, forKey: .stages) {
@@ -384,20 +404,23 @@ struct JobCoverage: Decodable, Equatable {
     let returned: Int?
     let totalForViewer: Int?
     let slotFilter: String?
+    let totalForVehicle: Int?
 
     enum CodingKeys: String, CodingKey {
         case returned
         case totalForViewer = "total_for_viewer"
         case slotFilter = "slot_filter"
+        case totalForVehicle = "total_for_vehicle"
     }
 
-    init(returned: Int?, totalForViewer: Int?, slotFilter: String? = nil) {
+    init(returned: Int?, totalForViewer: Int?, slotFilter: String? = nil, totalForVehicle: Int? = nil) {
         self.returned = returned; self.totalForViewer = totalForViewer; self.slotFilter = slotFilter
+        self.totalForVehicle = totalForVehicle
     }
 
     /// "Showing 3 of 7 work orders", or the honest unknown.
     var sentence: String {
-        switch (returned, totalForViewer) {
+        switch (returned, totalForViewer ?? totalForVehicle) {
         case let (r?, t?): return "Showing \(r) of \(t) work orders"
         case let (r?, nil): return "Showing \(r) · total not available"
         default: return "Total not available"
@@ -480,6 +503,8 @@ struct MyWorkOrders: Decodable, Equatable {
     let viewer: JobViewer?
     let nextAfter: String?
     let asOf: String?
+    /// vehicle_work_orders_read names the vehicle once for the page.
+    let vehicleLabel: JobVehicleLabel?
     /// Rows the reader sent in a shape this build cannot read; counted, never dropped silently.
     var unreadableRows: Int
 
@@ -487,6 +512,7 @@ struct MyWorkOrders: Decodable, Equatable {
         case rows, work_orders, coverage, viewer
         case nextAfter = "next_after"
         case asOf = "as_of"
+        case vehicleLabel = "vehicle_label"
     }
 
     init(from decoder: Decoder) throws {
@@ -499,6 +525,7 @@ struct MyWorkOrders: Decodable, Equatable {
         viewer = try? c.decode(JobViewer.self, forKey: .viewer)
         nextAfter = try? c.decode(String.self, forKey: .nextAfter)
         asOf = try? c.decode(String.self, forKey: .asOf)
+        vehicleLabel = try? c.decode(JobVehicleLabel.self, forKey: .vehicleLabel)
     }
 
     /// The next page appended to this one; the newer page's cursor and coverage win.

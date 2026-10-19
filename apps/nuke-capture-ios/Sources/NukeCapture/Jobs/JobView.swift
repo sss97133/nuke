@@ -18,10 +18,12 @@ struct JobView: View {
 
     @State private var path: JobLoad<JobPath> = .loading
     @State private var resources: JobLoad<JobResources> = .loading
+    @State private var quotes: JobLoad<JobQuotes> = .loading
 
     var body: some View {
-        JobPathContent(workOrderId: workOrderId, path: path, resources: resources,
-                       titleHint: titleHint, vehicleHint: vehicleHint)
+        JobPathContent(workOrderId: workOrderId, path: path, resources: resources, quotes: quotes,
+                       titleHint: titleHint, vehicleHint: vehicleHint,
+                       onChanged: { Task { await load() } })
             .task(id: workOrderId) { await load() }
             .refreshable { await load() }
     }
@@ -29,8 +31,10 @@ struct JobView: View {
     private func load() async {
         async let p = JobReaders.jobPath(workOrderId: workOrderId)
         async let r = JobReaders.resources(workOrderId: workOrderId)
+        async let q = JobReaders.quotes(workOrderId: workOrderId)
         path = await p
         resources = await r
+        quotes = await q
     }
 }
 
@@ -50,8 +54,12 @@ struct JobPathContent: View {
     let workOrderId: String
     let path: JobLoad<JobPath>
     let resources: JobLoad<JobResources>
+    var quotes: JobLoad<JobQuotes> = .loading
     var titleHint: String? = nil
     var vehicleHint: String? = nil
+    var onChanged: (() -> Void)? = nil
+
+    @State private var accepting: QuoteBox?
 
     var body: some View {
         List {
@@ -71,6 +79,7 @@ struct JobPathContent: View {
             case .loaded(let p):
                 header(p)
                 railSection(p)
+                quoteSection
                 ForEach(JobStageKey.allCases) { key in
                     stageSection(key, p.stages[key], p)
                 }
@@ -86,6 +95,9 @@ struct JobPathContent: View {
         }
         .navigationTitle(navigationTitle)
         .navigationBarTitleDisplayMode(.inline)
+        .sheet(item: $accepting) { box in
+            AcceptQuoteSheet(quote: box.quote, action: box.action) { onChanged?() }
+        }
     }
 
     /// The job's own title when anyone has it; never an id.
@@ -133,13 +145,17 @@ struct JobPathContent: View {
     @ViewBuilder private func stageSection(_ key: JobStageKey, _ stage: JobStage?, _ p: JobPath) -> some View {
         Section {
             if let stage {
-                if let rung = JobRung.status(stage) {
+                if stage.state == .withheld {
+                    Label(JobCopy.withheldPayments, systemImage: "lock")
+                        .font(.footnote).foregroundStyle(.secondary)
+                } else if let rung = JobRung.status(stage) {
                     RootedValueView(label: "Status", value: JobCopy.stateLine(stage.state), status: rung)
                     ForEach(Self.visibleFacts(stage.facts)) { fact in
                         RootedValueView(label: JobCopy.fact(fact.key),
                                         value: fact.key == "request_source"
                                             ? (p.requestSourceLabel ?? fact.value.stringValue.map(JobCopy.requestSource) ?? JobCopy.value(fact.value))
-                                            : Self.factText(fact, moneyVisible: p.viewer?.moneyVisible == true),
+                                            : JobCopy.factValue(fact.key, fact.value)
+                                                ?? Self.factText(fact, moneyVisible: p.viewer?.moneyVisible == true),
                                         status: Self.factStatus(fact, stageRung: JobRung.status(stage.state, hasInconsistency: false) ?? .recorded))
                     }
                 }
@@ -217,22 +233,89 @@ struct JobPathContent: View {
     // MARK: Actions (server-offered only)
 
     @ViewBuilder private func actionsSection(_ viewer: JobViewer?) -> some View {
+        let pathActions = viewer?.actions ?? []
+        let accept: (JobAction, Quote)? = {
+            if case .loaded(let q) = quotes, let a = q.acceptAction, let cur = q.currentQuote { return (a, cur) }
+            return nil
+        }()
         Section {
-            if let actions = viewer?.actions, !actions.isEmpty {
-                ForEach(actions) { a in
-                    RootedValueView(label: a.stage.map { JobStageKey(rawValue: $0)?.title ?? JobCopy.sentence($0) } ?? "Next step",
-                                    value: a.title, status: .pending)
+            if let pair = accept {
+                Button {
+                    accepting = QuoteBox(quote: pair.1, action: pair.0)
+                } label: {
+                    Label("Accept quote", systemImage: "signature")
+                        .frame(maxWidth: .infinity, alignment: .leading)
                 }
-            } else {
+            }
+            ForEach(pathActions) { a in
+                RootedValueView(label: a.stage.map { JobStageKey(rawValue: $0)?.title ?? JobCopy.sentence($0) } ?? "Next step",
+                                value: a.title, status: .pending)
+            }
+            if accept == nil && pathActions.isEmpty {
                 Text("Nothing for you to do on this job right now.")
                     .font(.footnote).foregroundStyle(.secondary)
             }
         } header: {
             Text("Your next steps")
         } footer: {
-            if let actions = viewer?.actions, !actions.isEmpty {
-                Text("Signing from the app is coming soon.")
+            if !pathActions.isEmpty {
+                Text("Signing these from the app is coming soon.")
             }
+        }
+    }
+
+    // MARK: Quote (work_order_quotes_read; prices are open)
+
+    @ViewBuilder private var quoteSection: some View {
+        Section {
+            switch quotes {
+            case .loading:
+                Text("Loading…").font(.footnote).foregroundStyle(.secondary)
+            case .refused(let refusal):
+                JobRefusalRow(refusal: refusal)
+            case .loaded(let q):
+                if let quote = q.currentQuote {
+                    if let party = quote.quotingParty {
+                        RootedValueView(label: "Quoted by", value: party.text,
+                                        status: party.signedThroughNuke ? .proven : .attributed,
+                                        decay: party.signedThroughNuke ? "signed through Nuke" : "as recorded")
+                    }
+                    RootedValueView(label: "Version", value: quote.versionLine, status: .attributed)
+                    ForEach(quote.lines) { line in
+                        RootedValueView(label: JobCopy.lineLabel(line), value: JobCopy.linePrice(line),
+                                        status: line.amount == nil ? .recorded : .attributed)
+                    }
+                    ForEach(Array(quote.totals.enumerated()), id: \.offset) { _, t in
+                        let total = JobCopy.total(t)
+                        RootedValueView(label: "Total", value: total.value, status: .attributed, decay: total.note)
+                    }
+                    if quote.unpricedLines > 0 {
+                        Text("\(quote.unpricedLines) line\(quote.unpricedLines == 1 ? "" : "s") not priced")
+                            .font(.footnote).foregroundStyle(.secondary)
+                    }
+                    if let deposit = quote.depositRequested {
+                        RootedValueView(label: "Deposit requested", value: JobMoney.format(deposit.amount, deposit.currency),
+                                        status: .attributed, decay: "a term of the quote, not a payment")
+                    }
+                    if let until = JobCopy.day(quote.validUntil) {
+                        RootedValueView(label: quote.expired ? "Expired" : "Valid until", value: until,
+                                        status: quote.expired ? .refuted : .attributed)
+                    }
+                    if quote.scopeStatus == "changed_since_quote" {
+                        RootedValueView(label: "Records disagree", value: "The work changed since this quote", status: .conflicting)
+                    }
+                    RootedValueView(label: "Acceptance", value: JobCopy.acceptance(q.acceptance),
+                                    status: q.acceptance?.state == "accepted" ? .proven
+                                        : (q.acceptance?.state == "withheld" ? .conflicting : .pending))
+                } else {
+                    Text(q.history.isEmpty ? "No quote yet." : "No current quote. Earlier versions were withdrawn.")
+                        .font(.footnote).foregroundStyle(.secondary)
+                }
+            }
+        } header: {
+            Text("Quote")
+        } footer: {
+            Text("Prices are open to everyone. \(JobCopy.withheldPayments).")
         }
     }
 
@@ -265,6 +348,12 @@ struct JobPathContent: View {
         default: return stageRung
         }
     }
+}
+
+private struct QuoteBox: Identifiable {
+    let quote: Quote
+    let action: JobAction
+    var id: String { quote.quoteId }
 }
 
 /// A refusal in plain words: what is unavailable and, in one line, why.
