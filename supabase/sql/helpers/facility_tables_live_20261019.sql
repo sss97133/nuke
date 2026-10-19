@@ -1,8 +1,13 @@
 -- Live shapes (2026-10-19) of the facility tables before 20261019224000: equipment without an organization FK, shop_licenses
 -- keyed to shops_archived_20260129 with its archived-shop policies, anon/authenticated grants as live, RLS on.
 ALTER TABLE public.organizations ADD COLUMN IF NOT EXISTS is_public boolean, ADD COLUMN IF NOT EXISTS slug text, ADD COLUMN IF NOT EXISTS status text;
+ALTER TABLE public.vehicle_observations ALTER COLUMN id SET DEFAULT gen_random_uuid();
 ALTER TABLE public.vehicle_observations ADD COLUMN IF NOT EXISTS subject_type text, ADD COLUMN IF NOT EXISTS subject_id uuid,
-  ADD COLUMN IF NOT EXISTS subject_organization_id uuid;
+  ADD COLUMN IF NOT EXISTS subject_organization_id uuid, ADD COLUMN IF NOT EXISTS source_identifier text, ADD COLUMN IF NOT EXISTS observed_at_basis text,
+  ADD COLUMN IF NOT EXISTS source_event_at timestamptz, ADD COLUMN IF NOT EXISTS source_event_time_precision text, ADD COLUMN IF NOT EXISTS content_text text,
+  ADD COLUMN IF NOT EXISTS content_hash text, ADD COLUMN IF NOT EXISTS submitted_by_user_id uuid, ADD COLUMN IF NOT EXISTS observer_raw jsonb,
+  ADD COLUMN IF NOT EXISTS extraction_method text, ADD COLUMN IF NOT EXISTS confidence text, ADD COLUMN IF NOT EXISTS confidence_score numeric,
+  ADD COLUMN IF NOT EXISTS is_superseded boolean DEFAULT false, ADD COLUMN IF NOT EXISTS superseded_by uuid, ADD COLUMN IF NOT EXISTS superseded_at timestamptz;
 CREATE TABLE IF NOT EXISTS public.organization_images(id uuid PRIMARY KEY, organization_id uuid, user_id uuid);
 CREATE TABLE public.shops_archived_20260129(id uuid PRIMARY KEY, slug text, is_public boolean, owner_user_id uuid);
 CREATE TABLE public.shop_locations(id uuid PRIMARY KEY, shop_id uuid);
