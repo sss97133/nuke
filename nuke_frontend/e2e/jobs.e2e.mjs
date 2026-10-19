@@ -181,7 +181,7 @@ describe('shop bookings', () => {
       args: { p_work_order_id: WO, p_asset_id: null, p_from: null, p_until: null, p_terms: null },
       facilities: [{ kind: 'organization', name: 'E2E Garage', organization_id: 'org-e2e' }],
       binds: ['a request for one declared asset for the window; it occupies capacity only when the facility confirms'], does_not_bind: ['payment', 'vehicle access'] }]);
-    const facility = { organization_id: 'org-e2e', assets: [{ kind: 'lift', capacity_total: 1, assets: [{ asset_id: 'asset-1', label: 'Lift A', capacity: 1, busy: [] }] }] };
+    const facility = { organization: { kind: 'organization', name: 'E2E Garage', organization_id: 'org-e2e' }, assets_by_kind: [{ kind: 'lift', capacity_total: 1, assets: [{ asset_id: 'asset-1', label: 'Lift A', capacity: 1, busy: [] }] }] };
     let s = await open(`/jobs/${WO}`, { who: CUSTOMER, readers: jobReaders(viewer('client', ['customer']), { work_order_job_path_read: jobPath(cv), facility_read: facility }) });
     await s.page.getByRole('button', { name: 'Book a bay' }).click();
     const d = dialog(s.page);
@@ -296,5 +296,71 @@ describe('inspection', () => {
     await d.getByRole('button', { name: 'Attach photos' }).click();
     assert.deepEqual(await waitForWrite(s.writes, 'attach_job_evidence'), { p_work_order_id: WO, p_image_ids: ['img-1'], p_operation_id: null, p_note: null });
     await s.ctx.close();
+  });
+});
+
+describe('publication', () => {
+  const REFUSAL = 'Remove names and contact details from the job title and description before opening it; contact goes through Nuke';
+  const pub = (visibility, actions) => ({ work_order_id: WO, visibility, requirements: 0, listed_in_open_requirements: false, last_sign: null,
+    as_of: '2026-10-19T19:00:00Z', viewer: { party: actions.length > 0, actions } });
+  const openAction = (refused = null) => ({ action: 'publish_work_order', rpc: 'publish_work_order', args: { p_work_order_id: WO, p_visibility: 'open' }, visibility: 'open',
+    refused_reason: refused, binds: ['your statement that this job is open: technicians near you can see its needs and offer'], does_not_bind: ['a price', 'payment'] });
+
+  it('the vehicle owner publishes a job open after confirming', async () => {
+    const cv = viewer('client', ['customer']);
+    const { ctx, page, writes } = await open(`/jobs/${WO}`, { who: CUSTOMER, readers: jobReaders(cv, {
+      work_order_publication_read: pub('not_published', [openAction(), { action: 'publish_work_order', rpc: 'publish_work_order', args: { p_work_order_id: WO, p_visibility: 'invite_only' }, visibility: 'invite_only' }]) }) });
+    await page.getByText('Not published').waitFor();
+    await page.getByRole('button', { name: 'Publish: open to technicians' }).click();
+    const d = dialog(page);
+    await d.getByText('Your statement that this job is open').waitFor();
+    assert.equal(writes.length, 0);
+    await d.getByRole('button', { name: 'Publish: open to technicians' }).click();
+    assert.deepEqual(await waitForWrite(writes, 'publish_work_order'), { p_work_order_id: WO, p_visibility: 'open' });
+    await ctx.close();
+  });
+
+  it('shows the server refusal instead of a confirm when contact details block open, and a visitor sees only the state', async () => {
+    const cv = viewer('client', ['customer']);
+    let s = await open(`/jobs/${WO}`, { who: CUSTOMER, readers: jobReaders(cv, { work_order_publication_read: pub('invite_only', [openAction(REFUSAL)]) }) });
+    const b = s.page.getByRole('button', { name: 'Change to open' });
+    await b.waitFor();
+    assert.equal(await b.isDisabled(), true);
+    await s.page.getByText(REFUSAL).waitFor();
+    assert.equal(s.writes.length, 0);
+    await s.ctx.close();
+
+    s = await open(`/jobs/${WO}`, { readers: jobReaders(viewer('visitor'), { work_order_publication_read: pub('open', []) }) });
+    await s.page.getByText('Open — technicians near you can offer').waitFor();
+    assert.equal(await s.page.getByRole('group', { name: 'Publish this job' }).count(), 0);
+    await s.ctx.close();
+  });
+});
+
+describe('business invite', () => {
+  it('a business opens the shared link, sees the need, and claims by its e-mail domain', async () => {
+    const ORG = '00000000-0000-4000-a000-00000000e2ea';
+    const TOKEN = 'f'.repeat(64);
+    const onNuke = { state: 'not_on_nuke_yet', label: 'Not on Nuke yet', owners_active: 0, members_active: 0, claimed_via: [],
+      claim: { writer: 'claim_organization', methods: ['domain_email', 'document'], domain: 'e2eparts.example', domain_email_rule: "your confirmed sign-in e-mail is at this website's domain" } };
+    const redeemed = { invite_id: 'inv-e2e', duplicate: false, organization: { kind: 'organization', name: 'E2E Parts', organization_id: ORG }, on_nuke: onNuke,
+      claim: { writer: 'claim_organization', args: { p_organization_id: ORG }, domain_email_qualifies: true, methods: ['domain_email', 'document'] },
+      requirement: { requirement_id: 'req-1', work_order_id: WO, kind: 'skill', description: 'Exhaust repair and fabrication', still_open: true,
+        offer: { writer: 'offer_on_requirement', args: { p_requirement_id: 'req-1' } } }, membership_changed: false, email_returned: false };
+    const { ctx, page, writes } = await open(`/supplier-invite/${TOKEN}`, { who: SHOP, readers: { redeem_supplier_invite: redeemed } });
+    // The mock answers writers with { ok: true }; this reader-shaped answer stands in for redeem's real return.
+    await ctx.route('https://e2e-mock.supabase.co/rest/v1/rpc/redeem_supplier_invite', async (route) => {
+      writes.push({ rpc: 'redeem_supplier_invite', args: route.request().postDataJSON() });
+      await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(redeemed) });
+    });
+    assert.equal(writes.length, 0);
+    await page.getByRole('button', { name: 'Open the invite' }).click();
+    await page.getByText('Exhaust repair and fabrication').waitFor();
+    assert.deepEqual(onlyWrite(writes, 'redeem_supplier_invite'), { p_token: TOKEN });
+    await page.getByRole('button', { name: 'Claim E2E Parts' }).click();
+    await dialog(page).getByText('never shows or stores it').waitFor();
+    await dialog(page).getByRole('button', { name: 'Claim this business' }).click();
+    assert.deepEqual(await waitForWrite(writes, 'claim_organization'), { p_organization_id: ORG, p_method: 'domain_email', p_evidence: null });
+    await ctx.close();
   });
 });
