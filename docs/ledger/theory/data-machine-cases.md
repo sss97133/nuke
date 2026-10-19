@@ -2705,3 +2705,36 @@ board) is the only input until the on-demand Analyze path exists. Venue: a class
 measures venue and condition, which is why the ask-vs-asks position leads and the sale position follows. Facebook
 classified listings do not reach the board (no vehicle binding since 10-13). Craigslist exits accrue at the revisit
 sweep's rate (5 posts per 15-minute run). Mileage is not yet a feature.
+
+### Work-order resource evidence — owner direction and executable first slice, 2026-10-19
+
+Owner direction: build the data model beneath inspection, job planning, provider tools,
+shared facilities, scoped sign-offs and contributions. Historical messages, images,
+receipts, invoices and payments are retained evidence for reconstructing real jobs;
+their full linked population and replay coverage have not been measured. A missing
+resource should permit alternative supplying arrangements rather than disqualifying
+the performing mechanic automatically. Ownership, access, capability, availability,
+approval and compensation are separate relationships.
+
+The live atlas and column inspection found existing owners in work_orders,
+work_order_line_items, work_order_assignments, user_tools, tool_inventory, equipment,
+organizations, actor_capabilities and the observation logs. A tool verification boolean
+does not carry a scoped attestation; an assignment's payout fields do not establish an
+equipment reservation. The resource relations did not exist at inspection.
+
+The implementation in migration `20261019005027_work_order_resource_evidence.sql`
+adds three private typed indexes of existing work_record testimony: operation requirements,
+candidate resource arrangements, and reported scoped attestations. Source IDs key every
+row; no raw source writer or duplicated identity/invoice/payment ledger is introduced.
+The service-only projector validates the source and same-job relationships. The service-only
+reader excludes superseded/reattributed source chains and keeps unknown coverage explicit.
+Details and payload contract: `docs/library/technical/work-order-intelligence.md`.
+
+Acceptance is the actual migration on disposable PG17: personal-tool and shop alternatives,
+source-to-graph reads, duplicate replay, cross-order/source/type refusals, immutable projections,
+withdrawal/reattribution propagation and anonymous/authenticated access refusals. This tests
+the supplied cases; it does not measure historical-job coverage or certify physical work.
+Provider authority, authenticated sign-off, reservations and conflicts, compensation settlement,
+historical replay, end-user exposure and historical source reconstruction remain to implement.
+No empty or populated graph declares a booking ready. Deployment is a separate stage and must
+be checked against the live function and relation definitions after the normal CI release.
