@@ -18,7 +18,7 @@ CREATE TABLE public.organizations(id uuid PRIMARY KEY);
 CREATE TABLE public.work_orders(id uuid PRIMARY KEY,vehicle_id uuid,request_source text,title text,description text,scope_description text,
  quoted_at timestamptz,estimated_total numeric,estimated_cost_cents integer,approved_at timestamptz,scheduled_start timestamptz,
  scheduled_end timestamptz,started_at timestamptz,actual_start timestamptz,completed_at timestamptz,actual_end timestamptz,status text,
- created_at timestamptz DEFAULT '2026-01-01',scope_category text);
+ created_at timestamptz DEFAULT '2026-01-01',scope_category text,customer_id uuid);
 CREATE TABLE public.actors(id uuid PRIMARY KEY,name text,actor_type text);
 CREATE TABLE public.component_events(id uuid PRIMARY KEY,vehicle_id uuid,work_order_id uuid,metadata jsonb);
 CREATE TABLE public.work_order_parts(id uuid PRIMARY KEY,work_order_id uuid,part_name text,status text,job_op_code text);
@@ -79,6 +79,7 @@ INSERT INTO work_order_labor(work_order_id,hours) VALUES ('30000000-0000-0000-00
 \ir ../migrations/20261019153000_job_path_inspection.sql
 \ir ../migrations/20261019180000_work_order_offers.sql
 \ir ../migrations/20261019181500_work_order_offer_acceptance.sql
+\ir ../migrations/20261019183000_work_order_offers_read.sql
 
 -- Synthetic interpretations in the guarded disposable database only.
 CREATE FUNCTION public.op_source(p_patch jsonb,p_vehicle uuid DEFAULT '40000000-0000-0000-0000-000000000001') RETURNS uuid LANGUAGE plpgsql AS $$

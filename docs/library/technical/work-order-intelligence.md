@@ -507,6 +507,21 @@ on an inspection job, record findings (`accepted_inspector`) without an identity
 because the customer chose that authenticated account. Contract:
 `supabase/sql/test_work_order_offer_acceptance.sql`.
 
+`work_order_offers_read(p_work_order_id)` is open to anon and authenticated callers. Per
+current requirement it lists the current offers: kind, evidence rung, provider by public
+handle, organization name or `unnamed party`, performer label, terms, availability window,
+offered clock and acceptance state (`accepted`, `withheld`, `not_accepted`). It also lists the
+accepted providers. Terms are open. Raw ids and the offer note go to parties, and to the
+offering account for its own offers. `viewer.actions` holds `offer` (per requirement, when the
+viewer may offer as an individual), `withdraw_offer` (own offers) and `accept_offer` (the
+customer, per acceptable offer). A non-public vehicle is shown only to slot holders.
+
+The job path's plan stage reports `requirements_with_offers` and
+`requirements_with_accepted_provider`. The terms stage counts an `accept_offer` assignment as an
+accept clock only while it is current, and adds `accepted_providers`,
+`provider_acceptance_clock` and `provider_acceptances_withheld`, plus the gap
+`provider_acceptance_withheld`. Contract: `supabase/sql/test_work_order_offers_read.sql`.
+
 ## Job path self-measurement
 
 `read_work_order_job_path(work_order_id)` reports one work order's evidence across seven
