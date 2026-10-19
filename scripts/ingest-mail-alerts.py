@@ -42,8 +42,17 @@ SENDERS = {'bhcc': {'sales@beverlyhillscarclub.com'}, 'ksl': {'cars@ksl.com'},
            'carsandbids': {'cab@carsandbids.com'}}
 
 
+class MessageIdentityConflict(ValueError):
+    """Keep conflicting evidence for review without blocking unrelated mail."""
+
+
 def utc(ts=None):
     return datetime.fromtimestamp(ts, timezone.utc).isoformat() if ts is not None else datetime.now(timezone.utc).isoformat()
+
+
+def iso_timestamp(value):
+    # Python 3.9 ships on Intel Macs and requires an explicit offset for UTC.
+    return datetime.fromisoformat(value[:-1] + '+00:00' if value.endswith('Z') else value)
 
 
 def digest(data):
@@ -479,6 +488,39 @@ def emlx_index(mail_dir, emails):
     return index
 
 
+def priority_listing(listing, years):
+    """Rank only a card's stated year, never its saved-search name or neighbor."""
+    year = listing.get('year')
+    return bool(years and type(year) is int and years[0] <= year <= years[1])
+
+
+def prioritize_emails(emails, files, args, index):
+    years = getattr(args, 'priority_years', None)
+    if not years:
+        return emails
+    priority = set()
+    for em in emails:
+        path = files.get(str(em['msg_id']))
+        if path is None:
+            continue
+        try:
+            if args.message_manifest:
+                raw = path.read_bytes()
+                msg = email.message_from_bytes(raw, policy=email.policy.default)
+            else:
+                msg, raw = read_emlx(path)
+            source = next(key for key, values in SENDERS.items() if em['sender'] in values)
+            alert = parse_alert(msg, raw, source, em['received_ts'], index)
+            if any(priority_listing(card, years) for card in alert['listings']):
+                priority.add(str(em['msg_id']))
+        except Exception:
+            # The normal processing pass records errors and preserves retry behavior.
+            continue
+    # Stable sorting keeps newest first within each group. Nonpriority and unknown
+    # cards remain eligible, and a message is acknowledged only after every card.
+    return sorted(emails, key=lambda em: str(em['msg_id']) not in priority)
+
+
 class Supabase:
     def __init__(self):
         self.url = (os.environ.get('VITE_SUPABASE_URL') or os.environ.get('SUPABASE_URL') or '').rstrip('/')
@@ -589,7 +631,7 @@ class Supabase:
             if existing:
                 if (len(existing) != 1 or existing[0]['source_url'] and existing[0]['source_url'] != listing['url']
                         or existing[0]['structured_data'].get('raw_sha256') != alert['raw_sha256']):
-                    raise RuntimeError('message identity conflicts with existing testimony')
+                    raise MessageIdentityConflict('message identity conflicts with existing testimony')
                 if not existing[0].get('vehicle_id') and len(inventory_ids) == 1 and inventory_url:
                     vehicle_id = next(iter(inventory_ids))
                     linked = self.request('/rest/v1/rpc/attribute_testimony', {
@@ -645,7 +687,7 @@ class Supabase:
                              select='id,source_identifier,source_url,observed_at,ingested_at,vehicle_id,structured_data')
             if (len(rows) != 1 or rows[0]['source_identifier'] != payload['source_identifier']
                     or rows[0]['source_url'] != listing['url'] or rows[0]['structured_data'] != payload['structured_data']
-                    or datetime.fromisoformat(rows[0]['observed_at']) != datetime.fromisoformat(alert['observed_at'])):
+                    or iso_timestamp(rows[0]['observed_at']) != iso_timestamp(alert['observed_at'])):
                 raise RuntimeError('observation readback differs from email testimony')
             result.update(observation_id=obs_id, duplicate=bool(observation.get('duplicate')),
                           vehicle_id=rows[0].get('vehicle_id'), ingested_at=rows[0]['ingested_at'])
@@ -674,7 +716,7 @@ def run(args):
                 raise ValueError('manifest message recipient differs from selected mailbox')
             if source is None or args.source not in ('all', source):
                 continue
-            received = datetime.fromisoformat(item['received_at'])
+            received = iso_timestamp(item['received_at'])
             if received.tzinfo is None:
                 raise ValueError('manifest receipt timestamp requires a timezone')
             if args.days and received.timestamp() < time.time() - args.days * 86400:
@@ -691,6 +733,9 @@ def run(args):
     report = {'method': VERSION, 'started_at': utc(), 'dry_run': args.dry_run, 'selected': len(emails),
               'cached': 0, 'already_completed': 0, 'holds': {}, 'errors': [], 'results': [],
               'sitemap_sha256': sitemap_sha, 'latest_email_received_at': utc(emails[0]['received_ts']) if emails else None}
+    years = getattr(args, 'priority_years', None)
+    report['priority_years'] = years
+    emails = prioritize_emails(emails, files, args, index)
     client = None
     attempted = 0
     for em in emails:
@@ -708,10 +753,13 @@ def run(args):
             source = next(key for key, values in SENDERS.items() if em['sender'] in values)
             alert = parse_alert(msg, raw, source, em['received_ts'], index)
             key = alert['message_key']
-            if key in state['completed']:
-                if state['completed'][key]['raw_sha256'] != alert['raw_sha256']:
-                    raise ValueError('same Message-ID has different raw evidence; held for review')
-                completed = state['completed'][key]
+            raw_sha = alert['raw_sha256']
+            if not args.dry_run and not args.replay and raw_sha in state.get('identity_holds', {}):
+                report['holds']['message_identity_conflict'] = report['holds'].get('message_identity_conflict', 0) + 1
+                continue
+            completed = state['completed'].get(key)
+            raw_conflict = completed and completed['raw_sha256'] != raw_sha
+            if completed and not raw_conflict:
                 needs_resolution = completed.get('resolution_pending') and completed.get('sitemap_sha256') != sitemap_sha
                 needs_reparse = completed.get('method') != VERSION and source != 'bhcc'
                 if not args.dry_run and not args.replay and not needs_resolution and not needs_reparse:
@@ -726,24 +774,36 @@ def run(args):
                 if not archive_path.exists():
                     archive_path.write_bytes(raw)
                     archive_path.chmod(0o600)
+            if raw_conflict:
+                if not args.dry_run:
+                    attempted += 1
+                raise MessageIdentityConflict('same Message-ID has different raw evidence; held for review')
             if alert['hold']:
                 hold = alert['hold']
                 report['holds'][hold] = report['holds'].get(hold, 0) + 1
                 continue
             if not args.dry_run:
                 attempted += 1
-            for listing in alert['listings']:
+            for listing in sorted(alert['listings'], key=lambda card: not priority_listing(card, years)):
                 if args.dry_run:
                     report['results'].append({**listing, 'message_key': key, 'source': source,
                                               'observed_at': alert['observed_at']})
                 else:
                     client = client or Supabase()
                     source_id = client.source_config(source)
-                    report['results'].append(client.ingest(alert, listing, source_id, sitemap_sha))
+                    result = client.ingest(alert, listing, source_id, sitemap_sha)
+                    report['results'].append({**result, 'priority': priority_listing(listing, years)})
             if not args.dry_run:
+                state.get('identity_holds', {}).pop(raw_sha, None)
                 state['completed'][key] = {'raw_sha256': alert['raw_sha256'], 'completed_at': utc(),
                                            'resolution_pending': any(not x['url'] for x in alert['listings']),
                                            'sitemap_sha256': sitemap_sha, 'method': VERSION}
+                atomic_json(state_dir / 'state.json', state)
+        except MessageIdentityConflict as err:
+            report['holds']['message_identity_conflict'] = report['holds'].get('message_identity_conflict', 0) + 1
+            if not args.dry_run:
+                state.setdefault('identity_holds', {}).setdefault(raw_sha, {
+                    'message_key': key, 'held_at': utc(), 'reason': str(err), 'method': VERSION})
                 atomic_json(state_dir / 'state.json', state)
         except Exception as err:
             # Never print bodies, tracking links, credentials, or recipient identifiers.
@@ -753,7 +813,6 @@ def run(args):
     report['finished_at'] = utc()
     report['queue_inserted'] = sum(r.get('queued', 0) for r in report['results'])
     report['observations_verified'] = sum(bool(r.get('observation_id')) for r in report['results'])
-    report['source_stale'] = not emails or time.time() - emails[0]['received_ts'] > args.stale_hours * 3600
     report['source_freshness'] = {}
     for source in SOURCE_SLUGS if args.source == 'all' else (args.source,):
         latest = max((e['received_ts'] for e in emails if e['sender'] in SENDERS[source]), default=None)
@@ -776,6 +835,8 @@ def main():
     p.add_argument('--days', type=int)
     p.add_argument('--limit', type=int, default=1000)
     p.add_argument('--batch-size', type=int, default=10, help='Maximum unprocessed messages attempted per cycle')
+    p.add_argument('--priority-years', nargs=2, type=int, metavar=('FROM', 'TO'),
+                   help='Process messages and cards with a stated year in this inclusive range first')
     p.add_argument('--mail-db', type=Path, default=MAIL_DB)
     p.add_argument('--mail-dir', type=Path, default=MAIL_DIR)
     p.add_argument('--message-manifest', type=Path, help='Private JSON array of raw .eml paths and timezone-aware received_at values')
@@ -790,13 +851,15 @@ def main():
         report = json.loads(path.read_text()) if path.exists() else {}
         healthy = bool(report) and not report.get('errors') and not report.get('source_stale', True)
         if report:
-            healthy = healthy and time.time() - datetime.fromisoformat(report['finished_at']).timestamp() < 900
+            healthy = healthy and time.time() - iso_timestamp(report['finished_at']).timestamp() < 900
         print(json.dumps({'healthy': healthy, 'last_run': report.get('finished_at'),
                           'latest_email_received_at': report.get('latest_email_received_at'),
                           'errors': report.get('errors', []), 'holds': report.get('holds', {})}))
         return 0 if healthy else 1
     if args.limit < 1 or args.limit > 10000 or not 1 <= args.batch_size <= 100 or args.days is not None and args.days < 1:
         p.error('limit must be 1..10000; batch-size 1..100; days must be positive')
+    if args.priority_years and not 1800 <= args.priority_years[0] <= args.priority_years[1] <= 2100:
+        p.error('priority-years must be an ascending range within 1800..2100')
     args.state_dir.mkdir(parents=True, exist_ok=True, mode=0o700)
     with (args.state_dir / 'intake.lock').open('a') as lock:
         try:

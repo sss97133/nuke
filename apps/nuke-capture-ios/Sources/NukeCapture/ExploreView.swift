@@ -76,6 +76,8 @@ struct ExploreView: View {
     @State private var loadingFeed = false
     @State private var feedError = false
     @State private var searchError = false   // a failed search ≠ "no matches"
+    @State private var feedFailureText: String?
+    @State private var searchFailureText: String?
     @State private var searched = false
     @State private var feedRetried = false   // cold-launch first call self-heals once
     // The Worklight: report the stage, never a blank spinner; a stall reads as an
@@ -290,9 +292,9 @@ struct ExploreView: View {
             .frame(maxWidth: .infinity, maxHeight: .infinity)
         } else if feedError && metros.isEmpty {
             ContentUnavailableView {
-                Label("Couldn't load the market", systemImage: "wifi.exclamationmark")
+                Label("Couldn't load the market", systemImage: "exclamationmark.triangle")
             } description: {
-                Text("Check your connection.")
+                Text(feedFailureText ?? "The read failed.")
             } actions: {
                 Button("Retry") { Task { await loadMetros(force: true) } }
                     .buttonStyle(.borderedProminent)
@@ -323,9 +325,9 @@ struct ExploreView: View {
     @ViewBuilder private var searchResults: some View {
         if searched && searchError && results.isEmpty {
             ContentUnavailableView {
-                Label("Couldn't search", systemImage: "wifi.exclamationmark")
+                Label("Couldn't search", systemImage: "exclamationmark.triangle")
             } description: {
-                Text("Check your connection.")
+                Text(searchFailureText ?? "The search failed.")
             } actions: {
                 Button("Retry") {
                     Task { await search(query.trimmingCharacters(in: .whitespaces)) }
@@ -512,6 +514,7 @@ struct ExploreView: View {
                 return
             }
             feedError = true
+            feedFailureText = ReadFailure.text(error)
             NSLog("NukeCapture explore market pulse failed: %@", String(describing: error))
         }
     }
@@ -541,6 +544,7 @@ struct ExploreView: View {
             #endif
         } catch {
             searchError = true
+            searchFailureText = ReadFailure.text(error)
             searched = true
             NSLog("NukeCapture explore search failed: %@", String(describing: error))
         }
@@ -660,7 +664,7 @@ struct MetroDetailView: View {
             } else if loadError {
                 Section {
                     HStack {
-                        Label("Couldn't load", systemImage: "wifi.exclamationmark")
+                        Label("Couldn't load", systemImage: "exclamationmark.triangle")
                             .font(.caption2).foregroundStyle(.secondary)
                         Spacer()
                         Button("Retry") { Task { await load() } }.font(.caption2)

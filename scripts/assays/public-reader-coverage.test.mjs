@@ -5,11 +5,11 @@ import { createHash } from 'node:crypto';
 import { execFileSync, spawnSync } from 'node:child_process';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
-import { options, anonymousConfiguration, publicClient, inspectPage, runCoverage, lineageSubjects, inspectSpecification, inspectProvenance, runSpecificationLineage, inspectCommentHeaders, inspectCommentLineage, inspectCommentMeasurements, runCommentLineage, inspectBidHeaders, inspectBidLineage, runBidLineage, acceptanceMatrix, reconcilePopulation, comparePopulations, acquireIdentityEvidence, inspectIdentityEvidence, PUBLIC_ACCEPTANCE, main } from './public-reader-coverage.mjs';
+import { options, anonymousConfiguration, publicClient, inspectPage, runCoverage, lineageSubjects, inspectSpecification, inspectProvenance, runSpecificationLineage, typedLineageSubjects, inspectTypedSpecifications, inspectTypedProvenance, runTypedSpecificationLineage, inspectReportedWork, inspectReportedSources, runReportedWorkLineage, inspectCommentHeaders, inspectCommentLineage, inspectCommentMeasurements, runCommentLineage, inspectBidHeaders, inspectBidLineage, runBidLineage, acceptanceMatrix, reconcilePopulation, comparePopulations, acquireIdentityEvidence, inspectIdentityEvidence, PUBLIC_ACCEPTANCE, main } from './public-reader-coverage.mjs';
 
 // These are offline detector inputs, never production testimony.
 const id = n => `00000000-0000-4000-8000-${String(n).padStart(12, '0')}`;
-const env = role => ({ SUPABASE_ANON_KEY: `test.${Buffer.from(JSON.stringify({ role })).toString('base64url')}.test` });
+const env = (role, ref = 'qkgaybvrernstplzjaam') => ({ SUPABASE_ANON_KEY: `test.${Buffer.from(JSON.stringify({ role, ref })).toString('base64url')}.test` });
 const parent = n => ({ id: id(n), is_public: true, deleted_at: null, listing_kind: null,
   sale_status: 'sold', auction_outcome: 'sold', canonical_outcome: 'sold', canonical_sold_price: 30000,
   year: 1966, make: 'synthetic', model: 'offline', condition_rating: null, body_style: null, engine_type: null, transmission: null, mileage: null });
@@ -31,7 +31,33 @@ test('scope uses explicit finite page/time budgets and a resumable UUID cursor',
 
 test('anonymous assay refuses service JWTs, missing anon config and another project', () => {
   assert.equal(anonymousConfiguration(env('anon')).url, 'https://qkgaybvrernstplzjaam.supabase.co');
-  for (const bad of [env('service_role'), env('authenticated'), { SUPABASE_SERVICE_ROLE_KEY:'secret' }, { SUPABASE_ANON_KEY:'sb_secret_secret' }, { ...env('anon'), SUPABASE_URL:'https://example.com' }]) assert.throws(() => anonymousConfiguration(bad));
+  for (const bad of [env('service_role'), env('authenticated'), env('anon', 'anotherproject'), env('anon', null),
+    { SUPABASE_SERVICE_ROLE_KEY:'secret' }, { SUPABASE_ANON_KEY:'sb_secret_secret' },
+    { SUPABASE_ANON_KEY:'sb_publishable_' }, { SUPABASE_ANON_KEY:'sb_publishable_key\n' },
+    { ...env('anon'), SUPABASE_URL:'https://example.com' },
+    { SUPABASE_ANON_KEY:'sb_publishable_offline', VITE_SUPABASE_URL:'https://example.com' },
+    { ...env('service_role'), VITE_SUPABASE_ANON_KEY:'sb_publishable_offline' },
+  ]) assert.throws(() => anonymousConfiguration(bad), { message: 'anonymous_configuration_required' });
+});
+
+test('current frontend publishable key works only as apikey, without a bearer identity', async () => {
+  const source = await readFile(new URL('../../nuke_frontend/src/lib/env.ts', import.meta.url), 'utf8');
+  const key = source.match(/'(sb_publishable_[A-Za-z0-9_-]+)'/)?.[1];
+  assert.ok(key, 'the current public frontend configuration uses a publishable key');
+  for (const name of ['SUPABASE_ANON_KEY', 'VITE_SUPABASE_ANON_KEY']) {
+    const config = anonymousConfiguration({ [name]: key, SUPABASE_SERVICE_ROLE_KEY:'sb_secret_offline',
+      VITE_SUPABASE_SERVICE_ROLE_KEY:'sb_secret_offline' });
+    const calls = [], client = publicClient(config, async (url, init) => { calls.push({ url, init }); return new Response('[]'); });
+    assert.equal((await client.parents(id(0), 20, 'all')).ok, true);
+    assert.equal((await client.rpc('vehicle_price_facts', { p_vehicle_ids:[id(1)] })).ok, true);
+    for (const { url, init } of calls) {
+      assert.equal(new URL(url).origin, 'https://qkgaybvrernstplzjaam.supabase.co');
+      const headers = new Headers(init.headers);
+      assert.ok(headers.get('apikey') === key);
+      assert.equal(headers.has('authorization'), false);
+      assert.equal(init.redirect, 'error');
+    }
+  }
 });
 
 test('public transport has exact eligibility, keyed pages and a read-only RPC whitelist', async () => {
@@ -47,6 +73,8 @@ test('public transport has exact eligibility, keyed pages and a read-only RPC wh
   assert.equal(u.searchParams.get('order'),'id.asc');
   assert.equal(u.searchParams.has('offset'),false);
   assert.equal(calls[0].init.redirect,'error');
+  assert.equal(calls[0].init.headers.apikey, config.key);
+  assert.equal(calls[0].init.headers.Authorization, `Bearer ${config.key}`);
   await c.rpc('vehicle_price_facts',{ p_vehicle_ids:[id(2)] });
   assert.equal(calls[1].init.method,'POST');
   assert.throws(() => c.rpc('ingest-observation',{}));
@@ -276,6 +304,432 @@ test('lineage CLI keeps a private immutable manifest/assay receipt and a distinc
   assert.match(rows.at(-1).manifestSha256,/^[a-f0-9]{64}$/); assert.match(rows[0].assaySourceSha256,/^[a-f0-9]{64}$/);
   assert.equal(body.includes('PRIVATE CLAIM'),false); assert.equal(body.includes('PRIVATE SOURCE BODY'),false); assert.equal((await stat(out)).mode&0o777,0o600);
   assert.equal(await main(['--out',out,'--family','specifications','--subjects',input],{env:env('anon'),client:lineageClient(),print:()=>{}}),1);
+});
+
+const typedClaim = extra => ({ property_id: id(300), property_key: 'engine_family_label', data_type: 'string', unit: null,
+  value: 'SYNTHETIC FAMILY', status: 'current_canonical_claim', observation_id: id(101), source_observation_id: id(100),
+  source_id: id(200), source_url: 'https://example.com/synthetic-private-capture', kind: 'specification',
+  extraction_method: 'synthetic-offline', confidence_score: 0, observed_at: '2026-01-02T00:00:00.123456Z', ingested_at: '2026-01-03T00:00:00Z',
+  qualifiers: { source_value: 'SYNTHETIC PRIVATE ORIGINAL QUOTATION '.repeat(20), claim_role: 'listing_claim',
+    observed_at_basis: 'source_testimony_recorded_at', source_event_time_status: 'unknown',
+    source_recorded_at: '2026-01-02T00:00:00.123456Z', source_observed_at: '2026-01-01T00:00:00.123456Z',
+    normalization_version: 'retained_engine_family_label_v1', independent_source: false,
+    factory_configuration_status: 'unknown', current_configuration_status: 'unknown',
+    label_role: 'publisher_powering_engine_label', engine_identity_status: 'unverified', source_capture_sha256: 'a'.repeat(64),
+    source_captured_at: '2026-01-01T00:00:00.123456Z', source_capture_basis: 'protected_snapshot',
+    source_witness_version: 'retained_description_engine_family_label_v1' }, ...extra });
+const typedRow = (n = 1, claims = [typedClaim()]) => ({ vehicle_id: id(n), schema_version: 'vehicle_data_model_v1',
+  grain: 'stored_vehicle_record', physical_identity_status: 'unresolved', typed_claims_status: 'current_core_scope_read',
+  read_at: '2026-01-04T00:00:00Z', typed_claims: claims, model_scope: { retained_record_fields: 13, record_binding_property_keys: 11,
+    canonical_property_keys: 12, source_event_history: 'not_reconstructed', complete_vehicle_model: false, retained_metadata_is_typed_testimony: false },
+  retained_record: { property_bindings: [{ value: 'SYNTHETIC METADATA IS NOT TESTIMONY' }] } });
+const typedManifest = (ids = [id(1)], claims = [typedClaim()]) => ({ ...manifest(ids), properties: claims.map(c => ({ key:c.property_key, id:c.property_id })) });
+const typedDrill = (n = 1, c = typedClaim()) => ({ vehicle_id: id(n), field: c.property_key, observations: [{ ...c.qualifiers,
+  id: c.observation_id, value: String(c.value), source_observation_id: c.source_observation_id, source_url: c.source_url,
+  kind: c.kind, extraction_method: c.extraction_method, confidence: c.confidence_score, observed_at: c.observed_at, ingested_at: c.ingested_at,
+  content: 'SYNTHETIC PRIVATE OBSERVATION BODY' }] });
+function typedClient(extra = {}) {
+  const calls = [], rows = extra.rows ?? [typedRow()], ok = value => ({ ok:true, status:200, value });
+  return { calls, get requests() { return calls.length; }, async subjects(ids) { calls.push({reader:'vehicles', ids}); return extra.gate ?? ok((extra.parents ?? [parent(1)]).filter(p => ids.includes(p.id))); },
+    async rpc(reader, args) { calls.push({reader,args});
+      if (reader === 'get_vehicle_specs') return extra.bulk ?? ok(rows.filter(r => args.p_vehicle_ids.includes(r.vehicle_id)));
+      return extra.drills?.shift() ?? ok(typedDrill(Number(args.p_vehicle_id.slice(-12)), rows.find(r => r.vehicle_id === args.p_vehicle_id).typed_claims.find(c => c.property_key === args.p_field)));
+    } };
+}
+
+test('typed lineage requires explicit existing property keys and unique expected registry identities', () => {
+  assert.equal(typedLineageSubjects(typedManifest()).properties[0].id, id(300));
+  for (const properties of [undefined, [], [{key:'other',id:id(300)}], [{key:'engine_family_label',id:'bad'}],
+    [{key:'year',id:id(300)},{key:'make',id:id(300)}], [{key:'year',id:id(300)},{key:'year',id:id(301)}],
+    [{key:'year',id:id(300),guess:true}]]) assert.throws(() => typedLineageSubjects({...typedManifest(),properties}));
+  const args=['--out','private','--family','typed-specifications','--subjects','manifest'];
+  assert.equal(options(args).scope,'explicit_manifest');
+  for(const flags of [['--scope','all'],['--page-size','20'],['--comment-limit','1000']]) assert.throws(()=>options([...args,...flags]));
+});
+
+test('typed bulk RPC allows only an explicit true flag and at most20 distinct valid keys', async () => {
+  const calls=[],client=publicClient(anonymousConfiguration(env('anon')),async(url,init)=>{calls.push({url,init});return new Response('[]');});
+  await client.rpc('get_vehicle_specs',{p_vehicle_ids:[id(1),id(2)],p_include_typed_claims:true});
+  assert.deepEqual(JSON.parse(calls[0].init.body),{p_vehicle_ids:[id(1),id(2)],p_include_typed_claims:true});
+  for(const args of [{p_vehicle_ids:[],p_include_typed_claims:true},{p_vehicle_ids:[id(1)],p_include_typed_claims:false},
+    {p_vehicle_ids:[id(1)]},{p_vehicle_ids:[id(1)],p_include_typed:true},{p_vehicle_ids:[id(1),id(1)],p_include_typed_claims:true},
+    {p_vehicle_ids:Array.from({length:21},(_,n)=>id(n)),p_include_typed_claims:true},{p_vehicle_ids:['bad'],p_include_typed_claims:true},
+    {p_vehicle_ids:[id(1)],p_include_typed_claims:true,p_vehicle_id:id(1)}]) assert.throws(()=>client.rpc('get_vehicle_specs',args));
+  await client.rpc('get_field_provenance',{p_vehicle_id:id(1),p_field:'engine_family_label'});
+  assert.throws(()=>client.rpc('get_field_provenance',{p_vehicle_id:id(1),p_field:'unratified_future_property'}));
+  assert.equal(calls.length,2);
+});
+
+test('typed envelopes refuse foreign/duplicate parents, changed property identity and metadata promotion', () => {
+  const properties=typedLineageSubjects(typedManifest()).properties;
+  for(const rows of [[typedRow(2)],[typedRow(),typedRow()], [{...typedRow(),typed_claims_status:'not_requested'}],
+    [{...typedRow(),model_scope:{complete_vehicle_model:true,retained_metadata_is_typed_testimony:false}}],
+    [typedRow(1,[typedClaim({property_id:id(301)})])],[typedRow(1,[typedClaim({unit:'liters'})])],
+    [typedRow(1,[typedClaim({data_type:'integer'})])],[typedRow(1,[typedClaim({value:null})])],
+    [typedRow(1,[typedClaim({kind:'bid'})])], [typedRow(1,[typedClaim({source_url:{location:'other'}})])],
+    [typedRow(1,[typedClaim(),typedClaim()])]]) assert.equal(inspectTypedSpecifications([id(1)],properties,rows).safe,false);
+  const empty=inspectTypedSpecifications([id(1)],properties,[typedRow(1,[])]);
+  assert.equal(empty.safe,true);assert.deepEqual(empty.parents[0].unavailable,['engine_family_label']);assert.equal(empty.parents[0].claims.length,0);
+});
+
+test('current eleven-key and expanded twelve-key v1 scopes stay distinct, including empty reads', () => {
+  // The inspected live v1 owner declares 13 retained fields, 11 record bindings,
+  // 11 canonical keys and no reconstructed history. Values here are synthetic.
+  const make=typedClaim({property_key:'make',value:'SYNTHETIC MAKE'}),current=typedRow(1,[make]);
+  current.model_scope.canonical_property_keys=11;
+  const requested=typedManifest([id(1)],[make]).properties;
+  assert.equal(inspectTypedSpecifications([id(1)],requested,[current]).safe,true);
+  const family=typedRow();
+  assert.equal(inspectTypedSpecifications([id(1)],typedManifest().properties,[family]).safe,true);
+  family.model_scope.canonical_property_keys=11;
+  assert.equal(inspectTypedSpecifications([id(1)],typedManifest().properties,[family]).safe,false);
+  // An undeclared family is invalid even when the operator requests only make.
+  assert.equal(inspectTypedSpecifications([id(1)],requested,[family]).safe,false);
+  const changedHistory=structuredClone(current);changedHistory.model_scope.source_event_history='reconstructed';
+  assert.equal(inspectTypedSpecifications([id(1)],requested,[changedHistory]).safe,false);
+  const changedBindings=structuredClone(current);changedBindings.model_scope.record_binding_property_keys=12;
+  assert.equal(inspectTypedSpecifications([id(1)],requested,[changedBindings]).safe,false);
+  const changedFields=structuredClone(current);changedFields.model_scope.retained_record_fields=14;
+  assert.equal(inspectTypedSpecifications([id(1)],requested,[changedFields]).safe,false);
+  const unknownScope=structuredClone(current);unknownScope.model_scope.canonical_property_keys=13;
+  assert.equal(inspectTypedSpecifications([id(1)],requested,[unknownScope]).safe,false);
+  const empty=structuredClone(current);empty.typed_claims=[];
+  assert.equal(inspectTypedSpecifications([id(1)],requested,[empty]).safe,true);
+  delete empty.read_at;
+  assert.equal(inspectTypedSpecifications([id(1)],requested,[empty]).safe,false);
+  empty.read_at='infinity';
+  assert.equal(inspectTypedSpecifications([id(1)],requested,[empty]).safe,false);
+});
+
+test('typed projection comparison preserves full quotes, microsecond clocks, zero confidence and explicit uncertainty', () => {
+  const c=typedClaim(),drill=typedDrill();
+  drill.observations[0].observed_at='2026-01-01T16:00:00.123456-08:00';
+  const result=inspectTypedProvenance(id(1),c,typedRow().read_at,drill);
+  assert.equal(result.projectionMatches,true);assert.deepEqual(result.failures,{});
+  assert.equal(result.originalSourceValidation,'unmeasured');assert.equal(result.registryRatificationValidation,'unmeasured');
+  assert.equal(result.gaps.typed_provenance_property_and_source_fk_unprojected,1);
+  for(const [field,value,reason] of [['value','ANOTHER CLAIM','typed_observation_value_mismatch'],['source_observation_id',id(999),'typed_source_observation_id_mismatch'],
+    ['source_url','https://example.com/other','typed_source_url_mismatch'],['confidence',0.5,'typed_confidence_score_mismatch'],
+    ['observed_at','2026-01-02T00:00:00.123457Z','typed_observed_at_mismatch'],
+    ['source_value',c.qualifiers.source_value.slice(0,400),'typed_qualifier_source_value_mismatch'],
+    ['source_capture_sha256','b'.repeat(64),'typed_qualifier_source_capture_sha256_mismatch'],
+    ['property_id',id(998),'typed_property_id_mismatch'],['source_id',id(999),'typed_source_id_mismatch'],
+    ['engine_identity_status','verified','typed_qualifier_engine_identity_status_mismatch']]) {
+    const changed=typedDrill();changed.observations[0][field]=value;
+    assert.equal(inspectTypedProvenance(id(1),c,typedRow().read_at,changed).failures[reason],1);
+  }
+});
+
+test('typed numeric/string values remain typed and a family label cannot become verified physical identity', () => {
+  for(const [key,data_type,unit,value,text] of [['engine_displacement_l','numeric','liters',5.7,'5.70'],['year','integer',null,1995,'1995']]) {
+    const c=typedClaim({property_key:key,data_type,unit,value}),p=typedDrill(1,c);p.observations[0].value=text;
+    assert.equal(inspectTypedSpecifications([id(1)],typedManifest([id(1)],[c]).properties,[typedRow(1,[c])]).safe,true);
+    assert.equal(inspectTypedProvenance(id(1),c,typedRow().read_at,p).projectionMatches,true);
+    p.observations[0].value='0x10';assert.equal(inspectTypedProvenance(id(1),c,typedRow().read_at,p).projectionMatches,false);
+  }
+  const c=typedClaim();c.qualifiers.engine_identity_status='verified';
+  assert.equal(inspectTypedProvenance(id(1),c,typedRow().read_at,typedDrill(1,c)).failures.typed_family_engine_identity_status_invalid,1);
+  c.qualifiers.engine_identity_status='unverified';c.observed_at='2026-01-05T00:00:00Z';
+  assert.equal(inspectTypedProvenance(id(1),c,typedRow().read_at,typedDrill(1,c)).failures.typed_observation_after_reader_clock,1);
+});
+
+test('missing quote/clock projections and withdrawn claims stay unmeasured; duplicates and wrong subjects fail', () => {
+  const c=typedClaim();
+  for(const key of ['source_value','source_recorded_at','independent_source','engine_identity_status']) {
+    const p=typedDrill();delete p.observations[0][key];
+    assert.equal(inspectTypedProvenance(id(1),c,typedRow().read_at,p).projectionMatches,false);
+  }
+  const withdrawn=inspectTypedProvenance(id(1),c,typedRow().read_at,{...typedDrill(),observations:[]});
+  assert.equal(withdrawn.projectionMatches,false);assert.equal(withdrawn.gaps.typed_observation_unavailable_in_current_drill,1);assert.deepEqual(withdrawn.failures,{});
+  const duplicate=typedDrill();duplicate.observations.push(duplicate.observations[0]);
+  assert.equal(inspectTypedProvenance(id(1),c,typedRow().read_at,duplicate).failures.typed_observation_duplicated_in_drill,1);
+  assert.equal(inspectTypedProvenance(id(2),c,typedRow().read_at,typedDrill()).failures.typed_provenance_shape_or_subject_invalid,1);
+  const missing=typedClaim();delete missing.qualifiers.source_value;
+  assert.equal(inspectTypedProvenance(id(1),missing,typedRow().read_at,typedDrill()).gaps.typed_qualifier_source_value_unprojected,1);
+  const invalid=typedClaim({confidence_score:NaN});
+  assert.equal(inspectTypedProvenance(id(1),invalid,typedRow().read_at,typedDrill(1,invalid)).failures.typed_confidence_invalid,1);
+});
+
+test('repeated captures of one listing assertion are counted, not mistaken for support or for a mismatch', async () => {
+  // Live 2026-10-15: one displacement claim's provenance listed 16 rows from 16 identical captures of one page.
+  const c=typedClaim(),drill=typedDrill(),repeat=n=>({...drill.observations[0],id:id(700+n),source_observation_id:id(800+n)});
+  drill.observations.push(repeat(1),repeat(2),{...repeat(3),value:'ANOTHER CLAIM'},{...repeat(4),source_url:'https://example.com/other-page'},
+    {...repeat(5),source_value:'SYNTHETIC PRIVATE DIFFERENT QUOTATION'});
+  const result=inspectTypedProvenance(id(1),c,typedRow().read_at,drill);
+  assert.equal(result.repeatedListingAssertions,2,'Only same page, value and quotation');assert.equal(result.projectionMatches,true);
+  assert.deepEqual(result.failures,{});assert.equal(result.gaps.typed_provenance_repeated_listing_assertion,1);
+  assert.equal(inspectTypedProvenance(id(1),c,typedRow().read_at,typedDrill()).repeatedListingAssertions,0);
+  const repeated=typedDrill();repeated.observations.push(repeat(1));
+  const r=await runTypedSpecificationLineage(typedClient({drills:[{ok:true,status:200,value:repeated}]}),scope(),typedLineageSubjects(typedManifest()));
+  assert.equal(r.claimsWithRepeatedAssertion,1);assert.equal(r.repeatedAssertionObservations,1);assert.equal(r.gaps.typed_provenance_repeated_listing_assertion,1);
+  assert.equal(r.matchedProjectionPairs,1);
+});
+
+test('typed runner gates denied parents, emits only private hashes/counters and cannot claim source truth', async () => {
+  const client=typedClient(),events=[];
+  const r=await runTypedSpecificationLineage(client,scope(),typedLineageSubjects(typedManifest([id(1),id(2)])),{emit:x=>events.push(x)});
+  assert.equal(r.eligibleParents,1);assert.equal(r.absentOrIneligibleParents,1);assert.equal(r.matchedProjectionPairs,1);assert.equal(r.unmeasuredPairs,0);
+  assert.equal(r.supportedAnswerCoverage,'unmeasured');assert.equal(r.sourceQualification,'unmeasured');assert.equal(r.databaseWrites,0);assert.equal(r.modelCalls,0);
+  assert.deepEqual(client.calls[1].args,{p_vehicle_ids:[id(1)],p_include_typed_claims:true});
+  assert.equal(r.status,'matched_current_typed_projections_in_manifest');
+  const output=JSON.stringify(events);for(const raw of ['PRIVATE ORIGINAL','PRIVATE OBSERVATION','SYNTHETIC FAMILY','https://example.com',id(2)])assert.equal(output.includes(raw),false);
+});
+
+test('empty and withheld typed responses never count metadata or unavailable answers as successful projections', async () => {
+  for(const rows of [[typedRow(1,[])],[]]) {
+    const c=typedClient({rows}),r=await runTypedSpecificationLineage(c,scope(),typedLineageSubjects(typedManifest()));
+    assert.equal(r.matchedProjectionPairs,0);assert.equal(r.exitCode,2);assert.equal(c.requests,2);assert.equal(r.supportedAnswerCoverage,'unmeasured');
+    assert.equal(r.unavailablePairs+r.unmeasuredPairs,1);
+  }
+  const c=typedClient({parents:[]}),r=await runTypedSpecificationLineage(c,scope(),typedLineageSubjects(typedManifest()));
+  assert.equal(c.requests,1);assert.equal(r.eligiblePairs,0);assert.equal(r.exitCode,2);
+});
+
+test('unsafe typed gate and bulk output stop without foreign IDs or child reads', async () => {
+  for(const extra of [{gate:{ok:true,value:[parent(999)]}},{bulk:{ok:true,value:[typedRow(999)]}}]) {
+    const c=typedClient(extra),events=[],r=await runTypedSpecificationLineage(c,scope(),typedLineageSubjects(typedManifest()),{emit:x=>events.push(x)});
+    assert.equal(r.status,'failed');assert.ok(c.requests<=2);assert.equal(JSON.stringify(events).includes(id(999)),false);
+  }
+});
+
+test('typed requests are batched to20 and two reader failures stop with unmeasured pairs', async () => {
+  const ids=Array.from({length:45},(_,n)=>id(n+1)),parents=ids.map((_,n)=>parent(n+1));
+  const c=typedClient({parents,bulk:{ok:false,status:500,code:'57014'}});
+  const r=await runTypedSpecificationLineage(c,scope(),typedLineageSubjects(typedManifest(ids)));
+  assert.equal(r.stopReason,'two_typed_reader_failures_inspect_cause');assert.equal(r.unmeasuredPairs,40);assert.equal(r.ungatedParents,5);
+  assert.deepEqual(c.calls.filter(x=>x.reader==='get_vehicle_specs').map(x=>x.args.p_vehicle_ids.length),[20,20]);
+});
+
+test('typed deadline and provenance body refusal remain unmeasured and preserve finite stop reasons', async () => {
+  let clock=0;const c=typedClient(),rpc=c.rpc;c.rpc=async(...args)=>{const result=await rpc(...args);clock=10;return result;};
+  const timed=await runTypedSpecificationLineage(c,scope({until:5}),typedLineageSubjects(typedManifest()),{now:()=>clock});
+  assert.equal(timed.stopReason,'time_budget_reached');assert.equal(timed.unmeasuredPairs,1);assert.equal(c.requests,2);
+  const refused=typedClient({drills:[{ok:false,status:200,code:'response_byte_limit'}]});
+  const r=await runTypedSpecificationLineage(refused,scope(),typedLineageSubjects(typedManifest()));
+  assert.equal(r.drilledClaims,0);assert.equal(r.unmeasuredPairs,1);assert.equal(r.status,'failed');
+  const pageClient=typedClient({parents:Array.from({length:21},(_,n)=>parent(n+1)),rows:[]});
+  const limited=await runTypedSpecificationLineage(pageClient,scope({maxPages:1}),typedLineageSubjects(typedManifest(Array.from({length:21},(_,n)=>id(n+1)))));
+  assert.equal(limited.stopReason,'page_budget_reached');assert.equal(limited.ungatedParents,1);assert.equal(pageClient.requests,2);
+});
+
+test('typed CLI preserves the distinct mode, manifest identity, exclusive receipt and omitted testimony', async t => {
+  const dir=await mkdtemp(path.join(tmpdir(),'nuke-typed-lineage-'));t.after(()=>rm(dir,{recursive:true,force:true}));
+  const input=path.join(dir,'manifest.json'),out=path.join(dir,'receipt.jsonl');await writeFile(input,JSON.stringify(typedManifest()));
+  const args=['--out',out,'--family','typed-specifications','--subjects',input];
+  assert.equal(await main(args,{env:env('anon'),client:typedClient(),print:()=>{}}),0);
+  const body=await readFile(out,'utf8'),rows=body.trim().split('\n').map(JSON.parse),summary=rows.at(-1);
+  assert.equal(rows[0].options.family,'typed-specifications');assert.equal(summary.matchedProjectionPairs,1);
+  assert.equal(summary.supportedAnswerCoverage,'unmeasured');assert.match(summary.manifestSha256,/^[a-f0-9]{64}$/);
+  assert.equal(body.includes('PRIVATE ORIGINAL'),false);assert.equal(body.includes('SYNTHETIC FAMILY'),false);assert.equal((await stat(out)).mode&0o777,0o600);
+  assert.equal(await main(args,{env:env('anon'),client:typedClient(),print:()=>{}}),1);
+});
+
+const WORK = 'Work in September 2026 included SYNTHETIC PRIVATE WORK.';
+const RECOMMENDED_CLAUSE = 'The SYNTHETIC PRIVATE PART was replaced in July 2023';
+const RECOMMENDED = `${RECOMMENDED_CLAUSE}, an inspection at that time recommended SYNTHETIC PRIVATE FOLLOW-UP.`;
+const report = (n = 1, extra = {}) => ({ observation_id: id(400 + n), kind: 'activity', report_status: 'publisher_reported_completion',
+  occurrence_status: 'unverified', performer_id: null, performer_status: 'unknown', independent_source: false, intent_status: 'unknown',
+  observed_at_basis: 'source_testimony_recorded_at', reported_date: '2026-09', reported_date_label: 'September 2026', date_precision: 'month',
+  performed_clause: WORK, source_value: WORK, source_observation_id: id(500), source_id: id(200),
+  source_url: 'https://bringatrailer.com/listing/synthetic-private-listing/', source_captured_at: '2026-10-10T02:40:06.123456Z',
+  source_recorded_at: '2026-10-10T02:40:08.811435+00:00', source_capture_sha256: 'c'.repeat(64), source_capture_basis: 'direct_fetch',
+  source_witness_version: 'retained_description_reported_work_v1', observed_at: '2026-10-10T02:40:08.811435+00:00',
+  ingested_at: '2026-10-15T07:00:00.000001+00:00', confidence_score: 0.4, ...extra });
+const recommendedReport = () => report(2, { performed_clause: RECOMMENDED_CLAUSE, source_value: RECOMMENDED, reported_date: '2023-07', reported_date_label: 'July 2023' });
+const reportSource = (extra = {}) => ({ id: id(500), vehicle_id: id(1), kind: 'listing', is_superseded: false, source_id: id(200),
+  source_url: 'https://bringatrailer.com/listing/synthetic-private-listing/', observed_at: '2026-10-10T02:40:06.123456+00:00',
+  ingested_at: '2026-10-10T02:40:08.811435+00:00', extraction_method: 'html_description_capture',
+  content_text: `SYNTHETIC PRIVATE SOURCE BODY opens here. ${WORK} ${RECOMMENDED} It closes here.`,
+  source_captured_at: '2026-10-10T02:40:06.123456Z', source_capture_sha256: 'c'.repeat(64), source_capture_basis: 'direct_fetch',
+  extractor_input_truncated: false, ...extra });
+const buildLog = (reports = [report(), recommendedReport()], work = []) => ({ work_records: work, reported_work: reports });
+function reportClient(extra = {}) {
+  const calls = [], ok = value => ({ ok: true, status: 200, value });
+  return { calls, get requests() { return calls.length; },
+    async subjects(ids) { calls.push({ reader: 'vehicles', ids }); return extra.gate ?? ok((extra.parents ?? [parent(1)]).filter(p => ids.includes(p.id))); },
+    async rpc(reader, args) { calls.push({ reader, args }); return extra.logs?.shift() ?? extra.log ?? ok(buildLog()); },
+    async reportSources(vehicleId, ids) { calls.push({ reader: 'vehicle_observations', vehicleId, ids });
+      return extra.sources?.shift() ?? ok((extra.rows ?? [reportSource()]).filter(x => ids.includes(x.id))); } };
+}
+
+test('reported-work family needs an explicit manifest and the opt-in reader with exact arguments', async () => {
+  const args = ['--out', 'private', '--family', 'reported-work', '--subjects', 'manifest'];
+  assert.equal(options(args).scope, 'explicit_manifest');
+  assert.throws(() => options(['--out', 'private', '--family', 'reported-work']));
+  for (const flags of [['--scope', 'all'], ['--page-size', '20'], ['--bid-limit', '1000']]) assert.throws(() => options([...args, ...flags]));
+  const calls = [], client = publicClient(anonymousConfiguration(env('anon')), async (url, init) => { calls.push({ url, init }); return new Response('[]'); });
+  await client.rpc('vehicle_build_log_public', { p_vehicle_id: id(1), p_include_reported: true });
+  assert.match(calls[0].url, /\/rest\/v1\/rpc\/vehicle_build_log_public$/);
+  assert.deepEqual(JSON.parse(calls[0].init.body), { p_vehicle_id: id(1), p_include_reported: true });
+  for (const bad of [{ p_vehicle_id: id(1) }, { p_vehicle_id: id(1), p_include_reported: false }, { p_vehicle_id: 'bad', p_include_reported: true },
+    { p_vehicle_id: id(1), p_include_reported: true, p_limit: 5 }, { p_vehicle_ids: [id(1)], p_include_reported: true }]) {
+    assert.throws(() => client.rpc('vehicle_build_log_public', bad));
+  }
+  await client.reportSources(id(1), [id(500)]);
+  const drill = new URL(calls[1].url);
+  assert.equal(drill.pathname, '/rest/v1/vehicle_observations');
+  assert.equal(drill.searchParams.get('id'), `in.(${id(500)})`); assert.equal(drill.searchParams.get('vehicle_id'), `eq.${id(1)}`);
+  assert.match(drill.searchParams.get('select'), /content_text/);
+  assert.equal(/source_observation_id|performed_clause|reported_date/.test(drill.searchParams.get('select')), false, 'Parent listing fields only; the activity child stays private');
+  assert.throws(() => client.reportSources('bad', [id(500)])); assert.throws(() => client.reportSources(id(1), []));
+  assert.equal(calls.length, 2);
+});
+
+test('matching reports drill to the exact source sentence and keep recommendation context out of the performed clause', async () => {
+  const client = reportClient(), events = [];
+  const r = await runReportedWorkLineage(client, scope(), lineageSubjects(manifest([id(1), id(2)])), { emit: x => events.push(x) });
+  assert.equal(r.status, 'matched_current_reported_work_in_manifest'); assert.equal(r.exitCode, 0);
+  assert.equal(r.eligibleParents, 1); assert.equal(r.absentOrIneligibleParents, 1);
+  assert.equal(r.selectedReports, 2); assert.equal(r.matchingReports, 2); assert.equal(r.sourcesFound, 2);
+  assert.equal(r.sourceCapability, 'reader_asserted'); assert.equal(r.publisherTruth, 'unmeasured'); assert.equal(r.physicalOccurrence, 'unmeasured');
+  assert.equal(r.supportedAnswerCoverage, 'unmeasured'); assert.equal(r.databaseWrites, 0); assert.equal(r.modelCalls, 0);
+  assert.deepEqual(client.calls.filter(c => c.reader === 'vehicle_observations').map(c => c.ids), [[id(500)]], 'One drill per parent, distinct sources');
+  const output = JSON.stringify(events);
+  for (const raw of ['SYNTHETIC PRIVATE', 'synthetic-private-listing', id(2)]) assert.equal(output.includes(raw), false);
+});
+
+test('an absent opt-in overload is incomplete, never agreement, and stops before any source read', async () => {
+  const client = reportClient({ log: { ok: false, status: 404, code: 'PGRST202' } });
+  const r = await runReportedWorkLineage(client, scope(), lineageSubjects(manifest([id(1)])));
+  assert.equal(r.status, 'incomplete'); assert.equal(r.exitCode, 2); assert.equal(r.stopReason, 'reported_work_reader_absent');
+  assert.equal(r.gaps.reported_work_reader_absent, 1); assert.equal(r.matchingReports, 0); assert.deepEqual(r.failures, {});
+  assert.equal(client.calls.some(c => c.reader === 'vehicle_observations'), false);
+});
+
+test('zero reports is missing support, and legacy confirmed rows are counted, not treated as reports', async () => {
+  const client = reportClient({ log: { ok: true, status: 200, value: buildLog([], [{ observation_id: id(9), item: 'SYNTHETIC PRIVATE LEGACY' }]) } });
+  const r = await runReportedWorkLineage(client, scope(), lineageSubjects(manifest([id(1)])));
+  assert.equal(r.status, 'measured_with_missing_or_unmatched_reports'); assert.equal(r.exitCode, 2);
+  assert.equal(r.parentsWithoutReports, 1); assert.equal(r.gaps.reported_work_absent_for_parent, 1); assert.equal(r.legacyWorkRecords, 1);
+  assert.equal(r.selectedReports, 0); assert.equal(client.calls.some(c => c.reader === 'vehicle_observations'), false);
+});
+
+test('a repeated listing sentence is inflation, not corroboration', () => {
+  // Live 2026-10-15: one listing page held 16 identical captures; each is the same assertion.
+  const repeat = report(3, { source_observation_id: id(501) });
+  assert.equal(inspectReportedWork(buildLog([report(), repeat])).failures.reported_work_repeated_listing_sentence, 1);
+  const otherPage = report(3, { source_observation_id: id(501), source_url: 'https://bringatrailer.com/listing/synthetic-relisting/' });
+  assert.deepEqual(inspectReportedWork(buildLog([report(), otherPage])).failures, {}, 'A different listing page is a separate publication');
+  assert.equal(inspectReportedWork(buildLog([report(), report()])).failures.reported_work_observation_duplicated, 1);
+});
+
+test('v2 passive-sentence witnesses are accepted beside v1 only when the performed clause is the whole sentence', async () => {
+  const PASSIVE = 'The SYNTHETIC PRIVATE FLUID was flushed in September 2026.';
+  const v2 = report(3, { source_witness_version: 'retained_description_reported_work_v2', performed_clause: PASSIVE, source_value: PASSIVE });
+  const inspected = inspectReportedWork(buildLog([report(), v2]));
+  assert.deepEqual(inspected.failures, {}); assert.equal(inspected.reports.length, 2);
+  const rows = [reportSource({ content_text: `SYNTHETIC PRIVATE SOURCE BODY opens here. ${WORK} ${PASSIVE} It closes here.` })];
+  const client = reportClient({ log: { ok: true, status: 200, value: buildLog([report(), v2]) }, rows });
+  const r = await runReportedWorkLineage(client, scope(), lineageSubjects(manifest([id(1)])));
+  assert.equal(r.status, 'matched_current_reported_work_in_manifest'); assert.equal(r.matchingReports, 2); assert.deepEqual(r.failures, {});
+  const PREFIX = 'The SYNTHETIC PRIVATE FLUID was flushed in September 2026';
+  const partial = report(3, { source_witness_version: 'retained_description_reported_work_v2', performed_clause: PREFIX, source_value: `${PREFIX}, and SYNTHETIC PRIVATE MORE.` });
+  assert.equal(inspectReportedWork(buildLog([partial])).failures.reported_work_v2_clause_not_whole_sentence, 1);
+  for (const version of ['retained_description_reported_work_v3', 'retained_description_engine_family_label_v1', null]) {
+    const refused = inspectReportedWork(buildLog([report(1, { source_witness_version: version })]));
+    assert.equal(refused.failures.reported_work_source_witness_version_invalid, 1, String(version)); assert.equal(refused.reports.length, 0);
+  }
+});
+
+test('reader rows cannot add a performer, confirm occurrence, invent a day or blur the clocks', () => {
+  for (const [extra, reason] of [
+    [{ performer_id: id(9) }, 'reported_work_performer_id_invalid'], [{ performer_status: 'known' }, 'reported_work_performer_status_invalid'],
+    [{ occurrence_status: 'confirmed' }, 'reported_work_occurrence_status_invalid'], [{ independent_source: true }, 'reported_work_independent_source_invalid'],
+    [{ kind: 'work_record' }, 'reported_work_kind_invalid'], [{ date_precision: 'day' }, 'reported_work_date_precision_invalid'],
+    [{ reported_date: '2026-09-01' }, 'reported_work_month_invalid'], [{ reported_date_label: 'October 2026' }, 'reported_work_month_label_mismatch'],
+    [{ reported_date: '2026-11', reported_date_label: 'November 2026', performed_clause: 'Work in November 2026 included X.', source_value: 'Work in November 2026 included X.' }, 'reported_work_month_after_capture'],
+    [{ performed_clause: RECOMMENDED, source_value: RECOMMENDED, reported_date: '2023-07', reported_date_label: 'July 2023' }, 'reported_work_recommendation_in_performed_clause'],
+    [{ performed_clause: 'Work in September 2026 included other work.' }, 'reported_work_clause_not_source_prefix'],
+    [{ observed_at: '2026-10-10T02:40:08.811436+00:00' }, 'reported_work_observation_clock_basis_mismatch'],
+    [{ source_captured_at: '2026-10-10T02:40:09Z' }, 'reported_work_capture_after_source_recording'],
+    [{ ingested_at: '2026-10-10T02:40:08.811434+00:00' }, 'reported_work_recorded_before_source'],
+    [{ source_recorded_at: '2026-10-10 02:40:08' }, 'reported_work_clock_invalid'], [{ confidence_score: 0.9 }, 'reported_work_confidence_invalid'],
+    [{ source_capture_sha256: 'short' }, 'reported_work_capture_witness_invalid'], [{ source_url: 'http://bringatrailer.com/listing/x/' }, 'reported_work_source_url_invalid'],
+    [{ source_value: `${WORK} ${'x'.repeat(300)}`, performed_clause: WORK }, 'reported_work_text_invalid'],
+  ]) {
+    const inspected = inspectReportedWork(buildLog([report(1, extra)]));
+    assert.equal(inspected.failures[reason], 1, reason); assert.equal(inspected.reports.length, 0, `${reason} is not drilled`);
+  }
+  assert.equal(inspectReportedWork(buildLog([{ ...report(), performer_name: 'SYNTHETIC PRIVATE' }])).failures.reported_work_shape_invalid, 1);
+  for (const value of [[], { work_records: [] }, { work_records: [], reported_work: [], extra: [] }, { work_records: [], reported_work: Array(201).fill(report()) }]) {
+    assert.equal(inspectReportedWork(value).safe, false);
+  }
+});
+
+test('source drills keep withheld, missing and oversized sources as gaps and fail every custody mismatch', () => {
+  const run = (rows, reports = [report()]) => inspectReportedSources(id(1), reports, rows);
+  assert.equal(run([reportSource()]).matchedReports, 1);
+  assert.equal(run([]).gaps.reported_source_unavailable_in_current_read, 1);
+  assert.equal(run([reportSource({ content_text: null })]).gaps.reported_source_text_withheld, 1);
+  assert.equal(run([reportSource({ content_text: `${WORK} ${'y'.repeat(32001)}` })]).gaps.reported_source_text_oversized, 1);
+  for (const [extra, reason] of [
+    [{ content_text: 'Work in September 2026 included SYNTHETIC PRIVATE WORK, and more.' }, 'reported_source_sentence_not_found'],
+    [{ content_text: `Prefix ${WORK}` }, 'reported_source_sentence_not_found'],
+    [{ is_superseded: true }, 'reported_source_not_current_native_listing'], [{ kind: 'comment' }, 'reported_source_not_current_native_listing'],
+    [{ extraction_method: 'html_match' }, 'reported_source_not_current_native_listing'], [{ source_id: id(201) }, 'reported_source_id_mismatch'],
+    [{ source_url: 'https://bringatrailer.com/listing/other/' }, 'reported_source_url_mismatch'],
+    [{ ingested_at: '2026-10-10T02:40:08.811436+00:00' }, 'reported_source_recording_clock_mismatch'],
+    [{ source_captured_at: '2026-10-10T02:40:06.123457Z', observed_at: '2026-10-10T02:40:06.123457Z' }, 'reported_source_capture_clock_mismatch'],
+    [{ observed_at: '2026-10-10T02:40:07+00:00' }, 'reported_source_observation_not_capture_clock'],
+    [{ source_capture_sha256: 'd'.repeat(64) }, 'reported_source_capture_witness_mismatch'], [{ source_capture_basis: 'protected_snapshot' }, 'reported_source_capture_witness_mismatch'],
+    [{ extractor_input_truncated: true }, 'reported_source_truncated_or_unqualified'], [{ extractor_input_truncated: null }, 'reported_source_truncated_or_unqualified'],
+  ]) assert.equal(run([reportSource(extra)]).failures[reason], 1, reason);
+  // The PostgreSQL microsecond instant, not the string, is compared.
+  assert.equal(run([reportSource({ observed_at: '2026-10-09T19:40:06.123456-07:00' })]).matchedReports, 1);
+  for (const rows of [[reportSource({ vehicle_id: id(2) })], [reportSource({ id: id(999) })], [reportSource(), reportSource()], null]) assert.equal(run(rows).safe, false);
+});
+
+test('source-wide completion qualifications prevent an exact sentence from passing reported-work lineage', async () => {
+  // The existing retained-work witness withholds these governing contexts across sentence boundaries.
+  // Matching the isolated sentence must not turn a stale or misprojected reader row into agreement.
+  for (const [version, sentence] of [
+    ['retained_description_reported_work_v1', 'Work in September 2026 included rebuilding the carburetor.'],
+    ['retained_description_reported_work_v2', 'The SYNTHETIC PRIVATE FLUID was flushed in September 2026.'],
+  ]) {
+    const r = report(1, { source_witness_version: version, source_value: sentence, performed_clause: sentence });
+    const ordinary = reportSource({ content_text: `SYNTHETIC PRIVATE SOURCE BODY opens here. ${sentence} It closes here.` });
+    assert.equal(inspectReportedSources(id(1), [r], [ordinary]).matchedReports, 1);
+    for (const context of ['The work was never completed.', 'The following work was not performed.',
+      'Only the following proposed work is described.', 'This was recommended for the next service.',
+      `The following ${'😀'.repeat(101)} proposed work is described.`]) {
+      const content_text = `SYNTHETIC PRIVATE SOURCE BODY opens here. ${context}\n${sentence} It closes here.`;
+      const rows = [reportSource({ content_text })], inspected = inspectReportedSources(id(1), [r], rows);
+      assert.equal(inspected.matchedReports, 0, `${version}: ${context}`);
+      assert.equal(inspected.failures.reported_source_completion_context_withheld, 1);
+      const events = [], result = await runReportedWorkLineage(reportClient({ log: { ok: true, status: 200, value: buildLog([r]) }, rows }),
+        scope(), lineageSubjects(manifest([id(1)])), { emit: x => events.push(x) });
+      assert.equal(result.status, 'failed'); assert.equal(result.exitCode, 1); assert.equal(result.matchingReports, 0);
+      assert.equal(result.unmeasuredReports, 1); assert.equal(JSON.stringify(events).includes('SYNTHETIC PRIVATE'), false);
+    }
+  }
+  const rows = [reportSource({ content_text: `SYNTHETIC PRIVATE SOURCE BODY opens here. ${WORK} Recommended work is separate.` })];
+  assert.equal(inspectReportedSources(id(1), [report()], rows).matchedReports, 1, 'Unrelated recommendations do not negate a completion assertion');
+});
+
+test('unsafe reader or source output stops without foreign IDs; two reader failures and the deadline stay unmeasured', async () => {
+  for (const extra of [{ log: { ok: true, status: 200, value: { reported_work: [] } } }, { rows: [reportSource({ vehicle_id: id(999) })] }, { gate: { ok: true, value: [parent(999)] } }]) {
+    const events = [], r = await runReportedWorkLineage(reportClient(extra), scope(), lineageSubjects(manifest([id(1)])), { emit: x => events.push(x) });
+    assert.equal(r.status, 'failed'); assert.equal(JSON.stringify(events).includes(id(999)), false);
+  }
+  const parents = [parent(1), parent(2), parent(3)], failing = { ok: false, status: 500, code: '57014' };
+  const failed = reportClient({ parents, logs: [failing, failing, { ok: true, status: 200, value: buildLog() }] });
+  const r = await runReportedWorkLineage(failed, scope(), lineageSubjects(manifest([id(1), id(2), id(3)])));
+  assert.equal(r.stopReason, 'two_reported_work_reader_failures_inspect_cause'); assert.equal(r.completedParents, 0); assert.equal(r.status, 'failed');
+  let clock = 0; const timed = reportClient(), rpc = timed.rpc; timed.rpc = async (...args) => { const result = await rpc(...args); clock = 10; return result; };
+  const late = await runReportedWorkLineage(timed, scope({ until: 5 }), lineageSubjects(manifest([id(1)])), { now: () => clock });
+  assert.equal(late.stopReason, 'time_budget_reached'); assert.equal(late.status, 'incomplete'); assert.equal(late.matchingReports, 0);
+  assert.equal(timed.calls.some(c => c.reader === 'vehicle_observations'), false);
+});
+
+test('reported-work CLI writes a private exclusive receipt with its readers and no source text', async t => {
+  const dir = await mkdtemp(path.join(tmpdir(), 'nuke-reported-work-')); t.after(() => rm(dir, { recursive: true, force: true }));
+  const input = path.join(dir, 'manifest.json'), out = path.join(dir, 'receipt.jsonl'); await writeFile(input, JSON.stringify(manifest([id(1)])));
+  const args = ['--out', out, '--family', 'reported-work', '--subjects', input];
+  assert.equal(await main(args, { env: env('anon'), client: reportClient(), print: () => {} }), 0);
+  const body = await readFile(out, 'utf8'), rows = body.trim().split('\n').map(JSON.parse);
+  assert.deepEqual(rows[0].readers, ['vehicles', 'vehicle_build_log_public', 'vehicle_observations']); assert.equal(rows[0].options.family, 'reported-work');
+  assert.equal(rows.at(-1).matchingReports, 2); assert.equal(body.includes('SYNTHETIC PRIVATE'), false); assert.equal((await stat(out)).mode & 0o777, 0o600);
+  assert.equal(await main(args, { env: env('anon'), client: reportClient(), print: () => {} }), 1);
 });
 
 const comment = (n, extra = {}) => ({ id: id(100 + n), vehicle_id: id(1), auction_event_id: id(10),

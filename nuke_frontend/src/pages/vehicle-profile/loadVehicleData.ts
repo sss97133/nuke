@@ -80,6 +80,12 @@ function scoreHeroCandidate(row: any, options: { frontExterior?: boolean } = {})
   return moneyShotScore + qualityScore + zoneScore + getHeroAspectScore(row);
 }
 
+/** The record a merged-away vehicle was folded into, or null: the vehicle's own id (a loop) is not a target. */
+export function mergedTargetOf(vehicle: { id?: unknown; merged_into_vehicle_id?: unknown } | null | undefined): string | null {
+  const to = vehicle?.merged_into_vehicle_id;
+  return typeof to === 'string' && to.length >= 20 && to !== vehicle?.id ? to : null;
+}
+
 // In-flight dedupe for the hero-candidate query. The identical vehicle_images
 // query was observed firing 2-4x per page load (StrictMode double-mount +
 // RPC-fallback path both selecting a hero). Key = vehicleId — the rest of the
@@ -304,6 +310,11 @@ function buildHeroResult(row: any): HeroImageResult {
   return { url, meta };
 }
 
+export interface TimelineReadState {
+  timeline: 'pending' | 'ready' | 'unavailable';
+  work: 'pending' | 'ready' | 'unavailable';
+}
+
 export interface RpcLoadResult {
   /** RPC provided non-truncated images — skip separate loadVehicleImages */
   images: boolean;
@@ -320,7 +331,7 @@ export interface LoadVehicleParams {
   session: any;
   leadImageUrl: string | null;
   supabase: any;
-  navigate: (path: string) => void;
+  navigate: (path: string, options?: { replace?: boolean }) => void;
   ranBatSyncRef: React.MutableRefObject<string | null>;
   setLoading: (v: boolean) => void;
   setVehicle: (v: any) => void;
@@ -328,6 +339,7 @@ export interface LoadVehicleParams {
   setLeadImageUrl: (url: string) => void;
   setVehicleImages: (images: string[]) => void;
   setTimelineEvents: React.Dispatch<React.SetStateAction<any[]>>;
+  onTimelineRead?: (state: TimelineReadState) => void;
   setAuctionPulse: (pulse: any) => void;
 }
 
@@ -343,6 +355,39 @@ export function observationTotal(fromRpc: number | null, row: unknown): number |
   return typeof column === 'number' && Number.isFinite(column) && column >= 0 ? column : null;
 }
 
+export function isVehicleVinAddress(value: unknown): value is string {
+  return typeof value === 'string' && /^[A-HJ-NPR-Z0-9]{17}$/i.test(value);
+}
+
+export type VinAddressResolution = { status: 'resolved'; id: string }
+  | { status: 'missing' | 'ambiguous' | 'unavailable' | 'malformed' };
+
+/** Qualify the existing indexed public reader's candidates; never choose the first of several. */
+export async function resolveVehicleVinAddress(vin: string, supabase: any): Promise<VinAddressResolution> {
+  if (!isVehicleVinAddress(vin)) return { status: 'malformed' };
+  const normalized = vin.toUpperCase();
+  try {
+    const key = `vin:${normalized}`;
+    let pending = inflightProfileRpc.get(key);
+    if (!pending) {
+      pending = Promise.resolve(supabase.rpc('vehicle_by_vin_public', { p_vin: normalized }))
+        .finally(() => inflightProfileRpc.delete(key));
+      inflightProfileRpc.set(key, pending);
+    }
+    const { data, error } = await pending;
+    if (error) return { status: 'unavailable' };
+    if (!Array.isArray(data)) return { status: 'malformed' };
+    if (data.length === 0) return { status: 'missing' };
+    if (data.length !== 1) return { status: 'ambiguous' };
+    const match = data[0];
+    if (typeof match?.id !== 'string' || !/^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i.test(match.id)
+      || typeof match.vin !== 'string' || match.vin.trim().toUpperCase() !== normalized) return { status: 'malformed' };
+    return { status: 'resolved', id: match.id };
+  } catch {
+    return { status: 'unavailable' };
+  }
+}
+
 export async function loadVehicleImpl({
   vehicleId,
   session,
@@ -356,6 +401,7 @@ export async function loadVehicleImpl({
   setLeadImageUrl,
   setVehicleImages,
   setTimelineEvents,
+  onTimelineRead,
   setAuctionPulse,
 }: LoadVehicleParams): Promise<RpcLoadResult> {
   const rpcLoaded: RpcLoadResult = { images: false, timeline: false, commentCount: null, observationCount: null };
@@ -364,11 +410,23 @@ export async function loadVehicleImpl({
 
     // Accept both UUID format (with hyphens) and VIN format (17 chars alphanumeric)
     const isUUID = vehicleId && vehicleId.length >= 20 && vehicleId.includes('-');
-    const isVIN = vehicleId && /^[A-HJ-NPR-Z0-9]{17}$/i.test(vehicleId);
+    const isVIN = isVehicleVinAddress(vehicleId);
 
     if (!vehicleId || (!isUUID && !isVIN)) {
       console.error('Invalid vehicleId format:', vehicleId);
       navigate('/vehicles');
+      return rpcLoaded;
+    }
+
+    if (isVIN) {
+      // Resolve with the existing indexed public owner, then let every profile reader use a UUID.
+      const resolution = await resolveVehicleVinAddress(vehicleId, supabase);
+      if (resolution.status === 'resolved') {
+        navigate(`/vehicle/${resolution.id}`, { replace: true });
+      } else {
+        console.warn('[VehicleProfile] VIN address unresolved:', resolution.status);
+        setVehicle(null);
+      }
       return rpcLoaded;
     }
 
@@ -418,7 +476,7 @@ export async function loadVehicleImpl({
       try {
         const { data, error } = await supabase
           .from('vehicles')
-          .select('id,year,make,model,normalized_model,series,trim,vin,primary_image_url,image_url,sale_price,nuke_estimate,nuke_estimate_confidence,status,is_public,sale_status,auction_outcome,auction_source,bat_auction_url,discovery_url,listing_url,listing_source,listing_location,uploaded_by,user_id,owner_id,color,interior_color,mileage,fuel_type,transmission,engine_size,engine_type,engine_displacement,horsepower,torque,drivetrain,body_style,doors,is_modified,modification_details,condition_rating,notes,created_at,updated_at,is_for_sale,is_draft,deleted_at,asking_price,current_value,msrp,msrp_source,completion_percentage,displacement,auction_end_date,bid_count,view_count,bat_sold_price,bat_sale_date,bat_listing_title,bat_location,bat_seller,bat_lot_number,sale_date,ownership_verified,ownership_verified_at,data_quality_score,platform_source,discovery_source,profile_origin,listing_kind,reserve_status,origin_organization_id,origin_metadata,description,description_source,highlights,equipment,modifications,known_flaws,recent_service_history,title_status,location,observation_count,image_count')
+          .select('id,merged_into_vehicle_id,year,make,model,normalized_model,series,trim,vin,primary_image_url,image_url,sale_price,nuke_estimate,nuke_estimate_confidence,status,is_public,sale_status,auction_outcome,auction_source,bat_auction_url,discovery_url,listing_url,listing_source,listing_location,uploaded_by,user_id,owner_id,color,interior_color,mileage,fuel_type,transmission,engine_size,engine_type,engine_displacement,horsepower,torque,drivetrain,body_style,doors,is_modified,modification_details,condition_rating,notes,created_at,updated_at,is_for_sale,is_draft,deleted_at,asking_price,current_value,msrp,msrp_source,completion_percentage,displacement,auction_end_date,bid_count,view_count,bat_sold_price,bat_sale_date,bat_listing_title,bat_location,bat_seller,bat_lot_number,sale_date,ownership_verified,ownership_verified_at,data_quality_score,platform_source,discovery_source,profile_origin,listing_kind,reserve_status,origin_organization_id,origin_metadata,import_metadata,provenance_metadata,description,description_source,highlights,equipment,modifications,known_flaws,recent_service_history,title_status,location,observation_count,image_count')
           .eq('id', vehicleId)
           .single();
 
@@ -464,7 +522,7 @@ export async function loadVehicleImpl({
         setVehicleImages(rpcData.images.map((img: any) => img.image_url));
         rpcLoaded.images = !rpcImagesTruncated;
       }
-      if (rpcData.timeline_events) {
+      if (Array.isArray(rpcData.timeline_events)) {
         // Merge work_sessions into timeline events (work_sessions table has RLS,
         // so the RPC returns them separately via SECURITY DEFINER)
         const events = [...rpcData.timeline_events];
@@ -477,7 +535,7 @@ export async function loadVehicleImpl({
               event_type: 'work_session',
               title: ws.title,
               category: ws.work_type,
-              cost_amount: (ws.total_job_cost || 0) + (ws.total_parts_cost || 0),
+              cost_amount: ws.total_job_cost ?? null,
               metadata: {
                 work_type: ws.work_type,
                 image_count: ws.image_count,
@@ -499,6 +557,10 @@ export async function loadVehicleImpl({
         });
         // Paint the timeline NOW — do not gate first paint on image_sets.
         sortByDateDesc(events);
+        onTimelineRead?.({
+          timeline: 'ready',
+          work: Array.isArray(rpcData.work_sessions) ? 'ready' : 'unavailable',
+        });
         setTimelineEvents(events);
         rpcLoaded.timeline = true;
         // RPC doesn't include image_sets — supplement asynchronously and merge
@@ -545,6 +607,15 @@ export async function loadVehicleImpl({
     }
 
     rpcLoaded.observationCount = observationTotal(rpcLoaded.observationCount, vehicleData);
+
+    // A vehicle merged into another stays at its old address as a stub: no photos, no owner, only the specs it was
+    // created with (2026-10-16: an owner's old link opened a bare "NO IMAGES" page for a car with 1,800 photos under
+    // its merge target). Send the visitor to the record that holds the data; replace, so Back does not bounce again.
+    const mergedTarget = mergedTargetOf(vehicleData);
+    if (mergedTarget) {
+      navigate(`/vehicle/${mergedTarget}`, { replace: true });
+      return rpcLoaded;
+    }
 
     // For non-authenticated users, only show public vehicles
     if (!session && !vehicleData.is_public) {

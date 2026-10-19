@@ -140,7 +140,7 @@ const OPENAI_NO_CREDITS =
   '{"success":false,"error":"OpenAI API error: 429 - {\\n \\"error\\": {\\n \\"message\\": \\"You have no credits remaining. Add credits to continue using the API';
 
 const SLUG_VENUES: Array<{ platform: string; url: string; extractor: string }> = [
-  { platform: "classiccars", url: "https://classiccars.com/listings/view/2089229/1993-chevrolet-corvette-for-sale-in-cleveland-ohio-44128", extractor: "extract-vehicle-data-ai" },
+  { platform: "classiccars", url: "https://classiccars.com/listings/view/2089229/1993-chevrolet-corvette-for-sale-in-cleveland-ohio-44128", extractor: "extract-classiccars" },
   { platform: "mecum", url: "https://www.mecum.com/lots/1177355/2005-hummer-h2", extractor: "extract-mecum" },
   { platform: "barrett_jackson", url: "https://www.barrett-jackson.com/2026-columbus/docket/vehicle/1951-plymouth-cranbrook-300183", extractor: "extract-barrett-jackson" },
   { platform: "hagerty", url: "https://www.hagerty.com/marketplace/auction/1965-Ford-Mustang/ce62f601-14d5-4090-9489-2287744182ee", extractor: "extract-hagerty-listing" },
@@ -313,11 +313,12 @@ Deno.test({
     extractor = () => json({ success: true, extracted: data });
     clWorld = { failEventOnce: true };
     try {
-      const first = (await ingest({ url: listingUrl })).result;
+      const first = (await ingest({ url: listingUrl, notes: "Caller notes disagree with the seller's account." })).result;
       equal(first.status, "created");
       const observation = JSON.parse(writes().find(r => r.path === "/rest/v1/vehicle_observations")!.body!);
       equal([observation.vehicle_id, observation.source_identifier, observation.source_url, observation.observed_at],
         [first.vehicle_id, data.post_id, listingUrl, sourceCapture.observed_at]);
+      equal(observation.content_text, data.description);
       equal(first.listing_capture.capture_landing.observation, "written");
       equal(first.listing_capture.capture_landing.listing_event.action, "error");
       const retry = (await ingest({ url: listingUrl })).result;
@@ -350,6 +351,58 @@ Deno.test({
       equal(raced.listing_capture.capture_landing.listing_event, { action: "skipped", reason: "listing changed during projection; retry" });
       equal(clWorld.event!.current_price, 27000);
       equal((clWorld.event!.metadata as Record<string, unknown>).clock_locked_by_supersession, true);
+    } finally { clWorld = null; persistedVehicle = null; }
+  },
+});
+
+Deno.test({
+  name: "Craigslist prose without a valid snapshot and source clock is withheld while existing attributes still land",
+  sanitizeOps: false, sanitizeResources: false,
+  fn: async () => {
+    const listingUrl = "https://lasvegas.craigslist.org/cto/d/1993-chevrolet-corvette/1234567890.html";
+    for (const source_capture of [
+      undefined,
+      { snapshot_id: "not-a-snapshot-id", observed_at: "2026-01-04T01:02:03.000Z" },
+      { snapshot_id: "dddddddd-dddd-4ddd-8ddd-dddddddddddd", observed_at: "unknown" },
+    ]) {
+      extractor = () => json({ success: true, extracted: { ...SUCCESS_BODY.data, source_capture,
+        post_id: "1234567890", attributes: { raw: { year: "1993" }, odometer: 12345 } } });
+      clWorld = {};
+      try {
+        const { result } = await ingest({ url: listingUrl });
+        equal(result.status, "created");
+        const observation = JSON.parse(writes().find(r => r.path === "/rest/v1/vehicle_observations")!.body!);
+        equal(observation.content_text, undefined);
+        equal(observation.structured_data.mileage, 12345);
+        equal(observation.extraction_metadata.raw.source_capture, undefined);
+      } finally { clWorld = null; persistedVehicle = null; }
+    }
+  },
+});
+
+Deno.test({
+  name: "Craigslist missing source prose stays unknown despite caller notes or a caller description",
+  sanitizeOps: false, sanitizeResources: false,
+  fn: async () => {
+    const listingUrl = "https://lasvegas.craigslist.org/cto/d/1993-chevrolet-corvette/1234567890.html";
+    const notes = "Caller recollection must not become the seller's testimony.";
+    for (const description of [null, "   "]) {
+      extractor = () => json({ success: true, extracted: { ...SUCCESS_BODY.data, description,
+        post_id: "1234567890", attributes: { raw: { year: "1993" }, odometer: 12345 },
+        source_capture: { snapshot_id: "dddddddd-dddd-4ddd-8ddd-dddddddddddd", observed_at: "2026-01-04T01:02:03.000Z" } } });
+      clWorld = {};
+      try {
+        const { result } = await ingest({ url: listingUrl, notes });
+        equal(result.status, "created");
+        const observation = JSON.parse(writes().find(r => r.path === "/rest/v1/vehicle_observations")!.body!);
+        equal(observation.content_text, undefined);
+      } finally { clWorld = null; persistedVehicle = null; }
+    }
+    clWorld = {};
+    try {
+      await ingest({ url: listingUrl, year: 1993, make: "Chevrolet", model: "Corvette", description: notes });
+      equal(extractorCalls(), []);
+      equal(writes().filter(r => r.path === "/rest/v1/vehicle_observations").length, 0);
     } finally { clWorld = null; persistedVehicle = null; }
   },
 });

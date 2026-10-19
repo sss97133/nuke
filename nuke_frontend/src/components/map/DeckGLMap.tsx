@@ -1,5 +1,6 @@
 import React, { useCallback, useRef, useMemo } from 'react';
 import 'maplibre-gl/dist/maplibre-gl.css';
+import './maplibreWorker';
 import DeckGL from '@deck.gl/react';
 import { Map as MapLibre, Source, Layer, Popup } from 'react-map-gl/maplibre';
 import type { MapViewState, MapMode, BizPin } from './types';

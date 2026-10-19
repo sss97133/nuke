@@ -1,3 +1,5 @@
+// Redeployed 2026-10-15 for the archiveFetch login-heuristic and cache fix (PR 1616).
+// Redeployed 2026-10-15 so the bundle carries the archiveFetch rawHtml block fallback (PR 1428).
 /**
  * HAGERTY MARKETPLACE EXTRACTOR
  *
@@ -17,9 +19,11 @@ import { corsHeaders } from '../_shared/cors.ts';
 import { archiveFetch } from '../_shared/archiveFetch.ts';
 import { normalizeListingUrlKey } from '../_shared/listingUrl.ts';
 import { normalizeVehicleFields } from '../_shared/normalizeVehicle.ts';
+import { writeVehicleEventByKey } from '../_shared/vehicleEventWrite.ts';
 import { writeObservation } from '../_shared/observationWriter.ts';
 import { requireWriteAuth } from '../_shared/writeGuard.ts';
 import { projectSecretKey } from "../_shared/supabaseKeys.ts";
+import { ALLOWANCE_EXHAUSTED, firecrawlGate } from "../_shared/firecrawlGate.ts";
 
 // ============================================================================
 // TYPES
@@ -674,24 +678,33 @@ async function fetchHagertyPage(url: string): Promise<{ html: string; source: st
   // page fetch — so the feed could never reach the clean-end stamp that clears
   // its last_error. Re-polls now read the archive instead of the network.
   // "Fetch once, extract forever" (.claude/rules/extraction.md).
+  // Ask first, record after: no paid scrape without a credit in firecrawl_allowance('hagerty') (0 until an allocation row exists).
+  const gate = firecrawlGate(createClient(Deno.env.get('SUPABASE_URL')!, projectSecretKey()!), 'hagerty');
   const result = await archiveFetch(url, {
+    firecrawlAllowed: () => gate.allow(),
     platform: 'hagerty',
     callerName: 'extract-hagerty-listing',
     // A live auction's bid/price moves; a day-old snapshot would report a stale
     // number as current. One hour keeps the re-poll cheap without going stale.
     maxAgeSec: 3600,
     waitForJs: 3000,
+    // Server-side direct fetches of hagerty.com are refused ("Blocked by site", every poll since 10-10); a laptop gets 200.
+    firecrawlOnBlock: true,
   });
 
+  if (result.error === 'firecrawl_allowance_exhausted') throw new Error(ALLOWANCE_EXHAUSTED);
   if (!result.html) {
+    if (result.source === 'firecrawl') await gate.record(1, 0, 'extract-hagerty-listing', `no page ${url}`);
     throw new Error(`Fetch failed: ${result.error || 'No HTML returned'}`);
   }
   // The parser needs __NEXT_DATA__; a page without it is a soft failure worth
   // naming, because it means the shape changed rather than the fetch failing.
   if (!result.html.includes('__NEXT_DATA__')) {
+    if (result.source === 'firecrawl') await gate.record(1, 0, 'extract-hagerty-listing', `no __NEXT_DATA__ ${url}`);
     throw new Error(`Page fetched (${result.source}) but no __NEXT_DATA__ present`);
   }
 
+  if (result.source === 'firecrawl') await gate.record(1, 1, 'extract-hagerty-listing', url);
   console.log(`[hagerty] ${result.source}${result.cached ? ' (cached)' : ''} — ${result.html.length} bytes`);
   return { html: result.html, source: result.source };
 }
@@ -1035,45 +1048,42 @@ Deno.serve(async (req) => {
         const listingUrlKey = normalizeListingUrlKey(extracted.url);
         console.log(`[hagerty] Creating vehicle_event with source_listing_id: ${listingUrlKey}`);
 
-        const { data: listingData, error: listingError } = await supabase
-          .from('vehicle_events')
-          .upsert({
-            vehicle_id: targetVehicleId,
-            source_platform: 'hagerty',
-            event_type: 'auction',
-            source_url: extracted.url,
-            source_listing_id: listingUrlKey || extracted.listing_uuid,
-            event_status: extracted.status,
-            ended_at: extracted.auction_end || null,  // Keep full ISO timestamp for countdown timer
-            final_price: extracted.sale_price,
-            bid_count: extracted.bid_count,
+        // Keyed read-then-write: vehicle_events' listing key is a partial unique index, so .upsert(onConflict) cannot infer it.
+        const eventWrite = await writeVehicleEventByKey(supabase, {
+          vehicle_id: targetVehicleId,
+          source_platform: 'hagerty',
+          event_type: 'auction',
+          source_url: extracted.url,
+          source_listing_id: listingUrlKey || extracted.listing_uuid,
+          event_status: extracted.status,
+          ended_at: extracted.auction_end || null,  // Keep full ISO timestamp for countdown timer
+          final_price: extracted.sale_price,
+          bid_count: extracted.bid_count,
+          comment_count: extracted.comment_count,
+          view_count: extracted.view_count,
+          sold_at: extracted.status === 'sold' && extracted.auction_end ? extracted.auction_end : null,
+          metadata: {
+            lot_number: extracted.lot_number,
+            seller_username: extracted.seller_username,
+            seller_slug: extracted.seller_slug,
+            seller_verified: extracted.seller_verified,
+            buyer_username: extracted.buyer_username,
+            has_reserve: extracted.has_reserve,
+            reserve_met: extracted.reserve_met,
+            hagerty_valuation: extracted.hagerty_valuation,
+            like_count: extracted.like_count,
             comment_count: extracted.comment_count,
-            view_count: extracted.view_count,
-            sold_at: extracted.status === 'sold' && extracted.auction_end ? extracted.auction_end : null,
-            metadata: {
-              lot_number: extracted.lot_number,
-              seller_username: extracted.seller_username,
-              seller_slug: extracted.seller_slug,
-              seller_verified: extracted.seller_verified,
-              buyer_username: extracted.buyer_username,
-              has_reserve: extracted.has_reserve,
-              reserve_met: extracted.reserve_met,
-              hagerty_valuation: extracted.hagerty_valuation,
-              like_count: extracted.like_count,
-              comment_count: extracted.comment_count,
-              video_urls: extracted.video_urls,
-              websocket_channel: extracted.websocket_channel,
-            },
-          }, { onConflict: 'source_platform,source_listing_id' })
-          .select()
-          .maybeSingle();
+            video_urls: extracted.video_urls,
+            websocket_channel: extracted.websocket_channel,
+          },
+        });
 
-        if (listingError) {
-          console.error('[hagerty] Vehicle event save error:', JSON.stringify(listingError));
-          dbErrors.push(`vehicle_event: ${listingError.message || JSON.stringify(listingError)}`);
+        if (eventWrite.action === 'error') {
+          console.error('[hagerty] Vehicle event save error:', eventWrite.error);
+          dbErrors.push(`vehicle_event: ${eventWrite.error}`);
         } else {
           externalListingSaved = true;
-          console.log(`[hagerty] Created vehicle_events record: ${listingData?.id}`);
+          console.log(`[hagerty] vehicle_events ${eventWrite.action}`);
         }
       }
 
@@ -1272,7 +1282,7 @@ Deno.serve(async (req) => {
 
         const { error: snapError } = await supabase
           .from('listing_page_snapshots')
-          .upsert({
+          .insert({
             platform: 'hagerty',
             listing_url: url,
             fetched_at: new Date().toISOString(),
@@ -1288,9 +1298,10 @@ Deno.serve(async (req) => {
               comments_extracted: commentsExtracted,
               extraction_version: 'hagerty_v2_comments',
             },
-          }, { onConflict: 'platform,listing_url,html_sha256' });
+          });
 
-        if (snapError) {
+        // 23505: this exact page body is already archived (partial unique on platform, listing_url, html_sha256)
+        if (snapError && snapError.code !== '23505') {
           console.error('[hagerty] Snapshot save error:', snapError.message);
           dbErrors.push(`snapshot: ${snapError.message}`);
         } else {
@@ -1324,9 +1335,12 @@ Deno.serve(async (req) => {
       response.raw = extracted.raw_auction_data;
     }
 
+    // A requested save that hit a database error is a failed run, not a 200 with an errors array.
+    const failedSave = (save_to_db || vehicle_id) && dbErrors.length > 0;
+    if (failedSave) response.success = false;
     return new Response(
       JSON.stringify(response),
-      { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      { status: failedSave ? 500 : 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
 
   } catch (error: any) {

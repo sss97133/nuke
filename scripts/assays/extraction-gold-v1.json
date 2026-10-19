@@ -1,0 +1,446 @@
+{
+  "version": "extraction_gold_v1",
+  "recorded_at": "2026-10-18T04:05:00Z",
+  "method": "Each value was read by hand from the house's own page (or the house's own public listing API where the page is client-rendered) at the evidence clock below, never from a Nuke extractor. Values are as published: source fidelity, not physical truth. A field the source does not publish is omitted; omission is not-applicable, not missing.",
+  "conventions": {
+    "comment_count": "non-bid comments as the house counts them (BaT's 'N Comments' and Cars & Bids' stats.comments both exclude bids)",
+    "bid_count": "bids on the lot as the house counts them",
+    "hammer_price": "the price without buyer's premium, where the house publishes that figure (BaT, Cars & Bids, Mecum, PCarMarket, Collecting Cars)",
+    "price_with_premium": "the published price including buyer's premium (Bonhams 'inc. premium', RM Sotheby's, Gooding, Broad Arrow)",
+    "high_bid": "the top bid at close for a lot that did not sell, or the current bid of a live lot at the evidence clock",
+    "outcome": "sold | not_sold | live | upcoming",
+    "match": "every listed token must appear (case- and punctuation-insensitive) in one model value",
+    "match_any": "at least one listed token must appear in one model value",
+    "approx": "the source rounds (e.g. '13k Miles'); compared within 5% or 1,000",
+    "one_of": "any listed value is correct (e.g. a two-day sale whose lot day is not published)",
+    "perishable": "the lot was open at the evidence clock; after auction_end its outcome, bid and count fields are reported stale, not graded"
+  },
+  "evidence_store": "listing_page_snapshots rows are cited by id. Pages fetched directly (free) and house-API records are pinned by sha256; the bytes are kept with the run receipt, not in this public repo.",
+  "lots": [
+    {
+      "key": "bat_corvette_z06_sold", "house": "bat", "platform": "bat", "stage": "sold",
+      "url": "https://bringatrailer.com/listing/2019-chevrolet-corvette-z06-coupe-60",
+      "evidence": { "kind": "direct_fetch", "fetched_at": "2026-10-18T03:53:08Z", "sha256": "3132abd090f7c28314813c406cc3e2ccfd2189f75e59a77c364b44c9dbfdb23e" },
+      "truth": {
+        "year": 2019, "make": "Chevrolet", "model": { "value": "Corvette" },
+        "series": { "value": "Z06 Coupe 3LZ Z07", "match": ["z06"] },
+        "vin": "1G1YU2D69K5603450", "mileage": { "value": 13000, "unit": "mi", "approx": true },
+        "exterior_color": { "value": "Corvette Racing Yellow Tintcoat", "match": ["yellow"] },
+        "interior_color": { "value": "Black Leather & Sueded Microfiber", "match": ["black"] },
+        "engine": { "value": "Supercharged 6.2-Liter LT4 V8", "match_any": ["6.2", "lt4"] },
+        "transmission": { "value": "Eight-Speed Automatic Gearbox", "match": ["automatic"] },
+        "outcome": "sold", "currency": "USD", "hammer_price": 77000, "sale_date": "2026-10-17",
+        "lot_number": "269031", "gallery_count": 91, "seller": "AnderliniAuto", "comment_count": 20, "bid_count": 14
+      }
+    },
+    {
+      "key": "bat_gx470_bid_to", "house": "bat", "platform": "bat", "stage": "not_sold",
+      "url": "https://bringatrailer.com/listing/2008-lexus-gx470-63",
+      "evidence": { "kind": "direct_fetch", "fetched_at": "2026-10-18T03:53:08Z", "sha256": "2a62fd0295db4d5e2dbe2c3c22846fe8d06300845bb2b5573017c9d4cfc9a68b" },
+      "truth": {
+        "year": 2008, "make": "Lexus", "model": { "value": "GX470", "match_any": ["gx470", "gx 470"] },
+        "vin": "JTJBT20XX80158069", "mileage": { "value": 47000, "unit": "mi", "approx": true },
+        "exterior_color": { "value": "Black Onyx", "match": ["black"] },
+        "interior_color": { "value": "Dark Gray Leather", "match_any": ["gray", "grey"] },
+        "engine": { "value": "4.7-Liter 2UZ-FE V8", "match_any": ["4.7", "2uz"] },
+        "transmission": { "value": "Five-Speed Automatic Transmission", "match": ["automatic"] },
+        "outcome": "not_sold", "currency": "USD", "high_bid": 16750, "sale_date": "2026-10-17",
+        "lot_number": "269054", "gallery_count": 194, "seller": "corsamotors", "comment_count": 36, "bid_count": 5
+      }
+    },
+    {
+      "key": "bat_bronco_live", "house": "bat", "platform": "bat", "stage": "live", "perishable": true,
+      "url": "https://bringatrailer.com/listing/1977-ford-bronco-277",
+      "evidence": { "kind": "direct_fetch", "fetched_at": "2026-10-18T03:53:08Z", "sha256": "2ac6915a160f986554bcbbff4dcab3ec824ff07a61f975557c0a7d8312f9d90a" },
+      "truth": {
+        "year": 1977, "make": "Ford", "model": { "value": "Bronco" },
+        "vin": "U15GL060116", "mileage": { "value": 75000, "unit": "mi", "approx": true },
+        "exterior_color": { "value": "Light Blue", "match": ["blue"] },
+        "interior_color": { "value": "Parchment Vinyl", "match": ["parchment"] },
+        "engine": { "value": "347ci V8", "match": ["347"] },
+        "transmission": { "value": "Five-Speed Manual Transmission", "match": ["manual"] },
+        "outcome": "live", "currency": "USD", "high_bid": 25000, "auction_end": "2026-10-18T17:13:00Z",
+        "lot_number": "269092", "gallery_count": 109, "seller": "w8liftr49", "comment_count": 5, "bid_count": 4
+      }
+    },
+    {
+      "key": "cab_e450_sold_after", "house": "cars_and_bids", "platform": "cars_and_bids", "stage": "sold",
+      "url": "https://carsandbids.com/auctions/3BGz5JeE/2020-mercedes-benz-e450-coupe",
+      "evidence": { "kind": "listing_page_snapshots", "snapshot_id": "f496d950-e797-4807-9e05-fa7f95f6a9b3", "fetched_at": "2026-10-18T00:43:39Z", "sha256": "c71c812d9dd9d14588ad1c5f8e44d952b17b8a721d478437dd13c6fd9a252f5b" },
+      "truth": {
+        "year": 2020, "make": "Mercedes-Benz", "model": { "value": "E-Class", "match_any": ["e-class", "e450", "e class"] },
+        "series": { "value": "E450 Coupe", "match": ["e450"] },
+        "vin": "W1K1J6HB3LF138696", "mileage": { "value": 59100, "unit": "mi" },
+        "exterior_color": { "value": "Emerald Green", "match": ["green"] },
+        "interior_color": { "value": "Beige", "match": ["beige"] },
+        "engine": { "value": "3.0L Turbocharged V6", "match": ["3.0"] },
+        "transmission": { "value": "Automatic (9-Speed)", "match": ["automatic"] },
+        "outcome": "sold", "currency": "USD", "hammer_price": 28000, "high_bid": 27000, "sale_date": "2026-06-12",
+        "gallery_count": 71, "seller": "GESager", "comment_count": 17, "bid_count": 24, "no_reserve": false
+      },
+      "notes": "Sold after the auction (status sold_after): the top bid at close was $27,000, the sale $28,000."
+    },
+    {
+      "key": "cab_335i_reserve_not_met", "house": "cars_and_bids", "platform": "cars_and_bids", "stage": "not_sold",
+      "url": "https://carsandbids.com/auctions/9XbzZ8og/2015-bmw-335i-sedan",
+      "evidence": { "kind": "listing_page_snapshots", "snapshot_id": "beb05c16-831e-41f0-b1f4-560436fbd11f", "fetched_at": "2026-10-18T00:43:46Z", "sha256": "80af00af42e0e0726bb665336670b09ab689d23546de0f66581d1bae42813342" },
+      "truth": {
+        "year": 2015, "make": "BMW", "model": { "value": "3 Series", "match_any": ["3 series", "335i"] },
+        "series": { "value": "335i Sedan", "match": ["335i"] },
+        "vin": "WBA3A9C53FK472984", "mileage": { "value": 79100, "unit": "mi" },
+        "exterior_color": { "value": "Mineral Grey Metallic", "match_any": ["grey", "gray"] },
+        "interior_color": { "value": "Black", "match": ["black"] },
+        "engine": { "value": "3.0L Turbocharged I6", "match": ["3.0"] },
+        "transmission": { "value": "Automatic (8-Speed)", "match": ["automatic"] },
+        "outcome": "not_sold", "currency": "USD", "high_bid": 17000, "sale_date": "2026-06-12",
+        "gallery_count": 97, "seller": "pmonina", "comment_count": 39, "bid_count": 21, "no_reserve": false
+      }
+    },
+    {
+      "key": "cab_260z_reserve_not_met", "house": "cars_and_bids", "platform": "cars_and_bids", "stage": "not_sold",
+      "url": "https://carsandbids.com/auctions/K1NlDO60/1974-datsun-260z",
+      "evidence": { "kind": "listing_page_snapshots", "snapshot_id": "c1b4dba7-4439-4874-8fba-6f0d14d62f7a", "fetched_at": "2026-10-18T00:42:26Z", "sha256": "4ea81709488728675b02f286959c02f85d7d2c1108b8a44a9c28889022dc29f4" },
+      "truth": {
+        "year": 1974, "make": "Datsun", "model": { "value": "260Z" },
+        "vin": "RLS30042708",
+        "exterior_color": { "value": "Blue", "match": ["blue"] },
+        "interior_color": { "value": "Brown", "match": ["brown"] },
+        "engine": { "value": "2.6L I6", "match": ["2.6"] },
+        "transmission": { "value": "Manual (4-Speed)", "match": ["manual"] },
+        "outcome": "not_sold", "currency": "USD", "high_bid": 17750, "sale_date": "2026-06-15",
+        "gallery_count": 144, "seller": "Jmaucha", "comment_count": 30, "bid_count": 37, "no_reserve": false
+      }
+    },
+    {
+      "key": "mecum_911_turbo_sold", "house": "mecum", "platform": "mecum", "stage": "sold",
+      "url": "https://www.mecum.com/lots/1178060/1997-porsche-911-turbo",
+      "evidence": { "kind": "direct_fetch", "fetched_at": "2026-10-18T03:53:10Z", "sha256": "125fad5577ed61421a459d60121584683a74fb2ebbec279d4a96d2ff8d76e7ff" },
+      "truth": {
+        "year": 1997, "make": "Porsche", "model": { "value": "911" }, "series": { "value": "Turbo", "match": ["turbo"] },
+        "vin": "WP0AC2990VS375231", "mileage": { "value": 73258, "unit": "mi" },
+        "exterior_color": { "value": "Silver", "match": ["silver"] }, "interior_color": { "value": "Black", "match": ["black"] },
+        "engine": { "value": "3.6L Flat 6-Cylinder", "match": ["3.6"] },
+        "transmission": { "value": "6-Speed Manual", "match": ["manual"] },
+        "outcome": "sold", "currency": "USD", "hammer_price": 220000, "sale_date": "2026-09-26",
+        "lot_number": "S331", "gallery_count": 15
+      }
+    },
+    {
+      "key": "mecum_etype_bid_goes_on", "house": "mecum", "platform": "mecum", "stage": "not_sold",
+      "url": "https://www.mecum.com/lots/1178036/1968-jaguar-e-type-22",
+      "evidence": { "kind": "direct_fetch", "fetched_at": "2026-10-18T03:53:10Z", "sha256": "c5ddd5613c7f809ab985ae43874362ee6290e80cb88d3f81e6a64575f0c6ada6" },
+      "truth": {
+        "year": 1968, "make": "Jaguar", "model": { "value": "E-Type", "match_any": ["e-type", "e type", "etype"] },
+        "series": { "value": "2+2", "match": ["2+2"] },
+        "vin": "1E78794BW", "mileage": { "value": 8077, "unit": "mi" },
+        "exterior_color": { "value": "Beige", "match": ["beige"] }, "interior_color": { "value": "Beige", "match": ["beige"] },
+        "engine": { "value": "4.2L Inline 6-Cylinder", "match": ["4.2"] },
+        "transmission": { "value": "Automatic", "match": ["automatic"] },
+        "outcome": "not_sold", "currency": "USD", "high_bid": 30000, "sale_date": "2026-09-26",
+        "lot_number": "S332", "gallery_count": 25
+      },
+      "notes": "Mecum result 'The Bid Goes On': not sold at the block, high bid $30,000."
+    },
+    {
+      "key": "mecum_hemi_gtx_upcoming", "house": "mecum", "platform": "mecum", "stage": "upcoming",
+      "url": "https://www.mecum.com/lots/1176456/1967-plymouth-hemi-gtx",
+      "evidence": { "kind": "listing_page_snapshots", "snapshot_id": "462e2553-220d-4ffc-a968-c269158bf5c7", "fetched_at": "2026-10-15T10:00:04Z", "sha256": "e0d79c51051dc217d58fe9681234ee29fc794da41b4c210ae67b176a3d14cac2" },
+      "truth": {
+        "year": 1967, "make": "Plymouth", "model": { "value": "Hemi GTX", "match": ["gtx"] },
+        "vin": "RS23J77128057",
+        "exterior_color": { "value": "Blue", "match": ["blue"] }, "interior_color": { "value": "Blue", "match": ["blue"] },
+        "engine": { "value": "426 CI V-8", "match": ["426"] },
+        "transmission": { "value": "4-Speed Manual", "match": ["manual"] },
+        "outcome": "upcoming", "sale_date": "2027-01-14", "lot_number": "R406", "gallery_count": 38
+      }
+    },
+    {
+      "key": "bj_challenger_sold", "house": "barrettjackson", "platform": "barrettjackson", "stage": "sold",
+      "url": "https://www.barrett-jackson.com/las-vegas-2019/docket/vehicle/2019-dodge-challenger-rt-scat-pack-widebody-edition-233945",
+      "evidence": { "kind": "listing_page_snapshots", "snapshot_id": "36ef8abc-840a-4fdb-907d-62a6b501eacd", "fetched_at": "2026-10-15T17:09:36Z", "sha256": "cda95201b224331ac706dd24ca810f43f8dc6c2ffaa77bdebd4e95971178b032" },
+      "truth": {
+        "year": 2019, "make": "Dodge", "model": { "value": "Challenger R/T", "match": ["challenger"] },
+        "series": { "value": "Scat Pack Widebody", "match": ["scat pack"] },
+        "vin": "2C3CDZFJ5KH508618",
+        "exterior_color": { "value": "Destroyer Gray", "match_any": ["gray", "grey"] },
+        "interior_color": { "value": "Houndstooth Petromas Gray", "match_any": ["houndstooth", "gray", "grey"] },
+        "engine": { "value": "6.4-Liter", "match": ["6.4"] },
+        "transmission": { "value": "8-Speed Automatic", "match": ["automatic"] },
+        "outcome": "sold", "no_reserve": true, "gallery_count": 8
+      },
+      "notes": "Price is published only to signed-in users ('Register to View Price'); no lot number on this page."
+    },
+    {
+      "key": "bj_camaro_sold", "house": "barrettjackson", "platform": "barrettjackson", "stage": "sold",
+      "url": "https://barrett-jackson.com/2026-palm-beach/docket/vehicle/1967-chevrolet-camaro-rs-298742",
+      "evidence": { "kind": "direct_fetch", "fetched_at": "2026-10-18T03:53:12Z", "sha256": "a68c61e4490723c12f6acd1db9df490090277f0160021ef4fb554c499ce49527" },
+      "truth": {
+        "year": 1967, "make": "Chevrolet", "model": { "value": "Camaro RS", "match": ["camaro"] },
+        "vin": "124377N149837",
+        "exterior_color": { "value": "Gold", "match": ["gold"] }, "interior_color": { "value": "Black", "match": ["black"] },
+        "engine": { "value": "327ci", "match": ["327"] },
+        "transmission": { "value": "3-Speed Automatic", "match": ["automatic"] },
+        "outcome": "sold", "no_reserve": true, "lot_number": "487", "gallery_count": 15
+      },
+      "notes": "Disagreement case: the page reads 'No Reserve, Status: Sold'; price is published only to signed-in users."
+    },
+    {
+      "key": "bj_k10_sold", "house": "barrettjackson", "platform": "barrettjackson", "stage": "sold",
+      "url": "https://barrett-jackson.com/2026-palm-beach/docket/vehicle/1966-chevrolet-k10-pickup-298475",
+      "evidence": { "kind": "direct_fetch", "fetched_at": "2026-10-18T03:53:13Z", "sha256": "bcd1908ecc57d3f66345a1dbb3722f9cf09c72f9c0b128bda540efc62195b89d" },
+      "truth": {
+        "year": 1966, "make": "Chevrolet", "model": { "value": "K10", "match": ["k10"] },
+        "vin": "K1546B112546",
+        "exterior_color": { "value": "Blue", "match": ["blue"] }, "interior_color": { "value": "Tan", "match": ["tan"] },
+        "engine": { "value": "327 V8", "match": ["327"] },
+        "transmission": { "value": "5-Speed Manual", "match": ["manual"] },
+        "outcome": "sold", "no_reserve": true, "lot_number": "845", "gallery_count": 14
+      }
+    },
+    {
+      "key": "bonhams_bmw2002_sold", "house": "bonhams", "platform": "bonhams", "stage": "sold",
+      "url": "https://bonhams.com/auction/19638/lot/167/1974-bmw-2002-rally-car-chassis-no-3671021-engine-no-3671021",
+      "evidence": { "kind": "listing_page_snapshots", "snapshot_id": "c1f03a0f-ac29-483b-9b3c-ea6ccd2dcf74", "fetched_at": "2026-04-24T04:32:43Z", "sha256": "a2bb6a1fb5c9bd81cdb81b6631ee300f8c9832299a60b47d652a70b96cf2b853" },
+      "truth": {
+        "year": 1974, "make": "BMW", "model": { "value": "2002", "match": ["2002"] }, "series": { "value": "Rally Car", "match": ["rally"] },
+        "vin": "3671021", "outcome": "sold", "currency": "EUR", "price_with_premium": 21850, "sale_date": "2011-10-01",
+        "lot_number": "167", "gallery_count": 7
+      }
+    },
+    {
+      "key": "bonhams_silver_spur_sold", "house": "bonhams", "platform": "bonhams", "stage": "sold",
+      "url": "https://bonhams.com/auction/17486/lot/18/1989-rolls-royce-silver-spur-saloon-chassis-no-scazn02a4jcx23484",
+      "evidence": { "kind": "listing_page_snapshots", "snapshot_id": "9ab7cb17-9211-44ae-bae0-a56d407d5f0a", "fetched_at": "2026-04-25T03:42:57Z", "sha256": "cce344b137f50e0eb36fda468dd02f4de5486f014cee21654639881bd881f4b3" },
+      "truth": {
+        "year": 1989, "make": "Rolls-Royce", "model": { "value": "Silver Spur", "match": ["silver spur"] },
+        "vin": "SCAZN02A4JCX23484", "mileage": { "value": 116000, "unit": "mi", "approx": true },
+        "outcome": "sold", "currency": "USD", "price_with_premium": 14040, "sale_date": "2009-09-11", "lot_number": "18"
+      },
+      "notes": "Disagreement case: the page reads 'Sold for US$14,040 inc. premium'."
+    },
+    {
+      "key": "bonhams_dodge_fast_four_sold", "house": "bonhams", "platform": "bonhams", "stage": "sold",
+      "url": "https://bonhams.com/auction/20140/lot/331/1928-dodge-fast-four-landaulette-chassis-no-a983024-engine-no-d1056541",
+      "evidence": { "kind": "listing_page_snapshots", "snapshot_id": "216fb734-5f5d-434d-9949-69a47c4e07fd", "fetched_at": "2026-04-25T03:33:26Z", "sha256": "f35eedaff4c4c180be5066eb77678849f86c63c609c89dd69312d085d65b6f59" },
+      "truth": {
+        "year": 1928, "make": "Dodge", "model": { "value": "'Fast Four' Landaulette", "match": ["fast four"] },
+        "vin": "A983024", "outcome": "sold", "currency": "GBP", "price_with_premium": 23000, "sale_date": "2012-03-03",
+        "lot_number": "331", "gallery_count": 8
+      }
+    },
+    {
+      "key": "bonhams_356a_not_sold", "house": "bonhams", "platform": "bonhams", "stage": "not_sold",
+      "url": "https://www.bonhams.com/auction/27525/lot/132/1958-porsche-356a-t2-coupe-chassis-no-102714-engine-no-p68580",
+      "evidence": { "kind": "direct_fetch", "fetched_at": "2026-10-18T03:56:45Z", "sha256": "f0eade4afc6a43b4606ad10a55444e3e517419d0d1cc316c056aaf44f039ca4f" },
+      "truth": {
+        "year": 1958, "make": "Porsche", "model": { "value": "356A", "match": ["356"] }, "series": { "value": "T2 Coupé", "match": ["t2"] },
+        "vin": "102714", "estimate_low": 140000, "estimate_high": 180000, "currency": "GBP",
+        "outcome": "not_sold", "sale_date": "2022-12-16", "lot_number": "132", "gallery_count": 52
+      },
+      "notes": "Past sale whose page shows only the estimate: not sold."
+    },
+    {
+      "key": "bonhams_3500gti_not_sold", "house": "bonhams", "platform": "bonhams", "stage": "not_sold",
+      "url": "https://www.bonhams.com/auction/23593/lot/254/1963-maserati-3500-gti-coupe-chassis-no-am1012716-engine-no-am1012716-see-text",
+      "evidence": { "kind": "direct_fetch", "fetched_at": "2026-10-18T03:56:48Z", "sha256": "0c87808b589a51854a1e5aac4c2f54fbaf06ad8a363566f512ae1cea125ab46e" },
+      "truth": {
+        "year": 1963, "make": "Maserati", "model": { "value": "3500 GTI", "match": ["3500"] },
+        "vin": "AM101.2716", "estimate_low": 170000, "estimate_high": 220000, "currency": "GBP",
+        "outcome": "not_sold", "sale_date": "2016-06-24", "lot_number": "254", "gallery_count": 37
+      },
+      "notes": "Disagreement case: a 2016 sale whose page shows only the estimate."
+    },
+    {
+      "key": "bonhams_humber_upcoming", "house": "bonhams", "platform": "bonhams", "stage": "upcoming",
+      "url": "https://www.bonhams.com/auction/31858/lot/205/c1905-humber-coventry-810hp-two-seat-open-tourer-chassis-no-c-355-engine-no-843",
+      "evidence": { "kind": "direct_fetch", "fetched_at": "2026-10-18T03:57:16Z", "sha256": "0d497e1cc9937c6c6cdd6c6c7a401daa22233c92a3d9b4034232049e9585da14" },
+      "truth": {
+        "year": 1905, "make": "Humber", "model": { "value": "8/10hp Two-Seat Open Tourer", "match_any": ["8/10", "810hp", "tourer"] },
+        "vin": "C 355", "estimate_low": 20000, "estimate_high": 30000, "currency": "GBP",
+        "outcome": "upcoming", "sale_date": "2026-10-30", "lot_number": "205", "gallery_count": 55
+      }
+    },
+    {
+      "key": "rm_gt3rs_sold", "house": "rm-sothebys", "platform": "rm-sothebys", "stage": "sold",
+      "url": "https://rmsothebys.com/auctions/pa25/lots/b0066-2004-porsche-911-gt3-rs",
+      "evidence": { "kind": "direct_fetch", "fetched_at": "2026-10-18T03:53:15Z", "sha256": "732776efd36cdcfdec533811925aba049690582137a2b5eb2bb6a6fcc04bfb73" },
+      "truth": {
+        "year": 2004, "make": "Porsche", "model": { "value": "911", "match": ["911"] }, "series": { "value": "GT3 RS", "match": ["gt3 rs"] },
+        "vin": "WP0ZZZ99Z4S691363",
+        "exterior_color": { "value": "Carrara White", "match": ["white"] },
+        "engine": { "value": "3.6-litre Mezger", "match": ["3.6"] },
+        "transmission": { "value": "six-speed manual", "match": ["manual"] },
+        "outcome": "sold", "currency": "EUR", "price_with_premium": 161000, "lot_number": "132", "gallery_count": 41
+      }
+    },
+    {
+      "key": "rm_928_sold", "house": "rm-sothebys", "platform": "rm-sothebys", "stage": "sold",
+      "url": "https://rmsothebys.com/auctions/pa25/lots/b0050-1979-porsche-928",
+      "evidence": { "kind": "direct_fetch", "fetched_at": "2026-10-18T03:53:17Z", "sha256": "54ae41886a668f4ce7b990a96b2362432c46e9af4939cc6045a7cc56f3748b91" },
+      "truth": {
+        "year": 1979, "make": "Porsche", "model": { "value": "928" },
+        "vin": "92A0800399", "mileage": { "value": 168652, "unit": "km" },
+        "exterior_color": { "value": "Silver Grey Metallic", "match": ["silver"] },
+        "interior_color": { "value": "cream fabric with Pasha inserts", "match": ["cream"] },
+        "engine": { "value": "4.5-litre V-8", "match": ["4.5"] },
+        "transmission": { "value": "five-speed dogleg manual", "match": ["manual"] },
+        "outcome": "sold", "currency": "EUR", "price_with_premium": 20700, "lot_number": "125", "gallery_count": 32
+      }
+    },
+    {
+      "key": "rm_330gts_not_sold", "house": "rm-sothebys", "platform": "rm-sothebys", "stage": "not_sold",
+      "url": "https://rmsothebys.com/auctions/mc26/lots/r0040-1967-ferrari-330-gts-by-pininfarina",
+      "evidence": { "kind": "direct_fetch", "fetched_at": "2026-10-18T03:57:54Z", "sha256": "175c3b6c488436c86cc60f06c9a8fa524fec282a5131a70ea49864211e94af73" },
+      "truth": {
+        "year": 1967, "make": "Ferrari", "model": { "value": "330 GTS", "match": ["330"] },
+        "vin": "10689",
+        "exterior_color": { "value": "Grigio Notte", "match": ["grigio"] }, "interior_color": { "value": "black hide", "match": ["black"] },
+        "estimate_low": 1400000, "estimate_high": 1800000, "currency": "EUR",
+        "outcome": "not_sold", "lot_number": "176", "gallery_count": 54
+      }
+    },
+    {
+      "key": "rm_m5_upcoming", "house": "rm-sothebys", "platform": "rm-sothebys", "stage": "upcoming",
+      "url": "https://rmsothebys.com/auctions/mu26/lots/r0034-1985-bmw-m5",
+      "evidence": { "kind": "direct_fetch", "fetched_at": "2026-10-18T03:57:55Z", "sha256": "cf11640a9a75daab9df8722ec5932e1599af8194da7f3839b8e420c330d13c36" },
+      "truth": {
+        "year": 1985, "make": "BMW", "model": { "value": "M5" },
+        "vin": "WBSDC910901018415", "estimate_low": 60000, "estimate_high": 80000, "currency": "EUR",
+        "outcome": "upcoming", "no_reserve": true, "gallery_count": 60
+      }
+    },
+    {
+      "key": "gooding_hakosuka_sold", "house": "gooding", "platform": "gooding", "stage": "sold",
+      "url": "https://goodingco.com/lot/1971-nissan-skyline-h-t-2000gt-r-hakosuka",
+      "evidence": { "kind": "listing_page_snapshots", "snapshot_id": "270c39fd-03a1-413e-b2bd-7a6d6e6f8cd8", "fetched_at": "2026-10-15T14:31:09Z", "sha256": "4a369281939cad768feb7490b01ee8d640032ad1586f981b2bb7b22a64101987" },
+      "truth": {
+        "year": 1971, "make": "Nissan", "model": { "value": "Skyline H/T 2000GT-R 'Hakosuka'", "match": ["skyline"] },
+        "series": { "value": "2000GT-R", "match_any": ["gt-r", "gtr"] },
+        "vin": "KPGC10-000641",
+        "engine": { "value": "1,989 CC DOHC Inline 6-Cylinder", "match_any": ["1989", "1,989", "2.0", "s20"] },
+        "transmission": { "value": "5-Speed Manual Gearbox", "match": ["manual"] },
+        "estimate_low": 225000, "estimate_high": 275000, "currency": "USD",
+        "outcome": "sold", "price_with_premium": 179200, "sale_date": { "one_of": ["2022-08-19", "2022-08-20"] },
+        "lot_number": "45", "gallery_count": 31
+      }
+    },
+    {
+      "key": "gooding_cunningham_not_sold", "house": "gooding", "platform": "gooding", "stage": "not_sold",
+      "url": "https://www.goodingco.com/lot/1952-cunningham-c-3-coupe",
+      "evidence": { "kind": "listing_page_snapshots", "snapshot_id": "f2c32178-6a54-439d-b080-e0f1e0912cb3", "fetched_at": "2026-10-06T16:50:16Z", "sha256": "77480566f0942bd86c3efec10a52d8e85783e7d86517a9c35569ae420c38aee0" },
+      "truth": {
+        "year": 1952, "make": "Cunningham", "model": { "value": "C-3 Coupe", "match_any": ["c-3", "c3"] },
+        "vin": "5211", "estimate_low": 600000, "estimate_high": 750000, "currency": "USD",
+        "outcome": "not_sold", "sale_date": { "one_of": ["2026-08-14", "2026-08-15"] }, "lot_number": "160", "gallery_count": 54
+      },
+      "notes": "Sale is past (Pebble Beach, August 2026), reserve lot, no sale price published."
+    },
+    {
+      "key": "gooding_300sl_upcoming", "house": "gooding", "platform": "gooding", "stage": "upcoming",
+      "url": "https://www.goodingco.com/lot/1962-mercedes-benz-300-sl-roadster-rn26",
+      "evidence": { "kind": "listing_page_snapshots", "snapshot_id": "c8ebe4d7-6753-4adc-9640-ef7acc8f6436", "fetched_at": "2026-10-18T01:24:13Z", "sha256": "70f34c6acff0712d3b9ab479cf051ea0c9c16f48efc604ea9149ef69d77f5e72" },
+      "truth": {
+        "year": 1962, "make": "Mercedes-Benz", "model": { "value": "300 SL Roadster", "match": ["300 sl"] },
+        "vin": "198.042.10.003062", "outcome": "upcoming", "sale_date": { "one_of": ["2026-11-20", "2026-11-21"] }, "gallery_count": 55
+      }
+    },
+    {
+      "key": "cc_991_50th_sold", "house": "collecting_cars", "platform": "collecting_cars", "stage": "sold",
+      "url": "https://collectingcars.com/for-sale/2014-porsche-911-991-50th-anniversary-edition-6",
+      "evidence": { "kind": "house_api", "source": "collectingcars typesense production_listings id 84088", "fetched_at": "2026-10-18T03:59:40Z", "sha256": "8cda5a6eb3312ab514f2adfe23aa3604894dd204986dff803d0b276ed0e8bc47" },
+      "truth": {
+        "year": 2014, "make": "Porsche", "model": { "value": "911" }, "series": { "value": "50th Anniversary Edition", "match": ["50th"] },
+        "mileage": { "value": 31008, "unit": "mi" }, "transmission": { "value": "Automatic", "match": ["automatic"] },
+        "outcome": "sold", "currency": "GBP", "hammer_price": 73325, "sale_date": "2026-01-23", "bid_count": 63, "no_reserve": true
+      }
+    },
+    {
+      "key": "cc_964_sold_after", "house": "collecting_cars", "platform": "collecting_cars", "stage": "sold",
+      "url": "https://collectingcars.com/for-sale/1990-porsche-911-964-carrera-2-16",
+      "evidence": { "kind": "house_api", "source": "collectingcars typesense production_listings id 84059", "fetched_at": "2026-10-18T03:59:40Z", "sha256": "56bf9a880afddf0b5011febd0a53d5a07f6b283d2399d829a7d5d1956bad9c6b" },
+      "truth": {
+        "year": 1990, "make": "Porsche", "model": { "value": "911" }, "series": { "value": "Carrera 2", "match": ["carrera"] },
+        "mileage": { "value": 100674, "unit": "mi" }, "engine": { "value": "3.6L H6", "match": ["3.6"] },
+        "transmission": { "value": "Manual", "match": ["manual"] },
+        "outcome": "sold", "currency": "GBP", "hammer_price": 70000, "high_bid": 68055, "sale_date": "2026-01-22", "bid_count": 61, "no_reserve": false
+      },
+      "notes": "Reserve not met at close (top bid 68,055), sold afterwards for 70,000."
+    },
+    {
+      "key": "cc_964_speedster_live", "house": "collecting_cars", "platform": "collecting_cars", "stage": "live", "perishable": true,
+      "url": "https://collectingcars.com/for-sale/1994-porsche-911-964-speedster-6",
+      "evidence": { "kind": "house_api", "source": "collectingcars typesense production_listings id 93239", "fetched_at": "2026-10-18T04:00:27Z", "sha256": "a7808ad4df504c00f53dc4c504400d08e2699536b34bc6cd6666b0dbb7339cac" },
+      "truth": {
+        "year": 1994, "make": "Porsche", "model": { "value": "911" }, "series": { "value": "964 Speedster", "match": ["speedster"] },
+        "mileage": { "value": 28833, "unit": "km" }, "engine": { "value": "3.6L Flat-Six", "match": ["3.6"] },
+        "transmission": { "value": "Manual", "match": ["manual"] },
+        "outcome": "live", "currency": "EUR", "high_bid": 120000, "bid_count": 36, "auction_end": "2026-10-18T17:20:00Z", "no_reserve": false
+      }
+    },
+    {
+      "key": "pcar_993_cab_sold", "house": "pcarmarket", "platform": "pcarmarket", "stage": "sold",
+      "url": "https://pcarmarket.com/auction/1996-porsche-993-cabriolet-2",
+      "evidence": { "kind": "direct_fetch", "fetched_at": "2026-10-18T03:53:20Z", "sha256": "b8316df9dc9aa0268d046960ca4298386650e67567c91976b3b1b6d602db7702" },
+      "truth": {
+        "year": 1996, "make": "Porsche", "model": { "value": "911 Carrera Cabriolet", "match": ["911"] },
+        "vin": "WP0CA2997TS340956",
+        "exterior_color": { "value": "Guards Red", "match": ["red"] }, "interior_color": { "value": "black leather", "match": ["black"] },
+        "transmission": { "value": "Manual (6-Speed)", "match": ["manual"] },
+        "outcome": "sold", "currency": "USD", "hammer_price": 44000, "sale_date": "2020-07-23", "bid_count": 18, "gallery_count": 112
+      }
+    },
+    {
+      "key": "pcar_911s_final_bid", "house": "pcarmarket", "platform": "pcarmarket", "stage": "not_sold",
+      "url": "https://pcarmarket.com/auction/1969-porsche-911-s-1",
+      "evidence": { "kind": "direct_fetch", "fetched_at": "2026-10-18T03:53:21Z", "sha256": "ed6980855b0f47c7e904386b51fd8c332f959dff46fee376166057eadb8918e8" },
+      "truth": {
+        "year": 1969, "make": "Porsche", "model": { "value": "911 S", "match": ["911"] },
+        "vin": "119300607", "mileage": { "value": 2913, "unit": "mi" },
+        "exterior_color": { "value": "Silver Metallic", "match": ["silver"] }, "interior_color": { "value": "Black", "match": ["black"] },
+        "transmission": { "value": "5-Speed Manual", "match": ["manual"] },
+        "outcome": "not_sold", "currency": "USD", "high_bid": 178911, "sale_date": "2026-09-15", "bid_count": 42, "gallery_count": 317
+      }
+    },
+    {
+      "key": "pcar_997_gts_final_bid", "house": "pcarmarket", "platform": "pcarmarket", "stage": "not_sold",
+      "url": "https://pcarmarket.com/auction/2011-porsche-911-gts-coupe",
+      "evidence": { "kind": "direct_fetch", "fetched_at": "2026-10-18T03:53:22Z", "sha256": "e7e69d20bdda4854d57787c0f0c08ed5f928f13fabab866f0dff43e63bd2f18a" },
+      "truth": {
+        "year": 2011, "make": "Porsche", "model": { "value": "911 Carrera GTS", "match": ["911"] },
+        "vin": "WP0AB2A92BS721029", "mileage": { "value": 27000, "unit": "mi", "approx": true },
+        "exterior_color": { "value": "Carrara White", "match": ["white"] }, "interior_color": { "value": "black leather", "match": ["black"] },
+        "engine": { "value": "3.8 L flat-six", "match": ["3.8"] },
+        "transmission": { "value": "PDK (Automatic)", "match_any": ["automatic", "pdk"] },
+        "outcome": "not_sold", "currency": "USD", "high_bid": 64000, "sale_date": "2019-12-02", "bid_count": 10, "gallery_count": 59
+      }
+    },
+    {
+      "key": "ba_dino_sold", "house": "broad_arrow", "platform": "broad_arrow", "stage": "sold",
+      "url": "https://broadarrowauctions.com/vehicles/jc25_r0090/1973-ferrari-dino-246-gts",
+      "evidence": { "kind": "direct_fetch", "fetched_at": "2026-10-18T03:53:23Z", "sha256": "b18f5d20bde20f10272f579b46c43ce6be5580e392583bed6c6af12f1e7ec357" },
+      "truth": {
+        "year": 1973, "make": "Ferrari", "model": { "value": "Dino 246 GTS", "match": ["246"] },
+        "vin": "5834", "outcome": "sold", "currency": "USD", "price_with_premium": 545000, "lot_number": "130", "gallery_count": 75
+      }
+    },
+    {
+      "key": "ba_miura_not_sold", "house": "broad_arrow", "platform": "broad_arrow", "stage": "not_sold",
+      "url": "https://www.broadarrowauctions.com/vehicles/dg25_r0043/1967-lamborghini-miura-p400",
+      "evidence": { "kind": "direct_fetch", "fetched_at": "2026-10-18T03:53:23Z", "sha256": "5869efab86ab243b675301eb5b11086af2c7c29514d128a5dd7bd6bc332d235f" },
+      "truth": {
+        "year": 1967, "make": "Lamborghini", "model": { "value": "Miura P400", "match": ["miura"] },
+        "vin": "3135", "outcome": "not_sold", "lot_number": "119", "gallery_count": 59
+      }
+    },
+    {
+      "key": "ba_pantera_upcoming", "house": "broad_arrow", "platform": "broad_arrow", "stage": "upcoming",
+      "url": "https://www.broadarrowauctions.com/vehicles/dg26_r0012/1991-de-tomaso-pantera-si",
+      "evidence": { "kind": "direct_fetch", "fetched_at": "2026-10-18T03:53:24Z", "sha256": "6d823b0c1a7c93a07876ac3154eff9bbdfb9439cc1a0a4e1f3e8bf6b57aefed1" },
+      "truth": {
+        "year": 1991, "make": "De Tomaso", "model": { "value": "Pantera Si", "match": ["pantera"] },
+        "vin": "ZDT874000MA009612", "estimate_low": 210000, "estimate_high": 255000, "currency": "CHF",
+        "outcome": "upcoming", "sale_date": "2026-11-07", "gallery_count": 100
+      }
+    }
+  ]
+}

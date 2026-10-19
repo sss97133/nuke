@@ -5,10 +5,11 @@ import { useHeaderHeight } from './hooks/useHeaderHeight';
 import { useSession } from './hooks/useSession';
 import { useNotificationBadge } from './hooks/useNotificationBadge';
 import { useAdminAccess } from '../../hooks/useAdminAccess';
-import AIDataIngestionSearch from '../search/AIDataIngestionSearch';
+import HeaderSearch from '../HeaderSearch';
 import { UserArea } from './UserArea';
 import { UserDropdown } from './UserDropdown';
 import { useBranding } from '../../branding/BrandingContext';
+import { useOptionalTheme } from '../../contexts/ThemeContext';
 import GlobalUploadIndicator from '../GlobalUploadIndicator';
 import './AppHeader.css';
 
@@ -41,6 +42,7 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
   const unreadCount = useNotificationBadge(userId);
   const { isAdmin } = useAdminAccess();
   const { brand } = useBranding();
+  const themeCtx = useOptionalTheme();
   const location = useLocation();
 
   const [showUserDropdown, setShowUserDropdown] = useState(false);
@@ -97,11 +99,22 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
 
         {/* Zone 3: Command Input */}
         <div className="header-command">
-          <AIDataIngestionSearch />
+          <HeaderSearch />
         </div>
 
         {/* Zone 4: Session */}
         <div className="header-session">
+          {themeCtx && (
+            <button
+              type="button"
+              className="header-theme-btn"
+              onClick={themeCtx.toggleTheme}
+              title={`Theme: ${themeCtx.theme.toUpperCase()} (${themeCtx.preference === 'auto' ? 'Auto' : 'Manual'}) — click to switch to ${themeCtx.theme === 'dark' ? 'Day (Light)' : 'Night (Dark)'}`}
+              aria-label={`Switch to ${themeCtx.theme === 'dark' ? 'light' : 'dark'} theme`}
+            >
+              {themeCtx.theme === 'dark' ? 'DAY' : 'NIGHT'}
+            </button>
+          )}
           <GlobalUploadIndicator />
           {session ? (
             <UserArea

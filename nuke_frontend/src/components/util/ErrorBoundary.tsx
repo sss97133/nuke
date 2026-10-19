@@ -11,7 +11,7 @@ export default class ErrorBoundary extends React.Component<React.PropsWithChildr
   private static readonly CHUNK_LOAD_ERROR_RE =
     /(Failed to fetch dynamically imported module|Importing a module script failed|Loading chunk .* failed)/i;
 
-  private static maybeReloadForChunkError(error: any) {
+  static maybeReloadForChunkError(error: any) {
     const msg =
       typeof error === 'string'
         ? error

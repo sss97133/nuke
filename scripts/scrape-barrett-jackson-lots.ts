@@ -15,6 +15,7 @@
 
 import { chromium } from "playwright";
 import { createClient } from "@supabase/supabase-js";
+import { extractBarrettJacksonVehicleFacets } from "../supabase/functions/extract-barrett-jackson/vehicleFacets.ts";
 
 const SUPABASE_URL = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL || "";
 const SUPABASE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || "";
@@ -29,6 +30,9 @@ interface BJLotData {
   year: number | null;
   make: string | null;
   model: string | null;
+  series_code: string | null;
+  trim_package: string | null;
+  body_style_facet: string | null;
   vin: string | null;
   salePrice: number | null;
   lotNumber: string | null;
@@ -53,13 +57,24 @@ async function parseBJPage(page: any, url: string): Promise<BJLotData | null> {
     const text = await page.locator("body").innerText();
 
     const yearMatch = title.match(/\b(19\d{2}|20[0-2]\d)\b/);
-    const year = yearMatch ? parseInt(yearMatch[1]) : null;
+    let year = yearMatch ? parseInt(yearMatch[1]) : null;
 
     const titleWithoutYear = title.replace(/^\d{4}\s*/, "").trim();
     const parts = titleWithoutYear.split(/\s+/).filter(Boolean);
     let make = parts[0] || null;
     let model = parts.slice(1).join(" ").slice(0, 150) || null;
     if (make === "Vehicle" || (model && /^Details\s*Page$/i.test(model))) return null;
+
+    const facets = extractBarrettJacksonVehicleFacets({
+      title,
+      year,
+      make,
+      model,
+      description: text.slice(0, 4000),
+    });
+    if (facets.year) year = facets.year;
+    if (facets.make) make = facets.make;
+    if (facets.model) model = facets.model;
 
     const lotMatch = text.match(/Lot\s*#?\s*(\d+)/i);
     const lotNumber = lotMatch ? lotMatch[1] : null;
@@ -114,6 +129,9 @@ async function parseBJPage(page: any, url: string): Promise<BJLotData | null> {
       year,
       make,
       model,
+      series_code: facets.series_code,
+      trim_package: facets.trim_package,
+      body_style_facet: facets.body_style_facet,
       vin,
       salePrice: salePrice != null && salePrice > 0 ? salePrice : null,
       lotNumber,
@@ -172,6 +190,10 @@ async function processBatch(): Promise<{ processed: number; errors: number }> {
         year: lot.year,
         make: lot.make,
         model: lot.model,
+        series: lot.series_code || undefined,
+        trim: lot.trim_package || undefined,
+        body_style: lot.body_style_facet || undefined,
+        listing_title: lot.title || undefined,
         vin: lot.vin || undefined,
         sale_price: lot.salePrice,
         color: lot.color || undefined,

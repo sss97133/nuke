@@ -108,18 +108,6 @@ const S = {
     whiteSpace: 'nowrap' as const,
   } as React.CSSProperties,
 
-  conflictBadge: {
-    fontFamily: 'Arial, sans-serif',
-    fontSize: '8px',
-    fontWeight: 700,
-    letterSpacing: '0.04em',
-    textTransform: 'uppercase' as const,
-    padding: '1px 4px',
-    border: '1px solid var(--error)',
-    background: 'var(--error-dim)',
-    color: 'var(--error)',
-  } as React.CSSProperties,
-
   body: {
     padding: '6px 8px 8px',
     borderTop: '1px dashed var(--border)',
@@ -193,7 +181,7 @@ const FieldProvenanceDrawer: React.FC<FieldProvenanceDrawerProps> = ({
   isOpen,
   onToggle,
 }) => {
-  const { sources, agreementCount, totalSources, hasConflict, conflictType, primary } = group;
+  const { sources, agreementCount, totalSources, hasConflict, primary } = group;
 
   return (
     <div
@@ -226,17 +214,8 @@ const FieldProvenanceDrawer: React.FC<FieldProvenanceDrawerProps> = ({
             </span>
           )}
           {hasConflict && (
-            <span style={{
-              ...S.conflictBadge,
-              ...(conflictType === 'genuine' ? {} :
-                conflictType === 'refinement' ? { borderColor: 'var(--warning)', background: 'var(--warning-dim)', color: 'var(--warning)' } :
-                conflictType === 'synonym' ? { borderColor: 'var(--text-secondary)', background: 'var(--bg)', color: 'var(--text-secondary)' } :
-                conflictType === 'variance' ? { borderColor: 'var(--text-secondary)', background: 'var(--bg)', color: 'var(--text-secondary)' } : {}),
-            }}>
-              {conflictType === 'genuine' ? 'CONFLICT' :
-               conflictType === 'refinement' ? 'REFINEMENT' :
-               conflictType === 'synonym' ? 'SYNONYM' :
-               conflictType === 'variance' ? 'VARIANCE' : 'CONFLICT'}
+            <span style={S.badge}>
+              DIFFERING TEXT
             </span>
           )}
         </div>
@@ -327,8 +306,7 @@ export interface SourceBadgeProps {
 }
 
 export const SourceBadge: React.FC<SourceBadgeProps> = ({ group, onClick }) => {
-  const { primary, totalSources, hasConflict, conflictType } = group;
-  const isGenuine = hasConflict && conflictType === 'genuine';
+  const { primary, totalSources } = group;
 
   return (
     <span
@@ -351,9 +329,6 @@ export const SourceBadge: React.FC<SourceBadgeProps> = ({ group, onClick }) => {
         ...S.badge,
         fontSize: '8px',
         padding: '0px 3px',
-        borderColor: isGenuine ? 'var(--error)' : 'var(--text-disabled)',
-        background: isGenuine ? 'var(--error-dim)' : 'var(--bg)',
-        color: isGenuine ? 'var(--error)' : 'var(--text)',
       }}>
         {getSourceLabel(primary.source_type)}
       </span>

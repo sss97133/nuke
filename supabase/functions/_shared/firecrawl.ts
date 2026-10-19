@@ -8,6 +8,8 @@
  * - Provide helpers for /scrape and /map (URL discovery)
  */
  
+import { meterAllowance, meterRecord, type MeterClient } from './firecrawlMeter.ts';
+
 export const FIRECRAWL_SCRAPE_URL = 'https://api.firecrawl.dev/v1/scrape';
 export const FIRECRAWL_MAP_URL = 'https://api.firecrawl.dev/v1/map';
  
@@ -63,6 +65,10 @@ export interface FirecrawlMapResult {
 }
  
 export interface FirecrawlClientOptions {
+  /** The calling function, written to firecrawl_spend_log as the lane of the scrape. */
+  caller?: string;
+  /** Test seam: an rpc client for the allowance and spend functions (default: the project's service client). */
+  meterClient?: MeterClient;
   apiKey?: string;
   timeoutMs?: number;
   maxAttempts?: number;
@@ -134,7 +140,9 @@ function normalizeScrapePayload(parsed: any): {
   const success = Boolean(parsed?.success);
  
   // v1 shape
-  const html = typeof parsed?.data?.html === 'string' ? parsed.data.html : null;
+  // rawHtml keeps the page's <script> blocks (__NEXT_DATA__, flight payloads, JSON-LD); html strips them. Used when a caller asks for it.
+  const html = typeof parsed?.data?.rawHtml === 'string' ? parsed.data.rawHtml
+    : typeof parsed?.data?.html === 'string' ? parsed.data.html : null;
   const markdown = typeof parsed?.data?.markdown === 'string' ? parsed.data.markdown : null;
   const extract = parsed?.data?.extract ?? null;
   const metadata = parsed?.data?.metadata ?? null;
@@ -154,7 +162,7 @@ function normalizeScrapePayload(parsed: any): {
   };
 }
  
-export async function firecrawlScrape(
+async function firecrawlScrapeRaw(
   request: FirecrawlScrapeRequest,
   options: FirecrawlClientOptions = {}
 ): Promise<FirecrawlScrapeResult> {
@@ -266,7 +274,62 @@ export async function firecrawlScrape(
   };
 }
  
-export async function firecrawlMap(
+/**
+ * The one door every paid Firecrawl scrape goes through (owner-lead rule, 2026-10-15): ask first, record after, and no allowance
+ * means no fetch. The allowance is firecrawl_allowance_for_url(url): the allocation of the source the URL's host belongs to (a host
+ * no source row names has none). An unreadable allowance is a no. Every scrape that reaches Firecrawl is written to
+ * firecrawl_spend_log, failures included, under the URL's source with the caller as its lane. A caller's own check (the
+ * firecrawlAllowed hook of archiveFetch) may narrow this, never widen it.
+ */
+export function scrapeCredits(request: FirecrawlScrapeRequest): number {
+  return request.extract || request.formats.some((f) => f === 'extract' || f === 'json') ? 5 : 1;
+}
+
+export async function firecrawlScrape(
+  request: FirecrawlScrapeRequest,
+  options: FirecrawlClientOptions = {}
+): Promise<FirecrawlScrapeResult> {
+  const gate = await meterAllowance(request.url, options.meterClient);
+  if (!gate.allowed) {
+    return {
+      httpStatus: 0,
+      ok: false,
+      success: false,
+      data: { html: null, markdown: null, extract: null, metadata: null },
+      blocked: false,
+      blockedSignals: [],
+      error: 'firecrawl_allowance_exhausted',
+      raw: null,
+      attempts: 0,
+    };
+  }
+  let result: FirecrawlScrapeResult | null = null;
+  try {
+    result = await firecrawlScrapeRaw(request, options);
+    return result;
+  } finally {
+    // Success or failure, a scrape that was sent costs its credits: 1, or 5 with an LLM extract (extract or json format).
+    await meterRecord(
+      request.url,
+      scrapeCredits(request),
+      options.caller ?? 'firecrawlScrape',
+      result ? `http=${result.httpStatus};attempts=${result.attempts};${result.success ? 'ok' : (result.error ?? 'failed').slice(0, 80)}` : 'threw',
+      options.meterClient,
+    );
+  }
+}
+
+type FirecrawlMapOptions = FirecrawlClientOptions & {
+    limit?: number;
+    search?: string;
+    ignoreSitemap?: boolean;
+    sitemapOnly?: boolean;
+    includeSubdomains?: boolean;
+    timeout?: number;
+    location?: any;
+  };
+
+async function firecrawlMapRaw(
   url: string,
   options: FirecrawlClientOptions & {
     limit?: number;
@@ -372,3 +435,23 @@ export async function firecrawlMap(
   };
 }
 
+/**
+ * The /map endpoint costs credits too, so it goes through the same door as firecrawlScrape: ask the allowance of the URL's source
+ * first (none, an unmapped host or an unreadable allowance means no call: error firecrawl_allowance_exhausted), record one credit
+ * after every call that was sent.
+ */
+export async function firecrawlMap(url: string, options: FirecrawlMapOptions = {}): Promise<FirecrawlMapResult> {
+  const gate = await meterAllowance(url, options.meterClient);
+  if (!gate.allowed) {
+    return { httpStatus: 0, ok: false, success: false, links: [], error: 'firecrawl_allowance_exhausted', raw: null, attempts: 0 };
+  }
+  let result: FirecrawlMapResult | null = null;
+  try {
+    result = await firecrawlMapRaw(url, options);
+    return result;
+  } finally {
+    await meterRecord(url, 1, options.caller ?? 'firecrawlMap',
+      result ? `map;http=${result.httpStatus};attempts=${result.attempts};${result.success ? 'ok' : (result.error ?? 'failed').slice(0, 80)}` : 'map;threw',
+      options.meterClient);
+  }
+}

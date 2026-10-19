@@ -7,6 +7,7 @@
  *        (3) vehicles by discovery_url ILIKE pattern (same listing, different URL format)
  *
  * Returns vehicleId or null. If null, caller should insert new vehicle.
+ * Exact-listing mode refuses ambiguous or failed reads instead of falling through.
  */
 
 import { normalizeListingUrlKey } from './listingUrl.ts';
@@ -16,26 +17,55 @@ export type ResolveOptions = {
   platform: string;
   /** Optional: pattern for ILIKE match e.g. "%historics.co.uk%lot/12345%" or "%goodingco.com/lot/slug%" */
   discoveryUrlIlikePattern?: string | null;
+  /** Require whole normalized listing URLs; do not equate different path slugs. */
+  requireExactListingUrl?: boolean;
 };
+
+function exactListingKey(raw: string): string | null {
+  try {
+    const url = new URL(raw);
+    if (!['http:', 'https:'].includes(url.protocol) || url.username || url.password || url.port) return null;
+    return normalizeListingUrlKey(url.href);
+  } catch { return null; }
+}
 
 export async function resolveExistingVehicleId(
   supabase: { from: (t: string) => any },
   options: ResolveOptions
 ): Promise<{ vehicleId: string | null }> {
-  const { url, platform, discoveryUrlIlikePattern } = options;
-  const listingUrlKey = normalizeListingUrlKey(url);
+  const { url, platform, discoveryUrlIlikePattern, requireExactListingUrl } = options;
+  const listingUrlKey = requireExactListingUrl ? exactListingKey(url) : normalizeListingUrlKey(url);
+  if (requireExactListingUrl && !listingUrlKey) throw new Error('Invalid listing URL for exact resolution');
+  const signal = requireExactListingUrl ? AbortSignal.timeout(3_000) : undefined;
 
   // 1. By vehicle_events (source_platform + source_listing_id)
   if (listingUrlKey) {
-    const { data: event } = await supabase
+    let query = supabase
       .from('vehicle_events')
       .select('vehicle_id')
       .eq('source_platform', platform)
-      .eq('source_listing_id', listingUrlKey)
-      .maybeSingle();
+      .eq('source_listing_id', listingUrlKey);
+    if (signal) query = query.limit(2).abortSignal(signal);
+    const { data: event, error } = await query.maybeSingle();
+    if (requireExactListingUrl && error) throw error;
     if (event?.vehicle_id) {
       return { vehicleId: event.vehicle_id };
     }
+  }
+
+  if (requireExactListingUrl) {
+    // A canonical URL hit alone cannot exclude conflicting query/hash aliases.
+    // Inspect a bounded candidate set, then compare whole keys rather than prefixes.
+    const pattern = `%${listingUrlKey!.replace(/[\\%_]/g, '\\$&')}%`;
+    const { data, error } = await supabase.from('vehicles').select('id,discovery_url')
+      .ilike('discovery_url', pattern).limit(51).abortSignal(signal!);
+    if (error) throw error;
+    const rows = data ?? [];
+    if (rows.length >= 51) throw new Error('Listing URL candidate limit reached; identity unresolved');
+    const ids = [...new Set<string>(rows.filter((row: { discovery_url: string }) => exactListingKey(row.discovery_url) === listingUrlKey)
+      .map((row: { id: string }) => row.id))];
+    if (ids.length > 1) throw new Error('Ambiguous listing URL aliases; identity unresolved');
+    return { vehicleId: ids[0] ?? null };
   }
 
   // 2. By discovery_url exact

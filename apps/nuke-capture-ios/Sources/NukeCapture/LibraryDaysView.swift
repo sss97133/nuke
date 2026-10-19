@@ -87,19 +87,13 @@ struct LibraryDaysView: View {
                 // And push the other direction: on-device tags UP to the cloud ledger
                 // (bounded; resumes via its own persisted cursor; no-op offline).
                 await LocalTagPush.run(perRun: 1000)
-                // Grow the receipt while it's open: walk the deep backlog in batches,
-                // refreshing the counts as each lands. Resumes via the persisted cursor;
-                // SwiftUI cancels this .task on disappear, which stops the loop.
-                while !ingest.backlogComplete && !Task.isCancelled {
-                    // If a head pass (or another batch) holds the walk, runBackfillBatch
-                    // no-ops instantly — don't tight-loop full-table reloads against it.
-                    if ingest.running {
-                        try? await Task.sleep(for: .seconds(1))
-                        continue
-                    }
-                    await ingest.runBackfillBatch(budget: 600)
+                // The deep backlog belongs to the charging background job. Walking it here, batch
+                // after batch until the whole library was done, held the phone at full load for as
+                // long as the sheet stayed open. One bounded batch, on a charger at a nominal
+                // temperature, keeps the receipt growing while it is open.
+                if !ingest.backlogComplete, !ingest.running, LibraryIngest.mayReviewInForeground {
+                    await ingest.runBackfillBatch(budget: 100)
                     await reload()
-                    try? await Task.sleep(for: .milliseconds(250))   // breathe between batches
                 }
                 // Newly-indexed days may carry verdicts too — one more bounded pull.
                 await ingest.runCloudBackfill()
@@ -198,7 +192,7 @@ private struct DayPhotosView: View {
             // preserving the takenAt-DESC order. The grid renders from PhotoKit +
             // LocalStore only (no network).
             let lids = await Task.detached { LocalStore.shared.localIdentifiers(onDay: day) }.value
-            let map = LibraryStore.shared.indexMap(forLocalIdentifiers: lids)
+            let map = await LibraryStore.shared.indexMap(forLocalIdentifiers: lids)
             indices = lids.compactMap { map[$0] }
             loaded = true
             await reloadReceipt()

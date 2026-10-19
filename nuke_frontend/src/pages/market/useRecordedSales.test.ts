@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 const fixture = vi.hoisted(() => ({ rpc: vi.fn(), from: vi.fn() }));
 vi.mock('../../lib/supabase', () => ({ supabase: fixture }));
-import { fetchRecordedSales, fetchSalesScopes, matchSalesMake, recordedSalesRequest, recordedSalesWindow } from './useRecordedSales';
+import { fetchRecordedSales, fetchSalesScopes, matchSalesMake, recordedSalesRequest, recordedSalesWindow, retryColdTimeout } from './useRecordedSales';
 
 beforeEach(() => { fixture.rpc.mockReset(); fixture.from.mockReset(); });
 describe('existing recorded-sales reader contract', () => {
@@ -39,5 +39,16 @@ describe('existing recorded-sales reader contract', () => {
     expect(options[1].scope).toEqual({ kind: 'supported_subject', subject_id: 'returned-subject-id' });
     expect(matchSalesMake([...options, options[0]], 'Fixture')).toBeUndefined();
     expect(matchSalesMake(options, 'unknown')).toBeUndefined();
+  });
+});
+
+describe('a cold read past the reader\'s time limit', () => {
+  it('is retried once, and only a statement timeout is', () => {
+    const timeout = { code: '57014', message: 'canceling statement due to statement timeout' };
+    expect(retryColdTimeout(0, timeout)).toBe(true);
+    expect(retryColdTimeout(1, timeout)).toBe(false);
+    expect(retryColdTimeout(0, { code: '42501', message: 'permission denied' })).toBe(false);
+    expect(retryColdTimeout(0, new Error('Unsupported recorded-sales receipt'))).toBe(false);
+    expect(retryColdTimeout(0, null)).toBe(false);
   });
 });

@@ -7,6 +7,7 @@ import { normalizeVehicleFields } from '../_shared/normalizeVehicle.ts'
 import { archiveFetch } from '../_shared/archiveFetch.ts'
 import { requireWriteAuth } from '../_shared/writeGuard.ts';
 import { projectSecretKey } from "../_shared/supabaseKeys.ts";
+import { writeVehicleEventByKey } from '../_shared/vehicleEventWrite.ts'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -81,11 +82,11 @@ Deno.serve(async (req) => {
       }
     }
 
+    // Listing data needs no user: vehicles.user_id, vehicle_images.user_id and timeline_events.user_id are nullable.
+    // With no profile to attribute to, rows are written with user_id null instead of stopping the queue.
     if (!importUserId) {
-      return new Response(
-        JSON.stringify({ success: false, error: 'No user_id found. Please provide user_id or ensure users exist.' }),
-        { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 400 }
-      )
+      importUserId = null
+      console.warn('No import user found; writing Craigslist rows with user_id null')
     }
 
     console.log('🔄 Processing Craigslist queue...')
@@ -232,6 +233,8 @@ Return JSON only (no markdown):
       }
     }
 
+    // Failed vehicle_events writes are counted and returned (non-2xx), not just warned.
+    const eventWriteErrors: string[] = []
     const upsertExternalListing = async (args: {
       vehicle_id: string
       listing_url: string
@@ -247,10 +250,7 @@ Return JSON only (no markdown):
           url.match(/[?&]postingID=(\d+)/i)?.[1] ||
           null
 
-        await supabase
-          .from('vehicle_events')
-          .upsert(
-            {
+        const eventWrite = await writeVehicleEventByKey(supabase, {
               vehicle_id: args.vehicle_id,
               source_organization_id: null,
               source_platform: 'craigslist',
@@ -260,11 +260,14 @@ Return JSON only (no markdown):
               event_status: args.listing_status,
               metadata: args.metadata ?? {},
               updated_at: new Date().toISOString(),
-            } as any,
-            { onConflict: 'source_platform,source_listing_id' }
-          )
+            })
+        if (eventWrite.action === 'error') {
+          eventWriteErrors.push(`${listingId ?? url}: ${eventWrite.error}`)
+          console.error('vehicle_events write failed:', eventWrite.error)
+        }
       } catch (e) {
-        console.warn('vehicle_events upsert failed (non-fatal):', (e as any)?.message || e)
+        eventWriteErrors.push(String((e as any)?.message || e))
+        console.warn('vehicle_events write threw:', (e as any)?.message || e)
       }
     }
 
@@ -1100,11 +1103,13 @@ Return JSON only (no markdown):
 
     return new Response(
       JSON.stringify({
-        success: true,
+        success: eventWriteErrors.length === 0,
         stats,
+        event_write_errors: eventWriteErrors.slice(0, 5),
+        event_write_error_count: eventWriteErrors.length,
         message: `Processed ${stats.processed} listings: ${stats.created} created, ${stats.updated} updated, ${stats.skipped} skipped, ${stats.failed} failed`
       }),
-      { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 }
+      { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: eventWriteErrors.length === 0 ? 200 : 500 }
     )
 
   } catch (error: any) {

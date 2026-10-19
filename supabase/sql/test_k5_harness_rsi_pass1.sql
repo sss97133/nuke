@@ -37,11 +37,28 @@ CREATE TABLE public.stack_substrates (substrate text PRIMARY KEY, declared_table
   declared_by text, note text, source text NOT NULL, registered_at timestamptz NOT NULL, registered_by text NOT NULL);
 INSERT INTO public.stack_substrates (substrate, source, registered_at, registered_by) VALUES ('text fold', 'fixture', now(), 'fixture');
 -- The live shape: substrate is generated from an abstract need's text and must be a declared substrate.
-CREATE TABLE public.stack_needs (stack_id text NOT NULL, version integer NOT NULL, layer text NOT NULL, kind text NOT NULL,
+-- stack_needs as production defines it (20261007014500_stack_registry.sql), checks included: a K5 pass that names an
+-- object production would refuse fails here, not on deploy (20261015103000 did, 2026-10-15).
+CREATE TABLE public.stack_needs (stack_id text NOT NULL, version integer NOT NULL,
+  layer text NOT NULL CHECK (layer IN ('log', 'key', 'dimension', 'fold', 'baseline', 'residual', 'feature', 'prediction', 'outcome')),
+  kind text NOT NULL CHECK (kind IN ('table', 'column', 'function', 'intake', 'stack', 'abstract')),
   object text NOT NULL, denominator text, fresh_within interval, note text,
   substrate text GENERATED ALWAYS AS (CASE WHEN kind = 'abstract' THEN object ELSE NULL END) STORED
     REFERENCES public.stack_substrates(substrate),
-  FOREIGN KEY (stack_id, version) REFERENCES public.stacks(stack_id, version));
+  PRIMARY KEY (stack_id, version, layer, object),
+  FOREIGN KEY (stack_id, version) REFERENCES public.stacks(stack_id, version),
+  CONSTRAINT stack_needs_object_form CHECK (CASE kind
+    WHEN 'table'    THEN object ~ '^[a-z_][a-z0-9_]*$'
+    WHEN 'function' THEN object ~ '^[a-z_][a-z0-9_]*$'
+    WHEN 'column'   THEN object ~ '^[a-z_][a-z0-9_]*\.[a-z_][a-z0-9_]*$'
+    WHEN 'intake'   THEN object ~ '^[a-z_][a-z0-9_]*\.[a-z_][a-z0-9_]*$'
+    WHEN 'stack'    THEN object ~ '^S[0-9A-Z]+$' AND object <> stack_id
+    ELSE btrim(object) <> '' AND object = btrim(object) END),
+  CONSTRAINT stack_needs_denominator_same_table CHECK (denominator IS NULL OR (kind = 'column'
+    AND denominator ~ '^[a-z_][a-z0-9_]*\.[a-z_][a-z0-9_]*$'
+    AND split_part(denominator, '.', 1) = split_part(object, '.', 1) AND denominator <> object)),
+  CONSTRAINT stack_needs_window_for_intake CHECK ((kind = 'intake') = (fresh_within IS NOT NULL)
+    AND (fresh_within IS NULL OR fresh_within > interval '0')));
 CREATE TABLE public.catalog_parts (id uuid PRIMARY KEY DEFAULT gen_random_uuid(), part_number text);
 CREATE TABLE public.harness_designs (id uuid PRIMARY KEY, vehicle_id uuid);
 CREATE TABLE public.harness_endpoints (id uuid PRIMARY KEY DEFAULT gen_random_uuid(), design_id uuid, code text, name text,

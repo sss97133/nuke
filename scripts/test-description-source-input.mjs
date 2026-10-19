@@ -43,6 +43,7 @@ function compile(path) {
 const sources = new Map([
   ['handler', compile('../supabase/functions/discover-description-data/index.ts')],
   ['input', compile('../supabase/functions/discover-description-data/descriptionInput.ts')],
+  ['proposals', compile('../supabase/functions/discover-description-data/reportedWorkProposals.ts')],
   ['guard', compile('../supabase/functions/_shared/writeGuard.ts')],
   ['keys', compile('../supabase/functions/_shared/supabaseKeys.ts')],
   ['hash', compile('../supabase/functions/_shared/observationContentHash.ts')],
@@ -175,12 +176,14 @@ function fixture(options = {}) {
             auth: { persistSession: false, autoRefreshToken: false } }),
         };
         if (specifier === './descriptionInput.ts') return load('input');
+        if (specifier === './reportedWorkProposals.ts') return load('proposals');
         if (specifier === '../_shared/batParser.ts') return load('bat');
         if (specifier === './batChassis.ts') return load('chassis');
         if (specifier === './batAuctionRecord.ts') return load('record');
         if (specifier === '../_shared/observationContentHash.ts') return load('hash');
         if (specifier === '../_shared/writeGuard.ts') return load('guard');
         if (specifier === './supabaseKeys.ts' || specifier === '../_shared/supabaseKeys.ts') return load('keys');
+        if (specifier === '../_shared/geminiGuard.ts') return { geminiFetch: (url, init) => fixtureFetch(url, init) };
         if (specifier === './apiKeyAuth.ts') return { hashApiKey: () => assert.fail('No API-key path is used') };
         assert.fail(`Unexpected import ${specifier}`);
       },

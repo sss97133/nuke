@@ -13,7 +13,7 @@
  * Single RPC call via popup_make_intel() — one round trip.
  */
 
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { supabase } from '../../lib/supabase';
 import { VEHICLE_POPUP_COLUMNS } from './vehiclePopupColumns';
 import { usePopup } from './usePopup';
@@ -84,31 +84,35 @@ export function MakePopup({ make, searchQuery }: Props) {
   const { openPopup } = usePopup();
   const [data, setData] = useState<MakeIntel | null>(null);
   const [loading, setLoading] = useState(true);
+  const [unavailable, setUnavailable] = useState(false);
+  const continuationEpoch = useRef(0);
 
   useEffect(() => {
     let cancelled = false;
 
     async function load() {
+      setUnavailable(false);
       try {
         const { data: result, error } = await supabase.rpc('popup_make_intel', { p_make: make });
+        if (error) throw error;
         if (!cancelled && !error && result) {
           setData(result as MakeIntel);
         }
       } catch {
-        // fallback: nothing
+        if (!cancelled) setUnavailable(true);
       }
       if (!cancelled) setLoading(false);
     }
 
     load();
-    return () => { cancelled = true; };
+    return () => { cancelled = true; continuationEpoch.current += 1; };
   }, [make]);
 
   if (loading || !data) {
     return (
       <div style={{ padding: 20, textAlign: 'center' }}>
         <span style={{ fontFamily: SANS, fontSize: 8, fontWeight: 700, textTransform: 'uppercase', color: '#999', letterSpacing: '0.5px' }}>
-          LOADING...
+          {unavailable ? 'Make details unavailable.' : 'LOADING...'}
         </span>
       </div>
     );
@@ -133,8 +137,9 @@ export function MakePopup({ make, searchQuery }: Props) {
   };
 
   const handleVehicleClick = (id: string, title: string) => {
+    const epoch = continuationEpoch.current;
     supabase.from('vehicles').select(VEHICLE_POPUP_COLUMNS).eq('id', id).single().then(({ data: v }) => {
-      if (v) openPopup(<VehiclePopup vehicle={v as unknown as FeedVehicle} />, title, 480);
+      if (v && continuationEpoch.current === epoch) openPopup(<VehiclePopup vehicle={v as unknown as FeedVehicle} />, title, 480);
     });
   };
 
