@@ -39,6 +39,7 @@ export interface CandidateScope {
 export interface SubjectEnvelope extends SubjectProjection {
   user_id: string; method: typeof SUBJECT_METHOD; run_key: string; provider: string; model: string;
   read_at: string; inputs: SubjectInput[]; candidate_scope: CandidateScope;
+  raw_model_reading?: unknown;
 }
 export interface CaptureProfileRequest {
   basis: "capture_session"; vin: string; image_ids: string[];
@@ -367,7 +368,7 @@ export async function resolveSubjectBatch(store: SubjectStore, request: SubjectR
       provider: result.model_result.provider, model: result.model_result.model, read_at,
     }))).then(value => [...new Uint8Array(value)].map(v => v.toString(16).padStart(2, "0")).join(""));
     envelope = { ...projection, user_id: request.user_id, method: SUBJECT_METHOD, run_key,
-      provider: result.model_result.provider, model: result.model_result.model, read_at, inputs, candidate_scope };
+      provider: result.model_result.provider, model: result.model_result.model, read_at, inputs, candidate_scope, raw_model_reading: result.model_result.data };
   }
   const writeScopeRefusal = scopeRefusal(sources);
   if (writeScopeRefusal) return { ...base, status: "refused", refusal: writeScopeRefusal };
