@@ -8,10 +8,17 @@
  * /, /market, /journal, /llms.txt — readable text for crawlers and AI readers (the app is drawn by JavaScript, so
  *                        without this they see a title and nothing else). Numbers come from market_sources_read()
  *                        through the anon key, each with its own date; if the read fails the page says so and shows no number.
+ * /jobs, /jobs/:id, /providers/:handle, /org/:id, /sitemap-work.xml — titles, descriptions, OG tags and readable text
+ *                        for the open job, provider and organization pages, and their sitemap, from anon readers only
+ *                        (src/lib/discoveryFace.ts). No customer identity, payments, contact fields or private names.
  */
+import {
+  injectPage, jobFace, jobsBoardFace, organizationFace, providerFace, sitemapXml, workSitemapUrls,
+} from './src/lib/discoveryFace';
 
 export const config = {
-  matcher: ['/', '/market', '/journal', '/llms.txt', '/vehicle/:path*', '/api/v1/vehicle/:path*'],
+  matcher: ['/', '/market', '/journal', '/llms.txt', '/vehicle/:path*', '/api/v1/vehicle/:path*',
+    '/jobs', '/jobs/:path*', '/providers/:path*', '/org/:path*', '/sitemap-work.xml'],
 };
 
 // ── Vehicle data config ──────────────────────────────────────────────────────
@@ -274,6 +281,113 @@ function llmsTxt(b: Board): string {
   return lines.join('\n') + '\n';
 }
 
+// ── Open job, provider and organization pages ──────────────────────────────
+
+const WORK_CACHE = 'public, s-maxage=300, stale-while-revalidate=3600';
+const SITEMAP_CACHE = 'public, s-maxage=21600, stale-while-revalidate=86400';
+const HANDLE_RE = /^[A-Za-z0-9_.-]{1,64}$/;
+
+function anonHeaders(): Record<string, string> {
+  return { apikey: SUPABASE_ANON, 'Content-Type': 'application/json',
+    ...(SUPABASE_ANON.startsWith('eyJ') ? { Authorization: `Bearer ${SUPABASE_ANON}` } : {}) };
+}
+
+/** An anon reader call; null when it refuses, fails or takes too long (the page then keeps the plain app shell). */
+async function anonRpc(fn: string, args: Record<string, unknown>, ms = 4000): Promise<Record<string, unknown> | null> {
+  if (!SUPABASE_URL || !SUPABASE_ANON) return null;
+  const ctl = new AbortController();
+  const timer = setTimeout(() => ctl.abort(), ms);
+  try {
+    const resp = await fetch(`${SUPABASE_URL}/rest/v1/rpc/${fn}`, { method: 'POST', headers: anonHeaders(), body: JSON.stringify(args), signal: ctl.signal });
+    if (!resp.ok) return null;
+    const v = await resp.json();
+    return v && typeof v === 'object' && !Array.isArray(v) ? v as Record<string, unknown> : null;
+  } catch { return null; } finally { clearTimeout(timer); }
+}
+
+/** An anon PostgREST read of rows the row policies already open; null on any failure. */
+async function anonRows(path: string, ms = 4000): Promise<Record<string, unknown>[] | null> {
+  if (!SUPABASE_URL || !SUPABASE_ANON) return null;
+  const ctl = new AbortController();
+  const timer = setTimeout(() => ctl.abort(), ms);
+  try {
+    const resp = await fetch(`${SUPABASE_URL}/rest/v1/${path}`, { headers: anonHeaders(), signal: ctl.signal });
+    if (!resp.ok) return null;
+    const v = await resp.json();
+    return Array.isArray(v) ? v as Record<string, unknown>[] : null;
+  } catch { return null; } finally { clearTimeout(timer); }
+}
+
+async function openJobIds(): Promise<{ ids: string[]; asOf: string | null } | null> {
+  const ids: string[] = [];
+  let after: string | null = null;
+  let asOf: string | null = null;
+  for (let page = 0; page < 10; page++) {
+    const r = await anonRpc('open_requirements_read', { p_after: after, p_limit: 100, p_kind: null });
+    if (!r) return page === 0 ? null : { ids, asOf };
+    asOf = asOf ?? (typeof r.as_of === 'string' ? r.as_of : null);
+    for (const row of Array.isArray(r.rows) ? r.rows : []) {
+      const id = (row as Record<string, unknown>)?.work_order_id;
+      if (typeof id === 'string' && UUID_RE.test(id)) ids.push(id);
+    }
+    after = typeof r.next_after === 'string' ? r.next_after : null;
+    if (!after) break;
+  }
+  return { ids, asOf };
+}
+
+async function workSitemap(): Promise<Response> {
+  const [jobs, providers, orgs] = await Promise.all([
+    openJobIds(),
+    anonRpc('discovery_providers_read', { p_limit: 5000 }),
+    anonRows('organizations?is_public=eq.true&select=id,updated_at&order=updated_at.desc.nullslast&limit=10000', 8000),
+  ]);
+  const status = `jobs=${jobs ? 'ok' : 'unread'};providers=${providers ? 'ok' : 'unread'};organizations=${orgs ? 'ok' : 'unread'}`;
+  const urls = workSitemapUrls(jobs?.ids ?? [], providers, (orgs ?? []).filter(o => typeof o.id === 'string' && UUID_RE.test(o.id as string)), jobs?.asOf ?? null);
+  return new Response(sitemapXml(urls), {
+    headers: { 'Content-Type': 'application/xml; charset=utf-8', 'Cache-Control': SITEMAP_CACHE, 'x-nuke-sitemap': status },
+  });
+}
+
+/** The page for an open job, provider or organization route, or null to fall through to the plain app shell. */
+async function workPage(pathname: string, requestUrl: string): Promise<Response | null> {
+  const path = pathname.length > 1 ? pathname.replace(/\/$/, '') : pathname;
+  let page = null;
+  if (path === '/jobs') {
+    page = jobsBoardFace(await anonRpc('open_requirements_read', { p_after: null, p_limit: 25, p_kind: null }));
+  } else if (/^\/jobs\/[^/]+$/.test(path)) {
+    const id = path.slice('/jobs/'.length);
+    if (!UUID_RE.test(id)) return null;
+    const [jp, res] = await Promise.all([anonRpc('work_order_job_path_read', { p_work_order_id: id }), anonRpc('work_order_resources_read', { p_work_order_id: id })]);
+    if (!jp) return null;
+    const vid = typeof jp.vehicle_id === 'string' && UUID_RE.test(jp.vehicle_id) ? jp.vehicle_id : null;
+    const veh = vid ? await anonRows(`vehicles?id=eq.${vid}&is_public=eq.true&select=primary_image_url`, 2500) : null;
+    const img = veh?.[0]?.primary_image_url;
+    page = jobFace(id, jp, res, typeof img === 'string' && /^https:\/\//.test(img) ? img : null);
+  } else if (/^\/providers\/[^/]+$/.test(path) && !path.startsWith('/providers/actor')) {
+    const handle = decodeURIComponent(path.slice('/providers/'.length));
+    if (!HANDLE_RE.test(handle)) return null;
+    const rows = await anonRows(`profiles?username=eq.${encodeURIComponent(handle)}&is_public=eq.true&select=id&limit=1`, 2500);
+    const uid = rows?.[0]?.id;
+    if (typeof uid !== 'string' || !UUID_RE.test(uid)) return null;
+    const profile = await anonRpc('provider_profile_read', { p_user_id: uid, p_actor_id: null }, 6000);
+    if (!profile) return null;
+    page = providerFace(handle, profile);
+  } else if (/^\/org\/[^/]+$/.test(path)) {
+    const id = path.slice('/org/'.length);
+    if (!UUID_RE.test(id)) return null;
+    const [rows, supply] = await Promise.all([
+      anonRows(`organizations?id=eq.${id}&is_public=eq.true&select=id,business_name,name,city,state,business_type&limit=1`, 2500),
+      anonRpc('organization_supply_read', { p_organization_id: id }, 2500),
+    ]);
+    if (!rows?.[0]) return null;
+    page = organizationFace(id, rows[0], supply);
+  }
+  if (!page) return null;
+  const html = await getBaseHtml(requestUrl);
+  return new Response(injectPage(html, page), { headers: { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': WORK_CACHE } });
+}
+
 // ── Fetch base HTML ──────────────────────────────────────────────────────────
 
 async function getBaseHtml(requestUrl: string): Promise<string> {
@@ -384,6 +498,14 @@ export default async function middleware(request: Request): Promise<Response | u
     return new Response(injectFace(html, face, board), {
       headers: { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': FACE_CACHE, 'x-nuke-board': face.withBoard ? boardStatus : 'not-needed' },
     });
+  }
+
+  // ── Open job, provider and organization pages, and their sitemap ──
+  if (url.pathname === '/sitemap-work.xml') return workSitemap();
+  if (/^\/(jobs|providers|org)(\/|$)/.test(url.pathname)) {
+    const accept = request.headers.get('Accept') || '';
+    if (accept && !accept.includes('text/html') && !accept.includes('*/*')) return undefined;
+    return (await workPage(url.pathname, request.url)) ?? undefined;
   }
 
   // ── /api/v1/vehicle/:id (REST API) ──

@@ -204,6 +204,7 @@ CREATE POLICY "Anyone can view actor_capabilities" ON public.actor_capabilities 
 GRANT SELECT ON public.actor_capabilities TO anon, authenticated;
 GRANT ALL ON public.actor_capabilities TO service_role;
 ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS created_at timestamptz DEFAULT now();
+ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS updated_at timestamptz DEFAULT now();
 ALTER TABLE public.work_orders ADD COLUMN IF NOT EXISTS estimated_labor_cost numeric, ADD COLUMN IF NOT EXISTS estimated_parts_cost numeric,
   ADD COLUMN IF NOT EXISTS actual_labor_cost numeric, ADD COLUMN IF NOT EXISTS actual_parts_cost numeric, ADD COLUMN IF NOT EXISTS actual_total numeric,
   ADD COLUMN IF NOT EXISTS updated_at timestamptz;
@@ -369,9 +370,13 @@ ALTER TABLE public.observation_sources ADD COLUMN IF NOT EXISTS display_name tex
 \ir ../migrations/20261020074500_work_order_part_product_matches.sql
 \echo REPLAY 20261020081000_publish_work_order.sql
 \ir ../migrations/20261020081000_publish_work_order.sql
+\echo REPLAY 20261020083000_work_order_publication_read.sql
+\ir ../migrations/20261020083000_work_order_publication_read.sql
 \ir helpers/part_product_tables_live_20261020.sql
 \echo REPLAY 20261020084500_work_order_part_product_read.sql
 \ir ../migrations/20261020084500_work_order_part_product_read.sql
+\echo REPLAY 20261020093000_discovery_providers_read.sql
+\ir ../migrations/20261020093000_discovery_providers_read.sql
 -- Plan check and final state.
 \set replay_problems `scripts/ci/job-loop-replay-check.sh | tr '\n' ' '`
 SELECT t_assert(btrim(:'replay_problems') = '', 'replay plan covers the build in filename order: ' || COALESCE(NULLIF(btrim(:'replay_problems'), ''), 'ok'));
