@@ -313,7 +313,7 @@ struct AccountView: View {
                         .foregroundStyle(.secondary)
                 }
 
-                // What you choose to link — your AI subscriptions (BYOK) + accounting.
+                // Optional provider keys + accounting; cloud analysis runs on the server credential and prepaid wallet.
                 Section {
                     NavigationLink {
                         ConnectedAccountsView()

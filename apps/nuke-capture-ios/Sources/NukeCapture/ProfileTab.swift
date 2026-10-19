@@ -595,6 +595,12 @@ struct ProfileView: View {
                     .fixedSize(horizontal: false, vertical: true)
             }
 
+            // profiles.role is a self-claim, never a decided context: dim, at the record rung.
+            if let role = profile?.role, !role.isEmpty {
+                RootedValueView(label: "Role", value: role.replacingOccurrences(of: "_", with: " "),
+                                status: .recorded, decay: "stated by the account")
+            }
+
             // LIVE STATE — is this node producing NOW? The first "worth-connecting-to"
             // read. Capture-or-work based (uploading today counts), honest when idle.
             if let p = producer {
@@ -1109,7 +1115,7 @@ struct ProfileView: View {
         do {
             let rows: [ProfileRow] = try await SupabaseService.client
                 .from("profiles")
-                .select("id,username,full_name,avatar_url,bio,location,role")
+                .select("id,username,full_name,avatar_url,bio,location,city,role")
                 .eq("id", value: userId)
                 .limit(1)
                 .execute()
@@ -1138,7 +1144,7 @@ struct ProfileView: View {
             loadError = nil
         } catch {
             if Self.isPermissionDenied(error) { signInNeeded = true; loadError = nil; profileSettled = true; return }
-            loadError = "Load failed"
+            loadError = ReadFailure.text(error)
             NSLog("NukeCapture profile load failed: %@", String(describing: error))
         }
         profileSettled = true
@@ -1259,12 +1265,12 @@ struct DayReceiptView: View {
                     } description: {
                         Text("Day receipts are read by signed-in accounts.")
                     }
-                } else if loadError != nil {
+                } else if let failure = loadError {
                     // Failed ≠ empty — offer a way back, never a dead red string.
                     ContentUnavailableView {
                         Label("Couldn't load the day", systemImage: "exclamationmark.triangle")
                     } description: {
-                        Text("The read failed. Retry.")
+                        Text(failure)
                     } actions: {
                         Button("Retry") { Task { loaded = false; loadError = nil; await load() } }
                             .buttonStyle(.borderedProminent)
@@ -1313,7 +1319,7 @@ struct DayReceiptView: View {
             if let pg = error as? PostgrestError, pg.code == "42501" {
                 loadError = "Sign in to open a day receipt"
             } else {
-                loadError = "Load failed"
+                loadError = ReadFailure.text(error)
             }
             NSLog("NukeCapture day receipt failed: %@", String(describing: error))
         }
