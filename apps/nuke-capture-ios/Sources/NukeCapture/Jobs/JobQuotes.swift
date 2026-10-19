@@ -149,6 +149,8 @@ struct Quote: Decodable, Equatable {
     let specifications: [SnapshotSpec]
     /// When payment is released under this version; nil when it declares none (Nuke's standard applies).
     let releaseConditions: [ReleaseCondition]?
+    /// The signed-in viewer issued this version (work_order_quotes_read).
+    let issuedByViewer: Bool
 
     var isChangeOrder: Bool { changeOrder != nil }
 
@@ -166,6 +168,7 @@ struct Quote: Decodable, Equatable {
         case depositRequested = "deposit_requested"
         case scopeStatus = "scope_status"
         case releaseConditions = "release_conditions"
+        case issuedByViewer = "issued_by_viewer"
     }
 
     private struct LineList: Decodable {
@@ -199,6 +202,7 @@ struct Quote: Decodable, Equatable {
         changeOrder = (try? c.decode(ChangeOrder.self, forKey: .changeOrder)) ?? (flagged ? ChangeOrder.empty : nil)
         specifications = (try? c.decode(SnapshotSpecs.self, forKey: .scopeSnapshot))?.specifications ?? []
         releaseConditions = ReleaseCondition.list(try? c.decode(JobJSON.self, forKey: .releaseConditions))
+        issuedByViewer = (try? c.decode(Bool.self, forKey: .issuedByViewer)) == true
     }
 
     private struct SnapshotSpecs: Decodable {

@@ -12,6 +12,7 @@
 
 import Foundation
 import Supabase
+import SwiftUI
 
 // MARK: - The job's scope, as the quote must reference it
 
@@ -20,48 +21,120 @@ struct QuoteScope: Equatable {
         let refKind: String
         let refId: String
         let description: String
+        /// A price already recorded on the job (parts, labor), offered as the starting price.
+        var basis: String? = nil
+        var amount: Double? = nil
+        var quantity: Double? = nil
         var id: String { refKind + refId }
     }
     let operations: [Item]
     let requirements: [Item]
+    var parts: [Item] = []
+    var labor: [Item] = []
 
     static let empty = QuoteScope(operations: [], requirements: [])
 }
 
-/// work_order_resources_read requirements (id, line_item_id, requirement_kind, description).
-struct ScopeRequirements: Decodable, Equatable {
-    struct Row: Decodable, Equatable {
+/// work_order_operations_read (anon + authenticated): the job's operations with their needs and
+/// specification keys, parts and labor with open prices, each carrying the exact quote_ref
+/// issue_work_order_quote accepts. Descriptions that name a person are withheld for non-parties.
+struct WorkOrderOperations: Decodable, Equatable {
+    struct Ref: Decodable, Equatable { let ref_kind: String; let ref_id: String }
+    struct Requirement: Decodable, Equatable, Identifiable {
         let id: String
-        let line_item_id: String?
         let requirement_kind: String?
         let description: String?
+        let quote_ref: Ref?
     }
-    let rows: [Row]
+    struct Operation: Decodable, Equatable, Identifiable {
+        let id: String
+        let lineNumber: Int?
+        let taskType: String?
+        let status: String?
+        let description: String?
+        let requestedByRole: String?
+        let requirements: [Requirement]
+        let quoteRef: Ref?
+
+        init(from decoder: Decoder) throws {
+            let c = try decoder.container(keyedBy: JobCodingKey.self)
+            id = try c.decode(String.self, forKey: JobCodingKey("id"))
+            lineNumber = try? c.decode(Int.self, forKey: JobCodingKey("line_number"))
+            taskType = try? c.decode(String.self, forKey: JobCodingKey("task_type"))
+            status = try? c.decode(String.self, forKey: JobCodingKey("status"))
+            description = (try? c.decode(String.self, forKey: JobCodingKey("description"))).flatMap { $0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? nil : $0 }
+            requestedByRole = try? c.decode(String.self, forKey: JobCodingKey("requested_by_role"))
+            requirements = (try? c.decode([Lossy<Requirement>].self, forKey: JobCodingKey("requirements")))?.compactMap(\.value) ?? []
+            quoteRef = try? c.decode(Ref.self, forKey: JobCodingKey("quote_ref"))
+        }
+    }
+    struct Part: Decodable, Equatable, Identifiable {
+        let id: String
+        let part_name: String?
+        let quantity: Double?
+        let unit_price: Double?
+        let total_price: Double?
+        let is_comped: Bool?
+        let quote_ref: Ref?
+    }
+    struct Labor: Decodable, Equatable, Identifiable {
+        let id: String
+        let task_name: String?
+        let hours: Double?
+        let hourly_rate: Double?
+        let is_comped: Bool?
+        let quote_ref: Ref?
+    }
+
+    let operations: [Operation]
+    let parts: [Part]
+    let labor: [Labor]
 
     init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: JobCodingKey.self)
-        rows = (try? c.decode([Lossy<Row>].self, forKey: JobCodingKey("requirements")))?.compactMap(\.value) ?? []
+        operations = (try? c.decode([Lossy<Operation>].self, forKey: JobCodingKey("operations")))?.compactMap(\.value) ?? []
+        parts = (try? c.decode([Lossy<Part>].self, forKey: JobCodingKey("parts")))?.compactMap(\.value) ?? []
+        labor = (try? c.decode([Lossy<Labor>].self, forKey: JobCodingKey("labor")))?.compactMap(\.value) ?? []
+    }
+
+    /// Every line choice with its server-given quote_ref; rows without one, or without words, are left out.
+    var scope: QuoteScope {
+        func text(_ s: String?) -> String? { s.flatMap { $0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? nil : $0 } }
+        let ops = operations.compactMap { o -> QuoteScope.Item? in
+            guard let r = o.quoteRef, let d = o.description else { return nil }
+            return QuoteScope.Item(refKind: r.ref_kind, refId: r.ref_id, description: d)
+        }
+        let reqs = operations.flatMap(\.requirements).compactMap { q -> QuoteScope.Item? in
+            guard let r = q.quote_ref, let d = text(q.description) else { return nil }
+            return QuoteScope.Item(refKind: r.ref_kind, refId: r.ref_id, description: d)
+        }
+        let ps = parts.compactMap { p -> QuoteScope.Item? in
+            guard let r = p.quote_ref, let d = text(p.part_name) else { return nil }
+            let price = p.is_comped == true ? nil : (p.unit_price ?? p.total_price)
+            return QuoteScope.Item(refKind: r.ref_kind, refId: r.ref_id, description: d, basis: "flat",
+                                   amount: price.map { p.unit_price != nil ? $0 * max(p.quantity ?? 1, 1) : $0 })
+        }
+        let ls = labor.compactMap { l -> QuoteScope.Item? in
+            guard let r = l.quote_ref, let d = text(l.task_name) else { return nil }
+            return QuoteScope.Item(refKind: r.ref_kind, refId: r.ref_id, description: d, basis: "hourly",
+                                   amount: l.is_comped == true ? nil : l.hourly_rate, quantity: l.hours.flatMap { $0 > 0 ? $0 : nil })
+        }
+        return QuoteScope(operations: ops, requirements: reqs, parts: ps, labor: ls)
     }
 }
 
-/// work_order_line_items rows (readable by the job's shop owner, customer and vehicle owners under RLS).
-struct ScopeOperation: Decodable, Equatable {
-    let id: String
-    let line_number: Int?
-    let task_description: String?
-}
-
 enum IssueQuoteReaders {
+    static let operationsName = "work_order_operations_read"
+
+    static func operations(workOrderId: String) async -> JobLoad<WorkOrderOperations> {
+        await JobReaders.call(operationsName) {
+            try await SupabaseService.client.rpc(operationsName, params: ["p_work_order_id": workOrderId]).execute().data
+        }
+    }
+
     static func scope(workOrderId: String) async -> QuoteScope {
-        async let reqData = try? SupabaseService.client.rpc("work_order_resources_read", params: ["p_work_order_id": workOrderId]).execute().data
-        async let opRows: [ScopeOperation]? = try? SupabaseService.client.from("work_order_line_items")
-            .select("id,line_number,task_description")
-            .eq("work_order_id", value: workOrderId)
-            .order("line_number")
-            .limit(200)
-            .execute().value
-        let reqs = (await reqData).flatMap { try? JobReaders.decode(ScopeRequirements.self, from: $0) }?.rows ?? []
-        return IssueQuoteDrafting.scope(operations: await opRows ?? [], requirements: reqs)
+        if case .loaded(let o) = await operations(workOrderId: workOrderId) { return o.scope }
+        return .empty
     }
 }
 
@@ -112,18 +185,6 @@ enum IssueQuoteDrafting {
         static func fee() -> LineDraft { LineDraft(refKind: "fee", refId: nil, description: "") }
     }
 
-    static func scope(operations: [ScopeOperation], requirements: [ScopeRequirements.Row]) -> QuoteScope {
-        let ops = operations.compactMap { o -> QuoteScope.Item? in
-            guard let d = o.task_description?.trimmingCharacters(in: .whitespacesAndNewlines), !d.isEmpty else { return nil }
-            return QuoteScope.Item(refKind: "operation", refId: o.id, description: d)
-        }
-        let reqs = requirements.compactMap { r -> QuoteScope.Item? in
-            guard let d = r.description?.trimmingCharacters(in: .whitespacesAndNewlines), !d.isEmpty else { return nil }
-            return QuoteScope.Item(refKind: "requirement", refId: r.id, description: d)
-        }
-        return QuoteScope(operations: ops, requirements: reqs)
-    }
-
     /// A revision starts from the current quote's lines; a first quote from the job's operations and needs.
     static func seed(scope: QuoteScope, current: Quote?) -> [LineDraft] {
         if let current, !current.lines.isEmpty {
@@ -137,11 +198,18 @@ enum IssueQuoteDrafting {
                 return d
             }
         }
-        let ops = scope.operations.map { LineDraft(refKind: $0.refKind, refId: $0.refId, description: $0.description) }
-        var reqs = scope.requirements.map { LineDraft(refKind: $0.refKind, refId: $0.refId, description: $0.description) }
-        // Needs are listed but start unpriced and off when the operations already cover the work.
-        if !ops.isEmpty { for i in reqs.indices { reqs[i].included = false } }
-        let all = ops + reqs
+        func draft(_ i: QuoteScope.Item, on: Bool) -> LineDraft {
+            var d = LineDraft(refKind: i.refKind, refId: i.refId, description: i.description)
+            d.included = on
+            if let b = i.basis.flatMap(Basis.init(rawValue:)) { d.basis = b }
+            d.amount = i.amount.map { JobCopy.plainNumber($0) } ?? ""
+            d.quantity = i.quantity.map { JobCopy.plainNumber($0) } ?? ""
+            return d
+        }
+        let ops = scope.operations.map { draft($0, on: true) }
+        // Needs, parts and labor are listed but start off when operations already describe the work.
+        let rest = (scope.parts + scope.labor + scope.requirements).map { draft($0, on: ops.isEmpty) }
+        let all = ops + rest
         return all.isEmpty ? [.fee()] : all
     }
 
@@ -272,8 +340,10 @@ enum IssueQuoteCopy {
         "That this is final — a new version replaces this one",
     ]
 
-    static func title(_ action: JobAction) -> String {
-        IssueQuoteDrafting.supersedes(action) == nil ? "Issue quote" : "Revise quote"
+    /// "Revise quote" only for the viewer's own current quote; another issuer's current quote is replaced by a new version.
+    static func title(_ action: JobAction, current: Quote?) -> String {
+        guard IssueQuoteDrafting.supersedes(action) != nil else { return "Issue quote" }
+        return current?.issuedByViewer == true ? "Revise quote" : "Issue a new version"
     }
 
     static func refLabel(_ kind: String) -> String {
@@ -306,5 +376,56 @@ enum IssueQuoteCopy {
         ]
         if let hit = table.first(where: { message.contains($0.0) }) { return hit.1 }
         return ReadFailure.text(error)
+    }
+}
+
+// MARK: - The job's operations on the plan stage (open data)
+
+enum OperationsCopy {
+    static func requestedBy(_ role: String?) -> String? {
+        switch role {
+        case "customer"?: return "asked for by the customer"
+        case "organization_owner"?: return "added by the shop"
+        case "accepted_provider"?: return "added by the technician"
+        case "offering_provider"?: return "from a technician's offer"
+        case "scope_text_interpretation"?: return "read from the job's description"
+        case "source_record"?: return "from the shop's records"
+        default: return nil
+        }
+    }
+
+    /// "1. Replace front pads and rotors" — or a plain stand-in when the words name a person.
+    static func title(_ o: WorkOrderOperations.Operation) -> String {
+        (o.lineNumber.map { "\($0). " } ?? "") + (o.description ?? "Description withheld (it named a person)")
+    }
+
+    /// "asked for by the customer · needs: skill, inspection".
+    static func detail(_ o: WorkOrderOperations.Operation) -> String? {
+        let needs = Array(Set(o.requirements.compactMap(\.requirement_kind))).sorted().map(OfferCopy.kind).map { $0.lowercased() }
+        let parts = [requestedBy(o.requestedByRole), needs.isEmpty ? nil : "needs: " + needs.joined(separator: ", ")].compactMap { $0 }
+        return parts.isEmpty ? nil : parts.joined(separator: " · ")
+    }
+}
+
+struct OperationsList: View {
+    let operations: WorkOrderOperations
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text("The work").font(.caption.weight(.semibold)).foregroundStyle(.secondary)
+            ForEach(operations.operations) { o in
+                VStack(alignment: .leading, spacing: 1) {
+                    Text(OperationsCopy.title(o)).font(.footnote)
+                    if let d = OperationsCopy.detail(o) { Text(d).font(.caption2).foregroundStyle(.secondary) }
+                }
+            }
+            if !operations.parts.isEmpty || !operations.labor.isEmpty {
+                Text([operations.parts.isEmpty ? nil : "\(operations.parts.count) part\(operations.parts.count == 1 ? "" : "s") on record",
+                      operations.labor.isEmpty ? nil : "\(operations.labor.count) labor line\(operations.labor.count == 1 ? "" : "s") on record"]
+                        .compactMap { $0 }.joined(separator: " · "))
+                    .font(.caption2).foregroundStyle(.tertiary)
+            }
+        }
+        .padding(.vertical, 2)
     }
 }

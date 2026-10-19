@@ -329,8 +329,8 @@ final class JobFixtureSnapshotTests: XCTestCase {
     }
 
     func testRenderIssueQuote() throws {
-        let scope = IssueQuoteDrafting.scope(operations: try decode([ScopeOperation].self, IssueQuoteFixtures.operations),
-                                             requirements: try decode(ScopeRequirements.self, IssueQuoteFixtures.resources).rows)
+        let ops = try decode(WorkOrderOperations.self, IssueQuoteFixtures.operationsRead)
+        let scope = ops.scope
         let first = try decode(JobQuotes.self, IssueQuoteFixtures.noQuote)
         try snapshot(IssueQuoteSheet(action: try XCTUnwrap(first.issueQuoteAction), current: nil, scope: scope,
                                      conditions: ["customer_completion_sign", "photos_in_window"]), name: "fixture-issue-quote", pages: 3)
@@ -341,6 +341,12 @@ final class JobFixtureSnapshotTests: XCTestCase {
             of: #""context":"client","slots":["customer"]"#, with: #""context":"provider","slots":["organization_owner"]"#))
         try snapshot(NavigationStack { JobPathContent(workOrderId: JobFixtures.workOrderId, path: .loaded(path), resources: .loading, quotes: .loaded(first)) },
                      name: "fixture-issue-quote-entry")
+        let others = try decode(JobQuotes.self, IssueQuoteFixtures.withOthersQuote)
+        try snapshot(IssueQuoteSheet(action: try XCTUnwrap(others.issueQuoteAction), current: others.currentQuote, scope: scope),
+                     name: "fixture-new-version-quote")
+        try snapshot(NavigationStack { JobPathContent(workOrderId: JobFixtures.workOrderId, path: .loaded(path), resources: .loading,
+                                                      quotes: .loaded(first), operations: .loaded(ops)) },
+                     name: "fixture-plan-operations", pages: 5)
     }
 
     func testRenderWorkSessionSignSheet() throws {
