@@ -76,6 +76,6 @@ BEGIN
 END $$;
 
 COMMENT ON COLUMN public.source_registry.observation_source_id IS
-'The platform entity row (observation_sources.id) this registry entry is. Lets a value keyed by source_registry.slug, such as vehicles.platform_source, reach the declared platform entity. Filled by migrations: 3 rows before 2026-10-14, 21 by 20261015020000 (exact slug match, or the source_alias_mapping choice for bringatrailer -> bat and broadarrow -> broad-arrow). NULL means no entity row is chosen yet, not that none exists. Grain: one registry entry. Clock: none of its own; source_registry.updated_at moves when it is set.';
+'The platform entity row (observation_sources.id) this registry entry is. Lets a value keyed by source_registry.slug, such as vehicles.platform_source, reach the declared platform entity. Filled by migrations: 3 rows before 2026-10-14; 20261015020000 bridges 21 registry slugs (exact slug match, or the source_alias_mapping choice for bringatrailer -> bat and broadarrow -> broad-arrow), leaving rows already linked to the same entity unchanged (4 of the 21 on 2026-10-19). NULL means no entity row is chosen yet, not that none exists. Grain: one registry entry. Clock: none of its own; source_registry.updated_at moves when it is set.';
 
 COMMIT;

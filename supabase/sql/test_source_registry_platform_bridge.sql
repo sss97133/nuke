@@ -69,4 +69,4 @@ SELECT pg_temp.ok('the second application changed nothing',
 SELECT pg_temp.ok('the column carries its comment',
   col_description('public.source_registry'::regclass,
     (SELECT attnum FROM pg_attribute WHERE attrelid = 'public.source_registry'::regclass
-       AND attname = 'observation_source_id')) LIKE '%21 by 20261015020000%');
+       AND attname = 'observation_source_id')) LIKE '%20261015020000 bridges 21 registry slugs%');
