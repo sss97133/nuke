@@ -1459,6 +1459,25 @@ Existing upcoming capture-date semantics remain a separate gap; this repair does
 those dates or restart held Facebook intake. Exact checked/deployed/runtime stages belong in
 ~/nuke-logs/model-movers-sold-20261019/.
 
+### Lotus catch-all aliases corrected, prepared 2026-10-19 UTC
+
+The next concrete source-to-reader failure is a retained Climax Eleven headline grouped as Seven.
+The bounded population is727 retained Lotus names representing2,939 dictionary records; these are
+classification inputs, not verified physical assets or a fleet-readiness denominator. Lotus's
+own Seven/Eleven/2-Eleven/3-Eleven histories establish distinct model identities. Two catalog rows
+are narrowed, the dedicated2-Eleven alias row's generic Elise label is corrected, and3-Eleven is
+added through canonical_models. Existing340R/Elise membership remains: Lotus explicitly names the
+car Elise340R. Generic engines, unrelated types and unassessed replicas are retained unresolved.
+Superseded labels/aliases remain in notes; source testimony is unchanged. No saved fits or profiles
+were present for the affected keys at preparation time; the existing fit writer remains the
+invalidation path if any appear before deployment.
+
+Twelve synthetic names exercise actual folds/intake with count/dollar/source preservation and
+idempotent migration application. Production acceptance returns to the two exact retained source
+vehicles and their public sales groups, alongside conserved Lotus totals. This is a shipped repair
+only once checked merge, CI deployment, fold rebuilds and anonymous runtime checks are recorded in
+~/nuke-logs/model-identity-lotus-20261019/. Other catalog candidates are not certified by this slice.
+
 ## 13. Aspiration: twenty stacks the model must be able to carry (owner, 2026-10-06)
 
 **Owner direction, 2026-10-06 23:35Z.** "This scale is where we should be starting at every session: we are combing
