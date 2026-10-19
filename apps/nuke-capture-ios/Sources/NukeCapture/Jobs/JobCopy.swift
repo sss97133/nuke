@@ -83,6 +83,7 @@ enum JobCopy {
         "no_inspection_requirement": "No inspection requested",
         "inspection_performer_unresolved": "No inspector found yet",
         "no_operations": "No operations planned",
+        "operations_only_in_labor_rows": "The work is listed only as labor lines",
         "operations_without_requirements": "Some operations have no requirements",
         "parts_without_operation_link": "Some parts aren't tied to an operation",
         "conflicting_specification": "Specifications disagree",
@@ -109,6 +110,8 @@ enum JobCopy {
         "done_status_without_completion_clock": "Marked done, but no completion date",
         "paid_status_without_payment_record": "Marked paid, but no payment recorded",
         "payments_without_vehicle": "Payments recorded without a vehicle",
+        "operation_source_withdrawn": "An operation's source was withdrawn",
+        "operation_excerpt_missing_from_scope": "An operation's quoted words are no longer in the job's text",
     ]
 
     private static let withheldReasons: [String: String] = [
