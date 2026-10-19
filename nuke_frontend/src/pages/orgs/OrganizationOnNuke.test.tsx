@@ -67,6 +67,7 @@ describe('OrganizationOnNuke', () => {
   it('states who runs it without inventing a claim', () => {
     expect(ownerState({ members: [], members_unnamed: 0 }).text).toBe('No one runs this business on Nuke yet');
     expect(ownerState({ members: [{ handle: 'm1', relation: 'member' }], members_unnamed: 1 }).text).toBe('No public owner on Nuke; 2 members');
-    expect(ownerState({ members: [], members_unnamed: 0, on_nuke: { state: 'not_on_nuke_yet', label: 'Not on Nuke yet' } }).text).toBe('Not on Nuke yet: no one runs this business on Nuke');
+    expect(ownerState({ members: [], members_unnamed: 0, on_nuke: { state: 'not_on_nuke_yet', label: 'Not on Nuke yet' } }).text).toBe('No one runs this business on Nuke yet');
+    expect(ownerState({ members: [], members_unnamed: 1, on_nuke: { state: 'claimed', label: 'Claimed on Nuke' } }).text).toBe('Run on Nuke by its team (no public owner handle)');
   });
 });
