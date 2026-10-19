@@ -18,7 +18,7 @@ final class DeviceAttributionTests: XCTestCase {
         .init(imageID: id, vin: vin, exactVIN: exact, takenAt: time, latitude: lat, longitude: lon,
               fileHash: hash, isVehicle: vehicle,
               isDocument: document, isSensitive: sensitive, contextualYear: year,
-              contextualMake: make, contextualModel: model)
+              contextualMake: make, contextualModel: model, albumContextAmbiguous: false)
     }
 
     func testDuplicateSerialClaimsDoNotChooseDatabaseOrder() {
@@ -72,7 +72,8 @@ final class DeviceAttributionTests: XCTestCase {
                       capture("front", time: "2026-10-18T12:03:00Z", lat: 37.0001, vehicle: true),
                       capture("rear", time: "2026-10-18T12:04:00Z", lat: 37.0002, vehicle: true)]
         XCTAssertEqual(AttributionEngine.vinAnchoredCaptureGroups(frames), [
-            .init(vin: vin, anchorImageID: "plate", imageIDs: ["front", "plate", "rear"], vehicleFrameCount: 2)
+            .init(vin: vin, year: nil, make: nil, model: nil, anchorImageID: "plate",
+                  imageIDs: ["front", "plate", "rear"], vehicleFrameCount: 2)
         ])
     }
 
