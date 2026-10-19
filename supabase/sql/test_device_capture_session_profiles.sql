@@ -1,11 +1,6 @@
 -- Synthetic PG17 contract only; the included fixture refuses non-disposable databases.
 \ir test_device_attribution.sql
 SET ROLE dm_contract_deployer;
-ALTER TABLE public.vehicle_images ADD COLUMN latitude double precision,
-  ADD COLUMN longitude double precision, ADD COLUMN device_fingerprint text,
-  ADD COLUMN is_sensitive boolean DEFAULT false;
-RESET ROLE;
-SET ROLE dm_contract_deployer;
 CREATE TABLE public.image_observations (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(), image_id uuid NOT NULL, vehicle_id uuid, cluster_id uuid,
   role text NOT NULL, confidence numeric NOT NULL, confidence_basis jsonb NOT NULL, observed_by text NOT NULL,
@@ -16,10 +11,10 @@ RESET ROLE;
 
 -- All fixture writes below remain in the disposable dm_refinement_* database.
 INSERT INTO public.profiles(id) VALUES (pg_temp.u('capture'));
-INSERT INTO public.vehicle_images(id,user_id,image_url,file_hash,taken_at,latitude,longitude,device_fingerprint)
+INSERT INTO public.vehicle_images(id,user_id,image_url,file_hash,taken_at,latitude,longitude)
 SELECT pg_temp.i('capture-' || n), pg_temp.u('capture'), 'https://fixture.invalid/' || n,
   repeat(n::text,64), '2026-01-01T12:00:00Z'::timestamptz + n * interval '30 seconds',
-  35.0, -115.0, 'fixture-device' FROM generate_series(1,6) n;
+  35.0, -115.0 FROM generate_series(1,6) n;
 UPDATE public.vehicle_images SET vision_gate_status='approved',is_document=false,is_sensitive=false
  WHERE id IN (SELECT pg_temp.i('capture-' || n) FROM generate_series(1,6) n);
 CREATE FUNCTION pg_temp.capture_request() RETURNS jsonb LANGUAGE sql AS $$
