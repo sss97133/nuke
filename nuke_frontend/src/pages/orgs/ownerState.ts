@@ -9,8 +9,7 @@ export function ownerState(read: JsonObject | null): OwnerState {
   const members = people.filter(m => m.relation !== 'owner').map(m => str(m.handle)!);
   const unnamed = num(read?.members_unnamed) ?? 0;
   let text: string;
-  const label = str(obj(read?.on_nuke)?.label);
-  if (label && !owners.length) text = obj(read?.on_nuke)?.state === 'not_on_nuke_yet' ? `${label}: no one runs this business on Nuke` : label;
+  if (!owners.length && obj(read?.on_nuke)?.state === 'claimed') text = 'Run on Nuke by its team (no public owner handle)';
   else if (owners.length) text = `Run on Nuke by ${owners.map(h => '@' + h).join(', ')}`;
   else if (members.length || unnamed) text = `No public owner on Nuke; ${members.length + unnamed} member${members.length + unnamed === 1 ? '' : 's'}`;
   else text = 'No one runs this business on Nuke yet';
