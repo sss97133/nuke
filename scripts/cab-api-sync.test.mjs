@@ -58,7 +58,9 @@ test('C&B archive requires the SDK persisted ID and preserves the exact source p
   assert.equal(f.inserted.length,1);assert.equal(f.held().id,snapshotId);
   const row=f.held();assert.equal(row.fetched_at,clock);assert.equal(row.success,true);
   assert.equal(row.html_sha256,createHash('sha256').update(row.html).digest('hex'));
-  const body=JSON.parse(row.html.match(/<script[^>]*>([\s\S]*)<\/script>/)[1]);
+  const open='<script id="cab-v2-json" type="application/json">',at=row.html.indexOf(open);
+  assert(at>0&&row.html.endsWith('</script>'));
+  const body=JSON.parse(row.html.slice(at+open.length,-'</script>'.length));
   assert.deepEqual(body,{detail,comments_count:rows.length,comments_and_bids:rows});
   assert(f.requests.at(-1).prefer.includes('return=representation'));
 });
