@@ -81,7 +81,7 @@ SELECT pg_temp.ok('partial identifiers cannot mint and classic identifiers retai
  AND NOT EXISTS(SELECT 1 FROM public.vehicles WHERE vin='6R07T123456'));
 SELECT pg_temp.ok('a source-bound anchor is required',
  :'missing_hash_r'::jsonb->>'status'='insufficient_evidence' AND :'wrong_hash_r'::jsonb->>'status'='insufficient_evidence');
-UPDATE public.vehicle_images SET device_fingerprint=NULL,latitude=36 WHERE id=pg_temp.i('capture-2');
+UPDATE public.vehicle_images SET latitude=36 WHERE id=pg_temp.i('capture-2');
 SET ROLE authenticated;
 SELECT public.device_create_vehicle_profile(pg_temp.capture_request()) AS r \gset wrong_place_
 RESET ROLE;
@@ -104,7 +104,6 @@ SELECT public.device_create_vehicle_profile(pg_temp.capture_request()) AS r \gse
 RESET ROLE;
 SELECT pg_temp.ok('sensitive source members cannot seed or join a profile', :'sensitive_r'::jsonb->>'status'='insufficient_evidence');
 UPDATE public.vehicle_images SET is_sensitive=false WHERE id=pg_temp.i('capture-2');
-UPDATE public.vehicle_images SET device_fingerprint=NULL WHERE id IN (pg_temp.i('capture-1'),pg_temp.i('capture-2'));
 SELECT pg_temp.record_capture_reading('capture-1','capture-2');
 SELECT pg_temp.record_capture_reading('capture-3','capture-2','1HGCM82633A004352');
 SET ROLE authenticated;
@@ -166,6 +165,9 @@ SELECT pg_temp.ok('a withdrawn anchor cannot file new photos on replay',
  :'withdrawn_anchor_r'::jsonb->>'status'='insufficient_evidence'
  AND (SELECT vehicle_id IS NULL FROM public.vehicle_images WHERE id=pg_temp.i('capture-3')));
 UPDATE public.vehicle_images SET is_superseded=false WHERE id=pg_temp.i('capture-1');
+UPDATE public.vehicle_images SET is_sensitive=false WHERE id=pg_temp.i('capture-3');
+UPDATE public.image_observations SET is_active=false WHERE image_id=pg_temp.i('capture-3');
+SELECT pg_temp.record_capture_reading('capture-3','capture-4');
 SELECT jsonb_set(jsonb_set(jsonb_set(pg_temp.capture_request(),'{image_ids}',
  jsonb_build_array(pg_temp.i('capture-3'),pg_temp.i('capture-4'))),'{evidence,anchor_image_id}',to_jsonb(pg_temp.i('capture-3'))),
  '{evidence,anchor_source_sha256}',to_jsonb(repeat('3',64))) AS request \gset existing_capture_
@@ -186,6 +188,9 @@ SELECT jsonb_set(jsonb_set(jsonb_set(jsonb_set(jsonb_set(
  '{evidence,anchor_image_id}',to_jsonb(pg_temp.i('capture-5'))),
  '{evidence,anchor_source_sha256}',to_jsonb(repeat('5',64))),
  '{evidence,identifier_read}',to_jsonb(pg_temp.vin('1FTRX18L?XKA00377'))) AS request \gset modern_capture_
+-- A separate vehicle and capture context: conflicting VINs in one neighborhood must refuse.
+UPDATE public.vehicle_images SET latitude=36 WHERE id IN (pg_temp.i('capture-5'),pg_temp.i('capture-6'));
+SELECT pg_temp.record_capture_reading('capture-5','capture-6',pg_temp.vin('1FTRX18L?XKA00377'));
 SET ROLE authenticated;
 SELECT public.device_create_vehicle_profile(:'modern_capture_request'::jsonb) AS r \gset modern_capture_
 RESET ROLE;
