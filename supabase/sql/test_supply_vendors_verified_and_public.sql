@@ -1,4 +1,4 @@
--- Disposable PG17 only. Proves 20261020060000_supply_vendors_verified_and_public.sql (on 20261020050000 and the
+-- Disposable PG17 only. Proves 20261020070000_supply_vendors_verified_and_public.sql (on 20261020050000 and the
 -- owner_delegated_signs register): the organizations created from receipts become public through an owner-delegated,
 -- audited, registered writer that only flips private -> public; vendors get a domain only from a recorded verifying fetch,
 -- are created through create_organization_batch with the verified source, and their records join the supply projection;
@@ -28,7 +28,7 @@ CREATE TABLE public.organization_inventory_sync_queue(organization_id uuid, run_
   created_at timestamptz, updated_at timestamptz, UNIQUE (organization_id, run_mode));
 SELECT array_agg(id ORDER BY id) AS s2 FROM organizations WHERE discovered_via = 'declared-source:nuke-retained-receipts' \gset
 
-\ir ../migrations/20261020060000_supply_vendors_verified_and_public.sql
+\ir ../migrations/20261020070000_supply_vendors_verified_and_public.sql
 
 SELECT t_assert(NOT has_function_privilege('authenticated', 'public.set_organizations_public_owner_delegated(uuid[],text,text,text)', 'EXECUTE')
   AND has_function_privilege('service_role', 'public.set_organizations_public_owner_delegated(uuid[],text,text,text)', 'EXECUTE')
