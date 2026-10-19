@@ -12,7 +12,7 @@ export function useInviterJobs(signedIn: boolean): Set<string> {
     let cancelled = false;
     void JobReaders.myWorkOrders(null).then(r => {
       if (cancelled || !r.data) return;
-      setJobs(new Set(r.data.rows.filter(w => (w.slots ?? []).some(s => s === 'customer' || s === 'vehicle_access')).map(w => w.work_order_id)));
+      setJobs(new Set((r.data.rows ?? []).filter(w => (w.slots ?? []).some(s => s === 'customer' || s === 'vehicle_access')).map(w => w.work_order_id)));
     });
     return () => { cancelled = true; };
   }, [signedIn]);

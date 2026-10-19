@@ -23,8 +23,8 @@ export default function JobSuppliers({ workOrderId }: { workOrderId: string }) {
         const r = await JobReaders.openRequirements(after);
         if (!r.data) break;
         if (i === 0) setAsOf(r.data.as_of);
-        found.push(...r.data.rows.filter(x => x.work_order_id === workOrderId && (x.plan_b_suppliers ?? []).length > 0));
-        after = r.data.next_after;
+        found.push(...(r.data.rows ?? []).filter(x => x.work_order_id === workOrderId && (x.plan_b_suppliers ?? []).length > 0));
+        after = r.data.next_after ?? null;
         if (!after) break;
       }
       if (!cancelled) setRows(found);
