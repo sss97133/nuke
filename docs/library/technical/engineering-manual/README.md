@@ -105,3 +105,5 @@ These principles govern every subsystem. They are not suggestions. Violations of
 ### Truck market partition validation (2026-10-18)
 
 Use the installed frontend Vitest binary for `truckFacets`, `HomePage`, its existing image/URL/phone contracts, and `FamilySalesChart`. `supabase/sql/test_truck_market_membership.sql` runs only in a disposable `truck_contract` / `dm_refinement_*` database and is discovered by the existing CI contract runner. Its synthetic views test idempotence, conversion, conflict, withdrawal, parent privacy and keyset boundaries without testimony writes. Publish the one reader migration through the normal PR/CI path; verify anonymous membership and the deployed UI separately.
+
+Truck membership RPC uses a bound per-call plan (20261019011500): SQL-function generic plans underestimate Chevrolet model scope and time out despite a fast literal assay. Verify the deployed RPC anonymously, not only its extracted SELECT. Membership and public gates are unchanged.

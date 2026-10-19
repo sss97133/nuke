@@ -40,6 +40,8 @@ CREATE FUNCTION public.observation_is_public(text,jsonb) RETURNS boolean LANGUAG
 CREATE FUNCTION public.classify_drivetrain(text) RETURNS text LANGUAGE sql IMMUTABLE AS $$ SELECT CASE lower($1) WHEN '4wd' THEN '4WD' WHEN '2wd' THEN 'RWD' END $$;
 \ir ../migrations/20261018223739_truck_market_membership.sql
 \ir ../migrations/20261018223739_truck_market_membership.sql
+\ir ../migrations/20261019011500_truck_membership_bound_plan.sql
+\ir ../migrations/20261019011500_truck_membership_bound_plan.sql
 SELECT pg_temp.ok('complete all-time membership excludes El Camino and preserves raw identity',
  (SELECT (j->>'n')::int=2 AND jsonb_array_length(j->'rows')=2 AND NOT (j->>'truncated')::boolean
  AND j->'rows'->0->>1='3100 Custom Pickup' FROM (SELECT public.treemap_family_models('Chevrolet','truck',true) j) s));
