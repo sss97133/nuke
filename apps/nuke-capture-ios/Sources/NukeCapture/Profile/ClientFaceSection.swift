@@ -25,8 +25,13 @@ struct ClientFaceSection: View {
             } footer: {
                 Text("Describe the work; technicians near you can offer. Nothing is booked or paid until you accept.")
             }
-            .task { if !loaded { garage = await SupabaseService.fetchGarage(); loaded = true } }
+            .task { if !loaded { garage = Self.postable(await SupabaseService.fetchGarage()); loaded = true } }
         }
+    }
+
+    /// Only vehicles the garage reader states as owned; a contribution or past car takes no job post.
+    static func postable(_ garage: [SupabaseService.RelinkTarget]) -> [SupabaseService.RelinkTarget] {
+        garage.filter { $0.relationship == "owner" }
     }
 
     static func title(_ v: SupabaseService.RelinkTarget) -> String {
