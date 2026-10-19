@@ -1,9 +1,10 @@
 -- Disposable PG17 only. Proves 20261020102000_open_requirements_claimed_providers.sql as the job-loop replay applies it
 -- (chained on the verified-claimant offers contract: X is AutoZone's verified claimant by domain e-mail, Y is No Website
 -- Garage's by document): open_requirements_read and work_order_provider_matches_read count a verified claimant as a
--- provider for its organization: skill from the organization's recorded service work or declared capabilities, tools
--- from its supply records, facility from its declared assets, evidence rung 'verified_claimant'; people without a
--- claim are unchanged and unclaimed organizations stay Not on Nuke yet, not offer-capable.
+-- provider for its organization: facility from its declared assets and evidence rung 'verified_claimant'; the
+-- organization's paid-for service work and supply records are corroboration / supplier evidence, never a skill or
+-- performer-tools pass (20261020155000, lead decision K3); people without a claim are unchanged and unclaimed
+-- organizations stay Not on Nuke yet, not offer-capable.
 \set ON_ERROR_STOP on
 \ir test_verified_claimant_offers.sql
 
@@ -53,11 +54,12 @@ SELECT vc_as('10000000-0000-0000-0000-0000000000a9');
 SELECT vc_match('ab200000-0000-0000-0000-000000000004', 'evidence_rung') AS z_rung \gset
 SELECT vc_match('ab200000-0000-0000-0000-000000000004', 'skill') AS z_skill \gset
 RESET ROLE;
-SELECT t_assert((:'x_skill'::jsonb) @> '{"result":"pass","basis":"verified_claimant","organization_evidence":[{"organization":{"name":"AutoZone"},"kind":"upholstery_service","records":1}]}'
+SELECT t_assert((:'x_skill'::jsonb)->>'result' <> 'pass'
+  AND (:'x_skill'::jsonb)->'organization_corroboration' @> '[{"organization":{"name":"AutoZone"},"kind":"upholstery_service","records":1,"label":"paid for this kind of work 1 time","strength":"corroborating"}]'
   AND (:'x_rung'::jsonb) @> '{"result":"pass","rung":"verified_claimant","reason":"verified business claim (domain_email)"}',
-  'open_requirements_read: AutoZone''s claimant passes skill on its recorded upholstery work and the evidence rung');
-SELECT t_assert((:'x_tools'::jsonb) @> '{"result":"pass","basis":"verified_claimant","organization_evidence":[{"kind":"paint_materials"}]}',
-  'tools pass on the organization''s supply records for the kind the requirement names');
+  'open_requirements_read: AutoZone''s recorded upholstery work is corroboration, not a skill pass; the evidence rung passes');
+SELECT t_assert((:'x_tools'::jsonb) @> '{"result":"unknown","role":"performer","basis":"organization_supplies_this_kind","supplier_evidence":[{"kind":"paint_materials","label":"can supply this"}]}',
+  'supply records for the kind the requirement names are supplier evidence; performer tools stay unknown');
 SELECT t_assert((:'x_fac'::jsonb)->>'result' = 'pass', 'facility passes on the claimed organization''s declared lift: ' || (:'x_fac'::jsonb)::text);
 SELECT t_assert((:'y_rung'::jsonb) @> '{"result":"pass","reason":"verified business claim (document)"}'
   AND (:'y_skill'::jsonb)->>'result' <> 'pass', 'a document claimant passes the rung; no recorded work, no skill pass');
@@ -72,10 +74,11 @@ SELECT t_assert(EXISTS (SELECT 1 FROM jsonb_array_elements((:'pm'::jsonb)->'prov
     WHERE p->'listed_because' ? 'verified_claimant'
       AND p->'offers_as' @> '[{"kind":"organization","name":"AutoZone","on_nuke":"Claimed on Nuke"}]'
       AND EXISTS (SELECT 1 FROM jsonb_array_elements(p->'requirements') q, jsonb_array_elements(q->'inputs') i
-        WHERE q->>'requirement_id' = 'ab200000-0000-0000-0000-000000000004' AND i @> '{"input":"skill","result":"pass","basis":"verified_claimant"}'))
+        WHERE q->>'requirement_id' = 'ab200000-0000-0000-0000-000000000004' AND i->>'input' = 'skill' AND i->>'result' <> 'pass'
+          AND i->'organization_corroboration' @> '[{"kind":"upholstery_service"}]'))
   AND (:'pm'::jsonb)#>>'{coverage,population}' ~ 'verified business claim'
   AND position('parts@autozone.com' IN :'pm') = 0,
-  'work_order_provider_matches_read lists the claimant offering as AutoZone (Claimed on Nuke) with the skill pass; no address');
+  'work_order_provider_matches_read lists the claimant offering as AutoZone (Claimed on Nuke), upholstery work as corroboration only; no address');
 SELECT t_assert(NOT has_function_privilege('authenticated', 'verified_claimant_match_inputs(uuid,jsonb,jsonb)', 'EXECUTE')
   AND NOT has_function_privilege('anon', 'verified_claimant_match_inputs(uuid,jsonb,jsonb)', 'EXECUTE'), 'the helper stays internal');
 
