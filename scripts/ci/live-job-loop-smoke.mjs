@@ -9,7 +9,8 @@
  * query proves zero net rows: job-loop table counts unchanged and no synthetic id (prefix 5e0e5e0e) left anywhere.
  * A second scenario exercises the ownership review path (user submission, service approve_ownership_verification, audit
  * row, owner grant). Read-only checks on real data: scoreboard shape, the owner's provider profile, anon latency through
- * PostgREST (one cold call, then the median of five warm calls; 2 s, the owner's photo-heavy profile 3 s).
+ * PostgREST (one cold call, then the median of five warm calls; 2 s, the owner's photo-heavy profile 3 s), and server-side
+ * reader budgets inside rolled-back transactions as anon and as the owner (warm median of five < 500 ms, first call < 3 s).
  *
  *   SUPABASE_ACCESS_TOKEN=... VITE_SUPABASE_ANON_KEY=... node scripts/ci/live-job-loop-smoke.mjs [--json out.json]
  *   locally: (cd ~/nuke && dotenvx run -q -- node <worktree>/scripts/ci/live-job-loop-smoke.mjs)
@@ -25,6 +26,23 @@ const OWNER = '0b9f107a-d124-49de-9ded-94698f63c1c4';
 const OWNER_ACTOR = 'a0000001-0000-0000-0000-000000000001';
 const LATENCY_BUDGET_S = 2;
 const OWNER_PROFILE_BUDGET_S = 3;
+// Server-side reader budgets (in the database, no network): warm median of five < 500 ms, first call in the session < 3 s,
+// as anon and as the owner (rolled-back JWT simulation). The K2500 job is the biggest published job (34 requirements).
+const SERVER_WARM_BUDGET_MS = 500;
+const SERVER_COLD_BUDGET_MS = 3000;
+const K2500_JOB = '3df0f925-1b79-49b4-9181-fd0f4c6e14ad';
+const K2500_VEHICLE = 'a90c008a-3379-41d8-9eb2-b4eda365d74c';
+const SERVER_READERS = [
+  ['open_requirements_read', 'public.open_requirements_read(NULL, 25, NULL)', [null, OWNER]],
+  ['work_order_provider_matches_read (K2500)', `public.work_order_provider_matches_read('${K2500_JOB}')`, [OWNER]],
+  ['provider_profile_read (owner)', `public.provider_profile_read('${OWNER}', NULL)`, [null, OWNER]],
+  ['work_order_job_path_read (K2500)', `public.work_order_job_path_read('${K2500_JOB}')`, [null, OWNER]],
+  ['work_order_operations_read (K2500)', `public.work_order_operations_read('${K2500_JOB}')`, [null, OWNER]],
+  ['work_order_quotes_read (K2500)', `public.work_order_quotes_read('${K2500_JOB}')`, [null, OWNER]],
+  ['work_order_offers_read (K2500)', `public.work_order_offers_read('${K2500_JOB}')`, [null, OWNER]],
+  ['my_signature_queue (owner)', 'public.my_signature_queue()', [OWNER]],
+  ['vehicle_work_orders_read (K2500 vehicle)', `public.vehicle_work_orders_read('${K2500_VEHICLE}')`, [null, OWNER]],
+];
 const token = process.env.SUPABASE_ACCESS_TOKEN;
 const anonKey = process.env.VITE_SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY;
 if (!token) { console.error('live-job-loop-smoke: SUPABASE_ACCESS_TOKEN is not set'); process.exit(2); }
@@ -264,6 +282,34 @@ async function anonCall(name, body) {
   return { status, cold_s: Number(times[0].toFixed(3)), warm_s: Number(warm[2].toFixed(3)), warm_samples_s: times.slice(1).map((t) => Number(t.toFixed(3))), text };
 }
 
+async function serverLatencyChecks() {
+  const out = [];
+  for (const [label, expr, viewers] of SERVER_READERS) {
+    for (const sub of viewers) {
+      const who = sub ? 'owner' : 'anon';
+      try {
+        const rows = await q(rolledBack([
+          'CREATE TEMP TABLE smoke_lat(cold_ms numeric, warm_ms numeric[])',
+          'GRANT ALL ON smoke_lat TO PUBLIC',
+          as(sub),
+          `DO $b$ DECLARE t0 timestamptz; c numeric; w numeric[] := '{}'; r jsonb; i int; BEGIN
+             t0 := clock_timestamp(); r := ${expr}; c := extract(epoch FROM clock_timestamp() - t0) * 1000;
+             FOR i IN 1..5 LOOP t0 := clock_timestamp(); r := ${expr}; w := w || round(extract(epoch FROM clock_timestamp() - t0) * 1000, 1); END LOOP;
+             INSERT INTO smoke_lat VALUES (round(c, 1), w); END $b$`,
+          'SELECT cold_ms, warm_ms, (SELECT percentile_cont(0.5) WITHIN GROUP (ORDER BY x) FROM unnest(warm_ms) x) AS warm_median_ms FROM smoke_lat',
+        ]));
+        const r = rows[0] || {};
+        const warm = Number(r.warm_median_ms), cold = Number(r.cold_ms);
+        out.push({ step: `server ${who} ${label}: warm median < ${SERVER_WARM_BUDGET_MS} ms, first call < ${SERVER_COLD_BUDGET_MS} ms`,
+          ok: warm < SERVER_WARM_BUDGET_MS && cold < SERVER_COLD_BUDGET_MS, detail: { cold_ms: cold, warm_median_ms: warm, warm_samples_ms: r.warm_ms } });
+      } catch (e) {
+        out.push({ step: `server ${who} ${label}`, ok: false, detail: { error: String(e.message).slice(0, 300) } });
+      }
+    }
+  }
+  return out;
+}
+
 async function readOnlyChecks() {
   const out = [];
   const [{ sb }] = await q('SELECT work_order_job_path_scoreboard() AS sb');
@@ -312,6 +358,7 @@ for (const build of [jobLoopScenario, ownershipReviewScenario]) {
   }
 }
 try { report.read_only = await readOnlyChecks(); } catch (e) { report.read_only = [{ step: 'read-only checks', ok: false, detail: { error: String(e.message).slice(0, 400) } }]; }
+try { report.read_only.push(...await serverLatencyChecks()); } catch (e) { report.read_only.push({ step: 'server latency checks', ok: false, detail: { error: String(e.message).slice(0, 400) } }); }
 failed += report.read_only.filter((c) => !c.ok).length;
 const after = await tableCounts();
 const residueAfter = await residue(startedAt);

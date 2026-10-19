@@ -336,11 +336,23 @@ async function openJobIds(): Promise<{ ids: string[]; asOf: string | null } | nu
   return { ids, asOf };
 }
 
+/** Public organizations in pages of 1,000 (PostgREST returns at most that many rows per request); null if the first page fails. */
+async function publicOrganizations(): Promise<Record<string, unknown>[] | null> {
+  const out: Record<string, unknown>[] = [];
+  for (let offset = 0; offset < 20000; offset += 1000) {
+    const rows = await anonRows(`organizations?is_public=eq.true&select=id,updated_at&order=id.asc&limit=1000&offset=${offset}`, 6000);
+    if (!rows) return offset === 0 ? null : out;
+    out.push(...rows);
+    if (rows.length < 1000) break;
+  }
+  return out;
+}
+
 async function workSitemap(): Promise<Response> {
   const [jobs, providers, orgs] = await Promise.all([
     openJobIds(),
     anonRpc('discovery_providers_read', { p_limit: 5000 }),
-    anonRows('organizations?is_public=eq.true&select=id,updated_at&order=updated_at.desc.nullslast&limit=10000', 8000),
+    publicOrganizations(),
   ]);
   const status = `jobs=${jobs ? 'ok' : 'unread'};providers=${providers ? 'ok' : 'unread'};organizations=${orgs ? 'ok' : 'unread'}`;
   const urls = workSitemapUrls(jobs?.ids ?? [], providers, (orgs ?? []).filter(o => typeof o.id === 'string' && UUID_RE.test(o.id as string)), jobs?.asOf ?? null);
@@ -363,7 +375,10 @@ async function workPage(pathname: string, requestUrl: string): Promise<Response 
     const vid = typeof jp.vehicle_id === 'string' && UUID_RE.test(jp.vehicle_id) ? jp.vehicle_id : null;
     const veh = vid ? await anonRows(`vehicles?id=eq.${vid}&is_public=eq.true&select=primary_image_url`, 2500) : null;
     const img = veh?.[0]?.primary_image_url;
-    page = jobFace(id, jp, res, typeof img === 'string' && /^https:\/\//.test(img) ? img : null);
+    // The preview image is used only when the image row policies show that photo to anyone (not held, not sensitive).
+    const shown = typeof img === 'string' && /^https:\/\//.test(img)
+      ? await anonRows(`vehicle_images?vehicle_id=eq.${vid}&image_url=eq.${encodeURIComponent(img)}&select=id&limit=1`, 2500) : null;
+    page = jobFace(id, jp, res, shown && shown.length > 0 ? img as string : null);
   } else if (/^\/providers\/[^/]+$/.test(path) && !path.startsWith('/providers/actor')) {
     const handle = decodeURIComponent(path.slice('/providers/'.length));
     if (!HANDLE_RE.test(handle)) return null;

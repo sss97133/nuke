@@ -384,6 +384,8 @@ GRANT SELECT ON public.organization_ownership_verifications TO service_role;
 \ir ../migrations/20261020091000_organization_claims_on_nuke.sql
 \echo REPLAY 20261020093000_discovery_providers_read.sql
 \ir ../migrations/20261020093000_discovery_providers_read.sql
+\echo REPLAY 20261020100000_job_loop_read_speedups.sql
+\ir ../migrations/20261020100000_job_loop_read_speedups.sql
 \echo REPLAY 20261020101000_verified_claimant_offers.sql
 \ir ../migrations/20261020101000_verified_claimant_offers.sql
 -- Plan check and final state.
