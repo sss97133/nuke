@@ -640,3 +640,21 @@ it('keeps single-family forecasts and indices out of the GM Truck umbrella', asy
   expect(fixture.rpc).toHaveBeenCalledWith('treemap_family_sales', { p_brand: 'Chevrolet', p_family_key: 'pickup', p_limit: 15000 });
   expect(fixture.rpc.mock.calls.some(([name]) => name === 'treemap_family_upcoming_supply' || name === 'family_price_index_read')).toBe(false);
 });
+
+it('intersects selected IDs with accepted sale rows and never invents points for other member records', async () => {
+  const accepted = [sale(1, 20, 30000, 'Mecum'), sale(2, 30, 40000, 'Mecum')];
+  fixture.rpc.mockResolvedValue({ data: value(accepted), error: null });
+  await act(async () => root.render(<FamilySalesChart brand="Chevrolet" familyKey="pickup" family="Truck" width={900} height={500} memberIds={new Set([accepted[0].vehicle_id, 'member-without-accepted-sale'])} onOpen={() => {}} />));
+  expect(fixture.rpc).toHaveBeenCalledWith('treemap_family_sales', { p_brand: 'Chevrolet', p_family_key: 'pickup', p_limit: 15000 });
+  expect(container.querySelectorAll('svg.family-sales__plot circle')).toHaveLength(1);
+  await act(async () => root.render(<FamilySalesChart brand="Chevrolet" familyKey="pickup" family="Truck" width={900} height={500} memberIds={new Set()} onOpen={() => {}} />));
+  expect(container.querySelectorAll('svg.family-sales__plot circle')).toHaveLength(0);
+});
+
+it('withholds a selected chart when its source sale window is incomplete', async () => {
+  const accepted = [sale(1, 20, 30000, 'Mecum')];
+  fixture.rpc.mockResolvedValue({ data: value(accepted, 10), error: null });
+  await act(async () => root.render(<FamilySalesChart brand="Chevrolet" familyKey="pickup" family="Truck" width={900} height={500} memberIds={new Set([accepted[0].vehicle_id])} onOpen={() => {}} />));
+  expect(container.textContent).toContain('Complete sales for this selection are unavailable');
+  expect(container.querySelectorAll('svg.family-sales__plot circle')).toHaveLength(0);
+});

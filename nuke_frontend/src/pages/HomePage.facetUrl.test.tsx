@@ -103,7 +103,7 @@ describe('HomePage facet axis & selected facet URL synchronization', () => {
     expect(switchedFamily.get('facet')).toBeNull();
   });
 
-  it('updates URL query params (?axis=...&facet=...) when clicking the 4-way axis tabs and facet pills in TreemapHomePage', async () => {
+  it('preserves legacy facet URL navigation inside a specific series family', async () => {
     rpc.mockImplementation(async (fnName: string) => {
       if (fnName === 'treemap_by_brand') {
         return {
@@ -119,7 +119,7 @@ describe('HomePage facet axis & selected facet URL synchronization', () => {
       }
       if (fnName === 'treemap_brand_families') {
         return {
-          data: [{ family_key: 'Pickup', family: 'Pickup', models: 12, sold: 1580, usd: 72_000_000, sold_any: 1580, offered: 1900, dated: 1400, sold_12m: 310, sold_prior_12m: 275 }],
+          data: [{ family_key: 'C10', family: 'C10', models: 12, sold: 1580, usd: 72_000_000, sold_any: 1580, offered: 1900, dated: 1400, sold_12m: 310, sold_prior_12m: 275 }],
           error: null,
         };
       }
@@ -127,8 +127,8 @@ describe('HomePage facet axis & selected facet URL synchronization', () => {
         return {
           data: [
             { model: 'C10 Silverado', sold: 420, usd: 19_320_000, sold_any: 420, offered: 480, dated: 390, sold_12m: 96, sold_prior_12m: 80 },
-            { model: 'K10 Cheyenne Super', sold: 180, usd: 9_900_000, sold_any: 180, offered: 210, dated: 165, sold_12m: 44, sold_prior_12m: 38 },
-            { model: '3100 5-Window Pickup', sold: 260, usd: 11_700_000, sold_any: 260, offered: 300, dated: 240, sold_12m: 55, sold_prior_12m: 50 },
+            { model: 'C10 Cheyenne Super', sold: 180, usd: 9_900_000, sold_any: 180, offered: 210, dated: 165, sold_12m: 44, sold_prior_12m: 38 },
+            { model: 'C10 Custom Deluxe', sold: 260, usd: 11_700_000, sold_any: 260, offered: 300, dated: 240, sold_12m: 55, sold_prior_12m: 50 },
           ],
           error: null,
         };
@@ -146,7 +146,7 @@ describe('HomePage facet axis & selected facet URL synchronization', () => {
 
     await act(async () => {
       root.render(
-        <MemoryRouter initialEntries={['/?make=Chevrolet&family=Pickup']}>
+        <MemoryRouter initialEntries={['/?make=Chevrolet&family=C10&axis=series']}>
           <UrlProbe onSearch={(s) => { latestSearch = s; }} />
           <TreemapHomePage embedded onBrowse={() => {}} />
         </MemoryRouter>,
@@ -169,7 +169,7 @@ describe('HomePage facet axis & selected facet URL synchronization', () => {
     });
     const paramsAfterAxis = new URLSearchParams(latestSearch);
     expect(paramsAfterAxis.get('make')).toBe('Chevrolet');
-    expect(paramsAfterAxis.get('family')).toBe('Pickup');
+    expect(paramsAfterAxis.get('family')).toBe('C10');
     expect(paramsAfterAxis.get('axis')).toBe('trim');
     expect(paramsAfterAxis.get('facet')).toBeNull();
 
@@ -211,7 +211,7 @@ describe('HomePage facet axis & selected facet URL synchronization', () => {
       rawTab!.click();
     });
     const paramsAfterRaw = new URLSearchParams(latestSearch);
-    expect(paramsAfterRaw.get('axis')).toBe('raw');
+    expect(paramsAfterRaw.get('axis')).toBeNull();
     expect(host.querySelector('[data-testid="facet-axis-raw"]')?.getAttribute('aria-selected')).toBe('true');
     expect(paramsAfterRaw.get('facet')).toBeNull();
 

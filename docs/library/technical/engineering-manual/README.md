@@ -101,3 +101,7 @@ These principles govern every subsystem. They are not suggestions. Violations of
 **4. Pipeline Ownership Principle.** Every computed field in the database has exactly one owning function. Check `pipeline_registry` before writing to any field. Building a duplicate tool creates data forks.
 
 **5. Tool Registry Principle.** Before building anything, read `TOOLS.md`. If a tool already exists for your intent, use it. The registry maps every common operation to its existing edge function.
+
+### Truck market partition validation (2026-10-18)
+
+Use the installed frontend Vitest binary for `truckFacets`, `HomePage`, its existing image/URL/phone contracts, and `FamilySalesChart`. `supabase/sql/test_truck_market_membership.sql` runs only in a disposable `truck_contract` / `dm_refinement_*` database and is discovered by the existing CI contract runner. Its synthetic views test idempotence, conversion, conflict, withdrawal, parent privacy and keyset boundaries without testimony writes. Publish the one reader migration through the normal PR/CI path; verify anonymous membership and the deployed UI separately.
