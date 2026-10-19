@@ -8,17 +8,18 @@
  * /, /market, /journal, /llms.txt — readable text for crawlers and AI readers (the app is drawn by JavaScript, so
  *                        without this they see a title and nothing else). Numbers come from market_sources_read()
  *                        through the anon key, each with its own date; if the read fails the page says so and shows no number.
+ * /login, /work, /work/setup — static text (noindex) so the sign-in path paints before the app's ~300 KB of code.
  * /jobs, /jobs/:id, /providers/:handle, /org/:id, /sitemap-work.xml — titles, descriptions, OG tags and readable text
  *                        for the open job, provider and organization pages, and their sitemap, from anon readers only
  *                        (src/lib/discoveryFace.ts). No customer identity, payments, contact fields or private names.
  */
 import {
-  injectPage, jobFace, jobsBoardFace, organizationFace, providerFace, sitemapXml, workSitemapUrls,
+  injectPage, jobFace, jobsBoardFace, organizationFace, providerFace, sitemapXml, staticFace, workSitemapUrls,
 } from './src/lib/discoveryFace';
 
 export const config = {
   matcher: ['/', '/market', '/journal', '/llms.txt', '/vehicle/:path*', '/api/v1/vehicle/:path*',
-    '/jobs', '/jobs/:path*', '/providers/:path*', '/org/:path*', '/sitemap-work.xml'],
+    '/jobs', '/jobs/:path*', '/providers/:path*', '/org/:path*', '/sitemap-work.xml', '/login', '/work', '/work/setup'],
 };
 
 // ── Vehicle data config ──────────────────────────────────────────────────────
@@ -518,6 +519,14 @@ export default async function middleware(request: Request): Promise<Response | u
     const [html, board] = await Promise.all([getBaseHtml(request.url), face.withBoard ? fetchBoard() : Promise.resolve(null)]);
     return new Response(injectFace(html, face, board), {
       headers: { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': FACE_CACHE, 'x-nuke-board': face.withBoard ? boardStatus : 'not-needed' },
+    });
+  }
+
+  // ── Sign-in and work console: static text painted before the app's code arrives ──
+  const fixed = staticFace(url.pathname);
+  if (fixed) {
+    return new Response(injectPage(await getBaseHtml(request.url), fixed), {
+      headers: { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': FACE_CACHE },
     });
   }
 

@@ -9,5 +9,5 @@ export { default } from './nuke_frontend/middleware';
 
 export const config = {
   matcher: ['/', '/market', '/journal', '/llms.txt', '/vehicle/:path*', '/api/v1/vehicle/:path*',
-    '/jobs', '/jobs/:path*', '/providers/:path*', '/org/:path*', '/sitemap-work.xml'],
+    '/jobs', '/jobs/:path*', '/providers/:path*', '/org/:path*', '/sitemap-work.xml', '/login', '/work', '/work/setup'],
 };

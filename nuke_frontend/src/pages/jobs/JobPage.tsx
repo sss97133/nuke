@@ -19,6 +19,7 @@ import { JobPublication } from './Publication';
 import { completionActions, completionState } from './signDrafts';
 import './job-page.css';
 const BestMatches = React.lazy(() => import('./BestMatches'));
+const JobSuppliers = React.lazy(() => import('./JobSuppliers'));
 
 const READERS = {
   operations: { rpc: 'work_order_operations_read', title: 'Operations' },
@@ -167,8 +168,8 @@ function OffersSection({ d, onSigned }: { d: JsonObject; onSigned: () => void })
           const cosigns = arr(o.co_signs).map(obj).filter((x): x is JsonObject => !!x);
           return <div key={str(o.offer_id) ?? oi} className="job-offer">
             <Rows title="Offer">
-              <Row label="From"><Person p={who} /></Row>
-              <Row label="Technician profile">{offerRung(str(o.offer_rung))}</Row>
+              <Row label="From"><Person p={who} />{str(obj(who)?.on_nuke) ? ` · ${str(obj(who)?.on_nuke)}` : ''}</Row>
+              <Row label={o.offer_kind === 'organization' ? 'Offered as' : 'Technician profile'}>{offerRung(str(o.offer_rung))}</Row>
               {terms.map((l, li) => <Row key={li} label={lineLabel(l)} role="measure">{linePrice(l)}</Row>)}
               {window && <Row label="Available">{window}</Row>}
               <Row label="Acceptance">{acc?.state === 'accepted' ? `Accepted by the customer${day(str(acc.accepted_at)) ? ` · ${day(str(acc.accepted_at))}` : ''}` : acc?.state === 'withheld' ? 'Acceptance on hold' : 'Not accepted yet'}</Row>
@@ -189,6 +190,7 @@ function offerRung(r: string | null): string {
     case 'co_sign': return 'Vouched for by someone they worked with';
     case 'authenticated_sign': return 'Signed';
     case 'organization_owner': return 'Shop owner';
+    case 'verified_claimant': return 'The business, by someone verified to run it';
     case null: case 'self_claim': case 'unknown': return 'Linked by them — not yet backed by work';
     default: return sentence(r);
   }
@@ -461,6 +463,7 @@ export default function JobPage() {
     {r('resources') && <ResourcesSection d={r('resources')!} />}
     {r('offers') && <OffersSection d={r('offers')!} onSigned={reload} />}
     {viewer && (viewer.slots.includes('customer') || viewer.slots.includes('org_owner')) && <React.Suspense fallback={null}><BestMatches workOrderId={workOrderId} /></React.Suspense>}
+    {viewer && (viewer.slots.includes('customer') || viewer.slots.includes('vehicle_access')) && <React.Suspense fallback={null}><JobSuppliers workOrderId={workOrderId} /></React.Suspense>}
     {r('quotes') && <QuoteSection d={r('quotes')!} onSigned={reload} />}
     {r('bookings') && <BookingsSection d={r('bookings')!} onSigned={reload} />}
     {r('inspection') && <InspectionSection d={r('inspection')!} onSigned={reload} />}
