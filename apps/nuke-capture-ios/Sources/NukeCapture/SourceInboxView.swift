@@ -6,22 +6,121 @@ enum SourceInboxReader {
         let limit = 24
         let cursor: String?
         let image_id: String?
+        let private_vehicle_id: String?
     }
     private struct Request: Encodable {
         let mode = "read_subjects"
         let user_id: String
         let source_inbox: Scope
     }
-    static func read(userId: String, cursor: String? = nil, imageId: UUID? = nil) async throws -> SourceInboxRead {
+    static func read(userId: String, cursor: String? = nil, imageId: UUID? = nil, privateVehicleId: UUID? = nil) async throws -> SourceInboxRead {
         guard let owner = ObservedCarRead.ownAccount(userId, activeUserId: SupabaseService.currentUserId),
               cursor.map({ !$0.isEmpty && $0.count <= 512 }) ?? true else { throw CocoaError(.userCancelled) }
         let result: SourceInboxRead = try await SupabaseService.client.functions.invoke("check-image-vehicle-match",
             options: FunctionInvokeOptions(body: Request(user_id: owner,
-                source_inbox: Scope(cursor: cursor, image_id: imageId?.uuidString.lowercased()))))
+                source_inbox: Scope(cursor: cursor, image_id: imageId?.uuidString.lowercased(),
+                    private_vehicle_id: privateVehicleId?.uuidString.lowercased()))))
         guard ObservedCarRead.ownAccount(userId, activeUserId: SupabaseService.currentUserId) == owner,
               result.isQualified, result.next_cursor == nil || result.next_cursor != cursor,
-              imageId == nil || result.photos.allSatisfy({ $0.id == imageId }) else { throw CocoaError(.coderInvalidValue) }
+              imageId == nil || result.photos.allSatisfy({ $0.id == imageId }),
+              privateVehicleId == nil || result.private_vehicle_id == privateVehicleId && result.photos.allSatisfy({
+                $0.source_state != "ready" || $0.attached_vehicle_id_context == privateVehicleId }) else { throw CocoaError(.coderInvalidValue) }
         return result
+    }
+}
+
+/// The same qualified own-source reader, scoped to a vehicle. This never changes
+/// the public gallery gate or mixes its count with the private page population.
+struct VehiclePrivatePhotosSection: View {
+    let vehicleId: String
+    @EnvironmentObject private var session: SessionStore
+    @State private var photos: [SourceInboxRead.Photo] = []
+    @State private var nextCursor: String?
+    @State private var loading = false
+    @State private var failure: String?
+    @State private var generation = UUID()
+    @State private var selection: Start?
+    @State private var loadedScope: String?
+    @State private var refreshPending = false
+    private var scopeKey: String { "\(owner ?? "signed-out")|\(vehicleId.lowercased())" }
+    private struct Start: Identifiable { let id: UUID }
+    private var owner: String? { session.isSignedIn ? SupabaseService.currentUserId : nil }
+    private var ready: [SourceInboxRead.Photo] {
+        photos.filter { $0.source_state == "ready" && $0.image_url != nil }.sorted {
+            ($0.taken_at ?? $0.created_at ?? "") < ($1.taken_at ?? $1.created_at ?? "")
+        }
+    }
+    private var gallery: [VehicleGalleryImage] {
+        ready.map { photo in
+            VehicleGalleryImage(id: photo.id, image_url: photo.image_url, thumbnail_url: nil, is_primary: nil,
+                taken_at: photo.taken_at, labels: nil, ai_processing_status: nil, image_category: nil,
+                created_at: photo.created_at, vision_gate_agent_reasoning: nil)
+        }
+    }
+    var body: some View {
+        Group {
+            if owner != nil, loadedScope == scopeKey, !ready.isEmpty || nextCursor != nil || failure != nil {
+                VStack(alignment: .leading, spacing: 8) {
+                    HStack {
+                        Label("Your private photos", systemImage: "lock")
+                        Spacer()
+                        Text("\(ready.count) shown").foregroundStyle(.secondary)
+                    }.font(.caption).padding(.horizontal, 16)
+                    LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 2), count: 3), spacing: 2) {
+                        ForEach(ready) { photo in
+                            Button { selection = Start(id: photo.id) } label: {
+                                Color(.secondarySystemFill).aspectRatio(1, contentMode: .fit).overlay {
+                                    CachedAsyncImage(url: NukeImage.thumb(photo.image_url, width: 360)) {
+                                        $0.resizable().scaledToFill()
+                                    } placeholder: { ProgressView() }
+                                }.clipped()
+                            }.buttonStyle(.plain)
+                        }
+                    }
+                    if let failure {
+                        Text(failure).font(.caption).foregroundStyle(.secondary).padding(.horizontal, 16)
+                        if !loading { Button("Retry") { Task { await load(cursor: nextCursor) } }.padding(.horizontal, 16) }
+                    }
+                    if loading { ProgressView().padding(.horizontal, 16) }
+                    else if let cursor = nextCursor {
+                        Button("More private photos") { Task { await load(cursor: cursor) } }.padding(.horizontal, 16)
+                    }
+                }
+            }
+        }
+        .task(id: scopeKey) {
+            loadedScope = scopeKey; photos = []; nextCursor = nil; selection = nil
+            await load()
+        }
+        .onChange(of: scopeKey) { _, _ in selection = nil; refreshPending = false }
+        .onReceive(NotificationCenter.default.publisher(for: SubjectResolutionEngine.didChange)) { _ in
+            if selection != nil { refreshPending = true }
+            else { photos = []; nextCursor = nil; Task { await load() } }
+        }
+        .onChange(of: selection?.id) { _, selected in
+            if selected == nil, refreshPending {
+                refreshPending = false; photos = []; nextCursor = nil
+                Task { await load() }
+            }
+        }
+        .fullScreenCover(item: $selection) { start in
+            FullScreenGalleryView(photos: gallery, startIndex: gallery.firstIndex { $0.id == start.id } ?? 0)
+        }
+    }
+    @MainActor private func load(cursor: String? = nil) async {
+        guard let user = owner, let vehicle = UUID(uuidString: vehicleId) else { return }
+        let request = UUID(), requestedScope = scopeKey; generation = request; loading = true; failure = nil
+        defer { if generation == request { loading = false } }
+        do {
+            let read = try await SourceInboxReader.read(userId: user, cursor: cursor, privateVehicleId: vehicle)
+            guard generation == request, owner == user, loadedScope == requestedScope else { return }
+            let existing = Set(photos.map(\.id))
+            guard read.photos.allSatisfy({ !existing.contains($0.id) }) else { throw CocoaError(.coderInvalidValue) }
+            photos.append(contentsOf: read.photos); nextCursor = read.next_cursor
+        } catch {
+            guard generation == request, owner == user else { return }
+            failure = "Couldn't load your private photos. \(ReadFailure.text(error))"
+        }
     }
 }
 

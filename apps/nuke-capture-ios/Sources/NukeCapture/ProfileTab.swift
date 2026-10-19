@@ -285,11 +285,12 @@ struct ProfileView: View {
     @State private var showAlbums = false
     @ObservedObject private var libraryIngest = LibraryIngest.shared
 
-    // CURRENT stewardship headlines the garage; previously-owned / contributed-to
-    // (departed — e.g. shipped-out trucks) are demoted to a collapsed section, not
-    // mixed into "what I'm building now". Reads the relationship the RPC already returns.
+    // Stewardship and contribution are separate current relationships. A newly
+    // photographed vehicle remains visible without implying that the photographer owns it.
+    // Only previous ownership belongs in collapsed history.
     private var currentGarage: [GarageVehicle] { garage.filter { $0.relationship == "owner" } }
-    private var pastGarage: [GarageVehicle] { garage.filter { ["previously_owned", "contributor"].contains($0.relationship) } }
+    private var contributedGarage: [GarageVehicle] { garage.filter { $0.relationship == "contributor" } }
+    private var pastGarage: [GarageVehicle] { garage.filter { $0.relationship == "previously_owned" } }
     private var otherRelationships: [String] {
         Array(Set(garage.map(\.relationship))).filter { !["owner", "previously_owned", "contributor"].contains($0) }.sorted()
     }
@@ -426,6 +427,9 @@ struct ProfileView: View {
         .task(id: userId) { await load() }
         .task(id: userId) { await loadSync() }   // owner-only inside loadSync
         .task(id: userId) { await loadGarage() }
+        .onReceive(NotificationCenter.default.publisher(for: SubjectResolutionEngine.didChange)) { _ in
+            Task { await loadGarage() }
+        }
         .task(id: userId) { await loadLatest() }
         .task(id: userId) { await loadProducer() }
         .task(id: userId) {
@@ -729,15 +733,19 @@ struct ProfileView: View {
                 ForEach(rows) { v in garageRow(v) }
             }
         }
-        // Past & contributions — departed/peripheral, collapsed by default so the
-        // headline garage is what you're stewarding NOW.
+        if !contributedGarage.isEmpty {
+            Section("Your contributions · \(contributedGarage.count)") {
+                ForEach(contributedGarage) { v in garageRow(v) }
+            }
+        }
+        // Former ownership remains available as history.
         if !pastGarage.isEmpty {
             Section {
                 if showPast { ForEach(pastGarage) { v in garageRow(v) } }
             } header: {
                 Button { withAnimation(.snappy(duration: 0.2)) { showPast.toggle() } } label: {
                     HStack {
-                        Text("History & other relationships · \(pastGarage.count)")
+                        Text("History · \(pastGarage.count)")
                         Spacer()
                         Image(systemName: showPast ? "chevron.up" : "chevron.down")
                             .font(.caption2)

@@ -212,6 +212,7 @@ class FixtureQuery {
   select(_columns: string) { return this; }
   eq(field: string, value: any) { this.filters.push(["eq", field, value]); return this; }
   is(field: string, value: any) { this.filters.push(["is", field, value]); return this; }
+  not(field: string, operator: string, value: any) { this.filters.push([`not_${operator}`, field, value]); return this; }
   lt(field: string, value: any) { this.filters.push(["lt", field, value]); return this; }
   in(field: string, value: any) { this.filters.push(["in", field, value]); return this; }
   or(expression: string) { this.filters.push(["or", "", expression]); return this; }
@@ -228,7 +229,7 @@ class FixtureQuery {
         return row.created_at === null || clock(row.created_at)! < clock(match[1])! ||
           clock(row.created_at) === clock(match[1]) && row.id < match[2];
       }
-      return op === "in" ? expected.includes(got) : op === "lt" ? got < expected : got === expected;
+      return op === "not_is" ? got !== expected : op === "in" ? expected.includes(got) : op === "lt" ? got < expected : got === expected;
     })).sort((left: any, right: any) => {
       for (const [field, ascending] of this.orders) {
         if (left[field] === right[field]) continue;
@@ -245,6 +246,52 @@ class FixtureQuery {
       error: this.db.fail === this.table ? { message: "private backend detail" } : null }).then(resolve, reject);
   }
 }
+
+function nativePrivacyHead(s: any): any {
+  const native = { method: "device_privacy_v1", purpose: "own_private_visual_subjects", policy_version: 1,
+    owner_user_id: s.user_id, source_sha256: s.file_hash, source_byte_length: 4,
+    observed_at: "2026-10-01T01:00:00Z", classifier_revision: 2, face_revision: 3, os_major: 26,
+    classifier_completed: true, face_completed: true, pixels_eligible: true, clutter: false, personal: false,
+    prominent_face: false, is_vehicle: true, max_core_confidence: 0.8, total_vehicle_confidence: 0.8,
+    face_threshold: 0.045, labels: [{ identifier: "car", confidence: 0.8 }],
+    decode: { contract: "imageio_thumbnail_512_v1", max_pixel: 512, orientation_applied: true,
+      input_sha256: "b".repeat(64), width: 1, height: 1, byte_length: 4 } };
+  return { id: id(5000 + Number(s.id.slice(-4))), image_id: s.id, observed_by: "device_privacy_v1",
+    is_active: true, superseded_by: null, observed_at: readAt,
+    confidence_basis: { device_privacy_v1: { state: "active", envelope: {
+      method: "device_privacy_v1", purpose: "own_private_visual_subjects", user_id: s.user_id,
+      read_at: readAt, subjects: [], native, inputs: [{ image_id: s.id, source_sha256: s.file_hash,
+        input_sha256: s.file_hash, source_qualified: true, source_bytes_qualified: true,
+        representation: "source", source_url: s.image_url, input_url: s.image_url, storage_path: s.storage_path,
+        byte_length: 4, mime_type: "image/heic", captured_at: readAt,
+        created_at: s.created_at, taken_at: s.taken_at }] } } } };
+}
+Deno.test("a vehicle private read shows qualified own pending photos without exposing another user or duplicating the public gallery", async () => {
+  const s = fixture(5, false), vehicle = id(8000), rows = s.sources as any[];
+  for (const row of rows) Object.assign(row, { vehicle_id: vehicle, source: "capture_relay_ios",
+    vision_gate_status: "pending", vehicle_image_gallery_eligible: false, image_vehicle_match_status: null });
+  rows[1].vision_gate_status = "approved"; rows[1].vehicle_image_gallery_eligible = true;
+  rows[2].vehicle_id = id(8001); rows[3].user_id = other; rows[4].image_vehicle_match_status = "mismatch";
+  s.membership_heads = rows.map(nativePrivacyHead);
+  (s as any).audits = rows.map((row, index) => ({ id: id(7000 + index), observation_type: "image",
+    old_observation_id: row.id, new_observation_id: row.id, old_vehicle_id: null, new_vehicle_id: vehicle,
+    actor_user_id: row.user_id, reason: "first_attribution: device capture_session by the photo's owner; evidence_ref=fixture; evidence {}; confidence=0.9; signal=device_capture_session", created_at: readAt }));
+  const db = new FixtureDB(s), result = await readSourceInbox(db, owner, { private_vehicle_id: vehicle });
+  equal(result.private_vehicle_id, vehicle);
+  equal(result.photos.map(photo => photo.id), [id(5), id(1)]);
+  equal(result.photos.find(photo => photo.id === id(1))?.source_state, "ready");
+  equal(result.photos.find(photo => photo.id === id(5))?.image_url, null);
+  equal(result.coverage.displayable, 1); equal(result.coverage.inference_started, false);
+  equal(rows[0].vision_gate_status, "pending");
+  const savedAudits = (s as any).audits; (s as any).audits = [];
+  const unproven = await readSourceInbox(new FixtureDB(s), owner, { private_vehicle_id: vehicle });
+  equal(unproven.coverage.displayable, 0);
+  (s as any).audits = savedAudits;
+  s.membership_heads.push({ id: id(6000), image_id: rows[0].id, observed_by: "device_privacy_v1",
+    is_active: false, superseded_by: null, confidence_basis: { device_privacy_v1: { state: "withdrawn", envelope: { user_id: owner } } } });
+  const withdrawn = await readSourceInbox(new FixtureDB(s), owner, { private_vehicle_id: vehicle });
+  equal(withdrawn.coverage.displayable, 0);
+});
 
 Deno.test("owner source reader pages historical and filed rows without inference or writer capabilities", async () => {
   const state = fixture(3); (state.sources[1] as any).vehicle_id = id(8000);

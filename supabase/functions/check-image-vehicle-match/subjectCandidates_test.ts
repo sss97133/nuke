@@ -9,7 +9,7 @@ const source = (n: number): any => ({ id: id(n), user_id: owner, image_url: `htt
   file_hash: n.toString(16).padStart(64, "0"), created_at: "2025-01-01T00:00:00.000001Z", taken_at: null,
   vision_gate_status: "approved", private_subject_privacy_complete: true, private_subject_privacy: [], is_superseded: false, is_duplicate: false, is_document: false, is_sensitive: false });
 const input = (s: any): SubjectInput => ({ image_id: s.id, source_url: s.image_url, source_sha256: s.file_hash, input_sha256: s.file_hash,
-  representation: "source", source_qualified: true, created_at: s.created_at, taken_at: null });
+  representation: "source", source_qualified: true, created_at: s.created_at, taken_at: s.taken_at });
 const frame = (image_id: string) => ({ image_id, medium: "photograph", primary_subject: "vehicle", view: "exterior", bbox: [0, 0, 1, 1] });
 function raw(sources: any[], read = "2025-02-01T00:00:00Z"): any[] {
   const envelope = { user_id: owner, method: "visual_subjects_v1", provider: "fixture", model: "fixture", read_at: read,
@@ -22,6 +22,19 @@ function state(sources: any[], readings = raw(sources)) {
   return { profiles: [] as any[], raw_readings: readings, membership_heads: [] as any[], sources,
     membership_complete: true, truncated: false, as_of };
 }
+Deno.test("retained exterior context prioritizes the nearby capture over unrelated account references", () => {
+  const [near, far, fresh] = [1, 2, 3].map(source);
+  for (const s of [near, far, fresh]) Object.assign(s, { latitude: 35, longitude: -115, device_fingerprint: "camera" });
+  near.taken_at = "2025-01-01T12:00:00Z"; fresh.taken_at = "2025-01-01T12:02:00Z";
+  far.taken_at = "2025-01-01T09:00:00Z";
+  const s = state([near, far, fresh], raw([near, far]));
+  const result = projectResolutionContext(owner, fresh.id, s);
+  equal(result.image_ids, [near.id]); equal(result.coverage.capture_neighbor_first, true);
+  equal(result.coverage.fresh_batch_size, 2); equal(result.coverage.selected[0].basis, "capture_proximity");
+  s.membership_heads.push({ image_id: near.id, observed_by: "visual_subjects_v1", superseded_by: null,
+    is_active: false, confidence_basis: { visual_subjects_v1: { state: "withdrawn", envelope: { user_id: owner } } } });
+  equal(projectResolutionContext(owner, fresh.id, s).image_ids.includes(near.id), false);
+});
 function addProfile(s: ReturnType<typeof state>, anchor: any, peer: any) {
   s.profiles.push({ id: cluster, anchor_image_id: anchor.id, image_count: 2, images: [{ id: anchor.id }, { id: peer.id }] });
   const envelope = raw([anchor, peer])[0].confidence_basis.visual_subject_reading_v1.envelope;
