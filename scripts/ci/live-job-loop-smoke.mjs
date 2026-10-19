@@ -7,8 +7,9 @@
  * claims), the open readers as anon and as a signed-in stranger, assertions collected into a temp table, then
  * ROLLBACK. The script refuses to send SQL that contains COMMIT or does not end in ROLLBACK. Afterwards a read-only
  * query proves zero net rows: job-loop table counts unchanged and no synthetic id (prefix 5e0e5e0e) left anywhere.
- * Read-only checks on real data: scoreboard shape, the owner's provider profile, anon latency through PostgREST
- * (one cold call, then the median of five warm calls against the budget).
+ * A second scenario exercises the ownership review path (user submission, service approve_ownership_verification, audit
+ * row, owner grant). Read-only checks on real data: scoreboard shape, the owner's provider profile, anon latency through
+ * PostgREST (one cold call, then the median of five warm calls; 2 s, the owner's photo-heavy profile 3 s).
  *
  *   SUPABASE_ACCESS_TOKEN=... VITE_SUPABASE_ANON_KEY=... node scripts/ci/live-job-loop-smoke.mjs [--json out.json]
  *   locally: (cd ~/nuke && dotenvx run -q -- node <worktree>/scripts/ci/live-job-loop-smoke.mjs)
@@ -23,6 +24,7 @@ const REST = `https://${PROJECT}.supabase.co/rest/v1`;
 const OWNER = '0b9f107a-d124-49de-9ded-94698f63c1c4';
 const OWNER_ACTOR = 'a0000001-0000-0000-0000-000000000001';
 const LATENCY_BUDGET_S = 2;
+const OWNER_PROFILE_BUDGET_S = 3;
 const token = process.env.SUPABASE_ACCESS_TOKEN;
 const anonKey = process.env.VITE_SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY;
 if (!token) { console.error('live-job-loop-smoke: SUPABASE_ACCESS_TOKEN is not set'); process.exit(2); }
@@ -193,9 +195,40 @@ function jobLoopScenario() {
   return { name: 'job_loop', sql: rolledBack(statements), synthetic: { C, M, S, V, X } };
 }
 
+// The ownership review path: a signed-in user files a pending title verification for their own vehicle (the
+// recompute trigger must not refuse them), the service-only approve_ownership_verification approves it with a
+// reviewer, one audit row is appended, the owner permission is granted and vehicle_verified_owner turns true.
+function ownershipReviewScenario() {
+  const U = synth(), R = synth(), V = synth();
+  const user = (id, tag) => `(${lit(id)}, '00000000-0000-0000-0000-000000000000', 'authenticated', 'authenticated', ${lit(`smoke-${id.slice(9, 13)}-${tag}@smoke.invalid`)}, now(), now())`;
+  const ov = `(SELECT id FROM ownership_verifications WHERE user_id = ${lit(U)} AND vehicle_id = ${lit(V)})`;
+  const statements = [
+    "SET LOCAL statement_timeout = '10s'",
+    'CREATE TEMP TABLE smoke_ctx(k text PRIMARY KEY, v jsonb)',
+    'CREATE TEMP TABLE smoke_log(n serial, step text, ok boolean, detail jsonb)',
+    'GRANT ALL ON smoke_ctx, smoke_log TO PUBLIC',
+    'GRANT USAGE ON SEQUENCE smoke_log_n_seq TO PUBLIC',
+    `INSERT INTO auth.users(id, instance_id, aud, role, email, created_at, updated_at) VALUES ${user(U, 'owner')}, ${user(R, 'reviewer')}`,
+    `INSERT INTO vehicles(id, year, make, model, owner_id, uploaded_by, is_public) VALUES (${lit(V)}, 1977, 'Chevrolet', 'Blazer', ${lit(U)}, ${lit(U)}, true)`,
+    as(U),
+    `INSERT INTO ownership_verifications(user_id, vehicle_id, title_document_url, drivers_license_url, status) VALUES (${lit(U)}, ${lit(V)}, 'https://example.invalid/smoke-title.jpg', 'pending', 'pending')`,
+    refused('approve_ownership_verification: a signed-in user cannot approve', `approve_ownership_verification(${ov}, ${lit(U)}, 'self')`),
+    'RESET ROLE',
+    check('submission: the user\'s own pending verification lands', `EXISTS (SELECT 1 FROM ownership_verifications WHERE id = ${ov} AND status = 'pending')`),
+    asService,
+    put('ap', `to_jsonb(approve_ownership_verification(${ov}, ${lit(R)}, 'smoke review'))`),
+    'RESET ROLE',
+    check('approve_ownership_verification: approved with reviewer, notes and clocks', `${ctx('ap')} = 'true'::jsonb AND EXISTS (SELECT 1 FROM ownership_verifications WHERE id = ${ov} AND status = 'approved' AND human_reviewer_id = ${lit(R)} AND human_review_notes = 'smoke review' AND approved_at IS NOT NULL AND human_reviewed_at IS NOT NULL)`),
+    check('approve_ownership_verification: one audit row', `(SELECT count(*) FROM verification_audit_log WHERE verification_id = ${ov} AND action = 'approved' AND actor_id = ${lit(R)}) = 1`),
+    check('approval grants the owner permission and verified ownership', `public.vehicle_verified_owner(${lit(U)}, ${lit(V)}) AND EXISTS (SELECT 1 FROM vehicle_user_permissions WHERE vehicle_id = ${lit(V)} AND user_id = ${lit(U)} AND role = 'owner' AND is_active)`),
+    'SELECT jsonb_agg(jsonb_build_object(\'step\', step, \'ok\', ok, \'detail\', detail) ORDER BY n) AS log FROM smoke_log',
+  ];
+  return { name: 'ownership_review', sql: rolledBack(statements), synthetic: { U, R, V } };
+}
+
 // Zero net rows: counts of every job-loop table and residue of synthetic ids.
 const JOB_TABLES = `SELECT c.relname FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace AND n.nspname = 'public'
-  WHERE c.relkind = 'r' AND c.relname ~ '^(work_order|account_link_claims|contact_|provider_vouches|actor_capabilit|owner_delegated_signs|facility_|actors$)'`;
+  WHERE c.relkind = 'r' AND c.relname ~ '^(work_order|account_link_claims|contact_|provider_vouches|actor_capabilit|owner_delegated_signs|facility_|actors$|verification_audit_log$)'`;
 async function tableCounts() {
   const names = (await q(JOB_TABLES)).map((r) => r.relname).sort();
   const sql = names.map((t) => `SELECT ${lit(t)} AS t, count(*)::bigint AS n FROM public.${t}`).join(' UNION ALL ');
@@ -211,7 +244,9 @@ async function residue(since) {
     (SELECT count(*) FROM public.work_orders WHERE customer_id >= ${lo} AND customer_id < ${hi}) AS work_orders,
     (SELECT count(*) FROM public.account_link_claims WHERE user_id >= ${lo} AND user_id < ${hi}) AS claims,
     (SELECT count(*) FROM public.vehicle_observations WHERE ingested_at >= ${lit(since)}::timestamptz AND submitted_by_user_id >= ${lo} AND submitted_by_user_id < ${hi}) AS observations,
-    (SELECT count(*) FROM public.contact_requests WHERE requester_user_id >= ${lo} AND requester_user_id < ${hi}) AS contact_requests`);
+    (SELECT count(*) FROM public.contact_requests WHERE requester_user_id >= ${lo} AND requester_user_id < ${hi}) AS contact_requests,
+    (SELECT count(*) FROM public.ownership_verifications WHERE user_id >= ${lo} AND user_id < ${hi}) AS ownership_verifications,
+    (SELECT count(*) FROM public.vehicle_user_permissions WHERE user_id >= ${lo} AND user_id < ${hi}) AS vehicle_permissions`);
   return Object.fromEntries(Object.entries(rows[0]).map(([k, v]) => [k, Number(v)]));
 }
 
@@ -238,15 +273,15 @@ async function readOnlyChecks() {
     out.push({ step: 'anon checks (no anon key in env)', ok: false, detail: { skipped: true } });
     return out;
   }
-  for (const [label, name, body] of [
-    ['owner provider profile', 'provider_profile_read', { p_user_id: OWNER }],
+  for (const [label, name, body, budget = LATENCY_BUDGET_S] of [
+    ['owner provider profile', 'provider_profile_read', { p_user_id: OWNER }, OWNER_PROFILE_BUDGET_S],
     ['actor provider profile', 'provider_profile_read', { p_actor_id: OWNER_ACTOR }],
     ['open requirements', 'open_requirements_read', {}],
     ['delegated-sign register', 'owner_delegated_signs_read', {}],
   ]) {
     const r = await anonCall(name, body);
     const leak = /@[a-z0-9-]+\.[a-z]|"(email|phone|phone_number|address|street|zip)": "[^"]+"/i.test(r.text);
-    out.push({ step: `anon ${label}: 200, warm median < ${LATENCY_BUDGET_S}s, no contact fields`, ok: r.status === 200 && r.warm_s < LATENCY_BUDGET_S && !leak,
+    out.push({ step: `anon ${label}: 200, warm median < ${budget}s, no contact fields`, ok: r.status === 200 && r.warm_s < budget && !leak,
       detail: { status: r.status, cold_s: r.cold_s, warm_median_s: r.warm_s, warm_samples_s: r.warm_samples_s, leak } });
     if (label === 'owner provider profile' && r.status === 200) {
       const want = ['fabrication_exhaust', 'welding_tig', 'welding_mig'];
@@ -262,7 +297,7 @@ const report = { started_at: startedAt, project: PROJECT, scenarios: [], read_on
 let failed = 0;
 const before = await tableCounts();
 const residueBefore = await residue(startedAt);
-for (const build of [jobLoopScenario]) {
+for (const build of [jobLoopScenario, ownershipReviewScenario]) {
   const s = build();
   const t0 = Date.now();
   try {
