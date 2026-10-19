@@ -219,7 +219,7 @@ enum JobReaders {
         }
     }
 
-    private static func call<T: Decodable>(_ reader: String, _ fetch: () async throws -> Data) async -> JobLoad<T> {
+    static func call<T: Decodable>(_ reader: String, _ fetch: () async throws -> Data) async -> JobLoad<T> {
         do {
             return .loaded(try decode(T.self, from: try await fetch()))
         } catch {
@@ -244,6 +244,10 @@ enum JobReaders {
     static func refusal(_ reader: String, _ error: Error,
                         signedIn: Bool = SupabaseService.currentUserId != nil) -> JobRefusal {
         if let pg = error as? PostgrestError {
+            if pg.message.contains("Profile unavailable") || pg.message.contains("Provider unavailable") {
+                return JobRefusal(reader: reader, kind: .unavailable, title: "Profile not available",
+                                  detail: "It's private, or it doesn't exist.")
+            }
             if pg.message.contains("Vehicle unavailable") {
                 return JobRefusal(reader: reader, kind: .unavailable, title: "Vehicle not available",
                                   detail: "It doesn't exist, or it isn't shared with you.")

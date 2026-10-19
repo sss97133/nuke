@@ -141,6 +141,7 @@ struct VehicleStatementContent: View {
         Section {
             Button {} label: {
                 Label("Contact via Nuke", systemImage: "bubble.left.and.bubble.right")
+                    .foregroundStyle(.secondary)
             }
             .disabled(true)
         } footer: {

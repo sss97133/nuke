@@ -437,6 +437,54 @@ enum JobCopy {
         }
     }
 
+    // MARK: Provider face
+
+    /// The technician-profile link of someone else, in the third person.
+    static func technicianLinkOf(_ rung: String?) -> String {
+        switch rung {
+        case "evidenced"?: return "Linked to a technician profile, backed by their work"
+        case "claimed"?: return "Linked by them — not yet backed by work"
+        default: return "Not linked to a technician profile"
+        }
+    }
+
+    static func role(_ r: String) -> String {
+        switch r {
+        case "shop_owner": return "shop owner"
+        default: return slot(r)
+        }
+    }
+
+    static func relationState(_ s: String?) -> String? {
+        switch s {
+        case "live"?: return "active now"
+        case "stalling"?: return "quiet lately"
+        case "dormant"?: return "dormant"
+        default: return nil
+        }
+    }
+
+    /// "install 3 · paint 1", most first.
+    static func operations(_ kinds: [String: Int]) -> String? {
+        guard !kinds.isEmpty else { return nil }
+        return kinds.sorted { $0.value == $1.value ? $0.key < $1.key : $0.value > $1.value }
+            .map { "\(sentence($0.key).lowercased()) \($0.value)" }.joined(separator: " · ")
+    }
+
+    /// "1,396 h" for a capture span in hours.
+    static func hours(_ h: Double) -> String {
+        let f = NumberFormatter()
+        f.numberStyle = .decimal
+        f.maximumFractionDigits = h < 10 ? 1 : 0
+        return (f.string(from: NSNumber(value: h)) ?? String(h)) + " h"
+    }
+
+    static func count(_ n: Int) -> String {
+        let f = NumberFormatter()
+        f.numberStyle = .decimal
+        return f.string(from: NSNumber(value: n)) ?? String(n)
+    }
+
     // MARK: Actions
 
     private static let actions: [String: String] = [

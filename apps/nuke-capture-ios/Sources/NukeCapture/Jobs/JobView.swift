@@ -276,9 +276,14 @@ struct JobPathContent: View {
             case .loaded(let q):
                 if let quote = q.currentQuote {
                     if let party = quote.quotingParty {
-                        RootedValueView(label: "Quoted by", value: party.text,
-                                        status: party.signedThroughNuke ? .proven : .attributed,
-                                        decay: party.signedThroughNuke ? "signed through Nuke" : "as recorded")
+                        let row = RootedValueView(label: "Quoted by", value: party.text,
+                                                  status: party.signedThroughNuke ? .proven : .attributed,
+                                                  decay: party.signedThroughNuke ? "signed through Nuke" : "as recorded")
+                        if let profileId = party.profileId {
+                            NavigationLink { ProfileView(userId: profileId, isOwn: false) } label: { row }
+                        } else {
+                            row
+                        }
                     }
                     RootedValueView(label: "Version", value: quote.versionLine, status: .attributed)
                     ForEach(quote.lines) { line in

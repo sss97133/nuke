@@ -79,6 +79,20 @@ struct NukeCaptureApp: App {
                     NavigationStack { JobView(workOrderId: dbgJob) }
                 } else if let dbgStatement = ProcessInfo.processInfo.environment["NUKE_DEBUG_STATEMENT_VEHICLE"], !dbgStatement.isEmpty {
                     NavigationStack { VehicleStatementView(vehicleId: dbgStatement) }
+                } else if let dbgProvider = ProcessInfo.processInfo.environment["NUKE_DEBUG_PROVIDER"], !dbgProvider.isEmpty {
+                    // The provider face alone (no identity header, garage or photos), over the live readers.
+                    NavigationStack {
+                        ScrollViewReader { proxy in
+                            List { ProviderFaceSection(userId: dbgProvider, showSubject: true) }
+                                .navigationTitle("Provider")
+                                .navigationBarTitleDisplayMode(.inline)
+                                .task {
+                                    guard let target = ProcessInfo.processInfo.environment["NUKE_DEBUG_SCROLL_TO"] else { return }
+                                    try? await Task.sleep(for: .seconds(8))
+                                    proxy.scrollTo(target, anchor: .top)
+                                }
+                        }
+                    }
                 } else if let dbgWork = ProcessInfo.processInfo.environment["NUKE_DEBUG_VEHICLE_WORK"], !dbgWork.isEmpty {
                     // The vehicle page's Work card alone, over the live reader, without the page's photos.
                     NavigationStack {

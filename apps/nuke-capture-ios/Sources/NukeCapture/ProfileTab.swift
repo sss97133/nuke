@@ -357,6 +357,8 @@ struct ProfileView: View {
                 }
             }
 
+            ProviderFaceSection(userId: userId, isOwn: isOwn)
+
             // ORGANIZATIONS — the person's memberships with each relation's weight (user_org_relations), on their
             // own profile only: the owner took organizations off the profile face on 2026-06-13 ("I don't want those
             // showing up"; UserWorkspaceContent.tsx), and the web shows them only on the signed-in capsule.

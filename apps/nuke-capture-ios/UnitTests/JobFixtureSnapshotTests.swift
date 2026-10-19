@@ -91,6 +91,26 @@ final class JobFixtureSnapshotTests: XCTestCase {
         try snapshot(view, name: "fixture-vehicle-work-card")
     }
 
+    func testRenderProviderFaceSelf() throws {
+        let p = try decode(ProviderProfile.self, ProviderFixtures.profile(context: "self"))
+        let jobs = try decode(ProviderJobRecord.self, ProviderFixtures.jobRecord)
+        let view = NavigationStack {
+            List { ProviderFaceContent(profile: .loaded(p), jobs: .loaded(jobs), isOwn: true, showSubject: true) }
+                .navigationTitle("Profile").navigationBarTitleDisplayMode(.inline)
+        }
+        try snapshot(view, name: "fixture-provider-self", pages: 5)
+    }
+
+    func testRenderProviderFaceVisitor() throws {
+        let p = try decode(ProviderProfile.self, ProviderFixtures.profile(context: "visitor"))
+        let jobs = try decode(ProviderJobRecord.self, ProviderFixtures.jobRecord)
+        let view = NavigationStack {
+            List { ProviderFaceContent(profile: .loaded(p), jobs: .loaded(jobs), showSubject: true) }
+                .navigationTitle("Provider").navigationBarTitleDisplayMode(.inline)
+        }
+        try snapshot(view, name: "fixture-provider-visitor", pages: 2)
+    }
+
     func testRenderWorkSessionSignSheet() throws {
         let item = try decode(SignatureQueue.self, JobFixtures.signatureQueue).items[0]
         try snapshot(WorkSessionSignSheet(item: item), name: "fixture-sign-work-day")

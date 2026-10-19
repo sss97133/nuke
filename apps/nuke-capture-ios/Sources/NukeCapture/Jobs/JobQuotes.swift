@@ -15,6 +15,8 @@ import Foundation
 /// A party as the reader labels it: a public handle, an organization name, or "unnamed party".
 struct JobPerson: Decodable, Equatable {
     let kind: String?
+    /// A public profile the person can be opened at; present only for public handles.
+    let profileId: String?
     let handle: String?
     let name: String?
     let label: String?
@@ -22,9 +24,9 @@ struct JobPerson: Decodable, Equatable {
     /// "authenticated_sign" when the party signed through Nuke; otherwise source-attributed.
     let attribution: String?
 
-    init(kind: String? = nil, handle: String? = nil, name: String? = nil, label: String? = nil,
+    init(kind: String? = nil, profileId: String? = nil, handle: String? = nil, name: String? = nil, label: String? = nil,
          role: String? = nil, attribution: String? = nil) {
-        self.kind = kind; self.handle = handle; self.name = name; self.label = label
+        self.kind = kind; self.profileId = profileId; self.handle = handle; self.name = name; self.label = label
         self.role = role; self.attribution = attribution
     }
 
@@ -33,7 +35,7 @@ struct JobPerson: Decodable, Equatable {
         func str(_ k: String) -> String? {
             (try? c.decode(String.self, forKey: JobCodingKey(k))).flatMap { $0.trimmingCharacters(in: .whitespaces).isEmpty ? nil : $0 }
         }
-        self.init(kind: str("kind"), handle: str("handle"), name: str("name"), label: str("label"),
+        self.init(kind: str("kind"), profileId: str("profile_id"), handle: str("handle"), name: str("name"), label: str("label"),
                   role: str("role"), attribution: str("attribution"))
     }
 
