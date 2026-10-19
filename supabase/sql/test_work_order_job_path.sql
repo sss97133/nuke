@@ -98,7 +98,7 @@ INSERT INTO vehicle_observations(id,vehicle_id,kind,source_id,observed_at,struct
 \ir ../migrations/20261019150000_inspection_request.sql
 \ir ../migrations/20261019153000_job_path_inspection.sql
 \ir ../migrations/20261019180000_work_order_offers.sql
-\ir ../migrations/20261019181500_work_order_offer_acceptance.sql
+\ir ../migrations/20261019182000_work_order_offer_acceptance.sql
 \ir ../migrations/20261019183000_work_order_offers_read.sql
 \ir ../migrations/20261019184500_inspection_access.sql
 

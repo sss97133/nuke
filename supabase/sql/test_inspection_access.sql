@@ -134,7 +134,7 @@ INSERT INTO work_order_assignments(work_order_id,technician_id,role,status,payou
 \ir ../migrations/20261019152500_inspection_findings.sql
 \ir ../migrations/20261019153000_job_path_inspection.sql
 \ir ../migrations/20261019180000_work_order_offers.sql
-\ir ../migrations/20261019181500_work_order_offer_acceptance.sql
+\ir ../migrations/20261019182000_work_order_offer_acceptance.sql
 \ir ../migrations/20261019183000_work_order_offers_read.sql
 \ir ../migrations/20261019184500_inspection_access.sql
 
