@@ -400,6 +400,7 @@ struct ProviderFaceContent: View {
                     NavigationLink { ProviderStandingView(userId: id) } label: {
                         Label("Your provider standing", systemImage: "person.text.rectangle")
                     }
+                    NavigationLink { ToolboxView(userId: id) } label: { Label("Your toolbox", systemImage: "wrench.adjustable") }
                 }
             } else {
                 RootedValueView(label: "Technician profile", value: JobCopy.technicianLinkOf(p.identityBridgeState),
