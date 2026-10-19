@@ -197,7 +197,7 @@ struct ExploreView: View {
             .navigationDestination(for: VehicleHeaderRow.self) { v in
                 // PUSH (back chevron) — kills the Done-only dead-end.
                 VehicleDetailView(vehicleId: v.id.uuidString.lowercased(),
-                                  embedInNavigationStack: false)
+                                  embedInNavigationStack: false).environment(\.vehicleListingContext, true)
             }
             .navigationDestination(for: CohortTarget.self) { c in
                 // PUSH the cohort instrument. Its comp rows drill back into this

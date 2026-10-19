@@ -669,6 +669,7 @@ struct VehicleDetailView: View {
                         }
                         photoStrip.id("photos")
                         assetWindow.id("asset")
+                        VehicleWorkSection(vehicleId: vehicleId, ownerContext: isOwner).id("work")
                         specTable.id("specs")
                         webCTA
                     }
