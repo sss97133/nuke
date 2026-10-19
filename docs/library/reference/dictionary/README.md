@@ -284,6 +284,8 @@ can supersede it without editing the original or guessing from model/year.
 
 ## R
 
+**Resource performer candidate** — A canonical `actors` reference proposed for a skill or inspection requirement. The contracting supplier can be unknown; an actor label does not establish account identity, qualification, consent or completion. A retained-operation basis includes an exact row snapshot and is withheld from current reads after that operation changes. See [Work Order Intelligence](../../technical/work-order-intelligence.md).
+
 **Resource requirement basis** — The original retained work-record observation and exact excerpt supporting an interpreted need for a work-order operation. The interpretation keeps the original observation clock and its own extraction method and confidence. A quoted need does not establish quantity, provider competence, permission or reservation. Withdrawing or reattributing the basis excludes its dependent current resource graph; original records remain. See [Work Order Intelligence](../../technical/work-order-intelligence.md).
 
 **Rhizome** — Deleuzian concept. A network with no center, no hierarchy, no beginning or end. Nuke's architecture is rhizomatic — every concept connects to every other. The observation system is the purest expression. See RHIZOME.md.

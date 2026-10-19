@@ -2866,3 +2866,17 @@ The disposable contract covers these cases and private source visibility remains
 A selected historical case is validation scope; neither its requirements nor the complete
 historical-job population has been exhaustively enumerated. No candidate, permission,
 booking readiness, reservation or payment is inferred from these requirement records.
+
+Participant follow-up (2026-10-19): inspection of actors, actor_capabilities, technicians,
+assignments and identity bridges found a canonical actor reference on a selected retained
+operation, but no supported account bridge or proof of qualification. Migration
+`20261019030510_work_resource_actor_candidates.sql` extends the existing fulfillment
+owner with an actor alternative for skill/inspection and an optional exact operation
+snapshot. The supplier remains separate and can be unknown. Existing internal-inference
+intake identifies derived evidence; it does not impersonate a provider. Changed operation
+bases withhold current descendants without deleting history. The reader carries method,
+confidence and unresolved source interpretation, including process disagreements.
+Disposable PG17 exercises participant alternatives, inspection, type/identity refusals,
+snapshot custody, stale-basis propagation and the unchanged private access boundary.
+This selected case does not establish broader historical coverage, accepted terms,
+authenticated approval, capacity reservation, completion or payment accounting.

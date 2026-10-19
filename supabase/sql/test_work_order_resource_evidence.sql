@@ -15,7 +15,14 @@ END $$;
 CREATE TABLE auth.users(id uuid PRIMARY KEY);
 CREATE TABLE public.organizations(id uuid PRIMARY KEY);
 CREATE TABLE public.work_orders(id uuid PRIMARY KEY,vehicle_id uuid);
-CREATE TABLE public.work_order_line_items(id uuid PRIMARY KEY,work_order_id uuid REFERENCES work_orders(id));
+CREATE TABLE public.actors(id uuid PRIMARY KEY,name text,actor_type text);
+CREATE TABLE public.work_order_line_items(id uuid PRIMARY KEY,work_order_id uuid REFERENCES work_orders(id),
+ actor_id uuid REFERENCES actors(id),task_description text,updated_at timestamptz);
+CREATE TYPE public.observation_kind AS ENUM ('valuation','condition','specification','work_record');
+CREATE TABLE public.observation_sources(id uuid PRIMARY KEY,slug text UNIQUE,category text,
+ supported_observations public.observation_kind[],updated_at timestamptz);
+INSERT INTO observation_sources VALUES ('90000000-0000-0000-0000-000000000001','internal-inference','internal',
+ ARRAY['valuation','condition','specification']::public.observation_kind[],now());
 CREATE TABLE public.user_tools(id uuid PRIMARY KEY,user_id uuid REFERENCES auth.users(id));
 CREATE TABLE public.tool_inventory(id uuid PRIMARY KEY,owner_id uuid);
 CREATE TABLE public.equipment(id uuid PRIMARY KEY,shop_id uuid);
@@ -36,7 +43,7 @@ INSERT INTO organizations VALUES ('20000000-0000-0000-0000-000000000001');
 INSERT INTO work_orders VALUES
  ('30000000-0000-0000-0000-000000000001','40000000-0000-0000-0000-000000000001'),
  ('30000000-0000-0000-0000-000000000002','40000000-0000-0000-0000-000000000002');
-INSERT INTO work_order_line_items VALUES
+INSERT INTO work_order_line_items(id,work_order_id) VALUES
  ('50000000-0000-0000-0000-000000000001','30000000-0000-0000-0000-000000000001'),
  ('50000000-0000-0000-0000-000000000002','30000000-0000-0000-0000-000000000002');
 INSERT INTO user_tools VALUES ('60000000-0000-0000-0000-000000000001','10000000-0000-0000-0000-000000000001');
@@ -53,6 +60,7 @@ INSERT INTO vehicle_observations(id,vehicle_id,kind,source_id,observed_at,struct
 
 \ir ../migrations/20261019005027_work_order_resource_evidence.sql
 \ir ../migrations/20261019013808_work_resource_retained_basis.sql
+\ir ../migrations/20261019030510_work_resource_actor_candidates.sql
 SET ROLE service_role;
 SELECT t_assert(read_work_order_resources('30000000-0000-0000-0000-000000000001')->>'booking_readiness'='not_assessed','empty graph never means ready');
 SELECT t_assert(t_refused($q$SELECT project_work_order_resource_observation('80000000-0000-0000-0000-000000000002')$q$),'fulfillment before requirement refused');
@@ -167,3 +175,88 @@ SELECT t_assert((SELECT count(*) FROM work_order_resource_requirements WHERE id=
 UPDATE vehicle_observations SET is_superseded=false,vehicle_id='40000000-0000-0000-0000-000000000002' WHERE id='81000000-0000-0000-0000-000000000001';
 SELECT t_assert(read_work_order_resources('30000000-0000-0000-0000-000000000001')->'requirements'='[]'::jsonb,'original reattribution hides derived graph');
 SELECT t_assert(t_refused(format('SELECT project_work_order_resource_observation(%L)',:'retained_offer')),'cross-vehicle original blocks dependent replay');
+
+-- Participant candidates use the existing actors namespace; no account bridge is invented.
+INSERT INTO actors VALUES
+ ('a0000000-0000-0000-0000-000000000001','Fixture performer','individual'),
+ ('a0000000-0000-0000-0000-000000000002','Alternative performer','individual');
+UPDATE work_order_line_items SET actor_id='a0000000-0000-0000-0000-000000000001',
+ task_description='Synthetic operation',updated_at='2026-01-01'
+ WHERE id='50000000-0000-0000-0000-000000000001';
+INSERT INTO work_order_line_items(id,work_order_id,actor_id) VALUES
+ ('50000000-0000-0000-0000-000000000003','30000000-0000-0000-0000-000000000001','a0000000-0000-0000-0000-000000000001');
+SELECT t_assert((SELECT supported_observations=ARRAY['valuation','condition','specification','work_record']::public.observation_kind[]
+ FROM observation_sources WHERE slug='internal-inference'),'existing derived source admits work records without losing prior kinds');
+SELECT bad_source('{"requirement_kind":"skill"}') AS skill_req \gset
+SELECT bad_source('{"requirement_kind":"inspection"}') AS inspection_req \gset
+SELECT bad_source('{"requirement_kind":"approval"}') AS approval_req \gset
+SELECT bad_source('{"requirement_kind":"tool"}') AS tool_req \gset
+SELECT project_work_order_resource_observation(:'skill_req');
+SELECT project_work_order_resource_observation(:'inspection_req');
+SELECT project_work_order_resource_observation(:'approval_req');
+SELECT project_work_order_resource_observation(:'tool_req');
+CREATE FUNCTION public.participant_source(p_requirement uuid,p_patch jsonb DEFAULT '{}') RETURNS uuid LANGUAGE plpgsql AS $$
+DECLARE k uuid:=gen_random_uuid(); BEGIN
+ INSERT INTO vehicle_observations(id,vehicle_id,kind,source_id,observed_at,extraction_method,confidence_score,structured_data)
+ VALUES(k,'40000000-0000-0000-0000-000000000001','work_record','90000000-0000-0000-0000-000000000001',
+ '2026-01-02','retained_operation_actor_interpretation_v1',0.5,
+ jsonb_build_object('work_order_resource',jsonb_build_object('version',1,'event_type','fulfillment',
+ 'work_order_id','30000000-0000-0000-0000-000000000001','requirement_id',p_requirement,
+ 'performer_actor_id','a0000000-0000-0000-0000-000000000001')||p_patch,
+ 'interpretation',jsonb_build_object('qualification','not_assessed','process_agreement','unresolved')));
+ RETURN k; END $$;
+SELECT participant_source(:'skill_req',jsonb_build_object('basis_line_item_id',li.id,'basis_line_item_snapshot',to_jsonb(li))) AS actor_offer
+ FROM work_order_line_items li WHERE id='50000000-0000-0000-0000-000000000001' \gset
+SELECT participant_source(:'inspection_req') AS inspection_offer \gset
+SELECT participant_source(:'skill_req','{"performer_actor_id":"a0000000-0000-0000-0000-000000000002","supplier_organization_id":"20000000-0000-0000-0000-000000000001"}') AS alternative_offer \gset
+SET ROLE service_role;
+SELECT project_work_order_resource_observation(:'actor_offer');
+SELECT project_work_order_resource_observation(:'inspection_offer');
+SELECT project_work_order_resource_observation(:'alternative_offer');
+SELECT t_assert((project_work_order_resource_observation(:'actor_offer')->>'duplicate')::boolean,'actor candidate replay is idempotent');
+SELECT t_assert((SELECT supplier_user_id IS NULL AND supplier_organization_id IS NULL FROM work_order_resource_fulfillments WHERE id=:'actor_offer'),'unknown contracting party is preserved');
+SELECT t_assert((SELECT count(*) FROM work_order_resource_fulfillments WHERE requirement_id=:'skill_req')=2,'alternative skilled performers coexist');
+SELECT t_assert((SELECT performer_actor_id IS NOT NULL FROM work_order_resource_fulfillments WHERE id=:'inspection_offer'),'inspection may name its canonical performer');
+SELECT t_assert((SELECT f->>'contracting_party_status'='unknown' AND f->>'candidate_basis'='retained_operation_assignment'
+ AND f#>>'{performer,identity_namespace}'='actors' AND f#>>'{performer,account_link}'='not_assessed'
+ AND f#>>'{performer,qualification}'='not_assessed' AND f#>>'{interpretation,process_agreement}'='unresolved'
+ AND (f->>'confidence_score')::numeric=0.5
+ FROM jsonb_array_elements(read_work_order_resources('30000000-0000-0000-0000-000000000001')->'fulfillments') f
+ WHERE f->>'id'=:'actor_offer'),'reader carries provenance and unresolved qualification without account inference');
+SELECT t_assert((SELECT f->>'contracting_party_status'='source_attributed' FROM jsonb_array_elements(
+ read_work_order_resources('30000000-0000-0000-0000-000000000001')->'fulfillments') f WHERE f->>'id'=:'alternative_offer'),'shop supplier remains distinct from performer');
+SELECT t_assert(t_refused($q$UPDATE work_order_resource_fulfillments SET performer_actor_id=NULL$q$),'actor projection remains immutable');
+RESET ROLE;
+SELECT t_assert(t_refused(format('SELECT project_work_order_resource_observation(%L)',participant_source(:'approval_req'))),'actor does not satisfy approval authority');
+SELECT t_assert(t_refused(format('SELECT project_work_order_resource_observation(%L)',participant_source(:'tool_req'))),'actor does not stand in for a tool');
+SELECT t_assert(t_refused(format('SELECT project_work_order_resource_observation(%L)',participant_source(:'skill_req','{"performer_actor_id":null,"equipment_id":"70000000-0000-0000-0000-000000000001","supplier_organization_id":"20000000-0000-0000-0000-000000000001"}'))),'equipment does not stand in for skill');
+SELECT t_assert(t_refused(format('SELECT project_work_order_resource_observation(%L)',participant_source(:'tool_req','{"performer_actor_id":null,"user_tool_id":"60000000-0000-0000-0000-000000000001"}'))),'unknown supplier exception does not extend to inventory');
+SELECT t_assert(t_refused(format('SELECT project_work_order_resource_observation(%L)',participant_source(:'skill_req','{"performer_actor_id":"a0000000-0000-0000-0000-000000000099"}'))),'missing canonical actor refused');
+SELECT t_assert(t_refused(format('SELECT project_work_order_resource_observation(%L)',participant_source(:'skill_req','{"user_tool_id":"60000000-0000-0000-0000-000000000001"}'))),'person and inventory cannot share one resource identity');
+SELECT t_assert(t_refused(format('SELECT project_work_order_resource_observation(%L)',participant_source(:'skill_req','{"supplier_user_id":"10000000-0000-0000-0000-000000000001","supplier_organization_id":"20000000-0000-0000-0000-000000000001"}'))),'multiple contracting identities refused');
+SELECT t_assert(t_refused(format('SELECT project_work_order_resource_observation(%L)',participant_source(:'skill_req','{"basis_line_item_id":"50000000-0000-0000-0000-000000000001"}'))),'assignment without snapshot refused');
+SELECT t_assert(t_refused(format('SELECT project_work_order_resource_observation(%L)',participant_source(:'skill_req','{"basis_line_item_snapshot":{}}'))),'snapshot without assignment refused');
+SELECT t_assert(t_refused(format('SELECT project_work_order_resource_observation(%L)',participant_source(:'skill_req',
+ jsonb_build_object('basis_line_item_id',li.id,'basis_line_item_snapshot',to_jsonb(li)||'{"task_description":"invented"}'::jsonb)))),'changed snapshot refused')
+ FROM work_order_line_items li WHERE id='50000000-0000-0000-0000-000000000001';
+SELECT t_assert(t_refused(format('SELECT project_work_order_resource_observation(%L)',participant_source(:'skill_req',
+ jsonb_build_object('basis_line_item_id',li.id,'basis_line_item_snapshot',to_jsonb(li)) ))),'other operation in same order cannot establish performer')
+ FROM work_order_line_items li WHERE id='50000000-0000-0000-0000-000000000003';
+SELECT t_assert(t_refused(format('SELECT project_work_order_resource_observation(%L)',participant_source(:'skill_req',
+ jsonb_build_object('basis_line_item_id',li.id,'basis_line_item_snapshot',to_jsonb(li),'performer_actor_id','a0000000-0000-0000-0000-000000000002')))),'assignment must name same performer')
+ FROM work_order_line_items li WHERE id='50000000-0000-0000-0000-000000000001';
+SELECT bad_source(jsonb_build_object('event_type','attestation','fulfillment_id',:'actor_offer',
+ 'attestor_organization_id','20000000-0000-0000-0000-000000000001','attestation_kind','supervision','verdict','supports','scope','Synthetic scoped review')) AS actor_attestation \gset
+SELECT project_work_order_resource_observation(:'actor_attestation');
+SELECT t_assert((SELECT count(*) FROM jsonb_array_elements(read_work_order_resources('30000000-0000-0000-0000-000000000001')->'attestations') a WHERE a->>'id'=:'actor_attestation')=1,'actor candidate supports existing scoped attestation chain');
+UPDATE work_order_line_items SET updated_at='2026-01-03' WHERE id='50000000-0000-0000-0000-000000000001';
+SELECT t_assert((SELECT count(*) FROM jsonb_array_elements(read_work_order_resources('30000000-0000-0000-0000-000000000001')->'fulfillments') f WHERE f->>'id'=:'actor_offer')=0,'any retained operation revision withholds stale candidate');
+SELECT t_assert((SELECT count(*) FROM jsonb_array_elements(read_work_order_resources('30000000-0000-0000-0000-000000000001')->'attestations') a WHERE a->>'id'=:'actor_attestation')=0,'basis revision withholds dependent attestation');
+SELECT t_assert(t_refused(format('SELECT project_work_order_resource_observation(%L)',:'actor_offer')),'duplicate cannot restore stale assignment');
+SELECT t_assert(t_refused(format('SELECT project_work_order_resource_observation(%L)',:'actor_attestation')),'attestation cannot bypass stale assignment');
+SELECT t_assert((SELECT count(*) FROM work_order_resource_fulfillments WHERE id=:'actor_offer')=1,'changed assignment preserves historical candidate');
+SELECT t_assert((SELECT count(*) FROM jsonb_array_elements(read_work_order_resources('30000000-0000-0000-0000-000000000001')->'fulfillments') f WHERE f->>'id'=:'alternative_offer')=1,'independent alternative survives assignment change');
+SELECT t_assert(read_work_order_resources('30000000-0000-0000-0000-000000000001') @> '{"booking_readiness":"not_assessed","permission_authority":"not_assessed","capacity_reserved":false,"payment_authorized":false}'::jsonb,'actor and supervision evidence do not book or authorize payment');
+SELECT jsonb_agg(jsonb_build_object('proname',proname,'hash',md5(pg_get_functiondef(oid))) ORDER BY proname) AS implementation_hashes
+ FROM pg_proc WHERE pronamespace='public'::regnamespace
+ AND proname IN ('project_work_order_resource_observation','read_work_order_resources');
