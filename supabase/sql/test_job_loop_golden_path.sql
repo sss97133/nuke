@@ -1,5 +1,6 @@
--- Disposable PG17 only. Golden path of the job loop ("a job is a quote"): one synthetic story end to end through only the
--- public Sign writers and open readers, as distinct authenticated users, with the privacy invariants checked for a visitor
+-- Disposable PG17 only. Golden path of the job loop ("a job is a quote"): two synthetic stories end to end (a listing bought
+-- through a pre-purchase inspection, and a job the client posts on their own truck) through only the public Sign writers and
+-- open readers, as distinct authenticated users, with the privacy invariants checked for a visitor
 -- and a signed-in stranger at each step. No payment is authorized and nothing is disbursed anywhere on the path.
 -- Fixture and prior state: the contact-broker contract chain, then every later job-loop migration in live order.
 \set ON_ERROR_STOP on
@@ -43,6 +44,11 @@ CREATE TABLE public.organization_vehicles(organization_id uuid, vehicle_id uuid)
 \ir ../migrations/20261019221500_quote_release_terms.sql
 \ir ../migrations/20261019230000_provider_jobs_accepted_offers.sql
 \ir ../migrations/20261019231500_job_loop_grant_tidy.sql
+\ir ../migrations/20261019233000_post_work_request.sql
+\ir ../migrations/20261019234500_start_work.sql
+\ir ../migrations/20261019234000_post_work_request_description.sql
+-- Live shape: work_orders.description is required (new rows).
+ALTER TABLE public.work_orders ADD CONSTRAINT fixture_description_required CHECK (description IS NOT NULL) NOT VALID;
 
 -- Listing-reader inputs and live columns these readers and Signs use.
 ALTER TABLE public.vehicles ADD COLUMN IF NOT EXISTS merged_into_vehicle_id uuid, ADD COLUMN IF NOT EXISTS series text,
@@ -106,7 +112,8 @@ INSERT INTO vehicles(id,owner_id,year,make,model,is_public,vin,listing_url,descr
   'https://bringatrailer.com/listing/1972-chevrolet-c10-golden/',
   'This 1972 Chevrolet C10 has a 350 ci V8. The exhaust leaks at the manifold and the muffler is rusted through. The brakes are worn and need service.',
   'Sela Sellerlegal','Automatic','RWD','Sparks','NV'),
- ('e7300000-0000-0000-0000-000000000002',NULL,1968,'Ford','F-100',true,NULL,NULL,NULL,NULL,NULL,NULL,'Reno','NV');
+ ('e7300000-0000-0000-0000-000000000002',NULL,1968,'Ford','F-100',true,NULL,NULL,NULL,NULL,NULL,NULL,'Reno','NV'),
+ ('e7300000-0000-0000-0000-000000000003','e7000000-0000-0000-0000-0000000000c1',1985,'Chevrolet','K10',true,NULL,NULL,NULL,NULL,NULL,NULL,'Reno','NV');
 INSERT INTO labor_operations VALUES ('EXH-MUFFLER-RR','Muffler',1.5,'exhaust',NULL,NULL),('MECH-BRAKES-ALL','All brakes',4,'brakes',NULL,NULL);
 INSERT INTO ownership_verifications(user_id,vehicle_id,status,expires_at) VALUES
  ('e7000000-0000-0000-0000-0000000000e1','e7300000-0000-0000-0000-000000000001','approved',now()+interval '1 year');
@@ -136,8 +143,10 @@ CREATE TABLE public.g_sweep(step text, viewer text, reader text, j jsonb);
 GRANT INSERT, SELECT ON public.g_sweep TO anon, authenticated;
 CREATE FUNCTION public.g_iw() RETURNS uuid LANGUAGE sql STABLE SECURITY DEFINER AS $$
   SELECT id FROM work_orders WHERE parent_work_order_id = 'e7400000-0000-0000-0000-000000000001' $$;
+CREATE FUNCTION public.g_pwo() RETURNS uuid LANGUAGE sql STABLE SECURITY DEFINER AS $$
+  SELECT id FROM work_orders WHERE vehicle_id = 'e7300000-0000-0000-0000-000000000003' AND request_visibility IS NOT NULL ORDER BY id LIMIT 1 $$;
 CREATE FUNCTION public.g_capture(p_viewer text) RETURNS void LANGUAGE plpgsql AS $$
-DECLARE wo uuid := 'e7400000-0000-0000-0000-000000000001'; iw uuid := public.g_iw(); st text := current_setting('g.step', true); BEGIN
+DECLARE wo uuid := 'e7400000-0000-0000-0000-000000000001'; iw uuid := public.g_iw(); pwo uuid := public.g_pwo(); st text := current_setting('g.step', true); BEGIN
   INSERT INTO g_sweep VALUES (st,p_viewer,'listing_work_plan_read',listing_work_plan_read('e7300000-0000-0000-0000-000000000001')),
    (st,p_viewer,'open_requirements_read',open_requirements_read(NULL,100,NULL)),
    (st,p_viewer,'work_order_offers_read',work_order_offers_read(wo)),
@@ -152,8 +161,12 @@ DECLARE wo uuid := 'e7400000-0000-0000-0000-000000000001'; iw uuid := public.g_i
     INSERT INTO g_sweep VALUES (st,p_viewer,'work_order_offers_read/inspection',work_order_offers_read(iw)),
      (st,p_viewer,'work_order_inspection_read',work_order_inspection_read(iw));
   END IF;
+  IF pwo IS NOT NULL THEN
+    INSERT INTO g_sweep VALUES (st,p_viewer,'work_order_job_path_read/posted',work_order_job_path_read(pwo)),
+     (st,p_viewer,'work_order_offers_read/posted',work_order_offers_read(pwo));
+  END IF;
 END $$;
-GRANT EXECUTE ON FUNCTION public.g_capture(text), public.g_iw() TO anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.g_capture(text), public.g_iw(), public.g_pwo() TO anon, authenticated;
 \set g_step 'SET ROLE anon; SELECT g_anon(); SELECT g_capture(''visitor''); RESET ROLE; SET ROLE authenticated; SELECT t_as(''e7000000-0000-0000-0000-000000000099''); SELECT g_capture(''stranger''); RESET ROLE;'
 
 SELECT set_config('g.step','before 1',false);
@@ -400,6 +413,25 @@ RESET ROLE;
 SELECT t_assert((:'qr_anon'::jsonb) @> '{"current_quote":{"is_change_order":true,"version":2},"change_order":{"state":"accepted"},"acceptance":{"state":"accepted"}}'
   AND NOT g_pii(:'qr_anon'::jsonb),'15 visitor: accepted change order with its diff open; signer not identified');
 
+SELECT set_config('g.step','before start',false);
+:g_step
+-- Start: the client's job view offers nothing; the mechanic's lists start_work under the accepted change order.
+SET ROLE authenticated;
+SELECT t_as('e7000000-0000-0000-0000-0000000000c1');
+SELECT jsonb_array_length(my_signature_queue()->'items') AS cl_q_before_start \gset
+SELECT t_assert(work_order_job_path_read('e7400000-0000-0000-0000-000000000001')#>'{viewer,actions}'='[]'::jsonb,'start: the client has no job-view action');
+SELECT t_as('e7000000-0000-0000-0000-0000000000a1');
+SELECT t_assert(work_order_job_path_read('e7400000-0000-0000-0000-000000000001')#>'{viewer,actions}' @> jsonb_build_array(jsonb_build_object('action','start_work',
+   'terms_basis','accepted_quote','args',jsonb_build_object('p_terms_hash',(:'co'::jsonb)->>'quote_hash')))
+ AND NOT EXISTS (SELECT 1 FROM jsonb_array_elements(my_signature_queue()->'items') i WHERE i->>'kind' ~ 'start'),
+ 'start: start_work is a job-view action for the accepted provider (change-order hash), not a queue item');
+SELECT start_work('e7400000-0000-0000-0000-000000000001',(:'co'::jsonb)->>'quote_hash') AS st \gset
+SELECT t_as('e7000000-0000-0000-0000-0000000000c1');
+SELECT t_assert(jsonb_array_length(my_signature_queue()->'items')=(:'cl_q_before_start')::int,'start: the client''s queue gains nothing');
+RESET ROLE;
+SELECT t_assert((:'st'::jsonb) @> '{"signer_role":"technician","terms_basis":"accepted_quote","duplicate":false,"payment_authorized":false,"work_order_status_changed":false}',
+  'start_work: the mechanic starts under the accepted change order');
+
 SELECT set_config('g.step','before 16',false);
 :g_step
 -- 16. The mechanic attaches their own photos of the work.
@@ -481,8 +513,9 @@ SELECT t_assert((SELECT count(*) FROM jsonb_object_keys((:'jp_svc'::jsonb)->'sta
  AND (:'jp_svc'::jsonb)->'stages' @> '{"intake":{"state":"recorded"},"inspection":{"state":"recorded"},"terms":{"state":"recorded","customer_acceptance":"signed",
    "change_order":{"state":"accepted"}},"completion":{"state":"recorded"},"accounting":{"state":"recorded"}}'
  AND (:'jp_svc'::jsonb)#>>'{stages,plan,state}'='partial' AND (:'jp_svc'::jsonb)#>'{stages,plan,gaps}' @> '["operations_without_requirements"]'
- AND (:'jp_svc'::jsonb)#>'{stages,execution,attached_evidence}' @> '{"images":2}' AND (:'jp_svc'::jsonb)#>'{stages,execution,gaps}' @> '["no_start_clock"]',
- 'job path: all 7 stages; intake/inspection/terms/completion/accounting recorded; plan partial (brakes op has no requirement); execution has evidence but no start Sign');
+ AND (:'jp_svc'::jsonb)#>'{stages,execution}' @> '{"state":"recorded","state_basis":"provider_start_sign","start_sign":{"terms_basis":"accepted_quote"},"attached_evidence":{"images":2}}'
+ AND NOT (:'jp_svc'::jsonb)#>'{stages,execution,gaps}' @> '["no_start_clock"]',
+ 'job path: all 7 stages; every stage recorded except plan (partial: the brakes op has no requirement); execution by the start Sign with evidence');
 SELECT t_assert((:'jp_anon'::jsonb)#>>'{stages,accounting,state}' IN ('withheld','not_reported') OR NOT (:'jp_anon'::jsonb)#>'{stages,accounting}' ? 'reconciliation',
   'job path (visitor): accounting withheld');
 SELECT t_assert(NOT g_pii(:'jp_anon'::jsonb) AND NOT (:'jp_anon'::jsonb)::text ~ '"amount"|: 1020[,}]|client-ref','job path (visitor): no PII, amounts or references');
@@ -514,11 +547,58 @@ SELECT t_assert((:'cr'::jsonb) @> '{"status":"pending","delivery":"in_app","reci
   AND (:'th'::jsonb) @> '{"request":{"status":"accepted"},"messages":[{"body":"Monday works."}]}' AND NOT g_pii(:'th'::jsonb),
   'contact: request, acceptance and thread between the two parties; no contact fields');
 
+-- ============================================================================================================
+-- Second story: the client posts a job on their own truck with a photo; the mechanic finds it, offers, is accepted, starts.
+-- ============================================================================================================
+SELECT set_config('g.step','before post',false);
+:g_step
+INSERT INTO vehicle_images(id,vehicle_id,taken_at,is_external,user_id,vision_gate_status,image_url,is_sensitive,is_superseded) VALUES
+ ('e7b00000-0000-0000-0000-000000000011','e7300000-0000-0000-0000-000000000003',now()-interval '1 day',false,'e7000000-0000-0000-0000-0000000000c1','approved','https://img.example.invalid/k10.jpg',false,false);
+SET ROLE authenticated;
+SELECT t_as('e7000000-0000-0000-0000-0000000000c1');
+SELECT t_assert(t_refused_with($q$SELECT post_work_request('e7300000-0000-0000-0000-000000000001','The brakes squeal when stopping.')$q$,'request_inspection'),
+  'post: not on the listing the client does not own');
+SELECT post_work_request('e7300000-0000-0000-0000-000000000003','The exhaust leaks at the manifold. The brakes squeal when stopping.',
+  '{e7b00000-0000-0000-0000-000000000011}',NULL,now()+interval '21 days','open') AS pr \gset
+SELECT jsonb_array_length(my_signature_queue()->'items') AS cl_q_after_post \gset
+RESET ROLE;
+SELECT (:'pr'::jsonb)->>'work_order_id' AS pwo \gset
+SELECT r->>'requirement_id' AS preq FROM jsonb_array_elements((:'pr'::jsonb)->'requirements') r WHERE r->>'description'='Exhaust repair and fabrication' \gset
+SELECT t_assert((:'pr'::jsonb) @> '{"listed_in_open_requirements":true,"intake_evidence":{"image_count":1},"payment_authorized":false,
+   "operations":[{"text":"The exhaust leaks at the manifold.","basis":"client_stated"},{"text":"The brakes squeal when stopping."}],
+   "suggested_cost":{"rate_label":"placeholder","hours_label":"seed_uncalibrated"}}'
+ AND jsonb_array_length((:'pr'::jsonb)->'requirements')=4,'post_work_request: job, client-stated operations, template requirements, intake photo, labelled suggested cost');
+SET ROLE authenticated;
+SELECT t_as('e7000000-0000-0000-0000-0000000000a1');
+SELECT t_assert(EXISTS (SELECT 1 FROM jsonb_array_elements(open_requirements_read(NULL,100,'skill')->'rows') r WHERE r->>'requirement_id'=:'preq'
+  AND r->'match' @> '[{"input":"evidence_rung","result":"pass"}]'),'post: the mechanic finds the posted requirement with a match table');
+SELECT offer_on_requirement(:'preq',jsonb_build_object('lines',jsonb_build_array(jsonb_build_object('description','Manifold gasket and muffler',
+  'pricing_basis','flat','amount',350,'currency','USD','unit',NULL,'quantity',NULL))),now()+interval '1 day',now()+interval '10 days',NULL) AS mo2 \gset
+SELECT t_as('e7000000-0000-0000-0000-0000000000c1');
+SELECT a->'args'->>'p_offer_hash' AS ph2 FROM jsonb_array_elements(work_order_offers_read(:'pwo')#>'{viewer,actions}') a WHERE a->>'action'='accept_offer' \gset
+SELECT accept_offer(((:'mo2'::jsonb)->>'offer_id')::uuid,:'ph2') AS ma2 \gset
+SELECT t_as('e7000000-0000-0000-0000-0000000000a1');
+SELECT a->'args'->>'p_terms_hash' AS sh2 FROM jsonb_array_elements(work_order_job_path_read(:'pwo')#>'{viewer,actions}') a WHERE a->>'action'='start_work' \gset
+SELECT start_work(:'pwo',:'sh2') AS st2 \gset
+SELECT t_as('e7000000-0000-0000-0000-0000000000c1');
+SELECT t_assert(jsonb_array_length(my_signature_queue()->'items')=(:'cl_q_after_post')::int,'post: the client''s queue gains nothing from the start');
+RESET ROLE;
+SET ROLE anon;
+SELECT g_anon();
+SELECT work_order_job_path_read(:'pwo') AS pjp \gset
+RESET ROLE;
+SELECT t_assert((:'ma2'::jsonb) @> '{"role":"technician","payment_authorized":false}' AND (:'st2'::jsonb) @> '{"terms_basis":"accepted_offer","duplicate":false}'
+ AND (:'pjp'::jsonb)->'stages' @> '{"intake":{"state":"recorded"},"terms":{"state":"recorded"},"execution":{"state":"recorded","state_basis":"provider_start_sign",
+   "attached_evidence":{"images":1}}}' AND NOT g_pii(:'pjp'::jsonb),
+ 'post: offer, acceptance and start under the offer terms; visitor job path intake/terms/execution recorded, no PII');
+SELECT set_config('g.step','after post',false);
+:g_step
+
 -- Privacy sweep after the last step.
 SELECT set_config('g.step','after contact',false);
 :g_step
-SELECT t_assert((SELECT count(DISTINCT step) FROM g_sweep)=19 AND (SELECT count(*) FROM g_sweep WHERE step='after contact')=30
-  AND (SELECT count(DISTINCT viewer) FROM g_sweep)=2,'sweep: the open readers captured for visitor and stranger after every step (15 readers each at the end)');
+SELECT t_assert((SELECT count(DISTINCT step) FROM g_sweep)=22 AND (SELECT count(*) FROM g_sweep WHERE step='after contact')=34
+  AND (SELECT count(DISTINCT viewer) FROM g_sweep)=2,'sweep: the open readers captured for visitor and stranger after every step (17 readers each at the end)');
 SELECT t_assert(NOT EXISTS (SELECT 1 FROM g_sweep WHERE g_pii(j)),'sweep: no legal names, contact fields, street addresses or the private client id');
 SELECT t_assert(NOT EXISTS (SELECT 1 FROM g_sweep WHERE j::text ~ '(client-ref-77|"payer_reported"|"confirmed_received"|"balance_due": [0-9]|Welds before wrap|Can start next week|Monday works)'),
   'sweep: no payment witnesses, balances, private notes or messages');
@@ -533,7 +613,8 @@ CREATE TEMP TABLE g_signs(label text, j jsonb);
 INSERT INTO g_signs VALUES ('request_inspection',:'ri'),('offer inspector',:'io'),('accept_offer inspector',:'ia'),('grant_inspection_access',:'ga'),
  ('record_inspection_findings',:'rf'),('offer mechanic',:'mo'),('cosign_provider',:'cs'),('accept_offer mechanic',:'ma'),('issue_work_order_quote',:'q1'),
  ('accept_work_order_quote',:'qa'),('issue_change_order',:'co'),('accept change order',:'coa'),('attach_job_evidence',:'att'),('attest_work_completion',:'at'),
- ('accept_work_completion',:'ac'),('issue_work_order_invoice',:'inv'),('payment payer',:'pw1'),('payment payee',:'pw2'),('request_contact',:'cr');
-SELECT t_assert((SELECT count(*) FROM g_signs)=19 AND NOT EXISTS (SELECT 1 FROM g_signs WHERE j::text ~ '"payment_authorized": true'
+ ('accept_work_completion',:'ac'),('issue_work_order_invoice',:'inv'),('payment payer',:'pw1'),('payment payee',:'pw2'),('request_contact',:'cr'),
+ ('start_work',:'st'),('post_work_request',:'pr'),('offer posted',:'mo2'),('accept_offer posted',:'ma2'),('start_work posted',:'st2');
+SELECT t_assert((SELECT count(*) FROM g_signs)=24 AND NOT EXISTS (SELECT 1 FROM g_signs WHERE j::text ~ '"payment_authorized": true'
   OR (j ? 'disbursement' AND j->>'disbursement' <> 'not_performed') OR (j ? 'money_moved' AND (j->>'money_moved')::boolean))
  AND (SELECT count(*) FROM g_signs WHERE j ? 'payment_authorized')>=14,'every Sign on the path: payment_authorized false, nothing disbursed or moved');
