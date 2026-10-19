@@ -100,3 +100,86 @@ performed versus planned work, and corroborating documents/images. Route admitte
 claims through the existing canonical owners and sanctioned writer. Reliability and
 resale stacks should consume qualified evidence separately and state their outcomes,
 cohort, horizon, denominator, uncertainty and calibration before assigning weights.
+
+## Structured request comparison
+
+`--request /private/request.json` selects a separate read-only mode in this same
+operator. It compares an attributed request against 1–10 explicit candidate records
+using the existing anonymous `get_vehicle_specs(uuid[],true)` and
+`get_field_provenance(uuid,text)` readers. It does not reread comments, images or
+source websites. Missing source requests require independent acquisition and
+interpretation; this mode does not infer a buying request from browsing or prose.
+
+Synthetic request example (not a real buyer or production observation):
+
+```json
+{
+  "schema_version": "buying_request_v1",
+  "id": "example-request",
+  "source_ref": "operator:synthetic-example",
+  "source_url": null,
+  "observed_at": "2026-10-14T00:00:00Z",
+  "recorded_at": "2026-10-14T00:00:00Z",
+  "status": "open",
+  "valid_until": null,
+  "criteria": [
+    {"id":"year","property_key":"year","operator":"between","value":[1980,1989],"unit":null,"requirement":"required","claim_scope":"listing_report"},
+    {"id":"manual","property_key":"transmission_type","operator":"eq","value":"manual","unit":null,"requirement":"preferred","claim_scope":"listing_report"}
+  ]
+}
+```
+
+```sh
+node scripts/discovery/buying-evidence.mjs \
+  --request /private/request.json --vehicles VEHICLE_UUID,OTHER_VEHICLE_UUID \
+  --out /private/new-request-comparison
+
+node scripts/discovery/buying-evidence.mjs \
+  --cache /private/new-request-comparison/capture.json \
+  --out /private/replayed-request-comparison
+
+node --test scripts/discovery/buying-evidence.test.mjs scripts/discovery/buying-evidence-matching.test.mjs
+```
+
+Requirements reference candidate property keys; they are not claims about the
+candidate. `eq`, `in`, `gte`, `lte` and inclusive `between` compare exact typed
+values. String comparisons trim and ignore case; they infer no synonyms, vehicle
+aliases, cultural meaning or unit conversions. Required and preferred criteria
+remain separate. Every hard requirement must be met before `criteria_met`; unknown,
+conflicting or empty hard requirements cannot establish a fit. A preferred mismatch
+does not disqualify a candidate. Closed, expired, unknown-status or future requests
+are refused for active evaluation. Supplied source attribution and open status are
+operator declarations, not independently verified request truth.
+
+The supported public-reader scope is eleven existing keys: year, make, model, VIN,
+interior/exterior color, engine configuration/displacement, transmission, drivetrain
+and reported odometer miles. Unsupported requirements remain visible as unknown,
+including asking price, nearby, rust-free, current installation and true mileage.
+The property catalog may contain more keys than this reader can qualify. Units are
+exact `liters`, `miles` or null as declared by these properties. Approximate values
+without bounds cannot establish an exact/range match.
+
+Only current typed canonical claims corroborated by the same observation ID, value,
+source, role and clocks in complete field provenance can qualify a predicate. The
+current record's selected listing URL scopes the match. Other listing episodes do
+not become current configuration evidence. Primitive record fields only label the
+report. They never fill missing claims. Same-listing differing reports stay
+unadjudicated counterevidence; changes in paint or mileage may be history rather
+than factual contradiction. Unknown counterevidence clocks block certainty; future
+claims do not enter an earlier cutoff. All clocks retain submillisecond precision.
+
+`capture.json` preserves the supplied request/hash, exact candidate input and read
+hashes; `report.json` and `review.html` expose every predicate, source ID and gap.
+Replaying the same captured input is deterministic. It does not reconstruct a past
+database state or a previous canonical winner from today's reader. Separate current
+reads can disagree; the custody check withholds such claims. Privacy, time, row,
+deadline and output boundaries from the existing operator remain in force, with two
+consecutive provenance failures stopping further provenance reads.
+
+This is a private operator comparison of retained listing reports. Request
+admission, active inventory, source enumeration, maintained matches, public feed,
+geographic/cultural relevance and profit remain separate missing capabilities.
+Whole-market coverage is unmeasured; the population is the exact supplied record
+manifest. Exit 0 establishes complete selected reader access, not a supported match
+or available vehicle; exit 2 retains the partial receipt. No database changes,
+source activation, paid inference or contact is performed.

@@ -335,8 +335,8 @@ struct CompsDrillView: View {
                     }
                 } else if loadError {
                     ContentUnavailableView {
-                        Label("Couldn't load comps", systemImage: "wifi.exclamationmark")
-                    } description: { Text("Check your connection.") } actions: {
+                        Label("Couldn't load comps", systemImage: "exclamationmark.triangle")
+                    } description: { Text("The read failed. Retry.") } actions: {
                         Button("Retry") { Task { loaded = false; loadError = false; await load() } }
                             .buttonStyle(.borderedProminent)
                     }

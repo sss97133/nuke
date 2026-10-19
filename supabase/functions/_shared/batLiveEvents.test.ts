@@ -275,3 +275,19 @@ Deno.test("public collector covers all 20 simultaneous closings and recovers on 
   assert.equal(recovered.size, 20);
   assert.equal(new Set(heartbeats.map(h => h.monitored_auction_id)).size, 20);
 }));
+
+Deno.test("one bid arriving by three transports with differently shaped frames is one observation key", async () => {
+  const pusher = await prepareBatLiveFrame({ ...frames[0], transport: "public_pusher" }, target);
+  const missed = await prepareBatLiveFrame({ ...frames[0], transport: "missed_comments", received_at: "2026-10-04T18:01:30Z",
+    data: { ...frames[0].data, extra_transport_field: "x", comment: { ...frames[0].data.comment, likes: 3 } } }, target);
+  const html = await prepareBatLiveFrame({ ...frames[0], transport: "direct_html", received_at: "2026-10-04T18:05:00Z",
+    data: { post_id: frames[0].data.post_id, comment: frames[0].data.comment } }, target);
+  assert.equal(pusher.kind, "bid");
+  assert.equal(pusher.content_hash, missed.content_hash);
+  assert.equal(pusher.content_hash, html.content_hash);
+  assert.equal(pusher.source_identifier, missed.source_identifier);
+  assert.equal(pusher.source_identifier, html.source_identifier);
+  // a different bid (different comment id) still gets its own key
+  const other = await prepareBatLiveFrame(frames[1], target);
+  assert.notEqual(other.source_identifier, pusher.source_identifier);
+});

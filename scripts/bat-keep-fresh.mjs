@@ -363,7 +363,10 @@ async function byCategory() {
 
 async function daily() {
   let totalNew = 0, totalChanged = 0, caughtUpStreak = 0;
-  const key = `feed-${new Date().toISOString().slice(0, 10)}`;
+  // One folder per UTC hour: a re-run within the hour resumes from its saved pages, a later run fetches fresh. Keyed by
+  // day, a second run on the same UTC day re-read the first run's pages (2026-10-15: the 23:10Z append re-read the
+  // 03:42Z catch-up's 8 pages and added no lots). The archive build reads every feed-* folder, newest fetch per URL.
+  const key = `feed-${new Date().toISOString().slice(0, 13)}`;
 
   for (let page = START_PAGE; page <= MAX_PAGES; page++) {
     let data;

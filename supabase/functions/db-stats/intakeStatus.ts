@@ -1,6 +1,7 @@
 // Read-only operator sections for the existing db-stats / SystemStatus owners.
 // Each statement has its own clock and timeout. No source bodies or job commands.
 import { intakeThrottle } from '../poll-listing-feeds/ledger.ts';
+import { SOURCE_OPERATING_OWNERS, SOURCE_OPERATING_QUERIES, shapeSourceInventory } from './sourceOperating.ts';
 export const INTAKE_TABLES = ['source_targets', 'import_queue', 'listing_page_snapshots',
   'vehicle_events', 'auction_events', 'auction_comments', 'external_identities',
   'vehicle_observations', 'vehicles', 'vehicle_images', 'vehicle_field_consensus',
@@ -17,7 +18,7 @@ export const HEALTH_JOBS = ['drain-sale-residual-fold', 'poll-listing-feeds', 'b
   'derivation-queue-drain', 'rmsothebys-discovery', 'project-retained-listing-properties',
   'qualify-bat-archived-sales', 'bat-live-pull', 'drain-vehicle-derived-queues',
   'qualify-retained-vin-references'];
-export type IntakeSection = 'coverage' | 'model' | 'jobs' | 'consumers';
+export type IntakeSection = 'coverage' | 'model' | 'jobs' | 'consumers' | 'reporting';
 export interface IntakeConnection {
   queryObject<T = Record<string, unknown>>(query: string, args?: unknown[]): Promise<{ rows: T[] }>;
 }
@@ -267,6 +268,15 @@ export async function boundedRead(conn: IntakeConnection, sql: string, args: unk
 }
 
 export async function readIntakeSection(conn: IntakeConnection, section: IntakeSection) {
+  if (section === 'reporting') {
+    const inventories = [];
+    for (const owner of SOURCE_OPERATING_OWNERS) {
+      // Independent clocks and failures: one unavailable owner cannot erase the
+      // other inventories. At most four 3-second reads on this connection.
+      inventories.push(shapeSourceInventory(owner, await boundedRead(conn, SOURCE_OPERATING_QUERIES[owner], [], '3s')));
+    }
+    return { contract: 'intake_status_v1', section, inventories };
+  }
   if (section === 'jobs') {
     const deadline = Date.now() + 20_000;
     const config = await boundedRead(conn, CONFIG_SQL, [INTAKE_JOBS]);

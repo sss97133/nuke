@@ -940,6 +940,37 @@ PS-STUDS:
     IBOOST_PERM_FH: ["9918"]         # the Blue Sea 5065 holder's 12 AWG pigtail on the 3/8 in distribution stud (the #6 lug there is 238LTP, 3/8): ProWire 9918 12-10 AWG 3/8
     GND_RET_CAB: [238LTP, 238LTP]
   wires: ["63", "6", "59", G1, G2, G3, ISO_OUT, ODY_NEG, ACC_NEG, DCDC_IN, GND_RET_CAB, PDM_BPOS, PDM15_BPOS, "52", "3", IBOOST_PERM_FH]
+  # RSI pass 37: the studs each cable end lands on, in the order of its lugs above. PS-STUDS is the DC primary's stud set;
+  # its ends live on these stud nodes (GND-BANK-ENG is the ground star's own endpoint). Read from each wire's own words
+  # (registry frm/to: "distribution stud", "starter B+ stud", "isolator stud A" ...).
+  stud_set: true
+  studs:
+    "63": [ISO-STUD-A]                    # Odyssey + to isolator stud A (Blue Sea 7700, 3/8-16)
+    "6": [DIST-STUD, STARTER-BPLUS]       # distribution stud to the starter B+ stud
+    "59": [ALT-BPLUS, DIST-STUD]          # alternator B+ stud to the distribution stud via the MEGA
+    G1: [GND-BANK-ENG, GND-BLOCK]         # ground star to the engine block near the starter
+    G2: [GND-BANK-ENG, GND-FRAME]         # ground star to the frame rail boss
+    G3: [GND-HEAD, FW-BOND]               # engine head/block strap to the firewall bond stud
+    ISO_OUT: [ISO-STUD-B, DIST-STUD]      # isolator stud B to the distribution stud
+    ODY_NEG: [GND-BANK-ENG]               # Odyssey - to the ground star
+    ACC_NEG: [GND-BANK-ENG]               # YellowTop - to the ground star
+    DCDC_IN: [DIST-STUD]                  # MIDI 60 A holder on the distribution bus
+    GND_RET_CAB: [GND-BANK-ENG]           # the cab return to the ground star
+    PDM_BPOS: [DIST-STUD]                 # MEGA 125 A holder on the distribution bus
+    PDM15_BPOS: [DIST-STUD]               # MEGA 100 A holder on the distribution bus
+    "52": [DIST-STUD]                     # MIDI 40 A holder on the distribution bus
+    "3": [DIST-STUD]                      # the step kit's own fuse on the distribution bus
+    IBOOST_PERM_FH: [DIST-STUD]           # the Blue Sea 5065 holder's pigtail on the 3/8 in distribution stud
+  stud_nodes:
+    DIST-STUD: "distribution stud and its fuse holders (MEGA 125 A, MEGA 100 A, MIDI 60 A, MIDI 40 A), downstream of isolator stud B"
+    ISO-STUD-A: "Blue Sea 7700 isolator stud A (3/8-16), battery side"
+    ISO-STUD-B: "Blue Sea 7700 isolator stud B (3/8-16), load side"
+    STARTER-BPLUS: "starter B+ stud (5/16 in, build-book assumption)"
+    ALT-BPLUS: "alternator B+ stud (Holley 197-302; 5/16 in, build-book assumption)"
+    GND-BLOCK: "engine block ground stud near the starter (G1)"
+    GND-FRAME: "frame rail ground boss (G2)"
+    GND-HEAD: "engine head/block ground strap stud (G3)"
+    FW-BOND: "firewall bond stud, engine side (G3)"
   open:
     - "topology is Dave's DC primary (battery → isolator → stud → branches) but the registry still carries the v4 runs #63/#6/#59 — the power-spine chapter re-draws them"
     - "stud sizes: starter + alternator 5/16 in is the build book's assumption; isolator studs are 3/8 in-16 (Blue Sea 7700), so 238LTP fits them"
@@ -1370,7 +1401,7 @@ AMP:
   note: "75 W x 4 at 4 ohm + 300 W x 1 at 2 ohm; 4 AWG power and ground leads, 60 A fuse; 9-13/16 x 2-1/8 x 6-3/4 in; tuned with JL's TuN app over USB"
   family: open
   kit: {}
-  wires: ["AMP_PWR_TAIL", "AMP_GND_TAIL", "RADIO_REM", "RCA_FRONT", "RCA_REAR", "RCA_SUB", "26a", "26b", "27a", "27b", "28a", "28b", "29a", "29b", "30a", "30b"]
+  wires: ["AMP_PWR_TAIL", "AMP_GND_TAIL", "RADIO_REM", "RCA_FRONT", "RCA_REAR", "RCA_SUB", "26a", "26b", "27a", "27b", "28a", "28b", "29a", "29b", "30a", "30b", "30c", "30d"]
   open: ["mount spot (cargo area, near the woofers)", "input count for the radio's sub RCA (see RCA_SUB)"]
   sources: ["web_snapshots/www.crutchfield.com__JL-Audio-VX700-5i.md ('4-gauge power and ground leads and a 60-amp fuse recommended'; DSP input routing and mixing)",
             "owner 2026-09-27: 'kicker is not cool... what a brand for a 100k truck'"]
@@ -1391,16 +1422,16 @@ SUB:
   device: "woofer 1 of 2 — JBL Club 102SL 10 in shallow-mount (3.25 in deep), impedance switch set to 4 ohm; the two in parallel = 2 ohm on the amp's 300 W sub channel; lined up at Crutchfield, $274.95 each"
   family: open
   kit: {}
-  wires: ["30a", "30b", SUB_JMP_P, SUB_JMP_N]
+  wires: ["30a", "30b"]
   open: ["enclosure: sealed box sized for two shallow 10s, built or bought once the cargo-area spot is set"]
   sources: ["owner 2026-09-25: 'we are gonna do jbl 10\" compact woofers, an amp not sure which and then the appropriate other speakers'",
             "web_snapshots/www.crutchfield.com__JBL-Club-102SL.md (in stock, $274.95 each; the Club WS1000 page lists it as the in-stock replacement)"]
 SUB-2:
   where: rear
-  device: "woofer 2 of 2 — JBL Club 102SL, switch at 4 ohm, jumpered in parallel with woofer 1"
+  device: "woofer 2 of 2 — JBL Club 102SL, switch at 4 ohm, on the amp sub harness's second lead pair (paralleled inside the harness, JL guide)"
   family: open
   kit: {}
-  wires: [SUB_JMP_P, SUB_JMP_N]
+  wires: ["30c", "30d"]
   sources: ["web_snapshots/www.crutchfield.com__JBL-Club-102SL.md"]
 GND-SPLICE-REAR:
   where: rear
@@ -1796,6 +1827,15 @@ SPL-PDM15-OUT7:
   wires: ["64_PT1", "64_PT2", "64"]
   note: "in-line MiniSeal M81824/1-3: 2 × 2,580 = 5,160 CM in, 16 AWG out"
   sources: ["MoTeC PDM user manual p.43 (20 A Output 7 on B5 with B11)", "ProWire 3137CT cavities 16-12 AWG"]
+
+SPL-PDM15-OUT8:
+  where: engine
+  device: "PDM15 OUT8 pigtail splice — pins B7 + B13 (2 × 20 AWG) joined to the A/C clutch feed #23 (18 AWG)"
+  family: miniseal
+  kit: {M81824/1-2: 1}
+  wires: ["23_PT1", "23_PT2", "23"]
+  note: "in-line MiniSeal M81824/1-2: 2 x 20 AWG in, 18 AWG out (RSI pass 24: the clutch moved off the 8 A OUT11 so its feed can be 18 AWG)"
+  sources: ["MoTeC PDM user manual p.43 (20 A Output 8 on B7 with B13)", "MoTeC PDM user manual p.6, p.48 (20#-16# on 20 A outputs)"]
 
 # ---------------- iBooster candidates (IBST-CAN, BFL) — research/2026-09-28_ibooster-gen2-wiring.md §6 and A4
 IBST-DIAG:

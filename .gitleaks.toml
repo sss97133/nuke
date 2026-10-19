@@ -72,6 +72,13 @@ title = "Nuke Key Guardian"
       '''^\n?\+?MODEL_DIGEST = "(5ced39dfa4bac325)(dc183dd1e4febaa1)(c46b3ea28bce4889)(6c8e69c1e79611cc)"$''',
     ]
 
+  # SHA-256 pins of public auction pages in the extraction gold fixture (evidence digests, not credentials).
+  [[rules.allowlists]]
+    condition = "AND"
+    paths = ['''(^|/)scripts/assays/extraction-gold-v\d+\.json$''']
+    regexTarget = "line"
+    regexes = ['''"sha256": "[0-9a-f]{64}" \},?$''']
+
 [[rules]]
   id = "modal-token"
   description = "Modal Token"

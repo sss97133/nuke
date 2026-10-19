@@ -25,6 +25,7 @@ FIELDS = {
     "objective": {"type": "string", "minLength": 1},
     "acceptance": {"type": "array", "minItems": 1, "items": {"type": "string", "minLength": 1}},
     "status": {"enum": ["active", "waiting_review", "blocked", "complete"]},
+    "ready_actions": {"type": "array", "items": {"type": "string", "minLength": 1}},
     "next_action": {"type": "string"},
     "progress": {"type": "string"},
     "blocker": {"type": "string"},
@@ -106,7 +107,7 @@ class Controller:
         # Persist ownership before creation; never replace or prune an unfinished worktree.
         self.state.update(status="active", task_id=task_id, worktree=str(wt),
                           session_id=str(uuid.uuid4()), session_started=False, handoff=None,
-                          failures=0, stagnant=0, next_check=0)
+                          failures=0, stagnant=0, next_check=0, ready_actions_reassessed=False)
         self.save()
         command(["git", "worktree", "add", "-q", "--detach", str(wt), "origin/main"], self.repo)
         deps = wt / "nuke_frontend/node_modules"
@@ -147,6 +148,9 @@ class Controller:
             raise ValueError("objective and acceptance criteria are required")
         if handoff["status"] not in FIELDS["status"]["enum"]:
             raise ValueError("unknown handoff status")
+        if not isinstance(handoff["ready_actions"], list) or any(
+                not isinstance(action, str) or not action.strip() for action in handoff["ready_actions"]):
+            raise ValueError("ready_actions must be an array of nonempty descriptions of authorized independent steps")
         if not isinstance(handoff["prs"], list) or any(type(p) is not int or p < 1 for p in handoff["prs"]):
             raise ValueError("invalid PR numbers")
         if not isinstance(handoff["superseded_prs"], list) or any(not isinstance(e, dict)
@@ -173,6 +177,8 @@ class Controller:
         if handoff["status"] == "waiting_review" and not any(p["state"] == "OPEN" for p in prs):
             raise ValueError("waiting_review requires an open PR")
         if handoff["status"] == "complete":
+            if handoff["ready_actions"]:
+                raise ValueError("completion cannot leave ready actions unfinished")
             # Mechanical minimum, NOT an independent proof of the model's semantic claims.
             merged = {p["number"] for p in prs if p["state"] == "MERGED"}
             replaced = {e["pr"] for e in handoff["superseded_prs"] if e["replacement"] in merged}
@@ -184,9 +190,11 @@ class Controller:
             if command(["git", "status", "--porcelain"], wt):
                 raise ValueError("uncommitted work cannot be reported as complete")
         stagnant = self.state.get("stagnant", 0) + 1 if previous == handoff else 0
-        self.state.update(handoff=handoff, status=handoff["status"], pr_snapshot=prs,
+        # Keep the proposed blocker in the handoff; it only gates dependent work.
+        status = "active" if handoff["ready_actions"] else handoff["status"]
+        self.state.update(handoff=handoff, status=status, pr_snapshot=prs,
                           stagnant=stagnant, failures=0, reason=handoff["blocker"], next_check=0)
-        if stagnant >= 2 and handoff["status"] == "active":
+        if stagnant >= 2 and status == "active":
             self.state.update(status="blocked", reason="Three identical handoffs without progress; inspect then --resume.")
         if self.state["status"] == "complete":
             self.state["completion_basis"] = "agent-reported acceptance receipts; clean worktree; linked PRs merged or closed with recorded merged replacements"
@@ -209,6 +217,8 @@ class Controller:
                   f"Remaining allowance: {int(remaining)} seconds. Report: {self.logs / (str(dt.datetime.now(dt.timezone.utc).date()) + '.md')}.\n"
                   f"Shared lane/history location: {self.repo}/.claude/LANES.md and {self.repo}/DONE.md (targeted recent reads).\n"
                   f"Controller feedback: {self.state.get('reason', '')}\n"
+                  "Exhaust ready_actions that are independently authorized before waiting on other steps. "
+                  "Blocker and review holds still apply to dependent actions; readiness grants no new authority.\n"
                   f"Persistent handoff (preserve objective and acceptance exactly):\n{json.dumps(self.state.get('handoff'))}\n\n"
                   + command(["git", "show", "origin/main:scripts/night-run/work-order.md"], self.repo))
         identity = ["--resume", self.state["session_id"]] if self.state["session_started"] else ["--session-id", self.state["session_id"]]
@@ -240,7 +250,7 @@ class Controller:
         if not isinstance(envelope, dict):
             return self.fail(f"CLI exit {result.returncode}; JSON result is not an object. See {out_path.name}.")
         if envelope.get("is_error") and re.search(
-                r"rate.?limit|usage.?limit|hit your limit|quota exceeded", json.dumps(envelope), re.I):
+                r"rate.?limit|usage.?limit|hit your (?:weekly )?limit|quota exceeded", json.dumps(envelope), re.I):
             self.state.update(next_check=time.time() + 21600, reason="Subscription limit; retry in six hours with the same objective/session.")
             self.save()
             self.note(self.state["reason"])
@@ -262,12 +272,17 @@ class Controller:
         if self.state.pop("in_flight", None):
             self.note("Recovered interrupted invocation; reservation retained, session will resume within budget.")
         self.save()
-        if self.state["status"] == "blocked":
+        handoff = self.state.get("handoff") or {}
+        reassess_ready = (self.state["status"] in ("waiting_review", "blocked")
+                         and handoff.get("status") == self.state["status"] and "ready_actions" not in handoff
+                         and not self.state.get("ready_actions_reassessed")
+                         and self.state.get("failures", 0) < 3 and self.state.get("stagnant", 0) < 2)
+        if self.state["status"] == "blocked" and not reassess_ready:
             print(f"blocked: {self.state.get('reason')}")
             return 0
         if now < self.state.get("next_check", 0):
             return 0
-        if self.state["status"] == "waiting_review":
+        if self.state["status"] == "waiting_review" and not reassess_ready:
             snapshot = self.pr_state(self.state["handoff"]["prs"])
             if snapshot == self.state.get("pr_snapshot"):
                 return 0  # no inference for an unchanged review/check/deployment gate
@@ -282,7 +297,15 @@ class Controller:
             return 0
         if self.state["status"] in ("idle", "complete"):
             self.prepare()
-        return self.invoke(self.worktree(), remaining, lock_fd)
+        wt = self.worktree()
+        if reassess_ready:
+            # Initiate once; unfinished assessment then follows normal active continuation.
+            self.state.update(ready_actions_reassessed=True, status="active", reason=(
+                "Legacy checkpoint has no ready_actions. Continue its readiness assessment within the existing allowance: identify only already "
+                "authorized independent steps, or return an empty array and preserve the existing dependency. "
+                "Do not infer approval or lift any hold."))
+            self.save()
+        return self.invoke(wt, remaining, lock_fd)
 
 
 def main():

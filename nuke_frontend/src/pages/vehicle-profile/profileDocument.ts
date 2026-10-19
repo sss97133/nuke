@@ -14,8 +14,19 @@ type Masthead = Extract<Section, { kind: 'masthead' }>;
 /** The masthead as the read ships it: the raw identity columns in place of tokens. */
 export type MastheadRead = Omit<Masthead, 'identity'> & { identity_source: VehicleIdentitySource };
 export type ReadSection = MastheadRead | Exclude<Section, { kind: 'masthead' }>;
+/** The listing's full prose as captured (the newest readable description capture), or null. */
+export type ProfileDescription = {
+  text: string;
+  length: number;
+  source: { kind: string; url: string | null; method: string | null };
+  observed_at: string | null;
+};
 /** What vehicle_profile_read returns. */
-export type ProfileRead = Omit<ProfileDocument, 'sections'> & { sections: ReadSection[] };
+export type ProfileRead = Omit<ProfileDocument, 'sections'> & {
+  sections: ReadSection[];
+  description?: ProfileDescription | null;
+  identity_marks?: Record<string, unknown>[];
+};
 
 const SECTION_KINDS = new Set(['masthead', 'strip', 'measures', 'timeline', 'table', 'gallery']);
 const VIEWERS = new Set(['anon', 'contributor', 'owner']);

@@ -70,6 +70,7 @@ else
   unset PGPASSWORD PGDATABASE PGSERVICE
 fi
 psql=("$pg_bin/psql" -X -v ON_ERROR_STOP=1)
+export DB_CONTRACT_PSQL="$pg_bin/psql"
 in_actions=false; stream=/dev/null
 if [[ "${GITHUB_ACTIONS:-}" == true ]]; then in_actions=true; stream=/dev/stdout; fi
 

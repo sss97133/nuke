@@ -1,4 +1,4 @@
-export const TARGET = 'https://www.facebook.com/marketplace/category/vehicles/?minYear=1960&maxYear=1990&sortBy=creation_time_descend';
+export const TARGET = 'https://www.facebook.com/marketplace/category/vehicles/?minYear=1964&maxYear=1991&sortBy=creation_time_descend&topLevelVehicleType=car_truck&exact=false';
 export const HOST = 'com.nuke.marketplace_capture';
 export const LIMITS = Object.freeze({ cadenceMinutes: 15, minCadenceMinutes: 5, maxCards: 50, maxCycleCards: 200, scrollSteps: 4, maxQueue: 8, maxBytes: 200000, maxPassesDay: 96 });
 export function searchUrl(value) {

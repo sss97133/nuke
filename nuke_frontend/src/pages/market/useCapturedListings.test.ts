@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { createClient } from '@supabase/supabase-js';
 const fixture = vi.hoisted(() => ({ from: vi.fn() }));
 vi.mock('../../lib/supabase', () => ({ supabase: { from: fixture.from } }));
 import { readCapturedListings, sourceLink } from './useCapturedListings';
@@ -9,11 +10,60 @@ function row(id: string, vehicle_id: string | null = null, source_url = 'https:/
     event_status: 'active', created_at: '2026-10-13T02:31:04.821+00:00', updated_at: '2026-10-13T02:32:00Z' };
 }
 function query(data: unknown[], error: Error | null = null) {
-  const q: any = { then: (resolve: any) => Promise.resolve({ data, error }).then(resolve) };
-  for (const name of ['select', 'in', 'eq', 'is', 'or', 'order', 'limit', 'abortSignal', 'lt']) q[name] = vi.fn(() => q);
+  const q: any = { then: (resolve: any) => Promise.resolve({
+    data: q.is.mock.calls.some(([column, value]: unknown[]) => column === 'created_at' && value === null)
+      ? data.filter((row: any) => row.created_at === null) : data, error,
+  }).then(resolve) };
+  for (const name of ['select', 'in', 'eq', 'is', 'not', 'or', 'order', 'limit', 'abortSignal', 'lt', 'lte']) q[name] = vi.fn(() => q);
   return q;
 }
-beforeEach(() => fixture.from.mockReset());
+
+// Execute the real client's serialized filters against a retained fixture. The
+// expected traversal below is computed independently as one NULLS LAST ordering.
+function serveEvents(rows: Array<Omit<ReturnType<typeof row>, 'created_at'> & { created_at: string | null }>) {
+  const requests: URL[] = [];
+  const client = createClient('https://fixture.supabase.co', 'fixture-anon-key', {
+    auth: { persistSession: false, autoRefreshToken: false },
+    global: { fetch: async (input) => {
+      const url = new URL(String(input)); requests.push(url);
+      const params = url.searchParams;
+      let data = [...rows];
+      const sources = params.get('source_platform')!.slice(4, -1).split(',');
+      data = data.filter(row => sources.includes(row.source_platform));
+      for (const filter of params.getAll('created_at')) {
+        if (filter === 'not.is.null') data = data.filter(row => row.created_at !== null);
+        else if (filter === 'is.null') data = data.filter(row => row.created_at === null);
+        else if (filter.startsWith('lte.')) data = data.filter(row => row.created_at !== null && Date.parse(row.created_at) <= Date.parse(filter.slice(4)));
+        else throw new Error(`Unsupported fixture date filter: ${filter}`);
+      }
+      const or = params.get('or');
+      if (or) {
+        const at = /created_at\.lt\.([^,]+)/.exec(or)![1];
+        const id = /id\.lt\.([a-f0-9-]+)/.exec(or)![1];
+        data = data.filter(row => row.created_at === null ? or.includes('created_at.is.null')
+          : Date.parse(row.created_at) < Date.parse(at) || (Date.parse(row.created_at) === Date.parse(at) && row.id < id));
+      }
+      const id = params.get('id');
+      if (id) data = data.filter(row => row.id < id.slice(3));
+      const orders = params.get('order')!.split(',');
+      data.sort((a, b) => {
+        for (const order of orders) {
+          if (order.startsWith('created_at.')) {
+            if (a.created_at === null && b.created_at !== null) return order.endsWith('nullsfirst') ? -1 : 1;
+            if (b.created_at === null && a.created_at !== null) return order.endsWith('nullsfirst') ? 1 : -1;
+            const delta = Date.parse(b.created_at!) - Date.parse(a.created_at!);
+            if (delta) return delta;
+          } else if (a.id !== b.id) return a.id < b.id ? 1 : -1;
+        }
+        return 0;
+      });
+      return new Response(JSON.stringify(data.slice(0, Number(params.get('limit')))), { status: 200, headers: { 'Content-Type': 'application/json' } });
+    } },
+  });
+  fixture.from.mockImplementation((table: string) => client.from(table));
+  return requests;
+}
+beforeEach(() => { fixture.from.mockReset(); });
 describe('public captured listing boundary', () => {
   it('preserves actual unresolved presentations but withholds hidden/missing linked parents and arbitrary URLs', async () => {
     const events = query([row('unresolved'), row('hidden', vehicleId), row('not-public-source', null, 'https://internal.example/private'), row('public', 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb')]);
@@ -62,7 +112,8 @@ describe('public captured listing boundary', () => {
     const events = query([{ ...row('unknown-clock'), created_at: null }]); fixture.from.mockReturnValue(events);
     const result = await readCapturedListings('craigslist', { at: null, id: vehicleId });
     expect(result.items[0].created_at).toBeNull();
-    expect(events.order).toHaveBeenCalledWith('created_at', { ascending: false, nullsFirst: false });
+    expect(events.order).toHaveBeenCalledWith('id', { ascending: false });
+    expect(events.not).not.toHaveBeenCalled();
     expect(events.is).toHaveBeenCalledWith('created_at', null); expect(events.lt).toHaveBeenCalledWith('id', vehicleId);
   });
   it('qualifies unresolved rows against actual supported listing paths and intake aliases', () => {
@@ -85,5 +136,40 @@ describe('public captured listing boundary', () => {
     const events = query([]); fixture.from.mockReturnValue(events);
     await readCapturedListings('bat'); expect(events.in).toHaveBeenCalledWith('source_platform', ['bat', 'bring_a_trailer']);
     await readCapturedListings('barrett_jackson'); expect(events.in).toHaveBeenCalledWith('source_platform', ['barrett_jackson', 'barrettjackson']);
+  });
+  it.each([0, 1, 49, 50, 51, 80])('preserves every row across tied dates and the null tail with %i dated rows', async datedCount => {
+    const records = Array.from({ length: datedCount + 67 }, (_, i) => ({
+      ...row(`${String(i).padStart(8, '0')}-0000-0000-0000-000000000000`),
+      created_at: i >= datedCount ? null : i < datedCount - 3 ? '2026-10-13T02:00:00Z' : '2026-10-12T02:00:00Z',
+    }));
+    const requests = serveEvents([...records].reverse());
+    const expected = [...records].sort((a, b) => {
+      if (a.created_at !== b.created_at) return a.created_at === null ? 1 : b.created_at === null ? -1 : Date.parse(b.created_at) - Date.parse(a.created_at);
+      return a.id < b.id ? 1 : -1;
+    });
+    let cursor: Parameters<typeof readCapturedListings>[1];
+    const seen: string[] = [];
+    do {
+      const page = await readCapturedListings('craigslist', cursor);
+      seen.push(...page.items.map(row => row.id)); cursor = page.next;
+      expect(seen.length).toBeLessThanOrEqual(records.length);
+    } while (cursor);
+    expect(seen).toEqual(expected.map(row => row.id));
+    expect(requests.every(url => Number(url.searchParams.get('limit')) <= 51)).toBe(true);
+    const datedReads = requests.filter(url => url.searchParams.getAll('created_at').includes('not.is.null'));
+    expect(datedReads.length).toBeGreaterThan(0);
+    expect(datedReads.every(url => url.searchParams.get('order') === 'created_at.desc.nullsfirst,id.desc')).toBe(true);
+    for (const url of datedReads.filter(url => url.searchParams.has('or'))) {
+      expect(url.searchParams.getAll('created_at').some(filter => filter.startsWith('lte.'))).toBe(true);
+      expect(url.searchParams.get('or')).not.toContain('created_at.is.null');
+    }
+  });
+  it('rejects a failed undated tail instead of claiming a complete dated page', async () => {
+    const dated = query([row('dated')]);
+    const undated = query([], new Error('undated reader unavailable'));
+    fixture.from.mockReturnValueOnce(dated).mockReturnValueOnce(undated);
+    await expect(readCapturedListings('craigslist')).rejects.toThrow('undated reader unavailable');
+    expect(undated.limit).toHaveBeenCalledWith(50);
+    expect(undated.abortSignal.mock.calls[0][0]).toBe(dated.abortSignal.mock.calls[0][0]);
   });
 });

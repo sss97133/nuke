@@ -76,14 +76,72 @@ function parseYearMakeModel(makeModelStr: string): { make: string | null; model:
   };
 }
 
+function textOf(raw: string | undefined): string | null {
+  const t = (raw ?? "").replace(/&#0?39;|&apos;/g, "'").replace(/&quot;/g, '"').replace(/&amp;/g, "&").replace(/\s+/g, " ").trim();
+  return t || null;
+}
+
+/**
+ * The post's whole photo gallery, in gallery order, at full size. The page lists the gallery twice: JSON-LD `image`
+ * (which carries a subset on many posts) and the `imgList` script variable the gallery viewer itself reads (every photo,
+ * 600x450 urls). Craigslist serves each photo at _1200x900 as well; the size is a suffix on the same image id.
+ * Measured 2026-10-15: every stored Craigslist image URL was the 600x450 size.
+ */
+export const CRAIGSLIST_FULL_SIZE = "1200x900";
+
+export function fullSizeImageUrl(url: string): string {
+  return url.replace(/_\d+x\d+c?\.jpg(\?.*)?$/i, `_${CRAIGSLIST_FULL_SIZE}.jpg`);
+}
+
+/** The image id without its size suffix: the key two sizes of one photo share. */
+export function imageKey(url: string): string {
+  return (url.split("/").pop() ?? url).replace(/_\d+x\d+c?\.jpg(\?.*)?$/i, "");
+}
+
+export function extractGallery(html: string, jsonLdImages: string[] = []): string[] {
+  const out: string[] = [];
+  const seen = new Set<string>();
+  const add = (u: unknown) => {
+    if (typeof u !== "string" || !u.startsWith("https://")) return;
+    const k = imageKey(u);
+    if (seen.has(k)) return;
+    seen.add(k);
+    out.push(fullSizeImageUrl(u));
+  };
+  const start = html.search(/var\s+imgList\s*=\s*\[/);
+  if (start >= 0) {
+    const open = html.indexOf("[", start);
+    let depth = 0, inStr = false, esc = false, end = -1;
+    for (let i = open; i < html.length; i++) {
+      const c = html[i];
+      if (inStr) { if (esc) esc = false; else if (c === "\\") esc = true; else if (c === '"') inStr = false; continue; }
+      if (c === '"') inStr = true;
+      else if (c === "[") depth++;
+      else if (c === "]" && --depth === 0) { end = i; break; }
+    }
+    if (end > open) {
+      try {
+        const list = JSON.parse(html.slice(open, end + 1));
+        if (Array.isArray(list)) for (const it of list) add(it?.url);
+      } catch { /* fall back to the JSON-LD list */ }
+    }
+  }
+  for (const u of jsonLdImages) add(u);
+  return out;
+}
+
 export function extractFromHtml(html: string, url: string): CraigslistExtracted {
   // Parse JSON-LD structured data
   const jsonLd = extractJsonLd(html);
 
   // Extract title and basic info
-  const title = jsonLd?.name || null;
+  // A post with no asking price carries no Product JSON-LD, so no name and no place there (measured 2026-10-15: 25 of 332
+  // post pages in 10 h were refused as "lacks full listing evidence" for this alone). The page's own title line and its
+  // geo.placename meta hold the same two facts.
+  const title = jsonLd?.name || textOf(html.match(/<span id="titletextonly">([^<]*)<\/span>/i)?.[1]) || null;
   const price = jsonLd?.offers?.price ? Math.round(parseFloat(jsonLd.offers.price)) : null;
-  const location = jsonLd?.offers?.availableAtOrFrom?.address?.addressLocality || null;
+  const location = jsonLd?.offers?.availableAtOrFrom?.address?.addressLocality
+    || textOf(html.match(/<meta name="geo\.placename" content="([^"]*)"/i)?.[1]) || null;
 
   // Extract year from HTML attributes (it's a span class, not attr class)
   const yearStr = extractSpanValue(html, 'year');
@@ -104,18 +162,21 @@ export function extractFromHtml(html: string, url: string): CraigslistExtracted 
     description = stripTags(
       descMatch[1]
         .replace(/<div class="print-information[^>]*>[\s\S]*?<\/div>/g, '')
-        .replace(/<br\s*\/?>/gi, '\n'),
+        .replace(/<br\s*\/?>/gi, '\n')
+        .replace(/<\/(p|div|li|ul|ol|h[1-6])>/gi, '\n'),
     )
-      .replace(/\s+/g, ' ')
+      .replace(/[ \t\r\f\v]+/g, ' ')
+      .replace(/ ?\n ?/g, '\n')
+      .replace(/\n{3,}/g, '\n\n')
       .trim()
-      .slice(0, 5000) || null;
+      .slice(0, 30000) || null;
   }
 
   // Extract images from JSON-LD
-  const image_urls: string[] = [];
-  if (jsonLd?.image && Array.isArray(jsonLd.image)) {
-    image_urls.push(...jsonLd.image.filter((url: string) => url && url.startsWith('https://')));
-  }
+  const image_urls: string[] = extractGallery(
+    html,
+    jsonLd?.image && Array.isArray(jsonLd.image) ? jsonLd.image.filter((url: string) => url && url.startsWith('https://')) : [],
+  );
 
   return {
     url,

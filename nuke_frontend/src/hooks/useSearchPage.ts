@@ -5,6 +5,7 @@ import { track } from '../lib/track';
 import { ingestVehicle } from '../services/aiDataIngestion';
 import type { SearchResult, SearchResultType } from '../types/search';
 import { parseQuery } from '../lib/search/queryParser';
+import { buildMarketScopeUrl, resolveMarketScopeQuery, resolveSynchronousMarketAlias } from '../lib/search/marketScopeResolver';
 
 /* ─── A VIN: 17 characters, no I, O or Q ─── */
 const VIN_RE = /^[A-HJ-NPR-Z0-9]{17}$/i;
@@ -124,20 +125,35 @@ export interface CohortTarget {
 function parseCohort(q: string): CohortTarget | null {
   const t = q.trim();
   const m = t.match(/^(1[89]\d{2}|20\d{2})\s+([A-Za-z][A-Za-z-]*)\s+(.+?)\s*$/);
-  if (!m) return null;
-  const year = parseInt(m[1], 10);
-  if (year < 1885 || year > new Date().getFullYear() + 1) return null;
-  const make = m[2];
-  const model = m[3].trim();
-  if (!model) return null;
-  const slug = (s: string) => encodeURIComponent(s.toLowerCase());
-  return {
-    year,
-    make,
-    model,
-    label: `${year} ${make} ${model}`,
-    path: `/cohort/${slug(make)}/${slug(model)}/${year}`,
-  };
+  if (m) {
+    const year = parseInt(m[1], 10);
+    if (year >= 1885 && year <= new Date().getFullYear() + 1) {
+      const make = m[2];
+      const model = m[3].trim();
+      if (model) {
+        const slug = (s: string) => encodeURIComponent(s.toLowerCase());
+        return {
+          year,
+          make,
+          model,
+          label: `${year} ${make} ${model}`,
+          path: `/cohort/${slug(make)}/${slug(model)}/${year}`,
+        };
+      }
+    }
+  }
+  const alias = resolveSynchronousMarketAlias(t);
+  if (alias) {
+    const modelLabel = alias.model || alias.family_name || '';
+    return {
+      year: alias.year ?? 0,
+      make: alias.make,
+      model: modelLabel,
+      label: [alias.year, alias.make, modelLabel].filter(Boolean).join(' '),
+      path: buildMarketScopeUrl(alias),
+    };
+  }
+  return null;
 }
 
 function mapRawResult(r: any): SearchResult {
@@ -206,6 +222,8 @@ export function useSearchPage() {
   // Detect make from query or URL params for browse_stats
   const detectedMake = useMemo(() => {
     if (urlMake) return urlMake;
+    const syncAlias = resolveSynchronousMarketAlias(query);
+    if (syncAlias?.make) return syncAlias.make;
     // Simple detection: if first word of query matches a known pattern
     const q = query.trim();
     if (!q) return '';
@@ -370,7 +388,7 @@ export function useSearchPage() {
         }, () => { /* stats are decoration — never surface their failures */ });
     }
 
-    searchPromise.then((searchRes) => {
+    searchPromise.then(async (searchRes) => {
       if (lastQueryRef.current !== q) return;
       const { data, error } = searchRes;
 
@@ -381,7 +399,60 @@ export function useSearchPage() {
         return;
       }
 
-      const mapped: SearchResult[] = data.results.map(mapRawResult);
+      let mapped: SearchResult[] = data.results.map(mapRawResult);
+      const syncAlias = resolveSynchronousMarketAlias(q);
+      const canonicalModel = syncAlias?.model || syncAlias?.family_name || '';
+      if (
+        syncAlias?.make &&
+        canonicalModel &&
+        canonicalModel.toLowerCase() !== q.toLowerCase() &&
+        typeof (supabase as any).from === 'function'
+      ) {
+        try {
+          const { data: canonicalVehicles } = await supabase
+            .from('vehicles')
+            .select('id, year, make, model, trim, title, vin, primary_image_url, sale_price, asking_price, current_value, is_for_sale, sale_status, mileage, transmission, updated_at')
+            .eq('is_public', true)
+            .ilike('make', syncAlias.make)
+            .ilike('model', `%${canonicalModel}%`)
+            .order('sale_price', { ascending: false, nullsFirst: false })
+            .limit(60);
+          if (lastQueryRef.current !== q) return;
+          if (Array.isArray(canonicalVehicles) && canonicalVehicles.length > 0) {
+            const expanded: SearchResult[] = canonicalVehicles.map((v: any) => mapRawResult({
+              id: v.id,
+              type: 'vehicle',
+              title: [v.year, v.make, v.model].filter(Boolean).join(' ') || v.title || 'Vehicle',
+              subtitle: v.trim || v.title || '',
+              image_url: v.primary_image_url || undefined,
+              relevance_score: 1,
+              metadata: {
+                year: v.year,
+                make: v.make,
+                model: v.model,
+                vin: v.vin,
+                image_url: v.primary_image_url,
+                sale_price: v.sale_price,
+                asking_price: v.asking_price,
+                current_value: v.current_value,
+                is_for_sale: v.is_for_sale,
+                sale_status: v.sale_status,
+                mileage: v.mileage,
+                transmission: v.transmission,
+                updated_at: v.updated_at,
+              },
+            }));
+            const seenIds = new Set<string>();
+            mapped = [...expanded, ...mapped].filter((r) => {
+              if (seenIds.has(r.id)) return false;
+              seenIds.add(r.id);
+              return true;
+            });
+          }
+        } catch {
+          // Keep base results if canonical expansion fails
+        }
+      }
       // Prioritize results with images — users see photos, not placeholders
       mapped.sort((a, b) => (b.image_url ? 1 : 0) - (a.image_url ? 1 : 0));
       setResults(mapped);

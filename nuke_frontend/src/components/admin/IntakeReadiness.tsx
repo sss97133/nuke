@@ -7,8 +7,9 @@ import { useOrderBook, shapeOrderBook } from '../../pages/stacks/orderBookReader
 import { VehicleIdentity } from '../common/MakeIdentity';
 import './IntakeReadiness.css';
 import FacebookListingHistory from './FacebookListingHistory';
+import SourceOperatingInventory, { readSourceOperating, retainSourceOperating, type SourceOperatingReading } from './SourceOperatingInventory';
 
-type Section = 'coverage' | 'model' | 'jobs' | 'consumers';
+type Section = 'reporting' | 'coverage' | 'model' | 'jobs' | 'consumers';
 type Source = { source_slug: string; total_targets: number; in_queue: number; extracted: number; gap: number; failed: number; skipped: number;
   organization_id?: string | null; display_name?: string | null; base_url?: string | null };
 type Table = { table_name: string; atlas_present: boolean; est_rows: number; n_cols: number; n_cols_described: number;
@@ -40,7 +41,7 @@ type Reading = { contract: string; section: Section; status?: string; measured_a
     sources: Record<string, { enabled?: boolean; max_ingests?: number }> } } };
 
 // Start with bounded metadata, then avoid overlapping the two aggregate readers.
-const sections: Section[] = ['model', 'consumers', 'coverage', 'jobs'];
+const sections: Section[] = ['reporting', 'model', 'consumers', 'coverage', 'jobs'];
 const count = (n: unknown) => typeof n === 'number' && Number.isSafeInteger(n) && n >= 0 ? n.toLocaleString() : 'Unmeasured';
 const time = (s: string | null | undefined) => s && Number.isFinite(Date.parse(s)) ? new Date(s).toLocaleString() : 'Unmeasured';
 const validActivity = (reading: Reading['activity']) => reading?.status === 'measured'
@@ -182,6 +183,7 @@ export function RetainedBidReplay() {
 
 export default function IntakeReadiness({ arrivals }: { arrivals?: ReactNode }) {
   const [readings, setReadings] = useState<Partial<Record<Section, Reading>>>({});
+  const [reporting, setReporting] = useState<SourceOperatingReading | null>(null);
   const [failed, setFailed] = useState<Section[]>([]);
   const [refresh, setRefresh] = useState(0);
   const [loading, setLoading] = useState(true);
@@ -204,9 +206,16 @@ export default function IntakeReadiness({ arrivals }: { arrivals?: ReactNode }) 
       try {
         const signal = AbortSignal.any([controller.signal, AbortSignal.timeout(25_000)]);
         const { data, error } = await supabase.functions.invoke(`db-stats?intake=${section}`, { method: 'GET', signal });
-        if (error || !validReading(data, section)) throw new Error('unavailable');
+        if (error) throw new Error('unavailable');
+        if (section === 'reporting') {
+          const next = readSourceOperating(data);
+          if (!next) throw new Error('unavailable');
+          if (!cancelled) setReporting(previous => retainSourceOperating(previous, next));
+        } else {
+          if (!validReading(data, section)) throw new Error('unavailable');
+          if (!cancelled) setReadings(previous => ({ ...previous, [section]: data }));
+        }
         if (!cancelled) {
-          setReadings(previous => ({ ...previous, [section]: data }));
           setFailed(previous => previous.filter(s => s !== section));
         }
       } catch {
@@ -277,8 +286,8 @@ export default function IntakeReadiness({ arrivals }: { arrivals?: ReactNode }) 
 
     <nav className="status-flow" aria-label="Explore the data flow">
       <a href="#status-sources" onClick={() => setSourcesOpen(true)}>
-        <span className="status-kicker">01 · SOURCES</span><strong>{coverage ? count(sources.length) : '…'}</strong>
-        <span>{coverage?.complete === false ? 'sources in returned inventory slice' : 'sources in target inventory'}</span><small>{totals ? `${count(totals.completed)} / ${count(totals.targets)} URL queue matches complete` : 'Coverage reading pending or unavailable'}{coverage && <><br />Read {time(coverage.measured_at)}</>}</small><em>Inspect capture gaps →</em>
+        <span className="status-kicker">01 · SOURCE FAMILIES</span><strong>{coverage ? count(sources.length) : '…'}</strong>
+        <span>{coverage?.complete === false ? 'source families with known target URLs · returned slice' : 'source families with known target URLs'}</span><small>{totals ? `${count(totals.completed)} / ${count(totals.targets)} URL queue matches complete` : 'Coverage reading pending or unavailable'}{coverage && <><br />Read {time(coverage.measured_at)}</>}</small><em>Inspect capture gaps →</em>
       </a>
       <a href="#status-model" onClick={() => { setSelectedTable('vehicle_observations'); setModelOpen(true); }}>
         <span className="status-kicker">02 · RETAINED EVIDENCE</span><strong>{typeof observationRows === 'number' && Number.isFinite(observationRows) && observationRows >= 0 ? `≈${count(Math.round(observationRows))}` : 'Unmeasured'}</strong>
@@ -294,6 +303,8 @@ export default function IntakeReadiness({ arrivals }: { arrivals?: ReactNode }) 
       </a>
     </nav>
     <p className="status-basis">Independent readings of the same machine. URL completion, stored structure, job checks and delivered answers have different scopes.</p>
+
+    <SourceOperatingInventory reading={reporting} failed={failed.includes('reporting')} loading={loading} />
 
     <div className="status-operating-panels">
     {(failedJobs.length > 0 || feedProblems.length > 0 || landingProblems.length > 0 || receiptProblems.length > 0 || jobs?.health?.output_measured === false || jobs?.health?.status === 'unavailable') &&
@@ -339,7 +350,7 @@ export default function IntakeReadiness({ arrivals }: { arrivals?: ReactNode }) 
     {arrivals}
 
     {coverage && <details id="status-sources" open={sourcesOpen} onToggle={e => setSourcesOpen(e.currentTarget.open)} style={box}>
-      <summary style={label}>SOURCE COVERAGE · {sources.length} sources · {totals && totals.targets > 0 ? `${(100 * totals.completed / totals.targets).toFixed(2)}% queue complete` : 'Unmeasured'}</summary>
+      <summary style={label}>SOURCE COVERAGE · {sources.length} source families with known target URLs · {totals && totals.targets > 0 ? `${(100 * totals.completed / totals.targets).toFixed(2)}% queue complete` : 'Unmeasured'}</summary>
       <h3 style={{ fontSize: 11 }}>KNOWN SOURCE TARGETS · {time(coverage.measured_at)}</h3>
       <p>{totals ? `${count(totals.completed)} completed queue matches / ${count(totals.targets)} known target URLs`
         : 'Overall target coverage unmeasured.'}{coverage.complete === false ? ' First 30 sources only; totals withheld.' : ''}</p>

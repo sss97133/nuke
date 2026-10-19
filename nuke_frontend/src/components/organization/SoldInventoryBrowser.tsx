@@ -41,6 +41,8 @@ interface Props {
   title?: string; // Optional custom title (e.g., "Service Archive" for service orgs)
 }
 
+const IN_FILTER_CHUNK = 150;
+
 type ViewMode = 'gallery' | 'grid' | 'technical';
 type SortBy = 'date' | 'price' | 'year' | 'make' | 'model';
 type SortDirection = 'asc' | 'desc';
@@ -98,7 +100,11 @@ export default function SoldInventoryBrowser({ organizationId, title = 'Sold Inv
         return;
       }
 
-      const { data, error } = await supabase
+      // An `in` filter travels in the GET URL: 1,000 ids are ~39k characters and the API answers 400.
+      const idChunks: string[][] = [];
+      for (let i = 0; i < vehicleIds.length; i += IN_FILTER_CHUNK) idChunks.push(vehicleIds.slice(i, i + IN_FILTER_CHUNK));
+
+      const vehicleReads = await Promise.all(idChunks.map((ids) => supabase
         .from('vehicles')
         .select(`
           id,
@@ -118,9 +124,10 @@ export default function SoldInventoryBrowser({ organizationId, title = 'Sold Inv
           listing_source,
           image_count
         `)
-        .in('id', vehicleIds);
-
-      if (error) throw error;
+        .in('id', ids)));
+      const vehicleReadError = vehicleReads.find((r) => r.error)?.error;
+      if (vehicleReadError) throw vehicleReadError;
+      const data = vehicleReads.flatMap((r) => r.data || []);
 
       // Create map of vehicle_id -> orgVehicle data
       const orgVehicleMap = new Map(orgVehicles.map(ov => [ov.vehicle_id, ov]));
@@ -134,10 +141,11 @@ export default function SoldInventoryBrowser({ organizationId, title = 'Sold Inv
       const proofMap = new Map((proofData || []).map((p: any) => [p.vehicle_id, p]));
 
       // Fetch vehicle event data (BaT, C&B, etc) in one shot
-      const { data: vehicleEvents } = await supabase
+      const eventReads = await Promise.all(idChunks.map((ids) => supabase
         .from('vehicle_events')
         .select('vehicle_id, source_platform, source_url, final_price, sold_at, event_status, current_price, metadata')
-        .in('vehicle_id', vehicleIds);
+        .in('vehicle_id', ids)));
+      const vehicleEvents = eventReads.flatMap((r) => r.data || []);
       // Build maps: one for non-BaT events, one for BaT events (which have richer metadata)
       const eventMap = new Map((vehicleEvents || []).map((e: any) => [e.vehicle_id, e]));
       const batEventMap = new Map(

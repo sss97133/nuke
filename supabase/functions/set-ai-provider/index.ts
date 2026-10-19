@@ -75,7 +75,7 @@ Deno.serve(async (req) => {
   const enc = await encryptSecret(apiKey);
   const { data: existing } = await svc.from("user_ai_providers")
     .select("id").eq("user_id", userId).eq("provider", provider).maybeSingle();
-  const row: any = { user_id: userId, provider, api_key_encrypted: enc, is_active: true };
+  const row: any = { user_id: userId, provider, api_key_encrypted: enc, is_active: true, updated_at: new Date().toISOString() };
   if (modelName) row.model_name = modelName;
   const { error } = existing
     ? await svc.from("user_ai_providers").update(row).eq("id", existing.id)
