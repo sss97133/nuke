@@ -15,6 +15,16 @@ CI_BUILD=1  scripts/ci/verify.sh        # also run `vite build` (slower; catches
 CI_WRITE_BASELINE=1 scripts/ci/verify.sh  # re-seed baseline.json from current counts (after burndown)
 ```
 
+Each invocation owns a private scratch directory under `${TMPDIR:-/tmp}`. Count JSON and
+diagnostic logs are isolated between invocations and removed on exit or handled HUP/INT/TERM.
+Allocation failure stops the gate before grading. Diagnostics still print to the gate's output;
+redirect that output to retain a receipt. This does not serialize intentional
+`CI_WRITE_BASELINE=1` writes to the same checkout's baseline file.
+
+Run the offline isolation and mode contracts with `node --test scripts/ci/verify.test.mjs`.
+They execute the verifier in fixture checkout roots with controlled commands. Legacy global
+scratch paths are translated only into the fixture namespace; tests never touch another gate's files.
+
 ## What it checks
 
 | Check | Type | Baseline (2026-07-12) | Notes |
@@ -26,6 +36,7 @@ CI_WRITE_BASELINE=1 scripts/ci/verify.sh  # re-seed baseline.json from current c
 | raw-fetch regression fixtures | **gate** | must pass | internal URL continuations, external pages and Firecrawl |
 | `no-raw-testimony-insert` (must use `ingest-observation`) | **ratchet** | 2 | should trend to 0 |
 | `no-schema-baked-labels` (label-as-projection) | advisory | 282 | never blocks; informational |
+| `design-system/*` (seven eslint rules over `src`, `src/kit` exempt) | **ratchet**, one floor per rule | seeded 2026-10-12 | `node scripts/guardrails/design-violations.mjs` to list; `--list <rule>` for sites. The kit is the only place type and inline style may be set. |
 
 **Ratchet rule:** a check fails only when its count **exceeds** the baseline — i.e. you *added* a
 violation. Pre-existing debt doesn't block you; new debt does. As you fix violations, lower the

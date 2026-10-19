@@ -1,5 +1,12 @@
 import type { BidExpression, BidGrouping, BidMeasure } from './bidMeasurements';
 
+// Contributor drills store a query string; accept a complete internal Stacks
+// address as well, without ever turning this into an external return target.
+export function stackBackParams(back: string | null): URLSearchParams {
+  const query = back?.startsWith('/stacks?') ? back.slice('/stacks?'.length) : back;
+  return new URLSearchParams(query && !query.startsWith('/') && !query.includes('://') ? query : '');
+}
+
 export function expressionFromParams(params: URLSearchParams): BidExpression {
   const year = new Date().getUTCFullYear();
   const rawMeasure = params.get('measure') as BidMeasure, rawGroup = params.get('by') as BidGrouping;

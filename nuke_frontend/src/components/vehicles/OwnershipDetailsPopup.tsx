@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { OWNERSHIP_TRANSFER_PUBLIC_COLUMNS } from '../../lib/ownershipTransferColumns';
 import { supabase } from '../../lib/supabase';
 
 interface OwnershipDetailsPopupProps {
@@ -81,7 +82,7 @@ export const OwnershipDetailsPopup: React.FC<OwnershipDetailsPopupProps> = ({
         const transferResult = await supabase
           .from('ownership_transfers')
           .select(`
-            *,
+            ${OWNERSHIP_TRANSFER_PUBLIC_COLUMNS},
             from_owner:profiles!from_owner_id(id, full_name, username),
             to_owner:profiles!to_owner_id(id, full_name, username)
           `)
@@ -93,7 +94,7 @@ export const OwnershipDetailsPopup: React.FC<OwnershipDetailsPopupProps> = ({
           console.warn('Error loading transfers with profile join:', transferResult.error);
           const fallbackResult = await supabase
             .from('ownership_transfers')
-            .select('*')
+            .select(OWNERSHIP_TRANSFER_PUBLIC_COLUMNS)
             .eq('vehicle_id', vehicleId)
             .order('transfer_date', { ascending: false });
           

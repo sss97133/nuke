@@ -15,7 +15,7 @@ The observation's source is the evidence that actually backs it, not the one it 
   our own records -> k5-wiring-design (cavity map, names, bench/open items)
 Confidence is computed by ingest-observation from the source, never entered here.
 
-Usage: dotenvx run -- python3 load_observations.py [--only EID] [--dry-run] [--limit N]
+Usage: dotenvx run -- python3 load_observations.py [--only EID] [--factory-refs] [--dry-run] [--limit N]
 """
 import json
 import os
@@ -170,6 +170,36 @@ def build(only=None):
     return out
 
 
+def build_factory_refs():
+    """One observation per wire end whose termination row names the factory circuit it takes the place of
+    (k5_registry terminations[].factory_circuit, e.g. 'circuit 9 brown', 'factory 16 LT GRN-11A'). These are the
+    evidence for the harness residual against the factory baseline (case ledger 13.12.2, RSI pass 3). gm_circuits holds
+    the GM circuit numbers the text names ('circuit N', or the number after a colour code: LT GRN-11A -> 11)."""
+    reg = json.load(open(CD / "k5_registry.json"))
+    sha = subprocess.run(["git", "-C", str(REPO), "rev-parse", "--short", "HEAD"], capture_output=True, text=True).stdout.strip()
+    now = subprocess.run(["git", "-C", str(REPO), "log", "-1", "--format=%cI", "--", "docs/wiring/calc-data/k5_registry.json"],
+                         capture_output=True, text=True).stdout.strip() or datetime.now(timezone.utc).isoformat(timespec="seconds")
+    out = []
+    for t in reg["terminations"]:
+        value = t.get("factory_circuit")
+        if not value:
+            continue
+        nums = sorted({int(n) for n in re.findall(r"\bcircuit (\d+)", value) + re.findall(r"-(\d+)[A-Z]?\b", value)})
+        field = f"#{t['wire']} factory circuit"
+        sd = {"domain": "wiring", "registry": f"k5_registry v5 @ {sha}", "plug": t["endpoint"],
+              "plug_name": K.BOOK_TITLE.get(t["endpoint"], t["endpoint"]), "row_field": field, "wire_id": str(t["wire"]),
+              "property_key": "factory circuit", "value": value, "state": "design", "gm_circuits": nums,
+              "citation": "docs/wiring/calc-data/k5_registry.json terminations[].factory_circuit"}
+        out.append({
+            "source_slug": "k5-wiring-design", "kind": "specification", "observed_at": now, "vehicle_id": K5,
+            "source_identifier": f"k5-wiring:{t['endpoint']}:{field}", "source_url": None,
+            "content_text": f"{sd['plug_name']} · {field}: {value}", "structured_data": sd, "citation": {},
+            "extraction_method": "registry_v5_loader", "agent_tier": "agent", "agent_model": "claude-opus-5-5",
+            "raw_source_ref": f"docs/wiring/calc-data/k5_registry.json@{sha}", "rank": "normal",
+        })
+    return out
+
+
 def post(payload, url, key):
     """One observation. 4xx = our payload is wrong (no retry); timeouts/5xx = the server is struggling (back off)."""
     import urllib.error
@@ -195,7 +225,7 @@ def post(payload, url, key):
 def main():
     only = sys.argv[sys.argv.index("--only") + 1] if "--only" in sys.argv else None
     limit = int(sys.argv[sys.argv.index("--limit") + 1]) if "--limit" in sys.argv else None
-    rows = build(only)
+    rows = build_factory_refs() if "--factory-refs" in sys.argv else build(only)
     if limit:
         rows = rows[:limit]
     from collections import Counter

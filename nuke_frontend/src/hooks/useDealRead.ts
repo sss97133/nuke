@@ -79,12 +79,6 @@ const SUBJECT_COLUMNS = [
   'updated_at', 'primary_image_url', 'status',
 ].join(',');
 
-const COMP_COLUMNS = [
-  'id', 'year', 'make', 'model', 'trim', 'sale_price', 'sale_status', 'auction_outcome', 'sale_date',
-  'listing_url', 'bat_auction_url', 'discovery_url', 'bat_sold_price', 'high_bid', 'mileage',
-  'transmission', 'engine_size', 'engine_type', 'bat_listing_title', 'title', 'primary_image_url',
-].join(',');
-
 const BAT_LISTING_COLUMNS = [
   'id', 'vehicle_id', 'bat_listing_url', 'bat_listing_title', 'listing_status', 'sale_price',
   'sale_date', 'auction_end_date',
@@ -156,24 +150,16 @@ async function fetchAllPages<T>(build: (from: number, to: number) => PromiseLike
   return out;
 }
 
-// Exact make + listing_url only: measured under the anon role 2026-09-27, this
-// shape answers in ~0.4 s where `make ilike` + a three-column URL OR took 9 s
-// warm and timed out cold (anon statement_timeout is 15 s). The rows it drops
-// are BaT stubs whose URL sits only in discovery_url — duplicates of lots the
-// listing_url rows already carry.
+// The cohort's BaT lots through deal_cohort_bat_sales (migration 20261014113000): public, undeleted vehicles of the
+// make, the model token inside the model, the years and a listing_url on BaT, read through the make+model trigram
+// index. The same read straight from vehicles ran under the row policies, where the ilike tests cannot use an index:
+// every vehicle of the make and years was fetched (K5 Blazer: 66,581 rows for 828) and the call hit the anon 15 s
+// timeout on 2026-10-14. BaT stubs whose URL sits only in discovery_url stay out, as before: duplicates of lots the
+// listing_url rows already carry. Ordered by id, so the pages hold.
 async function fetchCohortVehicles(make: string, model: string, yearStart: number, yearEnd: number): Promise<VehicleCompRow[]> {
-  const makes = Array.from(new Set([make, make.toUpperCase(), make.toLowerCase(), make[0].toUpperCase() + make.slice(1).toLowerCase()]));
   return fetchAllPages<VehicleCompRow>((from, to) =>
     supabase
-      .from('vehicles')
-      .select(COMP_COLUMNS)
-      .in('make', makes)
-      .ilike('model', `%${model}%`)
-      .gte('year', yearStart)
-      .lte('year', yearEnd)
-      .is('deleted_at', null)
-      .ilike('listing_url', '%bringatrailer.com%')
-      .order('id')
+      .rpc('deal_cohort_bat_sales', { p_make: make, p_model: model, p_year_start: yearStart, p_year_end: yearEnd })
       .range(from, to),
   );
 }

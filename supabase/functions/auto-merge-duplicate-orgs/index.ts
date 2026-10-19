@@ -1,5 +1,7 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
-import { requireWriteAuth } from '../_shared/writeGuard.ts';
+import { authenticateWriter, writeAuthResponse } from '../_shared/writeGuard.ts';
+import { projectSecretKey } from "../_shared/supabaseKeys.ts";
+import { pickSurvivorId } from "./survivor.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -171,10 +173,13 @@ async function mergeOrganizations(
         .maybeSingle();
 
       if (!existing) {
-        // Move contributor
+        // Move the membership to the surviving org, but demote it to 'pending' (2026-10-14): a merge must never
+        // hand someone an ACTIVE role in the survivor — caller_manages_organization and the org money readers trust
+        // active roles, so a forced merge of a planted duplicate could otherwise grant management of a real org. An
+        // owner of the survivor re-activates a legitimate member through the normal review path.
         await supabase
           .from('organization_contributors')
-          .update({ organization_id: targetId })
+          .update({ organization_id: targetId, status: 'pending' })
           .eq('organization_id', sourceId)
           .eq('user_id', contrib.user_id);
       } else {
@@ -284,12 +289,46 @@ async function mergeOrganizations(
 }
 
 /**
+ * Does this signed-in user own or discover the organization? Read with the service client (bypasses row security),
+ * so a forged client role can't answer for itself: the org's discovered_by/uploaded_by, an active business_ownership
+ * row, or an active owner/co_founder/board_member/manager contributor row.
+ */
+async function callerManagesOrg(supabase: any, orgId: string, userId: string | null): Promise<boolean> {
+  if (!userId) return false;
+  const { data: org } = await supabase
+    .from('organizations')
+    .select('discovered_by, uploaded_by')
+    .eq('id', orgId)
+    .maybeSingle();
+  if (org && (org.discovered_by === userId || org.uploaded_by === userId)) return true;
+
+  const { data: owned } = await supabase
+    .from('business_ownership')
+    .select('business_id')
+    .eq('business_id', orgId)
+    .eq('owner_id', userId)
+    .eq('status', 'active')
+    .limit(1);
+  if (owned && owned.length > 0) return true;
+
+  const { data: role } = await supabase
+    .from('organization_contributors')
+    .select('role')
+    .eq('organization_id', orgId)
+    .eq('user_id', userId)
+    .eq('status', 'active')
+    .in('role', ['owner', 'co_founder', 'board_member', 'manager'])
+    .limit(1);
+  return !!(role && role.length > 0);
+}
+
+/**
  * Find and merge duplicates for a specific organization
  */
 async function findAndMergeDuplicates(orgId: string, supabase: any): Promise<{ merged: boolean; targetId?: string }> {
   const { data: org, error } = await supabase
     .from('businesses')
-    .select('id, business_name, legal_name, website, phone, email, city, state, zip_code, business_type')
+    .select('id, business_name, legal_name, website, phone, email, city, state, zip_code, business_type, created_at')
     .eq('id', orgId)
     .maybeSingle();
 
@@ -300,7 +339,7 @@ async function findAndMergeDuplicates(orgId: string, supabase: any): Promise<{ m
   // Find potential duplicates
   const { data: candidates } = await supabase
     .from('businesses')
-    .select('id, business_name, legal_name, website, phone, email, city, state, zip_code, business_type')
+    .select('id, business_name, legal_name, website, phone, email, city, state, zip_code, business_type, created_at')
     .eq('is_public', true)
     .neq('id', orgId);
 
@@ -313,17 +352,10 @@ async function findAndMergeDuplicates(orgId: string, supabase: any): Promise<{ m
     const { isDuplicate, confidence } = areDuplicates(org, candidate);
     
     if (isDuplicate && confidence >= 0.75) {
-      // Determine which is the "target" (keep the one with more data or older)
-      const orgDataCount = [
-        org.website, org.phone, org.email, org.address, org.logo_url, org.description
-      ].filter(Boolean).length;
-      
-      const candidateDataCount = [
-        candidate.website, candidate.phone, candidate.email, candidate.address, candidate.logo_url, candidate.description
-      ].filter(Boolean).length;
-
-      // Prefer the one with more data, or the older one if equal
-      const targetId = candidateDataCount > orgDataCount ? candidate.id : org.id;
+      // The OLDER organization survives (merge-ordering rule, 2026-10-14): an attacker's freshly created duplicate
+      // can never become the survivor that absorbs a real org. The former "more data wins" heuristic is dropped —
+      // it let a planted duplicate with padded fields win.
+      const targetId = pickSurvivorId(org, candidate);
       const sourceId = targetId === candidate.id ? org.id : candidate.id;
 
       try {
@@ -341,21 +373,34 @@ async function findAndMergeDuplicates(orgId: string, supabase: any): Promise<{ m
 }
 
 Deno.serve(async (req) => {
-  // Writes are never anonymous: service key, signed-in user, or nothing (P0.2, 2026-09-27).
-  const denied = await requireWriteAuth(req);
-  if (denied) return denied;
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders });
   }
+  // A merge hides one organization, moves its vehicles, images and memberships into another, and rewrites its
+  // profile. It is never anonymous, and who may trigger it depends on the mode (2026-10-14):
+  //   - scanAll sweeps every public org: the service role only (cron / internal).
+  //   - organizationId merges duplicates of one org: the service role, or a signed-in user who owns or discovered
+  //     that org (so a stranger cannot force two real orgs together).
+  const verdict = await authenticateWriter(req);
+  if (!verdict.ok) return writeAuthResponse(verdict, corsHeaders);
+  const caller = verdict.caller;
+  const isService = caller.kind === 'service_role';
+  const callerUserId = caller.kind === 'user' || caller.kind === 'api_key' ? caller.userId : null;
 
   try {
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
-    const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+    const supabaseKey = projectSecretKey()!;
     const supabase = createClient(supabaseUrl, supabaseKey);
 
     const { organizationId, scanAll } = await req.json().catch(() => ({}));
 
     if (organizationId) {
+      if (!isService && !(await callerManagesOrg(supabase, organizationId, callerUserId))) {
+        return new Response(
+          JSON.stringify({ error: 'forbidden', message: 'Only an owner or discoverer of this organization, or the service role, may merge it.' }),
+          { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 403 }
+        );
+      }
       // Check and merge duplicates for a specific organization
       const result = await findAndMergeDuplicates(organizationId, supabase);
       return new Response(
@@ -363,6 +408,12 @@ Deno.serve(async (req) => {
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 }
       );
     } else if (scanAll) {
+      if (!isService) {
+        return new Response(
+          JSON.stringify({ error: 'forbidden', message: 'scanAll is the service role only.' }),
+          { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 403 }
+        );
+      }
       // Scan all organizations for duplicates
       const { data: orgs } = await supabase
         .from('businesses')

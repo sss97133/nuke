@@ -88,7 +88,7 @@ export default function StackExplore() {
   const request: PopulationRequest | null = params.get('source') === 'read' ? { make: expression.make, model: null, year: expression.to } : null;
   const read = useBidPopulation(request), dataset = request ? read.data : study.data;
   const paired = expression.grouping === 'participant' && params.get('paired') === 'entry-outcome';
-  const excludedVehicle = params.get('excludeVehicle');
+  const excludedVehicle = params.get('excludeVehicle')?.toLowerCase() ?? null;
   // A scatter point uses paired entry/outcome records. Its drill must retain that
   // denominator, including withholding zero-span episodes whose entry is undefined.
   const measurementDataset = useMemo(() => dataset && (paired || excludedVehicle) ? { ...dataset, lots: dataset.lots.filter(l => l.vehicleId !== excludedVehicle && (!paired || (l.winner && l.sums.gaps.some(gap => gap > 0)))) } : dataset, [dataset, paired, excludedVehicle]);

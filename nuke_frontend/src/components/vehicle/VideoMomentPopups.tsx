@@ -1,29 +1,28 @@
 import React, { useState, useEffect } from 'react';
 import ReactDOM from 'react-dom';
 import { supabase } from '../../lib/supabase';
+import { PrefetchLink } from '../PrefetchLink';
+
+function sourceLocator(raw: string | null | undefined): string | null {
+  try {
+    const url = new URL(raw || '');
+    return ['http:', 'https:'].includes(url.protocol) && !url.username && !url.password ? url.href : null;
+  } catch { return null; }
+}
 
 // ============================================================================
 // PRICE BREAKDOWN POPUP
 // ============================================================================
 
 interface PriceBreakdownProps {
-  hammerPrice: number;
+  recordedAmount: number;
   estimateLow?: number | null;
   estimateHigh?: number | null;
   source?: string;
+  sourceUrl?: string | null;
+  lotNumber?: string | null;
   vehicleId?: string;
   onClose: () => void;
-}
-
-interface ComparableSale {
-  id: string;
-  year: number;
-  make: string;
-  model: string;
-  winning_bid: number;
-  auction_start_date: string;
-  source: string;
-  lot_number: string;
 }
 
 interface PriceLineItem {
@@ -34,141 +33,63 @@ interface PriceLineItem {
 }
 
 export const PriceBreakdownPopup: React.FC<PriceBreakdownProps> = ({
-  hammerPrice,
+  recordedAmount,
   estimateLow,
   estimateHigh,
-  source = 'mecum',
+  source,
+  sourceUrl,
+  lotNumber,
   vehicleId,
   onClose
 }) => {
-  const [comparables, setComparables] = useState<ComparableSale[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [saleContext, setSaleContext] = useState<{ vehicleId: string; href: string } | null>(null);
   const [activeDefinition, setActiveDefinition] = useState<string | null>(null);
+  const sourceLink = sourceLocator(sourceUrl);
 
-  // Calculate fees based on source
-  const buyerPremiumPct = source === 'mecum' ? 0.10 : source === 'barrett_jackson' ? 0.10 : 0.10;
-  const sellerCommPct = source === 'mecum' ? 0.10 : source === 'barrett_jackson' ? 0.10 : 0.10;
-  const sellerEntryFee = source === 'mecum' ? 350 : 300;
-
-  const buyerPremium = hammerPrice * buyerPremiumPct;
-  const buyerTotal = hammerPrice + buyerPremium;
-  const sellerComm = hammerPrice * sellerCommPct;
-  const sellerNet = hammerPrice - sellerComm - sellerEntryFee;
-  const houseTake = buyerPremium + sellerComm + sellerEntryFee;
-
-  // Price vs estimate
-  let vsEstimate = '';
-  if (estimateLow && estimateHigh) {
-    const mid = (estimateLow + estimateHigh) / 2;
-    const diff = ((hammerPrice - mid) / mid) * 100;
-    if (diff > 5) vsEstimate = `+${Math.round(diff)}% over`;
-    else if (diff < -5) vsEstimate = `${Math.round(diff)}% under`;
-    else vsEstimate = 'Within range';
-  }
-
-  // Fetch comparables
+  // Reuse the qualified sale reader; a raw year/model match is not a comparable sale.
   useEffect(() => {
-    const fetchComparables = async () => {
-      if (!vehicleId) {
-        setLoading(false);
-        return;
-      }
-
-      // Get vehicle info first
-      const { data: vehicle } = await supabase
-        .from('vehicles')
-        .select('year, make, model')
-        .eq('id', vehicleId)
-        .single();
-
-      if (!vehicle) {
-        setLoading(false);
-        return;
-      }
-
-      // Find similar vehicles
-      const { data: comps } = await supabase
-        .from('auction_events')
-        .select(`
-          id, winning_bid, auction_start_date, source, lot_number,
-          vehicles!inner(id, year, make, model)
-        `)
-        .eq('vehicles.make', vehicle.make)
-        .eq('vehicles.model', vehicle.model)
-        .gte('vehicles.year', vehicle.year - 3)
-        .lte('vehicles.year', vehicle.year + 3)
-        .not('winning_bid', 'is', null)
-        .neq('vehicle_id', vehicleId)
-        .order('auction_start_date', { ascending: false })
-        .limit(5);
-
-      if (comps) {
-        setComparables(comps.map((c: any) => ({
-          id: c.vehicles.id,
-          year: c.vehicles.year,
-          make: c.vehicles.make,
-          model: c.vehicles.model,
-          winning_bid: c.winning_bid,
-          auction_start_date: c.auction_start_date,
-          source: c.source,
-          lot_number: c.lot_number
-        })));
-      }
-      setLoading(false);
-    };
-
-    fetchComparables();
+    let cancelled = false;
+    setSaleContext(null);
+    if (vehicleId) void (async () => {
+      try {
+        const { data: vehicle, error } = await supabase.from('vehicles')
+          .select('id, year, make, model').eq('id', vehicleId)
+          .eq('is_public', true).is('deleted_at', null)
+          .or('listing_kind.is.null,listing_kind.neq.non_vehicle_item').maybeSingle();
+        if (cancelled || error || vehicle?.id !== vehicleId || !Number.isInteger(vehicle.year) || vehicle.year <= 0
+          || !vehicle.make?.trim() || !vehicle.model?.trim()) return;
+        // Same identity/subject-exclusion contract as AuctionEvidence. Do not lend this amount units.
+        setSaleContext({ vehicleId, href: `/valuation?${new URLSearchParams({
+          year: String(vehicle.year), make: vehicle.make, model: vehicle.model, vehicle_id: vehicleId,
+        })}` });
+      } catch { /* Failed or denied metadata leaves the attributed amount intact. */ }
+    })();
+    return () => { cancelled = true; };
   }, [vehicleId]);
 
   const lineItems: PriceLineItem[] = [
-    ...(estimateLow && estimateHigh ? [{
-      label: 'Estimate Range',
-      value: `$${(estimateLow/1000).toFixed(0)}K - $${(estimateHigh/1000).toFixed(0)}K`,
-      definition: 'Pre-auction estimate set by the auction house based on market data, condition, and comparable sales.',
+    {
+      label: 'Recorded auction amount',
+      value: recordedAmount,
+      definition: 'Amount recorded for this auction lot. Currency and fee basis are unknown in this read; it does not establish a hammer price or buyer total.',
+    },
+    {
+      label: 'Currency and fee basis',
+      value: 'Unknown',
+      definition: 'This auction record does not supply attributed currency or fee terms. The source name alone cannot establish them.',
+      highlight: 'muted'
+    },
+    ...(typeof estimateLow === 'number' && Number.isFinite(estimateLow) && estimateLow > 0
+      && typeof estimateHigh === 'number' && Number.isFinite(estimateHigh) && estimateHigh >= estimateLow ? [{
+      label: 'Recorded estimate range',
+      value: `${estimateLow.toLocaleString()} – ${estimateHigh.toLocaleString()}`,
+      definition: 'Recorded source estimates; currency and comparability to the recorded auction amount are unestablished. No price-versus-estimate calculation is made.',
       highlight: 'muted' as const
     }] : []),
     {
-      label: 'Hammer Price',
-      value: hammerPrice,
-      definition: 'The final bid amount when the auctioneer\'s hammer falls. This is the base price before any fees.',
-    },
-    ...(vsEstimate ? [{
-      label: 'vs Estimate',
-      value: vsEstimate,
-      definition: 'How the final price compared to the mid-point of the estimate range.',
-      highlight: (vsEstimate.startsWith('+') ? 'success' : vsEstimate.startsWith('-') ? 'warning' : 'muted') as 'success' | 'warning' | 'muted'
-    }] : []),
-    {
-      label: `Buyer Premium (${(buyerPremiumPct*100).toFixed(0)}%)`,
-      value: buyerPremium,
-      definition: `Fee charged to the buyer on top of hammer price. ${source?.toUpperCase()} charges ${(buyerPremiumPct*100).toFixed(0)}% for in-person bidders.`,
-    },
-    {
-      label: 'Buyer Total',
-      value: buyerTotal,
-      definition: 'Total amount the buyer pays = Hammer Price + Buyer Premium. Does not include taxes, transport, or registration.',
-      highlight: 'success'
-    },
-    {
-      label: `Seller Commission (${(sellerCommPct*100).toFixed(0)}%)`,
-      value: sellerComm,
-      definition: `Commission taken from the seller\'s proceeds. Standard rate is ${(sellerCommPct*100).toFixed(0)}% for reserve listings.`,
-    },
-    {
-      label: 'Entry Fee',
-      value: sellerEntryFee,
-      definition: `Flat fee charged to sellers to list their vehicle. Ranges from $${sellerEntryFee} to $1,000 depending on lot placement.`,
-    },
-    {
-      label: 'Seller Net',
-      value: sellerNet,
-      definition: 'Amount the seller receives after commission and entry fee are deducted from the hammer price.',
-      highlight: 'warning'
-    },
-    {
-      label: 'House Take',
-      value: houseTake,
-      definition: 'Total revenue the auction house earns from this transaction (buyer premium + seller commission + entry fee).',
+      label: 'Fees and proceeds',
+      value: 'Unrecorded',
+      definition: 'Lot-specific buyer fees, seller commission and entry fees are not recorded in this read, so buyer total, seller proceeds and house revenue are unknown.',
       highlight: 'muted'
     },
   ];
@@ -210,11 +131,16 @@ export const PriceBreakdownPopup: React.FC<PriceBreakdownProps> = ({
           background: 'var(--surface)',
           zIndex: 1
         }}>
-          <span style={{ fontWeight: 700, fontSize: '13px' }}>PRICE BREAKDOWN</span>
+          <span style={{ fontWeight: 700, fontSize: '13px' }}>AUCTION AMOUNT</span>
           <button onClick={onClose} style={{
             background: 'none', border: 'none', cursor: 'pointer',
             fontSize: '18px', color: 'var(--text-muted)', lineHeight: 1
           }}>×</button>
+        </div>
+
+        <div style={{ padding: '8px 16px', fontSize: '11px', color: 'var(--text-muted)' }}>
+          {source?.toUpperCase() || 'Auction record'}{lotNumber ? ` · Lot ${lotNumber}` : ''}
+          {sourceLink && <> · <a href={sourceLink} target="_blank" rel="noopener noreferrer">Original listing ↗</a></>}
         </div>
 
         {/* Line Items */}
@@ -249,7 +175,7 @@ export const PriceBreakdownPopup: React.FC<PriceBreakdownProps> = ({
                          item.highlight === 'warning' ? 'var(--warning)' :
                          item.highlight === 'muted' ? 'var(--text-muted)' : 'var(--text)'
                 }}>
-                  {typeof item.value === 'number' ? `$${item.value.toLocaleString()}` : item.value}
+                  {typeof item.value === 'number' ? item.value.toLocaleString() : item.value}
                 </span>
               </div>
               {activeDefinition === item.label && (
@@ -269,57 +195,14 @@ export const PriceBreakdownPopup: React.FC<PriceBreakdownProps> = ({
           ))}
         </div>
 
-        {/* Comparables */}
-        {vehicleId && (
-          <div style={{ borderTop: '2px solid var(--border)' }}>
-            <div style={{
-              padding: '12px 16px',
-              fontWeight: 700,
-              fontSize: '11px',
-              color: 'var(--text-muted)'
-            }}>
-              COMPARABLE SALES
+        {saleContext && saleContext.vehicleId === vehicleId && (
+          <div style={{ borderTop: '2px solid var(--border)', padding: '12px 16px', fontSize: '11px' }}>
+            <PrefetchLink to={saleContext.href}
+              onMouseEnter={() => { void import('../../pages/Valuation').catch(() => {}); }}
+              onFocus={() => { void import('../../pages/Valuation').catch(() => {}); }}>Recorded sale context →</PrefetchLink>
+            <div style={{ marginTop: '4px', color: 'var(--text-muted)' }}>
+              Source-qualified sales use their own currency, dates and fee basis. Condition and equipment remain unmatched.
             </div>
-            {loading ? (
-              <div style={{ padding: '20px', textAlign: 'center', fontSize: '11px', color: 'var(--text-muted)' }}>
-                Loading...
-              </div>
-            ) : comparables.length === 0 ? (
-              <div style={{ padding: '20px', textAlign: 'center', fontSize: '11px', color: 'var(--text-muted)' }}>
-                No comparables found
-              </div>
-            ) : (
-              <div style={{ padding: '0 8px 12px' }}>
-                {comparables.map((comp) => (
-                  <a
-                    key={comp.id}
-                    href={`/vehicle/${comp.id}`}
-                    onClick={(e) => e.stopPropagation()}
-                    style={{
-                      display: 'block',
-                      padding: '8px',
-                      margin: '4px 0',
-                      background: 'var(--surface-raised)',
-                      borderRadius: 0,
-                      textDecoration: 'none',
-                      color: 'inherit'
-                    }}
-                  >
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <span style={{ fontSize: '11px' }}>
-                        {comp.year} {comp.make} {comp.model}
-                      </span>
-                      <span style={{ fontSize: '11px', fontWeight: 600, fontFamily: "'Courier New', monospace" }}>
-                        ${comp.winning_bid.toLocaleString()}
-                      </span>
-                    </div>
-                    <div style={{ fontSize: '9px', color: 'var(--text-muted)', marginTop: '2px' }}>
-                      {comp.source?.toUpperCase()} {comp.lot_number} • {new Date(comp.auction_start_date).toLocaleDateString()}
-                    </div>
-                  </a>
-                ))}
-              </div>
-            )}
           </div>
         )}
       </div>
@@ -336,8 +219,8 @@ export const PriceBreakdownPopup: React.FC<PriceBreakdownProps> = ({
 interface LotStatsProps {
   lotNumber: string;
   source: string;
-  broadcastStart: number;
-  broadcastEnd?: number | null;
+  videoOffset: string;
+  videoSpan: string;
   auctionName?: string | null;
   onClose: () => void;
 }
@@ -345,8 +228,10 @@ interface LotStatsProps {
 interface LotHistorical {
   id: string;
   vehicle_id: string;
-  auction_name: string;
-  auction_start_date: string;
+  source: string;
+  source_url: string | null;
+  lot_number: string;
+  auction_start_date: string | null;
   winning_bid: number | null;
   outcome: string;
   year?: number;
@@ -354,113 +239,47 @@ interface LotHistorical {
   model?: string;
 }
 
-interface TimeSlotStats {
-  hour: number;
-  total: number;
-  sold: number;
-  avgPrice: number;
-  sellRate: number;
-}
-
 export const LotStatsPopup: React.FC<LotStatsProps> = ({
   lotNumber,
   source,
-  broadcastStart,
-  broadcastEnd,
+  videoOffset,
+  videoSpan,
   auctionName,
   onClose
 }) => {
-  const [historical, setHistorical] = useState<LotHistorical[]>([]);
-  const [timeSlots, setTimeSlots] = useState<TimeSlotStats[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [activeSection, setActiveSection] = useState<'performance' | 'historical' | 'timeslots'>('performance');
-
-  const duration = (broadcastEnd || broadcastStart + 60) - broadcastStart;
-  const hourOfDay = Math.floor(broadcastStart / 3600);
-  const minuteOfHour = Math.floor((broadcastStart % 3600) / 60);
-
-  // Lot number analysis
-  const lotPrefix = lotNumber.match(/^[A-Z]+/)?.[0] || '';
-  const lotNum = parseInt(lotNumber.replace(/^[A-Z]+/, '').split('.')[0]) || 0;
-  const lotSuffix = lotNumber.includes('.') ? lotNumber.split('.')[1] : null;
-
-  const lotPrefixMeaning: Record<string, string> = {
-    'S': 'Main Stage - Premium placement, highest visibility',
-    'F': 'Featured - High-value consignments with prime slots',
-    'T': 'Tent/Secondary - Standard consignments',
-    'K': 'Kissimmee Special - Event-specific designation',
-  };
+  const [activeSection, setActiveSection] = useState<'performance' | 'historical'>('performance');
+  const scope = JSON.stringify([source, lotNumber]);
+  const [history, setHistory] = useState<{
+    scope: string; status: 'loading' | 'ready' | 'error'; rows: LotHistorical[];
+  } | null>(null);
+  const currentHistory = history?.scope === scope ? history : null;
 
   useEffect(() => {
-    const fetchData = async () => {
-      // Fetch historical lot data (same lot number across auctions)
-      const { data: histData } = await supabase
-        .from('auction_events')
-        .select(`
-          id, vehicle_id, auction_name, auction_start_date, winning_bid, outcome,
-          vehicles(year, make, model)
-        `)
-        .eq('lot_number', lotNumber)
-        .eq('source', source)
-        .order('auction_start_date', { ascending: false })
-        .limit(10);
-
-      if (histData) {
-        setHistorical(histData.map((h: any) => ({
-          ...h,
-          year: h.vehicles?.year,
-          make: h.vehicles?.make,
-          model: h.vehicles?.model
-        })));
+    if (activeSection !== 'historical') return;
+    let cancelled = false;
+    setHistory({ scope, status: 'loading', rows: [] });
+    void (async () => {
+      try {
+        const { data, error } = await supabase.from('auction_events')
+          .select(`id, vehicle_id, source, source_url, lot_number, auction_start_date, winning_bid, outcome,
+            vehicles!inner(id, year, make, model, is_public, deleted_at, listing_kind)`)
+          .eq('lot_number', lotNumber).eq('source', source)
+          .eq('vehicles.is_public', true).is('vehicles.deleted_at', null)
+          .or('listing_kind.is.null,listing_kind.neq.non_vehicle_item', { referencedTable: 'vehicles' })
+          .order('auction_start_date', { ascending: false }).limit(10);
+        if (cancelled) return;
+        if (error) throw error;
+        const rows = (data || []).filter((h: any) => h.source === source && h.lot_number === lotNumber
+          && h.vehicles?.id === h.vehicle_id && h.vehicles?.is_public === true
+          && h.vehicles?.deleted_at === null && h.vehicles?.listing_kind !== 'non_vehicle_item')
+          .map((h: any) => ({ ...h, year: h.vehicles.year, make: h.vehicles.make, model: h.vehicles.model }));
+        setHistory({ scope, status: 'ready', rows });
+      } catch {
+        if (!cancelled) setHistory({ scope, status: 'error', rows: [] });
       }
-
-      // Fetch time slot statistics
-      const { data: slotData } = await supabase
-        .rpc('get_auction_timeslot_stats', { source_filter: source })
-        .limit(24);
-
-      if (slotData) {
-        setTimeSlots(slotData);
-      } else {
-        // Fallback: calculate manually if RPC doesn't exist
-        const { data: allEvents } = await supabase
-          .from('auction_events')
-          .select('broadcast_timestamp_start, winning_bid, outcome')
-          .eq('source', source)
-          .not('broadcast_timestamp_start', 'is', null)
-          .limit(500);
-
-        if (allEvents) {
-          const byHour: Record<number, { total: number; sold: number; prices: number[] }> = {};
-          allEvents.forEach((e: any) => {
-            const h = Math.floor(e.broadcast_timestamp_start / 3600);
-            if (!byHour[h]) byHour[h] = { total: 0, sold: 0, prices: [] };
-            byHour[h].total++;
-            if (e.outcome === 'sold' && e.winning_bid) {
-              byHour[h].sold++;
-              byHour[h].prices.push(e.winning_bid);
-            }
-          });
-
-          const stats: TimeSlotStats[] = Object.entries(byHour).map(([hour, data]) => ({
-            hour: parseInt(hour),
-            total: data.total,
-            sold: data.sold,
-            avgPrice: data.prices.length > 0 ? data.prices.reduce((a,b)=>a+b,0) / data.prices.length : 0,
-            sellRate: data.total > 0 ? (data.sold / data.total) * 100 : 0
-          })).sort((a,b) => a.hour - b.hour);
-
-          setTimeSlots(stats);
-        }
-      }
-
-      setLoading(false);
-    };
-
-    fetchData();
-  }, [lotNumber, source]);
-
-  const currentSlotStats = timeSlots.find(s => s.hour === hourOfDay);
+    })();
+    return () => { cancelled = true; };
+  }, [activeSection, source, lotNumber, scope]);
 
   return ReactDOM.createPortal(
     <div
@@ -517,7 +336,7 @@ export const LotStatsPopup: React.FC<LotStatsProps> = ({
           borderBottom: '1px solid var(--border)',
           background: 'var(--surface-raised)'
         }}>
-          {(['performance', 'historical', 'timeslots'] as const).map(tab => (
+          {(['performance', 'historical'] as const).map(tab => (
             <button
               key={tab}
               onClick={() => setActiveSection(tab)}
@@ -534,7 +353,7 @@ export const LotStatsPopup: React.FC<LotStatsProps> = ({
                 color: activeSection === tab ? 'var(--text)' : 'var(--text-muted)'
               }}
             >
-              {tab === 'performance' ? 'This Lot' : tab === 'historical' ? 'History' : 'Time Slots'}
+              {tab === 'performance' ? 'This Lot' : 'Matching labels'}
             </button>
           ))}
         </div>
@@ -543,40 +362,12 @@ export const LotStatsPopup: React.FC<LotStatsProps> = ({
         <div style={{ padding: '12px 16px' }}>
           {activeSection === 'performance' && (
             <>
-              {/* Lot breakdown */}
-              <div style={{
-                padding: '12px',
-                background: 'var(--surface-raised)',
-                borderRadius: 0,
-                marginBottom: '12px'
-              }}>
-                <div style={{ fontSize: '10px', color: 'var(--text-muted)', marginBottom: '8px' }}>
-                  LOT NUMBER BREAKDOWN
+              <div style={{ padding: '12px', background: 'var(--surface-raised)', marginBottom: '12px' }}>
+                <div style={{ fontSize: '10px', color: 'var(--text-muted)', marginBottom: '8px' }}>RECORDED LOT LABEL</div>
+                <div style={{ fontSize: '14px', fontWeight: 600 }}>{lotNumber}</div>
+                <div style={{ fontSize: '10px', color: 'var(--text-muted)', marginTop: '4px' }}>
+                  The source's lot label does not establish stage, placement, day or sub-lot meaning.
                 </div>
-                <div style={{ display: 'flex', gap: '8px', alignItems: 'center', marginBottom: '8px' }}>
-                  <span style={{
-                    background: 'var(--accent)',
-                    color: 'var(--bg)',
-                    padding: '4px 8px',
-                    borderRadius: 0,
-                    fontSize: '14px',
-                    fontWeight: 700
-                  }}>
-                    {lotPrefix}
-                  </span>
-                  <span style={{ fontSize: '14px', fontWeight: 600 }}>{lotNum}</span>
-                  {lotSuffix && (
-                    <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>.{lotSuffix}</span>
-                  )}
-                </div>
-                <div style={{ fontSize: '10px', color: 'var(--text-muted)' }}>
-                  {lotPrefixMeaning[lotPrefix] || 'Standard lot designation'}
-                </div>
-                {lotSuffix && (
-                  <div style={{ fontSize: '10px', color: 'var(--text-muted)', marginTop: '4px' }}>
-                    .{lotSuffix} = Sub-lot (additional vehicle in same slot)
-                  </div>
-                )}
               </div>
 
               {/* Timing */}
@@ -587,81 +378,52 @@ export const LotStatsPopup: React.FC<LotStatsProps> = ({
                 marginBottom: '12px'
               }}>
                 <div style={{ fontSize: '10px', color: 'var(--text-muted)', marginBottom: '8px' }}>
-                  TIMING ANALYSIS
+                  RECORDED VIDEO MARKERS
                 </div>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
                   <div>
                     <div style={{ fontSize: '18px', fontWeight: 700, fontFamily: "'Courier New', monospace" }}>
-                      {Math.floor(duration / 60)}:{String(duration % 60).padStart(2, '0')}
+                      {videoSpan}
                     </div>
-                    <div style={{ fontSize: '9px', color: 'var(--text-muted)' }}>Time on block</div>
+                    <div style={{ fontSize: '9px', color: 'var(--text-muted)' }}>Recorded video span</div>
                   </div>
                   <div>
                     <div style={{ fontSize: '18px', fontWeight: 700, fontFamily: "'Courier New', monospace" }}>
-                      {hourOfDay}:{String(minuteOfHour).padStart(2, '0')}
+                      {videoOffset}
                     </div>
-                    <div style={{ fontSize: '9px', color: 'var(--text-muted)' }}>Broadcast time</div>
+                    <div style={{ fontSize: '9px', color: 'var(--text-muted)' }}>Offset into video</div>
                   </div>
                 </div>
               </div>
 
-              {/* Current slot performance */}
-              {currentSlotStats && (
-                <div style={{
-                  padding: '12px',
-                  background: 'var(--surface-raised)',
-                  borderRadius: 0
-                }}>
-                  <div style={{ fontSize: '10px', color: 'var(--text-muted)', marginBottom: '8px' }}>
-                    HOUR {hourOfDay} PERFORMANCE
-                  </div>
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '8px' }}>
-                    <div>
-                      <div style={{ fontSize: '16px', fontWeight: 700 }}>{currentSlotStats.total}</div>
-                      <div style={{ fontSize: '9px', color: 'var(--text-muted)' }}>Total lots</div>
-                    </div>
-                    <div>
-                      <div style={{
-                        fontSize: '16px',
-                        fontWeight: 700,
-                        color: currentSlotStats.sellRate > 70 ? 'var(--success)' : 'var(--warning)'
-                      }}>
-                        {currentSlotStats.sellRate.toFixed(0)}%
-                      </div>
-                      <div style={{ fontSize: '9px', color: 'var(--text-muted)' }}>Sell rate</div>
-                    </div>
-                    <div>
-                      <div style={{ fontSize: '16px', fontWeight: 700, fontFamily: "'Courier New', monospace" }}>
-                        {currentSlotStats.total}
-                      </div>
-                      <div style={{ fontSize: '9px', color: 'var(--text-muted)' }}>Total lots</div>
-                    </div>
-                  </div>
-                </div>
-              )}
+              <div style={{ fontSize: '10px', color: 'var(--text-muted)' }}>
+                Auction local time and hourly performance are not established by video offsets.
+              </div>
             </>
           )}
 
           {activeSection === 'historical' && (
             <>
               <div style={{ fontSize: '10px', color: 'var(--text-muted)', marginBottom: '12px' }}>
-                Same lot number ({lotNumber}) across different {source?.toUpperCase()} auctions
+                Up to 10 public {source?.toUpperCase()} records with lot label {lotNumber}. A repeated label does not establish the same vehicle or sale, or complete source history.
               </div>
-              {loading ? (
+              {!currentHistory || currentHistory.status === 'loading' ? (
                 <div style={{ padding: '20px', textAlign: 'center', fontSize: '11px', color: 'var(--text-muted)' }}>
-                  Loading...
+                  Reading matching lot labels…
                 </div>
-              ) : historical.length === 0 ? (
+              ) : currentHistory.status === 'error' ? (
+                <div role="status" style={{ padding: '20px', fontSize: '11px', color: 'var(--text-muted)' }}>
+                  Matching lot records could not be read.
+                </div>
+              ) : currentHistory.rows.length === 0 ? (
                 <div style={{ padding: '20px', textAlign: 'center', fontSize: '11px', color: 'var(--text-muted)' }}>
-                  No historical data for this lot number
+                  No matching public lot records returned
                 </div>
               ) : (
                 <div>
-                  {historical.map((h) => (
-                    <a
+                  {currentHistory.rows.map((h) => (
+                    <div
                       key={h.id}
-                      href={`/vehicle/${h.vehicle_id}`}
-                      onClick={(e) => e.stopPropagation()}
                       style={{
                         display: 'block',
                         padding: '10px',
@@ -675,135 +437,36 @@ export const LotStatsPopup: React.FC<LotStatsProps> = ({
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                         <div>
                           <div style={{ fontSize: '11px', fontWeight: 600 }}>
-                            {h.year} {h.make} {h.model}
+                            <PrefetchLink to={`/vehicle/${h.vehicle_id}`}>{h.year} {h.make} {h.model}</PrefetchLink>
                           </div>
                           <div style={{ fontSize: '10px', color: 'var(--text-muted)' }}>
-                            {h.auction_name || source?.toUpperCase()}
+                            {h.source?.toUpperCase()} · Lot {h.lot_number}
                           </div>
                         </div>
                         <div style={{ textAlign: 'right' }}>
-                          {h.winning_bid ? (
-                            <div style={{ fontSize: '12px', fontWeight: 700, color: 'var(--success)' }}>
-                              ${h.winning_bid.toLocaleString()}
+                          {typeof h.winning_bid === 'number' && Number.isFinite(h.winning_bid) && h.winning_bid > 0 ? (
+                            <div style={{ fontSize: '11px' }}>
+                              Recorded amount {h.winning_bid.toLocaleString()} · currency and fee basis unknown
                             </div>
                           ) : (
                             <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
-                              {h.outcome || 'No sale'}
+                              {h.outcome || 'Outcome unknown'}
                             </div>
                           )}
                           <div style={{ fontSize: '9px', color: 'var(--text-muted)' }}>
-                            {new Date(h.auction_start_date).toLocaleDateString()}
+                            {h.auction_start_date && Number.isFinite(Date.parse(h.auction_start_date))
+                              ? `Recorded open (UTC): ${new Date(h.auction_start_date).toISOString().slice(0, 10)}` : 'Open date unknown'}
+                            {sourceLocator(h.source_url) && <> · <a href={sourceLocator(h.source_url)!} target="_blank" rel="noopener noreferrer">Original listing ↗</a></>}
                           </div>
                         </div>
                       </div>
-                    </a>
+                    </div>
                   ))}
                 </div>
               )}
             </>
           )}
 
-          {activeSection === 'timeslots' && (
-            <>
-              <div style={{ fontSize: '10px', color: 'var(--text-muted)', marginBottom: '12px' }}>
-                Performance by broadcast hour for {source?.toUpperCase()}
-              </div>
-              {loading ? (
-                <div style={{ padding: '20px', textAlign: 'center', fontSize: '11px', color: 'var(--text-muted)' }}>
-                  Loading...
-                </div>
-              ) : timeSlots.length === 0 ? (
-                <div style={{ padding: '20px', textAlign: 'center', fontSize: '11px', color: 'var(--text-muted)' }}>
-                  No time slot data available
-                </div>
-              ) : (
-                <div>
-                  {/* Mini bar chart */}
-                  <div style={{
-                    display: 'flex',
-                    alignItems: 'flex-end',
-                    height: '80px',
-                    gap: '2px',
-                    marginBottom: '12px',
-                    padding: '8px',
-                    background: 'var(--surface-raised)',
-                    borderRadius: 0
-                  }}>
-                    {timeSlots.map((slot) => {
-                      const maxRate = Math.max(...timeSlots.map(s => s.sellRate));
-                      const height = maxRate > 0 ? (slot.sellRate / maxRate) * 100 : 0;
-                      const isCurrentHour = slot.hour === hourOfDay;
-
-                      return (
-                        <div
-                          key={slot.hour}
-                          style={{
-                            flex: 1,
-                            background: isCurrentHour ? 'var(--accent)' :
-                                        slot.sellRate > 70 ? 'var(--success)' :
-                                        slot.sellRate > 50 ? 'var(--warning)' : 'var(--text-muted)',
-                            height: `${Math.max(height, 5)}%`,
-                            borderRadius: 0,
-                            opacity: isCurrentHour ? 1 : 0.6
-                          }}
-                          title={`Hour ${slot.hour}: ${slot.sellRate.toFixed(0)}% sell rate`}
-                        />
-                      );
-                    })}
-                  </div>
-
-                  {/* Top performing slots */}
-                  <div style={{ fontSize: '10px', color: 'var(--text-muted)', marginBottom: '8px' }}>
-                    BEST TIME SLOTS
-                  </div>
-                  {[...timeSlots]
-                    .sort((a, b) => b.sellRate - a.sellRate)
-                    .slice(0, 3)
-                    .map((slot, idx) => (
-                      <div
-                        key={slot.hour}
-                        style={{
-                          display: 'flex',
-                          justifyContent: 'space-between',
-                          padding: '8px',
-                          background: slot.hour === hourOfDay ? 'var(--accent-dim)' : 'var(--surface-raised)',
-                          borderRadius: 0,
-                          marginBottom: '4px',
-                          border: slot.hour === hourOfDay ? '1px solid var(--accent)' : 'none'
-                        }}
-                      >
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                          <span style={{
-                            width: '20px',
-                            height: '20px',
-                            background: idx === 0 ? 'gold' : idx === 1 ? 'silver' : '#cd7f32',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            fontSize: '10px',
-                            fontWeight: 700
-                          }}>
-                            {idx + 1}
-                          </span>
-                          <span style={{ fontSize: '11px' }}>Hour {slot.hour}</span>
-                          {slot.hour === hourOfDay && (
-                            <span style={{ fontSize: '9px', color: 'var(--accent)' }}>← This lot</span>
-                          )}
-                        </div>
-                        <div style={{ textAlign: 'right' }}>
-                          <div style={{ fontSize: '12px', fontWeight: 700, color: 'var(--success)' }}>
-                            {slot.sellRate.toFixed(0)}%
-                          </div>
-                          <div style={{ fontSize: '9px', color: 'var(--text-muted)' }}>
-                            {slot.sold}/{slot.total} sold
-                          </div>
-                        </div>
-                      </div>
-                    ))}
-                </div>
-              )}
-            </>
-          )}
         </div>
       </div>
     </div>,

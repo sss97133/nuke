@@ -1,9 +1,8 @@
 /**
  * Facebook Marketplace Listing Extractor
  *
- * Two modes:
- *   1. "direct" — accepts pre-extracted data from agents (no Firecrawl)
- *   2. URL mode — scrapes via Firecrawl, parses, inserts (legacy)
+ * "direct" accepts extracted data; "browser_capture" retains bounded browser passes
+ * with original source clocks and acknowledged sightings. URL mode is legacy Firecrawl.
  *
  * POST /functions/v1/extract-facebook-marketplace
  *
@@ -17,11 +16,20 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { corsHeaders } from "../_shared/cors.ts";
 import { writeObservation } from "../_shared/observationWriter.ts";
 import { isGarbageMake } from "../_shared/normalizeVehicle.ts";
+import { handleDirect as landDirect, type DirectInput } from "./direct.ts";
+import { handleBrowserCapture } from "./capture.ts";
+import { integrateListings, type IntegrationDeps, type IntegrationReceipt, type LandedResult } from "./integrate.ts";
+import { landClassifiedListing } from "../ingest/classifiedEvent.ts";
+import { writeVehicleEventByKey } from "../_shared/vehicleEventWrite.ts";
+import { intakeThrottle } from "../poll-listing-feeds/ledger.ts";
 import { requireWriteAuth } from "../_shared/writeGuard.ts";
+import { projectSecretKey } from "../_shared/supabaseKeys.ts";
+
+declare const EdgeRuntime: { waitUntil(promise: Promise<unknown>): void };
 
 const supabase = createClient(
   Deno.env.get("SUPABASE_URL")!,
-  Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
+  projectSecretKey()!,
 );
 
 const FIRECRAWL_API_KEY = Deno.env.get("FIRECRAWL_API_KEY");
@@ -62,6 +70,8 @@ async function linkToVehicle(params: {
   parsed_model?: string | null;
   location?: string | null;
   description?: string | null;
+  /** Browser captures leave year/make/model candidates to ingest's merge proposals; only a VIN links here. */
+  vinOnly?: boolean;
 }): Promise<{ vehicle_id: string | null; suggested_vehicle_id: string | null }> {
   const out = { vehicle_id: null as string | null, suggested_vehicle_id: null as string | null };
 
@@ -90,7 +100,7 @@ async function linkToVehicle(params: {
 
   // 2. YMM + state match — soft link
   const { parsed_year, parsed_make, parsed_model, location } = params;
-  if (!parsed_year || !parsed_make) return out;
+  if (params.vinOnly || !parsed_year || !parsed_make) return out;
 
   // Parse state from "City, ST" format
   const stateMatch = location?.match(/,\s*([A-Z]{2})$/);
@@ -128,233 +138,94 @@ async function linkToVehicle(params: {
 
 // ── Direct Mode ──────────────────────────────────────────────────────────────
 
-interface DirectInput {
-  mode: "direct";
-  facebook_id?: string;
-  url?: string;
-  title?: string;
-  price?: number;
-  current_price?: number;
-  description?: string;
-  location?: string;
-  parsed_year?: number;
-  parsed_make?: string;
-  parsed_model?: string;
-  mileage?: number;
-  exterior_color?: string;
-  interior_color?: string;
-  transmission?: string;
-  fuel_type?: string;
-  image_url?: string;
-  all_images?: string[];
-  seller_name?: string;
-  contact_info?: Record<string, unknown>;
-  status?: string;
-  agent_context?: {
-    agent_id?: string;
-    on_behalf_of?: string | null;
-    session_type?: string;
-  };
+const handleDirect = (body: DirectInput) => landDirect(body, { supabase, linkToVehicle, writeObservation });
+
+// ── Integration (after custody) ──────────────────────────────────────────────
+
+async function ownFunction(name: string, body: unknown, timeoutMs: number): Promise<any> {
+  const secret = projectSecretKey() ?? "";
+  const r = await fetch(`${Deno.env.get("SUPABASE_URL")}/functions/v1/${name}`, { // guardrail-allow: raw-fetch (our own function)
+    method: "POST", headers: { Authorization: `Bearer ${secret}`, apikey: secret, "Content-Type": "application/json" },
+    body: JSON.stringify(body), signal: AbortSignal.timeout(timeoutMs),
+  });
+  return await r.json().catch(() => ({ status: "error", error: `${name} HTTP ${r.status} (non-JSON body)` }));
 }
 
-async function handleDirect(body: DirectInput) {
-  // Resolve facebook_id: from body or URL
-  let facebookId = body.facebook_id;
-  if (!facebookId && body.url) {
-    facebookId = extractFacebookItemId(body.url) ?? undefined;
-  }
-  if (!facebookId) {
-    return jsonResponse({ error: "facebook_id or valid url required" }, 400);
-  }
-
-  const url = body.url || `https://www.facebook.com/marketplace/item/${facebookId}/`;
-
-  // Check existing
-  const { data: existing } = await supabase
-    .from("marketplace_listings")
-    .select("id, vehicle_id, submission_count")
-    .eq("facebook_id", facebookId)
-    .maybeSingle();
-
-  if (existing) {
-    // Update: bump submission_count, refresh last_seen_at, merge non-null fields
-    const updates: Record<string, unknown> = {
-      last_seen_at: new Date().toISOString(),
-      submission_count: (existing.submission_count || 1) + 1,
-    };
-
-    // Merge any new non-null fields from body
-    const mergeFields: Array<[string, unknown]> = [
-      ["title", body.title],
-      ["price", body.price != null ? Math.round(body.price) : undefined],
-      ["current_price", body.current_price ?? body.price],
-      ["description", body.description],
-      ["location", body.location],
-      ["parsed_year", body.parsed_year],
-      ["extracted_year", body.parsed_year],
-      ["parsed_make", body.parsed_make],
-      ["parsed_model", body.parsed_model],
-      ["mileage", body.mileage],
-      ["exterior_color", body.exterior_color],
-      ["interior_color", body.interior_color],
-      ["transmission", body.transmission],
-      ["fuel_type", body.fuel_type],
-      ["image_url", body.image_url],
-      ["all_images", body.all_images],
-      ["seller_name", body.seller_name],
-      ["contact_info", body.contact_info],
-      ["status", body.status],
-    ];
-
-    for (const [col, val] of mergeFields) {
-      if (val != null && val !== undefined) {
-        updates[col] = val;
-      }
+const integrationDeps: IntegrationDeps = {
+  supabase, writeObservation,
+  callIngest: async (batch) => {
+    const out: any[] = [];
+    // ingest runs a batch's items concurrently; ten at a time keeps a 40-listing packet to four bounded calls.
+    for (let i = 0; i < batch.length; i += 10) {
+      const j = await ownFunction("ingest", { batch: batch.slice(i, i + 10) }, 60_000);
+      if (!Array.isArray(j?.results)) throw new Error(j?.error ?? "ingest returned no results");
+      out.push(...j.results);
     }
+    return out;
+  },
+  landEvent: landClassifiedListing,
+  writeEvent: writeVehicleEventByKey,
+  promotionLimit: async () => {
+    const { data, error } = await supabase.from("platform_config").select("config_value").eq("config_key", "source_intake").maybeSingle();
+    if (error) throw new Error("intake throttle unavailable; no listing sent to ingest");
+    const t = intakeThrottle(data?.config_value ?? {});
+    const own = t.sources["facebook_marketplace"];
+    return !t.enabled || own?.enabled === false ? 0 : (own?.max_ingests ?? t.max_ingests);
+  },
+  persistPhotos: (vehicleId, urls, observedAt) => {
+    // Facebook CDN links carry an expiry of a few days; an older sighting's links would only fail.
+    if (Date.now() - Date.parse(observedAt) > 72 * 3600_000) return false;
+    // run_analysis false: copying photos must not start paid image analysis.
+    EdgeRuntime.waitUntil(ownFunction("backfill-images", { vehicle_id: vehicleId, image_urls: urls,
+      source: "facebook_marketplace", run_analysis: false, max_images: 20, listed_date: observedAt.slice(0, 10) }, 120_000)
+      .catch((e) => console.error(`[fb] photo copy ${vehicleId}: ${e instanceof Error ? e.message : String(e)}`)));
+    return true;
+  },
+};
 
-    // Append agent provenance to raw_scrape_data
-    if (body.agent_context) {
-      updates.raw_scrape_data = {
-        agent_context: body.agent_context,
-        submitted_at: new Date().toISOString(),
-        mode: "direct",
-      };
-    }
-
-    // Attempt vehicle linking if not already linked
-    let vehicleId = existing.vehicle_id;
-    if (!vehicleId) {
-      const link = await linkToVehicle({
-        vin: null,
-        parsed_year: body.parsed_year,
-        parsed_make: body.parsed_make,
-        parsed_model: body.parsed_model,
-        location: body.location,
-        description: body.description,
-      });
-      if (link.vehicle_id) {
-        updates.vehicle_id = link.vehicle_id;
-        vehicleId = link.vehicle_id;
-      }
-      if (link.suggested_vehicle_id) {
-        updates.suggested_vehicle_id = link.suggested_vehicle_id;
-      }
-    }
-
-    await supabase
-      .from("marketplace_listings")
-      .update(updates)
-      .eq("id", existing.id);
-
-    // Fire-and-forget observation write if linked to a vehicle
-    if (vehicleId) {
-      const obsFields: Record<string, any> = {};
-      if (body.parsed_year) obsFields.year = body.parsed_year;
-      if (body.parsed_make) obsFields.make = body.parsed_make;
-      if (body.parsed_model) obsFields.model = body.parsed_model;
-      if (body.price) obsFields.asking_price = body.price;
-      if (body.mileage) obsFields.mileage = body.mileage;
-      if (body.exterior_color) obsFields.color = body.exterior_color;
-      if (body.transmission) obsFields.transmission = body.transmission;
-      writeObservation(supabase, {
-        vehicleId,
-        source: { platform: "facebook_marketplace", url, trustScore: 0.4 },
-        fields: obsFields,
-        observationKind: "listing",
-        extractionMethod: "fb_direct_input",
-      }).catch((e: any) => console.warn(`[fb] observationWriter error for ${vehicleId}: ${e?.message}`));
-    }
-
-    return jsonResponse({
-      success: true,
-      listing_id: existing.id,
-      vehicle_id: vehicleId,
-      is_new: false,
-      submission_count: (existing.submission_count || 1) + 1,
-    });
+/**
+ * Integration for listings already in custody, read back from their rows: no new source visit, no submission count,
+ * no change to the listing's testimony. Bounded: at most 50 rows per call, oldest-unlinked-last by last_seen_at.
+ */
+async function handleIntegrateReplay(body: { facebook_ids?: string[]; first_seen_since?: string; limit?: number }) {
+  const limit = Math.min(Math.max(Number(body.limit ?? 25), 1), 50);
+  let q = supabase.from("marketplace_listings").select(
+    "id, facebook_id, vehicle_id, title, price, current_price, location, description, mileage, transmission, " +
+    "exterior_color, interior_color, fuel_type, image_url, all_images, seller_profile_url, contact_info, status, last_seen_at",
+  ).eq("platform", "facebook_marketplace");
+  if (Array.isArray(body.facebook_ids) && body.facebook_ids.length) {
+    q = q.in("facebook_id", body.facebook_ids.slice(0, 50).map(String));
+  } else {
+    const since = Date.parse(body.first_seen_since ?? "");
+    if (!Number.isFinite(since)) return jsonResponse({ error: "facebook_ids or first_seen_since required" }, 400);
+    q = q.is("vehicle_id", null).eq("status", "active").gte("first_seen_at", new Date(since).toISOString())
+      .order("last_seen_at", { ascending: false });
   }
+  const { data: rows, error } = await q.limit(limit);
+  if (error) return jsonResponse({ error: error.message }, 500);
+  const items: DirectInput[] = (rows ?? []).map((r: any) => ({
+    mode: "direct", facebook_id: r.facebook_id, title: r.title ?? undefined, price: r.price ?? undefined,
+    current_price: r.current_price ?? undefined, location: r.location ?? undefined, description: r.description ?? undefined,
+    mileage: r.mileage ?? undefined, transmission: r.transmission ?? undefined, exterior_color: r.exterior_color ?? undefined,
+    interior_color: r.interior_color ?? undefined, fuel_type: r.fuel_type ?? undefined, image_url: r.image_url ?? undefined,
+    all_images: r.all_images ?? undefined, seller_profile_url: r.seller_profile_url ?? undefined,
+    contact_info: r.contact_info ?? undefined, status: r.status ?? undefined,
+    agent_context: { agent_id: "fb-integrate-replay", session_type: "retained_listing_row" },
+  }));
+  const seen = new Map((rows ?? []).map((r: any) => [r.facebook_id, r.last_seen_at]));
+  const landed: LandedResult[] = (rows ?? []).map((r: any) => ({ facebook_id: r.facebook_id, listing_id: r.id, vehicle_id: r.vehicle_id, listing_landed: true }));
+  const integration = await integrateListings(items, landed, integrationDeps,
+    (b) => seen.get(b.facebook_id) ?? new Date().toISOString());
+  return jsonResponse({ success: integration.errors.length === 0, rows: rows?.length ?? 0, integration });
+}
 
-  // New listing — attempt vehicle linking before insert
-  const link = await linkToVehicle({
-    vin: null,
-    parsed_year: body.parsed_year,
-    parsed_make: body.parsed_make,
-    parsed_model: body.parsed_model,
-    location: body.location,
-    description: body.description,
-  });
-
-  const row: Record<string, unknown> = {
-    facebook_id: facebookId,
-    platform: "facebook_marketplace",
-    url: normalizeUrl(facebookId),
-    title: body.title || null,
-    price: body.price != null ? Math.round(body.price) : null,
-    current_price: body.current_price ?? body.price ?? null,
-    description: body.description || null,
-    location: body.location || null,
-    parsed_year: body.parsed_year || null,
-    extracted_year: body.parsed_year || null,
-    parsed_make: body.parsed_make || null,
-    parsed_model: body.parsed_model || null,
-    mileage: body.mileage || null,
-    exterior_color: body.exterior_color || null,
-    interior_color: body.interior_color || null,
-    transmission: body.transmission || null,
-    fuel_type: body.fuel_type || null,
-    image_url: body.image_url || null,
-    all_images: body.all_images || null,
-    seller_name: body.seller_name || null,
-    contact_info: body.contact_info || null,
-    status: body.status || "active",
-    last_seen_at: new Date().toISOString(),
-    raw_scrape_data: {
-      agent_context: body.agent_context || null,
-      submitted_at: new Date().toISOString(),
-      mode: "direct",
-    },
-  };
-
-  // Apply vehicle linking results
-  if (link.vehicle_id) row.vehicle_id = link.vehicle_id;
-  if (link.suggested_vehicle_id) row.suggested_vehicle_id = link.suggested_vehicle_id;
-
-  const { data: inserted, error: insertError } = await supabase
-    .from("marketplace_listings")
-    .insert(row)
-    .select("id, vehicle_id")
-    .maybeSingle();
-
-  if (insertError) throw insertError;
-
-  // Fire-and-forget observation write if linked to a vehicle
-  const linkedVehicleId = inserted!.vehicle_id || link.vehicle_id;
-  if (linkedVehicleId) {
-    const obsFields: Record<string, any> = {};
-    if (body.parsed_year) obsFields.year = body.parsed_year;
-    if (body.parsed_make) obsFields.make = body.parsed_make;
-    if (body.parsed_model) obsFields.model = body.parsed_model;
-    if (body.price) obsFields.asking_price = body.price;
-    if (body.mileage) obsFields.mileage = body.mileage;
-    if (body.exterior_color) obsFields.color = body.exterior_color;
-    if (body.transmission) obsFields.transmission = body.transmission;
-    writeObservation(supabase, {
-      vehicleId: linkedVehicleId,
-      source: { platform: "facebook_marketplace", url: normalizeUrl(facebookId), trustScore: 0.4 },
-      fields: obsFields,
-      observationKind: "listing",
-      extractionMethod: "fb_direct_input",
-    }).catch((e: any) => console.warn(`[fb] observationWriter error for ${linkedVehicleId}: ${e?.message}`));
+async function integrate(items: DirectInput[], landed: LandedResult[]): Promise<IntegrationReceipt | { error: string }> {
+  try {
+    return await integrateListings(items, landed, integrationDeps, (b) => b.capture?.observed_at ?? new Date().toISOString());
+  } catch (e) {
+    console.error("FB integration error:", e);
+    return { error: e instanceof Error ? e.message : String(e) };
   }
-
-  return jsonResponse({
-    success: true,
-    listing_id: inserted!.id,
-    vehicle_id: inserted!.vehicle_id,
-    is_new: true,
-    submission_count: 1,
-    linked_via: link.vehicle_id ? "vin" : link.suggested_vehicle_id ? "ymm_match" : null,
-  });
 }
 
 // ── URL (Legacy) Mode ────────────────────────────────────────────────────────
@@ -671,6 +542,8 @@ interface BatchInput {
     parsed_make?: string;
     parsed_model?: string;
     year?: number;
+    location?: string;
+    image_url?: string;
     _source?: string;
   }>;
   source?: string;
@@ -714,7 +587,9 @@ async function handleBatch(body: BatchInput) {
       const resp = await handleDirect(directInput);
       const respBody = await resp.json();
 
-      if (respBody.is_new) {
+      if (!resp.ok || !respBody.success) {
+        results.errors++;
+      } else if (respBody.is_new) {
         results.created++;
       } else {
         results.updated++;
@@ -726,7 +601,7 @@ async function handleBatch(body: BatchInput) {
   }
 
   return jsonResponse({
-    success: true,
+    success: results.errors === 0,
     source,
     ...results,
     message: `Synced ${results.created} new, ${results.updated} existing, ${results.skipped} skipped, ${results.errors} errors`,
@@ -746,17 +621,40 @@ Deno.serve(async (req) => {
   try {
     const body = await req.json();
 
+    if (body.mode === "browser_capture") {
+      const landed = await handleBrowserCapture(supabase, body, (item) => landDirect(item, { supabase, linkToVehicle, writeObservation, capturePrepared: true }));
+      const integration = await integrate(body.batch.map((i: DirectInput) => ({ ...i, mode: "direct", capture: body.capture })), landed.results);
+      // The custody receipt is written; the integration receipt joins it on the same ledger row.
+      const run = await supabase.from("fb_sweep_jobs").select("metadata").eq("id", landed.capture_id).maybeSingle();
+      if (run.data && !run.data.metadata?.integration) {
+        const saved = await supabase.from("fb_sweep_jobs").update({ metadata: { ...run.data.metadata, integration } })
+          .eq("id", landed.capture_id);
+        if (saved.error) console.error(`[fb] integration receipt ${landed.capture_id}: ${saved.error.message}`);
+      }
+      return jsonResponse({ ...landed, integration });
+    }
+
     if (body.mode === "batch") {
       return await handleBatch(body as BatchInput);
     }
 
+    if (body.mode === "integrate") {
+      return await handleIntegrateReplay(body);
+    }
+
     if (body.mode === "direct") {
-      return await handleDirect(body as DirectInput);
+      const resp = await handleDirect(body as DirectInput);
+      const result = await resp.json();
+      const facebookId = body.facebook_id ?? extractFacebookItemId(body.url ?? "");
+      if (resp.ok && result.success && facebookId) {
+        result.integration = await integrate([{ ...body, facebook_id: facebookId }], [{ ...result, facebook_id: facebookId }]);
+      }
+      return jsonResponse(result, resp.status);
     }
 
     return await handleUrlMode(body);
   } catch (error) {
     console.error("FB Marketplace extraction error:", error);
-    return jsonResponse({ error: error.message }, 500);
+    return jsonResponse({ error: error instanceof Error ? error.message : String(error) }, 500);
   }
 });

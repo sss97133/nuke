@@ -78,9 +78,66 @@ try {
     {cwd:root,env:childEnv,encoding:'utf8',maxBuffer:8*1024*1024});
   log+=`${fixture.stdout||''}\n${fixture.stderr||''}`;
   assert.equal(fixture.status,0,log.split('\n').slice(-15).join('\n'));
+  const cabFixture=spawnSync(executable('psql'),[...psql,'-v','ON_ERROR_STOP=1','-f','scripts/discovery/cab-listing-lineage-test.sql'],
+    {cwd:root,env:childEnv,encoding:'utf8',maxBuffer:8*1024*1024});
+  log+=`${cabFixture.stdout||''}\n${cabFixture.stderr||''}`;
+  assert.equal(cabFixture.status,0,log.split('\n').slice(-20).join('\n'));
+  const cabHandler=spawnSync('deno',['test',...(ci?[]:['--cached-only']),'--node-modules-dir=none','--allow-env',`--allow-run=${executable('psql')}`,
+    'supabase/functions/ingest-observation/cabListingCapture.contract.ts'],
+    {cwd:root,env:{...childEnv,CAB_LINEAGE_PSQL:executable('psql'),CAB_LINEAGE_PSQL_ARGS:JSON.stringify(psql)},encoding:'utf8',maxBuffer:8*1024*1024});
+  log+=`${cabHandler.stdout||''}\n${cabHandler.stderr||''}`;
+  assert.equal(cabHandler.status,0,log.split('\n').slice(-35).join('\n'));
+  // Optional private rehearsal of at most three explicit retained tuples, never
+  // discovery and never enabled in CI. Source rows are loaded only into this
+  // freshly created fixture DB and rolled back; no real receipt is admitted.
+  if (process.env.CAB_LINEAGE_RETAINED_CONTEXTS) {
+    assert(!ci,'Private retained rehearsal is local only');
+    const contexts=JSON.parse(readFileSync(process.env.CAB_LINEAGE_RETAINED_CONTEXTS,'utf8'));
+    assert(Array.isArray(contexts)&&contexts.length>0&&contexts.length<=3,'Explicit bounded retained tuples required');
+    const quote=value=>`'${JSON.stringify(value).replaceAll("'","''")}'::jsonb`;
+    const results=[];
+    // query() opens independent psql sessions; keep load, qualify and rollback in
+    // one transaction below rather than relying on session state across calls.
+    const load=["BEGIN; DELETE FROM public.vehicle_observations WHERE id=md5('cab-original')::uuid; DELETE FROM public.observation_sources WHERE id=md5('source-cab')::uuid;"];
+    for(const {context:c} of contexts) {
+      for(const [table,row] of [['vehicles',c.vehicle],['observation_sources',c.source],['vehicle_events',c.episode],['auction_events',c.auction],['listing_page_snapshots',c.snapshot],['vehicle_observations',c.original]]) {
+        assert(row&&typeof row.id==='string'&&/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(row.id),'Retained tuple must preserve original UUIDs');
+        load.push(`INSERT INTO public.${table} SELECT (jsonb_populate_record(NULL::public.${table},${quote(row)})).* ON CONFLICT DO NOTHING;`);
+      }
+      load.push(`SELECT public.qualify_cab_listing_capture('${c.original.id}'::uuid,'${c.snapshot.id}'::uuid,'${c.auction.id}'::uuid);`);
+    }
+    load.push('ROLLBACK;');
+    const output=query(load.join('\n')).split('\n').filter(line=>line.startsWith('{'));
+    assert.equal(output.length,contexts.length,'Every selected tuple receives one verdict');
+    for(let i=0;i<output.length;i++) {
+      const q=JSON.parse(output[i]);
+      results.push({source_observation_id:contexts[i].context.original.id,qualified:q.ok===true,reason:q.reason??null,
+        scope:q.input?.structured_data?.listing_capture_receipt?.scope??null,
+        database_admission:'not_attempted',privacy_policy:'actual_observation_predicate_offline',public_readiness:'not_assessed'});
+    }
+    writeFileSync(process.env.CAB_LINEAGE_RETAINED_REPORT||join(base,'retained-rehearsal.json'),JSON.stringify(results,null,2));
+    log+=`Retained selected tuples: ${results.filter(r=>r.qualified).length}/${results.length} qualify under fixture boundaries; no production admission/public readiness.\n`;
+  }
   const schemaContracts=(log.match(/NOTICE:\s+PASS /g)||[]).length;
   assert(schemaContracts>0,'Actual schema assertions required');
   const actorA=session('nuke-sale-episode-integrity-a'),actorB=session('nuke-sale-episode-integrity-b');
+  for(const [label,update] of [
+    ['original',"UPDATE public.vehicle_observations SET is_superseded=true WHERE id=md5('cab-original')::uuid;"],
+    ['capture',"UPDATE public.listing_page_snapshots SET success=false WHERE id=md5('cab-snapshot')::uuid;"],
+    ['presentation',"UPDATE public.auction_events SET source_listing_id='other' WHERE id=md5('cab-auction')::uuid;"]
+  ]) {
+    await actorA.send('BEGIN; SET LOCAL ROLE service_role; SELECT public.synthetic_insert_cab_receipt(public.synthetic_cab_qualification()->\'input\');');
+    await actorB.send("BEGIN; SET LOCAL lock_timeout='150ms';");
+    await state(actorB,update,'55P03');
+    await actorB.send('ROLLBACK;');
+    await actorA.send('ROLLBACK;');
+    passed(`C&B ${label} mutation cannot race a source-bound admission`);
+  }
+  await actorA.send("BEGIN; UPDATE public.listing_page_snapshots SET success=false WHERE id=md5('cab-snapshot')::uuid;");
+  await actorB.send('BEGIN; SET LOCAL ROLE service_role;');
+  await state(actorB,"SELECT public.synthetic_insert_cab_receipt(public.synthetic_cab_qualification()->'input');",'55P03');
+  await actorB.send('ROLLBACK;'); await actorA.send('ROLLBACK;');
+  passed('C&B mutator-first admission refuses rather than using pre-lock testimony');
   for(const [label,update,restore] of [
     ['parent',"UPDATE public.vehicles SET is_public=false WHERE id=md5('vehicle-1')::uuid;","UPDATE public.vehicles SET is_public=true WHERE id=md5('vehicle-1')::uuid;"],
     ['source',"UPDATE public.observation_sources SET slug='bat-changed' WHERE slug='bat';","UPDATE public.observation_sources SET slug='bat' WHERE slug='bat-changed';"],
@@ -132,7 +189,7 @@ try {
   for(const actor of sessions){actor.child.stdin.end();await new Promise(resolve=>actor.child.once('exit',resolve));}
   writeFileSync(process.env.SALE_EPISODE_TEST_LOG||join(base,'fixture.log'),log);
   console.log(JSON.stringify({stage:ci?'ci_actual_pg17_schema_and_concurrency_passed':'local_actual_pg17_schema_and_concurrency_passed',schemaContracts,concurrencyContracts,
-    productionConnected:false,admittedEpisodeV2Method:false,writerChanged:false}));
+    productionConnected:false,admittedEpisodeV2Method:false,productionWriterChanged:false,cabCanonicalHandlerAndReader:true}));
 } catch(error) {
   if(existsSync(join(base,'server.log')))log+=readFileSync(join(base,'server.log'),'utf8');
   writeFileSync(process.env.SALE_EPISODE_TEST_LOG||join(base,'fixture.log'),log);

@@ -12,7 +12,10 @@
  *     vin, drivetrain, fuel_type, listing_posted_at, listing_updated_at, plus confirmations of what ingest wrote at
  *     creation (mileage, transmission, color, body_style, title_status);
  *   - field_evidence rows for each of those, written by the same writer;
- *   - condition, cylinders and the odometer disclosures have no vehicles column; they stay testimony in the observation.
+ *   - condition, cylinders and the odometer disclosures have no vehicles column; they stay testimony in the observation;
+ *   - the post's place (city, region, postal code, approximate point; never the street line) as one listing row in
+ *     vehicle_location_observations, the table the map and the county key already read. A re-read of the same post
+ *     with the same place adds nothing.
  *
  * Two choices that are not obvious:
  *   1. The VIN is NOT given to ingest's identity machinery for Craigslist (gate, Tier-1 VIN match, the creation insert).
@@ -29,8 +32,11 @@
  */
 
 import { normalizeDrivetrain, normalizeTransmission } from "../_shared/normalizeVehicle.ts";
-import { type CraigslistCapture } from "../_shared/craigslistAttributes.ts";
+import { pickCapture, type CraigslistCapture } from "../_shared/craigslistAttributes.ts";
 import type { ObservationInput, WriteResult } from "../_shared/observationWriter.ts";
+import { writeVehicleEventByKey, type VehicleEventWriteResult } from "../_shared/vehicleEventWrite.ts";
+import { recordSellerTypes } from "../_shared/sellerType.ts";
+import { craigslistSellerTypeRow } from "./craigslistSellerType.ts";
 
 /** What matchOrCreateVehicle was handed (after ingest's gate), so the observation confirms it instead of disagreeing. */
 export interface WrittenColumns {
@@ -58,6 +64,13 @@ export interface CaptureLanding {
   confirmed: string[];
   conflicted: string[];
   errors: string[];
+  observation_id?: string;
+  listing_event?: VehicleEventWriteResult;
+  place?: "written" | "duplicate" | "error";
+  /** The seller class (private | dealer | unknown) written as a lot-level signal for the listing episode. */
+  seller_type?: "private" | "dealer" | "unknown" | "error";
+  /** The asking price: first reading logged, a changed one applied, an unchanged one left alone. */
+  price?: "logged" | "changed" | "unchanged" | "error";
 }
 
 /** Craigslist says "gas"; the column's dominant spelling (93,571 + 61,487 rows, 2026-10-06) is "gasoline". "other" is not a fuel. */
@@ -105,6 +118,7 @@ export function captureObservationFields(
   put("condition", a.condition);
   put("listing_posted_at", capture.posted_at);
   put("listing_updated_at", capture.updated_at);
+  put("listing_asking_price", capture.asking_price);
   return out;
 }
 
@@ -115,8 +129,98 @@ export function ledgerFields(capture: CraigslistCapture, landing?: CaptureLandin
     posted_at: capture.posted_at,
     updated_at: capture.updated_at,
     attributes: capture.attributes,
+    ...(capture.source_capture ? { source_capture: capture.source_capture } : {}),
+    ...(capture.asking_price !== undefined ? { asking_price: capture.asking_price } : {}),
+    ...(capture.place ? { place: capture.place } : {}),
     ...(landing ? { capture_landing: landing } : {}),
   };
+}
+
+/**
+ * The vehicle_location_observations row for a post's place, or null when it has none. Craigslist moves its map pin,
+ * so a point is city precision, the same grain the table's other listing rows carry.
+ */
+export function placeObservationRow(
+  vehicleId: string,
+  listingUrl: string,
+  capture: CraigslistCapture,
+  observationId: string | null,
+): Record<string, unknown> | null {
+  const p = capture.place;
+  // A town name alone is already vehicles.location, and ambiguous without its state.
+  if (!p || (!p.region && !p.postal_code && p.latitude === null)) return null;
+  const text = [p.locality, [p.region, p.postal_code].filter(Boolean).join(" ")].filter(Boolean).join(", ") || null;
+  return {
+    vehicle_id: vehicleId,
+    source_type: "listing",
+    source_platform: "craigslist",
+    source_url: listingUrl,
+    observed_at: capture.source_capture?.observed_at ?? new Date().toISOString(),
+    location_text_raw: text,
+    location_text_clean: text,
+    country_code: p.country,
+    region_code: p.region,
+    city: p.locality,
+    postal_code: p.postal_code,
+    latitude: p.latitude,
+    longitude: p.longitude,
+    precision: p.locality || p.latitude !== null ? "city" : "region",
+    confidence: p.latitude !== null || p.postal_code ? 0.8 : 0.6,
+    metadata: {
+      method: "json_ld_available_at_or_from",
+      ...(observationId ? { observation_id: observationId } : {}),
+      ...(capture.source_capture ? { snapshot_id: capture.source_capture.snapshot_id } : {}),
+    },
+  };
+}
+
+/**
+ * The post's asking price against the vehicle row. vehicle_price_history is the change log of vehicles.asking_price:
+ * a trigger writes a row on every UPDATE of the column, but nothing writes the first reading on INSERT, and the
+ * observation writer quarantines a different price instead of applying it. So here:
+ *   - a vehicle this page just created: log the first reading, with the source, the page's own observed_at and the URL;
+ *   - a vehicle already holding a different price (or none): apply the new price; the trigger logs the change.
+ * A page read is newer than every earlier read of the same post, so the later reading is the current claim; the
+ * earlier ones stay in the observations and the log. Never throws.
+ */
+async function landAskingPrice(
+  supabase: any,
+  args: { vehicleId: string; listingUrl: string; price: number; observedAt: string; postId: string | null; isNewVehicle: boolean },
+): Promise<"logged" | "changed" | "unchanged" | "error"> {
+  try {
+    if (args.isNewVehicle) {
+      const { error } = await supabase.from("vehicle_price_history").insert({
+        vehicle_id: args.vehicleId, price_type: "asking", value: args.price, source: "craigslist", as_of: args.observedAt,
+        confidence: 80, proof_type: "listing", proof_url: args.listingUrl,
+        notes: args.postId ? `craigslist post ${args.postId}` : null,
+      });
+      return error ? "error" : "logged";
+    }
+    const { data, error } = await supabase.from("vehicles").select("asking_price").eq("id", args.vehicleId).maybeSingle();
+    if (error || !data) return "error";
+    if (data.asking_price !== null && Number(data.asking_price) === args.price) return "unchanged";
+    const { error: upErr } = await supabase.from("vehicles").update({ asking_price: args.price, price: Math.round(args.price) })
+      .eq("id", args.vehicleId);
+    return upErr ? "error" : "changed";
+  } catch {
+    return "error";
+  }
+}
+
+/** Write the place once per (vehicle, post, place). Never throws. */
+async function landPlace(supabase: any, row: Record<string, unknown>): Promise<"written" | "duplicate" | "error"> {
+  try {
+    let seen = supabase.from("vehicle_location_observations").select("id")
+      .eq("vehicle_id", row.vehicle_id).eq("source_platform", "craigslist").eq("source_url", row.source_url);
+    for (const k of ["postal_code", "latitude", "longitude"]) seen = row[k] === null ? seen.is(k, null) : seen.eq(k, row[k]);
+    const { data, error } = await seen.limit(1);
+    if (error) return "error";
+    if (data && data.length > 0) return "duplicate";
+    const { error: insertError } = await supabase.from("vehicle_location_observations").insert(row);
+    return insertError ? "error" : "written";
+  } catch {
+    return "error";
+  }
 }
 
 /** The columns ingest inserts at creation from the same page. On a vehicle it just created they are already there. */
@@ -164,9 +268,15 @@ export async function landCraigslistCapture(
     vehicleId: string;
     listingUrl: string;
     capture: CraigslistCapture;
+    /** Prose parsed from this same source capture; admitted only with its validated snapshot and source clock. */
+    sourceDescription?: string | null;
     written: WrittenColumns;
     /** True when ingest created the vehicle from this page a moment ago. Then the columns it wrote are not re-confirmed. */
     isNewVehicle?: boolean;
+    /** The span of the post's text the model was read from, when the page's attributes named none. */
+    /** The post's body text, read for dealer wording against a declared private class. */
+    description?: string | null;
+    modelCitation?: { value: string; span: { start: number; end: number; text: string }; rule: string } | null;
     timeoutMs?: number;
   },
 ): Promise<CaptureLanding> {
@@ -185,7 +295,10 @@ export async function landCraigslistCapture(
     }
 
     const fields = captureObservationFields(capture, written, vinWritable);
-    if (Object.keys(fields).length === 0) return landing;
+    // A cached page without its receipt must not acquire a current source clock from the writer's default.
+    const sourceDescription = pickCapture(capture)?.source_capture && typeof args.sourceDescription === "string" && args.sourceDescription.trim()
+      ? args.sourceDescription : null;
+    if (Object.keys(fields).length === 0 && !sourceDescription) return landing;
 
     const result = await withTimeout(
       deps.writeObservation(deps.supabase, {
@@ -197,8 +310,10 @@ export async function landCraigslistCapture(
         ...(args.isNewVehicle ? { testimonyOnly: COLUMNS_WRITTEN_AT_CREATION } : {}),
         observationKind: "listing",
         extractionMethod: "html_parse",
+        ...(sourceDescription ? { contentText: sourceDescription } : {}),
+        ...(capture.source_capture ? { observedAt: capture.source_capture.observed_at } : {}),
         // The verbatim block, so the observation stands on its own if the page is gone.
-        rawData: { ...ledgerFields(capture), ...(typeof heldBy === "string" ? { vin_held_by: heldBy } : {}) },
+        rawData: { ...ledgerFields(capture), ...(args.modelCitation ? { model_from_text: args.modelCitation } : {}), ...(typeof heldBy === "string" ? { vin_held_by: heldBy } : {}) },
       }),
       args.timeoutMs ?? 8000,
     );
@@ -208,11 +323,63 @@ export async function landCraigslistCapture(
     landing.confirmed = result.confirmed;
     landing.conflicted = result.conflicted;
     landing.errors = result.errors.slice(0, 5);
+    if (result.observationId) landing.observation_id = result.observationId;
     if (vinWritable) {
       landing.vin = result.gapFilled.includes("vin") ? "filled"
         : result.confirmed.includes("vin") ? "confirmed"
         : result.conflicted.includes("vin") ? "conflict"
         : "not_written";
+    }
+    // A retained source receipt and canonical observation ACK precede the public listing projection.
+    // Retry after a projection failure may have a duplicate observation; it must still finish this relationship.
+    if (result.observationId && capture.post_id && capture.source_capture) {
+      try {
+        landing.listing_event = await withTimeout(writeVehicleEventByKey(deps.supabase, {
+          vehicle_id: vehicleId,
+          source_platform: "craigslist",
+          source_listing_id: capture.post_id,
+          source_url: listingUrl,
+          event_type: "listing",
+          event_status: "unknown",
+          ...(capture.asking_price != null ? { current_price: capture.asking_price } : {}),
+          metadata: {
+            source: "ingest", observation_id: result.observationId,
+            snapshot_id: capture.source_capture.snapshot_id,
+            source_observed_at: capture.source_capture.observed_at,
+            ...(capture.posted_at ? { listing_posted_at: capture.posted_at } : {}),
+            ...(capture.updated_at ? { listing_updated_at: capture.updated_at } : {}),
+          },
+        }, { preserveEventStatus: true, sourceObservedAt: capture.source_capture.observed_at }), args.timeoutMs ?? 8000);
+        if (landing.listing_event.action === "error") landing.errors.push(`listing event: ${landing.listing_event.error}`);
+        // The seller class, one signal row per listing episode (record_lot_quality_signals; failures are counted, not thrown).
+        const eventId = (landing.listing_event as { id?: string | null }).id;
+        if (eventId) {
+          try {
+            const row = craigslistSellerTypeRow(eventId, capture.seller_class, args.description);
+            await withTimeout(recordSellerTypes(deps.supabase, [row], "ingest-craigslist"), args.timeoutMs ?? 8000);
+            landing.seller_type = row.value;
+          } catch (e) {
+            landing.seller_type = "error";
+            landing.errors.push(`seller_type: ${e instanceof Error ? e.message : String(e)}`);
+          }
+        }
+      } catch (e) {
+        landing.listing_event = { action: "error", error: e instanceof Error ? e.message : String(e), code: null };
+        landing.errors.push(`listing event: ${landing.listing_event.error}`);
+      }
+    }
+    if (result.observationId && capture.asking_price != null && capture.asking_price > 0) {
+      landing.price = await withTimeout(landAskingPrice(deps.supabase, {
+        vehicleId, listingUrl, price: capture.asking_price,
+        observedAt: capture.source_capture?.observed_at ?? new Date().toISOString(),
+        postId: capture.post_id ?? null, isNewVehicle: !!args.isNewVehicle,
+      }), args.timeoutMs ?? 8000).catch(() => "error" as const);
+      if (landing.price === "error") landing.errors.push("price: not applied");
+    }
+    const placeRow = result.observationId ? placeObservationRow(vehicleId, listingUrl, capture, result.observationId) : null;
+    if (placeRow) {
+      landing.place = await withTimeout(landPlace(deps.supabase, placeRow), args.timeoutMs ?? 8000).catch(() => "error" as const);
+      if (landing.place === "error") landing.errors.push("place: not written");
     }
   } catch (e) {
     landing.observation = "error";

@@ -174,6 +174,9 @@ function BadgeRichTooltip({
           {segments.join(' \u00B7 ')}
         </div>
       ))}
+      <div style={{ marginTop: '4px', maxWidth: 280, fontFamily: 'Arial, sans-serif', fontSize: '8px', lineHeight: 1.4, color: 'rgba(255,255,255,0.7)', whiteSpace: 'normal', textTransform: 'none' }}>
+        Stats use up to 500 returned records per read; year ranges use records with prices above zero. Previews show up to 6 records. The count is a separate read.
+      </div>
       {/* Arrow */}
       <div
         style={{
@@ -197,6 +200,7 @@ export interface BadgePortalProps {
   dimension: BadgeDimension;
   /** The value to filter by */
   value: string | number | null;
+  modelMake?: string | null;
   /** Display text */
   label: string;
   /** Visual variant — affects colors */
@@ -249,6 +253,7 @@ const VARIANT_STYLES: Record<string, { bg: string; color: string; borderColor: s
 export function BadgePortal({
   dimension,
   value,
+  modelMake,
   label,
   variant = 'default',
   bg,
@@ -259,7 +264,7 @@ export function BadgePortal({
 }: BadgePortalProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [hovered, setHovered] = useState(false);
-  const { data, loading, load } = useBadgeDepth(dimension, value);
+  const { data, loading, unavailable, load } = useBadgeDepth(dimension, value);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const containerRef = useRef<HTMLSpanElement>(null);
   const popupCtx = useContext(PopupStackContext);
@@ -295,7 +300,7 @@ export function BadgePortal({
         return;
       }
       if (dimension === 'model') {
-        popupCtx.push(<ModelPopup make="" model={strVal} />, strVal, 360);
+        popupCtx.push(<ModelPopup make={modelMake ?? ''} model={strVal} />, strVal, 360);
         return;
       }
       if (dimension === 'source') {
@@ -309,7 +314,7 @@ export function BadgePortal({
       load(); // Ensure data is loaded
     }
     setIsOpen((prev) => !prev);
-  }, [isStatic, isOpen, load, popupCtx, dimension, value]);
+  }, [isStatic, isOpen, load, popupCtx, dimension, value, modelMake]);
 
   const handleClose = useCallback(() => {
     setIsOpen(false);
@@ -401,6 +406,7 @@ export function BadgePortal({
           preview={data.preview}
           stats={data.stats}
           loading={loading}
+          unavailable={unavailable}
           onClose={handleClose}
         />
       )}

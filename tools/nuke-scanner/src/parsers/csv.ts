@@ -71,7 +71,7 @@ export class CsvParser {
    * Parse CSV content string
    */
   parseContent(content: string): CsvVehicle[] {
-    const records = parse(content, {
+    const records = parse<Record<string, string>>(content, {
       columns: true,
       skip_empty_lines: true,
       trim: true,

@@ -10,10 +10,12 @@ import { useAuth } from '../hooks/useAuth';
 import { useVehiclePermissions } from '../hooks/useVehiclePermissions';
 import { supabase } from '../lib/supabase';
 import type { ManifestDevice } from '../components/wiring/overlayCompute';
+import { BUILD_MANIFEST_PUBLIC_COLUMNS } from '../lib/buildManifestColumns';
 import { useOverlayCompute } from '../components/wiring/useOverlayCompute';
-import { DeviceDetailPanel } from '../components/wiring/DeviceDetailPanel';
+import { DeviceDetailPanel, type LivePlug } from '../components/wiring/DeviceDetailPanel';
 import { CommandPalette } from '../components/wiring/CommandPalette';
 import { useDRC } from '../components/wiring/useDRC';
+import HarnessModelView from '../components/wiring/model/HarnessModelView';
 
 // Tab views are lazy-loaded so initial paint only pays for the active tab.
 // The 3D tab pulls Three.js (~2.7MB), schematics/data/topology each have their
@@ -66,7 +68,7 @@ const ZONE_COLORS: Record<string, string> = {
   underbody: '#666666',
 };
 
-type ViewTab = 'formboard' | 'schematics' | '3d' | 'data' | 'topology' | 'workbench' | 'connectors' | 'map';
+type ViewTab = 'formboard' | 'schematics' | '3d' | 'data' | 'topology' | 'workbench' | 'connectors' | 'map' | 'model';
 const TABS: { id: ViewTab; label: string; key: string }[] = [
   { id: 'formboard', label: 'FORMBOARD', key: '1' },
   { id: 'schematics', label: 'SCHEMATICS', key: '2' },
@@ -76,6 +78,7 @@ const TABS: { id: ViewTab; label: string; key: string }[] = [
   { id: 'workbench', label: 'WORKBENCH', key: '6' },
   { id: 'connectors', label: 'CONNECTORS', key: '7' },
   { id: 'map', label: 'MAP', key: '8' },
+  { id: 'model', label: 'MODEL', key: '9' },
 ];
 
 // ── Camera state per view ─────────────────────────────────────────────
@@ -141,7 +144,6 @@ export default function WiringPlan() {
 
   // ── Supabase queries for detail panel ──
   const [pinMaps, setPinMaps] = useState<Record<string, unknown[]>>({});
-  const [partsReception, setPartsReception] = useState<unknown[]>([]);
   const [workOrderParts, setWorkOrderParts] = useState<unknown[]>([]);
 
   // ── DRC (must be after pinMaps declaration) ──
@@ -167,7 +169,7 @@ export default function WiringPlan() {
         const [vehicleRes, manifestRes] = await Promise.all([
           supabase.from('vehicles').select('year, make, model').eq('id', vehicleId).maybeSingle(),
           supabase.from('vehicle_build_manifest')
-            .select('*')
+            .select(BUILD_MANIFEST_PUBLIC_COLUMNS)
             .eq('vehicle_id', vehicleId)
             .order('device_category')
             .order('device_name'),
@@ -180,6 +182,70 @@ export default function WiringPlan() {
     }
     init();
   }, [vehicleId]);
+
+  // ── The live harness model's plugs, by part number: a manifest device that is one of them shows its pins from the
+  // model (live wire ends), not the April pin map. Same reads and filters as the MAP tab (useWiringMap). ──
+  const [livePlugsByPart, setLivePlugsByPart] = useState<Record<string, LivePlug[]>>({});
+  useEffect(() => {
+    if (!vehicleId) return;
+    let cancelled = false;
+    (async () => {
+      const [designs, overlays] = await Promise.all([
+        supabase.from('harness_designs').select('id').eq('vehicle_id', vehicleId),
+        supabase.from('vehicle_wiring_overlays').select('id').eq('vehicle_id', vehicleId),
+      ]);
+      const designIds = (designs.data ?? []).map(d => d.id as string);
+      const overlayIds = (overlays.data ?? []).map(o => o.id as string);
+      if (!designIds.length || !overlayIds.length) return;
+      const [eps, wires, ends] = await Promise.all([
+        supabase.from('harness_endpoints').select('id, code, part_number')
+          .in('design_id', designIds).eq('is_superseded', false).not('code', 'is', null).limit(2000),
+        supabase.from('vehicle_custom_circuits').select('id, circuit_code, wire_gauge_awg, wire_color')
+          .in('overlay_id', overlayIds).eq('is_superseded', false).limit(3000),
+        supabase.from('wire_termination_specs').select('circuit_id, endpoint_id, cavity')
+          .eq('vehicle_id', vehicleId).eq('is_superseded', false).not('circuit_id', 'is', null).limit(3000),
+      ]);
+      if (cancelled || eps.error || wires.error || ends.error) return;
+      const epById = new Map((eps.data ?? []).map(e => [e.id as string, e as { id: string; code: string; part_number: string | null }]));
+      const wireById = new Map((wires.data ?? []).map(w => [w.id as string, w as { circuit_code: string; wire_gauge_awg: number | null; wire_color: string | null }]));
+      const endsByWire = new Map<string, { endpoint_id: string; cavity: string | null }[]>();
+      for (const t of (ends.data ?? []) as { circuit_id: string; endpoint_id: string; cavity: string | null }[]) {
+        if (!endsByWire.has(t.circuit_id)) endsByWire.set(t.circuit_id, []);
+        endsByWire.get(t.circuit_id)!.push(t);
+      }
+      const plugs = new Map<string, LivePlug>();
+      for (const [wireId, wireEnds] of endsByWire) {
+        const w = wireById.get(wireId);
+        if (!w) continue;
+        for (const t of wireEnds) {
+          const ep = epById.get(t.endpoint_id);
+          if (!ep?.part_number) continue;
+          // every other end of the wire (a firewall crossing has its mate and both far ends), in the order written
+          const others = wireEnds.filter(o => o !== t && o.endpoint_id !== t.endpoint_id)
+            .map(o => `${epById.get(o.endpoint_id)?.code ?? '?'}${o.cavity ? ` ${o.cavity}` : ''}`);
+          if (!plugs.has(ep.id)) plugs.set(ep.id, { code: ep.code, pins: [] });
+          plugs.get(ep.id)!.pins.push({
+            cavity: t.cavity, wire: w.circuit_code, awg: w.wire_gauge_awg, color: w.wire_color,
+            other: others.length ? others.join(' · ') : null,
+          });
+        }
+      }
+      const byPart: Record<string, LivePlug[]> = {};
+      for (const [id, plug] of plugs) {
+        plug.pins.sort((a, b) => (a.cavity ?? '').localeCompare(b.cavity ?? '', 'en', { numeric: true }) || a.wire.localeCompare(b.wire));
+        for (const pn of String(epById.get(id)?.part_number ?? '').split(',')) {
+          const key = pn.trim().toUpperCase();
+          if (key) (byPart[key] ??= []).push(plug);
+        }
+      }
+      setLivePlugsByPart(byPart);
+    })();
+    return () => { cancelled = true; };
+  }, [vehicleId]);
+  const selectedLivePlugs = useMemo(
+    () => (selectedDevice?.model_number ? livePlugsByPart[selectedDevice.model_number.trim().toUpperCase()] ?? [] : []),
+    [selectedDevice, livePlugsByPart]
+  );
 
   // ── Load pin maps once ──
   useEffect(() => {
@@ -198,18 +264,12 @@ export default function WiringPlan() {
     loadPinMaps();
   }, []);
 
-  // ── Load procurement data once ──
+  // ── Procurement is the owner's: work-order parts carry prices, so only the row owner reads them. parts_reception
+  // is not read at all: no browser role holds a grant on it (every read was a 401, the owner's too). ──
   useEffect(() => {
-    async function loadProcurement() {
-      const [prRes, woRes] = await Promise.all([
-        supabase.from('parts_reception').select('*'),
-        supabase.from('work_order_parts').select('*'),
-      ]);
-      if (prRes.data) setPartsReception(prRes.data);
-      if (woRes.data) setWorkOrderParts(woRes.data);
-    }
-    loadProcurement();
-  }, []);
+    if (!isRowOwner) return;
+    supabase.from('work_order_parts').select('*').then(({ data }) => { if (data) setWorkOrderParts(data); });
+  }, [isRowOwner]);
 
   // ── Click handlers ──
   const handleDeviceClick = useCallback((deviceId: string, shiftKey?: boolean) => {
@@ -364,9 +424,9 @@ export default function WiringPlan() {
         {/* The chips below come from the older compute-wiring-overlay engine (it recommends an M150 and counts
             the April device list). The MAP tab reads the typed rows and carries its own counts, so on the map
             these would contradict it (owner saw "ECU M150" on 2026-09-29; the locked ECU is the M130). */}
-        {shownTab === 'map' ? (
+        {shownTab === 'map' || shownTab === 'model' ? (
           <span style={{ color: C.label, fontFamily: 'Arial', fontSize: 8, textTransform: 'uppercase', letterSpacing: 1 }}>
-            COUNTS ARE ON THE MAP BELOW (TYPED ROWS)
+            {shownTab === 'model' ? 'THE MODEL MEASURING ITSELF BELOW (TYPED ROWS)' : 'COUNTS ARE ON THE MAP BELOW (TYPED ROWS)'}
           </span>
         ) : (<>
         <StatusChip label="DEVICES" value={overlay.result.deviceCount} />
@@ -498,6 +558,7 @@ export default function WiringPlan() {
               <WiringMap vehicleId={vehicleId} />
             </div>
           )}
+          {shownTab === 'model' && <HarnessModelView vehicleId={vehicleId} />}
           {shownTab === 'topology' && (
             <div style={{ position: 'absolute', inset: 0 }}>
               <TopologyView
@@ -518,11 +579,11 @@ export default function WiringPlan() {
         {/* ── Detail Panel (slides in from right) ── */}
         <DeviceDetailPanel
           device={selectedDevice}
+          livePlugs={selectedLivePlugs}
           wire={selectedWire}
           result={overlay.result}
           devices={overlay.devices}
           pinMaps={pinMaps}
-          partsReception={partsReception}
           workOrderParts={workOrderParts}
           zoneColors={ZONE_COLORS}
           onClose={handleClosePanel}

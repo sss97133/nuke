@@ -37,7 +37,13 @@ export interface ObservationSource {
 }
 
 export interface ObservationInput {
-  vehicleId: string;
+  /** Null only with `unresolved: true`. */
+  vehicleId: string | null;
+  /**
+   * A listing that is not yet any vehicle (a blip): the row is written with vehicle_id NULL and a match confidence of 0,
+   * and the vehicle-only gap-fill and field evidence are skipped. Retained, not guessed (AGENTS.md).
+   */
+  unresolved?: boolean;
   /**
    * Polymorphic subject (engineering-manual/20). Optional + backward-compatible:
    * when omitted, the observation is a vehicle observation exactly as before.
@@ -50,6 +56,8 @@ export interface ObservationInput {
   fields: Record<string, any>;       // extracted key-value pairs
   observationKind?: string;           // observation_kind enum; default "specification"
   rawData?: any;                      // optional raw extraction payload
+  /** Include rawData in dedup when large evidence is kept outside indexed fields. Omitted preserves legacy hashes. */
+  hashRawData?: boolean;
   extractionMethod?: string;          // "html_parse" | "regex" | "ai" | etc.
   observedAt?: string;                // ISO timestamp; defaults to now
   contentText?: string;               // optional free-text content
@@ -166,6 +174,7 @@ export async function writeObservation(
     fields,
     observationKind = "specification",
     rawData,
+    hashRawData,
     extractionMethod = "unknown",
     observedAt,
     contentText,
@@ -174,6 +183,7 @@ export async function writeObservation(
     agentCostCents,
     agentDurationMs,
     testimonyOnly,
+    unresolved,
   } = params;
 
   // The fields the vehicle row and the evidence ledger see; the observation row always keeps all of `fields`.
@@ -189,7 +199,7 @@ export async function writeObservation(
     errors.push("source.platform and source.url are required");
     return result;
   }
-  if (isVehicleSubject && !vehicleId) {
+  if (isVehicleSubject && !vehicleId && !unresolved) {
     errors.push("vehicleId is required for vehicle observations");
     return result;
   }
@@ -201,12 +211,14 @@ export async function writeObservation(
   // --- 1. Write observation (independent of gap-fill) ---
   const observationPromise = writeObservationRow(supabase, {
     vehicleId,
+    unresolved,
     subjectType,
     subjectId,
     source,
     fields,
     observationKind,
     rawData,
+    hashRawData,
     extractionMethod,
     observedAt,
     contentText,
@@ -222,14 +234,14 @@ export async function writeObservation(
   // --- 2 & 3. Gap-fill + field-evidence are VEHICLE-only post-processing.
   // Skip them entirely for non-vehicle subjects (they are keyed on vehicleId).
   // For vehicle observations this path is unchanged.
-  const gapFillPromise = isVehicleSubject
+  const gapFillPromise = isVehicleSubject && vehicleId
     ? gapFillVehicle(supabase, vehicleId, source, derivedFields, extractionMethod).catch((e: any) => {
         errors.push(`gap-fill: ${e?.message || e}`);
         return null;
       })
     : Promise.resolve(null);
 
-  const evidencePromise = isVehicleSubject
+  const evidencePromise = isVehicleSubject && vehicleId
     ? writeFieldEvidence(supabase, vehicleId, source, derivedFields, extractionMethod).catch((e: any) => {
         errors.push(`field-evidence: ${e?.message || e}`);
         return [];
@@ -302,13 +314,15 @@ export async function writeObservationBatch(
 async function writeObservationRow(
   supabase: any,
   params: {
-    vehicleId: string;
+    vehicleId: string | null;
+    unresolved?: boolean;
     subjectType?: string;
     subjectId?: string;
     source: ObservationSource;
     fields: Record<string, any>;
     observationKind: string;
     rawData?: any;
+    hashRawData?: boolean;
     extractionMethod: string;
     observedAt?: string;
     contentText?: string;
@@ -341,6 +355,7 @@ async function writeObservationRow(
     identifier: params.source.sourceIdentifier,
     text: params.contentText,
     data: params.fields,
+    ...(params.hashRawData ? { raw: params.rawData } : {}),
   });
   const contentHash = await hashContent(contentForHash);
 
@@ -367,7 +382,7 @@ async function writeObservationRow(
     .from("vehicle_observations")
     .insert({
       vehicle_id: params.vehicleId,
-      vehicle_match_confidence: 1.0, // caller provides vehicleId directly
+      vehicle_match_confidence: params.unresolved ? 0 : 1.0, // caller provides vehicleId directly, or none (a blip)
       // Polymorphic subject (engineering-manual/20). Conditional spread: when the
       // caller passes no subject, this object is byte-identical to before and the
       // DB default (subject_type='vehicle', subject_id=NULL) applies.

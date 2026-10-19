@@ -1,0 +1,285 @@
+import { test } from 'node:test';
+import assert from 'node:assert/strict';
+import fs from 'node:fs/promises';
+import os from 'node:os';
+import path from 'node:path';
+import { spawnSync } from 'node:child_process';
+import { capturePopulation } from './stacks-population-capture.mjs';
+import { loadPopulationQuery, analyzePopulation } from './stacks-study-query.mjs';
+import { createBidQuery } from '../src/pages/stacks/bidQuery.ts';
+import { decodeStudy, evaluateBidExpression, percentile } from '../src/pages/stacks/bidMeasurements.ts';
+
+const uuid = (prefix,n) => `${prefix}0000000-0000-4000-8000-${String(n).padStart(12,'0')}`;
+const expression = { measure:'relative', grouping:'make', from:2016, to:2026, make:null, model:null, vehicleYear:null, weighting:'auction' };
+async function fixture(t, amend = () => {}) {
+  const root = await fs.mkdtemp(path.join(os.tmpdir(),'nuke-query-'));
+  t.after(() => fs.rm(root,{recursive:true,force:true}));
+  const parents = [], bids = [];
+  for (let i = 1; i <= 150; i++) {
+    const id = uuid('1',i), vehicle_id = uuid('3',i), source_url = `https://bringatrailer.com/listing/fixture-${i}/`;
+    parents.push({ id, vehicle_id, source:'bat', source_url, created_at:'2026-09-01T00:00:00Z', auction_end_date:'2026-09-01T20:00:00Z',
+      total_bids:2, winning_bid:i === 150 ? 999 : 100 + i, winning_bidder_external_identity_id:uuid('4',1),
+      vehicles:{ id:vehicle_id, year:2000, make:'Chevrolet', model:'Corvette', normalized_model:'Corvette', is_public:true, deleted_at:null, listing_kind:null } });
+    for (let j = 1; j <= 2; j++) bids.push({ id:uuid('2',(i-1)*2+j), auction_event_id:id, vehicle_id, source_url,
+      posted_at:`2026-09-01T19:00:0${j}Z`, created_at:'2026-09-01T20:00:00Z', bid_amount:j === 1 ? 100 : 100 + i,
+      external_identity_id:uuid('4',1), bat_comment_id:(i-1)*2+j, author_username:'fixture',
+      vehicles:{ id:vehicle_id, is_public:true, deleted_at:null, listing_kind:null } });
+  }
+  amend(parents,bids);
+  const output = path.join(root,'study.json');
+  await capturePopulation({ cache:path.join(root,'raw'), output, before:'2026-09-02T00:00:00Z', maxRequests:1000,
+    reader:{ parents:async r => parents.filter(p => !r.after || p.id > r.after).slice(0,50),
+      bids:async r => bids.filter(b => r.ids.includes(b.auction_event_id) && (!r.after || b.id > r.after)).slice(0,50) } });
+  const dataset = decodeStudy(JSON.parse(await fs.readFile(output,'utf8')));
+  return { output, dataset, query:await loadPopulationQuery(output) };
+}
+
+test('corpus reconciles episodes, repeated vehicles, unresolved identities and conflicting outcomes without exposing member arrays', async t => {
+  const {query,dataset} = await fixture(t,(parents,bids) => {
+    parents[1].vehicle_id=parents[0].vehicle_id; parents[1].vehicles.id=parents[0].vehicle_id;
+    for (const bid of bids.filter(b => b.auction_event_id===parents[1].id)) {bid.vehicle_id=parents[0].vehicle_id;bid.vehicles.id=parents[0].vehicle_id;}
+    parents[0].winning_bidder_external_identity_id=uuid('4',2);
+    parents[2].vehicles.normalized_model=null; bids[4].external_identity_id=null;
+  });
+  const c=query.corpus();
+  assert.deepEqual(c.counts,{studyCandidates:150,studyUsable:149,studyExcluded:1,usableVehicles:148,canonicalIdentities:1,
+    bids:298,raises:149,unresolvedBids:1,knownWinners:148,recordedWinners:149,winnerConflicts:1,modelFallbackEpisodes:1});
+  assert.deepEqual(c.closeYears,[{year:2026,candidates:150,usable:149,excluded:1}]);
+  assert.deepEqual(c.exclusionReasons,c.coverage.exclusionReasons);
+  assert.equal(c.coverage.marketDenominator,null);assert.equal(c.coverage.sourceFreshness,'unverified');
+  assert.equal(c.readAt,c.coverage.completedAt);assert.equal(c.snapshot,c.coverage.outputHash);
+  assert.ok(!('lots' in c));assert.ok(!('identities' in c));assert.ok(!('members' in c));
+  const original=structuredClone(c);c.counts.bids=0;c.closeYears[0].usable=0;c.exclusionReasons.changed=9;
+  assert.deepEqual(query.corpus(),original);
+  const unknown=createBidQuery({...dataset,candidateN:151,exclusions:[...dataset.exclusions,{id:uuid('1',151),year:null,reason:'unknown close'}]},'a'.repeat(64)).corpus();
+  assert.deepEqual(unknown.closeYears.at(-1),{year:null,candidates:1,usable:0,excluded:1});
+  assert.equal(unknown.closeYears.reduce((n,y)=>n+y.candidates,0),151);
+});
+
+test('facets keep all usable choices and exact scoped episode counts independently of analytical year, grouping and page size', async t => {
+  const {query}=await fixture(t,parents => {
+    Object.assign(parents[0].vehicles,{make:'Mercedes-Benz',model:'SLS',normalized_model:'SLS',year:2001});
+    Object.assign(parents[1].vehicles,{make:'Mercedes-Benz',model:'280 SL',normalized_model:'280 SL',year:1999});
+    Object.assign(parents[2].vehicles,{make:'CHEVROLET',model:'Camaro',normalized_model:'Camaro'});
+    parents[3].vehicles.year=null;
+    Object.assign(parents[4].vehicles,{make:'Audi',model:'TT',normalized_model:'TT'});
+  });
+  const e={...expression,make:'chevrolet',model:'Corvette'}, f=query.facets(e);
+  assert.deepEqual(f.makes,[{value:'Audi',episodes:1},{value:'Chevrolet',episodes:146},{value:'Mercedes-Benz',episodes:2}]);
+  assert.deepEqual(f.models,[{value:'Camaro',episodes:1},{value:'Corvette',episodes:145}]);
+  assert.deepEqual(f.vehicleYears,[{value:2000,episodes:144}]);assert.equal(f.studyUsable,149);
+  assert.deepEqual(query.facets({...e,from:2018,to:2019,grouping:'year'}),f);
+  assert.deepEqual(query.facets({...e,make:'CHEVROLET'}).models,f.models);
+  assert.deepEqual(query.facets({...expression,make:'mercedes-benz',model:'280 SL'}).vehicleYears,[{value:1999,episodes:1}]);
+  const absent=query.facets({...expression,make:'Uncaptured make',model:'Uncaptured model',vehicleYear:2025});
+  assert.ok(absent.makes.some(m=>m.value==='Uncaptured make'&&m.episodes===0));
+  assert.deepEqual(absent.models,[{value:'Uncaptured model',episodes:0}]);assert.deepEqual(absent.vehicleYears,[{value:2025,episodes:0}]);
+  assert.equal(query.groups({...expression,grouping:'auction'},{size:1}).counts.eligibleEpisodes,149);
+  f.makes[0].episodes=0;assert.equal(query.facets(e).makes[0].episodes,1);
+});
+
+test('corpus close years follow the canonical UTC clock across offset New Year boundaries', async t => {
+  const {query}=await fixture(t,(parents,bids)=>{
+    parents[0].auction_end_date='2026-01-01T00:30:00+02:00';
+    bids[0].posted_at='2025-12-31T22:00:01Z';bids[1].posted_at='2025-12-31T22:00:02Z';
+  });
+  assert.deepEqual(query.corpus().closeYears,[{year:2025,candidates:1,usable:1,excluded:0},{year:2026,candidates:149,usable:148,excluded:1}]);
+});
+
+test('real CLI exposes complete corpus and facets with coverage; rejects misleading summary cursors or selectors before source load', async t => {
+  const {output,query}=await fixture(t);
+  const run=extra=>{const cli=spawnSync(process.execPath,['scripts/build-stacks-study.mjs','--analyze',`--input=${output}`,...extra],{cwd:new URL('..',import.meta.url),encoding:'utf8'});assert.equal(cli.status,0,cli.stderr);return JSON.parse(cli.stdout);};
+  assert.deepEqual(run(['--corpus']),query.corpus());
+  assert.deepEqual(run(['--facets','--expression=make=chevrolet&model=Corvette&measure=relative']),query.facets({...expression,make:'chevrolet',model:'Corvette'}));
+  for(const args of [['--corpus','--facets'],['--corpus','--corpus'],['--facets','--reference'],['--facets','--size=1'],['--corpus','--cursor={}'],['--facets','--group=chevrolet']])
+    await assert.rejects(analyzePopulation(['--analyze','--input=does-not-exist',...args]),/do not use/);
+  await assert.rejects(analyzePopulation(['--analyze','--input=does-not-exist','--corpus','--expression=from=2026']),/complete capture/);
+});
+
+test('all149 usable episodes page exactly once; full statistics and reference survive page size changes', async t => {
+  const { dataset,query } = await fixture(t), e = { ...expression,grouping:'auction' };
+  const reference = evaluateBidExpression(dataset,e), small = query.groups(e,{size:7}), large = query.groups(e,{size:100});
+  assert.deepEqual(small.counts,large.counts);
+  assert.deepEqual(small.reference,large.reference);
+  assert.deepEqual(small.domain,large.domain);
+  assert.equal(small.reference.records,reference.rankValues.length);
+  assert.equal(small.reference.median,reference.median);
+  assert.equal(small.counts.studyCandidates,150);
+  assert.equal(small.counts.studyExcluded,1);
+  assert.equal(small.counts.contributingEpisodes,149);
+  assert.equal(small.coverage.marketDenominator,null);
+  const seen = []; let page = small;
+  while (true) {
+    seen.push(...page.groups);
+    if (!page.page.nextCursor) break;
+    page = query.groups(e,{size:7,cursor:page.page.nextCursor});
+  }
+  assert.deepEqual(seen.map(g => g.key),reference.groups.map(g => g.key));
+  assert.equal(new Set(seen.map(g => g.key)).size,149);
+  const readings = []; let refs = query.references(e,{size:13});
+  while (true) { readings.push(...refs.readings); if (!refs.page.nextCursor) break; refs = query.references(e,{size:13,cursor:refs.page.nextCursor}); }
+  assert.equal(readings.length,149);
+  assert.equal(new Set(readings.map(r => r.key)).size,149);
+  assert.deepEqual(readings.map(r => r.value).sort((a,b) => a-b),[...reference.rankValues].sort((a,b) => a-b));
+  assert.ok(readings.every(r => r.sourceUrl && r.vehicleId && r.lotId));
+  for (let i = 0; i < seen.length; i++) {
+    const { members,lotIds,values,...expected } = reference.groups[i];
+    assert.deepEqual(seen[i],{ ...expected,records:values.length,episodes:lotIds.length });
+    assert.ok(!('members' in seen[i]));
+  }
+});
+
+test('contributor pages preserve canonical identities, complete denominator, source links and empirical percentiles', async t => {
+  const { dataset,query } = await fixture(t), e = { ...expression,grouping:'participant' };
+  const r = evaluateBidExpression(dataset,e), group = r.groups[0];
+  const all = []; let page = query.contributors(e,group.key,{size:31});
+  while (true) { all.push(...page.contributors); if (!page.page.nextCursor) break; page = query.contributors(e,group.key,{size:31,cursor:page.page.nextCursor}); }
+  assert.equal(page.page.total,149);
+  assert.equal(page.group.mean,group.mean);
+  assert.equal(page.group.percentile,group.percentile);
+  assert.equal(page.reference.recordReferenceN,r.values.length);
+  const refs = query.references(e);
+  assert.equal(refs.records,r.rankValues.length);
+  assert.deepEqual(refs.readings,[{key:group.key,value:group.mean}]);
+  const expected = [...group.members].sort((a,b) => b.value-a.value);
+  assert.deepEqual(all.map(m => m.id),expected.map(m => m.id));
+  for (const m of all) {
+    const lot = dataset.lots.find(l => l.id === m.lotId);
+    assert.equal(m.vehicleId,lot.vehicleId);
+    assert.equal(m.actorId,group.key);
+    assert.equal(m.sourceUrl,lot.sourceUrl);
+    assert.equal(m.recordPercentile,percentile(r.values,m.value));
+  }
+});
+
+test('every supported grouping/measure and weighting preserves the canonical operator result', async t => {
+  const {dataset,query} = await fixture(t);
+  for (const grouping of ['make','model','year','participant','auction']) for (const measure of ['amount','increment','relative','typical','spacing','participants','bids','entry','winRate']) {
+    if ((['entry','winRate'].includes(measure) && grouping !== 'participant') || (measure === 'participants' && grouping === 'participant')) continue;
+    for (const weighting of ['auction',...(['amount','increment','relative'].includes(measure) ? ['bid'] : [])]) {
+      const e = {...expression,grouping,measure,weighting}, r = evaluateBidExpression(dataset,e), page = query.groups(e,{size:100});
+      assert.equal(page.counts.eligibleEpisodes,r.eligibleLots);
+      assert.equal(page.counts.contributingEpisodes,r.contributingLots);
+      assert.equal(page.counts.withheldRecords,r.withheldRecordN);
+      assert.equal(page.reference.records,r.rankValues.length);
+      assert.equal(page.reference.median,r.median);
+      for (const group of page.groups) {
+        const canonical = r.groups.find(g => g.key === group.key);
+        for (const field of ['mean','median','q25','q75','min','max','percentile','supported','observations']) assert.equal(group[field],canonical[field]);
+      }
+    }
+  }
+});
+
+test('cursors refuse a changed study, expression, scope or drill instead of silently continuing', async t => {
+  const { dataset,query } = await fixture(t), e = { ...expression,grouping:'auction' };
+  const cursor = query.groups(e,{size:1}).page.nextCursor;
+  for (const options of [{snapshot:'0'.repeat(64)},{offset:-1},{offset:150},{kind:'contributors'},{group:'absent'}])
+    assert.throws(() => query.groups(e,{cursor:{...cursor,...options}}),/Cursor/);
+  assert.throws(() => query.groups({...e,measure:'amount'},{cursor}),/Cursor/);
+  assert.throws(() => query.groups(e,{cursor},{paired:true}),/Cursor/);
+  assert.throws(() => createBidQuery(dataset,'0'.repeat(64)).groups(e,{cursor}),/Cursor/);
+  assert.throws(() => query.contributors(e,e.grouping,{cursor}),/absent/);
+  for (const size of [0,101,1.5,NaN]) assert.throws(() => query.groups(e,{size}),/page size/);
+  assert.throws(() => query.groups(e,{cursor:false}),/cursor/);
+  assert.throws(() => query.groups(e,{}, {excludeVehicle:'------------------------------------'}),/vehicle/);
+});
+
+test('paired and vehicle exclusion use the exact canonical scoped population; unknown groups remain absent', async t => {
+  const { dataset,query } = await fixture(t), scope = {paired:true,excludeVehicle:dataset.lots[0].vehicleId};
+  const selected = {...dataset,lots:dataset.lots.filter(l => l.vehicleId !== scope.excludeVehicle && l.winner && l.sums.gaps.some(g => g > 0))};
+  const expected = evaluateBidExpression(selected,expression), actual = query.groups(expression,{},scope);
+  assert.equal(actual.counts.eligibleEpisodes,148);
+  assert.equal(actual.counts.studyCandidates,150);
+  assert.equal(actual.groups[0].mean,expected.groups[0].mean);
+  const absent = query.groups({...expression,make:'no such make'});
+  assert.equal(absent.groups.length,0);
+  assert.equal(absent.reference.median,null);
+  assert.equal(absent.domain,null);
+});
+
+test('partial, mutated and inconsistent population artifacts cannot be analyzed', async t => {
+  const {output} = await fixture(t), receiptFile = `${output}.receipt.json`, receipt = JSON.parse(await fs.readFile(receiptFile,'utf8'));
+  for (const fields of [{complete:false},{phase:'bids'},{selectedEpisodes:151},{completedAt:'2020-01-01T00:00:00Z'},{outputBytes:0},{outputHash:'0'.repeat(64)}]) {
+    await fs.writeFile(receiptFile,JSON.stringify({...receipt,...fields}));
+    await assert.rejects(loadPopulationQuery(output),/complete|disagree/);
+  }
+  await fs.writeFile(receiptFile,JSON.stringify(receipt));
+  await fs.appendFile(output,' ');
+  await assert.rejects(loadPopulationQuery(output),/hash-verified/);
+});
+
+test('operator mode stays offline and refuses capture/unknown options', async t => {
+  const {output} = await fixture(t);
+  const args = ['--analyze',`--input=${output}`,'--expression=by=auction&measure=relative','--size=3'];
+  const direct = await analyzePopulation(args);
+  const cli = spawnSync(process.execPath,['scripts/build-stacks-study.mjs',...args],{cwd:new URL('..',import.meta.url),encoding:'utf8',env:{...process.env,VITE_SUPABASE_ANON_KEY:'sb_secret_'}});
+  assert.equal(cli.status,0,cli.stderr);
+  assert.deepEqual(JSON.parse(cli.stdout),direct);
+  for (const extra of ['--population','--output=/tmp/no','--size=4','--expression=bogus=x'])
+    await assert.rejects(analyzePopulation([...args,extra]),/Unknown|Duplicate/);
+  await assert.rejects(analyzePopulation(['--analyze']),/explicit private/);
+});
+
+test('JSON group transport inspects composite model keys and continues their exact source drill through the real CLI', async t => {
+  const {output,query} = await fixture(t), e={...expression,grouping:'model'};
+  const group=query.groups(e).groups[0].key;
+  assert.ok(group.includes('\u0000'));
+  const args=['--analyze',`--input=${output}`,'--expression=by=model&measure=relative',`--group-json=${JSON.stringify(group)}`,'--size=11'];
+  const run = extra => {
+    const cli=spawnSync(process.execPath,['scripts/build-stacks-study.mjs',...args,...extra],{cwd:new URL('..',import.meta.url),encoding:'utf8'});
+    assert.equal(cli.status,0,cli.stderr);
+    return JSON.parse(cli.stdout);
+  };
+  const first=run([]), expected=query.contributors(e,group,{size:11});
+  assert.deepEqual(first,expected);
+  assert.equal(first.group.episodes,149);
+  assert.ok(first.contributors.every(m => m.sourceUrl && m.lotId && m.vehicleId));
+  const second=run([`--cursor=${JSON.stringify(first.page.nextCursor)}`]);
+  assert.deepEqual(second,query.contributors(e,group,{size:11,cursor:first.page.nextCursor}));
+  assert.equal(new Set([...first.contributors,...second.contributors].map(m => m.id)).size,22);
+  await assert.rejects(analyzePopulation([...args,'--group=chevrolet']),/one group/);
+  await assert.rejects(analyzePopulation([...args,'--reference']),/separate cursor/);
+  await assert.rejects(analyzePopulation([...args,'--group-json="duplicate"']),/Duplicate/);
+  for (const encoded of ['null','42','{}','[]']) await assert.rejects(analyzePopulation(['--analyze','--input=does-not-exist',`--group-json=${encoded}`]),/must be a string/);
+  await assert.rejects(analyzePopulation(['--analyze','--input=does-not-exist','--group-json={']),/JSON/);
+});
+
+test('130837 synthetic records retain full group extrema and reference without argument-stack overflow', async t => {
+  const {dataset} = await fixture(t), base = dataset.lots[0], n = 130837;
+  const lots = Array.from({length:n},(_,i) => ({...base,id:uuid('1',i+1),vehicleId:uuid('3',i+1),
+    sums:{...base.sums,relativeSum:i+1}, years:{2026:{...base.sums,relativeSum:i+1}}}));
+  lots[0].vehicleId = 'abcdef01-0000-4000-8000-000000000001';
+  const large = {...dataset,lots,candidateN:n,candidatesByYear:{2026:n},exclusions:[]};
+  const query = createBidQuery(large,'0'.repeat(64)), page = query.groups(expression,{size:1});
+  const corpus=query.corpus(), facets=query.facets(expression);
+  assert.equal(corpus.counts.studyUsable,n);assert.equal(corpus.counts.usableVehicles,n);
+  assert.equal(corpus.counts.bids,2*n);assert.equal(corpus.counts.canonicalIdentities,1);
+  assert.deepEqual(corpus.closeYears,[{year:2026,candidates:n,usable:n,excluded:0}]);
+  assert.deepEqual(facets.makes,[{value:'Chevrolet',episodes:n}]);
+  assert.deepEqual(facets.models,[{value:'Corvette',episodes:n}]);
+  assert.deepEqual(facets.vehicleYears,[{value:2000,episodes:n}]);
+  assert.ok(Buffer.byteLength(JSON.stringify(corpus))<2000);
+  assert.ok(Buffer.byteLength(JSON.stringify(facets))<2000);
+  assert.equal(page.counts.contributingEpisodes,n);
+  assert.equal(page.reference.records,n);
+  assert.equal(page.groups[0].mean,(n+1)/2);
+  assert.equal(page.groups[0].min,1);
+  assert.equal(page.groups[0].max,n);
+  assert.equal(page.groups[0].records,n);
+  assert.equal(page.reference.median,(n+1)/2);
+  assert.ok(Buffer.byteLength(JSON.stringify(page)) < 5000,'presentation response must not serialize the full reference vector');
+  const group = page.groups[0].key;
+  for (const cursor of [null,query.contributors(expression,group,{size:100}).page.nextCursor]) {
+    const drill = query.contributors(expression,group,{size:100,cursor});
+    assert.equal(drill.reference.recordReferenceN,n);
+    for (const member of drill.contributors) assert.equal(member.recordPercentile,100*(member.value-.5)/n);
+  }
+  // A new expression must replace its record reference; all equal values have midrank50.
+  const amount = query.contributors({...expression,measure:'amount'},group,{size:100});
+  assert.ok(amount.contributors.every(m => m.recordPercentile === 50));
+  const excluded = query.contributors(expression,group,{size:100},{excludeVehicle:lots[0].vehicleId.toUpperCase()});
+  assert.equal(excluded.reference.recordReferenceN,n-1);
+  for (const member of excluded.contributors) assert.equal(member.recordPercentile,100*(member.value-1.5)/(n-1));
+  assert.equal(excluded.query,query.contributors(expression,group,{size:100},{excludeVehicle:lots[0].vehicleId}).query);
+});

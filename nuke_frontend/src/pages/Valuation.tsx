@@ -487,7 +487,9 @@ export default function Valuation() {
             No qualified source sales for {subject}
           </div>
           <div style={{ fontSize: FS.label, color: 'var(--text-secondary)' }}>
-            Try a broader model (drop trim), a nearby year, or a different make spelling.
+            {receipt && receipt.coverage.member_rows > 0
+              ? `${receipt.coverage.member_rows} public cohort records are retained, but no source sales pass this reading's evidence, date and currency requirements. Inspect the source evidence receipt above for admission gaps. Changing filters does not repair missing evidence.`
+              : 'No public cohort records were returned for this scope. Check the recorded make/model labels or inspect a broader scope.'}
           </div>
         </div>
       )}

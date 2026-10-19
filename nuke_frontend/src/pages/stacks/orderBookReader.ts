@@ -33,6 +33,7 @@ export interface VehicleRow {
   year: number | null;
   make: string | null;
   model: string | null;
+  normalized_model?: string | null;
   listing_url: string | null;
   sale_status: string | null;
 }
@@ -133,6 +134,7 @@ async function readAll<T extends { id: string }>(
 }
 
 export function chooseLot(lots: LotRow[], listingUrl: string | null, lotId: string | null): LotRow | null {
+  if (lotId === 'latest') return lots[0] ?? null;
   if (lotId) {
     const asked = lots.find((l) => l.id === lotId);
     if (asked) return asked;
@@ -141,40 +143,48 @@ export function chooseLot(lots: LotRow[], listingUrl: string | null, lotId: stri
   return current ?? lots[0] ?? null;
 }
 
-export async function readOrderBook(vehicleId: string, lotId: string | null, signal?: AbortSignal): Promise<OrderBookRead | null> {
+async function readBook(vehicleId: string, lotId: string | null, signal?: AbortSignal,
+  bidProjection?: { sourceUrl: string }): Promise<OrderBookRead | null> {
   if (!UUID_RE.test(vehicleId)) return null;
   const abort = signal ?? new AbortController().signal;
   const parent = await supabase.from('vehicles')
-    .select('id,year,make,model,listing_url,sale_status')
+    .select('id,year,make,model,normalized_model,listing_url,sale_status')
     .eq('id', vehicleId).eq('is_public', true).is('deleted_at', null)
     .or('listing_kind.is.null,listing_kind.neq.non_vehicle_item')
     .abortSignal(abort).maybeSingle();
   if (parent.error) throw unreadable();
   if (!parent.data || parent.data.id !== vehicleId) return null;
   const vehicle = parent.data as VehicleRow;
+  if (bidProjection && (!BAT_LOT_URL.test(bidProjection.sourceUrl)
+    || trimUrl(vehicle.listing_url ?? '') !== trimUrl(bidProjection.sourceUrl))) return null;
 
   const lotsRes = await supabase.from('auction_events').select(LOT_SELECT)
     .eq('vehicle_id', vehicleId).in('source', ['bat', 'bringatrailer'])
     .order('auction_end_date', { ascending: false, nullsFirst: false }).limit(50).abortSignal(abort);
   if (lotsRes.error || !Array.isArray(lotsRes.data)) throw unreadable();
   const lots = (lotsRes.data as unknown as LotRow[]).filter((l) => BAT_LOT_URL.test(l.source_url ?? ''));
-  const lot = chooseLot(lots, vehicle.listing_url, lotId);
+  const matches = bidProjection ? lots.filter(l => trimUrl(l.source_url) === trimUrl(bidProjection.sourceUrl)) : [];
+  // A board reading is about the selected listing, never a fallback to another episode.
+  if (bidProjection && matches.length !== 1) return null;
+  const lot = bidProjection ? matches[0] : chooseLot(lots, vehicle.listing_url, lotId);
   const readAt = () => new Date().toISOString();
   if (!lot) return { vehicle, lots, lot: null, comments: [], unkeyedOnUrl: 0, frames: [], identities: {}, readAt: readAt() };
 
   const url = trimUrl(lot.source_url);
   const [comments, unkeyed, frames] = await Promise.all([
     readAll<CommentRow>((after) => {
-      let q = supabase.from('auction_comments').select(COMMENT_SELECT)
+      let q = supabase.from('auction_comments').select(bidProjection ? COMMENT_SELECT.replace(',comment_text', '') : COMMENT_SELECT)
         .eq('auction_event_id', lot.id).eq('vehicle_id', vehicleId)
         .eq('vehicles.is_public', true).is('vehicles.deleted_at', null)
+        .or('listing_kind.is.null,listing_kind.neq.non_vehicle_item', { referencedTable: 'vehicles' })
         .order('id').limit(PAGE).abortSignal(abort);
+      if (bidProjection) q = q.eq('comment_type', 'bid');
       if (after) q = q.gt('id', after);
       return q;
     }),
-    supabase.from('auction_comments').select('id', { count: 'exact', head: true })
+    bidProjection ? Promise.resolve({ error: null, count: 0 }) : supabase.from('auction_comments').select('id', { count: 'exact', head: true })
       .eq('vehicle_id', vehicleId).is('auction_event_id', null).in('source_url', [url, `${url}/`]).abortSignal(abort),
-    readAll<FrameRow>((after) => {
+    bidProjection ? Promise.resolve([] as FrameRow[]) : readAll<FrameRow>((after) => {
       let q = supabase.from('vehicle_observations').select(FRAME_SELECT)
         .eq('vehicle_id', vehicleId).eq('extraction_method', 'bat_public_live_v1').in('source_url', [url, `${url}/`])
         .order('id').limit(PAGE).abortSignal(abort);
@@ -188,7 +198,7 @@ export async function readOrderBook(vehicleId: string, lotId: string | null, sig
   for (const c of comments) if (c.external_identity_id && UUID_RE.test(c.external_identity_id)) ids.add(c.external_identity_id);
   for (const k of [lot.seller_external_identity_id, lot.winning_bidder_external_identity_id]) if (k && UUID_RE.test(k)) ids.add(k);
   const identities: Record<string, IdentityRow> = {};
-  const all = [...ids];
+  const all = bidProjection ? [] : [...ids];
   for (let i = 0; i < all.length; i += 100) {
     const chunk = all.slice(i, i + 100);
     const res = await supabase.from('external_identities').select('id,platform,handle').in('id', chunk).abortSignal(abort);
@@ -210,6 +220,29 @@ export async function readOrderBook(vehicleId: string, lotId: string | null, sig
     identities,
     readAt: readAt(),
   };
+}
+
+export function readOrderBook(vehicleId: string, lotId: string | null, signal?: AbortSignal) {
+  return readBook(vehicleId, lotId, signal);
+}
+
+/** Stack A's compact projection: complete keyed bid collection, without prose, identities or frame history.
+ * Its type deliberately cannot be passed to the full reader's comment/frame coverage calculation. */
+export interface BidBookRead {
+  vehicle: VehicleRow;
+  lot: LotRow;
+  bids: CommentRow[];
+  readAt: string;
+}
+export async function readBidBook(vehicleId: string, sourceUrl: string, signal?: AbortSignal): Promise<BidBookRead | null> {
+  const read = await readBook(vehicleId, null, signal, { sourceUrl });
+  return read?.lot ? { vehicle: read.vehicle, lot: read.lot, bids: read.comments, readAt: read.readAt } : null;
+}
+export function useBidBook(vehicleId: string, sourceUrl: string | null | undefined, enabled = true) {
+  return useQuery({ queryKey: ['stack-bid-book', vehicleId, sourceUrl?.replace(/\/+$/, '')],
+    queryFn: ({ signal }) => readBidBook(vehicleId, sourceUrl!, signal),
+    enabled: enabled && UUID_RE.test(vehicleId) && !!sourceUrl && BAT_LOT_URL.test(sourceUrl),
+    staleTime: 60_000, refetchInterval: enabled ? 60_000 : false, refetchOnWindowFocus: false, retry: false });
 }
 
 export function useOrderBook(vehicleId: string, lotId: string | null) {
@@ -388,6 +421,49 @@ export function foldOrderBook(bids: BidEvent[], closeAt: number | null): FoldSta
 /** Revealed demand at price P: book entries whose highest revealed amount is at or above P. */
 export function depthAt(book: BookEntry[], price: number): number {
   return book.filter((e) => e.max >= price).length;
+}
+
+/** Compact, auditable Stack A measurements. Count agreement is evidence coverage, not source freshness.
+ * Identity depth is a lower bound on demonstrated bidding, never a reservation price or a prediction. */
+export function bidBookReading(read: BidBookRead) {
+  const close = time(read.lot.auction_end_date);
+  const readAt = time(read.readAt);
+  const cutoff = close != null && readAt != null ? Math.min(close, readAt) : null;
+  const expectedUrl = trimUrl(read.lot.source_url);
+  const admitted = read.bids.filter(r => {
+    const at = time(r.posted_at);
+    return cutoff != null && close != null && at != null && at <= cutoff
+      && at >= close - LOT_WINDOW_DAYS * DAY_MS && trimUrl(r.source_url ?? '') === expectedUrl
+      && amountOf(r.bid_amount) != null && Number(r.bid_amount) > 0;
+  });
+  const seen = new Set<number>();
+  let duplicates = 0;
+  const unique = admitted.filter(r => {
+    if (r.bat_comment_id == null) return true;
+    if (seen.has(r.bat_comment_id)) { duplicates++; return false; }
+    seen.add(r.bat_comment_id); return true;
+  });
+  const bids = bidEvents(unique, {}).map(b => ({ ...b,
+    identityId: b.identityId && UUID_RE.test(b.identityId) ? b.identityId : null }));
+  const states = foldOrderBook(bids, close);
+  const last = states[states.length - 1];
+  const reported = Number.isSafeInteger(read.lot.total_bids) && read.lot.total_bids! > 0 ? read.lot.total_bids : null;
+  const rejected = read.bids.length - bids.length;
+  const increasing = bids.every((b, i) => i === 0 || b.amount > bids[i - 1].amount);
+  const countMatched = reported != null && reported === bids.length && rejected === 0 && duplicates === 0;
+  const allIdentified = bids.length > 0 && bids.every(b => b.identityId != null);
+  const knownBook = last?.book.filter(e => e.identityId != null) ?? [];
+  const high = last?.price ?? null;
+  const near = high != null ? depthAt(knownBook, high * .9) : null;
+  const previous = states[states.length - 2];
+  const lastRaise = countMatched && increasing && previous && last
+    ? 100 * (last.price - previous.price) / previous.price : null;
+  // A gap to the second known identity would overstate separation if any bid identity were unresolved.
+  const gap = countMatched && allIdentified && knownBook.length > 1 && high != null
+    ? 100 * (high - knownBook[1].max) / high : null;
+  return { states, high, near, bidders: knownBook.length, reported, held: bids.length, rejected,
+    countMatched, allIdentified, lastRaise, gap, lastAt: last?.bid.at ?? null,
+    exact: countMatched && allIdentified, increasing };
 }
 
 export interface FrameCoverage {

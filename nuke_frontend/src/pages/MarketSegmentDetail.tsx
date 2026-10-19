@@ -39,7 +39,6 @@ interface SegmentMeta {
   market_cap_usd: number;
   change_7d_pct: number | null;
   change_30d_pct: number | null;
-  fund_symbol: string | null;
 }
 
 /* ------------------------------------------------------------------ */
@@ -88,18 +87,6 @@ function SegmentHeader({ seg }: { seg: SegmentMeta }) {
         <div style={{ flex: 1, minWidth: 200 }}>
           <div style={{ display: 'flex', alignItems: 'baseline', gap: 10, flexWrap: 'wrap' }}>
             <h1 style={{ margin: 0, fontSize: 19, fontWeight: 900 }}>{seg.name}</h1>
-            {seg.fund_symbol && (
-              <span style={{
-                fontFamily: "'Courier New', monospace",
-                fontSize: 11,
-                fontWeight: 700,
-                padding: '2px 6px',
-                border: '1px solid var(--border)',
-                color: 'var(--text-secondary)',
-              }}>
-                {seg.fund_symbol}
-              </span>
-            )}
           </div>
           {seg.description && (
             <div style={{ marginTop: 4, fontSize: 12, color: 'var(--text-secondary)' }}>{seg.description}</div>
@@ -157,6 +144,7 @@ export default function MarketSegmentDetailPage() {
   // Segment metadata
   const [segment, setSegment] = useState<SegmentMeta | null>(null);
   const [segLoading, setSegLoading] = useState(true);
+  const [segError, setSegError] = useState<string | null>(null);
 
   // Feed state
   const {
@@ -166,6 +154,8 @@ export default function MarketSegmentDetailPage() {
     searchText,
     viewMode,
     cardsPerRow,
+    imageFit,
+    setImageFit,
     hasActiveFilters,
     setFilters,
     setSortBy,
@@ -183,12 +173,18 @@ export default function MarketSegmentDetailPage() {
   // Load segment metadata
   useEffect(() => {
     if (!slug) return;
+    let cancelled = false;
+    setSegLoading(true);
+    setSegment(null);
+    setSegError(null);
     supabase
       .from('market_segments_index')
-      .select('segment_id, slug, name, description, year_min, year_max, makes, model_keywords, vehicle_count, market_cap_usd, change_7d_pct, change_30d_pct, fund_symbol')
+      .select('segment_id, slug, name, description, year_min, year_max, makes, model_keywords, vehicle_count, market_cap_usd, change_7d_pct, change_30d_pct')
       .eq('slug', slug)
       .maybeSingle()
-      .then(({ data }) => {
+      .then(({ data, error }) => {
+        if (cancelled) return;
+        if (error) setSegError('The segment definition could not be read.');
         if (data) {
           setSegment({
             segment_id: data.segment_id,
@@ -203,11 +199,11 @@ export default function MarketSegmentDetailPage() {
             market_cap_usd: Number(data.market_cap_usd || 0),
             change_7d_pct: data.change_7d_pct != null ? Number(data.change_7d_pct) : null,
             change_30d_pct: data.change_30d_pct != null ? Number(data.change_30d_pct) : null,
-            fund_symbol: data.fund_symbol ?? null,
           });
         }
         setSegLoading(false);
       });
+    return () => { cancelled = true; };
   }, [slug]);
 
   // Apply segment criteria to feed filters on load
@@ -223,7 +219,7 @@ export default function MarketSegmentDetailPage() {
 
   // Feed query — default to deal_score for segment pages too
   const effectiveSortBy = sortBy === 'popular' ? 'deal_score' : sortBy;
-  const feedQuery = useFeedQuery({ filters, sortBy: effectiveSortBy, sortDirection, searchText });
+  const feedQuery = useFeedQuery({ filters, sortBy: effectiveSortBy, sortDirection, searchText }, !!segment && !segError, segment?.segment_id);
   const vehicles = useMemo(() => feedQuery.data?.pages.flatMap((p) => p.items) ?? [], [feedQuery.data]);
   const stats = feedQuery.data?.pages[0]?.stats ?? null;
 
@@ -235,13 +231,14 @@ export default function MarketSegmentDetailPage() {
         viewMode={viewMode}
         compact={viewMode === 'grid' && cardsPerRow > 8}
         showScores={showScores}
+        imageFit={imageFit === 'auto' ? 'cover' : imageFit}
       />
     ),
-    [viewMode, cardsPerRow, showScores],
+    [viewMode, cardsPerRow, showScores, imageFit],
   );
 
   const renderStatCard = useCallback(
-    (index: number) => <FeedStatCard index={index} stats={stats} vehicleCount={vehicles.length} />,
+    (index: number) => <FeedStatCard index={index} stats={stats} />,
     [stats, vehicles.length],
   );
 
@@ -263,7 +260,7 @@ export default function MarketSegmentDetailPage() {
   if (!segLoading && !segment) {
     return (
       <div style={{ padding: 24, color: 'var(--text-secondary)', fontSize: 12 }}>
-        Segment not found.
+        {segError || 'Segment not found.'}
         <div style={{ marginTop: 10 }}>
           <Link to="/market/segments" className="button button-secondary" style={{ textDecoration: 'none', color: 'inherit' }}>
             All Segments
@@ -300,6 +297,8 @@ export default function MarketSegmentDetailPage() {
           cardsPerRow={cardsPerRow}
           fontSize={fontSize}
           showScores={showScores}
+          imageFit={imageFit}
+          onImageFitChange={setImageFit}
           onSortChange={setSortBy}
           onDirectionChange={setSortDirection}
           onViewModeChange={setViewMode}

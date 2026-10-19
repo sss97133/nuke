@@ -1,8 +1,10 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { normalizeListingUrlKey } from '../_shared/listingUrl.ts';
+import { writeVehicleEventByKey } from '../_shared/vehicleEventWrite.ts';
 import { resolveExistingVehicleId, discoveryUrlIlikePattern } from '../_shared/resolveVehicleForListing.ts';
 import { writeObservation } from "../_shared/observationWriter.ts";
 import { requireWriteAuth } from '../_shared/writeGuard.ts';
+import { projectSecretKey } from "../_shared/supabaseKeys.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -153,30 +155,31 @@ Deno.serve(async (req) => {
 
     const supabase = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
+      projectSecretKey() ?? '',
     );
 
     // Get or create scrape source
     const { data: source } = await supabase
       .from('scrape_sources')
       .select('id')
-      .eq('domain', 'classic.com')
+      .eq('url', 'https://www.classic.com')
       .maybeSingle();
 
     let sourceId = source?.id;
 
     if (!sourceId) {
-      const { data: newSource } = await supabase
+      // scrape_sources keys on url (UNIQUE) and has name, not domain/source_name/base_url; source_type is CHECK-listed.
+      const { data: newSource, error: newSourceErr } = await supabase
         .from('scrape_sources')
         .insert({
-          domain: 'classic.com',
-          source_name: 'Classic.com',
-          source_type: 'auction_house',
-          base_url: 'https://www.classic.com',
+          url: 'https://www.classic.com',
+          name: 'Classic.com',
+          source_type: 'auction',
           is_active: true,
         })
         .select('id')
         .maybeSingle();
+      if (newSourceErr) throw new Error(`scrape_sources insert failed: ${newSourceErr.message}`);
 
       if (newSource) {
         sourceId = newSource.id;
@@ -316,10 +319,7 @@ Deno.serve(async (req) => {
     // Upsert external listing for marketplace
     const listingId = extractListingId(u);
     const listingUrlKey = normalizeListingUrlKey(url);
-    const { data: ext, error: extErr } = await supabase
-      .from('vehicle_events')
-      .upsert(
-        {
+    const ext = await writeVehicleEventByKey(supabase, {
           vehicle_id: vehicleId,
           source_organization_id: organizationId,
           source_platform: 'classic_com',
@@ -336,12 +336,8 @@ Deno.serve(async (req) => {
             images: extractImageUrlsFromHtml(url, html),
           },
           updated_at: new Date().toISOString(),
-        },
-        { onConflict: 'source_platform,source_listing_id' },
-      )
-      .select('id')
-      .maybeSingle();
-    if (extErr) throw extErr;
+        });
+    if (ext.action === 'error') throw new Error(`vehicle_events write failed: ${ext.error}`);
 
     // Persist images into vehicle_images so marketplace/profile cards can show them.
     const extractedImages = extractImageUrlsFromHtml(url, html);
@@ -418,7 +414,7 @@ Deno.serve(async (req) => {
       JSON.stringify({
         success: true,
         vehicle_id: vehicleId,
-        vehicle_event_id: ext?.id,
+        vehicle_event_id: ext.action === 'inserted' || ext.action === 'updated' || ext.action === 'updated_clock_locked' ? ext.id : null,
         platform: 'classic_com',
         source_id: sourceId,
         listing_status: listingStatus,

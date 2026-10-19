@@ -43,6 +43,7 @@ const AnalysisStreamPage: React.FC = () => {
   const [atoms, setAtoms] = useState<StreamAtom[]>([]);
   const [images, setImages] = useState<Record<string, ImageMeta>>({});
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [streaming, setStreaming] = useState(false);
   const [newCount, setNewCount] = useState(0);
   const justArrivedRef = useRef<Set<string>>(new Set());
@@ -50,6 +51,10 @@ const AnalysisStreamPage: React.FC = () => {
   useEffect(() => {
     if (!vehicleId) return;
     let cancelled = false;
+    setAtoms([]);
+    setImages({});
+    setLoading(true);
+    setLoadError(null);
 
     (async () => {
       const { data, error } = await supabase
@@ -63,6 +68,7 @@ const AnalysisStreamPage: React.FC = () => {
       if (cancelled) return;
       if (error) {
         console.error('AnalysisStream initial fetch error:', error);
+        setLoadError('Image interpretations could not be read.');
         setLoading(false);
         return;
       }
@@ -201,10 +207,10 @@ const AnalysisStreamPage: React.FC = () => {
         <div style={{ fontSize: 11, color: 'var(--ink-secondary)' }}>loading recent atoms…</div>
       )}
 
-      {!loading && atoms.length === 0 && (
+      {loadError && <div role="alert">{loadError}</div>}
+      {!loading && !loadError && atoms.length === 0 && (
         <div style={{ fontSize: 11, color: 'var(--ink-secondary)', padding: 24, border: '2px dashed var(--ink-secondary)' }}>
-          no deep-analysis atoms have been ingested for this vehicle yet.
-          Run <code>scripts/deep-image-analysis-byok.mjs ingest --sink ...</code> to seed.
+          No retained deep-image interpretations are available for this vehicle.
         </div>
       )}
 

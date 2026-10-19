@@ -22,6 +22,7 @@ enum RootStatus {
     case pending       // a root may exist but isn't surfaced yet — drill says "tracing…"
     case conflicting   // observations disagree
     case refuted       // owner flagged wrong (superseded, never deleted)
+    case recorded      // the record itself, no observation beneath it — dim, but opens to say so (the kit's legacy claim)
     case facade        // NO root beneath it — renders dim, never drills
 
     /// The status glyph. nil → the row falls back to the plain drill chevron
@@ -34,6 +35,7 @@ enum RootStatus {
         case .pending:     return nil
         case .conflicting: return "exclamationmark.2"
         case .refuted:     return "xmark"
+        case .recorded:    return nil
         case .facade:      return nil
         }
     }
@@ -50,8 +52,8 @@ enum RootStatus {
     /// The value's ink. Only a facade or a refuted claim is demoted off primary.
     var valueColor: Color {
         switch self {
-        case .facade, .refuted: return .secondary
-        default:                return .primary
+        case .facade, .refuted, .recorded: return .secondary
+        default:                           return .primary
         }
     }
 

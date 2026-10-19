@@ -588,7 +588,7 @@ function NodeCard({ cw, n, map, byId, facts, recordsOnly, onNode, onCall }: {
         {' · '}{n.designStatus === 'decided' ? 'DECIDED' : 'CONCEPT (NOT DECIDED)'}
       </Field>
       <Field cw={cw} label="WHO">{n.assignee ?? 'UNASSIGNED'}</Field>
-      <Field cw={cw} label="POSITION">{n.x != null ? n.posSource ?? 'placed' : 'NOT PLACED YET'}</Field>
+      <Field cw={cw} label="POSITION">{n.x != null ? n.posSource ?? 'placed' : `NOT PLACED YET${n.posSource ? ` (${n.posSource})` : ''}`}</Field>
       {n.partNumber && <Field cw={cw} label="PLUG / KIT">{n.partNumber}</Field>}
       {n.partNumber && <PartPhotos cw={cw} codes={n.partNumber} />}
       {n.notes && <Field cw={cw} label="NOTE">{n.notes}</Field>}

@@ -4,6 +4,14 @@
 
 This document describes the observation architecture: the unified intake system designed to accept data from any source, attach trust scores, deduplicate, resolve vehicles, and store structured observations with full provenance. This is the target architecture the system is migrating toward.
 
+Prepared engine-family path, 2026-10-11: retained native source → explicit service selector in
+`ingest-observation` → existing ratified property → `validate_retained_listing_property_source` →
+source-linked observation → existing canonical/provenance readers. The shared
+`retained_description_property_value_matches` predicate checks the family registration and exact
+witness; `retained_listing_property_result_matches` also checks every successful handler response.
+No new table, stack registry entry, queue or worker is created. Proposal approval, production deployment
+and fleet coverage are not established by the disposable integration contract.
+
 ---
 
 ## Table of Contents

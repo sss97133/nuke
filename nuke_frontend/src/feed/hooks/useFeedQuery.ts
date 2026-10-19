@@ -93,10 +93,11 @@ function toQueryParams(input: UseFeedQueryInput): FeedQueryParams {
 // Hook
 // ---------------------------------------------------------------------------
 
-export function useFeedQuery(input: UseFeedQueryInput) {
-  const params = toQueryParams(input);
+export function useFeedQuery(input: UseFeedQueryInput, enabled = true, segmentId?: string) {
+  const params = { ...toQueryParams(input), ...(segmentId ? { segment_id: segmentId } : {}) };
 
   return useInfiniteQuery<FeedQueryResponse>({
+    enabled,
     queryKey: ['feed', params],
     queryFn: ({ pageParam }) =>
       fetchFeed({ ...params, cursor: pageParam as string | undefined }),

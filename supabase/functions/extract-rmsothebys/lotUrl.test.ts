@@ -1,7 +1,7 @@
 // Run: deno test supabase/functions/extract-rmsothebys/lotUrl.test.ts
 // Both link shapes the SearchLots API has returned, against the URL form stored on vehicles for MO26 lots on 2026-10-06
 // ("https://rmsothebys.com/auctions/mo26/lots/r0008-…", no trailing slash).
-import { rmLotLinkMatchesUrl, rmLotUrl } from './lotUrl.ts';
+import { rmListingUrlVariants, rmLotLinkMatchesUrl, rmLotUrl } from './lotUrl.ts';
 import { normalizeListingUrlKey } from '../_shared/listingUrl.ts';
 
 function equal(actual: unknown, expected: unknown) {
@@ -44,4 +44,11 @@ Deno.test('a different lot, auction or host does not match', () => {
   equal(rmLotLinkMatchesUrl(ABSOLUTE, 'https://rmsothebys.com/auctions/mo26/lots/r0008-1923-rollsroyce-silver-ghost'), false);
   equal(rmLotLinkMatchesUrl(ABSOLUTE, 'https://rmsothebys.com/auctions/mc26/lots/r0007-1954-buick-skylark'), false);
   equal(rmLotLinkMatchesUrl(ABSOLUTE, 'https://example.com/auctions/mo26/lots/r0007-1954-buick-skylark'), false);
+});
+
+Deno.test('a lookup by listing_url tries the URL as given and with its trailing slash toggled', () => {
+  equal(rmListingUrlVariants(ABSOLUTE), [ABSOLUTE, STORED]);
+  equal(rmListingUrlVariants(STORED), [STORED, ABSOLUTE]);
+  equal(rmListingUrlVariants(` ${ABSOLUTE} `), [ABSOLUTE, STORED]);
+  equal(rmListingUrlVariants(''), []);
 });

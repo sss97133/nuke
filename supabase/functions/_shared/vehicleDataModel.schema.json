@@ -1,0 +1,1007 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:nuke:vehicle-data-model:v1",
+  "title": "Public stored vehicle record model; incomplete evidence model",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "vehicle_id",
+    "read_at",
+    "grain",
+    "physical_identity_status",
+    "retained_record",
+    "typed_claims",
+    "model_scope",
+    "typed_claims_status"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "vehicle_data_model_v1"
+    },
+    "vehicle_id": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "read_at": {
+      "type": "string"
+    },
+    "grain": {
+      "const": "stored_vehicle_record"
+    },
+    "physical_identity_status": {
+      "const": "unresolved"
+    },
+    "retained_record": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "origin_relation",
+        "row_created_at",
+        "row_updated_at",
+        "clock_basis",
+        "source_attribution_status",
+        "factory_configuration_status",
+        "current_configuration_status",
+        "attributes",
+        "property_bindings"
+      ],
+      "properties": {
+        "origin_relation": {
+          "const": "vehicles"
+        },
+        "row_created_at": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "row_updated_at": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "clock_basis": {
+          "const": "record_maintenance_not_source_event_or_capture"
+        },
+        "source_attribution_status": {
+          "const": "unassayed"
+        },
+        "factory_configuration_status": {
+          "const": "unknown"
+        },
+        "current_configuration_status": {
+          "const": "unknown"
+        },
+        "attributes": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "year",
+            "make",
+            "model",
+            "vin",
+            "trim",
+            "mileage",
+            "color",
+            "interior_color",
+            "transmission",
+            "drivetrain",
+            "engine_type",
+            "engine_size",
+            "body_style"
+          ],
+          "properties": {
+            "year": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "value",
+                "data_type",
+                "origin_column",
+                "unit",
+                "unit_status",
+                "value_status"
+              ],
+              "properties": {
+                "value": {
+                  "type": [
+                    "integer",
+                    "null"
+                  ]
+                },
+                "data_type": {
+                  "const": "integer"
+                },
+                "origin_column": {
+                  "const": "year"
+                },
+                "unit": {
+                  "type": "null"
+                },
+                "unit_status": {
+                  "const": "not_established"
+                },
+                "value_status": {
+                  "enum": [
+                    "unrecorded",
+                    "retained_record_value"
+                  ]
+                }
+              }
+            },
+            "make": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "value",
+                "data_type",
+                "origin_column",
+                "unit",
+                "unit_status",
+                "value_status"
+              ],
+              "properties": {
+                "value": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "data_type": {
+                  "const": "string"
+                },
+                "origin_column": {
+                  "const": "make"
+                },
+                "unit": {
+                  "type": "null"
+                },
+                "unit_status": {
+                  "const": "not_established"
+                },
+                "value_status": {
+                  "enum": [
+                    "unrecorded",
+                    "retained_record_value"
+                  ]
+                }
+              }
+            },
+            "model": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "value",
+                "data_type",
+                "origin_column",
+                "unit",
+                "unit_status",
+                "value_status"
+              ],
+              "properties": {
+                "value": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "data_type": {
+                  "const": "string"
+                },
+                "origin_column": {
+                  "const": "model"
+                },
+                "unit": {
+                  "type": "null"
+                },
+                "unit_status": {
+                  "const": "not_established"
+                },
+                "value_status": {
+                  "enum": [
+                    "unrecorded",
+                    "retained_record_value"
+                  ]
+                }
+              }
+            },
+            "vin": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "value",
+                "data_type",
+                "origin_column",
+                "unit",
+                "unit_status",
+                "value_status"
+              ],
+              "properties": {
+                "value": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "data_type": {
+                  "const": "string"
+                },
+                "origin_column": {
+                  "const": "vin"
+                },
+                "unit": {
+                  "type": "null"
+                },
+                "unit_status": {
+                  "const": "not_established"
+                },
+                "value_status": {
+                  "enum": [
+                    "unrecorded",
+                    "retained_record_value"
+                  ]
+                }
+              }
+            },
+            "trim": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "value",
+                "data_type",
+                "origin_column",
+                "unit",
+                "unit_status",
+                "value_status"
+              ],
+              "properties": {
+                "value": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "data_type": {
+                  "const": "string"
+                },
+                "origin_column": {
+                  "const": "trim"
+                },
+                "unit": {
+                  "type": "null"
+                },
+                "unit_status": {
+                  "const": "not_established"
+                },
+                "value_status": {
+                  "enum": [
+                    "unrecorded",
+                    "retained_record_value"
+                  ]
+                }
+              }
+            },
+            "mileage": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "value",
+                "data_type",
+                "origin_column",
+                "unit",
+                "unit_status",
+                "value_status"
+              ],
+              "properties": {
+                "value": {
+                  "type": [
+                    "integer",
+                    "null"
+                  ]
+                },
+                "data_type": {
+                  "const": "integer"
+                },
+                "origin_column": {
+                  "const": "mileage"
+                },
+                "unit": {
+                  "type": "null"
+                },
+                "unit_status": {
+                  "const": "not_established"
+                },
+                "value_status": {
+                  "enum": [
+                    "unrecorded",
+                    "retained_record_value"
+                  ]
+                }
+              }
+            },
+            "color": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "value",
+                "data_type",
+                "origin_column",
+                "unit",
+                "unit_status",
+                "value_status"
+              ],
+              "properties": {
+                "value": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "data_type": {
+                  "const": "string"
+                },
+                "origin_column": {
+                  "const": "color"
+                },
+                "unit": {
+                  "type": "null"
+                },
+                "unit_status": {
+                  "const": "not_established"
+                },
+                "value_status": {
+                  "enum": [
+                    "unrecorded",
+                    "retained_record_value"
+                  ]
+                }
+              }
+            },
+            "interior_color": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "value",
+                "data_type",
+                "origin_column",
+                "unit",
+                "unit_status",
+                "value_status"
+              ],
+              "properties": {
+                "value": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "data_type": {
+                  "const": "string"
+                },
+                "origin_column": {
+                  "const": "interior_color"
+                },
+                "unit": {
+                  "type": "null"
+                },
+                "unit_status": {
+                  "const": "not_established"
+                },
+                "value_status": {
+                  "enum": [
+                    "unrecorded",
+                    "retained_record_value"
+                  ]
+                }
+              }
+            },
+            "transmission": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "value",
+                "data_type",
+                "origin_column",
+                "unit",
+                "unit_status",
+                "value_status"
+              ],
+              "properties": {
+                "value": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "data_type": {
+                  "const": "string"
+                },
+                "origin_column": {
+                  "const": "transmission"
+                },
+                "unit": {
+                  "type": "null"
+                },
+                "unit_status": {
+                  "const": "not_established"
+                },
+                "value_status": {
+                  "enum": [
+                    "unrecorded",
+                    "retained_record_value"
+                  ]
+                }
+              }
+            },
+            "drivetrain": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "value",
+                "data_type",
+                "origin_column",
+                "unit",
+                "unit_status",
+                "value_status"
+              ],
+              "properties": {
+                "value": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "data_type": {
+                  "const": "string"
+                },
+                "origin_column": {
+                  "const": "drivetrain"
+                },
+                "unit": {
+                  "type": "null"
+                },
+                "unit_status": {
+                  "const": "not_established"
+                },
+                "value_status": {
+                  "enum": [
+                    "unrecorded",
+                    "retained_record_value"
+                  ]
+                }
+              }
+            },
+            "engine_type": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "value",
+                "data_type",
+                "origin_column",
+                "unit",
+                "unit_status",
+                "value_status"
+              ],
+              "properties": {
+                "value": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "data_type": {
+                  "const": "string"
+                },
+                "origin_column": {
+                  "const": "engine_type"
+                },
+                "unit": {
+                  "type": "null"
+                },
+                "unit_status": {
+                  "const": "not_established"
+                },
+                "value_status": {
+                  "enum": [
+                    "unrecorded",
+                    "retained_record_value"
+                  ]
+                }
+              }
+            },
+            "engine_size": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "value",
+                "data_type",
+                "origin_column",
+                "unit",
+                "unit_status",
+                "value_status"
+              ],
+              "properties": {
+                "value": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "data_type": {
+                  "const": "string"
+                },
+                "origin_column": {
+                  "const": "engine_size"
+                },
+                "unit": {
+                  "type": "null"
+                },
+                "unit_status": {
+                  "const": "not_established"
+                },
+                "value_status": {
+                  "enum": [
+                    "unrecorded",
+                    "retained_record_value"
+                  ]
+                }
+              }
+            },
+            "body_style": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "value",
+                "data_type",
+                "origin_column",
+                "unit",
+                "unit_status",
+                "value_status"
+              ],
+              "properties": {
+                "value": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "data_type": {
+                  "const": "string"
+                },
+                "origin_column": {
+                  "const": "body_style"
+                },
+                "unit": {
+                  "type": "null"
+                },
+                "unit_status": {
+                  "const": "not_established"
+                },
+                "value_status": {
+                  "enum": [
+                    "unrecorded",
+                    "retained_record_value"
+                  ]
+                }
+              }
+            }
+          }
+        },
+        "property_bindings": {
+          "type": "array",
+          "maxItems": 12,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "property_id",
+              "property_key",
+              "data_type",
+              "unit",
+              "value",
+              "origin_relation",
+              "origin_column",
+              "source_value",
+              "normalization_version",
+              "status",
+              "source_attribution_status",
+              "claim_role",
+              "independent_source",
+              "factory_configuration_status",
+              "current_configuration_status",
+              "record_columns_disagree"
+            ],
+            "properties": {
+              "property_id": {
+                "type": "string",
+                "format": "uuid"
+              },
+              "property_key": {
+                "enum": [
+                  "year",
+                  "make",
+                  "model",
+                  "vin",
+                  "trim",
+                  "exterior_color",
+                  "interior_color",
+                  "engine_configuration",
+                  "engine_displacement_l",
+                  "transmission_type",
+                  "drivetrain_layout"
+                ]
+              },
+              "data_type": {
+                "enum": [
+                  "integer",
+                  "numeric",
+                  "string",
+                  "enum"
+                ]
+              },
+              "unit": {
+                "enum": [
+                  null,
+                  "liters"
+                ]
+              },
+              "value": {
+                "type": [
+                  "string",
+                  "number"
+                ]
+              },
+              "origin_relation": {
+                "const": "vehicles"
+              },
+              "origin_column": {
+                "enum": [
+                  "year",
+                  "make",
+                  "model",
+                  "vin",
+                  "trim",
+                  "color",
+                  "interior_color",
+                  "engine_type",
+                  "engine_size",
+                  "transmission",
+                  "drivetrain"
+                ]
+              },
+              "source_value": {
+                "type": [
+                  "string",
+                  "number"
+                ]
+              },
+              "normalization_version": {
+                "enum": [
+                  "retained_record_identity_labels_v1",
+                  "retained_record_text_v1",
+                  "retained_powertrain_v1"
+                ]
+              },
+              "status": {
+                "const": "retained_record_binding"
+              },
+              "source_attribution_status": {
+                "const": "unassayed"
+              },
+              "claim_role": {
+                "const": "record_metadata"
+              },
+              "independent_source": {
+                "const": false
+              },
+              "factory_configuration_status": {
+                "const": "unknown"
+              },
+              "current_configuration_status": {
+                "const": "unknown"
+              },
+              "record_columns_disagree": {
+                "type": "boolean"
+              }
+            },
+            "allOf": [
+              {
+                "if": {
+                  "properties": {
+                    "data_type": {
+                      "const": "integer"
+                    }
+                  }
+                },
+                "then": {
+                  "properties": {
+                    "value": {
+                      "type": "integer"
+                    }
+                  }
+                }
+              },
+              {
+                "if": {
+                  "properties": {
+                    "data_type": {
+                      "const": "numeric"
+                    }
+                  }
+                },
+                "then": {
+                  "properties": {
+                    "value": {
+                      "type": "number"
+                    }
+                  }
+                }
+              },
+              {
+                "if": {
+                  "properties": {
+                    "data_type": {
+                      "const": "string"
+                    }
+                  }
+                },
+                "then": {
+                  "properties": {
+                    "value": {
+                      "type": "string"
+                    }
+                  }
+                }
+              },
+              {
+                "if": {
+                  "properties": {
+                    "data_type": {
+                      "const": "enum"
+                    }
+                  }
+                },
+                "then": {
+                  "properties": {
+                    "value": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            ]
+          }
+        }
+      }
+    },
+    "typed_claims": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "property_id",
+          "property_key",
+          "data_type",
+          "unit",
+          "value",
+          "status",
+          "observation_id",
+          "source_id",
+          "source_url",
+          "source_observation_id",
+          "kind",
+          "extraction_method",
+          "confidence_score",
+          "observed_at",
+          "ingested_at",
+          "qualifiers"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "property_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "property_key": {
+            "enum": [
+              "year",
+              "make",
+              "model",
+              "vin",
+              "interior_color",
+              "exterior_color",
+              "engine_configuration",
+              "engine_displacement_l",
+              "transmission_type",
+              "drivetrain_layout",
+              "mileage_miles"
+            ]
+          },
+          "data_type": {
+            "enum": [
+              "string",
+              "integer",
+              "numeric",
+              "enum"
+            ]
+          },
+          "unit": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "value": {
+            "type": [
+              "string",
+              "number"
+            ]
+          },
+          "status": {
+            "const": "current_canonical_claim"
+          },
+          "observation_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "source_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid"
+          },
+          "source_url": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "source_observation_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid"
+          },
+          "kind": {
+            "type": "string"
+          },
+          "extraction_method": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "confidence_score": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "observed_at": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "ingested_at": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "qualifiers": {
+            "type": "object"
+          }
+        },
+        "allOf": [
+          {
+            "if": {
+              "properties": {
+                "data_type": {
+                  "const": "string"
+                }
+              }
+            },
+            "then": {
+              "properties": {
+                "value": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "data_type": {
+                  "const": "enum"
+                }
+              }
+            },
+            "then": {
+              "properties": {
+                "value": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "data_type": {
+                  "const": "integer"
+                }
+              }
+            },
+            "then": {
+              "properties": {
+                "value": {
+                  "type": "integer"
+                }
+              }
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "data_type": {
+                  "const": "numeric"
+                }
+              }
+            },
+            "then": {
+              "properties": {
+                "value": {
+                  "type": "number"
+                }
+              }
+            }
+          }
+        ]
+      }
+    },
+    "model_scope": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "retained_record_fields",
+        "canonical_property_keys",
+        "complete_vehicle_model",
+        "source_event_history",
+        "retained_metadata_is_typed_testimony",
+        "record_binding_property_keys"
+      ],
+      "properties": {
+        "retained_record_fields": {
+          "const": 13
+        },
+        "canonical_property_keys": {
+          "const": 11
+        },
+        "complete_vehicle_model": {
+          "const": false
+        },
+        "source_event_history": {
+          "const": "not_reconstructed"
+        },
+        "retained_metadata_is_typed_testimony": {
+          "const": false
+        },
+        "record_binding_property_keys": {
+          "const": 11
+        }
+      }
+    },
+    "typed_claims_status": {
+      "enum": [
+        "not_requested",
+        "current_core_scope_read"
+      ]
+    }
+  }
+}

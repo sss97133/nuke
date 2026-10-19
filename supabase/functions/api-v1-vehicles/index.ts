@@ -13,6 +13,8 @@
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.0";
 import { authenticateRequest, logApiUsage } from "../_shared/apiKeyAuth.ts";
+import { projectSecretKey } from "../_shared/supabaseKeys.ts";
+import { maskOwnerMoney } from "../_shared/ownerMoney.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -46,7 +48,7 @@ Deno.serve(async (req) => {
 
   try {
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
-    const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+    const supabaseKey = projectSecretKey()!;
     const supabase = createClient(supabaseUrl, supabaseKey);
 
     // Authenticate user (JWT or API key) — uses atomic rate limiting
@@ -175,8 +177,10 @@ Deno.serve(async (req) => {
           );
         }
 
+        // Owner money is owner-only, as in vehicle_owner_books (#1164): a public vehicle is visible to any
+        // caller, but its purchase_price is not. The owner and the service role keep it; everyone else gets null.
         return new Response(
-          JSON.stringify({ data }),
+          JSON.stringify({ data: maskOwnerMoney(data, userId, isServiceRole) }),
           { headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
       } else {
@@ -272,10 +276,14 @@ Deno.serve(async (req) => {
           throw error;
         }
 
+        // Owner money is owner-only (#1164): keep purchase_price on the caller's own rows, null it on the
+        // public rows this list also returns.
+        const masked = (data || []).map((row: Record<string, unknown>) => maskOwnerMoney(row, userId, isServiceRole));
+
         return new Response(
           JSON.stringify({
-            data: data,
-            vehicles: data,
+            data: masked,
+            vehicles: masked,
             pagination: {
               page,
               limit,

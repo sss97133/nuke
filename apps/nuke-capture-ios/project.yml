@@ -54,7 +54,7 @@ targets:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: ag.nuke.capture
         PRODUCT_NAME: NukeCapture
-        MARKETING_VERSION: "1.0.1"
+        MARKETING_VERSION: "1.2.0"
         # CI OWNS THE BUILD NUMBER — do NOT bump this per release. ci_post_clone.sh
         # rewrites CURRENT_PROJECT_VERSION to an epoch timestamp ($(date +%s)) before
         # xcodegen, and ci_pre_xcodebuild.sh PlistBuddy-stamps CFBundleVersion to the
@@ -128,12 +128,41 @@ targets:
         # compliance docs; answering here skips the question on every upload.
         ITSAppUsesNonExemptEncryption: false
 
+  # Unit tests for the payload decoders and the rules the app enforces client-side. Run by
+  # .github/workflows/ios-build.yml on every iOS pull request and locally with
+  # `xcodebuild test -scheme NukeCapture-iOS -destination 'platform=iOS Simulator,name=iPhone 17 Pro'`.
+  NukeCaptureTests:
+    type: bundle.unit-test
+    platform: iOS
+    deploymentTarget: "26.0"
+    sources:
+      - path: UnitTests
+      # The hot/cold contract shared with the web (#1088): the same JSON its vitest reads, so one file
+      # binds both clients' verdicts. A change to it runs this target too (ios-build.yml paths).
+      - path: ../../nuke_frontend/src/pages/market/__fixtures__/heat-fixture-20261013T2300Z.json
+        buildPhase: resources
+    dependencies:
+      - target: NukeCapture-iOS
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: ag.nuke.capture.tests
+        SWIFT_VERSION: "5.0"
+        CODE_SIGN_STYLE: Automatic
+        # The app's PRODUCT_NAME is NukeCapture (not the target name), so the host path is explicit.
+        TEST_HOST: $(BUILT_PRODUCTS_DIR)/NukeCapture.app/NukeCapture
+        BUNDLE_LOADER: $(TEST_HOST)
+
 schemes:
   NukeCapture-iOS:
     build:
       targets:
         NukeCapture-iOS: all
+        NukeCaptureTests: [test]
     run:
       config: Debug
+    test:
+      config: Debug
+      targets:
+        - NukeCaptureTests
     archive:
       config: Release

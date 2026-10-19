@@ -149,19 +149,37 @@ export function makeStudy(lots: BidLot[], bids: StudyBid[], readAt: string, sele
     candidateN: unique.length, candidatesByYear, capped, exclusions, lots: readings };
 }
 function scopeSums(lot: LotReading, from: number, to: number) {
-  return Object.entries(lot.years).filter(([year]) => Number(year) >= from && Number(year) <= to).reduce((a, [, b]) => mergeSums(a, b), emptySums());
+  let selected:Sums|null = null;
+  for (const [year,s] of Object.entries(lot.years)) {
+    if (!(Number(year)>=from && Number(year)<=to)) continue;
+    // Measurements only read these vectors; quantile sorts its own copy. Preserve
+    // identity deduplication and scalar addition even for a single selected year.
+    selected = selected ? mergeSums(selected,s) : {
+      bids:0+s.bids,bidSum:0+s.bidSum,raises:0+s.raises,raiseSum:0+s.raiseSum,relativeSum:0+s.relativeSum,
+      gaps:s.gaps,relativeValues:s.relativeValues,identityIds:[...new Set(s.identityIds)],unresolvedBids:0+s.unresolvedBids,
+    };
+  }
+  return selected ?? emptySums();
+}
+function matchesScope(lot: LotReading, expression: BidExpression) {
+  return (!expression.make || lot.make.toLowerCase() === expression.make.toLowerCase())
+    && (!expression.model || lot.model === expression.model) && (!expression.vehicleYear || lot.vehicleYear === expression.vehicleYear);
+}
+function completeParticipantWindow(lot: LotReading, from: number, to: number) {
+  return !Object.keys(lot.years).some(y => Number(y) < from || Number(y) > to);
 }
 export function evaluateBidExpression(dataset: StudyDataset, expression: BidExpression): MeasurementResult {
-  const { measure, grouping, from, to, make, model, vehicleYear, weighting } = expression;
-  const scoped = dataset.lots.filter(l => (!make || l.make.toLowerCase() === make.toLowerCase()) && (!model || l.model === model) && (!vehicleYear || l.vehicleYear === vehicleYear));
+  const { measure, grouping, from, to, weighting } = expression;
+  const scoped = dataset.lots.filter(l => matchesScope(l,expression));
   const lotById = new Map(scoped.map(l => [l.id, l]));
   const buckets = new Map<string, { label: string; make?: string; model?: string; year?: number; members: MeasurementMember[] }>();
-  let bidN = 0, raiseN = 0, missing = 0, modelFallbackLots = 0; const contributing = new Set<string>();
+  let bidN = 0, raiseN = 0, missing = 0, modelFallbackLots = 0, eligibleLots = 0; const contributing = new Set<string>();
   const append = (key: string, label: string, m: MeasurementMember, extra: { make?: string; model?: string; year?: number } = {}) => {
     const bucket = buckets.get(key) ?? { label, members: [], ...extra }; bucket.members.push(m); buckets.set(key, bucket); contributing.add(m.lotId);
   };
   for (const l of scoped) {
     const s = scopeSums(l, from, to); if (!s.bids) continue;
+    if (s.bids>0) eligibleLots++;
     bidN += s.bids; raiseN += s.raises; if (l.modelBasis === 'source-label') modelFallbackLots++;
     if (grouping === 'year') {
       for (let year = from; year <= to; year++) { const ys = l.years[String(year)]; if (!ys) continue; const m = measured(ys, measure);
@@ -169,7 +187,7 @@ export function evaluateBidExpression(dataset: StudyDataset, expression: BidExpr
     } else if (grouping === 'participant') {
       // Participant records currently refer to complete episodes. Withhold crossing-year episodes rather
       // than silently including an actor's later bids in a narrower bid-year selection.
-      if (Object.keys(l.years).some(y => Number(y) < from || Number(y) > to)) { missing += l.actors.length; continue; }
+      if (!completeParticipantWindow(l,from,to)) { missing += l.actors.length; continue; }
       const spanSeconds = l.sums.gaps.reduce((sum,gap) => sum + gap,0);
       for (const a of l.actors) { const m = measure === 'entry' ? (spanSeconds > 0 ? {value:100 * a.entrySeconds / spanSeconds,observations:1,sum:100 * a.entrySeconds / spanSeconds} : null) : measure === 'winRate' ? (l.winner ? {value:l.winner === a.identity ? 100 : 0,observations:1,sum:l.winner === a.identity ? 100 : 0} : null) : measured(a, measure); if (m) append(a.identity, a.handle || 'Unresolved handle',
         { id: `${l.id}:${a.identity}`, lotId: l.id, vehicleId: l.vehicleId, title: l.title, actorId: a.identity, handle: a.handle, ...m }); else missing++; }
@@ -189,7 +207,7 @@ export function evaluateBidExpression(dataset: StudyDataset, expression: BidExpr
     const lotIds = [...new Set(b.members.map(m => m.lotId))];
     const outcomes = grouping === 'participant' ? lotIds.map(id => lotById.get(id)!).filter(l => l.winner) : [];
     return { key, ...b, lotIds, values: v, mean: avg,
-      median: quantile(v, .5)!, q25: quantile(v, .25)!, q75: quantile(v, .75)!, min: Math.min(...v), max: Math.max(...v), observations,
+      median: quantile(v, .5)!, q25: quantile(v, .25)!, q75: quantile(v, .75)!, min: v.reduce((a,b) => Math.min(a,b),Infinity), max: v.reduce((a,b) => Math.max(a,b),-Infinity), observations,
       percentile: sortedPercentile(sortedValues, avg), supported: v.length >= MIN_DISTRIBUTION,
       ...(grouping === 'participant' ? { knownOutcomes: outcomes.length, wins: outcomes.filter(l => l.winner === key).length } : {}) };
   });
@@ -200,9 +218,12 @@ export function evaluateBidExpression(dataset: StudyDataset, expression: BidExpr
   }
   groups.sort(grouping === 'year' ? (a, b) => (a.year ?? 0) - (b.year ?? 0) : (a, b) => b.lotIds.length - a.lotIds.length || a.label.localeCompare(b.label));
   return { expression, method: dataset.method, readAt: dataset.readAt, selection: dataset.selection,
-    eligibleLots: scoped.filter(l => scopeSums(l, from, to).bids > 0).length, contributingLots: contributing.size,
+    eligibleLots, contributingLots: contributing.size,
     bidN, raiseN, withheldRecordN: missing, modelFallbackLots, groups, values, median: quantile(rankValues, .5), rankValues, rankGrain: grouping === 'participant' ? 'participant' : 'record' };
 }
+
+// Reuse the canonical midrank lookup when a reader keeps a sorted reference.
+export { sortedPercentile };
 
 // A transfer encoding, not a second identity model. Canonical keys survive the round trip;
 // single-calendar-year lots share their full sums instead of sending those sums twice.
@@ -261,14 +282,29 @@ export function decodeStudy(value: unknown): StudyDataset {
 export interface ParticipantMapPoint { identity:string; n:number; entryPct:number; winRate:number; lotIds:string[] }
 /** Paired records only: both axes have the same participant-auction denominator. */
 export function participantBehaviorMap(dataset:StudyDataset, expression:BidExpression): ParticipantMapPoint[] {
-  const entries = evaluateBidExpression(dataset,{...expression,grouping:'participant',measure:'entry',weighting:'auction'});
-  const wins = evaluateBidExpression(dataset,{...expression,grouping:'participant',measure:'winRate',weighting:'auction'});
-  const byIdentity = new Map(entries.groups.map(g => [g.key,new Map(g.members.map(m => [m.lotId,m.value]))]));
-  return wins.groups.flatMap(g => {
-    const times = byIdentity.get(g.key);
-    const pairs = g.members.filter(m => times?.has(m.lotId));
-    if (pairs.length < 5) return [];
-    return [{identity:g.key,n:pairs.length,entryPct:mean(pairs.map(m => times!.get(m.lotId)!))!,
-      winRate:mean(pairs.map(m => m.value))!,lotIds:pairs.map(m => m.lotId)}];
-  });
+  const {from,to} = expression;
+  const scoped = dataset.lots.filter(l => matchesScope(l,expression) && completeParticipantWindow(l,from,to) && Boolean(scopeSums(l,from,to).bids));
+  // Retain only the entry join, rather than two full measurement results, ranks and quartiles.
+  // Merge entries by episode/identity to preserve the existing last-entry join semantics.
+  const entries = new Map<string,Map<string,number>>();
+  for (const lot of scoped) {
+    const span = lot.sums.gaps.reduce((n,gap) => n+gap,0); if (!(span > 0)) continue;
+    const actors = entries.get(lot.id) ?? new Map<string,number>();
+    for (const actor of lot.actors) actors.set(actor.identity,100 * actor.entrySeconds / span);
+    entries.set(lot.id,actors);
+  }
+  const groups = new Map<string,{identity:string;label:string;known:Set<string>;entrySum:number;winSum:number;lotIds:string[]}>();
+  for (const lot of scoped) {
+    if (!lot.winner) continue;
+    const times = entries.get(lot.id);
+    for (const actor of lot.actors) {
+      const group = groups.get(actor.identity) ?? {identity:actor.identity,label:actor.handle || 'Unresolved handle',known:new Set<string>(),entrySum:0,winSum:0,lotIds:[]};
+      group.known.add(lot.id); groups.set(actor.identity,group);
+      const entry = times?.get(actor.identity); if (entry === undefined) continue;
+      group.entrySum += entry; group.winSum += lot.winner === actor.identity ? 100 : 0; group.lotIds.push(lot.id);
+    }
+  }
+  return [...groups.values()].filter(g => g.lotIds.length >= 5)
+    .sort((a,b) => b.known.size - a.known.size || a.label.localeCompare(b.label))
+    .map(g => ({identity:g.identity,n:g.lotIds.length,entryPct:g.entrySum/g.lotIds.length,winRate:g.winSum/g.lotIds.length,lotIds:g.lotIds}));
 }

@@ -16,6 +16,9 @@ import {
   planIngests,
   readbackFor,
   readLandedBatch,
+  intakeThrottle,
+  createIntakeBudget,
+  selectIntakeFeeds,
   type IngestOutcome,
   type LandedBatch,
   type LedgerKnown,
@@ -94,9 +97,87 @@ Deno.test("a complete row clears any earlier error and retry time; a skipped row
   assert(!("error_message" in skipped!.row) && !("attempts" in skipped!.row), "a structural skip writes no error or attempts");
 });
 
-Deno.test("the poller ledgers nothing for an ingest error or a non-structural rejection", () => {
-  equal(write({ status: "error", error: "ingest HTTP 502" }, null), null);
-  equal(write({ status: "rejected", reason: "insufficient identity: year=? make=? model=?" }, null), null);
+const clOutcome = (event: NonNullable<NonNullable<IngestOutcome["listing_capture"]>["capture_landing"]>["listing_event"]): IngestOutcome => ({
+  status: "created", source: "craigslist", vehicle_id: "v1",
+  listing_capture: { post_id: "7000000001", capture_landing: {
+    observation: "written", observation_id: "observation-1", listing_event: event,
+  } },
+});
+const WITH_DATA = { description: "Retained source description." };
+
+Deno.test("a Craigslist parent with data but failed, conflicted or missing event ACK stays retryable", () => {
+  for (const event of [{ action: "error", error: "projection unavailable" },
+    { action: "skipped", reason: "listing changed during projection; retry" }, { action: "inserted", id: null }, undefined]) {
+    const result = write(clOutcome(event), WITH_DATA)!;
+    equal(result.status, "failed");
+    equal(result.row.failure_category, "readback_error");
+    equal(result.row.attempts, 1);
+    equal(result.row.next_attempt_at, iso(HOUR));
+    equal(ledgerDecision({ status: result.status, attempts: 1, next_attempt_at: iso(-HOUR) }, NOW), "retry");
+  }
+});
+
+Deno.test("Craigslist requires a canonical observation ACK as well as a native post and event ACK", () => {
+  for (const change of ["capture", "observation", "post"] as const) {
+    const ingest = clOutcome({ action: "inserted", id: "event-1" });
+    if (change === "capture") delete ingest.listing_capture;
+    if (change === "observation") delete ingest.listing_capture!.capture_landing!.observation_id;
+    if (change === "post") ingest.listing_capture!.post_id = "opaque-share-token";
+    equal(write(ingest, WITH_DATA)!.status, "failed");
+  }
+});
+
+Deno.test("a Craigslist canonical event ACK or an existing newer keyed episode completes and clears prior failures", () => {
+  for (const event of [{ action: "inserted", id: "event-1" }, { action: "updated", id: "event-1" },
+    { action: "updated_clock_locked", id: "event-1" }, { action: "skipped", reason: "older source observation" }]) {
+    const ingest = clOutcome(event);
+    ingest.status = "matched";
+    ingest.listing_capture!.capture_landing!.observation = "duplicate";
+    const result = write(ingest, WITH_DATA, { status: "failed", attempts: 1, max_attempts: 3 })!;
+    equal([result.status, result.row.error_message, result.row.failure_category, result.row.next_attempt_at], ["complete", null, null, null]);
+  }
+});
+
+Deno.test("repeated Craigslist projection failure uses existing bounded backoff and max attempts", () => {
+  const ingest = clOutcome({ action: "error", error: "projection unavailable" });
+  const second = write(ingest, WITH_DATA, { status: "failed", attempts: 1, max_attempts: 3 })!;
+  const third = write(ingest, WITH_DATA, { status: "failed", attempts: 2, max_attempts: 3 })!;
+  equal([second.row.attempts, second.row.next_attempt_at], [2, iso(2 * HOUR)]);
+  equal([third.row.attempts, third.row.next_attempt_at], [3, null]);
+  equal(ledgerDecision({ status: "failed", attempts: 3, max_attempts: 3, next_attempt_at: null }, NOW), "settled");
+});
+
+Deno.test("another platform keeps its existing completeness contract even with similarly named capture data", () => {
+  const ingest = clOutcome({ action: "error", error: "unrelated projection" });
+  ingest.source = "mecum";
+  equal(write(ingest, WITH_DATA)!.status, "complete");
+  equal(write({ status: "created", vehicle_id: "v1" }, WITH_DATA)!.status, "complete");
+});
+
+Deno.test("attempted errors back off with unknown landing, preserving an earlier vehicle pointer and attempt ceiling", () => {
+  const first = write({ status: "error", error: "ingest HTTP 502" }, WITH_DATA,
+    { status: "complete", vehicle_id: "earlier-vehicle", attempts: 0 })!;
+  equal(first.status, "failed");
+  equal(first.landed, null);
+  equal([first.row.attempts, first.row.next_attempt_at, first.row.vehicle_id], [1, iso(24 * HOUR), "earlier-vehicle"]);
+  equal((first.row.raw_data as Record<string, unknown>).ingest_result_unknown, true);
+  equal((first.row.raw_data as Record<string, unknown>).landed, undefined);
+  const timeout = write({ status: "error", error: "AbortError: timed out" }, null)!;
+  equal([timeout.status, timeout.row.failure_category, timeout.row.next_attempt_at], ["failed", "timeout", iso(HOUR)]);
+  const final = write({ status: "error", error: "HTTP 500" }, null, { status: "failed", attempts: 2, max_attempts: 3 })!;
+  equal([final.row.attempts, final.row.next_attempt_at], [3, null]);
+  equal(write({ status: "rejected", reason: "unspecified" }, null), null);
+});
+
+Deno.test("a post with a blank model is ledgered failed, retried a day later, and final at max attempts", () => {
+  const ingest = { status: "rejected", reason: "insufficient identity: year=1975 make=Datsun model=? — need all three" };
+  const first = write(ingest, null)!;
+  equal(first.status, "failed");
+  equal(first.row.failure_category, "identity_insufficient");
+  equal(first.row.attempts, 1);
+  equal(Date.parse(first.row.next_attempt_at as string) - NOW.getTime(), 24 * HOUR);
+  const last = ledgerWriteFor({ url: "u", feedId: "f", ingest, batch: { rows: new Map(), error: null }, prev: { status: "failed", attempts: 2 }, now: NOW })!;
+  equal(last.row.next_attempt_at, null);
 });
 
 Deno.test("landedFields reports which of price, images and description the row holds", () => {
@@ -371,7 +452,7 @@ Deno.test("a rejection is never skipped, even when the extractor's text holds a 
 
 Deno.test("a rejection that is not enrichment_failed still follows the old rule: structural is skipped, the rest is not ledgered", () => {
   equal(ledgerWriteFor({ url: "u", feedId: "f", ingest: { status: "rejected", reason: "implausible year: 1801" }, batch: { rows: new Map(), error: null }, now: NOW })?.status, "skipped");
-  equal(ledgerWriteFor({ url: "u", feedId: "f", ingest: { status: "rejected", reason: "insufficient identity: year=? make=? model=?" }, batch: { rows: new Map(), error: null }, now: NOW }), null);
+  equal(ledgerWriteFor({ url: "u", feedId: "f", ingest: { status: "rejected", reason: "some other rejection" }, batch: { rows: new Map(), error: null }, now: NOW }), null);
 });
 
 Deno.test("the rejection is recorded once: later polls skip the URL until it is due, and a final one never returns", () => {
@@ -385,4 +466,129 @@ Deno.test("the rejection is recorded once: later polls skip the URL until it is 
   // the third rejection is final
   const third = writeRejection("extract-hagerty-listing HTTP 500: Fetch failed: Blocked by site", { status: "failed", attempts: 2, max_attempts: 3 })!;
   equal(planIngests([REJECTED_URL], new Set(), new Map([[REJECTED_URL, third.row as unknown as LedgerKnown]]), at(30 * 24 * 60), 20).toIngest, []);
+});
+
+Deno.test('intake switches and zero budgets refuse work; malformed limits fail closed', () => {
+  for (const raw of [{ enabled: false }, { max_ingests: 0 }, { sources: { mecum: { max_ingests: 0 } } }]) {
+    equal(createIntakeBudget(intakeThrottle(raw), 0, () => 0).reserve('mecum'), null);
+  }
+  for (const raw of [null, { max_ingests: -1 }, { max_feeds: 0.5 }, { max_ingests: '20' }, { enabled: 'yes' }, { sources: [] }]) {
+    let rejected = false;
+    try { intakeThrottle(raw); } catch { rejected = true; }
+    assert(rejected, 'invalid controls must not silently reopen intake');
+  }
+});
+
+Deno.test('a busy metro source shares the feed slots with due auction and dealer sources', () => {
+  const feeds = Array.from({ length: 80 }, (_, i) => ({ source_slug: 'craigslist', id: i, last_polled_at: null }));
+  feeds.push({ source_slug: 'mecum', id: 81, last_polled_at: null }, { source_slug: 'dealer', id: 82, last_polled_at: null });
+  const selected = selectIntakeFeeds(feeds, 4, intakeThrottle(), 0);
+  equal(selected.map(f => f.source_slug), ['craigslist', 'mecum', 'dealer', 'craigslist']);
+  equal(selectIntakeFeeds(feeds, 0, intakeThrottle(), 0), []);
+  equal(selectIntakeFeeds([{ source_slug: 'mecum', last_polled_at: NOW.toISOString(), poll_interval_minutes: 60 }], 4, intakeThrottle(), NOW.getTime()), []);
+});
+
+Deno.test('shared budget caps all feeds and source failures back off independently', () => {
+  let time = 0;
+  const budget = createIntakeBudget(intakeThrottle({ max_ingests: 3, sources: { mecum: { max_ingests: 1 } } }), 0, () => time);
+  assert(!!budget.reserve('mecum'), 'first source admission');
+  equal(budget.reserve('mecum'), null);
+  equal(budget.refusal('mecum'), 'source_limit');
+  assert(!!budget.reserve('dealer'), 'other source stays usable');
+  budget.record('dealer', 200, { enrichment_error: 'OpenAI API error: You have no credits remaining' });
+  equal(budget.reserve('dealer'), null);
+  equal(budget.refusal('dealer'), 'billing');
+  assert(!!budget.reserve('bat'), 'a different source is not blocked by dealer billing');
+  equal(budget.reserve('other'), null);
+  equal(budget.snapshot().attempted, 3);
+  time = 111_000;
+  equal(budget.remainingMs(), 0);
+});
+
+Deno.test('measured slow calls defer the next call; fast calls use available worker time', () => {
+  let time = 0;
+  const budget = createIntakeBudget(intakeThrottle(), 0, () => time);
+  assert(!!budget.reserve('slow'), 'initial bounded attempt');
+  time = 60_000;
+  budget.record('slow', 60_000, { status: 'matched' });
+  equal(budget.reserve('slow'), null);
+  equal(budget.refusal('slow'), 'worker_deadline');
+  assert(!!budget.reserve('fast'), 'another source can use the remaining time');
+  budget.record('fast', 100, { status: 'matched' });
+  assert(!!budget.reserve('fast'), 'fast cached extraction adapts to observed latency');
+  time = 101_000;
+  equal(budget.reserve('fast'), null);
+});
+
+Deno.test('feed allocations share remaining slots and redistribute empty or refused targets without raising caps', () => {
+  const budget = createIntakeBudget(intakeThrottle({ max_ingests: 40,
+    sources: { paused: { enabled: false }, small: { max_ingests: 1 } } }), 0, () => 0);
+  equal(budget.feedAllowance(40, 20), 1);
+  equal(budget.feedAllowance(4, 20), 10); // Thirty-six empty targets spent no slots.
+  equal(budget.reserve('paused'), null);
+  equal(budget.feedAllowance(3, 20), 14);
+  assert(!!budget.reserve('small'), 'one configured source slot');
+  equal(budget.reserve('small'), null);
+  equal(budget.feedAllowance(2, 20), 20);
+  equal(budget.snapshot().attempted, 1);
+  equal(budget.feedAllowance(1, 8), 8); // Article-hop ceiling survives redistribution.
+  equal(createIntakeBudget(intakeThrottle({ max_ingests: 0 }), 0, () => 0).feedAllowance(1, 20), 0);
+});
+
+Deno.test('latest source visit outranks its old metro feeds; billing errors persist a six-hour backoff', () => {
+  const now = NOW.getTime();
+  const feeds = [{ source_slug: 'craigslist', last_polled_at: new Date(now - 86400000).toISOString() },
+    { source_slug: 'craigslist', last_polled_at: new Date(now - 60000).toISOString() },
+    { source_slug: 'mecum', last_polled_at: new Date(now - 7200000).toISOString() }];
+  equal(selectIntakeFeeds(feeds, 1, intakeThrottle(), now).map(f => f.source_slug), ['mecum']);
+  const blocked = [{ source_slug: 'dealer', last_polled_at: new Date(now - 7200000).toISOString(),
+    last_error: 'intake_backoff: billing', error_count: 1 }];
+  equal(selectIntakeFeeds(blocked, 1, intakeThrottle(), now), []);
+  equal(selectIntakeFeeds(blocked, 1, intakeThrottle(), now + 6 * 3600000).length, 1);
+  const budget = createIntakeBudget(intakeThrottle({ max_ingests: 4 }), 0, () => 0);
+  budget.shareAcrossSources(4);
+  assert(!!budget.reserve('mecum'), 'source receives one slot');
+  equal(budget.reserve('mecum'), null);
+  assert(!!budget.reserve('other'), 'another source retains a slot');
+});
+
+Deno.test("planIngests: a complete row past the revisit age is asked again after new URLs and retries, bounded by max", () => {
+  const old = { status: "complete", processed_at: iso(-25 * HOUR) };
+  const recent = { status: "complete", processed_at: iso(-HOUR) };
+  const ledger = new Map<string, LedgerKnown>([["old1", old], ["old2", old], ["recent", recent]]);
+  const rule = { afterMs: 24 * HOUR, max: 1 };
+  const plan = planIngests(["old1", "old2", "recent", "n1"], new Set(), ledger, NOW, 20, rule);
+  equal(plan.toIngest, ["n1", "old1"]);
+  equal(plan.revisits, 1);
+  equal(plan.settled, 2);
+  equal(planIngests(["old1"], new Set(), ledger, NOW, 20).toIngest, []);
+});
+
+Deno.test("an unresolved Craigslist blip is ledgered skipped with its observation id, and is not retried", () => {
+  const w = ledgerWriteFor({ url: "u", feedId: "f", ingest: { status: "unresolved", reason: "insufficient identity", blip: { observation: "written", observation_id: "obs-1" } }, batch: { rows: new Map(), error: null }, now: NOW })!;
+  equal(w.status, "skipped");
+  equal((w.row.raw_data as any).blip_observation_id, "obs-1");
+});
+
+Deno.test("revisits take at most a quarter of an invocation's ingests, spent across feed pages", () => {
+  const b = createIntakeBudget(intakeThrottle({ max_ingests: 40 }), Date.now());
+  equal(b.revisitAllowance(), 10);
+  b.spendRevisits(4);
+  equal(b.revisitAllowance(), 6);
+  b.spendRevisits(50);
+  equal(b.revisitAllowance(), 0);
+});
+
+Deno.test("a Firecrawl allowance deferral is not a failure: no ledger row, no attempt, and the source stops for this run", () => {
+  equal(failureCategoryFor("extract-ksl HTTP 500: allowance_deferred: firecrawl allowance exhausted for today"), "deferred");
+  // KSL's extractor failing falls through to ingest's identity check; the extractor's error rides on enrichment_error.
+  const ingest: IngestOutcome = { status: "rejected", reason: "insufficient identity: year=? make=? model=? — need all three",
+    enrichment_error: "extract-ksl HTTP 500: allowance_deferred: firecrawl allowance exhausted for today" };
+  equal(ledgerWriteFor({ url: "u", feedId: "f", ingest, batch: { rows: new Map(), error: null }, prev: { status: "failed", attempts: 1 }, now: NOW }), null);
+  const budget = createIntakeBudget(intakeThrottle({ max_ingests: 20 }), 0, () => 0);
+  budget.record("ksl", 1000, ingest);
+  equal(budget.refusal("ksl"), "deferred");
+  // an ordinary identity failure is still ledgered as before
+  const plain: IngestOutcome = { status: "rejected", reason: "insufficient identity: year=? make=? model=? — need all three" };
+  equal(ledgerWriteFor({ url: "u", feedId: "f", ingest: plain, batch: { rows: new Map(), error: null }, now: NOW })?.row.failure_category, "identity_insufficient");
 });
