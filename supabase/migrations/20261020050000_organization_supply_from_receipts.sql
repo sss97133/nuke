@@ -296,8 +296,9 @@ COMMENT ON FUNCTION public.requirement_plan_b_suppliers(text, integer) IS
   'Open helper for matching readers: organizations whose recorded supply kinds match a requirement''s text (reviewed keywords), labelled paid for this before on Nuke (n times).';
 
 CREATE FUNCTION public.supply_counterparty_gaps() RETURNS jsonb
-LANGUAGE sql STABLE SECURITY DEFINER SET search_path = pg_catalog, public AS $$
-  WITH r AS (SELECT r.id, public.supply_vendor_key(r.vendor_name) k FROM public.receipts r
+LANGUAGE plpgsql STABLE SECURITY DEFINER SET search_path = pg_catalog, public AS $$
+BEGIN
+  RETURN (WITH r AS (SELECT r.id, public.supply_vendor_key(r.vendor_name) k FROM public.receipts r
     WHERE r.is_superseded IS NOT TRUE AND r.is_active IS NOT FALSE),
   resolved AS (SELECT DISTINCT basis_id FROM public.organization_supply_evidence WHERE basis_table = 'receipts')
   SELECT jsonb_build_object(
@@ -311,8 +312,8 @@ LANGUAGE sql STABLE SECURITY DEFINER SET search_path = pg_catalog, public AS $$
       AND NOT EXISTS (SELECT 1 FROM public.supply_vendor_aliases a WHERE a.alias_key = r.k)),
     'unmapped_receipts', (SELECT count(*) FROM r WHERE r.k IS NOT NULL
       AND NOT EXISTS (SELECT 1 FROM public.supply_vendor_aliases a WHERE a.alias_key = r.k)),
-    'basis', 'unmapped keys include personal purchases (groceries, fuel, utilities, banks, insurance, restaurants) and OCR noise; never auto-created')
-$$;
+    'basis', 'unmapped keys include personal purchases (groceries, fuel, utilities, banks, insurance, restaurants) and OCR noise; never auto-created'));
+END $$;
 REVOKE ALL ON FUNCTION public.supply_counterparty_gaps() FROM PUBLIC, anon, authenticated;
 GRANT EXECUTE ON FUNCTION public.supply_counterparty_gaps() TO service_role;
 
