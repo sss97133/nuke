@@ -1,8 +1,9 @@
-// ContactFixtures.swift — Contact via Nuke JSON for tests. Test-only; never in the app bundle.
+// ContactFixtures.swift — Contact via Nuke JSON for tests. DEBUG-only (unit tests and the UI-test fixture backend); never compiled into Release.
 // Keys mirror pg_get_functiondef (my_contact_requests, contact_request_item, contact_thread_read,
 // request_contact and the readers' contact blocks) on 2026-10-19; values synthetic. Nothing here
 // is ever sent to production.
 
+#if DEBUG
 enum ContactFixtures {
     static let profileId = "00000000-0000-4000-8000-0000000000c1"
 
@@ -76,3 +77,4 @@ enum ContactFixtures {
      "recipient":{"kind":"user","profile_id":"\(profileId)","handle":"fixture_tech"},"delivery":"in_app"}
     """
 }
+#endif

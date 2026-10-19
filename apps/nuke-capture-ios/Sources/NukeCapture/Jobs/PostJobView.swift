@@ -99,7 +99,9 @@ struct PostJobView: View {
                 HStack { Spacer(); if busy { ProgressView() } else { Text("Post the job").bold() }; Spacer() }
             }
             .disabled(busy || description.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
-            .confirmationDialog("Post this job?", isPresented: $confirming, titleVisibility: .visible) {
+            .accessibilityIdentifier("postjob.post")
+            .alert("Post this job?", isPresented: $confirming) {
+                Button("Cancel", role: .cancel) {}
                 Button("Post the job") { Task { await post() } }
             } message: {
                 Text(visibility == .open ? "Technicians near you will be able to see it." : "It won't be listed.")
@@ -200,6 +202,11 @@ struct PostedJobSections: View {
                 JobView(workOrderId: posted.workOrderId, titleHint: posted.operations.first?.text, vehicleHint: vehicleTitle)
             } label: {
                 Label("Open the job", systemImage: "wrench.and.screwdriver").bold()
+            }
+            NavigationLink {
+                ProviderMatchesView(workOrderId: posted.workOrderId)
+            } label: {
+                Label("Choose who does it", systemImage: "person.2.wave.2")
             }
         } footer: {
             Text("No one is booked and no one has been notified. Technicians offer; you decide.")

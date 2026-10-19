@@ -53,6 +53,7 @@ struct SignStepSheet<Details: View>: View {
                             HStack { Spacer(); if busy { ProgressView() } else { Text(confirmTitle).bold() }; Spacer() }
                         }
                         .disabled(busy || !confirmEnabled)
+                        .accessibilityIdentifier("sign.confirm")
                     }
                     if let failure { Text(failure).font(.footnote).foregroundStyle(.secondary) }
                 }

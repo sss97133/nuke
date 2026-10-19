@@ -1,6 +1,7 @@
 // ProviderFixtures.swift — provider_profile_read / provider_job_record_read JSON for tests.
-// Test-only; never in the app bundle. Keys mirror pg_get_functiondef on 2026-10-19; values synthetic.
+// DEBUG-only (unit tests and the UI-test fixture backend); never compiled into Release. Keys mirror pg_get_functiondef on 2026-10-19; values synthetic.
 
+#if DEBUG
 enum ProviderFixtures {
     static let userId = "00000000-0000-4000-8000-0000000000c1"
 
@@ -93,3 +94,4 @@ enum ProviderFixtures {
      "money":"not_reported"}
     """
 }
+#endif

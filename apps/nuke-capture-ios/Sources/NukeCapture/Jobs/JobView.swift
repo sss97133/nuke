@@ -26,11 +26,12 @@ struct JobView: View {
     @State private var facility: JobLoad<JobFacility> = .loading
     @State private var operations: JobLoad<WorkOrderOperations> = .loading
     @State private var attachments: JobLoad<WorkOrderEvidence> = .loading
+    @State private var place: JobLoad<JobProviderPlace> = .loading
 
     var body: some View {
         JobPathContent(workOrderId: workOrderId, path: path, resources: resources, quotes: quotes, offers: offers,
                        inspections: inspections, invoices: invoices, evidence: evidence,
-                       facility: facility, operations: operations, attachments: attachments,
+                       facility: facility, operations: operations, attachments: attachments, place: place,
                        titleHint: titleHint, vehicleHint: vehicleHint,
                        onChanged: { Task { await load() } })
             .task(id: workOrderId) { await load() }
@@ -45,12 +46,14 @@ struct JobView: View {
         async let i = PlanReaders.inspections(workOrderId: workOrderId)
         async let v = CloseoutReaders.invoices(workOrderId: workOrderId)
         async let a = JobEvidenceReaders.evidence(workOrderId: workOrderId)
+        async let w = ProviderPlaceReaders.read(workOrderId: workOrderId)
         async let e = SupabaseService.currentUserId == nil ? JobLoad<EvidenceCandidates>.loading
             : await CloseoutReaders.evidenceCandidates(workOrderId: workOrderId)
         let loaded = await (p, r, q, o, i)
         invoices = await v
         evidence = await e
         attachments = await a
+        place = await w
         path = loaded.0
         resources = loaded.1
         quotes = loaded.2
@@ -86,6 +89,7 @@ struct JobPathContent: View {
     var facility: JobLoad<JobFacility>? = nil
     var operations: JobLoad<WorkOrderOperations>? = nil
     var attachments: JobLoad<WorkOrderEvidence>? = nil
+    var place: JobLoad<JobProviderPlace>? = nil
     var titleHint: String? = nil
     var vehicleHint: String? = nil
     var onChanged: (() -> Void)? = nil
@@ -93,6 +97,7 @@ struct JobPathContent: View {
     @State private var accepting: QuoteBox?
     @State private var changing: ChangeBox?
     @State private var issuing: IssueBox?
+    @State private var jobSheet: JobSheet?
     @State private var starting: JobAction?
     @State private var paying = false
     @State private var payFailure: String?
@@ -114,6 +119,7 @@ struct JobPathContent: View {
                     debugId
                 }
             case .loaded(let p):
+                if let place { JobProviderPlaceSection(read: place).id("job-provider-place") }
                 header(p)
                 railSection(p)
                 if let start = p.viewer?.actions.first(where: { $0.kind == "start_work" }) {
@@ -121,9 +127,6 @@ struct JobPathContent: View {
                         Button { starting = start } label: { Label("Start work", systemImage: "play.circle") }
                     } header: {
                         Text("Your next step")
-                            .sheet(item: $starting) { a in
-                                StartWorkSheet(action: a, workOrderId: workOrderId, jobTitle: navigationTitle) { onChanged?() }
-                            }
                     } footer: {
                         Text("You were accepted for this job. Starting records the time, under exactly what was accepted.")
                     }
@@ -131,6 +134,7 @@ struct JobPathContent: View {
                 if let operations { JobOperationsSection(read: operations, plan: p.stages[.plan]).id("job-operations") }
                 quoteSection.id("job-quote")
                 if let offers { JobOffersSection(offers: offers, onChanged: onChanged).id("job-offers") }
+                if let offers { ProviderMatchesEntry(workOrderId: workOrderId, offers: offers, onChanged: onChanged) }
                 if let facility {
                     JobFacilitySection(workOrderId: workOrderId, facility: facility, onChanged: onChanged)
                         .id("job-facility")
@@ -171,6 +175,14 @@ struct JobPathContent: View {
         .sheet(item: $accepting) { box in
             AcceptQuoteSheet(quote: box.quote, action: box.action) { onChanged?() }
         }
+        .sheet(item: $starting) { a in
+            StartWorkSheet(action: a, workOrderId: workOrderId, jobTitle: navigationTitle) { onChanged?() }
+        }
+        .sheet(item: $issuing) { box in
+            IssueQuoteSheet(action: box.action, current: box.quote) { onChanged?() }
+        }
+        .sheet(item: $jobSheet) { $0.content }
+        .environment(\.presentJobSheet) { jobSheet = JobSheet(content: $0) }
         .sheet(item: $changing) { box in
             IssueChangeOrderSheet(action: box.action, quote: box.quote) { onChanged?() }
         }
@@ -451,9 +463,6 @@ struct JobPathContent: View {
             }
         } header: {
             Text("Quote")
-                .sheet(item: $issuing) { box in
-                    IssueQuoteSheet(action: box.action, current: box.quote) { onChanged?() }
-                }
         } footer: {
             Text("Prices are open to everyone. \(JobCopy.withheldPayments).")
         }

@@ -1,8 +1,9 @@
-// CosignFixtures.swift — co-signed offers, change orders and vouches for tests. Test-only.
+// CosignFixtures.swift — co-signed offers, change orders and vouches for tests. DEBUG-only (unit tests and the UI-test fixture backend); never compiled into Release.
 // Keys mirror pg_get_functiondef (work_order_offers_read, work_order_offer_cosigns, accept_offer,
 // cosign_provider, work_order_quotes_read, work_order_quote_for_viewer, work_order_change_order_apply,
 // provider_vouched_for_by) on 2026-10-19; values synthetic. No writer is ever called with these.
 
+#if DEBUG
 enum CosignFixtures {
     static let offerId = "00000000-0000-4000-8000-0000000000e9"
     static let offerHash = String(repeating: "cd", count: 32)
@@ -87,3 +88,4 @@ enum CosignFixtures {
      "facilities":[],"work_record":{},"contact":{"action":"contact_via_nuke","available":false}}
     """
 }
+#endif

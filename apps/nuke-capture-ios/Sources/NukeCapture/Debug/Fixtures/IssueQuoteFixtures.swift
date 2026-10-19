@@ -3,6 +3,7 @@
 // project_work_order_quote_event line rules, work_order_quote_scope_snapshot, read_work_order_resources)
 // on 2026-10-19; values synthetic. No writer is ever called with these.
 
+#if DEBUG
 enum IssueQuoteFixtures {
     static let workOrderId = JobFixtures.workOrderId
     static let quoteHash = "3f9a1c0e" + String(repeating: "ab", count: 28)
@@ -72,3 +73,4 @@ extension IssueQuoteFixtures {
     /// The same current quote issued by someone else: the viewer's version replaces it, but it isn't "theirs" to revise.
     static let withOthersQuote = withQuote.replacingOccurrences(of: #""issued_by_viewer":true"#, with: #""issued_by_viewer":false"#)
 }
+#endif

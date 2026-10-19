@@ -152,17 +152,36 @@ targets:
         TEST_HOST: $(BUILT_PRODUCTS_DIR)/NukeCapture.app/NukeCapture
         BUNDLE_LOADER: $(TEST_HOST)
 
+  # UI tests for the job flows: drive the real screens against the in-process fixture backend
+  # (Sources/NukeCapture/Debug, DEBUG-only; launched with -NukeFixtureBackend 1), never production.
+  NukeCaptureUITests:
+    type: bundle.ui-testing
+    platform: iOS
+    deploymentTarget: "26.0"
+    sources:
+      - path: UITests
+    dependencies:
+      - target: NukeCapture-iOS
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: ag.nuke.capture.uitests
+        SWIFT_VERSION: "5.0"
+        CODE_SIGN_STYLE: Automatic
+        TEST_TARGET_NAME: NukeCapture-iOS
+
 schemes:
   NukeCapture-iOS:
     build:
       targets:
         NukeCapture-iOS: all
         NukeCaptureTests: [test]
+        NukeCaptureUITests: [test]
     run:
       config: Debug
     test:
       config: Debug
       targets:
         - NukeCaptureTests
+        - NukeCaptureUITests
     archive:
       config: Release

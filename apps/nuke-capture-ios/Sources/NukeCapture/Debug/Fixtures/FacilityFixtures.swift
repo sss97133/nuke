@@ -1,8 +1,9 @@
-// FacilityFixtures.swift — shop space, bookings and the facility input for tests. Test-only.
+// FacilityFixtures.swift — shop space, bookings and the facility input for tests. DEBUG-only (unit tests and the UI-test fixture backend); never compiled into Release.
 // Keys mirror pg_get_functiondef (facility_read, reserve_facility, confirm_facility_reservation,
 // signature_queue_facility_items, open_requirement_facility_input) on 2026-10-19; values synthetic.
 // No writer is ever called with these.
 
+#if DEBUG
 enum FacilityFixtures {
     static let orgId = "00000000-0000-4000-8000-0000000000f1"
     static let workOrderId = "00000000-0000-4000-8000-000000000001"
@@ -83,3 +84,4 @@ enum FacilityFixtures {
      "duplicate":false,"payment_authorized":false}
     """
 }
+#endif

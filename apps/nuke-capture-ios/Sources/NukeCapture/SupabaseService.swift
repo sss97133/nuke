@@ -64,25 +64,36 @@ struct PhotoMeta {
 enum SupabaseService {
     /// Anon-key client: all writes ride the signed-in user's JWT, RLS scopes
     /// storage objects and rows to that user. Never the service-role key.
-    static let client = SupabaseClient(
-        supabaseURL: Config.supabaseURL,
-        supabaseKey: Config.supabaseAnonKey,
-        // Opt into the SDK's corrected initial-session behavior (supabase-swift
-        // PR #822): always emit the locally stored session on startup, even if
-        // expired (the SDK refreshes on first authenticated call). Silences the
-        // runtime reportIssue warning. SessionStore already tolerates an expired
-        // session, so no isExpired gating is needed here.
-        options: SupabaseClientOptions(
-            auth: SupabaseClientOptions.AuthOptions(emitLocalSessionAsInitialSession: true)
+    static let client: SupabaseClient = {
+        #if DEBUG
+        // UI tests: an in-process fixture backend on a fake host; nothing reaches production.
+        if FixtureBackend.isActive {
+            return SupabaseClient(supabaseURL: FixtureBackend.baseURL, supabaseKey: "fixture-anon-key", options: FixtureBackend.clientOptions)
+        }
+        #endif
+        return SupabaseClient(
+            supabaseURL: Config.supabaseURL,
+            supabaseKey: Config.supabaseAnonKey,
+            // Opt into the SDK's corrected initial-session behavior (supabase-swift
+            // PR #822): always emit the locally stored session on startup, even if
+            // expired (the SDK refreshes on first authenticated call). Silences the
+            // runtime reportIssue warning. SessionStore already tolerates an expired
+            // session, so no isExpired gating is needed here.
+            options: SupabaseClientOptions(
+                auth: SupabaseClientOptions.AuthOptions(emitLocalSessionAsInitialSession: true)
+            )
         )
-    )
+    }()
 
     // ─── Auth ────────────────────────────────────────────────────────────────
 
     /// Signed-in user id, if a Keychain session exists (possibly expired —
     /// the SDK refreshes on first authenticated call).
     static var currentUserId: String? {
-        client.auth.currentUser?.id.uuidString.lowercased()
+        #if DEBUG
+        if FixtureBackend.isActive { return FixtureBackend.userId }
+        #endif
+        return client.auth.currentUser?.id.uuidString.lowercased()
     }
 
     static var currentUserEmail: String? {

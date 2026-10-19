@@ -5,6 +5,8 @@
 // held no evidence attachment that day, so `evidenceForVisitor` follows the reader's
 // pg_get_functiondef with synthetic values.
 
+@testable import NukeCapture
+
 extension JobFixtures {
     static let historyOp1 = "00000000-0000-4000-8000-0000000000c1"
     static let historyOp2 = "00000000-0000-4000-8000-0000000000c2"

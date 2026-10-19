@@ -33,11 +33,11 @@ struct JobCompletionSection: View {
             }
         } header: {
             Text("Completion")
-                .sheet(isPresented: $marking) { MarkDoneSheet(workOrderId: workOrderId, state: state) { onChanged?() } }
-                .sheet(isPresented: $confirming) { ConfirmDoneSheet(workOrderId: workOrderId, state: state) { onChanged?() } }
         } footer: {
             Text("Done means the technician signed it and the customer confirmed it. No payment follows from either.")
         }
+        .jobSheet(isPresented: $marking) { MarkDoneSheet(workOrderId: workOrderId, state: state) { onChanged?() } }
+        .jobSheet(isPresented: $confirming) { ConfirmDoneSheet(workOrderId: workOrderId, state: state) { onChanged?() } }
     }
 }
 
@@ -62,16 +62,16 @@ struct JobInvoiceSection: View {
             }
         } header: {
             Text("Invoice")
-                .sheet(isPresented: $issuing) {
-                    IssueInvoiceSheet(workOrderId: workOrderId, acceptedQuote: acceptedQuote) { onChanged?() }
-                }
-                .sheet(isPresented: $paying) {
-                    if case .loaded(let r) = read, let a = r.paymentAction, let inv = r.current {
-                        RecordPaymentSheet(action: a, invoice: inv) { onChanged?() }
-                    }
-                }
         } footer: {
             Text("Prices are open to everyone. \(CloseoutCopy.moneyNote)")
+        }
+        .jobSheet(isPresented: $issuing) {
+            IssueInvoiceSheet(workOrderId: workOrderId, acceptedQuote: acceptedQuote) { onChanged?() }
+        }
+        .jobSheet(isPresented: $paying) {
+            if case .loaded(let r) = read, let a = r.paymentAction, let inv = r.current {
+                RecordPaymentSheet(action: a, invoice: inv) { onChanged?() }
+            }
         }
     }
 
@@ -149,12 +149,12 @@ struct JobEvidencePrompt: View {
                 Button { attaching = true } label: { Label("File them to this job", systemImage: "tray.and.arrow.down") }
             } header: {
                 Text("Evidence to file")
-                    .sheet(isPresented: $attaching) {
-                        AttachEvidenceSheet(workOrderId: workOrderId, jobTitle: jobTitle,
-                                            imageIds: c.items(for: workOrderId).map(\.image_id), candidates: c) { onChanged?() }
-                    }
             } footer: {
                 if c.notAttachable > 0 { Text("Personal or sensitive photos are never offered here.") }
+            }
+            .jobSheet(isPresented: $attaching) {
+                AttachEvidenceSheet(workOrderId: workOrderId, jobTitle: jobTitle,
+                                    imageIds: c.items(for: workOrderId).map(\.image_id), candidates: c) { onChanged?() }
             }
         }
     }

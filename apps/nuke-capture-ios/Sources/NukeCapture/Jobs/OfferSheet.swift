@@ -95,6 +95,7 @@ struct OfferSheet: View {
                             HStack { Spacer(); if busy { ProgressView() } else { Text("Send offer").bold() }; Spacer() }
                         }
                         .disabled(busy)
+                        .accessibilityIdentifier("sign.confirm")
                     }
                     if let failure { Text(failure).font(.footnote).foregroundStyle(.secondary) }
                 }
@@ -191,6 +192,7 @@ struct AcceptOfferSheet: View {
                             HStack { Spacer(); if busy { ProgressView() } else { Text("Accept offer").bold() }; Spacer() }
                         }
                         .disabled(busy)
+                        .accessibilityIdentifier("sign.confirm")
                     }
                     if let failure { Text(failure).font(.footnote).foregroundStyle(.secondary) }
                 }
