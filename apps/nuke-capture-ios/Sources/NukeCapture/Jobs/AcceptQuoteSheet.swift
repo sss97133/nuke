@@ -92,6 +92,7 @@ struct AcceptQuoteSheet: View {
                             }
                         }
                         .disabled(busy)
+                        .accessibilityIdentifier("sign.confirm")
                     }
                     if let failure {
                         Text(failure).font(.footnote).foregroundStyle(.secondary)

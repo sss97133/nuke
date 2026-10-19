@@ -144,12 +144,12 @@ struct JobEvidenceSection: View {
             }
         } header: {
             Text("Evidence")
-                .sheet(item: $viewing) { image in EvidencePhotoView(image: image) }
         } footer: {
             if case .loaded(let e) = read {
                 Text("\(JobEvidenceCopy.coverage(e)). Photos show what a party filed; they don't confirm the work.")
             }
         }
+        .jobSheet(item: $viewing) { image in EvidencePhotoView(image: image) }
     }
 
     @ViewBuilder private func attachment(_ a: WorkOrderEvidence.Attachment, party: Bool) -> some View {

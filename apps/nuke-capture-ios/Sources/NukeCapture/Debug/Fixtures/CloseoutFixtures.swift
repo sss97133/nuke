@@ -1,7 +1,8 @@
 // CloseoutFixtures.swift — completion, invoice, evidence and the widened signature queue, for tests.
-// Test-only; never in the app bundle. Keys mirror pg_get_functiondef / the B8 backend receipt and
+// DEBUG-only (unit tests and the UI-test fixture backend); never compiled into Release. Keys mirror pg_get_functiondef / the B8 backend receipt and
 // live anon output on 2026-10-19; values synthetic. No writer is ever called with these.
 
+#if DEBUG
 enum CloseoutFixtures {
     static let workOrderId = "00000000-0000-4000-8000-000000000001"
     static let completionId = "00000000-0000-4000-8000-0000000000c7"
@@ -121,3 +122,4 @@ enum CloseoutFixtures {
      "coverage":{"returned":5,"total":5,"kinds":["completion_to_accept","invoice_payment_to_confirm","contact_request","work_session"],"kinds_not_yet_available":[]}}
     """
 }
+#endif

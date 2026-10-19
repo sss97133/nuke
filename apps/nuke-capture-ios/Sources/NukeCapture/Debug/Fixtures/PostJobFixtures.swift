@@ -1,8 +1,9 @@
-// PostJobFixtures.swift — posting a job and starting work, for tests. Test-only.
+// PostJobFixtures.swift — posting a job and starting work, for tests. DEBUG-only (unit tests and the UI-test fixture backend); never compiled into Release.
 // Keys mirror pg_get_functiondef (post_work_request, start_work, work_order_start_terms,
 // work_order_execution_start_overlay, work_order_job_actions) on 2026-10-19; values synthetic.
 // No writer is ever called with these.
 
+#if DEBUG
 enum PostJobFixtures {
     static let vehicleId = JobFixtures.vehicleId
     static let workOrderId = "00000000-0000-4000-8000-0000000000c1"
@@ -61,3 +62,4 @@ enum PostJobFixtures {
         .replacingOccurrences(of: #""execution":{"state":"recorded","start_clock":"2026-10-05T15:00:00+00:00","#,
                               with: #""execution":{"state":"recorded","state_basis":"provider_start_sign","start_sign":{"start_id":"s1","started_at":"2026-10-21T16:00:00+00:00","signer_role":"technician","terms_basis":"accepted_offer","terms_current":true,"start_signs":1,"basis":"start_work Sign by a current accepted provider"},"start_clock":null,"#)
 }
+#endif

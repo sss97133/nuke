@@ -362,11 +362,16 @@ ALTER TABLE public.observation_sources ADD COLUMN IF NOT EXISTS display_name tex
 \ir helpers/capability_keys_live_20261020.sql
 \echo REPLAY 20261020060000_requirement_capability_keys.sql
 \ir ../migrations/20261020060000_requirement_capability_keys.sql
+\echo REPLAY 20261020071500_work_order_provider_place_read.sql
+\ir ../migrations/20261020071500_work_order_provider_place_read.sql
 \ir helpers/catalog_tables_live_20261020.sql
 \echo REPLAY 20261020074500_work_order_part_product_matches.sql
 \ir ../migrations/20261020074500_work_order_part_product_matches.sql
 \echo REPLAY 20261020081000_publish_work_order.sql
 \ir ../migrations/20261020081000_publish_work_order.sql
+\ir helpers/part_product_tables_live_20261020.sql
+\echo REPLAY 20261020084500_work_order_part_product_read.sql
+\ir ../migrations/20261020084500_work_order_part_product_read.sql
 \echo REPLAY 20261020100000_job_loop_read_speedups.sql
 \ir ../migrations/20261020100000_job_loop_read_speedups.sql
 -- Plan check and final state.
