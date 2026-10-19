@@ -325,6 +325,11 @@ struct AccountView: View {
                     } label: {
                         Label("Technician profile", systemImage: "wrench.and.screwdriver")
                     }
+                    NavigationLink {
+                        MyVouchesView()
+                    } label: {
+                        Label("Vouches you've given", systemImage: "hand.thumbsup")
+                    }
                 }
 
                 // Contributor mode — the crew safety gate. ON when this device

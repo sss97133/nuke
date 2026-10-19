@@ -18,7 +18,7 @@ enum JobRung {
         case .recorded: return .attributed
         case .partial: return .pending
         case .statusOnly: return .recorded
-        case .absent: return nil
+        case .absent, .withheld: return nil
         case .unknown: return .recorded
         }
     }
@@ -75,6 +75,7 @@ struct JobStageRail: View {
 
     static func symbol(_ dot: Dot) -> String {
         guard let state = dot.state else { return "circle.dotted" }
+        if state == .withheld { return "lock.circle" }
         switch JobRung.status(state, hasInconsistency: dot.conflicting) {
         case .attributed?: return "circle.fill"
         case .pending?: return "circle.lefthalf.filled"
@@ -110,6 +111,7 @@ struct JobStageRailLegend: View {
             row("circle.fill", Color(.tertiaryLabel), "Marked, but no record behind it")
             row("circle", Color(.tertiaryLabel), "Not started")
             row("exclamationmark.circle.fill", .orange, "Records disagree")
+            row("lock.circle", Color(.tertiaryLabel), "People on this job only")
             row("circle.dotted", Color(.tertiaryLabel), "Not available")
         }
         .font(.caption2)

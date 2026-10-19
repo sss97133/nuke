@@ -226,8 +226,12 @@ Standing rules the code carries:
 - **No fabricated data anywhere,** including DEBUG builds and screenshots (`docs/design/CONSTRAINTS.md` C0).
   DEBUG-only deep links (`NUKE_DEBUG_*`, `NukeCaptureApp.swift`) drive the screenshot loop and are compiled
   out of Release: `NUKE_DEBUG_VEHICLE_ID=<uuid>` roots on a profile as anon, `NUKE_DEBUG_SCREEN=app|
-  profile|explore|today|work|library`, `NUKE_DEBUG_JOB_ID=<uuid>` roots on that work order's `JobView` (readable signed out when the reader
-  allows it; `NUKE_DEBUG_CODES=1` shows raw reader codes under the plain copy), `NUKE_DEBUG_SCROLL_TO=worth|proof|asset|specs|events|photos|more`,
+  profile|explore|today|work|library`, `NUKE_DEBUG_JOB_ID=<uuid>` roots on that work order's `JobView` (with `NUKE_DEBUG_SCROLL_TO=job-completion|job-invoice`) (readable signed out when the reader
+  allows it; `NUKE_DEBUG_CODES=1` shows raw reader codes under the plain copy),
+  `NUKE_DEBUG_VEHICLE_WORK=<uuid>` hosts a vehicle's Work card alone, `NUKE_DEBUG_STATEMENT_VEHICLE=<uuid>` its statement,
+  `NUKE_DEBUG_PROVIDER=<user uuid>` hosts a profile's provider face alone (no photos),
+  `NUKE_DEBUG_JOBS_LOOKING=1` hosts Work's "Jobs looking for someone" alone,
+  `NUKE_DEBUG_WORK_PLAN=<vehicle uuid>` hosts "Plan the work" for a listed vehicle (scroll anchors plan-work, plan-checklist), `NUKE_DEBUG_SCROLL_TO=worth|proof|asset|specs|events|photos|more`,
   `NUKE_DEBUG_EXPLORE_MODE=pulse|live|listings|map`, `NUKE_DEBUG_EXPLORE_QUERY=<text>` lands on the search
   results and `NUKE_DEBUG_EXPLORE_PAGES=<n>` walks n more pages through the door, `NUKE_DEBUG_LIVE_READING=1` opens
   the first hot or cold lot's reading on the board, `NUKE_DEBUG_LEDGER_MAKE=Chevrolet` opens that brand's models on the
@@ -365,6 +369,15 @@ Sources/NukeCapture/
   Work/WorkConsoleView.swift       the Work tab: signature queue, jobs in motion, Capture
   Work/WorkSessionSignSheet.swift  confirm one work day (confirm_work_session), explicit button
   Account/ProviderLinkView.swift   technician-profile link: my_identity_read claims + self-claim filing
+  Jobs/JobQuotes.swift             quote, people and statement DTOs (open prices; payments to parties)
+  Jobs/AcceptQuoteSheet.swift      the customer's Sign on one quote version (accept_work_order_quote)
+  Vehicle/                         Work card (vehicle_work_orders_read) and statement view
+  Profile/                         provider face (provider_profile_read) and jobs on record
+  Contact/                         Contact via Nuke: request sheet, Work inbox, thread (in-app only)
+  Explore/                         Plan the work (listing_work_plan_read) and the Order inspection Sign
+  Jobs/JobCloseout*.swift + CloseoutSheets.swift  completion, invoice, payment witness, evidence Signs
+  Library/JobAttachBar.swift       select mode → Attach to job (job_evidence_candidates_read + attach_job_evidence)
+  Jobs/JobOffers.swift + Work/JobsLookingSection.swift  open requests, match table, offers (offer/accept Signs)
   Jobs/                            JobView over work_order_job_path_read; DTOs, readers, stage rail
   SyncEngine.swift                 PhotoKit watch + watermark + dedupe + GPS gate
   SupabaseService.swift            auth, storage upload, vehicle_images insert
