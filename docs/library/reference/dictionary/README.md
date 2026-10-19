@@ -284,6 +284,8 @@ can supersede it without editing the original or guessing from model/year.
 
 ## R
 
+**Resource image sighting** — One retained tool/component array member in a canonical image observation, identified by source observation and JSON pointer. Several sightings may describe the same physical object; an equipment association is separately qualified. Presence, use, ownership, purchase cost, market value and contribution to labor are different claims. See [Work Order Intelligence](../../technical/work-order-intelligence.md).
+
 **Resource performer candidate** — A canonical `actors` reference proposed for a skill or inspection requirement. The contracting supplier can be unknown; an actor label does not establish account identity, qualification, consent or completion. A retained-operation basis includes an exact row snapshot and is withheld from current reads after that operation changes. See [Work Order Intelligence](../../technical/work-order-intelligence.md).
 
 **Resource requirement basis** — The original retained work-record observation and exact excerpt supporting an interpreted need for a work-order operation. The interpretation keeps the original observation clock and its own extraction method and confidence. A quoted need does not establish quantity, provider competence, permission or reservation. Withdrawing or reattributing the basis excludes its dependent current resource graph; original records remain. See [Work Order Intelligence](../../technical/work-order-intelligence.md).

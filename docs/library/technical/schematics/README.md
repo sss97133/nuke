@@ -61,6 +61,13 @@ Other arrangements survive independently. Actor identity is not an authenticated
 skill certification, accepted assignment or permission grant.
 Payload and limitations: [Work Order Intelligence](../work-order-intelligence.md).
 
+Work order → vehicle → current canonical deep-image observation → approved same-vehicle
+private image → each tool/component occurrence (source observation + JSON pointer).
+The service-only `read_work_order_image_objects` exposes these repeated sightings and
+joins existing image/equipment evidence to its asset endpoint. Legacy usage and purchase
+claims stay qualified; computed depreciation value is separate from market value,
+allocated job cost and labor value. No new observation, physical identity or usage is minted.
+
 These schematics describe the system as it exists in code, not as an aspirational design. Where the current implementation diverges from the encyclopedia specification, both states are documented and the gap is called out.
 
 ASCII diagrams use the following conventions:
