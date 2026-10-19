@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { parseAction, type JobAction } from './jobRead';
+import { parseAction, type JobAction, type JsonObject } from './jobRead';
 import {
   attestArgs, baseLines, changeOrderArgs, completionActions, confirmBookingArgs, cosignArgs, facilityAssets, invoiceArgs, invoiceLinesFromQuote,
   payInvoiceTarget, paymentArgs, paymentSide, quoteArgs, quoteScope, refusal, releaseVocabulary, requestsLeft, reserveArgs, seedQuoteLines,
@@ -66,7 +66,7 @@ describe('issue / revise quote', () => {
 });
 
 describe('change order', () => {
-  const quote = { quote_id: 'q-1', lines: [{ ref_kind: 'labor', ref_id: 'l1', description: 'Install', pricing_basis: 'hourly', amount: 130, currency: 'USD', quantity: 3 },
+  const quote: JsonObject = { quote_id: 'q-1', lines: [{ ref_kind: 'labor', ref_id: 'l1', description: 'Install', pricing_basis: 'hourly', amount: 130, currency: 'USD', quantity: 3 },
     { ref_kind: 'fee', description: 'Shop supplies', pricing_basis: 'flat', amount: 40, currency: 'USD' }],
     scope_snapshot: { specifications: [{ id: 's1', material_key: 'stainless_steel.304', process_key: 'welding.tig' }] } };
   const act = a({ action: 'issue_change_order', rpc: 'issue_change_order', args: { p_work_order_id: WO, p_base_quote_id: 'q-1' } });
