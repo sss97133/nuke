@@ -77,6 +77,9 @@ const ClaimExternalIdentity = React.lazy(() => import('../pages/ClaimExternalIde
 const BaTMembers = React.lazy(() => import('../pages/BaTMembers'));
 const InvoiceManager = React.lazy(() => import('../pages/InvoiceManager'));
 const WorkOrderStatement = React.lazy(() => import('../pages/WorkOrderStatement'));
+// Job loop: open requests board (public) and the signed-in work console
+const JobsBoard = React.lazy(() => import('../pages/jobs/JobsBoard'));
+const WorkPage = React.lazy(() => import('../pages/jobs/WorkPage'));
 const ImportDataPage = React.lazy(() => import('../pages/ImportDataPage'));
 const PhotoSyncPage = React.lazy(() => import('../pages/PhotoSyncPage'));
 const DailyDebrief = React.lazy(() => import('../pages/DailyDebrief'));
@@ -114,6 +117,10 @@ const TransferPartyPage = React.lazy(() => import('../pages/TransferPartyPage'))
 
 // Build Coordinator dashboard (public, vehicle-scoped)
 const BuildDashboard = React.lazy(() => import('../pages/BuildDashboard'));
+
+// Jobs and providers — open job path readers; party money and personal fields withheld at the source
+const JobPage = React.lazy(() => import('../pages/jobs/JobPage'));
+const ProviderProfilePage = React.lazy(() => import('../pages/providers/ProviderProfilePage'));
 
 // Public projections — journal index + day page
 const JournalIndex = React.lazy(() => import('../pages/journal/JournalIndex'));
@@ -202,6 +209,10 @@ export const DomainRoutes = () => {
         <Route path="/profile/external/:externalIdentityId" element={<UserProfile />} />
         {/* Canonical handle-based user binding (frontend-doctrine §2a primary surface) */}
         <Route path="/u/:handle" element={<UserProfile />} />
+        {/* Jobs (work orders) and provider work records — public, read-first; Signs only where the server offers them */}
+        <Route path="/jobs/:workOrderId" element={<JobPage />} />
+        <Route path="/providers/actor/:actorId" element={<ProviderProfilePage />} />
+        <Route path="/providers/:handle" element={<ProviderProfilePage />} />
         {/* Investor offering / data room — semi-public fundraising page */}
         {/* Docs / developers landing */}
         <Route path="/developers" element={<DevelopersPage />} />
@@ -215,6 +226,8 @@ export const DomainRoutes = () => {
         <Route path="/t/:transferId" element={<TransferPartyPage />} />
         {/* Build Coordinator dashboard — public, vehicle-scoped */}
         <Route path="/builds/:vehicleId" element={<BuildDashboard />} />
+        {/* Open requests looking for a technician, inspector, tool or shop space */}
+        <Route path="/jobs" element={<JobsBoard />} />
         {/* Public projections — journal index + day page */}
         <Route path="/journal" element={<JournalIndex />} />
         <Route path="/journal/:date" element={<JournalPage />} />
@@ -279,6 +292,8 @@ export const DomainRoutes = () => {
           <Route path="/restoration" element={<RestorationIntake />} />
           <Route path="/intake/restoration" element={<RestorationIntake />} />
           <Route path="/work-orders/statement" element={<WorkOrderStatement />} />
+          {/* Work console: signature queue and the viewer's jobs */}
+          <Route path="/work" element={<WorkPage />} />
 
 
           {/* Settings (protected) */}

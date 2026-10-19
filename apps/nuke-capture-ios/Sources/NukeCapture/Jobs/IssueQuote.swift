@@ -53,6 +53,11 @@ struct WorkOrderOperations: Decodable, Equatable {
         let status: String?
         let description: String?
         let requestedByRole: String?
+        /// authenticated_sign | source_without_sign | not_established.
+        let requestedByBasis: String?
+        /// The work order field the words are quoted from (description, scope_description), or unsourced_row.
+        let descriptionBasis: String?
+        let specifications: Int
         let requirements: [Requirement]
         let quoteRef: Ref?
 
@@ -64,6 +69,9 @@ struct WorkOrderOperations: Decodable, Equatable {
             status = try? c.decode(String.self, forKey: JobCodingKey("status"))
             description = (try? c.decode(String.self, forKey: JobCodingKey("description"))).flatMap { $0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? nil : $0 }
             requestedByRole = try? c.decode(String.self, forKey: JobCodingKey("requested_by_role"))
+            requestedByBasis = try? c.decode(String.self, forKey: JobCodingKey("requested_by_basis"))
+            descriptionBasis = try? c.decode(String.self, forKey: JobCodingKey("description_basis"))
+            specifications = (try? c.decode([JobJSON].self, forKey: JobCodingKey("specifications")))?.count ?? 0
             requirements = (try? c.decode([Lossy<Requirement>].self, forKey: JobCodingKey("requirements")))?.compactMap(\.value) ?? []
             quoteRef = try? c.decode(Ref.self, forKey: JobCodingKey("quote_ref"))
         }
@@ -75,6 +83,7 @@ struct WorkOrderOperations: Decodable, Equatable {
         let unit_price: Double?
         let total_price: Double?
         let is_comped: Bool?
+        let status: String?
         let quote_ref: Ref?
     }
     struct Labor: Decodable, Equatable, Identifiable {
@@ -83,18 +92,23 @@ struct WorkOrderOperations: Decodable, Equatable {
         let hours: Double?
         let hourly_rate: Double?
         let is_comped: Bool?
+        let status: String?
         let quote_ref: Ref?
     }
 
     let operations: [Operation]
     let parts: [Part]
     let labor: [Labor]
+    var asOf: String? = nil
+    var party = false
 
     init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: JobCodingKey.self)
         operations = (try? c.decode([Lossy<Operation>].self, forKey: JobCodingKey("operations")))?.compactMap(\.value) ?? []
         parts = (try? c.decode([Lossy<Part>].self, forKey: JobCodingKey("parts")))?.compactMap(\.value) ?? []
         labor = (try? c.decode([Lossy<Labor>].self, forKey: JobCodingKey("labor")))?.compactMap(\.value) ?? []
+        asOf = try? c.decode(String.self, forKey: JobCodingKey("as_of"))
+        party = (try? c.decode([String: JobJSON].self, forKey: JobCodingKey("viewer")))?["party"] == .bool(true)
     }
 
     /// Every line choice with its server-given quote_ref; rows without one, or without words, are left out.
@@ -379,7 +393,7 @@ enum IssueQuoteCopy {
     }
 }
 
-// MARK: - The job's operations on the plan stage (open data)
+// MARK: - The job's operations in words (open data; the checklist is JobOperationsSection)
 
 enum OperationsCopy {
     static func requestedBy(_ role: String?) -> String? {
@@ -404,28 +418,5 @@ enum OperationsCopy {
         let needs = Array(Set(o.requirements.compactMap(\.requirement_kind))).sorted().map(OfferCopy.kind).map { $0.lowercased() }
         let parts = [requestedBy(o.requestedByRole), needs.isEmpty ? nil : "needs: " + needs.joined(separator: ", ")].compactMap { $0 }
         return parts.isEmpty ? nil : parts.joined(separator: " · ")
-    }
-}
-
-struct OperationsList: View {
-    let operations: WorkOrderOperations
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            Text("The work").font(.caption.weight(.semibold)).foregroundStyle(.secondary)
-            ForEach(operations.operations) { o in
-                VStack(alignment: .leading, spacing: 1) {
-                    Text(OperationsCopy.title(o)).font(.footnote)
-                    if let d = OperationsCopy.detail(o) { Text(d).font(.caption2).foregroundStyle(.secondary) }
-                }
-            }
-            if !operations.parts.isEmpty || !operations.labor.isEmpty {
-                Text([operations.parts.isEmpty ? nil : "\(operations.parts.count) part\(operations.parts.count == 1 ? "" : "s") on record",
-                      operations.labor.isEmpty ? nil : "\(operations.labor.count) labor line\(operations.labor.count == 1 ? "" : "s") on record"]
-                        .compactMap { $0 }.joined(separator: " · "))
-                    .font(.caption2).foregroundStyle(.tertiary)
-            }
-        }
-        .padding(.vertical, 2)
     }
 }

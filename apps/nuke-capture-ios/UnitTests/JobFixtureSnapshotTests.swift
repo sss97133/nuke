@@ -349,6 +349,15 @@ final class JobFixtureSnapshotTests: XCTestCase {
                      name: "fixture-plan-operations", pages: 5)
     }
 
+    func testRenderJobHistory() throws {
+        let path = try decode(JobPath.self, JobFixtures.historicalJobPath)
+        let ops = try decode(WorkOrderOperations.self, JobFixtures.operationsFromScopeText)
+        let evidence = try decode(WorkOrderEvidence.self, JobFixtures.evidenceForVisitor)
+        try snapshot(NavigationStack { JobPathContent(workOrderId: JobFixtures.workOrderId, path: .loaded(path), resources: .loading,
+                                                      operations: .loaded(ops), attachments: .loaded(evidence)) },
+                     name: "fixture-job-history", pages: 8)
+    }
+
     func testRenderWorkSessionSignSheet() throws {
         let item = try decode(SignatureQueue.self, JobFixtures.signatureQueue).items[0]
         try snapshot(WorkSessionSignSheet(item: item), name: "fixture-sign-work-day")

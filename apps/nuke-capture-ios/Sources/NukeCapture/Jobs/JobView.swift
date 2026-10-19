@@ -25,11 +25,12 @@ struct JobView: View {
     @State private var evidence: JobLoad<EvidenceCandidates> = .loading
     @State private var facility: JobLoad<JobFacility> = .loading
     @State private var operations: JobLoad<WorkOrderOperations> = .loading
+    @State private var attachments: JobLoad<WorkOrderEvidence> = .loading
 
     var body: some View {
         JobPathContent(workOrderId: workOrderId, path: path, resources: resources, quotes: quotes, offers: offers,
                        inspections: inspections, invoices: invoices, evidence: evidence,
-                       facility: facility, operations: operations,
+                       facility: facility, operations: operations, attachments: attachments,
                        titleHint: titleHint, vehicleHint: vehicleHint,
                        onChanged: { Task { await load() } })
             .task(id: workOrderId) { await load() }
@@ -43,11 +44,13 @@ struct JobView: View {
         async let o = OfferReaders.offers(workOrderId: workOrderId)
         async let i = PlanReaders.inspections(workOrderId: workOrderId)
         async let v = CloseoutReaders.invoices(workOrderId: workOrderId)
+        async let a = JobEvidenceReaders.evidence(workOrderId: workOrderId)
         async let e = SupabaseService.currentUserId == nil ? JobLoad<EvidenceCandidates>.loading
             : await CloseoutReaders.evidenceCandidates(workOrderId: workOrderId)
         let loaded = await (p, r, q, o, i)
         invoices = await v
         evidence = await e
+        attachments = await a
         path = loaded.0
         resources = loaded.1
         quotes = loaded.2
@@ -82,6 +85,7 @@ struct JobPathContent: View {
     var evidence: JobLoad<EvidenceCandidates>? = nil
     var facility: JobLoad<JobFacility>? = nil
     var operations: JobLoad<WorkOrderOperations>? = nil
+    var attachments: JobLoad<WorkOrderEvidence>? = nil
     var titleHint: String? = nil
     var vehicleHint: String? = nil
     var onChanged: (() -> Void)? = nil
@@ -124,6 +128,7 @@ struct JobPathContent: View {
                         Text("You were accepted for this job. Starting records the time, under exactly what was accepted.")
                     }
                 }
+                if let operations { JobOperationsSection(read: operations, plan: p.stages[.plan]).id("job-operations") }
                 quoteSection.id("job-quote")
                 if let offers { JobOffersSection(offers: offers, onChanged: onChanged).id("job-offers") }
                 if let facility {
@@ -143,6 +148,10 @@ struct JobPathContent: View {
                 }
                 if let evidence {
                     JobEvidencePrompt(workOrderId: workOrderId, jobTitle: navigationTitle, read: evidence, onChanged: onChanged)
+                }
+                if let attachments {
+                    JobEvidenceSection(read: attachments, operations: { if case .loaded(let o)? = operations { return o } else { return nil } }())
+                        .id("job-evidence")
                 }
                 ForEach(JobStageKey.allCases) { key in
                     stageSection(key, p.stages[key], p)
@@ -223,9 +232,6 @@ struct JobPathContent: View {
                         .font(.footnote).foregroundStyle(.secondary)
                 } else if let rung = JobRung.status(stage) {
                     RootedValueView(label: "Status", value: JobCopy.stateLine(stage.state), status: rung)
-                    if key == .plan, case .loaded(let ops)? = operations, !ops.operations.isEmpty {
-                        OperationsList(operations: ops)
-                    }
                     ForEach(Self.visibleFacts(stage.facts)) { fact in
                         RootedValueView(label: JobCopy.fact(fact.key),
                                         value: fact.key == "request_source"
@@ -235,6 +241,7 @@ struct JobPathContent: View {
                                         status: Self.factStatus(fact, stageRung: JobRung.status(stage.state, hasInconsistency: false) ?? .recorded))
                     }
                 }
+                JobTestimonyRows(stage: stage)
                 ForEach(stage.inconsistencies, id: \.self) { code in
                     RootedValueView(label: "Records disagree", value: JobCopy.conflict(code), status: .conflicting)
                 }
@@ -470,11 +477,13 @@ struct JobPathContent: View {
         }
     }
 
-    /// Facts a person may see: never personal contact fields, never reader bookkeeping.
+    /// Facts a person may see: never personal contact fields, never reader bookkeeping. Testimony and
+    /// filed evidence have their own rows (JobTestimonyRows, JobEvidenceSection).
     static func visibleFacts(_ facts: [JobStage.Fact]) -> [JobStage.Fact] {
         let signedStart = facts.contains { if $0.key == "start_sign", case .object = $0.value { return true } else { return false } }
         return facts.filter {
             !JobWords.isContactKey($0.key) && !JobCopy.hiddenFacts.contains($0.key)
+                && $0.key != JobTestimony.factKey && $0.key != WorkOrderEvidence.stageFactKey
                 && !(signedStart && $0.key == "start_clock" && $0.value == .null)
         }
     }

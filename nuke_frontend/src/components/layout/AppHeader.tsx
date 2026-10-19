@@ -25,6 +25,8 @@ const NAV_LINKS = [
   { label: 'JOURNAL', to: '/journal' },
   { label: 'STACKS', to: '/stacks' },
 ];
+// Signed-in only: the work console (signature queue and the viewer's jobs).
+const SIGNED_IN_NAV_LINKS = [{ label: 'WORK', to: '/work' }];
 
 /**
  * AppHeader — One row, four zones, 40px.
@@ -85,7 +87,7 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
 
         {/* Zone 2: Navigation — hover-prefetch per McMaster benchmark */}
         <nav className="header-nav" aria-label="Main navigation">
-          {NAV_LINKS.map(({ label, to }) => (
+          {(session ? [...NAV_LINKS, ...SIGNED_IN_NAV_LINKS] : NAV_LINKS).map(({ label, to }) => (
             <PrefetchLink
               key={to}
               to={to}
