@@ -18,7 +18,7 @@ CREATE TABLE public.organizations(id uuid PRIMARY KEY);
 CREATE TABLE public.work_orders(id uuid PRIMARY KEY,vehicle_id uuid,request_source text,title text,description text,scope_description text,
  quoted_at timestamptz,estimated_total numeric,estimated_cost_cents integer,approved_at timestamptz,scheduled_start timestamptz,
  scheduled_end timestamptz,started_at timestamptz,actual_start timestamptz,completed_at timestamptz,actual_end timestamptz,status text,
- created_at timestamptz DEFAULT '2026-01-01');
+ created_at timestamptz DEFAULT '2026-01-01',scope_category text);
 CREATE TABLE public.actors(id uuid PRIMARY KEY,name text,actor_type text);
 CREATE TABLE public.component_events(id uuid PRIMARY KEY,vehicle_id uuid,work_order_id uuid,metadata jsonb);
 CREATE TABLE public.work_order_parts(id uuid PRIMARY KEY,work_order_id uuid,part_name text,status text,job_op_code text);
@@ -42,7 +42,7 @@ CREATE TABLE public.user_tools(id uuid PRIMARY KEY,user_id uuid REFERENCES auth.
 CREATE TABLE public.tool_inventory(id uuid PRIMARY KEY,owner_id uuid);
 CREATE TABLE public.equipment(id uuid PRIMARY KEY,shop_id uuid);
 CREATE TABLE public.vehicle_observations(id uuid PRIMARY KEY,vehicle_id uuid,kind text,source_id uuid,
-  content_text text,extraction_method text,confidence_score numeric,structured_data jsonb,observed_at timestamptz,ingested_at timestamptz DEFAULT now(),is_superseded boolean DEFAULT false);
+  content_text text,extraction_method text,confidence_score numeric,structured_data jsonb,observed_at timestamptz,ingested_at timestamptz DEFAULT now(),is_superseded boolean DEFAULT false,source_identifier text);
 CREATE TABLE public.pipeline_registry(id uuid DEFAULT gen_random_uuid(),table_name text,column_name text,owned_by text,
   description text,do_not_write_directly boolean,write_via text,UNIQUE(table_name,column_name));
 GRANT USAGE ON SCHEMA public,auth TO anon,authenticated,service_role;
@@ -71,6 +71,7 @@ INSERT INTO work_order_labor(work_order_id,hours) VALUES ('30000000-0000-0000-00
 \ir ../migrations/20261019120000_work_order_quote_issue.sql
 \ir ../migrations/20261019123000_work_order_job_path_quotes.sql
 \ir ../migrations/20261019150000_inspection_request.sql
+\ir ../migrations/20261019153000_job_path_inspection.sql
 
 -- Synthetic interpretations in the guarded disposable database only.
 CREATE FUNCTION public.op_source(p_patch jsonb,p_vehicle uuid DEFAULT '40000000-0000-0000-0000-000000000001') RETURNS uuid LANGUAGE plpgsql AS $$

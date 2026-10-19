@@ -110,6 +110,7 @@ INSERT INTO work_order_labor(id,work_order_id,task_name,task_category,hours,hour
 \ir ../migrations/20261019120000_work_order_quote_issue.sql
 \ir ../migrations/20261019123000_work_order_job_path_quotes.sql
 \ir ../migrations/20261019150000_inspection_request.sql
+\ir ../migrations/20261019153000_job_path_inspection.sql
 
 
 -- P (..0f) performer with an approved work_evidence bridge to the operation actor; P2 (..09) self_claim only;
@@ -210,8 +211,8 @@ SELECT t_assert((SELECT count(*)=1 AND bool_and(r.requirement_kind='inspection' 
  AND r.description='Inspect the vehicle against the 2 checklist items') FROM work_order_resource_requirements r WHERE r.work_order_id=:'wo'),
  'inspection requirement on it, based on the request');
 SET ROLE service_role;
-SELECT t_assert(read_work_order_job_path(:'wo')#>>'{stages,inspection,state}'='recorded'
- AND read_work_order_job_path(:'wo')#>>'{stages,plan,operations}'='1','job path sees the operation and the requirement');
+SELECT t_assert(read_work_order_job_path(:'wo')#>'{stages,inspection}' @> '{"state":"partial","inspection_job_role":"self","inspection_requirements":1}'
+ AND read_work_order_job_path(:'wo')#>>'{stages,plan,operations}'='1','job path sees the operation, the requirement and a pending inspection job');
 RESET ROLE;
 SELECT t_assert(NOT vehicle_user_has_access('40000000-0000-0000-0000-000000000002','10000000-0000-0000-0000-00000000000c')
  AND (SELECT owner_id='10000000-0000-0000-0000-00000000000d' AND user_id IS NULL FROM vehicles WHERE id='40000000-0000-0000-0000-000000000002')

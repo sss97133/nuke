@@ -485,6 +485,14 @@ A withheld acceptance adds `acceptance_withheld_<reason>`. `work_orders.approved
 `quoted_at` stay the fallback; the stored approval clock is also reported as
 `stored_approval_clock`. Contract: `supabase/sql/test_work_order_job_path_quotes.sql`.
 
+The inspection stage reads linked inspection jobs: the job itself when it is an inspection,
+otherwise its child inspections (`parent_work_order_id`). With a linked job, the stage is
+`recorded` once one has a findings report and `partial` while requested (gap
+`inspection_findings_pending`). It reports `inspection_jobs`, `inspection_job_role`
+(`self` / `child`), jobs with findings, `findings_reports`, `findings_clock` and
+`seller_permission: not_established`. Without a linked job, an inspection requirement still
+records the stage, as before. Contract: `supabase/sql/test_job_path_inspection.sql`.
+
 ### Requested operations from scope text
 
 `work_order_line_items` is the operations owner. A work order's own description or

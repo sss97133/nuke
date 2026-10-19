@@ -22,7 +22,7 @@ CREATE TABLE public.work_orders(id uuid PRIMARY KEY,vehicle_id uuid,customer_id 
  customer_name text,customer_phone text,customer_email text,title text,description text,scope_description text,
  quoted_at timestamptz,estimated_total numeric,estimated_cost_cents integer,approved_at timestamptz,scheduled_start timestamptz,
  scheduled_end timestamptz,started_at timestamptz,actual_start timestamptz,completed_at timestamptz,actual_end timestamptz,status text,
- deposit_cents integer,lead_actor_id uuid,created_at timestamptz DEFAULT '2026-01-01');
+ deposit_cents integer,lead_actor_id uuid,created_at timestamptz DEFAULT '2026-01-01',scope_category text);
 CREATE TABLE public.vehicles(id uuid PRIMARY KEY,user_id uuid,owner_id uuid,uploaded_by uuid);
 CREATE TABLE public.business_ownership(business_id uuid,owner_id uuid,status text);
 CREATE TABLE public.admin_users(user_id uuid,is_active boolean);
@@ -110,6 +110,7 @@ INSERT INTO work_order_labor(id,work_order_id,task_name,task_category,hours,hour
 \ir ../migrations/20261019120000_work_order_quote_issue.sql
 \ir ../migrations/20261019123000_work_order_job_path_quotes.sql
 \ir ../migrations/20261019150000_inspection_request.sql
+\ir ../migrations/20261019153000_job_path_inspection.sql
 
 
 -- P (..0f) performer with an approved work_evidence bridge to the operation actor; P2 (..09) self_claim only;
