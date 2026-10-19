@@ -102,7 +102,7 @@ enum ActivityCopy {
     /// The big status line for a phase. The phase is the latest kind of event on record, not a stage verdict.
     static func headline(_ phase: String) -> String {
         switch phase {
-        case "requested": return "Looking for a provider"
+        case "requested": return "No provider booked yet"
         case "booking": return "Getting booked"
         case "in_progress": return "Work in progress"
         case "closing": return "Wrapping up"

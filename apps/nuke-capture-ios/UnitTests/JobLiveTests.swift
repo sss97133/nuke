@@ -46,7 +46,7 @@ final class JobLiveTests: XCTestCase {
     }
 
     func testHeadlinesAndLiveDot() {
-        XCTAssertEqual(ActivityCopy.headline("requested"), "Looking for a provider")
+        XCTAssertEqual(ActivityCopy.headline("requested"), "No provider booked yet")
         XCTAssertEqual(ActivityCopy.headline("in_progress"), "Work in progress")
         XCTAssertEqual(ActivityCopy.headline("settled"), "Paid")
         XCTAssertEqual(ActivityCopy.headline("something_new"), "On record")
