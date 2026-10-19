@@ -327,7 +327,7 @@ struct ProviderProfile: Decodable, Equatable {
     let identityBridgeState: String?
     let workDays: WorkDays?
     let jobs: Jobs?
-    let contactAvailable: Bool
+    let contact: ContactBlock?
     let asOf: String?
 
     enum CodingKeys: String, CodingKey {
@@ -356,7 +356,6 @@ struct ProviderProfile: Decodable, Equatable {
             jobs = try? c.decode(Jobs.self, forKey: .jobs)
         }
     }
-    private struct Contact: Decodable { let available: Bool? }
 
     init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
@@ -370,11 +369,12 @@ struct ProviderProfile: Decodable, Equatable {
         let record = try? c.decode(WorkRecord.self, forKey: .workRecord)
         workDays = record?.days
         jobs = record?.jobs
-        contactAvailable = (try? c.decode(Contact.self, forKey: .contact))?.available == true
+        contact = try? c.decode(ContactBlock.self, forKey: .contact)
         asOf = try? c.decode(String.self, forKey: .asOf)
     }
 
     var isSelf: Bool { viewer?.context == .selfView }
+    var contactAvailable: Bool { contact?.canRequest == true }
 
     /// A list of plain strings from a jsonb array, or nothing (a string or null reads as empty).
     fileprivate static func strings<K: CodingKey>(_ c: KeyedDecodingContainer<K>, _ k: K) -> [String] {

@@ -16,12 +16,15 @@ struct WorkConsoleView: View {
     @State private var signatures: JobLoad<SignatureQueue> = .loading
     @State private var jobs: JobLoad<MyWorkOrders> = .loading
     @State private var identity: JobLoad<MyIdentity> = .loading
+    @State private var inbox: JobLoad<ContactInbox> = .loading
     @State private var loadingMore = false
     @State private var showAccount = false
 
     var body: some View {
         NavigationStack {
             WorkConsoleContent(signatures: signatures, jobs: jobs, identity: identity, showCapture: showCapture,
+                               inbox: inbox,
+                               onInboxChanged: { Task { inbox = await ContactReaders.inbox() } },
                                loadingMore: loadingMore,
                                onLoadMore: { Task { await loadMoreJobs() } },
                                onSigned: { Task { signatures = await JobReaders.signatures() } })
@@ -52,9 +55,11 @@ struct WorkConsoleView: View {
         async let s = JobReaders.signatures()
         async let j = JobReaders.myWorkOrders()
         async let i = JobReaders.myIdentity()
+        async let m = ContactReaders.inbox()
         signatures = await s
         jobs = await j
         identity = await i
+        inbox = await m
     }
 
     private func loadMoreJobs() async {
@@ -73,6 +78,8 @@ struct WorkConsoleContent: View {
     let jobs: JobLoad<MyWorkOrders>
     let identity: JobLoad<MyIdentity>
     let showCapture: Bool
+    var inbox: JobLoad<ContactInbox> = .loading
+    var onInboxChanged: (() -> Void)? = nil
     var loadingMore = false
     var onLoadMore: (() -> Void)? = nil
     var onSigned: (() -> Void)? = nil
@@ -82,6 +89,7 @@ struct WorkConsoleContent: View {
     var body: some View {
         List {
             signatureSection
+            ContactInboxSection(inbox: inbox, onChanged: onInboxChanged)
             jobsSection
             openRequirementsSection
             if showCapture {

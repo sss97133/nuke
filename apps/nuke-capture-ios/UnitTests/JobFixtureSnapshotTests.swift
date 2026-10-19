@@ -111,6 +111,30 @@ final class JobFixtureSnapshotTests: XCTestCase {
         try snapshot(view, name: "fixture-provider-visitor", pages: 2)
     }
 
+    func testRenderContactRequestSheet() throws {
+        let block = try decode(ContactBlock.self, ContactFixtures.availableBlock)
+        let sheet = ContactRequestSheet(block: block, recipientName: "@fixture_tech", contextLabel: "Their profile (@fixture_tech)",
+                                        loadLimits: false, draft: "Hi, do you take square-body brake jobs? I'm nearby.", leftToday: 7)
+        try snapshot(sheet, name: "fixture-contact-sheet")
+    }
+
+    func testRenderContactInbox() throws {
+        let box = try decode(ContactInbox.self, ContactFixtures.inbox)
+        let view = NavigationStack {
+            List { ContactInboxSection(inbox: .loaded(box)) }
+                .navigationTitle("Work").navigationBarTitleDisplayMode(.inline)
+        }
+        try snapshot(view, name: "fixture-contact-inbox")
+    }
+
+    func testRenderContactThread() throws {
+        let t = try decode(ContactThread.self, ContactFixtures.thread)
+        let view = NavigationStack {
+            ContactThreadView(requestId: "00000000-0000-4000-8000-00000000c002", thread: .loaded(t), loadOnAppear: false)
+        }
+        try snapshot(view, name: "fixture-contact-thread")
+    }
+
     func testRenderWorkSessionSignSheet() throws {
         let item = try decode(SignatureQueue.self, JobFixtures.signatureQueue).items[0]
         try snapshot(WorkSessionSignSheet(item: item), name: "fixture-sign-work-day")

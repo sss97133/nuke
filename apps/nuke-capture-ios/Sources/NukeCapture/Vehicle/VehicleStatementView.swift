@@ -139,13 +139,10 @@ struct VehicleStatementContent: View {
 
     @ViewBuilder private func contact(_ s: JobStatement) -> some View {
         Section {
-            Button {} label: {
-                Label("Contact via Nuke", systemImage: "bubble.left.and.bubble.right")
-                    .foregroundStyle(.secondary)
-            }
-            .disabled(true)
+            ContactViaNukeRow(block: s.contact, recipientName: s.shop?.name ?? "The people on this job",
+                              contextLabel: s.workOrders.first?.displayTitle)
         } footer: {
-            Text("Coming soon. Nuke passes your message along; contact details are never shared.")
+            Text(ContactViaNukeRow.footer(s.contact))
         }
     }
 }

@@ -41,6 +41,7 @@ struct JobPerson: Decodable, Equatable {
 
     /// "@handle", the organization's name, or "Unnamed party".
     var text: String {
+        if kind == "you" { return "You" }
         if let handle { return "@" + handle }
         if kind == "organization", let name { return name }
         return "Unnamed party"
@@ -436,15 +437,10 @@ struct JobStatement: Decodable, Equatable {
             return p.isEmpty ? nil : p.joined(separator: ", ")
         }
     }
-    struct Contact: Decodable, Equatable {
-        let action: String?
-        let available: Bool
-    }
-
     let error: String?
     let vehicleLabel: JobVehicleLabel?
     let shop: Shop?
-    let contact: Contact?
+    let contact: ContactBlock?
     let workOrders: [StatementWorkOrder]
     let totals: Totals?
     let viewer: JobViewer?
@@ -466,7 +462,7 @@ struct JobStatement: Decodable, Equatable {
         error = try? c.decode(String.self, forKey: .error)
         vehicleLabel = try? c.decode(JobVehicleLabel.self, forKey: .vehicle)
         shop = try? c.decode(Shop.self, forKey: .shop)
-        contact = try? c.decode(Contact.self, forKey: .contact)
+        contact = try? c.decode(ContactBlock.self, forKey: .contact)
         workOrders = ((try? c.decode([WOSlot].self, forKey: .workOrders)) ?? []).compactMap(\.wo)
         totals = try? c.decode(Totals.self, forKey: .totals)
         viewer = try? c.decode(JobViewer.self, forKey: .viewer)

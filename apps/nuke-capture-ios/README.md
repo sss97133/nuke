@@ -371,6 +371,7 @@ Sources/NukeCapture/
   Jobs/AcceptQuoteSheet.swift      the customer's Sign on one quote version (accept_work_order_quote)
   Vehicle/                         Work card (vehicle_work_orders_read) and statement view
   Profile/                         provider face (provider_profile_read) and jobs on record
+  Contact/                         Contact via Nuke: request sheet, Work inbox, thread (in-app only)
   Jobs/                            JobView over work_order_job_path_read; DTOs, readers, stage rail
   SyncEngine.swift                 PhotoKit watch + watermark + dedupe + GPS gate
   SupabaseService.swift            auth, storage upload, vehicle_images insert

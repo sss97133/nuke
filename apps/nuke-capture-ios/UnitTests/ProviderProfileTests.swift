@@ -34,13 +34,18 @@ final class ProviderProfileTests: XCTestCase {
     func testWhatTheySayStaysSelfDescribed() throws {
         let p = try decode(ProviderProfile.self, ProviderFixtures.profile(context: "visitor"))
         let rows = ProviderFaceContent.claimRows(p.claims)
-        XCTAssertEqual(rows.map(\.label), ["Role", "Trade", "Account type", "Expertise", "Specialties", "Makes", "Eras", "Experience"])
-        XCTAssertEqual(rows[0].value, "Mechanic")
-        XCTAssertEqual(rows[3].value, "Engines, Fabrication")
+        // role and user_type are platform account settings: never shown to a visitor as self-description.
+        XCTAssertEqual(rows.map(\.label), ["Trade", "Expertise", "Specialties", "Makes", "Eras", "Experience"])
+        XCTAssertEqual(rows[0].value, "Restoration")
+        XCTAssertEqual(rows[1].value, "Engines, Fabrication")
         XCTAssertEqual(rows[0].basis, "self-described")
-        XCTAssertEqual(rows[4].basis, "stated on their technician profile")
+        XCTAssertEqual(rows[2].basis, "stated on their technician profile")
         XCTAssertEqual(rows.last?.value, "12 years")
         XCTAssertTrue(ProviderFaceContent.claimRows(nil).isEmpty)
+        let mine = ProviderFaceContent.claimRows(p.claims, isSelf: true)
+        XCTAssertEqual(mine.map(\.label), ["Trade", "Expertise", "Account role", "Account type", "Specialties", "Makes", "Eras", "Experience"])
+        XCTAssertEqual(mine[2].basis, "account setting, not shown to visitors")
+        XCTAssertEqual(mine[4].basis, "stated on your technician profile")
     }
 
     func testRecordShowsEvidenceWithCounts() throws {

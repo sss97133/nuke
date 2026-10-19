@@ -101,7 +101,7 @@ struct ProviderFaceContent: View {
                 workRecordSection(p).id("provider-work")
                 ConcludedJobsSection(jobs: jobs, loadingMore: loadingMore, onLoadMore: onLoadMore).id("provider-jobs")
                 linkSection(p)
-                contactSection
+                contactSection(p)
             }
         }
     }
@@ -148,14 +148,18 @@ struct ProviderFaceContent: View {
         }
     }
 
+    /// role and user_type are platform account settings (e.g. "admin", "user"), not trades: a visitor
+    /// never sees them as self-description; the person sees them labelled as account settings.
     static func claimRows(_ claims: ProviderProfile.Claims?, isSelf: Bool = false) -> [(label: String, value: String, basis: String)] {
         var rows: [(String, String, String)] = []
         if let a = claims?.account {
-            if let v = a.role, !v.isEmpty { rows.append(("Role", JobCopy.sentence(v), "self-described")) }
             if let v = a.profession, !v.isEmpty { rows.append(("Trade", JobCopy.sentence(v), "self-described")) }
-            if let v = a.userType, !v.isEmpty { rows.append(("Account type", JobCopy.sentence(v), "self-described")) }
             if !a.expertiseAreas.isEmpty {
                 rows.append(("Expertise", a.expertiseAreas.map(JobCopy.sentence).joined(separator: ", "), "self-described"))
+            }
+            if isSelf {
+                if let v = a.role, !v.isEmpty { rows.append(("Account role", JobCopy.sentence(v), "account setting, not shown to visitors")) }
+                if let v = a.userType, !v.isEmpty { rows.append(("Account type", JobCopy.sentence(v), "account setting, not shown to visitors")) }
             }
         }
         for r in claims?.actorRecords ?? [] {
@@ -332,15 +336,14 @@ struct ProviderFaceContent: View {
         }
     }
 
-    private var contactSection: some View {
-        Section {
-            Button {} label: {
-                Label("Contact via Nuke", systemImage: "bubble.left.and.bubble.right")
-                    .foregroundStyle(.secondary)
+    @ViewBuilder private func contactSection(_ p: ProviderProfile) -> some View {
+        if !(p.isSelf || isOwn) {
+            Section {
+                ContactViaNukeRow(block: p.contact, recipientName: p.subject?.name ?? "them",
+                                  contextLabel: p.subject.map { "Their profile (\($0.name))" })
+            } footer: {
+                Text(ContactViaNukeRow.footer(p.contact))
             }
-            .disabled(true)
-        } footer: {
-            Text("Coming soon. Nuke passes your message along; contact details are never shared.")
         }
     }
 }
