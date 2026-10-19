@@ -359,6 +359,15 @@ event type `quote` (payload: `quote_version`, `supersedes_quote_id`, `quoting_pa
 
 The projection stores a SHA-256 `quote_hash` over the quote's canonical content.
 
+**Issue (Sign).** `issue_work_order_quote(p_work_order_id, p_lines, p_deposit, p_valid_until,
+p_supersedes_quote_id)` lets an authenticated provider issue a version through the same path:
+an `owner-input` work record signed by `auth.uid()`, projected as `quote` in the same
+transaction, with the signer as quoting party. Eligible: an active owner of the work order's
+organization (`business_ownership`), or an account whose evidenced identity bridge
+(`viewer_identity_bridge`: an approved actor claim at `work_evidence` or above; `self_claim` is
+not enough) names the work order's lead actor or an operation's actor. The customer cannot
+quote their own job. A repeated identical request returns the existing quote.
+
 **Acceptance (Sign).** `accept_work_order_quote(p_quote_id, p_quote_hash)` is the only writer.
 The caller must be the work order's customer (`auth.uid() = work_orders.customer_id`; a vehicle
 owner is not assumed to be the client, since in a pre-purchase inspection the owner is the
