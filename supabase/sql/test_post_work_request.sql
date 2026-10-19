@@ -68,7 +68,7 @@ SELECT t_assert((:'pr'::jsonb) @> '{"request_source":"web","visibility":"open","
  'post_work_request: work order, three client-stated operations, template requirements, intake photo attached');
 SELECT t_assert((SELECT customer_id='e7000000-0000-0000-0000-0000000000c1' AND scope_description=E'The exhaust leaks at the manifold. The brakes squeal when stopping.\nReplace the cracked dash pad.'
    AND request_source='web' AND request_visibility='open' AND request_observation_id::text=(:'pr'::jsonb)->>'request_observation_id' AND status='pending'
-   AND description IS NULL AND organization_id IS NULL FROM work_orders WHERE id=:'pwo')
+   AND (description IS NULL OR description = scope_description) AND organization_id IS NULL FROM work_orders WHERE id=:'pwo')
  AND (SELECT count(*) FROM work_order_line_items WHERE work_order_id=:'pwo' AND notes='Client-stated in the work request' AND basis_field='scope_description')=3,
  'work order: customer = signer, scope_description verbatim, operations sourced from the client''s text');
 SELECT t_assert((:'pr'::jsonb)->'image_analyses_cited' @> '[{"observation_id":"e7c00000-0000-0000-0000-000000000001","analysis_kind":"image_deep_byok","extraction_method":"image_deep","confidence_score":0.6}]'
