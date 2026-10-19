@@ -1,5 +1,47 @@
 # Work Order Intelligence
 
+## Resource evidence graph (2026-10-19)
+
+`work_order_resource_requirements`, `work_order_resource_fulfillments` and
+`work_order_resource_attestations` are private typed projections of existing
+`vehicle_observations` work records. The observation ID is the projection ID and
+idempotency key. Original sources, methods, trust and clocks stay on that observation;
+corrections use the existing testimony supersession path.
+
+After a source has been admitted through `ingest-observation`, a service operator calls
+`project_work_order_resource_observation(observation_id)`. It accepts only a current,
+source-attributed `work_record` on the same vehicle as the work order. The versioned
+payload is `structured_data.work_order_resource`:
+
+| Event | Required payload beyond `version: 1`, `event_type`, `work_order_id` |
+|---|---|
+| `requirement` | `line_item_id`, `requirement_kind` (`tool`, `equipment`, `facility`, `skill`, `inspection`, `approval`), `description`, positive `quantity`, `unit` |
+| `fulfillment` | `requirement_id`; exactly one of `supplier_user_id` / `supplier_organization_id`; exactly one of `user_tool_id` / `inventory_tool_id` / `equipment_id` / `facility_organization_id`; optional paired `available_from`, `available_until` |
+| `attestation` | `fulfillment_id`; exactly one of `attestor_user_id` / `attestor_organization_id`; `attestation_kind` (`condition`, `suitability`, `permission`, `availability`, `supervision`, `delivery`, `withdrawal`); `verdict` (`supports`, `contradicts`, `unknown`); explicit `scope` |
+
+The service-only `read_work_order_resources(work_order_id)` returns the current graph,
+source IDs and observation/ingestion clocks, plus recorded coverage. Withdrawing or
+reattributing a requirement source excludes its dependent offers and attestations from
+the current graph. Original projections remain immutable. Anonymous and authenticated
+roles receive no grants; neither the public resolver nor existing access policies change.
+
+A fulfillment is a **candidate arrangement**, and an attestation is a **reported
+statement**, including when its kind is `permission`. This projection does not
+authenticate the attestor or establish supplier authority. Several alternatives can
+coexist. Personal inventory may represent multiple tools, so its ID is not an exclusive
+physical-unit reservation. Tool requirements accept personal or shop tool/equipment
+references; equipment and facility requirements require their respective reference.
+Skill, inspection and approval requirements remain unresolved until participant-specific
+fulfillment is implemented. No resource conflicts are adjudicated because no capacity
+is reserved. The reader explicitly returns booking readiness and permission authority
+as `not_assessed`, and reservation/payment flags as false—even for a populated graph.
+
+This is the backend evidence relation, not completed booking, authenticated sign-off,
+settlement, historical replay, or historical job reconstruction. No source collection,
+photo-processing holds, paid inference or existing invoices are changed. The focused
+PG17 contract is `supabase/sql/test_work_order_resource_evidence.sql` and is picked up
+by the existing database-contract CI job.
+
 The system that answers "update me on the Smith build" with a complete cited receipt in <5s.
 
 ## The Dual System
