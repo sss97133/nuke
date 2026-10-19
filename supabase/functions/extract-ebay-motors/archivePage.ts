@@ -121,6 +121,16 @@ function descriptionHtml(html: string): string {
   return end < 0 ? rest.slice(0, 60_000) : rest.slice(0, end);
 }
 
+/** The model year in the archived URL's title slug: "/ebaymotors/1965-65-Barn-Find-...", "/ebaymotors/68-Charger-RT-..."
+ *  (two digits, 1920s-1990s), or a four-digit year among the first five words of "Chevrolet-Camaro-1969-RS-...". */
+export function slugYear(url: string): string | undefined {
+  const words = (url.match(/\/ebaymotors\/([^/?_]+)/)?.[1] ?? "").split("-").filter(Boolean);
+  const four = words.slice(0, 5).find((w) => /^(?:19|20)\d\d$/.test(w));
+  if (four) return four;
+  const two = words[0]?.match(/^'?([2-9]\d)$/)?.[1];
+  return two ? `19${two}` : undefined;
+}
+
 export function parseArchivedItemPage(html: string, originalUrl = ""): ArchivedItemPage {
   const text = textOf(html);
   const titleTag = decode(html.match(/<title>([\s\S]*?)<\/title>/i)?.[1] ?? "").replace(/\s+/g, " ").trim();
@@ -160,7 +170,7 @@ export function parseArchivedItemPage(html: string, originalUrl = ""): ArchivedI
   if (!specifics["Make"] && ymm) specifics["Make"] = ymm[1].trim();
   if (!specifics["Model"] && ymm) specifics["Model"] = ymm[2].trim();
   if (!specifics["Year"]) {
-    const y = text.match(/Summary for ((?:19|20)\d\d) /)?.[1] ?? title?.match(/^((?:19|20)\d\d)\b/)?.[1] ?? originalUrl.match(/\/((?:19|20)\d\d)-[A-Za-z]/)?.[1];
+    const y = text.match(/Summary for ((?:19|20)\d\d) /)?.[1] ?? title?.match(/^((?:19|20)\d\d)\b/)?.[1] ?? slugYear(originalUrl);
     if (y) specifics["Year"] = y;
   }
   // Still no Make/Model: the heading's "1977 Toyota Corolla" (eBay's category word "Other" is not a model).
