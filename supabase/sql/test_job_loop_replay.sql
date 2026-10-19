@@ -326,6 +326,8 @@ ALTER TABLE public.work_orders ADD COLUMN IF NOT EXISTS estimated_labor_cost num
 \ir ../migrations/20261020000500_work_order_invented_zero_totals.sql
 \echo REPLAY 20261020002000_owner_delegated_signs.sql
 \ir ../migrations/20261020002000_owner_delegated_signs.sql
+\echo REPLAY 20261020002500_actor_link_owner_delegated_approve.sql
+\ir ../migrations/20261020002500_actor_link_owner_delegated_approve.sql
 \echo REPLAY 20261020003000_work_order_retained_testimony.sql
 \ir ../migrations/20261020003000_work_order_retained_testimony.sql
 -- Plan check and final state.
