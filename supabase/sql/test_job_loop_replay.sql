@@ -396,6 +396,8 @@ CREATE TABLE IF NOT EXISTS public.organization_capabilities(id uuid PRIMARY KEY 
 \ir ../migrations/20261020111500_work_order_activity_read.sql
 \echo REPLAY 20261020120000_requirement_keyword_capabilities.sql
 \ir ../migrations/20261020120000_requirement_keyword_capabilities.sql
+\echo REPLAY 20261020130000_requirement_key_exclusions_trim_steering.sql
+\ir ../migrations/20261020130000_requirement_key_exclusions_trim_steering.sql
 \echo REPLAY 20261020160000_job_market_health.sql
 \ir ../migrations/20261020160000_job_market_health.sql
 -- Plan check and final state.
