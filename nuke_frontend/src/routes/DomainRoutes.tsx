@@ -115,6 +115,10 @@ const TransferPartyPage = React.lazy(() => import('../pages/TransferPartyPage'))
 // Build Coordinator dashboard (public, vehicle-scoped)
 const BuildDashboard = React.lazy(() => import('../pages/BuildDashboard'));
 
+// Jobs and providers — open job path readers; party money and personal fields withheld at the source
+const JobPage = React.lazy(() => import('../pages/jobs/JobPage'));
+const ProviderProfilePage = React.lazy(() => import('../pages/providers/ProviderProfilePage'));
+
 // Public projections — journal index + day page
 const JournalIndex = React.lazy(() => import('../pages/journal/JournalIndex'));
 const JournalPage = React.lazy(() => import('../pages/journal/JournalPage'));
@@ -202,6 +206,10 @@ export const DomainRoutes = () => {
         <Route path="/profile/external/:externalIdentityId" element={<UserProfile />} />
         {/* Canonical handle-based user binding (frontend-doctrine §2a primary surface) */}
         <Route path="/u/:handle" element={<UserProfile />} />
+        {/* Jobs (work orders) and provider work records — public, read-first; Signs only where the server offers them */}
+        <Route path="/jobs/:workOrderId" element={<JobPage />} />
+        <Route path="/providers/actor/:actorId" element={<ProviderProfilePage />} />
+        <Route path="/providers/:handle" element={<ProviderProfilePage />} />
         {/* Investor offering / data room — semi-public fundraising page */}
         {/* Docs / developers landing */}
         <Route path="/developers" element={<DevelopersPage />} />

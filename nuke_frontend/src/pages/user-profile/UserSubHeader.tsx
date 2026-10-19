@@ -1,6 +1,7 @@
 import React from 'react';
 import { useUserProfile } from './UserProfileContext';
 import TextScaleControl from '../../components/TextScaleControl';
+import { PrefetchLink } from '../../components/PrefetchLink';
 
 /**
  * UserSubHeader -- Badge bar below the header.
@@ -50,6 +51,12 @@ const UserSubHeader: React.FC = () => {
         <span className="up-badge" title="Profession listed in this profile">
           {profile.profession.replace(/_/g, ' ').toUpperCase()}
         </span>
+      )}
+
+      {profile.username && (
+        <PrefetchLink className="up-badge" to={`/providers/${encodeURIComponent(profile.username)}`} title="Skills, tools and jobs on record">
+          WORK RECORD
+        </PrefetchLink>
       )}
 
       {/* Text size control — right end */}
