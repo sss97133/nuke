@@ -23,12 +23,17 @@ const VehicleHeroImage: React.FC<VehicleHeroImageProps> = ({ overlayNode }) => {
   // the request flood. Measured 2026-06-10: heroImgs=0 at t+30s, first paint t+40s.)
   // VehicleMediaKit stays mounted regardless and upgrades the slot via
   // onCurationResolved when curation lands.
-  const [mediaKitActive, setMediaKitActive] = useState<boolean>(false);
+  const [mediaKitState, setMediaKitState] = useState({ vehicleId, active: false });
+  // A new vehicle entry starts with its static lead, including A → B → A.
+  if (mediaKitState.vehicleId !== vehicleId) {
+    setMediaKitState({ vehicleId, active: false });
+  }
+  const mediaKitActive = mediaKitState.vehicleId === vehicleId && mediaKitState.active;
   const isMobile = useIsMobile();
 
   const handleCurationResolved = useCallback((count: number) => {
-    setMediaKitActive(count >= 3);
-  }, []);
+    setMediaKitState(current => current.vehicleId === vehicleId ? { ...current, active: count >= 3 } : current);
+  }, [vehicleId]);
 
   const getSupabaseRenderUrl = (publicObjectUrl: string, width: number, quality = 90): string | null => {
     try {
@@ -151,13 +156,13 @@ const VehicleHeroImage: React.FC<VehicleHeroImageProps> = ({ overlayNode }) => {
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', justifyContent: 'center' }}>
             {v?.year && <BadgePortal dimension="year" value={v.year} label={String(v.year)} variant="source" />}
             {v?.make && <BadgePortal dimension="make" value={v.make} label={String(v.make).toUpperCase()} variant="source" />}
-            {v?.model && <BadgePortal dimension="model" value={v.model} label={String(v.model).toUpperCase()} variant="source" />}
+            {v?.model && <BadgePortal dimension="model" value={v.model} modelMake={v.make} label={String(v.model).toUpperCase()} variant="source" />}
             {v?.body_style && <BadgePortal dimension="body_style" value={v.body_style} label={String(v.body_style).toUpperCase()} variant="status" />}
             {v?.transmission && (
               <BadgePortal
                 dimension="transmission"
                 value={v.transmission}
-                label={String(v.transmission).toLowerCase().includes('manual') ? 'MANUAL' : 'AUTO'}
+                label={String(v.transmission).toUpperCase()}
                 variant="status"
               />
             )}
@@ -171,7 +176,7 @@ const VehicleHeroImage: React.FC<VehicleHeroImageProps> = ({ overlayNode }) => {
             textTransform: 'uppercase' as const,
             marginTop: '4px',
           }}>
-            NO PHOTO · EXPLORE BY BADGE
+            {candidates.length > 0 ? 'PHOTO UNAVAILABLE' : 'NO PHOTO'} · EXPLORE BY BADGE
           </span>
         </div>
       </div>
@@ -224,6 +229,7 @@ const VehicleHeroImage: React.FC<VehicleHeroImageProps> = ({ overlayNode }) => {
                   upgrade the static hero to the slideshow when ready. */}
               {vehicleId && (
                 <VehicleMediaKit
+                  key={vehicleId}
                   vehicleId={vehicleId}
                   onCurationResolved={handleCurationResolved}
                   onImageClick={isMobile ? () => setShowGallery(true) : (imageId) => openVehiclePhoto(imageId)}
@@ -312,6 +318,8 @@ const VehicleHeroImage: React.FC<VehicleHeroImageProps> = ({ overlayNode }) => {
 
       {isMobile && showGallery && (
         <MobileImageGallery
+          key={vehicleId}
+          vehicleId={vehicleId}
           leadImageUrl={leadImageUrl}
           onClose={() => setShowGallery(false)}
         />

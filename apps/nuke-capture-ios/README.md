@@ -58,6 +58,130 @@ Standing rules the code carries:
   and until it checks `vision_gate_status` a reader that drops the predicate can read rejected frames.
   Thumbnails render through `NukeImage.thumb(url, width:)` (the render endpoint, or BaT's `?w=`), never
   the raw original outside the full-screen viewer.
+- **Uploads are keyed by their bytes.** The storage path is `users/<uid>/capture-relay/<sha256>/<filename>`
+  (`Config.storagePath`). The filename alone wraps at IMG_9999: by 2026-10-15, 586 old paths each held rows of
+  different photos (1,266 rows, at least 598 showing another photo's bytes). Never key an object by a name the
+  camera reuses. A pass reads no original for an asset it already settled (`SyncEngine.processAsset`, by
+  `localIdentifier`), gives each asset three attempts before it stops holding the watermark or the queue, and
+  stops on a refused session (`SupabaseService.isAuthFailure`) instead of failing every remaining photo.
+- **Photos file to the owner's vehicles; strong evidence makes a profile.** Owner direction, 2026-10-15: "the app
+  after vision run is supposed to assign the vehicle to a profile under the image owners associated vehicle profiles,
+  its supposed to create new profiles if theres enough data to support it." `AttributionEngine.run` files an uploaded
+  photo through the server (`device_file_images` → `attribute_testimony`, audited) on a serial read matching one of
+  the owner's vehicles (every era's serial, `VisionEngine.matchSerial`) or on the owner's album mapped to a vehicle
+  (`album_sync_map`). A valid 17-character VIN (`VisionEngine.isValidVIN`) that matches nothing, or an unmapped album
+  named "year make model" (`AlbumLabel`) with `Config.albumProfileMinPhotos` uploaded photos, goes to
+  `device_create_vehicle_profile`, which resolves an existing vehicle first and creates a private profile, with the
+  owner as photographer and not as owner, only when the server's thresholds hold. A session inheritance (same day,
+  same ~100 m cell) stays a suggestion: a dealer lot holds many cars. Nothing in the app writes `vehicle_id` directly.
+  Confirming one at a time is unrealistic at the owner's volume (owner, 2026-10-17): `SessionConfirmView` files
+  photo-backed serial matches to its server suggestion (`get_orphan_sessions.suggested_vehicle_id`) with one tap, or
+  across all suggested sessions at once. A session is a day/place review group and can contain several vehicles;
+  quick/bulk filing never treats its day-level fallback as evidence for every photo. Remaining photos stay in review,
+  and manual filing requires selecting the source photos before choosing a vehicle (60 owner-scoped references per page).
+  `WorkDaySignView` signs every loaded day, or every day for one vehicle, in one `confirm_work_sessions_bulk` call.
+  Every pixel-uploading sync pass also runs metadata-only album filing, after the album catalog finishes loading.
+  Album-name fallback collapses whitespace and preserves competing mappings. A failed evidence read stops filing;
+  a profile request counts only photos acknowledged as filed or already filed in the server's receipt.
+  **Identity investigation belongs to the machine** (owner, 2026-10-18): manual filing is a correction tool.
+  Inspect retained photos and historical references before asking which car they show. Distinguish a depicted
+  subject from its year/VIN, existing record and ownership; an unknown specification does not justify losing a
+  supported new subject. The [autonomous subject-resolution contract](../../docs/ledger/theory/data-machine-cases.md)
+  records the required flow and missing admission. Current VIN/album routing does not implement visual subject
+  discovery, and a time group, dirty cover or model confidence cannot substitute for that missing mechanism.
+  **Uploaded photos remains a source history, separate from supported photo profiles.** The own-profile
+  door reads the existing `check-image-vehicle-match` owner with `mode=read_subjects` and a `source_inbox`
+  scope. It includes historical and already-filed source records; opening, paging and refreshing never
+  enrolls analysis or starts inference. A single photograph or all-unknown reading remains inspectable
+  without claiming one physical vehicle. Each page checks current source locators, hashes, clocks and protected
+  reading heads; held or unpinned sources expose metadata without pixels. Metadata-only uploads state
+  that pixels were not retained and their reason is unknown, rather than inferring personal content or
+  successful analysis. Counters describe source records in the bounded page, not distinct photographs,
+  account totals or accessible Photos coverage. Cached fallback is dated and requires a live visibility
+  check before showing remote pixels. This does not lift privacy, source-restoration or paid-intake holds.
+  The held audited-source continuation keeps immutable reading and anchor IDs separate from a current
+  attribution record. A complete exact source family can represent one photograph across several records;
+  the inbox still counts records in its page. A replacement needs its own current approval or a protected
+  purpose receipt bound to that leaf and family. It inherits no ancestor approval. Pending replacements
+  keep pixels and current interpretations hidden while retaining inspectable earlier-reading provenance;
+  alias-wide rejection, privacy withdrawal or incomplete lookup keeps that provenance opaque too.
+  Attribution history proves source continuity, not the current canonical vehicle attachment. Detail and
+  refresh remain read-only. This proposed policy and its correction writer require separate activation.
+  The own-user profile also opens **Observed cars**, private photo-backed subject profiles from the existing
+  `check-image-vehicle-match` reader's `read_subjects` mode. They retain visual interpretations and unresolved physical
+  identity separately from Garage vehicles, owner statements and fleet value. The profile and gallery carry source-photo
+  coverage, exclusions, clocks and bounded-read limits. Visual labels use `RootedValueView` at the projected rung, dated
+  by their actual reading clock and rooted in the source gallery; opening them starts no inference or filing. `LocalStore` mirrors
+  exact owner-scoped backend response pages for offline use, marked saved and potentially stale. Refreshing a page clears
+  its old continuations; a source withdrawal is reflected by the next qualified backend read. This consumer does not
+  activate the held processing pipeline or establish autonomous identity accuracy.
+  Acknowledged pixel uploads also enter an account-scoped visual-reading work queue. Each active, cool-phone sync
+  submits at most one bounded comparison request: two fresh photos to start, or one fresh photo with up to two
+  source-qualified retained references. Unused photos remain queued. A lone photo with no reference waits for another
+  view. The server preserves complete unknown readings separately from supported memberships, reuses exact retained
+  contexts before inference, and refuses to restore later-withdrawn memberships from old readings. Native ambiguous
+  retries request retained results only. These operational leases bound one device's work; they are not a cross-device
+  exactly-once inference guarantee. Retained-reference retrieval is bounded and reports unassessed scope; private
+  subject profiles remain unresolved hypotheses, outside canonical vehicle and ownership totals. This code requires
+  the protected writer deployed with the approved baseline. The additional private qualification, NULL attribution
+  correction and historical reinspection proposal below remains held for separate activation; the global photo
+  pipeline remains paused.
+  Provider failures retain only allowlisted code, provider, HTTP status and credential-kind diagnostics. A 401 means
+  the credential was not accepted by the existing API-key route; it does not prove revocation or expiry. In-memory
+  sign-in/API-key shape classification never exports credential values or changes routes or provider order. A complete,
+  untruncated outcome for every existing provider can certify no reading began (401, no key or lookup failure only),
+  allowing the existing fresh-retry path within its same three-attempt cap and backoff. Ambiguous output/transport,
+  mixed failures and already reuse-only batches stay reuse-only; finished source hashes are never reset.
+  Own-account analysis status can open the existing Connected accounts screen; no key test, mutation or fallback is triggered.
+  An optional `allowed_source_hashes` request map pins at most 64 exact source IDs and hashes, including all requested
+  photos and any server-selected or replayed context. Outside or changed sources refuse before input capture/inference;
+  it only narrows input scope and never replaces current own-account, privacy or source qualification.
+- **A relation is a weight, not a status.** Owner direction, 2026-10-15: "active cant be a hard code like it is. its
+  a weight. a relation goes dormant immediately after one day if not maintained by contribution. even within 24hr can
+  stall." The app never shows a membership's `status` as ACTIVE. It shows the state the server cuts from
+  `relation_weight` (2^(-age/6 h) of the last contribution): live, stalling, or dormant a day after the last one.
+  Contributions are passive (photos at the organization's locations, its images, timeline events, contractor work),
+  because nobody at work spends a minute in the app. Reads: `user_org_relations` (the profile's list) and
+  `get_org_page` (`OrganizationView`). An organization opens inside the app, never on nuke.ag. The list shows on the
+  person's own profile only (the owner took organizations off the profile face on 2026-06-13), and only live and
+  stalling relations, warmest first: "only show active orgs. its annoying that evening side projects surface to top
+  billing." Membership still
+  decides permissions and the contributor gate (`fetchActiveOrgMemberships`).
+- **Newest first.** Each sync pass leads with the last three days, newest first, ahead of the watermark window, and an
+  original that lives only in iCloud goes to the backfill queue (the background job downloads it on Wi-Fi) instead of
+  holding the watermark. On 2026-10-15 the owner's window sat in June; every open re-read the same 200 iCloud-only June
+  photos and the morning's measurement shots never uploaded. Pixels follow the device rule of record
+  (`VisionEngine.triage`, the same rule `scripts/ios-vision-triage` applies to stored frames): clutter and personal stay
+  on the phone as metadata only; everything else, a part close-up included, uploads. The contributor firewall
+  (`VisionEngine.contributorVerdict`) holds by the same rule.
+  A failed decode, classifier or required face read stays in the existing bounded retry path and does not mark the
+  source synced; historical photos already settled as metadata only are not automatically replayed.
+  The held private-subject qualification path retains an account/hash-bound receipt from that same completed
+  native pass, including original and decoded-input digests, detector completion and pinned revisions. Its protected
+  intake qualifies only the owner's private subject analysis; global vision approval and processing status stay
+  unchanged. Unknown or withdrawn privacy evidence stays held, including across audited copies of the same photo.
+  Its held historical bridge reads bounded metadata for retained paid readings, then reinspects at most two exact
+  PhotoKit originals per cool, active sync pass with network downloads disabled. A three-source reading can retain
+  two leaf-specific proofs and finish the third on a later pass; replay preserves its old inputs, anchor and reading
+  clock without new inference or resetting upload settlement. Missing local originals, old readings or current
+  permission remain held. This separate private qualification policy requires activation approval.
+  Unread historical photos are not enrolled by this replay bridge. They require a separate bounded source-enrollment
+  path and approval for new paid analysis; preserving a source or correcting its filing does not create a reading.
+  A finite approved repair can instead retain and verify protected readings while its original sources still qualify,
+  before any separately approved NULL correction. After the audited correction, each pending leaf needs its own
+  current privacy proof; the bridge then reuses the original reading and anchor. Provider authentication, an explicit
+  cumulative paid-attempt budget and source/correction approval are prerequisites. An expanded cohort never resets
+  the existing pilot's attempts or activates general historical enrollment.
+- **Heat is a budget.** Nothing reads originals in bulk while the app is open: iCloud originals download only in
+  the background job on Wi-Fi; the album review (originals + accurate OCR) runs in the foreground only on a
+  charger at a nominal temperature (`LibraryIngest.mayReviewInForeground`); a foreground backfill slice waits
+  when the phone is already warm (`SyncEngine.deviceWarm`); polls pause when the app is not active. Low Power
+  Mode holds uploads only on battery (`SyncEngine.lowPowerHolds`): on a charger only heat holds them. A new loop
+  that reads photos or the network states its bound and its thermal gate. The 2026-10-15 audit of every
+  launch-time cost is in the PR that added this rule.
+- **A failed read says why.** `ReadFailure.text(error)` (SupabaseService.swift): no connection, a server timeout,
+  an HTTP status, a refused sign-in. "Check your connection" was the copy for every failure, including the
+  board's server-side 500s.
 - **Money is never anonymous.** The readers mask it at the source (#1037, #1046, #1048, and the day
   receipt since June); the phone also renders the ledger and value curve only when the read's viewer is
   not `anon`, failing closed without a document. OCR text regions from a day receipt are rendered as
@@ -65,11 +189,19 @@ Standing rules the code carries:
 - **An estimate is defended or absent.** The web's `marketDefends` rule: an estimate shows only against a
   typed price (sold, bid, ask) or a live listing; an unlisted car, such as an owner's build, shows none, on
   screen and on the share card.
-- **Explore opens as the Market tab opens.** The ledger as a map first (`LedgerMap.swift`: `treemap_by_brand`,
-  `treemap_models_by_brand`, `treemap_years`, then the `vehicles` leaf, the web's readers column for column; area =
-  count, color = median, the web's captions; the unreadable tail folded into a box of its own cells with the list
-  behind its title, as the inventory map folds its tail), the open board below it (web #1061). A capped level
-  (200 models a brand, 200 records a model) states its denominator.
+- **Explore keeps the ledger cohort explicit.** `LedgerMapView` browses make → family → model → year → sale,
+  including a family with one model. Map/List preserves scope; Chart is deliberate, and Back returns one step.
+  The confirmed-sales header opens that cohort's contributors as a list. All-sales colors are neutral; Refine
+  and activity comparisons start closed. Optional comparison means sales activity share within its declared
+  source cohort, not appreciation; custom windows stay on the activity board with a neutral map. The all-time
+  ledger, five-year family chart ($500+; at most 600 plotted rows) and sale leaf (at most 200 rows) retain distinct
+  labels. Native make labels use the shared bundled `MakeIdentityView`, with readable missing-artwork text.
+- **Context survives the scroll.** The global live board, calendar and source directory start with an explicit
+  All Makes boundary after the selected ledger cohort. Source rows use recorded artwork and source type;
+  operational arrivals and census comparisons belong under Data coverage. A source introduction leads to its
+  linked vehicle records inside Nuke. Preserve source record-date precision and keep intake clocks separate;
+  an ingestion timestamp is not a new listing. Unknown vehicle bindings stay unresolved, with the attributed
+  source headline and original URL behind a deliberate Source disclosure. Counts and sample limits remain qualified.
 - **The board is the web's board.** `market_pulse_live` is read once per 30 s and rendered as nuke.ag renders it:
   bids in dollars (BaT runs every auction in USD; web #1061), the heat tag per lot computed exactly as
   `MarketPulse.tsx heatOf` (curve share by tier at hours left, typical = band p50 × share, hot ≥ 1.25×, cold ≤ 0.8×,
@@ -77,6 +209,18 @@ Standing rules the code carries:
   record of lots tagged this way is typed into the web page, not carried by a read, so the phone states that and
   waits (market lane plans a table + view, 2026-10-13). Prove a board change lot-for-lot against the live site as a
   stranger (Playwright pattern in memory `reference_logged_out_live_check_playwright.md`).
+- **Current-bid ranges use the loaded live board.** Live offers the web's six USD bid ranges, including
+  Unrecorded. Zero is recorded under $10,000; absent, negative and nonfinite bids are unrecorded. Map and
+  supporting rows share the auction window and bid range; the selection count states its make/decade/window
+  denominator and evaluation clock. A make or window change clears the bid range, and Any current bid restores
+  all eligible rows. Filtering starts no read or inference; these are current bids, not sold prices or valuations.
+- **Calendar rosters continue through the same read.** Live → Calendar uses `auction_calendar_read`, a 200-day
+  horizon and explicit 100-lot pages, as the web does. More lots reads only on request. A changed read-model build,
+  server day, total or repeated contributor refuses page stitching and offers refresh; a missing build clock or
+  prematurely empty page leaves coverage incomplete. Retained lots are distinct from the house's listed roster.
+  A lot opens its vehicle and the house's HTTPS source; earlier records retain their occurrence day, currency,
+  source outcome and unconfirmed basis. Public source amounts are distinct from private ledger/value-curve money.
+  Calendar and roster failures retain prior results and offer retry; no read triggers intake or inference.
 - **Coverage on every counter.** A count without its population and clock is not shown; say "unknown"
   instead of guessing (fleet-relative reporting, `docs/ledger/theory/data-machine.md`).
 - **No fabricated data anywhere,** including DEBUG builds and screenshots (`docs/design/CONSTRAINTS.md` C0).
@@ -157,6 +301,16 @@ context, not independent confirmation.
 The pass retains raw OCR lines as well as modern VIN-shaped candidates, so shorter
 classic-vehicle serials are preserved for later identity review. It is a source and
 coverage foundation; it does not yet identify every vehicle from appearance.
+
+Customer cloud subject analysis uses Nuke's server credential and existing prepaid
+wallet, following the owner's 2026-10-18 direction. Customers do not connect a
+provider key for this path. The resolver reserves a bounded amount before one
+provider call and settles only after protected reading storage acknowledges it.
+Cached reading replay performs no inference or new charge. Uncertain transport or
+settlement outcomes retain a pending reservation rather than starting another paid
+call. The platform key, monetary migration and phone runtime must be verified
+before claiming this path is active; monthly plan fulfillment is not established
+by this wallet integration.
 
 The own-user profile opens this same album/source viewer. Its local projection
 matches complete OCR serial tokens against the account's cached exact vehicles,

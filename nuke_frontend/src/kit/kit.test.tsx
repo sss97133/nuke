@@ -50,6 +50,44 @@ describe('ClaimView', () => {
     expect(document.body.textContent).toContain('Sep 21, 2026');
     expect(document.body.textContent).toContain('BaT');
     expect(document.body.textContent).toContain('90%');
+    expect(document.body.querySelector('img.k-claim__logo')?.getAttribute('src')).toBe('/source-logos/bat.png');
+  });
+
+  it('shows the auction PNG logo, lot number, and opens the sale moment video popup when clicked', () => {
+    render(<ClaimView label="Last recorded sale" role="measure" format={v => '$' + Number(v).toLocaleString('en-US')}
+      claim={{
+        value: 242000,
+        unit: 'USD',
+        source: {
+          kind: 'listing',
+          url: 'https://www.mecum.com/lots/1128139/1971-plymouth-hemi-road-runner/',
+          label: 'MECUM',
+          method: 'sold',
+          lotNumber: 'F162.1',
+          auctionName: 'Kissimmee 2025',
+          video: {
+            url: 'https://www.youtube.com/watch?v=dQw4w9WgXcQ',
+            startSeconds: 185,
+            lotNumber: 'F162.1',
+            auctionName: 'Kissimmee 2025',
+            title: '1971 Plymouth Hemi Road Runner',
+            priceText: '$242,000',
+          },
+        },
+        observed_at: '2025-01-17',
+        trust: 0.9,
+      }} />);
+    act(() => (host.querySelector('button.k-claim__value') as HTMLButtonElement).click());
+    expect(document.body.querySelector('img.k-claim__logo')?.getAttribute('src')).toBe('/source-logos/mecum.png');
+    expect(document.body.textContent).toContain('Lot F162.1 · Kissimmee 2025');
+    const playBtn = document.body.querySelector('button.k-claim__play-btn') as HTMLButtonElement;
+    expect(playBtn).not.toBeNull();
+    expect(playBtn.textContent).toContain('Watch sale moment (3:05)');
+    act(() => playBtn.click());
+    const iframe = document.body.querySelector('iframe.k-video-modal__iframe') as HTMLIFrameElement;
+    expect(iframe).not.toBeNull();
+    expect(iframe.getAttribute('src')).toContain('https://www.youtube.com/embed/dQw4w9WgXcQ');
+    expect(iframe.getAttribute('src')).toContain('start=185');
   });
 });
 

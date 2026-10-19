@@ -46,17 +46,146 @@ function cleanVin(raw) {
 
 function normalizeBodyStyle(raw) {
   const bs = raw.trim().toLowerCase();
+  const collectorMap = {
+    "split-window coupe": "Split-Window Coupe",
+    "split window coupe": "Split-Window Coupe",
+    "gullwing coupe": "Gullwing Coupe",
+    "stepside": "Stepside",
+    "flareside": "Flareside",
+    "fleetside": "Fleetside",
+    "styleside": "Styleside",
+    "sweptline": "Sweptline",
+    "short bed": "Short Bed",
+    "short-bed": "Short Bed",
+    "long bed": "Long Bed",
+    "long-bed": "Long Bed",
+    "half-cab": "Half-Cab",
+    "half cab": "Half-Cab",
+    "2-door hardtop": "2-Door Hardtop",
+    "2 door hardtop": "2-Door Hardtop",
+    "sport coupe": "2-Door Hardtop",
+    "t-top": "T-Top",
+    "crew cab": "Crew Cab",
+    "panel": "Panel",
+  };
+  for (const [key, val] of Object.entries(collectorMap)) {
+    if (bs.includes(key)) return val;
+  }
   const map = {
     coupe: "Coupe", "coupé": "Coupe", convertible: "Convertible",
     cabriolet: "Convertible", roadster: "Roadster", sedan: "Sedan",
     saloon: "Sedan", wagon: "Wagon", estate: "Wagon", hatchback: "Hatchback",
-    truck: "Truck", pickup: "Truck", suv: "SUV", van: "Van", targa: "Targa",
-    speedster: "Speedster",
+    truck: "Pickup", pickup: "Pickup", suv: "SUV", van: "Van", targa: "Targa",
+    speedster: "Speedster", hardtop: "Hardtop", fastback: "Fastback",
   };
   for (const [key, val] of Object.entries(map)) {
     if (bs.includes(key)) return val;
   }
   return null;
+}
+
+function extractFacetsFromText(title, make, model, rawStyle, description) {
+  const primary = [title, model, rawStyle].filter(Boolean).join(" ");
+  const descSafe = (description || "").replace(
+    /\b(?:corvette|camaro|chevelle|mustang(?:\s+ii)?|crown\s+victoria|cobra\s+jet)\s+(?:engine|motor|v8|ls\d|lt\d|front\s+end|front\s+suspension|rear\s+end|subframe|brakes|trans(?:mission)?)\b/gi,
+    " "
+  );
+  const full = `${primary} ${descSafe}`;
+  let series = null;
+  let trim = null;
+  let body_style = rawStyle ? normalizeBodyStyle(rawStyle) : null;
+  let canonicalModel = model;
+
+  // GM Trucks (C10 / K10 / C20 / K20 / 3100 / Apache / Cameo / Blazer / Suburban)
+  const truckCode = primary.match(/\b([CKRV]\s*-?\s*(?:10|15|20|25|30|35|1500|2500|3500)|3100|3600|3800|APACHE|CAMEO)\b/i);
+  if (truckCode) {
+    const rawCode = truckCode[1].toUpperCase().replace(/[\s-]+/g, "");
+    const codeMap = { K15: "K1500", C15: "C1500", K25: "K2500", C25: "C2500", K35: "K3500", C35: "C3500", CAMEO: "Cameo", APACHE: "Apache" };
+    series = codeMap[rawCode] || rawCode;
+    canonicalModel = series;
+    const gmTrims = [
+      [/\bCHEYENNE\s+SUPER\b/i, "Cheyenne Super"],
+      [/\bCUSTOM\s+DELUXE\b/i, "Custom Deluxe"],
+      [/\bSILVERADO\b/i, "Silverado"],
+      [/\bCHEYENNE\b/i, "Cheyenne"],
+      [/\bSCOTTSDALE\b/i, "Scottsdale"],
+      [/\bBIG\s*10\b/i, "Big 10"],
+      [/\b454\s*SS\b/i, "454 SS"],
+      [/\b(?:CST|CUSTOM\s+SPORT\s+TRUCK)\b/i, "CST"],
+      [/\bSIERRA\s+CLASSIC\b/i, "Sierra Classic"],
+      [/\bSIERRA\s+GRANDE\b/i, "Sierra Grande"],
+      [/\bHIGH\s+SIERRA\b/i, "High Sierra"],
+      [/\bCAMEO\s+CARRIER\b/i, "Cameo Carrier"],
+    ];
+    for (const [re, label] of gmTrims) {
+      if (re.test(full)) { trim = label; break; }
+    }
+    body_style = normalizeBodyStyle(primary) || normalizeBodyStyle(full) || body_style || "Pickup";
+  } else if (/\bCHEVELLE\b/i.test(primary)) {
+    canonicalModel = "Chevelle";
+    if (/\bSS\s*454\b|\b454\s*SS\b/i.test(full)) {
+      series = "SS 454";
+      trim = /\bLS6\b/i.test(full) ? "SS 454 LS6" : "SS 454";
+    } else if (/\bSS\s*396\b|\b396\s*SS\b/i.test(full)) {
+      series = "SS 396";
+      trim = /\bL78\b/i.test(full) ? "SS 396 L78" : "SS 396";
+    } else if (/\bMALIBU\s+SS\b/i.test(full)) {
+      series = "Malibu SS";
+      trim = "Malibu SS";
+    }
+    body_style = normalizeBodyStyle(primary) || body_style;
+  } else if (/\bBRONCO\b/i.test(primary)) {
+    canonicalModel = "Bronco";
+    if (/\bU13\b|\bROADSTER\b/i.test(full)) series = "U13 Roadster";
+    else if (/\bU14\b|\bHALF[-\s]?CAB\b/i.test(full)) series = "U14 Half-Cab";
+    else if (/\bU15\b/i.test(full)) series = "U15 Wagon";
+    if (/\bRANGER\b/i.test(full)) trim = "Ranger";
+    else if (/\bSPORT\b/i.test(full)) trim = "Sport";
+    else if (/\bEDDIE\s+BAUER\b/i.test(full)) trim = "Eddie Bauer";
+    else if (/\bXLT\b/i.test(full)) trim = "XLT";
+    if (!series && (trim === "Ranger" || trim === "Sport")) series = "U15 Wagon";
+    body_style = normalizeBodyStyle(primary) || (series === "U14 Half-Cab" ? "Half-Cab" : series === "U13 Roadster" ? "Roadster" : body_style || "SUV");
+  } else if (/\bCORVETTE\b/i.test(primary)) {
+    canonicalModel = "Corvette";
+    if (/\bSPLIT[-\s]?WINDOW\b/i.test(full)) {
+      series = "Sting Ray";
+      trim = "Split-Window";
+      body_style = "Split-Window Coupe";
+    } else if (/\bL88\b/i.test(full)) {
+      series = "L88";
+      trim = "L88";
+    } else if (/\b427\s*\/\s*435\b/i.test(full)) {
+      series = "427";
+      trim = "427/435";
+    } else if (/\b427\b/i.test(primary)) {
+      series = "427";
+      trim = "427";
+    } else if (/\bSTING\s+RAY\b/i.test(full)) {
+      series = "Sting Ray";
+    } else if (/\bSTINGRAY\b/i.test(full)) {
+      series = "Stingray";
+    }
+    if (!body_style) body_style = normalizeBodyStyle(primary);
+  } else if (/\b(?:ROAD\s+RUNNER|SUPERBIRD|GTX|BARRACUDA|'CUDA|CUDA)\b/i.test(primary)) {
+    if (/\bSUPERBIRD\b/i.test(primary)) { canonicalModel = "Superbird"; series = "Superbird"; }
+    else if (/\bROAD\s+RUNNER\b/i.test(primary)) { canonicalModel = "Road Runner"; series = "Road Runner"; }
+    else if (/\bGTX\b/i.test(primary)) { canonicalModel = "GTX"; series = "GTX"; }
+    else {
+      canonicalModel = "Barracuda";
+      if (/\bHEMI\s*'?\s*CUDA\b/i.test(full)) series = "Hemi 'Cuda";
+      else if (/\bAAR\s*'?\s*CUDA\b/i.test(full)) series = "AAR 'Cuda";
+      else if (/\bFORMULA\s+S\b/i.test(full)) series = "Formula S";
+      else if (/\b'?\s*CUDA\b/i.test(primary)) series = "'Cuda";
+    }
+    if (/\b426\s+HEMI\b|\bHEMI\b/i.test(full)) trim = "426 Hemi";
+    else if (/\b440\s*(?:SIX\s+BARREL|6\s*BBL)\b/i.test(full)) trim = "440 Six Barrel";
+    else if (/\b440\s*(?:SIX\s+PACK|6\s*PACK)\b/i.test(full)) trim = "440 Six Pack";
+    else if (/\bAAR\b/i.test(full)) trim = "AAR";
+    else if (/\bFORMULA\s+S\b/i.test(full)) trim = "Formula S";
+    body_style = normalizeBodyStyle(primary) || body_style;
+  }
+
+  return { model: canonicalModel, series, trim, body_style };
 }
 
 function normalizeDrivetrain(raw) {
@@ -82,7 +211,14 @@ function parseBarrettJacksonHtml(rawHtml) {
   // BJ uses Next.js RSC with double-escaped JSON in self.__next_f.push() calls.
   const html = rawHtml.replace(/\\\\"/g, '"').replace(/\\"/g, '"');
 
+  // Strategy 0: RSC JSON title
+  const rscTitleMatch = html.match(/"title"\s*:\s*"(\d{4}\s+[^"]+)"/);
+  if (rscTitleMatch) {
+    result.listing_title = titleCase(rscTitleMatch[1].trim());
+  }
+
   // Strategy 1: Full RSC JSON data (year/make/model/style)
+  let rawStyle = null;
   const ymmMatch = html.match(
     /"year"\s*:\s*"(\d{4})"\s*,\s*"make"\s*:\s*"([^"]+)"\s*,\s*"model"\s*:\s*"([^"]+)"\s*,\s*"style"\s*:\s*"([^"]*)"/
   );
@@ -91,7 +227,7 @@ function parseBarrettJacksonHtml(rawHtml) {
     result.make = titleCase(ymmMatch[2]);
     result.model = titleCase(ymmMatch[3]);
     if (ymmMatch[4]) {
-      result.trim = titleCase(ymmMatch[4]);
+      rawStyle = titleCase(ymmMatch[4]);
       const bs = normalizeBodyStyle(ymmMatch[4]);
       if (bs) result.body_style = bs;
     }
@@ -212,6 +348,19 @@ function parseBarrettJacksonHtml(rawHtml) {
     if (hp) result.horsepower = parseInt(hp[1]);
   }
 
+  // Extract canonical series, trim_package, and body_style_facet from headline + description
+  const facets = extractFacetsFromText(
+    result.listing_title,
+    result.make,
+    result.model,
+    rawStyle,
+    result.description
+  );
+  if (facets.model) result.model = facets.model;
+  if (facets.series) result.series = facets.series;
+  if (facets.trim) result.trim = facets.trim;
+  if (facets.body_style) result.body_style = facets.body_style;
+
   return result;
 }
 
@@ -280,7 +429,7 @@ async function main() {
 
       const { data: vBatch } = await sb
         .from("vehicles")
-        .select("id, listing_url, discovery_url, vin, description, color, engine_type, engine_displacement, transmission, sale_price, interior_color, body_style, drivetrain, mileage, horsepower, trim")
+        .select("id, listing_url, discovery_url, vin, description, color, engine_type, engine_displacement, transmission, sale_price, interior_color, body_style, drivetrain, mileage, horsepower, series, trim, listing_title")
         .is("deleted_at", null)
         .or(
           variants.map(u => `listing_url.eq.${u}`).join(",") + "," +
@@ -345,7 +494,8 @@ async function main() {
             engine_displacement: "engine_displacement", transmission: "transmission",
             drivetrain: "drivetrain", body_style: "body_style", color: "color",
             interior_color: "interior_color", description: "description",
-            sale_price: "sale_price", horsepower: "horsepower", trim: "trim",
+            sale_price: "sale_price", horsepower: "horsepower",
+            series: "series", trim: "trim", listing_title: "listing_title",
           };
 
           const updatePayload = {};

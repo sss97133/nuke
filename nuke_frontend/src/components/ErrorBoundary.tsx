@@ -1,5 +1,6 @@
 import React, { Component, ErrorInfo, ReactNode } from 'react';
 import { AlertTriangle, RefreshCw, Home, Bug } from 'lucide-react';
+import AppErrorBoundary from './util/ErrorBoundary';
 
 interface Props {
   children: ReactNode;
@@ -37,6 +38,9 @@ class ErrorBoundary extends Component<Props, State> {
   }
 
   componentDidCatch(error: Error, errorInfo: ErrorInfo) {
+    // Route errors are caught here before the app boundary or window handlers see them.
+    AppErrorBoundary.maybeReloadForChunkError(error);
+
     // Log error details
     console.error('ErrorBoundary caught an error:', error);
     console.error('Error info:', errorInfo);

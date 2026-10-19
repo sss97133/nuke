@@ -12,7 +12,7 @@ import { supabase } from '../lib/supabase';
 import type { ManifestDevice } from '../components/wiring/overlayCompute';
 import { BUILD_MANIFEST_PUBLIC_COLUMNS } from '../lib/buildManifestColumns';
 import { useOverlayCompute } from '../components/wiring/useOverlayCompute';
-import { DeviceDetailPanel } from '../components/wiring/DeviceDetailPanel';
+import { DeviceDetailPanel, type LivePlug } from '../components/wiring/DeviceDetailPanel';
 import { CommandPalette } from '../components/wiring/CommandPalette';
 import { useDRC } from '../components/wiring/useDRC';
 import HarnessModelView from '../components/wiring/model/HarnessModelView';
@@ -182,6 +182,70 @@ export default function WiringPlan() {
     }
     init();
   }, [vehicleId]);
+
+  // ── The live harness model's plugs, by part number: a manifest device that is one of them shows its pins from the
+  // model (live wire ends), not the April pin map. Same reads and filters as the MAP tab (useWiringMap). ──
+  const [livePlugsByPart, setLivePlugsByPart] = useState<Record<string, LivePlug[]>>({});
+  useEffect(() => {
+    if (!vehicleId) return;
+    let cancelled = false;
+    (async () => {
+      const [designs, overlays] = await Promise.all([
+        supabase.from('harness_designs').select('id').eq('vehicle_id', vehicleId),
+        supabase.from('vehicle_wiring_overlays').select('id').eq('vehicle_id', vehicleId),
+      ]);
+      const designIds = (designs.data ?? []).map(d => d.id as string);
+      const overlayIds = (overlays.data ?? []).map(o => o.id as string);
+      if (!designIds.length || !overlayIds.length) return;
+      const [eps, wires, ends] = await Promise.all([
+        supabase.from('harness_endpoints').select('id, code, part_number')
+          .in('design_id', designIds).eq('is_superseded', false).not('code', 'is', null).limit(2000),
+        supabase.from('vehicle_custom_circuits').select('id, circuit_code, wire_gauge_awg, wire_color')
+          .in('overlay_id', overlayIds).eq('is_superseded', false).limit(3000),
+        supabase.from('wire_termination_specs').select('circuit_id, endpoint_id, cavity')
+          .eq('vehicle_id', vehicleId).eq('is_superseded', false).not('circuit_id', 'is', null).limit(3000),
+      ]);
+      if (cancelled || eps.error || wires.error || ends.error) return;
+      const epById = new Map((eps.data ?? []).map(e => [e.id as string, e as { id: string; code: string; part_number: string | null }]));
+      const wireById = new Map((wires.data ?? []).map(w => [w.id as string, w as { circuit_code: string; wire_gauge_awg: number | null; wire_color: string | null }]));
+      const endsByWire = new Map<string, { endpoint_id: string; cavity: string | null }[]>();
+      for (const t of (ends.data ?? []) as { circuit_id: string; endpoint_id: string; cavity: string | null }[]) {
+        if (!endsByWire.has(t.circuit_id)) endsByWire.set(t.circuit_id, []);
+        endsByWire.get(t.circuit_id)!.push(t);
+      }
+      const plugs = new Map<string, LivePlug>();
+      for (const [wireId, wireEnds] of endsByWire) {
+        const w = wireById.get(wireId);
+        if (!w) continue;
+        for (const t of wireEnds) {
+          const ep = epById.get(t.endpoint_id);
+          if (!ep?.part_number) continue;
+          // every other end of the wire (a firewall crossing has its mate and both far ends), in the order written
+          const others = wireEnds.filter(o => o !== t && o.endpoint_id !== t.endpoint_id)
+            .map(o => `${epById.get(o.endpoint_id)?.code ?? '?'}${o.cavity ? ` ${o.cavity}` : ''}`);
+          if (!plugs.has(ep.id)) plugs.set(ep.id, { code: ep.code, pins: [] });
+          plugs.get(ep.id)!.pins.push({
+            cavity: t.cavity, wire: w.circuit_code, awg: w.wire_gauge_awg, color: w.wire_color,
+            other: others.length ? others.join(' · ') : null,
+          });
+        }
+      }
+      const byPart: Record<string, LivePlug[]> = {};
+      for (const [id, plug] of plugs) {
+        plug.pins.sort((a, b) => (a.cavity ?? '').localeCompare(b.cavity ?? '', 'en', { numeric: true }) || a.wire.localeCompare(b.wire));
+        for (const pn of String(epById.get(id)?.part_number ?? '').split(',')) {
+          const key = pn.trim().toUpperCase();
+          if (key) (byPart[key] ??= []).push(plug);
+        }
+      }
+      setLivePlugsByPart(byPart);
+    })();
+    return () => { cancelled = true; };
+  }, [vehicleId]);
+  const selectedLivePlugs = useMemo(
+    () => (selectedDevice?.model_number ? livePlugsByPart[selectedDevice.model_number.trim().toUpperCase()] ?? [] : []),
+    [selectedDevice, livePlugsByPart]
+  );
 
   // ── Load pin maps once ──
   useEffect(() => {
@@ -515,6 +579,7 @@ export default function WiringPlan() {
         {/* ── Detail Panel (slides in from right) ── */}
         <DeviceDetailPanel
           device={selectedDevice}
+          livePlugs={selectedLivePlugs}
           wire={selectedWire}
           result={overlay.result}
           devices={overlay.devices}

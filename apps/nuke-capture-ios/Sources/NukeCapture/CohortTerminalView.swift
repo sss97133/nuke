@@ -175,6 +175,7 @@ struct CohortTerminalView: View {
     @State private var sentiment: CohortSentiment?   // per-comment 2-axis map (get_make_model_sentiment_points)
     @State private var loaded = false
     @State private var loadError = false
+    @State private var failureText: String?
     @State private var drillVehicle: VehicleHeaderRow?   // a comp row / card → its real vehicle record
     @State private var cardSale: SalePoint?              // a tapped dot → its snapshot card
     @State private var pendingPush: String?              // card → "open full profile" after dismiss
@@ -186,9 +187,9 @@ struct CohortTerminalView: View {
                 resolvedBody(t)
             } else if loadError {
                 ContentUnavailableView {
-                    Label("Couldn't load the cohort", systemImage: "wifi.exclamationmark")
+                    Label("Couldn't load the cohort", systemImage: "exclamationmark.triangle")
                 } description: {
-                    Text("Check your connection.")
+                    Text(failureText ?? "The read failed.")
                 } actions: {
                     Button("Retry") { Task { await load() } }
                         .buttonStyle(.borderedProminent)
@@ -702,6 +703,7 @@ struct CohortTerminalView: View {
             #endif
         } catch {
             loadError = true
+            failureText = ReadFailure.text(error)
             NSLog("NukeCapture cohort terminal load failed: %@", String(describing: error))
         }
     }
@@ -1112,7 +1114,7 @@ struct ProductionProvenanceSheet: View {
             } else if !loaded {
                 HStack(spacing: 8) { ProgressView(); Text("Loading…").font(.footnote).foregroundStyle(.secondary) }
             } else if loadFailed {
-                Label("Couldn't load production records", systemImage: "wifi.exclamationmark").font(.footnote).foregroundStyle(.secondary)
+                Label("Couldn't load production records", systemImage: "exclamationmark.triangle").font(.footnote).foregroundStyle(.secondary)
             } else {
                 Text("Year total not yet cited. The reverse census below is what Nuke has documented so far.")
                     .font(.footnote).foregroundStyle(.tertiary).fixedSize(horizontal: false, vertical: true)

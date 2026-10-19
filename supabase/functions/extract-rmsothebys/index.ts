@@ -34,6 +34,8 @@ import { collectLots, type CollectedLots } from './lotPaging.ts';
 import { parseTitle } from './lotTitle.ts';
 import { forEachConcurrent, readConcurrency } from './concurrency.ts';
 import { saveVehicle as saveVehicleWith, type ExtractedVehicle, type SaveDeps } from './saveVehicle.ts';
+import { extractVehicleFacets } from '../_shared/vehicleFacets.ts';
+import { normalizeVehicleFields } from '../_shared/normalizeVehicle.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -42,38 +44,38 @@ const corsHeaders = {
 
 const RM_SOTHEBYS_WEBSITE = 'https://rmsothebys.com';
 
-interface RMSLotItem {
+export interface RMSLotItem {
   id: string;
-  auctionId: string;
+  auctionId?: string;
   header: string;
   publicName: string;
   lot: string;
-  collection: string;
+  collection?: string | null;
   value: string;
   valueType: string;
-  preSaleEstimate: string;
-  canViewLotDetails: boolean;
+  preSaleEstimate?: string | null;
+  canViewLotDetails?: boolean;
   link: string;
-  styleClass: string;
-  auctionStyleName: string;
-  isRecentlyPosted: boolean;
-  auctioned: boolean;
-  canDisplayCurrentBid: boolean;
+  styleClass?: string;
+  auctionStyleName?: string;
+  isRecentlyPosted?: boolean;
+  auctioned?: boolean | null;
+  canDisplayCurrentBid?: boolean;
   sold: boolean;
-  crop: string;
-  alt: string;
+  crop?: string | null;
+  alt?: string;
   isStillForSale: boolean;
-  locationFlag: string;
+  locationFlag?: string;
   biddingLotId: string;
   biddingAuctionId: string;
   biddingType: string;
-  newWindow: boolean;
-  specialist: string;
-  referenceId: string;
+  newWindow?: boolean;
+  specialist?: string;
+  referenceId?: string;
   /** RM's category: 1 automobile, 2 automobilia, 3 motorcycle, 4 watercraft (see lotKind.ts). */
   categoryId?: number;
-  isFavourite: boolean;
-  won: boolean | null;
+  isFavourite?: boolean;
+  won?: boolean | null;
 }
 
 // Parse value like "EUR 5,500,000" or "Sold For EUR 1,200,000"
@@ -144,9 +146,23 @@ async function fetchAuctionLots(auctionCode: string): Promise<CollectedLots<RMSL
 }
 
 // Transform API item to extracted vehicle
-function transformLotItem(item: RMSLotItem, auctionCode: string): ExtractedVehicle {
+export function transformLotItem(item: RMSLotItem, auctionCode: string): ExtractedVehicle {
   const { year, make, model } = parseTitle(item.publicName);
   const { amount, currency, text: valueText } = parseValue(item.value, item.valueType);
+  const lotUrl = rmLotUrl(item.link);
+  const facets = extractVehicleFacets({
+    year,
+    make,
+    model,
+    title: item.publicName,
+    url: lotUrl,
+  });
+  const normalized = normalizeVehicleFields({
+    year,
+    make,
+    model,
+    body_style: facets.body_style_facet,
+  });
 
   // Determine if this is a sold price or estimate. "Not Sold" contains "sold": the old includes()
   // test turned unsold lots' low estimates into sale prices (82 rows measured 2026-09-27; lock 1
@@ -157,11 +173,14 @@ function transformLotItem(item: RMSLotItem, auctionCode: string): ExtractedVehic
   const estimateText = !isSold ? valueText : item.preSaleEstimate || null;
 
   return {
-    url: rmLotUrl(item.link), // the API returns absolute links since 2026-10; site-relative ones still get the origin
+    url: lotUrl, // the API returns absolute links since 2026-10; site-relative ones still get the origin
     title: item.publicName,
     year,
     make,
     model,
+    series: facets.series_code,
+    trim: facets.trim_package,
+    body_style: normalized.body_style ?? facets.body_style_facet,
     lot_number: item.lot,
     auction_name: item.header,
     auction_code: auctionCode.toUpperCase(),
@@ -216,7 +235,7 @@ function lotReport(collected: CollectedLots<RMSLotItem>, part: LotPartition<Extr
   };
 }
 
-Deno.serve(async (req) => {
+if (import.meta.main) Deno.serve(async (req) => {
   // Writes are never anonymous: service key, signed-in user, or nothing (P0.2, 2026-09-27).
   const denied = await requireWriteAuth(req);
   if (denied) return denied;
@@ -232,7 +251,8 @@ Deno.serve(async (req) => {
 
     const supabase = createClient(
       Deno.env.get('SUPABASE_URL')!,
-      projectSecretKey()!
+      projectSecretKey()!,
+      { global: { headers: { 'X-Nuke-Writer': 'extract-rmsothebys' } } },
     );
 
     console.log(`[RMS] Action: ${action}, Auction: ${auction || 'N/A'}`);
@@ -583,6 +603,9 @@ Deno.serve(async (req) => {
 
       if (save_to_db) {
         const saved = await saveVehicle(supabase, vehicle);
+        if ('skipped' in saved && saved.skipped === 'different_car') {
+          return okJson({ success: false, refused: 'different_car', vehicle_id: saved.vehicleId, detail: saved.detail, vehicle }, 409);
+        }
         if ('skipped' in saved) {
           return okJson({ success: false, skipped: true, skip_reason: saved.skipped, error: `No vehicle data found: ${saved.skipped}`, vehicle });
         }

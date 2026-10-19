@@ -2,11 +2,15 @@
 import React, { act } from 'react';
 import { createRoot } from 'react-dom/client';
 import { BrowserRouter } from 'react-router-dom';
-import { afterEach, beforeEach, expect, it, vi } from 'vitest';
-const fixture = vi.hoisted(() => ({ query: {} as any, source: vi.fn(), more: vi.fn(), board: vi.fn(), boardQuery: {} as any }));
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+const fixture = vi.hoisted(() => ({ query: {} as any, source: vi.fn(), more: vi.fn(), board: vi.fn(), poll: vi.fn(), refresh: vi.fn(), boardQuery: {} as any, photos: vi.fn(), photoMap: new Map() as Map<string, any[]>, admin: false, analyze: vi.fn() }));
 vi.mock('./useCapturedListings', async original => ({ ...await original<typeof import('./useCapturedListings')>(), useCapturedListings: (source: string, enabled = true) => { if (enabled) fixture.source(source); return fixture.query; } }));
-vi.mock('./useAskBoard', async original => ({ ...await original<typeof import('./useAskBoard')>(), useAskBoard: (q: any, enabled = true) => { fixture.board(q, enabled); return fixture.boardQuery; } }));
+vi.mock('./useAskBoard', async original => ({ ...await original<typeof import('./useAskBoard')>(), readAskBoard: fixture.poll, useAskBoard: (q: any, enabled = true) => { fixture.board(q, enabled); return fixture.boardQuery; } }));
+vi.mock('./useListingPhotos', async original => ({ ...await original<typeof import('./useListingPhotos')>(), useListingPhotos: (pages: string[][]) => { fixture.photos(pages); return fixture.photoMap; } }));
+vi.mock('../../hooks/useAdminAccess', () => ({ useAdminAccess: () => ({ isAdmin: fixture.admin, loading: false, refresh: () => {} }) }));
+vi.mock('./analyzeListing', async original => ({ ...await original<typeof import('./analyzeListing')>(), requestListingRead: fixture.analyze }));
 vi.mock('./MarketPulse', () => ({ default: ({ collection }: any) => <section>Existing BaT bid board{collection}</section> }));
+vi.mock('./AuctionCalendar', () => ({ default: ({ collection }: any) => <section>Calendar fixture{collection}</section> }));
 vi.mock('./PrivateCaptureHistory', () => ({ default: () => null }));
 vi.mock('../../components/PrefetchLink', () => ({ PrefetchLink: ({ to, children, ...props }: any) => <a href={to} {...props}>{children}</a> }));
 import MarketInventory from './MarketInventory';
@@ -14,7 +18,13 @@ let container: HTMLDivElement, root: ReturnType<typeof createRoot>;
 beforeEach(() => {
   (globalThis as any).IS_REACT_ACT_ENVIRONMENT = true;
   container = document.createElement('div'); document.body.appendChild(container); root = createRoot(container);
-  fixture.source.mockClear(); fixture.more.mockClear(); fixture.board.mockClear();
+  fixture.source.mockClear(); fixture.more.mockClear(); fixture.board.mockClear(); fixture.photos.mockClear(); fixture.analyze.mockReset(); fixture.admin = false;
+  fixture.poll.mockReset(); fixture.refresh.mockReset();
+  fixture.photoMap = new Map([['v1', [
+    { vehicle_id: 'v1', image_url: 'https://images.craigslist.org/00b_fixtureB_600x450.jpg' },
+    { vehicle_id: 'v1', image_url: 'https://images.craigslist.org/00a_fixtureA_600x450.jpg' },
+    { vehicle_id: 'v1', image_url: 'https://images.craigslist.org/00b_fixtureB_600x450.jpg' },
+  ]]]);
   fixture.boardQuery = { data: { pages: [{ as_of: '2026-10-13T23:30:00Z', since: '2026-10-12T23:30:00Z', window_hours: 24, band_min_taste: 60, matching: 3,
     population: { asks: 374, priced: 368, with_point: 3, in_band: 67, by_source: { craigslist: 374 }, by_tier: { under_5k: 120, '5k_15k': 140, '15k_40k': 80, '40k_100k': 25, '100k_plus': 3, unpriced: 6 } },
     rows: [
@@ -23,37 +33,82 @@ beforeEach(() => {
         image: null, city: 'Phoenix', region: 'AZ', lat: 33.45, lng: -112.07, distance_mi: 256, taste: 96, in_band: true },
       { event_id: 'e2', vehicle_id: 'v2', source: 'craigslist', url: null, asking_price: null, tier: null, first_seen_at: '2026-10-13T21:00:00Z', posted_at: null,
         year: 1979, make: 'Ford', model: 'F-250', drivetrain: null, body_style: null, mileage: null, image: null, city: null, region: null, lat: null, lng: null, distance_mi: null, taste: 20, in_band: false },
-    ] }] }, hasNextPage: true, fetchNextPage: fixture.more, isPending: false, isError: false };
+    ] }] }, hasNextPage: true, fetchNextPage: fixture.more, refetch: fixture.refresh, isPending: false, isError: false };
   fixture.query = { data: { pages: [{ items: [{ id: 'listing', vehicle_id: null, vehicle: null, source_platform: 'craigslist', source_listing_id: '7000000000', source_url: 'https://www.craigslist.org/view/d/fixture-listing/SyntheticShareToken0000', current_price: 0, event_status: 'active', created_at: '2026-10-13T02:31:04Z', updated_at: '2026-10-13T02:32:00Z' }] }] }, hasNextPage: true, fetchNextPage: fixture.more };
 });
-afterEach(async () => { await act(async () => root.unmount()); container.remove(); });
+afterEach(async () => { await act(async () => root.unmount()); container.remove(); vi.useRealTimers(); vi.restoreAllMocks(); });
 async function render(query = 'collection=listings&source=craigslist') { window.history.replaceState({}, '', '/?' + query); await act(async () => root.render(<BrowserRouter><MarketInventory /></BrowserRouter>)); }
 it('opens the existing explorer at Market and keeps unresolved source presentations one explicit collection away', async () => {
   await render('tab=market');
   expect(container.textContent).toContain('Existing BaT bid board');
   expect(fixture.source).not.toHaveBeenCalled();
-  await act(async () => [...container.querySelectorAll('button')].find(b => b.textContent === 'Captured listings')!.click());
+  await act(async () => [...container.querySelectorAll('button')].find(b => b.textContent === 'Classifieds')!.click());
   expect(new URLSearchParams(window.location.search).get('tab')).toBe('market');
   expect(new URLSearchParams(window.location.search).get('collection')).toBe('listings');
-  expect(container.querySelector('h1')?.textContent).toBe('Classified arrivals');
+  expect(container.querySelector('h1')?.textContent).toBe('Classifieds');
   expect(fixture.source).not.toHaveBeenCalled();
   await act(async () => root.unmount()); root = createRoot(container);
   await render('tab=market&collection=listings&source=craigslist');
   expect(container.textContent).toContain('Vehicle unresolved'); expect(container.textContent).toContain('7000000000');
-  expect(container.textContent).toContain('$0 · asking'); expect(container.textContent).toContain('availability and source-wide coverage are unverified');
+  expect(container.querySelector('tbody tr td:nth-child(2)')?.textContent).toBe('0');
+  expect(container.textContent).toContain('Availability and source-wide coverage are unverified');
   expect(container.textContent).toContain('Source observation time unrecorded');
   expect(container.querySelector('a')?.getAttribute('href')).toContain('craigslist.org/view/d/');
   expect(container.querySelector('a[href^="/vehicle/"]')).toBeNull();
   await act(async () => [...container.querySelectorAll('button')].find(b => b.textContent === 'Load more listings')!.click());
   expect(fixture.more).toHaveBeenCalledOnce();
 });
+it('keeps retained auction and classified amounts neutral when their reader supplies no currency or price basis', async () => {
+  const original = fixture.query.data.pages[0].items[0];
+  fixture.query.data.pages[0].items = [
+    { ...original, id: 'auction', source_platform: 'bat', source_url: 'https://bringatrailer.com/listing/1963-chevrolet-corvette/', current_price: 125000, event_status: 'sold' },
+    { ...original, id: 'classified', current_price: 18800 },
+    { ...original, id: 'unknown', source_platform: 'mecum', current_price: null, event_status: 'unknown' },
+  ];
+  await render('collection=listings&source=');
+  const amounts = [...container.querySelectorAll('tbody tr td:nth-child(2)')].map(cell => cell.textContent);
+  expect(amounts).toEqual(['125,000', '18,800', 'Unrecorded']);
+  expect(container.textContent).toContain('Recorded amount');
+  expect(container.textContent).toContain('amount type and currency are unrecorded here');
+  expect(container.textContent).toContain('Recorded sold');
+  expect(container.querySelector('table')?.textContent).not.toMatch(/\$|asking|sale price|high bid/);
+  expect(container.textContent).not.toContain('US classifieds, in dollars');
+});
 it('keeps source filtering and Market navigation in the URL and retains existing auction deep links', async () => {
   await render('tab=market&source=craigslist'); expect(fixture.source).toHaveBeenLastCalledWith('craigslist');
   await act(async () => { const select = container.querySelector('select')!; select.value = 'ksl'; select.dispatchEvent(new Event('change', { bubbles: true })); });
   expect(new URLSearchParams(window.location.search).get('source')).toBe('ksl');
   expect(new URLSearchParams(window.location.search).get('tab')).toBe('market');
-  await act(async () => [...container.querySelectorAll('button')].find(b => b.textContent === 'BaT auctions')!.click());
+  await act(async () => [...container.querySelectorAll('button')].find(b => b.textContent === 'BaT live auctions')!.click());
   expect(container.textContent).toContain('Existing BaT bid board');
+});
+it('opens the auction calendar as a third collection and clears a chosen sale when leaving it', async () => {
+  await render('tab=market');
+  await act(async () => [...container.querySelectorAll('button')].find(b => b.textContent === 'Calendar')!.click());
+  expect(new URLSearchParams(window.location.search).get('collection')).toBe('calendar');
+  expect(container.textContent).toContain('Calendar fixture');
+  expect([...container.querySelectorAll('button')].map(b => b.textContent)).toEqual(expect.arrayContaining(['BaT live auctions', 'Classifieds']));
+  await act(async () => root.unmount()); root = createRoot(container);
+  await render('tab=market&collection=calendar&sale=mecum:fixture-2027');
+  await act(async () => [...container.querySelectorAll('button')].find(b => b.textContent === 'BaT live auctions')!.click());
+  expect(new URLSearchParams(window.location.search).get('sale')).toBeNull();
+  expect(container.textContent).toContain('Existing BaT bid board');
+});
+it('carries no lens from one collection into another: only the page params, vehicle scope, and the new collection survive a switch', async () => {
+  const kept = () => [...new URLSearchParams(window.location.search).keys()].sort();
+  await render('tab=market&force_treemap=1&collection=listings&source=ksl&near=1&sort=newest&radius=250');
+  await act(async () => [...container.querySelectorAll('button')].find(b => b.textContent === 'BaT live auctions')!.click());
+  expect(kept()).toEqual(['collection', 'force_treemap', 'tab']);
+  expect(new URLSearchParams(window.location.search).get('collection')).toBe('auctions');
+  expect(container.textContent).toContain('Existing BaT bid board');
+  await act(async () => root.unmount()); root = createRoot(container);
+  await render('tab=market&collection=auctions&make=Ford&family=8a8271f8-d299-4b55-837a-35ca919f8937&family_name=Mustang&era=1964-1973&live=1&bidRange=under10k&lot=retained-lot&sort=ending');
+  await act(async () => [...container.querySelectorAll('button')].find(b => b.textContent === 'Calendar')!.click());
+  expect(kept()).toEqual(['collection', 'era', 'family', 'family_name', 'make', 'tab']);
+  await act(async () => [...container.querySelectorAll('button')].find(b => b.textContent === 'Classifieds')!.click());
+  expect(kept()).toEqual(['collection', 'era', 'family', 'family_name', 'make', 'tab']);
+  expect(new URLSearchParams(window.location.search).get('collection')).toBe('listings');
+  expect(container.textContent).toContain('Ford · Mustang · 1964–1973');
 });
 it('shows the retained source observation separately from admission and update clocks', async () => {
   const row = fixture.query.data.pages[0].items[0];
@@ -95,20 +150,108 @@ it('links eligible vehicles with their exact recorded identity and shared namepl
 const button = (text: string) => [...container.querySelectorAll('button')].find(b => b.textContent?.startsWith(text))!;
 const lastQuery = () => fixture.board.mock.calls.at(-1)![0];
 
-it('opens classifieds on the arrivals board: the count with its population and clock, tiers with counts, place and band', async () => {
+it('opens classifieds: a refresh control instead of a clock, filters folded away, rows with source and age', async () => {
   await render('collection=listings');
-  expect(container.querySelector('h1')?.textContent).toBe('Classified arrivals');
-  expect(container.textContent).toContain(`of 374 asks first seen in the last 24 hours · as of ${new Date('2026-10-13T23:30:00Z').toLocaleString()}`);
+  expect(container.querySelector('h1')?.textContent).toBe('Classifieds');
+  expect(container.textContent).not.toContain('asks first seen');
+  expect(button('↻')).toBeTruthy();
+  expect(container.querySelector('details.market-filters')?.hasAttribute('open')).toBe(false);
   expect(button('$5K–15K').textContent).toBe('$5K–15K · 140');
   expect(container.textContent).toContain('368 of 374 priced (6 without a price) · 3 with a recorded place · 67 in the band (taste 60+) · Craigslist 374');
   expect(container.textContent).toContain('Phoenix, AZ'); expect(container.textContent).toContain('256 mi away');
-  expect(container.textContent).toContain('In band · taste 96'); expect(container.textContent).toContain('4WD · SUV · 88,000 mi');
-  expect(container.textContent).toContain('$18,800 · asking');
+  expect(container.textContent).toContain('88,000 mi'); expect(container.textContent).not.toContain('4WD · SUV');
+  expect(container.textContent).not.toContain('original listing'); expect(container.textContent).not.toMatch(/taste 96/);
+  // The source is a quiet mark with its name for screen readers; the age reads in feed terms; the price stands alone.
+  expect(container.querySelector('.market-ask__mark')?.getAttribute('alt')).toBe('Craigslist');
+  expect(container.querySelector('.market-ask__seen')?.textContent).toMatch(/^(just now|\d+ (min|h|d)( \d+ min)? ago)$/);
+  expect(container.querySelector('.market-ask__deal')?.textContent).toContain('$18,800');
+  expect(container.querySelector('.market-asks')?.textContent).not.toContain('asking');
   expect(container.textContent).toContain('Unpriced'); expect(container.textContent).toContain('Place unrecorded');
   expect(container.querySelector('a[href="/vehicle/v1"]')).not.toBeNull();
   expect(lastQuery()).toEqual({ hours: 24, tier: null, band: false, sort: 'newest', point: null, radius: null });
   await act(async () => button('Load more').click());
   expect(fixture.more).toHaveBeenCalledOnce();
+});
+
+it('a card carries every photo the capture landed: the board image first, one read per page, the count in the corner', async () => {
+  fixture.boardQuery.data.pages[0].rows[0].image = 'https://images.craigslist.org/00a_fixtureA_600x450.jpg';
+  await render('collection=listings');
+  expect(fixture.photos).toHaveBeenLastCalledWith([['v1', 'v2']]);
+  const [first, second] = [...container.querySelectorAll('.market-ask')];
+  expect([...first.querySelectorAll('.market-ask__strip img')].map(img => img.getAttribute('src')))
+    .toEqual(['https://images.craigslist.org/00a_fixtureA_600x450.jpg', 'https://images.craigslist.org/00b_fixtureB_600x450.jpg']);
+  expect(first.querySelector('.market-ask__count')?.textContent).toBe('1 / 2');
+  expect(first.querySelector<HTMLButtonElement>('button[aria-label="Previous photo"]')?.disabled).toBe(true);
+  expect(first.querySelector<HTMLButtonElement>('button[aria-label="Next photo"]')?.disabled).toBe(false);
+  expect(first.querySelector('a[href="/vehicle/v1"] .market-ask__strip')).not.toBeNull();
+  // No photo at all: the blank frame, no count, no arrows.
+  expect(second.querySelector('.market-ask__blank')).not.toBeNull();
+  expect(second.querySelector('.market-ask__count')).toBeNull();
+  expect(second.querySelector('button[aria-label="Next photo"]')).toBeNull();
+});
+
+it('a photo list keeps web addresses only, once each, the lead first', async () => {
+  const { photoList } = await import('./useListingPhotos');
+  expect(photoList('https://a.example/1.jpg', [
+    { vehicle_id: 'v', image_url: 'https://a.example/2.jpg' }, { vehicle_id: 'v', image_url: 'https://a.example/1.jpg' },
+    { vehicle_id: 'v', image_url: 'javascript:alert(1)' }, { vehicle_id: 'v', image_url: 'https://user:pw@a.example/3.jpg' },
+    { vehicle_id: 'v', image_url: null }, { vehicle_id: 'v', image_url: 'storage/relative.jpg' },
+  ])).toEqual(['https://a.example/1.jpg', 'https://a.example/2.jpg']);
+  expect(photoList(null, undefined)).toEqual([]);
+});
+
+it('says where an ask lands: the word, the price line, then the counts it rests on; nothing without a position', async () => {
+  fixture.boardQuery.data.pages[0].rows[0].position = {
+    family: 'Blazer', family_id: 'f-blazer', share: 40 / 43, basis: 'asked',
+    sold: { n: 16, year_from: 1983, year_to: 1985, thin: false, p25: 9000, p50: 12500, p75: 16000, at_or_below: 15, by_source: { bat: 12, mecum: 4 },
+      miles: { n: 12, p50: 96000, at_or_below: 4 }, venues: { bat: { n: 12, p50: 13000 }, mecum: { n: 4, p50: null } } },
+    asked: { n: 43, year_from: 1983, year_to: 1985, thin: false, p25: 8000, p50: 11000, p75: 15000, at_or_below: 40 },
+  };
+  await render('collection=listings');
+  const [first, second] = [...container.querySelectorAll('.market-ask')];
+  const placed = first.querySelector('.market-ask__position')!;
+  expect(placed.querySelector('.k-label')?.textContent).toBe('top of the market · 1983–85 Blazer');
+  // Placed by the other asks (ten or more exist), so they come first; the sales follow.
+  expect([...placed.querySelectorAll('.k-caption')].map(n => n.textContent)).toEqual([
+    'at or above 40 of 43 asks, median $11K', 'at or above 15 of 16 sales, median $12.5K', 'BaT $13K (12) · Mecum (4)',
+    'fewer miles than 8 of 12 recorded sales, median 96,000 mi']);
+  expect(placed.querySelector('svg[role="img"]')?.getAttribute('aria-label')).toBe('ask $18,800; middle half $8,000 to $15,000, median $11,000');
+  expect(second.querySelector('.market-ask__position')).toBeNull();
+});
+
+it('only an admin sees Analyze; a read lands on the card and says what the photos showed', async () => {
+  await render('collection=listings');
+  expect(container.querySelector('.market-ask__read')).toBeNull();
+  await act(async () => root.unmount()); root = createRoot(container);
+  fixture.admin = true;
+  fixture.analyze.mockResolvedValue({ observation_id: 'o1', photos_requested: 12, photos_analyzed: 12, analyzer: 'anthropic/claude-sonnet-4-6',
+    cost_bearer: 'user', cost_usd: null, condition_score: 4, condition_scores_counted: 12, zones_seen: ['exterior', 'interior'],
+    damage_flags: [{ flag: 'paint_fade', photos: 2 }], modification_flags: [{ flag: 'aftermarket_wheels', photos: 3 }], interior_quality: 4 });
+  await render('collection=listings');
+  const first = container.querySelector('.market-ask')!;
+  const analyze = [...first.querySelectorAll('button')].find(b => b.textContent === 'Analyze photos')!;
+  await act(async () => analyze.click());
+  expect(fixture.analyze).toHaveBeenCalledWith('v1');
+  expect([...first.querySelectorAll('.market-ask__read .k-caption')].map(n => n.textContent)).toEqual([
+    'photos: condition 4 of 5, 12 of 12 read by anthropic/claude-sonnet-4-6', 'damage seen: paint fade (2)', 'changes seen: aftermarket wheels (3)']);
+});
+
+it('a refused read says why and keeps the control', async () => {
+  fixture.admin = true;
+  fixture.analyze.mockRejectedValue(new Error('no analyzer available: connect your AI subscription'));
+  await render('collection=listings');
+  const first = container.querySelector('.market-ask')!;
+  await act(async () => [...first.querySelectorAll('button')].find(b => b.textContent === 'Analyze photos')!.click());
+  expect(first.querySelector('.market-ask__read')?.textContent).toContain('no analyzer available: connect your AI subscription');
+  expect([...first.querySelectorAll('button')].some(b => b.textContent === 'Analyze photos')).toBe(true);
+});
+
+it('offers the order lowest for its family', async () => {
+  await render('collection=listings');
+  const order = [...container.querySelectorAll('select')].find(s => s.querySelector('option[value="position"]'))!;
+  expect(order.querySelector('option[value="position"]')?.textContent).toBe('Lowest for its family');
+  await act(async () => { order.value = 'position'; order.dispatchEvent(new Event('change', { bubbles: true })); });
+  expect(lastQuery().sort).toBe('position');
 });
 
 it('tier, band and window are lenses in the URL', async () => {
@@ -141,4 +284,140 @@ it('near me refused: the whole country, said so', async () => {
   await render('collection=listings&near=1');
   expect(container.textContent).toContain('Location not shared; showing the whole country.');
   expect(lastQuery().point).toBeNull();
+});
+
+describe('what a listing says about its miles and title', () => {
+  it('never shows a disclosed broken odometer as a mileage, says rolled over and an unclean title, and leaves clean unsaid', async () => {
+    const { listingFacts } = await import('./ClassifiedArrivals');
+    expect(listingFacts({ mileage: 10, listing_mileage: 10, odometer: 'broken', title_status: null })).toEqual({ miles: 'odometer broken', title: null });
+    expect(listingFacts({ mileage: 5, listing_mileage: 62000, odometer: 'rolled_over', title_status: 'salvage' })).toEqual({ miles: '62,000 mi, rolled over', title: 'salvage title' });
+    expect(listingFacts({ mileage: 88000, listing_mileage: null, odometer: null, title_status: 'clean' })).toEqual({ miles: '88,000 mi', title: null });
+    expect(listingFacts({ mileage: null, odometer: null, title_status: undefined } as never)).toEqual({ miles: null, title: null });
+  });
+});
+
+describe('how a listing is named', () => {
+  it('capitalises words typed in lower case, writes codes in capitals, and keeps what the seller capitalised', async () => {
+    const { tidyName } = await import('./ClassifiedArrivals');
+    expect(tidyName('wrangler')).toBe('Wrangler');
+    expect(tidyName('tacoma sr5')).toBe('Tacoma SR5');
+    expect(tidyName('f-150 xlt')).toBe('F-150 XLT');
+    expect(tidyName('camaro ss')).toBe('Camaro SS');
+    expect(tidyName('ranger xlt 4x4')).toBe('Ranger XLT 4X4');
+    expect(tidyName('sky')).toBe('Sky');
+    expect(tidyName('k1500')).toBe('K1500');
+    expect(tidyName('Sonoma')).toBe('Sonoma');
+    expect(tidyName('DeVille')).toBe('DeVille');
+    expect(tidyName(null)).toBe('');
+  });
+});
+
+describe('how a feed says time', () => {
+  it('says how old a listing is in feed terms, and unknown as unknown', async () => {
+    const { ageOf, freshness } = await import('./ClassifiedArrivals');
+    const now = Date.parse('2026-10-15T02:00:00Z');
+    expect(ageOf('2026-10-15T01:59:30Z', now)).toBe('now');
+    expect(ageOf('2026-10-15T01:48:00Z', now)).toBe('12 min');
+    expect(ageOf('2026-10-15T00:48:00Z', now)).toBe('1 h 12 min');
+    expect(ageOf('2026-10-15T01:00:00Z', now)).toBe('1 h');
+    expect(ageOf('2026-10-14T23:00:00Z', now)).toBe('3 h');
+    expect(ageOf('2026-10-13T01:00:00Z', now)).toBe('2 d');
+    expect(ageOf(null, now)).toBeNull();
+    expect(freshness(null, now)).toBe('refresh');
+  });
+
+  it('says live when the intake captured a listing within a cycle, else how far behind, from capture time', async () => {
+    const { captureFreshness } = await import('./ClassifiedArrivals');
+    const now = Date.parse('2026-10-15T02:00:00Z');
+    expect(captureFreshness('2026-10-15T01:50:00Z', now)).toBe('live');
+    expect(captureFreshness('2026-10-15T01:35:00Z', now)).toBe('25 min behind');
+    expect(captureFreshness('2026-10-14T23:00:00Z', now)).toBe('3 h behind');
+    expect(captureFreshness(null, now)).toBeNull();
+    expect(captureFreshness('2026-10-15T03:00:00Z', now)).toBeNull();
+  });
+  it('states the read age without treating it as proof of source freshness', async () => {
+    const { freshness } = await import('./ClassifiedArrivals');
+    const now = Date.parse('2026-10-15T02:00:00Z');
+    expect(freshness('2026-10-15T01:59:45Z', now)).toBe('read just now');
+    expect(freshness('2026-10-15T01:45:00Z', now)).toBe('read 15 min ago');
+    expect(freshness('2026-10-15T01:35:00Z', now)).toBe('read 25 min ago');
+    expect(freshness('2026-10-14T23:00:00Z', now)).toBe('read 3 h ago');
+    expect(freshness('2099-01-01T00:00:00Z', now)).toBe('refresh');
+  });
+
+  it('keeps the snapshot clock independent of posting age and surfaces a failed background check', async () => {
+    vi.useFakeTimers(); vi.setSystemTime(new Date('2026-10-15T02:00:00Z'));
+    vi.spyOn(document, 'hidden', 'get').mockReturnValue(false);
+    fixture.boardQuery.data.pages[0].as_of = '2026-10-15T01:30:00Z';
+    fixture.boardQuery.data.pages[0].newest_at = '2026-10-15T01:59:59Z';
+    fixture.poll.mockRejectedValue(new Error('read unavailable'));
+    await render('collection=listings');
+    expect(container.querySelector('.k-masthead__result button')?.textContent).toBe('↻ read 30 min ago');
+    await act(async () => { await vi.advanceTimersByTimeAsync(120_000); });
+    expect(container.querySelector('.k-masthead__result button')?.textContent).toBe('↻ retry');
+    expect(container.querySelector('.k-masthead__result button')?.getAttribute('title')).toContain('Latest check failed');
+    expect(container.querySelectorAll('.market-ask')).toHaveLength(2);
+  });
+
+  it('does not report nothing new after a failed refresh or keep reading on initial failure', async () => {
+    fixture.refresh.mockResolvedValue({ isError: true, data: fixture.boardQuery.data });
+    await render('collection=listings');
+    await act(async () => (container.querySelector('.k-masthead__result button') as HTMLButtonElement).click());
+    expect(container.textContent).not.toContain('nothing new yet');
+    fixture.boardQuery.data = undefined; fixture.boardQuery.isError = true;
+    await render('collection=listings');
+    expect(container.querySelector('.k-masthead__result button')?.textContent).toBe('↻ retry');
+  });
+
+  it('knows its newest arrival from the reader, else from its rows, and counts what came after it', async () => {
+    const { newestOf, arrivalsAfter } = await import('./ClassifiedArrivals');
+    const rows = [{ first_seen_at: '2026-10-15T01:30:00+00:00' }, { first_seen_at: '2026-10-15T01:45:00+00:00' }];
+    expect(newestOf({ newest_at: '2026-10-15T01:46:00+00:00', rows: rows as never })).toBe('2026-10-15T01:46:00+00:00');
+    expect(newestOf({ newest_at: undefined, rows: rows as never })).toBe('2026-10-15T01:45:00.000Z');
+    // Before the reader carries listed_at: a post time before the first sighting is the listing's age; a later one is not.
+    const { listedAt } = await import('./ClassifiedArrivals');
+    expect(listedAt({ first_seen_at: '2026-10-15T01:45:00Z', posted_at: '2026-10-14T19:00:00Z' })).toBe('2026-10-14T19:00:00Z');
+    expect(listedAt({ first_seen_at: '2026-10-15T01:45:00Z', posted_at: '2099-01-01T00:00:00Z' })).toBe('2026-10-15T01:45:00Z');
+    expect(listedAt({ first_seen_at: '2026-10-15T01:45:00Z', posted_at: null, listed_at: '2026-10-15T01:00:00Z' })).toBe('2026-10-15T01:00:00Z');
+    expect(newestOf({ newest_at: null, rows: [] })).toBeNull();
+    expect(newestOf(undefined)).toBeNull();
+    expect(arrivalsAfter(rows, '2026-10-15T01:40:00Z')).toBe(1);
+    expect(arrivalsAfter(rows, '2026-10-15T01:45:00Z')).toBe(0);
+    expect(arrivalsAfter(rows, null)).toBe(0);
+  });
+});
+
+describe('where an ask lands', () => {
+  it('says how the miles sit and which venues the prices come from', async () => {
+    const { milesLine, venuesLine } = await import('./askPosition');
+    const pop = { n: 62, year_from: 1995, year_to: 1997, thin: false, p25: 6000, p50: 8900, p75: 12500, at_or_below: 4 };
+    expect(milesLine({ ...pop, miles: { n: 40, p50: 168000, at_or_below: 39 } }, 'sales')).toBe('more miles than 39 of 40 recorded sales, median 168,000 mi');
+    expect(milesLine({ ...pop, miles: { n: 8, p50: null, at_or_below: null } }, 'sales')).toBeNull();
+    expect(milesLine(pop, 'sales')).toBeNull();
+    expect(venuesLine({ ...pop, venues: { facebook_marketplace: { n: 30, p50: 5500 }, bat: { n: 34, p50: 14500 }, ksl: { n: 2, p50: null }, mecum: { n: 1, p50: null } } }))
+      .toBe('BaT $14.5K (34) · Facebook $5.5K (30) · KSL (2)');
+    expect(venuesLine(pop)).toBeNull();
+  });
+
+  it('places by the reader\'s share, else by asks when they are enough, else by sales, and counts a thin population without placing it', async () => {
+    const { headline, placement, spreadLine } = await import('./askPosition');
+    expect(placement(0.95)).toBe('top of the market');
+    expect(placement(0.75)).toBe('upper end');
+    expect(placement(0.5)).toBe('middle of the market');
+    expect(placement(0.2)).toBe('lower end');
+    expect(placement(0.05)).toBe('bottom of the market');
+    // The reader's share and basis lead when present.
+    expect(headline({ family: 'Wrangler', share: 0.52, basis: 'sold',
+      sold: { n: 214, year_from: 1997, year_to: 2001, thin: false, p25: 9000, p50: 13500, p75: 19000, at_or_below: 111 } }))
+      .toEqual({ word: 'middle of the market', basis: 'sales', span: '1997–01 Wrangler' });
+    const thinSold = { n: 6, year_from: 1965, year_to: 1965, thin: true, p25: null, p50: null, p75: null, at_or_below: null };
+    const asked = { n: 40, year_from: 1964, year_to: 1966, thin: false, p25: 12000, p50: 18000, p75: 24000, at_or_below: 3 };
+    expect(headline({ family: 'Barracuda', sold: thinSold, asked })).toEqual({ word: 'bottom of the market', basis: 'asks', span: '1964–66 Barracuda' });
+    expect(spreadLine(thinSold, 'sales')).toBe('only 6 recorded sales');
+    expect(spreadLine({ ...thinSold, n: 1 }, 'sales')).toBe('only 1 recorded sale');
+    expect(spreadLine(asked, 'asks')).toBe('under 37 of 40 asks, median $18K');
+    expect(spreadLine(null, 'asks')).toBeNull();
+    expect(headline({ family: 'Barracuda', sold: thinSold, asked: null })).toBeNull();
+    expect(headline(null)).toBeNull();
+  });
 });

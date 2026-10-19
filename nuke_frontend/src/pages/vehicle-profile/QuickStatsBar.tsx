@@ -2,6 +2,7 @@ import React, { useContext } from 'react';
 import { useVehicleProfile } from './VehicleProfileContext';
 import { PopupStackContext } from '../../components/popups/PopupStack';
 import { CommentsPopup } from '../../components/popups/CommentsPopup';
+import { useSecondClock } from '../../hooks/useSecondClock';
 
 interface StatPart {
   text: string;
@@ -13,12 +14,17 @@ const QuickStatsBar: React.FC = () => {
   const { vehicleImages, timelineEvents, totalCommentCount, observationCount, vehicle } = useVehicleProfile();
   const popupCtx = useContext(PopupStackContext);
   const updatedAt = vehicle?.updated_at;
+  const clockEnabled = React.useMemo(() => {
+    if (!updatedAt) return false;
+    try { return Number.isFinite(new Date(updatedAt).getTime()); } catch { return false; }
+  }, [updatedAt]);
+  const now = useSecondClock(clockEnabled);
 
   const timeAgo = React.useMemo(() => {
     if (!updatedAt) return null;
     try {
       const d = new Date(updatedAt);
-      const ms = Date.now() - d.getTime();
+      const ms = now - d.getTime();
       if (ms < 0 || !Number.isFinite(ms)) return null;
       const mins = Math.floor(ms / 60000);
       if (mins < 1) return 'just now';
@@ -31,7 +37,7 @@ const QuickStatsBar: React.FC = () => {
     } catch {
       return null;
     }
-  }, [updatedAt]);
+  }, [updatedAt, now]);
 
   const parts: StatPart[] = [];
   if (vehicleImages.length > 0) parts.push({ text: `${vehicleImages.length} image${vehicleImages.length === 1 ? '' : 's'}` });

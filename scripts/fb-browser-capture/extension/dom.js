@@ -44,7 +44,7 @@
       if (item && !ids.has(item.facebook_id)) { ids.add(item.facebook_id); cards.push(item); }
     }
     const region = [...document.querySelectorAll('[aria-label]')].filter(visible).map(n => n.getAttribute('aria-label')).find(label => /^Location:.*Within\s+\d+\s+mi/i.test(label ?? '')) ?? 'displayed region unavailable';
-    const years = [...document.querySelectorAll('input')].filter(n => visible(n) && /^(1960|1990)$/.test(n.value)).map(n => n.value);
+    const years = [...document.querySelectorAll('input')].filter(n => visible(n) && /^(1964|1991)$/.test(n.value)).map(n => n.value);
     const newest = [...document.querySelectorAll('[role="radio"]')].filter(visible).some(n => /newest/i.test(n.innerText || n.getAttribute('aria-label') || '') && n.getAttribute('aria-checked') === 'true');
     return { cards, actual_url: location.href, actual_region: region, observed_at: observedAt,
       displayed_filters: { year_values: years, newest_first_checked: newest }, main };

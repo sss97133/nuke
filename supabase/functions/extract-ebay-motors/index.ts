@@ -19,10 +19,13 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { corsHeaders } from '../_shared/cors.ts';
 import { firecrawlScrape } from '../_shared/firecrawl.ts';
 import { normalizeListingUrlKey } from '../_shared/listingUrl.ts';
+import { writeVehicleEventByKey } from '../_shared/vehicleEventWrite.ts';
 import { ExtractionLogger, validateVin, parsePrice, parseMileage } from '../_shared/extractionHealth.ts';
 import { writeObservation } from "../_shared/observationWriter.ts";
 import { requireWriteAuth } from '../_shared/writeGuard.ts';
 import { projectSecretKey } from "../_shared/supabaseKeys.ts";
+import { BROWSE_ACTIONS, handleBrowse } from './browseHandler.ts';
+import { insertMissingVehicleImages } from '../_shared/vehicleImageWrite.ts';
 
 // ============================================================================
 // TYPES
@@ -761,7 +764,13 @@ Deno.serve(async (req) => {
   }
 
   try {
-    const { url, save_to_db = false } = await req.json();
+    const body = await req.json();
+    // Browse API intake (official API, keys in function secrets); the Firecrawl single-URL path below is the older door.
+    if (BROWSE_ACTIONS.includes(body?.action)) {
+      const supabase = createClient(Deno.env.get('SUPABASE_URL')!, projectSecretKey()!);
+      return await handleBrowse(supabase, body);
+    }
+    const { url, save_to_db = false } = body;
 
     // Validate URL
     if (!url || (!url.includes('ebay.com/itm/') && !url.includes('ebay.com/p/'))) {
@@ -806,6 +815,7 @@ Deno.serve(async (req) => {
 
     // Save to database if requested
     let vehicle_id: string | null = null;
+    let vehicleEventError: string | null = null;
 
     if (save_to_db) {
       const supabase = createClient(
@@ -956,9 +966,7 @@ Deno.serve(async (req) => {
           is_external: true,
         }));
 
-        const { error: imgError } = await supabase
-          .from('vehicle_images')
-          .insert(imageRecords);
+        const { error: imgError } = await insertMissingVehicleImages(supabase, vehicle_id, imageRecords);
 
         if (imgError) {
           console.error('Image save error:', imgError);
@@ -971,9 +979,7 @@ Deno.serve(async (req) => {
       if (vehicle_id) {
         const listingUrlKey = normalizeListingUrlKey(extracted.url);
 
-        const { error: listingError } = await supabase
-          .from('vehicle_events')
-          .upsert({
+        const eventWrite = await writeVehicleEventByKey(supabase, {
             vehicle_id,
             source_platform: 'ebay-motors',
             event_type: 'listing',
@@ -994,14 +1000,13 @@ Deno.serve(async (req) => {
               quality_score: extracted.quality_score,
               quality_flags: extracted.quality_flags,
             },
-          }, {
-            onConflict: 'source_platform,source_listing_id'
           });
 
-        if (listingError) {
-          console.error('Vehicle event save error:', listingError);
+        if (eventWrite.action === 'error') {
+          console.error('Vehicle event save error:', eventWrite.error);
+          vehicleEventError = eventWrite.error;
         } else {
-          console.log(`Created/updated vehicle_events record`);
+          console.log(`vehicle_events ${eventWrite.action}`);
         }
       }
 
@@ -1011,8 +1016,9 @@ Deno.serve(async (req) => {
 
     return new Response(
       JSON.stringify({
-        success: true,
+        success: !vehicleEventError,
         skipped: false,
+        vehicle_event_error: vehicleEventError,
         vehicle_id,
         extracted: {
           ...extracted,
@@ -1020,7 +1026,7 @@ Deno.serve(async (req) => {
           description: extracted.description ? `${extracted.description.slice(0, 200)}...` : null,
         },
       }),
-      { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      { status: vehicleEventError ? 500 : 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
 
   } catch (error: any) {

@@ -9,6 +9,7 @@ interface VehicleVideoSectionProps {
 }
 
 function formatTimestamp(seconds: number): string {
+  if (typeof seconds !== 'number' || !Number.isFinite(seconds) || seconds < 0) return 'Unknown';
   const h = Math.floor(seconds / 3600);
   const m = Math.floor((seconds % 3600) / 60);
   const s = Math.floor(seconds % 60);
@@ -16,7 +17,10 @@ function formatTimestamp(seconds: number): string {
   return `${m}:${String(s).padStart(2, '0')}`;
 }
 
-function formatDuration(seconds: number): string {
+function formatDuration(start: number, end: number | null): string {
+  if (typeof start !== 'number' || !Number.isFinite(start) || start < 0
+    || typeof end !== 'number' || !Number.isFinite(end) || end < start) return 'Unknown';
+  const seconds = end - start;
   if (seconds < 60) return `${Math.round(seconds)}s`;
   const mins = Math.floor(seconds / 60);
   const secs = Math.round(seconds % 60);
@@ -46,7 +50,9 @@ function getThumbnailUrl(videoUrl: string): string {
 function getYouTubeEmbedUrl(videoUrl: string, startTime: number): string {
   const videoId = getVideoId(videoUrl);
   if (!videoId) return '';
-  return `https://www.youtube.com/embed/${videoId}?start=${Math.floor(startTime)}&autoplay=1`;
+  const seek = typeof startTime === 'number' && Number.isFinite(startTime) && startTime >= 0
+    ? `start=${Math.floor(startTime)}&` : '';
+  return `https://www.youtube.com/embed/${videoId}?${seek}autoplay=1`;
 }
 
 // Video Modal Component
@@ -57,7 +63,9 @@ const VideoModal: React.FC<{
 }> = ({ video, vehicleId, onClose }) => {
   const [showPricePopup, setShowPricePopup] = useState(false);
   const [showLotPopup, setShowLotPopup] = useState(false);
-  const duration = (video.broadcast_timestamp_end || video.broadcast_timestamp_start + 60) - video.broadcast_timestamp_start;
+  const recordedAmount = typeof video.winning_bid === 'number' && Number.isFinite(video.winning_bid)
+    && video.winning_bid > 0 && video.outcome === 'sold' ? video.winning_bid : null;
+  const span = formatDuration(video.broadcast_timestamp_start, video.broadcast_timestamp_end);
 
   // Close on escape key
   useEffect(() => {
@@ -142,22 +150,23 @@ const VideoModal: React.FC<{
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
               <span style={{ fontSize: '11px', fontFamily: "'Courier New', monospace", color: 'var(--text-muted)' }}>
-                {formatTimestamp(video.broadcast_timestamp_start)} ({formatDuration(duration)})
+                Video offset {formatTimestamp(video.broadcast_timestamp_start)} · recorded video span {span}
+                {video.displayed_bid_changes ? ` · screen showed ${video.displayed_bid_changes} bid changes` : ''}
               </span>
-              {video.winning_bid && video.outcome === 'sold' && (
+              {recordedAmount !== null && (
                 <button
                   onClick={() => setShowPricePopup(true)}
                   style={{
-                    background: 'var(--success-dim)',
-                    border: '1px solid var(--success)', padding: '4px 10px',
+                    background: 'var(--surface)',
+                    border: '1px solid var(--border)', padding: '4px 10px',
                     cursor: 'pointer',
                     fontWeight: 700,
-                    color: 'var(--success)',
+                    color: 'var(--text)',
                     fontSize: '13px'
                   }}
-                  title="View price breakdown"
+                  title="Inspect recorded auction amount"
                 >
-                  ${video.winning_bid.toLocaleString()}
+                  Recorded amount {recordedAmount.toLocaleString()}
                 </button>
               )}
               <button
@@ -177,12 +186,14 @@ const VideoModal: React.FC<{
       </div>
 
       {/* Price Breakdown Popup */}
-      {showPricePopup && video.winning_bid && (
+      {showPricePopup && recordedAmount !== null && (
         <PriceBreakdownPopup
-          hammerPrice={video.winning_bid}
+          recordedAmount={recordedAmount}
           estimateLow={video.estimate_low}
           estimateHigh={video.estimate_high}
           source={video.source}
+          sourceUrl={video.source_url}
+          lotNumber={video.lot_number}
           vehicleId={vehicleId}
           onClose={() => setShowPricePopup(false)}
         />
@@ -193,8 +204,8 @@ const VideoModal: React.FC<{
         <LotStatsPopup
           lotNumber={video.lot_number}
           source={video.source}
-          broadcastStart={video.broadcast_timestamp_start}
-          broadcastEnd={video.broadcast_timestamp_end}
+          videoOffset={formatTimestamp(video.broadcast_timestamp_start)}
+          videoSpan={span}
           auctionName={video.auction_name}
           onClose={() => setShowLotPopup(false)}
         />
@@ -211,6 +222,7 @@ export const VehicleVideoSection: React.FC<VehicleVideoSectionProps> = ({
   const { data: videos = [], isLoading: loading } = useVehicleVideos(vehicleId);
   const [isCollapsed, setIsCollapsed] = useState(defaultCollapsed);
   const [activeModal, setActiveModal] = useState<VideoMoment | null>(null);
+  useEffect(() => { setActiveModal(null); }, [vehicleId]);
 
   if (loading) return null;
   if (videos.length === 0) return null;
@@ -247,7 +259,9 @@ export const VehicleVideoSection: React.FC<VehicleVideoSectionProps> = ({
               gap: '8px'
             }}>
               {videos.map((video) => {
-                const duration = (video.broadcast_timestamp_end || video.broadcast_timestamp_start + 60) - video.broadcast_timestamp_start;
+                const span = formatDuration(video.broadcast_timestamp_start, video.broadcast_timestamp_end);
+                const recordedAmount = typeof video.winning_bid === 'number' && Number.isFinite(video.winning_bid)
+                  && video.winning_bid > 0 && video.outcome === 'sold' ? video.winning_bid : null;
 
                 return (
                   <div
@@ -301,7 +315,7 @@ export const VehicleVideoSection: React.FC<VehicleVideoSectionProps> = ({
                           marginLeft: '3px'
                         }} />
                       </div>
-                      {/* Timestamp badge */}
+                      {/* Recorded video offset badge */}
                       <div style={{
                         position: 'absolute',
                         bottom: '4px',
@@ -310,7 +324,7 @@ export const VehicleVideoSection: React.FC<VehicleVideoSectionProps> = ({
                         color: 'var(--bg)',
                         padding: '2px 5px', fontSize: '9px',
                         fontFamily: "'Courier New', monospace"
-                      }}>
+                      }} title="Offset into recorded video">
                         {formatTimestamp(video.broadcast_timestamp_start)}
                       </div>
                     </div>
@@ -325,14 +339,14 @@ export const VehicleVideoSection: React.FC<VehicleVideoSectionProps> = ({
                         alignItems: 'center'
                       }}>
                         <span>{video.lot_number || video.source?.toUpperCase()}</span>
-                        {video.winning_bid && video.outcome === 'sold' && (
-                          <span style={{ color: 'var(--success)' }}>
-                            ${(video.winning_bid / 1000).toFixed(0)}K
+                        {recordedAmount !== null && (
+                          <span title="Recorded auction amount; currency and fee basis unknown">
+                            {recordedAmount.toLocaleString()}
                           </span>
                         )}
                       </div>
                       <div style={{ fontSize: '9px', color: 'var(--text-muted)', marginTop: '2px' }}>
-                        {formatDuration(duration)} on block
+                        Recorded video span: {span}
                       </div>
                     </div>
                   </div>
@@ -344,7 +358,7 @@ export const VehicleVideoSection: React.FC<VehicleVideoSectionProps> = ({
       </div>
 
       {/* Modal */}
-      {activeModal && (
+      {activeModal && activeModal.vehicle_id === vehicleId && (
         <VideoModal
           video={activeModal}
           vehicleId={activeModal.vehicle_id || vehicleId}

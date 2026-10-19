@@ -1,6 +1,7 @@
 import React, { useRef, useEffect, useState } from 'react';
 import type { AutocompleteResult, CompsData } from './hooks/useSearch';
 import type { RecentItem } from './hooks/useRecentItems';
+import { HeaderSearchFacetPills } from '../HeaderSearch';
 
 function formatPrice(n: number): string {
   if (n >= 1000) return '$' + Math.round(n / 1000).toLocaleString() + 'K';
@@ -32,23 +33,23 @@ function MarketCard({ comps }: { comps: CompsData }) {
       <div className="search-overlay-section-header">
         <span className="search-overlay-section-label">MARKET DATA</span>
       </div>
-      <div style={{ padding: '6px 12px' }}>
-        <div style={{ fontWeight: 'bold', fontSize: '12px', marginBottom: '4px' }}>
+      <div className="search-overlay-market-body">
+        <div className="search-overlay-market-title">
           {summary.count} comparable sale{summary.count !== 1 ? 's' : ''}
-          {label && <span style={{ fontWeight: 'normal', opacity: 0.6 }}> &middot; {label} {yearLabel}</span>}
+          {label && <span className="search-overlay-market-label"> &middot; {label} {yearLabel}</span>}
         </div>
-        <div style={{ fontFamily: '"Courier New", monospace', fontSize: '11px', lineHeight: '18px' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-            <span style={{ opacity: 0.5 }}>median</span>
+        <div className="search-overlay-market-stats">
+          <div className="search-overlay-market-row">
+            <span className="search-overlay-market-muted">median</span>
             <span>{formatPrice(summary.median_price)}</span>
           </div>
-          <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-            <span style={{ opacity: 0.5 }}>range</span>
+          <div className="search-overlay-market-row">
+            <span className="search-overlay-market-muted">range</span>
             <span>{formatPrice(summary.min_price)} – {formatPrice(summary.max_price)}</span>
           </div>
         </div>
         {sourceList && (
-          <div style={{ fontSize: '10px', opacity: 0.5, marginTop: '4px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+          <div className="search-overlay-market-sources">
             {sourceList}
           </div>
         )}
@@ -191,6 +192,9 @@ export const SearchOverlay: React.FC<SearchOverlayProps> = ({
               type="button"
             >
               <span className="search-overlay-item-label">{item.label}</span>
+              {(category === 'model' || category === 'vehicle') && (
+                <HeaderSearchFacetPills label={item.label} compact />
+              )}
               {item.count > 0 && (
                 <span className="search-overlay-item-count">
                   {item.count.toLocaleString()}

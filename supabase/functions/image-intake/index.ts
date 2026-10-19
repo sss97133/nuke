@@ -481,7 +481,8 @@ Deno.serve(async (req) => {
               (analysis as any)._insertedId = viData?.id;
             }
           } else {
-            await supabase.from("pending_image_assignments").upsert({
+            // pending_image_assignments does not exist in the schema; surface the failure in the per-image result.
+            const { error: paErr } = await supabase.from("pending_image_assignments").upsert({
               image_url: img.url,
               user_id: effectiveUserId,
               ai_hints: analysis.hints,
@@ -490,6 +491,10 @@ Deno.serve(async (req) => {
               status: "pending",
               created_at: new Date().toISOString(),
             }, { onConflict: "image_url" });
+            if (paErr) {
+              console.error(`pending_image_assignments upsert failed: ${paErr.message}`);
+              (analysis as any)._insertError = `pending_image_assignments: ${paErr.message}`;
+            }
           }
         }
 

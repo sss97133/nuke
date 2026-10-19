@@ -3077,8 +3077,8 @@
    "kind": "v5",
    "label": "A/C Compressor Clutch",
    "from": [
-    "PDM15",
-    "OUT11"
+    "SPL-PDM15-OUT8 (PDM15:OUT8 pigtails B7 + B13)",
+    null
    ],
    "to": [
     "AC-CLUTCH",
@@ -3088,18 +3088,18 @@
     "engine bay",
     "engine bay"
    ],
-   "from_str": "PDM15:OUT11 (A6)",
+   "from_str": "SPL-PDM15-OUT8 (PDM15:OUT8 pigtails B7 + B13)",
    "control": "CAN: M130 A/C request, interlocked by the PDM15 low/high pressure switch inputs",
    "subsystem": "HVAC_AC",
    "engine_run": false,
    "rules": {
     "R8 ends": [
      "PASS",
-     "PDM15:OUT11 -> AC-CLUTCH:T1 single lead, male bullet (clutch coil +)"
+     "SPL-PDM15-OUT8 (PDM15:OUT8 pigtails B7 + B13):None -> AC-CLUTCH:T1 single lead, male bullet (clutch coil +)"
     ],
     "R9 pin": [
      "PASS",
-     "OUT11 8 A vs load 4.0 A"
+     "OUT8 20 A vs load 4.0 A"
     ],
     "R11 command": [
      "PASS",
@@ -3718,12 +3718,12 @@
     "B15"
    ],
    "to": [
-    null,
-    null
+    "SPL-M130-B-B15",
+    "splice 2"
    ],
    "sides": [
     "cab",
-    null
+    "cab"
    ],
    "from_str": "M130:B15",
    "control": null,
@@ -3732,7 +3732,7 @@
    "rules": {
     "R8 ends": [
      "PASS",
-     "M130:B15 -> None:None"
+     "M130:B15 -> SPL-M130-B-B15:splice 2"
     ],
     "R9 pin": [
      "OPEN",
@@ -3819,12 +3819,12 @@
     "B15"
    ],
    "to": [
-    null,
-    null
+    "SPL-M130-B-B15",
+    "splice 4"
    ],
    "sides": [
     "cab",
-    null
+    "cab"
    ],
    "from_str": "M130:B15",
    "control": null,
@@ -3833,7 +3833,7 @@
    "rules": {
     "R8 ends": [
      "PASS",
-     "M130:B15 -> None:None"
+     "M130:B15 -> SPL-M130-B-B15:splice 4"
     ],
     "R9 pin": [
      "OPEN",
@@ -3885,12 +3885,12 @@
     "B16"
    ],
    "to": [
-    null,
-    null
+    "SPL-M130-B-B16-G2",
+    "splice 2"
    ],
    "sides": [
     "cab",
-    null
+    "cab"
    ],
    "from_str": "M130:B16",
    "control": null,
@@ -3899,7 +3899,7 @@
    "rules": {
     "R8 ends": [
      "PASS",
-     "M130:B16 -> None:None"
+     "M130:B16 -> SPL-M130-B-B16-G2:splice 2"
     ],
     "R9 pin": [
      "OPEN",
@@ -3951,12 +3951,12 @@
     "B16"
    ],
    "to": [
-    null,
-    null
+    "SPL-M130-B-B16-G2",
+    "splice 4"
    ],
    "sides": [
     "cab",
-    null
+    "cab"
    ],
    "from_str": "M130:B16",
    "control": null,
@@ -3965,7 +3965,7 @@
    "rules": {
     "R8 ends": [
      "PASS",
-     "M130:B16 -> None:None"
+     "M130:B16 -> SPL-M130-B-B16-G2:splice 4"
     ],
     "R9 pin": [
      "OPEN",
@@ -4863,7 +4863,7 @@
    ],
    "to": [
     "PS-STUDS (engine block near the starter)",
-    "stud, lug 238LTP + 238LTP"
+    "engine block near the starter"
    ],
    "sides": [
     "engine bay",
@@ -4876,7 +4876,7 @@
    "rules": {
     "R8 ends": [
      "PASS",
-     "GND-BANK-ENG (ground star: stud bank beside the batteries - both battery negatives, block, frame and engine-bay returns): -> PS-STUDS (engine block near the starter):stud, lug 238LTP + 238LTP"
+     "GND-BANK-ENG (ground star: stud bank beside the batteries - both battery negatives, block, frame and engine-bay returns): -> PS-STUDS (engine block near the starter):engine block near the starter"
     ]
    }
   },
@@ -4890,7 +4890,7 @@
    ],
    "to": [
     "PS-STUDS (frame rail boss)",
-    "stud, lug DL438 + DL438"
+    "frame rail boss"
    ],
    "sides": [
     "engine bay",
@@ -4903,7 +4903,7 @@
    "rules": {
     "R8 ends": [
      "PASS",
-     "GND-BANK-ENG (ground star: stud bank beside the batteries - both battery negatives, block, frame and engine-bay returns): -> PS-STUDS (frame rail boss):stud, lug DL438 + DL438"
+     "GND-BANK-ENG (ground star: stud bank beside the batteries - both battery negatives, block, frame and engine-bay returns): -> PS-STUDS (frame rail boss):frame rail boss"
     ]
    }
   },
@@ -9801,11 +9801,11 @@
    }
   },
   {
-   "wire": "SUB_JMP_P",
+   "wire": "30c",
    "kind": "implied",
-   "label": "Woofer jumper (+): woofer 1 to woofer 2, in parallel",
+   "label": "Subwoofer 2 (+): amp sub harness pair 2 -> woofer 2",
    "from": [
-    "SUB (+)",
+    "AMP (sub output +, pair 2)",
     ""
    ],
    "to": [
@@ -9816,23 +9816,23 @@
     "other",
     "other"
    ],
-   "from_str": "SUB (+)",
+   "from_str": "AMP (sub output +, pair 2)",
    "control": null,
    "subsystem": "AUDIO",
    "engine_run": false,
    "rules": {
     "R8 ends": [
      "PASS",
-     "SUB (+): -> SUB-2 (+):+ push terminal"
+     "AMP (sub output +, pair 2): -> SUB-2 (+):+ push terminal"
     ]
    }
   },
   {
-   "wire": "SUB_JMP_N",
+   "wire": "30d",
    "kind": "implied",
-   "label": "Woofer jumper (-): woofer 1 to woofer 2, in parallel",
+   "label": "Subwoofer 2 (-): amp sub harness pair 2 -> woofer 2",
    "from": [
-    "SUB (-)",
+    "AMP (sub output -, pair 2)",
     ""
    ],
    "to": [
@@ -9843,14 +9843,14 @@
     "other",
     "other"
    ],
-   "from_str": "SUB (-)",
+   "from_str": "AMP (sub output -, pair 2)",
    "control": null,
    "subsystem": "AUDIO",
    "engine_run": false,
    "rules": {
     "R8 ends": [
      "PASS",
-     "SUB (-): -> SUB-2 (-):- push terminal"
+     "AMP (sub output -, pair 2): -> SUB-2 (-):- push terminal"
     ]
    }
   },
@@ -10069,7 +10069,7 @@
    ],
    "to": [
     "GND-BANK-ENG (ground star: stud bank beside the batteries - both battery negatives, block, frame and engine-bay returns)",
-    "ground star: stud bank beside the batteries - both battery negatives, block, frame and engine-bay returns"
+    "stud, lug 238LTP"
    ],
    "sides": [
     "cab",
@@ -10082,7 +10082,7 @@
    "rules": {
     "R8 ends": [
      "PASS",
-     "GND-BANK-CAB (cab ground bank beside the PDM30): -> GND-BANK-ENG (ground star: stud bank beside the batteries - both battery negatives, block, frame and engine-bay returns):ground star: stud bank beside the batteries - both battery negatives, block, frame and engine-bay returns"
+     "GND-BANK-CAB (cab ground bank beside the PDM30): -> GND-BANK-ENG (ground star: stud bank beside the batteries - both battery negatives, block, frame and engine-bay returns):stud, lug 238LTP"
     ],
     "R12 firewall": [
      "PASS",
@@ -10336,7 +10336,7 @@
    ],
    "to": [
     "GND-BANK-ENG (ground star: stud bank beside the batteries - both battery negatives, block, frame and engine-bay returns)",
-    "ground star: stud bank beside the batteries - both battery negatives, block, frame and engine-bay returns"
+    "stud, lug 238LTP"
    ],
    "sides": [
     "engine bay",
@@ -10349,7 +10349,7 @@
    "rules": {
     "R8 ends": [
      "PASS",
-     "ODYSSEY (-): -> GND-BANK-ENG (ground star: stud bank beside the batteries - both battery negatives, block, frame and engine-bay returns):ground star: stud bank beside the batteries - both battery negatives, block, frame and engine-bay returns"
+     "ODYSSEY (-): -> GND-BANK-ENG (ground star: stud bank beside the batteries - both battery negatives, block, frame and engine-bay returns):stud, lug 238LTP"
     ]
    }
   },
@@ -10363,7 +10363,7 @@
    ],
    "to": [
     "GND-BANK-ENG (ground star: stud bank beside the batteries - both battery negatives, block, frame and engine-bay returns)",
-    "ground star: stud bank beside the batteries - both battery negatives, block, frame and engine-bay returns"
+    "stud, lug DL438"
    ],
    "sides": [
     "engine bay",
@@ -10376,7 +10376,7 @@
    "rules": {
     "R8 ends": [
      "PASS",
-     "ACC-BATT (-): -> GND-BANK-ENG (ground star: stud bank beside the batteries - both battery negatives, block, frame and engine-bay returns):ground star: stud bank beside the batteries - both battery negatives, block, frame and engine-bay returns"
+     "ACC-BATT (-): -> GND-BANK-ENG (ground star: stud bank beside the batteries - both battery negatives, block, frame and engine-bay returns):stud, lug DL438"
     ]
    }
   },
@@ -11273,6 +11273,60 @@
    }
   },
   {
+   "wire": "23_PT1",
+   "kind": "implied",
+   "label": "PDM15 OUT8 pigtail 1 of 2 (pin B7) to the #23 splice",
+   "from": [
+    "PDM15",
+    "B7"
+   ],
+   "to": [
+    "SPL-PDM15-OUT8 (pigtail side)",
+    "splice 1"
+   ],
+   "sides": [
+    "engine bay",
+    "engine bay"
+   ],
+   "from_str": "PDM15:B7",
+   "control": "CAN: M130 A/C request, interlocked by the PDM15 low/high pressure switch inputs",
+   "subsystem": "HVAC_AC",
+   "engine_run": false,
+   "rules": {
+    "R8 ends": [
+     "PASS",
+     "PDM15:B7 -> SPL-PDM15-OUT8 (pigtail side):splice 1"
+    ]
+   }
+  },
+  {
+   "wire": "23_PT2",
+   "kind": "implied",
+   "label": "PDM15 OUT8 pigtail 2 of 2 (pin B13) to the #23 splice",
+   "from": [
+    "PDM15",
+    "B13"
+   ],
+   "to": [
+    "SPL-PDM15-OUT8 (pigtail side)",
+    "splice 2"
+   ],
+   "sides": [
+    "engine bay",
+    "engine bay"
+   ],
+   "from_str": "PDM15:B13",
+   "control": "CAN: M130 A/C request, interlocked by the PDM15 low/high pressure switch inputs",
+   "subsystem": "HVAC_AC",
+   "engine_run": false,
+   "rules": {
+    "R8 ends": [
+     "PASS",
+     "PDM15:B13 -> SPL-PDM15-OUT8 (pigtail side):splice 2"
+    ]
+   }
+  },
+  {
    "wire": "INJ_PWR_PT1",
    "kind": "implied",
    "label": "PDM15 OUT2 pigtail 1 of 2 (pin A3) to the #INJ_PWR splice",
@@ -11647,6 +11701,701 @@
     "R8 ends": [
      "PASS",
      "PDM30:A12 -> SPL-PDM30-OUT2 (pigtail side):splice 2"
+    ]
+   }
+  },
+  {
+   "wire": "LEAD-M130-A-A02",
+   "kind": "implied",
+   "label": "20 AWG lead from the D-609-05 splice SPL-M130-A-A02 into M130-A pin A02",
+   "from": [
+    "M130",
+    "A02"
+   ],
+   "to": [
+    "SPL-M130-A-A02",
+    "splice 6"
+   ],
+   "sides": [
+    "cab",
+    "cab"
+   ],
+   "from_str": "M130:A02",
+   "control": null,
+   "subsystem": "CORE_ENGINE",
+   "engine_run": true,
+   "rules": {
+    "R8 ends": [
+     "PASS",
+     "M130:A02 -> SPL-M130-A-A02:splice 6"
+    ],
+    "R9 pin": [
+     "OPEN",
+     "M130 A02 not in the stored pin table"
+    ]
+   }
+  },
+  {
+   "wire": "LEAD-M130-B-B15",
+   "kind": "implied",
+   "label": "20 AWG lead from the D-609-05 splice SPL-M130-B-B15 into M130-B pin B15",
+   "from": [
+    "M130",
+    "B15"
+   ],
+   "to": [
+    "SPL-M130-B-B15",
+    "splice 6"
+   ],
+   "sides": [
+    "cab",
+    "cab"
+   ],
+   "from_str": "M130:B15",
+   "control": null,
+   "subsystem": "CORE_ENGINE",
+   "engine_run": true,
+   "rules": {
+    "R8 ends": [
+     "PASS",
+     "M130:B15 -> SPL-M130-B-B15:splice 6"
+    ],
+    "R9 pin": [
+     "OPEN",
+     "M130 B15 not in the stored pin table"
+    ]
+   }
+  },
+  {
+   "wire": "LEAD-M130-B-B16-G1",
+   "kind": "implied",
+   "label": "20 AWG group lead from the D-609-05 splice SPL-M130-B-B16-G1 into the join SPL-M130-B-B16 (M130-B pin B16)",
+   "from": [
+    "SPL-M130-B-B16-G1",
+    ""
+   ],
+   "to": [
+    "SPL-M130-B-B16",
+    "splice 1"
+   ],
+   "sides": [
+    "cab",
+    "cab"
+   ],
+   "from_str": "SPL-M130-B-B16-G1",
+   "control": null,
+   "subsystem": "CORE_ENGINE",
+   "engine_run": true,
+   "rules": {
+    "R8 ends": [
+     "PASS",
+     "SPL-M130-B-B16-G1: -> SPL-M130-B-B16:splice 1"
+    ]
+   }
+  },
+  {
+   "wire": "LEAD-M130-B-B16-G2",
+   "kind": "implied",
+   "label": "20 AWG group lead from the D-609-05 splice SPL-M130-B-B16-G2 into the join SPL-M130-B-B16 (M130-B pin B16)",
+   "from": [
+    "SPL-M130-B-B16-G2",
+    ""
+   ],
+   "to": [
+    "SPL-M130-B-B16",
+    "splice 2"
+   ],
+   "sides": [
+    "cab",
+    "cab"
+   ],
+   "from_str": "SPL-M130-B-B16-G2",
+   "control": null,
+   "subsystem": "CORE_ENGINE",
+   "engine_run": true,
+   "rules": {
+    "R8 ends": [
+     "PASS",
+     "SPL-M130-B-B16-G2: -> SPL-M130-B-B16:splice 2"
+    ]
+   }
+  },
+  {
+   "wire": "LEAD-M130-B-B16",
+   "kind": "implied",
+   "label": "20 AWG lead from the D-609-05 splice SPL-M130-B-B16 into M130-B pin B16",
+   "from": [
+    "M130",
+    "B16"
+   ],
+   "to": [
+    "SPL-M130-B-B16",
+    "splice 3"
+   ],
+   "sides": [
+    "cab",
+    "cab"
+   ],
+   "from_str": "M130:B16",
+   "control": null,
+   "subsystem": "CORE_ENGINE",
+   "engine_run": true,
+   "rules": {
+    "R8 ends": [
+     "PASS",
+     "M130:B16 -> SPL-M130-B-B16:splice 3"
+    ],
+    "R9 pin": [
+     "OPEN",
+     "M130 B16 not in the stored pin table"
+    ]
+   }
+  },
+  {
+   "wire": "LEAD-M130-B-B19",
+   "kind": "implied",
+   "label": "20 AWG lead from the D-609-05 splice SPL-M130-B-B19 into M130-B pin B19",
+   "from": [
+    "M130",
+    "B19"
+   ],
+   "to": [
+    "SPL-M130-B-B19",
+    "splice 3"
+   ],
+   "sides": [
+    "cab",
+    "cab"
+   ],
+   "from_str": "M130:B19",
+   "control": null,
+   "subsystem": "CORE_ENGINE",
+   "engine_run": true,
+   "rules": {
+    "R8 ends": [
+     "PASS",
+     "M130:B19 -> SPL-M130-B-B19:splice 3"
+    ],
+    "R9 pin": [
+     "OPEN",
+     "M130 B19 not in the stored pin table"
+    ]
+   }
+  },
+  {
+   "wire": "LEAD-M130-B-B21",
+   "kind": "implied",
+   "label": "20 AWG lead from the D-609-05 splice SPL-M130-B-B21 into M130-B pin B21",
+   "from": [
+    "M130",
+    "B21"
+   ],
+   "to": [
+    "SPL-M130-B-B21",
+    "splice 3"
+   ],
+   "sides": [
+    "cab",
+    "cab"
+   ],
+   "from_str": "M130:B21",
+   "control": null,
+   "subsystem": "CORE_ENGINE",
+   "engine_run": true,
+   "rules": {
+    "R8 ends": [
+     "PASS",
+     "M130:B21 -> SPL-M130-B-B21:splice 3"
+    ],
+    "R9 pin": [
+     "OPEN",
+     "M130 B21 not in the stored pin table"
+    ]
+   }
+  },
+  {
+   "wire": "LEAD-PDM30-A-A11",
+   "kind": "implied",
+   "label": "20 AWG lead from the D-609-05 splice SPL-PDM30-A-A11 into PDM30-A pin A11",
+   "from": [
+    "PDM30",
+    "A11"
+   ],
+   "to": [
+    "SPL-PDM30-A-A11",
+    "splice 6"
+   ],
+   "sides": [
+    "cab",
+    "cab"
+   ],
+   "from_str": "PDM30:A11",
+   "control": null,
+   "subsystem": "LIGHTING_EXTERIOR",
+   "engine_run": false,
+   "rules": {
+    "R8 ends": [
+     "PASS",
+     "PDM30:A11 -> SPL-PDM30-A-A11:splice 6"
+    ]
+   }
+  },
+  {
+   "wire": "LEAD-PDM30-A-A15",
+   "kind": "implied",
+   "label": "20 AWG lead from the D-609-05 splice SPL-PDM30-A-A15 into PDM30-A pin A15",
+   "from": [
+    "PDM30",
+    "A15"
+   ],
+   "to": [
+    "SPL-PDM30-A-A15",
+    "splice 5"
+   ],
+   "sides": [
+    "cab",
+    "cab"
+   ],
+   "from_str": "PDM30:A15",
+   "control": null,
+   "subsystem": "CAMERA_REAR",
+   "engine_run": false,
+   "rules": {
+    "R8 ends": [
+     "PASS",
+     "PDM30:A15 -> SPL-PDM30-A-A15:splice 5"
+    ]
+   }
+  },
+  {
+   "wire": "LEAD-PDM30-A-A24-G1",
+   "kind": "implied",
+   "label": "20 AWG group lead from the D-609-05 splice SPL-PDM30-A-A24-G1 into the join SPL-PDM30-A-A24 (PDM30-A pin A24)",
+   "from": [
+    "SPL-PDM30-A-A24-G1",
+    ""
+   ],
+   "to": [
+    "SPL-PDM30-A-A24",
+    "splice 1"
+   ],
+   "sides": [
+    "cab",
+    "cab"
+   ],
+   "from_str": "SPL-PDM30-A-A24-G1",
+   "control": null,
+   "subsystem": "LIGHTING_EXTERIOR",
+   "engine_run": false,
+   "rules": {
+    "R8 ends": [
+     "PASS",
+     "SPL-PDM30-A-A24-G1: -> SPL-PDM30-A-A24:splice 1"
+    ]
+   }
+  },
+  {
+   "wire": "LEAD-PDM30-A-A24-G2",
+   "kind": "implied",
+   "label": "20 AWG group lead from the D-609-05 splice SPL-PDM30-A-A24-G2 into the join SPL-PDM30-A-A24 (PDM30-A pin A24)",
+   "from": [
+    "SPL-PDM30-A-A24-G2",
+    ""
+   ],
+   "to": [
+    "SPL-PDM30-A-A24",
+    "splice 2"
+   ],
+   "sides": [
+    "cab",
+    "cab"
+   ],
+   "from_str": "SPL-PDM30-A-A24-G2",
+   "control": null,
+   "subsystem": "LIGHTING_EXTERIOR",
+   "engine_run": false,
+   "rules": {
+    "R8 ends": [
+     "PASS",
+     "SPL-PDM30-A-A24-G2: -> SPL-PDM30-A-A24:splice 2"
+    ]
+   }
+  },
+  {
+   "wire": "LEAD-PDM30-A-A24",
+   "kind": "implied",
+   "label": "20 AWG lead from the D-609-05 splice SPL-PDM30-A-A24 into PDM30-A pin A24",
+   "from": [
+    "PDM30",
+    "A24"
+   ],
+   "to": [
+    "SPL-PDM30-A-A24",
+    "splice 3"
+   ],
+   "sides": [
+    "cab",
+    "cab"
+   ],
+   "from_str": "PDM30:A24",
+   "control": null,
+   "subsystem": "LIGHTING_EXTERIOR",
+   "engine_run": false,
+   "rules": {
+    "R8 ends": [
+     "PASS",
+     "PDM30:A24 -> SPL-PDM30-A-A24:splice 3"
+    ]
+   }
+  },
+  {
+   "wire": "LEAD-PDM30-A-A28",
+   "kind": "implied",
+   "label": "20 AWG lead from the D-609-05 splice SPL-PDM30-A-A28 into PDM30-A pin A28",
+   "from": [
+    "PDM30",
+    "A28"
+   ],
+   "to": [
+    "SPL-PDM30-A-A28",
+    "splice 5"
+   ],
+   "sides": [
+    "cab",
+    "cab"
+   ],
+   "from_str": "PDM30:A28",
+   "control": null,
+   "subsystem": "CHARGING_STARTING",
+   "engine_run": true,
+   "rules": {
+    "R8 ends": [
+     "PASS",
+     "PDM30:A28 -> SPL-PDM30-A-A28:splice 5"
+    ]
+   }
+  },
+  {
+   "wire": "LEAD-PDM30-B-B1",
+   "kind": "implied",
+   "label": "20 AWG lead from the D-609-05 splice SPL-PDM30-B-B1 into PDM30-B pin B1",
+   "from": [
+    "PDM30",
+    "B1"
+   ],
+   "to": [
+    "SPL-PDM30-B-B1",
+    "splice 3"
+   ],
+   "sides": [
+    "cab",
+    "cab"
+   ],
+   "from_str": "PDM30:B1",
+   "control": null,
+   "subsystem": "POWER_LOCKS",
+   "engine_run": false,
+   "rules": {
+    "R8 ends": [
+     "PASS",
+     "PDM30:B1 -> SPL-PDM30-B-B1:splice 3"
+    ]
+   }
+  },
+  {
+   "wire": "LEAD-PDM30-B-B12",
+   "kind": "implied",
+   "label": "20 AWG lead from the D-609-05 splice SPL-PDM30-B-B12 into PDM30-B pin B12",
+   "from": [
+    "PDM30",
+    "B12"
+   ],
+   "to": [
+    "SPL-PDM30-B-B12",
+    "splice 3"
+   ],
+   "sides": [
+    "cab",
+    "cab"
+   ],
+   "from_str": "PDM30:B12",
+   "control": null,
+   "subsystem": "LIGHTING_EXTERIOR",
+   "engine_run": false,
+   "rules": {
+    "R8 ends": [
+     "PASS",
+     "PDM30:B12 -> SPL-PDM30-B-B12:splice 3"
+    ]
+   }
+  },
+  {
+   "wire": "LEAD-PDM30-B-B14",
+   "kind": "implied",
+   "label": "20 AWG lead from the D-609-05 splice SPL-PDM30-B-B14 into PDM30-B pin B14",
+   "from": [
+    "PDM30",
+    "B14"
+   ],
+   "to": [
+    "SPL-PDM30-B-B14",
+    "splice 3"
+   ],
+   "sides": [
+    "cab",
+    "cab"
+   ],
+   "from_str": "PDM30:B14",
+   "control": null,
+   "subsystem": "LIGHTING_EXTERIOR",
+   "engine_run": false,
+   "rules": {
+    "R8 ends": [
+     "PASS",
+     "PDM30:B14 -> SPL-PDM30-B-B14:splice 3"
+    ]
+   }
+  },
+  {
+   "wire": "LEAD-PDM30-B-B16",
+   "kind": "implied",
+   "label": "20 AWG lead from the D-609-05 splice SPL-PDM30-B-B16 into PDM30-B pin B16",
+   "from": [
+    "PDM30",
+    "B16"
+   ],
+   "to": [
+    "SPL-PDM30-B-B16",
+    "splice 3"
+   ],
+   "sides": [
+    "cab",
+    "cab"
+   ],
+   "from_str": "PDM30:B16",
+   "control": null,
+   "subsystem": "DASH_CLUSTER_DAKOTA",
+   "engine_run": true,
+   "rules": {
+    "R8 ends": [
+     "PASS",
+     "PDM30:B16 -> SPL-PDM30-B-B16:splice 3"
+    ]
+   }
+  },
+  {
+   "wire": "LEAD-PDM30-B-B25",
+   "kind": "implied",
+   "label": "20 AWG lead from the D-609-05 splice SPL-PDM30-B-B25 into PDM30-B pin B25",
+   "from": [
+    "PDM30",
+    "B25"
+   ],
+   "to": [
+    "SPL-PDM30-B-B25",
+    "splice 3"
+   ],
+   "sides": [
+    "cab",
+    "cab"
+   ],
+   "from_str": "PDM30:B25",
+   "control": null,
+   "subsystem": "CORE_ENGINE",
+   "engine_run": true,
+   "rules": {
+    "R8 ends": [
+     "PASS",
+     "PDM30:B25 -> SPL-PDM30-B-B25:splice 3"
+    ]
+   }
+  },
+  {
+   "wire": "LEAD-PDM30-B-B26",
+   "kind": "implied",
+   "label": "20 AWG lead from the D-609-05 splice SPL-PDM30-B-B26 into PDM30-B pin B26",
+   "from": [
+    "PDM30",
+    "B26"
+   ],
+   "to": [
+    "SPL-PDM30-B-B26",
+    "splice 3"
+   ],
+   "sides": [
+    "cab",
+    "cab"
+   ],
+   "from_str": "PDM30:B26",
+   "control": null,
+   "subsystem": "CORE_ENGINE",
+   "engine_run": true,
+   "rules": {
+    "R8 ends": [
+     "PASS",
+     "PDM30:B26 -> SPL-PDM30-B-B26:splice 3"
+    ]
+   }
+  },
+  {
+   "wire": "LEAD-PDM30-B-B8-G1",
+   "kind": "implied",
+   "label": "20 AWG group lead from the D-609-05 splice SPL-PDM30-B-B8-G1 into the join SPL-PDM30-B-B8 (PDM30-B pin B8)",
+   "from": [
+    "SPL-PDM30-B-B8-G1",
+    ""
+   ],
+   "to": [
+    "SPL-PDM30-B-B8",
+    "splice 1"
+   ],
+   "sides": [
+    "cab",
+    "cab"
+   ],
+   "from_str": "SPL-PDM30-B-B8-G1",
+   "control": null,
+   "subsystem": "DOME_COURTESY",
+   "engine_run": false,
+   "rules": {
+    "R8 ends": [
+     "PASS",
+     "SPL-PDM30-B-B8-G1: -> SPL-PDM30-B-B8:splice 1"
+    ]
+   }
+  },
+  {
+   "wire": "LEAD-PDM30-B-B8-G2",
+   "kind": "implied",
+   "label": "20 AWG group lead from the D-609-04 splice SPL-PDM30-B-B8-G2 into the join SPL-PDM30-B-B8 (PDM30-B pin B8)",
+   "from": [
+    "SPL-PDM30-B-B8-G2",
+    ""
+   ],
+   "to": [
+    "SPL-PDM30-B-B8",
+    "splice 2"
+   ],
+   "sides": [
+    "cab",
+    "cab"
+   ],
+   "from_str": "SPL-PDM30-B-B8-G2",
+   "control": null,
+   "subsystem": "LIGHTING_INTERIOR",
+   "engine_run": false,
+   "rules": {
+    "R8 ends": [
+     "PASS",
+     "SPL-PDM30-B-B8-G2: -> SPL-PDM30-B-B8:splice 2"
+    ]
+   }
+  },
+  {
+   "wire": "LEAD-PDM30-B-B8",
+   "kind": "implied",
+   "label": "20 AWG lead from the D-609-05 splice SPL-PDM30-B-B8 into PDM30-B pin B8",
+   "from": [
+    "PDM30",
+    "B8"
+   ],
+   "to": [
+    "SPL-PDM30-B-B8",
+    "splice 3"
+   ],
+   "sides": [
+    "cab",
+    "cab"
+   ],
+   "from_str": "PDM30:B8",
+   "control": null,
+   "subsystem": "DOME_COURTESY",
+   "engine_run": false,
+   "rules": {
+    "R8 ends": [
+     "PASS",
+     "PDM30:B8 -> SPL-PDM30-B-B8:splice 3"
+    ]
+   }
+  },
+  {
+   "wire": "LEAD-PDM15-A-A28",
+   "kind": "implied",
+   "label": "20 AWG lead from the D-609-05 splice SPL-PDM15-A-A28 into PDM15-A pin A28",
+   "from": [
+    "PDM15",
+    "A28"
+   ],
+   "to": [
+    "SPL-PDM15-A-A28",
+    "splice 3"
+   ],
+   "sides": [
+    "engine bay",
+    "engine bay"
+   ],
+   "from_str": "PDM15:A28",
+   "control": null,
+   "subsystem": "HVAC_AC",
+   "engine_run": false,
+   "rules": {
+    "R8 ends": [
+     "PASS",
+     "PDM15:A28 -> SPL-PDM15-A-A28:splice 3"
+    ]
+   }
+  },
+  {
+   "wire": "LEAD-PDM15-B-B25",
+   "kind": "implied",
+   "label": "20 AWG lead from the D-609-05 splice SPL-PDM15-B-B25 into PDM15-B pin B25",
+   "from": [
+    "PDM15",
+    "B25"
+   ],
+   "to": [
+    "SPL-PDM15-B-B25",
+    "splice 3"
+   ],
+   "sides": [
+    "engine bay",
+    "engine bay"
+   ],
+   "from_str": "PDM15:B25",
+   "control": null,
+   "subsystem": "CORE_ENGINE",
+   "engine_run": true,
+   "rules": {
+    "R8 ends": [
+     "PASS",
+     "PDM15:B25 -> SPL-PDM15-B-B25:splice 3"
+    ]
+   }
+  },
+  {
+   "wire": "LEAD-PDM15-B-B26",
+   "kind": "implied",
+   "label": "20 AWG lead from the D-609-05 splice SPL-PDM15-B-B26 into PDM15-B pin B26",
+   "from": [
+    "PDM15",
+    "B26"
+   ],
+   "to": [
+    "SPL-PDM15-B-B26",
+    "splice 3"
+   ],
+   "sides": [
+    "engine bay",
+    "engine bay"
+   ],
+   "from_str": "PDM15:B26",
+   "control": null,
+   "subsystem": "CORE_ENGINE",
+   "engine_run": true,
+   "rules": {
+    "R8 ends": [
+     "PASS",
+     "PDM15:B26 -> SPL-PDM15-B-B26:splice 3"
     ]
    }
   },

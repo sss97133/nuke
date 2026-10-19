@@ -25,8 +25,13 @@ import { archiveFetch } from "../_shared/archiveFetch.ts";
 import { normalizeListingUrl } from "../_shared/urlNormalization.ts";
 import { requireWriteAuth } from "../_shared/writeGuard.ts";
 import { writeObservation } from "../_shared/observationWriter.ts";
+import { insertMissingVehicleImages } from "../_shared/vehicleImageWrite.ts";
+import { applyCraigslistImagePlan, planCraigslistImages } from "../_shared/craigslistImages.ts";
+import { landCraigslistBlip, modelFromText, type ModelCitation } from "./craigslistBlip.ts";
 import { type CraigslistCapture, pickCapture } from "../_shared/craigslistAttributes.ts";
 import { type CaptureLanding, landCraigslistCapture, ledgerFields } from "./craigslistCapture.ts";
+import { vinMakeCheckApplies } from "./vinGate.ts";
+import { classifiedListingId, classifiedPlatform, landClassifiedListing } from "./classifiedEvent.ts";
 import { slugStubRejection } from "./slugStub.ts";
 import { extractFromHtml } from "../extract-craigslist/extract.ts";
 import { projectSecretKey } from "../_shared/supabaseKeys.ts";
@@ -273,6 +278,7 @@ async function resolveCraigslistShareUrl(shareUrl: string): Promise<{ url: strin
     const canonicalTag = html.match(/<link\b[^>]*\brel\s*=\s*["'][^"']*\bcanonical\b[^"']*["'][^>]*>/i)?.[0];
     const canonical = canonicalTag?.match(/\bhref\s*=\s*(["'])([^"']+)\1/i)?.[2];
     if (canonical === requested.href) {
+      // A post with no asking price has no JSON-LD name; extractFromHtml reads its title line (2026-10-15).
       const detail = extractFromHtml(html, shareUrl);
       if (detail.post_id && detail.title && detail.description) return { url: shareUrl, postId: detail.post_id, error: null };
       // A self-canonical shell/expired page cannot borrow a recommendation's identity.
@@ -345,6 +351,8 @@ interface ParsedVehicle {
   year: number | null;
   make: string | null;
   model: string | null;
+  /** Set to "listing_text" when the model was read from the post's own text (craigslistBlip.modelFromText). */
+  modelSource?: string | null;
 }
 
 // Models/sub-brands that unambiguously identify a make when the title omits it.
@@ -789,6 +797,11 @@ async function matchOrCreateVehicle(
     source: platform && platform !== "unknown" ? platform : null,
     platform_source: platformSourceFor(platform), // C7: the platform key
   };
+  // A Craigslist post is a live classified when we read it. The column defaulted to false for every one of them
+  // (1,053 of 1,053 created in two days, 2026-10-15) while sale_status said "available".
+  if (platform === "craigslist") vehicleData.is_for_sale = true;
+  // A model read from the post's own text (craigslistBlip.modelFromText) says so; the span is on the observation.
+  if (parsed.modelSource) vehicleData.model_source = parsed.modelSource;
 
   // Populate everything we have (real vehicles columns only — the table has
   // engine_type, not engine, and no condition_notes column)
@@ -835,12 +848,17 @@ async function matchOrCreateVehicle(
     const imageRows = allImages.map((url: string, i: number) => ({
       vehicle_id: newVehicle.id,
       image_url: url,
+      position: i,
+      display_order: i,
       is_primary: i === 0,
       source: imageSourceFor(platform),
       is_external: true,
+      ai_processing_status: "skipped", // not requested: see the matched path below
       source_url: parsed.url || null,
     }));
-    await supabaseAdmin.from("vehicle_images").insert(imageRows);
+    // (Deployed 2026-10-15 with #1531: #1528's deploy died on its migration before the functions step.)
+    const imgWrite = await insertMissingVehicleImages(supabaseAdmin, newVehicle.id, imageRows);
+    if (imgWrite.error) console.error(`[ingest] vehicle_images insert ${newVehicle.id}: ${imgWrite.error.message}`);
   }
 
   // ── Create merge proposals for Tier 3 candidates ──────────────
@@ -928,8 +946,18 @@ async function enrichVehicle(vehicleId: string, data: VehicleEnrichment, platfor
     // Check which images already exist
     const { data: existingImages } = await supabaseAdmin
       .from("vehicle_images")
-      .select("image_url")
+      .select("id, image_url, is_primary, is_duplicate, vision_gate_status")
       .eq("vehicle_id", vehicleId);
+
+    if (platform === "craigslist") {
+      // The gallery at full size: add what is missing, supersede the 600x450 rows (never delete). See craigslistImages.ts.
+      const plan = planCraigslistImages(existingImages || [], allImages);
+      if (plan.insert.length > 0) {
+        const applied = await applyCraigslistImagePlan(supabaseAdmin, { vehicleId, sourceUrl: data.url || null, source: imageSourceFor(platform), plan });
+        if (applied.errors.length) console.error(`[ingest] craigslist images ${vehicleId}: ${applied.errors.slice(0, 3).join("; ")}`);
+      }
+      return;
+    }
 
     const existingUrls = new Set((existingImages || []).map((i: any) => i.image_url));
     const newImages = allImages.filter((url: string) => !existingUrls.has(url));
@@ -942,9 +970,12 @@ async function enrichVehicle(vehicleId: string, data: VehicleEnrichment, platfor
         is_primary: !hasPrimary && i === 0,
         source: imageSourceFor(platform),
         is_external: true,
+        ai_processing_status: "skipped", // listing photos are not analyzed unless someone asks; "pending" fires the photo pipeline per row
         source_url: data.url || null,
       }));
-      await supabaseAdmin.from("vehicle_images").insert(imageRows);
+      // A revisit never re-adds a photo the vehicle already holds (_shared/vehicleImageWrite.ts).
+      const imgWrite = await insertMissingVehicleImages(supabaseAdmin, vehicleId, imageRows);
+      if (imgWrite.error) console.error(`[ingest] vehicle_images insert ${vehicleId}: ${imgWrite.error.message}`);
 
       // Update primary_image_url if vehicle didn't have one
       if (!hasPrimary) {
@@ -979,6 +1010,10 @@ interface EnrichedData {
   seller_name?: string | null;
   /** Canonicalized listing URL the extractor actually wrote to `vehicles.listing_url`, if it differs from the input URL. */
   listing_url?: string | null;
+  /** When the listing went up, if the extractor read it (ClassicCars and KSL events; ISO). */
+  posted_at?: string | null;
+  /** The seller class the source states (KSL sellerType, ClassicCars Listed By), as written. */
+  seller_type_raw?: string | null;
   /** Craigslist only: the post's attribute block, id and clocks, as extract-craigslist read them (see ./craigslistCapture.ts). */
   capture?: CraigslistCapture | null;
 }
@@ -1110,6 +1145,9 @@ async function tryAutoEnrich(url: string, platform: string): Promise<EnrichResul
     "bonhams.com": "extract-bonhams",
     "cars.bonhams.com": "extract-bonhams",
     "broadarrowauctions.com": "extract-broad-arrow",
+    "cars.ksl.com": "extract-ksl", // deterministic (page payload); no LLM
+    "collectingcars.com": "extract-collecting-cars", // deterministic (page payload via Firecrawl); no LLM
+    "classiccars.com": "extract-classiccars", // deterministic (page JSON-LD + attribute panel); no LLM
   };
   const host = new URL(url).hostname.replace(/^www\./, "").toLowerCase();
   const extractorName = extractors[platform] || hostExtractors[host] || "extract-vehicle-data-ai";
@@ -1186,6 +1224,8 @@ async function tryAutoEnrich(url: string, platform: string): Promise<EnrichResul
         seller_name: vehicle.seller || vehicle.seller_username || vehicle.seller_name || null,
         listing_url: vehicle.listing_url || (typeof vehicle.url === "string" ? vehicle.url : null),
         vehicle_id: writtenId || undefined,
+        posted_at: typeof vehicle.posted_at === "string" ? vehicle.posted_at : null,
+        seller_type_raw: typeof vehicle.seller_type === "string" ? vehicle.seller_type : null,
         capture: platform === "craigslist" ? pickCapture(vehicle) : null,
       },
     };
@@ -1230,7 +1270,7 @@ interface IngestInput {
 }
 
 interface IngestResult {
-  status: "created" | "matched" | "duplicate" | "rejected" | "error" | "preview";
+  status: "created" | "matched" | "duplicate" | "rejected" | "error" | "preview" | "unresolved";
   vehicle_id?: string | null;
   discovery_id?: string | null;
   is_new_vehicle?: boolean;
@@ -1253,6 +1293,8 @@ interface IngestResult {
   // Craigslist only: the post's id, clocks and attribute block (and, once a vehicle exists, how the landing went).
   // The poller copies it onto the import_queue ledger row, so the ledger carries what the page said.
   listing_capture?: Record<string, unknown>;
+  // Craigslist only: the unresolved-listing observation written when the post names no model (status "unresolved").
+  blip?: { observation: string; observation_id?: string; errors: string[] };
 }
 
 /**
@@ -1396,12 +1438,16 @@ async function ingestOne(input: IngestInput, userId: string | null): Promise<Ing
 
     // Auto-enrich: call the platform's extractor to get full listing data
     let capture: CraigslistCapture | null = null;
+    // Keep source prose beside its capture, separately from caller notes or retained vehicle text.
+    let captureDescription: string | null = null;
     const captureAnswer = (): { listing_capture?: Record<string, unknown> } =>
       capture ? { listing_capture: ledgerFields(capture) } : {};
     let enrichmentSucceeded = false;
     let enrichmentSkipped = false;
     let enrichmentError: string | null = null;
     let extractorVehicleId: string | undefined;
+    let enrichedPostedAt: string | null = null;
+    let enrichedSellerType: string | null = null;
 
     if (input.enrich !== false && listingUrl && !input.description) {
       const enrichResult = await tryAutoEnrich(listingUrl, platform);
@@ -1413,6 +1459,8 @@ async function ingestOne(input: IngestInput, userId: string | null): Promise<Ing
             enrichment_error: "Craigslist share detail post identity mismatch", source: platform, external_id: externalId };
         }
         extractorVehicleId = enriched.vehicle_id;
+        enrichedPostedAt = enriched.posted_at ?? null;
+        enrichedSellerType = enriched.seller_type_raw ?? null;
         // The extractor (e.g. extract-bat-core) may have written the vehicle
         // under its own canonicalized URL, which can differ from the URL we
         // were given (trailing slash, www, query params). Adopt it so the
@@ -1443,7 +1491,11 @@ async function ingestOne(input: IngestInput, userId: string | null): Promise<Ing
           input.location = normalizeLocation(enriched.location) ?? undefined;
         }
         if (!input.seller_name && enriched.seller_name) input.seller_name = enriched.seller_name;
-        if (enriched.capture) capture = enriched.capture;
+        if (enriched.capture) {
+          capture = enriched.capture;
+          captureDescription = typeof enriched.description === "string" && enriched.description.trim()
+            ? enriched.description : null;
+        }
         // Extracted identity beats slug-derived guesses (caller-explicit fields
         // were already merged into input above, so they still win)
         if (enriched.year && enriched.make) {
@@ -1479,6 +1531,28 @@ async function ingestOne(input: IngestInput, userId: string | null): Promise<Ing
         reason: `extractor skipped page: ${enrichmentError}`,
         source: platform,
         external_id: externalId,
+      };
+    }
+    // Craigslist: a blank model may be stated in the post's own text. Read it with its citation, or keep the post.
+    let modelCitation: ModelCitation | null = null;
+    if (platform === "craigslist" && capture && parsed.year && parsed.make && !parsed.model) {
+      modelCitation = modelFromText(input.description || input.notes, parsed.year, parsed.make);
+      if (modelCitation) { parsed.model = modelCitation.value; (parsed as any).modelSource = "listing_text"; }
+    }
+    if ((!parsed.year || !parsed.make || !parsed.model) && platform === "craigslist" && capture) {
+      // A blip: the post, its text, photos, place and clocks, retained with no vehicle (AGENTS.md).
+      const blip = await landCraigslistBlip(
+        { supabase: supabaseAdmin, writeObservation },
+        { listingUrl: listingUrl ?? input.url ?? "", capture, year: parsed.year ?? null, make: parsed.make ?? null,
+          description: input.description || input.notes, imageUrls: input.image_urls ?? (input.image_url ? [input.image_url] : null) },
+      );
+      return {
+        status: "unresolved",
+        reason: `insufficient identity: year=${parsed.year ?? "?"} make=${parsed.make ?? "?"} model=${parsed.model ?? "?"} — kept as an unresolved listing`,
+        blip,
+        source: platform,
+        external_id: externalId,
+        ...captureAnswer(),
       };
     }
     if (!parsed.year || !parsed.make || !parsed.model) {
@@ -1560,7 +1634,8 @@ async function ingestOne(input: IngestInput, userId: string | null): Promise<Ing
     const suggestions: Record<string, string> = {};
     if (candidateData.vin && typeof candidateData.vin === "string" && candidateData.vin.length >= 6) {
       const decoded = decodeVin(candidateData.vin);
-      if (decoded.make && candidateData.make) {
+      // Only a 17-character VIN with a valid check digit is decoded for make (./vinGate.ts); a chassis number is a claim.
+      if (vinMakeCheckApplies(candidateData.vin) && decoded.make && candidateData.make) {
         const vinMake = normalizeMake(decoded.make);
         const claimedMake = normalizeMake(candidateData.make);
         if (vinMake && claimedMake && vinMake !== claimedMake) {
@@ -1641,7 +1716,8 @@ async function ingestOne(input: IngestInput, userId: string | null): Promise<Ing
       year: gateResult.cleaned.year ?? parsed.year,
       make: gateResult.cleaned.make ?? parsed.make,
       model: gateResult.cleaned.model ?? parsed.model,
-    };
+      ...((parsed as any).modelSource ? { modelSource: (parsed as any).modelSource } : {}),
+    } as typeof parsed;
     if (gateResult.cleaned.vin) input.vin = gateResult.cleaned.vin;
     if (gateResult.cleaned.transmission) input.transmission = gateResult.cleaned.transmission;
     if (gateResult.cleaned.color) input.color = gateResult.cleaned.color;
@@ -1687,7 +1763,10 @@ async function ingestOne(input: IngestInput, userId: string | null): Promise<Ing
           vehicleId: match.vehicleId,
           listingUrl: listingUrl ?? input.url ?? "",
           capture,
+          sourceDescription: captureDescription,
           isNewVehicle: match.isNew,
+          modelCitation,
+          description: input.description || input.notes,
           written: {
             mileage: input.mileage,
             title_status: input.title_status,
@@ -1697,6 +1776,24 @@ async function ingestOne(input: IngestInput, userId: string | null): Promise<Ing
           },
         },
       );
+    }
+
+    // ClassicCars and KSL: the same listing projection Craigslist lands, so the classified board can read them.
+    const classified = classifiedPlatform(listingUrl);
+    if (classified && match.vehicleId && !isPreview) {
+      const listingId = classifiedListingId(listingUrl);
+      if (listingId) {
+        try {
+          const landed = await landClassifiedListing(supabaseAdmin, {
+            vehicleId: match.vehicleId, platform: classified, listingUrl: listingUrl ?? "", listingId,
+            price: typeof input.price === "number" ? input.price : null, postedAt: enrichedPostedAt,
+            observedAt: new Date().toISOString(), sellerTypeRaw: enrichedSellerType,
+          });
+          if (landed.event.action === "error") console.error(`[ingest] ${classified} listing event ${match.vehicleId}: ${landed.event.error}`);
+        } catch (e) {
+          console.error(`[ingest] ${classified} listing event ${match.vehicleId}: ${e instanceof Error ? e.message : String(e)}`);
+        }
+      }
     }
 
     // Facebook Saved: set status based on sold flag

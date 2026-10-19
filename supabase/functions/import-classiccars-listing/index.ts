@@ -6,6 +6,7 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { writeObservation } from "../_shared/observationWriter.ts"
 import { isServiceCaller, requireWriteAuth } from "../_shared/writeGuard.ts";
 import { projectSecretKey } from "../_shared/supabaseKeys.ts";
+import { geminiFetch } from '../_shared/geminiGuard.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -851,8 +852,8 @@ async function analyzeWithGemini(base64Image: string, prompt: string): Promise<I
     throw new Error('GOOGLE_AI_API_KEY not configured')
   }
 
-  const response = await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${geminiApiKey}`,
+  const response = await geminiFetch(
+    `https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent?key=${geminiApiKey}`,
     {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -873,7 +874,7 @@ async function analyzeWithGemini(base64Image: string, prompt: string): Promise<I
         }
       })
     }
-  )
+  , 'import-classiccars-listing')
 
   if (!response.ok) {
     throw new Error(`Gemini API error: ${response.status}`)

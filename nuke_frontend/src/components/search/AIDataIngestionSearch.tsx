@@ -1,12 +1,21 @@
 import React, { useMemo, useState, useRef, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { supabase, getCurrentUserId } from '../../lib/supabase';
+import {
+  HeaderSearchCohortShortcuts,
+  HeaderSearchFacetPills,
+  boostAndFilterVehicleSearchResults,
+  extractQueryFacets,
+  resolveSearchResultEraMark,
+} from '../HeaderSearch';
+import { resolveMarketCohortShortcuts, type MarketCohortShortcut } from '../../lib/market/vehicleTaxonomy';
 import { aiDataIngestion, type ExtractionResult, ingestVehicle } from '../../services/aiDataIngestion';
 import { dataRouter, type DatabaseOperationPlan } from '../../services/dataRouter';
 import { findPublicVehicleByVin } from '../../lib/vehicleByVin';
 import { universalSearchService, type UniversalSearchResult } from '../../services/universalSearchService';
 import { classifyIntent, type SearchIntent } from '../../lib/search/intentRouter';
 import { KNOWN_MAKES, MAKE_ALIASES } from '../../lib/search/dictionaries';
+import { buildMarketScopeUrl, isOnMarketTab, resolveMarketScopeQuery } from '../../lib/search/marketScopeResolver';
 import { useToast } from '../../hooks/useToast';
 import VehicleCritiqueMode from './VehicleCritiqueMode';
 import { SmartInvoiceUploader } from '../SmartInvoiceUploader';
@@ -42,6 +51,7 @@ function detectPlatform(url: string): { label: string; short: string } | null {
 /* ─── Make stats for browse intent ─── */
 interface MakeStats {
   make: string;
+  /** The planner's row estimate for the make, not a count; shown as approximate. */
   total: number;
   topModels: Array<{ model: string; count: number }>;
   avgPrice: number | null;
@@ -56,11 +66,15 @@ async function fetchMakeStats(make: string): Promise<MakeStats | null> {
     // normalizedMake is the canonical spelling from KNOWN_MAKES, so an equality match finds the make through
     // idx_vehicles_make_year. `make ilike` is not leakproof, cannot be an index qual under the row policies, and
     // scans the whole heap (measured 2026-10-14: Lotus count 1.5 s with eq, over 10 s with ilike).
+    // An exact count still visits every row of the make for the row policy: Porsche ran into the 15 s anon timeout
+    // (HTTP 500) on 2026-10-17, and `estimated` still counts up to max-rows (1,000 cold heap reads, 3-7 s). `planned` is
+    // the planner's estimate from EXPLAIN (0.1-0.2 s); limit(1) keeps the HEAD request from reading max-rows rows too.
     const [countRes, modelsRes, priceRes] = await Promise.all([
       supabase
         .from('vehicles')
-        .select('id', { count: 'exact', head: true })
-        .eq('make', normalizedMake),
+        .select('id', { count: 'planned', head: true })
+        .eq('make', normalizedMake)
+        .limit(1),
       supabase
         .from('vehicles')
         .select('model')
@@ -76,8 +90,8 @@ async function fetchMakeStats(make: string): Promise<MakeStats | null> {
         .limit(200),
     ]);
 
+    if (!modelsRes.data?.length) return null;
     const total = countRes.count || 0;
-    if (total === 0) return null;
 
     // Aggregate top models
     const modelCounts: Record<string, number> = {};
@@ -105,6 +119,10 @@ async function fetchMakeStats(make: string): Promise<MakeStats | null> {
   } catch {
     return null;
   }
+}
+
+function formatMakeTotal(stats: MakeStats): string {
+  return `≈${Number(stats.total.toPrecision(2)).toLocaleString()}`;
 }
 
 function normalizeUrlInput(value: string): string | null {
@@ -246,6 +264,7 @@ export default function AIDataIngestionSearch() {
   const [showAutocomplete, setShowAutocomplete] = useState(false);
   const [selectedAutocompleteIndex, setSelectedAutocompleteIndex] = useState(-1);
   const autocompleteDebounceRef = useRef<NodeJS.Timeout | null>(null);
+  const autocompleteRequestIdRef = useRef(0);
 
   // Magic Box intent state
   const [currentIntent, setCurrentIntent] = useState<SearchIntent | null>(null);
@@ -261,6 +280,80 @@ export default function AIDataIngestionSearch() {
   const navigate = useNavigate();
   const location = useLocation();
   const { showToast } = useToast();
+
+  const dismissAutocomplete = () => {
+    autocompleteRequestIdRef.current += 1;
+    if (autocompleteDebounceRef.current) {
+      clearTimeout(autocompleteDebounceRef.current);
+      autocompleteDebounceRef.current = null;
+    }
+    setShowAutocomplete(false);
+    setAutocompleteResults([]);
+    setAutocompleteAISuggestion(null);
+    setAutocompleteTotalCount(null);
+    setSelectedAutocompleteIndex(-1);
+  };
+
+  // On the Market page, queries that name a brand, family, model, or era ("mustang", "73-87 gm trucks", "corvette")
+  // set the Market URL scope in place instead of navigating away to /search.
+  const navigateSearchOrScopeMarket = async (rawQuery: string) => {
+    dismissAutocomplete();
+    const q = rawQuery.trim();
+    if (!q) {
+      navigate('/search');
+      return;
+    }
+    if (isOnMarketTab(location.pathname, location.search)) {
+      const resolved = await resolveMarketScopeQuery(q);
+      if (resolved) {
+        navigate(buildMarketScopeUrl(resolved, location.search));
+        return;
+      }
+    }
+    navigate(`/search?q=${encodeURIComponent(q)}`);
+  };
+
+  // Dismiss any open autocomplete dropdown whenever the route or query changes
+  useEffect(() => {
+    autocompleteRequestIdRef.current += 1;
+    if (autocompleteDebounceRef.current) {
+      clearTimeout(autocompleteDebounceRef.current);
+      autocompleteDebounceRef.current = null;
+    }
+    setShowAutocomplete(false);
+    setSelectedAutocompleteIndex(-1);
+  }, [location.pathname, location.search]);
+
+  const cohortShortcuts = useMemo(
+    () => (isProcessing || attachedImage || showPreview || normalizeUrlInput(input.trim())
+      ? []
+      : resolveMarketCohortShortcuts(input, 3)),
+    [input, isProcessing, attachedImage, showPreview],
+  );
+
+  const resultEraMarks = useMemo(() => {
+    const marks = new Map<string, ReturnType<typeof resolveSearchResultEraMark>>();
+    for (const result of autocompleteResults) {
+      if (result.type !== 'vehicle' && result.type !== 'vin_match') continue;
+      const mark = resolveSearchResultEraMark({
+        year: result.metadata?.year,
+        make: result.metadata?.make,
+        model: result.metadata?.model || result.metadata?.normalized_model,
+        series: result.metadata?.series,
+        trim: result.metadata?.trim,
+        bodyStyle: result.metadata?.body_style,
+        title: result.title,
+      });
+      if (mark) marks.set(`${result.type}-${result.id}`, mark);
+    }
+    return marks;
+  }, [autocompleteResults]);
+
+  const handleCohortShortcutSelect = (shortcut: MarketCohortShortcut) => {
+    dismissAutocomplete();
+    navigate(shortcut.url);
+    setInput('');
+  };
 
   const vehicleIdFromRoute = useMemo(() => {
     const m = location.pathname.match(/\/vehicle\/([a-f0-9-]{36})/);
@@ -279,8 +372,11 @@ export default function AIDataIngestionSearch() {
   useEffect(() => {
     if (autocompleteDebounceRef.current) {
       clearTimeout(autocompleteDebounceRef.current);
+      autocompleteDebounceRef.current = null;
     }
 
+    const reqId = ++autocompleteRequestIdRef.current;
+    let cancelled = false;
     const trimmedInput = input.trim();
 
     // Don't show autocomplete if:
@@ -308,78 +404,73 @@ export default function AIDataIngestionSearch() {
 
     // VINs can be searched - universal search handles them
 
+    // Cohort shortcuts resolve locally, so they show before the debounced search returns.
+    if (cohortShortcuts.length > 0) {
+      setShowAutocomplete(true);
+    }
+
     autocompleteDebounceRef.current = setTimeout(async () => {
       try {
-        // Use universal search service for rich results with thumbnails
-        const response = await universalSearchService.search(trimmedInput, {
-          limit: 24,
-          includeAI: true
-        });
+        const [response, resolvedScope] = await Promise.all([
+          universalSearchService.search(trimmedInput, {
+            limit: 24,
+            includeAI: true
+          }),
+          resolveMarketScopeQuery(trimmedInput).catch(() => null),
+        ]);
 
-        let combinedResults = response.results;
+        if (cancelled || reqId !== autocompleteRequestIdRef.current) return;
 
-        if (combinedResults.length < 8) {
-          try {
-            const safeQuery = trimmedInput.replace(/([%_\\])/g, '\\$1');
-            const { data: vehicles } = await supabase
-              .from('vehicles')
-              .select('id, year, make, model, normalized_model, series, trim, title, sale_price, current_value')
-              .eq('is_public', true)
-              .or(`make.ilike.%${safeQuery}%,model.ilike.%${safeQuery}%,normalized_model.ilike.%${safeQuery}%,series.ilike.%${safeQuery}%,trim.ilike.%${safeQuery}%,title.ilike.%${safeQuery}%`)
-              .limit(16);
-
-            if (vehicles && vehicles.length > 0) {
-              const fallbackResults: UniversalSearchResult[] = vehicles.map((v: any) => ({
-                id: v.id,
-                type: 'vehicle',
-                title: `${v.year || ''} ${v.make || ''} ${v.model || ''}`.trim() || v.title || 'Vehicle',
-                subtitle: v.trim || v.series || v.normalized_model || undefined,
-                description: v.title || undefined,
-                relevance_score: 0.3,
-                metadata: {
-                  year: v.year,
-                  make: v.make,
-                  model: v.model,
-                  price: v.sale_price || v.current_value
-                }
-              }));
-
-              const seen = new Set<string>();
-              const merged = [...combinedResults, ...fallbackResults].filter((r) => {
-                const key = `${r.type}:${r.id}`;
-                if (seen.has(key)) return false;
-                seen.add(key);
-                return true;
-              });
-              combinedResults = merged.slice(0, 24);
-            }
-          } catch {
-            // Ignore fallback errors; keep edge results.
-          }
+        // No direct `vehicles` ilike read here: under the row policies ilike is not leakproof, so no trigram index can
+        // serve it, and as anon it ran into the 15 s statement timeout (HTTP 500) on every query measured 2026-10-17.
+        let shown = response.results;
+        if (extractQueryFacets(trimmedInput).hasFacetIntent) {
+          shown = boostAndFilterVehicleSearchResults(trimmedInput, shown);
         }
 
-        setAutocompleteResults(combinedResults);
-        setAutocompleteAISuggestion(response.ai_suggestion || null);
-        const totalCount = Math.max(response.total_count || 0, combinedResults.length);
-        setAutocompleteTotalCount(totalCount > 0 ? totalCount : combinedResults.length);
-        setShowAutocomplete(combinedResults.length > 0 || !!response.ai_suggestion);
-        setSelectedAutocompleteIndex(-1);
+        if (resolvedScope) {
+          const scopeUrl = buildMarketScopeUrl(resolvedScope, isOnMarketTab(location.pathname, location.search) ? location.search : '');
+          const scopeTitle = [resolvedScope.year, resolvedScope.make, resolvedScope.model || resolvedScope.family_name]
+            .filter(Boolean)
+            .join(' ');
+          const marketResult: UniversalSearchResult = {
+            id: `market_scope:${scopeUrl}`,
+            type: 'tag',
+            title: scopeTitle || trimmedInput,
+            subtitle: 'MARKET COHORT · CLICK TO VIEW IN MARKET',
+            relevance_score: 1,
+            metadata: {
+              marketUrl: scopeUrl,
+              tag: scopeTitle || trimmedInput,
+            },
+          };
+          shown = [marketResult, ...shown.slice(0, 23)];
+        }
 
+        setAutocompleteResults(shown);
+        setAutocompleteAISuggestion(response.ai_suggestion || null);
+        const totalCount = Math.max(response.total_count || 0, shown.length);
+        setAutocompleteTotalCount(totalCount > 0 ? totalCount : shown.length);
+        setShowAutocomplete(shown.length > 0 || !!response.ai_suggestion || cohortShortcuts.length > 0);
+        setSelectedAutocompleteIndex(-1);
       } catch (error) {
+        if (cancelled || reqId !== autocompleteRequestIdRef.current) return;
         // Autocomplete error - fail silently
         setAutocompleteResults([]);
         setAutocompleteAISuggestion(null);
         setAutocompleteTotalCount(null);
-        setShowAutocomplete(false);
+        setShowAutocomplete(cohortShortcuts.length > 0);
       }
     }, 300); // 300ms debounce
 
     return () => {
+      cancelled = true;
       if (autocompleteDebounceRef.current) {
         clearTimeout(autocompleteDebounceRef.current);
+        autocompleteDebounceRef.current = null;
       }
     };
-  }, [input, isProcessing, attachedImage, showPreview]);
+  }, [input, isProcessing, attachedImage, showPreview, cohortShortcuts]);
 
   // ── Magic Box: Intent classification on every keystroke ──
   useEffect(() => {
@@ -598,13 +689,15 @@ export default function AIDataIngestionSearch() {
   }, [actionsOpen]);
 
   // Close popovers on outside click WITHOUT blocking the entire page (no full-screen click-catcher)
-  const anyPopoverOpen = showPreview || !!imagePreview || !!error || showCritique || showWiringWorkbench;
+  const anyPopoverOpen = showAutocomplete || showPreview || !!imagePreview || !!error || showCritique || showWiringWorkbench;
   useEffect(() => {
     if (!anyPopoverOpen) return;
     const onMouseDown = (e: MouseEvent) => {
       const el = containerRef.current;
       if (!el) return;
       if (el.contains(e.target as Node)) return;
+      setShowAutocomplete(false);
+      setSelectedAutocompleteIndex(-1);
       setShowPreview(false);
       setExtractionPreview(null);
       setError(null);
@@ -756,7 +849,7 @@ export default function AIDataIngestionSearch() {
       setExtractionPreview(null);
       setActionsOpen(false);
       setError(null);
-      navigate(`/search?q=${encodeURIComponent(searchQuery)}`);
+      await navigateSearchOrScopeMarket(searchQuery);
       return;
     }
 
@@ -910,15 +1003,14 @@ export default function AIDataIngestionSearch() {
 
       // Handle vehicle/image search queries differently
       if (extractionResult.inputType === 'search') {
-        // Navigate to unified search page with search query
+        // Navigate to unified search page with search query (or scope Market in place)
         const searchQuery = extractionResult.rawData?.query || effectiveText;
         // Clear input and close preview
         setInput('');
         setShowPreview(false);
         setExtractionPreview(null);
         setIsProcessing(false);
-        // Navigate to unified search page
-        navigate(`/search?q=${encodeURIComponent(searchQuery)}`);
+        await navigateSearchOrScopeMarket(searchQuery);
         return;
       }
 
@@ -1140,12 +1232,13 @@ export default function AIDataIngestionSearch() {
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
-    // Handle autocomplete navigation
-    if (showAutocomplete && autocompleteResults.length > 0) {
+    // Handle autocomplete navigation: cohort shortcuts first, then results
+    const navigableCount = cohortShortcuts.length + autocompleteResults.length;
+    if (showAutocomplete && navigableCount > 0) {
       if (e.key === 'ArrowDown') {
         e.preventDefault();
         setSelectedAutocompleteIndex(prev => 
-          prev < autocompleteResults.length - 1 ? prev + 1 : prev
+          prev < navigableCount - 1 ? prev + 1 : prev
         );
         return;
       }
@@ -1158,9 +1251,11 @@ export default function AIDataIngestionSearch() {
         e.preventDefault();
         e.stopPropagation();
         // If an item is selected, navigate to it
-        if (selectedAutocompleteIndex >= 0) {
-          const selected = autocompleteResults[selectedAutocompleteIndex];
-          handleAutocompleteSelect(selected);
+        if (selectedAutocompleteIndex >= 0 && selectedAutocompleteIndex < cohortShortcuts.length) {
+          handleCohortShortcutSelect(cohortShortcuts[selectedAutocompleteIndex]);
+        } else if (selectedAutocompleteIndex >= 0) {
+          const selected = autocompleteResults[selectedAutocompleteIndex - cohortShortcuts.length];
+          if (selected) handleAutocompleteSelect(selected);
         } else {
           // No item highlighted - close autocomplete and navigate to full search
           setShowAutocomplete(false);
@@ -1169,8 +1264,8 @@ export default function AIDataIngestionSearch() {
           if (trimmedInput && !showPreview) {
             const maybeUrl = normalizeUrlInput(trimmedInput);
             if (!trimmedInput.match(/^[A-HJ-NPR-Z0-9]{17}$/i) && !maybeUrl) {
-              // Simple text search - navigate to search page
-              navigate(`/search?q=${encodeURIComponent(trimmedInput)}`);
+              // Simple text search - scope Market in place if on Market tab, else navigate to search page
+              void navigateSearchOrScopeMarket(trimmedInput);
               setInput('');
             } else {
               processInput();
@@ -1196,10 +1291,9 @@ export default function AIDataIngestionSearch() {
       if (!showPreview) {
         const trimmedInput = input.trim();
         const maybeUrl = normalizeUrlInput(trimmedInput);
-        // If it's a simple text query (not VIN, not URL), navigate directly to search
+        // If it's a simple text query (not VIN, not URL), scope Market in place or navigate to search
         if (trimmedInput && !trimmedInput.match(/^[A-HJ-NPR-Z0-9]{17}$/i) && !maybeUrl) {
-          // Simple text search - navigate immediately
-          navigate(`/search?q=${encodeURIComponent(trimmedInput)}`);
+          void navigateSearchOrScopeMarket(trimmedInput);
           setInput('');
           return;
         }
@@ -1222,9 +1316,7 @@ export default function AIDataIngestionSearch() {
   };
 
   const handleAutocompleteSelect = (result: UniversalSearchResult) => {
-    setShowAutocomplete(false);
-    setSelectedAutocompleteIndex(-1);
-    setAutocompleteAISuggestion(null);
+    dismissAutocomplete();
 
     switch (result.type) {
       case 'vehicle':
@@ -1243,19 +1335,26 @@ export default function AIDataIngestionSearch() {
         setInput('');
         break;
 
-      case 'external_identity':
+      case 'external_identity': {
         // External identities have id format "external_<uuid>"
         const externalId = result.id.replace('external_', '');
         navigate(`/profile/external/${externalId}`);
         setInput('');
         break;
+      }
 
-      case 'tag':
+      case 'tag': {
+        if (result.metadata?.marketUrl) {
+          navigate(String(result.metadata.marketUrl));
+          setInput('');
+          break;
+        }
         // Tags navigate to search with that tag as query
         const tagName = result.metadata?.tag || result.title;
         navigate(`/search?q=${encodeURIComponent(tagName)}`);
         setInput('');
         break;
+      }
 
       default:
         // Fallback: set input and let user press Enter
@@ -1461,7 +1560,7 @@ export default function AIDataIngestionSearch() {
           }}
           onKeyDown={handleKeyDown}
           onFocus={() => {
-            if (autocompleteResults.length > 0) {
+            if (input.trim().length >= 2 && autocompleteResults.length > 0) {
               setShowAutocomplete(true);
             }
           }}
@@ -1672,6 +1771,12 @@ export default function AIDataIngestionSearch() {
           background: 'var(--white)', border: '2px solid var(--border)', zIndex: 1203,
           fontSize: '11px', fontFamily: 'Arial, sans-serif',
         }}>
+          <HeaderSearchCohortShortcuts
+            shortcuts={cohortShortcuts}
+            onSelect={handleCohortShortcutSelect}
+            activeIndex={selectedAutocompleteIndex}
+            onActivate={setSelectedAutocompleteIndex}
+          />
           {makeStatsLoading ? (
             <div style={{ padding: '12px', display: 'flex', alignItems: 'center', gap: '10px' }}>
               <div style={{
@@ -1695,8 +1800,8 @@ export default function AIDataIngestionSearch() {
                 <div style={{
                   fontFamily: '"Courier New", monospace', fontSize: '11px',
                   color: 'var(--text-secondary)',
-                }}>
-                  {makeStats.total.toLocaleString()} VEHICLES
+                }} title="Estimated count">
+                  {formatMakeTotal(makeStats)} VEHICLES
                 </div>
               </div>
 
@@ -1728,7 +1833,7 @@ export default function AIDataIngestionSearch() {
                         onMouseDown={(e) => e.preventDefault()}
                         onClick={() => {
                           setInput(`${makeStats.make} ${m.model}`);
-                          navigate(`/search?q=${encodeURIComponent(`${makeStats.make} ${m.model}`)}`);
+                          void navigateSearchOrScopeMarket(`${makeStats.make} ${m.model}`);
                           setInput('');
                         }}
                         style={{
@@ -1743,6 +1848,12 @@ export default function AIDataIngestionSearch() {
                         }}
                       >
                         <span style={{ fontWeight: 600 }}>{m.model}</span>
+                        <HeaderSearchFacetPills
+                          make={makeStats.make}
+                          model={m.model}
+                          label={`${makeStats.make} ${m.model}`}
+                          compact
+                        />
                         <span style={{
                           fontFamily: '"Courier New", monospace',
                           fontSize: '9px', color: 'var(--text-secondary)',
@@ -1760,7 +1871,7 @@ export default function AIDataIngestionSearch() {
                 type="button"
                 onMouseDown={(e) => e.preventDefault()}
                 onClick={() => {
-                  navigate(`/search?q=${encodeURIComponent(input.trim())}`);
+                  void navigateSearchOrScopeMarket(input.trim() || makeStats.make);
                   setInput('');
                 }}
                 style={{
@@ -1771,7 +1882,7 @@ export default function AIDataIngestionSearch() {
                   fontFamily: 'Arial, sans-serif',
                 }}
               >
-                BROWSE ALL {makeStats.make.toUpperCase()} ({makeStats.total.toLocaleString()})
+                BROWSE ALL {makeStats.make.toUpperCase()} ({formatMakeTotal(makeStats)})
               </button>
             </div>
           ) : null}
@@ -1779,8 +1890,9 @@ export default function AIDataIngestionSearch() {
       )}
 
       {/* Standard autocomplete dropdown — for QUERY and other text intents */}
-      {showAutocomplete && autocompleteResults.length > 0 && currentIntent !== 'EXACT_URL' && currentIntent !== 'EXACT_VIN' && !(currentIntent === 'BROWSE' && (makeStats || makeStatsLoading)) && (
+      {input.trim().length >= 2 && showAutocomplete && (autocompleteResults.length > 0 || cohortShortcuts.length > 0) && currentIntent !== 'EXACT_URL' && currentIntent !== 'EXACT_VIN' && !(currentIntent === 'BROWSE' && (makeStats || makeStatsLoading)) && (
         <div
+          data-testid="header-search-dropdown"
           style={{
             position: 'absolute',
             top: '100%',
@@ -1809,8 +1921,17 @@ export default function AIDataIngestionSearch() {
             </div>
           )}
 
+          <HeaderSearchCohortShortcuts
+            shortcuts={cohortShortcuts}
+            onSelect={handleCohortShortcutSelect}
+            activeIndex={selectedAutocompleteIndex}
+            onActivate={setSelectedAutocompleteIndex}
+          />
+
           {/* Rich results with thumbnails */}
-          {autocompleteResults.map((result, index) => {
+          {autocompleteResults.map((result, resultIndex) => {
+            const index = cohortShortcuts.length + resultIndex;
+            const eraMark = resultEraMarks.get(`${result.type}-${result.id}`);
             const typeColors: Record<string, string> = {
               vehicle: 'var(--accent)',
               organization: 'var(--success)',
@@ -1823,6 +1944,7 @@ export default function AIDataIngestionSearch() {
             return (
               <div
                 key={`${result.type}-${result.id}`}
+                data-testid={`header-search-result-${result.id}`}
                 onClick={() => handleAutocompleteSelect(result as any)}
                 onMouseEnter={() => setSelectedAutocompleteIndex(index)}
                 style={{
@@ -1883,6 +2005,21 @@ export default function AIDataIngestionSearch() {
                     }}>
                       {result.subtitle}
                     </div>
+                  )}
+                  {(result.type === 'vehicle' || result.type === 'tag' || result.type === 'vin_match') && (
+                    <HeaderSearchFacetPills
+                      year={result.metadata?.year}
+                      make={result.metadata?.make}
+                      model={result.metadata?.model || result.metadata?.normalized_model}
+                      series={result.metadata?.series}
+                      trim={result.metadata?.trim}
+                      bodyStyle={result.metadata?.body_style}
+                      title={result.title}
+                      subtitle={result.subtitle}
+                      description={result.description}
+                      eraMark={eraMark}
+                      eraMarkTestId={`header-search-result-era-mark-${result.id}`}
+                    />
                   )}
                 </div>
 

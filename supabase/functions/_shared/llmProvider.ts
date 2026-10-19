@@ -1,3 +1,5 @@
+import { geminiFetch } from './geminiGuard.ts';
+import { ProviderHTTPError } from './providerDiagnostic.ts';
 /**
  * Unified LLM Provider System
  * Supports OpenAI, Anthropic, and Google Gemini
@@ -12,6 +14,7 @@ export interface LLMConfig {
   model: string;
   apiKey: string;
   source: 'user' | 'system';
+  workspaceId?: string;
 }
 
 export interface ProviderModel {
@@ -35,15 +38,15 @@ export const PROVIDER_MODELS: Record<LLMProvider, ProviderModel[]> = {
     { name: 'claude-opus-4-5', costPer1kTokens: 15.00, maxTokens: 200000, supportsVision: true, speed: 'slow', quality: 'excellent' },
   ],
   google: [
-    { name: 'gemini-2.5-flash-lite', costPer1kTokens: 0.00, maxTokens: 1048576, supportsVision: true, speed: 'fast', quality: 'good' }, // FREE, separate quota
-    { name: 'gemini-2.5-flash', costPer1kTokens: 0.15, maxTokens: 1048576, supportsVision: true, speed: 'fast', quality: 'excellent' },
-    { name: 'gemini-2.5-pro', costPer1kTokens: 1.25, maxTokens: 1048576, supportsVision: true, speed: 'medium', quality: 'excellent' },
+    { name: 'gemini-flash-lite-latest', costPer1kTokens: 0.00, maxTokens: 1048576, supportsVision: true, speed: 'fast', quality: 'good' }, // FREE, separate quota
+    { name: 'gemini-flash-latest', costPer1kTokens: 0.15, maxTokens: 1048576, supportsVision: true, speed: 'fast', quality: 'excellent' },
+    { name: 'gemini-pro-latest', costPer1kTokens: 1.25, maxTokens: 1048576, supportsVision: true, speed: 'medium', quality: 'excellent' },
   ],
 };
 
 export const TIER_CONFIGS: Record<AnalysisTier, { provider: LLMProvider; model: string; description: string }> = {
-  tier1: { provider: 'google', model: 'gemini-2.5-flash-lite', description: 'Fast, free basic analysis' },
-  tier2: { provider: 'google', model: 'gemini-2.5-flash', description: 'Good quality, cheap' },
+  tier1: { provider: 'google', model: 'gemini-flash-lite-latest', description: 'Fast, free basic analysis' },
+  tier2: { provider: 'google', model: 'gemini-flash-latest', description: 'Good quality, cheap' },
   tier3: { provider: 'openai', model: 'gpt-4o', description: 'High quality, balanced cost' },
   expert: { provider: 'anthropic', model: 'claude-sonnet-4-5', description: 'Highest quality, comprehensive analysis' },
 };
@@ -176,7 +179,8 @@ export async function callLLM(
     };
   } catch (error: any) {
     const duration = Date.now() - startTime;
-    console.error(`${logPrefix} ❌ Failed (${duration}ms):`, error.message);
+    console.error(`${logPrefix} ❌ Failed (${duration}ms):`,
+      error instanceof ProviderHTTPError ? error.diagnostic.code : 'provider_call_failed');
     throw error;
   }
 }
@@ -197,8 +201,7 @@ async function callOpenAI(config: LLMConfig, messages: any[], options?: any): Pr
   });
   
   if (!response.ok) {
-    const error = await response.text();
-    throw new Error(`OpenAI API error: ${response.status} - ${error}`);
+    throw new ProviderHTTPError('openai', response.status, await response.json().catch(() => null));
   }
   
   const data = await response.json();
@@ -216,7 +219,7 @@ async function callAnthropic(config: LLMConfig, messages: any[], options?: any):
     .filter(m => m.role !== 'system')
     .map(m => ({
       role: m.role === 'assistant' ? 'assistant' : 'user',
-      content: m.content,
+      content: anthropicContent(m.content),
     }));
   
   const response = await fetch('https://api.anthropic.com/v1/messages', {
@@ -224,28 +227,63 @@ async function callAnthropic(config: LLMConfig, messages: any[], options?: any):
     headers: {
       'x-api-key': config.apiKey,
       'anthropic-version': '2023-06-01',
+      ...(config.workspaceId ? { 'anthropic-workspace-id': config.workspaceId } : {}),
       'Content-Type': 'application/json',
     },
     body: JSON.stringify({
       model: config.model,
       max_tokens: options?.maxTokens ?? 4096,
-      temperature: options?.temperature ?? 0.7,
+      ...(config.model === "claude-haiku-5-5" ? { output_config: { effort: "low" } } : { temperature: options?.temperature ?? 0.7 }),
       system: systemMessage,
       messages: conversationMessages,
     }),
   });
   
   if (!response.ok) {
-    const error = await response.text();
-    throw new Error(`Anthropic API error: ${response.status} - ${error}`);
+    throw new ProviderHTTPError('anthropic', response.status, await response.json().catch(() => null));
   }
   
   const data = await response.json();
   return {
-    content: data.content[0]?.text || '',
+    content: (data.content ?? []).filter((block: any) => block.type === 'text').map((block: any) => block.text).join('\n'),
     usage: data.usage,
     finish_reason: data.stop_reason,
   };
+}
+
+/** Preserve image bytes and their actual type at the provider boundary. Claude's
+ * Messages API uses image/source blocks, not OpenAI image_url blocks.
+ * https://platform.claude.com/docs/en/build-with-claude/vision
+ */
+function inlineImage(url: unknown, supported: Set<string>): { mime: string; data: string } {
+  const match = typeof url === 'string' ? /^data:(image\/[a-z0-9.+-]+);base64,([A-Za-z0-9+/]+={0,2})$/i.exec(url) : null;
+  if (!match || !supported.has(match[1].toLowerCase()) || match[2].length % 4 !== 0) {
+    throw new Error('vision_image_inline_format_unsupported');
+  }
+  return { mime: match[1].toLowerCase(), data: match[2] };
+}
+const CLAUDE_IMAGES = new Set(['image/jpeg', 'image/png', 'image/gif', 'image/webp']);
+const GEMINI_IMAGES = new Set(['image/jpeg', 'image/png', 'image/webp', 'image/heic', 'image/heif']);
+export function anthropicContent(content: unknown): unknown {
+  if (!Array.isArray(content)) return content;
+  return content.map(block => {
+    if (block?.type !== 'image_url') return block;
+    const url = block.image_url?.url;
+    if (typeof url === 'string' && /^https?:\/\//i.test(url)) {
+      return { type: 'image', source: { type: 'url', url } };
+    }
+    const image = inlineImage(url, CLAUDE_IMAGES);
+    return { type: 'image', source: { type: 'base64', media_type: image.mime, data: image.data } };
+  });
+}
+
+/** Google inline_data requires the MIME of the actual bytes, rather than a
+ * blanket JPEG label. Unpinned URL text is not base64 image data.
+ * https://ai.google.dev/gemini-api/docs/image-understanding
+ */
+export function googleImagePart(url: unknown) {
+  const image = inlineImage(url, GEMINI_IMAGES);
+  return { inline_data: { mime_type: image.mime, data: image.data } };
 }
 
 async function callGoogle(config: LLMConfig, messages: any[], options?: any): Promise<any> {
@@ -264,12 +302,7 @@ async function callGoogle(config: LLMConfig, messages: any[], options?: any): Pr
         parts = m.content.map((c: any) => {
           if (c.type === 'text') return { text: c.text };
           if (c.type === 'image_url') {
-            return {
-              inline_data: {
-                mime_type: 'image/jpeg',
-                data: c.image_url.url.split(',')[1] || c.image_url.url,
-              },
-            };
+            return googleImagePart(c.image_url?.url);
           }
           return { text: JSON.stringify(c) };
         });
@@ -292,18 +325,17 @@ async function callGoogle(config: LLMConfig, messages: any[], options?: any): Pr
     requestBody.systemInstruction = { parts: [{ text: systemMessage }] };
   }
 
-  const response = await fetch(
+  const response = await geminiFetch(
     `https://generativelanguage.googleapis.com/v1beta/models/${config.model}:generateContent?key=${config.apiKey}`,
     {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(requestBody),
     }
-  );
+  , 'llmProvider');
   
   if (!response.ok) {
-    const error = await response.text();
-    throw new Error(`Google API error: ${response.status} - ${error}`);
+    throw new ProviderHTTPError('google', response.status, await response.json().catch(() => null), response.headers.has('x-gemini-guard'));
   }
   
   const data = await response.json();
