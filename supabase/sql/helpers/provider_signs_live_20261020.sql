@@ -1,4 +1,4 @@
--- Live shapes read by 20261020031000_provider_availability_area.sql (subset; synthetic fixtures only).
+-- Live shapes read by 20261020031100_provider_availability_area.sql (subset; synthetic fixtures only).
 CREATE TYPE public.user_observation_kind AS ENUM ('vendor_preference','tool_owned','scene_observation','presence','availability','capacity');
 CREATE TABLE public.user_observations(id uuid PRIMARY KEY DEFAULT gen_random_uuid(), user_id uuid NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
   kind public.user_observation_kind NOT NULL, observed_at timestamptz NOT NULL, ingested_at timestamptz NOT NULL DEFAULT now(), source text NOT NULL,
