@@ -370,6 +370,8 @@ ALTER TABLE public.observation_sources ADD COLUMN IF NOT EXISTS display_name tex
 \ir ../migrations/20261020074500_work_order_part_product_matches.sql
 \echo REPLAY 20261020081000_publish_work_order.sql
 \ir ../migrations/20261020081000_publish_work_order.sql
+\echo REPLAY 20261020083000_work_order_publication_read.sql
+\ir ../migrations/20261020083000_work_order_publication_read.sql
 \ir helpers/part_product_tables_live_20261020.sql
 \echo REPLAY 20261020084500_work_order_part_product_read.sql
 \ir ../migrations/20261020084500_work_order_part_product_read.sql
