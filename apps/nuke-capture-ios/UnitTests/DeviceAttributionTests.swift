@@ -68,7 +68,7 @@ final class DeviceAttributionTests: XCTestCase {
         let vin = "1GCEK14L9EJ147915"
         let frames = [capture("plate", vin: vin, exact: true),
                       capture("front", time: "2026-10-18T12:03:00Z", lat: 37.0001, vehicle: true),
-                      capture("rear", time: "2026-10-18T12:06:00Z", lat: 37.0002, vehicle: true)]
+                      capture("rear", time: "2026-10-18T12:04:00Z", lat: 37.0002, vehicle: true)]
         XCTAssertEqual(AttributionEngine.vinAnchoredCaptureGroups(frames), [
             .init(vin: vin, anchorImageID: "plate", imageIDs: ["front", "plate", "rear"], vehicleFrameCount: 2)
         ])

@@ -217,8 +217,12 @@ SELECT pg_temp.ok('the recovered check digit accepts known VINs and refuses a wr
   AND NOT public.validate_vin_check_digit('1HGCM82634A004352'));
 
 -- Fixture -----------------------------------------------------------------------------------------------------------
-INSERT INTO public.profiles (id) VALUES (pg_temp.u('owner')), (pg_temp.u('stranger')), (pg_temp.u('busy'));
+-- auth.users is owned by the platform auth role in production; seed that fixture as postgres,
+-- then resume the constrained deployment role for the application tables.
+RESET ROLE;
 INSERT INTO auth.users (id) VALUES (pg_temp.u('owner')), (pg_temp.u('stranger')), (pg_temp.u('busy'));
+SET ROLE dm_contract_deployer;
+INSERT INTO public.profiles (id) VALUES (pg_temp.u('owner')), (pg_temp.u('stranger')), (pg_temp.u('busy'));
 INSERT INTO public.vehicles (id, uploaded_by, owner_id, year, make, model, vin, is_public, status, merged_into_vehicle_id, deleted_at) VALUES
   (pg_temp.v('accord'),   pg_temp.u('owner'),    NULL,               2003, 'Honda',     'Accord',       '1HGCM82633A004352', true, 'active', NULL, NULL),
   (pg_temp.v('camaro'),   pg_temp.u('stranger'), pg_temp.u('owner'), 1967, 'Chevrolet', 'Camaro',       '124377N100001',     true, 'active', NULL, NULL),
