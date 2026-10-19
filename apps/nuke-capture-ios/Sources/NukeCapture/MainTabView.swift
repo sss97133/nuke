@@ -33,6 +33,7 @@ struct MainTabView: View {
     @State private var photoGrant = Self.currentPhotoGrant()
     @State private var fullAccess = (PHPhotoLibrary.authorizationStatus(for: .readWrite) == .authorized)
     @State private var tab: Tab = .explore
+    @ObservedObject private var inboxBadge = InboxBadgeStore.shared
 
     enum Tab: Hashable { case library, profile, explore, today }
 
@@ -65,15 +66,18 @@ struct MainTabView: View {
                 WorkConsoleView(showCapture: photoGrant)
                     .tag(Tab.today)
                     .tabItem { Label("Work", systemImage: "wrench.and.screwdriver") }
+                    .badge(inboxBadge.badge)
             }
         }
         .onAppear { tab = landingTab() }
         .onChange(of: session.isSignedIn) { _, _ in tab = landingTab() }
+        .task(id: session.isSignedIn) { await inboxBadge.refresh() }
         .onChange(of: scenePhase) { _, phase in
             // Settings round-trips can change the grant — re-read it.
             if phase == .active {
                 photoGrant = Self.currentPhotoGrant()
                 fullAccess = (PHPhotoLibrary.authorizationStatus(for: .readWrite) == .authorized)
+                Task { await inboxBadge.refresh() }
             }
         }
     }
