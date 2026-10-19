@@ -201,6 +201,11 @@ struct PostedJobSections: View {
             } label: {
                 Label("Open the job", systemImage: "wrench.and.screwdriver").bold()
             }
+            NavigationLink {
+                ProviderMatchesView(workOrderId: posted.workOrderId)
+            } label: {
+                Label("Choose who does it", systemImage: "person.2.wave.2")
+            }
         } footer: {
             Text("No one is booked and no one has been notified. Technicians offer; you decide.")
         }
