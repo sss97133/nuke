@@ -58,6 +58,7 @@ Standing rules the code carries:
   and until it checks `vision_gate_status` a reader that drops the predicate can read rejected frames.
   Thumbnails render through `NukeImage.thumb(url, width:)` (the render endpoint, or BaT's `?w=`), never
   the raw original outside the full-screen viewer.
+- **Payments open Stripe, never compose an amount.** A job's `pay_invoice` action comes only from the server (`viewer.actions`, offered to the work order customer while a balance is due). `JobPayment.swift` passes back its `work_order_id` to `create-work-order-invoice-checkout` and opens the returned page only when it is https on stripe.com. Nothing is charged until the customer finishes on Stripe; the payment reaches the job through `stripe-webhook`. Collection only: the app shows no payout or release.
 - **Uploads are keyed by their bytes.** The storage path is `users/<uid>/capture-relay/<sha256>/<filename>`
   (`Config.storagePath`). The filename alone wraps at IMG_9999: by 2026-10-15, 586 old paths each held rows of
   different photos (1,266 rows, at least 598 showing another photo's bytes). Never key an object by a name the
