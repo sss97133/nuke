@@ -79,8 +79,9 @@ describe('type-only imports used as values', () => {
     expect(typeOnlyValueUses('fixture.tsx', src)).toEqual(['fixture.tsx:3:svc', 'fixture.tsx:4:svc', 'fixture.tsx:5:Other', 'fixture.tsx:7:Widget']);
   });
 
+  // Parses every source file (about 1 s locally, 6 s on CI runners), so it gets more than vitest's 5 s default.
   it('no source file under src calls, constructs, reads or renders a type-only import', () => {
     const found = sourceFiles(SRC).flatMap((f) => typeOnlyValueUses(relative(SRC, f), readFileSync(f, 'utf8')));
     expect(found).toEqual([]);
-  });
+  }, 60_000);
 });
