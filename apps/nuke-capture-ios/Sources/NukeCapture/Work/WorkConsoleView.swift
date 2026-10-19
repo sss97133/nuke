@@ -3,7 +3,7 @@
 // Sections (R4 §2 "Work"): Awaiting your signature (my_signature_queue: each work day opens an
 // explicit confirm sheet over confirm_work_session), Jobs in motion (my_work_orders, paged by
 // next_after, each row a seven-dot stage rail that opens JobView), Messages (Contact via Nuke),
-// Jobs looking for someone (open_requirements_read with the viewer's match), and Capture (the Engine's
+// Notifications (user_notifications; NotificationsSection), Jobs looking for someone (open_requirements_read with the viewer's match), and Capture (the Engine's
 // sections, unchanged, shown only with the photo grant). The tab itself is signed-in only
 // because these are personal queues. Every list is what a server reader returned for this
 // account; a reader that is missing or refuses renders "Not available yet" and why.
@@ -18,17 +18,19 @@ struct WorkConsoleView: View {
     @State private var identity: JobLoad<MyIdentity> = .loading
     @State private var inbox: JobLoad<ContactInbox> = .loading
     @State private var open: JobLoad<OpenRequirements> = .loading
+    @State private var notifications: JobLoad<NotificationPage> = .loading
     @State private var loadingMore = false
     @State private var showAccount = false
 
     var body: some View {
         NavigationStack {
             WorkConsoleContent(signatures: signatures, jobs: jobs, identity: identity, showCapture: showCapture,
-                               inbox: inbox, open: open,
+                               inbox: inbox, open: open, notifications: notifications,
                                onInboxChanged: { Task { inbox = await ContactReaders.inbox() } },
+                               onNotificationsChanged: { Task { await loadNotifications() } },
                                loadingMore: loadingMore,
                                onLoadMore: { Task { await loadMoreJobs() } },
-                               onSigned: { Task { signatures = await JobReaders.signatures() } })
+                               onSigned: { Task { await loadSignatures() } })
                 .navigationTitle("Work")
                 .navigationBarTitleDisplayMode(.inline)
                 .toolbar {
@@ -58,11 +60,25 @@ struct WorkConsoleView: View {
         async let i = JobReaders.myIdentity()
         async let m = ContactReaders.inbox()
         async let r = OfferReaders.openRequirements()
+        async let n = NotificationReaders.page()
         signatures = await s
         jobs = await j
         identity = await i
         inbox = await m
         open = await r
+        notifications = await n
+        InboxBadgeStore.shared.toSign = InboxBadgeStore.toSign(signatures)
+        if case .loaded(let p) = notifications { InboxBadgeStore.shared.unreadNotifications = p.unread }
+    }
+
+    private func loadSignatures() async {
+        signatures = await JobReaders.signatures()
+        InboxBadgeStore.shared.toSign = InboxBadgeStore.toSign(signatures)
+    }
+
+    private func loadNotifications() async {
+        notifications = await NotificationReaders.page()
+        if case .loaded(let p) = notifications { InboxBadgeStore.shared.unreadNotifications = p.unread }
     }
 
     private func loadMoreJobs() async {
@@ -83,7 +99,9 @@ struct WorkConsoleContent: View {
     let showCapture: Bool
     var inbox: JobLoad<ContactInbox> = .loading
     var open: JobLoad<OpenRequirements> = .loading
+    var notifications: JobLoad<NotificationPage> = .loading
     var onInboxChanged: (() -> Void)? = nil
+    var onNotificationsChanged: (() -> Void)? = nil
     var loadingMore = false
     var onLoadMore: (() -> Void)? = nil
     var onSigned: (() -> Void)? = nil
@@ -95,6 +113,7 @@ struct WorkConsoleContent: View {
         List {
             signatureSection
             ContactInboxSection(inbox: inbox, onChanged: onInboxChanged)
+            NotificationsSection(page: notifications, onChanged: onNotificationsChanged)
             jobsSection
             JobsLookingSection(open: open, bridge: { if case .loaded(let me) = identity { return me.bridge } else { return nil } }())
             if showCapture {

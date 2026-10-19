@@ -341,6 +341,11 @@ ALTER TABLE public.observation_sources ADD COLUMN IF NOT EXISTS display_name tex
 \ir ../migrations/20261020014500_work_order_invoice_stripe_payments.sql
 \echo REPLAY 20261020020000_work_order_inspection_seller_actions.sql
 \ir ../migrations/20261020020000_work_order_inspection_seller_actions.sql
+\ir helpers/tool_tables_live_20261020.sql
+\echo REPLAY 20261020030000_tool_requirement_keys.sql
+\ir ../migrations/20261020030000_tool_requirement_keys.sql
+\echo REPLAY 20261020040000_suggested_provider_links.sql
+\ir ../migrations/20261020040000_suggested_provider_links.sql
 \echo REPLAY 20261020041000_actor_link_review_owner_agent.sql
 \ir ../migrations/20261020041000_actor_link_review_owner_agent.sql
 -- Plan check and final state.

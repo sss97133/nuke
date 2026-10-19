@@ -59,6 +59,7 @@ Standing rules the code carries:
   Thumbnails render through `NukeImage.thumb(url, width:)` (the render endpoint, or BaT's `?w=`), never
   the raw original outside the full-screen viewer.
 - **Payments open Stripe, never compose an amount.** A job's `pay_invoice` action comes only from the server (`viewer.actions`, offered to the work order customer while a balance is due). `JobPayment.swift` passes back its `work_order_id` to `create-work-order-invoice-checkout` and opens the returned page only when it is https on stripe.com. Nothing is charged until the customer finishes on Stripe; the payment reaches the job through `stripe-webhook`. Collection only: the app shows no payout or release.
+- **Notifications mirror the web's NotificationCenter.** The Work tab reads the account's latest 50 `user_notifications` rows under their own-row policy (exact count beside them), the unread count from `get_unread_notification_count`, and marks read only from a tap through `mark_notification_read` / `mark_all_notifications_read` (`Notifications/`). A row opens a job or conversation when its metadata names one (`work_order_id`, `contact_request_id`), else the web's order: `action_url`, `vehicle_id`, `organization_id`; a nuke.ag path with no screen opens on the web, and other sites are not opened. Anything that needs a Sign stays in `my_signature_queue`. The Work badge is the unread count plus the queue's stated total. There is no push (no APNs entitlement or registration).
 - **Uploads are keyed by their bytes.** The storage path is `users/<uid>/capture-relay/<sha256>/<filename>`
   (`Config.storagePath`). The filename alone wraps at IMG_9999: by 2026-10-15, 586 old paths each held rows of
   different photos (1,266 rows, at least 598 showing another photo's bytes). Never key an object by a name the
@@ -362,6 +363,16 @@ title/dispute qualifiers, evidence IDs and qualified account cover choices survi
 the offline cache. Business handling, consignment, representation and pending or
 disputed interests remain separate from personal ownership. A fork requires review.
 
+The own profile's **Garage** door (`Garage/`) opens the same fold (`GarageReaders.ownGarage`, shared
+with the profile list) grouped by the server's relationship: owned, other interests, previously owned,
+contributed; the footer states the total and its clock. A photographed or contributed vehicle is never
+shown as owned. `my_unorganized_photo_count` (the web's inbox badge, capped at 1,000 and shown as
+"1,000+") leads to `SessionConfirmView`, which reviews only this app's dated uploads; the screen says so.
+Each vehicle opens a hub: visibility, removal or merge from `vehicle_row_read`, the Work card (jobs,
+"Post a job" for an owned vehicle until `vehicle_access` says otherwise, else an inspection) and the
+profile. `my_vehicles` is not read: on 2026-10-19 no `work_record` observation carried an observer and
+the reader ran past the statement timeout.
+
 Album grouping and on-device review coverage persist locally. Limited Photos access
 cannot expose user albums, so the screen reports unknown album coverage while
 selected photos remain analyzable. No new
@@ -403,7 +414,10 @@ Sources/NukeCapture/
   Jobs/JobQuotes.swift             quote, people and statement DTOs (open prices; payments to parties)
   Jobs/AcceptQuoteSheet.swift      the customer's Sign on one quote version (accept_work_order_quote)
   Vehicle/                         Work card (vehicle_work_orders_read) and statement view
+  Garage/                          owner's garage, photos to organize, per-vehicle work hub
   Profile/                         provider face (provider_profile_read) and jobs on record
+  Provider/                        provider standing: link evidence (actor_link_claim_evidence_read), work days and
+                                   day-rate terms (provider_productivity_read), agent-signed register (owner_delegated_signs_read)
   Contact/                         Contact via Nuke: request sheet, Work inbox, thread (in-app only)
   Explore/                         Plan the work (listing_work_plan_read) and the Order inspection Sign
   Jobs/JobCloseout*.swift + CloseoutSheets.swift  completion, invoice, payment witness, evidence Signs

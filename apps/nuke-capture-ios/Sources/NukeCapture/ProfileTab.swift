@@ -368,6 +368,7 @@ struct ProfileView: View {
             // GARAGE — the user's vehicles, the way into the whole drill chain.
             // Empty + own profile → a LIVING state that says what's coming, not a
             // hidden section that reads as a dead profile (the cold-start gravestone).
+            if isOwn { GarageDoorSection(userId: userId) }
             if !garage.isEmpty || !unresolvedGarageSources.isEmpty {
                 garageSection
             } else if garageError {
@@ -865,36 +866,9 @@ struct ProfileView: View {
         guard isOwn else { await loadPublicGarage(); return }
         garageError = false
         do {
-            async let legacyRows: [GarageVehicle] = SupabaseService.client
-                .rpc("get_user_garage", params: ["p_user_id": userId])
-                .execute()
-                .value
-            async let correctionRows = fetchOwnGarageCorrections()
-            var rows = try await legacyRows
-            let fetchedCorrections = try await correctionRows
-            let corrections = isOwn && SupabaseService.currentUserId == userId.lowercased() ? fetchedCorrections : []
-            let unresolved = GarageUnresolvedSource.from(corrections)
-            let ids = Array(Set(rows.map(\.vehicle_id) + corrections.compactMap(\.vehicle_id)))
-            if !ids.isEmpty {
-                let metadata: [GarageMetadata] = try await SupabaseService.client.from("vehicles")
-                    .select("id,year,make,model,normalized_model,trim,vin,primary_image_url,image_count")
-                    .in("id", values: ids).execute().value
-                let byID = Dictionary(uniqueKeysWithValues: metadata.map { ($0.id, $0) })
-                let present = Set(rows.map(\.vehicle_id))
-                for m in metadata where !present.contains(m.id) {
-                    rows.append(GarageVehicle(vehicle_id: m.id, year: m.year, make: m.make,
-                        model: m.normalized_model ?? m.model, trim_name: m.trim, image_url: m.primary_image_url,
-                        current_value: nil, image_count: m.image_count ?? 0, relationship: "relationship_review", vin: m.vin))
-                }
-                for index in rows.indices {
-                    if let m = byID[rows[index].id] {
-                        rows[index].vin = m.vin
-                        let normalized = m.normalized_model?.trimmingCharacters(in: .whitespaces)
-                        rows[index].model = normalized?.isEmpty == false ? normalized : m.model
-                    }
-                }
-            }
-            rows = GarageVehicle.applying(corrections, to: rows)
+            let own = try await GarageReaders.ownGarage(userId: userId)
+            let rows = own.vehicles
+            let unresolved = own.unresolved
             garage = rows
             unresolvedGarageSources = unresolved
             garageIsCached = false
@@ -943,11 +917,6 @@ struct ProfileView: View {
         let vin: String?
         let primary_image_url: String?
         let image_count: Int?
-    }
-
-    private func fetchOwnGarageCorrections() async throws -> [GarageOwnerCorrection] {
-        guard isOwn, SupabaseService.currentUserId == userId.lowercased() else { return [] }
-        return try await SupabaseService.client.rpc("get_my_garage_owner_corrections", params: ["p_include_unresolved": true]).execute().value
     }
 
     // ─── Garage failed to load — distinct from "no vehicles yet". ─────────────
