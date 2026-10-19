@@ -226,7 +226,7 @@ Standing rules the code carries:
 - **No fabricated data anywhere,** including DEBUG builds and screenshots (`docs/design/CONSTRAINTS.md` C0).
   DEBUG-only deep links (`NUKE_DEBUG_*`, `NukeCaptureApp.swift`) drive the screenshot loop and are compiled
   out of Release: `NUKE_DEBUG_VEHICLE_ID=<uuid>` roots on a profile as anon, `NUKE_DEBUG_SCREEN=app|
-  profile|explore|today|library`, `NUKE_DEBUG_SCROLL_TO=worth|proof|asset|specs|events|photos|more`,
+  profile|explore|today|work|library`, `NUKE_DEBUG_JOB_ID=<uuid>` roots on that work order's `JobView`, `NUKE_DEBUG_SCROLL_TO=worth|proof|asset|specs|events|photos|more`,
   `NUKE_DEBUG_EXPLORE_MODE=pulse|live|listings|map`, `NUKE_DEBUG_EXPLORE_QUERY=<text>` lands on the search
   results and `NUKE_DEBUG_EXPLORE_PAGES=<n>` walks n more pages through the door, `NUKE_DEBUG_LIVE_READING=1` opens
   the first hot or cold lot's reading on the board, `NUKE_DEBUG_LEDGER_MAKE=Chevrolet` opens that brand's models on the
@@ -360,7 +360,9 @@ PrivacyInfo.xcprivacy              Apple privacy manifest (photos, precise locat
 Sources/NukeCapture/
   NukeCaptureApp.swift             @main; BGAppRefreshTask register/schedule; routing
   SignInView.swift                 sign in / sign out / account deletion (5.1.1(v))
-  TodayView.swift                  native value screen: counters, thumbs, Sync Now
+  TodayView.swift                  native value screen: counters, thumbs, Sync Now (CaptureSections)
+  Work/WorkConsoleView.swift       the Work tab: signature queue, jobs in motion, Capture
+  Jobs/                            JobView over work_order_job_path_read; DTOs, readers, stage rail
   SyncEngine.swift                 PhotoKit watch + watermark + dedupe + GPS gate
   SupabaseService.swift            auth, storage upload, vehicle_images insert
   Config.swift                     public URL/anon key, shop-gate geometry, tuning

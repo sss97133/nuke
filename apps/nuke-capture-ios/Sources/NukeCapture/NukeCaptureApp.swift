@@ -72,6 +72,11 @@ struct NukeCaptureApp: App {
                     DebugProfileDeepLink()
                 } else if ProcessInfo.processInfo.environment["NUKE_DEBUG_SCREEN"] == "today" {
                     DebugTodayDeepLink()
+                } else if ProcessInfo.processInfo.environment["NUKE_DEBUG_SCREEN"] == "work" {
+                    // The Work console over the live readers, as whoever the Keychain holds.
+                    WorkConsoleView(showCapture: MainTabView.currentPhotoGrant())
+                } else if let dbgJob = ProcessInfo.processInfo.environment["NUKE_DEBUG_JOB_ID"], !dbgJob.isEmpty {
+                    NavigationStack { JobView(workOrderId: dbgJob) }
                 } else if ProcessInfo.processInfo.environment["NUKE_DEBUG_SCREEN"] == "days" {
                     // Days + the day receipt are entirely LocalStore — anon, no session.
                     LibraryDaysView()
