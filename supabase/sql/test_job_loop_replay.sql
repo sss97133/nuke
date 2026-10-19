@@ -204,6 +204,9 @@ CREATE POLICY "Anyone can view actor_capabilities" ON public.actor_capabilities 
 GRANT SELECT ON public.actor_capabilities TO anon, authenticated;
 GRANT ALL ON public.actor_capabilities TO service_role;
 ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS created_at timestamptz DEFAULT now();
+ALTER TABLE public.work_orders ADD COLUMN IF NOT EXISTS estimated_labor_cost numeric, ADD COLUMN IF NOT EXISTS estimated_parts_cost numeric,
+  ADD COLUMN IF NOT EXISTS actual_labor_cost numeric, ADD COLUMN IF NOT EXISTS actual_parts_cost numeric, ADD COLUMN IF NOT EXISTS actual_total numeric,
+  ADD COLUMN IF NOT EXISTS updated_at timestamptz;
 
 -- This build in filename order.
 \echo REPLAY 20261019005027_work_order_resource_evidence.sql
@@ -319,6 +322,8 @@ ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS created_at timestamptz DEFA
 \ir ../migrations/20261019235900_offers_cosign_acting_for.sql
 \echo REPLAY 20261019235930_quotes_release_conditions_read.sql
 \ir ../migrations/20261019235930_quotes_release_conditions_read.sql
+\echo REPLAY 20261020000500_work_order_invented_zero_totals.sql
+\ir ../migrations/20261020000500_work_order_invented_zero_totals.sql
 \echo REPLAY 20261020002000_owner_delegated_signs.sql
 \ir ../migrations/20261020002000_owner_delegated_signs.sql
 -- Plan check and final state.
