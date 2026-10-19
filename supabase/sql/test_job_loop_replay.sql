@@ -388,6 +388,10 @@ GRANT SELECT ON public.organization_ownership_verifications TO service_role;
 \ir ../migrations/20261020100000_job_loop_read_speedups.sql
 \echo REPLAY 20261020101000_verified_claimant_offers.sql
 \ir ../migrations/20261020101000_verified_claimant_offers.sql
+CREATE TABLE IF NOT EXISTS public.organization_capabilities(id uuid PRIMARY KEY DEFAULT gen_random_uuid(), organization_id uuid,
+  capability_type text, evidence_count integer, is_active boolean);
+\echo REPLAY 20261020102000_open_requirements_claimed_providers.sql
+\ir ../migrations/20261020102000_open_requirements_claimed_providers.sql
 \echo REPLAY 20261020111500_work_order_activity_read.sql
 \ir ../migrations/20261020111500_work_order_activity_read.sql
 \echo REPLAY 20261020120000_requirement_keyword_capabilities.sql
