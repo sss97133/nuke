@@ -72,6 +72,7 @@ describe('discovery faces', () => {
         stages: { intake: { state: 'recorded' }, plan: { state: 'partial' }, terms: { state: 'partial' }, execution: { state: 'absent' }, accounting: { state: 'recorded', paid: 4200 } } },
       work_order_resources_read: { requirements: [{ requirement_kind: 'skill', description: 'Factory radiator top brackets' }, { requirement_kind: 'skill', description: 'Spark plugs' }] },
       'rest:vehicles': [{ primary_image_url: 'https://images.example/k2500.jpg' }],
+      'rest:vehicle_images': [{ id: 'img-1' }],
     });
     const html = out!.body;
     expect(html).toContain('<title>83 GMC C10 - Drivetrain &amp; Suspension Service | Nuke jobs</title>');
@@ -82,6 +83,33 @@ describe('discovery faces', () => {
     expect(html).not.toMatch(PERSONAL);
     expect(html).not.toContain('4200');
     expect(html).not.toMatch(/accounting/i);
+  });
+
+  it('uses the default preview image when the vehicle photo is not shown to the public', async () => {
+    const out = await call(`/jobs/${WO}`, {
+      work_order_job_path_read: { display_title: 'Job', vehicle_id: VEH, stages: {} },
+      'rest:vehicles': [{ primary_image_url: 'https://images.example/held.jpg' }],
+      'rest:vehicle_images': [],
+    });
+    expect(meta(out!.body, 'og:image')).toBe('https://nuke.ag/og-image.png');
+  });
+
+  it('pages public organizations past the 1,000-row response cap', async () => {
+    const page = (start: number, n: number) => Array.from({ length: n }, (_, i) => ({ id: `00000000-0000-4000-8000-${String(start + i).padStart(12, '0')}` }));
+    vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL) => {
+      const u = String(input);
+      if (u.includes('/rest/v1/organizations')) {
+        const offset = Number(/offset=(\d+)/.exec(u)?.[1] ?? 0);
+        return new Response(JSON.stringify(offset === 0 ? page(0, 1000) : offset === 1000 ? page(1000, 1000) : page(2000, 3)));
+      }
+      if (u.includes('/rpc/')) return new Response('{"message":"x"}', { status: 400 });
+      return new Response(SHELL);
+    }));
+    const mod = await import('../middleware');
+    const res = await mod.default(new Request('https://nuke.ag/sitemap-work.xml'));
+    const xml = await res!.text();
+    expect((xml.match(/\/org\//g) ?? []).length).toBe(2003);
+    expect(res!.headers.get('x-nuke-sitemap')).toBe('jobs=unread;providers=unread;organizations=ok');
   });
 
   it('falls through to the app shell when a job is not open, or the id is not a UUID', async () => {
