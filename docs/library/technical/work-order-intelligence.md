@@ -132,6 +132,27 @@ measured usage, labor value and cost allocation stay unassessed or false, and no
 disbursed. The scoreboard is the measurement the RSI loop reads before choosing the next
 gap that retained evidence can close. Contract: `supabase/sql/test_work_order_job_path.sql`.
 
+### Requested operations from scope text
+
+`work_order_line_items` is the operations owner. A work order's own description or
+scope text often itemizes the requested work, but line items had no provenance and no
+sanctioned insert path. The `operation` event (payload: `line_number`, `task_type`,
+`task_description`, `basis_field` = `description` | `scope_description`, `basis_excerpt`,
+optional `notes`) projects one admitted work record into one line item whose id is the
+source observation id. The excerpt must appear in that field of the same-vehicle work
+order, and the task text must equal it. The row starts `pending` with no cost, hours or
+actor: a requested item, not priced, assigned, scheduled or performed work. Task type is
+set only when one explicit verb names it, otherwise `other`. Supply lines are not operations.
+
+`source_observation_id`, `basis_field` and `basis_excerpt` record provenance. A trigger keeps
+text, line number and provenance immutable on sourced rows and requires a sourced insert to
+match its current observation and the work order's text. Status stays editable by the work
+order's parties. Bills list only priced or comped lines, so requested rows do not bill. The
+job path counts sourced and pending operations, treats labor-task rows as operations evidence
+(`operations_only_in_labor_rows`), and reports `operation_source_withdrawn` and
+`operation_excerpt_missing_from_scope` without deleting rows.
+Contract: `supabase/sql/test_work_order_scope_operations.sql`.
+
 ## Image objects in job context
 
 `read_work_order_image_objects(work_order_id, after_observation_id, limit)` is a

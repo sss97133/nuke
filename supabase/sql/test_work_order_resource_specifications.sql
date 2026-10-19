@@ -19,7 +19,7 @@ CREATE TABLE public.work_orders(id uuid PRIMARY KEY,vehicle_id uuid);
 CREATE TABLE public.actors(id uuid PRIMARY KEY,name text,actor_type text);
 CREATE TABLE public.component_events(id uuid PRIMARY KEY,vehicle_id uuid,work_order_id uuid REFERENCES work_orders(id),
  event_type text,description text,metadata jsonb,updated_at timestamptz);
-CREATE TABLE public.work_order_line_items(id uuid PRIMARY KEY,work_order_id uuid REFERENCES work_orders(id),
+CREATE TABLE public.work_order_line_items(id uuid PRIMARY KEY,work_order_id uuid REFERENCES work_orders(id),line_number integer,
  actor_id uuid REFERENCES actors(id),task_description text,component_event_id uuid REFERENCES component_events(id),updated_at timestamptz);
 CREATE TABLE public.work_order_parts(id uuid PRIMARY KEY,work_order_id uuid REFERENCES work_orders(id),part_name text,
  status text,unit_price numeric,notes text,updated_at timestamptz);
@@ -67,6 +67,7 @@ INSERT INTO vehicle_observations(id,vehicle_id,kind,source_id,content_text,obser
 \ir ../migrations/20261019013808_work_resource_retained_basis.sql
 \ir ../migrations/20261019030510_work_resource_actor_candidates.sql
 \ir ../migrations/20261019035407_work_order_resource_specifications.sql
+\ir ../migrations/20261019051336_work_order_scope_operations.sql
 
 -- Synthetic interpretations in the guarded disposable database only.
 CREATE FUNCTION public.spec_source(p_envelope jsonb,p_observed timestamptz DEFAULT '2026-01-04') RETURNS uuid LANGUAGE plpgsql AS $$

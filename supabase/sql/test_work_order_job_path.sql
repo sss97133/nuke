@@ -22,7 +22,7 @@ CREATE TABLE public.work_orders(id uuid PRIMARY KEY,vehicle_id uuid,request_sour
 CREATE TABLE public.actors(id uuid PRIMARY KEY,name text,actor_type text);
 CREATE TABLE public.component_events(id uuid PRIMARY KEY,vehicle_id uuid,work_order_id uuid,metadata jsonb);
 CREATE TABLE public.work_order_parts(id uuid PRIMARY KEY,work_order_id uuid,part_name text,status text,job_op_code text,unit_price numeric);
-CREATE TABLE public.work_order_line_items(id uuid PRIMARY KEY,work_order_id uuid REFERENCES work_orders(id),
+CREATE TABLE public.work_order_line_items(id uuid PRIMARY KEY,work_order_id uuid REFERENCES work_orders(id),line_number integer,
  actor_id uuid REFERENCES actors(id),task_description text,component_event_id uuid,status text,updated_at timestamptz);
 CREATE TABLE public.work_order_assignments(id uuid PRIMARY KEY DEFAULT gen_random_uuid(),work_order_id uuid,status text,
  accepted_at timestamptz,started_at timestamptz,completed_at timestamptz,actual_payout numeric,paid_at timestamptz,payout_status text);
@@ -86,6 +86,7 @@ INSERT INTO vehicle_observations(id,vehicle_id,kind,source_id,observed_at,struct
 \ir ../migrations/20261019030510_work_resource_actor_candidates.sql
 \ir ../migrations/20261019035407_work_order_resource_specifications.sql
 \ir ../migrations/20261019045753_work_order_job_path.sql
+\ir ../migrations/20261019051336_work_order_scope_operations.sql
 
 SET ROLE service_role;
 SELECT project_work_order_resource_observation('80000000-0000-0000-0000-000000000001');

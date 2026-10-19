@@ -2928,3 +2928,15 @@ records on 3, including one without a vehicle; a paid status with no payment rec
 vehicle-scoped payment events with no job attribution; no approval clock and no payout record
 anywhere. Next passes take the largest gap the retained evidence can close; readiness,
 acceptance, usage and labor value stay unassessed until evidence supports them.
+
+Mechanics RSI pass 2, requested operations (2026-10-19): the pass 1 scoreboard's largest gap was
+`no_operations`, 24 of 26 work orders. Retained evidence for those 24 is mostly prose summary;
+one quoted work order itemizes its scope line by line, and one completed order holds labor-task
+rows the scoreboard did not count. The operations owner, `work_order_line_items`, had no
+provenance or sanctioned insert path, and billing reads only priced lines. Migration
+`20261019051336_work_order_scope_operations.sql` adds provenance to that owner and an `operation`
+projection that quotes the work order's own text verbatim into pending, unpriced, unassigned
+line items. A guard keeps sourced text and provenance immutable while parties keep editing status.
+The job path now counts labor-task evidence and reports withdrawn or stale sources. Disposable
+PG17 covers 27 cases and reruns the 25 + 57 + 88 earlier mechanics assertions. Prose-only scopes
+remain unitemized; splitting comma lists is a later, separately evidenced pass.
