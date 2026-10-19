@@ -362,6 +362,16 @@ title/dispute qualifiers, evidence IDs and qualified account cover choices survi
 the offline cache. Business handling, consignment, representation and pending or
 disputed interests remain separate from personal ownership. A fork requires review.
 
+The own profile's **Garage** door (`Garage/`) opens the same fold (`GarageReaders.ownGarage`, shared
+with the profile list) grouped by the server's relationship: owned, other interests, previously owned,
+contributed; the footer states the total and its clock. A photographed or contributed vehicle is never
+shown as owned. `my_unorganized_photo_count` (the web's inbox badge, capped at 1,000 and shown as
+"1,000+") leads to `SessionConfirmView`, which reviews only this app's dated uploads; the screen says so.
+Each vehicle opens a hub: visibility, removal or merge from `vehicle_row_read`, the Work card (jobs,
+"Post a job" for an owned vehicle until `vehicle_access` says otherwise, else an inspection) and the
+profile. `my_vehicles` is not read: on 2026-10-19 no `work_record` observation carried an observer and
+the reader ran past the statement timeout.
+
 Album grouping and on-device review coverage persist locally. Limited Photos access
 cannot expose user albums, so the screen reports unknown album coverage while
 selected photos remain analyzable. No new
@@ -403,6 +413,7 @@ Sources/NukeCapture/
   Jobs/JobQuotes.swift             quote, people and statement DTOs (open prices; payments to parties)
   Jobs/AcceptQuoteSheet.swift      the customer's Sign on one quote version (accept_work_order_quote)
   Vehicle/                         Work card (vehicle_work_orders_read) and statement view
+  Garage/                          owner's garage, photos to organize, per-vehicle work hub
   Profile/                         provider face (provider_profile_read) and jobs on record
   Contact/                         Contact via Nuke: request sheet, Work inbox, thread (in-app only)
   Explore/                         Plan the work (listing_work_plan_read) and the Order inspection Sign
