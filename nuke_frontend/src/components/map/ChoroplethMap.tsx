@@ -84,9 +84,16 @@ interface ChoroplethMapProps {
   colorwayId: ColorwayId;
   onColorwayChange: (id: ColorwayId) => void;
   timeline?: TimelineData;
+  /** Count new listings over the last `days` (vehicle_map_county_listings) instead of located vehicles and sold value. */
+  listings?: { days: number; onDaysChange: (days: number) => void; asOf?: string | null };
 }
 
-export default function ChoroplethMap({ countyLayerData, stateLayerData, stats, colorway, colorwayId, onColorwayChange, timeline }: ChoroplethMapProps) {
+const LISTING_WINDOWS = [1, 7, 30];
+
+export default function ChoroplethMap({ countyLayerData, stateLayerData, stats, colorway, colorwayId, onColorwayChange, timeline, listings }: ChoroplethMapProps) {
+  const listingDaysRef = useRef<number | null>(listings?.days ?? null);
+  listingDaysRef.current = listings?.days ?? null;
+  const windowStart = (days: number) => new Date(Date.now() - days * 86_400_000).toISOString();
   const mapRef = useRef<HTMLDivElement>(null);
   const leafletRef = useRef<any>(null);
   const geoLayerRef = useRef<any>(null);
@@ -296,23 +303,25 @@ export default function ChoroplethMap({ countyLayerData, stateLayerData, stats, 
     const bounds = map.getBounds();
 
     try {
-      const { data, error } = await supabase
+      let pointsQuery = supabase
         .from('vehicle_location_observations')
         .select('id, vehicle_id, latitude, longitude, location_text_raw, source_platform, confidence')
         .not('latitude', 'is', null)
         .gte('latitude', bounds.getSouth())
         .lte('latitude', bounds.getNorth())
         .gte('longitude', bounds.getWest())
-        .lte('longitude', bounds.getEast())
-        .order('confidence', { ascending: false })
-        .limit(500);
+        .lte('longitude', bounds.getEast());
+      if (listingDaysRef.current) {
+        pointsQuery = pointsQuery.eq('source_type', 'listing').gte('observed_at', windowStart(listingDaysRef.current));
+      }
+      const { data, error } = await pointsQuery.order('confidence', { ascending: false }).limit(500);
 
       if (error || !data) return;
 
       const vehicleIds = [...new Set(data.map(d => d.vehicle_id))];
       const { data: vehicles } = await supabase
         .from('vehicles')
-        .select('id, year, make, model, sale_price, sold_price, primary_image_url')
+        .select('id, year, make, model, sale_price, sold_price, asking_price, primary_image_url')
         .in('id', vehicleIds.slice(0, 200));
 
       const vehicleMap = new Map((vehicles || []).map(v => [v.id, v]));
@@ -327,7 +336,7 @@ export default function ChoroplethMap({ countyLayerData, stateLayerData, stats, 
 
         const v = vehicleMap.get(obs.vehicle_id);
         if (!v) continue;
-        const price = v.sale_price || v.sold_price;
+        const price = listingDaysRef.current ? v.asking_price : (v.sale_price || v.sold_price);
         const label = `${v.year || '?'} ${(v.make || '').toUpperCase()} ${(v.model || '').toUpperCase()}`;
 
         // Confidence-aware pin styling
@@ -553,6 +562,28 @@ export default function ChoroplethMap({ countyLayerData, stateLayerData, stats, 
     setRegionLoading(true);
     setRegionVehicles(null);
     setCountyDetail(null);
+    if (listingDaysRef.current) {
+      // The county's listings in the window, newest first: the measure the map is colored by.
+      try {
+        const { data: obs } = await supabase
+          .from('vehicle_location_observations')
+          .select('vehicle_id, observed_at, source_platform, source_url')
+          .eq('county_fips', fips).eq('source_type', 'listing')
+          .gte('observed_at', windowStart(listingDaysRef.current))
+          .order('observed_at', { ascending: false }).limit(200);
+        const newest = new Map<string, any>();
+        for (const o of obs || []) if (!newest.has(o.vehicle_id)) newest.set(o.vehicle_id, o);
+        const ids = [...newest.keys()].slice(0, 60);
+        const { data: vs } = ids.length ? await supabase.from('vehicles')
+          .select('id, year, make, model, asking_price, primary_image_url').in('id', ids) : { data: [] as any[] };
+        const byId = new Map((vs || []).map((v: any) => [v.id, v]));
+        setRegionVehicles(ids.map((id) => byId.get(id) && { ...byId.get(id), ...newest.get(id), effective_price: byId.get(id).asking_price }).filter(Boolean));
+      } catch (e) {
+        console.error('Failed to load county listings:', e);
+        setRegionVehicles([]);
+      } finally { setRegionLoading(false); }
+      return;
+    }
     try {
       const { data, error } = await supabase.rpc('get_county_detail', { p_fips: fips });
       if (error) throw error;
@@ -592,8 +623,20 @@ export default function ChoroplethMap({ countyLayerData, stateLayerData, stats, 
 
       {/* Info panel */}
       <DraggablePanel basemap={colorway.basemap}>
+        {listings && (
+          <div style={{ display: 'flex', gap: 3, marginBottom: 6 }} role="group" aria-label="Listing window">
+            {LISTING_WINDOWS.map((d) => (
+              <button key={d} onClick={() => listings.onDaysChange(d)} aria-pressed={listings.days === d} style={{
+                flex: 1, fontSize: 8, fontWeight: 700, padding: '3px 0', cursor: 'pointer', fontFamily: MAP_FONT,
+                background: listings.days === d ? 'rgba(245, 158, 11, 0.15)' : 'transparent',
+                border: `1px solid ${listings.days === d ? 'rgba(245, 158, 11, 0.5)' : (isDark ? 'rgba(255,255,255,0.12)' : 'rgba(0,0,0,0.1)')}`,
+                color: listings.days === d ? 'rgba(245, 158, 11, 1)' : (isDark ? 'rgba(255,255,255,0.6)' : 'rgba(0,0,0,0.6)'),
+              }}>{d === 1 ? '24H' : `${d}D`}</button>
+            ))}
+          </div>
+        )}
         {/* Make filter input */}
-        <div style={{ marginBottom: 6 }}>
+        {!listings && <div style={{ marginBottom: 6 }}>
           <div style={{ fontSize: 7, fontWeight: 700, textTransform: 'uppercase', marginBottom: 3,
             color: isDark ? 'rgba(255,255,255,0.35)' : 'rgba(0,0,0,0.35)' }}>FILTER BY MAKE</div>
           <div style={{ display: 'flex', gap: 3 }}>
@@ -638,7 +681,7 @@ export default function ChoroplethMap({ countyLayerData, stateLayerData, stats, 
               </span>
             </div>
           )}
-        </div>
+        </div>}
 
         <input type="range" min={0} max={COLORWAY_IDS.length - 1}
           value={COLORWAY_IDS.indexOf(colorwayId)}
@@ -652,7 +695,9 @@ export default function ChoroplethMap({ countyLayerData, stateLayerData, stats, 
           <span style={{ fontSize: 7, textTransform: 'uppercase',
             color: isDark ? 'rgba(255,255,255,0.35)' : 'rgba(0,0,0,0.35)' }}>{colorway.label}</span>
           <span style={{ flex: 1, textAlign: 'right', color: isDark ? 'rgba(255,255,255,0.5)' : 'rgba(0,0,0,0.45)' }}>
-            {makeFilter
+            {listings
+              ? `${stats.totalCount.toLocaleString()} LISTINGS · ${listings.days === 1 ? '24 HOURS' : `${listings.days} DAYS`}`
+              : makeFilter
               ? `${makeFilter.total_vehicles.toLocaleString()} ${makeFilter.make.toUpperCase()}`
               : <>{stats.totalCount.toLocaleString()} &middot; ${(stats.totalValue / 1e9).toFixed(1)}B</>
             }
@@ -689,8 +734,10 @@ export default function ChoroplethMap({ countyLayerData, stateLayerData, stats, 
           )}
           {tooltip.datum ? (
             <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.7)' }}>
-              {tooltip.datum.count.toLocaleString()} {makeFilter ? makeFilter.make.toLowerCase() : 'vehicles'}
-              {!makeFilter && <> &middot; ${(tooltip.datum.value / 1e6).toFixed(1)}M</>}
+              {tooltip.datum.count.toLocaleString()} {listings ? (tooltip.datum.count === 1 ? 'listing' : 'listings') : makeFilter ? makeFilter.make.toLowerCase() : 'vehicles'}
+              {listings
+                ? (tooltip.datum.avg ? <> &middot; avg ask ${tooltip.datum.avg.toLocaleString()}</> : null)
+                : !makeFilter && <> &middot; ${(tooltip.datum.value / 1e6).toFixed(1)}M</>}
             </div>
           ) : (
             <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.35)' }}>NO DATA</div>
@@ -813,7 +860,7 @@ export default function ChoroplethMap({ countyLayerData, stateLayerData, stats, 
       )}
 
       {/* Timeline scrubber */}
-      {timeline && (
+      {timeline && !listings && (
         <MapTimeline
           buckets={timeline.buckets}
           timeEnd={timeline.timeEnd}
@@ -845,13 +892,15 @@ export default function ChoroplethMap({ countyLayerData, stateLayerData, stats, 
                 <div style={{ fontSize: 18, color: 'rgba(245, 158, 11, 1)', fontWeight: 700, fontFamily: 'Courier New, monospace' }}>
                   {(countyDetail?.vehicle_count ?? selectedRegion.datum?.count ?? 0).toLocaleString()}
                 </div>
-                <div style={{ fontSize: 7, color: 'rgba(255,255,255,0.3)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>VEHICLES</div>
+                <div style={{ fontSize: 7, color: 'rgba(255,255,255,0.3)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>{listings ? 'LISTINGS' : 'VEHICLES'}</div>
               </div>
               <div style={{ flex: 1, padding: '6px 0 6px 12px' }}>
                 <div style={{ fontSize: 18, color: '#fff', fontWeight: 700, fontFamily: 'Courier New, monospace' }}>
-                  ${((countyDetail?.total_value ?? selectedRegion.datum?.value ?? 0) / 1e6).toFixed(0)}M
+                  {listings
+                    ? (selectedRegion.datum?.avg ? `$${selectedRegion.datum.avg.toLocaleString()}` : '—')
+                    : `$${((countyDetail?.total_value ?? selectedRegion.datum?.value ?? 0) / 1e6).toFixed(0)}M`}
                 </div>
-                <div style={{ fontSize: 7, color: 'rgba(255,255,255,0.3)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>TOTAL VALUE</div>
+                <div style={{ fontSize: 7, color: 'rgba(255,255,255,0.3)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>{listings ? 'AVG ASK' : 'TOTAL VALUE'}</div>
               </div>
             </div>
           </div>
@@ -882,7 +931,7 @@ export default function ChoroplethMap({ countyLayerData, stateLayerData, stats, 
           {/* Vehicle grid */}
           <div style={{ padding: '4px 12px 12px' }}>
             <div style={{ fontSize: 7, color: 'rgba(255,255,255,0.25)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: 6 }}>
-              {regionLoading ? 'LOADING...' : `TOP ${regionVehicles?.length ?? 0} BY PRICE`}
+              {regionLoading ? 'LOADING...' : listings ? `${regionVehicles?.length ?? 0} NEWEST LISTINGS` : `TOP ${regionVehicles?.length ?? 0} BY PRICE`}
             </div>
             {regionVehicles?.map((v: any) => {
               const price = v.effective_price || v.sale_price || v.sold_price;
@@ -904,13 +953,22 @@ export default function ChoroplethMap({ countyLayerData, stateLayerData, stats, 
                     <div style={{ fontSize: 11, color: price ? 'rgba(245, 158, 11, 0.9)' : 'rgba(255,255,255,0.2)', fontFamily: 'Courier New, monospace', fontWeight: 700 }}>
                       {price ? `$${price.toLocaleString()}` : '—'}
                     </div>
+                    {listings && v.source_platform && (
+                      <div style={{ fontSize: 8, color: 'rgba(255,255,255,0.35)', textTransform: 'uppercase' }}>
+                        {String(v.source_platform).replace(/_/g, ' ')}
+                        {v.source_url && /^https:\/\//.test(v.source_url) && (
+                          <> · <a href={v.source_url} target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()}
+                            style={{ color: 'rgba(245, 158, 11, 0.8)', textDecoration: 'none' }}>LISTING ↗</a></>
+                        )}
+                      </div>
+                    )}
                   </div>
                 </div>
               );
             })}
             {regionVehicles?.length === 0 && !regionLoading && (
               <div style={{ padding: '20px 0', fontSize: 9, color: 'rgba(255,255,255,0.2)', textAlign: 'center' }}>
-                NO VEHICLES FOUND
+                {listings ? 'NO LISTINGS IN THIS WINDOW' : 'NO VEHICLES FOUND'}
               </div>
             )}
           </div>

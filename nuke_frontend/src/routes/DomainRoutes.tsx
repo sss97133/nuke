@@ -22,21 +22,12 @@ const CohortTerminal = React.lazy(() => import('../pages/CohortTerminal'));
 const DealRead = React.lazy(() => import('../pages/DealRead'));
 // R&D: white-label / "make this my app" showroom
 const BrandStudio = React.lazy(() => import('../pages/BrandStudio'));
-const PublicMap = React.lazy(() => import('../components/map/PublicMap'));
 const Valuation = React.lazy(() => import('../pages/Valuation'));
 const SourcesBoard = React.lazy(() => import('../pages/market/SourcesBoard'));
 // Stacks: a page per stack, a path through the nine layers (case ledger §13.2)
 const StacksIndex = React.lazy(() => import('../pages/stacks/StacksIndex'));
 const OrderBookStack = React.lazy(() => import('../pages/stacks/OrderBookStack'));
 
-// Public map page — no auth, no DeckGL
-function MapPage() {
-  return (
-    <React.Suspense fallback={<div style={{ height: '100vh', background: '#111' }} />}>
-      <PublicMap />
-    </React.Suspense>
-  );
-}
 
 // Lazy load domain modules
 const VehicleRoutes = React.lazy(() => import('./modules/vehicle/routes'));
@@ -196,7 +187,6 @@ export const DomainRoutes = () => {
         <Route path="/deal/:vehicleId" element={<DealRead />} />
         <Route path="/browse" element={<BrowseVehicles />} />
         <Route path="/live" element={<LiveFloor />} />
-        <Route path="/map" element={<MapPage />} />
         <Route path="/sources" element={<SourcesBoard />} />
         <Route path="/sources/:source" element={<SourcesBoard />} />
         <Route path="/valuation" element={<Valuation />} />
@@ -240,11 +230,7 @@ export const DomainRoutes = () => {
 
         {/* ── Hub convenience redirects → homepage tabs ─────────────────── */}
         <Route path="/garage" element={<Navigate to="/?tab=garage" replace />} />
-        {/* /map is NOT redirected here — it's served by the real MapPage route
-            declared above (line ~181). A duplicate redirect route used to live
-            here; it was dead code (React Router resolves same-path ties to the
-            earlier-declared route, so this one could never fire). Removed
-            2026-07-06 QA pass — see nuke.ag QA findings. */}
+        {/* /map is the standalone county listing map in App.tsx (no AppLayout chrome). */}
         <Route path="/feed" element={<Navigate to="/?tab=feed" replace />} />
 
         {/* ── Protected routes (require sign-in) ───────────────────────── */}
