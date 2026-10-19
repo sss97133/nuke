@@ -1,6 +1,7 @@
 -- Empty disposable PG17 only: psql -X -v ON_ERROR_STOP=1 -d dm_refinement_org_private -f this-file.sql
 -- Proves that organizations.tax_id and business_license are editor-only: organization_private_fields_read
--- (20261020140000) returns them to whoever passes an organizations UPDATE policy and refuses everyone else.
+-- (20261020140000) returns them to whoever passes an organizations UPDATE policy and refuses everyone else, and
+-- 20261020141000 removes them from the anon/authenticated column grant while businesses keeps its shape.
 -- Starts from the live table, businesses view, row policies and grants (2026-10-19) and shows the leak first.
 \set ON_ERROR_STOP on
 DO $$ BEGIN
@@ -156,4 +157,111 @@ DO $$ BEGIN
 END $$;
 RESET ROLE;
 
-SELECT 'PASS: tax_id exposure reproduced; private reader gated to editors and the service role' AS result;
+SET ROLE org_owner;
+\ir ../migrations/20261020141000_organizations_private_columns.sql
+RESET ROLE;
+
+-- 4. Grants: the two private columns and the table-wide SELECT are gone for anon and authenticated; every
+-- other column stays readable; the service role keeps everything.
+DO $$
+DECLARE r text;
+BEGIN
+  FOREACH r IN ARRAY ARRAY['anon', 'authenticated'] LOOP
+    IF has_table_privilege(r, 'public.organizations', 'SELECT')
+       OR has_column_privilege(r, 'public.organizations', 'tax_id', 'SELECT')
+       OR has_column_privilege(r, 'public.organizations', 'business_license', 'SELECT') THEN
+      RAISE EXCEPTION '% can still read a private organizations column', r;
+    END IF;
+    IF EXISTS (SELECT 1 FROM pg_attribute WHERE attrelid = 'public.organizations'::regclass AND attnum > 0
+                 AND NOT attisdropped AND attname NOT IN ('tax_id', 'business_license')
+                 AND NOT has_column_privilege(r, 'public.organizations', attname, 'SELECT')) THEN
+      RAISE EXCEPTION '% lost a public organizations column', r;
+    END IF;
+  END LOOP;
+  IF NOT has_column_privilege('service_role', 'public.organizations', 'tax_id', 'SELECT')
+     OR NOT has_table_privilege('authenticated', 'public.organizations', 'UPDATE') THEN
+    RAISE EXCEPTION 'Service read or editor write privileges changed';
+  END IF;
+  IF (SELECT reloptions FROM pg_class WHERE oid = 'public.businesses'::regclass) IS DISTINCT FROM ARRAY['security_invoker=true'] THEN
+    RAISE EXCEPTION 'businesses stopped running as its caller';
+  END IF;
+END $$;
+
+-- 5. anon: explicit public columns and row policies unchanged; wildcard and private columns refused on the
+-- table; businesses keeps its full shape with NULL private fields.
+SET ROLE anon;
+SELECT set_config('test.auth_uid', '', false), set_config('test.auth_role', 'anon', false);
+DO $$ BEGIN
+  IF (SELECT count(*) FROM public.organizations) <> 1
+     OR (SELECT email FROM public.organizations WHERE business_name = 'Public Shop') <> 'shop@fixture.invalid'
+     OR (SELECT registration_state FROM public.organizations WHERE business_name = 'Public Shop') <> 'NV' THEN
+    RAISE EXCEPTION 'anon lost public columns or row eligibility changed';
+  END IF;
+  BEGIN
+    PERFORM tax_id FROM public.organizations;
+    RAISE EXCEPTION 'anon read organizations.tax_id';
+  EXCEPTION WHEN insufficient_privilege THEN NULL;
+  END;
+  BEGIN
+    PERFORM business_license FROM public.organizations;
+    RAISE EXCEPTION 'anon read organizations.business_license';
+  EXCEPTION WHEN insufficient_privilege THEN NULL;
+  END;
+  BEGIN
+    PERFORM o.* FROM public.organizations o;
+    RAISE EXCEPTION 'anon wildcard on organizations still expands to private columns';
+  EXCEPTION WHEN insufficient_privilege THEN NULL;
+  END;
+  IF (SELECT count(*) FROM public.businesses) <> 1
+     OR (SELECT to_jsonb(b) ->> 'business_name' FROM public.businesses b) <> 'Public Shop'
+     OR (SELECT to_jsonb(b) ->> 'tax_id' FROM public.businesses b) IS NOT NULL
+     OR (SELECT to_jsonb(b) ->> 'business_license' FROM public.businesses b) IS NOT NULL THEN
+    RAISE EXCEPTION 'businesses wildcard read broke or still returns private fields';
+  END IF;
+END $$;
+RESET ROLE;
+
+-- 6. A signed-in editor: the reader still works, updates of the private fields go through organizations
+-- without RETURNING them, and the view refuses writes to its NULL columns while other columns stay writable.
+SET ROLE authenticated;
+SELECT set_config('test.auth_uid', '00000000-0000-0000-0000-000000000003', false),
+       set_config('test.auth_role', 'authenticated', false);
+UPDATE public.organizations SET tax_id = 'updated-tax-id'
+WHERE id = '00000000-0000-0000-0000-0000000000a1' RETURNING business_name;
+UPDATE public.businesses SET city = 'Sparks' WHERE id = '00000000-0000-0000-0000-0000000000a1';
+DO $$ BEGIN
+  IF public.organization_private_fields_read('00000000-0000-0000-0000-0000000000a1') ->> 'tax_id' <> 'updated-tax-id'
+     OR (SELECT city FROM public.organizations WHERE id = '00000000-0000-0000-0000-0000000000a1') <> 'Sparks' THEN
+    RAISE EXCEPTION 'Editor update or private read broke';
+  END IF;
+  BEGIN
+    UPDATE public.businesses SET tax_id = 'via-view' WHERE id = '00000000-0000-0000-0000-0000000000a1';
+    RAISE EXCEPTION 'businesses accepted a write to its NULL tax_id column';
+  EXCEPTION WHEN feature_not_supported THEN NULL;
+  END;
+  BEGIN
+    PERFORM tax_id FROM public.organizations WHERE id = '00000000-0000-0000-0000-0000000000a1';
+    RAISE EXCEPTION 'Editor read tax_id through the table instead of the reader';
+  EXCEPTION WHEN insufficient_privilege THEN NULL;
+  END;
+END $$;
+RESET ROLE;
+
+-- 7. New columns are private by default; the service role still reads the table with a wildcard.
+ALTER TABLE public.organizations ADD COLUMN future_private_field text;
+DO $$ BEGIN
+  IF has_column_privilege('anon', 'public.organizations', 'future_private_field', 'SELECT')
+     OR has_column_privilege('authenticated', 'public.organizations', 'future_private_field', 'SELECT') THEN
+    RAISE EXCEPTION 'A new organizations column inherited public read access';
+  END IF;
+END $$;
+SET ROLE service_role;
+DO $$ BEGIN
+  IF (SELECT tax_id FROM (SELECT o.* FROM public.organizations o WHERE o.id = '00000000-0000-0000-0000-0000000000a1') s)
+     <> 'updated-tax-id' THEN
+    RAISE EXCEPTION 'Service role lost the table';
+  END IF;
+END $$;
+RESET ROLE;
+
+SELECT 'PASS: exposure reproduced; tax_id/business_license editor-only via reader; public columns, businesses wildcard, editor writes and service access intact; new columns private' AS result;
