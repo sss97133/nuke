@@ -14,6 +14,7 @@ import { useAuthContext } from '../../contexts/AuthContext';
 import { usePageTitle } from '../../hooks/usePageTitle';
 import { ContactSheet, OfferSheet } from './JobSheets';
 import { MatchList, PlanBList } from './MatchList';
+import { useInviterJobs } from './useInviterJobs';
 import {
   JobReaders, areaText, jobHref, openRequestsSentence, quoteText, requirementKind, vehicleText, windowText,
   type JobAction, type OpenRequirement, type OpenRequirementsRead,
@@ -39,8 +40,8 @@ function HowJobsAppear({ signedIn }: { signedIn: boolean }) {
   </section>;
 }
 
-function RequirementRow({ row, offer, canContact, onOffer, onContact }: {
-  row: OpenRequirement; offer: JobAction | null; canContact: boolean; onOffer: () => void; onContact: () => void;
+function RequirementRow({ row, offer, canContact, onOffer, onContact, inviter }: {
+  row: OpenRequirement; offer: JobAction | null; canContact: boolean; onOffer: () => void; onContact: () => void; inviter?: boolean;
 }) {
   const detail = [vehicleText(row.vehicle_label), areaText(row.area_band), windowText(row.window), quoteText(row.quote_state), row.request_source_label]
     .filter(Boolean).join(' · ');
@@ -54,7 +55,7 @@ function RequirementRow({ row, offer, canContact, onOffer, onContact }: {
     <PrefetchLink to={jobHref(row.work_order_id)}><Text role="entity" dense>{row.display_title || 'Untitled job'}</Text></PrefetchLink>
     {detail && <Text role="caption">{detail}</Text>}
     {row.match && row.match.length > 0 && <MatchList inputs={row.match} />}
-    {row.plan_b_suppliers && row.plan_b_suppliers.length > 0 && <PlanBList suppliers={row.plan_b_suppliers} />}
+    {row.plan_b_suppliers && row.plan_b_suppliers.length > 0 && <PlanBList suppliers={row.plan_b_suppliers} requirementId={row.requirement_id} inviter={inviter} />}
     {(offer || canContact) && <div className="jb-actions">
       {offer && <button type="button" className="btn-base btn-sm btn-primary" onClick={onOffer}><Text role="label">Make an offer</Text></button>}
       {canContact && <button type="button" className="btn-base btn-sm btn-secondary" onClick={onContact}><Text role="label">Contact via Nuke</Text></button>}
@@ -66,6 +67,7 @@ const JobsBoard: React.FC = () => {
   usePageTitle('Jobs looking for someone');
   const { session } = useAuthContext();
   const signedIn = !!session?.user?.id;
+  const inviterJobs = useInviterJobs(signedIn);
   const [page, setPage] = useState<OpenRequirementsRead | null>(null);
   const [rows, setRows] = useState<OpenRequirement[]>([]);
   const [refusal, setRefusal] = useState<string | null>(null);
@@ -113,7 +115,7 @@ const JobsBoard: React.FC = () => {
         ? <Text role="body">No open requests right now.</Text>
         : <ul className="jb-list">{rows.map(row => <RequirementRow key={row.requirement_id} row={row}
             offer={offers[row.requirement_id] ?? null} canContact={!!page.contact?.available}
-            onOffer={() => setOffering(row)} onContact={() => setContacting(row)} />)}</ul>}
+            onOffer={() => setOffering(row)} onContact={() => setContacting(row)} inviter={inviterJobs.has(row.work_order_id)} />)}</ul>}
       {page.next_after && <div className="jb-more"><button type="button" className="btn-base btn-sm btn-secondary" onClick={() => void load(page.next_after)}>
         <Text role="label">More requests</Text></button></div>}
       {page.coverage.not_assessed && page.coverage.not_assessed.length > 0 &&
