@@ -134,7 +134,7 @@ INSERT INTO work_order_assignments(work_order_id,technician_id,role,status,payou
 \ir ../migrations/20261019152500_inspection_findings.sql
 \ir ../migrations/20261019153000_job_path_inspection.sql
 \ir ../migrations/20261019180000_work_order_offers.sql
-\ir ../migrations/20261019181500_work_order_offer_acceptance.sql
+\ir ../migrations/20261019182000_work_order_offer_acceptance.sql
 
 
 -- P (..0f) performer with an approved work_evidence bridge to the operation actor; P2 (..09) self_claim only;

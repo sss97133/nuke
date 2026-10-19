@@ -78,7 +78,7 @@ INSERT INTO work_order_labor(work_order_id,hours) VALUES ('30000000-0000-0000-00
 \ir ../migrations/20261019150000_inspection_request.sql
 \ir ../migrations/20261019153000_job_path_inspection.sql
 \ir ../migrations/20261019180000_work_order_offers.sql
-\ir ../migrations/20261019181500_work_order_offer_acceptance.sql
+\ir ../migrations/20261019182000_work_order_offer_acceptance.sql
 
 -- Synthetic interpretations in the guarded disposable database only.
 CREATE FUNCTION public.op_source(p_patch jsonb,p_vehicle uuid DEFAULT '40000000-0000-0000-0000-000000000001') RETURNS uuid LANGUAGE plpgsql AS $$
