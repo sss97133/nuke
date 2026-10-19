@@ -402,6 +402,11 @@ CREATE TABLE IF NOT EXISTS public.organization_capabilities(id uuid PRIMARY KEY 
 \ir ../migrations/20261020135000_skill_supply_corroboration.sql
 \echo REPLAY 20261020160000_job_market_health.sql
 \ir ../migrations/20261020160000_job_market_health.sql
+ALTER TABLE public.organizations ADD COLUMN IF NOT EXISTS services_offered text[], ADD COLUMN IF NOT EXISTS service_radius_miles integer,
+  ADD COLUMN IF NOT EXISTS latitude numeric, ADD COLUMN IF NOT EXISTS longitude numeric, ADD COLUMN IF NOT EXISTS city text, ADD COLUMN IF NOT EXISTS state text;
+CREATE TABLE IF NOT EXISTS public.city_geocode_lookup(city text, state text, latitude numeric, longitude numeric, sample_size integer, source text);
+\echo REPLAY 20261020173000_requirement_plan_b_listing_tier.sql
+\ir ../migrations/20261020173000_requirement_plan_b_listing_tier.sql
 -- Plan check and final state.
 \set replay_problems `scripts/ci/job-loop-replay-check.sh | tr '\n' ' '`
 SELECT t_assert(btrim(:'replay_problems') = '', 'replay plan covers the build in filename order: ' || COALESCE(NULLIF(btrim(:'replay_problems'), ''), 'ok'));
