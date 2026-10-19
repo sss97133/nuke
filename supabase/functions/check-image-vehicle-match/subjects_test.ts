@@ -24,11 +24,12 @@ Deno.test("a VIN anchor and walk-around combine source capture context without f
   equal(result.capture_sessions?.[0].member_image_ids, ["a", "b"]);
   for (const change of [
     { taken_at: "2026-10-01T13:00:00Z" },
-    { capture_context: { device_fingerprint: "other", latitude: 35, longitude: -115 } },
     { capture_context: { device_fingerprint: "device", latitude: 36, longitude: -115 } },
     { capture_context: { device_fingerprint: "device", latitude: null, longitude: -115 } },
     { source_qualified: false },
   ]) equal(projectDepictedSubjects(reading, [sources[0], { ...sources[1], ...change }]).capture_sessions, undefined);
+  equal(projectDepictedSubjects(reading, [sources[0], { ...sources[1], capture_context: { device_fingerprint: "other", latitude: 35, longitude: -115 } }]).capture_sessions?.length, 1);
+  equal(projectDepictedSubjects(reading, [sources[0], { ...sources[1], capture_context: { device_fingerprint: null, latitude: 35, longitude: -115 } }]).capture_sessions?.length, 1);
   reading.contradictions = [{ left_image_id: "a", right_image_id: "b", reason: "Different paint and body configuration" }];
   equal(projectDepictedSubjects(reading, sources).capture_sessions, undefined);
 });

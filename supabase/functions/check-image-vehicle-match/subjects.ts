@@ -105,7 +105,7 @@ export function captureRelation(a: CaptureMetadata, b: CaptureMetadata) {
 export function captureNeighbors(a: SubjectInput, b: SubjectInput): boolean {
   if (!qualifiedSubjectInput(a) || !qualifiedSubjectInput(b) || a.source_sha256 === b.source_sha256) return false;
   const relation = captureRelation({ taken_at: a.taken_at, ...a.capture_context }, { taken_at: b.taken_at, ...b.capture_context });
-  return relation.same_device_signature === true && relation.seconds_apart !== null && relation.seconds_apart <= 900 &&
+  return relation.seconds_apart !== null && relation.seconds_apart <= 900 &&
     relation.meters_apart !== null && relation.meters_apart <= 100;
 }
 

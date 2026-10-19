@@ -25,6 +25,7 @@ function state(sources: any[], readings = raw(sources)) {
 Deno.test("retained exterior context prioritizes the nearby capture over unrelated account references", () => {
   const [near, far, fresh] = [1, 2, 3].map(source);
   for (const s of [near, far, fresh]) Object.assign(s, { latitude: 35, longitude: -115, device_fingerprint: "camera" });
+  near.device_fingerprint = "camera-a"; fresh.device_fingerprint = "camera-b";
   near.taken_at = "2025-01-01T12:00:00Z"; fresh.taken_at = "2025-01-01T12:02:00Z";
   far.taken_at = "2025-01-01T09:00:00Z";
   const s = state([near, far, fresh], raw([near, far]));
