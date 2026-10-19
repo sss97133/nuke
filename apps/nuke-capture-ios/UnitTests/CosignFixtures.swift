@@ -12,7 +12,7 @@ enum CosignFixtures {
     static func offers(customer: Bool) -> String {
         let actions = customer
             ? #"[{"action":"accept_offer","rpc":"accept_offer","args":{"p_offer_id":"\#(offerId)","p_offer_hash":"\#(termsHash)"}}]"#
-            : #"[{"action":"cosign_provider","rpc":"cosign_provider","args":{"p_work_order_id":"\#(workOrderId)","p_offer_id":"\#(offerId)"},"as":{"attestor_kind":"organization","attestor_organization_id":"o1"}}]"#
+            : #"[{"action":"cosign_provider","rpc":"cosign_provider","args":{"p_work_order_id":"\#(workOrderId)","p_offer_id":"\#(offerId)"},"as":{"attestor_kind":"organization","attestor_organization_id":"o1"},"acting_for":[{"kind":"organization","organization_id":"o1","name":"Fixture Garage","p_cut":{"organization_id":"o1"}},{"kind":"organization","organization_id":"o2","name":"Second Shop","p_cut":{"organization_id":"o2"}},{"kind":"user","label":"yourself","p_cut":{"as":"self"}}]}]"#
         return """
         {"work_order_id":"\(workOrderId)","display_title":"Pre-delivery work","as_of":"2026-10-19T12:00:00Z",
          "requirements":[{"requirement_id":"r1","requirement_kind":"skill","description":"Paint touch-up on the driver door",
@@ -81,7 +81,7 @@ enum CosignFixtures {
      "vouched_for_by":{"items":[
        {"vouch_id":"v1","voucher":{"kind":"organization","organization_id":"o1","name":"Fixture Garage"},"kinds":["suitability","supervision"],
         "scope":"Worked under our lead on K5 wiring for a year","vouched_at":"2026-10-01T00:00:00Z","expires_at":"2027-04-01T00:00:00Z",
-        "subject":"account","attribution":"authenticated_sign"},
+        "subject":"account","attribution":"authenticated_sign","is_mine":true,"actions":[{"action":"withdraw_vouch","rpc":"withdraw_vouch","args":{"p_id":"v1"}}]},
        {"vouch_id":"v2","voucher":{"kind":"user","label":"unnamed party"},"kinds":["availability"],"scope":null,"vouched_at":"2026-10-10T00:00:00Z"}],
        "basis":"standing vouches; not skill evidence"},
      "facilities":[],"work_record":{},"contact":{"action":"contact_via_nuke","available":false}}

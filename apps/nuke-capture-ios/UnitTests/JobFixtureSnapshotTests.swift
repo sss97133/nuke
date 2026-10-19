@@ -271,15 +271,35 @@ final class JobFixtureSnapshotTests: XCTestCase {
                      name: "fixture-declare-asset", pages: 2)
         let item = try XCTUnwrap(decode(SignatureQueue.self, FacilityFixtures.queue).items.first)
         try snapshot(ConfirmBookingSheet(item: item), name: "fixture-confirm-booking", pages: 2)
-        let matches = try decode(FacilityMatches.self, FacilityFixtures.open).byRequirement
-        let req = JobFacility.Requirement(requirementId: "rf1", description: "A lift for two days to drop the transmission", match: matches["rf1"])
-        let booked = JobFacility(requirements: [req], bookings: JobFacility.bookings(for: FacilityFixtures.workOrderId, in: [party]))
-        let waiting = JobFacility(requirements: [req], bookings: [])
-        let reserved = try decode(FacilityReservation.self, FacilityFixtures.reserved)
+        let req = JobFacility.Requirement(requirementId: "rf1", description: "A lift for two days to drop the transmission")
+        let partyRes = try decode(JobReservations.self, ReaderGapFixtures.reservationsParty)
+        let visitorRes = try decode(JobReservations.self, ReaderGapFixtures.reservationsVisitor)
         try snapshot(NavigationStack { List {
-            JobFacilitySection(workOrderId: FacilityFixtures.workOrderId, facility: .loaded(booked), viewerIsParty: true, requested: .constant(nil))
-            JobFacilitySection(workOrderId: FacilityFixtures.workOrderId, facility: .loaded(waiting), viewerIsParty: true, requested: .constant(reserved))
+            JobFacilitySection(workOrderId: FacilityFixtures.workOrderId,
+                               facility: .loaded(JobFacility(requirements: [req], reservations: partyRes, choices: FacilityChoice.from(party))))
         } }, name: "fixture-job-facility")
+        try snapshot(NavigationStack { List {
+            JobFacilitySection(workOrderId: FacilityFixtures.workOrderId,
+                               facility: .loaded(JobFacility(requirements: [req], reservations: visitorRes, choices: [])))
+        } }, name: "fixture-job-facility-visitor")
+    }
+
+    func testRenderReaderGaps() throws {
+        let vouches = try decode(MyVouches.self, ReaderGapFixtures.myVouches)
+        try snapshot(NavigationStack { MyVouchesContent(read: .loaded(vouches)) }, name: "fixture-my-vouches")
+        let offers = try decode(WorkOrderOffers.self, CosignFixtures.offers(customer: false))
+        let offer = try XCTUnwrap(offers.requirements.first?.offers.first)
+        try snapshot(CosignSheet(action: try XCTUnwrap(offers.cosignAction(for: offer)), technician: "@fixture_painter",
+                                 requestTitle: "Skill: Paint touch-up on the driver door"), name: "fixture-cosign-acting-for")
+        let q = try decode(JobQuotes.self, ReaderGapFixtures.quotesWithRelease)
+        let path = try decode(JobPath.self, JobFixtures.jobPathWithLabels)
+        try snapshot(NavigationStack { JobPathContent(workOrderId: JobFixtures.workOrderId, path: .loaded(path), resources: .loading, quotes: .loaded(q)) },
+                     name: "fixture-quote-release", pages: 2)
+        try snapshot(AcceptQuoteSheet(quote: try XCTUnwrap(q.currentQuote), action: try XCTUnwrap(q.acceptAction)),
+                     name: "fixture-accept-quote-release", pages: 2)
+        let p = try decode(ProviderProfile.self, CosignFixtures.vouches)
+        try snapshot(NavigationStack { List { ProviderFaceContent(profile: .loaded(p), jobs: .loading, showSubject: true) } },
+                     name: "fixture-vouch-withdraw", pages: 2)
     }
 
     func testRenderPostJobAndStartWork() throws {

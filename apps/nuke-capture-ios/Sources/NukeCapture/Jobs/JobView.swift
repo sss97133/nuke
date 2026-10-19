@@ -24,12 +24,11 @@ struct JobView: View {
     @State private var invoices: JobLoad<WorkOrderInvoices> = .loading
     @State private var evidence: JobLoad<EvidenceCandidates> = .loading
     @State private var facility: JobLoad<JobFacility> = .loading
-    @State private var facilityRequest: FacilityReservation?
 
     var body: some View {
         JobPathContent(workOrderId: workOrderId, path: path, resources: resources, quotes: quotes, offers: offers,
                        inspections: inspections, invoices: invoices, evidence: evidence,
-                       facility: facility, facilityRequest: $facilityRequest,
+                       facility: facility,
                        titleHint: titleHint, vehicleHint: vehicleHint,
                        onChanged: { Task { await load() } })
             .task(id: workOrderId) { await load() }
@@ -53,10 +52,8 @@ struct JobView: View {
         quotes = loaded.2
         offers = loaded.3
         inspections = loaded.4
-        if case .loaded(let o) = loaded.3 {
-            facility = await FacilityReaders.job(workOrderId: workOrderId, requirements: o.requirements,
-                                                 extraOrganizationIds: [facilityRequest?.organizationId].compactMap { $0 })
-        }
+        let requirements: [RequirementOffers] = { if case .loaded(let o) = loaded.3 { return o.requirements } else { return [] } }()
+        facility = await FacilityReaders.job(workOrderId: workOrderId, requirements: requirements)
     }
 }
 
@@ -82,7 +79,6 @@ struct JobPathContent: View {
     var invoices: JobLoad<WorkOrderInvoices>? = nil
     var evidence: JobLoad<EvidenceCandidates>? = nil
     var facility: JobLoad<JobFacility>? = nil
-    var facilityRequest: Binding<FacilityReservation?> = .constant(nil)
     var titleHint: String? = nil
     var vehicleHint: String? = nil
     var onChanged: (() -> Void)? = nil
@@ -124,8 +120,7 @@ struct JobPathContent: View {
                 quoteSection.id("job-quote")
                 if let offers { JobOffersSection(offers: offers, onChanged: onChanged).id("job-offers") }
                 if let facility {
-                    JobFacilitySection(workOrderId: workOrderId, facility: facility, viewerIsParty: !(p.viewer?.slots.isEmpty ?? true),
-                                       requested: facilityRequest, onChanged: onChanged)
+                    JobFacilitySection(workOrderId: workOrderId, facility: facility, onChanged: onChanged)
                         .id("job-facility")
                 }
                 if let inspections { JobInspectionSection(read: inspections) }
@@ -392,6 +387,8 @@ struct JobPathContent: View {
                     RootedValueView(label: "Acceptance", value: JobCopy.acceptance(q.acceptance),
                                     status: q.acceptance?.state == "accepted" ? .proven
                                         : (q.acceptance?.state == "withheld" ? .conflicting : .pending))
+                    ReleaseConditionsRow(conditions: quote.releaseConditions, release: q.release,
+                                         accepted: q.acceptance?.state == "accepted")
                     if let a = q.changeOrderAction {
                         Button {
                             changing = ChangeBox(action: a, quote: quote)

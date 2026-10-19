@@ -268,45 +268,100 @@ struct FacilityMatches: Decodable, Equatable {
     }
 }
 
-/// What the job page shows for its shop-space requirements.
+/// work_order_facility_reservations_read: the job's booking requests. Parties, the requester and
+/// the shop see every request with its state and terms; everyone else sees confirmed busy windows.
+struct JobReservations: Decodable, Equatable {
+    struct Item: Decodable, Equatable, Identifiable {
+        let reservationId: String?
+        let assetLabel: String
+        let assetKind: String
+        let shopName: String?
+        let shopId: String?
+        let from: String?
+        let until: String?
+        let state: String
+        let requesterRole: String?
+        let requestedBy: JobPerson?
+        let terms: FacilityRequestSummary.Terms?
+        let party: Bool
+        var id: String { reservationId ?? "\(assetLabel)|\(from ?? "")|\(state)" }
+
+        private struct Asset: Decodable { let label: String?; let kind: String? }
+        private struct Shop: Decodable { let name: String?; let organization_id: String? }
+        private struct Window: Decodable { let from: String?; let until: String? }
+
+        init(from decoder: Decoder) throws {
+            let c = try decoder.container(keyedBy: JobCodingKey.self)
+            let a = try? c.decode(Asset.self, forKey: JobCodingKey("asset"))
+            let shop = try? c.decode(Shop.self, forKey: JobCodingKey("shop"))
+            let w = try? c.decode(Window.self, forKey: JobCodingKey("window"))
+            reservationId = try? c.decode(String.self, forKey: JobCodingKey("reservation_id"))
+            assetLabel = a?.label ?? "Shop space"
+            assetKind = a?.kind ?? "other"
+            shopName = shop?.name
+            shopId = shop?.organization_id
+            from = w?.from
+            until = w?.until
+            state = (try? c.decode(String.self, forKey: JobCodingKey("state"))) ?? "requested"
+            requesterRole = try? c.decode(String.self, forKey: JobCodingKey("requester_role"))
+            requestedBy = try? c.decode(JobPerson.self, forKey: JobCodingKey("requested_by"))
+            terms = try? c.decode(FacilityRequestSummary.Terms.self, forKey: JobCodingKey("terms"))
+            party = (try? c.decode(String.self, forKey: JobCodingKey("visibility"))) == "party"
+        }
+    }
+
+    let items: [Item]
+    let actions: [JobAction]
+    let party: Bool
+
+    private struct Viewer: Decodable {
+        let party: Bool?
+        let actions: [Lossy<JobAction>]?
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: JobCodingKey.self)
+        items = (try? c.decode([Lossy<Item>].self, forKey: JobCodingKey("reservations")))?.compactMap(\.value) ?? []
+        let v = try? c.decode(Viewer.self, forKey: JobCodingKey("viewer"))
+        actions = v?.actions?.compactMap(\.value) ?? []
+        party = v?.party ?? false
+    }
+
+    var reserveAction: JobAction? { actions.first { $0.kind == "reserve_facility" } }
+
+    func cancelAction(for reservationId: String?) -> JobAction? {
+        guard let reservationId else { return nil }
+        return actions.first { $0.kind == "cancel_facility_reservation" && $0.args["p_reservation_id"]?.stringValue == reservationId }
+    }
+}
+
+extension JobAction {
+    /// reserve_facility's reachable shops: the job's shop and any proposed facility.
+    var facilities: [(id: String, name: String?)] {
+        guard case .array(let list)? = raw["facilities"] else { return [] }
+        return list.compactMap { item in
+            guard case .object(let o) = item, let id = o["organization_id"]?.stringValue else { return nil }
+            return (id, o["name"]?.stringValue)
+        }
+    }
+    var facilityRequirementId: String? { raw["facility_requirement_id"]?.stringValue }
+}
+
+/// What the job page shows for shop space.
 struct JobFacility: Equatable {
     struct Requirement: Equatable, Identifiable {
         let requirementId: String
         let description: String?
-        let match: FacilityMatch?
         var id: String { requirementId }
-    }
-    struct Booking: Equatable, Identifiable {
-        let assetLabel: String
-        let kind: String
-        let organizationId: String?
-        let organizationName: String?
-        let from: String
-        let until: String
-        let reservationId: String?
-        var id: String { (reservationId ?? assetLabel) + from }
     }
 
     let requirements: [Requirement]
-    let bookings: [Booking]
+    let reservations: JobReservations?
+    /// Declared assets at the shops reserve_facility names, read for "Book a bay".
+    let choices: [FacilityChoice]
 
-    /// Confirmed bookings for this job, from each reachable shop's calendar (job ids are shown to parties only).
-    static func bookings(for workOrderId: String, in reads: [FacilityRead]) -> [Booking] {
-        reads.flatMap { read in
-            read.assets.flatMap { a in
-                a.busy.filter { $0.workOrderId == workOrderId }.map {
-                    Booking(assetLabel: a.label, kind: a.kind, organizationId: read.organizationId, organizationName: read.organizationName,
-                            from: $0.from, until: $0.until, reservationId: $0.reservationId)
-                }
-            }
-        }
-        .sorted { $0.from < $1.from }
-    }
-
-    var choices: [FacilityChoice] {
-        var seen = Set<String>()
-        return requirements.flatMap { $0.match?.assets ?? [] }.filter { seen.insert($0.assetId).inserted }
-    }
+    var reserveAction: JobAction? { reservations?.reserveAction }
+    var isEmpty: Bool { requirements.isEmpty && (reservations?.items.isEmpty ?? true) && reserveAction == nil }
 }
 
 /// reserve_facility's answer: the request waiting on the shop.
@@ -380,27 +435,25 @@ enum FacilityReaders {
         }
     }
 
-    /// The job's shop-space requirements with their facility input, and confirmed bookings from the shops involved.
-    static func job(workOrderId: String, requirements: [RequirementOffers], extraOrganizationIds: [String] = []) async -> JobLoad<JobFacility> {
-        let facility = requirements.filter { $0.kind == "facility" }
-        guard !facility.isEmpty else { return .loaded(JobFacility(requirements: [], bookings: [])) }
-        struct P: Encodable { let p_kind: String; let p_limit: Int }
-        let matches: FacilityMatches = await {
-            guard let data = try? await SupabaseService.client.rpc("open_requirements_read", params: P(p_kind: "facility", p_limit: 100)).execute().data,
-                  let m = try? JobReaders.decode(FacilityMatches.self, from: data) else { return FacilityMatches(byRequirement: [:]) }
-            return m
-        }()
-        let reqs = facility.map { JobFacility.Requirement(requirementId: $0.requirementId, description: $0.description,
-                                                          match: matches.byRequirement[$0.requirementId]) }
-        var orgs: [String] = []
-        for id in reqs.flatMap({ $0.match?.assets ?? [] }).compactMap(\.organizationId) + extraOrganizationIds where !orgs.contains(id) {
-            orgs.append(id)
+    static let reservationsName = "work_order_facility_reservations_read"
+
+    /// The job's shop-space needs, its booking requests, and (when the server offers reserve_facility) the bookable assets.
+    static func job(workOrderId: String, requirements: [RequirementOffers]) async -> JobLoad<JobFacility> {
+        let reqs = requirements.filter { $0.kind == "facility" }.map { JobFacility.Requirement(requirementId: $0.requirementId, description: $0.description) }
+        let loaded: JobLoad<JobReservations> = await JobReaders.call(reservationsName) {
+            try await SupabaseService.client.rpc(reservationsName, params: ["p_work_order_id": workOrderId]).execute().data
         }
-        var reads: [FacilityRead] = []
-        for org in orgs.prefix(5) {
-            if case .loaded(let r) = await read(organizationId: org) { reads.append(r) }
+        let reservations: JobReservations?
+        switch loaded {
+        case .loaded(let r): reservations = r
+        case .refused(let refusal) where reqs.isEmpty: return .refused(refusal)
+        default: reservations = nil
         }
-        return .loaded(JobFacility(requirements: reqs, bookings: JobFacility.bookings(for: workOrderId, in: reads)))
+        var choices: [FacilityChoice] = []
+        for org in (reservations?.reserveAction?.facilities ?? []).prefix(5) {
+            if case .loaded(let f) = await read(organizationId: org.id) { choices += FacilityChoice.from(f) }
+        }
+        return .loaded(JobFacility(requirements: reqs, reservations: reservations, choices: choices))
     }
 }
 

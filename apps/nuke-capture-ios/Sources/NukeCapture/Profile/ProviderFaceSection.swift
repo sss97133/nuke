@@ -70,6 +70,9 @@ struct ProviderFaceContent: View {
 
     @State private var showAccount = false
     @State private var vouching = false
+    @State private var withdrawing: ProviderProfile.Vouch?
+    @State private var withdrawnVouches: Set<String> = []
+    @State private var vouchFailure: String?
 
     var body: some View {
         Group {
@@ -258,23 +261,42 @@ struct ProviderFaceContent: View {
             if p.vouches.isEmpty {
                 Text("No one has vouched yet.").font(.footnote).foregroundStyle(.secondary)
             }
-            ForEach(p.vouches) { v in
+            ForEach(p.vouches.filter { !withdrawnVouches.contains($0.vouch_id) }) { v in
                 VStack(alignment: .leading, spacing: 2) {
-                    Text(Self.vouchLine(v)).font(.footnote)
+                    Text(Self.vouchLine(v) + (v.isMine ? " · yours" : "")).font(.footnote)
                     if let s = v.scope { Text(s).font(.caption).foregroundStyle(.secondary) }
                     Text([JobCopy.day(v.vouched_at).map { "vouched \($0)" }, JobCopy.day(v.expires_at).map { "until \($0)" }]
                         .compactMap { $0 }.joined(separator: " · "))
                         .font(.system(size: 9, design: .monospaced)).foregroundStyle(.tertiary)
+                    if v.withdrawAction != nil {
+                        Button("Withdraw your vouch", role: .destructive) { withdrawing = v }
+                            .font(.caption).buttonStyle(.borderless)
+                    }
                 }
             }
+            if let vouchFailure { Text(vouchFailure).font(.caption).foregroundStyle(.red) }
             if !(p.isSelf || isOwn), SupabaseService.currentUserId != nil, let id = p.subject?.profileId {
                 Button { vouching = true } label: { Label("Vouch for this person", systemImage: "hand.thumbsup") }
                     .sheet(isPresented: $vouching) { VouchSheet(subjectUserId: id, subjectName: p.subject?.name ?? "this person") }
             }
         } header: {
             Text("Vouched for by")
+                .confirmationDialog("Withdraw your vouch?", isPresented: Binding(get: { withdrawing != nil }, set: { if !$0 { withdrawing = nil } }),
+                                    titleVisibility: .visible, presenting: withdrawing) { v in
+                    Button("Withdraw", role: .destructive) { Task { await withdrawVouch(v) } }
+                } message: { _ in
+                    Text("It stops showing here. The record that you vouched stays.")
+                }
         } footer: {
             Text("A vouch is someone's signed word about this person. It isn't counted as skill.")
+        }
+    }
+
+    private func withdrawVouch(_ v: ProviderProfile.Vouch) async {
+        guard let p = VouchCopy.withdraw(v.withdrawAction, vouchId: v.vouch_id) else { return }
+        switch await CosignWriters.write("withdraw_vouch", p) {
+        case .failure(let f): vouchFailure = f.text
+        case .success: vouchFailure = nil; withdrawnVouches.insert(v.vouch_id)
         }
     }
 

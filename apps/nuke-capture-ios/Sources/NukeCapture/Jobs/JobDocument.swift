@@ -272,6 +272,8 @@ struct JobAction: Decodable, Equatable, Identifiable {
     var binds: [String] = []
     var doesNotBind: [String] = []
     var termsBasis: String? = nil
+    /// The whole action object, for hints a step carries beyond rpc/args (acting_for, facilities, …).
+    var raw: [String: JobJSON] = [:]
     var id: String { kind + (stage ?? "") + (args.keys.sorted().compactMap { args[$0]?.stringValue }.joined()) }
 
     init(kind: String, label: String? = nil, stage: String? = nil, rpc: String? = nil, args: [String: JobJSON] = [:],
@@ -300,6 +302,7 @@ struct JobAction: Decodable, Equatable, Identifiable {
         binds = (try? c.decode([String].self, forKey: JobCodingKey("binds"))) ?? []
         doesNotBind = (try? c.decode([String].self, forKey: JobCodingKey("does_not_bind"))) ?? []
         termsBasis = try? c.decode(String.self, forKey: JobCodingKey("terms_basis"))
+        raw = (try? [String: JobJSON](from: decoder)) ?? [:]
     }
 
     var title: String { label ?? JobCopy.action(kind) }

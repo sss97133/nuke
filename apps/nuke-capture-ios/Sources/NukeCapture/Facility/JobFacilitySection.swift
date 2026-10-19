@@ -1,60 +1,67 @@
-// JobFacilitySection.swift — the job page's shop-space requirement and its booking state.
+// JobFacilitySection.swift — the job page's shop space over work_order_facility_reservations_read.
 //
-// "Booked: Lift A, Tue Oct 21, 9 AM–12 PM" from the shop's calendar (job ids are shown to parties
-// only), "Requested at <shop> — waiting for the shop" after you send a request, else what the
-// facility input found. No reader lists a job's pending requests, so a request shows here only in the
-// session that sent it; the shop sees it in its signature queue.
+// Parties, the requester and the shop see every booking request with its state, terms and who
+// asked; everyone else sees confirmed busy windows only. "Book a bay" appears only when the reader's
+// viewer.actions offers reserve_facility (its facilities are the shops to choose from); "Cancel the
+// request" only from the request's own cancel_facility_reservation action.
 
 import SwiftUI
 
 struct JobFacilitySection: View {
     let workOrderId: String
     let facility: JobLoad<JobFacility>
-    /// The server decides who may book (customer or accepted technician); visitors aren't offered it.
-    let viewerIsParty: Bool
-    @Binding var requested: FacilityReservation?
     var onChanged: (() -> Void)? = nil
 
     @State private var booking = false
-    @State private var cancelling = false
+    @State private var cancelling: JobReservations.Item?
     @State private var cancelFailure: String?
 
     var body: some View {
         switch facility {
-        case .loaded(let f) where !f.requirements.isEmpty:
+        case .loaded(let f) where !f.isEmpty:
             Section {
                 ForEach(f.requirements) { r in
-                    VStack(alignment: .leading, spacing: 4) {
+                    VStack(alignment: .leading, spacing: 2) {
                         Text("Shop space").font(.caption).foregroundStyle(.secondary)
                         Text(r.description ?? "Shop space for this job").font(.subheadline)
-                        if let m = r.match {
-                            Label(FacilityCopy.match(m), systemImage: OfferCopy.symbol(m.result).name)
-                                .font(.caption).foregroundStyle(.secondary)
-                            if m.next == "plan_b_supplier_needed" {
-                                Text("Needs a backup: another shop with this kind of space.").font(.caption2).foregroundStyle(.tertiary)
-                            }
-                        }
                     }
                 }
-                state(f)
-                if viewerIsParty, !f.choices.isEmpty, f.bookings.isEmpty, pending(f) == nil {
-                    Button { booking = true } label: { Label("Book a bay", systemImage: "calendar.badge.plus") }
+                ForEach(f.reservations?.items ?? []) { item in row(item, f.reservations) }
+                if (f.reservations?.items ?? []).isEmpty {
+                    Text("Not booked yet.").font(.footnote).foregroundStyle(.secondary)
+                }
+                if let action = f.reserveAction {
+                    if f.choices.isEmpty {
+                        Text("The shops on this job haven't listed any space yet.").font(.footnote).foregroundStyle(.secondary)
+                    } else {
+                        Button { booking = true } label: { Label("Book a bay", systemImage: "calendar.badge.plus") }
+                            .sheet(isPresented: $booking) {
+                                BookFacilitySheet(workOrderId: action.args["p_work_order_id"]?.stringValue ?? workOrderId,
+                                                  choices: f.choices) { _ in onChanged?() }
+                            }
+                    }
                 }
                 ForEach(shops(f), id: \.id) { shop in
                     NavigationLink {
-                        FacilityView(organizationId: shop.id, nameHint: shop.name, bookingFor: viewerIsParty ? workOrderId : nil,
-                                     onBooked: { requested = $0 })
+                        FacilityView(organizationId: shop.id, nameHint: shop.name, bookingFor: f.reserveAction == nil ? nil : workOrderId,
+                                     onBooked: { _ in onChanged?() })
                     } label: {
                         Label("See \(shop.name ?? "the shop")'s space and calendar", systemImage: "building.2")
                     }
                 }
+                if let cancelFailure { Text(cancelFailure).font(.caption).foregroundStyle(.red) }
             } header: {
                 Text("Shop space")
-                    .sheet(isPresented: $booking) {
-                        BookFacilitySheet(workOrderId: workOrderId, choices: f.choices) { r in requested = r; onChanged?() }
+                    .confirmationDialog("Cancel this booking request?", isPresented: Binding(get: { cancelling != nil }, set: { if !$0 { cancelling = nil } }),
+                                        titleVisibility: .visible, presenting: cancelling) { item in
+                        Button("Cancel the request", role: .destructive) { Task { await cancel(item, f.reservations) } }
+                    } message: { _ in
+                        Text("The space is released and the shop can't confirm it.")
                     }
             } footer: {
-                Text("A booking holds space only once the shop confirms it. Nuke doesn't take payment for it.")
+                Text(f.reservations?.party == true || (f.reservations?.items.contains(where: \.party) ?? false)
+                     ? "A booking holds space only once the shop confirms it. Nuke doesn't take payment for it."
+                     : "Only confirmed bookings are shown here. Requests and fees are visible to the people on the job.")
             }
         case .refused(let refusal):
             Section("Shop space") { JobRefusalRow(refusal: refusal) }
@@ -63,46 +70,36 @@ struct JobFacilitySection: View {
         }
     }
 
-    private func pending(_ f: JobFacility) -> FacilityReservation? {
-        guard let r = requested, r.state == "requested", !f.bookings.contains(where: { $0.reservationId == r.reservationId }) else { return nil }
-        return r
-    }
-
-    @ViewBuilder private func state(_ f: JobFacility) -> some View {
-        ForEach(f.bookings) { b in
-            Label(FacilityCopy.booked(b), systemImage: "checkmark.seal.fill").font(.footnote).foregroundStyle(.green)
-        }
-        if let r = pending(f) {
-            let shop = f.choices.first { $0.assetId == r.assetId }?.organizationName
-            VStack(alignment: .leading, spacing: 4) {
-                Label(FacilityCopy.requested(shop: shop, window: FacilityCopy.window(r.from, r.until)), systemImage: "hourglass")
-                    .font(.footnote)
-                Button("Cancel the request", role: .destructive) { cancelling = true }
-                    .font(.footnote)
-                    .confirmationDialog("Cancel this booking request?", isPresented: $cancelling, titleVisibility: .visible) {
-                        Button("Cancel the request", role: .destructive) { Task { await cancel(r) } }
-                    } message: {
-                        Text("The shop won't be able to confirm it.")
-                    }
-                if let cancelFailure { Text(cancelFailure).font(.caption).foregroundStyle(.red) }
+    @ViewBuilder private func row(_ item: JobReservations.Item, _ r: JobReservations?) -> some View {
+        VStack(alignment: .leading, spacing: 3) {
+            Label(FacilityCopy.reservation(item), systemImage: FacilityCopy.reservationSymbol(item.state))
+                .font(.footnote)
+                .foregroundStyle(item.state == "confirmed" ? .green : (item.state == "requested" ? .primary : .secondary))
+            if let detail = FacilityCopy.reservationDetail(item) {
+                Text(detail).font(.caption).foregroundStyle(.secondary)
             }
-        } else if f.bookings.isEmpty {
-            Text("Not booked yet.").font(.footnote).foregroundStyle(.secondary)
+            if r?.cancelAction(for: item.reservationId) != nil {
+                Button(item.state == "confirmed" ? "Cancel the booking" : "Cancel the request", role: .destructive) { cancelling = item }
+                    .font(.caption).buttonStyle(.borderless)
+            }
         }
     }
 
     private func shops(_ f: JobFacility) -> [(id: String, name: String?)] {
         var out: [(id: String, name: String?)] = []
-        for c in f.choices { if let id = c.organizationId, !out.contains(where: { $0.id == id }) { out.append((id, c.organizationName)) } }
-        for b in f.bookings { if let id = b.organizationId, !out.contains(where: { $0.id == id }) { out.append((id, b.organizationName)) } }
+        for s in f.reserveAction?.facilities ?? [] where !out.contains(where: { $0.id == s.id }) { out.append(s) }
+        for i in f.reservations?.items ?? [] {
+            if let id = i.shopId, !out.contains(where: { $0.id == id }) { out.append((id, i.shopName)) }
+        }
         return out
     }
 
-    private func cancel(_ r: FacilityReservation) async {
+    private func cancel(_ item: JobReservations.Item, _ r: JobReservations?) async {
+        guard let action = r?.cancelAction(for: item.reservationId), let id = action.args["p_reservation_id"]?.stringValue else { return }
         struct P: Encodable, Sendable { let p_reservation_id: String }
-        switch await FacilityWriters.write("cancel_facility_reservation", P(p_reservation_id: r.reservationId)) {
+        switch await FacilityWriters.write(action.rpc ?? "cancel_facility_reservation", P(p_reservation_id: id)) {
         case .failure(let f): cancelFailure = f.text
-        case .success: cancelFailure = nil; requested = nil; onChanged?()
+        case .success: cancelFailure = nil; onChanged?()
         }
     }
 }

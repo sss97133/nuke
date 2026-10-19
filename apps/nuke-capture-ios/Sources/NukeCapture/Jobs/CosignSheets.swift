@@ -17,9 +17,9 @@ struct CosignSheet: View {
     @State private var cutBasis: CosignDrafting.CutBasis = .none
     @State private var value = ""
     @State private var currency = "USD"
-    @State private var actAsSelf = false
+    @State private var actingIndex = 0
 
-    private var forShop: Bool { action.asFields["attestor_kind"]?.stringValue == "organization" }
+    private var acting: [CosignActingFor] { action.actingFor }
 
     var body: some View {
         SignStepSheet(title: "Co-sign this technician", says: CosignCopy.cosignSays, doesNotSay: CosignCopy.cosignDoesNotSay,
@@ -28,11 +28,12 @@ struct CosignSheet: View {
             Section {
                 RootedValueView(label: "Technician", value: technician, status: .attributed)
                 RootedValueView(label: "Request", value: requestTitle, status: .attributed)
-                if forShop {
-                    Picker("Signing for", selection: $actAsSelf) {
-                        Text("Your shop").tag(false)
-                        Text("Yourself").tag(true)
+                if acting.count > 1 {
+                    Picker("Signing for", selection: $actingIndex) {
+                        ForEach(Array(acting.enumerated()), id: \.offset) { i, a in Text(a.title).tag(i) }
                     }
+                } else if let only = acting.first {
+                    RootedValueView(label: "Signing for", value: only.title, status: .attributed)
                 }
             }
             Section("What you vouch for") {
@@ -67,7 +68,7 @@ struct CosignSheet: View {
             }
         } confirm: {
             switch CosignDrafting.cosign(action: action, kinds: kinds, scope: scope, cutBasis: cutBasis, value: value,
-                                         currency: currency, actAsSelf: actAsSelf) {
+                                         currency: currency, actingFor: acting.indices.contains(actingIndex) ? acting[actingIndex].cut : [:]) {
             case .failure(let f): return f.text
             case .success(let p):
                 if case .failure(let f) = await CosignWriters.write("cosign_provider", p) { return f.text }

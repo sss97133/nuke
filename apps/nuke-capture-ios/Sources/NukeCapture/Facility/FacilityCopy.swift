@@ -115,8 +115,36 @@ enum FacilityCopy {
         "Requested at \(shop ?? "the shop") — waiting for the shop" + (window.map { " · \($0)" } ?? "")
     }
 
-    static func booked(_ b: JobFacility.Booking, timeZone: TimeZone = .current) -> String {
-        "Booked: \(b.assetLabel)" + (window(b.from, b.until, timeZone: timeZone).map { ", \($0)" } ?? "")
+    /// One booking request in plain words, by its state.
+    static func reservation(_ i: JobReservations.Item, timeZone: TimeZone = .current) -> String {
+        let when = window(i.from, i.until, timeZone: timeZone).map { ", \($0)" } ?? ""
+        switch i.state {
+        case "requested": return requested(shop: i.shopName, window: nil) + " · \(i.assetLabel)" + when
+        case "confirmed": return i.party ? "Booked: \(i.assetLabel)\(when)" : "Busy: \(i.assetLabel)\(when)"
+        case "completed_window": return "Booked (past): \(i.assetLabel)\(when)"
+        case "expired": return "Request expired: \(i.assetLabel)\(when)"
+        case "cancelled": return "Cancelled: \(i.assetLabel)\(when)"
+        default: return "\(JobCopy.sentence(i.state)): \(i.assetLabel)\(when)"
+        }
+    }
+
+    /// "at Fixture Garage · asked by @fixture_customer (the customer) · fee $40.00 / hour".
+    static func reservationDetail(_ i: JobReservations.Item) -> String? {
+        var parts: [String] = []
+        if i.state != "requested", let shop = i.shopName { parts.append("at \(shop)") }
+        if i.party {
+            if let who = i.requestedBy { parts.append("asked by \(who.text) (\(requester(i.requesterRole)))") }
+            if let t = i.terms, let fee = terms(basis: t.basis, amount: t.amount, currency: t.currency) { parts.append("fee \(fee)") }
+        }
+        return parts.isEmpty ? nil : parts.joined(separator: " · ")
+    }
+
+    static func reservationSymbol(_ state: String) -> String {
+        switch state {
+        case "confirmed", "completed_window": return "checkmark.seal.fill"
+        case "requested": return "hourglass"
+        default: return "minus.circle"
+        }
     }
 
     /// The facility input in plain words, from the reader's own result and reason.

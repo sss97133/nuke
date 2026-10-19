@@ -60,13 +60,7 @@ final class FacilityTests: XCTestCase {
                        "Not needed for this")
     }
 
-    func testJobBookingState() throws {
-        let read = try decode(FacilityRead.self, FacilityFixtures.read(party: true))
-        let bookings = JobFacility.bookings(for: FacilityFixtures.workOrderId, in: [read])
-        XCTAssertEqual(bookings.count, 1)
-        XCTAssertEqual(FacilityCopy.booked(bookings[0], timeZone: utc), "Booked: Lift A, Wed Oct 21, 4 PM–7 PM")
-        let visitor = try decode(FacilityRead.self, FacilityFixtures.read(party: false))
-        XCTAssertTrue(JobFacility.bookings(for: FacilityFixtures.workOrderId, in: [visitor]).isEmpty)
+    func testReservationAnswer() throws {
         XCTAssertEqual(FacilityCopy.requested(shop: "Fixture Garage", window: nil), "Requested at Fixture Garage — waiting for the shop")
         let r = try decode(FacilityReservation.self, FacilityFixtures.reserved)
         XCTAssertEqual(r.state, "requested")

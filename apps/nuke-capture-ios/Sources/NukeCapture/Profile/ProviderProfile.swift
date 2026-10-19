@@ -329,7 +329,24 @@ struct ProviderProfile: Decodable, Equatable {
         let scope: String?
         let vouched_at: String?
         let expires_at: String?
+        /// The viewer signed it, or belongs to the shop that did.
+        let isMine: Bool
+        let actions: [JobAction]
         var id: String { vouch_id }
+
+        var withdrawAction: JobAction? { actions.first { $0.kind == "withdraw_vouch" && $0.args["p_id"]?.stringValue == vouch_id } }
+
+        init(from decoder: Decoder) throws {
+            let c = try decoder.container(keyedBy: JobCodingKey.self)
+            vouch_id = try c.decode(String.self, forKey: JobCodingKey("vouch_id"))
+            voucher = try? c.decode(JobPerson.self, forKey: JobCodingKey("voucher"))
+            kinds = try? c.decode([String].self, forKey: JobCodingKey("kinds"))
+            scope = try? c.decode(String.self, forKey: JobCodingKey("scope"))
+            vouched_at = try? c.decode(String.self, forKey: JobCodingKey("vouched_at"))
+            expires_at = try? c.decode(String.self, forKey: JobCodingKey("expires_at"))
+            isMine = (try? c.decode(Bool.self, forKey: JobCodingKey("is_mine"))) ?? false
+            actions = (try? c.decode([Lossy<JobAction>].self, forKey: JobCodingKey("actions")))?.compactMap(\.value) ?? []
+        }
     }
 
     let viewer: JobViewer?

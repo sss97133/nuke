@@ -131,7 +131,7 @@ enum CosignDrafting {
     enum CutBasis: String, CaseIterable { case none, share_of_labor_line, flat, day_rate }
 
     static func cosign(action: JobAction, kinds: Set<String>, scope: String, cutBasis: CutBasis, value: String,
-                       currency: String, actAsSelf: Bool) -> Result<CosignParams, JobSignFailure> {
+                       currency: String, actingFor: [String: JobJSON] = [:]) -> Result<CosignParams, JobSignFailure> {
         guard action.kind == "cosign_provider", let wo = action.args["p_work_order_id"]?.stringValue,
               let offer = action.args["p_offer_id"]?.stringValue else {
             return .failure(JobSignFailure(text: "This offer isn't open for co-signing from your account."))
@@ -160,7 +160,7 @@ enum CosignDrafting {
             cut = ["basis": .string(cutBasis.rawValue), "amount": .number(a), "currency": .string(cur)]
             if cutBasis == .day_rate { cut["unit"] = .string("day") }
         }
-        if actAsSelf { cut["as"] = .string("self") }
+        for (k, v) in actingFor { cut[k] = v }
         return .success(CosignParams(p_work_order_id: wo, p_offer_id: offer, p_kinds: picked, p_scope: text,
                                      p_cut: cut.isEmpty ? nil : .object(cut)))
     }
@@ -288,6 +288,25 @@ enum ChangeOrderDrafting {
             return .failure(JobSignFailure(text: "Keep at least one line."))
         }
         return .success(Params(p_work_order_id: wo, p_base_quote_id: base, p_changes: changes, p_reason: why))
+    }
+}
+
+/// One capacity the server lets you co-sign in (cosign_acting_for): a shop you own or belong to, or yourself.
+struct CosignActingFor: Equatable, Identifiable {
+    let title: String
+    /// Merged into p_cut as given: {organization_id} for a shop, {as: "self"} for yourself.
+    let cut: [String: JobJSON]
+    var id: String { title + (cut["organization_id"]?.stringValue ?? "") }
+}
+
+extension JobAction {
+    var actingFor: [CosignActingFor] {
+        guard case .array(let list)? = raw["acting_for"] else { return [] }
+        return list.compactMap { item in
+            guard case .object(let o) = item, case .object(let cut)? = o["p_cut"] else { return nil }
+            let title = o["kind"]?.stringValue == "organization" ? (o["name"]?.stringValue ?? "Your shop") : "Yourself"
+            return CosignActingFor(title: title, cut: cut)
+        }
     }
 }
 

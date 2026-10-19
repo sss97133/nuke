@@ -9,6 +9,7 @@
 // handle or as an unnamed party; ids and hashes are never primary text.
 
 import Foundation
+import SwiftUI
 
 // MARK: - People
 
@@ -146,6 +147,8 @@ struct Quote: Decodable, Equatable {
     let changeOrder: ChangeOrder?
     /// The scope snapshot's specifications (material / process keys a change order can substitute).
     let specifications: [SnapshotSpec]
+    /// When payment is released under this version; nil when it declares none (Nuke's standard applies).
+    let releaseConditions: [ReleaseCondition]?
 
     var isChangeOrder: Bool { changeOrder != nil }
 
@@ -162,6 +165,7 @@ struct Quote: Decodable, Equatable {
         case totalsByCurrency = "totals_by_currency"
         case depositRequested = "deposit_requested"
         case scopeStatus = "scope_status"
+        case releaseConditions = "release_conditions"
     }
 
     private struct LineList: Decodable {
@@ -194,6 +198,7 @@ struct Quote: Decodable, Equatable {
         let flagged = (try? c.decode(Bool.self, forKey: .isChangeOrderFlag)) == true
         changeOrder = (try? c.decode(ChangeOrder.self, forKey: .changeOrder)) ?? (flagged ? ChangeOrder.empty : nil)
         specifications = (try? c.decode(SnapshotSpecs.self, forKey: .scopeSnapshot))?.specifications ?? []
+        releaseConditions = ReleaseCondition.list(try? c.decode(JobJSON.self, forKey: .releaseConditions))
     }
 
     private struct SnapshotSpecs: Decodable {
@@ -347,6 +352,8 @@ struct JobQuotes: Decodable, Equatable {
     let asOf: String?
     /// Steps for the quoting side (e.g. issue_change_order), listed by the reader beside viewer.actions.
     let issuerActions: [JobAction]
+    /// Which release conditions apply: the accepted quote's, or Nuke's standard.
+    let release: ReleaseTerms?
 
     enum CodingKeys: String, CodingKey {
         case history, acceptance, viewer
@@ -355,6 +362,7 @@ struct JobQuotes: Decodable, Equatable {
         case displayTitle = "display_title"
         case vehicleLabel = "vehicle_label"
         case asOf = "as_of"
+        case release = "release_conditions"
     }
 
     private struct HistorySlot: Decodable {
@@ -373,6 +381,7 @@ struct JobQuotes: Decodable, Equatable {
         vehicleLabel = try? c.decode(JobVehicleLabel.self, forKey: .vehicleLabel)
         asOf = try? c.decode(String.self, forKey: .asOf)
         issuerActions = (try? c.decode(IssuerActions.self, forKey: .viewer))?.issuer_actions ?? []
+        release = try? c.decode(ReleaseTerms.self, forKey: .release)
     }
 
     private struct IssuerActions: Decodable {
@@ -571,5 +580,99 @@ struct JobStatement: Decodable, Equatable {
         totals = try? c.decode(Totals.self, forKey: .totals)
         viewer = try? c.decode(JobViewer.self, forKey: .viewer)
         asOf = try? c.decode(String.self, forKey: .asOf)
+    }
+}
+
+// MARK: - Release conditions (work_order_quote_release_conditions)
+
+/// One condition under which payment is released: customer_completion_sign, inspector_attestation,
+/// installed_parts_witness, photos_in_window, or days_signed with days 1–90.
+struct ReleaseCondition: Equatable, Identifiable {
+    let kind: String
+    let days: Int?
+    var id: String { kind }
+
+    /// Accepts the reader's array of {kind[, days]} objects or bare kind strings; nil for null or none.
+    static func list(_ v: JobJSON?) -> [ReleaseCondition]? {
+        guard case .array(let a)? = v else { return nil }
+        let out: [ReleaseCondition] = a.compactMap {
+            switch $0 {
+            case .string(let k): return ReleaseCondition(kind: k, days: nil)
+            case .object(let o):
+                guard let k = o["kind"]?.stringValue else { return nil }
+                if case .number(let d)? = o["days"] { return ReleaseCondition(kind: k, days: Int(d)) }
+                return ReleaseCondition(kind: k, days: nil)
+            default: return nil
+            }
+        }
+        return out.isEmpty ? nil : out
+    }
+}
+
+struct ReleaseTerms: Decodable, Equatable {
+    let current: [ReleaseCondition]?
+    let accepted: [ReleaseCondition]?
+    /// "accepted_quote" or "platform_standard".
+    let declaredBy: String?
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: JobCodingKey.self)
+        current = ReleaseCondition.list(try? c.decode(JobJSON.self, forKey: JobCodingKey("current")))
+        accepted = ReleaseCondition.list(try? c.decode(JobJSON.self, forKey: JobCodingKey("accepted")))
+        declaredBy = try? c.decode(String.self, forKey: JobCodingKey("declared_by"))
+    }
+}
+
+enum ReleaseCopy {
+    static func condition(_ c: ReleaseCondition) -> String {
+        switch c.kind {
+        case "customer_completion_sign": return "the customer confirms the work is done"
+        case "inspector_attestation": return "an inspector signs off on the work"
+        case "installed_parts_witness": return "the installed parts are witnessed"
+        case "photos_in_window": return "photos are taken in the job window"
+        case "days_signed":
+            let d = c.days ?? 0
+            return d == 1 ? "1 day has passed since the work was signed off" : "\(d) days have passed since the work was signed off"
+        default: return JobCopy.sentence(c.kind).lowercased()
+        }
+    }
+
+    /// "Payment is released when: the customer confirms the work is done; photos are taken in the job window".
+    static func line(_ conditions: [ReleaseCondition]) -> String {
+        "Payment is released when: " + conditions.map(condition).joined(separator: "; ")
+    }
+
+    /// Which conditions hold for the job now.
+    static func applies(_ r: ReleaseTerms?, accepted: Bool) -> String {
+        if r?.declaredBy == "accepted_quote" { return "These are the accepted quote's conditions." }
+        return accepted ? "The accepted quote sets no conditions, so Nuke's standard conditions apply."
+            : "Until a quote with conditions is accepted, Nuke's standard conditions apply."
+    }
+
+    static let noMoney = "Nuke records when these are met; it doesn't hold or move the money."
+}
+
+/// The quote's release conditions and which ones apply.
+struct ReleaseConditionsRow: View {
+    let conditions: [ReleaseCondition]?
+    let release: ReleaseTerms?
+    let accepted: Bool
+    /// On the Accept quote sheet: accepting this version makes its conditions the job's.
+    var accepting = false
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 3) {
+            if let conditions {
+                Text(ReleaseCopy.line(conditions)).font(.footnote)
+                Text(accepting ? "Accepting this quote makes these the job's conditions." : ReleaseCopy.applies(release, accepted: accepted))
+                    .font(.caption).foregroundStyle(.secondary)
+            } else {
+                Text(accepting ? "This quote sets no release conditions; Nuke's standard conditions apply."
+                     : "This quote sets no release conditions. " + ReleaseCopy.applies(release, accepted: accepted))
+                    .font(.footnote).foregroundStyle(.secondary)
+            }
+            Text(ReleaseCopy.noMoney).font(.caption2).foregroundStyle(.tertiary)
+        }
+        .padding(.vertical, 2)
     }
 }

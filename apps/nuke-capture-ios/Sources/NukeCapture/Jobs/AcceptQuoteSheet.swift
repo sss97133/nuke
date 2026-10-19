@@ -32,6 +32,9 @@ struct AcceptQuoteSheet: View {
                 } header: {
                     Text("You are accepting")
                 }
+                Section("When payment is released") {
+                    ReleaseConditionsRow(conditions: quote.releaseConditions, release: nil, accepted: false, accepting: true)
+                }
                 if let co = quote.changeOrder {
                     Section("Change order") {
                         if let r = co.reason { Text("Why: \(r)").font(.footnote) }
