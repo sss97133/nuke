@@ -6,7 +6,7 @@
 const UNAVAILABLE = /(this listing (isn.t|is not|is no longer) available|listing (was|has been) removed|this content isn.t available|no longer available|this page isn.t available)/i;
 const SECTION_END = /^(seller information|seller details|location|today.s picks|related listings|more from|message seller|send seller a message|send message|is this still available)/i;
 
-export function readListingPage({ text = '', title = null, images = [] }, observedAt) {
+export function readListingPage({ text = '', title = null, images = [], seller_profile_url = null }, observedAt) {
   const lines = text.split('\n').map(s => s.trim()).filter(Boolean);
   const unavailable = UNAVAILABLE.test(text.slice(0, 4000)) && !title;
   const label = lines.slice(0, 40).find(l => /^(sold|pending)$/i.test(l))?.toLowerCase() ?? null;
@@ -28,6 +28,7 @@ export function readListingPage({ text = '', title = null, images = [] }, observ
   const unique = [...new Map(sizes.map(i => [i.url, i])).values()];
   return { unavailable, status_label: label, title, price: price ? Number(price.replaceAll(',', '')) : null, listed_label: listed, description,
     description_complete: description !== null && !lines.some(l => /^see more$/i.test(l)), seller_name: sellerName, seller_type: sellerType, seller_type_basis: sellerType ? 'page_text' : 'not_shown',
+    seller_profile_url: /^https:\/\/(www\.)?facebook\.com\/marketplace\/profile\/\d{5,}/.test(seller_profile_url ?? '') ? seller_profile_url.split('?')[0] : null,
     images: unique, observed_at: observedAt };
 }
 
@@ -46,6 +47,7 @@ export function revisitCard(id, page, ctx) {
   if (page.price !== null) base.price = page.price;
   if (page.description) base.description = page.description;
   if (page.seller_name) base.seller_name = page.seller_name;
+  if (page.seller_profile_url) base.seller_profile_url = page.seller_profile_url;
   if (page.images.length) { base.all_images = page.images.map(i => i.url); base.image_url = base.all_images[0]; base.agent_context.image_sizes = page.images.map(i => [i.width, i.height]); }
   base.agent_context.description_complete = page.description_complete;
   base.agent_context.seller_type = page.seller_type; base.agent_context.seller_type_basis = page.seller_type_basis;

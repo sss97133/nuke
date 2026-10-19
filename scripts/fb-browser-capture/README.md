@@ -19,6 +19,15 @@ Private packets/ACKs live in `~/nuke-logs/provenance-development-2026-10-11/fb-b
 
 Pending landing blocks new source work. Transient failure retries the same packet after1/2 minutes, at most3 attempts, then pauses for explicit Resume. Login/challenge/scope/load failures pause immediately with visible status. Queue and source limits are independent. Chrome worker sleep/reload preserves queue; browser startup clears the tab association and creates a fresh owned tab rather than adopting a user tab. Source-attempt interruptions and late scheduling are recorded, never counted as completed capture. The host/browser must remain available; alarms do not wake a sleeping machine. No continuous-availability, all-day operation or source-wide enumeration claim follows from this implementation.
 
+## After custody: what the writer connects
+
+The ACK covers custody only (raw packet, listing row, sighting). The same request then connects each landed listing (`supabase/functions/extract-facebook-marketplace/integrate.ts`); its counts are returned as `integration` and kept in the capture's `fb_sweep_jobs.metadata.integration`. A failure there never undoes the ACK.
+
+- Facts are read from the card's own `content_text` (`listingFacts.ts`): title identity, the listing page's "About this vehicle" lines, seller counts and badges, the listed label and the listing's own gallery. Absent lines stay absent.
+- A listing whose title states year, make and model goes through `ingest` (`enrich: false`): a `discovered` vehicle or a match, merge proposals for year/make/model candidates, and the classified listing event the Sources and market boards read. No model means it stays unresolved in `marketplace_listings`.
+- Linked listings get their listing event at the capture clock, a city-grain `vehicle_location_observations` row (the `/atlas` map), and photo copies through `backfill-images` (no image analysis). A revisit's removal ends the event; it is never a sale.
+- The listing page runner sends `seller_profile_url` (the seller block's Marketplace profile link) and leaves out photos inside links to other items. The numeric id becomes an `external_identities` row (`platform 'facebook'`, no display name); the name stays in `marketplace_listings`, which anonymous readers cannot read.
+
 ## Focused validation and live acceptance
 
 Use installed dependencies: `node --import tsx --test scripts/fb-browser-capture/collector.test.mjs`.
