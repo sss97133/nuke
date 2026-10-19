@@ -3916,8 +3916,9 @@ async function handleGetOrganization(args: Record<string, unknown>): Promise<Too
   ]);
 
   if (org.error) return toolErr(org.error.message);
+  const { tax_id: _taxId, business_license: _businessLicense, ...publicOrg } = org.data;
   return toolOk({
-    ...org.data,
+    ...publicOrg,
     vehicle_count: vehicleCount.count ?? 0,
     locations: locations.data || [],
   });
