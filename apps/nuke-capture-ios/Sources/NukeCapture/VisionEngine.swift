@@ -189,9 +189,11 @@ enum VisionEngine {
 
     static func classify(_ cg: CGImage) -> Classification? {
         let request = VNClassifyImageRequest()
+        request.revision = VNClassifyImageRequestRevision2
         let handler = VNImageRequestHandler(cgImage: cg, options: [:])
         do { try handler.perform([request]) } catch { return nil }
-        let results = (request.results ?? [])
+        guard let observations = request.results else { return nil }
+        let results = observations
             .filter { $0.confidence > 0.02 }
             .sorted { $0.confidence > $1.confidence }
             .map { ($0.identifier, $0.confidence) }
@@ -209,22 +211,32 @@ enum VisionEngine {
     // The geo-gate keeps OFF-site photos out; it does NOTHING for a private
     // photo shot AT the shop (a selfie, a paycheck on the bench, a coworker's
     // kid). For the CONTRIBUTOR (multi-user) path such a photo must never
-    // auto-upload into the shared org record, so the firewall holds anything
-    // with a prominent human face — default-EXCLUDE, faces lose ties. The
-    // OWNER path does not use this (founder ruling: an owner's own at-site
-    // photos upload ungated); this is the contributor gate only.
+    // auto-upload into the shared org record. The firewall and owner triage
+    // use a prominent face without a vehicle as the personal-photo signal.
+    // A failed detector is not evidence of an absent face.
+
+    enum TriageFailure: String, Error, LocalizedError {
+        case imageUndecodable, classifierUnavailable, faceDetectorUnavailable
+
+        var errorDescription: String? {
+            switch self {
+            case .imageUndecodable: return "The original photo couldn't be decoded for its privacy check."
+            case .classifierUnavailable: return "Apple Vision couldn't classify the photo for its privacy check."
+            case .faceDetectorUnavailable: return "Apple Vision couldn't finish the photo's face privacy check."
+            }
+        }
+    }
 
     /// True when a human face occupies a meaningful share of the frame — a
     /// person-centric photo, not a worker incidentally in a wide garage shot.
     /// `minAreaFraction` is the bbox area fraction: a distant bystander stays
-    /// under it, a selfie/portrait trips it. Returns false on detector failure
-    /// — safe because `contributorVerdict` ALSO requires an affirmative vehicle
-    /// label, so a failed face pass alone can never let a private photo through.
-    static func hasProminentFace(_ cg: CGImage, minAreaFraction: CGFloat = 0.045) -> Bool {
+    /// under it, a selfie/portrait trips it. A failed detector is unknown.
+    static func detectProminentFace(_ cg: CGImage, minAreaFraction: CGFloat = 0.045) throws -> Bool {
         let request = VNDetectFaceRectanglesRequest()
+        request.revision = VNDetectFaceRectanglesRequestRevision3
         let handler = VNImageRequestHandler(cgImage: cg, options: [:])
-        do { try handler.perform([request]) } catch { return false }
-        guard let faces = request.results else { return false }
+        try handler.perform([request])
+        guard let faces = request.results else { throw TriageFailure.faceDetectorUnavailable }
         // VNFaceObservation.boundingBox is normalized [0,1] in image space;
         // width*height is the fraction of the frame the face covers.
         return faces.contains {
@@ -232,25 +244,42 @@ enum VisionEngine {
         }
     }
 
+    /// Existing local-review callers still use a Boolean face result. Upload
+    /// triage uses detectProminentFace directly so a failed read remains pending.
+    static func hasProminentFace(_ cg: CGImage, minAreaFraction: CGFloat = 0.045) -> Bool {
+        (try? detectProminentFace(cg, minAreaFraction: minAreaFraction)) ?? false
+    }
+
     // MARK: - 1c. Contributor upload verdict (default-exclude firewall)
 
     /// Whether a CONTRIBUTOR's at-site photo may cross into the shared org
-    /// record. Two affirmative conditions, BOTH required (swiss-cheese):
-    ///   • the frame classifies as vehicle/work (`isVehicle`) — an affirmative
-    ///     positive, not merely "absence of something bad"
-    ///   • no prominent human face
-    /// Anything else → `.hold` (quarantined for the contributor's OWN review,
-    /// never auto-uploaded). Ambiguity loses. Multi-user path ONLY; the owner's
-    /// own-device flow stays deliberately ungated.
+    /// record. The device rule of record, the same as `triage`: hold clutter (a
+    /// document, receipt, web or product label in the top three) and personal (a
+    /// prominent face and no vehicle); a part close-up or a measurement shot that
+    /// Apple does not label "vehicle" is work and passes. An unclassifiable frame
+    /// holds. A held frame stays for the contributor's OWN review, never
+    /// auto-uploaded. Multi-user path ONLY; the owner's own-device flow stays
+    /// deliberately ungated.
     enum ContributorVerdict: Equatable {
         case allow
         case hold(reason: String)
+        case unavailable(reason: String)
     }
 
-    static func contributorVerdict(_ cg: CGImage) -> ContributorVerdict {
-        guard let cls = classify(cg) else { return .hold(reason: "unclassifiable") }
-        if hasProminentFace(cg) { return .hold(reason: "prominent_face") }
-        guard cls.isVehicle else { return .hold(reason: "not_vehicle_work") }
+    static func contributorVerdict(_ cg: CGImage,
+                                   classifyImage: (CGImage) -> Classification? = { classify($0) },
+                                   detectFace: (CGImage) throws -> Bool = { try detectProminentFace($0) }) -> ContributorVerdict {
+        guard let cls = classifyImage(cg) else { return .unavailable(reason: TriageFailure.classifierUnavailable.localizedDescription) }
+        let top3 = Array(cls.labels.prefix(3).map { $0.0 })
+        if isUnnecessary(labels: top3, isScreenshot: false) {
+            return .hold(reason: "clutter")
+        }
+        let face: Bool
+        do { face = try detectFace(cg) }
+        catch { return .unavailable(reason: TriageFailure.faceDetectorUnavailable.localizedDescription) }
+        if face && !cls.isVehicle {
+            return .hold(reason: "prominent_face")
+        }
         return .allow
     }
 
@@ -269,23 +298,48 @@ enum VisionEngine {
     // so the caller AND-folds it into the final decision.
 
     struct TriageResult {
-        /// isVehicle AND no prominent face. Caller ANDs in `!asset.isSensitivePhoto`.
+        /// Not clutter and not personal (the device rule of record, see triage).
         let pixelsEligible: Bool
         /// Top labels (confidence-desc), for the `apple_ml_labels` column.
         let labels: [String]
         let isVehicle: Bool
-        /// false ⇒ classify() returned nil (unclassifiable). Caller fails safe to metadata-only.
+        /// false ⇒ classify() returned nil (unclassifiable); upload preparation retries.
         let classified: Bool
+        /// Operational failure, never a personal/clutter verdict or upload permission.
+        let failure: TriageFailure?
+        var privacyEvidence: DevicePrivacyReceipt.Evidence? = nil
     }
 
-    static func triage(_ cg: CGImage, labelCap: Int = 12) -> TriageResult {
-        guard let cls = classify(cg) else {
-            return TriageResult(pixelsEligible: false, labels: [], isVehicle: false, classified: false)
+    static func triage(_ cg: CGImage, labelCap: Int = 12,
+                       classifyImage: (CGImage) -> Classification? = { classify($0) },
+                       detectFace: (CGImage) throws -> Bool = { try detectProminentFace($0) }) -> TriageResult {
+        guard let cls = classifyImage(cg) else {
+            return TriageResult(pixelsEligible: false, labels: [], isVehicle: false, classified: false,
+                                failure: .classifierUnavailable)
         }
         let labels = Array(cls.labels.prefix(labelCap).map { $0.0 })
-        let pixelsEligible = cls.isVehicle && !hasProminentFace(cg)
-        return TriageResult(pixelsEligible: pixelsEligible, labels: labels,
-                            isVehicle: cls.isVehicle, classified: true)
+        // The device rule of record (owner, 2026-10-15: "images have their own rules via ios";
+        // scripts/ios-vision-triage applies it to stored frames): hold clutter (a document,
+        // receipt, web or product label in the top three) and personal (a prominent face and no
+        // vehicle); everything else is work evidence, including a part close-up or a tape measure
+        // on a fuse-box opening that Apple does not label "vehicle". The previous rule required an
+        // affirmative vehicle label, so measurement shots went up as metadata only.
+        let clutter = isUnnecessary(labels: Array(labels.prefix(3)), isScreenshot: false)
+        if clutter {
+            return TriageResult(pixelsEligible: false, labels: labels, isVehicle: cls.isVehicle, classified: true, failure: nil)
+        }
+        let face: Bool
+        do { face = try detectFace(cg) }
+        catch {
+            return TriageResult(pixelsEligible: false, labels: labels, isVehicle: cls.isVehicle, classified: true,
+                                failure: .faceDetectorUnavailable)
+        }
+        let personal = face && !cls.isVehicle
+        return TriageResult(pixelsEligible: !clutter && !personal, labels: labels,
+                            isVehicle: cls.isVehicle, classified: true, failure: nil,
+                            privacyEvidence: .init(labels: cls.labels, prominentFace: face, isVehicle: cls.isVehicle,
+                                maxCoreConfidence: cls.maxCoreConfidence,
+                                totalVehicleConfidence: cls.labels.filter { allVehicleLabels.contains($0.0) }.reduce(0) { $0 + $1.1 }))
     }
 
     /// Classify one library photo by its PHAsset id — the cheap, on-device
@@ -356,15 +410,64 @@ enum VisionEngine {
     /// matched KNOWN vin (canonical), not the raw OCR string.
     static func matchVIN(_ cg: CGImage, knownVINs: [String]) -> (vin: String, editDistance: Int)? {
         guard !knownVINs.isEmpty else { return nil }
-        let candidates = vinCandidates(in: recognizeText(cg))
+        return matchSerial(in: recognizeText(cg), known: knownVINs)
+    }
+
+    /// Known serials of every era: 17-character VINs (1981 on) and the shorter chassis numbers
+    /// before them (13 characters on a 1977 K5, 11 on a 1971 Bronco). Matching only 17-character
+    /// runs left 206 of the owner's 211 vehicles unmatchable (2026-10-15). Each known serial is slid
+    /// across each OCR line at its own length: two misreads allowed at 17 characters, one from 11,
+    /// none below; it must mix letters and digits, so a phone number or a price cannot match it.
+    /// 17-character runs also keep the edit-distance-2 recovery for a dropped or doubled character.
+    static func matchSerial(in lines: [String], known: [String]) -> (vin: String, editDistance: Int)? {
         var best: (String, Int)? = nil
-        for cand in candidates {
-            for known in knownVINs {
-                let d = levenshtein(cand, known.uppercased())
-                if d <= 2 && (best == nil || d < best!.1) { best = (known, d) }
+        func consider(_ k: String, _ d: Int) { if best == nil || d < best!.1 { best = (k, d) } }
+        let vins = known.filter { $0.count == 17 }
+        if !vins.isEmpty {
+            for cand in vinCandidates(in: lines) {
+                for k in vins {
+                    let d = levenshtein(cand, k.uppercased())
+                    if d <= 2 { consider(k, d) }
+                }
+            }
+        }
+        let texts = lines.map { Array($0.uppercased().filter { $0.isLetter || $0.isNumber }) }
+        // Every serial, 17-character VINs included, is also slid across each line: a plate read as
+        // "VIN 1GT…" joins the label onto the number, and a 17-character run then never lines up.
+        for k in known where k.count >= 8 {
+            let key = Array(k.uppercased())
+            guard key.contains(where: \.isLetter), key.contains(where: \.isNumber) else { continue }
+            let allowed = key.count >= 17 ? 2 : (key.count >= 11 ? 1 : 0)
+            for a in texts where a.count >= key.count {
+                for start in 0...(a.count - key.count) {
+                    var d = 0
+                    for i in 0..<key.count where a[start + i] != key[i] {
+                        d += 1
+                        if d > allowed { break }
+                    }
+                    if d <= allowed { consider(k, d) }
+                }
             }
         }
         return best.map { (vin: $0.0, editDistance: $0.1) }
+    }
+
+    /// A 17-character VIN whose check digit (position 9) is right, by the North American rule:
+    /// transliterate, weight, sum mod 11, 10 = "X". I, O and Q never appear. An OCR run that passes
+    /// this is a VIN, not a part number that happens to be 17 characters long.
+    static func isValidVIN(_ raw: String) -> Bool {
+        let v = Array(raw.uppercased())
+        guard v.count == 17, !v.contains(where: { "IOQ".contains($0) }) else { return false }
+        let map: [Character: Int] = ["A":1,"B":2,"C":3,"D":4,"E":5,"F":6,"G":7,"H":8,"J":1,"K":2,"L":3,"M":4,"N":5,
+                                     "P":7,"R":9,"S":2,"T":3,"U":4,"V":5,"W":6,"X":7,"Y":8,"Z":9]
+        let weights = [8,7,6,5,4,3,2,10,0,9,8,7,6,5,4,3,2]
+        var sum = 0
+        for (i, c) in v.enumerated() {
+            guard let n = c.wholeNumberValue ?? map[c] else { return false }
+            sum += n * weights[i]
+        }
+        let check = sum % 11
+        return v[8] == (check == 10 ? "X" : Character(String(check)))
     }
 
     /// Every 17-char alphanumeric run in the OCR text (VIN-shaped, no spaces).

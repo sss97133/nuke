@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { supabase } from '../../lib/supabase';
+import { signPrivateStorageUrl } from '../../lib/privateStorage';
 import '../../styles/unified-design-system.css';
 
 type VehicleDocRow = {
@@ -98,7 +99,11 @@ export function VehicleLedgerDocumentsCard(props: {
         }
       }
 
-      setDocs((docsRes.data as any[]) || []);
+      // A document stored in a private bucket opens through a signed URL (lib/privateStorage).
+      const docRows = (docsRes.data as any[]) || [];
+      setDocs(await Promise.all(docRows.map(async (d) => (
+        d.file_url ? { ...d, file_url: await signPrivateStorageUrl(d.file_url) } : d
+      ))));
       setReceipts(receiptRows);
     } catch (e: any) {
       setDocs([]);

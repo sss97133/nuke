@@ -1,3 +1,4 @@
+import { geminiFetch } from '../_shared/geminiGuard.ts';
 /** Existing classifier, isolated for failure/receipt assays without hosted calls. */
 export interface ClassifierReceipt {
   model: string | null;
@@ -70,14 +71,17 @@ function UNCLASSIFIED_FALLBACK(receipt: ClassifierReceipt): ClassificationResult
   };
 }
 
-export const CLASSIFIER_MODEL = "gemini-2.5-flash";
-export const CANDIDATE_CLASSIFIER_MODEL = "gemini-2.5-flash-lite";
+export const CLASSIFIER_MODEL = "gemini-flash-latest";
+export const CANDIDATE_CLASSIFIER_MODEL = "gemini-flash-lite-latest";
 export const CLASSIFIER_BUDGET = Object.freeze({ image_bytes: 4 * 1024 * 1024,
   response_bytes: 65536, input_tokens: 16384, output_tokens: 768,
   image_ms: 10000, request_ms: 20000, attempts: 1 });
+// 2026-10-15: gemini-2.5-flash and -flash-lite answer 404 for this key; the -latest aliases are what it lists. The rates below
+// are the 2.5-flash / 2.5-flash-lite rate cards carried over (estimates for the cost receipt); they are NOT re-verified for the
+// aliases' current targets.
 export const CLASSIFIER_PRICES = Object.freeze({
-  "gemini-2.5-flash": { input_per_million: 0.30, output_per_million: 2.50 },
-  "gemini-2.5-flash-lite": { input_per_million: 0.10, output_per_million: 0.40 },
+  "gemini-flash-latest": { input_per_million: 0.30, output_per_million: 2.50 },
+  "gemini-flash-lite-latest": { input_per_million: 0.10, output_per_million: 0.40 },
 });
 
 const sha256 = async (bytes: Uint8Array) => Array.from(new Uint8Array(await crypto.subtle.digest("SHA-256", new Uint8Array(bytes))))
@@ -211,9 +215,9 @@ export async function classifyImage(
     timing.token_count = performance.now() - phaseStarted; phaseStarted = performance.now();
     phase = "classification";
     receipt.attempts = 1;
-    const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`, {
+    const response = await geminiFetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`, {
       method: "POST", headers, body, redirect: "error", signal: AbortSignal.timeout(CLASSIFIER_BUDGET.request_ms),
-    });
+    }, 'photo-pipeline-orchestrator', fetch);
     if (!response.ok) return UNCLASSIFIED_FALLBACK({ ...receipt, failure_phase: phase,
       error_class: response.status === 429 ? "classifier_rate_limited" : "classifier_http_error", http_status: response.status, quota: await quotaDiagnostics(response) });
     phase = "response";

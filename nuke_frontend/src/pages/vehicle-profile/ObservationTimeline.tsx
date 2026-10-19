@@ -114,13 +114,39 @@ function formatTimeAgo(iso: string | null): string {
 /* ------------------------------------------------------------------ */
 
 function extractSummary(obs: Observation): string | null {
+  const sd = obs.structured_data;
+  // Atomic source claims carry an explicit property/value/role. Prefer that
+  // readable grain to a serialized extraction sentence; retain the full body
+  // in the existing observation detail and never promote an amount to a sale.
+  if (sd && typeof sd.property === 'string' && 'value' in sd) {
+    const value = sd.value;
+    if (sd.property === 'publisher_reported_result' && value && typeof value === 'object') {
+      const amount = (value as Record<string, unknown>).amount;
+      const currency = (value as Record<string, unknown>).currency;
+      if (typeof amount === 'number' && Number.isFinite(amount) && currency === 'USD') {
+        return `$${amount.toLocaleString('en-US')} · publisher reported result`;
+      }
+    }
+    if (value !== null && ['string', 'number', 'boolean'].includes(typeof value)) {
+      return `${sd.property.replace(/_/g, ' ')}: ${String(value)}${typeof sd.unit === 'string' ? ` ${sd.unit.replace(/_/g, ' ')}` : ''}`;
+    }
+    if (value && typeof value === 'object' && !Array.isArray(value)) {
+      const vObj = value as Record<string, unknown>;
+      if (typeof vObj.paraphrase === 'string') {
+        return `${sd.property.replace(/_/g, ' ')}: ${vObj.paraphrase}`;
+      }
+      if (typeof vObj.amount === 'number' && Number.isFinite(vObj.amount)) {
+        const role = typeof vObj.role === 'string' ? ` (${vObj.role.replace(/_/g, ' ')})` : '';
+        return `${sd.property.replace(/_/g, ' ')}: $${vObj.amount.toLocaleString('en-US')}${role}`;
+      }
+    }
+  }
   if (obs.content_text) {
     const text = obs.content_text.trim();
     if (text.length > 200) return text.substring(0, 197) + '...';
     return text;
   }
 
-  const sd = obs.structured_data;
   if (!sd) return null;
 
   // Sale result
@@ -153,6 +179,41 @@ function extractSummary(obs: Observation): string | null {
   }
 
   return null;
+}
+
+function sourceContextLabel(obs: Observation): string | null {
+  const data = obs.structured_data;
+  const context = data?.event_context as Record<string, unknown> | undefined;
+  const media = data?.media as Record<string, unknown> | undefined;
+  const parts: string[] = [];
+  const auction = typeof context?.auction === 'string'
+    ? context.auction
+    : typeof context?.auction_name_claim === 'string'
+      ? context.auction_name_claim
+      : null;
+  if (auction) parts.push(auction);
+  const lot = typeof context?.lot === 'string'
+    ? context.lot
+    : typeof context?.lot_claim === 'string'
+      ? context.lot_claim
+      : null;
+  if (lot) parts.push(`Lot ${lot}`);
+  const eventDate = typeof context?.event_date === 'string'
+    ? context.event_date
+    : typeof context?.event_date_claim === 'string'
+      ? context.event_date_claim
+      : null;
+  if (eventDate && context?.event_date_precision === 'day') {
+    // A date-only auction claim must not shift to the prior day in local time.
+    parts.push(`${eventDate} (day)`);
+  }
+  if (typeof media?.video_id === 'string') {
+    parts.push(`YouTube ${media.video_id}`);
+  }
+  if (typeof media?.start_seconds === 'number' && Number.isFinite(media.start_seconds) && media.start_seconds >= 0) {
+    parts.push(`Source offset ${media.start_seconds}s`);
+  }
+  return parts.length ? parts.join(' · ') : null;
 }
 
 /* ------------------------------------------------------------------ */
@@ -431,6 +492,7 @@ const ObservationTimeline: React.FC = () => {
       {!loading && displayed.map((obs) => {
         const kc = getKindConfig(obs.kind);
         const summary = extractSummary(obs);
+        const sourceContext = sourceContextLabel(obs);
         const host = extractHost(obs.source_url);
         const confLabel = confidenceLabel(obs.confidence, obs.confidence_score);
         const confColor = confidenceColor(obs.confidence, obs.confidence_score);
@@ -497,6 +559,12 @@ const ObservationTimeline: React.FC = () => {
                   </span>
                 )}
               </div>
+
+              {sourceContext && (
+                <div className="obi-source-context">
+                  {sourceContext}
+                </div>
+              )}
 
               {/* Source URL (truncated) */}
               {obs.source_url && (

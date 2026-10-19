@@ -5,7 +5,8 @@ import { mkdtempSync, readFileSync, statSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { VERSION, findExcerpts, sourceUrl, validateOptions, collectionSQL, collect,
-  documentRegions, buildReport, renderReport, main } from './buying-evidence.mjs';
+  documentRegions, buildReport, renderReport, main, matchingSQL, reconcileMatchingField,
+  collectMatching, buildMatchingReport } from './buying-evidence.mjs';
 const ID = '11111111-1111-4111-8111-111111111111';
 const ROW = '22222222-2222-4222-8222-222222222222';
 const DATE = '2026-10-08T20:00:00.123456Z';
@@ -193,4 +194,114 @@ test('offline run preserves retrieval clocks, creates private files and refuses 
   assert.equal(statSync(out).mode & 0o777, 0o700);
   await assert.rejects(main(['--cache', file, '--out', out]));
   await assert.rejects(main(['--cache', file, '--out', 'scripts/discovery/private-output']));
+});
+
+const request = { schema_version: 'buying_request_v1', id: 'synthetic-request', source_ref: 'fixture:request-1',
+  source_url: null, observed_at: DATE, recorded_at: DATE, status: 'open', valid_until: null,
+  criteria: [{ id: 'year-band', property_key: 'year', operator: 'between', value: [1980, 1989],
+    unit: null, requirement: 'required', claim_scope: 'listing_report' }] };
+const claim = { property_key: 'year', property_id: ROW, value: 1984, data_type: 'integer', unit: null,
+  observation_id: ROW, source_url: 'https://example.com/listing/truck', observed_at: DATE, ingested_at: DATE,
+  status: 'current_canonical_claim', qualifiers: { claim_role: 'listing_claim' } };
+const provenance = { vehicle_id: ID, field: 'year', coverage: { status: 'complete_current_reader' },
+  observations: [{ id: ROW, value: '1984', source_url: claim.source_url, observed_at: DATE,
+    ingested_at: DATE, claim_role: 'listing_claim' }] };
+
+test('matching reads use existing anonymous readers and repeat parent gates', () => {
+  for (const kind of ['parents', 'specifications', 'provenance']) {
+    const sql = matchingSQL(kind, [ID], 'year');
+    assert.match(sql, /BEGIN READ ONLY; SET LOCAL statement_timeout='5s'; SET LOCAL ROLE anon;/);
+    if (kind === 'specifications') assert.match(sql, /get_vehicle_specs\(ARRAY\[.*\],true\)/);
+    else { assert.match(sql, /is_public IS TRUE/); assert.match(sql, /deleted_at IS NULL/); }
+  }
+  assert.throws(() => matchingSQL('provenance', [ID], "year'); DROP TABLE vehicles;--"));
+  assert.throws(() => matchingSQL('parents', [ID, ID]));
+});
+
+test('canonical custody must agree with complete same-subject provenance', () => {
+  const good = reconcileMatchingField([claim], provenance, 'year', ID, claim.source_url, DATE);
+  assert.equal(good.coverage.status, 'complete_current_reader');
+  assert.equal(good.claims[0].observation_id, ROW);
+  for (const patch of [{ vehicle_id: ROW }, { field: 'make' }, { coverage: { status: 'refused_input_limit' } },
+    { observations: [] }, { observations: [{ ...provenance.observations[0], value: '1985' }] },
+    { observations: [{ ...provenance.observations[0], ingested_at: '2026-10-09T00:00:00Z' }] }]) {
+    const result = reconcileMatchingField([claim], { ...provenance, ...patch }, 'year', ID, claim.source_url, DATE);
+    assert.equal(result.coverage.status, 'unavailable');
+    assert.equal(result.claims.length, 0);
+  }
+});
+
+test('same-listing variation stays counterevidence; other listing episodes cannot contaminate it', () => {
+  const other = { ...provenance.observations[0], id: ID, value: '1985' };
+  const changed = reconcileMatchingField([claim], { ...provenance, observations: [...provenance.observations, other] },
+    'year', ID, claim.source_url, DATE);
+  assert.equal(changed.coverage.conflict, true);
+  assert.equal(changed.claims.length, 1);
+  assert.equal(changed.counterevidence.length, 1);
+  const differentEpisode = reconcileMatchingField([claim], { ...provenance, observations: [...provenance.observations,
+    { ...other, source_url: 'https://example.com/listing/another-sale' }] }, 'year', ID, claim.source_url, DATE);
+  assert.equal(differentEpisode.coverage.conflict, false);
+  const future = reconcileMatchingField([claim], { ...provenance, observations: [...provenance.observations,
+    { ...other, ingested_at: '2026-10-08T20:00:00.123457Z' }] }, 'year', ID, claim.source_url, DATE);
+  assert.equal(future.coverage.conflict, false);
+  const undated = reconcileMatchingField([claim], { ...provenance, observations: [...provenance.observations,
+    { ...other, observed_at: null }] }, 'year', ID, claim.source_url, DATE);
+  assert.equal(undated.coverage.status, 'unavailable');
+  assert.equal(undated.coverage.conflict, false);
+  const oldClaim = { ...claim, source_url: 'https://example.com/listing/older-sale' };
+  const older = { ...provenance.observations[0], source_url: oldClaim.source_url };
+  const otherCanonical = reconcileMatchingField([oldClaim], { ...provenance, observations: [older, other] },
+    'year', ID, claim.source_url, DATE);
+  assert.equal(otherCanonical.coverage.conflict, false);
+  assert.equal(otherCanonical.counterevidence.length, 0);
+});
+
+test('request-to-reader result uses typed testimony and keeps metadata-only fields unknown', async () => {
+  const fullRequest = { ...request, criteria: [...request.criteria,
+    { id: 'manual', property_key: 'transmission_type', operator: 'eq', value: 'manual',
+      unit: null, requirement: 'required', claim_scope: 'listing_report' }] };
+  const model = { schema_version: 'vehicle_data_model_v1', vehicle_id: ID,
+    typed_claims_status: 'current_core_scope_read', typed_claims: [claim],
+    retained_record: { attributes: { transmission: { value: 'manual' } } } };
+  const result = await collectMatching(options, fullRequest, async sql => {
+    if (sql.includes('get_vehicle_specs')) return [{ model }];
+    if (sql.includes('get_field_provenance')) return [{ provenance: sql.includes("'year'") ? provenance :
+      { vehicle_id: ID, field: 'transmission_type', coverage: { status: 'complete_current_reader' }, observations: [] } }];
+    return [{ id: ID, year: 1984, make: 'Example', model: 'Truck', listing_url: claim.source_url }];
+  });
+  const report = buildMatchingReport(result);
+  assert.equal(report.candidates[0].fit, 'needs_evidence');
+  assert.deepEqual(report.candidates[0].criteria.map(c => c.status), ['met', 'unknown']);
+  assert.equal(report.population.selected, 1);
+  assert.equal(report.population.market_total, null);
+  assert.equal(result.reads.length, 4);
+  assert.equal(report.database_writes, 0);
+  assert.match(renderReport(report), /Availability unassessed/);
+  const base = mkdtempSync(join(tmpdir(), 'buying-matching-test-'));
+  const { writeFileSync } = await import('node:fs');
+  const file = join(base, 'capture.json'); writeFileSync(file, JSON.stringify(result));
+  assert.equal(await main(['--cache', file, '--out', join(base, 'replay')]), 0);
+  const replay = JSON.parse(readFileSync(join(base, 'replay/report.json')));
+  assert.deepEqual(replay, report);
+  assert.throws(() => buildMatchingReport({ ...result, request_sha256: 'forged' }));
+});
+
+test('matching denied parents get no child reads and repeated provenance failure stops', async () => {
+  let reads = 0;
+  const denied = await collectMatching(options, request, async () => { reads++; return []; });
+  assert.equal(reads, 1);
+  assert.equal(buildMatchingReport(denied).candidates[0].fit, 'refused');
+  const three = { ...request, criteria: ['year', 'make', 'model'].map((key, i) => ({ id: `r${i}`, property_key: key,
+    operator: 'eq', value: key === 'year' ? 1984 : 'Example', unit: null,
+    requirement: 'required', claim_scope: 'listing_report' })) };
+  let provenanceReads = 0;
+  const failed = await collectMatching(options, three, async sql => {
+    if (sql.includes('get_vehicle_specs')) return [{ model: { schema_version: 'vehicle_data_model_v1', vehicle_id: ID,
+      typed_claims_status: 'current_core_scope_read', typed_claims: [] } }];
+    if (sql.includes('get_field_provenance')) { provenanceReads++; throw Error('private failure'); }
+    return [{ id: ID, listing_url: claim.source_url }];
+  });
+  assert.equal(provenanceReads, 2);
+  assert.equal(failed.candidates[0].field_coverage.model.reasons[0], 'repeated_provenance_read_failure_stop');
+  assert.ok(!JSON.stringify(failed).includes('private failure'));
 });

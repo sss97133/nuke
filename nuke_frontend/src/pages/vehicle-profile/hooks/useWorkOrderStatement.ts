@@ -151,6 +151,7 @@ export function useWorkOrderStatement(query: string | null) {
       const { data: rpcData, error: rpcError } = await supabase
         .rpc('resolve_work_order_status', { p_query: query });
 
+      if (rpcError?.code === '42501') throw new Error('Work order statements are not available from this session.');
       if (rpcError) throw new Error(rpcError.message);
       if (!rpcData || rpcData.error) return null;
 

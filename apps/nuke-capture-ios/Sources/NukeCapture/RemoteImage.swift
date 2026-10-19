@@ -16,6 +16,7 @@
 // to the render path, append width/quality, and force resize=contain (the default
 // `cover` crops portrait iPhone photos — standing rule).
 
+import ImageIO
 import SwiftUI
 import UIKit
 
@@ -56,7 +57,7 @@ enum NukeImage {
 /// an NSCache of already-decoded UIImages (a re-appearing cell is a dict hit).
 final class RemoteImageCache {
     static let shared = RemoteImageCache()
-    private let decoded = NSCache<NSURL, UIImage>()
+    private let decoded = NSCache<NSString, UIImage>()
     private let session: URLSession
 
     private init() {
@@ -68,23 +69,52 @@ final class RemoteImageCache {
         cfg.requestCachePolicy = .returnCacheDataElseLoad
         session = URLSession(configuration: cfg)
         decoded.countLimit = 400
+        decoded.totalCostLimit = 160 * 1024 * 1024   // decoded bytes, not a count of images
     }
 
-    /// Synchronous decoded-cache hit (lets the view show instantly, no flash).
-    func cached(_ url: URL) -> UIImage? { decoded.object(forKey: url as NSURL) }
+    /// The longest side a decoded bitmap may have. Sources that cannot resize on request
+    /// (most dealer and classified CDNs) send originals; decoding a 4032-pixel original for a
+    /// 64-point cell or a 393-point screen was the "loads full res" cost (owner, 2026-10-15).
+    static let defaultMaxPixel: CGFloat = 2048
 
-    /// Fetch (HTTP-cached) and decode once off the main thread; memoize the bitmap.
-    func image(_ url: URL) async -> UIImage? {
-        if let hit = decoded.object(forKey: url as NSURL) { return hit }
+    private func key(_ url: URL, _ maxPixel: CGFloat) -> NSString { "\(url.absoluteString)#\(Int(maxPixel))" as NSString }
+
+    /// Synchronous decoded-cache hit (lets the view show instantly, no flash).
+    func cached(_ url: URL, maxPixel: CGFloat = RemoteImageCache.defaultMaxPixel) -> UIImage? {
+        decoded.object(forKey: key(url, maxPixel))
+    }
+
+    /// Fetch (HTTP-cached) and decode once off the main thread, downsampled so the longest side is
+    /// at most `maxPixel`; memoize the bitmap, costed by its decoded bytes.
+    func image(_ url: URL, maxPixel: CGFloat = RemoteImageCache.defaultMaxPixel) async -> UIImage? {
+        let k = key(url, maxPixel)
+        if let hit = decoded.object(forKey: k) { return hit }
         do {
             let (data, _) = try await session.data(from: url)
-            guard let raw = UIImage(data: data) else { return nil }
-            let img = raw.preparingForDisplay() ?? raw   // force decode off the draw path
-            decoded.setObject(img, forKey: url as NSURL)
+            guard let img = Self.downsample(data, maxPixel: maxPixel) else { return nil }
+            let cost = img.cgImage.map { $0.bytesPerRow * $0.height } ?? 0
+            decoded.setObject(img, forKey: k, cost: cost)
             return img
         } catch {
             return nil
         }
+    }
+
+    /// ImageIO thumbnail decode: reads only what the target size needs and applies EXIF
+    /// orientation, so a portrait iPhone photo stands up and fits.
+    private static func downsample(_ data: Data, maxPixel: CGFloat) -> UIImage? {
+        guard let src = CGImageSourceCreateWithData(data as CFData, [kCGImageSourceShouldCache: false] as CFDictionary)
+        else { return UIImage(data: data) }
+        let opts: [CFString: Any] = [
+            kCGImageSourceCreateThumbnailFromImageAlways: true,
+            kCGImageSourceCreateThumbnailWithTransform: true,
+            kCGImageSourceShouldCacheImmediately: true,
+            kCGImageSourceThumbnailMaxPixelSize: maxPixel,
+        ]
+        guard let cg = CGImageSourceCreateThumbnailAtIndex(src, 0, opts as CFDictionary) else {
+            return UIImage(data: data)
+        }
+        return UIImage(cgImage: cg)
     }
 }
 
@@ -92,19 +122,21 @@ final class RemoteImageCache {
 /// cache. Same call shape, so the four scrolling surfaces swap 1:1.
 struct CachedAsyncImage<Content: View, Placeholder: View>: View {
     let url: URL?
+    let maxPixel: CGFloat
     @ViewBuilder let content: (Image) -> Content
     @ViewBuilder let placeholder: () -> Placeholder
 
     @State private var image: UIImage?
 
-    init(url: URL?,
+    init(url: URL?, maxPixel: CGFloat = RemoteImageCache.defaultMaxPixel,
          @ViewBuilder content: @escaping (Image) -> Content,
          @ViewBuilder placeholder: @escaping () -> Placeholder) {
         self.url = url
+        self.maxPixel = maxPixel
         self.content = content
         self.placeholder = placeholder
         // Seed from the decoded cache so a re-appearing cell paints with no flash.
-        if let url, let hit = RemoteImageCache.shared.cached(url) {
+        if let url, let hit = RemoteImageCache.shared.cached(url, maxPixel: maxPixel) {
             _image = State(initialValue: hit)
         }
     }
@@ -119,8 +151,8 @@ struct CachedAsyncImage<Content: View, Placeholder: View>: View {
         }
         .task(id: url) {
             guard let url else { image = nil; return }
-            if let hit = RemoteImageCache.shared.cached(url) { image = hit; return }
-            image = await RemoteImageCache.shared.image(url)
+            if let hit = RemoteImageCache.shared.cached(url, maxPixel: maxPixel) { image = hit; return }
+            image = await RemoteImageCache.shared.image(url, maxPixel: maxPixel)
         }
     }
 }

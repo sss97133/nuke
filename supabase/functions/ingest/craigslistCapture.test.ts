@@ -259,6 +259,43 @@ Deno.test("an observation the writer already holds is reported as a duplicate, n
 
 // ---- through the real writer ----------------------------------------------------------------------------------
 
+Deno.test("source prose reaches the real writer; a retry deduplicates and changed prose retains a new observation", async () => {
+  const observations = new Map<string, Record<string, any>>();
+  const w = fakeSupabase(c => {
+    if (c.table === "observation_sources") return { data: { id: "source-craigslist", base_trust_score: 0.4, supported_observations: ["listing"] } };
+    if (c.table === "vehicle_observations") {
+      const row = op(c, "insert")?.[0] as Record<string, any> | undefined;
+      if (row) {
+        const saved = { ...row, id: `observation-${observations.size + 1}` };
+        observations.set(row.content_hash, saved);
+        return { data: { id: saved.id } };
+      }
+      const hash = c.ops.find(([name, args]) => name === "eq" && args[0] === "content_hash")?.[1][1] as string;
+      const saved = observations.get(hash);
+      return { data: saved ? { id: saved.id } : null };
+    }
+    return { data: [] };
+  });
+  const capture = { ...classic(), source_capture: {
+    snapshot_id: "33333333-3333-4333-8333-333333333333", observed_at: "2026-01-04T01:02:03.000Z",
+  } };
+  const sourceDescription = "Wanted: a manual truck. Seller's source text remains attributed, not classified as supply.";
+  const args = { vehicleId: VEHICLE, listingUrl: URL1, capture, written: WRITTEN, sourceDescription };
+  const first = await landCraigslistCapture({ supabase: w.client, writeObservation }, args);
+  const retry = await landCraigslistCapture({ supabase: w.client, writeObservation }, args);
+  equal([first.observation, retry.observation, retry.observation_id], ["written", "duplicate", first.observation_id]);
+  equal(observations.size, 1);
+  const original = [...observations.values()][0];
+  equal(original.content_text, sourceDescription);
+  equal(original.observed_at, capture.source_capture.observed_at);
+  equal(original.extraction_metadata.raw.source_capture, capture.source_capture);
+  equal([original.source_url, original.source_identifier, original.extraction_method], [URL1, capture.post_id, "html_parse"]);
+  await landCraigslistCapture({ supabase: w.client, writeObservation }, { ...args, sourceDescription: "The source now says the request is fulfilled." });
+  equal(observations.size, 2);
+  equal(original.content_text, sourceDescription);
+  assert(!writes(w.calls, "vehicle_observations", "update").length, "prior testimony is never overwritten");
+});
+
 Deno.test("through the real observation writer: the VIN is on the observation, in the evidence, and filled on the vehicle with provenance", async () => {
   const w = world();
   const landing = await landCraigslistCapture(

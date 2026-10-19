@@ -171,10 +171,122 @@ Reuse the actual owners and tests:
   output without overwriting an existing receipt.
 - [Candidate assay](../../scripts/assay-sale-population.mjs): existing explicit bounded subject/input
   modes locate unresolved candidates. It is a diagnostic, not price qualification or write authority.
+- [Public-reader coverage assay](../../scripts/assays/public-reader-coverage.mjs): run through
+  `scripts/check-ingestion-health.sh --public-readers` with a finite scope and private output.
+  Its HTTP modes accept a current publishable key in `SUPABASE_ANON_KEY` or
+  `VITE_SUPABASE_ANON_KEY`, sent through `apikey` without a bearer identity. Legacy anon JWTs
+  must name the Nuke project and still pass server validation; privileged credentials never
+  substitute for an anonymous read. A successful credential check establishes no population
+  coverage: retain reader failures, unfinished pages and unknown eligible denominators.
 
 Reuse the already pinned HTML parser instead of reconstructing script-tag grammar with a regex.
 Do not repeat the failed `deno check --cached-only` invocation: the installed CLI rejected that
 flag. Inspect installed tooling before adding dependency downloads or model calls.
+
+### Typed specification projection assay, 2026-10-15
+
+The same operator accepts `--family typed-specifications`. Use the existing
+`public_reader_lineage_subjects_v1` manifest (`population` and `vehicleIds`) with
+an explicit `properties: [{key, id}]` list taken from the inspected property registry.
+It reads the existing `get_vehicle_specs(uuid[],boolean)` overload with
+`p_include_typed_claims: true`, then checks each selected claim against
+`get_field_provenance`. The older scalar `specifications` mode remains separate.
+
+```sh
+bash scripts/check-ingestion-health.sh --public-readers \
+  --family typed-specifications --subjects /private/typed-subjects.json \
+  --env /private/public-reader.env --out /private/new-typed-receipt.jsonl --max-pages 1
+```
+
+Each page gates at most 20 explicit public parents before any child read. The
+default deadline is 15 minutes; set `--until` for a shorter run. The assay checks
+declared scope, property/type/unit, selected observation, source pointer and URL,
+values, microsecond clocks, original quotation and shared uncertainty qualifiers.
+Receipts retain hashes, keys and reasons, without quotation payloads. Missing
+claims or qualifiers stay unavailable/unmeasured; empty results cannot pass.
+Exit 0 establishes only agreement of the requested current projections, never
+independent registry ratification, source truth, physical configuration or readiness.
+
+At 04:59:27 UTC the atlas estimated 1,017,178 stored vehicle records; full public
+and eligible denominators remained unknown. A one-record control at 05:04:59–05:05:04
+returned 11 typed claims and found all 11 selected observations in provenance,
+with no mismatches. Missing projections/qualifiers prevented a complete match for
+all 11: this is an incomplete result, not supported-answer coverage. The same
+record's scalar reader returned eight rows, a different scope. No production
+claim or supported-answer gain was created by this measurement. Private receipts
+are under `/Users/skylar/nuke-logs/data-model-expand-20261015/`. Follow the observed
+qualifier gaps into their existing reader owners; retain the separate curator and
+replay holds on [PR1361](https://github.com/sss97133/nuke/pull/1361).
+
+### Publisher-reported work assay, 2026-10-15
+
+`--family reported-work` takes the same `public_reader_lineage_subjects_v1`
+manifest. Per gated public parent it calls only the opt-in
+`vehicle_build_log_public(p_vehicle_id, p_include_reported: true)` overload, then
+drills each report to its parent listing on the anonymous `vehicle_observations`
+route, constrained by source observation and vehicle. It never reads the private
+activity child.
+
+```sh
+bash scripts/check-ingestion-health.sh --public-readers \
+  --family reported-work --subjects /private/subjects.json \
+  --env /private/public-reader.env --out /private/new-reported-work.jsonl
+```
+
+Per report it checks the fixed uncertainty (unverified occurrence, unknown
+performer and intent, not independent), month precision and label, that the
+performed clause is a prefix of the full sentence and carries no recommendation,
+that four clocks keep their bases at microsecond precision, and that the parent is
+a current native listing whose source, URL, capture witness and clocks agree and
+whose text contains the exact sentence. One sentence on one listing page counts
+once: a repeat is reported as `reported_work_repeated_listing_sentence`, never
+corroboration. An absent overload stops as `reported_work_reader_absent`
+(incomplete); zero reports is missing support; a withheld, missing or oversized
+parent stays a gap. Source capability and protected admission are asserted by the
+reader, not established by this route; capture authenticity, publisher truth and
+physical occurrence remain unmeasured.
+
+The source drill also preserves the v1/v2 witness's bounded source-wide refusal
+for negated completion and governing proposed/recommended-work context. A reader
+row that matches an isolated sentence in such a source fails as
+`reported_source_completion_context_withheld`; matching text alone cannot discard
+the surrounding qualification. This control does not establish semantic quality
+outside the existing witness's context rules.
+
+At 06:25:04–06:25:05 UTC on 2026-10-15 an anonymous control over the two first-admission
+vehicles made two requests and stopped as `reported_work_reader_absent`: the held
+overload is not deployed, so nothing agrees yet. Against a local PostgreSQL
+fixture the assay accepted all four real reader rows and matched each to its
+parent's sentence; against the earlier capture-grain reader state it flagged the
+repeated listing sentence.
+
+### Repeated captures of one listing page, 2026-10-15
+
+A listing assertion's grain is one page (source, listing URL) and its projection
+inputs, not one capture. BaT live reads re-capture an unchanged page roughly every
+40 minutes, and the arrival trigger queued each capture for retained-property
+projection, so the same claims were written again per capture. Bounded reads on
+2026-10-15: all 101 description parents projected 05:37–06:37 UTC were word-for-word
+repeats of an earlier queued capture (719 of 974 retained claims that hour); all 20
+`html_match` parents in the hour to 06:42 repeated the nine projected fields; a
+0.15% block sample found 38 of 40 current description captures repeating; on the
+20 diagnostic vehicles 4,999 current claims stood for 286 listing assertions (one
+repeated 367 times). The share of the 616,038 completed projection items that came
+from repeats is unmeasured: three bounded samples hit the 10 s statement limit.
+
+Visitors see it: `get_field_provenance` lists each repeat as its own source report.
+The `typed-specifications` drill now counts these rows
+(`typed_provenance_repeated_listing_assertion`, `repeatedAssertionObservations`); an
+anonymous control at 06:47 UTC found 43 repeated rows behind three selected claims
+on two vehicles. A repeat is neither corroboration nor a new claim.
+
+The held repair changes only `trg_enqueue_retained_listing_properties()`: a
+re-capture whose projection inputs equal an earlier current, queued capture of the
+same page stays testimony and is not queued. Its contract is
+`supabase/sql/test_retained_recapture_enqueue.sql`. Existing duplicate claims and a
+provenance reader collapse are separate decisions (`get_field_provenance` is pinned by
+held PR1361). PR1361's 703-entry replay frame is 82 listing assertions on 81 vehicles.
+Private receipts: `/Users/skylar/nuke-logs/data-model-expand-20261015/recapture-load-measurements.json`.
 
 ## How to close the next repair
 
@@ -535,3 +647,72 @@ source-support gains cannot be reported as newly ready records. The private
 full-manifest accounting control traversed 632,014 keys within a 128 MB heap;
 its replies were synthetic and establish no production coverage. Production
 population acquisition and its measured source-support distribution remain pending.
+
+
+### Publisher-reported work with month precision, 2026-10-15
+
+The next retained-evidence case asks what work a publisher reports, when, and by
+whom. A deterministic diagnostic selected 20 retained source observations from
+completed displacement work with native captures but no engine-family witness;
+this is not a random sample or a fleet denominator. Two inspected public
+vehicles contain month-dated work assertions in their retained descriptions,
+but the existing anonymous build-log reader returned no work rows, and the
+indexed observation lookup found no `work_record` rows for those two vehicles.
+At 05:26 UTC the atlas estimated 1,017,178 stored vehicle records. Full public
+and eligible denominators remain unknown; net supported-answer gain is zero.
+
+The existing owners distinguish these meanings: `work_sessions` is the actual
+work ledger, `work_record` is confirmed work, and `activity` can preserve an
+unconfirmed action report. The local proposed integration uses an attributed
+activity child tied to its original listing observation through the existing
+source foreign key and protected `ingest-observation` path. Its selector accepts
+only the source observation and a bounded report index; it derives the exact
+source sentence, performed clause, month, capture witness and unknown performer.
+A source month never becomes a fabricated day, and a recommendation never becomes
+a reported completed repair. The bounded v1 grammar recognizes explicit action
+and literal object phrases from inspected testimony; unknown phrases, qualification
+tails and “and more” remain withheld. These source words establish no parts catalog
+identity.
+
+A report's grain is one sentence on one listing page (source, listing URL, exact
+sentence), not one capture. On 2026-10-15 each of the two first-admission
+vehicles held 15–16 non-superseded captures of a single listing page, all with
+identical text. A later capture of the same sentence replays the existing report
+(`duplicate`, zero writes); the custody trigger refuses a second current child
+under an advisory lock, and the reader returns the earliest admitted report once.
+When the admitted capture is withdrawn, a surviving capture may carry the report.
+A different listing page is a separate publication of the sentence, not
+corroboration.
+
+The proposed required two-argument `vehicle_build_log_public(uuid,boolean)`
+overload returns separate `work_records` and `reported_work` arrays. Its report
+reader rechecks source custody and current eligibility; the one-argument reader,
+general activity visibility and confirmed-work totals keep their existing
+contracts. The table opts in to qualified reports and retains a legacy-reader
+fallback when the overload is absent. Reported work preserves unverified
+occurrence, unknown intent and performer, original quotation, exact source keys
+and distinct capture/recording clocks.
+
+This integration is **local preparation, held from production**. The registered
+BaT source currently excludes `activity`. The held migration prepares an exact
+six-to-seven-kind change on the existing source, adding only `activity` after
+installing intake and database gates that require the protected report selector.
+Other registry values, general activity visibility and unrelated source activity
+remain unchanged. Applying that capability and releasing the new anonymous reader
+scope require a concrete owner-reviewed decision. No production source capability,
+testimony, permissions, queue or capacity changed.
+The existing schema-proposal `add_source` path does not modify a registered slug,
+so it cannot be used to evade that source contract. Local fixtures may simulate
+the proposed capability to prove the actual handler and reader. Final checked
+head, test receipts and release order belong in the private review packet before
+any release decision: `/Users/skylar/nuke-logs/data-model-expand-20261015/REPORTED_WORK_PACKET.json`.
+
+Local proof for this proposal passed 18 actual handler/PostgreSQL steps
+(including the repeated-capture step, which fails against the earlier
+capture-grain identity), 414 cached intake tests and 27 focused table tests. SQL and JavaScript agreed on all
+20 retained diagnostic texts: five candidate assertions across four sources,
+including withholding the vague “and more” assertion. Candidate detection is not
+admission or independent corroboration. The fixture anonymous reader returned
+three attributed reports and one unchanged confirmed-work control. Deployed Edge,
+PostgREST and browser behavior remain unverified. The local withdrawal test
+injects a late replay-boundary change; it is not a concurrent transaction proof.
