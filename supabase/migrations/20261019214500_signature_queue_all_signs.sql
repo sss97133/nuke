@@ -21,8 +21,15 @@ BEGIN;
 SET LOCAL statement_timeout = '10s';
 SET LOCAL lock_timeout = '1s';
 
-CREATE FUNCTION public.work_order_change_orders_live() RETURNS boolean LANGUAGE sql IMMUTABLE AS $$ SELECT false $$;
-CREATE FUNCTION public.work_order_quote_is_change_order(p_quote_id uuid) RETURNS boolean LANGUAGE sql STABLE AS $$ SELECT false $$;
+-- Created only when absent: in filename order 20261019213000 (change orders) defines the live versions first.
+DO $hooks$ BEGIN
+  IF to_regprocedure('public.work_order_change_orders_live()') IS NULL THEN
+    CREATE FUNCTION public.work_order_change_orders_live() RETURNS boolean LANGUAGE sql IMMUTABLE AS $f$ SELECT false $f$;
+  END IF;
+  IF to_regprocedure('public.work_order_quote_is_change_order(uuid)') IS NULL THEN
+    CREATE FUNCTION public.work_order_quote_is_change_order(p_quote_id uuid) RETURNS boolean LANGUAGE sql STABLE AS $f$ SELECT false $f$;
+  END IF;
+END $hooks$;
 COMMENT ON FUNCTION public.work_order_change_orders_live() IS 'Hook for my_signature_queue: true once quote change orders exist (QUOTE lane replaces).';
 COMMENT ON FUNCTION public.work_order_quote_is_change_order(uuid) IS 'Hook for my_signature_queue: whether a quote version is a change order (QUOTE lane replaces).';
 
