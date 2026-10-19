@@ -599,7 +599,7 @@ final class AttributionEngine: ObservableObject {
 
     /// Asset id → the albums holding it, from the local album catalog.
     private static func albumsByAsset() -> [String: [LocalPhotoAlbum]] {
-        guard let catalog = LibraryStore.shared.albumCatalog else { return ([:], []) }
+        guard let catalog = LibraryStore.shared.albumCatalog else { return [:] }
         var out: [String: [LocalPhotoAlbum]] = [:]
         for album in catalog.albums {
             for p in album.photos { out[p.localIdentifier, default: []].append(album) }
@@ -608,7 +608,7 @@ final class AttributionEngine: ObservableObject {
     }
 
     private static func albumContextByAsset() -> (labels: [String: AlbumLabel], ambiguous: Set<String>) {
-        guard let catalog = LibraryStore.shared.albumCatalog else { return [:] }
+        guard let catalog = LibraryStore.shared.albumCatalog else { return ([:], []) }
         var labels: [String: Set<AlbumLabel>] = [:]
         for album in catalog.albums {
             guard let label = AlbumLabel.parse(album.name) else { continue }
