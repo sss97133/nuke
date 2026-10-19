@@ -125,6 +125,15 @@ describe('plain words', () => {
     expect(matchReason({ input: 'tools', result: 'fail', reason: 'no claimed tool records' })).toBe('No tools in your records');
     expect(matchReason({ input: 'skill', result: 'pass', reason: 'capability welding_tig is named in the requirement' })).toBe('Your record shows welding tig');
     expect(matchReason({ input: 'facility', result: 'pass', reason: 'not required for a skill requirement' })).toBe('Not needed for this');
+    // open_requirement_tools_input (reviewed tool key map, 2026-10-19)
+    expect(matchReason({ input: 'tools', result: 'pass', reason: 'claimed tool maps to lift_two_post, welder_tig (claimed ownership, not physical verification)' }))
+      .toBe('You said you own a tool for: lift two post, welder tig');
+    expect(matchReason({ input: 'tools', result: 'pass', reason: 'claimed tool record named in the requirement: torch (claimed ownership, not physical verification)' }))
+      .toBe('You said you own: torch');
+    expect(matchReason({ input: 'tools', result: 'unknown', next: 'claim_tool_record', reason: 'seen in photos at your shop; not claimed as your tool' }))
+      .toBe('Seen in photos at your shop, not claimed as your tool');
+    expect(matchNext('claim_tool_record')).toBe('add it to your tools');
+    expect(matchReason({ input: 'tools', result: 'fail', next: 'plan_b_supplier_needed', reason: 'no claimed tool maps to lift_two_post' })).toBe('No matching tool in your records');
   });
 
   it('states the reader total as an honest coverage line', () => {

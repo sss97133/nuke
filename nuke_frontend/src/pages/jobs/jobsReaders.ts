@@ -284,8 +284,13 @@ export function matchReason(m: MatchInput): string {
       return r.includes('do not name') ? "Your record doesn't show this skill yet" : 'Not shown in your record yet';
     }
     case 'tools': {
-      const named = /requirement: (.+?)( \(claimed|$)/.exec(r);
-      if (m.result === 'pass' && named) return `You said you own: ${named[1]}`;
+      if (m.result === 'pass') {
+        const mapped = /maps to (.+?)( \(claimed|$)/.exec(r);
+        if (mapped) return `You said you own a tool for: ${mapped[1].replace(/_/g, ' ')}`;
+        const named = /requirement: (.+?)( \(claimed|$)/.exec(r);
+        return named ? `You said you own: ${named[1]}` : 'Your tool records cover this';
+      }
+      if (r.startsWith('seen in photos')) return 'Seen in photos at your shop, not claimed as your tool';
       return r.includes('no claimed tool records') ? 'No tools in your records' : 'No matching tool in your records';
     }
     case 'facility':
@@ -311,6 +316,7 @@ export function matchNext(n: string | null | undefined): string | null {
   switch (n) {
     case 'plan_b_supplier_needed': return 'needs a backup supplier';
     case 'claim_provider_link': return 'link your technician profile';
+    case 'claim_tool_record': return 'add it to your tools';
     case null: case undefined: case '': return null;
     default: return sentence(n).toLowerCase();
   }
