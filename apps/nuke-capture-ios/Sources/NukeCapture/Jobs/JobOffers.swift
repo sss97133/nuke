@@ -522,11 +522,22 @@ enum OfferCopy {
         case "facility":
             return FacilityCopy.match(FacilityMatch(result: m.result, next: m.next, reason: m.reason))
         case "area":
-            if m.result == "pass" { return r.contains("city") ? "Same city" : "Same state" }
+            if let within = r.range(of: #"within your (\d+)-mile service area"#, options: .regularExpression) {
+                return "Within your \(r[within].filter(\.isNumber))-mile service area"
+            }
+            if let outside = r.range(of: #"outside your (\d+)-mile service area"#, options: .regularExpression) {
+                return "Outside your \(r[outside].filter(\.isNumber))-mile service area"
+            }
+            if r.hasPrefix("same state as your service area") { return "Same state as your service area (distance not worked out)" }
+            if r.hasPrefix("different state from your service area") { return "Different state from your service area" }
+            if m.result == "pass" { return r.contains("and city") ? "Same city" : "Same state" }
             if r.contains("job area not public") { return "The job's area isn't public" }
             if r.contains("states no area") { return "Your profile doesn't list an area" }
             return "Different state"
         case "availability":
+            if m.result == "pass" { return "Your hours fall inside the job window" }
+            if r.contains("window has passed") { return "The job window has passed" }
+            if r.hasPrefix("no declared availability inside") { return "Your hours don't cover the job window" }
             return "You haven't set availability yet"
         case "evidence_rung":
             if m.result == "pass" { return "Linked and backed by your work" }
