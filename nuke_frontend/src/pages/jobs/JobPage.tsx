@@ -91,7 +91,8 @@ function OperationsSection({ d }: { d: JsonObject }) {
     </Rows>
     <Rows title="Parts" count={parts.length}>
       {parts.map((p, i) => <Row key={str(p.id) ?? i} label={[str(p.part_name) ?? 'Part', str(p.brand)].filter(Boolean).join(' · ')} role="measure">
-        {p.is_comped === true ? 'Comped' : money(num(p.total_price) ?? num(p.unit_price), 'USD')}{num(p.quantity) !== null ? ` · qty ${num(p.quantity)}` : ''}
+        {[num(p.quantity) !== null && num(p.unit_price) !== null ? `${num(p.quantity)} × ${money(num(p.unit_price), 'USD')}` : null,
+          p.is_comped === true ? 'comped' : num(p.total_price) !== null ? `${money(num(p.total_price), 'USD')} total` : null].filter(Boolean).join(' · ') || 'Not priced'}
       </Row>)}
     </Rows>
     <Rows title="Labor" count={labor.length}>
@@ -384,16 +385,16 @@ export default function JobPage() {
   usePageTitle(title);
 
   if (path.status === 'loading') {
-    return <main className="job-page" aria-busy="true" aria-label="Job"><Masthead><Text role="entity" as="h1">Loading the job…</Text></Masthead></main>;
+    return <article className="job-page" aria-busy="true" aria-label="Job"><Masthead><Text role="entity" as="h1">Loading the job…</Text></Masthead></article>;
   }
   if (path.status === 'failed') {
-    return <main className="job-page" aria-label="Job unavailable">
+    return <article className="job-page" aria-label="Job unavailable">
       <Masthead><Text role="entity" as="h1">Job unavailable</Text></Masthead>
       <section className="k-section job-block">
         <Text role="body" as="p">{path.reason}</Text>
         <button type="button" className="job-button" onClick={reload}><Text role="label">Try again</Text></button>
       </section>
-    </main>;
+    </article>;
   }
 
   const data = path.data;
@@ -406,7 +407,7 @@ export default function JobPage() {
   const pending = READER_KEYS.filter(k => !reads[k] || reads[k]?.status === 'loading');
   const r = (k: ReaderKey) => loaded(reads[k]);
 
-  return <main className="job-page" aria-label={title}>
+  return <article className="job-page" aria-label={title}>
     <Masthead result={<Text role="caption">{str(data.request_source_label) ?? ''}</Text>}>
       <div className="job-masthead">
         <Text role="entity" as="h1">{title}</Text>
@@ -450,5 +451,5 @@ export default function JobPage() {
         {' '}— parts and labor for every work order on this vehicle; payments only for the people on each job.
       </Text>
     </section>
-  </main>;
+  </article>;
 }

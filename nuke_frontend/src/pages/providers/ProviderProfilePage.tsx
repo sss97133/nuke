@@ -153,7 +153,8 @@ function ProductivitySection({ d }: { d: JsonObject }) {
       {days.slice(0, 14).map((x, i) => {
         const signed = obj(x.signed);
         const mark = signed?.customer_accepted === true ? 'customer-accepted' : signed?.self_confirmed === true ? 'confirmed by them' : 'not signed';
-        return <Row key={i} label={day(str(x.day)) ?? 'Day'}>{`${count(num(x.image_evidence))} photos · ${mark}`}</Row>;
+        const photos = num(x.image_evidence) ?? 0;
+        return <Row key={i} label={day(str(x.day)) ?? 'Day'}>{`${count(photos)} photo${photos === 1 ? '' : 's'} · ${mark}`}</Row>;
       })}
     </Rows>
     {dayRate.length > 0 && <Rows title="Day-rate jobs" count={dayRate.length}>
@@ -240,25 +241,25 @@ export default function ProviderProfilePage() {
   usePageTitle(`${name} · work record`);
 
   if (subject === 'missing') {
-    return <main className="job-page" aria-label="Provider unavailable">
+    return <article className="job-page" aria-label="Provider unavailable">
       <Masthead><Text role="entity" as="h1">No public profile</Text></Masthead>
       <section className="k-section job-block"><Text role="body" as="p">No public profile has the handle {handle ? `@${handle}` : 'given'}. The link may be old, or mistyped.</Text></section>
-    </main>;
+    </article>;
   }
   if (profile.status === 'loading') {
-    return <main className="job-page" aria-busy="true" aria-label={name}>
+    return <article className="job-page" aria-busy="true" aria-label={name}>
       <Masthead><Text role="entity" as="h1">{name}</Text></Masthead>
       <section className="k-section job-block"><Text role="caption" as="p">Loading their work record. A long record can take a few seconds the first time.</Text></section>
-    </main>;
+    </article>;
   }
   if (profile.status === 'failed') {
-    return <main className="job-page" aria-label="Provider unavailable">
+    return <article className="job-page" aria-label="Provider unavailable">
       <Masthead><Text role="entity" as="h1">{name}</Text></Masthead>
       <section className="k-section job-block">
         <Text role="body" as="p">{profile.reason}</Text>
         <button type="button" className="job-button" onClick={() => setNonce(n => n + 1)}><Text role="label">Try again</Text></button>
       </section>
-    </main>;
+    </article>;
   }
 
   const data = profile.data;
@@ -268,7 +269,7 @@ export default function ProviderProfilePage() {
   const evidencedHandle = s?.kind === 'actor' ? str(obj(s.display)?.handle) : null;
   const where = place(s);
 
-  return <main className="job-page" aria-label={`${name}, work record`}>
+  return <article className="job-page" aria-label={`${name}, work record`}>
     <Masthead result={<Text role="caption">{[where, day(str(s?.member_since)) ? `on Nuke since ${day(str(s?.member_since))}` : null].filter(Boolean).join(' · ')}</Text>}>
       <div className="job-masthead">
         <Text role="entity" as="h1">{name}</Text>
@@ -297,5 +298,5 @@ export default function ProviderProfilePage() {
       <Text role="label" as="h2">Contact</Text>
       <ContactViaNuke contact={obj(data.contact)} signedIn={!!user} recipient={name} />
     </section>}
-  </main>;
+  </article>;
 }
