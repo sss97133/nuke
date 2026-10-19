@@ -79,3 +79,12 @@ Deno.test("an 'eBay Motors: Make' title with no specifics takes make and model f
   const p = parseArchivedItemPage(html, "http://cgi.ebay.com:80/ebaymotors/1978-Ferrari-400-GT-Rare-5-Speed_W0QQitemZ260345678901QQcmdZViewItem");
   eq([p.specifics.Year, p.specifics.Make, p.specifics.Model, p.outcome, p.priceShown], ["1978", "Ferrari", "400", "reserve_not_met", 10000]);
 });
+
+Deno.test("a dealer-template description with early-closing divs is read to eBay's next section", () => {
+  const html = `<html><head><title>Toyota : Land Cruiser FJ40 in Toyota | eBay Motors</title></head><body><h1>1977 Toyota Land Cruiser FJ40</h1>
+<div>Ended: Feb 28, 2013 15:49:08 PST Sold For: US $29,750.00</div><div>Item number: 380581917878</div>
+<div id="ngvi_desc_div" class="d-pad"><div><div><table><tr><td></td></tr></table></div></div><style>.x{margin:0}</style>
+<p>Frame-off restoration, 11,000 miles since.</p><div><p>Original 2F engine.</p></div></div></div>
+<div>Questions and answers about this item</div><div>Back to home page</div></body></html>`;
+  eq(parseArchivedItemPage(html).description, "Frame-off restoration, 11,000 miles since. Original 2F engine.");
+});

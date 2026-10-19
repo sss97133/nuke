@@ -110,6 +110,17 @@ function imagesOf(html: string): string[] {
   return [...best.values()].map((v) => v.url);
 }
 
+// The seller's description sits inline after ngvi_desc_div, often in a dealer template whose own nested <div>s close early;
+// it ends before the first of eBay's following sections (2009, 2011, 2012 and 2013 pages).
+const DESC_END = /Questions and answers|Seller assumes all responsibility|id="rtm_html_|Back to home page/;
+function descriptionHtml(html: string): string {
+  const start = html.search(/<div[^>]+id="ngvi_desc_div"[^>]*>/i);
+  if (start < 0) return "";
+  const rest = html.slice(start, start + 400_000);
+  const end = rest.search(DESC_END);
+  return end < 0 ? rest.slice(0, 60_000) : rest.slice(0, end);
+}
+
 export function parseArchivedItemPage(html: string, originalUrl = ""): ArchivedItemPage {
   const text = textOf(html);
   const titleTag = decode(html.match(/<title>([\s\S]*?)<\/title>/i)?.[1] ?? "").replace(/\s+/g, " ").trim();
@@ -165,7 +176,7 @@ export function parseArchivedItemPage(html: string, originalUrl = ""): ArchivedI
     if (specifics[k] !== undefined) { if (n) specifics[k] = n; else delete specifics[k]; }
   }
   const seller = text.match(/Seller info\s+(?:Member id\s+)?([A-Za-z0-9._*\-]{2,64})\s*\(\s*(?:Feedback Score Of\s*)?(\d+)\s*\)/);
-  const descHtml = html.match(/<div[^>]+id="ngvi_desc_div"[^>]*>([\s\S]*?)<\/div>\s*<\/div>/i)?.[1] ?? "";
+  const descHtml = descriptionHtml(html);
   return {
     itemId, title, outcome, endedAt: endedText ? endedAtIso(endedText) : null, endedText, priceShown, priceLabel, bids,
     reserveNotMet, specifics,
