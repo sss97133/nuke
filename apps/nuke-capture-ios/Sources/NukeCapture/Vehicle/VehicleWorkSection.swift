@@ -16,9 +16,16 @@ struct VehicleWorkSection: View {
     @Environment(\.vehicleListingContext) private var listingContext
     @State private var jobs: JobLoad<MyWorkOrders> = .loading
 
+    /// The reader's vehicle_access decides when it states it (owners and access holders alike); else the page's owner check.
+    static func postEntry(signedIn: Bool, ownerContext: Bool, jobs: JobLoad<MyWorkOrders>) -> VehicleWorkCard.PostEntry {
+        guard signedIn else { return .none }
+        if case .loaded(let page) = jobs, let can = page.canPostWorkRequest { return can ? .post : .inspect }
+        return ownerContext ? .post : .inspect
+    }
+
     var body: some View {
         VehicleWorkCard(vehicleId: vehicleId, jobs: jobs, planEntry: listingContext,
-                        postEntry: SupabaseService.currentUserId == nil ? .none : (ownerContext ? .post : .inspect),
+                        postEntry: Self.postEntry(signedIn: SupabaseService.currentUserId != nil, ownerContext: ownerContext, jobs: jobs),
                         vehicleTitle: vehicleTitle)
             .task(id: vehicleId) { jobs = await JobReaders.vehicleWorkOrders(vehicleId: vehicleId) }
     }

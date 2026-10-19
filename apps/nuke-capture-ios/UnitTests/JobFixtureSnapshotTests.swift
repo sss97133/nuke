@@ -328,6 +328,21 @@ final class JobFixtureSnapshotTests: XCTestCase {
         } }, name: "fixture-vehicle-post-entry")
     }
 
+    func testRenderIssueQuote() throws {
+        let scope = IssueQuoteDrafting.scope(operations: try decode([ScopeOperation].self, IssueQuoteFixtures.operations),
+                                             requirements: try decode(ScopeRequirements.self, IssueQuoteFixtures.resources).rows)
+        let first = try decode(JobQuotes.self, IssueQuoteFixtures.noQuote)
+        try snapshot(IssueQuoteSheet(action: try XCTUnwrap(first.issueQuoteAction), current: nil, scope: scope,
+                                     conditions: ["customer_completion_sign", "photos_in_window"]), name: "fixture-issue-quote", pages: 3)
+        let revise = try decode(JobQuotes.self, IssueQuoteFixtures.withQuote)
+        try snapshot(IssueQuoteSheet(action: try XCTUnwrap(revise.issueQuoteAction), current: revise.currentQuote, scope: scope),
+                     name: "fixture-revise-quote", pages: 2)
+        let path = try decode(JobPath.self, JobFixtures.jobPathWithLabels.replacingOccurrences(
+            of: #""context":"client","slots":["customer"]"#, with: #""context":"provider","slots":["organization_owner"]"#))
+        try snapshot(NavigationStack { JobPathContent(workOrderId: JobFixtures.workOrderId, path: .loaded(path), resources: .loading, quotes: .loaded(first)) },
+                     name: "fixture-issue-quote-entry")
+    }
+
     func testRenderWorkSessionSignSheet() throws {
         let item = try decode(SignatureQueue.self, JobFixtures.signatureQueue).items[0]
         try snapshot(WorkSessionSignSheet(item: item), name: "fixture-sign-work-day")

@@ -85,6 +85,7 @@ struct JobPathContent: View {
 
     @State private var accepting: QuoteBox?
     @State private var changing: ChangeBox?
+    @State private var issuing: IssueBox?
     @State private var starting: JobAction?
 
     var body: some View {
@@ -396,15 +397,30 @@ struct JobPathContent: View {
                             Label("Issue change order", systemImage: "arrow.triangle.branch")
                         }
                     }
+                    issueButton(q)
                 } else {
                     Text(q.history.isEmpty ? "No quote yet." : "No current quote. Earlier versions were withdrawn.")
                         .font(.footnote).foregroundStyle(.secondary)
+                    issueButton(q)
                 }
             }
         } header: {
             Text("Quote")
+                .sheet(item: $issuing) { box in
+                    IssueQuoteSheet(action: box.action, current: box.quote) { onChanged?() }
+                }
         } footer: {
             Text("Prices are open to everyone. \(JobCopy.withheldPayments).")
+        }
+    }
+
+    @ViewBuilder private func issueButton(_ q: JobQuotes) -> some View {
+        if let a = q.issueQuoteAction {
+            Button {
+                issuing = IssueBox(action: a, quote: q.currentQuote)
+            } label: {
+                Label(IssueQuoteCopy.title(a), systemImage: "doc.badge.plus")
+            }
         }
     }
 
@@ -441,6 +457,12 @@ struct JobPathContent: View {
         default: return stageRung
         }
     }
+}
+
+private struct IssueBox: Identifiable {
+    let action: JobAction
+    let quote: Quote?
+    var id: String { action.id }
 }
 
 private struct ChangeBox: Identifiable {

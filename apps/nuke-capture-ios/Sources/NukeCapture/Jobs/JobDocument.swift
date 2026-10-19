@@ -518,6 +518,9 @@ struct MyWorkOrders: Decodable, Equatable {
     var rows: [JobRow]
     let coverage: JobCoverage?
     let viewer: JobViewer?
+    /// vehicle_work_orders_read viewer.vehicle_access.can_post_work_request, once the reader states it;
+    /// nil means not stated (the vehicle page falls back to its owner check).
+    let canPostWorkRequest: Bool?
     let nextAfter: String?
     let asOf: String?
     /// vehicle_work_orders_read names the vehicle once for the page.
@@ -540,6 +543,7 @@ struct MyWorkOrders: Decodable, Equatable {
         unreadableRows = raw.count - rows.count
         coverage = try? c.decode(JobCoverage.self, forKey: .coverage)
         viewer = try? c.decode(JobViewer.self, forKey: .viewer)
+        canPostWorkRequest = (try? c.decode(VehicleAccessHolder.self, forKey: .viewer))?.vehicle_access?.can_post_work_request
         nextAfter = try? c.decode(String.self, forKey: .nextAfter)
         asOf = try? c.decode(String.self, forKey: .asOf)
         vehicleLabel = try? c.decode(JobVehicleLabel.self, forKey: .vehicleLabel)
@@ -854,4 +858,10 @@ enum JobClock {
         f.dateFormat = "MMM d, yyyy HH:mm 'UTC'"
         return f.string(from: d)
     }
+}
+
+/// viewer.vehicle_access on vehicle_work_orders_read.
+private struct VehicleAccessHolder: Decodable {
+    struct Access: Decodable { let can_post_work_request: Bool? }
+    let vehicle_access: Access?
 }
