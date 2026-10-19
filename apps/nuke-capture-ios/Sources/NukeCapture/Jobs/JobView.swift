@@ -93,6 +93,7 @@ struct JobPathContent: View {
     @State private var accepting: QuoteBox?
     @State private var changing: ChangeBox?
     @State private var issuing: IssueBox?
+    @State private var jobSheet: JobSheet?
     @State private var starting: JobAction?
     @State private var paying = false
     @State private var payFailure: String?
@@ -121,9 +122,6 @@ struct JobPathContent: View {
                         Button { starting = start } label: { Label("Start work", systemImage: "play.circle") }
                     } header: {
                         Text("Your next step")
-                            .sheet(item: $starting) { a in
-                                StartWorkSheet(action: a, workOrderId: workOrderId, jobTitle: navigationTitle) { onChanged?() }
-                            }
                     } footer: {
                         Text("You were accepted for this job. Starting records the time, under exactly what was accepted.")
                     }
@@ -171,6 +169,14 @@ struct JobPathContent: View {
         .sheet(item: $accepting) { box in
             AcceptQuoteSheet(quote: box.quote, action: box.action) { onChanged?() }
         }
+        .sheet(item: $starting) { a in
+            StartWorkSheet(action: a, workOrderId: workOrderId, jobTitle: navigationTitle) { onChanged?() }
+        }
+        .sheet(item: $issuing) { box in
+            IssueQuoteSheet(action: box.action, current: box.quote) { onChanged?() }
+        }
+        .sheet(item: $jobSheet) { $0.content }
+        .environment(\.presentJobSheet) { jobSheet = JobSheet(content: $0) }
         .sheet(item: $changing) { box in
             IssueChangeOrderSheet(action: box.action, quote: box.quote) { onChanged?() }
         }
@@ -451,9 +457,6 @@ struct JobPathContent: View {
             }
         } header: {
             Text("Quote")
-                .sheet(item: $issuing) { box in
-                    IssueQuoteSheet(action: box.action, current: box.quote) { onChanged?() }
-                }
         } footer: {
             Text("Prices are open to everyone. \(JobCopy.withheldPayments).")
         }
