@@ -130,7 +130,7 @@ struct JobPathContent: View {
                     JobFacilitySection(workOrderId: workOrderId, facility: facility, onChanged: onChanged)
                         .id("job-facility")
                 }
-                if let inspections { JobInspectionSection(read: inspections, onSigned: { Task { await load() } }) }
+                if let inspections { JobInspectionSection(read: inspections, onSigned: onChanged) }
                 if let completion = CompletionState(path: p) {
                     JobCompletionSection(workOrderId: workOrderId, state: completion, viewerSlots: p.viewer?.slots ?? [],
                                          canMarkDone: { if case .loaded(let r)? = invoices { return r.issueAction != nil } else { return false } }(),
