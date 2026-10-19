@@ -435,6 +435,37 @@ and supersession refusal, with registry/provenance branches isolated. Earlier ve
 separate and are not rolled back by an observation failure. Production delivery, full intake/RLS,
 typed capture bindings and fleet coverage remain separate evidence in the private ETL receipt.
 
+**Next loop, staged 2026-10-18: explicit listing-capture custody.** The prospective
+`cab_listing_capture_v1` mode in the existing `ingest-observation` accepts only an original
+observation, retained snapshot and canonical auction-lot selector, with explicit dry-run. Its
+database qualifier independently checks inline UTF8 SHA, case-sensitive source auction ID,
+same attributed parent/source, exact reconstructed listing narrative and microsecond clocks.
+Both existing source guards must admit the exact derived tuple under locks. A separate sparse
+`provenance` receipt keys the original observation, capture and presentation; the original remains
+unchanged. It asserts narrative provenance only: no copied specification, sale, independent
+corroboration or physical identity verification. Receipt ingestion establishes when that
+binding was recorded; it does not reconstruct historical native identity availability.
+
+The existing inspector's `--lineage <original> <snapshot> <presentation>` previews without writes;
+`--result <receipt>` requalifies stored custody through the same service-only qualifier. Withdrawal,
+privacy or changed source evidence withholds verification. No public grants, collection, queue,
+source activation or historical replay are added. Local tests combine the actual canonical handler,
+PostgreSQL admission, current receipt reader and two-session mutation controls. Three explicitly
+selected retained tuples are rehearsed offline; this is
+not production admission, actual anonymous privacy acceptance or a fleet readiness numerator.
+Full retained/eligible populations and net public supported-answer gain remain unassessed.
+The production schema/admission change remains a held draft until separately authorized; do not
+treat implementation, local tests or source-selector previews as a deployed repair. The existing
+observation visibility predicate withholds `provenance`; this internal receipt must not become a
+second public listing. The source's existing listing capability qualifies its retained parent;
+this guarded derivation does not declare a new publisher-provided provenance capability.
+
+The typed relationship uses the existing `auction_event_id` FK, shared with the lot interaction
+log. It leaves `source_vehicle_event_id` NULL: that pointer would make native-state replacement
+refuse under existing sanctioned episode supersession. The local counterexample replaces the
+native state while the auction-lot/capture receipt remains verifiable; no correction owner or
+public policy is weakened.
+
 ## 7. Hypotheses the owner wants tested as veins (in the vocabulary)
 
 - **The repair chain precedes the market event.** "How many thermostats had to sell before an AC system sold, before
