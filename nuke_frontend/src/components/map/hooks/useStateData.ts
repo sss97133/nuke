@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { fetchStateData } from '../mapService';
+import { fetchStateData, type ListingMeasure } from '../mapService';
 import type { StateMapData, StateDatum } from '../types';
 import { STATE_FIPS } from '../shared';
 import { feature } from 'topojson-client';
@@ -26,7 +26,7 @@ export interface StateLayerData {
   nameLookup: Map<string, string>; // FIPS → state name from TopoJSON
 }
 
-export function useStateData(enabled: boolean, timeStart?: string, timeEnd?: string) {
+export function useStateData(enabled: boolean, timeStart?: string, timeEnd?: string, listing?: ListingMeasure) {
   const [layerData, setLayerData] = useState<StateLayerData | null>(null);
   const [stats, setStats] = useState<StateMapData['stats'] | null>(null);
   const [loading, setLoading] = useState(false);
@@ -38,7 +38,7 @@ export function useStateData(enabled: boolean, timeStart?: string, timeEnd?: str
     setLoading(true);
     setError(null);
 
-    Promise.all([loadStateBoundaries(), fetchStateData(timeStart, timeEnd)])
+    Promise.all([loadStateBoundaries(), fetchStateData(timeStart, timeEnd, listing)])
       .then(([geojson, data]) => {
         if (cancelled) return;
 
@@ -67,7 +67,7 @@ export function useStateData(enabled: boolean, timeStart?: string, timeEnd?: str
       });
 
     return () => { cancelled = true; };
-  }, [enabled, timeStart, timeEnd]);
+  }, [enabled, timeStart, timeEnd, listing?.eventType, listing?.days, listing?.source]);
 
   return { layerData, stats, loading, error, STATE_FIPS_TO_ABBR };
 }

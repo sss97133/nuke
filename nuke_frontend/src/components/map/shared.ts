@@ -31,6 +31,13 @@ export const STATE_FIPS: Record<string, string> = {
 };
 
 // ─── Colorway system ───────────────────────────────────────────────────────────
+// CARTO's raster basemaps answer every request with an "API KEY REQUIRED" tile (2026-10-19). Esri's canvas basemaps are
+// keyless; their terms require the attribution below.
+const ESRI_DARK_CANVAS = 'https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}';
+const ESRI_LIGHT_CANVAS = 'https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Light_Gray_Base/MapServer/tile/{z}/{y}/{x}';
+export const BASEMAP_ATTRIBUTION = 'Esri, HERE, Garmin, &copy; OpenStreetMap contributors';
+export const BASEMAP_MAX_NATIVE_ZOOM = 16;
+
 export type ColorwayId = 'amber' | 'plasma' | 'viridis' | 'heat';
 
 export interface Colorway {
@@ -51,7 +58,7 @@ export const COLORWAYS: Record<ColorwayId, Colorway> = {
     label: 'AMBER',
     basemap: 'dark',
     blendMode: 'screen',
-    tileUrl: 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',
+    tileUrl: ESRI_DARK_CANVAS,
     empty: 'transparent',
     border: 'rgba(80,70,50,0.12)',
     hoverBorder: 'rgba(245, 158, 11, 0.8)',
@@ -70,7 +77,7 @@ export const COLORWAYS: Record<ColorwayId, Colorway> = {
     label: 'PLASMA',
     basemap: 'dark',
     blendMode: 'screen',
-    tileUrl: 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',
+    tileUrl: ESRI_DARK_CANVAS,
     empty: 'transparent',
     border: 'rgba(50,40,80,0.12)',
     hoverBorder: 'rgba(240, 220, 60, 0.8)',
@@ -89,7 +96,7 @@ export const COLORWAYS: Record<ColorwayId, Colorway> = {
     label: 'VIRIDIS',
     basemap: 'light',
     blendMode: 'multiply',
-    tileUrl: 'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png',
+    tileUrl: ESRI_LIGHT_CANVAS,
     empty: 'transparent',
     border: 'rgba(150,150,145,0.15)',
     hoverBorder: 'rgba(30, 30, 30, 0.7)',
@@ -108,7 +115,7 @@ export const COLORWAYS: Record<ColorwayId, Colorway> = {
     label: 'HEAT',
     basemap: 'light',
     blendMode: 'multiply',
-    tileUrl: 'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png',
+    tileUrl: ESRI_LIGHT_CANVAS,
     empty: 'transparent',
     border: 'rgba(180,175,170,0.15)',
     hoverBorder: 'rgba(30, 30, 30, 0.7)',
