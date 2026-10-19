@@ -2914,3 +2914,17 @@ remains. Disposable PG17 covers 57 specification cases and reruns the 88 existin
 assertions against the new projector. This is one selected case; the specification population
 of other jobs is not assessed, and accepted scope changes, measured usage, completion and
 compensation remain open.
+
+Mechanics RSI pass 1, job-path scoreboard (2026-10-19): owner direction "rsi" applies the
+measure → largest closable gap → migration + PG17 → re-measure loop to the mechanics job path.
+The job path had no self-measurement. Migration `20261019045753_work_order_job_path.sql`
+adds a private read-only reader per work order and a population scoreboard over existing
+owners, reporting stage states, gaps and status/clock/record inconsistencies without repair.
+Before (live, 2026-10-19 04:56 UTC, denominator all 26 work_orders rows): 22 vehicle-bound;
+operations itemized on 2; resource requirements on 2 and specifications on 1; installed parts
+on 2, parts with an operation code on 1; assignments on 1 (9 rows, none with an accept clock);
+labor rows on 3; start clocks 5; completion clocks 7 against 10 done/paid statuses; payment
+records on 3, including one without a vehicle; a paid status with no payment record; 15
+vehicle-scoped payment events with no job attribution; no approval clock and no payout record
+anywhere. Next passes take the largest gap the retained evidence can close; readiness,
+acceptance, usage and labor value stay unassessed until evidence supports them.
