@@ -3,6 +3,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { supabase } from '../lib/supabase';
 import LazyImage from './LazyImage';
+import { vehicleImageRowColumns } from '../lib/vehicleImageColumns';
 
 // Tag types available in the system
 const TAG_TYPES = [
@@ -196,7 +197,7 @@ const ProImageViewer: React.FC<ProImageViewerProps> = ({
     try {
       const query = supabase
         .from('vehicle_images')
-        .select('*')
+        .select(await vehicleImageRowColumns())
         .eq('vehicle_id', vehicleId)
         // Exclude superseded (reattributed prior versions) and gate-rejected (wrong-vehicle / personal)
         .not('is_superseded', 'is', true)

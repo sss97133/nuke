@@ -15,6 +15,7 @@ import { ImageExpandedData } from './ImageExpandedData';
 import { AdminNotificationService } from '../../services/adminNotificationService';
 import toast from 'react-hot-toast';
 import '../../design-system.css';
+import { vehicleImageRowColumns } from '../../lib/vehicleImageColumns';
 
 interface ImageLightboxProps {
   imageUrl: string;
@@ -756,7 +757,7 @@ const ImageLightbox: React.FC<ImageLightboxProps> = ({
     // Image Metadata - load image first, then load profile separately
     const { data: imgData, error: imgError } = await supabase
       .from('vehicle_images')
-      .select('*')
+      .select(await vehicleImageRowColumns())
       .eq('id', imageId)
       .single();
     

@@ -165,7 +165,7 @@ export default function ScriptControlCenter() {
       // Get total images
       const { count: total } = await supabase
         .from('vehicle_images')
-        .select('*', { count: 'exact', head: true });
+        .select('id', { count: 'exact', head: true });
 
       // Processed count from the RPC. null = not computed (43M-row vehicle_images scans cannot run
       // inside a request; the server says so in `note`) — shown as unknown, never as 0.
