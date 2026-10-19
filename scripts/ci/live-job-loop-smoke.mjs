@@ -7,7 +7,8 @@
  * claims), the open readers as anon and as a signed-in stranger, assertions collected into a temp table, then
  * ROLLBACK. The script refuses to send SQL that contains COMMIT or does not end in ROLLBACK. Afterwards a read-only
  * query proves zero net rows: job-loop table counts unchanged and no synthetic id (prefix 5e0e5e0e) left anywhere.
- * Read-only checks on real data: scoreboard shape, the owner's provider profile, anon latency through PostgREST.
+ * Read-only checks on real data: scoreboard shape, the owner's provider profile, anon latency through PostgREST
+ * (one cold call, then the median of five warm calls against the budget).
  *
  *   SUPABASE_ACCESS_TOKEN=... VITE_SUPABASE_ANON_KEY=... node scripts/ci/live-job-loop-smoke.mjs [--json out.json]
  *   locally: (cd ~/nuke && dotenvx run -q -- node <worktree>/scripts/ci/live-job-loop-smoke.mjs)
@@ -215,15 +216,17 @@ async function residue(since) {
 }
 
 async function anonCall(name, body) {
-  let warm = null, cold = null, status = null, text = '';
-  for (let i = 0; i < 2; i++) {
+  const times = [];
+  let status = null, text = '';
+  for (let i = 0; i < 6; i++) {
     const t0 = performance.now();
     const res = await fetch(`${REST}/rpc/${name}`, { method: 'POST', headers: { apikey: anonKey, Authorization: `Bearer ${anonKey}`, 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
     text = await res.text(); status = res.status;
-    const s = (performance.now() - t0) / 1000;
-    if (i === 0) cold = s; else warm = s;
+    times.push((performance.now() - t0) / 1000);
+    await sleep(500);
   }
-  return { status, cold_s: Number(cold.toFixed(3)), warm_s: Number(warm.toFixed(3)), text };
+  const warm = times.slice(1).sort((a, b) => a - b);
+  return { status, cold_s: Number(times[0].toFixed(3)), warm_s: Number(warm[2].toFixed(3)), warm_samples_s: times.slice(1).map((t) => Number(t.toFixed(3))), text };
 }
 
 async function readOnlyChecks() {
@@ -243,8 +246,8 @@ async function readOnlyChecks() {
   ]) {
     const r = await anonCall(name, body);
     const leak = /@[a-z0-9-]+\.[a-z]|"(email|phone|phone_number|address|street|zip)": "[^"]+"/i.test(r.text);
-    out.push({ step: `anon ${label}: 200, warm < ${LATENCY_BUDGET_S}s, no contact fields`, ok: r.status === 200 && r.warm_s < LATENCY_BUDGET_S && !leak,
-      detail: { status: r.status, cold_s: r.cold_s, warm_s: r.warm_s, leak } });
+    out.push({ step: `anon ${label}: 200, warm median < ${LATENCY_BUDGET_S}s, no contact fields`, ok: r.status === 200 && r.warm_s < LATENCY_BUDGET_S && !leak,
+      detail: { status: r.status, cold_s: r.cold_s, warm_median_s: r.warm_s, warm_samples_s: r.warm_samples_s, leak } });
     if (label === 'owner provider profile' && r.status === 200) {
       const want = ['fabrication_exhaust', 'welding_tig', 'welding_mig'];
       out.push({ step: 'owner profile: derived skills shown (fabrication_exhaust, welding_tig, welding_mig)', ok: want.every((c) => r.text.includes(`"${c}"`)),
