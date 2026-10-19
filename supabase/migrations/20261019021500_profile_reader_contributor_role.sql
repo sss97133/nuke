@@ -1,7 +1,7 @@
 -- Creator provenance is not ownership for explicitly contributed records.
 -- Preserve the existing invoker reader, policies, grants and explicit ownership evidence.
 SET lock_timeout = '3s';
-SET statement_timeout = '20s';
+SET statement_timeout = '10s';
 DO $patch$
 DECLARE
   d text := pg_get_functiondef('public.vehicle_profile_read(uuid)'::regprocedure);
