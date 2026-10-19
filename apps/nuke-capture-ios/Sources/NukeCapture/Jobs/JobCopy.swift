@@ -523,6 +523,8 @@ enum JobCopy {
         "accept_terms": "Accept quote",
         "contact_request": "Contact request",
         "accept_quote": "Accept quote",
+        "record_findings": "Record findings",
+        "grant_inspection_access": "Grant inspection access",
         "pay_invoice": "Pay invoice",
         "accept_offer": "Accept offer",
         "offer_on_requirement": "Make an offer",
