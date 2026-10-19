@@ -204,6 +204,7 @@ CREATE POLICY "Anyone can view actor_capabilities" ON public.actor_capabilities 
 GRANT SELECT ON public.actor_capabilities TO anon, authenticated;
 GRANT ALL ON public.actor_capabilities TO service_role;
 ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS created_at timestamptz DEFAULT now();
+ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS updated_at timestamptz DEFAULT now();
 ALTER TABLE public.work_orders ADD COLUMN IF NOT EXISTS estimated_labor_cost numeric, ADD COLUMN IF NOT EXISTS estimated_parts_cost numeric,
   ADD COLUMN IF NOT EXISTS actual_labor_cost numeric, ADD COLUMN IF NOT EXISTS actual_parts_cost numeric, ADD COLUMN IF NOT EXISTS actual_total numeric,
   ADD COLUMN IF NOT EXISTS updated_at timestamptz;
@@ -379,6 +380,8 @@ CREATE TABLE public.organization_ownership_verifications(id uuid PRIMARY KEY DEF
 GRANT SELECT ON public.organization_ownership_verifications TO service_role;
 \echo REPLAY 20261020091000_organization_claims_on_nuke.sql
 \ir ../migrations/20261020091000_organization_claims_on_nuke.sql
+\echo REPLAY 20261020093000_discovery_providers_read.sql
+\ir ../migrations/20261020093000_discovery_providers_read.sql
 \echo REPLAY 20261020101000_verified_claimant_offers.sql
 \ir ../migrations/20261020101000_verified_claimant_offers.sql
 -- Plan check and final state.
