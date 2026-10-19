@@ -3,7 +3,8 @@
 // Shows what the item is (job, vehicle, when, the server's summary) and, always, "Signing says /
 // It does not say" from the item's sign block. The Sign itself happens on the screen that holds
 // the full terms: the job (quotes, offers, completion, change orders, payments, inspection access,
-// co-signs) or the contact request. Unknown kinds never reach this sheet.
+// co-signs) or the contact request; a shop confirms a booking request right here, pinned to its hash.
+// Unknown kinds never reach this sheet.
 
 import SwiftUI
 
@@ -11,7 +12,8 @@ enum SignatureKinds {
     /// Kinds this build can open; anything else shows "Needs a newer app version".
     static let known: Set<String> = ["work_session", "quote_to_accept", "offer_to_accept", "completion_to_accept",
                                      "change_order_to_accept", "contact_request", "inspection_access_request",
-                                     "invoice_payment_to_confirm", "cosign_request"]
+                                     "invoice_payment_to_confirm", "cosign_request",
+                                     "facility_reservation_to_confirm"]
 
     static func isKnown(_ kind: String) -> Bool { known.contains(kind) }
 }
@@ -22,6 +24,14 @@ struct SignatureItemSheet: View {
     @Environment(\.dismiss) private var dismiss
 
     var body: some View {
+        if item.kind == "facility_reservation_to_confirm" {
+            ConfirmBookingSheet(item: item)
+        } else {
+            details
+        }
+    }
+
+    private var details: some View {
         NavigationStack {
             List {
                 Section {

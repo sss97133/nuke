@@ -100,6 +100,9 @@ struct NukeCaptureApp: App {
                                 }
                         }
                     }
+                } else if let dbgFacility = ProcessInfo.processInfo.environment["NUKE_DEBUG_FACILITY"], !dbgFacility.isEmpty {
+                    // A shop's space, equipment and licenses alone, over the live reader (no photos).
+                    NavigationStack { FacilityView(organizationId: dbgFacility) }
                 } else if ProcessInfo.processInfo.environment["NUKE_DEBUG_JOBS_LOOKING"] == "1" {
                     // Work's "Jobs looking for someone" alone, over the live reader (no capture photos).
                     DebugJobsLookingHost()

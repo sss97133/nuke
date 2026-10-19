@@ -257,6 +257,31 @@ final class JobFixtureSnapshotTests: XCTestCase {
                      name: "fixture-vouched-for-by", pages: 2)
     }
 
+    func testRenderFacilityScreensAndSheets() throws {
+        let now = FacilityCopy.date("2026-10-19T12:00:00Z") ?? Date()
+        let party = try decode(FacilityRead.self, FacilityFixtures.read(party: true))
+        let visitor = try decode(FacilityRead.self, FacilityFixtures.read(party: false))
+        try snapshot(NavigationStack { FacilityContent(read: .loaded(visitor), now: now) }, name: "fixture-facility-visitor", pages: 2)
+        try snapshot(NavigationStack { FacilityContent(read: .loaded(party), bookingFor: FacilityFixtures.workOrderId, now: now) },
+                     name: "fixture-facility-party", pages: 2)
+        let start = FacilityCopy.date("2026-10-21T16:00:00Z")
+        try snapshot(BookFacilitySheet(workOrderId: FacilityFixtures.workOrderId, choices: FacilityChoice.from(party), start: start),
+                     name: "fixture-book-bay", pages: 2)
+        try snapshot(DeclareAssetSheet(action: try XCTUnwrap(party.declareAction), shopName: "Fixture Garage", kind: "lift", label: "Lift C", capacity: 1),
+                     name: "fixture-declare-asset", pages: 2)
+        let item = try XCTUnwrap(decode(SignatureQueue.self, FacilityFixtures.queue).items.first)
+        try snapshot(ConfirmBookingSheet(item: item), name: "fixture-confirm-booking", pages: 2)
+        let matches = try decode(FacilityMatches.self, FacilityFixtures.open).byRequirement
+        let req = JobFacility.Requirement(requirementId: "rf1", description: "A lift for two days to drop the transmission", match: matches["rf1"])
+        let booked = JobFacility(requirements: [req], bookings: JobFacility.bookings(for: FacilityFixtures.workOrderId, in: [party]))
+        let waiting = JobFacility(requirements: [req], bookings: [])
+        let reserved = try decode(FacilityReservation.self, FacilityFixtures.reserved)
+        try snapshot(NavigationStack { List {
+            JobFacilitySection(workOrderId: FacilityFixtures.workOrderId, facility: .loaded(booked), viewerIsParty: true, requested: .constant(nil))
+            JobFacilitySection(workOrderId: FacilityFixtures.workOrderId, facility: .loaded(waiting), viewerIsParty: true, requested: .constant(reserved))
+        } }, name: "fixture-job-facility")
+    }
+
     func testRenderWorkSessionSignSheet() throws {
         let item = try decode(SignatureQueue.self, JobFixtures.signatureQueue).items[0]
         try snapshot(WorkSessionSignSheet(item: item), name: "fixture-sign-work-day")

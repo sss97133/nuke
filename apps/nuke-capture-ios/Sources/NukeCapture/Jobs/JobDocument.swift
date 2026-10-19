@@ -615,6 +615,10 @@ struct SignatureItem: Decodable, Equatable, Identifiable {
     let sign: Sign?
     let displayTitle: String?
     let summary: String?
+    /// facility_reservation_to_confirm: the asset, shop, requester and proposed fee.
+    let facilityRequest: FacilityRequestSummary?
+    let windowFrom: String?
+    let windowUntil: String?
 
     var id: String { kind + refId }
 
@@ -640,6 +644,11 @@ struct SignatureItem: Decodable, Equatable, Identifiable {
         captureSpanMinutes = try? c.decode(Int.self, forKey: .captureSpanMinutes)
         evidenceCounts = (try? c.decode([String: JobJSON].self, forKey: .evidenceCounts)) ?? [:]
         sign = try? c.decode(Sign.self, forKey: .sign)
+        facilityRequest = kind == "facility_reservation_to_confirm" ? try? c.decode(FacilityRequestSummary.self, forKey: .summary) : nil
+        struct Window: Decodable { let from: String?; let until: String? }
+        let w = try? c.decode(Window.self, forKey: .clock)
+        windowFrom = w?.from
+        windowUntil = w?.until
     }
 }
 

@@ -32,7 +32,7 @@ final class OfferTests: XCTestCase {
         XCTAssertEqual(skill.map { "\(OfferCopy.input($0.input)) — \(OfferCopy.reason($0))" }, [
             "Skill — Not shown in your record yet",
             "Tools — Not needed for this",
-            "Shop access — Not needed for this",
+            "Shop space — Not needed for this",
             "Area — Same city",
             "Availability — You haven't set availability yet",
             "Technician profile — Linked by you — not yet backed by work",

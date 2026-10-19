@@ -492,7 +492,7 @@ enum OfferCopy {
         switch i {
         case "skill": return "Skill"
         case "tools": return "Tools"
-        case "facility": return "Shop access"
+        case "facility": return "Shop space"
         case "area": return "Area"
         case "availability": return "Availability"
         case "evidence_rung": return "Technician profile"
@@ -520,9 +520,7 @@ enum OfferCopy {
             }
             return r.contains("no claimed tool records") ? "No tools in your records" : "No matching tool in your records"
         case "facility":
-            if m.result == "pass" { return "You're part of this job's shop" }
-            if m.result == "unknown" { return "Your shop isn't assessed for this job" }
-            return "No shop access on record"
+            return FacilityCopy.match(FacilityMatch(result: m.result, next: m.next, reason: m.reason))
         case "area":
             if m.result == "pass" { return r.contains("city") ? "Same city" : "Same state" }
             if r.contains("job area not public") { return "The job's area isn't public" }

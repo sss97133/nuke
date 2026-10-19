@@ -302,8 +302,13 @@ struct ProviderFaceContent: View {
         if !active.isEmpty {
             Section {
                 ForEach(active) { f in
-                    RootedValueView(label: f.name ?? "Unnamed shop", value: Self.facilityValue(f), status: .attributed,
-                                    decay: [JobCopy.relationState(f.relationState), f.city].compactMap { $0 }.joined(separator: " · "))
+                    let row = RootedValueView(label: f.name ?? "Unnamed shop", value: Self.facilityValue(f), status: .attributed,
+                                              decay: [JobCopy.relationState(f.relationState), f.city].compactMap { $0 }.joined(separator: " · "))
+                    if let org = f.organizationId {
+                        NavigationLink { FacilityView(organizationId: org, nameHint: f.name) } label: { row }
+                    } else {
+                        row
+                    }
                 }
             } header: {
                 Text("Shops")

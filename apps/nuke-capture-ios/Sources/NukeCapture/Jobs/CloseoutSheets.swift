@@ -11,6 +11,7 @@ struct SignStepSheet<Details: View>: View {
     let title: String
     let says: [String]
     let doesNotSay: [String]
+    var saysTitle = "Signing says"
     let confirmTitle: String
     let successTitle: String
     let successDetail: String
@@ -30,7 +31,7 @@ struct SignStepSheet<Details: View>: View {
             Form {
                 details()
                 if !says.isEmpty {
-                    Section("Signing says") {
+                    Section(saysTitle) {
                         ForEach(says, id: \.self) { Label($0, systemImage: "checkmark.seal") }
                     }
                     .font(.footnote)

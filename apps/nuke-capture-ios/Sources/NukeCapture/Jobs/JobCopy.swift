@@ -528,6 +528,7 @@ enum JobCopy {
         "inspection_access_request": "Let an inspector see your car",
         "invoice_payment_to_confirm": "Confirm a payment you received",
         "cosign_request": "Co-sign a technician",
+        "facility_reservation_to_confirm": "Confirm a booking",
         "work_session": "Confirm work day",
         "session": "Confirm photo session",
         "photo_session": "Confirm photo session",
