@@ -345,8 +345,8 @@ ALTER TABLE public.observation_sources ADD COLUMN IF NOT EXISTS display_name tex
 \echo REPLAY 20261020030000_tool_requirement_keys.sql
 \ir ../migrations/20261020030000_tool_requirement_keys.sql
 \ir helpers/provider_signs_live_20261020.sql
-\echo REPLAY 20261020031000_provider_availability_area.sql
-\ir ../migrations/20261020031000_provider_availability_area.sql
+\echo REPLAY 20261020031100_provider_availability_area.sql
+\ir ../migrations/20261020031100_provider_availability_area.sql
 \echo REPLAY 20261020040000_suggested_provider_links.sql
 \ir ../migrations/20261020040000_suggested_provider_links.sql
 \echo REPLAY 20261020041000_actor_link_review_owner_agent.sql
