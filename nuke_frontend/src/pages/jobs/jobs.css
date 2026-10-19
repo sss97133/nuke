@@ -1,0 +1,41 @@
+/* Job loop pages: layout only. Type comes from the kit roles (src/kit/kit.css); colors from
+   unified-design-system.css. Zero radius, zero shadow, 2px frames, 1px rules. */
+
+.jb-page { max-width: 980px; margin: 0 auto; padding: 0 12px 24px; }
+.jb-page > .k-section { padding-left: 0; padding-right: 0; }
+.jb-intro { display: grid; gap: 4px; padding: 10px 0 8px; border-bottom: 2px solid var(--border); }
+
+.jb-list { list-style: none; margin: 0; padding: 0; }
+.jb-row { display: grid; gap: 3px; padding: 8px 0; border-bottom: 1px solid var(--border); }
+.jb-row:last-child { border-bottom: 0; }
+.jb-row__head { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; flex-wrap: wrap; }
+.jb-row a { color: inherit; text-decoration: underline; text-underline-offset: 2px; }
+.jb-actions { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 4px; }
+.jb-more { padding: 8px 0; }
+
+.jb-match { list-style: none; margin: 4px 0 0; padding: 2px 0 2px 8px; border-left: 2px solid var(--border); display: grid; gap: 2px; }
+.jb-match li { display: flex; gap: 6px; align-items: baseline; }
+.jb-mark { width: 10px; flex-shrink: 0; text-align: center; }
+.jb-mark--pass { color: var(--success, var(--text)); }
+.jb-next { color: var(--warning, var(--text-secondary)); }
+
+.jb-says { display: grid; gap: 2px; }
+.jb-says ul { margin: 0; padding-left: 14px; }
+.jb-quote { margin: 0; padding-left: 8px; border-left: 2px solid var(--border); }
+.jb-ol { margin: 0; padding-left: 20px; display: grid; gap: 3px; }
+
+.jb-sheet-backdrop { position: fixed; inset: 0; z-index: 11000; background: rgba(0, 0, 0, 0.6); display: flex; align-items: center; justify-content: center; padding: 16px; }
+.jb-sheet { width: 100%; max-width: 560px; max-height: 90vh; overflow: auto; background: var(--surface); border: 2px solid var(--text); color: var(--text); }
+.jb-sheet__head { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 8px 12px; border-bottom: 2px solid var(--border); }
+.jb-sheet__body { display: grid; gap: 10px; padding: 10px 12px 12px; }
+.jb-field { display: grid; gap: 3px; }
+.jb-field--row { display: flex; gap: 8px; align-items: end; flex-wrap: wrap; }
+.jb-input { box-sizing: border-box; width: 100%; padding: 4px 6px; border: 2px solid var(--border); border-radius: 0; background: var(--bg); color: var(--text); }
+.jb-input:focus { outline: 2px solid var(--text); outline-offset: 0; }
+textarea.jb-input { resize: vertical; min-height: 96px; }
+.jb-input--short { width: 72px; }
+.jb-choice { display: flex; gap: 12px; flex-wrap: wrap; }
+.jb-choice label { display: inline-flex; gap: 4px; align-items: center; cursor: pointer; }
+.jb-line { display: grid; gap: 6px; padding: 6px 0; border-bottom: 1px solid var(--border); }
+.jb-warn { color: var(--warning, var(--text)); }
+.jb-done { color: var(--success, var(--text)); }
