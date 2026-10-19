@@ -151,3 +151,32 @@ describe('Sign actions', () => {
     expect([...host.querySelectorAll('.job-sign button')]).toHaveLength(0);
   });
 });
+
+describe('JobPage on a direct load', () => {
+  it('paints the header from the payload the edge middleware embedded while its own reads are pending', async () => {
+    const script = document.createElement('script');
+    script.type = 'application/json';
+    script.id = 'nuke-job-header';
+    script.textContent = JSON.stringify({ work_order_id: WO, display_title: 'Synthetic exhaust job', vehicle_label: { text: '1983 GMC K2500' },
+      vehicle_id: header.vehicle_id, request_source_label: 'Requested on the web', stages: { intake: 'recorded' } });
+    document.head.appendChild(script);
+    fixture.rpc.mockImplementation(() => new Promise(() => {}));
+    await render();
+    expect(host.querySelector('h1')?.textContent).toBe('Synthetic exhaust job');
+    expect(host.textContent).toContain('1983 GMC K2500');
+    expect(host.textContent).toContain("Loading the job's record");
+    script.remove();
+  });
+
+  it('ignores a payload for a different job', async () => {
+    const script = document.createElement('script');
+    script.type = 'application/json';
+    script.id = 'nuke-job-header';
+    script.textContent = JSON.stringify({ work_order_id: 'other', display_title: 'Someone else' });
+    document.head.appendChild(script);
+    fixture.rpc.mockImplementation(() => new Promise(() => {}));
+    await render();
+    expect(host.querySelector('h1')?.textContent).toBe('Loading the job…');
+    script.remove();
+  });
+});
