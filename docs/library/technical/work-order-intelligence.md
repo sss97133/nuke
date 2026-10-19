@@ -1,6 +1,25 @@
 # Work Order Intelligence
 
-## A job is a future receipt (2026-10-19)
+## A job is a quote (2026-10-19)
+
+Use the standard trade vocabulary in docs, readers and interface copy (owner, 2026-10-18:
+"its good to use the standard language"). Lifecycle: estimate → quote (→ revisions) →
+acceptance → deposit → work order → (change orders) → completion → invoice → payment →
+receipt. The live `work_orders.status` check already follows it: `pending`, `quoted`,
+`approved`, `rejected`, `scheduled`, `in_progress`, `completed`, `paid`, `cancelled`.
+
+| Standard term | Meaning here | Existing holder |
+|---|---|---|
+| Estimate | Unpriced or ranged scope derived from evidence (photos, a listing); not an offer | `work_orders.estimated_*` scalars (no provenance); the read-only `buying-evidence.mjs --plan` report |
+| Quote | Priced, itemized scope and terms offered by a provider; versioned | `work_orders.status='quoted'` + `quoted_at`. No quote entity: `work_order_quotes` exists only as an unapplied repo migration |
+| Quote revision | A new version superseding the prior quote before acceptance | Gap |
+| Acceptance / approval | The client signs one specific quote version | `work_orders.approved_at` (no signer, no version) |
+| Deposit | Payment against an accepted quote | `work_orders.deposit_cents` (no payment link) |
+| Work order | The accepted quote being executed | `work_orders` (status `approved` → `scheduled` → `in_progress`) |
+| Change order | A signed revision after acceptance | Gap |
+| Invoice | Bill for completed work against the work order | `generated_invoices` |
+| Payment | Money movement against an invoice | `work_order_payments`, `payment_events` |
+| Receipt | The concluded record: what was done, by whom, and what was paid | `work_order_receipt_unified` + `work_order_balance`, `get_user_day_receipt` |
 
 A **receipt** in Nuke is not a row. It is a computed conclusion over witnesses that have
 been reconciled with each other: purchase receipts (`receipts` + `receipt_items`), money
@@ -12,14 +31,14 @@ conclusion: `get_user_day_receipt` (one person-day), `compute_vehicle_investment
 (one vehicle, tiered proven / attributed / projected / market) and
 `work_order_receipt_unified` with `work_order_balance` (one job).
 
-A **job** is the same graph before conclusion. A `work_orders` header and its operations
-are expected receipt lines; each line names the witness that will close it, the clock it
-will carry and the party who must sign. Concluding fills those slots with admitted
-observations. It never flips a status. `transfer_milestones` (required step, deadline,
-completed clock, signer, evidence pointer) is the existing shape of a future receipt in
-the ownership domain; reuse the shape, not the table.
+A **job** is a **quote**: a `work_orders` header whose itemized lines each name the witness
+that will close it, the clock it will carry and the party who must sign. Acceptance turns
+the quote into a work order; invoicing and payment conclude it as a receipt. Concluding
+fills those slots with admitted observations. It never flips a status. `transfer_milestones`
+(required step, deadline, completed clock, signer, evidence pointer) is the existing shape
+of an itemized, signer-closed plan in the ownership domain; reuse the shape, not the table.
 
-| Stage (`read_work_order_job_path`) | Becomes this receipt line | Closed by |
+| Stage (`read_work_order_job_path`) | Quote / work-order line it becomes | Closed by |
 |---|---|---|
 | intake | Header: asset, requester, stated scope, request clock | Vehicle bound + scope stated + authenticated requester |
 | inspection | A billable inspection line; its findings become the plan's basis | Inspector Sign on the findings |
@@ -61,7 +80,7 @@ basis changes.
 
 | Agreement | Parties | Existing holder | Gap |
 |---|---|---|---|
-| Scope acceptance | client ↔ lead provider | `work_orders.approved_at` (one clock) | No signer, no scope version |
+| Quote acceptance | client ↔ lead provider | `work_orders.approved_at` (one clock) | No signer, no quote version |
 | Material/process spec | client ↔ provider ↔ supplier ↔ performer | `work_order_resource_specifications` stages + comparisons | Acceptance of the proposed pair: `not_established` |
 | Inspection as a job | client ↔ inspector (≠ executor) | `inspection` requirement + actor fulfillment; `scope_category='inspection'` | No parent ↔ child work-order link |
 | Provider offer/accept | provider ↔ lead or client | `work_order_assignments` offer/accept/decline clocks | Dormant; keyed to `technicians`, not the resource graph |
@@ -85,9 +104,10 @@ of them; until then, build against them.
 
 1. **The job row.** `work_orders` is the job header; no `jobs` table. `work_sessions` stays
    the labor witness and links to a job through an evidenced edge.
-2. **Where agreements live.** New projector event types (`terms`, `acceptance`,
-   `change_order`, `release_condition`, `custody`), added the way `operation` was.
-   Status columns become derived caches, not truth.
+2. **Where agreements live.** New projector event types named in standard language
+   (`quote`, `quote_acceptance`, `change_order`, `invoice`, `release_condition`,
+   `custody`), added the way `operation` was. Status columns become derived caches,
+   not truth.
 3. **Sign.** One authenticated Sign RPC family records the signer, the sign clock and a
    snapshot or hash of the scope it covers. A later scope edit withholds the acceptance.
 4. **Identity bridge.** Extend `account_link_claims` with an `actor_id` (exclusive with the
@@ -109,9 +129,14 @@ of them; until then, build against them.
    is never skill evidence.
 9. **Mutable conclusions** become superseding testimony: session un-confirm, line-item
    status, payment status and scope text.
-10. **Phantom tables.** `work_order_quotes`, `work_order_proofs`, `work_contracts` and
-    `technician_payout_log` exist in repo migrations but not live. They are not applied
-    as written. Quotes fold into `terms`; proofs into the observation/image path.
+10. **Phantom tables and the quote.** `work_order_quotes`, `work_order_proofs`,
+    `work_contracts` and `technician_payout_log` exist in repo migrations but not live.
+    They are not applied as written. The quote is the central object, so it keeps the
+    standard name: an immutable, versioned, observation-backed quote projection, where a
+    revision supersedes and an acceptance signs one version. Reconcile the unapplied
+    `20251212000013_work_order_quotes.sql` (a mutable `status` of draft / sent / accepted /
+    rejected / withdrawn, no version) before reusing the name. Proofs fold into the
+    observation/image path.
 
 ### Listing → pre-purchase inspection
 
@@ -136,7 +161,8 @@ Pipeline, each step extending an existing owner:
    attestation; findings land as `inspection_type: pre_purchase` observations.
 7. Builder match (below).
 8. Purchase and custody through `transfer_milestones` plus `delivery` attestations.
-9. The future receipt on the work-order spine.
+9. The quote, accepted as a work order, then invoice, payment and receipt on the
+   work-order spine.
 
 The smallest honest first version is the read-only `scripts/discovery/buying-evidence.mjs
 --plan` report (operator contract in `scripts/discovery/buying-evidence.md`): identity conflicts first, then claims, candidate operations labelled
@@ -160,13 +186,34 @@ jobs in motion on a seven-stage rail, open requirements nearby, evidence to file
 capture. One shared job view returns faces from server-supplied viewer slots and actions
 only from server-supplied action lists. Stage states map onto the trust ladder:
 recorded → attributed, partial → pending, status_only → recorded (dimmed), inconsistency →
-conflicting; proven only for authenticated signatures. Authenticated per-user readers
-(identity, my work orders, job path, resources, evidence, signature queue) come first.
+conflicting; proven only for authenticated signatures. Readers follow the privacy doctrine
+below: job path, resources and evidence are anon-safe readers with personal information
+stripped at the source; only a party's own payments and balances, and its signature queue,
+need the authenticated party.
+
+### Privacy doctrine (owner, 2026-10-18)
+
+- **Open by default.** Job, work, provider and vehicle data (job paths, quote scope and
+  specifications, resources, evidence, provider capability and work history) is platform
+  data, used across platform calculations and readable anonymously.
+- **Prices are open.** Quote prices, labor rates and parts costs are open.
+- **Party money is not.** Actual payments and balances between specific parties are
+  visible only to those parties.
+- **Personal information is withheld:** email, phone, street address and the legal names
+  of private people. People appear by platform handle.
+- **Contact is brokered.** Users reach each other through a platform contact request, never
+  through exposed contact fields, so contact data cannot be extracted.
+- **Mechanism.** Readers default to anon-safe, with personal information stripped at the
+  source rather than gated per caller. Sign writers require the authenticated party. The
+  job readers shipped so far (`read_work_order_resources`, `read_work_order_job_path`,
+  `read_work_order_image_objects`) are still service-only; opening them under this
+  doctrine is separate work.
 
 ### Exposures and traps
 
-The 2026-10-19 review found public read paths on work-order, participant, rate and
-membership data; they are being closed in separate migrations and are not described here.
+The 2026-10-19 review found read paths that exposed personal contact fields on work-order
+and participant data; they are being closed in separate migrations and are not described
+here.
 The trap functions below are correctness hazards, listed in
 `docs/ledger/CAPABILITY_MAP.md`: `resolve_labor_rate`'s contract branch reads the absent
 `work_contracts`; `generate_repair_estimate` writes to an absent table;

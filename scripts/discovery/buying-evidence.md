@@ -189,7 +189,7 @@ source activation, paid inference or contact is performed.
 `--plan` selects a third read-only mode for 1–10 named public vehicles: an
 **estimate to inspect**, not an estimate to restore. It is the smallest first version
 of the listing → pre-purchase inspection pipeline in
-`docs/library/technical/work-order-intelligence.md` § "A job is a future receipt".
+`docs/library/technical/work-order-intelligence.md` § "A job is a quote".
 Logic lives in `buying-evidence-plan.mjs`; the reviewed claim → operation vocabulary is
 `buying-evidence-plan-keywords.json`.
 
