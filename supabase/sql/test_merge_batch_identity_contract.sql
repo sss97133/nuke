@@ -1,4 +1,5 @@
--- Isolated PostgreSQL 17 contract for 20261019030000_merge_carries_identity_unmerge_batch.sql. Synthetic rows only; never production.
+-- Isolated PostgreSQL 17 contract for 20261019030000_merge_carries_identity_unmerge_batch.sql and
+-- 20261020011000_merge_batch_discovery_url_fill_only.sql. Synthetic rows only; never production.
 -- Run in an empty, disposable dm_refinement_* database from the repo root:
 --   createdb dm_refinement_merge_batch_identity
 --   psql -X -v ON_ERROR_STOP=1 -d dm_refinement_merge_batch_identity -f supabase/sql/test_merge_batch_identity_contract.sql
@@ -98,6 +99,7 @@ CREATE TABLE public.superseded_rows (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(), source_table text, row_id uuid, row_data jsonb, asserted_by text, source jsonb, reason text);
 
 \i supabase/migrations/20261019030000_merge_carries_identity_unmerge_batch.sql
+\i supabase/migrations/20261020011000_merge_batch_discovery_url_fill_only.sql
 
 -- ---------------------------------------------------------------------------------------------------------------------
 -- 1. correct_vehicle_vin: a merged-away holder owns nothing; a live holder still does.
@@ -258,3 +260,24 @@ SELECT pg_temp.ok('writers are service-role only; unmerge_vehicle is also open t
   AND NOT has_function_privilege('anon', 'propose_listing_vin_merge(uuid,uuid,text,text)', 'EXECUTE')
   AND has_function_privilege('authenticated', 'unmerge_vehicle(uuid,text)', 'EXECUTE')
   AND NOT has_function_privilege('anon', 'unmerge_vehicle(uuid,text)', 'EXECUTE'));
+
+-- ---------------------------------------------------------------------------------------------------------------------
+-- 6. A primary whose www. URL canonicalizes onto the duplicate's URL still merges (live canonicalize trigger shape).
+-- ---------------------------------------------------------------------------------------------------------------------
+CREATE FUNCTION pg_temp.canon(u text) RETURNS text LANGUAGE sql IMMUTABLE AS $$
+  SELECT regexp_replace(regexp_replace(u, '^(https?://)www\.', '\1'), '/+$', '') $$;
+CREATE FUNCTION public.tg_canonicalize_test_discovery_url() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN
+  IF NEW.discovery_url IS NOT NULL THEN NEW.discovery_url := pg_temp.canon(NEW.discovery_url); END IF; RETURN NEW;
+END $$;
+INSERT INTO vehicles (id, status, vin, year, make, model, discovery_url) VALUES
+  ('00000000-0000-0000-0000-0000000008a1', 'active', 'F 251', 1903, 'Packard', 'Model F', 'https://www.goodingco.com/lot/1903-packard-model-f'),
+  ('00000000-0000-0000-0000-0000000008d1', 'active', NULL, 1903, 'Packard', 'Model F', 'https://goodingco.com/lot/1903-packard-model-f');
+CREATE TRIGGER vehicles_canonicalize_discovery_url BEFORE INSERT OR UPDATE OF discovery_url ON public.vehicles
+  FOR EACH ROW EXECUTE FUNCTION public.tg_canonicalize_test_discovery_url();
+CREATE TABLE pg_temp.www_merge AS
+  SELECT merge_into_primary_batch(ARRAY['00000000-0000-0000-0000-0000000008a1']::uuid[], ARRAY['00000000-0000-0000-0000-0000000008d1']::uuid[]) r;
+SELECT pg_temp.ok('a www. primary merges a duplicate holding the canonical URL; the primary keeps its own URL',
+  (SELECT (r ->> 'merged_count')::int FROM pg_temp.www_merge) = 1
+  AND (SELECT discovery_url FROM vehicles WHERE id = '00000000-0000-0000-0000-0000000008a1') = 'https://www.goodingco.com/lot/1903-packard-model-f'
+  AND (SELECT status FROM vehicles WHERE id = '00000000-0000-0000-0000-0000000008d1') = 'merged');
+DROP TRIGGER vehicles_canonicalize_discovery_url ON public.vehicles;
