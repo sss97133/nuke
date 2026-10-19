@@ -232,6 +232,7 @@ SELECT t_assert(rd()#>>'{viewer,context}'='visitor' AND rd()#>'{viewer,actions}'
  'stranger: visitor; signer by public handle, no raw id');
 RESET ROLE;
 SET ROLE anon;
+SELECT as_user(NULL);
 SELECT t_assert(rd()#>>'{acceptance,state}'='accepted' AND NOT (rd()#>>'{acceptance,accepted_by_viewer}')::boolean,'anon sees acceptance state');
 RESET ROLE;
 
@@ -245,6 +246,7 @@ SELECT as_user('10000000-0000-0000-0000-00000000000b');
 SELECT t_assert(t_refused_with($q$SELECT rd('30000000-0000-0000-0000-000000000003')$q$,'Work order unavailable'),'stranger refused on a private vehicle');
 RESET ROLE;
 SET ROLE anon;
+SELECT as_user(NULL);
 SELECT t_assert(t_refused_with($q$SELECT rd('30000000-0000-0000-0000-000000000003')$q$,'Work order unavailable'),'anon refused on a private vehicle');
 SELECT t_assert(t_refused_with($q$SELECT rd('30000000-0000-0000-0000-0000000000ff')$q$,'Work order unavailable'),'missing work order refused');
 SELECT t_assert(t_refused(format($q$SELECT accept_work_order_quote(%L,%L)$q$,:'q2',:'h2')),'anon still cannot sign');
@@ -253,6 +255,7 @@ RESET ROLE;
 -- A withdrawn version shows its summary only.
 UPDATE vehicle_observations SET is_superseded=true WHERE id=:'q1';
 SET ROLE anon;
+SELECT as_user(NULL);
 SELECT t_assert(rd()#>'{history,0}' @> '{"state":"withdrawn","withheld_reason":"source_withdrawn"}' AND NOT rd()#>'{history,0}' ? 'lines',
  'withdrawn version: summary only');
 RESET ROLE;
