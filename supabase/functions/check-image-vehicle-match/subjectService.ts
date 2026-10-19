@@ -33,6 +33,7 @@ export interface CandidateScope {
   exhausted: boolean; truncated: boolean; reference_photos_assessed: number;
   unavailable_references: string[]; global_novelty_asserted: false;
   identifier_candidates?: Array<{ vin: string; make: string | null; model: string | null }>;
+  identifier_context?: { retrieved: number; supplied: number; truncated: boolean };
   subject_references?: { image_ids: string[]; coverage: Record<string, unknown> };
 }
 export interface SubjectEnvelope extends SubjectProjection {
@@ -308,9 +309,18 @@ export async function resolveSubjectBatch(store: SubjectStore, request: SubjectR
     // Three frames include per-frame witnesses and pairwise contradictions. The
     // live three-frame pilot exhausted 1,600 tokens with an unreadable result.
     // 4096 remains inside the same two-cent default preflight reservation.
+    // Keep account context inside the existing platform's 8 KB text ceiling.
+    // Serial strings aid worn-mark reading; catalog labels are unnecessary here.
+    const serials = [...new Set((candidate_scope.identifier_candidates ?? []).map(candidate => candidate.vin))].sort();
+    const supplied: string[] = [];
+    for (const serial of serials) {
+      if (new TextEncoder().encode(JSON.stringify([...supplied, serial])).length > 3200) break;
+      supplied.push(serial);
+    }
+    candidate_scope.identifier_context = { retrieved: serials.length, supplied: supplied.length, truncated: supplied.length < serials.length };
     const result = await runCapturedVision(visionSources, capture, () => [
       { text: SUBJECT_PROMPT },
-      { text: `Known account serial candidates (fallible lookup context, not proof): ${JSON.stringify(candidate_scope.identifier_candidates ?? [])}` },
+      { text: `Known account serial candidates (fallible lookup context, not proof; coverage=${JSON.stringify(candidate_scope.identifier_context)}): ${JSON.stringify(supplied)}` },
       { text: `Capture relations: ${JSON.stringify(sources.flatMap((a, i) => sources.slice(i + 1).map(b => {
         return { left_image_id: a.id, right_image_id: b.id, ...captureRelation(a, b) };
       })))}` },

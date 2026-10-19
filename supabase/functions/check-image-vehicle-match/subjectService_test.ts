@@ -149,6 +149,20 @@ Deno.test("current admission holds, changed metadata and non-user stores cannot 
   const service = captureFixture(); delete service.store.admitCapture;
   await service.run(); equal(service.requests.length, 0);
 });
+Deno.test("large account serial context stays below the platform text ceiling with explicit coverage", async () => {
+  const f = captureFixture(), vision = f.dependencies.vision;
+  f.store.candidates = async () => ({ ...scope, identifier_candidates: Array.from({ length: 500 }, (_, i) => ({
+    vin: `1AB${String(i).padStart(14, "0")}`, make: "Example".repeat(5), model: "Long catalog model".repeat(3) })) });
+  f.dependencies.vision = async options => {
+    const textBytes = options.parts.reduce((n, part) => n + ("text" in part ? new TextEncoder().encode(part.text).length : 0), 0);
+    equal(textBytes < 8000, true);
+    return await vision(options);
+  };
+  const result = await f.run(); equal(result.status, "resolved");
+  const coverage = "candidate_scope" in result && result.candidate_scope?.identifier_context;
+  equal(coverage && coverage.retrieved, 500); equal(coverage && coverage.truncated, true);
+  equal(f.counts.models, 1);
+});
 Deno.test("protected owner binding rejects other accounts and anonymous or unscoped callers", () => {
   equal(subjectOwnerId({ kind: "user", userId: uid }, uid), uid);
   equal(subjectOwnerId({ kind: "service_role" }, other), other);
