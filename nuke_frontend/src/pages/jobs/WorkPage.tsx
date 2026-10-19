@@ -101,7 +101,7 @@ const WorkPage: React.FC = () => {
   return <main className="jb-page jb-scope">
     <div className="jb-intro">
       <Text role="entity" as="h1">Work</Text>
-      <Text role="body">What is waiting for your signature, and the jobs you are on. <PrefetchLink to="/jobs">Jobs looking for someone</PrefetchLink></Text>
+      <Text role="body">What is waiting for your signature, and the jobs you are on. <PrefetchLink to="/jobs">Jobs looking for someone</PrefetchLink> · <PrefetchLink to="/work/market">The job market</PrefetchLink></Text>
       <Text role="body"><PrefetchLink to="/work/setup">Set up your provider page</PrefetchLink> so jobs that fit can find you.</Text>
     </div>
     {refusal && <Text role="body" className="jb-warn">{refusal}</Text>}
