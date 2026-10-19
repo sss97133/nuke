@@ -235,6 +235,8 @@ DECLARE
   v_recent integer;
   v_filing jsonb;
   v_contributor boolean := false;
+  v_identity_run uuid;
+  v_identity_method text;
 BEGIN
   IF v_caller IS NULL THEN
     RAISE EXCEPTION 'device_create_vehicle_profile: authentication required' USING ERRCODE = '42501';
@@ -270,6 +272,9 @@ BEGIN
     -- A source-bound identifier read anchors a bounded capture sequence. An album
     -- declaration is not identity evidence and is not required for this path.
     v_ident := upper(btrim(coalesce(p_profile ->> 'vin', p_profile ->> 'serial', '')));
+    v_identity_run := CASE WHEN pg_input_is_valid(v_evidence ->> 'identity_run_id','uuid')
+      THEN (v_evidence ->> 'identity_run_id')::uuid END;
+    v_identity_method := v_evidence ->> 'identity_method_version';
     IF v_ident !~ '^[A-Z0-9]{8,17}$' OR v_ident !~ '[A-Z]' OR v_ident !~ '[0-9]'
        OR (length(v_ident) = 17 AND NOT public.validate_vin_check_digit(v_ident)) THEN
       RETURN jsonb_build_object('status', 'invalid_identifier', 'basis', v_basis);
@@ -280,6 +285,8 @@ BEGIN
        OR upper(btrim(coalesce(v_evidence ->> 'identifier_read', ''))) <> v_ident
        OR v_evidence ->> 'edit_distance' IS DISTINCT FROM '0'
        OR coalesce(v_evidence ->> 'identifier_legibility', '') NOT IN ('clear', 'partial')
+       OR v_identity_run IS NULL
+       OR coalesce(v_identity_method,'') !~ '^vehicle-identity-context-fold-v2:[A-Za-z0-9._:-]{1,80}$'
        OR cardinality(v_image_ids) NOT BETWEEN 2 AND 100 THEN
       RETURN jsonb_build_object('status', 'insufficient_evidence', 'basis', v_basis,
         'detail', 'needs an exact source-bound identifier anchor and its capture sequence');
@@ -385,13 +392,13 @@ BEGIN
        AND (v_basis <> 'album' OR btrim(coalesce(vi.image_url, '')) <> '');
     IF v_basis = 'capture_session' THEN
       -- Validate every member against the retained upload, not caller-supplied
-      -- coordinates. Missing clocks/GPS/device evidence stays unresolved.
+      -- coordinates. Missing clocks/GPS stays unresolved.
       SELECT ARRAY[vi.id] INTO v_exact FROM vehicle_images vi
        WHERE vi.id = (v_evidence ->> 'anchor_image_id')::uuid AND vi.id = ANY(v_usable)
          AND vi.file_hash = v_evidence ->> 'anchor_source_sha256'
          AND nullif(btrim(vi.image_url), '') IS NOT NULL
          AND vi.is_duplicate IS NOT TRUE AND vi.is_document IS NOT TRUE AND vi.is_sensitive IS NOT TRUE
-         AND vi.taken_at IS NOT NULL AND vi.device_fingerprint IS NOT NULL
+         AND vi.taken_at IS NOT NULL
          AND vi.latitude BETWEEN -90 AND 90 AND vi.longitude BETWEEN -180 AND 180;
       IF coalesce(cardinality(v_exact), 0) <> 1
          OR cardinality(v_usable) <> cardinality(v_image_ids)
@@ -400,7 +407,6 @@ BEGIN
             WHERE a.id = v_exact[1] AND vi.id = ANY(v_image_ids)
               AND (nullif(btrim(vi.image_url), '') IS NULL OR vi.file_hash IS NULL
                 OR vi.is_duplicate IS TRUE OR vi.is_document IS TRUE OR vi.is_sensitive IS TRUE
-                OR vi.device_fingerprint IS DISTINCT FROM a.device_fingerprint
                 OR vi.taken_at IS NULL OR vi.latitude IS NULL OR vi.longitude IS NULL
                 OR vi.latitude NOT BETWEEN -90 AND 90 OR vi.longitude NOT BETWEEN -180 AND 180
                 OR abs(extract(epoch FROM vi.taken_at - a.taken_at)) > 900
@@ -410,7 +416,104 @@ BEGIN
                      * power(sin(radians(vi.longitude - a.longitude) / 2), 2)))) > 100))
          OR (SELECT max(taken_at) - min(taken_at) FROM vehicle_images WHERE id = ANY(v_image_ids)) > interval '15 minutes' THEN
         RETURN jsonb_build_object('status', 'insufficient_evidence', 'basis', v_basis,
-          'detail', 'capture members must retain one device, nearby source clocks/GPS and live source bytes');
+          'detail', 'capture members need nearby source clocks/GPS and live source bytes');
+      END IF;
+      -- Fresh on-device source reads are stored in image_observations' protected
+      -- reading-only namespace. They provide the VIN and vehicle classification,
+      -- but assert no physical membership; this fold adds only a VIN-anchored,
+      -- nearby capture relation after contextual qualification.
+      IF NOT EXISTS (
+        SELECT 1 FROM public.image_observations o
+        CROSS JOIN LATERAL jsonb_array_elements(coalesce(
+          o.confidence_basis #> '{visual_subject_reading_v1,envelope,device_source_context,observations}',
+          o.confidence_basis #> '{visual_subject_reading_v1,envelope,raw_model_reading,observations}')) anchor_read
+        WHERE o.image_id = (v_evidence ->> 'anchor_image_id')::uuid
+          AND o.observed_by = 'visual_subject_reading_v1' AND o.is_active AND o.superseded_by IS NULL
+          AND o.confidence_basis #>> '{visual_subject_reading_v1,envelope,user_id}' = v_caller::text
+          AND coalesce(o.confidence_basis #>> '{visual_subject_reading_v1,envelope,device_source_context,kind}',
+            o.confidence_basis #>> '{visual_subject_reading_v1,envelope,raw_model_reading,kind}') IN ('on_device_identity_read_v1','on_device_identity_context_v1')
+          AND coalesce(o.confidence_basis #>> '{visual_subject_reading_v1,envelope,device_source_context,identity_run_id}',
+            o.confidence_basis #>> '{visual_subject_reading_v1,envelope,raw_model_reading,identity_run_id}') = v_identity_run::text
+          AND coalesce(o.confidence_basis #>> '{visual_subject_reading_v1,envelope,device_source_context,identity_method_version}',
+            o.confidence_basis #>> '{visual_subject_reading_v1,envelope,raw_model_reading,identity_method_version}') = v_identity_method
+          AND anchor_read ->> 'image_id' = (v_evidence ->> 'anchor_image_id')
+          AND anchor_read ->> 'is_document' = 'false' AND (anchor_read -> 'vin_candidates') ? v_ident
+          AND coalesce(o.confidence_basis #> '{visual_subject_reading_v1,envelope,device_source_context,inputs}',
+            o.confidence_basis #> '{visual_subject_reading_v1,envelope,inputs}') @>
+            jsonb_build_array(jsonb_build_object('image_id', v_evidence ->> 'anchor_image_id', 'source_sha256', v_evidence ->> 'anchor_source_sha256'))
+      ) OR EXISTS (
+        SELECT 1 FROM unnest(v_image_ids) AS members(member_id)
+        JOIN public.vehicle_images member ON member.id = member_id
+        WHERE member_id <> (v_evidence ->> 'anchor_image_id')::uuid AND NOT EXISTS (
+          SELECT 1 FROM public.image_observations o
+          CROSS JOIN LATERAL jsonb_array_elements(coalesce(
+            o.confidence_basis #> '{visual_subject_reading_v1,envelope,device_source_context,observations}',
+            o.confidence_basis #> '{visual_subject_reading_v1,envelope,raw_model_reading,observations}')) anchor_read
+          CROSS JOIN LATERAL jsonb_array_elements(coalesce(
+            o.confidence_basis #> '{visual_subject_reading_v1,envelope,device_source_context,observations}',
+            o.confidence_basis #> '{visual_subject_reading_v1,envelope,raw_model_reading,observations}')) member_read
+          WHERE o.image_id = member_id AND o.observed_by = 'visual_subject_reading_v1'
+            AND o.is_active AND o.superseded_by IS NULL
+            AND o.confidence_basis #>> '{visual_subject_reading_v1,envelope,user_id}' = v_caller::text
+            AND coalesce(o.confidence_basis #>> '{visual_subject_reading_v1,envelope,device_source_context,kind}',
+              o.confidence_basis #>> '{visual_subject_reading_v1,envelope,raw_model_reading,kind}') IN ('on_device_identity_read_v1','on_device_identity_context_v1')
+            AND coalesce(o.confidence_basis #>> '{visual_subject_reading_v1,envelope,device_source_context,identity_run_id}',
+              o.confidence_basis #>> '{visual_subject_reading_v1,envelope,raw_model_reading,identity_run_id}') = v_identity_run::text
+            AND coalesce(o.confidence_basis #>> '{visual_subject_reading_v1,envelope,device_source_context,identity_method_version}',
+              o.confidence_basis #>> '{visual_subject_reading_v1,envelope,raw_model_reading,identity_method_version}') = v_identity_method
+            AND anchor_read ->> 'image_id' = (v_evidence ->> 'anchor_image_id')
+            AND (anchor_read -> 'vin_candidates') ? v_ident AND anchor_read ->> 'is_document' = 'false'
+            AND member_read ->> 'image_id' = member_id::text
+            AND member_read ->> 'is_vehicle' = 'true' AND member_read ->> 'is_document' = 'false'
+            AND coalesce(o.confidence_basis #> '{visual_subject_reading_v1,envelope,device_source_context,inputs}',
+              o.confidence_basis #> '{visual_subject_reading_v1,envelope,inputs}') @>
+              jsonb_build_array(jsonb_build_object('image_id', member_id::text, 'source_sha256', member.file_hash))
+            AND coalesce(o.confidence_basis #> '{visual_subject_reading_v1,envelope,device_source_context,inputs}',
+              o.confidence_basis #> '{visual_subject_reading_v1,envelope,inputs}') @>
+              jsonb_build_array(jsonb_build_object('image_id', v_evidence ->> 'anchor_image_id', 'source_sha256', v_evidence ->> 'anchor_source_sha256'))
+        )
+      ) OR EXISTS (
+        -- Another fresh, source-matching VIN inside this same physical capture
+        -- neighborhood is a hard conflict even if the phone omitted it from the
+        -- requested profile member list.
+        SELECT 1 FROM public.image_observations o
+        CROSS JOIN LATERAL jsonb_array_elements(coalesce(
+          o.confidence_basis #> '{visual_subject_reading_v1,envelope,device_source_context,observations}',
+          o.confidence_basis #> '{visual_subject_reading_v1,envelope,raw_model_reading,observations}')) other_read
+        CROSS JOIN LATERAL jsonb_array_elements_text(other_read -> 'vin_candidates') other_vin(vin)
+        JOIN public.vehicle_images other_image ON other_image.id = (other_read ->> 'image_id')::uuid
+        CROSS JOIN public.vehicle_images anchor_image
+        WHERE o.observed_by = 'visual_subject_reading_v1' AND o.is_active AND o.superseded_by IS NULL
+          AND o.confidence_basis #>> '{visual_subject_reading_v1,envelope,user_id}' = v_caller::text
+          AND coalesce(o.confidence_basis #>> '{visual_subject_reading_v1,envelope,device_source_context,kind}',
+            o.confidence_basis #>> '{visual_subject_reading_v1,envelope,raw_model_reading,kind}') IN ('on_device_identity_read_v1','on_device_identity_context_v1')
+          AND coalesce(o.confidence_basis #>> '{visual_subject_reading_v1,envelope,device_source_context,identity_run_id}',
+            o.confidence_basis #>> '{visual_subject_reading_v1,envelope,raw_model_reading,identity_run_id}') = v_identity_run::text
+          AND coalesce(o.confidence_basis #>> '{visual_subject_reading_v1,envelope,device_source_context,identity_method_version}',
+            o.confidence_basis #>> '{visual_subject_reading_v1,envelope,raw_model_reading,identity_method_version}') = v_identity_method
+          AND anchor_image.id = (v_evidence ->> 'anchor_image_id')::uuid
+          AND other_image.id <> anchor_image.id AND other_image.user_id = v_caller
+          AND other_read ->> 'is_document' = 'false'
+          AND other_vin.vin ~ '^[A-HJ-NPR-Z0-9]{17}$' AND public.validate_vin_check_digit(other_vin.vin)
+          AND upper(other_vin.vin) <> v_ident
+          AND other_image.is_superseded IS NOT TRUE AND other_image.is_duplicate IS NOT TRUE
+          AND other_image.is_document IS NOT TRUE AND other_image.is_sensitive IS NOT TRUE
+          AND coalesce(other_image.vision_gate_status::text,'') NOT IN ('rejected_personal','rejected_misattributed')
+          AND coalesce(o.confidence_basis #> '{visual_subject_reading_v1,envelope,device_source_context,inputs}',
+            o.confidence_basis #> '{visual_subject_reading_v1,envelope,inputs}') @>
+            jsonb_build_array(jsonb_build_object('image_id', other_image.id::text, 'source_sha256', other_image.file_hash))
+          AND other_image.file_hash ~ '^[a-f0-9]{64}$'
+          AND other_image.taken_at IS NOT NULL AND anchor_image.taken_at IS NOT NULL
+          AND abs(extract(epoch FROM other_image.taken_at - anchor_image.taken_at)) <= 900
+          AND other_image.latitude BETWEEN -90 AND 90 AND other_image.longitude BETWEEN -180 AND 180
+          AND anchor_image.latitude BETWEEN -90 AND 90 AND anchor_image.longitude BETWEEN -180 AND 180
+          AND 6371000 * 2 * asin(sqrt(least(1.0,
+               power(sin(radians(other_image.latitude - anchor_image.latitude) / 2), 2)
+               + cos(radians(anchor_image.latitude)) * cos(radians(other_image.latitude))
+               * power(sin(radians(other_image.longitude - anchor_image.longitude) / 2), 2)))) <= 100
+      ) THEN
+        RETURN jsonb_build_object('status', 'insufficient_evidence', 'basis', v_basis,
+          'detail', 'fresh contextual on-device VIN and vehicle reads are required');
       END IF;
     END IF;
     IF v_basis = 'vin' THEN

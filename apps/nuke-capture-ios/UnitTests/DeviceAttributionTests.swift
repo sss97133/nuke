@@ -7,6 +7,17 @@ import Supabase
 @testable import NukeCapture
 
 final class DeviceAttributionTests: XCTestCase {
+    private func capture(_ id: String, vin: String? = nil, exact: Bool = false,
+                         time: String? = "2026-10-18T12:00:00Z", lat: Double? = 37,
+                         lon: Double? = -122,
+                         hash: String? = String(repeating: "a", count: 64),
+                         vehicle: Bool = false, document: Bool = false,
+                         sensitive: Bool = false) -> AttributionEngine.VINCaptureFrame {
+        .init(imageID: id, vin: vin, exactVIN: exact, takenAt: time, latitude: lat, longitude: lon,
+              fileHash: hash, isVehicle: vehicle,
+              isDocument: document, isSensitive: sensitive)
+    }
+
     func testDuplicateSerialClaimsDoNotChooseDatabaseOrder() {
         let entries = [(serial: "VIN12345678", vehicleId: "first"),
                        (serial: "vin12345678", vehicleId: "second"),
@@ -50,6 +61,66 @@ final class DeviceAttributionTests: XCTestCase {
         XCTAssertEqual(AttributionEngine.profileFiledIDs(from: partial), ["a", "d"])
         XCTAssertTrue(AttributionEngine.profileFiledIDs(from: try response(#"{"status":"ambiguous","candidates":["vehicle-a","vehicle-b"]}"#)).isEmpty)
         XCTAssertTrue(AttributionEngine.profileFiledIDs(from: try response(#"{"status":"created","filing":{}}"#)).isEmpty)
+    }
+
+    func testFreshExactVINFoldsNearbyVehicleFramesFromTheSameReadRun() {
+        let vin = "1GCEK14L9EJ147915"
+        let frames = [capture("plate", vin: vin, exact: true),
+                      capture("front", time: "2026-10-18T12:03:00Z", lat: 37.0001, vehicle: true),
+                      capture("rear", time: "2026-10-18T12:06:00Z", lat: 37.0002, vehicle: true)]
+        XCTAssertEqual(AttributionEngine.vinAnchoredCaptureGroups(frames), [
+            .init(vin: vin, anchorImageID: "plate", imageIDs: ["front", "plate", "rear"], vehicleFrameCount: 2)
+        ])
+    }
+
+    func testIdentityFoldRejectsDocumentsStaleReadsAndAmbiguousVINNeighborhoods() {
+        let vinA = "1GCEK14L9EJ147915", vinB = "JT6HJ88J4V0178097"
+        for invalidAnchor in [
+            capture("old-cache", vin: vinA, exact: true, hash: nil),
+            capture("document-vin", vin: vinA, exact: true, document: true),
+            capture("sensitive-vin", vin: vinA, exact: true, sensitive: true),
+            capture("invalid-vin", vin: "1GCEK14L9EJ147916", exact: true),
+        ] {
+            XCTAssertTrue(AttributionEngine.vinAnchoredCaptureGroups([
+                invalidAnchor, capture("front", vehicle: true)
+            ]).isEmpty)
+        }
+        XCTAssertTrue(AttributionEngine.vinAnchoredCaptureGroups([
+            capture("plate", vin: vinA, exact: true),
+            capture("late", time: "2026-10-18T12:16:00Z", vehicle: true)
+        ]).isEmpty)
+        XCTAssertEqual(AttributionEngine.vinAnchoredCaptureGroups([
+            capture("plate", vin: vinA, exact: true),
+            capture("front", vehicle: true)
+        ]).count, 1, "the run plus capture neighborhood is the relation; camera model metadata is not")
+        XCTAssertTrue(AttributionEngine.vinAnchoredCaptureGroups([
+            capture("plate-a", vin: vinA, exact: true),
+            capture("plate-b", vin: vinB, exact: true, time: "2026-10-18T12:01:00Z", lat: 37.0001),
+            capture("shared", time: "2026-10-18T12:00:30Z", lat: 37.00005, vehicle: true)
+        ]).isEmpty)
+    }
+
+    func testCaptureSessionRequestCarriesSourceBoundAnchorAndFreshRunKey() throws {
+        let request = AttributionEngine.DeviceProfileRequest(basis: "capture_session", vin: "1GCEK14L9EJ147915",
+            serial: nil, year: nil, make: nil, model: nil, album_name: nil, album_native_id: nil,
+            image_ids: ["plate", "front"], evidence: [
+                "context_method": "vin_capture_session_v1",
+                "identifier_read": "1GCEK14L9EJ147915",
+                "edit_distance": "0",
+                "identifier_legibility": "clear",
+                "identity_run_id": UUID().uuidString,
+                "identity_method_version": LibraryIngest.identityMethodVersion,
+                "anchor_image_id": "plate",
+                "anchor_source_sha256": String(repeating: "a", count: 64),
+                "read_at": "2026-10-18T12:00:00Z",
+            ])
+        let json = try JSONSerialization.jsonObject(with: JSONEncoder().encode(request)) as! [String: Any]
+        XCTAssertEqual(json["basis"] as? String, "capture_session")
+        let evidence = json["evidence"] as? [String: String]
+        XCTAssertEqual(evidence?["anchor_image_id"], "plate")
+        XCTAssertEqual(evidence?["identity_method_version"], LibraryIngest.identityMethodVersion)
+        XCTAssertNotNil(evidence?["identity_run_id"])
+        XCTAssertNotEqual(LibraryIngest.identityMethodVersion, LibraryIngest.albumMethodVersion)
     }
 
     private func album(_ id: String, _ name: String) -> LocalPhotoAlbum {

@@ -154,6 +154,13 @@ final class LibraryIngest: ObservableObject {
         return "album-vision-v2:\(VNClassifyImageRequest.defaultRevision):\(VNRecognizeTextRequest.defaultRevision):\(os.majorVersion)"
     }
 
+    /// Identity decisions start with a new pass over the original bytes. A prior
+    /// image analysis may have been wrong anywhere upstream, so it cannot qualify
+    /// as the VIN/classification read that anchors a capture-session fold.
+    static var identityMethodVersion: String {
+        "vehicle-identity-context-fold-v2:\(VNClassifyImageRequest.defaultRevision):\(VNRecognizeTextRequest.defaultRevision)"
+    }
+
     /// Read every selected source image, including already-bound photos. Album
     /// membership is context, never an inferred vehicle ID. A whole-library pass
     /// prioritizes albums, then visits the remaining visible photos exactly once.

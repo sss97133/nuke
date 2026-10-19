@@ -9,7 +9,7 @@ import { assertComparisonReceiptCapacity, comparisonReceiptPatch, parseReference
   referenceDecisionProjection, scopeComparisonImages, type ReferenceDecision } from './decision.ts';
 import { runPinnedVision, type CustodiedVisionPart, type VisionInputSource,
   type VisionInputReceipt, type UnavailableVisionInput } from './inputCustody.ts';
-import { resolveSubjectBatch, subjectOwnerId, supabaseSubjectStore, type SubjectRequest } from './subjectService.ts';
+import { resolveSubjectBatch, retainDeviceSourceReading, subjectOwnerId, supabaseSubjectStore, type DeviceSourceReadRequest, type SubjectRequest } from './subjectService.ts';
 import { readSubjectProfiles } from './subjectReader.ts';
 import { selectResolutionContext } from './subjectCandidates.ts';
 import { readSourceInbox, type SourceInboxOptions } from './sourceInbox.ts';
@@ -21,7 +21,7 @@ import { readSubjectReinspections } from './subjectReinspection.ts';
 
 interface CheckRequest extends SubjectRequest {
   // Mode: "check" (default/legacy), "build_signatures", "disambiguate"
-  mode?: "check" | "build_signatures" | "disambiguate" | "resolve_subjects" | "read_subjects" | "read_subject_reinspections";
+  mode?: "check" | "build_signatures" | "disambiguate" | "resolve_subjects" | "read_subjects" | "read_subject_reinspections" | "record_device_reading";
   cluster_id?: string;
   limit?: number;
   offset?: number;
@@ -305,7 +305,7 @@ Deno.serve(async (req: Request) => {
     const batchSize = Math.min(body.batch_size || 10, 50);
     const dryRun = body.dry_run ?? false;
 
-    if (mode === "resolve_subjects" || mode === "read_subjects" || mode === "read_subject_reinspections") {
+    if (mode === "resolve_subjects" || mode === "read_subjects" || mode === "read_subject_reinspections" || mode === "record_device_reading") {
       const caller = await authenticateWriter(req);
       if (!caller.ok) return writeAuthResponse(caller, corsHeaders);
       let owner: string;
@@ -316,7 +316,13 @@ Deno.serve(async (req: Request) => {
         });
       }
       let result;
-      if (mode === "read_subjects") {
+      if (mode === "record_device_reading") {
+        const identityClient = caller.caller.kind === "user" ? createClient(supabaseUrl,
+          Deno.env.get("SUPABASE_ANON_KEY")!, { global: { headers: { Authorization: req.headers.get("Authorization")! } },
+            auth: { persistSession: false, autoRefreshToken: false } }) : undefined;
+        if (!identityClient) throw new Error("device_reading_user_auth_required");
+        result = await retainDeviceSourceReading(supabaseSubjectStore(supabase, identityClient), { ...body, user_id: owner } as DeviceSourceReadRequest & { user_id: string });
+      } else if (mode === "read_subjects") {
         result = body.source_inbox === undefined ? await readSubjectProfiles(supabase, owner, body)
           : await readSourceInbox(supabase, owner, body.source_inbox);
       } else if (mode === "read_subject_reinspections") {
