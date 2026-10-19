@@ -379,6 +379,8 @@ ALTER TABLE public.observation_sources ADD COLUMN IF NOT EXISTS display_name tex
 \ir ../migrations/20261020093000_discovery_providers_read.sql
 \echo REPLAY 20261020100000_job_loop_read_speedups.sql
 \ir ../migrations/20261020100000_job_loop_read_speedups.sql
+\echo REPLAY 20261020111500_work_order_activity_read.sql
+\ir ../migrations/20261020111500_work_order_activity_read.sql
 \echo REPLAY 20261020120000_requirement_keyword_capabilities.sql
 \ir ../migrations/20261020120000_requirement_keyword_capabilities.sql
 -- Plan check and final state.

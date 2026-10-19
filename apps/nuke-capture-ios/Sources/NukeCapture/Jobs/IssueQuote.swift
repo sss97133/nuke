@@ -77,14 +77,26 @@ struct WorkOrderOperations: Decodable, Equatable {
         }
     }
     struct Part: Decodable, Equatable, Identifiable {
+        /// The part's current product link (work_order_part_product_card, migration 20261020074500); null when none.
+        struct Product: Decodable, Equatable {
+            let image_url: String?
+            let product_name: String?
+            let manufacturer: String?
+            let source: String?
+            let match_basis: String?
+        }
         let id: String
         let part_name: String?
+        let part_name_visibility: String?
+        let brand: String?
+        let part_number: String?
         let quantity: Double?
         let unit_price: Double?
         let total_price: Double?
         let is_comped: Bool?
         let status: String?
         let quote_ref: Ref?
+        let product: Product?
     }
     struct Labor: Decodable, Equatable, Identifiable {
         let id: String
