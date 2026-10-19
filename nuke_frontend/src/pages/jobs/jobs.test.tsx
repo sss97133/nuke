@@ -12,7 +12,7 @@ const fixture = vi.hoisted(() => ({
 vi.mock('../../lib/supabase', () => ({ supabase: { rpc: fixture.rpc } }));
 vi.mock('../../contexts/AuthContext', () => ({ useAuthContext: () => ({ session: fixture.session }) }));
 vi.mock('../../hooks/usePageTitle', () => ({ usePageTitle: () => {} }));
-vi.mock('../../components/PrefetchLink', () => ({ PrefetchLink: ({ to, children }: any) => <a href={to}>{children}</a> }));
+vi.mock('../../components/PrefetchLink', () => ({ PrefetchLink: ({ to, children }: { to: string; children: React.ReactNode }) => <a href={to}>{children}</a> }));
 
 import JobsBoard from './JobsBoard';
 import WorkPage from './WorkPage';
@@ -21,10 +21,10 @@ import { WorkPlanView } from './WorkPlanPanel';
 import { PostedJobView } from './PostJobSheet';
 import {
   NO_SHOP_RATE, hasContactDetails, matchReason, matchNext, offerArgs, openRequestsSentence, paymentLine, postArgs, targetHours,
-  type OpenRequirementsRead, type WorkPlan,
+  type OpenRequirementsRead, type PostedJob, type WorkPlan,
 } from './jobsReaders';
 
-(globalThis as any).IS_REACT_ACT_ENVIRONMENT = true;
+(globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
 const WO = '11111111-1111-4111-8111-111111111111';
 const REQ_A = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
@@ -256,13 +256,15 @@ describe('WorkPlanView', () => {
 
 describe('PostedJobView', () => {
   it('shows suggested cost as hours only, with no placeholder dollars', async () => {
-    await render(<PostedJobView posted={{
+    // What post_work_request returns: cost and rate beside the hours. The page must use the hours only.
+    const posted = {
       work_order_id: WO, visibility: 'open', listed_in_open_requirements: true,
       operations: [{ line_number: 1, text: 'Replace the front pads' }],
       requirements: [{ requirement_id: REQ_A, kind: 'skill', description: 'Replace the front pads' }],
-      suggested_cost: { lines: [{ line_number: 1, text: 'Replace the front pads', hours: { low: 2, high: 3 }, cost: { low: 320, high: 480 }, state: 'estimated' } as any],
-        total: { low: 320, high: 480, lines_estimated: 1, lines: 1 } as any, rate: 160, rate_label: 'placeholder' } as any,
-    }} />);
+      suggested_cost: { lines: [{ line_number: 1, text: 'Replace the front pads', hours: { low: 2, high: 3 }, cost: { low: 320, high: 480 }, state: 'estimated' }],
+        total: { low: 320, high: 480, lines_estimated: 1, lines: 1 }, rate: 160, rate_label: 'placeholder' },
+    } as unknown as PostedJob;
+    await render(<PostedJobView posted={posted} />);
     const text = container.textContent ?? '';
     expect(text).toContain('about 2–3 h');
     expect(text).toContain(NO_SHOP_RATE);
