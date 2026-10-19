@@ -362,6 +362,9 @@ ALTER TABLE public.observation_sources ADD COLUMN IF NOT EXISTS display_name tex
 \ir helpers/capability_keys_live_20261020.sql
 \echo REPLAY 20261020060000_requirement_capability_keys.sql
 \ir ../migrations/20261020060000_requirement_capability_keys.sql
+\ir helpers/catalog_tables_live_20261020.sql
+\echo REPLAY 20261020074500_work_order_part_product_matches.sql
+\ir ../migrations/20261020074500_work_order_part_product_matches.sql
 \echo REPLAY 20261020081000_publish_work_order.sql
 \ir ../migrations/20261020081000_publish_work_order.sql
 -- Plan check and final state.
