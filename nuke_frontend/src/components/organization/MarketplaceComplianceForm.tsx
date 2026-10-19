@@ -38,7 +38,6 @@ type BusinessRecord = {
   legal_name: string | null;
   business_name: string | null;
   business_type: string | null;
-  tax_id: string | null;
   registration_state: string | null;
   address: string | null;
   city: string | null;
@@ -79,6 +78,8 @@ const MarketplaceComplianceForm: React.FC<MarketplaceComplianceFormProps> = ({ o
   const [legalName, setLegalName] = useState('');
   const [businessType, setBusinessType] = useState<string>('');
   const [taxId, setTaxId] = useState('');
+  // tax_id is editor-only (organization_private_fields_read); never save it unless it was read.
+  const [taxIdLoaded, setTaxIdLoaded] = useState(false);
   const [registrationState, setRegistrationState] = useState('');
   const [address, setAddress] = useState('');
   const [city, setCity] = useState('');
@@ -122,16 +123,28 @@ const MarketplaceComplianceForm: React.FC<MarketplaceComplianceFormProps> = ({ o
     try {
       const { data, error } = await supabase
         .from('businesses')
-        .select('legal_name, business_name, entity_type, tax_id, registration_state, address, city, state, zip_code, country, phone, email, website, metadata')
+        .select('legal_name, business_name, entity_type, registration_state, address, city, state, zip_code, country, phone, email, website, metadata')
         .eq('id', organizationId)
         .single<BusinessRecord>();
 
       if (error) throw error;
       if (!data) throw new Error('Organization not found');
 
+      setTaxIdLoaded(false);
+      setTaxId('');
+      if (canEdit) {
+        const { data: privateFields, error: privateError } = await supabase
+          .rpc('organization_private_fields_read', { p_organization_id: organizationId });
+        if (privateError) {
+          console.error('Failed to load private organization fields', privateError);
+        } else {
+          setTaxId(privateFields?.tax_id || '');
+          setTaxIdLoaded(true);
+        }
+      }
+
       setLegalName(data.legal_name || data.business_name || '');
       setBusinessType((data as any).entity_type || '');
-      setTaxId(data.tax_id || '');
       setRegistrationState(data.registration_state || '');
       setAddress(data.address || '');
       setCity(data.city || '');
@@ -175,7 +188,7 @@ const MarketplaceComplianceForm: React.FC<MarketplaceComplianceFormProps> = ({ o
     } finally {
       setLoading(false);
     }
-  }, [organizationId]);
+  }, [organizationId, canEdit]);
 
   useEffect(() => {
     load();
@@ -222,7 +235,7 @@ const MarketplaceComplianceForm: React.FC<MarketplaceComplianceFormProps> = ({ o
       const updatePayload: Record<string, any> = {
         legal_name: legalName.trim() || null,
         entity_type: businessType || null,
-        tax_id: taxId.trim() || null,
+        ...(taxIdLoaded ? { tax_id: taxId.trim() || null } : {}),
         registration_state: registrationState.trim() || null,
         address: address.trim() || null,
         city: city.trim() || null,
@@ -237,7 +250,7 @@ const MarketplaceComplianceForm: React.FC<MarketplaceComplianceFormProps> = ({ o
       };
 
       const { error } = await supabase
-        .from('businesses')
+        .from('organizations')
         .update(updatePayload)
         .eq('id', organizationId);
 
@@ -325,7 +338,7 @@ const MarketplaceComplianceForm: React.FC<MarketplaceComplianceFormProps> = ({ o
                     ))}
                   </select>
                 </div>
-                {renderInput('Tax ID / EIN', taxId, setTaxId)}
+                {renderInput('Tax ID / EIN', taxId, setTaxId, { disabled: disableInputs || !taxIdLoaded })}
                 {renderInput('Registration State', registrationState, setRegistrationState)}
                 {renderInput('Phone', phone, setPhone, { placeholder: '(555) 123-4567' })}
                 {renderInput('Email', email, setEmail, { type: 'email' })}

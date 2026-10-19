@@ -13,6 +13,7 @@ import {
 } from './jobRead';
 import { readJob, type Load } from './readJob';
 import ShareButton from './ShareButton';
+import { readJobHeader } from './jobHeader';
 import { JobSheetContext } from './jobSheetContext';
 import { JobPublication } from './Publication';
 import { completionActions, completionState } from './signDrafts';
@@ -392,7 +393,20 @@ export default function JobPage() {
   usePageTitle(title);
 
   if (path.status === 'loading') {
-    return <article className="job-page" aria-busy="true" aria-label="Job"><Masthead><Text role="entity" as="h1">Loading the job…</Text></Masthead></article>;
+    const head = readJobHeader(workOrderId);
+    if (!head?.display_title) return <article className="job-page" aria-busy="true" aria-label="Job"><Masthead><Text role="entity" as="h1">Loading the job…</Text></Masthead></article>;
+    const headVehicle = head.vehicle_label?.text ?? null;
+    return <article className="job-page" aria-busy="true" aria-label={head.display_title}>
+      <Masthead result={<Text role="caption">{head.request_source_label ?? ''}</Text>}>
+        <div className="job-masthead">
+          <Text role="entity" as="h1">{head.display_title}</Text>
+          {headVehicle && (head.vehicle_id
+            ? <PrefetchLink className="job-link" to={`/vehicle/${head.vehicle_id}`}><Text role="body">{headVehicle}</Text></PrefetchLink>
+            : <Text role="body">{headVehicle}</Text>)}
+        </div>
+      </Masthead>
+      <section className="k-section job-block"><Text role="caption" as="p">Loading the job's record…</Text></section>
+    </article>;
   }
   if (path.status === 'failed') {
     return <article className="job-page" aria-label="Job unavailable">

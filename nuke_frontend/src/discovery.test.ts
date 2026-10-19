@@ -1,6 +1,8 @@
 // What a crawler or link preview reads on the open job, provider and organization pages, and the work sitemap.
 // The middleware is called directly with fetch stubbed to fixtures in the live readers' shapes (2026-10-19).
+import { readFileSync } from 'node:fs';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { HEADER_CSS_RULES } from './lib/discoveryFace';
 
 const SHELL = '<!doctype html><html><head><title>Nuke</title>' +
   '<meta name="description" content="x" /><link rel="canonical" href="https://nuke.ag" />' +
@@ -110,6 +112,30 @@ describe('discovery faces', () => {
     const xml = await res!.text();
     expect((xml.match(/\/org\//g) ?? []).length).toBe(2003);
     expect(res!.headers.get('x-nuke-sitemap')).toBe('jobs=unread;providers=unread;organizations=ok');
+  });
+
+  it('/jobs/:id draws the header with the app\'s own markup and embeds a public header payload', async () => {
+    const out = await call(`/jobs/${WO}`, {
+      work_order_job_path_read: { work_order_id: WO, display_title: 'Brakes </script><b>x', vehicle_id: VEH, vehicle_label: { text: '1983 GMC K2500' },
+        request_source_label: 'Requested on the web', customer_name: 'Jane Customer',
+        stages: { intake: { state: 'recorded' }, terms: { state: 'partial' }, accounting: { state: 'recorded', paid: 4200 } } },
+      work_order_resources_read: { requirements: [] },
+    });
+    const html = out!.body;
+    expect(html).toContain('<style id="nuke-face-css">');
+    expect(html).toContain('<header class="k-section k-masthead"><div class="job-masthead"><h1 class="k-entity">Brakes &lt;/script&gt;&lt;b&gt;x</h1>');
+    expect(html).toContain(`<a class="job-link" href="https://nuke.ag/vehicle/${VEH}"><span class="k-body">1983 GMC K2500</span></a>`);
+    const raw = /<script type="application\/json" id="nuke-job-header">([\s\S]*?)<\/script>/.exec(html)![1];
+    expect(raw).not.toContain('</script>');
+    expect(JSON.parse(raw)).toEqual({ work_order_id: WO, display_title: 'Brakes </script><b>x', vehicle_label: { text: '1983 GMC K2500' }, vehicle_id: VEH,
+      request_source_label: 'Requested on the web', stages: { intake: 'recorded', terms: 'partial' } });
+    expect(html).not.toMatch(PERSONAL);
+    expect(html).not.toContain('4200');
+  });
+
+  it('the server header copies rules that still exist verbatim in the kit and job-page stylesheets', () => {
+    const css = readFileSync(new URL('./kit/kit.css', import.meta.url), 'utf8') + readFileSync(new URL('./pages/jobs/job-page.css', import.meta.url), 'utf8');
+    for (const rule of HEADER_CSS_RULES) expect(css).toContain(rule);
   });
 
   it('falls through to the app shell when a job is not open, or the id is not a UUID', async () => {
