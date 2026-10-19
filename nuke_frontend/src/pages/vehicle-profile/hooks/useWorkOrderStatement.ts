@@ -1,9 +1,9 @@
 /**
  * useWorkOrderStatement — data hook for the editable invoice (owner view)
  *
- * Two-step load:
- * 1. resolve_work_order_status RPC → vehicle, contact, work order IDs, summary
- * 2. Three parallel SELECTs for full editable rows with IDs
+ * One read: work_order_statement_read (open statement; payments, balances, payment
+ * instructions and notes only for the viewer's own work orders; no contact fields).
+ * Lookup is by work order id, vehicle id or public handle, never by name or e-mail.
  *
  * Mutations follow UniversalFieldEditor auto-save pattern:
  * optimistic state → DB write → recalc totals
@@ -20,14 +20,21 @@ export interface StatementVehicle {
   year: number | null;
   make: string | null;
   model: string | null;
+  trim: string | null;
   vin: string | null;
-  sale_price: number | null;
+  text: string | null;
 }
 
+/** Contact is brokered by Nuke; the statement never carries contact fields. */
 export interface StatementContact {
-  name: string | null;
-  email: string | null;
-  phone: string | null;
+  action: 'contact_via_nuke';
+  available: boolean;
+  basis: string;
+}
+
+export interface StatementMatch {
+  vehicle_id: string;
+  vehicle_label: { year: number | null; make: string | null; model: string | null; trim: string | null; text: string | null } | null;
 }
 
 export interface PartRow {
@@ -110,14 +117,9 @@ export interface StatementTotals {
 
 export interface ShopInfo {
   name: string | null;
-  legal_name: string | null;
-  email: string | null;
-  phone: string | null;
   website: string | null;
-  address: string | null;
   city: string | null;
   state: string | null;
-  zip_code: string | null;
   logo_url: string | null;
   tax_rate: number | null;
   payment_methods: Array<{ method: string; label: string; detail: string; note?: string }> | null;
@@ -132,6 +134,58 @@ export interface StatementData {
   labor: Record<string, LaborRow[]>;
   payments: Record<string, PaymentRow[]>;
   totals: StatementTotals;
+  /** True only when the viewer is a party to every work order shown (payments are party-only). */
+  moneyVisible: boolean;
+}
+
+type StatementResult = StatementData | { matches: StatementMatch[] };
+
+type Num = number | string | null | undefined;
+
+interface RawWorkOrder {
+  id: string;
+  display_title?: string | null;
+  title?: string | null;
+  status: string;
+  created_at: string;
+  notes: string | null;
+  money_visible?: boolean;
+  parts?: PartRow[];
+  labor?: LaborRow[];
+  payments?: PaymentRow[] | null;
+  parts_total?: Num;
+  labor_total?: Num;
+  payments_total?: Num;
+  comped_value?: Num;
+  balance_due?: Num;
+}
+
+interface RawStatement {
+  error?: string;
+  matches?: StatementMatch[];
+  vehicle?: StatementVehicle;
+  contact?: StatementContact | null;
+  shop?: ShopInfo | null;
+  work_orders?: RawWorkOrder[];
+}
+
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/** Lookup keys: `wo:<uuid>`, `vehicle:<uuid>`, `handle:<name>`, or a bare uuid / @handle. */
+export async function readStatement(query: string): Promise<RawStatement | null> {
+  const [kind, ...rest] = query.includes(':') ? query.split(':') : ['', query];
+  const key = (rest.length ? rest.join(':') : kind).trim();
+  const call = (args: Record<string, string>) => supabase.rpc('work_order_statement_read', args);
+  let res;
+  if (kind === 'wo') res = await call({ p_work_order_id: key });
+  else if (kind === 'vehicle') res = await call({ p_vehicle_id: key });
+  else if (kind === 'handle' || !UUID_RE.test(key)) res = await call({ p_handle: key.replace(/^@/, '') });
+  else {
+    res = await call({ p_work_order_id: key });
+    if (!res.error && res.data?.error === 'no_match') res = await call({ p_vehicle_id: key });
+  }
+  if (res.error) throw new Error(res.error.message);
+  return res.data as RawStatement | null;
 }
 
 type EditableTable = 'work_order_parts' | 'work_order_labor' | 'work_order_payments';
@@ -142,57 +196,27 @@ export function useWorkOrderStatement(query: string | null) {
   const queryClient = useQueryClient();
   const queryKey = ['work-order-statement', query];
 
-  const { data, isLoading, error, refetch } = useQuery({
+  const { data: result, isLoading, error, refetch } = useQuery({
     queryKey,
-    queryFn: async (): Promise<StatementData | null> => {
+    queryFn: async (): Promise<StatementResult | null> => {
       if (!query) return null;
 
-      // Step 1: RPC to resolve vehicle + work orders
-      const { data: rpcData, error: rpcError } = await supabase
-        .rpc('resolve_work_order_status', { p_query: query });
-
-      if (rpcError) throw new Error(rpcError.message);
+      const rpcData = await readStatement(query);
       if (!rpcData || rpcData.error) return null;
+      if (Array.isArray(rpcData.matches)) return { matches: rpcData.matches as StatementMatch[] };
 
+      const woArray = rpcData.work_orders || [];
+      if (woArray.length === 0) return null;
       const vehicle = rpcData.vehicle as StatementVehicle;
-      const contact = rpcData.contact as StatementContact | null;
-      const shop = (rpcData.shop as ShopInfo | null) || null;
-      const woArray = (rpcData.work_orders || []) as any[];
-      const woIds = woArray.map((wo: any) => wo.id);
+      const contact = rpcData.contact || null;
+      const shop = rpcData.shop || null;
 
-      if (woIds.length === 0) return null;
-
-      // Step 2: Three parallel SELECTs for full editable rows
-      const [partsRes, laborRes, paymentsRes] = await Promise.all([
-        supabase.from('work_order_parts')
-          .select('*')
-          .in('work_order_id', woIds)
-          .neq('status', 'cancelled')
-          .order('created_at'),
-        supabase.from('work_order_labor')
-          .select('*')
-          .in('work_order_id', woIds)
-          .neq('status', 'cancelled')
-          .order('created_at'),
-        supabase.from('work_order_payments')
-          .select('*')
-          .in('work_order_id', woIds)
-          .order('payment_date'),
-      ]);
-
-      if (partsRes.error) throw new Error(partsRes.error.message);
-      if (laborRes.error) throw new Error(laborRes.error.message);
-      if (paymentsRes.error) throw new Error(paymentsRes.error.message);
-
-      // Group by work_order_id
       const parts: Record<string, PartRow[]> = {};
       const labor: Record<string, LaborRow[]> = {};
       const payments: Record<string, PaymentRow[]> = {};
 
-      for (const p of (partsRes.data || [])) {
-        const woId = p.work_order_id;
-        if (!parts[woId]) parts[woId] = [];
-        parts[woId].push({
+      for (const wo of woArray) {
+        parts[wo.id] = (wo.parts || []).map((p) => ({
           ...p,
           quantity: Number(p.quantity) || 1,
           unit_price: p.unit_price != null ? Number(p.unit_price) : null,
@@ -200,34 +224,21 @@ export function useWorkOrderStatement(query: string | null) {
           comp_retail_value: p.comp_retail_value != null ? Number(p.comp_retail_value) : null,
           is_comped: !!p.is_comped,
           is_taxable: !!p.is_taxable,
-        });
-      }
-
-      for (const l of (laborRes.data || [])) {
-        const woId = l.work_order_id;
-        if (!labor[woId]) labor[woId] = [];
-        labor[woId].push({
+        }));
+        labor[wo.id] = (wo.labor || []).map((l) => ({
           ...l,
           hours: Number(l.hours) || 0,
           hourly_rate: l.hourly_rate != null ? Number(l.hourly_rate) : null,
           total_cost: l.total_cost != null ? Number(l.total_cost) : null,
           comp_retail_value: l.comp_retail_value != null ? Number(l.comp_retail_value) : null,
           is_comped: !!l.is_comped,
-        });
+        }));
+        payments[wo.id] = (wo.payments || []).map((pm) => ({ ...pm, amount: Number(pm.amount) || 0 }));
       }
 
-      for (const pm of (paymentsRes.data || [])) {
-        const woId = pm.work_order_id;
-        if (!payments[woId]) payments[woId] = [];
-        payments[woId].push({
-          ...pm,
-          amount: Number(pm.amount) || 0,
-        });
-      }
-
-      const workOrders: WorkOrderSummary[] = woArray.map((wo: any) => ({
+      const workOrders: WorkOrderSummary[] = woArray.map((wo) => ({
         id: wo.id,
-        title: wo.title,
+        title: wo.display_title ?? wo.title ?? '',
         status: wo.status,
         created_at: wo.created_at,
         notes: wo.notes,
@@ -238,11 +249,14 @@ export function useWorkOrderStatement(query: string | null) {
         balance_due: Number(wo.balance_due) || 0,
       }));
 
-      return { vehicle, contact, shop, workOrders, parts, labor, payments, totals: calcTotals(parts, labor, payments) };
+      const moneyVisible = woArray.every((wo) => wo.money_visible === true);
+      return { vehicle, contact, shop, workOrders, parts, labor, payments, totals: calcTotals(parts, labor, payments), moneyVisible };
     },
     enabled: !!query,
     staleTime: 5 * 60 * 1000,
   });
+  const data: StatementData | null = result && 'vehicle' in result ? result : null;
+  const matches: StatementMatch[] | null = result && 'matches' in result ? result.matches : null;
 
   // ── Mutations ──
 
@@ -253,8 +267,8 @@ export function useWorkOrderStatement(query: string | null) {
     const oldValue = getOldValue(data, table, id, field);
 
     // Optimistic update
-    queryClient.setQueryData<StatementData | null>(queryKey, (old) => {
-      if (!old) return old;
+    queryClient.setQueryData<StatementResult | null>(queryKey, (old) => {
+      if (!old || !('vehicle' in old)) return old;
       return applyFieldUpdate(old, table, id, field, value);
     });
 
@@ -332,8 +346,8 @@ export function useWorkOrderStatement(query: string | null) {
 
   const deleteRow = useCallback(async (table: EditableTable, id: string) => {
     // Optimistic remove
-    queryClient.setQueryData<StatementData | null>(queryKey, (old) => {
-      if (!old) return old;
+    queryClient.setQueryData<StatementResult | null>(queryKey, (old) => {
+      if (!old || !('vehicle' in old)) return old;
       return applyRowDelete(old, table, id);
     });
 
@@ -385,8 +399,8 @@ export function useWorkOrderStatement(query: string | null) {
     }
 
     // Optimistic
-    queryClient.setQueryData<StatementData | null>(queryKey, (prev) => {
-      if (!prev) return prev;
+    queryClient.setQueryData<StatementResult | null>(queryKey, (prev) => {
+      if (!prev || !('vehicle' in prev)) return prev;
       let updated = applyFieldUpdate(prev, table, id, 'is_comped', newIsComped);
       if (newIsComped) {
         updated = applyFieldUpdate(updated!, table, id, 'comp_retail_value', currentPrice);
@@ -406,7 +420,8 @@ export function useWorkOrderStatement(query: string | null) {
   }, [data, queryClient, queryKey, refetch]);
 
   return {
-    data: data ?? null,
+    data,
+    matches,
     loading: isLoading,
     error: error?.message ?? null,
     refetch,

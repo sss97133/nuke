@@ -18,14 +18,19 @@ CREATE TABLE public.organizations(id uuid PRIMARY KEY);
 CREATE TABLE public.work_orders(id uuid PRIMARY KEY,vehicle_id uuid,request_source text,customer_name text,customer_phone text,
  title text,description text,scope_description text,quoted_at timestamptz,estimated_total numeric,estimated_cost_cents integer,
  approved_at timestamptz,scheduled_start timestamptz,scheduled_end timestamptz,started_at timestamptz,actual_start timestamptz,
- completed_at timestamptz,actual_end timestamptz,status text,created_at timestamptz DEFAULT '2026-01-01');
+ completed_at timestamptz,actual_end timestamptz,status text,created_at timestamptz DEFAULT '2026-01-01',scope_category text,customer_id uuid);
 CREATE TABLE public.actors(id uuid PRIMARY KEY,name text,actor_type text);
 CREATE TABLE public.component_events(id uuid PRIMARY KEY,vehicle_id uuid,work_order_id uuid,metadata jsonb);
 CREATE TABLE public.work_order_parts(id uuid PRIMARY KEY,work_order_id uuid,part_name text,status text,job_op_code text,unit_price numeric);
 CREATE TABLE public.work_order_line_items(id uuid PRIMARY KEY,work_order_id uuid REFERENCES work_orders(id),line_number integer,
  actor_id uuid REFERENCES actors(id),task_description text,component_event_id uuid,status text,updated_at timestamptz);
-CREATE TABLE public.work_order_assignments(id uuid PRIMARY KEY DEFAULT gen_random_uuid(),work_order_id uuid,status text,
- accepted_at timestamptz,started_at timestamptz,completed_at timestamptz,actual_payout numeric,paid_at timestamptz,payout_status text);
+CREATE TABLE public.work_order_assignments(id uuid PRIMARY KEY DEFAULT gen_random_uuid(),work_order_id uuid NOT NULL,
+ technician_id uuid,job_op_code text,role text DEFAULT 'lead' CHECK (role = ANY (ARRAY['lead','technician','helper'])),
+ status text DEFAULT 'pending',
+ offered_at timestamptz,accepted_at timestamptz,declined_at timestamptz,decline_reason text,started_at timestamptz,completed_at timestamptz,
+ payout_type text DEFAULT 'flat' CHECK (payout_type = ANY (ARRAY['flat','hourly','percentage'])),payout_rate numeric,payout_percentage numeric,
+ estimated_payout numeric,actual_payout numeric,payout_status text DEFAULT 'unpaid',
+ paid_at timestamptz,notes text,created_at timestamptz DEFAULT now(),updated_at timestamptz DEFAULT now(),UNIQUE (work_order_id, technician_id, job_op_code));
 CREATE TABLE public.work_order_labor(id uuid PRIMARY KEY DEFAULT gen_random_uuid(),work_order_id uuid,hours numeric,ai_estimated boolean,total_cost numeric);
 CREATE TABLE public.work_order_status_history(id uuid PRIMARY KEY DEFAULT gen_random_uuid(),work_order_id uuid,new_status text);
 CREATE TABLE public.work_order_payments(id uuid PRIMARY KEY DEFAULT gen_random_uuid(),work_order_id uuid,amount numeric,status text);
@@ -39,7 +44,7 @@ CREATE TABLE public.user_tools(id uuid PRIMARY KEY,user_id uuid REFERENCES auth.
 CREATE TABLE public.tool_inventory(id uuid PRIMARY KEY,owner_id uuid);
 CREATE TABLE public.equipment(id uuid PRIMARY KEY,shop_id uuid);
 CREATE TABLE public.vehicle_observations(id uuid PRIMARY KEY,vehicle_id uuid,kind text,source_id uuid,
-  content_text text,extraction_method text,confidence_score numeric,structured_data jsonb,observed_at timestamptz,ingested_at timestamptz DEFAULT now(),is_superseded boolean DEFAULT false);
+  content_text text,extraction_method text,confidence_score numeric,structured_data jsonb,observed_at timestamptz,ingested_at timestamptz DEFAULT now(),is_superseded boolean DEFAULT false,source_identifier text,submitted_by_user_id uuid);
 CREATE TABLE public.pipeline_registry(id uuid DEFAULT gen_random_uuid(),table_name text,column_name text,owned_by text,
   description text,do_not_write_directly boolean,write_via text,UNIQUE(table_name,column_name));
 GRANT USAGE ON SCHEMA public,auth TO anon,authenticated,service_role;
@@ -87,6 +92,15 @@ INSERT INTO vehicle_observations(id,vehicle_id,kind,source_id,observed_at,struct
 \ir ../migrations/20261019035407_work_order_resource_specifications.sql
 \ir ../migrations/20261019045753_work_order_job_path.sql
 \ir ../migrations/20261019051336_work_order_scope_operations.sql
+\ir ../migrations/20261019094500_work_order_quotes.sql
+\ir ../migrations/20261019120000_work_order_quote_issue.sql
+\ir ../migrations/20261019123000_work_order_job_path_quotes.sql
+\ir ../migrations/20261019150000_inspection_request.sql
+\ir ../migrations/20261019153000_job_path_inspection.sql
+\ir ../migrations/20261019180000_work_order_offers.sql
+\ir ../migrations/20261019182000_work_order_offer_acceptance.sql
+\ir ../migrations/20261019183000_work_order_offers_read.sql
+\ir ../migrations/20261019184500_inspection_access.sql
 
 SET ROLE service_role;
 SELECT project_work_order_resource_observation('80000000-0000-0000-0000-000000000001');

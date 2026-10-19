@@ -17,7 +17,7 @@ const MAKES = ['AC', 'Alfa', 'AMC', 'Aston', 'Auburn', 'Austin', 'Bentley', 'BMW
   'Chrysler', 'Citroen', 'Cord', 'Datsun', 'DeLorean', 'DeSoto', 'De-Tomaso', 'Detomaso', 'Dodge', 'Duesenberg', 'Edsel', 'Facel', 'Ferrari', 'Fiat', 'Ford',
   'GMC', 'Hudson', 'Iso', 'International', 'Jaguar', 'Jeep', 'Jensen', 'Lamborghini', 'Lancia', 'Land-Rover', 'Lincoln', 'Lotus', 'Maserati', 'Mercedes',
   'Mercedes-Benz', 'Mercury', 'MG', 'Mopar', 'Morgan', 'Nash', 'Oldsmobile', 'Packard', 'Plymouth', 'Pontiac', 'Porsche', 'Rambler', 'Rolls', 'Rolls-Royce',
-  'Shelby', 'Studebaker', 'Sunbeam', 'Toyota', 'Triumph', 'Tucker', 'Volkswagen', 'VW', 'Volvo', 'Willys', 'Nissan', 'Honda', 'Mazda', 'Saab', 'Lexus',
+  'Shelby', 'Studebaker', 'Stude', 'Chevelle', 'Camaro', 'Impala', 'Belair', 'Bel-Air', 'Nova', 'GTO', 'Firebird', 'Cuda', 'Charger', 'Challenger', 'Thunderbird', 'T-Bird', 'Falcon', 'Fairlane', 'Galaxie', 'Cutlass', 'Riviera', 'Skylark', 'Eldorado', 'Beetle', 'Bus', 'Sunbeam', 'Toyota', 'Triumph', 'Tucker', 'Volkswagen', 'VW', 'Volvo', 'Willys', 'Nissan', 'Honda', 'Mazda', 'Saab', 'Lexus',
   'Acura', 'Alpine', 'Avanti', 'Bugatti', 'Delahaye', 'Hispano', 'Kaiser', 'Pierce', 'Stutz', 'Talbot', 'Excalibur', 'Pantera', 'Corvette', 'Mustang', 'Bronco', 'Scout'];
 const MAKE_RE = new RegExp(`^(${MAKES.join('|')})$`, 'i');
 // A part, accessory or collectible titled with a car's year and make (the bulk of ebaymotors URLs).
@@ -44,15 +44,20 @@ for (const f of readdirSync(dir).filter((n) => n.endsWith('.txt')).sort()) {
     try { slug = decodeURIComponent(rawSlug); } catch { slug = rawSlug; }
     slug = slug.replace(/^-+|-+$/g, '');
     const words = slug.split('-').filter(Boolean);
-    const year = Number(words[0]?.match(/^(19[0-9]{2}|20[01][0-9])$/)?.[1] ?? NaN);
     const carCategory = /US_Cars_Trucks|ptZUS_Cars/.test(original);
+    // "1969-Camaro...", "69-Camaro..." / "'69-..." (two-digit year: needs a make next or the car category), or a
+    // four-digit year in the first five words of a make-first title ("Chevrolet-Camaro-1969-...").
+    let year = Number(words[0]?.match(/^(19[0-9]{2}|20[01][0-9])$/)?.[1] ?? NaN);
+    const two = words[0]?.match(/^'?([2-9][0-9])$/)?.[1];
+    if (!Number.isFinite(year) && two && (carCategory || words.slice(1, 3).some((w) => MAKE_RE.test(w)))) year = 1900 + Number(two);
+    if (!Number.isFinite(year)) { const k = words.slice(1, 5).findIndex((w) => /^19[0-9]{2}$/.test(w)); if (k >= 0 && words.slice(0, k + 1).some((w) => MAKE_RE.test(w))) year = Number(words[k + 1]); }
     const partsCategory = /Parts|Accessories|ptZMotors_Car_Truck_Parts/.test(original);
     const has = items.get(id);
     if (has) { has.captures.push({ timestamp, original }); continue; }
     const reasons = [];
     let score = 0;
     if (!Number.isFinite(year) || year > maxYear) continue;
-    if (!words.slice(1, 3).some((w) => MAKE_RE.test(w))) continue;
+    if (!words.slice(0, 4).some((w) => MAKE_RE.test(w)) && !carCategory) continue;
     if (partsCategory || (!carCategory && PARTS.test(slug))) continue;
     if (carCategory) { score += 2; reasons.push('car category'); }
     if (year < 1975) { score += 1; reasons.push('pre-1975'); }
