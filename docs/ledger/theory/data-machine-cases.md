@@ -3020,7 +3020,7 @@ Mechanics RSI pass 3, retained lifecycle testimony (2026-10-19): overnight the j
 quote acceptance, start, completion, invoice and payment witness, all empty across the 26 work orders because
 their Signs need authenticated parties. The selected real job's retained messages already state client price
 acceptance, an invoice, a pause and finished operations. Forging Signs from them would invent authentication,
-so migration `20261020002000_work_order_retained_testimony.sql` adds a separate immutable projection keyed to the
+so migration `20261020003000_work_order_retained_testimony.sql` adds a separate immutable projection keyed to the
 interpretation, quoting the original message under its own clock and speaker label, and anchors count-only
 testimony blocks into the shared job-path reader and scoreboard without changing stage states. Disposable PG17
 covers 33 cases; the job-loop replay contract proves the anchored edits against the real build. A name collision

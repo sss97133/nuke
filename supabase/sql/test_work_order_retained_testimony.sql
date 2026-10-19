@@ -106,7 +106,7 @@ BEGIN
   EXECUTE jp;
 END $sim$;
 
-\ir ../migrations/20261020002000_work_order_retained_testimony.sql
+\ir ../migrations/20261020003000_work_order_retained_testimony.sql
 
 -- Synthetic interpretations in the guarded disposable database only.
 CREATE FUNCTION public.lc(p_basis uuid,p_patch jsonb DEFAULT '{}',p_observed timestamptz DEFAULT NULL) RETURNS uuid LANGUAGE plpgsql AS $$

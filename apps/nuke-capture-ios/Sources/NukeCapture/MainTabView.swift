@@ -1,4 +1,4 @@
-// MainTabView.swift — the app spine: LIBRARY · EXPLORE · PROFILE · TODAY.
+// MainTabView.swift — the app spine: LIBRARY · EXPLORE · PROFILE · WORK.
 //
 // LIBRARY is the FOUNDATION for a signed-in owner with full access — their whole
 // photo library at Photos speed (the source); everything else rides on top as
@@ -13,10 +13,11 @@
 //   PROFILE  the owner's record (own when signed in, the sample in explore
 //            mode); other profiles via handle search. Receipt-first: a
 //            signed-in owner's FIRST landing is still their own record.
-//   TODAY    only when signed in AND the photo grant exists — the capture gauge
-//            + pause toggle (the consent surface) and the live-analysis
-//            worklight. Conditional BY DESIGN (no upload button; the gauge is
-//            the consent surface) — not a bug to "fix" by always-showing it.
+//   WORK     every signed-in account: signature queue, jobs in motion (each
+//            opens JobView), open requirements. Its Capture section (the
+//            capture gauge + pause toggle, the consent surface, and the
+//            live-analysis worklight) shows only when the photo grant exists,
+//            conditional BY DESIGN as the old Engine tab was.
 //
 // MAP stays cut from 1.0 — it returns in Build 2 as the pulse map
 // (BUILD_2_SCOPE.md §5); Explore is its 1.0 stand-in. Recover MapTab from git
@@ -56,14 +57,14 @@ struct MainTabView: View {
                 .tag(Tab.profile)
                 .tabItem { Label("Profile", systemImage: "person") }
 
-            // ENGINE (was "Today") — the engine room: the live worklight (the agent
-            // reading your photos) + the workbench (operator tools). Renamed because a
-            // "Today" that reads 0 most days was the old cloud-relay paradigm leaking
-            // through; in the local-first model this is honestly the engine, not a feed.
-            if session.isSignedIn && photoGrant {
-                TodayView()
+            // WORK (was "Engine", before that "Today") — what needs you now: signatures,
+            // jobs in motion, open requirements. Every signed-in account has it, so a
+            // client without a photo grant still has a console. The Engine's capture
+            // sections live inside as "Capture", still gated on the photo grant.
+            if session.isSignedIn {
+                WorkConsoleView(showCapture: photoGrant)
                     .tag(Tab.today)
-                    .tabItem { Label("Engine", systemImage: "gauge.medium") }
+                    .tabItem { Label("Work", systemImage: "wrench.and.screwdriver") }
             }
         }
         .onAppear { tab = landingTab() }

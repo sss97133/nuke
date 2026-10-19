@@ -1,6 +1,6 @@
 // Run: deno test supabase/functions/extract-ebay-motors/
 // Snippets follow the text of real archived pages (2009 W0QQ era, 2011-2013 ViewItem era); no seller text is copied.
-import { archivedPageToItem, archiveItemId, endedAtIso, parseArchivedItemPage, plausibleVin } from "./archivePage.ts";
+import { archivedPageToItem, archiveItemId, endedAtIso, parseArchivedItemPage, plausibleVin, slugYear } from "./archivePage.ts";
 
 const eq = (a: unknown, b: unknown) => { if (JSON.stringify(a) !== JSON.stringify(b)) throw new Error(`${JSON.stringify(a)} != ${JSON.stringify(b)}`); };
 
@@ -87,4 +87,15 @@ Deno.test("a dealer-template description with early-closing divs is read to eBay
 <p>Frame-off restoration, 11,000 miles since.</p><div><p>Original 2F engine.</p></div></div></div>
 <div>Questions and answers about this item</div><div>Back to home page</div></body></html>`;
   eq(parseArchivedItemPage(html).description, "Frame-off restoration, 11,000 miles since. Original 2F engine.");
+});
+
+Deno.test("the year comes from two-digit and make-first URL slugs when the page prints none", () => {
+  eq(slugYear("http://cgi.ebay.com:80/ebaymotors/1965-65-Barn-Find-389-4-speed-Pontiac-GTO_W0QQitemZ1"), "1965");
+  eq(slugYear("http://cgi.ebay.com:80/ebaymotors/68-Charger-RT-barn-find-numbers-matching-/2903"), "1968");
+  eq(slugYear("http://cgi.ebay.com:80/ebaymotors/Chevrolet-Camaro-1969-RS-CAMARO-CONVERTIBLE-/1"), "1969");
+  eq(slugYear("http://cgi.ebay.com:80/ebaymotors/AUTOMATIC-SPORT-STYLE-CHROME-SHIFTER-/1"), undefined);
+  const html = `<html><head><title>Dodge : Charger:eBay Motors (item 290303659996 end time Mar-10-09 18:00:00 PDT)</title></head><body>
+<div>Ended: Mar 10, 2009 18:00:00 PDT Bid history: 22 bids Winning bid: US $21,100.00</div><div>Item number: 290303659996</div></body></html>`;
+  const p = parseArchivedItemPage(html, "http://cgi.ebay.com:80/ebaymotors/68-Charger-RT-barn-find-numbers-matching-rare-440_W0QQitemZ290303659996");
+  eq([p.specifics.Year, p.specifics.Make, p.specifics.Model], ["1968", "Dodge", "Charger"]);
 });

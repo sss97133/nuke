@@ -324,8 +324,10 @@ ALTER TABLE public.work_orders ADD COLUMN IF NOT EXISTS estimated_labor_cost num
 \ir ../migrations/20261019235930_quotes_release_conditions_read.sql
 \echo REPLAY 20261020000500_work_order_invented_zero_totals.sql
 \ir ../migrations/20261020000500_work_order_invented_zero_totals.sql
-\echo REPLAY 20261020002000_work_order_retained_testimony.sql
-\ir ../migrations/20261020002000_work_order_retained_testimony.sql
+\echo REPLAY 20261020002000_owner_delegated_signs.sql
+\ir ../migrations/20261020002000_owner_delegated_signs.sql
+\echo REPLAY 20261020003000_work_order_retained_testimony.sql
+\ir ../migrations/20261020003000_work_order_retained_testimony.sql
 -- Plan check and final state.
 \set replay_problems `scripts/ci/job-loop-replay-check.sh | tr '\n' ' '`
 SELECT t_assert(btrim(:'replay_problems') = '', 'replay plan covers the build in filename order: ' || COALESCE(NULLIF(btrim(:'replay_problems'), ''), 'ok'));
