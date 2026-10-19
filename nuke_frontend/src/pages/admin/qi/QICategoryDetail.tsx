@@ -5,8 +5,8 @@
 import { useState, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { supabase } from '../../../lib/supabase';
-import { TaxonomyRow, L1_COLORS, fmtK } from './constants';
-import QICommentRow, { QIComment } from './QICommentRow';
+import { type TaxonomyRow, L1_COLORS, fmtK } from './constants';
+import QICommentRow, { type QIComment } from './QICommentRow';
 import QIPagination from './QIPagination';
 
 interface VehicleBreakdown {

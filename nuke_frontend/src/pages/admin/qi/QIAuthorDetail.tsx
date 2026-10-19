@@ -6,7 +6,7 @@ import { useState, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { supabase } from '../../../lib/supabase';
 import { L1_COLORS, fmtK } from './constants';
-import QICommentRow, { QIComment } from './QICommentRow';
+import QICommentRow, { type QIComment } from './QICommentRow';
 import QIPagination from './QIPagination';
 
 interface CategoryDist {
