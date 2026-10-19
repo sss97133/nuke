@@ -264,10 +264,13 @@ struct JobAction: Decodable, Equatable, Identifiable {
     /// with p_quote_id and p_quote_hash). The phone passes them back; it never composes them.
     let rpc: String?
     let args: [String: JobJSON]
-    var id: String { kind + (stage ?? "") }
+    /// What the step will record the viewer as (e.g. offer_kind, offer_rung for an offer).
+    let asFields: [String: JobJSON]
+    var id: String { kind + (stage ?? "") + (args.keys.sorted().compactMap { args[$0]?.stringValue }.joined()) }
 
-    init(kind: String, label: String? = nil, stage: String? = nil, rpc: String? = nil, args: [String: JobJSON] = [:]) {
-        self.kind = kind; self.label = label; self.stage = stage; self.rpc = rpc; self.args = args
+    init(kind: String, label: String? = nil, stage: String? = nil, rpc: String? = nil, args: [String: JobJSON] = [:],
+         asFields: [String: JobJSON] = [:]) {
+        self.kind = kind; self.label = label; self.stage = stage; self.rpc = rpc; self.args = args; self.asFields = asFields
     }
 
     init(from decoder: Decoder) throws {
@@ -285,7 +288,8 @@ struct JobAction: Decodable, Equatable, Identifiable {
                   label: try? c.decode(String.self, forKey: JobCodingKey("label")),
                   stage: try? c.decode(String.self, forKey: JobCodingKey("stage")),
                   rpc: try? c.decode(String.self, forKey: JobCodingKey("rpc")),
-                  args: (try? c.decode([String: JobJSON].self, forKey: JobCodingKey("args"))) ?? [:])
+                  args: (try? c.decode([String: JobJSON].self, forKey: JobCodingKey("args"))) ?? [:],
+                  asFields: (try? c.decode([String: JobJSON].self, forKey: JobCodingKey("as"))) ?? [:])
     }
 
     var title: String { label ?? JobCopy.action(kind) }

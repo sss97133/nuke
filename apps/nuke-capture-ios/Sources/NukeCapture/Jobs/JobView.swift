@@ -19,9 +19,10 @@ struct JobView: View {
     @State private var path: JobLoad<JobPath> = .loading
     @State private var resources: JobLoad<JobResources> = .loading
     @State private var quotes: JobLoad<JobQuotes> = .loading
+    @State private var offers: JobLoad<WorkOrderOffers> = .loading
 
     var body: some View {
-        JobPathContent(workOrderId: workOrderId, path: path, resources: resources, quotes: quotes,
+        JobPathContent(workOrderId: workOrderId, path: path, resources: resources, quotes: quotes, offers: offers,
                        titleHint: titleHint, vehicleHint: vehicleHint,
                        onChanged: { Task { await load() } })
             .task(id: workOrderId) { await load() }
@@ -32,9 +33,12 @@ struct JobView: View {
         async let p = JobReaders.jobPath(workOrderId: workOrderId)
         async let r = JobReaders.resources(workOrderId: workOrderId)
         async let q = JobReaders.quotes(workOrderId: workOrderId)
-        path = await p
-        resources = await r
-        quotes = await q
+        async let o = OfferReaders.offers(workOrderId: workOrderId)
+        let loaded = await (p, r, q, o)
+        path = loaded.0
+        resources = loaded.1
+        quotes = loaded.2
+        offers = loaded.3
     }
 }
 
@@ -55,6 +59,7 @@ struct JobPathContent: View {
     let path: JobLoad<JobPath>
     let resources: JobLoad<JobResources>
     var quotes: JobLoad<JobQuotes> = .loading
+    var offers: JobLoad<WorkOrderOffers>? = nil
     var titleHint: String? = nil
     var vehicleHint: String? = nil
     var onChanged: (() -> Void)? = nil
@@ -80,6 +85,7 @@ struct JobPathContent: View {
                 header(p)
                 railSection(p)
                 quoteSection
+                if let offers { JobOffersSection(offers: offers, onChanged: onChanged) }
                 ForEach(JobStageKey.allCases) { key in
                     stageSection(key, p.stages[key], p)
                 }

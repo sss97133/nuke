@@ -79,6 +79,9 @@ struct NukeCaptureApp: App {
                     NavigationStack { JobView(workOrderId: dbgJob) }
                 } else if let dbgStatement = ProcessInfo.processInfo.environment["NUKE_DEBUG_STATEMENT_VEHICLE"], !dbgStatement.isEmpty {
                     NavigationStack { VehicleStatementView(vehicleId: dbgStatement) }
+                } else if ProcessInfo.processInfo.environment["NUKE_DEBUG_JOBS_LOOKING"] == "1" {
+                    // Work's "Jobs looking for someone" alone, over the live reader (no capture photos).
+                    DebugJobsLookingHost()
                 } else if let dbgProvider = ProcessInfo.processInfo.environment["NUKE_DEBUG_PROVIDER"], !dbgProvider.isEmpty {
                     // The provider face alone (no identity header, garage or photos), over the live readers.
                     NavigationStack {
@@ -395,6 +398,19 @@ private struct DebugVehicleDeepLink: View {
                       SupabaseService.currentUserId ?? "nil")
             }
             ready = true
+        }
+    }
+}
+
+/// NUKE_DEBUG_JOBS_LOOKING=1 → the open-requests section alone, read live. DEBUG only.
+private struct DebugJobsLookingHost: View {
+    @State private var open: JobLoad<OpenRequirements> = .loading
+    var body: some View {
+        NavigationStack {
+            List { JobsLookingSection(open: open) }
+                .navigationTitle("Work")
+                .navigationBarTitleDisplayMode(.inline)
+                .task { open = await OfferReaders.openRequirements() }
         }
     }
 }

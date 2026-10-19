@@ -135,6 +135,39 @@ final class JobFixtureSnapshotTests: XCTestCase {
         try snapshot(view, name: "fixture-contact-thread")
     }
 
+    func testRenderJobsLookingWithMatch() throws {
+        let page = try decode(OpenRequirements.self, OfferFixtures.open(signedIn: true))
+        let view = NavigationStack {
+            List { JobsLookingSection(open: .loaded(page), bridge: "claimed") }
+                .navigationTitle("Work").navigationBarTitleDisplayMode(.inline)
+        }
+        try snapshot(view, name: "fixture-jobs-looking-match", pages: 2)
+    }
+
+    func testRenderOfferSheet() throws {
+        let o = try decode(WorkOrderOffers.self, OfferFixtures.offers)
+        let action = try XCTUnwrap(o.offerAction(for: OfferFixtures.reqTool))
+        let lines = [OfferLineDraft(description: "Weld exhaust hangers", pricingBasis: "hourly", amount: "120", currency: "USD", quantity: "3")]
+        try snapshot(OfferSheet(action: action, requirementTitle: "Tool: MIG welder for exhaust hangers", lines: lines),
+                     name: "fixture-offer-sheet", pages: 2)
+    }
+
+    func testRenderAcceptOfferSheet() throws {
+        let o = try decode(WorkOrderOffers.self, OfferFixtures.offers)
+        let offer = o.requirements[0].offers[0]
+        let action = try XCTUnwrap(o.acceptAction(for: offer))
+        try snapshot(AcceptOfferSheet(action: action, offer: offer, requirementTitle: "Skill: Paint touch-up on the driver door"),
+                     name: "fixture-accept-offer", pages: 2)
+    }
+
+    func testRenderJobOffersSection() throws {
+        let o = try decode(WorkOrderOffers.self, OfferFixtures.offers)
+        let view = NavigationStack {
+            List { JobOffersSection(offers: .loaded(o)) }.navigationTitle("Job").navigationBarTitleDisplayMode(.inline)
+        }
+        try snapshot(view, name: "fixture-job-offers")
+    }
+
     func testRenderWorkSessionSignSheet() throws {
         let item = try decode(SignatureQueue.self, JobFixtures.signatureQueue).items[0]
         try snapshot(WorkSessionSignSheet(item: item), name: "fixture-sign-work-day")

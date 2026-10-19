@@ -94,6 +94,7 @@ enum JobCopy {
         "no_status_history": "No status history",
         "no_payment_record": "No payment recorded",
         "no_payout_record": "No payout recorded",
+        "provider_acceptance_withheld": "A provider acceptance is on hold",
     ]
 
     private static let conflicts: [String: String] = [
@@ -150,6 +151,13 @@ enum JobCopy {
         "estimate_recorded": "Estimate on record",
         "approval_clock": "Quote accepted",
         "quote_versions": "Quote versions",
+        "accepted_providers": "Providers accepted",
+        "provider_acceptance_clock": "Provider accepted",
+        "provider_acceptances_withheld": "Provider acceptances on hold",
+        "requirements_with_offers": "Requests with offers",
+        "requirements_with_accepted_provider": "Requests with an accepted provider",
+        "operations_from_scope_text": "Operations read from the job description",
+        "operations_pending": "Operations not started",
         "approval_signer": "Accepted by",
         "schedule_window_recorded": "Schedule set",
         "assignments": "Technicians assigned",

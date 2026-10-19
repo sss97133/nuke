@@ -2,8 +2,8 @@
 //
 // Sections (R4 §2 "Work"): Awaiting your signature (my_signature_queue: each work day opens an
 // explicit confirm sheet over confirm_work_session), Jobs in motion (my_work_orders, paged by
-// next_after, each row a seven-dot stage rail that opens JobView), Open requirements near you
-// (needs a linked technician profile; links to ProviderLinkView), and Capture (the Engine's
+// next_after, each row a seven-dot stage rail that opens JobView), Messages (Contact via Nuke),
+// Jobs looking for someone (open_requirements_read with the viewer's match), and Capture (the Engine's
 // sections, unchanged, shown only with the photo grant). The tab itself is signed-in only
 // because these are personal queues. Every list is what a server reader returned for this
 // account; a reader that is missing or refuses renders "Not available yet" and why.
@@ -17,13 +17,14 @@ struct WorkConsoleView: View {
     @State private var jobs: JobLoad<MyWorkOrders> = .loading
     @State private var identity: JobLoad<MyIdentity> = .loading
     @State private var inbox: JobLoad<ContactInbox> = .loading
+    @State private var open: JobLoad<OpenRequirements> = .loading
     @State private var loadingMore = false
     @State private var showAccount = false
 
     var body: some View {
         NavigationStack {
             WorkConsoleContent(signatures: signatures, jobs: jobs, identity: identity, showCapture: showCapture,
-                               inbox: inbox,
+                               inbox: inbox, open: open,
                                onInboxChanged: { Task { inbox = await ContactReaders.inbox() } },
                                loadingMore: loadingMore,
                                onLoadMore: { Task { await loadMoreJobs() } },
@@ -56,10 +57,12 @@ struct WorkConsoleView: View {
         async let j = JobReaders.myWorkOrders()
         async let i = JobReaders.myIdentity()
         async let m = ContactReaders.inbox()
+        async let r = OfferReaders.openRequirements()
         signatures = await s
         jobs = await j
         identity = await i
         inbox = await m
+        open = await r
     }
 
     private func loadMoreJobs() async {
@@ -79,6 +82,7 @@ struct WorkConsoleContent: View {
     let identity: JobLoad<MyIdentity>
     let showCapture: Bool
     var inbox: JobLoad<ContactInbox> = .loading
+    var open: JobLoad<OpenRequirements> = .loading
     var onInboxChanged: (() -> Void)? = nil
     var loadingMore = false
     var onLoadMore: (() -> Void)? = nil
@@ -91,7 +95,7 @@ struct WorkConsoleContent: View {
             signatureSection
             ContactInboxSection(inbox: inbox, onChanged: onInboxChanged)
             jobsSection
-            openRequirementsSection
+            JobsLookingSection(open: open, bridge: { if case .loaded(let me) = identity { return me.bridge } else { return nil } }())
             if showCapture {
                 Section {
                     Text("Sync, on-device reads and tools for photos taken at your work sites.")
@@ -219,31 +223,6 @@ struct WorkConsoleContent: View {
             if case .loaded(let page) = jobs {
                 Text(page.coverage?.sentence ?? "Total not available")
             }
-        }
-    }
-
-    // MARK: Open requirements near you
-
-    @ViewBuilder private var openRequirementsSection: some View {
-        Section {
-            switch identity {
-            case .loading:
-                loadingRow
-            case .refused(let refusal):
-                JobRefusalRow(refusal: refusal)
-            case .loaded(let me):
-                NavigationLink {
-                    ProviderLinkView()
-                } label: {
-                    RootedValueView(label: "Technician profile",
-                                    value: JobCopy.technicianLink(me.bridge) ?? "Not available",
-                                    status: me.bridge == nil ? .facade : .recorded)
-                }
-            }
-            Text("Jobs looking for a technician near you will show here once your account is linked to a technician profile backed by your work. Coming soon.")
-                .font(.footnote).foregroundStyle(.secondary)
-        } header: {
-            Text("Open requirements near you")
         }
     }
 

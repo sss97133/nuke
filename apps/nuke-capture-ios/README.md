@@ -229,7 +229,8 @@ Standing rules the code carries:
   profile|explore|today|work|library`, `NUKE_DEBUG_JOB_ID=<uuid>` roots on that work order's `JobView` (readable signed out when the reader
   allows it; `NUKE_DEBUG_CODES=1` shows raw reader codes under the plain copy),
   `NUKE_DEBUG_VEHICLE_WORK=<uuid>` hosts a vehicle's Work card alone, `NUKE_DEBUG_STATEMENT_VEHICLE=<uuid>` its statement,
-  `NUKE_DEBUG_PROVIDER=<user uuid>` hosts a profile's provider face alone (no photos), `NUKE_DEBUG_SCROLL_TO=worth|proof|asset|specs|events|photos|more`,
+  `NUKE_DEBUG_PROVIDER=<user uuid>` hosts a profile's provider face alone (no photos),
+  `NUKE_DEBUG_JOBS_LOOKING=1` hosts Work's "Jobs looking for someone" alone, `NUKE_DEBUG_SCROLL_TO=worth|proof|asset|specs|events|photos|more`,
   `NUKE_DEBUG_EXPLORE_MODE=pulse|live|listings|map`, `NUKE_DEBUG_EXPLORE_QUERY=<text>` lands on the search
   results and `NUKE_DEBUG_EXPLORE_PAGES=<n>` walks n more pages through the door, `NUKE_DEBUG_LIVE_READING=1` opens
   the first hot or cold lot's reading on the board, `NUKE_DEBUG_LEDGER_MAKE=Chevrolet` opens that brand's models on the
@@ -372,6 +373,7 @@ Sources/NukeCapture/
   Vehicle/                         Work card (vehicle_work_orders_read) and statement view
   Profile/                         provider face (provider_profile_read) and jobs on record
   Contact/                         Contact via Nuke: request sheet, Work inbox, thread (in-app only)
+  Jobs/JobOffers.swift + Work/JobsLookingSection.swift  open requests, match table, offers (offer/accept Signs)
   Jobs/                            JobView over work_order_job_path_read; DTOs, readers, stage rail
   SyncEngine.swift                 PhotoKit watch + watermark + dedupe + GPS gate
   SupabaseService.swift            auth, storage upload, vehicle_images insert
