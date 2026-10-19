@@ -10,31 +10,42 @@ final class IssueQuoteTests: XCTestCase {
     }
 
     private func scope() throws -> QuoteScope {
-        IssueQuoteDrafting.scope(operations: try decode([ScopeOperation].self, IssueQuoteFixtures.operations),
-                                 requirements: try decode(ScopeRequirements.self, IssueQuoteFixtures.resources).rows)
+        try decode(WorkOrderOperations.self, IssueQuoteFixtures.operationsRead).scope
     }
 
     func testOfferedOnlyFromTheIssuerAction() throws {
         let q = try decode(JobQuotes.self, IssueQuoteFixtures.noQuote)
         let a = try XCTUnwrap(q.issueQuoteAction)
         XCTAssertNil(IssueQuoteDrafting.supersedes(a))
-        XCTAssertEqual(IssueQuoteCopy.title(a), "Issue quote")
+        XCTAssertEqual(IssueQuoteCopy.title(a, current: nil), "Issue quote")
         XCTAssertEqual(IssueQuoteDrafting.vocabulary(a).map(\.kind),
                        ["customer_completion_sign", "inspector_attestation", "installed_parts_witness", "photos_in_window", "days_signed"])
         XCTAssertEqual(IssueQuoteDrafting.vocabulary(a).filter(\.takesDays).map(\.kind), ["days_signed"])
-        let revise = try XCTUnwrap(decode(JobQuotes.self, IssueQuoteFixtures.withQuote).issueQuoteAction)
+        let mine = try decode(JobQuotes.self, IssueQuoteFixtures.withQuote)
+        let revise = try XCTUnwrap(mine.issueQuoteAction)
         XCTAssertEqual(IssueQuoteDrafting.supersedes(revise), "q1")
-        XCTAssertEqual(IssueQuoteCopy.title(revise), "Revise quote")
+        XCTAssertEqual(mine.currentQuote?.issuedByViewer, true)
+        XCTAssertEqual(IssueQuoteCopy.title(revise, current: mine.currentQuote), "Revise quote")
+        let others = try decode(JobQuotes.self, IssueQuoteFixtures.withOthersQuote)
+        XCTAssertEqual(others.currentQuote?.issuedByViewer, false)
+        XCTAssertEqual(IssueQuoteCopy.title(try XCTUnwrap(others.issueQuoteAction), current: others.currentQuote), "Issue a new version")
         XCTAssertNil(try decode(JobQuotes.self, JobFixtures.quotesForCustomer).issueQuoteAction)    // customers are never offered it
     }
 
     func testLinesStartFromTheJobsOwnWork() throws {
         let s = try scope()
-        XCTAssertEqual(s.operations.map(\.refId), ["op1", "op2"])                    // a blank operation is skipped
-        XCTAssertEqual(s.requirements.map(\.refId), ["rq1", "rq2"])
+        XCTAssertEqual(s.operations.map(\.refId), ["op1", "op2"])                    // a withheld description is skipped
+        XCTAssertEqual(s.requirements.map(\.refId), ["rq1", "rq2"])                  // a blank need is skipped
+        XCTAssertEqual(s.parts.map(\.refId), ["pt1", "pt2"])
+        XCTAssertEqual(s.parts[0].amount, 170)                                       // 2 × $85 recorded, as a flat starting price
+        XCTAssertNil(s.parts[1].amount)                                              // comped: no starting price
+        XCTAssertEqual(s.labor.map(\.refId), ["lb1"])
         let seeded = IssueQuoteDrafting.seed(scope: s, current: nil)
-        XCTAssertEqual(seeded.map(\.refKind), ["operation", "operation", "requirement", "requirement"])
-        XCTAssertEqual(seeded.map(\.included), [true, true, false, false])           // needs start off when operations cover the work
+        XCTAssertEqual(seeded.map(\.refKind), ["operation", "operation", "part", "part", "labor", "requirement", "requirement"])
+        XCTAssertEqual(seeded.map(\.included), [true, true, false, false, false, false, false])   // the rest start off when operations cover the work
+        XCTAssertEqual(seeded[4].basis, .hourly)
+        XCTAssertEqual(seeded[4].amount, "140")
+        XCTAssertEqual(seeded[4].quantity, "2.5")
         XCTAssertEqual(IssueQuoteDrafting.seed(scope: .empty, current: nil).map(\.refKind), ["fee"])
         let current = try XCTUnwrap(decode(JobQuotes.self, IssueQuoteFixtures.withQuote).currentQuote)
         let revision = IssueQuoteDrafting.seed(scope: s, current: current)
@@ -128,5 +139,17 @@ final class VehicleAccessTests: XCTestCase {
         XCTAssertEqual(VehicleWorkSection.postEntry(signedIn: true, ownerContext: true, jobs: .loaded(unstated)), .post)  // owner fallback
         XCTAssertEqual(VehicleWorkSection.postEntry(signedIn: true, ownerContext: false, jobs: .loaded(unstated)), .inspect)
         XCTAssertEqual(VehicleWorkSection.postEntry(signedIn: false, ownerContext: true, jobs: .loaded(holder)), .none)
+    }
+}
+
+final class OperationsReadTests: XCTestCase {
+    func testOperationsReadPlainly() throws {
+        let o = try JobReaders.decode(WorkOrderOperations.self, from: Data(IssueQuoteFixtures.operationsRead.utf8))
+        XCTAssertEqual(o.operations.map(OperationsCopy.title),
+                       ["1. Replace front pads and rotors", "2. Bleed the brake lines", "3. Description withheld (it named a person)"])
+        XCTAssertEqual(OperationsCopy.detail(o.operations[0]), "asked for by the customer · needs: skill")
+        XCTAssertEqual(OperationsCopy.detail(o.operations[1]), "added by the technician · needs: inspection, skill")
+        XCTAssertEqual(OperationsCopy.detail(o.operations[2]), "read from the job's description")
+        XCTAssertEqual(o.operations[0].quoteRef, .init(ref_kind: "operation", ref_id: "op1"))
     }
 }

@@ -36,7 +36,7 @@ struct IssueQuoteSheet: View {
     private var vocab: [IssueQuoteDrafting.Condition] { IssueQuoteDrafting.vocabulary(action) }
 
     var body: some View {
-        SignStepSheet(title: IssueQuoteCopy.title(action), says: IssueQuoteCopy.says, doesNotSay: IssueQuoteCopy.doesNotSay,
+        SignStepSheet(title: IssueQuoteCopy.title(action, current: current), says: IssueQuoteCopy.says, doesNotSay: IssueQuoteCopy.doesNotSay,
                       saysTitle: "Quoting says",
                       confirmTitle: IssueQuoteDrafting.supersedes(action) == nil ? "Issue the quote" : "Issue the new version",
                       successTitle: issued?.duplicate == true ? "Already issued" : "Quote issued",

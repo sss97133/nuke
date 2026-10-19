@@ -24,11 +24,12 @@ struct JobView: View {
     @State private var invoices: JobLoad<WorkOrderInvoices> = .loading
     @State private var evidence: JobLoad<EvidenceCandidates> = .loading
     @State private var facility: JobLoad<JobFacility> = .loading
+    @State private var operations: JobLoad<WorkOrderOperations> = .loading
 
     var body: some View {
         JobPathContent(workOrderId: workOrderId, path: path, resources: resources, quotes: quotes, offers: offers,
                        inspections: inspections, invoices: invoices, evidence: evidence,
-                       facility: facility,
+                       facility: facility, operations: operations,
                        titleHint: titleHint, vehicleHint: vehicleHint,
                        onChanged: { Task { await load() } })
             .task(id: workOrderId) { await load() }
@@ -52,6 +53,7 @@ struct JobView: View {
         quotes = loaded.2
         offers = loaded.3
         inspections = loaded.4
+        operations = await IssueQuoteReaders.operations(workOrderId: workOrderId)
         let requirements: [RequirementOffers] = { if case .loaded(let o) = loaded.3 { return o.requirements } else { return [] } }()
         facility = await FacilityReaders.job(workOrderId: workOrderId, requirements: requirements)
     }
@@ -79,6 +81,7 @@ struct JobPathContent: View {
     var invoices: JobLoad<WorkOrderInvoices>? = nil
     var evidence: JobLoad<EvidenceCandidates>? = nil
     var facility: JobLoad<JobFacility>? = nil
+    var operations: JobLoad<WorkOrderOperations>? = nil
     var titleHint: String? = nil
     var vehicleHint: String? = nil
     var onChanged: (() -> Void)? = nil
@@ -217,6 +220,9 @@ struct JobPathContent: View {
                         .font(.footnote).foregroundStyle(.secondary)
                 } else if let rung = JobRung.status(stage) {
                     RootedValueView(label: "Status", value: JobCopy.stateLine(stage.state), status: rung)
+                    if key == .plan, case .loaded(let ops)? = operations, !ops.operations.isEmpty {
+                        OperationsList(operations: ops)
+                    }
                     ForEach(Self.visibleFacts(stage.facts)) { fact in
                         RootedValueView(label: JobCopy.fact(fact.key),
                                         value: fact.key == "request_source"
@@ -419,7 +425,7 @@ struct JobPathContent: View {
             Button {
                 issuing = IssueBox(action: a, quote: q.currentQuote)
             } label: {
-                Label(IssueQuoteCopy.title(a), systemImage: "doc.badge.plus")
+                Label(IssueQuoteCopy.title(a, current: q.currentQuote), systemImage: "doc.badge.plus")
             }
         }
     }
