@@ -6,7 +6,8 @@
 --   * shop_licenses.shop_id pointed at shops_archived_20260129 (1 row, an archived shop with no organization of the same
 --     id or slug). It now references organizations; unresolved values move to legacy_archived_shop_id and shop_id is set
 --     null. Policies are rewritten to organization owners/members (read) and active owners (write), plus global admins;
---     anon loses its table grants (licenses reach the public through facility_read: type and expiry only).
+--     anon loses its table grants (licenses reach the public through facility_read: type and expiry only). Its two dead
+--     triggers (update_shop_timestamp -> dropped shops; fn_org_audit_record -> missing org_audit_log) are repaired first.
 --   * declare_facility_asset(p_organization_id, p_kind, p_label, p_capacity, p_evidence): an active owner or member of the
 --     organization declares an asset (bay | lift | paint_booth | compressor | parking | other) with a capacity. One
 --     owner-input specification observation about the organization (vehicle_id null, subject organization) and one
@@ -40,6 +41,33 @@ COMMENT ON COLUMN public.equipment.shop_id IS 'Organization holding the equipmen
 COMMENT ON COLUMN public.equipment.asset_kind IS 'Facility asset kind for member-declared assets: bay, lift, paint_booth, compressor, parking, other.';
 COMMENT ON COLUMN public.equipment.capacity IS 'How many concurrent confirmed reservations the declared asset holds.';
 COMMENT ON COLUMN public.equipment.declaration_observation_id IS 'Current owner-input declaration (declare_facility_asset) behind a member_declaration row.';
+
+-- shop_licenses writes have failed since the 2026-01-29 organization consolidation: update_shop_timestamp updates the
+-- dropped table shops, and trg_audit_shop_licenses calls fn_org_audit_record, whose table org_audit_log was never created.
+-- Repaired (not disabled): the timestamp goes to organizations (also for shop_locations), and the audit table exists.
+CREATE OR REPLACE FUNCTION public.update_shop_timestamp() RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path = pg_catalog, public AS $$
+BEGIN
+  UPDATE public.organizations SET updated_at = now() WHERE id = NEW.shop_id;
+  RETURN NEW;
+END $$;
+REVOKE ALL ON FUNCTION public.update_shop_timestamp() FROM PUBLIC, anon, authenticated;
+CREATE TABLE IF NOT EXISTS public.org_audit_log (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  shop_id uuid,
+  actor_user_id uuid,
+  action text NOT NULL,
+  entity_table text NOT NULL,
+  entity_id uuid,
+  changes jsonb NOT NULL DEFAULT '{}'::jsonb,
+  created_at timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS org_audit_log_shop ON public.org_audit_log(shop_id, created_at DESC);
+ALTER TABLE public.org_audit_log ENABLE ROW LEVEL SECURITY;
+REVOKE ALL ON public.org_audit_log FROM PUBLIC, anon, authenticated, service_role;
+GRANT SELECT ON public.org_audit_log TO service_role;
+DROP POLICY IF EXISTS org_audit_log_service_read ON public.org_audit_log;
+CREATE POLICY org_audit_log_service_read ON public.org_audit_log FOR SELECT TO service_role USING (true);
+COMMENT ON TABLE public.org_audit_log IS 'Organization audit rows written by fn_org_audit_record (shop_licenses and other org triggers). Created 2026-10-19: the triggers referenced it but it did not exist.';
 
 ALTER TABLE public.shop_licenses ADD COLUMN legacy_archived_shop_id uuid;
 COMMENT ON COLUMN public.shop_licenses.legacy_archived_shop_id IS 'shops_archived_20260129 id this license pointed at when it did not resolve to an organization (2026-10-19); kept for review, never guessed.';
