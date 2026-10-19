@@ -237,6 +237,7 @@
     "yono:daily:unstick": "dotenvx run -- node yono/daily_progress.mjs --unstick",
     "receipts:reconcile": "dotenvx run -- node scripts/receipts/reconcile.mjs",
     "receipts:reconcile:dry-run": "dotenvx run -- node scripts/receipts/reconcile.mjs --org-scoped",
+    "books:recategorize": "dotenvx run -- node scripts/books/qb-recategorize.mjs",
     "backfill:bat-bids": "dotenvx run -- node scripts/bat-bid-backfill.mjs",
     "backfill:bat-bids:dry": "dotenvx run -- node scripts/bat-bid-backfill.mjs --dry-run --limit 10",
     "compute:bat-profiles": "dotenvx run -- node scripts/bat-compute-profiles.mjs",
