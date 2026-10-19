@@ -325,8 +325,15 @@ export function matchReason(m: MatchInput): string {
   if (r.startsWith('not required for a')) return 'Not needed for this';
   switch (m.input) {
     case 'skill': {
+      const covers = /capability (.+?) covers this requirement/.exec(r);
+      if (m.result === 'pass' && covers) return `Your work record shows ${covers[1].replace(/_/g, ' ')}`;
       const named = /capability (.+) is named in the requirement/.exec(r);
       if (m.result === 'pass' && named) return `Your record shows ${named[1].replace(/_/g, ' ')}`;
+      const against = /^only evidence against (.+?) for this requirement/.exec(r);
+      if (against) return `Only evidence against so far (${against[1].replace(/_/g, ' ')})`;
+      const hand = /^hand-entered capability record without basis: (.+)/.exec(r);
+      if (hand) return `An older hand-entered record lists ${hand[1].replace(/_/g, ' ')}, without its basis`;
+      if (r.startsWith('requested and reported-performed specifications differed')) return 'Earlier work differed from what was asked (evidence against, not a verdict)';
       return r.includes('do not name') ? "Your record doesn't show this skill yet" : 'Not shown in your record yet';
     }
     case 'tools': {

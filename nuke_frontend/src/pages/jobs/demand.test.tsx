@@ -55,6 +55,8 @@ describe('match words', () => {
     expect(matchReason({ input: 'area', result: 'pass', reason: 'same state and city' })).toBe('Same city');
     expect(matchReason({ input: 'availability', result: 'pass', reason: 'standing availability (self-claimed) falls inside the job window' })).toBe('Your hours fall inside the job window');
     expect(matchReason({ input: 'availability', result: 'fail', reason: 'no declared availability inside the job window' })).toBe("Your hours don't cover the job window");
+    expect(matchReason({ input: 'skill', result: 'pass', reason: 'evidence-derived capability welding_tig covers this requirement' })).toBe('Your work record shows welding tig');
+    expect(matchReason({ input: 'skill', result: 'unknown', reason: 'only evidence against paint_refinish for this requirement' })).toBe('Only evidence against so far (paint refinish)');
     expect(theirWords("You haven't set availability yet")).toBe("They haven't set availability yet");
     expect(theirWords('Linked by you, not yet backed by work')).toBe('Linked by them, not yet backed by work');
     expect(theirWords('No tools in your records')).toBe('No tools in their records');
