@@ -2,7 +2,7 @@
 //
 // What checking this car would cover, not a restoration price: identity checks first, the
 // listing's claims as quoted testimony with their source and clocks, likely work with rough
-// uncalibrated hours, the labor rate exactly as returned (a placeholder), only text-matched parts
+// uncalibrated hours (no dollar figure unless a shop reported a rate), only text-matched parts
 // (unverified fit), and the pre-purchase checklist an inspection would answer. Ordering the
 // inspection is a signed-in Sign step (OrderInspectionSheet).
 
@@ -135,9 +135,11 @@ struct WorkPlanEstimateView: View {
                     RootedValueView(label: t.name ?? "Operation", value: PlanCopy.hours(t), status: .projected, decay: PlanCopy.roughGuide)
                 }
             }
-            if let rate = p.rateValue {
-                RootedValueView(label: "Labor rate", value: "\(JobMoney.format(rate, "USD")) / hour", status: .projected,
-                                decay: "placeholder rate, shown exactly as returned")
+            if let rate = p.reportedRate {
+                RootedValueView(label: "Labor rate", value: "\(JobMoney.format(rate, "USD")) / hour", status: .attributed,
+                                decay: "a reported rate")
+            } else {
+                Text(PlanCopy.noShopRate).font(.footnote).foregroundStyle(.secondary)
             }
         } header: {
             Text("Likely work")

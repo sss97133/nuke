@@ -3,7 +3,7 @@
 // The description in your own words, optional own photos of this vehicle (personal, sensitive,
 // misattributed or replaced ones are shown as not attachable, with the reason), an optional
 // needed-by date and Open / Invite only. "Posting says / It does not say", then an explicit confirm.
-// After posting: what Nuke recorded, the rough cost guide (never a quote) and the new job.
+// After posting: what Nuke recorded, the rough hours guide (never a quote) and the new job.
 
 import SwiftUI
 
@@ -182,7 +182,7 @@ struct PostJobView: View {
     }
 }
 
-/// What post_work_request recorded, the rough cost guide and the way into the new job.
+/// What post_work_request recorded, the rough hours guide and the way into the new job.
 struct PostedJobSections: View {
     let posted: PostedJob
     var vehicleTitle: String? = nil
@@ -222,12 +222,12 @@ struct PostedJobSections: View {
                 ForEach(c.lines) { l in
                     VStack(alignment: .leading, spacing: 2) {
                         Text(l.text ?? "Item \(l.line_number)").font(.footnote)
-                        Text(PostJobCopy.costLine(l, currency: c.currency)).font(.caption).foregroundStyle(.secondary)
+                        Text(PostJobCopy.costLine(l, c)).font(.caption).foregroundStyle(.secondary)
                     }
                 }
-                if let r = PostJobCopy.rate(c) { Text(r).font(.caption2).foregroundStyle(.secondary) }
+                Text(PostJobCopy.rate(c)).font(.caption2).foregroundStyle(.secondary)
             } header: {
-                Text("Rough cost")
+                Text(PostJobCopy.showsMoney(c) ? "Rough cost" : "Rough hours")
             } footer: {
                 Text(PostJobCopy.costLabel + ". Hours are uncalibrated reference figures.")
             }

@@ -18,6 +18,8 @@ final class PlanTests: XCTestCase {
         XCTAssertEqual(p.operations.first?.targets.count, 2)
         XCTAssertEqual(p.checklist.count, 3)
         XCTAssertEqual(p.rateValue, 160)
+        XCTAssertNil(p.reportedRate)                                             // spitball: never shown as dollars
+        XCTAssertEqual(PlanCopy.noShopRate, "No shop rate on record yet — a technician's quote sets the price.")
         XCTAssertEqual(p.modelCalls, 0)
         XCTAssertEqual(p.databaseWrites, 0)
         XCTAssertEqual(p.pricedParts.map(\.name), ["Timing belt kit"])

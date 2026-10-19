@@ -3,7 +3,7 @@
 // listing_work_plan_read (buying_plan_v1, anon-readable) states what checking a car would cover,
 // not a restoration price: identity checks across sources, the listing's claims as testimony,
 // candidate operations with uncalibrated reference hours, unverified text-matched parts, the
-// labor rate exactly as returned (a placeholder), and a pre-purchase checklist. Its
+// labor rate (shown in dollars only when reported, never the placeholder), and a pre-purchase checklist. Its
 // inspection_scope goes to request_inspection unchanged (plus the request channel) on the
 // client's explicit Sign; no vehicle access, seller permission or payment follows from ordering.
 // work_order_inspection_read returns the inspection, its findings and the seller's permission.
@@ -190,6 +190,9 @@ struct WorkPlan: Decodable, Equatable {
     let matchedClaims: Int?
     let eligibleClaims: Int?
     let rateValue: Double?
+    /// Where the rate came from; only a rate a shop or person reported is ever shown as dollars.
+    let rateSource: String?
+    var reportedRate: Double? { ["contract", "user", "organization"].contains(rateSource ?? "") ? rateValue : nil }
     let modelCalls: Int?
     let databaseWrites: Int?
 
@@ -225,7 +228,7 @@ struct WorkPlan: Decodable, Equatable {
     private struct Coverage: Decodable { let matched_claims: Int?; let eligible_claims: Int? }
     private struct Rate: Decodable {
         let value: Value?
-        struct Value: Decodable { let rate: Double? }
+        struct Value: Decodable { let rate: Double?; let source: String? }
     }
     private struct ClaimSlot: Decodable {
         let claim: Claim?
@@ -255,7 +258,9 @@ struct WorkPlan: Decodable, Equatable {
         let cov = try? c.decode(Coverage.self, forKey: .coverage)
         matchedClaims = cov?.matched_claims
         eligibleClaims = cov?.eligible_claims
-        rateValue = (try? c.decode(Rate.self, forKey: .rate))?.value?.rate
+        let rate = (try? c.decode(Rate.self, forKey: .rate))?.value
+        rateValue = rate?.rate
+        rateSource = rate?.source
         modelCalls = try? c.decode(Int.self, forKey: .modelCalls)
         databaseWrites = try? c.decode(Int.self, forKey: .databaseWrites)
     }
@@ -504,6 +509,8 @@ enum PlanCopy {
     }
 
     static let roughGuide = "rough guide, not calibrated"
+    /// Shown instead of any placeholder labor rate: no dollar figure until a real rate or quote exists.
+    static let noShopRate = "No shop rate on record yet — a technician's quote sets the price."
 
     static func system(_ s: String?) -> String {
         switch s {

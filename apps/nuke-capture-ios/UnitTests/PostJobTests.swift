@@ -24,12 +24,18 @@ final class PostJobTests: XCTestCase {
         XCTAssertEqual(PostJobCopy.listing(p), "Listed: technicians can see it under Jobs looking for someone.")
         let c = try XCTUnwrap(p.cost)
         XCTAssertNil(c.currency)
-        XCTAssertEqual(PostJobCopy.total(c), "$240.00–$480.00 for 1 of 3 items")
-        XCTAssertEqual(c.lines.map { PostJobCopy.costLine($0, currency: c.currency) }, [
-            "about 1.5–3 h · $240.00–$480.00", "Matched, but no reference hours yet", "Nothing to estimate from yet",
+        XCTAssertFalse(PostJobCopy.showsMoney(c))                                       // the placeholder rate never becomes dollars
+        XCTAssertEqual(PostJobCopy.total(c), "about 1.5–3 h for 1 of 3 items")
+        XCTAssertEqual(c.lines.map { PostJobCopy.costLine($0, c) }, [
+            "about 1.5–3 h", "Matched, but no reference hours yet", "Nothing to estimate from yet",
         ])
-        XCTAssertEqual(PostJobCopy.rate(c), "$160.00 / hour, a placeholder rate shown as returned")
-        XCTAssertEqual(PostJobCopy.costLabel, "Rough guide from reference hours × a placeholder rate — not a quote")
+        XCTAssertEqual(PostJobCopy.rate(c), "No shop rate on record yet — a technician's quote sets the price.")
+        XCTAssertEqual(PostJobCopy.costLabel, "Rough guide from reference hours — not a quote")
+        let reported = try decode(PostedJob.self, PostJobFixtures.posted.replacingOccurrences(of: #""rate_label":"placeholder""#,
+                                                                                                with: #""rate_label":"reported_rate""#))
+        let rc = try XCTUnwrap(reported.cost)
+        XCTAssertEqual(PostJobCopy.total(rc), "$240.00–$480.00 for 1 of 3 items")             // a shop's own rate may show dollars
+        XCTAssertEqual(PostJobCopy.rate(rc), "$160.00 / hour, a reported rate")
         let dup = try decode(PostedJob.self, PostJobFixtures.duplicate)
         XCTAssertTrue(dup.duplicate)
         XCTAssertNil(dup.cost)

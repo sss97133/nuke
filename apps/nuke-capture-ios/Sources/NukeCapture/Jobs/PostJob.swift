@@ -4,8 +4,8 @@
 // p_visibility 'open'|'invite_only'): owners, uploaders and access holders only (anyone else is
 // pointed to request_inspection); the description is the client's own words, refused when it holds
 // contact details or the client's own name; operations are excerpts of it, requirements come from
-// the reviewed template, and the suggested cost is reference hours × resolve_labor_rate() as returned
-// (hours seed_uncalibrated, rate placeholder) — never a quote. Intake photos go through
+// the reviewed template, and the suggested cost is reference hours × resolve_labor_rate(); the app shows the
+// hours only, and dollars only for a reported rate (never the placeholder) — never a quote. Intake photos go through
 // attach_job_evidence (own, non-sensitive photos of this vehicle only). No provider is notified,
 // nothing is booked, no payment is authorized.
 // start_work(p_work_order_id, p_terms_hash): offered in the job view's viewer.actions to the current
@@ -208,7 +208,7 @@ enum PostJobDrafting {
 
 enum PostJobCopy {
     static let warning = "Don't include phone numbers or emails — people reach you through Nuke."
-    static let costLabel = "Rough guide from reference hours × a placeholder rate — not a quote"
+    static let costLabel = "Rough guide from reference hours — not a quote"
 
     static let postingSays = [
         "Your job is listed on Nuke in your own words, for this vehicle.",
@@ -217,7 +217,7 @@ enum PostJobCopy {
     static let postingDoesNotSay = [
         "That anyone is booked",
         "Any payment",
-        "A price — the cost shown is a rough placeholder",
+        "A price — the hours shown are a rough guide",
     ]
 
     static func startSays(_ basis: String?) -> String {
@@ -255,25 +255,36 @@ enum PostJobCopy {
         return lo == hi ? "about \(f(lo)) h" : "about \(f(lo))–\(f(hi)) h"
     }
 
-    static func costLine(_ l: PostedJob.CostLine, currency: String?) -> String {
+    /// Dollars only when the rate is one a shop or person reported; a placeholder rate is never shown.
+    static func showsMoney(_ c: PostedJob.Cost) -> Bool { c.rateLabel == "reported_rate" }
+
+    static func costLine(_ l: PostedJob.CostLine, _ c: PostedJob.Cost) -> String {
         switch l.state {
         case "estimated"?:
-            return [hours(l.hours), range(l.cost, currency: currency)].compactMap { $0 }.joined(separator: " · ")
+            return [hours(l.hours), showsMoney(c) ? range(l.cost, currency: c.currency) : nil].compactMap { $0 }.joined(separator: " · ")
         case "reference_rows_absent"?: return "Matched, but no reference hours yet"
         default: return "Nothing to estimate from yet"
         }
     }
 
+    /// Summed reference hours (or dollars, for a reported rate) over the lines that could be estimated.
     static func total(_ c: PostedJob.Cost) -> String? {
-        guard let t = c.total, let r = range(PostedJob.Range(low: t.low, high: t.high), currency: c.currency) else { return nil }
-        if let n = t.lines_estimated, let of = t.lines, n < of { return "\(r) for \(n) of \(of) items" }
-        return r
+        let est = c.lines.filter { $0.state == "estimated" }
+        let r: String?
+        if showsMoney(c), let t = c.total {
+            r = range(PostedJob.Range(low: t.low, high: t.high), currency: c.currency)
+        } else {
+            let lo = est.compactMap { $0.hours?.low }, hi = est.compactMap { $0.hours?.high }
+            r = lo.isEmpty ? nil : hours(PostedJob.Range(low: lo.reduce(0, +), high: hi.reduce(0, +)))
+        }
+        guard let r else { return nil }
+        let of = c.lines.count
+        return est.count < of ? "\(r) for \(est.count) of \(of) items" : r
     }
 
-    static func rate(_ c: PostedJob.Cost) -> String? {
-        guard let r = c.rate?.rate else { return nil }
-        let price = JobMoney.format(r, c.currency) + " / hour"
-        return c.rateLabel == "reported_rate" ? "\(price), a reported rate" : "\(price), a placeholder rate shown as returned"
+    static func rate(_ c: PostedJob.Cost) -> String {
+        if showsMoney(c), let r = c.rate?.rate { return JobMoney.format(r, c.currency) + " / hour, a reported rate" }
+        return PlanCopy.noShopRate
     }
 
     static func requirement(_ r: PostedJob.Requirement) -> String {
