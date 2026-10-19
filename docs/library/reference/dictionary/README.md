@@ -184,6 +184,8 @@ author. Missing, held and ambiguous originals remain unlinked.
 
 **Jewel** — A low-frequency, high-importance concept from the prompt analysis. Features that appear in few prompts but are architecturally critical: YONO, Photo Sync, Condition Scoring, Autonomous Loop, Nuke Estimate, Observation System, Developer API, Labor Estimation. See JEWELS.md.
 
+**Job path stage state** — For one work order and one stage (intake, inspection, plan, terms, execution, completion, accounting): `recorded`, `partial`, `status_only` or `absent`, from existing owner records and clocks. Presence of evidence, not verified truth; status/clock/record disagreements are listed as inconsistencies. See [Work Order Intelligence](../../technical/work-order-intelligence.md).
+
 ## K
 
 **Knowledge Graph** — The materialized relational schema that encodes everything that can be true about assets in a domain. Not a separate graph database — the Postgres tables ARE the graph.

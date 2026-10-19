@@ -111,6 +111,27 @@ and completion as `not_established` and qualification as `not_assessed`. A confl
 the records disagree; it does not decide which record is right or whether a substitution
 was agreed. Contract: `supabase/sql/test_work_order_resource_specifications.sql`.
 
+## Job path self-measurement
+
+`read_work_order_job_path(work_order_id)` reports one work order's evidence across seven
+stages: intake, inspection, plan, terms, execution, completion and accounting.
+`work_order_job_path_scoreboard()` aggregates every `work_orders` row (the denominator)
+into per-stage state counts, gap counts and inconsistency counts. Both are service-only,
+read-only and run as the caller; they read existing owners (`work_orders`, line items,
+the resource graph, parts, labor, assignments, `component_events`, status history,
+`work_order_payments`, `payment_events`) and return counts, statuses and clocks, never
+customer contact fields or amounts.
+
+A stage state is `recorded`, `partial`, `status_only` (a status says done or paid without
+the clock) or `absent`. It reports whether evidence exists, not whether it is true.
+Inconsistencies are reported and never repaired: an assignment status of accepted with no
+`accepted_at`, a done status with no completion clock, a paid status with no payment record,
+and payments on a work order with no vehicle. Vehicle-scoped `payment_events` are counted
+beside the job with attribution `not_established`. Plan executability, customer acceptance,
+measured usage, labor value and cost allocation stay unassessed or false, and nothing is
+disbursed. The scoreboard is the measurement the RSI loop reads before choosing the next
+gap that retained evidence can close. Contract: `supabase/sql/test_work_order_job_path.sql`.
+
 ## Image objects in job context
 
 `read_work_order_image_objects(work_order_id, after_observation_id, limit)` is a
