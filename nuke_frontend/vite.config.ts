@@ -37,6 +37,10 @@ export default defineConfig({
     rollupOptions: {
       output: {
         manualChunks(id) {
+          // Vite's dynamic-import preload helper is imported by every chunk that lazy-loads anything. Left unassigned,
+          // Rollup placed it in 'maps', so the entry and every route statically imported maps (Leaflet, ~150 KB
+          // compressed, plus its stylesheet in <head>) on every page (measured 2026-10-19). Keep it with React.
+          if (id.includes('vite/preload-helper')) return 'vendor';
           if (id.includes('node_modules')) {
             // THREE.JS — @react-three/* goes here (only used by wiring page, lazy-loaded).
             // Dependency is one-way: three→vendor (for React). No circular dep.
