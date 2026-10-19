@@ -184,6 +184,8 @@ author. Missing, held and ambiguous originals remain unlinked.
 
 **Jewel** — A low-frequency, high-importance concept from the prompt analysis. Features that appear in few prompts but are architecturally critical: YONO, Photo Sync, Condition Scoring, Autonomous Loop, Nuke Estimate, Observation System, Developer API, Labor Estimation. See JEWELS.md.
 
+**Job path stage state** — For one work order and one stage (intake, inspection, plan, terms, execution, completion, accounting): `recorded`, `partial`, `status_only` or `absent`, from existing owner records and clocks. Presence of evidence, not verified truth; status/clock/record disagreements are listed as inconsistencies. See [Work Order Intelligence](../../technical/work-order-intelligence.md).
+
 ## K
 
 **Knowledge Graph** — The materialized relational schema that encodes everything that can be true about assets in a domain. Not a separate graph database — the Postgres tables ARE the graph.
@@ -283,6 +285,14 @@ can supersede it without editing the original or guessing from model/year.
 **Question Data Gap** — A taxonomy category where `answerable_from_db = false` — buyers ask about it but no structured DB field can answer it. Examples: video requests, seller responsiveness, provenance value, bidding strategy. Gaps inform what data to collect next or what features to build.
 
 ## R
+
+**Resource image sighting** — One retained tool/component array member in a canonical image observation, identified by source observation and JSON pointer. Several sightings may describe the same physical object; an equipment association is separately qualified. Presence, use, ownership, purchase cost, market value and contribution to labor are different claims. See [Work Order Intelligence](../../technical/work-order-intelligence.md).
+
+**Resource performer candidate** — A canonical `actors` reference proposed for a skill or inspection requirement. The contracting supplier can be unknown; an actor label does not establish account identity, qualification, consent or completion. A retained-operation basis includes an exact row snapshot and is withheld from current reads after that operation changes. See [Work Order Intelligence](../../technical/work-order-intelligence.md).
+
+**Resource requirement basis** — The original retained work-record observation and exact excerpt supporting an interpreted need for a work-order operation. The interpretation keeps the original observation clock and its own extraction method and confidence. A quoted need does not establish quantity, provider competence, permission or reservation. Withdrawing or reattributing the basis excludes its dependent current resource graph; original records remain. See [Work Order Intelligence](../../technical/work-order-intelligence.md).
+
+**Resource specification** — One attributed material/process pair for a work order at one stage: requested, proposed (quoted part), supplied (part recorded installed) or reported_performed (recorded operation). Labels are verbatim from the basis record; dotted keys are the interpretation, and materials are compared only within the same role (workpiece, filler, consumable). Disagreement between stages is reported as conflicting evidence, not as an approved substitution, a qualification finding or completion. See [Work Order Intelligence](../../technical/work-order-intelligence.md).
 
 **Rhizome** — Deleuzian concept. A network with no center, no hierarchy, no beginning or end. Nuke's architecture is rhizomatic — every concept connects to every other. The observation system is the purest expression. See RHIZOME.md.
 

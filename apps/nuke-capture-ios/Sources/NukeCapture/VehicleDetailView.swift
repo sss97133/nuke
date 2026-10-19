@@ -662,6 +662,9 @@ struct VehicleDetailView: View {
                             ValueTrajectoryView(vehicleId: vehicleId).id("trajectory")
                             InvestmentProofView(vehicleId: vehicleId).id("proof")
                         }
+                        if let viewer = profile?.viewer, viewer != .anon {
+                            VehiclePrivatePhotosSection(vehicleId: vehicleId)
+                        }
                         photoStrip.id("photos")
                         assetWindow.id("asset")
                         specTable.id("specs")
@@ -2249,7 +2252,7 @@ private struct DayDrillSheet: View {
 // A real photo viewer (the Photos-app idiom): swipe between, pinch/pan/double-tap zoom,
 // a filmstrip scrubber, date caption, cached full-res. Tap toggles chrome. Analysis is
 // still one tap away (the drill survives) — never a parallel atom view (don't-mint).
-private struct FullScreenGalleryView: View {
+struct FullScreenGalleryView: View {
     let photos: [VehicleGalleryImage]
     var onAnalyze: ((VehicleGalleryImage) -> Void)? = nil
     @State private var index: Int

@@ -41,7 +41,8 @@ export async function loadCabObservation(supabase: any, capture: CabObservation,
   }
   const { data: row, error } = await supabase.from("vehicle_observations")
     .select("id,vehicle_id,source_url,source_identifier,kind,observed_at,is_superseded,structured_data,content_text,extraction_metadata")
-    .eq("id", result.observationId).maybeSingle();
+    // PostgreSQL retains microseconds that JavaScript's Date comparison truncates.
+    .eq("id", result.observationId).eq("observed_at", observedAt).maybeSingle();
   if (error || !row || row.vehicle_id !== capture.vehicleId || row.source_url !== capture.listingUrl ||
       row.source_identifier !== capture.listingId || row.kind !== "listing" || row.is_superseded === true ||
       Date.parse(row.observed_at) !== clock || (row.content_text ?? undefined) !== input.contentText ||

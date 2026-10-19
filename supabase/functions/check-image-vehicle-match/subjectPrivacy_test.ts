@@ -2,17 +2,17 @@ import { attachSubjectPrivacy, hydrateSubjectPrivacy, privateSubjectPrivacyQuali
   subjectPrivacyLookupComplete, subjectSourceAvailable, subjectSourceCanEstablishPrivacy } from "./subjectPrivacy.ts";
 import { projectSourceIdentities, attachSourceIdentityRecords } from "./sourceIdentity.ts";
 import { qualifySubjectSource } from "./subjectReader.ts";
-import { captureTrustedJPEGInputs, visionInputSHA256 } from "./inputCustody.ts";
+import { captureTrustedJPEGInputs, captureVisionInputs, visionInputSHA256 } from "./inputCustody.ts";
 import { resolveSubjectBatch, type SubjectStore } from "./subjectService.ts";
 import { assessSubjectAdmission } from "./subjectReplay.ts";
 const id = (n: number) => `00000000-0000-4000-8000-${String(n).padStart(12, "0")}`;
 const user = id(9000), at = "2026-10-18T00:00:00Z", origin = "https://qkgaybvrernstplzjaam.supabase.co";
 const clone = <T>(v: T): T => JSON.parse(JSON.stringify(v));
 function equal(a: unknown, b: unknown) { if (JSON.stringify(a) !== JSON.stringify(b)) throw new Error(`${JSON.stringify(a)} != ${JSON.stringify(b)}`); }
-async function fixture() {
-  const bytes = [new Uint8Array([255, 216, 255, 1]), new Uint8Array([255, 216, 255, 2])];
+async function fixture(count = 2) {
+  const bytes = Array.from({ length: count }, (_, n) => new Uint8Array([255, 216, 255, n + 1]));
   const sources: any[] = [];
-  for (let n = 0; n < 2; n++) {
+  for (let n = 0; n < count; n++) {
     const hash = await visionInputSHA256(bytes[n]), path = `users/${user}/capture-relay/${hash}/synthetic-${n}.JPG`;
     sources.push({ id: id(n + 1), user_id: user, source: "capture_relay_ios", file_hash: hash, storage_path: path,
       image_url: `${origin}/storage/v1/object/public/vehicle-photos/${path}`, created_at: "2026-10-17T00:00:00.000001Z", taken_at: null,
@@ -61,6 +61,36 @@ Deno.test("one existing source capture qualifies native privacy with zero extra 
   const own = await f.store.sources(user, [f.sources[0].id]);
   equal(privateSubjectPrivacyQualified(own[0], user, at), true);
   equal(qualifySubjectSource(f.retained[0].inputs[0], own[0], user, at), true);
+});
+Deno.test("free privacy qualification admits two then one originals independently of a paid reading", async () => {
+  const f = await fixture(3), originals = clone(f.sources);
+  const capturePrivacy = (sources: any[]) => captureVisionInputs(sources, { now: () => new Date(at), fetch: async url => {
+    const i = f.sources.findIndex(source => String(url).includes(source.storage_path));
+    return new Response(f.bytes[i], { headers: { "Content-Type": "image/jpeg" } });
+  } });
+  for (const ids of [f.sources.slice(0, 2).map(s => s.id), [f.sources[2].id]]) {
+    const request = f.request();
+    const result = await resolveSubjectBatch(f.store, { ...request, image_ids: ids,
+      expected_source_hashes: Object.fromEntries(ids.map(id => [id, request.expected_source_hashes[id]])),
+      device_privacy_receipts: Object.fromEntries(ids.map(id => [id, request.device_privacy_receipts[id]])), privacy_only: true }, origin,
+      { capturePrivacy, vision: async () => { throw new Error("free qualification must not call a provider"); }, now: () => new Date(at) });
+    equal(result.status, "privacy_qualified"); equal(result.persisted_image_ids, []);
+    equal("inference_started" in result && result.inference_started, false);
+  }
+  equal(f.heads.length, 3); equal(f.retained, []); equal(f.sources, originals); equal(f.counts().modelCalls, 0);
+  const request = f.request(); delete (request as any).device_privacy_receipts;
+  equal((await resolveSubjectBatch(f.store, request, origin, { capture: f.capture, vision: f.vision, now: () => new Date(at) })).status, "resolved");
+  equal(f.counts().modelCalls, 1);
+});
+Deno.test("free qualification preserves source byte and allowed-scope holds without provider calls", async () => {
+  for (const mode of ["changed", "outside", "withdrawn"]) {
+    const f = await fixture(), request = { ...f.request(), privacy_only: true };
+    if (mode === "changed") request.device_privacy_receipts[f.sources[0].id].source_sha256 = "a".repeat(64);
+    if (mode === "outside") Object.assign(request, { allowed_source_hashes: { [f.sources[0].id]: f.sources[0].file_hash } });
+    if (mode === "withdrawn") f.heads.push({ image_id: f.sources[0].id, observed_by: "device_privacy_v1", confidence_basis: { device_privacy_v1: { state: "withdrawn" } } });
+    const result = await resolveSubjectBatch(f.store, request, origin, { vision: async () => { throw new Error("provider forbidden"); }, now: () => new Date(at) });
+    equal(result.status, "refused"); equal(f.retained.length, 0); equal(f.counts().modelCalls, 0);
+  }
 });
 
 Deno.test("pending native proof cannot capture an outside or changed automatic context", async () => {

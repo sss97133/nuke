@@ -1,6 +1,6 @@
 import { observationClockMicroseconds as clock } from "../_shared/observationContentHash.ts";
 import { qualifySubjectSource, type SubjectProfile } from "./subjectReader.ts";
-import { SUBJECT_METHOD } from "./subjects.ts";
+import { captureNeighbors, SUBJECT_METHOD } from "./subjects.ts";
 import { sourceAliases, sourceRoot, sourceIdentityLineage } from "./sourceIdentity.ts";
 import { subjectPrivacyLookupComplete } from "./subjectPrivacy.ts";
 import { lineageReadingAfterWithdrawals } from "./sourceLineage.ts";
@@ -57,6 +57,22 @@ export function assessSubjectAdmission(envelope: unknown, userId: string, state:
       members.add(id);
     }
   }
+  const captureMembers = new Set<string>();
+  if (envelope.capture_sessions !== undefined && (!Array.isArray(envelope.capture_sessions) || envelope.capture_sessions.length > 7))
+    return result(false, blocked, "retained_reading_invalid");
+  for (const session of envelope.capture_sessions ?? []) {
+    if (!record(session) || !record(session.identifier) || !["vin", "chassis"].includes(session.identifier.kind) ||
+      typeof session.identifier.text !== "string" || !/^[A-Z0-9]{8,17}$/.test(session.identifier.text) ||
+      !["clear", "partial"].includes(session.identifier.legibility) || typeof session.basis !== "string" || !session.basis.trim() ||
+      !uuid(session.anchor_image_id) || !Array.isArray(session.member_image_ids) ||
+      session.member_image_ids.length < 2 || session.member_image_ids.length > 14 ||
+      !session.member_image_ids.includes(session.anchor_image_id) ||
+      new Set(session.member_image_ids).size !== session.member_image_ids.length ||
+      !session.member_image_ids.every((id: unknown) => uuid(id) && inputs.has(id) && !captureMembers.has(id) &&
+        (id === session.anchor_image_id || captureNeighbors(inputs.get(session.anchor_image_id), inputs.get(id)))))
+      return result(false, blocked, "retained_reading_invalid");
+    for (const id of session.member_image_ids) { captureMembers.add(id); members.add(id); }
+  }
   if (!state.readings_complete || !subjectPrivacyLookupComplete([...sources.values()])) return result(true, members, "current_membership_unassessed");
   const roots = new Set<string>();
   for (const id of members) {
@@ -80,7 +96,10 @@ export function assessSubjectAdmission(envelope: unknown, userId: string, state:
       row.is_active !== true || wrapper.state === "withdrawn") { for (const id of affected) blocked.add(id); continue; }
     for (const id of affected) {
       const proposed = envelope.subjects.find((s: any) => s.member_image_ids.includes(id));
-      if (wrapper.anchor_image_id !== proposed.anchor_image_id ||
+      // Canonical filing does not replace an existing visual cluster/cover anchor.
+      // Withdrawals above still block it; private membership changes retain their own checks.
+      if (!proposed && captureMembers.has(id)) continue;
+      if (!proposed || wrapper.anchor_image_id !== proposed.anchor_image_id ||
         proposed.existing_cluster_id && row.cluster_id !== proposed.existing_cluster_id) blocked.add(id);
     }
   }

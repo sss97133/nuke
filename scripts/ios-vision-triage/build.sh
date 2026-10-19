@@ -9,5 +9,6 @@ sdk="$(xcrun --sdk macosx --show-sdk-path)"
 out="${OUT:-${TMPDIR:-/tmp}/ios-triage}"
 swiftc -O -target "$(uname -m)-apple-ios17.0-macabi" -sdk "$sdk" \
   -Fsystem "$sdk/System/iOSSupport/System/Library/Frameworks" \
+  "$repo/apps/nuke-capture-ios/Sources/NukeCapture/DevicePrivacyReceipt.swift" \
   "$repo/apps/nuke-capture-ios/Sources/NukeCapture/VisionEngine.swift" "$here/main.swift" -o "$out"
 echo "$out"

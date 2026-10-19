@@ -148,6 +148,7 @@ struct SourceInboxRead: Codable, Equatable, Sendable {
             value.count == 64 && value.utf8.allSatisfy { (48...57).contains($0) || (97...102).contains($0) }
         }
     }
+    var private_vehicle_id: UUID? = nil
     let photos: [Photo]
     let coverage: Coverage
     let next_cursor: String?
@@ -155,6 +156,7 @@ struct SourceInboxRead: Codable, Equatable, Sendable {
         coverage.isQualified && coverage.returned == photos.count && photos.allSatisfy(\.isQualified)
             && coverage.displayable == photos.filter({ $0.source_state == "ready" }).count
             && Set(photos.map(\.id)).count == photos.count && (next_cursor.map { !$0.isEmpty && $0.count <= 512 } ?? true)
+            && (private_vehicle_id == nil || photos.allSatisfy { $0.source_state != "ready" || $0.attached_vehicle_id_context == private_vehicle_id })
     }
 }
 

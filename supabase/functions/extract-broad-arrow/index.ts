@@ -43,7 +43,7 @@ import { archiveFetch } from '../_shared/archiveFetch.ts';
 import { fillOnlyIdentity, identityConflict } from '../_shared/identityMatch.ts';
 import { recordRevision } from '../_shared/revision.ts';
 import { parseEventPage, parseListingCards, type RosterCard } from './roster.ts';
-import { galleryImageId, isVinClash, parseLotPage } from './lotPage.ts';
+import { estimateCurrency, galleryImageId, isVinClash, parseLotPage } from './lotPage.ts';
 
 // ============================================================================
 // TYPES
@@ -1318,10 +1318,13 @@ if (import.meta.main) Deno.serve(async (req) => {
       const { data: gate } = await supabase.rpc('firecrawl_io_gate');
       if (gate && gate.open === false) return okJson({ success: true, skipped: 'io_gate_closed', gate });
 
-      const { data: last } = await supabase.from('import_queue').select('raw_data').eq('extractor_version', TAG).order('created_at', { ascending: false }).limit(1).maybeSingle();
+      const { data: last } = await supabase.from('import_queue').select('raw_data').eq('extractor_version', TAG).not('raw_data->target_id', 'is', null).order('created_at', { ascending: false }).limit(1).maybeSingle();
       let cursor = Number(body.after_id) || Number(last?.raw_data?.target_id) || 0;
-      const picked: { id: number; listing_url: string }[] = [];
-      for (let page = 0; page < 10 && picked.length < batchLimit; page++) {
+      // body.urls re-reads named landed lots (a stored-row replay); they are not targets, so the target cursor is untouched.
+      const forced: string[] = (Array.isArray(body.urls) ? body.urls : [])
+        .filter((u: unknown): u is string => typeof u === 'string' && /^https:\/\/www\.broadarrowauctions\.com\/vehicles\//.test(u)).slice(0, batchLimit);
+      const picked: { id: number | null; listing_url: string }[] = forced.map((u) => ({ id: null, listing_url: u }));
+      for (let page = 0; page < 10 && !forced.length && picked.length < batchLimit; page++) {
         const { data: targets, error: tErr } = await supabase.from('source_targets').select('id, listing_url').eq('source_slug', 'broad-arrow').gt('id', cursor).order('id', { ascending: true }).limit(200);
         if (tErr) throw tErr;
         if (!targets?.length) break;
@@ -1342,7 +1345,7 @@ if (import.meta.main) Deno.serve(async (req) => {
       let streak = 0;
       for (const t of picked) {
         if (Date.now() - started > 110_000) { res.stopped = 'time_budget'; break; }
-        const { data: row, error: claimErr } = await supabase.from('import_queue').insert({ listing_url: t.listing_url, status: 'processing', extractor_version: TAG, raw_data: { target_id: t.id }, locked_at: new Date().toISOString() }).select('id').single();
+        const { data: row, error: claimErr } = await supabase.from('import_queue').insert({ listing_url: t.listing_url, status: 'processing', extractor_version: TAG, raw_data: t.id === null ? { replay: true } : { target_id: t.id }, locked_at: new Date().toISOString() }).select('id').single();
         if (claimErr || !row) continue;
         const finish = async (status: string, error?: string, vehicleId?: string) =>
           softWrite('import_queue update', await supabase.from('import_queue').update({ status, error_message: error?.slice(0, 500) ?? null, vehicle_id: vehicleId ?? null, processed_at: new Date().toISOString() }).eq('id', row.id), res.errors);
@@ -1364,17 +1367,18 @@ if (import.meta.main) Deno.serve(async (req) => {
             saleDays.set(lot.saleName, days);
           }
           const usd = lot.currency === 'USD' || lot.currency === null;
+          const estimate = parseFromMarkdown('', page.html, t.listing_url);
           const extracted: BroadArrowExtracted = {
             url: t.listing_url, title: lot.title, year: lot.year, make: lot.make, model: lot.model,
             vin: lot.vin && lot.vin.length === 17 ? lot.vin : null, chassis_number: lot.vin && lot.vin.length !== 17 ? lot.vin : null,
-            estimate_low: null, estimate_high: null,
+            estimate_low: estimate.estimate_low, estimate_high: estimate.estimate_high,
             sale_price: lot.status === 'sold' && usd ? lot.soldPrice : null, sold_price_text: lot.soldPriceText,
             lot_number: lot.lotNumber, auction_name: lot.saleName, auction_date: days?.starts_on ?? null,
             auction_status: lot.status === 'unknown' ? null : lot.status,
             mileage: lot.odometer ? (lot.odometer.unit === 'km' ? Math.round(lot.odometer.value * 0.621371) : lot.odometer.value) : null,
             engine: null, transmission: null, drivetrain: null, exterior_color: null, interior_color: null, body_style: null,
             description: lot.description, image_urls: lot.imageUrls, scrape_ms: 0,
-            extra_metadata: { sale_starts_on: days?.starts_on ?? null, sale_ends_on: days?.ends_on ?? null, currency: lot.currency, sold_amount: lot.status === 'sold' ? lot.soldPrice : null, odometer: lot.odometer, read_by: 'broad-arrow-targets' },
+            extra_metadata: { sale_starts_on: days?.starts_on ?? null, sale_ends_on: days?.ends_on ?? null, currency: lot.currency ?? estimateCurrency(page.html), sold_amount: lot.status === 'sold' ? lot.soldPrice : null, odometer: lot.odometer, read_by: 'broad-arrow-targets' },
           };
           const saved = await saveToDatabase(supabase, extracted);
           await finish('complete', undefined, saved.vehicle_id);

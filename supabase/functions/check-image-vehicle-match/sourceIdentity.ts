@@ -3,7 +3,7 @@ import {
   resolveImageAttributionLineage,
 } from "./sourceLineage.ts";
 
-export const SOURCE_IDENTITY_COLUMNS = "id,vehicle_id,user_id,source,image_url,file_hash,storage_path,taken_at,created_at,exif_data," +
+export const SOURCE_IDENTITY_COLUMNS = "id,vehicle_id,user_id,source,image_url,file_hash,storage_path,taken_at,created_at,exif_data,latitude,longitude,device_fingerprint,image_vehicle_match_status," +
   "is_superseded,superseded_by,superseded_at,is_duplicate,duplicate_of,is_document,is_sensitive,vision_gate_status";
 const AUDIT_COLUMNS = "id,observation_type,old_observation_id,new_observation_id,old_vehicle_id,new_vehicle_id,created_at";
 const MAX_RECEIPTS = 256, MAX_ROWS = 2048, MAX_AUDITS = 2048, CHUNK = 128;
@@ -180,7 +180,7 @@ export function inspectSourceIdentity(source: unknown) {
   const result = binding.result, lineage = result.status === "refused" ? null : result.lineage;
   return { contract: binding.contract, receipt_image_id: binding.receipt_image_id,
     root_image_id: lineage?.root_image_id ?? null, current_image_id: lineage?.current_image_id ?? null,
-    alias_image_ids: lineage?.alias_image_ids ?? [binding.receipt_image_id], audit_ids: lineage?.audit_ids ?? [],
+    alias_image_ids: lineage?.alias_image_ids ?? [], audit_ids: lineage?.audit_ids ?? [],
     state: result.status, reason: result.status === "eligible_for_byte_verification" ? null : result.reason,
     complete: binding.lookup_complete, source_photo_count: lineage ? 1 : null,
     current_vehicle_attribution_proven: false };

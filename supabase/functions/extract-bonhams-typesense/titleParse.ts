@@ -203,8 +203,11 @@ export function parseTitle(title: string): ParsedTitle {
   const atStart = clean.match(MAKE_AT_START);
   if (atStart) {
     const canon = MAKE_CANON.get(makeKey(atStart[1])) ?? atStart[1];
-    foundMake = MAKE_ALIASES[canon.toLowerCase()] ?? canon;
+    // Catalogue tokens such as MGB combine the MG make and the model letter.
+    const mgModel = /^MG([ABCF])$/.exec(canon);
+    foundMake = mgModel ? "MG" : MAKE_ALIASES[canon.toLowerCase()] ?? canon;
     clean = clean.slice(atStart[1].length).replace(/^[\s-]+/, "");
+    if (mgModel) clean = `${mgModel[1]} ${clean}`.trim();
   }
   if (!foundMake && clean.length > 0) {
     // Hyphenated makes: "Harley-Davidson", unknown compound
