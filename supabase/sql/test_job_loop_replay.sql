@@ -255,6 +255,8 @@ CREATE TABLE public.organization_vehicles(organization_id uuid, vehicle_id uuid)
 \ir ../migrations/20261019231500_job_loop_grant_tidy.sql
 \echo REPLAY 20261019233000_post_work_request.sql
 \ir ../migrations/20261019233000_post_work_request.sql
+\echo REPLAY 20261019234000_post_work_request_description.sql
+\ir ../migrations/20261019234000_post_work_request_description.sql
 \echo REPLAY 20261019234500_start_work.sql
 \ir ../migrations/20261019234500_start_work.sql
 
