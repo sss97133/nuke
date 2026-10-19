@@ -83,9 +83,14 @@ final class JobFlowUITests: XCTestCase {
         app.staticTexts.containing(NSPredicate(format: "label CONTAINS %@", s)).firstMatch
     }
 
+    /// Types into the field with this placeholder (a text field, or a multi-line text view); "" means the first text view.
     private func type(_ app: XCUIApplication, into placeholder: String, _ value: String) {
-        let field = app.textFields[placeholder].exists ? app.textFields[placeholder] : app.textViews[placeholder]
-        let target = field.exists ? field : app.textViews.firstMatch
+        let byPlaceholder = NSPredicate(format: "placeholderValue == %@", placeholder)
+        let field = app.textFields.matching(byPlaceholder).firstMatch
+        let view = placeholder.isEmpty ? app.textViews.firstMatch : app.textViews.matching(byPlaceholder).firstMatch
+        let deadline = Date().addingTimeInterval(8)
+        while !field.exists && !view.exists && Date() < deadline { usleep(250_000) }
+        let target = field.exists ? field : view
         reveal(target, in: app).tap()
         target.typeText(value)
     }
@@ -160,7 +165,12 @@ final class JobFlowUITests: XCTestCase {
         let row = app.staticTexts["Paint touch-up on the driver door"].firstMatch
         XCTAssertTrue(row.waitForExistence(timeout: 10))
         row.tap()
+        // Let the page fill in its later sections first: with the Offers header scrolled out of view, the sheet
+        // must still open (regression: sheets hung off section headers did nothing once the header left the screen).
+        XCTAssertTrue(app.staticTexts["Stages"].waitForExistence(timeout: 10))
+        sleep(2)
         reveal(app.buttons["Make an offer"].firstMatch, in: app).tap()
+        XCTAssertTrue(app.navigationBars["Make an offer"].waitForExistence(timeout: 6), "the offer sheet didn't open")
         type(app, into: "Amount", "450")
         tapConfirm(app)
         XCTAssertTrue(app.staticTexts["Offer sent"].waitForExistence(timeout: 8))

@@ -49,7 +49,7 @@ enum FixtureBackend {
 
     static let log = FixtureWriteLog()
 
-    /// Readers the app may call; any other RPC is treated as a writer and recorded.
+    /// Readers the app may call: these, plus any *_read, get_* or my_* RPC. Any other RPC is a writer and recorded.
     static let readers: Set<String> = [
         "work_order_job_path_read", "work_order_resources_read", "work_order_quotes_read", "work_order_offers_read",
         "work_order_inspection_read", "work_order_invoices_read", "job_evidence_candidates_read",
@@ -59,13 +59,17 @@ enum FixtureBackend {
         "work_order_statement_read", "facility_read", "my_vouches_read",
     ]
 
+    static func isReader(_ name: String) -> Bool {
+        readers.contains(name) || name.hasSuffix("_read") || name.hasPrefix("get_") || name.hasPrefix("my_")
+    }
+
     static func respond(_ request: URLRequest) -> (Int, Data) {
         guard let url = request.url, url.host == baseURL.host else { return (404, Data()) }
         let path = url.path
         if path.hasPrefix("/rest/v1/rpc/") {
             let name = String(path.dropFirst("/rest/v1/rpc/".count))
             let args = (FixtureURLProtocol.body(of: request)).flatMap { try? JSONSerialization.jsonObject(with: $0) as? [String: Any] } ?? [:]
-            if !readers.contains(name) {
+            if !isReader(name) {
                 log.record(rpc: name, args: args)
                 return writer(name, args)
             }
