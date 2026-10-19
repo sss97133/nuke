@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Auction, FlexibleAuctionService } from '../../services/flexibleAuctionService';
+import { type Auction, FlexibleAuctionService } from '../../services/flexibleAuctionService';
 import '../../styles/unified-design-system.css';
 
 // Urgency level type for timer coloring (NO YELLOW - BaT uses yellow)

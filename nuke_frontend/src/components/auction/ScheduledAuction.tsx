@@ -7,7 +7,7 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
 import { supabase, getSupabaseFunctionsUrl } from '../../lib/supabase';
-import { CommittedBidStack, BidStackData } from './CommittedBidStack';
+import { CommittedBidStack, type BidStackData } from './CommittedBidStack';
 
 export type AuctionStatus = 'scheduled' | 'preview' | 'active' | 'extended' | 'ended' | 'settled' | 'cancelled';
 

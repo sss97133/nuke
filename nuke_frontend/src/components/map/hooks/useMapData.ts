@@ -34,7 +34,7 @@ export function useMapData(params: UseMapDataParams) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const abortRef = useRef<AbortController | null>(null);
-  const timerRef = useRef<ReturnType<typeof setTimeout>>();
+  const timerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
 
   const fetch = useCallback(() => {
     if (timerRef.current) clearTimeout(timerRef.current);
