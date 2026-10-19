@@ -656,8 +656,10 @@ final class AttributionEngine: ObservableObject {
             guard !a.albumContextAmbiguous, !b.albumContextAmbiguous else { return false }
             let first = (a.contextualYear, a.contextualMake, a.contextualModel)
             let second = (b.contextualYear, b.contextualMake, b.contextualModel)
-            return first.0 == nil && first.1 == nil && first.2 == nil && second.0 == nil && second.1 == nil && second.2 == nil ||
-                first.0 == second.0 && first.1 == second.1 && first.2 == second.2
+            let firstHasContext = first.0 != nil || first.1 != nil || first.2 != nil
+            let secondHasContext = second.0 != nil || second.1 != nil || second.2 != nil
+            if !secondHasContext { return true }
+            return firstHasContext && first.0 == second.0 && first.1 == second.1 && first.2 == second.2
         }
         let anchors = frames.filter { frame in
             frame.exactVIN && !frame.isDocument && !frame.isSensitive &&

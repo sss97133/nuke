@@ -89,6 +89,10 @@ final class DeviceAttributionTests: XCTestCase {
             capture("front", vehicle: true)
         ]), [.init(vin: serial, year: 1966, make: "Ford", model: "Mustang Cpe Blk",
                    anchorImageID: "plate", imageIDs: ["front", "plate"], vehicleFrameCount: 1)])
+        XCTAssertTrue(AttributionEngine.vinAnchoredCaptureGroups([
+            capture("plate", vin: serial, exact: true, year: 1966, make: "Ford", model: "Mustang"),
+            capture("other-album-car", vehicle: true, year: 1966, make: "Chevrolet", model: "C10")
+        ]).isEmpty, "a conflicting owner album blocks cross-vehicle context")
     }
 
     func testContextFoldUsesWalkaroundScaleAndRejectsCompetingVINAnchors() {
