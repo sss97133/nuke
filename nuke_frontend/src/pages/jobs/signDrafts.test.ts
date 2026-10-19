@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { parseAction, type JobAction, type JsonObject } from './jobRead';
 import {
-  attestArgs, baseLines, changeOrderArgs, completionActions, confirmBookingArgs, cosignArgs, facilityAssets, invoiceArgs, invoiceLinesFromQuote,
+  attestArgs, baseLines, evidenceArgs, findingsArgs, grantArgs, notAttachableText, changeOrderArgs, completionActions, confirmBookingArgs, cosignArgs, facilityAssets, invoiceArgs, invoiceLinesFromQuote,
   payInvoiceTarget, paymentArgs, paymentSide, quoteArgs, quoteScope, refusal, releaseVocabulary, requestsLeft, reserveArgs, seedQuoteLines,
   stripeCheckoutUrl, vouchArgs,
 } from './signDrafts';
@@ -182,5 +182,41 @@ describe('contact and refusals', () => {
     expect(refusal({ message: 'Contact request limit reached (10 per day)' })).toBe("You've reached today's limit for new requests. Try again tomorrow.");
     expect(refusal({ message: 'Scope hash does not match the current accepted quote or scope' })).toBe('The job changed since you opened it. Reload and try again.');
     expect(refusal({ message: 'relation "x" does not exist' })).toBe('Nuke could not do that right now.');
+  });
+});
+
+describe('inspection findings, access and evidence', () => {
+  const rec = a({ action: 'record_findings', rpc: 'record_inspection_findings', args: { p_inspection_work_order_id: 'insp1' } });
+  const blank = { finding: '', severity: 'info', system: '', photoRef: '' };
+  it('records verdicts only for answered checklist items, plus other findings', () => {
+    const built = findingsArgs(rec, ['frame', 'rust'], ' Solid truck ', [
+      { ...blank, itemId: 'frame', verdict: 'supports', finding: 'Frame straight,\nno repairs', system: 'undercarriage', photoRef: 'IMG_0001' },
+      { ...blank, itemId: 'rust', verdict: null },
+      { ...blank, itemId: null, verdict: null, finding: 'Small oil seep', severity: 'monitor' },
+    ], 'good');
+    expect(built).toEqual({ ok: true, args: { p_inspection_work_order_id: 'insp1', p_findings: { summary: 'Solid truck', overall_condition: 'good', findings: [
+      { finding: 'Frame straight, no repairs', severity: 'info', item_id: 'frame', verdict: 'supports', system: 'undercarriage', evidence_photo_ref: 'IMG_0001' },
+      { finding: 'Small oil seep', severity: 'monitor' },
+    ] } } });
+  });
+  it('refuses an answered item without words, an unknown item, no findings, or a step not offered', () => {
+    expect(findingsArgs(rec, ['frame'], 'x', [{ ...blank, itemId: 'frame', verdict: 'contradicts' }], '')).toEqual({ ok: false, error: 'Say what you found for each checklist item you answered.' });
+    expect(findingsArgs(rec, ['frame'], 'x', [{ ...blank, itemId: 'other', verdict: 'unknown', finding: 'y' }], '').ok).toBe(false);
+    expect(findingsArgs(rec, [], 'x', [{ ...blank, itemId: null, verdict: null }], '')).toEqual({ ok: false, error: 'Record at least one finding.' });
+    expect(findingsArgs(a({ action: 'record_findings', rpc: 'grant_inspection_access', args: { p_inspection_work_order_id: 'insp1' } }), [], 'x', [{ ...blank, itemId: null, verdict: null, finding: 'y' }], '').ok).toBe(false);
+  });
+  it('grants access with a scope and an optional future window', () => {
+    const grant = a({ action: 'grant_inspection_access', rpc: 'grant_inspection_access', args: { p_inspection_work_order_id: 'insp1' } });
+    expect(grantArgs(grant, ' Driveway only, no test drive ', '', '', NOW)).toEqual({ ok: true, args: { p_inspection_work_order_id: 'insp1', p_scope: 'Driveway only, no test drive', p_window: null } });
+    expect(grantArgs(grant, 'x', '2026-10-21T09:00', '', NOW)).toEqual({ ok: false, error: 'Pick both the start and the end, or neither.' });
+    expect(grantArgs(grant, 'x', '2020-01-01T09:00', '2020-01-01T10:00', NOW)).toEqual({ ok: false, error: 'The window must end in the future.' });
+  });
+  it('attaches only listed own photos for this job and explains exclusions', () => {
+    const attach = a({ action: 'attach_evidence', rpc: 'attach_job_evidence', args: { p_work_order_id: WO } });
+    const candidates = { items: [{ image_id: 'i1', work_order_id: WO }, { image_id: 'i2', work_order_id: 'other' }], coverage: { not_attachable_excluded: 2 } };
+    expect(evidenceArgs(attach, candidates, ['i1', 'i2', 'i1', 'x'], null, ' after ')).toEqual({ ok: true, args: { p_work_order_id: WO, p_image_ids: ['i1'], p_operation_id: null, p_note: 'after' } });
+    expect(evidenceArgs(attach, candidates, ['i2'], null, '')).toEqual({ ok: false, error: 'Choose at least one of your photos listed here.' });
+    expect(notAttachableText(candidates)).toContain('2 of your photos');
+    expect(notAttachableText({ coverage: { not_attachable_excluded: 0 } })).toBeNull();
   });
 });

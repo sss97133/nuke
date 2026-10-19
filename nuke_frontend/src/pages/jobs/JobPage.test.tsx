@@ -143,7 +143,7 @@ describe('Sign actions', () => {
 
   it('sends steps the web has no sheet for to the app', async () => {
     const inspector = { ...visitor, context: 'provider', slots: ['inspector'], party: true,
-      actions: [{ action: 'record_findings', rpc: 'record_inspection_findings', args: { p_work_order_id: WO } }] };
+      actions: [{ action: 'sign_a_future_step', rpc: 'future_writer', args: { p_work_order_id: WO } }] };
     fixture.readers.work_order_job_path_read = path(inspector);
     fixture.readers.work_order_inspection_read = { ...header, viewer: inspector, inspections: [{ work_order_id: WO, inspection_type: 'pre_purchase', checklist: [] }] };
     await render();

@@ -296,7 +296,7 @@ function InspectionSection({ d, onSigned }: { d: JsonObject; onSigned: () => voi
 function EvidenceSection({ d, onSigned }: { d: JsonObject; onSigned: () => void }) {
   const viewer = parseViewer(d.viewer);
   const items = arr(d.attachments).map(obj).filter((o): o is JsonObject => !!o);
-  if (!items.length) return null;
+  if (!items.length && !viewer?.actions.length) return null;
   return <Section title="Evidence" coverage={cov(items.length, items.length, 'evidence attachments', d.as_of)}>
     {items.map((a, i) => {
       const images = arr(a.images).map(obj).filter((o): o is JsonObject => !!o && !!str(o.image_url));
@@ -322,7 +322,7 @@ function EvidenceSection({ d, onSigned }: { d: JsonObject; onSigned: () => void 
 function InvoicesSection({ d, onSigned }: { d: JsonObject; onSigned: () => void }) {
   const viewer = parseViewer(d.viewer);
   const invoices = arr(d.invoices).map(obj).filter((o): o is JsonObject => !!o);
-  if (!invoices.length) return null;
+  if (!invoices.length && !viewer?.actions.length) return null;
   const showPayments = paymentsVisible(viewer, d.payments);
   const payments = showPayments ? arr(d.payments).map(obj).filter((o): o is JsonObject => !!o) : [];
   const rec = showPayments ? obj(d.reconciliation) : null;
@@ -413,7 +413,7 @@ export default function JobPage() {
   const completionStage = stages.find(s => s.key === 'completion')?.raw ?? null;
   const pathActions = [...(viewer?.actions ?? []),
     ...completionActions(workOrderId, completionStage, parseViewer(r('invoices')?.viewer)?.actions ?? [], viewer?.slots ?? [])];
-  const sheetData = { workOrderId, quotes: r('quotes'), operations: r('operations'), offers: r('offers'), invoices: r('invoices'),
+  const sheetData = { workOrderId, quotes: r('quotes'), operations: r('operations'), offers: r('offers'), invoices: r('invoices'), inspection: r('inspection'),
     completionSignedAt: completionState(completionStage).signedAt, reload };
 
   return <JobSheetContext.Provider value={sheetData}><article className="job-page" aria-label={title}>

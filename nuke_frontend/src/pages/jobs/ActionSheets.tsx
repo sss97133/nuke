@@ -6,6 +6,7 @@ import { ChangeOrderSheet, IssueQuoteSheet } from './QuoteSheets';
 import { ConfirmDoneSheet, IssueInvoiceSheet, MarkDoneSheet, PayByCard, RecordPaymentSheet } from './CloseoutSheets';
 import { CosignSheet, ReserveFacilitySheet } from './PeopleSheets';
 import { OfferSheet } from './JobSheets';
+import { AttachEvidenceSheet, GrantAccessSheet, RecordFindingsSheet } from './InspectionSheets';
 
 function offerFor(offers: JsonObject | null, offerId: string | null): JsonObject | null {
   for (const r of arr(offers?.requirements).map(obj)) {
@@ -42,6 +43,9 @@ function Sheet({ action, data, onClose }: { action: JobAction; data: JobSheetDat
     case 'offer':
       return <OfferSheet action={{ action: action.kind, rpc: action.rpc ?? undefined, args: action.args, as: obj(action.raw.as) }}
         requestTitle={requirementText(data.offers, str(action.args.p_requirement_id))} onClose={() => { done(); onClose(); }} />;
+    case 'record_findings': return <RecordFindingsSheet action={action} inspection={data.inspection} onClose={onClose} onDone={done} />;
+    case 'grant_inspection_access': return <GrantAccessSheet action={action} onClose={onClose} onDone={done} />;
+    case 'attach_evidence': return <AttachEvidenceSheet action={action} operations={data.operations} onClose={onClose} onDone={done} />;
     default: return null;
   }
 }

@@ -1,0 +1,40 @@
+name: Frontend e2e (job loop)
+
+# The signed-in job loop in a real browser: the Vite dev server against a mocked Supabase host
+# (nuke_frontend/e2e/mockSupabase.mjs answers every request from fixtures in the live readers' shapes and aborts all
+# other hosts), so no test reaches production. Asserts the exact writer arguments each Sign sends after its confirm,
+# and what a visitor must not see. Playwright is installed outside the app's lockfile, as profile-contract does.
+on:
+  pull_request:
+    paths:
+      - 'nuke_frontend/src/pages/jobs/**'
+      - 'nuke_frontend/src/pages/providers/**'
+      - 'nuke_frontend/src/pages/work/**'
+      - 'nuke_frontend/src/pages/messages/**'
+      - 'nuke_frontend/e2e/**'
+      - '.github/workflows/frontend-e2e.yml'
+  workflow_dispatch:
+
+jobs:
+  job-loop-e2e:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+          cache-dependency-path: nuke_frontend/package-lock.json
+      - name: Install app dependencies
+        working-directory: ./nuke_frontend
+        run: npm ci
+      - name: Install Playwright (outside the app lockfile)
+        run: |
+          mkdir -p /tmp/pw && cd /tmp/pw && npm init -y >/dev/null && npm i playwright@1.61.1 >/dev/null
+          npx playwright install --with-deps chromium
+      - name: Run the job loop in the browser
+        working-directory: ./nuke_frontend
+        env:
+          NODE_PATH: /tmp/pw/node_modules
+        run: node --test --test-reporter=spec e2e/jobs.e2e.mjs

@@ -383,7 +383,7 @@ const ACTION_TITLES: Record<string, string> = {
   start_work: 'Start work', accept_quote: 'Accept quote', accept_offer: 'Accept offer', withdraw_offer: 'Withdraw your offer',
   cancel_facility_reservation: 'Cancel your booking request', withdraw_vouch: 'Withdraw your vouch', reserve_facility: 'Book a bay', pay_invoice: 'Pay invoice',
   issue_quote: 'Issue a quote', issue_change_order: 'Issue a change order', offer: 'Make an offer', cosign_provider: 'Co-sign this technician',
-  record_findings: 'Record inspection findings', grant_inspection_access: 'Let an inspector see the vehicle',
+  record_findings: 'Record inspection findings', grant_inspection_access: 'Let an inspector see your car',
   attach_evidence: 'Attach photos to this job', issue_invoice: 'Issue an invoice', record_payment: 'Record a payment',
   attest_completion: 'Mark the work done', accept_completion: 'Confirm the work is done',
 };
@@ -407,6 +407,8 @@ const SAYS: Record<string, string[]> = {
   reserve_facility: ['You ask the shop for this space in this window.'],
   confirm_booking: ['You confirm the space for this window; it now holds capacity.'],
   vouch: ['You vouch for this person within the scope you write.'],
+  record_findings: ['Your findings as the accepted inspector, item by item against the checklist.'],
+  attach_evidence: ['These photos of yours document this job.'],
 };
 const DOES_NOT_SAY: Record<string, string[]> = {
   start_work: ['completion', 'schedule', 'payment'],
@@ -425,6 +427,8 @@ const DOES_NOT_SAY: Record<string, string[]> = {
   reserve_facility: ['payment', 'vehicle access', 'the shop’s confirmation'],
   confirm_booking: ['payment', 'vehicle access'],
   vouch: ['skill proof (a vouch is not skill evidence)', 'any job, payment or booking'],
+  record_findings: ['a price', 'approval of the work', "the seller's permission"],
+  attach_evidence: ['who can see the photos or who owns them', 'completion', 'payment'],
 };
 const NOT_SAY_WORDS: Record<string, string> = {
   completion: 'That the work is done',
