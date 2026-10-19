@@ -43,6 +43,8 @@ struct OpenRequirement: Decodable, Equatable, Identifiable {
     let quoteAcceptance: String?
     /// nil for a signed-out viewer: the reader explains matches only to an account.
     let match: [MatchInput]?
+    /// Businesses this kind of thing was paid for before on Nuke (requirement_plan_b_suppliers).
+    let planB: [PlanBSupplier]
 
     var id: String { requirementId }
 
@@ -57,6 +59,7 @@ struct OpenRequirement: Decodable, Equatable, Identifiable {
         case area = "area_band"
         case candidatesListed = "candidates_listed"
         case quoteState = "quote_state"
+        case planB = "plan_b_suppliers"
     }
     private struct QuoteState: Decodable { let has_current_quote: Bool?; let acceptance: String? }
     private struct MatchSlot: Decodable {
@@ -83,6 +86,7 @@ struct OpenRequirement: Decodable, Equatable, Identifiable {
         hasCurrentQuote = qs?.has_current_quote == true
         quoteAcceptance = qs?.acceptance
         match = ((try? c.decodeIfPresent([MatchSlot].self, forKey: .match)) ?? nil)?.compactMap(\.input)
+        planB = (try? c.decode([Lossy<PlanBSupplier>].self, forKey: .planB))?.compactMap(\.value) ?? []
     }
 
     var place: String? {
