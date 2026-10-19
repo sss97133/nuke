@@ -53,3 +53,7 @@ textarea.jb-input { resize: vertical; min-height: 96px; }
 
 /* Inspection call-to-action on a public vehicle page. */
 .jb-cta { border: 2px solid var(--text); display: grid; gap: 6px; }
+
+/* Share control: a button, and the bare URL to copy by hand when the clipboard is unavailable. */
+.jb-share { display: inline-flex; gap: 6px; align-items: center; flex-wrap: wrap; }
+.jb-share__url { width: 320px; max-width: 100%; }
