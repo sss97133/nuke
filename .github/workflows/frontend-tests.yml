@@ -786,7 +786,7 @@ jobs:
           NODE_PATH: ${{ github.workspace }}/nuke_frontend/node_modules
 
       - name: Verify pinned archive custody and deterministic producer (offline)
-        run: node --test scripts/test-archive-source-custody.mjs
+        run: node --test scripts/test-archive-source-custody.mjs scripts/cab-api-sync.test.mjs
         env:
           NODE_PATH: ${{ github.workspace }}/nuke_frontend/node_modules
 

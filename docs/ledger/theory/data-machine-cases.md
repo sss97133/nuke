@@ -439,6 +439,13 @@ millisecond equality falsely accepts it; the readback must also constrain `obser
 PostgreSQL's native timestamp equality. That refuses the different instant while accepting equivalent
 time-zone representations. This is a local receipt-verification assay, not evidence of production
 clock corruption or a new production admission; exact deployment/runtime stages stay in the receipt.
+An independent collector replay uses a qualified retained response and rejects its snapshot insert.
+The old archive phase ignores the database error and proceeds toward the model with no saved capture.
+Archive lookup errors, rejected inserts and missing persisted IDs must stop that attempt. Dedup and
+unique-key races qualify only the exact successful platform/URL/content-hash tuple; an unsuccessful
+capture is not promoted or overwritten. This preserves the existing pre-write capture guard and
+does not repair source pagination. Script availability, collector activation and full source-to-reader
+acceptance remain separate stages in the private receipt.
 
 **Next loop, staged 2026-10-18: explicit listing-capture custody.** The prospective
 `cab_listing_capture_v1` mode in the existing `ingest-observation` accepts only an original
