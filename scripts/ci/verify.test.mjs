@@ -8,6 +8,7 @@ import { tmpdir } from 'node:os';
 import { join, dirname, resolve } from 'node:path';
 
 const source = await readFile(new URL('./verify.sh', import.meta.url), 'utf8');
+const migrationVersions = await readFile(new URL('./migration-versions-unique.sh', import.meta.url), 'utf8');
 const realMktemp = execFileSync('which', ['mktemp'], { encoding: 'utf8' }).trim();
 const quote = value => `'${value.replaceAll("'", "'\\''")}'`;
 const pause = ms => new Promise(resolve => setTimeout(resolve, ms));
@@ -118,6 +119,7 @@ async function fixture(run) {
       // All predicates, ordering, redirects and exit paths remain the source's.
       await put(join(checkout, 'scripts/ci/verify.sh'), source.replaceAll('/tmp/ci_', `${shared}/ci_`));
       await put(join(checkout, 'scripts/ci/baseline.json'), JSON.stringify(baseline));
+      await put(join(checkout, 'scripts/ci/migration-versions-unique.sh'), migrationVersions);
       await mkdir(join(checkout, 'nuke_frontend'));
       await put(join(checkout, 'scripts/guardrails/no-raw-fetch.sh'), '#!/bin/sh\nif [ "${FIXTURE_RAWFETCH:-0}" = 1 ]; then echo "fixture.ts:1: offline external fetch"; fi\n');
       await put(join(checkout, 'scripts/guardrails/no-committed-secrets.sh'), `#!/bin/sh\nexec ${quote(process.execPath)} ${quote(join(root, 'commands.cjs'))} secrets\n`);
