@@ -99,7 +99,9 @@ struct PostJobView: View {
                 HStack { Spacer(); if busy { ProgressView() } else { Text("Post the job").bold() }; Spacer() }
             }
             .disabled(busy || description.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
-            .confirmationDialog("Post this job?", isPresented: $confirming, titleVisibility: .visible) {
+            .accessibilityIdentifier("postjob.post")
+            .alert("Post this job?", isPresented: $confirming) {
+                Button("Cancel", role: .cancel) {}
                 Button("Post the job") { Task { await post() } }
             } message: {
                 Text(visibility == .open ? "Technicians near you will be able to see it." : "It won't be listed.")

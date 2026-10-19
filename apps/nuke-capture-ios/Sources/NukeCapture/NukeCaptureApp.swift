@@ -126,7 +126,11 @@ struct NukeCaptureApp: App {
                 } else if let dbgWork = ProcessInfo.processInfo.environment["NUKE_DEBUG_VEHICLE_WORK"], !dbgWork.isEmpty {
                     // The vehicle page's Work card alone, over the live reader, without the page's photos.
                     NavigationStack {
-                        ScrollView { VehicleWorkSection(vehicleId: dbgWork).padding(.top, 12) }
+                        ScrollView {
+                            VehicleWorkSection(vehicleId: dbgWork)
+                                .environment(\.vehicleListingContext, ProcessInfo.processInfo.environment["NUKE_DEBUG_LISTING"] == "1")
+                                .padding(.top, 12)
+                        }
                             .background(Color(.systemGroupedBackground))
                             .navigationTitle("Vehicle work")
                             .navigationBarTitleDisplayMode(.inline)
@@ -153,8 +157,15 @@ struct NukeCaptureApp: App {
                 #endif
             }
             .environmentObject(session)
+            #if DEBUG
+            .overlay(alignment: .topLeading) { if FixtureBackend.isActive { FixtureWriteLogOverlay() } }
+            #endif
         }
         .onChange(of: scenePhase) { _, phase in
+            #if DEBUG
+            // Fixture runs (UI tests) start no sync, photo-library or background work.
+            if FixtureBackend.isActive { return }
+            #endif
             switch phase {
             case .active:
                 // Back from Settings with the grant now on? Re-arm ignition

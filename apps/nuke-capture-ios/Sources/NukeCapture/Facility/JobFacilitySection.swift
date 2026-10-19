@@ -52,12 +52,6 @@ struct JobFacilitySection: View {
                 if let cancelFailure { Text(cancelFailure).font(.caption).foregroundStyle(.red) }
             } header: {
                 Text("Shop space")
-                    .confirmationDialog("Cancel this booking request?", isPresented: Binding(get: { cancelling != nil }, set: { if !$0 { cancelling = nil } }),
-                                        titleVisibility: .visible, presenting: cancelling) { item in
-                        Button("Cancel the request", role: .destructive) { Task { await cancel(item, f.reservations) } }
-                    } message: { _ in
-                        Text("The space is released and the shop can't confirm it.")
-                    }
             } footer: {
                 Text(f.reservations?.party == true || (f.reservations?.items.contains(where: \.party) ?? false)
                      ? "A booking holds space only once the shop confirms it. Nuke doesn't take payment for it."
@@ -81,6 +75,14 @@ struct JobFacilitySection: View {
             if r?.cancelAction(for: item.reservationId) != nil {
                 Button(item.state == "confirmed" ? "Cancel the booking" : "Cancel the request", role: .destructive) { cancelling = item }
                     .font(.caption).buttonStyle(.borderless)
+                    // On the row's own button, keyed to this row: a header scrolled out of view can't host it.
+                    .confirmationDialog("Cancel this booking request?",
+                                        isPresented: Binding(get: { cancelling?.id == item.id }, set: { if !$0 { cancelling = nil } }),
+                                        titleVisibility: .visible) {
+                        Button("Cancel the request", role: .destructive) { Task { await cancel(item, r) } }
+                    } message: {
+                        Text("The space is released and the shop can't confirm it.")
+                    }
             }
         }
     }

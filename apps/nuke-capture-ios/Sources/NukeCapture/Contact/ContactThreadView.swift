@@ -77,6 +77,7 @@ struct ContactThreadView: View {
                             if busy { ProgressView() } else { Text("Send").bold() }
                         }
                         .disabled(busy || draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                        .accessibilityIdentifier("thread.send")
                         if let failure {
                             Text(failure).font(.footnote).foregroundStyle(.secondary)
                         }

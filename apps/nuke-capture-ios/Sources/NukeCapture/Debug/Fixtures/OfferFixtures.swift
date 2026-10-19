@@ -1,7 +1,8 @@
 // OfferFixtures.swift — open_requirements_read and work_order_offers_read JSON for tests.
-// Test-only; never in the app bundle. Keys mirror pg_get_functiondef on 2026-10-19; values synthetic.
+// DEBUG-only (unit tests and the UI-test fixture backend); never compiled into Release. Keys mirror pg_get_functiondef on 2026-10-19; values synthetic.
 // Nothing here is ever sent to production.
 
+#if DEBUG
 enum OfferFixtures {
     static let reqSkill = "00000000-0000-4000-8000-0000000000d1"
     static let reqTool = "00000000-0000-4000-8000-0000000000d2"
@@ -97,3 +98,4 @@ enum OfferFixtures {
      "payment_authorized":false,"customer_notified":false}
     """
 }
+#endif

@@ -1,4 +1,4 @@
-// JobFixtures.swift — reader-shaped JSON for the job (quote → receipt) tests. Test-only; never in the app bundle.
+// JobFixtures.swift — reader-shaped JSON for the job (quote → receipt) tests. DEBUG-only (unit tests and the UI-test fixture backend); never compiled into Release.
 //
 // Each fixture mirrors a shipped reader key for key, as pg_get_functiondef stated it on
 // 2026-10-19: work_order_job_path_read (read_work_order_job_path + viewer + coverage),
@@ -6,6 +6,7 @@
 // `jobPathWithLabels` adds the display fields another lane is adding (vehicle_label,
 // display_title, request_source_label). Ids and names are visibly synthetic.
 
+#if DEBUG
 enum JobFixtures {
     static let workOrderId = "00000000-0000-4000-8000-000000000001"
     static let vehicleId = "00000000-0000-4000-8000-0000000000a1"
@@ -157,3 +158,4 @@ enum JobFixtures {
      "viewer":{"context":"client","slots":["customer"],"money_visible":false,"contact_visible":false,"decided_from":"auth.uid()","identity_bridge":"none","party":true}}
     """
 }
+#endif

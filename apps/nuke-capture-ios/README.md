@@ -327,6 +327,13 @@ In Xcode: target **NukeCapture-iOS** → Signing & Capabilities → set your
 preview; use the existing CI release path for an upload, without hand-bumping the
 build number. `generate.sh` is not tracked on main.
 
+**Tests.** `xcodebuild test -scheme NukeCapture-iOS` runs the unit tests (`UnitTests/`) and the UI tests
+(`UITests/`, XCUITest). The UI tests launch the app with `-NukeFixtureBackend 1` and a persona
+(`-NukeFixturePersona visitor|client|provider`): the Supabase client then talks only to an in-process fixture
+backend on `https://fixture.nuke.invalid` (`Sources/NukeCapture/Debug/FixtureBackend.swift`) and records every
+writer call for the assertions. The backend and the reader fixtures (`Sources/NukeCapture/Debug/Fixtures/`, shared
+with the unit tests) are wrapped in `#if DEBUG`, so a Release build never contains them and no test reaches production.
+
 ## Shipping
 
 The Library's **Albums** door preserves native album names, folder paths and exact
