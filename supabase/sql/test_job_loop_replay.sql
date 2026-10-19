@@ -372,6 +372,15 @@ ALTER TABLE public.observation_sources ADD COLUMN IF NOT EXISTS display_name tex
 \ir helpers/part_product_tables_live_20261020.sql
 \echo REPLAY 20261020084500_work_order_part_product_read.sql
 \ir ../migrations/20261020084500_work_order_part_product_read.sql
+ALTER TABLE public.organizations ADD COLUMN IF NOT EXISTS website text, ADD COLUMN IF NOT EXISTS is_public boolean;
+CREATE TABLE public.organization_ownership_verifications(id uuid PRIMARY KEY DEFAULT gen_random_uuid(), organization_id uuid, user_id uuid,
+  verification_type text, status text, document_url text, supporting_documents jsonb, human_reviewer_id uuid, human_review_notes text,
+  submitted_at timestamptz, human_reviewed_at timestamptz, approved_at timestamptz, created_at timestamptz DEFAULT now(), updated_at timestamptz DEFAULT now());
+GRANT SELECT ON public.organization_ownership_verifications TO service_role;
+\echo REPLAY 20261020091000_organization_claims_on_nuke.sql
+\ir ../migrations/20261020091000_organization_claims_on_nuke.sql
+\echo REPLAY 20261020101000_verified_claimant_offers.sql
+\ir ../migrations/20261020101000_verified_claimant_offers.sql
 -- Plan check and final state.
 \set replay_problems `scripts/ci/job-loop-replay-check.sh | tr '\n' ' '`
 SELECT t_assert(btrim(:'replay_problems') = '', 'replay plan covers the build in filename order: ' || COALESCE(NULLIF(btrim(:'replay_problems'), ''), 'ok'));

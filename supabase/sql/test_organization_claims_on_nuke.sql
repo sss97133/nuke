@@ -1,8 +1,9 @@
--- Disposable PG17 only. Proves 20261020091000_organization_claims_on_nuke.sql (on the job-loop replay with the supply
--- migrations): a confirmed e-mail at an organization's website domain claims it as an active owner without storing or
--- returning the address; free-mail, unconfirmed, look-alike and missing domains are refused; a document claim is pending
--- until an owner-delegated, registered review approves it; readers say "Claimed on Nuke" vs "Not on Nuke yet"; a contact
--- request to an unclaimed organization returns not_on_nuke_yet with an invite descriptor and sends nothing.
+-- Disposable PG17 only. Proves 20261020091000_organization_claims_on_nuke.sql as the job-loop replay applies it, with
+-- 20261020101000_verified_claimant_offers.sql (claims recorded in organization_verified_claimants, not as organization
+-- membership): a confirmed e-mail at an organization's website domain claims it without storing or returning the address;
+-- free-mail, unconfirmed, look-alike and missing domains are refused; a document claim is pending until an owner-delegated,
+-- registered review approves it; readers say "Claimed on Nuke" vs "Not on Nuke yet"; a contact request to an unclaimed
+-- organization returns not_on_nuke_yet with an invite descriptor and sends nothing.
 \set ON_ERROR_STOP on
 \ir test_open_requirements_plan_b_suppliers.sql
 
@@ -15,10 +16,6 @@ ALTER TABLE auth.users ADD COLUMN IF NOT EXISTS email text, ADD COLUMN IF NOT EX
   ADD COLUMN IF NOT EXISTS is_anonymous boolean, ADD COLUMN IF NOT EXISTS last_sign_in_at timestamptz;
 ALTER TABLE organization_contributors ADD COLUMN IF NOT EXISTS updated_at timestamptz DEFAULT now(),
   ADD CONSTRAINT fixture_oc_unique UNIQUE (organization_id, user_id);
-CREATE TABLE public.organization_ownership_verifications(id uuid PRIMARY KEY DEFAULT gen_random_uuid(), organization_id uuid, user_id uuid,
-  verification_type text, status text, document_url text, supporting_documents jsonb, human_reviewer_id uuid, human_review_notes text,
-  submitted_at timestamptz, human_reviewed_at timestamptz, approved_at timestamptz, created_at timestamptz DEFAULT now(), updated_at timestamptz DEFAULT now());
-GRANT SELECT ON public.organization_ownership_verifications TO service_role;
 -- X works at AutoZone (confirmed), Y uses free mail, Z is unconfirmed at the domain, L is at a look-alike host; O is the owner.
 INSERT INTO auth.users(id, email, email_confirmed_at, last_sign_in_at) VALUES
  ('10000000-0000-0000-0000-0000000000a7', 'parts@autozone.com', '2026-10-01', '2026-10-01'),
@@ -32,8 +29,6 @@ INSERT INTO admin_users(user_id, is_active) VALUES ('0b9f107a-d124-49de-9ded-946
 INSERT INTO organizations(id, business_name, is_public) VALUES ('20000000-0000-0000-0000-0000000000d1', 'No Website Garage', true);
 SELECT id AS az FROM organizations WHERE website = 'https://autozone.com' \gset
 UPDATE organizations SET is_public = true WHERE id = :'az';
-
-\ir ../migrations/20261020091000_organization_claims_on_nuke.sql
 
 SELECT t_assert(has_function_privilege('authenticated', 'claim_organization(uuid,text,jsonb)', 'EXECUTE')
   AND NOT has_function_privilege('anon', 'claim_organization(uuid,text,jsonb)', 'EXECUTE')
@@ -76,14 +71,17 @@ SELECT t_assert(t_refused_with(format('SELECT claim_organization(%L, %L)', :'az'
 SELECT t_assert(t_refused_with($q$SELECT claim_organization('20000000-0000-0000-0000-0000000000d1', 'domain_email')$q$, 'no website domain'), 'no website, no domain claim');
 SELECT set_config('request.jwt.claims', '{"sub":"10000000-0000-0000-0000-0000000000a7","role":"authenticated"}', false);
 SELECT claim_organization(:'az', 'domain_email') AS c1 \gset
-SELECT t_assert((:'c1'::jsonb) @> '{"state":"claimed","method":"domain_email","role":"owner","domain":"autozone.com","email_returned":false,
-  "on_nuke":{"state":"claimed","owners_active":1,"claimed_via":["domain_email"]}}' AND (:'c1'::jsonb)::text !~ '@', 'claimed as owner; no address returned');
+SELECT t_assert((:'c1'::jsonb) @> '{"state":"claimed","method":"domain_email","role":"verified_claimant","domain":"autozone.com","email_returned":false,
+  "on_nuke":{"state":"claimed","owners_active":0,"verified_claimants":1,"claimed_via":["domain_email"]}}' AND (:'c1'::jsonb)::text !~ '@',
+  'claimed as a verified claimant; no address returned');
 SELECT t_assert(claim_organization(:'az', 'domain_email') @> '{"duplicate":true}', 'a second claim is a duplicate');
 SELECT t_assert(t_refused_with(format('SELECT claim_organization(%L, %L)', :'az', 'fax'), 'Method'), 'method vocabulary');
 RESET ROLE;
-SELECT t_assert((SELECT role = 'owner' AND status = 'active' AND verification_method = 'domain_email' AND claim_evidence::text !~ '@'
-  AND claim_evidence @> '{"domain":"autozone.com","match":"exact"}' FROM organization_contributors WHERE organization_id = :'az'
-  AND user_id = '10000000-0000-0000-0000-0000000000a7'), 'membership records the method and domain, never the address');
+SELECT t_assert((SELECT method = 'domain_email' AND revoked_at IS NULL AND claim_evidence::text !~ '@'
+  AND claim_evidence @> '{"domain":"autozone.com","match":"exact"}' FROM organization_verified_claimants WHERE organization_id = :'az'
+  AND user_id = '10000000-0000-0000-0000-0000000000a7')
+  AND NOT EXISTS (SELECT 1 FROM organization_contributors WHERE user_id = '10000000-0000-0000-0000-0000000000a7'),
+  'the claim records the method and domain, never the address, and is not an organization membership');
 SELECT t_assert(requirement_plan_b_suppliers('Paint touch-up for the door') @> '[{"organization":{"name":"AutoZone"},"can_receive_requests":true}]',
   'plan-B: AutoZone can now receive requests');
 
@@ -111,12 +109,12 @@ SELECT t_assert(t_refused_with(format('SELECT approve_organization_claim_owner_a
 SELECT approve_organization_claim_owner_agent(((:'d1'::jsonb)->>'verification_id')::uuid, 'Nevada business license naming No Website Garage, current through 2027',
   'dude its fine', 'agent-test') AS a1 \gset
 RESET ROLE;
-SELECT t_assert((:'a1'::jsonb) @> '{"state":"claimed","reviewer":"agent_on_behalf_of_owner"}'
+SELECT t_assert((:'a1'::jsonb) @> '{"state":"claimed","role":"verified_claimant","reviewer":"agent_on_behalf_of_owner"}'
   AND (SELECT status = 'approved' AND human_reviewer_id = '0b9f107a-d124-49de-9ded-94698f63c1c4' FROM organization_ownership_verifications
     WHERE id = ((:'a1'::jsonb)->>'verification_id')::uuid)
   AND EXISTS (SELECT 1 FROM owner_delegated_signs WHERE rpc = 'approve_organization_claim_owner_agent' AND result_ref = (:'a1'::jsonb)->>'verification_id')
   AND organization_on_nuke('20000000-0000-0000-0000-0000000000d1') @> '{"state":"claimed","claimed_via":["document"]}',
-  'approved on the owner''s behalf, registered, owner membership by document');
+  'approved on the owner''s behalf, registered, verified claimant by document');
 SET ROLE authenticated;
 SELECT set_config('request.jwt.claims', '{"sub":"0b9f107a-d124-49de-9ded-94698f63c1c4","role":"authenticated"}', false);
 SELECT claim_organization(:'az', 'document', '{"verification_type":"tax_id","document_url":"https://docs.example.invalid/ein.pdf"}') AS d2 \gset
