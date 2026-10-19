@@ -83,13 +83,23 @@ Standing rules the code carries:
   the VIN anchor and independently classified vehicle frames within 15 minutes and 100 m by capture metadata.
   Documents, sensitive or rejected photos, stale hashes, missing clocks/locations, and nearby conflicting VINs block
   the fold. The existing audited profile writer then resolves a globally held VIN or creates a private profile with
-  the photographer relation. Camera make/model/lens metadata is not treated as a unique device id. This path includes
-  a pending migration and is not deployed or runtime-verified. Broad day/place inheritance remains a suggestion.
+  the photographer relation. For a newly created 17-character VIN profile, the server invokes the existing
+  `decode-vin-and-update` owner so free NHTSA results seed canonical fields and their observation provenance; it
+  reports decode unavailable/no-new-fields separately from the successfully filed photos. The live VIN trigger is
+  installed but its required database URL and service-key settings are absent, so it currently skips its queue call.
+  Camera make/model/lens metadata is not treated as a unique device id. This path includes a pending migration and is
+  not deployed or runtime-verified. Broad day/place inheritance remains a suggestion.
   The table fold follows ownership: `vehicle_images` retains original source, owner, hash and capture facts;
   `image_observations` retains private source reads and unresolved subject testimony; `emergent_vehicle_clusters`
   carries supported unresolved depicted subjects; the profile writer uses `vehicles`, `vehicle_contributors` and
   `reattribution_audit` only after admission. `image_analysis_records` and `vehicle_field_evidence` are downstream
   vehicle-linked analysis, so neither is allowed to invent identity before that fold resolves.
+  Historical analysis is not silently promoted into fresh identity evidence: the live atlas shows no
+  `image_analysis_records` writes since 2026-08-02, `vehicle_observations` has a large photo-pipeline cohort whose
+  rows mostly record classifier failures, and `vehicle_field_evidence` contains 238k NHTSA values literally equal
+  to `undefined` plus fabricated Hagerty placeholders already flagged for exclusion. `image_identities` is a content
+  root, not a vehicle identity; it can connect exact/aliased photo appearances but cannot by itself establish which
+  car is pictured. The fresh v2 read is hash-pinned to the retained original and does not reuse those prior verdicts.
   Nothing in the app writes `vehicle_id` directly.
   Confirming one at a time is unrealistic at the owner's volume (owner, 2026-10-17): `SessionConfirmView` files
   photo-backed serial matches to its server suggestion (`get_orphan_sessions.suggested_vehicle_id`) with one tap, or

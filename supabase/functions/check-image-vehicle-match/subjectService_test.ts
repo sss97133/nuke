@@ -1,4 +1,4 @@
-import { resolveSubjectBatch, retainDeviceSourceReading, subjectOwnerId, type CandidateScope, type SubjectEnvelope, type SubjectReading,
+import { resolveSubjectBatch, retainDeviceSourceReading, subjectOwnerId, supabaseSubjectStore, type CandidateScope, type SubjectEnvelope, type SubjectReading,
   type SubjectSource, type SubjectStore, type SubjectDependencies, type CaptureProfileRequest } from "./subjectService.ts";
 import type { VisionInputCapture } from "./inputCustody.ts";
 import { projectSourceIdentities, sourceAliases, sourceIdentityRecords, attachSourceIdentityRecords } from "./sourceIdentity.ts";
@@ -228,6 +228,28 @@ Deno.test("protected owner binding rejects other accounts and anonymous or unsco
   for (const caller of [{ kind: "user", userId: other }, { kind: "anonymous" }, { kind: "api_key", userId: uid }]) {
     let refused = false; try { subjectOwnerId(caller, uid); } catch { refused = true; } equal(refused, true);
   }
+});
+
+Deno.test("a newly created capture profile uses the existing NHTSA writer for free VIN seed fields", async () => {
+  const calls: unknown[] = [], vehicleId = "40000000-0000-4000-8000-000000000001";
+  const request: CaptureProfileRequest = { basis: "capture_session", vin: "1HGCM82633A004352", image_ids: ids.slice(0, 2),
+    evidence: { context_method: "vin_capture_session_v1" } };
+  const store = supabaseSubjectStore({ functions: { invoke: async (...args: unknown[]) => {
+    calls.push(args); return { data: { success: true, decoded_fields: ["make", "year", "model"] }, error: null };
+  } } }, { rpc: async () => ({ data: { status: "created", replay: false, vehicle_id: vehicleId }, error: null }) });
+  const result = await store.admitCapture!(request);
+  equal(calls, [["decode-vin-and-update", { body: { vehicle_id: vehicleId, vin: request.vin } }]]);
+  equal(result.identity_seed, { status: "decoded", fields: ["make", "year", "model"] });
+});
+
+Deno.test("a profile replay does not repeat VIN decoding", async () => {
+  let calls = 0;
+  const request: CaptureProfileRequest = { basis: "capture_session", vin: "1HGCM82633A004352", image_ids: ids.slice(0, 2),
+    evidence: { context_method: "vin_capture_session_v1" } };
+  const store = supabaseSubjectStore({ functions: { invoke: async () => { calls++; return { data: { success: true }, error: null }; } } },
+    { rpc: async () => ({ data: { status: "created", replay: true, vehicle_id: cluster }, error: null }) });
+  await store.admitCapture!(request);
+  equal(calls, 0);
 });
 Deno.test("source to projection to sanctioned storage retains per-photo evidence and broad retrieval coverage", async () => {
   const f = fixture(), result = await f.run();

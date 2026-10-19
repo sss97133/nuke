@@ -81,6 +81,11 @@ final class AttributionEngine: ObservableObject {
         let observations: [IdentitySourceItem]
         let device_privacy_receipts: [String: DevicePrivacyReceipt]
     }
+    private struct CaptureProfileRequestBody: Encodable {
+        let mode = "create_capture_profile"
+        let user_id: String
+        let profile: DeviceProfileRequest
+    }
     private struct Signal {
         let row: OrphanRow
         let isVehicle: Bool
@@ -314,7 +319,7 @@ final class AttributionEngine: ObservableObject {
             ]
             let result = await createProfile(DeviceProfileRequest(basis: "capture_session", vin: group.vin, serial: nil,
                     year: nil, make: nil, model: nil, album_name: nil, album_native_id: nil,
-                    image_ids: ids, evidence: evidence))
+                    image_ids: ids, evidence: evidence), userId: userId)
             profileResults.append(result.summary)
             completedIDs.formUnion(result.filed)
             filedIDs.formUnion(result.filed)
@@ -329,7 +334,7 @@ final class AttributionEngine: ObservableObject {
             guard ids.count >= Config.albumProfileMinPhotos else { continue }
             let result = await createProfile(DeviceProfileRequest(basis: "album", vin: nil, serial: nil, year: label.year,
                     make: label.make, model: label.model, album_name: group.name, album_native_id: albumId,
-                    image_ids: ids, evidence: ["album": group.name]))
+                    image_ids: ids, evidence: ["album": group.name]), userId: userId)
             profileResults.append(result.summary)
             completedIDs.formUnion(result.filed)
             filedIDs.formUnion(result.filed)
@@ -459,16 +464,20 @@ final class AttributionEngine: ObservableObject {
     }
 
     /// Asks the server to resolve or create a profile; returns a one-line outcome for the summary.
-    private func createProfile(_ req: DeviceProfileRequest) async -> (summary: String, filed: Set<String>) {
-        struct P: Encodable { let p_profile: DeviceProfileRequest }
+    private func createProfile(_ req: DeviceProfileRequest, userId: String) async -> (summary: String, filed: Set<String>) {
         let label = req.vin ?? [req.year.map(String.init), req.make, req.model].compactMap { $0 }.joined(separator: " ")
         do {
-            let res: AnyJSON = try await SupabaseService.client.rpc("device_create_vehicle_profile",
-                params: P(p_profile: req)).execute().value
+            let res: AnyJSON = try await SupabaseService.client.functions.invoke("check-image-vehicle-match",
+                options: FunctionInvokeOptions(body: CaptureProfileRequestBody(user_id: userId, profile: req)))
             guard case .object(let o) = res, case .string(let status)? = o["status"] else {
                 return ("\(label): unreadable profile response", [])
             }
-            return ("\(label): \(status)", Self.profileFiledIDs(from: res).intersection(req.image_ids))
+            let seedStatus: String? = {
+                guard case .object(let seed)? = o["identity_seed"], case .string(let value)? = seed["status"] else { return nil }
+                return value
+            }()
+            let seedSummary = seedStatus.map { " · VIN data \($0)" } ?? ""
+            return ("\(label): \(status)\(seedSummary)", Self.profileFiledIDs(from: res).intersection(req.image_ids))
         } catch {
             NSLog("NukeCapture device_create_vehicle_profile failed: %@", String(describing: error))
             return ("\(label): \(ReadFailure.text(error))", [])

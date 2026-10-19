@@ -628,7 +628,24 @@ export function supabaseSubjectStore(client: any, identityClient?: any): Subject
     ...(identityClient ? { async admitCapture(request: CaptureProfileRequest) {
       const result = await identityClient.rpc("device_create_vehicle_profile", { p_profile: request });
       if (result.error || !result.data || typeof result.data !== "object") throw new Error("capture_profile_filing_failed");
-      return result.data;
+      const profile = result.data as Record<string, unknown>;
+      const vehicleId = profile.vehicle_id;
+      // The live VIN trigger has no configured URL/service key, so it silently
+      // skips this canonical enrichment. Invoke the already-deployed, free NHTSA
+      // decoder through its service-only owner after the user-scoped profile RPC.
+      // Never write decoded fields from this image-reading function itself.
+      if (profile.status === "created" && profile.replay !== true && typeof vehicleId === "string" &&
+        UUID.test(vehicleId) && /^[A-HJ-NPR-Z0-9]{17}$/.test(request.vin)) {
+        const decoded = await client.functions.invoke("decode-vin-and-update", {
+          body: { vehicle_id: vehicleId, vin: request.vin },
+        });
+        const data = decoded.data && typeof decoded.data === "object" ? decoded.data as Record<string, unknown> : {};
+        profile.identity_seed = decoded.error || data.success !== true
+          ? { status: "decode_unavailable" }
+          : { status: Array.isArray(data.decoded_fields) && data.decoded_fields.length > 0 ? "decoded" : "no_new_fields",
+              fields: Array.isArray(data.decoded_fields) ? data.decoded_fields.filter((field): field is string => typeof field === "string").slice(0, 32) : [] };
+      }
+      return profile;
     } } : {}),
     async sources(user, ids) {
       if (owner !== null && owner !== user) loaded.clear();

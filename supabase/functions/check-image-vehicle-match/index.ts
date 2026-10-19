@@ -9,7 +9,8 @@ import { assertComparisonReceiptCapacity, comparisonReceiptPatch, parseReference
   referenceDecisionProjection, scopeComparisonImages, type ReferenceDecision } from './decision.ts';
 import { runPinnedVision, type CustodiedVisionPart, type VisionInputSource,
   type VisionInputReceipt, type UnavailableVisionInput } from './inputCustody.ts';
-import { resolveSubjectBatch, retainDeviceSourceReading, subjectOwnerId, supabaseSubjectStore, type DeviceSourceReadRequest, type SubjectRequest } from './subjectService.ts';
+import { resolveSubjectBatch, retainDeviceSourceReading, subjectOwnerId, supabaseSubjectStore, type CaptureProfileRequest,
+  type DeviceSourceReadRequest, type SubjectRequest } from './subjectService.ts';
 import { readSubjectProfiles } from './subjectReader.ts';
 import { selectResolutionContext } from './subjectCandidates.ts';
 import { readSourceInbox, type SourceInboxOptions } from './sourceInbox.ts';
@@ -21,11 +22,12 @@ import { readSubjectReinspections } from './subjectReinspection.ts';
 
 interface CheckRequest extends SubjectRequest {
   // Mode: "check" (default/legacy), "build_signatures", "disambiguate"
-  mode?: "check" | "build_signatures" | "disambiguate" | "resolve_subjects" | "read_subjects" | "read_subject_reinspections" | "record_device_reading";
+  mode?: "check" | "build_signatures" | "disambiguate" | "resolve_subjects" | "read_subjects" | "read_subject_reinspections" | "record_device_reading" | "create_capture_profile";
   cluster_id?: string;
   limit?: number;
   offset?: number;
   source_inbox?: SourceInboxOptions;
+  profile?: CaptureProfileRequest;
 
   // Common
   vehicle_id?: string;
@@ -305,7 +307,8 @@ Deno.serve(async (req: Request) => {
     const batchSize = Math.min(body.batch_size || 10, 50);
     const dryRun = body.dry_run ?? false;
 
-    if (mode === "resolve_subjects" || mode === "read_subjects" || mode === "read_subject_reinspections" || mode === "record_device_reading") {
+    if (mode === "resolve_subjects" || mode === "read_subjects" || mode === "read_subject_reinspections" ||
+      mode === "record_device_reading" || mode === "create_capture_profile") {
       const caller = await authenticateWriter(req);
       if (!caller.ok) return writeAuthResponse(caller, corsHeaders);
       let owner: string;
@@ -316,7 +319,27 @@ Deno.serve(async (req: Request) => {
         });
       }
       let result;
-      if (mode === "record_device_reading") {
+      if (mode === "create_capture_profile") {
+        if (caller.caller.kind !== "user") {
+          return new Response(JSON.stringify({ error: "capture_profile_user_required" }), {
+            status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        }
+        if (!body.profile || typeof body.profile !== "object" || Array.isArray(body.profile)) {
+          return new Response(JSON.stringify({ error: "capture_profile_required" }), {
+            status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        }
+        const identityClient = createClient(supabaseUrl, Deno.env.get("SUPABASE_ANON_KEY")!, {
+          global: { headers: { Authorization: req.headers.get("Authorization")! } },
+          auth: { persistSession: false, autoRefreshToken: false },
+        });
+        const store = supabaseSubjectStore(supabase, identityClient);
+        if (!store.admitCapture) return new Response(JSON.stringify({ error: "capture_profile_writer_unavailable" }), {
+          status: 503, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+        result = await store.admitCapture(body.profile);
+      } else if (mode === "record_device_reading") {
         const identityClient = caller.caller.kind === "user" ? createClient(supabaseUrl,
           Deno.env.get("SUPABASE_ANON_KEY")!, { global: { headers: { Authorization: req.headers.get("Authorization")! } },
             auth: { persistSession: false, autoRefreshToken: false } }) : undefined;
