@@ -27,8 +27,13 @@ CREATE TABLE public.work_order_line_items(id uuid PRIMARY KEY DEFAULT gen_random
  task_description text,actor_id uuid REFERENCES actors(id),hours_labor numeric,total_cost_cents integer,
  status text NOT NULL DEFAULT 'pending' CHECK (status IN ('pending','in_progress','complete','rework','skipped','cancelled')),
  component_event_id uuid,notes text,updated_at timestamptz NOT NULL DEFAULT now());
-CREATE TABLE public.work_order_assignments(id uuid PRIMARY KEY DEFAULT gen_random_uuid(),work_order_id uuid,status text,
- accepted_at timestamptz,started_at timestamptz,completed_at timestamptz,actual_payout numeric,paid_at timestamptz,payout_status text);
+CREATE TABLE public.work_order_assignments(id uuid PRIMARY KEY DEFAULT gen_random_uuid(),work_order_id uuid NOT NULL,
+ technician_id uuid,job_op_code text,role text DEFAULT 'lead' CHECK (role = ANY (ARRAY['lead','technician','helper'])),
+ status text DEFAULT 'pending',
+ offered_at timestamptz,accepted_at timestamptz,declined_at timestamptz,decline_reason text,started_at timestamptz,completed_at timestamptz,
+ payout_type text DEFAULT 'flat' CHECK (payout_type = ANY (ARRAY['flat','hourly','percentage'])),payout_rate numeric,payout_percentage numeric,
+ estimated_payout numeric,actual_payout numeric,payout_status text DEFAULT 'unpaid',
+ paid_at timestamptz,notes text,created_at timestamptz DEFAULT now(),updated_at timestamptz DEFAULT now(),UNIQUE (work_order_id, technician_id, job_op_code));
 CREATE TABLE public.work_order_labor(id uuid PRIMARY KEY DEFAULT gen_random_uuid(),work_order_id uuid,hours numeric,ai_estimated boolean);
 CREATE TABLE public.work_order_status_history(id uuid PRIMARY KEY DEFAULT gen_random_uuid(),work_order_id uuid);
 CREATE TABLE public.work_order_payments(id uuid PRIMARY KEY DEFAULT gen_random_uuid(),work_order_id uuid,status text);
@@ -42,7 +47,7 @@ CREATE TABLE public.user_tools(id uuid PRIMARY KEY,user_id uuid REFERENCES auth.
 CREATE TABLE public.tool_inventory(id uuid PRIMARY KEY,owner_id uuid);
 CREATE TABLE public.equipment(id uuid PRIMARY KEY,shop_id uuid);
 CREATE TABLE public.vehicle_observations(id uuid PRIMARY KEY,vehicle_id uuid,kind text,source_id uuid,
-  content_text text,extraction_method text,confidence_score numeric,structured_data jsonb,observed_at timestamptz,ingested_at timestamptz DEFAULT now(),is_superseded boolean DEFAULT false,source_identifier text);
+  content_text text,extraction_method text,confidence_score numeric,structured_data jsonb,observed_at timestamptz,ingested_at timestamptz DEFAULT now(),is_superseded boolean DEFAULT false,source_identifier text,submitted_by_user_id uuid);
 CREATE TABLE public.pipeline_registry(id uuid DEFAULT gen_random_uuid(),table_name text,column_name text,owned_by text,
   description text,do_not_write_directly boolean,write_via text,UNIQUE(table_name,column_name));
 GRANT USAGE ON SCHEMA public,auth TO anon,authenticated,service_role;
@@ -73,6 +78,7 @@ INSERT INTO work_order_labor(work_order_id,hours) VALUES ('30000000-0000-0000-00
 \ir ../migrations/20261019150000_inspection_request.sql
 \ir ../migrations/20261019153000_job_path_inspection.sql
 \ir ../migrations/20261019180000_work_order_offers.sql
+\ir ../migrations/20261019182000_work_order_offer_acceptance.sql
 
 -- Synthetic interpretations in the guarded disposable database only.
 CREATE FUNCTION public.op_source(p_patch jsonb,p_vehicle uuid DEFAULT '40000000-0000-0000-0000-000000000001') RETURNS uuid LANGUAGE plpgsql AS $$

@@ -484,6 +484,29 @@ Each account has one current offer per requirement. A new offer supersedes the p
 and `withdraw_offer(p_offer_id)` writes a withdrawal record that supersedes it; superseded
 offers leave every reader. Contract: `supabase/sql/test_work_order_offers.sql`.
 
+`accept_offer(p_offer_id, p_offer_hash)` is the customer's Sign over one exact current
+performer offer, the same rule as `accept_work_order_quote`. It is never available to the
+offering account, a closed window or a concluded job. It projects into
+`work_order_assignments`, the dormant offer → accept → payout owner:
+
+- one accepted row with `performer_actor_id` (the legacy `technician_id` is kept, now
+  nullable), `fulfillment_id`, `acceptance_observation_id`, `accepted_by_user_id` and
+  `offer_hash`;
+- `offered_at` from the offer and `accepted_at` set to the sign clock;
+- role `inspector` on an inspection requirement, otherwise `technician`;
+- payout fields copied from a single priced offer line. These are terms, not a payment.
+
+Accepted rows are written only inside `accept_offer`, and their acceptance fields are
+immutable; status may still progress. A status of accepted or later now requires
+`accepted_at` (`NOT VALID`: the 9 legacy technician rows, none clocked, are kept as they are).
+
+`work_order_accepted_providers` counts an acceptance while its acceptance, offer and
+requirement sources are current and the signer is still the customer; a revised or withdrawn
+offer withholds it. The accepted offering account may issue quotes (`accepted_provider`) and,
+on an inspection job, record findings (`accepted_inspector`) without an identity bridge,
+because the customer chose that authenticated account. Contract:
+`supabase/sql/test_work_order_offer_acceptance.sql`.
+
 ## Job path self-measurement
 
 `read_work_order_job_path(work_order_id)` reports one work order's evidence across seven

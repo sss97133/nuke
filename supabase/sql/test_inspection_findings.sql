@@ -50,8 +50,13 @@ CREATE TABLE public.work_order_line_items(id uuid PRIMARY KEY DEFAULT gen_random
  task_description text,actor_id uuid REFERENCES actors(id),hours_labor numeric,total_cost_cents integer,
  status text NOT NULL DEFAULT 'pending' CHECK (status IN ('pending','in_progress','complete','rework','skipped','cancelled')),
  component_event_id uuid,notes text,updated_at timestamptz NOT NULL DEFAULT now());
-CREATE TABLE public.work_order_assignments(id uuid PRIMARY KEY DEFAULT gen_random_uuid(),work_order_id uuid,status text,
- accepted_at timestamptz,started_at timestamptz,completed_at timestamptz,actual_payout numeric,paid_at timestamptz,payout_status text);
+CREATE TABLE public.work_order_assignments(id uuid PRIMARY KEY DEFAULT gen_random_uuid(),work_order_id uuid NOT NULL,
+ technician_id uuid,job_op_code text,role text DEFAULT 'lead' CHECK (role = ANY (ARRAY['lead','technician','helper'])),
+ status text DEFAULT 'pending',
+ offered_at timestamptz,accepted_at timestamptz,declined_at timestamptz,decline_reason text,started_at timestamptz,completed_at timestamptz,
+ payout_type text DEFAULT 'flat' CHECK (payout_type = ANY (ARRAY['flat','hourly','percentage'])),payout_rate numeric,payout_percentage numeric,
+ estimated_payout numeric,actual_payout numeric,payout_status text DEFAULT 'unpaid',
+ paid_at timestamptz,notes text,created_at timestamptz DEFAULT now(),updated_at timestamptz DEFAULT now(),UNIQUE (work_order_id, technician_id, job_op_code));
 CREATE TABLE public.work_order_labor(id uuid PRIMARY KEY DEFAULT gen_random_uuid(),work_order_id uuid,task_name text,task_category text,
  hours numeric,hourly_rate numeric,ai_estimated boolean,total_cost numeric,job_op_code text);
 CREATE TABLE public.work_order_status_history(id uuid PRIMARY KEY DEFAULT gen_random_uuid(),work_order_id uuid);
@@ -125,6 +130,7 @@ INSERT INTO work_order_labor(id,work_order_id,task_name,task_category,hours,hour
 \ir ../migrations/20261019152500_inspection_findings.sql
 \ir ../migrations/20261019153000_job_path_inspection.sql
 \ir ../migrations/20261019180000_work_order_offers.sql
+\ir ../migrations/20261019182000_work_order_offer_acceptance.sql
 
 
 -- P (..0f) performer with an approved work_evidence bridge to the operation actor; P2 (..09) self_claim only;
