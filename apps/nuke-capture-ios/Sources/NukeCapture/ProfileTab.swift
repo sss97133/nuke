@@ -598,7 +598,7 @@ struct ProfileView: View {
             // profiles.role is a self-claim, never a decided context: dim, at the record rung.
             if let role = profile?.role, !role.isEmpty {
                 RootedValueView(label: "Role", value: role.replacingOccurrences(of: "_", with: " "),
-                                status: .recorded, decay: "stated by the account")
+                                status: .recorded, decay: "self-described")
             }
 
             // LIVE STATE — is this node producing NOW? The first "worth-connecting-to"

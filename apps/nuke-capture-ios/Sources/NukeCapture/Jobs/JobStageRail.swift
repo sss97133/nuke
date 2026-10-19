@@ -60,7 +60,7 @@ struct JobStageRail: View {
                     Image(systemName: Self.symbol(dot))
                         .font(compact ? .caption2 : .footnote)
                         .foregroundStyle(Self.color(dot))
-                    Text(compact ? dot.key.initial : dot.key.title)
+                    Text(compact ? dot.key.initial : dot.key.shortTitle)
                         .font(compact ? .system(size: 8, design: .monospaced) : .system(size: 9))
                         .foregroundStyle(.secondary)
                         .lineLimit(1)
@@ -95,9 +95,9 @@ struct JobStageRail: View {
     }
 
     static func spoken(_ dot: Dot) -> String {
-        guard let state = dot.state else { return "not read" }
-        let words = JobWords.humanize(state.raw)
-        return dot.conflicting ? "\(words), conflicting" : words
+        guard let state = dot.state else { return "not available" }
+        let words = JobCopy.stateLine(state)
+        return dot.conflicting ? "\(words), records disagree" : words
     }
 }
 
@@ -105,12 +105,12 @@ struct JobStageRail: View {
 struct JobStageRailLegend: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 3) {
-            row("circle.fill", .primary, "recorded · attributed to an owner record, not verified")
-            row("circle.lefthalf.filled", .primary, "partial · pending")
-            row("circle.fill", Color(.tertiaryLabel), "status only · a status with no clock beneath it")
-            row("circle", Color(.tertiaryLabel), "absent · see what's missing")
-            row("exclamationmark.circle.fill", .orange, "conflicting · records disagree")
-            row("circle.dotted", Color(.tertiaryLabel), "not sent by the reader")
+            row("circle.fill", .primary, "Recorded — not yet verified")
+            row("circle.lefthalf.filled", .primary, "In progress")
+            row("circle.fill", Color(.tertiaryLabel), "Marked, but no record behind it")
+            row("circle", Color(.tertiaryLabel), "Not started")
+            row("exclamationmark.circle.fill", .orange, "Records disagree")
+            row("circle.dotted", Color(.tertiaryLabel), "Not available")
         }
         .font(.caption2)
         .foregroundStyle(.secondary)

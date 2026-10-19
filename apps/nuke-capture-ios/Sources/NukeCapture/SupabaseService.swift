@@ -605,7 +605,7 @@ enum ReadFailure {
         if let e = error as? PostgrestError, e.code == "57014" {
             return "The database ran out of time on this read."
         }
-        if error is DecodingError { return "The answer arrived in a shape this build cannot read." }
+        if error is DecodingError { return "This needs a newer version of the app." }
         return "The read failed: \(error.localizedDescription)"
     }
 }

@@ -1,4 +1,4 @@
-// JobFixtures.swift — reader-shaped JSON for the job tests. Test-only; never in the app bundle.
+// JobFixtures.swift — reader-shaped JSON for the job (quote → receipt) tests. Test-only; never in the app bundle.
 //
 // The job path mirrors read_work_order_job_path (migration 20261019045753) key for key, with
 // the viewer block R4 §1 specifies for its authenticated wrapper. Ids are visibly synthetic.

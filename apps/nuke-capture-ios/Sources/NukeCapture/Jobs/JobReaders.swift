@@ -1,9 +1,10 @@
 // JobReaders.swift — the authenticated job readers, called the way the web calls them.
 //
 // Every call goes through SupabaseService.client to a server reader (R4 §4 #1–#6). The phone
-// adds no query of its own for job state. A reader that is not deployed, or that refuses this
-// account, becomes a JobRefusal whose text says which, so a screen shows the refusal instead
-// of placeholder rows (C0).
+// adds no query of its own for job state and gates nothing on sign-in: data is open by default,
+// so the reader decides who may read. A reader that is not deployed, or that refuses, becomes a
+// JobRefusal in plain words ("Not available yet" and why), so a screen shows that instead of
+// placeholder rows (C0). The reader name is kept for DEBUG disclosure only.
 
 import Foundation
 import Supabase
@@ -19,7 +20,10 @@ struct JobRefusal: Error, Equatable {
 
     let reader: String
     let kind: Kind
-    let text: String
+    let title: String
+    let detail: String
+
+    var text: String { "\(title). \(detail)" }
 }
 
 enum JobLoad<T> {
@@ -90,24 +94,25 @@ enum JobReaders {
         if let pg = error as? PostgrestError {
             switch pg.code {
             case "PGRST202", "42883":
-                return JobRefusal(reader: reader, kind: .readerPending, text: pendingText(reader))
+                return pending(reader)
             case "42501":
-                return JobRefusal(reader: reader, kind: .notPermitted,
-                                  text: "Your account is not permitted to read this (\(reader) refused it).")
+                return JobRefusal(reader: reader, kind: .notPermitted, title: "Not available to your account",
+                                  detail: "You don't have access to this yet.")
             default:
                 break
             }
         }
         if let http = error as? HTTPError, http.response.statusCode == 404 {
-            return JobRefusal(reader: reader, kind: .readerPending, text: pendingText(reader))
+            return pending(reader)
         }
         if SupabaseService.isAuthFailure(error) {
-            return JobRefusal(reader: reader, kind: .signInRefused, text: ReadFailure.text(error))
+            return JobRefusal(reader: reader, kind: .signInRefused, title: "Sign in again", detail: "Your session has ended.")
         }
-        return JobRefusal(reader: reader, kind: .failed, text: ReadFailure.text(error))
+        return JobRefusal(reader: reader, kind: .failed, title: "Couldn't load", detail: ReadFailure.text(error))
     }
 
-    static func pendingText(_ reader: String) -> String {
-        "Not readable by your account yet — reader pending (\(reader) is not deployed)."
+    static func pending(_ reader: String) -> JobRefusal {
+        JobRefusal(reader: reader, kind: .readerPending, title: "Not available yet",
+                   detail: "This part of Nuke is still being built.")
     }
 }

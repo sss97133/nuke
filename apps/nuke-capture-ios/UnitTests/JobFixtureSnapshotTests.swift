@@ -47,9 +47,7 @@ final class JobFixtureSnapshotTests: XCTestCase {
     }
 
     func testRenderWorkConsoleRefusals() throws {
-        func pending(_ reader: String) -> JobRefusal {
-            JobRefusal(reader: reader, kind: .readerPending, text: JobReaders.pendingText(reader))
-        }
+        let pending = JobReaders.pending
         let view = NavigationStack {
             WorkConsoleContent(signatures: .refused(pending(JobReaders.signatureQueueName)),
                                jobs: .refused(pending(JobReaders.workOrdersName)),

@@ -1,8 +1,10 @@
-// JobPathDecodeTests.swift — the job readers' shapes, the stage → rung ladder and the viewer block.
+// JobPathDecodeTests.swift — the job readers' shapes, the stage → rung ladder, the viewer block
+// and the words a person reads.
 //
-// The job path is read_work_order_job_path's output as its authenticated wrapper returns it. A
-// future state, stage, context or action must decode and render verbatim; money and contact
-// visibility open only on a literal true; no stage state reaches .proven.
+// The job path is read_work_order_job_path's output as its wrapper returns it. A future state,
+// stage, context or action must decode without crashing; no stage state reaches .proven. Data is
+// open by default: prices and costs show to anyone, payment/balance amounts need money_visible,
+// and personal contact fields are never rendered.
 
 import XCTest
 import Supabase
@@ -135,19 +137,52 @@ final class JobPathDecodeTests: XCTestCase {
         XCTAssertFalse(future.moneyVisible)                       // "yes" is not true
         XCTAssertFalse(future.contactVisible)                     // absent is not true
         XCTAssertEqual(future.actions.map(\.kind), ["accept_terms", "attest_completion"])
-        XCTAssertEqual(future.actions[0].title, "accept terms")
+        XCTAssertEqual(future.actions[0].title, "Accept quote")
         XCTAssertEqual(future.actions[1].title, "Attest completion")
         XCTAssertEqual(future.actions[1].stage, "completion")
     }
 
-    func testMoneyKeysAreMaskedUnlessTheServerOpensMoney() {
-        let amount = JobStage.Fact(key: "estimated_total_cents", value: .number(125000))
-        XCTAssertEqual(JobPathContent.factText(amount, moneyVisible: false), "masked")
-        XCTAssertEqual(JobPathContent.factText(amount, moneyVisible: true), "125000")
+    func testPricesAreOpenAndPaymentsNeedTheServersMoneyFlag() {
+        let quote = JobStage.Fact(key: "estimated_total_cents", value: .number(125000))
+        XCTAssertEqual(JobPathContent.factText(quote, moneyVisible: false), "125000")
+        let rate = JobStage.Fact(key: "labor_rate_cents", value: .number(16000))
+        XCTAssertEqual(JobPathContent.factText(rate, moneyVisible: false), "16000")
+        let paid = JobStage.Fact(key: "amount_paid_cents", value: .number(50000))
+        XCTAssertEqual(JobPathContent.factText(paid, moneyVisible: false), "Shown to the people on this job")
+        XCTAssertEqual(JobPathContent.factText(paid, moneyVisible: true), "50000")
+        let balance = JobStage.Fact(key: "balance_due_cents", value: .number(75000))
+        XCTAssertEqual(JobPathContent.factText(balance, moneyVisible: false), "Shown to the people on this job")
         let count = JobStage.Fact(key: "payment_records", value: .number(2))
         XCTAssertEqual(JobPathContent.factText(count, moneyVisible: false), "2")
         let flag = JobStage.Fact(key: "cost_allocated", value: .bool(false))
-        XCTAssertEqual(JobPathContent.factText(flag, moneyVisible: false), "false")
+        XCTAssertEqual(JobPathContent.factText(flag, moneyVisible: false), "No")
+    }
+
+    func testContactFieldsAreNeverRendered() {
+        let facts: [JobStage.Fact] = ["customer_email", "phone", "street_address", "contact_info", "legal_name", "operations", "source_scope"]
+            .map { .init(key: $0, value: .string("x")) }
+        XCTAssertEqual(JobPathContent.visibleFacts(facts).map(\.key), ["operations"])
+    }
+
+    func testPlainWordsForCodes() throws {
+        XCTAssertEqual(JobCopy.stateLine(.recorded), "Recorded — not yet verified")
+        XCTAssertEqual(JobCopy.state(.unknown("awaiting_signature")), "Needs a newer app version")
+        XCTAssertEqual(JobCopy.gap("no_approval_clock"), "Quote not accepted yet")
+        XCTAssertEqual(JobCopy.gap("some_new_gap"), "Some new gap")
+        XCTAssertEqual(JobCopy.conflict("done_status_without_completion_clock"), "Marked done, but no completion date")
+        XCTAssertEqual(JobCopy.fact("approval_clock"), "Quote accepted")
+        XCTAssertEqual(JobCopy.value(.string("not_assessed")), "Not assessed yet")
+        XCTAssertEqual(JobCopy.value(.bool(false)), "No")
+        XCTAssertEqual(JobCopy.value(.null), "Not on record")
+        XCTAssertEqual(JobStageKey.terms.title, "Quote & terms")
+        XCTAssertEqual(JobStageKey.allCases.map(\.initial).joined(), "RIEQWCP")
+        let v = try XCTUnwrap(try decode(JobPath.self, JobFixtures.jobPath).viewer)
+        XCTAssertEqual(JobCopy.viewingAs(v), "customer")
+        XCTAssertEqual(JobCopy.viewingAs(JobViewer(context: .visitor)), "visitor")
+        XCTAssertEqual(JobCopy.technicianLink("none"), "Your account isn't linked to a technician profile yet")
+        XCTAssertNil(JobCopy.technicianLink(nil))
+        XCTAssertEqual(JobCopy.action("contact_via_nuke"), "Contact via Nuke")
+        XCTAssertEqual(JobCopy.newerVersion(1), "Some items need a newer app version (1)")
     }
 
     func testNotEstablishedFactsRenderAtTheRecordRung() {
@@ -163,13 +198,13 @@ final class JobPathDecodeTests: XCTestCase {
         let page = try decode(MyWorkOrders.self, JobFixtures.myWorkOrders)
         XCTAssertEqual(page.rows.count, 2)
         XCTAssertEqual(page.unreadableRows, 1)
-        XCTAssertEqual(page.coverage?.sentence, "2 of 2 work orders readable by your account")
+        XCTAssertEqual(page.coverage?.sentence, "Showing 2 of 2 work orders")
         XCTAssertEqual(page.rows[0].stageStates[.completion], .statusOnly)
         XCTAssertEqual(page.rows[0].firstGap, "no_inspection_requirement")
         XCTAssertNil(page.rows[1].title)
         XCTAssertEqual(page.rows[1].stageStates.count, 7)           // an unknown stage key is not a column
         XCTAssertEqual(page.viewer?.slots.count, 3)
-        XCTAssertEqual(JobCoverage(returned: nil, totalForViewer: nil).sentence, "Coverage not stated by the reader")
+        XCTAssertEqual(JobCoverage(returned: nil, totalForViewer: nil).sentence, "Total not available")
     }
 
     func testSignatureQueueDecodes() throws {
@@ -178,6 +213,7 @@ final class JobPathDecodeTests: XCTestCase {
         XCTAssertEqual(q.unreadableItems, 1)
         XCTAssertEqual(q.items[0].workOrderId, JobFixtures.workOrderId)
         XCTAssertEqual(WorkConsoleContent.evidenceLine(q.items[0].evidenceCounts), "3 operations · 12 photos")
+        XCTAssertEqual(JobCopy.action(q.items[0].kind), "Accept quote")
         XCTAssertEqual(q.viewer?.context, .selfView)
     }
 
@@ -203,22 +239,25 @@ final class JobPathDecodeTests: XCTestCase {
         let missing = PostgrestError(code: "PGRST202", message: "Could not find the function public.my_work_orders")
         let r = JobReaders.refusal(JobReaders.workOrdersName, missing)
         XCTAssertEqual(r.kind, .readerPending)
-        XCTAssertEqual(r.text, "Not readable by your account yet — reader pending (my_work_orders is not deployed).")
+        XCTAssertEqual(r.title, "Not available yet")
+        XCTAssertEqual(r.detail, "This part of Nuke is still being built.")
+        XCTAssertEqual(r.reader, "my_work_orders")
     }
 
     func testARefusedGrantSaysSo() {
         let denied = PostgrestError(code: "42501", message: "permission denied for function work_order_job_path_read")
         let r = JobReaders.refusal(JobReaders.jobPathName, denied)
         XCTAssertEqual(r.kind, .notPermitted)
-        XCTAssertTrue(r.text.contains("not permitted"))
+        XCTAssertEqual(r.title, "Not available to your account")
     }
 
     func testOtherFailuresUseReadFailureWords() {
         let decodeFailure = DecodingError.dataCorrupted(.init(codingPath: [], debugDescription: "x"))
         let r = JobReaders.refusal(JobReaders.signatureQueueName, decodeFailure)
         XCTAssertEqual(r.kind, .failed)
-        XCTAssertEqual(r.text, ReadFailure.text(decodeFailure))
+        XCTAssertEqual(r.detail, "This needs a newer version of the app.")
         let offline = JobReaders.refusal(JobReaders.identityName, URLError(.notConnectedToInternet))
-        XCTAssertEqual(offline.text, "No network connection.")
+        XCTAssertEqual(offline.title, "Couldn't load")
+        XCTAssertEqual(offline.detail, "No network connection.")
     }
 }

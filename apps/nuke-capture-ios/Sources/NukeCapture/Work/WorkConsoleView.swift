@@ -3,8 +3,9 @@
 // Sections (R4 §2 "Work"): Awaiting your signature (my_signature_queue), Jobs in motion
 // (my_work_orders, each row a seven-dot stage rail that opens JobView), Open requirements near
 // you (needs the identity bridge), and Capture (the Engine's sections, unchanged, shown only
-// with the photo grant). Every list is what a server reader returned for this account; a
-// reader that is missing or refuses renders its refusal, never placeholder rows.
+// with the photo grant). The tab itself is signed-in only because these are personal queues.
+// Every list is what a server reader returned for this account; a reader that is missing or
+// refuses renders "Not available yet" and why, never placeholder rows.
 
 import SwiftUI
 
@@ -82,7 +83,7 @@ struct WorkConsoleContent: View {
         Section {
             switch signatures {
             case .loading:
-                loadingRow("Reading your signature queue…")
+                loadingRow("Loading…")
             case .refused(let refusal):
                 JobRefusalRow(refusal: refusal)
                 NavigationLink {
@@ -97,13 +98,13 @@ struct WorkConsoleContent: View {
                 }
             case .loaded(let q):
                 if q.items.isEmpty {
-                    Text("Nothing awaits your signature.").font(.footnote).foregroundStyle(.secondary)
+                    Text("Nothing to sign right now.").font(.footnote).foregroundStyle(.secondary)
                 }
                 ForEach(q.items) { item in
                     signatureRow(item)
                 }
                 if q.unreadableItems > 0 {
-                    Text("Items in a shape this build cannot read: \(q.unreadableItems)")
+                    Text(JobCopy.newerVersion(q.unreadableItems))
                         .font(.footnote).foregroundStyle(.secondary)
                 }
             }
@@ -115,13 +116,13 @@ struct WorkConsoleContent: View {
             }
         } footer: {
             if case .refused = signatures {
-                Text("Until the queue is readable, your days and photo sessions are signed from their existing screens.")
+                Text("For now, confirm your work days and photo sessions here.")
             }
         }
     }
 
     @ViewBuilder private func signatureRow(_ item: SignatureItem) -> some View {
-        let row = RootedValueView(label: JobWords.humanize(item.kind),
+        let row = RootedValueView(label: JobCopy.action(item.kind),
                                   value: JobClock.text(item.clock) ?? JobPathContent.shortId(item.refId),
                                   status: .pending,
                                   decay: Self.evidenceLine(item.evidenceCounts))
@@ -141,7 +142,7 @@ struct WorkConsoleContent: View {
 
     static func evidenceLine(_ counts: [String: JobJSON]) -> String? {
         guard !counts.isEmpty else { return nil }
-        return counts.keys.sorted().map { "\(counts[$0]!.text) \(JobWords.humanize($0))" }.joined(separator: " · ")
+        return counts.keys.sorted().map { "\(counts[$0]!.text) \(JobCopy.sentence($0).lowercased())" }.joined(separator: " · ")
     }
 
     // MARK: Jobs in motion
@@ -150,12 +151,12 @@ struct WorkConsoleContent: View {
         Section {
             switch jobs {
             case .loading:
-                loadingRow("Reading your work orders…")
+                loadingRow("Loading…")
             case .refused(let refusal):
                 JobRefusalRow(refusal: refusal)
             case .loaded(let page):
                 if page.rows.isEmpty {
-                    Text("No work order is readable by your account.").font(.footnote).foregroundStyle(.secondary)
+                    Text("No jobs in motion.").font(.footnote).foregroundStyle(.secondary)
                 }
                 ForEach(page.rows) { row in
                     NavigationLink {
@@ -165,7 +166,7 @@ struct WorkConsoleContent: View {
                     }
                 }
                 if page.unreadableRows > 0 {
-                    Text("Rows in a shape this build cannot read: \(page.unreadableRows)")
+                    Text(JobCopy.newerVersion(page.unreadableRows))
                         .font(.footnote).foregroundStyle(.secondary)
                 }
             }
@@ -173,7 +174,7 @@ struct WorkConsoleContent: View {
             Text("Jobs in motion")
         } footer: {
             if case .loaded(let page) = jobs {
-                Text(page.coverage?.sentence ?? "Coverage not stated by the reader")
+                Text(page.coverage?.sentence ?? "Total not available")
             }
         }
     }
@@ -184,16 +185,15 @@ struct WorkConsoleContent: View {
         Section {
             switch identity {
             case .loading:
-                loadingRow("Reading your identity bridge…")
+                loadingRow("Loading…")
             case .refused(let refusal):
                 JobRefusalRow(refusal: refusal)
             case .loaded(let me):
-                RootedValueView(label: "Identity bridge",
-                                value: me.bridge.map(JobWords.humanize) ?? "not stated by the reader",
-                                status: me.bridge == nil ? .facade : .recorded,
-                                decay: me.viewer?.decidedFrom.map { "decided from \($0)" })
+                RootedValueView(label: "Technician profile",
+                                value: JobCopy.technicianLink(me.bridge) ?? "Not available",
+                                status: me.bridge == nil ? .facade : .recorded)
             }
-            Text("Open requirements are offered to providers whose account is linked to their work record by evidence, never by a name match. This build does not list them yet.")
+            Text("Jobs looking for a technician near you will show here once your account is linked to a technician profile backed by your work. Coming soon.")
                 .font(.footnote).foregroundStyle(.secondary)
         } header: {
             Text("Open requirements near you")
@@ -224,19 +224,19 @@ struct JobRowView: View {
             }
             HStack(spacing: 6) {
                 if !row.slots.isEmpty {
-                    Text("as " + row.slots.map(JobWords.humanize).joined(separator: " · "))
+                    Text("You: " + row.slots.map(JobCopy.slot).joined(separator: " · "))
                 }
                 if let gap = row.firstGap {
                     Text("·")
-                    Text("missing: \(JobWords.humanize(gap))")
+                    Text(JobCopy.gap(gap))
                 }
                 Spacer(minLength: 0)
             }
             .font(.caption2)
             .foregroundStyle(.secondary)
             .lineLimit(1)
-            if let asOf = JobClock.text(row.asOf) {
-                Text("as of \(asOf)")
+            if let updated = JobCopy.updated(row.asOf) {
+                Text(updated)
                     .font(.system(size: 9, design: .monospaced))
                     .foregroundStyle(.tertiary)
             }

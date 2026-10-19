@@ -1,10 +1,12 @@
-// JobView.swift — one work order as a future receipt: header, stage rail, stage detail.
+// JobView.swift — one job, from request and quote through payment: header, stage rail, stage detail.
 //
 // The shared destination pushed from Work (and later Profile, VehicleDetail and Explore). It
 // reads work_order_job_path_read and work_order_resources_read and renders what they return:
-// each stage's state on the trust ladder (JobStageRail), its gaps as "What's missing", its
-// inconsistencies as conflicts, and the reader's own refusals (booking readiness, permission
-// authority, payment authorization) verbatim. Actions come only from viewer.actions[].
+// each stage on the trust ladder (JobStageRail), its gaps as "What's missing", its
+// inconsistencies as disagreeing records, and what the record does not decide (booking,
+// permission, payment) as the reader states it. Actions come only from viewer.actions[].
+// Nothing here checks sign-in: job data is open by default and the reader decides who reads it.
+// Personal contact fields are never rendered; payment and balance amounts need money_visible.
 
 import SwiftUI
 
@@ -28,6 +30,17 @@ struct JobView: View {
     }
 }
 
+/// Raw reader codes under the plain words, for development only (DEBUG + NUKE_DEBUG_CODES=1).
+enum JobDebug {
+    static var showCodes: Bool {
+        #if DEBUG
+        return ProcessInfo.processInfo.environment["NUKE_DEBUG_CODES"] == "1"
+        #else
+        return false
+        #endif
+    }
+}
+
 /// The render, separated from the reads so previews and fixture snapshots drive it directly.
 struct JobPathContent: View {
     let workOrderId: String
@@ -41,15 +54,13 @@ struct JobPathContent: View {
                 Section {
                     HStack(spacing: 8) {
                         ProgressView()
-                        Text("Reading the job path…").font(.footnote).foregroundStyle(.secondary)
+                        Text("Loading job…").font(.footnote).foregroundStyle(.secondary)
                     }
                 }
             case .refused(let refusal):
                 Section {
                     RootedValueView(label: "Work order", value: Self.shortId(workOrderId), status: .recorded)
                     JobRefusalRow(refusal: refusal)
-                } footer: {
-                    Text("Nothing below is shown until the reader answers this account.")
                 }
             case .loaded(let p):
                 header(p)
@@ -58,14 +69,12 @@ struct JobPathContent: View {
                     stageSection(key, p.stages[key], p)
                 }
                 if !p.unknownStages.isEmpty {
-                    Section("Stages this build cannot read") {
-                        ForEach(p.unknownStages, id: \.self) { s in
-                            RootedValueView(label: JobWords.humanize(s), value: "sent by the reader", status: .recorded)
-                        }
+                    Section {
+                        Text(JobCopy.newerVersion(p.unknownStages.count)).font(.footnote).foregroundStyle(.secondary)
                     }
                 }
                 resourcesSection
-                refusalsSection(p)
+                undecidedSection(p)
                 actionsSection(p.viewer)
             }
         }
@@ -85,22 +94,13 @@ struct JobPathContent: View {
                     RootedValueView(label: "Vehicle", value: Self.shortId(v), status: .attributed)
                 }
             } else {
-                RootedValueView(label: "Vehicle", value: "not bound", status: .facade)
+                RootedValueView(label: "Vehicle", value: "No vehicle attached", status: .facade)
             }
             if let viewer = p.viewer {
-                RootedValueView(label: "You read as",
-                                value: ([viewer.context.raw] + viewer.slots).map(JobWords.humanize).joined(separator: " · "),
-                                status: .attributed,
-                                decay: viewer.decidedFrom.map { "decided from \($0)" })
-                if let bridge = viewer.identityBridge {
-                    RootedValueView(label: "Identity bridge", value: JobWords.humanize(bridge), status: .recorded)
-                }
-            } else {
-                RootedValueView(label: "You read as", value: "not stated by the reader", status: .facade)
+                RootedValueView(label: "You're viewing as", value: JobCopy.viewingAs(viewer), status: .attributed)
             }
         } footer: {
-            Text([JobClock.text(p.asOf).map { "As of \($0)" }, p.stateBasis.map { "Basis: \($0)." }]
-                .compactMap { $0 }.joined(separator: " · "))
+            Text([JobCopy.updated(p.asOf), JobCopy.notVerifiedNote].compactMap { $0 }.joined(separator: " · "))
         }
     }
 
@@ -121,22 +121,21 @@ struct JobPathContent: View {
         Section {
             if let stage {
                 if let rung = JobRung.status(stage) {
-                    RootedValueView(label: "State", value: JobWords.humanize(stage.state.raw), status: rung,
-                                    decay: JobClock.text(p.asOf).map { "as of \($0)" })
-                    ForEach(stage.facts) { fact in
-                        RootedValueView(label: JobWords.humanize(fact.key),
+                    RootedValueView(label: "Status", value: JobCopy.stateLine(stage.state), status: rung)
+                    ForEach(Self.visibleFacts(stage.facts)) { fact in
+                        RootedValueView(label: JobCopy.fact(fact.key),
                                         value: Self.factText(fact, moneyVisible: p.viewer?.moneyVisible == true),
                                         status: Self.factStatus(fact, stageRung: JobRung.status(stage.state, hasInconsistency: false) ?? .recorded))
                     }
                 }
                 ForEach(stage.inconsistencies, id: \.self) { code in
-                    RootedValueView(label: "Conflict", value: JobWords.humanize(code), status: .conflicting)
+                    RootedValueView(label: "Records disagree", value: JobCopy.conflict(code), status: .conflicting)
                 }
                 if !stage.gaps.isEmpty {
                     VStack(alignment: .leading, spacing: 4) {
                         Text("What's missing").font(.caption.weight(.semibold)).foregroundStyle(.secondary)
                         ForEach(stage.gaps, id: \.self) { gap in
-                            Label(JobWords.humanize(gap), systemImage: "circle.dashed")
+                            Label(JobCopy.gap(gap), systemImage: "circle.dashed")
                                 .font(.footnote)
                                 .foregroundStyle(.primary)
                         }
@@ -144,13 +143,17 @@ struct JobPathContent: View {
                     .padding(.vertical, 4)
                 }
                 if stage.state == .absent, stage.gaps.isEmpty, stage.inconsistencies.isEmpty {
-                    Text("Absent; the reader names no gap.").font(.footnote).foregroundStyle(.secondary)
+                    Text("Not started.").font(.footnote).foregroundStyle(.secondary)
+                }
+                if JobDebug.showCodes {
+                    Text(([stage.state.raw] + stage.gaps + stage.inconsistencies).joined(separator: " · "))
+                        .font(.system(size: 9, design: .monospaced)).foregroundStyle(.tertiary)
                 }
             } else {
-                RootedValueView(label: "State", value: "not sent by the reader", status: .facade)
+                RootedValueView(label: "Status", value: "Not available", status: .facade)
             }
         } header: {
-            Text("\(key.title) · \(stage.map { JobWords.humanize($0.state.raw) } ?? "not read")")
+            Text("\(key.title) · \(stage.map { JobCopy.state($0.state) } ?? "Not available")")
         }
     }
 
@@ -160,39 +163,39 @@ struct JobPathContent: View {
         Section {
             switch resources {
             case .loading:
-                Text("Reading resources…").font(.footnote).foregroundStyle(.secondary)
+                Text("Loading…").font(.footnote).foregroundStyle(.secondary)
             case .refused(let refusal):
                 JobRefusalRow(refusal: refusal)
             case .loaded(let r):
                 RootedValueView(label: "Requirements", value: "\(r.requirements)", status: .attributed)
-                RootedValueView(label: "Candidate fulfillments", value: "\(r.fulfillments)", status: .attributed)
-                RootedValueView(label: "Attestations", value: "\(r.attestations)", status: .attributed,
-                                decay: "attributed by source testimony")
+                RootedValueView(label: "Candidates found", value: "\(r.fulfillments)", status: .attributed)
+                RootedValueView(label: "Sign-offs", value: "\(r.attestations)", status: .attributed,
+                                decay: "as reported by the source")
                 RootedValueView(label: "Specifications", value: "\(r.specifications)", status: .attributed)
-                ForEach(r.coverage) { fact in
-                    RootedValueView(label: JobWords.humanize(fact.key), value: fact.value.text, status: .recorded)
+                ForEach(Self.visibleFacts(r.coverage)) { fact in
+                    RootedValueView(label: JobCopy.fact(fact.key), value: JobCopy.value(fact.value), status: .recorded)
                 }
             }
         } header: {
-            Text("Resources")
+            Text("Parts, tools & specs")
         } footer: {
-            if case .loaded(let r) = resources, let asOf = JobClock.text(r.asOf) {
-                Text("Coverage as the reader states it · as of \(asOf)")
+            if case .loaded(let r) = resources, let updated = JobCopy.updated(r.asOf) {
+                Text(updated)
             }
         }
     }
 
-    // MARK: What the reader does not decide
+    // MARK: What the record does not decide
 
-    @ViewBuilder private func refusalsSection(_ p: JobPath) -> some View {
+    @ViewBuilder private func undecidedSection(_ p: JobPath) -> some View {
         Section {
-            RootedValueView(label: "Booking readiness", value: p.bookingReadiness?.text ?? "not stated", status: .recorded)
-            RootedValueView(label: "Permission authority", value: p.permissionAuthority?.text ?? "not stated", status: .recorded)
-            RootedValueView(label: "Payment authorized", value: p.paymentAuthorized?.text ?? "not stated", status: .recorded)
+            RootedValueView(label: "Ready to book", value: p.bookingReadiness.map(JobCopy.value) ?? "Not stated", status: .recorded)
+            RootedValueView(label: "Permission to work on the vehicle", value: p.permissionAuthority.map(JobCopy.value) ?? "Not stated", status: .recorded)
+            RootedValueView(label: "Payment authorized", value: p.paymentAuthorized.map(JobCopy.value) ?? "Not stated", status: .recorded)
         } header: {
-            Text("Not decided by this record")
+            Text("Not decided yet")
         } footer: {
-            Text("Shown as the reader states them. No payment is authorized here, and nothing on this screen books, approves or pays.")
+            Text("Nothing on this screen books, approves or pays.")
         }
     }
 
@@ -202,18 +205,18 @@ struct JobPathContent: View {
         Section {
             if let actions = viewer?.actions, !actions.isEmpty {
                 ForEach(actions) { a in
-                    RootedValueView(label: a.stage.map { JobWords.humanize($0) } ?? "Step",
+                    RootedValueView(label: a.stage.map { JobStageKey(rawValue: $0)?.title ?? JobCopy.sentence($0) } ?? "Next step",
                                     value: a.title, status: .pending)
                 }
             } else {
-                Text("No signing step is offered to your account on this job.")
+                Text("Nothing for you to do on this job right now.")
                     .font(.footnote).foregroundStyle(.secondary)
             }
         } header: {
-            Text("Your steps")
+            Text("Your next steps")
         } footer: {
             if let actions = viewer?.actions, !actions.isEmpty {
-                Text("Offered by the server for your account. The signing sheet arrives in a later build.")
+                Text("Signing from the app is coming soon.")
             }
         }
     }
@@ -224,10 +227,17 @@ struct JobPathContent: View {
         id.count > 8 ? String(id.prefix(8)) + "…" : id
     }
 
+    /// Facts a person may see: never personal contact fields, never reader bookkeeping.
+    static func visibleFacts(_ facts: [JobStage.Fact]) -> [JobStage.Fact] {
+        facts.filter { !JobWords.isContactKey($0.key) && !JobCopy.hiddenFacts.contains($0.key) }
+    }
+
+    /// Prices, rates and costs are open; a payment or balance amount needs the server's money_visible.
     static func factText(_ fact: JobStage.Fact, moneyVisible: Bool) -> String {
-        if case .number = fact.value, JobWords.isMoneyKey(fact.key), !moneyVisible { return "masked" }
-        if case .string(let s) = fact.value, JobClock.date(s) != nil { return JobClock.text(s) ?? s }
-        return fact.value.text
+        if case .number = fact.value, JobWords.isPaymentKey(fact.key), !moneyVisible {
+            return "Shown to the people on this job"
+        }
+        return JobCopy.value(fact.value)
     }
 
     /// A fact the reader states as not established / not assessed is the record of a refusal: dim.
@@ -240,25 +250,30 @@ struct JobPathContent: View {
     }
 }
 
-/// A reader's refusal, said once, in the reader's own terms.
+/// A refusal in plain words: what is unavailable and, in one line, why.
 struct JobRefusalRow: View {
     let refusal: JobRefusal
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 4) {
-            Label(refusal.text, systemImage: icon)
+        VStack(alignment: .leading, spacing: 3) {
+            Label(refusal.title, systemImage: icon)
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
+            Text(refusal.detail)
                 .font(.footnote)
                 .foregroundStyle(.secondary)
-            Text(refusal.reader)
-                .font(.system(size: 10, design: .monospaced))
-                .foregroundStyle(.tertiary)
+            if JobDebug.showCodes {
+                Text(refusal.reader)
+                    .font(.system(size: 10, design: .monospaced))
+                    .foregroundStyle(.tertiary)
+            }
         }
         .padding(.vertical, 2)
     }
 
     private var icon: String {
         switch refusal.kind {
-        case .readerPending: return "hourglass"
+        case .readerPending: return "clock"
         case .notPermitted: return "lock"
         case .signInRefused: return "person.crop.circle.badge.exclamationmark"
         case .failed: return "exclamationmark.triangle"

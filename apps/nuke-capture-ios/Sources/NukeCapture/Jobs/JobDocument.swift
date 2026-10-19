@@ -1,16 +1,20 @@
 // JobDocument.swift — the job-path reader's answer, decoded the way the server sends it.
 //
-// A job is a future receipt: one work_orders header read across seven stages (intake,
-// inspection, plan, terms, execution, completion, accounting). The shape is the output of
+// A job is a quote on its way to a receipt: estimate → quote (revisions) → acceptance →
+// deposit → work order → change order → completion → invoice → payment → receipt. The reader
+// measures one work_orders header across seven stages (intake, inspection, plan, terms,
+// execution, completion, accounting). The shape is the output of
 // read_work_order_job_path (migration 20261019045753) as wrapped by the authenticated
 // readers in docs R4 §4 (#2 my_work_orders, #3 work_order_job_path_read, #4
 // work_order_resources_read, #6 my_signature_queue). Each wrapper adds a `viewer` block the
 // phone renders from and never infers.
 //
 // Decoding is tolerant by contract: a stage state, viewer context or action this build does
-// not know decodes as `.unknown(raw)` and renders verbatim, never as a crash and never as a
-// rung it was not given. Money and contact visibility fail closed: only a literal `true`
-// opens them.
+// not know decodes as `.unknown(raw)`, never as a crash and never as a rung it was not given.
+// Data is open by default (stages, scope, specs, resources, quote prices, labor rates, parts
+// costs). Two things are withheld on the phone whatever a reader sends: personal contact
+// fields are never rendered (people reach each other through a Contact via Nuke request), and
+// payment/balance amounts show only when the server's money_visible is a literal `true`.
 
 import Foundation
 
@@ -78,12 +82,18 @@ enum JobWords {
         code.replacingOccurrences(of: "_", with: " ")
     }
 
-    /// Fact keys that could carry an amount. The job path is amount-free today; this guards a
-    /// later wrapper that adds one, so a number under such a key is shown only to a viewer the
-    /// server opened money for.
-    static func isMoneyKey(_ key: String) -> Bool {
+    /// Keys that carry money actually moved or owed (payments, balances, payouts). Prices, rates
+    /// and costs are open; these show only to the parties the server opened money for.
+    static func isPaymentKey(_ key: String) -> Bool {
         let k = key.lowercased()
-        return ["amount", "cost", "price", "total", "cents", "usd"].contains { k.contains($0) }
+        return ["amount_paid", "paid_amount", "payment_amount", "payout_amount", "balance", "owed",
+                "refund", "amount_received", "deposit_paid"].contains { k.contains($0) }
+    }
+
+    /// Personal contact fields. Never rendered: contact happens through a platform request.
+    static func isContactKey(_ key: String) -> Bool {
+        let k = key.lowercased()
+        return ["email", "phone", "address", "contact", "legal_name", "full_name"].contains { k.contains($0) }
     }
 }
 
@@ -94,30 +104,9 @@ enum JobStageKey: String, CaseIterable, Identifiable {
 
     var id: String { rawValue }
 
-    var title: String {
-        switch self {
-        case .intake: return "Intake"
-        case .inspection: return "Inspection"
-        case .plan: return "Plan"
-        case .terms: return "Terms"
-        case .execution: return "Execution"
-        case .completion: return "Completion"
-        case .accounting: return "Accounting"
-        }
-    }
-
-    /// One letter for the mini rail; Inspection and Intake share an initial, so Inspection is "S" (survey).
-    var initial: String {
-        switch self {
-        case .intake: return "I"
-        case .inspection: return "S"
-        case .plan: return "P"
-        case .terms: return "T"
-        case .execution: return "E"
-        case .completion: return "C"
-        case .accounting: return "A"
-        }
-    }
+    var title: String { JobCopy.title(self) }
+    var shortTitle: String { JobCopy.shortTitle(self) }
+    var initial: String { JobCopy.initial(self) }
 }
 
 enum JobStageState: Equatable, Decodable {
@@ -287,7 +276,7 @@ struct JobAction: Decodable, Equatable, Identifiable {
                   stage: try? c.decode(String.self, forKey: JobCodingKey("stage")))
     }
 
-    var title: String { label ?? JobWords.humanize(kind) }
+    var title: String { label ?? JobCopy.action(kind) }
 }
 
 // MARK: - work_order_job_path_read
@@ -353,12 +342,12 @@ struct JobCoverage: Decodable, Equatable {
         case totalForViewer = "total_for_viewer"
     }
 
-    /// "3 of 7 work orders readable by your account", or the honest unknown.
+    /// "Showing 3 of 7 work orders", or the honest unknown.
     var sentence: String {
         switch (returned, totalForViewer) {
-        case let (r?, t?): return "\(r) of \(t) work orders readable by your account"
-        case let (r?, nil): return "\(r) shown · total readable by your account not stated"
-        default: return "Coverage not stated by the reader"
+        case let (r?, t?): return "Showing \(r) of \(t) work orders"
+        case let (r?, nil): return "Showing \(r) · total not available"
+        default: return "Total not available"
         }
     }
 }
