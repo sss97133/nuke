@@ -14,6 +14,10 @@ import type { AnthropicTokenUsage, PlatformAnalysisBilling } from "../_shared/pr
 import { validateVINChecksum } from "../_shared/intelligence-layer.ts";
 
 export const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
+function isDeviceVehicleIdentifier(value: unknown): value is string {
+  if (typeof value !== "string" || !/^[A-Z0-9]{8,17}$/.test(value) || !/[A-Z]/.test(value) || !/[0-9]/.test(value)) return false;
+  return value.length === 17 ? /^[A-HJ-NPR-Z0-9]{17}$/.test(value) && validateVINChecksum(value) : true;
+}
 export interface SubjectSource {
   source_identity?: SourceIdentity;
   latitude?: number | null; longitude?: number | null; device_fingerprint?: string | null;
@@ -45,7 +49,7 @@ export function onDeviceSourceHints(readings: SubjectReading[], sources: Subject
       !raw || !["on_device_identity_read_v1", "on_device_identity_context_v1"].includes(raw.kind) ||
       typeof raw.identity_run_id !== "string" || !UUID.test(raw.identity_run_id) ||
       typeof raw.identity_method_version !== "string" ||
-      !/^vehicle-identity-context-fold-v2:[A-Za-z0-9._:-]{1,80}$/.test(raw.identity_method_version) ||
+      !/^vehicle-identity-context-fold-v3:[A-Za-z0-9._:-]{1,80}$/.test(raw.identity_method_version) ||
       !Array.isArray(sourceInputs) || sourceInputs.length < 2 || sourceInputs.length > 3 ||
       !Array.isArray(raw.observations) || raw.observations.length !== sourceInputs.length) continue;
     const qualified = sourceInputs.every((input: any) => {
@@ -62,8 +66,7 @@ export function onDeviceSourceHints(readings: SubjectReading[], sources: Subject
       const current = hints.get(observation.image_id);
       const candidate = { image_id: observation.image_id, is_vehicle: observation.is_vehicle,
         is_document: observation.is_document, labels: observation.labels.filter((value: unknown) => typeof value === "string").slice(0, 8),
-        vin_candidates: observation.vin_candidates.filter((value: unknown) => typeof value === "string" &&
-          /^[A-HJ-NPR-Z0-9]{17}$/.test(value) && validateVINChecksum(value)).slice(0, 4),
+        vin_candidates: observation.vin_candidates.filter((value: unknown) => isDeviceVehicleIdentifier(value)).slice(0, 4),
         method_version: raw.identity_method_version, identity_run_id: raw.identity_run_id };
       if (!current || Date.parse(envelope.read_at) > Date.parse(String(current.read_at ?? "")))
         hints.set(observation.image_id, { ...candidate, read_at: envelope.read_at });
@@ -91,8 +94,8 @@ export interface SubjectEnvelope extends SubjectProjection {
   device_source_context?: unknown;
 }
 export interface CaptureProfileRequest {
-  basis: "capture_session"; vin: string; image_ids: string[];
-  make?: string; model?: string; evidence: Record<string, string>;
+  basis: "capture_session"; vin?: string; serial?: string; image_ids: string[];
+  year?: number; make?: string; model?: string; evidence: Record<string, string>;
 }
 export interface SubjectStore {
   admitCapture?(request: CaptureProfileRequest): Promise<Record<string, unknown>>;
@@ -139,11 +142,10 @@ export async function retainDeviceSourceReading(store: SubjectStore, request: De
     new Set(observations.map(item => item?.image_id)).size !== ids.length || observations.some(item =>
       !ids.includes(item.image_id) || typeof item.is_vehicle !== "boolean" || typeof item.is_document !== "boolean" ||
       !Array.isArray(item.labels) || item.labels.length > 12 || item.labels.some(label => typeof label !== "string" || label.length > 80) ||
-      !Array.isArray(item.vin_candidates) || item.vin_candidates.length > 8 || item.vin_candidates.some(vin =>
-        typeof vin !== "string" || !/^[A-HJ-NPR-Z0-9]{17}$/.test(vin) || !validateVINChecksum(vin)) ||
+      !Array.isArray(item.vin_candidates) || item.vin_candidates.length > 8 || item.vin_candidates.some(vin => !isDeviceVehicleIdentifier(vin)) ||
       typeof item.read_at !== "string" || !Number.isFinite(Date.parse(item.read_at)) || Date.parse(item.read_at) > now.getTime() + 5 * 60_000) ||
     typeof request.identity_run_id !== "string" || !UUID.test(request.identity_run_id) ||
-    typeof request.identity_method_version !== "string" || !/^vehicle-identity-context-fold-v2:[A-Za-z0-9._:-]{1,80}$/.test(request.identity_method_version) ||
+    typeof request.identity_method_version !== "string" || !/^vehicle-identity-context-fold-v3:[A-Za-z0-9._:-]{1,80}$/.test(request.identity_method_version) ||
     !request.expected_source_hashes || Object.keys(request.expected_source_hashes).length !== ids.length ||
     ids.some(id => !/^[a-f0-9]{64}$/.test(request.expected_source_hashes![id] ?? "")) ||
     !privacy || typeof privacy !== "object" || Array.isArray(privacy) || Object.keys(privacy).length > 2 ||
@@ -635,7 +637,7 @@ export function supabaseSubjectStore(client: any, identityClient?: any): Subject
       // decoder through its service-only owner after the user-scoped profile RPC.
       // Never write decoded fields from this image-reading function itself.
       if (profile.status === "created" && profile.replay !== true && typeof vehicleId === "string" &&
-        UUID.test(vehicleId) && /^[A-HJ-NPR-Z0-9]{17}$/.test(request.vin)) {
+        UUID.test(vehicleId) && typeof request.vin === "string" && /^[A-HJ-NPR-Z0-9]{17}$/.test(request.vin)) {
         const decoded = await client.functions.invoke("decode-vin-and-update", {
           body: { vehicle_id: vehicleId, vin: request.vin },
         });

@@ -93,7 +93,7 @@ function captureFixture() {
   const runWithDeviceContext = async (body = f.request) => {
     await retainDeviceSourceReading(f.store, { user_id: uid, image_ids: [ids[1], ids[0]],
       expected_source_hashes: Object.fromEntries(f.sources.slice(0, 2).map(source => [source.id, source.file_hash])),
-      identity_run_id: "30000000-0000-4000-8000-000000000001", identity_method_version: "vehicle-identity-context-fold-v2:vision-1",
+      identity_run_id: "30000000-0000-4000-8000-000000000001", identity_method_version: "vehicle-identity-context-fold-v3:vision-1",
       observations: [
         { image_id: ids[1], read_at: "2026-10-01T12:02:00Z", is_vehicle: false, is_document: false,
           labels: ["VIN plate"], vin_candidates: ["1HGCM82633A004352"] },
@@ -112,7 +112,7 @@ Deno.test("capture reading reaches the existing profile writer with source custo
   equal(f.requests[0].evidence.anchor_source_sha256, f.sources[1].file_hash);
   equal(f.requests[0].evidence.identifier_legibility, "clear");
   equal(f.requests[0].evidence.identity_run_id, "30000000-0000-4000-8000-000000000001");
-  equal(f.requests[0].evidence.identity_method_version, "vehicle-identity-context-fold-v2:vision-1");
+  equal(f.requests[0].evidence.identity_method_version, "vehicle-identity-context-fold-v3:vision-1");
   equal("album_name" in f.requests[0], false);
   equal("persisted_image_ids" in result && result.persisted_image_ids, ids.slice(0, 2));
   equal("unresolved" in result && result.unresolved, []);
@@ -120,7 +120,7 @@ Deno.test("capture reading reaches the existing profile writer with source custo
   equal(f.counts.models, 1); equal(f.requests.length, 2);
 });
 Deno.test("fresh on-device context is retained as a reading-only receipt without inference or membership", async () => {
-  const f = fixture(), run = "30000000-0000-4000-8000-000000000001", method = "vehicle-identity-context-fold-v2:vision-1";
+  const f = fixture(), run = "30000000-0000-4000-8000-000000000001", method = "vehicle-identity-context-fold-v3:vision-1";
   const vin = "1HGCM82633A004352";
   const result = await retainDeviceSourceReading(f.store, { user_id: uid, image_ids: ids.slice(0, 2),
     expected_source_hashes: Object.fromEntries(f.sources.slice(0, 2).map(source => [source.id, source.file_hash])),
@@ -135,11 +135,24 @@ Deno.test("fresh on-device context is retained as a reading-only receipt without
   const envelope = f.readings[0].confidence_basis.visual_subject_reading_v1!.envelope;
   equal(envelope.subjects, []); equal((envelope.raw_model_reading as Record<string, unknown>).kind, "on_device_identity_read_v1");
 });
+Deno.test("fresh reading lane retains a labelled classic chassis serial candidate", async () => {
+  const f = fixture();
+  const result = await retainDeviceSourceReading(f.store, { user_id: uid, image_ids: ids.slice(0, 2),
+    expected_source_hashes: Object.fromEntries(f.sources.slice(0, 2).map(source => [source.id, source.file_hash])),
+    identity_run_id: "30000000-0000-4000-8000-000000000001", identity_method_version: "vehicle-identity-context-fold-v3:vision-1",
+    observations: [
+      { image_id: ids[0], read_at: "2026-10-02T00:00:00Z", is_vehicle: false, is_document: false,
+        labels: ["VIN plate"], vin_candidates: ["CKR187F127263"] },
+      { image_id: ids[1], read_at: "2026-10-02T00:00:01Z", is_vehicle: true, is_document: false,
+        labels: ["car"], vin_candidates: [] },
+    ] }, new Date("2026-10-02T00:00:02Z"));
+  equal(result.status, "reading_retained");
+});
 Deno.test("a pending source without its existing device privacy receipt stays unqualified", async () => {
   const f = fixture(); f.sources[0].vision_gate_status = "pending";
   const result = await retainDeviceSourceReading(f.store, { user_id: uid, image_ids: ids.slice(0, 2),
     expected_source_hashes: Object.fromEntries(f.sources.slice(0, 2).map(source => [source.id, source.file_hash])),
-    identity_run_id: "30000000-0000-4000-8000-000000000001", identity_method_version: "vehicle-identity-context-fold-v2:vision-1",
+    identity_run_id: "30000000-0000-4000-8000-000000000001", identity_method_version: "vehicle-identity-context-fold-v3:vision-1",
     observations: ids.slice(0, 2).map((image_id, index) => ({ image_id, read_at: `2026-10-02T00:00:0${index}Z`,
       is_vehicle: true, is_document: false, labels: ["car"], vin_candidates: [] })) }, new Date("2026-10-02T00:00:02Z"));
   equal(result.status, "refused"); equal(f.readings.length, 0);
@@ -148,7 +161,7 @@ Deno.test("fresh device receipts contextualize the later deep read but never rep
   const f = fixture(), vin = "1HGCM82633A004352";
   await retainDeviceSourceReading(f.store, { user_id: uid, image_ids: ids.slice(0, 2),
     expected_source_hashes: Object.fromEntries(f.sources.slice(0, 2).map(source => [source.id, source.file_hash])),
-    identity_run_id: "30000000-0000-4000-8000-000000000001", identity_method_version: "vehicle-identity-context-fold-v2:vision-1",
+    identity_run_id: "30000000-0000-4000-8000-000000000001", identity_method_version: "vehicle-identity-context-fold-v3:vision-1",
     observations: [
       { image_id: ids[0], read_at: "2026-10-01T00:00:00Z", is_vehicle: false, is_document: false, labels: ["VIN plate"], vin_candidates: [vin] },
       { image_id: ids[1], read_at: "2026-10-01T00:00:01Z", is_vehicle: true, is_document: false, labels: ["car"], vin_candidates: [] },

@@ -56,9 +56,16 @@ final class AttributionEngine: ObservableObject {
         let isVehicle: Bool
         let isDocument: Bool
         let isSensitive: Bool
+        let contextualYear: Int? = nil
+        let contextualMake: String? = nil
+        let contextualModel: String? = nil
+        let albumContextAmbiguous: Bool = false
     }
     struct VINCaptureGroup: Equatable, Sendable {
         let vin: String
+        let year: Int?
+        let make: String?
+        let model: String?
         let anchorImageID: String
         let imageIDs: [String]
         let vehicleFrameCount: Int
@@ -116,10 +123,11 @@ final class AttributionEngine: ObservableObject {
     ///   1. a fresh exact VIN/chassis serial in a fresh vehicle-classified frame matching one of the
     ///      owner's vehicles → file the photo (`device_file_images`, method vin_ocr / serial_ocr);
     ///   2. the owner's own mapped album plus a fresh vehicle-classified source frame → file (album_map);
-    ///   3. a valid 17-character VIN that matches no vehicle, or an album named "year make model"
+    ///   3. a valid modern VIN or labelled classic serial with an unambiguous "year make model"
+    ///      album context, or an album named "year make model"
     ///      holding enough uploaded photos → ask the server to resolve or create the profile
     ///      (`device_create_vehicle_profile`, which enforces the thresholds and dedupes);
-    ///   4. a VIN-anchored capture fold records fresh per-image source reads, then checks exact
+    ///   4. an identifier-anchored capture fold records fresh per-image source reads, then checks exact
     ///      source bytes, capture clock/GPS, privacy gates and conflicting anchors on the server.
     ///      Broad day/place inheritance remains a suggestion.
     /// The server is the gate for every write (ownership of the photo, association with the
@@ -191,7 +199,8 @@ final class AttributionEngine: ObservableObject {
                 labels = cached.labels
                 isDocument = VisionEngine.isIdentityDocument(labels: cached.labels,
                     isScreenshot: VisionEngine.isScreenshot(localIdentifier: assetID), ocrLines: cached.textLines)
-                sourceVINCandidates = isDocument ? [] : cached.vinCandidates.filter(VisionEngine.isValidVIN)
+                let classic = Set(VisionEngine.labelledClassicSerialCandidates(in: cached.textLines))
+                sourceVINCandidates = isDocument ? [] : cached.vinCandidates.filter { VisionEngine.isValidVIN($0) || classic.contains($0) }
             } else {
                 guard read < ocrBudget else { continue }
                 guard let photo = localPhotos[assetID] else { skippedNonLocal += 1; continue }
@@ -213,11 +222,14 @@ final class AttributionEngine: ObservableObject {
                 labels = review.labels
                 isDocument = VisionEngine.isIdentityDocument(labels: review.labels,
                     isScreenshot: VisionEngine.isScreenshot(localIdentifier: assetID), ocrLines: review.textLines)
-                sourceVINCandidates = isDocument ? [] : review.vinCandidates.filter(VisionEngine.isValidVIN)
+                let classic = Set(VisionEngine.labelledClassicSerialCandidates(in: review.textLines))
+                sourceVINCandidates = isDocument ? [] : review.vinCandidates.filter { VisionEngine.isValidVIN($0) || classic.contains($0) }
             }
             let match = isDocument || knownVINs.isEmpty ? nil : VisionEngine.matchSerial(in: lines, known: knownVINs)
-            let unknown = !isDocument && match == nil ? VisionEngine.vinCandidates(in: lines).first(where: {
-                VisionEngine.isValidVIN($0) && !knownVINs.contains($0)
+            let classicIdentifiers = Set(VisionEngine.labelledClassicSerialCandidates(in: lines))
+            let rawIdentifiers = VisionEngine.vinCandidates(in: lines) + Array(classicIdentifiers)
+            let unknown = !isDocument && match == nil ? rawIdentifiers.first(where: {
+                (VisionEngine.isValidVIN($0) || classicIdentifiers.contains($0)) && !knownVINs.contains($0)
             }) : nil
             var vinVehicleId: String? = nil, vinDist: Int? = nil
             if let m = match {
@@ -230,13 +242,18 @@ final class AttributionEngine: ObservableObject {
                                   session: sessionKey(row)))
         }
 
+        let albumContext = Self.albumContextByAsset()
         let captureFrames = signals.map { s in
-            VINCaptureFrame(imageID: s.row.id, vin: s.unknownVIN ?? (s.vinDist == 0 ? s.vinRead : nil),
+            let assetID = s.row.exif_data?.uuid
+            let albumLabel = assetID.flatMap { albumContext.labels[$0] }
+            return VINCaptureFrame(imageID: s.row.id, vin: s.unknownVIN ?? (s.vinDist == 0 ? s.vinRead : nil),
                 exactVIN: s.unknownVIN != nil || s.vinDist == 0,
                 takenAt: s.row.taken_at, latitude: s.row.latitude, longitude: s.row.longitude,
                 fileHash: s.row.file_hash, isVehicle: s.isVehicle,
                 isDocument: s.isDocument || s.row.is_document == true || s.row.doc_flag == true,
-                isSensitive: s.row.is_sensitive == true)
+                isSensitive: s.row.is_sensitive == true,
+                contextualYear: albumLabel?.year, contextualMake: albumLabel?.make, contextualModel: albumLabel?.model,
+                albumContextAmbiguous: assetID.map { albumContext.ambiguous.contains($0) } ?? false)
         }
         let identityGroups = Self.vinAnchoredCaptureGroups(captureFrames)
         // Persist contextual 2–3 source reading receipts before any VIN profile write.
@@ -317,8 +334,11 @@ final class AttributionEngine: ObservableObject {
                 "anchor_source_sha256": captureFrames.first(where: { $0.imageID == group.anchorImageID })?.fileHash ?? "",
                 "read_at": ISO8601DateFormatter().string(from: anchorSignal.identityReadAt),
             ]
-            let result = await createProfile(DeviceProfileRequest(basis: "capture_session", vin: group.vin, serial: nil,
-                    year: nil, make: nil, model: nil, album_name: nil, album_native_id: nil,
+            let modernVIN = group.vin.count == 17
+            let result = await createProfile(DeviceProfileRequest(basis: "capture_session", vin: modernVIN ? group.vin : nil,
+                    serial: modernVIN ? nil : group.vin,
+                    year: modernVIN ? nil : group.year, make: modernVIN ? nil : group.make, model: modernVIN ? nil : group.model,
+                    album_name: nil, album_native_id: nil,
                     image_ids: ids, evidence: evidence), userId: userId)
             profileResults.append(result.summary)
             completedIDs.formUnion(result.filed)
@@ -485,7 +505,7 @@ final class AttributionEngine: ObservableObject {
     }
 
     /// Append the cheap, fresh per-image source pass under one run key. Only
-    /// check-digit-valid VIN candidates, local classification, labels, source hash
+    /// check-digit-valid VIN or explicitly labelled classic-serial candidates, local classification, labels, source hash
     /// and reading clock leave the phone; free-form OCR text and pixels stay local.
     private func recordIdentitySourcePass(_ groups: [VINCaptureGroup], signals: [Signal], runID: String,
                                          method: String, userId: String) async -> Bool {
@@ -579,12 +599,23 @@ final class AttributionEngine: ObservableObject {
 
     /// Asset id → the albums holding it, from the local album catalog.
     private static func albumsByAsset() -> [String: [LocalPhotoAlbum]] {
-        guard let catalog = LibraryStore.shared.albumCatalog else { return [:] }
+        guard let catalog = LibraryStore.shared.albumCatalog else { return ([:], []) }
         var out: [String: [LocalPhotoAlbum]] = [:]
         for album in catalog.albums {
             for p in album.photos { out[p.localIdentifier, default: []].append(album) }
         }
         return out
+    }
+
+    private static func albumContextByAsset() -> (labels: [String: AlbumLabel], ambiguous: Set<String>) {
+        guard let catalog = LibraryStore.shared.albumCatalog else { return [:] }
+        var labels: [String: Set<AlbumLabel>] = [:]
+        for album in catalog.albums {
+            guard let label = AlbumLabel.parse(album.name) else { continue }
+            for photo in album.photos { labels[photo.localIdentifier, default: []].insert(label) }
+        }
+        return (labels.compactMapValues { values in values.count == 1 ? values.first : nil },
+                Set(labels.filter { $0.value.count > 1 }.keys))
     }
 
     // ─── Helpers ───────────────────────────────────────────────────────────────
@@ -621,26 +652,35 @@ final class AttributionEngine: ObservableObject {
                 sin(dLon / 2) * sin(dLon / 2)
             return 6_371_000 * 2 * asin(sqrt(min(1, h))) <= 25
         }
-        let anchors = frames.filter {
-            $0.exactVIN && !$0.isDocument && !$0.isSensitive &&
-            $0.fileHash?.range(of: "^[a-f0-9]{64}$", options: .regularExpression) != nil &&
-            $0.vin.map(VisionEngine.isValidVIN) == true &&
-            captureDate($0.takenAt) != nil && $0.latitude.map { abs($0) <= 90 } == true &&
-            $0.longitude.map { abs($0) <= 180 } == true
+        func albumContextAgrees(_ a: VINCaptureFrame, _ b: VINCaptureFrame) -> Bool {
+            guard !a.albumContextAmbiguous, !b.albumContextAmbiguous else { return false }
+            let first = (a.contextualYear, a.contextualMake, a.contextualModel)
+            let second = (b.contextualYear, b.contextualMake, b.contextualModel)
+            return first.0 == nil && first.1 == nil && first.2 == nil && second.0 == nil && second.1 == nil && second.2 == nil ||
+                first.0 == second.0 && first.1 == second.1 && first.2 == second.2
+        }
+        let anchors = frames.filter { frame in
+            frame.exactVIN && !frame.isDocument && !frame.isSensitive &&
+            frame.fileHash?.range(of: "^[a-f0-9]{64}$", options: .regularExpression) != nil &&
+            frame.vin.map { VisionEngine.isValidVIN($0) ||
+                ((8...16).contains($0.count) && $0.contains(where: \.isLetter) && $0.contains(where: \.isNumber) && frame.contextualMake != nil) } == true &&
+            captureDate(frame.takenAt) != nil && frame.latitude.map { abs($0) <= 90 } == true &&
+            frame.longitude.map { abs($0) <= 180 } == true
         }.sorted { ($0.takenAt ?? "", $0.imageID) < ($1.takenAt ?? "", $1.imageID) }
         guard !anchors.isEmpty else { return [] }
         var emitted = Set<String>()
         var groups: [VINCaptureGroup] = []
         for anchor in anchors where emitted.insert(anchor.vin!).inserted {
             guard !anchors.contains(where: { $0.vin != anchor.vin && near(anchor, $0) }) else { continue }
-            let neighbors = frames.filter { $0.isVehicle && !$0.isDocument && !$0.isSensitive && near(anchor, $0) }
+            let neighbors = frames.filter { $0.isVehicle && !$0.isDocument && !$0.isSensitive && near(anchor, $0) && albumContextAgrees(anchor, $0) }
             let members = neighbors.filter { frame in
                 Set(anchors.filter { near($0, frame) }.compactMap(\.vin)) == [anchor.vin!]
             }
             guard !members.isEmpty else { continue }
             let ids = Array(Set([anchor.imageID] + members.map(\.imageID))).sorted()
             guard (2...100).contains(ids.count) else { continue }
-            groups.append(VINCaptureGroup(vin: anchor.vin!, anchorImageID: anchor.imageID,
+            groups.append(VINCaptureGroup(vin: anchor.vin!, year: anchor.contextualYear, make: anchor.contextualMake,
+                model: anchor.contextualModel, anchorImageID: anchor.imageID,
                 imageIDs: ids, vehicleFrameCount: Set(members.map(\.imageID)).count))
         }
         return groups

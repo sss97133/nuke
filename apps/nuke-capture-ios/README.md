@@ -77,10 +77,13 @@ Standing rules the code carries:
   Vision OCR/classification and does not accept previous cloud, album, or deep-analysis output as identity evidence.
   A fresh VIN-anchored capture read is retained in the existing protected, reading-only `image_observations` lane.
   It records the source hash, method revision, run, bounded peer inputs, local vehicle/document classifications and
-  check-digit-valid VIN candidates. It creates no subject or membership. This keeps pre-identity reads out of
+  check-digit-valid modern VINs and explicitly labelled 8–16 character classic chassis serials. It creates no subject or membership. This keeps pre-identity reads out of
   `image_analysis_records` (whose required `vehicle_id` would invent a relation) and avoids a parallel source-read
   table. Before profile admission, the server folds only reads from the same fresh run and exact source hashes, with
-  the VIN anchor and independently classified vehicle frames within 15 minutes and 100 m by capture metadata.
+  the identifier anchor and independently classified vehicle frames within five minutes and 25 m by capture metadata.
+  A classic serial additionally needs one unambiguous owner album label for its year, make and model; unlabeled OCR
+  strings and serials without that context remain unresolved. Invoice/document language in local OCR blocks both VIN
+  and serial anchors, and raw OCR text never leaves the phone.
   Documents, sensitive or rejected photos, stale hashes, missing clocks/locations, and nearby conflicting VINs block
   the fold. The existing audited profile writer then resolves a globally held VIN or creates a private profile with
   the photographer relation. For a newly created 17-character VIN profile, the server invokes the existing

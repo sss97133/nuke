@@ -497,6 +497,28 @@ enum VisionEngine {
         return out
     }
 
+    /// Pre-1981 chassis serials have no check digit. Accept them only when OCR sees
+    /// an explicit VIN/serial/chassis label on the same line; album context later
+    /// supplies make/model and the capture fold supplies the photographed vehicle.
+    /// This keeps arbitrary part numbers and invoice line items from becoming IDs.
+    static func labelledClassicSerialCandidates(in lines: [String]) -> [String] {
+        let label = try? NSRegularExpression(pattern: #"\b(?:VIN|SERIAL(?:\s+NO\.?|\s+NUMBER)?|CHASSIS(?:\s+(?:NO\.?|NUMBER))?|VEHICLE\s+IDENTIFICATION)\b"#, options: [.caseInsensitive])
+        var result = Set<String>()
+        for line in lines {
+            let ns = line as NSString
+            guard let match = label?.firstMatch(in: line, range: NSRange(location: 0, length: ns.length)) else { continue }
+            let tail = ns.substring(from: NSMaxRange(match.range))
+            let tokens = tail.uppercased().components(separatedBy: CharacterSet.alphanumerics.inverted)
+            let candidates = tokens.filter { token in
+                (8...16).contains(token.count) && token.contains(where: \.isLetter) &&
+                    token.contains(where: \.isNumber) && token.utf8.allSatisfy({ $0 < 128 })
+            }
+            // More than one serial-shaped value on a labelled line is ambiguous.
+            if candidates.count == 1, let candidate = candidates.first { result.insert(candidate) }
+        }
+        return result.sorted()
+    }
+
     private static func levenshtein(_ a: String, _ b: String) -> Int {
         let s = Array(a), t = Array(b)
         if s.isEmpty { return t.count }; if t.isEmpty { return s.count }

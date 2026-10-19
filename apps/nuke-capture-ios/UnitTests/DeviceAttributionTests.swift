@@ -13,10 +13,12 @@ final class DeviceAttributionTests: XCTestCase {
                          lon: Double? = -122,
                          hash: String? = String(repeating: "a", count: 64),
                          vehicle: Bool = false, document: Bool = false,
-                         sensitive: Bool = false) -> AttributionEngine.VINCaptureFrame {
+                         sensitive: Bool = false, year: Int? = nil, make: String? = nil,
+                         model: String? = nil) -> AttributionEngine.VINCaptureFrame {
         .init(imageID: id, vin: vin, exactVIN: exact, takenAt: time, latitude: lat, longitude: lon,
               fileHash: hash, isVehicle: vehicle,
-              isDocument: document, isSensitive: sensitive)
+              isDocument: document, isSensitive: sensitive, contextualYear: year,
+              contextualMake: make, contextualModel: model)
     }
 
     func testDuplicateSerialClaimsDoNotChooseDatabaseOrder() {
@@ -72,6 +74,20 @@ final class DeviceAttributionTests: XCTestCase {
         XCTAssertEqual(AttributionEngine.vinAnchoredCaptureGroups(frames), [
             .init(vin: vin, anchorImageID: "plate", imageIDs: ["front", "plate", "rear"], vehicleFrameCount: 2)
         ])
+    }
+
+    func testClassicChassisSerialNeedsLabelAndAlbumIdentityContext() {
+        XCTAssertEqual(VisionEngine.labelledClassicSerialCandidates(in: ["CHASSIS NO. CKR187F127263"]), ["CKR187F127263"])
+        XCTAssertTrue(VisionEngine.labelledClassicSerialCandidates(in: ["Invoice  CKR187F127263", "part CKR187F127263"]).isEmpty)
+        let serial = "CKR187F127263"
+        XCTAssertTrue(AttributionEngine.vinAnchoredCaptureGroups([
+            capture("plate", vin: serial, exact: true), capture("front", vehicle: true)
+        ]).isEmpty, "a classic serial alone cannot establish its make")
+        XCTAssertEqual(AttributionEngine.vinAnchoredCaptureGroups([
+            capture("plate", vin: serial, exact: true, year: 1966, make: "Ford", model: "Mustang Cpe Blk"),
+            capture("front", vehicle: true)
+        ]), [.init(vin: serial, year: 1966, make: "Ford", model: "Mustang Cpe Blk",
+                   anchorImageID: "plate", imageIDs: ["front", "plate"], vehicleFrameCount: 1)])
     }
 
     func testContextFoldUsesWalkaroundScaleAndRejectsCompetingVINAnchors() {

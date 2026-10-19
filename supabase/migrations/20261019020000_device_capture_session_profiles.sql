@@ -286,7 +286,7 @@ BEGIN
        OR v_evidence ->> 'edit_distance' IS DISTINCT FROM '0'
        OR coalesce(v_evidence ->> 'identifier_legibility', '') NOT IN ('clear', 'partial')
        OR v_identity_run IS NULL
-       OR coalesce(v_identity_method,'') !~ '^vehicle-identity-context-fold-v2:[A-Za-z0-9._:-]{1,80}$'
+       OR coalesce(v_identity_method,'') !~ '^vehicle-identity-context-fold-v3:[A-Za-z0-9._:-]{1,80}$'
        OR cardinality(v_image_ids) NOT BETWEEN 2 AND 100 THEN
       RETURN jsonb_build_object('status', 'insufficient_evidence', 'basis', v_basis,
         'detail', 'needs an exact source-bound identifier anchor and its capture sequence');

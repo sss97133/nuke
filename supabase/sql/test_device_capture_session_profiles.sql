@@ -18,20 +18,20 @@ SELECT pg_temp.i('capture-' || n), pg_temp.u('capture'), 'https://fixture.invali
 UPDATE public.vehicle_images SET vision_gate_status='approved',is_document=false,is_sensitive=false
  WHERE id IN (SELECT pg_temp.i('capture-' || n) FROM generate_series(1,6) n);
 CREATE FUNCTION pg_temp.capture_request() RETURNS jsonb LANGUAGE sql AS $$
- SELECT jsonb_build_object('basis','capture_session','serial','6R07T123456',
+ SELECT jsonb_build_object('basis','capture_session','serial','CKR187F127263',
    'year',1966,'make','Ford','model','Mustang',
    'image_ids',jsonb_build_array(pg_temp.i('capture-1'),pg_temp.i('capture-2')),
    'evidence',jsonb_build_object('context_method','vin_capture_session_v1',
      'identity_run_id','30000000-0000-4000-8000-000000000001',
-     'identity_method_version','vehicle-identity-context-fold-v2:fixture',
+     'identity_method_version','vehicle-identity-context-fold-v3:fixture',
      'anchor_image_id',pg_temp.i('capture-1'),'anchor_source_sha256',repeat('1',64),
-     'identifier_read','6R07T123456','edit_distance','0','identifier_legibility','clear'))
+     'identifier_read','CKR187F127263','edit_distance','0','identifier_legibility','clear'))
 $$;
-CREATE FUNCTION pg_temp.record_capture_reading(anchor_label text, member_label text, anchor_vin text DEFAULT '6R07T123456') RETURNS void LANGUAGE plpgsql AS $$
+CREATE FUNCTION pg_temp.record_capture_reading(anchor_label text, member_label text, anchor_vin text DEFAULT 'CKR187F127263') RETURNS void LANGUAGE plpgsql AS $$
 DECLARE e jsonb; anchor_id uuid:=pg_temp.i(anchor_label); member_id uuid:=pg_temp.i(member_label);
 BEGIN
  SELECT jsonb_build_object('user_id',pg_temp.u('capture'),'method','visual_subjects_v1','run_key','30000000-0000-4000-8000-000000000001',
-   'provider','Apple Vision (on-device)','model','vehicle-identity-context-fold-v2:fixture','read_at',clock_timestamp(),
+   'provider','Apple Vision (on-device)','model','vehicle-identity-context-fold-v3:fixture','read_at',clock_timestamp(),
    'inputs',(SELECT jsonb_agg(jsonb_build_object('image_id',id,'source_sha256',file_hash,'input_sha256',file_hash,
      'source_qualified',true,'source_bytes_qualified',true,'representation','source','source_url',image_url,'input_url',image_url,
      'created_at',created_at,'taken_at',taken_at,'mime_type','image/jpeg','byte_length',100) ORDER BY id)
@@ -40,7 +40,7 @@ BEGIN
    'candidate_scope',jsonb_build_object('kind','account_associated_terminal_vehicles','vehicle_ids','[]'::jsonb,'retrieved',0,
      'exhausted',false,'truncated',false,'reference_photos_assessed',0,'unavailable_references','[]'::jsonb,'global_novelty_asserted',false),
    'raw_model_reading',jsonb_build_object('kind','on_device_identity_read_v1','identity_run_id','30000000-0000-4000-8000-000000000001',
-     'identity_method_version','vehicle-identity-context-fold-v2:fixture','observations',jsonb_build_array(
+     'identity_method_version','vehicle-identity-context-fold-v3:fixture','observations',jsonb_build_array(
        jsonb_build_object('image_id',anchor_id,'is_vehicle',false,'is_document',false,'labels',jsonb_build_array('VIN plate'),
          'vin_candidates',jsonb_build_array(anchor_vin)),
        jsonb_build_object('image_id',member_id,'is_vehicle',true,'is_document',false,'labels',jsonb_build_array('car'),'vin_candidates','[]'::jsonb))))
@@ -78,7 +78,7 @@ RESET ROLE;
 SELECT pg_temp.ok('partial identifiers cannot mint and classic identifiers retain a make namespace',
  :'partial_new_r'::jsonb->>'status'='insufficient_evidence'
  AND :'no_namespace_r'::jsonb->>'status'='insufficient_evidence'
- AND NOT EXISTS(SELECT 1 FROM public.vehicles WHERE vin='6R07T123456'));
+ AND NOT EXISTS(SELECT 1 FROM public.vehicles WHERE vin='CKR187F127263'));
 SELECT pg_temp.ok('a source-bound anchor is required',
  :'missing_hash_r'::jsonb->>'status'='insufficient_evidence' AND :'wrong_hash_r'::jsonb->>'status'='insufficient_evidence');
 UPDATE public.vehicle_images SET latitude=36 WHERE id=pg_temp.i('capture-2');
@@ -119,12 +119,12 @@ SELECT public.device_create_vehicle_profile(pg_temp.capture_request()) AS r \gse
 RESET ROLE;
 SELECT pg_temp.ok('a classic serial and nearby views seed one private profile without unique camera metadata or an album',
  :'capture_r'::jsonb->>'status'='created'
- AND (SELECT count(*) FROM public.vehicles WHERE vin='6R07T123456')=1
+ AND (SELECT count(*) FROM public.vehicles WHERE vin='CKR187F127263')=1
  AND (SELECT count(*) FROM public.vehicle_images WHERE id IN (pg_temp.i('capture-1'),pg_temp.i('capture-2'))
       AND vehicle_id=(:'capture_r'::jsonb->>'vehicle_id')::uuid)=2
  AND (SELECT is_public=false AND owner_id IS NULL AND created_via_role='photographer'
       AND vin_source='device_capture_session' AND vin_source_image_id=pg_temp.i('capture-1')
-      AND year_source='device_capture_session' FROM public.vehicles WHERE vin='6R07T123456')
+      AND year_source='device_capture_session' FROM public.vehicles WHERE vin='CKR187F127263')
  AND EXISTS(SELECT 1 FROM public.vehicle_contributors WHERE vehicle_id=(:'capture_r'::jsonb->>'vehicle_id')::uuid
       AND user_id=pg_temp.u('capture') AND role='photographer' AND can_sell=false)
  AND :'replay_r'::jsonb->>'vehicle_id'=:'capture_r'::jsonb->>'vehicle_id');
@@ -177,7 +177,7 @@ SELECT public.device_create_vehicle_profile(jsonb_set(:'existing_capture_request
 RESET ROLE;
 SELECT pg_temp.ok('a subsequent capture resolves the existing profile and files through its audited path',
  :'existing_capture_r'::jsonb->>'vehicle_id'=:'capture_r'::jsonb->>'vehicle_id'
- AND (SELECT count(*) FROM public.vehicles WHERE vin='6R07T123456')=1
+ AND (SELECT count(*) FROM public.vehicles WHERE vin='CKR187F127263')=1
  AND (SELECT count(*) FROM public.vehicle_images WHERE id IN(pg_temp.i('capture-3'),pg_temp.i('capture-4'))
       AND vehicle_id=(:'capture_r'::jsonb->>'vehicle_id')::uuid)=2
  AND EXISTS(SELECT 1 FROM public.reattribution_audit WHERE old_observation_id=pg_temp.i('capture-3')
