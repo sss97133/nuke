@@ -311,8 +311,9 @@ infer them.
 
 **What remains.**
 
-- Facility and bay assignment: no reservation, bay grain or facility Sign yet (backend lane in
-  progress).
+- Facility and bay assignment: organizations can declare assets (`declare_facility_asset`,
+  `20261019224000`), but reserving a bay for a job and confirming that reservation are not
+  shipped yet (backend lane in progress).
 - Payouts stay off. Release conditions are evaluated, but nothing is authorized or
   disbursed. Deposits are requested terms only.
 - No Sign for posting a job or its requirements. A job's operations and requirements still
