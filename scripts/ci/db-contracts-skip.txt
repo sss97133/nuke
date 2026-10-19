@@ -14,5 +14,6 @@ test_image_write_receipts.sql                # passes alone; not run in CI
 test_organization_listing_activity.sql       # fails alone; scripts/test-organization-listing-activity.mjs runs it
 test_retained_engine_family_intake_fixture.sql # setup only; engine-family-intake runs it with the Deno handler/PG contract
 test_retained_engine_family_proposal.sql     # fails alone; included by test_schema_proposal_add_source_contract.sql
+test_schema_proposal_retry_and_progress.sql  # fails alone; included by test_schema_proposal_add_source_contract.sql
 test_search_vehicles_fts_pagination.sql      # fails alone; scripts/test-search-reader-pagination.sh runs it
 test_structure_review_closeout.sql           # fails alone; scripts/check-structure-review-closeout.test.mjs runs it

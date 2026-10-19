@@ -2793,6 +2793,18 @@ opens the Facebook listing; a seller key appears only where a profile link was c
 without a model stays unlinked and is counted `unresolved_identity`. Stages (implemented, tested, merged, deployed,
 runtime-verified) are recorded in the PR and the lane log.
 
+**Delivered 2026-10-19.** #2122 (column) and #2124 (writer, ingest, map) merged and deployed 06:17Z; #2133 (card photo
+for imageless vehicles) 06:44Z. Runtime-verified on live packets: 06:21:52Z 50 cards gave 40 vehicles, observations,
+map rows and photo copies, with 9 deferred by the source_intake ceiling of 40; 06:22:22Z 31 cards gave 30, 0 errors. A
+bounded replay (`mode: "integrate"`, 77 calls of 25 ids) over the 1,909 capture-era unlinked listings created 1,805
+vehicles, 1,805 observations and 1,697 map rows, left 22 unresolved (no model) and had 0 errors; it added no sighting or
+submission count. Population after, first seen since 2026-10-12, measured 06:53Z: 2,066 listings, 2,029 linked (98%),
+2,029 with a listing event, 1,820 with a map row, 209 with a stored photo (replayed rows held no image; their next
+sighting copies one), 28 unlinked active, 9 unlinked inactive; 28 merge proposals filed, none auto-merged. Sources board
+Facebook landed 24 h: 1,938 (this day includes the replay, which the board dates by event creation). Seller identities:
+0, waiting on the iMac runner adopting `seller_profile_url`. Not in scope: the 111,644 older linked listings and the 513
+older seller ids (replaying them would present phantom actives as live listings).
+
 ### 13.13 A listing rises by what it is: the classified merit stack (owner, 2026-10-15)
 
 **Owner direction, in substance.** The arrivals feed is led by Craigslist "not cuz its good but cuz its easy. its

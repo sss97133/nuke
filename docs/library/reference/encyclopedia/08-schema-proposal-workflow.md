@@ -22,6 +22,37 @@ This chapter is the handbook entry an external agent reads when it encounters da
 
 ## 0. Grounding — what exists today vs what this chapter proposes
 
+### Implementation check, 2026-10-11
+
+Live catalog inspection confirms `schema_proposals` as the existing owner. Its review
+trigger calls `fn_schema_proposal_apply`: approved `add_property` and `add_source`
+proposals insert registry rows; other proposal types need their particular implementation
+checked. An approval is not evidence that a consumer can use the resulting vocabulary.
+`ingest-observation` still admits explicitly supported property keys. Registration alone
+does not expand that intake contract.
+
+The [retry and progress migration](../../../../supabase/migrations/20261011223810_schema_proposal_retry_and_progress.sql)
+is implemented and tested in disposable PostgreSQL 17, **not yet deployed**. It makes an
+`add_property` retry a no-op only while the same proposal owns the matching definition,
+including insertion-default parent and trust policy. Missing, changed, foreign or retired
+registrations require review. Matching is against the current approved proposal row;
+this change does not add an immutable snapshot of the reviewed payload.
+
+Its service-only, invoker reader `get_schema_proposal_progress(proposal_id)` distinguishes
+review, unregistered vocabulary, registration drift, pending ratification and core
+registration. It also distinguishes source registration from verification of the proposed
+source definition: the existing source branch can retain a previously registered source.
+`consumer_state` remains `unverified` in every result because this reader has no consumer
+replay receipt. Agents can inspect it with the existing read-only `scripts/data/q.sh` route.
+
+The older counts, endpoint examples, lifecycle diagram and cleanup-bot descriptions below
+are historical design material, not current operational receipts. In particular, the live
+`pending_claims` table and its comment do not establish an operating replay worker. A repair
+closes only after retained input passes the sanctioned writer and the original consumer
+question is tested, including a counterexample. Do not mark a claim migrated from a registry
+insertion alone. See [case §13.11](../../../ledger/theory/data-machine-cases.md#1311-discussion-must-develop-the-model-and-its-working-method-owner-2026-10-11)
+for the owner's discussion-to-construction direction and remaining acceptance work.
+
 This chapter describes a workflow. The tables the workflow runs on are partly real and partly proposed. Read this section first so you know which is which.
 
 | Table or enum                         | Status                                | Notes |

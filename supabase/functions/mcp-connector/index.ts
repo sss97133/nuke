@@ -5375,6 +5375,9 @@ async function handleVerifyAccountLink(args: Record<string, unknown>): Promise<T
     .single();
 
   if (error || !claim) return toolErr("Claim not found");
+  if (claim.actor_id) {
+    return toolErr("Actor claims are promoted only by a reviewed evidence approval (approve_actor_link_claim), not by verify_account_link.");
+  }
   if (claim.status === "verified") return toolOk({ status: "already_verified", claim });
   if (claim.status === "rejected" || claim.status === "expired") {
     return toolErr(`Claim is ${claim.status}. Create a new link request.`);
@@ -5446,7 +5449,8 @@ async function handleVerifyAccountLink(args: Record<string, unknown>): Promise<T
   };
   if (proof) updates.proof_url = proof;
 
-  await supabase.from("account_link_claims").update(updates).eq("id", claimId);
+  const { error: updateErr } = await supabase.from("account_link_claims").update(updates).eq("id", claimId);
+  if (updateErr) return toolErr(`Failed to update claim: ${updateErr.message}`);
 
   // If verified, update external_identities
   if (newStatus === "verified" && claim.external_identity_id) {
