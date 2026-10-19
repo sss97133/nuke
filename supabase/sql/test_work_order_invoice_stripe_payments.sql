@@ -5,7 +5,7 @@
 \ir test_job_loop_golden_path.sql
 ALTER TABLE public.observation_sources ADD COLUMN IF NOT EXISTS display_name text, ADD COLUMN IF NOT EXISTS base_trust_score numeric,
   ADD COLUMN IF NOT EXISTS notes text, ADD COLUMN IF NOT EXISTS supported_observations public.observation_kind[];
-\ir ../migrations/20261020012000_work_order_invoice_stripe_payments.sql
+\ir ../migrations/20261020014500_work_order_invoice_stripe_payments.sql
 
 SET ROLE authenticated;
 SELECT t_as('e7000000-0000-0000-0000-0000000000a1');
