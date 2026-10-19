@@ -9,7 +9,11 @@ SELECT NOT (pg_get_functiondef('public.post_work_request(uuid,text,uuid[],jsonb,
 \endif
 
 -- Live shape: description is required.
-ALTER TABLE work_orders ADD CONSTRAINT fixture_description_required CHECK (description IS NOT NULL) NOT VALID;
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'fixture_description_required') THEN
+    ALTER TABLE work_orders ADD CONSTRAINT fixture_description_required CHECK (description IS NOT NULL) NOT VALID;
+  END IF;
+END $$;
 SET ROLE authenticated;
 SELECT t_as('e7000000-0000-0000-0000-0000000000c1');
 SELECT post_work_request('e7300000-0000-0000-0000-000000000003','The radiator leaks coolant. Replace the cracked windshield.') AS dr \gset

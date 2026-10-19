@@ -12,7 +12,8 @@ SELECT to_regprocedure('public.post_work_request(uuid,text,uuid[],jsonb,timestam
 -- The client's own vehicles: a public truck (V3) and a private car (V4); own photos (one sensitive), one existing analysis.
 INSERT INTO vehicles(id,owner_id,year,make,model,is_public,city,state) VALUES
  ('e7300000-0000-0000-0000-000000000003','e7000000-0000-0000-0000-0000000000c1',1985,'Chevrolet','K10',true,'Reno','NV'),
- ('e7300000-0000-0000-0000-000000000004','e7000000-0000-0000-0000-0000000000c1',1990,'Mazda','Miata',false,'Reno','NV');
+ ('e7300000-0000-0000-0000-000000000004','e7000000-0000-0000-0000-0000000000c1',1990,'Mazda','Miata',false,'Reno','NV')
+ ON CONFLICT (id) DO NOTHING;
 INSERT INTO labor_operations VALUES ('INT-DASH-RR','Dash pad',3,'interior',NULL,NULL) ON CONFLICT DO NOTHING;
 INSERT INTO vehicle_images(id,vehicle_id,taken_at,is_external,user_id,vision_gate_status,image_url,is_sensitive,is_superseded) VALUES
  ('e7b00000-0000-0000-0000-000000000001','e7300000-0000-0000-0000-000000000003',now()-interval '1 day',false,'e7000000-0000-0000-0000-0000000000c1','approved','https://img.example.invalid/k10a.jpg',false,false),

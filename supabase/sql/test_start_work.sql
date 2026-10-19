@@ -1,8 +1,8 @@
 -- Disposable PG17 only. Proves 20261019234500_start_work.sql: the accepted provider starts the work, pinned to the accepted
 -- quote hash (or the accepted offer terms when no quote is accepted); the job path execution stage is recorded with a start
 -- Sign and partial with evidence only; start_work is a job-view action for that provider only, not a queue item.
--- Fixture and prior state: the golden-path chain (inspection job IW with an accepted inspector and no quote; the parent job
--- with an accepted change order, attached evidence and no start Sign).
+-- Fixture and prior state: the golden-path chain (inspection job IW with an accepted inspector and no quote); a fresh job
+-- posted here on the client's own truck, offered, accepted, quoted and accepted, with evidence attached and no start Sign.
 \set ON_ERROR_STOP on
 \ir test_job_loop_golden_path.sql
 SELECT to_regprocedure('public.start_work(uuid,text)') IS NULL AS need_start \gset
@@ -12,7 +12,37 @@ SELECT to_regprocedure('public.start_work(uuid,text)') IS NULL AS need_start \gs
 
 CREATE FUNCTION public.s_jp(p_wo uuid) RETURNS jsonb LANGUAGE sql AS $$ SELECT work_order_job_path_read(p_wo) $$;
 GRANT EXECUTE ON FUNCTION public.s_jp(uuid) TO anon, authenticated;
-SELECT 'e7400000-0000-0000-0000-000000000001' AS pw \gset
+INSERT INTO vehicles(id,owner_id,year,make,model,is_public,city,state) VALUES
+ ('e7300000-0000-0000-0000-000000000003','e7000000-0000-0000-0000-0000000000c1',1985,'Chevrolet','K10',true,'Reno','NV') ON CONFLICT (id) DO NOTHING;
+INSERT INTO vehicle_images(id,vehicle_id,taken_at,is_external,user_id,vision_gate_status,image_url,is_sensitive,is_superseded) VALUES
+ ('e7d00000-0000-0000-0000-000000000001','e7300000-0000-0000-0000-000000000003',clock_timestamp()+interval '1 minute',false,'e7000000-0000-0000-0000-0000000000a1','approved','https://img.example.invalid/w1.jpg',false,false),
+ ('e7d00000-0000-0000-0000-000000000002','e7300000-0000-0000-0000-000000000003',clock_timestamp()+interval '1 minute',false,'e7000000-0000-0000-0000-0000000000a1','approved','https://img.example.invalid/w2.jpg',false,false);
+SET ROLE authenticated;
+SELECT t_as('e7000000-0000-0000-0000-0000000000c1');
+SELECT post_work_request('e7300000-0000-0000-0000-000000000003','The radiator leaks coolant.',NULL,NULL,NULL,'invite_only') AS pj \gset
+RESET ROLE;
+SELECT (:'pj'::jsonb)->>'work_order_id' AS pw \gset
+SELECT (:'pj'::jsonb)#>>'{requirements,0,requirement_id}' AS pwreq \gset
+SELECT (:'pj'::jsonb)#>>'{operations,0,line_item_id}' AS pwop \gset
+SET ROLE authenticated;
+SELECT t_as('e7000000-0000-0000-0000-0000000000a1');
+SELECT offer_on_requirement(:'pwreq',jsonb_build_object('lines',jsonb_build_array(jsonb_build_object('description','Radiator replacement',
+  'pricing_basis','flat','amount',300,'currency','USD','unit',NULL,'quantity',NULL))),NULL,NULL,NULL) AS so \gset
+SELECT t_as('e7000000-0000-0000-0000-0000000000c1');
+SELECT accept_offer(((:'so'::jsonb)->>'offer_id')::uuid,(:'so'::jsonb)->>'offer_hash');
+SELECT t_as('e7000000-0000-0000-0000-0000000000a1');
+SELECT issue_work_order_quote(:'pw',jsonb_build_array(jsonb_build_object('ref_kind','operation','ref_id',:'pwop','description','Radiator replacement',
+  'pricing_basis','flat','amount',300,'currency','USD','unit',NULL,'quantity',NULL)),NULL,NULL,NULL) AS q1 \gset
+SELECT t_as('e7000000-0000-0000-0000-0000000000c1');
+SELECT accept_work_order_quote(((:'q1'::jsonb)->>'quote_id')::uuid,(:'q1'::jsonb)->>'quote_hash');
+SELECT t_as('e7000000-0000-0000-0000-0000000000a1');
+SELECT issue_change_order(:'pw',((:'q1'::jsonb)->>'quote_id')::uuid,jsonb_build_array(jsonb_build_object('action','add','line',jsonb_build_object('ref_kind','fee',
+  'ref_id',NULL,'description','Coolant','pricing_basis','flat','amount',30,'currency','USD','unit',NULL,'quantity',NULL))),'Coolant added') AS co \gset
+SELECT t_as('e7000000-0000-0000-0000-0000000000c1');
+SELECT accept_work_order_quote(((:'co'::jsonb)->>'quote_id')::uuid,(:'co'::jsonb)->>'quote_hash');
+SELECT t_as('e7000000-0000-0000-0000-0000000000a1');
+SELECT attach_job_evidence(:'pw',ARRAY['e7d00000-0000-0000-0000-000000000001','e7d00000-0000-0000-0000-000000000002']::uuid[],NULL,NULL);
+RESET ROLE;
 
 -- Evidence alone is partial now; nothing started.
 SET ROLE anon;
