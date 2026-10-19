@@ -256,7 +256,7 @@ SELECT t_assert((SELECT j::text !~ '(one@example|5550111|Main St)' AND NOT t_pri
 CREATE TEMP TABLE q1 AS SELECT my_signature_queue() j;
 SELECT t_assert((SELECT j @> '{"coverage":{"returned":1,"total":1,"kinds":["work_session"]},"items":[{"kind":"work_session","ref_id":"60000000-0000-0000-0000-000000000001","work_order_id":null,"capture_span_minutes":60,"evidence_counts":{"session_images":3,"vehicle_photos_that_day":2},"sign":{"rpc":"confirm_work_session"}}]}' FROM q1),
   'signature queue: own signable day only, with evidence counts');
-SELECT t_assert((SELECT NOT t_private(j) AND j::text !~ '410' FROM q1), 'signature queue: no labor cost');
+SELECT t_assert((SELECT NOT t_private(j) AND j::text !~ '(labor_cost|\m410(\.0+)?\M)' FROM q1), 'signature queue: no labor cost');
 
 -- 4. A vehicle-access holder who is not a party sees the job but not supplier identity or excerpts.
 SELECT t_as('00000000-0000-0000-0000-000000000003');
