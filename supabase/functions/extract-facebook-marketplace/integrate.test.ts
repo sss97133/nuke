@@ -82,6 +82,19 @@ Deno.test("an already-linked listing lands its listing event at the capture cloc
   assert.equal(calls.photos.length, 0, "a repeat search sighting does not re-copy photos");
 });
 
+Deno.test("a repeat sighting copies its card photo only when the linked vehicle has none", async () => {
+  const { db, calls, deps } = harness(async () => []);
+  db.t.vehicles = [{ id: "veh-a", primary_image_url: null }, { id: "veh-b", primary_image_url: "https://example.supabase.co/storage/v1/object/public/x.jpg" }];
+  listing(db, "LA", "1201", "veh-a"); listing(db, "LB", "1202", "veh-b");
+  const mk = (fb: string) => ({ mode: "direct", capture, facebook_id: fb, title: "1985 Toyota pickup", image_url: photo,
+    agent_context: { session_type: "browser_search_card" } }) as any;
+  await integrateListings([mk("1201"), mk("1202")], [
+    { facebook_id: "1201", listing_id: "LA", vehicle_id: "veh-a", listing_landed: true },
+    { facebook_id: "1202", listing_id: "LB", vehicle_id: "veh-b", listing_landed: true },
+  ], deps, at);
+  assert.deepEqual(calls.photos.map((p) => p.vehicleId), ["veh-a"]);
+});
+
 Deno.test("a revisit that saw the listing gone ends its event with the evidence, never a sale", async () => {
   const { db, calls, deps } = harness(async () => []);
   listing(db, "L3", "333", "veh-3");

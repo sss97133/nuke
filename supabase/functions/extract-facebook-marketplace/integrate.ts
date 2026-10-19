@@ -231,7 +231,12 @@ export async function integrateListings(items: DirectInput[], landed: LandedResu
       catch (e) { r.places.error = (r.places.error ?? 0) + 1; r.errors.push(`place ${x.body.facebook_id}: ${e instanceof Error ? e.message : String(e)}`); }
     }
     const photos = photosFor(x.body);
-    if (photos.length && (promoted.has(x.listingId) || x.isDetail)) {
+    // A repeat search sighting copies its card photo only for a vehicle that still has none.
+    const needsPhoto = async () => {
+      const v = await deps.supabase.from("vehicles").select("primary_image_url").eq("id", x.vehicleId).maybeSingle();
+      return !v.error && !!v.data && !v.data.primary_image_url;
+    };
+    if (photos.length && (promoted.has(x.listingId) || x.isDetail || await needsPhoto())) {
       if (deps.persistPhotos(x.vehicleId, photos, x.observedAt)) r.photo_jobs++;
     }
   }
