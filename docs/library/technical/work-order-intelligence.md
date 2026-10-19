@@ -455,6 +455,35 @@ findings, the recorder by public handle or `unnamed party`, coverage, quote stat
 non-public vehicle is shown only to slot holders. Contract:
 `supabase/sql/test_inspection_findings.sql`.
 
+## Provider offers and acceptance
+
+The matching loop: `open_requirements_read` lists a requirement with an explainable match;
+a provider **offers**; the client **accepts a provider**; then quote and acceptance.
+
+An offer is a candidate arrangement made by the provider, so it extends
+`work_order_resource_fulfillments` with `offer_kind`, `offer_rung`, `offer_terms` and
+`offer_hash`. Every resource reader already lists those rows. The offering account and any
+note stay on the signed source record, never on the row, because the open resource readers
+pass fulfillment columns through.
+
+`offer_on_requirement(p_requirement_id, p_terms, p_available_from, p_available_until, p_note)`
+is the provider's Sign:
+
+- **Individual offer:** an account with an actor claim of any rung offers that actor as
+  performer on a skill or inspection requirement. A pending `self_claim` may offer; the rung
+  is recorded and is not competence.
+- **Organization offer (`p_terms.organization_id`):** an active owner offers the
+  organization's facility, or a named performer actor (attributed by the organization).
+- **Terms** are lines priced `flat`, `hourly`, `day_rate` or `per_operation`, with a
+  currency whenever an amount is stated. An unpriced offer is allowed.
+- **Where:** the work order must be open (not completed, paid, cancelled or rejected), on a
+  public vehicle or one the provider holds a slot on. The customer cannot offer on their own
+  job.
+
+Each account has one current offer per requirement. A new offer supersedes the previous one,
+and `withdraw_offer(p_offer_id)` writes a withdrawal record that supersedes it; superseded
+offers leave every reader. Contract: `supabase/sql/test_work_order_offers.sql`.
+
 ## Job path self-measurement
 
 `read_work_order_job_path(work_order_id)` reports one work order's evidence across seven

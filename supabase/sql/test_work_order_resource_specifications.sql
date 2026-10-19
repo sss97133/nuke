@@ -71,6 +71,7 @@ INSERT INTO vehicle_observations(id,vehicle_id,kind,source_id,content_text,obser
 \ir ../migrations/20261019094500_work_order_quotes.sql
 \ir ../migrations/20261019120000_work_order_quote_issue.sql
 \ir ../migrations/20261019123000_work_order_job_path_quotes.sql
+\ir ../migrations/20261019180000_work_order_offers.sql
 
 -- Synthetic interpretations in the guarded disposable database only.
 CREATE FUNCTION public.spec_source(p_envelope jsonb,p_observed timestamptz DEFAULT '2026-01-04') RETURNS uuid LANGUAGE plpgsql AS $$

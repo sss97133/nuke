@@ -69,6 +69,7 @@ INSERT INTO vehicle_observations(id,vehicle_id,kind,source_id,observed_at,struct
 \ir ../migrations/20261019094500_work_order_quotes.sql
 \ir ../migrations/20261019120000_work_order_quote_issue.sql
 \ir ../migrations/20261019123000_work_order_job_path_quotes.sql
+\ir ../migrations/20261019180000_work_order_offers.sql
 SET ROLE service_role;
 SELECT t_assert(read_work_order_resources('30000000-0000-0000-0000-000000000001')->>'booking_readiness'='not_assessed','empty graph never means ready');
 SELECT t_assert(t_refused($q$SELECT project_work_order_resource_observation('80000000-0000-0000-0000-000000000002')$q$),'fulfillment before requirement refused');

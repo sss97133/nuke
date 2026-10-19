@@ -27,6 +27,7 @@ INSERT INTO public.actors VALUES ('a0000000-0000-0000-0000-0000000000f2','Privat
 \ir ../migrations/20261019120000_work_order_quote_issue.sql
 \ir ../migrations/20261019123000_work_order_job_path_quotes.sql
 \ir ../migrations/20261019150000_inspection_request.sql
+\ir ../migrations/20261019180000_work_order_offers.sql
 
 CREATE OR REPLACE FUNCTION public.t_pii(j jsonb) RETURNS boolean LANGUAGE sql IMMUTABLE AS $$
   SELECT j::text ~ '(Fixture Customer|Other Customer|5550100|5550177|5550199|example\.com|Customer asked|road test|Fixture Performer|Private Painter|"amount"|amount_usd|actual_payout|total_cost|unit_price|total_labor_cost|"phone"|"email"|"address"|payment_records|payouts_recorded)' $$;

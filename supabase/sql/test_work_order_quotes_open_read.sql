@@ -123,6 +123,7 @@ INSERT INTO work_order_labor(id,work_order_id,task_name,task_category,hours,hour
 \ir ../migrations/20261019124500_work_order_quotes_open_read.sql
 \ir ../migrations/20261019150000_inspection_request.sql
 \ir ../migrations/20261019153000_job_path_inspection.sql
+\ir ../migrations/20261019180000_work_order_offers.sql
 
 
 -- P (..0f) performer with an approved work_evidence bridge to the operation actor; P2 (..09) self_claim only;
