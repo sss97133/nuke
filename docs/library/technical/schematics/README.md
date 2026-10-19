@@ -35,7 +35,45 @@ The existing `valuation_by_ymm` extension follows current public cohort members 
 
 ---
 
+## Truck market membership (2026-10-18 implementation)
+
+`mv_family_market` name scope + `mv_treemap_outcomes` priced records → current public
+`vehicles` gate + eligible selected drivetrain testimony/rooted record → bounded existing
+`treemap_family_models` overload → complete membership read → intersecting filters → one
+partition → map/phone choices. The same selected IDs feed chart eligibility and photos.
+No new testimony store or canonical identity rewrite is introduced; missing/conflicting
+configuration remains unresolved. The function migration ships only through existing CI.
+
 ## How to Read These Documents
+
+### Work-order resource evidence (2026-10-19)
+
+Retained private work record → explicitly attributed interpretation through
+`ingest-observation` → `project_work_order_resource_observation` validates the
+same-vehicle operation, original excerpt and clock → immutable requirement → candidate
+resource arrangements → scoped reported attestations. `read_work_order_resources`
+excludes chains whose original basis was superseded or reattributed. Unstated quantities
+remain null; booking readiness, provider authority and compensation remain unassessed.
+For skill/inspection, an existing canonical actor can be a candidate independently of
+the contracting user/shop. Retained operation attribution → exact full-row snapshot →
+derived actor candidate; a changed operation withholds that candidate and its descendants.
+Other arrangements survive independently. Actor identity is not an authenticated account,
+skill certification, accepted assignment or permission grant.
+Payload and limitations: [Work Order Intelligence](../work-order-intelligence.md).
+
+Work order → vehicle → current canonical deep-image observation → approved same-vehicle
+private image → each tool/component occurrence (source observation + JSON pointer).
+The service-only `read_work_order_image_objects` exposes these repeated sightings and
+joins existing image/equipment evidence to its asset endpoint. Legacy usage and purchase
+claims stay qualified; computed depreciation value is separate from market value,
+allocated job cost and labor value. No new observation, physical identity or usage is minted.
+
+Retained request excerpt / operation `component_events` row / installed or quoted
+`work_order_parts` row → derived specification through `ingest-observation` →
+projector checks verbatim labels and exact row snapshot → immutable material/process
+claim (requested, supplied, proposed, reported_performed) → `read_work_order_resources`
+compares requested pairs with current claims by role and dotted key. Part claims stay
+work-order scoped; a changed basis row withholds its claim. Conflict ≠ adjudication.
 
 These schematics describe the system as it exists in code, not as an aspirational design. Where the current implementation diverges from the encyclopedia specification, both states are documented and the gap is called out.
 

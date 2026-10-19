@@ -734,6 +734,10 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: '22'
+      - name: Setup Deno for canonical listing capture admission
+        uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.x
       - name: Verify nullable episode ancestry, source custody and two-session races
         run: node scripts/discovery/sale-episode-source-integrity-test.mjs
 
@@ -782,7 +786,7 @@ jobs:
           NODE_PATH: ${{ github.workspace }}/nuke_frontend/node_modules
 
       - name: Verify pinned archive custody and deterministic producer (offline)
-        run: node --test scripts/test-archive-source-custody.mjs
+        run: node --test scripts/test-archive-source-custody.mjs scripts/cab-api-sync.test.mjs
         env:
           NODE_PATH: ${{ github.workspace }}/nuke_frontend/node_modules
 

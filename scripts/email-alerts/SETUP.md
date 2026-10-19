@@ -25,6 +25,22 @@ or all-history scan. `scripts/mail-app-intake.mjs --daemon` forwards the same op
 bounded cycles five minutes apart. Verify a scheduled receipt and durable observations before
 calling recurrence operational. This path reads Mail's cache without changing labels/read state.
 
+The reader supports Python 3.9, including UTC timestamps ending in `Z` in raw-email manifests,
+database readback and health receipts. On older Macs, select the actual Mail cache with
+`--mail-dir` and `--mail-db`; Monterey uses `~/Library/Mail/V9` rather than the default V10.
+For a machine move, verify the destination's selected account, background Mail access and
+successful scheduled writer receipt before unloading the original worker. Keep private MIME,
+checkpoints and credentials outside the repository; a code copy alone is not a working move.
+
+Different cached bytes under the same message identity remain a review hold, even when the
+decoded email looks identical. Original MIME and stored testimony are never normalized or
+replaced to force a duplicate match. The local `identity_holds` checkpoint retains each raw
+variant separately from completed messages; subsequent cycles skip that exact held variant
+while continuing other alerts. Changed bytes are checked again, and `--replay` explicitly
+rechecks held variants. The receipt reports `holds.message_identity_conflict`; a healthy
+transport does not mean these conflicts are resolved. Failed requests and failed readback
+still stop the batch after three errors and remain retryable.
+
 Email capture remains independent of KSL page enrichment. A blocked/failed headless request
 must not discard the email, imply withdrawal, or trigger a paid fallback. Keep the paused cloud
 poller and paid source settings unchanged. Deployment and runtime receipts remain private.

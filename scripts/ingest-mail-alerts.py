@@ -42,8 +42,17 @@ SENDERS = {'bhcc': {'sales@beverlyhillscarclub.com'}, 'ksl': {'cars@ksl.com'},
            'carsandbids': {'cab@carsandbids.com'}}
 
 
+class MessageIdentityConflict(ValueError):
+    """Keep conflicting evidence for review without blocking unrelated mail."""
+
+
 def utc(ts=None):
     return datetime.fromtimestamp(ts, timezone.utc).isoformat() if ts is not None else datetime.now(timezone.utc).isoformat()
+
+
+def iso_timestamp(value):
+    # Python 3.9 ships on Intel Macs and requires an explicit offset for UTC.
+    return datetime.fromisoformat(value[:-1] + '+00:00' if value.endswith('Z') else value)
 
 
 def digest(data):
@@ -622,7 +631,7 @@ class Supabase:
             if existing:
                 if (len(existing) != 1 or existing[0]['source_url'] and existing[0]['source_url'] != listing['url']
                         or existing[0]['structured_data'].get('raw_sha256') != alert['raw_sha256']):
-                    raise RuntimeError('message identity conflicts with existing testimony')
+                    raise MessageIdentityConflict('message identity conflicts with existing testimony')
                 if not existing[0].get('vehicle_id') and len(inventory_ids) == 1 and inventory_url:
                     vehicle_id = next(iter(inventory_ids))
                     linked = self.request('/rest/v1/rpc/attribute_testimony', {
@@ -678,7 +687,7 @@ class Supabase:
                              select='id,source_identifier,source_url,observed_at,ingested_at,vehicle_id,structured_data')
             if (len(rows) != 1 or rows[0]['source_identifier'] != payload['source_identifier']
                     or rows[0]['source_url'] != listing['url'] or rows[0]['structured_data'] != payload['structured_data']
-                    or datetime.fromisoformat(rows[0]['observed_at']) != datetime.fromisoformat(alert['observed_at'])):
+                    or iso_timestamp(rows[0]['observed_at']) != iso_timestamp(alert['observed_at'])):
                 raise RuntimeError('observation readback differs from email testimony')
             result.update(observation_id=obs_id, duplicate=bool(observation.get('duplicate')),
                           vehicle_id=rows[0].get('vehicle_id'), ingested_at=rows[0]['ingested_at'])
@@ -707,7 +716,7 @@ def run(args):
                 raise ValueError('manifest message recipient differs from selected mailbox')
             if source is None or args.source not in ('all', source):
                 continue
-            received = datetime.fromisoformat(item['received_at'])
+            received = iso_timestamp(item['received_at'])
             if received.tzinfo is None:
                 raise ValueError('manifest receipt timestamp requires a timezone')
             if args.days and received.timestamp() < time.time() - args.days * 86400:
@@ -744,10 +753,13 @@ def run(args):
             source = next(key for key, values in SENDERS.items() if em['sender'] in values)
             alert = parse_alert(msg, raw, source, em['received_ts'], index)
             key = alert['message_key']
-            if key in state['completed']:
-                if state['completed'][key]['raw_sha256'] != alert['raw_sha256']:
-                    raise ValueError('same Message-ID has different raw evidence; held for review')
-                completed = state['completed'][key]
+            raw_sha = alert['raw_sha256']
+            if not args.dry_run and not args.replay and raw_sha in state.get('identity_holds', {}):
+                report['holds']['message_identity_conflict'] = report['holds'].get('message_identity_conflict', 0) + 1
+                continue
+            completed = state['completed'].get(key)
+            raw_conflict = completed and completed['raw_sha256'] != raw_sha
+            if completed and not raw_conflict:
                 needs_resolution = completed.get('resolution_pending') and completed.get('sitemap_sha256') != sitemap_sha
                 needs_reparse = completed.get('method') != VERSION and source != 'bhcc'
                 if not args.dry_run and not args.replay and not needs_resolution and not needs_reparse:
@@ -762,6 +774,10 @@ def run(args):
                 if not archive_path.exists():
                     archive_path.write_bytes(raw)
                     archive_path.chmod(0o600)
+            if raw_conflict:
+                if not args.dry_run:
+                    attempted += 1
+                raise MessageIdentityConflict('same Message-ID has different raw evidence; held for review')
             if alert['hold']:
                 hold = alert['hold']
                 report['holds'][hold] = report['holds'].get(hold, 0) + 1
@@ -778,9 +794,16 @@ def run(args):
                     result = client.ingest(alert, listing, source_id, sitemap_sha)
                     report['results'].append({**result, 'priority': priority_listing(listing, years)})
             if not args.dry_run:
+                state.get('identity_holds', {}).pop(raw_sha, None)
                 state['completed'][key] = {'raw_sha256': alert['raw_sha256'], 'completed_at': utc(),
                                            'resolution_pending': any(not x['url'] for x in alert['listings']),
                                            'sitemap_sha256': sitemap_sha, 'method': VERSION}
+                atomic_json(state_dir / 'state.json', state)
+        except MessageIdentityConflict as err:
+            report['holds']['message_identity_conflict'] = report['holds'].get('message_identity_conflict', 0) + 1
+            if not args.dry_run:
+                state.setdefault('identity_holds', {}).setdefault(raw_sha, {
+                    'message_key': key, 'held_at': utc(), 'reason': str(err), 'method': VERSION})
                 atomic_json(state_dir / 'state.json', state)
         except Exception as err:
             # Never print bodies, tracking links, credentials, or recipient identifiers.
@@ -828,7 +851,7 @@ def main():
         report = json.loads(path.read_text()) if path.exists() else {}
         healthy = bool(report) and not report.get('errors') and not report.get('source_stale', True)
         if report:
-            healthy = healthy and time.time() - datetime.fromisoformat(report['finished_at']).timestamp() < 900
+            healthy = healthy and time.time() - iso_timestamp(report['finished_at']).timestamp() < 900
         print(json.dumps({'healthy': healthy, 'last_run': report.get('finished_at'),
                           'latest_email_received_at': report.get('latest_email_received_at'),
                           'errors': report.get('errors', []), 'holds': report.get('holds', {})}))

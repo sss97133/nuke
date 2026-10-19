@@ -20,12 +20,14 @@ struct SubjectReinspectionQueue: Codable {
         let expected_source_hashes: [String: String]
         let pending_source_count: Int
         let inspect: [Witness]
+        var capture_filing_pending: Bool? = nil
         var valid: Bool {
             method == SubjectReinspectionQueue.method && UUID(uuidString: reading_id) != nil && !run_key.isEmpty && run_key.count <= 1024
                 && (2...3).contains(image_ids.count) && Set(image_ids).count == image_ids.count
                 && image_ids.allSatisfy { UUID(uuidString: $0) != nil && SubjectResolutionQueue.validHash(expected_source_hashes[$0] ?? "") }
-                && Set(expected_source_hashes.keys) == Set(image_ids) && (1...2).contains(inspect.count)
-                && (inspect.count...3).contains(pending_source_count)
+                && Set(expected_source_hashes.keys) == Set(image_ids)
+                && (capture_filing_pending == true ? inspect.isEmpty && pending_source_count == 0
+                    : (1...2).contains(inspect.count) && (inspect.count...3).contains(pending_source_count))
                 && Set(inspect.map(\.receipt_image_id)).count == inspect.count && Set(inspect.map(\.current_image_id)).count == inspect.count
                 && Set(inspect.map(\.root_image_id)).count == inspect.count
                 && inspect.allSatisfy { image_ids.contains($0.receipt_image_id) && UUID(uuidString: $0.current_image_id) != nil
@@ -34,7 +36,8 @@ struct SubjectReinspectionQueue: Codable {
         }
         var key: String {
             let parts = inspect.map { "\($0.current_image_id.lowercased()):\($0.source_sha256)" }.sorted().joined(separator: "|")
-            return SHA256.hash(data: Data("\(method)|\(reading_id)|\(run_key)|\(parts)".utf8)).map { String(format: "%02x", $0) }.joined()
+            let continuation = capture_filing_pending == true ? "|capture-filing" : ""
+            return SHA256.hash(data: Data("\(method)|\(reading_id)|\(run_key)|\(parts)\(continuation)".utf8)).map { String(format: "%02x", $0) }.joined()
         }
     }
     struct Lease: Codable {

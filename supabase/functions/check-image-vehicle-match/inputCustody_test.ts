@@ -180,7 +180,7 @@ Deno.test("limits can only decrease and duplicate keys or oversized input scopes
   const fetcher = async () => { calls++; return response(); };
   for (const attempt of [
     () => captureVisionInputs([source("query")], { fetch: fetcher, limits: { image_bytes: VISION_INPUT_LIMITS.image_bytes + 1 } }),
-    () => captureVisionInputs([source("query")], { fetch: fetcher, limits: { output_tokens: 1601 } }),
+    () => captureVisionInputs([source("query")], { fetch: fetcher, limits: { output_tokens: VISION_INPUT_LIMITS.output_tokens + 1 } }),
     () => captureVisionInputs([source("query"), source("query")], { fetch: fetcher }),
     () => captureVisionInputs(Array.from({ length: 15 }, (_, i) => source(String(i))), { fetch: fetcher }),
   ]) {
@@ -189,6 +189,17 @@ Deno.test("limits can only decrease and duplicate keys or oversized input scopes
     equal(refused, true);
   }
   equal(calls, 0);
+});
+
+Deno.test("explicit subject output allowance does not change the legacy comparison default", async () => {
+  for (const output of [undefined, 4096]) {
+    let observed = 0;
+    const result = await runPinnedVision([source("query", { required: true })], allParts,
+      async options => { observed = options.maxTokens; return modelResult; },
+      { fetch: async () => response(), ...(output ? { limits: { output_tokens: output } } : {}) });
+    equal(result.refusal, null);
+    equal(observed, output ?? 400);
+  }
 });
 
 Deno.test("repeated parts and duplicate-URL aliases cannot bypass the submitted-byte budget", async () => {

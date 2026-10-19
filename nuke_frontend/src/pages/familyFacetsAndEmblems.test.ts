@@ -184,8 +184,8 @@ describe('familyFacetsAndEmblems', () => {
     const nodes = ['Pickup', 'C10', 'Colorado', 'Avalanche', 'SSR', 'LUV', 'El Camino', 'Corvette', 'Suburban', 'Blazer']
       .map((name) => ({ name, familyKey: name, count: 1, value: 10, usd: 10 }));
     const grouped = consolidateBrandPickupFamilies('Chevrolet', nodes, false)!;
-    expect(grouped.map((n) => n.name).sort()).toEqual(['Truck', 'Corvette', 'Suburban', 'Blazer'].sort());
-    expect(grouped.find((n) => n.name === 'Truck')).toMatchObject({ familyKey: 'Pickup', count: 7, usd: 70 });
+    expect(grouped.map((n) => n.name).sort()).toEqual(['Truck', 'El Camino', 'Corvette', 'Suburban', 'Blazer'].sort());
+    expect(grouped.find((n) => n.name === 'Truck')).toMatchObject({ familyKey: 'Pickup', count: 6, usd: 60 });
     const synonyms = buildFacetNodes('series', 'Chevrolet', 'Truck', [
       { name: 'C10 Truck', count: 2, value: 20 }, { name: 'C10 Pickup', count: 3, value: 30 },
     ], null)!;

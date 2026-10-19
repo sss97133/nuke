@@ -1,4 +1,4 @@
-import { galleryImageId, isVinClash, lotGallery, parseAmount, parseLotPage } from "./lotPage.ts";
+import { estimateCurrency, galleryImageId, isVinClash, lotGallery, parseAmount, parseLotPage } from "./lotPage.ts";
 
 const eq = (a: unknown, b: unknown) => { if (JSON.stringify(a) !== JSON.stringify(b)) throw new Error(`${JSON.stringify(a)} != ${JSON.stringify(b)}`); };
 
@@ -62,4 +62,10 @@ Deno.test("isVinClash recognises the two refusals a held VIN produces, and nothi
   for (const m of ["canceling statement due to statement timeout", 'duplicate key value violates unique constraint "vehicles_discovery_url_key"', null]) {
     if (isVinClash(m)) throw new Error(`false clash: ${m}`);
   }
+});
+
+Deno.test("an unsold Zurich lot keeps CHF from its estimate line; a dollar estimate is USD; no estimate is null", () => {
+  eq(estimateCurrency("<span id='label'>Estimate:</span> <span>CHF 1&#39;100&#39;000 - CHF 1&#39;400&#39;000</span>"), "CHF");
+  eq(estimateCurrency("<span>Estimate:</span><span>$800,000 - $1,000,000</span>"), "USD");
+  eq(estimateCurrency("<p>Lot 12</p>"), null);
 });

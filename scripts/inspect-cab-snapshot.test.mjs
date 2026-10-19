@@ -4,9 +4,42 @@ import { spawnSync } from 'node:child_process';
 import { mkdtempSync, writeFileSync, rmSync, readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { assessCabCapture, requireCabCapture } from './inspect-cab-snapshot.mjs';
+import { assessCabCapture, requireCabCapture, inspectCabLineage } from './inspect-cab-snapshot.mjs';
 
 const row = (id, extra = {}) => ({ id, type: 1, timestamp: '2026-10-18T12:00:00Z', ...extra });
+const lineage = { sourceId: '00000000-0000-4000-8000-000000000001', snapshotId: '00000000-0000-4000-8000-000000000002',
+  auctionId: '00000000-0000-4000-8000-000000000003', url: 'https://db.test', key: 'synthetic' };
+
+test('lineage consumer previews only explicit selectors and never emits original prose', async () => {
+  const result = await inspectCabLineage({ ...lineage, request: async (url, options) => {
+    assert.equal(url, 'https://db.test/functions/v1/ingest-observation');
+    const body = JSON.parse(options.body);
+    assert.equal(body.dry_run, true);
+    assert.equal(body.source_observation_id, lineage.sourceId);
+    assert.equal(Object.keys(body).length, 5);
+    return new Response(JSON.stringify({ success: true, dry_run: true, writes: 0,
+      qualification: { ok: true, source_known_at: '2026-01-01T00:00:02.123456+00:00',
+        input: { kind: 'provenance', content_text: 'SOURCE_PROSE_MUST_NOT_ESCAPE', structured_data: {
+          listing_capture_receipt: { scope: 'attributed_listing_narrative_only' } } } } }));
+  } });
+  assert.equal(result.status, 'qualified_not_admitted');
+  assert.equal(result.writes, 0);
+  assert.equal(result.public_readiness, 'not_assessed');
+  assert(!JSON.stringify(result).includes('SOURCE_PROSE_MUST_NOT_ESCAPE'));
+});
+
+test('stored receipt consumer requires current qualification; unverified and malformed responses stay blocked', async () => {
+  for (const response of [{ ok: false, reason: 'parent_not_public_real_vehicle' }, { ok: true },
+    { ok: true, result_verified: false, input: { structured_data: { listing_capture_receipt: { scope: 'attributed_listing_narrative_only' } } } }]) {
+    const result = await inspectCabLineage({ ...lineage, resultId: lineage.sourceId, request: async (url, options) => {
+      assert.equal(url, 'https://db.test/rest/v1/rpc/qualify_cab_listing_capture');
+      assert.equal(JSON.parse(options.body).p_result, lineage.sourceId);
+      return new Response(JSON.stringify(response));
+    } });
+    assert.equal(result.status, 'blocked');
+  }
+  await assert.rejects(inspectCabLineage({ ...lineage, sourceId: 'invalid', request: () => assert.fail('no request for invalid selector') }));
+});
 function input(items = [row('comment'), row('bid', { type: 2, amount: 12000 })]) {
   return {
     auctionId: 'lot-1',

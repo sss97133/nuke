@@ -125,7 +125,7 @@ In addition to the card's list:
 | C4 | Soft-close fold for every closed lot | 400-lot sample: 80% extend; 39% of bids in chains; median +25% price made in chain | open | yes | read-only chain function; batch fold per closed lot as-of its close; bidder record as-of date keyed to `external_identities` |
 | C5 | `hours_until_close` defect | 73% wrong; 98.8% right since 09-27 | **closed for the reader** 2f48581f4 (20261001000200): `live_lot_temperature` keys comparables on `auction_events.auction_end_date` (else the vehicle's clocked end) minus `posted_at`; lots with no defensible close are not counted (`lots_without_close`). SL500 cohort before: the "bid at 2 h" equalled the final bid on 179 of 312 lots (median 20 bids by 2 h); after: 7 of 183 (median 6). Live lot 99fcbbd4: above 157 of 182 sold comparables, 101 lots without a close, 0.78 s as anon. The column itself is still wrong: a recompute or view is a separate case | yes | the column: recompute from `auction_events` in batches, or a view; never trust it |
 | C6 | Identity keys half filled | 2026-10-02 08:17Z: latest 10,000 comments, 9,971 identifiable, 7,960 missing keys; 6,905 missing keys match existing exact identities. At 12:11Z: all 187/187 identifiable arrivals since deployment linked, 0 mismatches, 0 missing vehicle/event links (10,000-row cap; arrivals 08:25–12:11Z). | open — fresh writer verified | yes | `e96ba7f02`: shared bounded identity resolver in core reader + archive loader, deployed `extract-bat-core` v155 via [CI](https://github.com/sss97133/nuke/actions/runs/36983740279). Re-measure with `node scripts/check-comment-linkage.ts --since 2026-10-02T08:24:02.906Z`. Historical rows untouched; historical repair through sanctioned supersession, listing/event identities and `bat_users` retirement remain. |
-| C7 | `platform_source` NULL on every new vehicle | 55,507 in 7 days | **writers fixed** 567bf9b0d: extract-bat-core stamps `bringatrailer` on insert and fills it on update; ingest maps its platform to `source_registry.slug` (the platform entity exists: slug matches the column's main values). Measured 10-01: 56,243 of 58,566 rows created 09-24..10-01 NULL (45,612 BaT, 9,963 Craigslist); 10 of 1,227 live BaT lots NULL and so unscheduled by the live pull. **Backfilled** 4191be659 (`backfill_vehicle_platform_source`, cron 512, self-retiring): NULL on vehicles created since 09-24 went 56,243 → 217 (59,549 filled) in 60 runs 08:12Z–10:10Z (2 hit the 50 s timeout), then the job turned itself off; the 217 are hosts outside the map. (PR #498 closed: merging is agent work, not the owner's.) Tested live 10-01 ~09:30Z: a Facebook Marketplace listing (1993 Land Cruiser FZJ80, item 1081313484286582, $9,500, 266,000 mi, Moreno Valley CA) sent through the `ingest` edge function with the service key landed as vehicle 6044cfee with `platform_source = facebook_marketplace`, anon-visible. Found: fan-out 1 (one `marketplace_listings` row); 0 `vehicle_observations`, 0 `vehicle_events`, 0 `vehicle_images`: the ingest writer makes an entity and a blip but no event in the log (§2.3 again). The Nuke MCP connector returned 401 (not a JWT), the wall the Opus session also hit | yes | a `NOT VALID` key to `source_registry.slug` once `unknown`, `facebook_marketplace`, `classiccars`, `bonhams` have registry rows |
+| C7 | `platform_source` NULL on every new vehicle | 55,507 in 7 days | **writers fixed** 567bf9b0d: extract-bat-core stamps `bringatrailer` on insert and fills it on update; ingest maps its platform to `source_registry.slug` (the platform entity exists: slug matches the column's main values). Measured 10-01: 56,243 of 58,566 rows created 09-24..10-01 NULL (45,612 BaT, 9,963 Craigslist); 10 of 1,227 live BaT lots NULL and so unscheduled by the live pull. **Backfilled** 4191be659 (`backfill_vehicle_platform_source`, cron 512, self-retiring): NULL on vehicles created since 09-24 went 56,243 → 217 (59,549 filled) in 60 runs 08:12Z–10:10Z (2 hit the 50 s timeout), then the job turned itself off; the 217 are hosts outside the map. (PR #498 closed: merging is agent work, not the owner's.) Tested live 10-01 ~09:30Z: a Facebook Marketplace listing (1993 Land Cruiser FZJ80, item 1081313484286582, $9,500, 266,000 mi, Moreno Valley CA) sent through the `ingest` edge function with the service key landed as vehicle 6044cfee with `platform_source = facebook_marketplace`, anon-visible. Found: fan-out 1 (one `marketplace_listings` row); 0 `vehicle_observations`, 0 `vehicle_events`, 0 `vehicle_images`: the ingest writer makes an entity and a blip but no event in the log (§2.3 again). The Nuke MCP connector returned 401 (not a JWT), the wall the Opus session also hit | yes | a `NOT VALID` key to the platform entity `observation_sources(slug)` (declared 20261007233000), not `source_registry.slug`, once the writers' spellings have entity rows (2026-10-14: 285,417 of 570,508 non-null public values, 50.0%, matched an entity slug; `bringatrailer` alone is 210,828). Steps proposed: the `source_registry.observation_source_id` bridge fill (3 of 97 filled; #1251), the alias rows (the #798 proposals, #1246), and the resolver fix (#1253). The sale-provenance writer also writes non-platform values into this column (memo #1500) |
 | C8 | Place is not an entity | 13 location columns; `geocoding_cache` 26K idle | **declared at county grain** 2026-10-07 (migration 20261007210000, memo `docs/proposals/2026-10-07-place-entity.md`): `us_county_boundaries` (3,231 counties) is the place entity; `vehicle_location_observations.county_fips` and `zip_to_fips.fips` key to it (NOT VALID). County coding had stopped in 2026-04 (0 of 207,324 rows since carried a code): migration 20261007213000 keys `county_fips` at insert from the postal code through `zip_to_fips` (trigger `trg_key_vehicle_location_county`, ZIP grain, method in `metadata.county_key`) and back-fills the 183,478 eligible rows through `key_vehicle_location_county_from_zip()` (receipted). Still open: state → region levels; non-US places; the 3,244 `_none` rows and 244 retired ZIP codes | yes | a state level when a reader needs it; the per-county residual fold for S01 |
 | C9 | Comparables too narrow for half the lots | 6 of 12 lots closing within 10 min had < 8 same-model comparables | open | yes | widen model → make → department per `TEMPERATURE_PLAN.md`; store level and n |
 | C10 | Two truths for the sale of record | §2.7 | open | yes | every cohort reader goes through `vehicle_sale_basis()`; `canonical_sold_price` nulled on live lots through the chokepoint |
@@ -422,6 +422,68 @@ admission and existing binding owners before extending that path. Original sourc
 capture identity, disagreement, withdrawal and anonymous-reader behavior must be proved together;
 adding a pointer alone does not close the case. Current stage: local implementation and focused tests;
 publication/deployment evidence belongs in the private lane receipt.
+
+The October 18 observation-load replay uses one retained C&B page and the live observation-index
+definition in disposable PostgreSQL 17. The old writer returns no observation ID and a contained
+error: its 6,808-byte index row exceeds the 2,704-byte limit. Compact fields occupy 1,380 bytes;
+full text stays in `content_text` and import metadata in `extraction_metadata.raw`. Opt-in raw-data
+hashing retains materially different evidence in dedup while existing callers keep their old hash.
+The source capture clock stays separate from database ingest time. A caller must await the writer,
+inspect its errors, and read back the same source, vehicle, clock and evidence on an unsuperseded
+row; a duplicate ID alone is insufficient. The local replay proves admission, identical-input dedup
+and supersession refusal, with registry/provenance branches isolated. Earlier vehicle writes are
+separate and are not rolled back by an observation failure. Production delivery, full intake/RLS,
+typed capture bindings and fleet coverage remain separate evidence in the private ETL receipt.
+The next private PG17 counterexample changes only the stored clock by one microsecond. JavaScript
+millisecond equality falsely accepts it; the readback must also constrain `observed_at` through
+PostgreSQL's native timestamp equality. That refuses the different instant while accepting equivalent
+time-zone representations. This is a local receipt-verification assay, not evidence of production
+clock corruption or a new production admission; exact deployment/runtime stages stay in the receipt.
+An independent collector replay uses a qualified retained response and rejects its snapshot insert.
+The old archive phase ignores the database error and proceeds toward the model with no saved capture.
+Archive lookup errors, rejected inserts and missing persisted IDs must stop that attempt. Dedup and
+unique-key races qualify only the exact successful platform/URL/content-hash tuple; an unsuccessful
+capture is not promoted or overwritten. This preserves the existing pre-write capture guard and
+does not repair source pagination. Script availability, collector activation and full source-to-reader
+acceptance remain separate stages in the private receipt.
+
+**Next loop, staged 2026-10-18: explicit listing-capture custody.** The prospective
+`cab_listing_capture_v1` mode in the existing `ingest-observation` accepts only an original
+observation, retained snapshot and canonical auction-lot selector, with explicit dry-run. Its
+database qualifier independently checks inline UTF8 SHA, case-sensitive source auction ID,
+same attributed parent/source, exact reconstructed listing narrative and microsecond clocks.
+Both existing source guards must admit the exact derived tuple under locks. A separate sparse
+`provenance` receipt keys the original observation, capture and presentation; the original remains
+unchanged. It asserts narrative provenance only: no copied specification, sale, independent
+corroboration or physical identity verification. Receipt ingestion establishes when that
+binding was recorded; it does not reconstruct historical native identity availability.
+
+The existing inspector's `--lineage <original> <snapshot> <presentation>` previews without writes;
+`--result <receipt>` requalifies stored custody through the same service-only qualifier. Withdrawal,
+privacy or changed source evidence withholds verification. No public grants, collection, queue,
+source activation or historical replay are added. Local tests combine the actual canonical handler,
+PostgreSQL admission, current receipt reader and two-session mutation controls. Three explicitly
+selected retained tuples are rehearsed offline; this is
+not production admission, actual anonymous privacy acceptance or a fleet readiness numerator.
+Full retained/eligible populations and net public supported-answer gain remain unassessed.
+The production schema/admission change remains a held draft until separately authorized; do not
+treat implementation, local tests or source-selector previews as a deployed repair. The existing
+observation visibility predicate withholds `provenance`; this internal receipt must not become a
+second public listing. The source's existing listing capability qualifies its retained parent;
+this guarded derivation does not declare a new publisher-provided provenance capability.
+
+The first authorized live attempt qualified all three selectors but admitted none: the existing
+market/media guard also requires sale context for an auction FK. The local fixture had omitted that
+guard. The follow-up fixture now reproduces the refusal with its actual function and both triggers;
+the narrow repair independently requalifies the exact protected narrative receipt, excludes media
+citations, and preserves legacy sale/chassis checks and both source-custody guards. A passing
+qualifier remains distinct from a successful canonical write and current stored-receipt readback.
+
+The typed relationship uses the existing `auction_event_id` FK, shared with the lot interaction
+log. It leaves `source_vehicle_event_id` NULL: that pointer would make native-state replacement
+refuse under existing sanctioned episode supersession. The local counterexample replaces the
+native state while the auction-lot/capture receipt remains verifiable; no correction owner or
+public policy is weakened.
 
 ## 7. Hypotheses the owner wants tested as veins (in the vocabulary)
 
@@ -1328,6 +1390,138 @@ Delivery stages and before/after anonymous reader evidence belong in the operato
 not production completion. Remaining work includes other catalog candidate families, the differing
 normalizer year/null rules and the independent 1D sale/capture admission defect. Existing GM truck
 hierarchy decisions are outside this repair and remain intact.
+
+### Year-price correction rebuild follow-up prepared, 2026-10-18
+
+PR2074's catalog correction deployed; names, market, sales and movers rebuilt, with anonymous
+Frontera/Pursang separation and unchanged source rows and two-brand count/dollar totals. The
+existing year-price refresh was canceled twice when Realtime slot creation waited on its long
+transaction. A later wait belonged to a separate pg_net worker; unrelated sessions were preserved.
+This is an operational failure of the rebuild, not a completed year-price correction.
+
+A read-only, one-snapshot Bultaco/Suzuki replay of the year-price query returned 716 rows on both
+sides, with zero differences under EXCEPT ALL in both directions. Materializing the existing named
+and conflict stages reduced cohort execution from 4,893.630ms to 1,569.982ms. The original conflict
+subplan ran 825 times for each of ten aggregates; the candidate evaluates it once per eligible row.
+This fixed cohort is a performance/equality assay, not full-build timing or fleet readiness.
+
+The prepared migration creates only a private, unpopulated beside copy from the live definition,
+adding those two evaluation fences and the same indexes. The populated view, public grants and
+cron remain unchanged. The PG17 contract reuses the existing sold/ask, privacy, conflict, year-window,
+platform-pooling, odometer and percentile fixtures and checks exact output multiplicity (excluding
+only the rebuild clock). Build and reviewed rename cutover remain separate delivery stages.
+The private-copy preparation subsequently deployed through PR2082. Its first full build completed
+in 79.5s under the operator's 120s ceiling, producing 101,347 rows. The 716-row corrected cohort
+matched the independently evaluated reference digest exactly. Frontera contributes 22 sold-year
+rows with at most eight pooled prices; every row remains thin and withholds percentiles. These are
+model-year aggregate rows, not physical vehicles. A separate guarded activation migration is prepared;
+it preserves role privileges, retains the old populated fold privately, refuses new tracked consumers
+or semantic drift, and leaves the existing refresh owner and schedule intact. Activation is not yet
+claimed here; exact checked/deployed/runtime stages remain in the private receipt.
+Receipts: `~/nuke-logs/model-year-refresh-20261018/`. No third unchanged refresh, Realtime access
+change, capacity increase, raw testimony mutation or new recurring job is part of this repair.
+
+### Fiat model identity and intake matching prepared, 2026-10-19 UTC
+
+The earlier full stored-vehicle reference remains the October18 atlas estimate of1,248,544 rows;
+current exact public/eligible and affected-fleet denominators are not measured. This next validation
+cohort is all973 retained Fiat name rows representing4,133 dictionary record rows, not verified
+physical vehicles or newly ready answers.94 name rows/367 represented records explicitly naming
+nine other models were in500;850 source examples were inX1/9. Retained Panda/850 native headlines
+agree with those model claims. Original source rows and physical identity uncertainty remain intact.
+
+Two catalog rows are narrowed and ten source-supported names use the existing canonical_models
+owner. References are Fiat's official history, Stellantis Heritage's1100/128/130/131/barchetta
+accounts and Giugiaro's850 Spider portfolio. Fiat's history explicitly identifies Topolino as500,
+so that alias is retained. Unassessed coachbuilder/generic tokens remain unresolved. In the complete
+retained-name replay,594 represented records rebind, none become newly bound, and370 formerly forced
+bindings become unresolved; all973 names/4,133 represented records survive. These are classification
+changes, not a fleet-readiness gain. New production ranges remain unknown.
+
+The native normalize_vehicle_model owner also ranked generic Spider above the specific850 alias
+because it sorted display-name length. It treated NULL year starts as exclusion and could match130
+inside1300. The prepared fix ranks the actual literal alias, preserves numeric boundaries, admits
+unknown bounds while respecting explicit limits, and leaves exact-match confidence semantics intact.
+GM truck, unqualified and wildcard-make lookup paths retain their prior rules. An initial generic
+candidate changed K1500 Silverado toSilverado; the final scoped candidate preserves all19 controls
+from the current273-row GM catalog. No GM catalog or market-family rule changes are included.
+The same-corrected-catalog Fiat name-only diagnostic changes45 names/116 represented records under
+the new normalizer; that diagnostic has no independent correctness or fleet-readiness interpretation.
+
+The actual PostgreSQL contract has33 assertions, including source/count/dollar preservation,
+Topolino/X1/9 controls, public Panda sales, old-fit withholding, explicit-year refusal, earlier
+Bultaco/Suzuki cases, literal wildcard/numeric negatives and unchanged functionOID/owner/grants.
+A real concurrent owner edit is refused before catalog writes and remains preserved. No Fiat
+make_model_profiles rows were present. The prior500 fit/series is retained privately and withheld
+through record_family_price_index; qualified new fitting remains separate. The legacy normalize_model
+location/casing path and physical scalar backfills remain outside this patch. Delivery is prepared
+and locally tested here; checked merge, CI deployment, dependent folds and anonymous runtime evidence
+belong in ~/nuke-logs/model-identity-fiat-20261018/.
+
+### Daily sold movement excludes asking captures, prepared 2026-10-19 UTC
+
+The broader identity investigation found a second measurement error in the current
+family_share_movers_build(integer,integer,text) owner: its live 1D branch unions Facebook
+capture/asking rows into confirmed sold vehicle_events. The capture clock is not a sale clock,
+and a classified status or asking amount supplies neither a confirmed outcome nor sale price.
+A bounded current read found982 captures in48 hours, none with parsed_make, so this admission
+path is presently latent; it does not establish contamination of today's displayed counts.
+No fleet-wide public/eligible denominator or readiness gain is claimed.
+
+The prepared repair removes only that union and its temporary capture load. Synthetic acceptance
+first reproduces10 confirmed Ford sales plus2 asks becoming12, then proves10 sales and the exact
+sold-dollar totals,11 Ford sale bins across both windows, unchanged other7 horizons, original
+function identity/owner/ACL, preserved source rows and supporting Facebook supply, and unchanged
+low-volume fallback. Capture recency, amount and even a classified sold label cannot change the
+confirmed-sale measure. A strict whole-definition guard refuses concurrent owner edits.
+Existing upcoming capture-date semantics remain a separate gap; this repair does not certify
+those dates or restart held Facebook intake. Exact checked/deployed/runtime stages belong in
+~/nuke-logs/model-movers-sold-20261019/.
+
+### Lotus catch-all aliases corrected, prepared 2026-10-19 UTC
+
+The next concrete source-to-reader failure is a retained Climax Eleven headline grouped as Seven.
+The bounded population is727 retained Lotus names representing2,939 dictionary records; these are
+classification inputs, not verified physical assets or a fleet-readiness denominator. Lotus's
+own Seven/Eleven/2-Eleven/3-Eleven histories establish distinct model identities. Two catalog rows
+are narrowed, the dedicated2-Eleven alias row's generic Elise label is corrected, and3-Eleven is
+added through canonical_models. Existing340R/Elise membership remains: Lotus explicitly names the
+car Elise340R. Generic engines, unrelated types and unassessed replicas are retained unresolved.
+Superseded labels/aliases remain in notes; source testimony is unchanged. No saved fits or profiles
+were present for the affected keys at preparation time; the existing fit writer remains the
+invalidation path if any appear before deployment.
+
+Twelve synthetic names exercise actual folds/intake with count/dollar/source preservation and
+idempotent migration application. Production acceptance returns to the two exact retained source
+vehicles and their public sales groups, alongside conserved Lotus totals. This is a shipped repair
+only once checked merge, CI deployment, fold rebuilds and anonymous runtime checks are recorded in
+~/nuke-logs/model-identity-lotus-20261019/. Other catalog candidates are not certified by this slice.
+
+### Civic identity admission corrected, prepared 2026-10-19 UTC
+
+The next bounded repair starts with retained City and Legend presentations incorrectly returned
+as Civic. The current Civic name bucket contains195 names representing1,873 dictionary records;
+these are classification inputs, not physical-asset or fleet-readiness counts. Honda's own Civic,
+City and Legend histories establish their distinct model identities. The Civic reference contains
+15 unrelated/generic aliases, including the single letter s. Remove those broad admissions, retain
+the eight Civic aliases, add City/Legend through canonical_models, and keep unassessed names
+unresolved. Source labels, bundle descriptions and superseded reference aliases remain intact.
+No claim that a City/Motocompo bundle is a single physical vehicle is introduced.
+
+Twelve actual-fold/intake cases cover City/Legend, valid Civic variants, existing Acty/S2000/Accord,
+and generic or unassessed negatives. Source rows and aggregate sale counts/dollars are conserved.
+One saved Civic fit is retained privately and withheld through record_family_price_index until
+qualified refitting; no affected registered profile was found. Acceptance must return to the
+exact retained City/Legend vehicles through the public reader after deployment and view rebuilds.
+Exact stages and private receipts belong in ~/nuke-logs/model-identity-honda-civic-20261019/.
+
+The preceding Lotus repair is now deployed and runtime-verified (PR2097). Its runtime dependency
+check also found one saved composite Elise fit beyond the three directly revised catalog keys;
+that fit was preserved privately and withheld through its sanctioned writer. Original specimens
+from2006/2015 were checked through the public historical fold, and the chart's intentional five-year
+window was checked separately. Saved-fit checks must include composite families losing members,
+not only edited catalog IDs. The public535-row Lotus year-price result matched its bounded
+independent reference. This closes that repair, not a full-catalog certification.
 
 ## 13. Aspiration: twenty stacks the model must be able to carry (owner, 2026-10-06)
 
@@ -2626,3 +2820,130 @@ board) is the only input until the on-demand Analyze path exists. Venue: a class
 measures venue and condition, which is why the ask-vs-asks position leads and the sale position follows. Facebook
 classified listings do not reach the board (no vehicle binding since 10-13). Craigslist exits accrue at the revisit
 sweep's rate (5 posts per 15-minute run). Mileage is not yet a feature.
+
+### Work-order resource evidence — owner direction and executable first slice, 2026-10-19
+
+Owner direction: build the data model beneath inspection, job planning, provider tools,
+shared facilities, scoped sign-offs and contributions. Historical messages, images,
+receipts, invoices and payments are retained evidence for reconstructing real jobs;
+their full linked population and replay coverage have not been measured. A missing
+resource should permit alternative supplying arrangements rather than disqualifying
+the performing mechanic automatically. Ownership, access, capability, availability,
+approval and compensation are separate relationships.
+
+The live atlas and column inspection found existing owners in work_orders,
+work_order_line_items, work_order_assignments, user_tools, tool_inventory, equipment,
+organizations, actor_capabilities and the observation logs. A tool verification boolean
+does not carry a scoped attestation; an assignment's payout fields do not establish an
+equipment reservation. The resource relations did not exist at inspection.
+
+The implementation in migration `20261019005027_work_order_resource_evidence.sql`
+adds three private typed indexes of existing work_record testimony: operation requirements,
+candidate resource arrangements, and reported scoped attestations. Source IDs key every
+row; no raw source writer or duplicated identity/invoice/payment ledger is introduced.
+The service-only projector validates the source and same-job relationships. The service-only
+reader excludes superseded/reattributed source chains and keeps unknown coverage explicit.
+Details and payload contract: `docs/library/technical/work-order-intelligence.md`.
+
+Acceptance is the actual migration on disposable PG17: personal-tool and shop alternatives,
+source-to-graph reads, duplicate replay, cross-order/source/type refusals, immutable projections,
+withdrawal/reattribution propagation and anonymous/authenticated access refusals. This tests
+the supplied cases; it does not measure historical-job coverage or certify physical work.
+Provider authority, authenticated sign-off, reservations and conflicts, compensation settlement,
+historical replay, end-user exposure and historical source reconstruction remain to implement.
+No empty or populated graph declares a booking ready. Deployment is a separate stage and must
+be checked against the live function and relation definitions after the normal CI release.
+
+
+Historical resource reconstruction follow-up (2026-10-19): bounded retained-message
+inspection found explicit work requirements without resource quantities, and legacy
+message observations lacking source_id. Migration `20261019013808_work_resource_retained_basis.sql`
+allows a paired unknown quantity/unit and links interpretations to the original observation
+and exact excerpt. Admission preserves the original clock, validates same-vehicle custody,
+and refuses nested resource interpretations. Original withdrawal/reattribution propagates
+through current reads and duplicate projections; the original testimony is untouched.
+The disposable contract covers these cases and private source visibility remains unchanged.
+A selected historical case is validation scope; neither its requirements nor the complete
+historical-job population has been exhaustively enumerated. No candidate, permission,
+booking readiness, reservation or payment is inferred from these requirement records.
+
+Participant follow-up (2026-10-19): inspection of actors, actor_capabilities, technicians,
+assignments and identity bridges found a canonical actor reference on a selected retained
+operation, but no supported account bridge or proof of qualification. Migration
+`20261019030510_work_resource_actor_candidates.sql` extends the existing fulfillment
+owner with an actor alternative for skill/inspection and an optional exact operation
+snapshot. The supplier remains separate and can be unknown. Existing internal-inference
+intake identifies derived evidence; it does not impersonate a provider. Changed operation
+bases withhold current descendants without deleting history. The reader carries method,
+confidence and unresolved source interpretation, including process disagreements.
+Disposable PG17 exercises participant alternatives, inspection, type/identity refusals,
+snapshot custody, stale-basis propagation and the unchanged private access boundary.
+This selected case does not establish broader historical coverage, accepted terms,
+authenticated approval, capacity reservation, completion or payment accounting.
+
+Image-object connection (2026-10-19): owner emphasized every background object occurrence,
+entity endpoints, separate cost/value claims and the eventual calculation of labor value.
+Live inspection found retained canonical tool/component arrays, an equipment ledger and
+legacy per-image equipment evidence. Old cascade code resolves names globally and can
+convert photo visibility into estimated minutes; those claims cannot be silently treated
+as measured use or a physical-instance identity. Migration
+`20261019031934_work_order_image_objects.sql` adds a private bounded job-context reader
+over existing observations, preserving source pointers, repeated appearances and clocks.
+It joins existing image/equipment associations while separating recorded purchase cost,
+computed depreciation value and unknown market/job/labor values. Current source and image
+qualification gates apply. The disposable PG17 contract covers custody, pagination,
+malformed evidence, privacy and refusal to accrue usage/value. This connects retained
+evidence without a new observation ledger, photo processing, paid inference or canonical
+asset minting. Full image coverage and a physical-object identity resolver remain unmeasured
+and unimplemented respectively; vehicle context does not establish operation usage.
+
+Work-specification connection (2026-10-19): owner direction that material and process belong
+together in the work specification, not in a free-standing provider qualification judgment.
+Live inspection of the selected case found three disagreeing accounts already retained: the
+requested scope quote, installed part records (graded and ungraded stainless, a stainless TIG
+filler) and the operation's component event (mild steel with MIG). Parts carry no typed
+operation link, and cost subsets matching the operation total were not unique, so part
+supply cannot be assigned to an operation by inference. Migration
+`20261019035407_work_order_resource_specifications.sql` adds a `specification` event to the
+existing resource projector and an immutable private table. Each claim records a stage, role,
+verbatim labels and dotted interpretation keys; its basis is a retained excerpt or an exact
+component-event or part row snapshot. The existing reader compares requested pairs with
+current claims by role and key and reports a conflict without adjudicating substitution,
+qualification or completion. Changed, withdrawn or reattributed bases withhold claims; history
+remains. Disposable PG17 covers 57 specification cases and reruns the 88 existing resource
+assertions against the new projector. This is one selected case; the specification population
+of other jobs is not assessed, and accepted scope changes, measured usage, completion and
+compensation remain open.
+
+Mechanics RSI pass 1, job-path scoreboard (2026-10-19): owner direction "rsi" applies the
+measure → largest closable gap → migration + PG17 → re-measure loop to the mechanics job path.
+The job path had no self-measurement. Migration `20261019045753_work_order_job_path.sql`
+adds a private read-only reader per work order and a population scoreboard over existing
+owners, reporting stage states, gaps and status/clock/record inconsistencies without repair.
+Before (live, 2026-10-19 04:56 UTC, denominator all 26 work_orders rows): 22 vehicle-bound;
+operations itemized on 2; resource requirements on 2 and specifications on 1; installed parts
+on 2, parts with an operation code on 1; assignments on 1 (9 rows, none with an accept clock);
+labor rows on 3; start clocks 5; completion clocks 7 against 10 done/paid statuses; payment
+records on 3, including one without a vehicle; a paid status with no payment record; 15
+vehicle-scoped payment events with no job attribution; no approval clock and no payout record
+anywhere. Next passes take the largest gap the retained evidence can close; readiness,
+acceptance, usage and labor value stay unassessed until evidence supports them.
+
+Mechanics RSI pass 2, requested operations (2026-10-19): the pass 1 scoreboard's largest gap was
+`no_operations`, 24 of 26 work orders. Retained evidence for those 24 is mostly prose summary;
+one quoted work order itemizes its scope line by line, and one completed order holds labor-task
+rows the scoreboard did not count. The operations owner, `work_order_line_items`, had no
+provenance or sanctioned insert path, and billing reads only priced lines. Migration
+`20261019051336_work_order_scope_operations.sql` adds provenance to that owner and an `operation`
+projection that quotes the work order's own text verbatim into pending, unpriced, unassigned
+line items. A guard keeps sourced text and provenance immutable while parties keep editing status.
+The job path now counts labor-task evidence and reports withdrawn or stale sources. Disposable
+PG17 covers 27 cases and reruns the 25 + 57 + 88 earlier mechanics assertions. Prose-only scopes
+remain unitemized; splitting comma lists is a later, separately evidenced pass.
+
+A job is a future receipt (2026-10-19): the mechanics slices above are read together as one
+model. A receipt is a computed conclusion over reconciled witnesses; a job is the same graph
+before conclusion, each stage a receipt line closed by a named witness, clock and signer.
+The stage-to-line table, invariants, fourteen-agreement inventory with holders and gaps,
+adopted owner-overridable defaults, listing-to-inspection pipeline and explainable matching
+join live in `docs/library/technical/work-order-intelligence.md` § "A job is a future receipt".

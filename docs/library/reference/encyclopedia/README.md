@@ -351,6 +351,17 @@ This is the direct analog of vehicle restoration records. "Would you rather have
 
 ## Section 5: Market Layer
 
+### Truck navigation (owner, 2026-10-18)
+
+Chevrolet/GMC Truck browsing separates the selected population from its arrangement.
+An attribute partitions that population into exclusive groups; selecting a group intersects
+filters, and regrouping preserves them. Drivetrain is the initial arrangement. Original
+recorded series, current configuration, nominal series class, wheelbase, bed, cab/body,
+trim and model year remain separate meanings. Unknown attributes are retained, and later
+conversions do not establish configuration at an earlier sale. El Camino/Caballero remain
+outside Truck. See the [interaction contract](../../technical/design-book/03-interactions.md#truck-market-partitions-owner-2026-10-18)
+and the indexed implementation; deployment evidence is recorded separately.
+
 ### `auction_results` — Unified Across Domains
 
 The same table structure handles vehicle auctions (BaT, Mecum, Barrett-Jackson) and art auctions (Christie's, Sotheby's, Phillips). The asset_id links to the unified asset layer.

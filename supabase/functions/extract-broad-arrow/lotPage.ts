@@ -71,6 +71,14 @@ export function parseAmount(raw: string): number | null {
   return Number.isFinite(n) && n > 0 ? Math.round(n) : null;
 }
 
+/** The currency of the page's "Estimate:" amounts (an unsold lot has no "Sold Price:" token), or null. */
+export function estimateCurrency(html: string): string | null {
+  const m = textOf(html).match(/Estimate:?\s*(CHF|USD|EUR|GBP|[$€£])/i);
+  if (!m) return null;
+  const t = m[1].toUpperCase();
+  return t === "$" ? "USD" : t === "€" ? "EUR" : t === "£" ? "GBP" : t;
+}
+
 export function parseLotPage(html: string): BroadArrowLot {
   const titleRaw = decode(html.match(/<title[^>]*>([\s\S]*?)<\/title>/i)?.[1] ?? "").replace(/\s+/g, " ").trim();
   const parts = titleRaw.split(" | ").map((p) => p.trim());

@@ -47,6 +47,14 @@ broader browsing-family member are different relationships. Binding more names t
 does not establish identity accuracy; preserve unresolved names and the make-level market context.
 An alias correction must revisit its materialized groups, saved price fits, normalizers and cohorts,
 not merely replace the label printed by one consumer.
+For enabled intake matching, aliases are literal references, adjacent digits keep distinct model
+codes apart, and specificity comes from the alias that matched. Unknown reference-year bounds are
+not a contradiction; explicit bounds still exclude a supplied year. Normalization confidence is a
+mapping score, not physical-vehicle verification. Record held lookup paths and legacy callers that
+have not adopted the repair, rather than claiming all-model or all-reader completion.
+A long corrective fold must also preserve reader availability and replication. Diagnose repeated
+blocking before retrying; compare identical source snapshots and output multiplicity when caching
+repeated expressions. Preparing a private copy is not a completed build or a reader cutover.
 
 Every claimed correction loop needs a plausible wrong interpretation, later discriminating evidence,
 the same source-to-consumer assay and an unaffected counterexample. Contradiction may correctly withhold
@@ -114,6 +122,10 @@ tables and captured batches are processing diagnostics. None is a public-readine
 | Follow presentations, asking prices and history | Publicly eligible presentation/episode × question; include single-sighting episodes | Correct source/episode keys, original price/unit witnesses and ordered source/processing clocks reach the reader. Repeats are idempotent. One sighting yields one observation; duration needs its declared evidence. Observed span is a lower bound, disappearance is not a sale, and an earlier state excludes later evidence. |
 | Compare examples and read market movement | Declared subject × comparison question, plus its candidate episode population | Reader returns qualifying members, exclusions, unresolved candidates, source/window coverage and matching rules. Amounts, currencies, asking prices, bids and sale outcomes remain distinct. A qualified measure requires the stated evidence and uncertainty; a browse group alone is insufficient. |
 | Use a derived assessment or forecast | Eligible subject × versioned question × cutoff | Inputs and calculation are replayable; held-out evaluation against the declared baseline establishes the method's error/calibration in its intended population. Unsupported assessments stay unavailable. Shipping basic exploration does not certify an unvalidated forecast. |
+
+A confirmed-sale movement fold must admit sale outcomes on their sale clocks. A classified
+capture, asking amount or disappearance cannot enter its sale count, sold-dollar sum or sparkline;
+keep those observations available through their presentation and supply readers.
 
 These are separate capabilities with separate gates. Do not average them into a completeness
 score. A record can support attributed inspection while its valuation is blocked. An unresolved
