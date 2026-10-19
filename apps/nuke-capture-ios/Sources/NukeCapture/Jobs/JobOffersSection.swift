@@ -41,19 +41,19 @@ struct JobOffersSection: View {
                 if let failure { Text(failure).font(.footnote).foregroundStyle(.secondary) }
             }
         } header: {
-            // Sheets hang off the header: modifiers on list content fan out to every row.
             Text("Offers")
-                .sheet(item: $offering) { box in
-                    OfferSheet(action: box.action, requirementTitle: box.title) { onChanged?() }
-                }
-                .sheet(item: $accepting) { box in
-                    AcceptOfferSheet(action: box.action, offer: box.offer, requirementTitle: box.title) { onChanged?() }
-                }
-                .sheet(item: $cosigning) { box in
-                    CosignSheet(action: box.action, technician: box.offer.who, requestTitle: box.title) { onChanged?() }
-                }
         } footer: {
             Text("Offer prices are open to everyone. Nothing is booked or paid until the customer accepts.")
+        }
+        // Presented from the job page's list: a header scrolled out of view can't host a sheet.
+        .jobSheet(item: $offering) { box in
+            OfferSheet(action: box.action, requirementTitle: box.title) { onChanged?() }
+        }
+        .jobSheet(item: $accepting) { box in
+            AcceptOfferSheet(action: box.action, offer: box.offer, requirementTitle: box.title) { onChanged?() }
+        }
+        .jobSheet(item: $cosigning) { box in
+            CosignSheet(action: box.action, technician: box.offer.who, requestTitle: box.title) { onChanged?() }
         }
     }
 

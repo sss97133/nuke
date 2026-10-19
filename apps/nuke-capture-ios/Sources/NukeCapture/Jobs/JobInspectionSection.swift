@@ -42,7 +42,7 @@ struct JobInspectionSection: View {
                     Text("Findings are what the inspector recorded, signed through Nuke. No payment is authorized here.")
                 }
             } }
-            .sheet(item: $step) { s in
+            .jobSheet(item: $step) { s in
                 switch s.kind {
                 case .findings: RecordFindingsSheet(action: s.action, doc: s.doc, onDone: onSigned)
                 case .grant: GrantInspectionAccessSheet(action: s.action, doc: s.doc, onDone: onSigned)
