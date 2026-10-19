@@ -1,6 +1,6 @@
 import { observationClockMicroseconds as clock } from "../_shared/observationContentHash.ts";
 import { qualifySubjectSource, readSubjectProfiles, type SubjectProfile } from "./subjectReader.ts";
-import { SUBJECT_METHOD } from "./subjects.ts";
+import { captureRelation, SUBJECT_METHOD } from "./subjects.ts";
 import { loadSourceIdentities, sourceAliases, sourceRoot, sourceIdentityLineage } from "./sourceIdentity.ts";
 import { hydrateSubjectPrivacy, subjectPrivacyLookupComplete } from "./subjectPrivacy.ts";
 import { lineageReadingAfterWithdrawals } from "./sourceLineage.ts";
@@ -13,8 +13,8 @@ type ContextRole = "supported_anchor" | "unresolved_exterior";
 export interface ResolutionContext {
   image_ids: string[];
   coverage: { assessed: number; eligible: number; excluded: number; truncated: boolean; as_of: string;
-    context_available: boolean; fresh_batch_size: 1 | 2;
-    selected: Array<{ image_id: string; role: ContextRole; basis: "bounded_least_co_read" }>;
+    context_available: boolean; fresh_batch_size: 1 | 2; capture_neighbor_first?: boolean;
+    selected: Array<{ image_id: string; role: ContextRole; basis: "bounded_least_co_read" | "capture_proximity" }>;
     source_lookup?: Record<string, unknown>;
     scope: "latest_24_supported_subjects_and_32_retained_frames"; global_novelty_asserted: false };
 }
@@ -115,7 +115,14 @@ export function projectResolutionContext(userId: string, freshImageId: string, s
     rotation(freshImageId, a) - rotation(freshImageId, b) || a.localeCompare(b);
   const anchors = [...pool.keys()].filter(id => pool.get(id) === "supported_anchor").sort(rank);
   const unresolved = [...pool.keys()].filter(id => pool.get(id) === "unresolved_exterior").sort(rank);
-  const selected = anchors.length && unresolved.length ? [anchors[0], unresolved[0]] : [...anchors, ...unresolved].slice(0, 2);
+  const freshSource = sources.get(freshImageId);
+  const captureNeighbors = freshSource ? [...pool.keys()].map(id => ({ id, relation: captureRelation(freshSource, sources.get(id)) }))
+    .filter(row => row.relation.same_device_signature === true && row.relation.seconds_apart !== null && row.relation.seconds_apart <= 900 &&
+      row.relation.meters_apart !== null && row.relation.meters_apart <= 100)
+    .sort((a, b) => a.relation.seconds_apart! - b.relation.seconds_apart! || rank(a.id, b.id)) : [];
+  const captureFirst = captureNeighbors.length > 0;
+  const selected = captureFirst ? [captureNeighbors[0].id]
+    : anchors.length && unresolved.length ? [anchors[0], unresolved[0]] : [...anchors, ...unresolved].slice(0, 2);
   // Duplicate source bytes cannot provide a second view, even with another row ID.
   const hashes = new Set<string>(), familyRoots = new Set<string>();
   const freshRoot = sourceRoot(sources.get(freshImageId)); if (freshRoot) familyRoots.add(freshRoot);
@@ -123,8 +130,10 @@ export function projectResolutionContext(userId: string, freshImageId: string, s
   const image_ids = selected.filter(id => { const hash = sources.get(id)?.file_hash, root = sourceRoot(sources.get(id)) ?? id; if (!hash || hashes.has(hash) || familyRoots.has(root)) return false; hashes.add(hash); familyRoots.add(root); return true; });
   return { image_ids, coverage: { assessed: new Set([...assessed].map(id => sourceRoot(sources.get(id)) ?? id)).size, eligible: new Set([...pool.keys()].map(id => sourceRoot(sources.get(id)) ?? id)).size, excluded: new Set([...assessed].map(id => sourceRoot(sources.get(id)) ?? id)).size - new Set([...pool.keys()].map(id => sourceRoot(sources.get(id)) ?? id)).size,
     truncated: state.truncated || !subjectPrivacyLookupComplete([...sources.values()].filter(Boolean)) || pool.size > image_ids.length, as_of: state.as_of, context_available: image_ids.length > 0,
-    fresh_batch_size: image_ids.length ? 1 : 2,
-    selected: image_ids.map(image_id => ({ image_id, role: pool.get(image_id)!, basis: "bounded_least_co_read" })),
+    fresh_batch_size: captureFirst ? 2 : image_ids.length ? 1 : 2,
+    ...(captureFirst ? { capture_neighbor_first: true } : {}),
+    selected: image_ids.map(image_id => ({ image_id, role: pool.get(image_id)!,
+      basis: captureFirst ? "capture_proximity" as const : "bounded_least_co_read" as const })),
     scope: "latest_24_supported_subjects_and_32_retained_frames", global_novelty_asserted: false } };
 }
 

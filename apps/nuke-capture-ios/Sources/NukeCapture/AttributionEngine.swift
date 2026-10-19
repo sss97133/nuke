@@ -257,6 +257,7 @@ final class AttributionEngine: ObservableObject {
                         filing.refused > 0 ? "\(filing.refused) refused by the server" : nil,
                         "\(vinHits) serial reads"].compactMap { $0 }).joined(separator: " · ")
         NSLog("NukeCapture attribution: %@", lastSummary ?? "")
+        if !completedIDs.isEmpty { NotificationCenter.default.post(name: SubjectResolutionEngine.didChange, object: nil) }
         // The same pass report the sync writes (app_events, insert-only): what was filed, refused and
         // asked of the profile writer, so a pass that changes nothing can be seen from the server.
         let props: [String: AnyJSON] = [

@@ -36,6 +36,19 @@ final class SourceInboxTests: XCTestCase {
         try JSONDecoder().decode(SourceInboxRead.self, from: JSONSerialization.data(withJSONObject: value))
     }
 
+    func testPrivateVehicleReadBindsReadyPhotosToItsAcknowledgedVehicle() throws {
+        let vehicle = "33333333-3333-4333-8333-333333333333"
+        var payload = wire(), photos = try XCTUnwrap(payload["photos"] as? [[String: Any]])
+        photos[0]["attached_vehicle_id_context"] = vehicle
+        payload["photos"] = photos; payload["private_vehicle_id"] = vehicle
+        let read = try decode(payload)
+        XCTAssertTrue(read.isQualified)
+        XCTAssertEqual(read.private_vehicle_id, UUID(uuidString: vehicle))
+        photos[0]["attached_vehicle_id_context"] = other; payload["photos"] = photos
+        XCTAssertFalse(try decode(payload).isQualified)
+        XCTAssertNil(try decode(wire()).private_vehicle_id)
+    }
+
     func testSingleUnreadSourcePreservesUnknownIdentityAndPageCoverage() throws {
         let read = try decode(wire())
         XCTAssertTrue(read.isQualified)

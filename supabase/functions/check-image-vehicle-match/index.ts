@@ -35,7 +35,7 @@ interface CheckRequest extends SubjectRequest {
   source_filter?: string;
   dry_run?: boolean;
 
-  // Retained for old callers; sessions never substitute for per-image evidence.
+  // Legacy comparison knobs; source-bound capture sessions use their own validated context.
   use_sessions?: boolean;
   session_gap_minutes?: number;
 }
@@ -325,7 +325,12 @@ Deno.serve(async (req: Request) => {
         if (dryRun) return new Response(JSON.stringify({ error: "subject_preview_unavailable" }), {
           status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
-        const store = supabaseSubjectStore(supabase);
+        // Forward the already-validated end-user JWT to the existing authenticated
+        // writer. Service/operator calls cannot impersonate a customer here.
+        const identityClient = caller.caller.kind === "user" ? createClient(supabaseUrl,
+          Deno.env.get("SUPABASE_ANON_KEY")!, { global: { headers: { Authorization: req.headers.get("Authorization")! } },
+            auth: { persistSession: false, autoRefreshToken: false } }) : undefined;
+        const store = supabaseSubjectStore(supabase, identityClient);
         store.context = async (user, fresh) => {
           const context = await selectResolutionContext(supabase, user, fresh.id);
           return { sources: context.image_ids.length ? await store.sources(user, context.image_ids) : [], coverage: context.coverage };

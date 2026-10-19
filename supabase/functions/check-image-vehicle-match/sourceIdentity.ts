@@ -3,7 +3,7 @@ import {
   resolveImageAttributionLineage,
 } from "./sourceLineage.ts";
 
-export const SOURCE_IDENTITY_COLUMNS = "id,vehicle_id,user_id,source,image_url,file_hash,storage_path,taken_at,created_at,exif_data," +
+export const SOURCE_IDENTITY_COLUMNS = "id,vehicle_id,user_id,source,image_url,file_hash,storage_path,taken_at,created_at,exif_data,latitude,longitude,device_fingerprint,image_vehicle_match_status," +
   "is_superseded,superseded_by,superseded_at,is_duplicate,duplicate_of,is_document,is_sensitive,vision_gate_status";
 const AUDIT_COLUMNS = "id,observation_type,old_observation_id,new_observation_id,old_vehicle_id,new_vehicle_id,created_at";
 const MAX_RECEIPTS = 256, MAX_ROWS = 2048, MAX_AUDITS = 2048, CHUNK = 128;
