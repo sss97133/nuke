@@ -6,6 +6,7 @@ import XCTest
 import Supabase
 @testable import NukeCapture
 
+@MainActor
 final class DeviceAttributionTests: XCTestCase {
     private func capture(_ id: String, vin: String? = nil, exact: Bool = false,
                          time: String? = "2026-10-18T12:00:00Z", lat: Double? = 37,
