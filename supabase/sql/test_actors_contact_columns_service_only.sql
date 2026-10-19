@@ -1,4 +1,4 @@
--- Disposable PG17 only. Proves 20261019060000_actors_contact_columns_service_only.sql closes actors contact columns
+-- Disposable PG17 only. Proves 20261019060100_actors_contact_columns_service_only.sql closes actors contact columns
 -- to anon and authenticated while names, profile columns, the owner-run actor_profiles view and service reads stay.
 -- The fixture mirrors the live table, policies and grants read on 2026-10-19; it shows the leak first.
 \set ON_ERROR_STOP on
@@ -53,8 +53,8 @@ SET ROLE anon;
 SELECT t_assert((SELECT phone FROM public.actors) = '+15550100', 'before: anon reads actors.phone');
 RESET ROLE;
 
-\ir ../migrations/20261019060000_actors_contact_columns_service_only.sql
-\ir ../migrations/20261019060000_actors_contact_columns_service_only.sql
+\ir ../migrations/20261019060100_actors_contact_columns_service_only.sql
+\ir ../migrations/20261019060100_actors_contact_columns_service_only.sql
 
 SET ROLE anon;
 SELECT t_assert(t_refused('SELECT phone FROM public.actors'), 'anon: phone refused');
