@@ -193,8 +193,11 @@ export function organizationFace(id: string, org: J, supply: J | null): FacePage
   const kindWords = kinds.slice(0, 6).map(k => `${sentence(str(k.supply_kind)!).toLowerCase()} (${plural(num(k.times) ?? 0, 'purchase record')}${str(k.last_on) ? `, last ${str(k.last_on)}` : ''})`);
   const description = [type && type !== 'other' ? sentence(type) : null, where || null,
     kindWords.length ? `Supplies on record: ${kindWords.join('; ')}` : null].filter(Boolean).join(' · ') || `${name} on Nuke`;
-  const body = `<article><h1>${escapeHtml(name)}</h1><p>${escapeHtml(description)}.</p>` +
-    (kindWords.length ? '<p>Purchase records retained on Nuke, by kind of supply; amounts and payers are not shown.</p>' : '') + '</article>';
+  // One summary paragraph: what the record says about the organization, how it was counted, and what the page holds.
+  const summary = `${description}.` +
+    (kindWords.length ? ' Purchase records retained on Nuke, by kind of supply; amounts and payers are not shown.' : '') +
+    ' The page lists its vehicles and the work recorded on Nuke; contact goes through Nuke.';
+  const body = `<article><h1>${escapeHtml(name)}</h1><p>${escapeHtml(summary)}</p></article>`;
   return { title: `${name} | Nuke`, description, path: `/org/${id}`, type: 'website', body };
 }
 
