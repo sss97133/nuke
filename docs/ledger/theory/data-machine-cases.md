@@ -434,6 +434,11 @@ row; a duplicate ID alone is insufficient. The local replay proves admission, id
 and supersession refusal, with registry/provenance branches isolated. Earlier vehicle writes are
 separate and are not rolled back by an observation failure. Production delivery, full intake/RLS,
 typed capture bindings and fleet coverage remain separate evidence in the private ETL receipt.
+The next private PG17 counterexample changes only the stored clock by one microsecond. JavaScript
+millisecond equality falsely accepts it; the readback must also constrain `observed_at` through
+PostgreSQL's native timestamp equality. That refuses the different instant while accepting equivalent
+time-zone representations. This is a local receipt-verification assay, not evidence of production
+clock corruption or a new production admission; exact deployment/runtime stages stay in the receipt.
 
 **Next loop, staged 2026-10-18: explicit listing-capture custody.** The prospective
 `cab_listing_capture_v1` mode in the existing `ingest-observation` accepts only an original
