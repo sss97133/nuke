@@ -279,7 +279,7 @@
     "node-fetch": "^3.3.2",
     "openai": "^6.10.0",
     "pdf-parse": "^2.4.5",
-    "pdfjs-dist": "^5.4.449",
+    "pdfjs-dist": "^6.2.108",
     "pg": "^8.18.0",
     "playwright": "^1.58.1",
     "plist": "^3.1.0",
@@ -293,10 +293,10 @@
     "tar": "^7.5.11"
   },
   "devDependencies": {
-    "@anthropic-ai/sdk": "^0.71.2",
+    "@anthropic-ai/sdk": "^0.72.0",
     "@playwright/test": "^1.58.0",
     "glob": "^13.0.0",
     "ts-node": "^10.9.2",
-    "tsx": "^4.7.0"
+    "tsx": "^4.23.15"
   }
 }
